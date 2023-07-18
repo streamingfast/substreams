@@ -33,7 +33,7 @@ func NewModuleState(logger *zap.Logger, name string, segmenter *block.Segmenter,
 }
 
 func (s *ModuleState) getStore(ctx context.Context, exclusiveEndBlock uint64) (*store.FullKV, error) {
-	if s.lastBlockInStore == exclusiveEndBlock {
+	if s.lastBlockInStore == exclusiveEndBlock && s.cachedStore != nil {
 		return s.cachedStore, nil
 	}
 	loadStore := s.storeConfig.NewFullKV(s.logger)

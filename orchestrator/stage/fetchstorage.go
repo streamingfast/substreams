@@ -35,11 +35,13 @@ func (s *Stages) FetchStoresState(
 		conf := execoutConfigs.ConfigMap[mapperName]
 		// TODO: OPTIMIZATION: get the actual needed range for execOutputs to optimize lookup
 
-		files, err := conf.ListSnapshotFiles(ctx, bstream.NewInclusiveRange(0, upToBlock))
-		if err != nil {
-			return fmt.Errorf("fetching mapper storage state: %w", err)
+		if upToBlock != 0 {
+			files, err := conf.ListSnapshotFiles(ctx, bstream.NewInclusiveRange(0, upToBlock))
+			if err != nil {
+				return fmt.Errorf("fetching mapper storage state: %w", err)
+			}
+			mapperFiles = files
 		}
-		mapperFiles = files
 	}
 
 	// TODO: OPTIMIZATION: why load stores if there could be ExecOut data present

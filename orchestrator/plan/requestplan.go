@@ -47,7 +47,14 @@ type RequestPlan struct {
 	segmentInterval uint64
 }
 
-func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphInitBlock, resolvedStartBlock, linearHandoffBlock, exclusiveEndBlock uint64) *RequestPlan {
+func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphInitBlock, resolvedStartBlock, linearHandoffBlock, exclusiveEndBlock uint64, needsStores bool) *RequestPlan {
+	if exclusiveEndBlock != 0 && linearHandoffBlock > exclusiveEndBlock {
+		panic(fmt.Sprintf("invalid linearHandoff %d when building plan, it should always be capped at exclusiveEndBlock %d", linearHandoffBlock, exclusiveEndBlock))
+	}
+	if resolvedStartBlock < graphInitBlock {
+		panic(fmt.Errorf("start block cannot be prior to the lowest init block in the requested module graph (%d)", graphInitBlock))
+	}
+
 	segmenter := block.NewSegmenter(segmentInterval, graphInitBlock, exclusiveEndBlock)
 	plan := &RequestPlan{
 		segmentInterval: segmentInterval,
@@ -55,9 +62,6 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphIni
 	if linearHandoffBlock != exclusiveEndBlock {
 		// assumes exclusiveEndBlock isn't 0, because linearHandoffBlock cannot be 0
 		plan.LinearPipeline = block.NewRange(linearHandoffBlock, exclusiveEndBlock)
-	}
-	if resolvedStartBlock < graphInitBlock {
-		panic(fmt.Errorf("start block cannot be prior to the lowest init block in the requested module graph (%d)", graphInitBlock))
 	}
 	if resolvedStartBlock == linearHandoffBlock && graphInitBlock == resolvedStartBlock {
 		return plan
@@ -69,7 +73,9 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphIni
 			segmentIdx := segmenter.IndexForEndBlock(linearHandoffBlock)
 			endStoreBound = segmenter.Range(segmentIdx).StartBlock
 		}
-		plan.BuildStores = block.NewRange(graphInitBlock, endStoreBound)
+		if needsStores && endStoreBound > graphInitBlock {
+			plan.BuildStores = block.NewRange(graphInitBlock, endStoreBound)
+		}
 
 		startExecOutAtBlock := utils.MaxOf(resolvedStartBlock, graphInitBlock)
 		startExecOutAtSegment := segmenter.IndexForStartBlock(startExecOutAtBlock)
@@ -77,7 +83,9 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphIni
 		plan.WriteExecOut = block.NewRange(writeExecOutStartBlock, linearHandoffBlock)
 		plan.ReadExecOut = block.NewRange(resolvedStartBlock, linearHandoffBlock)
 	} else { /* dev mode */
-		plan.BuildStores = block.NewRange(graphInitBlock, linearHandoffBlock)
+		if needsStores {
+			plan.BuildStores = block.NewRange(graphInitBlock, linearHandoffBlock)
+		}
 		plan.WriteExecOut = nil
 	}
 	return plan

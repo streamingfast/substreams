@@ -16,6 +16,7 @@ func TestBuildConfig(t *testing.T) {
 		storeInterval             int
 		execOutInterval           int
 		productionMode            bool
+		needsStores               bool
 		graphInitBlock            uint64
 		resolvedStartBlock        uint64
 		linearHandoffBlock        uint64
@@ -32,6 +33,7 @@ func TestBuildConfig(t *testing.T) {
 			storeInterval:             100,
 			execOutInterval:           100,
 			productionMode:            false,
+			needsStores:               true,
 			graphInitBlock:            621,
 			resolvedStartBlock:        621,
 			linearHandoffBlock:        621,
@@ -41,12 +43,12 @@ func TestBuildConfig(t *testing.T) {
 			expectReadExecOutRange:    "nil",
 			expectLinearPipelineRange: "621-742",
 		},
-
 		{
 			name:                      "no parallel work to do dev mode",
 			storeInterval:             100,
 			execOutInterval:           100,
 			productionMode:            true,
+			needsStores:               true,
 			graphInitBlock:            621,
 			resolvedStartBlock:        621,
 			linearHandoffBlock:        621,
@@ -61,6 +63,7 @@ func TestBuildConfig(t *testing.T) {
 			storeInterval:             100,
 			execOutInterval:           100,
 			productionMode:            false,
+			needsStores:               true,
 			graphInitBlock:            621,
 			resolvedStartBlock:        738,
 			linearHandoffBlock:        738,
@@ -75,6 +78,7 @@ func TestBuildConfig(t *testing.T) {
 			storeInterval:             100,
 			execOutInterval:           100,
 			productionMode:            false,
+			needsStores:               true,
 			graphInitBlock:            621,
 			resolvedStartBlock:        738,
 			linearHandoffBlock:        738,
@@ -89,6 +93,7 @@ func TestBuildConfig(t *testing.T) {
 			storeInterval:             100,
 			execOutInterval:           100,
 			productionMode:            true,
+			needsStores:               true,
 			graphInitBlock:            621,
 			resolvedStartBlock:        738,
 			linearHandoffBlock:        742,
@@ -103,6 +108,7 @@ func TestBuildConfig(t *testing.T) {
 			storeInterval:             100,
 			execOutInterval:           100,
 			productionMode:            true,
+			needsStores:               true,
 			graphInitBlock:            621,
 			resolvedStartBlock:        738,
 			linearHandoffBlock:        800,
@@ -117,6 +123,7 @@ func TestBuildConfig(t *testing.T) {
 			storeInterval:             100,
 			execOutInterval:           100,
 			productionMode:            true,
+			needsStores:               true,
 			graphInitBlock:            0,
 			resolvedStartBlock:        0,
 			linearHandoffBlock:        10000,
@@ -131,6 +138,7 @@ func TestBuildConfig(t *testing.T) {
 			storeInterval:             100,
 			execOutInterval:           100,
 			productionMode:            true,
+			needsStores:               true,
 			graphInitBlock:            621,
 			resolvedStartBlock:        738,
 			linearHandoffBlock:        842,
@@ -145,6 +153,7 @@ func TestBuildConfig(t *testing.T) {
 			storeInterval:             100,
 			execOutInterval:           100,
 			productionMode:            true,
+			needsStores:               true,
 			graphInitBlock:            621,
 			resolvedStartBlock:        621,
 			linearHandoffBlock:        942,
@@ -159,6 +168,7 @@ func TestBuildConfig(t *testing.T) {
 			storeInterval:             100,
 			execOutInterval:           100,
 			productionMode:            true,
+			needsStores:               true,
 			graphInitBlock:            621,
 			resolvedStartBlock:        621,
 			linearHandoffBlock:        942,
@@ -169,10 +179,11 @@ func TestBuildConfig(t *testing.T) {
 			expectLinearPipelineRange: "942-0",
 		},
 		{
-			name:                      "g7. small segment, production",
+			name:                      "small segment, production",
 			storeInterval:             1000,
 			execOutInterval:           1000,
 			productionMode:            true,
+			needsStores:               true,
 			graphInitBlock:            5,
 			resolvedStartBlock:        10,
 			linearHandoffBlock:        20,
@@ -181,6 +192,36 @@ func TestBuildConfig(t *testing.T) {
 			expectWriteExecOutRange:   "5-20",
 			expectReadExecOutRange:    "10-20",
 			expectLinearPipelineRange: "nil",
+		},
+		{
+			name:                      "dev, no store",
+			storeInterval:             100,
+			execOutInterval:           100,
+			productionMode:            false,
+			needsStores:               false,
+			graphInitBlock:            5,
+			resolvedStartBlock:        105,
+			linearHandoffBlock:        105,
+			exclusiveEndBlock:         0,
+			expectStoresRange:         "nil",
+			expectWriteExecOutRange:   "nil",
+			expectReadExecOutRange:    "nil",
+			expectLinearPipelineRange: "105-0",
+		},
+		{
+			name:                      "prod, no store",
+			storeInterval:             100,
+			execOutInterval:           100,
+			productionMode:            true,
+			needsStores:               false,
+			graphInitBlock:            5,
+			resolvedStartBlock:        105,
+			linearHandoffBlock:        300,
+			exclusiveEndBlock:         0,
+			expectStoresRange:         "nil",
+			expectWriteExecOutRange:   "100-300",
+			expectReadExecOutRange:    "105-300",
+			expectLinearPipelineRange: "300-0",
 		},
 
 		// This panics because we don't accept a start block prior to the graph init block.
@@ -197,7 +238,7 @@ func TestBuildConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			res := BuildTier1RequestPlan(tt.productionMode, uint64(tt.storeInterval), tt.graphInitBlock, tt.resolvedStartBlock, tt.linearHandoffBlock, tt.exclusiveEndBlock)
+			res := BuildTier1RequestPlan(tt.productionMode, uint64(tt.storeInterval), tt.graphInitBlock, tt.resolvedStartBlock, tt.linearHandoffBlock, tt.exclusiveEndBlock, tt.needsStores)
 			assert.Equal(t, tt.expectStoresRange, tostr(res.BuildStores), "buildStores")
 			assert.Equal(t, tt.expectWriteExecOutRange, tostr(res.WriteExecOut), "writeExecOut")
 			assert.Equal(t, tt.expectLinearPipelineRange, tostr(res.LinearPipeline), "linearPipeline")

@@ -368,11 +368,18 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		opts...,
 	)
 
-
 	// FIXME: eventually, we could use the `orchestrator/plan.RequestPlan` object to
 	// tackle the `LinearHandoffBlockNum == StopBlockNum`, and the linear segment that
 	// needs to be produced.
 	// But it seems a bit more involved in here.
+
+	var needsStores bool
+	for _, stageLayer := range outputGraph.StagedUsedModules() {
+		if stageLayer.LastLayer().IsStoreLayer() {
+			needsStores = true
+			break
+		}
+	}
 
 	reqPlan := plan.BuildTier1RequestPlan(
 		requestDetails.ProductionMode,
@@ -381,6 +388,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		requestDetails.ResolvedStartBlockNum,
 		requestDetails.LinearHandoffBlockNum,
 		requestDetails.StopBlockNum,
+		needsStores,
 	)
 
 	logger.Info("initializing tier1 pipeline",

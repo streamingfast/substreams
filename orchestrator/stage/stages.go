@@ -107,6 +107,9 @@ func NewStages(
 		stage := NewStage(idx, kind, stageSegmenter, moduleStates)
 		out.stages = append(out.stages, stage)
 	}
+	if out.stages == nil {
+		panic("NewStages should never return empty stages")
+	}
 
 	out.initSegmentsOffset(reqPlan)
 

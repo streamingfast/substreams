@@ -42,15 +42,18 @@ func BuildParallelProcessor(
 	stages := stage.NewStages(ctx, outputGraph, reqPlan, storeConfigs, traceID)
 	sched.Stages = stages
 
-	err := stages.FetchStoresState(
-		ctx,
-		reqPlan.StoresSegmenter(),
-		storeConfigs,
-		execoutStorage,
-		traceID,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("fetch stores storage state: %w", err)
+	// we may be here only for mapper, without stores
+	if reqPlan.BuildStores != nil {
+		err := stages.FetchStoresState(
+			ctx,
+			reqPlan.StoresSegmenter(),
+			storeConfigs,
+			execoutStorage,
+			traceID,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("fetch stores storage state: %w", err)
+		}
 	}
 
 	if os.Getenv("SUBSTREAMS_DEBUG_SCHEDULER_STATE") == "true" {

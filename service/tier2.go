@@ -3,13 +3,14 @@ package service
 import (
 	"context"
 	"fmt"
+	"os"
+
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
 	tracing "github.com/streamingfast/sf-tracing"
-	"os"
 
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/metrics"
@@ -130,6 +131,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	fields := []zap.Field{
 		zap.Uint64("start_block", request.StartBlockNum),
 		zap.Uint64("stop_block", request.StopBlockNum),
+		zap.Uint32("stage", request.Stage),
 		zap.Strings("modules", moduleNames),
 		zap.String("output_module", request.OutputModule),
 	}

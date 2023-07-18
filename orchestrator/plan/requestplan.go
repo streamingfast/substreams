@@ -73,7 +73,7 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphIni
 			segmentIdx := segmenter.IndexForEndBlock(linearHandoffBlock)
 			endStoreBound = segmenter.Range(segmentIdx).StartBlock
 		}
-		if needsStores && endStoreBound > graphInitBlock {
+		if needsStores {
 			plan.BuildStores = block.NewRange(graphInitBlock, endStoreBound)
 		}
 

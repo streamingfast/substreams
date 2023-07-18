@@ -14,7 +14,6 @@ func TestBuildConfig(t *testing.T) {
 	type testStruct struct {
 		name                      string
 		storeInterval             int
-		execOutInterval           int
 		productionMode            bool
 		needsStores               bool
 		graphInitBlock            uint64
@@ -31,7 +30,6 @@ func TestBuildConfig(t *testing.T) {
 		{
 			name:                      "no parallel work to do prod mode",
 			storeInterval:             100,
-			execOutInterval:           100,
 			productionMode:            false,
 			needsStores:               true,
 			graphInitBlock:            621,
@@ -46,7 +44,6 @@ func TestBuildConfig(t *testing.T) {
 		{
 			name:                      "no parallel work to do dev mode",
 			storeInterval:             100,
-			execOutInterval:           100,
 			productionMode:            true,
 			needsStores:               true,
 			graphInitBlock:            621,
@@ -61,7 +58,6 @@ func TestBuildConfig(t *testing.T) {
 		{
 			name:                      "g1. dev mode with stop within same segment as start block",
 			storeInterval:             100,
-			execOutInterval:           100,
 			productionMode:            false,
 			needsStores:               true,
 			graphInitBlock:            621,
@@ -76,7 +72,6 @@ func TestBuildConfig(t *testing.T) {
 		{
 			name:                      "g2. dev mode with stop in next segment",
 			storeInterval:             100,
-			execOutInterval:           100,
 			productionMode:            false,
 			needsStores:               true,
 			graphInitBlock:            621,
@@ -91,7 +86,6 @@ func TestBuildConfig(t *testing.T) {
 		{
 			name:                      "g3. production with handoff and stop within same segment",
 			storeInterval:             100,
-			execOutInterval:           100,
 			productionMode:            true,
 			needsStores:               true,
 			graphInitBlock:            621,
@@ -106,7 +100,6 @@ func TestBuildConfig(t *testing.T) {
 		{
 			name:                      "similar to g3. production with handoff on boundary",
 			storeInterval:             100,
-			execOutInterval:           100,
 			productionMode:            true,
 			needsStores:               true,
 			graphInitBlock:            621,
@@ -121,7 +114,6 @@ func TestBuildConfig(t *testing.T) {
 		{
 			name:                      "production, handoff 10k and start/init is 0, stop infinity (0)",
 			storeInterval:             100,
-			execOutInterval:           100,
 			productionMode:            true,
 			needsStores:               true,
 			graphInitBlock:            0,
@@ -136,7 +128,6 @@ func TestBuildConfig(t *testing.T) {
 		{
 			name:                      "g4. production with handoff and stop in next segment",
 			storeInterval:             100,
-			execOutInterval:           100,
 			productionMode:            true,
 			needsStores:               true,
 			graphInitBlock:            621,
@@ -151,7 +142,6 @@ func TestBuildConfig(t *testing.T) {
 		{
 			name:                      "g5. production, start is init, start handoff and stop in three segments",
 			storeInterval:             100,
-			execOutInterval:           100,
 			productionMode:            true,
 			needsStores:               true,
 			graphInitBlock:            621,
@@ -166,7 +156,6 @@ func TestBuildConfig(t *testing.T) {
 		{
 			name:                      "g6. production, start is init, start and handoff in two segments, stop infinity",
 			storeInterval:             100,
-			execOutInterval:           100,
 			productionMode:            true,
 			needsStores:               true,
 			graphInitBlock:            621,
@@ -181,14 +170,13 @@ func TestBuildConfig(t *testing.T) {
 		{
 			name:                      "small segment, production",
 			storeInterval:             1000,
-			execOutInterval:           1000,
 			productionMode:            true,
 			needsStores:               true,
 			graphInitBlock:            5,
 			resolvedStartBlock:        10,
 			linearHandoffBlock:        20,
 			exclusiveEndBlock:         20,
-			expectStoresRange:         "nil",
+			expectStoresRange:         "5-5", // this 'empty' store range only exists to keep proper stage idx on execout mapper
 			expectWriteExecOutRange:   "5-20",
 			expectReadExecOutRange:    "10-20",
 			expectLinearPipelineRange: "nil",
@@ -196,7 +184,6 @@ func TestBuildConfig(t *testing.T) {
 		{
 			name:                      "dev, no store",
 			storeInterval:             100,
-			execOutInterval:           100,
 			productionMode:            false,
 			needsStores:               false,
 			graphInitBlock:            5,
@@ -211,7 +198,6 @@ func TestBuildConfig(t *testing.T) {
 		{
 			name:                      "prod, no store",
 			storeInterval:             100,
-			execOutInterval:           100,
 			productionMode:            true,
 			needsStores:               false,
 			graphInitBlock:            5,

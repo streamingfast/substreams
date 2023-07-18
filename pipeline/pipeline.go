@@ -155,15 +155,23 @@ func (p *Pipeline) InitTier1StoresAndBackprocess(ctx context.Context, reqPlan *p
 		return err
 	}
 
-	var storeMap store.Map
 	if reqPlan.BuildStores != nil {
-		if storeMap, err = p.runParallelProcess(ctx, reqPlan); err != nil {
+		storeMap, err := p.runParallelProcess(ctx, reqPlan)
+		if err != nil {
 			return fmt.Errorf("run_parallel_process failed: %w", err)
 		}
-	} else {
-		storeMap = p.setupEmptyStores(ctx)
+		p.stores.SetStoreMap(storeMap)
+		return nil
 	}
-	p.stores.SetStoreMap(storeMap)
+
+	// special case: no store, but production mode: does not return a storeMap
+	if reqPlan.WriteExecOut != nil {
+		if _, err := p.runParallelProcess(ctx, reqPlan); err != nil {
+			return fmt.Errorf("run_parallel_process failed: %w", err)
+		}
+	}
+
+	p.stores.SetStoreMap(p.setupEmptyStores(ctx))
 
 	return nil
 }

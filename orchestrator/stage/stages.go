@@ -58,6 +58,11 @@ func NewStages(
 	storeConfigs store.ConfigMap,
 	traceID string,
 ) (out *Stages) {
+
+	if reqPlan.BuildStores == nil && reqPlan.WriteExecOut == nil {
+		panic("internal error: new_stages should never be called with a req_plan without execout and buildstores")
+	}
+
 	logger := reqctx.Logger(ctx)
 
 	stagedModules := outputGraph.StagedUsedModules()
@@ -84,13 +89,12 @@ func NewStages(
 			continue
 		}
 
-		// TODO: what will happen if we have only a single _mapper_  module, and
-		// no stores? will the BuildStores requestPlan field be defined?
-		// Right now it is, but what if we had it distinct, and clearly distinct everywhere?
+		var segmenter *block.Segmenter
 
-		segmenter := reqPlan.StoresSegmenter()
 		if kind == KindMap {
 			segmenter = reqPlan.WriteOutSegmenter()
+		} else {
+			segmenter = reqPlan.StoresSegmenter()
 		}
 
 		var moduleStates []*ModuleState
@@ -107,9 +111,6 @@ func NewStages(
 		stage := NewStage(idx, kind, stageSegmenter, moduleStates)
 		out.stages = append(out.stages, stage)
 	}
-	if out.stages == nil {
-		panic("NewStages should never return empty stages")
-	}
 
 	out.initSegmentsOffset(reqPlan)
 
@@ -124,13 +125,17 @@ func layerKind(layer outputmodules.LayerModules) Kind {
 }
 
 func (s *Stages) AllStoresCompleted() bool {
+	if s.storeSegmenter == nil { // no store at all
+		return true
+	}
 	lastSegment := s.storeSegmenter.LastIndex()
 
 	for idx, stage := range s.stages {
 		if stage.kind != KindStore {
 			continue
 		}
-		if s.getState(Unit{Segment: lastSegment, Stage: idx}) != UnitCompleted {
+		state := s.getState(Unit{Segment: lastSegment, Stage: idx})
+		if state != UnitCompleted && state != UnitNoOp {
 			return false
 		}
 	}
@@ -327,8 +332,15 @@ func (s *Stages) NextJob() (Unit, *block.Range) {
 				continue
 			}
 
+			r := stage.segmenter.Range(unit.Segment)
+			if r.Len() == 0 {
+				// empty units get marked as completed automatically
+				s.markSegmentCompleted(unit)
+				continue
+			}
+
 			s.markSegmentScheduled(unit)
-			return unit, stage.segmenter.Range(unit.Segment)
+			return unit, r
 		}
 	}
 	return Unit{}, nil

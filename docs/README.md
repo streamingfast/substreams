@@ -29,7 +29,7 @@ The primary ways to use Substreams include:
 
 After installing Substreams and reviewing the Quickstart:
 
-* You can [learn more about modules](concepts-and-fundamentals/modules.md), and then [study the Developer's guide](developers-guide/overview.md).
+* You can l[earn more about ](developers-guide/modules/)modules, and then [study the Developer's guide](developers-guide/overview.md).
 
 Find pre-built Substreams by using the following resources:
 

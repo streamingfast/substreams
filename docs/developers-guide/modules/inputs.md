@@ -69,7 +69,7 @@ Define the `map` input type in the manifest and choose a name for the `map` refl
 ```
 {% endcode %}
 
-[Learn more about `maps`](../../concepts-and-fundamentals/modules.md#the-map-module-type) in the Substreams modules documentation.
+Learn more about `maps` in the [Modules](./) section.
 
 ## Input type `store`
 
@@ -147,5 +147,3 @@ message StoreDelta {
 }
 ```
 {% endcode %}
-
-[^1]: `source` input

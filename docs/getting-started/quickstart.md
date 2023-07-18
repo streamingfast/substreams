@@ -200,7 +200,7 @@ You have successfully created your first Substreams module that extracts data fr
 
 ## Next steps
 
-* [Modules basics](../concepts-and-fundamentals/modules.md)
+* [Modules](../developers-guide/modules/)
 * [Substreams fundamentals](../concepts-and-fundamentals/fundamentals.md)
 * [Protobuf schemas](../developers-guide/creating-protobuf-schemas.md)
 * [Substreams Template](https://github.com/streamingfast/substreams-template)

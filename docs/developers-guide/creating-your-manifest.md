@@ -66,7 +66,7 @@ View the [`substreams.yaml`](https://github.com/streamingfast/substreams-templat
 ## Manifest walkthrough
 
 {% hint style="success" %}
-**Tip**: When writing and checking your `substreams.yaml` file, it may help to check your manifest against our [JSON schema](https://json-schema.org/) to ensure there are no problems. JSON schemas can be used in [Jetbrains](https://www.jetbrains.com/help/idea/json.html#ws_json_schema_add_custom) and [VSCode](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml). Our manifest schema can be seen [here](../../schemas/manifest-schema.json).
+**Tip**: When writing and checking your `substreams.yaml` file, it may help to check your manifest against our [JSON schema](https://json-schema.org/) to ensure there are no problems. JSON schemas can be used in [Jetbrains](https://www.jetbrains.com/help/idea/json.html#ws\_json\_schema\_add\_custom) and [VSCode](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml). Our manifest schema can be seen [here](../../schemas/manifest-schema.json).
 {% endhint %}
 
 ### `protobuf.files`
@@ -83,7 +83,7 @@ The `protobuf.importPaths` contains the paths to the protobufs for the current S
 
 ## Module definitions
 
-The manifest defines a list of [modules](../concepts-and-fundamentals/modules.md) used in the Substreams module.
+The manifest defines a list of [modules](modules/) used in the Substreams module.
 
 The modules are Rust functions containing the business logic for the module.
 

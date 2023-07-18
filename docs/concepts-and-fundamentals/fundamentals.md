@@ -6,18 +6,19 @@ description: StreamingFast Substreams fundamental knowledge
 
 ## Fundamentals overview
 
-Substreams development involves using several different pieces of technology, including the [Substreams engine](fundamentals.md#the-substreams-engine), [`substreams` command line interface (CLI)](../reference-and-specs/command-line-interface.md), [modules](modules.md), [protobufs](../developers-guide/creating-protobuf-schemas.md), and various configuration files of different types. The documentation explains how these pieces fit together.
+Substreams development involves using several different pieces of technology, including the [Substreams engine](fundamentals.md#the-substreams-engine), [`substreams` command line interface (CLI)](../reference-and-specs/command-line-interface.md), [modules](../developers-guide/modules/), [protobufs](../developers-guide/creating-protobuf-schemas.md), and various configuration files of different types. The documentation explains how these pieces fit together.
 
 <figure><img src="../.gitbook/assets/substreams-breakdown-in-action.png" alt=""><figcaption><p>Substreams in Action</p></figcaption></figure>
 
 ### The process to use Substreams includes:
 
-* Choosing the blockchain to capture and process data.
-* Identifying interesting smart contract addresses, including wallets and decentralized exchanges (DEXs).
-* Identifying data and defining and creating protobufs.
-* Writing Rust Substreams module handler functions.
-* Updating the Substreams manifest to reference the protobufs and module handlers.
-* Using the [`substreams` CLI](../reference-and-specs/command-line-interface.md) to send commands and view results.
+* Choose the blockchain to capture and process data.
+* Identify interesting smart contract addresses (like DEXs or interesting wallet addresses).
+* Identify the data and defining and creating protobufs.
+* Find already-built Substreams modules and consume their streams, or:
+* Write Rust Substreams module handler functions.
+* Update the Substreams manifest to reference the protobufs and module handlers.
+* Use the [`substreams` CLI](../reference-and-specs/command-line-interface.md) to send commands and view results.
 
 ### **The Substreams engine**
 
@@ -44,7 +45,7 @@ The data flow is [defined in the Substreams manifest](../reference-and-specs/man
 Substreams modules are composed through a [directed acyclic graph](https://en.wikipedia.org/wiki/Directed\_acyclic\_graph) (DAG).
 
 {% hint style="info" %}
-**Note**: In DAGs, data flows from one module to another in a one-directional manner, governed by the fundamental rules and principles of DAGs.
+**Note**: In DAGs, data flows from one module to another in a one-directional manner, with no cycle, similar to Git's model of commits and branches.
 {% endhint %}
 
 The Substreams manifest references the modules and the handlers defined within them, forming the intention of how they are used by the Substreams engine.

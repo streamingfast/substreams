@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -72,6 +74,7 @@ func NewTier1(
 	hub *hub.ForkableHub,
 
 	stateStore dstore.Store,
+	defaultCacheTag string,
 
 	blockType string,
 
@@ -92,6 +95,7 @@ func NewTier1(
 		10,
 		0,
 		stateStore,
+		defaultCacheTag,
 		func(logger *zap.Logger) work.Worker {
 			return work.NewRemoteWorker(clientFactory, logger)
 		},
@@ -122,10 +126,6 @@ func NewTier1(
 	}
 
 	return s
-}
-
-func (s *Tier1Service) BaseStateStore() dstore.Store {
-	return s.runtimeConfig.BaseObjectStore
 }
 
 func (s *Tier1Service) BlockType() string {
@@ -213,9 +213,6 @@ func (s *Tier1Service) Blocks(
 		return err
 	}
 
-	if err := s.writePackage(ctx, request, outputGraph); err != nil {
-		logger.Warn("cannot write package", zap.Error(err))
-	}
 	// On app shutdown, we cancel the running '.blocks()' command,
 	// we catch this situation via IsTerminating() to return a special error.
 	runningContext, cancelRunning := context.WithCancel(ctx)
@@ -263,7 +260,8 @@ func (s *Tier1Service) writePackage(ctx context.Context, request *pbsubstreamsrp
 		return fmt.Errorf("marshalling package: %w", err)
 	}
 
-	moduleStore, err := s.runtimeConfig.BaseObjectStore.SubStore(outputGraph.ModuleHashes().Get(request.OutputModule))
+	modulePath := filepath.Join(reqctx.Details(ctx).CacheTag, outputGraph.ModuleHashes().Get(request.OutputModule))
+	moduleStore, err := s.runtimeConfig.BaseObjectStore.SubStore(modulePath)
 	if err != nil {
 		return fmt.Errorf("getting substore: %w", err)
 	}
@@ -279,6 +277,8 @@ func (s *Tier1Service) writePackage(ctx context.Context, request *pbsubstreamsrp
 	return nil
 }
 
+var IsValidCacheTag = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`).MatchString
+
 func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Request, outputGraph *outputmodules.Graph, respFunc substreams.ResponseFunc) error {
 	logger := reqctx.Logger(ctx)
 
@@ -288,12 +288,21 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	}
 
 	requestDetails.MaxParallelJobs = s.runtimeConfig.DefaultParallelSubrequests
+	requestDetails.CacheTag = s.runtimeConfig.DefaultCacheTag
 	if auth := dauth.FromContext(ctx); auth != nil {
 		if parallelJobs := auth.Get("X-Sf-Substreams-Parallel-Jobs"); parallelJobs != "" {
 			if ll, err := strconv.ParseUint(parallelJobs, 10, 64); err == nil {
 				requestDetails.MaxParallelJobs = ll
 			}
 		}
+		if cacheTag := auth.Get("X-Sf-Substreams-Cache-Tag"); cacheTag != "" {
+			if IsValidCacheTag(cacheTag) {
+				requestDetails.CacheTag = cacheTag
+			} else {
+				return fmt.Errorf("invalid value for X-Sf-Substreams-Cache-Tag %s, should only contain letters, numbers, hyphens and undescores", cacheTag)
+			}
+		}
+
 	}
 
 	if s.runtimeConfig.WithRequestStats {
@@ -319,18 +328,27 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		ctx = reqctx.WithModuleExecutionTracing(ctx)
 	}
 
+	if err := s.writePackage(ctx, request, outputGraph); err != nil {
+		logger.Warn("cannot write package", zap.Error(err))
+	}
+
 	if err := outputGraph.ValidateRequestStartBlock(requestDetails.ResolvedStartBlockNum); err != nil {
 		return stream.NewErrInvalidArg(err.Error())
 	}
 
 	wasmRuntime := wasm.NewRegistry(s.wasmExtensions, s.runtimeConfig.MaxWasmFuel)
 
-	execOutputConfigs, err := execout.NewConfigs(s.runtimeConfig.BaseObjectStore, outputGraph.UsedModules(), outputGraph.ModuleHashes(), s.runtimeConfig.CacheSaveInterval, logger)
+	cacheStore, err := s.runtimeConfig.BaseObjectStore.SubStore(requestDetails.CacheTag)
+	if err != nil {
+		return fmt.Errorf("internal error setting store: %w", err)
+	}
+
+	execOutputConfigs, err := execout.NewConfigs(cacheStore, outputGraph.UsedModules(), outputGraph.ModuleHashes(), s.runtimeConfig.CacheSaveInterval, logger)
 	if err != nil {
 		return fmt.Errorf("new config map: %w", err)
 	}
 
-	storeConfigs, err := store.NewConfigMap(s.runtimeConfig.BaseObjectStore, outputGraph.Stores(), outputGraph.ModuleHashes(), tracing.GetTraceID(ctx).String())
+	storeConfigs, err := store.NewConfigMap(cacheStore, outputGraph.Stores(), outputGraph.ModuleHashes(), tracing.GetTraceID(ctx).String())
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}

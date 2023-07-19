@@ -20,6 +20,7 @@ type RequestDetails struct {
 	LinearHandoffBlockNum uint64
 	StopBlockNum          uint64
 	MaxParallelJobs       uint64
+	CacheTag              string
 	UniqueID              uint64
 
 	ProductionMode bool

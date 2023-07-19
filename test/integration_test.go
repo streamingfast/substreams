@@ -506,12 +506,18 @@ func listFiles(t *testing.T, tempDir string) []string {
 func assertFiles(t *testing.T, tempDir string, wantedFiles ...string) {
 	producedFiles := listFiles(t, tempDir)
 
-	actualFiles := make([]string, len(producedFiles))
-	for i, f := range producedFiles {
+	actualFiles := make([]string, 0, len(producedFiles))
+	var seenPartialSpkg bool
+	for _, f := range producedFiles {
 		parts := strings.Split(f, string(os.PathSeparator))
-		actualFiles[i] = filepath.Join(parts[3:]...)
+		if parts[len(parts)-1] == "substreams.partial.spkg" {
+			seenPartialSpkg = true
+			continue
+		}
+		actualFiles = append(actualFiles, filepath.Join(parts[4:]...))
 	}
 
+	assert.True(t, seenPartialSpkg, "substreams.partial.spkg should be produced")
 	assert.ElementsMatch(t, wantedFiles, actualFiles)
 }
 
@@ -523,7 +529,7 @@ func partialPreWork(t *testing.T, start, end uint64, stageIdx int, run *testRun,
 	// caller to `partialPreWork` doesn't need to be changed too much? :)
 	segmenter := block.NewSegmenter(10, 0, 0)
 	unit := stage.Unit{Segment: segmenter.IndexForStartBlock(start), Stage: stageIdx}
-	ctx := reqctx.WithRequest(run.Context, &reqctx.RequestDetails{Modules: run.Package.Modules, OutputModule: run.ModuleName})
+	ctx := reqctx.WithRequest(run.Context, &reqctx.RequestDetails{Modules: run.Package.Modules, OutputModule: run.ModuleName, CacheTag: "tag"})
 	cmd := worker.Work(ctx, unit, block.NewRange(start, end), []string{run.ModuleName}, nil)
 	result := cmd()
 	msg, ok := result.(work.MsgJobSucceeded)

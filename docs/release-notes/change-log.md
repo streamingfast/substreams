@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Backend changes
 
 * Massive refactoring of the scheduler: prevent excessive splitting of jobs, grouping them into stages when they have the same dependencies. This should significantly reduce the required resources for running substreams tier2 workers.
+* `StateStoreURL` config can now be used in conjunction with `StateStoreDefaultTag` (ex: `v2`), which will be appended to the store URL. Users will be able to point to a different state store (ex: stay on `/my/store/v2` while default path is now `/my/store/v3`) by providing a `X-Sf-Substreams-Cache-Tag` header (gated by auth module) .
 
 ### CLI changes
 

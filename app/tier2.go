@@ -21,9 +21,10 @@ type Tier2Config struct {
 	GRPCListenAddr       string // gRPC address where this app will listen to
 	ServiceDiscoveryURL  *url.URL
 
-	StateStoreURL   string
-	StateBundleSize uint64
-	BlockType       string
+	StateStoreURL        string
+	StateStoreDefaultTag string
+	StateBundleSize      uint64
+	BlockType            string
 
 	WASMExtensions  []wasm.WASMExtensioner
 	PipelineOptions []pipeline.PipelineOptioner
@@ -92,7 +93,7 @@ func (a *Tier2App) Run() error {
 		a.logger,
 		mergedBlocksStore,
 		stateStore,
-		a.config.StateBundleSize,
+		a.config.StateStoreDefaultTag,
 		a.config.BlockType,
 		opts...,
 	)

@@ -46,7 +46,7 @@ func NewTier2(
 	mergedBlocksStore dstore.Store,
 
 	stateStore dstore.Store,
-	stateBundleSize uint64,
+	defaultCacheTag string,
 
 	blockType string,
 	opts ...Option,
@@ -60,6 +60,7 @@ func NewTier2(
 		0, // tier2 don't send subrequests
 		0, // tier2 don't send subrequests
 		stateStore,
+		defaultCacheTag,
 		nil,
 	)
 	s = &Tier2Service{
@@ -82,10 +83,6 @@ func NewTier2(
 	}
 
 	return s
-}
-
-func (s *Tier2Service) BaseStateStore() dstore.Store {
-	return s.runtimeConfig.BaseObjectStore
 }
 
 func (s *Tier2Service) BlockType() string {
@@ -168,6 +165,17 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		ctx = reqctx.WithModuleExecutionTracing(ctx)
 	}
 
+	requestDetails.CacheTag = s.runtimeConfig.DefaultCacheTag
+	if auth := dauth.FromContext(ctx); auth != nil {
+		if cacheTag := auth.Get("X-Sf-Substreams-Cache-Tag"); cacheTag != "" {
+			if IsValidCacheTag(cacheTag) {
+				requestDetails.CacheTag = cacheTag
+			} else {
+				return fmt.Errorf("invalid value for X-Sf-Substreams-Cache-Tag %s, should only contain letters, numbers, hyphens and undescores", cacheTag)
+			}
+		}
+	}
+
 	if s.runtimeConfig.WithRequestStats {
 		var requestStats metrics.Stats
 		ctx, requestStats = setupRequestStats(ctx, requestDetails, outputGraph, true)
@@ -180,12 +188,17 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 
 	wasmRuntime := wasm.NewRegistry(s.wasmExtensions, s.runtimeConfig.MaxWasmFuel)
 
-	execOutputConfigs, err := execout.NewConfigs(s.runtimeConfig.BaseObjectStore, outputGraph.UsedModules(), outputGraph.ModuleHashes(), s.runtimeConfig.CacheSaveInterval, logger)
+	cacheStore, err := s.runtimeConfig.BaseObjectStore.SubStore(requestDetails.CacheTag)
+	if err != nil {
+		return fmt.Errorf("internal error setting store: %w", err)
+	}
+
+	execOutputConfigs, err := execout.NewConfigs(cacheStore, outputGraph.UsedModules(), outputGraph.ModuleHashes(), s.runtimeConfig.CacheSaveInterval, logger)
 	if err != nil {
 		return fmt.Errorf("new config map: %w", err)
 	}
 
-	storeConfigs, err := store.NewConfigMap(s.runtimeConfig.BaseObjectStore, outputGraph.Stores(), outputGraph.ModuleHashes(), traceID)
+	storeConfigs, err := store.NewConfigMap(cacheStore, outputGraph.Stores(), outputGraph.ModuleHashes(), traceID)
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}

@@ -30,9 +30,10 @@ type Tier1Config struct {
 	GRPCShutdownGracePeriod time.Duration // The duration we allow for gRPC connections to terminate gracefully prior forcing shutdown
 	ServiceDiscoveryURL     *url.URL
 
-	StateStoreURL   string
-	StateBundleSize uint64
-	BlockType       string
+	StateStoreURL        string
+	StateStoreDefaultTag string
+	StateBundleSize      uint64
+	BlockType            string
 
 	MaxSubrequests       uint64
 	SubrequestsSize      uint64
@@ -163,6 +164,7 @@ func (a *Tier1App) Run() error {
 		forkedBlocksStore,
 		forkableHub,
 		stateStore,
+		a.config.StateStoreDefaultTag,
 		a.config.BlockType,
 		a.config.MaxSubrequests,
 		a.config.SubrequestsSize,

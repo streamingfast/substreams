@@ -18,6 +18,7 @@ type RuntimeConfig struct {
 	// derives substores `states/`, for `store` modules snapshots (full and partial)
 	// and `outputs/` for execution output of both `map` and `store` module kinds
 	BaseObjectStore dstore.Store
+	DefaultCacheTag string // appended to BaseObjectStore unless overriden by auth layer
 	WorkerFactory   work.WorkerFactory
 
 	WithRequestStats       bool
@@ -31,6 +32,7 @@ func NewRuntimeConfig(
 	maxJobsAhead uint64,
 	maxWasmFuel uint64,
 	baseObjectStore dstore.Store,
+	defaultCacheTag string,
 	workerFactory work.WorkerFactory,
 ) RuntimeConfig {
 	return RuntimeConfig{
@@ -40,6 +42,7 @@ func NewRuntimeConfig(
 		MaxJobsAhead:               maxJobsAhead,
 		MaxWasmFuel:                maxWasmFuel,
 		BaseObjectStore:            baseObjectStore,
+		DefaultCacheTag:            defaultCacheTag,
 		WorkerFactory:              workerFactory,
 		// overridden by Tier Options
 		ModuleExecutionTracing: false,

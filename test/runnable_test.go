@@ -248,9 +248,11 @@ func processInternalRequest(
 	baseStoreStore, err := dstore.NewStore(filepath.Join(testTempDir, "test.store"), "", "none", true)
 	require.NoError(t, err)
 
+	taggedStore, err := baseStoreStore.SubStore("tag")
+	require.NoError(t, err)
 	tr := &TestRunner{
 		t:                      t,
-		baseStoreStore:         baseStoreStore,
+		baseStoreStore:         taggedStore,
 		blockProcessedCallBack: blockProcessedCallBack,
 		blockGeneratorFactory:  newGenerator,
 	}
@@ -261,6 +263,7 @@ func processInternalRequest(
 		0,
 		0,
 		baseStoreStore,
+		"tag",
 		workerFactory,
 	)
 	svc := service.TestNewServiceTier2(runtimeConfig, tr.StreamFactory)
@@ -287,9 +290,12 @@ func processRequest(
 	baseStoreStore, err := dstore.NewStore(filepath.Join(testTempDir, "test.store"), "", "none", true)
 	require.NoError(t, err)
 
+	taggedStore, err := baseStoreStore.SubStore("tag")
+	require.NoError(t, err)
+
 	tr := &TestRunner{
 		t:                      t,
-		baseStoreStore:         baseStoreStore,
+		baseStoreStore:         taggedStore,
 		blockProcessedCallBack: blockProcessedCallBack,
 		blockGeneratorFactory:  newGenerator,
 	}
@@ -300,6 +306,7 @@ func processRequest(
 		10,
 		0,
 		baseStoreStore,
+		"tag",
 		workerFactory,
 	)
 	svc := service.TestNewService(runtimeConfig, linearHandoffBlockNum, tr.StreamFactory)

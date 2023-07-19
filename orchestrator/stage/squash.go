@@ -1,6 +1,7 @@
 package stage
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -98,8 +99,7 @@ func (s *Stages) singleSquash(stage *Stage, modState *ModuleState, mergeUnit Uni
 		metrics.saveEnd = time.Now()
 
 		stage.asyncWork.Go(func() error {
-			// TODO: could this cause an issue if the writing takes more time than when trying to opening the file??
-			return writer.Write(s.ctx)
+			return writer.Write(context.Background()) // always write files here even if the request was cancelled.
 		})
 	}
 

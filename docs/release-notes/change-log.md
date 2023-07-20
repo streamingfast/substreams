@@ -12,10 +12,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Backend changes
 
-* Massive refactoring of the scheduler: prevent excessive splitting of jobs, grouping them into stages when they have the same dependencies. This should significantly reduce the required resources for running substreams tier2 workers.
-* `StateStoreURL` config can now be used in conjunction with `StateStoreDefaultTag` (ex: `v2`), which will be appended to the store URL. Users will be able to point to a different state store (ex: stay on `/my/store/v2` while default path is now `/my/store/v3`) by providing a `X-Sf-Substreams-Cache-Tag` header (gated by auth module) .
+* Massive refactoring of the scheduler: prevent excessive splitting of jobs, grouping them into stages when they have the same dependencies. This should significantly reduce the required resources for running Substreams `tier2` workers. We expect a
+
+* The `tier1` and `tier2` config have a new configuration `StateStoreDefaultTag`, if non-empty, it which will be appended to the value `StateStoreURL` to form the final state store URL. Users will be able to point to a different state store (ex: stay on `/my/store/v2` while default path is now `/my/store/v3`) by providing a `X-Sf-Substreams-Cache-Tag` header (gated by auth module).
+
 * Authentication plugin `trust` can now specify an exclusive list of `allowed` headers (all lowercase), ex: `trust://?allowed=x-sf-user-id,x-sf-api-key-id,x-real-ip,x-sf-substreams-cache-tag`
-* Tier2 no longer has customizable auth plugin (or any Modules). `trust` will always be used, so that Tier1 can pass down its headers (ex: X-Sf-Substreams-Cache-Tag)
+
+* The `tier2` app no longer has customizable auth plugin (or any Modules), `trust` will always be used, so that `tier` can pass down its headers (e.g. `X-Sf-Substreams-Cache-Tag`).
 
 ### CLI changes
 

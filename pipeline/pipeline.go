@@ -10,8 +10,6 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 
-	"github.com/streamingfast/dauth"
-
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/orchestrator"
 	"github.com/streamingfast/substreams/orchestrator/plan"
@@ -268,7 +266,7 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 	logger.Info("starting parallel processing")
 
 	t0 := time.Now()
-	storeMap, err = parallelProcessor.Run(dauth.FromContext(ctx).ToOutgoingGRPCContext(ctx))
+	storeMap, err = parallelProcessor.Run(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("parallel processing run: %w", err)
 	}

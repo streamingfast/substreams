@@ -7,6 +7,7 @@ import (
 	"io"
 	"sync/atomic"
 
+	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/derr"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -160,6 +161,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 		zap.String("output_module", request.OutputModule),
 	)
 
+	ctx = dauth.FromContext(ctx).ToOutgoingGRPCContext(ctx)
 	stream, err := grpcClient.ProcessRange(ctx, request, grpcCallOpts...)
 	if err != nil {
 		if ctx.Err() != nil {

@@ -3,9 +3,12 @@ package tools
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
+	"google.golang.org/grpc/metadata"
 
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
@@ -24,6 +27,7 @@ func init() {
 	tier2CallCmd.Flags().StringP("substreams-endpoint", "e", "mainnet.eth.streamingfast.io:443", "Substreams gRPC endpoint")
 	tier2CallCmd.Flags().Bool("insecure", false, "Skip certificate validation on GRPC connection")
 	tier2CallCmd.Flags().Bool("plaintext", false, "Establish GRPC connection in plaintext")
+	tier2CallCmd.Flags().StringSliceP("header", "H", nil, "Additional headers to be sent in the substreams request")
 
 	tier2CallCmd.Flags().StringArrayP("params", "p", nil, "Set a params for parameterizable modules. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
 
@@ -62,6 +66,17 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("new internal client: %w", err)
 	}
+	//parse additional-headers flag
+	additionalHeaders := mustGetStringSlice(cmd, "header")
+	if additionalHeaders != nil {
+		res := parseHeaders(additionalHeaders)
+		headerArray := make([]string, 0, len(res)*2)
+		for k, v := range res {
+			headerArray = append(headerArray, k, v)
+		}
+		fmt.Println("the header array is this", headerArray)
+		ctx = metadata.AppendToOutgoingContext(ctx, headerArray...)
+	}
 
 	req, err := ssClient.ProcessRange(ctx, &pbssinternal.ProcessRangeRequest{
 		StartBlockNum: uint64(startBlock),
@@ -84,4 +99,20 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// util to parse headers flags
+func parseHeaders(headers []string) map[string]string {
+	if headers == nil {
+		return nil
+	}
+	result := make(map[string]string)
+	for _, header := range headers {
+		parts := strings.Split(header, ":")
+		if len(parts) != 2 {
+			log.Fatalf("invalid header format: %s", header)
+		}
+		result[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+	}
+	return result
 }

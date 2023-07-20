@@ -9,6 +9,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/blockstream"
 	"github.com/streamingfast/bstream/hub"
+	dauth "github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/shutter"
@@ -20,6 +21,13 @@ import (
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
 )
+
+type Tier1Modules struct {
+	// Required dependencies
+	Authenticator         dauth.Authenticator
+	HeadTimeDriftMetric   *dmetrics.HeadTimeDrift
+	HeadBlockNumberMetric *dmetrics.HeadBlockNum
+}
 
 type Tier1Config struct {
 	MergedBlocksStoreURL    string
@@ -51,12 +59,12 @@ type Tier1Config struct {
 type Tier1App struct {
 	*shutter.Shutter
 	config  *Tier1Config
-	modules *Modules
+	modules *Tier1Modules
 	logger  *zap.Logger
 	isReady *atomic.Bool
 }
 
-func NewTier1(logger *zap.Logger, config *Tier1Config, modules *Modules) *Tier1App {
+func NewTier1(logger *zap.Logger, config *Tier1Config, modules *Tier1Modules) *Tier1App {
 	return &Tier1App{
 		Shutter: shutter.New(),
 		config:  config,

@@ -393,10 +393,26 @@ func (p *Pipeline) returnInternalModuleProgressOutputs(clock *pbsubstreams.Clock
 			p.lastProgressSent = time.Now()
 			out := &pbssinternal.ProcessRangeResponse{
 				ModuleName: p.processingModule.name,
-				Type: &pbssinternal.ProcessRangeResponse_ProcessedRange{
-					ProcessedRange: &pbssinternal.BlockRange{
-						StartBlock: p.processingModule.initialBlockNum,
-						EndBlock:   clock.Number,
+				Type: &pbssinternal.ProcessRangeResponse_Update{
+					Update: &pbssinternal.Update{
+						ProcessedBlocks: clock.Number - p.processingModule.initialBlockNum,
+						//	DurationSecs:
+						//
+						// TotalBytesRead:
+						// TotalBytesWritten
+						//ModulesStats: []*pbssinternal.ModuleStats{
+						//{
+						//	Name
+						//	ProcessingTimeSecs
+						//	ExternalCallsTimeSecs
+						//	ExternalCallsCount
+						//	StoreOperationsTimeSecs
+						//	StoreReadsCount
+						//	StoreWritesCount
+						//	StoreDeleteprefixCount
+						//	StoreSizeBytes
+						//},
+						//},
 					},
 				},
 			}

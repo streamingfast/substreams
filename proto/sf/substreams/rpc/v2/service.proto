@@ -130,6 +130,37 @@ message OutputDebugInfo {
 
 message ModulesProgress {
   repeated ModuleProgress modules = 1;
+  repeated Job running_jobs = 2;
+  repeated ModuleStats modules_stats = 3;
+}
+
+message Job {
+    uint64 stage = 1;
+    repeated string modules = 2;
+    uint64 start_block = 3;
+    uint64 stop_block = 4;
+    uint64 processed_blocks = 5;
+    uint64 duration_secs = 6;
+}
+
+message ModuleStats {
+    string name = 1;
+
+    // total_processed_blocks includes duplicate for each stage going over that module
+    uint64 total_processed_blocks = 2;
+    uint64 highest_processed_block = 3;
+    uint64 total_processing_time_secs = 4;
+    uint64 total_external_calls_time_secs = 5;
+    uint64 total_external_calls_count = 6;
+    uint64 total_store_operations_time_secs = 7;
+    uint64 total_store_reads_count = 8;
+    uint64 total_errors_count = 9;
+
+    // store-specific (will be 0 on mappers)
+    uint64 total_store_writes_count = 10;
+    uint64 total_store_deleteprefix_count = 11;
+    uint64 store_size_bytes = 12;
+    uint64 highest_merged_block = 13;
 }
 
 message ModuleProgress {

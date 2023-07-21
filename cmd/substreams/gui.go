@@ -93,7 +93,8 @@ func runGui(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
-	if err := manifest.ApplyParams(mustGetStringArray(cmd, "params"), pkg); err != nil {
+	params := mustGetStringArray(cmd, "params")
+	if err := manifest.ApplyParams(params, pkg); err != nil {
 		return err
 	}
 
@@ -135,6 +136,7 @@ func runGui(cmd *cobra.Command, args []string) error {
 		StartBlock:                  startBlock,
 		StopBlock:                   stopBlock,
 		FinalBlocksOnly:             mustGetBool(cmd, "final-blocks-only"),
+		Params:                      params,
 	}
 
 	ui, err := tui2.New(requestConfig)

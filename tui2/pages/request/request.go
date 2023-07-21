@@ -43,6 +43,7 @@ type RequestConfig struct {
 	HomeDir                     string
 	Vcr                         bool
 	Cursor                      string
+	Params                      []string
 }
 
 type RequestInstance struct {
@@ -66,6 +67,7 @@ type Request struct {
 	resolvedStartBlock uint64
 	linearHandoffBlock uint64
 	parallelWorkers    uint64
+	params             map[string][]string
 }
 
 func New(c common.Common) *Request {
@@ -89,6 +91,17 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case NewRequestInstance:
 		r.RequestSummary = msg.RequestSummary
 		r.Modules = msg.Modules
+
+		r.params = make(map[string][]string)
+		if msg.RequestSummary.Params != nil {
+			for _, p := range msg.RequestSummary.Params {
+				kv := strings.SplitN(p, "=", 2)
+				if len(kv) != 2 {
+					panic("invalid params in gui")
+				}
+				r.params[kv[0]] = append(r.params[kv[0]], kv[1])
+			}
+		}
 		r.setModulesViewContent()
 	case tea.KeyMsg:
 		var cmd tea.Cmd
@@ -124,6 +137,7 @@ func (r *Request) renderRequestSummary() string {
 		"Package: ",
 		"Endpoint: ",
 		"Start Block: ",
+		"Parameters: ",
 		"Production mode: ",
 		"Trace ID: ",
 		"Parallel Workers: ",
@@ -138,6 +152,7 @@ func (r *Request) renderRequestSummary() string {
 		fmt.Sprintf("%s", summary.Manifest),
 		fmt.Sprintf("%s", summary.Endpoint),
 		fmt.Sprintf("%d%s", r.resolvedStartBlock, handoffStr),
+		strings.Join(summary.Params, ", "),
 		fmt.Sprintf("%v", summary.ProductionMode),
 		r.traceId,
 		fmt.Sprintf("%d", r.parallelWorkers),
@@ -187,7 +202,11 @@ func (r *Request) getViewportContent() (string, error) {
 		output += fmt.Sprintf("	Initial block: %v\n", module.InitialBlock)
 		output += fmt.Sprintln("	Inputs: ")
 		for i := range module.Inputs {
-			output += fmt.Sprintf("		- %s\n", module.Inputs[i])
+			if module.Inputs[i].GetParams() != nil && r.params[module.Name] != nil {
+				output += fmt.Sprintf("		- params: [%s]\n", strings.Join(r.params[module.Name], ", "))
+			} else {
+				output += fmt.Sprintf("		- %s\n", module.Inputs[i])
+			}
 		}
 		output += fmt.Sprintln("	Outputs: ")
 		output += fmt.Sprintf("		- %s\n", module.Output)
@@ -212,15 +231,19 @@ func (r *Request) getViewPortDropdown(metadata *pbsubstreams.PackageMetadata, mo
 func glamouriseModuleDoc(metadata *pbsubstreams.PackageMetadata, module *pbsubstreams.Module) (string, error) {
 	markdown := ""
 
-	markdown += "# " + fmt.Sprintf("docs: \n")
-	markdown += "\n"
 	if metadata.GetDoc() != "" {
-		markdown += "[doc]: " + "" + metadata.GetDoc()
+		markdown += "# " + fmt.Sprintf("docs: \n")
+		markdown += "\n"
+		markdown += metadata.GetDoc()
 		markdown += "\n"
 	}
 	markdown += "\n\n"
 
-	out, err := glamour.Render(markdown, "dark")
+	style := "light"
+	if lipgloss.HasDarkBackground() {
+		style = "dark"
+	}
+	out, err := glamour.Render(markdown, style)
 	if err != nil {
 		return "", fmt.Errorf("GlamouriseItem: %w", err)
 	}
@@ -302,6 +325,7 @@ func (c *RequestConfig) NewInstance() (*RequestInstance, error) {
 		ProductionMode:  c.ProdMode,
 		InitialSnapshot: req.DebugInitialStoreSnapshotForModules,
 		Docs:            pkg.PackageMeta,
+		Params:          c.Params,
 	}
 
 	substreamRequirements := &RequestInstance{

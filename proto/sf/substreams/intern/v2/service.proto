@@ -21,9 +21,10 @@ message ProcessRangeRequest {
 message ProcessRangeResponse {
   string module_name = 1;
 
+  reserved 2; // previously in oneof(type): BlockRange processed_range
+  reserved 3; // previously in oneof(type): ProcessedBytes processed_bytes
+
   oneof type {
-    // reserved 2; // previously: BlockRange processed_range
-    // reserved 3; // previously: ProcessedBytes processed_bytes
     Failed failed = 4;
     Completed completed = 5;
     Update update = 6;

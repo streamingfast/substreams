@@ -52,6 +52,7 @@ func (n *NavigatorMemory) SetLastSelectedChildOf(modName, childName string) {
 }
 
 type Navigator struct {
+	common.Common
 	graph  *manifest.ModuleGraph
 	memory *NavigatorMemory
 
@@ -91,8 +92,9 @@ func WithModuleGraph(graph *manifest.ModuleGraph) Option {
 	}
 }
 
-func New(requestOutputModule string, opts ...Option) (*Navigator, error) {
+func New(requestOutputModule string, c common.Common, opts ...Option) (*Navigator, error) {
 	n := &Navigator{
+		Common:            c,
 		knownModules:      map[string]bool{},
 		selectableModules: map[string]bool{},
 		memory:            NewNavigatorMemory(),
@@ -418,15 +420,15 @@ func (n *Navigator) View() string {
 
 		// colorize the module
 		if op == n.SelectedModule {
-			parents[i] = Styles.SelectedModule.Render(p)
+			parents[i] = n.Styles.Navigator.SelectedModule.Render(p)
 		} else if op == n.HighlightedModule {
-			parents[i] = Styles.HighlightedModule.Render(p)
+			parents[i] = n.Styles.Navigator.HighlightedModule.Render(p)
 		} else {
 			selectable := n.selectableModules[op]
 			if selectable {
-				parents[i] = Styles.SelectableModule.Render(p)
+				parents[i] = n.Styles.Navigator.SelectableModule.Render(p)
 			} else {
-				parents[i] = Styles.UnselectableModule.Render(p)
+				parents[i] = n.Styles.Navigator.UnselectableModule.Render(p)
 			}
 		}
 	}
@@ -459,15 +461,15 @@ func (n *Navigator) View() string {
 
 		// colorize the module
 		if oc == n.SelectedModule {
-			children[i] = Styles.SelectedModule.Render(c)
+			children[i] = n.Styles.Navigator.SelectedModule.Render(c)
 		} else if oc == n.HighlightedModule {
-			children[i] = Styles.HighlightedModule.Render(c)
+			children[i] = n.Styles.Navigator.HighlightedModule.Render(c)
 		} else {
 			selectable := n.selectableModules[oc]
 			if selectable {
-				children[i] = Styles.SelectableModule.Render(c)
+				children[i] = n.Styles.Navigator.SelectableModule.Render(c)
 			} else {
-				children[i] = Styles.UnselectableModule.Render(c)
+				children[i] = n.Styles.Navigator.UnselectableModule.Render(c)
 			}
 		}
 	}
@@ -487,31 +489,31 @@ func (n *Navigator) View() string {
 		for i, p := range preview {
 			if p == n.HighlightedModule {
 				if p == n.SelectedModule {
-					preview[i] = " [" + Styles.SelectedModule.Render(p) + "] "
+					preview[i] = " [" + n.Styles.Navigator.SelectedModule.Render(p) + "] "
 				} else {
-					preview[i] = " [" + Styles.HighlightedModule.Render(p) + "] "
+					preview[i] = " [" + n.Styles.Navigator.HighlightedModule.Render(p) + "] "
 				}
 			} else if p == n.SelectedModule {
-				preview[i] = " " + Styles.SelectedModule.Render(p) + " "
+				preview[i] = " " + n.Styles.Navigator.SelectedModule.Render(p) + " "
 			} else {
-				preview[i] = Styles.Preview.Render(p)
+				preview[i] = n.Styles.Navigator.Preview.Render(p)
 			}
 		}
 		current = lipgloss.JoinVertical(lipgloss.Center, preview...)
 	} else {
 		if current == n.HighlightedModule {
-			current = Styles.HighlightedModule.Render(" [") + Styles.SelectedModule.Render(current) + Styles.HighlightedModule.Render("] ")
+			current = n.Styles.Navigator.HighlightedModule.Render(" [") + n.Styles.Navigator.SelectedModule.Render(current) + n.Styles.Navigator.HighlightedModule.Render("] ")
 		} else {
-			current = Styles.SelectedModule.Render(" " + current + " ")
+			current = n.Styles.Navigator.SelectedModule.Render(" " + current + " ")
 		}
 	}
 
 	for i, g := range grandparents {
-		grandparents[i] = Styles.Preview.Render(g)
+		grandparents[i] = n.Styles.Navigator.Preview.Render(g)
 	}
 
 	for i, g := range grandchildren {
-		grandchildren[i] = Styles.Preview.Render(g)
+		grandchildren[i] = n.Styles.Navigator.Preview.Render(g)
 	}
 
 	var leftPreviewSide string
@@ -607,20 +609,4 @@ func (n *Navigator) View() string {
 	)
 
 	return res
-}
-
-var Styles = struct {
-	SelectedModule                lipgloss.Style
-	HighlightedModule             lipgloss.Style
-	HighlightedUnselectableModule lipgloss.Style
-	SelectableModule              lipgloss.Style
-	UnselectableModule            lipgloss.Style
-	Preview                       lipgloss.Style
-}{
-	SelectedModule:                lipgloss.NewStyle().Margin(0, 2).Foreground(lipgloss.Color("12")).Bold(true),
-	HighlightedModule:             lipgloss.NewStyle().Margin(0, 2).Foreground(lipgloss.Color("10")),
-	HighlightedUnselectableModule: lipgloss.NewStyle().Margin(0, 2).Foreground(lipgloss.Color("1")).Faint(true),
-	SelectableModule:              lipgloss.NewStyle().Margin(0, 2).Foreground(lipgloss.Color("8")).Faint(false),
-	UnselectableModule:            lipgloss.NewStyle().Margin(0, 2).Foreground(lipgloss.Color("1")).Faint(true),
-	Preview:                       lipgloss.NewStyle().Margin(0, 2).Foreground(lipgloss.Color("70")).Bold(false).Faint(true),
 }

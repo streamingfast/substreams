@@ -74,7 +74,7 @@ func (b *BlockSelect) View() string {
 		return ""
 	}
 
-	bins := float64(b.Width - Styles.Box.GetVerticalBorderSize())
+	bins := float64(b.Width - b.Styles.BlockSelect.Box.GetVerticalBorderSize())
 	binSize := float64(b.highBlock-b.lowBlock) / bins
 	if binSize < 1 {
 		binSize = 1
@@ -106,9 +106,9 @@ func (b *BlockSelect) View() string {
 			chr = "⁝" // or: ⁞⁝⁚‧
 		}
 
-		style := Styles.searchUnmatchedBlock
+		style := b.Styles.BlockSelect.SearchUnmatchedBlock
 		if colored[i] {
-			style = Styles.searchMatchedBlock
+			style = b.Styles.BlockSelect.SearchMatchedBlock
 		}
 		chr = style.Render(chr)
 
@@ -119,8 +119,8 @@ func (b *BlockSelect) View() string {
 	if b.activeBlock != 0 {
 		ptr := int(float64(b.activeBlock-b.lowBlock) / binSize)
 		activeBlock = fmt.Sprintf("%s: %s",
-			Styles.CurrentBlock.Render("Current block"),
-			Styles.SelectedBlock.Render(humanize.Comma(int64(b.activeBlock))),
+			b.Styles.BlockSelect.CurrentBlock.Render("Current block"),
+			b.Styles.BlockSelect.SelectedBlock.Render(humanize.Comma(int64(b.activeBlock))),
 		)
 
 		labelLen := lipgloss.Width(activeBlock) + 1
@@ -144,23 +144,9 @@ func (b *BlockSelect) View() string {
 	highBlockMargin := len(string(humanize.Comma(int64(b.highBlock)))) + len(string(humanize.Comma(int64(b.highBlock)))) + 2
 	highBlockStyle := lipgloss.NewStyle().MarginLeft(b.Width - highBlockMargin)
 
-	return Styles.Box.Render(lipgloss.JoinVertical(0,
+	return b.Styles.BlockSelect.Box.Render(lipgloss.JoinVertical(0,
 		fmt.Sprintf("%s%s", humanize.Comma(int64(b.lowBlock)), highBlockStyle.Render(humanize.Comma(int64(b.highBlock)))),
 		strings.Join(ptrsBar, ""),
 		activeBlock,
 	))
-}
-
-var Styles = struct {
-	Box                  lipgloss.Style
-	SelectedBlock        lipgloss.Style
-	CurrentBlock         lipgloss.Style
-	searchUnmatchedBlock lipgloss.Style
-	searchMatchedBlock   lipgloss.Style
-}{
-	Box:                  lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true),
-	SelectedBlock:        lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true),
-	CurrentBlock:         lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true),
-	searchUnmatchedBlock: lipgloss.NewStyle().Background(lipgloss.Color("235")),
-	searchMatchedBlock:   lipgloss.NewStyle().Background(lipgloss.Color("235")).Foreground(lipgloss.Color("9")).Bold(true),
 }

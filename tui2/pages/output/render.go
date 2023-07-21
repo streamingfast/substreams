@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/alecthomas/chroma/quick"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/itchyny/gojq"
 	"github.com/jhump/protoreflect/dynamic"
 
@@ -72,7 +73,7 @@ func (o *Output) renderedOutput(in *pbsubstreamsrpc.AnyModuleOutput, withStyle b
 	dynamic.SetDefaultBytesRepresentation(o.bytesRepresentation)
 
 	if o.errReceived != nil {
-		out.styledError.WriteString(Styles.ErrorLine.Render(o.errReceived.Error()))
+		out.styledError.WriteString(o.Styles.Output.ErrorLine.Render(o.errReceived.Error()))
 	}
 	if o.logsEnabled {
 		if debugInfo := in.DebugInfo(); debugInfo != nil {
@@ -80,8 +81,8 @@ func (o *Output) renderedOutput(in *pbsubstreamsrpc.AnyModuleOutput, withStyle b
 			for _, log := range debugInfo.Logs {
 				plainLogs = append(plainLogs, fmt.Sprintf("log: %s", log))
 				if withStyle {
-					out.styledLogs.WriteString(Styles.LogLabel.Render("log: "))
-					out.styledLogs.WriteString(Styles.LogLine.Render(o.wrapLogs(log)))
+					out.styledLogs.WriteString(o.Styles.Output.LogLabel.Render("log: "))
+					out.styledLogs.WriteString(o.Styles.Output.LogLine.Render(o.wrapLogs(log)))
 					out.styledLogs.WriteString("\n")
 				}
 			}
@@ -120,7 +121,7 @@ func (o *Output) renderedOutput(in *pbsubstreamsrpc.AnyModuleOutput, withStyle b
 func (o *Output) renderPayload(in *renderedOutput) string {
 	out := &strings.Builder{}
 	if in.error != nil {
-		out.WriteString(Styles.ErrorLine.Render(in.error.Error()))
+		out.WriteString(o.Styles.Output.ErrorLine.Render(in.error.Error()))
 		out.WriteString("\n")
 	}
 	if o.errReceived != nil {
@@ -170,7 +171,11 @@ func (o *Output) decodeDynamicMessage(msgDesc *manifest.ModuleDescriptor, anyin 
 
 func highlightJSON(in string) string {
 	out := &strings.Builder{}
-	if err := quick.Highlight(out, in, "json", "terminal256", "dracula"); err != nil {
+	profile := "friendly"
+	if lipgloss.HasDarkBackground() {
+		profile = "dracula"
+	}
+	if err := quick.Highlight(out, in, "json", "terminal256", profile); err != nil {
 		return in
 	}
 	return out.String()

@@ -68,7 +68,7 @@ type Output struct {
 }
 
 func New(c common.Common, manifestPath string, outputModule string, config *request.RequestConfig) (*Output, error) {
-	nav, err := explorer.New(config.OutputModule, explorer.WithManifestFilePath(config.ManifestPath))
+	nav, err := explorer.New(config.OutputModule, c, explorer.WithManifestFilePath(config.ManifestPath))
 	if err != nil {
 		return nil, err
 	}
@@ -369,16 +369,6 @@ func (o *Output) View() string {
 		searchLine,
 	)
 	return out
-}
-
-var Styles = struct {
-	LogLabel  lipgloss.Style
-	LogLine   lipgloss.Style
-	ErrorLine lipgloss.Style
-}{
-	LogLabel:  lipgloss.NewStyle().Foreground(lipgloss.Color("243")),
-	LogLine:   lipgloss.NewStyle().Foreground(lipgloss.Color("252")),
-	ErrorLine: lipgloss.NewStyle().Foreground(lipgloss.Color("1")),
 }
 
 func (o *Output) updateMatchingBlocks() tea.Cmd {

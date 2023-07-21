@@ -183,7 +183,7 @@ func (p *Progress) View() string {
 				lipgloss.JoinVertical(1, labels...),
 				lipgloss.JoinVertical(0, infos...),
 			)),
-			lipgloss.NewStyle().Background(lipgloss.Color("9")).Width(p.Width).Render(errorStringWrapped),
+			lipgloss.NewStyle().Background(p.Styles.StreamErrorColor).Width(p.Width).Render(errorStringWrapped),
 			lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(p.Width-5).Height(p.progressView.Height-lineCount).Render(p.progressView.View()),
 		)
 	}

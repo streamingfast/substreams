@@ -54,14 +54,22 @@ func New(req *pbsubstreamsrpc.Request, client pbsubstreamsrpc.StreamClient, head
 	}
 }
 
-func (s *Stream) StreamColor() string {
+type Status int
+
+const (
+	StatusRunning Status = 0
+	StatusError          = 1
+	StatusStopped        = 2
+)
+
+func (s *Stream) StreamStatus() Status {
 	if s.err != nil && s.err != io.EOF {
-		return "9"
+		return StatusError
 	}
 	if s.cancelContext != nil || s.err == io.EOF {
-		return "2"
+		return StatusStopped
 	}
-	return "3"
+	return StatusRunning
 }
 
 func (s *Stream) TargetParallelProcessingBlock() uint64 {

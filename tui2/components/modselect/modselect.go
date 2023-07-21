@@ -117,22 +117,11 @@ func (m *ModSelect) View() string {
 
 	alignRight := lipgloss.NewStyle().Width(sidePartsWidth + 4).Align(lipgloss.Right)
 	alignLeft := lipgloss.NewStyle().Width(sidePartsWidth + 4).Align(lipgloss.Left)
-	return Styles.Box.MaxWidth(m.Width).Render(
+	return m.Styles.ModSelect.Box.MaxWidth(m.Width).Render(
 		lipgloss.JoinHorizontal(0.5,
 			alignRight.Render(leftModules),
-			Styles.SelectedModule.Render(activeModule),
+			m.Styles.ModSelect.SelectedModule.Render(activeModule),
 			alignLeft.Render(rightModules),
 		),
 	)
-}
-
-var Styles = struct {
-	Box               lipgloss.Style
-	SelectedModule    lipgloss.Style
-	HighlightedModule lipgloss.Style
-	UnselectedModule  lipgloss.Style
-}{
-	Box:               lipgloss.NewStyle().BorderStyle(lipgloss.NormalBorder()).BorderTop(true),
-	SelectedModule:    lipgloss.NewStyle().Margin(0, 2).Foreground(lipgloss.Color("12")).Bold(true),
-	HighlightedModule: lipgloss.NewStyle().Margin(0, 2).Foreground(lipgloss.Color("21")).Bold(true),
 }

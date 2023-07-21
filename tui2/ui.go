@@ -16,6 +16,7 @@ import (
 	"github.com/streamingfast/substreams/tui2/pages/progress"
 	"github.com/streamingfast/substreams/tui2/pages/request"
 	"github.com/streamingfast/substreams/tui2/replaylog"
+	"github.com/streamingfast/substreams/tui2/stream"
 	streamui "github.com/streamingfast/substreams/tui2/stream"
 	"github.com/streamingfast/substreams/tui2/styles"
 	"github.com/streamingfast/substreams/tui2/tabs"
@@ -213,7 +214,16 @@ func (ui *UI) View() string {
 	headline := ui.Styles.Header.Render("Substreams GUI")
 
 	if ui.stream != nil {
-		headline = ui.Styles.Header.Copy().Foreground(lipgloss.Color(ui.stream.StreamColor())).Render("Substreams GUI")
+		var color lipgloss.TerminalColor
+		switch ui.stream.StreamStatus() {
+		case stream.StatusRunning:
+			color = ui.Styles.StreamRunningColor
+		case stream.StatusStopped:
+			color = ui.Styles.StreamStoppedColor
+		case stream.StatusError:
+			color = ui.Styles.StreamErrorColor
+		}
+		headline = ui.Styles.Header.Copy().Foreground(color).Render("Substreams GUI")
 	}
 
 	ui.memoized = lipgloss.JoinVertical(0,

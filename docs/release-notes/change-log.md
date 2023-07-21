@@ -20,6 +20,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * The `tier2` app no longer has customizable auth plugin (or any Modules), `trust` will always be used, so that `tier` can pass down its headers (e.g. `X-Sf-Substreams-Cache-Tag`).
 
+### GUI changes
+
+* Color theme is now adapted to the terminal background (fixes readability on 'light' background)
+
+* Provided parameters are now shown in the 'Request' tab.
+
 ### CLI changes
 
 #### Added

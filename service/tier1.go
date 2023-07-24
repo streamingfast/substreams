@@ -181,9 +181,17 @@ func (s *Tier1Service) Blocks(
 		zap.String("output_module", request.OutputModule),
 	}
 	fields = append(fields, zap.Bool("production_mode", request.ProductionMode))
-
 	if auth := dauth.FromContext(ctx); auth != nil {
-		fields = append(fields, zap.String("user_id", auth.UserID()))
+		fields = append(fields,
+			zap.String("user_id", auth.UserID()),
+			zap.String("key_id", auth.APIKeyID()),
+			zap.String("ip_address", auth.RealIP()),
+		)
+		if cacheTag := auth.Get("X-Sf-Substreams-Cache-Tag"); cacheTag != "" {
+			fields = append(fields,
+				zap.String("cache_tag", cacheTag),
+			)
+		}
 	}
 
 	logger.Info("incoming Substreams Blocks request", fields...)

@@ -132,6 +132,20 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 		zap.Strings("modules", moduleNames),
 		zap.String("output_module", request.OutputModule),
 	}
+
+	if auth := dauth.FromContext(ctx); auth != nil {
+		fields = append(fields,
+			zap.String("user_id", auth.UserID()),
+			zap.String("key_id", auth.APIKeyID()),
+			zap.String("ip_address", auth.RealIP()),
+		)
+		if cacheTag := auth.Get("X-Sf-Substreams-Cache-Tag"); cacheTag != "" {
+			fields = append(fields,
+				zap.String("cache_tag", cacheTag),
+			)
+		}
+	}
+
 	logger.Info("incoming substreams ProcessRange request", fields...)
 
 	respFunc := tier2ResponseHandler(ctx, logger, streamSrv)

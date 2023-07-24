@@ -8,17 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Breaking changes
 
-* Tier1 and Tier2 should be upgraded concurrently, but failure to do so will only result in temporary errors until they are at the same version.
+* Tier1 and Tier2 must be upgraded concurrently.
 
 ### Backend changes
 
-* Massive refactoring of the scheduler: prevent excessive splitting of jobs, grouping them into stages when they have the same dependencies. This should significantly reduce the required resources for running Substreams `tier2` workers. We expect a
+* Massive refactoring of the scheduler: prevent excessive splitting of jobs, grouping them into stages when they have the same dependencies. This should reduce the required number of `tier2` workers (2x to 3x, depending on the substreams).
 
-* The `tier1` and `tier2` config have a new configuration `StateStoreDefaultTag`, if non-empty, it which will be appended to the value `StateStoreURL` to form the final state store URL. Users will be able to point to a different state store (ex: stay on `/my/store/v2` while default path is now `/my/store/v3`) by providing a `X-Sf-Substreams-Cache-Tag` header (gated by auth module).
+* The `tier1` and `tier2` config have a new configuration `StateStoreDefaultTag`, will be appended to the `StateStoreURL` value to form the final state store URL, ex: `StateStoreURL="/data/states"` and `StateStoreDefaultTag="v2"` will make `/data/states/v2` the default state store location, while allowing users to provide a `X-Sf-Substreams-Cache-Tag` header (gated by auth module) to point to `/data/states/v1`, and so on.
 
 * Authentication plugin `trust` can now specify an exclusive list of `allowed` headers (all lowercase), ex: `trust://?allowed=x-sf-user-id,x-sf-api-key-id,x-real-ip,x-sf-substreams-cache-tag`
 
-* The `tier2` app no longer has customizable auth plugin (or any Modules), `trust` will always be used, so that `tier` can pass down its headers (e.g. `X-Sf-Substreams-Cache-Tag`).
+* The `tier2` app no longer has customizable auth plugin (or any Modules), `trust` will always be used, so that `tier` can pass down its headers (e.g. `X-Sf-Substreams-Cache-Tag`). The `tier2` instances should not be accessible publicly.
 
 ### GUI changes
 

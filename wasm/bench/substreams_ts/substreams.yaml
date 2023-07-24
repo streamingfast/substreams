@@ -1,0 +1,8 @@
+specVersion: v0.1.0
+package:
+  name: map_block
+  version: v0.0.1
+
+imports:
+  database: https://github.com/streamingfast/substreams-sink-database-changes/releases/download/v1.2.1/substreams-database-change-v1.2.1.spkg
+  eth: https://github.com/streamingfast/firehose-ethereum/releases/download/v1.4.8/ethereum-v1.0.0.spkg

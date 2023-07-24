@@ -1,0 +1,3 @@
+{
+  "excludePaths": ["google", "sf/ethereum/substreams", "sf/substreams/rpc", "sf/substreams/v1"]
+}

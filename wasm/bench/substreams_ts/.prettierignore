@@ -1,0 +1,29 @@
+## Coverage
+/coverage
+
+## Docs Theme Partials
+/docs/theme/partials/*.hbs
+
+## Generated Files
+index.js
+/build
+/dist
+/types
+*.d.ts
+
+## Git
+.git
+.gitignore
+
+## NPM
+package-lock.json
+
+## Prettier
+.prettierignore
+
+## VSCode
+.vscode
+
+## Yarn
+package.json
+yarn.lock

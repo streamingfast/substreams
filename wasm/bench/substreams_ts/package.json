@@ -1,0 +1,32 @@
+{
+  "name": "substreams_ts",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "build": "esbuild --bundle index.ts --format=esm --outdir=. --target=es2020 && javy compile index.js -o ./index.wasm"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/streamingfast/substreams.git"
+  },
+  "keywords": [
+    "substreams",
+    "test",
+    "typescript",
+    "benchmark"
+  ],
+  "author": "StreamingFast Inc.",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/streamingfast/substreams/issues"
+  },
+  "homepage": "https://github.com/streamingfast/substreams#readme",
+  "dependencies": {
+    "@bufbuild/protobuf": "^1.2.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.18.12",
+    "prettier": "^3.0.0",
+    "typescript": "^5.1.6"
+  }
+}

@@ -129,10 +129,29 @@ message OutputDebugInfo {
 }
 
 message ModulesProgress {
-  repeated ModuleProgress modules = 1;
+  // previously: repeated ModuleProgress modules = 1;
+  reserved 1;
   repeated Job running_jobs = 2;
   repeated ModuleStats modules_stats = 3;
+
+  ProcessedBytes processed_bytes = 4;
 }
+
+message ProcessedBytes {
+  uint64 total_bytes_read = 1;
+  uint64 total_bytes_written = 2;
+}
+
+
+message Error {
+  string module = 1;
+  string reason = 2;
+  repeated string logs = 3;
+  // FailureLogsTruncated is a flag that tells you if you received all the logs or if they
+  // were truncated because you logged too much (fixed limit currently is set to 128 KiB).
+  bool logs_truncated = 4;
+}
+
 
 message Job {
     uint64 stage = 1;
@@ -140,64 +159,54 @@ message Job {
     uint64 start_block = 3;
     uint64 stop_block = 4;
     uint64 processed_blocks = 5;
-    uint64 duration_secs = 6;
+    uint64 duration_ms = 6;
 }
 
+// ModuleStats gathers metrics and statistics from each module, running on tier1 or tier2
+// All the 'count' and 'time_ms' values may include duplicate for each stage going over that module
 message ModuleStats {
+    // name of the module
     string name = 1;
 
-    // total_processed_blocks includes duplicate for each stage going over that module
-    uint64 total_processed_blocks = 2;
-    uint64 highest_processed_block = 3;
-    uint64 total_processing_time_secs = 4;
-    uint64 total_external_calls_time_secs = 5;
-    uint64 total_external_calls_count = 6;
-    uint64 total_store_operations_time_secs = 7;
-    uint64 total_store_reads_count = 8;
-    uint64 total_errors_count = 9;
+    // total_processed_blocks is the sum of blocks sent to that module code
+    uint64 total_processed_block_count = 2;
+    // total_processing_time_ms is the sum of all time spent running that module code
+    uint64 total_processing_time_ms = 3;
 
-    // store-specific (will be 0 on mappers)
-    uint64 total_store_writes_count = 10;
+    // external_calls are chain-specific intrinsics, like "Ethereum RPC calls".
+    // total_external_call_count is the sum of all external calls from that module code
+    uint64 total_external_call_count = 4;
+    // total_external_call_time_ms is the sum of all time spent running that module code waiting for an external call
+    uint64 total_external_call_time_ms = 5;
+
+    // total_store_operation_time_ms is the sum of all time spent running that module code waiting for a store operation (ex: read, write, delete...)
+    uint64 total_store_operation_time_ms = 6;
+    // total_store_read_count is the sum of all the store Read operations called from that module code
+    uint64 total_store_read_count = 7;
+    // total_error_count is the sum of all errors that the tier1 has received from tier2 jobs for that module. Some errors are not fatal and there are retry mechanisms.
+    uint64 total_error_count = 8;
+
+    // total_store_write_count is the sum of all store Write operations called from that module code (store-only)
+    uint64 total_store_write_count = 10;
+
+    // total_store_deleteprefix_count is the sum of all store DeletePrefix operations called from that module code (store-only)
+    // note that DeletePrefix can be a costly operation on large stores
     uint64 total_store_deleteprefix_count = 11;
+
+    // store_size_bytes is the uncompressed size of the full KV store for that module, from the last 'merge' operation (store-only)
     uint64 store_size_bytes = 12;
-    uint64 highest_merged_block = 13;
-}
 
-message ModuleProgress {
-  string name = 1;
+    // total_store_merging_time_ms is the time spent merging partial stores into a full KV store for that module (store-only)
+    uint64 total_store_merging_time_ms = 13;
 
-  oneof type {
-    ProcessedRanges processed_ranges = 2;
-    InitialState initial_state = 3;
-    ProcessedBytes processed_bytes = 4;
-    Failed failed = 5;
-  }
+    // store_currently_merging is true if there is a merging operation (partial store to full KV store) on the way.
+    bool store_currently_merging = 14;
 
-  message ProcessedRanges {
-    repeated BlockRange processed_ranges = 1;
-  }
-  message InitialState {
-    uint64 available_up_to_block = 2;
-  }
-  message ProcessedBytes {
-    uint64 total_bytes_read = 1;
-    uint64 total_bytes_written = 2;
-    uint64 bytes_read_delta = 3;
-    uint64 bytes_written_delta = 4;
-    uint64 nano_seconds_delta = 5;
-  }
-  message Failed {
-    string reason = 1;
-    repeated string logs = 2;
-    // FailureLogsTruncated is a flag that tells you if you received all the logs or if they
-    // were truncated because you logged too much (fixed limit currently is set to 128 KiB).
-    bool logs_truncated = 3;
-  }
-}
+    // highest_contiguous_block is the highest block in the highest merged full KV store of that module (store-only)
+    uint64 highest_contiguous_block = 15;
 
-message BlockRange {
-  uint64 start_block = 2;
-  uint64 end_block = 3;
+    // last_error is the last error that was produced on a tier2 job. Some errors are not fatal and there are retry mechanisms.
+    Error last_error = 16;
 }
 
 message StoreDelta {

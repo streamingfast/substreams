@@ -269,15 +269,15 @@ func (c *RequestConfig) NewInstance() (*RequestInstance, error) {
 		return nil, fmt.Errorf("stop block: %w", err)
 	}
 
+	if err := manifest.ApplyParams(c.Params, pkg); err != nil {
+		return nil, err
+	}
+
 	ssClient, _, callOpts, err := client.NewSubstreamsClient(c.SubstreamsClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("substreams client setup: %w", err)
 	}
 	//defer connClose()
-
-	if err := manifest.ApplyParams(c.Params, pkg); err != nil {
-		return nil, err
-	}
 
 	req := &pbsubstreamsrpc.Request{
 		StartBlockNum:                       c.StartBlock,

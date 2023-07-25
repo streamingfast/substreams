@@ -197,7 +197,7 @@ func (s *Tier1Service) Blocks(
 	logger.Info("incoming Substreams Blocks request", fields...)
 
 	if err := outputmodules.ValidateTier1Request(request, s.blockType); err != nil {
-		return toGRPCError(bsstream.NewErrInvalidArg(fmt.Errorf("validate request: %w", err).Error()))
+		return status.Error(codes.InvalidArgument, fmt.Errorf("validate request: %w", err).Error())
 	}
 
 	outputGraph, err := outputmodules.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules)
@@ -223,22 +223,19 @@ func (s *Tier1Service) Blocks(
 
 	// On app shutdown, we cancel the running '.blocks()' command,
 	// we catch this situation via IsTerminating() to return a special error.
-	runningContext, cancelRunning := context.WithCancel(ctx)
+	runningContext, cancelRunning := context.WithCancelCause(ctx)
 	go func() {
 		select {
 		case <-ctx.Done():
 			return
 		case <-s.Terminating():
-			cancelRunning()
+			cancelRunning(fmt.Errorf("endpoint is shutting down, please reconnect"))
 		}
 	}()
 
 	err = s.blocks(runningContext, request, outputGraph, respFunc)
-	if s.IsTerminating() {
-		return status.Error(codes.Canceled, "endpoint is shutting down, please reconnect")
-	}
 
-	if grpcError := toGRPCError(err); grpcError != nil {
+	if grpcError := toGRPCError(runningContext, err); grpcError != nil {
 		switch status.Code(grpcError) {
 		case codes.Internal:
 			logger.Info("unexpected termination of stream of blocks", zap.String("stream_processor", "tier1"), zap.Error(err))
@@ -525,7 +522,7 @@ func setupRequestStats(ctx context.Context, requestDetails *reqctx.RequestDetail
 //
 // Otherwise, the error is assumed to be an internal error and turned backed into a proper
 // `status.Error(codes.Internal, err.Error())`.
-func toGRPCError(err error) error {
+func toGRPCError(ctx context.Context, err error) error {
 	if err == nil {
 		return nil
 	}
@@ -535,7 +532,7 @@ func toGRPCError(err error) error {
 	}
 
 	if errors.Is(err, context.Canceled) {
-		return status.Error(codes.Canceled, "source canceled")
+		return status.Error(codes.Canceled, context.Cause(ctx).Error())
 	}
 
 	if errors.Is(err, context.DeadlineExceeded) {

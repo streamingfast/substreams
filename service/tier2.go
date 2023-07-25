@@ -150,7 +150,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 
 	respFunc := tier2ResponseHandler(ctx, logger, streamSrv)
 	err = s.processRange(ctx, request, respFunc, tracing.GetTraceID(ctx).String())
-	grpcError = toGRPCError(err)
+	grpcError = toGRPCError(ctx, err)
 
 	if grpcError != nil && status.Code(grpcError) == codes.Internal {
 		logger.Info("unexpected termination of stream of blocks", zap.Error(err))

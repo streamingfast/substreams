@@ -275,6 +275,10 @@ func (c *RequestConfig) NewInstance() (*RequestInstance, error) {
 	}
 	//defer connClose()
 
+	if err := manifest.ApplyParams(c.Params, pkg); err != nil {
+		return nil, err
+	}
+
 	req := &pbsubstreamsrpc.Request{
 		StartBlockNum:                       c.StartBlock,
 		StartCursor:                         c.Cursor,

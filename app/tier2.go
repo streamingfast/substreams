@@ -98,9 +98,9 @@ func (a *Tier2App) Run() error {
 	)
 
 	// tier2 always trusts the headers sent from tier1
-	trustAuth, err := dauth.New("trust://")
+	trustAuth, err := dauth.New("trust://", a.logger)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to setup trust authenticator: %w", err)
 	}
 
 	go func() {

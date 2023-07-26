@@ -532,7 +532,6 @@ func toGRPCError(ctx context.Context, err error) error {
 	}
 
 	if errors.Is(err, context.Canceled) {
-
 		if context.Cause(ctx) != nil {
 			err = context.Cause(ctx)
 		}

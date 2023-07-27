@@ -56,20 +56,6 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, err error) error {
 		return fmt.Errorf("step new irr: stores end of stream: %w", err)
 	}
 
-	p.execOutputCache.Close()
-
-	//if p.stores.partialsWritten != nil {
-	//	p.respFunc(&pbssinternal.ProcessRangeResponse{
-	//		ModuleName: reqDetails.OutputModule,
-	//		Type: &pbssinternal.ProcessRangeResponse_Completed{
-	//			Completed: &pbssinternal.Completed{
-	//				AllProcessedRanges: toPBInternalBlockRanges(p.stores.partialsWritten),
-	//				TraceId:            p.traceID,
-	//			},
-	//		},
-	//	})
-	//}
-
 	return nil
 }
 

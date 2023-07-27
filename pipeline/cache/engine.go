@@ -24,7 +24,7 @@ type Engine struct {
 	ctx               context.Context
 	blockType         string
 	reversibleBuffers map[uint64]*execout.Buffer // block num to modules' outputs for that given block
-	writableFiles     *execout.Writer            // moduleName => irreversible File
+	execOutputWriter  *execout.Writer            // moduleName => irreversible File
 	runtimeConfig     config.RuntimeConfig       // TODO(abourget): Deprecated: remove this as it's not used
 	logger            *zap.Logger
 }
@@ -34,7 +34,7 @@ func NewEngine(ctx context.Context, runtimeConfig config.RuntimeConfig, execOutW
 		ctx:               ctx,
 		runtimeConfig:     runtimeConfig,
 		reversibleBuffers: map[uint64]*execout.Buffer{},
-		writableFiles:     execOutWriter,
+		execOutputWriter:  execOutWriter,
 		logger:            reqctx.Logger(ctx),
 		blockType:         blockType,
 	}
@@ -64,15 +64,8 @@ func (e *Engine) HandleFinal(clock *pbsubstreams.Clock) error {
 		return nil
 	}
 
-	if e.writableFiles != nil {
-		// TODO(abourget): clarify what we send to `MaybeRotate`, perhaps we do the checking
-		// flushing conditions here? We pass a few conditions down?
-		// the File down there will know if it should flush its subrequest or not?
-		if err := e.writableFiles.MaybeRotate(e.ctx, clock.Number); err != nil {
-			return fmt.Errorf("rotating writable files: %w", err)
-		}
-
-		e.writableFiles.Write(clock, execOutBuf)
+	if e.execOutputWriter != nil {
+		e.execOutputWriter.Write(clock, execOutBuf)
 	}
 
 	delete(e.reversibleBuffers, clock.Number)
@@ -86,21 +79,8 @@ func (e *Engine) HandleStalled(clock *pbsubstreams.Clock) error {
 }
 
 func (e *Engine) EndOfStream(lastFinalClock *pbsubstreams.Clock) error {
-	if e.writableFiles != nil {
-		// We're adding +1 here for the case where we triggered the `stopBlock` using the
-		// >= clause, in which case +1 will make it go over that boundary and save/rotate the files.
-		// In the cases where we skipped huge number of blocks, and we get a large clock jump
-		// then +1 is not necessary but won't harm either.
-		if err := e.writableFiles.MaybeRotate(e.ctx, lastFinalClock.Number+1); err != nil {
-			return fmt.Errorf("rotating writable files: %w", err)
-		}
+	if e.execOutputWriter != nil {
+		e.execOutputWriter.Close(context.Background())
 	}
-
 	return nil
-}
-
-func (e *Engine) Close() {
-	if e.writableFiles != nil {
-		e.writableFiles.Close()
-	}
 }

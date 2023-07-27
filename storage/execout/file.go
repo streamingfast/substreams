@@ -128,34 +128,21 @@ func (c *File) Load(ctx context.Context) error {
 	})
 }
 
-func (c *File) Save(ctx context.Context) (func(), error) {
-	if len(c.kv) == 0 {
-		c.logger.Info("not saving cache, because empty", zap.Stringer("block_range", c.Range))
-		return func() {}, nil
-	}
-	filename := c.Filename()
+func (c *File) Save(ctx context.Context) error {
 
-	// TODO(abourget): once the `outputData` has been detached, could we put the full MarshalFast() call
-	// inside the Go routine? Since in this new version of a File, the File itself
-	// is not reused, but a Next() one is created.
+	filename := c.Filename()
 	outputData := &pboutput.Map{Kv: c.kv}
 	cnt, err := outputData.MarshalFast()
 	if err != nil {
-		return nil, fmt.Errorf("unmarshalling file %s: %w", filename, err)
+		return fmt.Errorf("unmarshalling file %s: %w", filename, err)
 	}
 
-	return func() {
-		c.logger.Info("writing execution output file", zap.String("filename", filename))
-
-		err = derr.RetryContext(ctx, 5, func(ctx context.Context) error {
-			reader := bytes.NewReader(cnt)
-			err := c.store.WriteObject(ctx, filename, reader)
-			return err
-		})
-		if err != nil {
-			c.logger.Warn("failed writing output cache", zap.Error(err))
-		}
-	}, nil
+	c.logger.Info("writing execution output file", zap.String("filename", filename))
+	return derr.RetryContext(ctx, 5, func(ctx context.Context) error {
+		reader := bytes.NewReader(cnt)
+		err := c.store.WriteObject(ctx, filename, reader)
+		return err
+	})
 }
 
 func (c *File) String() string {

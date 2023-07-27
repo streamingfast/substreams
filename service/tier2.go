@@ -219,12 +219,16 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	stores := pipeline.NewStores(ctx, storeConfigs, s.runtimeConfig.StateBundleSize, requestDetails.ResolvedStartBlockNum, request.StopBlockNum, true)
 
 	outputModule := outputGraph.OutputModule()
-	execOutWriter := execout.NewWriter(
-		requestDetails.ResolvedStartBlockNum,
-		requestDetails.StopBlockNum,
-		outputModule.Name,
-		execOutputConfigs,
-	)
+
+	var execOutWriter *execout.Writer
+	if !outputGraph.StagedUsedModules()[request.Stage].LastLayer().IsStoreLayer() {
+		execOutWriter = execout.NewWriter(
+			requestDetails.ResolvedStartBlockNum,
+			requestDetails.StopBlockNum,
+			outputModule.Name,
+			execOutputConfigs,
+		)
+	}
 
 	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, execOutWriter, s.blockType)
 	if err != nil {

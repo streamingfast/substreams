@@ -79,7 +79,7 @@ func NewTier1(
 	blockType string,
 
 	parallelSubRequests uint64,
-	subrequestSplitSize uint64,
+	stateBundleSize uint64,
 
 	substreamsClientConfig *client.SubstreamsClientConfig,
 	opts ...Option,
@@ -89,8 +89,7 @@ func NewTier1(
 	clientFactory := client.NewInternalClientFactory(substreamsClientConfig)
 
 	runtimeConfig := config.NewRuntimeConfig(
-		1000, // overridden by Options
-		subrequestSplitSize,
+		stateBundleSize,
 		parallelSubRequests,
 		10,
 		0,
@@ -348,7 +347,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		return fmt.Errorf("internal error setting store: %w", err)
 	}
 
-	execOutputConfigs, err := execout.NewConfigs(cacheStore, outputGraph.UsedModules(), outputGraph.ModuleHashes(), s.runtimeConfig.CacheSaveInterval, logger)
+	execOutputConfigs, err := execout.NewConfigs(cacheStore, outputGraph.UsedModules(), outputGraph.ModuleHashes(), s.runtimeConfig.StateBundleSize, logger)
 	if err != nil {
 		return fmt.Errorf("new config map: %w", err)
 	}
@@ -358,7 +357,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		return fmt.Errorf("configuring stores: %w", err)
 	}
 
-	stores := pipeline.NewStores(ctx, storeConfigs, s.runtimeConfig.CacheSaveInterval, requestDetails.LinearHandoffBlockNum, request.StopBlockNum, false)
+	stores := pipeline.NewStores(ctx, storeConfigs, s.runtimeConfig.StateBundleSize, requestDetails.LinearHandoffBlockNum, request.StopBlockNum, false)
 
 	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, nil, s.blockType)
 	if err != nil {
@@ -400,7 +399,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 
 	reqPlan := plan.BuildTier1RequestPlan(
 		requestDetails.ProductionMode,
-		s.runtimeConfig.SubrequestsSplitSize,
+		s.runtimeConfig.StateBundleSize,
 		outputGraph.LowestInitBlock(),
 		requestDetails.ResolvedStartBlockNum,
 		requestDetails.LinearHandoffBlockNum,

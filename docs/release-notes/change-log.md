@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+* Fixed: jobs would hang when config parameter `StateBundleSize` was different from `SubrequestsSize`. The latter has been removed completely: Subrequests size will now always be aligned with bundle size.
+
 ### Backend changes
 
 ### CLI changes

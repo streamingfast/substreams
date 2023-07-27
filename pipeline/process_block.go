@@ -225,7 +225,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, block *bstream.Block, cloc
 
 	if reqDetails.ShouldReturnProgressMessages() {
 		if reqDetails.IsTier2Request {
-			forceSend := (clock.Number+1)%p.runtimeConfig.CacheSaveInterval == 0
+			forceSend := (clock.Number+1)%p.runtimeConfig.StateBundleSize == 0
 
 			if err = p.returnInternalModuleProgressOutputs(clock, forceSend); err != nil {
 				return fmt.Errorf("failed to return modules progress %w", err)

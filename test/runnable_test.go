@@ -42,7 +42,6 @@ type testRun struct {
 	StartBlock             int64
 	ExclusiveEndBlock      uint64
 	ModuleName             string
-	SubrequestsSplitSize   uint64
 	ParallelSubrequests    uint64
 	NewBlockGenerator      BlockGeneratorFactory
 	BlockProcessedCallback blockProcessedCallBack
@@ -112,9 +111,6 @@ func (f *testRun) Run(t *testing.T, testName string) error {
 		}
 	}
 
-	if f.SubrequestsSplitSize == 0 {
-		f.SubrequestsSplitSize = 10
-	}
 	if f.ParallelSubrequests == 0 {
 		f.ParallelSubrequests = 1
 	}
@@ -146,7 +142,7 @@ func (f *testRun) Run(t *testing.T, testName string) error {
 		f.PreWork(t, f, workerFactory)
 	}
 
-	if err := processRequest(t, ctx, request, workerFactory, newBlockGenerator, responseCollector, false, f.BlockProcessedCallback, testTempDir, f.SubrequestsSplitSize, f.ParallelSubrequests, f.LinearHandoffBlockNum); err != nil {
+	if err := processRequest(t, ctx, request, workerFactory, newBlockGenerator, responseCollector, false, f.BlockProcessedCallback, testTempDir, f.ParallelSubrequests, f.LinearHandoffBlockNum); err != nil {
 		return fmt.Errorf("running test: %w", err)
 	}
 
@@ -261,7 +257,6 @@ func processInternalRequest(
 		0,
 		0,
 		0,
-		0,
 		baseStoreStore,
 		"tag",
 		workerFactory,
@@ -281,7 +276,6 @@ func processRequest(
 	isSubRequest bool,
 	blockProcessedCallBack blockProcessedCallBack,
 	testTempDir string,
-	subrequestsSplitSize uint64,
 	parallelSubrequests uint64,
 	linearHandoffBlockNum uint64,
 ) error {
@@ -301,7 +295,6 @@ func processRequest(
 	}
 	runtimeConfig := config.NewRuntimeConfig(
 		10,
-		subrequestsSplitSize,
 		parallelSubrequests,
 		10,
 		0,

@@ -34,18 +34,6 @@ func WithPipelineOptions(f pipeline.PipelineOptioner) Option {
 	}
 }
 
-func WithCacheSaveInterval(block uint64) Option {
-	return func(a anyTierService) {
-		switch s := a.(type) {
-		case *Tier1Service:
-			s.runtimeConfig.CacheSaveInterval = block
-		case *Tier2Service:
-			s.runtimeConfig.CacheSaveInterval = block
-		}
-	}
-
-}
-
 func WithRequestStats() Option {
 	return func(a anyTierService) {
 		switch s := a.(type) {

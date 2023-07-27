@@ -47,6 +47,7 @@ func NewTier2(
 
 	stateStore dstore.Store,
 	defaultCacheTag string,
+	stateBundleSize uint64,
 
 	blockType string,
 	opts ...Option,
@@ -54,11 +55,10 @@ func NewTier2(
 ) (s *Tier2Service) {
 
 	runtimeConfig := config.NewRuntimeConfig(
-		1000, // overridden by Options
+		stateBundleSize,
+		0, // tier2 don't send subrequests
+		0, // tier2 don't send subrequests
 		0,
-		0, // tier2 don't send subrequests
-		0, // tier2 don't send subrequests
-		0, // tier2 don't send subrequests
 		stateStore,
 		defaultCacheTag,
 		nil,
@@ -207,7 +207,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("internal error setting store: %w", err)
 	}
 
-	execOutputConfigs, err := execout.NewConfigs(cacheStore, outputGraph.UsedModules(), outputGraph.ModuleHashes(), s.runtimeConfig.CacheSaveInterval, logger)
+	execOutputConfigs, err := execout.NewConfigs(cacheStore, outputGraph.UsedModules(), outputGraph.ModuleHashes(), s.runtimeConfig.StateBundleSize, logger)
 	if err != nil {
 		return fmt.Errorf("new config map: %w", err)
 	}
@@ -216,7 +216,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
-	stores := pipeline.NewStores(ctx, storeConfigs, s.runtimeConfig.CacheSaveInterval, requestDetails.ResolvedStartBlockNum, request.StopBlockNum, true)
+	stores := pipeline.NewStores(ctx, storeConfigs, s.runtimeConfig.StateBundleSize, requestDetails.ResolvedStartBlockNum, request.StopBlockNum, true)
 
 	outputModule := outputGraph.OutputModule()
 	execOutWriter := execout.NewWriter(

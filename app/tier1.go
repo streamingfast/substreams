@@ -44,7 +44,6 @@ type Tier1Config struct {
 	BlockType            string
 
 	MaxSubrequests       uint64
-	SubrequestsSize      uint64
 	SubrequestsEndpoint  string
 	SubrequestsInsecure  bool
 	SubrequestsPlaintext bool
@@ -147,9 +146,7 @@ func (a *Tier1App) Run() error {
 		a.config.SubrequestsInsecure,
 		a.config.SubrequestsPlaintext,
 	)
-	opts := []service.Option{
-		service.WithCacheSaveInterval(a.config.StateBundleSize),
-	}
+	var opts []service.Option
 	for _, ext := range a.config.WASMExtensions {
 		opts = append(opts, service.WithWASMExtension(ext))
 	}
@@ -175,7 +172,7 @@ func (a *Tier1App) Run() error {
 		a.config.StateStoreDefaultTag,
 		a.config.BlockType,
 		a.config.MaxSubrequests,
-		a.config.SubrequestsSize,
+		a.config.StateBundleSize,
 		subrequestsClientConfig,
 		opts...,
 	)

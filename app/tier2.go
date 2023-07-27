@@ -69,9 +69,7 @@ func (a *Tier2App) Run() error {
 		return fmt.Errorf("failed setting up state store from url %q: %w", a.config.StateStoreURL, err)
 	}
 
-	opts := []service.Option{
-		service.WithCacheSaveInterval(a.config.StateBundleSize),
-	}
+	var opts []service.Option
 	for _, ext := range a.config.WASMExtensions {
 		opts = append(opts, service.WithWASMExtension(ext))
 	}
@@ -93,6 +91,7 @@ func (a *Tier2App) Run() error {
 		mergedBlocksStore,
 		stateStore,
 		a.config.StateStoreDefaultTag,
+		a.config.StateBundleSize,
 		a.config.BlockType,
 		opts...,
 	)

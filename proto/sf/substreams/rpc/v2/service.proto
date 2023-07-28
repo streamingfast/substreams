@@ -133,8 +133,9 @@ message ModulesProgress {
   reserved 1;
   repeated Job running_jobs = 2;
   repeated ModuleStats modules_stats = 3;
+  repeated Stage stages = 4;
 
-  ProcessedBytes processed_bytes = 4;
+  ProcessedBytes processed_bytes = 5;
 }
 
 message ProcessedBytes {
@@ -155,11 +156,15 @@ message Error {
 
 message Job {
     uint64 stage = 1;
-    repeated string modules = 2;
-    uint64 start_block = 3;
-    uint64 stop_block = 4;
-    uint64 processed_blocks = 5;
-    uint64 duration_ms = 6;
+    uint64 start_block = 2;
+    uint64 stop_block = 3;
+    uint64 processed_blocks = 4;
+    uint64 duration_ms = 5;
+}
+
+message Stage {
+    repeated string modules = 1;
+    repeated BlockRange completed_ranges = 2;
 }
 
 // ModuleStats gathers metrics and statistics from each module, running on tier1 or tier2
@@ -221,4 +226,9 @@ message StoreDelta {
   string key = 3;
   bytes old_value = 4;
   bytes new_value = 5;
+}
+
+message BlockRange {
+  uint64 start_block = 2;
+  uint64 end_block = 3;
 }

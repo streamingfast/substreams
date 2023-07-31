@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/dmetering"
 	"net/url"
 
 	dauth "github.com/streamingfast/dauth"
@@ -85,6 +86,8 @@ func (a *Tier2App) Run() error {
 	if a.config.RequestStats {
 		opts = append(opts, service.WithRequestStats())
 	}
+
+	opts = append(opts, service.WithBytesMeter(dmetering.NewBytesMeter()))
 
 	svc := service.NewTier2(
 		a.logger,

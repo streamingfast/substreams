@@ -1,6 +1,7 @@
 package service
 
 import (
+	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/wasm"
 )
@@ -8,6 +9,21 @@ import (
 type anyTierService interface{}
 
 type Option func(anyTierService)
+
+func WithBytesMeter(bm dmetering.Meter) Option {
+	if bm == nil { //guard against any weird nils
+		bm = dmetering.NewBytesMeter()
+	}
+
+	return func(a anyTierService) {
+		switch s := a.(type) {
+		case *Tier1Service:
+			s.bytesMeter = bm
+		case *Tier2Service:
+			s.bytesMeter = bm
+		}
+	}
+}
 
 func WithWASMExtension(ext wasm.WASMExtensioner) Option {
 	return func(a anyTierService) {

@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/dmetering"
 	"net/url"
 	"time"
 
@@ -106,13 +107,13 @@ func (a *Tier1App) Run() error {
 		}
 	}
 
-	withLive := a.config.BlockStreamAddr != ""
+	bytesMeter := dmetering.NewBytesMeter()
 
 	var forkableHub *hub.ForkableHub
 
+	withLive := a.config.BlockStreamAddr != ""
 	if withLive {
 		liveSourceFactory := bstream.SourceFactory(func(h bstream.Handler) bstream.Source {
-
 			return blockstream.NewSource(
 				context.Background(),
 				a.config.BlockStreamAddr,
@@ -123,6 +124,7 @@ func (a *Tier1App) Run() error {
 					return h.ProcessBlock(blk, obj)
 				}),
 				blockstream.WithRequester("substreams-tier1"),
+				blockstream.WithBytesMeter(bytesMeter),
 			)
 		})
 
@@ -162,6 +164,8 @@ func (a *Tier1App) Run() error {
 	if a.config.RequestStats {
 		opts = append(opts, service.WithRequestStats())
 	}
+
+	opts = append(opts, service.WithBytesMeter(bytesMeter))
 
 	svc := service.NewTier1(
 		a.logger,

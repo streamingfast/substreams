@@ -65,8 +65,6 @@ type Tier1Service struct {
 	getRecentFinalBlock func() (uint64, error)
 	resolveCursor       pipeline.CursorResolver
 	getHeadBlock        func() (uint64, error)
-
-	bytesMeter dmetering.Meter
 }
 
 func NewTier1(
@@ -147,7 +145,7 @@ func (s *Tier1Service) Blocks(
 
 	ctx = logging.WithLogger(ctx, logger)
 	ctx = reqctx.WithTracer(ctx, s.tracer)
-	ctx = dmetering.WithExistingBytesMeter(ctx, s.bytesMeter)
+	ctx = dmetering.WithBytesMeter(ctx)
 
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier1/request")
 	defer span.EndWithErr(&err)

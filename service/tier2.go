@@ -39,8 +39,6 @@ type Tier2Service struct {
 	runtimeConfig     config.RuntimeConfig
 	tracer            ttrace.Tracer
 	logger            *zap.Logger
-
-	bytesMeter dmetering.Meter
 }
 
 func NewTier2(
@@ -109,7 +107,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	)
 
 	ctx = logging.WithLogger(ctx, logger)
-	ctx = dmetering.WithExistingBytesMeter(ctx, s.bytesMeter)
+	ctx = dmetering.WithBytesMeter(ctx)
 	ctx = reqctx.WithTracer(ctx, s.tracer)
 
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/request")

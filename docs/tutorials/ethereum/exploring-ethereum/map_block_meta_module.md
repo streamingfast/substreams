@@ -1,6 +1,6 @@
-## The "map_block_meta" Module
+## Mapping Blocks
 
-This module takes a raw Ethereum block and returns a reduced version of block, with just three pieces of information: hash, parent hash and block number.
+This module takes a raw Ethereum block and returns a reduced version of a block, with just three pieces of information: hash, parent hash, and block number.
 
 - Input:
 - Output:
@@ -9,7 +9,7 @@ Let's run the Substreams first, and then go through the code.
 
 ### Running the Substreams
 
-Running a Substreams usually requires three steps: generating the Rust protobufs, building the WASM container and using the Substream CLI to start the streaming. Make sure to run the following commands in the `substreams-explorer/ethereum-explorer` folder:
+Running a Substreams usually requires three steps: generating the Rust Protobufs, building the WASM container, and using the Substream CLI to start the streaming. Make sure to run the following commands in the `substreams-explorer/ethereum-explorer` folder:
 
 1. **Generate the Protobuf objects:** The `.proto` files define a data model regardless of any programming language. However, in order to use this model in your Rust application, you must generate the corresponding Rust data structures.
 
@@ -17,13 +17,13 @@ Running a Substreams usually requires three steps: generating the Rust protobufs
 $ make protogen
 ```
 
-2. **Build the WASM container:** The following command generates a WASM container from the Rust application, which you can find at `/target/wasm32-unknown-unknown/release/substreams.wasm`. Note that this the same path provided in the Substreams manifest (`substreams.yml`).
+2. **Build the WASM container:** The following command generates a WASM container from the Rust application, which you can find at `/target/wasm32-unknown-unknown/release/substreams.wasm`. Note that this is the same path provided in the Substreams manifest (`substreams.yml`).
 
 ```bash
 $ make build
 ```
 
-3. **Streaming data through the CLI:** The following command streams the Ethereum block chain data, and applies the transformations contained in the `map_block_meta` module to every block.
+3. **Streaming data through the CLI:** The following command streams the Ethereum blockchain data, and applies the transformations contained in the `map_block_meta` module to every block.
 
 ```bash
 $ substreams run -e mainnet.eth.streamingfast.io:443 substreams.yaml map_block_meta --start-block 17712040 --stop-block +1
@@ -52,9 +52,9 @@ Let's break down the command into pieces:
 - `substreams.yaml`: specifies the Substreams manifest.
 - `map_block_meta`: specifies the module to execute. Since the Ethereum Explorer application contains several modules, it is necessary to specify which one you want to execute.
 - `--start-block 17712040`: specifies the starting block (i.e. the block where Substreams will start streaming).
-- `--stop-block +1`: specifies how many blocks after the starting block should be considered. In this example, `+3` means that the straming will start at `17712040` and finish at `17712043`.
+- `--stop-block +1`: specifies how many blocks after the starting block should be considered. In this example, `+3` means that the streaming will start at `17712040` and finish at `17712043`.
 
-As you can see, the output is formatted as JSON, and the `@data` field contains the actual output protobuf of the module (`BlockMeta`).
+As you can see, the output is formatted as JSON, and the `@data` field contains the actual output Protobuf of the module (`BlockMeta`).
 
 The `BlockMeta` definition:
 
@@ -82,7 +82,7 @@ The JSON output:
 
 ### Inspecting the Code
 
-Although the code (which is at the `map_block_meta.rs` file) for this module is pretty straightforward to understand, let's discuss its main parts.
+Although the code (which is in the `map_block_meta.rs` file) for this module is pretty straightforward to understand, let's discuss its main parts.
 
 Declaration of the module in the manifest (`substreams.yml`):
 
@@ -128,4 +128,3 @@ Ok(BlockMeta {
     parent_hash: Hex::encode(&header.parent_hash),
 })
 ```
-

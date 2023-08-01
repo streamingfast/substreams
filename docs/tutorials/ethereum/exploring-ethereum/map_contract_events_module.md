@@ -1,6 +1,6 @@
-## The "map_contract_events" Module
+## Retrieving Events of a Smart Contract
 
-Given a smart contract address passed as parameter, this module returns the logs attached to the contract.
+Given a smart contract address passed as a parameter, this module returns the logs attached to the contract.
 
 ### Running the Substreams
 
@@ -14,8 +14,8 @@ $ make protogen
 $ make build
 ```
 
-Now, you can run the Substreams. The logs retrieved correpond to the `0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d` (BoredApeYachtClub smart contract).
-To avoid iterating over all the blockchain, the following command starts at block `17717995` and finished at block `17718004`. Therefore, only the BoredApeYachtClub smart contract logs that happened within these block range are printed.
+Now, you can run the Substreams. The logs retrieved correspond to the `0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d` (BoredApeYachtClub smart contract).
+To avoid iterating over the full blockchain, the following command starts at block `17717995` and finished at block `17718004`. Therefore, only the BoredApeYachtClub smart contract logs that happened within this block range are printed.
 
 ```bash
 substreams run -e mainnet.eth.streamingfast.io:443 substreams.yaml map_contract_events --start-block 17717995 --stop-block +10
@@ -91,7 +91,7 @@ Declaration of the module in the manifest (`substreams.yml`):
 The module expects two inputs: the parameter as a string, and a raw Ethereum block.
 The output is the `Events` object defined in the Protobuf.
 
-The corresponding the Rust function declaration, which matches the name of the module, `map_contract_events`:
+The corresponding Rust function declaration, which matches the name of the module, `map_contract_events`:
 
 ```rust
 fn map_contract_events(contract_address: String, blk: Block) -> Result<Events, Error> {
@@ -116,6 +116,6 @@ However, it is necessary to verify that the parameter is a valid Ethereum; this 
 
 Then, you iterate over the events of the contract:
 1. The `.logs()` function iterates over the logs of successful transactions within the block.
-2. For every log of a successful transactions, you verify if its `address` matches the smart contract address (i.e. you verify if the log was actually emitted by the smart contract). For the comparison, both `log.address()` and `contract_address` are converted to `Vec<u8>`.
+2. For every log of a successful transaction, you verify if its `address` matches the smart contract address (i.e. you verify if the log was actually emitted by the smart contract). For the comparison, both `log.address()` and `contract_address` are converted to `Vec<u8>`.
 3. Every filtered log (i.e. every log that belongs to the smart contract) is mapped to a `pb::eth::event::v1::Event` struct, which was specified in the Protobuf definition.
 4. Finally, you collect all the events in a vector.

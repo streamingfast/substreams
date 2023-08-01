@@ -1,7 +1,7 @@
-## The "map_filter_transactions" Module
+## Filtering Transactions
 
-This module iterates over all the blockchain transactions, and filters them by some of their fields (the `from` and `to` fields).
-For example, if that you want to retrieve all the trasactions initiated by the address `0x`, you set the filter `from = 0x`.
+This module iterates over all the blockchain transactions and filters them by some of their fields (the `from` and `to` fields).
+For example, if you want to retrieve all the transactions initiated by the address `0x`, you set the filter `from = 0x`.
 
 ### Running the Substreams
 
@@ -189,7 +189,7 @@ map_filter_transactions: "to=0xdAC17F958D2ee523a2206206994597C13D831ec7"
 
 ### Applying Filters
 
-The filters are specified as a query-encoded string (`param1=value1&param2=value2&param3=value3`). In this example, only two parameters are support, `from` and `to`, which you can use to create filters, such as:
+The filters are specified as a query-encoded string (`param1=value1&param2=value2&param3=value3`). In this example, only two parameters are supported, `from` and `to`, which you can use to create filters, such as:
 
 ```yml
 map_filter_transactions: "from=0x89e51fa8ca5d66cd220baed62ed01e8951aa7c40&to=0xdAC17F958D2ee523a2206206994597C13D831ec7"
@@ -254,7 +254,7 @@ fn map_filter_transactions(params: String, blk: Block) -> Result<Transactions, V
 ```
 
 The function name, `map_filter_transactions` matches the name given in the Substreams manifest. Two parameters are passed: `params: String, blk: Block`.
-For Substreams, the parameter specified in the manifest is a simple String. The query-enconded format is just an abstraction that you must parse.
+For Substreams, the parameter specified in the manifest is a simple String. The query-encoded format is just an abstraction that you must parse.
 The `parse_filters_from_params` parses the string and creates a `TransactionFilterParams` struct.
 
 ```rust
@@ -283,7 +283,7 @@ Back in the main function, if the parameters parsing is correct, you start filte
 ```rust
     let filters = parse_filters_from_params(params)?;
 
-    // At this point, filters are correct. If not, a Vec<substreams::errors::Error> object is returned.
+    // At this point, the filters are correct. If not, a Vec<substreams::errors::Error> object is returned.
     let transactions: Vec<Transaction> = blk
         .transactions() // 1.
         .filter(|trans| apply_filter(&trans, &filters)) // 2.
@@ -297,27 +297,5 @@ Back in the main function, if the parameters parsing is correct, you start filte
 1. The `transactions()` method iterates over all the **successful** transactions of the block.
 2. Then, for every successful transaction, the previously parsed filters are applied.
 3. Every transaction that complies with the filters provided is mapped into a `pb::eth::transaction::v1::Transaction` struct.
-This struct is part of the Protobuf declarations, and is part of the output of the Substreams module.
+This struct is part of the Protobuf declarations and is part of the output of the Substreams module.
 4. Finally, all the transactions are collected into a vector of type  `pb::eth::transaction::v1::Transaction`.
-
-Let's take a look at the `apply_filter` function, which returns `true` if the current transaction in the iterator must be filtered or `false` otherwise.
-
-```rust
-fn apply_filter(transaction: &TransactionTrace, filters: &TransactionFilterParams) -> bool {
-    if !filter_by_parameter(&filters.from, &transaction.from)
-        || !filter_by_parameter(&filters.to, &transaction.to)
-        || transaction.status != (TransactionTraceStatus::Succeeded as i32)
-    {
-        return false;
-    }
-
-    true
-}
-```
-
-The function receives two parameters: `TransactionTrace`, which contains all the information about a specific transaction, and `TransactionFilterParams`, which contains the filters provided by the user. If 
-
-
-
-
-

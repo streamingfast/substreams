@@ -1,7 +1,7 @@
 ## Filtering Transactions
 
 This module iterates over all the blockchain transactions and filters them by some of their fields (the `from` and `to` fields).
-For example, if you want to retrieve all the transactions initiated by the address `0x`, you set the filter `from = 0x`.
+For example, if you want to retrieve all the transactions initiated by the address `0xb6692f7ae54e89da0269c1bfd685ccdfd41d2bf7`, you set the filter `from = 0xb6692f7ae54e89da0269c1bfd685ccdfd41d2bf7`.
 
 ### Running the Substreams
 
@@ -181,7 +181,7 @@ Backprocessing history up to requested target block 17712038:
 all done
 ```
 
-In the previous command, you are filtering all the transactions from blocks `17712038` to `17712041`, where `to = 0xdac17f958d2ee523a2206206994597c13d831ec7` (the USDT smart contract address). The filters are specified in the `params` section of the Substreams manifest (`substreams.yml`):
+In the previous command, you are filtering all the transactions from blocks `17712038` to `17712040`, where `to = 0xdac17f958d2ee523a2206206994597c13d831ec7` (the USDT smart contract address). The filters are specified in the `params` section of the Substreams manifest (`substreams.yml`):
 
 ```yml
 map_filter_transactions: "to=0xdAC17F958D2ee523a2206206994597C13D831ec7"

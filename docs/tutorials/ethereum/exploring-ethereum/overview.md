@@ -51,15 +51,14 @@ Given any combination of two parameters (`from` and `to`), the `map_filter_trans
 
 Given a smart contract address parameter (`contract_address`), the `map_contract_events` module retrieves all the events related to a specific smart contract. This involves:
 
-1. Iterating over all the smart contract transactions,
-2. Filtering the transactions, where the `to` field is equal to the smart contract address parameter (`to == contract_address`).
-3. For every filtered transaction, retrieve the logs.
+1. Iterating over all the logs of a block.
+2. Filtering the log, where the `address` field is equal to the smart contract address parameter (`address == contract_address`).
 
 In the following sections, you will through every module, run the corresponding Substreams, and understand every piece of code. Let's go!
 
 ### The Project Structure
 
-<img src="../../../.gitbook/assets/eth-explorer-manifest.png" alt="" />
+<img src="../../../.gitbook/assets/eth-explorer-manifest.png" width="100%" />
 
 1. The `proto` folder contains the Protobuf definitions for the transformations.
 In this example, there are three Protobuf objects, which are the outputs of the Substreams module mentioned in the previous section: BlockMeta (which represents the information of an Ethereum block), Transaction (which is an abstraction for an Ethereum transaction), and Event (an abstraction for an Ethereum event).
@@ -70,7 +69,7 @@ In this example, there are three Protobuf objects, which are the outputs of the 
 
 Let's take a closer look at the Substreams manifest (`substreams.yml`):
 
-<img src="../../../.gitbook/assets/eth-explorer-manifest.png" alt="" />
+<img src="../../../.gitbook/assets/eth-explorer-manifest.png" width="100%" />
 
 1. The `protobuf` section specifies the location of the Protobuf files used in the Substreams (i.e. where are the files defining the objects that you are going to use as output). In this example, the files are under the `proto` folder.
 2. When you run Substreams, you are really executing a Rust application inside a WASM container. Therefore, Substreams needs to know where is the WASM executable. The `binaries` section specifies the location of the WASM executable.

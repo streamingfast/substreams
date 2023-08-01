@@ -2,9 +2,6 @@
 
 This module takes a raw Ethereum block and returns a reduced version of a block, with just three pieces of information: hash, parent hash, and block number.
 
-- Input:
-- Output:
-
 Let's run the Substreams first, and then go through the code.
 
 ### Running the Substreams

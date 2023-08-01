@@ -59,7 +59,7 @@ In the following sections, you will through every module, run the corresponding 
 
 ### The Project Structure
 
-<img src="../.gitbook/assets/eth-explorer-structure.png" alt="" />
+<img src="../../../assets/.gitbook/assets/eth-explorer-manifest.png" alt="" />
 
 1. The `proto` folder contains the Protobuf definitions for the transformations.
 In this example, there are three Protobuf objects, which are the outputs of the Substreams module mentioned in the previous section: BlockMeta (which represents the information of an Ethereum block), Transaction (which is an abstraction for an Ethereum transaction), and Event (an abstraction for an Ethereum event).
@@ -70,7 +70,7 @@ In this example, there are three Protobuf objects, which are the outputs of the 
 
 Let's take a closer look at the Substreams manifest (`substreams.yml`):
 
-<img src="../.gitbook/assets/eth-explorer-manifest.png" alt="" />
+<img src="../../../assets/.gitbook/assets/eth-explorer-manifest.png" alt="" />
 
 1. The `protobuf` section specifies the location of the Protobuf files used in the Substreams (i.e. where are the files defining the objects that you are going to use as output). In this example, the files are under the `proto` folder.
 2. When you run Substreams, you are really executing a Rust application inside a WASM container. Therefore, Substreams needs to know where is the WASM executable. The `binaries` section specifies the location of the WASM executable.

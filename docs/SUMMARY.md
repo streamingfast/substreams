@@ -17,9 +17,9 @@
 
 * [Ethereum](tutorials/ethereum/overview.md)
   * [Exploring Ethereum](tutorials/ethereum/exploring-ethereum/overview.md)
-    * ["map_block_meta" module](tutorials/ethereum/exploring-ethereum/map_block_meta_module.md)
-    * ["map_filter_transactions" module](tutorials/ethereum/exploring-ethereum/map_filter_transactions_module.md)
-    * ["map_contract_events" module](tutorials/ethereum/exploring-ethereum/map_contract_events_module.md)
+    * [Mapping Blocks](tutorials/ethereum/exploring-ethereum/map_block_meta_module.md)
+    * [Filtering Transactions](tutorials/ethereum/exploring-ethereum/map_filter_transactions_module.md)
+    * [Retrieving Events of a Smart Contract](tutorials/ethereum/exploring-ethereum/map_contract_events_module.md)
 
 ## Developer's Guide
 

@@ -25,3 +25,9 @@ Some libraries include kernel syscalls or other operations unavailable in the Su
 Helpful information people found through the use of third-party libraries and Substreams together include:
 
 * [`tiny_keccak`](https://docs.rs/tiny-keccak): an implementation of Keccak-derived functions specified in FIPS-202, SP800-185, and KangarooTwelve.
+
+### Git Versions
+
+[Specifying dependencies from Git repositories](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#specifying-dependencies-from-git-repositories) is possible in Rust, but it is **NOT recommended** by the Substreams team, as they are not fully tested and can brings bugs to your Substreams project.
+
+The Substreams team recommends using the templates provided in the [Examples section](examples.md) as a starting point to develop your Substreams application.

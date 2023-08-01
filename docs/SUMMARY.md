@@ -13,6 +13,14 @@
 * [Installing the Substreams CLI](getting-started/installing-the-cli.md)
 * [Quickstart](getting-started/quickstart.md)
 
+## Tutorials
+
+* [Ethereum](tutorials/ethereum/overview.md)
+  * [Exploring Ethereum](tutorials/ethereum/exploring-ethereum/overview.md)
+    * ["map_block_meta" module](tutorials/ethereum/exploring-ethereum/map_block_meta_module.md)
+    * ["map_filter_transactions" module](tutorials/ethereum/exploring-ethereum/map_filter_transactions_module.md)
+    * ["map_contract_events" module](tutorials/ethereum/exploring-ethereum/map_contract_events_module.md)
+
 ## Developer's Guide
 
 * [Overview](developers-guide/overview.md)

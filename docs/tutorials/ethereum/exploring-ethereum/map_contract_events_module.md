@@ -7,11 +7,11 @@ Given a smart contract address passed as a parameter, this module returns the lo
 First, generate the Protobuf modules and build the Rust code:
 
 ```bash
-$ make protogen
+make protogen
 ```
 
 ```bash
-$ make build
+make build
 ```
 
 Now, you can run the Substreams. The logs retrieved correspond to the `0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d` (BoredApeYachtClub smart contract).
@@ -19,11 +19,12 @@ To avoid iterating over the full blockchain, the following command starts at blo
 
 ```bash
 substreams run -e mainnet.eth.streamingfast.io:443 substreams.yaml map_contract_events --start-block 17717995 --stop-block +10
+```
 
-Connected (trace ID 612a91bac1a11f812d14282cf07d6a40)
-Progress messages received: 0 (0/sec)
-Backprocessing history up to requested target block 17717995:
-(hit 'm' to switch mode)
+The output of the command should be similar to:
+
+```bash
+...output omitted...
 
 ----------- BLOCK #17,717,995 (bfecb26963a2cd77700754612185e0074fc9589d2d73abb90e362fe9e7969451) ---------------
 ----------- BLOCK #17,717,996 (7bf431a4f9df67e1d7e385d9a6cba41c658e66a77f0eb926163a7bbf6619ce20) ---------------
@@ -71,7 +72,8 @@ all done
 The smart contract address is passed as a parameter defined in the Substreams manifest (`substreams.yml`):
 
 ```yml
-map_contract_events: "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d"
+params:
+  map_contract_events: "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d"
 ```
 
 ### Inspecting the Code

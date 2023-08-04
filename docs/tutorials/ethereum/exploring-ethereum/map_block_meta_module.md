@@ -11,23 +11,32 @@ Running a Substreams usually requires three steps: generating the Rust Protobufs
 1. **Generate the Protobuf objects:** The `.proto` files define a data model regardless of any programming language. However, in order to use this model in your Rust application, you must generate the corresponding Rust data structures.
 
 ```bash
-$ make protogen
+make protogen
 ```
 
-2. **Build the WASM container:** The following command generates a WASM container from the Rust application, which you can find at `/target/wasm32-unknown-unknown/release/substreams.wasm`. Note that this is the same path provided in the Substreams manifest (`substreams.yml`).
+2. **Build the WASM module:** The following command generates a WASM container from the Rust application, which you can find at `/target/wasm32-unknown-unknown/release/substreams.wasm`. Note that this is the same path provided in the Substreams manifest (`substreams.yml`).
 
 ```bash
-$ make build
+make build
 ```
 
 3. **Streaming data through the CLI:** The following command streams the Ethereum blockchain data, and applies the transformations contained in the `map_block_meta` module to every block.
 
 ```bash
 $ substreams run -e mainnet.eth.streamingfast.io:443 substreams.yaml map_block_meta --start-block 17712040 --stop-block +1
-Connected (trace ID e98f04cd7ebb6191befbbf2e6668eafc)
-Progress messages received: 0 (0/sec)
-Backprocessing history up to requested target block 17712040:
-(hit 'm' to switch mode)
+```
+
+Let's break down the command into pieces:
+- `mainnet.eth.streamingfast.io:443`: is the StreamingFast Ethereum Mainnet endpoint where you are sending your Substreams for execution. 
+- `substreams.yaml`: specifies the Substreams manifest.
+- `map_block_meta`: specifies the module to execute. Since the Ethereum Explorer application contains several modules, it is necessary to specify which one you want to execute.
+- `--start-block 17712040`: specifies the starting block (i.e. the block where Substreams will start streaming).
+- `--stop-block +1`: specifies how many blocks after the starting block should be considered. In this example, `+1` means that the streaming will start at `17712040` and finish at `17712041` (just one block).
+
+The output of the command should similar to:
+
+```bash
+...output omitted...
 
 ----------- BLOCK #17,712,040 (31ad07fed936990d3c75314589b15cbdec91e4cc53a984a43de622b314c38d0b) ---------------
 {
@@ -43,13 +52,6 @@ Backprocessing history up to requested target block 17712040:
 
 all done
 ```
-
-Let's break down the command into pieces:
-- `mainnet.eth.streamingfast.io:443`: is the StreamingFast Ethereum Mainnet endpoint where you are sending your Substreams for execution. 
-- `substreams.yaml`: specifies the Substreams manifest.
-- `map_block_meta`: specifies the module to execute. Since the Ethereum Explorer application contains several modules, it is necessary to specify which one you want to execute.
-- `--start-block 17712040`: specifies the starting block (i.e. the block where Substreams will start streaming).
-- `--stop-block +1`: specifies how many blocks after the starting block should be considered. In this example, `+1` means that the streaming will start at `17712040` and finish at `17712041` (just one block).
 
 As you can see, the output is formatted as JSON, and the `@data` field contains the actual output Protobuf of the module (`BlockMeta`).
 

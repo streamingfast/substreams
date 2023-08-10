@@ -180,7 +180,7 @@ func addExtensionFunctions(ctx context.Context, runtime wazero.Runtime, registry
 					if err != nil {
 						panic(fmt.Errorf(`running wasm extension "%s::%s": %w`, namespace, importName, err))
 					}
-					reqctx.ReqStats(ctx).RecordWasmExtDuration(importName, time.Since(t0))
+					reqctx.ReqStats(ctx).RecordModuleWasmBlock(call.ModuleName, time.Since(t0))
 
 					if ctx.Err() == context.Canceled {
 						// Sometimes long-running extensions will come back to a canceled context.

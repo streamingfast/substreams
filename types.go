@@ -18,12 +18,6 @@ func NewBlockScopedDataResponse(in *pbsubstreamsrpc.BlockScopedData) *pbsubstrea
 	}
 }
 
-func NewModulesProgressResponse(in []*pbsubstreamsrpc.ModuleProgress) *pbsubstreamsrpc.Response {
-	return &pbsubstreamsrpc.Response{
-		Message: &pbsubstreamsrpc.Response_Progress{Progress: &pbsubstreamsrpc.ModulesProgress{Modules: in}},
-	}
-}
-
 func NewSnapshotData(in *pbsubstreamsrpc.InitialSnapshotData) *pbsubstreamsrpc.Response {
 	return &pbsubstreamsrpc.Response{
 		Message: &pbsubstreamsrpc.Response_DebugSnapshotData{DebugSnapshotData: in},

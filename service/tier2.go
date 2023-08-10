@@ -190,11 +190,9 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		}
 	}
 
-	if s.runtimeConfig.WithRequestStats {
-		var requestStats metrics.Stats
-		ctx, requestStats = setupRequestStats(ctx, requestDetails, outputGraph, true)
-		defer requestStats.LogAndClose()
-	}
+	var requestStats *metrics.Stats
+	ctx, requestStats = setupRequestStats(ctx, requestDetails, outputGraph, true)
+	defer requestStats.LogAndClose()
 
 	if err := outputGraph.ValidateRequestStartBlock(requestDetails.ResolvedStartBlockNum); err != nil {
 		return stream.NewErrInvalidArg(err.Error())

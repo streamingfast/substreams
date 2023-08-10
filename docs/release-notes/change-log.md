@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Highlights
+
+* Complete redesign of the progress messages: statistics are now aggregated between tier2 and tier1 and represent a snapshot of the current state.
+* tier1 progress messages now include details of current running parallel stages and a breakdown of where the time is spent in each module.
+
+### CLI changes
+
+* `substreams info` now takes an optional second parameter `<output-module>` to show how the substreams modules can be divided into stages
+
+### Backend changes
+
+* Removed `Config.RequestStats`, stats are now always enabled.
+
 ## v1.1.10
 
 ### Backend changes

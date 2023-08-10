@@ -8,10 +8,12 @@ import (
 	"testing"
 
 	"github.com/streamingfast/logging"
+	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/wasm"
 	_ "github.com/streamingfast/substreams/wasm/wasmtime"
 	_ "github.com/streamingfast/substreams/wasm/wazero"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func init() {
@@ -46,6 +48,7 @@ func BenchmarkExecution(b *testing.B) {
 
 		wasmCode := readCode(b, "substreams_wasm/substreams.wasm")
 
+		stats := metrics.NewReqStats(&metrics.Config{}, zap.NewNop())
 		for _, config := range []*runtime{
 			{"wasmtime", wasmCode, reuseInstance},
 			{"wasmtime", wasmCode, freshInstanceEachRun},
@@ -70,7 +73,7 @@ func BenchmarkExecution(b *testing.B) {
 				require.NoError(b, err)
 				defer cachedInstance.Close(ctx)
 
-				call := wasm.NewCall(nil, testCase.tag, testCase.entrypoint, testCase.arguments)
+				call := wasm.NewCall(nil, testCase.tag, testCase.entrypoint, stats, testCase.arguments)
 
 				for i := 0; i < b.N; i++ {
 					instance := cachedInstance

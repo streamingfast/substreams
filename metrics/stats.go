@@ -1,34 +1,137 @@
 package metrics
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dmetrics"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"go.uber.org/zap"
 )
 
-type Stats interface {
-	RecordParallelDuration(elapsed time.Duration)
-	RecordWasmExtDuration(wasmExtName string, elapsed time.Duration)
-	RecordModuleExecDuration(elapsed time.Duration)
-	RecordBlock(ref bstream.BlockRef)
-	LogAndClose()
+type Stats struct {
+	sync.Mutex
+
+	config *Config
+
+	blockRate *dmetrics.AvgRateCounter
+
+	startTime      time.Time
+	initDuration   time.Duration
+	modulesStats   map[string]*extendedStats
+	schedulerStats *schedulerStats
+
+	logger *zap.Logger
 }
 
-func NewNoopStats() Stats {
-	return &noopstats{}
+type schedulerStats struct {
+	runningJobs int
 }
 
-type noopstats struct{}
+func NewReqStats(config *Config, logger *zap.Logger) *Stats {
+	return &Stats{
+		config:       config,
+		blockRate:    dmetrics.MustNewAvgRateCounter(1*time.Second, 30*time.Second, "blocks"),
+		startTime:    time.Now(),
+		logger:       logger,
+		modulesStats: make(map[string]*extendedStats),
+		schedulerStats: &schedulerStats{
+			runningJobs: 0,
+		},
+	}
+}
 
-func (n noopstats) RecordParallelDuration(_ time.Duration)          {}
-func (n noopstats) RecordBlock(_ bstream.BlockRef)                  {}
-func (n noopstats) RecordWasmExtDuration(_ string, _ time.Duration) {}
-func (n noopstats) RecordModuleExecDuration(_ time.Duration)        {}
-func (n noopstats) LogAndClose()                                    {}
+type extendedStats struct {
+	*pbssinternal.ModuleStats
+	storeOperationsTime time.Duration
+	processingTime      time.Duration
+	externalCallsTime   time.Duration
+}
+
+func (s *extendedStats) updateDurations() {
+	s.ModuleStats.ProcessingTimeMs = uint64(s.processingTime.Milliseconds())
+	s.ModuleStats.ExternalCallsTimeMs = uint64(s.externalCallsTime.Milliseconds())
+	s.ModuleStats.StoreOperationsTimeMs = uint64(s.storeOperationsTime.Milliseconds())
+}
+
+func (s *Stats) RecordInitializationComplete() {
+	s.initDuration = time.Since(s.startTime)
+}
+
+// FIXME: add stage and range
+func (s *Stats) RecordNewSubrequest() {
+	s.Lock()
+	s.schedulerStats.runningJobs += 1
+	s.Unlock()
+}
+func (s *Stats) RecordEndSubrequest() {
+	s.Lock()
+	s.schedulerStats.runningJobs += 1
+	s.Unlock()
+}
+
+// RecordModuleWasmBlock should be called once per module per block. `elapsed` is the time spent in executing the WASM code, including store and extension calls
+func (s *Stats) RecordModuleWasmBlock(moduleName string, elapsed time.Duration) {
+	s.Lock()
+	defer s.Unlock()
+	mod := s.moduleStats(moduleName)
+	mod.processingTime += elapsed
+}
+
+// RecordModuleWasmExternalCall can be called multiple times per module per block, for each external module call (ex: eth_call). `elapsed` is the time spent in executing that call.
+func (s *Stats) RecordModuleWasmExternalCall(moduleName string, elapsed time.Duration) {
+	s.Lock()
+	defer s.Unlock()
+	mod := s.moduleStats(moduleName)
+	mod.ExternalCallsCount++
+	mod.externalCallsTime += elapsed
+}
+
+// RecordModuleWasmStoreRead can be called multiple times per module per block `elapsed` is the time spent in executing that operation.
+func (s *Stats) RecordModuleWasmStoreRead(moduleName string, elapsed time.Duration) {
+	s.Lock()
+	defer s.Unlock()
+	mod := s.moduleStats(moduleName)
+	mod.StoreReadsCount++
+	mod.storeOperationsTime += elapsed
+}
+
+// RecordModuleWasmStoreWrite can be called multiple times per module per block `elapsed` is the time spent in executing that operation.
+func (s *Stats) RecordModuleWasmStoreWrite(moduleName string, elapsed time.Duration) {
+	s.Lock()
+	defer s.Unlock()
+	mod := s.moduleStats(moduleName)
+	mod.StoreWritesCount++
+	mod.storeOperationsTime += elapsed
+}
+
+// RecordModuleWasmStoreDeletePrefix can be called multiple times per module per block `elapsed` is the time spent in executing that operation.
+func (s *Stats) RecordModuleWasmStoreDeletePrefix(moduleName string, elapsed time.Duration) {
+	s.Lock()
+	defer s.Unlock()
+	mod := s.moduleStats(moduleName)
+	mod.StoreDeleteprefixCount++
+	mod.storeOperationsTime += elapsed
+}
+
+func (s *Stats) RecordBlock(ref bstream.BlockRef) {
+	s.blockRate.Add(1)
+}
+
+// moduleStats should be called while locked
+func (s *Stats) moduleStats(moduleName string) *extendedStats {
+	mod, ok := s.modulesStats[moduleName]
+	if !ok {
+		mod = &extendedStats{
+			ModuleStats: &pbssinternal.ModuleStats{
+				Name: moduleName,
+			},
+		}
+		s.modulesStats[moduleName] = mod
+	}
+	return mod
+}
 
 type Config struct {
 	UserID           string
@@ -39,53 +142,29 @@ type Config struct {
 	Tier2            bool
 }
 
-func NewReqStats(config *Config, logger *zap.Logger) Stats {
-	return &stats{
-		config:           config,
-		blockRate:        dmetrics.MustNewAvgRateCounter(1*time.Second, 30*time.Second, "blocks"),
-		wasmExtDurations: map[string]time.Duration{},
-		llDuration:       0,
-		logger:           logger,
+func (s *Stats) ModulesStats() []*pbssinternal.ModuleStats {
+	s.Lock()
+	defer s.Unlock()
+
+	out := make([]*pbssinternal.ModuleStats, len(s.modulesStats))
+	i := 0
+	for _, v := range s.modulesStats {
+		v.updateDurations()
+		out[i] = v.ModuleStats
+		i++
 	}
+
+	return out
 }
 
-type stats struct {
-	config     *Config
-	blockRate  *dmetrics.AvgRateCounter
-	llDuration time.Duration
-
-	wasmExtDurationLock sync.RWMutex
-	wasmExtDurations    map[string]time.Duration
-	moduleExecDuration  time.Duration
-
-	logger *zap.Logger
-}
-
-func (s *stats) RecordParallelDuration(elapsed time.Duration) {
-	s.llDuration = elapsed
-}
-
-func (s *stats) RecordBlock(ref bstream.BlockRef) {
-	s.blockRate.Add(1)
-}
-
-func (s *stats) RecordWasmExtDuration(wasmExtName string, elapsed time.Duration) {
-	s.wasmExtDurationLock.Lock()
-	defer s.wasmExtDurationLock.Unlock()
-	s.wasmExtDurations[wasmExtName] += elapsed
-}
-
-func (s *stats) RecordModuleExecDuration(elapsed time.Duration) {
-	s.moduleExecDuration += elapsed
-}
-
-func (s *stats) LogAndClose() {
+func (s *Stats) LogAndClose() {
 	s.blockRate.SyncNow()
 	s.blockRate.Stop()
 	s.logger.Info("substreams request stats", s.getZapFields()...)
 }
 
-func (s *stats) getZapFields() []zap.Field {
+// getZapFields should be called while Stats is locked
+func (s *Stats) getZapFields() []zap.Field {
 	// Logging fields order is important as it affects the final rendering, we carefully ordered
 	// them so the development logs looks nicer.
 	tier := "tier1"
@@ -102,12 +181,26 @@ func (s *stats) getZapFields() []zap.Field {
 		zap.String("tier", tier),
 		zap.String("block_rate_per_sec", s.blockRate.RateString()),
 		zap.Uint64("block_count", s.blockRate.Total()),
-		zap.Duration("parallel_duration", s.llDuration),
-		zap.Duration("module_exec_duration", s.moduleExecDuration),
+		zap.Duration("parallel_duration", s.initDuration),
+		zap.Duration("module_exec_duration", s.moduleExecDuration()),
+		zap.Duration("module_wasm_ext_duration", s.moduleWasmExtDuration()),
 	}
 
-	for name, duration := range s.wasmExtDurations {
-		out = append(out, zap.Duration(fmt.Sprintf("%s_wasm_ext_duration", name), duration))
-	}
 	return out
+}
+
+// moduleExecDuration should be called while Stats is locked
+func (s *Stats) moduleExecDuration() (out time.Duration) {
+	for _, m := range s.modulesStats {
+		out += m.processingTime
+	}
+	return
+}
+
+// moduleWasmExtDuration should be called while Stats is locked
+func (s *Stats) moduleWasmExtDuration() (out time.Duration) {
+	for _, m := range s.modulesStats {
+		out += m.externalCallsTime
+	}
+	return
 }

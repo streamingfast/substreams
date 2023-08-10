@@ -4,7 +4,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/tui2/common"
 )
 
@@ -33,26 +32,28 @@ func NewBars(c common.Common, targetBlock uint64) *Bars {
 func (b *Bars) Init() tea.Cmd { return nil }
 
 func (b *Bars) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case *pbsubstreamsrpc.ModulesProgress:
-		for _, mod := range msg.Modules {
-			bar, found := b.barsMap[mod.Name]
-			if !found {
-				bar = NewBar(b.Common, mod.Name, b.targetBlock)
-				b.barsMap[mod.Name] = bar
-				b.bars = append(b.bars, bar)
-				b.SetSize(b.Width, b.Height)
-			}
-			bar.Update(mod.Type)
-		}
-	}
-	var totalBlocks uint64
-	for _, bar := range b.bars {
-		totalBlocks += bar.totalBlocks
-	}
-	b.TotalBlocks = totalBlocks
-	b.BarCount = uint64(len(b.bars))
+	// FIXME
 	return b, nil
+	//switch msg := msg.(type) {
+	//case *pbsubstreamsrpc.ModulesProgress:
+	//	for _, mod := range msg.Modules {
+	//		bar, found := b.barsMap[mod.Name]
+	//		if !found {
+	//			bar = NewBar(b.Common, mod.Name, b.targetBlock)
+	//			b.barsMap[mod.Name] = bar
+	//			b.bars = append(b.bars, bar)
+	//			b.SetSize(b.Width, b.Height)
+	//		}
+	//		bar.Update(mod.Type)
+	//	}
+	//}
+	//var totalBlocks uint64
+	//for _, bar := range b.bars {
+	//	totalBlocks += bar.totalBlocks
+	//}
+	//b.TotalBlocks = totalBlocks
+	//b.BarCount = uint64(len(b.bars))
+	//return b, nil
 }
 
 func (b *Bars) SetSize(w, h int) {

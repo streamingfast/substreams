@@ -14,6 +14,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/streamingfast/substreams/manifest"
+	"github.com/streamingfast/substreams/metrics"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
@@ -53,6 +54,7 @@ func TestPipeline_runExecutor(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := reqctx.WithRequest(context.Background(), &reqctx.RequestDetails{})
+			ctx = reqctx.WithReqStats(ctx, metrics.NewReqStats(&metrics.Config{}, zap.NewNop()))
 			pipe := &Pipeline{
 				forkHandler: NewForkHandler(),
 				outputGraph: outputmodules.TestNew(),

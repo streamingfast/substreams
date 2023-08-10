@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -54,42 +53,43 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.TraceID = msg.Session.TraceId
 		m.BackprocessingCompleteAtBlock = msg.Session.ResolvedStartBlock
 
-	case *pbsubstreamsrpc.ModuleProgress:
-		m.Updates += 1
-		thisSec := time.Now().Unix()
-		if m.UpdatedSecond != thisSec {
-			m.UpdatesPerSecond = m.UpdatesThisSecond
-			m.UpdatesThisSecond = 0
-			m.UpdatedSecond = thisSec
-		}
-		m.UpdatesThisSecond += 1
-
-		switch progMsg := msg.Type.(type) {
-		case *pbsubstreamsrpc.ModuleProgress_ProcessedRanges_:
-			newModules := updatedRanges{}
-			for k, v := range m.Modules {
-				newModules[k] = v
-			}
-
-			for _, v := range progMsg.ProcessedRanges.ProcessedRanges {
-				newModules[msg.Name] = mergeRangeLists(newModules[msg.Name], &blockRange{
-					Start: v.StartBlock,
-					End:   v.EndBlock,
-				})
-			}
-
-			m.Modules = newModules
-		case *pbsubstreamsrpc.ModuleProgress_InitialState_:
-		case *pbsubstreamsrpc.ModuleProgress_ProcessedBytes_:
-		case *pbsubstreamsrpc.ModuleProgress_Failed_:
-			m.Failures += 1
-			if progMsg.Failed.Reason != "" {
-				m.Reason = fmt.Sprintf("Reason: %s, logs: %s, truncated: %v", progMsg.Failed.Reason, progMsg.Failed.Logs, progMsg.Failed.LogsTruncated)
-			}
-			m.LastFailure = progMsg.Failed
-			m.ui.Cancel()
-			return m, nil
-		}
+		// FIXME
+		//	case *pbsubstreamsrpc.ModuleProgress:
+		//		m.Updates += 1
+		//		thisSec := time.Now().Unix()
+		//		if m.UpdatedSecond != thisSec {
+		//			m.UpdatesPerSecond = m.UpdatesThisSecond
+		//			m.UpdatesThisSecond = 0
+		//			m.UpdatedSecond = thisSec
+		//		}
+		//		m.UpdatesThisSecond += 1
+		//
+		//		switch progMsg := msg.Type.(type) {
+		//		case *pbsubstreamsrpc.ModuleProgress_ProcessedRanges_:
+		//			newModules := updatedRanges{}
+		//			for k, v := range m.Modules {
+		//				newModules[k] = v
+		//			}
+		//
+		//			for _, v := range progMsg.ProcessedRanges.ProcessedRanges {
+		//				newModules[msg.Name] = mergeRangeLists(newModules[msg.Name], &blockRange{
+		//					Start: v.StartBlock,
+		//					End:   v.EndBlock,
+		//				})
+		//			}
+		//
+		//			m.Modules = newModules
+		//		case *pbsubstreamsrpc.ModuleProgress_InitialState_:
+		//		case *pbsubstreamsrpc.ModuleProgress_ProcessedBytes_:
+		//		case *pbsubstreamsrpc.ModuleProgress_Failed_:
+		//			m.Failures += 1
+		//			if progMsg.Failed.Reason != "" {
+		//				m.Reason = fmt.Sprintf("Reason: %s, logs: %s, truncated: %v", progMsg.Failed.Reason, progMsg.Failed.Logs, progMsg.Failed.LogsTruncated)
+		//			}
+		//			m.LastFailure = progMsg.Failed
+		//			m.ui.Cancel()
+		//			return m, nil
+		//		}
 	default:
 	}
 

@@ -34,17 +34,6 @@ func WithPipelineOptions(f pipeline.PipelineOptioner) Option {
 	}
 }
 
-func WithRequestStats() Option {
-	return func(a anyTierService) {
-		switch s := a.(type) {
-		case *Tier1Service:
-			s.runtimeConfig.WithRequestStats = true
-		case *Tier2Service:
-			s.runtimeConfig.WithRequestStats = true
-		}
-	}
-}
-
 func WithMaxWasmFuelPerBlockModule(maxFuel uint64) Option {
 	return func(a anyTierService) {
 		switch s := a.(type) {

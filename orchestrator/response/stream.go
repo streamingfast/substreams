@@ -2,7 +2,6 @@ package response
 
 import (
 	"github.com/streamingfast/substreams"
-	"github.com/streamingfast/substreams/block"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 )
 
@@ -20,78 +19,68 @@ func (s *Stream) BlockScopedData(in *pbsubstreamsrpc.BlockScopedData) error {
 	return s.respFunc(substreams.NewBlockScopedDataResponse(in))
 }
 
-func (s *Stream) InitialProgressMessages(in map[string]block.Ranges) error {
-	var out []*pbsubstreamsrpc.ModuleProgress
-	for storeName, rngs := range in {
-		var more []*pbsubstreamsrpc.BlockRange
-		for _, rng := range rngs {
-			more = append(more, &pbsubstreamsrpc.BlockRange{
-				StartBlock: rng.StartBlock,
-				EndBlock:   rng.ExclusiveEndBlock,
-			})
-		}
-		if len(more) != 0 {
-			out = append(out, &pbsubstreamsrpc.ModuleProgress{
-				Name: storeName,
-				Type: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges_{
-					ProcessedRanges: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges{
-						ProcessedRanges: more,
-					},
-				},
-			})
-		}
-	}
-
-	return s.respFunc(&pbsubstreamsrpc.Response{
-		Message: &pbsubstreamsrpc.Response_Progress{Progress: &pbsubstreamsrpc.ModulesProgress{Modules: out}},
-	})
-}
-
-func (s *Stream) RPCFailedProgressResponse(moduleName, reason string, logs []string, logsTruncated bool) error {
+func (s *Stream) SendModulesStats(stats []*pbsubstreamsrpc.ModuleStats, stages []*pbsubstreamsrpc.Stage, jobs []*pbsubstreamsrpc.Job, processedBytes *pbsubstreamsrpc.ProcessedBytes) error {
 	return s.respFunc(&pbsubstreamsrpc.Response{
 		Message: &pbsubstreamsrpc.Response_Progress{
 			Progress: &pbsubstreamsrpc.ModulesProgress{
-				Modules: []*pbsubstreamsrpc.ModuleProgress{
-					{
-						Name: moduleName,
-						Type: &pbsubstreamsrpc.ModuleProgress_Failed_{
-							Failed: &pbsubstreamsrpc.ModuleProgress_Failed{
-								Reason:        reason,
-								Logs:          logs,
-								LogsTruncated: logsTruncated,
-							},
-						},
-					},
-				},
+				ModulesStats:   stats,
+				Stages:         stages,
+				RunningJobs:    jobs,
+				ProcessedBytes: processedBytes,
 			},
 		},
 	})
+}
+
+func (s *Stream) RPCFailedProgressResponse(reason string, logs []string, logsTruncated bool) error {
+	// FIXME
+	return nil
+	//return s.respFunc(&pbsubstreamsrpc.Response{
+	//	Message: &pbsubstreamsrpc.Response_Progress{
+	//		Progress: &pbsubstreamsrpc.ModulesProgress{
+	//			Modules: []*pbsubstreamsrpc.ModuleProgress{
+	//				{
+	//					Name: moduleName,
+	//					Type: &pbsubstreamsrpc.ModuleProgress_Failed_{
+	//						Failed: &pbsubstreamsrpc.ModuleProgress_Failed{
+	//							Reason:        reason,
+	//							Logs:          logs,
+	//							LogsTruncated: logsTruncated,
+	//						},
+	//					},
+	//				},
+	//			},
+	//		},
+	//	},
+	//})
 }
 
 func (s *Stream) RPCRangeProgressResponse(moduleNames []string, start, end uint64) error {
-	var mods []*pbsubstreamsrpc.ModuleProgress
-	for _, moduleName := range moduleNames {
-		mods = append(mods, &pbsubstreamsrpc.ModuleProgress{
-			Name: moduleName,
-			Type: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges_{
-				ProcessedRanges: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges{
-					ProcessedRanges: []*pbsubstreamsrpc.BlockRange{
-						{
-							StartBlock: start,
-							EndBlock:   end,
-						},
-					},
-				},
-			},
-		})
-	}
-	return s.respFunc(&pbsubstreamsrpc.Response{
-		Message: &pbsubstreamsrpc.Response_Progress{
-			Progress: &pbsubstreamsrpc.ModulesProgress{
-				Modules: mods,
-			},
-		},
-	})
+	// FIXME
+	return nil
+	//var mods []*pbsubstreamsrpc.ModuleProgress
+	//for _, moduleName := range moduleNames {
+	//	mods = append(mods, &pbsubstreamsrpc.ModuleProgress{
+	//		Name: moduleName,
+	//		Type: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges_{
+	//			ProcessedRanges: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges{
+	//				ProcessedRanges: []*pbsubstreamsrpc.BlockRange{
+	//					{
+	//						StartBlock: start,
+	//						EndBlock:   end,
+	//					},
+	//				},
+	//			},
+	//		},
+	//	})
+	//}
+	//return s.respFunc(&pbsubstreamsrpc.Response{
+	//	Message: &pbsubstreamsrpc.Response_Progress{
+	//		Progress: &pbsubstreamsrpc.ModulesProgress{
+	//			Modules: mods,
+	//		},
+	//	},
+	//})
 }
 
 func (s *Stream) RPCProcessedBytes(
@@ -102,26 +91,28 @@ func (s *Stream) RPCProcessedBytes(
 	totalBytesWritten uint64,
 	nanoSeconds uint64,
 ) error {
-	return s.respFunc(&pbsubstreamsrpc.Response{
-		Message: &pbsubstreamsrpc.Response_Progress{
-			Progress: &pbsubstreamsrpc.ModulesProgress{
-				Modules: []*pbsubstreamsrpc.ModuleProgress{
-					{
-						Name: moduleName,
-						Type: &pbsubstreamsrpc.ModuleProgress_ProcessedBytes_{
-							ProcessedBytes: &pbsubstreamsrpc.ModuleProgress_ProcessedBytes{
-								BytesReadDelta:    bytesReadDelta,
-								BytesWrittenDelta: bytesWrittenDelta,
-								TotalBytesRead:    totalBytesRead,
-								TotalBytesWritten: totalBytesWritten,
-								NanoSecondsDelta:  nanoSeconds,
-							},
-						},
-					},
-				},
-			},
-		},
-	})
+	// FIXME
+	return nil
+	//return s.respFunc(&pbsubstreamsrpc.Response{
+	//	Message: &pbsubstreamsrpc.Response_Progress{
+	//		Progress: &pbsubstreamsrpc.ModulesProgress{
+	//			Modules: []*pbsubstreamsrpc.ModuleProgress{
+	//				{
+	//					Name: moduleName,
+	//					Type: &pbsubstreamsrpc.ModuleProgress_ProcessedBytes_{
+	//						ProcessedBytes: &pbsubstreamsrpc.ModuleProgress_ProcessedBytes{
+	//							BytesReadDelta:    bytesReadDelta,
+	//							BytesWrittenDelta: bytesWrittenDelta,
+	//							TotalBytesRead:    totalBytesRead,
+	//							TotalBytesWritten: totalBytesWritten,
+	//							NanoSecondsDelta:  nanoSeconds,
+	//						},
+	//					},
+	//				},
+	//			},
+	//		},
+	//	},
+	//})
 }
 
 /*

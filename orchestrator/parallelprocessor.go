@@ -61,7 +61,8 @@ func BuildParallelProcessor(
 		fmt.Print(stages.StatesString())
 	}
 
-	if err := stream.InitialProgressMessages(stages.InitialProgressMessages()); err != nil {
+	stagesProgress := stages.Progress()
+	if err := stream.SendModulesStats(nil, stagesProgress, nil, nil); err != nil {
 		return nil, fmt.Errorf("initial progress: %w", err)
 	}
 

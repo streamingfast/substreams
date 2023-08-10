@@ -226,9 +226,9 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 				// for that that would pick up the errors, and pack the remaining logs
 				// and reasons into a message. This is nowhere to be found now.
 
-				upstream.RPCFailedProgressResponse(resp.ModuleName, r.Failed.Reason, r.Failed.Logs, r.Failed.LogsTruncated)
+				upstream.RPCFailedProgressResponse(r.Failed.Reason, r.Failed.Logs, r.Failed.LogsTruncated)
 
-				err := fmt.Errorf("module %s failed on host: %s", resp.ModuleName, r.Failed.Reason)
+				err := fmt.Errorf("work failed on remote host: %s", r.Failed.Reason)
 				span.SetStatus(codes.Error, err.Error())
 				return &Result{Error: err}
 

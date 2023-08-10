@@ -3,10 +3,11 @@ package tui
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/substreams/tools/test"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/streamingfast/substreams/tools/test"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jhump/protoreflect/desc"
@@ -150,34 +151,36 @@ func (ui *TUI) IncomingMessage(ctx context.Context, resp *pbsubstreamsrpc.Respon
 		}
 
 	case *pbsubstreamsrpc.Response_BlockScopedData:
-		if testRunner != nil {
-			if err := testRunner.Test(ctx, m.BlockScopedData.Output, m.BlockScopedData.DebugMapOutputs, m.BlockScopedData.DebugStoreOutputs, m.BlockScopedData.Clock); err != nil {
-				fmt.Errorf("test runner failed: %w", err)
-			}
-		}
+		//if testRunner != nil {
+		//	if err := testRunner.Test(ctx, m.BlockScopedData.Output, m.BlockScopedData.DebugMapOutputs, m.BlockScopedData.DebugStoreOutputs, m.BlockScopedData.Clock); err != nil {
+		//		fmt.Errorf("test runner failed: %w", err)
+		//	}
+		//}
 
-		if ui.outputMode == OutputModeTUI {
-			printClock(m.BlockScopedData)
-		}
-		if m.BlockScopedData == nil {
-			return nil
-		}
-		ui.seenFirstData = true
-		if ui.outputMode == OutputModeTUI {
-			ui.ensureTerminalUnlocked()
-			return ui.decoratedBlockScopedData(m.BlockScopedData.Output, m.BlockScopedData.DebugMapOutputs, m.BlockScopedData.DebugStoreOutputs, m.BlockScopedData.Clock)
-		} else {
-			return ui.jsonBlockScopedData(m.BlockScopedData.Output, m.BlockScopedData.DebugMapOutputs, m.BlockScopedData.DebugStoreOutputs, m.BlockScopedData.Clock)
-		}
+		//if ui.outputMode == OutputModeTUI {
+		//	printClock(m.BlockScopedData)
+		//}
+		//if m.BlockScopedData == nil {
+		//	return nil
+		//}
+		//ui.seenFirstData = true
+		//if ui.outputMode == OutputModeTUI {
+		//	ui.ensureTerminalUnlocked()
+		//	return ui.decoratedBlockScopedData(m.BlockScopedData.Output, m.BlockScopedData.DebugMapOutputs, m.BlockScopedData.DebugStoreOutputs, m.BlockScopedData.Clock)
+		//} else {
+		//	return ui.jsonBlockScopedData(m.BlockScopedData.Output, m.BlockScopedData.DebugMapOutputs, m.BlockScopedData.DebugStoreOutputs, m.BlockScopedData.Clock)
+		//}
 	case *pbsubstreamsrpc.Response_Progress:
 		if ui.seenFirstData {
 			ui.formatPostDataProgress(m)
 		} else {
 			if ui.outputMode == OutputModeTUI {
 				ui.ensureTerminalLocked()
-				for _, module := range m.Progress.Modules {
-					ui.prog.Send(module)
-				}
+				fmt.Printf("%d stages: %+v\n", len(m.Progress.Stages), m.Progress.Stages)
+				fmt.Printf("module_stats: %+v\n", m.Progress.ModulesStats)
+				//for _, module := range m.Progress.Modules {
+				//	ui.prog.Send(module)
+				//}
 			}
 		}
 	case *pbsubstreamsrpc.Response_DebugSnapshotData:

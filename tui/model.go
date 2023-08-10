@@ -28,7 +28,7 @@ type model struct {
 	Connected                     bool
 
 	Failures    int
-	LastFailure *pbsubstreamsrpc.ModuleProgress_Failed
+	LastFailure error //*pbsubstreamsrpc.ModuleProgress_Failed
 	Reason      string
 
 	TraceID string

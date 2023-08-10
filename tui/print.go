@@ -210,36 +210,38 @@ func (ui *TUI) jsonSnapshotData(output *pbsubstreamsrpc.InitialSnapshotData) err
 }
 
 func (ui *TUI) formatPostDataProgress(msg *pbsubstreamsrpc.Response_Progress) {
-	var displayedFailure bool
-	for _, mod := range msg.Progress.Modules {
-		switch progMsg := mod.Type.(type) {
-		case *pbsubstreamsrpc.ModuleProgress_ProcessedRanges_:
-		case *pbsubstreamsrpc.ModuleProgress_InitialState_:
-		case *pbsubstreamsrpc.ModuleProgress_ProcessedBytes_:
-		case *pbsubstreamsrpc.ModuleProgress_Failed_:
-			failure := progMsg.Failed
-			if !displayedFailure {
-				fmt.Println("--------------------------------------------")
-				fmt.Println("EXECUTION FAILURE")
-				displayedFailure = true
-			}
+	// FIXME
+	fmt.Println(msg.Progress.ModulesStats)
+	//var displayedFailure bool
+	//for _, mod := range msg.Progress.Modules {
+	//	switch progMsg := mod.Type.(type) {
+	//	case *pbsubstreamsrpc.ModuleProgress_ProcessedRanges_:
+	//	case *pbsubstreamsrpc.ModuleProgress_InitialState_:
+	//	case *pbsubstreamsrpc.ModuleProgress_ProcessedBytes_:
+	//	case *pbsubstreamsrpc.ModuleProgress_Failed_:
+	//		failure := progMsg.Failed
+	//		if !displayedFailure {
+	//			fmt.Println("--------------------------------------------")
+	//			fmt.Println("EXECUTION FAILURE")
+	//			displayedFailure = true
+	//		}
 
-			if failure.Reason != "" {
-				fmt.Printf("%s: failed: %s\n", mod.Name, failure.Reason)
-			}
-			if len(failure.Logs) != 0 {
-				for _, log := range failure.Logs {
-					fmt.Printf("%s: log: %s\n", mod.Name, log)
-				}
-				if failure.LogsTruncated {
-					fmt.Printf("%s: <logs truncated>\n", mod.Name)
-				}
-			}
-		}
-	}
-	if displayedFailure {
-		fmt.Println("--------------------------------------------")
-	}
+	//		if failure.Reason != "" {
+	//			fmt.Printf("%s: failed: %s\n", mod.Name, failure.Reason)
+	//		}
+	//		if len(failure.Logs) != 0 {
+	//			for _, log := range failure.Logs {
+	//				fmt.Printf("%s: log: %s\n", mod.Name, log)
+	//			}
+	//			if failure.LogsTruncated {
+	//				fmt.Printf("%s: <logs truncated>\n", mod.Name)
+	//			}
+	//		}
+	//	}
+	//}
+	//if displayedFailure {
+	//	fmt.Println("--------------------------------------------")
+	//}
 }
 
 func (ui *TUI) decodeDynamicMessage(msgType string, msgDesc *desc.MessageDescriptor, blockNum uint64, modName string, anyin *anypb.Any) []byte {

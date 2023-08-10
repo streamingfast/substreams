@@ -309,11 +309,9 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 
 	}
 
-	if s.runtimeConfig.WithRequestStats {
-		var requestStats metrics.Stats
-		ctx, requestStats = setupRequestStats(ctx, requestDetails, outputGraph, false)
-		defer requestStats.LogAndClose()
-	}
+	var requestStats *metrics.Stats
+	ctx, requestStats = setupRequestStats(ctx, requestDetails, outputGraph, false)
+	defer requestStats.LogAndClose()
 
 	traceId := tracing.GetTraceID(ctx).String()
 	respFunc(&pbsubstreamsrpc.Response{
@@ -495,7 +493,7 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 	}
 }
 
-func setupRequestStats(ctx context.Context, requestDetails *reqctx.RequestDetails, graph *outputmodules.Graph, tier2 bool) (context.Context, metrics.Stats) {
+func setupRequestStats(ctx context.Context, requestDetails *reqctx.RequestDetails, graph *outputmodules.Graph, tier2 bool) (context.Context, *metrics.Stats) {
 	logger := reqctx.Logger(ctx)
 	auth := dauth.FromContext(ctx)
 	stats := metrics.NewReqStats(&metrics.Config{

@@ -19,7 +19,7 @@ message ProcessRangeRequest {
 }
 
 message ProcessRangeResponse {
-  string module_name = 1;
+  reserved 1;// previously string module_name = 1;
 
   reserved 2; // previously in oneof(type): BlockRange processed_range
   reserved 3; // previously in oneof(type): ProcessedBytes processed_bytes
@@ -33,7 +33,7 @@ message ProcessRangeResponse {
 }
 
 message Update {
-    uint64 duration_secs = 1;
+    uint64 duration_ms = 1;
     uint64 processed_blocks = 2;
     uint64 total_bytes_read = 3;
     uint64 total_bytes_written = 4;
@@ -43,10 +43,10 @@ message Update {
 
 message ModuleStats {
     string name = 1;
-    uint64 processing_time_secs = 2;
-    uint64 external_calls_time_secs = 3;
+    uint64 processing_time_ms = 2;
+    uint64 external_calls_time_ms = 3;
     uint64 external_calls_count = 4;
-    uint64 store_operations_time_secs = 5;
+    uint64 store_operations_time_ms = 5;
     uint64 store_reads_count = 6;
 
     // store-specific (will be 0 on mappers)

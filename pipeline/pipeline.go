@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/dmetering"
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 
@@ -53,6 +54,8 @@ type Pipeline struct {
 	respFunc         substreams.ResponseFunc
 	lastProgressSent time.Time
 
+	startTime      time.Time
+	modulesStats   map[string]*pbssinternal.ModuleStats
 	stores         *Stores
 	execoutStorage *execout.Configs
 
@@ -98,6 +101,7 @@ func New(
 		execoutStorage:  execoutStorage,
 		forkHandler:     NewForkHandler(),
 		traceID:         traceID,
+		startTime:       time.Now(),
 	}
 	for _, opt := range opts {
 		opt(pipe)
@@ -265,12 +269,11 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 
 	logger.Info("starting parallel processing")
 
-	t0 := time.Now()
 	storeMap, err = parallelProcessor.Run(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("parallel processing run: %w", err)
 	}
-	reqStats.RecordParallelDuration(time.Since(t0))
+	reqStats.RecordInitializationComplete()
 
 	p.processingModule = nil
 
@@ -363,56 +366,46 @@ func toRPCMapModuleOutputs(in *pbssinternal.ModuleOutput) (out *pbsubstreamsrpc.
 }
 
 func (p *Pipeline) returnRPCModuleProgressOutputs(clock *pbsubstreams.Clock) error {
-	var progress []*pbsubstreamsrpc.ModuleProgress
-	if p.processingModule != nil {
-		progress = append(progress, &pbsubstreamsrpc.ModuleProgress{
-			Name: p.processingModule.name,
-			Type: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges_{
-				ProcessedRanges: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges{
-					ProcessedRanges: []*pbsubstreamsrpc.BlockRange{
-						{
-							StartBlock: p.processingModule.initialBlockNum,
-							EndBlock:   clock.Number,
-						},
-					},
-				},
-			},
-		})
-	}
-	if p.respFunc != nil {
-		if err := p.respFunc(substreams.NewModulesProgressResponse(progress)); err != nil {
-			return fmt.Errorf("calling return func: %w", err)
-		}
-	}
+	// FIXME
 	return nil
+	//var progress []*pbsubstreamsrpc.ModuleProgress
+	//if p.processingModule != nil {
+	//	progress = append(progress, &pbsubstreamsrpc.ModuleProgress{
+	//		Name: p.processingModule.name,
+	//		Type: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges_{
+	//			ProcessedRanges: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges{
+	//				ProcessedRanges: []*pbsubstreamsrpc.BlockRange{
+	//					{
+	//						StartBlock: p.processingModule.initialBlockNum,
+	//						EndBlock:   clock.Number,
+	//					},
+	//				},
+	//			},
+	//		},
+	//	})
+	//}
+	//if p.respFunc != nil {
+	//	if err := p.respFunc(substreams.NewModulesProgressResponse(progress)); err != nil {
+	//		return fmt.Errorf("calling return func: %w", err)
+	//	}
+	//}
+	//return nil
 }
 
 func (p *Pipeline) returnInternalModuleProgressOutputs(clock *pbsubstreams.Clock, forceOutput bool) error {
 	if p.respFunc != nil {
 		if forceOutput || time.Since(p.lastProgressSent) > progressMessageInterval {
 			p.lastProgressSent = time.Now()
+
+			meter := dmetering.GetBytesMeter(p.ctx)
 			out := &pbssinternal.ProcessRangeResponse{
-				ModuleName: p.processingModule.name,
 				Type: &pbssinternal.ProcessRangeResponse_Update{
 					Update: &pbssinternal.Update{
-						ProcessedBlocks: clock.Number - p.processingModule.initialBlockNum,
-						//	DurationSecs:
-						//
-						// TotalBytesRead:
-						// TotalBytesWritten
-						//ModulesStats: []*pbssinternal.ModuleStats{
-						//{
-						//	Name
-						//	ProcessingTimeSecs
-						//	ExternalCallsTimeSecs
-						//	ExternalCallsCount
-						//	StoreOperationsTimeSecs
-						//	StoreReadsCount
-						//	StoreWritesCount
-						//	StoreDeleteprefixCount
-						//	StoreSizeBytes
-						//},
-						//},
+						ProcessedBlocks:   clock.Number - p.processingModule.initialBlockNum,
+						DurationMs:        uint64(time.Since(p.startTime).Milliseconds()),
+						TotalBytesRead:    meter.BytesRead(),
+						TotalBytesWritten: meter.BytesWritten(),
+						ModulesStats:      reqctx.ReqStats(p.ctx).ModulesStats(),
 					},
 				},
 			}

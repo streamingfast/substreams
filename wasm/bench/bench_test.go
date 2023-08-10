@@ -75,6 +75,9 @@ func BenchmarkExecution(b *testing.B) {
 
 				call := wasm.NewCall(nil, testCase.tag, testCase.entrypoint, stats, testCase.arguments)
 
+				b.ReportAllocs()
+				b.ResetTimer()
+
 				for i := 0; i < b.N; i++ {
 					instance := cachedInstance
 					if !config.shouldReUseInstance {

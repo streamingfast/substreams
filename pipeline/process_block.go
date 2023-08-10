@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/substreams/metrics"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -97,7 +98,14 @@ func (p *Pipeline) processBlock(
 		}
 
 	case bstream.StepNew:
-		err := p.handleStepNew(ctx, block, clock, cursor)
+		// metering of live blocks
+		payload, err := block.Payload.Get()
+		if err != nil {
+			return fmt.Errorf("step new: getting block payload: %w", err)
+		}
+		dmetering.GetBytesMeter(ctx).AddBytesRead(len(payload))
+
+		err = p.handleStepNew(ctx, block, clock, cursor)
 		if err != nil && err != io.EOF {
 			return fmt.Errorf("step new: handler step new: %w", err)
 		}

@@ -19,6 +19,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * Removed `Config.RequestStats`, stats are now always enabled.
 
+## v1.1.11
+
+### Fixes
+
+* Added metering of live blocks
+
 ## v1.1.10
 
 ### Backend changes

@@ -8,7 +8,7 @@ require (
 	github.com/jhump/protoreflect v1.12.0
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/pflag v1.0.5
-	github.com/streamingfast/bstream v0.0.2-0.20230510131449-6b591d74130d
+	github.com/streamingfast/bstream v0.0.2-0.20230731165201-639b4f347707
 	github.com/streamingfast/cli v0.0.4-0.20220630165922-bc58c6666fc8
 	github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1
 	github.com/streamingfast/dgrpc v0.0.0-20230621153617-bc715cdb9fd1
@@ -54,7 +54,7 @@ require (
 	github.com/streamingfast/dauth v0.0.0-20230726175303-fc1d7198cb33
 	github.com/streamingfast/dbin v0.0.0-20210809205249-73d5eca35dc5
 	github.com/streamingfast/dhttp v0.0.2-0.20220314180036-95936809c4b8
-	github.com/streamingfast/dmetering v0.0.0-20230706141508-cd783a0fb671
+	github.com/streamingfast/dmetering v0.0.0-20230731155453-e1df53e362aa
 	github.com/streamingfast/dmetrics v0.0.0-20230516031116-28fcfeb4b9ed
 	github.com/streamingfast/eth-go v0.0.0-20230410173454-433bd8803da1
 	github.com/streamingfast/sf-tracing v0.0.0-20230616174903-cd2ade641ca9

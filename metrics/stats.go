@@ -98,19 +98,21 @@ func (s *Stats) RecordModuleWasmStoreRead(moduleName string, elapsed time.Durati
 }
 
 // RecordModuleWasmStoreWrite can be called multiple times per module per block `elapsed` is the time spent in executing that operation.
-func (s *Stats) RecordModuleWasmStoreWrite(moduleName string, elapsed time.Duration) {
+func (s *Stats) RecordModuleWasmStoreWrite(moduleName string, sizeBytes uint64, elapsed time.Duration) {
 	s.Lock()
 	defer s.Unlock()
 	mod := s.moduleStats(moduleName)
+	mod.StoreSizeBytes = sizeBytes
 	mod.StoreWritesCount++
 	mod.storeOperationsTime += elapsed
 }
 
 // RecordModuleWasmStoreDeletePrefix can be called multiple times per module per block `elapsed` is the time spent in executing that operation.
-func (s *Stats) RecordModuleWasmStoreDeletePrefix(moduleName string, elapsed time.Duration) {
+func (s *Stats) RecordModuleWasmStoreDeletePrefix(moduleName string, sizeBytes uint64, elapsed time.Duration) {
 	s.Lock()
 	defer s.Unlock()
 	mod := s.moduleStats(moduleName)
+	mod.StoreSizeBytes = sizeBytes
 	mod.StoreDeleteprefixCount++
 	mod.storeOperationsTime += elapsed
 }

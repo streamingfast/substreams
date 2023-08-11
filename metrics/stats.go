@@ -45,15 +45,15 @@ func NewReqStats(config *Config, logger *zap.Logger) *Stats {
 
 type extendedStats struct {
 	*pbssinternal.ModuleStats
-	storeOperationsTime time.Duration
-	processingTime      time.Duration
-	externalCallsTime   time.Duration
+	storeOperationTime time.Duration
+	processingTime     time.Duration
+	externalCallTime   time.Duration
 }
 
 func (s *extendedStats) updateDurations() {
 	s.ModuleStats.ProcessingTimeMs = uint64(s.processingTime.Milliseconds())
-	s.ModuleStats.ExternalCallsTimeMs = uint64(s.externalCallsTime.Milliseconds())
-	s.ModuleStats.StoreOperationsTimeMs = uint64(s.storeOperationsTime.Milliseconds())
+	s.ModuleStats.ExternalCallTimeMs = uint64(s.externalCallTime.Milliseconds())
+	s.ModuleStats.StoreOperationTimeMs = uint64(s.storeOperationTime.Milliseconds())
 }
 
 type extendedJob struct {
@@ -103,8 +103,8 @@ func (s *Stats) RecordModuleWasmExternalCall(moduleName string, elapsed time.Dur
 	s.Lock()
 	defer s.Unlock()
 	mod := s.moduleStats(moduleName)
-	mod.ExternalCallsCount++
-	mod.externalCallsTime += elapsed
+	mod.ExternalCallCount++
+	mod.externalCallTime += elapsed
 }
 
 // RecordModuleWasmStoreRead can be called multiple times per module per block `elapsed` is the time spent in executing that operation.
@@ -112,8 +112,8 @@ func (s *Stats) RecordModuleWasmStoreRead(moduleName string, elapsed time.Durati
 	s.Lock()
 	defer s.Unlock()
 	mod := s.moduleStats(moduleName)
-	mod.StoreReadsCount++
-	mod.storeOperationsTime += elapsed
+	mod.StoreReadCount++
+	mod.storeOperationTime += elapsed
 }
 
 // RecordModuleWasmStoreWrite can be called multiple times per module per block `elapsed` is the time spent in executing that operation.
@@ -122,8 +122,8 @@ func (s *Stats) RecordModuleWasmStoreWrite(moduleName string, sizeBytes uint64, 
 	defer s.Unlock()
 	mod := s.moduleStats(moduleName)
 	mod.StoreSizeBytes = sizeBytes
-	mod.StoreWritesCount++
-	mod.storeOperationsTime += elapsed
+	mod.StoreWriteCount++
+	mod.storeOperationTime += elapsed
 }
 
 // RecordModuleWasmStoreDeletePrefix can be called multiple times per module per block `elapsed` is the time spent in executing that operation.
@@ -133,7 +133,7 @@ func (s *Stats) RecordModuleWasmStoreDeletePrefix(moduleName string, sizeBytes u
 	mod := s.moduleStats(moduleName)
 	mod.StoreSizeBytes = sizeBytes
 	mod.StoreDeleteprefixCount++
-	mod.storeOperationsTime += elapsed
+	mod.storeOperationTime += elapsed
 }
 
 func (s *Stats) RecordBlock(ref bstream.BlockRef) {
@@ -221,7 +221,7 @@ func (s *Stats) moduleExecDuration() (out time.Duration) {
 // moduleWasmExtDuration should be called while Stats is locked
 func (s *Stats) moduleWasmExtDuration() (out time.Duration) {
 	for _, m := range s.modulesStats {
-		out += m.externalCallsTime
+		out += m.externalCallTime
 	}
 	return
 }

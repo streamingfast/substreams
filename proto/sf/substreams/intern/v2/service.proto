@@ -44,15 +44,21 @@ message Update {
 message ModuleStats {
     string name = 1;
     uint64 processing_time_ms = 2;
-    uint64 external_call_time_ms = 3;
-    uint64 external_call_count = 4;
-    uint64 store_operation_time_ms = 5;
-    uint64 store_read_count = 6;
+    uint64 store_operation_time_ms = 3;
+    uint64 store_read_count = 4;
+
+    repeated ExternalCallMetric external_call_metrics = 5;
 
     // store-specific (will be 0 on mappers)
     uint64 store_write_count = 10;
     uint64 store_deleteprefix_count = 11;
     uint64 store_size_bytes = 12;
+}
+
+message ExternalCallMetric {
+    string name = 1;
+    uint64 count = 2;
+    uint64 time_ms = 3;
 }
 
 message Completed {

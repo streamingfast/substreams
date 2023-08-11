@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"sort"
 	"sync"
 	"time"
 
@@ -45,14 +46,33 @@ func NewReqStats(config *Config, logger *zap.Logger) *Stats {
 
 type extendedStats struct {
 	*pbssinternal.ModuleStats
-	storeOperationTime time.Duration
-	processingTime     time.Duration
-	externalCallTime   time.Duration
+	storeOperationTime  time.Duration
+	processingTime      time.Duration
+	externalCallTime    time.Duration
+	externalCallMetrics map[string]*extendedCallMetric
 }
 
+type extendedCallMetric struct {
+	count uint64
+	time  time.Duration
+}
+
+// updateDurations should be called while locked
 func (s *extendedStats) updateDurations() {
 	s.ModuleStats.ProcessingTimeMs = uint64(s.processingTime.Milliseconds())
-	s.ModuleStats.ExternalCallTimeMs = uint64(s.externalCallTime.Milliseconds())
+	s.ModuleStats.ExternalCallMetrics = make([]*pbssinternal.ExternalCallMetric, len(s.externalCallMetrics))
+	i := 0
+	for k, v := range s.externalCallMetrics {
+		s.ModuleStats.ExternalCallMetrics[i] = &pbssinternal.ExternalCallMetric{
+			Name:   k,
+			Count:  v.count,
+			TimeMs: uint64(v.time.Milliseconds()),
+		}
+		sort.Slice(s.ModuleStats.ExternalCallMetrics, func(i, j int) bool {
+			return s.ModuleStats.ExternalCallMetrics[i].Name < s.ModuleStats.ExternalCallMetrics[j].Name
+		})
+		i++
+	}
 	s.ModuleStats.StoreOperationTimeMs = uint64(s.storeOperationTime.Milliseconds())
 }
 
@@ -99,12 +119,18 @@ func (s *Stats) RecordModuleWasmBlock(moduleName string, elapsed time.Duration) 
 }
 
 // RecordModuleWasmExternalCall can be called multiple times per module per block, for each external module call (ex: eth_call). `elapsed` is the time spent in executing that call.
-func (s *Stats) RecordModuleWasmExternalCall(moduleName string, elapsed time.Duration) {
+func (s *Stats) RecordModuleWasmExternalCall(moduleName string, extension string, elapsed time.Duration) {
 	s.Lock()
 	defer s.Unlock()
 	mod := s.moduleStats(moduleName)
-	mod.ExternalCallCount++
-	mod.externalCallTime += elapsed
+
+	met, ok := mod.externalCallMetrics[extension]
+	if !ok {
+		met = &extendedCallMetric{}
+		mod.externalCallMetrics[extension] = met
+	}
+	met.count++
+	met.time += elapsed
 }
 
 // RecordModuleWasmStoreRead can be called multiple times per module per block `elapsed` is the time spent in executing that operation.

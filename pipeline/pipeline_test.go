@@ -61,7 +61,7 @@ func TestPipeline_runExecutor(t *testing.T) {
 			}
 			clock := &pbsubstreams.Clock{Id: test.block.Id, Number: test.block.Number}
 			execOutput := NewExecOutputTesting(t, bstreamBlk(t, test.block), clock)
-			executor := mapTestExecutor(t, test.moduleName)
+			executor := mapTestExecutor(t, ctx, test.moduleName)
 			res := pipe.execute(ctx, executor, execOutput)
 			err := pipe.applyExecutionResult(ctx, executor, res, execOutput)
 			require.NoError(t, err)
@@ -72,7 +72,7 @@ func TestPipeline_runExecutor(t *testing.T) {
 	}
 }
 
-func mapTestExecutor(t *testing.T, name string) *exec.MapperModuleExecutor {
+func mapTestExecutor(t *testing.T, ctx context.Context, name string) *exec.MapperModuleExecutor {
 	pkg := manifest.TestReadManifest(t, "../test/testdata/substreams-test-v0.1.0.spkg")
 
 	binaryIndex := uint32(0)
@@ -84,15 +84,13 @@ func mapTestExecutor(t *testing.T, name string) *exec.MapperModuleExecutor {
 	binary := pkg.Modules.Binaries[binaryIndex]
 	require.Greater(t, len(binary.Content), 1)
 
-	ctx := context.Background()
-
 	registry := wasm.NewRegistry(nil, 0)
 	module, err := registry.NewModule(ctx, binary.Content)
 	require.NoError(t, err)
 
 	return exec.NewMapperModuleExecutor(
 		exec.NewBaseExecutor(
-			context.Background(),
+			ctx,
 			name,
 			module,
 			false, // could exercice with cache enabled too

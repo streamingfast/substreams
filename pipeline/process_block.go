@@ -222,19 +222,13 @@ func (p *Pipeline) handleStepNew(ctx context.Context, block *bstream.Block, cloc
 		return fmt.Errorf("pre block hook: %w", err)
 	}
 
-	//blockDuration = 0
-	//exec.Timer = 0
 	if err := p.executeModules(ctx, execOutput); err != nil {
 		return fmt.Errorf("execute modules: %w", err)
 	}
-	//sumCount++
-	//sumDuration += exec.Timer
-	//fmt.Println("accumulated time for all modules", exec.Timer, "avg", sumDuration/time.Duration(sumCount))
 
 	if reqDetails.ShouldReturnProgressMessages() {
 		if reqDetails.IsTier2Request {
 			forceSend := (clock.Number+1)%p.runtimeConfig.StateBundleSize == 0
-
 			if err = p.returnInternalModuleProgressOutputs(clock, forceSend); err != nil {
 				return fmt.Errorf("failed to return modules progress %w", err)
 			}
@@ -263,9 +257,6 @@ func (p *Pipeline) handleStepNew(ctx context.Context, block *bstream.Block, cloc
 	return nil
 }
 
-// var blockDuration time.Duration
-// var sumDuration time.Duration
-// var sumCount int
 func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.ExecutionOutput) (err error) {
 	ctx, span := reqctx.WithModuleExecutionSpan(ctx, "modules_executions")
 	defer span.EndWithErr(&err)

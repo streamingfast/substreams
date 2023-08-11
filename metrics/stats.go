@@ -7,6 +7,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dmetrics"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"go.uber.org/zap"
 )
 
@@ -21,24 +22,24 @@ type Stats struct {
 	initDuration   time.Duration
 	modulesStats   map[string]*extendedStats
 	schedulerStats *schedulerStats
+	counter        uint64
 
 	logger *zap.Logger
 }
 
 type schedulerStats struct {
-	runningJobs int
+	runningJobs  map[uint64]*extendedJob
+	modulesStats map[string]*pbssinternal.ModuleStats
 }
 
 func NewReqStats(config *Config, logger *zap.Logger) *Stats {
 	return &Stats{
-		config:       config,
-		blockRate:    dmetrics.MustNewAvgRateCounter(1*time.Second, 30*time.Second, "blocks"),
-		startTime:    time.Now(),
-		logger:       logger,
-		modulesStats: make(map[string]*extendedStats),
-		schedulerStats: &schedulerStats{
-			runningJobs: 0,
-		},
+		config:         config,
+		blockRate:      dmetrics.MustNewAvgRateCounter(1*time.Second, 30*time.Second, "blocks"),
+		startTime:      time.Now(),
+		logger:         logger,
+		modulesStats:   make(map[string]*extendedStats),
+		schedulerStats: &schedulerStats{},
 	}
 }
 
@@ -55,19 +56,37 @@ func (s *extendedStats) updateDurations() {
 	s.ModuleStats.StoreOperationsTimeMs = uint64(s.storeOperationsTime.Milliseconds())
 }
 
+type extendedJob struct {
+	*pbsubstreamsrpc.Job
+	start time.Time
+}
+
 func (s *Stats) RecordInitializationComplete() {
 	s.initDuration = time.Since(s.startTime)
 }
 
-// FIXME: add stage and range
-func (s *Stats) RecordNewSubrequest() {
+func (s *Stats) RecordNewSubrequest(stage, startBlock, stopBlock uint64) (id uint64) {
 	s.Lock()
-	s.schedulerStats.runningJobs += 1
+	id = s.counter
+	s.counter++
+
+	s.schedulerStats.runningJobs[id] = &extendedJob{
+		start: time.Now(),
+		Job: &pbsubstreamsrpc.Job{
+			Stage:           stage,
+			StartBlock:      startBlock,
+			StopBlock:       stopBlock,
+			ProcessedBlocks: 0,
+			DurationMs:      0,
+		},
+	}
 	s.Unlock()
+	return id
 }
-func (s *Stats) RecordEndSubrequest() {
+
+func (s *Stats) RecordEndSubrequest(id uint64) {
 	s.Lock()
-	s.schedulerStats.runningJobs += 1
+	delete(s.schedulerStats.runningJobs, id)
 	s.Unlock()
 }
 

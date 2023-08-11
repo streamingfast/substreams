@@ -13,7 +13,7 @@
 * [Installing the Substreams CLI](getting-started/installing-the-cli.md)
 * [Quickstart](getting-started/quickstart.md)
 
-## Tutorials
+## :computer: Tutorials
 
 * [Ethereum](tutorials/ethereum/overview.md)
   * [Exploring Ethereum](tutorials/ethereum/exploring-ethereum/overview.md)

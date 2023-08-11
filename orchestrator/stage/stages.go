@@ -178,7 +178,6 @@ func (s *Stages) Progress() []*pbsubstreamsrpc.Stage {
 		}
 	}
 
-	fmt.Println("hey outpting out with", len(out), "one of which is", out[0])
 	return out
 }
 

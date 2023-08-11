@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/streamingfast/substreams"
 	orchestratorExecout "github.com/streamingfast/substreams/orchestrator/execout"
@@ -13,6 +14,7 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/stage"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
+	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"
@@ -61,10 +63,19 @@ func BuildParallelProcessor(
 		fmt.Print(stages.StatesString())
 	}
 
-	stagesProgress := stages.Progress()
-	if err := stream.SendModulesStats(nil, stagesProgress, nil, nil); err != nil {
-		return nil, fmt.Errorf("initial progress: %w", err)
-	}
+	stats := reqctx.ReqStats(ctx)
+	go func() {
+		for {
+			select {
+			case <-time.After(time.Millisecond * 100):
+				stagesProgress := stages.Progress()
+				jobs := stats.JobsStats()
+				stream.SendModulesStats(nil, stagesProgress, jobs, nil)
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 
 	// OPTIMIZATION: We should fetch the ExecOut files too, and see if they
 	// cover some of the ranges that we're after.

@@ -33,14 +33,50 @@ type schedulerStats struct {
 	modulesStats map[string]*pbssinternal.ModuleStats
 }
 
+func (s *Stats) ApplyTier2Update(jobIdx uint64, upd *pbssinternal.Update) {
+	s.schedulerStats.runningJobs[jobIdx].ProcessedBlocks = upd.ProcessedBlocks
+	for _, modStatUpdate := range upd.ModulesStats {
+		modStat, ok := s.modulesStats[modStatUpdate.Name]
+		if !ok {
+			s.schedulerStats.modulesStats[modStatUpdate.Name] = modStatUpdate
+			continue
+		}
+
+		modStat.StoreReadCount += modStatUpdate.StoreReadCount
+		modStat.ProcessingTimeMs += modStatUpdate.ProcessingTimeMs
+		modStat.StoreDeleteprefixCount += modStatUpdate.StoreDeleteprefixCount
+		modStat.StoreWriteCount += modStatUpdate.StoreWriteCount
+		modStat.StoreOperationTimeMs += modStatUpdate.StoreOperationTimeMs
+		if modStatUpdate.StoreSizeBytes > modStat.StoreSizeBytes {
+			modStat.StoreSizeBytes = modStatUpdate.StoreSizeBytes
+		}
+		for _, v := range modStatUpdate.ExternalCallMetrics {
+			var found bool
+			for _, prev := range modStat.ExternalCallMetrics {
+				if prev.Name == v.Name {
+					found = true
+					prev.Count += v.Count
+					prev.TimeMs += v.TimeMs
+				}
+			}
+			if !found {
+				modStat.ExternalCallMetrics = append(modStat.ExternalCallMetrics, v)
+			}
+		}
+	}
+}
+
 func NewReqStats(config *Config, logger *zap.Logger) *Stats {
 	return &Stats{
-		config:         config,
-		blockRate:      dmetrics.MustNewAvgRateCounter(1*time.Second, 30*time.Second, "blocks"),
-		startTime:      time.Now(),
-		logger:         logger,
-		modulesStats:   make(map[string]*extendedStats),
-		schedulerStats: &schedulerStats{},
+		config:       config,
+		blockRate:    dmetrics.MustNewAvgRateCounter(1*time.Second, 30*time.Second, "blocks"),
+		startTime:    time.Now(),
+		logger:       logger,
+		modulesStats: make(map[string]*extendedStats),
+		schedulerStats: &schedulerStats{
+			runningJobs:  make(map[uint64]*extendedJob),
+			modulesStats: make(map[string]*pbssinternal.ModuleStats),
+		},
 	}
 }
 
@@ -85,7 +121,7 @@ func (s *Stats) RecordInitializationComplete() {
 	s.initDuration = time.Since(s.startTime)
 }
 
-func (s *Stats) RecordNewSubrequest(stage, startBlock, stopBlock uint64) (id uint64) {
+func (s *Stats) RecordNewSubrequest(stage uint32, startBlock, stopBlock uint64) (id uint64) {
 	s.Lock()
 	id = s.counter
 	s.counter++
@@ -187,6 +223,26 @@ type Config struct {
 	OutputModuleHash string
 	ProductionMode   bool
 	Tier2            bool
+}
+
+func (s *Stats) JobsStats() []*pbsubstreamsrpc.Job {
+	s.Lock()
+	defer s.Unlock()
+
+	out := make([]*pbsubstreamsrpc.Job, len(s.schedulerStats.runningJobs))
+	i := 0
+	for _, v := range s.schedulerStats.runningJobs {
+		out[i] = &pbsubstreamsrpc.Job{
+			Stage:           v.Stage,
+			StartBlock:      v.StartBlock,
+			StopBlock:       v.StopBlock,
+			ProcessedBlocks: v.ProcessedBlocks,
+			DurationMs:      uint64(time.Since(v.start).Milliseconds()),
+		}
+		i++
+	}
+
+	return out
 }
 
 func (s *Stats) ModulesStats() []*pbssinternal.ModuleStats {

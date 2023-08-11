@@ -155,7 +155,7 @@ message Error {
 
 
 message Job {
-    uint64 stage = 1;
+    uint32 stage = 1;
     uint64 start_block = 2;
     uint64 stop_block = 3;
     uint64 processed_blocks = 4;

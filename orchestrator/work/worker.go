@@ -147,8 +147,8 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *blo
 			zap.Object("unit", unit),
 			zap.Int("number_of_tries", retryIdx),
 			zap.Strings("module_name", moduleNames),
-			zap.Duration("duration", timeTook),
-			zap.Float64("num_of_blocks_per_sec", float64(request.StopBlockNum-request.StartBlockNum)/timeTook.Seconds()),
+			zap.Float64("duration", timeTook.Seconds()),
+			zap.Float64("avg_processing_block_ms", float64(request.StopBlockNum-request.StartBlockNum)/timeTook.Seconds()),
 		)
 		return MsgJobSucceeded{
 			Unit:   unit,

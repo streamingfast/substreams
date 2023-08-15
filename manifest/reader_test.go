@@ -286,7 +286,7 @@ func TestReader_Read(t *testing.T) {
 				t.Setenv(envKey, envValue)
 			}
 
-			var readerOptions []Options
+			var readerOptions []Option
 			if !tt.args.validateBinary {
 				readerOptions = append(readerOptions, SkipSourceCodeReader())
 			}

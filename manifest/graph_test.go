@@ -226,7 +226,7 @@ func TestModuleGraph_computeInitialBlocks(t *testing.T) {
 		},
 		{
 			Name:         "mint_burn_swaps_extractor",
-			InitialBlock: UNSET,
+			InitialBlock: fourty,
 			Inputs: []*pbsubstreams.Module_Input{
 				{
 					Input: &pbsubstreams.Module_Input_Store_{
@@ -304,6 +304,7 @@ func TestModuleGraph_computeInitialBlocks(t *testing.T) {
 
 	assert.Equal(t, uint64(20), startBlockTestModule[0].InitialBlock)
 	assert.Equal(t, uint64(20), startBlockTestModule[1].InitialBlock)
+	assert.Equal(t, uint64(40), startBlockTestModule[len(startBlockTestModule)-1].InitialBlock)
 }
 
 func TestModuleGraph_ComputeInitialBlocks_WithOneParentContainingNoInitialBlock(t *testing.T) {

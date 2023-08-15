@@ -30,32 +30,40 @@ var httpClient = &http.Client{
 	Timeout: 30 * time.Second,
 }
 
-type Options func(r *Reader) *Reader
+type Option func(r *Reader) *Reader
 
-func SkipSourceCodeReader() Options {
+func SkipSourceCodeReader() Option {
 	return func(r *Reader) *Reader {
 		r.skipSourceCodeImportValidation = true
 		return r
 	}
 }
 
-func SkipModuleOutputTypeValidationReader() Options {
+func SkipModuleOutputTypeValidationReader() Option {
 	return func(r *Reader) *Reader {
 		r.skipModuleOutputTypeValidation = true
 		return r
 	}
 }
 
-func SkipPackageValidationReader() Options {
+func SkipPackageValidationReader() Option {
 	return func(r *Reader) *Reader {
 		r.skipPackageValidation = true
 		return r
 	}
 }
 
-func WithCollectProtoDefinitions(f func(protoDefinitions []*desc.FileDescriptor)) Options {
+func WithCollectProtoDefinitions(f func(protoDefinitions []*desc.FileDescriptor)) Option {
 	return func(r *Reader) *Reader {
 		r.collectProtoDefinitionsFunc = f
+		return r
+	}
+}
+
+func WithOverrides(overrides ...*ConfigurationOverride) Option {
+	override := mergeOverrides(overrides...)
+	return func(r *Reader) *Reader {
+		r.override = override
 		return r
 	}
 }
@@ -75,9 +83,11 @@ type Reader struct {
 	skipPackageValidation          bool
 
 	constructorErr error
+
+	override *ConfigurationOverride
 }
 
-func NewReader(input string, opts ...Options) (*Reader, error) {
+func NewReader(input string, opts ...Option) (*Reader, error) {
 	workingDir, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get working directory: %w", err)
@@ -86,7 +96,7 @@ func NewReader(input string, opts ...Options) (*Reader, error) {
 	return newReader(input, workingDir, opts...)
 }
 
-func MustNewReader(input string, opts ...Options) *Reader {
+func MustNewReader(input string, opts ...Option) *Reader {
 	reader, err := NewReader(input, opts...)
 	if err != nil {
 		panic(err)
@@ -95,7 +105,7 @@ func MustNewReader(input string, opts ...Options) *Reader {
 	return reader
 }
 
-func newReader(input string, workingDir string, opts ...Options) (*Reader, error) {
+func newReader(input string, workingDir string, opts ...Option) (*Reader, error) {
 	r := &Reader{resolvedInput: input}
 	for _, opt := range opts {
 		r = opt(r)
@@ -158,7 +168,16 @@ func (r *Reader) Read() (*pbsubstreams.Package, error) {
 		return nil, fmt.Errorf("unable to get working directory: %w", err)
 	}
 
-	return r.read(workingDir)
+	pack, err := r.read(workingDir)
+	if err != nil {
+		return nil, fmt.Errorf("read: %w", err)
+	}
+
+	if r.override != nil {
+		mergeManifests(pack, r.override)
+	}
+
+	return pack, nil
 }
 
 func (r *Reader) read(workingDir string) (*pbsubstreams.Package, error) {

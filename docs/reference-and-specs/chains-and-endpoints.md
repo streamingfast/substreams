@@ -31,20 +31,33 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 | Arweave  | [`sf.arweave.type.v1.Block`](https://github.com/streamingfast/firehose-arweave/blob/develop/proto/sf/arweave/type/v1/type.proto)\`\`              |                                                                                                                       |
 | Aptos    | [`aptos.extractor.v1.Block`](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-protos/proto/aptos/extractor/v1/extractor.proto)\`\` |                                                                                                                       |
 
-## Endpoints
+## StreamingFast Endpoints
 
 * **Ethereum Mainnet**: `mainnet.eth.streamingfast.io:443`
 * **Ethereum Görli**: `goerli.eth.streamingfast.io:443`
-* **Polygon** **Mainnet**: `polygon.streamingfast.io:443`
+* **Polygon Mainnet**: `polygon.streamingfast.io:443`
 * **Mumbai Testnet**: `mumbai.streamingfast.io:443`
 * **Arbitrum One:** `arb-one.streamingfast.io:443` (beta)
 * **BNB**: `bnb.streamingfast.io:443`
 * **NEAR Mainnet**: `mainnet.near.streamingfast.io:443`
 * **NEAR Testnet**: `testnet.near.streamingfast.io:443`
-* **Solana mainnet-beta**: `mainnet.sol.streamingfast.io:443`
+* **Solana Mainnet**: `mainnet.sol.streamingfast.io:443` (beta)
 * **Arweave Mainnet**: `mainnet.arweave.streamingfast.io:443`
 * **Aptos Testnet**: `testnet.aptos.streamingfast.io:443`
 
-## Others
+
+## Pinax Endpoints
+
+* **Ethereum Mainnet**: `eth.substreams.pinax.network:9000`
+* **Ethereum Görli**: `goerli.substreams.pinax.network:9000`
+* **Ethereum Sepolia**: `sepolia.substreams.pinax.network:9000`
+* **Polygon Mainnet**: `polygon.substreams.pinax.network:9000`
+* **Mumbai Testnet**: `mumbai.substreams.pinax.network:9000`
+* **BNB**: `bsc.substreams.pinax.network:9000`
+* **Chapel Testnet**: `bsc.substreams.pinax.network:9000`
+* **NEAR Mainnet**: `near.substreams.pinax.network:9000`
+* **NEAR Testnet**: `neartest.substreams.pinax.network:9000`
+
+## Other Chains
 
 You can support other blockchains for Substreams through Firehose instrumentation. Learn more in the [official Firehose documentation](https://firehose.streamingfast.io/).

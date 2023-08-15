@@ -54,7 +54,7 @@ $ sftoken
 
 ## Pinax Authentication
 
-If you are using [Pinax endpoints](https://thegraph.com/docs/en/substreams/reference-and-specs/chains-and-endpoints/) follow the same authentication flow with these URLs:
+If you are using [Pinax endpoints](https://thegraph.com/docs/en/substreams/reference-and-specs/chains-and-endpoints/#pinax-endpoints) follow the same authentication flow with these URLs:
 
 * Portal to manage your Pinax API key: [https://app.pinax.network](https://app.pinax.network)
 * Authentication endpoint: `https://auth.pinax.network/v1/auth/issue`

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -37,6 +38,7 @@ func init() {
 		replaced by "-") and "<version>" is "package.version" value. You can use "{version}" which resolves
 		to "package.version".
 	`))
+	packCmd.Flags().StringArrayP("config", "c", []string{}, cli.FlagDescription(`path to a configuration file that contains overrides for the manifest`))
 }
 
 func runPack(cmd *cobra.Command, args []string) error {
@@ -45,7 +47,26 @@ func runPack(cmd *cobra.Command, args []string) error {
 		manifestPath = args[0]
 	}
 
-	manifestReader, err := manifest.NewReader(manifestPath)
+	// Get the value of the -c flag
+	overridePaths, _ := cmd.Flags().GetStringArray("config")
+
+	var manifestReaderOptions []manifest.Option
+
+	// If the overridePath is provided, read, decode it and add to manifestReaderOptions
+	if len(overridePaths) > 0 {
+		var overrides []*manifest.ConfigurationOverride
+		for _, overridePath := range overridePaths {
+			overrideConfig, err := readOverrideConfig(overridePath)
+			if err != nil {
+				return fmt.Errorf("reading override config %q: %w", overridePath, err)
+			}
+			overrides = append(overrides, overrideConfig)
+		}
+		manifestReaderOptions = append(manifestReaderOptions, manifest.WithOverrides(overrides...))
+	}
+
+	// Use the manifestReaderOptions while creating the manifest reader
+	manifestReader, err := manifest.NewReader(manifestPath, manifestReaderOptions...)
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
@@ -98,4 +119,20 @@ func resolveOutputFile(input string, bindings map[string]string) string {
 	}
 
 	return input
+}
+
+// This function reads and decodes the override configuration from a given path
+func readOverrideConfig(path string) (*manifest.ConfigurationOverride, error) {
+	fileBytes, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	overrideConfig := &manifest.ConfigurationOverride{}
+	err = yaml.Unmarshal(fileBytes, overrideConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return overrideConfig, nil
 }

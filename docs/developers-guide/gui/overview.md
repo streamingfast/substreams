@@ -21,16 +21,7 @@ substreams gui -e mainnet.eth.streamingfast.io:443 https://github.com/streamingf
 
 In your command-line terminal, you should see something like:
 
-<video width="320" height="240" controls>
-  <source src="../../.gitbook/assets/videos/block1.mp4" type="video/mp4">
-  Your browser does not support the video tag.
-</video>
-
-{% embed url="../../.gitbook/assets/videos/block1.mp4" %}
-
-{% endembed %}
-
-<iframe width="560" height="315" src="https://www.youtube.com/embed/qWxffTKpciU?si=n14xIUi-YdnZtX-S" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+<img src="../../.gitbook/assets/gui/launching.gif" alt="" class="gitbook-drawing">
 
 The `Progress` screen provides information about the Substreams execution, such as its status or the payload received. Once all the blocks have been consumed, the status is `Stream ended`.
 There are two other main screens in the Substreams GUI: `Request` and `Output`. You can move to a different screen by using the `tab` key:

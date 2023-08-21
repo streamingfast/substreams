@@ -21,12 +21,12 @@ substreams gui -e mainnet.eth.streamingfast.io:443 https://github.com/streamingf
 
 In your command-line terminal, you should see something like:
 
-<img src="../../.gitbook/assets/gui/launching.gif" alt="" class="gitbook-drawing">
+<img src="../../.gitbook/assets/gui/launching.gif" />
 
 The `Progress` screen provides information about the Substreams execution, such as its status or the payload received. Once all the blocks have been consumed, the status is `Stream ended`.
 There are two other main screens in the Substreams GUI: `Request` and `Output`. You can move to a different screen by using the `tab` key:
 
-// video 2
+<img src="../../.gitbook/assets/gui/tabs.gif" />
 
 You can restart the stream by pressing the `s` key.
 

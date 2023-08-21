@@ -50,6 +50,8 @@
   * [Keys in stores](developers-guide/cookbook/keys-in-stores.md)
   * [Aggregation windows](developers-guide/cookbook/aggregation-windows.md)
   * [Subgraph entity changes](developers-guide/cookbook/entity-changes.md)
+* [GUI](developers-guide/gui/overview.md)
+  * [Launching](developers-guide/gui/launching.md)
 
 ## Reference & Specs
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"sync/atomic"
+	"time"
 
 	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/derr"
@@ -98,12 +99,15 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *blo
 
 	return func() loop.Msg {
 		var res *Result
+		retryIdx := 0
+		startTime := time.Now()
 		err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 			res = w.work(ctx, request, moduleNames, upstream)
 			err := res.Error
 			switch err.(type) {
 			case *RetryableErr:
 				logger.Debug("worker failed with retryable error", zap.Error(err))
+				retryIdx++
 				return err
 			default:
 				if err != nil {
@@ -119,6 +123,16 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *blo
 			} else {
 				logger.Info("job failed", zap.Object("unit", unit), zap.Error(err))
 			}
+
+			timeTook := time.Since(startTime)
+			logger.Info(
+				"incomplete job",
+				zap.Object("unit", unit),
+				zap.Int("number_of_tries", retryIdx),
+				zap.Strings("module_name", moduleNames),
+				zap.Duration("duration", timeTook),
+				zap.Float64("num_of_blocks_per_sec", float64(request.StopBlockNum-request.StartBlockNum)/timeTook.Seconds()),
+			)
 			return MsgJobFailed{Unit: unit, Error: err}
 		}
 
@@ -127,7 +141,15 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *blo
 			return MsgJobFailed{Unit: unit, Error: err}
 		}
 
-		logger.Info("job completed", zap.Object("unit", unit))
+		timeTook := time.Since(startTime)
+		logger.Info(
+			"job completed",
+			zap.Object("unit", unit),
+			zap.Int("number_of_tries", retryIdx),
+			zap.Strings("module_name", moduleNames),
+			zap.Float64("duration", timeTook.Seconds()),
+			zap.Float64("processing_time_per_block", timeTook.Seconds()/float64(request.StopBlockNum-request.StartBlockNum)),
+		)
 		return MsgJobSucceeded{
 			Unit:   unit,
 			Worker: w,

@@ -114,7 +114,7 @@ function checks() {
     exit 1
   fi
 
-  result=`printf "" | protoc-gen-connect-go --version 2>&1 | grep -Eo '1\.[4-9]+\.[0-9]+'`
+  result=`printf "" | protoc-gen-connect-go --version 2>&1 | grep -Eo '1\.([4-9]|[1-9][0-9]+)\.[0-9]+'`
   if [[ "$result" == "" ]]; then
     echo "Plugin 'protoc-gen-connect-go' is either missing or is not recent enough (at `which protoc-gen-connect-go || echo N/A`)."
     echo ""

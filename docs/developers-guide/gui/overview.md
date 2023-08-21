@@ -26,6 +26,10 @@ In your command-line terminal, you should see something like:
   Your browser does not support the video tag.
 </video>
 
+{% embed url="../../.gitbook/assets/videos/block1.mp4" %}
+
+{% endembed %}
+
 <iframe width="560" height="315" src="https://www.youtube.com/embed/qWxffTKpciU?si=n14xIUi-YdnZtX-S" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
 
 The `Progress` screen provides information about the Substreams execution, such as its status or the payload received. Once all the blocks have been consumed, the status is `Stream ended`.

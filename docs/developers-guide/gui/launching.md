@@ -10,7 +10,7 @@ substreams gui -e mainnet.eth.streamingfast.io:443 explorer1.spkg map_filter_tra
 In your command-line terminal, you see something like:
 
 <video width="320" height="240" controls>
-  <source src="../.gitbook/assets/videos/block1.mp4ss" type="video/mp4">
+  <source src="../../.gitbook/assets/videos/block1.mp4" type="video/mp4">
   Your browser does not support the video tag.
 </video>
 

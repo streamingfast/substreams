@@ -1,6 +1,9 @@
 package block
 
-import "strings"
+import (
+	"sort"
+	"strings"
+)
 
 func ParseRanges(in string) (out Ranges) {
 	for _, e := range strings.Split(in, ",") {
@@ -43,7 +46,33 @@ func (r Ranges) Contains(input *Range) bool {
 	return false
 }
 
+func (r Ranges) SortAndDedupe() (out Ranges) {
+	if r == nil {
+		return nil
+	}
+
+	m := make(map[string]*Range)
+
+	for _, rr := range r {
+		m[rr.String()] = rr
+	}
+
+	out = make(Ranges, len(m))
+	i := 0
+	for _, v := range m {
+		out[i] = v
+		i++
+	}
+
+	sort.Sort(out)
+	return
+}
+
 func (r Ranges) Merged() (out Ranges) {
+	if r == nil {
+		return nil
+	}
+
 	for i := 0; i < len(r); i++ {
 		curRange := r[i]
 		if i == len(r)-1 {

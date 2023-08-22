@@ -14,6 +14,7 @@ import (
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/orchestrator"
 	"github.com/streamingfast/substreams/orchestrator/plan"
+	"github.com/streamingfast/substreams/orchestrator/response"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -266,6 +267,23 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 	if err != nil {
 		return nil, fmt.Errorf("building parallel processor: %w", err)
 	}
+
+	stats := reqctx.ReqStats(ctx)
+	go func() {
+		stream := response.New(p.respFunc)
+		for {
+			select {
+			case <-time.After(time.Millisecond * 500):
+				stagesProgress := stats.Stages()
+				jobs := stats.JobsStats()
+				modStats := stats.AggregatedModulesStats()
+
+				stream.SendModulesStats(modStats, stagesProgress, jobs, nil)
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 
 	logger.Info("starting parallel processing")
 

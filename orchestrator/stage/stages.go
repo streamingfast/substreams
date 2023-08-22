@@ -3,7 +3,6 @@ package stage
 import (
 	"context"
 	"fmt"
-	"sort"
 	"strings"
 
 	"go.uber.org/zap"
@@ -148,8 +147,7 @@ func (s *Stages) AllStoresCompleted() bool {
 	return true
 }
 
-func (s *Stages) Progress() []*pbsubstreamsrpc.Stage {
-
+func (s *Stages) UpdateStats() {
 	out := make([]*pbsubstreamsrpc.Stage, len(s.stages))
 
 	s.StatesString()
@@ -161,16 +159,15 @@ func (s *Stages) Progress() []*pbsubstreamsrpc.Stage {
 
 		var br []*block.Range
 		for segmentIdx, segment := range s.segmentStates {
-			for stageIdx, state := range segment {
-				segmenter := s.stages[stageIdx].moduleStates[0].segmenter
-				if state == UnitCompleted {
-					if rng := segmenter.Range(segmentIdx + s.segmentOffset); rng != nil {
-						br = append(br, rng)
-					}
+			state := segment[i]
+			segmenter := s.stages[i].moduleStates[0].segmenter
+			if state == UnitCompleted || state == UnitPartialPresent || state == UnitMerging {
+				if rng := segmenter.Range(segmentIdx + s.segmentOffset); rng != nil {
+					br = append(br, rng)
 				}
 			}
 		}
-		blockRanges := block.Ranges(br).Merged()
+		blockRanges := block.Ranges(br).SortAndDedupe().Merged()
 
 		out[i] = &pbsubstreamsrpc.Stage{
 			Modules:         mods,
@@ -178,74 +175,13 @@ func (s *Stages) Progress() []*pbsubstreamsrpc.Stage {
 		}
 	}
 
-	return out
-}
-
-func (s *Stages) ModuleStats() []*pbsubstreamsrpc.ModuleStats {
-	stats := make(map[string]*pbsubstreamsrpc.ModuleStats)
-
-	for _, stage := range s.stages {
-		for _, state := range stage.moduleStates {
-			if _, ok := stats[state.name]; ok {
-				panic("seeing module twice")
-			}
-			stats[state.name] = &pbsubstreamsrpc.ModuleStats{
-				Name:                     state.name,
-				TotalProcessedBlockCount: 0,
-				// total_processing_time_ms is the sum of all time spent running that module code
-				TotalProcessingTimeMs: 0,
-				// external_calls are chain-specific intrinsics, like "Ethereum RPC calls".
-				// total_external_call_count is the sum of all external calls from that module code
-				TotalExternalCallCount: 0,
-				// total_external_call_time_ms is the sum of all time spent running that module code waiting for an external call
-				TotalExternalCallTimeMs: 0,
-				// total_store_operation_time_ms is the sum of all time spent running that module code waiting for a store operation (ex: read, write, delete...)
-				TotalStoreOperationTimeMs: 0,
-				// total_store_read_count is the sum of all the store Read operations called from that module code
-				TotalStoreReadCount: 0,
-				// total_error_count is the sum of all errors that the tier1 has received from tier2 jobs for that module. Some errors are not fatal and there are retry mechanisms.
-				TotalErrorCount: 0,
-				// last_error is the last error that was produced on a tier2 job. Some errors are not fatal and there are retry mechanisms.
-				LastError: nil,
-			}
-
-			if stage.kind == KindStore {
-				// total_store_write_count is the sum of all store Write operations called from that module code (store-only)
-				stats[state.name].TotalStoreWriteCount = 0
-
-				// total_store_deleteprefix_count is the sum of all store DeletePrefix operations called from that module code (store-only)
-				// note that DeletePrefix can be a costly operation on large stores
-				stats[state.name].TotalStoreDeleteprefixCount = 0
-
-				// store_size_bytes is the uncompressed size of the full KV store for that module, from the last 'merge' operation (store-only)
-				stats[state.name].StoreSizeBytes = state.cachedStore.SizeBytes()
-
-				// total_store_merging_time_ms is the time spent merging partial stores into a full KV store for that module (store-only)
-				stats[state.name].TotalStoreMergingTimeMs = 0
-
-				// store_currently_merging is true if there is a merging operation (partial store to full KV store) on the way.
-				stats[state.name].StoreCurrentlyMerging = false
-
-				// highest_contiguous_block is the highest block in the highest merged full KV store of that module (store-only)
-				stats[state.name].HighestContiguousBlock = 0
-			}
-		}
-	}
-	out := make([]*pbsubstreamsrpc.ModuleStats, len(stats))
-
-	i := 0
-	for _, stat := range stats {
-		out[i] = stat
-		i++
-	}
-	sort.SliceStable(out, func(i, j int) bool {
-		return out[i].Name < out[j].Name
-	})
-
-	return out
+	reqctx.ReqStats(s.ctx).RecordStages(out)
 }
 
 func toProtoRanges(in block.Ranges) []*pbsubstreamsrpc.BlockRange {
+	if len(in) == 0 {
+		return nil
+	}
 	out := make([]*pbsubstreamsrpc.BlockRange, len(in))
 	for i := range in {
 		out[i] = &pbsubstreamsrpc.BlockRange{

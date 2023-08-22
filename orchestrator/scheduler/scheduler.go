@@ -67,6 +67,7 @@ func (s *Scheduler) Init() loop.Cmd {
 }
 
 func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
+	defer s.Stages.UpdateStats()
 
 	if os.Getenv("SUBSTREAMS_DEBUG_SCHEDULER_STATE") == "true" {
 		fmt.Print(s.Stages.StatesString())

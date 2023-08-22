@@ -20,6 +20,7 @@ type Stats struct {
 	blockRate *dmetrics.AvgRateCounter
 
 	startTime      time.Time
+	stages         []*pbsubstreamsrpc.Stage
 	initDuration   time.Duration
 	modulesStats   map[string]*extendedStats
 	schedulerStats *schedulerStats
@@ -29,16 +30,19 @@ type Stats struct {
 }
 
 type schedulerStats struct {
-	runningJobs  map[uint64]*extendedJob
-	modulesStats map[string]*pbssinternal.ModuleStats
+	runningJobs map[uint64]*extendedJob
 }
 
 func (s *Stats) ApplyTier2Update(jobIdx uint64, upd *pbssinternal.Update) {
+	s.Lock()
+	defer s.Unlock()
 	s.schedulerStats.runningJobs[jobIdx].ProcessedBlocks = upd.ProcessedBlocks
 	for _, modStatUpdate := range upd.ModulesStats {
 		modStat, ok := s.modulesStats[modStatUpdate.Name]
 		if !ok {
-			s.schedulerStats.modulesStats[modStatUpdate.Name] = modStatUpdate
+			s.modulesStats[modStatUpdate.Name] = &extendedStats{
+				ModuleStats: modStatUpdate,
+			}
 			continue
 		}
 
@@ -74,14 +78,17 @@ func NewReqStats(config *Config, logger *zap.Logger) *Stats {
 		logger:       logger,
 		modulesStats: make(map[string]*extendedStats),
 		schedulerStats: &schedulerStats{
-			runningJobs:  make(map[uint64]*extendedJob),
-			modulesStats: make(map[string]*pbssinternal.ModuleStats),
+			runningJobs: make(map[uint64]*extendedJob),
 		},
 	}
 }
 
 type extendedStats struct {
 	*pbssinternal.ModuleStats
+
+	merging                       bool
+	processedBlocksInCompleteJobs uint64
+
 	storeOperationTime  time.Duration
 	processingTime      time.Duration
 	externalCallTime    time.Duration
@@ -121,6 +128,18 @@ func (s *Stats) RecordInitializationComplete() {
 	s.initDuration = time.Since(s.startTime)
 }
 
+func (s *Stats) RecordStages(stages []*pbsubstreamsrpc.Stage) {
+	s.Lock()
+	defer s.Unlock()
+	s.stages = stages
+}
+
+func (s *Stats) Stages() []*pbsubstreamsrpc.Stage {
+	s.Lock()
+	defer s.Unlock()
+	return s.stages
+}
+
 func (s *Stats) RecordNewSubrequest(stage uint32, startBlock, stopBlock uint64) (id uint64) {
 	s.Lock()
 	id = s.counter
@@ -142,6 +161,13 @@ func (s *Stats) RecordNewSubrequest(stage uint32, startBlock, stopBlock uint64) 
 
 func (s *Stats) RecordEndSubrequest(id uint64) {
 	s.Lock()
+	job := s.schedulerStats.runningJobs[id]
+
+	stage := s.stages[job.Stage]
+	for _, mod := range stage.Modules {
+		s.modulesStats[mod].processedBlocksInCompleteJobs += job.ProcessedBlocks
+	}
+
 	delete(s.schedulerStats.runningJobs, id)
 	s.Unlock()
 }
@@ -210,6 +236,7 @@ func (s *Stats) moduleStats(moduleName string) *extendedStats {
 			ModuleStats: &pbssinternal.ModuleStats{
 				Name: moduleName,
 			},
+			externalCallMetrics: make(map[string]*extendedCallMetric),
 		}
 		s.modulesStats[moduleName] = mod
 	}
@@ -257,6 +284,66 @@ func (s *Stats) ModulesStats() []*pbssinternal.ModuleStats {
 		i++
 	}
 
+	return out
+}
+
+func (s *Stats) Stage(module string) *pbsubstreamsrpc.Stage {
+	for _, ss := range s.stages {
+		for _, mod := range ss.Modules {
+			if mod == module {
+				return ss
+			}
+		}
+	}
+	// could happen on initial lookup, minor race condition
+	return nil
+}
+
+func (s *Stats) AggregatedModulesStats() []*pbsubstreamsrpc.ModuleStats {
+	s.Lock()
+	defer s.Unlock()
+
+	out := make([]*pbsubstreamsrpc.ModuleStats, len(s.modulesStats))
+	i := 0
+	for _, v := range s.modulesStats {
+		out[i] = &pbsubstreamsrpc.ModuleStats{
+			Name:                        v.Name,
+			TotalProcessedBlockCount:    v.processedBlocksInCompleteJobs, // FIXME: add the ones in jobs
+			TotalProcessingTimeMs:       v.ProcessingTimeMs,
+			ExternalCallMetrics:         toRPCExternalCallMetrics(v.ExternalCallMetrics),
+			StoreSizeBytes:              v.StoreSizeBytes,
+			TotalStoreOperationTimeMs:   v.StoreOperationTimeMs,
+			TotalStoreReadCount:         v.StoreReadCount,
+			TotalStoreWriteCount:        v.StoreWriteCount,
+			TotalStoreDeleteprefixCount: v.StoreDeleteprefixCount,
+			StoreCurrentlyMerging:       v.merging,
+			// TotalStoreMergingTimeMs: //FIXME .. need to store this
+			// TotalErrorCount: v.ModuleStats. //FIXME .. need to store this
+		}
+		if stage := s.Stage(v.Name); stage != nil { // will be nil for mappers
+			if ranges := stage.CompletedRanges; ranges != nil {
+				out[i].HighestContiguousBlock = ranges[0].EndBlock
+			}
+		}
+		i++
+	}
+
+	return out
+}
+
+func toRPCExternalCallMetrics(in []*pbssinternal.ExternalCallMetric) []*pbsubstreamsrpc.ExternalCallMetric {
+	if in == nil {
+		return nil
+	}
+
+	out := make([]*pbsubstreamsrpc.ExternalCallMetric, len(in))
+	for i := range in {
+		out[i] = &pbsubstreamsrpc.ExternalCallMetric{
+			Name:   in[i].Name,
+			Count:  in[i].Count,
+			TimeMs: in[i].TimeMs,
+		}
+	}
 	return out
 }
 

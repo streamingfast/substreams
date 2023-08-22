@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -177,9 +178,11 @@ func (ui *TUI) IncomingMessage(ctx context.Context, resp *pbsubstreamsrpc.Respon
 			if ui.outputMode == OutputModeTUI {
 				ui.ensureTerminalLocked()
 				fmt.Println("Got update message:")
-				fmt.Printf("%d jobs: %+v\n", len(m.Progress.RunningJobs), m.Progress.RunningJobs)
-				fmt.Printf("%d stages: %+v\n", len(m.Progress.Stages), m.Progress.Stages)
-				fmt.Printf("module_stats: %+v\n", m.Progress.ModulesStats)
+				j, err := json.Marshal(m.Progress)
+				if err != nil {
+					panic(err)
+				}
+				fmt.Println(string(j))
 				//for _, module := range m.Progress.Modules {
 				//	ui.prog.Send(module)
 				//}

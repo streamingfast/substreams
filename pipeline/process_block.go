@@ -185,9 +185,21 @@ func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
 	return nil
 }
 
-func (p *Pipeline) handleStepNew(ctx context.Context, block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) error {
+func (p *Pipeline) handleStepNew(ctx context.Context, block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) (err error) {
 	p.insideReorgUpTo = nil
 	reqDetails := reqctx.Details(ctx)
+
+	if reqDetails.ShouldReturnProgressMessages() {
+		defer func() {
+			if reqDetails.IsTier2Request {
+				forceSend := (clock.Number+1)%p.runtimeConfig.StateBundleSize == 0
+				err = p.returnInternalModuleProgressOutputs(clock, forceSend)
+			} else {
+				err = p.returnRPCModuleProgressOutputs(clock)
+			}
+		}()
+	}
+
 	if isBlockOverStopBlock(clock.Number, reqDetails.StopBlockNum) {
 		return io.EOF
 	}
@@ -224,19 +236,6 @@ func (p *Pipeline) handleStepNew(ctx context.Context, block *bstream.Block, cloc
 
 	if err := p.executeModules(ctx, execOutput); err != nil {
 		return fmt.Errorf("execute modules: %w", err)
-	}
-
-	if reqDetails.ShouldReturnProgressMessages() {
-		if reqDetails.IsTier2Request {
-			forceSend := (clock.Number+1)%p.runtimeConfig.StateBundleSize == 0
-			if err = p.returnInternalModuleProgressOutputs(clock, forceSend); err != nil {
-				return fmt.Errorf("failed to return modules progress %w", err)
-			}
-		} else {
-			if err = p.returnRPCModuleProgressOutputs(clock); err != nil {
-				return fmt.Errorf("failed to return modules progress %w", err)
-			}
-		}
 	}
 
 	if p.gate.shouldSendOutputs() {

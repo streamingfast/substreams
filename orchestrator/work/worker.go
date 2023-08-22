@@ -235,20 +235,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 		if resp != nil {
 			switch r := resp.Type.(type) {
 			case *pbssinternal.ProcessRangeResponse_Update:
-
 				stats.ApplyTier2Update(jobIdx, r.Update)
-
-				//// push some updates for all those stages, altogether
-				//err := upstream.RPCRangeProgressResponse(moduleNames, request.StartBlockNum, request.StartBlockNum+r.Update.ProcessedBlocks)
-				//if err != nil {
-				//	if ctx.Err() != nil {
-				//		return &Result{Error: ctx.Err()}
-				//	}
-				//	span.SetStatus(codes.Error, err.Error())
-				//	return &Result{
-				//		Error: NewRetryableErr(fmt.Errorf("sending progress: %w", err)),
-				//	}
-				//}
 
 			case *pbssinternal.ProcessRangeResponse_Failed:
 				// FIXME(abourget): we do NOT emit those Failed objects anymore. There was a flow

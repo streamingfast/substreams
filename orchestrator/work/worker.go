@@ -235,7 +235,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 		if resp != nil {
 			switch r := resp.Type.(type) {
 			case *pbssinternal.ProcessRangeResponse_Update:
-				stats.ApplyTier2Update(jobIdx, r.Update)
+				stats.RecordJobUpdate(jobIdx, r.Update)
 
 			case *pbssinternal.ProcessRangeResponse_Failed:
 				// FIXME(abourget): we do NOT emit those Failed objects anymore. There was a flow

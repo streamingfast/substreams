@@ -56,6 +56,7 @@ message Response {
     ModulesProgress progress = 2; // Progress of data preparation, before sending in the stream of `data` events.
     BlockScopedData block_scoped_data = 3;
     BlockUndoSignal block_undo_signal = 4;
+    Error fatal_error = 5;
 
     // Available only in developer mode, and only if `debug_initial_store_snapshot_for_modules` is set.
     InitialSnapshotData debug_snapshot_data = 10;
@@ -185,8 +186,6 @@ message ModuleStats {
     uint64 total_store_operation_time_ms = 5;
     // total_store_read_count is the sum of all the store Read operations called from that module code
     uint64 total_store_read_count = 6;
-    // total_error_count is the sum of all errors that the tier1 has received from tier2 jobs for that module. Some errors are not fatal and there are retry mechanisms.
-    uint64 total_error_count = 7;
 
     // total_store_write_count is the sum of all store Write operations called from that module code (store-only)
     uint64 total_store_write_count = 10;
@@ -206,9 +205,6 @@ message ModuleStats {
 
     // highest_contiguous_block is the highest block in the highest merged full KV store of that module (store-only)
     uint64 highest_contiguous_block = 15;
-
-    // last_error is the last error that was produced on a tier2 job. Some errors are not fatal and there are retry mechanisms.
-    Error last_error = 16;
 }
 
 message ExternalCallMetric {

@@ -80,9 +80,15 @@ func NewStages(
 	if reqPlan.WriteExecOut != nil {
 		out.mapSegmenter = reqPlan.WriteOutSegmenter()
 	}
-	for idx, stageLayer := range stagedModules {
-		mods := stageLayer.LastLayer()
-		kind := layerKind(mods)
+	for idx, stageLayers := range stagedModules {
+		var allModules []string
+		for _, layer := range stageLayers {
+			for _, mod := range layer {
+				allModules = append(allModules, mod.Name)
+			}
+		}
+		layer := stageLayers.LastLayer()
+		kind := layerKind(layer)
 
 		if kind == KindMap && reqPlan.WriteExecOut == nil {
 			continue
@@ -100,8 +106,8 @@ func NewStages(
 		}
 
 		var moduleStates []*ModuleState
-		stageLowestInitBlock := mods[0].InitialBlock
-		for _, mod := range mods {
+		stageLowestInitBlock := layer[0].InitialBlock
+		for _, mod := range layer {
 			modSegmenter := segmenter.WithInitialBlock(mod.InitialBlock)
 			modState := NewModuleState(logger, mod.Name, modSegmenter, storeConfigs[mod.Name])
 			moduleStates = append(moduleStates, modState)
@@ -110,7 +116,7 @@ func NewStages(
 		}
 
 		stageSegmenter := segmenter.WithInitialBlock(stageLowestInitBlock)
-		stage := NewStage(idx, kind, stageSegmenter, moduleStates)
+		stage := NewStage(idx, kind, stageSegmenter, moduleStates, allModules)
 		out.stages = append(out.stages, stage)
 	}
 
@@ -153,8 +159,8 @@ func (s *Stages) UpdateStats() {
 	s.StatesString()
 	for i := range s.stages {
 		var mods []string
-		for _, mod := range s.stages[i].moduleStates {
-			mods = append(mods, mod.name)
+		for _, mod := range s.stages[i].allExecutedModules {
+			mods = append(mods, mod)
 		}
 
 		var br []*block.Range

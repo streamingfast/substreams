@@ -189,13 +189,17 @@ func (p *Pipeline) handleStepNew(ctx context.Context, block *bstream.Block, cloc
 	p.insideReorgUpTo = nil
 	reqDetails := reqctx.Details(ctx)
 
-	if reqDetails.ShouldReturnProgressMessages() {
+	if p.respFunc != nil {
 		defer func() {
+			forceSend := (clock.Number+1)%p.runtimeConfig.StateBundleSize == 0 || err != nil
+			var sendError error
 			if reqDetails.IsTier2Request {
-				forceSend := (clock.Number+1)%p.runtimeConfig.StateBundleSize == 0
-				err = p.returnInternalModuleProgressOutputs(clock, forceSend)
+				sendError = p.returnInternalModuleProgressOutputs(clock, forceSend)
 			} else {
-				err = p.returnRPCModuleProgressOutputs(clock)
+				sendError = p.returnRPCModuleProgressOutputs(clock, forceSend)
+			}
+			if err == nil {
+				err = sendError
 			}
 		}()
 	}

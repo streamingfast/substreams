@@ -2,10 +2,12 @@ package progress
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/viewport"
+	"github.com/dustin/go-humanize"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -26,9 +28,12 @@ type Progress struct {
 	replayState string
 	targetBlock uint64
 
-	progressView       viewport.Model
-	progressUpdates    int
-	dataPayloads       int
+	progressView    viewport.Model
+	progressUpdates int
+	dataPayloads    int
+	slowestJobs     []string
+	slowestModules  []string
+
 	blocksPerSecond    uint64
 	blocksThisSecond   uint64
 	updatedSecond      int64
@@ -36,7 +41,8 @@ type Progress struct {
 	updatesThisSecond  int
 	maxParallelWorkers uint64
 
-	bars   *ranges.Bars
+	bars *ranges.Bars
+
 	curErr string
 }
 
@@ -93,7 +99,78 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			p.blocksThisSecond = p.bars.TotalBlocks
 		}
 		p.updatesThisSecond += 1
-		p.bars.Update(msg)
+
+		msg := msg.(*pbsubstreamsrpc.ModulesProgress)
+		newBars := make([]*ranges.Bar, len(msg.Stages))
+		newStageModules := make([]string, len(msg.Stages))
+
+		sort.Slice(msg.RunningJobs, func(i, j int) bool {
+			return msg.RunningJobs[i].DurationMs > msg.RunningJobs[j].DurationMs
+		})
+		newSlowestJobs := make([]string, 5)
+
+		jobsPerStage := make([]int, len(msg.Stages))
+		for i, j := range msg.RunningJobs {
+			jobsPerStage[j.Stage]++
+			if i < 5 {
+				newSlowestJobs[i] = fmt.Sprintf("[Stage: %d, Range: %d-%d, Duration: %ds]", j.Stage, j.StartBlock, j.StopBlock, j.DurationMs/1000)
+			}
+		}
+
+		for i, stage := range msg.Stages {
+			newStageModules[i] = strings.Join(stage.Modules, ",")
+
+			jobsForStage := jobsPerStage[i]
+			displayedName := fmt.Sprintf("stage %d (%d jobs)", i, jobsForStage)
+
+			br := make([]*ranges.BlockRange, len(stage.CompletedRanges))
+			for j, r := range stage.CompletedRanges {
+				br[j] = &ranges.BlockRange{
+					Start: r.StartBlock,
+					End:   r.EndBlock,
+				}
+			}
+
+			newBar := p.bars.NewBar(displayedName, br, stage.Modules)
+			newBars[i] = newBar
+		}
+
+		newSlowestModules := make([]string, 5)
+		sort.Slice(msg.ModulesStats, func(i, j int) bool {
+			return msg.ModulesStats[i].TotalProcessingTimeMs/(msg.ModulesStats[i].TotalProcessedBlockCount+1) > msg.ModulesStats[j].TotalProcessingTimeMs/(msg.ModulesStats[j].TotalProcessedBlockCount+1)
+		})
+		var moduleNameLen int
+		for _, mod := range msg.ModulesStats {
+			if len(mod.Name) > moduleNameLen {
+				moduleNameLen = len(mod.Name)
+			}
+		}
+		for i, mod := range msg.ModulesStats {
+			totalBlocks := mod.TotalProcessedBlockCount + 1
+
+			ratio := mod.TotalProcessingTimeMs / totalBlocks
+			if i > 4 {
+				break
+			}
+			var externalMetrics string
+			for _, ext := range mod.ExternalCallMetrics {
+				externalMetrics += fmt.Sprintf(" [%s (%d): %d%%]", ext.Name, ext.Count, ext.TimeMs/mod.TotalProcessingTimeMs)
+			}
+			var storeMetrics string
+			if mod.TotalStoreOperationTimeMs != 0 {
+				storeMetrics = fmt.Sprintf(" [store (%d read/blk, %d write/blk, %d deletePrefix/blk): %d%%]",
+					mod.TotalStoreReadCount/totalBlocks,
+					mod.TotalStoreWriteCount/totalBlocks,
+					mod.TotalStoreDeleteprefixCount/totalBlocks,
+					mod.TotalStoreOperationTimeMs/mod.TotalProcessingTimeMs)
+			}
+			newSlowestModules[i] = fmt.Sprintf("%*s %8sms per block%s%s", moduleNameLen, mod.Name, humanize.Comma(int64(ratio)), storeMetrics, externalMetrics)
+		}
+
+		p.slowestJobs = newSlowestJobs
+		p.slowestModules = newSlowestModules
+
+		p.bars.Update(newBars)
 		p.progressView.SetContent(p.bars.View())
 	case stream.StreamErrorMsg:
 		p.state = fmt.Sprintf("Error")
@@ -187,23 +264,45 @@ func (p *Progress) View() string {
 			lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(p.Width-5).Height(p.progressView.Height-lineCount).Render(p.progressView.View()),
 		)
 	}
+
+	slowestJobs := "Slowest jobs:\n"
+	for _, job := range p.slowestJobs {
+		if job == "" {
+			slowestJobs += "\n"
+		} else {
+			slowestJobs += " - " + job + "\n"
+		}
+	}
+
+	slowestModules := "Slowest modules:\n"
+	for _, mod := range p.slowestModules {
+		if mod == "" {
+			slowestModules += "\n"
+		} else {
+			slowestModules += " - " + mod + "\n"
+		}
+	}
+
 	return lipgloss.JoinVertical(0,
 		lipgloss.NewStyle().Margin(0, 2).Render(lipgloss.JoinHorizontal(0,
 			lipgloss.JoinVertical(1, labels...),
 			lipgloss.JoinVertical(0, infos...),
 		)),
 		lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(p.Width-5).Render(p.progressView.View()),
+		lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(p.Width-5).Render(lipgloss.NewStyle().MarginLeft(10).Render(slowestJobs)),
+		lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(p.Width-5).Render(lipgloss.NewStyle().MarginLeft(10).Render(slowestModules)),
 	)
 
 }
 
 func (p *Progress) SetSize(w, h int) {
 	headerHeight := 7
+	footerHeight := 16
 	p.Common.SetSize(w, h)
 	if p.bars != nil {
 		p.bars.SetSize(w-2 /* borders */, h-headerHeight)
 	}
 	p.progressView.Width = w
-	p.progressView.Height = h - headerHeight
+	p.progressView.Height = h - headerHeight - footerHeight
 	p.Styles.StatusBarValue.Width(p.Common.Width - labelsMaxLen()) // adjust status bar width to force word wrap: full width - labels width
 }

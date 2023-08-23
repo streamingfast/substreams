@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-type ranges []*blockRange
+type ranges []*BlockRange
 
 func (r ranges) Len() int           { return len(r) }
 func (r ranges) Less(i, j int) bool { return r[i].Start < r[j].Start }
@@ -58,12 +58,12 @@ func (r ranges) PartiallyCovered(lo, hi uint64) bool {
 	return false
 }
 
-type blockRange struct {
+type BlockRange struct {
 	Start uint64
 	End   uint64
 }
 
-func (b blockRange) String() string {
+func (b BlockRange) String() string {
 	return fmt.Sprintf("%d-%d", b.Start, b.End)
 }
 
@@ -91,9 +91,9 @@ func (u updatedRanges) LoHi() (lo uint64, hi uint64) {
 func (u updatedRanges) Lo() uint64 { a, _ := u.LoHi(); return a }
 func (u updatedRanges) Hi() uint64 { _, b := u.LoHi(); return b }
 
-type newRange map[string]blockRange
+type newRange map[string]BlockRange
 
-func mergeRangeLists(prevRanges ranges, newRange *blockRange) ranges {
+func mergeRangeLists(prevRanges ranges, newRange *BlockRange) ranges {
 	// fmt.Println("merge input, prevRanges:", prevRanges, "new range:", newRange)
 	var stretched bool
 	for _, prevRange := range prevRanges {
@@ -136,7 +136,7 @@ func reduceOverlaps(r ranges) ranges {
 				maxEnd = r1.End
 			}
 			// Reduces one hole at a time. Should recurse to do more holes at a time.
-			newRanges = append(append(newRanges, &blockRange{Start: r1.Start, End: maxEnd}), r[i+2:]...)
+			newRanges = append(append(newRanges, &BlockRange{Start: r1.Start, End: maxEnd}), r[i+2:]...)
 			break
 
 		} else {

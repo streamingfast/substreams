@@ -15,6 +15,7 @@ import (
 type Bar struct {
 	common.Common
 	name           string
+	modules        []string
 	targetEndBlock uint64
 	totalBlocks    uint64
 
@@ -30,23 +31,7 @@ func NewBar(c common.Common, name string, targetEndBlock uint64) *Bar {
 func (b *Bar) Init() tea.Cmd { return nil }
 
 func (b *Bar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	// FIXME update bars
 	return b, nil
-	//switch msg := msg.(type) {
-	//case *pbsubstreamsrpc.ModuleProgress_ProcessedRanges_:
-	//	for _, v := range msg.ProcessedRanges.ProcessedRanges {
-	//		b.ranges = mergeRangeLists(b.ranges, &blockRange{
-	//			Start: v.StartBlock,
-	//			End:   v.EndBlock,
-	//		})
-	//	}
-	//	var totalBlocks uint64
-	//	for _, r := range b.ranges {
-	//		totalBlocks += (r.End - r.Start)
-	//	}
-	//	b.totalBlocks = totalBlocks
-	//}
-	//return b, nil
 }
 
 func (b *Bar) View() string {

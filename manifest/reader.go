@@ -174,10 +174,7 @@ func (r *Reader) Read() (*pbsubstreams.Package, error) {
 	}
 
 	if r.override != nil {
-		err := mergeManifests(pack, r.override)
-		if err != nil {
-			return nil, fmt.Errorf("merge overrides: %w", err)
-		}
+		mergeManifests(pack, r.override)
 	}
 
 	return pack, nil

@@ -14,21 +14,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * Fixed compilation errors when tracking some contracts when using `substreams alpha init`.
 
-### Added
-
-* Pack command: added `-c` flag to allow overriding of certain substreams.yaml values by passing in the path of a yaml file.
-  example yaml contents:
-```yaml
-package:
-  name: my_custom_package_name
-
-network: arbitrum-one
-initialBlocks:
-  module_name_1: 123123123
-params:
-  mod1: "custom_parameter"
-```
-
 ## v1.1.11
 
 ### Fixes

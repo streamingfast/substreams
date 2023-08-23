@@ -1,19 +1,33 @@
 package manifest
 
-import pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+import (
+	"encoding/base64"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"google.golang.org/protobuf/types/known/anypb"
+	"io"
+	"strings"
+)
 
 type ConfigurationOverride struct {
 	Package       *PackageOverride  `yaml:"package,omitempty"`
 	Network       string            `yaml:"network,omitempty"`
 	InitialBlocks map[string]int64  `yaml:"initialBlocks,omitempty"`
 	Params        map[string]string `yaml:"params,omitempty"`
+
+	SinkConfig *SinkConfigOverride `yaml:"sinkConfig,omitempty"`
+	SinkModule string              `yaml:"sinkModule,omitempty"`
+}
+
+type SinkConfigOverride struct {
+	TypeUrl string `yaml:"typeUrl,omitempty"`
+	Value   string `yaml:"value,omitempty"`
 }
 
 type PackageOverride struct {
 	Name string `yaml:"name,omitempty"`
 }
 
-func mergeManifests(main *pbsubstreams.Package, override *ConfigurationOverride) {
+func mergeManifests(main *pbsubstreams.Package, override *ConfigurationOverride) error {
 	if override.Package != nil && override.Package.Name != "" {
 		if main.PackageMeta == nil {
 			main.PackageMeta = []*pbsubstreams.PackageMetadata{}
@@ -37,6 +51,27 @@ func mergeManifests(main *pbsubstreams.Package, override *ConfigurationOverride)
 	if override.InitialBlocks != nil {
 		mergeInitialBlocks(main, override)
 	}
+
+	// Overriding SinkModule
+	if override.Package != nil && override.SinkModule != "" {
+		main.SinkModule = override.SinkModule
+	}
+
+	// Overriding SinkConfig
+	if override.Package != nil && override.SinkConfig != nil {
+		decoder := base64.NewDecoder(base64.StdEncoding, strings.NewReader(string(override.SinkConfig.Value)))
+		configValueBytes, err := io.ReadAll(decoder)
+		if err != nil {
+			return err
+		}
+
+		main.SinkConfig = &anypb.Any{
+			TypeUrl: override.SinkConfig.TypeUrl,
+			Value:   configValueBytes,
+		}
+	}
+
+	return nil
 }
 
 func mergeInitialBlocks(main *pbsubstreams.Package, override *ConfigurationOverride) {
@@ -121,6 +156,14 @@ func mergeOverrides(overrides ...*ConfigurationOverride) *ConfigurationOverride 
 			for name, value := range override.Params {
 				merged.Params[name] = value
 			}
+		}
+
+		if override.SinkConfig != nil {
+			merged.SinkConfig = override.SinkConfig
+		}
+
+		if override.SinkModule != "" {
+			merged.SinkModule = override.SinkModule
 		}
 	}
 

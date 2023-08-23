@@ -2,7 +2,6 @@ package tui
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -152,40 +151,30 @@ func (ui *TUI) IncomingMessage(ctx context.Context, resp *pbsubstreamsrpc.Respon
 		}
 
 	case *pbsubstreamsrpc.Response_BlockScopedData:
-		//if testRunner != nil {
-		//	if err := testRunner.Test(ctx, m.BlockScopedData.Output, m.BlockScopedData.DebugMapOutputs, m.BlockScopedData.DebugStoreOutputs, m.BlockScopedData.Clock); err != nil {
-		//		fmt.Errorf("test runner failed: %w", err)
-		//	}
-		//}
+		if testRunner != nil {
+			if err := testRunner.Test(ctx, m.BlockScopedData.Output, m.BlockScopedData.DebugMapOutputs, m.BlockScopedData.DebugStoreOutputs, m.BlockScopedData.Clock); err != nil {
+				fmt.Errorf("test runner failed: %w", err)
+			}
+		}
 
-		//if ui.outputMode == OutputModeTUI {
-		//	printClock(m.BlockScopedData)
-		//}
-		//if m.BlockScopedData == nil {
-		//	return nil
-		//}
-		//ui.seenFirstData = true
-		//if ui.outputMode == OutputModeTUI {
-		//	ui.ensureTerminalUnlocked()
-		//	return ui.decoratedBlockScopedData(m.BlockScopedData.Output, m.BlockScopedData.DebugMapOutputs, m.BlockScopedData.DebugStoreOutputs, m.BlockScopedData.Clock)
-		//} else {
-		//	return ui.jsonBlockScopedData(m.BlockScopedData.Output, m.BlockScopedData.DebugMapOutputs, m.BlockScopedData.DebugStoreOutputs, m.BlockScopedData.Clock)
-		//}
-	case *pbsubstreamsrpc.Response_Progress:
-		if ui.seenFirstData {
-			ui.formatPostDataProgress(m)
+		if ui.outputMode == OutputModeTUI {
+			printClock(m.BlockScopedData)
+		}
+		if m.BlockScopedData == nil {
+			return nil
+		}
+		ui.seenFirstData = true
+		if ui.outputMode == OutputModeTUI {
+			ui.ensureTerminalUnlocked()
+			return ui.decoratedBlockScopedData(m.BlockScopedData.Output, m.BlockScopedData.DebugMapOutputs, m.BlockScopedData.DebugStoreOutputs, m.BlockScopedData.Clock)
 		} else {
+			return ui.jsonBlockScopedData(m.BlockScopedData.Output, m.BlockScopedData.DebugMapOutputs, m.BlockScopedData.DebugStoreOutputs, m.BlockScopedData.Clock)
+		}
+	case *pbsubstreamsrpc.Response_Progress:
+		if !ui.seenFirstData {
 			if ui.outputMode == OutputModeTUI {
 				ui.ensureTerminalLocked()
-				fmt.Println("Got update message:")
-				j, err := json.Marshal(m.Progress)
-				if err != nil {
-					panic(err)
-				}
-				fmt.Println(string(j))
-				//for _, module := range m.Progress.Modules {
-				//	ui.prog.Send(module)
-				//}
+				ui.prog.Send(m.Progress)
 			}
 		}
 	case *pbsubstreamsrpc.Response_DebugSnapshotData:

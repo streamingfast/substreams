@@ -6,15 +6,19 @@ import (
 
 func newModel(ui *TUI) model {
 	return model{
-		Modules: updatedRanges{},
-		ui:      ui,
+		StagesProgress: updatedRanges{},
+		ui:             ui,
 	}
 }
 
 type model struct {
 	ui *TUI
 
-	Modules updatedRanges
+	StagesProgress updatedRanges
+	StagesModules  []string
+	SlowJobs       []string
+	SlowModules    []string
+
 	BarMode bool
 	BarSize uint64
 
@@ -28,7 +32,7 @@ type model struct {
 	Connected                     bool
 
 	Failures    int
-	LastFailure error //*pbsubstreamsrpc.ModuleProgress_Failed
+	LastFailure *pbsubstreamsrpc.Error
 	Reason      string
 
 	TraceID string

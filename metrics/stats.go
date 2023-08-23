@@ -37,12 +37,25 @@ type Stats struct {
 
 type runningJobs map[uint64]*extendedJob
 
+func cloneStats(in *pbssinternal.ModuleStats) *pbssinternal.ModuleStats {
+	return &pbssinternal.ModuleStats{
+		Name:                   in.Name,
+		ProcessingTimeMs:       in.ProcessingTimeMs,
+		StoreOperationTimeMs:   in.StoreOperationTimeMs,
+		StoreReadCount:         in.StoreReadCount,
+		ExternalCallMetrics:    cloneCallMetrics(in.ExternalCallMetrics),
+		StoreWriteCount:        in.StoreWriteCount,
+		StoreDeleteprefixCount: in.StoreDeleteprefixCount,
+		StoreSizeBytes:         in.StoreSizeBytes,
+	}
+}
+
 func (j runningJobs) ModuleStats(module string) (out *pbssinternal.ModuleStats) {
 	for _, job := range j {
 		for _, stat := range job.modulesStats {
 			if stat.Name == module {
 				if out == nil {
-					out = stat
+					out = cloneStats(stat)
 					continue
 				}
 				mergeModuleStats(out, stat)
@@ -394,6 +407,18 @@ func mergeMixedCallMetrics(left []*pbsubstreamsrpc.ExternalCallMetric, right []*
 	}
 
 	return left
+}
+
+func cloneCallMetrics(in []*pbssinternal.ExternalCallMetric) []*pbssinternal.ExternalCallMetric {
+	out := make([]*pbssinternal.ExternalCallMetric, len(in))
+	for i := range in {
+		out[i] = &pbssinternal.ExternalCallMetric{
+			Name:   in[i].Name,
+			Count:  in[i].Count,
+			TimeMs: in[i].TimeMs,
+		}
+	}
+	return out
 }
 
 func mergeCallMetricsMap(completeJobsMetrics []*pbssinternal.ExternalCallMetric, localMetrics map[string]*extendedCallMetric) (out []*pbssinternal.ExternalCallMetric) {

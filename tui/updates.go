@@ -2,8 +2,12 @@ package tui
 
 import (
 	"fmt"
+	"sort"
+	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/dustin/go-humanize"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 )
 
@@ -53,43 +57,84 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.TraceID = msg.Session.TraceId
 		m.BackprocessingCompleteAtBlock = msg.Session.ResolvedStartBlock
 
-		// FIXME
-		//	case *pbsubstreamsrpc.ModuleProgress:
-		//		m.Updates += 1
-		//		thisSec := time.Now().Unix()
-		//		if m.UpdatedSecond != thisSec {
-		//			m.UpdatesPerSecond = m.UpdatesThisSecond
-		//			m.UpdatesThisSecond = 0
-		//			m.UpdatedSecond = thisSec
-		//		}
-		//		m.UpdatesThisSecond += 1
-		//
-		//		switch progMsg := msg.Type.(type) {
-		//		case *pbsubstreamsrpc.ModuleProgress_ProcessedRanges_:
-		//			newModules := updatedRanges{}
-		//			for k, v := range m.Modules {
-		//				newModules[k] = v
-		//			}
-		//
-		//			for _, v := range progMsg.ProcessedRanges.ProcessedRanges {
-		//				newModules[msg.Name] = mergeRangeLists(newModules[msg.Name], &blockRange{
-		//					Start: v.StartBlock,
-		//					End:   v.EndBlock,
-		//				})
-		//			}
-		//
-		//			m.Modules = newModules
-		//		case *pbsubstreamsrpc.ModuleProgress_InitialState_:
-		//		case *pbsubstreamsrpc.ModuleProgress_ProcessedBytes_:
-		//		case *pbsubstreamsrpc.ModuleProgress_Failed_:
-		//			m.Failures += 1
-		//			if progMsg.Failed.Reason != "" {
-		//				m.Reason = fmt.Sprintf("Reason: %s, logs: %s, truncated: %v", progMsg.Failed.Reason, progMsg.Failed.Logs, progMsg.Failed.LogsTruncated)
-		//			}
-		//			m.LastFailure = progMsg.Failed
-		//			m.ui.Cancel()
-		//			return m, nil
-		//		}
+	case *pbsubstreamsrpc.ModulesProgress:
+		m.Updates += 1
+		thisSec := time.Now().Unix()
+		if m.UpdatedSecond != thisSec {
+			m.UpdatesPerSecond = m.UpdatesThisSecond
+			m.UpdatesThisSecond = 0
+			m.UpdatedSecond = thisSec
+		}
+		m.UpdatesThisSecond += 1
+
+		newStageProgress := updatedRanges{}
+		newStageModules := make([]string, len(msg.Stages))
+
+		sort.Slice(msg.RunningJobs, func(i, j int) bool {
+			return msg.RunningJobs[i].DurationMs > msg.RunningJobs[j].DurationMs
+		})
+		var newSlowestJobs []string
+
+		jobsPerStage := make([]int, len(msg.Stages))
+		for _, j := range msg.RunningJobs {
+			jobsPerStage[j.Stage]++
+			if j.DurationMs > 5000 && len(newSlowestJobs) < 5 {
+				newSlowestJobs = append(newSlowestJobs, fmt.Sprintf("[Stage: %d, Range: %d-%d, Duration: %ds]", j.Stage, j.StartBlock, j.StopBlock, j.DurationMs/1000))
+			}
+		}
+
+		for i, stage := range msg.Stages {
+			newStageModules[i] = strings.Join(stage.Modules, ",")
+
+			jobsForStage := jobsPerStage[i]
+			displayedName := fmt.Sprintf("stage %d (%d jobs)", i, jobsForStage)
+
+			ranges := make([]*blockRange, len(stage.CompletedRanges))
+			for j, r := range stage.CompletedRanges {
+				ranges[j] = &blockRange{
+					Start: r.StartBlock,
+					End:   r.EndBlock,
+				}
+			}
+			newStageProgress[displayedName] = ranges
+		}
+
+		var newSlowestModules []string
+		sort.Slice(msg.ModulesStats, func(i, j int) bool {
+			return msg.ModulesStats[i].TotalProcessingTimeMs/(msg.ModulesStats[i].TotalProcessedBlockCount+1) > msg.ModulesStats[j].TotalProcessingTimeMs/(msg.ModulesStats[j].TotalProcessedBlockCount+1)
+		})
+		var moduleNameLen int
+		for _, mod := range msg.ModulesStats {
+			if len(mod.Name) > moduleNameLen {
+				moduleNameLen = len(mod.Name)
+			}
+		}
+		for i, mod := range msg.ModulesStats {
+			totalBlocks := mod.TotalProcessedBlockCount + 1
+
+			ratio := mod.TotalProcessingTimeMs / totalBlocks
+			if ratio < 10 || i > 4 {
+				break
+			}
+			var externalMetrics string
+			for _, ext := range mod.ExternalCallMetrics {
+				externalMetrics += fmt.Sprintf(" [%s (%d): %d%%]", ext.Name, ext.Count, ext.TimeMs/mod.TotalProcessingTimeMs)
+			}
+			var storeMetrics string
+			if mod.TotalStoreOperationTimeMs != 0 {
+				storeMetrics = fmt.Sprintf(" [store (%d read/blk, %d write/blk, %d deletePrefix/blk): %d%%]",
+					mod.TotalStoreReadCount/totalBlocks,
+					mod.TotalStoreWriteCount/totalBlocks,
+					mod.TotalStoreDeleteprefixCount/totalBlocks,
+					mod.TotalStoreOperationTimeMs/mod.TotalProcessingTimeMs)
+			}
+			newSlowestModules = append(newSlowestModules, fmt.Sprintf("%*s - %8sms per block%s%s", moduleNameLen, mod.Name, humanize.Comma(int64(ratio)), storeMetrics, externalMetrics))
+		}
+
+		m.SlowModules = newSlowestModules
+		m.StagesProgress = newStageProgress
+		m.StagesModules = newStageModules
+		m.SlowJobs = newSlowestJobs
 	default:
 	}
 

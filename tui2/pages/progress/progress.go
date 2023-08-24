@@ -34,14 +34,16 @@ type Progress struct {
 	slowestJobs     []string
 	slowestModules  []string
 
-	blocksPerSecond    uint64
-	blocksThisSecond   uint64
-	updatedSecond      int64
-	updatesPerSecond   int
-	updatesThisSecond  int
-	maxParallelWorkers uint64
+	totalBytesRead    uint64
+	totalBytesWritten uint64
 
-	bars *ranges.Bars
+	initCheckpointBlockCount uint64
+	lastCheckpointTime       time.Time
+	lastCheckpointBlocks     uint64
+	lastCheckpointBlockRate  uint64
+
+	maxParallelWorkers uint64
+	bars               *ranges.Bars
 
 	curErr string
 }
@@ -87,32 +89,22 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case *pbsubstreamsrpc.BlockScopedData:
 		p.dataPayloads += 1
 	case *pbsubstreamsrpc.ModulesProgress:
-		p.progressUpdates += 1
-		thisSec := time.Now().Unix()
-		if p.updatedSecond != thisSec {
-			p.updatesPerSecond = p.updatesThisSecond
-			p.updatesThisSecond = 0
-			p.updatedSecond = thisSec
-			if p.blocksThisSecond > 0 {
-				p.blocksPerSecond = p.bars.TotalBlocks - p.blocksThisSecond
-			}
-			p.blocksThisSecond = p.bars.TotalBlocks
-		}
-		p.updatesThisSecond += 1
-
 		msg := msg.(*pbsubstreamsrpc.ModulesProgress)
 		newBars := make([]*ranges.Bar, len(msg.Stages))
 		newStageModules := make([]string, len(msg.Stages))
 
+		var totalProcessedBlocks uint64
+
 		sort.Slice(msg.RunningJobs, func(i, j int) bool {
 			return msg.RunningJobs[i].DurationMs > msg.RunningJobs[j].DurationMs
 		})
-		newSlowestJobs := make([]string, 5)
+		newSlowestJobs := make([]string, 4)
 
 		jobsPerStage := make([]int, len(msg.Stages))
 		for i, j := range msg.RunningJobs {
+			totalProcessedBlocks += j.ProcessedBlocks
 			jobsPerStage[j.Stage]++
-			if i < 5 {
+			if i < len(newSlowestJobs) {
 				newSlowestJobs[i] = fmt.Sprintf("[Stage: %d, Range: %d-%d, Duration: %ds]", j.Stage, j.StartBlock, j.StopBlock, j.DurationMs/1000)
 			}
 		}
@@ -125,6 +117,8 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			br := make([]*ranges.BlockRange, len(stage.CompletedRanges))
 			for j, r := range stage.CompletedRanges {
+
+				totalProcessedBlocks += (r.EndBlock - r.StartBlock)
 				br[j] = &ranges.BlockRange{
 					Start: r.StartBlock,
 					End:   r.EndBlock,
@@ -135,7 +129,7 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			newBars[i] = newBar
 		}
 
-		newSlowestModules := make([]string, 5)
+		var newSlowestModules []string
 		sort.Slice(msg.ModulesStats, func(i, j int) bool {
 			return msg.ModulesStats[i].TotalProcessingTimeMs/(msg.ModulesStats[i].TotalProcessedBlockCount+1) > msg.ModulesStats[j].TotalProcessingTimeMs/(msg.ModulesStats[j].TotalProcessedBlockCount+1)
 		})
@@ -149,7 +143,7 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			totalBlocks := mod.TotalProcessedBlockCount + 1
 
 			ratio := mod.TotalProcessingTimeMs / totalBlocks
-			if i > 4 {
+			if i > 3 {
 				break
 			}
 			var externalMetrics string
@@ -164,12 +158,35 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					mod.TotalStoreDeleteprefixCount/totalBlocks,
 					mod.TotalStoreOperationTimeMs/mod.TotalProcessingTimeMs)
 			}
-			newSlowestModules[i] = fmt.Sprintf("%*s %8sms per block%s%s", moduleNameLen, mod.Name, humanize.Comma(int64(ratio)), storeMetrics, externalMetrics)
+			newSlowestModules = append(newSlowestModules, fmt.Sprintf("%*s %8sms per block%s%s", moduleNameLen, mod.Name, humanize.Comma(int64(ratio)), storeMetrics, externalMetrics))
 		}
 
+		var mustResize bool
 		p.slowestJobs = newSlowestJobs
+		if len(newSlowestModules) != len(p.slowestModules) {
+			mustResize = true
+		}
 		p.slowestModules = newSlowestModules
 
+		if elapsed := time.Since(p.lastCheckpointTime); elapsed > 900*time.Millisecond {
+			if p.lastCheckpointBlocks == 0 {
+				p.initCheckpointBlockCount = totalProcessedBlocks
+			} else {
+				blockDiff := totalProcessedBlocks - p.lastCheckpointBlocks
+				p.lastCheckpointBlockRate = blockDiff * 1000 / uint64(elapsed.Milliseconds())
+			}
+			p.lastCheckpointBlocks = totalProcessedBlocks
+			p.lastCheckpointTime = time.Now()
+		}
+
+		if msg.ProcessedBytes != nil {
+			p.totalBytesRead = msg.ProcessedBytes.TotalBytesRead
+			p.totalBytesWritten = msg.ProcessedBytes.TotalBytesWritten
+		}
+
+		if mustResize {
+			p.SetSize(p.Common.Width, p.Common.Height)
+		}
 		p.bars.Update(newBars)
 		p.progressView.SetContent(p.bars.View())
 	case stream.StreamErrorMsg:
@@ -194,6 +211,7 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 var labels = []string{
 	"Parallel engine blocks processed: ",
+	"Bytes Read / Written: ",
 	"Target block: ",
 	"Data payloads received: ",
 	"Status: ",
@@ -237,16 +255,13 @@ func wrapString(input string, screenWidth int) (string, int) {
 }
 
 func (p *Progress) View() string {
-	blocksPerSecondPerModule := ""
 	maxWorkers := ""
 	if p.maxParallelWorkers != 0 {
 		maxWorkers = fmt.Sprintf(", %d max workers", p.maxParallelWorkers)
 	}
-	if p.bars.BarCount != 0 && p.blocksPerSecond != 0 {
-		blocksPerSecondPerModule = fmt.Sprintf(", %d per module", p.blocksPerSecond/p.bars.BarCount)
-	}
 	infos := []string{
-		fmt.Sprintf("%d (%d per second%s%s)", p.bars.TotalBlocks, p.blocksPerSecond, blocksPerSecondPerModule, maxWorkers),
+		fmt.Sprintf("%d (%d per second%s)", p.lastCheckpointBlocks-p.initCheckpointBlockCount, p.lastCheckpointBlockRate, maxWorkers),
+		fmt.Sprintf("%s / %s", humanize.Bytes(p.totalBytesRead), humanize.Bytes(p.totalBytesWritten)),
 		fmt.Sprintf("%d", p.targetBlock),
 		fmt.Sprintf("%d", p.dataPayloads),
 		p.Styles.StatusBarValue.Render(p.state + p.replayState),
@@ -297,7 +312,7 @@ func (p *Progress) View() string {
 
 func (p *Progress) SetSize(w, h int) {
 	headerHeight := 7
-	footerHeight := 16
+	footerHeight := 6 + len(p.slowestModules) + len(p.slowestJobs)
 	p.Common.SetSize(w, h)
 	if p.bars != nil {
 		p.bars.SetSize(w-2 /* borders */, h-headerHeight)

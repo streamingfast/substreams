@@ -29,6 +29,9 @@ type Stats struct {
 	runningJobs        runningJobs
 	completedJobsStats map[string]*pbssinternal.ModuleStats
 
+	completedJobsBytesRead    uint64
+	completedJobsBytesWritten uint64
+
 	// counter is used to get the next jobIdx
 	counter uint64
 
@@ -101,6 +104,8 @@ type extendedJob struct {
 	*pbsubstreamsrpc.Job
 	modulesStats map[string]*pbssinternal.ModuleStats
 	start        time.Time
+	bytesRead    uint64
+	bytesWritten uint64
 }
 
 // RecordJobUpdate will be called each time a job sends an update message
@@ -114,6 +119,8 @@ func (s *Stats) RecordJobUpdate(jobIdx uint64, upd *pbssinternal.Update) {
 	}
 	job.ProcessedBlocks = upd.ProcessedBlocks
 	job.DurationMs = upd.DurationMs
+	job.bytesRead = upd.TotalBytesRead
+	job.bytesWritten = upd.TotalBytesWritten
 }
 
 func NewReqStats(config *Config, logger *zap.Logger) *Stats {
@@ -219,6 +226,8 @@ func (s *Stats) RecordEndSubrequest(jobIdx uint64) {
 		}
 		mergeModuleStats(modStat, jobStats)
 	}
+	s.completedJobsBytesRead += job.bytesRead
+	s.completedJobsBytesWritten += job.bytesWritten
 
 	delete(s.runningJobs, jobIdx)
 }
@@ -470,6 +479,17 @@ func (s *Stats) processedBlocksFromJobs(moduleName string) (count uint64) {
 		}
 	}
 	return
+}
+
+func (s *Stats) RemoteBytesConsumption() (read uint64, written uint64) {
+	read = s.completedJobsBytesRead
+	written = s.completedJobsBytesWritten
+	for _, j := range s.runningJobs {
+		read += j.bytesRead
+		written += j.bytesWritten
+	}
+
+	return read, written
 }
 
 func (s *Stats) AggregatedModulesStats() []*pbsubstreamsrpc.ModuleStats {

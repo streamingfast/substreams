@@ -273,14 +273,17 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 	defer cancel()
 	go func() {
 		stream := response.New(p.respFunc)
+
+		meter := dmetering.GetBytesMeter(ctx)
 		for {
 			select {
 			case <-time.After(time.Millisecond * 500):
 				stagesProgress := stats.Stages()
 				jobs := stats.JobsStats()
 				modStats := stats.AggregatedModulesStats()
+				remoteBytesRead, remoteBytesWritten := stats.RemoteBytesConsumption()
 
-				stream.SendModulesStats(modStats, stagesProgress, jobs, nil)
+				stream.SendModulesStats(modStats, stagesProgress, jobs, meter.BytesRead()+remoteBytesRead, meter.BytesWritten()+remoteBytesWritten)
 			case <-progressCtx.Done():
 				return
 			}
@@ -395,7 +398,9 @@ func (p *Pipeline) returnRPCModuleProgressOutputs(clock *pbsubstreams.Clock, for
 	jobs := stats.JobsStats()
 	modStats := stats.AggregatedModulesStats()
 
-	return stream.SendModulesStats(modStats, stagesProgress, jobs, nil)
+	meter := dmetering.GetBytesMeter(p.ctx)
+	remoteBytesRead, remoteBytesWritten := stats.RemoteBytesConsumption()
+	return stream.SendModulesStats(modStats, stagesProgress, jobs, meter.BytesRead()+remoteBytesRead, meter.BytesWritten()+remoteBytesWritten)
 
 }
 

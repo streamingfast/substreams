@@ -532,6 +532,8 @@ func (s *Stats) LogAndClose() {
 
 // getZapFields should be called while Stats is locked
 func (s *Stats) getZapFields() []zap.Field {
+	s.Lock()
+	defer s.Unlock()
 	// Logging fields order is important as it affects the final rendering, we carefully ordered
 	// them so the development logs looks nicer.
 	tier := "tier1"

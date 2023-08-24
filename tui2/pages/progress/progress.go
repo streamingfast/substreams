@@ -162,6 +162,9 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		var mustResize bool
+		if len(newSlowestJobs) != len(p.slowestJobs) {
+			mustResize = true
+		}
 		p.slowestJobs = newSlowestJobs
 		if len(newSlowestModules) != len(p.slowestModules) {
 			mustResize = true
@@ -304,6 +307,7 @@ func (p *Progress) View() string {
 			lipgloss.JoinVertical(0, infos...),
 		)),
 		lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(p.Width-5).Render(p.progressView.View()),
+
 		lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(p.Width-5).Render(lipgloss.NewStyle().MarginLeft(10).Render(slowestJobs)),
 		lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(p.Width-5).Render(lipgloss.NewStyle().MarginLeft(10).Render(slowestModules)),
 	)
@@ -312,7 +316,7 @@ func (p *Progress) View() string {
 
 func (p *Progress) SetSize(w, h int) {
 	headerHeight := 7
-	footerHeight := 6 + len(p.slowestModules) + len(p.slowestJobs)
+	footerHeight := 7 + len(p.slowestModules) + len(p.slowestJobs)
 	p.Common.SetSize(w, h)
 	if p.bars != nil {
 		p.bars.SetSize(w-2 /* borders */, h-headerHeight)

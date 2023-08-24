@@ -85,5 +85,6 @@ func (b *Bars) View() string {
 		out += lipgloss.NewStyle().Margin(0, 0, 0, 3).Italic(true).Width(b.Width-6).Render(strings.Join(b.bars[i].modules, " ")) + "\n\n"
 		i++
 	}
-	return lipgloss.NewStyle().Render(lipgloss.JoinVertical(0, out))
+
+	return out
 }

@@ -45,7 +45,9 @@ type Progress struct {
 	maxParallelWorkers uint64
 	bars               *ranges.Bars
 
-	curErr string
+	curErr          string
+	curErrFormated  string
+	curErrLineCount int
 }
 
 func New(c common.Common) *Progress {
@@ -98,14 +100,14 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		sort.Slice(msg.RunningJobs, func(i, j int) bool {
 			return msg.RunningJobs[i].DurationMs > msg.RunningJobs[j].DurationMs
 		})
-		newSlowestJobs := make([]string, 4)
+		var newSlowestJobs []string
 
 		jobsPerStage := make([]int, len(msg.Stages))
 		for i, j := range msg.RunningJobs {
 			totalProcessedBlocks += j.ProcessedBlocks
 			jobsPerStage[j.Stage]++
-			if i < len(newSlowestJobs) {
-				newSlowestJobs[i] = fmt.Sprintf("[Stage: %d, Range: %d-%d, Duration: %ds]", j.Stage, j.StartBlock, j.StopBlock, j.DurationMs/1000)
+			if i < 4 && j.DurationMs > 10000 {
+				newSlowestJobs = append(newSlowestJobs, fmt.Sprintf("[Stage: %d, Range: %d-%d, Duration: %ds]", j.Stage, j.StartBlock, j.StopBlock, j.DurationMs/1000))
 			}
 		}
 
@@ -143,7 +145,7 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			totalBlocks := mod.TotalProcessedBlockCount + 1
 
 			ratio := mod.TotalProcessingTimeMs / totalBlocks
-			if i > 3 {
+			if i > 3 || ratio < 50 {
 				break
 			}
 			var externalMetrics string
@@ -193,8 +195,11 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		p.bars.Update(newBars)
 		p.progressView.SetContent(p.bars.View())
 	case stream.StreamErrorMsg:
-		p.state = fmt.Sprintf("Error")
+		p.state = "Error"
 		p.curErr = msg.(stream.StreamErrorMsg).Error()
+		p.SetSize(p.Common.Width, p.Common.Height)
+
+		return p, nil
 	case *replaylog.File:
 		p.replayState = " [saving to replay log]"
 	}
@@ -270,53 +275,47 @@ func (p *Progress) View() string {
 		p.Styles.StatusBarValue.Render(p.state + p.replayState),
 	}
 
-	if p.state == "Error" {
-		errorStringWrapped, lineCount := wrapString(p.curErr, p.Width)
-
-		return lipgloss.JoinVertical(0,
-			lipgloss.NewStyle().Margin(0, 2).Render(lipgloss.JoinHorizontal(0,
-				lipgloss.JoinVertical(1, labels...),
-				lipgloss.JoinVertical(0, infos...),
-			)),
-			lipgloss.NewStyle().Background(p.Styles.StreamErrorColor).Width(p.Width).Render(errorStringWrapped),
-			lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(p.Width-5).Height(p.progressView.Height-lineCount).Render(p.progressView.View()),
-		)
-	}
-
-	slowestJobs := "Slowest jobs:\n"
-	for _, job := range p.slowestJobs {
-		if job == "" {
-			slowestJobs += "\n"
-		} else {
-			slowestJobs += " - " + job + "\n"
-		}
-	}
-
-	slowestModules := "Slowest modules:\n"
-	for _, mod := range p.slowestModules {
-		if mod == "" {
-			slowestModules += "\n"
-		} else {
-			slowestModules += " - " + mod + "\n"
-		}
-	}
-
-	return lipgloss.JoinVertical(0,
+	components := []string{
 		lipgloss.NewStyle().Margin(0, 2).Render(lipgloss.JoinHorizontal(0,
 			lipgloss.JoinVertical(1, labels...),
 			lipgloss.JoinVertical(0, infos...),
 		)),
-		lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(p.Width-5).Render(p.progressView.View()),
+	}
 
-		lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(p.Width-5).Render(lipgloss.NewStyle().MarginLeft(10).Render(slowestJobs)),
-		lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(p.Width-5).Render(lipgloss.NewStyle().MarginLeft(10).Render(slowestModules)),
+	if p.state == "Error" {
+		components = append(components, lipgloss.NewStyle().Background(p.Styles.StreamErrorColor).Width(p.Width).Render(p.curErrFormated))
+	}
+
+	components = append(components,
+		lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(p.Width-5).Render(p.progressView.View()),
 	)
 
+	if p.slowestJobs != nil {
+		slowestJobs := lipgloss.JoinHorizontal(lipgloss.Top, "Slowest Jobs:      ", lipgloss.JoinVertical(lipgloss.Left, p.slowestJobs...))
+		components = append(components, lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(p.Width-5).Render(lipgloss.NewStyle().MarginLeft(1).Render(slowestJobs)))
+	}
+
+	if p.slowestModules != nil {
+		slowestModules := lipgloss.JoinHorizontal(lipgloss.Top, "Slowest Modules:   ", lipgloss.JoinVertical(lipgloss.Left, p.slowestModules...))
+		components = append(components, lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(p.Width-5).Render(lipgloss.NewStyle().MarginLeft(1).Render(slowestModules)))
+	}
+
+	return lipgloss.JoinVertical(0, components...)
 }
 
 func (p *Progress) SetSize(w, h int) {
-	headerHeight := 7
-	footerHeight := 7 + len(p.slowestModules) + len(p.slowestJobs)
+	if p.curErr != "" {
+		p.curErrFormated, p.curErrLineCount = wrapString(p.curErr, p.Width) // wrapping and linecount always recomputed on SetSize
+	}
+
+	headerHeight := 8 + p.curErrLineCount
+	footerHeight := 0
+	if p.slowestModules != nil {
+		footerHeight += len(p.slowestModules) + 2
+	}
+	if p.slowestJobs != nil {
+		footerHeight += len(p.slowestJobs) + 2
+	}
 	p.Common.SetSize(w, h)
 	if p.bars != nil {
 		p.bars.SetSize(w-2 /* borders */, h-headerHeight)

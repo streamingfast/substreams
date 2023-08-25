@@ -204,13 +204,6 @@ func (ui *UI) forceRefresh() {
 }
 
 func (ui *UI) View() string {
-	switch ui.activePage {
-	case progressPage:
-		if time.Since(ui.lastView) < time.Millisecond*100 {
-			return ui.memoized
-		}
-		ui.lastView = time.Now()
-	}
 	headline := ui.Styles.Header.Render("Substreams GUI")
 
 	if ui.stream != nil {
@@ -226,13 +219,12 @@ func (ui *UI) View() string {
 		headline = ui.Styles.Header.Copy().Foreground(color).Render("Substreams GUI")
 	}
 
-	ui.memoized = lipgloss.JoinVertical(0,
+	return lipgloss.JoinVertical(0,
 		headline,
 		ui.Styles.Tabs.Render(ui.tabs.View()),
 		ui.pages[ui.activePage].View(),
 		ui.footer.View(),
 	)
-	return ui.memoized
 }
 
 func (ui *UI) restartStream() tea.Cmd {

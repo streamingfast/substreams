@@ -1,6 +1,6 @@
 # The Result<T, E> struct
 
-In Rust, the `Result<T, E>` to abstract both a succesful response (if exists) and an error (if exists). Let's understand it with an example.
+In Rust, the `Result<T, E>` struct is used to abstract both a successful response (if exists) and an error (if exists). Let's understand it with an example.
 
 ## Basic Usage
 Consider that you have a function `divide(num1, num2)`, which executes the division between two numbers. As you already know, dividing by 0 is undefined, and generates an error in Rust. You can use `Result` to return a controlled error.
@@ -36,7 +36,7 @@ fn divide(num1: u32, num2: u32) -> Result<u32, String> { // 1.
 }
 ```
 1. Declaration of the function. Two unsigned numbers of 32-bit length are passed as parameters.
-The return type is `Result<u32, String>`: the first type (`u32`) is for the succesful response, and second type (`String`) is for the error response.
+The return type is `Result<u32, String>`: the first type (`u32`) is for the successful response, and the second type (`String`) is for the error response.
 2. If diving by 0, you return an error String.
 3. If not, you return the result of the division (`u32`).
 
@@ -56,7 +56,7 @@ fn main() {
     }
 }
 ```
-1. You invoke the function, and store the `Result<T,E>` enum in a variable.
+1. You invoke the function and store the `Result<T,E>` enum in a variable.
 2. If the result _is ok_ (i.e. the happy path has been returned), you can take its value by using the `result.unwrap()` method.
 3. If the error has been returned, you can take the error string by using the `result.err().unwrap()` method.
 
@@ -74,9 +74,9 @@ This is the error: You can't divide by 0
 
 ## The Shortcut
 
-Checking with an `if` condition whether the result contains an error is a valid approach. However, Rust includes a shortcut to deal improve this.
+Checking with an `if` condition whether the result contains an error is a valid approach. However, Rust includes a shortcut to improve this.
 
-In the previous example, consider that you want to invoke the `divide` function from another function which performs other computations.
+In the previous example, consider that you want to invoke the `divide` function from another function that performs other computations.
 
 ```rust
 fn divide(num1: u32, num2: u32) -> Result<u32, String> {

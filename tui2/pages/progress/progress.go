@@ -24,15 +24,17 @@ type refreshProgress tea.Msg
 type Progress struct {
 	common.Common
 
+	started     time.Time
 	state       string
 	replayState string
 	targetBlock uint64
 
-	progressView    viewport.Model
-	progressUpdates int
-	dataPayloads    int
-	slowestJobs     []string
-	slowestModules  []string
+	progressView     viewport.Model
+	progressUpdates  int
+	dataPayloads     int
+	slowestJobs      []string
+	slowestModules   []string
+	slowestSquashing []string
 
 	totalBytesRead    uint64
 	totalBytesWritten uint64
@@ -57,6 +59,7 @@ func New(c common.Common) *Progress {
 		targetBlock:  0,
 		progressView: viewport.New(24, 80),
 		bars:         ranges.NewBars(c, 0),
+		started:      time.Now(),
 	}
 }
 func (p *Progress) Init() tea.Cmd {
@@ -93,7 +96,6 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case *pbsubstreamsrpc.ModulesProgress:
 		msg := msg.(*pbsubstreamsrpc.ModulesProgress)
 		newBars := make([]*ranges.Bar, len(msg.Stages))
-		newStageModules := make([]string, len(msg.Stages))
 
 		var totalProcessedBlocks uint64
 
@@ -114,26 +116,6 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			incompleteRanges[int(j.Stage)] = append(incompleteRanges[int(j.Stage)], &ranges.BlockRange{Start: j.StartBlock, End: j.StartBlock + j.ProcessedBlocks})
 		}
 
-		for i, stage := range msg.Stages {
-			newStageModules[i] = strings.Join(stage.Modules, ",")
-
-			jobsForStage := jobsPerStage[i]
-			displayedName := fmt.Sprintf("stage %d (%d jobs)", i, jobsForStage)
-
-			br := make([]*ranges.BlockRange, len(stage.CompletedRanges))
-			for j, r := range stage.CompletedRanges {
-				totalProcessedBlocks += (r.EndBlock - r.StartBlock)
-				br[j] = &ranges.BlockRange{
-					Start: r.StartBlock,
-					End:   r.EndBlock,
-				}
-			}
-			br = append(br, incompleteRanges[i]...)
-
-			newBar := p.bars.NewBar(displayedName, br, stage.Modules)
-			newBars[i] = newBar
-		}
-
 		var newSlowestModules []string
 		sort.Slice(msg.ModulesStats, func(i, j int) bool {
 			return msg.ModulesStats[i].TotalProcessingTimeMs/(msg.ModulesStats[i].TotalProcessedBlockCount+1) > msg.ModulesStats[j].TotalProcessingTimeMs/(msg.ModulesStats[j].TotalProcessedBlockCount+1)
@@ -144,12 +126,20 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				moduleNameLen = len(mod.Name)
 			}
 		}
+		var newSlowestSquashing []string
+		squashingModules := make(map[string]bool)
 		for i, mod := range msg.ModulesStats {
 			totalBlocks := mod.TotalProcessedBlockCount + 1
+			if mod.StoreCurrentlyMerging {
+				squashingModules[mod.Name] = true
+				if percent := mod.TotalStoreMergingTimeMs * 100 / uint64(time.Since(p.started).Milliseconds()); percent > 15 {
+					newSlowestSquashing = append(newSlowestSquashing, fmt.Sprintf("%s (%d%%)", mod.Name, percent))
+				}
+			}
 
 			ratio := mod.TotalProcessingTimeMs / totalBlocks
 			if i > 3 || ratio < 50 {
-				break
+				continue
 			}
 			var externalMetrics string
 			for _, ext := range mod.ExternalCallMetrics {
@@ -166,6 +156,32 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			newSlowestModules = append(newSlowestModules, fmt.Sprintf("%*s %8sms per block%s%s", moduleNameLen, mod.Name, humanize.Comma(int64(ratio)), storeMetrics, externalMetrics))
 		}
 
+		for i, stage := range msg.Stages {
+			displayedModules := make([]string, len(stage.Modules))
+			for i := range stage.Modules {
+				displayedModules[i] = stage.Modules[i]
+				if squashingModules[stage.Modules[i]] {
+					displayedModules[i] += lipgloss.NewStyle().Foreground(p.Styles.StreamErrorColor).Render("(S)")
+				}
+			}
+
+			jobsForStage := jobsPerStage[i]
+			displayedName := fmt.Sprintf("stage %d (%d jobs)", i, jobsForStage)
+
+			br := make([]*ranges.BlockRange, len(stage.CompletedRanges))
+			for j, r := range stage.CompletedRanges {
+				totalProcessedBlocks += (r.EndBlock - r.StartBlock)
+				br[j] = &ranges.BlockRange{
+					Start: r.StartBlock,
+					End:   r.EndBlock,
+				}
+			}
+			br = append(br, incompleteRanges[i]...)
+
+			newBar := p.bars.NewBar(displayedName, br, displayedModules)
+			newBars[i] = newBar
+		}
+
 		var mustResize bool
 		if len(newSlowestJobs) != len(p.slowestJobs) {
 			mustResize = true
@@ -175,6 +191,10 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			mustResize = true
 		}
 		p.slowestModules = newSlowestModules
+		if len(newSlowestSquashing) != len(p.slowestSquashing) {
+			mustResize = true
+		}
+		p.slowestSquashing = newSlowestSquashing
 
 		if elapsed := time.Since(p.lastCheckpointTime); elapsed > 900*time.Millisecond {
 			if p.lastCheckpointBlocks == 0 {
@@ -303,6 +323,10 @@ func (p *Progress) View() string {
 		components = append(components, lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(p.Width-5).Render(lipgloss.NewStyle().MarginLeft(1).Render(slowestModules)))
 	}
 
+	if p.slowestSquashing != nil {
+		components = append(components, lipgloss.NewStyle().MarginLeft(2).Foreground(p.Styles.StreamErrorColor).Render("Slow Squashing: "+strings.Join(p.slowestSquashing, ", ")))
+	}
+
 	return lipgloss.JoinVertical(0, components...)
 }
 
@@ -318,6 +342,9 @@ func (p *Progress) SetSize(w, h int) {
 	}
 	if p.slowestJobs != nil {
 		footerHeight += len(p.slowestJobs) + 2
+	}
+	if p.slowestSquashing != nil {
+		footerHeight += 1
 	}
 	p.Common.SetSize(w, h)
 	if p.bars != nil {

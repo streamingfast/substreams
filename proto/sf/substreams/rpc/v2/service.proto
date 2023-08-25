@@ -129,11 +129,16 @@ message OutputDebugInfo {
   bool cached = 3;
 }
 
+// ModulesProgress is a message that is sent every 500ms
 message ModulesProgress {
   // previously: repeated ModuleProgress modules = 1;
+  // these previous `modules` messages were sent in bursts and are not sent anymore.
   reserved 1;
+  // List of jobs running on tier2 servers
   repeated Job running_jobs = 2;
+  // Execution statistics for each module
   repeated ModuleStats modules_stats = 3;
+  // Stages definition and completed block ranges
   repeated Stage stages = 4;
 
   ProcessedBytes processed_bytes = 5;

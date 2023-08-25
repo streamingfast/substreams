@@ -8,8 +8,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Highlights
 
-* Complete redesign of the progress messages: statistics are now aggregated between tier2 and tier1 and represent a snapshot of the current state.
-* tier1 progress messages now include details of current running parallel stages and a breakdown of where the time is spent in each module.
+* Complete redesign of the progress messages:
+  * Tier2 internal stats are aggregated on Tier1 and sent out every 500ms (no more bursts)
+  * No need to collect events on client: a single message now represents the current state
+  * Message now includes list of running jobs and information about execution stages
+  * Performance metrics has been added to show which modules are executing slowly and where the time is spent (eth calls, store operations, etc.)
+
+### Upgrading client and server
+
+> [!IMPORTANT]
+* The client and servers will both need to be upgraded at the same time for the new progress messages to be parsed:
+  - The new substreams servers will *NOT* send the old `modules` field as part of its `progress` message, only the new `running_jobs`, `modules_stats`, `stages`.
+  - The new substreams clients will *NOT* be able to decode the old progress information when connecting to older servers.
+
+* However, the actual data (and cursor) will work correctly between versions. Only incompatible progress information will be ignored.
 
 ### CLI changes
 

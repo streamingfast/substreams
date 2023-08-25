@@ -207,11 +207,18 @@ func (s *Stats) RecordNewSubrequest(stage uint32, startBlock, stopBlock uint64) 
 }
 
 func (s *Stats) RecordModuleMerging(module string) {
+	s.Lock()
+	defer s.Unlock()
+	if _, ok := s.modulesStats[module]; !ok {
+		s.modulesStats[module] = newExtendedStats(module)
+	}
 	s.modulesStats[module].merging = true
 	s.modulesStats[module].mergeBegin = time.Now()
 }
 
 func (s *Stats) RecordModuleMergeComplete(module string) {
+	s.Lock()
+	defer s.Unlock()
 	stat := s.modulesStats[module]
 	stat.merging = false
 	stat.mergingTime += time.Since(stat.mergeBegin)

@@ -13,6 +13,7 @@ import (
 type Store interface {
 	Name() string
 	InitialBlock() uint64
+	SizeBytes() uint64
 
 	Loadable
 	Savable

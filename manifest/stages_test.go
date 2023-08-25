@@ -1,7 +1,6 @@
 package manifest
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
@@ -76,6 +75,5 @@ func TestStages(t *testing.T) {
 		}
 	}
 
-	fmt.Println(stages)
 	assert.Equal(t, expect, stages)
 }

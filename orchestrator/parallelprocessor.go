@@ -61,10 +61,6 @@ func BuildParallelProcessor(
 		fmt.Print(stages.StatesString())
 	}
 
-	if err := stream.InitialProgressMessages(stages.InitialProgressMessages()); err != nil {
-		return nil, fmt.Errorf("initial progress: %w", err)
-	}
-
 	// OPTIMIZATION: We should fetch the ExecOut files too, and see if they
 	// cover some of the ranges that we're after.
 	// We don't need to plan work for ranges where we have ExecOut
@@ -132,6 +128,10 @@ func BuildParallelProcessor(
 		scheduler: sched,
 		reqPlan:   reqPlan,
 	}, nil
+}
+
+func (b *ParallelProcessor) Stages() *stage.Stages {
+	return b.scheduler.Stages
 }
 
 func (b *ParallelProcessor) Run(ctx context.Context) (storeMap store.Map, err error) {

@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/pipeline/outputmodules"
 )
 
 //	var manifestCmd = &cobra.Command{
@@ -16,15 +17,16 @@ import (
 //		SilenceUsage: true,
 //	}
 var infoCmd = &cobra.Command{
-	Use:   "info [<manifest_file>]",
+	Use:   "info [<manifest_file> [<output_module>]]",
 	Short: "Display package modules and docs",
 	Long: cli.Dedent(`
 		Display package modules and docs. The manifest is optional as it will try to find a file named
 		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains
 		a 'substreams.yaml' file in place of '<manifest_file>, or a link to a remote .spkg file, using urls gs://, http(s)://, ipfs://, etc.'.
+		Specify an "output_module" to see how processing can be divided in different stages to produce the requested output.
 	`),
 	RunE:         runInfo,
-	Args:         cobra.RangeArgs(0, 1),
+	Args:         cobra.RangeArgs(0, 2),
 	SilenceUsage: true,
 }
 
@@ -34,8 +36,13 @@ func init() {
 
 func runInfo(cmd *cobra.Command, args []string) error {
 	manifestPath := ""
-	if len(args) == 1 {
+	if len(args) != 0 {
 		manifestPath = args[0]
+	}
+
+	var outputModule string
+	if len(args) == 2 {
+		outputModule = args[1]
 	}
 
 	manifestReader, err := manifest.NewReader(manifestPath)
@@ -87,6 +94,25 @@ func runInfo(cmd *cobra.Command, args []string) error {
 			fmt.Println("Doc: " + strings.Replace(moduleMeta.Doc, "\n", "\n  ", -1))
 		}
 		fmt.Println("")
+	}
+
+	if outputModule != "" {
+		outputGraph, err := outputmodules.NewOutputModuleGraph(outputModule, true, pkg.Modules)
+		if err != nil {
+			return err
+		}
+		for i, layers := range outputGraph.StagedUsedModules() {
+			var layerDefs []string
+			for _, l := range layers {
+				var mods []string
+				for _, m := range l {
+					mods = append(mods, m.Name)
+				}
+				layerDefs = append(layerDefs, fmt.Sprintf(`["%s"]`, strings.Join(mods, `","`)))
+			}
+			fmt.Printf("Stage %d: [%s]\n", i, strings.Join(layerDefs, `,`))
+		}
+
 	}
 
 	return nil

@@ -3,8 +3,9 @@ package exec
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/substreams/storage/execout"
 	"time"
+
+	"github.com/streamingfast/substreams/storage/execout"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
@@ -54,7 +55,7 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 	if err != nil {
 		return nil, nil, fmt.Errorf("execute: %w", err)
 	}
-	reqctx.ReqStats(ctx).RecordModuleExecDuration(time.Since(t0))
+	reqctx.ReqStats(ctx).RecordModuleWasmBlock(modName, time.Since(t0))
 
 	fillModuleOutputMetadata(executor, moduleOutput)
 

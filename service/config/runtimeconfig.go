@@ -20,7 +20,6 @@ type RuntimeConfig struct {
 	DefaultCacheTag string // appended to BaseObjectStore unless overriden by auth layer
 	WorkerFactory   work.WorkerFactory
 
-	WithRequestStats       bool
 	ModuleExecutionTracing bool
 }
 

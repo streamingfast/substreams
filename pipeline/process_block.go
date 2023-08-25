@@ -185,9 +185,25 @@ func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
 	return nil
 }
 
-func (p *Pipeline) handleStepNew(ctx context.Context, block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) error {
+func (p *Pipeline) handleStepNew(ctx context.Context, block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) (err error) {
 	p.insideReorgUpTo = nil
 	reqDetails := reqctx.Details(ctx)
+
+	if p.respFunc != nil {
+		defer func() {
+			forceSend := (clock.Number+1)%p.runtimeConfig.StateBundleSize == 0 || err != nil
+			var sendError error
+			if reqDetails.IsTier2Request {
+				sendError = p.returnInternalModuleProgressOutputs(clock, forceSend)
+			} else {
+				sendError = p.returnRPCModuleProgressOutputs(clock, forceSend)
+			}
+			if err == nil {
+				err = sendError
+			}
+		}()
+	}
+
 	if isBlockOverStopBlock(clock.Number, reqDetails.StopBlockNum) {
 		return io.EOF
 	}
@@ -222,27 +238,8 @@ func (p *Pipeline) handleStepNew(ctx context.Context, block *bstream.Block, cloc
 		return fmt.Errorf("pre block hook: %w", err)
 	}
 
-	//blockDuration = 0
-	//exec.Timer = 0
 	if err := p.executeModules(ctx, execOutput); err != nil {
 		return fmt.Errorf("execute modules: %w", err)
-	}
-	//sumCount++
-	//sumDuration += exec.Timer
-	//fmt.Println("accumulated time for all modules", exec.Timer, "avg", sumDuration/time.Duration(sumCount))
-
-	if reqDetails.ShouldReturnProgressMessages() {
-		if reqDetails.IsTier2Request {
-			forceSend := (clock.Number+1)%p.runtimeConfig.StateBundleSize == 0
-
-			if err = p.returnInternalModuleProgressOutputs(clock, forceSend); err != nil {
-				return fmt.Errorf("failed to return modules progress %w", err)
-			}
-		} else {
-			if err = p.returnRPCModuleProgressOutputs(clock); err != nil {
-				return fmt.Errorf("failed to return modules progress %w", err)
-			}
-		}
 	}
 
 	if p.gate.shouldSendOutputs() {
@@ -263,9 +260,6 @@ func (p *Pipeline) handleStepNew(ctx context.Context, block *bstream.Block, cloc
 	return nil
 }
 
-// var blockDuration time.Duration
-// var sumDuration time.Duration
-// var sumCount int
 func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.ExecutionOutput) (err error) {
 	ctx, span := reqctx.WithModuleExecutionSpan(ctx, "modules_executions")
 	defer span.EndWithErr(&err)

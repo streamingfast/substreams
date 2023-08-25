@@ -16,6 +16,9 @@ type Stage struct {
 
 	moduleStates []*ModuleState
 
+	// allExecutedModules is all the store+mapper executed specifically for this stage
+	allExecutedModules []string
+
 	// syncWork keeps tab of the parallel goroutines that do the merge work,
 	// and need to be waited on before marking the Unit as properly merged.
 	syncWork *llerrgroup.Group
@@ -26,15 +29,16 @@ type Stage struct {
 	asyncWork *llerrgroup.Group
 }
 
-func NewStage(idx int, kind Kind, segmenter *block.Segmenter, moduleStates []*ModuleState) *Stage {
+func NewStage(idx int, kind Kind, segmenter *block.Segmenter, moduleStates []*ModuleState, allExecutedModules []string) *Stage {
 	return &Stage{
-		idx:              idx,
-		kind:             kind,
-		segmenter:        segmenter,
-		segmentCompleted: segmenter.FirstIndex() - 1,
-		moduleStates:     moduleStates,
-		syncWork:         llerrgroup.New(250),
-		asyncWork:        llerrgroup.New(250),
+		idx:                idx,
+		kind:               kind,
+		allExecutedModules: allExecutedModules,
+		segmenter:          segmenter,
+		segmentCompleted:   segmenter.FirstIndex() - 1,
+		moduleStates:       moduleStates,
+		syncWork:           llerrgroup.New(250),
+		asyncWork:          llerrgroup.New(250),
 	}
 }
 

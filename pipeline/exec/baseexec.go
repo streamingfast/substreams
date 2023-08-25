@@ -7,6 +7,7 @@ import (
 
 	ttrace "go.opentelemetry.io/otel/trace"
 
+	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/wasm"
 )
@@ -77,8 +78,9 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 		clock := outputGetter.Clock()
 		var inst wasm.Instance
 
+		stats := reqctx.ReqStats(e.ctx)
 		//t0 := time.Now()
-		call = wasm.NewCall(clock, e.moduleName, e.entrypoint, e.wasmArguments)
+		call = wasm.NewCall(clock, e.moduleName, e.entrypoint, stats, e.wasmArguments)
 		inst, err = e.wasmModule.ExecuteNewCall(e.ctx, call, e.cachedInstance, e.wasmArguments)
 		//Timer += time.Since(t0)
 		if panicErr := call.Err(); panicErr != nil {

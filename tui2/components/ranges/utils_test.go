@@ -11,105 +11,105 @@ import (
 func Test_MergeRangeLists(t *testing.T) {
 	tests := []struct {
 		name                      string
-		completedBlockRanges      []*blockRange
-		newlyCompletedBlockRanges []*blockRange
-		expectedBlockRanges       []*blockRange
+		completedBlockRanges      []*BlockRange
+		newlyCompletedBlockRanges []*BlockRange
+		expectedBlockRanges       []*BlockRange
 	}{
 		{
 			name: "Nothing new",
-			completedBlockRanges: []*blockRange{
+			completedBlockRanges: []*BlockRange{
 				{Start: 0, End: 99},
 				{Start: 100, End: 199},
 			},
-			newlyCompletedBlockRanges: []*blockRange{},
-			expectedBlockRanges: []*blockRange{
+			newlyCompletedBlockRanges: []*BlockRange{},
+			expectedBlockRanges: []*BlockRange{
 				{Start: 0, End: 99},
 				{Start: 100, End: 199},
 			},
 		},
 		{
 			name: "Merging 1 block range",
-			completedBlockRanges: []*blockRange{
+			completedBlockRanges: []*BlockRange{
 				{Start: 0, End: 99},
 			},
-			newlyCompletedBlockRanges: []*blockRange{
+			newlyCompletedBlockRanges: []*BlockRange{
 				{Start: 100, End: 199},
 			},
-			expectedBlockRanges: []*blockRange{
+			expectedBlockRanges: []*BlockRange{
 				{Start: 0, End: 199},
 			},
 		},
 		{
 			name: "Merging multiple block ranges",
-			completedBlockRanges: []*blockRange{
+			completedBlockRanges: []*BlockRange{
 				{Start: 0, End: 99},
 			},
-			newlyCompletedBlockRanges: []*blockRange{
+			newlyCompletedBlockRanges: []*BlockRange{
 				{Start: 100, End: 199},
 				{Start: 200, End: 299},
 				{Start: 400, End: 499},
 				{Start: 500, End: 599},
 			},
-			expectedBlockRanges: []*blockRange{
+			expectedBlockRanges: []*BlockRange{
 				{Start: 0, End: 299},
 				{Start: 400, End: 599},
 			},
 		},
 		{
 			name: "Merging multiple block ranges and reduce overlaps",
-			completedBlockRanges: []*blockRange{
+			completedBlockRanges: []*BlockRange{
 				{Start: 0, End: 99},
 			},
-			newlyCompletedBlockRanges: []*blockRange{
+			newlyCompletedBlockRanges: []*BlockRange{
 				{Start: 100, End: 199},
 				{Start: 200, End: 299},
 				{Start: 400, End: 499},
 				{Start: 500, End: 599},
 				{Start: 300, End: 399},
 			},
-			expectedBlockRanges: []*blockRange{
+			expectedBlockRanges: []*BlockRange{
 				{Start: 0, End: 599},
 			},
 		},
 		{
 			name: "Badly overlapping",
-			completedBlockRanges: []*blockRange{
+			completedBlockRanges: []*BlockRange{
 				{Start: 0, End: 199},
 				{Start: 0, End: 99},
 			},
-			newlyCompletedBlockRanges: []*blockRange{
+			newlyCompletedBlockRanges: []*BlockRange{
 				{Start: 100, End: 220},
 			},
-			expectedBlockRanges: []*blockRange{
+			expectedBlockRanges: []*BlockRange{
 				{Start: 0, End: 220},
 			},
 		},
 		{
 			name: "Unmerging range",
-			completedBlockRanges: []*blockRange{
+			completedBlockRanges: []*BlockRange{
 				{Start: 10000, End: 19998},
 				{Start: 20000, End: 37999},
 			},
-			newlyCompletedBlockRanges: []*blockRange{
+			newlyCompletedBlockRanges: []*BlockRange{
 				{Start: 10000, End: 19999},
 			},
-			expectedBlockRanges: []*blockRange{
+			expectedBlockRanges: []*BlockRange{
 				{Start: 10000, End: 37999},
 			},
 		},
 		{
 			name: "Preemptive overlap",
-			completedBlockRanges: []*blockRange{
+			completedBlockRanges: []*BlockRange{
 				{Start: 6950000, End: 6959999},
 				{Start: 6990000, End: 6999997},
 				{Start: 6990000, End: 6992496},
 				{Start: 7000000, End: 7009999},
 			},
-			newlyCompletedBlockRanges: []*blockRange{
+			newlyCompletedBlockRanges: []*BlockRange{
 				{Start: 6990000, End: 6999998},
 				{Start: 6990000, End: 6999999},
 			},
-			expectedBlockRanges: []*blockRange{
+			expectedBlockRanges: []*BlockRange{
 				{Start: 6950000, End: 6959999},
 				{Start: 6990000, End: 7009999},
 			},
@@ -129,7 +129,7 @@ func Test_MergeRangeLists(t *testing.T) {
 }
 
 func TestReduce1(t *testing.T) {
-	res := reduceOverlaps([]*blockRange{
+	res := reduceOverlaps([]*BlockRange{
 		{Start: 6990000, End: 6999997},
 		{Start: 6990000, End: 6992496}, // Happens if a process failed and restarted, will re-send lower level, which might appear as stalled, but it's actually re-working.
 		{Start: 7000000, End: 7009999},
@@ -141,7 +141,7 @@ func TestReduce1(t *testing.T) {
 }
 
 func TestReduce2(t *testing.T) {
-	res := reduceOverlaps([]*blockRange{
+	res := reduceOverlaps([]*BlockRange{
 		{Start: 6990000, End: 6999997},
 		{Start: 6990000, End: 6992496},
 	})

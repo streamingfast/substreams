@@ -183,6 +183,10 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 		zap.String("output_module", request.OutputModule),
 	)
 
+	stats := reqctx.ReqStats(ctx)
+	jobIdx := stats.RecordNewSubrequest(request.Stage, request.StartBlockNum, request.StopBlockNum)
+	defer stats.RecordEndSubrequest(jobIdx)
+
 	ctx = dauth.FromContext(ctx).ToOutgoingGRPCContext(ctx)
 	stream, err := grpcClient.ProcessRange(ctx, request, grpcCallOpts...)
 	if err != nil {
@@ -230,30 +234,17 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 
 		if resp != nil {
 			switch r := resp.Type.(type) {
-			case *pbssinternal.ProcessRangeResponse_ProcessedRange:
-				// push some updates for all those stages, altogether
-				err := upstream.RPCRangeProgressResponse(moduleNames, r.ProcessedRange.StartBlock, r.ProcessedRange.EndBlock)
-				if err != nil {
-					if ctx.Err() != nil {
-						return &Result{Error: ctx.Err()}
-					}
-					span.SetStatus(codes.Error, err.Error())
-					return &Result{
-						Error: NewRetryableErr(fmt.Errorf("sending progress: %w", err)),
-					}
-				}
-
-			case *pbssinternal.ProcessRangeResponse_ProcessedBytes:
-				/// ignore
+			case *pbssinternal.ProcessRangeResponse_Update:
+				stats.RecordJobUpdate(jobIdx, r.Update)
 
 			case *pbssinternal.ProcessRangeResponse_Failed:
 				// FIXME(abourget): we do NOT emit those Failed objects anymore. There was a flow
 				// for that that would pick up the errors, and pack the remaining logs
 				// and reasons into a message. This is nowhere to be found now.
 
-				upstream.RPCFailedProgressResponse(resp.ModuleName, r.Failed.Reason, r.Failed.Logs, r.Failed.LogsTruncated)
+				upstream.RPCFailedProgressResponse(r.Failed.Reason, r.Failed.Logs, r.Failed.LogsTruncated)
 
-				err := fmt.Errorf("module %s failed on host: %s", resp.ModuleName, r.Failed.Reason)
+				err := fmt.Errorf("work failed on remote host: %s", r.Failed.Reason)
 				span.SetStatus(codes.Error, err.Error())
 				return &Result{Error: err}
 

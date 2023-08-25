@@ -175,7 +175,7 @@ func (r *Request) renderRequestSummary() string {
 func (r *Request) SetSize(w, h int) {
 	r.Common.SetSize(w, h)
 	r.manifestView.Width = w
-	r.manifestView.Height = h - 11
+	r.manifestView.Height = h - 16
 }
 
 func (r *Request) setModulesViewContent() {

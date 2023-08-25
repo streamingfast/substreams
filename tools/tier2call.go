@@ -16,9 +16,9 @@ import (
 )
 
 var tier2CallCmd = &cobra.Command{
-	Use:   "tier2call <manifest_url> <output_module> <start_block> <end_block>",
+	Use:   "tier2call <manifest_url> <output_module> <stage_number> <start_block> <end_block>",
 	Short: "Calls a tier2 service, for internal inspection",
-	Args:  cobra.ExactArgs(4),
+	Args:  cobra.ExactArgs(5),
 	RunE:  tier2CallE,
 }
 
@@ -39,8 +39,9 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	manifestPath := args[0]
 	outputModule := args[1]
-	startBlock, _ := strconv.ParseInt(args[2], 10, 64)
-	stopBlock, _ := strconv.ParseInt(args[3], 10, 64)
+	stage, _ := strconv.ParseUint(args[2], 10, 32)
+	startBlock, _ := strconv.ParseInt(args[3], 10, 64)
+	stopBlock, _ := strconv.ParseInt(args[4], 10, 64)
 
 	manifestReader, err := manifest.NewReader(manifestPath)
 	if err != nil {
@@ -83,6 +84,7 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 		StopBlockNum:  uint64(stopBlock),
 		OutputModule:  outputModule,
 		Modules:       pkg.Modules,
+		Stage:         uint32(stage),
 	}, callOpts...)
 	if err != nil {
 		return fmt.Errorf("process range request: %w", err)

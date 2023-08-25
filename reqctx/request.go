@@ -40,10 +40,6 @@ func (d *RequestDetails) ShouldReturnWrittenPartials(modName string) bool {
 	return d.IsTier2Request && d.IsOutputModule(modName)
 }
 
-func (d *RequestDetails) ShouldReturnProgressMessages() bool {
-	return d.IsTier2Request
-}
-
 func (d *RequestDetails) ShouldStreamCachedOutputs() bool {
 	return d.ProductionMode &&
 		d.ResolvedStartBlockNum < d.LinearHandoffBlockNum

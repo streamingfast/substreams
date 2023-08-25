@@ -39,15 +39,11 @@ func WithTracer(ctx context.Context, tracer ttrace.Tracer) context.Context {
 	return context.WithValue(ctx, tracerKey, tracer)
 }
 
-func ReqStats(ctx context.Context) metrics.Stats {
-	reqStats := ctx.Value(reqStatsKey)
-	if t, ok := reqStats.(metrics.Stats); ok {
-		return t
-	}
-	return metrics.NewNoopStats()
+func ReqStats(ctx context.Context) *metrics.Stats {
+	return ctx.Value(reqStatsKey).(*metrics.Stats)
 }
 
-func WithReqStats(ctx context.Context, stats metrics.Stats) context.Context {
+func WithReqStats(ctx context.Context, stats *metrics.Stats) context.Context {
 	return context.WithValue(ctx, reqStatsKey, stats)
 }
 

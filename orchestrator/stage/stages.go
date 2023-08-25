@@ -14,6 +14,8 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/utils"
+
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 )
 
 // NOTE:
@@ -78,9 +80,15 @@ func NewStages(
 	if reqPlan.WriteExecOut != nil {
 		out.mapSegmenter = reqPlan.WriteOutSegmenter()
 	}
-	for idx, stageLayer := range stagedModules {
-		mods := stageLayer.LastLayer()
-		kind := layerKind(mods)
+	for idx, stageLayers := range stagedModules {
+		var allModules []string
+		for _, layer := range stageLayers {
+			for _, mod := range layer {
+				allModules = append(allModules, mod.Name)
+			}
+		}
+		layer := stageLayers.LastLayer()
+		kind := layerKind(layer)
 
 		if kind == KindMap && reqPlan.WriteExecOut == nil {
 			continue
@@ -98,8 +106,8 @@ func NewStages(
 		}
 
 		var moduleStates []*ModuleState
-		stageLowestInitBlock := mods[0].InitialBlock
-		for _, mod := range mods {
+		stageLowestInitBlock := layer[0].InitialBlock
+		for _, mod := range layer {
 			modSegmenter := segmenter.WithInitialBlock(mod.InitialBlock)
 			modState := NewModuleState(logger, mod.Name, modSegmenter, storeConfigs[mod.Name])
 			moduleStates = append(moduleStates, modState)
@@ -108,7 +116,7 @@ func NewStages(
 		}
 
 		stageSegmenter := segmenter.WithInitialBlock(stageLowestInitBlock)
-		stage := NewStage(idx, kind, stageSegmenter, moduleStates)
+		stage := NewStage(idx, kind, stageSegmenter, moduleStates, allModules)
 		out.stages = append(out.stages, stage)
 	}
 
@@ -145,18 +153,46 @@ func (s *Stages) AllStoresCompleted() bool {
 	return true
 }
 
-func (s *Stages) InitialProgressMessages() map[string]block.Ranges {
-	out := make(map[string]block.Ranges)
-	for segmentIdx, segment := range s.segmentStates {
-		for stageIdx, state := range segment {
-			if state == UnitCompleted {
-				for _, mod := range s.stages[stageIdx].moduleStates {
-					rng := mod.segmenter.Range(segmentIdx + s.segmentOffset)
-					if rng != nil {
-						out[mod.name] = append(out[mod.name], rng)
-					}
+func (s *Stages) UpdateStats() {
+	out := make([]*pbsubstreamsrpc.Stage, len(s.stages))
+
+	s.StatesString()
+	for i := range s.stages {
+		var mods []string
+		for _, mod := range s.stages[i].allExecutedModules {
+			mods = append(mods, mod)
+		}
+
+		var br []*block.Range
+		for segmentIdx, segment := range s.segmentStates {
+			state := segment[i]
+			segmenter := s.stages[i].moduleStates[0].segmenter
+			if state == UnitCompleted || state == UnitPartialPresent || state == UnitMerging {
+				if rng := segmenter.Range(segmentIdx + s.segmentOffset); rng != nil {
+					br = append(br, rng)
 				}
 			}
+		}
+		blockRanges := block.Ranges(br).SortAndDedupe().Merged()
+
+		out[i] = &pbsubstreamsrpc.Stage{
+			Modules:         mods,
+			CompletedRanges: toProtoRanges(blockRanges),
+		}
+	}
+
+	reqctx.ReqStats(s.ctx).RecordStages(out)
+}
+
+func toProtoRanges(in block.Ranges) []*pbsubstreamsrpc.BlockRange {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]*pbsubstreamsrpc.BlockRange, len(in))
+	for i := range in {
+		out[i] = &pbsubstreamsrpc.BlockRange{
+			StartBlock: in[i].StartBlock,
+			EndBlock:   in[i].ExclusiveEndBlock,
 		}
 	}
 	return out

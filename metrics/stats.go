@@ -138,6 +138,8 @@ func NewReqStats(config *Config, logger *zap.Logger) *Stats {
 type extendedStats struct {
 	*pbssinternal.ModuleStats
 	merging                       bool
+	mergeBegin                    time.Time
+	mergingTime                   time.Duration
 	processedBlocksInCompleteJobs uint64
 	storeOperationTime            time.Duration
 	processingTime                time.Duration
@@ -202,6 +204,17 @@ func (s *Stats) RecordNewSubrequest(stage uint32, startBlock, stopBlock uint64) 
 	}
 	s.Unlock()
 	return id
+}
+
+func (s *Stats) RecordModuleMerging(module string) {
+	s.modulesStats[module].merging = true
+	s.modulesStats[module].mergeBegin = time.Now()
+}
+
+func (s *Stats) RecordModuleMergeComplete(module string) {
+	stat := s.modulesStats[module]
+	stat.merging = false
+	stat.mergingTime += time.Since(stat.mergeBegin)
 }
 
 func (s *Stats) RecordEndSubrequest(jobIdx uint64) {
@@ -510,8 +523,8 @@ func (s *Stats) AggregatedModulesStats() []*pbsubstreamsrpc.ModuleStats {
 			TotalStoreDeleteprefixCount: v.StoreDeleteprefixCount,
 			StoreSizeBytes:              v.StoreSizeBytes,
 			TotalProcessedBlockCount:    v.processedBlocksInCompleteJobs,
-			// TotalStoreMergingTimeMs: //FIXME
-			// StoreCurrentlyMerging: // FIXME
+			TotalStoreMergingTimeMs:     uint64(v.mergingTime.Milliseconds()),
+			StoreCurrentlyMerging:       v.merging,
 		}
 
 		mergeMixedModuleStats(out[i], s.runningJobs.ModuleStats(k))

@@ -100,17 +100,19 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var totalProcessedBlocks uint64
 
 		sort.Slice(msg.RunningJobs, func(i, j int) bool {
-			return msg.RunningJobs[i].DurationMs > msg.RunningJobs[j].DurationMs
+			return msg.RunningJobs[i].ProcessedBlocks*100000/msg.RunningJobs[i].DurationMs < msg.RunningJobs[j].ProcessedBlocks*100000/msg.RunningJobs[j].DurationMs
 		})
 		var newSlowestJobs []string
 
 		incompleteRanges := make(map[int][]*ranges.BlockRange)
 		jobsPerStage := make([]int, len(msg.Stages))
-		for i, j := range msg.RunningJobs {
+		slowJobCount := 0
+		for _, j := range msg.RunningJobs {
 			totalProcessedBlocks += j.ProcessedBlocks
 			jobsPerStage[j.Stage]++
-			if i < 4 && j.DurationMs > 10000 {
-				newSlowestJobs = append(newSlowestJobs, fmt.Sprintf("[Stage: %d, Range: %d-%d, Duration: %ds]", j.Stage, j.StartBlock, j.StopBlock, j.DurationMs/1000))
+			if slowJobCount < 4 && j.DurationMs > 10000 { // skip 'young' jobs
+				newSlowestJobs = append(newSlowestJobs, fmt.Sprintf("[Stage: %d, Range: %d-%d, Duration: %ds, Blocks/sec: %.1f]", j.Stage, j.StartBlock, j.StopBlock, j.DurationMs/1000, float64(j.ProcessedBlocks)/float64(j.DurationMs/1000)))
+				slowJobCount++
 			}
 
 			incompleteRanges[int(j.Stage)] = append(incompleteRanges[int(j.Stage)], &ranges.BlockRange{Start: j.StartBlock, End: j.StartBlock + j.ProcessedBlocks})
@@ -178,6 +180,7 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			br = append(br, incompleteRanges[i]...)
 
+			sort.Slice(br, func(i, j int) bool { return br[i].Start < br[j].Start })
 			newBar := p.bars.NewBar(displayedName, br, displayedModules)
 			newBars[i] = newBar
 		}

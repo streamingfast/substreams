@@ -102,6 +102,7 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		})
 		var newSlowestJobs []string
 
+		incompleteRanges := make(map[int][]*ranges.BlockRange)
 		jobsPerStage := make([]int, len(msg.Stages))
 		for i, j := range msg.RunningJobs {
 			totalProcessedBlocks += j.ProcessedBlocks
@@ -109,6 +110,8 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if i < 4 && j.DurationMs > 10000 {
 				newSlowestJobs = append(newSlowestJobs, fmt.Sprintf("[Stage: %d, Range: %d-%d, Duration: %ds]", j.Stage, j.StartBlock, j.StopBlock, j.DurationMs/1000))
 			}
+
+			incompleteRanges[int(j.Stage)] = append(incompleteRanges[int(j.Stage)], &ranges.BlockRange{Start: j.StartBlock, End: j.StartBlock + j.ProcessedBlocks})
 		}
 
 		for i, stage := range msg.Stages {
@@ -119,13 +122,13 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			br := make([]*ranges.BlockRange, len(stage.CompletedRanges))
 			for j, r := range stage.CompletedRanges {
-
 				totalProcessedBlocks += (r.EndBlock - r.StartBlock)
 				br[j] = &ranges.BlockRange{
 					Start: r.StartBlock,
 					End:   r.EndBlock,
 				}
 			}
+			br = append(br, incompleteRanges[i]...)
 
 			newBar := p.bars.NewBar(displayedName, br, stage.Modules)
 			newBars[i] = newBar

@@ -18,8 +18,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 > [!IMPORTANT]
 * The client and servers will both need to be upgraded at the same time for the new progress messages to be parsed:
-  - The new substreams servers will *NOT* send the old `modules` field as part of its `progress` message, only the new `running_jobs`, `modules_stats`, `stages`.
-  - The new substreams clients will *NOT* be able to decode the old progress information when connecting to older servers.
+  - The new Substreams servers will *NOT* send the old `modules` field as part of its `progress` message, only the new `running_jobs`, `modules_stats`, `stages`.
+  - The new Substreams clients will *NOT* be able to decode the old progress information when connecting to older servers.
 
 * However, the actual data (and cursor) will work correctly between versions. Only incompatible progress information will be ignored.
 
@@ -28,6 +28,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Changed
 
 * Bumped `substreams` and `substreams-ethereum` to latest in `substreams alpha init`.
+
+* Improved error message when `<module_name>` is not received, previously this would lead to weird error message, now, if the input is likely a manifest, the error message will be super clear.
 
 ### Fixed
 

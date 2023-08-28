@@ -16,6 +16,7 @@ import (
 	ipfs "github.com/ipfs/go-ipfs-api"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
+	"github.com/streamingfast/cli"
 	"github.com/streamingfast/dstore"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
@@ -121,7 +122,7 @@ func newReader(input string, workingDir string, opts ...Option) (*Reader, error)
 }
 
 func resolveInput(input string, workingDir string) (string, error) {
-	if isRemotePackage(input) {
+	if hasRemotePackagePrefix(input) {
 		return input, nil
 	}
 
@@ -207,16 +208,38 @@ func (r *Reader) read(workingDir string) (*pbsubstreams.Package, error) {
 // IsRemotePackage determines if reader's input to read the manifest is a remote file accessible over
 // HTTP/HTTPS, Google Cloud Storage, S3 or Azure Storage.
 func (r *Reader) IsRemotePackage() bool {
-	return isRemotePackage(r.resolvedInput)
+	return hasRemotePackagePrefix(r.resolvedInput)
 }
 
-func isRemotePackage(in string) bool {
-	u, err := url.Parse(in)
-	if err != nil {
-		return false
+func hasRemotePackagePrefix(in string) bool {
+	for _, prefix := range []string{"https://", "http://", "ipfs://", "gs://", "s3://", "az://"} {
+		if strings.HasPrefix(in, prefix) {
+			return true
+		}
 	}
 
-	return u.Scheme == "http" || u.Scheme == "https" || u.Scheme == "gs" || u.Scheme == "s3" || u.Scheme == "az" || u.Scheme == "ipfs"
+	return false
+}
+
+// IsLikelyManifestInput determines if the input is likely a manifest input, which is determined
+// by checking:
+//   - If the input starts with remote prefix ("https://", "http://", "ipfs://", "gs://", "s3://", "az://")
+//   - If the input ends with `.yaml`
+//   - If the input is a directory (we check for path separator)
+func IsLikelyManifestInput(in string) bool {
+	if hasRemotePackagePrefix(in) {
+		return true
+	}
+
+	if strings.HasSuffix(in, ".yaml") {
+		return true
+	}
+
+	if strings.Contains(in, string(os.PathSeparator)) {
+		return true
+	}
+
+	return cli.DirectoryExists(in) || cli.FileExists(in)
 }
 
 // IsLocalManifest determines if reader's input to read the manifest is a local manifest file, which is determined

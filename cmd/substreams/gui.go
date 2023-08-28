@@ -7,12 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/streamingfast/substreams/manifest"
-
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/substreams/client"
+	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/tools"
 	"github.com/streamingfast/substreams/tui2"
 	"github.com/streamingfast/substreams/tui2/pages/request"
@@ -59,9 +58,11 @@ func runGui(cmd *cobra.Command, args []string) error {
 		manifestPath = args[0]
 		args = args[1:]
 	} else {
-		if cli.DirectoryExists(args[0]) || cli.FileExists(args[0]) || strings.Contains(args[0], ".") {
-			return fmt.Errorf("parameter entered likely a manifest file, don't forget to include a '<module_name>' in your command")
+		// Check common error where manifest is provided by module name is missing
+		if manifest.IsLikelyManifestInput(args[0]) {
+			return fmt.Errorf("missing <module_name> argument, check 'substreams run --help' for more information")
 		}
+
 		// At this point, we assume the user invoked `substreams run <module_name>` so we `resolveManifestFile` using the empty string since no argument has been passed.
 		manifestPath, err = resolveManifestFile("")
 		if err != nil {

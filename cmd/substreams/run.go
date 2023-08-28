@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"google.golang.org/grpc/metadata"
 	"io"
 	"strconv"
 	"strings"
@@ -17,6 +16,7 @@ import (
 	"github.com/streamingfast/substreams/tools/test"
 	"github.com/streamingfast/substreams/tui"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/metadata"
 )
 
 func init() {
@@ -59,6 +59,11 @@ func runRun(cmd *cobra.Command, args []string) error {
 	var manifestPath, outputModule string
 	if len(args) == 1 {
 		outputModule = args[0]
+
+		// Check common error where manifest is provided by module name is missing
+		if manifest.IsLikelyManifestInput(outputModule) {
+			return fmt.Errorf("missing <module_name> argument, check 'substreams run --help' for more information")
+		}
 	} else {
 		manifestPath = args[0]
 		outputModule = args[1]

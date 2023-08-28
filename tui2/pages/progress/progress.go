@@ -100,6 +100,13 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var totalProcessedBlocks uint64
 
 		sort.Slice(msg.RunningJobs, func(i, j int) bool {
+			if msg.RunningJobs[i].DurationMs == 0 {
+				return false
+			}
+			if msg.RunningJobs[j].DurationMs == 0 {
+				return true
+			}
+
 			return msg.RunningJobs[i].ProcessedBlocks*100000/msg.RunningJobs[i].DurationMs < msg.RunningJobs[j].ProcessedBlocks*100000/msg.RunningJobs[j].DurationMs
 		})
 		var newSlowestJobs []string

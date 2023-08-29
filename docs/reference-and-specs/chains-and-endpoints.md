@@ -35,6 +35,7 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 
 * **Ethereum Mainnet**: `mainnet.eth.streamingfast.io:443`
 * **Ethereum Görli**: `goerli.eth.streamingfast.io:443`
+* **Ethereum Sepolia**: `sepolia.eth.streamingfast.io:443`
 * **Polygon** **Mainnet**: `polygon.streamingfast.io:443`
 * **Mumbai Testnet**: `mumbai.streamingfast.io:443`
 * **Arbitrum One:** `arb-one.streamingfast.io:443` (beta)

@@ -15,7 +15,8 @@ import (
 
 func TestNewStages(t *testing.T) {
 	//seg := block.NewSegmenter(10, 5, 75)
-	reqPlan := plan.BuildTier1RequestPlan(true, 10, 5, 5, 75, 75, true)
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 75, 75, true)
+	assert.NoError(t, err)
 
 	stages := NewStages(
 		context.Background(),
@@ -40,7 +41,8 @@ func TestNewStages(t *testing.T) {
 
 func TestNewStagesNextJobs(t *testing.T) {
 	//seg := block.NewSegmenter(10, 5, 50)
-	reqPlan := plan.BuildTier1RequestPlan(true, 10, 5, 5, 50, 50, true)
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 50, 50, true)
+	assert.NoError(t, err)
 	assert.Equal(t, "interval=10, stores=[5, 40), map_write=[5, 50), map_read=[5, 50), linear=[nil)", reqPlan.String())
 	stages := NewStages(
 		context.Background(),

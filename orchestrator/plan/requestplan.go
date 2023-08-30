@@ -51,7 +51,7 @@ func (p *RequestPlan) RequiresParallelProcessing() bool {
 	return p.WriteExecOut != nil || p.BuildStores != nil
 }
 
-func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphInitBlock, resolvedStartBlock, linearHandoffBlock, exclusiveEndBlock uint64, scheduleStores bool) *RequestPlan {
+func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphInitBlock, resolvedStartBlock, linearHandoffBlock, exclusiveEndBlock uint64, scheduleStores bool) (*RequestPlan, error) {
 	if exclusiveEndBlock != 0 && linearHandoffBlock > exclusiveEndBlock {
 		panic(fmt.Sprintf("invalid linearHandoff %d when building plan, it should always be capped at exclusiveEndBlock %d", linearHandoffBlock, exclusiveEndBlock))
 	}
@@ -68,14 +68,18 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphIni
 		plan.LinearPipeline = block.NewRange(linearHandoffBlock, exclusiveEndBlock)
 	}
 	if resolvedStartBlock == linearHandoffBlock && graphInitBlock == resolvedStartBlock {
-		return plan
+		return plan, nil
 	}
 	if productionMode {
 		storesStopOnBound := plan.LinearPipeline == nil
 		endStoreBound := linearHandoffBlock
 		if storesStopOnBound {
 			segmentIdx := segmenter.IndexForEndBlock(linearHandoffBlock)
-			endStoreBound = segmenter.Range(segmentIdx).StartBlock
+			endStoreBoundRange := segmenter.Range(segmentIdx)
+			if endStoreBoundRange == nil {
+				return nil, fmt.Errorf("store bound range: invalid start block %d for segment interval %d", linearHandoffBlock, segmentInterval)
+			}
+			endStoreBound = endStoreBoundRange.StartBlock
 		}
 		if scheduleStores {
 			plan.BuildStores = block.NewRange(graphInitBlock, endStoreBound)
@@ -83,7 +87,11 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphIni
 
 		startExecOutAtBlock := utils.MaxOf(resolvedStartBlock, graphInitBlock)
 		startExecOutAtSegment := segmenter.IndexForStartBlock(startExecOutAtBlock)
-		writeExecOutStartBlock := segmenter.Range(startExecOutAtSegment).StartBlock
+		writeExecOutStartBlockRange := segmenter.Range(startExecOutAtSegment)
+		if writeExecOutStartBlockRange == nil {
+			return nil, fmt.Errorf("write execout range: invalid start block %d for segment interval %d", startExecOutAtBlock, segmentInterval)
+		}
+		writeExecOutStartBlock := writeExecOutStartBlockRange.StartBlock
 		plan.WriteExecOut = block.NewRange(writeExecOutStartBlock, linearHandoffBlock)
 		plan.ReadExecOut = block.NewRange(resolvedStartBlock, linearHandoffBlock)
 	} else { /* dev mode */
@@ -92,7 +100,7 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphIni
 		}
 		plan.WriteExecOut = nil
 	}
-	return plan
+	return plan, nil
 }
 
 func (p *RequestPlan) StoresSegmenter() *block.Segmenter {

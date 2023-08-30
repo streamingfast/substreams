@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v1.1.12
 
-## Highlights
+### Highlights
 
 * Complete redesign of the progress messages:
   * Tier2 internal stats are aggregated on Tier1 and sent out every 500ms (no more bursts)
@@ -14,47 +14,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   * Message now includes list of running jobs and information about execution stages
   * Performance metrics has been added to show which modules are executing slowly and where the time is spent (eth calls, store operations, etc.)
 
-## Upgrading client and server
+### Upgrading client and server
 
 > [!IMPORTANT]
 > The client and servers will both need to be upgraded at the same time for the new progress messages to be parsed:
 > - The new Substreams servers will *NOT* send the old `modules` field as part of its `progress` message, only the new `running_jobs`, `modules_stats`, `stages`.
 > - The new Substreams clients will *NOT* be able to decode the old progress information when connecting to older servers.
 
-* However, the actual data (and cursor) will work correctly between versions. Only incompatible progress information will be ignored.
+However, the actual data (and cursor) will work correctly between versions. Only incompatible progress information will be ignored.
 
-## CLI
+### CLI
 
-### Changed
+#### Changed
 
 * Bumped `substreams` and `substreams-ethereum` to latest in `substreams alpha init`.
 
 * Improved error message when `<module_name>` is not received, previously this would lead to weird error message, now, if the input is likely a manifest, the error message will be super clear.
 
-### Fixed
+#### Fixed
 
 * Fixed compilation errors when tracking some contracts when using `substreams alpha init`.
 
-### Added
+#### Added
 
 * `substreams info` now takes an optional second parameter `<output-module>` to show how the substreams modules can be divided into stages
 * Pack command: added `-c` flag to allow overriding of certain substreams.yaml values by passing in the path of a yaml file.
   example yaml contents:
-```yaml
-package:
-  name: my_custom_package_name
+  ```yaml
+  package:
+    name: my_custom_package_name
+  
+  network: arbitrum-one
+  initialBlocks:
+    module_name_1: 123123123
+  params:
+    mod1: "custom_parameter"
+  ```
 
-network: arbitrum-one
-initialBlocks:
-  module_name_1: 123123123
-params:
-  mod1: "custom_parameter"
-```
+### Backend
 
-## Backend
-
-### Removed
+#### Removed
 * Removed `Config.RequestStats`, stats are now always enabled.
+
 ## v1.1.11
 
 ### Fixes

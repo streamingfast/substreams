@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v1.1.12
 
 ## Highlights
 
@@ -17,9 +17,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## Upgrading client and server
 
 > [!IMPORTANT]
-* The client and servers will both need to be upgraded at the same time for the new progress messages to be parsed:
-  - The new Substreams servers will *NOT* send the old `modules` field as part of its `progress` message, only the new `running_jobs`, `modules_stats`, `stages`.
-  - The new Substreams clients will *NOT* be able to decode the old progress information when connecting to older servers.
+> The client and servers will both need to be upgraded at the same time for the new progress messages to be parsed:
+> - The new Substreams servers will *NOT* send the old `modules` field as part of its `progress` message, only the new `running_jobs`, `modules_stats`, `stages`.
+> - The new Substreams clients will *NOT* be able to decode the old progress information when connecting to older servers.
 
 * However, the actual data (and cursor) will work correctly between versions. Only incompatible progress information will be ignored.
 

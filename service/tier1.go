@@ -395,7 +395,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 
 	scheduleStores := outputGraph.StagedUsedModules()[0].LastLayer().IsStoreLayer()
 
-	reqPlan := plan.BuildTier1RequestPlan(
+	reqPlan, err := plan.BuildTier1RequestPlan(
 		requestDetails.ProductionMode,
 		s.runtimeConfig.StateBundleSize,
 		outputGraph.LowestInitBlock(),
@@ -404,6 +404,9 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		requestDetails.StopBlockNum,
 		scheduleStores,
 	)
+	if err != nil {
+		return fmt.Errorf("error building request plan: %w", err)
+	}
 
 	logger.Info("initializing tier1 pipeline",
 		zap.Stringer("plan", reqPlan),

@@ -117,10 +117,13 @@ func runGui(cmd *cobra.Command, args []string) error {
 
 	startBlock, readFromModule, err := readStartBlockFlag(cmd, "start-block")
 	if err != nil {
-		return fmt.Errorf("stop block: %w", err)
+		return fmt.Errorf("start block: %w", err)
 	}
 
-	stopBlock := mustGetString(cmd, "stop-block")
+	stopBlock, err := readStopBlockFlag(cmd, startBlock, "stop-block", cursor != "")
+	if err != nil {
+		return fmt.Errorf("stop block: %w", err)
+	}
 
 	requestConfig := &request.RequestConfig{
 		ManifestPath:                manifestPath,

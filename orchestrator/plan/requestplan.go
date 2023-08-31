@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/streamingfast/substreams/block"
-	"github.com/streamingfast/substreams/utils"
 )
 
 // RequestPlan lays out the configuration of the components to accomplish
@@ -85,7 +84,7 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphIni
 			plan.BuildStores = block.NewRange(graphInitBlock, endStoreBound)
 		}
 
-		startExecOutAtBlock := utils.MaxOf(resolvedStartBlock, graphInitBlock)
+		startExecOutAtBlock := max(resolvedStartBlock, graphInitBlock)
 		startExecOutAtSegment := segmenter.IndexForStartBlock(startExecOutAtBlock)
 		writeExecOutStartBlockRange := segmenter.Range(startExecOutAtSegment)
 		if writeExecOutStartBlockRange == nil {
@@ -115,8 +114,8 @@ func (p *RequestPlan) BackprocessSegmenter() *block.Segmenter {
 	}
 	return block.NewSegmenter(
 		p.segmentInterval,
-		utils.MinOf(p.BuildStores.StartBlock, p.WriteExecOut.StartBlock),
-		utils.MaxOf(p.BuildStores.ExclusiveEndBlock, p.WriteExecOut.ExclusiveEndBlock),
+		min(p.BuildStores.StartBlock, p.WriteExecOut.StartBlock),
+		max(p.BuildStores.ExclusiveEndBlock, p.WriteExecOut.ExclusiveEndBlock),
 	)
 }
 

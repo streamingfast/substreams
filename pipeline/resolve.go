@@ -84,13 +84,13 @@ func computeLiveHandoffBlockNum(productionMode bool, startBlock, stopBlock uint6
 		if stopBlock == 0 {
 			return maxHandoff, nil
 		}
-		return minOf(stopBlock, maxHandoff), nil
+		return min(stopBlock, maxHandoff), nil
 	}
 	maxHandoff, err := getRecentFinalBlockFunc()
 	if err != nil {
 		return startBlock, nil
 	}
-	return minOf(startBlock, maxHandoff), nil
+	return min(startBlock, maxHandoff), nil
 }
 
 // resolveStartBlockNum will occasionally modify or remove the cursor inside the request
@@ -189,7 +189,6 @@ func (j *junctionBlockGetter) ProcessBlock(block *bstream.Block, obj interface{}
 }
 
 func NewCursorResolver(hub *hub.ForkableHub, mergedBlocksStore, forkedBlocksStore dstore.Store) CursorResolver {
-
 	return func(ctx context.Context, cursor *bstream.Cursor) (reorgJunctionBlock, currentHead bstream.BlockRef, err error) {
 		jctBlkGetter := &junctionBlockGetter{}
 		src := hub.SourceFromCursor(cursor, jctBlkGetter)
@@ -214,11 +213,4 @@ func NewCursorResolver(hub *hub.ForkableHub, mergedBlocksStore, forkedBlocksStor
 
 		return jctBlkGetter.reorgJunctionBlock, jctBlkGetter.currentHead, nil
 	}
-}
-
-func minOf(a, b uint64) uint64 {
-	if a < b {
-		return a
-	}
-	return b
 }

@@ -1,6 +1,6 @@
 module github.com/streamingfast/substreams
 
-go 1.19
+go 1.21
 
 require (
 	github.com/abourget/llerrgroup v0.2.0

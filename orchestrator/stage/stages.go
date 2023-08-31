@@ -10,12 +10,10 @@ import (
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/orchestrator/plan"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
-	"github.com/streamingfast/substreams/utils"
-
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 )
 
 // NOTE:
@@ -112,7 +110,7 @@ func NewStages(
 			modState := NewModuleState(logger, mod.Name, modSegmenter, storeConfigs[mod.Name])
 			moduleStates = append(moduleStates, modState)
 
-			stageLowestInitBlock = utils.MinOf(stageLowestInitBlock, mod.InitialBlock)
+			stageLowestInitBlock = min(stageLowestInitBlock, mod.InitialBlock)
 		}
 
 		stageSegmenter := segmenter.WithInitialBlock(stageLowestInitBlock)

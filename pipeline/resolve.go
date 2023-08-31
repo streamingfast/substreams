@@ -122,6 +122,10 @@ func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, res
 		return 0, "", nil, status.Errorf(grpccodes.InvalidArgument, "invalid StartCursor %q: %s", cursor, err.Error())
 	}
 
+	if req.StopBlockNum < cursor.Block.Num() {
+		return 0, "", nil, status.Errorf(grpccodes.InvalidArgument, "StartCursor %q is after StopBlockNum %d", cursor, req.StopBlockNum)
+	}
+
 	if cursor.IsOnFinalBlock() {
 		nextBlock := cursor.Block.Num() + 1
 		return nextBlock, "", nil, nil

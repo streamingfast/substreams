@@ -3,7 +3,6 @@ package request
 import (
 	"fmt"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/streamingfast/substreams/client"
@@ -35,7 +34,7 @@ type RequestConfig struct {
 	DebugModulesOutput          []string
 	DebugModulesInitialSnapshot []string
 	StartBlock                  int64
-	StopBlock                   string
+	StopBlock                   uint64
 	FinalBlocksOnly             bool
 	Headers                     map[string]string
 	OutputModule                string
@@ -264,11 +263,6 @@ func (c *RequestConfig) NewInstance() (*RequestInstance, error) {
 		c.StartBlock = int64(sb)
 	}
 
-	stopBlock, err := resolveStopBlock(c.StopBlock, c.StartBlock)
-	if err != nil {
-		return nil, fmt.Errorf("stop block: %w", err)
-	}
-
 	if err := manifest.ApplyParams(c.Params, pkg); err != nil {
 		return nil, err
 	}
@@ -283,7 +277,7 @@ func (c *RequestConfig) NewInstance() (*RequestInstance, error) {
 		StartBlockNum:                       c.StartBlock,
 		StartCursor:                         c.Cursor,
 		FinalBlocksOnly:                     c.FinalBlocksOnly,
-		StopBlockNum:                        stopBlock,
+		StopBlockNum:                        uint64(c.StopBlock),
 		Modules:                             pkg.Modules,
 		OutputModule:                        c.OutputModule,
 		ProductionMode:                      c.ProdMode,
@@ -361,25 +355,4 @@ func readManifest(manifestPath string) (*manifest.ModuleGraph, *pbsubstreams.Pac
 		return nil, nil, fmt.Errorf("creating module graph: %w", err)
 	}
 	return graph, pkg, nil
-}
-
-func resolveStopBlock(stopBlock string, startBlock int64) (uint64, error) {
-	isRelative := strings.HasPrefix(stopBlock, "+")
-	if isRelative {
-		stopBlock = strings.TrimPrefix(stopBlock, "+")
-		if startBlock < 0 {
-			return 0, fmt.Errorf("cannot have start block negative with relative stop block")
-		}
-	}
-
-	endBlock, err := strconv.ParseUint(stopBlock, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("end block is invalid: %w", err)
-	}
-
-	if isRelative {
-		return uint64(startBlock) + endBlock, nil
-	}
-
-	return endBlock, nil
 }

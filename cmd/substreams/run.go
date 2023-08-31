@@ -3,10 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
-	"strconv"
-	"strings"
-
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/substreams/client"
@@ -17,6 +13,7 @@ import (
 	"github.com/streamingfast/substreams/tui"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/metadata"
+	"io"
 )
 
 func init() {
@@ -139,14 +136,16 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 	defer connClose()
 
-	stopBlock, err := readStopBlockFlag(cmd, startBlock, "stop-block")
+	cursorStr := mustGetString(cmd, "cursor")
+
+	stopBlock, err := readStopBlockFlag(cmd, startBlock, "stop-block", cursorStr != "")
 	if err != nil {
 		return fmt.Errorf("stop block: %w", err)
 	}
 
 	req := &pbsubstreamsrpc.Request{
 		StartBlockNum:                       startBlock,
-		StartCursor:                         mustGetString(cmd, "cursor"),
+		StartCursor:                         cursorStr,
 		StopBlockNum:                        stopBlock,
 		FinalBlocksOnly:                     mustGetBool(cmd, "final-blocks-only"),
 		Modules:                             pkg.Modules,
@@ -225,48 +224,4 @@ func runRun(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	}
-}
-
-func readStartBlockFlag(cmd *cobra.Command, flagName string) (int64, bool, error) {
-	val, err := cmd.Flags().GetString(flagName)
-	if err != nil {
-		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
-	}
-	if val == "" {
-		return 0, true, nil
-	}
-
-	startBlock, err := strconv.ParseInt(val, 10, 64)
-	if err != nil {
-		return 0, false, fmt.Errorf("start block is invalid: %w", err)
-	}
-
-	return startBlock, false, nil
-}
-
-func readStopBlockFlag(cmd *cobra.Command, startBlock int64, flagName string) (uint64, error) {
-	val, err := cmd.Flags().GetString(flagName)
-	if err != nil {
-		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
-	}
-
-	isRelative := strings.HasPrefix(val, "+")
-	if isRelative {
-		if startBlock < 0 {
-			return 0, fmt.Errorf("relative end block is supported only with an absolute start block")
-		}
-
-		val = strings.TrimPrefix(val, "+")
-	}
-
-	endBlock, err := strconv.ParseUint(val, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("end block is invalid: %w", err)
-	}
-
-	if isRelative {
-		return uint64(startBlock) + endBlock, nil
-	}
-
-	return endBlock, nil
 }

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/streamingfast/bstream"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -284,6 +285,13 @@ func (s *Tier1Service) writePackage(ctx context.Context, request *pbsubstreamsrp
 var IsValidCacheTag = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`).MatchString
 
 func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Request, outputGraph *outputmodules.Graph, respFunc substreams.ResponseFunc) error {
+	chainFirstStreamableBlock := bstream.GetProtocolFirstStreamableBlock
+	if request.StartBlockNum != 0 && request.StartBlockNum < int64(chainFirstStreamableBlock) {
+		return stream.NewErrInvalidArg("invalid start block %d, must be >= %d (the first streamable block of the chain)", request.StartBlockNum, chainFirstStreamableBlock)
+	} else if request.StartBlockNum == 0 {
+		request.StartBlockNum = int64(chainFirstStreamableBlock)
+	}
+
 	logger := reqctx.Logger(ctx)
 
 	requestDetails, undoSignal, err := pipeline.BuildRequestDetails(ctx, request, s.getRecentFinalBlock, s.resolveCursor, s.getHeadBlock)

@@ -2,7 +2,7 @@
 
 ## The Problem
 
-Consider that you want to implement a function that given a user identifier, it returns the corresponding username. The signature of the function could be as the following:
+Consider that you want to implement a function that given a user identifier, returns the corresponding username. The signature of the function could be as the follows:
 
 ```rust
 fn get_username_by_id(id: u32) -> String {
@@ -26,11 +26,11 @@ fn get_username_by_id(id: u32) -> Option<String> {
 }
 ```
 
-Now, the functions works as follows:
+Now, the function works as follows:
 - If the function **is able to retrieve the data**, then a `Some` struct containing the string is returned.
 - If the function **is NOT able to retrieve the data**, then a `None` struct is returned.
 
-Let's complete the body of the funtion:
+Let's complete the body of the function:
 
 ```rust
 fn get_username_by_id(id: u32) -> Option<String> { // 1.
@@ -48,9 +48,9 @@ fn get_username_by_id(id: u32) -> Option<String> { // 1.
 
 ## Using Options
 
-Th `Option<T>` struct contains two helper methods to check if the returned type is `Some` or `None`: the `.is_some()` method returns `true` if the 
+The `Option<T>` struct contains two helper methods to check if the returned type is `Some` or `None`: the `.is_some()` method returns `true` if the 
 
-Next, let's show how to use a `Option` enum.
+Next, let's show how to use an `Option` enum.
 
 ```rust
 fn get_username_by_id(id: u32) -> Option<String> {
@@ -69,14 +69,15 @@ fn main() {
         println!("User with id = 1 holds username {}", user1.unwrap())
     }
 
-    if (user10.is_none()) {
+    if (user10.is_none()) { // 4.
         println!("User with id = 10 does not exist")
     }
 }
 ```
-1. Get user with `id == 1`
-1. Get user with `id == 10`
-3. Check if the function 
+1. Get the user with `id == 1`.
+1. Get the user with `id == 10`.
+3. If the function returned a name for `id = 1`, then `user1.is_some()` returns `true`.
+4. If the function did NOT return a name for `id = 10`, then `user1.is_none()` returns `true`.
 
 
 

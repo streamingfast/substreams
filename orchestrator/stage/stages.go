@@ -154,7 +154,6 @@ func (s *Stages) AllStoresCompleted() bool {
 func (s *Stages) UpdateStats() {
 	out := make([]*pbsubstreamsrpc.Stage, len(s.stages))
 
-	s.StatesString()
 	for i := range s.stages {
 		var mods []string
 		for _, mod := range s.stages[i].allExecutedModules {

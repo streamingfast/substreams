@@ -58,6 +58,11 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphIni
 		panic(fmt.Errorf("start block cannot be prior to the lowest init block in the requested module graph (%d)", graphInitBlock))
 	}
 
+	if linearHandoffBlock < resolvedStartBlock {
+		// this situation occurs when the substreams module initial block is in the future.  we adjust the linear handoff block to be the resolved start block
+		linearHandoffBlock = resolvedStartBlock
+	}
+
 	segmenter := block.NewSegmenter(segmentInterval, graphInitBlock, exclusiveEndBlock)
 	plan := &RequestPlan{
 		segmentInterval: segmentInterval,

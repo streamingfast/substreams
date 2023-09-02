@@ -11,6 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * If the initial block or start block is less than the first block in the chain, the substreams will now start from the
   first block in the chain. Previously, setting the initial block to a block before the first block in the chain would
   cause the substreams to hang.
+* Fixed a bug where the substreams would fail if the start block was set to a future block. The substreams will now wait
+  for the block to be produced before starting.
 
 ## v1.1.12
 

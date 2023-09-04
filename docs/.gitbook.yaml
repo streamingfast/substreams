@@ -1,0 +1,4 @@
+root: ./
+
+redirects:  
+    help: developers-guide/cookbook.md

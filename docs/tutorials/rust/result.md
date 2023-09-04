@@ -1,5 +1,6 @@
 # The Result<T, E> struct
 
+
 In Rust, the `Result<T, E>` struct is used to abstract both a successful response (if exists) and an error (if exists). Let's understand it with an example.
 
 ## Basic Usage

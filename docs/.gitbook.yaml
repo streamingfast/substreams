@@ -1,4 +1,4 @@
 root: ./
 
 redirects:  
-    help: developers-guide/cookbook.md
+    help: ./developers-guide/cookbook.md

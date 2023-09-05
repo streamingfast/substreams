@@ -2,7 +2,7 @@
 
 ## The Problem
 
-Consider that you want to implement a function that given a user identifier, returns the corresponding username. The signature of the function could be as the follows:
+Consider that you want to implement a function that given a user identifier, returns the corresponding username. The signature of the function could be as follows:
 
 ```rust
 fn get_username_by_id(id: u32) -> String {
@@ -78,6 +78,3 @@ fn main() {
 1. Get the user with `id == 10`.
 3. If the function returned a name for `id = 1`, then `user1.is_some()` returns `true`.
 4. If the function did NOT return a name for `id = 10`, then `user1.is_none()` returns `true`.
-
-
-

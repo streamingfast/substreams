@@ -48,9 +48,7 @@ fn get_username_by_id(id: u32) -> Option<String> { // 1.
 
 ## Using Options
 
-The `Option<T>` struct contains two helper methods to check if the returned type is `Some` or `None`: the `.is_some()` method returns `true` if the 
-
-Next, let's show how to use an `Option` enum.
+The `Option<T>` struct contains two helper methods to check if the returned type is `Some` or `None`: the `.is_some()` and `.is_none()` methods. Let's see how to use these methods:
 
 ```rust
 fn get_username_by_id(id: u32) -> Option<String> {

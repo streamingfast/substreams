@@ -27,7 +27,7 @@ fn get_username_by_id(id: u32) -> Option<String> {
 ```
 
 Now, the function works as follows:
-- If the function **is able to retrieve the data**, then a `Some` struct containing the string is returned.
+- If the function **is able to retrieve the data**, then a `Some` value containing the string is returned.
 - If the function **is NOT able to retrieve the data**, then a `None` struct is returned.
 
 Let's complete the body of the function:

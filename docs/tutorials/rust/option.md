@@ -18,7 +18,7 @@ Although this is a valid approach, it creates hidden logic that is not visible u
 
 ## The Solution
 
-Rust provides a better way of dealing with these situations by using the `Option<T>` enum. This enum has two possible values: `Some<T>` (used when the returned value is present) and `None` (used when the returned value is not present). Therefore, the previous function can be refactored:
+Rust provides a better way of dealing with these situations by using the `Option<T>` enum. This enum has two possible values: `Some(T)` (used when the returned value is present) and `None` (used when the returned value is not present). Therefore, the previous function can be refactored:
 
 ```rust
 fn get_username_by_id(id: u32) -> Option<String> {

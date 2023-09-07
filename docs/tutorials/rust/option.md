@@ -76,3 +76,30 @@ fn main() {
 1. Get the user with `id == 10`.
 3. If the function returned a name for `id = 1`, then `user1.is_some()` returns `true`.
 4. If the function did NOT return a name for `id = 10`, then `user1.is_none()` returns `true`.
+
+You can also use [pattern matching](https://doc.rust-lang.org/book/ch18-03-pattern-syntax.html) instead of the helper methods:
+
+```rust
+fn get_username_by_id(id: u32) -> Option<String> {
+    match(id) {
+        1 => Some(String::from("Susan")),
+        2 => Some(String::from("John")),
+        _ => None
+    }
+}
+
+fn main() {
+    let user1 = get_username_by_id(1);
+    let user10 = get_username_by_id(10);
+    
+    match (&user1) {
+        Some(name) => println!("User with id = 1 holds username {}", &user1.unwrap()),
+        None => println!("No user with id = 1 found")
+    }
+    
+    match (&user10) {
+        Some(name) => println!("User with id = 10 holds username {}", &user10.unwrap()),
+        None => println!("No user with id = 10 found")
+    }
+}
+```

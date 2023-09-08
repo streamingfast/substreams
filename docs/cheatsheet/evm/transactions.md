@@ -1,6 +1,3 @@
----
-description: Retrieving transactions on EVM blockchains
----
 
 In EVM-compatible chains, a Trasanction represents an change in the blockchain, such as ETH transfers or smart contract executions. In Substreams, transactions are abstracted by the [TransactionTrace](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto#L157) Protobuf model. Some of the most relevant fields and methods of the model are:
 - `hash` (property): hash of the transaction.
@@ -14,6 +11,8 @@ In EVM-compatible chains, a Trasanction represents an change in the blockchain, 
 <figure><img src="../../.gitbook/assets/cheatsheet/cheatsheet-transaction-structure.png" width="100%" /><figcaption><p>EVM-compatible Protobuf Structure - TransactionTrace</p></figcaption></figure>
 
 # Iterating over ALL Transactions
+
+The `block.transaction_traces` property contains **all** transactions, regardless of their status.
 
 ```rust
 use substreams::Hex;
@@ -39,6 +38,8 @@ fn all_transactions(blk: Block) -> Vec<TransactionMeta> {
 
 # Iterating over SUCCESSFUL Transactions
 
+The `transactions()` method contains **successful** transactions.
+
 ```rust
 use substreams::Hex;
 use substreams_ethereum::pb::eth::v2::Block;
@@ -60,7 +61,7 @@ fn successful_transactions(blk: Block) -> Vec<TransactionMeta> {
 }
 ```
 
-or
+You can also iterate over **all** transactions and **filter by their status** (`TransactionTraceStatus::Succeeded`), .
 
 ```rust
 use substreams::Hex;
@@ -86,6 +87,9 @@ fn successful_transactions(blk: Block) -> Vec<TransactionMeta> {
 
 # Iterating over FAILED Transactions
 
+Iterate over **all** transactions and **filter by their status** (`TransactionTraceStatus::Failed`), .
+
+
 ```rust
 use substreams::Hex;
 use substreams_ethereum::pb::eth::v2::{Block, TransactionTraceStatus};
@@ -110,6 +114,8 @@ fn failed_transactions(blk: Block) -> Vec<TransactionMeta> {
 
 
 # Iterating over REVERTED Transactions
+
+Iterate over **all** transactions and **filter by their status** (`TransactionTraceStatus::Reverted`), .
 
 ```rust
 use substreams::Hex;

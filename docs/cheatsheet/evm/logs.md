@@ -36,6 +36,9 @@ fn transaction_logs(transaction: &TransactionTrace) -> Vec<ContractLog> {
 Given a [Block](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto#L9) and a smart contract address (String), return the coresponding logs.
 
 ```rust
+use substreams::Hex;
+use substreams_ethereum::pb::eth::v2::Block;
+
 struct ContractLog {
     address: String,
     topics: Vec<String>,

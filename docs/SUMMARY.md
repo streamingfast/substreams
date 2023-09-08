@@ -13,6 +13,12 @@
 * [Installing the Substreams CLI](getting-started/installing-the-cli.md)
 * [Quickstart](getting-started/quickstart.md)
 
+## Cheatsheet
+
+* [EVM](cheathseet/evm/overview.md)
+  * [Transactions](cheathseet/evm/transactions.md)
+  * [Mapping Blocks](cheathseet/evm/logs.md)
+
 ## Tutorials
 
 * [Ethereum](tutorials/ethereum/overview.md)

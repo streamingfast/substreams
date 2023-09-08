@@ -15,9 +15,9 @@
 
 ## Cheatsheet
 
-* [EVM](cheathseet/evm/overview.md)
-  * [Transactions](cheathseet/evm/transactions.md)
-  * [Mapping Blocks](cheathseet/evm/logs.md)
+* [EVM](cheatsheet/evm/overview.md)
+  * [Transactions](cheatsheet/evm/transactions.md)
+  * [Logs](cheatsheet/evm/logs.md)
 
 ## Tutorials
 

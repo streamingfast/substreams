@@ -3,12 +3,12 @@ description: Retrieving transactions on EVM blockchains
 ---
 
 In EVM-compatible chains, a Trasanction represents an change in the blockchain, such as ETH transfers or smart contract executions. In Substreams, transactions are abstracted by the [TransactionTrace](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto#L157) Protobuf model. Some of the most relevant fields and methods of the model are:
-- `transaction.hash` (property): hash of the transaction.
-- `transaction.from` (property): `from` field of the transaction.
-- `transaction.to` (property): `to` field of the transaction.
+- `hash` (property): hash of the transaction.
+- `from` (property): `from` field of the transaction.
+- `to` (property): `to` field of the transaction.
 - `input`: (property): `input` field of the transaction.
 - `receipt`: (property): [TransactionReceipt](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto#L296) struct representing the receipt of the transaction.
-- `transaction.status()` (method): [TransactionTraceStatus](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto#L289) enum struct representing the status of the transaction, with the following possible values: `TransactionTraceStatus::Succeeded`, `TransactionTraceStatus::Failed`, `TransactionTraceStatus::Reverted`, `TransactionTraceStatus::Unknown`.
+- `status()` (method): [TransactionTraceStatus](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto#L289) enum struct representing the status of the transaction, with the following possible values: `TransactionTraceStatus::Succeeded`, `TransactionTraceStatus::Failed`, `TransactionTraceStatus::Reverted`, `TransactionTraceStatus::Unknown`.
 
 
 <figure><img src="../../.gitbook/assets/cheatsheet/cheatsheet-transaction-structure.png" width="100%" /><figcaption><p>EVM-compatible Protobuf Structure - TransactionTrace</p></figcaption></figure>

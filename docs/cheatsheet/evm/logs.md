@@ -1,4 +1,8 @@
 
+---
+description: Retrieving transactions on EVM blockchains
+---
+
 The logs of a transaction are contained in the [TransactionReceipt](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto#L296) model.
 
 There is also a helper method in the [Block](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto#L9) object (`block.logs()`), which retrieves all the logs for the block.

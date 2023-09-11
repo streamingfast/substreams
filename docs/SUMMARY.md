@@ -21,7 +21,8 @@
     * [Filtering Transactions](tutorials/ethereum/exploring-ethereum/map_filter_transactions_module.md)
     * [Retrieving Events of a Smart Contract](tutorials/ethereum/exploring-ethereum/map_contract_events_module.md)
 * [Rust](tutorials/rust/overview.md)
-  * [The Result<T, E> struct](tutorials/rust/result.md)
+  * [The Option struct](tutorials/rust/option.md)
+  * [The Result struct](tutorials/rust/result.md)
 
 ## Developer's Guide
 

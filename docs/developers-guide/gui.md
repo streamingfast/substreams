@@ -4,7 +4,7 @@ When running Substreams through the CLI, you can use two different commands: `su
 
 <figure><img src="../.gitbook/assets/gui/run.png" width="100%" /></figure>
 
-However, this is not useful a approach when dealing with complex Substreams (i.e. with several modules and many blocks). The `substreams gui` command allows you to easily see the progress of a Substreams, move across blocks or search within the output.
+However, this is not a useful approach when dealing with complex Substreams (i.e. with several modules and many blocks). The `substreams gui` command allows you to easily see the progress of a Substreams, move across blocks or search within the output.
 
 <figure><img src="../.gitbook/assets/gui/gui.png" width="100%" /></figure>
 

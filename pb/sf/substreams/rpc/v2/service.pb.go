@@ -883,13 +883,17 @@ func (x *OutputDebugInfo) GetCached() bool {
 	return false
 }
 
+// ModulesProgress is a message that is sent every 500ms
 type ModulesProgress struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	RunningJobs    []*Job          `protobuf:"bytes,2,rep,name=running_jobs,json=runningJobs,proto3" json:"running_jobs,omitempty"`
-	ModulesStats   []*ModuleStats  `protobuf:"bytes,3,rep,name=modules_stats,json=modulesStats,proto3" json:"modules_stats,omitempty"`
+	// List of jobs running on tier2 servers
+	RunningJobs []*Job `protobuf:"bytes,2,rep,name=running_jobs,json=runningJobs,proto3" json:"running_jobs,omitempty"`
+	// Execution statistics for each module
+	ModulesStats []*ModuleStats `protobuf:"bytes,3,rep,name=modules_stats,json=modulesStats,proto3" json:"modules_stats,omitempty"`
+	// Stages definition and completed block ranges
 	Stages         []*Stage        `protobuf:"bytes,4,rep,name=stages,proto3" json:"stages,omitempty"`
 	ProcessedBytes *ProcessedBytes `protobuf:"bytes,5,opt,name=processed_bytes,json=processedBytes,proto3" json:"processed_bytes,omitempty"`
 }

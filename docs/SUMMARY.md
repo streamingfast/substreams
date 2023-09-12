@@ -37,6 +37,7 @@
   * [Module handlers](developers-guide/modules/setting-up-handlers.md)
   * [Module handler creation](developers-guide/modules/writing-module-handlers.md)
 * [Running Substreams](developers-guide/running-substreams.md)
+* [GUI](developers-guide/gui.md)
 * [Parallel Execution](developers-guide/parallel-execution.md)
 * [Sink targets](developers-guide/sink-targets/README.md)
   * [Substreams-powered subgraph](developers-guide/sink-targets/substreams-powered-subgraph.md)

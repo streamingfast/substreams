@@ -22,6 +22,8 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 **Streaming a `sf.near.type.v1.Block` from an Ethereum endpoint does not work!**
 {% endhint %}
 
+<figure><img src="../.gitbook/assets/chains-endpoints.png" width="100%" /><figcaption><p>Protobuf for the different supported chains</p></figcaption></figure>
+
 | Protocol | Proto model                                                                                                                                       | Latest package                                                                                                        |
 | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | Ethereum | [`sf.ethereum.type.v2.Block`](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto)               | [ethereum-v0.10.4.spkg](https://github.com/streamingfast/sf-ethereum/releases/download/v0.10.2/ethereum-v0.10.4.spkg) |

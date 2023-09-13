@@ -52,10 +52,10 @@ func (p *RequestPlan) RequiresParallelProcessing() bool {
 
 func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphInitBlock, resolvedStartBlock, linearHandoffBlock, exclusiveEndBlock uint64, scheduleStores bool) (*RequestPlan, error) {
 	if exclusiveEndBlock != 0 && linearHandoffBlock > exclusiveEndBlock {
-		panic(fmt.Sprintf("invalid linearHandoff %d when building plan, it should always be capped at exclusiveEndBlock %d", linearHandoffBlock, exclusiveEndBlock))
+		return nil, fmt.Errorf("end block %d cannot be prior to the linear handoff block %d", exclusiveEndBlock, linearHandoffBlock)
 	}
 	if resolvedStartBlock < graphInitBlock {
-		panic(fmt.Errorf("start block cannot be prior to the lowest init block in the requested module graph (%d)", graphInitBlock))
+		return nil, fmt.Errorf("start block cannot be prior to the lowest init block in the requested module graph (%d)", graphInitBlock)
 	}
 
 	if linearHandoffBlock < resolvedStartBlock {

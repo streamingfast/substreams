@@ -1,5 +1,5 @@
 
-In EVM-compatible chains, a Trasanction represents an change in the blockchain, such as ETH transfers or smart contract executions. In Substreams, transactions are abstracted by the [TransactionTrace](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto#L157) Protobuf model. Some of the most relevant fields and methods of the model are:
+In EVM-compatible chains, a Trasanction represents a change in the blockchain, such as ETH transfers or smart contract executions. In Substreams, transactions are abstracted by the [TransactionTrace](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto#L157) Protobuf model. Some of the most relevant fields and methods of the model are:
 - `hash` (property): hash of the transaction.
 - `from` (property): `from` field of the transaction.
 - `to` (property): `to` field of the transaction.

@@ -16,7 +16,7 @@
 ## Cheatsheet
 
 * [EVM](cheatsheet/evm/overview.md)
-  * [Blocks](cheatsheet/evm/block.md)
+  * [Blocks](cheatsheet/evm/blocks.md)
   * [Transactions](cheatsheet/evm/transactions.md)
   * [Logs](cheatsheet/evm/logs.md)
 

@@ -26,7 +26,6 @@ fn block_data(blk: Block) -> BlockData {
 
 # Retrieve Block Header Data
 
-
 ```rust
 use substreams::Hex;
 use substreams_ethereum::pb::eth::v2::Block;

@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Bug fixes
 
 * Fixed (bumped) substreams protobuf definitions that get embedded in `spkg` to match the new progress messages from v1.1.12.
+* Regression fix: fixed a bug where negative start blocks would not be resolved correctly when using `substreams run`
+  or `substreams gui`.
 
 ## v1.1.13
 

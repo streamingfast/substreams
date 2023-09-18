@@ -11,6 +11,7 @@ binaries:
 modules:
   - name: mod1
     kind: map
+    initialBlock: 100
     inputs:
       - source: sf.test.Block
     output:
@@ -18,6 +19,7 @@ modules:
 
   - name: mod2
     kind: map
+    initialBlock: 100
     inputs:
       - params: string
       - map: mod1

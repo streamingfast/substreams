@@ -14,6 +14,49 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 )
 
+func TestReader_ReadWithOverride(t *testing.T) {
+	path, err := filepath.Abs("testdata/")
+	require.NoError(t, err)
+
+	override, err := filepath.Abs("testdata/with-params-override.yaml")
+
+	r, err := newReader(override, path)
+	require.NoError(t, err)
+
+	pkg, err := r.Read()
+	require.NoError(t, err)
+	require.NotNil(t, pkg)
+}
+
+func TestReader_ReadWithNestedOverride(t *testing.T) {
+	path, err := filepath.Abs("testdata/")
+	require.NoError(t, err)
+
+	override, err := filepath.Abs("testdata/with-params-override-override.yaml")
+	require.NoError(t, err)
+
+	r, err := newReader(override, path)
+	require.NoError(t, err)
+
+	pkg, err := r.Read()
+	require.NoError(t, err)
+	require.NotNil(t, pkg)
+}
+
+func TestReader_ReadWithRemoteOverride(t *testing.T) {
+	path, err := filepath.Abs("testdata/")
+	require.NoError(t, err)
+
+	override, err := filepath.Abs("testdata/univ3-override.yaml")
+	require.NoError(t, err)
+
+	r, err := newReader(override, path)
+	require.NoError(t, err)
+
+	_, err = r.Read()
+	require.NoError(t, err)
+}
+
 func TestReader_Read(t *testing.T) {
 	absolutePathToInferredManifest, err := filepath.Abs("testdata/inferred_manifest")
 	require.NoError(t, err)
@@ -308,7 +351,7 @@ func TestReader_Read(t *testing.T) {
 			r, err := newReader(manifestPath, workingDir, readerOptions...)
 			tt.assertionNew(t, err)
 
-			got, err := r.read(workingDir)
+			got, err := r.Read()
 			tt.assertionRead(t, err)
 			assertProtoEqual(t, tt.want, got)
 		})

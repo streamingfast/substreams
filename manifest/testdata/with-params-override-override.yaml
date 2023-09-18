@@ -1,0 +1,10 @@
+deriveFrom: "./testdata/with-params-override.yaml"
+
+package:
+  name: "overriddentwice"
+
+initialBlocks:
+  mod1: 175
+  mod2: 175
+params:
+  mod2: "goodbye"

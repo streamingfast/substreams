@@ -54,7 +54,7 @@ func runCodeGen(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("computing working directory: %w", err)
 	}
 	workingDir := filepath.Dir(manifestAbsPath)
-	manif, err := manifest.LoadManifestFile(manifestAbsPath)
+	manif, err := manifest.LoadManifestFile(manifestAbsPath, workingDir)
 	if err != nil {
 		return fmt.Errorf("loading manifest: %w", err)
 	}

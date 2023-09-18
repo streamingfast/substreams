@@ -1,47 +1,88 @@
 package manifest
 
 import (
-	"encoding/base64"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"google.golang.org/protobuf/types/known/anypb"
-	"io"
-	"strings"
 )
 
 type ConfigurationOverride struct {
 	Package       *PackageOverride  `yaml:"package,omitempty"`
-	Network       string            `yaml:"network,omitempty"`
-	InitialBlocks map[string]int64  `yaml:"initialBlocks,omitempty"`
+	Network       *string           `yaml:"network,omitempty"`
+	InitialBlocks map[string]uint64 `yaml:"initialBlocks,omitempty"`
 	Params        map[string]string `yaml:"params,omitempty"`
 
-	SinkConfig *SinkConfigOverride `yaml:"sinkConfig,omitempty"`
-	SinkModule string              `yaml:"sinkModule,omitempty"`
-}
-
-type SinkConfigOverride struct {
-	TypeUrl string `yaml:"typeUrl,omitempty"`
-	Value   string `yaml:"value,omitempty"`
+	DeriveFrom string `yaml:"deriveFrom,omitempty"`
 }
 
 type PackageOverride struct {
-	Name string `yaml:"name,omitempty"`
+	Name    *string `yaml:"name,omitempty"`
+	Version *string `yaml:"version,omitempty"`
 }
 
-func mergeManifests(main *pbsubstreams.Package, override *ConfigurationOverride) error {
-	if override.Package != nil && override.Package.Name != "" {
-		if main.PackageMeta == nil {
-			main.PackageMeta = []*pbsubstreams.PackageMetadata{}
+func mergeOverrides(overrides ...*ConfigurationOverride) *ConfigurationOverride {
+	var merged *ConfigurationOverride
+
+	for _, override := range overrides {
+		if override == nil {
+			continue
 		}
 
-		if len(main.PackageMeta) == 0 {
-			main.PackageMeta = append(main.PackageMeta, &pbsubstreams.PackageMetadata{Name: override.Package.Name})
-		} else {
-			main.PackageMeta[0].Name = override.Package.Name
+		if merged == nil {
+			merged = &ConfigurationOverride{}
+		}
+
+		if override.Package != nil {
+			if merged.Package == nil {
+				merged.Package = &PackageOverride{}
+			}
+
+			if override.Package.Name != nil {
+				merged.Package.Name = override.Package.Name
+			}
+
+			if override.Package.Version != nil {
+				merged.Package.Version = override.Package.Version
+			}
+		}
+
+		if override.Network != nil {
+			merged.Network = override.Network
+		}
+
+		if override.InitialBlocks != nil {
+			if merged.InitialBlocks == nil {
+				merged.InitialBlocks = make(map[string]uint64)
+			}
+
+			for name, block := range override.InitialBlocks {
+				merged.InitialBlocks[name] = block
+			}
+		}
+
+		if override.Params != nil {
+			if merged.Params == nil {
+				merged.Params = make(map[string]string)
+			}
+
+			for name, value := range override.Params {
+				merged.Params[name] = value
+			}
 		}
 	}
 
-	if override.Network != "" {
-		main.Network = override.Network
+	return merged
+}
+
+func applyOverride(main *pbsubstreams.Package, override *ConfigurationOverride) error {
+	if override == nil {
+		return nil
+	}
+
+	if override.Package != nil {
+		mergePackageMeta(main, override)
+	}
+
+	if override.Network != nil {
+		main.Network = *override.Network
 	}
 
 	if override.Params != nil {
@@ -52,26 +93,29 @@ func mergeManifests(main *pbsubstreams.Package, override *ConfigurationOverride)
 		mergeInitialBlocks(main, override)
 	}
 
-	// Overriding SinkModule
-	if override.Package != nil && override.SinkModule != "" {
-		main.SinkModule = override.SinkModule
-	}
-
-	// Overriding SinkConfig
-	if override.Package != nil && override.SinkConfig != nil {
-		decoder := base64.NewDecoder(base64.StdEncoding, strings.NewReader(string(override.SinkConfig.Value)))
-		configValueBytes, err := io.ReadAll(decoder)
-		if err != nil {
-			return err
-		}
-
-		main.SinkConfig = &anypb.Any{
-			TypeUrl: override.SinkConfig.TypeUrl,
-			Value:   configValueBytes,
-		}
-	}
-
 	return nil
+}
+
+func mergePackageMeta(main *pbsubstreams.Package, override *ConfigurationOverride) {
+	if override.Package == nil {
+		return
+	}
+
+	currentPackageMeta := main.GetPackageMeta()
+	if currentPackageMeta == nil {
+		currentPackageMeta = []*pbsubstreams.PackageMetadata{}
+	}
+	if len(currentPackageMeta) == 0 {
+		currentPackageMeta = append(currentPackageMeta, &pbsubstreams.PackageMetadata{})
+	}
+
+	if override.Package.Name != nil {
+		currentPackageMeta[0].Name = *override.Package.Name
+	}
+
+	if override.Package.Version != nil {
+		currentPackageMeta[0].Version = *override.Package.Version
+	}
 }
 
 func mergeInitialBlocks(main *pbsubstreams.Package, override *ConfigurationOverride) {
@@ -119,53 +163,4 @@ func mergeParams(main *pbsubstreams.Package, override *ConfigurationOverride) {
 			mainMod.Inputs = mainmodInputs
 		}
 	}
-
-}
-
-func mergeOverrides(overrides ...*ConfigurationOverride) *ConfigurationOverride {
-	merged := &ConfigurationOverride{}
-
-	for _, override := range overrides {
-		if override == nil {
-			continue
-		}
-
-		if override.Package != nil {
-			merged.Package = override.Package
-		}
-
-		if override.Network != "" {
-			merged.Network = override.Network
-		}
-
-		if override.InitialBlocks != nil {
-			if merged.InitialBlocks == nil {
-				merged.InitialBlocks = make(map[string]int64)
-			}
-
-			for name, block := range override.InitialBlocks {
-				merged.InitialBlocks[name] = block
-			}
-		}
-
-		if override.Params != nil {
-			if merged.Params == nil {
-				merged.Params = make(map[string]string)
-			}
-
-			for name, value := range override.Params {
-				merged.Params[name] = value
-			}
-		}
-
-		if override.SinkConfig != nil {
-			merged.SinkConfig = override.SinkConfig
-		}
-
-		if override.SinkModule != "" {
-			merged.SinkModule = override.SinkModule
-		}
-	}
-
-	return merged
 }

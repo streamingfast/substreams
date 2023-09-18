@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -17,23 +16,22 @@ import (
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
+	pbss "github.com/streamingfast/substreams/pb/sf/substreams"
+	pbssv1 "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/known/anypb"
-
-	pbss "github.com/streamingfast/substreams/pb/sf/substreams"
-	pbssv1 "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-func (r *Reader) loadSinkConfig(pkg *pbssv1.Package, m *Manifest) error {
+func (r *manifestConverter) loadSinkConfig(pkg *pbssv1.Package, m *Manifest) error {
 	if m.Sink == nil {
 		return nil
 	}
 	if m.Sink.Module == "" {
-		return errors.New(`sink: "module" unspecified`)
+		return fmt.Errorf(`sink: "module" unspecified`)
 	}
 	if m.Sink.Type == "" {
-		return errors.New(`sink: "type" unspecified`)
+		return fmt.Errorf(`sink: "type" unspecified`)
 	}
 	pkg.SinkModule = m.Sink.Module
 

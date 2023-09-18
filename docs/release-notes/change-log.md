@@ -29,6 +29,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * `substreams info` command now properly displays the content of sink configs, optionally writing the fields that were bundled from files to disk with `--output-sinkconfig-files-path=</some/path>`
 
+### Changed
+
+* The override feature has been overhauled. Users may now override an existing substreams by pointing to an override file in `run` or `gui` command. This override manifest will have a `deriveFrom` field which points to the original substreams which is to be overriden.
+
+Example of an override manifest:
+```
+deriveFrom: path/to/original.spkg #this can also be a remote url
+
+package:
+  name: "overriden_package_name"
+  version: "100.0.0"
+
+network: polygon
+  
+initialBlocks:
+  module_name_1: 17500000
+  module_name_1: 17500000
+params:
+  module_name_1: "override_paramete_value_here"
+```
+
 ## v1.1.14
 
 ### Bug fixes

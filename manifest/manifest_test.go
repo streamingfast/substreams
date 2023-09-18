@@ -11,7 +11,7 @@ import (
 )
 
 func TestManifest_YamlUnmarshal(t *testing.T) {
-	manifest, err := decodeYamlManifestFromFile("./test/test_manifest.yaml")
+	manifest, err := decodeYamlManifestFromFile("./test/test_manifest.yaml", ".")
 	assert.NoError(t, err)
 	assert.GreaterOrEqual(t, len(manifest.Modules), 1)
 }

@@ -111,7 +111,12 @@ type StreamOutput struct {
 	Type string `yaml:"type"`
 }
 
-func decodeYamlManifestFromFile(yamlFilePath string) (out *Manifest, err error) {
+func decodeYamlManifestFromFile(yamlFilePath, workingDir string) (out *Manifest, err error) {
+	//if yamlFilePath is a relative path, make it absolute
+	if !filepath.IsAbs(yamlFilePath) {
+		yamlFilePath = filepath.Join(workingDir, yamlFilePath)
+	}
+
 	cnt, err := os.ReadFile(yamlFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("reading substreams manifest %q: %w", yamlFilePath, err)

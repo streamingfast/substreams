@@ -118,7 +118,7 @@ The Substreams packager loads files in any of the listed `importPaths`.
 
 Protobufs and modules are packaged together to help Substreams clients decode the incoming streams. Protobufs are not sent to the Substreams server in network requests.
 
-[Learn more about Google Protocol Buffers](https://developers.google.com/protocol-buffers) in the official documentation provided by Google.
+[Learn more about Google Protocol Buffers](https://protobuf.dev/) in the official documentation provided by Google.
 
 ### `binaries`
 
@@ -186,7 +186,7 @@ The identifier for the module, prefixed by a letter, followed by a maximum of 64
 
 The module `name` is the reference identifier used on the command line for the `substreams` [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command. The module `name` is also used in the [`inputs`](manifests.md#modules-.inputs) defined in the Substreams manifest.
 
-The module `name` also corresponds to the **name of the Rust function** invoked on the compiled WASM code upon execution. The module `name` is the same `#[substreams::handlers::map]` as defined in the Rust \_\_ code\_.\_ Maps and stores both work in the same fashion.
+The module `name` also corresponds to the **name of the Rust function** invoked on the compiled WASM code upon execution. The module `name` is the same `#[substreams::handlers::map]` as defined in the Rust code. Maps and stores both work in the same fashion.
 
 {% hint style="warning" %}
 **Important**_:_ When importing another package, all module names are prefixed by the package's name and a colon. Prefixing ensures there are no name clashes across multiple imported packages and almost any name can be safely used for a module `name`.

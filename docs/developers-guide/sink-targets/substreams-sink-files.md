@@ -36,7 +36,7 @@ Extract `substreams-sink-files` into a folder and ensure this folder is referenc
 
 ### Accompanying code example
 
-The accompanying code example for this tutorial is available in the `substreams-sink-files` repository. The Substreams project for the tutorial is located in the [docs/tutorial](https://github.com/streamingfast/substreams-sink-files/blob/develop/docs/tutorial) directory.
+The accompanying code example for this tutorial is available in the `substreams-sink-files` repository. The Substreams project for the tutorial is located in the [docs/tutorial](https://github.com/streamingfast/substreams-sink-files/tree/master/docs/tutorial) directory.
 
 Run the included `make protogen` command to create the required Protobuf files.
 
@@ -100,7 +100,7 @@ fn jsonl_out(block: eth::Block) -> Result<Lines, substreams::errors::Error> {
 }
 ```
 
-This module handler uses `JSONL` for the output type, any other plain-text line-based format can be supported, `CSV` for example. The [`json!`](https://docs.rs/serde\_json/latest/serde\_json/macro.json.html) macro is used to write the block data to the Rust `Vec` type by using the Rust [`vec!`](https://doc.rust-lang.org/std/macro.vec.html) macro.
+This module handler uses `JSONL` for the output type, any other plain-text line-based format can be supported, `CSV` for example. The [`json!`](https://docs.rs/serde_json/latest/serde_json/macro.json.html) macro is used to write the block data to the Rust `Vec` type by using the Rust [`vec!`](https://doc.rust-lang.org/std/macro.vec.html) macro.
 
 The example code is intentionally very basic. StreamingFast [provides a more robust and full example](https://github.com/streamingfast/substreams-eth-token-transfers/blob/develop/src/lib.rs#L24) demonstrating how to extract data related to transfers from Ethereum. A crucial aspect of working with Substreams and sinks is a significant amount of data can be extracted from a Block object. The data is extracted and packed into a row. The row is represented by the JSONL or CSV based Protobuf you're responsible for designing for your sink.
 
@@ -108,9 +108,9 @@ The output type for sink is a list of lines. The line content can be any type an
 
 ### Core steps for Substreams sink modules
 
-* Import sink `.spkg` files, re-generate Protobufs and create and add a mod.rs file.
-* Create a map module outputting sf.substreams.sink.files.v1 format. This module extracts the entity to be written, one per block from the block or another module's dependencies. Each line will be in JSON format. You can use the json! macro from the [`serde_json`](https://docs.rs/serde\_json/latest/serde\_json) crate to assist creating your structure, one per line.
-* Add the correct module definition to the Substreams manifest `substreams.yaml`.
+- Import sink `.spkg` files, re-generate Protobufs and create and add a mod.rs file.
+- Create a map module outputting sf.substreams.sink.files.v1 format. This module extracts the entity to be written, one per block from the block or another module's dependencies. Each line will be in JSON format. You can use the json! macro from the [`serde_json`](https://docs.rs/serde_json/latest/serde_json) crate to assist creating your structure, one per line.
+- Add the correct module definition to the Substreams manifest `substreams.yaml`.
 
 ```yaml
 imports:
@@ -137,9 +137,11 @@ modules:
 The command to start and run the `substreams-sink-files` tool for the accompanying Substreams project will resemble:
 
 {% code overflow="wrap" %}
+
 ```bash
 substreams-sink-files run --encoder=lines --state-store=./output/state.yaml mainnet.eth.streamingfast.io:443 substreams.yaml jsonl_out ./output/files
 ```
+
 {% endcode %}
 
 ## Verify output from tool

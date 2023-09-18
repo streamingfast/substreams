@@ -12,13 +12,13 @@ Substreams development involves using several different pieces of technology, in
 
 ### The process to use Substreams includes:
 
-* Choose the blockchain to capture and process data.
-* Identify interesting smart contract addresses (like DEXs or interesting wallet addresses).
-* Identify the data and defining and creating protobufs.
-* Find already-built Substreams modules and consume their streams, or:
-* Write Rust Substreams module handler functions.
-* Update the Substreams manifest to reference the protobufs and module handlers.
-* Use the [`substreams` CLI](../reference-and-specs/command-line-interface.md) to send commands and view results.
+- Choose the blockchain to capture and process data.
+- Identify interesting smart contract addresses (like DEXs or interesting wallet addresses).
+- Identify the data and defining and creating protobufs.
+- Find already-built Substreams modules and consume their streams, or:
+- Write Rust Substreams module handler functions.
+- Update the Substreams manifest to reference the protobufs and module handlers.
+- Use the [`substreams` CLI](../reference-and-specs/command-line-interface.md) to send commands and view results.
 
 ### **The Substreams engine**
 
@@ -42,7 +42,7 @@ The data flow is [defined in the Substreams manifest](../reference-and-specs/man
 
 ### **Substreams DAG**
 
-Substreams modules are composed through a [directed acyclic graph](https://en.wikipedia.org/wiki/Directed\_acyclic\_graph) (DAG).
+Substreams modules are composed through a [directed acyclic graph](https://en.wikipedia.org/wiki/Directed_acyclic_graph) (DAG).
 
 {% hint style="info" %}
 **Note**: In DAGs, data flows from one module to another in a one-directional manner, with no cycle, similar to Git's model of commits and branches.
@@ -60,8 +60,8 @@ The Substreams engine creates the "_compute graph_" or "_dependency graph_" at r
 
 [Protocol buffers or protobufs](https://developers.google.com/protocol-buffers) are the data models operated on by the[ Rust-based module handler functions](../developers-guide/modules/writing-module-handlers.md). They define and outline the data models in the protobufs.
 
-* View the [`erc721.proto`](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto) protobuf file in the [Substreams Template repository](https://github.com/streamingfast/substreams-template).
-* View the Rust module handlers in the [`lib.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/lib.rs) file in the [Substreams Template repository](https://github.com/streamingfast/substreams-template).
+- View the [`erc721.proto`](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto) protobuf file in the [Substreams Template repository](https://github.com/streamingfast/substreams-template).
+- View the Rust module handlers in the [`lib.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/lib.rs) file in the [Substreams Template repository](https://github.com/streamingfast/substreams-template).
 
 {% hint style="info" %}
 **Note**: Protobufs include the names of the data objects and the fields contained and accessible within them.
@@ -69,7 +69,7 @@ The Substreams engine creates the "_compute graph_" or "_dependency graph_" at r
 
 Many protobuf definitions have already been created, such as [the erc721 token model](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto), for use by developers creating Substreams data transformation strategies.
 
-Custom smart contracts, [like UniSwap](https://github.com/streamingfast/substreams-uniswap-v3/blob/e4b0fb016210870a385484f29bb5116931ea9a50/proto/uniswap/v1/uniswap.proto), also have protobuf definitions that are referenced in the Substreams manifest and made available to module handler functions. Protobufs provide an API to the data for smart contract addresses.
+Custom smart contracts, like [UniSwap](https://github.com/streamingfast/substreams-uniswap-v3/blob/e4b0fb016210870a385484f29bb5116931ea9a50/proto/uniswap/v1/uniswap.proto), also have protobuf definitions that are referenced in the Substreams manifest and made available to module handler functions. Protobufs provide an API to the data for smart contract addresses.
 
 In object-oriented programming terminology, protobufs are the objects or object models. In front-end web development, they are similar to REST or other data APIs.
 

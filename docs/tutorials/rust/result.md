@@ -3,6 +3,7 @@
 In Rust, the `Result<T, E>` struct is used to abstract both a successful response (if it exists) and an error (if it occurs). Let's better understand through an example.
 
 ## Basic Usage
+
 Consider that you have a function `divide(num1, num2)`, which executes the division between two numbers. As you already know, dividing by 0 is undefined, and generates an error in Rust. You can use `Result` to return a controlled error.
 
 ```rust
@@ -35,14 +36,15 @@ fn divide(num1: u32, num2: u32) -> Result<u32, String> { // 1.
     return Ok(num1 / num2); // 3.
 }
 ```
+
 1. Declaration of the function. Two unsigned numbers of 32-bit length are passed as parameters.
-The return type is `Result<u32, String>`: the first type (`u32`) is for the successful response, and the second type (`String`) is for the error response.
+   The return type is `Result<u32, String>`: the first type (`u32`) is for the successful response, and the second type (`String`) is for the error response.
 2. If dividing by 0, you return an error String.
 3. If not, you return the result of the division (`u32`).
 
-The `Result<T, E>` is really an enum that can take two values: `Ok(T)` (success) and `Err(E)` (error). 
+The `Result<T, E>` is really an enum that can take two values: `Ok(T)` (success) and `Err(E)` (error).
 
-In the previous code, when you return `Err(String)`, the success part is automatically empty. At the same time, when you return `Ok(u32)`, the error part is empty. 
+In the previous code, when you return `Err(String)`, the success part is automatically empty. At the same time, when you return `Ok(u32)`, the error part is empty.
 
 Now, let's see how you can interact with this result.
 
@@ -56,6 +58,7 @@ fn main() {
     }
 }
 ```
+
 1. You invoke the function and store the `Result<T,E>` enum in a variable.
 2. If the result _is ok_ (i.e. the happy path has been returned), you can take its value by using the `result.unwrap()` method.
 3. If the error has been returned, you can return the error string by using the `result.err().unwrap()` method.
@@ -87,7 +90,7 @@ fn divide(num1: u32, num2: u32) -> Result<u32, String> {
     return Ok(num1 / num2);
 }
 
-fn compute() -> Result<u32, String> {
+fn computations() -> Result<u32, String> {
     let result = divide(6, 0); // Performing the division
 
     if result.is_err() { // If the division returns an error, then you return an error.
@@ -120,7 +123,7 @@ fn divide(num1: u32, num2: u32) -> Result<u32, String> {
     return Ok(num1 / num2);
 }
 
-fn compute() -> Result<u32, String> {
+fn computations() -> Result<u32, String> {
     let division_result = divide(6, 0)?;
 
     return Ok(division_result + 5);
@@ -137,9 +140,10 @@ fn main() {
 ```
 
 The `?` symbol after a `Result` enum does two things:
+
 1. If successful, it unwraps the result (in this case, a `u32` number), and stores it in a variable
-`let division_result = divide(6, 0)?;`
-2. If an error, it returns the error directly. In this example, the error type of the `divide` and the `compute` function is the same (a `String`).
+   `let division_result = divide(6, 0)?;`
+2. If an error occurs, it returns the error directly. In this example, the error type of the `divide` and the `computations` function is the same (a `String`).
 
 ## In Substreams
 

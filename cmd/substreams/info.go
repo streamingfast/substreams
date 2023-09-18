@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/streamingfast/cli"
@@ -12,10 +14,10 @@ import (
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
 )
 
-//	var manifestCmd = &cobra.Command{
-//		Use:          "manifest",
-//		SilenceUsage: true,
-//	}
+func init() {
+	infoCmd.Flags().String("output-sinkconfig-files-path", "", "if non-empty, any sinkconfig field of type 'bytes' that was packed from a file will be written to that path")
+}
+
 var infoCmd = &cobra.Command{
 	Use:   "info [<manifest_file> [<output_module>]]",
 	Short: "Display package modules and docs",
@@ -44,6 +46,8 @@ func runInfo(cmd *cobra.Command, args []string) error {
 	if len(args) == 2 {
 		outputModule = args[1]
 	}
+
+	outputSinkconfigFilesPath := mustGetString(cmd, "output-sinkconfig-files-path")
 
 	manifestReader, err := manifest.NewReader(manifestPath)
 	if err != nil {
@@ -111,6 +115,40 @@ func runInfo(cmd *cobra.Command, args []string) error {
 				layerDefs = append(layerDefs, fmt.Sprintf(`["%s"]`, strings.Join(mods, `","`)))
 			}
 			fmt.Printf("Stage %d: [%s]\n", i, strings.Join(layerDefs, `,`))
+		}
+
+	}
+
+	if pkg.SinkConfig != nil {
+		fmt.Println()
+		fmt.Println("Sink config:")
+		fmt.Println("----")
+		fmt.Println("type:", pkg.SinkConfig.TypeUrl)
+
+		confs, files, err := manifest.DescribeSinkConfigs(pkg)
+		if err != nil {
+			return err
+		}
+
+		fmt.Println("configs:")
+		fmt.Println(confs)
+
+		if outputSinkconfigFilesPath != "" && files != nil {
+			if err := os.MkdirAll(outputSinkconfigFilesPath, 0755); err != nil {
+				return err
+			}
+			fmt.Println("output files:")
+			for k, v := range files {
+				filename := filepath.Join(outputSinkconfigFilesPath, k)
+				f, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+				if err != nil {
+					return err
+				}
+				if _, err := f.Write(v); err != nil {
+					return err
+				}
+				fmt.Printf("  - %q written to %q\n", k, filename)
+			}
 		}
 
 	}

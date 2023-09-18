@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Highlights
+
+* This release brings enhancements to "sink-config" features, as a step to enable more potent descriptions of "deployable units" inside your Substreams package. The Substreams sinks will be able to leverage the new FieldOptions in upcoming releases.
+
+### Added
+
+* Sink configs can now use protobuf annotations (aka Field Options) to determine how the field will be interpreted in
+  substreams.yaml:
+  * `load_from_file` will put the content of the file directly in the field (string and bytes contents are supported).
+  * `zip_from_folder` will create a zip archive and put its content in the field (field type must be bytes).
+
+  Example: 
+  ```
+  import "sf/substreams/v1/options.proto";
+
+  message HostedPostgresDatabase {
+    bytes schema = 1 [ (sf.substreams.v1.options).load_from_file = true ];
+    bytes extra_config_files = 2 [ (sf.substreams.v1.options).zip_from_folder = true ];
+  }
+  ```
+
+* `substreams info` command now properly displays the content of sink configs, optionally writing the fields that were bundled from files to disk with `--output-sinkconfig-files-path=</some/path>`
+
 ## v1.1.14
 
 ### Bug fixes

@@ -48,6 +48,7 @@ function generate_system() {
   fi
 
   protoc -I$PROTO \
+    "$PROTO/sf/substreams/options.proto" \
     "$PROTO/sf/substreams/v1/modules.proto" \
     "$PROTO/sf/substreams/v1/package.proto" \
     "$PROTO/sf/substreams/v1/clock.proto" \

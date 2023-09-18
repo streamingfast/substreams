@@ -16,11 +16,11 @@ Learn more about the details of Google Protocol Buffers in the official document
 
 **Google Protocol Buffer Documentation**
 
-[Learn more about Google Protocol Buffers](https://developers.google.com/protocol-buffers) in the official documentation provided by Google.
+[Learn more about Google Protocol Buffers](https://protobuf.dev/) in the official documentation provided by Google.
 
 **Google Protocol Buffer Tutorial**
 
-[Explore examples and additional learning material](https://developers.google.com/protocol-buffers/docs/tutorials) for Google Protocol Buffers provided by Google.
+[Explore examples and additional learning material](https://protobuf.dev/programming-guides/proto3/) for Google Protocol Buffers provided by Google.
 
 ### Protobuf definition for Substreams
 
@@ -31,6 +31,7 @@ Define a protobuf model as [`proto:eth.erc721.v1.Transfers`](https://github.com/
 {% endhint %}
 
 {% code title="eth/erc721/v1/erc721.proto" lineNumbers="true" %}
+
 ```protobuf
 syntax = "proto3";
 
@@ -48,6 +49,7 @@ message Transfer {
   uint64 ordinal = 5;
 }
 ```
+
 {% endcode %}
 
 [View the `erc721.proto`](https://github.com/streamingfast/substreams-template/blob/develop/proto/erc721.proto) file in the official Substreams Template example repository.
@@ -61,9 +63,9 @@ The protobuf file serves as the interface between the module handlers and the da
 {% hint style="success" %}
 **Tip**: Protobufs are platform-independent and are defined and used for various blockchains.
 
-* The ERC721 smart contracts used in the Substreams Template example are generic contracts used across many different Ethereum applications.
-* The size and scope of the Substreams module dictates the number of and complexity of protobufs.
-{% endhint %}
+- The ERC721 smart contracts used in the Substreams Template example are generic contracts used across many different Ethereum applications.
+- The size and scope of the Substreams module dictates the number of and complexity of protobufs.
+  {% endhint %}
 
 The Substreams Template example extracts `Transfer` events from the [Bored Ape Yacht Club smart contract](https://etherscan.io/address/0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d) which is located on the Ethereum blockchain.
 
@@ -80,9 +82,11 @@ The [`substreams` CLI](../reference-and-specs/command-line-interface.md) is used
 Notice the `protogen` command and Substreams manifest passed into the [`substreams` CLI](../reference-and-specs/command-line-interface.md).
 
 {% code overflow="wrap" %}
+
 ```bash
 substreams protogen ./substreams.yaml --exclude-paths="sf/ethereum,sf/substreams,google"
 ```
+
 {% endcode %}
 
 The pairing code is generated and saved into the [`src/pb/eth.erc721.v1.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/pb/eth.erc721.v1.rs)Rust file.
@@ -90,11 +94,13 @@ The pairing code is generated and saved into the [`src/pb/eth.erc721.v1.rs`](htt
 The [`mod.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/pb/mod.rs) file located in the `src/pb` directory of the Substreams Template example is responsible for exporting the freshly generated Rust code.
 
 {% code title="src/pb/mod.rs" overflow="wrap" lineNumbers="true" %}
+
 ```rust
 #[path = "eth.erc721.v1.rs"]
 #[allow(dead_code)]
 pub mod erc721;
 ```
+
 {% endcode %}
 
 View the [`mod.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/pb/mod.rs) file in the repository.
@@ -113,7 +119,7 @@ The [`Option`](https://doc.rust-lang.org/rust-by-example/std/option.html) [`enum
 **Note**: The standard approach to represent nullable data in Rust is to wrap optional values in [`Option<T>`](https://doc.rust-lang.org/rust-by-example/std/option.html).
 {% endhint %}
 
-The Rust [`match`](https://doc.rust-lang.org/rust-by-example/flow\_control/match.html) keyword is used to compare the value of an [`Option`](https://doc.rust-lang.org/rust-by-example/std/option.html) to a [`Some`](https://doc.rust-lang.org/std/option/) or [`None`](https://doc.rust-lang.org/std/option/) variant. Handle a type wrapped [`Option`](https://doc.rust-lang.org/rust-by-example/std/option.html) in Rust by using:
+The Rust [`match`](https://doc.rust-lang.org/rust-by-example/flow_control/match.html) keyword is used to compare the value of an [`Option`](https://doc.rust-lang.org/rust-by-example/std/option.html) to a [`Some`](https://doc.rust-lang.org/std/option/) or [`None`](https://doc.rust-lang.org/std/option/) variant. Handle a type wrapped [`Option`](https://doc.rust-lang.org/rust-by-example/std/option.html) in Rust by using:
 
 ```rust
 match person.Location {
@@ -122,7 +128,7 @@ match person.Location {
 }
 ```
 
-If you are only interested in finding the presence of a value, use the [`if let`](https://doc.rust-lang.org/rust-by-example/flow\_control/if\_let.html) statement to handle the [`Some(x)`](https://doc.rust-lang.org/std/option/) arm of the [`match`](https://doc.rust-lang.org/rust-by-example/flow\_control/match.html) code.
+If you are only interested in finding the presence of a value, use the [`if let`](https://doc.rust-lang.org/rust-by-example/flow_control/if_let.html) statement to handle the [`Some(x)`](https://doc.rust-lang.org/std/option/) arm of the [`match`](https://doc.rust-lang.org/rust-by-example/flow_control/match.html) code.
 
 ```rust
 if let Some(location) = person.location {
@@ -130,7 +136,7 @@ if let Some(location) = person.location {
 }
 ```
 
-If a value is present, use the [`.unwrap()`](https://doc.rust-lang.org/rust-by-example/error/option\_unwrap.html) call on the [`Option`](https://doc.rust-lang.org/rust-by-example/std/option.html) to obtain the wrapped data. You'll need to account for these types of scenarios if you control the creation of the messages yourself or if the field is documented as always being present.
+If a value is present, use the [`.unwrap()`](https://doc.rust-lang.org/rust-by-example/error/option_unwrap.html) call on the [`Option`](https://doc.rust-lang.org/rust-by-example/std/option.html) to obtain the wrapped data. You'll need to account for these types of scenarios if you control the creation of the messages yourself or if the field is documented as always being present.
 
 {% hint style="info" %}
 **Note**: You need to be **absolutely sure** **the field is always defined**, otherwise Substreams panics and never completes, getting stuck on a block indefinitely.

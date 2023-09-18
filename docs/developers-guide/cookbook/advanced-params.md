@@ -63,7 +63,7 @@ pub fn map_whale_transfers(params: String, block: Block) -> Result<Transfers, Er
 }
 ```
 
-You can even pass a vector of addreses to track multiple specific whales in our example:
+You can even pass a vector of addresses to track multiple specific whales in our example:
 
 ```rust
 #[derive(Debug, Deserialize)]
@@ -80,6 +80,7 @@ pub fn map_whale_transfers(params: String, block: Block) -> Result<Transfers, Er
 ```
 
 Depending on the crate you use to decode params string, you can pass them to Substreams CLI like this for example:
+
 ```bash
 substreams gui map_whale_transfers -p map_whale_transfers="address[]=aaa..aaa&address[]=bbb..bbb&amount=100"
 ```

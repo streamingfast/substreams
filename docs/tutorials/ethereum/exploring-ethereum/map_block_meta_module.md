@@ -27,13 +27,14 @@ $ substreams run -e mainnet.eth.streamingfast.io:443 substreams.yaml map_block_m
 ```
 
 Let's break down the command into pieces:
-- `mainnet.eth.streamingfast.io:443`: is the StreamingFast Ethereum Mainnet endpoint where you are sending your Substreams for execution. 
+
+- `mainnet.eth.streamingfast.io:443`: is the StreamingFast Ethereum Mainnet endpoint where you are sending your Substreams for execution.
 - `substreams.yaml`: specifies the Substreams manifest.
 - `map_block_meta`: specifies the module to execute. Since the Ethereum Explorer application contains several modules, it is necessary to specify which one you want to execute.
 - `--start-block 17712040`: specifies the starting block (i.e. the block where Substreams will start streaming).
 - `--stop-block +1`: specifies how many blocks after the starting block should be considered. In this example, `+1` means that the streaming will start at `17712040` and finish at `17712041` (just one block).
 
-The output of the command should similar to:
+The output of the command should be similar to:
 
 ```bash
 ...output omitted...

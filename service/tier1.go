@@ -427,6 +427,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		zap.Uint64("request_stop_block", request.StopBlockNum),
 		zap.String("request_start_cursor", request.StartCursor),
 		zap.String("resolved_cursor", requestDetails.ResolvedCursor),
+		zap.Uint64("max_parallel_jobs", requestDetails.MaxParallelJobs),
 		zap.String("output_module", request.OutputModule),
 	)
 

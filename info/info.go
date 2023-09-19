@@ -1,0 +1,227 @@
+package info
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/streamingfast/substreams/manifest"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/pipeline/outputmodules"
+	"google.golang.org/protobuf/types/descriptorpb"
+)
+
+type BasicInfo struct {
+	Name                string                       `json:"name"`
+	Version             string                       `json:"version"`
+	Documentation       *string                      `json:"documentation,omitempty"`
+	Modules             []ModulesInfo                `json:"modules"`
+	SinkInfo            *SinkInfo                    `json:"sink_info,omitempty"`
+	ProtoPackages       []string                     `json:"proto_packages"`
+	ProtoFileCodeMap    map[string]string            `json:"proto_file_code_map"`
+	ProtoMessageCodeMap map[string]map[string]string `json:"proto_message_code_map"`
+}
+
+type SinkInfo struct {
+	Configs string            `json:"desc"`
+	TypeUrl string            `json:"type_url"`
+	Files   map[string][]byte `json:"files"`
+}
+
+type ExtendedInfo struct {
+	*BasicInfo
+
+	ExecutionStages [][][]string `json:"execution_stages,omitempty"`
+}
+
+type ProtoFileInfo struct {
+	Name               *string                                `json:"name,omitempty"`
+	Package            *string                                `json:"package,omitempty"`
+	Dependencies       []string                               `json:"dependencies,omitempty"`
+	PublicDependencies []int32                                `json:"public_dependencies,omitempty"`
+	MessageType        []*descriptorpb.DescriptorProto        `json:"message_type,omitempty"`
+	Services           []*descriptorpb.ServiceDescriptorProto `json:"services,omitempty"`
+}
+
+type ModulesInfo struct {
+	Name          string        `json:"name"`
+	Kind          string        `json:"kind"`
+	Inputs        []ModuleInput `json:"inputs"`
+	OutputType    *string       `json:"output_type,omitempty"`   //for map inputs
+	ValueType     *string       `json:"value_type,omitempty"`    //for store inputs
+	UpdatePolicy  *string       `json:"update_policy,omitempty"` //for store inputs
+	InitialBlock  uint64        `json:"initial_block"`
+	Documentation *string       `json:"documentation,omitempty"`
+	Hash          string        `json:"hash"`
+}
+
+type ModuleInput struct {
+	Type string  `json:"type"`
+	Name string  `json:"name"`
+	Mode *string `json:"mode,omitempty"` //for store inputs
+}
+
+func Basic(manifestPath string) (*BasicInfo, error) {
+	reader, err := manifest.NewReader(manifestPath)
+	if err != nil {
+		return nil, fmt.Errorf("manifest reader: %w", err)
+	}
+
+	pkg, err := reader.Read()
+	if err != nil {
+		return nil, fmt.Errorf("read manifest %q: %w", manifestPath, err)
+	}
+
+	manifestInfo := &BasicInfo{
+		Name:    pkg.PackageMeta[0].Name,
+		Version: pkg.PackageMeta[0].Version,
+	}
+	if pkg.PackageMeta[0].Doc != "" {
+		manifestInfo.Documentation = strPtr(strings.Replace(pkg.PackageMeta[0].Doc, "\n", "\n  ", -1))
+	}
+
+	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
+	if err != nil {
+		return nil, fmt.Errorf("creating module graph: %w", err)
+	}
+
+	modules := make([]ModulesInfo, 0, len(pkg.Modules.Modules))
+
+	hashes := manifest.NewModuleHashes()
+	for ix, mod := range pkg.Modules.Modules {
+		modInfo := ModulesInfo{}
+
+		_, _ = hashes.HashModule(pkg.Modules, mod, graph)
+		modInfo.Hash = hashes.Get(mod.Name)
+
+		modInfo.Name = mod.Name
+		modInfo.InitialBlock = mod.InitialBlock
+
+		kind := mod.GetKind()
+		switch v := kind.(type) {
+		case *pbsubstreams.Module_KindMap_:
+			modInfo.Kind = "map"
+			modInfo.OutputType = strPtr(v.KindMap.OutputType)
+		case *pbsubstreams.Module_KindStore_:
+			modInfo.Kind = "store"
+			modInfo.ValueType = strPtr(v.KindStore.ValueType)
+			modInfo.UpdatePolicy = strPtr(v.KindStore.UpdatePolicy.Pretty())
+		default:
+			modInfo.Kind = "unknown"
+		}
+
+		modMeta := pkg.ModuleMeta[ix]
+		if modMeta != nil && modMeta.Doc != "" {
+			modInfo.Documentation = strPtr(strings.Replace(modMeta.Doc, "\n", "\n  ", -1))
+		}
+
+		inputs := make([]ModuleInput, 0, len(mod.Inputs))
+		for _, input := range mod.Inputs {
+			inputInfo := ModuleInput{}
+
+			switch v := input.Input.(type) {
+			case *pbsubstreams.Module_Input_Source_:
+				inputInfo.Type = "source"
+				inputInfo.Name = v.Source.Type
+			case *pbsubstreams.Module_Input_Map_:
+				inputInfo.Type = "map"
+				inputInfo.Name = v.Map.ModuleName
+			case *pbsubstreams.Module_Input_Store_:
+				inputInfo.Type = "store"
+				inputInfo.Name = v.Store.ModuleName
+				if v.Store.Mode > 0 {
+					inputInfo.Mode = strPtr(v.Store.Mode.Pretty())
+				}
+			default:
+				inputInfo.Type = "unknown"
+				inputInfo.Name = "unknown"
+			}
+
+			inputs = append(inputs, inputInfo)
+		}
+		modInfo.Inputs = inputs
+
+		modules = append(modules, modInfo)
+	}
+	manifestInfo.Modules = modules
+
+	protoPackages := make([]string, 0, len(pkg.ProtoFiles))
+	protoPackageMap := make(map[string]struct{})
+	for _, protoFile := range pkg.ProtoFiles {
+		if _, ok := protoPackageMap[protoFile.GetPackage()]; ok {
+			continue
+		} else {
+			protoPackageMap[protoFile.GetPackage()] = struct{}{}
+		}
+
+		protoPackages = append(protoPackages, protoFile.GetPackage())
+	}
+	manifestInfo.ProtoPackages = protoPackages
+
+	protoParser, err := NewProtoParser(pkg.ProtoFiles)
+	err = protoParser.Parse()
+	if err != nil {
+		return nil, fmt.Errorf("parse files: %w", err)
+	}
+	manifestInfo.ProtoFileCodeMap = protoParser.ProtoFileCodeMap
+	manifestInfo.ProtoMessageCodeMap = protoParser.ProtoPackageMessageCodeMap
+
+	if pkg.SinkConfig != nil {
+		desc, files, err := manifest.DescribeSinkConfigs(pkg)
+		if err != nil {
+			return nil, fmt.Errorf("describe sink configs: %w", err)
+		}
+		manifestInfo.SinkInfo = &SinkInfo{
+			Configs: desc,
+			TypeUrl: pkg.SinkConfig.TypeUrl,
+			Files:   files,
+		}
+	}
+
+	return manifestInfo, nil
+}
+
+func Extended(manifestPath string, outputModule string) (*ExtendedInfo, error) {
+	basicInfo, err := Basic(manifestPath)
+	if err != nil {
+		return nil, err
+	}
+
+	reader, err := manifest.NewReader(manifestPath)
+	if err != nil {
+		return nil, fmt.Errorf("manifest reader: %w", err)
+	}
+
+	pkg, err := reader.Read()
+	if err != nil {
+		return nil, fmt.Errorf("read manifest %q: %w", manifestPath, err)
+	}
+
+	var stages [][][]string
+	if outputModule != "" {
+		outputGraph, err := outputmodules.NewOutputModuleGraph(outputModule, true, pkg.Modules)
+		if err != nil {
+			return nil, fmt.Errorf("creating output module graph: %w", err)
+		}
+		stages = make([][][]string, 0, len(outputGraph.StagedUsedModules()))
+		for _, layers := range outputGraph.StagedUsedModules() {
+			var layerDefs [][]string
+			for _, l := range layers {
+				var mods []string
+				for _, m := range l {
+					mods = append(mods, m.Name)
+				}
+				layerDefs = append(layerDefs, mods)
+			}
+			stages = append(stages, layerDefs)
+		}
+	}
+
+	return &ExtendedInfo{
+		BasicInfo:       basicInfo,
+		ExecutionStages: stages,
+	}, nil
+}
+
+func strPtr(s string) *string {
+	return &s
+}

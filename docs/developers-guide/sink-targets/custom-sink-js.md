@@ -15,13 +15,13 @@ In your JavaScript project, use your preferred JavaScript package manager to ins
 npm install @substreams/core
 ```
 
-2. The Substreams Manifest library
+2. The Substreams Manifest library:
 
 ```bash
 npm install @substreams/manifest
 ```
 
-3. The Protobuf library, which will be used to decode the Substreams response.
+3. The Protobuf library, which will be used to decode the Substreams response:
 
 ```bash
 npm install @bufbuild/connect-web
@@ -45,7 +45,7 @@ const SPKG = "https://storage.googleapis.com/substreams-registry/spkg/ethereum-e
 const MODULE = "map_block_meta" // Name of the Substreams Module to run
 ```
 
-2. Use the `fetchSubstream` method from the library to download the Substreams. Then, the `createRegistry` function creates the Protobuf definitions from the package.
+2. Use the `fetchSubstream` method from the library to download the Substreams. Then, the `createRegistry` function creates the Protobuf definitions from the package:
 
 ```javascript
 const fetchPackage = async () => {
@@ -60,7 +60,7 @@ const main = async () => {
 }
 ```
 
-3. Use the `createConnectTransport` to define the networking details of the connection (Substreams endpoint and authentication token).
+3. Use the `createConnectTransport` to define the networking details of the connection (Substreams endpoint and authentication token):
 
 ```javascript
 const main = async () => {
@@ -108,7 +108,7 @@ const main = async () => {
 }
 ```
 
-5. Finally, you can use the `streamBlocks` function to iterate over the stream of blocks returned by the Substreams endpoint.
+5. Finally, you can use the `streamBlocks` function to iterate over the stream of blocks returned by the Substreams endpoint:
 
 ```javascript
 const main = async () => {

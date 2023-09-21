@@ -1,7 +1,7 @@
 ## Custom Sink Using JavaScript
 
 If none of the previous sinks work for you, don't worry! You can create your own custom sink by using the [Substreams JavaScript library](https://github.com/substreams-js/substreams-js).
-This library enables you to run a Substreams, just like your do it through the CLI, but programatically.
+This library enables you to run a Substreams, just like you would through the CLI, but programatically.
 
 The library works both on the client-side and the server-side.
 

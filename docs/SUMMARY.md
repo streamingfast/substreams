@@ -54,6 +54,7 @@
   * [Prometheus](developers-guide/sink-targets/substreams-sink-prometheus.md)
   * [MongoDB](developers-guide/sink-targets/substreams-sink-mongodb.md)
   * [ClickHouse](developers-guide/sink-targets/substreams-sink-clickhouse.md)
+  * [Custom Sink Using JavaScript](developers-guide/sink-targets/custom-sink-js.md)
 * [Cookbook](developers-guide/cookbook.md)
   * [Dynamic data sources](developers-guide/cookbook/dynamic-data-sources.md)
   * [Factory parameterization](developers-guide/cookbook/factory-params.md)

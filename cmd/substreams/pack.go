@@ -70,7 +70,7 @@ func runPack(cmd *cobra.Command, args []string) error {
 	}
 
 	if !manifestReader.IsLocalManifest() {
-		return fmt.Errorf(`"pack" can only be use to pack local manifest file`)
+		return fmt.Errorf(`"pack" can only be used to pack local manifest file`)
 	}
 
 	pkg, err := manifestReader.Read()

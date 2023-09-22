@@ -4,11 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	ipfs "github.com/ipfs/go-ipfs-api"
-	"github.com/jhump/protoreflect/dynamic"
-	"github.com/streamingfast/dstore"
-	"golang.org/x/mod/semver"
-	"google.golang.org/protobuf/proto"
 	"io"
 	"net/http"
 	"net/url"
@@ -17,6 +12,12 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	ipfs "github.com/ipfs/go-ipfs-api"
+	"github.com/jhump/protoreflect/dynamic"
+	"github.com/streamingfast/dstore"
+	"golang.org/x/mod/semver"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/streamingfast/cli"
@@ -120,6 +121,10 @@ func newReader(input, workingDir string, opts ...Option) (*Reader, error) {
 		workingDir:    workingDir,
 	}
 
+	if err := r.resolveInputPath(); err != nil {
+		return nil, err
+	}
+
 	for _, opt := range opts {
 		opt(r)
 	}
@@ -141,10 +146,6 @@ func (r *Reader) MustRead() *pbsubstreams.Package {
 }
 
 func (r *Reader) read() error {
-	if r.currentInput == "" {
-		r.currentInput = r.originalInput
-	}
-
 	input := r.currentInput
 	if r.IsRemotePackage(input) {
 		return r.readRemote(input)
@@ -265,10 +266,6 @@ func (r *Reader) readFromIPFS(input string) error {
 }
 
 func (r *Reader) readLocal(input string) error {
-	err := r.resolveInputPath(input)
-	if err != nil {
-		return fmt.Errorf("unable to resolve input path %q: %w", input, err)
-	}
 	input = r.currentInput
 
 	b, err := os.ReadFile(input)
@@ -280,7 +277,8 @@ func (r *Reader) readLocal(input string) error {
 	return nil
 }
 
-func (r *Reader) resolveInputPath(input string) error {
+func (r *Reader) resolveInputPath() error {
+	input := r.originalInput
 	if r.IsRemotePackage(input) {
 		r.currentInput = input
 		return nil
@@ -300,6 +298,8 @@ func (r *Reader) resolveInputPath(input string) error {
 		r.currentInput = filepath.Join(input, "substreams.yaml")
 		return nil
 	}
+
+	r.currentInput = input
 
 	return nil
 }
@@ -515,13 +515,13 @@ func (r *Reader) IsRemotePackage(input string) bool {
 }
 
 // IsLocalManifest determines if reader's input to read the manifest is a local manifest file, which is determined
-// by ensure it's not a remote package and if the file end with `.yaml`.
+// by ensure it's not a remote package and if the file end with `.yaml` or `.yml`.
 func (r *Reader) IsLocalManifest() bool {
 	if r.IsRemotePackage(r.currentInput) {
 		return false
 	}
 
-	return strings.HasSuffix(r.currentInput, ".yaml")
+	return strings.HasSuffix(r.currentInput, ".yaml") || strings.HasSuffix(r.currentInput, ".yml")
 }
 
 // IsLikelyManifestInput determines if the input is likely a manifest input, which is determined

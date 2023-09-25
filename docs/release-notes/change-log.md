@@ -17,7 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   * `load_from_file` will put the content of the file directly in the field (string and bytes contents are supported).
   * `zip_from_folder` will create a zip archive and put its content in the field (field type must be bytes).
 
-  Example: 
+  Example:
   ```
   import "sf/substreams/v1/options.proto";
 
@@ -42,7 +42,7 @@ package:
   version: "100.0.0"
 
 network: polygon
-  
+
 initialBlocks:
   module_name_1: 17500000
   module_name_1: 17500000
@@ -109,7 +109,7 @@ However, the actual data (and cursor) will work correctly between versions. Only
   ```yaml
   package:
     name: my_custom_package_name
-  
+
   network: arbitrum-one
   initialBlocks:
     module_name_1: 123123123

@@ -32,6 +32,7 @@ The `Block` Protobuf object contains all the blockchain information for a specif
 ## SPKG (.spkg)
 [SPKG files](https://substreams.streamingfast.io/reference-and-specs/packages) contain Substreams definitions. You can create a `.spkg` file from a Substreams manifest using the `substreams pack` command. Then, you can use this file to share or run the Substreams independently.
 The `.spkg` file contains everything needed to run a Substreams: Rust code, Protobuf definitions and the manifest.
+# Glossary
 
 ## GUI
 The CLI includes two commands to run a Substreams: `run` and `gui`. The `substreams run` command prints the output of the execution linearly for every block, while the `substreams gui` allows you to easily jump to the output of a specific block.

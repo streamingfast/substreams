@@ -2,6 +2,11 @@
 
 * [Substreams](README.md)
 
+## Quick Access
+
+* [Glossary](glossary/glossary.md)
+* [Change log](release-notes/change-log.md)
+
 ## Concepts & Fundamentals
 
 * [Benefits and comparisons](concepts-and-fundamentals/benefits.md)
@@ -73,7 +78,3 @@
 * [Rust crates](reference-and-specs/rust-crates.md)
 * [Examples](reference-and-specs/examples.md)
 * [FAQ](reference-and-specs/faq.md)
-
-## Release notes
-
-* [Change log](release-notes/change-log.md)

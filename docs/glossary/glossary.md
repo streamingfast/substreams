@@ -27,7 +27,7 @@ The [Substreams manifest](https://substreams.streamingfast.io/developers-guide/c
 ## Block
 The `Block` Protobuf object contains all the blockchain information for a specific block number. EVM-compatible chains share the same [Block](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto) object, but non EVM-compatible chains must use [their corresponding Block Protobuf definition](https://substreams.streamingfast.io/reference-and-specs/chains-and-endpoints).
 
-<figure><img src=".gitbook/assets/chains-endpoints.png" width="100%" /></figure>
+<figure><img src="../.gitbook/assets/chains-endpoints.png" width="100%" /></figure>
 
 ## SPKG (.spkg)
 [SPKG files](https://substreams.streamingfast.io/reference-and-specs/packages) contain Substreams definitions. You can create a `.spkg` file from a Substreams manifest using the `substreams pack` command. Then, you can use this file to share or run the Substreams independently.
@@ -37,7 +37,7 @@ The `.spkg` file contains everything needed to run a Substreams: Rust code, Prot
 ## GUI
 The CLI includes two commands to run a Substreams: `run` and `gui`. The `substreams run` command prints the output of the execution linearly for every block, while the `substreams gui` allows you to easily jump to the output of a specific block.
 
-<figure><img src=".gitbook/assets/gui/gui.png" width="100%" /></figure>
+<figure><img src="../.gitbook/assets/gui/gui.png" width="100%" /></figure>
 
 ## Sink
 Substreams allows you to extract blockchain data and apply transformations to it. After that, you should choose **a place to send your transform data, which is called _sink_**.

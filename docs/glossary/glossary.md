@@ -40,7 +40,7 @@ That is why Substreams is so powerful!
 
 ## Protocol Buffers (Protobuf)
 [Protocol Buffers](https://protobuf.dev/) is a serializing format used to define module inputs and outputs in Substreams.
-For example, a module might define a module called `map_tranfers` with an input object, `Transfer` (representing an Ethereum transaction), and an output object `MyTransfer` (representing a reduced version of an Ethereum transaction).
+For example, a manifest might define a module called `map_tranfers` with an input object, `Transfer` (representing an Ethereum transaction), and an output object `MyTransfer` (representing a reduced version of an Ethereum transaction).
 
 ## Manifest
 The [Substreams manifest](https://substreams.streamingfast.io/developers-guide/creating-your-manifest) (called `substreams.yaml`) is a YAML file where you define all the configurations needed. For example, the modules of your Substreams (along with their inputs and outputs), or the Protobuf definitions used.

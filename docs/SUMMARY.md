@@ -4,7 +4,7 @@
 
 ## Quick Access
 
-* [Glossary][glossary/glossary.md]
+* [Glossary](glossary/glossary.md)
 * [Change log](release-notes/change-log.md)
 
 ## Concepts & Fundamentals

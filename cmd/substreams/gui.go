@@ -88,13 +88,9 @@ func runGui(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
-	endpoint := mustGetString(cmd, "substreams-endpoint")
-	envEndpoint := manifest.GetNetworkEndpointFromEnvironment(pkg.Network)
-	if endpoint == "" && envEndpoint != "" {
-		endpoint = envEndpoint
-	}
-	if endpoint == "" {
-		return fmt.Errorf("missing endpoint, specify -e or SUBSTREAMS_ENDPOINTS_CONFIG_[network] as defined in network field of the Substreams manifest")
+	endpoint, err := manifest.ExtractNetworkEndpoint(pkg.Network, mustGetString(cmd, "substreams-endpoint"))
+	if err != nil {
+		return fmt.Errorf("extracting endpoint: %w", err)
 	}
 
 	substreamsClientConfig := client.NewSubstreamsClientConfig(

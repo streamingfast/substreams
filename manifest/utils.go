@@ -30,21 +30,22 @@ func (s *mapSlice) UnmarshalYAML(n *yaml.Node) error {
 	return nil
 }
 
-func GetNetworkEndpointFromEnvironment(networkName string) string {
-	networkName = mapNetworkNameToCanonicalName(networkName)
-	networkEndpoint := os.Getenv(fmt.Sprintf("SUBSTREAMS_ENDPOINTS_CONFIG_%s", strings.ToUpper(networkName)))
-	return networkEndpoint
+func ExtractNetworkEndpoint(networkFromManifest, fromFlag string) (string, error) {
+	if fromFlag != "" {
+		return fromFlag, nil
+	}
+	if networkFromManifest == "" {
+		return "", fmt.Errorf("cannot determine endpoint. Either specify it with a flag, `-e mainnet.eth.streamingfast.io:443` or use the 'Network' field in the manifest, matching with SUBSTREAMS_ENDPOINTS_CONFIG_[network] environment variable")
+	}
+
+	endpoint := GetNetworkEndpointFromEnvironment(networkFromManifest)
+	if endpoint == "" {
+		return "", fmt.Errorf("cannot determine endpoint for network %q. Make sure that you set SUBSTREAMS_ENDPOINTS_CONFIG_%s environment variable to a valid endpoint", networkFromManifest, strings.ToUpper(networkFromManifest))
+	}
+	return endpoint, nil
 }
 
-func mapNetworkNameToCanonicalName(networkName string) string {
-	switch strings.ToLower(networkName) {
-	case "polygon":
-		return "matic"
-	case "arbitrum", "arb-one":
-		return "arbitrum-one"
-	case "bnb":
-		return "bsc"
-	default:
-		return strings.ToLower(networkName)
-	}
+func GetNetworkEndpointFromEnvironment(networkName string) string {
+	networkEndpoint := os.Getenv(fmt.Sprintf("SUBSTREAMS_ENDPOINTS_CONFIG_%s", strings.ToUpper(networkName)))
+	return networkEndpoint
 }

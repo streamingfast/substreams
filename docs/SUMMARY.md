@@ -1,6 +1,7 @@
 # Table of contents
 
 * [Substreams](README.md)
+* [Glossary][glossary.md]
 
 ## Concepts & Fundamentals
 

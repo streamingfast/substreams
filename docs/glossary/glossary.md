@@ -1,7 +1,7 @@
 # Glossary
 
 ## Substreams
-[Substreams](https://substreams.streamingfast.io/) is powerful indexing technology, which allows to:
+[Substreams](https://substreams.streamingfast.io/) is a powerful indexing technology, which allows you to:
 1. Extract data from several blockchains (Ethereum, Polygon, BNB, Solana...).
 2. Apply custom transformations to the data.
 3. Send the data to a place of your choice (for example, a Postgres database or a file).
@@ -28,13 +28,13 @@ There are two types of modules: `map` and `store`.
 ## Directed Acyclic Graph (DAG)
 [DAGs](https://en.wikipedia.org/wiki/Directed_acyclic_graph) are data structures used in many computational models. In Substreams, DAGs are used to define module data flows.
 
-In simple terms, a DAG is a one-direction, acyclic graph. They are used in a variety of software, such as Git or IPFS.
+A DAG is a one-direction, acyclic graph. They are used in a variety of software, such as Git or IPFS.
 
 ## Composability
 Modules make Substreams really _composable_. Being composable means that Substreams can be independent, but they can also work together to create powerful streams.
 
 For example, consider that you have two _map modules_: one emitting `Transfer` objects and another one emitting `AccountInformation` objects.
-You could another module that receives the previous modules as input and merges the information of both.
+You could create another module that receives the previous two modules as input and merges the information from both.
 
 That is why Substreams is so powerful!
 
@@ -43,7 +43,7 @@ That is why Substreams is so powerful!
 For example, a module might define a module called `map_tranfers` with an input object, `Transfer` (representing an Ethereum transaction), and an output object `MyTransfer` (representing a reduced version of an Ethereum transaction).
 
 ## Manifest
-The [Substreams manifest](https://substreams.streamingfast.io/developers-guide/creating-your-manifest) (called `substreams.yml`) is a YAML file where you define all the configurations needed. For example, the modules of your Substreams (along with their inputs and outputs), or the Protobuf definitions used.
+The [Substreams manifest](https://substreams.streamingfast.io/developers-guide/creating-your-manifest) (called `substreams.yaml`) is a YAML file where you define all the configurations needed. For example, the modules of your Substreams (along with their inputs and outputs), or the Protobuf definitions used.
 
 ## WebAssembly (WASM)
 [WebAssembly (WASM)](https://webassembly.org/) is a binary-code format used to run a Substreams. The Rust code used to define your Substreams transformations is packed into a WASM module, which you can use as an independent executable.
@@ -54,7 +54,7 @@ The `Block` Protobuf object contains all the blockchain information for a specif
 <figure><img src="../.gitbook/assets/chains-endpoints.png" width="100%" /></figure>
 
 ## SPKG (.spkg)
-[SPKG files](https://substreams.streamingfast.io/reference-and-specs/packages) contain Substreams definitions. You can create a `.spkg` file from a Substreams manifest using the `substreams pack` command. Then, you can use this file to share or run the Substreams independently.
+[SPKG files](https://substreams.streamingfast.io/reference-and-specs/packages) contain Substreams definitions. You can create an `.spkg` file from a Substreams manifest using the `substreams pack` command. Then, you can use this file to share or run the Substreams independently.
 The `.spkg` file contains everything needed to run a Substreams: Rust code, Protobuf definitions and the manifest.
 
 ## GUI
@@ -76,7 +76,7 @@ Substreams allows you to extract blockchain data and apply transformations to it
 A sink can be a [Postgres database](https://substreams.streamingfast.io/developers-guide/sink-targets/substreams-sink-postgres), [a file](https://substreams.streamingfast.io/developers-guide/sink-targets/substreams-sink-files) or a [custom solution of your choice](https://substreams.streamingfast.io/developers-guide/sink-targets/custom-sink-js).
 
 ## Substreams-powered Subgraph
-When a Subgraph acts as a sink for your Substreams, you call it [Substreams-powered Subgraph](https://thegraph.com/docs/en/cookbook/substreams-powered-subgraphs/).
+When a Subgraph acts as a sink for your Substreams, you call it a [Substreams-powered Subgraph](https://thegraph.com/docs/en/cookbook/substreams-powered-subgraphs/).
 
 The Subgraph Sink is one of the _official sinks_ supported by Substreams, and can help you index your Subgraph way faster!
 

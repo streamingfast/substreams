@@ -79,7 +79,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 
 	endpoint := mustGetString(cmd, "substreams-endpoint")
-	envEndpoint := getNetworkEndpointFromEnvironment(pkg.Network)
+	envEndpoint := manifest.GetNetworkEndpointFromEnvironment(pkg.Network)
 	if endpoint == "" && envEndpoint != "" {
 		endpoint = envEndpoint
 	}

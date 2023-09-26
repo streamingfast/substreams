@@ -2,6 +2,8 @@ package manifest
 
 import (
 	"fmt"
+	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -26,4 +28,23 @@ func (s *mapSlice) UnmarshalYAML(n *yaml.Node) error {
 	}
 
 	return nil
+}
+
+func GetNetworkEndpointFromEnvironment(networkName string) string {
+	networkName = mapNetworkNameToCanonicalName(networkName)
+	networkEndpoint := os.Getenv(fmt.Sprintf("SUBSTREAMS_ENDPOINTS_CONFIG_%s", strings.ToUpper(networkName)))
+	return networkEndpoint
+}
+
+func mapNetworkNameToCanonicalName(networkName string) string {
+	switch strings.ToLower(networkName) {
+	case "polygon":
+		return "matic"
+	case "arbitrum", "arb-one":
+		return "arbitrum-one"
+	case "bnb":
+		return "bsc"
+	default:
+		return strings.ToLower(networkName)
+	}
 }

@@ -79,13 +79,6 @@ func runGui(cmd *cobra.Command, args []string) error {
 
 	outputModule := args[0]
 
-	substreamsClientConfig := client.NewSubstreamsClientConfig(
-		mustGetString(cmd, "substreams-endpoint"),
-		tools.ReadAPIToken(cmd, "substreams-api-token-envvar"),
-		mustGetBool(cmd, "insecure"),
-		mustGetBool(cmd, "plaintext"),
-	)
-
 	manifestReader, err := manifest.NewReader(manifestPath)
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
@@ -94,6 +87,23 @@ func runGui(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
+
+	endpoint := mustGetString(cmd, "substreams-endpoint")
+	envEndpoint := getNetworkEndpointFromEnvironment(pkg.Network)
+	if endpoint == "" && envEndpoint != "" {
+		endpoint = envEndpoint
+	}
+	if endpoint == "" {
+		return fmt.Errorf("missing endpoint, specify -e or SUBSTREAMS_ENDPOINTS_CONFIG_[network] as defined in network field of the Substreams manifest")
+	}
+
+	substreamsClientConfig := client.NewSubstreamsClientConfig(
+		endpoint,
+		tools.ReadAPIToken(cmd, "substreams-api-token-envvar"),
+		mustGetBool(cmd, "insecure"),
+		mustGetBool(cmd, "plaintext"),
+	)
+
 	params := mustGetStringArray(cmd, "params")
 	if err := manifest.ApplyParams(params, pkg); err != nil {
 		return err

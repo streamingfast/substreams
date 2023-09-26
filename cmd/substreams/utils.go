@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/spf13/cobra"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -53,4 +54,9 @@ func readStopBlockFlag(cmd *cobra.Command, startBlock int64, flagName string, wi
 	}
 
 	return endBlock, nil
+}
+
+func getNetworkEndpointFromEnvironment(networkName string) string {
+	networkEndpoint := os.Getenv(fmt.Sprintf("SUBSTREAMS_ENDPOINTS_CONFIG_%s", strings.ToUpper(networkName)))
+	return networkEndpoint
 }

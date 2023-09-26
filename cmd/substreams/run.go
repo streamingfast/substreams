@@ -17,7 +17,7 @@ import (
 )
 
 func init() {
-	runCmd.Flags().StringP("substreams-endpoint", "e", "mainnet.eth.streamingfast.io:443", "Substreams gRPC endpoint")
+	runCmd.Flags().StringP("substreams-endpoint", "e", "", "Substreams gRPC endpoint")
 	runCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token")
 	runCmd.Flags().StringP("start-block", "s", "", "Start block to stream from. If empty, will be replaced by initialBlock of the first module you are streaming. If negative, will be resolved by the server relative to the chain head")
 	runCmd.Flags().StringP("cursor", "c", "", "Cursor to stream from. Leave blank for no cursor")
@@ -78,6 +78,15 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
+	endpoint := mustGetString(cmd, "substreams-endpoint")
+	envEndpoint := getNetworkEndpointFromEnvironment(pkg.Network)
+	if endpoint == "" && envEndpoint != "" {
+		endpoint = envEndpoint
+	}
+	if endpoint == "" {
+		return fmt.Errorf("missing endpoint, specify -e or SUBSTREAMS_ENDPOINTS_CONFIG_[network] as defined in network field of the Substreams manifest")
+	}
+
 	if err := manifest.ApplyParams(mustGetStringArray(cmd, "params"), pkg); err != nil {
 		return err
 	}
@@ -124,7 +133,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 
 	substreamsClientConfig := client.NewSubstreamsClientConfig(
-		mustGetString(cmd, "substreams-endpoint"),
+		endpoint,
 		tools.ReadAPIToken(cmd, "substreams-api-token-envvar"),
 		mustGetBool(cmd, "insecure"),
 		mustGetBool(cmd, "plaintext"),

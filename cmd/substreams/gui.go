@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
@@ -19,7 +20,7 @@ import (
 
 func init() {
 	guiCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token")
-	guiCmd.Flags().StringP("substreams-endpoint", "e", "mainnet.eth.streamingfast.io:443", "Substreams gRPC endpoint. If empty, will be replaced by the SUBSTREAMS_ENDPOINT_{network_name} environment variable, where `network_name` is determined from the substreams manifest")
+	guiCmd.Flags().StringP("substreams-endpoint", "e", "", "Substreams gRPC endpoint. If empty, will be replaced by the SUBSTREAMS_ENDPOINT_{network_name} environment variable, where `network_name` is determined from the substreams manifest")
 	guiCmd.Flags().Bool("insecure", false, "Skip certificate validation on GRPC connection")
 	guiCmd.Flags().Bool("plaintext", false, "Establish GRPC connection in plaintext")
 	guiCmd.Flags().StringSliceP("header", "H", nil, "Additional headers to be sent in the substreams request")
@@ -90,7 +91,12 @@ func runGui(cmd *cobra.Command, args []string) error {
 
 	endpoint, err := manifest.ExtractNetworkEndpoint(pkg.Network, mustGetString(cmd, "substreams-endpoint"))
 	if err != nil {
-		return fmt.Errorf("extracting endpoint: %w", err)
+		fmt.Println(networkDefaultEndpointDeprecationWarning)
+		time.Sleep(3 * time.Second)
+		endpoint = "mainnet.eth.streamingfast.io:443"
+
+		//TODO: activate error instead of issuing deprecation warning
+		//return fmt.Errorf("extracting endpoint: %w", err)
 	}
 
 	substreamsClientConfig := client.NewSubstreamsClientConfig(

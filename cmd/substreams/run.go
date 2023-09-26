@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc/metadata"
 	"io"
+	"time"
 )
 
 func init() {
@@ -80,7 +81,12 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	endpoint, err := manifest.ExtractNetworkEndpoint(pkg.Network, mustGetString(cmd, "substreams-endpoint"))
 	if err != nil {
-		return fmt.Errorf("extracting endpoint: %w", err)
+		fmt.Println(networkDefaultEndpointDeprecationWarning)
+		time.Sleep(3 * time.Second)
+		endpoint = "mainnet.eth.streamingfast.io:443"
+
+		//TODO: activate error instead of issuing deprecation warning
+		//return fmt.Errorf("extracting endpoint: %w", err)
 	}
 
 	if err := manifest.ApplyParams(mustGetStringArray(cmd, "params"), pkg); err != nil {

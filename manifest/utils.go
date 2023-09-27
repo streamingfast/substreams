@@ -47,7 +47,7 @@ func ExtractNetworkEndpoint(networkFromManifest, fromFlag string, logger *zap.Lo
 		return endpoint, nil
 	}
 
-	if ep, ok := hardcodedEndpoints[networkFromManifest]; ok {
+	if ep, ok := HardcodedEndpoints[networkFromManifest]; ok {
 		logger.Info("using endpoint from hardcoded list", zap.String("endpoint", endpoint))
 		return ep, nil
 	}
@@ -61,7 +61,7 @@ func getNetworkEndpointFromEnvironment(networkName string) string {
 }
 
 // TODO: replace by the blockchain-based discovery when available
-var hardcodedEndpoints = map[string]string{
+var HardcodedEndpoints = map[string]string{
 	"mainnet":      "mainnet.eth.streamingfast.io:443",
 	"matic":        "polygon.streamingfast.io:443",
 	"polygon":      "polygon.streamingfast.io:443",

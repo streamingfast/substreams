@@ -50,6 +50,10 @@ params:
   module_name_1: "override_paramete_value_here"
 ```
 
+* The `substreams run` and `substreams gui` commands now determine the endpoint from the 'network' field in the manifest if no value is passed in the `--substreams-endpoint` flag.
+* The endpoint for each network can be set by using an environment variable `SUBSTREAMS_ENDPOINTS_CONFIG_<network_name>`, ex: `SUBSTREAMS_ENDPOINTS_CONFIG_MAINNET=my-endpoint:443`
+
+
 ## v1.1.14
 
 ### Bug fixes

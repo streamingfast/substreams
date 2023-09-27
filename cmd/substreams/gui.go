@@ -3,10 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
-
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
@@ -15,11 +11,14 @@ import (
 	"github.com/streamingfast/substreams/tools"
 	"github.com/streamingfast/substreams/tui2"
 	"github.com/streamingfast/substreams/tui2/pages/request"
+	"os"
+	"path/filepath"
+	"strings"
 )
 
 func init() {
 	guiCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token")
-	guiCmd.Flags().StringP("substreams-endpoint", "e", "mainnet.eth.streamingfast.io:443", "Substreams gRPC endpoint")
+	guiCmd.Flags().StringP("substreams-endpoint", "e", "", "Substreams gRPC endpoint. If empty, will be replaced by the SUBSTREAMS_ENDPOINT_{network_name} environment variable, where `network_name` is determined from the substreams manifest. Some network names have default endpoints.")
 	guiCmd.Flags().Bool("insecure", false, "Skip certificate validation on GRPC connection")
 	guiCmd.Flags().Bool("plaintext", false, "Establish GRPC connection in plaintext")
 	guiCmd.Flags().StringSliceP("header", "H", nil, "Additional headers to be sent in the substreams request")
@@ -79,13 +78,6 @@ func runGui(cmd *cobra.Command, args []string) error {
 
 	outputModule := args[0]
 
-	substreamsClientConfig := client.NewSubstreamsClientConfig(
-		mustGetString(cmd, "substreams-endpoint"),
-		tools.ReadAPIToken(cmd, "substreams-api-token-envvar"),
-		mustGetBool(cmd, "insecure"),
-		mustGetBool(cmd, "plaintext"),
-	)
-
 	manifestReader, err := manifest.NewReader(manifestPath)
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
@@ -94,6 +86,19 @@ func runGui(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
+
+	endpoint, err := manifest.ExtractNetworkEndpoint(pkg.Network, mustGetString(cmd, "substreams-endpoint"), zlog)
+	if err != nil {
+		return fmt.Errorf("extracting endpoint: %w", err)
+	}
+
+	substreamsClientConfig := client.NewSubstreamsClientConfig(
+		endpoint,
+		tools.ReadAPIToken(cmd, "substreams-api-token-envvar"),
+		mustGetBool(cmd, "insecure"),
+		mustGetBool(cmd, "plaintext"),
+	)
+
 	params := mustGetStringArray(cmd, "params")
 	if err := manifest.ApplyParams(params, pkg); err != nil {
 		return err

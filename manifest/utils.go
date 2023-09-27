@@ -41,14 +41,13 @@ func ExtractNetworkEndpoint(networkFromManifest, fromFlag string, logger *zap.Lo
 		networkFromManifest = "mainnet"
 	}
 
-	endpoint := getNetworkEndpointFromEnvironment(networkFromManifest)
-	if endpoint != "" {
+	if endpoint := getNetworkEndpointFromEnvironment(networkFromManifest); endpoint != "" {
 		logger.Info("using endpoint from environment", zap.String("endpoint", endpoint))
 		return endpoint, nil
 	}
 
 	if ep, ok := HardcodedEndpoints[networkFromManifest]; ok {
-		logger.Info("using endpoint from hardcoded list", zap.String("endpoint", endpoint))
+		logger.Info("using endpoint from hardcoded list", zap.String("endpoint", ep))
 		return ep, nil
 	}
 

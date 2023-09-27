@@ -2,6 +2,7 @@ package manifest
 
 import (
 	"fmt"
+	"go.uber.org/zap"
 	"os"
 	"strings"
 
@@ -30,22 +31,51 @@ func (s *mapSlice) UnmarshalYAML(n *yaml.Node) error {
 	return nil
 }
 
-func ExtractNetworkEndpoint(networkFromManifest, fromFlag string) (string, error) {
+func ExtractNetworkEndpoint(networkFromManifest, fromFlag string, logger *zap.Logger) (string, error) {
 	if fromFlag != "" {
 		return fromFlag, nil
 	}
+
 	if networkFromManifest == "" {
-		return "", fmt.Errorf("cannot determine endpoint. Either specify it with a flag, `-e mainnet.eth.streamingfast.io:443` or use the 'Network' field in the manifest, matching with SUBSTREAMS_ENDPOINTS_CONFIG_[network] environment variable")
+		logger.Warn("DEPRECATION WARNING: This substreams does not define a 'network' field. To allow endpoint inference, define a 'network' field in your Substreams manifest. See --help for more information. Assuming 'mainnet' as network")
+		networkFromManifest = "mainnet"
 	}
 
-	endpoint := GetNetworkEndpointFromEnvironment(networkFromManifest)
-	if endpoint == "" {
-		return "", fmt.Errorf("cannot determine endpoint for network %q. Make sure that you set SUBSTREAMS_ENDPOINTS_CONFIG_%s environment variable to a valid endpoint", networkFromManifest, strings.ToUpper(networkFromManifest))
+	endpoint := getNetworkEndpointFromEnvironment(networkFromManifest)
+	if endpoint != "" {
+		logger.Info("using endpoint from environment", zap.String("endpoint", endpoint))
+		return endpoint, nil
 	}
-	return endpoint, nil
+
+	if ep, ok := hardcodedEndpoints[networkFromManifest]; ok {
+		logger.Info("using endpoint from hardcoded list", zap.String("endpoint", endpoint))
+		return ep, nil
+	}
+
+	return "", fmt.Errorf("cannot determine endpoint for network %q: make sure that you set SUBSTREAMS_ENDPOINTS_CONFIG_%s environment variable to a valid endpoint, or use the endpoint flag", networkFromManifest, strings.ToUpper(networkFromManifest))
 }
 
-func GetNetworkEndpointFromEnvironment(networkName string) string {
+func getNetworkEndpointFromEnvironment(networkName string) string {
 	networkEndpoint := os.Getenv(fmt.Sprintf("SUBSTREAMS_ENDPOINTS_CONFIG_%s", strings.ToUpper(networkName)))
 	return networkEndpoint
+}
+
+// TODO: replace by the blockchain-based discovery when available
+var hardcodedEndpoints = map[string]string{
+	"mainnet":      "mainnet.eth.streamingfast.io:443",
+	"matic":        "polygon.streamingfast.io:443",
+	"polygon":      "polygon.streamingfast.io:443",
+	"mumbais":      "mumbai.streamingfast.io:443",
+	"bnb":          "bnb.streamingfast.io:443",
+	"bsc":          "bnb.streamingfast.io:443",
+	"sepolia":      "sepolia.eth.streamingfast.io:443",
+	"holesky":      "holesky.eth.streamingfast.io:443",
+	"near":         "mainnet.near.streamingfast.io:443",
+	"near-mainnet": "mainnet.near.streamingfast.io:443",
+	"near-testnet": "testnet.near.streamingfast.io:443",
+	"arbitrum":     "arb-one.streamingfast.io:443",
+	"arb":          "arb-one.streamingfast.io:443",
+	"arb-one":      "arb-one.streamingfast.io:443",
+
+	//"antelope": "",
 }

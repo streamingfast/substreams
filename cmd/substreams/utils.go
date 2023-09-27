@@ -54,5 +54,3 @@ func readStopBlockFlag(cmd *cobra.Command, startBlock int64, flagName string, wi
 
 	return endBlock, nil
 }
-
-var networkDefaultEndpointDeprecationWarning string = "DEPRECATION WARNING: default endpoint is deprecated. Please specify a network endpoint using the --substreams-endpoint flag (-e) or by specifying an environment variable in the form SUBSTREAMS_ENDPOINTS_CONFIG_{network} where 'network' is the name of the network for this Substreams"

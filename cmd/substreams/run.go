@@ -14,11 +14,10 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc/metadata"
 	"io"
-	"time"
 )
 
 func init() {
-	runCmd.Flags().StringP("substreams-endpoint", "e", "", "Substreams gRPC endpoint. If empty, will be replaced by the SUBSTREAMS_ENDPOINT_{network_name} environment variable, where `network_name` is determined from the substreams manifest")
+	runCmd.Flags().StringP("substreams-endpoint", "e", "", "Substreams gRPC endpoint. If empty, will be replaced by the SUBSTREAMS_ENDPOINT_{network_name} environment variable, where `network_name` is determined from the substreams manifest. Some network names have default endpoints.")
 	runCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token")
 	runCmd.Flags().StringP("start-block", "s", "", "Start block to stream from. If empty, will be replaced by initialBlock of the first module you are streaming. If negative, will be resolved by the server relative to the chain head")
 	runCmd.Flags().StringP("cursor", "c", "", "Cursor to stream from. Leave blank for no cursor")
@@ -79,14 +78,9 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
-	endpoint, err := manifest.ExtractNetworkEndpoint(pkg.Network, mustGetString(cmd, "substreams-endpoint"))
+	endpoint, err := manifest.ExtractNetworkEndpoint(pkg.Network, mustGetString(cmd, "substreams-endpoint"), zlog)
 	if err != nil {
-		fmt.Println(networkDefaultEndpointDeprecationWarning)
-		time.Sleep(3 * time.Second)
-		endpoint = "mainnet.eth.streamingfast.io:443"
-
-		//TODO: activate error instead of issuing deprecation warning
-		//return fmt.Errorf("extracting endpoint: %w", err)
+		return fmt.Errorf("extracting endpoint: %w", err)
 	}
 
 	if err := manifest.ApplyParams(mustGetStringArray(cmd, "params"), pkg); err != nil {

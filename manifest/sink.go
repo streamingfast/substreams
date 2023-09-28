@@ -255,7 +255,7 @@ func convertYAMLtoJSONCompat(i any, resolvePath func(in string) string, scope st
 			if isBytes {
 				return base64.StdEncoding.EncodeToString(cnt), nil
 			}
-			return cnt, nil
+			return string(cnt), nil
 		}
 
 		if opts.ZipFromFolder {

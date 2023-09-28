@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/streamingfast/substreams/manifest"
+	"go.uber.org/zap/zapcore"
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -14,7 +14,7 @@ var rootCmd = &cobra.Command{
 	Long:         "Any place where <package> is specified, a 'substreams.yaml', a local '.spkg' file or an https://...spkg file can be specified",
 	SilenceUsage: true,
 	PersistentPreRun: func(cmd *cobra.Command, _ []string) {
-		manifest.IPFSURL = mustGetString(cmd, "ipfs-url")
+		setup(cmd, zapcore.WarnLevel)
 	},
 }
 

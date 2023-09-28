@@ -46,7 +46,7 @@ func (e *DockerEngine) newSink(deploymentID string, pgService string, pkg *pbsub
 	conf = types.ServiceConfig{
 		Name:          name,
 		ContainerName: name,
-		Image:         "ghcr.io/streamingfast/substreams-sink-sql:36cf706",
+		Image:         "ghcr.io/streamingfast/substreams-sink-sql:v3.0.1",
 		Restart:       "on-failure",
 		Entrypoint: []string{
 			"/opt/subservices/config/start.sh",
@@ -66,7 +66,7 @@ func (e *DockerEngine) newSink(deploymentID string, pgService string, pkg *pbsub
 		Links:     []string{pgService + ":postgres"},
 		DependsOn: []string{pgService},
 		Environment: map[string]*string{
-			"DATABASE_URL":  deref("postgres://dev-node:insecure-change-me-in-prod@postgres:5432/dev-node?sslmode=disable"),
+			"DSN":  deref("postgres://dev-node:insecure-change-me-in-prod@postgres:5432/dev-node?sslmode=disable"),
 			"ENDPOINT":      &endpoint,
 			"OUTPUT_MODULE": &pkg.SinkModule,
             "SUBSTREAMS_API_TOKEN": &token,
@@ -98,11 +98,10 @@ func (e *DockerEngine) newSink(deploymentID string, pgService string, pkg *pbsub
 set -xeu
 
 if [ ! -f /opt/subservices/data/setup-complete ]; then
-    /app/substreams-sink-sql setup /opt/subservices/config/substreams.spkg
-    touch /opt/subservices/data/setup-complete
+    /app/substreams-sink-sql setup $DSN /opt/subservices/config/substreams.spkg && touch /opt/subservices/data/setup-complete
 fi
 
-/app/substreams-sink-sql run /opt/subservices/config/substreams.spkg
+/app/substreams-sink-sql run $DSN /opt/subservices/config/substreams.spkg
 `)
 	if err := ioutil.WriteFile(filepath.Join(configFolder, "start.sh"), startScript, 0755); err != nil {
 		fmt.Println("")

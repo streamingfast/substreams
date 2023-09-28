@@ -3,13 +3,13 @@ package docker
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -20,7 +20,6 @@ import (
 	pbsinksvc "github.com/streamingfast/substreams/pb/sf/substreams/sink/service/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
-
 
 type DockerEngine struct {
 	mutex sync.Mutex
@@ -53,33 +52,49 @@ func (e *DockerEngine) Apply(deploymentID string, pkg *pbsubstreams.Package, zlo
 }
 
 func (e *DockerEngine) Info(deploymentID string, zlog *zap.Logger) (pbsinksvc.DeploymentStatus, map[string]string, error) {
-	cmd := exec.Command("docker-compose", "ps", "--format", "json")
+	cmd := exec.Command("docker", "compose", "ps", "--format", "json")
 	cmd.Dir = filepath.Join(e.dir, deploymentID)
 	out, err := cmd.Output()
 	if err != nil {
-		return pbsinksvc.DeploymentStatus_UNKNOWN, nil, fmt.Errorf("getting status from `docker-compose ps` command: %q, %w", out, err)
+		return pbsinksvc.DeploymentStatus_UNKNOWN, nil, fmt.Errorf("getting status from `docker compose ps` command: %q, %w", out, err)
 	}
 
-    var status pbsinksvc.DeploymentStatus
+	var status pbsinksvc.DeploymentStatus
 
 	sc := bufio.NewScanner(bytes.NewReader(out))
-	for sc.Scan() {
-		line := sc.Text()
-		values := strings.Split(line, " ")
-		// id := values[0]
-		UpOrDown := values[1]
-		// since -> values[2:3]
-		if UpOrDown != "Up" {
-			status = pbsinksvc.DeploymentStatus_FAILING
-			break
-		}
-		status = pbsinksvc.DeploymentStatus_RUNNING
+	if !sc.Scan() {
+		return 0, nil, fmt.Errorf("no output from command")
+	}
+	line := sc.Bytes()
+
+	var outputs []*dockerComposePSOutput
+	if err := json.Unmarshal(line, &outputs); err != nil {
+		return 0, nil, fmt.Errorf("unmarshalling docker output: %w", err)
 	}
 
-    return status, map[string]string{}, nil
+	for _, output := range outputs {
+		switch output.State {
+		case "running":
+			if status == pbsinksvc.DeploymentStatus_UNKNOWN { // anything else has priority
+				status = pbsinksvc.DeploymentStatus_RUNNING
+			}
+		case "paused":
+			if status != pbsinksvc.DeploymentStatus_FAILING {
+				status = pbsinksvc.DeploymentStatus_PAUSED
+			}
+		default:
+			status = pbsinksvc.DeploymentStatus_FAILING
+		}
+	}
+	return status, map[string]string{}, nil
 }
 
-func (e *DockerEngine) List(zlog *zap.Logger) ([]string, error) {
+type dockerComposePSOutput struct {
+	State  string `json:"State"`
+	Status string `json:"Status"`
+}
+
+func (e *DockerEngine) List(zlog *zap.Logger) (out []*pbsinksvc.DeploymentWithStatus, err error) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 
@@ -88,33 +103,51 @@ func (e *DockerEngine) List(zlog *zap.Logger) ([]string, error) {
 		return nil, err
 	}
 
-	out := make([]string, len(files))
-	for i, f := range files {
-		out[i] = f.Name()
+	for _, f := range files {
+		id := f.Name()
+		status, _, err := e.Info(id, zlog)
+		if err != nil {
+			zlog.Warn("cannot get info for deployment", zap.String("id", id))
+			continue
+		}
+		out = append(out, &pbsinksvc.DeploymentWithStatus{
+			Id:     id,
+			Status: status,
+		})
 	}
 	return out, nil
 }
 
 func (e *DockerEngine) Resume(deploymentID string, _ *zap.Logger) (string, error) {
-	cmd := exec.Command("docker-compose", "up", "-d")
+	cmd := exec.Command("docker", "compose", "up", "-d")
 	cmd.Dir = filepath.Join(e.dir, deploymentID)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("resuming docker-compose: %q, %w", out, err)
+		return "", fmt.Errorf("resuming docker compose: %q, %w", out, err)
 	}
 	return string(out), nil
 }
 
 func (e *DockerEngine) Pause(deploymentID string, zlog *zap.Logger) (string, error) {
-	cmd := exec.Command("docker-compose", "down")
+	cmd := exec.Command("docker", "compose", "down")
 	cmd.Dir = filepath.Join(e.dir, deploymentID)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("pausing docker-compose: %q, %w", out, err)
+		return "", fmt.Errorf("pausing docker compose: %q, %w", out, err)
 	}
 	return string(out), nil
 }
 
+func (e *DockerEngine) Remove(deploymentID string, zlog *zap.Logger) (string, error) {
+	cmd := exec.Command("docker", "compose", "down")
+	cmd.Dir = filepath.Join(e.dir, deploymentID)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("pausing docker compose: %q, %w", out, err)
+	}
+    err = os.RemoveAll(filepath.Join(e.dir, deploymentID))
+	return string(out), err
+}
 
 func (e *DockerEngine) applyManifest(deployment string, man []byte) (string, error) {
 	w, err := os.Create(filepath.Join(e.dir, deployment, "docker-compose.yaml"))
@@ -126,7 +159,7 @@ func (e *DockerEngine) applyManifest(deployment string, man []byte) (string, err
 		return "", fmt.Errorf("writing temporary docker-compose file: %w", err)
 	}
 
-	cmd := exec.Command("docker-compose", "up", "-d")
+	cmd := exec.Command("docker", "compose", "up", "-d")
 	cmd.Dir = filepath.Join(e.dir, deployment)
 
 	out, err := cmd.CombinedOutput()
@@ -148,8 +181,8 @@ func (e *DockerEngine) Shutdown(zlog *zap.Logger) (err error) {
 		return fmt.Errorf("cannot list deployments: %w", err)
 	}
 	for _, dep := range deps {
-        zlog.Info("shutting down deployment", zap.String("deploymentID", dep))
-		if _, e := e.Pause(dep, zlog); e != nil {
+		zlog.Info("shutting down deployment", zap.String("deploymentID", dep.Id))
+		if _, e := e.Pause(dep.Id, zlog); e != nil {
 			err = errors.Join(err, e)
 		}
 	}

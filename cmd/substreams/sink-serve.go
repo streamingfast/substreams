@@ -8,6 +8,7 @@ import (
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
 	server "github.com/streamingfast/substreams/sink-server"
+	"go.uber.org/zap/zapcore"
 )
 
 func init() {
@@ -24,12 +25,16 @@ var serveCmd = &cobra.Command{
 	Long: cli.Dedent(`
         Listens for "deploy" requests, allowing you to test your sink deployable units to a local docker-based dev environment.
 	`),
+	PersistentPreRun: func(cmd *cobra.Command, _ []string) {
+		setup(cmd, zapcore.InfoLevel)
+	},
 	RunE:         serveE,
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 }
 
 func serveE(cmd *cobra.Command, args []string) error {
+
 	listenAddr := sflags.MustGetString(cmd, "listen-addr")
 	corsHostRegexAllow := sflags.MustGetString(cmd, "cors-host-regex-allow")
 	dataDir := sflags.MustGetString(cmd, "data-dir")

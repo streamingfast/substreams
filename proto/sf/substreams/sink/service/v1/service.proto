@@ -9,6 +9,7 @@ import "sf/substreams/options.proto";
 
 service Provider {
   rpc Deploy(DeployRequest) returns (DeployResponse);
+  rpc Remove(RemoveRequest) returns (RemoveResponse);
   rpc Info(InfoRequest) returns (InfoResponse);
   rpc List(ListRequest) returns (ListResponse);
   rpc Pause(PauseRequest) returns (PauseResponse);
@@ -53,6 +54,14 @@ enum DeploymentStatus {
   RUNNING = 1;
   FAILING = 2;
   PAUSED = 3;  
+}
+
+message RemoveRequest {
+  string deployment_id = 1;
+}
+
+message RemoveResponse {
+  DeploymentStatus previous_status = 1;
 }
 
 message PauseRequest {

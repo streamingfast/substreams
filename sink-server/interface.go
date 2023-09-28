@@ -16,8 +16,10 @@ type Engine interface {
     Resume(deploymentID string, zlog *zap.Logger) (string, error)
     Pause(deploymentID string, zlog *zap.Logger) (string, error)
 
+    Remove(deploymentID string, zlog *zap.Logger) (string, error)
+
     Info(deploymentID string, zlog *zap.Logger) (pbsinksvc.DeploymentStatus, map[string]string, error)
-    List(zlog *zap.Logger) ([]string, error)
+    List(zlog *zap.Logger) ([]*pbsinksvc.DeploymentWithStatus, error)
 
     Shutdown(zlog *zap.Logger) error
 }

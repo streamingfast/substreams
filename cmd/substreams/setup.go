@@ -4,11 +4,17 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 
+	"github.com/spf13/cobra"
+	"github.com/streamingfast/logging"
+	"github.com/streamingfast/substreams/manifest"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
-func setup() {
+func setup(cmd *cobra.Command, loglevel zapcore.Level) {
 	setupProfiler()
+	manifest.IPFSURL = mustGetString(cmd, "ipfs-url")
+	logging.InstantiateLoggers(logging.WithLogLevelSwitcherServerAutoStart(), logging.WithDefaultLevel(loglevel))
 }
 
 var (

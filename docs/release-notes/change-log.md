@@ -8,7 +8,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Highlights
 
-* This release brings enhancements to "sink-config" features, as a step to enable more potent descriptions of "deployable units" inside your Substreams package. The Substreams sinks will be able to leverage the new FieldOptions in upcoming releases.
+This release brings enhancements to sink config features, as a step to enable more potent "deployable units" inside your Substreams. The way files and folders are embedded inside the packaged config has been greatly improved, no need for a clunky prefix anymore, the config definition itself now defines if the parameter you provide should be read from file or as a set of folder.
+
+You can see for example the [substreams-sink-sql tutorial sink config](https://github.com/streamingfast/substreams-sink-sql/blob/develop/docs/tutorial/sink/substreams.dev.yaml#L12-L17):
+
+```yaml
+specVersion: v0.1.0
+package:
+  name: "substreams_sink_sql_tutorial"
+
+...
+
+sink:
+  module: main:db_out
+  type: sf.substreams.sink.sql.v1.Service
+  config:
+    schema: "../schema.sql"
+```
+
+Here the `schema` will be embedded from it's file source directly.
 
 ### Added
 

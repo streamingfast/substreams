@@ -44,10 +44,8 @@ func sinkInfoE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Response for deployment %q:\n  Status: %v\n  Outputs:\n", id, resp.Msg.Status)
-	for k, v := range resp.Msg.Outputs {
-		fmt.Printf("  - %s:\n%s\n\n", k, v)
-	}
+	fmt.Printf("Response for deployment %q:\n  Status: %v (%s)\n  Outputs:\n", id, resp.Msg.Status, resp.Msg.Reason)
+	printOutputs(resp.Msg.Outputs)
 
 	return nil
 }

@@ -6,18 +6,19 @@ import (
 	"github.com/docker/cli/cli/compose/types"
 )
 
-func (e *DockerEngine) newPGWeb(deploymentID string, pgService string) (conf types.ServiceConfig) {
+func (e *DockerEngine) newPGWeb(deploymentID string, pgService string) (conf types.ServiceConfig, motd string) {
 
 	name := fmt.Sprintf("%s-pgweb", deploymentID)
+    localPort := uint32(8081) // TODO: assign dynamically
 
-	return types.ServiceConfig{
+    conf = types.ServiceConfig{
 		Name:          name,
 		ContainerName: name,
 		Image:         "sosedoff/pgweb:0.11.12",
 		Restart:       "on-failure",
 		Ports: []types.ServicePortConfig{
 			{
-				Published: 8081,
+				Published: localPort,
 				Target:    8081,
 			},
 		},
@@ -33,5 +34,13 @@ func (e *DockerEngine) newPGWeb(deploymentID string, pgService string) (conf typ
 			"DATABASE_URL": deref("postgres://dev-node:insecure-change-me-in-prod@postgres:5432/dev-node?sslmode=disable"),
 		},
 	}
+
+    motd = fmt.Sprintf("PGWeb service %q available at URL: 'http://localhost:%d'",
+        name,
+        localPort,
+     )
+
+    return conf, motd
+
 
 }

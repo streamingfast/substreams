@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
@@ -10,7 +12,6 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	pbsinksvc "github.com/streamingfast/substreams/pb/sf/substreams/sink/service/v1"
 	"github.com/streamingfast/substreams/pb/sf/substreams/sink/service/v1/pbsinksvcconnect"
-	"go.uber.org/zap"
 )
 
 func init() {
@@ -52,9 +53,25 @@ func deployE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	zlog.Info("response",
-		zap.Any("status", resp.Msg.Status),
-	)
 
+	fmt.Printf("Deployed substreams sink %q:\n  Status: %v (%s)\n  Outputs:\n", resp.Msg.DeploymentId, resp.Msg.Status, resp.Msg.Reason)
+	printOutputs(resp.Msg.Outputs)
 	return nil
+}
+
+func printOutputs(outputs map[string]string) {
+	for k, v := range outputs {
+		lines := strings.Split(v, "\n")
+        prefixLen := len(k) + 6
+		var withMargin string
+		for i, line := range lines {
+            if i == 0 {
+                withMargin = line + "\n"
+                continue
+            }
+			withMargin += strings.Repeat(" ", prefixLen) + line + "\n"
+		}
+		fmt.Printf("  - %s: %s", k, withMargin)
+	}
+
 }

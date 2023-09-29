@@ -10,23 +10,26 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-func (e *DockerEngine) newPostgres(deploymentID string, pkg *pbsubstreams.Package) (types.ServiceConfig, error) {
+func (e *DockerEngine) newPostgres(deploymentID string, pkg *pbsubstreams.Package) (types.ServiceConfig, string, error) {
 
 	name := fmt.Sprintf("%s-postgres", deploymentID)
 
 	dataFolder := filepath.Join(e.dir, deploymentID, "data", "postgres")
 	if err := os.MkdirAll(dataFolder, 0755); err != nil {
-		return types.ServiceConfig{}, fmt.Errorf("creating folder %q: %w", dataFolder, err)
+		return types.ServiceConfig{}, "", fmt.Errorf("creating folder %q: %w", dataFolder, err)
 	}
 
-	return types.ServiceConfig{
+    localPort := uint32(5432) // TODO: assign dynamically
+
+
+    conf := types.ServiceConfig{
 		Name:          name,
 		ContainerName: name,
 		Image:         "postgres:14",
 		Restart:       "on-failure",
 		Ports: []types.ServicePortConfig{
 			{
-				Published: 5432,
+				Published: localPort,
 				Target:    5432,
 			},
 		},
@@ -54,5 +57,15 @@ func (e *DockerEngine) newPostgres(deploymentID string, pkg *pbsubstreams.Packag
 			Timeout:  toDuration(time.Second * 10),
 			Retries:  deref(uint64(15)),
 		},
-	}, os.MkdirAll(dataFolder, 0755)
+	} 
+
+    motd := fmt.Sprintf("PostgreSQL service %q available at DSN: 'postgres://%s:%s@localhost:%d/%s?sslmode=disable'",
+        name,
+        *conf.Environment["POSTGRES_USER"],
+        *conf.Environment["POSTGRES_PASSWORD"],
+        localPort,
+        *conf.Environment["POSTGRES_DB"],
+     )
+
+    return conf, motd, nil
 }

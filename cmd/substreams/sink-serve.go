@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
+	"github.com/streamingfast/derr"
 	server "github.com/streamingfast/substreams/sink-server"
 	"go.uber.org/zap/zapcore"
 )
@@ -54,6 +55,13 @@ func serveE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("initializing server: %w", err)
 	}
 
+	signal := derr.SetupSignalHandler(0)
+	go func() {
+		<-signal
+		srv.Shutdown(nil)
+	}()
+
 	srv.Run()
+	<-srv.Terminated()
 	return srv.Err()
 }

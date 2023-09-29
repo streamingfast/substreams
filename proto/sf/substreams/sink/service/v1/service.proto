@@ -27,6 +27,7 @@ message DeployResponse {
   string deployment_id = 2;
   
   map<string, string> outputs = 3;
+  string reason = 4;
 }
 
 message InfoRequest {
@@ -36,6 +37,7 @@ message InfoRequest {
 message InfoResponse {
   DeploymentStatus status = 1;
   map<string, string> outputs = 2;
+  string reason = 3;
 }
 
 message ListRequest {}
@@ -47,6 +49,7 @@ message ListResponse {
 message DeploymentWithStatus {
   string  id = 1;
   DeploymentStatus status = 2;
+  string reason = 3;
 }
 
 enum DeploymentStatus {

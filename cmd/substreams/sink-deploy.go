@@ -20,14 +20,15 @@ func init() {
 }
 
 var deployCmd = &cobra.Command{
-	Use:   "sink-deploy <package>",
+	Use:   "sink-deploy <package> [deploymentID]",
 	Short: "Deploy a substreams package with a sink",
 	Long: cli.Dedent(`
         Sends a "deploy" request to a server. By default, it will talk to a local "substreams alpha sink-serve" instance.
         The substreams must contain a "SinkConfig" section to be deployable.
+        If a deploymentID is specified, the service should upgrade/replace that deployment.
 			`),
 	RunE:         deployE,
-	Args:         cobra.ExactArgs(1),
+	Args:         cobra.RangeArgs(1, 2),
 	SilenceUsage: true,
 }
 
@@ -46,6 +47,9 @@ func deployE(cmd *cobra.Command, args []string) error {
 	req := &pbsinksvc.DeployRequest{
 		SubstreamsPackage: pkg,
 	}
+    if len(args) == 2 {
+        req.DeploymentId = &args[1]
+    }
 
 	cli := pbsinksvcconnect.NewProviderClient(http.DefaultClient, sflags.MustGetString(cmd, "endpoint"))
 

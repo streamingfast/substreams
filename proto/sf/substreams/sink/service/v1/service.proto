@@ -18,6 +18,9 @@ service Provider {
 
 message DeployRequest {
   sf.substreams.v1.Package substreams_package = 1;
+
+  // specify deployment_id to update an existing deployment
+  optional string deployment_id = 2;
 }
 
 message DeployResponse {
@@ -38,6 +41,19 @@ message InfoResponse {
   DeploymentStatus status = 1;
   map<string, string> outputs = 2;
   string reason = 3;
+  PackageInfo package_info = 4;
+  SinkProgress progress = 5;
+}
+
+message SinkProgress {
+    uint64 last_processed_block = 1;
+}
+
+message PackageInfo {
+    string name = 1;
+    string version = 2;
+    string output_module_name = 3;
+    string output_module_hash = 4;
 }
 
 message ListRequest {}
@@ -50,6 +66,8 @@ message DeploymentWithStatus {
   string  id = 1;
   DeploymentStatus status = 2;
   string reason = 3;
+  PackageInfo package_info = 4;
+  SinkProgress progress = 5;
 }
 
 enum DeploymentStatus {

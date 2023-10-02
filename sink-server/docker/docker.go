@@ -3,6 +3,7 @@ package docker
 import (
 	"bufio"
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,6 +19,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	types "github.com/docker/cli/cli/compose/types"
+	"github.com/streamingfast/substreams/manifest"
 	pbsinksvc "github.com/streamingfast/substreams/pb/sf/substreams/sink/service/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
@@ -35,17 +37,63 @@ func NewEngine(dir string, sf_token string) *DockerEngine {
 	}
 }
 
-func (e *DockerEngine) writeServiceInfo(deploymentID string, info map[string]string) error {
-	json, err := json.Marshal(info)
+type deploymentInfo struct {
+	PackageInfo *pbsinksvc.PackageInfo
+	ServiceInfo map[string]string
+	UsedPorts   []uint32
+}
+
+func getModuleHash(mod string, pkg *pbsubstreams.Package) (hash string, err error) {
+	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
+	if err != nil {
+		return "", fmt.Errorf("creating module graph: %w", err)
+	}
+
+	hashes := manifest.NewModuleHashes()
+
+	for _, module := range pkg.Modules.Modules {
+		if module.Name != mod {
+			continue
+		}
+		h, err := hashes.HashModule(pkg.Modules, module, graph)
+		if err != nil {
+			return "", fmt.Errorf("hashing module: %w", err)
+		}
+		hash = hex.EncodeToString(h)
+	}
+	if hash == "" {
+		return hash, fmt.Errorf("cannot find module %s", mod)
+	}
+	return
+}
+
+func (e *DockerEngine) writeDeploymentInfo(deploymentID string, usedPorts []uint32, svcInfo map[string]string, pkg *pbsubstreams.Package) error {
+
+	pkgMeta := pkg.PackageMeta[0]
+	hash, err := getModuleHash(pkg.SinkModule, pkg)
+	if err != nil {
+		return err
+	}
+
+	depInfo := &deploymentInfo{
+		ServiceInfo: svcInfo,
+		UsedPorts:   usedPorts,
+		PackageInfo: &pbsinksvc.PackageInfo{
+			Name:             pkgMeta.Name,
+			Version:          pkgMeta.Version,
+			OutputModuleName: pkg.SinkModule,
+			OutputModuleHash: hash,
+		},
+	}
+
+	json, err := json.Marshal(depInfo)
 	if err != nil {
 		return err
 	}
 
 	return os.WriteFile(filepath.Join(e.dir, deploymentID, "info.json"), json, 0644)
 }
-func (e *DockerEngine) readServiceInfo(deploymentID string) (map[string]string, error) {
-	info := make(map[string]string)
-
+func (e *DockerEngine) readDeploymentInfo(deploymentID string) (info *deploymentInfo, err error) {
 	content, err := os.ReadFile(filepath.Join(e.dir, deploymentID, "info.json"))
 	if err != nil {
 		return nil, err
@@ -61,12 +109,12 @@ func (e *DockerEngine) Apply(deploymentID string, pkg *pbsubstreams.Package, zlo
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 
-	manifest, serviceInfo, err := e.createManifest(deploymentID, e.token, pkg)
+	manifest, usedPorts, serviceInfo, err := e.createManifest(deploymentID, e.token, pkg)
 	if err != nil {
 		return fmt.Errorf("creating manifest from package: %w", err)
 	}
 
-	if err := e.writeServiceInfo(deploymentID, serviceInfo); err != nil {
+	if err := e.writeDeploymentInfo(deploymentID, usedPorts, serviceInfo, pkg); err != nil {
 		return fmt.Errorf("cannot write Service Info: %w", err)
 	}
 
@@ -74,39 +122,39 @@ func (e *DockerEngine) Apply(deploymentID string, pkg *pbsubstreams.Package, zlo
 	if err != nil {
 		return fmt.Errorf("applying manifest: %w", err)
 	}
-    _ = output // TODO save somewhere maybe
+	_ = output // TODO save somewhere maybe
 	return nil
 }
 
 var reasonInternalError = "internal error"
 
-func (e *DockerEngine) Info(deploymentID string, zlog *zap.Logger) (pbsinksvc.DeploymentStatus, string, map[string]string, error) {
+func (e *DockerEngine) Info(deploymentID string, zlog *zap.Logger) (pbsinksvc.DeploymentStatus, string, map[string]string, *pbsinksvc.PackageInfo, error) {
 	cmd := exec.Command("docker", "compose", "ps", "--format", "json")
 	cmd.Dir = filepath.Join(e.dir, deploymentID)
 	out, err := cmd.Output()
 	if err != nil {
-		return pbsinksvc.DeploymentStatus_UNKNOWN, reasonInternalError, nil, fmt.Errorf("getting status from `docker compose ps` command: %q, %w", out, err)
+		return pbsinksvc.DeploymentStatus_UNKNOWN, reasonInternalError, nil, nil, fmt.Errorf("getting status from `docker compose ps` command: %q, %w", out, err)
 	}
 
 	var status pbsinksvc.DeploymentStatus
 
 	sc := bufio.NewScanner(bytes.NewReader(out))
 	if !sc.Scan() {
-		return 0, reasonInternalError, nil, fmt.Errorf("no output from command")
+		return 0, reasonInternalError, nil, nil, fmt.Errorf("no output from command")
 	}
 	line := sc.Bytes()
 
 	var outputs []*dockerComposePSOutput
 	if err := json.Unmarshal(line, &outputs); err != nil {
-		return 0, reasonInternalError, nil, fmt.Errorf("unmarshalling docker output: %w", err)
+		return 0, reasonInternalError, nil, nil, fmt.Errorf("unmarshalling docker output: %w", err)
 	}
 
-	info, err := e.readServiceInfo(deploymentID)
+	info, err := e.readDeploymentInfo(deploymentID)
 	if err != nil {
-		return status, reasonInternalError, nil, fmt.Errorf("cannot read Service Info: %w", err)
+		return status, reasonInternalError, nil, nil, fmt.Errorf("cannot read Service Info: %w", err)
 	}
 
-	seen := make(map[string]bool, len(info))
+	seen := make(map[string]bool, len(info.ServiceInfo))
 	var reason string
 
 	for _, output := range outputs {
@@ -128,7 +176,7 @@ func (e *DockerEngine) Info(deploymentID string, zlog *zap.Logger) (pbsinksvc.De
 	if len(seen) == 0 {
 		status = pbsinksvc.DeploymentStatus_PAUSED
 	} else {
-		for k := range info {
+		for k := range info.ServiceInfo {
 			if !seen[k] {
 				status = pbsinksvc.DeploymentStatus_FAILING
 				reason += fmt.Sprintf("%s: missing, ", strings.TrimPrefix(k, deploymentID+"-"))
@@ -136,7 +184,7 @@ func (e *DockerEngine) Info(deploymentID string, zlog *zap.Logger) (pbsinksvc.De
 		}
 	}
 
-	return status, reason, info, nil
+	return status, reason, info.ServiceInfo, info.PackageInfo, nil
 }
 
 type dockerComposePSOutput struct {
@@ -156,7 +204,7 @@ func (e *DockerEngine) List(zlog *zap.Logger) (out []*pbsinksvc.DeploymentWithSt
 
 	for _, f := range files {
 		id := f.Name()
-		status, reason, _, err := e.Info(id, zlog)
+		status, reason, _, info, err := e.Info(id, zlog)
 		if err != nil {
 			zlog.Warn("cannot get info for deployment", zap.String("id", id))
 			continue
@@ -165,6 +213,7 @@ func (e *DockerEngine) List(zlog *zap.Logger) (out []*pbsinksvc.DeploymentWithSt
 			Id:     id,
 			Status: status,
 			Reason: reason,
+            PackageInfo: info,
 		})
 	}
 	return out, nil
@@ -244,13 +293,13 @@ func (e *DockerEngine) Shutdown(zlog *zap.Logger) (err error) {
 	return err
 }
 
-func (e *DockerEngine) createManifest(deploymentID string, token string, pkg *pbsubstreams.Package) (content []byte, services map[string]string, err error) {
+func (e *DockerEngine) createManifest(deploymentID string, token string, pkg *pbsubstreams.Package) (content []byte, usedPorts []uint32, services map[string]string, err error) {
 
 	services = make(map[string]string)
 
 	pg, pgMotd, err := e.newPostgres(deploymentID, pkg)
 	if err != nil {
-		return nil, nil, fmt.Errorf("creating postgres deployment: %w", err)
+		return nil, nil, nil, fmt.Errorf("creating postgres deployment: %w", err)
 	}
 	services[pg.Name] = pgMotd
 
@@ -259,7 +308,7 @@ func (e *DockerEngine) createManifest(deploymentID string, token string, pkg *pb
 
 	sink, sinkMotd, err := e.newSink(deploymentID, pg.Name, pkg)
 	if err != nil {
-		return nil, nil, fmt.Errorf("creating postgres deployment: %w", err)
+		return nil, nil, nil, fmt.Errorf("creating postgres deployment: %w", err)
 	}
 	services[sink.Name] = sinkMotd
 
@@ -270,6 +319,12 @@ func (e *DockerEngine) createManifest(deploymentID string, token string, pkg *pb
 			pgweb,
 			sink,
 		},
+	}
+
+	for _, svc := range config.Services {
+		for _, port := range svc.Ports {
+			usedPorts = append(usedPorts, port.Published)
+		}
 	}
 
 	content, err = yaml.Marshal(config)

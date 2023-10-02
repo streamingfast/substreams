@@ -24,13 +24,13 @@ import (
 	"github.com/streamingfast/substreams/codegen/templates"
 )
 
-// Some developers centric environment overidde to make it faster to iterate on `substreams init` command
+// Some developers centric environment override to make it faster to iterate on `substreams init` command
 var (
 	devInitSourceDirectory         = os.Getenv("SUBSTREAMS_DEV_INIT_SOURCE_DIRECTORY")
 	devInitProjectName             = os.Getenv("SUBSTREAMS_DEV_INIT_PROJECT_NAME")
 	devInitProtocol                = os.Getenv("SUBSTREAMS_DEV_INIT_PROTOCOL")
 	devInitEthereumTrackedContract = os.Getenv("SUBSTREAMS_DEV_INIT_ETHEREUM_TRACKED_CONTRACT")
-	devInitEthereumChain           = os.Getenv(("SUBSTREAMS_DEV_INIT_ETHEREUM_CHAIN"))
+	devInitEthereumChain           = os.Getenv("SUBSTREAMS_DEV_INIT_ETHEREUM_CHAIN")
 )
 
 var errInitUnsupportedChain = errors.New("unsupported chain")
@@ -49,7 +49,7 @@ var initCmd = &cobra.Command{
 }
 
 func init() {
-	alphaCmd.AddCommand(initCmd)
+	rootCmd.AddCommand(initCmd)
 }
 
 func runSubstreamsInitE(cmd *cobra.Command, args []string) error {

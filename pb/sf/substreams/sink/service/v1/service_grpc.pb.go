@@ -27,6 +27,7 @@ type ProviderClient interface {
 	Info(ctx context.Context, in *InfoRequest, opts ...grpc.CallOption) (*InfoResponse, error)
 	List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error)
 	Pause(ctx context.Context, in *PauseRequest, opts ...grpc.CallOption) (*PauseResponse, error)
+	Stop(ctx context.Context, in *StopRequest, opts ...grpc.CallOption) (*StopResponse, error)
 	Resume(ctx context.Context, in *ResumeRequest, opts ...grpc.CallOption) (*ResumeResponse, error)
 }
 
@@ -83,6 +84,15 @@ func (c *providerClient) Pause(ctx context.Context, in *PauseRequest, opts ...gr
 	return out, nil
 }
 
+func (c *providerClient) Stop(ctx context.Context, in *StopRequest, opts ...grpc.CallOption) (*StopResponse, error) {
+	out := new(StopResponse)
+	err := c.cc.Invoke(ctx, "/sf.substreams.sink.service.v1.Provider/Stop", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *providerClient) Resume(ctx context.Context, in *ResumeRequest, opts ...grpc.CallOption) (*ResumeResponse, error) {
 	out := new(ResumeResponse)
 	err := c.cc.Invoke(ctx, "/sf.substreams.sink.service.v1.Provider/Resume", in, out, opts...)
@@ -101,6 +111,7 @@ type ProviderServer interface {
 	Info(context.Context, *InfoRequest) (*InfoResponse, error)
 	List(context.Context, *ListRequest) (*ListResponse, error)
 	Pause(context.Context, *PauseRequest) (*PauseResponse, error)
+	Stop(context.Context, *StopRequest) (*StopResponse, error)
 	Resume(context.Context, *ResumeRequest) (*ResumeResponse, error)
 }
 
@@ -122,6 +133,9 @@ func (UnimplementedProviderServer) List(context.Context, *ListRequest) (*ListRes
 }
 func (UnimplementedProviderServer) Pause(context.Context, *PauseRequest) (*PauseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Pause not implemented")
+}
+func (UnimplementedProviderServer) Stop(context.Context, *StopRequest) (*StopResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Stop not implemented")
 }
 func (UnimplementedProviderServer) Resume(context.Context, *ResumeRequest) (*ResumeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Resume not implemented")
@@ -228,6 +242,24 @@ func _Provider_Pause_Handler(srv interface{}, ctx context.Context, dec func(inte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Provider_Stop_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StopRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProviderServer).Stop(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/sf.substreams.sink.service.v1.Provider/Stop",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProviderServer).Stop(ctx, req.(*StopRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Provider_Resume_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ResumeRequest)
 	if err := dec(in); err != nil {
@@ -272,6 +304,10 @@ var Provider_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Pause",
 			Handler:    _Provider_Pause_Handler,
+		},
+		{
+			MethodName: "Stop",
+			Handler:    _Provider_Stop_Handler,
 		},
 		{
 			MethodName: "Resume",

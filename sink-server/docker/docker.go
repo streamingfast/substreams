@@ -180,7 +180,7 @@ func (e *DockerEngine) Info(deploymentID string, zlog *zap.Logger) (pbsinksvc.De
 		}
 	}
 	if len(seen) == 0 {
-		status = pbsinksvc.DeploymentStatus_PAUSED
+		status = pbsinksvc.DeploymentStatus_STOPPED
 	} else {
 		for k := range info.ServiceInfo {
 			if !seen[k] {
@@ -212,11 +212,12 @@ func getProgressBlock(serviceName, dir string, zlog *zap.Logger) uint64 {
 
 	lines := strings.Split(string(out), "\n")
 	if len(lines) == 0 {
+		zlog.Debug("got no output lines from sink for progress")
 		return 0
 	}
 
 	for i := len(lines) - 1; i >= 0; i-- {
-		if strings.Contains(lines[i], "substreams stream stats") {
+		if strings.Contains(lines[i], "postgres sink stats") { // postgres sink can be ahead of substreams sink, so we use the former
 			stats := &StreamStats{}
 			if err := json.Unmarshal([]byte(lines[i]), stats); err == nil {
 				parts := strings.Split(stats.LastBlock, " ")
@@ -274,8 +275,14 @@ func (e *DockerEngine) List(zlog *zap.Logger) (out []*pbsinksvc.DeploymentWithSt
 	return out, nil
 }
 
-func (e *DockerEngine) Resume(deploymentID string, _ *zap.Logger) (string, error) {
-	cmd := exec.Command("docker", "compose", "up", "-d")
+func (e *DockerEngine) Resume(deploymentID string, currentState pbsinksvc.DeploymentStatus, _ *zap.Logger) (string, error) {
+
+	var cmd *exec.Cmd
+	if currentState == pbsinksvc.DeploymentStatus_PAUSED {
+		cmd = exec.Command("docker", "compose", "unpause", sinkServiceName(deploymentID))
+	} else {
+		cmd = exec.Command("docker", "compose", "up", "-d")
+	}
 	cmd.Dir = filepath.Join(e.dir, deploymentID)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -285,11 +292,21 @@ func (e *DockerEngine) Resume(deploymentID string, _ *zap.Logger) (string, error
 }
 
 func (e *DockerEngine) Pause(deploymentID string, zlog *zap.Logger) (string, error) {
-	cmd := exec.Command("docker", "compose", "down")
+	cmd := exec.Command("docker", "compose", "pause", sinkServiceName(deploymentID))
 	cmd.Dir = filepath.Join(e.dir, deploymentID)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("pausing docker compose: %q, %w", out, err)
+	}
+	return string(out), nil
+}
+
+func (e *DockerEngine) Stop(deploymentID string, zlog *zap.Logger) (string, error) {
+	cmd := exec.Command("docker", "compose", "down")
+	cmd.Dir = filepath.Join(e.dir, deploymentID)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("stopping docker compose: %q, %w", out, err)
 	}
 	return string(out), nil
 }

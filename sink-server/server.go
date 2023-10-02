@@ -205,6 +205,31 @@ func (s *server) Pause(ctx context.Context, req *connect_go.Request[pbsinksvc.Pa
 	return connect_go.NewResponse(out), nil
 }
 
+func (s *server) Stop(ctx context.Context, req *connect_go.Request[pbsinksvc.StopRequest]) (*connect_go.Response[pbsinksvc.StopResponse], error) {
+	s.logger.Info("pause request", zap.String("deployment_id", req.Msg.DeploymentId))
+
+	prevState, _, _, _, _, err := s.engine.Info(req.Msg.DeploymentId, s.logger)
+	if err != nil {
+		s.logger.Warn("cannot get previous status on deployment", zap.Error(err), zap.String("deployent_id", req.Msg.DeploymentId))
+	}
+
+	_, err = s.engine.Stop(req.Msg.DeploymentId, s.logger)
+	if err != nil {
+		return nil, fmt.Errorf("pausing %q: %w", req.Msg.DeploymentId, err)
+	}
+
+	newState, _, _, _, _, err := s.engine.Info(req.Msg.DeploymentId, s.logger)
+	if err != nil {
+		s.logger.Warn("cannot get new status on deployment", zap.Error(err), zap.String("deployent_id", req.Msg.DeploymentId))
+	}
+
+	out := &pbsinksvc.StopResponse{
+		PreviousStatus: prevState,
+		NewStatus:      newState,
+	}
+	return connect_go.NewResponse(out), nil
+}
+
 func (s *server) Resume(ctx context.Context, req *connect_go.Request[pbsinksvc.ResumeRequest]) (*connect_go.Response[pbsinksvc.ResumeResponse], error) {
 	s.logger.Info("resume request", zap.String("deployment_id", req.Msg.DeploymentId))
 
@@ -213,7 +238,7 @@ func (s *server) Resume(ctx context.Context, req *connect_go.Request[pbsinksvc.R
 		s.logger.Warn("cannot get previous status on deployment", zap.Error(err), zap.String("deployent_id", req.Msg.DeploymentId))
 	}
 
-	_, err = s.engine.Resume(req.Msg.DeploymentId, s.logger)
+	_, err = s.engine.Resume(req.Msg.DeploymentId, prevState, s.logger)
 	if err != nil {
 		return nil, fmt.Errorf("pausing %q: %w", req.Msg.DeploymentId, err)
 	}

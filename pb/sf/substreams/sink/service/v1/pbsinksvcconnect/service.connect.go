@@ -32,6 +32,7 @@ type ProviderClient interface {
 	Info(context.Context, *connect_go.Request[v1.InfoRequest]) (*connect_go.Response[v1.InfoResponse], error)
 	List(context.Context, *connect_go.Request[v1.ListRequest]) (*connect_go.Response[v1.ListResponse], error)
 	Pause(context.Context, *connect_go.Request[v1.PauseRequest]) (*connect_go.Response[v1.PauseResponse], error)
+	Stop(context.Context, *connect_go.Request[v1.StopRequest]) (*connect_go.Response[v1.StopResponse], error)
 	Resume(context.Context, *connect_go.Request[v1.ResumeRequest]) (*connect_go.Response[v1.ResumeResponse], error)
 }
 
@@ -70,6 +71,11 @@ func NewProviderClient(httpClient connect_go.HTTPClient, baseURL string, opts ..
 			baseURL+"/sf.substreams.sink.service.v1.Provider/Pause",
 			opts...,
 		),
+		stop: connect_go.NewClient[v1.StopRequest, v1.StopResponse](
+			httpClient,
+			baseURL+"/sf.substreams.sink.service.v1.Provider/Stop",
+			opts...,
+		),
 		resume: connect_go.NewClient[v1.ResumeRequest, v1.ResumeResponse](
 			httpClient,
 			baseURL+"/sf.substreams.sink.service.v1.Provider/Resume",
@@ -85,6 +91,7 @@ type providerClient struct {
 	info   *connect_go.Client[v1.InfoRequest, v1.InfoResponse]
 	list   *connect_go.Client[v1.ListRequest, v1.ListResponse]
 	pause  *connect_go.Client[v1.PauseRequest, v1.PauseResponse]
+	stop   *connect_go.Client[v1.StopRequest, v1.StopResponse]
 	resume *connect_go.Client[v1.ResumeRequest, v1.ResumeResponse]
 }
 
@@ -113,6 +120,11 @@ func (c *providerClient) Pause(ctx context.Context, req *connect_go.Request[v1.P
 	return c.pause.CallUnary(ctx, req)
 }
 
+// Stop calls sf.substreams.sink.service.v1.Provider.Stop.
+func (c *providerClient) Stop(ctx context.Context, req *connect_go.Request[v1.StopRequest]) (*connect_go.Response[v1.StopResponse], error) {
+	return c.stop.CallUnary(ctx, req)
+}
+
 // Resume calls sf.substreams.sink.service.v1.Provider.Resume.
 func (c *providerClient) Resume(ctx context.Context, req *connect_go.Request[v1.ResumeRequest]) (*connect_go.Response[v1.ResumeResponse], error) {
 	return c.resume.CallUnary(ctx, req)
@@ -125,6 +137,7 @@ type ProviderHandler interface {
 	Info(context.Context, *connect_go.Request[v1.InfoRequest]) (*connect_go.Response[v1.InfoResponse], error)
 	List(context.Context, *connect_go.Request[v1.ListRequest]) (*connect_go.Response[v1.ListResponse], error)
 	Pause(context.Context, *connect_go.Request[v1.PauseRequest]) (*connect_go.Response[v1.PauseResponse], error)
+	Stop(context.Context, *connect_go.Request[v1.StopRequest]) (*connect_go.Response[v1.StopResponse], error)
 	Resume(context.Context, *connect_go.Request[v1.ResumeRequest]) (*connect_go.Response[v1.ResumeResponse], error)
 }
 
@@ -160,6 +173,11 @@ func NewProviderHandler(svc ProviderHandler, opts ...connect_go.HandlerOption) (
 		svc.Pause,
 		opts...,
 	))
+	mux.Handle("/sf.substreams.sink.service.v1.Provider/Stop", connect_go.NewUnaryHandler(
+		"/sf.substreams.sink.service.v1.Provider/Stop",
+		svc.Stop,
+		opts...,
+	))
 	mux.Handle("/sf.substreams.sink.service.v1.Provider/Resume", connect_go.NewUnaryHandler(
 		"/sf.substreams.sink.service.v1.Provider/Resume",
 		svc.Resume,
@@ -189,6 +207,10 @@ func (UnimplementedProviderHandler) List(context.Context, *connect_go.Request[v1
 
 func (UnimplementedProviderHandler) Pause(context.Context, *connect_go.Request[v1.PauseRequest]) (*connect_go.Response[v1.PauseResponse], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("sf.substreams.sink.service.v1.Provider.Pause is not implemented"))
+}
+
+func (UnimplementedProviderHandler) Stop(context.Context, *connect_go.Request[v1.StopRequest]) (*connect_go.Response[v1.StopResponse], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("sf.substreams.sink.service.v1.Provider.Stop is not implemented"))
 }
 
 func (UnimplementedProviderHandler) Resume(context.Context, *connect_go.Request[v1.ResumeRequest]) (*connect_go.Response[v1.ResumeResponse], error) {

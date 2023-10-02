@@ -13,6 +13,7 @@ service Provider {
   rpc Info(InfoRequest) returns (InfoResponse);
   rpc List(ListRequest) returns (ListResponse);
   rpc Pause(PauseRequest) returns (PauseResponse);
+  rpc Stop(StopRequest) returns (StopResponse);
   rpc Resume(ResumeRequest) returns (ResumeResponse);
 }
 
@@ -75,6 +76,7 @@ enum DeploymentStatus {
   RUNNING = 1;
   FAILING = 2;
   PAUSED = 3;  
+  STOPPED = 4;  
 }
 
 message RemoveRequest {
@@ -90,6 +92,15 @@ message PauseRequest {
 }
 
 message PauseResponse {
+  DeploymentStatus previous_status = 1;
+  DeploymentStatus new_status = 2;
+}
+
+message StopRequest {
+  string deployment_id = 1;
+}
+
+message StopResponse {
   DeploymentStatus previous_status = 1;
   DeploymentStatus new_status = 2;
 }

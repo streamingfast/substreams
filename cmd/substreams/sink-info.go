@@ -44,7 +44,11 @@ func sinkInfoE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Response for deployment %q:\n  Status: %v (%s)\n  Outputs:\n", id, resp.Msg.Status, resp.Msg.Reason)
+	fmt.Printf("Response for deployment %q:\n  Name: %s (%s)\n  Output module: %s (%s)\n  Status: %v (%s)\n ", id, resp.Msg.PackageInfo.Name, resp.Msg.PackageInfo.Version, resp.Msg.PackageInfo.OutputModuleName, resp.Msg.PackageInfo.OutputModuleHash, resp.Msg.Status, resp.Msg.Reason)
+	if resp.Msg.Progress != nil {
+		fmt.Printf("Last processed block: %d\n", resp.Msg.Progress.LastProcessedBlock)
+	}
+	fmt.Printf("Outputs:\n")
 	printOutputs(resp.Msg.Outputs)
 
 	return nil

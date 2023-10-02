@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -114,11 +115,16 @@ func (e *DockerEngine) Apply(deploymentID string, pkg *pbsubstreams.Package, zlo
 		return fmt.Errorf("creating manifest from package: %w", err)
 	}
 
+	var restartSink bool
+	if _, err := e.readDeploymentInfo(deploymentID); err == nil {
+		restartSink = true // existing deployment always triggers restart of the sink
+	}
+
 	if err := e.writeDeploymentInfo(deploymentID, usedPorts, serviceInfo, pkg); err != nil {
 		return fmt.Errorf("cannot write Service Info: %w", err)
 	}
 
-	output, err := e.applyManifest(deploymentID, manifest)
+	output, err := e.applyManifest(deploymentID, manifest, restartSink)
 	if err != nil {
 		return fmt.Errorf("applying manifest: %w", err)
 	}
@@ -128,30 +134,30 @@ func (e *DockerEngine) Apply(deploymentID string, pkg *pbsubstreams.Package, zlo
 
 var reasonInternalError = "internal error"
 
-func (e *DockerEngine) Info(deploymentID string, zlog *zap.Logger) (pbsinksvc.DeploymentStatus, string, map[string]string, *pbsinksvc.PackageInfo, error) {
+func (e *DockerEngine) Info(deploymentID string, zlog *zap.Logger) (pbsinksvc.DeploymentStatus, string, map[string]string, *pbsinksvc.PackageInfo, *pbsinksvc.SinkProgress, error) {
 	cmd := exec.Command("docker", "compose", "ps", "--format", "json")
 	cmd.Dir = filepath.Join(e.dir, deploymentID)
 	out, err := cmd.Output()
 	if err != nil {
-		return pbsinksvc.DeploymentStatus_UNKNOWN, reasonInternalError, nil, nil, fmt.Errorf("getting status from `docker compose ps` command: %q, %w", out, err)
+		return pbsinksvc.DeploymentStatus_UNKNOWN, reasonInternalError, nil, nil, nil, fmt.Errorf("getting status from `docker compose ps` command: %q, %w", out, err)
 	}
 
 	var status pbsinksvc.DeploymentStatus
 
 	sc := bufio.NewScanner(bytes.NewReader(out))
 	if !sc.Scan() {
-		return 0, reasonInternalError, nil, nil, fmt.Errorf("no output from command")
+		return 0, reasonInternalError, nil, nil, nil, fmt.Errorf("no output from command")
 	}
 	line := sc.Bytes()
 
 	var outputs []*dockerComposePSOutput
 	if err := json.Unmarshal(line, &outputs); err != nil {
-		return 0, reasonInternalError, nil, nil, fmt.Errorf("unmarshalling docker output: %w", err)
+		return 0, reasonInternalError, nil, nil, nil, fmt.Errorf("unmarshalling docker output: %w", err)
 	}
 
 	info, err := e.readDeploymentInfo(deploymentID)
 	if err != nil {
-		return status, reasonInternalError, nil, nil, fmt.Errorf("cannot read Service Info: %w", err)
+		return status, reasonInternalError, nil, nil, nil, fmt.Errorf("cannot read Service Info: %w", err)
 	}
 
 	seen := make(map[string]bool, len(info.ServiceInfo))
@@ -184,7 +190,56 @@ func (e *DockerEngine) Info(deploymentID string, zlog *zap.Logger) (pbsinksvc.De
 		}
 	}
 
-	return status, reason, info.ServiceInfo, info.PackageInfo, nil
+	var sinkProgress *pbsinksvc.SinkProgress
+	blk := getProgressBlock(sinkServiceName(deploymentID), filepath.Join(e.dir, deploymentID), zlog)
+	if blk != 0 {
+		sinkProgress = &pbsinksvc.SinkProgress{
+			LastProcessedBlock: blk,
+		}
+	}
+
+	return status, reason, info.ServiceInfo, info.PackageInfo, sinkProgress, nil
+}
+
+func getProgressBlock(serviceName, dir string, zlog *zap.Logger) uint64 {
+	cmd := exec.Command("docker", "compose", "logs", serviceName, "--no-log-prefix")
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		zlog.Debug("cannot get progress block", zap.Error(err))
+		return 0
+	}
+
+	lines := strings.Split(string(out), "\n")
+	if len(lines) == 0 {
+		return 0
+	}
+
+	for i := len(lines) - 1; i >= 0; i-- {
+		if strings.Contains(lines[i], "substreams stream stats") {
+			stats := &StreamStats{}
+			if err := json.Unmarshal([]byte(lines[i]), stats); err == nil {
+				parts := strings.Split(stats.LastBlock, " ")
+				if len(parts) == 2 {
+					blk := strings.TrimPrefix(parts[0], "#")
+					blknum, err := strconv.ParseUint(blk, 10, 64)
+					if err == nil {
+						return blknum
+					} else {
+						zlog.Debug("cannot parse blocknum in stream stats", zap.Error(err), zap.String("blk", blk))
+					}
+				}
+			} else {
+				zlog.Info("cannot unmarshal sink stream stats", zap.Error(err))
+			}
+		}
+	}
+	return 0
+
+}
+
+type StreamStats struct {
+	LastBlock string `json:"last_block"`
 }
 
 type dockerComposePSOutput struct {
@@ -204,16 +259,16 @@ func (e *DockerEngine) List(zlog *zap.Logger) (out []*pbsinksvc.DeploymentWithSt
 
 	for _, f := range files {
 		id := f.Name()
-		status, reason, _, info, err := e.Info(id, zlog)
+		status, reason, _, info, _, err := e.Info(id, zlog)
 		if err != nil {
 			zlog.Warn("cannot get info for deployment", zap.String("id", id))
 			continue
 		}
 		out = append(out, &pbsinksvc.DeploymentWithStatus{
-			Id:     id,
-			Status: status,
-			Reason: reason,
-            PackageInfo: info,
+			Id:          id,
+			Status:      status,
+			Reason:      reason,
+			PackageInfo: info,
 		})
 	}
 	return out, nil
@@ -250,7 +305,7 @@ func (e *DockerEngine) Remove(deploymentID string, zlog *zap.Logger) (string, er
 	return string(out), err
 }
 
-func (e *DockerEngine) applyManifest(deployment string, man []byte) (string, error) {
+func (e *DockerEngine) applyManifest(deployment string, man []byte, restartSink bool) (string, error) {
 	w, err := os.Create(filepath.Join(e.dir, deployment, "docker-compose.yaml"))
 	if err != nil {
 		return "", fmt.Errorf("creating docker-compose file: %w", err)
@@ -262,8 +317,18 @@ func (e *DockerEngine) applyManifest(deployment string, man []byte) (string, err
 
 	cmd := exec.Command("docker", "compose", "up", "-d")
 	cmd.Dir = filepath.Join(e.dir, deployment)
-
 	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return string(out), err
+	}
+
+	if restartSink {
+		cmd := exec.Command("docker", "compose", "restart", sinkServiceName(deployment))
+		cmd.Dir = filepath.Join(e.dir, deployment)
+		out2, err2 := cmd.CombinedOutput()
+		out = append(out, out2...)
+		err = err2
+	}
 
 	return string(out), err
 }

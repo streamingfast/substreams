@@ -18,7 +18,7 @@ type Engine interface {
 
 	Remove(deploymentID string, zlog *zap.Logger) (string, error)
 
-	Info(deploymentID string, zlog *zap.Logger) (pbsinksvc.DeploymentStatus, string, map[string]string, *pbsinksvc.PackageInfo, error)
+	Info(deploymentID string, zlog *zap.Logger) (pbsinksvc.DeploymentStatus, string, map[string]string, *pbsinksvc.PackageInfo, *pbsinksvc.SinkProgress, error)
 	List(zlog *zap.Logger) ([]*pbsinksvc.DeploymentWithStatus, error)
 
 	Shutdown(zlog *zap.Logger) error

@@ -2,21 +2,20 @@ package docker
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
 	"github.com/docker/cli/cli/compose/types"
+	pbsql "github.com/streamingfast/substreams-sink-sql/pb/sf/substreams/sink/sql/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-   	pbsql "github.com/streamingfast/substreams-sink-sql/pb/sf/substreams/sink/sql/v1"
 	"google.golang.org/protobuf/proto"
 )
 
 func (e *DockerEngine) newSink(deploymentID string, pgService string, pkg *pbsubstreams.Package) (conf types.ServiceConfig, motd string, err error) {
 
-	name := fmt.Sprintf("%s-sink", deploymentID)
+	name := sinkServiceName(deploymentID)
 
-    configFolder := filepath.Join(e.dir, deploymentID, "config", "sink")
+	configFolder := filepath.Join(e.dir, deploymentID, "config", "sink")
 	if err := os.MkdirAll(configFolder, 0755); err != nil {
 		return conf, motd, fmt.Errorf("creating folder %q: %w", configFolder, err)
 	}
@@ -63,10 +62,10 @@ func (e *DockerEngine) newSink(deploymentID string, pgService string, pkg *pbsub
 		Links:     []string{pgService + ":postgres"},
 		DependsOn: []string{pgService},
 		Environment: map[string]*string{
-			"DSN":  deref("postgres://dev-node:insecure-change-me-in-prod@postgres:5432/dev-node?sslmode=disable"),
-			"ENDPOINT":      &endpoint,
-			"OUTPUT_MODULE": &pkg.SinkModule,
-            "SUBSTREAMS_API_TOKEN": &e.token,
+			"DSN":                  deref("postgres://dev-node:insecure-change-me-in-prod@postgres:5432/dev-node?sslmode=disable"),
+			"ENDPOINT":             &endpoint,
+			"OUTPUT_MODULE":        &pkg.SinkModule,
+			"SUBSTREAMS_API_TOKEN": &e.token,
 		},
 	}
 
@@ -75,19 +74,19 @@ func (e *DockerEngine) newSink(deploymentID string, pgService string, pkg *pbsub
 		return conf, motd, fmt.Errorf("marshalling package: %w", err)
 	}
 
-	if err := ioutil.WriteFile(filepath.Join(configFolder, "substreams.spkg"), pkgContent, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(configFolder, "substreams.spkg"), pkgContent, 0644); err != nil {
 		return conf, motd, fmt.Errorf("writing file: %w", err)
 	}
 
-    if pkg.SinkConfig.TypeUrl != "sf.substreams.sink.sql.v1.Service" {
-        return conf, motd, fmt.Errorf("invalid sinkconfig type: %q", pkg.SinkConfig.TypeUrl)
-    }
-        sqlSvc := &pbsql.Service{}
-		if err := pkg.SinkConfig.UnmarshalTo(sqlSvc); err != nil {
-			return types.ServiceConfig{}, motd, fmt.Errorf("failed to proto unmarshal: %w", err)
-		}
+	if pkg.SinkConfig.TypeUrl != "sf.substreams.sink.sql.v1.Service" {
+		return conf, motd, fmt.Errorf("invalid sinkconfig type: %q", pkg.SinkConfig.TypeUrl)
+	}
+	sqlSvc := &pbsql.Service{}
+	if err := pkg.SinkConfig.UnmarshalTo(sqlSvc); err != nil {
+		return types.ServiceConfig{}, motd, fmt.Errorf("failed to proto unmarshal: %w", err)
+	}
 
-	if err := ioutil.WriteFile(filepath.Join(configFolder, "schema.sql"), []byte(sqlSvc.Schema), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(configFolder, "schema.sql"), []byte(sqlSvc.Schema), 0644); err != nil {
 		return conf, motd, fmt.Errorf("writing file: %w", err)
 	}
 
@@ -98,12 +97,16 @@ if [ ! -f /opt/subservices/data/setup-complete ]; then
     /app/substreams-sink-sql setup $DSN /opt/subservices/config/substreams.spkg && touch /opt/subservices/data/setup-complete
 fi
 
-/app/substreams-sink-sql run $DSN /opt/subservices/config/substreams.spkg
+/app/substreams-sink-sql run $DSN /opt/subservices/config/substreams.spkg --on-module-hash-mistmatch=warn
 `)
-	if err := ioutil.WriteFile(filepath.Join(configFolder, "start.sh"), startScript, 0755); err != nil {
+	if err := os.WriteFile(filepath.Join(configFolder, "start.sh"), startScript, 0755); err != nil {
 		fmt.Println("")
 		return conf, motd, fmt.Errorf("writing file: %w", err)
 	}
 
 	return conf, motd, nil
+}
+
+func sinkServiceName(deploymentID string) string {
+	return deploymentID + "-sink"
 }

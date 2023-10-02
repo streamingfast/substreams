@@ -59,7 +59,11 @@ func New(
 
 	switch engine {
 	case "docker":
-		srv.engine = docker.NewEngine(dataDir, token)
+		engine, err := docker.NewEngine(dataDir, token)
+		if err != nil {
+			return nil, err
+		}
+		srv.engine = engine
 	default:
 		return nil, fmt.Errorf("unsupported engine: %q", engine)
 	}

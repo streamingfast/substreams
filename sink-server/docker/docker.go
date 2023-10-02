@@ -31,11 +31,15 @@ type DockerEngine struct {
 	token string
 }
 
-func NewEngine(dir string, sf_token string) *DockerEngine {
-	return &DockerEngine{
+func NewEngine(dir string, sf_token string) (*DockerEngine, error) {
+	out := &DockerEngine{
 		dir:   dir,
 		token: sf_token,
 	}
+	if err := out.CheckVersion(); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 type deploymentInfo struct {
@@ -66,6 +70,21 @@ func getModuleHash(mod string, pkg *pbsubstreams.Package) (hash string, err erro
 		return hash, fmt.Errorf("cannot find module %s", mod)
 	}
 	return
+}
+
+func (e *DockerEngine) CheckVersion() error {
+	cmd := exec.Command("docker", "compose", "version", "--short")
+
+	out, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("cannot run `docker compose version`: %q, %w", out, err)
+	}
+
+	ver := string(out)
+	if strings.HasPrefix(ver, "2.") || strings.HasPrefix(ver, "3.") { // we don't preemptively support above docker compose v3...
+		return nil
+	}
+	return fmt.Errorf("unsupported 'docker compose' major version %q. Only version 2.x or 3.x are supported", ver)
 }
 
 func (e *DockerEngine) writeDeploymentInfo(deploymentID string, usedPorts []uint32, svcInfo map[string]string, pkg *pbsubstreams.Package) error {
@@ -110,6 +129,10 @@ func (e *DockerEngine) Apply(deploymentID string, pkg *pbsubstreams.Package, zlo
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 
+	if e.otherDeploymentIsActive(deploymentID, zlog) {
+		return fmt.Errorf("this substreams-sink engine only supports a single active deployment. Stop any active sink before launching another one")
+	}
+
 	manifest, usedPorts, serviceInfo, err := e.createManifest(deploymentID, e.token, pkg)
 	if err != nil {
 		return fmt.Errorf("creating manifest from package: %w", err)
@@ -130,6 +153,30 @@ func (e *DockerEngine) Apply(deploymentID string, pkg *pbsubstreams.Package, zlo
 	}
 	_ = output // TODO save somewhere maybe
 	return nil
+}
+
+func (e *DockerEngine) otherDeploymentIsActive(deploymentID string, zlog *zap.Logger) bool {
+	if deps, _ := e.list(zlog); deps != nil {
+		for _, dep := range deps {
+			if dep.Id == deploymentID {
+				continue
+			}
+			switch dep.Status {
+			case pbsinksvc.DeploymentStatus_PAUSED:
+				return true
+			case pbsinksvc.DeploymentStatus_RUNNING:
+				return true
+			case pbsinksvc.DeploymentStatus_FAILING:
+				return true
+			case pbsinksvc.DeploymentStatus_STOPPED:
+				continue
+			case pbsinksvc.DeploymentStatus_UNKNOWN:
+				zlog.Info("cannot determine if deployment is active: unknown", zap.String("deployment_id", dep.Id))
+				continue
+			}
+		}
+	}
+	return false
 }
 
 var reasonInternalError = "internal error"
@@ -252,7 +299,10 @@ type dockerComposePSOutput struct {
 func (e *DockerEngine) List(zlog *zap.Logger) (out []*pbsinksvc.DeploymentWithStatus, err error) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
+	return e.list(zlog)
+}
 
+func (e *DockerEngine) list(zlog *zap.Logger) (out []*pbsinksvc.DeploymentWithStatus, err error) {
 	files, err := os.ReadDir(e.dir)
 	if err != nil {
 		return nil, err
@@ -275,8 +325,11 @@ func (e *DockerEngine) List(zlog *zap.Logger) (out []*pbsinksvc.DeploymentWithSt
 	return out, nil
 }
 
-func (e *DockerEngine) Resume(deploymentID string, currentState pbsinksvc.DeploymentStatus, _ *zap.Logger) (string, error) {
+func (e *DockerEngine) Resume(deploymentID string, currentState pbsinksvc.DeploymentStatus, zlog *zap.Logger) (string, error) {
 
+	if e.otherDeploymentIsActive(deploymentID, zlog) {
+		return "", fmt.Errorf("this substreams-sink engine only supports a single active deployment. Stop any active sink before launching another one")
+	}
 	var cmd *exec.Cmd
 	if currentState == pbsinksvc.DeploymentStatus_PAUSED {
 		cmd = exec.Command("docker", "compose", "unpause", sinkServiceName(deploymentID))
@@ -359,7 +412,9 @@ func toDuration(in time.Duration) *types.Duration {
 }
 
 func (e *DockerEngine) Shutdown(zlog *zap.Logger) (err error) {
-	deps, err := e.List(zlog)
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+	deps, err := e.list(zlog)
 	if err != nil {
 		return fmt.Errorf("cannot list deployments: %w", err)
 	}
@@ -368,7 +423,7 @@ func (e *DockerEngine) Shutdown(zlog *zap.Logger) (err error) {
 			continue
 		}
 		zlog.Info("shutting down deployment", zap.String("deploymentID", dep.Id))
-		if _, e := e.Pause(dep.Id, zlog); e != nil {
+		if _, e := e.Stop(dep.Id, zlog); e != nil {
 			err = errors.Join(err, e)
 		}
 	}

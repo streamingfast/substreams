@@ -26,7 +26,13 @@ sink:
     schema: "../schema.sql"
 ```
 
-Here the `schema` will be embedded from it's file source directly.
+Here the `schema` will be embedded from its file source directly.
+
+`substreams alpha init` command is now out of alpha and part of the substreams root command. `substreams init` allows a Substreams developer to more easily boostrap a new Substreams project. Running the init command will do multiple actions: 
+* prompt what chain you want to create your substreams on
+* if you want to track a specific contract (the abi will be fetched, and all the required code will be generated for you)
+* create the schema.sql file which will be used to set up the postgres sinker
+* `lib.rs` file with mapper of events and `db_out`, which produces database changes for the postgres sinker, will be generated and ready to run
 
 ### Added
 
@@ -70,7 +76,7 @@ params:
 
 * The `substreams run` and `substreams gui` commands now determine the endpoint from the 'network' field in the manifest if no value is passed in the `--substreams-endpoint` flag.
 * The endpoint for each network can be set by using an environment variable `SUBSTREAMS_ENDPOINTS_CONFIG_<network_name>`, ex: `SUBSTREAMS_ENDPOINTS_CONFIG_MAINNET=my-endpoint:443`
-
+* The `substreams alpha init` has been moved to `substreams init`
 
 ## v1.1.14
 

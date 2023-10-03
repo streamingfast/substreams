@@ -16,9 +16,9 @@ type BasicInfo struct {
 	Documentation       *string                      `json:"documentation,omitempty"`
 	Modules             []ModulesInfo                `json:"modules"`
 	SinkInfo            *SinkInfo                    `json:"sink_info,omitempty"`
-	ProtoPackages       []string                     `json:"proto_packages"`
-	ProtoFileCodeMap    map[string]string            `json:"proto_file_code_map"`
-	ProtoMessageCodeMap map[string]map[string]string `json:"proto_message_code_map"`
+	ProtoPackages       []string                     `json:"proto_packages"`         // list of proto packages
+	ProtoFileCodeMap    map[string]string            `json:"proto_file_code_map"`    // map of proto file name to .proto file contents
+	ProtoMessageCodeMap map[string]map[string]string `json:"proto_message_code_map"` // map of package name to map of message name to .proto message contents
 }
 
 type SinkInfo struct {

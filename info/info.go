@@ -17,8 +17,13 @@ type BasicInfo struct {
 	Modules                []ModulesInfo                  `json:"modules"`
 	SinkInfo               *SinkInfo                      `json:"sink_info,omitempty"`
 	ProtoPackages          []string                       `json:"proto_packages"`            // list of proto packages
-	ProtoSourceCode        map[string]string              `json:"proto_source_code"`         // map of proto file name to .proto file contents
+	ProtoSourceCode        map[string][]*SourceCodeInfo   `json:"proto_source_code"`         // map of proto file name to .proto file contents
 	ProtoMessagesByPackage map[string][]*ProtoMessageInfo `json:"proto_messages_by_package"` // map of package name to a list of messages info in that package
+}
+
+type SourceCodeInfo struct {
+	Filename string `json:"filename"`
+	Source   string `json:"source"`
 }
 
 type ProtoMessageInfo struct {

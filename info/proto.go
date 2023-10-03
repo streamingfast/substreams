@@ -12,7 +12,9 @@ import (
 type ProtoPackageParser struct {
 	allFiles            []*descriptorpb.FileDescriptorProto
 	nestedMessagesAdded map[string]bool
-	fileCodeMap         map[string]string
+
+	fileCodeMap    map[string]string
+	filePacakgeMap map[string]string
 }
 
 func NewProtoPackageParser(files []*descriptorpb.FileDescriptorProto) (*ProtoPackageParser, error) {
@@ -30,14 +32,17 @@ func NewProtoPackageParser(files []*descriptorpb.FileDescriptorProto) (*ProtoPac
 		Compact: true,
 	}
 	fileCodeMap := make(map[string]string)
+	filePackageMap := make(map[string]string)
 	for fd, d := range desc {
 		r, err := printer.PrintProtoToString(d)
 		if err != nil {
 			return nil, err
 		}
 		fileCodeMap[fd] = r
+		filePackageMap[fd] = d.GetPackage()
 	}
 	p.fileCodeMap = fileCodeMap
+	p.filePacakgeMap = filePackageMap
 
 	return p, nil
 }
@@ -138,8 +143,17 @@ func (p *ProtoPackageParser) GetPackagesList() []string {
 	return result
 }
 
-func (p *ProtoPackageParser) GetFilesSourceCode() map[string]string {
-	return p.fileCodeMap
+func (p *ProtoPackageParser) GetFilesSourceCode() map[string][]*SourceCodeInfo {
+	result := make(map[string][]*SourceCodeInfo)
+	for filename, pkg := range p.filePacakgeMap {
+		source := p.fileCodeMap[filename]
+		result[pkg] = append(result[pkg], &SourceCodeInfo{
+			Filename: filename,
+			Source:   source,
+		})
+	}
+
+	return result
 }
 
 // getDocumentationForSymbol extracts the leading comments associated with a named symbol (message/enum)

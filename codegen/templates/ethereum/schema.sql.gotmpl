@@ -1,0 +1,13 @@
+{{range $event := .events }}
+{{- $rust := $event.Rust }}
+CREATE TABLE IF NOT EXISTS {{ $rust.ProtoOutputModuleFieldName }} (
+    "trx_hash" VARCHAR(40),
+    "log_index" INT,
+    {{- $numberOfAttributes := len $rust.ProtoFieldDatabaseChangesMap }}
+    {{- $i := 0 }}
+    {{- range $fieldName, $sqlType := $rust.ProtoFieldSqlmap }}
+    {{ $i = add $i 1 }}{{$fieldName}} {{$sqlType}}{{ if eq $i $numberOfAttributes }}{{ else }},{{ end }}
+    {{- end}}
+);
+
+{{- end}}

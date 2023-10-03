@@ -3,6 +3,9 @@ package:
   name: {{ .moduleName }}
   version: v0.1.0
 
+imports:
+  database_change: https://github.com/streamingfast/substreams-sink-database-changes/releases/download/v1.2.1/substreams-database-change-v1.2.1.spkg
+
 protobuf:
   files:
     - contract.proto
@@ -22,3 +25,11 @@ modules:
       - source: sf.ethereum.type.v2.Block
     output:
       type: proto:contract.v1.Events
+
+  - name: db_out
+    kind: map
+    initialBlock: {{ .initialBlock }}
+    inputs:
+      - map: map_events
+    output:
+      type: proto:sf.substreams.sink.database.v1.DatabaseChanges

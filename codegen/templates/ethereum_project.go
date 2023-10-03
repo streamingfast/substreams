@@ -24,6 +24,7 @@ import (
 //go:embed ethereum/Makefile.gotmpl
 //go:embed ethereum/substreams.yaml.gotmpl
 //go:embed ethereum/rust-toolchain.toml
+//go:embed ethereum/schema.sql.gotmpl
 var ethereumProject embed.FS
 
 type EthereumProject struct {
@@ -69,6 +70,7 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 		"Makefile.gotmpl",
 		"substreams.yaml.gotmpl",
 		"rust-toolchain.toml",
+		"schema.sql.gotmpl",
 	} {
 		content, err := ethereumProject.ReadFile(filepath.Join("ethereum", ethereumProjectEntry))
 		if err != nil {
@@ -118,7 +120,7 @@ func buildEventModels(abi *eth.ABI) (out []codegenEvent, err error) {
 	names := keys(abi.LogEventsByNameMap)
 	sort.StringSlice(names).Sort()
 
-	// We allocate as much names + 16 to potentially account for duplicates
+	// We allocate as many names + 16 to potentially account for duplicates
 	out = make([]codegenEvent, 0, len(names)+16)
 	for _, name := range names {
 		events := abi.FindLogsByName(name)
@@ -165,10 +167,12 @@ type codegenEvent struct {
 }
 
 type rustEventModel struct {
-	ABIStructName              string
-	ProtoMessageName           string
-	ProtoOutputModuleFieldName string
-	ProtoFieldABIConversionMap map[string]string
+	ABIStructName                string
+	ProtoMessageName             string
+	ProtoOutputModuleFieldName   string
+	ProtoFieldABIConversionMap   map[string]string
+	ProtoFieldDatabaseChangesMap map[string]string
+	ProtoFieldSqlmap             map[string]string
 }
 
 func (e *rustEventModel) populateFields(log *eth.LogEventDef) error {
@@ -177,6 +181,8 @@ func (e *rustEventModel) populateFields(log *eth.LogEventDef) error {
 	}
 
 	e.ProtoFieldABIConversionMap = map[string]string{}
+	e.ProtoFieldDatabaseChangesMap = map[string]string{}
+	e.ProtoFieldSqlmap = map[string]string{}
 	for _, parameter := range log.Parameters {
 		name := strcase.ToSnake(parameter.Name)
 		toProtoCode := generateFieldTransformCode(parameter.Type, "event."+name)
@@ -184,10 +190,97 @@ func (e *rustEventModel) populateFields(log *eth.LogEventDef) error {
 			return fmt.Errorf("field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
 		}
 
+		toDatabaseChangeCode := generateFieldDatabaseChangeCode(parameter.Type, "evt."+name)
+		if toDatabaseChangeCode == "" {
+			return fmt.Errorf("field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
+		}
+
+		toSqlCode := generateFieldSqlTypes(parameter.Type)
+		if toSqlCode == "" {
+			return fmt.Errorf("field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
+		}
+
+		columnName := sanitizeDatabaseChangesColumnNames(name)
+
 		e.ProtoFieldABIConversionMap[name] = toProtoCode
+		e.ProtoFieldDatabaseChangesMap[name] = toDatabaseChangeCode
+		e.ProtoFieldSqlmap[columnName] = toSqlCode
 	}
 
 	return nil
+}
+
+func sanitizeDatabaseChangesColumnNames(name string) string {
+	return fmt.Sprintf("\"%s\"", name)
+}
+
+func generateFieldSqlTypes(fieldType eth.SolidityType) string {
+	switch v := fieldType.(type) {
+	case eth.AddressType:
+		return "VARCHAR(40)"
+
+	case eth.BooleanType:
+		return "BOOL"
+
+	case eth.BytesType, eth.FixedSizeBytesType, eth.StringType:
+		return "TEXT"
+
+	case eth.SignedIntegerType:
+		if v.ByteSize <= 8 {
+			return "INT"
+		}
+		return "DECIMAL"
+
+	case eth.UnsignedIntegerType:
+		if v.ByteSize <= 8 {
+			return "INT"
+		}
+		return "DECIMAL"
+
+	case eth.SignedFixedPointType, eth.UnsignedFixedPointType:
+		return "DOUBLE"
+
+	case eth.ArrayType:
+		return "" // TODO: what should we really do here??
+
+	default:
+		return ""
+	}
+}
+
+func generateFieldDatabaseChangeCode(fieldType eth.SolidityType, fieldAccess string) string {
+	switch v := fieldType.(type) {
+	case eth.AddressType, eth.BytesType, eth.FixedSizeBytesType:
+		return fmt.Sprintf("Hex(&%s).to_string()", fieldAccess)
+
+	case eth.BooleanType, eth.StringType:
+		return fieldAccess
+
+	case eth.SignedIntegerType:
+		if v.ByteSize <= 8 {
+			return fmt.Sprintf("Into::<num_bigint::BigInt>::into(%s).to_i64().unwrap()", fieldAccess)
+		}
+
+		return fmt.Sprintf("%s.to_string()", fieldAccess)
+
+	case eth.UnsignedIntegerType:
+		if v.ByteSize <= 8 {
+			return fmt.Sprintf("%s.to_u64()", fieldAccess)
+		}
+
+		return fmt.Sprintf("%s.to_string()", fieldAccess)
+
+	case eth.SignedFixedPointType, eth.UnsignedFixedPointType:
+		return fmt.Sprintf("%s.to_string()", fieldAccess)
+
+	case eth.ArrayType:
+		inner := generateFieldTransformCode(v.ElementType, "x")
+
+		return fmt.Sprintf("%s.into_iter().map(|x| %s).collect::<Vec<_>>()", fieldAccess, inner)
+
+	default:
+		return ""
+	}
 }
 
 func generateFieldTransformCode(fieldType eth.SolidityType, fieldAccess string) string {
@@ -232,7 +325,7 @@ func generateFieldTransformCode(fieldType eth.SolidityType, fieldAccess string) 
 }
 
 type protoEventModel struct {
-	// MesageName is the name of the message representing this specific event
+	// MessageName is the name of the message representing this specific event
 	MessageName string
 
 	OutputModuleFieldName string

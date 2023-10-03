@@ -3,6 +3,7 @@ mod pb;
 use hex_literal::hex;
 use pb::contract::v1 as contract;
 use substreams::Hex;
+use substreams_database_change::pb::database::DatabaseChanges;
 use substreams_ethereum::pb::eth::v2 as eth;
 use substreams_ethereum::Event;
 
@@ -104,4 +105,49 @@ fn map_events(blk: eth::Block) -> Result<contract::Events, substreams::errors::E
             })
             .collect(),
     })
+}
+
+#[substreams::handlers::map]
+fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::errors::Error> {
+    // Initialize Database Changes container
+    let mut tables = substreams_database_change::tables::Tables::new();
+
+    // Loop over all the abis events to create database changes
+    events.approvals.into_iter().for_each(|evt| {
+        tables
+            .create_row("approvals", format!("{}-{}", evt.trx_hash, evt.log_index))
+            .set("trx_hash", evt.trx_hash)
+            .set("log_index", evt.log_index)
+            .set("approved", Hex(&evt.approved).to_string())
+            .set("owner", Hex(&evt.owner).to_string())
+            .set("token_id", evt.token_id.to_string());
+    });
+    events.approval_for_alls.into_iter().for_each(|evt| {
+        tables
+            .create_row("approval_for_alls", format!("{}-{}", evt.trx_hash, evt.log_index))
+            .set("trx_hash", evt.trx_hash)
+            .set("log_index", evt.log_index)
+            .set("approved", evt.approved)
+            .set("operator", Hex(&evt.operator).to_string())
+            .set("owner", Hex(&evt.owner).to_string());
+    });
+    events.ownership_transferreds.into_iter().for_each(|evt| {
+        tables
+            .create_row("ownership_transferreds", format!("{}-{}", evt.trx_hash, evt.log_index))
+            .set("trx_hash", evt.trx_hash)
+            .set("log_index", evt.log_index)
+            .set("new_owner", Hex(&evt.new_owner).to_string())
+            .set("previous_owner", Hex(&evt.previous_owner).to_string());
+    });
+    events.transfers.into_iter().for_each(|evt| {
+        tables
+            .create_row("transfers", format!("{}-{}", evt.trx_hash, evt.log_index))
+            .set("trx_hash", evt.trx_hash)
+            .set("log_index", evt.log_index)
+            .set("from", Hex(&evt.from).to_string())
+            .set("to", Hex(&evt.to).to_string())
+            .set("token_id", evt.token_id.to_string());
+    });
+
+    Ok(tables.to_database_changes())
 }

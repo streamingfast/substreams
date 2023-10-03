@@ -73,6 +73,7 @@ func TestNewEthereumTemplateProject(t *testing.T) {
 				"Makefile":              fileContent(t, "./ethereum/Makefile"),
 				"substreams.yaml":       fileContent(t, "./ethereum/substreams.yaml"),
 				"rust-toolchain.toml":   fileContent(t, "./ethereum/rust-toolchain.toml"),
+				"schema.sql":            fileContent(t, "./ethereum/schema.sql"),
 			},
 			require.NoError,
 		},

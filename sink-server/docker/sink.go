@@ -42,7 +42,7 @@ func (e *DockerEngine) newSink(deploymentID string, pgService string, pkg *pbsub
 	conf = types.ServiceConfig{
 		Name:          name,
 		ContainerName: name,
-		Image:         "ghcr.io/streamingfast/substreams-sink-sql:v3.0.1",
+		Image:         "ghcr.io/streamingfast/substreams-sink-sql:c7a7a0e",
 		Restart:       "on-failure",
 		Entrypoint: []string{
 			"/opt/subservices/config/start.sh",
@@ -69,6 +69,8 @@ func (e *DockerEngine) newSink(deploymentID string, pgService string, pkg *pbsub
 		},
 	}
 
+	motd = fmt.Sprintf("Sink service (no exposed port). Use 'substreams alpha sink-info %s' to see last processed block or 'docker logs %s' to see the logs.", name, name)
+
 	pkgContent, err := proto.Marshal(pkg)
 	if err != nil {
 		return conf, motd, fmt.Errorf("marshalling package: %w", err)
@@ -86,15 +88,11 @@ func (e *DockerEngine) newSink(deploymentID string, pgService string, pkg *pbsub
 		return types.ServiceConfig{}, motd, fmt.Errorf("failed to proto unmarshal: %w", err)
 	}
 
-	if err := os.WriteFile(filepath.Join(configFolder, "schema.sql"), []byte(sqlSvc.Schema), 0644); err != nil {
-		return conf, motd, fmt.Errorf("writing file: %w", err)
-	}
-
 	startScript := []byte(`#!/bin/bash
 set -xeu
 
 if [ ! -f /opt/subservices/data/setup-complete ]; then
-    /app/substreams-sink-sql setup $DSN /opt/subservices/config/substreams.spkg && touch /opt/subservices/data/setup-complete
+    /app/substreams-sink-sql setup $DSN /opt/subservices/config/substreams.spkg --postgraphile && touch /opt/subservices/data/setup-complete
 fi
 
 /app/substreams-sink-sql run $DSN /opt/subservices/config/substreams.spkg --on-module-hash-mistmatch=warn

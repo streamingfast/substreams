@@ -9,19 +9,17 @@ import "sf/substreams/options.proto";
 
 service Provider {
   rpc Deploy(DeployRequest) returns (DeployResponse);
-  rpc Remove(RemoveRequest) returns (RemoveResponse);
+  rpc Update(UpdateRequest) returns (UpdateResponse);
   rpc Info(InfoRequest) returns (InfoResponse);
   rpc List(ListRequest) returns (ListResponse);
   rpc Pause(PauseRequest) returns (PauseResponse);
   rpc Stop(StopRequest) returns (StopResponse);
   rpc Resume(ResumeRequest) returns (ResumeResponse);
+  rpc Remove(RemoveRequest) returns (RemoveResponse);
 }
 
 message DeployRequest {
   sf.substreams.v1.Package substreams_package = 1;
-
-  // specify deployment_id to update an existing deployment
-  optional string deployment_id = 2;
 }
 
 message DeployResponse {
@@ -30,8 +28,20 @@ message DeployResponse {
   // deployment_id is a short name (max 8 characters) that uniquely identifies your deployment
   string deployment_id = 2;
   
-  map<string, string> outputs = 3;
+  map<string, string> services = 3;
   string reason = 4;
+}
+
+message UpdateRequest {
+  sf.substreams.v1.Package substreams_package = 1;
+  string deployment_id = 2;
+  bool reset = 3;
+}
+
+message UpdateResponse {
+  DeploymentStatus status = 1;
+  map<string, string> services = 2;
+  string reason = 3;
 }
 
 message InfoRequest {
@@ -40,7 +50,7 @@ message InfoRequest {
 
 message InfoResponse {
   DeploymentStatus status = 1;
-  map<string, string> outputs = 2;
+  map<string, string> services = 2;
   string reason = 3;
   PackageInfo package_info = 4;
   SinkProgress progress = 5;

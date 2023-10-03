@@ -23,12 +23,13 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ProviderClient interface {
 	Deploy(ctx context.Context, in *DeployRequest, opts ...grpc.CallOption) (*DeployResponse, error)
-	Remove(ctx context.Context, in *RemoveRequest, opts ...grpc.CallOption) (*RemoveResponse, error)
+	Update(ctx context.Context, in *UpdateRequest, opts ...grpc.CallOption) (*UpdateResponse, error)
 	Info(ctx context.Context, in *InfoRequest, opts ...grpc.CallOption) (*InfoResponse, error)
 	List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error)
 	Pause(ctx context.Context, in *PauseRequest, opts ...grpc.CallOption) (*PauseResponse, error)
 	Stop(ctx context.Context, in *StopRequest, opts ...grpc.CallOption) (*StopResponse, error)
 	Resume(ctx context.Context, in *ResumeRequest, opts ...grpc.CallOption) (*ResumeResponse, error)
+	Remove(ctx context.Context, in *RemoveRequest, opts ...grpc.CallOption) (*RemoveResponse, error)
 }
 
 type providerClient struct {
@@ -48,9 +49,9 @@ func (c *providerClient) Deploy(ctx context.Context, in *DeployRequest, opts ...
 	return out, nil
 }
 
-func (c *providerClient) Remove(ctx context.Context, in *RemoveRequest, opts ...grpc.CallOption) (*RemoveResponse, error) {
-	out := new(RemoveResponse)
-	err := c.cc.Invoke(ctx, "/sf.substreams.sink.service.v1.Provider/Remove", in, out, opts...)
+func (c *providerClient) Update(ctx context.Context, in *UpdateRequest, opts ...grpc.CallOption) (*UpdateResponse, error) {
+	out := new(UpdateResponse)
+	err := c.cc.Invoke(ctx, "/sf.substreams.sink.service.v1.Provider/Update", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -102,17 +103,27 @@ func (c *providerClient) Resume(ctx context.Context, in *ResumeRequest, opts ...
 	return out, nil
 }
 
+func (c *providerClient) Remove(ctx context.Context, in *RemoveRequest, opts ...grpc.CallOption) (*RemoveResponse, error) {
+	out := new(RemoveResponse)
+	err := c.cc.Invoke(ctx, "/sf.substreams.sink.service.v1.Provider/Remove", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProviderServer is the server API for Provider service.
 // All implementations should embed UnimplementedProviderServer
 // for forward compatibility
 type ProviderServer interface {
 	Deploy(context.Context, *DeployRequest) (*DeployResponse, error)
-	Remove(context.Context, *RemoveRequest) (*RemoveResponse, error)
+	Update(context.Context, *UpdateRequest) (*UpdateResponse, error)
 	Info(context.Context, *InfoRequest) (*InfoResponse, error)
 	List(context.Context, *ListRequest) (*ListResponse, error)
 	Pause(context.Context, *PauseRequest) (*PauseResponse, error)
 	Stop(context.Context, *StopRequest) (*StopResponse, error)
 	Resume(context.Context, *ResumeRequest) (*ResumeResponse, error)
+	Remove(context.Context, *RemoveRequest) (*RemoveResponse, error)
 }
 
 // UnimplementedProviderServer should be embedded to have forward compatible implementations.
@@ -122,8 +133,8 @@ type UnimplementedProviderServer struct {
 func (UnimplementedProviderServer) Deploy(context.Context, *DeployRequest) (*DeployResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Deploy not implemented")
 }
-func (UnimplementedProviderServer) Remove(context.Context, *RemoveRequest) (*RemoveResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Remove not implemented")
+func (UnimplementedProviderServer) Update(context.Context, *UpdateRequest) (*UpdateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Update not implemented")
 }
 func (UnimplementedProviderServer) Info(context.Context, *InfoRequest) (*InfoResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Info not implemented")
@@ -139,6 +150,9 @@ func (UnimplementedProviderServer) Stop(context.Context, *StopRequest) (*StopRes
 }
 func (UnimplementedProviderServer) Resume(context.Context, *ResumeRequest) (*ResumeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Resume not implemented")
+}
+func (UnimplementedProviderServer) Remove(context.Context, *RemoveRequest) (*RemoveResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Remove not implemented")
 }
 
 // UnsafeProviderServer may be embedded to opt out of forward compatibility for this service.
@@ -170,20 +184,20 @@ func _Provider_Deploy_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Provider_Remove_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RemoveRequest)
+func _Provider_Update_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ProviderServer).Remove(ctx, in)
+		return srv.(ProviderServer).Update(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/sf.substreams.sink.service.v1.Provider/Remove",
+		FullMethod: "/sf.substreams.sink.service.v1.Provider/Update",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ProviderServer).Remove(ctx, req.(*RemoveRequest))
+		return srv.(ProviderServer).Update(ctx, req.(*UpdateRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -278,6 +292,24 @@ func _Provider_Resume_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Provider_Remove_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProviderServer).Remove(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/sf.substreams.sink.service.v1.Provider/Remove",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProviderServer).Remove(ctx, req.(*RemoveRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Provider_ServiceDesc is the grpc.ServiceDesc for Provider service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -290,8 +322,8 @@ var Provider_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Provider_Deploy_Handler,
 		},
 		{
-			MethodName: "Remove",
-			Handler:    _Provider_Remove_Handler,
+			MethodName: "Update",
+			Handler:    _Provider_Update_Handler,
 		},
 		{
 			MethodName: "Info",
@@ -312,6 +344,10 @@ var Provider_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Resume",
 			Handler:    _Provider_Resume_Handler,
+		},
+		{
+			MethodName: "Remove",
+			Handler:    _Provider_Remove_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

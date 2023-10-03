@@ -125,12 +125,12 @@ func (e *DockerEngine) readDeploymentInfo(deploymentID string) (info *deployment
 	return info, nil
 }
 
-func (e *DockerEngine) Apply(deploymentID string, pkg *pbsubstreams.Package, zlog *zap.Logger) error {
+func (e *DockerEngine) Create(deploymentID string, pkg *pbsubstreams.Package, zlog *zap.Logger) error {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 
-	if e.otherDeploymentIsActive(deploymentID, zlog) {
-		return fmt.Errorf("this substreams-sink engine only supports a single active deployment. Stop any active sink before launching another one")
+	if e.otherDeploymentIsActive("!NO_MATCH!", zlog) {
+		return fmt.Errorf("this substreams-sink engine only supports a single active deployment. Stop any active sink before launching another one or use `sink-update`")
 	}
 
 	manifest, usedPorts, serviceInfo, err := e.createManifest(deploymentID, e.token, pkg)
@@ -138,16 +138,38 @@ func (e *DockerEngine) Apply(deploymentID string, pkg *pbsubstreams.Package, zlo
 		return fmt.Errorf("creating manifest from package: %w", err)
 	}
 
-	var restartSink bool
-	if _, err := e.readDeploymentInfo(deploymentID); err == nil {
-		restartSink = true // existing deployment always triggers restart of the sink
+	if err := e.writeDeploymentInfo(deploymentID, usedPorts, serviceInfo, pkg); err != nil {
+		return fmt.Errorf("cannot write Service Info: %w", err)
+	}
+
+	output, err := e.applyManifest(deploymentID, manifest, false)
+	if err != nil {
+		return fmt.Errorf("applying manifest: %w", err)
+	}
+	_ = output // TODO save somewhere maybe
+	return nil
+}
+
+func (e *DockerEngine) Update(deploymentID string, pkg *pbsubstreams.Package, reset bool, zlog *zap.Logger) error {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+
+	manifest, usedPorts, serviceInfo, err := e.createManifest(deploymentID, e.token, pkg)
+	if err != nil {
+		return fmt.Errorf("creating manifest from package: %w", err)
+	}
+
+	if reset {
+		if _, err := e.Stop(deploymentID, zlog); err != nil {
+			return err
+		}
 	}
 
 	if err := e.writeDeploymentInfo(deploymentID, usedPorts, serviceInfo, pkg); err != nil {
 		return fmt.Errorf("cannot write Service Info: %w", err)
 	}
 
-	output, err := e.applyManifest(deploymentID, manifest, restartSink)
+	output, err := e.applyManifest(deploymentID, manifest, true)
 	if err != nil {
 		return fmt.Errorf("applying manifest: %w", err)
 	}
@@ -217,10 +239,6 @@ func (e *DockerEngine) Info(deploymentID string, zlog *zap.Logger) (pbsinksvc.De
 			if status == pbsinksvc.DeploymentStatus_UNKNOWN { // anything else has priority
 				status = pbsinksvc.DeploymentStatus_RUNNING
 			}
-		case "paused":
-			if status != pbsinksvc.DeploymentStatus_FAILING {
-				status = pbsinksvc.DeploymentStatus_PAUSED
-			}
 		default:
 			status = pbsinksvc.DeploymentStatus_FAILING
 			reason += fmt.Sprintf("%s: %q", strings.TrimPrefix(output.Name, deploymentID+"-"), output.Status)
@@ -231,6 +249,10 @@ func (e *DockerEngine) Info(deploymentID string, zlog *zap.Logger) (pbsinksvc.De
 	} else {
 		for k := range info.ServiceInfo {
 			if !seen[k] {
+				if k == sinkServiceName(deploymentID) {
+					status = pbsinksvc.DeploymentStatus_PAUSED
+					continue
+				}
 				status = pbsinksvc.DeploymentStatus_FAILING
 				reason += fmt.Sprintf("%s: missing, ", strings.TrimPrefix(k, deploymentID+"-"))
 			}
@@ -325,17 +347,13 @@ func (e *DockerEngine) list(zlog *zap.Logger) (out []*pbsinksvc.DeploymentWithSt
 	return out, nil
 }
 
-func (e *DockerEngine) Resume(deploymentID string, currentState pbsinksvc.DeploymentStatus, zlog *zap.Logger) (string, error) {
+func (e *DockerEngine) Resume(deploymentID string, _ pbsinksvc.DeploymentStatus, zlog *zap.Logger) (string, error) {
 
 	if e.otherDeploymentIsActive(deploymentID, zlog) {
 		return "", fmt.Errorf("this substreams-sink engine only supports a single active deployment. Stop any active sink before launching another one")
 	}
 	var cmd *exec.Cmd
-	if currentState == pbsinksvc.DeploymentStatus_PAUSED {
-		cmd = exec.Command("docker", "compose", "unpause", sinkServiceName(deploymentID))
-	} else {
-		cmd = exec.Command("docker", "compose", "up", "-d")
-	}
+	cmd = exec.Command("docker", "compose", "up", "-d")
 	cmd.Dir = filepath.Join(e.dir, deploymentID)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -345,7 +363,7 @@ func (e *DockerEngine) Resume(deploymentID string, currentState pbsinksvc.Deploy
 }
 
 func (e *DockerEngine) Pause(deploymentID string, zlog *zap.Logger) (string, error) {
-	cmd := exec.Command("docker", "compose", "pause", sinkServiceName(deploymentID))
+	cmd := exec.Command("docker", "compose", "stop", sinkServiceName(deploymentID)) // stop the sink process, keeping the database up
 	cmd.Dir = filepath.Join(e.dir, deploymentID)
 	out, err := cmd.CombinedOutput()
 	if err != nil {

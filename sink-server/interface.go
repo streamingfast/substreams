@@ -9,9 +9,8 @@ import (
 )
 
 type Engine interface {
-
-	// Apply can Create or Update a deployment
-	Apply(deploymentID string, pkg *pbsubstreams.Package, zlog *zap.Logger) error
+	Create(deploymentID string, pkg *pbsubstreams.Package, zlog *zap.Logger) error
+	Update(deploymentID string, pkg *pbsubstreams.Package, reset bool, zlog *zap.Logger) error
 
 	Resume(deploymentID string, currentState pbsinksvc.DeploymentStatus, zlog *zap.Logger) (string, error)
 	Pause(deploymentID string, zlog *zap.Logger) (string, error)

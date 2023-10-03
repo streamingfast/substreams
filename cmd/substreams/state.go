@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 
@@ -33,7 +33,7 @@ func runState(cmd *cobra.Command, args []string) error {
 		log.Panicf("failed reading file: %s", err)
 	}
 	defer file.Close()
-	data, err := ioutil.ReadAll(file)
+	data, err := io.ReadAll(file)
 	if err != nil {
 		panic(err)
 	}

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -101,7 +100,7 @@ func runPack(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("marshalling package: %w", err)
 	}
 
-	if err := ioutil.WriteFile(resolvedOutputFile, cnt, 0644); err != nil {
+	if err := os.WriteFile(resolvedOutputFile, cnt, 0644); err != nil {
 		fmt.Println("")
 		return fmt.Errorf("writing file: %w", err)
 	}

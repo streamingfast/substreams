@@ -25,6 +25,8 @@ import (
 	"google.golang.org/grpc"
 )
 
+const DeploymentIDLength = 8
+
 type server struct {
 	*shutter.Shutter
 	// provider Provider
@@ -112,24 +114,15 @@ func (s *server) Run() {
 }
 
 func genDeployID() string {
-	return uuid.New().String()[0:8]
+	return uuid.New().String()[0:DeploymentIDLength]
 }
 
 func (s *server) Deploy(ctx context.Context, req *connect_go.Request[pbsinksvc.DeployRequest]) (*connect_go.Response[pbsinksvc.DeployResponse], error) {
-	var id string
-	if req.Msg.DeploymentId != nil {
-		id = *req.Msg.DeploymentId
-		_, _, _, _, _, err := s.engine.Info(id, s.logger) // only checking if it exists
-		if err != nil {
-			return nil, fmt.Errorf("looking up deployment %q: %w", id, err)
-		}
-	} else {
-		id = genDeployID()
-	}
+	id := genDeployID()
 
-	s.logger.Info("deployment request", zap.String("deployment_id", id), zap.Bool("is_update", req.Msg.DeploymentId != nil))
+	s.logger.Info("deployment request", zap.String("deployment_id", id))
 
-	err := s.engine.Apply(id, req.Msg.SubstreamsPackage, s.logger)
+	err := s.engine.Create(id, req.Msg.SubstreamsPackage, s.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +136,33 @@ func (s *server) Deploy(ctx context.Context, req *connect_go.Request[pbsinksvc.D
 		Status:       status,
 		Reason:       reason,
 		DeploymentId: id,
-		Outputs:      outs,
+		Services:     outs,
+	}), nil
+}
+
+func (s *server) Update(ctx context.Context, req *connect_go.Request[pbsinksvc.UpdateRequest]) (*connect_go.Response[pbsinksvc.UpdateResponse], error) {
+	id := req.Msg.DeploymentId
+	_, _, _, _, _, err := s.engine.Info(id, s.logger) // only checking if it exists
+	if err != nil {
+		return nil, fmt.Errorf("looking up deployment %q: %w", id, err)
+	}
+
+	s.logger.Info("update request", zap.String("deployment_id", id))
+
+	err = s.engine.Update(id, req.Msg.SubstreamsPackage, req.Msg.Reset_, s.logger)
+	if err != nil {
+		return nil, err
+	}
+
+	status, reason, outs, _, _, err := s.engine.Info(id, s.logger)
+	if err != nil {
+		return nil, err
+	}
+
+	return connect_go.NewResponse(&pbsinksvc.UpdateResponse{
+		Status:   status,
+		Reason:   reason,
+		Services: outs,
 	}), nil
 }
 
@@ -157,7 +176,7 @@ func (s *server) Info(ctx context.Context, req *connect_go.Request[pbsinksvc.Inf
 		&pbsinksvc.InfoResponse{
 			Status:      status,
 			Reason:      reason,
-			Outputs:     outs,
+			Services:    outs,
 			PackageInfo: info,
 			Progress:    prog,
 		}), nil

@@ -10,5 +10,5 @@ target
 .fleet
 /codegen/test_substreams/src/
 /build
-
+/sink-data
 replay.log

@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
@@ -20,15 +19,14 @@ func init() {
 }
 
 var deployCmd = &cobra.Command{
-	Use:   "sink-deploy <package> [deploymentID]",
+	Use:   "sink-deploy <package>",
 	Short: "Deploy a substreams package with a sink",
 	Long: cli.Dedent(`
         Sends a "deploy" request to a server. By default, it will talk to a local "substreams alpha sink-serve" instance.
         The substreams must contain a "SinkConfig" section to be deployable.
-        If a deploymentID is specified, the service should upgrade/replace that deployment.
-			`),
+	`),
 	RunE:         deployE,
-	Args:         cobra.RangeArgs(1, 2),
+	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 }
 
@@ -47,10 +45,8 @@ func deployE(cmd *cobra.Command, args []string) error {
 	req := &pbsinksvc.DeployRequest{
 		SubstreamsPackage: pkg,
 	}
-    if len(args) == 2 {
-        req.DeploymentId = &args[1]
-    }
 
+	fmt.Printf("Deploying... (creating services, please wait)\n")
 	cli := pbsinksvcconnect.NewProviderClient(http.DefaultClient, sflags.MustGetString(cmd, "endpoint"))
 
 	resp, err := cli.Deploy(ctx, connect.NewRequest(req))
@@ -58,24 +54,7 @@ func deployE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Printf("Deployed substreams sink %q:\n  Status: %v (%s)\n  Outputs:\n", resp.Msg.DeploymentId, resp.Msg.Status, resp.Msg.Reason)
-	printOutputs(resp.Msg.Outputs)
+	fmt.Printf("Deployed substreams sink %q:\n  Status: %v (%s)\n", resp.Msg.DeploymentId, resp.Msg.Status, resp.Msg.Reason)
+	printServices(resp.Msg.Services)
 	return nil
-}
-
-func printOutputs(outputs map[string]string) {
-	for k, v := range outputs {
-		lines := strings.Split(v, "\n")
-        prefixLen := len(k) + 6
-		var withMargin string
-		for i, line := range lines {
-            if i == 0 {
-                withMargin = line + "\n"
-                continue
-            }
-			withMargin += strings.Repeat(" ", prefixLen) + line + "\n"
-		}
-		fmt.Printf("  - %s: %s", k, withMargin)
-	}
-
 }

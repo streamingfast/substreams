@@ -10,41 +10,57 @@ import (
 	"github.com/streamingfast/cli/sflags"
 	pbsinksvc "github.com/streamingfast/substreams/pb/sf/substreams/sink/service/v1"
 	"github.com/streamingfast/substreams/pb/sf/substreams/sink/service/v1/pbsinksvcconnect"
+	server "github.com/streamingfast/substreams/sink-server"
 )
 
 func init() {
 	alphaCmd.AddCommand(sinkPauseCmd)
 	sinkPauseCmd.Flags().StringP("endpoint", "e", "http://localhost:8000", "specify the endpoint to connect to.")
+	sinkPauseCmd.Flags().Bool("strict", false, "Require deploymentID parameter to be set and complete")
 }
 
 var sinkPauseCmd = &cobra.Command{
-	Use:   "sink-pause <deployment-id>",
+	Use:   "sink-pause [deployment-id]",
 	Short: "Pause a running substreams sink",
 	Long: cli.Dedent(`
         Sends an "Pause" request to a server. By default, it will talk to a local "substreams alpha sink-serve" instance.
         It will pause a substreams and returns information about the change of status.
+        If deploymentID is not set or is incomplete, the CLI will try to guess (unless --strict is set).
 		`),
 	RunE:         sinkPauseE,
-	Args:         cobra.ExactArgs(1),
+	Args:         cobra.RangeArgs(0, 1),
 	SilenceUsage: true,
 }
 
 func sinkPauseE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
-	id := args[0]
+	var id string
+	if len(args) == 1 {
+		id = args[0]
+	}
+
+	cli := pbsinksvcconnect.NewProviderClient(http.DefaultClient, sflags.MustGetString(cmd, "endpoint"))
+	if len(id) < server.DeploymentIDLength {
+		if sflags.MustGetBool(cmd, "strict") {
+			return fmt.Errorf("invalid ID provided: %q and '--strict' is set", id)
+		}
+		matching, err := fuzzyMatchDeployment(ctx, id, cli, fuzzyMatchPreferredStatusOrder)
+		if err != nil {
+			return err
+		}
+		id = matching.Id
+	}
 
 	req := &pbsinksvc.PauseRequest{
 		DeploymentId: id,
 	}
 
-	cli := pbsinksvcconnect.NewProviderClient(http.DefaultClient, sflags.MustGetString(cmd, "endpoint"))
-
 	resp, err := cli.Pause(ctx, connect.NewRequest(req))
 	if err != nil {
 		return err
 	}
-    fmt.Printf("Response for deployment %q:\n  Previous Status: %v, New Status: %v\n", id, resp.Msg.PreviousStatus, resp.Msg.NewStatus)
+	fmt.Printf("Response for deployment %q:\n  Previous Status: %v, New Status: %v\n", id, resp.Msg.PreviousStatus, resp.Msg.NewStatus)
 
 	return nil
 }

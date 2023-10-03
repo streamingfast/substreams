@@ -28,12 +28,13 @@ const (
 // ProviderClient is a client for the sf.substreams.sink.service.v1.Provider service.
 type ProviderClient interface {
 	Deploy(context.Context, *connect_go.Request[v1.DeployRequest]) (*connect_go.Response[v1.DeployResponse], error)
-	Remove(context.Context, *connect_go.Request[v1.RemoveRequest]) (*connect_go.Response[v1.RemoveResponse], error)
+	Update(context.Context, *connect_go.Request[v1.UpdateRequest]) (*connect_go.Response[v1.UpdateResponse], error)
 	Info(context.Context, *connect_go.Request[v1.InfoRequest]) (*connect_go.Response[v1.InfoResponse], error)
 	List(context.Context, *connect_go.Request[v1.ListRequest]) (*connect_go.Response[v1.ListResponse], error)
 	Pause(context.Context, *connect_go.Request[v1.PauseRequest]) (*connect_go.Response[v1.PauseResponse], error)
 	Stop(context.Context, *connect_go.Request[v1.StopRequest]) (*connect_go.Response[v1.StopResponse], error)
 	Resume(context.Context, *connect_go.Request[v1.ResumeRequest]) (*connect_go.Response[v1.ResumeResponse], error)
+	Remove(context.Context, *connect_go.Request[v1.RemoveRequest]) (*connect_go.Response[v1.RemoveResponse], error)
 }
 
 // NewProviderClient constructs a client for the sf.substreams.sink.service.v1.Provider service. By
@@ -51,9 +52,9 @@ func NewProviderClient(httpClient connect_go.HTTPClient, baseURL string, opts ..
 			baseURL+"/sf.substreams.sink.service.v1.Provider/Deploy",
 			opts...,
 		),
-		remove: connect_go.NewClient[v1.RemoveRequest, v1.RemoveResponse](
+		update: connect_go.NewClient[v1.UpdateRequest, v1.UpdateResponse](
 			httpClient,
-			baseURL+"/sf.substreams.sink.service.v1.Provider/Remove",
+			baseURL+"/sf.substreams.sink.service.v1.Provider/Update",
 			opts...,
 		),
 		info: connect_go.NewClient[v1.InfoRequest, v1.InfoResponse](
@@ -81,18 +82,24 @@ func NewProviderClient(httpClient connect_go.HTTPClient, baseURL string, opts ..
 			baseURL+"/sf.substreams.sink.service.v1.Provider/Resume",
 			opts...,
 		),
+		remove: connect_go.NewClient[v1.RemoveRequest, v1.RemoveResponse](
+			httpClient,
+			baseURL+"/sf.substreams.sink.service.v1.Provider/Remove",
+			opts...,
+		),
 	}
 }
 
 // providerClient implements ProviderClient.
 type providerClient struct {
 	deploy *connect_go.Client[v1.DeployRequest, v1.DeployResponse]
-	remove *connect_go.Client[v1.RemoveRequest, v1.RemoveResponse]
+	update *connect_go.Client[v1.UpdateRequest, v1.UpdateResponse]
 	info   *connect_go.Client[v1.InfoRequest, v1.InfoResponse]
 	list   *connect_go.Client[v1.ListRequest, v1.ListResponse]
 	pause  *connect_go.Client[v1.PauseRequest, v1.PauseResponse]
 	stop   *connect_go.Client[v1.StopRequest, v1.StopResponse]
 	resume *connect_go.Client[v1.ResumeRequest, v1.ResumeResponse]
+	remove *connect_go.Client[v1.RemoveRequest, v1.RemoveResponse]
 }
 
 // Deploy calls sf.substreams.sink.service.v1.Provider.Deploy.
@@ -100,9 +107,9 @@ func (c *providerClient) Deploy(ctx context.Context, req *connect_go.Request[v1.
 	return c.deploy.CallUnary(ctx, req)
 }
 
-// Remove calls sf.substreams.sink.service.v1.Provider.Remove.
-func (c *providerClient) Remove(ctx context.Context, req *connect_go.Request[v1.RemoveRequest]) (*connect_go.Response[v1.RemoveResponse], error) {
-	return c.remove.CallUnary(ctx, req)
+// Update calls sf.substreams.sink.service.v1.Provider.Update.
+func (c *providerClient) Update(ctx context.Context, req *connect_go.Request[v1.UpdateRequest]) (*connect_go.Response[v1.UpdateResponse], error) {
+	return c.update.CallUnary(ctx, req)
 }
 
 // Info calls sf.substreams.sink.service.v1.Provider.Info.
@@ -130,15 +137,21 @@ func (c *providerClient) Resume(ctx context.Context, req *connect_go.Request[v1.
 	return c.resume.CallUnary(ctx, req)
 }
 
+// Remove calls sf.substreams.sink.service.v1.Provider.Remove.
+func (c *providerClient) Remove(ctx context.Context, req *connect_go.Request[v1.RemoveRequest]) (*connect_go.Response[v1.RemoveResponse], error) {
+	return c.remove.CallUnary(ctx, req)
+}
+
 // ProviderHandler is an implementation of the sf.substreams.sink.service.v1.Provider service.
 type ProviderHandler interface {
 	Deploy(context.Context, *connect_go.Request[v1.DeployRequest]) (*connect_go.Response[v1.DeployResponse], error)
-	Remove(context.Context, *connect_go.Request[v1.RemoveRequest]) (*connect_go.Response[v1.RemoveResponse], error)
+	Update(context.Context, *connect_go.Request[v1.UpdateRequest]) (*connect_go.Response[v1.UpdateResponse], error)
 	Info(context.Context, *connect_go.Request[v1.InfoRequest]) (*connect_go.Response[v1.InfoResponse], error)
 	List(context.Context, *connect_go.Request[v1.ListRequest]) (*connect_go.Response[v1.ListResponse], error)
 	Pause(context.Context, *connect_go.Request[v1.PauseRequest]) (*connect_go.Response[v1.PauseResponse], error)
 	Stop(context.Context, *connect_go.Request[v1.StopRequest]) (*connect_go.Response[v1.StopResponse], error)
 	Resume(context.Context, *connect_go.Request[v1.ResumeRequest]) (*connect_go.Response[v1.ResumeResponse], error)
+	Remove(context.Context, *connect_go.Request[v1.RemoveRequest]) (*connect_go.Response[v1.RemoveResponse], error)
 }
 
 // NewProviderHandler builds an HTTP handler from the service implementation. It returns the path on
@@ -153,9 +166,9 @@ func NewProviderHandler(svc ProviderHandler, opts ...connect_go.HandlerOption) (
 		svc.Deploy,
 		opts...,
 	))
-	mux.Handle("/sf.substreams.sink.service.v1.Provider/Remove", connect_go.NewUnaryHandler(
-		"/sf.substreams.sink.service.v1.Provider/Remove",
-		svc.Remove,
+	mux.Handle("/sf.substreams.sink.service.v1.Provider/Update", connect_go.NewUnaryHandler(
+		"/sf.substreams.sink.service.v1.Provider/Update",
+		svc.Update,
 		opts...,
 	))
 	mux.Handle("/sf.substreams.sink.service.v1.Provider/Info", connect_go.NewUnaryHandler(
@@ -183,6 +196,11 @@ func NewProviderHandler(svc ProviderHandler, opts ...connect_go.HandlerOption) (
 		svc.Resume,
 		opts...,
 	))
+	mux.Handle("/sf.substreams.sink.service.v1.Provider/Remove", connect_go.NewUnaryHandler(
+		"/sf.substreams.sink.service.v1.Provider/Remove",
+		svc.Remove,
+		opts...,
+	))
 	return "/sf.substreams.sink.service.v1.Provider/", mux
 }
 
@@ -193,8 +211,8 @@ func (UnimplementedProviderHandler) Deploy(context.Context, *connect_go.Request[
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("sf.substreams.sink.service.v1.Provider.Deploy is not implemented"))
 }
 
-func (UnimplementedProviderHandler) Remove(context.Context, *connect_go.Request[v1.RemoveRequest]) (*connect_go.Response[v1.RemoveResponse], error) {
-	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("sf.substreams.sink.service.v1.Provider.Remove is not implemented"))
+func (UnimplementedProviderHandler) Update(context.Context, *connect_go.Request[v1.UpdateRequest]) (*connect_go.Response[v1.UpdateResponse], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("sf.substreams.sink.service.v1.Provider.Update is not implemented"))
 }
 
 func (UnimplementedProviderHandler) Info(context.Context, *connect_go.Request[v1.InfoRequest]) (*connect_go.Response[v1.InfoResponse], error) {
@@ -215,4 +233,8 @@ func (UnimplementedProviderHandler) Stop(context.Context, *connect_go.Request[v1
 
 func (UnimplementedProviderHandler) Resume(context.Context, *connect_go.Request[v1.ResumeRequest]) (*connect_go.Response[v1.ResumeResponse], error) {
 	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("sf.substreams.sink.service.v1.Provider.Resume is not implemented"))
+}
+
+func (UnimplementedProviderHandler) Remove(context.Context, *connect_go.Request[v1.RemoveRequest]) (*connect_go.Response[v1.RemoveResponse], error) {
+	return nil, connect_go.NewError(connect_go.CodeUnimplemented, errors.New("sf.substreams.sink.service.v1.Provider.Remove is not implemented"))
 }

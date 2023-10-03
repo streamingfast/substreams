@@ -41,10 +41,14 @@ func sinkListE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	if len(resp.Msg.Deployments) == 0 {
+		fmt.Printf("No deployments found.\n")
+		return nil
+	}
 
-    fmt.Printf("List of deployments:\n")
+	fmt.Printf("List of deployments:\n")
 	for _, v := range resp.Msg.Deployments {
-        fmt.Printf("  - %s (%s-%s): %s (%s)\n", v.Id, v.PackageInfo.Name, v.PackageInfo.Version, v.Status.String(), v.Reason)
+		fmt.Printf("  - %s (%s-%s): %s (%s)\n", v.Id, v.PackageInfo.Name, v.PackageInfo.Version, v.Status.String(), v.Reason)
 	}
 
 	return nil

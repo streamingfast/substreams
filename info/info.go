@@ -11,14 +11,24 @@ import (
 )
 
 type BasicInfo struct {
-	Name                string                       `json:"name"`
-	Version             string                       `json:"version"`
-	Documentation       *string                      `json:"documentation,omitempty"`
-	Modules             []ModulesInfo                `json:"modules"`
-	SinkInfo            *SinkInfo                    `json:"sink_info,omitempty"`
-	ProtoPackages       []string                     `json:"proto_packages"`         // list of proto packages
-	ProtoFileCodeMap    map[string]string            `json:"proto_file_code_map"`    // map of proto file name to .proto file contents
-	ProtoMessageCodeMap map[string]map[string]string `json:"proto_message_code_map"` // map of package name to map of message name to .proto message contents
+	Name                   string                         `json:"name"`
+	Version                string                         `json:"version"`
+	Documentation          *string                        `json:"documentation,omitempty"`
+	Modules                []ModulesInfo                  `json:"modules"`
+	SinkInfo               *SinkInfo                      `json:"sink_info,omitempty"`
+	ProtoPackages          []string                       `json:"proto_packages"`            // list of proto packages
+	ProtoSourceCode        map[string]string              `json:"proto_source_code"`         // map of proto file name to .proto file contents
+	ProtoMessagesByPackage map[string][]*ProtoMessageInfo `json:"proto_messages_by_package"` // map of package name to a list of messages info in that package
+}
+
+type ProtoMessageInfo struct {
+	Name           string              `json:"name"`
+	Package        string              `json:"package"`
+	Type           string              `json:"type"`
+	File           string              `json:"file"`
+	Proto          string              `json:"proto"`
+	Documentation  string              `json:"documentation"`
+	NestedMessages []*ProtoMessageInfo `json:"nested_messages"`
 }
 
 type SinkInfo struct {
@@ -144,26 +154,18 @@ func Basic(manifestPath string) (*BasicInfo, error) {
 	}
 	manifestInfo.Modules = modules
 
-	protoPackages := make([]string, 0, len(pkg.ProtoFiles))
-	protoPackageMap := make(map[string]struct{})
-	for _, protoFile := range pkg.ProtoFiles {
-		if _, ok := protoPackageMap[protoFile.GetPackage()]; ok {
-			continue
-		} else {
-			protoPackageMap[protoFile.GetPackage()] = struct{}{}
-		}
-
-		protoPackages = append(protoPackages, protoFile.GetPackage())
-	}
-	manifestInfo.ProtoPackages = protoPackages
-
-	protoParser, err := NewProtoParser(pkg.ProtoFiles)
-	err = protoParser.Parse()
+	protoPackageParser, err := NewProtoPackageParser(pkg.ProtoFiles)
 	if err != nil {
-		return nil, fmt.Errorf("parse files: %w", err)
+		return nil, fmt.Errorf("parse proto files: %w", err)
 	}
-	manifestInfo.ProtoFileCodeMap = protoParser.ProtoFileCodeMap
-	manifestInfo.ProtoMessageCodeMap = protoParser.ProtoPackageMessageCodeMap
+	packageMessageMap, err := protoPackageParser.Parse()
+	if err != nil {
+		return nil, fmt.Errorf("parse proto files: %w", err)
+	}
+	manifestInfo.ProtoMessagesByPackage = packageMessageMap
+
+	manifestInfo.ProtoPackages = protoPackageParser.GetPackagesList()
+	manifestInfo.ProtoSourceCode = protoPackageParser.GetFilesSourceCode()
 
 	if pkg.SinkConfig != nil {
 		desc, files, err := manifest.DescribeSinkConfigs(pkg)

@@ -14,11 +14,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	protov1 "github.com/golang/protobuf/proto"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 	pbss "github.com/streamingfast/substreams/pb/sf/substreams"
 	pbssv1 "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -66,6 +68,42 @@ func (r *manifestConverter) loadSinkConfig(pkg *pbssv1.Package, m *Manifest) err
 	return nil
 }
 
+func getFieldsAndValues(dynMsg *dynamic.Message) (out []*fieldAndValue, err error) {
+	for _, fd := range dynMsg.GetMessageDescriptor().GetFields() {
+		field := &fieldAndValue{
+			key: fd.GetName(),
+		}
+		if opts := fd.GetFieldOptions(); opts != nil {
+			if val := opts.ProtoReflect().Get(pbss.E_Options.TypeDescriptor()); val.IsValid() {
+				field.opts = val.Message().Interface().(*pbss.FieldOptions)
+			}
+		}
+
+		val, err := dynMsg.TryGetField(fd)
+		if err != nil {
+			return nil, err
+		}
+		if mt := fd.GetMessageType(); mt != nil {
+
+			msgV1 := protov1.MessageV1(val.(proto.Message))
+
+			subDynMsg, err := dynamic.AsDynamicMessage(msgV1)
+			if err != nil {
+				return nil, err
+			}
+			val, err := getFieldsAndValues(subDynMsg)
+			if err != nil {
+				return nil, err
+			}
+			field.value = val
+		} else {
+			field.value = val
+		}
+		out = append(out, field)
+	}
+	return
+}
+
 // DescribeSinkConfigs returns a human-readable description of the sinkconfigs.
 // Fields that were imported from files are returned as bytes in a map
 func DescribeSinkConfigs(pkg *pbssv1.Package) (desc string, files map[string][]byte, err error) {
@@ -84,36 +122,12 @@ func DescribeSinkConfigs(pkg *pbssv1.Package) (desc string, files map[string][]b
 		return "", nil, err
 	}
 
-	var fields []*fieldAndValue
-	for _, fd := range dynMsg.GetMessageDescriptor().GetFields() {
-		field := &fieldAndValue{
-			key: strings.TrimPrefix(strings.TrimPrefix(fd.GetFullyQualifiedJSONName(), pkg.SinkConfig.TypeUrl), "."),
-		}
-		if opts := fd.GetFieldOptions(); opts != nil {
-			if val := opts.ProtoReflect().Get(pbss.E_Options.TypeDescriptor()); val.IsValid() {
-				field.opts = val.Message().Interface().(*pbss.FieldOptions)
-			}
-		}
-		val, err := dynMsg.TryGetField(fd)
-		if err != nil {
-			return "", nil, err
-		}
-		field.value = val
-		fields = append(fields, field)
+	fields, err := getFieldsAndValues(dynMsg)
+	if err != nil {
+		return "", nil, err
 	}
 
-	outfiles := make(map[string][]byte)
-	for _, fv := range fields {
-		text, fullContent := fv.Describe()
-		if fullContent != nil {
-			outfiles[fv.key] = fullContent
-		}
-		desc += text + "\n"
-	}
-	if len(outfiles) != 0 {
-		files = outfiles
-	}
-
+	desc, files = fieldDescriptions(fields, 0)
 	return desc, files, nil
 }
 
@@ -123,9 +137,40 @@ type fieldAndValue struct {
 	opts  *pbss.FieldOptions
 }
 
+func fieldDescriptions(fields []*fieldAndValue, offset int) (string, map[string][]byte) {
+
+	var out string
+	outfiles := make(map[string][]byte)
+
+	var prefix string
+	for i := 0; i < offset; i++ {
+		prefix += " "
+	}
+
+	for _, fv := range fields {
+		switch val := fv.value.(type) {
+		case []*fieldAndValue:
+			textBlock, extraFiles := fieldDescriptions(val, offset+2)
+			out += fmt.Sprintf("%s- %s:\n", prefix, fv.key) + textBlock
+			for filename, content := range extraFiles {
+				outfiles[fv.key+"_"+filename] = content
+			}
+
+		default:
+			text, fullContent := fv.Describe(prefix)
+			if fullContent != nil {
+				outfiles[fv.key] = fullContent
+			}
+			out += text + "\n"
+		}
+	}
+
+	return out, outfiles
+}
+
 // Describe returns the field values as a string, except for fields that were extracted from a file. (with options 'read_from_file or zip_from_folder')
 // The latter will show a short description and return the full content as bytes.
-func (f *fieldAndValue) Describe() (string, []byte) {
+func (f *fieldAndValue) Describe(prefix string) (string, []byte) {
 
 	if f.opts != nil && (f.opts.LoadFromFile || f.opts.ZipFromFolder) { // special treatment for fields coming from files: show md5sum, return rawdata as bytes
 		var rawdata []byte
@@ -140,15 +185,15 @@ func (f *fieldAndValue) Describe() (string, []byte) {
 		hasher.Write(rawdata)
 		sum := hex.EncodeToString(hasher.Sum(nil))
 
-		return fmt.Sprintf("  - %v: (%d bytes) MD5SUM: %v %v", f.key, len(rawdata), sum, optsToString(f.opts)), rawdata
+		return fmt.Sprintf(prefix+"- %v: (%d bytes) MD5SUM: %v %v", f.key, len(rawdata), sum, optsToString(f.opts)), rawdata
 	}
 
 	switch val := f.value.(type) {
 	case []byte:
-		return fmt.Sprintf("  - %v: %v (hex-encoded) %v", f.key, hex.EncodeToString(val), optsToString(f.opts)), nil
+		return fmt.Sprintf(prefix+"- %v: %v (hex-encoded) %v", f.key, hex.EncodeToString(val), optsToString(f.opts)), nil
 	}
 
-	return fmt.Sprintf("  - %v: %v %v", f.key, f.value, optsToString(f.opts)), nil
+	return fmt.Sprintf(prefix+"- %v: %v %v", f.key, f.value, optsToString(f.opts)), nil
 }
 
 func optsToString(opts *pbss.FieldOptions) string {
@@ -166,22 +211,31 @@ func optsToString(opts *pbss.FieldOptions) string {
 
 func fieldResolver(msgDesc *desc.MessageDescriptor) func(string) (opts *pbss.FieldOptions, isBytes bool) {
 	return func(name string) (opts *pbss.FieldOptions, isBytes bool) {
-		options := &pbss.FieldOptions{}
-		fqdn := msgDesc.GetFullyQualifiedName() + "." + name
-		for _, fd := range msgDesc.GetFields() {
-			if fd.GetFullyQualifiedJSONName() == fqdn {
-				isBytes := fd.GetType() == descriptorpb.FieldDescriptorProto_TYPE_BYTES
-				if opts := fd.GetFieldOptions(); opts != nil {
-					if val := opts.ProtoReflect().Get(pbss.E_Options.TypeDescriptor()); val.IsValid() {
-						options = val.Message().Interface().(*pbss.FieldOptions)
-					}
-				}
-				return options, isBytes
-			}
-		}
-		return options, false
+		return resolve(name, msgDesc)
 	}
+}
 
+func resolve(name string, msgDesc *desc.MessageDescriptor) (opts *pbss.FieldOptions, isBytes bool) {
+	target := msgDesc.GetFullyQualifiedName() + "." + name
+	for _, fd := range msgDesc.GetFields() {
+		fqdn := fd.GetFullyQualifiedName()
+		if fqdn == target {
+			isBytes := fd.GetType() == descriptorpb.FieldDescriptorProto_TYPE_BYTES
+			if opts := fd.GetFieldOptions(); opts != nil {
+				if val := opts.ProtoReflect().Get(pbss.E_Options.TypeDescriptor()); val.IsValid() {
+					options := val.Message().Interface().(*pbss.FieldOptions)
+					return options, isBytes
+				}
+			}
+			return &pbss.FieldOptions{}, false
+		}
+		if strings.HasPrefix(target, fqdn) {
+			msgDesc = fd.GetMessageType()
+			name = strings.TrimPrefix(target, fqdn+".")
+			return resolve(name, msgDesc)
+		}
+	}
+	return &pbss.FieldOptions{}, false
 }
 
 func getMsgDesc(anyType string, protoFiles []*descriptorpb.FileDescriptorProto) (*desc.MessageDescriptor, error) {

@@ -238,19 +238,19 @@ func generateFieldSqlTypes(fieldType eth.SolidityType) string {
 		if v.ByteSize <= 8 {
 			return "INT"
 		}
-		return "DECIMAL"
+		return "TEXT"
 
 	case eth.UnsignedIntegerType:
 		if v.ByteSize <= 8 {
 			return "INT"
 		}
-		return "DECIMAL"
+		return "TEXT"
 
 	case eth.SignedFixedPointType, eth.UnsignedFixedPointType:
-		return "DOUBLE"
+		return "TEXT"
 
 	case eth.ArrayType:
-		return "" // TODO: what should we really do here??
+		return "" // not currently supported
 
 	default:
 		return ""

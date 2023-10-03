@@ -9,6 +9,7 @@ fn main() -> Result<(), anyhow::Error> {
     let contents = fs::read_to_string("abi/contract.abi.json")
         .expect("Should have been able to read the file");
 
+    // sanitize fields and attributes starting with an underscore
     let regex = Regex::new(r#"("\w+"\s?:\s?")_(\w+")"#).unwrap();
     let sanitized_abi_file = regex.replace_all(contents.as_str(), "${1}u_${2}");
 

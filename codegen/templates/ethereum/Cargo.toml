@@ -24,6 +24,7 @@ getrandom = { version = "0.2", features = ["custom"] }
 [build-dependencies]
 anyhow = "1"
 substreams-ethereum = "0.9"
+regex = "1.8"
 
 [profile.release]
 lto = true

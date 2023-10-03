@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -16,6 +17,9 @@ import (
 func TestEnsureOurProjectCompiles(t *testing.T) {
 	abiContent, err := os.ReadFile("./ethereum/abi/contract.abi.json")
 	require.NoError(t, err)
+
+	r := regexp.MustCompile(`("\w+"\s?:\s?")_(\w+")`)
+	abiContent = []byte(r.ReplaceAllString(string(abiContent), "${1}u_${2}"))
 
 	abi, err := eth.ParseABIFromBytes(abiContent)
 	require.NoError(t, err)
@@ -108,6 +112,31 @@ func TestNewEthereumTemplateProject(t *testing.T) {
 					require.NoError(t, err)
 				}
 			}
+		})
+	}
+}
+
+func TestProtoFieldName(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "no starting underscore",
+			input:    "tokenId",
+			expected: "tokenId",
+		},
+		{
+			name:     "input starting with an underscore",
+			input:    "_tokenId",
+			expected: "u_tokenId",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.Equal(t, test.expected, sanitizeProtoFieldName(test.input))
 		})
 	}
 }

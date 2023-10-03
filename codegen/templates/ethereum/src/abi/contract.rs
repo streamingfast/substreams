@@ -1615,7 +1615,7 @@
             pub from: Vec<u8>,
             pub to: Vec<u8>,
             pub token_id: substreams::scalar::BigInt,
-            pub data: Vec<u8>,
+            pub u_data: Vec<u8>,
         }
         impl SafeTransferFrom2 {
             const METHOD_ID: [u8; 4] = [184u8, 141u8, 79u8, 222u8];
@@ -1662,7 +1662,7 @@
                             .to_big_endian(v.as_mut_slice());
                         substreams::scalar::BigInt::from_unsigned_bytes_be(&v)
                     },
-                    data: values
+                    u_data: values
                         .pop()
                         .expect(INTERNAL_ERR)
                         .into_bytes()
@@ -1686,7 +1686,7 @@
                                     .as_slice(),
                             ),
                         ),
-                        ethabi::Token::Bytes(self.data.clone()),
+                        ethabi::Token::Bytes(self.u_data.clone()),
                     ],
                 );
                 let mut encoded = Vec::with_capacity(4 + data.len());

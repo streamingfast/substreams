@@ -15,7 +15,7 @@ message {{$proto.MessageName}} {
     string trx_hash = 1;
     uint32 log_index = 2;
     {{- range $index, $protoField := $proto.Fields }}
-    {{$protoField.Type}} {{$protoField.Name}} = {{ add $index 3 }};
+    {{ $protoField.Type }} {{ sanitizeProtoFieldName $protoField.Name }} = {{ add $index 3 }};
     {{- end}}
 }
 {{- end}}

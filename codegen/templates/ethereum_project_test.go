@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -17,9 +16,6 @@ import (
 func TestEnsureOurProjectCompiles(t *testing.T) {
 	abiContent, err := os.ReadFile("./ethereum/abi/contract.abi.json")
 	require.NoError(t, err)
-
-	r := regexp.MustCompile(`("\w+"\s?:\s?")_(\w+")`)
-	abiContent = []byte(r.ReplaceAllString(string(abiContent), "${1}u_${2}"))
 
 	abi, err := eth.ParseABIFromBytes(abiContent)
 	require.NoError(t, err)

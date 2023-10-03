@@ -123,10 +123,6 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("getting %s contract ABI: %w", chain.DisplayName, err)
 		}
 
-		// Sanitize fields which start with a '_' and replace it with 'u_'
-		r := regexp.MustCompile(`("\w+"\s?:\s?")_(\w+")`)
-		abiContent = r.ReplaceAllString(abiContent, "${1}u_${2}")
-
 		// Get contract creation block
 		// First, wait 5 seconds to avoid Etherscan API rate limit
 		time.Sleep(5 * time.Second)

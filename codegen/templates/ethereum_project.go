@@ -186,6 +186,7 @@ func (e *rustEventModel) populateFields(log *eth.LogEventDef) error {
 	for _, parameter := range log.Parameters {
 		name := strcase.ToSnake(parameter.Name)
 		name = sanitizeProtoFieldName(name)
+
 		toProtoCode := generateFieldTransformCode(parameter.Type, "event."+name)
 		if toProtoCode == "" {
 			return fmt.Errorf("field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
@@ -348,13 +349,13 @@ func (e *protoEventModel) populateFields(log *eth.LogEventDef) error {
 	e.Fields = make([]protoField, len(log.Parameters))
 	for index, parameter := range log.Parameters {
 		fieldName := strcase.ToSnake(parameter.Name)
+		fieldName = sanitizeProtoFieldName(fieldName)
 		fieldType := getProtoFieldType(parameter.Type)
 
 		if fieldType == "" {
 			return fmt.Errorf("field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
 		}
 
-		fieldName = sanitizeProtoFieldName(fieldName)
 		e.Fields[index] = protoField{Name: fieldName, Type: fieldType}
 	}
 

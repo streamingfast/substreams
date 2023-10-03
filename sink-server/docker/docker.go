@@ -20,6 +20,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	types "github.com/docker/cli/cli/compose/types"
+	pbsql "github.com/streamingfast/substreams-sink-sql/pb/sf/substreams/sink/sql/v1"
 	"github.com/streamingfast/substreams/manifest"
 	pbsinksvc "github.com/streamingfast/substreams/pb/sf/substreams/sink/service/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -450,6 +451,14 @@ func (e *DockerEngine) Shutdown(zlog *zap.Logger) (err error) {
 
 func (e *DockerEngine) createManifest(deploymentID string, token string, pkg *pbsubstreams.Package) (content []byte, usedPorts []uint32, services map[string]string, err error) {
 
+	if pkg.SinkConfig.TypeUrl != "sf.substreams.sink.sql.v1.Service" {
+		return nil, nil, nil, fmt.Errorf("invalid sinkconfig type: %q", pkg.SinkConfig.TypeUrl)
+	}
+	sqlSvc := &pbsql.Service{}
+	if err := pkg.SinkConfig.UnmarshalTo(sqlSvc); err != nil {
+		return nil, nil, nil, fmt.Errorf("cannot unmarshal sinkconfig: %w", err)
+	}
+
 	services = make(map[string]string)
 
 	pg, pgMotd, err := e.newPostgres(deploymentID, pkg)
@@ -457,9 +466,6 @@ func (e *DockerEngine) createManifest(deploymentID string, token string, pkg *pb
 		return nil, nil, nil, fmt.Errorf("creating postgres deployment: %w", err)
 	}
 	services[pg.Name] = pgMotd
-
-	pgweb, pgwebMotd := e.newPGWeb(deploymentID, pg.Name)
-	services[pgweb.Name] = pgwebMotd
 
 	sink, sinkMotd, err := e.newSink(deploymentID, pg.Name, pkg)
 	if err != nil {
@@ -471,9 +477,20 @@ func (e *DockerEngine) createManifest(deploymentID string, token string, pkg *pb
 		Version: "3",
 		Services: []types.ServiceConfig{
 			pg,
-			pgweb,
 			sink,
 		},
+	}
+
+	if sqlSvc.PgwebFrontend != nil && sqlSvc.PgwebFrontend.Enabled {
+		pgweb, motd := e.newPGWeb(deploymentID, pg.Name)
+		services[pgweb.Name] = motd
+		config.Services = append(config.Services, pgweb)
+	}
+
+	if sqlSvc.PostgraphileFrontend != nil && sqlSvc.PostgraphileFrontend.Enabled {
+		postgraphile, motd := e.newPostgraphile(deploymentID, pg.Name)
+		services[postgraphile.Name] = motd
+		config.Services = append(config.Services, postgraphile)
 	}
 
 	for _, svc := range config.Services {

@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/docker/cli/cli/compose/types"
-	pbsql "github.com/streamingfast/substreams-sink-sql/pb/sf/substreams/sink/sql/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"google.golang.org/protobuf/proto"
 )
@@ -78,14 +77,6 @@ func (e *DockerEngine) newSink(deploymentID string, pgService string, pkg *pbsub
 
 	if err := os.WriteFile(filepath.Join(configFolder, "substreams.spkg"), pkgContent, 0644); err != nil {
 		return conf, motd, fmt.Errorf("writing file: %w", err)
-	}
-
-	if pkg.SinkConfig.TypeUrl != "sf.substreams.sink.sql.v1.Service" {
-		return conf, motd, fmt.Errorf("invalid sinkconfig type: %q", pkg.SinkConfig.TypeUrl)
-	}
-	sqlSvc := &pbsql.Service{}
-	if err := pkg.SinkConfig.UnmarshalTo(sqlSvc); err != nil {
-		return types.ServiceConfig{}, motd, fmt.Errorf("failed to proto unmarshal: %w", err)
 	}
 
 	startScript := []byte(`#!/bin/bash

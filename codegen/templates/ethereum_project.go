@@ -238,16 +238,16 @@ func generateFieldSqlTypes(fieldType eth.SolidityType) string {
 		if v.ByteSize <= 8 {
 			return "INT"
 		}
-		return "TEXT"
+		return "DECIMAL"
 
 	case eth.UnsignedIntegerType:
 		if v.ByteSize <= 8 {
 			return "INT"
 		}
-		return "TEXT"
+		return "DECIMAL"
 
 	case eth.SignedFixedPointType, eth.UnsignedFixedPointType:
-		return "TEXT"
+		return "DECIMAL"
 
 	case eth.ArrayType:
 		return "" // not currently supported
@@ -269,14 +269,12 @@ func generateFieldDatabaseChangeCode(fieldType eth.SolidityType, fieldAccess str
 		if v.ByteSize <= 8 {
 			return fmt.Sprintf("Into::<num_bigint::BigInt>::into(%s).to_i64().unwrap()", fieldAccess)
 		}
-
 		return fmt.Sprintf("%s.to_string()", fieldAccess)
 
 	case eth.UnsignedIntegerType:
 		if v.ByteSize <= 8 {
 			return fmt.Sprintf("%s.to_u64()", fieldAccess)
 		}
-
 		return fmt.Sprintf("%s.to_string()", fieldAccess)
 
 	case eth.SignedFixedPointType, eth.UnsignedFixedPointType:
@@ -284,7 +282,6 @@ func generateFieldDatabaseChangeCode(fieldType eth.SolidityType, fieldAccess str
 
 	case eth.ArrayType:
 		inner := generateFieldTransformCode(v.ElementType, "x")
-
 		return fmt.Sprintf("%s.into_iter().map(|x| %s).collect::<Vec<_>>()", fieldAccess, inner)
 
 	default:
@@ -310,14 +307,12 @@ func generateFieldTransformCode(fieldType eth.SolidityType, fieldAccess string) 
 		if v.ByteSize <= 8 {
 			return fmt.Sprintf("Into::<num_bigint::BigInt>::into(%s).to_i64().unwrap()", fieldAccess)
 		}
-
 		return fmt.Sprintf("%s.to_string()", fieldAccess)
 
 	case eth.UnsignedIntegerType:
 		if v.ByteSize <= 8 {
 			return fmt.Sprintf("%s.to_u64()", fieldAccess)
 		}
-
 		return fmt.Sprintf("%s.to_string()", fieldAccess)
 
 	case eth.SignedFixedPointType, eth.UnsignedFixedPointType:
@@ -325,7 +320,6 @@ func generateFieldTransformCode(fieldType eth.SolidityType, fieldAccess string) 
 
 	case eth.ArrayType:
 		inner := generateFieldTransformCode(v.ElementType, "x")
-
 		return fmt.Sprintf("%s.into_iter().map(|x| %s).collect::<Vec<_>>()", fieldAccess, inner)
 
 	default:

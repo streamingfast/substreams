@@ -4,6 +4,10 @@ ENDPOINT ?= mainnet.eth.streamingfast.io:443
 build:
 	cargo build --target wasm32-unknown-unknown --release
 
+.PHONY: build-docker
+build-docker:
+	docker run --rm -v ${PWD}:/usr/src --workdir /usr/src/ rust:1.72.1-alpine cargo build --target wasm32-unknown-unknown --release
+
 .PHONY: run
 run: build
 	substreams run -e $(ENDPOINT) substreams.yaml map_events $(if $(START_BLOCK),-s $(START_BLOCK)) $(if $(STOP_BLOCK),-t $(STOP_BLOCK))

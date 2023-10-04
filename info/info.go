@@ -161,7 +161,7 @@ func Basic(manifestPath string) (*BasicInfo, error) {
 
 	protoPackageParser, err := NewProtoPackageParser(pkg.ProtoFiles)
 	if err != nil {
-		return nil, fmt.Errorf("parse proto files: %w", err)
+		return nil, fmt.Errorf("proto package parser: %w", err)
 	}
 	packageMessageMap, err := protoPackageParser.Parse()
 	if err != nil {

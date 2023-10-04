@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/docker/cli/cli/compose/types"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -72,7 +73,7 @@ func (e *DockerEngine) newSink(deploymentID string, pgService string, pkg *pbsub
 		},
 	}
 
-	motd = fmt.Sprintf("Sink service (no exposed port). Use 'substreams alpha sink-info %s' to see last processed block or 'docker logs %s' to see the logs.", name, name)
+	motd = fmt.Sprintf("Sink service (no exposed port). Use 'substreams alpha sink-info %s' to see last processed block or 'docker logs %s' to see the logs.", strings.ReplaceAll(name, "-sink", ""), name)
 
 	pkgContent, err := proto.Marshal(pkg)
 	if err != nil {

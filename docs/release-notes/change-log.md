@@ -29,10 +29,11 @@ sink:
 Here the `schema` will be embedded from its file source directly.
 
 `substreams alpha init` command is now out of alpha and part of the substreams root command. `substreams init` allows a Substreams developer to more easily boostrap a new Substreams project. Running the init command will do multiple actions: 
+* prompt what name you want your substreams to have
 * prompt what chain you want to create your substreams on
-* if you want to track a specific contract (the abi will be fetched, and all the required code will be generated for you)
-* create the schema.sql file which will be used to set up the postgres sinker
-* `lib.rs` file with mapper of events and `db_out`, which produces database changes for the postgres sinker, will be generated and ready to run
+* if you want to track a specific contract (needs to be a valid contract), the abi will be fetched, and all the required code will be generated for you
+* generate the schema.sql file which will be used to set up the postgres sinker
+* generate `lib.rs` file with `map_events`, which streams out the events of the contract provided and `db_out`, which produces database changes for the postgres sinker
 
 ### Added
 

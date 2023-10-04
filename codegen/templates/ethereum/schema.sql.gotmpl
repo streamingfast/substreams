@@ -3,6 +3,8 @@
 CREATE TABLE IF NOT EXISTS {{ $rust.ProtoOutputModuleFieldName }} (
     "trx_hash" VARCHAR(64),
     "log_index" INT,
+    "timestamp_s" DECIMAL,
+    "block_num" DECIMAL,
     {{- $numberOfAttributes := len $rust.ProtoFieldDatabaseChangesMap }}
     {{- $i := 0 }}
     {{- range $fieldName, $sqlType := $rust.ProtoFieldSqlmap }}

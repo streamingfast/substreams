@@ -28,8 +28,12 @@ func (e *DockerEngine) newSink(deploymentID string, pgService string, pkg *pbsub
 	switch pkg.Network {
 	case "mainnet":
 		break
-	case "polygon":
+	case "polygon", "matic":
 		endpoint = "polygon.streamingfast.io:443"
+	case "goerli":
+		endpoint = "goerli.eth.streamingfast.io:443"
+	case "sepolia":
+		endpoint = "sepolia.eth.streamingfast.io:443"
 	case "mumbai":
 		endpoint = "mumbai.streamingfast.io:443"
 	case "arbitrum", "arb-one":

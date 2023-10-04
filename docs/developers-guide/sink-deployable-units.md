@@ -63,7 +63,7 @@ configs:
 (...)
 ```
 
-## Running the stack on a local dev environment
+# Running the stack on a local dev environment
 
 1. Set your authentication token in your environment: `export SUBSTREAMS_API_TOKEN="your-token"`
 1. Run the `serve` command in a shell (this is the development server that will create docker containers to run the sink and database) `substreams alpha sink-serve` (it will store data under './sink-data' by default, override to your preference with `--data-dir`)

@@ -35,6 +35,8 @@ modules:
     output:
       type: proto:sf.substreams.sink.database.v1.DatabaseChanges
 
+network: {{ .network }}
+
 sink:
   module: db_out
   type: sf.substreams.sink.sql.v1.Service

@@ -37,6 +37,7 @@ type EthereumProject struct {
 	creationBlockNum            uint64
 	sqlImportVersion            string
 	databaseChangeImportVersion string
+	network                     string
 }
 
 func NewEthereumProject(name string, moduleName string, chain *EthereumChain, address eth.Address, abi *eth.ABI, abiContent string, creationBlockNum uint64) (*EthereumProject, error) {
@@ -56,6 +57,7 @@ func NewEthereumProject(name string, moduleName string, chain *EthereumChain, ad
 		creationBlockNum:            creationBlockNum,
 		sqlImportVersion:            "1.0.2",
 		databaseChangeImportVersion: "1.2.1",
+		network:                     chain.Network,
 	}, nil
 }
 
@@ -99,6 +101,7 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 				"initialBlock":                strconv.FormatUint(p.creationBlockNum, 10),
 				"sqlImportVersion":            p.sqlImportVersion,
 				"databaseChangeImportVersion": p.databaseChangeImportVersion,
+				"network":                     p.network,
 			}
 
 			zlog.Debug("rendering templated file", zap.String("filename", finalFileName), zap.Any("model", model))
@@ -273,13 +276,13 @@ func generateFieldDatabaseChangeCode(fieldType eth.SolidityType, fieldAccess str
 
 	case eth.SignedIntegerType:
 		if v.ByteSize <= 8 {
-			return fmt.Sprintf("Into::<num_bigint::BigInt>::into(%s).to_i64().unwrap()", fieldAccess)
+			return fieldAccess
 		}
 		return fmt.Sprintf("%s.to_string()", fieldAccess)
 
 	case eth.UnsignedIntegerType:
 		if v.ByteSize <= 8 {
-			return fmt.Sprintf("%s.to_u64()", fieldAccess)
+			return fieldAccess
 		}
 		return fmt.Sprintf("%s.to_string()", fieldAccess)
 

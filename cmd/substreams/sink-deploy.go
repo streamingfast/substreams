@@ -54,7 +54,11 @@ func deployE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Printf("Deployed substreams sink %q:\n  Status: %v (%s)\n", resp.Msg.DeploymentId, resp.Msg.Status, resp.Msg.Reason)
+	reason := ""
+	if resp.Msg.Reason != "" {
+		reason = " (" + resp.Msg.Reason + ")"
+	}
+	fmt.Printf("Deployed substreams sink %q:\n  Status: %v%s\n", resp.Msg.DeploymentId, resp.Msg.Status, reason)
 	printServices(resp.Msg.Services)
 	return nil
 }

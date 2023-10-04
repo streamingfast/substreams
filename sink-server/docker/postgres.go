@@ -19,10 +19,9 @@ func (e *DockerEngine) newPostgres(deploymentID string, pkg *pbsubstreams.Packag
 		return types.ServiceConfig{}, "", fmt.Errorf("creating folder %q: %w", dataFolder, err)
 	}
 
-    localPort := uint32(5432) // TODO: assign dynamically
+	localPort := uint32(5432) // TODO: assign dynamically
 
-
-    conf := types.ServiceConfig{
+	conf := types.ServiceConfig{
 		Name:          name,
 		ContainerName: name,
 		Image:         "postgres:14",
@@ -52,20 +51,20 @@ func (e *DockerEngine) newPostgres(deploymentID string, pkg *pbsubstreams.Packag
 			},
 		},
 		HealthCheck: &types.HealthCheckConfig{
-			Test:     []string{"CMD", "nc", "-z", "localhost", "5432"},
-			Interval: toDuration(time.Second * 30),
-			Timeout:  toDuration(time.Second * 10),
-			Retries:  deref(uint64(15)),
+			Test:     []string{"CMD", "pg_isready", "-U", "dev-node"},
+			Interval: toDuration(time.Second * 5),
+			Timeout:  toDuration(time.Second * 4),
+			Retries:  deref(uint64(10)),
 		},
-	} 
+	}
 
-    motd := fmt.Sprintf("PostgreSQL service %q available at DSN: 'postgres://%s:%s@localhost:%d/%s?sslmode=disable'",
-        name,
-        *conf.Environment["POSTGRES_USER"],
-        *conf.Environment["POSTGRES_PASSWORD"],
-        localPort,
-        *conf.Environment["POSTGRES_DB"],
-     )
+	motd := fmt.Sprintf("PostgreSQL service %q available at DSN: 'postgres://%s:%s@localhost:%d/%s?sslmode=disable'",
+		name,
+		*conf.Environment["POSTGRES_USER"],
+		*conf.Environment["POSTGRES_PASSWORD"],
+		localPort,
+		*conf.Environment["POSTGRES_DB"],
+	)
 
-    return conf, motd, nil
+	return conf, motd, nil
 }

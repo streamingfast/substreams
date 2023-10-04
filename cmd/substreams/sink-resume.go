@@ -59,6 +59,8 @@ func sinkResumeE(cmd *cobra.Command, args []string) error {
 		DeploymentId: id,
 	}
 
+	fmt.Printf("Resuming... (creating services, please wait)\n")
+
 	resp, err := cli.Resume(ctx, connect.NewRequest(req))
 	if err != nil {
 		return err

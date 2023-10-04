@@ -84,7 +84,11 @@ func updateE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Printf("Update complete for sink %q:\n  Status: %v (%s)\n", req.DeploymentId, resp.Msg.Status, resp.Msg.Reason)
+	reason := ""
+	if resp.Msg.Reason != "" {
+		reason = " (" + resp.Msg.Reason + ")"
+	}
+	fmt.Printf("Update complete for sink %q:\n  Status: %v%s\n", req.DeploymentId, resp.Msg.Status, reason)
 	printServices(resp.Msg.Services)
 	return nil
 }

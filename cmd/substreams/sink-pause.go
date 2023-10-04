@@ -56,6 +56,7 @@ func sinkPauseE(cmd *cobra.Command, args []string) error {
 		DeploymentId: id,
 	}
 
+	fmt.Printf("Pausing... please wait\n")
 	resp, err := cli.Pause(ctx, connect.NewRequest(req))
 	if err != nil {
 		return err

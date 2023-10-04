@@ -140,7 +140,7 @@ func (e *DockerEngine) Create(deploymentID string, pkg *pbsubstreams.Package, zl
 		return fmt.Errorf("this substreams-sink engine only supports a single active deployment. Stop any active sink before launching another one or use `sink-update`")
 	}
 
-	manifest, usedPorts, serviceInfo, err := e.createManifest(deploymentID, e.token, pkg)
+	manifest, usedPorts, serviceInfo, runMeFirst, err := e.createManifest(deploymentID, e.token, pkg)
 	if err != nil {
 		return fmt.Errorf("creating manifest from package: %w", err)
 	}
@@ -149,7 +149,7 @@ func (e *DockerEngine) Create(deploymentID string, pkg *pbsubstreams.Package, zl
 		return fmt.Errorf("cannot write Service Info: %w", err)
 	}
 
-	output, err := e.applyManifest(deploymentID, manifest, false)
+	output, err := e.applyManifest(deploymentID, manifest, runMeFirst, false)
 	if err != nil {
 		return fmt.Errorf("applying manifest: %w", err)
 	}
@@ -161,22 +161,29 @@ func (e *DockerEngine) Update(deploymentID string, pkg *pbsubstreams.Package, re
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 
-	manifest, usedPorts, serviceInfo, err := e.createManifest(deploymentID, e.token, pkg)
-	if err != nil {
-		return fmt.Errorf("creating manifest from package: %w", err)
-	}
-
 	if reset {
 		if _, err := e.Stop(deploymentID, zlog); err != nil {
 			return err
 		}
+
+		if err := os.RemoveAll(filepath.Join(e.dir, deploymentID)); err != nil {
+			return fmt.Errorf("cannot cleanup the deployment folder: %w", err)
+		}
+		if err := os.MkdirAll(filepath.Join(e.dir, deploymentID), 0755); err != nil {
+			return fmt.Errorf("cannot re-create the deployment folder: %w", err)
+		}
+	}
+
+	manifest, usedPorts, serviceInfo, runMeFirst, err := e.createManifest(deploymentID, e.token, pkg)
+	if err != nil {
+		return fmt.Errorf("creating manifest from package: %w", err)
 	}
 
 	if err := e.writeDeploymentInfo(deploymentID, usedPorts, serviceInfo, pkg); err != nil {
 		return fmt.Errorf("cannot write Service Info: %w", err)
 	}
 
-	output, err := e.applyManifest(deploymentID, manifest, true)
+	output, err := e.applyManifest(deploymentID, manifest, runMeFirst, true)
 	if err != nil {
 		return fmt.Errorf("applying manifest: %w", err)
 	}
@@ -400,7 +407,7 @@ func (e *DockerEngine) Remove(deploymentID string, zlog *zap.Logger) (string, er
 	return string(out), err
 }
 
-func (e *DockerEngine) applyManifest(deployment string, man []byte, restartSink bool) (string, error) {
+func (e *DockerEngine) applyManifest(deployment string, man []byte, runMeFirst []string, restartSink bool) (string, error) {
 	w, err := os.Create(filepath.Join(e.dir, deployment, "docker-compose.yaml"))
 	if err != nil {
 		return "", fmt.Errorf("creating docker-compose file: %w", err)
@@ -409,8 +416,18 @@ func (e *DockerEngine) applyManifest(deployment string, man []byte, restartSink 
 	if _, err := io.Copy(w, r); err != nil {
 		return "", fmt.Errorf("writing docker-compose file: %w", err)
 	}
+	// these services need to be healthy first
+	if runMeFirst != nil {
+		args := append([]string{"compose", "up", "-d", "--wait"}, runMeFirst...)
+		cmd := exec.Command("docker", args...)
+		cmd.Dir = filepath.Join(e.dir, deployment)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return string(out), err
+		}
+	}
 
-	cmd := exec.Command("docker", "compose", "up", "-d")
+	cmd := exec.Command("docker", "compose", "up", "-d", "--wait")
 	cmd.Dir = filepath.Join(e.dir, deployment)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -455,27 +472,28 @@ func (e *DockerEngine) Shutdown(zlog *zap.Logger) (err error) {
 	return err
 }
 
-func (e *DockerEngine) createManifest(deploymentID string, token string, pkg *pbsubstreams.Package) (content []byte, usedPorts []uint32, services map[string]string, err error) {
+func (e *DockerEngine) createManifest(deploymentID string, token string, pkg *pbsubstreams.Package) (content []byte, usedPorts []uint32, services map[string]string, runMeFirst []string, err error) {
 
 	if pkg.SinkConfig.TypeUrl != "sf.substreams.sink.sql.v1.Service" {
-		return nil, nil, nil, fmt.Errorf("invalid sinkconfig type: %q", pkg.SinkConfig.TypeUrl)
+		return nil, nil, nil, nil, fmt.Errorf("invalid sinkconfig type: %q. Only sf.substreams.sink.sql.v1.Service is supported for now.", pkg.SinkConfig.TypeUrl)
 	}
 	sqlSvc := &pbsql.Service{}
 	if err := pkg.SinkConfig.UnmarshalTo(sqlSvc); err != nil {
-		return nil, nil, nil, fmt.Errorf("cannot unmarshal sinkconfig: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("cannot unmarshal sinkconfig: %w", err)
 	}
 
 	services = make(map[string]string)
 
 	pg, pgMotd, err := e.newPostgres(deploymentID, pkg)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("creating postgres deployment: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("creating postgres deployment: %w", err)
 	}
 	services[pg.Name] = pgMotd
+	runMeFirst = append(runMeFirst, pg.Name)
 
 	sink, sinkMotd, err := e.newSink(deploymentID, pg.Name, pkg)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("creating postgres deployment: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("creating postgres deployment: %w", err)
 	}
 	services[sink.Name] = sinkMotd
 

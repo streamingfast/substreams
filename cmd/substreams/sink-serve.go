@@ -21,7 +21,7 @@ func init() {
 }
 
 var serveCmd = &cobra.Command{
-	Use:   "sink-serve <package>",
+	Use:   "sink-serve",
 	Short: "Serve local sink deployments using docker-compose",
 	Long: cli.Dedent(`
         Listens for "deploy" requests, allowing you to test your sink deployable units to a local docker-based dev environment.

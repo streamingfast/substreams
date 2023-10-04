@@ -71,7 +71,7 @@ func sinkRemoveE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Deployment %q successfully deleted.\nPrevious Status: %v\n", id, resp.Msg.PreviousStatus)
+	fmt.Printf("Deployment %q successfully deleted.\nPrevious Status: %v\nNew Status: DELETED.", id, resp.Msg.PreviousStatus)
 
 	return nil
 }

@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -85,10 +86,12 @@ func (e *DockerEngine) CheckVersion() error {
 	}
 
 	ver := string(out)
-	if strings.HasPrefix(ver, "2.") || strings.HasPrefix(ver, "3.") { // we don't preemptively support above docker compose v3...
+	match, _ := regexp.MatchString("v?[1-9]", ver)
+	if match {
 		return nil
 	}
-	return fmt.Errorf("unsupported 'docker compose' major version %q. Only version 2.x or 3.x are supported", ver)
+
+	return fmt.Errorf("Cannot determine docker compose version %q. Upgrade your Docker engine here: https://docs.docker.com/engine/install/", ver)
 }
 
 func (e *DockerEngine) writeDeploymentInfo(deploymentID string, usedPorts []uint32, svcInfo map[string]string, pkg *pbsubstreams.Package) error {

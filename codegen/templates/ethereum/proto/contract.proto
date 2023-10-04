@@ -12,30 +12,38 @@ message Events {
 message Approval {
     string trx_hash = 1;
     uint32 log_index = 2;
-    bytes owner = 3;
-    bytes approved = 4;
-    string token_id = 5;
+    uint64 timestamp_s = 3;
+    uint64 block_num = 4;
+    bytes owner = 5;
+    bytes approved = 6;
+    string token_id = 7;
 }
 
 message ApprovalForAll {
     string trx_hash = 1;
     uint32 log_index = 2;
-    bytes owner = 3;
-    bytes operator = 4;
-    bool approved = 5;
+    uint64 timestamp_s = 3;
+    uint64 block_num = 4;
+    bytes owner = 5;
+    bytes operator = 6;
+    bool approved = 7;
 }
 
 message OwnershipTransferred {
     string trx_hash = 1;
     uint32 log_index = 2;
-    bytes previous_owner = 3;
-    bytes new_owner = 4;
+    uint64 timestamp_s = 3;
+    uint64 block_num = 4;
+    bytes previous_owner = 5;
+    bytes new_owner = 6;
 }
 
 message Transfer {
     string trx_hash = 1;
     uint32 log_index = 2;
-    bytes from = 3;
-    bytes to = 4;
-    string token_id = 5;
+    uint64 timestamp_s = 3;
+    uint64 block_num = 4;
+    bytes from = 5;
+    bytes to = 6;
+    string token_id = 7;
 }

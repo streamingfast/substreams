@@ -14,8 +14,10 @@ message Events {
 message {{$proto.MessageName}} {
     string trx_hash = 1;
     uint32 log_index = 2;
+    uint64 timestamp_s = 3;
+    uint64 block_num = 4;
     {{- range $index, $protoField := $proto.Fields }}
-    {{ $protoField.Type }} {{ sanitizeProtoFieldName $protoField.Name }} = {{ add $index 3 }};
+    {{ $protoField.Type }} {{ sanitizeProtoFieldName $protoField.Name }} = {{ add $index 5 }};
     {{- end}}
 }
 {{- end}}

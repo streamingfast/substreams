@@ -16,28 +16,30 @@ substreams_ethereum::init!();
 
 #[substreams::handlers::map]
 fn map_events(blk: eth::Block) -> Result<contract::Events, substreams::errors::Error> {
+    let timestamp_s = blk.timestamp().seconds as u64 + blk.timestamp().nanos as u64;
+
     Ok(contract::Events {
         {{- range $event := .events }}
         {{- $rust := $event.Rust }}
         {{ $rust.ProtoOutputModuleFieldName }}: blk
             .receipts()
             .flat_map(|view| {
-                view.receipt.logs.iter().filter_map(|log| {
-                    if log.address != TRACKED_CONTRACT {
-                        return None;
-                    }
+                view.receipt.logs.iter()
+                    .filter(|log| log.address == TRACKED_CONTRACT)
+                    .filter_map(|log| {
+                        if let Some(event) = abi::contract::events::{{$rust.ABIStructName}}::match_and_decode(log) {
+                            return Some(contract::{{$rust.ProtoMessageName}} {
+                                trx_hash: Hex(&view.transaction.hash).to_string(),
+                                log_index: log.block_index,
+                                timestamp_s,
+                                block_num: blk.number,
+                                {{- range $protoField, $abiToProtoConversion := $rust.ProtoFieldABIConversionMap }}
+                                {{$protoField}}: {{$abiToProtoConversion}},
+                                {{- end}}
+                            });
+                        }
 
-                    if let Some(event) = abi::contract::events::{{$rust.ABIStructName}}::match_and_decode(log) {
-                        return Some(contract::{{$rust.ProtoMessageName}} {
-                            trx_hash: Hex(&view.transaction.hash).to_string(),
-                            log_index: log.block_index,
-                            {{- range $protoField, $abiToProtoConversion := $rust.ProtoFieldABIConversionMap }}
-                            {{$protoField}}: {{$abiToProtoConversion}},
-                            {{- end}}
-                        });
-                    }
-
-                    None
+                        None
                 })
             })
             .collect(),
@@ -58,6 +60,8 @@ fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::error
             .create_row("{{ $rust.ProtoOutputModuleFieldName }}", format!("{}-{}", evt.trx_hash, evt.log_index))
             .set("trx_hash", evt.trx_hash)
             .set("log_index", evt.log_index)
+            .set("timestamp_s", evt.timestamp_s)
+            .set("block_num", evt.block_num)
             {{- $numberOfAttributes := len $rust.ProtoFieldDatabaseChangesMap }}
             {{- $i := 0 }}
             {{- range $protoField, $databaseChangesToProtoConversion := $rust.ProtoFieldDatabaseChangesMap }}

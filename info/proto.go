@@ -55,7 +55,7 @@ func (p *ProtoPackageParser) Parse() (map[string][]*ProtoMessageInfo, error) {
 
 		for _, enum := range file.GetEnumType() {
 			doc := getDocumentationForSymbol(file.GetSourceCodeInfo(), enum.GetName())
-			protoCode, err := extractMessageBlock(p.fileCodeMap[file.GetName()], enum.GetName())
+			protoCode, err := extractEnumBlock(p.fileCodeMap[file.GetName()], enum.GetName())
 			if err != nil {
 				return nil, fmt.Errorf("extract message block: %w", err)
 			}

@@ -264,7 +264,7 @@ func promptTrackContract() (bool, error) {
 
 	return promptConfirm("Would you like to track a particular contract", &promptOptions{
 		PromptTemplates: &promptui.PromptTemplates{
-			Success: `{{ "Track contract:" | faint }} `,
+			Success: `{{ "Track particular contract:" | faint }} `,
 		},
 	})
 }

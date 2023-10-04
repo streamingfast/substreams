@@ -16,91 +16,93 @@ substreams_ethereum::init!();
 
 #[substreams::handlers::map]
 fn map_events(blk: eth::Block) -> Result<contract::Events, substreams::errors::Error> {
+    let timestamp_s = blk.timestamp().seconds as u64 + blk.timestamp().nanos as u64;
+
     Ok(contract::Events {
         approvals: blk
             .receipts()
             .flat_map(|view| {
-                view.receipt.logs.iter().filter_map(|log| {
-                    if log.address != TRACKED_CONTRACT {
-                        return None;
-                    }
+                view.receipt.logs.iter()
+                    .filter(|log| log.address == TRACKED_CONTRACT)
+                    .filter_map(|log| {
+                        if let Some(event) = abi::contract::events::Approval::match_and_decode(log) {
+                            return Some(contract::Approval {
+                                trx_hash: Hex(&view.transaction.hash).to_string(),
+                                log_index: log.block_index,
+                                timestamp_s,
+                                block_num: blk.number,
+                                approved: event.approved,
+                                owner: event.owner,
+                                token_id: event.token_id.to_string(),
+                            });
+                        }
 
-                    if let Some(event) = abi::contract::events::Approval::match_and_decode(log) {
-                        return Some(contract::Approval {
-                            trx_hash: Hex(&view.transaction.hash).to_string(),
-                            log_index: log.block_index,
-                            approved: event.approved,
-                            owner: event.owner,
-                            token_id: event.token_id.to_string(),
-                        });
-                    }
-
-                    None
+                        None
                 })
             })
             .collect(),
         approval_for_alls: blk
             .receipts()
             .flat_map(|view| {
-                view.receipt.logs.iter().filter_map(|log| {
-                    if log.address != TRACKED_CONTRACT {
-                        return None;
-                    }
+                view.receipt.logs.iter()
+                    .filter(|log| log.address == TRACKED_CONTRACT)
+                    .filter_map(|log| {
+                        if let Some(event) = abi::contract::events::ApprovalForAll::match_and_decode(log) {
+                            return Some(contract::ApprovalForAll {
+                                trx_hash: Hex(&view.transaction.hash).to_string(),
+                                log_index: log.block_index,
+                                timestamp_s,
+                                block_num: blk.number,
+                                approved: event.approved,
+                                operator: event.operator,
+                                owner: event.owner,
+                            });
+                        }
 
-                    if let Some(event) = abi::contract::events::ApprovalForAll::match_and_decode(log) {
-                        return Some(contract::ApprovalForAll {
-                            trx_hash: Hex(&view.transaction.hash).to_string(),
-                            log_index: log.block_index,
-                            approved: event.approved,
-                            operator: event.operator,
-                            owner: event.owner,
-                        });
-                    }
-
-                    None
+                        None
                 })
             })
             .collect(),
         ownership_transferreds: blk
             .receipts()
             .flat_map(|view| {
-                view.receipt.logs.iter().filter_map(|log| {
-                    if log.address != TRACKED_CONTRACT {
-                        return None;
-                    }
+                view.receipt.logs.iter()
+                    .filter(|log| log.address == TRACKED_CONTRACT)
+                    .filter_map(|log| {
+                        if let Some(event) = abi::contract::events::OwnershipTransferred::match_and_decode(log) {
+                            return Some(contract::OwnershipTransferred {
+                                trx_hash: Hex(&view.transaction.hash).to_string(),
+                                log_index: log.block_index,
+                                timestamp_s,
+                                block_num: blk.number,
+                                new_owner: event.new_owner,
+                                previous_owner: event.previous_owner,
+                            });
+                        }
 
-                    if let Some(event) = abi::contract::events::OwnershipTransferred::match_and_decode(log) {
-                        return Some(contract::OwnershipTransferred {
-                            trx_hash: Hex(&view.transaction.hash).to_string(),
-                            log_index: log.block_index,
-                            new_owner: event.new_owner,
-                            previous_owner: event.previous_owner,
-                        });
-                    }
-
-                    None
+                        None
                 })
             })
             .collect(),
         transfers: blk
             .receipts()
             .flat_map(|view| {
-                view.receipt.logs.iter().filter_map(|log| {
-                    if log.address != TRACKED_CONTRACT {
-                        return None;
-                    }
+                view.receipt.logs.iter()
+                    .filter(|log| log.address == TRACKED_CONTRACT)
+                    .filter_map(|log| {
+                        if let Some(event) = abi::contract::events::Transfer::match_and_decode(log) {
+                            return Some(contract::Transfer {
+                                trx_hash: Hex(&view.transaction.hash).to_string(),
+                                log_index: log.block_index,
+                                timestamp_s,
+                                block_num: blk.number,
+                                from: event.from,
+                                to: event.to,
+                                token_id: event.token_id.to_string(),
+                            });
+                        }
 
-                    if let Some(event) = abi::contract::events::Transfer::match_and_decode(log) {
-                        return Some(contract::Transfer {
-                            trx_hash: Hex(&view.transaction.hash).to_string(),
-                            log_index: log.block_index,
-                            from: event.from,
-                            to: event.to,
-                            token_id: event.token_id.to_string(),
-                        });
-                    }
-
-                    None
+                        None
                 })
             })
             .collect(),
@@ -118,6 +120,8 @@ fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::error
             .create_row("approvals", format!("{}-{}", evt.trx_hash, evt.log_index))
             .set("trx_hash", evt.trx_hash)
             .set("log_index", evt.log_index)
+            .set("timestamp_s", evt.timestamp_s)
+            .set("block_num", evt.block_num)
             .set("approved", Hex(&evt.approved).to_string())
             .set("owner", Hex(&evt.owner).to_string())
             .set("token_id", evt.token_id.to_string());
@@ -127,6 +131,8 @@ fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::error
             .create_row("approval_for_alls", format!("{}-{}", evt.trx_hash, evt.log_index))
             .set("trx_hash", evt.trx_hash)
             .set("log_index", evt.log_index)
+            .set("timestamp_s", evt.timestamp_s)
+            .set("block_num", evt.block_num)
             .set("approved", evt.approved)
             .set("operator", Hex(&evt.operator).to_string())
             .set("owner", Hex(&evt.owner).to_string());
@@ -136,6 +142,8 @@ fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::error
             .create_row("ownership_transferreds", format!("{}-{}", evt.trx_hash, evt.log_index))
             .set("trx_hash", evt.trx_hash)
             .set("log_index", evt.log_index)
+            .set("timestamp_s", evt.timestamp_s)
+            .set("block_num", evt.block_num)
             .set("new_owner", Hex(&evt.new_owner).to_string())
             .set("previous_owner", Hex(&evt.previous_owner).to_string());
     });
@@ -144,6 +152,8 @@ fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::error
             .create_row("transfers", format!("{}-{}", evt.trx_hash, evt.log_index))
             .set("trx_hash", evt.trx_hash)
             .set("log_index", evt.log_index)
+            .set("timestamp_s", evt.timestamp_s)
+            .set("block_num", evt.block_num)
             .set("from", Hex(&evt.from).to_string())
             .set("to", Hex(&evt.to).to_string())
             .set("token_id", evt.token_id.to_string());

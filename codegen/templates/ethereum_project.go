@@ -28,13 +28,15 @@ import (
 var ethereumProject embed.FS
 
 type EthereumProject struct {
-	name             string
-	moduleName       string
-	chain            *EthereumChain
-	contractAddress  eth.Address
-	events           []codegenEvent
-	abiContent       string
-	creationBlockNum uint64
+	name                        string
+	moduleName                  string
+	chain                       *EthereumChain
+	contractAddress             eth.Address
+	events                      []codegenEvent
+	abiContent                  string
+	creationBlockNum            uint64
+	sqlImportVersion            string
+	databaseChangeImportVersion string
 }
 
 func NewEthereumProject(name string, moduleName string, chain *EthereumChain, address eth.Address, abi *eth.ABI, abiContent string, creationBlockNum uint64) (*EthereumProject, error) {
@@ -45,13 +47,15 @@ func NewEthereumProject(name string, moduleName string, chain *EthereumChain, ad
 	}
 
 	return &EthereumProject{
-		name:             name,
-		moduleName:       moduleName,
-		chain:            chain,
-		contractAddress:  address,
-		events:           events,
-		abiContent:       abiContent,
-		creationBlockNum: creationBlockNum,
+		name:                        name,
+		moduleName:                  moduleName,
+		chain:                       chain,
+		contractAddress:             address,
+		events:                      events,
+		abiContent:                  abiContent,
+		creationBlockNum:            creationBlockNum,
+		sqlImportVersion:            "1.0.2",
+		databaseChangeImportVersion: "1.2.1",
 	}, nil
 }
 
@@ -87,12 +91,14 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 			}
 
 			model := map[string]any{
-				"name":         p.name,
-				"moduleName":   p.moduleName,
-				"chain":        p.chain,
-				"address":      p.contractAddress,
-				"events":       p.events,
-				"initialBlock": strconv.FormatUint(p.creationBlockNum, 10),
+				"name":                        p.name,
+				"moduleName":                  p.moduleName,
+				"chain":                       p.chain,
+				"address":                     p.contractAddress,
+				"events":                      p.events,
+				"initialBlock":                strconv.FormatUint(p.creationBlockNum, 10),
+				"sqlImportVersion":            p.sqlImportVersion,
+				"databaseChangeImportVersion": p.databaseChangeImportVersion,
 			}
 
 			zlog.Debug("rendering templated file", zap.String("filename", finalFileName), zap.Any("model", model))

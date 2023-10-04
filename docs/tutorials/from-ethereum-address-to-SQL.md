@@ -112,8 +112,18 @@ This is the expected output of your test
 
 Here is a PBWeb view of events added to **Approval For Alls** Table
 
-![img.png](pgweb.png)
+<figure>
+   <img src="../.gitbook/assets/pgweb.png" />
+   <figcaption>
+      <p>Approval For Alls PGWeb View</p>
+   </figcaption>
+</figure>
+![img.png](../../.gitbook/assets/pgweb.png/pgweb.png)
 
 Here is the Postgraphile view of the **Approval For Alls**
-
-![img.png](postgraphile.png)
+<figure>
+   <img src="../.gitbook/assets/postgraphile.png" />
+   <figcaption>
+      <p>Approval For Alls Postgraphile View</p>
+   </figcaption>
+</figure>

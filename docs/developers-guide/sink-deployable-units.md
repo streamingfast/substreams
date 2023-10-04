@@ -69,16 +69,24 @@ configs:
 1. Run the `serve` command in a shell (this is the development server that will create docker containers to run the sink and database) `substreams alpha sink-serve` (it will store data under './sink-data' by default, override to your preference with `--data-dir`)
 1. From another shell, deploy your Substreams deployable unit: `substreams alpha sink-deploy ./substreams.yaml` and see the output services details:
 ```
-FIXME
+Deploying... (creating services, please wait)
+Deployed substreams sink "1ef89c74":
+  Status: RUNNING ()
+Services:
+  - 1ef89c74-pgweb: PGWeb service "1ef89c74-pgweb" available at URL: 'http://localhost:8081'
+  - 1ef89c74-postgraphile: Postgraphile service "1ef89c74-postgraphile" available at URL: 'http://localhost:3000/graphiql' (API at 'http://localhost:3000/graphql')
+  - 1ef89c74-postgres: PostgreSQL service "1ef89c74-postgres" available at DSN: 'postgres://dev-node:insecure-change-me-in-prod@localhost:5432/dev-node?sslmode=disable'
+  - 1ef89c74-sink: Sink service (no exposed port). Use 'substreams alpha sink-info 1ef89c74-sink' to see last processed block or 'docker logs 1ef89c74-sink' to see the logs.
 ```
 
 1. You can explore the different services directly from your browser:
   * Postgraphile: http://localhost:3000/graphiql
   * PGWeb: http://localhost:8081/
-1. After a few seconds, the command `substreams alpha sink-info` should give you information about the progress of the sink (ex: `FIXME`)
+1. After a few seconds, the command `substreams alpha sink-info` should give you information about the progress of the sink (ex: `Last processed block: 11000`)
 1. You can pause the sink process and keep the database and tools available by running `substreams alpha sink-pause`
 1. Resume the sink process by running `substreams alpha sink-resume`
 1. To deploy a new version of your substreams to your development environment, simply use `substreams alpha sink-update ./substreams.yaml` with the new code. The sql-sink will continue feeding from where it left off, unless you use `--reset`, forcing the sink to start from the beginning.
+1. After deploying a new version, you can check the "output module hash" from the `sink-info` command and see confirm that it matches the module hash from your `substreams info` command. (ex: `Output module: db_out (dec326aecb9e27fbfb67d1748a91f7f84746ec27)`). The version number from your substreams.yaml is also displayed as part of the sink-info output.
 1. When you're done, use `substreams alpha sink-stop` or simply hit "ctrl-c" on the terminal running `sink-serve` and let it shut down the docker containers completely. You can always use `docker ps` to list all running containers on your machine.
 * Get the full list of sink management commands by running `substremas alpha help`
 

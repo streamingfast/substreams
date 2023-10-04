@@ -238,7 +238,7 @@ func (s *server) Stop(ctx context.Context, req *connect_go.Request[pbsinksvc.Sto
 
 	_, err = s.engine.Stop(req.Msg.DeploymentId, s.logger)
 	if err != nil {
-		return nil, fmt.Errorf("pausing %q: %w", req.Msg.DeploymentId, err)
+		return nil, fmt.Errorf("stopping %q: %w", req.Msg.DeploymentId, err)
 	}
 
 	newState, _, _, _, _, err := s.engine.Info(req.Msg.DeploymentId, s.logger)
@@ -263,7 +263,7 @@ func (s *server) Resume(ctx context.Context, req *connect_go.Request[pbsinksvc.R
 
 	_, err = s.engine.Resume(req.Msg.DeploymentId, prevState, s.logger)
 	if err != nil {
-		return nil, fmt.Errorf("pausing %q: %w", req.Msg.DeploymentId, err)
+		return nil, fmt.Errorf("resuming %q: %w", req.Msg.DeploymentId, err)
 	}
 
 	newState, _, _, _, _, err := s.engine.Info(req.Msg.DeploymentId, s.logger)
@@ -288,7 +288,7 @@ func (s *server) Remove(ctx context.Context, req *connect_go.Request[pbsinksvc.R
 
 	_, err = s.engine.Remove(req.Msg.DeploymentId, s.logger)
 	if err != nil {
-		return nil, fmt.Errorf("pausing %q: %w", req.Msg.DeploymentId, err)
+		return nil, fmt.Errorf("removing %q: %w", req.Msg.DeploymentId, err)
 	}
 
 	out := &pbsinksvc.RemoveResponse{

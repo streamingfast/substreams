@@ -180,6 +180,9 @@ func (f *fieldAndValue) Describe(prefix string) (string, []byte) {
 		case []byte:
 			rawdata = val
 		}
+		if len(rawdata) == 0 {
+			return fmt.Sprintf(prefix+"- %v: (empty) %v", f.key, optsToString(f.opts)), nil
+		}
 
 		hasher := md5.New()
 		hasher.Write(rawdata)
@@ -190,6 +193,9 @@ func (f *fieldAndValue) Describe(prefix string) (string, []byte) {
 
 	switch val := f.value.(type) {
 	case []byte:
+		if len(val) == 0 {
+			return fmt.Sprintf(prefix+"- %v: (empty) %v", f.key, optsToString(f.opts)), nil
+		}
 		return fmt.Sprintf(prefix+"- %v: %v (hex-encoded) %v", f.key, hex.EncodeToString(val), optsToString(f.opts)), nil
 	}
 
@@ -201,10 +207,10 @@ func optsToString(opts *pbss.FieldOptions) string {
 		return ""
 	}
 	if opts.LoadFromFile {
-		return "[LOADED FILE]"
+		return "[LOADED_FILE]"
 	}
 	if opts.ZipFromFolder {
-		return "[ZIPPED FOLDER]"
+		return "[ZIPPED_FOLDER]"
 	}
 	return ""
 }

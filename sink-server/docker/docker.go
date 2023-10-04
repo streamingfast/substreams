@@ -40,6 +40,9 @@ func NewEngine(dir string, sf_token string) (*DockerEngine, error) {
 	if err := out.CheckVersion(); err != nil {
 		return nil, err
 	}
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 

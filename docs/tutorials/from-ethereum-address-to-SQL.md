@@ -39,8 +39,7 @@ export SUBSTREAMS_API_TOKEN=$(curl https://auth.streamingfast.io/v1/auth/issue -
 {% code overflow="wrap" %}
 ```bash
 cd my-bayc/
-make build
-# make build-docker if you don't have a local Rust dev environment
+make build # this will either use your local rust environment if you have "cargo" installed, or a docker container
 ```
 {% endcode %}
 

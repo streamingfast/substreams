@@ -3,12 +3,19 @@ package info
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/streamingfast/substreams/manifest"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
 
 func TestBasicInfo(t *testing.T) {
-	info, err := Basic("https://github.com/streamingfast/substreams-uniswap-v3/releases/download/v0.2.8/substreams.spkg")
+	reader, err := manifest.NewReader("https://github.com/streamingfast/substreams-uniswap-v3/releases/download/v0.2.8/substreams.spkg")
+	require.NoError(t, err)
+
+	pkg, err := reader.Read()
+	require.NoError(t, err)
+
+	info, err := Basic(pkg)
 	require.NoError(t, err)
 
 	r, err := json.MarshalIndent(info, "", "  ")

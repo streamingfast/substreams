@@ -75,17 +75,7 @@ type ModuleInput struct {
 	Mode *string `json:"mode,omitempty"` //for store inputs
 }
 
-func Basic(manifestPath string) (*BasicInfo, error) {
-	reader, err := manifest.NewReader(manifestPath)
-	if err != nil {
-		return nil, fmt.Errorf("manifest reader: %w", err)
-	}
-
-	pkg, err := reader.Read()
-	if err != nil {
-		return nil, fmt.Errorf("read manifest %q: %w", manifestPath, err)
-	}
-
+func Basic(pkg *pbsubstreams.Package) (*BasicInfo, error) {
 	manifestInfo := &BasicInfo{
 		Name:    pkg.PackageMeta[0].Name,
 		Version: pkg.PackageMeta[0].Version,
@@ -188,11 +178,6 @@ func Basic(manifestPath string) (*BasicInfo, error) {
 }
 
 func Extended(manifestPath string, outputModule string) (*ExtendedInfo, error) {
-	basicInfo, err := Basic(manifestPath)
-	if err != nil {
-		return nil, err
-	}
-
 	reader, err := manifest.NewReader(manifestPath)
 	if err != nil {
 		return nil, fmt.Errorf("manifest reader: %w", err)
@@ -201,6 +186,15 @@ func Extended(manifestPath string, outputModule string) (*ExtendedInfo, error) {
 	pkg, err := reader.Read()
 	if err != nil {
 		return nil, fmt.Errorf("read manifest %q: %w", manifestPath, err)
+	}
+
+	return ExtendedWithPackage(pkg, outputModule)
+}
+
+func ExtendedWithPackage(pkg *pbsubstreams.Package, outputModule string) (*ExtendedInfo, error) {
+	basicInfo, err := Basic(pkg)
+	if err != nil {
+		return nil, err
 	}
 
 	var stages [][][]string

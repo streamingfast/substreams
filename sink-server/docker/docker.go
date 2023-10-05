@@ -51,6 +51,7 @@ type deploymentInfo struct {
 	PackageInfo *pbsinksvc.PackageInfo
 	ServiceInfo map[string]string
 	UsedPorts   []uint32
+	RunMeFirst  []string
 }
 
 func getModuleHash(mod string, pkg *pbsubstreams.Package) (hash string, err error) {
@@ -94,7 +95,7 @@ func (e *DockerEngine) CheckVersion() error {
 	return fmt.Errorf("Cannot determine docker compose version %q. Upgrade your Docker engine here: https://docs.docker.com/engine/install/", ver)
 }
 
-func (e *DockerEngine) writeDeploymentInfo(deploymentID string, usedPorts []uint32, svcInfo map[string]string, pkg *pbsubstreams.Package) error {
+func (e *DockerEngine) writeDeploymentInfo(deploymentID string, usedPorts []uint32, runMeFirst []string, svcInfo map[string]string, pkg *pbsubstreams.Package) error {
 
 	pkgMeta := pkg.PackageMeta[0]
 	hash, err := getModuleHash(pkg.SinkModule, pkg)
@@ -111,6 +112,7 @@ func (e *DockerEngine) writeDeploymentInfo(deploymentID string, usedPorts []uint
 			OutputModuleName: pkg.SinkModule,
 			OutputModuleHash: hash,
 		},
+		RunMeFirst: runMeFirst,
 	}
 
 	json, err := json.Marshal(depInfo)
@@ -145,7 +147,7 @@ func (e *DockerEngine) Create(deploymentID string, pkg *pbsubstreams.Package, zl
 		return fmt.Errorf("creating manifest from package: %w", err)
 	}
 
-	if err := e.writeDeploymentInfo(deploymentID, usedPorts, serviceInfo, pkg); err != nil {
+	if err := e.writeDeploymentInfo(deploymentID, usedPorts, runMeFirst, serviceInfo, pkg); err != nil {
 		return fmt.Errorf("cannot write Service Info: %w", err)
 	}
 
@@ -179,7 +181,7 @@ func (e *DockerEngine) Update(deploymentID string, pkg *pbsubstreams.Package, re
 		return fmt.Errorf("creating manifest from package: %w", err)
 	}
 
-	if err := e.writeDeploymentInfo(deploymentID, usedPorts, serviceInfo, pkg); err != nil {
+	if err := e.writeDeploymentInfo(deploymentID, usedPorts, runMeFirst, serviceInfo, pkg); err != nil {
 		return fmt.Errorf("cannot write Service Info: %w", err)
 	}
 
@@ -369,8 +371,24 @@ func (e *DockerEngine) Resume(deploymentID string, _ pbsinksvc.DeploymentStatus,
 	if e.otherDeploymentIsActive(deploymentID, zlog) {
 		return "", fmt.Errorf("this substreams-sink engine only supports a single active deployment. Stop any active sink before launching another one")
 	}
+
+	info, err := e.readDeploymentInfo(deploymentID)
+	if err != nil {
+		return "", err
+	}
+	// these services need to be healthy first
+	if info.RunMeFirst != nil {
+		args := append([]string{"compose", "up", "-d", "--wait"}, info.RunMeFirst...)
+		cmd := exec.Command("docker", args...)
+		cmd.Dir = filepath.Join(e.dir, deploymentID)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return string(out), err
+		}
+	}
+
 	var cmd *exec.Cmd
-	cmd = exec.Command("docker", "compose", "up", "-d")
+	cmd = exec.Command("docker", "compose", "up", "-d", "--wait")
 	cmd.Dir = filepath.Join(e.dir, deploymentID)
 	out, err := cmd.CombinedOutput()
 	if err != nil {

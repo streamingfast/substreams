@@ -16,12 +16,15 @@ $> substreams init
 Project name: my-bayc
 Protocol: Ethereum
 Ethereum chain: Mainnet
-Track contract: y # you can track any verified contract
-Verified Ethereum contract address to track: 0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d # Bored Ape Yacht Club
+Contract address to track (leave empty to use "Bored Ape Yacht Club"):
 Retrieving Ethereum Mainnet contract information (ABI & creation block)
 Writing project files
+  Generating ABI Events for Approval (owner,approved,tokenId)
+  Generating ABI Events for ApprovalForAll (owner,operator,approved)
+  Generating ABI Events for OwnershipTransferred (previousOwner,newOwner)
+  Generating ABI Events for Transfer (from,to,tokenId)
 Generating Protobuf Rust code
-Project "my-bayc" initialized at "/absolute/path/to/my-first/substreams/"
+Project "my-bayc" initialized at "/path/to/my-bayc"
 ```
 {% endcode %}
 
@@ -39,7 +42,8 @@ export SUBSTREAMS_API_TOKEN=$(curl https://auth.streamingfast.io/v1/auth/issue -
 {% code overflow="wrap" %}
 ```bash
 cd my-bayc/
-make build # this will either use your local rust environment if you have "cargo" installed, or a docker container
+make build # uses local "Cargo" command or falls back to using docker
+# ... Finished release [optimized] target(s) in 34.13s
 ```
 {% endcode %}
 
@@ -76,14 +80,9 @@ This is the expected output of your test
 ```
 {% endcode %}
 
-# Test your Substreams with the GUI
-You can also test your Substreams with the GUI. The GUI is a very good debugging tool if you want to have a better view of all your modules and be able to analyze all the outputs.
-
-{% code overflow="wrap" %}
-```bash
-substreams gui substreams.yaml db_out 
-```
-{% endcode %}
+{% hint style="info" %}
+**Note**: You can also test your Substreams with the GUI, which is a better debugging tool than the run command. Try `substreams gui substreams.yaml db_out --substreams-endpoint mainnet.eth.streamingfast.io:443 --stop-block +1`
+{% endhint %}
 
 # Deploy to a local sink dev environment
 * Your generated `substreams.yaml` defines your substreams as an SQL deployable unit with the `sink` section.

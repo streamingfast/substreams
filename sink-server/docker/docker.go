@@ -253,6 +253,9 @@ func (e *DockerEngine) Info(deploymentID string, zlog *zap.Logger) (pbsinksvc.De
 			if status == pbsinksvc.DeploymentStatus_UNKNOWN { // anything else has priority
 				status = pbsinksvc.DeploymentStatus_RUNNING
 			}
+		case "exited":
+			// some versions of 'docker compose' use 'exited' state for stopped containers, we ignore those here and treat them later
+			seen[output.Name] = false
 		default:
 			status = pbsinksvc.DeploymentStatus_FAILING
 			reason += fmt.Sprintf("%s: %q", strings.TrimPrefix(output.Name, deploymentID+"-"), output.Status)

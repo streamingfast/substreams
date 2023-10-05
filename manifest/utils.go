@@ -65,6 +65,7 @@ var HardcodedEndpoints = map[string]string{
 	"mainnet":      "mainnet.eth.streamingfast.io:443",
 	"matic":        "polygon.streamingfast.io:443",
 	"polygon":      "polygon.streamingfast.io:443",
+	"goerli":       "goerli.eth.streamingfast.io:443",
 	"mumbais":      "mumbai.streamingfast.io:443",
 	"bnb":          "bnb.streamingfast.io:443",
 	"bsc":          "bnb.streamingfast.io:443",

@@ -25,24 +25,6 @@ func (e *DockerEngine) newSink(deploymentID string, pgService string, pkg *pbsub
 		return conf, motd, fmt.Errorf("creating folder %q: %w", dataFolder, err)
 	}
 
-	endpoint := "api.streamingfast.io:443"
-	switch pkg.Network {
-	case "mainnet":
-		break
-	case "polygon", "matic":
-		endpoint = "polygon.streamingfast.io:443"
-	case "goerli":
-		endpoint = "goerli.eth.streamingfast.io:443"
-	case "sepolia":
-		endpoint = "sepolia.eth.streamingfast.io:443"
-	case "mumbai":
-		endpoint = "mumbai.streamingfast.io:443"
-	case "arbitrum", "arb-one":
-		endpoint = "arb-one.streamingfast.io:443"
-	case "solana", "sol-mainnet":
-		endpoint = "mainnet.sol.streamingfast.io:443"
-	}
-
 	conf = types.ServiceConfig{
 		Name:          name,
 		ContainerName: name,
@@ -67,7 +49,6 @@ func (e *DockerEngine) newSink(deploymentID string, pgService string, pkg *pbsub
 		DependsOn: []string{pgService},
 		Environment: map[string]*string{
 			"DSN":                  deref("postgres://dev-node:insecure-change-me-in-prod@postgres:5432/dev-node?sslmode=disable"),
-			"ENDPOINT":             &endpoint,
 			"OUTPUT_MODULE":        &pkg.SinkModule,
 			"SUBSTREAMS_API_TOKEN": &e.token,
 		},

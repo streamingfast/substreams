@@ -15,13 +15,13 @@ pub struct Events {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Approval {
     #[prost(string, tag="1")]
-    pub trx_hash: ::prost::alloc::string::String,
+    pub evt_tx_hash: ::prost::alloc::string::String,
     #[prost(uint32, tag="2")]
-    pub log_index: u32,
+    pub evt_index: u32,
     #[prost(uint64, tag="3")]
-    pub timestamp_s: u64,
+    pub evt_block_time: u64,
     #[prost(uint64, tag="4")]
-    pub block_num: u64,
+    pub evt_block_number: u64,
     #[prost(bytes="vec", tag="5")]
     pub owner: ::prost::alloc::vec::Vec<u8>,
     #[prost(bytes="vec", tag="6")]
@@ -33,13 +33,13 @@ pub struct Approval {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ApprovalForAll {
     #[prost(string, tag="1")]
-    pub trx_hash: ::prost::alloc::string::String,
+    pub evt_tx_hash: ::prost::alloc::string::String,
     #[prost(uint32, tag="2")]
-    pub log_index: u32,
+    pub evt_index: u32,
     #[prost(uint64, tag="3")]
-    pub timestamp_s: u64,
+    pub evt_block_time: u64,
     #[prost(uint64, tag="4")]
-    pub block_num: u64,
+    pub evt_block_number: u64,
     #[prost(bytes="vec", tag="5")]
     pub owner: ::prost::alloc::vec::Vec<u8>,
     #[prost(bytes="vec", tag="6")]
@@ -51,13 +51,13 @@ pub struct ApprovalForAll {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct OwnershipTransferred {
     #[prost(string, tag="1")]
-    pub trx_hash: ::prost::alloc::string::String,
+    pub evt_tx_hash: ::prost::alloc::string::String,
     #[prost(uint32, tag="2")]
-    pub log_index: u32,
+    pub evt_index: u32,
     #[prost(uint64, tag="3")]
-    pub timestamp_s: u64,
+    pub evt_block_time: u64,
     #[prost(uint64, tag="4")]
-    pub block_num: u64,
+    pub evt_block_number: u64,
     #[prost(bytes="vec", tag="5")]
     pub previous_owner: ::prost::alloc::vec::Vec<u8>,
     #[prost(bytes="vec", tag="6")]
@@ -67,13 +67,13 @@ pub struct OwnershipTransferred {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Transfer {
     #[prost(string, tag="1")]
-    pub trx_hash: ::prost::alloc::string::String,
+    pub evt_tx_hash: ::prost::alloc::string::String,
     #[prost(uint32, tag="2")]
-    pub log_index: u32,
+    pub evt_index: u32,
     #[prost(uint64, tag="3")]
-    pub timestamp_s: u64,
+    pub evt_block_time: u64,
     #[prost(uint64, tag="4")]
-    pub block_num: u64,
+    pub evt_block_number: u64,
     #[prost(bytes="vec", tag="5")]
     pub from: ::prost::alloc::vec::Vec<u8>,
     #[prost(bytes="vec", tag="6")]

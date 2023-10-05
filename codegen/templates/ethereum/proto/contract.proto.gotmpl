@@ -12,10 +12,10 @@ message Events {
 {{- range $event := $.events }}
 {{ $proto := $event.Proto }}
 message {{$proto.MessageName}} {
-    string trx_hash = 1;
-    uint32 log_index = 2;
-    uint64 timestamp_s = 3;
-    uint64 block_num = 4;
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    uint64 evt_block_time = 3;
+    uint64 evt_block_number = 4;
     {{- range $index, $protoField := $proto.Fields }}
     {{ $protoField.Type }} {{ sanitizeProtoFieldName $protoField.Name }} = {{ add $index 5 }};
     {{- end}}

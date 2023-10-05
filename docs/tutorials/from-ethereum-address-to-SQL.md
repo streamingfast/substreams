@@ -77,21 +77,32 @@ This is the expected output of your test
 ```
 {% endcode %}
 
+# Test your Substreams with the GUI
+You can also test your Substreams with the GUI. The GUI is a very good debugging tool if you want to have a better view of all your modules and be able to analyze all the outputs.
+
+{% code overflow="wrap" %}
+```bash
+substreams gui substreams.yaml db_out 
+```
+{% endcode %}
+
 # Deploy to a local sink dev environment
 * Your generated `substreams.yaml` defines your substreams as an SQL deployable unit with the `sink` section.
 
-1. Run the `serve` command in a shell (this is the development server that will create docker containers to run the sink and database) `substreams alpha sink-serve`
+1. Run the `serve` command in a shell (this is the development server that will create docker containers to run the sink and database)
     {% code overflow="wrap" %}
     ```bash
+    $> substreams alpha sink-serve
     2023-10-04T14:31:33.064-0400 INFO (substreams) starting server server
     2023-10-04T14:31:33.064-0400 INFO (substreams) grpc server with plain text server
     2023-10-04T14:31:33.064-0400 INFO (substreams) launching server {"listen_addr": "localhost:8000"}
     2023-10-04T14:31:33.065-0400 INFO (substreams) serving plaintext {"listen_addr": "localhost:8000"}
     ```
     {% endcode %}
-2. From another shell, deploy your Substreams `substreams alpha sink-deploy ./substreams.yaml` and see the output services details:
+2. From another shell, deploy your Substreams and see the output services details:
     {% code overflow="wrap" %}
     ```bash
+    $> substreams alpha sink-deploy ./substreams.yaml
     Response for deployment "f94fe55c":
     Name: my_bayc (v0.1.0)
     Output module: db_out (b9e2beff5403fcc89b14622f8224a72a9de27921)
@@ -103,7 +114,7 @@ This is the expected output of your test
       - f94fe55c-postgres: PostgreSQL service "f94fe55c-postgres" available at DSN: 'postgres://dev-node:insecure-change-me-in-prod@localhost:5432/dev-node?sslmode=disable'
       - f94fe55c-sink: Sink service (no exposed port). Use 'substreams alpha sink-info f94fe55c-sink' to see last processed block or 'docker logs f94fe55c-sink' to see the logs.
     ```
-    {% endcode %}
+    {% endcode %} 
 3. After a few seconds, the command `substreams alpha sink-info` should give you information about the progress of the sink (ex: `Last processed block: 12722000`)
 4. You can check the logs of the sink and see what's happening: `docker logs -f f94fe55c-sink`
 5. You can explore the different services directly from your browser:

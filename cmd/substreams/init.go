@@ -367,7 +367,7 @@ func prompt(label string, opts *promptOptions) (string, error) {
 	}
 
 	if opts != nil && opts.IsConfirm {
-		// We don't have no differences
+		// We have no differences
 		templates.Valid = `{{ "?" | blue}} {{ . | bold }} {{ "[y/N]" | faint}} `
 		templates.Invalid = templates.Valid
 	}

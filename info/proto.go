@@ -2,11 +2,12 @@ package info
 
 import (
 	"fmt"
+	"regexp"
+	"strings"
+
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/protoprint"
 	"google.golang.org/protobuf/types/descriptorpb"
-	"regexp"
-	"strings"
 )
 
 type ProtoPackageParser struct {
@@ -184,7 +185,7 @@ func extractEnumBlock(protoContent, messageName string) (string, error) {
 
 	matches := re.FindStringSubmatch(protoContent)
 	if matches == nil {
-		return "", fmt.Errorf("no message block found for message %q", messageName)
+		return "", fmt.Errorf("no message block found for enum %q", messageName)
 	}
 
 	return matches[0], nil

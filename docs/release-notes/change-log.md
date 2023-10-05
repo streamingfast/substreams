@@ -79,6 +79,10 @@ params:
 * The endpoint for each network can be set by using an environment variable `SUBSTREAMS_ENDPOINTS_CONFIG_<network_name>`, ex: `SUBSTREAMS_ENDPOINTS_CONFIG_MAINNET=my-endpoint:443`
 * The `substreams alpha init` has been moved to `substreams init`
 
+### Fixed
+
+* fixed the `substreams gui` command to correctly compute the stop-block when given a relative value (ex: '-t +10')
+
 ## v1.1.14
 
 ### Bug fixes

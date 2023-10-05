@@ -17,7 +17,6 @@ func main() {
 	}
 
 	rootCmd.Version = computeVersionString(version, info.Settings)
-	setup()
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)

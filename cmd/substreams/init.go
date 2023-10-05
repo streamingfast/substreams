@@ -94,11 +94,6 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			return errInitUnsupportedChain
 		}
 
-		isTrackingOwnContract, err := promptTrackContract()
-		if err != nil {
-			return fmt.Errorf("running contract address prompt: %w", err)
-		}
-
 		chain := templates.EthereumChainsByID[chainSelected.String()]
 		if chain == nil {
 			return fmt.Errorf("unknown chain: %s", chainSelected.String())
@@ -106,13 +101,9 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 
 		contract := eth.MustNewAddress(chain.DefaultContractAddress)
 
-		if isTrackingOwnContract {
-			contract, err = promptEthereumVerifiedContract()
-			if err != nil {
-				return fmt.Errorf("running contract prompt: %w", err)
-			}
-		} else {
-			fmt.Printf("Generating %s project using %s contract for demo purposes\n", chain.DisplayName, chain.DefaultContractName)
+		contract, err = promptEthereumVerifiedContract(contract, chain.DefaultContractName)
+		if err != nil {
+			return fmt.Errorf("running contract prompt: %w", err)
 		}
 
 		fmt.Printf("Retrieving %s contract information (ABI & creation block)\n", chain.DisplayName)
@@ -239,14 +230,24 @@ func projectNameToModuleName(in string) string {
 	return strings.ReplaceAll(in, "-", "_")
 }
 
-func promptEthereumVerifiedContract() (eth.Address, error) {
+func promptEthereumVerifiedContract(defaultAddress eth.Address, defaultContractName string) (eth.Address, error) {
 	if devInitEthereumTrackedContract != "" {
 		// It's ok to panic, we expect the dev to put in a valid Ethereum address
 		return eth.MustNewAddress(devInitEthereumTrackedContract), nil
 	}
 
-	return promptT("Verified Ethereum contract address to track", eth.NewAddress, &promptOptions{
+	inputOrDefaultFunc := func(input string) (eth.Address, error) {
+		if input == "" {
+			return defaultAddress, nil
+		}
+		return eth.NewAddress(input)
+	}
+
+	return promptT(fmt.Sprintf("Contract address to track (leave empty to use %q)", defaultContractName), inputOrDefaultFunc, &promptOptions{
 		Validate: func(input string) error {
+			if input == "" {
+				return nil
+			}
 			_, err := eth.NewAddress(input)
 			if err != nil {
 				return fmt.Errorf("invalid address: %w", err)
@@ -367,7 +368,7 @@ func prompt(label string, opts *promptOptions) (string, error) {
 	}
 
 	if opts != nil && opts.IsConfirm {
-		// We don't have no differences
+		// We have no differences
 		templates.Valid = `{{ "?" | blue}} {{ . | bold }} {{ "[y/N]" | faint}} `
 		templates.Invalid = templates.Valid
 	}

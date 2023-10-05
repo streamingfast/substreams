@@ -73,7 +73,12 @@ In Subgraphs, you define _triggers_ to index your data. These triggers are event
 
 ## Sink
 Substreams allows you to extract blockchain data and apply transformations to it. After that, you should choose **a place to send your transform data, which is called _sink_**.
-A sink can be a [Postgres database](https://substreams.streamingfast.io/developers-guide/sink-targets/substreams-sink-postgres), [a file](https://substreams.streamingfast.io/developers-guide/sink-targets/substreams-sink-files) or a [custom solution of your choice](https://substreams.streamingfast.io/developers-guide/sink-targets/custom-sink-js).
+A sink can be a [SQL database](https://substreams.streamingfast.io/developers-guide/sink-targets/substreams-sink-sql), [a file](https://substreams.streamingfast.io/developers-guide/sink-targets/substreams-sink-files) or a [custom solution of your choice](https://substreams.streamingfast.io/developers-guide/sink-targets/custom-sink-js).
+
+## Deployable Unit
+A deployable unit is a Substreams manifest or package (spkg) that contains all the information about how to run it from sink service. In the manifest, it corresponds to the `network` and `sink` fields.
+See [Working with deployable units](https://substreams.streamingfast.io/developers-guide/sink-deployable-units)
+
 
 ## Substreams-powered Subgraph
 When a Subgraph acts as a sink for your Substreams, you call it a [Substreams-powered Subgraph](https://thegraph.com/docs/en/cookbook/substreams-powered-subgraphs/).

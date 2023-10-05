@@ -16,8 +16,6 @@ substreams_ethereum::init!();
 
 #[substreams::handlers::map]
 fn map_events(blk: eth::Block) -> Result<contract::Events, substreams::errors::Error> {
-    let evt_block_time = (blk.timestamp().seconds as u64 * 1000) + (blk.timestamp().nanos as u64 / 1000000);
-
     Ok(contract::Events {
         {{- range $event := .events }}
         {{- $rust := $event.Rust }}
@@ -31,7 +29,7 @@ fn map_events(blk: eth::Block) -> Result<contract::Events, substreams::errors::E
                             return Some(contract::{{$rust.ProtoMessageName}} {
                                 evt_tx_hash: Hex(&view.transaction.hash).to_string(),
                                 evt_index: log.block_index,
-                                evt_block_time,
+                                evt_block_time: Some(blk.timestamp().to_owned()),
                                 evt_block_number: blk.number,
                                 {{- range $protoField, $abiToProtoConversion := $rust.ProtoFieldABIConversionMap }}
                                 {{$protoField}}: {{$abiToProtoConversion}},
@@ -60,7 +58,7 @@ fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::error
             .create_row("{{ $rust.ProtoOutputModuleFieldName }}", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
             .set("evt_tx_hash", evt.evt_tx_hash)
             .set("evt_index", evt.evt_index)
-            .set("evt_block_time", evt.evt_block_time)
+            .set("evt_block_time", evt.evt_block_time.unwrap())
             .set("evt_block_number", evt.evt_block_number)
             {{- $numberOfAttributes := len $rust.ProtoFieldDatabaseChangesMap }}
             {{- $i := 0 }}

@@ -16,8 +16,6 @@ substreams_ethereum::init!();
 
 #[substreams::handlers::map]
 fn map_events(blk: eth::Block) -> Result<contract::Events, substreams::errors::Error> {
-    let evt_block_time = (blk.timestamp().seconds as u64 * 1000) + (blk.timestamp().nanos as u64 / 1000000);
-
     Ok(contract::Events {
         approvals: blk
             .receipts()
@@ -29,7 +27,7 @@ fn map_events(blk: eth::Block) -> Result<contract::Events, substreams::errors::E
                             return Some(contract::Approval {
                                 evt_tx_hash: Hex(&view.transaction.hash).to_string(),
                                 evt_index: log.block_index,
-                                evt_block_time,
+                                evt_block_time: Some(blk.timestamp().to_owned()),
                                 evt_block_number: blk.number,
                                 approved: event.approved,
                                 owner: event.owner,
@@ -51,7 +49,7 @@ fn map_events(blk: eth::Block) -> Result<contract::Events, substreams::errors::E
                             return Some(contract::ApprovalForAll {
                                 evt_tx_hash: Hex(&view.transaction.hash).to_string(),
                                 evt_index: log.block_index,
-                                evt_block_time,
+                                evt_block_time: Some(blk.timestamp().to_owned()),
                                 evt_block_number: blk.number,
                                 approved: event.approved,
                                 operator: event.operator,
@@ -73,7 +71,7 @@ fn map_events(blk: eth::Block) -> Result<contract::Events, substreams::errors::E
                             return Some(contract::OwnershipTransferred {
                                 evt_tx_hash: Hex(&view.transaction.hash).to_string(),
                                 evt_index: log.block_index,
-                                evt_block_time,
+                                evt_block_time: Some(blk.timestamp().to_owned()),
                                 evt_block_number: blk.number,
                                 new_owner: event.new_owner,
                                 previous_owner: event.previous_owner,
@@ -94,7 +92,7 @@ fn map_events(blk: eth::Block) -> Result<contract::Events, substreams::errors::E
                             return Some(contract::Transfer {
                                 evt_tx_hash: Hex(&view.transaction.hash).to_string(),
                                 evt_index: log.block_index,
-                                evt_block_time,
+                                evt_block_time: Some(blk.timestamp().to_owned()),
                                 evt_block_number: blk.number,
                                 from: event.from,
                                 to: event.to,
@@ -120,7 +118,7 @@ fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::error
             .create_row("approvals", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
             .set("evt_tx_hash", evt.evt_tx_hash)
             .set("evt_index", evt.evt_index)
-            .set("evt_block_time", evt.evt_block_time)
+            .set("evt_block_time", evt.evt_block_time.unwrap())
             .set("evt_block_number", evt.evt_block_number)
             .set("approved", Hex(&evt.approved).to_string())
             .set("owner", Hex(&evt.owner).to_string())
@@ -131,7 +129,7 @@ fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::error
             .create_row("approval_for_alls", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
             .set("evt_tx_hash", evt.evt_tx_hash)
             .set("evt_index", evt.evt_index)
-            .set("evt_block_time", evt.evt_block_time)
+            .set("evt_block_time", evt.evt_block_time.unwrap())
             .set("evt_block_number", evt.evt_block_number)
             .set("approved", evt.approved)
             .set("operator", Hex(&evt.operator).to_string())
@@ -142,7 +140,7 @@ fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::error
             .create_row("ownership_transferreds", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
             .set("evt_tx_hash", evt.evt_tx_hash)
             .set("evt_index", evt.evt_index)
-            .set("evt_block_time", evt.evt_block_time)
+            .set("evt_block_time", evt.evt_block_time.unwrap())
             .set("evt_block_number", evt.evt_block_number)
             .set("new_owner", Hex(&evt.new_owner).to_string())
             .set("previous_owner", Hex(&evt.previous_owner).to_string());
@@ -152,7 +150,7 @@ fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::error
             .create_row("transfers", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
             .set("evt_tx_hash", evt.evt_tx_hash)
             .set("evt_index", evt.evt_index)
-            .set("evt_block_time", evt.evt_block_time)
+            .set("evt_block_time", evt.evt_block_time.unwrap())
             .set("evt_block_number", evt.evt_block_number)
             .set("from", Hex(&evt.from).to_string())
             .set("to", Hex(&evt.to).to_string())

@@ -819,6 +819,7 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "prost",
+ "prost-types",
  "regex",
  "substreams",
  "substreams-database-change",

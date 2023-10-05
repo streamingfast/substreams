@@ -18,8 +18,8 @@ pub struct Approval {
     pub evt_tx_hash: ::prost::alloc::string::String,
     #[prost(uint32, tag="2")]
     pub evt_index: u32,
-    #[prost(uint64, tag="3")]
-    pub evt_block_time: u64,
+    #[prost(message, optional, tag="3")]
+    pub evt_block_time: ::core::option::Option<::prost_types::Timestamp>,
     #[prost(uint64, tag="4")]
     pub evt_block_number: u64,
     #[prost(bytes="vec", tag="5")]
@@ -36,8 +36,8 @@ pub struct ApprovalForAll {
     pub evt_tx_hash: ::prost::alloc::string::String,
     #[prost(uint32, tag="2")]
     pub evt_index: u32,
-    #[prost(uint64, tag="3")]
-    pub evt_block_time: u64,
+    #[prost(message, optional, tag="3")]
+    pub evt_block_time: ::core::option::Option<::prost_types::Timestamp>,
     #[prost(uint64, tag="4")]
     pub evt_block_number: u64,
     #[prost(bytes="vec", tag="5")]
@@ -54,8 +54,8 @@ pub struct OwnershipTransferred {
     pub evt_tx_hash: ::prost::alloc::string::String,
     #[prost(uint32, tag="2")]
     pub evt_index: u32,
-    #[prost(uint64, tag="3")]
-    pub evt_block_time: u64,
+    #[prost(message, optional, tag="3")]
+    pub evt_block_time: ::core::option::Option<::prost_types::Timestamp>,
     #[prost(uint64, tag="4")]
     pub evt_block_number: u64,
     #[prost(bytes="vec", tag="5")]
@@ -70,8 +70,8 @@ pub struct Transfer {
     pub evt_tx_hash: ::prost::alloc::string::String,
     #[prost(uint32, tag="2")]
     pub evt_index: u32,
-    #[prost(uint64, tag="3")]
-    pub evt_block_time: u64,
+    #[prost(message, optional, tag="3")]
+    pub evt_block_time: ::core::option::Option<::prost_types::Timestamp>,
     #[prost(uint64, tag="4")]
     pub evt_block_number: u64,
     #[prost(bytes="vec", tag="5")]

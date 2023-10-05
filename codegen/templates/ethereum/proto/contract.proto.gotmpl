@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+import "google/protobuf/timestamp.proto";
+
 package contract.v1;
 
 message Events {
@@ -14,7 +16,7 @@ message Events {
 message {{$proto.MessageName}} {
     string evt_tx_hash = 1;
     uint32 evt_index = 2;
-    uint64 evt_block_time = 3;
+    google.protobuf.Timestamp evt_block_time = 3;
     uint64 evt_block_number = 4;
     {{- range $index, $protoField := $proto.Fields }}
     {{ $protoField.Type }} {{ sanitizeProtoFieldName $protoField.Name }} = {{ add $index 5 }};

@@ -3,6 +3,10 @@ package main
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
@@ -11,9 +15,6 @@ import (
 	"github.com/streamingfast/substreams/tools"
 	"github.com/streamingfast/substreams/tui2"
 	"github.com/streamingfast/substreams/tui2/pages/request"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 func init() {
@@ -128,6 +129,22 @@ func runGui(cmd *cobra.Command, args []string) error {
 	stopBlock, err := readStopBlockFlag(cmd, startBlock, "stop-block", cursor != "")
 	if err != nil {
 		return fmt.Errorf("stop block: %w", err)
+	}
+
+	if readFromModule { // need to tweak the stop block here
+		graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
+		if err != nil {
+			return fmt.Errorf("creating module graph: %w", err)
+		}
+		sb, err := graph.ModuleInitialBlock(outputModule)
+		if err != nil {
+			return fmt.Errorf("getting module start block: %w", err)
+		}
+		startBlock := int64(sb)
+		stopBlock, err = readStopBlockFlag(cmd, startBlock, "stop-block", cursor != "")
+		if err != nil {
+			return fmt.Errorf("stop block: %w", err)
+		}
 	}
 
 	requestConfig := &request.RequestConfig{

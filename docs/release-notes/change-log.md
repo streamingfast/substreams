@@ -4,36 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v1.1.15
 
 ### Highlights
 
-This release brings enhancements to sink config features, as a step to enable more potent "deployable units" inside your Substreams. The way files and folders are embedded inside the packaged config has been greatly improved, no need for a clunky prefix anymore, the config definition itself now defines if the parameter you provide should be read from file or as a set of folder.
+* This release brings the `substreams init` command out of alpha! You can quickly generate a Substreams from an ethereum ABI:
 
-You can see for example the [substreams-sink-sql tutorial sink config](https://github.com/streamingfast/substreams-sink-sql/blob/develop/docs/tutorial/sink/substreams.dev.yaml#L12-L17):
+![init-flow](../assets/init-flow.gif)
 
-```yaml
-specVersion: v0.1.0
-package:
-  name: "substreams_sink_sql_tutorial"
+* New Alpha feature: deploy your Substreams Sink as a deployable unit to a local docker environment!
 
-...
+![sink-deploy-flow](../assets/sink-deploy-flow.gif)
 
-sink:
-  module: main:db_out
-  type: sf.substreams.sink.sql.v1.Service
-  config:
-    schema: "../schema.sql"
-```
-
-Here the `schema` will be embedded from its file source directly.
-
-`substreams alpha init` command is now out of alpha and part of the substreams root command. `substreams init` allows a Substreams developer to more easily boostrap a new Substreams project. Running the init command will do multiple actions: 
-* prompt what name you want your substreams to have
-* prompt what chain you want to create your substreams on
-* if you want to track a specific contract (needs to be a valid contract), the abi will be fetched, and all the required code will be generated for you
-* generate the schema.sql file which will be used to set up the postgres sinker
-* generate `lib.rs` file with `map_events`, which streams out the events of the contract provided and `db_out`, which produces database changes for the postgres sinker
+* See those two new features in action in this [tutorial](https://substreams.streamingfast.io/tutorials/from-ethereum-address-to-sql)
 
 ### Added
 
@@ -42,7 +25,7 @@ Here the `schema` will be embedded from its file source directly.
   * `load_from_file` will put the content of the file directly in the field (string and bytes contents are supported).
   * `zip_from_folder` will create a zip archive and put its content in the field (field type must be bytes).
 
-  Example:
+  Example protobuf definition:
   ```
   import "sf/substreams/v1/options.proto";
 
@@ -52,27 +35,46 @@ Here the `schema` will be embedded from its file source directly.
   }
   ```
 
+  Example manifest file:
+  ```yaml
+  [...]
+  network: mainnet
+  
+  sink:
+    module: main:db_out
+    type: sf.substreams.sink.sql.v1.Service
+    config:
+      schema: "./schema.sql"
+      wire_protocol_access: true
+      postgraphile_frontend:
+        enabled: true
+      pgweb_frontend:
+        enabled: true
+  ```
+
 * `substreams info` command now properly displays the content of sink configs, optionally writing the fields that were bundled from files to disk with `--output-sinkconfig-files-path=</some/path>`
 
 ### Changed
 
-* The override feature has been overhauled. Users may now override an existing substreams by pointing to an override file in `run` or `gui` command. This override manifest will have a `deriveFrom` field which points to the original substreams which is to be overriden.
+* `substreams alpha init` renamed to `substreams init`. It now includes `db_out` module and `schema.sql` to support the substreams-sql-sink directly.
+* The override feature has been overhauled. Users may now override an existing substreams by pointing to an override file in `run` or `gui` command. 
+  This override manifest will have a `deriveFrom` field which points to the original substreams which is to be overriden.
+  This is useful to port a substreams to one network to another.
 
 Example of an override manifest:
 ```
-deriveFrom: path/to/original.spkg #this can also be a remote url
+deriveFrom: path/to/mainnet-substreams.spkg #this can also be a remote url
 
 package:
-  name: "overriden_package_name"
+  name: "polygon-substreams"
   version: "100.0.0"
 
 network: polygon
 
 initialBlocks:
-  module_name_1: 17500000
-  module_name_1: 17500000
+  module1: 17500000
 params:
-  module_name_1: "override_paramete_value_here"
+  module1: "address=2a75ca72679cf1299936d6104d825c9654489058"
 ```
 
 * The `substreams run` and `substreams gui` commands now determine the endpoint from the 'network' field in the manifest if no value is passed in the `--substreams-endpoint` flag.

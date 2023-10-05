@@ -127,9 +127,9 @@ Here is a PBWeb view of events added to **Approval For Alls** Table
       <p>Approval For Alls PGWeb View</p>
    </figcaption>
 </figure>
-![img.png](../../.gitbook/assets/pgweb.png/pgweb.png)
 
 Here is the Postgraphile view of the **Approval For Alls**
+
 <figure>
    <img src="../.gitbook/assets/postgraphile.png" />
    <figcaption>

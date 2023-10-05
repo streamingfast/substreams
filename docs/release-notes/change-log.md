@@ -8,13 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Highlights
 
-* This release brings the `substreams init` command out of alpha! You can quickly generate a Substreams from an ethereum ABI:
-
-![init-flow](../assets/init-flow.gif)
+* This release brings the `substreams init` command out of alpha! You can quickly generate a Substreams from an Ethereum ABI:
+  ![init-flow](../assets/init-flow.gif)
 
 * New Alpha feature: deploy your Substreams Sink as a deployable unit to a local docker environment!
-
-![sink-deploy-flow](../assets/sink-deploy-flow.gif)
+  ![sink-deploy-flow](../assets/sink-deploy-flow.gif)
 
 * See those two new features in action in this [tutorial](https://substreams.streamingfast.io/tutorials/from-ethereum-address-to-sql)
 
@@ -60,22 +58,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * The override feature has been overhauled. Users may now override an existing substreams by pointing to an override file in `run` or `gui` command. 
   This override manifest will have a `deriveFrom` field which points to the original substreams which is to be overriden.
   This is useful to port a substreams to one network to another.
-
-Example of an override manifest:
-```
-deriveFrom: path/to/mainnet-substreams.spkg #this can also be a remote url
-
-package:
-  name: "polygon-substreams"
-  version: "100.0.0"
-
-network: polygon
-
-initialBlocks:
-  module1: 17500000
-params:
-  module1: "address=2a75ca72679cf1299936d6104d825c9654489058"
-```
+  Example of an override manifest:
+  ```
+  deriveFrom: path/to/mainnet-substreams.spkg #this can also be a remote url
+  
+  package:
+    name: "polygon-substreams"
+    version: "100.0.0"
+  
+  network: polygon
+  
+  initialBlocks:
+    module1: 17500000
+  params:
+    module1: "address=2a75ca72679cf1299936d6104d825c9654489058"
+  ```
 
 * The `substreams run` and `substreams gui` commands now determine the endpoint from the 'network' field in the manifest if no value is passed in the `--substreams-endpoint` flag.
 * The endpoint for each network can be set by using an environment variable `SUBSTREAMS_ENDPOINTS_CONFIG_<network_name>`, ex: `SUBSTREAMS_ENDPOINTS_CONFIG_MAINNET=my-endpoint:443`
@@ -309,7 +306,7 @@ This release fixes data determinism issues. This comes at a 20% performance cost
     * You can then `cp` or `mv` the caches for each module hash.
   * You can also ignore this change. This will simply invalidate your cache.
 
-* Fixed a memory leak where "PostJobHooks" were not always called. These are used to hook in rpc calls in ethereum chain. They are now always called, even if no block has been processed (can be called with `nil` value for the clock)
+* Fixed a memory leak where "PostJobHooks" were not always called. These are used to hook in rpc calls in Ethereum chain. They are now always called, even if no block has been processed (can be called with `nil` value for the clock)
 * Jobs that fail deterministically (during WASM execution) on tier2 will fail faster, without retries from tier1.
 * `substreams gui` command now handles params flag (it was ignored)
 * Substeams GUI responsiveness improved significantly when handling large payloads

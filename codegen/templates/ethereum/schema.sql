@@ -1,6 +1,6 @@
 
 CREATE TABLE IF NOT EXISTS approvals (
-    "trx_hash" VARCHAR(40),
+    "trx_hash" VARCHAR(64),
     "log_index" INT,
     "timestamp_s" DECIMAL,
     "block_num" DECIMAL,
@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS approvals (
     "token_id" DECIMAL
 );
 CREATE TABLE IF NOT EXISTS approval_for_alls (
-    "trx_hash" VARCHAR(40),
+    "trx_hash" VARCHAR(64),
     "log_index" INT,
     "timestamp_s" DECIMAL,
     "block_num" DECIMAL,
@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS approval_for_alls (
     "owner" VARCHAR(40)
 );
 CREATE TABLE IF NOT EXISTS ownership_transferreds (
-    "trx_hash" VARCHAR(40),
+    "trx_hash" VARCHAR(64),
     "log_index" INT,
     "timestamp_s" DECIMAL,
     "block_num" DECIMAL,
@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS ownership_transferreds (
     "previous_owner" VARCHAR(40)
 );
 CREATE TABLE IF NOT EXISTS transfers (
-    "trx_hash" VARCHAR(40),
+    "trx_hash" VARCHAR(64),
     "log_index" INT,
     "timestamp_s" DECIMAL,
     "block_num" DECIMAL,

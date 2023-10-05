@@ -192,6 +192,12 @@ func (e *rustEventModel) populateFields(log *eth.LogEventDef) error {
 	e.ProtoFieldABIConversionMap = map[string]string{}
 	e.ProtoFieldDatabaseChangesMap = map[string]string{}
 	e.ProtoFieldSqlmap = map[string]string{}
+	paramNames := make([]string, len(log.Parameters))
+	for i := range log.Parameters {
+		paramNames[i] = log.Parameters[i].Name
+	}
+	fmt.Printf("  Generating ABI Events for %s (%s)\n", log.Name, strings.Join(paramNames, ","))
+
 	for _, parameter := range log.Parameters {
 		name := strcase.ToSnake(parameter.Name)
 		name = sanitizeProtoFieldName(name)

@@ -51,7 +51,7 @@ func deployE(cmd *cobra.Command, args []string) error {
 
 	resp, err := cli.Deploy(ctx, connect.NewRequest(req))
 	if err != nil {
-		return err
+		return interceptConnectionError(err)
 	}
 
 	reason := ""

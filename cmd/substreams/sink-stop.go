@@ -59,7 +59,7 @@ func sinkStopE(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Stopping... (shutting down services, please wait)\n")
 	resp, err := cli.Stop(ctx, connect.NewRequest(req))
 	if err != nil {
-		return err
+		return interceptConnectionError(err)
 	}
 	fmt.Printf("Response for deployment %q:\n  Previous Status: %v, New Status: %v\n", id, resp.Msg.PreviousStatus, resp.Msg.NewStatus)
 

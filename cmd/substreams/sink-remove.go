@@ -69,7 +69,7 @@ func sinkRemoveE(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Stopping... (shutting down services and removing data, please wait)\n")
 	resp, err := cli.Remove(ctx, connect.NewRequest(req))
 	if err != nil {
-		return err
+		return interceptConnectionError(err)
 	}
 	fmt.Printf("Deployment %q successfully deleted.\nPrevious Status: %v\nNew Status: DELETED.", id, resp.Msg.PreviousStatus)
 

@@ -58,7 +58,7 @@ func sinkInfoE(cmd *cobra.Command, args []string) error {
 
 	resp, err := cli.Info(ctx, connect.NewRequest(req))
 	if err != nil {
-		return err
+		return interceptConnectionError(err)
 	}
 	reason := ""
 	if resp.Msg.Reason != "" {

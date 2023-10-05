@@ -38,7 +38,7 @@ func sinkListE(cmd *cobra.Command, args []string) error {
 
 	resp, err := cli.List(ctx, connect.NewRequest(req))
 	if err != nil {
-		return err
+		return interceptConnectionError(err)
 	}
 
 	if len(resp.Msg.Deployments) == 0 {

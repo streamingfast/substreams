@@ -81,7 +81,7 @@ func updateE(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Updating sink %q... (restarting services,%s please wait)\n", req.DeploymentId, deletingString)
 	resp, err := cli.Update(ctx, connect.NewRequest(req))
 	if err != nil {
-		return err
+		return interceptConnectionError(err)
 	}
 
 	reason := ""

@@ -63,7 +63,7 @@ func sinkResumeE(cmd *cobra.Command, args []string) error {
 
 	resp, err := cli.Resume(ctx, connect.NewRequest(req))
 	if err != nil {
-		return err
+		return interceptConnectionError(err)
 	}
 	fmt.Printf("Response for deployment %q:\n  Previous Status: %v, New Status: %v\n", id, resp.Msg.PreviousStatus, resp.Msg.NewStatus)
 

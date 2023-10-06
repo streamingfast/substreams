@@ -12,7 +12,7 @@ In this tutorial, you will learn how to bootstrap a Substreams with the Bored Ap
 
 1. Substreams cli: version v1.1.15 or above required, navigate to [Installing the Cli](https://substreams.streamingfast.io/getting-started/installing-the-cli)
 2. Docker: visit the official installation [page](https://docs.docker.com/engine/install/)
-3. (Optional) Rust: to better tweak, get your hands dirty and have fun developing substreams, you need to install Rust. Visit the official Rust installation [page](https://www.rust-lang.org/tools/install)
+3. (Optional) Rust: to better tweak, get your hands dirty and have fun developing Substreams, you need to install Rust. Visit the official Rust installation [page](https://www.rust-lang.org/tools/install)
 
 ## Generate base Substreams code
 
@@ -91,7 +91,9 @@ This is the expected output of your test
 {% endcode %}
 
 {% hint style="info" %}
-**Note**: You can also test your Substreams with the GUI, which is a better debugging tool than the run command. Try `substreams gui substreams.yaml db_out --substreams-endpoint mainnet.eth.streamingfast.io:443 --stop-block +1`
+**Note**: You can also test your Substreams with the GUI, which is a better debugging tool than the run command. Try:
+
+`substreams gui substreams.yaml db_out --substreams-endpoint mainnet.eth.streamingfast.io:443 --stop-block +1`
 {% endhint %}
 
 ## Deploy to a local sink dev environment

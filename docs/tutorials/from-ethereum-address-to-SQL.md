@@ -101,7 +101,6 @@ This is the expected output of your test
 1. Run the `serve` command in a shell (this is the development server that will create docker containers to run the sink and database)
 
 {% code overflow="wrap" %}
-````
 ```bash
 $> substreams alpha sink-serve
 2023-10-04T14:31:33.064-0400 INFO (substreams) starting server server
@@ -109,13 +108,11 @@ $> substreams alpha sink-serve
 2023-10-04T14:31:33.064-0400 INFO (substreams) launching server {"listen_addr": "localhost:8000"}
 2023-10-04T14:31:33.065-0400 INFO (substreams) serving plaintext {"listen_addr": "localhost:8000"}
 ```
-````
 {% endcode %}
 
 2. From another shell, deploy your Substreams and see the output services details:
 
 {% code overflow="wrap" %}
-````
 ```bash
 $> substreams alpha sink-deploy ./substreams.yaml
 Response for deployment "f94fe55c":
@@ -129,7 +126,6 @@ Services:
   - f94fe55c-postgres: PostgreSQL service "f94fe55c-postgres" available at DSN: 'postgres://dev-node:insecure-change-me-in-prod@localhost:5432/dev-node?sslmode=disable'
   - f94fe55c-sink: Sink service (no exposed port). Use 'substreams alpha sink-info f94fe55c-sink' to see last processed block or 'docker logs f94fe55c-sink' to see the logs.
 ```
-````
 {% endcode %}
 
 3\. After a few seconds, the command `substreams alpha sink-info` should give you information about the progress of the sink (ex: `Last processed block: 12722000`)

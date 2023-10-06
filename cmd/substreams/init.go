@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"os"
 	"os/exec"
@@ -71,6 +73,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("running project name prompt: %w", err)
 	}
+	_ = moduleName
 
 	absoluteProjectDir := path.Join(absoluteWorkingDir, projectName)
 
@@ -99,28 +102,41 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("unknown chain: %s", chainSelected.String())
 		}
 
-		contract := eth.MustNewAddress(chain.DefaultContractAddress)
-
-		contract, err = promptEthereumVerifiedContract(contract, chain.DefaultContractName)
+		ethereumContracts, err := promptEthereumVerifiedContracts(eth.MustNewAddress(chain.DefaultContractAddress), chain.DefaultContractName)
 		if err != nil {
 			return fmt.Errorf("running contract prompt: %w", err)
 		}
 
+		if len(ethereumContracts) != 1 {
+			// more than one contract to track, need to set the short names of the contracts
+			fmt.Printf("Tracking %d contracts, let's define a short name for each contract\n", len(ethereumContracts))
+			ethereumContracts, err = promptEthereumContractShortNames(ethereumContracts)
+			if err != nil {
+				return fmt.Errorf("running short name contract prompt: %w", err)
+			}
+		}
+
 		fmt.Printf("Retrieving %s contract information (ABI & creation block)\n", chain.DisplayName)
 
-		// Get contract abiContent & parse
-		abiContent, abi, err := getContractABI(cmd.Context(), contract, chain)
+		// Get contract abiContents & parse them
+		ethereumContracts, err = getAndSetContractABIs(cmd.Context(), ethereumContracts, chain)
 		if err != nil {
 			return fmt.Errorf("getting %s contract ABI: %w", chain.DisplayName, err)
 		}
 
 		// Get contract creation block
-		// First, wait 5 seconds to avoid Etherscan API rate limit
-		time.Sleep(5 * time.Second)
-		creationBlockNum, err := getContractCreationBlock(cmd.Context(), contract, chain)
+		lowestStartBlock, err := getContractCreationBlock(cmd.Context(), ethereumContracts, chain)
 		if err != nil {
-			fmt.Printf("getting %s contract creation block, using 0 instead: %v\n", chain.DisplayName, err)
-			creationBlockNum = 0
+			// FIXME: not sure if we should simplify set the contract block num to zero by default
+			return fmt.Errorf("getting %s contract creating block: %w", chain.DisplayName, err)
+		}
+
+		for _, contract := range ethereumContracts {
+			events, err := templates.BuildEventModels(contract.GetAbi())
+			if err != nil {
+				return fmt.Errorf("build ABI event models for contract [%s - %s]: %w", contract.Address, contract.Name, err)
+			}
+			contract.SetEvents(events)
 		}
 
 		fmt.Println("Writing project files")
@@ -128,10 +144,8 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			projectName,
 			moduleName,
 			chain,
-			contract,
-			abi,
-			abiContent,
-			creationBlockNum,
+			ethereumContracts,
+			lowestStartBlock,
 		)
 		if err != nil {
 			return fmt.Errorf("new Ethereum %s project: %w", chain.DisplayName, err)
@@ -147,7 +161,6 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		fmt.Println()
 		fmt.Println("Come join us in discord at https://discord.gg/u8amUbGBgF and suggest templates/chains you want to see!")
 		fmt.Println()
-
 		return errInitUnsupportedProtocol
 	}
 
@@ -230,11 +243,15 @@ func projectNameToModuleName(in string) string {
 	return strings.ReplaceAll(in, "-", "_")
 }
 
-func promptEthereumVerifiedContract(defaultAddress eth.Address, defaultContractName string) (eth.Address, error) {
+func promptEthereumVerifiedContracts(defaultAddress eth.Address, defaultContractName string) ([]*templates.EthereumContract, error) {
 	if devInitEthereumTrackedContract != "" {
 		// It's ok to panic, we expect the dev to put in a valid Ethereum address
-		return eth.MustNewAddress(devInitEthereumTrackedContract), nil
+		return []*templates.EthereumContract{
+			templates.NewEthereumContract("", eth.MustNewAddress(devInitEthereumTrackedContract), nil, nil, ""),
+		}, nil
 	}
+
+	var ethContracts []*templates.EthereumContract
 
 	inputOrDefaultFunc := func(input string) (eth.Address, error) {
 		if input == "" {
@@ -243,7 +260,39 @@ func promptEthereumVerifiedContract(defaultAddress eth.Address, defaultContractN
 		return eth.NewAddress(input)
 	}
 
-	return promptT(fmt.Sprintf("Contract address to track (leave empty to use %q)", defaultContractName), inputOrDefaultFunc, &promptOptions{
+	inputOrEmptyFunc := func(input string) (eth.Address, error) {
+		if input == "" {
+			return nil, nil
+		}
+		return eth.NewAddress(input)
+	}
+
+	firstContractAddress, err := promptContractAddress(fmt.Sprintf("Contract address to track (leave empty to use %q)", defaultContractName), inputOrDefaultFunc)
+	if err != nil {
+		return nil, err
+	}
+
+	ethContracts = append(ethContracts, templates.NewEthereumContract("", firstContractAddress, nil, nil, ""))
+
+	if bytes.Equal(firstContractAddress, defaultAddress) {
+		return ethContracts, nil
+	}
+
+	for {
+		contractAddr, err := promptContractAddress("Would you like to track another contract? (Leave empty if not)", inputOrEmptyFunc)
+		if err != nil {
+			return nil, err
+		}
+
+		if contractAddr == nil {
+			return ethContracts, nil
+		}
+		ethContracts = append(ethContracts, templates.NewEthereumContract("", contractAddr, nil, nil, ""))
+	}
+}
+
+func promptContractAddress(message string, inputFuncCheck func(input string) (eth.Address, error)) (eth.Address, error) {
+	return promptT(message, inputFuncCheck, &promptOptions{
 		Validate: func(input string) error {
 			if input == "" {
 				return nil
@@ -252,10 +301,32 @@ func promptEthereumVerifiedContract(defaultAddress eth.Address, defaultContractN
 			if err != nil {
 				return fmt.Errorf("invalid address: %w", err)
 			}
-
 			return nil
 		},
 	})
+}
+
+var shortNameRegexp = regexp.MustCompile(`^([a-zA-Z][a-zA-Z0-9]{0,63})$`)
+
+func promptEthereumContractShortNames(ethereumContracts []*templates.EthereumContract) ([]*templates.EthereumContract, error) {
+	for _, contract := range ethereumContracts {
+		shortName, err := prompt(fmt.Sprintf("Choose a short name for %s", contract.Address), &promptOptions{
+			Validate: func(input string) error {
+				ok := shortNameRegexp.MatchString(input)
+				if !ok {
+					return fmt.Errorf("invalid name: must match %s", shortNameRegexp)
+				}
+
+				return nil
+			},
+		})
+		if err != nil {
+			return nil, err
+		}
+		contract.SetName(shortName)
+	}
+
+	return ethereumContracts, nil
 }
 
 func promptTrackContract() (bool, error) {
@@ -440,73 +511,90 @@ var httpClient = http.Client{
 	Timeout:   30 * time.Second,
 }
 
-func getContractABI(ctx context.Context, contract eth.Address, chain *templates.EthereumChain) (string, *eth.ABI, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/api?module=contract&action=getabi&address=%s&apikey=YourApiKeyToken", chain.ApiEndpoint, contract.Pretty()), nil)
-	if err != nil {
-		return "", nil, fmt.Errorf("new request: %w", err)
+func getAndSetContractABIs(ctx context.Context, contracts []*templates.EthereumContract, chain *templates.EthereumChain) ([]*templates.EthereumContract, error) {
+	for _, contract := range contracts {
+		// TODO: test the apikey for all the chains
+		req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/api?module=contract&action=getabi&address=%s", chain.ApiEndpoint, contract.Address.Pretty()), nil)
+		if err != nil {
+			return nil, fmt.Errorf("new request: %w", err)
+		}
+
+		res, err := httpClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("getting contract abi from etherscan: %w", err)
+		}
+		defer res.Body.Close()
+
+		type Response struct {
+			Result interface{} `json:"result"`
+		}
+
+		var response Response
+		if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
+			return nil, fmt.Errorf("unmarshaling: %w", err)
+		}
+
+		abiContent, ok := response.Result.(string)
+		if !ok {
+			return nil, fmt.Errorf(`invalid response "Result" field type, expected "string" got "%T"`, response.Result)
+		}
+
+		ethABI, err := eth.ParseABIFromBytes([]byte(abiContent))
+		if err != nil {
+			return nil, fmt.Errorf("parsing abi: %w", err)
+		}
+		contract.SetAbiContent(abiContent)
+		contract.SetAbi(ethABI)
+
+		// wait 5 seconds to avoid Etherscan API rate limit
+		time.Sleep(5 * time.Second)
 	}
 
-	res, err := httpClient.Do(req)
-	if err != nil {
-		return "", nil, fmt.Errorf("getting contract abi from etherscan: %w", err)
-	}
-	defer res.Body.Close()
-
-	type Response struct {
-		Result interface{} `json:"result"`
-	}
-
-	var response Response
-	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		return "", nil, fmt.Errorf("unmarshaling: %w", err)
-	}
-
-	abiContent, ok := response.Result.(string)
-	if !ok {
-		return "", nil, fmt.Errorf(`invalid response "Result" field type, expected "string" got "%T"`, response.Result)
-	}
-
-	ethABI, err := eth.ParseABIFromBytes([]byte(abiContent))
-	if err != nil {
-		return "", nil, fmt.Errorf("parsing abi: %w", err)
-	}
-
-	return abiContent, ethABI, nil
+	return contracts, nil
 }
 
-func getContractCreationBlock(ctx context.Context, contract eth.Address, chain *templates.EthereumChain) (uint64, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/api?module=account&action=txlist&address=%s&page=1&offset=1&sort=asc&apikey=YourApiKeyToken", chain.ApiEndpoint, contract.Pretty()), nil)
-	if err != nil {
-		return 0, fmt.Errorf("new request: %w", err)
-	}
+func getContractCreationBlock(ctx context.Context, contracts []*templates.EthereumContract, chain *templates.EthereumChain) (uint64, error) {
+	var lowestStartBlock uint64 = math.MaxUint64
+	for _, contract := range contracts {
+		req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/api?module=account&action=txlist&address=%s&page=1&offset=1&sort=asc&apikey=YourApiKeyToken", chain.ApiEndpoint, contract.Address.Pretty()), nil)
+		if err != nil {
+			return 0, fmt.Errorf("new request: %w", err)
+		}
 
-	res, err := httpClient.Do(req)
-	if err != nil {
-		return 0, fmt.Errorf("failed request to etherscan: %w", err)
-	}
-	defer res.Body.Close()
+		res, err := httpClient.Do(req)
+		if err != nil {
+			return 0, fmt.Errorf("failed request to etherscan: %w", err)
+		}
+		defer res.Body.Close()
 
-	type Response struct {
-		Status  string `json:"status"`
-		Message string `json:"message"`
-		Result  []struct {
-			BlockNumber string `json:"blockNumber"`
-		} `json:"result"`
-	}
+		type Response struct {
+			Status  string `json:"status"`
+			Message string `json:"message"`
+			Result  []struct {
+				BlockNumber string `json:"blockNumber"`
+			} `json:"result"`
+		}
 
-	var response Response
-	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		return 0, fmt.Errorf("unmarshaling: %w", err)
-	}
+		var response Response
+		if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
+			return 0, fmt.Errorf("unmarshaling: %w", err)
+		}
 
-	if len(response.Result) == 0 {
-		return 0, fmt.Errorf("empty result from response %v", response)
-	}
+		if len(response.Result) == 0 {
+			return 0, fmt.Errorf("empty result from response %v", response)
+		}
 
-	blockNum, err := strconv.ParseUint(response.Result[0].BlockNumber, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("parsing block number: %w", err)
-	}
+		blockNum, err := strconv.ParseUint(response.Result[0].BlockNumber, 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf("parsing block number: %w", err)
+		}
 
-	return blockNum, nil
+		if blockNum < lowestStartBlock {
+			lowestStartBlock = blockNum
+		}
+
+		// wait 5 seconds to avoid Etherscan API rate limit
+		time.Sleep(5 * time.Second)
+	}
+	return lowestStartBlock, nil
 }

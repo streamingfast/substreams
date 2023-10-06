@@ -1,14 +1,12 @@
 package templates
 
 import (
-	"bytes"
 	"embed"
 	"fmt"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
-	"text/template"
 
 	"github.com/gertd/go-pluralize"
 	"github.com/iancoleman/strcase"
@@ -27,34 +25,62 @@ import (
 //go:embed ethereum/schema.sql.gotmpl
 var ethereumProject embed.FS
 
+type EthereumContract struct {
+	Name       string
+	Address    eth.Address
+	events     []codegenEvent
+	abi        *eth.ABI
+	abiContent string
+}
+
+func NewEthereumContract(name string, address eth.Address, events []codegenEvent, abi *eth.ABI, abiContent string) *EthereumContract {
+	return &EthereumContract{
+		Name:       name,
+		Address:    address,
+		events:     events,
+		abi:        abi,
+		abiContent: abiContent,
+	}
+}
+
+func (e *EthereumContract) SetName(name string) {
+	e.Name = name
+}
+
+func (e *EthereumContract) SetEvents(events []codegenEvent) {
+	e.events = events
+}
+
+func (e *EthereumContract) GetAbi() *eth.ABI {
+	return e.abi
+}
+
+func (e *EthereumContract) SetAbi(abi *eth.ABI) {
+	e.abi = abi
+}
+
+func (e *EthereumContract) SetAbiContent(abiContent string) {
+	e.abiContent = abiContent
+}
+
 type EthereumProject struct {
 	name                        string
 	moduleName                  string
 	chain                       *EthereumChain
-	contractAddress             eth.Address
-	events                      []codegenEvent
-	abiContent                  string
 	creationBlockNum            uint64
+	ethereumContracts           []*EthereumContract
 	sqlImportVersion            string
 	databaseChangeImportVersion string
 	network                     string
 }
 
-func NewEthereumProject(name string, moduleName string, chain *EthereumChain, address eth.Address, abi *eth.ABI, abiContent string, creationBlockNum uint64) (*EthereumProject, error) {
-	// We only have one templated file so far, so we can build own model correctly
-	events, err := buildEventModels(abi)
-	if err != nil {
-		return nil, fmt.Errorf("build ABI event models: %w", err)
-	}
-
+func NewEthereumProject(name string, moduleName string, chain *EthereumChain, contracts []*EthereumContract, lowestStartBlock uint64) (*EthereumProject, error) {
 	return &EthereumProject{
 		name:                        name,
 		moduleName:                  moduleName,
 		chain:                       chain,
-		contractAddress:             address,
-		events:                      events,
-		abiContent:                  abiContent,
-		creationBlockNum:            creationBlockNum,
+		ethereumContracts:           contracts,
+		creationBlockNum:            lowestStartBlock,
 		sqlImportVersion:            "1.0.2",
 		databaseChangeImportVersion: "1.2.1",
 		network:                     chain.Network,
@@ -86,44 +112,45 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 		finalFileName := ethereumProjectEntry
 		zlog.Debug("reading ethereum project entry", zap.String("filename", finalFileName))
 
-		if strings.HasSuffix(finalFileName, ".gotmpl") {
-			tmpl, err := template.New(finalFileName).Funcs(ProjectGeneratorFuncs).Parse(string(content))
-			if err != nil {
-				return nil, fmt.Errorf("embed parse entry template %q: %w", finalFileName, err)
-			}
-
-			model := map[string]any{
-				"name":                        p.name,
-				"moduleName":                  p.moduleName,
-				"chain":                       p.chain,
-				"address":                     p.contractAddress,
-				"events":                      p.events,
-				"initialBlock":                strconv.FormatUint(p.creationBlockNum, 10),
-				"sqlImportVersion":            p.sqlImportVersion,
-				"databaseChangeImportVersion": p.databaseChangeImportVersion,
-				"network":                     p.network,
-			}
-
-			zlog.Debug("rendering templated file", zap.String("filename", finalFileName), zap.Any("model", model))
-
-			buffer := bytes.NewBuffer(make([]byte, 0, uint64(float64(len(content))*1.10)))
-			if err := tmpl.Execute(buffer, model); err != nil {
-				return nil, fmt.Errorf("embed render entry template %q: %w", finalFileName, err)
-			}
-
-			finalFileName = strings.TrimSuffix(finalFileName, ".gotmpl")
-			content = buffer.Bytes()
-		}
+		// todo: the logic here is going to change as we can have multiple contracts to track at the same time
+		//if strings.HasSuffix(finalFileName, ".gotmpl") {
+		//	tmpl, err := template.New(finalFileName).Funcs(ProjectGeneratorFuncs).Parse(string(content))
+		//	if err != nil {
+		//		return nil, fmt.Errorf("embed parse entry template %q: %w", finalFileName, err)
+		//	}
+		//
+		//	model := map[string]any{
+		//		"name":                        p.name,
+		//		"moduleName":                  p.moduleName,
+		//		"chain":                       p.chain,
+		//		"address":                     p.contractAddress,
+		//		"events":                      p.events,
+		//		"initialBlock":                strconv.FormatUint(p.creationBlockNum, 10),
+		//		"sqlImportVersion":            p.sqlImportVersion,
+		//		"databaseChangeImportVersion": p.databaseChangeImportVersion,
+		//		"network":                     p.network,
+		//	}
+		//
+		//	zlog.Debug("rendering templated file", zap.String("filename", finalFileName), zap.Any("model", model))
+		//
+		//	buffer := bytes.NewBuffer(make([]byte, 0, uint64(float64(len(content))*1.10)))
+		//	if err := tmpl.Execute(buffer, model); err != nil {
+		//		return nil, fmt.Errorf("embed render entry template %q: %w", finalFileName, err)
+		//	}
+		//
+		//	finalFileName = strings.TrimSuffix(finalFileName, ".gotmpl")
+		//	content = buffer.Bytes()
+		//}
 
 		entries[finalFileName] = content
 	}
 
-	entries["abi/contract.abi.json"] = []byte(p.abiContent)
+	//entries["abi/contract.abi.json"] = []byte(p.abiContents)
 
 	return entries, nil
 }
 
-func buildEventModels(abi *eth.ABI) (out []codegenEvent, err error) {
+func BuildEventModels(abi *eth.ABI) (out []codegenEvent, err error) {
 	pluralizer := pluralize.NewClient()
 
 	names := keys(abi.LogEventsByNameMap)
@@ -196,7 +223,7 @@ func (e *rustEventModel) populateFields(log *eth.LogEventDef) error {
 	for i := range log.Parameters {
 		paramNames[i] = log.Parameters[i].Name
 	}
-	fmt.Printf("  Generating ABI Events for %s (%s)\n", log.Name, strings.Join(paramNames, ","))
+	fmt.Printf("  Generating ABI events for %s (%s)\n", log.Name, strings.Join(paramNames, ","))
 
 	for _, parameter := range log.Parameters {
 		name := strcase.ToSnake(parameter.Name)
@@ -411,4 +438,16 @@ func getProtoFieldType(solidityType eth.SolidityType) string {
 type protoField struct {
 	Name string
 	Type string
+}
+
+type StartBlockContracts struct {
+	contractAddress eth.Address
+	startBlockNum   uint64
+}
+
+func New(contractAddress eth.Address, startBlockNum uint64) *StartBlockContracts {
+	return &StartBlockContracts{
+		contractAddress: contractAddress,
+		startBlockNum:   startBlockNum,
+	}
 }

@@ -10,28 +10,30 @@ use substreams_ethereum::Event;
 #[allow(unused_imports)]
 use num_traits::cast::ToPrimitive;
 
-{{- range $i, $contract := .ethereumContracts }}
-const {{ $contract.Name }}_TRACKED_CONTRACT: [u8; 20] = hex!("{{ $contract.Address }}");
-{{- end}}
+substreams_ethereum::init!();
 
 {{- range $i, $contract := .ethereumContracts }}
+const {{ toUpper $contract.Name }}_TRACKED_CONTRACT: [u8; 20] = hex!("{{ $contract.Address }}");
+{{- end}}
+
+{{ range $i, $contract := .ethereumContracts }}
 fn map_{{ $contract.Name }}_events(blk: &eth::Block, events: &mut contract::Events) {
     {{- range $event := $contract.Events }}
     {{- $rust := $event.Rust }}
-    events.{{ $rust.ProtoOutputModuleFieldName }}.append(&mut blk
+    events.{{ $contract.Name }}_{{ $rust.ProtoOutputModuleFieldName }}.append(&mut blk
         .receipts()
         .flat_map(|view| {
             view.receipt.logs.iter()
-                .filter(|log| log.address == {{ $contract.Name }}_TRACKED_CONTRACT)
+                .filter(|log| log.address == {{ toUpper $contract.Name }}_TRACKED_CONTRACT)
                 .filter_map(|log| {
                     if let Some(event) = abi::contract::events::{{$rust.ABIStructName}}::match_and_decode(log) {
-                        return Some(contract::{{$rust.ProtoMessageName}} {
+                        return Some(contract::{{ capitalizeFirst $contract.Name }}{{$rust.ProtoMessageName}} {
                             evt_tx_hash: Hex(&view.transaction.hash).to_string(),
                             evt_index: log.block_index,
                             evt_block_time: Some(blk.timestamp().to_owned()),
                             evt_block_number: blk.number,
                             {{- range $protoField, $abiToProtoConversion := $rust.ProtoFieldABIConversionMap }}
-                                {{$protoField}}: {{$abiToProtoConversion}},
+                            {{$protoField}}: {{$abiToProtoConversion}},
                             {{- end}}
                         });
                     }
@@ -40,15 +42,13 @@ fn map_{{ $contract.Name }}_events(blk: &eth::Block, events: &mut contract::Even
             })
         })
         .collect());
-    {{- end}}
+    {{- end }}
 }
-{{- end}}
-
-substreams_ethereum::init!();
+{{ end }}
 
 #[substreams::handlers::map]
 fn map_events(blk: eth::Block) -> Result<contract::Events, substreams::errors::Error> {
-    let mut events: contract::Events::default();
+    let mut events = contract::Events::default();
     {{- range $i, $contract := .ethereumContracts }}
     map_{{ $contract.Name }}_events(&blk, &mut events);
     {{- end }}

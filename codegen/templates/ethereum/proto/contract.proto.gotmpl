@@ -4,11 +4,13 @@ import "google/protobuf/timestamp.proto";
 
 package contract.v1;
 {{ $numberOfContracts := len .ethereumContracts }}
+{{- $eventsCounter := 0 }}
 message Events {
     {{- range $i, $contract := .ethereumContracts }}
     {{- range $index, $event := $contract.Events }}
     {{- $proto := $event.Proto }}
-    repeated {{ if ne $numberOfContracts 1 }}{{ $contract.Name_ }}{{ end }}{{$proto.MessageName}} {{$proto.OutputModuleFieldName}} = {{ add $index 1 }};
+    {{- $eventsCounter = add $eventsCounter 1 }}
+    repeated {{ if ne $numberOfContracts 1 }}{{ $contract.Name }}_{{ end }}{{$proto.MessageName}} {{ if ne $numberOfContracts 1 }}{{ $contract.Name }}_{{ end }}{{$proto.OutputModuleFieldName}} = {{ $eventsCounter }};
     {{- end}}
     {{- end}}
 }
@@ -16,13 +18,13 @@ message Events {
 {{- range $i, $contract := .ethereumContracts}}
 {{- range $event := $contract.Events }}
 {{ $proto := $event.Proto }}
-message {{$proto.MessageName}} {
+message {{ if ne $numberOfContracts 1 }}{{ $contract.Name }}_{{ end }}{{$proto.MessageName}} {
     string evt_tx_hash = 1;
     uint32 evt_index = 2;
     google.protobuf.Timestamp evt_block_time = 3;
     uint64 evt_block_number = 4;
     {{- range $index, $protoField := $proto.Fields }}
-    {{ $protoField.Type }} {{ if ne $numberOfContracts 1 }}{{ $contract.Name_ }}{{ end }}{{ sanitizeProtoFieldName $protoField.Name }} = {{ add $index 5 }};
+    {{ $protoField.Type }} {{ sanitizeProtoFieldName $protoField.Name }} = {{ add $index 5 }};
     {{- end}}
 }
 {{- end}}

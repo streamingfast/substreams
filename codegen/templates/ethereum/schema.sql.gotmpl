@@ -1,7 +1,8 @@
+{{- $numberOfContracts := len .ethereumContracts }}
 {{- range $i, $contract := .ethereumContracts }}
 {{- range $event := $contract.Events }}
 {{- $rust := $event.Rust }}
-CREATE TABLE IF NOT EXISTS {{ $contract.Name }}{{ $rust.ProtoOutputModuleFieldName }} (
+CREATE TABLE IF NOT EXISTS {{ if ne $numberOfContracts 1 }}{{ $contract.Name }}_{{ end }}{{ $rust.ProtoOutputModuleFieldName }} (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,

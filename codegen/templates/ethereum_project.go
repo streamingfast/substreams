@@ -106,15 +106,15 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 		"rust-toolchain.toml",
 		"schema.sql.gotmpl",
 	} {
+		if ethereumProjectEntry == "src/lib.rs.gotmpl" && len(p.ethereumContracts) != 1 {
+			ethereumProjectEntry = "src/multiple_contracts_lib.rs.gotmpl"
+		}
 		content, err := ethereumProject.ReadFile(filepath.Join("ethereum", ethereumProjectEntry))
 		if err != nil {
 			return nil, fmt.Errorf("embed read entry %q: %w", ethereumProjectEntry, err)
 		}
 
 		finalFileName := ethereumProjectEntry
-		if ethereumProjectEntry == "src/lib.rs.gotmpl" && len(p.ethereumContracts) != 1 {
-			finalFileName = "src/multiple_contracts_lib.rs.gotmpl"
-		}
 
 		zlog.Debug("reading ethereum project entry", zap.String("filename", finalFileName))
 
@@ -143,7 +143,7 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 			}
 
 			if len(p.ethereumContracts) != 1 {
-				finalFileName = strings.TrimPrefix(finalFileName, "multiple_contracts_")
+				finalFileName = strings.ReplaceAll(finalFileName, "multiple_contracts_", "")
 			}
 
 			finalFileName = strings.TrimSuffix(finalFileName, ".gotmpl")
@@ -151,6 +151,11 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 		}
 
 		entries[finalFileName] = content
+	}
+
+	if len(p.ethereumContracts) == 1 {
+		entries["abi/contract.abi.json"] = []byte(p.ethereumContracts[0].abiContent)
+		return entries, nil
 	}
 
 	for _, contract := range p.ethereumContracts {

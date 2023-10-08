@@ -132,6 +132,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		}
 
 		for _, contract := range ethereumContracts {
+			fmt.Printf("Generating ABI Event models for %s\n", contract.Name)
 			events, err := templates.BuildEventModels(contract.GetAbi())
 			if err != nil {
 				return fmt.Errorf("build ABI event models for contract [%s - %s]: %w", contract.Address, contract.Name, err)
@@ -513,7 +514,6 @@ var httpClient = http.Client{
 
 func getAndSetContractABIs(ctx context.Context, contracts []*templates.EthereumContract, chain *templates.EthereumChain) ([]*templates.EthereumContract, error) {
 	for _, contract := range contracts {
-		// TODO: test the apikey for all the chains
 		req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/api?module=contract&action=getabi&address=%s", chain.ApiEndpoint, contract.Address.Pretty()), nil)
 		if err != nil {
 			return nil, fmt.Errorf("new request: %w", err)
@@ -546,7 +546,8 @@ func getAndSetContractABIs(ctx context.Context, contracts []*templates.EthereumC
 		contract.SetAbiContent(abiContent)
 		contract.SetAbi(ethABI)
 
-		// wait 5 seconds to avoid Etherscan API rate limit
+		// wait 5 seconds to avoid API rate limit
+		fmt.Printf("Fetched contract ABI for %s\n", contract.Address)
 		time.Sleep(5 * time.Second)
 	}
 
@@ -594,6 +595,7 @@ func getContractCreationBlock(ctx context.Context, contracts []*templates.Ethere
 		}
 
 		// wait 5 seconds to avoid Etherscan API rate limit
+		fmt.Printf("Fetched initial block %d for %s (lowest %d)\n", blockNum, contract.Address, lowestStartBlock)
 		time.Sleep(5 * time.Second)
 	}
 	return lowestStartBlock, nil

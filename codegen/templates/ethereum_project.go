@@ -112,15 +112,12 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 		}
 
 		finalFileName := ethereumProjectEntry
-		if ethereumProjectEntry == "src/lib.rs.gotmpl" {
-			// here we should do a check on if there are multiple contracts of not
-			// if there is only one contract, use the lib.rs.gotmpl file if not
-			// use the multiple_contracts_lib.rs.gotmpl
+		if ethereumProjectEntry == "src/lib.rs.gotmpl" && len(p.ethereumContracts) != 1 {
+			finalFileName = "src/multiple_contracts_lib.rs.gotmpl"
 		}
 
 		zlog.Debug("reading ethereum project entry", zap.String("filename", finalFileName))
 
-		//todo: the logic here is going to change as we can have multiple contracts to track at the same time
 		if strings.HasSuffix(finalFileName, ".gotmpl") {
 			tmpl, err := template.New(finalFileName).Funcs(ProjectGeneratorFuncs).Parse(string(content))
 			if err != nil {
@@ -143,6 +140,10 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 			buffer := bytes.NewBuffer(make([]byte, 0, uint64(float64(len(content))*1.10)))
 			if err := tmpl.Execute(buffer, model); err != nil {
 				return nil, fmt.Errorf("embed render entry template %q: %w", finalFileName, err)
+			}
+
+			if len(p.ethereumContracts) != 1 {
+				finalFileName = strings.TrimPrefix(finalFileName, "multiple_contracts_")
 			}
 
 			finalFileName = strings.TrimSuffix(finalFileName, ".gotmpl")

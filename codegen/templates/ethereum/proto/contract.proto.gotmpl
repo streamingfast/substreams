@@ -3,15 +3,18 @@ syntax = "proto3";
 import "google/protobuf/timestamp.proto";
 
 package contract.v1;
-
+{{ $numberOfContracts := len .ethereumContracts }}
 message Events {
-    {{- range $index, $event := $.events }}
+    {{- range $i, $contract := .ethereumContracts }}
+    {{- range $index, $event := $contract.Events }}
     {{- $proto := $event.Proto }}
-    repeated {{$proto.MessageName}} {{$proto.OutputModuleFieldName}} = {{ add $index 1 }};
+    repeated {{ if ne $numberOfContracts 1 }}{{ $contract.Name_ }}{{ end }}{{$proto.MessageName}} {{$proto.OutputModuleFieldName}} = {{ add $index 1 }};
+    {{- end}}
     {{- end}}
 }
 
-{{- range $event := $.events }}
+{{- range $i, $contract := .ethereumContracts}}
+{{- range $event := $contract.Events }}
 {{ $proto := $event.Proto }}
 message {{$proto.MessageName}} {
     string evt_tx_hash = 1;
@@ -19,7 +22,8 @@ message {{$proto.MessageName}} {
     google.protobuf.Timestamp evt_block_time = 3;
     uint64 evt_block_number = 4;
     {{- range $index, $protoField := $proto.Fields }}
-    {{ $protoField.Type }} {{ sanitizeProtoFieldName $protoField.Name }} = {{ add $index 5 }};
+    {{ $protoField.Type }} {{ if ne $numberOfContracts 1 }}{{ $contract.Name_ }}{{ end }}{{ sanitizeProtoFieldName $protoField.Name }} = {{ add $index 5 }};
     {{- end}}
 }
+{{- end}}
 {{- end}}

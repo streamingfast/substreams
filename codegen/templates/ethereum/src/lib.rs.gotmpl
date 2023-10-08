@@ -10,47 +10,64 @@ use substreams_ethereum::Event;
 #[allow(unused_imports)]
 use num_traits::cast::ToPrimitive;
 
-{{- range $i, $contract := .ethereumContracts }}
-const {{ $contract.Name }}_TRACKED_CONTRACT: [u8; 20] = hex!("{{ $contract.Address }}");
-{{- end}}
-
-{{- range $i, $contract := .ethereumContracts }}
-fn map_{{ $contract.Name }}_events(blk: &eth::Block, events: &mut contract::Events) {
-    {{- range $event := $contract.Events }}
-    {{- $rust := $event.Rust }}
-    events.{{ $rust.ProtoOutputModuleFieldName }}.append(&mut blk
-        .receipts()
-        .flat_map(|view| {
-            view.receipt.logs.iter()
-                .filter(|log| log.address == {{ $contract.Name }}_TRACKED_CONTRACT)
-                .filter_map(|log| {
-                    if let Some(event) = abi::contract::events::{{$rust.ABIStructName}}::match_and_decode(log) {
-                        return Some(contract::{{$rust.ProtoMessageName}} {
-                            evt_tx_hash: Hex(&view.transaction.hash).to_string(),
-                            evt_index: log.block_index,
-                            evt_block_time: Some(blk.timestamp().to_owned()),
-                            evt_block_number: blk.number,
-                            {{- range $protoField, $abiToProtoConversion := $rust.ProtoFieldABIConversionMap }}
-                                {{$protoField}}: {{$abiToProtoConversion}},
-                            {{- end}}
-                        });
-                    }
-
-                    None
-            })
-        })
-        .collect());
-    {{- end}}
-}
-{{- end}}
+const TRACKED_CONTRACT: [u8; 20] = hex!("{{ (index .ethereumContracts 0).Address }}");
 
 substreams_ethereum::init!();
 
 #[substreams::handlers::map]
 fn map_events(blk: eth::Block) -> Result<contract::Events, substreams::errors::Error> {
-    let mut events: contract::Events::default();
-    {{- range $i, $contract := .ethereumContracts }}
-    map_{{ $contract.Name }}_events(&blk, &mut events);
-    {{- end }}
-    Ok(events)
+    Ok(contract::Events {
+        {{- range $event := (index .ethereumContracts 0).Events }}
+        {{- $rust := $event.Rust }}
+        {{ $rust.ProtoOutputModuleFieldName }}: blk
+            .receipts()
+            .flat_map(|view| {
+                view.receipt.logs.iter()
+                    .filter(|log| log.address == TRACKED_CONTRACT)
+                    .filter_map(|log| {
+                        if let Some(event) = abi::contract::events::{{$rust.ABIStructName}}::match_and_decode(log) {
+                            return Some(contract::{{$rust.ProtoMessageName}} {
+                                evt_tx_hash: Hex(&view.transaction.hash).to_string(),
+                                evt_index: log.block_index,
+                                evt_block_time: Some(blk.timestamp().to_owned()),
+                                evt_block_number: blk.number,
+                                {{- range $protoField, $abiToProtoConversion := $rust.ProtoFieldABIConversionMap }}
+                                {{$protoField}}: {{$abiToProtoConversion}},
+                                {{- end}}
+                            });
+                        }
+
+                        None
+                })
+            })
+            .collect(),
+        {{- end}}
+    })
+}
+
+#[substreams::handlers::map]
+fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::errors::Error> {
+    // Initialize Database Changes container
+    let mut tables = substreams_database_change::tables::Tables::new();
+
+    // Loop over all the abis events to create database changes
+    {{- range $event := (index .ethereumContracts 0).Events }}
+    {{- $rust := $event.Rust }}
+    events.{{ $rust.ProtoOutputModuleFieldName }}.into_iter().for_each(|evt| {
+        tables
+            .create_row("{{ $rust.ProtoOutputModuleFieldName }}", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
+            .set("evt_tx_hash", evt.evt_tx_hash)
+            .set("evt_index", evt.evt_index)
+            .set("evt_block_time", evt.evt_block_time.unwrap())
+            .set("evt_block_number", evt.evt_block_number)
+            {{- $numberOfAttributes := len $rust.ProtoFieldDatabaseChangesMap }}
+            {{- $i := 0 }}
+            {{- range $protoField, $databaseChangesToProtoConversion := $rust.ProtoFieldDatabaseChangesMap }}
+            {{ $i = add $i 1 }}.set("{{$protoField}}", {{$databaseChangesToProtoConversion}}){{if eq $i $numberOfAttributes}};{{ end }}
+            {{- end}}
+    });
+
+    {{- end}}
+
+    Ok(tables.to_database_changes())
 }

@@ -1,4 +1,3 @@
-ENDPOINT ?= mainnet.eth.streamingfast.io:443
 CARGO_VERSION := $(shell cargo version 2>/dev/null)
 
 .PHONY: build
@@ -12,11 +11,11 @@ endif
 
 .PHONY: run
 run: build
-	substreams run -e $(ENDPOINT) substreams.yaml map_events $(if $(START_BLOCK),-s $(START_BLOCK)) $(if $(STOP_BLOCK),-t $(STOP_BLOCK))
+	substreams run substreams.yaml map_events $(if $(START_BLOCK),-s $(START_BLOCK)) $(if $(STOP_BLOCK),-t $(STOP_BLOCK))
 
 .PHONY: gui
 gui: build
-	substreams gui -e $(ENDPOINT) substreams.yaml map_events $(if $(START_BLOCK),-s $(START_BLOCK)) $(if $(STOP_BLOCK),-t $(STOP_BLOCK))
+	substreams gui substreams.yaml map_events $(if $(START_BLOCK),-s $(START_BLOCK)) $(if $(STOP_BLOCK),-t $(STOP_BLOCK))
 
 .PHONY: protogen
 protogen:

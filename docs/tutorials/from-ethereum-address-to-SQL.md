@@ -158,7 +158,7 @@ Services:
 * Postgraphile: http://localhost:3000/graphiql
 * PGWeb: http://localhost:8081/
 
-Here is a PBWeb view of events added to **Approval For Alls** Table
+Here is a PGWeb view of events added to **Approval For Alls** Table
 
 <figure><img src="../.gitbook/assets/pgweb.png" alt=""><figcaption><p>Approval For Alls PGWeb View</p></figcaption></figure>
 

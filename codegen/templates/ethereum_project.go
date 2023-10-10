@@ -94,7 +94,7 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 
 	for _, ethereumProjectEntry := range []string{
 		"proto/contract.proto.gotmpl",
-		"src/abi/mod.rs",
+		"src/abi/mod.rs.gotmpl",
 		"src/pb/contract.v1.rs",
 		"src/pb/mod.rs",
 		"src/lib.rs.gotmpl",
@@ -104,7 +104,6 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 		"Makefile.gotmpl",
 		"substreams.yaml.gotmpl",
 		"rust-toolchain.toml",
-		"schema.sql.gotmpl",
 	} {
 		if ethereumProjectEntry == "src/lib.rs.gotmpl" && len(p.ethereumContracts) != 1 {
 			ethereumProjectEntry = "src/multiple_contracts_lib.rs.gotmpl"

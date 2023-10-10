@@ -1,0 +1,7 @@
+{{- if eq len .ethereumContracts 1 }}
+pub mod contract;
+{{- else }}
+{{- range $i, $contract := .ethereumContracts }}
+pub mod {{ $contract.Name }}_contract;
+{{- end }}
+{{- end }}

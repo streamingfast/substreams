@@ -24,6 +24,8 @@ message Package {
 
   google.protobuf.Any sink_config = 10;
   string sink_module = 11;
+  // image is the bytes to a JPEG, WebP or PNG file. Max size is 2 MiB
+  bytes image = 12;
 }
 
 message PackageMetadata {

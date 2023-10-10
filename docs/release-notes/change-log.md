@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## v1.1.16
 
 ### Added
-* `active_substreams` and `substreams_counter` metrics to `substreams-tier1`
+* `substreams_active_requests` and `substreams_counter` metrics to `substreams-tier1`
 
 ### Changed
 

@@ -9,7 +9,7 @@ import (
 
 var MetricSet = dmetrics.NewSet()
 
-var ActiveSubstreams = MetricSet.NewGauge("active_substreams", "Number of active substreams requests")
+var ActiveSubstreams = MetricSet.NewGauge("substreams_active_requests", "Number of active substreams requests")
 var SubstreamsCounter = MetricSet.NewCounter("substreams_counter", "Substreams requests count")
 
 var BlockBeginProcess = MetricSet.NewCounter("substreams_block_process_start_counter", "Counter for total block processes started, used for rate")

@@ -68,6 +68,9 @@ func runInfo(cmd *cobra.Command, args []string) error {
 	if doc := info.Documentation; doc != nil && *doc != "" {
 		fmt.Println("Doc: " + strings.Replace(*doc, "\n", "\n  ", -1))
 	}
+	if info.Image != nil {
+		fmt.Printf("Image: [embedded image: %d bytes]\n", len(info.Image))
+	}
 
 	fmt.Println("Modules:")
 	fmt.Println("----")

@@ -5,12 +5,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/streamingfast/bstream"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/streamingfast/bstream"
 
 	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/bstream/stream"
@@ -195,6 +196,9 @@ func (s *Tier1Service) Blocks(
 	}
 
 	logger.Info("incoming Substreams Blocks request", fields...)
+	metrics.SubstreamsCounter.Inc()
+	metrics.ActiveSubstreams.Inc()
+	defer metrics.ActiveSubstreams.Dec()
 
 	if err := outputmodules.ValidateTier1Request(request, s.blockType); err != nil {
 		return status.Error(codes.InvalidArgument, fmt.Errorf("validate request: %w", err).Error())

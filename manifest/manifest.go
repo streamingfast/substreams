@@ -67,6 +67,7 @@ type PackageMeta struct {
 	Version string `yaml:"version"` // Semver for package authors
 	URL     string `yaml:"url"`
 	Doc     string `yaml:"doc"`
+	Image   string `yaml:"image"`
 }
 
 type Protobuf struct {

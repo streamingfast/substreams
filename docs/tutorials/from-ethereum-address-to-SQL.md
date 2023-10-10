@@ -10,15 +10,22 @@ In this tutorial, you will learn how to bootstrap a Substreams with the Bored Ap
 
 ## Requirements
 
-1. Substreams cli: version v1.1.15 or above required, navigate to [Installing the Cli](https://substreams.streamingfast.io/getting-started/installing-the-cli)
+1. Substreams CLI: version v1.1.15 or above required, navigate to [Installing the Cli](https://substreams.streamingfast.io/getting-started/installing-the-cli)
 2. Docker: visit the official installation [page](https://docs.docker.com/engine/install/)
-3. (Optional) Rust: to better tweak, get your hands dirty and have fun developing substreams, you need to install Rust. Visit the official Rust installation [page](https://www.rust-lang.org/tools/install)
+3. (Optional) Rust: to better tweak, get your hands dirty and have fun developing Substreams, you need to install Rust. Visit the official Rust installation [page](https://www.rust-lang.org/tools/install)
 
 ## Generate base Substreams code
 
+Use the `substreams init` command you scaffold a basic Substreams project.
+
 {% code overflow="wrap" %}
 ```bash
-$> substreams init
+substreams init
+```
+
+This commnad will ask you to provide some inputs, such as the name of the project, or the smart contract address that you want to index. If you do not provide a specific smart contract address, the command will create a Substreams template for the "Bored Ape Yacht Club" smart contract. In this example, let's leave that field blank and use the default smart contract.
+
+```bash
 Project name: my-bayc
 Protocol: Ethereum
 Ethereum chain: Mainnet
@@ -32,6 +39,8 @@ Writing project files
 Generating Protobuf Rust code
 Project "my-bayc" initialized at "/path/to/my-bayc"
 ```
+
+
 {% endcode %}
 
 ## Fetch your api token
@@ -63,7 +72,7 @@ substreams run substreams.yaml db_out --substreams-endpoint mainnet.eth.streamin
 ```
 {% endcode %}
 
-This is the expected output of your test
+This is the expected output of your test:
 
 {% code overflow="wrap" %}
 ```json
@@ -91,7 +100,9 @@ This is the expected output of your test
 {% endcode %}
 
 {% hint style="info" %}
-**Note**: You can also test your Substreams with the GUI, which is a better debugging tool than the run command. Try `substreams gui substreams.yaml db_out --substreams-endpoint mainnet.eth.streamingfast.io:443 --stop-block +1`
+**Note**: You can also test your Substreams with the GUI, which is a better debugging tool than the run command. Try:
+
+`substreams gui substreams.yaml db_out --substreams-endpoint mainnet.eth.streamingfast.io:443 --stop-block +1`
 {% endhint %}
 
 ## Deploy to a local sink dev environment
@@ -102,19 +113,30 @@ This is the expected output of your test
 
 {% code overflow="wrap" %}
 ```bash
-$> substreams alpha sink-serve
+substreams alpha sink-serve
+```
+{% endcode %}
+
+The previous command will start a daemon that will run in your computer:
+
+```
 2023-10-04T14:31:33.064-0400 INFO (substreams) starting server server
 2023-10-04T14:31:33.064-0400 INFO (substreams) grpc server with plain text server
 2023-10-04T14:31:33.064-0400 INFO (substreams) launching server {"listen_addr": "localhost:8000"}
 2023-10-04T14:31:33.065-0400 INFO (substreams) serving plaintext {"listen_addr": "localhost:8000"}
 ```
-{% endcode %}
 
-2. From another shell, deploy your Substreams and see the output services details:
+2. From another shell, deploy your Substreams:
 
 {% code overflow="wrap" %}
 ```bash
-$> substreams alpha sink-deploy ./substreams.yaml
+substreams alpha sink-deploy ./substreams.yaml
+```
+{% endcode %}
+
+The previous command will deploy your Substreams and send the data to the local PostgreSQL database, providing some information:
+
+```bash
 Response for deployment "f94fe55c":
 Name: my_bayc (v0.1.0)
 Output module: db_out (b9e2beff5403fcc89b14622f8224a72a9de27921)
@@ -126,18 +148,17 @@ Services:
   - f94fe55c-postgres: PostgreSQL service "f94fe55c-postgres" available at DSN: 'postgres://dev-node:insecure-change-me-in-prod@localhost:5432/dev-node?sslmode=disable'
   - f94fe55c-sink: Sink service (no exposed port). Use 'substreams alpha sink-info f94fe55c-sink' to see last processed block or 'docker logs f94fe55c-sink' to see the logs.
 ```
-{% endcode %}
 
-3\. After a few seconds, the command `substreams alpha sink-info` should give you information about the progress of the sink (ex: `Last processed block: 12722000`)
+3. After a few seconds, the command `substreams alpha sink-info` should give you information about the progress of the sink (ex: `Last processed block: 12722000`)
 
-4\. You can check the logs of the sink and see what's happening: `docker logs -f f94fe55c-sink`
+4. You can check the logs of the sink and see what's happening: `docker logs -f f94fe55c-sink`
 
-5\. You can explore the different services directly from your browser:
+5. You can explore the different services directly from your browser:
 
 * Postgraphile: http://localhost:3000/graphiql
 * PGWeb: http://localhost:8081/
 
-Here is a PBWeb view of events added to **Approval For Alls** Table
+Here is a PGWeb view of events added to **Approval For Alls** Table
 
 <figure><img src="../.gitbook/assets/pgweb.png" alt=""><figcaption><p>Approval For Alls PGWeb View</p></figcaption></figure>
 

@@ -719,6 +719,36 @@ func loadImports(pkg *pbsubstreams.Package, manif *Manifest) error {
 	return nil
 }
 
+var PNGHeader = []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}
+var JPGHeader = []byte{0xff, 0xd8, 0xff}
+var WebPHeader = []byte{0x52, 0x49, 0x46, 0x46}
+
+func loadImage(pkg *pbsubstreams.Package, manif *Manifest) error {
+	path := manif.resolvePath(manif.Package.Image)
+	img, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	maxSize := 2 * 1024 * 1024
+	if len(img) > maxSize {
+		return fmt.Errorf("image %q is too big: %d bytes. (Max: %d bytes)", path, len(img), maxSize)
+	}
+	if len(img) < 16 { // prevent error on magic header check, also 16 bytes is way too small.
+		return fmt.Errorf("invalid image file: too small (%d bytes)", len(img))
+	}
+
+	switch {
+	case len(img) > 8 && bytes.Equal(img[0:8], PNGHeader):
+	case bytes.Equal(img[0:3], JPGHeader):
+	case bytes.Equal(img[0:4], WebPHeader):
+	default:
+		return fmt.Errorf("Unsupported file format for %q. Only JPEG, PNG and WebP images are supported", path)
+	}
+
+	pkg.Image = img
+	return nil
+}
+
 const PrefixSeparator = ":"
 
 func prefixModules(mods []*pbsubstreams.Module, prefix string) {

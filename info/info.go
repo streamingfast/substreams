@@ -14,6 +14,7 @@ type BasicInfo struct {
 	Name                   string                         `json:"name"`
 	Version                string                         `json:"version"`
 	Documentation          *string                        `json:"documentation,omitempty"`
+	Image                  []byte                         `json:"-"`
 	Modules                []ModulesInfo                  `json:"modules"`
 	SinkInfo               *SinkInfo                      `json:"sink_info,omitempty"`
 	ProtoPackages          []string                       `json:"proto_packages"`            // list of proto packages
@@ -79,6 +80,7 @@ func Basic(pkg *pbsubstreams.Package) (*BasicInfo, error) {
 	manifestInfo := &BasicInfo{
 		Name:    pkg.PackageMeta[0].Name,
 		Version: pkg.PackageMeta[0].Version,
+		Image:   pkg.Image,
 	}
 	if pkg.PackageMeta[0].Doc != "" {
 		manifestInfo.Documentation = strPtr(strings.Replace(pkg.PackageMeta[0].Doc, "\n", "\n  ", -1))

@@ -85,17 +85,22 @@ func getFieldsAndValues(dynMsg *dynamic.Message) (out []*fieldAndValue, err erro
 		}
 		if mt := fd.GetMessageType(); mt != nil {
 
-			msgV1 := protov1.MessageV1(val.(proto.Message))
+			switch val := val.(type) {
+			case proto.Message:
+				msgV1 := protov1.MessageV1(val)
 
-			subDynMsg, err := dynamic.AsDynamicMessage(msgV1)
-			if err != nil {
-				return nil, err
+				subDynMsg, err := dynamic.AsDynamicMessage(msgV1)
+				if err != nil {
+					return nil, err
+				}
+				v, err := getFieldsAndValues(subDynMsg)
+				if err != nil {
+					return nil, err
+				}
+				field.value = v
+			case *dynamic.Message:
+				field.value = val
 			}
-			val, err := getFieldsAndValues(subDynMsg)
-			if err != nil {
-				return nil, err
-			}
-			field.value = val
 		} else {
 			field.value = val
 		}

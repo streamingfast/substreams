@@ -9,12 +9,12 @@ fn main() -> Result<(), anyhow::Error> {
     {{- $numberOfContracts := len .ethereumContracts }}
     let file_names = [
         {{- range $i, $contract := .ethereumContracts }}
-        "abi/{{ $contract.Name }}{{ if eq $numberOfContracts 1 }}{{ else }}_{{ end }}contract.abi.json",
+        "abi/{{ $contract.GetName }}{{ if eq $numberOfContracts 1 }}{{ else }}_{{ end }}contract.abi.json",
         {{- end }}
     ];
     let file_output_names = [
         {{- range $i, $contract := .ethereumContracts }}
-        "src/abi/{{ $contract.Name }}{{ if eq $numberOfContracts 1 }}{{ else }}_{{ end }}contract.rs",
+        "src/abi/{{ $contract.GetName }}{{ if eq $numberOfContracts 1 }}{{ else }}_{{ end }}contract.rs",
         {{- end }}
     ];
 

@@ -1,4 +1,3 @@
-
 CREATE TABLE IF NOT EXISTS approvals (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,

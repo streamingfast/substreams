@@ -20,7 +20,27 @@ func TestEnsureOurProjectCompiles(t *testing.T) {
 	abi, err := eth.ParseABIFromBytes(abiContent)
 	require.NoError(t, err)
 
-	project, err := NewEthereumProject("substreams-tests", "substreams_tests", EthereumChainsByID["Mainnet"], eth.MustNewAddress("0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d"), abi, string(abiContent), 123)
+	ethereumContracts := []*EthereumContract{NewEthereumContract(
+		"",
+		eth.MustNewAddress("0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d"),
+		nil,
+		abi,
+		string(abiContent),
+	)}
+
+	for _, contract := range ethereumContracts {
+		events, err := BuildEventModels(contract)
+		require.NoError(t, err)
+		contract.SetEvents(events)
+	}
+
+	project, err := NewEthereumProject(
+		"",
+		"substreams_tests",
+		EthereumChainsByID["Mainnet"],
+		ethereumContracts,
+		123,
+	)
 	require.NoError(t, err)
 
 	files, err := project.Render()
@@ -45,7 +65,7 @@ func TestEnsureOurProjectCompiles(t *testing.T) {
 }
 
 func TestNewEthereumTemplateProject(t *testing.T) {
-	abi := fileContent(t, "ethereum/abi/contract.abi.json")
+	abiContent := fileContent(t, "ethereum/abi/contract.abi.json")
 
 	type args struct {
 		address string
@@ -59,9 +79,9 @@ func TestNewEthereumTemplateProject(t *testing.T) {
 	}{
 		{
 			"standard case",
-			args{"0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d", abi},
+			args{"0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d", abiContent},
 			map[string][]byte{
-				"abi/contract.abi.json": abi,
+				"abi/contract.abi.json": abiContent,
 				"proto/contract.proto":  fileContent(t, "./ethereum/proto/contract.proto"),
 				"src/abi/mod.rs":        fileContent(t, "./ethereum/src/abi/mod.rs"),
 				"src/pb/contract.v1.rs": fileContent(t, "./ethereum/src/pb/contract.v1.rs"),
@@ -85,7 +105,27 @@ func TestNewEthereumTemplateProject(t *testing.T) {
 
 			chain := EthereumChainsByID["Mainnet"]
 
-			project, err := NewEthereumProject("substreams-init-test", "substreams_init_test", chain, eth.MustNewAddress("0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d"), abi, string(tt.args.abi), 123)
+			ethereumContracts := []*EthereumContract{NewEthereumContract(
+				"",
+				eth.MustNewAddress("0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d"),
+				nil,
+				abi,
+				string(tt.args.abi),
+			)}
+
+			for _, contract := range ethereumContracts {
+				events, err := BuildEventModels(contract)
+				require.NoError(t, err)
+				contract.SetEvents(events)
+			}
+
+			project, err := NewEthereumProject(
+				"substreams-init-test",
+				"substreams_init_test",
+				chain,
+				ethereumContracts,
+				123,
+			)
 			require.NoError(t, err)
 
 			got, err := project.Render()

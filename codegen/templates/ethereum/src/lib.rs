@@ -4,6 +4,7 @@ use hex_literal::hex;
 use pb::contract::v1 as contract;
 use substreams::Hex;
 use substreams_database_change::pb::database::DatabaseChanges;
+use substreams_database_change::tables::Tables;
 use substreams_ethereum::pb::eth::v2 as eth;
 use substreams_ethereum::Event;
 
@@ -110,7 +111,7 @@ fn map_events(blk: eth::Block) -> Result<contract::Events, substreams::errors::E
 #[substreams::handlers::map]
 fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::errors::Error> {
     // Initialize Database Changes container
-    let mut tables = substreams_database_change::tables::Tables::new();
+    let mut tables = Tables::new();
 
     // Loop over all the abis events to create database changes
     events.approvals.into_iter().for_each(|evt| {

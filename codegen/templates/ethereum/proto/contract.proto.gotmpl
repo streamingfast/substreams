@@ -7,18 +7,18 @@ package contract.v1;
 {{- $eventsCounter := 0 }}
 message Events {
     {{- range $i, $contract := .ethereumContracts }}
-    {{- range $index, $event := $contract.Events }}
+    {{- range $index, $event := $contract.GetEvents }}
     {{- $proto := $event.Proto }}
     {{- $eventsCounter = add $eventsCounter 1 }}
-    repeated {{ if ne $numberOfContracts 1 }}{{ $contract.Name }}_{{ end }}{{$proto.MessageName}} {{ if ne $numberOfContracts 1 }}{{ $contract.Name }}_{{ end }}{{$proto.OutputModuleFieldName}} = {{ $eventsCounter }};
+    repeated {{ if ne $numberOfContracts 1 }}{{ $contract.GetName }}_{{ end }}{{$proto.MessageName}} {{ if ne $numberOfContracts 1 }}{{ $contract.GetName }}_{{ end }}{{$proto.OutputModuleFieldName}} = {{ $eventsCounter }};
     {{- end}}
     {{- end}}
 }
 
 {{- range $i, $contract := .ethereumContracts}}
-{{- range $event := $contract.Events }}
+{{- range $event := $contract.GetEvents }}
 {{ $proto := $event.Proto }}
-message {{ if ne $numberOfContracts 1 }}{{ $contract.Name }}_{{ end }}{{$proto.MessageName}} {
+message {{ if ne $numberOfContracts 1 }}{{ $contract.GetName }}_{{ end }}{{$proto.MessageName}} {
     string evt_tx_hash = 1;
     uint32 evt_index = 2;
     google.protobuf.Timestamp evt_block_time = 3;

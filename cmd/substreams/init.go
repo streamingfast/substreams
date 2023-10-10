@@ -132,10 +132,10 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		}
 
 		for _, contract := range ethereumContracts {
-			fmt.Printf("Generating ABI Event models for %s\n", contract.Name)
-			events, err := templates.BuildEventModels(contract.GetAbi())
+			fmt.Printf("Generating ABI Event models for %s\n", contract.GetName())
+			events, err := templates.BuildEventModels(contract)
 			if err != nil {
-				return fmt.Errorf("build ABI event models for contract [%s - %s]: %w", contract.Address, contract.Name, err)
+				return fmt.Errorf("build ABI event models for contract [%s - %s]: %w", contract.GetAddress(), contract.GetName(), err)
 			}
 			contract.SetEvents(events)
 		}
@@ -311,7 +311,7 @@ var shortNameRegexp = regexp.MustCompile(`^([a-zA-Z][a-zA-Z0-9]{0,63})$`)
 
 func promptEthereumContractShortNames(ethereumContracts []*templates.EthereumContract) ([]*templates.EthereumContract, error) {
 	for _, contract := range ethereumContracts {
-		shortName, err := prompt(fmt.Sprintf("Choose a short name for %s", contract.Address), &promptOptions{
+		shortName, err := prompt(fmt.Sprintf("Choose a short name for %s", contract.GetAddress()), &promptOptions{
 			Validate: func(input string) error {
 				ok := shortNameRegexp.MatchString(input)
 				if !ok {
@@ -514,7 +514,7 @@ var httpClient = http.Client{
 
 func getAndSetContractABIs(ctx context.Context, contracts []*templates.EthereumContract, chain *templates.EthereumChain) ([]*templates.EthereumContract, error) {
 	for _, contract := range contracts {
-		req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/api?module=contract&action=getabi&address=%s", chain.ApiEndpoint, contract.Address.Pretty()), nil)
+		req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/api?module=contract&action=getabi&address=%s", chain.ApiEndpoint, contract.GetAddress().Pretty()), nil)
 		if err != nil {
 			return nil, fmt.Errorf("new request: %w", err)
 		}
@@ -547,7 +547,7 @@ func getAndSetContractABIs(ctx context.Context, contracts []*templates.EthereumC
 		contract.SetAbi(ethABI)
 
 		// wait 5 seconds to avoid API rate limit
-		fmt.Printf("Fetched contract ABI for %s\n", contract.Address)
+		fmt.Printf("Fetched contract ABI for %s\n", contract.GetAddress())
 		time.Sleep(5 * time.Second)
 	}
 
@@ -557,7 +557,7 @@ func getAndSetContractABIs(ctx context.Context, contracts []*templates.EthereumC
 func getContractCreationBlock(ctx context.Context, contracts []*templates.EthereumContract, chain *templates.EthereumChain) (uint64, error) {
 	var lowestStartBlock uint64 = math.MaxUint64
 	for _, contract := range contracts {
-		req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/api?module=account&action=txlist&address=%s&page=1&offset=1&sort=asc&apikey=YourApiKeyToken", chain.ApiEndpoint, contract.Address.Pretty()), nil)
+		req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/api?module=account&action=txlist&address=%s&page=1&offset=1&sort=asc&apikey=YourApiKeyToken", chain.ApiEndpoint, contract.GetAddress().Pretty()), nil)
 		if err != nil {
 			return 0, fmt.Errorf("new request: %w", err)
 		}
@@ -595,7 +595,7 @@ func getContractCreationBlock(ctx context.Context, contracts []*templates.Ethere
 		}
 
 		// wait 5 seconds to avoid Etherscan API rate limit
-		fmt.Printf("Fetched initial block %d for %s (lowest %d)\n", blockNum, contract.Address, lowestStartBlock)
+		fmt.Printf("Fetched initial block %d for %s (lowest %d)\n", blockNum, contract.GetAddress(), lowestStartBlock)
 		time.Sleep(5 * time.Second)
 	}
 	return lowestStartBlock, nil

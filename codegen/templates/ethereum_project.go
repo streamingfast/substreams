@@ -29,29 +29,41 @@ import (
 var ethereumProject embed.FS
 
 type EthereumContract struct {
-	Name       string
-	Address    eth.Address
-	Events     []codegenEvent
+	name       string
+	address    eth.Address
+	events     []codegenEvent
 	abi        *eth.ABI
 	abiContent string
 }
 
 func NewEthereumContract(name string, address eth.Address, events []codegenEvent, abi *eth.ABI, abiContent string) *EthereumContract {
 	return &EthereumContract{
-		Name:       name,
-		Address:    address,
-		Events:     events,
+		name:       name,
+		address:    address,
+		events:     events,
 		abi:        abi,
 		abiContent: abiContent,
 	}
 }
 
+func (e *EthereumContract) GetAddress() eth.Address {
+	return e.address
+}
+
 func (e *EthereumContract) SetName(name string) {
-	e.Name = name
+	e.name = name
+}
+
+func (e *EthereumContract) GetName() string {
+	return e.name
 }
 
 func (e *EthereumContract) SetEvents(events []codegenEvent) {
-	e.Events = events
+	e.events = events
+}
+
+func (e *EthereumContract) GetEvents() []codegenEvent {
+	return e.events
 }
 
 func (e *EthereumContract) GetAbi() *eth.ABI {
@@ -160,13 +172,14 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 	}
 
 	for _, contract := range p.ethereumContracts {
-		entries[fmt.Sprintf("abi/%s_contract.abi.json", contract.Name)] = []byte(contract.abiContent)
+		entries[fmt.Sprintf("abi/%s_contract.abi.json", contract.GetName())] = []byte(contract.abiContent)
 	}
 
 	return entries, nil
 }
 
-func BuildEventModels(abi *eth.ABI) (out []codegenEvent, err error) {
+func BuildEventModels(contract *EthereumContract) (out []codegenEvent, err error) {
+	abi := contract.abi
 	pluralizer := pluralize.NewClient()
 
 	names := keys(abi.LogEventsByNameMap)

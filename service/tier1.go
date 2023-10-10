@@ -198,7 +198,7 @@ func (s *Tier1Service) Blocks(
 	logger.Info("incoming Substreams Blocks request", fields...)
 	metrics.SubstreamsCounter.Inc()
 	metrics.ActiveSubstreams.Inc()
-	defer metrics.ActiveSubstreams.Inc()
+	defer metrics.ActiveSubstreams.Dec()
 
 	if err := outputmodules.ValidateTier1Request(request, s.blockType); err != nil {
 		return status.Error(codes.InvalidArgument, fmt.Errorf("validate request: %w", err).Error())

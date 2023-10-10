@@ -25,6 +25,7 @@ import (
 //go:embed ethereum/substreams.yaml.gotmpl
 //go:embed ethereum/rust-toolchain.toml
 //go:embed ethereum/schema.sql.gotmpl
+//go:embed ethereum/build.rs.gotmpl
 var ethereumProject embed.FS
 
 type EthereumContract struct {
@@ -98,12 +99,13 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 		"src/pb/contract.v1.rs",
 		"src/pb/mod.rs",
 		"src/lib.rs.gotmpl",
-		"build.rs",
+		"build.rs.gotmpl",
 		"Cargo.lock",
 		"Cargo.toml.gotmpl",
 		"Makefile.gotmpl",
 		"substreams.yaml.gotmpl",
 		"rust-toolchain.toml",
+		"schema.sql.gotmpl",
 	} {
 		if ethereumProjectEntry == "src/lib.rs.gotmpl" && len(p.ethereumContracts) != 1 {
 			ethereumProjectEntry = "src/multiple_contracts_lib.rs.gotmpl"

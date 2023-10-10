@@ -18,7 +18,7 @@ message Events {
 {{- range $i, $contract := .ethereumContracts}}
 {{- range $event := $contract.GetEvents }}
 {{ $proto := $event.Proto }}
-message {{ if ne $numberOfContracts 1 }}{{ $contract.GetName }}_{{ end }}{{$proto.MessageName}} {
+message {{ if ne $numberOfContracts 1 }}{{ $contract.GetName }}_{{ end }}{{ $proto.MessageName }} {
     string evt_tx_hash = 1;
     uint32 evt_index = 2;
     google.protobuf.Timestamp evt_block_time = 3;

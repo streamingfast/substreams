@@ -197,16 +197,18 @@ func BuildEventModels(contract *EthereumContract) (out []codegenEvent, err error
 			}
 
 			protoFieldName := strcase.ToSnake(pluralizer.Plural(rustABIStructName))
+			// prost will do a to_lower_camel_case() on any struct name
+			rustGeneratedStructName := strcase.ToCamel(strcase.ToSnake(rustABIStructName))
 
 			codegenEvent := codegenEvent{
 				Rust: &rustEventModel{
-					ABIStructName:              rustABIStructName,
-					ProtoMessageName:           rustABIStructName,
+					ABIStructName:              rustGeneratedStructName,
+					ProtoMessageName:           rustGeneratedStructName,
 					ProtoOutputModuleFieldName: protoFieldName,
 				},
 
 				Proto: &protoEventModel{
-					MessageName:           rustABIStructName,
+					MessageName:           rustGeneratedStructName,
 					OutputModuleFieldName: protoFieldName,
 				},
 			}

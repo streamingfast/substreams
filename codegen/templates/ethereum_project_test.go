@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/streamingfast/substreams/codegen"
+
 	"github.com/streamingfast/eth-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -40,6 +42,7 @@ func TestEnsureOurProjectCompiles(t *testing.T) {
 		EthereumChainsByID["Mainnet"],
 		ethereumContracts,
 		123,
+		codegen.SinkChoiceDb,
 	)
 	require.NoError(t, err)
 
@@ -125,6 +128,7 @@ func TestNewEthereumTemplateProject(t *testing.T) {
 				chain,
 				ethereumContracts,
 				123,
+				codegen.SinkChoiceDb,
 			)
 			require.NoError(t, err)
 

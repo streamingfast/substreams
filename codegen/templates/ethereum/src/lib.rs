@@ -107,13 +107,12 @@ fn map_events(blk: eth::Block) -> Result<contract::Events, substreams::errors::E
             .collect(),
     })
 }
-
 #[substreams::handlers::map]
 fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::errors::Error> {
-    // Initialize Database Changes container
+    // Initialize changes container
     let mut tables = Tables::new();
 
-    // Loop over all the abis events to create database changes
+    // Loop over all the abis events to create changes
     events.approvals.into_iter().for_each(|evt| {
         tables
             .create_row("approvals", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
@@ -157,6 +156,7 @@ fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::error
             .set("to", Hex(&evt.to).to_string())
             .set("token_id", evt.token_id.to_string());
     });
-
+    
     Ok(tables.to_database_changes())
+    
 }

@@ -10,6 +10,8 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/streamingfast/substreams/codegen"
+
 	"github.com/gertd/go-pluralize"
 	"github.com/iancoleman/strcase"
 	"github.com/streamingfast/eth-go"
@@ -86,10 +88,12 @@ type EthereumProject struct {
 	ethereumContracts           []*EthereumContract
 	sqlImportVersion            string
 	databaseChangeImportVersion string
+	entityChangeImportVersion   string
 	network                     string
+	sinkChoice                  codegen.SinkChoice
 }
 
-func NewEthereumProject(name string, moduleName string, chain *EthereumChain, contracts []*EthereumContract, lowestStartBlock uint64) (*EthereumProject, error) {
+func NewEthereumProject(name string, moduleName string, chain *EthereumChain, contracts []*EthereumContract, lowestStartBlock uint64, choice codegen.SinkChoice) (*EthereumProject, error) {
 	return &EthereumProject{
 		name:                        name,
 		moduleName:                  moduleName,
@@ -98,7 +102,9 @@ func NewEthereumProject(name string, moduleName string, chain *EthereumChain, co
 		creationBlockNum:            lowestStartBlock,
 		sqlImportVersion:            "1.0.2",
 		databaseChangeImportVersion: "1.2.1",
+		entityChangeImportVersion:   "1.1.0",
 		network:                     chain.Network,
+		sinkChoice:                  choice,
 	}, nil
 }
 
@@ -145,7 +151,9 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 				"initialBlock":                strconv.FormatUint(p.creationBlockNum, 10),
 				"sqlImportVersion":            p.sqlImportVersion,
 				"databaseChangeImportVersion": p.databaseChangeImportVersion,
+				"entityChangeImportVersion":   p.entityChangeImportVersion,
 				"network":                     p.network,
+				"sinkChoice":                  p.sinkChoice,
 			}
 
 			zlog.Debug("rendering templated file", zap.String("filename", finalFileName), zap.Any("model", model))
@@ -234,12 +242,13 @@ type codegenEvent struct {
 }
 
 type rustEventModel struct {
-	ABIStructName                string
-	ProtoMessageName             string
-	ProtoOutputModuleFieldName   string
-	ProtoFieldABIConversionMap   map[string]string
-	ProtoFieldDatabaseChangesMap map[string]string
-	ProtoFieldSqlmap             map[string]string
+	ABIStructName              string
+	ProtoMessageName           string
+	ProtoOutputModuleFieldName string
+	ProtoFieldABIConversionMap map[string]string
+	ProtoFieldTableChangesMap  map[string]string
+	ProtoFieldSqlmap           map[string]string
+	ProtoFieldGraphQLMap       map[string]string
 }
 
 func (e *rustEventModel) populateFields(log *eth.LogEventDef) error {
@@ -248,8 +257,9 @@ func (e *rustEventModel) populateFields(log *eth.LogEventDef) error {
 	}
 
 	e.ProtoFieldABIConversionMap = map[string]string{}
-	e.ProtoFieldDatabaseChangesMap = map[string]string{}
+	e.ProtoFieldTableChangesMap = map[string]string{}
 	e.ProtoFieldSqlmap = map[string]string{}
+	e.ProtoFieldGraphQLMap = map[string]string{}
 	paramNames := make([]string, len(log.Parameters))
 	for i := range log.Parameters {
 		paramNames[i] = log.Parameters[i].Name
@@ -265,15 +275,15 @@ func (e *rustEventModel) populateFields(log *eth.LogEventDef) error {
 			continue
 		}
 		if toProtoCode == "" {
-			return fmt.Errorf("field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
+			return fmt.Errorf("transform - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
 		}
 
-		toDatabaseChangeCode := generateFieldDatabaseChangeCode(parameter.Type, "evt."+name)
+		toDatabaseChangeCode := generateFieldTableChangeCode(parameter.Type, "evt."+name)
 		if toDatabaseChangeCode == SKIP_FIELD {
 			continue
 		}
 		if toDatabaseChangeCode == "" {
-			return fmt.Errorf("field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
+			return fmt.Errorf("table change - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
 		}
 
 		toSqlCode := generateFieldSqlTypes(parameter.Type)
@@ -281,14 +291,20 @@ func (e *rustEventModel) populateFields(log *eth.LogEventDef) error {
 			continue
 		}
 		if toSqlCode == "" {
-			return fmt.Errorf("field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
+			return fmt.Errorf("sql - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
 		}
 
-		columnName := sanitizeDatabaseChangesColumnNames(name)
+		toGraphQLCode := generateFieldGraphQLTypes(parameter.Type)
+		//if toGraphQLCode == "" {
+		//	return fmt.Errorf("graphql - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
+		//}
+
+		columnName := sanitizeTableChangesColumnNames(name)
 
 		e.ProtoFieldABIConversionMap[name] = toProtoCode
-		e.ProtoFieldDatabaseChangesMap[name] = toDatabaseChangeCode
+		e.ProtoFieldTableChangesMap[name] = toDatabaseChangeCode
 		e.ProtoFieldSqlmap[columnName] = toSqlCode
+		e.ProtoFieldGraphQLMap[columnName] = toGraphQLCode
 	}
 
 	return nil
@@ -301,7 +317,7 @@ func sanitizeProtoFieldName(name string) string {
 	return name
 }
 
-func sanitizeDatabaseChangesColumnNames(name string) string {
+func sanitizeTableChangesColumnNames(name string) string {
 	return fmt.Sprintf("\"%s\"", name)
 }
 
@@ -344,7 +360,7 @@ func generateFieldSqlTypes(fieldType eth.SolidityType) string {
 	}
 }
 
-func generateFieldDatabaseChangeCode(fieldType eth.SolidityType, fieldAccess string) string {
+func generateFieldTableChangeCode(fieldType eth.SolidityType, fieldAccess string) string {
 	switch v := fieldType.(type) {
 	case eth.AddressType, eth.BytesType, eth.FixedSizeBytesType:
 		return fmt.Sprintf("Hex(&%s).to_string()", fieldAccess)
@@ -418,6 +434,10 @@ func generateFieldTransformCode(fieldType eth.SolidityType, fieldAccess string) 
 	default:
 		return ""
 	}
+}
+
+func generateFieldGraphQLTypes(fieldType eth.SolidityType) string {
+	return ""
 }
 
 type protoEventModel struct {
@@ -496,16 +516,4 @@ func getProtoFieldType(solidityType eth.SolidityType) string {
 type protoField struct {
 	Name string
 	Type string
-}
-
-type StartBlockContracts struct {
-	contractAddress eth.Address
-	startBlockNum   uint64
-}
-
-func New(contractAddress eth.Address, startBlockNum uint64) *StartBlockContracts {
-	return &StartBlockContracts{
-		contractAddress: contractAddress,
-		startBlockNum:   startBlockNum,
-	}
 }

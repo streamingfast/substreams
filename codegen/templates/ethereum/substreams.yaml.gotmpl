@@ -5,7 +5,11 @@ package:
 
 imports:
   sql: https://github.com/streamingfast/substreams-sink-sql/releases/download/protodefs-v{{ .sqlImportVersion }}/substreams-sink-sql-protodefs-v{{ .sqlImportVersion }}.spkg
+{{- if eq .sinkChoice 1}}
   database_change: https://github.com/streamingfast/substreams-sink-database-changes/releases/download/v{{ .databaseChangeImportVersion }}/substreams-database-change-v{{ .databaseChangeImportVersion }}.spkg
+{{- else if eq .sinkChoice 2 }}
+  entity: https://github.com/streamingfast/substreams-entity-change/releases/download/v{{ .entityChangeImportVersion }}/substreams-entity-change-v{{ .entityChangeImportVersion }}.spkg
+{{- end }}
 
 protobuf:
   files:
@@ -27,6 +31,7 @@ modules:
     output:
       type: proto:contract.v1.Events
 
+{{- if eq .sinkChoice 1 }}
   - name: db_out
     kind: map
     initialBlock: {{ .initialBlock }}
@@ -34,11 +39,21 @@ modules:
       - map: map_events
     output:
       type: proto:sf.substreams.sink.database.v1.DatabaseChanges
+{{- else if eq .sinkChoice 2 }}
+  - name: graph_out
+    kind: map
+    initialBlock: {{ .initialBlock }}
+    inputs:
+      - map: map_events
+    output:
+      type: proto:sf.substreams.entity.v1.EntityChanges
+{{- end }}
 
+{{ if or (eq .sinkChoice 1) (eq .sinkChoice 2) }}
 network: {{ .network }}
 
 sink:
-  module: db_out
+  module: {{ if eq .sinkChoice 1 }}db_out{{ else if eq .sinkChoice 2}}graph_out{{ end }}
   type: sf.substreams.sink.sql.v1.Service
   config:
     schema: "./schema.sql"
@@ -47,3 +62,4 @@ sink:
       enabled: true
     pgweb_frontend:
       enabled: true
+{{- end }}

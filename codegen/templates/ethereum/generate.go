@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/streamingfast/substreams/codegen"
+
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/eth-go"
 	"github.com/streamingfast/substreams/codegen/templates"
@@ -34,6 +36,7 @@ func main() {
 		chain,
 		ethereumContracts,
 		123,
+		codegen.SinkChoiceDb,
 	)
 
 	cli.NoError(err, "Unable to create Ethereum project")

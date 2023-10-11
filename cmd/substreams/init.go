@@ -33,6 +33,7 @@ var (
 	devInitProtocol                = os.Getenv("SUBSTREAMS_DEV_INIT_PROTOCOL")
 	devInitEthereumTrackedContract = os.Getenv("SUBSTREAMS_DEV_INIT_ETHEREUM_TRACKED_CONTRACT")
 	devInitEthereumChain           = os.Getenv("SUBSTREAMS_DEV_INIT_ETHEREUM_CHAIN")
+	devInitSinkChoice              = os.Getenv("SUBSTREAMS_DEV_INIT_SINK_CHOICE")
 )
 
 var errInitUnsupportedChain = errors.New("unsupported chain")
@@ -118,6 +119,11 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			}
 		}
 
+		sinkChoice, err := promptSinkChoice()
+		if err != nil {
+			return fmt.Errorf("running sink choice prompt")
+		}
+
 		fmt.Printf("Retrieving %s contract information (ABI & creation block)\n", chain.DisplayName)
 
 		// Get contract abiContents & parse them
@@ -149,6 +155,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			chain,
 			ethereumContracts,
 			lowestStartBlock,
+			sinkChoice,
 		)
 		if err != nil {
 			return fmt.Errorf("new Ethereum %s project: %w", chain.DisplayName, err)
@@ -330,6 +337,41 @@ func promptEthereumContractShortNames(ethereumContracts []*templates.EthereumCon
 	}
 
 	return ethereumContracts, nil
+}
+
+func promptSinkChoice() (codegen.SinkChoice, error) {
+	if devInitSinkChoice != "" {
+		sinkChoice, err := codegen.ParseSinkChoice(devInitSinkChoice)
+		if err != nil {
+			return 0, fmt.Errorf("invalid sink choice %s: %w", sinkChoice, err)
+		}
+	}
+
+	choice := promptui.Select{
+		Label: "Select Sink choice",
+		Items: codegen.SinkChoiceNames(),
+		Templates: &promptui.SelectTemplates{
+			Selected: `{{ "Sink:" | faint }} {{ . }}`,
+		},
+		HideHelp: true,
+	}
+
+	_, selection, err := choice.Run()
+	if err != nil {
+		if errors.Is(err, promptui.ErrInterrupt) {
+			// We received Ctrl-C, users wants to abort, nothing else to do, quit immediately
+			os.Exit(1)
+		}
+
+		return 0, fmt.Errorf("running protocol prompt: %w", err)
+	}
+
+	var sinkChoice codegen.SinkChoice
+	if err := sinkChoice.UnmarshalText([]byte(selection)); err != nil {
+		panic(fmt.Errorf("impossible, selecting hard-coded value from enum itself, something is really wrong here"))
+	}
+
+	return sinkChoice, nil
 }
 
 func promptTrackContract() (bool, error) {

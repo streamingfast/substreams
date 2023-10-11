@@ -433,17 +433,20 @@ func (e *protoEventModel) populateFields(log *eth.LogEventDef) error {
 		return nil
 	}
 
-	e.Fields = make([]protoField, len(log.Parameters))
-	for index, parameter := range log.Parameters {
+	e.Fields = make([]protoField, 0, len(log.Parameters))
+	for _, parameter := range log.Parameters {
 		fieldName := strcase.ToSnake(parameter.Name)
 		fieldName = sanitizeProtoFieldName(fieldName)
 		fieldType := getProtoFieldType(parameter.Type)
+		if fieldType == SKIP_FIELD {
+			continue
+		}
 
 		if fieldType == "" {
 			return fmt.Errorf("field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
 		}
 
-		e.Fields[index] = protoField{Name: fieldName, Type: fieldType}
+		e.Fields = append(e.Fields, protoField{Name: fieldName, Type: fieldType})
 	}
 
 	return nil
@@ -479,7 +482,11 @@ func getProtoFieldType(solidityType eth.SolidityType) string {
 
 	case eth.ArrayType:
 		// Flaky, I think we should support a single level of "array"
-		return "repeated " + getProtoFieldType(v.ElementType)
+		fieldType := getProtoFieldType(v.ElementType)
+		if fieldType == "" {
+			return SKIP_FIELD
+		}
+		return "repeated " + fieldType
 
 	default:
 		return ""

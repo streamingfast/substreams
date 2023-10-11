@@ -564,7 +564,7 @@ func timerUntilNextCall(msg string) *time.Timer {
 	if strings.HasPrefix(msg, "OK-Missing/Invalid API Key") {
 		return time.NewTimer(time.Second * 5)
 	}
-	return time.NewTimer(time.Millisecond * 50)
+	return time.NewTimer(time.Millisecond * 500)
 }
 
 func getContractABI(ctx context.Context, address eth.Address, endpoint string) (*eth.ABI, string, *time.Timer, error) {
@@ -598,7 +598,7 @@ func getContractABI(ctx context.Context, address eth.Address, endpoint string) (
 
 	ethABI, err := eth.ParseABIFromBytes([]byte(abiContent))
 	if err != nil {
-		return nil, "", timer, fmt.Errorf("parsing abi: %w", err)
+		return nil, "", timer, fmt.Errorf("parsing abi %q: %w", abiContent, err)
 	}
 	return ethABI, abiContent, timer, err
 }

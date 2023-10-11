@@ -22,3 +22,5 @@ modules:
       - source: sf.ethereum.type.v2.Block
     output:
       type: proto:contract.v1.Events
+
+network: mainnet

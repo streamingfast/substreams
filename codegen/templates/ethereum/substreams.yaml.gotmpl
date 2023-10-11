@@ -50,14 +50,14 @@ modules:
     output:
       type: proto:sf.substreams.entity.v1.EntityChanges
 {{ end }}
-{{- if or (eq .sinkChoice 1) (eq .sinkChoice 2) }}
 network: {{ .network }}
+{{- if or (eq .sinkChoice 1) (eq .sinkChoice 2) }}
 
 sink:
   module: {{ if eq .sinkChoice 1 }}db_out{{ else if eq .sinkChoice 2}}graph_out{{ end }}
   type: sf.substreams.sink.sql.v1.Service
   config:
-    schema: "./schema.sql"
+    schema: "./schema.{{ if eq .sinkChoice 1}}sql{{ else if eq .sinkChoice 2}}graphql{{ end }}"
     wire_protocol_access: true
     postgraphile_frontend:
       enabled: true

@@ -7,7 +7,6 @@ type approvals @entity {
     owner: String!
     token_id: Float!
 }
-
 type approval_for_alls @entity {
     evt_tx_hash: String!
     evt_index: Int!
@@ -17,7 +16,6 @@ type approval_for_alls @entity {
     operator: String!
     owner: String!
 }
-
 type ownership_transferreds @entity {
     evt_tx_hash: String!
     evt_index: Int!
@@ -26,7 +24,6 @@ type ownership_transferreds @entity {
     new_owner: String!
     previous_owner: String!
 }
-
 type transfers @entity {
     evt_tx_hash: String!
     evt_index: Int!

@@ -192,8 +192,8 @@ func BuildEventModels(contract *EthereumContract) (out []codegenEvent, err error
 
 		for i, event := range events {
 			rustABIStructName := name
-			if len(events) > 1 {
-				rustABIStructName = name + strconv.FormatUint(uint64(i), 10)
+			if len(events) > 1 { // will result in OriginalName, OriginalName1, OriginalName2
+				rustABIStructName = name + strconv.FormatUint(uint64(i+1), 10)
 			}
 
 			protoFieldName := strcase.ToSnake(pluralizer.Plural(rustABIStructName))
@@ -261,16 +261,25 @@ func (e *rustEventModel) populateFields(log *eth.LogEventDef) error {
 		name = sanitizeProtoFieldName(name)
 
 		toProtoCode := generateFieldTransformCode(parameter.Type, "event."+name)
+		if toProtoCode == SKIP_FIELD {
+			continue
+		}
 		if toProtoCode == "" {
 			return fmt.Errorf("field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
 		}
 
 		toDatabaseChangeCode := generateFieldDatabaseChangeCode(parameter.Type, "evt."+name)
+		if toDatabaseChangeCode == SKIP_FIELD {
+			continue
+		}
 		if toDatabaseChangeCode == "" {
 			return fmt.Errorf("field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
 		}
 
 		toSqlCode := generateFieldSqlTypes(parameter.Type)
+		if toSqlCode == SKIP_FIELD {
+			continue
+		}
 		if toSqlCode == "" {
 			return fmt.Errorf("field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
 		}
@@ -295,6 +304,8 @@ func sanitizeProtoFieldName(name string) string {
 func sanitizeDatabaseChangesColumnNames(name string) string {
 	return fmt.Sprintf("\"%s\"", name)
 }
+
+const SKIP_FIELD = "skip"
 
 func generateFieldSqlTypes(fieldType eth.SolidityType) string {
 	switch v := fieldType.(type) {
@@ -322,8 +333,11 @@ func generateFieldSqlTypes(fieldType eth.SolidityType) string {
 	case eth.SignedFixedPointType, eth.UnsignedFixedPointType:
 		return "DECIMAL"
 
+	case eth.StructType:
+		return SKIP_FIELD
+
 	case eth.ArrayType:
-		return "" // not currently supported
+		return SKIP_FIELD
 
 	default:
 		return ""
@@ -356,6 +370,9 @@ func generateFieldDatabaseChangeCode(fieldType eth.SolidityType, fieldAccess str
 	case eth.ArrayType:
 		inner := generateFieldTransformCode(v.ElementType, "x")
 		return fmt.Sprintf("%s.into_iter().map(|x| %s).collect::<Vec<_>>()", fieldAccess, inner)
+
+	case eth.StructType:
+		return SKIP_FIELD
 
 	default:
 		return ""
@@ -394,6 +411,9 @@ func generateFieldTransformCode(fieldType eth.SolidityType, fieldAccess string) 
 	case eth.ArrayType:
 		inner := generateFieldTransformCode(v.ElementType, "x")
 		return fmt.Sprintf("%s.into_iter().map(|x| %s).collect::<Vec<_>>()", fieldAccess, inner)
+
+	case eth.StructType:
+		return SKIP_FIELD
 
 	default:
 		return ""

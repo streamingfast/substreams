@@ -52,9 +52,12 @@ var initCmd = &cobra.Command{
 	SilenceUsage: true,
 }
 
-var etherscanAPIKey = os.Getenv("ETHERSCAN_API_KEY")
+var etherscanAPIKey = "YourApiKey"
 
 func init() {
+	if x := os.Getenv("ETHERSCAN_API_KEY"); x != "" {
+		etherscanAPIKey = x
+	}
 	rootCmd.AddCommand(initCmd)
 }
 
@@ -646,7 +649,6 @@ func getContractABI(ctx context.Context, address eth.Address, endpoint string) (
 }
 
 func getAndSetContractABIs(ctx context.Context, contracts []*templates.EthereumContract, chain *templates.EthereumChain) ([]*templates.EthereumContract, error) {
-
 	for _, contract := range contracts {
 		abi, abiContent, wait, err := getContractABI(ctx, contract.GetAddress(), chain.ApiEndpoint)
 		if err != nil {
@@ -694,7 +696,7 @@ func getAndSetContractABIs(ctx context.Context, contracts []*templates.EthereumC
 			<-wait.C
 		}
 
-		fmt.Println("this is the complete abiContent after merge", abiContent)
+		//fmt.Println("this is the complete abiContent after merge", abiContent)
 		contract.SetAbiContent(abiContent)
 		contract.SetAbi(abi)
 

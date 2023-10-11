@@ -78,27 +78,70 @@ func TestNewEthereumTemplateProject(t *testing.T) {
 		name      string
 		args      args
 		want      map[string][]byte
+		choice    codegen.SinkChoice
 		assertion require.ErrorAssertionFunc
 	}{
 		{
-			"standard case",
-			args{"0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d", abiContent},
-			map[string][]byte{
+			name: "standard case - no sink",
+			args: args{"0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d", abiContent},
+			want: map[string][]byte{
 				"abi/contract.abi.json": abiContent,
 				"proto/contract.proto":  fileContent(t, "./ethereum/proto/contract.proto"),
 				"src/abi/mod.rs":        fileContent(t, "./ethereum/src/abi/mod.rs"),
 				"src/pb/contract.v1.rs": fileContent(t, "./ethereum/src/pb/contract.v1.rs"),
 				"src/pb/mod.rs":         fileContent(t, "./ethereum/src/pb/mod.rs"),
-				"src/lib.rs":            fileContent(t, "./ethereum/src/lib.rs"),
+				"src/lib.rs":            fileContent(t, "./ethereum/results/lib.rs"),
 				"build.rs":              fileContent(t, "./ethereum/build.rs"),
 				"Cargo.lock":            fileContent(t, "./ethereum/Cargo.lock"),
 				"Cargo.toml":            fileContent(t, "./ethereum/Cargo.toml"),
 				"Makefile":              fileContent(t, "./ethereum/Makefile"),
-				"substreams.yaml":       fileContent(t, "./ethereum/substreams.yaml"),
+				"substreams.yaml":       fileContent(t, "./ethereum/results/substreams.yaml"),
+				"rust-toolchain.toml":   fileContent(t, "./ethereum/rust-toolchain.toml"),
+			},
+			choice:    codegen.SinkChoiceNo,
+			assertion: require.NoError,
+		},
+		{
+			name: "standard case - db sink",
+			args: args{"0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d", abiContent},
+			want: map[string][]byte{
+				"abi/contract.abi.json": abiContent,
+				"proto/contract.proto":  fileContent(t, "./ethereum/proto/contract.proto"),
+				"src/abi/mod.rs":        fileContent(t, "./ethereum/src/abi/mod.rs"),
+				"src/pb/contract.v1.rs": fileContent(t, "./ethereum/src/pb/contract.v1.rs"),
+				"src/pb/mod.rs":         fileContent(t, "./ethereum/src/pb/mod.rs"),
+				"src/lib.rs":            fileContent(t, "./ethereum/results/lib_db.rs"),
+				"build.rs":              fileContent(t, "./ethereum/build.rs"),
+				"Cargo.lock":            fileContent(t, "./ethereum/Cargo.lock"),
+				"Cargo.toml":            fileContent(t, "./ethereum/Cargo.toml"),
+				"Makefile":              fileContent(t, "./ethereum/Makefile"),
+				"substreams.yaml":       fileContent(t, "./ethereum/results/substreams_db.yaml"),
 				"rust-toolchain.toml":   fileContent(t, "./ethereum/rust-toolchain.toml"),
 				"schema.sql":            fileContent(t, "./ethereum/schema.sql"),
 			},
-			require.NoError,
+			choice:    codegen.SinkChoiceDb,
+			assertion: require.NoError,
+		},
+		{
+			name: "standard case - graph sink",
+			args: args{"0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d", abiContent},
+			want: map[string][]byte{
+				"abi/contract.abi.json": abiContent,
+				"proto/contract.proto":  fileContent(t, "./ethereum/proto/contract.proto"),
+				"src/abi/mod.rs":        fileContent(t, "./ethereum/src/abi/mod.rs"),
+				"src/pb/contract.v1.rs": fileContent(t, "./ethereum/src/pb/contract.v1.rs"),
+				"src/pb/mod.rs":         fileContent(t, "./ethereum/src/pb/mod.rs"),
+				"src/lib.rs":            fileContent(t, "./ethereum/results/lib_graph.rs"),
+				"build.rs":              fileContent(t, "./ethereum/build.rs"),
+				"Cargo.lock":            fileContent(t, "./ethereum/Cargo.lock"),
+				"Cargo.toml":            fileContent(t, "./ethereum/Cargo.toml"),
+				"Makefile":              fileContent(t, "./ethereum/Makefile"),
+				"substreams.yaml":       fileContent(t, "./ethereum/results/substreams_graph.yaml"),
+				"rust-toolchain.toml":   fileContent(t, "./ethereum/rust-toolchain.toml"),
+				"schema.graphql":        fileContent(t, "./ethereum/schema.graphql"),
+			},
+			choice:    codegen.SinkChoiceGraph,
+			assertion: require.NoError,
 		},
 	}
 	for _, tt := range tests {
@@ -128,7 +171,7 @@ func TestNewEthereumTemplateProject(t *testing.T) {
 				chain,
 				ethereumContracts,
 				123,
-				codegen.SinkChoiceDb,
+				tt.choice,
 			)
 			require.NoError(t, err)
 

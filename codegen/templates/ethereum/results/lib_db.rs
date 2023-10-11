@@ -107,6 +107,7 @@ fn map_events(blk: eth::Block) -> Result<contract::Events, substreams::errors::E
             .collect(),
     })
 }
+
 #[substreams::handlers::map]
 fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::errors::Error> {
     // Initialize changes container
@@ -156,7 +157,6 @@ fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::error
             .set("to", Hex(&evt.to).to_string())
             .set("token_id", evt.token_id.to_string());
     });
-    
+
     Ok(tables.to_database_changes())
-    
 }

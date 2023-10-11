@@ -13,18 +13,26 @@ type approval_for_alls @entity {
     evt_index: Int!
     evt_block_time: String!
     evt_block_number: Int!
+    approved: Boolean!
+    operator: String!
+    owner: String!
 }
 
 type ownership_transferreds @entity {
     evt_tx_hash: String!
     evt_index: Int!
-    evt_block_time: timestamptz!
+    evt_block_time: String!
     evt_block_number: Int!
+    new_owner: String!
+    previous_owner: String!
 }
 
 type transfers @entity {
     evt_tx_hash: String!
     evt_index: Int!
-    evt_block_time: timestamptz!
+    evt_block_time: String!
     evt_block_number: Int!
+    from: String!
+    to: String!
+    token_id: Float!
 }

@@ -52,6 +52,7 @@ fn map_events(blk: eth::Block) -> Result<contract::Events, substreams::errors::E
 }
 
 {{- if ne .sinkChoice 0 }}
+
 #[substreams::handlers::map]
 fn {{ if eq .sinkChoice 1 }}db_out{{ else if eq .sinkChoice 2 }}graph_out{{ end }}(events: contract::Events) -> Result<{{ if eq .sinkChoice 1 }}DatabaseChanges{{ else }}EntityChanges{{ end}}, substreams::errors::Error> {
     // Initialize changes container
@@ -75,10 +76,12 @@ fn {{ if eq .sinkChoice 1 }}db_out{{ else if eq .sinkChoice 2 }}graph_out{{ end 
     });
 
     {{- end}}
-    {{ if eq .sinkChoice 1 }}
+    {{- if eq .sinkChoice 1 }}
+
     Ok(tables.to_database_changes())
-    {{ else if eq .sinkChoice 2 }}
+    {{- else if eq .sinkChoice 2 }}
+
     Ok(tables.to_entity_changes())
     {{- end }}
 }
-{{- end }}
+{{ end }}

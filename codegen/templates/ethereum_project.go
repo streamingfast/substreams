@@ -28,6 +28,7 @@ import (
 //go:embed ethereum/rust-toolchain.toml
 //go:embed ethereum/schema.sql.gotmpl
 //go:embed ethereum/build.rs.gotmpl
+//go:embed ethereum/schema.graphql.gotmpl
 var ethereumProject embed.FS
 
 type EthereumContract struct {
@@ -125,9 +126,25 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 		"rust-toolchain.toml",
 		"schema.sql.gotmpl",
 	} {
-		if ethereumProjectEntry == "src/lib.rs.gotmpl" && len(p.ethereumContracts) != 1 {
-			ethereumProjectEntry = "src/multiple_contracts_lib.rs.gotmpl"
+		// some configurations
+		switch ethereumProjectEntry {
+		case "schema.sql.gotmpl":
+			switch p.sinkChoice {
+			case codegen.SinkChoiceNo:
+				continue // no schema needed if there is no sink
+			case codegen.SinkChoiceGraph:
+				ethereumProjectEntry = "schema.graphql.gotmpl"
+			default:
+				// nothing to do
+			}
+		case "src/lib.rs.gotmpl":
+			if len(p.ethereumContracts) != 1 {
+				ethereumProjectEntry = "src/multiple_contracts_lib.rs.gotmpl"
+			}
+		default:
+			// nothing to do
 		}
+
 		content, err := ethereumProject.ReadFile(filepath.Join("ethereum", ethereumProjectEntry))
 		if err != nil {
 			return nil, fmt.Errorf("embed read entry %q: %w", ethereumProjectEntry, err)
@@ -295,16 +312,16 @@ func (e *rustEventModel) populateFields(log *eth.LogEventDef) error {
 		}
 
 		toGraphQLCode := generateFieldGraphQLTypes(parameter.Type)
-		//if toGraphQLCode == "" {
-		//	return fmt.Errorf("graphql - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
-		//}
+		if toGraphQLCode == "" {
+			return fmt.Errorf("graphql - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
+		}
 
 		columnName := sanitizeTableChangesColumnNames(name)
 
 		e.ProtoFieldABIConversionMap[name] = toProtoCode
 		e.ProtoFieldTableChangesMap[name] = toDatabaseChangeCode
 		e.ProtoFieldSqlmap[columnName] = toSqlCode
-		e.ProtoFieldGraphQLMap[columnName] = toGraphQLCode
+		e.ProtoFieldGraphQLMap[name] = toGraphQLCode
 	}
 
 	return nil
@@ -437,7 +454,40 @@ func generateFieldTransformCode(fieldType eth.SolidityType, fieldAccess string) 
 }
 
 func generateFieldGraphQLTypes(fieldType eth.SolidityType) string {
-	return ""
+	switch v := fieldType.(type) {
+	case eth.AddressType:
+		return "String!"
+
+	case eth.BooleanType:
+		return "Boolean!"
+
+	case eth.BytesType, eth.FixedSizeBytesType, eth.StringType:
+		return "String!"
+
+	case eth.SignedIntegerType:
+		if v.ByteSize <= 8 {
+			return "Int!"
+		}
+		return "Float!"
+
+	case eth.UnsignedIntegerType:
+		if v.ByteSize <= 8 {
+			return "Int!"
+		}
+		return "Float!"
+
+	case eth.SignedFixedPointType, eth.UnsignedFixedPointType:
+		return "Float!"
+
+	case eth.StructType:
+		return SKIP_FIELD
+
+	case eth.ArrayType:
+		return SKIP_FIELD
+
+	default:
+		return ""
+	}
 }
 
 type protoEventModel struct {

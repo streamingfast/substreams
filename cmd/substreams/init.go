@@ -224,14 +224,14 @@ func renderProjectFilesIn(project templates.Project, absoluteProjectDir string) 
 
 // We accept _ here because they are used across developers. we sanitize it later when
 // used within Substreams module.
-var moduleNameRegexp = regexp.MustCompile(`^([a-zA-Z][a-zA-Z0-9_-]{0,63})$`)
+var moduleNameRegexp = regexp.MustCompile(`^([a-z][a-z0-9_]{0,63})$`)
 
 func promptProjectName(absoluteSrcDir string) (string, string, error) {
 	if name := devInitProjectName; name != "" {
 		return name, projectNameToModuleName(name), nil
 	}
 
-	projectName, err := prompt("Project name", &promptOptions{
+	projectName, err := prompt("Project name (lowercase, numbers, undescores)", &promptOptions{
 		Validate: func(input string) error {
 			ok := moduleNameRegexp.MatchString(input)
 			if !ok {
@@ -319,11 +319,11 @@ func promptContractAddress(message string, inputFuncCheck func(input string) (et
 	})
 }
 
-var shortNameRegexp = regexp.MustCompile(`^([a-zA-Z][a-zA-Z0-9]{0,63})$`)
+var shortNameRegexp = regexp.MustCompile(`^([a-z][a-z0-9]{0,63})$`)
 
 func promptEthereumContractShortNames(ethereumContracts []*templates.EthereumContract) ([]*templates.EthereumContract, error) {
 	for _, contract := range ethereumContracts {
-		shortName, err := prompt(fmt.Sprintf("Choose a short name for %s", contract.GetAddress()), &promptOptions{
+		shortName, err := prompt(fmt.Sprintf("Choose a short name for %s (lowercase and numbers only)", contract.GetAddress()), &promptOptions{
 			Validate: func(input string) error {
 				ok := shortNameRegexp.MatchString(input)
 				if !ok {

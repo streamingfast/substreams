@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"os"
@@ -583,8 +584,13 @@ func getProxyContractImplementation(ctx context.Context, address eth.Address, en
 	}
 
 	var response Response
-	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		return nil, nil, fmt.Errorf("unmarshaling: %w", err)
+
+	bod, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := json.NewDecoder(bytes.NewReader(bod)).Decode(&response); err != nil {
+		return nil, nil, fmt.Errorf("unmarshaling %s: %w", string(bod), err)
 	}
 
 	timer := timerUntilNextCall(response.Message)
@@ -609,7 +615,7 @@ func timerUntilNextCall(msg string) *time.Timer {
 	if strings.HasPrefix(msg, "OK-Missing/Invalid API Key") {
 		return time.NewTimer(time.Second * 5)
 	}
-	return time.NewTimer(time.Millisecond * 500)
+	return time.NewTimer(time.Millisecond * 400)
 }
 
 func getContractABI(ctx context.Context, address eth.Address, endpoint string) (*eth.ABI, string, *time.Timer, error) {
@@ -655,13 +661,14 @@ func getAndSetContractABIs(ctx context.Context, contracts []*templates.EthereumC
 			return nil, err
 		}
 
+		<-wait.C
 		implementationAddress, wait, err := getProxyContractImplementation(ctx, contract.GetAddress(), chain.ApiEndpoint)
 		if err != nil {
 			return nil, err
 		}
+		<-wait.C
 
 		if implementationAddress != nil {
-			<-wait.C
 			implementationABI, implementationABIContent, wait, err := getContractABI(ctx, *implementationAddress, chain.ApiEndpoint)
 			if err != nil {
 				return nil, err

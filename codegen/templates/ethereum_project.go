@@ -443,6 +443,9 @@ func generateFieldTransformCode(fieldType eth.SolidityType, fieldAccess string) 
 
 	case eth.ArrayType:
 		inner := generateFieldTransformCode(v.ElementType, "x")
+		if inner == SKIP_FIELD {
+			return SKIP_FIELD
+		}
 		return fmt.Sprintf("%s.into_iter().map(|x| %s).collect::<Vec<_>>()", fieldAccess, inner)
 
 	case eth.StructType:
@@ -553,10 +556,13 @@ func getProtoFieldType(solidityType eth.SolidityType) string {
 	case eth.ArrayType:
 		// Flaky, I think we should support a single level of "array"
 		fieldType := getProtoFieldType(v.ElementType)
-		if fieldType == "" {
+		if fieldType == SKIP_FIELD {
 			return SKIP_FIELD
 		}
 		return "repeated " + fieldType
+
+	case eth.StructType:
+		return SKIP_FIELD
 
 	default:
 		return ""

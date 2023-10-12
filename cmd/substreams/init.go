@@ -145,7 +145,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 
 		for _, contract := range ethereumContracts {
 			fmt.Printf("Generating ABI Event models for %s\n", contract.GetName())
-			events, err := templates.BuildEventModels(contract)
+			events, err := templates.BuildEventModels(contract, len(ethereumContracts) > 1)
 			if err != nil {
 				return fmt.Errorf("build ABI event models for contract [%s - %s]: %w", contract.GetAddress(), contract.GetName(), err)
 			}

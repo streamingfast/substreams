@@ -31,7 +31,7 @@ func TestEnsureOurProjectCompiles(t *testing.T) {
 	)}
 
 	for _, contract := range ethereumContracts {
-		events, err := BuildEventModels(contract)
+		events, err := BuildEventModels(contract, len(ethereumContracts) > 1)
 		require.NoError(t, err)
 		contract.SetEvents(events)
 	}
@@ -160,7 +160,7 @@ func TestNewEthereumTemplateProject(t *testing.T) {
 			)}
 
 			for _, contract := range ethereumContracts {
-				events, err := BuildEventModels(contract)
+				events, err := BuildEventModels(contract, len(ethereumContracts) > 1)
 				require.NoError(t, err)
 				contract.SetEvents(events)
 			}

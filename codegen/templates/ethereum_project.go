@@ -203,7 +203,7 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 	return entries, nil
 }
 
-func BuildEventModels(contract *EthereumContract) (out []codegenEvent, err error) {
+func BuildEventModels(contract *EthereumContract, multipleContracts bool) (out []codegenEvent, err error) {
 	abi := contract.abi
 	pluralizer := pluralize.NewClient()
 
@@ -238,7 +238,7 @@ func BuildEventModels(contract *EthereumContract) (out []codegenEvent, err error
 				},
 			}
 
-			if err := codegenEvent.Rust.populateFields(event); err != nil {
+			if err := codegenEvent.Rust.populateFields(event, multipleContracts); err != nil {
 				return nil, fmt.Errorf("populating codegen Rust fields: %w", err)
 			}
 
@@ -268,7 +268,7 @@ type rustEventModel struct {
 	ProtoFieldGraphQLMap       map[string]string
 }
 
-func (e *rustEventModel) populateFields(log *eth.LogEventDef) error {
+func (e *rustEventModel) populateFields(log *eth.LogEventDef, multipleContracts bool) error {
 	if len(log.Parameters) == 0 {
 		return nil
 	}
@@ -295,7 +295,7 @@ func (e *rustEventModel) populateFields(log *eth.LogEventDef) error {
 			return fmt.Errorf("transform - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
 		}
 
-		toDatabaseChangeCode := generateFieldTableChangeCode(parameter.Type, "evt."+name)
+		toDatabaseChangeCode := generateFieldTableChangeCode(parameter.Type, "evt."+name, multipleContracts)
 		if toDatabaseChangeCode == SKIP_FIELD {
 			continue
 		}
@@ -377,12 +377,18 @@ func generateFieldSqlTypes(fieldType eth.SolidityType) string {
 	}
 }
 
-func generateFieldTableChangeCode(fieldType eth.SolidityType, fieldAccess string) string {
+func generateFieldTableChangeCode(fieldType eth.SolidityType, fieldAccess string, multipleContract bool) string {
 	switch v := fieldType.(type) {
 	case eth.AddressType, eth.BytesType, eth.FixedSizeBytesType:
 		return fmt.Sprintf("Hex(&%s).to_string()", fieldAccess)
 
-	case eth.BooleanType, eth.StringType:
+	case eth.BooleanType:
+		return fieldAccess
+
+	case eth.StringType:
+		if multipleContract {
+			return fmt.Sprintf("&%s", fieldAccess)
+		}
 		return fieldAccess
 
 	case eth.SignedIntegerType:

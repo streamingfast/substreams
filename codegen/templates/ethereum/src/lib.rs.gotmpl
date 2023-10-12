@@ -68,7 +68,7 @@ fn {{ if eq .sinkChoice 1 }}db_out{{ else if eq .sinkChoice 2 }}graph_out{{ end 
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            {{- $numberOfAttributes := len $rust.ProtoFieldTableChangesMap }}
+            {{- $numberOfAttributes := len $rust.ProtoFieldTableChangesMap }}{{ if eq $numberOfAttributes 0 }};{{ end }}
             {{- $i := 0 }}
             {{- range $protoField, $changesToProtoConversion := $rust.ProtoFieldTableChangesMap }}
             {{ $i = add $i 1 }}.set("{{$protoField}}", {{$changesToProtoConversion}}){{ if eq $i $numberOfAttributes }};{{ end }}

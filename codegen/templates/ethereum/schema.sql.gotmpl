@@ -2,12 +2,12 @@
 {{- range $idx, $contract := .ethereumContracts -}}
 {{- range $event := $contract.GetEvents -}}
 {{- $rust := $event.Rust -}}
+{{- $numberOfAttributes := len $rust.ProtoFieldTableChangesMap -}}
 CREATE TABLE IF NOT EXISTS {{ if ne $numberOfContracts 1 }}{{ $contract.GetName }}_{{ end }}{{ $rust.ProtoOutputModuleFieldName }} (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,
-    "evt_block_number" DECIMAL,
-    {{- $numberOfAttributes := len $rust.ProtoFieldTableChangesMap }}
+    "evt_block_number" DECIMAL{{ if ne $numberOfAttributes 0 }},{{ end -}}
     {{- $i := 0 }}
     {{- range $fieldName, $sqlType := $rust.ProtoFieldSqlmap }}
     {{ $i = add $i 1 }}{{ $fieldName }} {{ $sqlType }}{{ if eq $i $numberOfAttributes }}{{ else }},{{ end }}

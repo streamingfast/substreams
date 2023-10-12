@@ -67,7 +67,7 @@ fn {{ if eq $choice 1 }}db{{ else if eq $choice 2 }}graph{{ end }}_{{ $contract.
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            {{- $numberOfAttributes := len $rust.ProtoFieldTableChangesMap }}
+            {{- $numberOfAttributes := len $rust.ProtoFieldTableChangesMap }}{{ if eq $numberOfAttributes 0 }};{{ end }}
             {{- $i := 0 }}
             {{- range $protoField, $databaseChangesToProtoConversion := $rust.ProtoFieldTableChangesMap }}
             {{ $i = add $i 1 }}.set("{{$protoField}}", {{$databaseChangesToProtoConversion}}){{if eq $i $numberOfAttributes}};{{ end }}

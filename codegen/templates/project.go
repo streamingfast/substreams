@@ -1,6 +1,7 @@
 package templates
 
 import (
+	"strings"
 	"text/template"
 )
 
@@ -19,4 +20,6 @@ var ProjectGeneratorFuncs = template.FuncMap{
 		return left + right
 	},
 	"sanitizeProtoFieldName": sanitizeProtoFieldName,
+	"toUpper":                strings.ToUpper,
+	"capitalizeFirst":        strings.Title,
 }

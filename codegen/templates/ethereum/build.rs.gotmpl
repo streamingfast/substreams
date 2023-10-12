@@ -6,11 +6,16 @@ use std::fs::File;
 use std::io::Write;
 
 fn main() -> Result<(), anyhow::Error> {
+    {{- $numberOfContracts := len .ethereumContracts }}
     let file_names = [
-        "abi/contract.abi.json",
+        {{- range $i, $contract := .ethereumContracts }}
+        "abi/{{ $contract.GetName }}{{ if eq $numberOfContracts 1 }}{{ else }}_{{ end }}contract.abi.json",
+        {{- end }}
     ];
     let file_output_names = [
-        "src/abi/contract.rs",
+        {{- range $i, $contract := .ethereumContracts }}
+        "src/abi/{{ $contract.GetName }}{{ if eq $numberOfContracts 1 }}{{ else }}_{{ end }}contract.rs",
+        {{- end }}
     ];
 
     let mut i = 0;

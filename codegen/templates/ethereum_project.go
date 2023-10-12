@@ -10,6 +10,8 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/streamingfast/substreams/codegen"
+
 	"github.com/gertd/go-pluralize"
 	"github.com/iancoleman/strcase"
 	"github.com/streamingfast/eth-go"
@@ -25,39 +27,85 @@ import (
 //go:embed ethereum/substreams.yaml.gotmpl
 //go:embed ethereum/rust-toolchain.toml
 //go:embed ethereum/schema.sql.gotmpl
+//go:embed ethereum/build.rs.gotmpl
+//go:embed ethereum/schema.graphql.gotmpl
 var ethereumProject embed.FS
+
+type EthereumContract struct {
+	name       string
+	address    eth.Address
+	events     []codegenEvent
+	abi        *eth.ABI
+	abiContent string
+}
+
+func NewEthereumContract(name string, address eth.Address, events []codegenEvent, abi *eth.ABI, abiContent string) *EthereumContract {
+	return &EthereumContract{
+		name:       name,
+		address:    address,
+		events:     events,
+		abi:        abi,
+		abiContent: abiContent,
+	}
+}
+
+func (e *EthereumContract) GetAddress() eth.Address {
+	return e.address
+}
+
+func (e *EthereumContract) SetName(name string) {
+	e.name = name
+}
+
+func (e *EthereumContract) GetName() string {
+	return e.name
+}
+
+func (e *EthereumContract) SetEvents(events []codegenEvent) {
+	e.events = events
+}
+
+func (e *EthereumContract) GetEvents() []codegenEvent {
+	return e.events
+}
+
+func (e *EthereumContract) GetAbi() *eth.ABI {
+	return e.abi
+}
+
+func (e *EthereumContract) SetAbi(abi *eth.ABI) {
+	e.abi = abi
+}
+
+func (e *EthereumContract) SetAbiContent(abiContent string) {
+	e.abiContent = abiContent
+}
 
 type EthereumProject struct {
 	name                        string
 	moduleName                  string
 	chain                       *EthereumChain
-	contractAddress             eth.Address
-	events                      []codegenEvent
-	abiContent                  string
 	creationBlockNum            uint64
+	ethereumContracts           []*EthereumContract
 	sqlImportVersion            string
 	databaseChangeImportVersion string
+	entityChangeImportVersion   string
 	network                     string
+	sinkChoice                  codegen.SinkChoice
 }
 
-func NewEthereumProject(name string, moduleName string, chain *EthereumChain, address eth.Address, abi *eth.ABI, abiContent string, creationBlockNum uint64) (*EthereumProject, error) {
-	// We only have one templated file so far, so we can build own model correctly
-	events, err := buildEventModels(abi)
-	if err != nil {
-		return nil, fmt.Errorf("build ABI event models: %w", err)
-	}
-
+func NewEthereumProject(name string, moduleName string, chain *EthereumChain, contracts []*EthereumContract, lowestStartBlock uint64, choice codegen.SinkChoice) (*EthereumProject, error) {
 	return &EthereumProject{
 		name:                        name,
 		moduleName:                  moduleName,
 		chain:                       chain,
-		contractAddress:             address,
-		events:                      events,
-		abiContent:                  abiContent,
-		creationBlockNum:            creationBlockNum,
+		ethereumContracts:           contracts,
+		creationBlockNum:            lowestStartBlock,
 		sqlImportVersion:            "1.0.2",
 		databaseChangeImportVersion: "1.2.1",
+		entityChangeImportVersion:   "1.1.0",
 		network:                     chain.Network,
+		sinkChoice:                  choice,
 	}, nil
 }
 
@@ -66,11 +114,11 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 
 	for _, ethereumProjectEntry := range []string{
 		"proto/contract.proto.gotmpl",
-		"src/abi/mod.rs",
+		"src/abi/mod.rs.gotmpl",
 		"src/pb/contract.v1.rs",
 		"src/pb/mod.rs",
 		"src/lib.rs.gotmpl",
-		"build.rs",
+		"build.rs.gotmpl",
 		"Cargo.lock",
 		"Cargo.toml.gotmpl",
 		"Makefile.gotmpl",
@@ -78,12 +126,32 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 		"rust-toolchain.toml",
 		"schema.sql.gotmpl",
 	} {
+		// some configurations
+		switch ethereumProjectEntry {
+		case "schema.sql.gotmpl":
+			switch p.sinkChoice {
+			case codegen.SinkChoiceNo:
+				continue // no schema needed if there is no sink
+			case codegen.SinkChoiceGraph:
+				ethereumProjectEntry = "schema.graphql.gotmpl"
+			default:
+				// nothing to do
+			}
+		case "src/lib.rs.gotmpl":
+			if len(p.ethereumContracts) != 1 {
+				ethereumProjectEntry = "src/multiple_contracts_lib.rs.gotmpl"
+			}
+		default:
+			// nothing to do
+		}
+
 		content, err := ethereumProject.ReadFile(filepath.Join("ethereum", ethereumProjectEntry))
 		if err != nil {
 			return nil, fmt.Errorf("embed read entry %q: %w", ethereumProjectEntry, err)
 		}
 
 		finalFileName := ethereumProjectEntry
+
 		zlog.Debug("reading ethereum project entry", zap.String("filename", finalFileName))
 
 		if strings.HasSuffix(finalFileName, ".gotmpl") {
@@ -96,12 +164,13 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 				"name":                        p.name,
 				"moduleName":                  p.moduleName,
 				"chain":                       p.chain,
-				"address":                     p.contractAddress,
-				"events":                      p.events,
+				"ethereumContracts":           p.ethereumContracts,
 				"initialBlock":                strconv.FormatUint(p.creationBlockNum, 10),
 				"sqlImportVersion":            p.sqlImportVersion,
 				"databaseChangeImportVersion": p.databaseChangeImportVersion,
+				"entityChangeImportVersion":   p.entityChangeImportVersion,
 				"network":                     p.network,
+				"sinkChoice":                  p.sinkChoice,
 			}
 
 			zlog.Debug("rendering templated file", zap.String("filename", finalFileName), zap.Any("model", model))
@@ -111,6 +180,10 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 				return nil, fmt.Errorf("embed render entry template %q: %w", finalFileName, err)
 			}
 
+			if len(p.ethereumContracts) != 1 {
+				finalFileName = strings.ReplaceAll(finalFileName, "multiple_contracts_", "")
+			}
+
 			finalFileName = strings.TrimSuffix(finalFileName, ".gotmpl")
 			content = buffer.Bytes()
 		}
@@ -118,12 +191,20 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 		entries[finalFileName] = content
 	}
 
-	entries["abi/contract.abi.json"] = []byte(p.abiContent)
+	if len(p.ethereumContracts) == 1 {
+		entries["abi/contract.abi.json"] = []byte(p.ethereumContracts[0].abiContent)
+		return entries, nil
+	}
+
+	for _, contract := range p.ethereumContracts {
+		entries[fmt.Sprintf("abi/%s_contract.abi.json", contract.GetName())] = []byte(contract.abiContent)
+	}
 
 	return entries, nil
 }
 
-func buildEventModels(abi *eth.ABI) (out []codegenEvent, err error) {
+func BuildEventModels(contract *EthereumContract, multipleContracts bool) (out []codegenEvent, err error) {
+	abi := contract.abi
 	pluralizer := pluralize.NewClient()
 
 	names := keys(abi.LogEventsByNameMap)
@@ -136,26 +217,28 @@ func buildEventModels(abi *eth.ABI) (out []codegenEvent, err error) {
 
 		for i, event := range events {
 			rustABIStructName := name
-			if len(events) > 1 {
-				rustABIStructName = name + strconv.FormatUint(uint64(i), 10)
+			if len(events) > 1 { // will result in OriginalName, OriginalName1, OriginalName2
+				rustABIStructName = name + strconv.FormatUint(uint64(i+1), 10)
 			}
 
 			protoFieldName := strcase.ToSnake(pluralizer.Plural(rustABIStructName))
+			// prost will do a to_lower_camel_case() on any struct name
+			rustGeneratedStructName := strcase.ToCamel(strcase.ToSnake(rustABIStructName))
 
 			codegenEvent := codegenEvent{
 				Rust: &rustEventModel{
-					ABIStructName:              rustABIStructName,
-					ProtoMessageName:           rustABIStructName,
+					ABIStructName:              rustGeneratedStructName,
+					ProtoMessageName:           rustGeneratedStructName,
 					ProtoOutputModuleFieldName: protoFieldName,
 				},
 
 				Proto: &protoEventModel{
-					MessageName:           rustABIStructName,
+					MessageName:           rustGeneratedStructName,
 					OutputModuleFieldName: protoFieldName,
 				},
 			}
 
-			if err := codegenEvent.Rust.populateFields(event); err != nil {
+			if err := codegenEvent.Rust.populateFields(event, multipleContracts); err != nil {
 				return nil, fmt.Errorf("populating codegen Rust fields: %w", err)
 			}
 
@@ -176,22 +259,24 @@ type codegenEvent struct {
 }
 
 type rustEventModel struct {
-	ABIStructName                string
-	ProtoMessageName             string
-	ProtoOutputModuleFieldName   string
-	ProtoFieldABIConversionMap   map[string]string
-	ProtoFieldDatabaseChangesMap map[string]string
-	ProtoFieldSqlmap             map[string]string
+	ABIStructName              string
+	ProtoMessageName           string
+	ProtoOutputModuleFieldName string
+	ProtoFieldABIConversionMap map[string]string
+	ProtoFieldTableChangesMap  map[string]string
+	ProtoFieldSqlmap           map[string]string
+	ProtoFieldGraphQLMap       map[string]string
 }
 
-func (e *rustEventModel) populateFields(log *eth.LogEventDef) error {
+func (e *rustEventModel) populateFields(log *eth.LogEventDef, multipleContracts bool) error {
 	if len(log.Parameters) == 0 {
 		return nil
 	}
 
 	e.ProtoFieldABIConversionMap = map[string]string{}
-	e.ProtoFieldDatabaseChangesMap = map[string]string{}
+	e.ProtoFieldTableChangesMap = map[string]string{}
 	e.ProtoFieldSqlmap = map[string]string{}
+	e.ProtoFieldGraphQLMap = map[string]string{}
 	paramNames := make([]string, len(log.Parameters))
 	for i := range log.Parameters {
 		paramNames[i] = log.Parameters[i].Name
@@ -203,25 +288,40 @@ func (e *rustEventModel) populateFields(log *eth.LogEventDef) error {
 		name = sanitizeProtoFieldName(name)
 
 		toProtoCode := generateFieldTransformCode(parameter.Type, "event."+name)
+		if toProtoCode == SKIP_FIELD {
+			continue
+		}
 		if toProtoCode == "" {
-			return fmt.Errorf("field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
+			return fmt.Errorf("transform - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
 		}
 
-		toDatabaseChangeCode := generateFieldDatabaseChangeCode(parameter.Type, "evt."+name)
+		toDatabaseChangeCode := generateFieldTableChangeCode(parameter.Type, "evt."+name, multipleContracts)
+		if toDatabaseChangeCode == SKIP_FIELD {
+			continue
+		}
 		if toDatabaseChangeCode == "" {
-			return fmt.Errorf("field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
+			return fmt.Errorf("table change - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
 		}
 
 		toSqlCode := generateFieldSqlTypes(parameter.Type)
+		if toSqlCode == SKIP_FIELD {
+			continue
+		}
 		if toSqlCode == "" {
-			return fmt.Errorf("field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
+			return fmt.Errorf("sql - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
 		}
 
-		columnName := sanitizeDatabaseChangesColumnNames(name)
+		toGraphQLCode := generateFieldGraphQLTypes(parameter.Type)
+		if toGraphQLCode == "" {
+			return fmt.Errorf("graphql - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
+		}
+
+		columnName := sanitizeTableChangesColumnNames(name)
 
 		e.ProtoFieldABIConversionMap[name] = toProtoCode
-		e.ProtoFieldDatabaseChangesMap[name] = toDatabaseChangeCode
+		e.ProtoFieldTableChangesMap[name] = toDatabaseChangeCode
 		e.ProtoFieldSqlmap[columnName] = toSqlCode
+		e.ProtoFieldGraphQLMap[name] = toGraphQLCode
 	}
 
 	return nil
@@ -234,9 +334,11 @@ func sanitizeProtoFieldName(name string) string {
 	return name
 }
 
-func sanitizeDatabaseChangesColumnNames(name string) string {
+func sanitizeTableChangesColumnNames(name string) string {
 	return fmt.Sprintf("\"%s\"", name)
 }
+
+const SKIP_FIELD = "skip"
 
 func generateFieldSqlTypes(fieldType eth.SolidityType) string {
 	switch v := fieldType.(type) {
@@ -264,20 +366,29 @@ func generateFieldSqlTypes(fieldType eth.SolidityType) string {
 	case eth.SignedFixedPointType, eth.UnsignedFixedPointType:
 		return "DECIMAL"
 
+	case eth.StructType:
+		return SKIP_FIELD
+
 	case eth.ArrayType:
-		return "" // not currently supported
+		return SKIP_FIELD
 
 	default:
 		return ""
 	}
 }
 
-func generateFieldDatabaseChangeCode(fieldType eth.SolidityType, fieldAccess string) string {
+func generateFieldTableChangeCode(fieldType eth.SolidityType, fieldAccess string, multipleContract bool) string {
 	switch v := fieldType.(type) {
 	case eth.AddressType, eth.BytesType, eth.FixedSizeBytesType:
 		return fmt.Sprintf("Hex(&%s).to_string()", fieldAccess)
 
-	case eth.BooleanType, eth.StringType:
+	case eth.BooleanType:
+		return fieldAccess
+
+	case eth.StringType:
+		if multipleContract {
+			return fmt.Sprintf("&%s", fieldAccess)
+		}
 		return fieldAccess
 
 	case eth.SignedIntegerType:
@@ -298,6 +409,9 @@ func generateFieldDatabaseChangeCode(fieldType eth.SolidityType, fieldAccess str
 	case eth.ArrayType:
 		inner := generateFieldTransformCode(v.ElementType, "x")
 		return fmt.Sprintf("%s.into_iter().map(|x| %s).collect::<Vec<_>>()", fieldAccess, inner)
+
+	case eth.StructType:
+		return SKIP_FIELD
 
 	default:
 		return ""
@@ -335,7 +449,50 @@ func generateFieldTransformCode(fieldType eth.SolidityType, fieldAccess string) 
 
 	case eth.ArrayType:
 		inner := generateFieldTransformCode(v.ElementType, "x")
+		if inner == SKIP_FIELD {
+			return SKIP_FIELD
+		}
 		return fmt.Sprintf("%s.into_iter().map(|x| %s).collect::<Vec<_>>()", fieldAccess, inner)
+
+	case eth.StructType:
+		return SKIP_FIELD
+
+	default:
+		return ""
+	}
+}
+
+func generateFieldGraphQLTypes(fieldType eth.SolidityType) string {
+	switch v := fieldType.(type) {
+	case eth.AddressType:
+		return "String!"
+
+	case eth.BooleanType:
+		return "Boolean!"
+
+	case eth.BytesType, eth.FixedSizeBytesType, eth.StringType:
+		return "String!"
+
+	case eth.SignedIntegerType:
+		if v.ByteSize <= 8 {
+			return "Int!"
+		}
+		return "Float!"
+
+	case eth.UnsignedIntegerType:
+		if v.ByteSize <= 8 {
+			return "Int!"
+		}
+		return "Float!"
+
+	case eth.SignedFixedPointType, eth.UnsignedFixedPointType:
+		return "Float!"
+
+	case eth.StructType:
+		return SKIP_FIELD
+
+	case eth.ArrayType:
+		return SKIP_FIELD
 
 	default:
 		return ""
@@ -355,17 +512,20 @@ func (e *protoEventModel) populateFields(log *eth.LogEventDef) error {
 		return nil
 	}
 
-	e.Fields = make([]protoField, len(log.Parameters))
-	for index, parameter := range log.Parameters {
+	e.Fields = make([]protoField, 0, len(log.Parameters))
+	for _, parameter := range log.Parameters {
 		fieldName := strcase.ToSnake(parameter.Name)
 		fieldName = sanitizeProtoFieldName(fieldName)
 		fieldType := getProtoFieldType(parameter.Type)
+		if fieldType == SKIP_FIELD {
+			continue
+		}
 
 		if fieldType == "" {
 			return fmt.Errorf("field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
 		}
 
-		e.Fields[index] = protoField{Name: fieldName, Type: fieldType}
+		e.Fields = append(e.Fields, protoField{Name: fieldName, Type: fieldType})
 	}
 
 	return nil
@@ -401,7 +561,14 @@ func getProtoFieldType(solidityType eth.SolidityType) string {
 
 	case eth.ArrayType:
 		// Flaky, I think we should support a single level of "array"
-		return "repeated " + getProtoFieldType(v.ElementType)
+		fieldType := getProtoFieldType(v.ElementType)
+		if fieldType == SKIP_FIELD {
+			return SKIP_FIELD
+		}
+		return "repeated " + fieldType
+
+	case eth.StructType:
+		return SKIP_FIELD
 
 	default:
 		return ""

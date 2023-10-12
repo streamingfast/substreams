@@ -3,8 +3,8 @@ mod pb;
 use hex_literal::hex;
 use pb::contract::v1 as contract;
 use substreams::Hex;
-use substreams_database_change::pb::database::DatabaseChanges;
-use substreams_database_change::tables::Tables;
+use substreams_entity_change::pb::entity::EntityChanges;
+use substreams_entity_change::tables::Tables;
 use substreams_ethereum::pb::eth::v2 as eth;
 use substreams_ethereum::Event;
 
@@ -109,7 +109,7 @@ fn map_events(blk: eth::Block) -> Result<contract::Events, substreams::errors::E
 }
 
 #[substreams::handlers::map]
-fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::errors::Error> {
+fn graph_out(events: contract::Events) -> Result<EntityChanges, substreams::errors::Error> {
     // Initialize changes container
     let mut tables = Tables::new();
 
@@ -158,5 +158,5 @@ fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::error
             .set("token_id", evt.token_id.to_string());
     });
 
-    Ok(tables.to_database_changes())
+    Ok(tables.to_entity_changes())
 }

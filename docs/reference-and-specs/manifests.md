@@ -70,7 +70,9 @@ The `package.url` field identifies and helps users discover the source of the Su
 
 #### package.doc
 
-The `package.doc` field is the documentation string of the package. The first line is a short description and longer documentation proceeds a blank line.
+The `package.doc` field is the documentation string of the package. The first line is used by the different UIs as a short-form description.
+
+This field should be written in Markdown format.
 
 ### `imports`
 
@@ -169,6 +171,10 @@ This example shows one map module, named `events_extractor` and one store module
       - store: myimport:prices
     output:
       type: proto:my.types.v1.Events
+    doc:
+      This module extracts events
+      
+      Use in such and such situations
 
   - name: totals
     kind: store
@@ -295,6 +301,10 @@ The value for `type` is always prefixed using `proto:` followed by a definition 
 {% hint style="success" %}
 **Tip**: The module `output` field is only available for modules of `kind: map`.
 {% endhint %}
+
+#### Module `doc`
+
+This field should contain Markdown documentation of the module. Use it to describe how to use the params, or what to expect from the module.
 
 ### `params`
 

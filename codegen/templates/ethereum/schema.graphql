@@ -1,35 +1,39 @@
 type approvals @entity {
+    id: ID!
     evt_tx_hash: String!
-    evt_index: Int!
+    evt_index: BigInt!
     evt_block_time: String!
-    evt_block_number: Int!
+    evt_block_number: BigInt!
     approved: String!
     owner: String!
-    token_id: Float!
+    token_id: BigDecimal!
 }
 type approval_for_alls @entity {
+    id: ID!
     evt_tx_hash: String!
-    evt_index: Int!
+    evt_index: BigInt!
     evt_block_time: String!
-    evt_block_number: Int!
+    evt_block_number: BigInt!
     approved: Boolean!
     operator: String!
     owner: String!
 }
 type ownership_transferreds @entity {
+    id: ID!
     evt_tx_hash: String!
-    evt_index: Int!
+    evt_index: BigInt!
     evt_block_time: String!
-    evt_block_number: Int!
+    evt_block_number: BigInt!
     new_owner: String!
     previous_owner: String!
 }
 type transfers @entity {
+    id: ID!
     evt_tx_hash: String!
-    evt_index: Int!
+    evt_index: BigInt!
     evt_block_time: String!
-    evt_block_number: Int!
+    evt_block_number: BigInt!
     from: String!
     to: String!
-    token_id: Float!
+    token_id: BigDecimal!
 }

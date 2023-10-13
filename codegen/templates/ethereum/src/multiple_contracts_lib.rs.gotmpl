@@ -3,13 +3,10 @@ mod pb;
 use hex_literal::hex;
 use pb::contract::v1 as contract;
 use substreams::Hex;
-{{- if eq .sinkChoice 1 }}
 use substreams_database_change::pb::database::DatabaseChanges;
-use substreams_database_change::tables::Tables;
-{{- else if eq .sinkChoice 2 }}
+use substreams_database_change::tables::Tables as DatabaseChangeTables;
 use substreams_entity_change::pb::entity::EntityChanges;
-use substreams_entity_change::tables::Tables;
-{{- end }}
+use substreams_entity_change::tables::Tables as EntityChangesTables;
 use substreams_ethereum::pb::eth::v2 as eth;
 use substreams_ethereum::Event;
 
@@ -53,10 +50,8 @@ fn map_{{ $contract.GetName }}_events(blk: &eth::Block, events: &mut contract::E
 }
 {{ end }}
 
-{{- $choice := .sinkChoice }}
-{{- if ne $choice 0 }}
 {{- range $i, $contract := .ethereumContracts }}
-fn {{ if eq $choice 1 }}db{{ else if eq $choice 2 }}graph{{ end }}_{{ $contract.GetName }}_out(events: &contract::Events, tables: &mut Tables) {
+fn db_{{ $contract.GetName }}_out(events: &contract::Events, tables: &mut DatabaseChangeTables) {
     // Loop over all the abis events to create table changes
     {{- range $event := $contract.GetEvents }}
     {{- $rust := $event.Rust }}
@@ -75,8 +70,30 @@ fn {{ if eq $choice 1 }}db{{ else if eq $choice 2 }}graph{{ end }}_{{ $contract.
     });
     {{- end}}
 }
-{{ end }}
 {{- end }}
+
+{{ range $i, $contract := .ethereumContracts }}
+fn graph_{{ $contract.GetName }}_out(events: &contract::Events, tables: &mut EntityChangesTables) {
+    // Loop over all the abis events to create table changes
+    {{- range $event := $contract.GetEvents }}
+    {{- $rust := $event.Rust }}
+    events.{{ $contract.GetName }}_{{ $rust.ProtoOutputModuleFieldName }}.iter().for_each(|evt| {
+        tables
+            .create_row("{{ if eq $numberOfContracts 1 }}{{ $rust.ProtoOutputModuleFieldName }}{{ else }}{{ $contract.GetName }}_{{ $rust.ProtoOutputModuleFieldName }}{{ end }}", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
+            .set("evt_tx_hash", &evt.evt_tx_hash)
+            .set("evt_index", evt.evt_index)
+            .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
+            .set("evt_block_number", evt.evt_block_number)
+            {{- $numberOfAttributes := len $rust.ProtoFieldTableChangesMap }}{{ if eq $numberOfAttributes 0 }};{{ end }}
+            {{- $i := 0 }}
+            {{- range $protoField, $databaseChangesToProtoConversion := $rust.ProtoFieldTableChangesMap }}
+            {{ $i = add $i 1 }}.set("{{$protoField}}", {{$databaseChangesToProtoConversion}}){{if eq $i $numberOfAttributes}};{{ end }}
+            {{- end}}
+    });
+{{- end}}
+}
+{{- end }}
+
 #[substreams::handlers::map]
 fn map_events(blk: eth::Block) -> Result<contract::Events, substreams::errors::Error> {
     let mut events = contract::Events::default();
@@ -86,24 +103,22 @@ fn map_events(blk: eth::Block) -> Result<contract::Events, substreams::errors::E
     Ok(events)
 }
 
-{{- if eq .sinkChoice 1 }}
 #[substreams::handlers::map]
 fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::errors::Error> {
     // Initialize Database Changes container
-    let mut tables = Tables::new();
+    let mut tables = DatabaseChangeTables::new();
     {{- range $i, $contract := .ethereumContracts }}
     db_{{ $contract.GetName }}_out(&events, &mut tables);
     {{- end }}
     Ok(tables.to_database_changes())
 }
-{{- else if eq .sinkChoice 2 }}
+
 #[substreams::handlers::map]
 fn graph_out(events: contract::Events) -> Result<EntityChanges, substreams::errors::Error> {
     // Initialize Database Changes container
-    let mut tables = Tables::new();
+    let mut tables = EntityChangesTables::new();
     {{- range $i, $contract := .ethereumContracts }}
     graph_{{ $contract.GetName }}_out(&events, &mut tables);
     {{- end }}
     Ok(tables.to_entity_changes())
 }
-{{ end }}

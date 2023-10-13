@@ -3,16 +3,11 @@ package:
   name: {{ .moduleName }}
   version: v0.1.0
 
-{{- if ne .sinkChoice 0 }}
-
 imports:
   sql: https://github.com/streamingfast/substreams-sink-sql/releases/download/protodefs-v{{ .sqlImportVersion }}/substreams-sink-sql-protodefs-v{{ .sqlImportVersion }}.spkg
-  {{- if eq .sinkChoice 1}}
+  graph: https://github.com/streamingfast/substreams-subgraph-sink/releases/download/v{{ .graphImportVersion }}/substreams-subgraph-sink-protodefs-v{{ .graphImportVersion }}.spkg
   database_change: https://github.com/streamingfast/substreams-sink-database-changes/releases/download/v{{ .databaseChangeImportVersion }}/substreams-database-change-v{{ .databaseChangeImportVersion }}.spkg
-  {{- else if eq .sinkChoice 2 }}
   entity: https://github.com/streamingfast/substreams-entity-change/releases/download/v{{ .entityChangeImportVersion }}/substreams-entity-change-v{{ .entityChangeImportVersion }}.spkg
-  {{- end }}
-{{- end }}
 
 protobuf:
   files:
@@ -33,7 +28,7 @@ modules:
       - source: sf.ethereum.type.v2.Block
     output:
       type: proto:contract.v1.Events
-{{ if eq .sinkChoice 1 }}
+
   - name: db_out
     kind: map
     initialBlock: {{ .initialBlock }}
@@ -41,7 +36,7 @@ modules:
       - map: map_events
     output:
       type: proto:sf.substreams.sink.database.v1.DatabaseChanges
-{{ else if eq .sinkChoice 2 }}
+
   - name: graph_out
     kind: map
     initialBlock: {{ .initialBlock }}
@@ -49,18 +44,20 @@ modules:
       - map: map_events
     output:
       type: proto:sf.substreams.entity.v1.EntityChanges
-{{ end }}
+
 network: {{ .network }}
-{{- if or (eq .sinkChoice 1) (eq .sinkChoice 2) }}
+{{- if ne .sinkChoice 0 }}
 
 sink:
   module: {{ if eq .sinkChoice 1 }}db_out{{ else if eq .sinkChoice 2}}graph_out{{ end }}
-  type: sf.substreams.sink.sql.v1.Service
+  type: {{ if eq .sinkChoice 1 }}sf.substreams.sink.sql.v1.Service{{ else if eq .sinkChoice 2}}sf.substreams.subgraph.sink.v1.Service{{ end }}
   config:
-    schema: "./schema.{{ if eq .sinkChoice 1}}sql{{ else if eq .sinkChoice 2}}graphql{{ end }}"
-    wire_protocol_access: true
+    schema: {{ if eq .sinkChoice 1}}"./schema.sql"{{ else if eq .sinkChoice 2}}"./schema.graphql"{{ end }}
+    {{ if eq .sinkChoice 1}}wire_protocol_access{{ else if eq .sinkChoice 2}}postgres_direct_protocol_access{{ end }}: true
+    {{- if eq .sinkChoice 1}}
     postgraphile_frontend:
       enabled: true
+    {{- end}}
     pgweb_frontend:
       enabled: true
 {{ end }}

@@ -4,7 +4,9 @@ use hex_literal::hex;
 use pb::contract::v1 as contract;
 use substreams::Hex;
 use substreams_database_change::pb::database::DatabaseChanges;
-use substreams_database_change::tables::Tables;
+use substreams_database_change::tables::Tables as DatabaseChangeTables;
+use substreams_entity_change::pb::entity::EntityChanges;
+use substreams_entity_change::tables::Tables as EntityChangesTables;
 use substreams_ethereum::pb::eth::v2 as eth;
 use substreams_ethereum::Event;
 
@@ -111,7 +113,7 @@ fn map_events(blk: eth::Block) -> Result<contract::Events, substreams::errors::E
 #[substreams::handlers::map]
 fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::errors::Error> {
     // Initialize changes container
-    let mut tables = Tables::new();
+    let mut tables = DatabaseChangeTables::new();
 
     // Loop over all the abis events to create changes
     events.approvals.into_iter().for_each(|evt| {
@@ -159,4 +161,57 @@ fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::error
     });
 
     Ok(tables.to_database_changes())
+}
+
+#[substreams::handlers::map]
+fn graph_out(events: contract::Events) -> Result<EntityChanges, substreams::errors::Error> {
+    // Initialize changes container
+    let mut tables = EntityChangesTables::new();
+
+    // Loop over all the abis events to create changes
+    events.approvals.into_iter().for_each(|evt| {
+        tables
+            .create_row("approvals", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
+            .set("evt_tx_hash", evt.evt_tx_hash)
+            .set("evt_index", evt.evt_index)
+            .set("evt_block_time", evt.evt_block_time.unwrap())
+            .set("evt_block_number", evt.evt_block_number)
+            .set("approved", Hex(&evt.approved).to_string())
+            .set("owner", Hex(&evt.owner).to_string())
+            .set("token_id", evt.token_id.to_string());
+    });
+    events.approval_for_alls.into_iter().for_each(|evt| {
+        tables
+            .create_row("approval_for_alls", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
+            .set("evt_tx_hash", evt.evt_tx_hash)
+            .set("evt_index", evt.evt_index)
+            .set("evt_block_time", evt.evt_block_time.unwrap())
+            .set("evt_block_number", evt.evt_block_number)
+            .set("approved", evt.approved)
+            .set("operator", Hex(&evt.operator).to_string())
+            .set("owner", Hex(&evt.owner).to_string());
+    });
+    events.ownership_transferreds.into_iter().for_each(|evt| {
+        tables
+            .create_row("ownership_transferreds", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
+            .set("evt_tx_hash", evt.evt_tx_hash)
+            .set("evt_index", evt.evt_index)
+            .set("evt_block_time", evt.evt_block_time.unwrap())
+            .set("evt_block_number", evt.evt_block_number)
+            .set("new_owner", Hex(&evt.new_owner).to_string())
+            .set("previous_owner", Hex(&evt.previous_owner).to_string());
+    });
+    events.transfers.into_iter().for_each(|evt| {
+        tables
+            .create_row("transfers", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
+            .set("evt_tx_hash", evt.evt_tx_hash)
+            .set("evt_index", evt.evt_index)
+            .set("evt_block_time", evt.evt_block_time.unwrap())
+            .set("evt_block_number", evt.evt_block_number)
+            .set("from", Hex(&evt.from).to_string())
+            .set("to", Hex(&evt.to).to_string())
+            .set("token_id", evt.token_id.to_string());
+    });
+
+    Ok(tables.to_entity_changes())
 }

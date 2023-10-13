@@ -26,9 +26,10 @@ import (
 //go:embed ethereum/Makefile.gotmpl
 //go:embed ethereum/substreams.yaml.gotmpl
 //go:embed ethereum/rust-toolchain.toml
-//go:embed ethereum/schema.sql.gotmpl
 //go:embed ethereum/build.rs.gotmpl
+//go:embed ethereum/schema.sql.gotmpl
 //go:embed ethereum/schema.graphql.gotmpl
+//go:embed ethereum/subgraph.yaml.gotmpl
 var ethereumProject embed.FS
 
 type EthereumContract struct {
@@ -88,6 +89,7 @@ type EthereumProject struct {
 	creationBlockNum            uint64
 	ethereumContracts           []*EthereumContract
 	sqlImportVersion            string
+	graphImportVersion          string
 	databaseChangeImportVersion string
 	entityChangeImportVersion   string
 	network                     string
@@ -102,6 +104,7 @@ func NewEthereumProject(name string, moduleName string, chain *EthereumChain, co
 		ethereumContracts:           contracts,
 		creationBlockNum:            lowestStartBlock,
 		sqlImportVersion:            "1.0.2",
+		graphImportVersion:          "0.1.0",
 		databaseChangeImportVersion: "1.2.1",
 		entityChangeImportVersion:   "1.1.0",
 		network:                     chain.Network,
@@ -125,24 +128,11 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 		"substreams.yaml.gotmpl",
 		"rust-toolchain.toml",
 		"schema.sql.gotmpl",
+		"schema.graphql.gotmpl",
+		"subgraph.yaml.gotmpl",
 	} {
-		// some configurations
-		switch ethereumProjectEntry {
-		case "schema.sql.gotmpl":
-			switch p.sinkChoice {
-			case codegen.SinkChoiceNo:
-				continue // no schema needed if there is no sink
-			case codegen.SinkChoiceGraph:
-				ethereumProjectEntry = "schema.graphql.gotmpl"
-			default:
-				// nothing to do
-			}
-		case "src/lib.rs.gotmpl":
-			if len(p.ethereumContracts) != 1 {
-				ethereumProjectEntry = "src/multiple_contracts_lib.rs.gotmpl"
-			}
-		default:
-			// nothing to do
+		if ethereumProjectEntry == "src/lib.rs.gotmpl" && len(p.ethereumContracts) > 1 {
+			ethereumProjectEntry = "src/multiple_contracts_lib.rs.gotmpl"
 		}
 
 		content, err := ethereumProject.ReadFile(filepath.Join("ethereum", ethereumProjectEntry))
@@ -167,6 +157,7 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 				"ethereumContracts":           p.ethereumContracts,
 				"initialBlock":                strconv.FormatUint(p.creationBlockNum, 10),
 				"sqlImportVersion":            p.sqlImportVersion,
+				"graphImportVersion":          p.graphImportVersion,
 				"databaseChangeImportVersion": p.databaseChangeImportVersion,
 				"entityChangeImportVersion":   p.entityChangeImportVersion,
 				"network":                     p.network,
@@ -477,16 +468,16 @@ func generateFieldGraphQLTypes(fieldType eth.SolidityType) string {
 		if v.ByteSize <= 8 {
 			return "Int!"
 		}
-		return "Float!"
+		return "BigDecimal!"
 
 	case eth.UnsignedIntegerType:
 		if v.ByteSize <= 8 {
 			return "Int!"
 		}
-		return "Float!"
+		return "BigDecimal!"
 
 	case eth.SignedFixedPointType, eth.UnsignedFixedPointType:
-		return "Float!"
+		return "BigDecimal!"
 
 	case eth.StructType:
 		return SKIP_FIELD

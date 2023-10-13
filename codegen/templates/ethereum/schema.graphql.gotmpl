@@ -3,10 +3,11 @@
 {{- range $event := $contract.GetEvents -}}
 {{- $rust := $event.Rust -}}
 type {{ if ne $numberOfContracts 1 }}{{ $contract.GetName }}_{{ end }}{{ $rust.ProtoOutputModuleFieldName }} @entity {
+    id: ID!
     evt_tx_hash: String!
-    evt_index: Int!
+    evt_index: BigInt!
     evt_block_time: String!
-    evt_block_number: Int!
+    evt_block_number: BigInt!
     {{- $i := 0 }}
     {{- range $fieldName, $graphqlType := $rust.ProtoFieldGraphQLMap }}
     {{ $i = add $i 1 }}{{ $fieldName }}: {{ $graphqlType }}

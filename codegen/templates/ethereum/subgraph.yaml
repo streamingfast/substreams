@@ -1,0 +1,17 @@
+specVersion: v0.1.0
+description: # add description
+repository: # fill in with git remote url
+schema:
+  file: ./schema.graphql
+
+dataSources:
+  - kind: substreams
+    name: substreams-init-test
+    network: mainnet
+    source:
+      package:
+        moduleName: graph_out
+        file: substreams-init-test-v0.1.0.spkg
+    mapping:
+      kind: substreams/graph-entities
+      apiVersion: 0.0.5

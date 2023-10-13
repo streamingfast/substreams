@@ -16,11 +16,8 @@ prost = "0.11"
 prost-types = "0.11"
 substreams = "0.5"
 substreams-ethereum = "0.9"
-{{- if eq .sinkChoice 1 }}
 substreams-database-change = "1"
-{{- else if eq .sinkChoice 2 }}
 substreams-entity-change = "1"
-{{- end }}
 
 # Required so that ethabi > ethereum-types build correctly under wasm32-unknown-unknown
 [target.wasm32-unknown-unknown.dependencies]

@@ -3,6 +3,12 @@ package:
   name: substreams_init_test
   version: v0.1.0
 
+imports:
+  sql: https://github.com/streamingfast/substreams-sink-sql/releases/download/protodefs-v1.0.2/substreams-sink-sql-protodefs-v1.0.2.spkg
+  graph: https://github.com/streamingfast/substreams-subgraph-sink/releases/download/v0.1.0/substreams-subgraph-sink-protodefs-v0.1.0.spkg
+  database_change: https://github.com/streamingfast/substreams-sink-database-changes/releases/download/v1.2.1/substreams-database-change-v1.2.1.spkg
+  entity: https://github.com/streamingfast/substreams-entity-change/releases/download/v1.1.0/substreams-entity-change-v1.1.0.spkg
+
 protobuf:
   files:
     - contract.proto
@@ -22,5 +28,21 @@ modules:
       - source: sf.ethereum.type.v2.Block
     output:
       type: proto:contract.v1.Events
+
+  - name: db_out
+    kind: map
+    initialBlock: 123
+    inputs:
+      - map: map_events
+    output:
+      type: proto:sf.substreams.sink.database.v1.DatabaseChanges
+
+  - name: graph_out
+    kind: map
+    initialBlock: 123
+    inputs:
+      - map: map_events
+    output:
+      type: proto:sf.substreams.entity.v1.EntityChanges
 
 network: mainnet

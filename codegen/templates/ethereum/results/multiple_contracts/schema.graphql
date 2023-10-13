@@ -1,0 +1,167 @@
+type moonbird_approvals @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    approved: String!
+    owner: String!
+    token_id: BigDecimal!
+}
+type moonbird_approval_for_alls @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    approved: Boolean!
+    operator: String!
+    owner: String!
+}
+type moonbird_expelleds @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    token_id: BigDecimal!
+}
+type moonbird_nesteds @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    token_id: BigDecimal!
+}
+type moonbird_ownership_transferreds @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    new_owner: String!
+    previous_owner: String!
+}
+type moonbird_pauseds @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    account: String!
+}
+type moonbird_refunds @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    amount: BigDecimal!
+    buyer: String!
+}
+type moonbird_revenues @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    amount: BigDecimal!
+    beneficiary: String!
+    num_purchased: BigDecimal!
+}
+type moonbird_role_admin_changeds @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    new_admin_role: String!
+    previous_admin_role: String!
+    role: String!
+}
+type moonbird_role_granteds @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    account: String!
+    role: String!
+    sender: String!
+}
+type moonbird_role_revokeds @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    account: String!
+    role: String!
+    sender: String!
+}
+type moonbird_transfers @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    from: String!
+    to: String!
+    token_id: BigDecimal!
+}
+type moonbird_unnesteds @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    token_id: BigDecimal!
+}
+type moonbird_unpauseds @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    account: String!
+}
+type bayc_approvals @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    approved: String!
+    owner: String!
+    token_id: BigDecimal!
+}
+type bayc_approval_for_alls @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    approved: Boolean!
+    operator: String!
+    owner: String!
+}
+type bayc_ownership_transferreds @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    new_owner: String!
+    previous_owner: String!
+}
+type bayc_transfers @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    from: String!
+    to: String!
+    token_id: BigDecimal!
+}

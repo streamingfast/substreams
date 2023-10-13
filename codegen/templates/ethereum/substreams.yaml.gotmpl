@@ -5,7 +5,7 @@ package:
 
 imports:
   sql: https://github.com/streamingfast/substreams-sink-sql/releases/download/protodefs-v{{ .sqlImportVersion }}/substreams-sink-sql-protodefs-v{{ .sqlImportVersion }}.spkg
-  graph: https://github.com/streamingfast/substreams-subgraph-sink/releases/download/v{{ .graphImportVersion }}/substreams-subgraph-sink-protodefs-v{{ .graphImportVersion }}.spkg
+  graph: https://github.com/streamingfast/substreams-sink-subgraph/releases/download/v{{ .graphImportVersion }}/substreams-sink-subgraph-protodefs-v{{ .graphImportVersion }}.spkg
   database_change: https://github.com/streamingfast/substreams-sink-database-changes/releases/download/v{{ .databaseChangeImportVersion }}/substreams-database-change-v{{ .databaseChangeImportVersion }}.spkg
   entity: https://github.com/streamingfast/substreams-entity-change/releases/download/v{{ .entityChangeImportVersion }}/substreams-entity-change-v{{ .entityChangeImportVersion }}.spkg
 
@@ -50,7 +50,7 @@ network: {{ .network }}
 
 sink:
   module: {{ if eq .sinkChoice 1 }}db_out{{ else if eq .sinkChoice 2}}graph_out{{ end }}
-  type: {{ if eq .sinkChoice 1 }}sf.substreams.sink.sql.v1.Service{{ else if eq .sinkChoice 2}}sf.substreams.subgraph.sink.v1.Service{{ end }}
+  type: {{ if eq .sinkChoice 1 }}sf.substreams.sink.sql.v1.Service{{ else if eq .sinkChoice 2}}sf.substreams.sink.subgraph.v1.Service{{ end }}
   config:
     schema: {{ if eq .sinkChoice 1}}"./schema.sql"{{ else if eq .sinkChoice 2}}"./schema.graphql"{{ end }}
     {{ if eq .sinkChoice 1}}wire_protocol_access{{ else if eq .sinkChoice 2}}postgres_direct_protocol_access{{ end }}: true

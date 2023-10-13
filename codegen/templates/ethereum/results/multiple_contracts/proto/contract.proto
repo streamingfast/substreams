@@ -1,0 +1,193 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+package contract.v1;
+
+message Events {
+    repeated moonbird_Approval moonbird_approvals = 1;
+    repeated moonbird_ApprovalForAll moonbird_approval_for_alls = 2;
+    repeated moonbird_Expelled moonbird_expelleds = 3;
+    repeated moonbird_Nested moonbird_nesteds = 4;
+    repeated moonbird_OwnershipTransferred moonbird_ownership_transferreds = 5;
+    repeated moonbird_Paused moonbird_pauseds = 6;
+    repeated moonbird_Refund moonbird_refunds = 7;
+    repeated moonbird_Revenue moonbird_revenues = 8;
+    repeated moonbird_RoleAdminChanged moonbird_role_admin_changeds = 9;
+    repeated moonbird_RoleGranted moonbird_role_granteds = 10;
+    repeated moonbird_RoleRevoked moonbird_role_revokeds = 11;
+    repeated moonbird_Transfer moonbird_transfers = 12;
+    repeated moonbird_Unnested moonbird_unnesteds = 13;
+    repeated moonbird_Unpaused moonbird_unpauseds = 14;
+    repeated bayc_Approval bayc_approvals = 15;
+    repeated bayc_ApprovalForAll bayc_approval_for_alls = 16;
+    repeated bayc_OwnershipTransferred bayc_ownership_transferreds = 17;
+    repeated bayc_Transfer bayc_transfers = 18;
+}
+
+message moonbird_Approval {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes owner = 5;
+    bytes approved = 6;
+    string token_id = 7;
+}
+
+message moonbird_ApprovalForAll {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes owner = 5;
+    bytes operator = 6;
+    bool approved = 7;
+}
+
+message moonbird_Expelled {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    string token_id = 5;
+}
+
+message moonbird_Nested {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    string token_id = 5;
+}
+
+message moonbird_OwnershipTransferred {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes previous_owner = 5;
+    bytes new_owner = 6;
+}
+
+message moonbird_Paused {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes account = 5;
+}
+
+message moonbird_Refund {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes buyer = 5;
+    string amount = 6;
+}
+
+message moonbird_Revenue {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes beneficiary = 5;
+    string num_purchased = 6;
+    string amount = 7;
+}
+
+message moonbird_RoleAdminChanged {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes role = 5;
+    bytes previous_admin_role = 6;
+    bytes new_admin_role = 7;
+}
+
+message moonbird_RoleGranted {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes role = 5;
+    bytes account = 6;
+    bytes sender = 7;
+}
+
+message moonbird_RoleRevoked {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes role = 5;
+    bytes account = 6;
+    bytes sender = 7;
+}
+
+message moonbird_Transfer {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes from = 5;
+    bytes to = 6;
+    string token_id = 7;
+}
+
+message moonbird_Unnested {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    string token_id = 5;
+}
+
+message moonbird_Unpaused {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes account = 5;
+}
+
+message bayc_Approval {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes owner = 5;
+    bytes approved = 6;
+    string token_id = 7;
+}
+
+message bayc_ApprovalForAll {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes owner = 5;
+    bytes operator = 6;
+    bool approved = 7;
+}
+
+message bayc_OwnershipTransferred {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes previous_owner = 5;
+    bytes new_owner = 6;
+}
+
+message bayc_Transfer {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes from = 5;
+    bytes to = 6;
+    string token_id = 7;
+}

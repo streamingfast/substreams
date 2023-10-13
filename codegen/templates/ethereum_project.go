@@ -118,7 +118,6 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 	for _, ethereumProjectEntry := range []string{
 		"proto/contract.proto.gotmpl",
 		"src/abi/mod.rs.gotmpl",
-		"src/pb/contract.v1.rs",
 		"src/pb/mod.rs",
 		"src/lib.rs.gotmpl",
 		"build.rs.gotmpl",

@@ -15,7 +15,7 @@ use num_traits::cast::ToPrimitive;
 
 substreams_ethereum::init!();
 
-const MOONBIRD_TRACKED_CONTRACT: [u8; 20] = hex!("23581767a106ae21c074b2276d25e5c3e136a68b");
+const MOONBIRD_TRACKED_CONTRACT: [u8; 20] = hex!("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d");
 const BAYC_TRACKED_CONTRACT: [u8; 20] = hex!("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d");
 
 fn map_moonbird_events(blk: &eth::Block, events: &mut contract::Events) {
@@ -552,7 +552,6 @@ fn db_moonbird_out(events: &contract::Events, tables: &mut DatabaseChangeTables)
             .set("account", Hex(&evt.account).to_string());
     });
 }
-
 fn db_bayc_out(events: &contract::Events, tables: &mut DatabaseChangeTables) {
     // Loop over all the abis events to create table changes
     events.bayc_approvals.iter().for_each(|evt| {
@@ -599,6 +598,7 @@ fn db_bayc_out(events: &contract::Events, tables: &mut DatabaseChangeTables) {
             .set("token_id", evt.token_id.to_string());
     });
 }
+
 
 fn graph_moonbird_out(events: &contract::Events, tables: &mut EntityChangesTables) {
     // Loop over all the abis events to create table changes
@@ -745,7 +745,6 @@ fn graph_moonbird_out(events: &contract::Events, tables: &mut EntityChangesTable
             .set("account", Hex(&evt.account).to_string());
     });
 }
-
 fn graph_bayc_out(events: &contract::Events, tables: &mut EntityChangesTables) {
     // Loop over all the abis events to create table changes
     events.bayc_approvals.iter().for_each(|evt| {

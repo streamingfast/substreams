@@ -149,8 +149,13 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 				return nil, fmt.Errorf("embed parse entry template %q: %w", finalFileName, err)
 			}
 
+			name := p.name
+			if finalFileName == "subgraph.yaml.gotmpl" {
+				name = strcase.ToKebab(p.name)
+			}
+
 			model := map[string]any{
-				"name":                        p.name,
+				"name":                        name,
 				"moduleName":                  p.moduleName,
 				"chain":                       p.chain,
 				"ethereumContracts":           p.ethereumContracts,

@@ -200,7 +200,7 @@ func Test_computeLiveHandoffBlockNum(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run("", func(t *testing.T) {
-			got, err := computeLiveHandoffBlockNum(
+			got, err := computeLinearHandoffBlockNum(
 				test.prodMode,
 				test.startBlockNum,
 				test.stopBlockNum,

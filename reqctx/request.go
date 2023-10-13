@@ -18,6 +18,7 @@ type RequestDetails struct {
 	ResolvedCursor        string
 
 	LinearHandoffBlockNum uint64
+	LinearGateBlockNum    uint64
 	StopBlockNum          uint64
 	MaxParallelJobs       uint64
 	CacheTag              string

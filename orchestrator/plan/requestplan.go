@@ -58,11 +58,6 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphIni
 		return nil, fmt.Errorf("start block cannot be prior to the lowest init block in the requested module graph (%d)", graphInitBlock)
 	}
 
-	if linearHandoffBlock < resolvedStartBlock {
-		// this situation occurs when the substreams module initial block is in the future.  we adjust the linear handoff block to be the resolved start block
-		linearHandoffBlock = resolvedStartBlock
-	}
-
 	segmenter := block.NewSegmenter(segmentInterval, graphInitBlock, exclusiveEndBlock)
 	plan := &RequestPlan{
 		segmentInterval: segmentInterval,
@@ -89,15 +84,17 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphIni
 			plan.BuildStores = block.NewRange(graphInitBlock, endStoreBound)
 		}
 
-		startExecOutAtBlock := max(resolvedStartBlock, graphInitBlock)
-		startExecOutAtSegment := segmenter.IndexForStartBlock(startExecOutAtBlock)
-		writeExecOutStartBlockRange := segmenter.Range(startExecOutAtSegment)
-		if writeExecOutStartBlockRange == nil {
-			return nil, fmt.Errorf("write execout range: invalid start block %d for segment interval %d", startExecOutAtBlock, segmentInterval)
+		if resolvedStartBlock <= linearHandoffBlock {
+			startExecOutAtBlock := max(resolvedStartBlock, graphInitBlock)
+			startExecOutAtSegment := segmenter.IndexForStartBlock(startExecOutAtBlock)
+			writeExecOutStartBlockRange := segmenter.Range(startExecOutAtSegment)
+			if writeExecOutStartBlockRange == nil {
+				return nil, fmt.Errorf("write execout range: invalid start block %d for segment interval %d", startExecOutAtBlock, segmentInterval)
+			}
+			writeExecOutStartBlock := writeExecOutStartBlockRange.StartBlock
+			plan.WriteExecOut = block.NewRange(writeExecOutStartBlock, linearHandoffBlock)
+			plan.ReadExecOut = block.NewRange(resolvedStartBlock, linearHandoffBlock)
 		}
-		writeExecOutStartBlock := writeExecOutStartBlockRange.StartBlock
-		plan.WriteExecOut = block.NewRange(writeExecOutStartBlock, linearHandoffBlock)
-		plan.ReadExecOut = block.NewRange(resolvedStartBlock, linearHandoffBlock)
 	} else { /* dev mode */
 		if scheduleStores {
 			plan.BuildStores = block.NewRange(graphInitBlock, linearHandoffBlock)

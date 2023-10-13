@@ -41,12 +41,16 @@ func BuildRequestDetails(
 		return nil, nil, err
 	}
 
-	linearHandoff, err := computeLiveHandoffBlockNum(request.ProductionMode, req.ResolvedStartBlockNum, request.StopBlockNum, getRecentFinalBlock)
+	linearHandoff, err := computeLinearHandoffBlockNum(request.ProductionMode, req.ResolvedStartBlockNum, request.StopBlockNum, getRecentFinalBlock)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	req.LinearHandoffBlockNum = linearHandoff
+	req.LinearGateBlockNum = req.LinearHandoffBlockNum
+	if req.ResolvedStartBlockNum > req.LinearHandoffBlockNum {
+		req.LinearGateBlockNum = req.ResolvedStartBlockNum
+	}
 
 	return
 }
@@ -72,7 +76,7 @@ func nextUniqueID() uint64 {
 	return uniqueRequestIDCounter.Add(1)
 }
 
-func computeLiveHandoffBlockNum(productionMode bool, startBlock, stopBlock uint64, getRecentFinalBlockFunc func() (uint64, error)) (uint64, error) {
+func computeLinearHandoffBlockNum(productionMode bool, startBlock, stopBlock uint64, getRecentFinalBlockFunc func() (uint64, error)) (uint64, error) {
 	if productionMode {
 		maxHandoff, err := getRecentFinalBlockFunc()
 		if err != nil {

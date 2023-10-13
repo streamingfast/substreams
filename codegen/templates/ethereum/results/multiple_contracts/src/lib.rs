@@ -12,6 +12,8 @@ use substreams_ethereum::Event;
 
 #[allow(unused_imports)]
 use num_traits::cast::ToPrimitive;
+use std::str::FromStr;
+use substreams::scalar::BigDecimal;
 
 substreams_ethereum::init!();
 
@@ -418,7 +420,7 @@ fn db_moonbird_out(events: &contract::Events, tables: &mut DatabaseChangeTables)
             .set("evt_block_number", evt.evt_block_number)
             .set("approved", Hex(&evt.approved).to_string())
             .set("owner", Hex(&evt.owner).to_string())
-            .set("token_id", evt.token_id.to_string());
+            .set("token_id", BigDecimal::from_str(&evt.token_id).unwrap());
     });
     events.moonbird_approval_for_alls.iter().for_each(|evt| {
         tables
@@ -438,7 +440,7 @@ fn db_moonbird_out(events: &contract::Events, tables: &mut DatabaseChangeTables)
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            .set("token_id", evt.token_id.to_string());
+            .set("token_id", BigDecimal::from_str(&evt.token_id).unwrap());
     });
     events.moonbird_nesteds.iter().for_each(|evt| {
         tables
@@ -447,7 +449,7 @@ fn db_moonbird_out(events: &contract::Events, tables: &mut DatabaseChangeTables)
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            .set("token_id", evt.token_id.to_string());
+            .set("token_id", BigDecimal::from_str(&evt.token_id).unwrap());
     });
     events.moonbird_ownership_transferreds.iter().for_each(|evt| {
         tables
@@ -475,7 +477,7 @@ fn db_moonbird_out(events: &contract::Events, tables: &mut DatabaseChangeTables)
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            .set("amount", evt.amount.to_string())
+            .set("amount", BigDecimal::from_str(&evt.amount).unwrap())
             .set("buyer", Hex(&evt.buyer).to_string());
     });
     events.moonbird_revenues.iter().for_each(|evt| {
@@ -485,9 +487,9 @@ fn db_moonbird_out(events: &contract::Events, tables: &mut DatabaseChangeTables)
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            .set("amount", evt.amount.to_string())
+            .set("amount", BigDecimal::from_str(&evt.amount).unwrap())
             .set("beneficiary", Hex(&evt.beneficiary).to_string())
-            .set("num_purchased", evt.num_purchased.to_string());
+            .set("num_purchased", BigDecimal::from_str(&evt.num_purchased).unwrap());
     });
     events.moonbird_role_admin_changeds.iter().for_each(|evt| {
         tables
@@ -531,7 +533,7 @@ fn db_moonbird_out(events: &contract::Events, tables: &mut DatabaseChangeTables)
             .set("evt_block_number", evt.evt_block_number)
             .set("from", Hex(&evt.from).to_string())
             .set("to", Hex(&evt.to).to_string())
-            .set("token_id", evt.token_id.to_string());
+            .set("token_id", BigDecimal::from_str(&evt.token_id).unwrap());
     });
     events.moonbird_unnesteds.iter().for_each(|evt| {
         tables
@@ -540,7 +542,7 @@ fn db_moonbird_out(events: &contract::Events, tables: &mut DatabaseChangeTables)
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            .set("token_id", evt.token_id.to_string());
+            .set("token_id", BigDecimal::from_str(&evt.token_id).unwrap());
     });
     events.moonbird_unpauseds.iter().for_each(|evt| {
         tables
@@ -563,7 +565,7 @@ fn db_bayc_out(events: &contract::Events, tables: &mut DatabaseChangeTables) {
             .set("evt_block_number", evt.evt_block_number)
             .set("approved", Hex(&evt.approved).to_string())
             .set("owner", Hex(&evt.owner).to_string())
-            .set("token_id", evt.token_id.to_string());
+            .set("token_id", BigDecimal::from_str(&evt.token_id).unwrap());
     });
     events.bayc_approval_for_alls.iter().for_each(|evt| {
         tables
@@ -595,7 +597,7 @@ fn db_bayc_out(events: &contract::Events, tables: &mut DatabaseChangeTables) {
             .set("evt_block_number", evt.evt_block_number)
             .set("from", Hex(&evt.from).to_string())
             .set("to", Hex(&evt.to).to_string())
-            .set("token_id", evt.token_id.to_string());
+            .set("token_id", BigDecimal::from_str(&evt.token_id).unwrap());
     });
 }
 
@@ -611,7 +613,7 @@ fn graph_moonbird_out(events: &contract::Events, tables: &mut EntityChangesTable
             .set("evt_block_number", evt.evt_block_number)
             .set("approved", Hex(&evt.approved).to_string())
             .set("owner", Hex(&evt.owner).to_string())
-            .set("token_id", evt.token_id.to_string());
+            .set("token_id", BigDecimal::from_str(&evt.token_id).unwrap());
     });
     events.moonbird_approval_for_alls.iter().for_each(|evt| {
         tables
@@ -631,7 +633,7 @@ fn graph_moonbird_out(events: &contract::Events, tables: &mut EntityChangesTable
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            .set("token_id", evt.token_id.to_string());
+            .set("token_id", BigDecimal::from_str(&evt.token_id).unwrap());
     });
     events.moonbird_nesteds.iter().for_each(|evt| {
         tables
@@ -640,7 +642,7 @@ fn graph_moonbird_out(events: &contract::Events, tables: &mut EntityChangesTable
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            .set("token_id", evt.token_id.to_string());
+            .set("token_id", BigDecimal::from_str(&evt.token_id).unwrap());
     });
     events.moonbird_ownership_transferreds.iter().for_each(|evt| {
         tables
@@ -668,7 +670,7 @@ fn graph_moonbird_out(events: &contract::Events, tables: &mut EntityChangesTable
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            .set("amount", evt.amount.to_string())
+            .set("amount", BigDecimal::from_str(&evt.amount).unwrap())
             .set("buyer", Hex(&evt.buyer).to_string());
     });
     events.moonbird_revenues.iter().for_each(|evt| {
@@ -678,9 +680,9 @@ fn graph_moonbird_out(events: &contract::Events, tables: &mut EntityChangesTable
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            .set("amount", evt.amount.to_string())
+            .set("amount", BigDecimal::from_str(&evt.amount).unwrap())
             .set("beneficiary", Hex(&evt.beneficiary).to_string())
-            .set("num_purchased", evt.num_purchased.to_string());
+            .set("num_purchased", BigDecimal::from_str(&evt.num_purchased).unwrap());
     });
     events.moonbird_role_admin_changeds.iter().for_each(|evt| {
         tables
@@ -724,7 +726,7 @@ fn graph_moonbird_out(events: &contract::Events, tables: &mut EntityChangesTable
             .set("evt_block_number", evt.evt_block_number)
             .set("from", Hex(&evt.from).to_string())
             .set("to", Hex(&evt.to).to_string())
-            .set("token_id", evt.token_id.to_string());
+            .set("token_id", BigDecimal::from_str(&evt.token_id).unwrap());
     });
     events.moonbird_unnesteds.iter().for_each(|evt| {
         tables
@@ -733,7 +735,7 @@ fn graph_moonbird_out(events: &contract::Events, tables: &mut EntityChangesTable
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            .set("token_id", evt.token_id.to_string());
+            .set("token_id", BigDecimal::from_str(&evt.token_id).unwrap());
     });
     events.moonbird_unpauseds.iter().for_each(|evt| {
         tables
@@ -756,7 +758,7 @@ fn graph_bayc_out(events: &contract::Events, tables: &mut EntityChangesTables) {
             .set("evt_block_number", evt.evt_block_number)
             .set("approved", Hex(&evt.approved).to_string())
             .set("owner", Hex(&evt.owner).to_string())
-            .set("token_id", evt.token_id.to_string());
+            .set("token_id", BigDecimal::from_str(&evt.token_id).unwrap());
     });
     events.bayc_approval_for_alls.iter().for_each(|evt| {
         tables
@@ -788,7 +790,7 @@ fn graph_bayc_out(events: &contract::Events, tables: &mut EntityChangesTables) {
             .set("evt_block_number", evt.evt_block_number)
             .set("from", Hex(&evt.from).to_string())
             .set("to", Hex(&evt.to).to_string())
-            .set("token_id", evt.token_id.to_string());
+            .set("token_id", BigDecimal::from_str(&evt.token_id).unwrap());
     });
 }
 

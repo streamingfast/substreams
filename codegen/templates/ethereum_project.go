@@ -390,20 +390,19 @@ func generateFieldTableChangeCode(fieldType eth.SolidityType, fieldAccess string
 		if v.ByteSize <= 8 {
 			return fieldAccess
 		}
-		return fmt.Sprintf("%s.to_string()", fieldAccess)
+		return fmt.Sprintf("BigDecimal::from_str(&%s).unwrap()", fieldAccess)
 
 	case eth.UnsignedIntegerType:
 		if v.ByteSize <= 8 {
 			return fieldAccess
 		}
-		return fmt.Sprintf("%s.to_string()", fieldAccess)
+		return fmt.Sprintf("BigDecimal::from_str(&%s).unwrap()", fieldAccess)
 
 	case eth.SignedFixedPointType, eth.UnsignedFixedPointType:
-		return fmt.Sprintf("%s.to_string()", fieldAccess)
+		return fmt.Sprintf("BigDecimal::from_str(&%s).unwrap()", fieldAccess)
 
 	case eth.ArrayType:
-		inner := generateFieldTransformCode(v.ElementType, "x")
-		return fmt.Sprintf("%s.into_iter().map(|x| %s).collect::<Vec<_>>()", fieldAccess, inner)
+		return SKIP_FIELD
 
 	case eth.StructType:
 		return SKIP_FIELD

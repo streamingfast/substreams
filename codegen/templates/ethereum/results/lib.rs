@@ -12,6 +12,8 @@ use substreams_ethereum::Event;
 
 #[allow(unused_imports)]
 use num_traits::cast::ToPrimitive;
+use std::str::FromStr;
+use substreams::scalar::BigDecimal;
 
 const TRACKED_CONTRACT: [u8; 20] = hex!("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d");
 
@@ -125,7 +127,7 @@ fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::error
             .set("evt_block_number", evt.evt_block_number)
             .set("approved", Hex(&evt.approved).to_string())
             .set("owner", Hex(&evt.owner).to_string())
-            .set("token_id", evt.token_id.to_string());
+            .set("token_id", BigDecimal::from_str(&evt.token_id).unwrap());
     });
     events.approval_for_alls.into_iter().for_each(|evt| {
         tables
@@ -157,7 +159,7 @@ fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::error
             .set("evt_block_number", evt.evt_block_number)
             .set("from", Hex(&evt.from).to_string())
             .set("to", Hex(&evt.to).to_string())
-            .set("token_id", evt.token_id.to_string());
+            .set("token_id", BigDecimal::from_str(&evt.token_id).unwrap());
     });
 
     Ok(tables.to_database_changes())
@@ -178,7 +180,7 @@ fn graph_out(events: contract::Events) -> Result<EntityChanges, substreams::erro
             .set("evt_block_number", evt.evt_block_number)
             .set("approved", Hex(&evt.approved).to_string())
             .set("owner", Hex(&evt.owner).to_string())
-            .set("token_id", evt.token_id.to_string());
+            .set("token_id", BigDecimal::from_str(&evt.token_id).unwrap());
     });
     events.approval_for_alls.into_iter().for_each(|evt| {
         tables
@@ -210,7 +212,7 @@ fn graph_out(events: contract::Events) -> Result<EntityChanges, substreams::erro
             .set("evt_block_number", evt.evt_block_number)
             .set("from", Hex(&evt.from).to_string())
             .set("to", Hex(&evt.to).to_string())
-            .set("token_id", evt.token_id.to_string());
+            .set("token_id", BigDecimal::from_str(&evt.token_id).unwrap());
     });
 
     Ok(tables.to_entity_changes())

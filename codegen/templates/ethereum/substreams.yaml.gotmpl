@@ -53,6 +53,8 @@ sink:
   type: {{ if eq .sinkChoice 1 }}sf.substreams.sink.sql.v1.Service{{ else if eq .sinkChoice 2}}sf.substreams.sink.subgraph.v1.Service{{ end }}
   config:
     schema: {{ if eq .sinkChoice 1}}"./schema.sql"{{ else if eq .sinkChoice 2}}"./schema.graphql"{{ end }}
+    {{ if eq .sinkChoice 2}}subgraph_yaml: "./subgraph.yaml"
+    {{ end -}}
     {{ if eq .sinkChoice 1}}wire_protocol_access{{ else if eq .sinkChoice 2}}postgres_direct_protocol_access{{ end }}: true
     {{- if eq .sinkChoice 1}}
     postgraphile_frontend:

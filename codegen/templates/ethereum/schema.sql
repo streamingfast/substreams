@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS approvals (
+CREATE TABLE IF NOT EXISTS approval (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,
@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS approvals (
     "owner" VARCHAR(40),
     "token_id" DECIMAL
 );
-CREATE TABLE IF NOT EXISTS approval_for_alls (
+CREATE TABLE IF NOT EXISTS approval_for_all (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS approval_for_alls (
     "operator" VARCHAR(40),
     "owner" VARCHAR(40)
 );
-CREATE TABLE IF NOT EXISTS ownership_transferreds (
+CREATE TABLE IF NOT EXISTS ownership_transferred (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS ownership_transferreds (
     "new_owner" VARCHAR(40),
     "previous_owner" VARCHAR(40)
 );
-CREATE TABLE IF NOT EXISTS transfers (
+CREATE TABLE IF NOT EXISTS transfer (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,

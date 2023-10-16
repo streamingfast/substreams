@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS moonbird_approvals (
+CREATE TABLE IF NOT EXISTS moonbird_approval (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,
@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS moonbird_approvals (
     "owner" VARCHAR(40),
     "token_id" DECIMAL
 );
-CREATE TABLE IF NOT EXISTS moonbird_approval_for_alls (
+CREATE TABLE IF NOT EXISTS moonbird_approval_for_all (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,
@@ -16,21 +16,21 @@ CREATE TABLE IF NOT EXISTS moonbird_approval_for_alls (
     "operator" VARCHAR(40),
     "owner" VARCHAR(40)
 );
-CREATE TABLE IF NOT EXISTS moonbird_expelleds (
+CREATE TABLE IF NOT EXISTS moonbird_expelled (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,
     "evt_block_number" DECIMAL,
     "token_id" DECIMAL
 );
-CREATE TABLE IF NOT EXISTS moonbird_nesteds (
+CREATE TABLE IF NOT EXISTS moonbird_nested (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,
     "evt_block_number" DECIMAL,
     "token_id" DECIMAL
 );
-CREATE TABLE IF NOT EXISTS moonbird_ownership_transferreds (
+CREATE TABLE IF NOT EXISTS moonbird_ownership_transferred (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,
@@ -38,14 +38,14 @@ CREATE TABLE IF NOT EXISTS moonbird_ownership_transferreds (
     "new_owner" VARCHAR(40),
     "previous_owner" VARCHAR(40)
 );
-CREATE TABLE IF NOT EXISTS moonbird_pauseds (
+CREATE TABLE IF NOT EXISTS moonbird_paused (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,
     "evt_block_number" DECIMAL,
     "account" VARCHAR(40)
 );
-CREATE TABLE IF NOT EXISTS moonbird_refunds (
+CREATE TABLE IF NOT EXISTS moonbird_refund (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS moonbird_refunds (
     "amount" DECIMAL,
     "buyer" VARCHAR(40)
 );
-CREATE TABLE IF NOT EXISTS moonbird_revenues (
+CREATE TABLE IF NOT EXISTS moonbird_revenue (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,
@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS moonbird_revenues (
     "beneficiary" VARCHAR(40),
     "num_purchased" DECIMAL
 );
-CREATE TABLE IF NOT EXISTS moonbird_role_admin_changeds (
+CREATE TABLE IF NOT EXISTS moonbird_role_admin_changed (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,
@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS moonbird_role_admin_changeds (
     "previous_admin_role" TEXT,
     "role" TEXT
 );
-CREATE TABLE IF NOT EXISTS moonbird_role_granteds (
+CREATE TABLE IF NOT EXISTS moonbird_role_granted (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,
@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS moonbird_role_granteds (
     "role" TEXT,
     "sender" VARCHAR(40)
 );
-CREATE TABLE IF NOT EXISTS moonbird_role_revokeds (
+CREATE TABLE IF NOT EXISTS moonbird_role_revoked (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,
@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS moonbird_role_revokeds (
     "role" TEXT,
     "sender" VARCHAR(40)
 );
-CREATE TABLE IF NOT EXISTS moonbird_transfers (
+CREATE TABLE IF NOT EXISTS moonbird_transfer (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,
@@ -98,21 +98,21 @@ CREATE TABLE IF NOT EXISTS moonbird_transfers (
     "to" VARCHAR(40),
     "token_id" DECIMAL
 );
-CREATE TABLE IF NOT EXISTS moonbird_unnesteds (
+CREATE TABLE IF NOT EXISTS moonbird_unnested (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,
     "evt_block_number" DECIMAL,
     "token_id" DECIMAL
 );
-CREATE TABLE IF NOT EXISTS moonbird_unpauseds (
+CREATE TABLE IF NOT EXISTS moonbird_unpaused (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,
     "evt_block_number" DECIMAL,
     "account" VARCHAR(40)
 );
-CREATE TABLE IF NOT EXISTS bayc_approvals (
+CREATE TABLE IF NOT EXISTS bayc_approval (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,
@@ -121,7 +121,7 @@ CREATE TABLE IF NOT EXISTS bayc_approvals (
     "owner" VARCHAR(40),
     "token_id" DECIMAL
 );
-CREATE TABLE IF NOT EXISTS bayc_approval_for_alls (
+CREATE TABLE IF NOT EXISTS bayc_approval_for_all (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,
@@ -130,7 +130,7 @@ CREATE TABLE IF NOT EXISTS bayc_approval_for_alls (
     "operator" VARCHAR(40),
     "owner" VARCHAR(40)
 );
-CREATE TABLE IF NOT EXISTS bayc_ownership_transferreds (
+CREATE TABLE IF NOT EXISTS bayc_ownership_transferred (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,
@@ -138,7 +138,7 @@ CREATE TABLE IF NOT EXISTS bayc_ownership_transferreds (
     "new_owner" VARCHAR(40),
     "previous_owner" VARCHAR(40)
 );
-CREATE TABLE IF NOT EXISTS bayc_transfers (
+CREATE TABLE IF NOT EXISTS bayc_transfer (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,

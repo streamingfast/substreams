@@ -1,4 +1,4 @@
-type moonbird_approvals @entity {
+type moonbird_approval @entity {
     id: ID!
     evt_tx_hash: String!
     evt_index: BigInt!
@@ -8,7 +8,7 @@ type moonbird_approvals @entity {
     owner: String!
     token_id: BigDecimal!
 }
-type moonbird_approval_for_alls @entity {
+type moonbird_approval_for_all @entity {
     id: ID!
     evt_tx_hash: String!
     evt_index: BigInt!
@@ -18,7 +18,7 @@ type moonbird_approval_for_alls @entity {
     operator: String!
     owner: String!
 }
-type moonbird_expelleds @entity {
+type moonbird_expelled @entity {
     id: ID!
     evt_tx_hash: String!
     evt_index: BigInt!
@@ -26,7 +26,7 @@ type moonbird_expelleds @entity {
     evt_block_number: BigInt!
     token_id: BigDecimal!
 }
-type moonbird_nesteds @entity {
+type moonbird_nested @entity {
     id: ID!
     evt_tx_hash: String!
     evt_index: BigInt!
@@ -34,7 +34,7 @@ type moonbird_nesteds @entity {
     evt_block_number: BigInt!
     token_id: BigDecimal!
 }
-type moonbird_ownership_transferreds @entity {
+type moonbird_ownership_transferred @entity {
     id: ID!
     evt_tx_hash: String!
     evt_index: BigInt!
@@ -43,7 +43,7 @@ type moonbird_ownership_transferreds @entity {
     new_owner: String!
     previous_owner: String!
 }
-type moonbird_pauseds @entity {
+type moonbird_paused @entity {
     id: ID!
     evt_tx_hash: String!
     evt_index: BigInt!
@@ -51,7 +51,7 @@ type moonbird_pauseds @entity {
     evt_block_number: BigInt!
     account: String!
 }
-type moonbird_refunds @entity {
+type moonbird_refund @entity {
     id: ID!
     evt_tx_hash: String!
     evt_index: BigInt!
@@ -60,7 +60,7 @@ type moonbird_refunds @entity {
     amount: BigDecimal!
     buyer: String!
 }
-type moonbird_revenues @entity {
+type moonbird_revenue @entity {
     id: ID!
     evt_tx_hash: String!
     evt_index: BigInt!
@@ -70,7 +70,7 @@ type moonbird_revenues @entity {
     beneficiary: String!
     num_purchased: BigDecimal!
 }
-type moonbird_role_admin_changeds @entity {
+type moonbird_role_admin_changed @entity {
     id: ID!
     evt_tx_hash: String!
     evt_index: BigInt!
@@ -80,7 +80,7 @@ type moonbird_role_admin_changeds @entity {
     previous_admin_role: String!
     role: String!
 }
-type moonbird_role_granteds @entity {
+type moonbird_role_granted @entity {
     id: ID!
     evt_tx_hash: String!
     evt_index: BigInt!
@@ -90,7 +90,7 @@ type moonbird_role_granteds @entity {
     role: String!
     sender: String!
 }
-type moonbird_role_revokeds @entity {
+type moonbird_role_revoked @entity {
     id: ID!
     evt_tx_hash: String!
     evt_index: BigInt!
@@ -100,7 +100,7 @@ type moonbird_role_revokeds @entity {
     role: String!
     sender: String!
 }
-type moonbird_transfers @entity {
+type moonbird_transfer @entity {
     id: ID!
     evt_tx_hash: String!
     evt_index: BigInt!
@@ -110,7 +110,7 @@ type moonbird_transfers @entity {
     to: String!
     token_id: BigDecimal!
 }
-type moonbird_unnesteds @entity {
+type moonbird_unnested @entity {
     id: ID!
     evt_tx_hash: String!
     evt_index: BigInt!
@@ -118,7 +118,7 @@ type moonbird_unnesteds @entity {
     evt_block_number: BigInt!
     token_id: BigDecimal!
 }
-type moonbird_unpauseds @entity {
+type moonbird_unpaused @entity {
     id: ID!
     evt_tx_hash: String!
     evt_index: BigInt!
@@ -126,7 +126,7 @@ type moonbird_unpauseds @entity {
     evt_block_number: BigInt!
     account: String!
 }
-type bayc_approvals @entity {
+type bayc_approval @entity {
     id: ID!
     evt_tx_hash: String!
     evt_index: BigInt!
@@ -136,7 +136,7 @@ type bayc_approvals @entity {
     owner: String!
     token_id: BigDecimal!
 }
-type bayc_approval_for_alls @entity {
+type bayc_approval_for_all @entity {
     id: ID!
     evt_tx_hash: String!
     evt_index: BigInt!
@@ -146,7 +146,7 @@ type bayc_approval_for_alls @entity {
     operator: String!
     owner: String!
 }
-type bayc_ownership_transferreds @entity {
+type bayc_ownership_transferred @entity {
     id: ID!
     evt_tx_hash: String!
     evt_index: BigInt!
@@ -155,7 +155,7 @@ type bayc_ownership_transferreds @entity {
     new_owner: String!
     previous_owner: String!
 }
-type bayc_transfers @entity {
+type bayc_transfer @entity {
     id: ID!
     evt_tx_hash: String!
     evt_index: BigInt!

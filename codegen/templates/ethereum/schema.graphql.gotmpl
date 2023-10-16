@@ -2,7 +2,7 @@
 {{- range $idx, $contract := .ethereumContracts }}
 {{- range $event := $contract.GetEvents -}}
 {{- $rust := $event.Rust -}}
-type {{ if ne $numberOfContracts 1 }}{{ $contract.GetName }}_{{ end }}{{ $rust.ProtoOutputModuleFieldName }} @entity {
+type {{ if ne $numberOfContracts 1 }}{{ $contract.GetName }}_{{ end }}{{ $rust.TableChangeEntityName }} @entity {
     id: ID!
     evt_tx_hash: String!
     evt_index: BigInt!

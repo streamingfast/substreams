@@ -3,7 +3,7 @@
 {{- range $event := $contract.GetEvents -}}
 {{- $rust := $event.Rust -}}
 {{- $numberOfAttributes := len $rust.ProtoFieldTableChangesMap -}}
-CREATE TABLE IF NOT EXISTS {{ if ne $numberOfContracts 1 }}{{ $contract.GetName }}_{{ end }}{{ $rust.ProtoOutputModuleFieldName }} (
+CREATE TABLE IF NOT EXISTS {{ if ne $numberOfContracts 1 }}{{ $contract.GetName }}_{{ end }}{{ $rust.TableChangeEntityName }} (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,

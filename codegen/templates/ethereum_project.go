@@ -225,6 +225,7 @@ func BuildEventModels(contract *EthereumContract, multipleContracts bool) (out [
 					ABIStructName:              rustGeneratedStructName,
 					ProtoMessageName:           rustGeneratedStructName,
 					ProtoOutputModuleFieldName: protoFieldName,
+					TableChangeEntityName:      strcase.ToSnake(rustABIStructName),
 				},
 
 				Proto: &protoEventModel{
@@ -257,6 +258,7 @@ type rustEventModel struct {
 	ABIStructName              string
 	ProtoMessageName           string
 	ProtoOutputModuleFieldName string
+	TableChangeEntityName      string
 	ProtoFieldABIConversionMap map[string]string
 	ProtoFieldTableChangesMap  map[string]string
 	ProtoFieldSqlmap           map[string]string

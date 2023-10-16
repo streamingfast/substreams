@@ -120,7 +120,7 @@ fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::error
     // Loop over all the abis events to create changes
     events.approvals.into_iter().for_each(|evt| {
         tables
-            .create_row("approvals", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
+            .create_row("approval", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
             .set("evt_tx_hash", evt.evt_tx_hash)
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.unwrap())
@@ -131,7 +131,7 @@ fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::error
     });
     events.approval_for_alls.into_iter().for_each(|evt| {
         tables
-            .create_row("approval_for_alls", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
+            .create_row("approval_for_all", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
             .set("evt_tx_hash", evt.evt_tx_hash)
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.unwrap())
@@ -142,7 +142,7 @@ fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::error
     });
     events.ownership_transferreds.into_iter().for_each(|evt| {
         tables
-            .create_row("ownership_transferreds", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
+            .create_row("ownership_transferred", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
             .set("evt_tx_hash", evt.evt_tx_hash)
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.unwrap())
@@ -152,7 +152,7 @@ fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::error
     });
     events.transfers.into_iter().for_each(|evt| {
         tables
-            .create_row("transfers", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
+            .create_row("transfer", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
             .set("evt_tx_hash", evt.evt_tx_hash)
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.unwrap())
@@ -173,7 +173,7 @@ fn graph_out(events: contract::Events) -> Result<EntityChanges, substreams::erro
     // Loop over all the abis events to create changes
     events.approvals.into_iter().for_each(|evt| {
         tables
-            .create_row("approvals", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
+            .create_row("approval", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
             .set("evt_tx_hash", evt.evt_tx_hash)
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.unwrap())
@@ -184,7 +184,7 @@ fn graph_out(events: contract::Events) -> Result<EntityChanges, substreams::erro
     });
     events.approval_for_alls.into_iter().for_each(|evt| {
         tables
-            .create_row("approval_for_alls", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
+            .create_row("approval_for_all", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
             .set("evt_tx_hash", evt.evt_tx_hash)
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.unwrap())
@@ -195,7 +195,7 @@ fn graph_out(events: contract::Events) -> Result<EntityChanges, substreams::erro
     });
     events.ownership_transferreds.into_iter().for_each(|evt| {
         tables
-            .create_row("ownership_transferreds", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
+            .create_row("ownership_transferred", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
             .set("evt_tx_hash", evt.evt_tx_hash)
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.unwrap())
@@ -205,7 +205,7 @@ fn graph_out(events: contract::Events) -> Result<EntityChanges, substreams::erro
     });
     events.transfers.into_iter().for_each(|evt| {
         tables
-            .create_row("transfers", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
+            .create_row("transfer", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
             .set("evt_tx_hash", evt.evt_tx_hash)
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.unwrap())

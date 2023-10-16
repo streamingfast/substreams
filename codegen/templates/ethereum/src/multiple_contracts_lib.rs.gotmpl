@@ -59,7 +59,7 @@ fn db_{{ $contract.GetName }}_out(events: &contract::Events, tables: &mut Databa
     {{- $rust := $event.Rust }}
     events.{{ $contract.GetName }}_{{ $rust.ProtoOutputModuleFieldName }}.iter().for_each(|evt| {
         tables
-            .create_row("{{ if eq $numberOfContracts 1 }}{{ $rust.ProtoOutputModuleFieldName }}{{ else }}{{ $contract.GetName }}_{{ $rust.ProtoOutputModuleFieldName }}{{ end }}", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
+            .create_row("{{ if eq $numberOfContracts 1 }}{{ $rust.TableChangeEntityName }}{{ else }}{{ $contract.GetName }}_{{ $rust.TableChangeEntityName }}{{ end }}", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
             .set("evt_tx_hash", &evt.evt_tx_hash)
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
@@ -81,7 +81,7 @@ fn graph_{{ $contract.GetName }}_out(events: &contract::Events, tables: &mut Ent
     {{- $rust := $event.Rust }}
     events.{{ $contract.GetName }}_{{ $rust.ProtoOutputModuleFieldName }}.iter().for_each(|evt| {
         tables
-            .create_row("{{ if eq $numberOfContracts 1 }}{{ $rust.ProtoOutputModuleFieldName }}{{ else }}{{ $contract.GetName }}_{{ $rust.ProtoOutputModuleFieldName }}{{ end }}", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
+            .create_row("{{ if eq $numberOfContracts 1 }}{{ $rust.TableChangeEntityName }}{{ else }}{{ $contract.GetName }}_{{ $rust.TableChangeEntityName }}{{ end }}", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
             .set("evt_tx_hash", &evt.evt_tx_hash)
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())

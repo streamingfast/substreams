@@ -146,13 +146,18 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
-			ratio := mod.TotalProcessingTimeMs / totalBlocks
+			modTotalTime := mod.TotalProcessingTimeMs + mod.TotalStoreOperationTimeMs
+			for _, ext := range mod.ExternalCallMetrics {
+				modTotalTime += ext.TimeMs
+			}
+
+			ratio := modTotalTime / totalBlocks
 			if i > 3 || ratio < 50 {
 				continue
 			}
 			var externalMetrics string
 			for _, ext := range mod.ExternalCallMetrics {
-				externalMetrics += fmt.Sprintf(" [%s (%d): %d%%]", ext.Name, ext.Count, ext.TimeMs/mod.TotalProcessingTimeMs)
+				externalMetrics += fmt.Sprintf(" [%s (%d): %d%%]", ext.Name, ext.Count, ext.TimeMs*100/modTotalTime)
 			}
 			var storeMetrics string
 			if mod.TotalStoreOperationTimeMs != 0 {

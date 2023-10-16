@@ -53,7 +53,7 @@ var initCmd = &cobra.Command{
 	SilenceUsage: true,
 }
 
-var etherscanAPIKey = "YourApiKey"
+var etherscanAPIKey = "YourApiKeyToken"
 
 func init() {
 	if x := os.Getenv("ETHERSCAN_API_KEY"); x != "" {

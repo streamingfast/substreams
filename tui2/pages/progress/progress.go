@@ -152,7 +152,7 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			var externalMetrics string
 			for _, ext := range mod.ExternalCallMetrics {
-				externalMetrics += fmt.Sprintf(" [%s (%d): %d%%]", ext.Name, ext.Count, ext.TimeMs/mod.TotalProcessingTimeMs)
+				externalMetrics += fmt.Sprintf(" [%s (%d): %d%%]", ext.Name, ext.Count, ext.TimeMs*100/mod.TotalProcessingTimeMs)
 			}
 			var storeMetrics string
 			if mod.TotalStoreOperationTimeMs != 0 {

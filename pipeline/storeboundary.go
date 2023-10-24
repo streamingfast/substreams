@@ -58,7 +58,7 @@ func (r *storeBoundary) GetStoreFlushRanges(isSubRequest bool, reqStopBlockNum u
 	}
 
 	out := []uint64{}
-	for v, _ := range boundaries {
+	for v := range boundaries {
 		out = append(out, v)
 	}
 	sort.Slice(out, func(i, j int) bool {

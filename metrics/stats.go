@@ -152,6 +152,10 @@ type extendedStats struct {
 	processedBlocksInCompleteJobs uint64
 	storeOperationTime            time.Duration
 	processingTime                time.Duration
+
+	// uniqueID -> startTime
+	inprocessSince map[uint64]time.Time
+
 	// extension --> metric
 	externalCallMetrics map[string]*extendedCallMetric
 
@@ -172,6 +176,10 @@ type extendedCallMetric struct {
 // updateDurations should be called while locked
 func (s *extendedStats) updateDurations() {
 	s.ModuleStats.ProcessingTimeMs = uint64(s.processingTime.Milliseconds())
+	for _, inproc := range s.inprocessSince {
+		s.ModuleStats.ProcessingTimeMs += uint64(time.Since(inproc).Milliseconds())
+	}
+
 	s.ModuleStats.ExternalCallMetrics = make([]*pbssinternal.ExternalCallMetric, len(s.externalCallMetrics))
 	i := 0
 	for k, v := range s.externalCallMetrics {
@@ -277,12 +285,24 @@ func (s *Stats) RecordEndSubrequest(jobIdx uint64) {
 	delete(s.runningJobs, jobIdx)
 }
 
-// RecordModuleWasmBlock should be called once per module per block. `elapsed` is the time spent in executing the WASM code, including store and extension calls
-func (s *Stats) RecordModuleWasmBlock(moduleName string, elapsed time.Duration) {
+// RecordModuleWasmBlockBegin should be called once per module per block
+func (s *Stats) RecordModuleWasmBlockBegin(moduleName string) uint64 {
+	s.Lock()
+	defer s.Unlock()
+	uniqueID := uniqueIDCounter.Inc()
+	mod := s.moduleStats(moduleName)
+	mod.inprocessSince[uniqueID] = time.Now()
+
+	return uniqueID
+}
+
+// RecordModuleWasmBlockEnd should be called once per module per block. `elapsed` is the time spent in executing the WASM code, including store and extension calls
+func (s *Stats) RecordModuleWasmBlockEnd(moduleName string, uniqueID uint64) {
 	s.Lock()
 	defer s.Unlock()
 	mod := s.moduleStats(moduleName)
-	mod.processingTime += elapsed
+	mod.processingTime += time.Since(mod.inprocessSince[uniqueID])
+	delete(mod.inprocessSince, uniqueID)
 }
 
 var uniqueIDCounter = atomic.NewUint64(0)
@@ -363,6 +383,7 @@ func newExtendedStats(moduleName string) *extendedStats {
 		},
 		externalCallMetrics:  make(map[string]*extendedCallMetric),
 		inprocessCallMetrics: make(map[uint64]inprocessCall),
+		inprocessSince:       make(map[uint64]time.Time),
 	}
 }
 
@@ -418,7 +439,7 @@ func (s *Stats) LocalModulesStats() []*pbssinternal.ModuleStats {
 			ProcessingTimeMs:       uint64(v.processingTime.Milliseconds()),
 			StoreOperationTimeMs:   uint64(v.storeOperationTime.Milliseconds()),
 			StoreReadCount:         v.StoreReadCount,
-			ExternalCallMetrics:    mergeCallMetricsMap(v.ExternalCallMetrics, v.externalCallMetrics),
+			ExternalCallMetrics:    v.ExternalCallMetrics,
 			StoreWriteCount:        v.StoreWriteCount,
 			StoreDeleteprefixCount: v.StoreDeleteprefixCount,
 			StoreSizeBytes:         v.StoreSizeBytes,
@@ -499,35 +520,6 @@ func cloneCallMetrics(in []*pbssinternal.ExternalCallMetric) []*pbssinternal.Ext
 	return out
 }
 
-func mergeCallMetricsMap(completeJobsMetrics []*pbssinternal.ExternalCallMetric, localMetrics map[string]*extendedCallMetric) (out []*pbssinternal.ExternalCallMetric) {
-	seen := make(map[string]bool)
-	for _, m := range completeJobsMetrics {
-		seen[m.Name] = true
-		cloned := &pbssinternal.ExternalCallMetric{
-			Name:   m.Name,
-			Count:  m.Count,
-			TimeMs: m.TimeMs,
-		}
-		if local, ok := localMetrics[m.Name]; ok {
-			cloned.Count += local.count
-			cloned.TimeMs += uint64(local.time.Milliseconds())
-		}
-		out = append(out, cloned)
-	}
-
-	for k, lm := range localMetrics {
-		if !seen[k] {
-			out = append(out, &pbssinternal.ExternalCallMetric{
-				Name:   k,
-				Count:  lm.count,
-				TimeMs: uint64(lm.time.Milliseconds()),
-			})
-		}
-	}
-
-	return out
-}
-
 func (s *Stats) Stage(module string) (uint32, *pbsubstreamsrpc.Stage) {
 	for i, ss := range s.stages {
 		for _, mod := range ss.Modules {
@@ -574,7 +566,7 @@ func (s *Stats) AggregatedModulesStats() []*pbsubstreamsrpc.ModuleStats {
 			TotalProcessingTimeMs:       uint64(v.processingTime.Milliseconds()),
 			TotalStoreOperationTimeMs:   uint64(v.storeOperationTime.Milliseconds()),
 			TotalStoreReadCount:         v.StoreReadCount,
-			ExternalCallMetrics:         toRPCCallMetrics(mergeCallMetricsMap(v.ExternalCallMetrics, v.externalCallMetrics)),
+			ExternalCallMetrics:         toRPCCallMetrics(v.ExternalCallMetrics),
 			TotalStoreWriteCount:        v.StoreWriteCount,
 			TotalStoreDeleteprefixCount: v.StoreDeleteprefixCount,
 			StoreSizeBytes:              v.StoreSizeBytes,

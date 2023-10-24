@@ -7,11 +7,12 @@ import (
 	"strings"
 
 	"github.com/docker/cli/cli/compose/types"
+	pbsql "github.com/streamingfast/substreams-sink-sql/pb/sf/substreams/sink/sql/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"google.golang.org/protobuf/proto"
 )
 
-func (e *DockerEngine) newSink(deploymentID string, pgService string, pkg *pbsubstreams.Package) (conf types.ServiceConfig, motd string, err error) {
+func (e *DockerEngine) newSink(deploymentID string, dbService string, pkg *pbsubstreams.Package, sinkConfig *pbsql.Service) (conf types.ServiceConfig, motd string, err error) {
 
 	name := sinkServiceName(deploymentID)
 
@@ -23,6 +24,16 @@ func (e *DockerEngine) newSink(deploymentID string, pgService string, pkg *pbsub
 	dataFolder := filepath.Join(e.dir, deploymentID, "data", "sink")
 	if err := os.MkdirAll(dataFolder, 0755); err != nil {
 		return conf, motd, fmt.Errorf("creating folder %q: %w", dataFolder, err)
+	}
+
+	var dsn string
+	switch sinkConfig.Engine {
+	case pbsql.Service_clickhouse:
+		dsn = "clickhouse://dev-node:insecure-change-me-in-prod@postgres:9000/substreams?sslmode=disable"
+	case pbsql.Service_postgres:
+		dsn = "postgres://dev-node:insecure-change-me-in-prod@postgres:5432/substreams?sslmode=disable"
+	default:
+		return conf, motd, fmt.Errorf("unknown service %q", sinkConfig.Engine)
 	}
 
 	conf = types.ServiceConfig{
@@ -45,10 +56,10 @@ func (e *DockerEngine) newSink(deploymentID string, pgService string, pkg *pbsub
 				Target: "/opt/subservices/config",
 			},
 		},
-		Links:     []string{pgService + ":postgres"},
-		DependsOn: []string{pgService},
+		Links:     []string{dbService + ":postgres"},
+		DependsOn: []string{dbService},
 		Environment: map[string]*string{
-			"DSN":                  deref("postgres://dev-node:insecure-change-me-in-prod@postgres:5432/dev-node?sslmode=disable"),
+			"DSN":                  &dsn,
 			"OUTPUT_MODULE":        &pkg.SinkModule,
 			"SUBSTREAMS_API_TOKEN": &e.token,
 		},

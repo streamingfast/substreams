@@ -24,7 +24,7 @@ func (e *DockerEngine) newPostgraphile(deploymentID string, pgService string) (c
 		},
 		Command: []string{
 			"--connection",
-			"postgres://dev-node:insecure-change-me-in-prod@postgres:5432/dev-node?sslmode=disable",
+			"postgres://dev-node:insecure-change-me-in-prod@postgres:5432/substreams?sslmode=disable",
 			"--watch",
 		},
 		Links:     []string{pgService + ":postgres"},

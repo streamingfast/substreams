@@ -39,7 +39,7 @@ func (e *DockerEngine) newPostgres(deploymentID string, pkg *pbsubstreams.Packag
 		Environment: map[string]*string{
 			"POSTGRES_USER":             deref("dev-node"),
 			"POSTGRES_PASSWORD":         deref("insecure-change-me-in-prod"),
-			"POSTGRES_DB":               deref("dev-node"),
+			"POSTGRES_DB":               deref("substreams"),
 			"POSTGRES_INITDB_ARGS":      deref("-E UTF8 --locale=C"),
 			"POSTGRES_HOST_AUTH_METHOD": deref("md5"),
 		},

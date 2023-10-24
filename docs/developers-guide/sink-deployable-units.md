@@ -75,7 +75,7 @@ Deployed substreams sink "1ef89c74":
 Services:
   - 1ef89c74-pgweb: PGWeb service "1ef89c74-pgweb" available at URL: 'http://localhost:8081'
   - 1ef89c74-postgraphile: Postgraphile service "1ef89c74-postgraphile" available at URL: 'http://localhost:3000/graphiql' (API at 'http://localhost:3000/graphql')
-  - 1ef89c74-postgres: PostgreSQL service "1ef89c74-postgres" available at DSN: 'postgres://dev-node:insecure-change-me-in-prod@localhost:5432/dev-node?sslmode=disable'
+  - 1ef89c74-postgres: PostgreSQL service "1ef89c74-postgres" available at DSN: 'postgres://dev-node:insecure-change-me-in-prod@localhost:5432/substreams?sslmode=disable'
   - 1ef89c74-sink: Sink service (no exposed port). Use 'substreams alpha sink-info 1ef89c74-sink' to see last processed block or 'docker logs 1ef89c74-sink' to see the logs.
 ```
 

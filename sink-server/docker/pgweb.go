@@ -9,9 +9,9 @@ import (
 func (e *DockerEngine) newPGWeb(deploymentID string, pgService string) (conf types.ServiceConfig, motd string) {
 
 	name := fmt.Sprintf("%s-pgweb", deploymentID)
-    localPort := uint32(8081) // TODO: assign dynamically
+	localPort := uint32(8081) // TODO: assign dynamically
 
-    conf = types.ServiceConfig{
+	conf = types.ServiceConfig{
 		Name:          name,
 		ContainerName: name,
 		Image:         "sosedoff/pgweb:0.11.12",
@@ -31,16 +31,15 @@ func (e *DockerEngine) newPGWeb(deploymentID string, pgService string) (conf typ
 		Links:     []string{pgService + ":postgres"},
 		DependsOn: []string{pgService},
 		Environment: map[string]*string{
-			"DATABASE_URL": deref("postgres://dev-node:insecure-change-me-in-prod@postgres:5432/dev-node?sslmode=disable"),
+			"DATABASE_URL": deref("postgres://dev-node:insecure-change-me-in-prod@postgres:5432/substreams?sslmode=disable"),
 		},
 	}
 
-    motd = fmt.Sprintf("PGWeb service %q available at URL: 'http://localhost:%d'",
-        name,
-        localPort,
-     )
+	motd = fmt.Sprintf("PGWeb service %q available at URL: 'http://localhost:%d'",
+		name,
+		localPort,
+	)
 
-    return conf, motd
-
+	return conf, motd
 
 }

@@ -60,7 +60,7 @@ require (
 	github.com/streamingfast/eth-go v0.0.0-20230410173454-433bd8803da1
 	github.com/streamingfast/sf-tracing v0.0.0-20230616174903-cd2ade641ca9
 	github.com/streamingfast/shutter v1.5.0
-	github.com/streamingfast/substreams-sink-sql v1.0.1-0.20231003155558-b48dcca8b008
+	github.com/streamingfast/substreams-sink-sql v1.0.1-0.20231024141225-6af37a8c8567
 	github.com/tetratelabs/wazero v1.1.0
 	github.com/tidwall/pretty v1.2.1
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.44.0

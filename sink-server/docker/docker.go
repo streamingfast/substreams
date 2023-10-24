@@ -493,71 +493,71 @@ func (e *DockerEngine) Shutdown(zlog *zap.Logger) (err error) {
 	return err
 }
 
-func (e *DockerEngine) createManifest(deploymentID string, token string, pkg *pbsubstreams.Package) (content []byte, usedPorts []uint32, services map[string]string, runMeFirst []string, err error) {
+func (e *DockerEngine) createManifest(deploymentID string, token string, pkg *pbsubstreams.Package) (content []byte, usedPorts []uint32, servicesDesc map[string]string, runMeFirst []string, err error) {
 
 	if pkg.SinkConfig.TypeUrl != "sf.substreams.sink.sql.v1.Service" {
 		return nil, nil, nil, nil, fmt.Errorf("invalid sinkconfig type: %q. Only sf.substreams.sink.sql.v1.Service is supported for now.", pkg.SinkConfig.TypeUrl)
 	}
-	sqlSvc := &pbsql.Service{}
-	if err := pkg.SinkConfig.UnmarshalTo(sqlSvc); err != nil {
+	sinkConfig := &pbsql.Service{}
+	if err := pkg.SinkConfig.UnmarshalTo(sinkConfig); err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("cannot unmarshal sinkconfig: %w", err)
 	}
 
-	services = make(map[string]string)
+	servicesDesc = make(map[string]string)
+	var services []types.ServiceConfig
 
-	pg, pgMotd, err := e.newPostgres(deploymentID, pkg)
+	var dbServiceName string
+	switch sinkConfig.Engine {
+	case pbsql.Service_clickhouse:
+		db, dbMotd, err := e.newClickhouse(deploymentID, pkg)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("creating clickhouse deployment: %w", err)
+		}
+		dbServiceName = db.Name
+		servicesDesc[db.Name] = dbMotd
+		runMeFirst = append(runMeFirst, db.Name)
+		services = append(services, db)
+
+	case pbsql.Service_postgres:
+		pg, pgMotd, err := e.newPostgres(deploymentID, pkg)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("creating postgres deployment: %w", err)
+		}
+		dbServiceName = pg.Name
+		servicesDesc[pg.Name] = pgMotd
+		runMeFirst = append(runMeFirst, pg.Name)
+		services = append(services, pg)
+	}
+
+	sink, sinkMotd, err := e.newSink(deploymentID, dbServiceName, pkg, sinkConfig)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("creating postgres deployment: %w", err)
 	}
-	services[pg.Name] = pgMotd
-	runMeFirst = append(runMeFirst, pg.Name)
+	servicesDesc[sink.Name] = sinkMotd
+	services = append(services, sink)
 
-	sink, sinkMotd, err := e.newSink(deploymentID, pg.Name, pkg)
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("creating postgres deployment: %w", err)
-	}
-	services[sink.Name] = sinkMotd
-
-	config := types.Config{
-		Version: "3",
-		Services: []types.ServiceConfig{
-			pg,
-			sink,
-		},
+	if sinkConfig.PgwebFrontend != nil && sinkConfig.PgwebFrontend.Enabled {
+		pgweb, motd := e.newPGWeb(deploymentID, dbServiceName)
+		servicesDesc[pgweb.Name] = motd
+		services = append(services, pgweb)
 	}
 
-	if sqlSvc.PgwebFrontend != nil && sqlSvc.PgwebFrontend.Enabled {
-		pgweb, motd := e.newPGWeb(deploymentID, pg.Name)
-		services[pgweb.Name] = motd
-		config.Services = append(config.Services, pgweb)
+	if sinkConfig.PostgraphileFrontend != nil && sinkConfig.PostgraphileFrontend.Enabled {
+		postgraphile, motd := e.newPostgraphile(deploymentID, dbServiceName)
+		servicesDesc[postgraphile.Name] = motd
+		services = append(services, postgraphile)
 	}
 
-	if sqlSvc.PostgraphileFrontend != nil && sqlSvc.PostgraphileFrontend.Enabled {
-		postgraphile, motd := e.newPostgraphile(deploymentID, pg.Name)
-		services[postgraphile.Name] = motd
-		config.Services = append(config.Services, postgraphile)
-	}
-
-	for _, svc := range config.Services {
+	for _, svc := range services {
 		for _, port := range svc.Ports {
 			usedPorts = append(usedPorts, port.Published)
 		}
 	}
 
+	config := types.Config{
+		Version:  "3",
+		Services: services,
+	}
 	content, err = yaml.Marshal(config)
 	return
-
-	//  clickhouse:
-	//    container_name: clickhouse-ssp
-	//    image: clickhouse/clickhouse-server
-	//    user: "101:101"
-	//    hostname: clickhouse
-	//    volumes:
-	//      - ${PWD}/devel/clickhouse-server/config.xml:/etc/clickhouse-server/config.d/config.xml
-	//      - ${PWD}/devel/clickhouse-server/users.xml:/etc/clickhouse-server/users.d/users.xml
-	//    ports:
-	//      - "8123:8123"
-	//      - "9000:9000"
-	//      - "9005:9005"
-	//  sink:
 }

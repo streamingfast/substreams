@@ -62,8 +62,8 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphIni
 	plan := &RequestPlan{
 		segmentInterval: segmentInterval,
 	}
-	if linearHandoffBlock != exclusiveEndBlock {
-		// assumes exclusiveEndBlock isn't 0, because linearHandoffBlock cannot be 0
+	if linearHandoffBlock != exclusiveEndBlock ||
+		linearHandoffBlock == 0 { // ex: unbound dev mode
 		plan.LinearPipeline = block.NewRange(linearHandoffBlock, exclusiveEndBlock)
 	}
 	if resolvedStartBlock == linearHandoffBlock && graphInitBlock == resolvedStartBlock {

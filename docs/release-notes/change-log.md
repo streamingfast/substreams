@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 * Fixed metrics for time spent in eth_calls within modules stats (server and GUI)
+* Fixed `undo` json message
 
 ## v1.1.18
 

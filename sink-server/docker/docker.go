@@ -153,7 +153,7 @@ func (e *DockerEngine) Create(deploymentID string, pkg *pbsubstreams.Package, zl
 
 	output, err := e.applyManifest(deploymentID, manifest, runMeFirst, false)
 	if err != nil {
-		return fmt.Errorf("applying manifest: %w", err)
+		return fmt.Errorf("applying manifest: %w\noutput: %s", err, output)
 	}
 	_ = output // TODO save somewhere maybe
 	return nil
@@ -187,7 +187,7 @@ func (e *DockerEngine) Update(deploymentID string, pkg *pbsubstreams.Package, re
 
 	output, err := e.applyManifest(deploymentID, manifest, runMeFirst, true)
 	if err != nil {
-		return fmt.Errorf("applying manifest: %w", err)
+		return fmt.Errorf("applying manifest: %w\noutput: %s", err, output)
 	}
 	_ = output // TODO save somewhere maybe
 	return nil

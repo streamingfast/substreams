@@ -29,7 +29,10 @@ func (e *DockerEngine) newSink(deploymentID string, dbService string, pkg *pbsub
 	var dsn string
 	switch sinkConfig.Engine {
 	case pbsql.Service_clickhouse:
-		dsn = "clickhouse://dev-node:insecure-change-me-in-prod@postgres:9000/substreams?sslmode=disable"
+		dsn = "clickhouse://dev-node:insecure-change-me-in-prod@postgres:9000/substreams"
+		if sinkConfig.PostgraphileFrontend != nil && sinkConfig.PostgraphileFrontend.Enabled {
+			return conf, motd, fmt.Errorf("postgraphile not supported on clickhouse")
+		}
 	case pbsql.Service_postgres:
 		dsn = "postgres://dev-node:insecure-change-me-in-prod@postgres:5432/substreams?sslmode=disable"
 	default:
@@ -39,7 +42,7 @@ func (e *DockerEngine) newSink(deploymentID string, dbService string, pkg *pbsub
 	conf = types.ServiceConfig{
 		Name:          name,
 		ContainerName: name,
-		Image:         "ghcr.io/streamingfast/substreams-sink-sql:v3.0.2",
+		Image:         "ghcr.io/streamingfast/substreams-sink-sql:v3.0.4",
 		Restart:       "on-failure",
 		Entrypoint: []string{
 			"/opt/subservices/config/start.sh",
@@ -76,15 +79,20 @@ func (e *DockerEngine) newSink(deploymentID string, dbService string, pkg *pbsub
 		return conf, motd, fmt.Errorf("writing file: %w", err)
 	}
 
-	startScript := []byte(`#!/bin/bash
+	withPostgraphile := ""
+	if sinkConfig.PostgraphileFrontend != nil && sinkConfig.PostgraphileFrontend.Enabled {
+		withPostgraphile = "--postgraphile"
+	}
+
+	startScript := []byte(fmt.Sprintf(`#!/bin/bash
 set -xeu
 
 if [ ! -f /opt/subservices/data/setup-complete ]; then
-    /app/substreams-sink-sql setup $DSN /opt/subservices/config/substreams.spkg --postgraphile && touch /opt/subservices/data/setup-complete
+    /app/substreams-sink-sql setup $DSN /opt/subservices/config/substreams.spkg %s && touch /opt/subservices/data/setup-complete
 fi
 
 /app/substreams-sink-sql run $DSN /opt/subservices/config/substreams.spkg --on-module-hash-mistmatch=warn
-`)
+`, withPostgraphile))
 	if err := os.WriteFile(filepath.Join(configFolder, "start.sh"), startScript, 0755); err != nil {
 		fmt.Println("")
 		return conf, motd, fmt.Errorf("writing file: %w", err)

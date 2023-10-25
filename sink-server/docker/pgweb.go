@@ -6,7 +6,7 @@ import (
 	"github.com/docker/cli/cli/compose/types"
 )
 
-func (e *DockerEngine) newPGWeb(deploymentID string, pgService string) (conf types.ServiceConfig, motd string) {
+func (e *DockerEngine) newPGWeb(deploymentID string, dbService string) (conf types.ServiceConfig, motd string) {
 
 	name := fmt.Sprintf("%s-pgweb", deploymentID)
 	localPort := uint32(8081) // TODO: assign dynamically
@@ -28,8 +28,8 @@ func (e *DockerEngine) newPGWeb(deploymentID string, pgService string) (conf typ
 			"--listen=8081",
 			"--binary-codec=hex",
 		},
-		Links:     []string{pgService + ":postgres"},
-		DependsOn: []string{pgService},
+		Links:     []string{dbService + ":postgres"},
+		DependsOn: []string{dbService},
 		Environment: map[string]*string{
 			"DATABASE_URL": deref("postgres://dev-node:insecure-change-me-in-prod@postgres:5432/substreams?sslmode=disable"),
 		},

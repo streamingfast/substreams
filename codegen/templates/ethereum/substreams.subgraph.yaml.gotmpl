@@ -46,3 +46,13 @@ modules:
       type: proto:sf.substreams.entity.v1.EntityChanges
 
 network: {{ .network }}
+
+sink:
+  module: graph_out
+  type: sf.substreams.sink.subgraph.v1.Service
+  config:
+    schema: "./schema.graphql"
+    subgraph_yaml: "./subgraph.yaml"
+    postgres_direct_protocol_access: true
+    pgweb_frontend:
+      enabled: true

@@ -6,9 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Changed
+* Codegen: Now generates separate substreams.{target}.yaml files for sql, clickhouse  and graphql sink targets.
+
+### Added
+* Codegen: Added support for clickhouse in schema.sql
+
 ### Fixed
 * Fixed metrics for time spent in eth_calls within modules stats (server and GUI)
-* Fixed `undo` json message
+* Fixed `undo` json message in 'run' command
+* Fixed stream ending immediately in dev mode when start/end blocks are both 0.
+* Codegen: Fixed pluralized entity created for db_out and graph_out
 
 ## v1.1.18
 

@@ -38,7 +38,7 @@ type Package struct {
 	Network    string     `protobuf:"bytes,9,opt,name=network,proto3" json:"network,omitempty"`
 	SinkConfig *anypb.Any `protobuf:"bytes,10,opt,name=sink_config,json=sinkConfig,proto3" json:"sink_config,omitempty"`
 	SinkModule string     `protobuf:"bytes,11,opt,name=sink_module,json=sinkModule,proto3" json:"sink_module,omitempty"`
-	// image is the bytes to a JPEG, WebP or GIF file. Max size is 2 MiB
+	// image is the bytes to a JPEG, WebP or PNG file. Max size is 2 MiB
 	Image []byte `protobuf:"bytes,12,opt,name=image,proto3" json:"image,omitempty"`
 }
 

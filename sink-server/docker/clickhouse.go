@@ -62,16 +62,13 @@ func (e *DockerEngine) newClickhouse(deploymentID string, pkg *pbsubstreams.Pack
 		},
 	}
 
-	motd := fmt.Sprintf("Clickhouse service %q available at DSN: 'clickhouse://%s:%s@localhost:%d/%s' or using postgres wire protocol at 'postgres://%s:%s@localhost:%d/%s?sslmode=disable'",
+	motd := fmt.Sprintf("Clickhouse service %q available at DSN: 'clickhouse://%s:%s@localhost:%d/%s', connect to CLI using 'docker exec -ti %s clickhouse client'",
 		name,
-		*conf.Environment["CLICKHOUSE_USER"],
-		*conf.Environment["CLICKHOUSE_PASSWORD"],
-		pgPort,
-		*conf.Environment["CLICKHOUSE_DB"],
 		*conf.Environment["CLICKHOUSE_USER"],
 		*conf.Environment["CLICKHOUSE_PASSWORD"],
 		clickhousePort,
 		*conf.Environment["CLICKHOUSE_DB"],
+		name,
 	)
 
 	return conf, motd, nil

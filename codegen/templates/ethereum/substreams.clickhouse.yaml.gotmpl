@@ -46,3 +46,15 @@ modules:
       type: proto:sf.substreams.entity.v1.EntityChanges
 
 network: {{ .network }}
+
+sink:
+  module: db_out
+  type: sf.substreams.sink.sql.v1.Service
+  config:
+    schema: "./schema.clickhouse.sql"
+    wire_protocol_access: true
+    engine: clickhouse
+    postgraphile_frontend:
+      enabled: false
+    pgweb_frontend:
+      enabled: false

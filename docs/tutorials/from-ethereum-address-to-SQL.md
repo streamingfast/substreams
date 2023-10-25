@@ -12,7 +12,8 @@ In this tutorial, you will learn how to bootstrap a Substreams with the Bored Ap
 
 1. Substreams CLI: version v1.1.15 or above required, navigate to [Installing the Cli](https://substreams.streamingfast.io/getting-started/installing-the-cli)
 2. Docker: visit the official installation [page](https://docs.docker.com/engine/install/)
-3. (Optional) Rust: to better tweak, get your hands dirty and have fun developing Substreams, you need to install Rust. Visit the official Rust installation [page](https://www.rust-lang.org/tools/install)
+3. buf.build CLI: visit the official installation [page](https://buf.build/product/cli)
+4. (Optional) Rust: to better tweak, get your hands dirty and have fun developing Substreams, you need to install Rust. Visit the official Rust installation [page](https://www.rust-lang.org/tools/install)
 
 ## Generate base Substreams code
 

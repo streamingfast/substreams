@@ -10,8 +10,6 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/streamingfast/substreams/codegen"
-
 	"github.com/gertd/go-pluralize"
 	"github.com/iancoleman/strcase"
 	"github.com/streamingfast/eth-go"
@@ -25,9 +23,13 @@ import (
 //go:embed ethereum/Cargo.toml.gotmpl
 //go:embed ethereum/Makefile.gotmpl
 //go:embed ethereum/substreams.yaml.gotmpl
+//go:embed ethereum/substreams.sql.yaml.gotmpl
+//go:embed ethereum/substreams.clickhouse.yaml.gotmpl
+//go:embed ethereum/substreams.subgraph.yaml.gotmpl
 //go:embed ethereum/rust-toolchain.toml
 //go:embed ethereum/build.rs.gotmpl
 //go:embed ethereum/schema.sql.gotmpl
+//go:embed ethereum/schema.clickhouse.sql.gotmpl
 //go:embed ethereum/schema.graphql.gotmpl
 //go:embed ethereum/subgraph.yaml.gotmpl
 var ethereumProject embed.FS
@@ -93,22 +95,20 @@ type EthereumProject struct {
 	databaseChangeImportVersion string
 	entityChangeImportVersion   string
 	network                     string
-	sinkChoice                  codegen.SinkChoice
 }
 
-func NewEthereumProject(name string, moduleName string, chain *EthereumChain, contracts []*EthereumContract, lowestStartBlock uint64, choice codegen.SinkChoice) (*EthereumProject, error) {
+func NewEthereumProject(name string, moduleName string, chain *EthereumChain, contracts []*EthereumContract, lowestStartBlock uint64) (*EthereumProject, error) {
 	return &EthereumProject{
 		name:                        name,
 		moduleName:                  moduleName,
 		chain:                       chain,
 		ethereumContracts:           contracts,
 		creationBlockNum:            lowestStartBlock,
-		sqlImportVersion:            "1.0.2",
+		sqlImportVersion:            "1.0.3",
 		graphImportVersion:          "0.1.0",
 		databaseChangeImportVersion: "1.2.1",
 		entityChangeImportVersion:   "1.1.0",
 		network:                     chain.Network,
-		sinkChoice:                  choice,
 	}, nil
 }
 
@@ -125,8 +125,12 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 		"Cargo.toml.gotmpl",
 		"Makefile.gotmpl",
 		"substreams.yaml.gotmpl",
+		"substreams.sql.yaml.gotmpl",
+		"substreams.clickhouse.yaml.gotmpl",
+		"substreams.subgraph.yaml.gotmpl",
 		"rust-toolchain.toml",
 		"schema.sql.gotmpl",
+		"schema.clickhouse.sql.gotmpl",
 		"schema.graphql.gotmpl",
 		"subgraph.yaml.gotmpl",
 	} {
@@ -165,7 +169,6 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 				"databaseChangeImportVersion": p.databaseChangeImportVersion,
 				"entityChangeImportVersion":   p.entityChangeImportVersion,
 				"network":                     p.network,
-				"sinkChoice":                  p.sinkChoice,
 			}
 
 			zlog.Debug("rendering templated file", zap.String("filename", finalFileName), zap.Any("model", model))
@@ -262,6 +265,7 @@ type rustEventModel struct {
 	ProtoFieldABIConversionMap map[string]string
 	ProtoFieldTableChangesMap  map[string]string
 	ProtoFieldSqlmap           map[string]string
+	ProtoFieldClickhouseMap    map[string]string
 	ProtoFieldGraphQLMap       map[string]string
 }
 
@@ -273,6 +277,7 @@ func (e *rustEventModel) populateFields(log *eth.LogEventDef, multipleContracts 
 	e.ProtoFieldABIConversionMap = map[string]string{}
 	e.ProtoFieldTableChangesMap = map[string]string{}
 	e.ProtoFieldSqlmap = map[string]string{}
+	e.ProtoFieldClickhouseMap = map[string]string{}
 	e.ProtoFieldGraphQLMap = map[string]string{}
 	paramNames := make([]string, len(log.Parameters))
 	for i := range log.Parameters {
@@ -308,6 +313,14 @@ func (e *rustEventModel) populateFields(log *eth.LogEventDef, multipleContracts 
 			return fmt.Errorf("sql - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
 		}
 
+		toClickhouseCode := generateFieldClickhouseTypes(parameter.Type)
+		if toClickhouseCode == SKIP_FIELD {
+			continue
+		}
+		if toClickhouseCode == "" {
+			return fmt.Errorf("clickhouse - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
+		}
+
 		toGraphQLCode := generateFieldGraphQLTypes(parameter.Type)
 		if toGraphQLCode == "" {
 			return fmt.Errorf("graphql - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
@@ -318,6 +331,7 @@ func (e *rustEventModel) populateFields(log *eth.LogEventDef, multipleContracts 
 		e.ProtoFieldABIConversionMap[name] = toProtoCode
 		e.ProtoFieldTableChangesMap[name] = toDatabaseChangeCode
 		e.ProtoFieldSqlmap[columnName] = toSqlCode
+		e.ProtoFieldClickhouseMap[columnName] = toClickhouseCode
 		e.ProtoFieldGraphQLMap[name] = toGraphQLCode
 	}
 
@@ -336,6 +350,92 @@ func sanitizeTableChangesColumnNames(name string) string {
 }
 
 const SKIP_FIELD = "skip"
+
+func generateFieldClickhouseTypes(fieldType eth.SolidityType) string {
+	switch v := fieldType.(type) {
+	case eth.AddressType:
+		return "VARCHAR(40)"
+
+	case eth.BooleanType:
+		return "BOOL"
+
+	case eth.BytesType, eth.FixedSizeBytesType, eth.StringType:
+		return "TEXT"
+
+	case eth.SignedIntegerType:
+		switch {
+		case v.ByteSize <= 8:
+			return "Int8"
+		case v.ByteSize <= 16:
+			return "Int16"
+		case v.ByteSize <= 32:
+			return "Int32"
+		case v.ByteSize <= 64:
+			return "Int64"
+		case v.ByteSize <= 128:
+			return "Int128"
+		}
+		return "Int256"
+
+	case eth.UnsignedIntegerType:
+		switch {
+		case v.ByteSize <= 8:
+			return "UInt8"
+		case v.ByteSize <= 16:
+			return "UInt16"
+		case v.ByteSize <= 32:
+			return "UInt32"
+		case v.ByteSize <= 64:
+			return "UInt64"
+		case v.ByteSize <= 128:
+			return "UInt128"
+		}
+		return "UInt256"
+
+	case eth.SignedFixedPointType:
+		precision := v.Decimals
+		if precision > 76 {
+			precision = 76
+		}
+		switch {
+		case v.BitsSize <= 32:
+			return fmt.Sprintf("Decimal128(%d)", precision)
+		case v.BitsSize <= 64:
+			return fmt.Sprintf("Decimal128(%d)", precision)
+		case v.BitsSize <= 128:
+			return fmt.Sprintf("Decimal128(%d)", precision)
+		}
+		return fmt.Sprintf("Decimal256(%d)", precision)
+
+	case eth.UnsignedFixedPointType:
+		precision := v.Decimals
+		if precision > 76 {
+			precision = 76
+		}
+		switch {
+		case v.BitsSize <= 31:
+			return fmt.Sprintf("Decimal32(%d)", precision)
+		case v.BitsSize <= 63:
+			return fmt.Sprintf("Decimal64(%d)", precision)
+		case v.BitsSize <= 127:
+			return fmt.Sprintf("Decimal128(%d)", precision)
+		}
+		return fmt.Sprintf("Decimal256(%d)", precision)
+
+	case eth.StructType:
+		return SKIP_FIELD
+
+		//case eth.ArrayType:
+		//	elemType := generateFieldClickhouseTypes(v.ElementType)
+		//	if elemType == "" || elemType == SKIP_FIELD {
+		//		return elemType
+		//	}
+		//	return fmt.Sprintf("Array(%s)", elemType)
+
+	default:
+		return ""
+	}
+}
 
 func generateFieldSqlTypes(fieldType eth.SolidityType) string {
 	switch v := fieldType.(type) {
@@ -366,8 +466,12 @@ func generateFieldSqlTypes(fieldType eth.SolidityType) string {
 	case eth.StructType:
 		return SKIP_FIELD
 
-	case eth.ArrayType:
-		return SKIP_FIELD
+	//case eth.ArrayType:
+	//	elemType := generateFieldClickhouseTypes(v.ElementType)
+	//	if elemType == "" || elemType == SKIP_FIELD {
+	//		return elemType
+	//	}
+	//	return fmt.Sprintf("%s ARRAY", elemType)
 
 	default:
 		return ""

@@ -8,8 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/streamingfast/substreams/codegen"
-
 	"github.com/streamingfast/eth-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -42,7 +40,6 @@ func TestEnsureOurProjectCompiles(t *testing.T) {
 		EthereumChainsByID["Mainnet"],
 		ethereumContracts,
 		123,
-		codegen.SinkChoiceDb,
 	)
 	require.NoError(t, err)
 
@@ -79,11 +76,10 @@ func TestNewEthereumTemplateProject(t *testing.T) {
 		name      string
 		args      []args
 		want      map[string][]byte
-		choice    codegen.SinkChoice
 		assertion require.ErrorAssertionFunc
 	}{
 		{
-			name: "standard case - no sink",
+			name: "standard case - all sinks",
 			args: []args{
 				{
 					address:   "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d",
@@ -92,82 +88,29 @@ func TestNewEthereumTemplateProject(t *testing.T) {
 				},
 			},
 			want: map[string][]byte{
-				"abi/contract.abi.json": abiContent,
-				"proto/contract.proto":  fileContent(t, "./ethereum/proto/contract.proto"),
-				"src/abi/mod.rs":        fileContent(t, "./ethereum/src/abi/mod.rs"),
-				"src/pb/mod.rs":         fileContent(t, "./ethereum/src/pb/mod.rs"),
-				"src/lib.rs":            fileContent(t, "./ethereum/results/lib.rs"),
-				"build.rs":              fileContent(t, "./ethereum/build.rs"),
-				"Cargo.lock":            fileContent(t, "./ethereum/Cargo.lock"),
-				"Cargo.toml":            fileContent(t, "./ethereum/results/Cargo.toml"),
-				"Makefile":              fileContent(t, "./ethereum/Makefile"),
-				"substreams.yaml":       fileContent(t, "./ethereum/results/nosink/substreams.yaml"),
-				"rust-toolchain.toml":   fileContent(t, "./ethereum/rust-toolchain.toml"),
-				"schema.sql":            fileContent(t, "./ethereum/schema.sql"),
-				"schema.graphql":        fileContent(t, "./ethereum/schema.graphql"),
-				"subgraph.yaml":         fileContent(t, "./ethereum/subgraph.yaml"),
+				"abi/contract.abi.json":      abiContent,
+				"proto/contract.proto":       fileContent(t, "./ethereum/proto/contract.proto"),
+				"src/abi/mod.rs":             fileContent(t, "./ethereum/src/abi/mod.rs"),
+				"src/pb/mod.rs":              fileContent(t, "./ethereum/src/pb/mod.rs"),
+				"src/lib.rs":                 fileContent(t, "./ethereum/results/lib.rs"),
+				"build.rs":                   fileContent(t, "./ethereum/build.rs"),
+				"Cargo.lock":                 fileContent(t, "./ethereum/Cargo.lock"),
+				"Cargo.toml":                 fileContent(t, "./ethereum/results/Cargo.toml"),
+				"Makefile":                   fileContent(t, "./ethereum/Makefile"),
+				"substreams.yaml":            fileContent(t, "./ethereum/substreams.yaml"),
+				"substreams.sql.yaml":        fileContent(t, "./ethereum/substreams.sql.yaml"),
+				"substreams.clickhouse.yaml": fileContent(t, "./ethereum/substreams.clickhouse.yaml"),
+				"substreams.subgraph.yaml":   fileContent(t, "./ethereum/substreams.subgraph.yaml"),
+				"rust-toolchain.toml":        fileContent(t, "./ethereum/rust-toolchain.toml"),
+				"schema.sql":                 fileContent(t, "./ethereum/schema.sql"),
+				"schema.clickhouse.sql":      fileContent(t, "./ethereum/schema.clickhouse.sql"),
+				"schema.graphql":             fileContent(t, "./ethereum/schema.graphql"),
+				"subgraph.yaml":              fileContent(t, "./ethereum/subgraph.yaml"),
 			},
-			choice:    codegen.SinkChoiceNo,
 			assertion: require.NoError,
 		},
 		{
-			name: "standard case - db sink",
-			args: []args{
-				{
-					address:   "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d",
-					abi:       abiContent,
-					shortName: "",
-				},
-			},
-			want: map[string][]byte{
-				"abi/contract.abi.json": abiContent,
-				"proto/contract.proto":  fileContent(t, "./ethereum/proto/contract.proto"),
-				"src/abi/mod.rs":        fileContent(t, "./ethereum/src/abi/mod.rs"),
-				"src/pb/mod.rs":         fileContent(t, "./ethereum/src/pb/mod.rs"),
-				"src/lib.rs":            fileContent(t, "./ethereum/results/lib.rs"),
-				"build.rs":              fileContent(t, "./ethereum/build.rs"),
-				"Cargo.lock":            fileContent(t, "./ethereum/Cargo.lock"),
-				"Cargo.toml":            fileContent(t, "./ethereum/results/Cargo.toml"),
-				"Makefile":              fileContent(t, "./ethereum/Makefile"),
-				"substreams.yaml":       fileContent(t, "./ethereum/results/dbsink/substreams.yaml"),
-				"rust-toolchain.toml":   fileContent(t, "./ethereum/rust-toolchain.toml"),
-				"schema.sql":            fileContent(t, "./ethereum/schema.sql"),
-				"schema.graphql":        fileContent(t, "./ethereum/schema.graphql"),
-				"subgraph.yaml":         fileContent(t, "./ethereum/subgraph.yaml"),
-			},
-			choice:    codegen.SinkChoiceDb,
-			assertion: require.NoError,
-		},
-		{
-			name: "standard case - graph sink",
-			args: []args{
-				{
-					address:   "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d",
-					abi:       abiContent,
-					shortName: "",
-				},
-			},
-			want: map[string][]byte{
-				"abi/contract.abi.json": abiContent,
-				"proto/contract.proto":  fileContent(t, "./ethereum/proto/contract.proto"),
-				"src/abi/mod.rs":        fileContent(t, "./ethereum/src/abi/mod.rs"),
-				"src/pb/mod.rs":         fileContent(t, "./ethereum/src/pb/mod.rs"),
-				"src/lib.rs":            fileContent(t, "./ethereum/results/lib.rs"),
-				"build.rs":              fileContent(t, "./ethereum/build.rs"),
-				"Cargo.lock":            fileContent(t, "./ethereum/Cargo.lock"),
-				"Cargo.toml":            fileContent(t, "./ethereum/results/Cargo.toml"),
-				"Makefile":              fileContent(t, "./ethereum/Makefile"),
-				"substreams.yaml":       fileContent(t, "./ethereum/results/graphsink/substreams.yaml"),
-				"rust-toolchain.toml":   fileContent(t, "./ethereum/rust-toolchain.toml"),
-				"schema.sql":            fileContent(t, "./ethereum/schema.sql"),
-				"schema.graphql":        fileContent(t, "./ethereum/schema.graphql"),
-				"subgraph.yaml":         fileContent(t, "./ethereum/subgraph.yaml"),
-			},
-			choice:    codegen.SinkChoiceGraph,
-			assertion: require.NoError,
-		},
-		{
-			name: "multiple contracts - graph sink ",
+			name: "multiple contracts - all sinks",
 			args: []args{
 				{
 					address:   "0x23581767a106ae21c074b2276d25e5c3e136a68b",
@@ -191,13 +134,16 @@ func TestNewEthereumTemplateProject(t *testing.T) {
 				"Cargo.lock":                     fileContent(t, "./ethereum/Cargo.lock"),
 				"Cargo.toml":                     fileContent(t, "./ethereum/results/Cargo.toml"),
 				"Makefile":                       fileContent(t, "./ethereum/Makefile"),
-				"substreams.yaml":                fileContent(t, "./ethereum/results/graphsink/substreams.yaml"),
+				"substreams.yaml":                fileContent(t, "./ethereum/substreams.yaml"),
+				"substreams.sql.yaml":            fileContent(t, "./ethereum/substreams.sql.yaml"),
+				"substreams.clickhouse.yaml":     fileContent(t, "./ethereum/substreams.clickhouse.yaml"),
+				"substreams.subgraph.yaml":       fileContent(t, "./ethereum/substreams.subgraph.yaml"),
 				"rust-toolchain.toml":            fileContent(t, "./ethereum/rust-toolchain.toml"),
 				"schema.sql":                     fileContent(t, "./ethereum/results/multiple_contracts/schema.sql"),
+				"schema.clickhouse.sql":          fileContent(t, "./ethereum/results/multiple_contracts/schema.clickhouse.sql"),
 				"schema.graphql":                 fileContent(t, "./ethereum/results/multiple_contracts/schema.graphql"),
 				"subgraph.yaml":                  fileContent(t, "./ethereum/subgraph.yaml"),
 			},
-			choice:    codegen.SinkChoiceGraph,
 			assertion: require.NoError,
 		},
 	}
@@ -230,7 +176,6 @@ func TestNewEthereumTemplateProject(t *testing.T) {
 				chain,
 				ethereumContracts,
 				123,
-				tt.choice,
 			)
 			require.NoError(t, err)
 

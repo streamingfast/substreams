@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v1.1.19
 
 ### Changed
 * Codegen: Now generates separate substreams.{target}.yaml files for sql, clickhouse  and graphql sink targets.
@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Fixed metrics for time spent in eth_calls within modules stats (server and GUI)
 * Fixed `undo` json message in 'run' command
 * Fixed stream ending immediately in dev mode when start/end blocks are both 0.
+* Sink-serve: fix missing output details on docker-compose apply errors
 * Codegen: Fixed pluralized entity created for db_out and graph_out
 
 ## v1.1.18

@@ -27,18 +27,29 @@ substreams init
 This commnad will ask you to provide some inputs, such as the name of the project, or the smart contract address that you want to index. If you do not provide a specific smart contract address, the command will create a Substreams template for the "Bored Ape Yacht Club" smart contract. In this example, let's leave that field blank and use the default smart contract.
 
 ```bash
-Project name: my-bayc
+Project name (lowercase, numbers, undescores): mybayc
 Protocol: Ethereum
 Ethereum chain: Mainnet
 Contract address to track (leave empty to use "Bored Ape Yacht Club"):
 Retrieving Ethereum Mainnet contract information (ABI & creation block)
-Writing project files
+Fetched contract ABI for bc4ca0eda7647a8ab7c2061c2e118a18a936f13d
+Fetched initial block 12287507 for bc4ca0eda7647a8ab7c2061c2e118a18a936f13d (lowest 12287507)
+Generating ABI Event models for
   Generating ABI Events for Approval (owner,approved,tokenId)
   Generating ABI Events for ApprovalForAll (owner,operator,approved)
   Generating ABI Events for OwnershipTransferred (previousOwner,newOwner)
   Generating ABI Events for Transfer (from,to,tokenId)
+Writing project files
 Generating Protobuf Rust code
-Project "my-bayc" initialized at "/path/to/my-bayc"
+Project "mybayc" initialized at "/Users/stepd"
+
+Run 'make build' to build the wasm code.
+
+The following substreams.yaml files have been created with different sink targets:
+ * substreams.yaml: no sink target
+ * substreams.sql.yaml: PostgreSQL sink
+ * substreams.clickhouse.yaml: Clickhouse sink
+ * substreams.subgraph.yaml: Sink into Substreams-based subgraph
 ```
 
 
@@ -131,9 +142,13 @@ The previous command will start a daemon that will run in your computer:
 
 {% code overflow="wrap" %}
 ```bash
-substreams alpha sink-deploy ./substreams.yaml
+substreams alpha sink-deploy ./substreams.sql.yaml
 ```
 {% endcode %}
+
+{% hint style="info" %}
+**Note**: You can also deploy clickhouse-based substreams by using `substreams.clickhouse.yaml`, or a substreams-based-subgraph by using `substreams.subgraph.yaml`
+{% endhint %}
 
 The previous command will deploy your Substreams and send the data to the local PostgreSQL database, providing some information:
 

@@ -14,6 +14,7 @@ type BasicInfo struct {
 	Name                   string                         `json:"name"`
 	Version                string                         `json:"version"`
 	Documentation          *string                        `json:"documentation,omitempty"`
+	Network                string                         `json:"network,omitempty"`
 	Image                  []byte                         `json:"-"`
 	Modules                []ModulesInfo                  `json:"modules"`
 	SinkInfo               *SinkInfo                      `json:"sink_info,omitempty"`
@@ -79,6 +80,7 @@ type ModuleInput struct {
 func Basic(pkg *pbsubstreams.Package) (*BasicInfo, error) {
 	manifestInfo := &BasicInfo{
 		Name:    pkg.PackageMeta[0].Name,
+		Network: pkg.Network,
 		Version: pkg.PackageMeta[0].Version,
 		Image:   pkg.Image,
 	}

@@ -42,14 +42,17 @@ func BuildRequestDetails(
 		return nil, nil, err
 	}
 
-	graph, err := manifest.NewModuleGraph(request.Modules.Modules)
-	if err != nil {
-		return nil, nil, status.Errorf(grpccodes.InvalidArgument, "invalid modules: %s", err.Error())
-	}
+	moduleHasStatefulDependencies := true
+	if req.Modules != nil { // because of tests which do not define modules in the request. too annoying to add this to tests for now. (TODO)
+		graph, err := manifest.NewModuleGraph(request.Modules.Modules)
+		if err != nil {
+			return nil, nil, status.Errorf(grpccodes.InvalidArgument, "invalid modules: %s", err.Error())
+		}
 
-	moduleHasStatefulDependencies, err := graph.HasStatefulDependencies(request.OutputModule)
-	if err != nil {
-		return nil, nil, status.Errorf(grpccodes.InvalidArgument, "invalid output module: %s", err.Error())
+		moduleHasStatefulDependencies, err = graph.HasStatefulDependencies(request.OutputModule)
+		if err != nil {
+			return nil, nil, status.Errorf(grpccodes.InvalidArgument, "invalid output module: %s", err.Error())
+		}
 	}
 
 	linearHandoff, err := computeLinearHandoffBlockNum(request.ProductionMode, req.ResolvedStartBlockNum, request.StopBlockNum, getRecentFinalBlock, moduleHasStatefulDependencies)

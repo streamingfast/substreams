@@ -518,7 +518,7 @@ func (e *DockerEngine) createManifest(deploymentID string, token string, pkg *pb
 		runMeFirst = append(runMeFirst, db.Name)
 		services = append(services, db)
 
-	case pbsql.Service_postgres:
+	case pbsql.Service_postgres, pbsql.Service_unset:
 		pg, pgMotd, err := e.newPostgres(deploymentID, pkg)
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("creating postgres deployment: %w", err)

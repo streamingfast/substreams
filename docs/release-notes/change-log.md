@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+* Optimized start of output stream in developer mode when start block is in reversible segment and output module does not have any stores in its dependencies.
+
+
 ## v1.1.19
 
 ### Changed
@@ -18,7 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Fixed stream ending immediately in dev mode when start/end blocks are both 0.
 * Sink-serve: fix missing output details on docker-compose apply errors
 * Codegen: Fixed pluralized entity created for db_out and graph_out
-
+* 
 ## v1.1.18
 
 ### Fixed

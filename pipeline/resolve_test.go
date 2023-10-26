@@ -181,21 +181,37 @@ func Test_computeLiveHandoffBlockNum(t *testing.T) {
 		stopBlockNum     uint64
 		expectHandoffNum uint64
 		expectError      bool
+		stateRequired    bool
 	}{
 		// prod (start-block ignored)
-		{true, 100, true, 10, 0, 100, false},
-		{true, 100, true, 10, 150, 100, false},
-		{true, 100, true, 10, 50, 50, false},
-		{false, 0, true, 10, 50, 50, false},
-		{false, 0, true, 10, 0, 0, true},
+		{true, 100, true, 10, 0, 100, false, true},
+		{true, 100, true, 10, 150, 100, false, true},
+		{true, 100, true, 10, 50, 50, false, true},
+		{false, 0, true, 10, 50, 50, false, true},
+		{false, 0, true, 10, 0, 0, true, true},
 
-		// non-prod (stop-block ignored)
-		{true, 100, false, 10, 0, 10, false},
-		{true, 100, false, 10, 9999, 10, false},
-		{true, 100, false, 150, 0, 100, false},
-		{true, 100, false, 150, 9999, 100, false},
-		{false, 0, false, 150, 0, 150, false},
-		{false, 0, false, 150, 9999, 150, false},
+		// prod (start-block ignored) (state not required)
+		{true, 100, true, 10, 0, 100, false, false},
+		{true, 100, true, 10, 150, 100, false, false},
+		{true, 100, true, 10, 50, 50, false, false},
+		{false, 0, true, 10, 50, 50, false, false},
+		{false, 0, true, 10, 0, 0, true, false},
+
+		// non-prod (stop-block ignored) (state required)
+		{true, 100, false, 10, 0, 10, false, true},
+		{true, 100, false, 10, 9999, 10, false, true},
+		{true, 100, false, 150, 0, 100, false, true},
+		{true, 100, false, 150, 9999, 100, false, true},
+		{false, 0, false, 150, 0, 150, false, true},
+		{false, 0, false, 150, 9999, 150, false, true},
+
+		// non-prod (stop-block ignored) (state not required)
+		{true, 100, false, 10, 0, 10, false, false},
+		{true, 100, false, 10, 9999, 10, false, false},
+		{true, 100, false, 150, 0, 150, false, false},
+		{true, 100, false, 150, 9999, 150, false, false},
+		{false, 0, false, 150, 0, 150, false, false},
+		{false, 0, false, 150, 9999, 150, false, false},
 	}
 
 	for _, test := range tests {
@@ -209,7 +225,7 @@ func Test_computeLiveHandoffBlockNum(t *testing.T) {
 						return 0, fmt.Errorf("live not available")
 					}
 					return test.recentBlockNum, nil
-				})
+				}, test.stateRequired)
 			if test.expectError {
 				assert.Error(t, err)
 			} else {

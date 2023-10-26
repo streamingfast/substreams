@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/streamingfast/substreams/manifest"
 	"sync/atomic"
 
 	"github.com/streamingfast/bstream"
@@ -41,12 +42,23 @@ func BuildRequestDetails(
 		return nil, nil, err
 	}
 
-	linearHandoff, err := computeLinearHandoffBlockNum(request.ProductionMode, req.ResolvedStartBlockNum, request.StopBlockNum, getRecentFinalBlock)
+	graph, err := manifest.NewModuleGraph(request.Modules.Modules)
+	if err != nil {
+		return nil, nil, status.Errorf(grpccodes.InvalidArgument, "invalid modules: %s", err.Error())
+	}
+
+	moduleHasStatefulDependencies, err := graph.HasStatefulDependencies(request.OutputModule)
+	if err != nil {
+		return nil, nil, status.Errorf(grpccodes.InvalidArgument, "invalid output module: %s", err.Error())
+	}
+
+	linearHandoff, err := computeLinearHandoffBlockNum(request.ProductionMode, req.ResolvedStartBlockNum, request.StopBlockNum, getRecentFinalBlock, moduleHasStatefulDependencies)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	req.LinearHandoffBlockNum = linearHandoff
+
 	req.LinearGateBlockNum = req.LinearHandoffBlockNum
 	if req.ResolvedStartBlockNum > req.LinearHandoffBlockNum {
 		req.LinearGateBlockNum = req.ResolvedStartBlockNum
@@ -76,7 +88,7 @@ func nextUniqueID() uint64 {
 	return uniqueRequestIDCounter.Add(1)
 }
 
-func computeLinearHandoffBlockNum(productionMode bool, startBlock, stopBlock uint64, getRecentFinalBlockFunc func() (uint64, error)) (uint64, error) {
+func computeLinearHandoffBlockNum(productionMode bool, startBlock, stopBlock uint64, getRecentFinalBlockFunc func() (uint64, error), stateRequired bool) (uint64, error) {
 	if productionMode {
 		maxHandoff, err := getRecentFinalBlockFunc()
 		if err != nil {
@@ -90,10 +102,17 @@ func computeLinearHandoffBlockNum(productionMode bool, startBlock, stopBlock uin
 		}
 		return min(stopBlock, maxHandoff), nil
 	}
+
+	//if no state required, we don't need to ever back-process blocks. we can start flowing blocks right away from the start block
+	if !stateRequired {
+		return startBlock, nil
+	}
+
 	maxHandoff, err := getRecentFinalBlockFunc()
 	if err != nil {
 		return startBlock, nil
 	}
+
 	return min(startBlock, maxHandoff), nil
 }
 

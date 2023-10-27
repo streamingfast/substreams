@@ -155,7 +155,7 @@ fn map_events(blk: eth::Block) -> Result<contract::Events, substreams::errors::E
 ```
 
 {% hint style="warning" %}
-**Important:** Remember that this tutorial shows how to call the `decimals` function, but all the available are under the `abi::contract::functions` namespace, so you should be able to find them just by exploring the auto-generated ABI Rust files.
+**Important:** Remember that this tutorial shows how to call the `decimals` function, but all the available calls are under the `abi::contract::functions` namespace, so you should be able to find them just by exploring the auto-generated ABI Rust files.
 {% endhint %}
 
 6. To see it in action, just re-build and re-run the Substreams:

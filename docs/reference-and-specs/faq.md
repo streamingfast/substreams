@@ -99,3 +99,7 @@ Additional information [is available in the Github issue for WASM-bindgen](https
 ### Why does the output show "@unknown" instead of "@type" and the decoding failed only showing "@str" and "@bytes"
 
 Check to make sure the module's output type matches the protobuf definition. In some cases, the renamed protobuf package isn't updated in the `substreams.yaml` manifest file's `module.output.type` field, creating an incompatibility.
+
+### Can I retrieve Mempool data with Substreams?
+
+No, it is currently NOT possible to retrieve Mempool data with Substreams.

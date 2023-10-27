@@ -290,7 +290,7 @@ var IsValidCacheTag = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`).MatchString
 
 func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Request, outputGraph *outputmodules.Graph, respFunc substreams.ResponseFunc) error {
 	chainFirstStreamableBlock := bstream.GetProtocolFirstStreamableBlock
-	if request.StartBlockNum >= 0 && request.StartBlockNum < int64(chainFirstStreamableBlock) {
+	if request.StartBlockNum > 0 && request.StartBlockNum < int64(chainFirstStreamableBlock) {
 		return stream.NewErrInvalidArg("invalid start block %d, must be >= %d (the first streamable block of the chain)", request.StartBlockNum, chainFirstStreamableBlock)
 	} else if request.StartBlockNum < 0 && request.StopBlockNum > 0 {
 		if int64(request.StopBlockNum)+int64(request.StartBlockNum) < int64(chainFirstStreamableBlock) {

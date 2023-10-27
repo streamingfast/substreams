@@ -12,8 +12,8 @@ The USDT smart contract exposes a read function called `decimals`.
 
 ## Pre-requisites
 
-- You have some knowledge about Substreams ([modules](https://substreams.streamingfast.io/concepts-and-fundamentals/modules) and [fundamentals](https://substreams.streamingfast.io/concepts-and-fundamentals/fundamentals)).
-- You have the latest version of the [CLI](https://substreams.streamingfast.io/getting-started/installing-the-cli) installed.
+- You have some knowledge about Substreams ([modules](/concepts-and-fundamentals/modules) and [fundamentals](/concepts-and-fundamentals/fundamentals)).
+- You have the latest version of the [CLI](/getting-started/installing-the-cli) installed.
 
 ## Querying on EthScan
 

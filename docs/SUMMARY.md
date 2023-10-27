@@ -32,6 +32,7 @@
   * [Mapping Blocks](tutorials/exploring-ethereum/map_block_meta_module.md)
   * [Filtering Transactions](tutorials/exploring-ethereum/map_filter_transactions_module.md)
   * [Retrieving Events of a Smart Contract](tutorials/exploring-ethereum/map_contract_events_module.md)
+* [Making eth_calls](tutorials/eth-calls.md)
 * [Rust](tutorials/rust/overview.md)
   * [The Option struct](tutorials/rust/option.md)
   * [The Result struct](tutorials/rust/result.md)

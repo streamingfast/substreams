@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+* Fix `substreams info` cli doc field which wasn't printing any doc output
+
 ## v1.1.20
 
 * Optimized start of output stream in developer mode when start block is in reversible segment and output module does not have any stores in its dependencies.

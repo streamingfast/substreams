@@ -147,7 +147,7 @@ func runGui(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	requestConfig := &request.RequestConfig{
+	requestConfig := &request.Config{
 		ManifestPath:                manifestPath,
 		ReadFromModule:              readFromModule,
 		ProdMode:                    productionMode,

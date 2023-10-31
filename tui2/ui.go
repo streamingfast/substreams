@@ -37,7 +37,7 @@ type UI struct {
 	msgDescs      map[string]*manifest.ModuleDescriptor
 	stream        *streamui.Stream
 	replayLog     *replaylog.File
-	requestConfig *request.RequestConfig // all boilerplate to pass down to refresh
+	requestConfig *request.Config // all boilerplate to pass down to refresh
 
 	common.Common
 	currentModalFunc common.ModalUpdateFunc
@@ -49,7 +49,7 @@ type UI struct {
 	tabs             *tabs.Tabs
 }
 
-func New(reqConfig *request.RequestConfig) (*UI, error) {
+func New(reqConfig *request.Config) (*UI, error) {
 	c := common.Common{
 		Styles: styles.DefaultStyles(),
 	}

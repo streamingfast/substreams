@@ -20,14 +20,14 @@ import (
 	"github.com/streamingfast/substreams/tui2/common"
 )
 
-type NewRequestInstance *RequestInstance
+type NewRequestInstance *Instance
 
 type BlockContext struct {
 	Module   string
 	BlockNum uint64
 }
 
-type RequestConfig struct {
+type Config struct {
 	ManifestPath                string
 	ReadFromModule              bool
 	ProdMode                    bool
@@ -45,13 +45,13 @@ type RequestConfig struct {
 	Params                      []string
 }
 
-type RequestInstance struct {
+type Instance struct {
 	Stream         *streamui.Stream
 	MsgDescs       map[string]*manifest.ModuleDescriptor
 	ReplayLog      *replaylog.File
 	RequestSummary *Summary
 	Modules        *pbsubstreams.Modules
-	RefreshCtx     *RequestConfig
+	RefreshCtx     *Config
 	Graph          *manifest.ModuleGraph
 }
 
@@ -61,7 +61,6 @@ type Request struct {
 	RequestSummary     *Summary
 	Modules            *pbsubstreams.Modules
 	manifestView       viewport.Model
-	modulesViewContent string
 	traceId            string
 	resolvedStartBlock uint64
 	linearHandoffBlock uint64
@@ -70,7 +69,6 @@ type Request struct {
 }
 
 func New(c common.Common) *Request {
-
 	return &Request{
 		Common:       c,
 		manifestView: viewport.New(24, 80),
@@ -140,6 +138,7 @@ func (r *Request) renderRequestSummary() string {
 		"Production mode: ",
 		"Trace ID: ",
 		"Parallel Workers: ",
+		// TODO: add docs field
 	}
 
 	handoffStr := ""
@@ -164,10 +163,13 @@ func (r *Request) renderRequestSummary() string {
 	style := lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(r.Width - 2)
 
 	return style.Render(
-		lipgloss.NewStyle().Padding(1, 2, 1, 2).Render(lipgloss.JoinHorizontal(0.5,
-			lipgloss.JoinVertical(0, labels...),
-			lipgloss.JoinVertical(0, values...),
-		)),
+		lipgloss.NewStyle().Padding(1, 2, 1, 2).Render(
+			lipgloss.JoinHorizontal(
+				0.5,
+				lipgloss.JoinVertical(0, labels...),
+				lipgloss.JoinVertical(0, values...),
+			),
+		),
 	)
 }
 
@@ -179,22 +181,18 @@ func (r *Request) SetSize(w, h int) {
 
 func (r *Request) setModulesViewContent() {
 	content, _ := r.getViewportContent()
-	r.modulesViewContent = content
 	r.manifestView.SetContent(content)
 }
 
 func (r *Request) getViewportContent() (string, error) {
 	output := ""
 	for i, module := range r.Modules.Modules {
-
 		var moduleDoc string
-
 		var err error
-		if i <= len(r.RequestSummary.Docs)-1 {
-			moduleDoc, err = r.getViewPortDropdown(r.RequestSummary.Docs[i], module)
-			if err != nil {
-				return "", fmt.Errorf("getting module doc: %w", err)
-			}
+
+		moduleDoc, err = r.getViewPortDropdown(r.RequestSummary.ModuleDocs[i])
+		if err != nil {
+			return "", fmt.Errorf("getting module doc: %w", err)
 		}
 
 		output += fmt.Sprintf("%s\n\n", module.Name)
@@ -218,8 +216,8 @@ func (r *Request) getViewportContent() (string, error) {
 	return lipgloss.NewStyle().Padding(2, 4, 1, 4).Render(output), nil
 }
 
-func (r *Request) getViewPortDropdown(metadata *pbsubstreams.PackageMetadata, module *pbsubstreams.Module) (string, error) {
-	content, err := glamouriseModuleDoc(metadata, module)
+func (r *Request) getViewPortDropdown(moduleMetadata *pbsubstreams.ModuleMetadata) (string, error) {
+	content, err := glamorizeDoc(moduleMetadata.GetDoc())
 	if err != nil {
 		return "", fmt.Errorf("getting module docs: %w", err)
 	}
@@ -227,13 +225,13 @@ func (r *Request) getViewPortDropdown(metadata *pbsubstreams.PackageMetadata, mo
 	return content, nil
 }
 
-func glamouriseModuleDoc(metadata *pbsubstreams.PackageMetadata, module *pbsubstreams.Module) (string, error) {
+func glamorizeDoc(doc string) (string, error) {
 	markdown := ""
 
-	if metadata.GetDoc() != "" {
+	if doc != "" {
 		markdown += "# " + fmt.Sprintf("docs: \n")
 		markdown += "\n"
-		markdown += metadata.GetDoc()
+		markdown += doc
 		markdown += "\n"
 	}
 	markdown += "\n\n"
@@ -250,7 +248,7 @@ func glamouriseModuleDoc(metadata *pbsubstreams.PackageMetadata, module *pbsubst
 	return out, nil
 }
 
-func (c *RequestConfig) NewInstance() (*RequestInstance, error) {
+func (c *Config) NewInstance() (*Instance, error) {
 	graph, pkg, err := readManifest(c.ManifestPath)
 	if err != nil {
 		return nil, fmt.Errorf("graph and package setup: %w", err)
@@ -323,17 +321,17 @@ func (c *RequestConfig) NewInstance() (*RequestInstance, error) {
 		ProductionMode:  c.ProdMode,
 		InitialSnapshot: req.DebugInitialStoreSnapshotForModules,
 		Docs:            pkg.PackageMeta,
+		ModuleDocs:      pkg.ModuleMeta,
 		Params:          c.Params,
 	}
 
-	substreamRequirements := &RequestInstance{
-		stream,
-		msgDescs,
-		replayLog,
-		requestSummary,
-		pkg.Modules,
-		c,
-		graph,
+	substreamRequirements := &Instance{
+		Stream:         stream,
+		MsgDescs:       msgDescs,
+		ReplayLog:      replayLog,
+		RequestSummary: requestSummary,
+		Modules:        pkg.Modules,
+		Graph:          graph,
 	}
 
 	return substreamRequirements, nil

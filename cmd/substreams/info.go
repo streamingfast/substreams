@@ -91,7 +91,7 @@ func runInfo(cmd *cobra.Command, args []string) error {
 
 		fmt.Println("Hash:", mod.Hash)
 		if doc := mod.Documentation; doc != nil && *doc != "" {
-			fmt.Println("Doc: ", mod.Documentation)
+			fmt.Println("Doc: ", *doc)
 		}
 		fmt.Println("")
 	}

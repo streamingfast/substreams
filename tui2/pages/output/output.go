@@ -67,7 +67,7 @@ type Output struct {
 	moduleNavigator     *explorer.Navigator
 }
 
-func New(c common.Common, manifestPath string, outputModule string, config *request.RequestConfig) (*Output, error) {
+func New(c common.Common, manifestPath string, outputModule string, config *request.Config) (*Output, error) {
 	nav, err := explorer.New(config.OutputModule, c, explorer.WithManifestFilePath(config.ManifestPath))
 	if err != nil {
 		return nil, err

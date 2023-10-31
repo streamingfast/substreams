@@ -8,5 +8,6 @@ type Summary struct {
 	ProductionMode  bool
 	InitialSnapshot []string
 	Docs            []*pbsubstreams.PackageMetadata
+	ModuleDocs      []*pbsubstreams.ModuleMetadata
 	Params          []string
 }

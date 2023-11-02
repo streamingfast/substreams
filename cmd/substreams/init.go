@@ -217,7 +217,12 @@ func renderProjectFilesIn(project templates.Project, absoluteProjectDir string) 
 			return fmt.Errorf("create directory %q: %w", directory, err)
 		}
 
-		if err := os.WriteFile(file, content, os.ModePerm); err != nil {
+		if err := os.WriteFile(file, content, 0644); err != nil {
+			// remove directory, we want a complete e2e file generation
+			e := os.RemoveAll(directory)
+			if e != nil {
+				return fmt.Errorf("removing directory %s: %w and write file: %w", directory, e, err)
+			}
 			return fmt.Errorf("write file: %w", err)
 		}
 	}

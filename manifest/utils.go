@@ -77,6 +77,8 @@ var HardcodedEndpoints = map[string]string{
 	"arbitrum":     "arb-one.streamingfast.io:443",
 	"arb":          "arb-one.streamingfast.io:443",
 	"arb-one":      "arb-one.streamingfast.io:443",
+	"solana":       "mainnet.sol.streamingfast.io:443",
+	"sol":          "mainnet.sol.streamingfast.io:443",
 
 	//"antelope": "",
 }

@@ -204,6 +204,8 @@ func (s *extendedStats) updateDurations() {
 }
 
 func (s *Stats) RecordInitializationComplete() {
+	s.Lock()
+	defer s.Unlock()
 	s.initDuration = time.Since(s.startTime)
 }
 
@@ -372,6 +374,8 @@ func (s *Stats) RecordModuleWasmStoreDeletePrefix(moduleName string, sizeBytes u
 }
 
 func (s *Stats) RecordBlock(ref bstream.BlockRef) {
+	s.Lock()
+	defer s.Unlock()
 	s.blockRate.Add(1)
 	s.localProcessedBlockCount += 1
 }
@@ -520,7 +524,7 @@ func cloneCallMetrics(in []*pbssinternal.ExternalCallMetric) []*pbssinternal.Ext
 	return out
 }
 
-func (s *Stats) Stage(module string) (uint32, *pbsubstreamsrpc.Stage) {
+func (s *Stats) stage(module string) (uint32, *pbsubstreamsrpc.Stage) {
 	for i, ss := range s.stages {
 		for _, mod := range ss.Modules {
 			if mod == module {
@@ -532,17 +536,9 @@ func (s *Stats) Stage(module string) (uint32, *pbsubstreamsrpc.Stage) {
 	return 0, nil
 }
 
-func (s *Stats) processedBlocksFromJobs(moduleName string) (count uint64) {
-	stageIdx, _ := s.Stage(moduleName)
-	for _, job := range s.runningJobs {
-		if job.Stage >= stageIdx { // higher stages will RE-RUN that module, so they include it too
-			count += job.ProcessedBlocks
-		}
-	}
-	return
-}
-
 func (s *Stats) RemoteBytesConsumption() (read uint64, written uint64) {
+	s.Lock()
+	defer s.Unlock()
 	read = s.completedJobsBytesRead
 	written = s.completedJobsBytesWritten
 	for _, j := range s.runningJobs {
@@ -577,7 +573,7 @@ func (s *Stats) AggregatedModulesStats() []*pbsubstreamsrpc.ModuleStats {
 
 		mergeMixedModuleStats(out[i], s.runningJobs.ModuleStats(k))
 		mergeMixedModuleStats(out[i], s.completedJobsStats[k])
-		_, stage := s.Stage(v.Name)
+		_, stage := s.stage(v.Name)
 		if stage != nil { // will be nil for mappers
 			if ranges := stage.CompletedRanges; ranges != nil {
 				out[i].HighestContiguousBlock = ranges[0].EndBlock
@@ -590,6 +586,8 @@ func (s *Stats) AggregatedModulesStats() []*pbsubstreamsrpc.ModuleStats {
 }
 
 func (s *Stats) LogAndClose() {
+	s.Lock()
+	defer s.Unlock()
 	s.blockRate.SyncNow()
 	s.blockRate.Stop()
 	s.logger.Info("substreams request stats", s.getZapFields()...)
@@ -597,8 +595,6 @@ func (s *Stats) LogAndClose() {
 
 // getZapFields should be called while Stats is locked
 func (s *Stats) getZapFields() []zap.Field {
-	s.Lock()
-	defer s.Unlock()
 	// Logging fields order is important as it affects the final rendering, we carefully ordered
 	// them so the development logs looks nicer.
 	tier := "tier1"

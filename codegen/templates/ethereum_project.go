@@ -364,30 +364,30 @@ func generateFieldClickhouseTypes(fieldType eth.SolidityType) string {
 
 	case eth.SignedIntegerType:
 		switch {
-		case v.ByteSize <= 8:
+		case v.BitsSize <= 8:
 			return "Int8"
-		case v.ByteSize <= 16:
+		case v.BitsSize <= 16:
 			return "Int16"
-		case v.ByteSize <= 32:
+		case v.BitsSize <= 32:
 			return "Int32"
-		case v.ByteSize <= 64:
+		case v.BitsSize <= 64:
 			return "Int64"
-		case v.ByteSize <= 128:
+		case v.BitsSize <= 128:
 			return "Int128"
 		}
 		return "Int256"
 
 	case eth.UnsignedIntegerType:
 		switch {
-		case v.ByteSize <= 8:
+		case v.BitsSize <= 8:
 			return "UInt8"
-		case v.ByteSize <= 16:
+		case v.BitsSize <= 16:
 			return "UInt16"
-		case v.ByteSize <= 32:
+		case v.BitsSize <= 32:
 			return "UInt32"
-		case v.ByteSize <= 64:
+		case v.BitsSize <= 64:
 			return "UInt64"
-		case v.ByteSize <= 128:
+		case v.BitsSize <= 128:
 			return "UInt128"
 		}
 		return "UInt256"

@@ -1,7 +1,6 @@
 package docker
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
@@ -227,18 +226,36 @@ func (e *DockerEngine) Info(deploymentID string, zlog *zap.Logger) (pbsinksvc.De
 		return pbsinksvc.DeploymentStatus_UNKNOWN, reasonInternalError, nil, nil, nil, fmt.Errorf("getting status from `docker compose ps` command: %q, %w", out, err)
 	}
 
-	var status pbsinksvc.DeploymentStatus
+	var line []byte
+	// If the output does not start with a '[', add some
+	if !bytes.HasPrefix(out, []byte("[")) {
+		// Split the output by lines
+		lines := bytes.Split(out, []byte("\n"))
 
-	sc := bufio.NewScanner(bytes.NewReader(out))
-	if !sc.Scan() {
-		return 0, reasonInternalError, nil, nil, nil, fmt.Errorf("no output from command")
+		// Remove empty lines
+		var cleanedLines [][]byte
+		for _, l := range lines {
+			if len(l) > 0 {
+				cleanedLines = append(cleanedLines, l)
+			}
+		}
+
+		// Join the cleaned lines with commas
+		line = bytes.Join(cleanedLines, []byte(","))
+
+		// Wrap the result in square brackets
+		line = append([]byte{'['}, line...)
+		line = append(line, ']')
+	} else {
+		line = out
 	}
-	line := sc.Bytes()
 
 	var outputs []*dockerComposePSOutput
 	if err := json.Unmarshal(line, &outputs); err != nil {
 		return 0, reasonInternalError, nil, nil, nil, fmt.Errorf("unmarshalling docker output: %w", err)
 	}
+
+	var status pbsinksvc.DeploymentStatus
 
 	info, err := e.readDeploymentInfo(deploymentID)
 	if err != nil {
@@ -546,6 +563,15 @@ func (e *DockerEngine) createManifest(deploymentID string, token string, pkg *pb
 		postgraphile, motd := e.newPostgraphile(deploymentID, dbServiceName)
 		servicesDesc[postgraphile.Name] = motd
 		services = append(services, postgraphile)
+	}
+
+	if sinkConfig.DbtConfig != nil && sinkConfig.DbtConfig.Files != nil {
+		dbt, motd, err := e.newPostgresDBT(deploymentID, dbServiceName, sinkConfig.DbtConfig)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("creating dbt deployment: %w", err)
+		}
+		servicesDesc[dbt.Name] = motd
+		services = append(services, dbt)
 	}
 
 	for _, svc := range services {

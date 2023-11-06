@@ -599,8 +599,8 @@ github.com/streamingfast/sf-tracing v0.0.0-20230616174903-cd2ade641ca9 h1:YRwpVv
 github.com/streamingfast/sf-tracing v0.0.0-20230616174903-cd2ade641ca9/go.mod h1:ktzt1BUj3GF+SKQHEmn3ShryJ7y87JeCHtaTGaDVATs=
 github.com/streamingfast/shutter v1.5.0 h1:NpzDYzj0HVpSiDJVO/FFSL6QIK/YKOxY0gJAtyaTOgs=
 github.com/streamingfast/shutter v1.5.0/go.mod h1:B/T6efqdeMGbGwjzPS1ToXzYZI4kDzI5/u4I+7qbjY8=
-github.com/streamingfast/substreams-sink-sql v1.0.1-0.20231024141225-6af37a8c8567 h1:mm8rkuvFMOmBg9lT8S65I5F322ORDa/MdaNLE8THpAQ=
-github.com/streamingfast/substreams-sink-sql v1.0.1-0.20231024141225-6af37a8c8567/go.mod h1:vi9cdOke79ezfUZVAJHJY7Y/nOsmHXkRh0++Ze9hZNk=
+github.com/streamingfast/substreams-sink-sql v1.0.1-0.20231102141400-56bec6ccf2e3 h1:X+sIFo//ffQKHJbIAkhYa657gYZi/KPWf9phBwUzKrg=
+github.com/streamingfast/substreams-sink-sql v1.0.1-0.20231102141400-56bec6ccf2e3/go.mod h1:vi9cdOke79ezfUZVAJHJY7Y/nOsmHXkRh0++Ze9hZNk=
 github.com/streamingfast/validator v0.0.0-20210812013448-b9da5752ce14 h1:/HCMj7plThWPFXsj/O8f+zDIAtXciwP4rK6tb+9UvPQ=
 github.com/streamingfast/validator v0.0.0-20210812013448-b9da5752ce14/go.mod h1:t4h97mWfTs6v0zjEFuGDOoW5wLtu9+ttegIx99i7gsM=
 github.com/streamingfast/wasmtime-go/v4 v4.0.0-freemem3 h1:raJHR0JWgYiSyX0vZ3leRK/TkNcn4ZUGTf+d64g48KQ=

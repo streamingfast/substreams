@@ -583,6 +583,12 @@ func (e *DockerEngine) createManifest(deploymentID string, token string, pkg *pb
 		}
 	}
 
+	if sinkConfig.RestFrontend != nil && sinkConfig.RestFrontend.Enabled {
+		rest, motd := e.newRestFrontend(deploymentID, dbServiceName)
+		servicesDesc[rest.Name] = motd
+		services = append(services, rest)
+	}
+
 	for _, svc := range services {
 		for _, port := range svc.Ports {
 			usedPorts = append(usedPorts, port.Published)

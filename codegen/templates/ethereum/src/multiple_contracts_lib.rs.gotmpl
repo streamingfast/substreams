@@ -59,7 +59,7 @@ fn db_{{ $contract.GetName }}_out(events: &contract::Events, tables: &mut Databa
     {{- $rust := $event.Rust }}
     events.{{ $contract.GetName }}_{{ $rust.ProtoOutputModuleFieldName }}.iter().for_each(|evt| {
         tables
-            .create_row("{{ if eq $numberOfContracts 1 }}{{ $rust.TableChangeEntityName }}{{ else }}{{ $contract.GetName }}_{{ $rust.TableChangeEntityName }}{{ end }}", [("evt_tx_hash", evt.evt_tx_hash),("evt_index", evt.evt_index.to_string())])
+            .create_row("{{ if eq $numberOfContracts 1 }}{{ $rust.TableChangeEntityName }}{{ else }}{{ $contract.GetName }}_{{ $rust.TableChangeEntityName }}{{ end }}", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
             {{- $numberOfAttributes := len $rust.ProtoFieldTableChangesMap }}{{ if eq $numberOfAttributes 0 }};{{ end }}

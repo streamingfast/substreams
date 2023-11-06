@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Changed
+* Codegen: substreams-database-change to v1.3, properly generates primary key to support chain reorgs in postgres sink.
+
 ### Fixed
 * Fix `substreams info` cli doc field which wasn't printing any doc output
 

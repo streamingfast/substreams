@@ -60,9 +60,7 @@ fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::error
     {{- $rust := $event.Rust }}
     events.{{ $rust.ProtoOutputModuleFieldName }}.into_iter().for_each(|evt| {
         tables
-            .create_row("{{ $rust.TableChangeEntityName }}", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
-            .set("evt_tx_hash", evt.evt_tx_hash)
-            .set("evt_index", evt.evt_index)
+            .create_row("{{ $rust.TableChangeEntityName }}", [("evt_tx_hash", evt.evt_tx_hash),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.unwrap())
             .set("evt_block_number", evt.evt_block_number)
             {{- $numberOfAttributes := len $rust.ProtoFieldTableChangesMap }}{{ if eq $numberOfAttributes 0 }};{{ end }}

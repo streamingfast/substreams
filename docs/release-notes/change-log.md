@@ -8,6 +8,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 * Codegen: substreams-database-change to v1.3, properly generates primary key to support chain reorgs in postgres sink.
+* Sink server: support for deploying sql postgres sinks with DBT configuration, so that users can deploy their own DBT models.
+  Example manifest file segment:
+  ```yaml
+  [...]
+  
+  sink:
+    module: db_out
+    type: sf.substreams.sink.sql.v1.Service
+    config:
+      schema: "./schema.sql"
+      wire_protocol_access: true
+      postgraphile_frontend:
+        enabled: true
+      pgweb_frontend:
+        enabled: true
+      dbt:
+        files: "./dbt"
+  ```
+  where "./dbt" is a folder containing the dbt project.
+
+* Sink server: added REST interface support for clickhouse sinks.
+  Example manifest file segment:
+  ```yaml
+  [...]
+    
+  sink:
+    module: db_out
+    type: sf.substreams.sink.sql.v1.Service
+    config:
+      schema: "./schema.clickhouse.sql"
+      wire_protocol_access: true
+      engine: clickhouse
+      postgraphile_frontend:
+        enabled: false
+      pgweb_frontend:
+        enabled: false
+      rest_frontend:
+        enabled: true
+  ```
 
 ### Fixed
 * Fix `substreams info` cli doc field which wasn't printing any doc output
@@ -31,7 +70,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Fixed stream ending immediately in dev mode when start/end blocks are both 0.
 * Sink-serve: fix missing output details on docker-compose apply errors
 * Codegen: Fixed pluralized entity created for db_out and graph_out
-* 
+
 ## v1.1.18
 
 ### Fixed

@@ -439,7 +439,7 @@ func (r *Reader) newPkgFromManifest(manif *Manifest) (*pbsubstreams.Package, err
 	converter := newManifestConverter(r.currentInput, r.skipSourceCodeImportValidation)
 	pkg, descriptors, dynMessage, err := converter.Convert(manif)
 	if err != nil {
-		return nil, fmt.Errorf("unable to convert manifest to package: %w", err)
+		return nil, err
 	}
 	r.sinkConfigDynamicMessage = dynMessage
 

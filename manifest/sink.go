@@ -44,21 +44,21 @@ func (r *manifestConverter) loadSinkConfig(pkg *pbssv1.Package, m *Manifest) err
 
 	jsonConfig, err := convertYAMLtoJSONCompat(m.Sink.Config, m.resolvePath, "", fieldResolver(msgDesc))
 	if err != nil {
-		return fmt.Errorf("sink: config: converting to json: %w", err)
+		return fmt.Errorf("converting YAML to JSON: %w", err)
 	}
 	jsonConfigBytes, err := json.Marshal(jsonConfig)
 	if err != nil {
-		return fmt.Errorf("sink: config: error marshalling to json: %w", err)
+		return fmt.Errorf("marshalling config to JSON: %w", err)
 	}
 
 	dynConf := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
 	if err := dynConf.UnmarshalJSON(jsonConfigBytes); err != nil {
-		return fmt.Errorf("sink: config: encoding json into protobuf message: %w", err)
+		return fmt.Errorf("cannot unmarshal the SinkConfig into type %s. Is your YAML file valid ? %w", m.Sink.Type, err)
 	}
 	r.sinkConfigDynamicMessage = dynConf
 	pbBytes, err := dynConf.Marshal()
 	if err != nil {
-		return fmt.Errorf("sink: config: encoding protobuf from dynamic message: %w", err)
+		return fmt.Errorf("encoding protobuf from dynamic message: %w", err)
 	}
 	pkg.SinkConfig = &anypb.Any{
 		TypeUrl: m.Sink.Type,

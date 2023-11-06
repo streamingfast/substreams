@@ -107,31 +107,23 @@ func (e *DockerEngine) newPostgresDBT(deploymentID string, serviceName string, c
 		Volumes: []types.ServiceVolumeConfig{
 			{
 				Type:   "bind",
-				Source: mustAbsPath(filepath.Join(e.dir, deploymentID, "data", "profile")),
+				Source: "./data/profile",
 				Target: "/opt/data/profile",
 			},
 			{
 				Type:   "bind",
-				Source: mustAbsPath(filepath.Join(e.dir, deploymentID, "data", "dbt")),
+				Source: "./data/dbt",
 				Target: "/opt/data/dbt",
 			},
 			{
 				Type:   "bind",
-				Source: mustAbsPath(filepath.Join(e.dir, deploymentID, "data", "scripts")),
+				Source: "./data/scripts",
 				Target: "/opt/data/scripts",
 			},
 		},
 	}
 
 	return conf, name, nil
-}
-
-func mustAbsPath(p string) string {
-	absPath, err := filepath.Abs(p)
-	if err != nil {
-		panic(err)
-	}
-	return absPath
 }
 
 func getFiles(archive []byte) (map[string][]byte, error) {

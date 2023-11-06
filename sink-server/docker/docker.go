@@ -524,6 +524,8 @@ func (e *DockerEngine) createManifest(deploymentID string, token string, pkg *pb
 	var services []types.ServiceConfig
 
 	var dbServiceName string
+	var isPostgres, isClickhouse bool
+
 	switch sinkConfig.Engine {
 	case pbsql.Service_clickhouse:
 		db, dbMotd, err := e.newClickhouse(deploymentID, pkg)
@@ -534,6 +536,7 @@ func (e *DockerEngine) createManifest(deploymentID string, token string, pkg *pb
 		servicesDesc[db.Name] = dbMotd
 		runMeFirst = append(runMeFirst, db.Name)
 		services = append(services, db)
+		isClickhouse = true
 
 	case pbsql.Service_postgres, pbsql.Service_unset:
 		pg, pgMotd, err := e.newPostgres(deploymentID, pkg)
@@ -544,6 +547,7 @@ func (e *DockerEngine) createManifest(deploymentID string, token string, pkg *pb
 		servicesDesc[pg.Name] = pgMotd
 		runMeFirst = append(runMeFirst, pg.Name)
 		services = append(services, pg)
+		isPostgres = true
 	}
 
 	sink, sinkMotd, err := e.newSink(deploymentID, dbServiceName, pkg, sinkConfig)
@@ -566,12 +570,17 @@ func (e *DockerEngine) createManifest(deploymentID string, token string, pkg *pb
 	}
 
 	if sinkConfig.DbtConfig != nil && sinkConfig.DbtConfig.Files != nil {
-		dbt, motd, err := e.newPostgresDBT(deploymentID, dbServiceName, sinkConfig.DbtConfig)
-		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("creating dbt deployment: %w", err)
+		if isPostgres {
+			dbt, motd, err := e.newPostgresDBT(deploymentID, dbServiceName, sinkConfig.DbtConfig)
+			if err != nil {
+				return nil, nil, nil, nil, fmt.Errorf("creating dbt deployment: %w", err)
+			}
+			servicesDesc[dbt.Name] = motd
+			services = append(services, dbt)
 		}
-		servicesDesc[dbt.Name] = motd
-		services = append(services, dbt)
+		if isClickhouse {
+			//todo!
+		}
 	}
 
 	for _, svc := range services {

@@ -8,7 +8,7 @@ require (
 	github.com/jhump/protoreflect v1.14.0
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
-	github.com/streamingfast/bstream v0.0.2-0.20230731165201-639b4f347707
+	github.com/streamingfast/bstream v0.0.2-0.20230829131224-b9272048dc6a
 	github.com/streamingfast/cli v0.0.4-0.20230825151644-8cc84512cd80
 	github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1
 	github.com/streamingfast/dgrpc v0.0.0-20230929132851-893fc52687fa
@@ -60,7 +60,7 @@ require (
 	github.com/streamingfast/eth-go v0.0.0-20230410173454-433bd8803da1
 	github.com/streamingfast/sf-tracing v0.0.0-20230616174903-cd2ade641ca9
 	github.com/streamingfast/shutter v1.5.0
-	github.com/streamingfast/substreams-sink-sql v1.0.1-0.20231102141400-56bec6ccf2e3
+	github.com/streamingfast/substreams-sink-sql v1.0.1-0.20231107184906-39740d2091cd
 	github.com/tetratelabs/wazero v1.1.0
 	github.com/tidwall/pretty v1.2.1
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.44.0

@@ -38,8 +38,13 @@ func (e *DockerEngine) newPostgresDBT(deploymentID string, serviceName string, c
 		return conf, "", fmt.Errorf("unable to create dbt_project.yml file: %w", err)
 	}
 
+	runInterval := config.GetRunIntervalSeconds()
+	if runInterval == 0 {
+		runInterval = 300 //default to 5 minutes
+	}
+
 	//create dbt start script
-	dbtStartScript := createDbtStartScript()
+	dbtStartScript := createDbtStartScript(runInterval)
 
 	//create a volume for the files
 	profileFolder := filepath.Join(e.dir, deploymentID, "data", "profile")
@@ -191,15 +196,15 @@ func createDbtProfileYml(profileName string) ([]byte, error) {
 	return []byte(data), nil
 }
 
-func createDbtStartScript() []byte {
-	return []byte(`#!/bin/bash
+func createDbtStartScript(runInterval int32) []byte {
+	return []byte(fmt.Sprintf(`#!/bin/bash
 
 # Set the working directory
 cd /opt/data/dbt
 
 while true; do
 	dbt run --profiles-dir /opt/data/profile --target dev
-    sleep 60  # Sleep for 60 seconds (1 minute)
+    sleep %d  
 done
-`)
+`, runInterval))
 }

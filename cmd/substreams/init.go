@@ -210,7 +210,7 @@ func renderProjectFilesIn(project templates.Project, absoluteProjectDir string) 
 	}
 
 	for relativeFile, content := range files {
-		file := path.Join(absoluteProjectDir, strings.ReplaceAll(relativeFile, "/", string(os.PathSeparator)))
+		file := path.Join(absoluteProjectDir, relativeFile)
 
 		directory := path.Dir(file)
 		if err := os.MkdirAll(directory, os.ModePerm); err != nil {

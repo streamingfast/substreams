@@ -7,7 +7,6 @@ import (
 )
 
 func (e *DockerEngine) newPostgraphile(deploymentID string, pgService string) (conf types.ServiceConfig, motd string) {
-
 	name := fmt.Sprintf("%s-postgraphile", deploymentID)
 	localPort := uint32(3000) // TODO: assign dynamically
 

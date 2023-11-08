@@ -16,14 +16,14 @@ import (
 	"sync"
 	"time"
 
-	"go.uber.org/zap"
-	"gopkg.in/yaml.v3"
-
-	types "github.com/docker/cli/cli/compose/types"
 	pbsql "github.com/streamingfast/substreams-sink-sql/pb/sf/substreams/sink/sql/v1"
 	"github.com/streamingfast/substreams/manifest"
 	pbsinksvc "github.com/streamingfast/substreams/pb/sf/substreams/sink/service/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+
+	types "github.com/docker/cli/cli/compose/types"
+	"go.uber.org/zap"
+	"gopkg.in/yaml.v3"
 )
 
 type DockerEngine struct {
@@ -95,7 +95,6 @@ func (e *DockerEngine) CheckVersion() error {
 }
 
 func (e *DockerEngine) writeDeploymentInfo(deploymentID string, usedPorts []uint32, runMeFirst []string, svcInfo map[string]string, pkg *pbsubstreams.Package) error {
-
 	pkgMeta := pkg.PackageMeta[0]
 	hash, err := getModuleHash(pkg.SinkModule, pkg)
 	if err != nil {
@@ -384,7 +383,6 @@ func (e *DockerEngine) list(zlog *zap.Logger) (out []*pbsinksvc.DeploymentWithSt
 }
 
 func (e *DockerEngine) Resume(deploymentID string, _ pbsinksvc.DeploymentStatus, zlog *zap.Logger) (string, error) {
-
 	if e.otherDeploymentIsActive(deploymentID, zlog) {
 		return "", fmt.Errorf("this substreams-sink engine only supports a single active deployment. Stop any active sink before launching another one")
 	}

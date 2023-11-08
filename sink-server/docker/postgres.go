@@ -11,15 +11,13 @@ import (
 )
 
 func (e *DockerEngine) newPostgres(deploymentID string, pkg *pbsubstreams.Package) (types.ServiceConfig, string, error) {
-
 	name := fmt.Sprintf("%s-postgres", deploymentID)
+	localPort := uint32(5432) // TODO: assign dynamically
 
 	dataFolder := filepath.Join(e.dir, deploymentID, "data", "postgres")
 	if err := os.MkdirAll(dataFolder, 0755); err != nil {
 		return types.ServiceConfig{}, "", fmt.Errorf("creating folder %q: %w", dataFolder, err)
 	}
-
-	localPort := uint32(5432) // TODO: assign dynamically
 
 	conf := types.ServiceConfig{
 		Name:          name,

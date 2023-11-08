@@ -7,7 +7,6 @@ import (
 )
 
 func (e *DockerEngine) newRestFrontend(deploymentID string, dbService string) (conf types.ServiceConfig, motd string) {
-
 	name := fmt.Sprintf("%s-rest", deploymentID)
 	localPort := uint32(3000) // TODO: assign dynamically
 
@@ -35,5 +34,4 @@ func (e *DockerEngine) newRestFrontend(deploymentID string, dbService string) (c
 	)
 
 	return conf, motd
-
 }

@@ -4,16 +4,20 @@ import (
 	"archive/zip"
 	"bytes"
 	"fmt"
-	"github.com/docker/cli/cli/compose/types"
-	pbsql "github.com/streamingfast/substreams-sink-sql/pb/sf/substreams/sink/sql/v1"
-	"gopkg.in/yaml.v2"
 	"io"
 	"os"
 	"path/filepath"
 	"time"
+
+	pbsql "github.com/streamingfast/substreams-sink-sql/pb/sf/substreams/sink/sql/v1"
+
+	"github.com/docker/cli/cli/compose/types"
+	"gopkg.in/yaml.v2"
 )
 
 func (e *DockerEngine) newDBT(deploymentID string, serviceName string, config *pbsql.DBTConfig, engine string) (types.ServiceConfig, string, error) {
+	name := fmt.Sprintf("%s-dbt", deploymentID)
+
 	var conf types.ServiceConfig
 
 	dbtFiles, err := getFiles(config.Files)
@@ -93,7 +97,6 @@ func (e *DockerEngine) newDBT(deploymentID string, serviceName string, config *p
 		return conf, "", fmt.Errorf("chmod +x start script: %w", err)
 	}
 
-	name := fmt.Sprintf("%s-dbt", deploymentID)
 	conf = types.ServiceConfig{
 		Name:          name,
 		ContainerName: name,

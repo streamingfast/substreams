@@ -13,7 +13,6 @@ import (
 )
 
 func (e *DockerEngine) newSink(deploymentID string, dbService string, pkg *pbsubstreams.Package, sinkConfig *pbsql.Service) (conf types.ServiceConfig, motd string, err error) {
-
 	name := sinkServiceName(deploymentID)
 
 	configFolder := filepath.Join(e.dir, deploymentID, "config", "sink")

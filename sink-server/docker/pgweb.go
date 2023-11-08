@@ -7,7 +7,6 @@ import (
 )
 
 func (e *DockerEngine) newPGWeb(deploymentID string, dbService string) (conf types.ServiceConfig, motd string) {
-
 	name := fmt.Sprintf("%s-pgweb", deploymentID)
 	localPort := uint32(8081) // TODO: assign dynamically
 

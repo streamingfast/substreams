@@ -11,7 +11,6 @@ import (
 )
 
 func (e *DockerEngine) newClickhouse(deploymentID string, pkg *pbsubstreams.Package) (types.ServiceConfig, string, error) {
-
 	name := fmt.Sprintf("%s-clickhouse", deploymentID)
 
 	dataFolder := filepath.Join(e.dir, deploymentID, "data", "clickhouse")

@@ -413,7 +413,7 @@ fn db_moonbird_out(events: &contract::Events, tables: &mut DatabaseChangeTables)
     // Loop over all the abis events to create table changes
     events.moonbird_approvals.iter().for_each(|evt| {
         tables
-            .create_row("moonbird_approval", [("evt_tx_hash", evt.evt_tx_hash),("evt_index", evt.evt_index.to_string())])
+            .create_row("moonbird_approval", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
             .set("approved", Hex(&evt.approved).to_string())
@@ -422,7 +422,7 @@ fn db_moonbird_out(events: &contract::Events, tables: &mut DatabaseChangeTables)
     });
     events.moonbird_approval_for_alls.iter().for_each(|evt| {
         tables
-            .create_row("moonbird_approval_for_all", [("evt_tx_hash", evt.evt_tx_hash),("evt_index", evt.evt_index.to_string())])
+            .create_row("moonbird_approval_for_all", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
             .set("approved", evt.approved)
@@ -431,21 +431,21 @@ fn db_moonbird_out(events: &contract::Events, tables: &mut DatabaseChangeTables)
     });
     events.moonbird_expelleds.iter().for_each(|evt| {
         tables
-            .create_row("moonbird_expelled", [("evt_tx_hash", evt.evt_tx_hash),("evt_index", evt.evt_index.to_string())])
+            .create_row("moonbird_expelled", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
             .set("token_id", BigDecimal::from_str(&evt.token_id).unwrap());
     });
     events.moonbird_nesteds.iter().for_each(|evt| {
         tables
-            .create_row("moonbird_nested", [("evt_tx_hash", evt.evt_tx_hash),("evt_index", evt.evt_index.to_string())])
+            .create_row("moonbird_nested", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
             .set("token_id", BigDecimal::from_str(&evt.token_id).unwrap());
     });
     events.moonbird_ownership_transferreds.iter().for_each(|evt| {
         tables
-            .create_row("moonbird_ownership_transferred", [("evt_tx_hash", evt.evt_tx_hash),("evt_index", evt.evt_index.to_string())])
+            .create_row("moonbird_ownership_transferred", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
             .set("new_owner", Hex(&evt.new_owner).to_string())
@@ -453,14 +453,14 @@ fn db_moonbird_out(events: &contract::Events, tables: &mut DatabaseChangeTables)
     });
     events.moonbird_pauseds.iter().for_each(|evt| {
         tables
-            .create_row("moonbird_paused", [("evt_tx_hash", evt.evt_tx_hash),("evt_index", evt.evt_index.to_string())])
+            .create_row("moonbird_paused", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
             .set("account", Hex(&evt.account).to_string());
     });
     events.moonbird_refunds.iter().for_each(|evt| {
         tables
-            .create_row("moonbird_refund", [("evt_tx_hash", evt.evt_tx_hash),("evt_index", evt.evt_index.to_string())])
+            .create_row("moonbird_refund", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
             .set("amount", BigDecimal::from_str(&evt.amount).unwrap())
@@ -468,7 +468,7 @@ fn db_moonbird_out(events: &contract::Events, tables: &mut DatabaseChangeTables)
     });
     events.moonbird_revenues.iter().for_each(|evt| {
         tables
-            .create_row("moonbird_revenue", [("evt_tx_hash", evt.evt_tx_hash),("evt_index", evt.evt_index.to_string())])
+            .create_row("moonbird_revenue", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
             .set("amount", BigDecimal::from_str(&evt.amount).unwrap())
@@ -477,7 +477,7 @@ fn db_moonbird_out(events: &contract::Events, tables: &mut DatabaseChangeTables)
     });
     events.moonbird_role_admin_changeds.iter().for_each(|evt| {
         tables
-            .create_row("moonbird_role_admin_changed", [("evt_tx_hash", evt.evt_tx_hash),("evt_index", evt.evt_index.to_string())])
+            .create_row("moonbird_role_admin_changed", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
             .set("new_admin_role", Hex(&evt.new_admin_role).to_string())
@@ -486,7 +486,7 @@ fn db_moonbird_out(events: &contract::Events, tables: &mut DatabaseChangeTables)
     });
     events.moonbird_role_granteds.iter().for_each(|evt| {
         tables
-            .create_row("moonbird_role_granted", [("evt_tx_hash", evt.evt_tx_hash),("evt_index", evt.evt_index.to_string())])
+            .create_row("moonbird_role_granted", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
             .set("account", Hex(&evt.account).to_string())
@@ -495,7 +495,7 @@ fn db_moonbird_out(events: &contract::Events, tables: &mut DatabaseChangeTables)
     });
     events.moonbird_role_revokeds.iter().for_each(|evt| {
         tables
-            .create_row("moonbird_role_revoked", [("evt_tx_hash", evt.evt_tx_hash),("evt_index", evt.evt_index.to_string())])
+            .create_row("moonbird_role_revoked", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
             .set("account", Hex(&evt.account).to_string())
@@ -504,7 +504,7 @@ fn db_moonbird_out(events: &contract::Events, tables: &mut DatabaseChangeTables)
     });
     events.moonbird_transfers.iter().for_each(|evt| {
         tables
-            .create_row("moonbird_transfer", [("evt_tx_hash", evt.evt_tx_hash),("evt_index", evt.evt_index.to_string())])
+            .create_row("moonbird_transfer", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
             .set("from", Hex(&evt.from).to_string())
@@ -513,14 +513,14 @@ fn db_moonbird_out(events: &contract::Events, tables: &mut DatabaseChangeTables)
     });
     events.moonbird_unnesteds.iter().for_each(|evt| {
         tables
-            .create_row("moonbird_unnested", [("evt_tx_hash", evt.evt_tx_hash),("evt_index", evt.evt_index.to_string())])
+            .create_row("moonbird_unnested", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
             .set("token_id", BigDecimal::from_str(&evt.token_id).unwrap());
     });
     events.moonbird_unpauseds.iter().for_each(|evt| {
         tables
-            .create_row("moonbird_unpaused", [("evt_tx_hash", evt.evt_tx_hash),("evt_index", evt.evt_index.to_string())])
+            .create_row("moonbird_unpaused", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
             .set("account", Hex(&evt.account).to_string());
@@ -530,7 +530,7 @@ fn db_bayc_out(events: &contract::Events, tables: &mut DatabaseChangeTables) {
     // Loop over all the abis events to create table changes
     events.bayc_approvals.iter().for_each(|evt| {
         tables
-            .create_row("bayc_approval", [("evt_tx_hash", evt.evt_tx_hash),("evt_index", evt.evt_index.to_string())])
+            .create_row("bayc_approval", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
             .set("approved", Hex(&evt.approved).to_string())
@@ -539,7 +539,7 @@ fn db_bayc_out(events: &contract::Events, tables: &mut DatabaseChangeTables) {
     });
     events.bayc_approval_for_alls.iter().for_each(|evt| {
         tables
-            .create_row("bayc_approval_for_all", [("evt_tx_hash", evt.evt_tx_hash),("evt_index", evt.evt_index.to_string())])
+            .create_row("bayc_approval_for_all", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
             .set("approved", evt.approved)
@@ -548,7 +548,7 @@ fn db_bayc_out(events: &contract::Events, tables: &mut DatabaseChangeTables) {
     });
     events.bayc_ownership_transferreds.iter().for_each(|evt| {
         tables
-            .create_row("bayc_ownership_transferred", [("evt_tx_hash", evt.evt_tx_hash),("evt_index", evt.evt_index.to_string())])
+            .create_row("bayc_ownership_transferred", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
             .set("new_owner", Hex(&evt.new_owner).to_string())
@@ -556,7 +556,7 @@ fn db_bayc_out(events: &contract::Events, tables: &mut DatabaseChangeTables) {
     });
     events.bayc_transfers.iter().for_each(|evt| {
         tables
-            .create_row("bayc_transfer", [("evt_tx_hash", evt.evt_tx_hash),("evt_index", evt.evt_index.to_string())])
+            .create_row("bayc_transfer", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
             .set("from", Hex(&evt.from).to_string())

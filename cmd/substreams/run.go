@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
+
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/substreams/client"
@@ -13,7 +15,6 @@ import (
 	"github.com/streamingfast/substreams/tui"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/metadata"
-	"io"
 )
 
 func init() {
@@ -68,7 +69,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	outputMode := mustGetString(cmd, "output")
 
-	manifestReader, err := manifest.NewReader(manifestPath)
+	manifestReader, err := manifest.NewReader(manifestPath, getReaderOpts(cmd)...)
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
 	}

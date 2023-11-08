@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/streamingfast/cli"
+	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/substreams/info"
 
 	"github.com/spf13/cobra"
@@ -49,7 +50,7 @@ func runInfo(cmd *cobra.Command, args []string) error {
 
 	outputSinkconfigFilesPath := mustGetString(cmd, "output-sinkconfig-files-path")
 
-	info, err := info.Extended(manifestPath, outputModule)
+	info, err := info.Extended(manifestPath, outputModule, sflags.MustGetBool(cmd, "skip-package-validation"))
 	if err != nil {
 		return err
 	}

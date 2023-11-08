@@ -33,7 +33,7 @@ var deployCmd = &cobra.Command{
 func deployE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
-	reader, err := manifest.NewReader(args[0])
+	reader, err := manifest.NewReader(args[0], getReaderOpts(cmd)...)
 	if err != nil {
 		return err
 	}

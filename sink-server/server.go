@@ -9,16 +9,14 @@ import (
 	"strings"
 	"time"
 
+	connect_go "github.com/bufbuild/connect-go"
 	"github.com/google/uuid"
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
-	pbsinksvc "github.com/streamingfast/substreams/pb/sf/substreams/sink/service/v1"
-	"github.com/streamingfast/substreams/pb/sf/substreams/sink/service/v1/pbsinksvcconnect"
-
-	docker "github.com/streamingfast/substreams/sink-server/docker"
-
-	connect_go "github.com/bufbuild/connect-go"
 	connectweb "github.com/streamingfast/dgrpc/server/connect-web"
 	"github.com/streamingfast/shutter"
+	pbsinksvc "github.com/streamingfast/substreams/pb/sf/substreams/sink/service/v1"
+	"github.com/streamingfast/substreams/pb/sf/substreams/sink/service/v1/pbsinksvcconnect"
+	docker "github.com/streamingfast/substreams/sink-server/docker"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"

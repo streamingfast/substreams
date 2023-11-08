@@ -579,7 +579,12 @@ func (e *DockerEngine) createManifest(deploymentID string, token string, pkg *pb
 			services = append(services, dbt)
 		}
 		if isClickhouse {
-			//todo!
+			dbt, motd, err := e.newClickhouseDBT(deploymentID, dbServiceName, sinkConfig.DbtConfig)
+			if err != nil {
+				return nil, nil, nil, nil, fmt.Errorf("creating dbt deployment: %w", err)
+			}
+			servicesDesc[dbt.Name] = motd
+			services = append(services, dbt)
 		}
 	}
 

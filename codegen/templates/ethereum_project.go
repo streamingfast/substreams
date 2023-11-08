@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"embed"
 	"fmt"
-	"path/filepath"
+	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -138,10 +138,9 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 			ethereumProjectEntry = "src/multiple_contracts_lib.rs.gotmpl"
 		}
 
-		content, err := ethereumProject.ReadFile(filepath.Join("ethereum", ethereumProjectEntry))
+		content, err := ethereumProject.ReadFile(path.Join("ethereum", ethereumProjectEntry))
 		if err != nil {
 			return nil, fmt.Errorf("embed read entry %q: %w", ethereumProjectEntry, err)
-		}
 
 		finalFileName := ethereumProjectEntry
 

@@ -4,6 +4,7 @@ import (
 	pbsinksvc "github.com/streamingfast/substreams/pb/sf/substreams/sink/service/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	docker "github.com/streamingfast/substreams/sink-server/docker"
+	"github.com/streamingfast/substreams/sink-server/kubernetes"
 
 	"go.uber.org/zap"
 )
@@ -25,3 +26,4 @@ type Engine interface {
 }
 
 var _ Engine = &docker.DockerEngine{}
+var _ Engine = &kubernetes.KubernetesEngine{}

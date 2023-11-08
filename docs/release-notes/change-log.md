@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 * Codegen: substreams-database-change to v1.3, properly generates primary key to support chain reorgs in postgres sink.
-* Sink server: support for deploying sql postgres sinks with DBT configuration, so that users can deploy their own DBT models.
+* Sink server: support for deploying sinks with DBT configuration, so that users can deploy their own DBT models (supported on postgres and clickhouse sinks).
   Example manifest file segment:
   ```yaml
   [...]

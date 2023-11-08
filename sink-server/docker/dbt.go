@@ -10,9 +10,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 )
 
-func (e *DockerEngine) newPostgresDBT(deploymentID string, serviceName string, config *pbsql.DBTConfig) (types.ServiceConfig, string, error) {
+func (e *DockerEngine) newDBT(deploymentID string, serviceName string, config *pbsql.DBTConfig, engine string) (types.ServiceConfig, string, error) {
 	var conf types.ServiceConfig
 
 	dbtFiles, err := getFiles(config.Files)
@@ -33,7 +34,7 @@ func (e *DockerEngine) newPostgresDBT(deploymentID string, serviceName string, c
 	}
 
 	//create dbt_project.yml file
-	dbtProfileYaml, err := createDbtProfileYml(dbtProfileName, "postgres")
+	dbtProfileYaml, err := createDbtProfileYml(dbtProfileName, engine)
 	if err != nil {
 		return conf, "", fmt.Errorf("unable to create dbt_project.yml file: %w", err)
 	}
@@ -96,7 +97,7 @@ func (e *DockerEngine) newPostgresDBT(deploymentID string, serviceName string, c
 	conf = types.ServiceConfig{
 		Name:          name,
 		ContainerName: name,
-		Image:         "ghcr.io/dbt-labs/dbt-postgres:1.4.9",
+		Image:         getDBTDockerImage(engine),
 		Restart:       "on-failure",
 		Environment: map[string]*string{
 			"DBT_PROFILES_DIR": deref("/opt/data/profile"),
@@ -107,7 +108,7 @@ func (e *DockerEngine) newPostgresDBT(deploymentID string, serviceName string, c
 		Command: []string{
 			"/opt/data/scripts/start.sh",
 		},
-		Links:     []string{serviceName + ":postgres"},
+		Links:     []string{serviceName + ":" + engine},
 		DependsOn: []string{serviceName},
 		Volumes: []types.ServiceVolumeConfig{
 			{
@@ -125,129 +126,27 @@ func (e *DockerEngine) newPostgresDBT(deploymentID string, serviceName string, c
 				Source: "./data/scripts",
 				Target: "/opt/data/scripts",
 			},
+		},
+		HealthCheck: &types.HealthCheckConfig{
+			Test:     []string{"CMD", "dbt", "debug"},
+			Interval: toDuration(time.Second * 300),
+			Timeout:  toDuration(time.Second * 60),
+			Retries:  deref(uint64(10)),
 		},
 	}
 
 	return conf, name, nil
 }
 
-func (e *DockerEngine) newClickhouseDBT(deploymentID string, serviceName string, config *pbsql.DBTConfig) (types.ServiceConfig, string, error) {
-	var conf types.ServiceConfig
-
-	dbtFiles, err := getFiles(config.Files)
-	if err != nil {
-		return conf, "", fmt.Errorf("unable to get dbt files: %w", err)
+func getDBTDockerImage(engine string) string {
+	switch engine {
+	case "postgres":
+		return "ghcr.io/dbt-labs/dbt-postgres:1.4.9"
+	case "clickhouse":
+		return "docker.io/dfuse/dbt-clickhouse:1.4.9"
+	default:
+		return ""
 	}
-
-	//get the dbt_project.yml file
-	dbtProjectYml, ok := dbtFiles["dbt_project.yml"]
-	if !ok {
-		return conf, "", fmt.Errorf("unable to get dbt_project.yml file")
-	}
-
-	//get profile name from yaml file
-	dbtProfileName, err := extractProfileName(dbtProjectYml)
-	if err != nil {
-		return conf, "", fmt.Errorf("unable to extract profile name from dbt_project.yml: %w", err)
-	}
-
-	//create dbt_project.yml file
-	dbtProfileYaml, err := createDbtProfileYml(dbtProfileName, "clickhouse")
-	if err != nil {
-		return conf, "", fmt.Errorf("unable to create dbt_project.yml file: %w", err)
-	}
-
-	runInterval := config.GetRunIntervalSeconds()
-	if runInterval == 0 {
-		runInterval = 300 //default to 5 minutes
-	}
-
-	//create dbt start script
-	dbtStartScript := createDbtStartScript(runInterval)
-
-	//create a volume for the files
-	profileFolder := filepath.Join(e.dir, deploymentID, "data", "profile")
-	if err := os.MkdirAll(profileFolder, 0755); err != nil {
-		return conf, "", fmt.Errorf("creating folder %q: %w", profileFolder, err)
-	}
-
-	dataFolder := filepath.Join(e.dir, deploymentID, "data", "dbt")
-	if err := os.MkdirAll(dataFolder, 0755); err != nil {
-		return conf, "", fmt.Errorf("creating folder %q: %w", profileFolder, err)
-	}
-
-	scriptFolder := filepath.Join(e.dir, deploymentID, "data", "scripts")
-	if err := os.MkdirAll(scriptFolder, 0755); err != nil {
-		return conf, "", fmt.Errorf("creating folder %q: %w", scriptFolder, err)
-	}
-
-	err = os.WriteFile(filepath.Join(e.dir, deploymentID, "data", "profile", "profiles.yml"), dbtProfileYaml, 0644)
-	if err != nil {
-		return conf, "", fmt.Errorf("writing profiles.yml file: %w", err)
-	}
-
-	//copy all dbt files
-	for fileName, fileContent := range dbtFiles {
-		//create the path if it doesn't exist
-		if err := os.MkdirAll(filepath.Join(e.dir, deploymentID, "data", "dbt", filepath.Dir(fileName)), 0755); err != nil {
-			return conf, "", fmt.Errorf("creating folder %q: %w", filepath.Join(e.dir, deploymentID, "data", "dbt", filepath.Dir(fileName)), err)
-		}
-
-		err = os.WriteFile(filepath.Join(e.dir, deploymentID, "data", "dbt", fileName), fileContent, 0644)
-		if err != nil {
-			return conf, "", fmt.Errorf("writing dbt file %s: %w", fileName, err)
-		}
-	}
-
-	//copy dbt start script
-	err = os.WriteFile(filepath.Join(e.dir, deploymentID, "data", "scripts", "start.sh"), dbtStartScript, 0755)
-	if err != nil {
-		return conf, "", fmt.Errorf("writing dbt start script: %w", err)
-	}
-
-	//chmod +x the start script
-	err = os.Chmod(filepath.Join(e.dir, deploymentID, "data", "scripts", "start.sh"), 0755)
-	if err != nil {
-		return conf, "", fmt.Errorf("chmod +x start script: %w", err)
-	}
-
-	name := fmt.Sprintf("%s-dbt", deploymentID)
-	conf = types.ServiceConfig{
-		Name:          name,
-		ContainerName: name,
-		Image:         "docker.io/dfuse/dbt-clickhouse:1.4.9",
-		Restart:       "on-failure",
-		Environment: map[string]*string{
-			"DBT_PROFILES_DIR": deref("/opt/data/profile"),
-		},
-		Entrypoint: []string{
-			"/bin/bash",
-		},
-		Command: []string{
-			"/opt/data/scripts/start.sh",
-		},
-		Links:     []string{serviceName + ":clickhouse"},
-		DependsOn: []string{serviceName},
-		Volumes: []types.ServiceVolumeConfig{
-			{
-				Type:   "bind",
-				Source: "./data/profile",
-				Target: "/opt/data/profile",
-			},
-			{
-				Type:   "bind",
-				Source: "./data/dbt",
-				Target: "/opt/data/dbt",
-			},
-			{
-				Type:   "bind",
-				Source: "./data/scripts",
-				Target: "/opt/data/scripts",
-			},
-		},
-	}
-
-	return conf, name, nil
 }
 
 func getFiles(archive []byte) (map[string][]byte, error) {

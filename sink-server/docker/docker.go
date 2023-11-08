@@ -570,16 +570,15 @@ func (e *DockerEngine) createManifest(deploymentID string, token string, pkg *pb
 	}
 
 	if sinkConfig.DbtConfig != nil && sinkConfig.DbtConfig.Files != nil {
+		var engine string
 		if isPostgres {
-			dbt, motd, err := e.newPostgresDBT(deploymentID, dbServiceName, sinkConfig.DbtConfig)
-			if err != nil {
-				return nil, nil, nil, nil, fmt.Errorf("creating dbt deployment: %w", err)
-			}
-			servicesDesc[dbt.Name] = motd
-			services = append(services, dbt)
+			engine = "postgres"
+		} else if isClickhouse {
+			engine = "clickhouse"
 		}
-		if isClickhouse {
-			dbt, motd, err := e.newClickhouseDBT(deploymentID, dbServiceName, sinkConfig.DbtConfig)
+
+		if engine != "" {
+			dbt, motd, err := e.newDBT(deploymentID, dbServiceName, sinkConfig.DbtConfig, engine)
 			if err != nil {
 				return nil, nil, nil, nil, fmt.Errorf("creating dbt deployment: %w", err)
 			}

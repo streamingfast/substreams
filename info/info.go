@@ -78,14 +78,22 @@ type ModuleInput struct {
 }
 
 func Basic(pkg *pbsubstreams.Package) (*BasicInfo, error) {
+	name := "Unnamed"
+	var doc, version string
+	if len(pkg.PackageMeta) != 0 {
+		name = pkg.PackageMeta[0].Name
+		version = pkg.PackageMeta[0].Version
+		doc = pkg.PackageMeta[0].Doc
+	}
+
 	manifestInfo := &BasicInfo{
-		Name:    pkg.PackageMeta[0].Name,
+		Name:    name,
 		Network: pkg.Network,
-		Version: pkg.PackageMeta[0].Version,
+		Version: version,
 		Image:   pkg.Image,
 	}
-	if pkg.PackageMeta[0].Doc != "" {
-		manifestInfo.Documentation = strPtr(strings.Replace(pkg.PackageMeta[0].Doc, "\n", "\n  ", -1))
+	if doc != "" {
+		manifestInfo.Documentation = strPtr(strings.Replace(doc, "\n", "\n  ", -1))
 	}
 
 	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
@@ -118,9 +126,11 @@ func Basic(pkg *pbsubstreams.Package) (*BasicInfo, error) {
 			modInfo.Kind = "unknown"
 		}
 
-		modMeta := pkg.ModuleMeta[ix]
-		if modMeta != nil && modMeta.Doc != "" {
-			modInfo.Documentation = strPtr(strings.Replace(modMeta.Doc, "\n", "\n  ", -1))
+		if pkg.ModuleMeta != nil {
+			modMeta := pkg.ModuleMeta[ix]
+			if modMeta != nil && modMeta.Doc != "" {
+				modInfo.Documentation = strPtr(strings.Replace(modMeta.Doc, "\n", "\n  ", -1))
+			}
 		}
 
 		inputs := make([]ModuleInput, 0, len(mod.Inputs))
@@ -181,8 +191,12 @@ func Basic(pkg *pbsubstreams.Package) (*BasicInfo, error) {
 	return manifestInfo, nil
 }
 
-func Extended(manifestPath string, outputModule string) (*ExtendedInfo, error) {
-	reader, err := manifest.NewReader(manifestPath)
+func Extended(manifestPath string, outputModule string, skipValidation bool) (*ExtendedInfo, error) {
+	var opts []manifest.Option
+	if skipValidation {
+		opts = append(opts, manifest.SkipPackageValidationReader())
+	}
+	reader, err := manifest.NewReader(manifestPath, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("manifest reader: %w", err)
 	}

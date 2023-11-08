@@ -53,7 +53,8 @@ func runProtogen(cmd *cobra.Command, args []string) error {
 		manifestPath = args[0]
 	}
 
-	manifestReader, err := manifest.NewReader(manifestPath, manifest.SkipSourceCodeReader(), manifest.SkipModuleOutputTypeValidationReader())
+	readerOpts := append(getReaderOpts(cmd), manifest.SkipSourceCodeReader(), manifest.SkipModuleOutputTypeValidationReader())
+	manifestReader, err := manifest.NewReader(manifestPath, readerOpts...)
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
 	}

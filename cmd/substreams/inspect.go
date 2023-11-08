@@ -27,7 +27,7 @@ func init() {
 func runInspect(cmd *cobra.Command, args []string) error {
 	manifestPath := args[0]
 
-	manifestReader, err := manifest.NewReader(manifestPath)
+	manifestReader, err := manifest.NewReader(manifestPath, getReaderOpts(cmd)...)
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
 	}

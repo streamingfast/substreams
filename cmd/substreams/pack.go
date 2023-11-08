@@ -45,7 +45,7 @@ func runPack(cmd *cobra.Command, args []string) error {
 		manifestPath = args[0]
 	}
 
-	var manifestReaderOptions []manifest.Option
+	manifestReaderOptions := getReaderOpts(cmd)
 
 	//// Get the value of the -c flag
 	//overridePaths, _ := cmd.Flags().GetStringArray("config")

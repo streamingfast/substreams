@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -82,7 +81,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("running project name prompt: %w", err)
 	}
 
-	absoluteProjectDir := path.Join(absoluteWorkingDir, projectName)
+	absoluteProjectDir := filepath.Join(absoluteWorkingDir, projectName)
 
 	protocol, err := promptProtocol()
 	if err != nil {
@@ -210,9 +209,9 @@ func renderProjectFilesIn(project templates.Project, absoluteProjectDir string) 
 	}
 
 	for relativeFile, content := range files {
-		file := path.Join(absoluteProjectDir, relativeFile)
+		file := filepath.Join(absoluteProjectDir, strings.ReplaceAll(relativeFile, "/", string(os.PathSeparator)))
 
-		directory := path.Dir(file)
+		directory := filepath.Dir(file)
 		if err := os.MkdirAll(directory, os.ModePerm); err != nil {
 			return fmt.Errorf("create directory %q: %w", directory, err)
 		}

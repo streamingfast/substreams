@@ -77,6 +77,4 @@ Notable facts and use cases for working `store` modules include:
 * `store` modules are used to implement the Dynamic Data Sources pattern from Subgraphs, keeping track of contracts created to filter the next block with that information.
 * Downstream of the Substreams output, do not use `store` modules to query anything from them. Instead, use a sink to shape the data for proper querying.
 
-### Additional information
 
-Learn more about [modules in the Developer's guide](./).

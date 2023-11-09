@@ -111,16 +111,17 @@ func (s *server) Run() {
 	<-srv.Terminated()
 }
 
-func genDeployID() string {
-	return uuid.New().String()[0:DeploymentIDLength]
+func genDeployID(uid string) string {
+	return uid[0:DeploymentIDLength]
 }
 
 func (s *server) Deploy(ctx context.Context, req *connect_go.Request[pbsinksvc.DeployRequest]) (*connect_go.Response[pbsinksvc.DeployResponse], error) {
-	id := genDeployID()
+	uid := uuid.New().String()
+	id := genDeployID(uid)
 
 	s.logger.Info("deployment request", zap.String("deployment_id", id))
 
-	err := s.engine.Create(id, req.Msg.SubstreamsPackage, s.logger)
+	err := s.engine.Create(ctx, id, req.Msg.SubstreamsPackage, s.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +148,7 @@ func (s *server) Update(ctx context.Context, req *connect_go.Request[pbsinksvc.U
 
 	s.logger.Info("update request", zap.String("deployment_id", id))
 
-	err = s.engine.Update(id, req.Msg.SubstreamsPackage, req.Msg.Reset_, s.logger)
+	err = s.engine.Update(ctx, id, req.Msg.SubstreamsPackage, req.Msg.Reset_, s.logger)
 	if err != nil {
 		return nil, err
 	}

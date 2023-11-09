@@ -2,6 +2,7 @@ package docker
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -132,11 +133,11 @@ func (e *DockerEngine) readDeploymentInfo(deploymentID string) (info *deployment
 	return info, nil
 }
 
-func (e *DockerEngine) Create(deploymentID string, pkg *pbsubstreams.Package, zlog *zap.Logger) error {
+func (e *DockerEngine) Create(ctx context.Context, deploymentID string, pkg *pbsubstreams.Package, zlog *zap.Logger) error {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 
-	if e.otherDeploymentIsActive("!NO_MATCH!", zlog) {
+	if e.otherDeploymentIsActive(ctx, "!NO_MATCH!", zlog) {
 		return fmt.Errorf("this substreams-sink engine only supports a single active deployment. Stop any active sink before launching another one or use `sink-update`")
 	}
 
@@ -157,12 +158,12 @@ func (e *DockerEngine) Create(deploymentID string, pkg *pbsubstreams.Package, zl
 	return nil
 }
 
-func (e *DockerEngine) Update(deploymentID string, pkg *pbsubstreams.Package, reset bool, zlog *zap.Logger) error {
+func (e *DockerEngine) Update(ctx context.Context, deploymentID string, pkg *pbsubstreams.Package, reset bool, zlog *zap.Logger) error {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 
 	if reset {
-		if _, err := e.Stop(deploymentID, zlog); err != nil {
+		if _, err := e.Stop(ctx, deploymentID, zlog); err != nil {
 			return err
 		}
 
@@ -191,8 +192,8 @@ func (e *DockerEngine) Update(deploymentID string, pkg *pbsubstreams.Package, re
 	return nil
 }
 
-func (e *DockerEngine) otherDeploymentIsActive(deploymentID string, zlog *zap.Logger) bool {
-	if deps, _ := e.list(zlog); deps != nil {
+func (e *DockerEngine) otherDeploymentIsActive(ctx context.Context, deploymentID string, zlog *zap.Logger) bool {
+	if deps, _ := e.list(ctx, zlog); deps != nil {
 		for _, dep := range deps {
 			if dep.Id == deploymentID {
 				continue
@@ -217,7 +218,7 @@ func (e *DockerEngine) otherDeploymentIsActive(deploymentID string, zlog *zap.Lo
 
 var reasonInternalError = "internal error"
 
-func (e *DockerEngine) Info(deploymentID string, zlog *zap.Logger) (pbsinksvc.DeploymentStatus, string, map[string]string, *pbsinksvc.PackageInfo, *pbsinksvc.SinkProgress, error) {
+func (e *DockerEngine) Info(ctx context.Context, deploymentID string, zlog *zap.Logger) (pbsinksvc.DeploymentStatus, string, map[string]string, *pbsinksvc.PackageInfo, *pbsinksvc.SinkProgress, error) {
 	cmd := exec.Command("docker", "compose", "ps", "--format", "json")
 	cmd.Dir = filepath.Join(e.dir, deploymentID)
 	out, err := cmd.Output()
@@ -353,13 +354,13 @@ type dockerComposePSOutput struct {
 	Name   string `json:"Name"`
 }
 
-func (e *DockerEngine) List(zlog *zap.Logger) (out []*pbsinksvc.DeploymentWithStatus, err error) {
+func (e *DockerEngine) List(ctx context.Context, zlog *zap.Logger) (out []*pbsinksvc.DeploymentWithStatus, err error) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
-	return e.list(zlog)
+	return e.list(ctx, zlog)
 }
 
-func (e *DockerEngine) list(zlog *zap.Logger) (out []*pbsinksvc.DeploymentWithStatus, err error) {
+func (e *DockerEngine) list(ctx context.Context, zlog *zap.Logger) (out []*pbsinksvc.DeploymentWithStatus, err error) {
 	files, err := os.ReadDir(e.dir)
 	if err != nil {
 		return nil, err
@@ -367,7 +368,7 @@ func (e *DockerEngine) list(zlog *zap.Logger) (out []*pbsinksvc.DeploymentWithSt
 
 	for _, f := range files {
 		id := f.Name()
-		status, reason, _, info, _, err := e.Info(id, zlog)
+		status, reason, _, info, _, err := e.Info(ctx, id, zlog)
 		if err != nil {
 			zlog.Warn("cannot get info for deployment", zap.String("id", id))
 			continue
@@ -382,8 +383,8 @@ func (e *DockerEngine) list(zlog *zap.Logger) (out []*pbsinksvc.DeploymentWithSt
 	return out, nil
 }
 
-func (e *DockerEngine) Resume(deploymentID string, _ pbsinksvc.DeploymentStatus, zlog *zap.Logger) (string, error) {
-	if e.otherDeploymentIsActive(deploymentID, zlog) {
+func (e *DockerEngine) Resume(ctx context.Context, deploymentID string, _ pbsinksvc.DeploymentStatus, zlog *zap.Logger) (string, error) {
+	if e.otherDeploymentIsActive(ctx, deploymentID, zlog) {
 		return "", fmt.Errorf("this substreams-sink engine only supports a single active deployment. Stop any active sink before launching another one")
 	}
 
@@ -412,7 +413,7 @@ func (e *DockerEngine) Resume(deploymentID string, _ pbsinksvc.DeploymentStatus,
 	return string(out), nil
 }
 
-func (e *DockerEngine) Pause(deploymentID string, zlog *zap.Logger) (string, error) {
+func (e *DockerEngine) Pause(ctx context.Context, deploymentID string, zlog *zap.Logger) (string, error) {
 	cmd := exec.Command("docker", "compose", "stop", sinkServiceName(deploymentID)) // stop the sink process, keeping the database up
 	cmd.Dir = filepath.Join(e.dir, deploymentID)
 	out, err := cmd.CombinedOutput()
@@ -422,7 +423,7 @@ func (e *DockerEngine) Pause(deploymentID string, zlog *zap.Logger) (string, err
 	return string(out), nil
 }
 
-func (e *DockerEngine) Stop(deploymentID string, zlog *zap.Logger) (string, error) {
+func (e *DockerEngine) Stop(ctx context.Context, deploymentID string, zlog *zap.Logger) (string, error) {
 	cmd := exec.Command("docker", "compose", "down")
 	cmd.Dir = filepath.Join(e.dir, deploymentID)
 	out, err := cmd.CombinedOutput()
@@ -432,7 +433,7 @@ func (e *DockerEngine) Stop(deploymentID string, zlog *zap.Logger) (string, erro
 	return string(out), nil
 }
 
-func (e *DockerEngine) Remove(deploymentID string, zlog *zap.Logger) (string, error) {
+func (e *DockerEngine) Remove(ctx context.Context, deploymentID string, zlog *zap.Logger) (string, error) {
 	cmd := exec.Command("docker", "compose", "down")
 	cmd.Dir = filepath.Join(e.dir, deploymentID)
 	out, err := cmd.CombinedOutput()
@@ -489,10 +490,10 @@ func toDuration(in time.Duration) *types.Duration {
 	return deref(types.Duration(in))
 }
 
-func (e *DockerEngine) Shutdown(zlog *zap.Logger) (err error) {
+func (e *DockerEngine) Shutdown(ctx context.Context, zlog *zap.Logger) (err error) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
-	deps, err := e.list(zlog)
+	deps, err := e.list(ctx, zlog)
 	if err != nil {
 		return fmt.Errorf("cannot list deployments: %w", err)
 	}
@@ -501,7 +502,7 @@ func (e *DockerEngine) Shutdown(zlog *zap.Logger) (err error) {
 			continue
 		}
 		zlog.Info("shutting down deployment", zap.String("deploymentID", dep.Id))
-		if _, e := e.Stop(dep.Id, zlog); e != nil {
+		if _, e := e.Stop(ctx, dep.Id, zlog); e != nil {
 			err = errors.Join(err, e)
 		}
 	}

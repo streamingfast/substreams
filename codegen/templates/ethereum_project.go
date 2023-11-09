@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"embed"
 	"fmt"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -137,8 +136,8 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 		if ethereumProjectEntry == "src/lib.rs.gotmpl" && len(p.ethereumContracts) > 1 {
 			ethereumProjectEntry = "src/multiple_contracts_lib.rs.gotmpl"
 		}
-
-		content, err := ethereumProject.ReadFile(filepath.Join("ethereum", ethereumProjectEntry))
+		// We use directly "/" here as `ethereumProject` is an embed FS and always uses "/"
+		content, err := ethereumProject.ReadFile("ethereum" + "/" + ethereumProjectEntry)
 		if err != nil {
 			return nil, fmt.Errorf("embed read entry %q: %w", ethereumProjectEntry, err)
 		}

@@ -13,10 +13,12 @@ import (
 
 func (k *KubernetesEngine) newPostgres(deploymentID string, pkg *pbsubstreams.Package) (createFunc, error) {
 	//create a stateful set object
-	name := fmt.Sprintf("%s-postgres", deploymentID)
+	name := fmt.Sprintf("postgres-%s", deploymentID)
 
 	labels := map[string]string{
 		"expiration": "",
+		"deployment": deploymentID,
+		"app":        "postgres",
 	}
 
 	svc := &corev1.Service{
@@ -24,7 +26,7 @@ func (k *KubernetesEngine) newPostgres(deploymentID string, pkg *pbsubstreams.Pa
 			Name: name,
 		},
 		Spec: corev1.ServiceSpec{
-			ClusterIP: "None", // This makes the service "headless"
+			ClusterIP: "None",
 			Selector:  labels,
 			Ports: []corev1.ServicePort{
 				{
@@ -51,6 +53,16 @@ func (k *KubernetesEngine) newPostgres(deploymentID string, pkg *pbsubstreams.Pa
 					Labels: labels,
 				},
 				Spec: corev1.PodSpec{
+					Volumes: []corev1.Volume{
+						{
+							Name: "datadir",
+							VolumeSource: corev1.VolumeSource{
+								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+									ClaimName: fmt.Sprintf("datadir-%s", name),
+								},
+							},
+						},
+					},
 					Containers: []corev1.Container{
 						{
 							Name:          "postgres",
@@ -65,12 +77,18 @@ func (k *KubernetesEngine) newPostgres(deploymentID string, pkg *pbsubstreams.Pa
 							},
 							Resources: corev1.ResourceRequirements{
 								Requests: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("100m"),
-									corev1.ResourceMemory: resource.MustParse("100Mi"),
+									corev1.ResourceCPU:    resource.MustParse("1"),
+									corev1.ResourceMemory: resource.MustParse("500Mi"),
 								},
 								Limits: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("200m"),
-									corev1.ResourceMemory: resource.MustParse("200Mi"),
+									corev1.ResourceCPU:    resource.MustParse("1"),
+									corev1.ResourceMemory: resource.MustParse("1Gi"),
+								},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "datadir",
+									MountPath: "/var/lib/postgresql",
 								},
 							},
 							Env: []corev1.EnvVar{
@@ -99,20 +117,36 @@ func (k *KubernetesEngine) newPostgres(deploymentID string, pkg *pbsubstreams.Pa
 					},
 				},
 			},
-			// Add PVC templates if necessary
-			// VolumeClaimTemplates: []corev1.PersistentVolumeClaim{ ... },
+			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fmt.Sprintf("datadir"),
+					},
+					Spec: corev1.PersistentVolumeClaimSpec{
+						AccessModes: []corev1.PersistentVolumeAccessMode{
+							corev1.ReadWriteOnce,
+						},
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceStorage: resource.MustParse("32Gi"),
+							},
+						},
+						StorageClassName: ref("gcpssd-lazy"),
+						VolumeMode:       ref(corev1.PersistentVolumeFilesystem),
+					},
+				},
+			},
 		},
 	}
 
 	return func(ctx context.Context) ([]*metav1.ObjectMeta, error) {
+		//todo: what if function is run more than once?
+
 		var res []*metav1.ObjectMeta
 
 		svc, err := k.clientSet.CoreV1().Services(k.namespace).Create(ctx, svc, metav1.CreateOptions{})
 		if err != nil {
 			return res, fmt.Errorf("creating service: %w", err)
-		}
-		if err := waitForDeployment(ctx, k.clientSet, k.namespace, name, 5*time.Minute); err != nil {
-			return res, fmt.Errorf("waiting for deployment: %w", err)
 		}
 		res = append(res, &svc.ObjectMeta)
 

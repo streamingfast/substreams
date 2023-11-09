@@ -9,15 +9,38 @@ import (
 	"go.uber.org/zap"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 type KubernetesEngine struct {
 	clientSet *kubernetes.Clientset
 	namespace string
+	apiToken  string
 }
 
-func NewEngine() (*KubernetesEngine, error) {
-	return &KubernetesEngine{}, nil
+func NewEngine(configPath string, namespace string, token string) (*KubernetesEngine, error) {
+	var config *rest.Config
+	var err error
+	if configPath == "" {
+		config, err = rest.InClusterConfig()
+	} else {
+		config, err = clientcmd.BuildConfigFromFlags("", configPath)
+		if err != nil {
+			panic(err.Error())
+		}
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	return &KubernetesEngine{
+		clientSet: clientset,
+		namespace: namespace,
+		apiToken:  token,
+	}, nil
 }
 
 func (k *KubernetesEngine) Create(ctx context.Context, deploymentID string, pkg *pbsubstreams.Package, zlog *zap.Logger) error {
@@ -54,6 +77,10 @@ func (k *KubernetesEngine) Create(ctx context.Context, deploymentID string, pkg 
 		}
 
 		createdObjects = append(createdObjects, oms...)
+	}
+
+	for _, om := range createdObjects {
+		zlog.Info("created object", zap.String("name", om.Name))
 	}
 
 	return nil

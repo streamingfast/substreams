@@ -86,7 +86,13 @@ enum DeploymentStatus {
   RUNNING = 1;
   FAILING = 2;
   PAUSED = 3;  
-  STOPPED = 4;  
+  STOPPED = 4;
+
+  STARTING = 5;
+  PAUSING = 6;
+  STOPPING = 7;
+  REMOVING = 8;
+  RESUMING = 9;
 }
 
 message RemoveRequest {

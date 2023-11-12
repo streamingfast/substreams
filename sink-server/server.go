@@ -201,6 +201,9 @@ func (s *server) Pause(ctx context.Context, req *connect_go.Request[pbsinksvc.Pa
 	if err != nil {
 		s.logger.Warn("cannot get new status on deployment", zap.Error(err), zap.String("deployent_id", req.Msg.DeploymentId))
 	}
+	if newState == pbsinksvc.DeploymentStatus_UNKNOWN || newState == pbsinksvc.DeploymentStatus_RUNNING {
+		newState = pbsinksvc.DeploymentStatus_PAUSING
+	}
 
 	out := &pbsinksvc.PauseResponse{
 		PreviousStatus: prevState,
@@ -226,6 +229,9 @@ func (s *server) Stop(ctx context.Context, req *connect_go.Request[pbsinksvc.Sto
 	if err != nil {
 		s.logger.Warn("cannot get new status on deployment", zap.Error(err), zap.String("deployent_id", req.Msg.DeploymentId))
 	}
+	if newState == pbsinksvc.DeploymentStatus_UNKNOWN || newState == pbsinksvc.DeploymentStatus_RUNNING {
+		newState = pbsinksvc.DeploymentStatus_STOPPING
+	}
 
 	out := &pbsinksvc.StopResponse{
 		PreviousStatus: prevState,
@@ -250,6 +256,9 @@ func (s *server) Resume(ctx context.Context, req *connect_go.Request[pbsinksvc.R
 	newState, _, _, _, _, err := s.engine.Info(ctx, req.Msg.DeploymentId, s.logger)
 	if err != nil {
 		s.logger.Warn("cannot get new status on deployment", zap.Error(err), zap.String("deployent_id", req.Msg.DeploymentId))
+	}
+	if newState == pbsinksvc.DeploymentStatus_UNKNOWN || newState == pbsinksvc.DeploymentStatus_PAUSED {
+		newState = pbsinksvc.DeploymentStatus_RESUMING
 	}
 
 	out := &pbsinksvc.ResumeResponse{

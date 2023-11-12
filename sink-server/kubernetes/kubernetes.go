@@ -274,9 +274,8 @@ func (k *KubernetesEngine) Remove(ctx context.Context, deploymentID string, zlog
 }
 
 func (k *KubernetesEngine) Info(ctx context.Context, deploymentID string, zlog *zap.Logger) (pbsinksvc.DeploymentStatus, string, map[string]string, *pbsinksvc.PackageInfo, *pbsinksvc.SinkProgress, error) {
-	//todo(colin): add "reason" string as second return value.
-
 	services := map[string]string{}
+	var reason string
 
 	var sinkProgress *pbsinksvc.SinkProgress
 	blk := k.getProgressBlock(ctx, "sink", deploymentID, zlog)
@@ -301,8 +300,13 @@ func (k *KubernetesEngine) Info(ctx context.Context, deploymentID string, zlog *
 		return pbsinksvc.DeploymentStatus_UNKNOWN, "", nil, pkgInfo, sinkProgress, nil
 	}
 
+	var sinkDesiredReplicas int32
+	var sinkCurrentReplicas int32
 	var paused bool
 	var stopped bool
+	var pausing bool
+	var resuming bool
+	var running bool
 	for _, sts := range stslist.Items {
 		if !strings.HasPrefix(sts.Name, "sink-") {
 			if sts.Status.Replicas == 0 && sts.Status.CurrentReplicas == 0 {
@@ -311,18 +315,37 @@ func (k *KubernetesEngine) Info(ctx context.Context, deploymentID string, zlog *
 				stopped = false
 			}
 		} else {
-			if sts.Status.Replicas == 0 && sts.Status.CurrentReplicas == 0 {
-				paused = true
+			sinkDesiredReplicas = sts.Status.Replicas
+			sinkCurrentReplicas = sts.Status.CurrentReplicas
+
+			if sinkDesiredReplicas > sinkCurrentReplicas {
+				pausing = true
+			} else if sinkDesiredReplicas < sinkCurrentReplicas {
+				resuming = true
+			} else {
+				if sts.Status.Replicas == 0 && sts.Status.CurrentReplicas == 0 {
+					paused = true
+				} else {
+					running = true
+				}
 			}
 		}
 	}
 
-	if stopped {
-		return pbsinksvc.DeploymentStatus_STOPPED, "", nil, pkgInfo, sinkProgress, nil
-	}
+	var sinkStatus pbsinksvc.DeploymentStatus
 
-	if paused {
-		return pbsinksvc.DeploymentStatus_PAUSED, "", nil, pkgInfo, sinkProgress, nil
+	if stopped {
+		sinkStatus = pbsinksvc.DeploymentStatus_STOPPED
+	} else if paused {
+		sinkStatus = pbsinksvc.DeploymentStatus_PAUSED
+	} else if pausing {
+		sinkStatus = pbsinksvc.DeploymentStatus_PAUSING
+	} else if resuming {
+		sinkStatus = pbsinksvc.DeploymentStatus_RESUMING
+	} else if running {
+		sinkStatus = pbsinksvc.DeploymentStatus_RUNNING
+	} else {
+		sinkStatus = pbsinksvc.DeploymentStatus_UNKNOWN
 	}
 
 	//list all pods for this deployment id.  if any are not in "running" state, return ERROR.  else return RUNNING
@@ -334,21 +357,23 @@ func (k *KubernetesEngine) Info(ctx context.Context, deploymentID string, zlog *
 		return pbsinksvc.DeploymentStatus_UNKNOWN, "", nil, pkgInfo, sinkProgress, nil
 	}
 
-	status := pbsinksvc.DeploymentStatus_RUNNING
+	status := sinkStatus
 	for _, pod := range pods.Items {
 		if strings.HasPrefix(pod.Name, "sink-") {
-
+			continue
 		}
 
 		if pod.Status.Phase == v1.PodFailed {
 			zlog.Info("pod failed", zap.String("pod", pod.Name))
 			status = pbsinksvc.DeploymentStatus_FAILING
+			reason = fmt.Sprintf("pod %q failed", pod.Name)
 			break
 		}
 
 		if pod.Status.Phase != v1.PodRunning {
 			zlog.Info("pod not running", zap.String("pod", pod.Name))
 			status = pbsinksvc.DeploymentStatus_UNKNOWN
+			reason = fmt.Sprintf("pod %q not running", pod.Name)
 			break
 		}
 	}
@@ -364,7 +389,7 @@ func (k *KubernetesEngine) Info(ctx context.Context, deploymentID string, zlog *
 		services[pod.Name] = NewPodStatus(&pod).String()
 	}
 
-	return status, "", services, pkgInfo, sinkProgress, nil
+	return status, reason, services, pkgInfo, sinkProgress, nil
 }
 
 func (k *KubernetesEngine) List(ctx context.Context, zlog *zap.Logger) ([]*pbsinksvc.DeploymentWithStatus, error) {

@@ -10,8 +10,7 @@ import (
 
 func getExpirationLabelValue(ctx context.Context) string {
 	//default 24 hours from now. string unix timestamp
-	// return fmt.Sprintf("%s", time.Now().Add(24*time.Hour).Unix())
-	return fmt.Sprintf("%d", time.Now().Add(7*time.Minute).Unix())
+	return fmt.Sprintf("%d", time.Now().Add(24*time.Hour).Unix())
 }
 
 func getIntFromString(s string) int64 {

@@ -8,7 +8,7 @@ import (
 	pbsinksvc "github.com/streamingfast/substreams/pb/sf/substreams/sink/service/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -72,6 +72,9 @@ func NewEngine(ctx context.Context, configPath string, namespace string, token s
 }
 
 func (k *KubernetesEngine) Create(ctx context.Context, deploymentID string, pkg *pbsubstreams.Package, zlog *zap.Logger) error {
+	k.resourceMutex.Lock()
+	defer k.resourceMutex.Unlock()
+
 	if pkg.SinkConfig.TypeUrl != "sf.substreams.sink.sql.v1.Service" {
 		return fmt.Errorf("invalid sinkconfig type: %q. Only sf.substreams.sink.sql.v1.Service is supported for now", pkg.SinkConfig.TypeUrl)
 	}
@@ -103,7 +106,7 @@ func (k *KubernetesEngine) Create(ctx context.Context, deploymentID string, pkg 
 	}
 	k8sCreateFuncs = append(k8sCreateFuncs, scf)
 
-	createdObjects := make([]*v1.ObjectMeta, 0)
+	createdObjects := make([]*metav1.ObjectMeta, 0)
 	for _, f := range k8sCreateFuncs {
 		oms, err := f(ctx)
 		if err != nil {
@@ -121,23 +124,57 @@ func (k *KubernetesEngine) Create(ctx context.Context, deploymentID string, pkg 
 }
 
 func (k *KubernetesEngine) Update(ctx context.Context, deploymentID string, pkg *pbsubstreams.Package, reset bool, zlog *zap.Logger) error {
-	//TODO implement me
-	panic("implement me")
+	return fmt.Errorf("update not implemented for kubernetes engine")
 }
 
 func (k *KubernetesEngine) Resume(ctx context.Context, deploymentID string, currentState pbsinksvc.DeploymentStatus, zlog *zap.Logger) (string, error) {
-	//TODO implement me
-	panic("implement me")
+	k.resourceMutex.Lock()
+	defer k.resourceMutex.Unlock()
 
-	// scale the sink to 1 replica
+	// Define the name of the StatefulSet
+	statefulSetName := "sink-" + deploymentID
+
+	// Get the current scale of the StatefulSet
+	sts, err := k.clientSet.AppsV1().StatefulSets(k.namespace).Get(ctx, statefulSetName, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("unable to get StatefulSet %s: %w", statefulSetName, err)
+	}
+
+	// Modify the replicas count
+	sts.Spec.Replicas = ref(int32(1))
+
+	// Update the StatefulSet with the new scale
+	_, err = k.clientSet.AppsV1().StatefulSets(k.namespace).Update(ctx, sts, metav1.UpdateOptions{})
+	if err != nil {
+		return "", fmt.Errorf("unable to update StatefulSet %s: %w", statefulSetName, err)
+	}
+
+	return fmt.Sprintf("deployment %s resumed", deploymentID), nil
 }
 
 func (k *KubernetesEngine) Pause(ctx context.Context, deploymentID string, zlog *zap.Logger) (string, error) {
-	//TODO implement me
-	panic("implement me")
+	k.resourceMutex.Lock()
+	defer k.resourceMutex.Unlock()
 
-	// scale the sink to 0 replicas
+	// Define the name of the StatefulSet
+	statefulSetName := "sink-" + deploymentID
 
+	// Get the current scale of the StatefulSet
+	sts, err := k.clientSet.AppsV1().StatefulSets(k.namespace).Get(ctx, statefulSetName, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("unable to get StatefulSet %s: %w", statefulSetName, err)
+	}
+
+	// Modify the replicas count
+	sts.Spec.Replicas = ref(int32(0))
+
+	// Update the StatefulSet with the new scale
+	_, err = k.clientSet.AppsV1().StatefulSets(k.namespace).Update(ctx, sts, metav1.UpdateOptions{})
+	if err != nil {
+		return "", fmt.Errorf("unable to update StatefulSet %s: %w", statefulSetName, err)
+	}
+
+	return fmt.Sprintf("deployment %s paused", deploymentID), nil
 }
 
 func (k *KubernetesEngine) Stop(ctx context.Context, deploymentID string, zlog *zap.Logger) (string, error) {
@@ -145,6 +182,7 @@ func (k *KubernetesEngine) Stop(ctx context.Context, deploymentID string, zlog *
 	panic("implement me")
 
 	// scale all deployments and stateful sets to 0 for this deployment id
+
 }
 
 func (k *KubernetesEngine) Remove(ctx context.Context, deploymentID string, zlog *zap.Logger) (string, error) {

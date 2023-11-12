@@ -75,9 +75,11 @@ func serveE(cmd *cobra.Command, args []string) error {
 		}
 	case "kubernetes":
 		engine, err = kubernetes.NewEngine(
+			ctx,
 			sflags.MustGetString(cmd, "kubernetes-config-path"),
 			sflags.MustGetString(cmd, "kubernetes-namespace"),
 			token,
+			zlog,
 		)
 		if err != nil {
 			return err

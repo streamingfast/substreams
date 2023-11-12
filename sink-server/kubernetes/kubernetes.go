@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/shutter"
 	pbsql "github.com/streamingfast/substreams-sink-sql/pb/sf/substreams/sink/sql/v1"
 	pbsinksvc "github.com/streamingfast/substreams/pb/sf/substreams/sink/service/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -11,15 +12,25 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"sync"
+	"time"
 )
 
 type KubernetesEngine struct {
+	shutter.Shutter
+
 	clientSet *kubernetes.Clientset
 	namespace string
 	apiToken  string
+
+	logger *zap.Logger
+
+	dbDSN string
+
+	resourceMutex sync.Mutex
 }
 
-func NewEngine(configPath string, namespace string, token string) (*KubernetesEngine, error) {
+func NewEngine(ctx context.Context, configPath string, namespace string, token string, zlog *zap.Logger) (*KubernetesEngine, error) {
 	var config *rest.Config
 	var err error
 	if configPath == "" {
@@ -36,11 +47,28 @@ func NewEngine(configPath string, namespace string, token string) (*KubernetesEn
 		panic(err.Error())
 	}
 
-	return &KubernetesEngine{
+	k := &KubernetesEngine{
 		clientSet: clientset,
 		namespace: namespace,
 		apiToken:  token,
-	}, nil
+		logger:    zlog,
+	}
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(10 * time.Second):
+				err := k.DeleteExpiredResources(ctx)
+				if err != nil {
+					k.logger.Error("error deleting expired resources", zap.Error(err))
+				}
+			}
+		}
+	}()
+
+	return k, nil
 }
 
 func (k *KubernetesEngine) Create(ctx context.Context, deploymentID string, pkg *pbsubstreams.Package, zlog *zap.Logger) error {
@@ -62,12 +90,18 @@ func (k *KubernetesEngine) Create(ctx context.Context, deploymentID string, pkg 
 		return fmt.Errorf("clickhouse engine is not supported yet")
 	case pbsql.Service_postgres:
 		// create a postgres stateful set
-		cf, err := k.newPostgres(deploymentID, pkg)
+		cf, err := k.newPostgres(ctx, deploymentID, pkg)
 		if err != nil {
 			return fmt.Errorf("error creating postgres stateful set: %w", err)
 		}
 		k8sCreateFuncs = append(k8sCreateFuncs, cf)
 	}
+
+	scf, err := k.newSink(ctx, deploymentID, "", pkg, sinkConfig)
+	if err != nil {
+		return fmt.Errorf("error creating sink: %w", err)
+	}
+	k8sCreateFuncs = append(k8sCreateFuncs, scf)
 
 	createdObjects := make([]*v1.ObjectMeta, 0)
 	for _, f := range k8sCreateFuncs {
@@ -94,26 +128,36 @@ func (k *KubernetesEngine) Update(ctx context.Context, deploymentID string, pkg 
 func (k *KubernetesEngine) Resume(ctx context.Context, deploymentID string, currentState pbsinksvc.DeploymentStatus, zlog *zap.Logger) (string, error) {
 	//TODO implement me
 	panic("implement me")
+
+	// scale the sink to 1 replica
 }
 
 func (k *KubernetesEngine) Pause(ctx context.Context, deploymentID string, zlog *zap.Logger) (string, error) {
 	//TODO implement me
 	panic("implement me")
+
+	// scale the sink to 0 replicas
+
 }
 
 func (k *KubernetesEngine) Stop(ctx context.Context, deploymentID string, zlog *zap.Logger) (string, error) {
 	//TODO implement me
 	panic("implement me")
+
+	// scale all deployments and stateful sets to 0 for this deployment id
 }
 
 func (k *KubernetesEngine) Remove(ctx context.Context, deploymentID string, zlog *zap.Logger) (string, error) {
 	//TODO implement me
 	panic("implement me")
+
+	// delete all deployments, stateful sets, configmaps and pvcs for this deployment id
 }
 
 func (k *KubernetesEngine) Info(ctx context.Context, deploymentID string, zlog *zap.Logger) (pbsinksvc.DeploymentStatus, string, map[string]string, *pbsinksvc.PackageInfo, *pbsinksvc.SinkProgress, error) {
-	//TODO implement me
-	panic("implement me")
+	return pbsinksvc.DeploymentStatus_UNKNOWN, "", nil, nil, nil, nil
+
+	// list the pods for this deployment id and get their running state
 }
 
 func (k *KubernetesEngine) List(ctx context.Context, zlog *zap.Logger) ([]*pbsinksvc.DeploymentWithStatus, error) {

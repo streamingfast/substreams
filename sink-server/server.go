@@ -122,7 +122,6 @@ func (s *server) Deploy(ctx context.Context, req *connect_go.Request[pbsinksvc.D
 }
 
 func (s *server) Update(ctx context.Context, req *connect_go.Request[pbsinksvc.UpdateRequest]) (*connect_go.Response[pbsinksvc.UpdateResponse], error) {
-
 	id := req.Msg.DeploymentId
 	_, _, _, _, _, err := s.engine.Info(ctx, id, s.logger) // only checking if it exists
 	if err != nil {

@@ -11,19 +11,21 @@ import (
 	"time"
 )
 
-func (k *KubernetesEngine) newPostgres(deploymentID string, pkg *pbsubstreams.Package) (createFunc, error) {
+func (k *KubernetesEngine) newPostgres(ctx context.Context, deploymentID string, pkg *pbsubstreams.Package) (createFunc, error) {
 	//create a stateful set object
 	name := fmt.Sprintf("postgres-%s", deploymentID)
 
 	labels := map[string]string{
-		"expiration": "",
+		"expiration": getExpirationLabelValue(ctx),
 		"deployment": deploymentID,
 		"app":        "postgres",
+		"component":  "substreams-sink-sql",
 	}
 
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
+			Name:   name,
+			Labels: labels,
 		},
 		Spec: corev1.ServiceSpec{
 			ClusterIP: "None",
@@ -40,7 +42,8 @@ func (k *KubernetesEngine) newPostgres(deploymentID string, pkg *pbsubstreams.Pa
 
 	sts := v1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
+			Name:   name,
+			Labels: labels,
 		},
 		Spec: v1.StatefulSetSpec{
 			Selector: &metav1.LabelSelector{
@@ -65,9 +68,8 @@ func (k *KubernetesEngine) newPostgres(deploymentID string, pkg *pbsubstreams.Pa
 					},
 					Containers: []corev1.Container{
 						{
-							Name:          "postgres",
-							Image:         "postgres:14",
-							RestartPolicy: ref(corev1.ContainerRestartPolicyAlways),
+							Name:  "postgres",
+							Image: "postgres:14",
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "postgres",
@@ -88,7 +90,7 @@ func (k *KubernetesEngine) newPostgres(deploymentID string, pkg *pbsubstreams.Pa
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "datadir",
-									MountPath: "/var/lib/postgresql",
+									MountPath: "/opt/subservices/data",
 								},
 							},
 							Env: []corev1.EnvVar{
@@ -120,7 +122,8 @@ func (k *KubernetesEngine) newPostgres(deploymentID string, pkg *pbsubstreams.Pa
 			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: fmt.Sprintf("datadir"),
+						Name:   fmt.Sprintf("datadir"),
+						Labels: labels,
 					},
 					Spec: corev1.PersistentVolumeClaimSpec{
 						AccessModes: []corev1.PersistentVolumeAccessMode{
@@ -139,9 +142,15 @@ func (k *KubernetesEngine) newPostgres(deploymentID string, pkg *pbsubstreams.Pa
 		},
 	}
 
-	return func(ctx context.Context) ([]*metav1.ObjectMeta, error) {
-		//todo: what if function is run more than once?
+	k.dbDSN = fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
+		"dev-node",
+		"insecure-change-me-in-prod",
+		name,
+		5432,
+		"substreams",
+	)
 
+	return func(ctx context.Context) ([]*metav1.ObjectMeta, error) {
 		var res []*metav1.ObjectMeta
 
 		svc, err := k.clientSet.CoreV1().Services(k.namespace).Create(ctx, svc, metav1.CreateOptions{})

@@ -2,16 +2,19 @@ package kubernetes
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/streamingfast/shutter"
 	pbsql "github.com/streamingfast/substreams-sink-sql/pb/sf/substreams/sink/sql/v1"
 	pbsinksvc "github.com/streamingfast/substreams/pb/sf/substreams/sink/service/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"strings"
 	"sync"
 	"time"
 )
@@ -149,6 +152,8 @@ func (k *KubernetesEngine) Resume(ctx context.Context, deploymentID string, curr
 		return "", fmt.Errorf("unable to update StatefulSet %s: %w", statefulSetName, err)
 	}
 
+	time.Sleep(10 * time.Second)
+
 	return fmt.Sprintf("deployment %s resumed", deploymentID), nil
 }
 
@@ -174,6 +179,8 @@ func (k *KubernetesEngine) Pause(ctx context.Context, deploymentID string, zlog 
 		return "", fmt.Errorf("unable to update StatefulSet %s: %w", statefulSetName, err)
 	}
 
+	time.Sleep(10 * time.Second)
+
 	return fmt.Sprintf("deployment %s paused", deploymentID), nil
 }
 
@@ -190,7 +197,7 @@ func (k *KubernetesEngine) Remove(ctx context.Context, deploymentID string, zlog
 
 	// delete all deployments, stateful sets, configmaps and pvcs for this deployment id
 
-	stsList, err := k.clientSet.AppsV1().StatefulSets(k.namespace).List(context.TODO(), metav1.ListOptions{
+	stsList, err := k.clientSet.AppsV1().StatefulSets(k.namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: labelSelector,
 	})
 	if err != nil {
@@ -198,14 +205,14 @@ func (k *KubernetesEngine) Remove(ctx context.Context, deploymentID string, zlog
 	}
 
 	for _, sts := range stsList.Items {
-		if err := k.clientSet.AppsV1().StatefulSets(k.namespace).Delete(context.TODO(), sts.Name, metav1.DeleteOptions{
+		if err := k.clientSet.AppsV1().StatefulSets(k.namespace).Delete(ctx, sts.Name, metav1.DeleteOptions{
 			GracePeriodSeconds: ref(int64(0)),
 		}); err != nil {
 			return "", fmt.Errorf("error deleting statefulset %q: %w", sts.Name, err)
 		}
 	}
 
-	deploymentsList, err := k.clientSet.AppsV1().Deployments(k.namespace).List(context.TODO(), metav1.ListOptions{
+	deploymentsList, err := k.clientSet.AppsV1().Deployments(k.namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: labelSelector,
 	})
 	if err != nil {
@@ -213,14 +220,14 @@ func (k *KubernetesEngine) Remove(ctx context.Context, deploymentID string, zlog
 	}
 
 	for _, deployment := range deploymentsList.Items {
-		if err := k.clientSet.AppsV1().Deployments(k.namespace).Delete(context.TODO(), deployment.Name, metav1.DeleteOptions{
+		if err := k.clientSet.AppsV1().Deployments(k.namespace).Delete(ctx, deployment.Name, metav1.DeleteOptions{
 			GracePeriodSeconds: ref(int64(0)),
 		}); err != nil {
 			return "", fmt.Errorf("error deleting deployment %q: %w", deployment.Name, err)
 		}
 	}
 
-	pvcsList, err := k.clientSet.CoreV1().PersistentVolumeClaims(k.namespace).List(context.TODO(), metav1.ListOptions{
+	pvcsList, err := k.clientSet.CoreV1().PersistentVolumeClaims(k.namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: labelSelector,
 	})
 	if err != nil {
@@ -228,14 +235,14 @@ func (k *KubernetesEngine) Remove(ctx context.Context, deploymentID string, zlog
 	}
 
 	for _, pvc := range pvcsList.Items {
-		if err := k.clientSet.CoreV1().PersistentVolumeClaims(k.namespace).Delete(context.TODO(), pvc.Name, metav1.DeleteOptions{
+		if err := k.clientSet.CoreV1().PersistentVolumeClaims(k.namespace).Delete(ctx, pvc.Name, metav1.DeleteOptions{
 			GracePeriodSeconds: ref(int64(0)),
 		}); err != nil {
 			return "", fmt.Errorf("error deleting pvc %q: %w", pvc.Name, err)
 		}
 	}
 
-	configMapsList, err := k.clientSet.CoreV1().ConfigMaps(k.namespace).List(context.TODO(), metav1.ListOptions{
+	configMapsList, err := k.clientSet.CoreV1().ConfigMaps(k.namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: labelSelector,
 	})
 	if err != nil {
@@ -243,7 +250,7 @@ func (k *KubernetesEngine) Remove(ctx context.Context, deploymentID string, zlog
 	}
 
 	for _, configMap := range configMapsList.Items {
-		if err := k.clientSet.CoreV1().ConfigMaps(k.namespace).Delete(context.TODO(), configMap.Name, metav1.DeleteOptions{
+		if err := k.clientSet.CoreV1().ConfigMaps(k.namespace).Delete(ctx, configMap.Name, metav1.DeleteOptions{
 			GracePeriodSeconds: ref(int64(0)),
 		}); err != nil {
 			return "", fmt.Errorf("error deleting configmap %q: %w", configMap.Name, err)
@@ -254,9 +261,96 @@ func (k *KubernetesEngine) Remove(ctx context.Context, deploymentID string, zlog
 }
 
 func (k *KubernetesEngine) Info(ctx context.Context, deploymentID string, zlog *zap.Logger) (pbsinksvc.DeploymentStatus, string, map[string]string, *pbsinksvc.PackageInfo, *pbsinksvc.SinkProgress, error) {
-	return pbsinksvc.DeploymentStatus_UNKNOWN, "", nil, nil, nil, nil
+	services := map[string]string{}
 
-	// list the pods for this deployment id and get their running state
+	var sinkProgress *pbsinksvc.SinkProgress
+	blk := k.getProgressBlock(ctx, "sink", deploymentID, zlog)
+	if blk != 0 {
+		sinkProgress = &pbsinksvc.SinkProgress{
+			LastProcessedBlock: blk,
+		}
+	}
+
+	pkgInfo, err := k.getPackageInfo(ctx, deploymentID)
+	if err != nil {
+		zlog.Warn("cannot get package info", zap.Error(err))
+		return pbsinksvc.DeploymentStatus_UNKNOWN, "", nil, pkgInfo, sinkProgress, nil
+	}
+
+	//get sink statefulset.  if this is set to 0 replicas, return PAUSED.
+	stslist, err := k.clientSet.AppsV1().StatefulSets(k.namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("deployment=%s", deploymentID),
+	})
+	if err != nil {
+		zlog.Warn("error listing statefulsets", zap.Error(err))
+		return pbsinksvc.DeploymentStatus_UNKNOWN, "", nil, pkgInfo, sinkProgress, nil
+	}
+
+	var paused bool
+	var stopped bool
+	for _, sts := range stslist.Items {
+		if !strings.HasPrefix(sts.Name, "sink-") {
+			if sts.Status.Replicas == 0 && sts.Status.CurrentReplicas == 0 {
+				stopped = true
+			} else {
+				stopped = false
+			}
+		} else {
+			if sts.Status.Replicas == 0 && sts.Status.CurrentReplicas == 0 {
+				paused = true
+			}
+		}
+	}
+
+	if stopped {
+		return pbsinksvc.DeploymentStatus_STOPPED, "", nil, pkgInfo, sinkProgress, nil
+	}
+
+	if paused {
+		return pbsinksvc.DeploymentStatus_PAUSED, "", nil, pkgInfo, sinkProgress, nil
+	}
+
+	//list all pods for this deployment id.  if any are not in "running" state, return ERROR.  else return RUNNING
+	pods, err := k.clientSet.CoreV1().Pods(k.namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("deployment=%s", deploymentID),
+	})
+	if err != nil {
+		zlog.Warn("error listing pods", zap.Error(err))
+		return pbsinksvc.DeploymentStatus_UNKNOWN, "", nil, pkgInfo, sinkProgress, nil
+	}
+
+	status := pbsinksvc.DeploymentStatus_RUNNING
+	for _, pod := range pods.Items {
+		if strings.HasPrefix(pod.Name, "sink-") {
+
+		}
+
+		if pod.Status.Phase == v1.PodFailed {
+			zlog.Info("pod failed", zap.String("pod", pod.Name))
+			status = pbsinksvc.DeploymentStatus_FAILING
+			break
+		}
+
+		if pod.Status.Phase != v1.PodRunning {
+			zlog.Info("pod not running", zap.String("pod", pod.Name))
+			status = pbsinksvc.DeploymentStatus_UNKNOWN
+			break
+		}
+	}
+
+	pods, err = k.clientSet.CoreV1().Pods(k.namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("deployment=%s", deploymentID),
+	})
+	if err != nil {
+		zlog.Warn("error listing pods", zap.Error(err))
+		return status, "", nil, pkgInfo, sinkProgress, nil
+	}
+	for _, pod := range pods.Items {
+		status, _ := json.MarshalIndent(pod.Status, "", "  ")
+		services[pod.Name] = string(status)
+	}
+
+	return status, "", services, pkgInfo, sinkProgress, nil
 }
 
 func (k *KubernetesEngine) List(ctx context.Context, zlog *zap.Logger) ([]*pbsinksvc.DeploymentWithStatus, error) {

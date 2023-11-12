@@ -142,7 +142,7 @@ func (k *KubernetesEngine) newPostgres(ctx context.Context, deploymentID string,
 		},
 	}
 
-	k.dbDSN = fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
+	k.dbDSNs[deploymentID] = fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
 		"dev-node",
 		"insecure-change-me-in-prod",
 		name,

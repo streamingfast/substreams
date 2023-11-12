@@ -28,7 +28,7 @@ type KubernetesEngine struct {
 
 	logger *zap.Logger
 
-	dbDSN string
+	dbDSNs map[string]string
 
 	resourceMutex sync.Mutex
 }
@@ -55,6 +55,7 @@ func NewEngine(ctx context.Context, configPath string, namespace string, token s
 		namespace: namespace,
 		apiToken:  token,
 		logger:    zlog,
+		dbDSNs:    make(map[string]string),
 	}
 
 	go func() {
@@ -185,11 +186,8 @@ func (k *KubernetesEngine) Pause(ctx context.Context, deploymentID string, zlog 
 }
 
 func (k *KubernetesEngine) Stop(ctx context.Context, deploymentID string, zlog *zap.Logger) (string, error) {
-	//TODO implement me
-	panic("implement me")
-
-	// scale all deployments and stateful sets to 0 for this deployment id
-
+	zlog.Warn("stop not implemented for kubernetes engine. doing a pause instead.")
+	return k.Pause(ctx, deploymentID, zlog)
 }
 
 func (k *KubernetesEngine) Remove(ctx context.Context, deploymentID string, zlog *zap.Logger) (string, error) {
@@ -257,10 +255,27 @@ func (k *KubernetesEngine) Remove(ctx context.Context, deploymentID string, zlog
 		}
 	}
 
+	svcList, err := k.clientSet.CoreV1().Services(k.namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	if err != nil {
+		return "", fmt.Errorf("error listing services: %w", err)
+	}
+
+	for _, svc := range svcList.Items {
+		if err := k.clientSet.CoreV1().Services(k.namespace).Delete(ctx, svc.Name, metav1.DeleteOptions{
+			GracePeriodSeconds: ref(int64(0)),
+		}); err != nil {
+			return "", fmt.Errorf("error deleting service %q: %w", svc.Name, err)
+		}
+	}
+
 	return fmt.Sprintf("deployment %s removed", deploymentID), nil
 }
 
 func (k *KubernetesEngine) Info(ctx context.Context, deploymentID string, zlog *zap.Logger) (pbsinksvc.DeploymentStatus, string, map[string]string, *pbsinksvc.PackageInfo, *pbsinksvc.SinkProgress, error) {
+	//todo(colin): add "reason" string as second return value.
+
 	services := map[string]string{}
 
 	var sinkProgress *pbsinksvc.SinkProgress
@@ -353,8 +368,36 @@ func (k *KubernetesEngine) Info(ctx context.Context, deploymentID string, zlog *
 }
 
 func (k *KubernetesEngine) List(ctx context.Context, zlog *zap.Logger) ([]*pbsinksvc.DeploymentWithStatus, error) {
-	//TODO implement me
-	panic("implement me")
+	//get all config maps with label "component=substreams-sink-sql"
+	configMaps, err := k.clientSet.CoreV1().ConfigMaps(k.namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: "component=substreams-sink-sql",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error listing configmaps: %w", err)
+	}
+
+	deployments := make([]*pbsinksvc.DeploymentWithStatus, 0)
+	for _, cm := range configMaps.Items {
+		deploymentId, ok := cm.Labels["deployment"]
+		if !ok {
+			continue
+		}
+
+		status, reason, _, info, prog, err := k.Info(ctx, deploymentId, zlog)
+		if err != nil {
+			return nil, fmt.Errorf("error getting deployment info: %w", err)
+		}
+		dws := &pbsinksvc.DeploymentWithStatus{
+			Id:          deploymentId,
+			Status:      status,
+			Reason:      reason,
+			PackageInfo: info,
+			Progress:    prog,
+		}
+		deployments = append(deployments, dws)
+	}
+
+	return deployments, nil
 }
 
 func (k *KubernetesEngine) Shutdown(ctx context.Context, zlog *zap.Logger) error {

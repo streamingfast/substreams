@@ -153,7 +153,7 @@ func (k *KubernetesEngine) newSink(ctx context.Context, deploymentID string, dbS
 							Env: []corev1.EnvVar{
 								{
 									Name:  "DSN",
-									Value: k.dbDSN,
+									Value: k.dbDSNs[deploymentID],
 								},
 								{
 									Name:  "OUTPUT_MODULE",

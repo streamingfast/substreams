@@ -186,10 +186,71 @@ func (k *KubernetesEngine) Stop(ctx context.Context, deploymentID string, zlog *
 }
 
 func (k *KubernetesEngine) Remove(ctx context.Context, deploymentID string, zlog *zap.Logger) (string, error) {
-	//TODO implement me
-	panic("implement me")
+	labelSelector := fmt.Sprintf("deployment=%s", deploymentID)
 
 	// delete all deployments, stateful sets, configmaps and pvcs for this deployment id
+
+	stsList, err := k.clientSet.AppsV1().StatefulSets(k.namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	if err != nil {
+		return "", fmt.Errorf("error listing statefulsets: %w", err)
+	}
+
+	for _, sts := range stsList.Items {
+		if err := k.clientSet.AppsV1().StatefulSets(k.namespace).Delete(context.TODO(), sts.Name, metav1.DeleteOptions{
+			GracePeriodSeconds: ref(int64(0)),
+		}); err != nil {
+			return "", fmt.Errorf("error deleting statefulset %q: %w", sts.Name, err)
+		}
+	}
+
+	deploymentsList, err := k.clientSet.AppsV1().Deployments(k.namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	if err != nil {
+		return "", fmt.Errorf("error listing deployments: %w", err)
+	}
+
+	for _, deployment := range deploymentsList.Items {
+		if err := k.clientSet.AppsV1().Deployments(k.namespace).Delete(context.TODO(), deployment.Name, metav1.DeleteOptions{
+			GracePeriodSeconds: ref(int64(0)),
+		}); err != nil {
+			return "", fmt.Errorf("error deleting deployment %q: %w", deployment.Name, err)
+		}
+	}
+
+	pvcsList, err := k.clientSet.CoreV1().PersistentVolumeClaims(k.namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	if err != nil {
+		return "", fmt.Errorf("error listing pvcs: %w", err)
+	}
+
+	for _, pvc := range pvcsList.Items {
+		if err := k.clientSet.CoreV1().PersistentVolumeClaims(k.namespace).Delete(context.TODO(), pvc.Name, metav1.DeleteOptions{
+			GracePeriodSeconds: ref(int64(0)),
+		}); err != nil {
+			return "", fmt.Errorf("error deleting pvc %q: %w", pvc.Name, err)
+		}
+	}
+
+	configMapsList, err := k.clientSet.CoreV1().ConfigMaps(k.namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	if err != nil {
+		return "", fmt.Errorf("error listing configmaps: %w", err)
+	}
+
+	for _, configMap := range configMapsList.Items {
+		if err := k.clientSet.CoreV1().ConfigMaps(k.namespace).Delete(context.TODO(), configMap.Name, metav1.DeleteOptions{
+			GracePeriodSeconds: ref(int64(0)),
+		}); err != nil {
+			return "", fmt.Errorf("error deleting configmap %q: %w", configMap.Name, err)
+		}
+	}
+
+	return fmt.Sprintf("deployment %s removed", deploymentID), nil
 }
 
 func (k *KubernetesEngine) Info(ctx context.Context, deploymentID string, zlog *zap.Logger) (pbsinksvc.DeploymentStatus, string, map[string]string, *pbsinksvc.PackageInfo, *pbsinksvc.SinkProgress, error) {

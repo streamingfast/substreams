@@ -346,8 +346,7 @@ func (k *KubernetesEngine) Info(ctx context.Context, deploymentID string, zlog *
 		return status, "", nil, pkgInfo, sinkProgress, nil
 	}
 	for _, pod := range pods.Items {
-		status, _ := json.MarshalIndent(pod.Status, "", "  ")
-		services[pod.Name] = string(status)
+		services[pod.Name] = NewPodStatus(&pod).String()
 	}
 
 	return status, "", services, pkgInfo, sinkProgress, nil
@@ -359,5 +358,44 @@ func (k *KubernetesEngine) List(ctx context.Context, zlog *zap.Logger) ([]*pbsin
 }
 
 func (k *KubernetesEngine) Shutdown(ctx context.Context, zlog *zap.Logger) error {
+	// nothing really to do here
 	return nil
+}
+
+type PodStatus struct {
+	Status     string            `json:"status"`
+	IP         string            `json:"ip"`
+	Containers []ContainerStatus `json:"containers"`
+}
+
+type ContainerStatus struct {
+	Name         string `json:"name"`
+	Image        string `json:"image"`
+	RestartCount int    `json:"restart_count"`
+}
+
+func NewPodStatus(pod *v1.Pod) *PodStatus {
+	ps := &PodStatus{
+		Status: string(pod.Status.Phase),
+		IP:     pod.Status.PodIP,
+	}
+
+	for _, container := range pod.Status.ContainerStatuses {
+		ps.Containers = append(ps.Containers, ContainerStatus{
+			Name:         container.Name,
+			Image:        container.Image,
+			RestartCount: int(container.RestartCount),
+		})
+	}
+
+	return ps
+}
+
+func (ps *PodStatus) String() string {
+	b, err := json.MarshalIndent(ps, "", "  ")
+	if err != nil {
+		return ""
+	}
+
+	return string(b)
 }

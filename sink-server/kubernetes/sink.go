@@ -180,7 +180,7 @@ func (k *KubernetesEngine) newSink(ctx context.Context, deploymentID string, dbS
 						},
 						Resources: corev1.ResourceRequirements{
 							Requests: corev1.ResourceList{
-								corev1.ResourceStorage: resource.MustParse("32Gi"),
+								corev1.ResourceStorage: resource.MustParse("256Mi"),
 							},
 						},
 						StorageClassName: ref("gcpssd-lazy"),

@@ -437,9 +437,15 @@ type PodStatus struct {
 }
 
 type ContainerStatus struct {
-	Name         string `json:"name"`
-	Image        string `json:"image"`
-	RestartCount int    `json:"restart_count"`
+	Name  string       `json:"name"`
+	Image string       `json:"image"`
+	Ports []PortStatus `json:"ports,omitempty"`
+}
+
+type PortStatus struct {
+	Name     string `json:"name"`
+	Port     int32  `json:"port"`
+	Protocol string `json:"protocol"`
 }
 
 func NewPodStatus(pod *v1.Pod) *PodStatus {
@@ -448,12 +454,30 @@ func NewPodStatus(pod *v1.Pod) *PodStatus {
 		IP:     pod.Status.PodIP,
 	}
 
-	for _, container := range pod.Status.ContainerStatuses {
-		ps.Containers = append(ps.Containers, ContainerStatus{
-			Name:         container.Name,
-			Image:        container.Image,
-			RestartCount: int(container.RestartCount),
-		})
+	//for _, container := range pod.Status.ContainerStatuses {
+	//	cs := ContainerStatus{
+	//		Name:  container.Name,
+	//		Image: container.Image,
+	//	}
+	//
+	//	ps.Containers = append(ps.Containers, cs)
+	//}
+
+	for _, container := range pod.Spec.Containers {
+		cs := ContainerStatus{
+			Name:  container.Name,
+			Image: container.Image,
+		}
+
+		for _, port := range container.Ports {
+			cs.Ports = append(cs.Ports, PortStatus{
+				Name:     port.Name,
+				Port:     port.ContainerPort,
+				Protocol: string(port.Protocol),
+			})
+		}
+
+		ps.Containers = append(ps.Containers, cs)
 	}
 
 	return ps

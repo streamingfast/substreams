@@ -133,6 +133,14 @@ func (k *KubernetesEngine) Create(ctx context.Context, deploymentID string, pkg 
 		k8sCreateFuncs = append(k8sCreateFuncs, postgraphile)
 	}
 
+	if sinkConfig.RestFrontend != nil && sinkConfig.RestFrontend.Enabled {
+		restFrontend, err := k.newRestFrontend(ctx, deploymentID)
+		if err != nil {
+			return fmt.Errorf("error creating rest frontend: %w", err)
+		}
+		k8sCreateFuncs = append(k8sCreateFuncs, restFrontend)
+	}
+
 	createdObjects := make([]*metav1.ObjectMeta, 0)
 	for _, f := range k8sCreateFuncs {
 		oms, err := f(ctx)

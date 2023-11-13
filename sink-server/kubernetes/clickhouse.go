@@ -3,12 +3,13 @@ package kubernetes
 import (
 	"context"
 	"fmt"
+	"time"
+
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"time"
 )
 
 func (k *KubernetesEngine) newClickhouse(ctx context.Context, deploymentID string) (createFunc, error) {

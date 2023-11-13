@@ -107,7 +107,6 @@ func (k *KubernetesEngine) getPackageInfo(ctx context.Context, deploymentId stri
 	}
 
 	return info, nil
-
 }
 
 func getModuleHash(mod string, pkg *pbsubstreams.Package) (hash string, err error) {

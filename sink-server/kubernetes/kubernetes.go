@@ -110,6 +110,14 @@ func (k *KubernetesEngine) Create(ctx context.Context, deploymentID string, pkg 
 	}
 	k8sCreateFuncs = append(k8sCreateFuncs, scf)
 
+	if sinkConfig.PgwebFrontend != nil && sinkConfig.PgwebFrontend.Enabled {
+		pgwebCreateFunc, err := k.newPGWeb(ctx, deploymentID, "")
+		if err != nil {
+			return fmt.Errorf("error creating pgweb: %w", err)
+		}
+		k8sCreateFuncs = append(k8sCreateFuncs, pgwebCreateFunc)
+	}
+
 	createdObjects := make([]*metav1.ObjectMeta, 0)
 	for _, f := range k8sCreateFuncs {
 		oms, err := f(ctx)

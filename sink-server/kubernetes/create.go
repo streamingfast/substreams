@@ -32,16 +32,16 @@ func waitForStateFulSet(ctx context.Context, clientset *kubernetes.Clientset, na
 
 func waitForDeployment(ctx context.Context, clientset *kubernetes.Clientset, namespace, name string, timeout time.Duration) error {
 	return wait.PollUntilContextTimeout(ctx, 10*time.Second, timeout, true, func(context.Context) (bool, error) {
-		sts, err := clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
+		depl, err := clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 
-		if sts.Status.ObservedGeneration < sts.Generation {
+		if depl.Status.ObservedGeneration < depl.Generation {
 			return false, nil
 		}
 
-		if sts.Status.ReadyReplicas != *sts.Spec.Replicas {
+		if depl.Status.ReadyReplicas != *depl.Spec.Replicas {
 			return false, nil
 		}
 

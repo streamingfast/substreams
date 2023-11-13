@@ -3,6 +3,8 @@ package kubernetes
 import (
 	"context"
 	"fmt"
+	"time"
+
 	pbsql "github.com/streamingfast/substreams-sink-sql/pb/sf/substreams/sink/sql/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"google.golang.org/protobuf/proto"
@@ -10,7 +12,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"time"
 )
 
 func (k *KubernetesEngine) newSink(ctx context.Context, deploymentID string, dbService string, pkg *pbsubstreams.Package, sinkConfig *pbsql.Service) (createFunc, error) {

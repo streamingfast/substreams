@@ -4,19 +4,22 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/streamingfast/shutter"
 	pbsql "github.com/streamingfast/substreams-sink-sql/pb/sf/substreams/sink/sql/v1"
 	pbsinksvc "github.com/streamingfast/substreams/pb/sf/substreams/sink/service/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+
 	"go.uber.org/zap"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"strings"
-	"sync"
-	"time"
 )
 
 type KubernetesEngine struct {

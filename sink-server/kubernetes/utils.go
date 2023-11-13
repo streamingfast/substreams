@@ -5,17 +5,18 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"strconv"
+	"strings"
+
 	"github.com/streamingfast/substreams/manifest"
 	pbsinksvc "github.com/streamingfast/substreams/pb/sf/substreams/sink/service/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
-	"io/ioutil"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"strconv"
-	"strings"
 )
 
 func ref[T any](v T) *T { return &v }

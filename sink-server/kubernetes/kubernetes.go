@@ -97,10 +97,14 @@ func (k *KubernetesEngine) Create(ctx context.Context, deploymentID string, pkg 
 	case pbsql.Service_unset:
 		// nothing to do
 	case pbsql.Service_clickhouse:
-		return fmt.Errorf("clickhouse engine is not supported yet")
+		cf, err := k.newClickhouse(ctx, deploymentID)
+		if err != nil {
+			return fmt.Errorf("error creating clickhouse stateful set: %w", err)
+		}
+		k8sCreateFuncs = append(k8sCreateFuncs, cf)
 	case pbsql.Service_postgres:
 		// create a postgres stateful set
-		cf, err := k.newPostgres(ctx, deploymentID, pkg)
+		cf, err := k.newPostgres(ctx, deploymentID)
 		if err != nil {
 			return fmt.Errorf("error creating postgres stateful set: %w", err)
 		}

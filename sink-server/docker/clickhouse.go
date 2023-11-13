@@ -38,7 +38,6 @@ func (e *DockerEngine) newClickhouse(deploymentID string, pkg *pbsubstreams.Pack
 		},
 
 		Environment: map[string]*string{
-
 			"CLICKHOUSE_USER":                      deref("dev-node"),
 			"CLICKHOUSE_PASSWORD":                  deref("insecure-change-me-in-prod"),
 			"CLICKHOUSE_DB":                        deref("substreams"),

@@ -10,14 +10,14 @@ import (
 	"time"
 )
 
-func (k *KubernetesEngine) newPGWeb(ctx context.Context, deploymentID string, dbService string) (createFunc, error) {
-	name := fmt.Sprintf("pgweb-%s", deploymentID)
+func (k *KubernetesEngine) newPostgraphile(ctx context.Context, deploymentID string) (createFunc, error) {
+	name := fmt.Sprintf("postgraphile-%s", deploymentID)
 
 	//create a kubernets deployment object
 	labels := map[string]string{
 		"expiration": getExpirationLabelValue(ctx),
 		"deployment": deploymentID,
-		"app":        "pgweb",
+		"app":        "postgraphile",
 		"component":  "substreams-sink-sql",
 	}
 
@@ -31,8 +31,8 @@ func (k *KubernetesEngine) newPGWeb(ctx context.Context, deploymentID string, db
 			Selector:  labels,
 			Ports: []corev1.ServicePort{
 				{
-					Port:     8081,
-					Name:     "http",
+					Port:     5000,
+					Name:     "graphql",
 					Protocol: corev1.ProtocolTCP,
 				},
 			},
@@ -58,23 +58,16 @@ func (k *KubernetesEngine) newPGWeb(ctx context.Context, deploymentID string, db
 					Containers: []corev1.Container{
 						{
 							Name:  name,
-							Image: "sosedoff/pgweb:0.11.12",
-							Command: []string{
-								"pgweb",
-								"--bind=0.0.0.0",
-								"--listen=8081",
-								"--binary-codec=hex",
-							},
-							Env: []corev1.EnvVar{
-								{
-									Name:  "DATABASE_URL",
-									Value: fmt.Sprintf("postgres://dev-node:insecure-change-me-in-prod@postgres-%s:5432/substreams?sslmode=disable", deploymentID),
-								},
+							Image: "graphile/postgraphile:4",
+							Args: []string{
+								"--connection",
+								fmt.Sprintf("postgres://dev-node:insecure-change-me-in-prod@postgres-%s:5432/substreams?sslmode=disable", deploymentID),
+								"--watch",
 							},
 							Ports: []corev1.ContainerPort{
 								{
-									ContainerPort: 8081,
-									Name:          "http",
+									ContainerPort: 5000,
+									Name:          "graphql",
 									Protocol:      corev1.ProtocolTCP,
 								},
 							},

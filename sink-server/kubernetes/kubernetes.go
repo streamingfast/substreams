@@ -24,7 +24,7 @@ type KubernetesEngine struct {
 
 	clientSet *kubernetes.Clientset
 	namespace string
-	apiToken  string
+	apiToken  string //todo: change this to come from user
 
 	logger *zap.Logger
 
@@ -116,6 +116,14 @@ func (k *KubernetesEngine) Create(ctx context.Context, deploymentID string, pkg 
 			return fmt.Errorf("error creating pgweb: %w", err)
 		}
 		k8sCreateFuncs = append(k8sCreateFuncs, pgwebCreateFunc)
+	}
+
+	if sinkConfig.PostgraphileFrontend != nil && sinkConfig.PostgraphileFrontend.Enabled {
+		postgraphile, err := k.newPostgraphile(ctx, deploymentID)
+		if err != nil {
+			return fmt.Errorf("error creating postgraphile: %w", err)
+		}
+		k8sCreateFuncs = append(k8sCreateFuncs, postgraphile)
 	}
 
 	createdObjects := make([]*metav1.ObjectMeta, 0)

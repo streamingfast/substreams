@@ -153,11 +153,11 @@ func (k *KubernetesEngine) newPostgres(ctx context.Context, deploymentID string,
 	return func(ctx context.Context) ([]*metav1.ObjectMeta, error) {
 		var res []*metav1.ObjectMeta
 
-		svc, err := k.clientSet.CoreV1().Services(k.namespace).Create(ctx, svc, metav1.CreateOptions{})
+		service, err := k.clientSet.CoreV1().Services(k.namespace).Create(ctx, svc, metav1.CreateOptions{})
 		if err != nil {
 			return res, fmt.Errorf("creating service: %w", err)
 		}
-		res = append(res, &svc.ObjectMeta)
+		res = append(res, &service.ObjectMeta)
 
 		obj, err := k.clientSet.AppsV1().StatefulSets(k.namespace).Create(ctx, &sts, metav1.CreateOptions{})
 		if err != nil {

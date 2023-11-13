@@ -93,6 +93,8 @@ func (k *KubernetesEngine) Create(ctx context.Context, deploymentID string, pkg 
 		return fmt.Errorf("cannot unmarshal sinkconfig: %w", err)
 	}
 
+	isPostgres := false
+	isClickhouse := false
 	switch sinkConfig.GetEngine() {
 	case pbsql.Service_unset:
 		// nothing to do
@@ -102,6 +104,7 @@ func (k *KubernetesEngine) Create(ctx context.Context, deploymentID string, pkg 
 			return fmt.Errorf("error creating clickhouse stateful set: %w", err)
 		}
 		k8sCreateFuncs = append(k8sCreateFuncs, cf)
+		isClickhouse = true
 	case pbsql.Service_postgres:
 		// create a postgres stateful set
 		cf, err := k.newPostgres(ctx, deploymentID)
@@ -109,6 +112,7 @@ func (k *KubernetesEngine) Create(ctx context.Context, deploymentID string, pkg 
 			return fmt.Errorf("error creating postgres stateful set: %w", err)
 		}
 		k8sCreateFuncs = append(k8sCreateFuncs, cf)
+		isPostgres = true
 	}
 
 	scf, err := k.newSink(ctx, deploymentID, "", pkg, sinkConfig)
@@ -139,6 +143,23 @@ func (k *KubernetesEngine) Create(ctx context.Context, deploymentID string, pkg 
 			return fmt.Errorf("error creating rest frontend: %w", err)
 		}
 		k8sCreateFuncs = append(k8sCreateFuncs, restFrontend)
+	}
+
+	if sinkConfig.DbtConfig != nil && sinkConfig.DbtConfig.Files != nil {
+		var engine string
+		if isPostgres {
+			engine = "postgres"
+		} else if isClickhouse {
+			engine = "clickhouse"
+		}
+
+		if engine != "" {
+			dbt, err := k.newDBT(ctx, deploymentID, sinkConfig.DbtConfig, engine)
+			if err != nil {
+				return fmt.Errorf("creating dbt deployment: %w", err)
+			}
+			k8sCreateFuncs = append(k8sCreateFuncs, dbt)
+		}
 	}
 
 	createdObjects := make([]*metav1.ObjectMeta, 0)

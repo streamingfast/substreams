@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/streamingfast/substreams/sink-server/docker"
-	"github.com/streamingfast/substreams/sink-server/kubernetes"
 	"os"
 	"regexp"
 
@@ -70,17 +69,6 @@ func serveE(cmd *cobra.Command, args []string) error {
 	switch engineType {
 	case "docker":
 		engine, err = docker.NewEngine(dataDir, token)
-		if err != nil {
-			return err
-		}
-	case "kubernetes":
-		engine, err = kubernetes.NewEngine(
-			ctx,
-			sflags.MustGetString(cmd, "kubernetes-config-path"),
-			sflags.MustGetString(cmd, "kubernetes-namespace"),
-			token,
-			zlog,
-		)
 		if err != nil {
 			return err
 		}

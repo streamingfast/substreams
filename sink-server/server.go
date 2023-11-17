@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	context2 "github.com/streamingfast/substreams/sink-server/context"
 	"net/http"
 	"regexp"
 	"strings"
@@ -101,12 +102,12 @@ func (s *server) Deploy(ctx context.Context, req *connect_go.Request[pbsinksvc.D
 	uid := uuid.New().String()
 	id := genDeployID(uid)
 
-	ctx = SetProductionMode(ctx, !req.Msg.GetDevelopmentMode())
+	ctx = context2.SetProductionMode(ctx, !req.Msg.GetDevelopmentMode())
 	envMap := map[string]string{}
 	for _, env := range req.Msg.GetEnvironment() {
 		envMap[env.Key] = env.Value
 	}
-	ctx = SetEnvironmentVariableMap(ctx, envMap)
+	ctx = context2.SetEnvironmentVariableMap(ctx, envMap)
 
 	s.logger.Info("deployment request", zap.String("deployment_id", id))
 

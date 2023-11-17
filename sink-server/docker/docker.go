@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	server "github.com/streamingfast/substreams/sink-server"
+	server "github.com/streamingfast/substreams/sink-server/context"
 	"io"
 	"os"
 	"os/exec"

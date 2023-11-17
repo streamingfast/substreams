@@ -20,6 +20,14 @@ service Provider {
 
 message DeployRequest {
   sf.substreams.v1.Package substreams_package = 1;
+
+  bool development_mode = 2;
+  repeated EnvironmentVariable environment = 3;
+}
+
+message EnvironmentVariable {
+  string key = 1;
+  string value = 2;
 }
 
 message DeployResponse {

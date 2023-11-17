@@ -2,9 +2,9 @@ package server
 
 import "context"
 
-type deployStatusPrinterKeyType int
+type sinkContextKey int
 
-const deployStatusPrinterKey = deployStatusPrinterKeyType(0)
+const deployStatusPrinterKey = sinkContextKey(0)
 
 func WithDeployStatusPrinter(ctx context.Context, printer *DeployStatusPrinter) context.Context {
 	return context.WithValue(ctx, deployStatusPrinterKey, printer)
@@ -17,4 +17,31 @@ func GetDeployStatusPrinter(ctx context.Context) interface {
 		return printer
 	}
 	return defaultDeployStatusPrinter
+}
+
+const productionModeKey = sinkContextKey(1)
+
+func SetProductionMode(ctx context.Context) context.Context {
+	return context.WithValue(ctx, productionModeKey, true)
+}
+
+func GetProductionMode(ctx context.Context) bool {
+	productionModeValue := ctx.Value(productionModeKey)
+	if productionMode, ok := productionModeValue.(bool); ok {
+		return productionMode
+	}
+	return false
+}
+
+const environmentKey = sinkContextKey(2)
+
+func SetEnvironmentVariableMap(ctx context.Context, env map[string]string) context.Context {
+	return context.WithValue(ctx, environmentKey, env)
+}
+
+func GetEnvironmentVariableMap(ctx context.Context) map[string]string {
+	if env, ok := ctx.Value(environmentKey).(map[string]string); ok {
+		return env
+	}
+	return map[string]string{}
 }

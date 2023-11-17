@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
+
 	"github.com/streamingfast/substreams/reqctx"
 
 	"github.com/streamingfast/bstream"
@@ -41,7 +43,7 @@ func NewEngine(ctx context.Context, runtimeConfig config.RuntimeConfig, execOutW
 	return e, nil
 }
 
-func (e *Engine) NewBuffer(block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) (execout.ExecutionOutput, error) {
+func (e *Engine) NewBuffer(block *pbbstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) (execout.ExecutionOutput, error) {
 	execOutBuf, err := execout.NewBuffer(e.blockType, block, clock)
 	if err != nil {
 		return nil, fmt.Errorf("setting up map: %w", err)

@@ -8,13 +8,14 @@ require (
 	github.com/jhump/protoreflect v1.14.0
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
-	github.com/streamingfast/bstream v0.0.2-0.20230829131224-b9272048dc6a
+	github.com/streamingfast/bstream v0.0.2-0.20231116220707-c5946cce90ff
 	github.com/streamingfast/cli v0.0.4-0.20230825151644-8cc84512cd80
+	github.com/streamingfast/dbin v0.9.1-0.20231115202300-f0d94cacb713
 	github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1
 	github.com/streamingfast/dgrpc v0.0.0-20230929132851-893fc52687fa
 	github.com/streamingfast/dstore v0.1.1-0.20230620124109-3924b3b36c77
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
-	github.com/streamingfast/pbgo v0.0.6-0.20221020131607-255008258d28
+	github.com/streamingfast/pbgo v0.0.6-0.20231116213602-165f136fce2c
 	github.com/stretchr/testify v1.8.4
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869
 	go.uber.org/zap v1.26.0
@@ -53,7 +54,6 @@ require (
 	github.com/schollz/closestmatch v2.1.0+incompatible
 	github.com/shopspring/decimal v1.3.1
 	github.com/streamingfast/dauth v0.0.0-20230726175303-fc1d7198cb33
-	github.com/streamingfast/dbin v0.0.0-20210809205249-73d5eca35dc5
 	github.com/streamingfast/dhttp v0.0.2-0.20220314180036-95936809c4b8
 	github.com/streamingfast/dmetering v0.0.0-20230731155453-e1df53e362aa
 	github.com/streamingfast/dmetrics v0.0.0-20230919161904-206fa8ebd545
@@ -187,7 +187,6 @@ require (
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/viper v1.15.0 // indirect
-	github.com/streamingfast/atm v0.0.0-20220131151839-18c87005e680 // indirect
 	github.com/streamingfast/dtracing v0.0.0-20220305214756-b5c0e8699839 // indirect
 	github.com/streamingfast/opaque v0.0.0-20210811180740-0c01d37ea308 // indirect
 	github.com/streamingfast/validator v0.0.0-20210812013448-b9da5752ce14 // indirect

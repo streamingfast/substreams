@@ -3,7 +3,8 @@ package execout
 import (
 	"fmt"
 
-	"github.com/streamingfast/bstream"
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
+
 	"google.golang.org/protobuf/proto"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -17,11 +18,8 @@ type Buffer struct {
 	clock  *pbsubstreams.Clock
 }
 
-func NewBuffer(blockType string, block *bstream.Block, clock *pbsubstreams.Clock) (*Buffer, error) {
-	blkBytes, err := block.Payload.Get()
-	if err != nil {
-		return nil, fmt.Errorf("getting block %d %q: %w", block.Number, block.Id, err)
-	}
+func NewBuffer(blockType string, block *pbbstream.Block, clock *pbsubstreams.Clock) (*Buffer, error) {
+	blkBytes := block.Payload.Value
 	clockBytes, err := proto.Marshal(clock)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling clock %d %q: %w", clock.Number, clock.Id, err)

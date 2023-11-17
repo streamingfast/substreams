@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"time"
 
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/blockstream"
 	"github.com/streamingfast/bstream/hub"
@@ -116,8 +118,8 @@ func (a *Tier1App) Run() error {
 				context.Background(),
 				a.config.BlockStreamAddr,
 				2,
-				bstream.HandlerFunc(func(blk *bstream.Block, obj interface{}) error {
-					a.modules.HeadBlockNumberMetric.SetUint64(blk.Num())
+				bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
+					a.modules.HeadBlockNumberMetric.SetUint64(blk.Number)
 					a.modules.HeadTimeDriftMetric.SetBlockTime(blk.Time())
 					return h.ProcessBlock(blk, obj)
 				}),

@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"testing"
 
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
+
 	"github.com/streamingfast/substreams/storage/execout"
 
-	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/logging"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/assert"
@@ -48,9 +49,8 @@ type ExecOutputTesting struct {
 	clock  *pbsubstreams.Clock
 }
 
-func NewExecOutputTesting(t *testing.T, block *bstream.Block, clock *pbsubstreams.Clock) *ExecOutputTesting {
-	blkBytes, err := block.Payload.Get()
-	require.NoError(t, err)
+func NewExecOutputTesting(t *testing.T, block *pbbstream.Block, clock *pbsubstreams.Clock) *ExecOutputTesting {
+	blkBytes := block.Payload.Value
 
 	clockBytes, err := proto.Marshal(clock)
 	require.NoError(t, err)

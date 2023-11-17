@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/streamingfast/substreams/manifest"
 	"sync/atomic"
+
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
+	"github.com/streamingfast/substreams/manifest"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/hub"
@@ -198,7 +200,7 @@ type junctionBlockGetter struct {
 
 var Done = errors.New("done")
 
-func (j *junctionBlockGetter) ProcessBlock(block *bstream.Block, obj interface{}) error {
+func (j *junctionBlockGetter) ProcessBlock(block *pbbstream.Block, obj interface{}) error {
 	j.currentHead = obj.(bstream.Cursorable).Cursor().HeadBlock
 
 	stepable := obj.(bstream.Stepable)

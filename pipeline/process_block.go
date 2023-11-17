@@ -8,6 +8,8 @@ import (
 	"runtime/debug"
 	"sync"
 
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
+
 	"github.com/streamingfast/bstream"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -22,7 +24,7 @@ import (
 	"github.com/streamingfast/substreams/storage/execout"
 )
 
-func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err error) {
+func (p *Pipeline) ProcessBlock(block *pbbstream.Block, obj interface{}) (err error) {
 	ctx := p.ctx
 
 	logger := reqctx.Logger(ctx)
@@ -35,7 +37,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 				}
 			}
 			err = fmt.Errorf("panic at block %s: %s", block, r)
-			logger.Error("panic while process block", zap.Uint64("block_num", block.Num()), zap.Error(err))
+			logger.Error("panic while process block", zap.Uint64("block_num", block.Number), zap.Error(err))
 			logger.Error(string(debug.Stack()))
 		}
 	}()
@@ -61,7 +63,7 @@ func (p *Pipeline) ProcessBlock(block *bstream.Block, obj interface{}) (err erro
 	return
 }
 
-func blockToClock(block *bstream.Block) *pbsubstreams.Clock {
+func blockToClock(block *pbbstream.Block) *pbsubstreams.Clock {
 	return &pbsubstreams.Clock{
 		Number:    block.Number,
 		Id:        block.Id,
@@ -78,7 +80,7 @@ func blockRefToPB(block bstream.BlockRef) *pbsubstreams.BlockRef {
 
 func (p *Pipeline) processBlock(
 	ctx context.Context,
-	block *bstream.Block,
+	block *pbbstream.Block,
 	clock *pbsubstreams.Clock,
 	cursor *bstream.Cursor,
 	step bstream.StepType,
@@ -99,10 +101,7 @@ func (p *Pipeline) processBlock(
 
 	case bstream.StepNew:
 		// metering of live blocks
-		payload, err := block.Payload.Get()
-		if err != nil {
-			return fmt.Errorf("step new: getting block payload: %w", err)
-		}
+		payload := block.Payload.Value
 		dmetering.GetBytesMeter(ctx).AddBytesRead(len(payload))
 
 		err = p.handleStepNew(ctx, block, clock, cursor)
@@ -185,7 +184,7 @@ func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
 	return nil
 }
 
-func (p *Pipeline) handleStepNew(ctx context.Context, block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) (err error) {
+func (p *Pipeline) handleStepNew(ctx context.Context, block *pbbstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) (err error) {
 	p.insideReorgUpTo = nil
 	reqDetails := reqctx.Details(ctx)
 

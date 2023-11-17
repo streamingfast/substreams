@@ -558,7 +558,7 @@ func (e *DockerEngine) createManifest(ctx context.Context, deploymentID string, 
 
 	env := server.GetEnvironmentVariableMap(ctx)
 
-	if server.IsTruthy(env["SF_PGWEB"]) {
+	if isTruthy(env["SF_PGWEB"]) {
 		pgweb, motd := e.newPGWeb(deploymentID, dbServiceName)
 		servicesDesc[pgweb.Name] = motd
 		services = append(services, pgweb)

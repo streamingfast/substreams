@@ -21,8 +21,8 @@ func GetDeployStatusPrinter(ctx context.Context) interface {
 
 const productionModeKey = sinkContextKey(1)
 
-func SetProductionMode(ctx context.Context) context.Context {
-	return context.WithValue(ctx, productionModeKey, true)
+func SetProductionMode(ctx context.Context, productionMode bool) context.Context {
+	return context.WithValue(ctx, productionModeKey, productionMode)
 }
 
 func GetProductionMode(ctx context.Context) bool {

@@ -101,6 +101,13 @@ func (s *server) Deploy(ctx context.Context, req *connect_go.Request[pbsinksvc.D
 	uid := uuid.New().String()
 	id := genDeployID(uid)
 
+	ctx = SetProductionMode(ctx, !req.Msg.GetDevelopmentMode())
+	envMap := map[string]string{}
+	for _, env := range req.Msg.GetEnvironment() {
+		envMap[env.Key] = env.Value
+	}
+	ctx = SetEnvironmentVariableMap(ctx, envMap)
+
 	s.logger.Info("deployment request", zap.String("deployment_id", id))
 
 	err := s.engine.Create(ctx, id, req.Msg.SubstreamsPackage, s.logger)

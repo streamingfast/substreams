@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	server "github.com/streamingfast/substreams/sink-server"
 	"net/http"
 
 	"github.com/bufbuild/connect-go"
@@ -48,6 +49,7 @@ func deployE(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Deploying... (creating services, please wait)\n")
 	cli := pbsinksvcconnect.NewProviderClient(http.DefaultClient, sflags.MustGetString(cmd, "endpoint"))
+	ctx = server.WithDeployStatusPrinter(ctx, &server.DeployStatusPrinter{})
 
 	resp, err := cli.Deploy(ctx, connect.NewRequest(req))
 	if err != nil {

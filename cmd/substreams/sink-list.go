@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
@@ -13,30 +14,42 @@ import (
 )
 
 func init() {
-	alphaCmd.AddCommand(sinkListCmd)
-	sinkListCmd.Flags().StringP("endpoint", "e", "http://localhost:8000", "specify the endpoint to connect to.")
+	serviceCmd.AddCommand(listCmd)
 }
 
-var sinkListCmd = &cobra.Command{
-	Use:   "sink-list",
-	Short: "Get list of deployed substreams sinks",
+var listCmd = &cobra.Command{
+	Use:   "list",
+	Short: "Get list of deployed services",
 	Long: cli.Dedent(`
-        Sends a "List" request to a server. By default, it will talk to a local "substreams alpha sink-serve" instance.
+        Sends a "List" request to a server. By default, it will talk to a local "substreams alpha service serve" instance.
         It returns the id and the status of the substreams.
 		`),
-	RunE:         sinkListE,
+	RunE:         listE,
 	Args:         cobra.ExactArgs(0),
 	SilenceUsage: true,
 }
 
-func sinkListE(cmd *cobra.Command, args []string) error {
+func addHeaders(cmd *cobra.Command, req connect.AnyRequest) error {
+	for _, header := range sflags.MustGetStringSlice(cmd, "header") {
+		parts := strings.Split(header, ": ")
+		if len(parts) != 2 {
+			return fmt.Errorf("invalid value for header: %s. Only one occurence of ': ' is permitted.", header)
+		}
+		req.Header().Add(parts[0], parts[1])
+	}
+	return nil
+}
+
+func listE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
-
-	req := &pbsinksvc.ListRequest{}
-
 	cli := pbsinksvcconnect.NewProviderClient(http.DefaultClient, sflags.MustGetString(cmd, "endpoint"))
 
-	resp, err := cli.List(ctx, connect.NewRequest(req))
+	req := connect.NewRequest(&pbsinksvc.ListRequest{})
+	if err := addHeaders(cmd, req); err != nil {
+		return err
+	}
+
+	resp, err := cli.List(ctx, req)
 	if err != nil {
 		return interceptConnectionError(err)
 	}

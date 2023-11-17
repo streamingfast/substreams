@@ -14,25 +14,23 @@ import (
 )
 
 func init() {
-	alphaCmd.AddCommand(sinkStopCmd)
-	sinkStopCmd.Flags().StringP("endpoint", "e", "http://localhost:8000", "specify the endpoint to connect to.")
-	sinkStopCmd.Flags().Bool("strict", false, "Require deploymentID parameter to be set and complete")
+	serviceCmd.AddCommand(stopCmd)
 }
 
-var sinkStopCmd = &cobra.Command{
-	Use:   "sink-stop [deployment-id]",
-	Short: "Stop a running substreams sink",
+var stopCmd = &cobra.Command{
+	Use:   "stop [deployment-id]",
+	Short: "Stop a running service",
 	Long: cli.Dedent(`
-        Sends an "Stop" request to a server. By default, it will talk to a local "substreams alpha sink-serve" instance.
-        It will stop a substreams sink and returns information about the change of status.
+        Sends an "Stop" request to a server. By default, it will talk to a local "substreams alpha service serve" instance.
+        It will stop a service and returns information about the change of status.
         If deploymentID is not set or is incomplete, the CLI will try to guess (unless --strict is set).
 		`),
-	RunE:         sinkStopE,
+	RunE:         stopE,
 	Args:         cobra.RangeArgs(0, 1),
 	SilenceUsage: true,
 }
 
-func sinkStopE(cmd *cobra.Command, args []string) error {
+func stopE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
 	var id string
@@ -52,12 +50,15 @@ func sinkStopE(cmd *cobra.Command, args []string) error {
 		id = matching.Id
 	}
 
-	req := &pbsinksvc.StopRequest{
+	req := connect.NewRequest(&pbsinksvc.StopRequest{
 		DeploymentId: id,
+	})
+	if err := addHeaders(cmd, req); err != nil {
+		return err
 	}
 
 	fmt.Printf("Stopping... (shutting down services, please wait)\n")
-	resp, err := cli.Stop(ctx, connect.NewRequest(req))
+	resp, err := cli.Stop(ctx, req)
 	if err != nil {
 		return interceptConnectionError(err)
 	}

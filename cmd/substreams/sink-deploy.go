@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
+	"net/http"
+
 	"github.com/streamingfast/substreams/sink-server/context"
 	"github.com/streamingfast/substreams/sink-server/printer"
-	"net/http"
 
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
@@ -16,15 +17,14 @@ import (
 )
 
 func init() {
-	alphaCmd.AddCommand(deployCmd)
-	deployCmd.Flags().StringP("endpoint", "e", "http://localhost:8000", "specify the endpoint to connect to.")
+	serviceCmd.AddCommand(deployCmd)
 }
 
 var deployCmd = &cobra.Command{
-	Use:   "sink-deploy <package>",
+	Use:   "deploy <package>",
 	Short: "Deploy a substreams package with a sink",
 	Long: cli.Dedent(`
-        Sends a "deploy" request to a server. By default, it will talk to a local "substreams alpha sink-serve" instance.
+        Sends a "deploy" request to a server. By default, it will talk to a local "substreams alpha service serve" instance.
         The substreams must contain a "SinkConfig" section to be deployable.
 	`),
 	RunE:         deployE,
@@ -44,15 +44,18 @@ func deployE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	req := &pbsinksvc.DeployRequest{
+	req := connect.NewRequest(&pbsinksvc.DeployRequest{
 		SubstreamsPackage: pkg,
+	})
+	if err := addHeaders(cmd, req); err != nil {
+		return err
 	}
 
 	fmt.Printf("Deploying... (creating services, please wait)\n")
 	cli := pbsinksvcconnect.NewProviderClient(http.DefaultClient, sflags.MustGetString(cmd, "endpoint"))
 	ctx = context.WithDeployStatusPrinter(ctx, &printer.DeployStatusPrinter{})
 
-	resp, err := cli.Deploy(ctx, connect.NewRequest(req))
+	resp, err := cli.Deploy(ctx, req)
 	if err != nil {
 		return interceptConnectionError(err)
 	}

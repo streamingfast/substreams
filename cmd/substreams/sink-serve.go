@@ -3,9 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/substreams/sink-server/docker"
 	"os"
 	"regexp"
+
+	"github.com/streamingfast/substreams/sink-server/docker"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
@@ -16,7 +17,7 @@ import (
 )
 
 func init() {
-	alphaCmd.AddCommand(serveCmd)
+	serviceCmd.AddCommand(serveCmd)
 
 	serveCmd.Flags().String("data-dir", "./sink-data", "Store data to this folder")
 	serveCmd.Flags().String("listen-addr", "localhost:8000", "Listen for GRPC connections on this address")
@@ -27,10 +28,10 @@ func init() {
 }
 
 var serveCmd = &cobra.Command{
-	Use:   "sink-serve",
-	Short: "Serve local sink deployments using docker-compose",
+	Use:   "serve",
+	Short: "Serve local service deployments using docker-compose",
 	Long: cli.Dedent(`
-        Listens for "deploy" requests, allowing you to test your sink deployable units to a local docker-based dev environment.
+        Listens for "deploy" requests, allowing you to test your deployable units to a local docker-based dev environment.
 	`),
 	PersistentPreRun: func(cmd *cobra.Command, _ []string) {
 		setup(cmd, zapcore.InfoLevel)

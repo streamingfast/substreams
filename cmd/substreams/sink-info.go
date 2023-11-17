@@ -14,25 +14,23 @@ import (
 )
 
 func init() {
-	alphaCmd.AddCommand(sinkInfoCmd)
-	sinkInfoCmd.Flags().StringP("endpoint", "e", "http://localhost:8000", "specify the endpoint to connect to.")
-	sinkInfoCmd.Flags().Bool("strict", false, "Require deploymentID parameter to be set and complete")
+	serviceCmd.AddCommand(sinkInfoCmd)
 }
 
 var sinkInfoCmd = &cobra.Command{
-	Use:   "sink-info [deployment-id]",
+	Use:   "info [deployment-id]",
 	Short: "Get info on a deployed substreams sink",
 	Long: cli.Dedent(`
         Sends an "Info" request to a server. By default, it will talk to a local "substreams alpha sink-serve" instance.
         It returns information about the status of the substreams and its available services.
         If deploymentID is not set or is incomplete, the CLI will try to guess (unless --strict is set).
 		`),
-	RunE:         sinkInfoE,
+	RunE:         serviceInfoE,
 	Args:         cobra.RangeArgs(0, 1),
 	SilenceUsage: true,
 }
 
-func sinkInfoE(cmd *cobra.Command, args []string) error {
+func serviceInfoE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
 	var id string
@@ -52,11 +50,14 @@ func sinkInfoE(cmd *cobra.Command, args []string) error {
 		id = matching.Id
 	}
 
-	req := &pbsinksvc.InfoRequest{
+	req := connect.NewRequest(&pbsinksvc.InfoRequest{
 		DeploymentId: id,
+	})
+	if err := addHeaders(cmd, req); err != nil {
+		return err
 	}
 
-	resp, err := cli.Info(ctx, connect.NewRequest(req))
+	resp, err := cli.Info(ctx, req)
 	if err != nil {
 		return interceptConnectionError(err)
 	}

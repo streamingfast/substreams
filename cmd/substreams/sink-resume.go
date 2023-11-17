@@ -14,25 +14,23 @@ import (
 )
 
 func init() {
-	alphaCmd.AddCommand(sinkResumeCmd)
-	sinkResumeCmd.Flags().StringP("endpoint", "e", "http://localhost:8000", "specify the endpoint to connect to.")
-	sinkResumeCmd.Flags().Bool("strict", false, "Require deploymentID parameter to be set and complete")
+	serviceCmd.AddCommand(resumeCmd)
 }
 
-var sinkResumeCmd = &cobra.Command{
-	Use:   "sink-resume [deployment-id]",
-	Short: "Resume a paused substreams sink",
+var resumeCmd = &cobra.Command{
+	Use:   "resume [deployment-id]",
+	Short: "Resume a paused service",
 	Long: cli.Dedent(`
-        Sends an "Resume" request to a server. By default, it will talk to a local "substreams alpha sink-serve" instance.
+        Sends an "Resume" request to a server. By default, it will talk to a local "substreams alpha service serve" instance.
         It will resume a paused substreams and returns information about the change of status.
         If deploymentID is not set or is incomplete, the CLI will try to guess (unless --strict is set).
 		`),
-	RunE:         sinkResumeE,
+	RunE:         resumeE,
 	Args:         cobra.RangeArgs(0, 1),
 	SilenceUsage: true,
 }
 
-func sinkResumeE(cmd *cobra.Command, args []string) error {
+func resumeE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
 	var id string
@@ -55,13 +53,16 @@ func sinkResumeE(cmd *cobra.Command, args []string) error {
 		id = matching.Id
 	}
 
-	req := &pbsinksvc.ResumeRequest{
+	req := connect.NewRequest(&pbsinksvc.ResumeRequest{
 		DeploymentId: id,
+	})
+	if err := addHeaders(cmd, req); err != nil {
+		return err
 	}
 
 	fmt.Printf("Resuming... (creating services, please wait)\n")
 
-	resp, err := cli.Resume(ctx, connect.NewRequest(req))
+	resp, err := cli.Resume(ctx, req)
 	if err != nil {
 		return interceptConnectionError(err)
 	}

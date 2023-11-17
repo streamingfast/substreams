@@ -14,25 +14,23 @@ import (
 )
 
 func init() {
-	alphaCmd.AddCommand(sinkPauseCmd)
-	sinkPauseCmd.Flags().StringP("endpoint", "e", "http://localhost:8000", "specify the endpoint to connect to.")
-	sinkPauseCmd.Flags().Bool("strict", false, "Require deploymentID parameter to be set and complete")
+	serviceCmd.AddCommand(pauseCmd)
 }
 
-var sinkPauseCmd = &cobra.Command{
-	Use:   "sink-pause [deployment-id]",
-	Short: "Pause a running substreams sink",
+var pauseCmd = &cobra.Command{
+	Use:   "pause [deployment-id]",
+	Short: "Pause a running service",
 	Long: cli.Dedent(`
-        Sends an "Pause" request to a server. By default, it will talk to a local "substreams alpha sink-serve" instance.
+        Sends an "Pause" request to a server. By default, it will talk to a local "substreams service serve" instance.
         It will pause a substreams and returns information about the change of status.
         If deploymentID is not set or is incomplete, the CLI will try to guess (unless --strict is set).
 		`),
-	RunE:         sinkPauseE,
+	RunE:         pauseE,
 	Args:         cobra.RangeArgs(0, 1),
 	SilenceUsage: true,
 }
 
-func sinkPauseE(cmd *cobra.Command, args []string) error {
+func pauseE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
 	var id string
@@ -52,12 +50,15 @@ func sinkPauseE(cmd *cobra.Command, args []string) error {
 		id = matching.Id
 	}
 
-	req := &pbsinksvc.PauseRequest{
+	req := connect.NewRequest(&pbsinksvc.PauseRequest{
 		DeploymentId: id,
+	})
+	if err := addHeaders(cmd, req); err != nil {
+		return err
 	}
 
 	fmt.Printf("Pausing... please wait\n")
-	resp, err := cli.Pause(ctx, connect.NewRequest(req))
+	resp, err := cli.Pause(ctx, req)
 	if err != nil {
 		return interceptConnectionError(err)
 	}

@@ -3,11 +3,12 @@ package server
 import (
 	"context"
 	"fmt"
-	context2 "github.com/streamingfast/substreams/sink-server/context"
 	"net/http"
 	"regexp"
 	"strings"
 	"time"
+
+	context2 "github.com/streamingfast/substreams/sink-server/context"
 
 	connect_go "github.com/bufbuild/connect-go"
 	"github.com/google/uuid"
@@ -102,6 +103,7 @@ func (s *server) Deploy(ctx context.Context, req *connect_go.Request[pbsinksvc.D
 	uid := uuid.New().String()
 	id := genDeployID(uid)
 
+	ctx = context2.SetHeader(ctx, req.Header())
 	ctx = context2.SetProductionMode(ctx, !req.Msg.GetDevelopmentMode())
 	envMap := map[string]string{}
 	for _, env := range req.Msg.GetEnvironment() {
@@ -130,6 +132,7 @@ func (s *server) Deploy(ctx context.Context, req *connect_go.Request[pbsinksvc.D
 }
 
 func (s *server) Update(ctx context.Context, req *connect_go.Request[pbsinksvc.UpdateRequest]) (*connect_go.Response[pbsinksvc.UpdateResponse], error) {
+	ctx = context2.SetHeader(ctx, req.Header())
 	id := req.Msg.DeploymentId
 	_, _, _, _, _, err := s.engine.Info(ctx, id, s.logger) // only checking if it exists
 	if err != nil {
@@ -156,6 +159,7 @@ func (s *server) Update(ctx context.Context, req *connect_go.Request[pbsinksvc.U
 }
 
 func (s *server) Info(ctx context.Context, req *connect_go.Request[pbsinksvc.InfoRequest]) (*connect_go.Response[pbsinksvc.InfoResponse], error) {
+	ctx = context2.SetHeader(ctx, req.Header())
 	status, reason, outs, info, prog, err := s.engine.Info(ctx, req.Msg.DeploymentId, s.logger)
 	if err != nil {
 		return nil, err
@@ -172,6 +176,7 @@ func (s *server) Info(ctx context.Context, req *connect_go.Request[pbsinksvc.Inf
 }
 
 func (s *server) List(ctx context.Context, req *connect_go.Request[pbsinksvc.ListRequest]) (*connect_go.Response[pbsinksvc.ListResponse], error) {
+	ctx = context2.SetHeader(ctx, req.Header())
 	s.logger.Info("list request")
 
 	list, err := s.engine.List(ctx, s.logger)
@@ -193,6 +198,7 @@ func (s *server) List(ctx context.Context, req *connect_go.Request[pbsinksvc.Lis
 }
 
 func (s *server) Pause(ctx context.Context, req *connect_go.Request[pbsinksvc.PauseRequest]) (*connect_go.Response[pbsinksvc.PauseResponse], error) {
+	ctx = context2.SetHeader(ctx, req.Header())
 	s.logger.Info("pause request", zap.String("deployment_id", req.Msg.DeploymentId))
 
 	prevState, _, _, _, _, err := s.engine.Info(ctx, req.Msg.DeploymentId, s.logger)
@@ -221,6 +227,7 @@ func (s *server) Pause(ctx context.Context, req *connect_go.Request[pbsinksvc.Pa
 }
 
 func (s *server) Stop(ctx context.Context, req *connect_go.Request[pbsinksvc.StopRequest]) (*connect_go.Response[pbsinksvc.StopResponse], error) {
+	ctx = context2.SetHeader(ctx, req.Header())
 	s.logger.Info("pause request", zap.String("deployment_id", req.Msg.DeploymentId))
 
 	prevState, _, _, _, _, err := s.engine.Info(ctx, req.Msg.DeploymentId, s.logger)
@@ -249,6 +256,7 @@ func (s *server) Stop(ctx context.Context, req *connect_go.Request[pbsinksvc.Sto
 }
 
 func (s *server) Resume(ctx context.Context, req *connect_go.Request[pbsinksvc.ResumeRequest]) (*connect_go.Response[pbsinksvc.ResumeResponse], error) {
+	ctx = context2.SetHeader(ctx, req.Header())
 	s.logger.Info("resume request", zap.String("deployment_id", req.Msg.DeploymentId))
 
 	prevState, _, _, _, _, err := s.engine.Info(ctx, req.Msg.DeploymentId, s.logger)
@@ -277,6 +285,7 @@ func (s *server) Resume(ctx context.Context, req *connect_go.Request[pbsinksvc.R
 }
 
 func (s *server) Remove(ctx context.Context, req *connect_go.Request[pbsinksvc.RemoveRequest]) (*connect_go.Response[pbsinksvc.RemoveResponse], error) {
+	ctx = context2.SetHeader(ctx, req.Header())
 	s.logger.Info("remove request", zap.String("deployment_id", req.Msg.DeploymentId))
 
 	prevState, _, _, _, _, err := s.engine.Info(ctx, req.Msg.DeploymentId, s.logger)

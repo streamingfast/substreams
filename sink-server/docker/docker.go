@@ -556,11 +556,12 @@ func (e *DockerEngine) createManifest(deploymentID string, token string, pkg *pb
 	servicesDesc[sink.Name] = sinkMotd
 	services = append(services, sink)
 
-	if sinkConfig.PgwebFrontend != nil && sinkConfig.PgwebFrontend.Enabled {
-		pgweb, motd := e.newPGWeb(deploymentID, dbServiceName)
-		servicesDesc[pgweb.Name] = motd
-		services = append(services, pgweb)
-	}
+	//TODO: add pgweb based on environment variables from the Deploy request instead of sink config
+	//if sinkConfig.PgwebFrontend != nil && sinkConfig.PgwebFrontend.Enabled {
+	//	pgweb, motd := e.newPGWeb(deploymentID, dbServiceName)
+	//	servicesDesc[pgweb.Name] = motd
+	//	services = append(services, pgweb)
+	//}
 
 	if sinkConfig.PostgraphileFrontend != nil && sinkConfig.PostgraphileFrontend.Enabled {
 		postgraphile, motd := e.newPostgraphile(deploymentID, dbServiceName)
@@ -568,6 +569,7 @@ func (e *DockerEngine) createManifest(deploymentID string, token string, pkg *pb
 		services = append(services, postgraphile)
 	}
 
+	//todo: handle development mode for DBT stuff
 	if sinkConfig.DbtConfig != nil && sinkConfig.DbtConfig.Files != nil {
 		var engine string
 		if isPostgres {

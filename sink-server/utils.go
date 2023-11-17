@@ -1,6 +1,9 @@
 package server
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 type DeployStatusPrinter struct {
 }
@@ -17,3 +20,12 @@ func (d *nilDeployStatusPrinter) Printf(format string, args ...interface{}) {
 }
 
 var defaultDeployStatusPrinter = &nilDeployStatusPrinter{}
+
+func IsTruthy(str string) bool {
+	switch strings.ToLower(strings.TrimSpace(str)) {
+	case "true", "1", "yes", "on", "y", "enabled":
+		return true
+	default:
+		return false
+	}
+}

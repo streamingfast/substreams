@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	server "github.com/streamingfast/substreams/sink-server"
 	"io"
 	"os"
 	"os/exec"
@@ -141,7 +142,7 @@ func (e *DockerEngine) Create(ctx context.Context, deploymentID string, pkg *pbs
 		return fmt.Errorf("this substreams-sink engine only supports a single active deployment. Stop any active sink before launching another one or use `sink-update`")
 	}
 
-	manifest, usedPorts, serviceInfo, runMeFirst, err := e.createManifest(deploymentID, e.token, pkg)
+	manifest, usedPorts, serviceInfo, runMeFirst, err := e.createManifest(ctx, deploymentID, e.token, pkg)
 	if err != nil {
 		return fmt.Errorf("creating manifest from package: %w", err)
 	}
@@ -175,7 +176,7 @@ func (e *DockerEngine) Update(ctx context.Context, deploymentID string, pkg *pbs
 		}
 	}
 
-	manifest, usedPorts, serviceInfo, runMeFirst, err := e.createManifest(deploymentID, e.token, pkg)
+	manifest, usedPorts, serviceInfo, runMeFirst, err := e.createManifest(ctx, deploymentID, e.token, pkg)
 	if err != nil {
 		return fmt.Errorf("creating manifest from package: %w", err)
 	}
@@ -509,8 +510,7 @@ func (e *DockerEngine) Shutdown(ctx context.Context, zlog *zap.Logger) (err erro
 	return err
 }
 
-func (e *DockerEngine) createManifest(deploymentID string, token string, pkg *pbsubstreams.Package) (content []byte, usedPorts []uint32, servicesDesc map[string]string, runMeFirst []string, err error) {
-
+func (e *DockerEngine) createManifest(ctx context.Context, deploymentID string, token string, pkg *pbsubstreams.Package) (content []byte, usedPorts []uint32, servicesDesc map[string]string, runMeFirst []string, err error) {
 	if pkg.SinkConfig.TypeUrl != "sf.substreams.sink.sql.v1.Service" {
 		return nil, nil, nil, nil, fmt.Errorf("invalid sinkconfig type: %q. Only sf.substreams.sink.sql.v1.Service is supported for now.", pkg.SinkConfig.TypeUrl)
 	}
@@ -556,12 +556,13 @@ func (e *DockerEngine) createManifest(deploymentID string, token string, pkg *pb
 	servicesDesc[sink.Name] = sinkMotd
 	services = append(services, sink)
 
-	//TODO: add pgweb based on environment variables from the Deploy request instead of sink config
-	//if sinkConfig.PgwebFrontend != nil && sinkConfig.PgwebFrontend.Enabled {
-	//	pgweb, motd := e.newPGWeb(deploymentID, dbServiceName)
-	//	servicesDesc[pgweb.Name] = motd
-	//	services = append(services, pgweb)
-	//}
+	env := server.GetEnvironmentVariableMap(ctx)
+
+	if server.IsTruthy(env["SF_PGWEB"]) {
+		pgweb, motd := e.newPGWeb(deploymentID, dbServiceName)
+		servicesDesc[pgweb.Name] = motd
+		services = append(services, pgweb)
+	}
 
 	if sinkConfig.PostgraphileFrontend != nil && sinkConfig.PostgraphileFrontend.Enabled {
 		postgraphile, motd := e.newPostgraphile(deploymentID, dbServiceName)

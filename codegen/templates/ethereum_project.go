@@ -103,7 +103,7 @@ func NewEthereumProject(name string, moduleName string, chain *EthereumChain, co
 		chain:                       chain,
 		ethereumContracts:           contracts,
 		creationBlockNum:            lowestStartBlock,
-		sqlImportVersion:            "1.0.5",
+		sqlImportVersion:            "1.0.6",
 		graphImportVersion:          "0.1.0",
 		databaseChangeImportVersion: "1.2.1",
 		entityChangeImportVersion:   "1.1.0",

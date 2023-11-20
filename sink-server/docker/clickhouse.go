@@ -29,7 +29,7 @@ func (e *DockerEngine) newClickhouse(deploymentID string, pkg *pbsubstreams.Pack
 		Ports: []types.ServicePortConfig{
 			{
 				Published: pgPort,
-				Target:    9005,
+				Target:    8123,
 			},
 			{
 				Published: clickhousePort,

@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	server "github.com/streamingfast/substreams/sink-server/context"
 	"io"
 	"os"
 	"os/exec"
@@ -22,6 +21,7 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	pbsinksvc "github.com/streamingfast/substreams/pb/sf/substreams/sink/service/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	sinkcontext "github.com/streamingfast/substreams/sink-server/context"
 
 	types "github.com/docker/cli/cli/compose/types"
 	"go.uber.org/zap"
@@ -556,7 +556,7 @@ func (e *DockerEngine) createManifest(ctx context.Context, deploymentID string, 
 	servicesDesc[sink.Name] = sinkMotd
 	services = append(services, sink)
 
-	env := server.GetEnvironmentVariableMap(ctx)
+	env := sinkcontext.GetEnvironmentVariableMap(ctx)
 
 	if isTruthy(env["SF_PGWEB"]) {
 		pgweb, motd := e.newPGWeb(deploymentID, dbServiceName)
@@ -570,8 +570,11 @@ func (e *DockerEngine) createManifest(ctx context.Context, deploymentID string, 
 		services = append(services, postgraphile)
 	}
 
+	isProduction := sinkcontext.GetProductionMode(ctx)
+
 	//todo: handle development mode for DBT stuff
-	if sinkConfig.DbtConfig != nil && sinkConfig.DbtConfig.Files != nil {
+
+	if sinkConfig.DbtConfig != nil && sinkConfig.DbtConfig.Enabled {
 		var engine string
 		if isPostgres {
 			engine = "postgres"
@@ -579,13 +582,22 @@ func (e *DockerEngine) createManifest(ctx context.Context, deploymentID string, 
 			engine = "clickhouse"
 		}
 
-		if engine != "" {
-			dbt, motd, err := e.newDBT(deploymentID, dbServiceName, sinkConfig.DbtConfig, engine)
-			if err != nil {
-				return nil, nil, nil, nil, fmt.Errorf("creating dbt deployment: %w", err)
-			}
+		if engine == "" {
+			return nil, nil, nil, nil, fmt.Errorf("cannot create dbt deployment: no valid engine specified")
+		}
+
+		dbt, motd, err := e.newDBT(deploymentID, dbServiceName, sinkConfig.DbtConfig, engine, isProduction)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("creating dbt deployment: %w", err)
+		}
+
+		if dbt != nil {
 			servicesDesc[dbt.Name] = motd
-			services = append(services, dbt)
+			if dbt != nil {
+				services = append(services, *dbt)
+			}
+		} else {
+			servicesDesc["dbt"] = motd
 		}
 	}
 

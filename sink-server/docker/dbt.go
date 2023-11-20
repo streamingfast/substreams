@@ -15,10 +15,10 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func (e *DockerEngine) newDBT(deploymentID string, serviceName string, config *pbsql.DBTConfig, engine string) (types.ServiceConfig, string, error) {
+func (e *DockerEngine) newDBT(deploymentID string, serviceName string, config *pbsql.DBTConfig, engine string, productionMode bool) (*types.ServiceConfig, string, error) {
 	name := fmt.Sprintf("%s-dbt", deploymentID)
 
-	var conf types.ServiceConfig
+	var conf *types.ServiceConfig
 
 	dbtFiles, err := getFiles(config.Files)
 	if err != nil {
@@ -97,7 +97,32 @@ func (e *DockerEngine) newDBT(deploymentID string, serviceName string, config *p
 		return conf, "", fmt.Errorf("chmod +x start script: %w", err)
 	}
 
-	conf = types.ServiceConfig{
+	if !productionMode {
+		absDataFolder, err := filepath.Abs(dataFolder)
+		if err != nil {
+			return conf, "", fmt.Errorf("getting absolute path for dbt folder: %w", err)
+		}
+		absProfileFolder, err := filepath.Abs(profileFolder)
+		if err != nil {
+			return conf, "", fmt.Errorf("getting absolute path for profile folder: %w", err)
+		}
+
+		/// return a motd with the commands to run the docker exec dbt run command with the proper volumes and environment variables
+		motd := fmt.Sprintf(`To run dbt manually, run the following command:
+
+		export LOCAL_DBT_PROFILES_DIR="%s"
+		export LOCAL_DBT_TARGET_PATH="%s"
+		docker run \
+		  -e DBT_PROFILES_DIR=/opt/data/profile \
+		  -e DBT_TARGET=dev \
+		  -v "${LOCAL_DBT_PROFILES_DIR}":/opt/data/profile \
+		  -v "${LOCAL_DBT_TARGET_PATH}":/opt/data/dbt \
+		  %s run --project-dir /opt/data/dbt`, absProfileFolder, absDataFolder, getDBTDockerImage(engine))
+
+		return nil, motd, nil
+	}
+
+	conf = &types.ServiceConfig{
 		Name:          name,
 		ContainerName: name,
 		Image:         getDBTDockerImage(engine),
@@ -154,6 +179,10 @@ func getDBTDockerImage(engine string) string {
 
 func getFiles(archive []byte) (map[string][]byte, error) {
 	contentMap := make(map[string][]byte)
+
+	if archive == nil {
+		return contentMap, fmt.Errorf("files archive is nil")
+	}
 
 	// Read the zipped content from the Files field
 	r, err := zip.NewReader(bytes.NewReader(archive), int64(len(archive)))

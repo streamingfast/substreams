@@ -110,7 +110,6 @@ sink:
   type: sf.substreams.sink.sql.v1.Service
   config:
     schema: "../schema.sql"
-    wire_protocol_access: true
 ```
 
 The `package.name` and `package.version` are meant to be replaced to fit your project.

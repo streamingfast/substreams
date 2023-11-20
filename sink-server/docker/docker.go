@@ -556,9 +556,11 @@ func (e *DockerEngine) createManifest(ctx context.Context, deploymentID string, 
 	servicesDesc[sink.Name] = sinkMotd
 	services = append(services, sink)
 
+	isProduction := sinkcontext.GetProductionMode(ctx)
+
 	env := sinkcontext.GetEnvironmentVariableMap(ctx)
 
-	if isTruthy(env["SF_PGWEB"]) {
+	if isTruthy(env["SF_PGWEB"]) || !isProduction {
 		pgweb, motd := e.newPGWeb(deploymentID, dbServiceName)
 		servicesDesc[pgweb.Name] = motd
 		services = append(services, pgweb)
@@ -569,8 +571,6 @@ func (e *DockerEngine) createManifest(ctx context.Context, deploymentID string, 
 		servicesDesc[postgraphile.Name] = motd
 		services = append(services, postgraphile)
 	}
-
-	isProduction := sinkcontext.GetProductionMode(ctx)
 
 	//todo: handle development mode for DBT stuff
 

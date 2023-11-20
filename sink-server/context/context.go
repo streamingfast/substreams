@@ -38,14 +38,14 @@ func GetProductionMode(ctx context.Context) bool {
 	return false
 }
 
-const environmentKey = sinkContextKey(2)
+const parameterKey = sinkContextKey(2)
 
-func SetEnvironmentVariableMap(ctx context.Context, env map[string]string) context.Context {
-	return context.WithValue(ctx, environmentKey, env)
+func SetParameterMap(ctx context.Context, env map[string]string) context.Context {
+	return context.WithValue(ctx, parameterKey, env)
 }
 
-func GetEnvironmentVariableMap(ctx context.Context) map[string]string {
-	if env, ok := ctx.Value(environmentKey).(map[string]string); ok {
+func GetParameterMap(ctx context.Context) map[string]string {
+	if env, ok := ctx.Value(parameterKey).(map[string]string); ok {
 		return env
 	}
 	return map[string]string{}

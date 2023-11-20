@@ -22,10 +22,10 @@ message DeployRequest {
   sf.substreams.v1.Package substreams_package = 1;
 
   bool development_mode = 2;
-  repeated EnvironmentVariable environment = 3;
+  repeated Parameter parameters = 3;
 }
 
-message EnvironmentVariable {
+message Parameter {
   string key = 1;
   string value = 2;
 }

@@ -557,8 +557,7 @@ func (e *DockerEngine) createManifest(ctx context.Context, deploymentID string, 
 	services = append(services, sink)
 
 	isProduction := sinkcontext.GetProductionMode(ctx)
-
-	env := sinkcontext.GetEnvironmentVariableMap(ctx)
+	env := sinkcontext.GetParameterMap(ctx)
 
 	if isTruthy(env["SF_PGWEB"]) || !isProduction {
 		pgweb, motd := e.newPGWeb(deploymentID, dbServiceName)

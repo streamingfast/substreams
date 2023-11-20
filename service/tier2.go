@@ -296,6 +296,7 @@ func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbs
 	auth := dauth.FromContext(ctx)
 	userID := auth.UserID()
 	apiKeyID := auth.APIKeyID()
+	userMeta := auth.Meta()
 	ip := auth.RealIP()
 
 	return func(respAny substreams.ResponseFromAnyTier) error {
@@ -305,7 +306,7 @@ func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbs
 			return status.Error(codes.Unavailable, err.Error())
 		}
 
-		sendMetering(meter, userID, apiKeyID, ip, "sf.substreams.internal.v2/ProcessRange", resp)
+		sendMetering(meter, userID, apiKeyID, ip, userMeta, "sf.substreams.internal.v2/ProcessRange", resp)
 		return nil
 	}
 }

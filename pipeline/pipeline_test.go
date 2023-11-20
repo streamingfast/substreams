@@ -4,19 +4,16 @@ import (
 	"context"
 	"testing"
 
-	"google.golang.org/protobuf/types/known/anypb"
-
-	"google.golang.org/protobuf/types/known/timestamppb"
-
-	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
-
 	"github.com/streamingfast/bstream"
+	pbbstream "github.com/streamingfast/bstream/types/pb/sf/bstream/v1"
 	"github.com/streamingfast/dstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/metrics"

@@ -6,11 +6,10 @@ import (
 	"net/url"
 	"time"
 
-	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
-
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/blockstream"
 	"github.com/streamingfast/bstream/hub"
+	pbbstream "github.com/streamingfast/bstream/types/pb/sf/bstream/v1"
 	dauth "github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/dstore"

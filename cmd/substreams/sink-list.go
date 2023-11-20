@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/bufbuild/connect-go"
@@ -30,6 +31,11 @@ var listCmd = &cobra.Command{
 }
 
 func addHeaders(cmd *cobra.Command, req connect.AnyRequest) error {
+	envVar := sflags.MustGetString(cmd, "substreams-api-token-envvar")
+	if value := os.Getenv(envVar); value != "" {
+		req.Header().Add("authorization", fmt.Sprintf("bearer %s", value))
+	}
+
 	for _, header := range sflags.MustGetStringSlice(cmd, "header") {
 		parts := strings.Split(header, ": ")
 		if len(parts) != 2 {

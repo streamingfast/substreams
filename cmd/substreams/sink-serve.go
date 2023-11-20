@@ -6,6 +6,8 @@ import (
 	"os"
 	"regexp"
 
+	"github.com/streamingfast/dauth"
+	dauthnull "github.com/streamingfast/dauth/null"
 	"github.com/streamingfast/substreams/sink-server/docker"
 
 	"github.com/spf13/cobra"
@@ -25,6 +27,7 @@ func init() {
 	serveCmd.Flags().String("engine", "docker", "Engine to use for deployments, defaults to docker")
 	serveCmd.Flags().String("kubernetes-config-path", "", "Path to the kubeconfig file for kubernetes engine. If empty, will use InClusterConfig")
 	serveCmd.Flags().String("kubernetes-namespace", "hosted-substreams-sinks", "Namespace to use for kubernetes engine")
+	dauthnull.Register()
 }
 
 var serveCmd = &cobra.Command{
@@ -77,7 +80,13 @@ func serveE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unsupported engine: %q", engine)
 	}
 
-	srv, err := server.New(ctx, engine, dataDir, listenAddr, cors, zlog)
+	// local service serve does not support auth, so we disable by using null://
+	auth, err := dauth.New("null://", zlog)
+	if err != nil {
+		return err
+	}
+
+	srv, err := server.New(ctx, engine, dataDir, listenAddr, cors, auth, zlog)
 	if err != nil {
 		return fmt.Errorf("initializing server: %w", err)
 	}

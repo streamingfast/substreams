@@ -8,19 +8,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/streamingfast/dauth"
 	context2 "github.com/streamingfast/substreams/sink-server/context"
 
 	connect_go "github.com/bufbuild/connect-go"
 	"github.com/google/uuid"
+	dauthconnect "github.com/streamingfast/dauth/middleware/connect"
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
 	connectweb "github.com/streamingfast/dgrpc/server/connect-web"
 	"github.com/streamingfast/shutter"
 	pbsinksvc "github.com/streamingfast/substreams/pb/sf/substreams/sink/service/v1"
 	"github.com/streamingfast/substreams/pb/sf/substreams/sink/service/v1/pbsinksvcconnect"
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
-	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
 )
 
 const DeploymentIDLength = 8
@@ -32,8 +31,9 @@ type server struct {
 	httpListenAddr     string
 	corsHostRegexAllow *regexp.Regexp
 
-	logger *zap.Logger
-	engine Engine
+	authenticator dauth.Authenticator
+	logger        *zap.Logger
+	engine        Engine
 }
 
 func New(
@@ -42,12 +42,14 @@ func New(
 	dataDir string,
 	httpListenAddr string,
 	corsHostRegexAllow *regexp.Regexp,
+	authenticator dauth.Authenticator,
 	logger *zap.Logger,
 ) (*server, error) {
 	srv := &server{
 		Shutter:            shutter.New(),
 		httpListenAddr:     httpListenAddr,
 		corsHostRegexAllow: corsHostRegexAllow,
+		authenticator:      authenticator,
 		logger:             logger,
 		engine:             engine,
 	}
@@ -59,13 +61,10 @@ func New(
 func (s *server) Run(ctx context.Context) {
 	s.logger.Info("starting server server")
 
-	tracerProvider := otel.GetTracerProvider()
 	options := []dgrpcserver.Option{
 		dgrpcserver.WithLogger(s.logger),
 		dgrpcserver.WithHealthCheck(dgrpcserver.HealthCheckOverGRPC|dgrpcserver.HealthCheckOverHTTP, s.healthzHandler()),
-		dgrpcserver.WithPostUnaryInterceptor(otelgrpc.UnaryServerInterceptor(otelgrpc.WithTracerProvider(tracerProvider))),
-		dgrpcserver.WithPostStreamInterceptor(otelgrpc.StreamServerInterceptor(otelgrpc.WithTracerProvider(tracerProvider))),
-		dgrpcserver.WithGRPCServerOptions(grpc.MaxRecvMsgSize(25 * 1024 * 1024)),
+		dgrpcserver.WithConnectInterceptor(dauthconnect.NewAuthInterceptor(s.authenticator, s.logger)),
 		dgrpcserver.WithReflection(pbsinksvc.Provider_ServiceDesc.ServiceName),
 		dgrpcserver.WithCORS(s.corsOption()),
 	}

@@ -3,9 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
-
-	"github.com/streamingfast/substreams/sink-server/context"
-	"github.com/streamingfast/substreams/sink-server/printer"
+	"strings"
 
 	"github.com/bufbuild/connect-go"
 	"github.com/spf13/cobra"
@@ -14,10 +12,13 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	pbsinksvc "github.com/streamingfast/substreams/pb/sf/substreams/sink/service/v1"
 	"github.com/streamingfast/substreams/pb/sf/substreams/sink/service/v1/pbsinksvcconnect"
+	"github.com/streamingfast/substreams/sink-server/context"
+	"github.com/streamingfast/substreams/sink-server/printer"
 )
 
 func init() {
 	serviceCmd.AddCommand(deployCmd)
+	deployCmd.Flags().StringArrayP("parameters", "p", []string{}, "Parameters to pass to the substreams")
 }
 
 var deployCmd = &cobra.Command{
@@ -44,8 +45,28 @@ func deployE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	//request parameters
+	// fmt.Println("request parameters")
+	paramsMap := make(map[string]string)
+	for _, param := range mustGetStringArray(cmd, "parameters") {
+		parts := strings.SplitN(param, "=", 2)
+		if len(parts) != 2 {
+			return fmt.Errorf("invalid parameter format: %q", param)
+		}
+		paramsMap[parts[0]] = parts[1]
+	}
+
+	params := []*pbsinksvc.Parameter{}
+	for k, v := range paramsMap {
+		params = append(params, &pbsinksvc.Parameter{
+			Key:   k,
+			Value: v,
+		})
+	}
+
 	req := connect.NewRequest(&pbsinksvc.DeployRequest{
 		SubstreamsPackage: pkg,
+		Parameters:        params,
 	})
 	if err := addHeaders(cmd, req); err != nil {
 		return err

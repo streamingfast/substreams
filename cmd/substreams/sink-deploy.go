@@ -19,6 +19,7 @@ import (
 func init() {
 	serviceCmd.AddCommand(deployCmd)
 	deployCmd.Flags().StringArrayP("parameters", "p", []string{}, "Parameters to pass to the substreams")
+	deployCmd.Flags().Bool("prod", false, "Enable production mode (default: false)")
 }
 
 var deployCmd = &cobra.Command{
@@ -67,6 +68,7 @@ func deployE(cmd *cobra.Command, args []string) error {
 	req := connect.NewRequest(&pbsinksvc.DeployRequest{
 		SubstreamsPackage: pkg,
 		Parameters:        params,
+		DevelopmentMode:   !sflags.MustGetBool(cmd, "prod"),
 	})
 	if err := addHeaders(cmd, req); err != nil {
 		return err

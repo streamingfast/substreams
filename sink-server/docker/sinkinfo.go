@@ -28,7 +28,7 @@ func (e *DockerEngine) newSinkInfo(deploymentID string, dbService string, dbType
 		DependsOn: []string{dbService},
 	}
 
-	motd = fmt.Sprintf("Sink info service %q available at URL: 'http://localhost:%d'",
+	motd = fmt.Sprintf("Sink info service %q available at URL: 'http://localhost:%d/sinkinfo'",
 		name,
 		localPort,
 	)

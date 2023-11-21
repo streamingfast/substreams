@@ -566,7 +566,7 @@ func (e *DockerEngine) createManifest(ctx context.Context, deploymentID string, 
 	}
 
 	if sinkConfig.PostgraphileFrontend != nil && sinkConfig.PostgraphileFrontend.Enabled {
-		postgraphile, motd := e.newPostgraphile(deploymentID, dbServiceName)
+		postgraphile, motd := e.newPostgraphile(deploymentID, dbServiceName, isProduction)
 		servicesDesc[postgraphile.Name] = motd
 		services = append(services, postgraphile)
 	}

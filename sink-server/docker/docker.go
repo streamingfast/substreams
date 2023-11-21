@@ -572,15 +572,13 @@ func (e *DockerEngine) createManifest(ctx context.Context, deploymentID string, 
 	}
 
 	//todo: handle development mode for DBT stuff
-
+	var engine string
+	if isPostgres {
+		engine = "postgres"
+	} else if isClickhouse {
+		engine = "clickhouse"
+	}
 	if sinkConfig.DbtConfig != nil && sinkConfig.DbtConfig.Enabled {
-		var engine string
-		if isPostgres {
-			engine = "postgres"
-		} else if isClickhouse {
-			engine = "clickhouse"
-		}
-
 		if engine == "" {
 			return nil, nil, nil, nil, fmt.Errorf("cannot create dbt deployment: no valid engine specified")
 		}
@@ -604,6 +602,12 @@ func (e *DockerEngine) createManifest(ctx context.Context, deploymentID string, 
 		rest, motd := e.newRestFrontend(deploymentID, dbServiceName)
 		servicesDesc[rest.Name] = motd
 		services = append(services, rest)
+	}
+
+	if !isProduction { //dev only for now
+		sinkinfo, motd := e.newSinkInfo(deploymentID, dbServiceName, engine)
+		servicesDesc[sinkinfo.Name] = motd
+		services = append(services, sinkinfo)
 	}
 
 	for _, svc := range services {

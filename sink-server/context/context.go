@@ -3,26 +3,9 @@ package context
 import (
 	"context"
 	"net/http"
-
-	"github.com/streamingfast/substreams/sink-server/printer"
 )
 
 type sinkContextKey int
-
-const deployStatusPrinterKey = sinkContextKey(0)
-
-func WithDeployStatusPrinter(ctx context.Context, printer *printer.DeployStatusPrinter) context.Context {
-	return context.WithValue(ctx, deployStatusPrinterKey, printer)
-}
-
-func GetDeployStatusPrinter(ctx context.Context) interface {
-	Printf(format string, args ...interface{})
-} {
-	if printer, ok := ctx.Value(deployStatusPrinterKey).(*printer.DeployStatusPrinter); ok {
-		return printer
-	}
-	return printer.DefaultDeployStatusPrinter
-}
 
 const productionModeKey = sinkContextKey(1)
 

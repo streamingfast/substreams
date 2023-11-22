@@ -12,8 +12,6 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	pbsinksvc "github.com/streamingfast/substreams/pb/sf/substreams/sink/service/v1"
 	"github.com/streamingfast/substreams/pb/sf/substreams/sink/service/v1/pbsinksvcconnect"
-	"github.com/streamingfast/substreams/sink-server/context"
-	"github.com/streamingfast/substreams/sink-server/printer"
 )
 
 func init() {
@@ -76,7 +74,6 @@ func deployE(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Deploying... (creating services, please wait)\n")
 	cli := pbsinksvcconnect.NewProviderClient(http.DefaultClient, sflags.MustGetString(cmd, "endpoint"))
-	ctx = context.WithDeployStatusPrinter(ctx, &printer.DeployStatusPrinter{})
 
 	resp, err := cli.Deploy(ctx, req)
 	if err != nil {

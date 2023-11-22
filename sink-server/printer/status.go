@@ -8,7 +8,7 @@ type DeployStatusPrinter struct {
 }
 
 func (d *DeployStatusPrinter) Printf(format string, args ...interface{}) {
-	fmt.Printf(format, args...)
+	fmt.Printf(fmt.Sprintf("%s\n", format), args...)
 }
 
 type nilDeployStatusPrinter struct {

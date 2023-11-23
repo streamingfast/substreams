@@ -116,23 +116,23 @@ func (s *server) Deploy(ctx context.Context, req *connect_go.Request[pbsinksvc.D
 		return nil, err
 	}
 
-	status, reason, outs, _, _, err := s.engine.Info(ctx, id, s.logger)
+	info, err := s.engine.Info(ctx, id, s.logger)
 	if err != nil {
 		return nil, err
 	}
 
 	return connect_go.NewResponse(&pbsinksvc.DeployResponse{
-		Status:       status,
-		Reason:       reason,
+		Status:       info.Status,
+		Reason:       info.Reason,
 		DeploymentId: id,
-		Services:     outs,
+		Services:     info.Services,
 	}), nil
 }
 
 func (s *server) Update(ctx context.Context, req *connect_go.Request[pbsinksvc.UpdateRequest]) (*connect_go.Response[pbsinksvc.UpdateResponse], error) {
 	ctx = sinkcontext.SetHeader(ctx, req.Header())
 	id := req.Msg.DeploymentId
-	_, _, _, _, _, err := s.engine.Info(ctx, id, s.logger) // only checking if it exists
+	_, err := s.engine.Info(ctx, id, s.logger) // only checking if it exists
 	if err != nil {
 		return nil, fmt.Errorf("looking up deployment %q: %w", id, err)
 	}
@@ -144,33 +144,26 @@ func (s *server) Update(ctx context.Context, req *connect_go.Request[pbsinksvc.U
 		return nil, err
 	}
 
-	status, reason, outs, _, _, err := s.engine.Info(ctx, id, s.logger)
+	info, err := s.engine.Info(ctx, id, s.logger)
 	if err != nil {
 		return nil, err
 	}
 
 	return connect_go.NewResponse(&pbsinksvc.UpdateResponse{
-		Status:   status,
-		Reason:   reason,
-		Services: outs,
+		Status:   info.Status,
+		Reason:   info.Reason,
+		Services: info.Services,
 	}), nil
 }
 
 func (s *server) Info(ctx context.Context, req *connect_go.Request[pbsinksvc.InfoRequest]) (*connect_go.Response[pbsinksvc.InfoResponse], error) {
 	ctx = sinkcontext.SetHeader(ctx, req.Header())
-	status, reason, outs, info, prog, err := s.engine.Info(ctx, req.Msg.DeploymentId, s.logger)
+	info, err := s.engine.Info(ctx, req.Msg.DeploymentId, s.logger)
 	if err != nil {
 		return nil, err
 	}
 
-	return connect_go.NewResponse(
-		&pbsinksvc.InfoResponse{
-			Status:      status,
-			Reason:      reason,
-			Services:    outs,
-			PackageInfo: info,
-			Progress:    prog,
-		}), nil
+	return connect_go.NewResponse(info), nil
 }
 
 func (s *server) List(ctx context.Context, req *connect_go.Request[pbsinksvc.ListRequest]) (*connect_go.Response[pbsinksvc.ListResponse], error) {
@@ -199,20 +192,22 @@ func (s *server) Pause(ctx context.Context, req *connect_go.Request[pbsinksvc.Pa
 	ctx = sinkcontext.SetHeader(ctx, req.Header())
 	s.logger.Info("pause request", zap.String("deployment_id", req.Msg.DeploymentId))
 
-	prevState, _, _, _, _, err := s.engine.Info(ctx, req.Msg.DeploymentId, s.logger)
+	info, err := s.engine.Info(ctx, req.Msg.DeploymentId, s.logger)
 	if err != nil {
 		s.logger.Warn("cannot get previous status on deployment", zap.Error(err), zap.String("deployent_id", req.Msg.DeploymentId))
 	}
+	prevState := info.Status
 
 	_, err = s.engine.Pause(ctx, req.Msg.DeploymentId, s.logger)
 	if err != nil {
 		return nil, fmt.Errorf("pausing %q: %w", req.Msg.DeploymentId, err)
 	}
 
-	newState, _, _, _, _, err := s.engine.Info(ctx, req.Msg.DeploymentId, s.logger)
+	info, err = s.engine.Info(ctx, req.Msg.DeploymentId, s.logger)
 	if err != nil {
 		s.logger.Warn("cannot get new status on deployment", zap.Error(err), zap.String("deployent_id", req.Msg.DeploymentId))
 	}
+	newState := info.Status
 	if newState == pbsinksvc.DeploymentStatus_UNKNOWN || newState == pbsinksvc.DeploymentStatus_RUNNING {
 		newState = pbsinksvc.DeploymentStatus_PAUSING
 	}
@@ -228,20 +223,22 @@ func (s *server) Stop(ctx context.Context, req *connect_go.Request[pbsinksvc.Sto
 	ctx = sinkcontext.SetHeader(ctx, req.Header())
 	s.logger.Info("pause request", zap.String("deployment_id", req.Msg.DeploymentId))
 
-	prevState, _, _, _, _, err := s.engine.Info(ctx, req.Msg.DeploymentId, s.logger)
+	info, err := s.engine.Info(ctx, req.Msg.DeploymentId, s.logger)
 	if err != nil {
 		s.logger.Warn("cannot get previous status on deployment", zap.Error(err), zap.String("deployent_id", req.Msg.DeploymentId))
 	}
+	prevState := info.Status
 
 	_, err = s.engine.Stop(ctx, req.Msg.DeploymentId, s.logger)
 	if err != nil {
 		return nil, fmt.Errorf("stopping %q: %w", req.Msg.DeploymentId, err)
 	}
 
-	newState, _, _, _, _, err := s.engine.Info(ctx, req.Msg.DeploymentId, s.logger)
+	info, err = s.engine.Info(ctx, req.Msg.DeploymentId, s.logger)
 	if err != nil {
 		s.logger.Warn("cannot get new status on deployment", zap.Error(err), zap.String("deployent_id", req.Msg.DeploymentId))
 	}
+	newState := info.Status
 	if newState == pbsinksvc.DeploymentStatus_UNKNOWN || newState == pbsinksvc.DeploymentStatus_RUNNING {
 		newState = pbsinksvc.DeploymentStatus_STOPPING
 	}
@@ -257,20 +254,22 @@ func (s *server) Resume(ctx context.Context, req *connect_go.Request[pbsinksvc.R
 	ctx = sinkcontext.SetHeader(ctx, req.Header())
 	s.logger.Info("resume request", zap.String("deployment_id", req.Msg.DeploymentId))
 
-	prevState, _, _, _, _, err := s.engine.Info(ctx, req.Msg.DeploymentId, s.logger)
+	info, err := s.engine.Info(ctx, req.Msg.DeploymentId, s.logger)
 	if err != nil {
 		s.logger.Warn("cannot get previous status on deployment", zap.Error(err), zap.String("deployent_id", req.Msg.DeploymentId))
 	}
+	prevState := info.Status
 
 	_, err = s.engine.Resume(ctx, req.Msg.DeploymentId, prevState, s.logger)
 	if err != nil {
 		return nil, fmt.Errorf("resuming %q: %w", req.Msg.DeploymentId, err)
 	}
 
-	newState, _, _, _, _, err := s.engine.Info(ctx, req.Msg.DeploymentId, s.logger)
+	info, err = s.engine.Info(ctx, req.Msg.DeploymentId, s.logger)
 	if err != nil {
 		s.logger.Warn("cannot get new status on deployment", zap.Error(err), zap.String("deployent_id", req.Msg.DeploymentId))
 	}
+	newState := info.Status
 	if newState == pbsinksvc.DeploymentStatus_UNKNOWN || newState == pbsinksvc.DeploymentStatus_PAUSED {
 		newState = pbsinksvc.DeploymentStatus_RESUMING
 	}
@@ -286,10 +285,11 @@ func (s *server) Remove(ctx context.Context, req *connect_go.Request[pbsinksvc.R
 	ctx = sinkcontext.SetHeader(ctx, req.Header())
 	s.logger.Info("remove request", zap.String("deployment_id", req.Msg.DeploymentId))
 
-	prevState, _, _, _, _, err := s.engine.Info(ctx, req.Msg.DeploymentId, s.logger)
+	info, err := s.engine.Info(ctx, req.Msg.DeploymentId, s.logger)
 	if err != nil {
 		s.logger.Warn("cannot get previous status on deployment", zap.Error(err), zap.String("deployent_id", req.Msg.DeploymentId))
 	}
+	prevState := info.Status
 
 	_, err = s.engine.Remove(ctx, req.Msg.DeploymentId, s.logger)
 	if err != nil {

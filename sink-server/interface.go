@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+
 	pbsinksvc "github.com/streamingfast/substreams/pb/sf/substreams/sink/service/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	docker "github.com/streamingfast/substreams/sink-server/docker"
@@ -19,7 +20,7 @@ type Engine interface {
 
 	Remove(ctx context.Context, deploymentID string, zlog *zap.Logger) (string, error)
 
-	Info(ctx context.Context, deploymentID string, zlog *zap.Logger) (pbsinksvc.DeploymentStatus, string, map[string]string, *pbsinksvc.PackageInfo, *pbsinksvc.SinkProgress, error)
+	Info(ctx context.Context, deploymentID string, zlog *zap.Logger) (*pbsinksvc.InfoResponse, error)
 	List(ctx context.Context, zlog *zap.Logger) ([]*pbsinksvc.DeploymentWithStatus, error)
 
 	Shutdown(ctx context.Context, zlog *zap.Logger) error

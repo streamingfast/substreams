@@ -219,12 +219,12 @@ func (e *DockerEngine) otherDeploymentIsActive(ctx context.Context, deploymentID
 
 var reasonInternalError = "internal error"
 
-func (e *DockerEngine) Info(ctx context.Context, deploymentID string, zlog *zap.Logger) (pbsinksvc.DeploymentStatus, string, map[string]string, *pbsinksvc.PackageInfo, *pbsinksvc.SinkProgress, error) {
+func (e *DockerEngine) Info(ctx context.Context, deploymentID string, zlog *zap.Logger) (*pbsinksvc.InfoResponse, error) {
 	cmd := exec.Command("docker", "compose", "ps", "--format", "json")
 	cmd.Dir = filepath.Join(e.dir, deploymentID)
 	out, err := cmd.Output()
 	if err != nil {
-		return pbsinksvc.DeploymentStatus_UNKNOWN, reasonInternalError, nil, nil, nil, fmt.Errorf("getting status from `docker compose ps` command: %q, %w", out, err)
+		return nil, fmt.Errorf("getting status from `docker compose ps` command: %q, %w", out, err)
 	}
 
 	var line []byte
@@ -252,15 +252,15 @@ func (e *DockerEngine) Info(ctx context.Context, deploymentID string, zlog *zap.
 	}
 
 	var outputs []*dockerComposePSOutput
-	if err := json.Unmarshal(line, &outputs); err != nil {
-		return 0, reasonInternalError, nil, nil, nil, fmt.Errorf("unmarshalling docker output: %w", err)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshalling docker output: %w", err)
 	}
 
 	var status pbsinksvc.DeploymentStatus
 
 	info, err := e.readDeploymentInfo(deploymentID)
 	if err != nil {
-		return status, reasonInternalError, nil, nil, nil, fmt.Errorf("cannot read Service Info: %w", err)
+		return nil, fmt.Errorf("cannot read Service Info: %w", err)
 	}
 
 	seen := make(map[string]bool, len(info.ServiceInfo))
@@ -304,7 +304,14 @@ func (e *DockerEngine) Info(ctx context.Context, deploymentID string, zlog *zap.
 		}
 	}
 
-	return status, reason, info.ServiceInfo, info.PackageInfo, sinkProgress, nil
+	return &pbsinksvc.InfoResponse{
+		Status:      status,
+		Services:    info.ServiceInfo,
+		Reason:      reason,
+		PackageInfo: info.PackageInfo,
+		Progress:    sinkProgress,
+		Motd:        `Running your deployment inside local docker containers`,
+	}, nil
 }
 
 func getProgressBlock(serviceName, dir string, zlog *zap.Logger) uint64 {
@@ -369,16 +376,16 @@ func (e *DockerEngine) list(ctx context.Context, zlog *zap.Logger) (out []*pbsin
 
 	for _, f := range files {
 		id := f.Name()
-		status, reason, _, info, _, err := e.Info(ctx, id, zlog)
+		info, err := e.Info(ctx, id, zlog)
 		if err != nil {
 			zlog.Warn("cannot get info for deployment", zap.String("id", id))
 			continue
 		}
 		out = append(out, &pbsinksvc.DeploymentWithStatus{
 			Id:          id,
-			Status:      status,
-			Reason:      reason,
-			PackageInfo: info,
+			Status:      info.Status,
+			Reason:      info.Reason,
+			PackageInfo: info.PackageInfo,
 		})
 	}
 	return out, nil

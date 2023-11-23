@@ -69,6 +69,7 @@ func serviceInfoE(cmd *cobra.Command, args []string) error {
 	if resp.Msg.Progress != nil {
 		fmt.Printf("Last processed block: %d\n", resp.Msg.Progress.LastProcessedBlock)
 	}
+	fmt.Print(resp.Msg.Motd)
 	printServices(resp.Msg.Services)
 
 	return nil

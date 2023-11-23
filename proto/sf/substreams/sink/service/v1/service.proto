@@ -62,6 +62,7 @@ message InfoResponse {
   string reason = 3;
   PackageInfo package_info = 4;
   SinkProgress progress = 5;
+  string motd = 6;
 }
 
 message SinkProgress {

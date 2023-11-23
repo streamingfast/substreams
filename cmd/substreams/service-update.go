@@ -94,6 +94,7 @@ func updateE(cmd *cobra.Command, args []string) error {
 		reason = " (" + resp.Msg.Reason + ")"
 	}
 	fmt.Printf("Update complete for service %q:\n  Status: %v%s\n", id, resp.Msg.Status, reason)
+	fmt.Print(resp.Msg.Motd)
 	printServices(resp.Msg.Services)
 	return nil
 }

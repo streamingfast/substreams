@@ -38,6 +38,7 @@ message DeployResponse {
   
   map<string, string> services = 3;
   string reason = 4;
+  string motd = 5;
 }
 
 message UpdateRequest {
@@ -50,6 +51,7 @@ message UpdateResponse {
   DeploymentStatus status = 1;
   map<string, string> services = 2;
   string reason = 3;
+  string motd = 4;
 }
 
 message InfoRequest {
@@ -88,6 +90,7 @@ message DeploymentWithStatus {
   string reason = 3;
   PackageInfo package_info = 4;
   SinkProgress progress = 5;
+  string motd = 6;
 }
 
 enum DeploymentStatus {

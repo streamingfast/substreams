@@ -126,6 +126,7 @@ func (s *server) Deploy(ctx context.Context, req *connect_go.Request[pbsinksvc.D
 		Reason:       info.Reason,
 		DeploymentId: id,
 		Services:     info.Services,
+		Motd:         info.Motd,
 	}), nil
 }
 
@@ -153,6 +154,7 @@ func (s *server) Update(ctx context.Context, req *connect_go.Request[pbsinksvc.U
 		Status:   info.Status,
 		Reason:   info.Reason,
 		Services: info.Services,
+		Motd:     info.Motd,
 	}), nil
 }
 

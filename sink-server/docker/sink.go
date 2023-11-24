@@ -44,7 +44,7 @@ func (e *DockerEngine) newSink(deploymentID string, dbService string, pkg *pbsub
 	conf = types.ServiceConfig{
 		Name:          name,
 		ContainerName: name,
-		Image:         "ghcr.io/streamingfast/substreams-sink-sql:v3.0.4",
+		Image:         "ghcr.io/streamingfast/substreams-sink-sql:v4.0.0-rc.1",
 		Restart:       "on-failure",
 		Entrypoint: []string{
 			"/opt/subservices/config/start.sh",

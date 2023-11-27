@@ -20,7 +20,7 @@ The USDT smart contract exposes a read function called `decimals`.
 You can query the `decimals` function by [visiting EthScan](https://etherscan.io/address/0xdac17f958d2ee523a2206206994597c13d831ec7#readContract).
 
 
-<figure><img src="../.gitbook/assets/eth-scan-calls.png" width="100%" /><figcaption><p>USDT contract on EthScan</p></figcaption></figure>
+<figure><img src="../../../../.gitbook/assets/eth-scan-calls.png" width="100%" /><figcaption><p>USDT contract on EthScan</p></figcaption></figure>
 
 ## Initializing the Substreams project
 

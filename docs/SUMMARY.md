@@ -37,6 +37,7 @@
   * [Chain-Specific Extensions](new/develop/chain-specific/overview.md)
     * [EVM Chain-Specific Extensions](new/develop/chain-specific/evm/overview.md)
       * [Making eth_calls](new/develop/chain-specific/evm/eth-calls.md)
+  * [Architecture]()
 
 
 
@@ -44,6 +45,7 @@
 
 * [Chains and endpoints](reference-and-specs/chains-and-endpoints.md)
 * [Substreams CLI reference](reference-and-specs/command-line-interface.md)
-* [Manifests](reference-and-specs/manifests.md)
+* [Manifests Reference](reference-and-specs/manifests.md)
+* [GUI Reference](reference-and-specs/manifests.md)
 * [Examples](reference-and-specs/examples.md)
 * [FAQ](reference-and-specs/faq.md)

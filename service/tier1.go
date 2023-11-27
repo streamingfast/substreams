@@ -491,6 +491,7 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 	auth := dauth.FromContext(ctx)
 	userID := auth.UserID()
 	apiKeyID := auth.APIKeyID()
+	userMeta := auth.Meta()
 	ip := auth.RealIP()
 	meter := dmetering.GetBytesMeter(ctx)
 
@@ -508,7 +509,7 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 			return status.Error(codes.Unavailable, err.Error())
 		}
 
-		sendMetering(meter, userID, apiKeyID, ip, "sf.substreams.rpc.v2/Blocks", resp)
+		sendMetering(meter, userID, apiKeyID, ip, userMeta, "sf.substreams.rpc.v2/Blocks", resp)
 		return nil
 	}
 }

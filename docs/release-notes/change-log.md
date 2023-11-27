@@ -9,12 +9,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v1.1.21
 
 ### Changed
 
 * Codegen: substreams-database-change to v1.3, properly generates primary key to support chain reorgs in postgres sink.
-*   Sink server: support for deploying sinks with DBT configuration, so that users can deploy their own DBT models (supported on postgres and clickhouse sinks). Example manifest file segment:
+* Sink server commands all moved from `substreams alpha sink-*` to `substreams alpha service *`
+* Sink server: support for deploying sinks with DBT configuration, so that users can deploy their own DBT models (supported on postgres and clickhouse sinks). Example manifest file segment:
 
     ```yaml
     [...]

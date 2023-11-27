@@ -44,9 +44,6 @@
 
 * [Chains and endpoints](reference-and-specs/chains-and-endpoints.md)
 * [Substreams CLI reference](reference-and-specs/command-line-interface.md)
-* [Authentication](reference-and-specs/authentication.md)
 * [Manifests](reference-and-specs/manifests.md)
-* [Packages](reference-and-specs/packages.md)
-* [Rust crates](reference-and-specs/rust-crates.md)
 * [Examples](reference-and-specs/examples.md)
 * [FAQ](reference-and-specs/faq.md)

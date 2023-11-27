@@ -4,6 +4,8 @@ description: StreamingFast Substreams documentation
 
 Substreams is a technology that allows you to **extract blockchain data in a fast and reliable way!**
 
+<figure><img src=".gitbook/assets/intro/supported-chains.png" width="100%" /></figure>
+
 **In order to define which specific data you want to extract from the blockchain, you can use Substreams packages**. For example, consider that you want to retrieve data from the Uniswap v3 smart contract. You can simply use the [Uniswap v3 Substreams Package](https://substreams.dev/streamingfast/uniswap-v3/v0.2.7) and send that data wherever you want!
 
 ## Consume Substreams

@@ -6,13 +6,32 @@ description: Learn the basics about modules and manifests
 
 In Substreams, manifests and modules are concepts tighly related because they are fundamental to understand how Substreams works.
 
-In simple terms, a Substreams module is a Rust function that receives an input and returns an output. For example, the following Rust function receives an Ethereum block and returns a list of transactions.
+In simple terms, a Substreams module is a Rust function that receives an input and returns an output. For example, the following Rust function receives an Ethereum block and returns a custom object containing fields such as block number, hash or parent hash.
 
-// example
+```rust
+fn get_my_block(blk: Block) -> Result<MyBlock, substreams::errors::Error> {
+    let header = blk.header.as_ref().unwrap();
 
-And also in simple terms, a Substreams manifest (`substreams.yaml`) is a configuration file (a YAML file) for your Substreams, which defines the different modules (functions) for your Substreams, among other configurations. For example, the following manifest...
+    Ok(MyBlock {
+        number: blk.number,
+        hash: Hex::encode(&blk.hash),
+        parent_hash: Hex::encode(&header.parent_hash),
+    })
+}
+```
 
-// example
+And also in simple terms, a Substreams manifest (`substreams.yaml`) is a configuration file (a YAML file) for your Substreams, which defines the different modules (functions) for your Substreams, among other configurations. For example, the following manifest receives a raw Ethereum block as input (`sf.ethereum.type.v2.Block`) and outputs a custom object (`eth.example.MyBlock`).
+
+```yaml
+modules:
+  - name: map_block
+    kind: map
+    initialBlock: 12287507
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+    output:
+      type: proto:eth.example.MyBlock
+```
 
 Among other things, the manifest allows you to define:
 - How many modules your Substreams uses, along with their corresponding inputs and outputs.

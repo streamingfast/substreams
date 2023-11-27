@@ -2,67 +2,31 @@
 description: StreamingFast Substreams documentation
 ---
 
-# Substreams
+Substreams is a technology that allows you to extract blockchain data in a fast and reliable way!
 
-## Welcome to Substreams documentation
+In order to define which specific data you want to extract from the blockchain, you can use Substreams packages. 
 
-Substreams is a powerful blockchain indexing technology, developed for [The Graph Network](https://thegraph.com).
+For example, consider that you want to retrieve data from the Uniswap v3 smart contract. You can simply use the [Uniswap v3 Substreams Package](https://substreams.dev/streamingfast/uniswap-v3/v0.2.7) and send that data wherever you want!
 
-> Substreams enables developers to write Rust modules, composing data streams alongside the community, and provides extremely high-performance indexing by virtue of parallelization, in a streaming-first fashion.
->
-> Substreams have all the benefits of StreamingFast Firehose, like low-cost caching and archiving of blockchain data, high throughput processing, and cursor-based reorgs handling.
+## Consume Substreams
 
-### Where to start
+There are many ready-to-use Substreams packages, so you can simply consume them. Use the Substreams Registry (https://substreams.dev) to explore packages.
 
-Learn about Substreams in a short, dense 25-minute intro and understand its impact on the blockchain ecosystem.
+Once you find a package that fits your needs, you only have choose **how you want to consume the data**. Send the data to a SQL database, configure a webhook or stream directly from your application!
 
-{% embed url="https://www.youtube.com/watch?v=K-nhC2FCB5k" %}
-A walkthrough of Firehose features, Substreams modules, including a sample Rust module and StreamingFast's vision.
+<figure><img src=".gitbook/assets/intro/consume-flow.png" width="100%" /></figure>
+
+
+## Develop Substreams
+
+If you can't find a Substreams package that retrieves exactly the data you need, you can develop your own Substreams.
+
+<figure><img src=".gitbook/assets/intro/develop-flow.png" width="100%" /></figure>
+
+## How Does It Work?
+
+The following video covers how Substreams works in less than 2 minutes:
+
+{% embed url="https://www.youtube.com/watch?v=gVqGCqKVM08" %}
+Get an overview of Substreams
 {% endembed %}
-
-Learn about the benefits of Substreams, and how it compares to otheressential facts about Substreams through [reading the Benefits and comparison](concepts-and-fundamentals/benefits.md).
-
-The primary ways to use Substreams include:
-
-* [Installing the `substreams` CLI](getting-started/installing-the-cli.md)
-* [Going through the Quickstart](getting-started/quickstart.md)
-
-After installing Substreams and reviewing the Quickstart:
-
-* You can [learn more about ](developers-guide/modules/)modules, and then [study the Developer's guide](developers-guide/overview.md).
-
-Find pre-built Substreams by using the following resources:
-
-* The [Substreams Template](https://github.com/streamingfast/substreams-template) helps expedite the process of getting you up and running.
-* A [list of maintained Substreams examples](reference-and-specs/examples.md)
-
-### Network model diagram
-
-<img src=".gitbook/assets/substreams.excalidraw.svg" alt="" class="gitbook-drawing">
-
-**You can view Substreams from two perspectives** as illustrated in the high-level visual diagram. It can be viewed through the perspective of the **Substreams engine** itself and also the perspective of the **end-user developer and consumer**.
-
-### Community
-
-Substreams is an open source community effort, so feel free to suggest new topics, report issues, and provide feedback. Contribute through GitHub [pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests).
-
-* [StreamingFast Discord](https://discord.gg/mYPcRAzeVN)
-* [The Graph Discord](https://discord.gg/vtvv7FP)
-* [StreamingFast on Twitter](https://twitter.com/streamingfastio)
-* [StreamingFast on YouTube](https://www.youtube.com/c/streamingfast)
-
-### Contributing
-
-For additional information, [refer to the general StreamingFast contribution guide](https://github.com/streamingfast/streamingfast/blob/master/CONTRIBUTING.md).
-
-### License
-
-Substreams uses the [Apache 2.0](../LICENSE/) license.
-
-### Disclaimer
-
-The content in the Substreams documentation was created through StreamingFast's full effort. It is up to the reader to validate the accuracy of all content presented. Substreams is in active development and, at times, the associated documentation becomes outdated. [Contact StreamingFast](https://discord.gg/mYPcRAzeVN) to report problems or service interruptions.
-
-{% hint style="info" %}
-**Note**: The Substreams documentation uses the [Google developer documentation style guide](https://developers.google.com/style) for its style and formatting.
-{% endhint %}

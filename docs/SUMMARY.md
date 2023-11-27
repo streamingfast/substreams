@@ -7,6 +7,18 @@
 * [Glossary](glossary/glossary.md)
 * [Change log](release-notes/change-log.md)
 
+## Consume Substreams
+
+* [Introduction to Substreams](new/consume/introduction.md)
+* [Install the CLI](new/common/installing-the-cli.md)
+* [Authentication](new/common/authentication.md)
+* [Packages](new/common/packages.md)
+* [Substreams:SQL](new/consume/sql/quickstart.md)
+* [Substreams:Stream](new/consume/stream/quickstart.md)
+  * [JavaScript](new/consume/stream/quickstart.md)
+
+
+
 ## Develop Substreams
 
 * [Introduction to Substreams](new/common/introduction.md)

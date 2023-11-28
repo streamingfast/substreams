@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/bufbuild/connect-go"
+	"github.com/spf13/cobra"
 	pbsinksvc "github.com/streamingfast/substreams/pb/sf/substreams/sink/service/v1"
 	"github.com/streamingfast/substreams/pb/sf/substreams/sink/service/v1/pbsinksvcconnect"
 )
@@ -19,10 +20,14 @@ var fuzzyMatchPreferredStatusOrder = []pbsinksvc.DeploymentStatus{
 	pbsinksvc.DeploymentStatus_UNKNOWN,
 }
 
-func fuzzyMatchDeployment(ctx context.Context, q string, cli pbsinksvcconnect.ProviderClient, preferredStatusOrder []pbsinksvc.DeploymentStatus) (*pbsinksvc.DeploymentWithStatus, error) {
-	resp, err := cli.List(ctx, connect.NewRequest(&pbsinksvc.ListRequest{}))
+func fuzzyMatchDeployment(ctx context.Context, q string, cli pbsinksvcconnect.ProviderClient, cmd *cobra.Command, preferredStatusOrder []pbsinksvc.DeploymentStatus) (*pbsinksvc.DeploymentWithStatus, error) {
+	req := connect.NewRequest(&pbsinksvc.ListRequest{})
+	if err := addHeaders(cmd, req); err != nil {
+		return nil, err
+	}
+	resp, err := cli.List(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("error fetching existing deployments")
+		return nil, fmt.Errorf("error fetching existing deployments: %w", err)
 	}
 
 	matching := make(map[*pbsinksvc.DeploymentWithStatus]pbsinksvc.DeploymentStatus)

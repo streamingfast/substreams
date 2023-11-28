@@ -43,7 +43,7 @@ func pauseE(cmd *cobra.Command, args []string) error {
 		if sflags.MustGetBool(cmd, "strict") {
 			return fmt.Errorf("invalid ID provided: %q and '--strict' is set", id)
 		}
-		matching, err := fuzzyMatchDeployment(ctx, id, cli, fuzzyMatchPreferredStatusOrder)
+		matching, err := fuzzyMatchDeployment(ctx, id, cli, cmd, fuzzyMatchPreferredStatusOrder)
 		if err != nil {
 			return err
 		}

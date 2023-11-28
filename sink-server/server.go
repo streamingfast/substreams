@@ -289,7 +289,7 @@ func (s *server) Remove(ctx context.Context, req *connect_go.Request[pbsinksvc.R
 
 	info, err := s.engine.Info(ctx, req.Msg.DeploymentId, s.logger)
 	if err != nil {
-		s.logger.Warn("cannot get previous status on deployment", zap.Error(err), zap.String("deployent_id", req.Msg.DeploymentId))
+		return nil, err
 	}
 	prevState := info.Status
 

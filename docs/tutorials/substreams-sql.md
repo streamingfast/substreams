@@ -299,12 +299,16 @@ substreams alpha service deploy substreams.sql.yaml --prod
 
 * See that the database starts correctly and that the tables defined in `dbt` are being created correctly
 
-* When you are happy with the results, verify or bump the `version` field in `substreams.sql.yaml`, then run `substreams pack substreams.sql.yaml` to generate the .spkg file.
+* When you are happy with the results, verify or bump the `version` field in `substreams.sql.yaml`, you can generate the `cryptopunks-v0.1.0.spkg` file.
+
+```bash
+substreams pack substreams.sql.yaml
+```
 
 ## Deploy your production package to the "hosted prod" environment
 
 ```bash
-substreams alpha service deploy substreams.sql.yaml -e https://deploy.streamingfast.io --prod
+substreams alpha service deploy cryptopunks-v0.1.0.spkg -e https://deploy.streamingfast.io --prod
 ```
 
 The production environment does not allow direct SQL access at the moment, so your apps will need to access the data to either the `rest` frontend or the `postgraphile` frontend.

@@ -28,6 +28,7 @@
 ## Tutorials
 
 * [From Ethereum address to SQL](tutorials/from-ethereum-address-to-SQL.md)
+* [Substreams:SQL Deployable Service](tutorials/substreams-sql.md)
 * [Exploring Ethereum](tutorials/exploring-ethereum/overview.md)
   * [Mapping Blocks](tutorials/exploring-ethereum/map_block_meta_module.md)
   * [Filtering Transactions](tutorials/exploring-ethereum/map_filter_transactions_module.md)

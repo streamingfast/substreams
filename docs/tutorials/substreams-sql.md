@@ -2,12 +2,12 @@
 
 In this tutorial, you will:
 
-1. Generate a simple Substreams that extract all events from the Cryptopunks smart contract on ethereum
-2. Feed your data into a local PostgreSQL database in a docker-based development environment
-3. Develop and apply a simple dbt model to your data
-4. Go from a local Substreams:SQL environment to a shared hosted development environment
-5. Create a production .spkg package and test it locally
-6. Deploy your .spkg to a production environment that fills a PostgreSQL database from your Substreams and applies dbt transformations automatically.
+1. Generate a simple Substreams that extract all events from the Cryptopunks smart contract on Ethereum.
+2. Feed your data into a local PostgreSQL database in a Docker-based development environment.
+3. Develop and apply SQL transformations with [dbt models](https://docs.getdbt.com/docs/build/models).
+4. Go from a local Substreams:SQL environment to a shared hosted development environment.
+5. Create a production `.spkg` package and test it locally
+6. Deploy your `.spkg` to a production environment that fills a PostgreSQL database from your Substreams and applies dbt transformations automatically.
 
 ## Generate a Substreams project from the Cryptopunks ABI
 
@@ -72,7 +72,7 @@ cargo build --target wasm32-unknown-unknown --release
     Finished release [optimized] target(s) in 30.71s
 ```
 
-## Start feeding a local database using 'substreams alpha service' and docker
+## Start feeding a local database using 'substreams alpha service' and Docker
 
 From another window:
 
@@ -199,7 +199,7 @@ select date_trunc('hour', evt_block_time) AS "hour", count(*) from punk_bought  
 EOF
 ```
 
-* Realize your view:
+* Create your views:
 
 ```bash
 dbt run
@@ -264,11 +264,11 @@ cryptopunks:
 ```
 
 * You can iterate using `dbt run --target=remote`
-* Other devs can work on that data and create dbt recipes.
+* Other devs can work on that data and create dbt models.
 
 ## Pack your production package and test it locally
 
-When your dbt recipes are ready, you can pack everything (substreams, dbt definitions, etc.) inside an `.spkg` file and deploy it as production:
+When your dbt models are ready, you can pack everything (Substreams, [dbt project](https://docs.getdbt.com/docs/build/projects), etc.) inside an `.spkg` file and deploy it as production:
 
 * Add a `dbt_config` section to the `substreams.sql.yaml` file:
 
@@ -285,7 +285,7 @@ When your dbt recipes are ready, you can pack everything (substreams, dbt defini
 SUBSTREAMS_API_TOKEN=(...) substreams alpha service serve
 ```
 
-* Stop the previous deployment completely (only a single deployment can run at the same time on local docker environment)
+* Stop the previous deployment completely (only a single deployment can run at the same time on local Docker environment)
 
 ```bash
 substreams alpha service stop

@@ -138,10 +138,6 @@ func (e *DockerEngine) Create(ctx context.Context, deploymentID string, pkg *pbs
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 
-	return e.create(ctx, deploymentID, pkg, zlog)
-}
-
-func (e *DockerEngine) create(ctx context.Context, deploymentID string, pkg *pbsubstreams.Package, zlog *zap.Logger) (*pbsinksvc.InfoResponse, error) {
 	if e.otherDeploymentIsActive(ctx, "!NO_MATCH!", zlog) {
 		return nil, fmt.Errorf("this substreams-sink engine only supports a single active deployment. Stop any active sink before launching another one or use `sink-update`")
 	}

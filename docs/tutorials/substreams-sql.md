@@ -209,7 +209,7 @@ dbt run
 
 ## Deploy your Substreams to the "hosted dev" environment
 
-Deployments of type "dev" gives you full read/write access to the database and are a good way of working together on a dataset while developing your `dbt` recipes.
+Deployments of type "dev" gives you full read/write access to the database and are a good way of working together on a dataset while developing your dbt models.
 
 ```bash
 substreams alpha service deploy substreams.sql.yaml -e https://deploy.streamingfast.io

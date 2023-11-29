@@ -111,12 +111,7 @@ func (s *server) Deploy(ctx context.Context, req *connect_go.Request[pbsinksvc.D
 
 	s.logger.Info("deployment request", zap.String("deployment_id", id))
 
-	err := s.engine.Create(ctx, id, req.Msg.SubstreamsPackage, s.logger)
-	if err != nil {
-		return nil, err
-	}
-
-	info, err := s.engine.Info(ctx, id, s.logger)
+	info, err := s.engine.Create(ctx, id, req.Msg.SubstreamsPackage, s.logger)
 	if err != nil {
 		return nil, err
 	}

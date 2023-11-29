@@ -11,7 +11,7 @@ import (
 )
 
 type Engine interface {
-	Create(ctx context.Context, deploymentID string, pkg *pbsubstreams.Package, zlog *zap.Logger) error
+	Create(ctx context.Context, deploymentID string, pkg *pbsubstreams.Package, zlog *zap.Logger) (*pbsinksvc.InfoResponse, error)
 	Update(ctx context.Context, deploymentID string, pkg *pbsubstreams.Package, reset bool, zlog *zap.Logger) error
 
 	Resume(ctx context.Context, deploymentID string, currentState pbsinksvc.DeploymentStatus, zlog *zap.Logger) (string, error)

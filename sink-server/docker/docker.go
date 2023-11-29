@@ -134,29 +134,34 @@ func (e *DockerEngine) readDeploymentInfo(deploymentID string) (info *deployment
 	return info, nil
 }
 
-func (e *DockerEngine) Create(ctx context.Context, deploymentID string, pkg *pbsubstreams.Package, zlog *zap.Logger) error {
+func (e *DockerEngine) Create(ctx context.Context, deploymentID string, pkg *pbsubstreams.Package, zlog *zap.Logger) (*pbsinksvc.InfoResponse, error) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 
+	return e.create(ctx, deploymentID, pkg, zlog)
+}
+
+func (e *DockerEngine) create(ctx context.Context, deploymentID string, pkg *pbsubstreams.Package, zlog *zap.Logger) (*pbsinksvc.InfoResponse, error) {
 	if e.otherDeploymentIsActive(ctx, "!NO_MATCH!", zlog) {
-		return fmt.Errorf("this substreams-sink engine only supports a single active deployment. Stop any active sink before launching another one or use `sink-update`")
+		return nil, fmt.Errorf("this substreams-sink engine only supports a single active deployment. Stop any active sink before launching another one or use `sink-update`")
 	}
 
 	manifest, usedPorts, serviceInfo, runMeFirst, err := e.createManifest(ctx, deploymentID, e.token, pkg)
 	if err != nil {
-		return fmt.Errorf("creating manifest from package: %w", err)
+		return nil, fmt.Errorf("creating manifest from package: %w", err)
 	}
 
 	if err := e.writeDeploymentInfo(deploymentID, usedPorts, runMeFirst, serviceInfo, pkg); err != nil {
-		return fmt.Errorf("cannot write Service Info: %w", err)
+		return nil, fmt.Errorf("cannot write Service Info: %w", err)
 	}
 
 	output, err := e.applyManifest(deploymentID, manifest, runMeFirst, false)
 	if err != nil {
-		return fmt.Errorf("applying manifest: %w\noutput: %s", err, output)
+		return nil, fmt.Errorf("applying manifest: %w\noutput: %s", err, output)
 	}
 	_ = output // TODO save somewhere maybe
-	return nil
+
+	return e.Info(ctx, deploymentID, zlog)
 }
 
 func (e *DockerEngine) Update(ctx context.Context, deploymentID string, pkg *pbsubstreams.Package, reset bool, zlog *zap.Logger) error {

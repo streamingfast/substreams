@@ -499,9 +499,10 @@ func toDuration(in time.Duration) *types.Duration {
 	return deref(types.Duration(in))
 }
 
-func (e *DockerEngine) Shutdown(ctx context.Context, zlog *zap.Logger) (err error) {
+func (e *DockerEngine) Shutdown(ctx context.Context, _ error, zlog *zap.Logger) error {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
+
 	deps, err := e.list(ctx, zlog)
 	if err != nil {
 		return fmt.Errorf("cannot list deployments: %w", err)
@@ -515,6 +516,7 @@ func (e *DockerEngine) Shutdown(ctx context.Context, zlog *zap.Logger) (err erro
 			err = errors.Join(err, e)
 		}
 	}
+
 	return err
 }
 

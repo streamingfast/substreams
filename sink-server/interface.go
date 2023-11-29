@@ -23,7 +23,7 @@ type Engine interface {
 	Info(ctx context.Context, deploymentID string, zlog *zap.Logger) (*pbsinksvc.InfoResponse, error)
 	List(ctx context.Context, zlog *zap.Logger) ([]*pbsinksvc.DeploymentWithStatus, error)
 
-	Shutdown(ctx context.Context, zlog *zap.Logger) error
+	Shutdown(ctx context.Context, err error, zlog *zap.Logger) error
 }
 
 var _ Engine = &docker.DockerEngine{}

@@ -83,10 +83,15 @@ func (s *server) Run(ctx context.Context) {
 	addr := strings.ReplaceAll(s.httpListenAddr, "*", "")
 
 	s.OnTerminating(func(err error) {
-		time.Sleep(time.Second)
+		shutdownErr := s.engine.Shutdown(ctx, err, s.logger)
+		if shutdownErr != nil {
+			s.logger.Warn("failed to shutdown engine", zap.Error(shutdownErr))
+		}
+
+		time.Sleep(1 * time.Second)
+
 		s.logger.Info("shutting down connect web server")
 		srv.Shutdown(nil)
-		s.engine.Shutdown(ctx, s.logger)
 	})
 
 	srv.Launch(addr)

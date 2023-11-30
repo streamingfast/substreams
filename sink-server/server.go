@@ -56,13 +56,6 @@ func New(
 		engine:             engine,
 	}
 
-	srv.OnTerminating(func(err error) {
-		srv.shutdownLock.Lock()
-	})
-	srv.OnTerminated(func(err error) {
-		srv.shutdownLock.Unlock()
-	})
-
 	return srv, nil
 }
 
@@ -93,6 +86,7 @@ func (s *server) Run(ctx context.Context) {
 	addr := strings.ReplaceAll(s.httpListenAddr, "*", "")
 
 	s.OnTerminating(func(err error) {
+		s.shutdownLock.Lock()
 		s.logger.Info("shutting down connect web server")
 
 		shutdownErr := s.engine.Shutdown(ctx, err, s.logger)
@@ -104,6 +98,10 @@ func (s *server) Run(ctx context.Context) {
 
 		srv.Shutdown(nil)
 		s.logger.Info("connect web server shutdown")
+	})
+
+	s.OnTerminated(func(err error) {
+		s.shutdownLock.Unlock()
 	})
 
 	srv.Launch(addr)

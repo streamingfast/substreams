@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	connect_go "github.com/bufbuild/connect-go"
@@ -33,6 +34,8 @@ type server struct {
 	authenticator dauth.Authenticator
 	logger        *zap.Logger
 	engine        Engine
+
+	shutdownLock sync.RWMutex
 }
 
 func New(
@@ -52,6 +55,13 @@ func New(
 		logger:             logger,
 		engine:             engine,
 	}
+
+	srv.OnTerminating(func(err error) {
+		srv.shutdownLock.Lock()
+	})
+	srv.OnTerminated(func(err error) {
+		srv.shutdownLock.Unlock()
+	})
 
 	return srv, nil
 }
@@ -83,6 +93,8 @@ func (s *server) Run(ctx context.Context) {
 	addr := strings.ReplaceAll(s.httpListenAddr, "*", "")
 
 	s.OnTerminating(func(err error) {
+		s.logger.Info("shutting down connect web server")
+
 		shutdownErr := s.engine.Shutdown(ctx, err, s.logger)
 		if shutdownErr != nil {
 			s.logger.Warn("failed to shutdown engine", zap.Error(shutdownErr))
@@ -90,8 +102,8 @@ func (s *server) Run(ctx context.Context) {
 
 		time.Sleep(1 * time.Second)
 
-		s.logger.Info("shutting down connect web server")
 		srv.Shutdown(nil)
+		s.logger.Info("connect web server shutdown")
 	})
 
 	srv.Launch(addr)
@@ -103,6 +115,9 @@ func genDeployID(uid string) string {
 }
 
 func (s *server) Deploy(ctx context.Context, req *connect_go.Request[pbsinksvc.DeployRequest]) (*connect_go.Response[pbsinksvc.DeployResponse], error) {
+	s.shutdownLock.RLock()
+	defer s.shutdownLock.RUnlock()
+
 	uid := uuid.New().String()
 	id := genDeployID(uid)
 

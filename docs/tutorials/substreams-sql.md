@@ -247,7 +247,7 @@ See some tutorials at https://substreams.streamingfast.io
 **Tip:** The SQL endpoint will be assigned a specific port mapped to your deployment, in this example, port 17622.
 {% endhint %}
 
-* Create another target in your `$HOME/.dbt/profiles.yml` :
+* Create another target in your `$HOME/.dbt/profiles.yml` replacing `PORT_NUMBER` and `RW_PASSWORD` with those assigned to you on the previous step:
 
 ```bash
 cryptopunks:
@@ -257,8 +257,8 @@ cryptopunks:
       type: postgres
       host: db.srv.streamingfast.io
       user: dev-node
-      password: LsmzKmJFYUaC
-      port: 8000
+      password: {RW_PASSWORD}
+      port: {PORT_NUMBER}
       dbname: substreams
       schema: public
 ```

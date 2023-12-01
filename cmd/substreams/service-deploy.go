@@ -35,13 +35,22 @@ var deployCmd = &cobra.Command{
 func deployE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
-	reader, err := manifest.NewReader(args[0], getReaderOpts(cmd)...)
+	file := args[0]
+
+	reader, err := manifest.NewReader(file, getReaderOpts(cmd)...)
 	if err != nil {
 		return err
 	}
 	pkg, err := reader.Read()
 	if err != nil {
 		return err
+	}
+
+	if pkg.SinkConfig == nil {
+		return fmt.Errorf("cannot deploy package %q: it does not contain a sink_config section", file)
+	}
+	if pkg.SinkModule == "" {
+		return fmt.Errorf("cannot deploy package %q: it does not specify a sink_module", file)
 	}
 
 	//request parameters

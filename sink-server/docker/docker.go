@@ -253,7 +253,7 @@ func (e *DockerEngine) Info(ctx context.Context, deploymentID string, zlog *zap.
 	}
 
 	var outputs []*dockerComposePSOutput
-	if err != nil {
+	if err := json.Unmarshal(line, &outputs); err != nil {
 		return nil, fmt.Errorf("unmarshalling docker output: %w", err)
 	}
 

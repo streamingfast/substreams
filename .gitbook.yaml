@@ -2,3 +2,6 @@ root: ./docs/
 
 structure:
   summary: SUMMARY.md
+
+redirects:
+  developers-guide/cookbok: ./new/common/installing-the-cli.md

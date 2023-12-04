@@ -1,5 +1,5 @@
 ---
-description: Lenar about the Substreams architecture
+description: Learn about the Substreams architecture
 ---
 
 # Parallel execution

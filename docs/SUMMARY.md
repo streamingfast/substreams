@@ -37,7 +37,7 @@
   * [Chain-Specific Extensions](new/develop/chain-specific/overview.md)
     * [EVM Chain-Specific Extensions](new/develop/chain-specific/evm/overview.md)
       * [Making eth_calls](new/develop/chain-specific/evm/eth-calls.md)
-  * [Architecture]()
+  * [Architecture](new/develop/architecture.md)
 
 
 

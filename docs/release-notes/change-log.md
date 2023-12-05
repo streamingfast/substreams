@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Fixed
 
 * Bug in `substreams init` with numbers in ABI types
+* Server implementation: return the correct GRPC code instead of wrapping it under an "Unknown" error.
 
 ## v1.1.22
 

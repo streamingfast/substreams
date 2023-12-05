@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/bufbuild/connect-go"
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetering"
@@ -26,9 +27,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/status"
 )
 
 type Tier2Service struct {
@@ -118,7 +117,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	span.SetAttributes(attribute.String("hostname", hostname))
 
 	if request.Modules == nil {
-		return status.Error(codes.InvalidArgument, "missing modules in request")
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("missing modules in request"))
 	}
 	moduleNames := make([]string, len(request.Modules.Modules))
 	for i := 0; i < len(moduleNames); i++ {
@@ -152,7 +151,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	err = s.processRange(ctx, request, respFunc, tracing.GetTraceID(ctx).String())
 	grpcError = toGRPCError(ctx, err)
 
-	if grpcError != nil && status.Code(grpcError) == codes.Internal {
+	if grpcError != nil && connect.CodeOf(grpcError) == connect.CodeInternal {
 		logger.Info("unexpected termination of stream of blocks", zap.Error(err))
 	}
 
@@ -303,7 +302,7 @@ func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbs
 		resp := respAny.(*pbssinternal.ProcessRangeResponse)
 		if err := streamSrv.Send(resp); err != nil {
 			logger.Info("unable to send block probably due to client disconnecting", zap.Error(err))
-			return status.Error(codes.Unavailable, err.Error())
+			return connect.NewError(connect.CodeUnavailable, err)
 		}
 
 		sendMetering(meter, userID, apiKeyID, ip, userMeta, "sf.substreams.internal.v2/ProcessRange", resp)

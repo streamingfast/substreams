@@ -4,15 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/streamingfast/substreams/manifest"
 	"sync/atomic"
+
+	"github.com/bufbuild/connect-go"
+	"github.com/streamingfast/substreams/manifest"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
-	grpccodes "google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -46,12 +46,12 @@ func BuildRequestDetails(
 	if req.Modules != nil { // because of tests which do not define modules in the request. too annoying to add this to tests for now. (TODO)
 		graph, err := manifest.NewModuleGraph(request.Modules.Modules)
 		if err != nil {
-			return nil, nil, status.Errorf(grpccodes.InvalidArgument, "invalid modules: %s", err.Error())
+			return nil, nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid modules: %w", err))
 		}
 
 		moduleHasStatefulDependencies, err = graph.HasStatefulDependencies(request.OutputModule)
 		if err != nil {
-			return nil, nil, status.Errorf(grpccodes.InvalidArgument, "invalid output module: %s", err.Error())
+			return nil, nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid output module: %w", err))
 		}
 	}
 
@@ -145,11 +145,11 @@ func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, res
 
 	cursor, err := bstream.CursorFromOpaque(req.StartCursor)
 	if err != nil {
-		return 0, "", nil, status.Errorf(grpccodes.InvalidArgument, "invalid StartCursor %q: %s", cursor, err.Error())
+		return 0, "", nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid StartCursor %q: %w", cursor, err))
 	}
 
 	if req.StopBlockNum > 0 && req.StopBlockNum < cursor.Block.Num() {
-		return 0, "", nil, status.Errorf(grpccodes.InvalidArgument, "StartCursor %q is after StopBlockNum %d", cursor, req.StopBlockNum)
+		return 0, "", nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("StartCursor %q is after StopBlockNum %d", cursor, req.StopBlockNum))
 	}
 
 	if cursor.IsOnFinalBlock() {
@@ -159,7 +159,7 @@ func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, res
 
 	reorgJunctionBlock, head, err := resolveCursor(ctx, cursor)
 	if err != nil {
-		return 0, "", nil, status.Errorf(grpccodes.InvalidArgument, "cannot resolve StartCursor %q: %s", cursor, err.Error())
+		return 0, "", nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("cannot resolve StartCursor %q: %s", cursor, err.Error()))
 	}
 	var undoSignal *pbsubstreamsrpc.BlockUndoSignal
 	resolvedCursor := cursor

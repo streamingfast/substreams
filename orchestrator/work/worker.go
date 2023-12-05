@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/bufbuild/connect-go"
 	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/derr"
 	"go.opentelemetry.io/otel"
@@ -15,8 +16,6 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
-	grpcCodes "google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/client"
@@ -263,10 +262,8 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 			if ctx.Err() != nil {
 				return &Result{Error: ctx.Err()}
 			}
-			if s, ok := status.FromError(err); ok {
-				if s.Code() == grpcCodes.InvalidArgument {
-					return &Result{Error: err}
-				}
+			if connect.CodeOf(err) == connect.CodeInvalidArgument {
+				return &Result{Error: err}
 			}
 			return &Result{
 				Error: NewRetryableErr(fmt.Errorf("receiving stream resp: %w", err)),

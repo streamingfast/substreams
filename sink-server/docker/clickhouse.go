@@ -24,7 +24,7 @@ func (e *DockerEngine) newClickhouse(deploymentID string, pkg *pbsubstreams.Pack
 	conf := types.ServiceConfig{
 		Name:          name,
 		ContainerName: name,
-		Image:         "clickhouse/clickhouse-server:23.3-alpine",
+		Image:         "clickhouse/clickhouse-server:23.9-alpine",
 		Restart:       "on-failure",
 		Ports: []types.ServicePortConfig{
 			{

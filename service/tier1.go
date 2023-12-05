@@ -45,8 +45,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -168,7 +166,7 @@ func (s *Tier1Service) Blocks(
 
 	request := req.Msg
 	if request.Modules == nil {
-		return status.Error(codes.InvalidArgument, "missing modules in request")
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("missing modules in request"))
 	}
 	moduleNames := make([]string, len(request.Modules.Modules))
 	for i := 0; i < len(moduleNames); i++ {
@@ -201,7 +199,7 @@ func (s *Tier1Service) Blocks(
 	defer metrics.ActiveSubstreams.Dec()
 
 	if err := outputmodules.ValidateTier1Request(request, s.blockType); err != nil {
-		return status.Error(codes.InvalidArgument, fmt.Errorf("validate request: %w", err).Error())
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("validate request: %w", err))
 	}
 
 	outputGraph, err := outputmodules.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules)
@@ -240,13 +238,13 @@ func (s *Tier1Service) Blocks(
 	err = s.blocks(runningContext, request, outputGraph, respFunc)
 
 	if grpcError := toGRPCError(runningContext, err); grpcError != nil {
-		switch status.Code(grpcError) {
-		case codes.Internal:
+		switch connect.CodeOf(grpcError) {
+		case connect.CodeInternal:
 			logger.Info("unexpected termination of stream of blocks", zap.String("stream_processor", "tier1"), zap.Error(err))
-		case codes.InvalidArgument:
+		case connect.CodeInvalidArgument:
 			logger.Debug("recording failure on request", zap.String("request_id", requestID))
 			s.recordFailure(requestID, grpcError)
-		case codes.Canceled:
+		case connect.CodeCanceled:
 			logger.Info("Blocks request canceled by user", zap.Error(grpcError))
 		default:
 			logger.Info("Blocks request completed with error", zap.Error(grpcError))
@@ -506,7 +504,7 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 		}
 		if err := streamSrv.Send(resp); err != nil {
 			logger.Info("unable to send block probably due to client disconnecting", zap.Error(err))
-			return status.Error(codes.Unavailable, err.Error())
+			return connect.NewError(connect.CodeUnavailable, err)
 		}
 
 		sendMetering(meter, userID, apiKeyID, ip, userMeta, "sf.substreams.rpc.v2/Blocks", resp)
@@ -535,11 +533,11 @@ func setupRequestStats(ctx context.Context, requestDetails *reqctx.RequestDetail
 // or `stream.ErrInvalidArg`, error is turned into a proper gRPC error respectively of code
 // `Canceled`, `DeadlineExceeded` or `InvalidArgument`.
 //
-// If the `err` has its in chain any error constructed through `status.Error` (and its variants), then
+// If the `err` has its in chain any error constructed through `connect.NewError` (and its variants), then
 // we return the first found error of such type directly, because it's already a gRPC error.
 //
 // Otherwise, the error is assumed to be an internal error and turned backed into a proper
-// `status.Error(codes.Internal, err.Error())`.
+// `connect.NewError(connect.CodeInternal, err)`.
 func toGRPCError(ctx context.Context, err error) error {
 	if err == nil {
 		return nil
@@ -553,23 +551,23 @@ func toGRPCError(ctx context.Context, err error) error {
 		if context.Cause(ctx) != nil {
 			err = context.Cause(ctx)
 		}
-		return status.Error(codes.Canceled, err.Error())
+		return connect.NewError(connect.CodeCanceled, err)
 	}
 
 	if errors.Is(err, context.DeadlineExceeded) {
-		return status.Error(codes.DeadlineExceeded, "source deadline exceeded")
+		return connect.NewError(connect.CodeDeadlineExceeded, err)
 	}
 
 	if errors.Is(err, exec.ErrWasmDeterministicExec) {
-		return status.Error(codes.InvalidArgument, err.Error())
+		return connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
 	var errInvalidArg *stream.ErrInvalidArg
 	if errors.As(err, &errInvalidArg) {
-		return status.Error(codes.InvalidArgument, errInvalidArg.Error())
+		return connect.NewError(connect.CodeInvalidArgument, errInvalidArg)
 	}
 
 	// Do we want to print the full cause as coming from Golang? Would we like to maybe trim off "operational"
 	// data?
-	return status.Error(codes.Internal, err.Error())
+	return connect.NewError(connect.CodeInternal, err)
 }

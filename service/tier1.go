@@ -12,12 +12,12 @@ import (
 	"sync"
 
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/dgrpc"
 
 	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/bstream/stream"
 	bsstream "github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dauth"
-	"github.com/streamingfast/dgrpc"
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
@@ -47,6 +47,8 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
+
+var errShuttingDown = errors.New("endpoint is shutting down, please reconnect")
 
 type Tier1Service struct {
 	*shutter.Shutter
@@ -231,7 +233,7 @@ func (s *Tier1Service) Blocks(
 		case <-ctx.Done():
 			return
 		case <-s.Terminating():
-			cancelRunning(fmt.Errorf("endpoint is shutting down, please reconnect"))
+			cancelRunning(errShuttingDown)
 		}
 	}()
 
@@ -550,6 +552,9 @@ func toGRPCError(ctx context.Context, err error) error {
 	if errors.Is(err, context.Canceled) {
 		if context.Cause(ctx) != nil {
 			err = context.Cause(ctx)
+			if err == errShuttingDown {
+				return connect.NewError(connect.CodeUnavailable, err)
+			}
 		}
 		return connect.NewError(connect.CodeCanceled, err)
 	}

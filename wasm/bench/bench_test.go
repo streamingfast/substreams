@@ -9,6 +9,7 @@ import (
 
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/wasm"
+	_ "github.com/streamingfast/substreams/wasm/wasip1"
 	_ "github.com/streamingfast/substreams/wasm/wasmtime"
 	_ "github.com/streamingfast/substreams/wasm/wazero"
 	"github.com/stretchr/testify/require"
@@ -42,16 +43,20 @@ func BenchmarkExecution(b *testing.B) {
 		{"map_block", "map_block", args(blockInputFile(b, "testdata/ethereum_mainnet_block_16021772.binpb")), []int{44957, 45081}},
 	} {
 		var reuseInstance = true
-		var freshInstanceEachRun = false
+		//var freshInstanceEachRun = false
 
-		wasmCode := readCode(b, "substreams_wasm/substreams.wasm")
+		//wasmCode := readCode(b, "substreams_wasm/substreams.wasm")
+		wasmCodep1 := readCode(b, "substreams_ts/index.wasm")
 
 		for _, config := range []*runtime{
-			{"wasmtime", wasmCode, reuseInstance},
-			{"wasmtime", wasmCode, freshInstanceEachRun},
+			//{"wasmtime", wasmCode, reuseInstance},
+			//{"wasmtime", wasmCode, freshInstanceEachRun},
+			//
+			//{"wazero", wasmCode, reuseInstance},
+			//{"wazero", wasmCode, freshInstanceEachRun},
 
-			{"wazero", wasmCode, reuseInstance},
-			{"wazero", wasmCode, freshInstanceEachRun},
+			{"wasip1", wasmCodep1, reuseInstance},
+			//{"wasip1", wasmCodep1, freshInstanceEachRun},
 		} {
 			instanceKey := "reused"
 			if !config.shouldReUseInstance {

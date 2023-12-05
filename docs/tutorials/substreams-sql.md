@@ -92,6 +92,10 @@ substreams alpha service deploy substreams.sql.yaml
 **Tip:** A new PostgreSQL container will be created at port `5432`. The deployment will fail if there is another Docker container using that port.
 {% endhint %}
 
+{% hint style="info" %}
+**Tip:** You can also use `substreams service deploy substreams.clickhouse.yaml` to use the Clickhouse engine instead of PostgreSQL. There is no postgraphile or pgweb in that case, you will need a tool like DataGrip to see the data.
+{% endhint %}
+
 You should see:
 
 ```bash
@@ -215,6 +219,10 @@ Deployments of type "dev" gives you full read/write access to the database and a
 substreams alpha service deploy substreams.sql.yaml -e https://deploy.streamingfast.io
 ```
 
+{% hint style="info" %}
+**Tip:** Here again, you can use the `substreams.clickhouse.yaml` manifest to use a Clickhouse engine.
+{% endhint %}
+
 You should see this output:
 
 ```bash
@@ -270,7 +278,7 @@ cryptopunks:
 
 When your dbt models are ready, you can pack everything (Substreams, [dbt project](https://docs.getdbt.com/docs/build/projects), etc.) inside an `.spkg` file and deploy it as production:
 
-* Add a `dbt_config` section to the `substreams.sql.yaml` file:
+* Add a `dbt_config` section to the `substreams.sql.yaml` (or `substreams.clickhouse.yaml`) file:
 
 ```yaml
     dbt_config:
@@ -294,15 +302,19 @@ substreams alpha service stop
 * Test your deployment locally, in production mode:
 
 ```bash
-substreams alpha service deploy substreams.sql.yaml --prod
+substreams alpha service deploy substreams.sql.yaml --prod # or substreams.clickhouse.yaml
 ```
+
+{% hint style="success" %}
+**Tip:** If using Clickhouse, you will need to set `sink.config.rest_frontend.enabled` to `true`: it is currently the only way to consume data in a 'production' deployment.
+{% endhint %}
 
 * See that the database starts correctly and that the tables defined in `dbt` are being created correctly
 
 * When you are happy with the results, verify or bump the `version` field in `substreams.sql.yaml`, you can generate the `cryptopunks-v0.1.0.spkg` file.
 
 ```bash
-substreams pack substreams.sql.yaml
+substreams pack substreams.sql.yaml # or substreams.clickhouse.yaml
 ```
 
 ## Deploy your production package to the "hosted prod" environment
@@ -311,4 +323,4 @@ substreams pack substreams.sql.yaml
 substreams alpha service deploy cryptopunks-v0.1.0.spkg -e https://deploy.streamingfast.io --prod
 ```
 
-The production environment does not allow direct SQL access at the moment, so your apps will need to access the data to either the `rest` frontend or the `postgraphile` frontend.
+The production environment does not allow direct SQL access at the moment, so your apps will need to access the data to either the `postgraphile` frontend (or the `rest` frontend when using Clickhouse)

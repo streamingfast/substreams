@@ -39,7 +39,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1
 	github.com/gertd/go-pluralize v0.2.1
 	github.com/google/uuid v1.3.0
-	github.com/iancoleman/strcase v0.2.0
+	github.com/huandu/xstrings v1.4.0
 	github.com/ipfs/go-ipfs-api v0.6.0
 	github.com/itchyny/gojq v0.12.12
 	github.com/lithammer/dedent v1.1.0
@@ -79,6 +79,7 @@ require (
 	github.com/bufbuild/connect-grpchealth-go v1.1.1 // indirect
 	github.com/felixge/httpsnoop v1.0.1 // indirect
 	github.com/google/s2a-go v0.1.4 // indirect
+	github.com/iancoleman/strcase v0.2.0 // indirect
 	github.com/mattn/go-sqlite3 v1.14.16 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.6 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20230711160842-782d3b101e98 // indirect

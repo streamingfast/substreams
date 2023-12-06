@@ -3,9 +3,11 @@ package service
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/bufbuild/connect-go"
+	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetering"
@@ -13,6 +15,7 @@ import (
 	"github.com/streamingfast/logging"
 	tracing "github.com/streamingfast/sf-tracing"
 
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/metrics"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
@@ -40,6 +43,20 @@ type Tier2Service struct {
 	logger            *zap.Logger
 }
 
+func getBlockTypeFromMergedBlocks(store dstore.Store) (string, error) {
+	var out string
+	fs := bstream.NewFileSource(store, bstream.GetProtocolFirstStreamableBlock, bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
+		out = blk.Payload.TypeUrl
+		return io.EOF
+	}), zlog)
+
+	fs.Run()
+	if err := fs.Err(); err != io.EOF {
+		return "", err
+	}
+	return out, nil
+}
+
 func NewTier2(
 	logger *zap.Logger,
 	mergedBlocksStore dstore.Store,
@@ -48,10 +65,9 @@ func NewTier2(
 	defaultCacheTag string,
 	stateBundleSize uint64,
 
-	blockType string,
 	opts ...Option,
 
-) (s *Tier2Service) {
+) (*Tier2Service, error) {
 
 	runtimeConfig := config.NewRuntimeConfig(
 		stateBundleSize,
@@ -62,7 +78,13 @@ func NewTier2(
 		defaultCacheTag,
 		nil,
 	)
-	s = &Tier2Service{
+
+	blockType, err := getBlockTypeFromMergedBlocks(mergedBlocksStore)
+	if err != nil {
+		return nil, fmt.Errorf("getting block type from merged-blocks-store: %w", err)
+	}
+
+	s := &Tier2Service{
 		runtimeConfig: runtimeConfig,
 		blockType:     blockType,
 		tracer:        tracing.GetTracer(),
@@ -81,11 +103,7 @@ func NewTier2(
 		opt(s)
 	}
 
-	return s
-}
-
-func (s *Tier2Service) BlockType() string {
-	return s.blockType
+	return s, nil
 }
 
 func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, streamSrv pbssinternal.Substreams_ProcessRangeServer) (grpcError error) {

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -15,6 +16,7 @@ import (
 	"github.com/streamingfast/dgrpc"
 
 	"github.com/streamingfast/bstream/hub"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/bstream/stream"
 	bsstream "github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dauth"
@@ -69,6 +71,28 @@ type Tier1Service struct {
 	getHeadBlock        func() (uint64, error)
 }
 
+func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
+	var out string
+	ctx := context.Background()
+	stream, err := sf.New(
+		ctx,
+		bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
+			out = blk.Payload.TypeUrl
+			return io.EOF
+		}),
+		int64(bstream.GetProtocolFirstStreamableBlock),
+		bstream.GetProtocolFirstStreamableBlock,
+		"", false, false, zlog,
+	)
+	if err != nil {
+		return "", err
+	}
+	if err := stream.Run(ctx); err != nil {
+		return "", err
+	}
+	return out, nil
+}
+
 func NewTier1(
 	logger *zap.Logger,
 	mergedBlocksStore dstore.Store,
@@ -78,14 +102,12 @@ func NewTier1(
 	stateStore dstore.Store,
 	defaultCacheTag string,
 
-	blockType string,
-
 	parallelSubRequests uint64,
 	stateBundleSize uint64,
 
 	substreamsClientConfig *client.SubstreamsClientConfig,
 	opts ...Option,
-) *Tier1Service {
+) (*Tier1Service, error) {
 
 	logger.Info("creating grpc client factory", zap.Reflect("config", substreamsClientConfig))
 	clientFactory := client.NewInternalClientFactory(substreamsClientConfig)
@@ -101,6 +123,17 @@ func NewTier1(
 			return work.NewRemoteWorker(clientFactory, logger)
 		},
 	)
+	sf := &StreamFactory{
+		mergedBlocksStore: mergedBlocksStore,
+		forkedBlocksStore: forkedBlocksStore,
+		hub:               hub,
+	}
+
+	blockType, err := getBlockTypeFromStreamFactory(sf)
+	if err != nil {
+		return nil, fmt.Errorf("getting block type from stream factory: %w", err)
+	}
+
 	s := &Tier1Service{
 		Shutter:        shutter.New(),
 		runtimeConfig:  runtimeConfig,
@@ -111,11 +144,6 @@ func NewTier1(
 		logger:         logger,
 	}
 
-	sf := &StreamFactory{
-		mergedBlocksStore: mergedBlocksStore,
-		forkedBlocksStore: forkedBlocksStore,
-		hub:               hub,
-	}
 	s.streamFactoryFunc = sf.New
 	s.getRecentFinalBlock = sf.GetRecentFinalBlock
 	s.getHeadBlock = sf.GetHeadBlock
@@ -126,11 +154,7 @@ func NewTier1(
 		opt(s)
 	}
 
-	return s
-}
-
-func (s *Tier1Service) BlockType() string {
-	return s.blockType
+	return s, nil
 }
 
 func (s *Tier1Service) Blocks(

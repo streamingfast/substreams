@@ -42,7 +42,6 @@ type Tier1Config struct {
 	StateStoreURL        string
 	StateStoreDefaultTag string
 	StateBundleSize      uint64
-	BlockType            string
 
 	MaxSubrequests       uint64
 	SubrequestsEndpoint  string
@@ -159,19 +158,21 @@ func (a *Tier1App) Run() error {
 		opts = append(opts, service.WithModuleExecutionTracing())
 	}
 
-	svc := service.NewTier1(
+	svc, err := service.NewTier1(
 		a.logger,
 		mergedBlocksStore,
 		forkedBlocksStore,
 		forkableHub,
 		stateStore,
 		a.config.StateStoreDefaultTag,
-		a.config.BlockType,
 		a.config.MaxSubrequests,
 		a.config.StateBundleSize,
 		subrequestsClientConfig,
 		opts...,
 	)
+	if err != nil {
+		return err
+	}
 
 	a.OnTerminating(func(err error) {
 		svc.Shutdown(err)

@@ -9,7 +9,7 @@ import (
 
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/wasm"
-	_ "github.com/streamingfast/substreams/wasm/wasip1"
+	//_ "github.com/streamingfast/substreams/wasm/wasip1"
 	_ "github.com/streamingfast/substreams/wasm/wasmtime"
 	_ "github.com/streamingfast/substreams/wasm/wazero"
 	"github.com/stretchr/testify/require"
@@ -22,6 +22,7 @@ func init() {
 func BenchmarkExecution(b *testing.B) {
 	type runtime struct {
 		name                string
+		wasmCodeType        string
 		code                []byte
 		shouldReUseInstance bool
 	}
@@ -35,10 +36,10 @@ func BenchmarkExecution(b *testing.B) {
 	}
 
 	for _, testCase := range []*testCase{
-		{"bare", "map_noop", args(wasm.NewParamsInput("")), []int{0}},
+		//{"bare", "map_noop", args(wasm.NewParamsInput("")), []int{0}},
 
 		// Decode proto only decode and returns the block.number as the output (to ensure the block is not elided at compile time)
-		{"decode_proto_only", "map_decode_proto_only", args(blockInputFile(b, "testdata/ethereum_mainnet_block_16021772.binpb")), []int{0}},
+		//{"decode_proto_only", "map_decode_proto_only", args(blockInputFile(b, "testdata/ethereum_mainnet_block_16021772.binpb")), []int{0}},
 
 		{"map_block", "map_block", args(blockInputFile(b, "testdata/ethereum_mainnet_block_16021772.binpb")), []int{44957, 45081}},
 	} {
@@ -47,6 +48,7 @@ func BenchmarkExecution(b *testing.B) {
 
 		//wasmCode := readCode(b, "substreams_wasm/substreams.wasm")
 		wasmCodep1 := readCode(b, "substreams_ts/index.wasm")
+		//wasmCodep1 := readCode(b, "substreams_wasi/wasi_hello_world/hello.wasm")
 
 		for _, config := range []*runtime{
 			//{"wasmtime", wasmCode, reuseInstance},
@@ -55,7 +57,7 @@ func BenchmarkExecution(b *testing.B) {
 			//{"wazero", wasmCode, reuseInstance},
 			//{"wazero", wasmCode, freshInstanceEachRun},
 
-			{"wasip1", wasmCodep1, reuseInstance},
+			{"wasip1", "rust/wasip1", wasmCodep1, reuseInstance},
 			//{"wasip1", wasmCodep1, freshInstanceEachRun},
 		} {
 			instanceKey := "reused"
@@ -68,7 +70,7 @@ func BenchmarkExecution(b *testing.B) {
 
 				wasmRuntime := wasm.NewRegistryWithRuntime(config.name, nil, 0)
 
-				module, err := wasmRuntime.NewModule(ctx, config.code)
+				module, err := wasmRuntime.NewModule(ctx, config.code, config.wasmCodeType)
 				require.NoError(b, err)
 
 				cachedInstance, err := module.NewInstance(ctx)

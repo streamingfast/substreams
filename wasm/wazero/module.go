@@ -6,11 +6,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/api"
-
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/wasm"
+	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
 
 // A Module represents a wazero.Runtime that clears and is destroyed upon completion of a request.
@@ -24,17 +24,27 @@ type Module struct {
 }
 
 func init() {
+	wasm.RegisterModuleFactory("wasip1", wasm.ModuleFactoryFunc(newModule))
 	wasm.RegisterModuleFactory("wazero", wasm.ModuleFactoryFunc(newModule))
 }
 
-func newModule(ctx context.Context, wasmCode []byte, registry *wasm.Registry) (wasm.Module, error) {
+func newModule(ctx context.Context, wasmCode []byte, wasmCodeType string, registry *wasm.Registry) (wasm.Module, error) {
 	// What's the effect of `ctx` here? Will it kill all the WASM if it cancels?
 	// TODO: try with: wazero.NewRuntimeConfigCompiler()
 	// TODO: try config := wazero.NewRuntimeConfig().WithCompilationCache(cache)
 	runtimeConfig := wazero.NewRuntimeConfigCompiler()
 	// TODO: can we use some caching in the RuntimeConfig so perhaps we reuse
 	// things across runtimes creations?
+
 	runtime := wazero.NewRuntimeWithConfig(ctx, runtimeConfig)
+
+	switch wasmCodeType {
+	case "rust/wasip1":
+		wasi_snapshot_preview1.MustInstantiate(ctx, runtime)
+	default:
+		//
+	}
+
 	hostModules, err := addExtensionFunctions(ctx, runtime, registry)
 	if err != nil {
 		return nil, err
@@ -60,13 +70,13 @@ func newModule(ctx context.Context, wasmCode []byte, registry *wasm.Registry) (w
 		return nil, fmt.Errorf("creating new module: %w", err)
 	}
 
-	funcs := mod.ExportedFunctions()
-	if funcs["alloc"] == nil {
-		return nil, fmt.Errorf("missing required functions: alloc")
-	}
-	if funcs["dealloc"] == nil {
-		return nil, fmt.Errorf("missing required functions: dealloc")
-	}
+	//funcs := mod.ExportedFunctions()
+	//if funcs["alloc"] == nil {
+	//	return nil, fmt.Errorf("missing required functions: alloc")
+	//}
+	//if funcs["dealloc"] == nil {
+	//	return nil, fmt.Errorf("missing required functions: dealloc")
+	//}
 
 	return &Module{
 		wazModuleConfig: wazero.NewModuleConfig(),

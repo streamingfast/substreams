@@ -19,7 +19,7 @@ func init() {
 	wasm.RegisterModuleFactory("wasmtime", wasm.ModuleFactoryFunc(newModule))
 }
 
-func newModule(ctx context.Context, wasmCode []byte, registry *wasm.Registry) (wasm.Module, error) {
+func newModule(ctx context.Context, wasmCode []byte, wasmCodeType string, registry *wasm.Registry) (wasm.Module, error) {
 	cfg := wasmtime.NewConfig()
 	if registry.MaxFuel() != 0 {
 		cfg.SetConsumeFuel(true)

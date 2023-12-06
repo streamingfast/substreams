@@ -84,8 +84,11 @@ func validateModuleGraph(mods []*pbsubstreams.Module, outputModule string, block
 
 func validateBinaryTypes(bins []*pbsubstreams.Binary) error {
 	for _, binary := range bins {
-		if binary.Type != "wasm/rust-v1" {
-			return fmt.Errorf(`unsupported binary type: %q, please use "wasm/rust-v1"`, binary.Type)
+		switch binary.Type {
+		case "wasm/rust-v1":
+		case "wasm/wasip1":
+		default:
+			return fmt.Errorf(`unsupported binary type: %q, please use "wasm/rust-v1" or "wasm/wasip1"`, binary.Type)
 		}
 	}
 	return nil

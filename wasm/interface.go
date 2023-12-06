@@ -24,13 +24,13 @@ type WASMExtension func(ctx context.Context, requestID string, clock *pbsubstrea
 // WASM VM specific implementation to create a new Module, which is an abstraction
 // around a runtime and pre-compiled WASM modules.
 type ModuleFactory interface {
-	NewModule(ctx context.Context, code []byte, registry *Registry) (module Module, err error)
+	NewModule(ctx context.Context, wasmCode []byte, wasmCodeType string, registry *Registry) (module Module, err error)
 }
 
-type ModuleFactoryFunc func(ctx context.Context, wasmCode []byte, registry *Registry) (module Module, err error)
+type ModuleFactoryFunc func(ctx context.Context, wasmCode []byte, wasmCodeType string, registry *Registry) (module Module, err error)
 
-func (f ModuleFactoryFunc) NewModule(ctx context.Context, wasmCode []byte, registry *Registry) (module Module, err error) {
-	return f(ctx, wasmCode, registry)
+func (f ModuleFactoryFunc) NewModule(ctx context.Context, wasmCode []byte, wasmCodeType string, registry *Registry) (module Module, err error) {
+	return f(ctx, wasmCode, wasmCodeType, registry)
 }
 
 // A Module is a cached or pre-compiled version able to generate new isolated

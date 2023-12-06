@@ -45,8 +45,8 @@ func (r *Registry) registerWASMExtension(namespace string, importName string, ex
 func (r *Registry) MaxFuel() uint64            { return r.maxFuel }
 func (r *Registry) InstanceCacheEnabled() bool { return r.instanceCacheEnabled }
 
-func (r *Registry) NewModule(ctx context.Context, wasmCode []byte) (Module, error) {
-	return r.runtimeStack.NewModule(ctx, wasmCode, r)
+func (r *Registry) NewModule(ctx context.Context, wasmCode []byte, wasmCodeType string) (Module, error) {
+	return r.runtimeStack.NewModule(ctx, wasmCode, wasmCodeType, r)
 }
 
 func NewRegistry(extensions []WASMExtensioner, maxFuel uint64) *Registry {

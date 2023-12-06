@@ -88,7 +88,9 @@ func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
 		return "", err
 	}
 	if err := stream.Run(ctx); err != nil {
-		return "", err
+		if err != io.EOF {
+			return "", err
+		}
 	}
 	return out, nil
 }
@@ -109,7 +111,6 @@ func NewTier1(
 	opts ...Option,
 ) (*Tier1Service, error) {
 
-	logger.Info("creating grpc client factory", zap.Reflect("config", substreamsClientConfig))
 	clientFactory := client.NewInternalClientFactory(substreamsClientConfig)
 
 	runtimeConfig := config.NewRuntimeConfig(
@@ -134,6 +135,7 @@ func NewTier1(
 		return nil, fmt.Errorf("getting block type from stream factory: %w", err)
 	}
 
+	logger.Info("launching tier1 service", zap.Reflect("client_config", substreamsClientConfig), zap.String("block_type", blockType), zap.Bool("with_live", hub != nil))
 	s := &Tier1Service{
 		Shutter:        shutter.New(),
 		runtimeConfig:  runtimeConfig,

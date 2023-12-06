@@ -84,6 +84,7 @@ func NewTier2(
 		return nil, fmt.Errorf("getting block type from merged-blocks-store: %w", err)
 	}
 
+	logger.Info("launching tier2 service", zap.String("block_type", blockType))
 	s := &Tier2Service{
 		runtimeConfig: runtimeConfig,
 		blockType:     blockType,

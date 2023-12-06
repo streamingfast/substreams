@@ -15,17 +15,15 @@ import (
 )
 
 func init() {
-	alphaCmd.AddCommand(updateCmd)
-	updateCmd.Flags().StringP("endpoint", "e", "http://localhost:8000", "Specify the endpoint to connect to")
-	updateCmd.Flags().Bool("strict", false, "Require deploymentID parameter to be set and complete")
+	serviceCmd.AddCommand(updateCmd)
 	updateCmd.Flags().BoolP("reset", "r", false, "Reset the deployment by DELETING ALL ITS DATA")
 }
 
 var updateCmd = &cobra.Command{
-	Use:   "sink-update <package> [deploymentID]",
-	Short: "Update a substreams package with a sink",
+	Use:   "update <package> [deploymentID]",
+	Short: "Update a deployed service with a substreams package",
 	Long: cli.Dedent(`
-        Sends a "update" request to a server. By default, it will talk to a local "substreams alpha sink-serve" instance.
+        Sends a "update" request to a server. By default, it will talk to a local "substreams alpha service serve" instance.
         The substreams must contain a "SinkConfig" section to be deployable.
         If deploymentID is not set or is incomplete, the CLI will try to guess (unless --strict is set).
      	`),
@@ -57,7 +55,7 @@ func updateE(cmd *cobra.Command, args []string) error {
 		if sflags.MustGetBool(cmd, "strict") {
 			return fmt.Errorf("invalid ID provided: %q and '--strict' is set", id)
 		}
-		matching, err := fuzzyMatchDeployment(ctx, id, cli, fuzzyMatchPreferredStatusOrder)
+		matching, err := fuzzyMatchDeployment(ctx, id, cli, cmd, fuzzyMatchPreferredStatusOrder)
 		if err != nil {
 			return err
 		}
@@ -68,18 +66,25 @@ func updateE(cmd *cobra.Command, args []string) error {
 		id = matching.Id
 	}
 
-	req := &pbsinksvc.UpdateRequest{
+	reset := sflags.MustGetBool(cmd, "reset")
+
+	req := connect.NewRequest(&pbsinksvc.UpdateRequest{
 		SubstreamsPackage: pkg,
 		DeploymentId:      id,
-		Reset_:            sflags.MustGetBool(cmd, "reset"),
-	}
+		Reset_:            reset,
+	})
+
 	deletingString := ""
-	if req.Reset_ {
+	if reset {
 		deletingString = " deleting data,"
 	}
 
-	fmt.Printf("Updating sink %q... (restarting services,%s please wait)\n", req.DeploymentId, deletingString)
-	resp, err := cli.Update(ctx, connect.NewRequest(req))
+	if err := addHeaders(cmd, req); err != nil {
+		return err
+	}
+
+	fmt.Printf("Updating service %q... (restarting services,%s please wait)\n", id, deletingString)
+	resp, err := cli.Update(ctx, req)
 	if err != nil {
 		return interceptConnectionError(err)
 	}
@@ -88,7 +93,8 @@ func updateE(cmd *cobra.Command, args []string) error {
 	if resp.Msg.Reason != "" {
 		reason = " (" + resp.Msg.Reason + ")"
 	}
-	fmt.Printf("Update complete for sink %q:\n  Status: %v%s\n", req.DeploymentId, resp.Msg.Status, reason)
+	fmt.Printf("Update complete for service %q:\n  Status: %v%s\n", id, resp.Msg.Status, reason)
+	fmt.Print(resp.Msg.Motd)
 	printServices(resp.Msg.Services)
 	return nil
 }

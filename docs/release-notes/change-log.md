@@ -11,10 +11,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Fixed
+
+* Bug in `substreams init` with numbers in ABI types
+* Server implementation: return the correct GRPC code instead of wrapping it under an "Unknown" error.
+
+## v1.1.22
+
+### alpha service deployments
+
+* Fix fuzzy matching when endpoint require auth headers
+* Fix panic in "serve" when trying to delete a non-existing deployment
+* Add validation check of substreams package before sending deploy request to server
+
+## v1.1.21
+
 ### Changed
 
 * Codegen: substreams-database-change to v1.3, properly generates primary key to support chain reorgs in postgres sink.
-*   Sink server: support for deploying sinks with DBT configuration, so that users can deploy their own DBT models (supported on postgres and clickhouse sinks). Example manifest file segment:
+* Sink server commands all moved from `substreams alpha sink-*` to `substreams alpha service *`
+* Sink server: support for deploying sinks with DBT configuration, so that users can deploy their own DBT models (supported on postgres and clickhouse sinks). Example manifest file segment:
 
     ```yaml
     [...]

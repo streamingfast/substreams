@@ -10,7 +10,7 @@ import (
 	"text/template"
 
 	"github.com/gertd/go-pluralize"
-	"github.com/iancoleman/strcase"
+	"github.com/huandu/xstrings"
 	"github.com/streamingfast/eth-go"
 	"go.uber.org/zap"
 )
@@ -103,7 +103,7 @@ func NewEthereumProject(name string, moduleName string, chain *EthereumChain, co
 		chain:                       chain,
 		ethereumContracts:           contracts,
 		creationBlockNum:            lowestStartBlock,
-		sqlImportVersion:            "1.0.5",
+		sqlImportVersion:            "1.0.7",
 		graphImportVersion:          "0.1.0",
 		databaseChangeImportVersion: "1.2.1",
 		entityChangeImportVersion:   "1.1.0",
@@ -154,7 +154,7 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 
 			name := p.name
 			if finalFileName == "subgraph.yaml.gotmpl" {
-				name = strcase.ToKebab(p.name)
+				name = xstrings.ToKebabCase(p.name)
 			}
 
 			model := map[string]any{
@@ -218,16 +218,16 @@ func BuildEventModels(contract *EthereumContract, multipleContracts bool) (out [
 				rustABIStructName = name + strconv.FormatUint(uint64(i+1), 10)
 			}
 
-			protoFieldName := strcase.ToSnake(pluralizer.Plural(rustABIStructName))
+			protoFieldName := xstrings.ToSnakeCase(pluralizer.Plural(rustABIStructName))
 			// prost will do a to_lower_camel_case() on any struct name
-			rustGeneratedStructName := strcase.ToCamel(strcase.ToSnake(rustABIStructName))
+			rustGeneratedStructName := xstrings.ToCamelCase(xstrings.ToSnakeCase(rustABIStructName))
 
 			codegenEvent := codegenEvent{
 				Rust: &rustEventModel{
 					ABIStructName:              rustGeneratedStructName,
 					ProtoMessageName:           rustGeneratedStructName,
 					ProtoOutputModuleFieldName: protoFieldName,
-					TableChangeEntityName:      strcase.ToSnake(rustABIStructName),
+					TableChangeEntityName:      xstrings.ToSnakeCase(rustABIStructName),
 				},
 
 				Proto: &protoEventModel{
@@ -285,7 +285,7 @@ func (e *rustEventModel) populateFields(log *eth.LogEventDef, multipleContracts 
 	fmt.Printf("  Generating ABI Events for %s (%s)\n", log.Name, strings.Join(paramNames, ","))
 
 	for _, parameter := range log.Parameters {
-		name := strcase.ToSnake(parameter.Name)
+		name := xstrings.ToSnakeCase(parameter.Name)
 		name = sanitizeProtoFieldName(name)
 
 		toProtoCode := generateFieldTransformCode(parameter.Type, "event."+name)
@@ -613,7 +613,7 @@ func (e *protoEventModel) populateFields(log *eth.LogEventDef) error {
 
 	e.Fields = make([]protoField, 0, len(log.Parameters))
 	for _, parameter := range log.Parameters {
-		fieldName := strcase.ToSnake(parameter.Name)
+		fieldName := xstrings.ToSnakeCase(parameter.Name)
 		fieldName = sanitizeProtoFieldName(fieldName)
 		fieldType := getProtoFieldType(parameter.Type)
 		if fieldType == SKIP_FIELD {

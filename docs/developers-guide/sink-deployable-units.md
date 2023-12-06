@@ -35,10 +35,7 @@ sink:
   type: sf.substreams.sink.sql.v1.Service
   config:
     schema: "./schema.sql"
-    wire_protocol_access: true
     postgraphile_frontend:
-      enabled: true
-    pgweb_frontend:
       enabled: true
 ```
 
@@ -57,8 +54,6 @@ type: sf.substreams.sink.sql.v1.Service
 configs:
 - schema: (371 bytes) MD5SUM: 280ada56ad9f83f58891872bf93e4794 [LOADED_FILE]
 - postgraphile_frontend:
-  - enabled: true
-- pgweb_frontend:
   - enabled: true
 (...)
 ```

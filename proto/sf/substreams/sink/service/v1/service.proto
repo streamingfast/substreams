@@ -20,6 +20,14 @@ service Provider {
 
 message DeployRequest {
   sf.substreams.v1.Package substreams_package = 1;
+
+  bool development_mode = 2;
+  repeated Parameter parameters = 3;
+}
+
+message Parameter {
+  string key = 1;
+  string value = 2;
 }
 
 message DeployResponse {
@@ -30,6 +38,7 @@ message DeployResponse {
   
   map<string, string> services = 3;
   string reason = 4;
+  string motd = 5;
 }
 
 message UpdateRequest {
@@ -42,6 +51,7 @@ message UpdateResponse {
   DeploymentStatus status = 1;
   map<string, string> services = 2;
   string reason = 3;
+  string motd = 4;
 }
 
 message InfoRequest {
@@ -54,6 +64,7 @@ message InfoResponse {
   string reason = 3;
   PackageInfo package_info = 4;
   SinkProgress progress = 5;
+  string motd = 6;
 }
 
 message SinkProgress {
@@ -79,6 +90,7 @@ message DeploymentWithStatus {
   string reason = 3;
   PackageInfo package_info = 4;
   SinkProgress progress = 5;
+  string motd = 6;
 }
 
 enum DeploymentStatus {
@@ -86,7 +98,13 @@ enum DeploymentStatus {
   RUNNING = 1;
   FAILING = 2;
   PAUSED = 3;  
-  STOPPED = 4;  
+  STOPPED = 4;
+
+  STARTING = 5;
+  PAUSING = 6;
+  STOPPING = 7;
+  REMOVING = 8;
+  RESUMING = 9;
 }
 
 message RemoveRequest {

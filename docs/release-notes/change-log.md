@@ -9,12 +9,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v1.2.0
 
-### Fixed
+### Client
 
-* Bug in `substreams init` with numbers in ABI types
-* Server implementation: return the correct GRPC code instead of wrapping it under an "Unknown" error.
+* Fixed bug in `substreams init` with numbers in ABI types
+
+### Backend
+
+* Return the correct GRPC code instead of wrapping it under an "Unknown" error. "Clean shutdown" now returns CodeUnavailable. This is compatible with previous substreams clients like substreams-sql which should retry automatically.
+* Upgraded components to manage the new block encapsulation format in merged-blocks and on the wire required for firehose-core v1.0.0
 
 ## v1.1.22
 

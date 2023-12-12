@@ -15,8 +15,16 @@ const approvalTopic = bytesFromHex(
 const transferTopic = bytesFromHex(
   "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
 )
-const out = map_block(readInput())
-writeOutput(out)
+
+// @ts-ignore
+
+export function popo() {
+  console.log("Hello from popo!")
+
+
+  const out = map_block(readInput())
+  writeOutput(out)
+}
 
 // Read input from stdin
 function readInput(): Uint8Array {
@@ -62,14 +70,14 @@ function writeOutput(output: any) {
   Javy.IO.writeSync(fd, buffer)
 }
 
-export function map_noop() {}
+function map_noop() {}
 
-export function map_decode_proto_only(data: Uint8Array) {
+function map_decode_proto_only(data: Uint8Array) {
   const block = new Block()
   block.fromBinary(data)
 }
 
-export function map_block(data: Uint8Array): any {
+function map_block(data: Uint8Array): any {
   const block = new Block()
   block.fromBinary(data)
 

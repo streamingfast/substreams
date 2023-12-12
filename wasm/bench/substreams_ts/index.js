@@ -5235,8 +5235,11 @@ var approvalTopic = bytesFromHex(
 var transferTopic = bytesFromHex(
   "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 );
-var out = map_block(readInput());
-writeOutput(out);
+function popo() {
+  console.log("Hello from popo!");
+  const out = map_block(readInput());
+  writeOutput(out);
+}
 function readInput() {
   const chunkSize = 1 * 1024 * 1024;
   const inputChunks = [];
@@ -5266,12 +5269,6 @@ function writeOutput(output) {
   const buffer = new Uint8Array(encodedOutput);
   const fd = 1;
   Javy.IO.writeSync(fd, buffer);
-}
-function map_noop() {
-}
-function map_decode_proto_only(data) {
-  const block = new Block();
-  block.fromBinary(data);
 }
 function map_block(data) {
   const block = new Block();
@@ -5388,7 +5385,5 @@ function bytesEqual(left, right) {
   return true;
 }
 export {
-  map_block,
-  map_decode_proto_only,
-  map_noop
+  popo
 };

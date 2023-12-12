@@ -1,1 +1,3 @@
-export declare function bar(): void
+declare module "Env" {
+    export function bar(): void
+}

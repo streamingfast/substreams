@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "build": "esbuild --bundle index.ts --format=esm --outdir=. --target=es2020 && javy compile index.js --wit index.wit -n index-world -o ./index.wasm"
+    "build": "esbuild --bundle env.ts index.ts --format=esm --outdir=. --target=es2020 && javy compile index.js --wit index.wit -n index-world -o ./index.wasm"
   },
   "repository": {
     "type": "git",

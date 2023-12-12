@@ -78,8 +78,10 @@ func newModule(ctx context.Context, wasmCode []byte, wasmCodeType string, regist
 	//	return nil, fmt.Errorf("missing required functions: dealloc")
 	//}
 
+	wazConfig := wazero.NewModuleConfig()
+
 	return &Module{
-		wazModuleConfig: wazero.NewModuleConfig(),
+		wazModuleConfig: wazConfig,
 		wazRuntime:      runtime,
 		userModule:      mod,
 		hostModules:     hostModules,

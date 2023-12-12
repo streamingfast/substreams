@@ -754,6 +754,13 @@ var require_bigInt = __commonJS({
   }
 });
 
+// env.ts
+var require_env = __commonJS({
+  "env.ts"() {
+    "use strict";
+  }
+});
+
 // index.ts
 var import_bigInt = __toESM(require_bigInt());
 
@@ -5228,6 +5235,7 @@ _Field.fields = proto3.util.newFieldList(() => [
 var Field = _Field;
 
 // index.ts
+var Env = __toESM(require_env());
 var rocketAddress = bytesFromHex("0xae78736Cd615f374D3085123A210448E74Fc6393");
 var approvalTopic = bytesFromHex(
   "0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925"
@@ -5237,6 +5245,7 @@ var transferTopic = bytesFromHex(
 );
 function popo() {
   console.log("Hello from popo!");
+  (void 0)();
   const out = map_block(readInput());
   writeOutput(out);
 }

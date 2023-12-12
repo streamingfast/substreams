@@ -25,6 +25,10 @@ fn main() {
 #[no_mangle]
 pub extern "C" fn map_block(blk_ptr: *mut u8, blk_len: usize) {
     println!("Hello world! {}", blk_len);
+
+    // let mut file = fs::File::create("/helloworld/helloworld.txt").unwrap();
+    // write!(file, "Hello world!\n").unwrap();
+
     let mut buf = Vec::with_capacity(50000);
     let ptr = buf.as_mut_ptr();
     unsafe {

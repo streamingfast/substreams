@@ -17,10 +17,12 @@ const transferTopic = bytesFromHex(
 )
 
 // @ts-ignore
+import * as Env from "./env";
 
 export function popo() {
   console.log("Hello from popo!")
 
+  Env.bar()
 
   const out = map_block(readInput())
   writeOutput(out)

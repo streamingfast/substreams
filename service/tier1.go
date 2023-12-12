@@ -92,7 +92,8 @@ func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
 			return "", err
 		}
 	}
-	return out, nil
+
+	return strings.TrimPrefix(out, protoPkfPrefix), nil
 }
 
 func NewTier1(

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/bufbuild/connect-go"
 	"github.com/streamingfast/bstream"
@@ -43,18 +44,20 @@ type Tier2Service struct {
 	logger            *zap.Logger
 }
 
+const protoPkfPrefix = "type.googleapis.com/"
+
 func getBlockTypeFromMergedBlocks(store dstore.Store) (string, error) {
 	var out string
 	fs := bstream.NewFileSource(store, bstream.GetProtocolFirstStreamableBlock, bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
 		out = blk.Payload.TypeUrl
 		return io.EOF
 	}), zlog)
-
 	fs.Run()
+
 	if err := fs.Err(); err != io.EOF {
 		return "", err
 	}
-	return out, nil
+	return strings.TrimPrefix(out, protoPkfPrefix), nil
 }
 
 func NewTier2(

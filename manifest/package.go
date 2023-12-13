@@ -124,6 +124,27 @@ func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package
 		PackageMeta: []*pbsubstreams.PackageMetadata{pkgMeta},
 		Modules:     &pbsubstreams.Modules{},
 		Network:     m.Network,
+		Networks:    make(map[string]*pbsubstreams.NetworkParams),
+	}
+
+	for k, v := range m.Networks {
+		params := &pbsubstreams.NetworkParams{}
+
+		if v.InitialBlocks != nil {
+			params.InitialBlocks = make(map[string]uint64)
+		}
+		for kk, vv := range v.InitialBlocks {
+			params.InitialBlocks[kk] = vv
+		}
+
+		if v.Params != nil {
+			params.Params = make(map[string]string)
+		}
+		for kk, vv := range v.Params {
+			params.Params[kk] = vv
+		}
+
+		pkg.Networks[k] = params
 	}
 
 	moduleCodeIndexes := map[string]int{}

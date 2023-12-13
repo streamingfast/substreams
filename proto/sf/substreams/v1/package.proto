@@ -26,6 +26,13 @@ message Package {
   string sink_module = 11;
   // image is the bytes to a JPEG, WebP or PNG file. Max size is 2 MiB
   bytes image = 12;
+
+   map<string, NetworkParams> networks = 13;
+}
+
+message NetworkParams {
+  map<string, uint64> initialBlocks = 1;
+  map<string, string> params = 2;
 }
 
 message PackageMetadata {

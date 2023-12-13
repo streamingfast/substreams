@@ -39,11 +39,17 @@ type Manifest struct {
 	Modules     []*Module         `yaml:"modules"`
 	Params      map[string]string `yaml:"params"`
 
-	Network string `yaml:"network"`
-	Sink    *Sink  `yaml:"sink"`
+	Network  string                    `yaml:"network"`
+	Networks map[string]*NetworkParams `yaml:"networks"`
+	Sink     *Sink                     `yaml:"sink"`
 
 	Graph   *ModuleGraph `yaml:"-"`
 	Workdir string       `yaml:"-"`
+}
+
+type NetworkParams struct {
+	InitialBlocks map[string]uint64 `yaml:"initial_blocks,omitempty" json:"initial_blocks,omitempty"`
+	Params        map[string]string `yaml:"params,omitempty" json:"params,omitempty"`
 }
 
 type Sink struct {

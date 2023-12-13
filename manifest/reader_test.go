@@ -10,6 +10,7 @@ import (
 
 	"github.com/jhump/protoreflect/desc/protoparse"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/descriptorpb"
 )
@@ -354,6 +355,225 @@ func TestReader_Read(t *testing.T) {
 			got, err := r.Read()
 			tt.assertionRead(t, err)
 			assertProtoEqual(t, tt.want, got)
+		})
+	}
+}
+
+func TestMergeNetworks(t *testing.T) {
+
+	var sepolia = &pbsubstreams.NetworkParams{
+		InitialBlocks: map[string]uint64{
+			"mod1": 10,
+		},
+		Params: map[string]string{
+			"mod2": "addr=0xdeadbeef",
+		},
+	}
+	var mainnet = &pbsubstreams.NetworkParams{
+		InitialBlocks: map[string]uint64{
+			"mod1": 20,
+		},
+		Params: map[string]string{
+			"mod2": "addr=0x12121212",
+		},
+	}
+	var sepoliaPrefixed = &pbsubstreams.NetworkParams{
+		InitialBlocks: map[string]uint64{
+			"src:mod1": 10,
+		},
+		Params: map[string]string{
+			"src:mod2": "addr=0xdeadbeef",
+		},
+	}
+	var mainnetPrefixed = &pbsubstreams.NetworkParams{
+		InitialBlocks: map[string]uint64{
+			"src:mod1": 20,
+		},
+		Params: map[string]string{
+			"src:mod2": "addr=0x12121212",
+		},
+	}
+
+	tests := []struct {
+		name               string
+		srcNetworks        map[string]*pbsubstreams.NetworkParams
+		destNetworks       map[string]*pbsubstreams.NetworkParams
+		expectError        string
+		expectDestNetworks map[string]*pbsubstreams.NetworkParams
+	}{
+		{
+			// src []  dest []  -> []
+			name:               "nil-nil",
+			srcNetworks:        nil,
+			destNetworks:       nil,
+			expectError:        "",
+			expectDestNetworks: nil,
+		},
+		{
+			// case: src []  dest [mainnet,sepolia] -> [mainnet,sepolia]
+			name:        "nil+some=some",
+			srcNetworks: nil,
+			destNetworks: map[string]*pbsubstreams.NetworkParams{
+				"sepolia": sepolia,
+				"mainnet": mainnet,
+			},
+			expectDestNetworks: map[string]*pbsubstreams.NetworkParams{
+				"sepolia": sepolia,
+				"mainnet": mainnet,
+			},
+		},
+		{
+			// case: src [mainnet,sepolia] dest [] -> [mainnet,sepolia]
+			name: "some+nil=prefixed",
+			srcNetworks: map[string]*pbsubstreams.NetworkParams{
+				"sepolia": sepolia,
+				"mainnet": mainnet,
+			},
+			destNetworks: nil,
+			expectError:  "",
+			expectDestNetworks: map[string]*pbsubstreams.NetworkParams{
+				"sepolia": sepoliaPrefixed,
+				"mainnet": mainnetPrefixed,
+			},
+		},
+		{
+			// case: src [mainnet,sepolia] dest [mainnet,sepolia] -> [mainnet,sepolia]
+			name: "same+same=merged_prefixed",
+			srcNetworks: map[string]*pbsubstreams.NetworkParams{
+				"mainnet": {
+					InitialBlocks: map[string]uint64{
+						"mod3": 100,
+					},
+					Params: map[string]string{
+						"mod4": "addr=0xffffffff",
+					},
+				},
+				"sepolia": {
+					InitialBlocks: map[string]uint64{
+						"mod3": 200,
+					},
+					Params: map[string]string{
+						"mod4": "addr=0xbbbbbbbb",
+					},
+				},
+			},
+			destNetworks: map[string]*pbsubstreams.NetworkParams{
+				"mainnet": mainnet,
+				"sepolia": sepolia,
+			},
+			expectError: "",
+			expectDestNetworks: map[string]*pbsubstreams.NetworkParams{
+				"mainnet": {
+					InitialBlocks: map[string]uint64{
+						"mod1":     20,
+						"src:mod3": 100,
+					},
+					Params: map[string]string{
+						"mod2":     "addr=0x12121212",
+						"src:mod4": "addr=0xffffffff",
+					},
+				},
+				"sepolia": {
+					InitialBlocks: map[string]uint64{
+						"mod1":     10,
+						"src:mod3": 200,
+					},
+					Params: map[string]string{
+						"mod2":     "addr=0xdeadbeef",
+						"src:mod4": "addr=0xbbbbbbbb",
+					},
+				},
+			},
+		},
+		{
+			// case: src [mainnet,sepolia] dest [mainnet] -> [mainnet]
+			name: "dest-is-subset",
+			srcNetworks: map[string]*pbsubstreams.NetworkParams{
+				"mainnet": {},
+				"sepolia": {},
+			},
+			destNetworks: map[string]*pbsubstreams.NetworkParams{
+				"mainnet": {},
+			},
+			expectError: "",
+			expectDestNetworks: map[string]*pbsubstreams.NetworkParams{
+				"mainnet": {},
+			},
+		},
+		{
+			// case: src [mainnet]          dest [mainnet,sepolia] -> ERROR
+			name: "missing-in-source",
+			srcNetworks: map[string]*pbsubstreams.NetworkParams{
+				"mainnet": {},
+			},
+			destNetworks: map[string]*pbsubstreams.NetworkParams{
+				"mainnet": {},
+				"sepolia": {},
+			},
+			expectError: `network "sepolia" defined in package "dest_package" but not in "source_package"`,
+		},
+		{
+			// case: src [mainnet] dest [mainnet,sepolia] -> no error if src:sepolia is overloaded
+			name: "missing-in-source-but-overloaded",
+			srcNetworks: map[string]*pbsubstreams.NetworkParams{
+				"mainnet": {},
+			},
+			destNetworks: map[string]*pbsubstreams.NetworkParams{
+				"mainnet": {
+					InitialBlocks: map[string]uint64{
+						"src:mod1": 100,
+					},
+				},
+				"sepolia": {},
+			},
+			expectDestNetworks: map[string]*pbsubstreams.NetworkParams{
+				"mainnet": {
+					InitialBlocks: map[string]uint64{
+						"src:mod1": 100,
+					},
+				},
+				"sepolia": {},
+			},
+		},
+		{
+			// case: src [mainnet, goerli]  dest [mainnet,sepolia] -> ERROR
+			name: "different",
+			srcNetworks: map[string]*pbsubstreams.NetworkParams{
+				"mainnet": {},
+				"goerli":  {},
+			},
+			destNetworks: map[string]*pbsubstreams.NetworkParams{
+				"mainnet": {},
+				"sepolia": {},
+			},
+			expectError: `network "sepolia" defined in package "dest_package" but not in "source_package"`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			src := &pbsubstreams.Package{
+				PackageMeta: []*pbsubstreams.PackageMetadata{
+					{
+						Name: "source_package",
+					},
+				},
+				Networks: test.srcNetworks,
+			}
+			dest := &pbsubstreams.Package{
+				PackageMeta: []*pbsubstreams.PackageMetadata{
+					{
+						Name: "dest_package",
+					},
+				},
+				Networks: test.destNetworks,
+			}
+			err := mergeNetworks(src, dest, "src")
+			if test.expectError != "" {
+				require.Equal(t, err.Error(), test.expectError)
+				return
+			}
+			assert.Equal(t, test.expectDestNetworks, dest.Networks)
 		})
 	}
 }

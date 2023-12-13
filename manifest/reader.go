@@ -713,6 +713,12 @@ func loadImports(pkg *pbsubstreams.Package, manif *Manifest) error {
 		prefixModules(subpkg.Modules.Modules, importName)
 		reindexAndMergePackage(subpkg, pkg)
 		mergeProtoFiles(subpkg, pkg)
+		if err := mergeNetworks(subpkg, pkg, importName); err != nil {
+			return err
+		}
+		if err := validateNetworks(pkg); err != nil {
+			return err
+		}
 	}
 	// loop through the Manifest, and get the `imports` statements,
 	// pull the Package files from Disk, and merge them into this one
@@ -751,16 +757,20 @@ func loadImage(pkg *pbsubstreams.Package, manif *Manifest) error {
 
 const PrefixSeparator = ":"
 
+func withPrefix(val, prefix string) string {
+	return prefix + PrefixSeparator + val
+}
+
 func prefixModules(mods []*pbsubstreams.Module, prefix string) {
 	for _, mod := range mods {
-		mod.Name = prefix + PrefixSeparator + mod.Name
+		mod.Name = withPrefix(mod.Name, prefix)
 		for idx, inputIface := range mod.Inputs {
 			switch input := inputIface.Input.(type) {
 			case *pbsubstreams.Module_Input_Source_:
 			case *pbsubstreams.Module_Input_Store_:
-				input.Store.ModuleName = prefix + PrefixSeparator + input.Store.ModuleName
+				input.Store.ModuleName = withPrefix(input.Store.ModuleName, prefix)
 			case *pbsubstreams.Module_Input_Map_:
-				input.Map.ModuleName = prefix + PrefixSeparator + input.Map.ModuleName
+				input.Map.ModuleName = withPrefix(input.Map.ModuleName, prefix)
 			case *pbsubstreams.Module_Input_Params_:
 			default:
 				panic(fmt.Sprintf("module %q: input index %d: unsupported module input type %s", mod.Name, idx, inputIface.Input))
@@ -785,6 +795,144 @@ func reindexAndMergePackage(src, dest *pbsubstreams.Package) {
 	dest.Modules.Binaries = append(dest.Modules.Binaries, src.Modules.Binaries...)
 	dest.ModuleMeta = append(dest.ModuleMeta, src.ModuleMeta...)
 	dest.PackageMeta = append(dest.PackageMeta, src.PackageMeta...)
+}
+
+func mergeNetwork(src, dest *pbsubstreams.NetworkParams, srcPrefix string) {
+	if src.InitialBlocks != nil {
+		if dest.InitialBlocks == nil {
+			dest.InitialBlocks = make(map[string]uint64)
+		}
+		for kk, vv := range src.InitialBlocks {
+			dest.InitialBlocks[withPrefix(kk, srcPrefix)] = vv
+		}
+	}
+
+	if src.Params != nil {
+		if dest.Params == nil {
+			dest.Params = make(map[string]string)
+		}
+		for kk, vv := range src.Params {
+			dest.Params[withPrefix(kk, srcPrefix)] = vv
+		}
+	}
+}
+
+// overloadedNetworks lists the networks that are declared in the downstreams package, with the given prefix
+// this way, a package with networks [mainnet,sepolia] can append to the list of networks of an imported spkg
+func overloadedNetworks(pkg *pbsubstreams.Package, prefix string) map[string]bool {
+	out := make(map[string]bool)
+
+networks:
+	for k, nw := range pkg.Networks {
+		for kk := range nw.InitialBlocks {
+			if strings.HasPrefix(kk, prefix) {
+				out[k] = true
+				continue networks
+			}
+		}
+		for kk := range nw.Params {
+			if strings.HasPrefix(kk, prefix) {
+				out[k] = true
+				continue networks
+			}
+		}
+	}
+	return out
+}
+
+func mergeNetworks(src, dest *pbsubstreams.Package, srcPrefix string) error {
+
+	// case: src []                 dest []                -> []
+	// case: src []                 dest [mainnet,sepolia] -> [mainnet,sepolia]
+	if src.Networks == nil {
+		return nil
+	}
+
+	overloaded := overloadedNetworks(dest, srcPrefix)
+
+	// case: src [mainnet,sepolia]          dest []                -> [mainnet,sepolia]
+	if dest.Networks == nil {
+		dest.Networks = make(map[string]*pbsubstreams.NetworkParams)
+		for k, srcNet := range src.Networks {
+			destNet := &pbsubstreams.NetworkParams{}
+			mergeNetwork(srcNet, destNet, srcPrefix)
+			dest.Networks[k] = destNet
+		}
+		return nil
+	}
+
+	for k, destNet := range dest.Networks {
+		srcNet, ok := src.Networks[k]
+		if !ok {
+			// the following error cases can be fixed by adding a value to src.sepolia in the dest package ^^
+			if _, ok := overloaded[k]; !ok {
+
+				// case: src [mainnet]          dest [mainnet,sepolia] -> ERROR
+				// case: src [mainnet, goerli]  dest [mainnet,sepolia] -> ERROR
+				// case: src [rinkeby, goerli]  dest [mainnet,sepolia] -> ERROR
+				return fmt.Errorf("network %q defined in package %q but not in %q", k, dest.PackageMeta[0].Name, src.PackageMeta[0].Name)
+			}
+		}
+
+		// case: src [mainnet,sepolia] dest [mainnet,sepolia] -> [mainnet,sepolia]
+		// case: src [mainnet, goerli]  dest [mainnet]         -> [mainnet] // dependency could support more packages than needed
+		mergeNetwork(srcNet, destNet, srcPrefix)
+
+	}
+
+	return nil
+}
+
+func validateNetworks(pkg *pbsubstreams.Package) error {
+	if pkg.Networks == nil {
+		return nil
+	}
+
+	// FIXME: add some tests for this
+	// FIXME maybe ignore the modules that are not used in this check ?
+
+	seenPackagesInitialBlocks := make(map[string]bool)
+	seenPackagesParams := make(map[string]bool)
+
+	var firstNetwork string
+	for name, nw := range pkg.Networks {
+		if firstNetwork == "" {
+			for k := range nw.InitialBlocks {
+				seenPackagesInitialBlocks[k] = true
+			}
+			for k := range nw.Params {
+				seenPackagesParams[k] = true
+			}
+			firstNetwork = name
+			continue
+		}
+
+		for k := range nw.InitialBlocks {
+			if !seenPackagesInitialBlocks[k] {
+				return fmt.Errorf("missing 'initial_blocks' value for module %q in network %s", k, firstNetwork)
+			}
+		}
+		for k := range nw.Params {
+			if !seenPackagesParams[k] {
+				return fmt.Errorf("missing 'params' value for module %q in network %s", k, firstNetwork)
+			}
+		}
+
+		for k := range seenPackagesInitialBlocks {
+			if _, ok := nw.InitialBlocks[k]; !ok {
+				return fmt.Errorf("missing 'initial_blocks' value for module %q in network %s", k, name)
+			}
+		}
+		for k := range seenPackagesParams {
+			if _, ok := nw.Params[k]; !ok {
+				return fmt.Errorf("missing 'params' value for module %q in network %s", k, name)
+			}
+		}
+
+	}
+
+	return nil
+
 }
 
 func mergeProtoFiles(src, dest *pbsubstreams.Package) {

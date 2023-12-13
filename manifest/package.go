@@ -26,25 +26,24 @@ func newManifestConverter(inputPath string, skipSourceCodeImportValidation bool)
 }
 
 func (r *manifestConverter) Convert(manif *Manifest) (*pbsubstreams.Package, []*desc.FileDescriptor, *dynamic.Message, error) {
-	loadedManifest, err := r.loadManifest(manif, r.inputPath)
-	if err != nil {
+
+	if err := r.expandManifestVariables(manif); err != nil {
+		return nil, nil, nil, err
+	}
+
+	if err := r.validateManifest(manif); err != nil {
 		return nil, nil, nil, fmt.Errorf("unable to load manifest: %w", err)
 	}
 
-	return r.manifestToPkg(loadedManifest)
+	return r.manifestToPkg(manif)
 }
 
-func (r *manifestConverter) loadManifest(manif *Manifest, inputPath string) (*Manifest, error) {
+func (r *manifestConverter) expandManifestVariables(manif *Manifest) error {
 	abs, err := filepath.Abs(r.inputPath)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get working dir: %w", err)
+		return fmt.Errorf("unable to get working dir: %w", err)
 	}
 	manif.Workdir = path.Dir(abs)
-
-	if manif.SpecVersion != "v0.1.0" {
-		return nil, fmt.Errorf("invalid 'specVersion', must be v0.1.0")
-	}
-
 	// Allow environment variables in `imports` element
 	for i, moduleImport := range manif.Imports {
 		manif.Imports[i][1] = os.ExpandEnv(moduleImport[1])
@@ -53,6 +52,14 @@ func (r *manifestConverter) loadManifest(manif *Manifest, inputPath string) (*Ma
 	// Allow environment variables in `protobuf.importPaths` element
 	for i := range manif.Protobuf.ImportPaths {
 		manif.Protobuf.ImportPaths[i] = os.ExpandEnv(manif.Protobuf.ImportPaths[i])
+	}
+	return nil
+}
+
+func (r *manifestConverter) validateManifest(manif *Manifest) error {
+
+	if manif.SpecVersion != "v0.1.0" {
+		return fmt.Errorf("invalid 'specVersion', must be v0.1.0")
 	}
 
 	// TODO: put some limits on the NUMBER of modules (max 50 ?)
@@ -64,24 +71,24 @@ func (r *manifestConverter) loadManifest(manif *Manifest, inputPath string) (*Ma
 		switch s.Kind {
 		case ModuleKindMap:
 			if s.Output.Type == "" {
-				return nil, fmt.Errorf("stream %q: missing 'output.type' for kind 'map'", s.Name)
+				return fmt.Errorf("stream %q: missing 'output.type' for kind 'map'", s.Name)
 			}
 		case ModuleKindStore:
 			if err := validateStoreBuilder(s); err != nil {
-				return nil, fmt.Errorf("stream %q: %w", s.Name, err)
+				return fmt.Errorf("stream %q: %w", s.Name, err)
 			}
 
 		default:
-			return nil, fmt.Errorf("stream %q: invalid kind %q", s.Name, s.Kind)
+			return fmt.Errorf("stream %q: invalid kind %q", s.Name, s.Kind)
 		}
 		for idx, input := range s.Inputs {
 			if err := input.parse(); err != nil {
-				return nil, fmt.Errorf("module %q: invalid input [%d]: %w", s.Name, idx, err)
+				return fmt.Errorf("module %q: invalid input [%d]: %w", s.Name, idx, err)
 			}
 		}
 	}
 
-	return manif, nil
+	return nil
 }
 
 func (r *manifestConverter) manifestToPkg(manif *Manifest) (*pbsubstreams.Package, []*desc.FileDescriptor, *dynamic.Message, error) {

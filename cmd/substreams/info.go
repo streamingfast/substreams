@@ -97,6 +97,31 @@ func runInfo(cmd *cobra.Command, args []string) error {
 		fmt.Println("")
 	}
 
+	if info.Network != "" {
+		fmt.Printf("Network: %s\n", info.Network)
+		fmt.Println("")
+	}
+
+	if info.Networks != nil {
+		fmt.Println("Networks:")
+		for network, params := range info.Networks {
+			fmt.Printf("  %s:\n", network)
+			if params.InitialBlocks != nil {
+				fmt.Println("    Initial Blocks:")
+			}
+			for mod, start := range params.InitialBlocks {
+				fmt.Printf("      - %s: %d\n", mod, start)
+			}
+			if params.Params != nil {
+				fmt.Println("    Params:")
+			}
+			for mod, p := range params.Params {
+				fmt.Printf("      - %s: %q\n", mod, p)
+			}
+			fmt.Println("")
+		}
+	}
+
 	if outputModule != "" {
 		stages := info.ExecutionStages
 		for i, layers := range stages {

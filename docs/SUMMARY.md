@@ -15,7 +15,7 @@
   * [Packages](new/common/packages.md)
   * [Substreams:SQL](new/consume/sql/quickstart.md)
   * [Substreams:Stream](new/consume/stream/quickstart.md)
-    * [JavaScript](new/consume/stream/quickstart.md)
+    * [JavaScript](new/consume/stream/javascript.md)
 * [Develop Substreams](new/develop/introduction.md)
   * [Install the CLI](new/common/installing-the-cli.md)
   * [Authentication](new/common/authentication.md)
@@ -39,13 +39,12 @@
       * [Making eth_calls](new/develop/chain-specific/evm/eth-calls.md)
   * [Architecture](new/develop/architecture.md)
 
-
-
 ## Reference & Specs
 
-* [Chains and endpoints](reference-and-specs/chains-and-endpoints.md)
-* [Substreams CLI reference](reference-and-specs/command-line-interface.md)
-* [Manifests Reference](reference-and-specs/manifests.md)
-* [GUI Reference](reference-and-specs/manifests.md)
-* [Examples](reference-and-specs/examples.md)
-* [FAQ](reference-and-specs/faq.md)
+* [Chains and endpoints](new/references/chains-and-endpoints.md)
+* [Substreams CLI reference](new/references/command-line-interface.md)
+* [Manifests Reference](new/references/manifests.md)
+* [GUI Reference](new/references/manifests.md)
+* [Glossary](new/references/glossary.md)
+* [Change log](new/references/change-log.md)
+* [FAQ](new/references/faq.md)

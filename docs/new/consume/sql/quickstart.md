@@ -71,7 +71,7 @@ Services:
 
 Once the package is deployed, your Substreams starts indexing data. You can access this data through in the form of a PostgreSQL database or a GraphQL API. To access the PostgreSQL client (PGWeb), copy the URL provided.
 
-<figure><img src=".gitbook/assets/sql/explore-pgweb.png" width="100%" /></figure>
+<figure><img src="../../../.gitbook/assets/sql/explore-pgweb.png" width="100%" /></figure>
 
 ### Stopping a Service
 

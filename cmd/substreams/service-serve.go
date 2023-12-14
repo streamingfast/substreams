@@ -21,6 +21,7 @@ import (
 func init() {
 	serviceCmd.AddCommand(serveCmd)
 
+	serveCmd.Flags().StringP("endpoint", "e", "", "Substreams endpoint to connect to")
 	serveCmd.Flags().String("data-dir", "./sink-data", "Store data to this folder")
 	serveCmd.Flags().String("listen-addr", "localhost:8000", "Listen for GRPC connections on this address")
 	serveCmd.Flags().String("cors-host-regex-allow", "^localhost", "Regex to allow CORS origin requests from, defaults to localhost only")

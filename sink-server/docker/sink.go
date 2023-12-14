@@ -86,6 +86,11 @@ func (e *DockerEngine) newSink(deploymentID string, dbService string, pkg *pbsub
 		withPostgraphile = "--postgraphile"
 	}
 
+	withEndpoint := ""
+	if e.endpoint != "" {
+		withEndpoint = "-e " + e.endpoint
+	}
+
 	startScript := []byte(fmt.Sprintf(`#!/bin/bash
 set -xeu
 
@@ -93,8 +98,8 @@ if [ ! -f /opt/subservices/data/setup-complete ]; then
     /app/substreams-sink-sql setup $DSN /opt/subservices/config/substreams.spkg %s && touch /opt/subservices/data/setup-complete
 fi
 
-/app/substreams-sink-sql run $DSN /opt/subservices/config/substreams.spkg --on-module-hash-mistmatch=warn
-`, withPostgraphile))
+/app/substreams-sink-sql run $DSN /opt/subservices/config/substreams.spkg --on-module-hash-mistmatch=warn %s
+`, withPostgraphile, withEndpoint))
 	if err := os.WriteFile(filepath.Join(configFolder, "start.sh"), startScript, 0755); err != nil {
 		fmt.Println("")
 		return conf, motd, fmt.Errorf("writing file: %w", err)

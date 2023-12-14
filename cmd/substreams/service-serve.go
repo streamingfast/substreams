@@ -21,6 +21,7 @@ import (
 func init() {
 	serviceCmd.AddCommand(serveCmd)
 
+	serveCmd.Flags().StringP("endpoint", "e", "", "Substreams endpoint to connect to")
 	serveCmd.Flags().String("data-dir", "./sink-data", "Store data to this folder")
 	serveCmd.Flags().String("listen-addr", "localhost:8000", "Listen for GRPC connections on this address")
 	serveCmd.Flags().String("cors-host-regex-allow", "^localhost", "Regex to allow CORS origin requests from, defaults to localhost only")
@@ -52,6 +53,7 @@ func serveE(cmd *cobra.Command, args []string) error {
 	listenAddr := sflags.MustGetString(cmd, "listen-addr")
 	corsHostRegexAllow := sflags.MustGetString(cmd, "cors-host-regex-allow")
 	dataDir := sflags.MustGetString(cmd, "data-dir")
+	endpoint := sflags.MustGetString(cmd, "endpoint")
 
 	var cors *regexp.Regexp
 	if corsHostRegexAllow != "" {
@@ -72,7 +74,7 @@ func serveE(cmd *cobra.Command, args []string) error {
 	var err error
 	switch engineType {
 	case "docker":
-		engine, err = docker.NewEngine(dataDir, token)
+		engine, err = docker.NewEngine(dataDir, token, endpoint)
 		if err != nil {
 			return err
 		}

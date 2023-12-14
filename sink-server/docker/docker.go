@@ -29,15 +29,17 @@ import (
 )
 
 type DockerEngine struct {
-	mutex sync.Mutex
-	dir   string
-	token string
+	mutex    sync.Mutex
+	dir      string
+	endpoint string
+	token    string
 }
 
-func NewEngine(dir string, sf_token string) (*DockerEngine, error) {
+func NewEngine(dir string, sf_token string, endpoint string) (*DockerEngine, error) {
 	out := &DockerEngine{
-		dir:   dir,
-		token: sf_token,
+		dir:      dir,
+		token:    sf_token,
+		endpoint: endpoint,
 	}
 	if err := out.CheckVersion(); err != nil {
 		return nil, err

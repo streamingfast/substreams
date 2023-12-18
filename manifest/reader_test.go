@@ -359,6 +359,117 @@ func TestReader_Read(t *testing.T) {
 	}
 }
 
+func TestMergeNetwork(t *testing.T) {
+
+	tests := []struct {
+		name              string
+		srcNetwork        *pbsubstreams.NetworkParams
+		destNetwork       *pbsubstreams.NetworkParams
+		expectDestNetwork *pbsubstreams.NetworkParams
+		expectPanic       bool
+	}{
+		{
+			name:              "some-nil",
+			srcNetwork:        &pbsubstreams.NetworkParams{},
+			destNetwork:       nil,
+			expectDestNetwork: nil,
+			expectPanic:       true,
+		},
+		{
+			name:       "nil-some",
+			srcNetwork: nil,
+			destNetwork: &pbsubstreams.NetworkParams{
+				InitialBlocks: map[string]uint64{
+					"mod1": 10,
+				},
+				Params: map[string]string{
+					"mod1": "mod=1",
+				},
+			},
+			expectDestNetwork: &pbsubstreams.NetworkParams{
+				InitialBlocks: map[string]uint64{
+					"mod1": 10,
+				},
+				Params: map[string]string{
+					"mod1": "mod=1",
+				},
+			},
+		},
+
+		{
+			name: "just append",
+			srcNetwork: &pbsubstreams.NetworkParams{
+				InitialBlocks: map[string]uint64{
+					"mod1": 10,
+					"mod2": 20,
+				},
+			},
+			destNetwork: &pbsubstreams.NetworkParams{
+				InitialBlocks: map[string]uint64{
+					"mod2": 22,
+					"mod3": 33,
+				},
+			},
+			expectDestNetwork: &pbsubstreams.NetworkParams{
+				InitialBlocks: map[string]uint64{
+					"src:mod1": 10,
+					"src:mod2": 20,
+					"mod2":     22,
+					"mod3":     33,
+				},
+			},
+		},
+		{
+			name: "overwrite mod2",
+			srcNetwork: &pbsubstreams.NetworkParams{
+				InitialBlocks: map[string]uint64{
+					"mod1": 10,
+					"mod2": 20,
+				},
+				Params: map[string]string{
+					"mod2": "mod=2",
+				},
+			},
+			destNetwork: &pbsubstreams.NetworkParams{
+				InitialBlocks: map[string]uint64{
+					"src:mod2": 22,
+					"mod3":     33,
+				},
+				Params: map[string]string{
+					"mod2": "mod=22",
+				},
+			},
+			expectDestNetwork: &pbsubstreams.NetworkParams{
+				InitialBlocks: map[string]uint64{
+					"src:mod1": 10,
+					"src:mod2": 22,
+					"mod3":     33,
+				},
+				Params: map[string]string{
+					"src:mod2": "mod=2",
+					"mod2":     "mod=22",
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if test.expectPanic {
+				defer func() {
+					if r := recover(); r == nil {
+						t.Errorf("The code did not panic")
+					}
+				}()
+			}
+			mergeNetwork(test.srcNetwork, test.destNetwork, "src")
+			assert.Equal(t, test.expectDestNetwork, test.destNetwork)
+
+		})
+	}
+
+}
+
 func TestMergeNetworks(t *testing.T) {
 
 	var sepolia = &pbsubstreams.NetworkParams{
@@ -406,7 +517,6 @@ func TestMergeNetworks(t *testing.T) {
 			name:               "nil-nil",
 			srcNetworks:        nil,
 			destNetworks:       nil,
-			expectError:        "",
 			expectDestNetworks: nil,
 		},
 		{
@@ -430,7 +540,6 @@ func TestMergeNetworks(t *testing.T) {
 				"mainnet": mainnet,
 			},
 			destNetworks: nil,
-			expectError:  "",
 			expectDestNetworks: map[string]*pbsubstreams.NetworkParams{
 				"sepolia": sepoliaPrefixed,
 				"mainnet": mainnetPrefixed,
@@ -438,115 +547,34 @@ func TestMergeNetworks(t *testing.T) {
 		},
 		{
 			// case: src [mainnet,sepolia] dest [mainnet,sepolia] -> [mainnet,sepolia]
-			name: "same+same=merged_prefixed",
+			name: "same+same=same",
 			srcNetworks: map[string]*pbsubstreams.NetworkParams{
-				"mainnet": {
-					InitialBlocks: map[string]uint64{
-						"mod3": 100,
-					},
-					Params: map[string]string{
-						"mod4": "addr=0xffffffff",
-					},
-				},
-				"sepolia": {
-					InitialBlocks: map[string]uint64{
-						"mod3": 200,
-					},
-					Params: map[string]string{
-						"mod4": "addr=0xbbbbbbbb",
-					},
-				},
+				"mainnet": {},
+				"sepolia": {},
 			},
 			destNetworks: map[string]*pbsubstreams.NetworkParams{
 				"mainnet": mainnet,
 				"sepolia": sepolia,
 			},
-			expectError: "",
 			expectDestNetworks: map[string]*pbsubstreams.NetworkParams{
-				"mainnet": {
-					InitialBlocks: map[string]uint64{
-						"mod1":     20,
-						"src:mod3": 100,
-					},
-					Params: map[string]string{
-						"mod2":     "addr=0x12121212",
-						"src:mod4": "addr=0xffffffff",
-					},
-				},
-				"sepolia": {
-					InitialBlocks: map[string]uint64{
-						"mod1":     10,
-						"src:mod3": 200,
-					},
-					Params: map[string]string{
-						"mod2":     "addr=0xdeadbeef",
-						"src:mod4": "addr=0xbbbbbbbb",
-					},
-				},
+				"mainnet": mainnet,
+				"sepolia": sepolia,
 			},
 		},
+
 		{
-			// case: src [mainnet,sepolia] dest [mainnet] -> [mainnet]
-			name: "dest-is-subset",
+			// case: src [mainnet] dest [sepolia] -> [mainnetPrefixed, sepolia]
+			name: "dest-is-different",
 			srcNetworks: map[string]*pbsubstreams.NetworkParams{
-				"mainnet": {},
-				"sepolia": {},
+				"mainnet": mainnet,
 			},
 			destNetworks: map[string]*pbsubstreams.NetworkParams{
-				"mainnet": {},
-			},
-			expectError: "",
-			expectDestNetworks: map[string]*pbsubstreams.NetworkParams{
-				"mainnet": {},
-			},
-		},
-		{
-			// case: src [mainnet]          dest [mainnet,sepolia] -> ERROR
-			name: "missing-in-source",
-			srcNetworks: map[string]*pbsubstreams.NetworkParams{
-				"mainnet": {},
-			},
-			destNetworks: map[string]*pbsubstreams.NetworkParams{
-				"mainnet": {},
-				"sepolia": {},
-			},
-			expectError: `network "sepolia" defined in package "dest_package" but not in "source_package"`,
-		},
-		{
-			// case: src [mainnet] dest [mainnet,sepolia] -> no error if src:sepolia is overloaded
-			name: "missing-in-source-but-overloaded",
-			srcNetworks: map[string]*pbsubstreams.NetworkParams{
-				"mainnet": {},
-			},
-			destNetworks: map[string]*pbsubstreams.NetworkParams{
-				"mainnet": {
-					InitialBlocks: map[string]uint64{
-						"src:mod1": 100,
-					},
-				},
-				"sepolia": {},
+				"sepolia": sepolia,
 			},
 			expectDestNetworks: map[string]*pbsubstreams.NetworkParams{
-				"mainnet": {
-					InitialBlocks: map[string]uint64{
-						"src:mod1": 100,
-					},
-				},
-				"sepolia": {},
+				"mainnet": mainnetPrefixed,
+				"sepolia": sepolia,
 			},
-		},
-		{
-			// case: src [mainnet, goerli]  dest [mainnet,sepolia] -> ERROR
-			name: "different",
-			srcNetworks: map[string]*pbsubstreams.NetworkParams{
-				"mainnet": {},
-				"goerli":  {},
-			},
-			destNetworks: map[string]*pbsubstreams.NetworkParams{
-				"mainnet": {},
-				"sepolia": {},
-			},
-			expectError: `network "sepolia" defined in package "dest_package" but not in "source_package"`,
 		},
 	}
 
@@ -568,11 +596,7 @@ func TestMergeNetworks(t *testing.T) {
 				},
 				Networks: test.destNetworks,
 			}
-			err := mergeNetworks(src, dest, "src")
-			if test.expectError != "" {
-				require.Equal(t, err.Error(), test.expectError)
-				return
-			}
+			mergeNetworks(src, dest, "src")
 			assert.Equal(t, test.expectDestNetworks, dest.Networks)
 		})
 	}
@@ -640,4 +664,357 @@ func readSystemProtoDescriptors(t *testing.T) (out []*descriptorpb.FileDescripto
 	require.NoError(t, err)
 
 	return systemProtoFiles.File
+}
+
+func Test_validateNetworks(t *testing.T) {
+	mainnetString := "mainnet"
+	tests := []struct {
+		name                   string
+		pkg                    *pbsubstreams.Package
+		includeImportedModules map[string]bool
+		overrideNetwork        *string
+		wantErr                bool
+	}{
+		{
+			name: "valid",
+			pkg: &pbsubstreams.Package{
+				Networks: map[string]*pbsubstreams.NetworkParams{
+					"mainnet": {
+						InitialBlocks: map[string]uint64{
+							"mod1": 10,
+						},
+						Params: map[string]string{
+							"mod1": "mod=1",
+						},
+					},
+					"testnet": {
+						InitialBlocks: map[string]uint64{
+							"mod1": 20,
+						},
+						Params: map[string]string{
+							"mod1": "mod=2",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "invalid",
+			pkg: &pbsubstreams.Package{
+				Networks: map[string]*pbsubstreams.NetworkParams{
+					"mainnet": {
+						InitialBlocks: map[string]uint64{
+							"mod1": 10,
+						},
+						Params: map[string]string{
+							"mod1": "mod=1",
+						},
+					},
+					"testnet": {
+						InitialBlocks: map[string]uint64{
+							"mod2": 20,
+						},
+						Params: map[string]string{
+							"mod3": "mod=3",
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "valid for modules declared by dependencies",
+			pkg: &pbsubstreams.Package{
+				Networks: map[string]*pbsubstreams.NetworkParams{
+					"mainnet": {
+						InitialBlocks: map[string]uint64{
+							"mod1": 10,
+						},
+						Params: map[string]string{
+							"mod1":     "mod=1",
+							"lib:mod3": "mod=3",
+						},
+					},
+					"testnet": {
+						InitialBlocks: map[string]uint64{
+							"mod1": 20,
+						},
+						Params: map[string]string{
+							"mod1": "mod=11",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "invalid for modules declared by dependencies when those modules are in the map of modules to include",
+			pkg: &pbsubstreams.Package{
+				Networks: map[string]*pbsubstreams.NetworkParams{
+					"mainnet": {
+						InitialBlocks: map[string]uint64{
+							"mod1": 10,
+						},
+						Params: map[string]string{
+							"mod1":     "mod=1",
+							"lib:mod3": "mod=3",
+						},
+					},
+					"testnet": {
+						InitialBlocks: map[string]uint64{
+							"mod1": 20,
+						},
+						Params: map[string]string{
+							"mod1": "mod=11",
+						},
+					},
+				},
+			},
+			includeImportedModules: map[string]bool{
+				"lib:mod3": true,
+			},
+			wantErr: true,
+		},
+
+		{
+			name: "valid for whole networks declared by dependencies",
+			pkg: &pbsubstreams.Package{
+				Networks: map[string]*pbsubstreams.NetworkParams{
+					"mainnet": {
+						InitialBlocks: map[string]uint64{
+							"mod1":     10,
+							"lib:mod2": 10,
+						},
+						Params: map[string]string{
+							"mod1":     "mod=1",
+							"lib:mod3": "mod=3",
+						},
+					},
+					"testnet": {
+						InitialBlocks: map[string]uint64{
+							"lib:mod2": 20,
+						},
+						Params: map[string]string{
+							"lib:mod3": "mod=3",
+						},
+					},
+				},
+			},
+		},
+		{
+			// even if we depend on an imported module, we don't have to support all its networks
+			name: "still valid for whole networks declared by dependencies even if they are in the list of modules to include",
+			pkg: &pbsubstreams.Package{
+				Networks: map[string]*pbsubstreams.NetworkParams{
+					"mainnet": {
+						InitialBlocks: map[string]uint64{
+							"mod1":     10,
+							"lib:mod2": 10,
+						},
+						Params: map[string]string{
+							"mod1":     "mod=1",
+							"lib:mod3": "mod=3",
+						},
+					},
+					"testnet": {
+						InitialBlocks: map[string]uint64{
+							"lib:mod2": 20,
+						},
+						Params: map[string]string{
+							"lib:mod3": "mod=3",
+						},
+					},
+				},
+			},
+			includeImportedModules: map[string]bool{
+				"lib:mod3": true,
+			},
+		},
+		{
+			name: "invalid for networks declared by dependencies that would be selected as default network",
+			pkg: &pbsubstreams.Package{
+				Network: "testnet",
+				Networks: map[string]*pbsubstreams.NetworkParams{
+					"mainnet": {
+						InitialBlocks: map[string]uint64{
+							"mod1": 10,
+						},
+						Params: map[string]string{
+							"mod1": "mod=1",
+						},
+					},
+					"testnet": {
+						InitialBlocks: map[string]uint64{
+							"lib:mod2": 20,
+						},
+						Params: map[string]string{
+							"lib:mod3": "mod=3",
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "network override works",
+			pkg: &pbsubstreams.Package{
+				Network: "testnet",
+				Networks: map[string]*pbsubstreams.NetworkParams{
+					"mainnet": {
+						InitialBlocks: map[string]uint64{
+							"mod1": 10,
+						},
+					},
+				},
+			},
+			overrideNetwork: &mainnetString,
+		},
+		{
+			name: "invalid for empty networks declared by dependencies that would be selected as default network",
+			pkg: &pbsubstreams.Package{
+				Network: "unavailable",
+				Networks: map[string]*pbsubstreams.NetworkParams{
+					"mainnet": {
+						InitialBlocks: map[string]uint64{
+							"mod1": 10,
+						},
+						Params: map[string]string{
+							"mod1": "mod=1",
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid for empty networks declared by dependencies that would be selected as default network",
+			pkg: &pbsubstreams.Package{
+				Network: "unavailable",
+				Networks: map[string]*pbsubstreams.NetworkParams{
+					"mainnet": {
+						InitialBlocks: map[string]uint64{
+							"mod1": 10,
+						},
+						Params: map[string]string{
+							"mod1": "mod=1",
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "valid for empty networks when a network is selected",
+			pkg: &pbsubstreams.Package{
+				Network:  "unavailable",
+				Networks: nil,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := validateNetworks(tt.pkg, tt.includeImportedModules, tt.overrideNetwork); (err != nil) != tt.wantErr {
+				t.Errorf("validateNetworks() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_dependentImportedModules(t *testing.T) {
+
+	storeKind := &pbsubstreams.Module_KindStore_{KindStore: &pbsubstreams.Module_KindStore{}}
+	mapKind := &pbsubstreams.Module_KindMap_{KindMap: &pbsubstreams.Module_KindMap{}}
+
+	testModules := []*pbsubstreams.Module{
+		{
+			Name: "lib:storemod",
+			Kind: storeKind,
+		},
+		{
+			Name: "lib:mapmod",
+			Kind: mapKind,
+		},
+		{
+			Name: "mod_dep_on_mapmod",
+			Kind: storeKind,
+			Inputs: []*pbsubstreams.Module_Input{
+				{
+					Input: &pbsubstreams.Module_Input_Map_{Map: &pbsubstreams.Module_Input_Map{
+						ModuleName: "lib:mapmod",
+					}},
+				},
+			},
+		},
+		{
+			Name: "mod_dep_on_two_mods",
+			Kind: mapKind,
+			Inputs: []*pbsubstreams.Module_Input{
+				{
+					Input: &pbsubstreams.Module_Input_Store_{Store: &pbsubstreams.Module_Input_Store{
+						ModuleName: "lib:storemod",
+					}},
+				},
+				{
+					Input: &pbsubstreams.Module_Input_Map_{Map: &pbsubstreams.Module_Input_Map{
+						ModuleName: "lib:mapmod",
+					}},
+				},
+			},
+		},
+		{
+			Name: "mod_independant",
+			Kind: &pbsubstreams.Module_KindMap_{KindMap: &pbsubstreams.Module_KindMap{}},
+		},
+	}
+
+	type args struct {
+		graph        *ModuleGraph
+		outputModule string
+	}
+
+	tests := []struct {
+		name    string
+		args    args
+		want    map[string]bool
+		wantErr bool
+	}{
+		{
+			name: "independant",
+			args: args{
+				graph:        MustNewModuleGraph(testModules),
+				outputModule: "mod_independant",
+			},
+			want: map[string]bool{},
+		},
+		{
+			name: "dep_on_map",
+			args: args{
+				graph:        MustNewModuleGraph(testModules),
+				outputModule: "mod_dep_on_mapmod",
+			},
+			want: map[string]bool{
+				"lib:mapmod": true,
+			},
+		},
+		{
+			name: "dep_on_two",
+			args: args{
+				graph:        MustNewModuleGraph(testModules),
+				outputModule: "mod_dep_on_two_mods",
+			},
+			want: map[string]bool{
+				"lib:mapmod":   true,
+				"lib:storemod": true,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := dependentImportedModules(tt.args.graph, &tt.args.outputModule)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("dependentImportedModules() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			assert.Equalf(t, tt.want, got, "dependentImportedModules() = %v (nil=%t), want %v (nil=%t)", got, got == nil, tt.want, tt.want == nil)
+		})
+	}
 }

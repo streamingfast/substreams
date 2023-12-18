@@ -100,7 +100,7 @@ type Reader struct {
 func NewReader(input string, opts ...Option) (*Reader, error) {
 	workingDir, err := os.Getwd()
 	if err != nil {
-		return nil, fmt.Errorf("unable to get working dir: %w", err)
+		return nil, fmt.Errorf("unable to get working directory: %w", err)
 	}
 
 	return newReader(input, workingDir, opts...)
@@ -133,7 +133,10 @@ func newReader(input, workingDir string, opts ...Option) (*Reader, error) {
 }
 
 func (r *Reader) Read() (*pbsubstreams.Package, error) {
-	return r.resolvePkg()
+	out, err := r.resolvePkg()
+
+	//	graph, err := manifest.NewModuleGraph(out.Modules.Modules)
+	return out, err
 }
 
 func (r *Reader) MustRead() *pbsubstreams.Package {
@@ -266,8 +269,6 @@ func (r *Reader) readFromIPFS(input string) error {
 }
 
 func (r *Reader) readLocal(input string) error {
-	input = r.currentInput
-
 	b, err := os.ReadFile(input)
 	if err != nil {
 		return fmt.Errorf("unable to read file %q: %w", input, err)
@@ -334,9 +335,6 @@ func (r *Reader) getPkg() (*pbsubstreams.Package, error) {
 			return nil, fmt.Errorf("unable to convert manifest to package: %w", err)
 		}
 
-		if err := r.validate(pkg); err != nil {
-			return nil, fmt.Errorf("failed validation: %w", err)
-		}
 		return pkg, nil
 	}
 
@@ -346,27 +344,67 @@ func (r *Reader) getPkg() (*pbsubstreams.Package, error) {
 		return nil, fmt.Errorf("unable to unmarshal package: %w", err)
 	}
 
-	if err := r.validate(pkg); err != nil {
-		return nil, fmt.Errorf("failed validation: %w", err)
-	}
-
 	return pkg, nil
 }
 
-func (r *Reader) validate(pkg *pbsubstreams.Package) error {
+func (r *Reader) Validate(pkg *pbsubstreams.Package, outputModule *string, network *string) error {
 	if !r.skipPackageValidation {
-		if err := r.validatePackage(pkg); err != nil {
+		if err := validatePackage(pkg, r.skipModuleOutputTypeValidation); err != nil {
 			return fmt.Errorf("package validation failed: %w", err)
 		}
-	}
 
-	if err := ValidateModules(pkg.Modules); err != nil {
-		return fmt.Errorf("module validation failed: %w", err)
+		if err := ValidateModules(pkg.Modules); err != nil {
+			return fmt.Errorf("module validation failed: %w", err)
+		}
+
+		graph, err := NewModuleGraph(pkg.Modules.Modules)
+		if err != nil {
+			return err
+		}
+
+		importIncludedModules, err := dependentImportedModules(graph, outputModule)
+		if err != nil {
+			return err
+		}
+		if err := validateNetworks(pkg, importIncludedModules, network); err != nil { // running on imported packages only, network validation on the main package is done later
+			return err
+		}
 	}
 	return nil
 }
 
-func (r *Reader) validatePackage(pkg *pbsubstreams.Package) error {
+func dependentImportedModules(graph *ModuleGraph, outputModule *string) (map[string]bool, error) {
+	out := make(map[string]bool)
+
+	outputModulesToCheck := make(map[string]bool)
+	if outputModule != nil {
+		outputModulesToCheck[*outputModule] = true
+	} else {
+		for _, mod := range graph.Modules() {
+			if !strings.Contains(mod, ":") {
+				outputModulesToCheck[mod] = true
+			}
+		}
+	}
+
+	for mod := range outputModulesToCheck {
+		if !strings.Contains(mod, ":") {
+			ancestors, err := graph.AncestorsOf(mod)
+			if err != nil {
+				return nil, fmt.Errorf("unable to get ancestors of module %q: %w", mod, err)
+			}
+			for _, ancestor := range ancestors {
+				if strings.Contains(ancestor.Name, ":") {
+					out[ancestor.Name] = true
+				}
+			}
+		}
+	}
+
+	return out, nil
+}
+
+func validatePackage(pkg *pbsubstreams.Package, skipModuleOutputTypeValidation bool) error {
 	if len(pkg.ModuleMeta) != len(pkg.Modules.Modules) {
 		return fmt.Errorf("inconsistent package, metadata for modules not same length as modules list")
 	}
@@ -390,14 +428,14 @@ func (r *Reader) validatePackage(pkg *pbsubstreams.Package) error {
 		switch i := mod.Kind.(type) {
 		case *pbsubstreams.Module_KindMap_:
 			outputType := i.KindMap.OutputType
-			if !r.skipModuleOutputTypeValidation {
+			if !skipModuleOutputTypeValidation {
 				if !strings.HasPrefix(outputType, "proto:") {
 					return fmt.Errorf("module %q incorrect outputTyupe %q valueType must be a proto Message", mod.Name, outputType)
 				}
 			}
 		case *pbsubstreams.Module_KindStore_:
 			valueType := i.KindStore.ValueType
-			if !r.skipModuleOutputTypeValidation {
+			if !skipModuleOutputTypeValidation {
 				if strings.HasPrefix(valueType, "proto:") {
 					// any store with a prototype is considered valid
 				} else if !storeValidTypes[valueType] {
@@ -503,6 +541,14 @@ func (r *Reader) resolvePkg() (*pbsubstreams.Package, error) {
 	if err := applyOverride(pkg, mergedOverride); err != nil {
 		return nil, fmt.Errorf("applying override: %w", err)
 	}
+
+	// FIXME: run a test with overrides for networks validation
+	// FIXME in validate, add the network validations for local package and all dependencies
+	// FIXME if we're on a 'run' and have an output module, we need to validate only the graph of that module
+	// FIXME: validate should be called after all overrides are applied
+	//if err := r.validate(pkg, outputModule, nil); err != nil {
+	//	return nil, fmt.Errorf("failed validation: %w", err)
+	//}
 
 	r.pkg = pkg
 	return pkg, nil
@@ -713,13 +759,9 @@ func loadImports(pkg *pbsubstreams.Package, manif *Manifest) error {
 		prefixModules(subpkg.Modules.Modules, importName)
 		reindexAndMergePackage(subpkg, pkg)
 		mergeProtoFiles(subpkg, pkg)
-		if err := mergeNetworks(subpkg, pkg, importName); err != nil {
-			return err
-		}
-		if err := validateNetworks(pkg); err != nil {
-			return err
-		}
+		mergeNetworks(subpkg, pkg, importName)
 	}
+
 	// loop through the Manifest, and get the `imports` statements,
 	// pull the Package files from Disk, and merge them into this one
 	return nil
@@ -798,12 +840,22 @@ func reindexAndMergePackage(src, dest *pbsubstreams.Package) {
 }
 
 func mergeNetwork(src, dest *pbsubstreams.NetworkParams, srcPrefix string) {
+	if dest == nil {
+		panic("mergeNetwork should never be called with nil dest")
+	}
+	if src == nil {
+		return
+	}
+
 	if src.InitialBlocks != nil {
 		if dest.InitialBlocks == nil {
 			dest.InitialBlocks = make(map[string]uint64)
 		}
 		for kk, vv := range src.InitialBlocks {
-			dest.InitialBlocks[withPrefix(kk, srcPrefix)] = vv
+			newKey := withPrefix(kk, srcPrefix)
+			if _, ok := dest.InitialBlocks[newKey]; !ok {
+				dest.InitialBlocks[newKey] = vv
+			}
 		}
 	}
 
@@ -812,14 +864,120 @@ func mergeNetwork(src, dest *pbsubstreams.NetworkParams, srcPrefix string) {
 			dest.Params = make(map[string]string)
 		}
 		for kk, vv := range src.Params {
-			dest.Params[withPrefix(kk, srcPrefix)] = vv
+			newKey := withPrefix(kk, srcPrefix)
+			if _, ok := dest.Params[newKey]; !ok {
+				dest.Params[newKey] = vv
+			}
 		}
 	}
 }
 
-// overloadedNetworks lists the networks that are declared in the downstreams package, with the given prefix
-// this way, a package with networks [mainnet,sepolia] can append to the list of networks of an imported spkg
-func overloadedNetworks(pkg *pbsubstreams.Package, prefix string) map[string]bool {
+func mergeNetworks(src, dest *pbsubstreams.Package, srcPrefix string) {
+	if src.Networks == nil {
+		return
+	}
+
+	if dest.Networks == nil {
+		dest.Networks = make(map[string]*pbsubstreams.NetworkParams)
+		for k, srcNet := range src.Networks {
+			destNet := &pbsubstreams.NetworkParams{}
+			mergeNetwork(srcNet, destNet, srcPrefix)
+			dest.Networks[k] = destNet
+		}
+		return
+	}
+
+	allKeys := make(map[string]bool)
+
+	for k := range dest.Networks {
+		allKeys[k] = true
+	}
+	for k := range src.Networks {
+		allKeys[k] = true
+	}
+
+	for k := range allKeys {
+		destNet := dest.Networks[k]
+		if destNet == nil {
+			destNet = &pbsubstreams.NetworkParams{}
+			dest.Networks[k] = destNet
+		}
+		mergeNetwork(src.Networks[k], destNet, srcPrefix)
+	}
+}
+
+// *  build a set of all keys, for each network
+// *  the set of keys need to be equal for each network, so no missing key.
+// *  This means that: if you define a module that needs override for a given network, it needs to be defined for all networks.
+// *  This also means we will not validate or force the overriding of the initialBlock or original params value for a module, unless it uses this networks override mechanism.
+
+// uniswap (10 networks) initialblock + value mod:pairs, mod:contracts, events
+
+/*
+networks:
+  mainnet, goerli, ....:
+    initialBlocks:
+      pairs: 123123
+      contracts: 123667
+    params:
+      pairs: "address=0x123123123123"
+
+
+
+
+moneyPerDay ! (imports uniswap), has one module money_out
+networks
+  sepolia:
+    params: money_out: "usdcAddress=0xdeadbeef"
+  mainnet:
+    params: money_out: "usdcAddress=0xdead0000"
+
+
+combined:networks
+  mainnet:
+    initialBlocks:
+        uni:pairs: 123123
+        uni:contracts: 123667
+    params:
+        uni:pairs: "address=0x123123123123"
+        money_out: "usdcAddress=0xdead0000"
+
+  holesky:
+    params:
+        money_out: "usdcAddress=0xdead0000"
+
+
+network: holesky
+
+   uni:pairs: 00000
+
+
+
+`substreams run moneyPerday.yaml money_out --network=mainnet`
+
+  money_out depends on uni:events
+
+`substreams run moneyPerday.yaml money_out --network=holesky`
+
+`substreams run money.spkg money_out --network=holesky`
+
+
+`substreams run money.spkg uni:pairs --network=holesky` ERROR
+
+
+
+
+add the notion of "local"
+- check the tree for all local modules as output_module
+- check the networks all of which are declared locally ?
+
+
+*/
+
+// overloadedModules gives the list of every module that is referenced in an overload on any network
+// for initialBlock or params
+
+func overloadedModules(pkg *pbsubstreams.Package, prefix string) map[string]bool {
 	out := make(map[string]bool)
 
 networks:
@@ -840,67 +998,57 @@ networks:
 	return out
 }
 
-func mergeNetworks(src, dest *pbsubstreams.Package, srcPrefix string) error {
-
-	// case: src []                 dest []                -> []
-	// case: src []                 dest [mainnet,sepolia] -> [mainnet,sepolia]
-	if src.Networks == nil {
-		return nil
-	}
-
-	overloaded := overloadedNetworks(dest, srcPrefix)
-
-	// case: src [mainnet,sepolia]          dest []                -> [mainnet,sepolia]
-	if dest.Networks == nil {
-		dest.Networks = make(map[string]*pbsubstreams.NetworkParams)
-		for k, srcNet := range src.Networks {
-			destNet := &pbsubstreams.NetworkParams{}
-			mergeNetwork(srcNet, destNet, srcPrefix)
-			dest.Networks[k] = destNet
-		}
-		return nil
-	}
-
-	for k, destNet := range dest.Networks {
-		srcNet, ok := src.Networks[k]
-		if !ok {
-			// the following error cases can be fixed by adding a value to src.sepolia in the dest package ^^
-			if _, ok := overloaded[k]; !ok {
-
-				// case: src [mainnet]          dest [mainnet,sepolia] -> ERROR
-				// case: src [mainnet, goerli]  dest [mainnet,sepolia] -> ERROR
-				// case: src [rinkeby, goerli]  dest [mainnet,sepolia] -> ERROR
-				return fmt.Errorf("network %q defined in package %q but not in %q", k, dest.PackageMeta[0].Name, src.PackageMeta[0].Name)
-			}
-		}
-
-		// case: src [mainnet,sepolia] dest [mainnet,sepolia] -> [mainnet,sepolia]
-		// case: src [mainnet, goerli]  dest [mainnet]         -> [mainnet] // dependency could support more packages than needed
-		mergeNetwork(srcNet, destNet, srcPrefix)
-
-	}
-
-	return nil
-}
-
-func validateNetworks(pkg *pbsubstreams.Package) error {
+// validateNetworks checks that network overloads have the same keys for initialBlocks and params for modules that are owned by the package
+func validateNetworks(pkg *pbsubstreams.Package, includeImportedModules map[string]bool, overrideNetwork *string) error {
 	if pkg.Networks == nil {
 		return nil
 	}
 
-	// FIXME: add some tests for this
-	// FIXME maybe ignore the modules that are not used in this check ?
-
+	network := pkg.Network
+	if overrideNetwork != nil {
+		network = *overrideNetwork
+	}
 	seenPackagesInitialBlocks := make(map[string]bool)
 	seenPackagesParams := make(map[string]bool)
 
-	var firstNetwork string
+	networksContainingLocalModules := make(map[string]*pbsubstreams.NetworkParams)
+networkLoop:
 	for name, nw := range pkg.Networks {
+		if name == network { // always consider the current network as containing local modules
+			networksContainingLocalModules[name] = nw
+			continue networkLoop
+		}
+		for k := range nw.InitialBlocks {
+			if !strings.Contains(k, ":") {
+				networksContainingLocalModules[name] = nw
+				continue networkLoop
+			}
+		}
+		for k := range nw.InitialBlocks {
+			if !strings.Contains(k, ":") {
+				networksContainingLocalModules[name] = nw
+				continue networkLoop
+			}
+			seenPackagesInitialBlocks[k] = true
+		}
+	}
+	if network != "" && networksContainingLocalModules[network] == nil {
+		networksContainingLocalModules[network] = &pbsubstreams.NetworkParams{}
+	}
+
+	var firstNetwork string
+	for name, nw := range networksContainingLocalModules {
 		if firstNetwork == "" {
 			for k := range nw.InitialBlocks {
+				if strings.Contains(k, ":") && !includeImportedModules[k] {
+					continue // skip modules that are not owned by the package
+				}
 				seenPackagesInitialBlocks[k] = true
 			}
 			for k := range nw.Params {
+				if strings.Contains(k, ":") && !includeImportedModules[k] {
+					continue // skip modules that are not owned by the package
+				}
 				seenPackagesParams[k] = true
 			}
 			firstNetwork = name
@@ -908,11 +1056,17 @@ func validateNetworks(pkg *pbsubstreams.Package) error {
 		}
 
 		for k := range nw.InitialBlocks {
+			if strings.Contains(k, ":") && !includeImportedModules[k] {
+				continue // skip modules that are not owned by the package
+			}
 			if !seenPackagesInitialBlocks[k] {
 				return fmt.Errorf("missing 'initial_blocks' value for module %q in network %s", k, firstNetwork)
 			}
 		}
 		for k := range nw.Params {
+			if strings.Contains(k, ":") && !includeImportedModules[k] {
+				continue // skip modules that are not owned by the package
+			}
 			if !seenPackagesParams[k] {
 				return fmt.Errorf("missing 'params' value for module %q in network %s", k, firstNetwork)
 			}
@@ -970,3 +1124,30 @@ var storeValidTypes = map[string]bool{
 	"string":     true,
 	"proto":      true,
 }
+
+/*
+modules:
+- name: module1
+  initialBlock: 123128 // WARN do not define initialBlock or ERROR this is not the same
+  inputs:
+  - params: string
+    value: "alskdjfalskdj"
+
+- name: module1
+  initialBlock: 123128 // ERROR do not define initialBlock when
+  inputs:
+  - params: string
+    value: "alskdjfalskdj"
+
+
+
+network: mainnet
+
+networks:
+  mainnet:
+    initialBlocks:
+      module1: 123123
+    params:
+      otherModule: "address=0x123123123123"
+
+*/

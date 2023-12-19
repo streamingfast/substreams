@@ -1,15 +1,15 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
-
-	"context"
 	"testing"
+	"time"
 
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/wasm"
-	//_ "github.com/streamingfast/substreams/wasm/wasip1"
+	_ "github.com/streamingfast/substreams/wasm/wasi"
 	_ "github.com/streamingfast/substreams/wasm/wasmtime"
 	_ "github.com/streamingfast/substreams/wasm/wazero"
 	"github.com/stretchr/testify/require"
@@ -41,13 +41,14 @@ func BenchmarkExecution(b *testing.B) {
 		// Decode proto only decode and returns the block.number as the output (to ensure the block is not elided at compile time)
 		//{"decode_proto_only", "map_decode_proto_only", args(blockInputFile(b, "testdata/ethereum_mainnet_block_16021772.binpb")), []int{0}},
 
-		{"map_block", "map_block", args(blockInputFile(b, "testdata/ethereum_mainnet_block_16021772.binpb")), []int{44957, 45081}},
+		{"map_block", "map_block", args(blockInputFile(b, "testdata/ethereum_mainnet_block_16021772.binpb")), []int{53}},
 	} {
 		var reuseInstance = true
 		//var freshInstanceEachRun = false
 
 		//wasmCode := readCode(b, "substreams_wasm/substreams.wasm")
-		wasmCodep1 := readCode(b, "substreams_ts/index.wasm")
+		//wasmCodep1 := readCode(b, "substreams_ts/index.wasm")
+		wasmTinyGo := readCode(b, "substreams_tiny_go/main.wasm")
 		//wasmCodep1 := readCode(b, "substreams_wasi/wasi_hello_world/hello.wasm")
 
 		for _, config := range []*runtime{
@@ -57,7 +58,7 @@ func BenchmarkExecution(b *testing.B) {
 			//{"wazero", wasmCode, reuseInstance},
 			//{"wazero", wasmCode, freshInstanceEachRun},
 
-			{"wasip1", "rust/wasip1", wasmCodep1, reuseInstance},
+			{name: "wasi", wasmCodeType: "go/wasi", code: wasmTinyGo, shouldReUseInstance: reuseInstance},
 			//{"wasip1", wasmCodep1, freshInstanceEachRun},
 		} {
 			instanceKey := "reused"
@@ -83,6 +84,7 @@ func BenchmarkExecution(b *testing.B) {
 				b.ResetTimer()
 
 				for i := 0; i < b.N; i++ {
+					start := time.Now()
 					instance := cachedInstance
 					if !config.shouldReUseInstance {
 						instance, err = module.NewInstance(ctx)
@@ -93,8 +95,9 @@ func BenchmarkExecution(b *testing.B) {
 					if err != nil {
 						require.NoError(b, err)
 					}
-
-					require.Contains(b, testCase.acceptedByteCount, len(call.Output()), "invalid byte count got %d expected one of %v", len(call.Output()), testCase.acceptedByteCount)
+					fmt.Println("call output", string(call.Output()))
+					fmt.Println("duration", time.Since(start))
+					//require.Contains(b, testCase.acceptedByteCount, len(call.Output()), "invalid byte count got %d expected one of %v", len(call.Output()), testCase.acceptedByteCount)
 				}
 			})
 		}

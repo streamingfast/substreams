@@ -24,7 +24,6 @@ type Module struct {
 }
 
 func init() {
-	wasm.RegisterModuleFactory("wasip1", wasm.ModuleFactoryFunc(newModule))
 	wasm.RegisterModuleFactory("wazero", wasm.ModuleFactoryFunc(newModule))
 }
 
@@ -49,15 +48,15 @@ func newModule(ctx context.Context, wasmCode []byte, wasmCodeType string, regist
 	if err != nil {
 		return nil, err
 	}
-	envModule, err := addHostFunctions(ctx, runtime, "env", envFuncs)
+	envModule, err := AddHostFunctions(ctx, runtime, "env", envFuncs)
 	if err != nil {
 		return nil, err
 	}
-	stateModule, err := addHostFunctions(ctx, runtime, "state", stateFuncs)
+	stateModule, err := AddHostFunctions(ctx, runtime, "state", stateFuncs)
 	if err != nil {
 		return nil, err
 	}
-	loggerModule, err := addHostFunctions(ctx, runtime, "logger", loggerFuncs)
+	loggerModule, err := AddHostFunctions(ctx, runtime, "logger", LoggerFuncs)
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +214,7 @@ func addExtensionFunctions(ctx context.Context, runtime wazero.Runtime, registry
 	return
 }
 
-func addHostFunctions(ctx context.Context, runtime wazero.Runtime, moduleName string, funcs []funcs) (wazero.CompiledModule, error) {
+func AddHostFunctions(ctx context.Context, runtime wazero.Runtime, moduleName string, funcs []funcs) (wazero.CompiledModule, error) {
 	build := runtime.NewHostModuleBuilder(moduleName)
 	for _, f := range funcs {
 		build.NewFunctionBuilder().

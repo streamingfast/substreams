@@ -1,5 +1,5 @@
 package local:main;
 
 world index-world {
-  export popo: func();
+  export main: func();
 }

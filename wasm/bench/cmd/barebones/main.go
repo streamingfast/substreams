@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/tetratelabs/wazero/api"
 	"log"
 	"os"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -24,7 +24,7 @@ func main() {
 	runtime := wazero.NewRuntime(ctx)
 	defer runtime.Close(ctx) // This closes everything this Runtime created.
 
-	reader, err := os.Open("/Users/colindickson/code/dfuse/substreams/wasm/bench/cmd/barebones/testdata/block.binpb")
+	reader, err := os.Open("/Users/cbillett/devel/sf/substreams/wasm/bench/cmd/barebones/testdata/block.binpb")
 	if err != nil {
 		panic(err)
 	}
@@ -34,7 +34,7 @@ func main() {
 	config := wazero.NewModuleConfig().
 		// By default, I/O streams are discarded and there's no file system.
 		WithStdout(os.Stdout).WithStderr(os.Stderr).WithStdin(reader)
-	config = config.WithStartFunctions("popo")
+	config = config.WithStartFunctions("main")
 
 	// Instantiate WASI, which implements system I/O such as console output.
 	wasi_snapshot_preview1.MustInstantiate(ctx, runtime)
@@ -56,7 +56,7 @@ func main() {
 	}
 	_ = apiMod
 
-	catWasm := readCode("/Users/colindickson/code/dfuse/substreams/wasm/bench/substreams_ts/index.wasm")
+	catWasm := readCode("/Users/cbillett/devel/sf/substreams/wasm/bench/substreams_ts/index.wasm")
 
 	// InstantiateModule runs the "_start" function, WASI's "main".
 	// * Set the program name (arg[0]) to "wasi"; arg[1] should be "/test.txt".

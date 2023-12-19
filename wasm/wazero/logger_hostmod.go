@@ -11,7 +11,7 @@ import (
 	"github.com/streamingfast/substreams/wasm"
 )
 
-var loggerFuncs = []funcs{
+var LoggerFuncs = []funcs{
 	{
 		"println",
 		[]parm{i32, i32}, // ptr, len

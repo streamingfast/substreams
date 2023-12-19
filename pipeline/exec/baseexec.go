@@ -5,10 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	ttrace "go.opentelemetry.io/otel/trace"
-
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/wasm"
+	ttrace "go.opentelemetry.io/otel/trace"
 )
 
 var ErrWasmDeterministicExec = errors.New("wasm execution failed deterministically")

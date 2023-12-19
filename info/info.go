@@ -78,7 +78,7 @@ type ModuleInput struct {
 	Mode *string `json:"mode,omitempty"` //for store inputs
 }
 
-func Basic(pkg *pbsubstreams.Package) (*BasicInfo, error) {
+func Basic(pkg *pbsubstreams.Package, graph *manifest.ModuleGraph) (*BasicInfo, error) {
 	name := "Unnamed"
 	var doc, version string
 	if len(pkg.PackageMeta) != 0 {
@@ -116,11 +116,6 @@ func Basic(pkg *pbsubstreams.Package) (*BasicInfo, error) {
 
 	if doc != "" {
 		manifestInfo.Documentation = strPtr(strings.Replace(doc, "\n", "\n  ", -1))
-	}
-
-	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
-	if err != nil {
-		return nil, fmt.Errorf("creating module graph: %w", err)
 	}
 
 	modules := make([]ModulesInfo, 0, len(pkg.Modules.Modules))
@@ -223,16 +218,16 @@ func Extended(manifestPath string, outputModule string, skipValidation bool) (*E
 		return nil, fmt.Errorf("manifest reader: %w", err)
 	}
 
-	pkg, err := reader.Read()
+	pkg, graph, err := reader.Read()
 	if err != nil {
 		return nil, fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
-	return ExtendedWithPackage(pkg, outputModule)
+	return ExtendedWithPackage(pkg, graph, outputModule)
 }
 
-func ExtendedWithPackage(pkg *pbsubstreams.Package, outputModule string) (*ExtendedInfo, error) {
-	basicInfo, err := Basic(pkg)
+func ExtendedWithPackage(pkg *pbsubstreams.Package, graph *manifest.ModuleGraph, outputModule string) (*ExtendedInfo, error) {
+	basicInfo, err := Basic(pkg, graph)
 	if err != nil {
 		return nil, err
 	}

@@ -111,7 +111,7 @@ func runDecodeStatesModuleRunE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
 
-	pkg, err := manifestReader.Read()
+	pkg, graph, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
@@ -119,11 +119,6 @@ func runDecodeStatesModuleRunE(cmd *cobra.Command, args []string) error {
 	protoFiles := pkg.ProtoFiles
 	if len(protoFiles) == 0 {
 		return fmt.Errorf("no protobuf file definitions in the manifest")
-	}
-
-	moduleGraph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
-	if err != nil {
-		return fmt.Errorf("processing module graph %w", err)
 	}
 
 	hashes := manifest.NewModuleHashes()
@@ -138,7 +133,7 @@ func runDecodeStatesModuleRunE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("module %q not found", moduleName)
 	}
 
-	hash, err := hashes.HashModule(pkg.Modules, matchingModule, moduleGraph)
+	hash, err := hashes.HashModule(pkg.Modules, matchingModule, graph)
 	if err != nil {
 		panic(err)
 	}
@@ -193,7 +188,7 @@ func runDecodeOutputsModuleRunE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
 
-	pkg, err := manifestReader.Read()
+	pkg, graph, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
@@ -201,11 +196,6 @@ func runDecodeOutputsModuleRunE(cmd *cobra.Command, args []string) error {
 	protoFiles := pkg.ProtoFiles
 	if len(protoFiles) == 0 {
 		return fmt.Errorf("no protobuf file definitions in the manifest")
-	}
-
-	moduleGraph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
-	if err != nil {
-		return fmt.Errorf("processing module graph %w", err)
 	}
 
 	hashes := manifest.NewModuleHashes()
@@ -219,7 +209,7 @@ func runDecodeOutputsModuleRunE(cmd *cobra.Command, args []string) error {
 	if matchingModule == nil {
 		return fmt.Errorf("module %q not found", moduleName)
 	}
-	hash, err := hashes.HashModule(pkg.Modules, matchingModule, moduleGraph)
+	hash, err := hashes.HashModule(pkg.Modules, matchingModule, graph)
 	if err != nil {
 		return err
 	}

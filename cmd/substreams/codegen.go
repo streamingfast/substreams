@@ -57,7 +57,7 @@ func runCodeGen(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("loading manifest: %w", err)
 	}
-	pkg, err := manifestReader.Read()
+	pkg, _, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("reading manifest %q: %w", manifestPath, err)
 	}

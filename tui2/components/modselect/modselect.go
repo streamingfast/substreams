@@ -25,11 +25,16 @@ type ModSelect struct {
 }
 
 func New(c common.Common, manifestPath string) *ModSelect {
+
+	_, graph, err := manifest.MustNewReader(manifestPath).Read()
+	if err != nil {
+		panic(err)
+	}
 	return &ModSelect{
 		seen:         map[string]bool{},
 		ModulesIndex: map[string]int{},
 		Common:       c,
-		moduleGraph:  manifest.MustNewModuleGraph(manifest.MustNewReader(manifestPath).MustRead().Modules.Modules),
+		moduleGraph:  graph,
 	}
 }
 

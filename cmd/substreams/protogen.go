@@ -69,7 +69,7 @@ func runProtogen(cmd *cobra.Command, args []string) error {
 		outputPath = newOutputPath
 	}
 
-	pkg, err := manifestReader.Read()
+	pkg, _, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("reading manifest %q: %w", manifestPath, err)
 	}

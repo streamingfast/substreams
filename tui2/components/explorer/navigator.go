@@ -82,7 +82,11 @@ type Option func(*Navigator)
 
 func WithManifestFilePath(path string) Option {
 	return func(n *Navigator) {
-		n.graph = manifest.MustNewModuleGraph(manifest.MustNewReader(path).MustRead().Modules.Modules)
+		_, graph, err := manifest.MustNewReader(path).Read()
+		if err != nil {
+			panic(err)
+		}
+		n.graph = graph
 	}
 }
 

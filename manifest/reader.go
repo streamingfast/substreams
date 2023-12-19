@@ -104,39 +104,31 @@ func newReader(input, workingDir string, opts ...Option) (*Reader, error) {
 	return r, nil
 }
 
-func (r *Reader) Read() (*pbsubstreams.Package, error) {
+func (r *Reader) Read() (*pbsubstreams.Package, *ModuleGraph, error) {
 	pkg, err := r.resolvePkg()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-
 	if r.params != nil {
 		if err := ApplyParams(r.params, pkg); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
-	if !r.skipPackageValidation {
-
-		graph, err := NewModuleGraph(pkg.Modules.Modules)
-		if err != nil {
-			return nil, err
-		}
-		if err := r.validate(pkg, graph, r.overrideOutputModule, r.overrideNetwork); err != nil {
-			return nil, err
-		}
-	}
-
-	return pkg, nil
-}
-
-func (r *Reader) MustRead() *pbsubstreams.Package {
-	pkg, err := r.Read()
+	graph, err := NewModuleGraph(pkg.Modules.Modules)
 	if err != nil {
-		panic(err)
+		return nil, nil, err
 	}
 
-	return pkg
+	if err := computeInitialBlock(pkg.Modules.Modules, graph); err != nil {
+		return nil, nil, err
+	}
+
+	if err := r.validate(pkg, graph, r.overrideOutputModule, r.overrideNetwork); err != nil {
+		return nil, nil, err
+	}
+
+	return pkg, graph, nil
 }
 
 func (r *Reader) read() error {
@@ -684,7 +676,7 @@ func loadImports(pkg *pbsubstreams.Package, manif *Manifest) error {
 		importPath := manif.resolvePath(kv[1])
 
 		subpkgReader := MustNewReader(importPath)
-		subpkg, err := subpkgReader.Read()
+		subpkg, _, err := subpkgReader.Read()
 		if err != nil {
 			return fmt.Errorf("importing %q: %w", importPath, err)
 		}
@@ -963,30 +955,3 @@ var storeValidTypes = map[string]bool{
 	"string":     true,
 	"proto":      true,
 }
-
-/*
-modules:
-- name: module1
-  initialBlock: 123128 // WARN do not define initialBlock or ERROR this is not the same
-  inputs:
-  - params: string
-    value: "alskdjfalskdj"
-
-- name: module1
-  initialBlock: 123128 // ERROR do not define initialBlock when
-  inputs:
-  - params: string
-    value: "alskdjfalskdj"
-
-
-
-network: mainnet
-
-networks:
-  mainnet:
-    initialBlocks:
-      module1: 123123
-    params:
-      otherModule: "address=0x123123123123"
-
-*/

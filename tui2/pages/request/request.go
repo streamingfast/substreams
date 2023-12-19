@@ -149,8 +149,8 @@ func (r *Request) renderRequestSummary() string {
 	}
 
 	values := []string{
-		fmt.Sprintf("%s", summary.Manifest),
-		fmt.Sprintf("%s", summary.Endpoint),
+		summary.Manifest,
+		summary.Endpoint,
 		fmt.Sprintf("%d%s", r.resolvedStartBlock, handoffStr),
 		strings.Join(summary.Params, ", "),
 		fmt.Sprintf("%v", summary.ProductionMode),
@@ -159,7 +159,7 @@ func (r *Request) renderRequestSummary() string {
 	}
 	if len(summary.InitialSnapshot) > 0 {
 		labels = append(labels, "Initial snapshots: ")
-		values = append(values, fmt.Sprintf("%s", strings.Join(summary.InitialSnapshot, ", ")))
+		values = append(values, strings.Join(summary.InitialSnapshot, ", "))
 	}
 
 	style := lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(r.Width - 2)
@@ -231,7 +231,7 @@ func glamorizeDoc(doc string) (string, error) {
 	markdown := ""
 
 	if doc != "" {
-		markdown += "# " + fmt.Sprintf("docs: \n")
+		markdown += "# " + "docs: \n"
 		markdown += "\n"
 		markdown += doc
 		markdown += "\n"
@@ -256,15 +256,11 @@ func (c *Config) NewInstance() (*Instance, error) {
 		return nil, err
 	}
 
-	pkg, err := reader.Read()
+	pkg, graph, err := reader.Read()
 	if err != nil {
 		return nil, fmt.Errorf("package setup: %w", err)
 	}
 
-	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
-	if err != nil {
-		return nil, fmt.Errorf("graph setup: %w", err)
-	}
 	if c.ReadFromModule {
 		sb, err := graph.ModuleInitialBlock(c.OutputModule)
 		if err != nil {
@@ -297,11 +293,6 @@ func (c *Config) NewInstance() (*Instance, error) {
 
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validate request: %w", err)
-	}
-
-	toPrint := c.DebugModulesOutput
-	if toPrint == nil {
-		toPrint = []string{c.OutputModule}
 	}
 
 	replayLogFilePath := filepath.Join(c.HomeDir, "replay.log")

@@ -232,7 +232,7 @@ func TestReadManifest(t testing.T, manifestPath string) *pbsubstreams.Package {
 	t.Helper()
 
 	manifestReader := MustNewReader(manifestPath)
-	pkg, err := manifestReader.Read()
+	pkg, _, err := manifestReader.Read()
 	require.NoError(t, err)
 	return pkg
 }

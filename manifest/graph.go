@@ -67,19 +67,7 @@ func NewModuleGraph(modules []*pbsubstreams.Module) (*ModuleGraph, error) {
 		return nil, fmt.Errorf("modules graph has a cycle")
 	}
 
-	if err := computeInitialBlock(modules, g); err != nil {
-		return nil, err
-	}
-
 	return g, nil
-}
-
-func MustNewModuleGraph(modules []*pbsubstreams.Module) *ModuleGraph {
-	g, err := NewModuleGraph(modules)
-	if err != nil {
-		panic(err)
-	}
-	return g
 }
 
 // ResetGraphHashes is to be called when you want to force a recomputation of the module hashes.

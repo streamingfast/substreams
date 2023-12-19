@@ -66,7 +66,7 @@ type Reader struct {
 	skipPackageValidation          bool
 	overrideNetwork                string
 	overrideOutputModule           string
-	params                         []string
+	params                         map[string]string
 }
 
 func NewReader(input string, opts ...Option) (*Reader, error) {
@@ -109,6 +109,17 @@ func (r *Reader) Read() (*pbsubstreams.Package, *ModuleGraph, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+
+	if !r.skipPackageValidation {
+		if err := validatePackage(pkg, r.skipModuleOutputTypeValidation); err != nil {
+			return nil, nil, fmt.Errorf("package validation failed: %w", err)
+		}
+
+		if err := ValidateModules(pkg.Modules); err != nil {
+			return nil, nil, fmt.Errorf("module validation failed: %w", err)
+		}
+	}
+
 	if r.params != nil {
 		if err := ApplyParams(r.params, pkg); err != nil {
 			return nil, nil, err
@@ -124,8 +135,23 @@ func (r *Reader) Read() (*pbsubstreams.Package, *ModuleGraph, error) {
 		return nil, nil, err
 	}
 
-	if err := r.validate(pkg, graph, r.overrideOutputModule, r.overrideNetwork); err != nil {
-		return nil, nil, err
+	if pkg.Networks != nil {
+		importIncludedModules, err := dependentImportedModules(graph, r.overrideOutputModule)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		network := pkg.Network
+		if r.overrideNetwork != "" {
+			network = r.overrideNetwork
+		}
+		if err := validateNetworks(pkg, importIncludedModules, network); err != nil {
+			return nil, nil, err
+		}
+		if err := ApplyNetwork(network, pkg); err != nil {
+			return nil, nil, err
+		}
+		// FIXME: run a test with overrides for networks validation
 	}
 
 	return pkg, graph, nil
@@ -315,25 +341,6 @@ func (r *Reader) getPkg() (*pbsubstreams.Package, error) {
 	return pkg, nil
 }
 
-func (r *Reader) validate(pkg *pbsubstreams.Package, graph *ModuleGraph, outputModule string, network string) error {
-	if err := validatePackage(pkg, r.skipModuleOutputTypeValidation); err != nil {
-		return fmt.Errorf("package validation failed: %w", err)
-	}
-
-	if err := ValidateModules(pkg.Modules); err != nil {
-		return fmt.Errorf("module validation failed: %w", err)
-	}
-
-	importIncludedModules, err := dependentImportedModules(graph, outputModule)
-	if err != nil {
-		return err
-	}
-	if err := validateNetworks(pkg, importIncludedModules, network); err != nil { // running on imported packages only, network validation on the main package is done later
-		return err
-	}
-	return nil
-}
-
 func dependentImportedModules(graph *ModuleGraph, outputModule string) (map[string]bool, error) {
 	out := make(map[string]bool)
 
@@ -463,15 +470,6 @@ func (r *Reader) resolvePkg() (*pbsubstreams.Package, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to get package: %w", err)
 	}
-
-	// FIXME: apply everything
-	// FIXME: run a test with overrides for networks validation
-	// FIXME in validate, add the network validations for local package and all dependencies
-	// FIXME if we're on a 'run' and have an output module, we need to validate only the graph of that module
-	// FIXME: validate should be called after all overrides are applied
-	//if err := r.validate(pkg, outputModule, nil); err != nil {
-	//	return nil, fmt.Errorf("failed validation: %w", err)
-	//}
 
 	r.pkg = pkg
 	return pkg, nil
@@ -827,97 +825,6 @@ func mergeNetworks(src, dest *pbsubstreams.Package, srcPrefix string) {
 		}
 		mergeNetwork(src.Networks[k], destNet, srcPrefix)
 	}
-}
-
-// validateNetworks checks that network overloads have the same keys for initialBlocks and params for modules that are owned by the package
-func validateNetworks(pkg *pbsubstreams.Package, includeImportedModules map[string]bool, overrideNetwork string) error {
-	if pkg.Networks == nil {
-		return nil
-	}
-
-	network := pkg.Network
-	if overrideNetwork != "" {
-		network = overrideNetwork
-	}
-	seenPackagesInitialBlocks := make(map[string]bool)
-	seenPackagesParams := make(map[string]bool)
-
-	networksContainingLocalModules := make(map[string]*pbsubstreams.NetworkParams)
-networkLoop:
-	for name, nw := range pkg.Networks {
-		if name == network { // always consider the current network as containing local modules
-			networksContainingLocalModules[name] = nw
-			continue networkLoop
-		}
-		for k := range nw.InitialBlocks {
-			if !strings.Contains(k, ":") {
-				networksContainingLocalModules[name] = nw
-				continue networkLoop
-			}
-		}
-		for k := range nw.InitialBlocks {
-			if !strings.Contains(k, ":") {
-				networksContainingLocalModules[name] = nw
-				continue networkLoop
-			}
-			seenPackagesInitialBlocks[k] = true
-		}
-	}
-	if network != "" && networksContainingLocalModules[network] == nil {
-		networksContainingLocalModules[network] = &pbsubstreams.NetworkParams{}
-	}
-
-	var firstNetwork string
-	for name, nw := range networksContainingLocalModules {
-		if firstNetwork == "" {
-			for k := range nw.InitialBlocks {
-				if strings.Contains(k, ":") && !includeImportedModules[k] {
-					continue // skip modules that are not owned by the package
-				}
-				seenPackagesInitialBlocks[k] = true
-			}
-			for k := range nw.Params {
-				if strings.Contains(k, ":") && !includeImportedModules[k] {
-					continue // skip modules that are not owned by the package
-				}
-				seenPackagesParams[k] = true
-			}
-			firstNetwork = name
-			continue
-		}
-
-		for k := range nw.InitialBlocks {
-			if strings.Contains(k, ":") && !includeImportedModules[k] {
-				continue // skip modules that are not owned by the package
-			}
-			if !seenPackagesInitialBlocks[k] {
-				return fmt.Errorf("missing 'initial_blocks' value for module %q in network %s", k, firstNetwork)
-			}
-		}
-		for k := range nw.Params {
-			if strings.Contains(k, ":") && !includeImportedModules[k] {
-				continue // skip modules that are not owned by the package
-			}
-			if !seenPackagesParams[k] {
-				return fmt.Errorf("missing 'params' value for module %q in network %s", k, firstNetwork)
-			}
-		}
-
-		for k := range seenPackagesInitialBlocks {
-			if _, ok := nw.InitialBlocks[k]; !ok {
-				return fmt.Errorf("missing 'initial_blocks' value for module %q in network %s", k, name)
-			}
-		}
-		for k := range seenPackagesParams {
-			if _, ok := nw.Params[k]; !ok {
-				return fmt.Errorf("missing 'params' value for module %q in network %s", k, name)
-			}
-		}
-
-	}
-
-	return nil
-
 }
 
 func mergeProtoFiles(src, dest *pbsubstreams.Package) {

@@ -39,7 +39,7 @@ func WithOverrideOutputModule(outputModule string) Option {
 	}
 }
 
-func WithParams(params []string) Option {
+func WithParams(params map[string]string) Option {
 	return func(r *Reader) *Reader {
 		r.params = params
 		return r

@@ -73,7 +73,11 @@ func runRun(cmd *cobra.Command, args []string) error {
 	outputMode := mustGetString(cmd, "output")
 
 	network := sflags.MustGetString(cmd, "network")
-	params := sflags.MustGetStringArray(cmd, "params")
+	paramsString := sflags.MustGetStringArray(cmd, "params")
+	params, err := manifest.ParseParams(paramsString)
+	if err != nil {
+		return fmt.Errorf("parsing params: %w", err)
+	}
 
 	readerOptions := []manifest.Option{
 		manifest.WithOverrideOutputModule(outputModule),

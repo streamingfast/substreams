@@ -43,7 +43,7 @@ type Config struct {
 	HomeDir                     string
 	Vcr                         bool
 	Cursor                      string
-	Params                      []string
+	Params                      map[string]string
 	ReaderOptions               []manifest.Option
 }
 
@@ -93,12 +93,8 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		r.params = make(map[string][]string)
 		if msg.RequestSummary.Params != nil {
-			for _, p := range msg.RequestSummary.Params {
-				kv := strings.SplitN(p, "=", 2)
-				if len(kv) != 2 {
-					panic("invalid params in gui")
-				}
-				r.params[kv[0]] = append(r.params[kv[0]], kv[1])
+			for k, v := range msg.RequestSummary.Params {
+				r.params[k] = append(r.params[k], v)
 			}
 		}
 		r.setModulesViewContent()
@@ -148,11 +144,16 @@ func (r *Request) renderRequestSummary() string {
 		handoffStr = fmt.Sprintf(" (handoff: %d)", r.linearHandoffBlock)
 	}
 
+	paramsStrings := make([]string, 0, len(summary.Params))
+	for k, v := range summary.Params {
+		paramsStrings = append(paramsStrings, fmt.Sprintf("%s=%s", k, v))
+	}
+
 	values := []string{
 		summary.Manifest,
 		summary.Endpoint,
 		fmt.Sprintf("%d%s", r.resolvedStartBlock, handoffStr),
-		strings.Join(summary.Params, ", "),
+		strings.Join(paramsStrings, ", "),
 		fmt.Sprintf("%v", summary.ProductionMode),
 		r.traceId,
 		fmt.Sprintf("%d", r.parallelWorkers),

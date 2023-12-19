@@ -33,36 +33,6 @@ var httpClient = &http.Client{
 	Timeout: 30 * time.Second,
 }
 
-type Option func(r *Reader) *Reader
-
-func SkipSourceCodeReader() Option {
-	return func(r *Reader) *Reader {
-		r.skipSourceCodeImportValidation = true
-		return r
-	}
-}
-
-func SkipModuleOutputTypeValidationReader() Option {
-	return func(r *Reader) *Reader {
-		r.skipModuleOutputTypeValidation = true
-		return r
-	}
-}
-
-func SkipPackageValidationReader() Option {
-	return func(r *Reader) *Reader {
-		r.skipPackageValidation = true
-		return r
-	}
-}
-
-func WithCollectProtoDefinitions(f func(protoDefinitions []*desc.FileDescriptor)) Option {
-	return func(r *Reader) *Reader {
-		r.collectProtoDefinitionsFunc = f
-		return r
-	}
-}
-
 func hasRemotePrefix(in string) bool {
 	for _, prefix := range []string{"https://", "http://", "ipfs://", "gs://", "s3://", "az://"} {
 		if strings.HasPrefix(in, prefix) {
@@ -81,8 +51,7 @@ type Reader struct {
 
 	workingDir string
 
-	pkg       *pbsubstreams.Package
-	overrides []*ConfigurationOverride
+	pkg *pbsubstreams.Package
 
 	// cached values
 	protoDefinitions         []*desc.FileDescriptor
@@ -95,6 +64,9 @@ type Reader struct {
 	skipSourceCodeImportValidation bool
 	skipModuleOutputTypeValidation bool
 	skipPackageValidation          bool
+	overrideNetwork                string
+	overrideOutputModule           string
+	params                         []string
 }
 
 func NewReader(input string, opts ...Option) (*Reader, error) {
@@ -133,10 +105,29 @@ func newReader(input, workingDir string, opts ...Option) (*Reader, error) {
 }
 
 func (r *Reader) Read() (*pbsubstreams.Package, error) {
-	out, err := r.resolvePkg()
+	pkg, err := r.resolvePkg()
+	if err != nil {
+		return nil, err
+	}
 
-	//	graph, err := manifest.NewModuleGraph(out.Modules.Modules)
-	return out, err
+	if r.params != nil {
+		if err := ApplyParams(r.params, pkg); err != nil {
+			return nil, err
+		}
+	}
+
+	if !r.skipPackageValidation {
+
+		graph, err := NewModuleGraph(pkg.Modules.Modules)
+		if err != nil {
+			return nil, err
+		}
+		if err := r.validate(pkg, graph, r.overrideOutputModule, r.overrideNetwork); err != nil {
+			return nil, err
+		}
+	}
+
+	return pkg, nil
 }
 
 func (r *Reader) MustRead() *pbsubstreams.Package {
@@ -222,10 +213,6 @@ func (r *Reader) readFromIPFS(input string) error {
 
 	r.currentData = b
 
-	if r.isOverride() {
-		return nil
-	}
-
 	type subgraphManifest struct {
 		DataSources []struct {
 			Kind   string `yaml:"kind"`
@@ -305,20 +292,9 @@ func (r *Reader) resolveInputPath() error {
 	return nil
 }
 
-func (r *Reader) isOverride() bool {
-	if r.currentData == nil {
-		return false
-	}
-	return bytes.Contains(r.currentData, []byte("deriveFrom:"))
-}
-
 func (r *Reader) getPkg() (*pbsubstreams.Package, error) {
 	if r.currentData == nil {
 		return nil, fmt.Errorf("no result available")
-	}
-
-	if r.isOverride() {
-		return nil, fmt.Errorf("cannot get package from override")
 	}
 
 	if strings.HasSuffix(r.currentInput, ".yaml") || strings.HasSuffix(r.currentInput, ".yml") {
@@ -347,38 +323,31 @@ func (r *Reader) getPkg() (*pbsubstreams.Package, error) {
 	return pkg, nil
 }
 
-func (r *Reader) Validate(pkg *pbsubstreams.Package, outputModule *string, network *string) error {
-	if !r.skipPackageValidation {
-		if err := validatePackage(pkg, r.skipModuleOutputTypeValidation); err != nil {
-			return fmt.Errorf("package validation failed: %w", err)
-		}
+func (r *Reader) validate(pkg *pbsubstreams.Package, graph *ModuleGraph, outputModule string, network string) error {
+	if err := validatePackage(pkg, r.skipModuleOutputTypeValidation); err != nil {
+		return fmt.Errorf("package validation failed: %w", err)
+	}
 
-		if err := ValidateModules(pkg.Modules); err != nil {
-			return fmt.Errorf("module validation failed: %w", err)
-		}
+	if err := ValidateModules(pkg.Modules); err != nil {
+		return fmt.Errorf("module validation failed: %w", err)
+	}
 
-		graph, err := NewModuleGraph(pkg.Modules.Modules)
-		if err != nil {
-			return err
-		}
-
-		importIncludedModules, err := dependentImportedModules(graph, outputModule)
-		if err != nil {
-			return err
-		}
-		if err := validateNetworks(pkg, importIncludedModules, network); err != nil { // running on imported packages only, network validation on the main package is done later
-			return err
-		}
+	importIncludedModules, err := dependentImportedModules(graph, outputModule)
+	if err != nil {
+		return err
+	}
+	if err := validateNetworks(pkg, importIncludedModules, network); err != nil { // running on imported packages only, network validation on the main package is done later
+		return err
 	}
 	return nil
 }
 
-func dependentImportedModules(graph *ModuleGraph, outputModule *string) (map[string]bool, error) {
+func dependentImportedModules(graph *ModuleGraph, outputModule string) (map[string]bool, error) {
 	out := make(map[string]bool)
 
 	outputModulesToCheck := make(map[string]bool)
-	if outputModule != nil {
-		outputModulesToCheck[*outputModule] = true
+	if outputModule != "" {
+		outputModulesToCheck[outputModule] = true
 	} else {
 		for _, mod := range graph.Modules() {
 			if !strings.Contains(mod, ":") {
@@ -488,24 +457,6 @@ func (r *Reader) newPkgFromManifest(manif *Manifest) (*pbsubstreams.Package, err
 	return pkg, nil
 }
 
-func (r *Reader) getOverride() (*ConfigurationOverride, error) {
-	if r.currentData == nil {
-		return nil, fmt.Errorf("no result available")
-	}
-
-	if !r.isOverride() {
-		return nil, fmt.Errorf("not an override")
-	}
-
-	override := &ConfigurationOverride{}
-	err := yaml.Unmarshal(r.currentData, override)
-	if err != nil {
-		return nil, fmt.Errorf("unable to unmarshal override: %w", err)
-	}
-
-	return override, nil
-}
-
 func (r *Reader) resolvePkg() (*pbsubstreams.Package, error) {
 	if r.pkg != nil {
 		return r.pkg, nil
@@ -516,32 +467,12 @@ func (r *Reader) resolvePkg() (*pbsubstreams.Package, error) {
 		return nil, err
 	}
 
-	if r.isOverride() {
-		or, err := r.getOverride()
-		if err != nil {
-			return nil, fmt.Errorf("unable to get override: %w", err)
-		}
-		r.overrides = append(r.overrides, or)
-		r.currentInput = or.DeriveFrom
-
-		return r.resolvePkg()
-	}
-
 	pkg, err := r.getPkg()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get package: %w", err)
 	}
 
-	//reverse order r.overrides to be able to squash them in the right order
-	for i, j := 0, len(r.overrides)-1; i < j; i, j = i+1, j-1 {
-		r.overrides[i], r.overrides[j] = r.overrides[j], r.overrides[i]
-	}
-
-	mergedOverride := mergeOverrides(r.overrides...)
-	if err := applyOverride(pkg, mergedOverride); err != nil {
-		return nil, fmt.Errorf("applying override: %w", err)
-	}
-
+	// FIXME: apply everything
 	// FIXME: run a test with overrides for networks validation
 	// FIXME in validate, add the network validations for local package and all dependencies
 	// FIXME if we're on a 'run' and have an output module, we need to validate only the graph of that module
@@ -745,6 +676,8 @@ func LoadManifestFile(inputPath, workingDir string) (*Manifest, error) {
 	return m, nil
 }
 
+// loop through the Manifest, and get the `imports` statements,
+// pull the Package files from Disk, and merge them into this one
 func loadImports(pkg *pbsubstreams.Package, manif *Manifest) error {
 	for _, kv := range manif.Imports {
 		importName := kv[0]
@@ -762,8 +695,6 @@ func loadImports(pkg *pbsubstreams.Package, manif *Manifest) error {
 		mergeNetworks(subpkg, pkg, importName)
 	}
 
-	// loop through the Manifest, and get the `imports` statements,
-	// pull the Package files from Disk, and merge them into this one
 	return nil
 }
 
@@ -790,7 +721,7 @@ func loadImage(pkg *pbsubstreams.Package, manif *Manifest) error {
 	case bytes.Equal(img[0:3], JPGHeader):
 	case bytes.Equal(img[0:4], WebPHeader):
 	default:
-		return fmt.Errorf("Unsupported file format for %q. Only JPEG, PNG and WebP images are supported", path)
+		return fmt.Errorf("unsupported file format for %q. Only JPEG, PNG and WebP images are supported", path)
 	}
 
 	pkg.Image = img
@@ -906,107 +837,15 @@ func mergeNetworks(src, dest *pbsubstreams.Package, srcPrefix string) {
 	}
 }
 
-// *  build a set of all keys, for each network
-// *  the set of keys need to be equal for each network, so no missing key.
-// *  This means that: if you define a module that needs override for a given network, it needs to be defined for all networks.
-// *  This also means we will not validate or force the overriding of the initialBlock or original params value for a module, unless it uses this networks override mechanism.
-
-// uniswap (10 networks) initialblock + value mod:pairs, mod:contracts, events
-
-/*
-networks:
-  mainnet, goerli, ....:
-    initialBlocks:
-      pairs: 123123
-      contracts: 123667
-    params:
-      pairs: "address=0x123123123123"
-
-
-
-
-moneyPerDay ! (imports uniswap), has one module money_out
-networks
-  sepolia:
-    params: money_out: "usdcAddress=0xdeadbeef"
-  mainnet:
-    params: money_out: "usdcAddress=0xdead0000"
-
-
-combined:networks
-  mainnet:
-    initialBlocks:
-        uni:pairs: 123123
-        uni:contracts: 123667
-    params:
-        uni:pairs: "address=0x123123123123"
-        money_out: "usdcAddress=0xdead0000"
-
-  holesky:
-    params:
-        money_out: "usdcAddress=0xdead0000"
-
-
-network: holesky
-
-   uni:pairs: 00000
-
-
-
-`substreams run moneyPerday.yaml money_out --network=mainnet`
-
-  money_out depends on uni:events
-
-`substreams run moneyPerday.yaml money_out --network=holesky`
-
-`substreams run money.spkg money_out --network=holesky`
-
-
-`substreams run money.spkg uni:pairs --network=holesky` ERROR
-
-
-
-
-add the notion of "local"
-- check the tree for all local modules as output_module
-- check the networks all of which are declared locally ?
-
-
-*/
-
-// overloadedModules gives the list of every module that is referenced in an overload on any network
-// for initialBlock or params
-
-func overloadedModules(pkg *pbsubstreams.Package, prefix string) map[string]bool {
-	out := make(map[string]bool)
-
-networks:
-	for k, nw := range pkg.Networks {
-		for kk := range nw.InitialBlocks {
-			if strings.HasPrefix(kk, prefix) {
-				out[k] = true
-				continue networks
-			}
-		}
-		for kk := range nw.Params {
-			if strings.HasPrefix(kk, prefix) {
-				out[k] = true
-				continue networks
-			}
-		}
-	}
-	return out
-}
-
 // validateNetworks checks that network overloads have the same keys for initialBlocks and params for modules that are owned by the package
-func validateNetworks(pkg *pbsubstreams.Package, includeImportedModules map[string]bool, overrideNetwork *string) error {
+func validateNetworks(pkg *pbsubstreams.Package, includeImportedModules map[string]bool, overrideNetwork string) error {
 	if pkg.Networks == nil {
 		return nil
 	}
 
 	network := pkg.Network
-	if overrideNetwork != nil {
-		network = *overrideNetwork
+	if overrideNetwork != "" {
+		network = overrideNetwork
 	}
 	seenPackagesInitialBlocks := make(map[string]bool)
 	seenPackagesParams := make(map[string]bool)

@@ -15,49 +15,6 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 )
 
-func TestReader_ReadWithOverride(t *testing.T) {
-	path, err := filepath.Abs("testdata/")
-	require.NoError(t, err)
-
-	override, err := filepath.Abs("testdata/with-params-override.yaml")
-
-	r, err := newReader(override, path)
-	require.NoError(t, err)
-
-	pkg, err := r.Read()
-	require.NoError(t, err)
-	require.NotNil(t, pkg)
-}
-
-func TestReader_ReadWithNestedOverride(t *testing.T) {
-	path, err := filepath.Abs("testdata/")
-	require.NoError(t, err)
-
-	override, err := filepath.Abs("testdata/with-params-override-override.yaml")
-	require.NoError(t, err)
-
-	r, err := newReader(override, path)
-	require.NoError(t, err)
-
-	pkg, err := r.Read()
-	require.NoError(t, err)
-	require.NotNil(t, pkg)
-}
-
-func TestReader_ReadWithRemoteOverride(t *testing.T) {
-	path, err := filepath.Abs("testdata/")
-	require.NoError(t, err)
-
-	override, err := filepath.Abs("testdata/univ3-override.yaml")
-	require.NoError(t, err)
-
-	r, err := newReader(override, path)
-	require.NoError(t, err)
-
-	_, err = r.Read()
-	require.NoError(t, err)
-}
-
 func TestReader_Read(t *testing.T) {
 	absolutePathToInferredManifest, err := filepath.Abs("testdata/inferred_manifest")
 	require.NoError(t, err)
@@ -667,12 +624,11 @@ func readSystemProtoDescriptors(t *testing.T) (out []*descriptorpb.FileDescripto
 }
 
 func Test_validateNetworks(t *testing.T) {
-	mainnetString := "mainnet"
 	tests := []struct {
 		name                   string
 		pkg                    *pbsubstreams.Package
 		includeImportedModules map[string]bool
-		overrideNetwork        *string
+		overrideNetwork        string
 		wantErr                bool
 	}{
 		{
@@ -866,7 +822,7 @@ func Test_validateNetworks(t *testing.T) {
 					},
 				},
 			},
-			overrideNetwork: &mainnetString,
+			overrideNetwork: "mainnet",
 		},
 		{
 			name: "invalid for empty networks declared by dependencies that would be selected as default network",
@@ -1009,7 +965,7 @@ func Test_dependentImportedModules(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := dependentImportedModules(tt.args.graph, &tt.args.outputModule)
+			got, err := dependentImportedModules(tt.args.graph, tt.args.outputModule)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("dependentImportedModules() error = %v, wantErr %v", err, tt.wantErr)
 				return

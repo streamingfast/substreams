@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/substreams/manifest"
 	"google.golang.org/protobuf/proto"
 )
@@ -22,12 +23,18 @@ var inspectCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(inspectCmd)
+	inspectCmd.Flags().Bool("skip-package-validation", false, "Do not perform any validation when reading substreams package")
 }
 
 func runInspect(cmd *cobra.Command, args []string) error {
 	manifestPath := args[0]
 
-	manifestReader, err := manifest.NewReader(manifestPath, getReaderOpts(cmd)...)
+	var readerOptions []manifest.Option
+	if sflags.MustGetBool(cmd, "skip-package-validation") {
+		readerOptions = append(readerOptions, manifest.SkipPackageValidationReader())
+	}
+
+	manifestReader, err := manifest.NewReader(manifestPath, readerOptions...)
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
@@ -35,10 +42,6 @@ func runInspect(cmd *cobra.Command, args []string) error {
 	pkg, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("reading manifest %q: %w", manifestPath, err)
-	}
-
-	if _, err = manifest.NewModuleGraph(pkg.Modules.Modules); err != nil {
-		return fmt.Errorf("processing module graph %w", err)
 	}
 
 	filename := filepath.Join(os.TempDir(), "package.spkg")

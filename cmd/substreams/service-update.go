@@ -35,7 +35,7 @@ var updateCmd = &cobra.Command{
 func updateE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
-	reader, err := manifest.NewReader(args[0], getReaderOpts(cmd)...)
+	reader, err := manifest.NewReader(args[0])
 	if err != nil {
 		return err
 	}

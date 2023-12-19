@@ -16,6 +16,7 @@ import (
 
 func init() {
 	infoCmd.Flags().String("output-sinkconfig-files-path", "", "if non-empty, any sinkconfig field of type 'bytes' that was packed from a file will be written to that path")
+	infoCmd.Flags().Bool("skip-package-validation", false, "Do not perform any validation when reading substreams package")
 }
 
 var infoCmd = &cobra.Command{

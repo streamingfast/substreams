@@ -45,25 +45,7 @@ func runPack(cmd *cobra.Command, args []string) error {
 		manifestPath = args[0]
 	}
 
-	manifestReaderOptions := getReaderOpts(cmd)
-
-	//// Get the value of the -c flag
-	//overridePaths, _ := cmd.Flags().GetStringArray("config")
-	//// If the overridePath is provided, read, decode it and add to manifestReaderOptions
-	//if len(overridePaths) > 0 {
-	//	var overrides []*manifest.ConfigurationOverride
-	//	for _, overridePath := range overridePaths {
-	//		overrideConfig, err := readOverrideConfig(overridePath)
-	//		if err != nil {
-	//			return fmt.Errorf("reading override config %q: %w", overridePath, err)
-	//		}
-	//		overrides = append(overrides, overrideConfig)
-	//	}
-	//	manifestReaderOptions = append(manifestReaderOptions, manifest.WithOverrides(overrides...))
-	//}
-
-	// Use the manifestReaderOptions while creating the manifest reader
-	manifestReader, err := manifest.NewReader(manifestPath, manifestReaderOptions...)
+	manifestReader, err := manifest.NewReader(manifestPath)
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
@@ -75,10 +57,6 @@ func runPack(cmd *cobra.Command, args []string) error {
 	pkg, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("reading manifest %q: %w", manifestPath, err)
-	}
-
-	if _, err = manifest.NewModuleGraph(pkg.Modules.Modules); err != nil {
-		return fmt.Errorf("processing module graph %w", err)
 	}
 
 	originalOutputFile := maybeGetString(cmd, "output-file")

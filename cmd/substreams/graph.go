@@ -32,7 +32,7 @@ func runManifestGraph(cmd *cobra.Command, args []string) error {
 		manifestPath = args[0]
 	}
 
-	manifestReader, err := manifest.NewReader(manifestPath, getReaderOpts(cmd)...)
+	manifestReader, err := manifest.NewReader(manifestPath)
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
 	}

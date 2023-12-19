@@ -38,11 +38,13 @@ type Config struct {
 	FinalBlocksOnly             bool
 	Headers                     map[string]string
 	OutputModule                string
+	OverrideNetwork             string
 	SubstreamsClientConfig      *client.SubstreamsClientConfig
 	HomeDir                     string
 	Vcr                         bool
 	Cursor                      string
 	Params                      []string
+	ReaderOptions               []manifest.Option
 }
 
 type Instance struct {
@@ -249,9 +251,19 @@ func glamorizeDoc(doc string) (string, error) {
 }
 
 func (c *Config) NewInstance() (*Instance, error) {
-	graph, pkg, err := readManifest(c.ManifestPath)
+	reader, err := manifest.NewReader(c.ManifestPath, c.ReaderOptions...)
 	if err != nil {
-		return nil, fmt.Errorf("graph and package setup: %w", err)
+		return nil, err
+	}
+
+	pkg, err := reader.Read()
+	if err != nil {
+		return nil, fmt.Errorf("package setup: %w", err)
+	}
+
+	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
+	if err != nil {
+		return nil, fmt.Errorf("graph setup: %w", err)
 	}
 	if c.ReadFromModule {
 		sb, err := graph.ModuleInitialBlock(c.OutputModule)
@@ -269,7 +281,6 @@ func (c *Config) NewInstance() (*Instance, error) {
 	if err != nil {
 		return nil, fmt.Errorf("substreams client setup: %w", err)
 	}
-	//defer connClose()
 
 	req := &pbsubstreamsrpc.Request{
 		StartBlockNum:                       c.StartBlock,
@@ -335,22 +346,4 @@ func (c *Config) NewInstance() (*Instance, error) {
 	}
 
 	return substreamRequirements, nil
-}
-
-func readManifest(manifestPath string) (*manifest.ModuleGraph, *pbsubstreams.Package, error) {
-	manifestReader, err := manifest.NewReader(manifestPath)
-	if err != nil {
-		return nil, nil, fmt.Errorf("manifest reader: %w", err)
-	}
-
-	pkg, err := manifestReader.Read()
-	if err != nil {
-		return nil, nil, fmt.Errorf("read manifest %q: %w", manifestPath, err)
-	}
-
-	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
-	if err != nil {
-		return nil, nil, fmt.Errorf("creating module graph: %w", err)
-	}
-	return graph, pkg, nil
 }

@@ -48,7 +48,7 @@ type Manifest struct {
 }
 
 type NetworkParams struct {
-	InitialBlocks map[string]uint64 `yaml:"initial_blocks,omitempty" json:"initial_blocks,omitempty"`
+	InitialBlocks map[string]uint64 `yaml:"initialBlock,omitempty" json:"initialBlock,omitempty"`
 	Params        map[string]string `yaml:"params,omitempty" json:"params,omitempty"`
 }
 

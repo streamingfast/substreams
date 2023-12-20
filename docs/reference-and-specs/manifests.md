@@ -350,7 +350,7 @@ The `networks` allows specifying per-network `params` and `initialBlock` for eac
 ```yaml
 networks:
   mainnet:
-    initial_blocks:
+    initialBlock:
       mod1: 200
       lib:mod1: 400
     params:

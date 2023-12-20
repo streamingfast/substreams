@@ -56,13 +56,13 @@ network: sepolia
 
 networks:
   mainnet:
-    initial_blocks:
+    initialBlock:
       erc20:map_balance_changes: 200 # overloading an imported map
       db_out: 200
     params:
       filter_erc20_balance_changes: "addr=0x1234"
   sepolia:
-    initial_blocks:
+    initialBlock:
       erc20:map_balance_changes: 400 # overloading an imported map
       db_out: 400
     params:

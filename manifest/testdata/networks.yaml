@@ -27,8 +27,8 @@ network: mainnet
 
 networks:
   mainnet:
-    initial_blocks:
+    initialBlock:
       mod1: 200
   sepolia:
-    initial_blocks:
+    initialBlock:
       mod1: 400

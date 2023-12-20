@@ -22,8 +22,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
-* Added `networks` field at the top level of the manifest definition, with `initial_blocks` and `params` overrides for each module. See the substreams.yaml.example file in the repository or https://substreams.streamingfast.io/reference-and-specs/manifests for more details and example usage.
-* The `networks` params and initial_blocks overrides for the chosen network are applied to the module directly before being sent to the server. All network configurations are kept when packing an .spkg file.
+* Added `networks` field at the top level of the manifest definition, with `initialBlock` and `params` overrides for each module. See the substreams.yaml.example file in the repository or https://substreams.streamingfast.io/reference-and-specs/manifests for more details and example usage.
+* The networks `params` and `initialBlock`` overrides for the chosen network are applied to the module directly before being sent to the server. All network configurations are kept when packing an .spkg file.
 * Added the `--network` flag for choosing the network on `run` and `gui` command. Default behavior is to use the one defined as `network` in the manifest. 
 * Added the `--endpoint` flag to `substreams alpha service serve` to specify substreams endpoint to connect to
 * Added endpoints for Antelope chains

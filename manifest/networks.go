@@ -117,7 +117,7 @@ networkLoop:
 				continue // skip modules that are not owned by the package
 			}
 			if !seenPackagesInitialBlocks[k] {
-				return fmt.Errorf("missing 'initial_blocks' value for module %q in network %s", k, firstNetwork)
+				return fmt.Errorf("missing 'initialBlock' value for module %q in network %s", k, firstNetwork)
 			}
 		}
 		for k := range nw.Params {
@@ -131,7 +131,7 @@ networkLoop:
 
 		for k := range seenPackagesInitialBlocks {
 			if _, ok := nw.InitialBlocks[k]; !ok {
-				return fmt.Errorf("missing 'initial_blocks' value for module %q in network %s", k, name)
+				return fmt.Errorf("missing 'initialBlock' value for module %q in network %s", k, name)
 			}
 		}
 		for k := range seenPackagesParams {

@@ -10,7 +10,6 @@ import (
 	"os"
 	_ "runtime"
 	"strings"
-	"time"
 	"unsafe"
 
 	"github.com/golang/protobuf/proto"
@@ -19,7 +18,7 @@ import (
 
 func main() {
 	printIt("let's do it")
-	start := time.Now()
+	//start := time.Now()
 	input, err := readInput()
 	if err != nil {
 		panic(fmt.Errorf("reading input: %w", err))
@@ -48,7 +47,7 @@ func main() {
 	if err != nil {
 		panic(fmt.Errorf("mapping block: %w", err))
 	}
-	fmt.Println("_duration", time.Since(start))
+	//fmt.Println("_duration", time.Since(start))
 }
 
 type blockStat struct {
@@ -58,7 +57,6 @@ type blockStat struct {
 }
 
 func mapBlock(block *pbeth.Block) error {
-	fmt.Println("mapping block", block.Number)
 	rocketAddress := strings.ToLower("ae78736Cd615f374D3085123A210448E74Fc6393")
 
 	approvalTopic := strings.ToLower("8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925")
@@ -102,7 +100,6 @@ func mapBlock(block *pbeth.Block) error {
 	if err != nil {
 		return fmt.Errorf("marshalling stats: %w", err)
 	}
-	fmt.Println("stats:", string(data))
 	_, err = writeOutput(data)
 	if err != nil {
 		return fmt.Errorf("writing output: %w", err)

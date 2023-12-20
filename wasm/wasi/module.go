@@ -8,8 +8,9 @@ import (
 	"os"
 	"sync"
 
-	"github.com/streamingfast/substreams/wasm"
 	sfwaz "github.com/streamingfast/substreams/wasm/wazero"
+
+	"github.com/streamingfast/substreams/wasm"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -40,12 +41,12 @@ func newModule(ctx context.Context, wasmCode []byte, wasmCodeType string, regist
 		return nil, fmt.Errorf("creating new module: %w", err)
 	}
 
+	hostModules := []wazero.CompiledModule{}
 	loggerModule, err := sfwaz.AddHostFunctions(ctx, runtime, "logger", sfwaz.LoggerFuncs)
 	if err != nil {
 		return nil, err
 	}
-
-	hostModules := []wazero.CompiledModule{loggerModule}
+	hostModules = append(hostModules, loggerModule)
 
 	startFunc := "main"
 	switch wasmCodeType {
@@ -53,8 +54,7 @@ func newModule(ctx context.Context, wasmCode []byte, wasmCodeType string, regist
 		startFunc = "_start"
 	}
 
-	wazConfig := wazero.NewModuleConfig().
-		WithStderr(os.Stderr).
+	wazConfig := wazero.NewModuleConfig().WithStderr(os.Stderr).
 		WithStartFunctions(startFunc)
 
 	return &Module{
@@ -94,6 +94,11 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 
 	sourceInput := arguments[0].(*wasm.SourceInput)
 
+	//f := mod.ExportedFunction("run")
+	//if f == nil {
+	//	return inst, fmt.Errorf("could not find entrypoint function %q ", call.Entrypoint)
+	//}
+
 	//arguments ->
 	//message MapPoolCreatedInput {
 	//	string params = 1;
@@ -108,7 +113,8 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 	w := bytes.NewBuffer(nil)
 	config := m.wazModuleConfig.WithStdin(r).WithStdout(w).WithArgs()
 
-	if _, err := m.wazRuntime.InstantiateModule(ctx, m.userModule, config); err != nil {
+	ctx2 := wasm.WithContext(withInstanceContext(ctx, inst), call)
+	if _, err := m.wazRuntime.InstantiateModule(ctx2, m.userModule, config); err != nil {
 		// Note: Most compilers do not exit the module after running "_start",
 		// unless there was an error. This allows you to call exported functions.
 		if exitErr, ok := err.(*sys.ExitError); ok && exitErr.ExitCode() != 0 {
@@ -127,9 +133,7 @@ func (m *Module) instantiateModule(ctx context.Context) (api.Module, error) {
 	defer m.Unlock()
 
 	for _, hostMod := range m.hostModules {
-		fmt.Println("instantiating host module", hostMod.Name())
 		if m.wazRuntime.Module(hostMod.Name()) != nil {
-			fmt.Println("already instantiated")
 			continue
 		}
 		_, err := m.wazRuntime.InstantiateModule(ctx, hostMod, m.wazModuleConfig.WithName(hostMod.Name()))
@@ -137,6 +141,6 @@ func (m *Module) instantiateModule(ctx context.Context) (api.Module, error) {
 			return nil, fmt.Errorf("instantiating host module %q: %w", hostMod.Name(), err)
 		}
 	}
-	mod, err := m.wazRuntime.InstantiateModule(ctx, m.userModule, m.wazModuleConfig.WithName(""))
-	return mod, err
+	//return m.wazRuntime.InstantiateModule(ctx, m.userModule, m.wazModuleConfig.WithName(""))
+	return nil, nil
 }

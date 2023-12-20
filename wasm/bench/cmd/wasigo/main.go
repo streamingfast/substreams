@@ -11,7 +11,6 @@ import (
 )
 
 func main() {
-	start := time.Now()
 	ctx := context.Background()
 	wasmRuntime := wasm.NewRegistryWithRuntime("wasi", nil, 0)
 	code, err := os.ReadFile("/Users/cbillett/devel/sf/substreams/wasm/bench/substreams_tiny_go/main.wasm")
@@ -27,13 +26,20 @@ func main() {
 	}
 	instance, err := module.NewInstance(ctx)
 
-	args := args(blockInputFile("/Users/cbillett/devel/sf/substreams/wasm/bench/cmd/barebones/testdata/block.binpb"))
-	call := wasm.NewCall(nil, "", "", args)
-	_, err = module.ExecuteNewCall(ctx, call, instance, args)
-	if err != nil {
-		panic(fmt.Errorf("executing call: %w", err))
+	start := time.Now()
+
+	for i := 0; i < 5; i++ {
+		execStart := time.Now()
+		args := args(blockInputFile("/Users/cbillett/devel/sf/substreams/wasm/bench/cmd/barebones/testdata/block.binpb"))
+		call := wasm.NewCall(nil, "", "", args)
+		_, err = module.ExecuteNewCall(ctx, call, instance, args)
+		if err != nil {
+			panic(fmt.Errorf("executing call: %w", err))
+		}
+		fmt.Println("exec duration", time.Since(execStart))
+		fmt.Println("call output", string(call.Output()))
+
 	}
-	fmt.Println("call output", string(call.Output()))
 	fmt.Println("duration", time.Since(start))
 
 }

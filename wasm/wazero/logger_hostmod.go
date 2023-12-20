@@ -5,10 +5,9 @@ import (
 	"fmt"
 
 	"github.com/dustin/go-humanize"
+	"github.com/streamingfast/substreams/wasm"
 	"github.com/tetratelabs/wazero/api"
 	"go.uber.org/zap"
-
-	"github.com/streamingfast/substreams/wasm"
 )
 
 var LoggerFuncs = []funcs{
@@ -33,7 +32,6 @@ var LoggerFuncs = []funcs{
 			if tracer.Enabled() {
 				zlog.Debug(message, zap.String("module_name", call.ModuleName))
 			}
-
 			call.AppendLog(message)
 			return
 		}),

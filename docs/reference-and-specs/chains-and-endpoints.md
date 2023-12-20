@@ -42,8 +42,9 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 * **Ethereum Holesky**: `holesky.eth.streamingfast.io:443`
 * **Polygon** **Mainnet**: `polygon.streamingfast.io:443`
 * **Mumbai Testnet**: `mumbai.streamingfast.io:443`
-* **Arbitrum One:** `arb-one.streamingfast.io:443` (beta)
+* **Arbitrum One:** `arb-one.streamingfast.io:443`
 * **BNB**: `bnb.streamingfast.io:443`
+* **Optimism:** `opt-mainnet.streamingfast.io:443`
 * **NEAR Mainnet**: `mainnet.near.streamingfast.io:443`
 * **NEAR Testnet**: `testnet.near.streamingfast.io:443`
 * **Solana mainnet-beta**: `mainnet.sol.streamingfast.io:443`

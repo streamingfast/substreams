@@ -24,14 +24,34 @@ func main() {
 		panic(fmt.Errorf("reading input: %w", err))
 	}
 
-	mapBlockInput := &pb.MapBlockInput{}
-	err = proto.Unmarshal(input, mapBlockInput)
-
-	err = mapBlock(mapBlockInput.Block)
-	if err != nil {
-		panic(fmt.Errorf("mapping block: %w", err))
+	var entrypoint string
+	switch len(os.Args) {
+	case 1:
+		entrypoint = os.Args[0]
+	default:
+		panic(fmt.Errorf("invalid number of arguments: %d", len(os.Args)))
 	}
-	//fmt.Println("_duration", time.Since(start))
+	fmt.Println("entrypoint", entrypoint)
+
+	switch entrypoint {
+	case "mapBlock":
+		//params := &MapBlockInputParams{}
+		//err = proto.Unmarshal(input, param)
+		//if err != nil {
+		//	panic(fmt.Errorf("unmarshalling input: %w", err))
+		//}
+		//mapBlock(params.Block, NewReadStore(params.StoreIdx))
+
+		readStore := NewReadStore(0)
+
+		mapBlockInput := &pb.MapBlockInput{}
+		err = proto.Unmarshal(input, mapBlockInput)
+
+		err = mapBlock(mapBlockInput.Block, readStore)
+		if err != nil {
+			panic(fmt.Errorf("mapping block: %w", err))
+		}
+	}
 }
 
 type blockStat struct {
@@ -40,7 +60,7 @@ type blockStat struct {
 	ApprovalCount int
 }
 
-func mapBlock(block *pb.Block) error {
+func mapBlock(block *pb.Block, readStore *ReadStore) error {
 	rocketAddress := strings.ToLower("ae78736Cd615f374D3085123A210448E74Fc6393")
 
 	approvalTopic := strings.ToLower("8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925")
@@ -129,6 +149,25 @@ func (rs *ReadStore) GetAt(ordinal uint64, key []byte) []byte {
 		return nil
 	}
 	return getOutputData(outputPtr)
+}
+
+type WriteStore struct {
+}
+
+func NewWriteStore(storeIdx uint32) *WriteStore {
+	return &WriteStore{}
+}
+
+//go:wasmimport store set
+//go:noescape
+func set(ordinal uint64, keyPtr unsafe.Pointer, keyLen uint32, valuePtr unsafe.Pointer, valueLen uint32)
+
+func (ws *WriteStore) Set(ordinal uint64, key, value []byte) {
+	keyPtr := unsafe.Pointer(&key[0])
+	keyLen := uint32(len(key))
+	valuePtr := unsafe.Pointer(&value[0])
+	valueLen := uint32(len(value))
+	set(ordinal, keyPtr, keyLen, valuePtr, valueLen)
 }
 
 func getOutputData(outputPtr unsafe.Pointer) []byte {

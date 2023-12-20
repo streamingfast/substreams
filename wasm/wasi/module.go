@@ -8,9 +8,8 @@ import (
 	"os"
 	"sync"
 
-	sfwaz "github.com/streamingfast/substreams/wasm/wazero"
-
 	"github.com/streamingfast/substreams/wasm"
+	sfwaz "github.com/streamingfast/substreams/wasm/wazero"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/sys"
@@ -79,25 +78,13 @@ func (m *Module) NewInstance(ctx context.Context) (out wasm.Instance, err error)
 
 func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, wasmInstance wasm.Instance, arguments []wasm.Argument) (out wasm.Instance, err error) {
 	inst := &instance{}
-	sourceInput := arguments[0].(*wasm.SourceInput)
 
-	//todo: on to access exported functions if go wasi
-	//f := mod.ExportedFunction("run")
-	//if f == nil {
-	//	return inst, fmt.Errorf("could not find entrypoint function %q ", call.Entrypoint)
-	//}
+	argsData, err := marshallArgs(arguments)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling args: %w", err)
+	}
 
-	//arguments ->
-	//message MapPoolCreatedInput {
-	//	string params = 1;
-	//	sf.ethereum.type.v2.Block block = 2;
-	//	sf.substreams.type.v1.Clock clock = 3;
-	//	uniswap.v3.Swaps = 4;
-	//	uint32 token_store_reader_id = 5;
-	//	uint32 mymod_writer_id = 6;
-	//}
-
-	r := bytes.NewReader(sourceInput.Value())
+	r := bytes.NewReader(argsData)
 	w := bytes.NewBuffer(nil)
 	config := m.wazModuleConfig.WithStdin(r).WithStdout(w).WithArgs()
 

@@ -1,0 +1,14 @@
+version: v1
+name: buf.build/streamingfast/substreams_tiny_go
+
+build:
+  excludes:
+  - google
+
+lint:
+  use:
+    - DEFAULT
+
+breaking:
+  use:
+    - FILE

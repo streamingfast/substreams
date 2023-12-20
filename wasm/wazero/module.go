@@ -135,8 +135,8 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 		switch v := input.(type) {
 		case *wasm.StoreWriterOutput:
 		case *wasm.StoreReaderInput:
+			args = append(args, uint64(inputStoreCount))
 			inputStoreCount++
-			args = append(args, uint64(inputStoreCount-1))
 		case wasm.ValueArgument:
 			cnt := v.Value()
 			ptr, err := writeToHeap(ctx, inst, true, cnt)

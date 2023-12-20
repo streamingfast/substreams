@@ -28,7 +28,7 @@ func main() {
 
 	start := time.Now()
 
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 1; i++ {
 		execStart := time.Now()
 		args := args(blockInputFile("/Users/cbillett/devel/sf/substreams/wasm/bench/cmd/barebones/testdata/block.binpb"))
 		call := wasm.NewCall(nil, "", "", args)

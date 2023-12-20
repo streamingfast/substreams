@@ -1,6 +1,9 @@
 package wasm
 
 import (
+	"fmt"
+
+	"github.com/protocolbuffers/protoscope"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage/store"
 )
@@ -17,6 +20,10 @@ type ValueArgument interface {
 	Argument
 	Value() []byte
 	SetValue([]byte)
+}
+
+type ProtoScopeValueArgument interface {
+	ProtoScopeValue() []byte
 }
 
 // implementations
@@ -49,6 +56,10 @@ func NewSourceInput(name string) *SourceInput {
 	}
 }
 
+func (i *SourceInput) ProtoScopeValue() string {
+	return "{" + protoscope.Write(i.value, protoscope.WriterOptions{}) + "}"
+}
+
 type MapInput struct {
 	BaseArgument
 	BaseValueArgument
@@ -62,6 +73,10 @@ func NewMapInput(name string) *MapInput {
 	}
 }
 
+func (i *MapInput) ProtoScopeValue() string {
+	return fmt.Sprintf("%d", i.value)
+}
+
 type StoreDeltaInput struct {
 	BaseArgument
 	BaseValueArgument
@@ -73,6 +88,10 @@ func NewStoreDeltaInput(name string) *StoreDeltaInput {
 			name: name,
 		},
 	}
+}
+
+func (i *StoreDeltaInput) ProtoScopeValue() string {
+	return "{" + protoscope.Write(i.value, protoscope.WriterOptions{}) + "}"
 }
 
 type StoreReaderInput struct {
@@ -121,4 +140,7 @@ func NewParamsInput(value string) *ParamsInput {
 			value: []byte(value),
 		},
 	}
+}
+func (i *ParamsInput) ProtoScopeValue() string {
+	return fmt.Sprintf("{%s}", string(i.value))
 }

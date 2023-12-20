@@ -8,43 +8,25 @@ import (
 	"fmt"
 	"io"
 	"os"
-	_ "runtime"
 	"strings"
-	"time"
 	"unsafe"
 
 	"github.com/golang/protobuf/proto"
-	pbeth "github.com/streamingfast/substreams/wasm/bench/substreams_tiny_go/pb/sf/ethereum/type/v2"
+	"github.com/streamingfast/substreams/wasm/bench/substreams_tiny_go/pb"
 )
 
 func main() {
 	printIt("let's do it")
 	input, err := readInput()
-	start := time.Now()
+	//start := time.Now()
 	if err != nil {
 		panic(fmt.Errorf("reading input: %w", err))
 	}
 
-	//fmt.Println("Input length:", len(input))
-	//todo: read args to know what module func to run
+	mapBlockInput := &pb.MapBlockInput{}
+	err = proto.Unmarshal(input, mapBlockInput)
 
-	//todo switch on os.Args[1]
-	//switch os.Args[1] {
-	//case "mapBlock":
-	//	param := &MapBlockParam{}
-	//	err = proto.Unmarshal(input, param)
-	//	if err != nil {
-	//		panic(fmt.Errorf("unmarshalling input: %w", err))
-	//	}
-	//	mapBlock(param.Block, NewReadStore(param.MyStoreIndex))
-	//}
-
-	block := &pbeth.Block{}
-	err = proto.Unmarshal(input, block)
-	if err != nil {
-		panic(fmt.Errorf("unmarshalling input: %w", err))
-	}
-	err = mapBlock(block)
+	err = mapBlock(mapBlockInput.Block)
 	if err != nil {
 		panic(fmt.Errorf("mapping block: %w", err))
 	}
@@ -57,7 +39,7 @@ type blockStat struct {
 	ApprovalCount int
 }
 
-func mapBlock(block *pbeth.Block) error {
+func mapBlock(block *pb.Block) error {
 	rocketAddress := strings.ToLower("ae78736Cd615f374D3085123A210448E74Fc6393")
 
 	approvalTopic := strings.ToLower("8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925")
@@ -124,13 +106,3 @@ func printIt(s string) {
 	d := []byte(s)
 	logger_println(unsafe.Pointer(&d[0]), uint32(len(d)))
 }
-
-////go:wasmimport wasi_snapshot_preview1 random_get
-////go:noescape
-//func random_get(buf unsafe.Pointer, bufLen size) errno
-//
-//func getRandomData(r []byte) {
-//	if random_get(unsafe.Pointer(&r[0]), size(len(r))) != 0 {
-//		throw("random_get failed")
-//	}
-//}

@@ -48,6 +48,7 @@ require (
 	github.com/muesli/reflow v0.3.0
 	github.com/muesli/termenv v0.13.0
 	github.com/prometheus/client_golang v1.16.0
+	github.com/protocolbuffers/protoscope v0.0.0-20221109213918-8e7a6aafa2c9
 	github.com/rs/cors v1.8.3
 	github.com/schollz/closestmatch v2.1.0+incompatible
 	github.com/shopspring/decimal v1.3.1

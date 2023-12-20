@@ -1,3 +1,0 @@
-generate.sh - Thu  7 Dec 2023 14:03:25 EST - stepd
-streamingfast/proto revision: 086dc4643579c0102b2a198bc40b89854dc50111
-streamingfast/firehose-ethereum/proto revision: 5221456

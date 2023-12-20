@@ -44,7 +44,11 @@ func newModule(ctx context.Context, wasmCode []byte, wasmCodeType string, regist
 	if err != nil {
 		return nil, err
 	}
-	hostModules = append(hostModules, loggerModule)
+	stateModule, err := sfwaz.AddHostFunctions(ctx, runtime, "state", sfwaz.StateFuncs)
+	if err != nil {
+		return nil, err
+	}
+	hostModules = append(hostModules, loggerModule, stateModule)
 
 	//startFunc := "main"
 	//switch wasmCodeType {

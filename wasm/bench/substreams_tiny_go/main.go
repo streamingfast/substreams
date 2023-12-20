@@ -54,6 +54,8 @@ type blockStat struct {
 }
 
 func mapBlock(block *pb.Block, readStore *ReadStore) error {
+	//readStore.GetAt(0, []byte("key_123"))
+
 	rocketAddress := strings.ToLower("ae78736Cd615f374D3085123A210448E74Fc6393")
 
 	approvalTopic := strings.ToLower("8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925")
@@ -121,7 +123,7 @@ func Println(s string) {
 	println(unsafe.Pointer(&d[0]), uint32(len(d)))
 }
 
-//go:wasmimport store get_at
+//go:wasmimport state get_at
 //go:noescape
 func get_at(storeIndex uint32, ordinal uint64, keyPtr unsafe.Pointer, keyLen uint32, outputPtr unsafe.Pointer) int32
 
@@ -151,7 +153,7 @@ func NewWriteStore(storeIdx uint32) *WriteStore {
 	return &WriteStore{}
 }
 
-//go:wasmimport store set
+//go:wasmimport state set
 //go:noescape
 func set(ordinal uint64, keyPtr unsafe.Pointer, keyLen uint32, valuePtr unsafe.Pointer, valueLen uint32)
 

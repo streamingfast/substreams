@@ -52,7 +52,7 @@ func newModule(ctx context.Context, wasmCode []byte, wasmCodeType string, regist
 	if err != nil {
 		return nil, err
 	}
-	stateModule, err := AddHostFunctions(ctx, runtime, "state", stateFuncs)
+	stateModule, err := AddHostFunctions(ctx, runtime, "state", StateFuncs)
 	if err != nil {
 		return nil, err
 	}

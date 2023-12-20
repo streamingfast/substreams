@@ -23,7 +23,7 @@ type funcs struct {
 	f      api.GoModuleFunction
 }
 
-var stateFuncs = []funcs{
+var StateFuncs = []funcs{
 	{
 		"set",
 		[]parm{i64, i32, i32, i32, i32},

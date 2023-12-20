@@ -33,5 +33,7 @@ redirects:
   references-and-specs/packages: ./new/common/packages.md
   references-and-specs/rust-crates: ./new/develop/rust-crates.md
   glossary/glossary: ./new/references/glossary.md
+  quick-access/change-log: ./new/references/change-log.md
+
 
 

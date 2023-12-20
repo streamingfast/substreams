@@ -28,7 +28,7 @@ func ApplyNetwork(network string, pkg *pbsubstreams.Package) error {
 		netParams = toNetworkParams(v)
 	}
 	if netParams == nil {
-		return fmt.Errorf("cannot apply network %s: not found in manifest", network)
+		return fmt.Errorf("cannot apply network %q: not found in manifest", network)
 	}
 
 	if err := ApplyParams(netParams.Params, pkg); err != nil {

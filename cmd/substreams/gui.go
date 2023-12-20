@@ -21,6 +21,7 @@ import (
 func init() {
 	guiCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token")
 	guiCmd.Flags().StringP("substreams-endpoint", "e", "", "Substreams gRPC endpoint. If empty, will be replaced by the SUBSTREAMS_ENDPOINT_{network_name} environment variable, where `network_name` is determined from the substreams manifest. Some network names have default endpoints.")
+	guiCmd.Flags().String("network", "", "Specify the network to use for params and initialBlocks, overriding the 'network' field in the substreams package")
 	guiCmd.Flags().Bool("insecure", false, "Skip certificate validation on GRPC connection")
 	guiCmd.Flags().Bool("plaintext", false, "Establish GRPC connection in plaintext")
 	guiCmd.Flags().StringSliceP("header", "H", nil, "Additional headers to be sent in the substreams request")
@@ -158,6 +159,8 @@ func runGui(cmd *cobra.Command, args []string) error {
 
 	requestConfig := &request.Config{
 		ManifestPath:                manifestPath,
+		Pkg:                         pkg,
+		Graph:                       graph,
 		ReadFromModule:              readFromModule,
 		ProdMode:                    productionMode,
 		DebugModulesOutput:          debugModulesOutput,
@@ -173,7 +176,6 @@ func runGui(cmd *cobra.Command, args []string) error {
 		FinalBlocksOnly:             mustGetBool(cmd, "final-blocks-only"),
 		Params:                      params,
 		ReaderOptions:               readerOptions,
-		OverrideNetwork:             network,
 	}
 
 	ui, err := tui2.New(requestConfig)

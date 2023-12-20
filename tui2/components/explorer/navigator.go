@@ -80,16 +80,6 @@ type Navigator struct {
 
 type Option func(*Navigator)
 
-func WithManifestFilePath(path string) Option {
-	return func(n *Navigator) {
-		_, graph, err := manifest.MustNewReader(path).Read()
-		if err != nil {
-			panic(err)
-		}
-		n.graph = graph
-	}
-}
-
 func WithModuleGraph(graph *manifest.ModuleGraph) Option {
 	return func(n *Navigator) {
 		n.graph = graph

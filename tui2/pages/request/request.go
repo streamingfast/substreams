@@ -29,6 +29,8 @@ type BlockContext struct {
 
 type Config struct {
 	ManifestPath                string
+	Pkg                         *pbsubstreams.Package
+	Graph                       *manifest.ModuleGraph
 	ReadFromModule              bool
 	ProdMode                    bool
 	DebugModulesOutput          []string
@@ -38,7 +40,6 @@ type Config struct {
 	FinalBlocksOnly             bool
 	Headers                     map[string]string
 	OutputModule                string
-	OverrideNetwork             string
 	SubstreamsClientConfig      *client.SubstreamsClientConfig
 	HomeDir                     string
 	Vcr                         bool
@@ -252,26 +253,12 @@ func glamorizeDoc(doc string) (string, error) {
 }
 
 func (c *Config) NewInstance() (*Instance, error) {
-	reader, err := manifest.NewReader(c.ManifestPath, c.ReaderOptions...)
-	if err != nil {
-		return nil, err
-	}
-
-	pkg, graph, err := reader.Read()
-	if err != nil {
-		return nil, fmt.Errorf("package setup: %w", err)
-	}
-
 	if c.ReadFromModule {
-		sb, err := graph.ModuleInitialBlock(c.OutputModule)
+		sb, err := c.Graph.ModuleInitialBlock(c.OutputModule)
 		if err != nil {
 			return nil, fmt.Errorf("getting module start block: %w", err)
 		}
 		c.StartBlock = int64(sb)
-	}
-
-	if err := manifest.ApplyParams(c.Params, pkg); err != nil {
-		return nil, err
 	}
 
 	ssClient, _, callOpts, err := client.NewSubstreamsClient(c.SubstreamsClientConfig)
@@ -284,7 +271,7 @@ func (c *Config) NewInstance() (*Instance, error) {
 		StartCursor:                         c.Cursor,
 		FinalBlocksOnly:                     c.FinalBlocksOnly,
 		StopBlockNum:                        uint64(c.StopBlock),
-		Modules:                             pkg.Modules,
+		Modules:                             c.Pkg.Modules,
 		OutputModule:                        c.OutputModule,
 		ProductionMode:                      c.ProdMode,
 		DebugInitialStoreSnapshotForModules: c.DebugModulesInitialSnapshot,
@@ -313,7 +300,7 @@ func (c *Config) NewInstance() (*Instance, error) {
 	debugLogPath := filepath.Join(c.HomeDir, "debug.log")
 	tea.LogToFile(debugLogPath, "gui:")
 
-	msgDescs, err := manifest.BuildMessageDescriptors(pkg)
+	msgDescs, err := manifest.BuildMessageDescriptors(c.Pkg)
 	if err != nil {
 		return nil, fmt.Errorf("building message descriptors: %w", err)
 	}
@@ -323,8 +310,8 @@ func (c *Config) NewInstance() (*Instance, error) {
 		Endpoint:        c.SubstreamsClientConfig.Endpoint(),
 		ProductionMode:  c.ProdMode,
 		InitialSnapshot: req.DebugInitialStoreSnapshotForModules,
-		Docs:            pkg.PackageMeta,
-		ModuleDocs:      pkg.ModuleMeta,
+		Docs:            c.Pkg.PackageMeta,
+		ModuleDocs:      c.Pkg.ModuleMeta,
 		Params:          c.Params,
 	}
 
@@ -333,8 +320,8 @@ func (c *Config) NewInstance() (*Instance, error) {
 		MsgDescs:       msgDescs,
 		ReplayLog:      replayLog,
 		RequestSummary: requestSummary,
-		Modules:        pkg.Modules,
-		Graph:          graph,
+		Modules:        c.Pkg.Modules,
+		Graph:          c.Graph,
 	}
 
 	return substreamRequirements, nil

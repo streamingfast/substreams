@@ -145,6 +145,9 @@ func (r *Reader) Read() (*pbsubstreams.Package, *ModuleGraph, error) {
 		if r.overrideNetwork != "" {
 			network = r.overrideNetwork
 		}
+		if network == "" {
+			return nil, nil, fmt.Errorf("no network specified in package, but networks are defined")
+		}
 		if err := validateNetworks(pkg, importIncludedModules, network); err != nil {
 			return nil, nil, err
 		}

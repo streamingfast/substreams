@@ -10,6 +10,7 @@ import (
 	"os"
 	_ "runtime"
 	"strings"
+	"time"
 	"unsafe"
 
 	"github.com/golang/protobuf/proto"
@@ -18,8 +19,8 @@ import (
 
 func main() {
 	printIt("let's do it")
-	//start := time.Now()
 	input, err := readInput()
+	start := time.Now()
 	if err != nil {
 		panic(fmt.Errorf("reading input: %w", err))
 	}
@@ -117,11 +118,11 @@ func readInput() ([]byte, error) {
 
 //go:wasmimport logger println
 //go:noescape
-func fuck(buf unsafe.Pointer, len uint32)
+func logger_println(buf unsafe.Pointer, len uint32)
 
 func printIt(s string) {
 	d := []byte(s)
-	fuck(unsafe.Pointer(&d[0]), uint32(len(d)))
+	logger_println(unsafe.Pointer(&d[0]), uint32(len(d)))
 }
 
 ////go:wasmimport wasi_snapshot_preview1 random_get

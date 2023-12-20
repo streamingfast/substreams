@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"reflect"
 	"strings"
 	"unsafe"
 
@@ -16,7 +17,7 @@ import (
 )
 
 func main() {
-	printIt("let's do it")
+	Println("let's do it")
 	input, err := readInput()
 	//start := time.Now()
 	if err != nil {
@@ -100,9 +101,52 @@ func readInput() ([]byte, error) {
 
 //go:wasmimport logger println
 //go:noescape
-func logger_println(buf unsafe.Pointer, len uint32)
+func println(buf unsafe.Pointer, len uint32)
 
-func printIt(s string) {
+func Println(s string) {
 	d := []byte(s)
-	logger_println(unsafe.Pointer(&d[0]), uint32(len(d)))
+	println(unsafe.Pointer(&d[0]), uint32(len(d)))
+}
+
+//go:wasmimport store get_at
+//go:noescape
+func get_at(storeIndex uint32, ordinal uint64, keyPtr unsafe.Pointer, keyLen uint32, outputPtr unsafe.Pointer) int32
+
+type ReadStore struct {
+	storeIdx uint32
+}
+
+func NewReadStore(storeIdx uint32) *ReadStore {
+	return &ReadStore{storeIdx: uint32(storeIdx)}
+}
+
+func (rs *ReadStore) GetAt(ordinal uint64, key []byte) []byte {
+	keyPtr := unsafe.Pointer(&key[0])
+	keyLen := uint32(len(key))
+	outputPtr := unsafe.Pointer(uintptr(0))
+	ret := get_at(rs.storeIdx, ordinal, keyPtr, keyLen, outputPtr)
+	if ret != 0 {
+		return nil
+	}
+	return getOutputData(outputPtr)
+}
+
+func getOutputData(outputPtr unsafe.Pointer) []byte {
+	valuePtr := *(*uint32)(unsafe.Pointer(outputPtr))
+	valueLen := *(*uint32)(unsafe.Pointer(uintptr(outputPtr) + uintptr(4)))
+
+	// Convert valuePtr (which is a uint32) to an unsafe.Pointer,
+	// and then to a pointer to a byte.
+	dataPtr := unsafe.Pointer(uintptr(valuePtr))
+
+	// Construct a slice from dataPtr.
+	// We are creating a slice header manually here.
+	sliceHeader := &reflect.SliceHeader{
+		Data: uintptr(dataPtr),
+		Len:  int(valueLen),
+		Cap:  int(valueLen),
+	}
+
+	// Convert the slice header to a []byte slice.
+	return *(*[]byte)(unsafe.Pointer(sliceHeader))
 }

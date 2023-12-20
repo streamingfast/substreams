@@ -11,10 +11,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
-### Client
+### Highlights
 
-* Add `--endpoint` flag to `substreams alpha service serve` to specify substreams endpoint to connect to
-* Add endpoints for Antelope chains
+* Support new `networks` configuration block in `substreams.yaml` to override modules' *params* and *initial_block*. Network can be specified at run-time, avoiding the need for separate spkg files for each chain.
+* [BREAKING CHANGE] Remove the support for the `deriveFrom` overrides. The `imports`, along with the new `networks` feature, should provide a better mechanism to cover the use cases that `deriveFrom` tried to address.
+
+{% hint style="info" %}
+> These changes are all handled in the substreams CLI. The Substreams server endpoints do not need to be upgraded to support it.
+{% endhint %}
+
+### Added
+
+* Added `networks` field at the top level of the manifest definition, with `initial_blocks` and `params` overrides for each module. See the substreams.yaml.example file in the repository or https://substreams.streamingfast.io/reference-and-specs/manifests for more details and example usage.
+* The `networks` params and initial_blocks overrides for the chosen network are applied to the module directly before being sent to the server. All network configurations are kept when packing an .spkg file.
+* Added the `--network` flag for choosing the network on `run` and `gui` command. Default behavior is to use the one defined as `network` in the manifest. 
+* Added the `--endpoint` flag to `substreams alpha service serve` to specify substreams endpoint to connect to
+* Added endpoints for Antelope chains
+
+### Removed
+
+* Removed the handling of the `DeriveFrom` keyword in manifest, this override feature is going away.
+* Removed the `--skip-package-validation`` option only on run/gui/inspect/info
+
+### Fixed
+
+* The `substreams gui` command no longer reads the .spkg multiple times with different behavior during its process.
 
 ## v1.2.0
 

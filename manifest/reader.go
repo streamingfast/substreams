@@ -154,7 +154,6 @@ func (r *Reader) Read() (*pbsubstreams.Package, *ModuleGraph, error) {
 		if err := ApplyNetwork(network, pkg); err != nil {
 			return nil, nil, err
 		}
-		// FIXME: run a test with overrides for networks validation
 	}
 
 	return pkg, graph, nil
@@ -761,73 +760,6 @@ func reindexAndMergePackage(src, dest *pbsubstreams.Package) {
 	dest.Modules.Binaries = append(dest.Modules.Binaries, src.Modules.Binaries...)
 	dest.ModuleMeta = append(dest.ModuleMeta, src.ModuleMeta...)
 	dest.PackageMeta = append(dest.PackageMeta, src.PackageMeta...)
-}
-
-func mergeNetwork(src, dest *pbsubstreams.NetworkParams, srcPrefix string) {
-	if dest == nil {
-		panic("mergeNetwork should never be called with nil dest")
-	}
-	if src == nil {
-		return
-	}
-
-	if src.InitialBlocks != nil {
-		if dest.InitialBlocks == nil {
-			dest.InitialBlocks = make(map[string]uint64)
-		}
-		for kk, vv := range src.InitialBlocks {
-			newKey := withPrefix(kk, srcPrefix)
-			if _, ok := dest.InitialBlocks[newKey]; !ok {
-				dest.InitialBlocks[newKey] = vv
-			}
-		}
-	}
-
-	if src.Params != nil {
-		if dest.Params == nil {
-			dest.Params = make(map[string]string)
-		}
-		for kk, vv := range src.Params {
-			newKey := withPrefix(kk, srcPrefix)
-			if _, ok := dest.Params[newKey]; !ok {
-				dest.Params[newKey] = vv
-			}
-		}
-	}
-}
-
-func mergeNetworks(src, dest *pbsubstreams.Package, srcPrefix string) {
-	if src.Networks == nil {
-		return
-	}
-
-	if dest.Networks == nil {
-		dest.Networks = make(map[string]*pbsubstreams.NetworkParams)
-		for k, srcNet := range src.Networks {
-			destNet := &pbsubstreams.NetworkParams{}
-			mergeNetwork(srcNet, destNet, srcPrefix)
-			dest.Networks[k] = destNet
-		}
-		return
-	}
-
-	allKeys := make(map[string]bool)
-
-	for k := range dest.Networks {
-		allKeys[k] = true
-	}
-	for k := range src.Networks {
-		allKeys[k] = true
-	}
-
-	for k := range allKeys {
-		destNet := dest.Networks[k]
-		if destNet == nil {
-			destNet = &pbsubstreams.NetworkParams{}
-			dest.Networks[k] = destNet
-		}
-		mergeNetwork(src.Networks[k], destNet, srcPrefix)
-	}
 }
 
 func mergeProtoFiles(src, dest *pbsubstreams.Package) {

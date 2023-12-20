@@ -35,13 +35,6 @@ func main() {
 
 	switch entrypoint {
 	case "mapBlock":
-		//params := &MapBlockInputParams{}
-		//err = proto.Unmarshal(input, param)
-		//if err != nil {
-		//	panic(fmt.Errorf("unmarshalling input: %w", err))
-		//}
-		//mapBlock(params.Block, NewReadStore(params.StoreIdx))
-
 		readStore := NewReadStore(0)
 
 		mapBlockInput := &pb.MapBlockInput{}

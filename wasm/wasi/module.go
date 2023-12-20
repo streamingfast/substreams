@@ -86,7 +86,7 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, wasmInstan
 
 	r := bytes.NewReader(argsData)
 	w := bytes.NewBuffer(nil)
-	config := m.wazModuleConfig.WithStdin(r).WithStdout(w).WithArgs()
+	config := m.wazModuleConfig.WithStdin(r).WithStdout(w).WithArgs("mapBlock")
 
 	ctx2 := wasm.WithContext(withInstanceContext(ctx, inst), call)
 	if _, err := m.wazRuntime.InstantiateModule(ctx2, m.userModule, config); err != nil {

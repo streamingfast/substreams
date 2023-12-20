@@ -12,7 +12,6 @@ import (
 
 	"github.com/streamingfast/substreams/wasm"
 	"github.com/tetratelabs/wazero"
-	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/sys"
 )
@@ -48,14 +47,14 @@ func newModule(ctx context.Context, wasmCode []byte, wasmCodeType string, regist
 	}
 	hostModules = append(hostModules, loggerModule)
 
-	startFunc := "main"
-	switch wasmCodeType {
-	case "go/wasi":
-		startFunc = "_start"
-	}
+	//startFunc := "main"
+	//switch wasmCodeType {
+	//case "go/wasi":
+	//	startFunc = "_start"
+	//}
 
-	wazConfig := wazero.NewModuleConfig().WithStderr(os.Stderr).
-		WithStartFunctions(startFunc)
+	wazConfig := wazero.NewModuleConfig().WithStderr(os.Stderr)
+	//WithStartFunctions(startFunc)
 
 	return &Module{
 		wazModuleConfig: wazConfig,
@@ -70,30 +69,19 @@ func (m *Module) Close(ctx context.Context) error {
 }
 
 func (m *Module) NewInstance(ctx context.Context) (out wasm.Instance, err error) {
-	mod, err := m.instantiateModule(ctx)
+	err = m.instantiateModule(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("could not instantiate wasm module: %w", err)
 	}
 
-	return &instance{
-		Module: mod,
-	}, nil
+	return &instance{}, nil
 }
 
-func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInstance wasm.Instance, arguments []wasm.Argument) (out wasm.Instance, err error) {
-	var mod api.Module
-	if cachedInstance != nil {
-		mod = cachedInstance.(api.Module)
-	} else {
-		mod, err = m.instantiateModule(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("could not instantiate wasm module: %w", err)
-		}
-	}
-	inst := &instance{Module: mod}
-
+func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, wasmInstance wasm.Instance, arguments []wasm.Argument) (out wasm.Instance, err error) {
+	inst := &instance{}
 	sourceInput := arguments[0].(*wasm.SourceInput)
 
+	//todo: on to access exported functions if go wasi
 	//f := mod.ExportedFunction("run")
 	//if f == nil {
 	//	return inst, fmt.Errorf("could not find entrypoint function %q ", call.Entrypoint)
@@ -128,7 +116,7 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 	return inst, nil
 }
 
-func (m *Module) instantiateModule(ctx context.Context) (api.Module, error) {
+func (m *Module) instantiateModule(ctx context.Context) error {
 	m.Lock()
 	defer m.Unlock()
 
@@ -138,9 +126,8 @@ func (m *Module) instantiateModule(ctx context.Context) (api.Module, error) {
 		}
 		_, err := m.wazRuntime.InstantiateModule(ctx, hostMod, m.wazModuleConfig.WithName(hostMod.Name()))
 		if err != nil {
-			return nil, fmt.Errorf("instantiating host module %q: %w", hostMod.Name(), err)
+			return fmt.Errorf("instantiating host module %q: %w", hostMod.Name(), err)
 		}
 	}
-	//return m.wazRuntime.InstantiateModule(ctx, m.userModule, m.wazModuleConfig.WithName(""))
-	return nil, nil
+	return nil
 }

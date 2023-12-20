@@ -2,13 +2,9 @@ package wasi
 
 import (
 	"context"
-
-	"github.com/tetratelabs/wazero/api"
 )
 
 type instance struct {
-	api.Module
-	allocations []allocation
 }
 
 type allocation struct {

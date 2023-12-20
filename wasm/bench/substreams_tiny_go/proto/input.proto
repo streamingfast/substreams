@@ -4,5 +4,9 @@ option go_package = "./pb";
 import "type.proto";
 
 message MapBlockInput {
-  Block block = 1;
+  string params = 1;
+  Block block = 2;
+  uint32 read_store = 3;
+  uint32 read_store2 = 4;
+  uint32 write_store = 5;
 }

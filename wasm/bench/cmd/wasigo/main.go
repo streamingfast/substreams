@@ -6,6 +6,11 @@ import (
 	"os"
 	"time"
 
+	"go.uber.org/zap"
+
+	"github.com/streamingfast/dstore"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
 	_ "github.com/streamingfast/substreams/wasm/wasi"
 )
@@ -30,7 +35,12 @@ func main() {
 
 	for i := 0; i < 1; i++ {
 		execStart := time.Now()
-		args := args(blockInputFile("/Users/cbillett/devel/sf/substreams/wasm/bench/cmd/barebones/testdata/block.binpb"))
+		args := args(
+			wasm.NewParamsInput("{key.1: 'value.1'}"),
+			blockInputFile("/Users/cbillett/devel/sf/substreams/wasm/bench/cmd/barebones/testdata/block.binpb"),
+			wasm.NewStoreReaderInput("store.reader.1", createStore(ctx, "store.reader.1")),
+			wasm.NewStoreReaderInput("store.reader.2", createStore(ctx, "store.reader.2")),
+		)
 		call := wasm.NewCall(nil, "", "", args)
 		_, err = module.ExecuteNewCall(ctx, call, instance, args)
 		if err != nil {
@@ -42,6 +52,23 @@ func main() {
 	}
 	fmt.Println("duration", time.Since(start))
 
+}
+
+func createStore(ctx context.Context, name string) *store.FullKV {
+	ds, err := dstore.NewStore("file:///tmp/"+name, "kv", "", true)
+	if err != nil {
+		panic(err)
+	}
+	storeConfig, err := store.NewConfig(name, 0, "hash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "string", ds, "trace.id.1")
+	if err != nil {
+		panic(err)
+	}
+	fullStore := storeConfig.NewFullKV(zap.NewNop())
+	//err = fullStore.Load(ctx, store.NewCompleteFileInfo("map_block", 0, 0))
+	//if err != nil {
+	//	panic(err)
+	//}
+	return fullStore
 }
 
 func args(ins ...wasm.Argument) []wasm.Argument {

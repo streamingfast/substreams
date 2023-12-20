@@ -23,7 +23,7 @@ type ValueArgument interface {
 }
 
 type ProtoScopeValueArgument interface {
-	ProtoScopeValue() []byte
+	ProtoScopeValue() string
 }
 
 // implementations
@@ -142,5 +142,6 @@ func NewParamsInput(value string) *ParamsInput {
 	}
 }
 func (i *ParamsInput) ProtoScopeValue() string {
-	return fmt.Sprintf("{%s}", string(i.value))
+	//todo: need to encode the value
+	return fmt.Sprintf("{\"%s\"}", string(i.value))
 }

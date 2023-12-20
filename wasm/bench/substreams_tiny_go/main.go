@@ -40,6 +40,10 @@ func main() {
 		mapBlockInput := &pb.MapBlockInput{}
 		err = proto.Unmarshal(input, mapBlockInput)
 
+		fmt.Println("parameters:", mapBlockInput.Params)
+		fmt.Println("read store:", mapBlockInput.ReadStore)
+		fmt.Println("read store2:", mapBlockInput.ReadStore2)
+
 		err = mapBlock(mapBlockInput.Block, readStore)
 		if err != nil {
 			panic(fmt.Errorf("mapping block: %w", err))

@@ -6,19 +6,17 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/golang/protobuf/proto"
+	"github.com/streamingfast/substreams/wasm/bench/substreams_tiny_go/pb"
 	"io"
 	"log"
 	"os"
-	"reflect"
 	"strings"
-	"unsafe"
-
-	"github.com/golang/protobuf/proto"
-	"github.com/streamingfast/substreams/wasm/bench/substreams_tiny_go/pb"
 )
 
 func main() {
 	log.Print("let's do it")
+
 	input, err := readInput()
 	//start := time.Now()
 	if err != nil {
@@ -36,8 +34,6 @@ func main() {
 
 	switch entrypoint {
 	case "mapBlock":
-		readStore := NewReadStore(0)
-
 		mapBlockInput := &pb.MapBlockInput{}
 		err = proto.Unmarshal(input, mapBlockInput)
 
@@ -45,7 +41,7 @@ func main() {
 		fmt.Println("read store:", mapBlockInput.ReadStore)
 		fmt.Println("read store2:", mapBlockInput.ReadStore2)
 
-		err = mapBlock(mapBlockInput.Block, readStore)
+		err = mapBlock(mapBlockInput.Block)
 		if err != nil {
 			panic(fmt.Errorf("mapping block: %w", err))
 		}
@@ -58,8 +54,9 @@ type blockStat struct {
 	ApprovalCount int
 }
 
-func mapBlock(block *pb.Block, readStore *ReadStore) error {
+func mapBlock(block *pb.Block) error {
 	//readStore.GetAt(0, []byte("key_123"))
+	readFile("/sys/store/0/read/first/key_123")
 
 	rocketAddress := strings.ToLower("ae78736Cd615f374D3085123A210448E74Fc6393")
 
@@ -119,64 +116,6 @@ func readInput() ([]byte, error) {
 	return io.ReadAll(os.Stdin)
 }
 
-//go:wasmimport state get_at
-//go:noescape
-func get_at(storeIndex uint32, ordinal uint64, keyPtr unsafe.Pointer, keyLen uint32, outputPtr unsafe.Pointer) int32
-
-type ReadStore struct {
-	storeIdx uint32
-}
-
-func NewReadStore(storeIdx uint32) *ReadStore {
-	return &ReadStore{storeIdx: uint32(storeIdx)}
-}
-
-func (rs *ReadStore) GetAt(ordinal uint64, key []byte) []byte {
-	keyPtr := unsafe.Pointer(&key[0])
-	keyLen := uint32(len(key))
-	outputPtr := unsafe.Pointer(uintptr(0))
-	ret := get_at(rs.storeIdx, ordinal, keyPtr, keyLen, outputPtr)
-	if ret != 0 {
-		return nil
-	}
-	return getOutputData(outputPtr)
-}
-
-type WriteStore struct {
-}
-
-func NewWriteStore(storeIdx uint32) *WriteStore {
-	return &WriteStore{}
-}
-
-//go:wasmimport state set
-//go:noescape
-func set(ordinal uint64, keyPtr unsafe.Pointer, keyLen uint32, valuePtr unsafe.Pointer, valueLen uint32)
-
-func (ws *WriteStore) Set(ordinal uint64, key, value []byte) {
-	keyPtr := unsafe.Pointer(&key[0])
-	keyLen := uint32(len(key))
-	valuePtr := unsafe.Pointer(&value[0])
-	valueLen := uint32(len(value))
-	set(ordinal, keyPtr, keyLen, valuePtr, valueLen)
-}
-
-func getOutputData(outputPtr unsafe.Pointer) []byte {
-	valuePtr := *(*uint32)(unsafe.Pointer(outputPtr))
-	valueLen := *(*uint32)(unsafe.Pointer(uintptr(outputPtr) + uintptr(4)))
-
-	// Convert valuePtr (which is a uint32) to an unsafe.Pointer,
-	// and then to a pointer to a byte.
-	dataPtr := unsafe.Pointer(uintptr(valuePtr))
-
-	// Construct a slice from dataPtr.
-	// We are creating a slice header manually here.
-	sliceHeader := &reflect.SliceHeader{
-		Data: uintptr(dataPtr),
-		Len:  int(valueLen),
-		Cap:  int(valueLen),
-	}
-
-	// Convert the slice header to a []byte slice.
-	return *(*[]byte)(unsafe.Pointer(sliceHeader))
+func readFile(path string) ([]byte, error) {
+	return os.ReadFile(path)
 }

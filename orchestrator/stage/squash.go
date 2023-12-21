@@ -84,13 +84,10 @@ func (s *Stages) singleSquash(stage *Stage, modState *ModuleState, mergeUnit Uni
 	modState.lastBlockInStore = rng.ExclusiveEndBlock
 	metrics.mergeEnd = time.Now()
 
-	// Delete partial store
-	if reqctx.Details(s.ctx).ProductionMode || segmentEndsOnInterval { /* FIXME: compute this elsewhere? */
-		s.logger.Info("deleting store", zap.Stringer("store", partialKV))
-		stage.asyncWork.Go(func() error {
-			return partialKV.DeleteStore(s.ctx, partialFile)
-		})
-	}
+	s.logger.Info("deleting partial store", zap.Stringer("store", partialKV))
+	stage.asyncWork.Go(func() error {
+		return partialKV.DeleteStore(s.ctx, partialFile)
+	})
 
 	// Flush full store
 	if segmentEndsOnInterval {

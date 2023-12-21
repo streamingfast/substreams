@@ -8,7 +8,7 @@ The Substreams Deployable Services define a common interface to easily deploy yo
 
 ### Choose a Sink
 
-Depending on your needs, you must use how you want to consume the data: using a SQL database or a subgraph. The data model that you Substreams emit
+Depending on your needs, you must choose how you want to consume the data: using a SQL database or a subgraph. Substreams using the SQL sink must have a `db_out` module and those using the subgraph sink must have a `graph_out` module.
 
 ### Add the Sink Configuration
 

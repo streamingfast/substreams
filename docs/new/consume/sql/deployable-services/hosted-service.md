@@ -1,4 +1,6 @@
-## Quickstart
+Using the StreamingFast SQL hosted service is the easiest way to get started with Substreams:SQL. The following tutorial teaches you how to deploy a Substreams package from the [Substreams Registry](https://substreams.dev) to hosted service.
+
+## Tutorial
 
 In this short tutorial, you will:
 

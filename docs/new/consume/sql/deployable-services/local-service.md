@@ -1,5 +1,6 @@
 
-In you want to manage your own infrastructure, you can use the `substreams alpha service` command locally.
+In you want to manage your own infrastructure, you can use still the deployable services, but locally. This essetially means using the `substreams alpha service` command pointing to a local Docker installation. The following tutorial teaches you how to use the Substreams:SQL deployable service locally.
+
 
 ## Tutorial
 
@@ -12,7 +13,7 @@ In this tutorial, you will:
 5. Create a production `.spkg` package and test it locally
 6. Deploy your `.spkg` to a production environment that fills a PostgreSQL database from your Substreams and applies dbt transformations automatically.
 
-## Generate a Substreams project from the Cryptopunks ABI
+### Generate a Substreams project from the Cryptopunks ABI
 
 * The cryptopunks address on mainnet is `0xb47e3cd837ddf8e4c57f05d70ab865de6e193bbb`
 
@@ -75,7 +76,7 @@ cargo build --target wasm32-unknown-unknown --release
     Finished release [optimized] target(s) in 30.71s
 ```
 
-## Start feeding a local database using 'substreams alpha service' and Docker
+### Start feeding a local database using 'substreams alpha service' and Docker
 
 From another window:
 
@@ -119,7 +120,7 @@ Running your deployment inside local docker containersServices:
 **Tip:** You can run `substreams alpha service pause` if you want to pause the sink from consuming Substreams data while you continue your development. `substreams alpha service resume` will continue the progress.
 {% endhint %}
 
-## Create a dbt project for transformations
+### Create a dbt project for transformations
 
 * Initialize the dbt project:
 
@@ -214,7 +215,7 @@ dbt run
 
 * Check that the `punks_bought_per_hour` has been created.
 
-## Deploy your Substreams to the "hosted dev" environment
+### Deploy your Substreams to the "hosted dev" environment
 
 Deployments of type "dev" gives you full read/write access to the database and are a good way of working together on a dataset while developing your dbt models.
 
@@ -277,7 +278,7 @@ cryptopunks:
 * You can iterate using `dbt run --target=remote`
 * Other devs can work on that data and create dbt models.
 
-## Pack your production package and test it locally
+### Pack your production package and test it locally
 
 When your dbt models are ready, you can pack everything (Substreams, [dbt project](https://docs.getdbt.com/docs/build/projects), etc.) inside an `.spkg` file and deploy it as production:
 
@@ -320,7 +321,7 @@ substreams alpha service deploy substreams.sql.yaml --prod # or substreams.click
 substreams pack substreams.sql.yaml # or substreams.clickhouse.yaml
 ```
 
-## Deploy your production package to the "hosted prod" environment
+### Deploy your production package to the "hosted prod" environment
 
 ```bash
 substreams alpha service deploy cryptopunks-v0.1.0.spkg -e https://deploy.streamingfast.io --prod

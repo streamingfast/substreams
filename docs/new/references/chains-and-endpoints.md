@@ -22,16 +22,17 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 **Streaming a `sf.near.type.v1.Block` from an Ethereum endpoint does not work!**
 {% endhint %}
 
-<figure><img src="../.gitbook/assets/chains-endpoints.png" width="100%" /><figcaption><p>Protobuf for the different supported chains</p></figcaption></figure>
+<figure><img src="../../.gitbook/assets/chains-endpoints.png" alt="" width="100%"><figcaption><p>Protobuf for the different supported chains</p></figcaption></figure>
 
-| Protocol | Proto model                                                                                                                                       | Latest package                                                                                                        |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Ethereum | [`sf.ethereum.type.v2.Block`](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto)               | [ethereum-v0.10.4.spkg](https://github.com/streamingfast/sf-ethereum/releases/download/v0.10.2/ethereum-v0.10.4.spkg) |
-| NEAR     | [`sf.near.type.v1.Block`](https://github.com/streamingfast/firehose-near/blob/develop/proto/sf/near/type/v1/type.proto)                           |                                                                                                                       |
-| Solana   | [`sf.solana.type.v1.Block`](https://github.com/streamingfast/firehose-solana/blob/develop/proto/sf/solana/type/v1/type.proto)                     | [solana-v0.1.0.spkg](https://github.com/streamingfast/sf-solana/releases/download/v0.1.0/solana-v0.1.0.spkg)          |
-| Cosmos   | [`sf.cosmos.type.v1.Block`](https://github.com/figment-networks/proto-cosmos/blob/main/sf/cosmos/type/v1/type.proto)                              |                                                                                                                       |
-| Arweave  | [`sf.arweave.type.v1.Block`](https://github.com/streamingfast/firehose-arweave/blob/develop/proto/sf/arweave/type/v1/type.proto)                  |                                                                                                                       |
-| Aptos    | [`aptos.extractor.v1.Block`](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-protos/proto/aptos/extractor/v1/extractor.proto)     |                                                                                                                       |
+| Protocol | Proto model                                                                                                                                   | Latest package                                                                                                        |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Ethereum | [`sf.ethereum.type.v2.Block`](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto)           | [ethereum-v0.10.4.spkg](https://github.com/streamingfast/sf-ethereum/releases/download/v0.10.2/ethereum-v0.10.4.spkg) |
+| NEAR     | [`sf.near.type.v1.Block`](https://github.com/streamingfast/firehose-near/blob/develop/proto/sf/near/type/v1/type.proto)                       |                                                                                                                       |
+| Solana   | [`sf.solana.type.v1.Block`](https://github.com/streamingfast/firehose-solana/blob/develop/proto/sf/solana/type/v1/type.proto)                 | [solana-v0.1.0.spkg](https://github.com/streamingfast/sf-solana/releases/download/v0.1.0/solana-v0.1.0.spkg)          |
+| Cosmos   | [`sf.cosmos.type.v1.Block`](https://github.com/figment-networks/proto-cosmos/blob/main/sf/cosmos/type/v1/type.proto)                          |                                                                                                                       |
+| Arweave  | [`sf.arweave.type.v1.Block`](https://github.com/streamingfast/firehose-arweave/blob/develop/proto/sf/arweave/type/v1/type.proto)              |                                                                                                                       |
+| Aptos    | [`aptos.extractor.v1.Block`](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-protos/proto/aptos/extractor/v1/extractor.proto) |                                                                                                                       |
+| Bitcoin  | [`sf.bitcoin.type.v1.Block`](https://github.com/streamingfast/firehose-bitcoin/blob/develop/proto/sf/bitcoin/type/v1/type.proto)              |                                                                                                                       |
 
 ## Endpoints
 
@@ -41,13 +42,15 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 * **Ethereum Holesky**: `holesky.eth.streamingfast.io:443`
 * **Polygon** **Mainnet**: `polygon.streamingfast.io:443`
 * **Mumbai Testnet**: `mumbai.streamingfast.io:443`
-* **Arbitrum One:** `arb-one.streamingfast.io:443` (beta)
+* **Arbitrum One:** `arb-one.streamingfast.io:443`
 * **BNB**: `bnb.streamingfast.io:443`
+* **Optimism:** `opt-mainnet.streamingfast.io:443`
 * **NEAR Mainnet**: `mainnet.near.streamingfast.io:443`
 * **NEAR Testnet**: `testnet.near.streamingfast.io:443`
 * **Solana mainnet-beta**: `mainnet.sol.streamingfast.io:443`
 * **Arweave Mainnet**: `mainnet.arweave.streamingfast.io:443`
 * **Aptos Testnet**: `testnet.aptos.streamingfast.io:443`
+* **Bitcoin Mainnet**: `mainnet.btc.streamingfast.io:443`
 
 ## Others
 

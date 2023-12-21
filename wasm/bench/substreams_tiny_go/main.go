@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"reflect"
 	"strings"
@@ -17,7 +18,7 @@ import (
 )
 
 func main() {
-	Println("let's do it")
+	log.Print("let's do it")
 	input, err := readInput()
 	//start := time.Now()
 	if err != nil {
@@ -116,15 +117,6 @@ func writeOutput(data []byte) (int, error) {
 
 func readInput() ([]byte, error) {
 	return io.ReadAll(os.Stdin)
-}
-
-//go:wasmimport logger println
-//go:noescape
-func println(buf unsafe.Pointer, len uint32)
-
-func Println(s string) {
-	d := []byte(s)
-	println(unsafe.Pointer(&d[0]), uint32(len(d)))
 }
 
 //go:wasmimport state get_at

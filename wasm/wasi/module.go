@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/dustin/go-humanize"
+	"io"
 	"log"
 	"os"
 	"sync"
@@ -56,8 +58,7 @@ func newModule(ctx context.Context, wasmCode []byte, wasmCodeType string, regist
 	//	startFunc = "_start"
 	//}
 
-	wazConfig := wazero.NewModuleConfig().WithStderr(os.Stderr)
-	//WithStartFunctions(startFunc)
+	wazConfig := wazero.NewModuleConfig()
 
 	return &Module{
 		wazModuleConfig: wazConfig,
@@ -90,10 +91,11 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, wasmInstan
 
 	r := bytes.NewReader(argsData)
 	w := bytes.NewBuffer(nil)
-	config := m.wazModuleConfig.WithStdin(r).WithStdout(w).WithArgs("mapBlock")
+	ctx = wasm.WithContext(withInstanceContext(ctx, inst), call)
 
-	ctx2 := wasm.WithContext(withInstanceContext(ctx, inst), call)
-	if _, err := m.wazRuntime.InstantiateModule(ctx2, m.userModule, config); err != nil {
+	config := m.wazModuleConfig.WithStdin(r).WithStdout(w).WithStderr(NewStdErrLogWriter(ctx)).WithArgs("mapBlock")
+
+	if _, err := m.wazRuntime.InstantiateModule(ctx, m.userModule, config); err != nil {
 		// Note: Most compilers do not exit the module after running "_start",
 		// unless there was an error. This allows you to call exported functions.
 		if exitErr, ok := err.(*sys.ExitError); ok && exitErr.ExitCode() != 0 {
@@ -121,4 +123,33 @@ func (m *Module) instantiateModule(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+type StdErrLogWriter struct {
+	ctx context.Context
+}
+
+func NewStdErrLogWriter(ctx context.Context) io.Writer {
+	return &StdErrLogWriter{
+		ctx: ctx,
+	}
+}
+
+func (w *StdErrLogWriter) Write(p []byte) (n int, err error) {
+	message := string(p)
+	length := len(p)
+
+	call := wasm.FromContext(w.ctx)
+
+	if call.ReachedLogsMaxByteCount() {
+		// Early exit, we don't even need to collect the message as we would not store it anyway
+		return 0, nil
+	}
+
+	if length > wasm.MaxLogByteCount {
+		return 0, fmt.Errorf("message to log is too big, max size is %s", humanize.IBytes(uint64(length)))
+	}
+
+	call.AppendLog(message)
+	return len(p), nil
 }

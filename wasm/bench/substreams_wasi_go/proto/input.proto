@@ -11,6 +11,12 @@ message MapBlockInput {
   uint32 write_store = 5;
 }
 
+message MapBlockOutput {
+  uint32 trx_count      = 1;
+  uint32 transfer_count = 2;
+  uint32 approval_count = 3;
+}
+
 message Block {
   // Hash is the block's hash.
   bytes hash = 2;

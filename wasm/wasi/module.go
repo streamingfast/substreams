@@ -115,8 +115,8 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, wasmInstan
 		WithStdin(m.send).
 		WithStdout(m.receive).
 		WithStderr(NewStdErrLogWriter(ctx)).
-		WithArgs("mapBlock").
-		WithFS(fs.NewVirtualFs(ctx))
+		WithFS(fs.NewVirtualFs(ctx)).
+		WithArgs(call.Entrypoint)
 	_, err = m.send.Write(argsData)
 	if err != nil {
 		return nil, fmt.Errorf("writing args: %w", err)

@@ -88,13 +88,15 @@ func Basic(pkg *pbsubstreams.Package, graph *manifest.ModuleGraph) (*BasicInfo, 
 	}
 
 	manifestInfo := &BasicInfo{
-		Name:     name,
-		Network:  pkg.Network,
-		Version:  version,
-		Image:    pkg.Image,
-		Networks: make(map[string]*manifest.NetworkParams),
+		Name:    name,
+		Network: pkg.Network,
+		Version: version,
+		Image:   pkg.Image,
 	}
 
+	if pkg.Networks != nil {
+		manifestInfo.Networks = make(map[string]*manifest.NetworkParams)
+	}
 	for k, v := range pkg.Networks {
 		params := &manifest.NetworkParams{}
 
@@ -167,6 +169,9 @@ func Basic(pkg *pbsubstreams.Package, graph *manifest.ModuleGraph) (*BasicInfo, 
 				if v.Store.Mode > 0 {
 					inputInfo.Mode = strPtr(v.Store.Mode.Pretty())
 				}
+			case *pbsubstreams.Module_Input_Params_:
+				inputInfo.Type = "params"
+				inputInfo.Name = input.GetParams().Value
 			default:
 				inputInfo.Type = "unknown"
 				inputInfo.Name = "unknown"

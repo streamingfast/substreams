@@ -9,7 +9,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v1.3.0
 
 ### Highlights
 
@@ -17,25 +17,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * [BREAKING CHANGE] Remove the support for the `deriveFrom` overrides. The `imports`, along with the new `networks` feature, should provide a better mechanism to cover the use cases that `deriveFrom` tried to address.
 
 {% hint style="info" %}
-> These changes are all handled in the substreams CLI. The Substreams server endpoints do not need to be upgraded to support it.
+> These changes are all handled in the substreams CLI, applying the necessary changes to the package before sending the requests. The Substreams server endpoints do not need to be upgraded to support it.
 {% endhint %}
 
 ### Added
 
 * Added `networks` field at the top level of the manifest definition, with `initialBlock` and `params` overrides for each module. See the substreams.yaml.example file in the repository or https://substreams.streamingfast.io/reference-and-specs/manifests for more details and example usage.
 * The networks `params` and `initialBlock`` overrides for the chosen network are applied to the module directly before being sent to the server. All network configurations are kept when packing an .spkg file.
-* Added the `--network` flag for choosing the network on `run` and `gui` command. Default behavior is to use the one defined as `network` in the manifest. 
+* Added the `--network` flag for choosing the network on `run`, `gui` and `alpha service deploy` commands. Default behavior is to use the one defined as `network` in the manifest. 
 * Added the `--endpoint` flag to `substreams alpha service serve` to specify substreams endpoint to connect to
 * Added endpoints for Antelope chains
+* Command 'substreams info' now shows the params
 
 ### Removed
 
 * Removed the handling of the `DeriveFrom` keyword in manifest, this override feature is going away.
 * Removed the `--skip-package-validation`` option only on run/gui/inspect/info
 
-### Fixed
+### Changed
 
-* The `substreams gui` command no longer reads the .spkg multiple times with different behavior during its process.
+* Added the `--params` flag to `alpha service deploy` to apply per-module parameters to the substreams before pushing it. 
+* Renamed the `--parameters` flag to  `--deployment-params` in `alpha service deploy`, to clarify the intent of those parameters (given to the endpoint, not applied to the substreams modules)
+* Small improvement on `substreams gui` command: no longer reads the .spkg multiple times with different behavior during its process.
 
 ## v1.2.0
 

@@ -16,7 +16,9 @@ import (
 
 func init() {
 	serviceCmd.AddCommand(deployCmd)
-	deployCmd.Flags().StringArrayP("parameters", "p", []string{}, "Parameters to pass to the substreams")
+	deployCmd.Flags().StringArray("deployment-params", []string{}, "Extra parameters to pass to the deployment endpoint")
+	deployCmd.Flags().StringArrayP("params", "p", []string{}, "Parameters to pass to the substreams (ex: module2=key1=valX&key2=valY)")
+	deployCmd.Flags().StringP("network", "n", "", "Network to deploy to (overrides the 'network' field in the manifest)")
 	deployCmd.Flags().Bool("prod", false, "Enable production mode (default: false)")
 }
 
@@ -37,7 +39,19 @@ func deployE(cmd *cobra.Command, args []string) error {
 
 	file := args[0]
 
-	reader, err := manifest.NewReader(file)
+	paramsString := sflags.MustGetStringArray(cmd, "params")
+	params, err := manifest.ParseParams(paramsString)
+	if err != nil {
+		return fmt.Errorf("parsing params: %w", err)
+	}
+
+	network := sflags.MustGetString(cmd, "network")
+	readerOptions := []manifest.Option{
+		manifest.WithOverrideNetwork(network),
+		manifest.WithParams(params),
+	}
+
+	reader, err := manifest.NewReader(file, readerOptions...)
 	if err != nil {
 		return err
 	}
@@ -53,10 +67,10 @@ func deployE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("cannot deploy package %q: it does not specify a sink_module", file)
 	}
 
-	//request parameters
-	// fmt.Println("request parameters")
+	pkg.Networks = nil // we don't want to send this to the server, so it does not apply network values again, possibly losing the overriden params
+
 	paramsMap := make(map[string]string)
-	for _, param := range mustGetStringArray(cmd, "parameters") {
+	for _, param := range mustGetStringArray(cmd, "deployment-params") {
 		parts := strings.SplitN(param, "=", 2)
 		if len(parts) != 2 {
 			return fmt.Errorf("invalid parameter format: %q", param)
@@ -64,9 +78,9 @@ func deployE(cmd *cobra.Command, args []string) error {
 		paramsMap[parts[0]] = parts[1]
 	}
 
-	params := []*pbsinksvc.Parameter{}
+	deployParams := []*pbsinksvc.Parameter{}
 	for k, v := range paramsMap {
-		params = append(params, &pbsinksvc.Parameter{
+		deployParams = append(deployParams, &pbsinksvc.Parameter{
 			Key:   k,
 			Value: v,
 		})
@@ -74,7 +88,7 @@ func deployE(cmd *cobra.Command, args []string) error {
 
 	req := connect.NewRequest(&pbsinksvc.DeployRequest{
 		SubstreamsPackage: pkg,
-		Parameters:        params,
+		Parameters:        deployParams,
 		DevelopmentMode:   !sflags.MustGetBool(cmd, "prod"),
 	})
 	if err := addHeaders(cmd, req); err != nil {

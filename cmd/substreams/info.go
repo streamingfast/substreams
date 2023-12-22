@@ -80,6 +80,9 @@ func runInfo(cmd *cobra.Command, args []string) error {
 		fmt.Println("Name:", mod.Name)
 		fmt.Println("Initial block:", mod.InitialBlock)
 		fmt.Println("Kind:", mod.Kind)
+		for _, input := range mod.Inputs {
+			fmt.Printf("Input: %s: %s\n", input.Type, input.Name)
+		}
 
 		switch mod.Kind {
 		case "map":

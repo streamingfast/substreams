@@ -200,7 +200,7 @@ func TestOneStoreOneMap(t *testing.T) {
 			expectFiles: []string{
 				"states/0000000010-0000000001.kv",
 				"states/0000000020-0000000001.kv",
-				"states/0000000025-0000000020.00000000000000000000000000000000.partial",
+				//				"states/0000000025-0000000020.00000000000000000000000000000000.partial", // produced, then deleted
 			},
 		},
 		{
@@ -213,7 +213,7 @@ func TestOneStoreOneMap(t *testing.T) {
 			expectFiles: []string{
 				"states/0000000010-0000000001.kv",
 				"states/0000000020-0000000001.kv",
-				"states/0000000025-0000000020.00000000000000000000000000000000.partial",
+				// "states/0000000025-0000000020.00000000000000000000000000000000.partial", // produced, then deleted
 				//"states/0000000030-0000000001.kv", // Again, backprocess wouldn't save this one, nor does it need to.
 			},
 		},

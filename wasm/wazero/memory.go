@@ -8,7 +8,7 @@ import (
 	"github.com/tetratelabs/wazero/api"
 )
 
-func writeToHeap(ctx context.Context, inst *instance, track bool, data []byte) (uint32, error) {
+func writeToHeap(ctx context.Context, inst *Instance, track bool, data []byte) (uint32, error) {
 	size := len(data)
 	stack := []uint64{uint64(size)}
 	if err := inst.ExportedFunction("alloc").CallWithStack(ctx, stack); err != nil {
@@ -25,7 +25,7 @@ func writeToHeap(ctx context.Context, inst *instance, track bool, data []byte) (
 	return ptr, nil
 }
 
-func writeOutputToHeap(ctx context.Context, inst *instance, outputPtr uint32, value []byte) error {
+func writeOutputToHeap(ctx context.Context, inst *Instance, outputPtr uint32, value []byte) error {
 	valuePtr, err := writeToHeap(ctx, inst, false, value)
 	if err != nil {
 		return fmt.Errorf("writing value: %w", err)
@@ -40,7 +40,7 @@ func writeOutputToHeap(ctx context.Context, inst *instance, outputPtr uint32, va
 	return nil
 }
 
-func deallocate(ctx context.Context, i *instance) {
+func deallocate(ctx context.Context, i *Instance) {
 	//t0 := time.Now()
 	dealloc := i.ExportedFunction("dealloc")
 	for _, alloc := range i.allocations {

@@ -109,7 +109,7 @@ func (m *Module) NewInstance(ctx context.Context) (out wasm.Instance, err error)
 		return nil, fmt.Errorf("could not instantiate wasm module: %w", err)
 	}
 
-	return &instance{Module: mod}, nil
+	return &Instance{Module: mod}, nil
 }
 
 func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInstance wasm.Instance, arguments []wasm.Argument) (out wasm.Instance, err error) {
@@ -122,7 +122,7 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 			return nil, fmt.Errorf("could not instantiate wasm module: %w", err)
 		}
 	}
-	inst := &instance{Module: mod}
+	inst := &Instance{Module: mod}
 
 	f := mod.ExportedFunction(call.Entrypoint)
 	if f == nil {
@@ -150,7 +150,7 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 		}
 	}
 
-	_, err = f.Call(wasm.WithContext(withInstanceContext(ctx, inst), call), args...)
+	_, err = f.Call(wasm.WithContext(WithInstanceContext(ctx, inst), call), args...)
 	if err != nil {
 		return inst, fmt.Errorf("call: %w", err)
 	}

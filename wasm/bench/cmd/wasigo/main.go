@@ -18,7 +18,7 @@ import (
 func main() {
 	ctx := context.Background()
 	wasmRuntime := wasm.NewRegistryWithRuntime("wasi", nil, 0)
-	code, err := os.ReadFile("/Users/cbillett/devel/sf/substreams/wasm/bench/substreams_tiny_go/main.wasm")
+	code, err := os.ReadFile("/Users/cbillett/devel/sf/substreams/wasm/bench/substreams_wasi_go/main.wasm")
 	blockReader, err := os.Open("/Users/cbillett/devel/sf/substreams/wasm/bench/cmd/barebones/testdata/block.binpb")
 	if err != nil {
 		panic(err)
@@ -34,13 +34,13 @@ func main() {
 	start := time.Now()
 
 	for i := 0; i < 1; i++ {
-		execStart := time.Now()
 		args := args(
 			wasm.NewParamsInput("{key.1: 'value.1'}"),
 			blockInputFile("/Users/cbillett/devel/sf/substreams/wasm/bench/cmd/barebones/testdata/block.binpb"),
 			wasm.NewStoreReaderInput("store.reader.1", createStore(ctx, "store.reader.1")),
 			wasm.NewStoreReaderInput("store.reader.2", createStore(ctx, "store.reader.2")),
 		)
+		execStart := time.Now()
 		call := wasm.NewCall(nil, "", "", args)
 		_, err = module.ExecuteNewCall(ctx, call, instance, args)
 		if err != nil {
@@ -48,9 +48,14 @@ func main() {
 		}
 		fmt.Println("exec duration", time.Since(execStart))
 		fmt.Println("call output", string(call.Output()))
+		fmt.Println("-------------------------------- call logs --------------------------------")
+		for _, log := range call.Logs {
+			fmt.Print(log)
+		}
+		fmt.Println("----------------------------------------------------------------")
 
 	}
-	fmt.Println("duration", time.Since(start))
+	fmt.Println("total duration", time.Since(start))
 
 }
 
@@ -68,6 +73,9 @@ func createStore(ctx context.Context, name string) *store.FullKV {
 	//if err != nil {
 	//	panic(err)
 	//}
+	fullStore.Set(0, "key_123", "value_123")
+	fullStore.Reset()
+
 	return fullStore
 }
 

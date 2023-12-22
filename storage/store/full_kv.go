@@ -4,9 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"go.uber.org/zap"
-
 	"github.com/streamingfast/substreams/storage/store/marshaller"
+	"go.uber.org/zap"
 )
 
 var _ Store = (*FullKV)(nil)

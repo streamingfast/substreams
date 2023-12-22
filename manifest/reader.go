@@ -131,10 +131,6 @@ func (r *Reader) Read() (*pbsubstreams.Package, *ModuleGraph, error) {
 		return nil, nil, err
 	}
 
-	if err := computeInitialBlock(pkg.Modules.Modules, graph); err != nil {
-		return nil, nil, err
-	}
-
 	if pkg.Networks != nil {
 		importIncludedModules, err := dependentImportedModules(graph, r.overrideOutputModule)
 		if err != nil {
@@ -154,6 +150,10 @@ func (r *Reader) Read() (*pbsubstreams.Package, *ModuleGraph, error) {
 		if err := ApplyNetwork(network, pkg); err != nil {
 			return nil, nil, err
 		}
+	}
+
+	if err := computeInitialBlock(pkg.Modules.Modules, graph); err != nil {
+		return nil, nil, err
 	}
 
 	return pkg, graph, nil

@@ -19,7 +19,7 @@ modules:
   - name: mod2
     kind: map
     inputs:
-      - source: sf.test.Block
+      - map: mod1
     output:
       type: proto:sf.test.Output
 

@@ -300,7 +300,7 @@ func TestReader_Read(t *testing.T) {
 					Binaries: []*pbsubstreams.Binary{newTestBinaryModel([]byte{})},
 					Modules: []*pbsubstreams.Module{
 						newTestModuleModel("mod1", 200, "sf.test.Block", "proto:sf.test.Output"),
-						newTestModuleModel("mod2", 0, "sf.test.Block", "proto:sf.test.Output"),
+						newTestModuleModel("mod2", 200, "map:mod1", "proto:sf.test.Output"),
 					},
 				},
 				Network: "mainnet",
@@ -378,6 +378,25 @@ func newTestBinaryModel(content []byte) *pbsubstreams.Binary {
 }
 
 func newTestModuleModel(name string, initialBlock uint64, inputType string, outputType string) *pbsubstreams.Module {
+
+	var input *pbsubstreams.Module_Input
+	if strings.HasPrefix(inputType, "map:") {
+		input = &pbsubstreams.Module_Input{
+			Input: &pbsubstreams.Module_Input_Map_{Map: &pbsubstreams.Module_Input_Map{
+				ModuleName: strings.TrimPrefix(inputType, "map:"),
+			},
+			},
+		}
+	} else {
+		input = &pbsubstreams.Module_Input{
+			Input: &pbsubstreams.Module_Input_Source_{
+				Source: &pbsubstreams.Module_Input_Source{
+					Type: inputType,
+				},
+			},
+		}
+	}
+
 	return &pbsubstreams.Module{
 		Name:             name,
 		BinaryEntrypoint: name,
@@ -388,13 +407,7 @@ func newTestModuleModel(name string, initialBlock uint64, inputType string, outp
 			},
 		},
 		Inputs: []*pbsubstreams.Module_Input{
-			{
-				Input: &pbsubstreams.Module_Input_Source_{
-					Source: &pbsubstreams.Module_Input_Source{
-						Type: inputType,
-					},
-				},
-			},
+			input,
 		},
 		Output: &pbsubstreams.Module_Output{
 			Type: outputType,

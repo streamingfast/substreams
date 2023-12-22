@@ -1,18 +1,16 @@
-//go:build wasip1
-
 package main
 
 import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/streamingfast/substreams/wasm/bench/substreams_wasi_go/pb"
+	"github.com/streamingfast/substreams/wasm/wasi/substream"
 )
 
 func main() {
@@ -20,7 +18,7 @@ func main() {
 	log.Print("let's do it")
 	log.Print("start: ", start)
 
-	input, err := readInput()
+	input, err := substream.ReadInput()
 	if err != nil {
 		panic(fmt.Errorf("reading input: %w", err))
 	}
@@ -67,28 +65,6 @@ func main() {
 	}
 
 	log.Print("total duration: ", time.Since(start))
-}
-
-func readAll(r io.Reader) ([]byte, error) {
-	b := make([]byte, 0, 1024*1024)
-	count := 0
-	for {
-		count++
-		n, err := r.Read(b[len(b):cap(b)])
-		log.Print("Read count: ", count)
-		b = b[:len(b)+n]
-		if err != nil {
-			if err == io.EOF {
-				err = nil
-			}
-			return b, err
-		}
-
-		if len(b) == cap(b) {
-			// Add more capacity (let append pick how much).
-			b = append(b, 0)[:len(b)]
-		}
-	}
 }
 
 type blockStat struct {
@@ -141,21 +117,9 @@ func mapBlock(block *pb.Block) error {
 	if err != nil {
 		return fmt.Errorf("marshalling stats: %w", err)
 	}
-	_, err = writeOutput(data)
+	_, err = substream.WriteOutput(data)
 	if err != nil {
 		return fmt.Errorf("writing output: %w", err)
 	}
 	return nil
-}
-
-func writeOutput(data []byte) (int, error) {
-	return os.Stdout.Write(data)
-}
-
-func readInput() ([]byte, error) {
-	return readAll(os.Stdin)
-}
-
-func readFile(path string) ([]byte, error) {
-	return os.ReadFile(path)
 }

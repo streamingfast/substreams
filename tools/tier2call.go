@@ -48,12 +48,17 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
 
-	pkg, err := manifestReader.Read()
+	pkg, _, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
-	if err := manifest.ApplyParams(mustGetStringArray(cmd, "params"), pkg); err != nil {
+	params, err := manifest.ParseParams(mustGetStringArray(cmd, "params"))
+	if err != nil {
+		return fmt.Errorf("parsing params: %w", err)
+	}
+
+	if err := manifest.ApplyParams(params, pkg); err != nil {
 		return fmt.Errorf("apply params: %w", err)
 	}
 

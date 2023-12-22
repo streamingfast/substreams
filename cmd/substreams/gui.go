@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
+	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/tools"
@@ -20,6 +21,7 @@ import (
 func init() {
 	guiCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token")
 	guiCmd.Flags().StringP("substreams-endpoint", "e", "", "Substreams gRPC endpoint. If empty, will be replaced by the SUBSTREAMS_ENDPOINT_{network_name} environment variable, where `network_name` is determined from the substreams manifest. Some network names have default endpoints.")
+	guiCmd.Flags().String("network", "", "Specify the network to use for params and initialBlocks, overriding the 'network' field in the substreams package")
 	guiCmd.Flags().Bool("insecure", false, "Skip certificate validation on GRPC connection")
 	guiCmd.Flags().Bool("plaintext", false, "Establish GRPC connection in plaintext")
 	guiCmd.Flags().StringSliceP("header", "H", nil, "Additional headers to be sent in the substreams request")
@@ -32,6 +34,7 @@ func init() {
 	guiCmd.Flags().Bool("production-mode", false, "Enable Production Mode, with high-speed parallel processing")
 	guiCmd.Flags().StringArrayP("params", "p", nil, "Set a params for parameterizable modules. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
 	guiCmd.Flags().Bool("replay", false, "Replay saved session into GUI from replay.bin")
+	guiCmd.Flags().Bool("skip-package-validation", false, "Do not perform any validation when reading substreams package")
 	rootCmd.AddCommand(guiCmd)
 }
 
@@ -78,12 +81,28 @@ func runGui(cmd *cobra.Command, args []string) error {
 	debugModulesInitialSnapshot := mustGetStringSlice(cmd, "debug-modules-initial-snapshot")
 
 	outputModule := args[0]
+	network := sflags.MustGetString(cmd, "network")
+	paramsString := sflags.MustGetStringArray(cmd, "params")
+	params, err := manifest.ParseParams(paramsString)
+	if err != nil {
+		return fmt.Errorf("parsing params: %w", err)
+	}
 
-	manifestReader, err := manifest.NewReader(manifestPath, getReaderOpts(cmd)...)
+	readerOptions := []manifest.Option{
+		manifest.WithOverrideOutputModule(outputModule),
+		manifest.WithOverrideNetwork(network),
+		manifest.WithParams(params),
+	}
+	if sflags.MustGetBool(cmd, "skip-package-validation") {
+		readerOptions = append(readerOptions, manifest.SkipPackageValidationReader())
+	}
+
+	manifestReader, err := manifest.NewReader(manifestPath, readerOptions...)
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
-	pkg, err := manifestReader.Read()
+
+	pkg, graph, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
@@ -99,11 +118,6 @@ func runGui(cmd *cobra.Command, args []string) error {
 		mustGetBool(cmd, "insecure"),
 		mustGetBool(cmd, "plaintext"),
 	)
-
-	params := mustGetStringArray(cmd, "params")
-	if err := manifest.ApplyParams(params, pkg); err != nil {
-		return err
-	}
 
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -132,10 +146,6 @@ func runGui(cmd *cobra.Command, args []string) error {
 	}
 
 	if readFromModule { // need to tweak the stop block here
-		graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
-		if err != nil {
-			return fmt.Errorf("creating module graph: %w", err)
-		}
 		sb, err := graph.ModuleInitialBlock(outputModule)
 		if err != nil {
 			return fmt.Errorf("getting module start block: %w", err)
@@ -149,6 +159,8 @@ func runGui(cmd *cobra.Command, args []string) error {
 
 	requestConfig := &request.Config{
 		ManifestPath:                manifestPath,
+		Pkg:                         pkg,
+		Graph:                       graph,
 		ReadFromModule:              readFromModule,
 		ProdMode:                    productionMode,
 		DebugModulesOutput:          debugModulesOutput,
@@ -163,6 +175,7 @@ func runGui(cmd *cobra.Command, args []string) error {
 		StopBlock:                   stopBlock,
 		FinalBlocksOnly:             mustGetBool(cmd, "final-blocks-only"),
 		Params:                      params,
+		ReaderOptions:               readerOptions,
 	}
 
 	ui, err := tui2.New(requestConfig)

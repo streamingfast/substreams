@@ -37,11 +37,11 @@ func deployE(cmd *cobra.Command, args []string) error {
 
 	file := args[0]
 
-	reader, err := manifest.NewReader(file, getReaderOpts(cmd)...)
+	reader, err := manifest.NewReader(file)
 	if err != nil {
 		return err
 	}
-	pkg, err := reader.Read()
+	pkg, _, err := reader.Read()
 	if err != nil {
 		return err
 	}

@@ -99,10 +99,9 @@ func Test_HashModule(t *testing.T) {
 			reader, err := NewReader(test.file)
 			require.NoError(t, err)
 
-			manifest, err := reader.Read()
+			manifest, graph, err := reader.Read()
 			require.NoError(t, err)
 
-			graph, _ := NewModuleGraph(manifest.Modules.Modules)
 			hashes := NewModuleHashes()
 			compare := map[string]string{}
 			for _, mod := range graph.modules {

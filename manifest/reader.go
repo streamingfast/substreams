@@ -33,36 +33,6 @@ var httpClient = &http.Client{
 	Timeout: 30 * time.Second,
 }
 
-type Option func(r *Reader) *Reader
-
-func SkipSourceCodeReader() Option {
-	return func(r *Reader) *Reader {
-		r.skipSourceCodeImportValidation = true
-		return r
-	}
-}
-
-func SkipModuleOutputTypeValidationReader() Option {
-	return func(r *Reader) *Reader {
-		r.skipModuleOutputTypeValidation = true
-		return r
-	}
-}
-
-func SkipPackageValidationReader() Option {
-	return func(r *Reader) *Reader {
-		r.skipPackageValidation = true
-		return r
-	}
-}
-
-func WithCollectProtoDefinitions(f func(protoDefinitions []*desc.FileDescriptor)) Option {
-	return func(r *Reader) *Reader {
-		r.collectProtoDefinitionsFunc = f
-		return r
-	}
-}
-
 func hasRemotePrefix(in string) bool {
 	for _, prefix := range []string{"https://", "http://", "ipfs://", "gs://", "s3://", "az://"} {
 		if strings.HasPrefix(in, prefix) {
@@ -81,8 +51,7 @@ type Reader struct {
 
 	workingDir string
 
-	pkg       *pbsubstreams.Package
-	overrides []*ConfigurationOverride
+	pkg *pbsubstreams.Package
 
 	// cached values
 	protoDefinitions         []*desc.FileDescriptor
@@ -95,12 +64,15 @@ type Reader struct {
 	skipSourceCodeImportValidation bool
 	skipModuleOutputTypeValidation bool
 	skipPackageValidation          bool
+	overrideNetwork                string
+	overrideOutputModule           string
+	params                         map[string]string
 }
 
 func NewReader(input string, opts ...Option) (*Reader, error) {
 	workingDir, err := os.Getwd()
 	if err != nil {
-		return nil, fmt.Errorf("unable to get working dir: %w", err)
+		return nil, fmt.Errorf("unable to get working directory: %w", err)
 	}
 
 	return newReader(input, workingDir, opts...)
@@ -132,17 +104,60 @@ func newReader(input, workingDir string, opts ...Option) (*Reader, error) {
 	return r, nil
 }
 
-func (r *Reader) Read() (*pbsubstreams.Package, error) {
-	return r.resolvePkg()
-}
-
-func (r *Reader) MustRead() *pbsubstreams.Package {
-	pkg, err := r.Read()
+func (r *Reader) Read() (*pbsubstreams.Package, *ModuleGraph, error) {
+	pkg, err := r.resolvePkg()
 	if err != nil {
-		panic(err)
+		return nil, nil, err
 	}
 
-	return pkg
+	if !r.skipPackageValidation {
+		if err := validatePackage(pkg, r.skipModuleOutputTypeValidation); err != nil {
+			return nil, nil, fmt.Errorf("package validation failed: %w", err)
+		}
+
+		if err := ValidateModules(pkg.Modules); err != nil {
+			return nil, nil, fmt.Errorf("module validation failed: %w", err)
+		}
+	}
+
+	graph, err := NewModuleGraph(pkg.Modules.Modules)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if r.overrideNetwork != "" {
+		pkg.Network = r.overrideNetwork
+	}
+
+	if pkg.Networks != nil {
+		importIncludedModules, err := dependentImportedModules(graph, r.overrideOutputModule)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if pkg.Network == "" {
+			return nil, nil, fmt.Errorf("no network specified in package, but networks are defined")
+		}
+		if err := validateNetworks(pkg, importIncludedModules, pkg.Network); err != nil {
+			return nil, nil, err
+		}
+		if err := ApplyNetwork(pkg.Network, pkg); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	// applied on top of network-specific params
+	if r.params != nil {
+		if err := ApplyParams(r.params, pkg); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	if err := computeInitialBlock(pkg.Modules.Modules, graph); err != nil {
+		return nil, nil, err
+	}
+
+	return pkg, graph, nil
 }
 
 func (r *Reader) read() error {
@@ -219,10 +234,6 @@ func (r *Reader) readFromIPFS(input string) error {
 
 	r.currentData = b
 
-	if r.isOverride() {
-		return nil
-	}
-
 	type subgraphManifest struct {
 		DataSources []struct {
 			Kind   string `yaml:"kind"`
@@ -266,8 +277,6 @@ func (r *Reader) readFromIPFS(input string) error {
 }
 
 func (r *Reader) readLocal(input string) error {
-	input = r.currentInput
-
 	b, err := os.ReadFile(input)
 	if err != nil {
 		return fmt.Errorf("unable to read file %q: %w", input, err)
@@ -304,20 +313,9 @@ func (r *Reader) resolveInputPath() error {
 	return nil
 }
 
-func (r *Reader) isOverride() bool {
-	if r.currentData == nil {
-		return false
-	}
-	return bytes.Contains(r.currentData, []byte("deriveFrom:"))
-}
-
 func (r *Reader) getPkg() (*pbsubstreams.Package, error) {
 	if r.currentData == nil {
 		return nil, fmt.Errorf("no result available")
-	}
-
-	if r.isOverride() {
-		return nil, fmt.Errorf("cannot get package from override")
 	}
 
 	if strings.HasSuffix(r.currentInput, ".yaml") || strings.HasSuffix(r.currentInput, ".yml") {
@@ -334,9 +332,6 @@ func (r *Reader) getPkg() (*pbsubstreams.Package, error) {
 			return nil, fmt.Errorf("unable to convert manifest to package: %w", err)
 		}
 
-		if err := r.validate(pkg); err != nil {
-			return nil, fmt.Errorf("failed validation: %w", err)
-		}
 		return pkg, nil
 	}
 
@@ -346,27 +341,41 @@ func (r *Reader) getPkg() (*pbsubstreams.Package, error) {
 		return nil, fmt.Errorf("unable to unmarshal package: %w", err)
 	}
 
-	if err := r.validate(pkg); err != nil {
-		return nil, fmt.Errorf("failed validation: %w", err)
-	}
-
 	return pkg, nil
 }
 
-func (r *Reader) validate(pkg *pbsubstreams.Package) error {
-	if !r.skipPackageValidation {
-		if err := r.validatePackage(pkg); err != nil {
-			return fmt.Errorf("package validation failed: %w", err)
+func dependentImportedModules(graph *ModuleGraph, outputModule string) (map[string]bool, error) {
+	out := make(map[string]bool)
+
+	outputModulesToCheck := make(map[string]bool)
+	if outputModule != "" {
+		outputModulesToCheck[outputModule] = true
+	} else {
+		for _, mod := range graph.Modules() {
+			if !strings.Contains(mod, ":") {
+				outputModulesToCheck[mod] = true
+			}
 		}
 	}
 
-	if err := ValidateModules(pkg.Modules); err != nil {
-		return fmt.Errorf("module validation failed: %w", err)
+	for mod := range outputModulesToCheck {
+		if !strings.Contains(mod, ":") {
+			ancestors, err := graph.AncestorsOf(mod)
+			if err != nil {
+				return nil, fmt.Errorf("unable to get ancestors of module %q: %w", mod, err)
+			}
+			for _, ancestor := range ancestors {
+				if strings.Contains(ancestor.Name, ":") {
+					out[ancestor.Name] = true
+				}
+			}
+		}
 	}
-	return nil
+
+	return out, nil
 }
 
-func (r *Reader) validatePackage(pkg *pbsubstreams.Package) error {
+func validatePackage(pkg *pbsubstreams.Package, skipModuleOutputTypeValidation bool) error {
 	if len(pkg.ModuleMeta) != len(pkg.Modules.Modules) {
 		return fmt.Errorf("inconsistent package, metadata for modules not same length as modules list")
 	}
@@ -390,14 +399,14 @@ func (r *Reader) validatePackage(pkg *pbsubstreams.Package) error {
 		switch i := mod.Kind.(type) {
 		case *pbsubstreams.Module_KindMap_:
 			outputType := i.KindMap.OutputType
-			if !r.skipModuleOutputTypeValidation {
+			if !skipModuleOutputTypeValidation {
 				if !strings.HasPrefix(outputType, "proto:") {
 					return fmt.Errorf("module %q incorrect outputTyupe %q valueType must be a proto Message", mod.Name, outputType)
 				}
 			}
 		case *pbsubstreams.Module_KindStore_:
 			valueType := i.KindStore.ValueType
-			if !r.skipModuleOutputTypeValidation {
+			if !skipModuleOutputTypeValidation {
 				if strings.HasPrefix(valueType, "proto:") {
 					// any store with a prototype is considered valid
 				} else if !storeValidTypes[valueType] {
@@ -450,24 +459,6 @@ func (r *Reader) newPkgFromManifest(manif *Manifest) (*pbsubstreams.Package, err
 	return pkg, nil
 }
 
-func (r *Reader) getOverride() (*ConfigurationOverride, error) {
-	if r.currentData == nil {
-		return nil, fmt.Errorf("no result available")
-	}
-
-	if !r.isOverride() {
-		return nil, fmt.Errorf("not an override")
-	}
-
-	override := &ConfigurationOverride{}
-	err := yaml.Unmarshal(r.currentData, override)
-	if err != nil {
-		return nil, fmt.Errorf("unable to unmarshal override: %w", err)
-	}
-
-	return override, nil
-}
-
 func (r *Reader) resolvePkg() (*pbsubstreams.Package, error) {
 	if r.pkg != nil {
 		return r.pkg, nil
@@ -478,30 +469,9 @@ func (r *Reader) resolvePkg() (*pbsubstreams.Package, error) {
 		return nil, err
 	}
 
-	if r.isOverride() {
-		or, err := r.getOverride()
-		if err != nil {
-			return nil, fmt.Errorf("unable to get override: %w", err)
-		}
-		r.overrides = append(r.overrides, or)
-		r.currentInput = or.DeriveFrom
-
-		return r.resolvePkg()
-	}
-
 	pkg, err := r.getPkg()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get package: %w", err)
-	}
-
-	//reverse order r.overrides to be able to squash them in the right order
-	for i, j := 0, len(r.overrides)-1; i < j; i, j = i+1, j-1 {
-		r.overrides[i], r.overrides[j] = r.overrides[j], r.overrides[i]
-	}
-
-	mergedOverride := mergeOverrides(r.overrides...)
-	if err := applyOverride(pkg, mergedOverride); err != nil {
-		return nil, fmt.Errorf("applying override: %w", err)
 	}
 
 	r.pkg = pkg
@@ -699,13 +669,15 @@ func LoadManifestFile(inputPath, workingDir string) (*Manifest, error) {
 	return m, nil
 }
 
+// loop through the Manifest, and get the `imports` statements,
+// pull the Package files from Disk, and merge them into this one
 func loadImports(pkg *pbsubstreams.Package, manif *Manifest) error {
 	for _, kv := range manif.Imports {
 		importName := kv[0]
 		importPath := manif.resolvePath(kv[1])
 
 		subpkgReader := MustNewReader(importPath)
-		subpkg, err := subpkgReader.Read()
+		subpkg, _, err := subpkgReader.Read()
 		if err != nil {
 			return fmt.Errorf("importing %q: %w", importPath, err)
 		}
@@ -713,9 +685,9 @@ func loadImports(pkg *pbsubstreams.Package, manif *Manifest) error {
 		prefixModules(subpkg.Modules.Modules, importName)
 		reindexAndMergePackage(subpkg, pkg)
 		mergeProtoFiles(subpkg, pkg)
+		mergeNetworks(subpkg, pkg, importName)
 	}
-	// loop through the Manifest, and get the `imports` statements,
-	// pull the Package files from Disk, and merge them into this one
+
 	return nil
 }
 
@@ -742,7 +714,7 @@ func loadImage(pkg *pbsubstreams.Package, manif *Manifest) error {
 	case bytes.Equal(img[0:3], JPGHeader):
 	case bytes.Equal(img[0:4], WebPHeader):
 	default:
-		return fmt.Errorf("Unsupported file format for %q. Only JPEG, PNG and WebP images are supported", path)
+		return fmt.Errorf("unsupported file format for %q. Only JPEG, PNG and WebP images are supported", path)
 	}
 
 	pkg.Image = img
@@ -751,16 +723,20 @@ func loadImage(pkg *pbsubstreams.Package, manif *Manifest) error {
 
 const PrefixSeparator = ":"
 
+func withPrefix(val, prefix string) string {
+	return prefix + PrefixSeparator + val
+}
+
 func prefixModules(mods []*pbsubstreams.Module, prefix string) {
 	for _, mod := range mods {
-		mod.Name = prefix + PrefixSeparator + mod.Name
+		mod.Name = withPrefix(mod.Name, prefix)
 		for idx, inputIface := range mod.Inputs {
 			switch input := inputIface.Input.(type) {
 			case *pbsubstreams.Module_Input_Source_:
 			case *pbsubstreams.Module_Input_Store_:
-				input.Store.ModuleName = prefix + PrefixSeparator + input.Store.ModuleName
+				input.Store.ModuleName = withPrefix(input.Store.ModuleName, prefix)
 			case *pbsubstreams.Module_Input_Map_:
-				input.Map.ModuleName = prefix + PrefixSeparator + input.Map.ModuleName
+				input.Map.ModuleName = withPrefix(input.Map.ModuleName, prefix)
 			case *pbsubstreams.Module_Input_Params_:
 			default:
 				panic(fmt.Sprintf("module %q: input index %d: unsupported module input type %s", mod.Name, idx, inputIface.Input))

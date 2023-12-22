@@ -1,5 +1,0 @@
-deriveFrom: "https://github.com/streamingfast/substreams-uniswap-v3/releases/download/v0.2.8/substreams.spkg"
-
-package:
-  name: "univ3custom"
-

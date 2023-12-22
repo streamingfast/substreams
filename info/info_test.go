@@ -13,10 +13,10 @@ func TestBasicInfo(t *testing.T) {
 	reader, err := manifest.NewReader("https://github.com/streamingfast/substreams-uniswap-v3/releases/download/v0.2.8/substreams.spkg")
 	require.NoError(t, err)
 
-	pkg, err := reader.Read()
+	pkg, graph, err := reader.Read()
 	require.NoError(t, err)
 
-	info, err := Basic(pkg)
+	info, err := Basic(pkg, graph)
 	require.NoError(t, err)
 
 	r, err := json.MarshalIndent(info, "", "  ")

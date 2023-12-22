@@ -67,8 +67,8 @@ type Output struct {
 	moduleNavigator     *explorer.Navigator
 }
 
-func New(c common.Common, manifestPath string, outputModule string, config *request.Config) (*Output, error) {
-	nav, err := explorer.New(config.OutputModule, c, explorer.WithManifestFilePath(config.ManifestPath))
+func New(c common.Common, config *request.Config) (*Output, error) {
+	nav, err := explorer.New(config.OutputModule, c, explorer.WithModuleGraph(config.Graph))
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func New(c common.Common, manifestPath string, outputModule string, config *requ
 		blocksPerModule:     make(map[string][]uint64),
 		payloads:            make(map[request.BlockContext]*pbsubstreamsrpc.AnyModuleOutput),
 		blockIDs:            make(map[uint64]string),
-		moduleSelector:      modselect.New(c, manifestPath),
+		moduleSelector:      modselect.New(c, config.Graph),
 		blockSelector:       blockselect.New(c),
 		outputView:          viewport.New(24, 80),
 		messageFactory:      dynamic.NewMessageFactoryWithDefaults(),
@@ -87,7 +87,7 @@ func New(c common.Common, manifestPath string, outputModule string, config *requ
 		blockSearchCtx:      blocksearch.New(c),
 		bytesRepresentation: dynamic.BytesAsHex,
 		moduleSearchView:    modsearch.New(c),
-		outputModule:        outputModule,
+		outputModule:        config.OutputModule,
 		logsEnabled:         true,
 		moduleNavigator:     nav,
 		firstBlockSeen:      true,

@@ -64,11 +64,15 @@ The `package.version` field identifies the package for the Substreams module.
 **Note**: The`package.version` **must respect** [Semantic Versioning, version 2.0](https://semver.org/)
 {% endhint %}
 
-#### package.url
+#### `package.url``
 
 The `package.url` field identifies and helps users discover the source of the Substreams package.
 
-#### package.doc
+#### `package.image``
+
+The `package.image` field can specify a path to an image (JPEG, PNG or WebP, < 2MiB) that will be embedded in the .spkg to represent the substreams on a website like https://substreams.dev.
+
+#### `package.doc`
 
 The `package.doc` field is the documentation string of the package. The first line is used by the different UIs as a short-form description.
 
@@ -87,7 +91,7 @@ Example:
 ```yaml
 imports:
   ethereum: substreams-ethereum-v1.0.0.spkg
-  tokens: ../eth-token/substreams.yaml
+  tokens: https://github.com/streamingfast/substreams-erc20-balance-changes/releases/download/v1.2.0/erc20-balance-changes-v1.2.0.spkg
   prices: ../eth-token/substreams.yaml
 ```
 
@@ -205,6 +209,8 @@ The initial block for the module is where Substreams begins processing data for 
 If all the inputs have the same `initialBlock`, the field can be omitted and its value is inferred by its dependent [`inputs`](manifests.md#modules-.inputs).
 
 `initialBlock` becomes **mandatory** **when inputs have different values**.
+
+The `initialBlock` of a module can be defined per-network in the `networks` section.
 
 #### Module `kind`
 
@@ -330,3 +336,29 @@ my_mod.inputs[0].params.value = "myvalue"
 {% endcode %}
 
 which would be inserted just before starting the stream.
+
+Params that are defined under `networks` do not need to be repeated here (their value will be overwritten)
+
+### `network`
+
+The `network` field specifies the default network to be used with this Substreams. It will help the client choose an endpoint if necessary, and will be used as the default value when applying the values defined under `networks`.
+
+### `networks`
+
+The `networks` allows specifying per-network `params` and `initialBlock` for each module:
+
+```yaml
+networks:
+  mainnet:
+    initialBlock:
+      mod1: 200
+      lib:mod1: 400
+    params:
+      mod2: "addr=0x1234"
+  sepolia:
+    [...]
+```
+
+You can override values for modules imported from other .spkg.
+
+Every local module specified under `networks` must have a value for **each network**

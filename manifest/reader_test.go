@@ -38,6 +38,7 @@ func TestReader_Read(t *testing.T) {
 		input            *string
 		env              map[string]string
 		validateBinary   bool
+		params           map[string]string
 		workingDirectory string
 	}
 
@@ -321,6 +322,85 @@ func TestReader_Read(t *testing.T) {
 			require.NoError,
 		},
 		{
+			"networks_with_params.yaml",
+			args{},
+			&pbsubstreams.Package{
+				Version:    1,
+				ProtoFiles: readSystemProtoDescriptors(t),
+				PackageMeta: []*pbsubstreams.PackageMetadata{
+					{
+						Name:    "testnetworks",
+						Version: "v0.1.0",
+					},
+				},
+				ModuleMeta: []*pbsubstreams.ModuleMetadata{
+					{},
+				},
+				Modules: &pbsubstreams.Modules{
+					Binaries: []*pbsubstreams.Binary{newTestBinaryModel([]byte{})},
+					Modules: []*pbsubstreams.Module{
+						newTestModuleModel("mod1", 0, "params:val=toto", "proto:sf.test.Output"),
+					},
+				},
+				Network: "mainnet",
+				Networks: map[string]*pbsubstreams.NetworkParams{
+					"mainnet": {
+						Params: map[string]string{
+							"mod1": "val=toto",
+						},
+					},
+					"sepolia": {
+						Params: map[string]string{
+							"mod1": "val=tata",
+						},
+					},
+				},
+			},
+			require.NoError,
+			require.NoError,
+		},
+		{
+			"networks_with_params.yaml",
+			args{
+				params: map[string]string{"mod1": "val=overloaded"},
+			},
+			&pbsubstreams.Package{
+				Version:    1,
+				ProtoFiles: readSystemProtoDescriptors(t),
+				PackageMeta: []*pbsubstreams.PackageMetadata{
+					{
+						Name:    "testnetworks",
+						Version: "v0.1.0",
+					},
+				},
+				ModuleMeta: []*pbsubstreams.ModuleMetadata{
+					{},
+				},
+				Modules: &pbsubstreams.Modules{
+					Binaries: []*pbsubstreams.Binary{newTestBinaryModel([]byte{})},
+					Modules: []*pbsubstreams.Module{
+						newTestModuleModel("mod1", 0, "params:val=overloaded", "proto:sf.test.Output"),
+					},
+				},
+				Network: "mainnet",
+				Networks: map[string]*pbsubstreams.NetworkParams{
+					"mainnet": {
+						Params: map[string]string{
+							"mod1": "val=toto",
+						},
+					},
+					"sepolia": {
+						Params: map[string]string{
+							"mod1": "val=tata",
+						},
+					},
+				},
+			},
+			require.NoError,
+			require.NoError,
+		},
+
+		{
 			"networks_missing_default.yaml",
 			args{},
 			nil,
@@ -344,6 +424,10 @@ func TestReader_Read(t *testing.T) {
 			var readerOptions []Option
 			if !tt.args.validateBinary {
 				readerOptions = append(readerOptions, SkipSourceCodeReader())
+			}
+
+			if tt.args.params != nil {
+				readerOptions = append(readerOptions, WithParams(tt.args.params))
 			}
 
 			var manifestPath string
@@ -378,12 +462,18 @@ func newTestBinaryModel(content []byte) *pbsubstreams.Binary {
 }
 
 func newTestModuleModel(name string, initialBlock uint64, inputType string, outputType string) *pbsubstreams.Module {
-
 	var input *pbsubstreams.Module_Input
 	if strings.HasPrefix(inputType, "map:") {
 		input = &pbsubstreams.Module_Input{
 			Input: &pbsubstreams.Module_Input_Map_{Map: &pbsubstreams.Module_Input_Map{
 				ModuleName: strings.TrimPrefix(inputType, "map:"),
+			},
+			},
+		}
+	} else if strings.HasPrefix(inputType, "params:") {
+		input = &pbsubstreams.Module_Input{
+			Input: &pbsubstreams.Module_Input_Params_{Params: &pbsubstreams.Module_Input_Params{
+				Value: strings.TrimPrefix(inputType, "params:"),
 			},
 			},
 		}

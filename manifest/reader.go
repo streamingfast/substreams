@@ -120,15 +120,13 @@ func (r *Reader) Read() (*pbsubstreams.Package, *ModuleGraph, error) {
 		}
 	}
 
-	if r.params != nil {
-		if err := ApplyParams(r.params, pkg); err != nil {
-			return nil, nil, err
-		}
-	}
-
 	graph, err := NewModuleGraph(pkg.Modules.Modules)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	if r.overrideNetwork != "" {
+		pkg.Network = r.overrideNetwork
 	}
 
 	if pkg.Networks != nil {
@@ -137,17 +135,20 @@ func (r *Reader) Read() (*pbsubstreams.Package, *ModuleGraph, error) {
 			return nil, nil, err
 		}
 
-		network := pkg.Network
-		if r.overrideNetwork != "" {
-			network = r.overrideNetwork
-		}
-		if network == "" {
+		if pkg.Network == "" {
 			return nil, nil, fmt.Errorf("no network specified in package, but networks are defined")
 		}
-		if err := validateNetworks(pkg, importIncludedModules, network); err != nil {
+		if err := validateNetworks(pkg, importIncludedModules, pkg.Network); err != nil {
 			return nil, nil, err
 		}
-		if err := ApplyNetwork(network, pkg); err != nil {
+		if err := ApplyNetwork(pkg.Network, pkg); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	// applied on top of network-specific params
+	if r.params != nil {
+		if err := ApplyParams(r.params, pkg); err != nil {
 			return nil, nil, err
 		}
 	}

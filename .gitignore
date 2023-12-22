@@ -3,6 +3,7 @@
 .env.release
 .DS_Store
 .idea
+.vscode
 target
 .goreleaser.SOURCE_ME.sh
 /dist

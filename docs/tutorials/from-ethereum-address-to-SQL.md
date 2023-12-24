@@ -125,7 +125,7 @@ This is the expected output of your test:
 
 {% code overflow="wrap" %}
 ```bash
-substreams alpha sink-serve
+substreams alpha service serve
 ```
 {% endcode %}
 
@@ -142,7 +142,7 @@ The previous command will start a daemon that will run in your computer:
 
 {% code overflow="wrap" %}
 ```bash
-substreams alpha sink-deploy ./substreams.sql.yaml
+substreams alpha service deploy ./substreams.sql.yaml
 ```
 {% endcode %}
 
@@ -165,7 +165,7 @@ Services:
   - f94fe55c-sink: Sink service (no exposed port). Use 'substreams alpha sink-info f94fe55c-sink' to see last processed block or 'docker logs f94fe55c-sink' to see the logs.
 ```
 
-3. After a few seconds, the command `substreams alpha sink-info` should give you information about the progress of the sink (ex: `Last processed block: 12722000`)
+3. After a few seconds, the command `substreams alpha service info` should give you information about the progress of the sink (ex: `Last processed block: 12722000`)
 
 4. You can check the logs of the sink and see what's happening: `docker logs -f f94fe55c-sink`
 

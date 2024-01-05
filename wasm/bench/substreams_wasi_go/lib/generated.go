@@ -25,8 +25,8 @@ func ExecuteMapBlock(input []byte) error {
 	}
 	mapBlockInputs := &MapBlockInput{
 		block:      res.Block,
-		readStore1: substream.NewStringStore(res.ReadStore),
-		readStore2: substream.NewStringStore(res.ReadStore2),
+		readStore1: substream.NewGetStringStore(res.ReadStore),
+		readStore2: substream.NewGetStringStore(res.ReadStore2),
 	}
 
 	out, err := mapBlock(mapBlockInputs)

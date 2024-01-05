@@ -2,6 +2,8 @@ package lib
 
 import (
 	"encoding/hex"
+	"fmt"
+	"log"
 	"strings"
 
 	"github.com/streamingfast/substreams/wasm/bench/substreams_wasi_go/pb"
@@ -12,6 +14,15 @@ func mapBlock(inputs *MapBlockInput) (*pb.MapBlockOutput, error) {
 
 	approvalTopic := strings.ToLower("8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925")
 	transferTopic := strings.ToLower("ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef")
+
+	v, err := inputs.readStore1.GetFirst("key_123")
+	if err != nil {
+		return nil, err
+	}
+	if v != "value_123" {
+		return nil, fmt.Errorf("expected value_123, got %q", v)
+	}
+	log.Print("got value_123")
 
 	trxCount := 0
 	transferCount := 0

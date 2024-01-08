@@ -43,6 +43,7 @@ func main() {
 			blockInputFile("/Users/colindickson/code/dfuse/substreams/wasm/bench/cmd/barebones/testdata/block.binpb"),
 			wasm.NewStoreReaderInput("store.reader.1", createStore(ctx, "store.reader.1")),
 			wasm.NewStoreReaderInput("store.reader.2", createStore(ctx, "store.reader.2")),
+			wasm.NewStoreWriterOutput("out", createStore(ctx, "out"), 1, "string"),
 		)
 		execStart := time.Now()
 		call := wasm.NewCall(nil, "mapBlock", "mapBlock", args)

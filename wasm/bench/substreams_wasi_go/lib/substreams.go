@@ -54,6 +54,12 @@ func mapBlock(inputs *MapBlockInput) (*pb.MapBlockOutput, error) {
 		}
 	}
 
+	err = inputs.writeStore1.Set(3, "popo", "lol")
+	if err != nil {
+		return nil, err
+	}
+	log.Print("set popo to lol")
+
 	output := &pb.MapBlockOutput{
 		TrxCount:      uint32(trxCount),
 		TransferCount: uint32(transferCount),

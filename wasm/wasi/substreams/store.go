@@ -156,11 +156,13 @@ func (s *baseStore) readFromFile(path string) ([]byte, error) {
 	return s.fileReadWriter.ReadFile(path)
 }
 
+//TODO: check this type.  is this what we want?  do we want to support VT?
 type ProtoMarhsaler interface {
 	Marshal() ([]byte, error)
 	Unmarshal([]byte) error
 }
 
+//TODO: DO WE EVEN NEED THIS???
 type protoStore[M ProtoMarhsaler] struct {
 	bytesStore *baseStore //for some reason, it does not like to be embedded for this struct. perhaps because of the generic type? not sure. no time to investigate at the moment
 }

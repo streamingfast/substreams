@@ -12,9 +12,10 @@ func init() {
 }
 
 type MapBlockInput struct {
-	block      *pb.Block
-	readStore1 substreams.StoreGet[string]
-	readStore2 substreams.StoreGet[string]
+	block       *pb.Block
+	readStore1  substreams.StoreGet[string]
+	readStore2  substreams.StoreGet[string]
+	writeStore1 substreams.StoreSet[string]
 }
 
 func ExecuteMapBlock(input []byte) error {
@@ -24,9 +25,10 @@ func ExecuteMapBlock(input []byte) error {
 		return fmt.Errorf("unmarshalling args: %w", err)
 	}
 	mapBlockInputs := &MapBlockInput{
-		block:      res.Block,
-		readStore1: substreams.NewGetStringStore(res.ReadStore),
-		readStore2: substreams.NewGetStringStore(res.ReadStore2),
+		block:       res.Block,
+		readStore1:  substreams.NewGetStringStore(res.ReadStore),
+		readStore2:  substreams.NewGetStringStore(res.ReadStore2),
+		writeStore1: substreams.NewSetStringStore(res.WriteStore),
 	}
 
 	out, err := mapBlock(mapBlockInputs)

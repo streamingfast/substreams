@@ -164,13 +164,15 @@ func stateDataToFile(ctx context.Context, parts []string, data []byte) error {
 			return fmt.Errorf("parsing ordinal %q: %w", ord, err)
 		}
 		key := parts[4]
-
-		switch parts[2] {
-		case "at":
-			call.DoSet(uint64(ordinal), key, data)
-		case "ifnotexists":
-			call.DoSetIfNotExists(uint64(ordinal), key, data)
+		call.DoSet(uint64(ordinal), key, data)
+	case "conditionalwrite":
+		ord := parts[3]
+		ordinal, err := strconv.Atoi(ord)
+		if err != nil {
+			return fmt.Errorf("parsing ordinal %q: %w", ord, err)
 		}
+		key := parts[4]
+		call.DoSetIfNotExists(uint64(ordinal), key, data)
 	case "delete":
 		ord := parts[3]
 		ordinal, err := strconv.Atoi(ord)

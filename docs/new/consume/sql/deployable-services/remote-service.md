@@ -1,10 +1,10 @@
-Using the StreamingFast SQL hosted service is the easiest way to get started with Substreams:SQL. The following tutorial teaches you how to deploy a Substreams package from the [Substreams Registry](https://substreams.dev) to hosted service.
+Using the StreamingFast SQL remote (hosted) service is the easiest way to get started with Substreams:SQL. The following tutorial teaches you how to deploy a Substreams package from the [Substreams Registry](https://substreams.dev) to StreamingFast remote service.
 
 ## Tutorial
 
 In this short tutorial, you will:
 
-- Deploy the Substreams package to the StreamingFast SQL hosted service.
+- Deploy the Substreams package to the StreamingFast SQL remote service.
 - Explore the SQL database in your browser.
 
 Before you get started, make sure you have:
@@ -12,7 +12,7 @@ Before you get started, make sure you have:
 
 The package used in this tutorial is the USDT Ethereum package, which retrieves events from the USDT smart contract on the Ethereum blockchain.
 
-### Deploying a Substreams Package to the Hosted Service
+### Deploying a Substreams Package to the Remote Service
 
 1. You can find the USDT Ethereum package in the Substreams Registry.
 
@@ -22,9 +22,9 @@ The package used in this tutorial is the USDT Ethereum package, which retrieves 
 substreams alpha service deploy https://spkg.io/enoldev/substreams-ethereum-usdt-v0.1.0.spkg -e https://deploy.streamingfast.io
 ```
 
-* The `substreams alpha service deploy` command is used to deploy a package to the hosted service.
+* The `substreams alpha service deploy` command is used to deploy a package to the remote service.
 * In this example, you deploy the USDT Ethereum package (`https://spkg.io/enoldev/substreams-ethereum-usdt-v0.1.0.spkg`).
-* The `-e` flag specifies the location of the hosted service. In this example, you are using the StreamingFast Hosted Service (`https://deploy.streamingfast.io`).
+* The `-e` flag specifies the location of the remote service. In this example, you are using the StreamingFast Remote Service (`https://deploy.streamingfast.io`).
 
 The deployment of the package might take 1-2 minutes. 
 

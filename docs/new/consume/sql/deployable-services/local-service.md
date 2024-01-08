@@ -9,7 +9,7 @@ In this tutorial, you will:
 1. Generate a simple Substreams that extract all events from the Cryptopunks smart contract on Ethereum.
 2. Feed your data into a local PostgreSQL database in a Docker-based development environment.
 3. Develop and apply SQL transformations with [dbt models](https://docs.getdbt.com/docs/build/models).
-4. Go from a local Substreams:SQL environment to a shared hosted development environment.
+4. Go from a local Substreams:SQL environment to a shared remote development environment.
 5. Create a production `.spkg` package and test it locally
 6. Deploy your `.spkg` to a production environment that fills a PostgreSQL database from your Substreams and applies dbt transformations automatically.
 

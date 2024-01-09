@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/streamingfast/substreams/wasm"
@@ -15,6 +16,13 @@ import (
 
 type Virtual struct {
 	ctx context.Context
+
+	resultOnce sync.Once
+	result     []byte
+}
+
+func (v *Virtual) Result() []byte {
+	return v.result
 }
 
 func NewVirtualFs(ctx context.Context) *Virtual {
@@ -24,7 +32,11 @@ func NewVirtualFs(ctx context.Context) *Virtual {
 }
 
 func (v *Virtual) Open(name string) (fs.File, error) {
-	return NewVirtualFile(v.ctx, name)
+	return newVirtualFile(v.ctx, name, func(b []byte) {
+		v.resultOnce.Do(func() {
+			v.result = b
+		})
+	})
 }
 
 type VirtualFile struct {
@@ -33,17 +45,16 @@ type VirtualFile struct {
 	nameParts []string
 	Remaining []byte
 	Loaded    bool
+
+	outputSetter func([]byte)
 }
 
-func NewVirtualFile(ctx context.Context, name string) (*VirtualFile, error) {
-	//if !strings.HasPrefix(name, "/sys/") {
-	//	fmt.Printf("invalid file name %q should start with /sys/\n", name)
-	//	return NewVirtualFile(ctx, name)
-	//}
+func newVirtualFile(ctx context.Context, name string, outputSetter func([]byte)) (*VirtualFile, error) {
 	return &VirtualFile{
-		ctx:       ctx,
-		name:      name,
-		nameParts: strings.Split(name, "/"),
+		ctx:          ctx,
+		name:         name,
+		nameParts:    strings.Split(name, "/"),
+		outputSetter: outputSetter,
 	}, nil
 }
 
@@ -53,6 +64,11 @@ func (v *VirtualFile) Stat() (fs.FileInfo, error) {
 }
 
 func (v *VirtualFile) Write(bytes []byte) (sent int, err error) {
+	if strings.HasSuffix(v.name, "sys/substreams/output") { //special function
+		v.outputSetter(bytes)
+		return len(bytes), nil
+	}
+
 	err = dataToFile(v.ctx, v.nameParts[1:], bytes) //skip /sys
 	if err != nil {
 		return 0, fmt.Errorf("writing data for file %q: %w", v.name, err)
@@ -147,13 +163,7 @@ func dataToFile(ctx context.Context, parts []string, data []byte) error {
 }
 
 func stateDataToFile(ctx context.Context, parts []string, data []byte) error {
-	//indexString := parts[0]
-	//index, err := strconv.Atoi(indexString)
-	//if err != nil {
-	//	return fmt.Errorf("parsing index %q: %w", indexString, err)
-	//}
 	verb := parts[1]
-
 	call := wasm.FromContext(ctx)
 
 	switch verb {

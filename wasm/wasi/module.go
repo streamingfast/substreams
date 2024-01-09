@@ -12,7 +12,6 @@ import (
 	"math/rand"
 	"os"
 	"sync"
-	"time"
 
 	"github.com/dustin/go-humanize"
 	"github.com/streamingfast/substreams/wasm"
@@ -85,15 +84,15 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, wasmInstan
 	if err != nil {
 		return nil, fmt.Errorf("marshalling args: %w", err)
 	}
-	fmt.Println("args data length", len(argsData))
 
 	ctx = wasm.WithContext(sfwaz.WithInstanceContext(ctx, inst), call)
+	vfs := fs.NewVirtualFs(ctx)
 	config := m.wazModuleConfig.
 		WithRandSource(rand.New(rand.NewSource(42))).
 		WithStdin(m.send).
-		WithStdout(m.receive).
+		WithStdout(os.Stdout).
 		WithStderr(NewStdErrLogWriter(ctx)).
-		WithFS(fs.NewVirtualFs(ctx)).
+		WithFS(vfs).
 		WithName(call.Entrypoint).
 		WithArgs(call.Entrypoint, "-inputsize", fmt.Sprintf("%d", len(argsData)))
 
@@ -102,7 +101,6 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, wasmInstan
 		return nil, fmt.Errorf("writing args: %w", err)
 	}
 
-	start := time.Now()
 	if _, err := m.wazRuntime.InstantiateModule(ctx, m.userModule, config); err != nil {
 		// Note: Most compilers do not exit the module after running "_start",
 		// unless there was an error. This allows you to call exported functions.
@@ -112,9 +110,8 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, wasmInstan
 			log.Panicln(err)
 		}
 	}
-	fmt.Println("wazero duration", time.Since(start))
 
-	data, err := io.ReadAll(m.receive)
+	data := vfs.Result()
 	if err != nil {
 		return nil, fmt.Errorf("reading output: %w", err)
 	}

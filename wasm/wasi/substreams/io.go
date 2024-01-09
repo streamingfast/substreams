@@ -2,7 +2,6 @@ package substreams
 
 import (
 	"io"
-	"log"
 	"os"
 )
 
@@ -16,7 +15,6 @@ func readAll(r io.Reader, allocSize int) ([]byte, error) {
 	for {
 		count++
 		n, err := r.Read(b[len(b):cap(b)])
-		log.Print("Read count: ", count)
 		b = b[:len(b)+n]
 		if err != nil {
 			if err == io.EOF {
@@ -33,7 +31,8 @@ func readAll(r io.Reader, allocSize int) ([]byte, error) {
 }
 
 func WriteOutput(data []byte) (int, error) {
-	return os.Stdout.Write(data)
+	err := os.WriteFile("/sys/substreams/output", data, 0644)
+	return len(data), err
 }
 
 func ReadInput(allocSize int) ([]byte, error) {

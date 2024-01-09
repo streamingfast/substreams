@@ -45,14 +45,13 @@ func main() {
 			wasm.NewStoreReaderInput("store.reader.2", createStore(ctx, "store.reader.2")),
 			wasm.NewStoreWriterOutput("out", createStore(ctx, "out"), 1, "string"),
 		)
-		execStart := time.Now()
+
 		call := wasm.NewCall(nil, "mapBlock", "mapBlock", args)
 		_, err = module.ExecuteNewCall(ctx, call, instance, args)
 		if err != nil {
 			panic(fmt.Errorf("executing call: %w", err))
 		}
-		fmt.Println("exec duration", time.Since(execStart))
-		//fmt.Println("call output", string(call.Output()))
+
 		data := call.Output()
 		output := &pb.MapBlockOutput{}
 		err = output.UnmarshalVT(data)

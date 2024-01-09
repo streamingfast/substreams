@@ -12,7 +12,7 @@ import (
 )
 
 func mapBlock(inputs *MapBlockInput) (*pb.MapBlockOutput, error) {
-	log.Print(rand.Int())
+	log.Printf("totally random number: %d", rand.Int())
 
 	rocketAddress := strings.ToLower("ae78736Cd615f374D3085123A210448E74Fc6393")
 
@@ -29,7 +29,7 @@ func mapBlock(inputs *MapBlockInput) (*pb.MapBlockOutput, error) {
 	log.Print("got value_123")
 
 	log.Printf("%s", time.Now())
-	time.Sleep(5 * time.Second)
+	time.Sleep(60 * time.Second)
 	log.Printf("%s", time.Now())
 
 	trxCount := 0
@@ -66,7 +66,7 @@ func mapBlock(inputs *MapBlockInput) (*pb.MapBlockOutput, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Print("set popo to lol")
+	log.Print("set key `popo` to value `lol`")
 
 	output := &pb.MapBlockOutput{
 		TrxCount:      uint32(trxCount),

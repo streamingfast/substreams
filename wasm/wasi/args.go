@@ -29,8 +29,7 @@ func marshallArgs(args []wasm.Argument) ([]byte, error) {
 	}
 	data, err := protoscope.NewScanner(scopeData).Exec()
 	if err != nil {
-		fmt.Println("scopeData", scopeData)
-		return nil, fmt.Errorf("scanning args: %w", err)
+		return nil, fmt.Errorf("scanning args: %w (scopeData: %s)", err, scopeData)
 	}
 	return data, nil
 

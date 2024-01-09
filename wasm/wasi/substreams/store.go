@@ -62,15 +62,15 @@ func newBaseStore(idx uint32) *baseStore {
 	}
 }
 
-func NewGetBytesStore(idx uint32) StoreGet[[]byte] {
+func NewGetbaseStore(idx uint32) StoreGet[[]byte] {
 	return newBaseStore(idx)
 }
 
-func NewSetBytesStore(idx uint32) StoreSet[[]byte] {
+func NewSetbaseStore(idx uint32) StoreSet[[]byte] {
 	return newBaseStore(idx)
 }
 
-func NewDeleteBytesStore(idx uint32) StoreDelete {
+func NewDeletebaseStore(idx uint32) StoreDelete {
 	return newBaseStore(idx)
 }
 
@@ -159,24 +159,24 @@ func (s *baseStore) readFromFile(path string) ([]byte, error) {
 }
 
 type protoStore[M proto.Message] struct {
-	bytesStore *baseStore //for some reason, it does not like to be embedded for this struct. perhaps because of the generic type? not sure. no time to investigate at the moment
+	baseStore *baseStore //for some reason, it does not like to be embedded for this struct. perhaps because of the generic type? not sure. no time to investigate at the moment
 }
 
 func NewGetProtoStore[M proto.Message](idx uint32) StoreGet[M] {
 	return &protoStore[M]{
-		bytesStore: newBaseStore(idx),
+		baseStore: newBaseStore(idx),
 	}
 }
 
 func NewSetProtoStore[M proto.Message](idx uint32) StoreSet[M] {
 	return &protoStore[M]{
-		bytesStore: newBaseStore(idx),
+		baseStore: newBaseStore(idx),
 	}
 }
 
 func NewDeleteProtoStore[M proto.Message](idx uint32) StoreDelete {
 	return &protoStore[M]{
-		bytesStore: newBaseStore(idx),
+		baseStore: newBaseStore(idx),
 	}
 }
 
@@ -186,7 +186,7 @@ func newM[M proto.Message]() M {
 }
 
 func (s *protoStore[M]) GetAt(ord uint64, key string) (M, error) {
-	data, err := s.bytesStore.GetAt(ord, key)
+	data, err := s.baseStore.GetAt(ord, key)
 	if err != nil {
 		return newM[M](), fmt.Errorf("reading key %q at %d: %w", key, ord, err)
 	}
@@ -194,7 +194,7 @@ func (s *protoStore[M]) GetAt(ord uint64, key string) (M, error) {
 }
 
 func (s *protoStore[M]) GetLast(key string) (M, error) {
-	data, err := s.bytesStore.GetLast(key)
+	data, err := s.baseStore.GetLast(key)
 	if err != nil {
 		return newM[M](), fmt.Errorf("reading last key %q: %w", key, err)
 	}
@@ -202,7 +202,7 @@ func (s *protoStore[M]) GetLast(key string) (M, error) {
 }
 
 func (s *protoStore[M]) GetFirst(key string) (M, error) {
-	data, err := s.bytesStore.GetLast(key)
+	data, err := s.baseStore.GetLast(key)
 	if err != nil {
 		return newM[M](), fmt.Errorf("reading first key %q: %w", key, err)
 	}
@@ -210,15 +210,15 @@ func (s *protoStore[M]) GetFirst(key string) (M, error) {
 }
 
 func (s *protoStore[M]) HasAt(ord uint64, key string) bool {
-	return s.bytesStore.HasAt(ord, key)
+	return s.baseStore.HasAt(ord, key)
 }
 
 func (s *protoStore[M]) HasLast(key string) bool {
-	return s.bytesStore.HasLast(key)
+	return s.baseStore.HasLast(key)
 }
 
 func (s *protoStore[M]) HasFirst(key string) bool {
-	return s.bytesStore.HasFirst(key)
+	return s.baseStore.HasFirst(key)
 }
 
 func (s *protoStore[M]) Set(ord uint64, key string, value M) error {
@@ -226,7 +226,7 @@ func (s *protoStore[M]) Set(ord uint64, key string, value M) error {
 	if err != nil {
 		return fmt.Errorf("converting value %v: %w", value, err)
 	}
-	return s.bytesStore.Set(ord, key, v)
+	return s.baseStore.Set(ord, key, v)
 }
 
 func (s *protoStore[M]) SetMany(ord uint64, keys []string, value M) error {
@@ -234,7 +234,7 @@ func (s *protoStore[M]) SetMany(ord uint64, keys []string, value M) error {
 	if err != nil {
 		return fmt.Errorf("converting value %v: %w", value, err)
 	}
-	return s.bytesStore.SetMany(ord, keys, v)
+	return s.baseStore.SetMany(ord, keys, v)
 }
 
 func (s *protoStore[M]) SetIfNotExists(ord uint64, key string, value M) error {
@@ -242,7 +242,7 @@ func (s *protoStore[M]) SetIfNotExists(ord uint64, key string, value M) error {
 	if err != nil {
 		return fmt.Errorf("converting value %v: %w", value, err)
 	}
-	return s.bytesStore.SetIfNotExists(ord, key, v)
+	return s.baseStore.SetIfNotExists(ord, key, v)
 }
 
 func (s *protoStore[M]) SetIfNotExistsMany(ord uint64, keys []string, value M) error {
@@ -250,11 +250,11 @@ func (s *protoStore[M]) SetIfNotExistsMany(ord uint64, keys []string, value M) e
 	if err != nil {
 		return fmt.Errorf("converting value %v: %w", value, err)
 	}
-	return s.bytesStore.SetIfNotExistsMany(ord, keys, v)
+	return s.baseStore.SetIfNotExistsMany(ord, keys, v)
 }
 
 func (s *protoStore[M]) DeletePrefix(ord uint64, prefix string) error {
-	return s.bytesStore.DeletePrefix(ord, prefix)
+	return s.baseStore.DeletePrefix(ord, prefix)
 }
 
 func (s *protoStore[M]) into(data []byte) (M, error) {

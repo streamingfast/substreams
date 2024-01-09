@@ -21,7 +21,10 @@ func Main() {
 	inputsize := 0
 	if *inputsizeval != "0" {
 		//parse to int
-		fmt.Sscanf(*inputsizeval, "%d", &inputsize)
+		_, err := fmt.Sscanf(*inputsizeval, "%d", &inputsize)
+		if err != nil {
+			//ignored.  will use 0 as default
+		}
 	}
 
 	moduleName := os.Args[0]

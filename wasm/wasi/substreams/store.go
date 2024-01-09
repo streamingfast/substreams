@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+
+	"google.golang.org/protobuf/proto"
 )
 
 type StoreGet[T any] interface {
@@ -156,36 +158,29 @@ func (s *baseStore) readFromFile(path string) ([]byte, error) {
 	return s.fileReadWriter.ReadFile(path)
 }
 
-//TODO: check this type.  is this what we want?  do we want to support VT?
-type ProtoMarhsaler interface {
-	Marshal() ([]byte, error)
-	Unmarshal([]byte) error
-}
-
-//TODO: DO WE EVEN NEED THIS???
-type protoStore[M ProtoMarhsaler] struct {
+type protoStore[M proto.Message] struct {
 	bytesStore *baseStore //for some reason, it does not like to be embedded for this struct. perhaps because of the generic type? not sure. no time to investigate at the moment
 }
 
-func NewGetProtoStore[M ProtoMarhsaler](idx uint32) StoreGet[M] {
+func NewGetProtoStore[M proto.Message](idx uint32) StoreGet[M] {
 	return &protoStore[M]{
 		bytesStore: newBaseStore(idx),
 	}
 }
 
-func NewSetProtoStore[M ProtoMarhsaler](idx uint32) StoreSet[M] {
+func NewSetProtoStore[M proto.Message](idx uint32) StoreSet[M] {
 	return &protoStore[M]{
 		bytesStore: newBaseStore(idx),
 	}
 }
 
-func NewDeleteProtoStore[M ProtoMarhsaler](idx uint32) StoreDelete {
+func NewDeleteProtoStore[M proto.Message](idx uint32) StoreDelete {
 	return &protoStore[M]{
 		bytesStore: newBaseStore(idx),
 	}
 }
 
-func newM[M ProtoMarhsaler]() M {
+func newM[M proto.Message]() M {
 	var m M // create a zero value of M
 	return m
 }
@@ -264,7 +259,7 @@ func (s *protoStore[M]) DeletePrefix(ord uint64, prefix string) error {
 
 func (s *protoStore[M]) into(data []byte) (M, error) {
 	m := newM[M]()
-	err := m.Unmarshal(data)
+	err := proto.Unmarshal(data, m)
 	if err != nil {
 		return m, fmt.Errorf("unmarshalling proto: %w", err)
 	}
@@ -272,7 +267,7 @@ func (s *protoStore[M]) into(data []byte) (M, error) {
 }
 
 func (s *protoStore[M]) from(item M) ([]byte, error) {
-	return item.Marshal()
+	return proto.Marshal(item)
 }
 
 type stringStore struct {

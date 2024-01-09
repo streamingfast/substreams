@@ -684,8 +684,8 @@ github.com/streamingfast/sf-tracing v0.0.0-20230616174903-cd2ade641ca9 h1:YRwpVv
 github.com/streamingfast/sf-tracing v0.0.0-20230616174903-cd2ade641ca9/go.mod h1:ktzt1BUj3GF+SKQHEmn3ShryJ7y87JeCHtaTGaDVATs=
 github.com/streamingfast/shutter v1.5.0 h1:NpzDYzj0HVpSiDJVO/FFSL6QIK/YKOxY0gJAtyaTOgs=
 github.com/streamingfast/shutter v1.5.0/go.mod h1:B/T6efqdeMGbGwjzPS1ToXzYZI4kDzI5/u4I+7qbjY8=
-github.com/streamingfast/substreams-sdk-go v0.0.0-20240109190512-85bc885905d7 h1:eRpkucqwTdKWYfcio6iTNieJuN3Sar7SbyUNrEF4D3A=
-github.com/streamingfast/substreams-sdk-go v0.0.0-20240109190512-85bc885905d7/go.mod h1:YoTWsS9WoJA01SZErNkg0DbZ4cX9U6llEaydWz5w2W8=
+github.com/streamingfast/substreams-sdk-go v0.0.0-20240109195230-86cbd949306b h1:iihwuJZCKHLt4j0WU+e+r+c6etZ0I/2K1pxT723qUQU=
+github.com/streamingfast/substreams-sdk-go v0.0.0-20240109195230-86cbd949306b/go.mod h1:TJXOmIAPY+FJvosBoMAiQeZzi32QiBXzCTSgVsss9Oo=
 github.com/streamingfast/validator v0.0.0-20210812013448-b9da5752ce14 h1:/HCMj7plThWPFXsj/O8f+zDIAtXciwP4rK6tb+9UvPQ=
 github.com/streamingfast/validator v0.0.0-20210812013448-b9da5752ce14/go.mod h1:t4h97mWfTs6v0zjEFuGDOoW5wLtu9+ttegIx99i7gsM=
 github.com/streamingfast/wasmtime-go/v4 v4.0.0-freemem3 h1:raJHR0JWgYiSyX0vZ3leRK/TkNcn4ZUGTf+d64g48KQ=

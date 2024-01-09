@@ -1,6 +1,6 @@
 module github.com/streamingfast/substreams
 
-go 1.21.5
+go 1.21
 
 require (
 	github.com/abourget/llerrgroup v0.2.0
@@ -60,7 +60,7 @@ require (
 	github.com/streamingfast/eth-go v0.0.0-20230410173454-433bd8803da1
 	github.com/streamingfast/sf-tracing v0.0.0-20230616174903-cd2ade641ca9
 	github.com/streamingfast/shutter v1.5.0
-	github.com/streamingfast/substreams-sdk-go v0.0.0-20240109190512-85bc885905d7
+	github.com/streamingfast/substreams-sdk-go v0.0.0-20240109195230-86cbd949306b
 	github.com/tetratelabs/wazero v1.5.1-0.20231221055507-cd143e849f7a
 	github.com/tidwall/pretty v1.2.1
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.36.4

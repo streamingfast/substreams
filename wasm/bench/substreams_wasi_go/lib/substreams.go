@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/streamingfast/substreams/wasm/bench/substreams_wasi_go/pb"
 )
 
 func mapBlock(inputs *MapBlockInput) (*pb.MapBlockOutput, error) {
+	//log.Print(rand.Int())
 	rocketAddress := strings.ToLower("ae78736Cd615f374D3085123A210448E74Fc6393")
 
 	approvalTopic := strings.ToLower("8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925")
@@ -23,6 +25,10 @@ func mapBlock(inputs *MapBlockInput) (*pb.MapBlockOutput, error) {
 		return nil, fmt.Errorf("expected value_123, got %q", v)
 	}
 	log.Print("got value_123")
+
+	log.Print(time.Now())
+	time.Sleep(1 * time.Second)
+	log.Print(time.Now())
 
 	trxCount := 0
 	transferCount := 0

@@ -218,3 +218,5 @@ require (
 retract v1.0.2 // Published at wrong tag.
 
 replace github.com/jhump/protoreflect => github.com/streamingfast/protoreflect v0.0.0-20230414203421-018294174fdc
+
+replace github.com/streamingfast/dstore => ../dstore

@@ -6,8 +6,12 @@ import (
 	"os"
 )
 
-func readAll(r io.Reader) ([]byte, error) {
-	b := make([]byte, 0, 1024*1024)
+func readAll(r io.Reader, allocSize int) ([]byte, error) {
+	if allocSize <= 0 {
+		allocSize = 1024
+	}
+
+	b := make([]byte, 0, allocSize)
 	count := 0
 	for {
 		count++
@@ -32,8 +36,8 @@ func WriteOutput(data []byte) (int, error) {
 	return os.Stdout.Write(data)
 }
 
-func ReadInput() ([]byte, error) {
-	return readAll(os.Stdin)
+func ReadInput(allocSize int) ([]byte, error) {
+	return readAll(os.Stdin, allocSize)
 }
 
 func ReadFile(path string) ([]byte, error) {

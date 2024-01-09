@@ -1,6 +1,7 @@
 package substreams
 
 import (
+	"flag"
 	"fmt"
 	"os"
 )
@@ -14,8 +15,17 @@ func Register(name string, f execFunc) {
 }
 
 func Main() {
+	inputsizeval := flag.String("inputsize", "0", "input size")
+	flag.Parse()
+
+	inputsize := 0
+	if *inputsizeval != "0" {
+		//parse to int
+		fmt.Sscanf(*inputsizeval, "%d", &inputsize)
+	}
+
 	moduleName := os.Args[0]
-	input, err := ReadInput()
+	input, err := ReadInput(inputsize)
 	if err != nil {
 		panic(fmt.Errorf("reading input: %w", err))
 	}

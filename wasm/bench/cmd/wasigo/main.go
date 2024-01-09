@@ -22,7 +22,7 @@ func main() {
 	ctx := context.Background()
 	wasmRuntime := wasm.NewRegistryWithRuntime("wasi", nil, 0)
 	code, err := os.ReadFile("/Users/colindickson/code/dfuse/substreams/wasm/bench/substreams_wasi_go/main.wasm")
-	blockReader, err := os.Open("/Users/colindickson/code/dfuse/substreams/wasm/bench/cmd/barebones/testdata/block.binpb")
+	blockReader, err := os.Open("/Users/colindickson/code/dfuse/substreams/wasm/bench/cmd/wasigo/testdata/block.binpb")
 	if err != nil {
 		panic(err)
 	}
@@ -40,7 +40,7 @@ func main() {
 	for i := 0; i < 1; i++ {
 		args := args(
 			wasm.NewParamsInput("{key.1: 'value.1'}"),
-			blockInputFile("/Users/colindickson/code/dfuse/substreams/wasm/bench/cmd/barebones/testdata/block.binpb"),
+			blockInputFile("/Users/colindickson/code/dfuse/substreams/wasm/bench/cmd/wasigo/testdata/block.binpb"),
 			wasm.NewStoreReaderInput("store.reader.1", createStore(ctx, "store.reader.1")),
 			wasm.NewStoreReaderInput("store.reader.2", createStore(ctx, "store.reader.2")),
 			wasm.NewStoreWriterOutput("out", createStore(ctx, "out"), 1, "string"),

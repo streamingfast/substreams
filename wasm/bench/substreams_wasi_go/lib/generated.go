@@ -3,8 +3,8 @@ package lib
 import (
 	"fmt"
 
+	"github.com/streamingfast/substreams-sdk-go/substreams"
 	"github.com/streamingfast/substreams/wasm/bench/substreams_wasi_go/pb"
-	"github.com/streamingfast/substreams/wasm/wasi/substreams"
 )
 
 func init() {

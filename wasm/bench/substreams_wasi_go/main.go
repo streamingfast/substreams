@@ -1,8 +1,8 @@
 package main
 
 import (
+	"github.com/streamingfast/substreams-sdk-go/substreams"
 	_ "github.com/streamingfast/substreams/wasm/bench/substreams_wasi_go/lib"
-	"github.com/streamingfast/substreams/wasm/wasi/substreams"
 )
 
 func main() {

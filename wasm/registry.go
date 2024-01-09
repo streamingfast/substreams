@@ -57,6 +57,7 @@ func NewRegistry(extensions []WASMExtensioner, maxFuel uint64) *Registry {
 		if selectedRuntime == nil {
 			panic(fmt.Errorf("could not find wasm runtime specified by `SUBSTREAMS_WASM_RUNTIME` env var: %q", selectRuntime))
 		}
+		runtimeName = selectRuntime
 	} else {
 		zlog.Info("using default wasm runtime", zap.String("runtime", runtimeName))
 	}

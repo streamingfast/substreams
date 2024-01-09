@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"os"
 	"sync"
 	"time"
@@ -48,23 +49,7 @@ func newModule(ctx context.Context, wasmCode []byte, wasmCodeType string, regist
 		return nil, fmt.Errorf("creating new module: %w", err)
 	}
 
-	hostModules := []wazero.CompiledModule{}
-	//loggerModule, err := sfwaz.AddHostFunctions(ctx, runtime, "logger", sfwaz.LoggerFuncs)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//stateModule, err := sfwaz.AddHostFunctions(ctx, runtime, "state", sfwaz.StateFuncs)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//hostModules = append(hostModules, loggerModule, stateModule)
-
-	//startFunc := "main"
-	//switch wasmCodeType {
-	//case "go/wasi":
-	//	startFunc = "_start"
-	//}
-
+	var hostModules []wazero.CompiledModule
 	wazConfig := wazero.NewModuleConfig()
 
 	s := bytes.NewBuffer(nil)
@@ -104,16 +89,7 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, wasmInstan
 
 	ctx = wasm.WithContext(sfwaz.WithInstanceContext(ctx, inst), call)
 	config := m.wazModuleConfig.
-		//todo: doc says this Defaults to return a deterministic source, but this does not seem to hold.  We need to investigate.
-		//WithRandSource(rand.New(rand.NewSource(0))).
-		WithWalltime(func() (sec int64, nsec int32) {
-			t := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-			return t.Unix(), int32(t.Nanosecond())
-		}, sys.ClockResolution(time.Microsecond.Nanoseconds())).
-		WithNanotime(func() int64 {
-			return time.Since(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)).Nanoseconds()
-		}, sys.ClockResolution(1)).
-		WithSysNanosleep().
+		WithRandSource(rand.New(rand.NewSource(42))).
 		WithStdin(m.send).
 		WithStdout(m.receive).
 		WithStderr(NewStdErrLogWriter(ctx)).

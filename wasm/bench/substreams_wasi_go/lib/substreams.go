@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"math/rand"
 	"strings"
 	"time"
 
@@ -11,7 +12,8 @@ import (
 )
 
 func mapBlock(inputs *MapBlockInput) (*pb.MapBlockOutput, error) {
-	//log.Print(rand.Int())
+	log.Print(rand.Int())
+
 	rocketAddress := strings.ToLower("ae78736Cd615f374D3085123A210448E74Fc6393")
 
 	approvalTopic := strings.ToLower("8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925")
@@ -26,9 +28,9 @@ func mapBlock(inputs *MapBlockInput) (*pb.MapBlockOutput, error) {
 	}
 	log.Print("got value_123")
 
-	log.Print(time.Now())
-	time.Sleep(1 * time.Second)
-	log.Print(time.Now())
+	log.Printf("%s", time.Now())
+	time.Sleep(5 * time.Second)
+	log.Printf("%s", time.Now())
 
 	trxCount := 0
 	transferCount := 0

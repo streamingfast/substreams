@@ -62,7 +62,7 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		fmt.Println("output", string(jdata))
+		fmt.Println("output::", string(jdata))
 
 		fmt.Println("-------------------------------- call logs --------------------------------")
 		for _, log := range call.Logs {

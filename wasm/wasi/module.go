@@ -16,7 +16,7 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/streamingfast/substreams/wasm"
 	"github.com/streamingfast/substreams/wasm/wasi/fs"
-	sfwaz "github.com/streamingfast/substreams/wasm/wazero"
+	sfwazero "github.com/streamingfast/substreams/wasm/wazero"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/sys"
@@ -74,24 +74,26 @@ func (m *Module) NewInstance(ctx context.Context) (out wasm.Instance, err error)
 		return nil, fmt.Errorf("could not instantiate wasm module: %w", err)
 	}
 
-	return &sfwaz.Instance{}, nil
+	return &sfwazero.Instance{}, nil
 }
 
 func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, wasmInstance wasm.Instance, arguments []wasm.Argument) (out wasm.Instance, err error) {
-	inst := &sfwaz.Instance{}
+	inst := &sfwazero.Instance{}
 
 	argsData, err := marshallArgs(arguments)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling args: %w", err)
 	}
 
-	ctx = wasm.WithContext(sfwaz.WithInstanceContext(ctx, inst), call)
+	ctx = wasm.WithContext(sfwazero.WithInstanceContext(ctx, inst), call)
 	vfs := fs.NewVirtualFs(ctx)
+	logWriter := NewLogWriter(ctx)
+
 	config := m.wazModuleConfig.
 		WithRandSource(rand.New(rand.NewSource(42))).
 		WithStdin(m.send).
-		WithStdout(os.Stdout).
-		WithStderr(NewStdErrLogWriter(ctx)).
+		WithStdout(logWriter).
+		WithStderr(logWriter).
 		WithFS(vfs).
 		WithName(call.Entrypoint).
 		WithArgs(call.Entrypoint, "-inputsize", fmt.Sprintf("%d", len(argsData)))
@@ -177,18 +179,18 @@ func (m *Module) instantiateModule(ctx context.Context) error {
 	return nil
 }
 
-type StdErrLogWriter struct {
+type LogWriter struct {
 	ctx context.Context
 }
 
-func NewStdErrLogWriter(ctx context.Context) io.Writer {
-	return &StdErrLogWriter{
+func NewLogWriter(ctx context.Context) io.Writer {
+	return &LogWriter{
 		ctx: ctx,
 	}
 }
 
-func (w *StdErrLogWriter) Write(p []byte) (n int, err error) {
-	message := string(p)
+func (w *LogWriter) Write(p []byte) (n int, err error) {
+	logMessage := string(p)
 	length := len(p)
 
 	call := wasm.FromContext(w.ctx)
@@ -202,6 +204,6 @@ func (w *StdErrLogWriter) Write(p []byte) (n int, err error) {
 		return 0, fmt.Errorf("message to log is too big, max size is %s", humanize.IBytes(uint64(length)))
 	}
 
-	call.AppendLog(message)
+	call.AppendLog(logMessage)
 	return len(p), nil
 }

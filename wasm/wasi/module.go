@@ -174,6 +174,7 @@ func (m *Module) instantiateModule(ctx context.Context) error {
 }
 
 type LogWriter struct {
+	mu  sync.Mutex
 	ctx context.Context
 }
 
@@ -184,6 +185,9 @@ func NewLogWriter(ctx context.Context) io.Writer {
 }
 
 func (w *LogWriter) Write(p []byte) (n int, err error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
 	logMessage := string(p)
 	length := len(p)
 

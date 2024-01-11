@@ -1,11 +1,8 @@
 package wasi
 
 import (
-	"bufio"
 	"bytes"
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -31,7 +28,6 @@ type Module struct {
 	userModule      wazero.CompiledModule
 	hostModules     []wazero.CompiledModule
 	send            io.ReadWriter
-	receive         io.ReadWriter
 }
 
 func init() {
@@ -52,7 +48,6 @@ func newModule(ctx context.Context, wasmCode []byte, wasmCodeType string, regist
 	wazConfig := wazero.NewModuleConfig()
 
 	s := bytes.NewBuffer(nil)
-	r := bytes.NewBuffer(nil)
 
 	return &Module{
 		wazModuleConfig: wazConfig,
@@ -60,7 +55,6 @@ func newModule(ctx context.Context, wasmCode []byte, wasmCodeType string, regist
 		userModule:      mod,
 		hostModules:     hostModules,
 		send:            s,
-		receive:         r,
 	}, nil
 }
 
@@ -119,42 +113,6 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, wasmInstan
 type message struct {
 	call    string
 	payload []byte
-}
-
-func (m *Module) receiveMessage(context.Context) error {
-	s := bufio.NewScanner(m.receive)
-	for {
-
-		// Repeated calls to Scan yield the token sequence found in the input.
-		for s.Scan() {
-			encoded := s.Text()
-			decoded, err := base64.StdEncoding.DecodeString(encoded)
-			if err != nil {
-				return fmt.Errorf("decoding input: %w", err)
-			}
-			msg := &message{}
-			err = json.Unmarshal(decoded, msg)
-			if err != nil {
-				return fmt.Errorf("unmarshalling message: %w", err)
-			}
-			switch msg.call {
-			case "Println":
-				fmt.Println("printing...", string(msg.payload))
-				_, err := m.send.Write([]byte("\n"))
-				if err != nil {
-					return fmt.Errorf("writing ok: %w", err)
-				}
-			default:
-				panic(fmt.Errorf("unknown call: %q", msg.call))
-			}
-
-		}
-		if err := s.Err(); err != nil {
-			return fmt.Errorf("reading input: %w", err)
-		}
-
-	}
-	return nil
 }
 
 func (m *Module) instantiateModule(ctx context.Context) error {

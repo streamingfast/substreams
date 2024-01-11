@@ -8,7 +8,6 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/streamingfast/substreams/wasm"
@@ -16,13 +15,6 @@ import (
 
 type Virtual struct {
 	ctx context.Context
-
-	resultOnce sync.Once
-	result     []byte
-}
-
-func (v *Virtual) Result() []byte {
-	return v.result
 }
 
 func NewVirtualFs(ctx context.Context) *Virtual {
@@ -32,11 +24,7 @@ func NewVirtualFs(ctx context.Context) *Virtual {
 }
 
 func (v *Virtual) Open(name string) (fs.File, error) {
-	return newVirtualFile(v.ctx, name, func(b []byte) {
-		v.resultOnce.Do(func() {
-			v.result = b
-		})
-	})
+	return newVirtualFile(v.ctx, name)
 }
 
 type VirtualFile struct {
@@ -45,16 +33,13 @@ type VirtualFile struct {
 	nameParts []string
 	Remaining []byte
 	Loaded    bool
-
-	outputSetter func([]byte)
 }
 
-func newVirtualFile(ctx context.Context, name string, outputSetter func([]byte)) (*VirtualFile, error) {
+func newVirtualFile(ctx context.Context, name string) (*VirtualFile, error) {
 	return &VirtualFile{
-		ctx:          ctx,
-		name:         name,
-		nameParts:    strings.Split(name, "/"),
-		outputSetter: outputSetter,
+		ctx:       ctx,
+		name:      name,
+		nameParts: strings.Split(name, "/"),
 	}, nil
 }
 
@@ -65,7 +50,9 @@ func (v *VirtualFile) Stat() (fs.FileInfo, error) {
 
 func (v *VirtualFile) Write(bytes []byte) (sent int, err error) {
 	if strings.HasSuffix(v.name, "sys/substreams/output") { //special function
-		v.outputSetter(bytes)
+		/// get call from context
+		call := wasm.FromContext(v.ctx)
+		call.SetReturnValue(bytes)
 		return len(bytes), nil
 	}
 

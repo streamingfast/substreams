@@ -113,12 +113,6 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, wasmInstan
 		}
 	}
 
-	data := vfs.Result()
-	if err != nil {
-		return nil, fmt.Errorf("reading output: %w", err)
-	}
-	call.SetReturnValue(data)
-
 	return inst, nil
 }
 

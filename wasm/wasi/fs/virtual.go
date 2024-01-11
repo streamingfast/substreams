@@ -49,10 +49,9 @@ func (v *VirtualFile) Stat() (fs.FileInfo, error) {
 }
 
 func (v *VirtualFile) Write(bytes []byte) (sent int, err error) {
-	if strings.HasSuffix(v.name, "sys/substreams/output") { //special function
-		/// get call from context
-		call := wasm.FromContext(v.ctx)
-		call.SetReturnValue(bytes)
+	if strings.HasSuffix(v.name, "sys/substreams/output") {
+		//special function
+		v.setOutput(bytes)
 		return len(bytes), nil
 	}
 
@@ -62,6 +61,12 @@ func (v *VirtualFile) Write(bytes []byte) (sent int, err error) {
 	}
 
 	return len(bytes), nil
+}
+
+func (v *VirtualFile) setOutput(bytes []byte) {
+	// get call from context
+	call := wasm.FromContext(v.ctx)
+	call.SetReturnValue(bytes)
 }
 
 func (v *VirtualFile) Read(bytes []byte) (sent int, err error) {

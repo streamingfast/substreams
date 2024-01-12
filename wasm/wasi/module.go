@@ -10,9 +10,8 @@ import (
 	"os"
 	"sync"
 
-	"github.com/protocolbuffers/protoscope"
-
 	"github.com/dustin/go-humanize"
+	"github.com/protocolbuffers/protoscope"
 	"github.com/streamingfast/substreams/wasm"
 	"github.com/streamingfast/substreams/wasm/wasi/fs"
 	sfwazero "github.com/streamingfast/substreams/wasm/wazero"
@@ -92,7 +91,7 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, wasmInstan
 		WithStderr(logWriter).
 		WithFS(vfs).
 		WithName(call.Entrypoint).
-		WithArgs(call.Entrypoint, "-inputsize", fmt.Sprintf("%d", len(argsData)))
+		WithArgs(call.Entrypoint, "--inputsize", fmt.Sprintf("%d", len(argsData)))
 
 	_, err = m.send.Write(argsData)
 	if err != nil {

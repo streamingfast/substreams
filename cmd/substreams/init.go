@@ -161,10 +161,8 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		if initConfigFlag {
 			ethereumContracts = parseContractsFromConfig(initConfig.Contracts)
 
-			fmt.Printf("%+v\n", ethereumContracts)
-
 		} else {
-			ethereumContracts, err := promptEthereumVerifiedContracts(eth.MustNewAddress(chain.DefaultContractAddress), chain.DefaultContractName)
+			ethereumContracts, err = promptEthereumVerifiedContracts(eth.MustNewAddress(chain.DefaultContractAddress), chain.DefaultContractName)
 			if err != nil {
 				return fmt.Errorf("running contract prompt: %w", err)
 			}
@@ -697,20 +695,26 @@ func getAndSetContractABIs(ctx context.Context, contracts []*templates.EthereumC
 			}
 
 		} else {
-			abi, abiContent, wait, err := getContractABI(ctx, contract.GetAddress(), chain.ApiEndpoint)
+
+			var wait *time.Timer
+			var implementationAddress *eth.Address
+			var implementationABI *eth.ABI
+			var implementationABIContent string
+
+			abi, abiContent, wait, err = getContractABI(ctx, contract.GetAddress(), chain.ApiEndpoint)
 			if err != nil {
 				return nil, err
 			}
 
 			<-wait.C
-			implementationAddress, wait, err := getProxyContractImplementation(ctx, contract.GetAddress(), chain.ApiEndpoint)
+			implementationAddress, wait, err = getProxyContractImplementation(ctx, contract.GetAddress(), chain.ApiEndpoint)
 			if err != nil {
 				return nil, err
 			}
 			<-wait.C
 
 			if implementationAddress != nil {
-				implementationABI, implementationABIContent, wait, err := getContractABI(ctx, *implementationAddress, chain.ApiEndpoint)
+				implementationABI, implementationABIContent, wait, err = getContractABI(ctx, *implementationAddress, chain.ApiEndpoint)
 				if err != nil {
 					return nil, err
 				}

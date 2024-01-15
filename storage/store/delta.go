@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"regexp"
 
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 )
@@ -41,8 +42,14 @@ func (b *baseStore) ApplyDelta(delta *pbssinternal.StoreDelta) {
 	}
 
 	if b.totalSizeBytes > b.totalSizeLimit {
-		panic(fmt.Sprintf("store %q became too big at %d, maximum size: %d", b.Name(), b.totalSizeBytes, b.totalSizeLimit))
+		panic(storeTooBigError(b.Name(), b.totalSizeBytes, b.totalSizeLimit))
 	}
+}
+
+var StoreAboveMaxSizeRegexp = regexp.MustCompile("store .* became too big at [0-9]*, maximum size: [0-9]*")
+
+func storeTooBigError(storeName string, size, limit uint64) error {
+	return fmt.Errorf("store %q became too big at %d, maximum size: %d", storeName, size, limit)
 }
 
 func (b *baseStore) ApplyDeltasReverse(deltas []*pbssinternal.StoreDelta) {

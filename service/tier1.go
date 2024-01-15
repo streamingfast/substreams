@@ -47,6 +47,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -266,19 +267,19 @@ func (s *Tier1Service) Blocks(
 
 	err = s.blocks(runningContext, request, outputGraph, respFunc)
 
-	if grpcError := toGRPCError(runningContext, err); grpcError != nil {
-		switch connect.CodeOf(grpcError) {
+	if connectError := toConnectError(runningContext, err); connectError != nil {
+		switch connect.CodeOf(connectError) {
 		case connect.CodeInternal:
 			logger.Info("unexpected termination of stream of blocks", zap.String("stream_processor", "tier1"), zap.Error(err))
 		case connect.CodeInvalidArgument:
 			logger.Debug("recording failure on request", zap.String("request_id", requestID))
-			s.recordFailure(requestID, grpcError)
+			s.recordFailure(requestID, connectError)
 		case connect.CodeCanceled:
-			logger.Info("Blocks request canceled by user", zap.Error(grpcError))
+			logger.Info("Blocks request canceled by user", zap.Error(connectError))
 		default:
-			logger.Info("Blocks request completed with error", zap.Error(grpcError))
+			logger.Info("Blocks request completed with error", zap.Error(connectError))
 		}
-		return grpcError
+		return connectError
 	}
 
 	logger.Info("Blocks request completed witout error")
@@ -555,27 +556,41 @@ func setupRequestStats(ctx context.Context, requestDetails *reqctx.RequestDetail
 	return reqctx.WithReqStats(ctx, stats), stats
 }
 
-// toGRPCError turns an `err` into a gRPC error if it's non-nil, in the `nil` case,
+// toConnectError turns an `err` into a connect error if it's non-nil, in the `nil` case,
 // `nil` is returned right away.
 //
 // If the `err` has in its chain of error either `context.Canceled`, `context.DeadlineExceeded`
-// or `stream.ErrInvalidArg`, error is turned into a proper gRPC error respectively of code
+// or `stream.ErrInvalidArg`, error is turned into a proper connect error respectively of code
 // `Canceled`, `DeadlineExceeded` or `InvalidArgument`.
 //
-// If the `err` has its in chain any error constructed through `connect.NewError` (and its variants), then
-// we return the first found error of such type directly, because it's already a gRPC error.
+// If the `err` has in its chain any error constructed through `connect.NewError` (and its variants), then
+// we return the first found error of such type directly, because it's already a connect error.
+//
+// If the `err` has in its chain any error constructed through `grpc` or `status`, it will be converted to connect equivalent.
 //
 // Otherwise, the error is assumed to be an internal error and turned backed into a proper
 // `connect.NewError(connect.CodeInternal, err)`.
-func toGRPCError(ctx context.Context, err error) error {
+func toConnectError(ctx context.Context, err error) error {
 	if err == nil {
 		return nil
 	}
 
+	// GRPC to connect error
 	if grpcError := dgrpc.AsGRPCError(err); grpcError != nil {
+		switch grpcError.Code() {
+		case codes.Canceled:
+			return connect.NewError(connect.CodeCanceled, grpcError.Err())
+		case codes.Unavailable:
+			return connect.NewError(connect.CodeUnavailable, grpcError.Err())
+		case codes.InvalidArgument:
+			return connect.NewError(connect.CodeInvalidArgument, grpcError.Err())
+		case codes.Unknown:
+			return connect.NewError(connect.CodeUnknown, grpcError.Err())
+		}
 		return grpcError.Err()
 	}
 
+	// special case for context canceled when shutting down
 	if errors.Is(err, context.Canceled) {
 		if context.Cause(ctx) != nil {
 			err = context.Cause(ctx)
@@ -586,8 +601,13 @@ func toGRPCError(ctx context.Context, err error) error {
 		return connect.NewError(connect.CodeCanceled, err)
 	}
 
+	// context deadline exceeded
 	if errors.Is(err, context.DeadlineExceeded) {
 		return connect.NewError(connect.CodeDeadlineExceeded, err)
+	}
+
+	if store.StoreAboveMaxSizeRegexp.MatchString(err.Error()) {
+		return connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
 	if errors.Is(err, exec.ErrWasmDeterministicExec) {

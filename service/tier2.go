@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dauth"
+	"github.com/streamingfast/dgrpc"
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
@@ -22,6 +24,7 @@ import (
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/pipeline/cache"
+	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
@@ -31,7 +34,9 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 type Tier2Service struct {
@@ -173,7 +178,8 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	err = s.processRange(ctx, request, respFunc, tracing.GetTraceID(ctx).String())
 	grpcError = toGRPCError(ctx, err)
 
-	if grpcError != nil && connect.CodeOf(grpcError) == connect.CodeInternal {
+	switch status.Code(grpcError) {
+	case codes.Unknown, codes.Internal, codes.Unavailable:
 		logger.Info("unexpected termination of stream of blocks", zap.Error(err))
 	}
 
@@ -346,4 +352,68 @@ func updateStreamHeadersHostname(setHeader func(metadata.MD) error, logger *zap.
 		}
 	}
 	return hostname
+}
+
+// toGRPCError turns an `err` into a gRPC error if it's non-nil, in the `nil` case,
+// `nil` is returned right away.
+//
+// If the `err` has in its chain of error either `context.Canceled`, `context.DeadlineExceeded`
+// or `stream.ErrInvalidArg`, error is turned into a proper gRPC error respectively of code
+// `Canceled`, `DeadlineExceeded` or `InvalidArgument`.
+//
+// If the `err` has its in chain any error constructed through `connect.NewError` (and its variants), then
+// we return the first found error of such type directly, because it's already a gRPC error.
+//
+// Otherwise, the error is assumed to be an internal error and turned backed into a proper
+// `connect.NewError(connect.CodeInternal, err)`.
+
+func toGRPCError(ctx context.Context, err error) error {
+	if err == nil {
+		return nil
+	}
+
+	// already GRPC error
+	if grpcError := dgrpc.AsGRPCError(err); grpcError != nil {
+		return grpcError.Err()
+	}
+
+	// GRPC to connect error
+	connectError := &connect.Error{}
+	if errors.As(err, &connectError) {
+		switch connectError.Code() {
+		case connect.CodeCanceled:
+			return status.Error(codes.Canceled, err.Error())
+		case connect.CodeUnavailable:
+			return status.Error(codes.Canceled, err.Error())
+		case connect.CodeInvalidArgument:
+			return status.Error(codes.InvalidArgument, err.Error())
+		case connect.CodeUnknown:
+			return status.Error(codes.Unknown, err.Error())
+		}
+	}
+
+	if errors.Is(err, context.Canceled) {
+		if context.Cause(ctx) != nil {
+			err = context.Cause(ctx)
+			if err == errShuttingDown {
+				return status.Error(codes.Unavailable, err.Error())
+			}
+		}
+		return status.Error(codes.Canceled, err.Error())
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return status.Error(codes.DeadlineExceeded, err.Error())
+	}
+	if store.StoreAboveMaxSizeRegexp.MatchString(err.Error()) {
+		return status.Error(codes.InvalidArgument, err.Error())
+	}
+	if errors.Is(err, exec.ErrWasmDeterministicExec) {
+		return status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	var errInvalidArg *stream.ErrInvalidArg
+	if errors.As(err, &errInvalidArg) {
+		return status.Error(codes.InvalidArgument, err.Error())
+	}
+	return status.Error(codes.Internal, err.Error())
 }

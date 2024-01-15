@@ -98,7 +98,7 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 	for {
 		msg, err := req.Recv()
 		if err != nil {
-			fmt.Println("Error: %w", err)
+			fmt.Println("Error:", err)
 			break
 		}
 		cnt, _ := json.Marshal(msg)

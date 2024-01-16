@@ -1,5 +1,12 @@
 Using the StreamingFast SQL remote (hosted) service is the easiest way to get started with Substreams:SQL. The following tutorial teaches you how to deploy a Substreams package from the [Substreams Registry](https://substreams.dev) to StreamingFast remote service.
 
+{% hint style="success" %}
+This tutorial shows you how to deploy Substreams package to the **StreamingFast remote service**.
+You can also set up a Substreams deployable service environment in your computer, which will allow you to test your deployable services easily.
+
+The Substreams:SQL Tutorial
+{% endhint %}
+
 ## Tutorial
 
 In this short tutorial, you will:

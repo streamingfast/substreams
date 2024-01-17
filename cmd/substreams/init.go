@@ -132,7 +132,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("running protocol prompt: %w", err)
 		}
 
-		chainSelected, err := promptEthereumChain()
+		chainSelected, err = promptEthereumChain()
 		if err != nil {
 			return fmt.Errorf("running chain prompt: %w", err)
 		}

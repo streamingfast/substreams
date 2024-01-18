@@ -55,8 +55,3 @@ $ sftoken
 [^2]: The `api_key` specified here is one starting with `server_`, `web_` or `mobile_`, obtained through the StreamingFast Portal.
 
 [^3]: Install `jq` from [https://stedolan.github.io/jq/](https://stedolan.github.io/jq/)
-
-
-## Authentication with Pinax
-
-TO DO

@@ -42,10 +42,10 @@
 
 ## Tutorials
 
-* [Exploring Ethereum](new/tutorials/exploring-ethereum/overview.md)
-  * [Mapping Blocks](new/tutorials/exploring-ethereum/map_block_meta_module.md)
-  * [Filtering Transactions](new/tutorials/exploring-ethereum/map_filter_transactions_module.md)
-  * [Retrieving Events of a Smart Contract](new/tutorials/exploring-ethereum/map_contract_events_module.md)
+* [Exploring Ethereum](new/tutorials/ethereum/exploring-ethereum/overview.md)
+  * [Mapping Blocks](new/tutorials/ethereum/exploring-ethereum/map_block_meta_module.md)
+  * [Filtering Transactions](new/tutorials/ethereum/exploring-ethereum/map_filter_transactions_module.md)
+  * [Retrieving Events of a Smart Contract](new/tutorials/ethereum/exploring-ethereum/map_contract_events_module.md)
 * [Rust](new/tutorials/rust/overview.md)
   * [The Option struct](tutorials/rust/option.md)
   * [The Result struct](tutorials/rust/result.md)

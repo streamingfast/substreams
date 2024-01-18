@@ -7,7 +7,6 @@
 * [Consume Substreams](new/consume/introduction.md)
   * [Install the CLI](new/common/installing-the-cli.md)
   * [Authentication](new/common/authentication.md)
-  * [Manifest & Modules](new/common/manifest-modules.md)
   * [Packages](new/common/packages.md)
   * [Deployable Services](new/common/deployable-services.md)
   * [Substreams:SQL](new/consume/sql/introduction.md)
@@ -20,7 +19,7 @@
 * [Develop Substreams](new/develop/introduction.md)
   * [Install the CLI](new/common/installing-the-cli.md)
   * [Authentication](new/common/authentication.md)
-  * [Initialize a Project](new/develop/init-project.md)
+  * [Quickstart](new/develop/init-project.md)
   * [Manifest & Modules](new/common/manifest-modules.md)
     * [Module types](new/develop/modules/types.md)
     * [Inputs](new/develop/modules/inputs.md)
@@ -41,12 +40,22 @@
       * [Making eth_calls](new/develop/chain-specific/evm/eth-calls.md)
   * [Architecture](new/develop/architecture.md)
 
+## Tutorials
+
+* [Exploring Ethereum](new/tutorials/exploring-ethereum/overview.md)
+  * [Mapping Blocks](new/tutorials/exploring-ethereum/map_block_meta_module.md)
+  * [Filtering Transactions](new/tutorials/exploring-ethereum/map_filter_transactions_module.md)
+  * [Retrieving Events of a Smart Contract](new/tutorials/exploring-ethereum/map_contract_events_module.md)
+* [Rust](new/tutorials/rust/overview.md)
+  * [The Option struct](tutorials/rust/option.md)
+  * [The Result struct](tutorials/rust/result.md)
+
 ## Reference & Specs
 
 * [Chains and endpoints](new/references/chains-and-endpoints.md)
 * [Substreams CLI reference](new/references/command-line-interface.md)
 * [Manifests Reference](new/references/manifests.md)
-* [GUI Reference](new/references/manifests.md)
+* [GUI Reference](new/references/gui.md)
 * [Glossary](new/references/glossary.md)
 * [Change log](new/references/change-log.md)
 * [FAQ](new/references/faq.md)

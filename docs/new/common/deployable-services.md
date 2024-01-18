@@ -12,7 +12,9 @@ Depending on your needs, you must choose how you want to consume the data: using
 
 ### Add the Sink Configuration
 
-The `sink` configuration in a Substreams manifest defines what sink should be used. Every sink has different configuration fields available, so check out the Manifest Reference for more information. In the following example, a SQL sink is defined:
+The `sink` configuration in a Substreams manifest defines what sink should be used. To get more information about the Substreams manifest, refer to the [Manifest & Modules page](manifest-modules.md)
+
+Every sink has different configuration fields available, so check out the Manifest Reference for more information. In the following example, a SQL sink is defined:
 
 ```
 sink:

@@ -19,6 +19,18 @@ Once you find a package that fits your needs, you only have choose **how you wan
 
 If you can't find a Substreams package that retrieves exactly the data you need, **you can develop your own Substreams**.
 
+You can write your own Rust function to extract data from the blockchain:
+
+```rust
+fn get_usdt_transaction(block: eth::Block) -> Result<Vec<Transaction>, substreams:error:Error> {
+    let my_transactions = block.transactions().
+        .filter(|transaction| transaction.to == USDT_CONTRACT_ADDRESS)
+        .map(|transaction| MyTransaction(transaction.hash, transaction.from, transaction.to))
+        .collect();
+    Ok(my_transactions)
+}
+```
+
 <figure><img src=".gitbook/assets/intro/develop-flow.png" width="100%" /></figure>
 
 ## How Does It Work?

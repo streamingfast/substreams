@@ -13,7 +13,7 @@
     * [Deployable Services](new/consume/sql/deployable-services/introduction.md)
       * [Remote Service](new/consume/sql/deployable-services/remote-service.md)
       * [Local Service](new/consume/sql/deployable-services/local-service.md)
-    * [PostgresSQL Sink](new/consume/sql/postgres-sink.md)
+    * [SQL Sink](new/consume/sql/sql-sink.md)
   * [Substreams:Stream](new/consume/stream/quickstart.md)
     * [JavaScript](new/consume/stream/javascript.md)
 * [Develop Substreams](new/develop/introduction.md)

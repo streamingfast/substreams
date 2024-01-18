@@ -21,7 +21,9 @@ redirects:
   developers-guide/cookbook/aggregation-windows: ./new/develop/modules/aggregation-windows.md
   developers-guide/cookbook/dynamic-data-sources: ./new/develop/modules/dynamic-data-sources.md
   developers-guide/cookbook/factory-params: ./new/develop/parameterized-modules.md
-  developers-guide/cookbook/keys-in-stores: ./new/develo/modules/keys-in-stores.md
+  developers-guide/cookbook/keys-in-stores: ./new/develop/modules/keys-in-stores.md
+  developers-guide/sink-targets/substreams-powered-subgraph: ./new/consume/subgraph/quickstart.md
+  developers-guide/sink-targets/substreams-sink-sql: ./new/consume/sql/introduction.md
   getting-started/installing-the-cli: ./new/common/installing-the-cli.md
   getting-started/quickstart: ./new/common/introduction.md
   references-and-specs/chains-and-endpoints: ./new/references/chains-and-endpoints.md

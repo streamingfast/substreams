@@ -16,6 +16,7 @@
     * [SQL Sink](new/consume/sql/sql-sink.md)
   * [Substreams:Stream](new/consume/stream/quickstart.md)
     * [JavaScript](new/consume/stream/javascript.md)
+  * [Substreams:Subgraph](new/consume/subgraph/quickstart.md)
 * [Develop Substreams](new/develop/introduction.md)
   * [Install the CLI](new/common/installing-the-cli.md)
   * [Authentication](new/common/authentication.md)

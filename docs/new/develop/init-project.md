@@ -3,6 +3,10 @@ Getting started with Substreams is very easy! If you have the Substreams CLI ins
 
 Given a smart contract address, the `substreams init` command will download the contract's ABI, inspect it and create a Substreams that extracts all the events.
 
+{% embed url="https://www.youtube.com/watch?v=vWYuOczDiAA&" %}
+Initialize a Substreams project
+{% endembed %}
+
 ## Initialize the Project
 
 1. Run `substreams init`:

@@ -24,12 +24,12 @@ func (e *DockerEngine) newClickhouse(deploymentID string, pkg *pbsubstreams.Pack
 	conf := types.ServiceConfig{
 		Name:          name,
 		ContainerName: name,
-		Image:         "clickhouse/clickhouse-server:23.3-alpine",
+		Image:         "clickhouse/clickhouse-server:23.9-alpine",
 		Restart:       "on-failure",
 		Ports: []types.ServicePortConfig{
 			{
 				Published: pgPort,
-				Target:    9005,
+				Target:    8123,
 			},
 			{
 				Published: clickhousePort,
@@ -38,7 +38,6 @@ func (e *DockerEngine) newClickhouse(deploymentID string, pkg *pbsubstreams.Pack
 		},
 
 		Environment: map[string]*string{
-
 			"CLICKHOUSE_USER":                      deref("dev-node"),
 			"CLICKHOUSE_PASSWORD":                  deref("insecure-change-me-in-prod"),
 			"CLICKHOUSE_DB":                        deref("substreams"),

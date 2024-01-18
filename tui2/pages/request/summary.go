@@ -9,5 +9,5 @@ type Summary struct {
 	InitialSnapshot []string
 	Docs            []*pbsubstreams.PackageMetadata
 	ModuleDocs      []*pbsubstreams.ModuleMetadata
-	Params          []string
+	Params          map[string]string
 }

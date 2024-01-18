@@ -3,15 +3,17 @@ package pipeline
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/streamingfast/bstream"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/metrics"
@@ -105,21 +107,21 @@ func mapTestExecutor(t *testing.T, ctx context.Context, name string) *exec.Mappe
 	)
 }
 
-func bstreamBlk(t *testing.T, blk *pbsubstreamstest.Block) *bstream.Block {
-	payload, err := proto.Marshal(blk)
+func bstreamBlk(t *testing.T, blk *pbsubstreamstest.Block) *pbbstream.Block {
+
+	payload, err := anypb.New(blk)
 	require.NoError(t, err)
 
-	bb := &bstream.Block{
+	bb := &pbbstream.Block{
 		Id:             blk.Id,
 		Number:         blk.Number,
-		PreviousId:     "",
-		Timestamp:      time.Time{},
+		ParentId:       "",
+		Timestamp:      &timestamppb.Timestamp{},
 		LibNum:         0,
 		PayloadKind:    0,
 		PayloadVersion: 0,
+		Payload:        payload,
 	}
-	_, err = bstream.MemoryBlockPayloadSetter(bb, payload)
-	require.NoError(t, err)
 
 	return bb
 }

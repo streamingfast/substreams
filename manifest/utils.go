@@ -80,6 +80,18 @@ var HardcodedEndpoints = map[string]string{
 	"solana":         "mainnet.sol.streamingfast.io:443",
 	"sol":            "mainnet.sol.streamingfast.io:443",
 	"solana-mainnet": "mainnet.sol.streamingfast.io:443",
-
-	//"antelope": "",
+	"optimism":       "optimism.streamingfast.io:443",
+	"bitcoin":        "btc-mainnet.streamingfast.io:443",
+	"chapel":         "chapel.substreams.pinax.network:443",
+	// antelope chains
+	"eos":       "eos.substreams.pinax.network:443",
+	"jungle4":   "jungle4.substreams.pinax.network:443",
+	"kylin":     "kylin.substreams.pinax.network:443",
+	"wax":       "wax.substreams.pinax.network:443",
+	"waxtest":   "waxtest.substreams.pinax.network:443",
+	"telos":     "telos.substreams.pinax.network:443",
+	"telostest": "telostest.substreams.pinax.network:443",
+	"ore":       "ore.substreams.pinax.network:443",
+	"orestage":  "orestage.substreams.pinax.network:443",
+	"ux":        "ux.substreams.pinax.network:443",
 }

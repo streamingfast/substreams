@@ -11,16 +11,17 @@ import (
 )
 
 type BasicInfo struct {
-	Name                   string                         `json:"name"`
-	Version                string                         `json:"version"`
-	Documentation          *string                        `json:"documentation,omitempty"`
-	Network                string                         `json:"network,omitempty"`
-	Image                  []byte                         `json:"-"`
-	Modules                []ModulesInfo                  `json:"modules"`
-	SinkInfo               *SinkInfo                      `json:"sink_info,omitempty"`
-	ProtoPackages          []string                       `json:"proto_packages"`            // list of proto packages
-	ProtoSourceCode        map[string][]*SourceCodeInfo   `json:"proto_source_code"`         // map of proto file name to .proto file contents
-	ProtoMessagesByPackage map[string][]*ProtoMessageInfo `json:"proto_messages_by_package"` // map of package name to a list of messages info in that package
+	Name                   string                             `json:"name"`
+	Version                string                             `json:"version"`
+	Documentation          *string                            `json:"documentation,omitempty"`
+	Network                string                             `json:"network,omitempty"`
+	Image                  []byte                             `json:"-"`
+	Modules                []ModulesInfo                      `json:"modules"`
+	SinkInfo               *SinkInfo                          `json:"sink_info,omitempty"`
+	ProtoPackages          []string                           `json:"proto_packages"` // list of proto packages
+	Networks               map[string]*manifest.NetworkParams `json:"networks,omitempty"`
+	ProtoSourceCode        map[string][]*SourceCodeInfo       `json:"proto_source_code"`         // map of proto file name to .proto file contents
+	ProtoMessagesByPackage map[string][]*ProtoMessageInfo     `json:"proto_messages_by_package"` // map of package name to a list of messages info in that package
 }
 
 type SourceCodeInfo struct {
@@ -77,7 +78,7 @@ type ModuleInput struct {
 	Mode *string `json:"mode,omitempty"` //for store inputs
 }
 
-func Basic(pkg *pbsubstreams.Package) (*BasicInfo, error) {
+func Basic(pkg *pbsubstreams.Package, graph *manifest.ModuleGraph) (*BasicInfo, error) {
 	name := "Unnamed"
 	var doc, version string
 	if len(pkg.PackageMeta) != 0 {
@@ -92,13 +93,31 @@ func Basic(pkg *pbsubstreams.Package) (*BasicInfo, error) {
 		Version: version,
 		Image:   pkg.Image,
 	}
-	if doc != "" {
-		manifestInfo.Documentation = strPtr(strings.Replace(doc, "\n", "\n  ", -1))
+
+	if pkg.Networks != nil {
+		manifestInfo.Networks = make(map[string]*manifest.NetworkParams)
+	}
+	for k, v := range pkg.Networks {
+		params := &manifest.NetworkParams{}
+
+		if v.InitialBlocks != nil {
+			params.InitialBlocks = make(map[string]uint64)
+		}
+		for kk, vv := range v.InitialBlocks {
+			params.InitialBlocks[kk] = vv
+		}
+
+		if v.Params != nil {
+			params.Params = make(map[string]string)
+		}
+		for kk, vv := range v.Params {
+			params.Params[kk] = vv
+		}
+		manifestInfo.Networks[k] = params
 	}
 
-	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
-	if err != nil {
-		return nil, fmt.Errorf("creating module graph: %w", err)
+	if doc != "" {
+		manifestInfo.Documentation = strPtr(strings.Replace(doc, "\n", "\n  ", -1))
 	}
 
 	modules := make([]ModulesInfo, 0, len(pkg.Modules.Modules))
@@ -150,6 +169,9 @@ func Basic(pkg *pbsubstreams.Package) (*BasicInfo, error) {
 				if v.Store.Mode > 0 {
 					inputInfo.Mode = strPtr(v.Store.Mode.Pretty())
 				}
+			case *pbsubstreams.Module_Input_Params_:
+				inputInfo.Type = "params"
+				inputInfo.Name = input.GetParams().Value
 			default:
 				inputInfo.Type = "unknown"
 				inputInfo.Name = "unknown"
@@ -201,16 +223,16 @@ func Extended(manifestPath string, outputModule string, skipValidation bool) (*E
 		return nil, fmt.Errorf("manifest reader: %w", err)
 	}
 
-	pkg, err := reader.Read()
+	pkg, graph, err := reader.Read()
 	if err != nil {
 		return nil, fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
-	return ExtendedWithPackage(pkg, outputModule)
+	return ExtendedWithPackage(pkg, graph, outputModule)
 }
 
-func ExtendedWithPackage(pkg *pbsubstreams.Package, outputModule string) (*ExtendedInfo, error) {
-	basicInfo, err := Basic(pkg)
+func ExtendedWithPackage(pkg *pbsubstreams.Package, graph *manifest.ModuleGraph, outputModule string) (*ExtendedInfo, error) {
+	basicInfo, err := Basic(pkg, graph)
 	if err != nil {
 		return nil, err
 	}

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -12,12 +13,13 @@ import (
 	"sync"
 
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/dgrpc"
 
 	"github.com/streamingfast/bstream/hub"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/bstream/stream"
 	bsstream "github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dauth"
-	"github.com/streamingfast/dgrpc"
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
@@ -46,9 +48,10 @@ import (
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
+
+var errShuttingDown = errors.New("endpoint is shutting down, please reconnect")
 
 type Tier1Service struct {
 	*shutter.Shutter
@@ -69,6 +72,31 @@ type Tier1Service struct {
 	getHeadBlock        func() (uint64, error)
 }
 
+func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
+	var out string
+	ctx := context.Background()
+	stream, err := sf.New(
+		ctx,
+		bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
+			out = blk.Payload.TypeUrl
+			return io.EOF
+		}),
+		int64(bstream.GetProtocolFirstStreamableBlock),
+		bstream.GetProtocolFirstStreamableBlock,
+		"", false, false, zlog,
+	)
+	if err != nil {
+		return "", err
+	}
+	if err := stream.Run(ctx); err != nil {
+		if err != io.EOF {
+			return "", err
+		}
+	}
+
+	return strings.TrimPrefix(out, protoPkfPrefix), nil
+}
+
 func NewTier1(
 	logger *zap.Logger,
 	mergedBlocksStore dstore.Store,
@@ -78,16 +106,13 @@ func NewTier1(
 	stateStore dstore.Store,
 	defaultCacheTag string,
 
-	blockType string,
-
 	parallelSubRequests uint64,
 	stateBundleSize uint64,
 
 	substreamsClientConfig *client.SubstreamsClientConfig,
 	opts ...Option,
-) *Tier1Service {
+) (*Tier1Service, error) {
 
-	logger.Info("creating grpc client factory", zap.Reflect("config", substreamsClientConfig))
 	clientFactory := client.NewInternalClientFactory(substreamsClientConfig)
 
 	runtimeConfig := config.NewRuntimeConfig(
@@ -101,6 +126,18 @@ func NewTier1(
 			return work.NewRemoteWorker(clientFactory, logger)
 		},
 	)
+	sf := &StreamFactory{
+		mergedBlocksStore: mergedBlocksStore,
+		forkedBlocksStore: forkedBlocksStore,
+		hub:               hub,
+	}
+
+	blockType, err := getBlockTypeFromStreamFactory(sf)
+	if err != nil {
+		return nil, fmt.Errorf("getting block type from stream factory: %w", err)
+	}
+
+	logger.Info("launching tier1 service", zap.Reflect("client_config", substreamsClientConfig), zap.String("block_type", blockType), zap.Bool("with_live", hub != nil))
 	s := &Tier1Service{
 		Shutter:        shutter.New(),
 		runtimeConfig:  runtimeConfig,
@@ -111,11 +148,6 @@ func NewTier1(
 		logger:         logger,
 	}
 
-	sf := &StreamFactory{
-		mergedBlocksStore: mergedBlocksStore,
-		forkedBlocksStore: forkedBlocksStore,
-		hub:               hub,
-	}
 	s.streamFactoryFunc = sf.New
 	s.getRecentFinalBlock = sf.GetRecentFinalBlock
 	s.getHeadBlock = sf.GetHeadBlock
@@ -126,11 +158,7 @@ func NewTier1(
 		opt(s)
 	}
 
-	return s
-}
-
-func (s *Tier1Service) BlockType() string {
-	return s.blockType
+	return s, nil
 }
 
 func (s *Tier1Service) Blocks(
@@ -168,7 +196,7 @@ func (s *Tier1Service) Blocks(
 
 	request := req.Msg
 	if request.Modules == nil {
-		return status.Error(codes.InvalidArgument, "missing modules in request")
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("missing modules in request"))
 	}
 	moduleNames := make([]string, len(request.Modules.Modules))
 	for i := 0; i < len(moduleNames); i++ {
@@ -201,7 +229,7 @@ func (s *Tier1Service) Blocks(
 	defer metrics.ActiveSubstreams.Dec()
 
 	if err := outputmodules.ValidateTier1Request(request, s.blockType); err != nil {
-		return status.Error(codes.InvalidArgument, fmt.Errorf("validate request: %w", err).Error())
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("validate request: %w", err))
 	}
 
 	outputGraph, err := outputmodules.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules)
@@ -233,25 +261,25 @@ func (s *Tier1Service) Blocks(
 		case <-ctx.Done():
 			return
 		case <-s.Terminating():
-			cancelRunning(fmt.Errorf("endpoint is shutting down, please reconnect"))
+			cancelRunning(errShuttingDown)
 		}
 	}()
 
 	err = s.blocks(runningContext, request, outputGraph, respFunc)
 
-	if grpcError := toGRPCError(runningContext, err); grpcError != nil {
-		switch status.Code(grpcError) {
-		case codes.Internal:
+	if connectError := toConnectError(runningContext, err); connectError != nil {
+		switch connect.CodeOf(connectError) {
+		case connect.CodeInternal:
 			logger.Info("unexpected termination of stream of blocks", zap.String("stream_processor", "tier1"), zap.Error(err))
-		case codes.InvalidArgument:
+		case connect.CodeInvalidArgument:
 			logger.Debug("recording failure on request", zap.String("request_id", requestID))
-			s.recordFailure(requestID, grpcError)
-		case codes.Canceled:
-			logger.Info("Blocks request canceled by user", zap.Error(grpcError))
+			s.recordFailure(requestID, connectError)
+		case connect.CodeCanceled:
+			logger.Info("Blocks request canceled by user", zap.Error(connectError))
 		default:
-			logger.Info("Blocks request completed with error", zap.Error(grpcError))
+			logger.Info("Blocks request completed with error", zap.Error(connectError))
 		}
-		return grpcError
+		return connectError
 	}
 
 	logger.Info("Blocks request completed witout error")
@@ -491,6 +519,7 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 	auth := dauth.FromContext(ctx)
 	userID := auth.UserID()
 	apiKeyID := auth.APIKeyID()
+	userMeta := auth.Meta()
 	ip := auth.RealIP()
 	meter := dmetering.GetBytesMeter(ctx)
 
@@ -505,10 +534,10 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 		}
 		if err := streamSrv.Send(resp); err != nil {
 			logger.Info("unable to send block probably due to client disconnecting", zap.Error(err))
-			return status.Error(codes.Unavailable, err.Error())
+			return connect.NewError(connect.CodeUnavailable, err)
 		}
 
-		sendMetering(meter, userID, apiKeyID, ip, "sf.substreams.rpc.v2/Blocks", resp)
+		sendMetering(meter, userID, apiKeyID, ip, userMeta, "sf.substreams.rpc.v2/Blocks", resp)
 		return nil
 	}
 }
@@ -527,48 +556,70 @@ func setupRequestStats(ctx context.Context, requestDetails *reqctx.RequestDetail
 	return reqctx.WithReqStats(ctx, stats), stats
 }
 
-// toGRPCError turns an `err` into a gRPC error if it's non-nil, in the `nil` case,
+// toConnectError turns an `err` into a connect error if it's non-nil, in the `nil` case,
 // `nil` is returned right away.
 //
 // If the `err` has in its chain of error either `context.Canceled`, `context.DeadlineExceeded`
-// or `stream.ErrInvalidArg`, error is turned into a proper gRPC error respectively of code
+// or `stream.ErrInvalidArg`, error is turned into a proper connect error respectively of code
 // `Canceled`, `DeadlineExceeded` or `InvalidArgument`.
 //
-// If the `err` has its in chain any error constructed through `status.Error` (and its variants), then
-// we return the first found error of such type directly, because it's already a gRPC error.
+// If the `err` has in its chain any error constructed through `connect.NewError` (and its variants), then
+// we return the first found error of such type directly, because it's already a connect error.
+//
+// If the `err` has in its chain any error constructed through `grpc` or `status`, it will be converted to connect equivalent.
 //
 // Otherwise, the error is assumed to be an internal error and turned backed into a proper
-// `status.Error(codes.Internal, err.Error())`.
-func toGRPCError(ctx context.Context, err error) error {
+// `connect.NewError(connect.CodeInternal, err)`.
+func toConnectError(ctx context.Context, err error) error {
 	if err == nil {
 		return nil
 	}
 
+	// GRPC to connect error
 	if grpcError := dgrpc.AsGRPCError(err); grpcError != nil {
+		switch grpcError.Code() {
+		case codes.Canceled:
+			return connect.NewError(connect.CodeCanceled, grpcError.Err())
+		case codes.Unavailable:
+			return connect.NewError(connect.CodeUnavailable, grpcError.Err())
+		case codes.InvalidArgument:
+			return connect.NewError(connect.CodeInvalidArgument, grpcError.Err())
+		case codes.Unknown:
+			return connect.NewError(connect.CodeUnknown, grpcError.Err())
+		}
 		return grpcError.Err()
 	}
 
+	// special case for context canceled when shutting down
 	if errors.Is(err, context.Canceled) {
 		if context.Cause(ctx) != nil {
 			err = context.Cause(ctx)
+			if err == errShuttingDown {
+				return connect.NewError(connect.CodeUnavailable, err)
+			}
 		}
-		return status.Error(codes.Canceled, err.Error())
+		return connect.NewError(connect.CodeCanceled, err)
 	}
 
+	// context deadline exceeded
 	if errors.Is(err, context.DeadlineExceeded) {
-		return status.Error(codes.DeadlineExceeded, "source deadline exceeded")
+		return connect.NewError(connect.CodeDeadlineExceeded, err)
+	}
+
+	if store.StoreAboveMaxSizeRegexp.MatchString(err.Error()) {
+		return connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
 	if errors.Is(err, exec.ErrWasmDeterministicExec) {
-		return status.Error(codes.InvalidArgument, err.Error())
+		return connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
 	var errInvalidArg *stream.ErrInvalidArg
 	if errors.As(err, &errInvalidArg) {
-		return status.Error(codes.InvalidArgument, errInvalidArg.Error())
+		return connect.NewError(connect.CodeInvalidArgument, errInvalidArg)
 	}
 
 	// Do we want to print the full cause as coming from Golang? Would we like to maybe trim off "operational"
 	// data?
-	return status.Error(codes.Internal, err.Error())
+	return connect.NewError(connect.CodeInternal, err)
 }

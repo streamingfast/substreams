@@ -10,13 +10,13 @@ import (
 
 	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/derr"
+	"github.com/streamingfast/dgrpc"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
+	otelCodes "go.opentelemetry.io/otel/codes"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
-	grpcCodes "google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	"google.golang.org/grpc/codes"
 
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/client"
@@ -245,7 +245,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 				upstream.RPCFailedProgressResponse(r.Failed.Reason, r.Failed.Logs, r.Failed.LogsTruncated)
 
 				err := fmt.Errorf("work failed on remote host: %s", r.Failed.Reason)
-				span.SetStatus(codes.Error, err.Error())
+				span.SetStatus(otelCodes.Error, err.Error())
 				return &Result{Error: err}
 
 			case *pbssinternal.ProcessRangeResponse_Completed:
@@ -263,10 +263,8 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 			if ctx.Err() != nil {
 				return &Result{Error: ctx.Err()}
 			}
-			if s, ok := status.FromError(err); ok {
-				if s.Code() == grpcCodes.InvalidArgument {
-					return &Result{Error: err}
-				}
+			if grpcErr := dgrpc.AsGRPCError(err); grpcErr.Code() == codes.InvalidArgument {
+				return &Result{Error: err}
 			}
 			return &Result{
 				Error: NewRetryableErr(fmt.Errorf("receiving stream resp: %w", err)),

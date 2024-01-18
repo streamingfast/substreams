@@ -1,0 +1,69 @@
+specVersion: v0.1.0
+package:
+  name: my_package
+  version: v0.0.1
+  url: https://github.com/my-org/my-repo
+  image: ./logo.png # will be embedded in spkg 
+  doc: |
+    This is an example of a package that can be deployed to Substreams.
+    It shows some common patterns like params, networks and imports.
+
+# You can use the `protobuf` section to specify the protobuf files
+# containing the types used by your modules.
+protobuf:
+  files:
+    - my_type.proto
+  importPaths:
+    - ./proto
+
+# The `binaries` section is used to specify the WASM binaries.
+# They should be compiled each time you change your code.
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: target/wasm32-unknown-unknown/release/substreams.wasm
+
+# The `imports` section allows importing other spkg files for their modules, binaries or embedded protobuf definitions.
+imports:
+  # we will use the protobuf definitions from the substreams-sink-sql spkg
+  sql: https://github.com/streamingfast/substreams-sink-sql/releases/download/protodefs-v1.0.3/substreams-sink-sql-protodefs-v1.0.3.spkg
+  # we will use modules from the erc20-balance-changes package
+  erc20: https://github.com/streamingfast/substreams-erc20-balance-changes/releases/download/v1.2.0/erc20-balance-changes-v1.2.0.spkg
+
+modules:
+  - name: filter_erc20_balance_changes
+    kind: map
+    #initialBlock: 0 # specified in the networks section
+    inputs:
+      - params: string
+      - map: erc20:map_balance_changes # this is the map from the erc20-balance-changes package
+    output:
+      type: proto:my.type.FilteredBalanceChanges # this is the fully-qualified message name from the my_type protobuf file
+
+  - name: db_out
+    kind: map
+    #initialBlock: 0 # specified in the networks section
+    inputs:
+      - map: filter_erc20_balance_changes
+    output:
+      type: proto:sf.substreams.sink.database.v1.DatabaseChanges # this message type is imported from the `substreams-sink-sql` package.
+
+## We don't specify params here because we define it under 'networks'
+# params:
+#   filter_erc20_balance_changes: "addr=0x1234"
+
+network: sepolia
+
+networks:
+  mainnet:
+    initialBlock:
+      erc20:map_balance_changes: 200 # overloading an imported map
+      db_out: 200
+    params:
+      filter_erc20_balance_changes: "addr=0x1234"
+  sepolia:
+    initialBlock:
+      erc20:map_balance_changes: 400 # overloading an imported map
+      db_out: 400
+    params:
+      filter_erc20_balance_changes: "addr=0x5678"

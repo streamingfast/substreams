@@ -10,52 +10,10 @@ import (
 
 	"github.com/jhump/protoreflect/desc/protoparse"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/descriptorpb"
 )
-
-func TestReader_ReadWithOverride(t *testing.T) {
-	path, err := filepath.Abs("testdata/")
-	require.NoError(t, err)
-
-	override, err := filepath.Abs("testdata/with-params-override.yaml")
-
-	r, err := newReader(override, path)
-	require.NoError(t, err)
-
-	pkg, err := r.Read()
-	require.NoError(t, err)
-	require.NotNil(t, pkg)
-}
-
-func TestReader_ReadWithNestedOverride(t *testing.T) {
-	path, err := filepath.Abs("testdata/")
-	require.NoError(t, err)
-
-	override, err := filepath.Abs("testdata/with-params-override-override.yaml")
-	require.NoError(t, err)
-
-	r, err := newReader(override, path)
-	require.NoError(t, err)
-
-	pkg, err := r.Read()
-	require.NoError(t, err)
-	require.NotNil(t, pkg)
-}
-
-func TestReader_ReadWithRemoteOverride(t *testing.T) {
-	path, err := filepath.Abs("testdata/")
-	require.NoError(t, err)
-
-	override, err := filepath.Abs("testdata/univ3-override.yaml")
-	require.NoError(t, err)
-
-	r, err := newReader(override, path)
-	require.NoError(t, err)
-
-	_, err = r.Read()
-	require.NoError(t, err)
-}
 
 func TestReader_Read(t *testing.T) {
 	absolutePathToInferredManifest, err := filepath.Abs("testdata/inferred_manifest")
@@ -80,6 +38,7 @@ func TestReader_Read(t *testing.T) {
 		input            *string
 		env              map[string]string
 		validateBinary   bool
+		params           map[string]string
 		workingDirectory string
 	}
 
@@ -183,7 +142,7 @@ func TestReader_Read(t *testing.T) {
 				Modules: &pbsubstreams.Modules{
 					Binaries: []*pbsubstreams.Binary{newTestBinaryModel([]byte{})},
 					Modules: []*pbsubstreams.Module{
-						newTestModuleModel("test_mapper", UNSET, "sf.test.Block", "proto:sf.test.Output"),
+						newTestModuleModel("test_mapper", 0, "sf.test.Block", "proto:sf.test.Output"),
 					},
 				},
 			},
@@ -322,6 +281,139 @@ func TestReader_Read(t *testing.T) {
 			require.NoError,
 			require.Error,
 		},
+		{
+			"networks.yaml",
+			args{},
+			&pbsubstreams.Package{
+				Version:    1,
+				ProtoFiles: readSystemProtoDescriptors(t),
+				PackageMeta: []*pbsubstreams.PackageMetadata{
+					{
+						Name:    "testnetworks",
+						Version: "v0.1.0",
+					},
+				},
+				ModuleMeta: []*pbsubstreams.ModuleMetadata{
+					{},
+					{},
+				},
+				Modules: &pbsubstreams.Modules{
+					Binaries: []*pbsubstreams.Binary{newTestBinaryModel([]byte{})},
+					Modules: []*pbsubstreams.Module{
+						newTestModuleModel("mod1", 200, "sf.test.Block", "proto:sf.test.Output"),
+						newTestModuleModel("mod2", 200, "map:mod1", "proto:sf.test.Output"),
+					},
+				},
+				Network: "mainnet",
+				Networks: map[string]*pbsubstreams.NetworkParams{
+					"mainnet": {
+						InitialBlocks: map[string]uint64{
+							"mod1": 200,
+						},
+					},
+					"sepolia": {
+						InitialBlocks: map[string]uint64{
+							"mod1": 400,
+						},
+					},
+				},
+			},
+			require.NoError,
+			require.NoError,
+		},
+		{
+			"networks_with_params.yaml",
+			args{},
+			&pbsubstreams.Package{
+				Version:    1,
+				ProtoFiles: readSystemProtoDescriptors(t),
+				PackageMeta: []*pbsubstreams.PackageMetadata{
+					{
+						Name:    "testnetworks",
+						Version: "v0.1.0",
+					},
+				},
+				ModuleMeta: []*pbsubstreams.ModuleMetadata{
+					{},
+				},
+				Modules: &pbsubstreams.Modules{
+					Binaries: []*pbsubstreams.Binary{newTestBinaryModel([]byte{})},
+					Modules: []*pbsubstreams.Module{
+						newTestModuleModel("mod1", 0, "params:val=toto", "proto:sf.test.Output"),
+					},
+				},
+				Network: "mainnet",
+				Networks: map[string]*pbsubstreams.NetworkParams{
+					"mainnet": {
+						Params: map[string]string{
+							"mod1": "val=toto",
+						},
+					},
+					"sepolia": {
+						Params: map[string]string{
+							"mod1": "val=tata",
+						},
+					},
+				},
+			},
+			require.NoError,
+			require.NoError,
+		},
+		{
+			"networks_with_params.yaml",
+			args{
+				params: map[string]string{"mod1": "val=overloaded"},
+			},
+			&pbsubstreams.Package{
+				Version:    1,
+				ProtoFiles: readSystemProtoDescriptors(t),
+				PackageMeta: []*pbsubstreams.PackageMetadata{
+					{
+						Name:    "testnetworks",
+						Version: "v0.1.0",
+					},
+				},
+				ModuleMeta: []*pbsubstreams.ModuleMetadata{
+					{},
+				},
+				Modules: &pbsubstreams.Modules{
+					Binaries: []*pbsubstreams.Binary{newTestBinaryModel([]byte{})},
+					Modules: []*pbsubstreams.Module{
+						newTestModuleModel("mod1", 0, "params:val=overloaded", "proto:sf.test.Output"),
+					},
+				},
+				Network: "mainnet",
+				Networks: map[string]*pbsubstreams.NetworkParams{
+					"mainnet": {
+						Params: map[string]string{
+							"mod1": "val=toto",
+						},
+					},
+					"sepolia": {
+						Params: map[string]string{
+							"mod1": "val=tata",
+						},
+					},
+				},
+			},
+			require.NoError,
+			require.NoError,
+		},
+
+		{
+			"networks_missing_default.yaml",
+			args{},
+			nil,
+			require.NoError,
+			require.Error,
+		},
+		{
+			"networks_inconsistent.yaml",
+			args{},
+			nil,
+			require.NoError,
+			require.Error,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -332,6 +424,10 @@ func TestReader_Read(t *testing.T) {
 			var readerOptions []Option
 			if !tt.args.validateBinary {
 				readerOptions = append(readerOptions, SkipSourceCodeReader())
+			}
+
+			if tt.args.params != nil {
+				readerOptions = append(readerOptions, WithParams(tt.args.params))
 			}
 
 			var manifestPath string
@@ -351,7 +447,7 @@ func TestReader_Read(t *testing.T) {
 			r, err := newReader(manifestPath, workingDir, readerOptions...)
 			tt.assertionNew(t, err)
 
-			got, err := r.Read()
+			got, _, err := r.Read()
 			tt.assertionRead(t, err)
 			assertProtoEqual(t, tt.want, got)
 		})
@@ -366,23 +462,42 @@ func newTestBinaryModel(content []byte) *pbsubstreams.Binary {
 }
 
 func newTestModuleModel(name string, initialBlock uint64, inputType string, outputType string) *pbsubstreams.Module {
+	var input *pbsubstreams.Module_Input
+	if strings.HasPrefix(inputType, "map:") {
+		input = &pbsubstreams.Module_Input{
+			Input: &pbsubstreams.Module_Input_Map_{Map: &pbsubstreams.Module_Input_Map{
+				ModuleName: strings.TrimPrefix(inputType, "map:"),
+			},
+			},
+		}
+	} else if strings.HasPrefix(inputType, "params:") {
+		input = &pbsubstreams.Module_Input{
+			Input: &pbsubstreams.Module_Input_Params_{Params: &pbsubstreams.Module_Input_Params{
+				Value: strings.TrimPrefix(inputType, "params:"),
+			},
+			},
+		}
+	} else {
+		input = &pbsubstreams.Module_Input{
+			Input: &pbsubstreams.Module_Input_Source_{
+				Source: &pbsubstreams.Module_Input_Source{
+					Type: inputType,
+				},
+			},
+		}
+	}
+
 	return &pbsubstreams.Module{
 		Name:             name,
 		BinaryEntrypoint: name,
-		InitialBlock:     18446744073709551615,
+		InitialBlock:     initialBlock,
 		Kind: &pbsubstreams.Module_KindMap_{
 			KindMap: &pbsubstreams.Module_KindMap{
 				OutputType: outputType,
 			},
 		},
 		Inputs: []*pbsubstreams.Module_Input{
-			{
-				Input: &pbsubstreams.Module_Input_Source_{
-					Source: &pbsubstreams.Module_Input_Source{
-						Type: inputType,
-					},
-				},
-			},
+			input,
 		},
 		Output: &pbsubstreams.Module_Output{
 			Type: outputType,
@@ -420,4 +535,112 @@ func readSystemProtoDescriptors(t *testing.T) (out []*descriptorpb.FileDescripto
 	require.NoError(t, err)
 
 	return systemProtoFiles.File
+}
+
+func Test_dependentImportedModules(t *testing.T) {
+
+	storeKind := &pbsubstreams.Module_KindStore_{KindStore: &pbsubstreams.Module_KindStore{}}
+	mapKind := &pbsubstreams.Module_KindMap_{KindMap: &pbsubstreams.Module_KindMap{}}
+
+	testModules := []*pbsubstreams.Module{
+		{
+			Name: "lib:storemod",
+			Kind: storeKind,
+		},
+		{
+			Name: "lib:mapmod",
+			Kind: mapKind,
+		},
+		{
+			Name: "mod_dep_on_mapmod",
+			Kind: storeKind,
+			Inputs: []*pbsubstreams.Module_Input{
+				{
+					Input: &pbsubstreams.Module_Input_Map_{Map: &pbsubstreams.Module_Input_Map{
+						ModuleName: "lib:mapmod",
+					}},
+				},
+			},
+		},
+		{
+			Name: "mod_dep_on_two_mods",
+			Kind: mapKind,
+			Inputs: []*pbsubstreams.Module_Input{
+				{
+					Input: &pbsubstreams.Module_Input_Store_{Store: &pbsubstreams.Module_Input_Store{
+						ModuleName: "lib:storemod",
+					}},
+				},
+				{
+					Input: &pbsubstreams.Module_Input_Map_{Map: &pbsubstreams.Module_Input_Map{
+						ModuleName: "lib:mapmod",
+					}},
+				},
+			},
+		},
+		{
+			Name: "mod_independant",
+			Kind: &pbsubstreams.Module_KindMap_{KindMap: &pbsubstreams.Module_KindMap{}},
+		},
+	}
+
+	type args struct {
+		graph        *ModuleGraph
+		outputModule string
+	}
+
+	tests := []struct {
+		name    string
+		args    args
+		want    map[string]bool
+		wantErr bool
+	}{
+		{
+			name: "independant",
+			args: args{
+				graph:        mustNewModuleGraph(testModules),
+				outputModule: "mod_independant",
+			},
+			want: map[string]bool{},
+		},
+		{
+			name: "dep_on_map",
+			args: args{
+				graph:        mustNewModuleGraph(testModules),
+				outputModule: "mod_dep_on_mapmod",
+			},
+			want: map[string]bool{
+				"lib:mapmod": true,
+			},
+		},
+		{
+			name: "dep_on_two",
+			args: args{
+				graph:        mustNewModuleGraph(testModules),
+				outputModule: "mod_dep_on_two_mods",
+			},
+			want: map[string]bool{
+				"lib:mapmod":   true,
+				"lib:storemod": true,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := dependentImportedModules(tt.args.graph, tt.args.outputModule)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("dependentImportedModules() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			assert.Equalf(t, tt.want, got, "dependentImportedModules() = %v (nil=%t), want %v (nil=%t)", got, got == nil, tt.want, tt.want == nil)
+		})
+	}
+}
+
+func mustNewModuleGraph(modules []*pbsubstreams.Module) *ModuleGraph {
+	g, err := NewModuleGraph(modules)
+	if err != nil {
+		panic(err)
+	}
+	return g
 }

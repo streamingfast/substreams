@@ -25,7 +25,6 @@ type Tier2Config struct {
 	StateStoreURL        string
 	StateStoreDefaultTag string
 	StateBundleSize      uint64
-	BlockType            string
 
 	WASMExtensions  []wasm.WASMExtensioner
 	PipelineOptions []pipeline.PipelineOptioner
@@ -81,15 +80,17 @@ func (a *Tier2App) Run() error {
 		opts = append(opts, service.WithModuleExecutionTracing())
 	}
 
-	svc := service.NewTier2(
+	svc, err := service.NewTier2(
 		a.logger,
 		mergedBlocksStore,
 		stateStore,
 		a.config.StateStoreDefaultTag,
 		a.config.StateBundleSize,
-		a.config.BlockType,
 		opts...,
 	)
+	if err != nil {
+		return err
+	}
 
 	// tier2 always trusts the headers sent from tier1
 	trustAuth, err := dauth.New("trust://", a.logger)

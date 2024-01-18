@@ -9,6 +9,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/blockstream"
 	"github.com/streamingfast/bstream/hub"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	dauth "github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/dstore"
@@ -41,7 +42,6 @@ type Tier1Config struct {
 	StateStoreURL        string
 	StateStoreDefaultTag string
 	StateBundleSize      uint64
-	BlockType            string
 
 	MaxSubrequests       uint64
 	SubrequestsEndpoint  string
@@ -116,8 +116,8 @@ func (a *Tier1App) Run() error {
 				context.Background(),
 				a.config.BlockStreamAddr,
 				2,
-				bstream.HandlerFunc(func(blk *bstream.Block, obj interface{}) error {
-					a.modules.HeadBlockNumberMetric.SetUint64(blk.Num())
+				bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
+					a.modules.HeadBlockNumberMetric.SetUint64(blk.Number)
 					a.modules.HeadTimeDriftMetric.SetBlockTime(blk.Time())
 					return h.ProcessBlock(blk, obj)
 				}),
@@ -158,19 +158,21 @@ func (a *Tier1App) Run() error {
 		opts = append(opts, service.WithModuleExecutionTracing())
 	}
 
-	svc := service.NewTier1(
+	svc, err := service.NewTier1(
 		a.logger,
 		mergedBlocksStore,
 		forkedBlocksStore,
 		forkableHub,
 		stateStore,
 		a.config.StateStoreDefaultTag,
-		a.config.BlockType,
 		a.config.MaxSubrequests,
 		a.config.StateBundleSize,
 		subrequestsClientConfig,
 		opts...,
 	)
+	if err != nil {
+		return err
+	}
 
 	a.OnTerminating(func(err error) {
 		svc.Shutdown(err)

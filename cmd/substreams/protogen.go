@@ -53,8 +53,11 @@ func runProtogen(cmd *cobra.Command, args []string) error {
 		manifestPath = args[0]
 	}
 
-	readerOpts := append(getReaderOpts(cmd), manifest.SkipSourceCodeReader(), manifest.SkipModuleOutputTypeValidationReader())
-	manifestReader, err := manifest.NewReader(manifestPath, readerOpts...)
+	readerOptions := []manifest.Option{
+		manifest.SkipSourceCodeReader(),
+		manifest.SkipModuleOutputTypeValidationReader(),
+	}
+	manifestReader, err := manifest.NewReader(manifestPath, readerOptions...)
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
@@ -66,13 +69,9 @@ func runProtogen(cmd *cobra.Command, args []string) error {
 		outputPath = newOutputPath
 	}
 
-	pkg, err := manifestReader.Read()
+	pkg, _, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("reading manifest %q: %w", manifestPath, err)
-	}
-
-	if _, err = manifest.NewModuleGraph(pkg.Modules.Modules); err != nil {
-		return fmt.Errorf("processing module graph %w", err)
 	}
 
 	generator := codegen.NewProtoGenerator(outputPath, excludePaths, generateMod)

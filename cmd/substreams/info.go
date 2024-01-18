@@ -16,6 +16,7 @@ import (
 
 func init() {
 	infoCmd.Flags().String("output-sinkconfig-files-path", "", "if non-empty, any sinkconfig field of type 'bytes' that was packed from a file will be written to that path")
+	infoCmd.Flags().Bool("skip-package-validation", false, "Do not perform any validation when reading substreams package")
 }
 
 var infoCmd = &cobra.Command{
@@ -79,6 +80,9 @@ func runInfo(cmd *cobra.Command, args []string) error {
 		fmt.Println("Name:", mod.Name)
 		fmt.Println("Initial block:", mod.InitialBlock)
 		fmt.Println("Kind:", mod.Kind)
+		for _, input := range mod.Inputs {
+			fmt.Printf("Input: %s: %s\n", input.Type, input.Name)
+		}
 
 		switch mod.Kind {
 		case "map":
@@ -95,6 +99,31 @@ func runInfo(cmd *cobra.Command, args []string) error {
 			fmt.Println("Doc: ", *doc)
 		}
 		fmt.Println("")
+	}
+
+	if info.Network != "" {
+		fmt.Printf("Network: %s\n", info.Network)
+		fmt.Println("")
+	}
+
+	if info.Networks != nil {
+		fmt.Println("Networks:")
+		for network, params := range info.Networks {
+			fmt.Printf("  %s:\n", network)
+			if params.InitialBlocks != nil {
+				fmt.Println("    Initial Blocks:")
+			}
+			for mod, start := range params.InitialBlocks {
+				fmt.Printf("      - %s: %d\n", mod, start)
+			}
+			if params.Params != nil {
+				fmt.Println("    Params:")
+			}
+			for mod, p := range params.Params {
+				fmt.Printf("      - %s: %q\n", mod, p)
+			}
+			fmt.Println("")
+		}
 	}
 
 	if outputModule != "" {

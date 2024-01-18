@@ -29,6 +29,8 @@ type BlockContext struct {
 
 type Config struct {
 	ManifestPath                string
+	Pkg                         *pbsubstreams.Package
+	Graph                       *manifest.ModuleGraph
 	ReadFromModule              bool
 	ProdMode                    bool
 	DebugModulesOutput          []string
@@ -42,7 +44,8 @@ type Config struct {
 	HomeDir                     string
 	Vcr                         bool
 	Cursor                      string
-	Params                      []string
+	Params                      map[string]string
+	ReaderOptions               []manifest.Option
 }
 
 type Instance struct {
@@ -91,12 +94,8 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		r.params = make(map[string][]string)
 		if msg.RequestSummary.Params != nil {
-			for _, p := range msg.RequestSummary.Params {
-				kv := strings.SplitN(p, "=", 2)
-				if len(kv) != 2 {
-					panic("invalid params in gui")
-				}
-				r.params[kv[0]] = append(r.params[kv[0]], kv[1])
+			for k, v := range msg.RequestSummary.Params {
+				r.params[k] = append(r.params[k], v)
 			}
 		}
 		r.setModulesViewContent()
@@ -146,18 +145,23 @@ func (r *Request) renderRequestSummary() string {
 		handoffStr = fmt.Sprintf(" (handoff: %d)", r.linearHandoffBlock)
 	}
 
+	paramsStrings := make([]string, 0, len(summary.Params))
+	for k, v := range summary.Params {
+		paramsStrings = append(paramsStrings, fmt.Sprintf("%s=%s", k, v))
+	}
+
 	values := []string{
-		fmt.Sprintf("%s", summary.Manifest),
-		fmt.Sprintf("%s", summary.Endpoint),
+		summary.Manifest,
+		summary.Endpoint,
 		fmt.Sprintf("%d%s", r.resolvedStartBlock, handoffStr),
-		strings.Join(summary.Params, ", "),
+		strings.Join(paramsStrings, ", "),
 		fmt.Sprintf("%v", summary.ProductionMode),
 		r.traceId,
 		fmt.Sprintf("%d", r.parallelWorkers),
 	}
 	if len(summary.InitialSnapshot) > 0 {
 		labels = append(labels, "Initial snapshots: ")
-		values = append(values, fmt.Sprintf("%s", strings.Join(summary.InitialSnapshot, ", ")))
+		values = append(values, strings.Join(summary.InitialSnapshot, ", "))
 	}
 
 	style := lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(r.Width - 2)
@@ -229,7 +233,7 @@ func glamorizeDoc(doc string) (string, error) {
 	markdown := ""
 
 	if doc != "" {
-		markdown += "# " + fmt.Sprintf("docs: \n")
+		markdown += "# " + "docs: \n"
 		markdown += "\n"
 		markdown += doc
 		markdown += "\n"
@@ -249,34 +253,25 @@ func glamorizeDoc(doc string) (string, error) {
 }
 
 func (c *Config) NewInstance() (*Instance, error) {
-	graph, pkg, err := readManifest(c.ManifestPath)
-	if err != nil {
-		return nil, fmt.Errorf("graph and package setup: %w", err)
-	}
 	if c.ReadFromModule {
-		sb, err := graph.ModuleInitialBlock(c.OutputModule)
+		sb, err := c.Graph.ModuleInitialBlock(c.OutputModule)
 		if err != nil {
 			return nil, fmt.Errorf("getting module start block: %w", err)
 		}
 		c.StartBlock = int64(sb)
 	}
 
-	if err := manifest.ApplyParams(c.Params, pkg); err != nil {
-		return nil, err
-	}
-
 	ssClient, _, callOpts, err := client.NewSubstreamsClient(c.SubstreamsClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("substreams client setup: %w", err)
 	}
-	//defer connClose()
 
 	req := &pbsubstreamsrpc.Request{
 		StartBlockNum:                       c.StartBlock,
 		StartCursor:                         c.Cursor,
 		FinalBlocksOnly:                     c.FinalBlocksOnly,
 		StopBlockNum:                        uint64(c.StopBlock),
-		Modules:                             pkg.Modules,
+		Modules:                             c.Pkg.Modules,
 		OutputModule:                        c.OutputModule,
 		ProductionMode:                      c.ProdMode,
 		DebugInitialStoreSnapshotForModules: c.DebugModulesInitialSnapshot,
@@ -286,11 +281,6 @@ func (c *Config) NewInstance() (*Instance, error) {
 
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validate request: %w", err)
-	}
-
-	toPrint := c.DebugModulesOutput
-	if toPrint == nil {
-		toPrint = []string{c.OutputModule}
 	}
 
 	replayLogFilePath := filepath.Join(c.HomeDir, "replay.log")
@@ -310,7 +300,7 @@ func (c *Config) NewInstance() (*Instance, error) {
 	debugLogPath := filepath.Join(c.HomeDir, "debug.log")
 	tea.LogToFile(debugLogPath, "gui:")
 
-	msgDescs, err := manifest.BuildMessageDescriptors(pkg)
+	msgDescs, err := manifest.BuildMessageDescriptors(c.Pkg)
 	if err != nil {
 		return nil, fmt.Errorf("building message descriptors: %w", err)
 	}
@@ -320,8 +310,8 @@ func (c *Config) NewInstance() (*Instance, error) {
 		Endpoint:        c.SubstreamsClientConfig.Endpoint(),
 		ProductionMode:  c.ProdMode,
 		InitialSnapshot: req.DebugInitialStoreSnapshotForModules,
-		Docs:            pkg.PackageMeta,
-		ModuleDocs:      pkg.ModuleMeta,
+		Docs:            c.Pkg.PackageMeta,
+		ModuleDocs:      c.Pkg.ModuleMeta,
 		Params:          c.Params,
 	}
 
@@ -330,27 +320,9 @@ func (c *Config) NewInstance() (*Instance, error) {
 		MsgDescs:       msgDescs,
 		ReplayLog:      replayLog,
 		RequestSummary: requestSummary,
-		Modules:        pkg.Modules,
-		Graph:          graph,
+		Modules:        c.Pkg.Modules,
+		Graph:          c.Graph,
 	}
 
 	return substreamRequirements, nil
-}
-
-func readManifest(manifestPath string) (*manifest.ModuleGraph, *pbsubstreams.Package, error) {
-	manifestReader, err := manifest.NewReader(manifestPath)
-	if err != nil {
-		return nil, nil, fmt.Errorf("manifest reader: %w", err)
-	}
-
-	pkg, err := manifestReader.Read()
-	if err != nil {
-		return nil, nil, fmt.Errorf("read manifest %q: %w", manifestPath, err)
-	}
-
-	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
-	if err != nil {
-		return nil, nil, fmt.Errorf("creating module graph: %w", err)
-	}
-	return graph, pkg, nil
 }

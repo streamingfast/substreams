@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
+	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -20,6 +21,7 @@ import (
 func init() {
 	runCmd.Flags().StringP("substreams-endpoint", "e", "", "Substreams gRPC endpoint. If empty, will be replaced by the SUBSTREAMS_ENDPOINT_{network_name} environment variable, where `network_name` is determined from the substreams manifest. Some network names have default endpoints.")
 	runCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token")
+	runCmd.Flags().String("network", "", "Specify the network to use for params and initialBlocks, overriding the 'network' field in the substreams package")
 	runCmd.Flags().StringP("start-block", "s", "", "Start block to stream from. If empty, will be replaced by initialBlock of the first module you are streaming. If negative, will be resolved by the server relative to the chain head")
 	runCmd.Flags().StringP("cursor", "c", "", "Cursor to stream from. Leave blank for no cursor")
 	runCmd.Flags().StringP("stop-block", "t", "0", "Stop block to end stream at, exclusively. If the start-block is positive, a '+' prefix can indicate 'relative to start-block'")
@@ -31,6 +33,7 @@ func init() {
 	runCmd.Flags().StringSlice("debug-modules-output", nil, "List of modules from which to print outputs, deltas and logs (Unavailable in Production Mode)")
 	runCmd.Flags().StringSliceP("header", "H", nil, "Additional headers to be sent in the substreams request")
 	runCmd.Flags().Bool("production-mode", false, "Enable Production Mode, with high-speed parallel processing")
+	runCmd.Flags().Bool("skip-package-validation", false, "Do not perform any validation when reading substreams package")
 	runCmd.Flags().StringArrayP("params", "p", nil, "Set a params for parameterizable modules. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
 	runCmd.Flags().String("test-file", "", "runs a test file")
 	runCmd.Flags().Bool("test-verbose", false, "print out all the results")
@@ -69,12 +72,28 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	outputMode := mustGetString(cmd, "output")
 
-	manifestReader, err := manifest.NewReader(manifestPath, getReaderOpts(cmd)...)
+	network := sflags.MustGetString(cmd, "network")
+	paramsString := sflags.MustGetStringArray(cmd, "params")
+	params, err := manifest.ParseParams(paramsString)
+	if err != nil {
+		return fmt.Errorf("parsing params: %w", err)
+	}
+
+	readerOptions := []manifest.Option{
+		manifest.WithOverrideOutputModule(outputModule),
+		manifest.WithOverrideNetwork(network),
+		manifest.WithParams(params),
+	}
+	if sflags.MustGetBool(cmd, "skip-package-validation") {
+		readerOptions = append(readerOptions, manifest.SkipPackageValidationReader())
+	}
+
+	manifestReader, err := manifest.NewReader(manifestPath, readerOptions...)
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
 
-	pkg, err := manifestReader.Read()
+	pkg, graph, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
@@ -82,10 +101,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 	endpoint, err := manifest.ExtractNetworkEndpoint(pkg.Network, mustGetString(cmd, "substreams-endpoint"), zlog)
 	if err != nil {
 		return fmt.Errorf("extracting endpoint: %w", err)
-	}
-
-	if err := manifest.ApplyParams(mustGetStringArray(cmd, "params"), pkg); err != nil {
-		return err
 	}
 
 	msgDescs, err := manifest.BuildMessageDescriptors(pkg)
@@ -110,11 +125,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 
 	debugModulesInitialSnapshot := mustGetStringSlice(cmd, "debug-modules-initial-snapshot")
-
-	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
-	if err != nil {
-		return fmt.Errorf("creating module graph: %w", err)
-	}
 
 	startBlock, readFromModule, err := readStartBlockFlag(cmd, "start-block")
 	if err != nil {

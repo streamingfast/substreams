@@ -54,7 +54,7 @@ func New(reqConfig *request.Config) (*UI, error) {
 		Styles: styles.DefaultStyles(),
 	}
 
-	out, err := output.New(c, reqConfig.ManifestPath, reqConfig.OutputModule, reqConfig)
+	out, err := output.New(c, reqConfig)
 	if err != nil {
 		return nil, err
 	}

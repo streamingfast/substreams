@@ -14,25 +14,23 @@ import (
 )
 
 func init() {
-	alphaCmd.AddCommand(sinkRemoveCmd)
-	sinkRemoveCmd.Flags().StringP("endpoint", "e", "http://localhost:8000", "specify the endpoint to connect to.")
-	sinkRemoveCmd.Flags().Bool("strict", false, "Require deploymentID parameter to be set and complete")
+	serviceCmd.AddCommand(removeCmd)
 }
 
-var sinkRemoveCmd = &cobra.Command{
-	Use:   "sink-remove [deployment-id]",
-	Short: "Remove a deployed substreams sink",
+var removeCmd = &cobra.Command{
+	Use:   "remove [deployment-id]",
+	Short: "Remove a deployed service",
 	Long: cli.Dedent(`
-        Sends an "Remove" request to a server. By default, it will talk to a local "substreams alpha sink-serve" instance.
-        It will remove a substreams sink completely, including its data. Use "pause" instead if you want to keep the data.
+        Sends an "Remove" request to a server. By default, it will talk to a local "substreams alpha service serve" instance.
+        It will remove a service completely, including its data. Use "pause" instead if you want to keep the data.
         If deploymentID is not set or is incomplete, the CLI will try to guess (unless --strict is set).
 		`),
-	RunE:         sinkRemoveE,
+	RunE:         removeE,
 	Args:         cobra.RangeArgs(0, 1),
 	SilenceUsage: true,
 }
 
-func sinkRemoveE(cmd *cobra.Command, args []string) error {
+func removeE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
 	var id string
@@ -45,7 +43,7 @@ func sinkRemoveE(cmd *cobra.Command, args []string) error {
 		if sflags.MustGetBool(cmd, "strict") {
 			return fmt.Errorf("invalid ID provided: %q and '--strict' is set", id)
 		}
-		matching, err := fuzzyMatchDeployment(ctx, id, cli, []pbsinksvc.DeploymentStatus{
+		matching, err := fuzzyMatchDeployment(ctx, id, cli, cmd, []pbsinksvc.DeploymentStatus{
 			pbsinksvc.DeploymentStatus_STOPPED,
 			pbsinksvc.DeploymentStatus_PAUSED,
 			pbsinksvc.DeploymentStatus_FAILING,
@@ -62,12 +60,15 @@ func sinkRemoveE(cmd *cobra.Command, args []string) error {
 		id = matching.Id
 	}
 
-	req := &pbsinksvc.RemoveRequest{
+	req := connect.NewRequest(&pbsinksvc.RemoveRequest{
 		DeploymentId: id,
+	})
+	if err := addHeaders(cmd, req); err != nil {
+		return err
 	}
 
 	fmt.Printf("Stopping... (shutting down services and removing data, please wait)\n")
-	resp, err := cli.Remove(ctx, connect.NewRequest(req))
+	resp, err := cli.Remove(ctx, req)
 	if err != nil {
 		return interceptConnectionError(err)
 	}

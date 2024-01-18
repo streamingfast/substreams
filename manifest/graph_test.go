@@ -299,7 +299,9 @@ func TestModuleGraph_computeInitialBlocks(t *testing.T) {
 		},
 	}
 
-	_, err := NewModuleGraph(startBlockTestModule)
+	graph, err := NewModuleGraph(startBlockTestModule)
+	require.NoError(t, err)
+	err = computeInitialBlock(startBlockTestModule, graph)
 	require.NoError(t, err)
 
 	assert.Equal(t, uint64(20), startBlockTestModule[0].InitialBlock)
@@ -333,7 +335,9 @@ func TestModuleGraph_ComputeInitialBlocks_WithOneParentContainingNoInitialBlock(
 		},
 	}
 
-	_, err := NewModuleGraph(testModules)
+	graph, err := NewModuleGraph(testModules)
+	require.NoError(t, err)
+	err = computeInitialBlock(testModules, graph)
 	require.NoError(t, err)
 
 	assert.Equal(t, bstream.GetProtocolFirstStreamableBlock, testModules[0].InitialBlock)
@@ -361,7 +365,9 @@ func TestModuleGraph_ComputeInitialBlocks_WithOneParentContainingAInitialBlock(t
 		},
 	}
 
-	_, err := NewModuleGraph(testModules)
+	graph, err := NewModuleGraph(testModules)
+	require.NoError(t, err)
+	err = computeInitialBlock(testModules, graph)
 	require.NoError(t, err)
 
 	assert.Equal(t, uint64(10), testModules[0].GetInitialBlock())
@@ -422,7 +428,9 @@ func TestModuleGraph_ComputeInitialBlocks_WithTwoParentsAndAGrandParentContainin
 		},
 	}
 
-	_, err := NewModuleGraph(testModules)
+	graph, err := NewModuleGraph(testModules)
+	require.NoError(t, err)
+	err = computeInitialBlock(testModules, graph)
 	require.NoError(t, err)
 
 	assert.Equal(t, uint64(10), testModules[0].GetInitialBlock())
@@ -474,6 +482,8 @@ func TestModuleGraph_ComputeInitialBlocks_WithThreeParentsEachContainingAInitial
 		},
 	}
 
-	_, err := NewModuleGraph(testModules)
+	graph, err := NewModuleGraph(testModules)
+	require.NoError(t, err)
+	err = computeInitialBlock(testModules, graph)
 	assert.Equal(t, `cannot deterministically determine the initialBlock for module "D"; multiple inputs have conflicting initial blocks defined or inherited`, err.Error())
 }

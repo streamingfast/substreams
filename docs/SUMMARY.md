@@ -9,7 +9,7 @@
   * [Authentication](new/common/authentication.md)
   * [Packages](new/common/packages.md)
   * [Deployable Services](new/common/deployable-services.md)
-  * [Substreams:SQL](new/consume/sql/substreams-sql.md)
+  * [Substreams:SQL](new/consume/sql/sql.md)
     * [Deployable Services](new/consume/sql/deployable-services/introduction.md)
       * [Remote Service](new/consume/sql/deployable-services/remote-service.md)
       * [Local Service](new/consume/sql/deployable-services/local-service.md)

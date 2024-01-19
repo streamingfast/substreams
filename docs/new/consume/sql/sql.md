@@ -8,7 +8,7 @@ Substreams offers two different ways of consuming data as SQL:
 - Using the Deployable Services (beta)
 - Using the SQL sink, which currently supports PostgresSQL and Clickhouse (recommended)
 
-### Substreams:SQL Deployable Service
+### - Substreams:SQL Deployable Service (beta)
 Use the Substreams CLI to easily send the data of your Substreams to a database. It also has support for **dbt transformations**, so it's great for data analyts!
 
 You can deploy a new service by using the `substreams alpha service` command.
@@ -19,7 +19,7 @@ The StreamingFast Hosted Service deploys a remote database in the StreamingFast 
 #### Local Service
 If you want to manage your own infrastructure, you can set up a services environment locally using Docker.
 
-### SQL sink (recommended)
+### - SQL sink (recommended)
 
 Previous to the implementation of the Deployable Services, the Postgres Sink was used to send data to a database. This is still available and there are a lot developers using it.
 

@@ -47,7 +47,10 @@
     * [Mapping Blocks](new/tutorials/evm/exploring-ethereum/map_block_meta_module.md)
     * [Filtering Transactions](new/tutorials/evm/exploring-ethereum/map_filter_transactions_module.md)
     * [Retrieving Events of a Smart Contract](new/tutorials/evm/exploring-ethereum/map_contract_events_module.md)
-* [Rust](new/tutorials/rust/overview.md)
+* [Rust](new/tutorials/rust/rust.md)
+  * [Option struct](new/tutorials/rust/option.md)
+  * [Result struct](new/tutorials/rust/result.md)
+
 
 ## Reference & Specs
 

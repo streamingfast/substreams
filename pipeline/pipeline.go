@@ -148,7 +148,7 @@ func (p *Pipeline) InitTier2Stores(ctx context.Context) (err error) {
 	p.stores.SetStoreMap(storeMap)
 
 	logger := reqctx.Logger(ctx)
-	logger.Info("stores loaded", zap.Object("stores", p.stores.StoreMap), zap.Int("stage", reqctx.Details(ctx).Tier2Stage))
+	logger.Debug("stores loaded", zap.Object("stores", p.stores.StoreMap), zap.Int("stage", reqctx.Details(ctx).Tier2Stage))
 
 	return nil
 }
@@ -290,7 +290,7 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 		}
 	}()
 
-	logger.Info("starting parallel processing")
+	logger.Debug("starting parallel processing")
 
 	storeMap, err = parallelProcessor.Run(ctx)
 	if err != nil {

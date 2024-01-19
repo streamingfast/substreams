@@ -30,7 +30,7 @@ type WorkerStatus struct {
 func NewWorkerPool(ctx context.Context, workerCount int, workerFactory WorkerFactory) *WorkerPool {
 	logger := reqctx.Logger(ctx)
 
-	logger.Info("initializing worker pool", zap.Int("worker_count", workerCount))
+	logger.Debug("initializing worker pool", zap.Int("worker_count", workerCount))
 
 	workers := make([]*WorkerStatus, workerCount)
 	for i := 0; i < workerCount; i++ {

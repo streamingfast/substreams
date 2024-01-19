@@ -121,11 +121,11 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *blo
 			if errors.Is(err, context.Canceled) {
 				logger.Debug("job canceled", zap.Object("unit", unit), zap.Error(err))
 			} else {
-				logger.Info("job failed", zap.Object("unit", unit), zap.Error(err))
+				logger.Warn("job failed", zap.Object("unit", unit), zap.Error(err))
 			}
 
 			timeTook := time.Since(startTime)
-			logger.Info(
+			logger.Warn(
 				"incomplete job",
 				zap.Object("unit", unit),
 				zap.Int("number_of_tries", retryIdx),
@@ -137,12 +137,12 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *blo
 		}
 
 		if err := ctx.Err(); err != nil {
-			logger.Info("job not completed", zap.Object("unit", unit), zap.Error(err))
+			logger.Warn("job not completed", zap.Object("unit", unit), zap.Error(err))
 			return MsgJobFailed{Unit: unit, Error: err}
 		}
 
 		timeTook := time.Since(startTime)
-		logger.Info(
+		logger.Debug(
 			"job completed",
 			zap.Object("unit", unit),
 			zap.Int("number_of_tries", retryIdx),
@@ -249,7 +249,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 				return &Result{Error: err}
 
 			case *pbssinternal.ProcessRangeResponse_Completed:
-				logger.Info("worker done")
+				logger.Debug("worker done")
 				return &Result{
 					PartialFilesWritten: toRPCPartialFiles(r.Completed),
 				}

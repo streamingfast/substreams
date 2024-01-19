@@ -32,7 +32,6 @@ func (p *Pipeline) ProcessBlock(block *pbbstream.Block, obj interface{}) (err er
 		if r := recover(); r != nil {
 			if err, ok := r.(error); ok {
 				if errors.Is(err, context.Canceled) {
-					logger.Info("context canceled")
 					return
 				}
 			}

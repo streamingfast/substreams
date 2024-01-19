@@ -76,7 +76,7 @@ func (s *FullKV) Save(endBoundaryBlock uint64) (*FileInfo, *fileWriter, error) {
 
 	file := NewCompleteFileInfo(s.name, s.moduleInitialBlock, endBoundaryBlock)
 
-	s.logger.Info("saving store",
+	s.logger.Debug("saving store",
 		zap.String("file_name", file.Filename),
 		zap.Object("block_range", file.Range),
 	)

@@ -270,19 +270,19 @@ func (s *Tier1Service) Blocks(
 	if connectError := toConnectError(runningContext, err); connectError != nil {
 		switch connect.CodeOf(connectError) {
 		case connect.CodeInternal:
-			logger.Info("unexpected termination of stream of blocks", zap.String("stream_processor", "tier1"), zap.Error(err))
+			logger.Warn("unexpected termination of stream of blocks", zap.String("stream_processor", "tier1"), zap.Error(err))
 		case connect.CodeInvalidArgument:
 			logger.Debug("recording failure on request", zap.String("request_id", requestID))
 			s.recordFailure(requestID, connectError)
 		case connect.CodeCanceled:
 			logger.Info("Blocks request canceled by user", zap.Error(connectError))
 		default:
-			logger.Info("Blocks request completed with error", zap.Error(connectError))
+			logger.Warn("Blocks request completed with error", zap.Error(connectError))
 		}
 		return connectError
 	}
 
-	logger.Info("Blocks request completed witout error")
+	logger.Debug("Blocks request completed witout error")
 	return nil
 }
 
@@ -452,7 +452,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		return fmt.Errorf("error building request plan: %w", err)
 	}
 
-	logger.Info("initializing tier1 pipeline",
+	logger.Debug("initializing tier1 pipeline",
 		zap.Stringer("plan", reqPlan),
 		zap.Int64("request_start_block", request.StartBlockNum),
 		zap.Uint64("resolved_start_block", requestDetails.ResolvedStartBlockNum),

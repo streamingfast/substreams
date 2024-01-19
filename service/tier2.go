@@ -92,7 +92,7 @@ func NewTier2(
 		return nil, fmt.Errorf("getting block type from merged-blocks-store: %w", err)
 	}
 
-	logger.Info("launching tier2 service", zap.String("block_type", blockType))
+	logger.Debug("launching tier2 service", zap.String("block_type", blockType))
 	s := &Tier2Service{
 		runtimeConfig: runtimeConfig,
 		blockType:     blockType,
@@ -278,7 +278,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		opts...,
 	)
 
-	logger.Info("initializing tier2 pipeline",
+	logger.Debug("initializing tier2 pipeline",
 		zap.Uint64("request_start_block", requestDetails.ResolvedStartBlockNum),
 		zap.Uint64("request_stop_block", request.StopBlockNum),
 		zap.String("output_module", request.OutputModule),

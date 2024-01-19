@@ -61,7 +61,7 @@ func New(
 
 // this is a blocking call
 func (s *server) Run(ctx context.Context) {
-	s.logger.Info("starting server server")
+	s.logger.Debug("starting server")
 
 	options := []dgrpcserver.Option{
 		dgrpcserver.WithLogger(s.logger),
@@ -71,7 +71,7 @@ func (s *server) Run(ctx context.Context) {
 		dgrpcserver.WithCORS(s.corsOption()),
 	}
 	if strings.Contains(s.httpListenAddr, "*") {
-		s.logger.Info("grpc server with insecure server")
+		s.logger.Warn("grpc server with insecure server")
 		options = append(options, dgrpcserver.WithInsecureServer())
 	} else {
 		s.logger.Info("grpc server with plain text server")
@@ -87,7 +87,7 @@ func (s *server) Run(ctx context.Context) {
 
 	s.OnTerminating(func(err error) {
 		s.shutdownLock.Lock()
-		s.logger.Info("shutting down connect web server")
+		s.logger.Warn("shutting down connect web server")
 
 		shutdownErr := s.engine.Shutdown(ctx, err, s.logger)
 		if shutdownErr != nil {
@@ -97,7 +97,7 @@ func (s *server) Run(ctx context.Context) {
 		time.Sleep(1 * time.Second)
 
 		srv.Shutdown(nil)
-		s.logger.Info("connect web server shutdown")
+		s.logger.Warn("connect web server shutdown")
 	})
 
 	s.OnTerminated(func(err error) {

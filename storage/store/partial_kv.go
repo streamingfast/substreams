@@ -66,7 +66,7 @@ func (p *PartialKV) Save(endBoundaryBlock uint64) (*FileInfo, *fileWriter, error
 	}
 
 	file := NewPartialFileInfo(p.name, p.initialBlock, endBoundaryBlock, p.traceID)
-	p.logger.Info("partial store save written", zap.String("file_name", file.Filename), zap.Stringer("block_range", file.Range))
+	p.logger.Debug("partial store save written", zap.String("file_name", file.Filename), zap.Stringer("block_range", file.Range))
 
 	fw := &fileWriter{
 		store:    p.objStore,

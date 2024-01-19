@@ -35,14 +35,20 @@ type Tier2Config struct {
 type Tier2App struct {
 	*shutter.Shutter
 	config  *Tier2Config
+	modules *Tier2Modules
 	logger  *zap.Logger
 	isReady *atomic.Bool
 }
 
-func NewTier2(logger *zap.Logger, config *Tier2Config) *Tier2App {
+type Tier2Modules struct {
+	CheckPendingShutDown func() bool
+}
+
+func NewTier2(logger *zap.Logger, config *Tier2Config, modules *Tier2Modules) *Tier2App {
 	return &Tier2App{
 		Shutter: shutter.New(),
 		config:  config,
+		modules: modules,
 		logger:  logger,
 
 		isReady: atomic.NewBool(false),
@@ -100,7 +106,7 @@ func (a *Tier2App) Run() error {
 
 	go func() {
 		a.logger.Info("launching gRPC server")
-		a.isReady.CAS(false, true)
+		a.isReady.CompareAndSwap(false, true)
 
 		err := service.ListenTier2(a.config.GRPCListenAddr, a.config.ServiceDiscoveryURL, svc, trustAuth, a.logger, a.HealthCheck)
 		a.Shutdown(err)
@@ -117,6 +123,10 @@ func (a *Tier2App) HealthCheck(ctx context.Context) (bool, interface{}, error) {
 // otherwise.
 func (a *Tier2App) IsReady(ctx context.Context) bool {
 	if a.IsTerminating() {
+		return false
+	}
+
+	if a.modules.CheckPendingShutDown != nil && a.modules.CheckPendingShutDown() {
 		return false
 	}
 

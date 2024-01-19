@@ -28,6 +28,7 @@ type Tier1Modules struct {
 	Authenticator         dauth.Authenticator
 	HeadTimeDriftMetric   *dmetrics.HeadTimeDrift
 	HeadBlockNumberMetric *dmetrics.HeadBlockNum
+	CheckPendingShutDown  func() bool
 }
 
 type Tier1Config struct {
@@ -191,7 +192,7 @@ func (a *Tier1App) Run() error {
 		}
 
 		a.logger.Info("launching gRPC server", zap.Bool("live_support", withLive))
-		a.isReady.CAS(false, true)
+		a.isReady.CompareAndSwap(false, true)
 
 		err := service.ListenTier1(a.config.GRPCListenAddr, svc, a.modules.Authenticator, a.logger, a.HealthCheck)
 		a.Shutdown(err)
@@ -211,6 +212,10 @@ func (a *Tier1App) IsReady(ctx context.Context) bool {
 		return false
 	}
 	if !a.modules.Authenticator.Ready(ctx) {
+		return false
+	}
+
+	if a.modules.CheckPendingShutDown != nil && a.modules.CheckPendingShutDown() {
 		return false
 	}
 

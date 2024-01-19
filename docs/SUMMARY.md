@@ -36,17 +36,17 @@
   * [Deployable Services](new/common/deployable-services.md)
   * [Rust Dependencies](new/develop/rust-crates.md)
   * [Parameterized Modules](new/develop/parameterized-modules.md)
-  * [Chain-Specific Extensions](new/develop/chain-specific/overview.md)
-    * [EVM Chain-Specific Extensions](new/develop/chain-specific/evm/overview.md)
+  * [Chain-Specific Extensions](new/develop/chain-specific/chain-specifi.md)
+    * [EVM Chain-Specific Extensions](new/develop/chain-specific/evm/evm.md)
       * [Making eth_calls](new/develop/chain-specific/evm/eth-calls.md)
   * [Architecture](new/develop/architecture.md)
 
 ## Tutorials
-
-* [Exploring Ethereum](new/tutorials/ethereum/exploring-ethereum/overview.md)
-  * [Mapping Blocks](new/tutorials/ethereum/exploring-ethereum/map_block_meta_module.md)
-  * [Filtering Transactions](new/tutorials/ethereum/exploring-ethereum/map_filter_transactions_module.md)
-  * [Retrieving Events of a Smart Contract](new/tutorials/ethereum/exploring-ethereum/map_contract_events_module.md)
+* [EVM](new/tutorials/evm/evm.md)
+  * [Exploring Ethereum](new/tutorials/evm/exploring-ethereum/exploring-ethereum.md)
+    * [Mapping Blocks](new/tutorials/evm/exploring-ethereum/map_block_meta_module.md)
+    * [Filtering Transactions](new/tutorials/evm/exploring-ethereum/map_filter_transactions_module.md)
+    * [Retrieving Events of a Smart Contract](new/tutorials/evm/exploring-ethereum/map_contract_events_module.md)
 * [Rust](new/tutorials/rust/overview.md)
 
 ## Reference & Specs

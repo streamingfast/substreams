@@ -1,6 +1,9 @@
 # Table of contents
 
-* [What is Substreams?](README.md)
+* [Substreams](README.md)
+
+## Docs
+
 * [Consume Substreams](new/consume/consume.md)
   * [Install the CLI](new/common/installing-the-cli.md)
   * [Authentication](new/common/authentication.md)

@@ -4,7 +4,7 @@
 
 ## Documentation
 
-* [Consume Substreams](new/consume/consume.md)
+* [Consume](new/consume/consume.md)
   * [Install the CLI](new/common/installing-the-cli.md)
   * [Authentication](new/common/authentication.md)
   * [Packages](new/common/packages.md)

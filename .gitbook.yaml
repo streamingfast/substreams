@@ -2,3 +2,40 @@ root: ./docs/
 
 structure:
   summary: SUMMARY.md
+
+redirects:
+  concepts-and-fundamentals/modules: ./new/common/manifest-modules.md
+  developers-guide/creating-protobuf-schema: ./new/develop/creating-protobuf-schemas.md
+  developers-guide/creating-your-manifest: ./new/common/manifest-modules.md
+  developers-guide/gui: ./new/common/manifest-modules.md
+  developers-guide/installation-requirements: ./new/common/installing-the-cli.md
+  developers-guide/overview: ./new/common/introduction.md
+  developers-guide/parallel-execution: ./new/develop/architecture.md
+  developers-guide/running-substreams: ./new/common/running-substreams.md
+  developers-guide/modules/inputs: ./new/develop/modules/inputs.md
+  developers-guide/modules/outputs: ./new/develop/modules/outputs.md
+  developers-guide/modules/setting-up-handlers: ./new/develop/modules/setting-up-handlers.md
+  developers-guide/modules/types: ./new/develop/modules/types.md
+  developers-guide/modules/writing-module-handlers: ./new/develop/modules/writing-module-handlers.md
+  developers-guide/cookbook/advanced-params: ./new/develop/parameterized-modules.md
+  developers-guide/cookbook/aggregation-windows: ./new/develop/modules/aggregation-windows.md
+  developers-guide/cookbook/dynamic-data-sources: ./new/develop/modules/dynamic-data-sources.md
+  developers-guide/cookbook/factory-params: ./new/develop/parameterized-modules.md
+  developers-guide/cookbook/keys-in-stores: ./new/develop/modules/keys-in-stores.md
+  developers-guide/sink-targets/substreams-powered-subgraph: ./new/consume/subgraph/quickstart.md
+  developers-guide/sink-targets/substreams-sink-sql: ./new/consume/sql/introduction.md
+  getting-started/installing-the-cli: ./new/common/installing-the-cli.md
+  getting-started/quickstart: ./new/common/introduction.md
+  references-and-specs/chains-and-endpoints: ./new/references/chains-and-endpoints.md
+  references-and-specs/command-line-interface: ./new/references/command-line-interface.md
+  references-and-specs/examples: ./new/tutorials/overview.md
+  references-and-specs/gui: ./new/references/gui.md
+  references-and-specs/faq: ./new/references/faq.md
+  references-and-specs/manifests: ./new/references/manifests.md
+  references-and-specs/packages: ./new/common/packages.md
+  references-and-specs/rust-crates: ./new/develop/rust-crates.md
+  glossary/glossary: ./new/references/glossary.md
+  quick-access/change-log: ./new/references/change-log.md
+
+
+

@@ -160,6 +160,44 @@ The `binaries[name].file` field references a locally compiled [WASM module](http
 **Tip**: The WASM file referenced by the `binary` field is picked up and packaged into an `.spkg` when invoking the [`pack`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#pack) and [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) commands through the [`substreams` CLI](command-line-interface.md).
 {% endhint %}
 
+### `deriveFrom`
+It is possible to override an existing substreams by pointing to an override file in the `run` or `gui` command. This override manifest will have a `deriveFrom` field which points to the original Substreams which is to be overriden. This is useful to port a substreams to one network to another. Example of an override manifest:
+
+```
+deriveFrom: path/to/mainnet-substreams.spkg # This can also be a remote url
+
+package:
+  name: "polygon-substreams"
+  version: "100.0.0"
+
+network: polygon
+
+initialBlocks:
+  module1: 17500000
+params:
+  module1: "address=2a75ca72679cf1299936d6104d825c9654489058"
+```
+
+### sink
+
+The `sink` field specifies the sink you want to use to consume your data (for example, a database or a subgraph).
+
+#### Sink `module`
+Specifies the name of the module that emits the data to the sink. For example, `db_out` or `graph_out`.
+
+#### Sink `type`
+Specifies the service used to consume the data. For example, `sf.substreams.sink.subgraph.v1.Service` for subgraphs, or `sf.substreams.sink.sql.v1.Service` for databases.
+
+#### Sink `config`
+Specifies the configuration specific to every sink. This field is different for every sink.
+
+##### Database Config
+
+
+##### Subgraph Config
+
+
+
 ### `modules`
 
 This example shows one map module, named `events_extractor` and one store module, named `totals` :

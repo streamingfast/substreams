@@ -2,7 +2,7 @@
 
 * [Substreams](README.md)
 
-## Documentation
+## Docs
 
 * [Consume Substreams](new/consume/consume.md)
   * [Install the CLI](new/common/installing-the-cli.md)

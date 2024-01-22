@@ -26,6 +26,10 @@ redirects:
   developers-guide/cookbook/keys-in-stores: ./new/develop/modules/keys-in-stores.md
   developers-guide/sink-targets/substreams-powered-subgraph: ./new/consume/subgraph/subgraph.md
   developers-guide/sink-targets/substreams-sink-sql: ./new/consume/sql/sql.md
+  developers-guide/sink-targets/substreams-sink-files: ./new/consume/other-sinks/files.md
+  developers-guide/sink-targets/substreams-sink-kv: ./new/consume/other-sinks/kv.md
+  developers-guide/sink-targets/substreams-sink-mongodb: ./new/consume/other-sinks/mongodb.md
+  developers-guide/sink-targets/substreams-sink-prometheus: ./new/consume/other-sinks/prometheus.md
   getting-started/installing-the-cli: ./new/common/installing-the-cli.md
   getting-started/quickstart: ./new/develop/init-project.md
   references-and-specs/chains-and-endpoints: ./new/references/chains-and-endpoints.md

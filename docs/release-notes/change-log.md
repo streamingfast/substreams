@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Unreleased
 
 * Fixed the 'local substreams alpha service serve' clickhouse deployment (was failing with a message regarding fork handling...)
+* Catch more cases of WASM deterministic errors as "InvalidArgument"
 * Added some output-stream info to logs
 
 ## v1.3.1

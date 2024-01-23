@@ -162,6 +162,13 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 
 func (s *Scheduler) cmdShutdownWhenComplete() loop.Cmd {
 	if s.outputStreamCompleted && s.storesSyncCompleted {
+
+		var fields []zap.Field
+		if s.ExecOutWalker != nil {
+			start, current, end := s.ExecOutWalker.Progress()
+			fields = append(fields, zap.Int("cached_output_start", start), zap.Int("cached_output_current", current), zap.Int("cached_output_end", end))
+		}
+		s.logger.Info("scheduler: stores and cached_outputs stream completed, switching to live", fields...)
 		return func() loop.Msg {
 			err := s.Stages.WaitAsyncWork()
 			return loop.Quit(err)()
@@ -171,7 +178,13 @@ func (s *Scheduler) cmdShutdownWhenComplete() loop.Cmd {
 		s.logger.Info("scheduler: waiting for output stream and stores to complete")
 	}
 	if !s.outputStreamCompleted && s.storesSyncCompleted {
-		s.logger.Info("scheduler: waiting for output stream to complete, stores ready")
+
+		var fields []zap.Field
+		if s.ExecOutWalker != nil {
+			start, current, end := s.ExecOutWalker.Progress()
+			fields = append(fields, zap.Int("cached_output_start", start), zap.Int("cached_output_current", current), zap.Int("cached_output_end", end))
+		}
+		s.logger.Info("scheduler: waiting for output stream to complete, stores ready", fields...)
 	}
 	if s.outputStreamCompleted && !s.storesSyncCompleted {
 		s.logger.Info("scheduler: waiting for stores to complete, output stream completed")

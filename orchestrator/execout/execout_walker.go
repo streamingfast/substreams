@@ -123,6 +123,10 @@ func (r *Walker) sendItems(sortedItems []*pboutput.Item) error {
 	return nil
 }
 
+func (r *Walker) Progress() (first, current, last int) {
+	return r.fileWalker.Progress()
+}
+
 func (r *Walker) NextSegment() {
 	r.fileWalker.Next()
 }

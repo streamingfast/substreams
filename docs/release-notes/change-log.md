@@ -11,9 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Unreleased
 
-* Fixed the 'local substreams alpha service serve' clickhouse deployment (was failing with a message regarding fork handling...)
-* Catch more cases of WASM deterministic errors as "InvalidArgument"
-* Added some output-stream info to logs
+* Fixed `store.has_at` Wazero signature which was defined as `has_at(storeIdx: i32, ord: i32, key_ptr: i32, key_len: i32)` but should have been `has_at(storeIdx: i32, ord: i64, key_ptr: i32, key_len: i32)`.
+* Fixed the local `substreams alpha service serve` ClickHouse deployment which was failing with a message regarding fork handling.
+* Catch more cases of WASM deterministic errors as `InvalidArgument`.
+* Added some output-stream info to logs.
 
 ## v1.3.1
 
@@ -38,7 +39,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * Added `networks` field at the top level of the manifest definition, with `initialBlock` and `params` overrides for each module. See the substreams.yaml.example file in the repository or https://substreams.streamingfast.io/reference-and-specs/manifests for more details and example usage.
 * The networks `params` and `initialBlock`` overrides for the chosen network are applied to the module directly before being sent to the server. All network configurations are kept when packing an .spkg file.
-* Added the `--network` flag for choosing the network on `run`, `gui` and `alpha service deploy` commands. Default behavior is to use the one defined as `network` in the manifest. 
+* Added the `--network` flag for choosing the network on `run`, `gui` and `alpha service deploy` commands. Default behavior is to use the one defined as `network` in the manifest.
 * Added the `--endpoint` flag to `substreams alpha service serve` to specify substreams endpoint to connect to
 * Added endpoints for Antelope chains
 * Command 'substreams info' now shows the params
@@ -50,7 +51,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
-* Added the `--params` flag to `alpha service deploy` to apply per-module parameters to the substreams before pushing it. 
+* Added the `--params` flag to `alpha service deploy` to apply per-module parameters to the substreams before pushing it.
 * Renamed the `--parameters` flag to  `--deployment-params` in `alpha service deploy`, to clarify the intent of those parameters (given to the endpoint, not applied to the substreams modules)
 * Small improvement on `substreams gui` command: no longer reads the .spkg multiple times with different behavior during its process.
 
@@ -104,7 +105,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
     ```yaml
     [...]
-      
+
     sink:
       module: db_out
       type: sf.substreams.sink.sql.v1.Service

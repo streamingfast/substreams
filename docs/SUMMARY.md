@@ -1,6 +1,8 @@
 # Table of contents
 
-* [Substreams](README.md)
+* [What is Substreams?](README.md)
+* [Substreams for Solana Developers](new/common/intro-solana.md)
+
 
 ## Documentation
 

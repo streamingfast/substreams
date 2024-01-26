@@ -1,5 +1,5 @@
 Substreams is a powerful indexing technology, which allows you to:
-- Extract data from several blockchains (Ethereum, Polygon, BNB, Solana...).
+- Extract data from several blockchains (Solana, Ethereum, Polygon, BNB...).
 - Apply custom transformations to the data.
 - Send the data to a place of your choice (for example, a Postgres database or a file).
 

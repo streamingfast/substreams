@@ -83,6 +83,10 @@ func (e *EthereumContract) SetAbiContent(abiContent string) {
 	e.abiContent = abiContent
 }
 
+func (e *EthereumContract) GetAbiContent() string {
+	return e.abiContent
+}
+
 type EthereumProject struct {
 	name                        string
 	moduleName                  string

@@ -18,6 +18,8 @@ const (
 	EthereumChainBNB
 	// EthereumChainPolygon is a EthereumChain of type Polygon.
 	EthereumChainPolygon
+	// EthereumChainPolygon is a EthereumChain of type Polygon.
+	EthereumChainArbitrum	
 	// EthereumChainGoerli is a EthereumChain of type Goerli.
 	EthereumChainGoerli
 	// EthereumChainMumbai is a EthereumChain of type Mumbai.
@@ -28,15 +30,16 @@ const (
 
 var ErrInvalidEthereumChain = fmt.Errorf("not a valid EthereumChain, try [%s]", strings.Join(_EthereumChainNames, ", "))
 
-const _EthereumChainName = "MainnetBNBPolygonGoerliMumbaiOther"
+const _EthereumChainName = "MainnetBNBPolygonArbitrumGoerliMumbaiOther"
 
 var _EthereumChainNames = []string{
 	_EthereumChainName[0:7],
 	_EthereumChainName[7:10],
 	_EthereumChainName[10:17],
-	_EthereumChainName[17:23],
-	_EthereumChainName[23:29],
-	_EthereumChainName[29:34],
+	_EthereumChainName[17:25],
+	_EthereumChainName[25:31],
+	_EthereumChainName[31:36],
+	_EthereumChainName[36:41],
 }
 
 // EthereumChainNames returns a list of possible string values of EthereumChain.
@@ -50,9 +53,10 @@ var _EthereumChainMap = map[EthereumChain]string{
 	EthereumChainMainnet: _EthereumChainName[0:7],
 	EthereumChainBNB:     _EthereumChainName[7:10],
 	EthereumChainPolygon: _EthereumChainName[10:17],
-	EthereumChainGoerli:  _EthereumChainName[17:23],
-	EthereumChainMumbai:  _EthereumChainName[23:29],
-	EthereumChainOther:   _EthereumChainName[29:34],
+	EthereumChainArbitrum: _EthereumChainName[17:25],
+	EthereumChainGoerli:  _EthereumChainName[25:31],
+	EthereumChainMumbai:  _EthereumChainName[31:36],
+	EthereumChainOther:   _EthereumChainName[36:41],
 }
 
 // String implements the Stringer interface.
@@ -77,12 +81,14 @@ var _EthereumChainValue = map[string]EthereumChain{
 	strings.ToLower(_EthereumChainName[7:10]):  EthereumChainBNB,
 	_EthereumChainName[10:17]:                  EthereumChainPolygon,
 	strings.ToLower(_EthereumChainName[10:17]): EthereumChainPolygon,
-	_EthereumChainName[17:23]:                  EthereumChainGoerli,
-	strings.ToLower(_EthereumChainName[17:23]): EthereumChainGoerli,
-	_EthereumChainName[23:29]:                  EthereumChainMumbai,
-	strings.ToLower(_EthereumChainName[23:29]): EthereumChainMumbai,
-	_EthereumChainName[29:34]:                  EthereumChainOther,
-	strings.ToLower(_EthereumChainName[29:34]): EthereumChainOther,
+	_EthereumChainName[17:25]:                  EthereumChainArbitrum,
+	strings.ToLower(_EthereumChainName[17:25]): EthereumChainArbitrum,
+	_EthereumChainName[25:31]:                  EthereumChainGoerli,
+	strings.ToLower(_EthereumChainName[25:31]): EthereumChainGoerli,
+	_EthereumChainName[31:36]:                  EthereumChainMumbai,
+	strings.ToLower(_EthereumChainName[31:36]): EthereumChainMumbai,
+	_EthereumChainName[36:41]:                  EthereumChainOther,
+	strings.ToLower(_EthereumChainName[36:41]): EthereumChainOther,
 }
 
 // ParseEthereumChain attempts to convert a string to a EthereumChain.

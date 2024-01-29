@@ -54,15 +54,31 @@ var initCmd = &cobra.Command{
 
 var etherscanAPIKey = "YourApiKeyToken"
 
+type ConfigContract struct {
+	Address    string `json:"address"`
+	ShortName  string `json:"short_name"`
+	StartBlock string `json:"start_block"`
+	ABIPath    string `json:"abi_path"`
+}
+
+type InitConfig struct {
+	ProjectName string           `json:"project_name"`
+	Protocol    string           `json:"protocol"`
+	Chain       string           `json:"chain"`
+	Contracts   []ConfigContract `json:"contracts"`
+}
+
 func init() {
 	if x := os.Getenv("ETHERSCAN_API_KEY"); x != "" {
 		etherscanAPIKey = x
 	}
+	initCmd.Flags().Bool("init-config", false, "Load init config from substreams-init.json")
 	rootCmd.AddCommand(initCmd)
 }
 
 func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	relativeWorkingDir := "."
+
 	if len(args) == 1 {
 		relativeWorkingDir = args[0]
 	}
@@ -71,26 +87,52 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		relativeWorkingDir = devInitSourceDirectory
 	}
 
+	var initConfig InitConfig
+
+	initConfigFlag := mustGetBool(cmd, "init-config")
+
+	if initConfigFlag {
+		initConfig = loadInitConfig(relativeWorkingDir)
+	}
+
 	absoluteWorkingDir, err := filepath.Abs(relativeWorkingDir)
 	if err != nil {
 		return fmt.Errorf("getting absolute path of %q: %w", relativeWorkingDir, err)
 	}
 
-	projectName, moduleName, err := promptProjectName(absoluteWorkingDir)
-	if err != nil {
-		return fmt.Errorf("running project name prompt: %w", err)
-	}
+	var protocol codegen.Protocol
+	var chainSelected codegen.EthereumChain
+	var projectName string
+	var moduleName string
 
-	absoluteProjectDir := filepath.Join(absoluteWorkingDir, projectName)
+	if initConfigFlag {
+		projectName = initConfig.ProjectName
+		moduleName = projectNameToModuleName(initConfig.ProjectName)
+		protocol, err = codegen.ParseProtocol(initConfig.Protocol)
 
-	protocol, err := promptProtocol()
-	if err != nil {
-		return fmt.Errorf("running protocol prompt: %w", err)
-	}
+		if err != nil {
+			return fmt.Errorf("loading protocol from config: %w", err)
+		}
+		chainSelected, err = codegen.ParseEthereumChain(initConfig.Chain)
 
-	switch protocol {
-	case codegen.ProtocolEthereum:
-		chainSelected, err := promptEthereumChain()
+		if err != nil {
+			return fmt.Errorf("loading chain from config: %w", err)
+		}
+	} else {
+
+		projectName, moduleName, err = promptProjectName(absoluteWorkingDir)
+
+		if err != nil {
+			return fmt.Errorf("running project name prompt: %w", err)
+		}
+
+		protocol, err = promptProtocol()
+
+		if err != nil {
+			return fmt.Errorf("running protocol prompt: %w", err)
+		}
+
+		chainSelected, err = promptEthereumChain()
 		if err != nil {
 			return fmt.Errorf("running chain prompt: %w", err)
 		}
@@ -102,23 +144,36 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			fmt.Println()
 			return errInitUnsupportedChain
 		}
+	}
 
-		chain := templates.EthereumChainsByID[chainSelected.String()]
-		if chain == nil {
-			return fmt.Errorf("unknown chain: %s", chainSelected.String())
-		}
+	absoluteProjectDir := filepath.Join(absoluteWorkingDir, projectName)
+	chain := templates.EthereumChainsByID[chainSelected.String()]
 
-		ethereumContracts, err := promptEthereumVerifiedContracts(eth.MustNewAddress(chain.DefaultContractAddress), chain.DefaultContractName)
-		if err != nil {
-			return fmt.Errorf("running contract prompt: %w", err)
-		}
+	if chain == nil {
+		return fmt.Errorf("unknown chain: %s", chainSelected.String())
+	}
 
-		if len(ethereumContracts) != 1 {
-			// more than one contract to track, need to set the short names of the contracts
-			fmt.Printf("Tracking %d contracts, let's define a short name for each contract\n", len(ethereumContracts))
-			ethereumContracts, err = promptEthereumContractShortNames(ethereumContracts)
+	switch protocol {
+	case codegen.ProtocolEthereum:
+
+		var ethereumContracts []*templates.EthereumContract
+
+		if initConfigFlag {
+			ethereumContracts = parseContractsFromConfig(initConfig.Contracts)
+
+		} else {
+			ethereumContracts, err = promptEthereumVerifiedContracts(eth.MustNewAddress(chain.DefaultContractAddress), chain.DefaultContractName)
 			if err != nil {
-				return fmt.Errorf("running short name contract prompt: %w", err)
+				return fmt.Errorf("running contract prompt: %w", err)
+			}
+
+			if len(ethereumContracts) != 1 {
+				// more than one contract to track, need to set the short names of the contracts
+				fmt.Printf("Tracking %d contracts, let's define a short name for each contract\n", len(ethereumContracts))
+				ethereumContracts, err = promptEthereumContractShortNames(ethereumContracts)
+				if err != nil {
+					return fmt.Errorf("running short name contract prompt: %w", err)
+				}
 			}
 		}
 
@@ -627,53 +682,72 @@ func getContractABI(ctx context.Context, address eth.Address, endpoint string) (
 
 func getAndSetContractABIs(ctx context.Context, contracts []*templates.EthereumContract, chain *templates.EthereumChain) ([]*templates.EthereumContract, error) {
 	for _, contract := range contracts {
-		abi, abiContent, wait, err := getContractABI(ctx, contract.GetAddress(), chain.ApiEndpoint)
-		if err != nil {
-			return nil, err
-		}
 
-		<-wait.C
-		implementationAddress, wait, err := getProxyContractImplementation(ctx, contract.GetAddress(), chain.ApiEndpoint)
-		if err != nil {
-			return nil, err
-		}
-		<-wait.C
+		localAbi := contract.GetAbiContent()
+		var abiContent string
+		var abi *eth.ABI
+		var err error
 
-		if implementationAddress != nil {
-			implementationABI, implementationABIContent, wait, err := getContractABI(ctx, *implementationAddress, chain.ApiEndpoint)
+		if localAbi != "" {
+			abi, abiContent, err = getLocalContractABI(ctx, localAbi)
 			if err != nil {
 				return nil, err
 			}
-			for k, v := range implementationABI.LogEventsMap {
-				abi.LogEventsMap[k] = append(abi.LogEventsMap[k], v...)
-			}
 
-			for k, v := range implementationABI.LogEventsByNameMap {
-				abi.LogEventsByNameMap[k] = append(abi.LogEventsByNameMap[k], v...)
-			}
+		} else {
 
-			abiAsArray := []map[string]interface{}{}
-			if err := json.Unmarshal([]byte(abiContent), &abiAsArray); err != nil {
-				return nil, fmt.Errorf("unmarshalling abiContent as array: %w", err)
-			}
+			var wait *time.Timer
+			var implementationAddress *eth.Address
+			var implementationABI *eth.ABI
+			var implementationABIContent string
 
-			implementationABIAsArray := []map[string]interface{}{}
-			if err := json.Unmarshal([]byte(implementationABIContent), &implementationABIAsArray); err != nil {
-				return nil, fmt.Errorf("unmarshalling implementationABIContent as array: %w", err)
-			}
-
-			abiAsArray = append(abiAsArray, implementationABIAsArray...)
-
-			content, err := json.Marshal(abiAsArray)
+			abi, abiContent, wait, err = getContractABI(ctx, contract.GetAddress(), chain.ApiEndpoint)
 			if err != nil {
-				return nil, fmt.Errorf("re-marshalling ABI")
+				return nil, err
 			}
-			abiContent = string(content)
 
-			fmt.Printf("Fetched contract ABI for Implementation %s of Proxy %s\n", *implementationAddress, contract.GetAddress())
 			<-wait.C
-		}
+			implementationAddress, wait, err = getProxyContractImplementation(ctx, contract.GetAddress(), chain.ApiEndpoint)
+			if err != nil {
+				return nil, err
+			}
+			<-wait.C
 
+			if implementationAddress != nil {
+				implementationABI, implementationABIContent, wait, err = getContractABI(ctx, *implementationAddress, chain.ApiEndpoint)
+				if err != nil {
+					return nil, err
+				}
+				for k, v := range implementationABI.LogEventsMap {
+					abi.LogEventsMap[k] = append(abi.LogEventsMap[k], v...)
+				}
+
+				for k, v := range implementationABI.LogEventsByNameMap {
+					abi.LogEventsByNameMap[k] = append(abi.LogEventsByNameMap[k], v...)
+				}
+
+				abiAsArray := []map[string]interface{}{}
+				if err := json.Unmarshal([]byte(abiContent), &abiAsArray); err != nil {
+					return nil, fmt.Errorf("unmarshalling abiContent as array: %w", err)
+				}
+
+				implementationABIAsArray := []map[string]interface{}{}
+				if err := json.Unmarshal([]byte(implementationABIContent), &implementationABIAsArray); err != nil {
+					return nil, fmt.Errorf("unmarshalling implementationABIContent as array: %w", err)
+				}
+
+				abiAsArray = append(abiAsArray, implementationABIAsArray...)
+
+				content, err := json.Marshal(abiAsArray)
+				if err != nil {
+					return nil, fmt.Errorf("re-marshalling ABI")
+				}
+				abiContent = string(content)
+
+				fmt.Printf("Fetched contract ABI for Implementation %s of Proxy %s\n", *implementationAddress, contract.GetAddress())
+				<-wait.C
+			}
+		}
 		//fmt.Println("this is the complete abiContent after merge", abiContent)
 		contract.SetAbiContent(abiContent)
 		contract.SetAbi(abi)
@@ -729,4 +803,70 @@ func getContractCreationBlock(ctx context.Context, contracts []*templates.Ethere
 		fmt.Printf("Fetched initial block %d for %s (lowest %d)\n", blockNum, contract.GetAddress(), lowestStartBlock)
 	}
 	return lowestStartBlock, nil
+}
+
+func loadInitConfig(relativeWorkingDir string) InitConfig {
+	file, err := os.Open(filepath.Join(relativeWorkingDir, "substreams-init.json"))
+	if err != nil {
+		panic(fmt.Errorf("error opening file: %w", err))
+	}
+	defer file.Close()
+	fmt.Println("Config file found!")
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		panic(fmt.Errorf("error reading file: %w", err))
+
+	}
+
+	var initConfig InitConfig
+
+	err = json.Unmarshal(data, &initConfig)
+	if err != nil {
+		panic(fmt.Errorf("error unmarshalling JSON: %w", err))
+	}
+
+	return initConfig
+}
+
+func parseContractsFromConfig(contracts []ConfigContract) []*templates.EthereumContract {
+
+	var ethereumContracts []*templates.EthereumContract
+
+	for _, contract := range contracts {
+
+		ethereumContracts = append(ethereumContracts, templates.NewEthereumContract(contract.ShortName, eth.MustNewAddress(contract.Address), nil, nil, contract.ABIPath))
+	}
+
+	return ethereumContracts
+}
+
+func getLocalContractABI(ctx context.Context, abiLocation string) (*eth.ABI, string, error) {
+
+	absAbi, err := filepath.Abs(abiLocation)
+
+	if err != nil {
+		return nil, "", fmt.Errorf("getting absolute path of %q: %w", abiLocation, err)
+
+	}
+
+	file, err := os.Open(absAbi)
+
+	if err != nil {
+		panic(fmt.Errorf("error opening file: %w", err))
+	}
+	defer file.Close()
+
+	abiContent, err := io.ReadAll(file)
+	if err != nil {
+		panic(fmt.Errorf("error reading file: %w", err))
+
+	}
+
+	ethABI, err := eth.ParseABIFromBytes(abiContent)
+	if err != nil {
+		return nil, "", fmt.Errorf("parsing abi %q: %w", abiContent, err)
+	}
+
+	return ethABI, string(abiContent), nil
 }

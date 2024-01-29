@@ -16,11 +16,11 @@ First, you must consider whether you want to develop your own Substreams or cons
     - [Stream the data from your application.](../consume/stream/stream.md)
     - [Send the data to a subgraph.]((./../consume/subgraph/subgraph.md))
 
-**If you can't find a Substreams package that fits your needs**, then you can go ahead an develop your own Substreams. The [Develop Substreams](../develop/develop.md) section of the documentation covers everything you need to know about building a Substreams from scratch. At the most basic level, you should cover:
+**If you can't find a Substreams package that fits your needs**, then you can go ahead and develop your own Substreams. The [Develop Substreams](../develop/develop.md) section of the documentation covers everything you need to know about building a Substreams from scratch. At the most basic level, you should cover:
 
 - [Install the Substreams CLI](./installing-the-cli.md)
 - [Authentication](./authentication.md)
-- [Initialize a project (Quickstart)](./../develop/init-project.md)
+<!-- - [Initialize a project (Quickstart)](./../develop/init-project.md) -->
 - [Manifest & Modules](./../common/manifest-modules.md)
 - [Protobuf defitions](./../develop/creating-protobuf-schemas.md)
 - [Packages](./packages.md)

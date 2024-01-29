@@ -11,7 +11,7 @@ Essentially, a Substreams package is a ready-to-consume binary file, which conta
 
 ## The Substreams Registry
 
-In order to facilitate how developers share Substreams packages, the Substreams Registry (https://substreams.dev) was created. In the Registry, deelopers can discover and push Substreams.
+In order to facilitate how developers share Substreams packages, the Substreams Registry (https://substreams.dev) was created. In the Registry, developers can discover and push Substreams.
 
 For example, the [ERC20 Balance Changes](https://github.com/streamingfast/substreams-erc20-balance-changes) package is stored at the registry (https://substreams.dev/streamingfast/erc20-balance-changes/v1.1.0).
 

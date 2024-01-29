@@ -1,5 +1,5 @@
 Substreams is a powerful indexing technology, which allows you to:
-- Extract data from several blockchains (Ethereum, Polygon, BNB, Solana...).
+- Extract data from several blockchains (Solana, Ethereum, Polygon, BNB...).
 - Apply custom transformations to the data.
 - Send the data to a place of your choice (for example, a Postgres database or a file).
 
@@ -21,6 +21,37 @@ If you can't find a Substreams package that retrieves exactly the data you need,
 
 You can write your own Rust function to extract data from the blockchain:
 
+{% tabs %}
+{% tab title="Solana" %}
+The following function extracts Solana instructions from a specific program ID.
+```rust
+fn map_filter_instructions(params: String, blk: Block) -> Result<Instructions, Vec<substreams::errors::Error>> {
+    let filters = parse_filters_from_params(params)?;
+
+    let mut instructions : Vec<Instruction> = Vec::new();
+
+    blk.transactions.iter().for_each(|tx| {
+        let msg = tx.transaction.clone().unwrap().message.unwrap();
+        let acct_keys = msg.account_keys.as_slice();
+        let insts : Vec<Instruction> = msg.instructions.iter()
+            .filter(|inst| apply_filter(inst, &filters, acct_keys.to_vec()))
+            .map(|inst| {
+            Instruction {
+                program_id: bs58::encode(acct_keys[inst.program_id_index as usize].to_vec()).into_string(),
+                accounts: inst.accounts.iter().map(|acct| bs58::encode(acct_keys[*acct as usize].to_vec()).into_string()).collect(),
+                data: bs58::encode(inst.data.clone()).into_string(),
+            }
+        }).collect();
+        instructions.extend(insts);
+    });
+
+    Ok(Instructions { instructions })
+}
+```
+{% endtab %}
+
+{% tab title="EVM" %}
+The following function extracts USDT transaction from EVM blockchains.
 ```rust
 fn get_usdt_transaction(block: eth::Block) -> Result<Vec<Transaction>, substreams:error:Error> {
     let my_transactions = block.transactions().
@@ -30,8 +61,9 @@ fn get_usdt_transaction(block: eth::Block) -> Result<Vec<Transaction>, substream
     Ok(my_transactions)
 }
 ```
+{% endtab %}
+{% endtabs %}
 
-<figure><img src=".gitbook/assets/intro/develop-flow.png" width="100%" /></figure>
 
 ## How Does It Work?
 

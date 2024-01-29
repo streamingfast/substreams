@@ -1,6 +1,8 @@
 # Table of contents
 
-* [Substreams](README.md)
+* [What is Substreams?](README.md)
+* [Substreams for Solana Developers](new/common/intro-solana.md)
+
 
 ## Documentation
 
@@ -50,8 +52,14 @@
 * [EVM](new/tutorials/evm/evm.md)
   * [Exploring Ethereum](new/tutorials/evm/exploring-ethereum/exploring-ethereum.md)
     * [Mapping Blocks](new/tutorials/evm/exploring-ethereum/map_block_meta_module.md)
-    * [Filtering Transactions](new/tutorials/evm/exploring-ethereum/map_filter_transactions_module.md)
-    * [Retrieving Events of a Smart Contract](new/tutorials/evm/exploring-ethereum/map_contract_events_module.md)
+    * [Filter Transactions](new/tutorials/evm/exploring-ethereum/map_filter_transactions_module.md)
+    * [Retrieve Events of a Smart Contract](new/tutorials/evm/exploring-ethereum/map_contract_events_module.md)
+* [Solana](new/tutorials/solana/solana.md)
+  * [Explore Solana](new/tutorials/solana/explore-solana/explore-solana.md)
+    * [Filter Instructions](new/tutorials/solana/explore-solana/filter-instructions.md)
+    * [Filter Transactions](new/tutorials/solana/explore-solana/filter-transactions.md)
+
+
 * [Rust](new/tutorials/rust/rust.md)
   * [Option struct](new/tutorials/rust/option.md)
   * [Result struct](new/tutorials/rust/result.md)

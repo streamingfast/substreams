@@ -15,197 +15,206 @@ use num_traits::cast::ToPrimitive;
 use std::str::FromStr;
 use substreams::scalar::BigDecimal;
 
-const TRACKED_CONTRACT: [u8; 20] = hex!("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d");
-
 substreams_ethereum::init!();
 
-#[substreams::handlers::map]
-fn map_events(blk: eth::Block) -> Result<contract::Events, substreams::errors::Error> {
-    Ok(contract::Events {
-        approvals: blk
-            .receipts()
-            .flat_map(|view| {
-                view.receipt.logs.iter()
-                    .filter(|log| log.address == TRACKED_CONTRACT)
-                    .filter_map(|log| {
-                        if let Some(event) = abi::contract::events::Approval::match_and_decode(log) {
-                            return Some(contract::Approval {
-                                evt_tx_hash: Hex(&view.transaction.hash).to_string(),
-                                evt_index: log.block_index,
-                                evt_block_time: Some(blk.timestamp().to_owned()),
-                                evt_block_number: blk.number,
-                                approved: event.approved,
-                                owner: event.owner,
-                                token_id: event.token_id.to_string(),
-                            });
-                        }
+const BAYC_TRACKED_CONTRACT: [u8; 20] = hex!("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d");
 
-                        None
-                })
-            })
-            .collect(),
-        approval_for_alls: blk
-            .receipts()
-            .flat_map(|view| {
-                view.receipt.logs.iter()
-                    .filter(|log| log.address == TRACKED_CONTRACT)
-                    .filter_map(|log| {
-                        if let Some(event) = abi::contract::events::ApprovalForAll::match_and_decode(log) {
-                            return Some(contract::ApprovalForAll {
-                                evt_tx_hash: Hex(&view.transaction.hash).to_string(),
-                                evt_index: log.block_index,
-                                evt_block_time: Some(blk.timestamp().to_owned()),
-                                evt_block_number: blk.number,
-                                approved: event.approved,
-                                operator: event.operator,
-                                owner: event.owner,
-                            });
-                        }
+fn map_bayc_events(blk: &eth::Block, events: &mut contract::Events) {
+    events.bayc_approvals.append(&mut blk
+        .receipts()
+        .flat_map(|view| {
+            view.receipt.logs.iter()
+                .filter(|log| log.address == BAYC_TRACKED_CONTRACT)
+                .filter_map(|log| {
+                    if let Some(event) = abi::bayc_contract::events::Approval::match_and_decode(log) {
+                        return Some(contract::BaycApproval {
+                            evt_tx_hash: Hex(&view.transaction.hash).to_string(),
+                            evt_index: log.block_index,
+                            evt_block_time: Some(blk.timestamp().to_owned()),
+                            evt_block_number: blk.number,
+                            approved: event.approved,
+                            owner: event.owner,
+                            token_id: event.token_id.to_string(),
+                        });
+                    }
 
-                        None
+                    None
                 })
-            })
-            .collect(),
-        ownership_transferreds: blk
-            .receipts()
-            .flat_map(|view| {
-                view.receipt.logs.iter()
-                    .filter(|log| log.address == TRACKED_CONTRACT)
-                    .filter_map(|log| {
-                        if let Some(event) = abi::contract::events::OwnershipTransferred::match_and_decode(log) {
-                            return Some(contract::OwnershipTransferred {
-                                evt_tx_hash: Hex(&view.transaction.hash).to_string(),
-                                evt_index: log.block_index,
-                                evt_block_time: Some(blk.timestamp().to_owned()),
-                                evt_block_number: blk.number,
-                                new_owner: event.new_owner,
-                                previous_owner: event.previous_owner,
-                            });
-                        }
+        })
+        .collect());
+    events.bayc_approval_for_alls.append(&mut blk
+        .receipts()
+        .flat_map(|view| {
+            view.receipt.logs.iter()
+                .filter(|log| log.address == BAYC_TRACKED_CONTRACT)
+                .filter_map(|log| {
+                    if let Some(event) = abi::bayc_contract::events::ApprovalForAll::match_and_decode(log) {
+                        return Some(contract::BaycApprovalForAll {
+                            evt_tx_hash: Hex(&view.transaction.hash).to_string(),
+                            evt_index: log.block_index,
+                            evt_block_time: Some(blk.timestamp().to_owned()),
+                            evt_block_number: blk.number,
+                            approved: event.approved,
+                            operator: event.operator,
+                            owner: event.owner,
+                        });
+                    }
 
-                        None
+                    None
                 })
-            })
-            .collect(),
-        transfers: blk
-            .receipts()
-            .flat_map(|view| {
-                view.receipt.logs.iter()
-                    .filter(|log| log.address == TRACKED_CONTRACT)
-                    .filter_map(|log| {
-                        if let Some(event) = abi::contract::events::Transfer::match_and_decode(log) {
-                            return Some(contract::Transfer {
-                                evt_tx_hash: Hex(&view.transaction.hash).to_string(),
-                                evt_index: log.block_index,
-                                evt_block_time: Some(blk.timestamp().to_owned()),
-                                evt_block_number: blk.number,
-                                from: event.from,
-                                to: event.to,
-                                token_id: event.token_id.to_string(),
-                            });
-                        }
+        })
+        .collect());
+    events.bayc_ownership_transferreds.append(&mut blk
+        .receipts()
+        .flat_map(|view| {
+            view.receipt.logs.iter()
+                .filter(|log| log.address == BAYC_TRACKED_CONTRACT)
+                .filter_map(|log| {
+                    if let Some(event) = abi::bayc_contract::events::OwnershipTransferred::match_and_decode(log) {
+                        return Some(contract::BaycOwnershipTransferred {
+                            evt_tx_hash: Hex(&view.transaction.hash).to_string(),
+                            evt_index: log.block_index,
+                            evt_block_time: Some(blk.timestamp().to_owned()),
+                            evt_block_number: blk.number,
+                            new_owner: event.new_owner,
+                            previous_owner: event.previous_owner,
+                        });
+                    }
 
-                        None
+                    None
                 })
-            })
-            .collect(),
-    })
+        })
+        .collect());
+    events.bayc_transfers.append(&mut blk
+        .receipts()
+        .flat_map(|view| {
+            view.receipt.logs.iter()
+                .filter(|log| log.address == BAYC_TRACKED_CONTRACT)
+                .filter_map(|log| {
+                    if let Some(event) = abi::bayc_contract::events::Transfer::match_and_decode(log) {
+                        return Some(contract::BaycTransfer {
+                            evt_tx_hash: Hex(&view.transaction.hash).to_string(),
+                            evt_index: log.block_index,
+                            evt_block_time: Some(blk.timestamp().to_owned()),
+                            evt_block_number: blk.number,
+                            from: event.from,
+                            to: event.to,
+                            token_id: event.token_id.to_string(),
+                        });
+                    }
+
+                    None
+                })
+        })
+        .collect());
 }
 
-#[substreams::handlers::map]
-fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::errors::Error> {
-    // Initialize changes container
-    let mut tables = DatabaseChangeTables::new();
-
-    // Loop over all the abis events to create changes
-    events.approvals.into_iter().for_each(|evt| {
+fn db_bayc_out(events: &contract::Events, tables: &mut DatabaseChangeTables) {
+    // Loop over all the abis events to create table changes
+    events.bayc_approvals.iter().for_each(|evt| {
         tables
-            .create_row("approval", [("evt_tx_hash", evt.evt_tx_hash),("evt_index", evt.evt_index.to_string())])
-            .set("evt_block_time", evt.evt_block_time.unwrap())
+            .create_row("bayc_approval", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
+            .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
             .set("approved", Hex(&evt.approved).to_string())
             .set("owner", Hex(&evt.owner).to_string())
             .set("token_id", BigDecimal::from_str(&evt.token_id).unwrap());
     });
-    events.approval_for_alls.into_iter().for_each(|evt| {
+    events.bayc_approval_for_alls.iter().for_each(|evt| {
         tables
-            .create_row("approval_for_all", [("evt_tx_hash", evt.evt_tx_hash),("evt_index", evt.evt_index.to_string())])
-            .set("evt_block_time", evt.evt_block_time.unwrap())
+            .create_row("bayc_approval_for_all", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
+            .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
             .set("approved", evt.approved)
             .set("operator", Hex(&evt.operator).to_string())
             .set("owner", Hex(&evt.owner).to_string());
     });
-    events.ownership_transferreds.into_iter().for_each(|evt| {
+    events.bayc_ownership_transferreds.iter().for_each(|evt| {
         tables
-            .create_row("ownership_transferred", [("evt_tx_hash", evt.evt_tx_hash),("evt_index", evt.evt_index.to_string())])
-            .set("evt_block_time", evt.evt_block_time.unwrap())
+            .create_row("bayc_ownership_transferred", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
+            .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
             .set("new_owner", Hex(&evt.new_owner).to_string())
             .set("previous_owner", Hex(&evt.previous_owner).to_string());
     });
-    events.transfers.into_iter().for_each(|evt| {
+    events.bayc_transfers.iter().for_each(|evt| {
         tables
-            .create_row("transfer", [("evt_tx_hash", evt.evt_tx_hash),("evt_index", evt.evt_index.to_string())])
-            .set("evt_block_time", evt.evt_block_time.unwrap())
+            .create_row("bayc_transfer", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
+            .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
             .set("from", Hex(&evt.from).to_string())
             .set("to", Hex(&evt.to).to_string())
             .set("token_id", BigDecimal::from_str(&evt.token_id).unwrap());
     });
+}
 
+
+fn graph_bayc_out(events: &contract::Events, tables: &mut EntityChangesTables) {
+    // Loop over all the abis events to create table changes
+    events.bayc_approvals.iter().for_each(|evt| {
+        tables
+            .create_row("bayc_approval", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
+            .set("evt_tx_hash", &evt.evt_tx_hash)
+            .set("evt_index", evt.evt_index)
+            .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
+            .set("evt_block_number", evt.evt_block_number)
+            .set("approved", Hex(&evt.approved).to_string())
+            .set("owner", Hex(&evt.owner).to_string())
+            .set("token_id", BigDecimal::from_str(&evt.token_id).unwrap());
+    });
+    events.bayc_approval_for_alls.iter().for_each(|evt| {
+        tables
+            .create_row("bayc_approval_for_all", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
+            .set("evt_tx_hash", &evt.evt_tx_hash)
+            .set("evt_index", evt.evt_index)
+            .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
+            .set("evt_block_number", evt.evt_block_number)
+            .set("approved", evt.approved)
+            .set("operator", Hex(&evt.operator).to_string())
+            .set("owner", Hex(&evt.owner).to_string());
+    });
+    events.bayc_ownership_transferreds.iter().for_each(|evt| {
+        tables
+            .create_row("bayc_ownership_transferred", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
+            .set("evt_tx_hash", &evt.evt_tx_hash)
+            .set("evt_index", evt.evt_index)
+            .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
+            .set("evt_block_number", evt.evt_block_number)
+            .set("new_owner", Hex(&evt.new_owner).to_string())
+            .set("previous_owner", Hex(&evt.previous_owner).to_string());
+    });
+    events.bayc_transfers.iter().for_each(|evt| {
+        tables
+            .create_row("bayc_transfer", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
+            .set("evt_tx_hash", &evt.evt_tx_hash)
+            .set("evt_index", evt.evt_index)
+            .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
+            .set("evt_block_number", evt.evt_block_number)
+            .set("from", Hex(&evt.from).to_string())
+            .set("to", Hex(&evt.to).to_string())
+            .set("token_id", BigDecimal::from_str(&evt.token_id).unwrap());
+    });
+}
+
+#[substreams::handlers::map]
+fn map_events(blk: eth::Block) -> Result<contract::Events, substreams::errors::Error> {
+    let mut events = contract::Events::default();
+    map_bayc_events(&blk, &mut events);
+    Ok(events)
+}
+
+#[substreams::handlers::map]
+fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::errors::Error> {
+    // Initialize Database Changes container
+    let mut tables = DatabaseChangeTables::new();
+    db_bayc_out(&events, &mut tables);
     Ok(tables.to_database_changes())
 }
 
 #[substreams::handlers::map]
 fn graph_out(events: contract::Events) -> Result<EntityChanges, substreams::errors::Error> {
-    // Initialize changes container
+    // Initialize Database Changes container
     let mut tables = EntityChangesTables::new();
-
-    // Loop over all the abis events to create changes
-    events.approvals.into_iter().for_each(|evt| {
-        tables
-            .create_row("approval", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
-            .set("evt_tx_hash", evt.evt_tx_hash)
-            .set("evt_index", evt.evt_index)
-            .set("evt_block_time", evt.evt_block_time.unwrap())
-            .set("evt_block_number", evt.evt_block_number)
-            .set("approved", Hex(&evt.approved).to_string())
-            .set("owner", Hex(&evt.owner).to_string())
-            .set("token_id", BigDecimal::from_str(&evt.token_id).unwrap());
-    });
-    events.approval_for_alls.into_iter().for_each(|evt| {
-        tables
-            .create_row("approval_for_all", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
-            .set("evt_tx_hash", evt.evt_tx_hash)
-            .set("evt_index", evt.evt_index)
-            .set("evt_block_time", evt.evt_block_time.unwrap())
-            .set("evt_block_number", evt.evt_block_number)
-            .set("approved", evt.approved)
-            .set("operator", Hex(&evt.operator).to_string())
-            .set("owner", Hex(&evt.owner).to_string());
-    });
-    events.ownership_transferreds.into_iter().for_each(|evt| {
-        tables
-            .create_row("ownership_transferred", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
-            .set("evt_tx_hash", evt.evt_tx_hash)
-            .set("evt_index", evt.evt_index)
-            .set("evt_block_time", evt.evt_block_time.unwrap())
-            .set("evt_block_number", evt.evt_block_number)
-            .set("new_owner", Hex(&evt.new_owner).to_string())
-            .set("previous_owner", Hex(&evt.previous_owner).to_string());
-    });
-    events.transfers.into_iter().for_each(|evt| {
-        tables
-            .create_row("transfer", format!("{}-{}", evt.evt_tx_hash, evt.evt_index))
-            .set("evt_tx_hash", evt.evt_tx_hash)
-            .set("evt_index", evt.evt_index)
-            .set("evt_block_time", evt.evt_block_time.unwrap())
-            .set("evt_block_number", evt.evt_block_number)
-            .set("from", Hex(&evt.from).to_string())
-            .set("to", Hex(&evt.to).to_string())
-            .set("token_id", BigDecimal::from_str(&evt.token_id).unwrap());
-    });
-
+    graph_bayc_out(&events, &mut tables);
     Ok(tables.to_entity_changes())
 }

@@ -3,14 +3,20 @@ syntax = "proto3";
 import "google/protobuf/timestamp.proto";
 
 package contract.v1;
-{{ $numberOfContracts := len .ethereumContracts }}
-{{- $eventsCounter := 0 }}
+{{ $eventsCounter := 0 }}
 message Events {
     {{- range $i, $contract := .ethereumContracts }}
     {{- range $index, $event := $contract.GetEvents }}
     {{- $proto := $event.Proto }}
     {{- $eventsCounter = add $eventsCounter 1 }}
-    repeated {{ if ne $numberOfContracts 1 }}{{ $contract.GetName }}_{{ end }}{{$proto.MessageName}} {{ if ne $numberOfContracts 1 }}{{ $contract.GetName }}_{{ end }}{{$proto.OutputModuleFieldName}} = {{ $eventsCounter }};
+    repeated {{ $contract.GetName }}_{{$proto.MessageName}} {{ $contract.GetName }}_{{$proto.OutputModuleFieldName}} = {{ $eventsCounter }};
+    {{- end}}
+    {{- range $ddsContract := $contract.GetDDS -}}
+    {{- range $index, $event := $ddsContract.GetEvents -}}
+    {{- $proto := $event.Proto }}
+    {{- $eventsCounter = add $eventsCounter 1 }}
+    repeated {{ $ddsContract.GetName }}_{{$proto.MessageName}} {{ $ddsContract.GetName }}_{{$proto.OutputModuleFieldName}} = {{ $eventsCounter }};
+    {{- end}}
     {{- end}}
     {{- end}}
 }
@@ -18,7 +24,7 @@ message Events {
 {{- range $i, $contract := .ethereumContracts}}
 {{- range $event := $contract.GetEvents }}
 {{ $proto := $event.Proto }}
-message {{ if ne $numberOfContracts 1 }}{{ $contract.GetName }}_{{ end }}{{ $proto.MessageName }} {
+message {{ $contract.GetName }}_{{ $proto.MessageName }} {
     string evt_tx_hash = 1;
     uint32 evt_index = 2;
     google.protobuf.Timestamp evt_block_time = 3;
@@ -27,5 +33,20 @@ message {{ if ne $numberOfContracts 1 }}{{ $contract.GetName }}_{{ end }}{{ $pro
     {{ $protoField.Type }} {{ sanitizeProtoFieldName $protoField.Name }} = {{ add $index 5 }};
     {{- end}}
 }
+{{- end}}
+{{- range $i, $ddsContract := $contract.GetDDS }}
+{{- range $event := $ddsContract.GetEvents }}
+{{ $proto := $event.Proto }}
+message {{ $ddsContract.GetName }}_{{ $proto.MessageName }} {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    string evt_address = 5;
+    {{- range $index, $protoField := $proto.Fields }}
+    {{ $protoField.Type }} {{ sanitizeProtoFieldName $protoField.Name }} = {{ add $index 6 }};
+    {{- end}}
+}
+{{- end}}
 {{- end}}
 {{- end}}

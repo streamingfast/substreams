@@ -3,17 +3,17 @@
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Events {
     #[prost(message, repeated, tag="1")]
-    pub approvals: ::prost::alloc::vec::Vec<Approval>,
+    pub bayc_approvals: ::prost::alloc::vec::Vec<BaycApproval>,
     #[prost(message, repeated, tag="2")]
-    pub approval_for_alls: ::prost::alloc::vec::Vec<ApprovalForAll>,
+    pub bayc_approval_for_alls: ::prost::alloc::vec::Vec<BaycApprovalForAll>,
     #[prost(message, repeated, tag="3")]
-    pub ownership_transferreds: ::prost::alloc::vec::Vec<OwnershipTransferred>,
+    pub bayc_ownership_transferreds: ::prost::alloc::vec::Vec<BaycOwnershipTransferred>,
     #[prost(message, repeated, tag="4")]
-    pub transfers: ::prost::alloc::vec::Vec<Transfer>,
+    pub bayc_transfers: ::prost::alloc::vec::Vec<BaycTransfer>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct Approval {
+pub struct BaycApproval {
     #[prost(string, tag="1")]
     pub evt_tx_hash: ::prost::alloc::string::String,
     #[prost(uint32, tag="2")]
@@ -31,7 +31,7 @@ pub struct Approval {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ApprovalForAll {
+pub struct BaycApprovalForAll {
     #[prost(string, tag="1")]
     pub evt_tx_hash: ::prost::alloc::string::String,
     #[prost(uint32, tag="2")]
@@ -49,7 +49,7 @@ pub struct ApprovalForAll {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct OwnershipTransferred {
+pub struct BaycOwnershipTransferred {
     #[prost(string, tag="1")]
     pub evt_tx_hash: ::prost::alloc::string::String,
     #[prost(uint32, tag="2")]
@@ -65,7 +65,7 @@ pub struct OwnershipTransferred {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct Transfer {
+pub struct BaycTransfer {
     #[prost(string, tag="1")]
     pub evt_tx_hash: ::prost::alloc::string::String,
     #[prost(uint32, tag="2")]

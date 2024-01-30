@@ -21,11 +21,23 @@ binaries:
     file: ./target/wasm32-unknown-unknown/release/substreams.wasm
 
 modules:
+{{- range $contract := .ethereumContracts -}}
+{{- range $ddsContract := $contract.GetDDS }}
+  - name: store_{{ $contract.GetName }}_{{ $ddsContract.GetName }}_created
+    kind: store
+    initialBlock: {{ $.initialBlock }}
+    updatePolicy: set
+    valueType: proto:dynamic_datasource
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+{{ end -}}
+{{- end }}
   - name: map_events
     kind: map
     initialBlock: {{ .initialBlock }}
     inputs:
-      - source: sf.ethereum.type.v2.Block
+      - source: sf.ethereum.type.v2.Block{{ range $contract := .ethereumContracts -}}{{ range $ddsContract := $contract.GetDDS }}
+      - store: store_{{ $contract.GetName }}_{{ $ddsContract.GetName }}_created{{ end }}{{ end }}
     output:
       type: proto:contract.v1.Events
 

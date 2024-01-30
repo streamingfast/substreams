@@ -113,17 +113,13 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("running contract prompt: %w", err)
 		}
 
-		if len(ethereumContracts) != 1 {
-			// more than one contract to track, need to set the short names of the contracts
-			fmt.Printf("Tracking %d contracts, let's define a short name for each contract\n", len(ethereumContracts))
-			ethereumContracts, err = promptEthereumContractShortNames(ethereumContracts)
-			if err != nil {
-				return fmt.Errorf("running short name contract prompt: %w", err)
-			}
+		fmt.Printf("Tracking %d contract(s), let's define a short name for each contract\n", len(ethereumContracts))
+		ethereumContracts, err = promptEthereumContractShortNames(ethereumContracts)
+		if err != nil {
+			return fmt.Errorf("running short name contract prompt: %w", err)
 		}
 
 		fmt.Printf("Retrieving %s contract information (ABI & creation block)\n", chain.DisplayName)
-
 		// Get contract abiContents & parse them
 		ethereumContracts, err = getAndSetContractABIs(cmd.Context(), ethereumContracts, chain)
 		if err != nil {
@@ -139,11 +135,17 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 
 		for _, contract := range ethereumContracts {
 			fmt.Printf("Generating ABI Event models for %s\n", contract.GetName())
-			events, err := templates.BuildEventModels(contract, len(ethereumContracts) > 1)
+			events, err := templates.BuildEventModels(contract.GetAbi())
 			if err != nil {
 				return fmt.Errorf("build ABI event models for contract [%s - %s]: %w", contract.GetAddress(), contract.GetName(), err)
 			}
 			contract.SetEvents(events)
+		}
+
+		// Ask for any dynamic datasources
+		ethereumContracts, err = promptEthereumDynamicDataSources(cmd.Context(), ethereumContracts, chain)
+		if err != nil {
+			return fmt.Errorf("running dynamic datasources prompt, %s, %w", chain.DisplayName, err)
 		}
 
 		fmt.Println("Writing project files")
@@ -267,7 +269,7 @@ func promptEthereumVerifiedContracts(defaultAddress eth.Address, defaultContract
 	if devInitEthereumTrackedContract != "" {
 		// It's ok to panic, we expect the dev to put in a valid Ethereum address
 		return []*templates.EthereumContract{
-			templates.NewEthereumContract("", eth.MustNewAddress(devInitEthereumTrackedContract), nil, nil, ""),
+			templates.NewEthereumContract("", eth.MustNewAddress(devInitEthereumTrackedContract), nil, ""),
 		}, nil
 	}
 
@@ -292,7 +294,7 @@ func promptEthereumVerifiedContracts(defaultAddress eth.Address, defaultContract
 		return nil, err
 	}
 
-	ethContracts = append(ethContracts, templates.NewEthereumContract("", firstContractAddress, nil, nil, ""))
+	ethContracts = append(ethContracts, templates.NewEthereumContract("", firstContractAddress, nil, ""))
 
 	if bytes.Equal(firstContractAddress, defaultAddress) {
 		return ethContracts, nil
@@ -307,7 +309,7 @@ func promptEthereumVerifiedContracts(defaultAddress eth.Address, defaultContract
 		if contractAddr == nil {
 			return ethContracts, nil
 		}
-		ethContracts = append(ethContracts, templates.NewEthereumContract("", contractAddr, nil, nil, ""))
+		ethContracts = append(ethContracts, templates.NewEthereumContract("", contractAddr, nil, ""))
 	}
 }
 
@@ -345,6 +347,121 @@ func promptEthereumContractShortNames(ethereumContracts []*templates.EthereumCon
 		}
 		contract.SetName(shortName)
 	}
+
+	return ethereumContracts, nil
+}
+
+func promptEthereumDynamicDataSources(ctx context.Context, ethereumContracts []*templates.EthereumContract, chain *templates.EthereumChain) ([]*templates.EthereumContract, error) {
+	dds, err := promptConfirm("Would you like to track a dynamic datasource", &promptOptions{
+		PromptTemplates: &promptui.PromptTemplates{
+			Success: `{{ "Track a dynamic datasource:" | faint }} `,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if !dds {
+		return ethereumContracts, nil
+	}
+
+	selected := ethereumContracts[0]
+	if len(ethereumContracts) != 1 {
+		fmt.Println("Select the factory contract:")
+		for i, contract := range ethereumContracts {
+			fmt.Printf("%d.  %s (%s)\n", i+1, contract.GetName(), contract.GetAddress().String())
+		}
+		_, err := prompt("(enter the number)", &promptOptions{
+			Validate: func(input string) error {
+				val, err := strconv.ParseInt(input, 10, 64)
+				if err != nil || val < 1 || val >= int64(len(ethereumContracts)+1) {
+					return fmt.Errorf("invalid value: must be an integer between 1 and %d", len(ethereumContracts)+1)
+				}
+
+				selected = ethereumContracts[int(val-1)]
+				return nil
+			},
+		})
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	shortName, err := prompt("Choose a short name for the created entity (lowercase and numbers only)", &promptOptions{
+		Validate: func(input string) error {
+			ok := shortNameRegexp.MatchString(input)
+			if !ok {
+				return fmt.Errorf("invalid name: must match %s", shortNameRegexp)
+			}
+
+			return nil
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	events := selected.GetEvents()
+	fmt.Println("Select the event on the factory that triggers the creation of a dynamic datasource:")
+	for i, event := range events {
+		fmt.Printf("%d.  %s\n", i+1, event.Rust.ABIStructName)
+	}
+	var selectedEvent int
+	var selectedEventName string
+	_, err = prompt("(enter the number)", &promptOptions{
+		Validate: func(input string) error {
+			val, err := strconv.ParseInt(input, 10, 64)
+			if err != nil || val < 1 || val >= int64(len(events)+1) {
+				return fmt.Errorf("invalid value: must be an integer between 1 and %d", len(events)+1)
+			}
+
+			selectedEvent = int(val - 1)
+			selectedEventName = events[selectedEvent].Rust.ABIStructName
+			return nil
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println("Select the field on the factory event that provides the address of the dynamic datasource:")
+	eventFields := events[selectedEvent].Proto.Fields
+	for i, eventField := range eventFields {
+		fmt.Printf("%d.  %s\n", i+1, eventField.Name)
+	}
+
+	var selectedEventField string
+	_, err = prompt("(enter the number)", &promptOptions{
+		Validate: func(input string) error {
+			val, err := strconv.ParseInt(input, 10, 64)
+			if err != nil || val < 1 || val >= int64(len(eventFields)+1) {
+				return fmt.Errorf("invalid value: must be an integer between 1 and %d", len(eventFields)+1)
+			}
+
+			selectedEventField = eventFields[int(val-1)].Name
+			return nil
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	referenceContractAddress, err := promptContractAddress(
+		"Enter a reference contract address to fetch the ABI",
+		func(input string) (eth.Address, error) {
+			return eth.NewAddress(input)
+		})
+	if err != nil {
+		return nil, err
+	}
+	abi, abiContent, err := getContractABIFollowingProxy(ctx, referenceContractAddress, chain)
+	if err != nil {
+		return nil, fmt.Errorf("getting contract ABI for %s: %w", referenceContractAddress, err)
+	}
+
+	fmt.Println("adding dynamic datasource", shortName, selectedEventName, selectedEventField)
+	selected.AddDynamicDataSource(shortName, abi, abiContent, selectedEventName, selectedEventField)
 
 	return ethereumContracts, nil
 }
@@ -625,53 +742,62 @@ func getContractABI(ctx context.Context, address eth.Address, endpoint string) (
 	return ethABI, abiContent, timer, err
 }
 
+func getContractABIFollowingProxy(ctx context.Context, contractAddress eth.Address, chain *templates.EthereumChain) (*eth.ABI, string, error) {
+	abi, abiContent, wait, err := getContractABI(ctx, contractAddress, chain.ApiEndpoint)
+	if err != nil {
+		return nil, "", err
+	}
+
+	<-wait.C
+	implementationAddress, wait, err := getProxyContractImplementation(ctx, contractAddress, chain.ApiEndpoint)
+	if err != nil {
+		return nil, "", err
+	}
+	<-wait.C
+
+	if implementationAddress != nil {
+		implementationABI, implementationABIContent, wait, err := getContractABI(ctx, *implementationAddress, chain.ApiEndpoint)
+		if err != nil {
+			return nil, "", err
+		}
+		for k, v := range implementationABI.LogEventsMap {
+			abi.LogEventsMap[k] = append(abi.LogEventsMap[k], v...)
+		}
+
+		for k, v := range implementationABI.LogEventsByNameMap {
+			abi.LogEventsByNameMap[k] = append(abi.LogEventsByNameMap[k], v...)
+		}
+
+		abiAsArray := []map[string]interface{}{}
+		if err := json.Unmarshal([]byte(abiContent), &abiAsArray); err != nil {
+			return nil, "", fmt.Errorf("unmarshalling abiContent as array: %w", err)
+		}
+
+		implementationABIAsArray := []map[string]interface{}{}
+		if err := json.Unmarshal([]byte(implementationABIContent), &implementationABIAsArray); err != nil {
+			return nil, "", fmt.Errorf("unmarshalling implementationABIContent as array: %w", err)
+		}
+
+		abiAsArray = append(abiAsArray, implementationABIAsArray...)
+
+		content, err := json.Marshal(abiAsArray)
+		if err != nil {
+			return nil, "", fmt.Errorf("re-marshalling ABI")
+		}
+		abiContent = string(content)
+
+		fmt.Printf("Fetched contract ABI for Implementation %s of Proxy %s\n", *implementationAddress, contractAddress)
+		<-wait.C
+	}
+	return abi, abiContent, nil
+
+}
+
 func getAndSetContractABIs(ctx context.Context, contracts []*templates.EthereumContract, chain *templates.EthereumChain) ([]*templates.EthereumContract, error) {
 	for _, contract := range contracts {
-		abi, abiContent, wait, err := getContractABI(ctx, contract.GetAddress(), chain.ApiEndpoint)
+		abi, abiContent, err := getContractABIFollowingProxy(ctx, contract.GetAddress(), chain)
 		if err != nil {
-			return nil, err
-		}
-
-		<-wait.C
-		implementationAddress, wait, err := getProxyContractImplementation(ctx, contract.GetAddress(), chain.ApiEndpoint)
-		if err != nil {
-			return nil, err
-		}
-		<-wait.C
-
-		if implementationAddress != nil {
-			implementationABI, implementationABIContent, wait, err := getContractABI(ctx, *implementationAddress, chain.ApiEndpoint)
-			if err != nil {
-				return nil, err
-			}
-			for k, v := range implementationABI.LogEventsMap {
-				abi.LogEventsMap[k] = append(abi.LogEventsMap[k], v...)
-			}
-
-			for k, v := range implementationABI.LogEventsByNameMap {
-				abi.LogEventsByNameMap[k] = append(abi.LogEventsByNameMap[k], v...)
-			}
-
-			abiAsArray := []map[string]interface{}{}
-			if err := json.Unmarshal([]byte(abiContent), &abiAsArray); err != nil {
-				return nil, fmt.Errorf("unmarshalling abiContent as array: %w", err)
-			}
-
-			implementationABIAsArray := []map[string]interface{}{}
-			if err := json.Unmarshal([]byte(implementationABIContent), &implementationABIAsArray); err != nil {
-				return nil, fmt.Errorf("unmarshalling implementationABIContent as array: %w", err)
-			}
-
-			abiAsArray = append(abiAsArray, implementationABIAsArray...)
-
-			content, err := json.Marshal(abiAsArray)
-			if err != nil {
-				return nil, fmt.Errorf("re-marshalling ABI")
-			}
-			abiContent = string(content)
-
-			fmt.Printf("Fetched contract ABI for Implementation %s of Proxy %s\n", *implementationAddress, contract.GetAddress())
-			<-wait.C
+			return nil, fmt.Errorf("getting contract ABI for %s: %w", contract.GetAddress(), err)
 		}
 
 		//fmt.Println("this is the complete abiContent after merge", abiContent)

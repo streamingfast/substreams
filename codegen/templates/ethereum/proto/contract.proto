@@ -5,13 +5,13 @@ import "google/protobuf/timestamp.proto";
 package contract.v1;
 
 message Events {
-    repeated Approval approvals = 1;
-    repeated ApprovalForAll approval_for_alls = 2;
-    repeated OwnershipTransferred ownership_transferreds = 3;
-    repeated Transfer transfers = 4;
+    repeated bayc_Approval bayc_approvals = 1;
+    repeated bayc_ApprovalForAll bayc_approval_for_alls = 2;
+    repeated bayc_OwnershipTransferred bayc_ownership_transferreds = 3;
+    repeated bayc_Transfer bayc_transfers = 4;
 }
 
-message Approval {
+message bayc_Approval {
     string evt_tx_hash = 1;
     uint32 evt_index = 2;
     google.protobuf.Timestamp evt_block_time = 3;
@@ -21,7 +21,7 @@ message Approval {
     string token_id = 7;
 }
 
-message ApprovalForAll {
+message bayc_ApprovalForAll {
     string evt_tx_hash = 1;
     uint32 evt_index = 2;
     google.protobuf.Timestamp evt_block_time = 3;
@@ -31,7 +31,7 @@ message ApprovalForAll {
     bool approved = 7;
 }
 
-message OwnershipTransferred {
+message bayc_OwnershipTransferred {
     string evt_tx_hash = 1;
     uint32 evt_index = 2;
     google.protobuf.Timestamp evt_block_time = 3;
@@ -40,7 +40,7 @@ message OwnershipTransferred {
     bytes new_owner = 6;
 }
 
-message Transfer {
+message bayc_Transfer {
     string evt_tx_hash = 1;
     uint32 evt_index = 2;
     google.protobuf.Timestamp evt_block_time = 3;

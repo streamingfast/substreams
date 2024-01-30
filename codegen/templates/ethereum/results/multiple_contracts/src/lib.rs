@@ -17,7 +17,7 @@ use substreams::scalar::BigDecimal;
 
 substreams_ethereum::init!();
 
-const MOONBIRD_TRACKED_CONTRACT: [u8; 20] = hex!("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d");
+const MOONBIRD_TRACKED_CONTRACT: [u8; 20] = hex!("23581767a106ae21c074b2276d25e5c3e136a68b");
 const BAYC_TRACKED_CONTRACT: [u8; 20] = hex!("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d");
 
 fn map_moonbird_events(blk: &eth::Block, events: &mut contract::Events) {

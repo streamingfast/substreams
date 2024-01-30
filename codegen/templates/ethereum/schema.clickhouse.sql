@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS approval (
+CREATE TABLE IF NOT EXISTS bayc_approval (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,
@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS approval (
     "owner" VARCHAR(40),
     "token_id" UInt256
 ) ENGINE = MergeTree PRIMARY KEY ("evt_tx_hash","evt_index");
-CREATE TABLE IF NOT EXISTS approval_for_all (
+CREATE TABLE IF NOT EXISTS bayc_approval_for_all (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS approval_for_all (
     "operator" VARCHAR(40),
     "owner" VARCHAR(40)
 ) ENGINE = MergeTree PRIMARY KEY ("evt_tx_hash","evt_index");
-CREATE TABLE IF NOT EXISTS ownership_transferred (
+CREATE TABLE IF NOT EXISTS bayc_ownership_transferred (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS ownership_transferred (
     "new_owner" VARCHAR(40),
     "previous_owner" VARCHAR(40)
 ) ENGINE = MergeTree PRIMARY KEY ("evt_tx_hash","evt_index");
-CREATE TABLE IF NOT EXISTS transfer (
+CREATE TABLE IF NOT EXISTS bayc_transfer (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
     "evt_block_time" TIMESTAMP,

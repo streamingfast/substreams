@@ -1,4 +1,4 @@
-type approval @entity {
+type bayc_approval @entity {
     id: ID!
     evt_tx_hash: String!
     evt_index: BigInt!
@@ -8,7 +8,7 @@ type approval @entity {
     owner: String!
     token_id: BigDecimal!
 }
-type approval_for_all @entity {
+type bayc_approval_for_all @entity {
     id: ID!
     evt_tx_hash: String!
     evt_index: BigInt!
@@ -18,7 +18,7 @@ type approval_for_all @entity {
     operator: String!
     owner: String!
 }
-type ownership_transferred @entity {
+type bayc_ownership_transferred @entity {
     id: ID!
     evt_tx_hash: String!
     evt_index: BigInt!
@@ -27,7 +27,7 @@ type ownership_transferred @entity {
     new_owner: String!
     previous_owner: String!
 }
-type transfer @entity {
+type bayc_transfer @entity {
     id: ID!
     evt_tx_hash: String!
     evt_index: BigInt!

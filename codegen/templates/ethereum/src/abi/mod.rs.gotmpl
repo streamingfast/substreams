@@ -1,8 +1,6 @@
-{{- $numberOfContracts := len .ethereumContracts }}
-{{- if eq $numberOfContracts 1 -}}
-pub mod contract;
-{{else }}
 {{- range $i, $contract := .ethereumContracts }}
 pub mod {{ $contract.GetName }}_contract;
+{{- range $ddsContract := $contract.GetDDS }}
+pub mod {{ $ddsContract.GetName }}_contract;
 {{- end }}
 {{- end }}

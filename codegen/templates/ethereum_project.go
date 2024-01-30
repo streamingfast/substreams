@@ -34,21 +34,73 @@ import (
 var ethereumProject embed.FS
 
 type EthereumContract struct {
-	name       string
-	address    eth.Address
-	events     []codegenEvent
-	abi        *eth.ABI
-	abiContent string
+	name               string
+	address            eth.Address
+	events             []codegenEvent
+	abi                *eth.ABI
+	abiContent         string
+	dynamicDataSources []*DDSContract
 }
 
-func NewEthereumContract(name string, address eth.Address, events []codegenEvent, abi *eth.ABI, abiContent string) *EthereumContract {
+type DDSContract struct {
+	name                 string
+	events               []codegenEvent
+	abi                  *eth.ABI
+	abiContent           string
+	creationEvent        string
+	creationAddressField string
+}
+
+func (c *DDSContract) GetName() string {
+	return c.name
+}
+
+func (c *DDSContract) GetEvents() []codegenEvent {
+	return c.events
+}
+
+func (c *DDSContract) GetCreationEvent() string {
+	return c.creationEvent
+}
+func (c *DDSContract) GetCreationAddressField() string {
+	return c.creationAddressField
+}
+
+func NewEthereumContract(name string, address eth.Address, abi *eth.ABI, abiContent string) *EthereumContract {
 	return &EthereumContract{
 		name:       name,
 		address:    address,
-		events:     events,
 		abi:        abi,
 		abiContent: abiContent,
 	}
+}
+
+func (e *EthereumContract) AddDynamicDataSource(
+	name string,
+	abi *eth.ABI,
+	abiContent string,
+	creationEvent string,
+	creationAddressField string,
+) error {
+
+	events, err := BuildEventModels(abi)
+	if err != nil {
+		return fmt.Errorf("build ABI event models for dynamic datasource contract %s: %w", name, err)
+	}
+
+	e.dynamicDataSources = append(e.dynamicDataSources, &DDSContract{
+		name:                 name,
+		events:               events,
+		abi:                  abi,
+		abiContent:           abiContent,
+		creationEvent:        creationEvent,
+		creationAddressField: creationAddressField,
+	})
+	return nil
+}
+
+func (e *EthereumContract) GetDDS() []*DDSContract {
+	return e.dynamicDataSources
 }
 
 func (e *EthereumContract) GetAddress() eth.Address {
@@ -111,6 +163,15 @@ func NewEthereumProject(name string, moduleName string, chain *EthereumChain, co
 	}, nil
 }
 
+func (p *EthereumProject) HasDDS() bool {
+	for _, contract := range p.ethereumContracts {
+		if len(contract.dynamicDataSources) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func (p *EthereumProject) Render() (map[string][]byte, error) {
 	entries := map[string][]byte{}
 
@@ -133,9 +194,6 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 		"schema.graphql.gotmpl",
 		"subgraph.yaml.gotmpl",
 	} {
-		if ethereumProjectEntry == "src/lib.rs.gotmpl" && len(p.ethereumContracts) > 1 {
-			ethereumProjectEntry = "src/multiple_contracts_lib.rs.gotmpl"
-		}
 		// We use directly "/" here as `ethereumProject` is an embed FS and always uses "/"
 		content, err := ethereumProject.ReadFile("ethereum" + "/" + ethereumProjectEntry)
 		if err != nil {
@@ -168,6 +226,7 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 				"databaseChangeImportVersion": p.databaseChangeImportVersion,
 				"entityChangeImportVersion":   p.entityChangeImportVersion,
 				"network":                     p.network,
+				"hasDDS":                      p.HasDDS(),
 			}
 
 			zlog.Debug("rendering templated file", zap.String("filename", finalFileName), zap.Any("model", model))
@@ -177,10 +236,6 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 				return nil, fmt.Errorf("embed render entry template %q: %w", finalFileName, err)
 			}
 
-			if len(p.ethereumContracts) != 1 {
-				finalFileName = strings.ReplaceAll(finalFileName, "multiple_contracts_", "")
-			}
-
 			finalFileName = strings.TrimSuffix(finalFileName, ".gotmpl")
 			content = buffer.Bytes()
 		}
@@ -188,20 +243,17 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 		entries[finalFileName] = content
 	}
 
-	if len(p.ethereumContracts) == 1 {
-		entries["abi/contract.abi.json"] = []byte(p.ethereumContracts[0].abiContent)
-		return entries, nil
-	}
-
 	for _, contract := range p.ethereumContracts {
 		entries[fmt.Sprintf("abi/%s_contract.abi.json", contract.GetName())] = []byte(contract.abiContent)
+		for _, dds := range contract.dynamicDataSources {
+			entries[fmt.Sprintf("abi/%s_contract.abi.json", dds.name)] = []byte(dds.abiContent)
+		}
 	}
 
 	return entries, nil
 }
 
-func BuildEventModels(contract *EthereumContract, multipleContracts bool) (out []codegenEvent, err error) {
-	abi := contract.abi
+func BuildEventModels(abi *eth.ABI) (out []codegenEvent, err error) {
 	pluralizer := pluralize.NewClient()
 
 	names := keys(abi.LogEventsByNameMap)
@@ -236,7 +288,7 @@ func BuildEventModels(contract *EthereumContract, multipleContracts bool) (out [
 				},
 			}
 
-			if err := codegenEvent.Rust.populateFields(event, multipleContracts); err != nil {
+			if err := codegenEvent.Rust.populateFields(event); err != nil {
 				return nil, fmt.Errorf("populating codegen Rust fields: %w", err)
 			}
 
@@ -268,7 +320,7 @@ type rustEventModel struct {
 	ProtoFieldGraphQLMap       map[string]string
 }
 
-func (e *rustEventModel) populateFields(log *eth.LogEventDef, multipleContracts bool) error {
+func (e *rustEventModel) populateFields(log *eth.LogEventDef) error {
 	if len(log.Parameters) == 0 {
 		return nil
 	}
@@ -296,7 +348,7 @@ func (e *rustEventModel) populateFields(log *eth.LogEventDef, multipleContracts 
 			return fmt.Errorf("transform - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
 		}
 
-		toDatabaseChangeCode := generateFieldTableChangeCode(parameter.Type, "evt."+name, multipleContracts)
+		toDatabaseChangeCode := generateFieldTableChangeCode(parameter.Type, "evt."+name)
 		if toDatabaseChangeCode == SKIP_FIELD {
 			continue
 		}
@@ -477,7 +529,7 @@ func generateFieldSqlTypes(fieldType eth.SolidityType) string {
 	}
 }
 
-func generateFieldTableChangeCode(fieldType eth.SolidityType, fieldAccess string, multipleContract bool) string {
+func generateFieldTableChangeCode(fieldType eth.SolidityType, fieldAccess string) string {
 	switch v := fieldType.(type) {
 	case eth.AddressType, eth.BytesType, eth.FixedSizeBytesType:
 		return fmt.Sprintf("Hex(&%s).to_string()", fieldAccess)
@@ -486,10 +538,7 @@ func generateFieldTableChangeCode(fieldType eth.SolidityType, fieldAccess string
 		return fieldAccess
 
 	case eth.StringType:
-		if multipleContract {
-			return fmt.Sprintf("&%s", fieldAccess)
-		}
-		return fieldAccess
+		return fmt.Sprintf("&%s", fieldAccess)
 
 	case eth.SignedIntegerType:
 		if v.ByteSize <= 8 {

@@ -4,15 +4,20 @@ use substreams_ethereum::Abigen;
 use std::fs;
 
 fn main() -> Result<(), anyhow::Error> {
-    {{- $numberOfContracts := len .ethereumContracts }}
     let file_names = [
         {{- range $i, $contract := .ethereumContracts }}
-        "abi/{{ $contract.GetName }}{{ if eq $numberOfContracts 1 }}{{ else }}_{{ end }}contract.abi.json",
+        "abi/{{ $contract.GetName }}_contract.abi.json",
+        {{- range $ddsContract := $contract.GetDDS }}
+        "abi/{{ $ddsContract.GetName }}_contract.abi.json",
+        {{- end }}
         {{- end }}
     ];
     let file_output_names = [
         {{- range $i, $contract := .ethereumContracts }}
-        "src/abi/{{ $contract.GetName }}{{ if eq $numberOfContracts 1 }}{{ else }}_{{ end }}contract.rs",
+        "src/abi/{{ $contract.GetName }}_contract.rs",
+        {{- range $ddsContract := $contract.GetDDS }}
+        "src/abi/{{ $ddsContract.GetName }}_contract.rs",
+        {{- end }}
         {{- end }}
     ];
 

@@ -3,6 +3,7 @@ package work
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
@@ -26,8 +27,17 @@ func Test_workerPoolPool_Borrow_Return(t *testing.T) {
 	assert.Len(t, pi.workers, 2)
 	assert.True(t, pi.WorkerAvailable())
 	worker1 := pi.Borrow()
+
+	// only one worker available until 4 seconds have passed
+	assert.False(t, pi.WorkerAvailable())
+
+	// after delay, all workers are available
+	newStarted := (*pi.started).Add(-5 * time.Second)
+	pi.started = &newStarted
+
 	assert.True(t, pi.WorkerAvailable())
 	worker2 := pi.Borrow()
+
 	assert.False(t, pi.WorkerAvailable())
 	assert.Panics(t, func() { pi.Borrow() })
 	pi.Return(worker2)

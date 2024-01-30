@@ -66,7 +66,7 @@ fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::error
             {{- $numberOfAttributes := len $rust.ProtoFieldTableChangesMap }}{{ if eq $numberOfAttributes 0 }};{{ end }}
             {{- $i := 0 }}
             {{- range $protoField, $changesToProtoConversion := $rust.ProtoFieldTableChangesMap }}
-            {{ $i = add $i 1 }}.set("{{$protoField}}", {{$changesToProtoConversion}}){{ if eq $i $numberOfAttributes }};{{ end }}
+            {{ $i = add $i 1 }}.{{$changesToProtoConversion.Setter}}("{{$protoField}}", {{$changesToProtoConversion.ValueAccessCode}}){{ if eq $i $numberOfAttributes }};{{ end }}
             {{- end }}
     });
     {{- end }}
@@ -92,7 +92,7 @@ fn graph_out(events: contract::Events) -> Result<EntityChanges, substreams::erro
             {{- $numberOfAttributes := len $rust.ProtoFieldTableChangesMap }}{{ if eq $numberOfAttributes 0 }};{{ end }}
             {{- $i := 0 }}
             {{- range $protoField, $changesToProtoConversion := $rust.ProtoFieldTableChangesMap }}
-            {{ $i = add $i 1 }}.set("{{$protoField}}", {{$changesToProtoConversion}}){{ if eq $i $numberOfAttributes }};{{ end }}
+            {{ $i = add $i 1 }}.set("{{$protoField}}", {{$changesToProtoConversion.ValueAccessCode}}){{ if eq $i $numberOfAttributes }};{{ end }}
             {{- end }}
     });
     {{- end}}

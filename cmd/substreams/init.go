@@ -41,11 +41,13 @@ var errInitUnsupportedProtocol = errors.New("unsupported protocol")
 
 var initCmd = &cobra.Command{
 	Use:   "init [<path>]",
-	Short: "Initialize a new, working Substreams project from scratch.",
+	Short: "Initialize a new, working Substreams project from scratch",
 	Long: cli.Dedent(`
 		Initialize a new, working Substreams project from scratch. The path parameter is optional,
 		with your current working directory being the default value.
-        If you have an Etherscan API Key, you can set it to "ETHERSCAN_API_KEY" environment variable, it will be used to fetch the ABIs and contract information.
+
+		If you have an Etherscan API Key, you can set it to "ETHERSCAN_API_KEY" environment variable, it will be used to
+		fetch the ABIs and contract information.
 	`),
 	RunE:         runSubstreamsInitE,
 	Args:         cobra.RangeArgs(0, 1),

@@ -262,10 +262,15 @@ type rustEventModel struct {
 	ProtoOutputModuleFieldName string
 	TableChangeEntityName      string
 	ProtoFieldABIConversionMap map[string]string
-	ProtoFieldTableChangesMap  map[string]string
+	ProtoFieldTableChangesMap  map[string]tableChangeSetField
 	ProtoFieldSqlmap           map[string]string
 	ProtoFieldClickhouseMap    map[string]string
 	ProtoFieldGraphQLMap       map[string]string
+}
+
+type tableChangeSetField struct {
+	Setter          string
+	ValueAccessCode string
 }
 
 func (e *rustEventModel) populateFields(log *eth.LogEventDef, multipleContracts bool) error {
@@ -274,7 +279,7 @@ func (e *rustEventModel) populateFields(log *eth.LogEventDef, multipleContracts 
 	}
 
 	e.ProtoFieldABIConversionMap = map[string]string{}
-	e.ProtoFieldTableChangesMap = map[string]string{}
+	e.ProtoFieldTableChangesMap = map[string]tableChangeSetField{}
 	e.ProtoFieldSqlmap = map[string]string{}
 	e.ProtoFieldClickhouseMap = map[string]string{}
 	e.ProtoFieldGraphQLMap = map[string]string{}
@@ -296,11 +301,11 @@ func (e *rustEventModel) populateFields(log *eth.LogEventDef, multipleContracts 
 			return fmt.Errorf("transform - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
 		}
 
-		toDatabaseChangeCode := generateFieldTableChangeCode(parameter.Type, "evt."+name, multipleContracts)
+		toDatabaseChangeSetter, toDatabaseChangeCode := generateFieldTableChangeCode(parameter.Type, "evt."+name, multipleContracts)
 		if toDatabaseChangeCode == SKIP_FIELD {
 			continue
 		}
-		if toDatabaseChangeCode == "" {
+		if toDatabaseChangeSetter == "" {
 			return fmt.Errorf("table change - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
 		}
 
@@ -328,7 +333,7 @@ func (e *rustEventModel) populateFields(log *eth.LogEventDef, multipleContracts 
 		columnName := sanitizeTableChangesColumnNames(name)
 
 		e.ProtoFieldABIConversionMap[name] = toProtoCode
-		e.ProtoFieldTableChangesMap[name] = toDatabaseChangeCode
+		e.ProtoFieldTableChangesMap[name] = tableChangeSetField{Setter: toDatabaseChangeSetter, ValueAccessCode: toDatabaseChangeCode}
 		e.ProtoFieldSqlmap[columnName] = toSqlCode
 		e.ProtoFieldClickhouseMap[columnName] = toClickhouseCode
 		e.ProtoFieldGraphQLMap[name] = toGraphQLCode
@@ -424,12 +429,13 @@ func generateFieldClickhouseTypes(fieldType eth.SolidityType) string {
 	case eth.StructType:
 		return SKIP_FIELD
 
-		//case eth.ArrayType:
-		//	elemType := generateFieldClickhouseTypes(v.ElementType)
-		//	if elemType == "" || elemType == SKIP_FIELD {
-		//		return elemType
-		//	}
-		//	return fmt.Sprintf("Array(%s)", elemType)
+	case eth.ArrayType:
+		elemType := generateFieldClickhouseTypes(v.ElementType)
+		if elemType == "" || elemType == SKIP_FIELD {
+			return SKIP_FIELD
+		}
+
+		return fmt.Sprintf("Array(%s)", elemType)
 
 	default:
 		return ""
@@ -465,55 +471,62 @@ func generateFieldSqlTypes(fieldType eth.SolidityType) string {
 	case eth.StructType:
 		return SKIP_FIELD
 
-	//case eth.ArrayType:
-	//	elemType := generateFieldClickhouseTypes(v.ElementType)
-	//	if elemType == "" || elemType == SKIP_FIELD {
-	//		return elemType
-	//	}
-	//	return fmt.Sprintf("%s ARRAY", elemType)
+	case eth.ArrayType:
+		elemType := generateFieldSqlTypes(v.ElementType)
+		if elemType == "" || elemType == SKIP_FIELD {
+			return SKIP_FIELD
+		}
+
+		return elemType + "[]"
 
 	default:
 		return ""
 	}
 }
 
-func generateFieldTableChangeCode(fieldType eth.SolidityType, fieldAccess string, multipleContract bool) string {
+func generateFieldTableChangeCode(fieldType eth.SolidityType, fieldAccess string, multipleContract bool) (setter string, valueAccessCode string) {
 	switch v := fieldType.(type) {
 	case eth.AddressType, eth.BytesType, eth.FixedSizeBytesType:
-		return fmt.Sprintf("Hex(&%s).to_string()", fieldAccess)
+		return "set", fmt.Sprintf("Hex(&%s).to_string()", fieldAccess)
 
 	case eth.BooleanType:
-		return fieldAccess
+		return "set", fieldAccess
 
 	case eth.StringType:
 		if multipleContract {
-			return fmt.Sprintf("&%s", fieldAccess)
+			return "set", fmt.Sprintf("&%s", fieldAccess)
 		}
-		return fieldAccess
+		return "set", fieldAccess
 
 	case eth.SignedIntegerType:
 		if v.ByteSize <= 8 {
-			return fieldAccess
+			return "set", fieldAccess
 		}
-		return fmt.Sprintf("BigDecimal::from_str(&%s).unwrap()", fieldAccess)
+		return "set", fmt.Sprintf("BigDecimal::from_str(&%s).unwrap()", fieldAccess)
 
 	case eth.UnsignedIntegerType:
 		if v.ByteSize <= 8 {
-			return fieldAccess
+			return "set", fieldAccess
 		}
-		return fmt.Sprintf("BigDecimal::from_str(&%s).unwrap()", fieldAccess)
+		return "set", fmt.Sprintf("BigDecimal::from_str(&%s).unwrap()", fieldAccess)
 
 	case eth.SignedFixedPointType, eth.UnsignedFixedPointType:
-		return fmt.Sprintf("BigDecimal::from_str(&%s).unwrap()", fieldAccess)
+		return "set", fmt.Sprintf("BigDecimal::from_str(&%s).unwrap()", fieldAccess)
 
 	case eth.ArrayType:
-		return SKIP_FIELD
+		// FIXME: Implement multiple contract support, check what is the actual semantics there
+		_, inner := generateFieldTableChangeCode(v.ElementType, "x", false)
+		if inner == SKIP_FIELD {
+			return SKIP_FIELD, SKIP_FIELD
+		}
+
+		return "set_psql_array", fmt.Sprintf("%s.into_iter().map(|x| %s).collect::<Vec<_>>()", fieldAccess, inner)
 
 	case eth.StructType:
-		return SKIP_FIELD
+		return SKIP_FIELD, SKIP_FIELD
 
 	default:
-		return ""
+		return "", ""
 	}
 }
 
@@ -587,10 +600,10 @@ func generateFieldGraphQLTypes(fieldType eth.SolidityType) string {
 	case eth.SignedFixedPointType, eth.UnsignedFixedPointType:
 		return "BigDecimal!"
 
-	case eth.StructType:
-		return SKIP_FIELD
-
 	case eth.ArrayType:
+		return "[" + generateFieldGraphQLTypes(v.ElementType) + "]!"
+
+	case eth.StructType:
 		return SKIP_FIELD
 
 	default:

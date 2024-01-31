@@ -21,6 +21,7 @@ import (
 func init() {
 	runCmd.Flags().StringP("substreams-endpoint", "e", "", "Substreams gRPC endpoint. If empty, will be replaced by the SUBSTREAMS_ENDPOINT_{network_name} environment variable, where `network_name` is determined from the substreams manifest. Some network names have default endpoints.")
 	runCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token")
+	runCmd.Flags().String("substreams-api-key-envvar", "SUBSTREAMS_API_KEY", "Name of variable containing Substreams Api Key")
 	runCmd.Flags().String("network", "", "Specify the network to use for params and initialBlocks, overriding the 'network' field in the substreams package")
 	runCmd.Flags().StringP("start-block", "s", "", "Start block to stream from. If empty, will be replaced by initialBlock of the first module you are streaming. If negative, will be resolved by the server relative to the chain head")
 	runCmd.Flags().StringP("cursor", "c", "", "Cursor to stream from. Leave blank for no cursor")
@@ -139,14 +140,16 @@ func runRun(cmd *cobra.Command, args []string) error {
 		startBlock = int64(sb)
 	}
 
+	authToken, authType := tools.GetAuth(cmd, "substreams-api-key-envvar", "substreams-api-token-envvar")
 	substreamsClientConfig := client.NewSubstreamsClientConfig(
 		endpoint,
-		tools.ReadAPIToken(cmd, "substreams-api-token-envvar"),
+		authToken,
+		authType,
 		mustGetBool(cmd, "insecure"),
 		mustGetBool(cmd, "plaintext"),
 	)
 
-	ssClient, connClose, callOpts, err := client.NewSubstreamsClient(substreamsClientConfig)
+	ctx, ssClient, connClose, callOpts, err := client.NewSubstreamsClient(ctx, substreamsClientConfig)
 	if err != nil {
 		return fmt.Errorf("substreams client setup: %w", err)
 	}

@@ -1,6 +1,7 @@
 package request
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -261,7 +262,7 @@ func (c *Config) NewInstance() (*Instance, error) {
 		c.StartBlock = int64(sb)
 	}
 
-	ssClient, _, callOpts, err := client.NewSubstreamsClient(c.SubstreamsClientConfig)
+	ctx, ssClient, _, callOpts, err := client.NewSubstreamsClient(context.Background(), c.SubstreamsClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("substreams client setup: %w", err)
 	}
@@ -277,7 +278,7 @@ func (c *Config) NewInstance() (*Instance, error) {
 		DebugInitialStoreSnapshotForModules: c.DebugModulesInitialSnapshot,
 	}
 
-	stream := streamui.New(req, ssClient, c.Headers, callOpts)
+	stream := streamui.New(ctx, req, ssClient, c.Headers, callOpts)
 
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validate request: %w", err)

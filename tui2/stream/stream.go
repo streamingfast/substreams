@@ -44,13 +44,14 @@ type Stream struct {
 	err error
 }
 
-func New(req *pbsubstreamsrpc.Request, client pbsubstreamsrpc.StreamClient, headers map[string]string, callOpts []grpc.CallOption) *Stream {
+func New(ctx context.Context, req *pbsubstreamsrpc.Request, client pbsubstreamsrpc.StreamClient, headers map[string]string, callOpts []grpc.CallOption) *Stream {
 	return &Stream{
 		req:            req,
 		targetEndBlock: req.StopBlockNum,
 		client:         client,
 		callOpts:       callOpts,
 		headers:        headers,
+		ctx:            ctx,
 	}
 }
 
@@ -126,7 +127,7 @@ func (s *Stream) Update(msg tea.Msg) tea.Cmd {
 }
 
 func (s *Stream) StartStream() tea.Msg {
-	streamCtx, cancel := context.WithCancel(context.Background())
+	streamCtx, cancel := context.WithCancel(s.ctx)
 	headerArray := make([]string, 0, len(s.headers)*2)
 	for k, v := range s.headers {
 		headerArray = append(headerArray, k, v)

@@ -77,7 +77,7 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 
 	outputStreamName := moduleName
 
-	apiToken := ReadAPIToken(cmd, "substreams-api-token-envvar")
+	authToken, authType := GetAuth(cmd, "substreams-api-key-envvar", "substreams-api-token-envvar")
 	insecure := mustGetBool(cmd, "insecure")
 	plaintext := mustGetBool(cmd, "plaintext")
 	interval := mustGetDuration(cmd, "lookup_interval")
@@ -85,7 +85,8 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 	for _, endpoint := range endpoints {
 		substreamsClientConfig := client.NewSubstreamsClientConfig(
 			endpoint,
-			apiToken,
+			authToken,
+			authType,
 			insecure,
 			plaintext,
 		)
@@ -136,7 +137,7 @@ func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.Subs
 
 		ctx, cancel := context.WithTimeout(context.Background(), pollingTimeout)
 		begin := time.Now()
-		ssClient, connClose, callOpts, err := client.NewSubstreamsClient(substreamsClientConfig)
+		ctx, ssClient, connClose, callOpts, err := client.NewSubstreamsClient(ctx, substreamsClientConfig)
 		if err != nil {
 			zlog.Error("substreams client setup", zap.Error(err))
 			maybeMarkFailure(endpoint, begin, counter)

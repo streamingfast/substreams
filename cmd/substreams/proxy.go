@@ -67,7 +67,7 @@ func (cs *ConnectServer) Blocks(
 		newReq.StartBlockNum = int64(cs.StartBlock)
 	}
 
-	ssClient, connClose, callOpts, err := client.NewSubstreamsClient(cs.SubstreamsClientConfig)
+	ctx, ssClient, connClose, callOpts, err := client.NewSubstreamsClient(ctx, cs.SubstreamsClientConfig)
 	if err != nil {
 		return fmt.Errorf("substreams client setup: %w", err)
 	}
@@ -99,6 +99,7 @@ func (cs *ConnectServer) Blocks(
 func init() {
 	proxyCmd.Flags().StringP("substreams-endpoint", "e", "mainnet.eth.streamingfast.io:443", "Substreams gRPC endpoint")
 	proxyCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token")
+	proxyCmd.Flags().String("substreams-api-key-envvar", "SUBSTREAMS_API_KEY", "Name of variable containing Substreams Api Key")
 	proxyCmd.Flags().String("listen-addr", "localhost:8080", "listen on this address (unencrypted)")
 	proxyCmd.Flags().BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
 	proxyCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
@@ -112,9 +113,11 @@ func runProxy(cmd *cobra.Command, args []string) error {
 	addr := mustGetString(cmd, "listen-addr")
 	fmt.Println("listening on", addr)
 
+	authToken, authType := tools.GetAuth(cmd, "substreams-api-key-envvar", "substreams-api-token-envvar")
 	substreamsClientConfig := client.NewSubstreamsClientConfig(
 		mustGetString(cmd, "substreams-endpoint"),
-		tools.ReadAPIToken(cmd, "substreams-api-token-envvar"),
+		authToken,
+		authType,
 		mustGetBool(cmd, "insecure"),
 		mustGetBool(cmd, "plaintext"),
 	)

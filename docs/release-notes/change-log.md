@@ -11,8 +11,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
-* `substreams init` now supports creating a substreams with the "Dynamic DataSources" pattern (ex: a `Factory` contract creating `pool` contracts through the `PoolCreated` event)
-* `substreams init` now always prefixes the tables and entities with the project name
+### Code generation
+
+* Added `substreams init` support for creating a substreams with the "Dynamic DataSources" pattern (ex: a `Factory` contract creating `pool` contracts through the `PoolCreated` event)
+* Changed `substreams init` to always add prefixes the tables and entities with the project name
+* Fixed `substreams init` support for unnamed params and topics on log events
 
 ## v1.3.3
 

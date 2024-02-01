@@ -269,6 +269,15 @@ func BuildEventModels(abi *eth.ABI) (out []codegenEvent, err error) {
 			if len(events) > 1 { // will result in OriginalName, OriginalName1, OriginalName2
 				rustABIStructName = name + strconv.FormatUint(uint64(i+1), 10)
 			}
+			for i, param := range event.Parameters {
+				if param.Name == "" {
+					if event.Parameters[i].Indexed {
+						param.Name = fmt.Sprintf("topic%d", i)
+					} else {
+						param.Name = fmt.Sprintf("param%d", i)
+					}
+				}
+			}
 
 			protoFieldName := xstrings.ToSnakeCase(pluralizer.Plural(rustABIStructName))
 			// prost will do a to_lower_camel_case() on any struct name

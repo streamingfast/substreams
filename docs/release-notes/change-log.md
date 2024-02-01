@@ -11,7 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
-* Codegen (`substreams init`) now always prefixes the tables and entities with the project name
+* `substreams init` now supports creating a substreams with the "Dynamic DataSources" pattern (ex: a `Factory` contract creating `pool` contracts through the `PoolCreated` event)
+* `substreams init` now always prefixes the tables and entities with the project name
 
 ## v1.3.3
 

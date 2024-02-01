@@ -116,6 +116,7 @@ fn map_pool_events(
                             evt_index: log.block_index,
                             evt_block_time: Some(blk.timestamp().to_owned()),
                             evt_block_number: blk.number,
+                            evt_address: Hex(&log.address).to_string(),
                             amount: event.amount.to_string(),
                             amount0: event.amount0.to_string(),
                             amount1: event.amount1.to_string(),
@@ -142,6 +143,7 @@ fn map_pool_events(
                             evt_index: log.block_index,
                             evt_block_time: Some(blk.timestamp().to_owned()),
                             evt_block_number: blk.number,
+                            evt_address: Hex(&log.address).to_string(),
                             amount0: event.amount0.to_string(),
                             amount1: event.amount1.to_string(),
                             owner: event.owner,
@@ -168,6 +170,7 @@ fn map_pool_events(
                             evt_index: log.block_index,
                             evt_block_time: Some(blk.timestamp().to_owned()),
                             evt_block_number: blk.number,
+                            evt_address: Hex(&log.address).to_string(),
                             amount0: event.amount0.to_string(),
                             amount1: event.amount1.to_string(),
                             recipient: event.recipient,
@@ -192,6 +195,7 @@ fn map_pool_events(
                             evt_index: log.block_index,
                             evt_block_time: Some(blk.timestamp().to_owned()),
                             evt_block_number: blk.number,
+                            evt_address: Hex(&log.address).to_string(),
                             amount0: event.amount0.to_string(),
                             amount1: event.amount1.to_string(),
                             paid0: event.paid0.to_string(),
@@ -218,6 +222,7 @@ fn map_pool_events(
                             evt_index: log.block_index,
                             evt_block_time: Some(blk.timestamp().to_owned()),
                             evt_block_number: blk.number,
+                            evt_address: Hex(&log.address).to_string(),
                             observation_cardinality_next_new: event.observation_cardinality_next_new.to_u64(),
                             observation_cardinality_next_old: event.observation_cardinality_next_old.to_u64(),
                         });
@@ -240,6 +245,7 @@ fn map_pool_events(
                             evt_index: log.block_index,
                             evt_block_time: Some(blk.timestamp().to_owned()),
                             evt_block_number: blk.number,
+                            evt_address: Hex(&log.address).to_string(),
                             sqrt_price_x96: event.sqrt_price_x96.to_string(),
                             tick: Into::<num_bigint::BigInt>::into(event.tick).to_i64().unwrap(),
                         });
@@ -262,6 +268,7 @@ fn map_pool_events(
                             evt_index: log.block_index,
                             evt_block_time: Some(blk.timestamp().to_owned()),
                             evt_block_number: blk.number,
+                            evt_address: Hex(&log.address).to_string(),
                             amount: event.amount.to_string(),
                             amount0: event.amount0.to_string(),
                             amount1: event.amount1.to_string(),
@@ -289,6 +296,7 @@ fn map_pool_events(
                             evt_index: log.block_index,
                             evt_block_time: Some(blk.timestamp().to_owned()),
                             evt_block_number: blk.number,
+                            evt_address: Hex(&log.address).to_string(),
                             fee_protocol0_new: event.fee_protocol0_new.to_u64(),
                             fee_protocol0_old: event.fee_protocol0_old.to_u64(),
                             fee_protocol1_new: event.fee_protocol1_new.to_u64(),
@@ -313,6 +321,7 @@ fn map_pool_events(
                             evt_index: log.block_index,
                             evt_block_time: Some(blk.timestamp().to_owned()),
                             evt_block_number: blk.number,
+                            evt_address: Hex(&log.address).to_string(),
                             amount0: event.amount0.to_string(),
                             amount1: event.amount1.to_string(),
                             liquidity: event.liquidity.to_string(),
@@ -367,7 +376,7 @@ fn db_pool_out(events: &contract::Events, tables: &mut DatabaseChangeTables) {
             .create_row("pool_burn", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            .set("evt_address", evt.evt_address)
+            .set("evt_address", &evt.evt_address)
             .set("amount", BigDecimal::from_str(&evt.amount).unwrap())
             .set("amount0", BigDecimal::from_str(&evt.amount0).unwrap())
             .set("amount1", BigDecimal::from_str(&evt.amount1).unwrap())
@@ -380,7 +389,7 @@ fn db_pool_out(events: &contract::Events, tables: &mut DatabaseChangeTables) {
             .create_row("pool_collect", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            .set("evt_address", evt.evt_address)
+            .set("evt_address", &evt.evt_address)
             .set("amount0", BigDecimal::from_str(&evt.amount0).unwrap())
             .set("amount1", BigDecimal::from_str(&evt.amount1).unwrap())
             .set("owner", Hex(&evt.owner).to_string())
@@ -393,7 +402,7 @@ fn db_pool_out(events: &contract::Events, tables: &mut DatabaseChangeTables) {
             .create_row("pool_collect_protocol", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            .set("evt_address", evt.evt_address)
+            .set("evt_address", &evt.evt_address)
             .set("amount0", BigDecimal::from_str(&evt.amount0).unwrap())
             .set("amount1", BigDecimal::from_str(&evt.amount1).unwrap())
             .set("recipient", Hex(&evt.recipient).to_string())
@@ -404,7 +413,7 @@ fn db_pool_out(events: &contract::Events, tables: &mut DatabaseChangeTables) {
             .create_row("pool_flash", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            .set("evt_address", evt.evt_address)
+            .set("evt_address", &evt.evt_address)
             .set("amount0", BigDecimal::from_str(&evt.amount0).unwrap())
             .set("amount1", BigDecimal::from_str(&evt.amount1).unwrap())
             .set("paid0", BigDecimal::from_str(&evt.paid0).unwrap())
@@ -417,7 +426,7 @@ fn db_pool_out(events: &contract::Events, tables: &mut DatabaseChangeTables) {
             .create_row("pool_increase_observation_cardinality_next", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            .set("evt_address", evt.evt_address)
+            .set("evt_address", &evt.evt_address)
             .set("observation_cardinality_next_new", evt.observation_cardinality_next_new)
             .set("observation_cardinality_next_old", evt.observation_cardinality_next_old);
     });
@@ -426,7 +435,7 @@ fn db_pool_out(events: &contract::Events, tables: &mut DatabaseChangeTables) {
             .create_row("pool_initialize", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            .set("evt_address", evt.evt_address)
+            .set("evt_address", &evt.evt_address)
             .set("sqrt_price_x96", BigDecimal::from_str(&evt.sqrt_price_x96).unwrap())
             .set("tick", evt.tick);
     });
@@ -435,7 +444,7 @@ fn db_pool_out(events: &contract::Events, tables: &mut DatabaseChangeTables) {
             .create_row("pool_mint", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            .set("evt_address", evt.evt_address)
+            .set("evt_address", &evt.evt_address)
             .set("amount", BigDecimal::from_str(&evt.amount).unwrap())
             .set("amount0", BigDecimal::from_str(&evt.amount0).unwrap())
             .set("amount1", BigDecimal::from_str(&evt.amount1).unwrap())
@@ -449,7 +458,7 @@ fn db_pool_out(events: &contract::Events, tables: &mut DatabaseChangeTables) {
             .create_row("pool_set_fee_protocol", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            .set("evt_address", evt.evt_address)
+            .set("evt_address", &evt.evt_address)
             .set("fee_protocol0_new", evt.fee_protocol0_new)
             .set("fee_protocol0_old", evt.fee_protocol0_old)
             .set("fee_protocol1_new", evt.fee_protocol1_new)
@@ -460,7 +469,7 @@ fn db_pool_out(events: &contract::Events, tables: &mut DatabaseChangeTables) {
             .create_row("pool_swap", [("evt_tx_hash", evt.evt_tx_hash.to_string()),("evt_index", evt.evt_index.to_string())])
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            .set("evt_address", evt.evt_address)
+            .set("evt_address", &evt.evt_address)
             .set("amount0", BigDecimal::from_str(&evt.amount0).unwrap())
             .set("amount1", BigDecimal::from_str(&evt.amount1).unwrap())
             .set("liquidity", BigDecimal::from_str(&evt.liquidity).unwrap())
@@ -517,7 +526,7 @@ fn graph_pool_out(events: &contract::Events, tables: &mut EntityChangesTables) {
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            .set("evt_address", evt.evt_address)
+            .set("evt_address", &evt.evt_address)
             .set("amount", BigDecimal::from_str(&evt.amount).unwrap())
             .set("amount0", BigDecimal::from_str(&evt.amount0).unwrap())
             .set("amount1", BigDecimal::from_str(&evt.amount1).unwrap())
@@ -532,7 +541,7 @@ fn graph_pool_out(events: &contract::Events, tables: &mut EntityChangesTables) {
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            .set("evt_address", evt.evt_address)
+            .set("evt_address", &evt.evt_address)
             .set("amount0", BigDecimal::from_str(&evt.amount0).unwrap())
             .set("amount1", BigDecimal::from_str(&evt.amount1).unwrap())
             .set("owner", Hex(&evt.owner).to_string())
@@ -547,7 +556,7 @@ fn graph_pool_out(events: &contract::Events, tables: &mut EntityChangesTables) {
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            .set("evt_address", evt.evt_address)
+            .set("evt_address", &evt.evt_address)
             .set("amount0", BigDecimal::from_str(&evt.amount0).unwrap())
             .set("amount1", BigDecimal::from_str(&evt.amount1).unwrap())
             .set("recipient", Hex(&evt.recipient).to_string())
@@ -560,7 +569,7 @@ fn graph_pool_out(events: &contract::Events, tables: &mut EntityChangesTables) {
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            .set("evt_address", evt.evt_address)
+            .set("evt_address", &evt.evt_address)
             .set("amount0", BigDecimal::from_str(&evt.amount0).unwrap())
             .set("amount1", BigDecimal::from_str(&evt.amount1).unwrap())
             .set("paid0", BigDecimal::from_str(&evt.paid0).unwrap())
@@ -575,7 +584,7 @@ fn graph_pool_out(events: &contract::Events, tables: &mut EntityChangesTables) {
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            .set("evt_address", evt.evt_address)
+            .set("evt_address", &evt.evt_address)
             .set("observation_cardinality_next_new", evt.observation_cardinality_next_new)
             .set("observation_cardinality_next_old", evt.observation_cardinality_next_old);
     });
@@ -586,7 +595,7 @@ fn graph_pool_out(events: &contract::Events, tables: &mut EntityChangesTables) {
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            .set("evt_address", evt.evt_address)
+            .set("evt_address", &evt.evt_address)
             .set("sqrt_price_x96", BigDecimal::from_str(&evt.sqrt_price_x96).unwrap())
             .set("tick", evt.tick);
     });
@@ -597,7 +606,7 @@ fn graph_pool_out(events: &contract::Events, tables: &mut EntityChangesTables) {
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            .set("evt_address", evt.evt_address)
+            .set("evt_address", &evt.evt_address)
             .set("amount", BigDecimal::from_str(&evt.amount).unwrap())
             .set("amount0", BigDecimal::from_str(&evt.amount0).unwrap())
             .set("amount1", BigDecimal::from_str(&evt.amount1).unwrap())
@@ -613,7 +622,7 @@ fn graph_pool_out(events: &contract::Events, tables: &mut EntityChangesTables) {
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            .set("evt_address", evt.evt_address)
+            .set("evt_address", &evt.evt_address)
             .set("fee_protocol0_new", evt.fee_protocol0_new)
             .set("fee_protocol0_old", evt.fee_protocol0_old)
             .set("fee_protocol1_new", evt.fee_protocol1_new)
@@ -626,7 +635,7 @@ fn graph_pool_out(events: &contract::Events, tables: &mut EntityChangesTables) {
             .set("evt_index", evt.evt_index)
             .set("evt_block_time", evt.evt_block_time.as_ref().unwrap())
             .set("evt_block_number", evt.evt_block_number)
-            .set("evt_address", evt.evt_address)
+            .set("evt_address", &evt.evt_address)
             .set("amount0", BigDecimal::from_str(&evt.amount0).unwrap())
             .set("amount1", BigDecimal::from_str(&evt.amount1).unwrap())
             .set("liquidity", BigDecimal::from_str(&evt.liquidity).unwrap())

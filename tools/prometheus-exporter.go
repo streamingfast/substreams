@@ -44,6 +44,7 @@ var prometheusCmd = &cobra.Command{
 func init() {
 	prometheusCmd.Flags().String("listen-addr", ":9102", "prometheus listen address")
 	prometheusCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token")
+	prometheusCmd.Flags().String("substreams-api-key-envvar", "SUBSTREAMS_API_KEY", "Name of variable containing Substreams Api Key")
 	prometheusCmd.Flags().BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
 	prometheusCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
 	prometheusCmd.Flags().Duration("lookup_interval", time.Second*20, "endpoints will be polled at this interval")

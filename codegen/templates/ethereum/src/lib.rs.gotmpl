@@ -114,8 +114,8 @@ fn db_{{ $contract.GetName }}_out(events: &contract::Events, tables: &mut Databa
             .set("evt_block_number", evt.evt_block_number)
             {{- $numberOfAttributes := len $rust.ProtoFieldTableChangesMap }}{{ if eq $numberOfAttributes 0 }};{{ end }}
             {{- $i := 0 }}
-            {{- range $protoField, $databaseChangesToProtoConversion := $rust.ProtoFieldTableChangesMap }}
-            {{ $i = add $i 1 }}.set("{{$protoField}}", {{$databaseChangesToProtoConversion}}){{if eq $i $numberOfAttributes}};{{ end }}
+            {{- range $protoField, $changesToProtoConversion := $rust.ProtoFieldTableChangesMap }}
+            {{ $i = add $i 1 }}.{{$changesToProtoConversion.Setter}}("{{$protoField}}", {{$changesToProtoConversion.ValueAccessCode}}){{if eq $i $numberOfAttributes}};{{ end }}
             {{- end}}
     });
     {{- end}}
@@ -133,8 +133,8 @@ fn db_{{ $ddsContract.GetName }}_out(events: &contract::Events, tables: &mut Dat
             .set("evt_address", &evt.evt_address)
             {{- $numberOfAttributes := len $rust.ProtoFieldTableChangesMap }}{{ if eq $numberOfAttributes 0 }};{{ end }}
             {{- $i := 0 }}
-            {{- range $protoField, $databaseChangesToProtoConversion := $rust.ProtoFieldTableChangesMap }}
-            {{ $i = add $i 1 }}.set("{{$protoField}}", {{$databaseChangesToProtoConversion}}){{if eq $i $numberOfAttributes}};{{ end }}
+            {{- range $protoField, $changesToProtoConversion := $rust.ProtoFieldTableChangesMap }}
+            {{ $i = add $i 1 }}.{{$changesToProtoConversion.Setter}}("{{$protoField}}", {{$changesToProtoConversion.ValueAccessCode}}){{if eq $i $numberOfAttributes}};{{ end }}
             {{- end}}
     });
     {{- end}}
@@ -157,8 +157,8 @@ fn graph_{{ $contract.GetName }}_out(events: &contract::Events, tables: &mut Ent
             .set("evt_block_number", evt.evt_block_number)
             {{- $numberOfAttributes := len $rust.ProtoFieldTableChangesMap }}{{ if eq $numberOfAttributes 0 }};{{ end }}
             {{- $i := 0 }}
-            {{- range $protoField, $databaseChangesToProtoConversion := $rust.ProtoFieldTableChangesMap }}
-            {{ $i = add $i 1 }}.set("{{$protoField}}", {{$databaseChangesToProtoConversion}}){{if eq $i $numberOfAttributes}};{{ end }}
+            {{- range $protoField, $changesToProtoConversion := $rust.ProtoFieldTableChangesMap }}
+            {{ $i = add $i 1 }}.set("{{$protoField}}", {{$changesToProtoConversion.ValueAccessCode}}){{if eq $i $numberOfAttributes}};{{ end }}
             {{- end}}
     });
 {{- end}}
@@ -178,8 +178,8 @@ fn graph_{{ $ddsContract.GetName }}_out(events: &contract::Events, tables: &mut 
             .set("evt_address", &evt.evt_address)
             {{- $numberOfAttributes := len $rust.ProtoFieldTableChangesMap }}{{ if eq $numberOfAttributes 0 }};{{ end }}
             {{- $i := 0 }}
-            {{- range $protoField, $databaseChangesToProtoConversion := $rust.ProtoFieldTableChangesMap }}
-            {{ $i = add $i 1 }}.set("{{$protoField}}", {{$databaseChangesToProtoConversion}}){{if eq $i $numberOfAttributes}};{{ end }}
+            {{- range $protoField, $changesToProtoConversion := $rust.ProtoFieldTableChangesMap }}
+            {{ $i = add $i 1 }}.set("{{$protoField}}", {{$changesToProtoConversion.ValueAccessCode}}){{if eq $i $numberOfAttributes}};{{ end }}
             {{- end}}
     });
 {{- end}}

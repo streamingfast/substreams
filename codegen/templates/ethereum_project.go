@@ -345,7 +345,7 @@ func (e *rustEventModel) populateFields(log *eth.LogEventDef) error {
 		name := xstrings.ToSnakeCase(parameter.Name)
 		name = sanitizeProtoFieldName(name)
 
-		toProtoCode := generateFieldTransformCode(parameter.Type, "event."+name)
+		toProtoCode := generateFieldTransformCode(parameter.Type, "event."+name, false)
 		if toProtoCode == SKIP_FIELD {
 			continue
 		}
@@ -353,7 +353,7 @@ func (e *rustEventModel) populateFields(log *eth.LogEventDef) error {
 			return fmt.Errorf("transform - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
 		}
 
-		toDatabaseChangeSetter, toDatabaseChangeCode := generateFieldTableChangeCode(parameter.Type, "evt."+name)
+		toDatabaseChangeSetter, toDatabaseChangeCode := generateFieldTableChangeCode(parameter.Type, "evt."+name, true)
 		if toDatabaseChangeCode == SKIP_FIELD {
 			continue
 		}
@@ -536,7 +536,7 @@ func generateFieldSqlTypes(fieldType eth.SolidityType) string {
 	}
 }
 
-func generateFieldTableChangeCode(fieldType eth.SolidityType, fieldAccess string) (setter string, valueAccessCode string) {
+func generateFieldTableChangeCode(fieldType eth.SolidityType, fieldAccess string, byRef bool) (setter string, valueAccessCode string) {
 	switch v := fieldType.(type) {
 	case eth.AddressType, eth.BytesType, eth.FixedSizeBytesType:
 		return "set", fmt.Sprintf("Hex(&%s).to_string()", fieldAccess)
@@ -564,12 +564,17 @@ func generateFieldTableChangeCode(fieldType eth.SolidityType, fieldAccess string
 
 	case eth.ArrayType:
 		// FIXME: Implement multiple contract support, check what is the actual semantics there
-		_, inner := generateFieldTableChangeCode(v.ElementType, "x")
+		_, inner := generateFieldTableChangeCode(v.ElementType, "x", byRef)
 		if inner == SKIP_FIELD {
 			return SKIP_FIELD, SKIP_FIELD
 		}
 
-		return "set_psql_array", fmt.Sprintf("%s.into_iter().map(|x| %s).collect::<Vec<_>>()", fieldAccess, inner)
+		iter := "into_iter()"
+		if byRef {
+			iter = "iter()"
+		}
+
+		return "set_psql_array", fmt.Sprintf("%s.%s.map(|x| %s).collect::<Vec<_>>()", fieldAccess, iter, inner)
 
 	case eth.StructType:
 		return SKIP_FIELD, SKIP_FIELD
@@ -579,7 +584,7 @@ func generateFieldTableChangeCode(fieldType eth.SolidityType, fieldAccess string
 	}
 }
 
-func generateFieldTransformCode(fieldType eth.SolidityType, fieldAccess string) string {
+func generateFieldTransformCode(fieldType eth.SolidityType, fieldAccess string, byRef bool) string {
 	switch v := fieldType.(type) {
 	case eth.AddressType:
 		return fieldAccess
@@ -609,11 +614,17 @@ func generateFieldTransformCode(fieldType eth.SolidityType, fieldAccess string) 
 		return fmt.Sprintf("%s.to_string()", fieldAccess)
 
 	case eth.ArrayType:
-		inner := generateFieldTransformCode(v.ElementType, "x")
+		inner := generateFieldTransformCode(v.ElementType, "x", byRef)
 		if inner == SKIP_FIELD {
 			return SKIP_FIELD
 		}
-		return fmt.Sprintf("%s.into_iter().map(|x| %s).collect::<Vec<_>>()", fieldAccess, inner)
+
+		iter := "into_iter()"
+		if byRef {
+			iter = "iter()"
+		}
+
+		return fmt.Sprintf("%s.%s.map(|x| %s).collect::<Vec<_>>()", fieldAccess, iter, inner)
 
 	case eth.StructType:
 		return SKIP_FIELD

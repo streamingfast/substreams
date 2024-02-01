@@ -33,7 +33,6 @@ var (
 	devInitProtocol                = os.Getenv("SUBSTREAMS_DEV_INIT_PROTOCOL")
 	devInitEthereumTrackedContract = os.Getenv("SUBSTREAMS_DEV_INIT_ETHEREUM_TRACKED_CONTRACT")
 	devInitEthereumChain           = os.Getenv("SUBSTREAMS_DEV_INIT_ETHEREUM_CHAIN")
-	devInitSinkChoice              = os.Getenv("SUBSTREAMS_DEV_INIT_SINK_CHOICE")
 )
 
 var errInitUnsupportedChain = errors.New("unsupported chain")

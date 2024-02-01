@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc/metadata"
 	"io"
 	"net/http"
 	"time"
@@ -67,7 +68,7 @@ func (cs *ConnectServer) Blocks(
 		newReq.StartBlockNum = int64(cs.StartBlock)
 	}
 
-	ctx, ssClient, connClose, callOpts, err := client.NewSubstreamsClient(ctx, cs.SubstreamsClientConfig)
+	ssClient, connClose, callOpts, headers, err := client.NewSubstreamsClient(cs.SubstreamsClientConfig)
 	if err != nil {
 		return fmt.Errorf("substreams client setup: %w", err)
 	}
@@ -77,6 +78,9 @@ func (cs *ConnectServer) Blocks(
 		return fmt.Errorf("validate request: %w", err)
 	}
 
+	if headers.IsSet() {
+		ctx = metadata.AppendToOutgoingContext(ctx, headers.ToArray()...)
+	}
 	cli, err := ssClient.Blocks(ctx, newReq, callOpts...)
 	if err != nil {
 		return fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err)

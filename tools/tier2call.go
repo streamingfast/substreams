@@ -71,9 +71,14 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 		mustGetBool(cmd, "insecure"),
 		mustGetBool(cmd, "plaintext"),
 	)
-	ssClient, _, callOpts, err := client.NewSubstreamsInternalClient(clientConfig)
+	ssClient, _, callOpts, headers, err := client.NewSubstreamsInternalClient(clientConfig)
 	if err != nil {
 		return fmt.Errorf("new internal client: %w", err)
+	}
+
+	// add auth header if available
+	if headers.IsSet() {
+		ctx = metadata.AppendToOutgoingContext(ctx, headers.ToArray()...)
 	}
 	//parse additional-headers flag
 	additionalHeaders := mustGetStringSlice(cmd, "header")

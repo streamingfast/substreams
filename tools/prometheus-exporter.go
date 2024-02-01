@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc/metadata"
 	"io"
 	"net/http"
 	"strconv"
@@ -137,12 +138,16 @@ func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.Subs
 
 		ctx, cancel := context.WithTimeout(context.Background(), pollingTimeout)
 		begin := time.Now()
-		ctx, ssClient, connClose, callOpts, err := client.NewSubstreamsClient(ctx, substreamsClientConfig)
+		ssClient, connClose, callOpts, headers, err := client.NewSubstreamsClient(substreamsClientConfig)
 		if err != nil {
 			zlog.Error("substreams client setup", zap.Error(err))
 			maybeMarkFailure(endpoint, begin, counter)
 			cancel()
 			continue
+		}
+
+		if headers.IsSet() {
+			ctx = metadata.AppendToOutgoingContext(ctx, headers.ToArray()...)
 		}
 
 		subReq := &pbsubstreamsrpc.Request{

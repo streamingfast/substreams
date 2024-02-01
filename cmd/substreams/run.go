@@ -3,8 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
-
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
@@ -16,6 +14,7 @@ import (
 	"github.com/streamingfast/substreams/tui"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/metadata"
+	"io"
 )
 
 func init() {
@@ -149,7 +148,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		mustGetBool(cmd, "plaintext"),
 	)
 
-	ctx, ssClient, connClose, callOpts, err := client.NewSubstreamsClient(ctx, substreamsClientConfig)
+	ssClient, connClose, callOpts, headers, err := client.NewSubstreamsClient(substreamsClientConfig)
 	if err != nil {
 		return fmt.Errorf("substreams client setup: %w", err)
 	}
@@ -197,6 +196,10 @@ func runRun(cmd *cobra.Command, args []string) error {
 	})
 	defer cancel()
 
+	// add additional authorization headers
+	if headers.IsSet() {
+		streamCtx = metadata.AppendToOutgoingContext(streamCtx, headers.ToArray()...)
+	}
 	//parse additional-headers flag
 	additionalHeaders := mustGetStringSlice(cmd, "header")
 	if additionalHeaders != nil {

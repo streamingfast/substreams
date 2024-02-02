@@ -21,6 +21,24 @@ message Events {
     {{- end}}
 }
 
+{{ $callsCounter := 0 }}
+message Calls {
+    {{- range $i, $contract := .ethereumContracts }}
+    {{- range $index, $call := $contract.GetCalls }}
+    {{- $proto := $call.Proto }}
+    {{- $callsCounter = add $callsCounter 1 }}
+    repeated {{ $contract.GetName }}_{{$proto.MessageName}} {{ $contract.GetName }}_{{$proto.OutputModuleFieldName}} = {{ $callsCounter }};
+    {{- end}}
+    {{- range $ddsContract := $contract.GetDDS -}}
+    {{- range $index, $event := $ddsContract.GetCalls -}}
+    {{- $proto := $event.Proto }}
+    {{- $callsCounter = add $callsCounter 1 }}
+    repeated {{ $ddsContract.GetName }}_{{$proto.MessageName}} {{ $ddsContract.GetName }}_{{$proto.OutputModuleFieldName}} = {{ $callsCounter }};
+    {{- end}}
+    {{- end}}
+    {{- end}}
+}
+
 {{- range $i, $contract := .ethereumContracts}}
 {{- range $event := $contract.GetEvents }}
 {{ $proto := $event.Proto }}
@@ -34,7 +52,22 @@ message {{ $contract.GetName }}_{{ $proto.MessageName }} {
     {{- end}}
 }
 {{- end}}
+{{- range $call := $contract.GetCalls }}
+{{ $proto := $call.Proto }}
+message {{ $contract.GetName }}_call_{{ $proto.MessageName }} {
+    string call_tx_hash = 1;
+    google.protobuf.Timestamp call_block_time = 2;
+    uint64 call_block_number = 3;
+    uint64 call_ordinal = 4;
+    uint64 call_success = 5;
+    {{- range $index, $protoField := $proto.Fields }}
+    {{ $protoField.Type }} {{ sanitizeProtoFieldName $protoField.Name }} = {{ add $index 6 }};
+    {{- end}}
+}
+{{- end}}
+
 {{- range $i, $ddsContract := $contract.GetDDS }}
+
 {{- range $event := $ddsContract.GetEvents }}
 {{ $proto := $event.Proto }}
 message {{ $ddsContract.GetName }}_{{ $proto.MessageName }} {
@@ -48,5 +81,21 @@ message {{ $ddsContract.GetName }}_{{ $proto.MessageName }} {
     {{- end}}
 }
 {{- end}}
+
+{{- range $call := $ddsContract.GetCalls }}
+{{ $proto := $call.Proto }}
+message {{ $ddsContract.GetName }}_call_{{ $proto.MessageName }} {
+    string call_tx_hash = 1;
+    google.protobuf.Timestamp call_block_time = 2;
+    uint64 call_block_number = 3;
+    uint64 call_ordinal = 4;
+    uint64 call_success = 5;
+    string call_address = 6;
+    {{- range $index, $protoField := $proto.Fields }}
+    {{ $protoField.Type }} {{ sanitizeProtoFieldName $protoField.Name }} = {{ add $index 7 }};
+    {{- end}}
+}
+{{- end}}
+
 {{- end}}
 {{- end}}

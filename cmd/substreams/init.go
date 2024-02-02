@@ -135,12 +135,22 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		}
 
 		for _, contract := range ethereumContracts {
-			fmt.Printf("Generating ABI Event models for %s\n", contract.GetName())
-			events, err := templates.BuildEventModels(contract.GetAbi())
-			if err != nil {
-				return fmt.Errorf("build ABI event models for contract [%s - %s]: %w", contract.GetAddress(), contract.GetName(), err)
+			if contract.GetWithEvents() {
+				fmt.Printf("Generating ABI Event models for %s\n", contract.GetName())
+				events, err := templates.BuildEventModels(contract.GetAbi())
+				if err != nil {
+					return fmt.Errorf("build ABI event models for contract [%s - %s]: %w", contract.GetAddress(), contract.GetName(), err)
+				}
+				contract.SetEvents(events)
 			}
-			contract.SetEvents(events)
+			if contract.GetWithCalls() {
+				fmt.Printf("Generating ABI Call models for %s\n", contract.GetName())
+				calls, err := templates.BuildCallModels(contract.GetAbi())
+				if err != nil {
+					return fmt.Errorf("build ABI call models for contract [%s - %s]: %w", contract.GetAddress(), contract.GetName(), err)
+				}
+				contract.SetCalls(calls)
+			}
 		}
 
 		// Ask for any dynamic datasources
@@ -347,6 +357,13 @@ func promptEthereumContractShortNames(ethereumContracts []*templates.EthereumCon
 			return nil, err
 		}
 		contract.SetName(shortName)
+
+		withEvents, withCalls, err := promptCallOrEvents()
+		if err != nil {
+			return nil, err
+		}
+		contract.SetWithEvents(withEvents)
+		contract.SetWithCalls(withCalls)
 	}
 
 	return ethereumContracts, nil
@@ -368,28 +385,69 @@ func promptEthereumDynamicDataSources(ctx context.Context, ethereumContracts []*
 
 	selected := ethereumContracts[0]
 	if len(ethereumContracts) != 1 {
-		fmt.Println("Select the factory contract:")
-		for i, contract := range ethereumContracts {
-			fmt.Printf("%d.  %s (%s)\n", i+1, contract.GetName(), contract.GetAddress().String())
+		contractNames := make([]string, len(ethereumContracts))
+		for i := range ethereumContracts {
+			contractNames[i] = ethereumContracts[i].GetName()
 		}
-		_, err := prompt("(enter the number)", &promptOptions{
-			Validate: func(input string) error {
-				val, err := strconv.ParseInt(input, 10, 64)
-				if err != nil || val < 1 || val >= int64(len(ethereumContracts)+1) {
-					return fmt.Errorf("invalid value: must be an integer between 1 and %d", len(ethereumContracts)+1)
-				}
 
-				selected = ethereumContracts[int(val-1)]
-				return nil
+		choice := promptui.Select{
+			Label: "Select the factory contract",
+			Items: contractNames,
+			Templates: &promptui.SelectTemplates{
+				Selected: `{{ "Contract:" | faint }} {{ . }}`,
 			},
-		})
-
+			HideHelp: true,
+		}
+		idx, _, err := choice.Run()
 		if err != nil {
 			return nil, err
 		}
+		selected = ethereumContracts[idx]
 	}
 
-	shortName, err := prompt("Choose a short name for the created entity (lowercase and numbers only)", &promptOptions{
+	events := selected.GetEvents()
+	fmt.Println("Select the event on the factory that triggers the creation of a dynamic datasource:")
+	eventNames := make([]string, len(events))
+	for i := range events {
+		eventNames[i] = events[i].Rust.ABIStructName
+	}
+
+	choice := promptui.Select{
+		Label: "Select the event",
+		Items: eventNames,
+		Templates: &promptui.SelectTemplates{
+			Selected: `{{ "Event:" | faint }} {{ . }}`,
+		},
+		HideHelp: true,
+	}
+	idx, _, err := choice.Run()
+	if err != nil {
+		return nil, err
+	}
+	selectedEventName := events[idx].Rust.ABIStructName
+
+	fmt.Println("Select the field on the factory event that provides the address of the dynamic datasource:")
+	eventFields := events[idx].Proto.Fields
+	eventFieldNames := make([]string, len(eventFields))
+	for i, eventField := range eventFields {
+		eventFieldNames[i] = eventField.Name
+	}
+
+	choice = promptui.Select{
+		Label: "Select the event field",
+		Items: eventFieldNames,
+		Templates: &promptui.SelectTemplates{
+			Selected: `{{ "Field:" | faint }} {{ . }}`,
+		},
+		HideHelp: true,
+	}
+	_, selectedEventField, err := choice.Run()
+	if err != nil {
+		return nil, err
+	}
+
+	shortName, err := prompt("Choose a short name for the created datasource, (lowercase and numbers only)", &promptOptions{
+		Default: selectedEventField,
 		Validate: func(input string) error {
 			ok := shortNameRegexp.MatchString(input)
 			if !ok {
@@ -403,47 +461,7 @@ func promptEthereumDynamicDataSources(ctx context.Context, ethereumContracts []*
 		return nil, err
 	}
 
-	events := selected.GetEvents()
-	fmt.Println("Select the event on the factory that triggers the creation of a dynamic datasource:")
-	for i, event := range events {
-		fmt.Printf("%d.  %s\n", i+1, event.Rust.ABIStructName)
-	}
-	var selectedEvent int
-	var selectedEventName string
-	_, err = prompt("(enter the number)", &promptOptions{
-		Validate: func(input string) error {
-			val, err := strconv.ParseInt(input, 10, 64)
-			if err != nil || val < 1 || val >= int64(len(events)+1) {
-				return fmt.Errorf("invalid value: must be an integer between 1 and %d", len(events)+1)
-			}
-
-			selectedEvent = int(val - 1)
-			selectedEventName = events[selectedEvent].Rust.ABIStructName
-			return nil
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	fmt.Println("Select the field on the factory event that provides the address of the dynamic datasource:")
-	eventFields := events[selectedEvent].Proto.Fields
-	for i, eventField := range eventFields {
-		fmt.Printf("%d.  %s\n", i+1, eventField.Name)
-	}
-
-	var selectedEventField string
-	_, err = prompt("(enter the number)", &promptOptions{
-		Validate: func(input string) error {
-			val, err := strconv.ParseInt(input, 10, 64)
-			if err != nil || val < 1 || val >= int64(len(eventFields)+1) {
-				return fmt.Errorf("invalid value: must be an integer between 1 and %d", len(eventFields)+1)
-			}
-
-			selectedEventField = eventFields[int(val-1)].Name
-			return nil
-		},
-	})
+	withEvents, withCalls, err := promptCallOrEvents()
 	if err != nil {
 		return nil, err
 	}
@@ -462,9 +480,32 @@ func promptEthereumDynamicDataSources(ctx context.Context, ethereumContracts []*
 	}
 
 	fmt.Println("adding dynamic datasource", shortName, selectedEventName, selectedEventField)
-	selected.AddDynamicDataSource(shortName, abi, abiContent, selectedEventName, selectedEventField)
+	selected.AddDynamicDataSource(shortName, abi, abiContent, selectedEventName, selectedEventField, withEvents, withCalls)
 
 	return ethereumContracts, nil
+}
+
+func promptCallOrEvents() (events bool, calls bool, err error) {
+	choice := promptui.Select{
+		Label:    "Select the type of data that you want to extract from this contract:",
+		Items:    []string{"Events only", "Events + Calls", "Calls only"},
+		HideHelp: true,
+	}
+	resp, _, err := choice.Run()
+	if err != nil {
+		return false, false, err
+	}
+
+	switch resp {
+	case 0:
+		return true, false, nil
+	case 1:
+		return true, true, nil
+	case 2:
+		return false, true, nil
+	}
+
+	panic("impossible choice")
 }
 
 func promptTrackContract() (bool, error) {
@@ -559,6 +600,7 @@ type promptOptions struct {
 	Validate        promptui.ValidateFunc
 	IsConfirm       bool
 	PromptTemplates *promptui.PromptTemplates
+	Default         string
 }
 
 var confirmPromptRegex = regexp.MustCompile("(y|Y|n|N|No|Yes|YES|NO)")
@@ -585,6 +627,7 @@ func prompt(label string, opts *promptOptions) (string, error) {
 	prompt := promptui.Prompt{
 		Label:     label,
 		Templates: templates,
+		Default:   opts.Default,
 	}
 	if opts != nil && opts.Validate != nil {
 		prompt.Validate = opts.Validate

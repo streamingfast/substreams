@@ -31,6 +31,9 @@ func TestEnsureOurProjectCompiles(t *testing.T) {
 		events, err := BuildEventModels(contract.abi)
 		require.NoError(t, err)
 		contract.SetEvents(events)
+		calls, err := BuildCallModels(contract.abi)
+		require.NoError(t, err)
+		contract.SetCalls(calls)
 	}
 
 	project, err := NewEthereumProject(
@@ -71,12 +74,16 @@ func TestNewEthereumTemplateProject(t *testing.T) {
 		targetABI      []byte
 		event          string
 		addressField   string
+		withEvents     bool
+		withCalls      bool
 	}
 	type args struct {
 		address            string
 		abi                []byte
 		shortName          string
 		dynamicDataSources []*dds
+		withEvents         bool
+		withCalls          bool
 	}
 	tests := []struct {
 		name       string
@@ -89,9 +96,10 @@ func TestNewEthereumTemplateProject(t *testing.T) {
 			name: "standard case - all sinks",
 			args: []args{
 				{
-					address:   "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d",
-					abi:       abiContent,
-					shortName: "bayc",
+					address:    "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d",
+					abi:        abiContent,
+					shortName:  "bayc",
+					withEvents: true,
 				},
 			},
 			startBlock: 123,
@@ -121,14 +129,16 @@ func TestNewEthereumTemplateProject(t *testing.T) {
 			name: "multiple contracts - all sinks",
 			args: []args{
 				{
-					address:   "0x23581767a106ae21c074b2276d25e5c3e136a68b",
-					abi:       fileContent(t, "ethereum/results/multiple_contracts/abi/moonbird_contract.abi.json"),
-					shortName: "moonbird",
+					address:    "0x23581767a106ae21c074b2276d25e5c3e136a68b",
+					abi:        fileContent(t, "ethereum/results/multiple_contracts/abi/moonbird_contract.abi.json"),
+					shortName:  "moonbird",
+					withEvents: true,
 				},
 				{
-					address:   "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d",
-					abi:       fileContent(t, "ethereum/results/multiple_contracts/abi/bayc_contract.abi.json"),
-					shortName: "bayc",
+					address:    "0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d",
+					abi:        fileContent(t, "ethereum/results/multiple_contracts/abi/bayc_contract.abi.json"),
+					shortName:  "bayc",
+					withEvents: true,
 				},
 			},
 			startBlock: 123,
@@ -159,15 +169,19 @@ func TestNewEthereumTemplateProject(t *testing.T) {
 			name: "dynamic datasource",
 			args: []args{
 				{
-					address:   "0x1f98431c8ad98523631ae4a59f267346ea31f984",
-					abi:       fileContent(t, "ethereum/results/dynamic_datasource/abi/factory_contract.abi.json"),
-					shortName: "factory",
+					address:    "0x1f98431c8ad98523631ae4a59f267346ea31f984",
+					abi:        fileContent(t, "ethereum/results/dynamic_datasource/abi/factory_contract.abi.json"),
+					shortName:  "factory",
+					withEvents: true,
+					withCalls:  true,
 					dynamicDataSources: []*dds{
 						{
 							targetTypeName: "pool",
 							addressField:   "pool",
 							targetABI:      fileContent(t, "ethereum/results/dynamic_datasource/abi/pool_contract.abi.json"),
 							event:          "PoolCreated",
+							withEvents:     true,
+							withCalls:      true,
 						},
 					},
 				},
@@ -214,16 +228,24 @@ func TestNewEthereumTemplateProject(t *testing.T) {
 				for _, dds := range arg.dynamicDataSources {
 					abi, err := eth.ParseABIFromBytes(dds.targetABI)
 					require.NoError(t, err)
-					ethContract.AddDynamicDataSource(dds.targetTypeName, abi, string(dds.targetABI), dds.event, dds.addressField)
+					ethContract.AddDynamicDataSource(dds.targetTypeName, abi, string(dds.targetABI), dds.event, dds.addressField, dds.withEvents, dds.withCalls)
 				}
 
 				ethereumContracts = append(ethereumContracts, ethContract)
 			}
 
 			for _, contract := range ethereumContracts {
-				events, err := BuildEventModels(contract.abi)
-				require.NoError(t, err)
-				contract.SetEvents(events)
+				if contract.withEvents {
+					events, err := BuildEventModels(contract.abi)
+					require.NoError(t, err)
+					contract.SetEvents(events)
+				}
+
+				if contract.withCalls {
+					calls, err := BuildCallModels(contract.abi)
+					require.NoError(t, err)
+					contract.SetCalls(calls)
+				}
 			}
 
 			project, err := NewEthereumProject(

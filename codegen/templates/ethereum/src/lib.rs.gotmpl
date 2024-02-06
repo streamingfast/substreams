@@ -23,7 +23,7 @@ substreams_ethereum::init!();
 
 {{ range $i, $contract := .ethereumContracts -}}
 const {{ toUpper $contract.GetName }}_TRACKED_CONTRACT: [u8; 20] = hex!("{{ $contract.GetAddress }}");
-{{ end -}}
+{{ end }}
 
 {{- range $i, $contract := .ethereumContracts }}
 fn map_{{ $contract.GetName }}_events(blk: &eth::Block, events: &mut contract::Events) {
@@ -53,7 +53,7 @@ fn map_{{ $contract.GetName }}_events(blk: &eth::Block, events: &mut contract::E
         .collect());
     {{- end }}
 }
-{{- if $contract.HasCalls }}
+{{ if $contract.HasCalls }}
 fn map_{{ $contract.GetName }}_calls(blk: &eth::Block, calls: &mut contract::Calls) {
     {{- range $call := $contract.GetCalls }}
     {{- $rust := $call.Rust }}
@@ -92,7 +92,6 @@ fn map_{{ $contract.GetName }}_calls(blk: &eth::Block, calls: &mut contract::Cal
 {{ end }}
 
 {{- if $.hasDDS }}
-
 fn is_declared_dds_address(addr: &Vec<u8>, ordinal: u64, dds_store: &store::StoreGetInt64) -> bool {
     //    substreams::log::info!("Checking if address {} is declared dds address", Hex(addr).to_string());
     if dds_store.get_at(ordinal, Hex(addr).to_string()).is_some() {
@@ -181,8 +180,7 @@ fn map_{{ $ddsContract.GetName }}_calls(
 {{ end }}
 
 {{ end }}
-{{ end }}
-
+{{- end }}
 {{- range $i, $contract := .ethereumContracts }}
 fn db_{{ $contract.GetName }}_out(events: &contract::Events, tables: &mut DatabaseChangeTables) {
     // Loop over all the abis events to create table changes
@@ -420,9 +418,9 @@ fn map_calls(blk: eth::Block) -> Result<contract::Calls, substreams::errors::Err
 #[substreams::handlers::map]
 {{- if .withCalls }}
 fn db_out(events: contract::Events, calls: contract::Calls) -> Result<DatabaseChanges, substreams::errors::Error> {
-{{ else }}
+{{- else }}
 fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::errors::Error> {
-{{ end }}
+{{- end }}
     // Initialize Database Changes container
     let mut tables = DatabaseChangeTables::new();
     {{- range $i, $contract := .ethereumContracts }}
@@ -441,9 +439,9 @@ fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::error
 #[substreams::handlers::map]
 {{- if .withCalls }}
 fn graph_out(events: contract::Events, calls: contract::Calls) -> Result<EntityChanges, substreams::errors::Error> {
-{{ else }}
+{{- else }}
 fn graph_out(events: contract::Events) -> Result<EntityChanges, substreams::errors::Error> {
-{{ end }}
+{{- end }}
     // Initialize Database Changes container
     let mut tables = EntityChangesTables::new();
     {{- range $i, $contract := .ethereumContracts }}

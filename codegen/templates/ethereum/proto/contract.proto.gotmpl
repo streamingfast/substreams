@@ -20,7 +20,7 @@ message Events {
     {{- end}}
     {{- end}}
 }
-
+{{- if .withCalls }}
 {{ $callsCounter := 0 }}
 message Calls {
     {{- range $i, $contract := .ethereumContracts }}
@@ -38,7 +38,7 @@ message Calls {
     {{- end}}
     {{- end}}
 }
-
+{{ end }}
 {{- range $i, $contract := .ethereumContracts}}
 {{- range $event := $contract.GetEvents }}
 {{ $proto := $event.Proto }}
@@ -98,4 +98,4 @@ message {{ $ddsContract.GetName }}_{{ $proto.MessageName }} {
 {{- end}}
 
 {{- end}}
-{{- end}}
+{{- end }}

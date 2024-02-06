@@ -13,6 +13,24 @@ type {{ $contract.GetName }}_{{ $rust.TableChangeEntityName }} @entity {
     {{- end}}
 }
 {{ end }}
+{{- if $contract.HasCalls -}}
+{{- range $call := $contract.GetCalls -}}
+{{- $rust := $call.Rust -}}
+type {{ $contract.GetName }}_{{ $rust.TableChangeEntityName }} @entity {
+    id: ID!
+    call_tx_hash: String!
+    call_block_time: String!
+    call_block_number: BigInt!
+    call_ordinal: BigInt!
+    call_success: Bool!
+    {{- $i := 0 }}
+    {{- range $fieldName, $graphqlType := $rust.ProtoFieldGraphQLMap }}
+    {{ $i = add $i 1 }}{{ $fieldName }}: {{ $graphqlType }}
+    {{- end}}
+}
+{{ end }}
+{{ end }}
+
 {{- range $ddsContract := $contract.GetDDS -}}
 {{- range $event := $ddsContract.GetEvents -}}
 {{- $rust := $event.Rust -}}
@@ -30,5 +48,23 @@ type {{ $ddsContract.GetName }}_{{ $rust.TableChangeEntityName }} @entity {
     {{- end}}
 }
 {{- end -}}
+{{- if $ddsContract.HasCalls -}}
+{{- range $call := $ddsContract.GetCalls -}}
+{{- $rust := $call.Rust -}}
+type {{ $ddsContract.GetName }}_{{ $rust.TableChangeEntityName }} @entity {
+    id: ID!
+    call_tx_hash: String!
+    call_block_time: String!
+    call_block_number: BigInt!
+    call_ordinal: BigInt!
+    call_success: Bool!
+    {{- $i := 0 }}
+    {{- range $fieldName, $graphqlType := $rust.ProtoFieldGraphQLMap }}
+    {{ $i = add $i 1 }}{{ $fieldName }}: {{ $graphqlType }}
+    {{- end}}
+}
+{{ end }}
+{{ end }}
+
 {{- end -}}
 {{- end }}

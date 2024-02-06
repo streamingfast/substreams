@@ -54,12 +54,12 @@ message {{ $contract.GetName }}_{{ $proto.MessageName }} {
 {{- end}}
 {{- range $call := $contract.GetCalls }}
 {{ $proto := $call.Proto }}
-message {{ $contract.GetName }}_call_{{ $proto.MessageName }} {
+message {{ $contract.GetName }}_{{ $proto.MessageName }} {
     string call_tx_hash = 1;
     google.protobuf.Timestamp call_block_time = 2;
     uint64 call_block_number = 3;
     uint64 call_ordinal = 4;
-    uint64 call_success = 5;
+    bool call_success = 5;
     {{- range $index, $protoField := $proto.Fields }}
     {{ $protoField.Type }} {{ sanitizeProtoFieldName $protoField.Name }} = {{ add $index 6 }};
     {{- end}}
@@ -84,12 +84,12 @@ message {{ $ddsContract.GetName }}_{{ $proto.MessageName }} {
 
 {{- range $call := $ddsContract.GetCalls }}
 {{ $proto := $call.Proto }}
-message {{ $ddsContract.GetName }}_call_{{ $proto.MessageName }} {
+message {{ $ddsContract.GetName }}_{{ $proto.MessageName }} {
     string call_tx_hash = 1;
     google.protobuf.Timestamp call_block_time = 2;
     uint64 call_block_number = 3;
     uint64 call_ordinal = 4;
-    uint64 call_success = 5;
+    bool call_success = 5;
     string call_address = 6;
     {{- range $index, $protoField := $proto.Fields }}
     {{ $protoField.Type }} {{ sanitizeProtoFieldName $protoField.Name }} = {{ add $index 7 }};

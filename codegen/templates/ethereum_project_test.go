@@ -228,18 +228,18 @@ func TestNewEthereumTemplateProject(t *testing.T) {
 				for _, dds := range arg.dynamicDataSources {
 					abi, err := eth.ParseABIFromBytes(dds.targetABI)
 					require.NoError(t, err)
-					ethContract.AddDynamicDataSource(dds.targetTypeName, abi, string(dds.targetABI), dds.event, dds.addressField, dds.withEvents, dds.withCalls)
+					ethContract.AddDynamicDataSource(dds.targetTypeName, abi, string(dds.targetABI), dds.event, dds.addressField, dds.withCalls)
 				}
 
 				ethereumContracts = append(ethereumContracts, ethContract)
 			}
 
 			for _, contract := range ethereumContracts {
-				if contract.withEvents {
-					events, err := BuildEventModels(contract.abi)
-					require.NoError(t, err)
-					contract.SetEvents(events)
-				}
+				//				if contract.withEvents {
+				events, err := BuildEventModels(contract.abi)
+				require.NoError(t, err)
+				contract.SetEvents(events)
+				//			}
 
 				if contract.withCalls {
 					calls, err := BuildCallModels(contract.abi)

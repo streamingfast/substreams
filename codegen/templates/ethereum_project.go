@@ -34,24 +34,24 @@ import (
 var ethereumProject embed.FS
 
 type EthereumContract struct {
-	name               string
-	address            eth.Address
-	events             []codegenEvent
-	calls              []codegenCall
-	abi                *eth.ABI
-	abiContent         string
-	withEvents         bool
+	name       string
+	address    eth.Address
+	events     []codegenEvent
+	calls      []codegenCall
+	abi        *eth.ABI
+	abiContent string
+	//withEvents         bool
 	withCalls          bool
 	dynamicDataSources []*DDSContract
 }
 
 type DDSContract struct {
-	name                 string
-	events               []codegenEvent
-	calls                []codegenCall
-	abi                  *eth.ABI
-	abiContent           string
-	withEvents           bool
+	name       string
+	events     []codegenEvent
+	calls      []codegenCall
+	abi        *eth.ABI
+	abiContent string
+	//withEvents           bool
 	withCalls            bool
 	creationEvent        string
 	creationAddressField string
@@ -66,6 +66,10 @@ func (c *DDSContract) GetEvents() []codegenEvent {
 }
 func (c *DDSContract) GetCalls() []codegenCall {
 	return c.calls
+}
+
+func (c *DDSContract) HasCalls() bool {
+	return len(c.calls) != 0
 }
 
 func (c *DDSContract) GetCreationEvent() string {
@@ -90,17 +94,17 @@ func (e *EthereumContract) AddDynamicDataSource(
 	abiContent string,
 	creationEvent string,
 	creationAddressField string,
-	withEvents bool,
+	//withEvents bool,
 	withCalls bool,
 ) (err error) {
 
 	var events []codegenEvent
-	if withEvents {
-		events, err = BuildEventModels(abi)
-		if err != nil {
-			return fmt.Errorf("build ABI event models for dynamic datasource contract %s: %w", name, err)
-		}
+	//	if withEvents {
+	events, err = BuildEventModels(abi)
+	if err != nil {
+		return fmt.Errorf("build ABI event models for dynamic datasource contract %s: %w", name, err)
 	}
+	//}
 
 	var calls []codegenCall
 	if withCalls {
@@ -130,15 +134,16 @@ func (e *EthereumContract) GetAddress() eth.Address {
 	return e.address
 }
 
-func (e *EthereumContract) SetWithEvents(v bool) {
-	e.withEvents = v
-}
+//	func (e *EthereumContract) SetWithEvents(v bool) {
+//		e.withEvents = v
+//	}
 func (e *EthereumContract) SetWithCalls(v bool) {
 	e.withCalls = v
 }
-func (e *EthereumContract) GetWithEvents() bool {
-	return e.withEvents
-}
+
+// //func (e *EthereumContract) GetWithEvents() bool {
+// //	return e.withEvents
+// //}
 func (e *EthereumContract) GetWithCalls() bool {
 	return e.withCalls
 }
@@ -164,6 +169,10 @@ func (e *EthereumContract) GetEvents() []codegenEvent {
 
 func (e *EthereumContract) GetCalls() []codegenCall {
 	return e.calls
+}
+
+func (e *EthereumContract) HasCalls() bool {
+	return len(e.calls) != 0
 }
 
 func (e *EthereumContract) GetAbi() *eth.ABI {
@@ -258,6 +267,20 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 				name = xstrings.ToKebabCase(p.name)
 			}
 
+			var withCalls bool
+			for _, contract := range p.ethereumContracts {
+				if contract.withCalls {
+					withCalls = true
+					break
+				}
+				for _, dds := range contract.dynamicDataSources {
+					if dds.withCalls {
+						withCalls = true
+						break
+					}
+				}
+			}
+
 			model := map[string]any{
 				"name":                        name,
 				"moduleName":                  p.moduleName,
@@ -270,6 +293,8 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 				"entityChangeImportVersion":   p.entityChangeImportVersion,
 				"network":                     p.network,
 				"hasDDS":                      p.HasDDS(),
+				//				"withEvents":                  true,
+				"withCalls": withCalls,
 			}
 
 			zlog.Debug("rendering templated file", zap.String("filename", finalFileName), zap.Any("model", model))
@@ -385,20 +410,21 @@ func BuildCallModels(abi *eth.ABI) (out []codegenCall, err error) {
 				}
 			}
 
-			protoFieldName := xstrings.ToSnakeCase(pluralizer.Plural(rustABIStructName))
+			protoFieldName := xstrings.ToSnakeCase(pluralizer.Plural(rustABIStructName + "_call"))
 			// prost will do a to_lower_camel_case() on any struct name
 			rustGeneratedStructName := xstrings.ToCamelCase(xstrings.ToSnakeCase(rustABIStructName))
+			protoMessageName := xstrings.ToCamelCase(xstrings.ToSnakeCase(rustABIStructName) + "Call")
 
 			codegenCall := codegenCall{
 				Rust: &rustCallModel{
 					ABIStructName:              rustGeneratedStructName,
-					ProtoMessageName:           rustGeneratedStructName,
+					ProtoMessageName:           protoMessageName,
 					ProtoOutputModuleFieldName: protoFieldName,
-					TableChangeEntityName:      xstrings.ToSnakeCase(rustABIStructName),
+					TableChangeEntityName:      xstrings.ToSnakeCase(rustABIStructName) + "_call",
 				},
 
 				Proto: &protoCallModel{
-					MessageName:           rustGeneratedStructName,
+					MessageName:           protoMessageName,
 					OutputModuleFieldName: protoFieldName,
 				},
 			}
@@ -441,20 +467,20 @@ type rustEventModel struct {
 }
 
 type rustCallModel struct {
-	ABIStructName                    string
-	ProtoMessageName                 string
-	ProtoOutputModuleFieldName       string
-	TableChangeEntityName            string
-	ProtoFieldABIConversionMap       map[string]string
-	ProtoFieldTableChangesMap        map[string]tableChangeSetField
-	ProtoFieldSqlmap                 map[string]string
-	ProtoFieldClickhouseMap          map[string]string
-	ProtoFieldGraphQLMap             map[string]string
-	ProtoOutputFieldABIConversionMap map[string]string
-	ProtoOutputFieldTableChangesMap  map[string]tableChangeSetField
-	ProtoOutputFieldSqlmap           map[string]string
-	ProtoOutputFieldClickhouseMap    map[string]string
-	ProtoOutputFieldGraphQLMap       map[string]string
+	ABIStructName              string
+	ProtoMessageName           string
+	ProtoOutputModuleFieldName string
+	TableChangeEntityName      string
+	ProtoFieldABIConversionMap map[string]string
+	ProtoFieldTableChangesMap  map[string]tableChangeSetField
+	ProtoFieldSqlmap           map[string]string
+	ProtoFieldClickhouseMap    map[string]string
+	ProtoFieldGraphQLMap       map[string]string
+	//ProtoOutputFieldABIConversionMap map[string]string
+	//ProtoOutputFieldTableChangesMap  map[string]tableChangeSetField
+	//ProtoOutputFieldSqlmap           map[string]string
+	//ProtoOutputFieldClickhouseMap    map[string]string
+	//ProtoOutputFieldGraphQLMap       map[string]string
 }
 
 type tableChangeSetField struct {
@@ -532,66 +558,70 @@ func (e *rustEventModel) populateFields(log *eth.LogEventDef) error {
 }
 
 func convertMethodParameters(parameters []*eth.MethodParameter) (
-	name,
-	toProtoCode,
-	toDatabaseChangeSetter,
-	toDatabaseChangeCode,
-	toSqlCode,
-	toClickhouseCode,
-	toGraphQLCode,
-	columnName string,
+	abiConversionMap map[string]string,
+	tableChangesMap map[string]tableChangeSetField,
+	sqlMap map[string]string,
+	clickhouseMap map[string]string,
+	graphqlMap map[string]string,
 	err error,
 ) {
+	abiConversionMap = map[string]string{}
+	tableChangesMap = map[string]tableChangeSetField{}
+	sqlMap = map[string]string{}
+	clickhouseMap = map[string]string{}
+	graphqlMap = map[string]string{}
+
 	for _, parameter := range parameters {
-		name = xstrings.ToSnakeCase(parameter.Name)
+		name := xstrings.ToSnakeCase(parameter.Name)
 		name = sanitizeProtoFieldName(name)
+		columnName := sanitizeTableChangesColumnNames(name)
 
-		toProtoCode = generateFieldTransformCode(parameter.Type, "event."+name, false)
-		if toProtoCode == SKIP_FIELD {
-			continue
-		}
-		if toProtoCode == "" {
-			err = fmt.Errorf("transform - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
-			return
-		}
-
-		toDatabaseChangeSetter, toDatabaseChangeCode = generateFieldTableChangeCode(parameter.Type, "evt."+name, true)
-		if toDatabaseChangeCode == SKIP_FIELD {
-			continue
-		}
-		if toDatabaseChangeSetter == "" {
-			err = fmt.Errorf("table change - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
-			return
+		toProtoCode := generateFieldTransformCode(parameter.Type, "decoded_call."+name, false)
+		if toProtoCode != SKIP_FIELD {
+			if toProtoCode == "" {
+				err = fmt.Errorf("transform - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
+				return
+			}
+			abiConversionMap[name] = toProtoCode
 		}
 
-		toSqlCode = generateFieldSqlTypes(parameter.Type)
-		if toSqlCode == SKIP_FIELD {
-			continue
-		}
-		if toSqlCode == "" {
-			err = fmt.Errorf("sql - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
-			return
-		}
-
-		toClickhouseCode = generateFieldClickhouseTypes(parameter.Type)
-		if toClickhouseCode == SKIP_FIELD {
-			continue
-		}
-		if toClickhouseCode == "" {
-			err = fmt.Errorf("clickhouse - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
-			return
+		toDatabaseChangeSetter, toDatabaseChangeCode := generateFieldTableChangeCode(parameter.Type, "call."+name, true)
+		if toDatabaseChangeCode != SKIP_FIELD {
+			if toDatabaseChangeSetter == "" {
+				err = fmt.Errorf("table change - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
+				return
+			}
+			tableChangesMap[name] = tableChangeSetField{Setter: toDatabaseChangeSetter, ValueAccessCode: toDatabaseChangeCode}
 		}
 
-		toGraphQLCode = generateFieldGraphQLTypes(parameter.Type)
-		if toGraphQLCode == "" {
-			err = fmt.Errorf("graphql - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
-			return
+		toSqlCode := generateFieldSqlTypes(parameter.Type)
+		if toSqlCode != SKIP_FIELD {
+			if toSqlCode == "" {
+				err = fmt.Errorf("sql - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
+				return
+			}
+			sqlMap[columnName] = toSqlCode
 		}
 
-		columnName = sanitizeTableChangesColumnNames(name)
+		toClickhouseCode := generateFieldClickhouseTypes(parameter.Type)
+		if toClickhouseCode != SKIP_FIELD {
+			if toClickhouseCode == "" {
+				err = fmt.Errorf("clickhouse - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
+				return
+			}
+			clickhouseMap[columnName] = toClickhouseCode
+		}
+
+		toGraphQLCode := generateFieldGraphQLTypes(parameter.Type)
+		if toGraphQLCode != SKIP_FIELD {
+			if toGraphQLCode == "" {
+				err = fmt.Errorf("graphql - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
+				return
+			}
+			graphqlMap[name] = toGraphQLCode
+		}
 	}
 	return
-
 }
 
 func (e *rustCallModel) populateFields(call *eth.MethodDef) error {
@@ -599,43 +629,41 @@ func (e *rustCallModel) populateFields(call *eth.MethodDef) error {
 		return nil
 	}
 
-	e.ProtoFieldABIConversionMap = map[string]string{}
-	e.ProtoFieldTableChangesMap = map[string]tableChangeSetField{}
-	e.ProtoFieldSqlmap = map[string]string{}
-	e.ProtoFieldClickhouseMap = map[string]string{}
-	e.ProtoFieldGraphQLMap = map[string]string{}
-
-	e.ProtoOutputFieldABIConversionMap = map[string]string{}
-	e.ProtoOutputFieldTableChangesMap = map[string]tableChangeSetField{}
-	e.ProtoOutputFieldSqlmap = map[string]string{}
-	e.ProtoOutputFieldClickhouseMap = map[string]string{}
-	e.ProtoOutputFieldGraphQLMap = map[string]string{}
-
 	paramNames := make([]string, len(call.Parameters))
 	for i := range call.Parameters {
 		paramNames[i] = call.Parameters[i].Name
 	}
-	fmt.Printf("  Generating ABI Calls for %s (%s)\n", call.Name, strings.Join(paramNames, ","))
+	outputParamNames := make([]string, len(call.ReturnParameters))
+	for i := range call.ReturnParameters {
+		outputParamNames[i] = call.ReturnParameters[i].Name
+	}
+	fmt.Printf("  Generating ABI Calls for %s (%s) => (%s)\n", call.Name, strings.Join(paramNames, ","), strings.Join(outputParamNames, ","))
 
-	name, toProtoCode, toDatabaseChangeSetter, toDatabaseChangeCode, toSqlCode, toClickhouseCode, toGraphQLCode, columnName, err := convertMethodParameters(call.Parameters)
+	var err error
+	e.ProtoFieldABIConversionMap, e.ProtoFieldTableChangesMap, e.ProtoFieldSqlmap, e.ProtoFieldClickhouseMap, e.ProtoFieldGraphQLMap, err = convertMethodParameters(call.Parameters)
 	if err != nil {
 		return err
 	}
-	e.ProtoFieldABIConversionMap[name] = toProtoCode
-	e.ProtoFieldTableChangesMap[name] = tableChangeSetField{Setter: toDatabaseChangeSetter, ValueAccessCode: toDatabaseChangeCode}
-	e.ProtoFieldSqlmap[columnName] = toSqlCode
-	e.ProtoFieldClickhouseMap[columnName] = toClickhouseCode
-	e.ProtoFieldGraphQLMap[name] = toGraphQLCode
 
-	name, toProtoCode, toDatabaseChangeSetter, toDatabaseChangeCode, toSqlCode, toClickhouseCode, toGraphQLCode, columnName, err = convertMethodParameters(call.ReturnParameters)
+	outputABI, outputTableChanges, outputSql, outputClickhouse, outputGraphQL, err := convertMethodParameters(call.ReturnParameters)
 	if err != nil {
 		return err
 	}
-	e.ProtoOutputFieldABIConversionMap[name] = toProtoCode
-	e.ProtoOutputFieldTableChangesMap[name] = tableChangeSetField{Setter: toDatabaseChangeSetter, ValueAccessCode: toDatabaseChangeCode}
-	e.ProtoOutputFieldSqlmap[columnName] = toSqlCode
-	e.ProtoOutputFieldClickhouseMap[columnName] = toClickhouseCode
-	e.ProtoOutputFieldGraphQLMap[name] = toGraphQLCode
+	for k, v := range outputABI {
+		e.ProtoFieldABIConversionMap[k] = v
+	}
+	for k, v := range outputTableChanges {
+		e.ProtoFieldTableChangesMap[k] = v
+	}
+	for k, v := range outputSql {
+		e.ProtoFieldSqlmap[k] = v
+	}
+	for k, v := range outputClickhouse {
+		e.ProtoFieldClickhouseMap[k] = v
+	}
+	for k, v := range outputGraphQL {
+		e.ProtoFieldGraphQLMap[k] = v
+	}
 
 	return nil
 }

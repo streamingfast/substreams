@@ -135,14 +135,12 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		}
 
 		for _, contract := range ethereumContracts {
-			if contract.GetWithEvents() {
-				fmt.Printf("Generating ABI Event models for %s\n", contract.GetName())
-				events, err := templates.BuildEventModels(contract.GetAbi())
-				if err != nil {
-					return fmt.Errorf("build ABI event models for contract [%s - %s]: %w", contract.GetAddress(), contract.GetName(), err)
-				}
-				contract.SetEvents(events)
+			fmt.Printf("Generating ABI Event models for %s\n", contract.GetName())
+			events, err := templates.BuildEventModels(contract.GetAbi())
+			if err != nil {
+				return fmt.Errorf("build ABI event models for contract [%s - %s]: %w", contract.GetAddress(), contract.GetName(), err)
 			}
+			contract.SetEvents(events)
 			if contract.GetWithCalls() {
 				fmt.Printf("Generating ABI Call models for %s\n", contract.GetName())
 				calls, err := templates.BuildCallModels(contract.GetAbi())
@@ -358,11 +356,10 @@ func promptEthereumContractShortNames(ethereumContracts []*templates.EthereumCon
 		}
 		contract.SetName(shortName)
 
-		withEvents, withCalls, err := promptCallOrEvents()
+		withCalls, err := promptCallOrEvents()
 		if err != nil {
 			return nil, err
 		}
-		contract.SetWithEvents(withEvents)
 		contract.SetWithCalls(withCalls)
 	}
 
@@ -461,7 +458,7 @@ func promptEthereumDynamicDataSources(ctx context.Context, ethereumContracts []*
 		return nil, err
 	}
 
-	withEvents, withCalls, err := promptCallOrEvents()
+	withCalls, err := promptCallOrEvents()
 	if err != nil {
 		return nil, err
 	}
@@ -480,44 +477,30 @@ func promptEthereumDynamicDataSources(ctx context.Context, ethereumContracts []*
 	}
 
 	fmt.Println("adding dynamic datasource", shortName, selectedEventName, selectedEventField)
-	selected.AddDynamicDataSource(shortName, abi, abiContent, selectedEventName, selectedEventField, withEvents, withCalls)
+	selected.AddDynamicDataSource(shortName, abi, abiContent, selectedEventName, selectedEventField, withCalls)
 
 	return ethereumContracts, nil
 }
 
-func promptCallOrEvents() (events bool, calls bool, err error) {
+func promptCallOrEvents() (calls bool, err error) {
 	choice := promptui.Select{
 		Label:    "Select the type of data that you want to extract from this contract:",
-		Items:    []string{"Events only", "Events + Calls", "Calls only"},
+		Items:    []string{"Events only", "Events + Calls"},
 		HideHelp: true,
 	}
 	resp, _, err := choice.Run()
 	if err != nil {
-		return false, false, err
+		return false, err
 	}
 
 	switch resp {
 	case 0:
-		return true, false, nil
+		return false, nil
 	case 1:
-		return true, true, nil
-	case 2:
-		return false, true, nil
-	}
-
-	panic("impossible choice")
-}
-
-func promptTrackContract() (bool, error) {
-	if devInitEthereumTrackedContract != "" {
 		return true, nil
 	}
 
-	return promptConfirm("Would you like to track a particular contract", &promptOptions{
-		PromptTemplates: &promptui.PromptTemplates{
-			Success: `{{ "Track particular contract:" | faint }} `,
-		},
-	})
+	panic("impossible choice")
 }
 
 func promptProtocol() (codegen.Protocol, error) {

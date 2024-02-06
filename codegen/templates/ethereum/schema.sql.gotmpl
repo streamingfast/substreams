@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS {{ $ddsContract.GetName }}_{{ $rust.TableChangeEntity
     "call_block_number" DECIMAL,
     "call_ordinal" INT,
     "call_success" BOOL,
+    "call_address" VARCHAR(40),
     {{- $i := 0 }}
     {{- range $fieldName, $sqlType := $rust.ProtoFieldSqlmap }}
     {{ $i = add $i 1 }}{{ $fieldName }} {{ $sqlType }},

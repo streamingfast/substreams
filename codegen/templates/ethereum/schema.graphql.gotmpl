@@ -58,6 +58,7 @@ type {{ $ddsContract.GetName }}_{{ $rust.TableChangeEntityName }} @entity {
     call_block_number: BigInt!
     call_ordinal: BigInt!
     call_success: Bool!
+    call_address: String!
     {{- $i := 0 }}
     {{- range $fieldName, $graphqlType := $rust.ProtoFieldGraphQLMap }}
     {{ $i = add $i 1 }}{{ $fieldName }}: {{ $graphqlType }}

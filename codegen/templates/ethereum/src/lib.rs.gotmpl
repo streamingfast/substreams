@@ -64,16 +64,24 @@ fn map_{{ $contract.GetName }}_calls(blk: &eth::Block, calls: &mut contract::Cal
                 .filter(|call| call.address == {{ toUpper $contract.GetName }}_TRACKED_CONTRACT && abi::{{ $contract.GetName }}_contract::functions::{{$rust.ABIStructName}}::match_call(call))
                 .filter_map(|call| {
                     match abi::{{ $contract.GetName }}_contract::functions::{{$rust.ABIStructName}}::decode(call) {
-                        Ok(decoded_call) => Some(contract::{{ capitalizeFirst $contract.GetName }}{{$rust.ProtoMessageName}} {
-                            call_tx_hash: Hex(&tx.hash).to_string(),
-                            call_block_time: Some(blk.timestamp().to_owned()),
-                            call_block_number: blk.number,
-                            call_ordinal: call.begin_ordinal,
-                            call_success: !call.status_reverted,
-                            {{- range $protoField, $abiToProtoConversion := $rust.ProtoFieldABIConversionMap }}
-                            {{$protoField}}: {{$abiToProtoConversion}},
-                            {{- end}}
-                        }),
+                        Ok(decoded_call) => {
+                            {{- if $rust.OutputFieldsString }}
+                            let {{ $rust.OutputFieldsString }} = match abi::{{ $contract.GetName }}_contract::functions::{{$rust.ABIStructName}}::output(&call.return_data) {
+                                Ok({{ $rust.OutputFieldsString }}) => {{`{`}}{{ $rust.OutputFieldsString }}{{`}`}}
+                                Err(_) => Default::default(),
+                            };
+                            {{ end }}
+                            Some(contract::{{ capitalizeFirst $contract.GetName }}{{$rust.ProtoMessageName}} {
+                                call_tx_hash: Hex(&tx.hash).to_string(),
+                                call_block_time: Some(blk.timestamp().to_owned()),
+                                call_block_number: blk.number,
+                                call_ordinal: call.begin_ordinal,
+                                call_success: !call.status_reverted,
+                                {{- range $protoField, $abiToProtoConversion := $rust.ProtoFieldABIConversionMap }}
+                                {{$protoField}}: {{$abiToProtoConversion}},
+                                {{- end}}
+                            })
+                        },
                         Err(_) => None,
                     }
                 })
@@ -144,17 +152,25 @@ fn map_{{ $ddsContract.GetName }}_calls(
                 .filter(|call| is_declared_dds_address(&call.address, call.begin_ordinal, dds_store) && abi::{{ $ddsContract.GetName }}_contract::functions::{{$rust.ABIStructName}}::match_call(call))
                 .filter_map(|call| {
                     match abi::{{ $ddsContract.GetName }}_contract::functions::{{$rust.ABIStructName}}::decode(call) {
-                        Ok(decoded_call) => Some(contract::{{ capitalizeFirst $ddsContract.GetName }}{{$rust.ProtoMessageName}} {
-                            call_tx_hash: Hex(&tx.hash).to_string(),
-                            call_block_time: Some(blk.timestamp().to_owned()),
-                            call_block_number: blk.number,
-                            call_ordinal: call.begin_ordinal,
-                            call_success: !call.status_reverted,
-                            call_address: Hex(&call.address).to_string(),
-                            {{- range $protoField, $abiToProtoConversion := $rust.ProtoFieldABIConversionMap }}
-                            {{$protoField}}: {{$abiToProtoConversion}},
-                            {{- end}}
-                        }),
+                            Ok(decoded_call) => {
+                            {{- if $rust.OutputFieldsString }}
+                            let {{ $rust.OutputFieldsString }} = match abi::{{ $ddsContract.GetName }}_contract::functions::{{$rust.ABIStructName}}::output(&call.return_data) {
+                                Ok({{ $rust.OutputFieldsString }}) => {{`{`}}{{ $rust.OutputFieldsString }}{{`}`}}
+                                Err(_) => Default::default(),
+                            };
+                            {{ end }}
+                            Some(contract::{{ capitalizeFirst $ddsContract.GetName }}{{$rust.ProtoMessageName}} {
+                                call_tx_hash: Hex(&tx.hash).to_string(),
+                                call_block_time: Some(blk.timestamp().to_owned()),
+                                call_block_number: blk.number,
+                                call_ordinal: call.begin_ordinal,
+                                call_success: !call.status_reverted,
+                                call_address: Hex(&call.address).to_string(),
+                                {{- range $protoField, $abiToProtoConversion := $rust.ProtoFieldABIConversionMap }}
+                                {{$protoField}}: {{$abiToProtoConversion}},
+                                {{- end}}
+                            })
+                        },
                         Err(_) => None,
                     }
                 })
@@ -236,6 +252,7 @@ fn db_{{ $ddsContract.GetName }}_calls_out(calls: &contract::Calls, tables: &mut
             .set("call_block_time", call.call_block_time.as_ref().unwrap())
             .set("call_block_number", call.call_block_number)
             .set("call_success", call.call_success)
+            .set("call_address", &call.call_address)
             {{- $numberOfAttributes := len $rust.ProtoFieldTableChangesMap }}{{ if eq $numberOfAttributes 0 }};{{ end }}
             {{- $i := 0 }}
             {{- range $protoField, $changesToProtoConversion := $rust.ProtoFieldTableChangesMap }}
@@ -326,6 +343,7 @@ fn graph_{{ $ddsContract.GetName }}_calls_out(calls: &contract::Calls, tables: &
             .set("call_block_time", call.call_block_time.as_ref().unwrap())
             .set("call_block_number", call.call_block_number)
             .set("call_success", call.call_success)
+            .set("call_address", &call.call_address)
             {{- $numberOfAttributes := len $rust.ProtoFieldTableChangesMap }}{{ if eq $numberOfAttributes 0 }};{{ end }}
             {{- $i := 0 }}
             {{- range $protoField, $changesToProtoConversion := $rust.ProtoFieldTableChangesMap }}

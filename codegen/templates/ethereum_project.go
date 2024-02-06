@@ -410,7 +410,7 @@ func BuildCallModels(abi *eth.ABI) (out []codegenCall, err error) {
 				}
 			}
 
-			protoFieldName := xstrings.ToSnakeCase(pluralizer.Plural(rustABIStructName + "_call"))
+			protoFieldName := "call_" + xstrings.ToSnakeCase(pluralizer.Plural(rustABIStructName))
 			// prost will do a to_lower_camel_case() on any struct name
 			rustGeneratedStructName := xstrings.ToCamelCase(xstrings.ToSnakeCase(rustABIStructName))
 			protoMessageName := xstrings.ToCamelCase(xstrings.ToSnakeCase(rustABIStructName) + "Call")
@@ -420,7 +420,7 @@ func BuildCallModels(abi *eth.ABI) (out []codegenCall, err error) {
 					ABIStructName:              rustGeneratedStructName,
 					ProtoMessageName:           protoMessageName,
 					ProtoOutputModuleFieldName: protoFieldName,
-					TableChangeEntityName:      xstrings.ToSnakeCase(rustABIStructName) + "_call",
+					TableChangeEntityName:      "call_" + xstrings.ToSnakeCase(rustABIStructName),
 				},
 
 				Proto: &protoCallModel{
@@ -471,16 +471,12 @@ type rustCallModel struct {
 	ProtoMessageName           string
 	ProtoOutputModuleFieldName string
 	TableChangeEntityName      string
+	OutputFieldsString         string
 	ProtoFieldABIConversionMap map[string]string
 	ProtoFieldTableChangesMap  map[string]tableChangeSetField
 	ProtoFieldSqlmap           map[string]string
 	ProtoFieldClickhouseMap    map[string]string
 	ProtoFieldGraphQLMap       map[string]string
-	//ProtoOutputFieldABIConversionMap map[string]string
-	//ProtoOutputFieldTableChangesMap  map[string]tableChangeSetField
-	//ProtoOutputFieldSqlmap           map[string]string
-	//ProtoOutputFieldClickhouseMap    map[string]string
-	//ProtoOutputFieldGraphQLMap       map[string]string
 }
 
 type tableChangeSetField struct {
@@ -557,33 +553,22 @@ func (e *rustEventModel) populateFields(log *eth.LogEventDef) error {
 	return nil
 }
 
-func convertMethodParameters(parameters []*eth.MethodParameter) (
-	abiConversionMap map[string]string,
+func convertMethodParameters(parameters []*eth.MethodParameter, optionalPrefix string) (
 	tableChangesMap map[string]tableChangeSetField,
 	sqlMap map[string]string,
 	clickhouseMap map[string]string,
 	graphqlMap map[string]string,
 	err error,
 ) {
-	abiConversionMap = map[string]string{}
 	tableChangesMap = map[string]tableChangeSetField{}
 	sqlMap = map[string]string{}
 	clickhouseMap = map[string]string{}
 	graphqlMap = map[string]string{}
 
 	for _, parameter := range parameters {
-		name := xstrings.ToSnakeCase(parameter.Name)
+		name := optionalPrefix + xstrings.ToSnakeCase(parameter.Name)
 		name = sanitizeProtoFieldName(name)
 		columnName := sanitizeTableChangesColumnNames(name)
-
-		toProtoCode := generateFieldTransformCode(parameter.Type, "decoded_call."+name, false)
-		if toProtoCode != SKIP_FIELD {
-			if toProtoCode == "" {
-				err = fmt.Errorf("transform - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
-				return
-			}
-			abiConversionMap[name] = toProtoCode
-		}
 
 		toDatabaseChangeSetter, toDatabaseChangeCode := generateFieldTableChangeCode(parameter.Type, "call."+name, true)
 		if toDatabaseChangeCode != SKIP_FIELD {
@@ -624,6 +609,59 @@ func convertMethodParameters(parameters []*eth.MethodParameter) (
 	return
 }
 
+func methodToABIConversionMaps(
+	parameters []*eth.MethodParameter,
+	outputParameters []*eth.MethodParameter,
+) (
+	abiConversionMap map[string]string,
+	outputString string,
+	err error,
+) {
+	if len(parameters) != 0 {
+		abiConversionMap = make(map[string]string)
+		for _, parameter := range parameters {
+			name := xstrings.ToSnakeCase(parameter.Name)
+			name = sanitizeProtoFieldName(name)
+
+			toProtoCode := generateFieldTransformCode(parameter.Type, "decoded_call."+name, false)
+			if toProtoCode != SKIP_FIELD {
+				if toProtoCode == "" {
+					err = fmt.Errorf("transform - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
+					return
+				}
+				abiConversionMap[name] = toProtoCode
+			}
+		}
+	}
+
+	if len(outputParameters) == 0 {
+		return
+	}
+
+	outputNames := make([]string, len(outputParameters))
+	for i, parameter := range outputParameters {
+		name := "output_" + xstrings.ToSnakeCase(parameter.Name)
+		name = sanitizeProtoFieldName(name)
+		outputNames[i] = name
+
+		toProtoCode := generateFieldTransformCode(parameter.Type, name, false)
+		if toProtoCode != SKIP_FIELD {
+			if toProtoCode == "" {
+				err = fmt.Errorf("transform - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
+				return
+			}
+			abiConversionMap[name] = toProtoCode
+		}
+	}
+	if len(outputNames) == 1 {
+		outputString = strings.Join(outputNames, ", ")
+	} else {
+		outputString = "(" + strings.Join(outputNames, ", ") + ")"
+	}
+
+	return
+}
+
 func (e *rustCallModel) populateFields(call *eth.MethodDef) error {
 	if len(call.Parameters) == 0 && call.ReturnParameters == nil {
 		return nil
@@ -640,17 +678,14 @@ func (e *rustCallModel) populateFields(call *eth.MethodDef) error {
 	fmt.Printf("  Generating ABI Calls for %s (%s) => (%s)\n", call.Name, strings.Join(paramNames, ","), strings.Join(outputParamNames, ","))
 
 	var err error
-	e.ProtoFieldABIConversionMap, e.ProtoFieldTableChangesMap, e.ProtoFieldSqlmap, e.ProtoFieldClickhouseMap, e.ProtoFieldGraphQLMap, err = convertMethodParameters(call.Parameters)
+	e.ProtoFieldTableChangesMap, e.ProtoFieldSqlmap, e.ProtoFieldClickhouseMap, e.ProtoFieldGraphQLMap, err = convertMethodParameters(call.Parameters, "")
 	if err != nil {
 		return err
 	}
 
-	outputABI, outputTableChanges, outputSql, outputClickhouse, outputGraphQL, err := convertMethodParameters(call.ReturnParameters)
+	outputTableChanges, outputSql, outputClickhouse, outputGraphQL, err := convertMethodParameters(call.ReturnParameters, "output_")
 	if err != nil {
 		return err
-	}
-	for k, v := range outputABI {
-		e.ProtoFieldABIConversionMap[k] = v
 	}
 	for k, v := range outputTableChanges {
 		e.ProtoFieldTableChangesMap[k] = v
@@ -665,7 +700,8 @@ func (e *rustCallModel) populateFields(call *eth.MethodDef) error {
 		e.ProtoFieldGraphQLMap[k] = v
 	}
 
-	return nil
+	e.ProtoFieldABIConversionMap, e.OutputFieldsString, err = methodToABIConversionMaps(call.Parameters, call.ReturnParameters)
+	return err
 }
 
 func sanitizeProtoFieldName(name string) string {
@@ -959,7 +995,6 @@ type protoCallModel struct {
 
 	OutputModuleFieldName string
 	Fields                []protoField
-	OutputFields          []protoField
 }
 
 func (e *protoEventModel) populateFields(log *eth.LogEventDef) error {
@@ -991,8 +1026,7 @@ func (e *protoCallModel) populateFields(call *eth.MethodDef) error {
 		return nil
 	}
 
-	e.Fields = make([]protoField, 0, len(call.Parameters))
-	e.OutputFields = make([]protoField, 0, len(call.ReturnParameters))
+	e.Fields = make([]protoField, 0, len(call.Parameters)+len(call.ReturnParameters))
 
 	for _, parameter := range call.Parameters {
 		fieldName := xstrings.ToSnakeCase(parameter.Name)
@@ -1009,7 +1043,7 @@ func (e *protoCallModel) populateFields(call *eth.MethodDef) error {
 		e.Fields = append(e.Fields, protoField{Name: fieldName, Type: fieldType})
 	}
 	for _, parameter := range call.ReturnParameters {
-		fieldName := xstrings.ToSnakeCase(parameter.Name)
+		fieldName := xstrings.ToSnakeCase("output_" + parameter.Name)
 		fieldName = sanitizeProtoFieldName(fieldName)
 		fieldType := getProtoFieldType(parameter.Type)
 		if fieldType == SKIP_FIELD {
@@ -1020,7 +1054,7 @@ func (e *protoCallModel) populateFields(call *eth.MethodDef) error {
 			return fmt.Errorf("field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
 		}
 
-		e.OutputFields = append(e.OutputFields, protoField{Name: fieldName, Type: fieldType})
+		e.Fields = append(e.Fields, protoField{Name: fieldName, Type: fieldType})
 	}
 
 	return nil

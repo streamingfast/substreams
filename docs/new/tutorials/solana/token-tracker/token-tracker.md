@@ -1,11 +1,11 @@
-The Solana Token Tracker Substreams allow you to extract transfers from SPL tokens. The Substreams allows you to pass as a parameter the token you want to track!
+The Solana Token Tracker Substreams allows you to extract transfers from Solana Token Programs. You can simply provide the address of the token you want to track as an input to the Substreams.
 
 ## Before You Begin
 
 The Solana Token Tracker Substreams requires medium to advanced Substreams knowledge. If this is the first time you are using Substreams, make sure you:
 
 - Read the [Develop Substreams](../../../develop/develop.md) section, which will teach you the basics of the developing Substreams modules.
-- Complete the [Explore Solana](../explore-solana/explore-solana.md) tutorial, which will assist in understading the main pieces of the Solana Substreams.
+- Complete the [Explore Solana](../explore-solana/explore-solana.md) tutorial, which will assist you in understanding the main pieces of the Solana Substreams.
 
 If you already have the required knowledge, clone the [Solana Token Tracker GitHub repository](https://github.com/streamingfast/solana-token-tracker). You will go through the code in the following steps.
 
@@ -33,6 +33,20 @@ The module receives two inputs (defined in the `intputs` section of the YAML):
 - A raw Solana block.
 
 You can update the `token_contract` parameter to track any token of your choice. You can also use the `-p` option in the Substreams GUI to dynamically override the parameters of the Substreams.
+
+## Run the Substreams
+
+You can run the Substreams by using the Substreams CLI. As specified in the manifest by default, the USDC data will be retrieved.
+
+```bash
+substreams gui ./substreams.yaml map_solana_token_events -e mainnet.sol.streamingfast.io:443  --start-block 158558168 --stop-block +1
+```
+
+You can also override the parameters of the manifest by using the `-p` option of the CLI. For example, if you want to track the transfer of the USDT token (`Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB`):
+
+```bash
+substreams gui ./substreams.yaml map_solana_token_events -e mainnet.sol.streamingfast.io:443  --start-block 158558168 --stop-block +1 -p map_solana_token_events="token_contract=Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB&token_decimals=6"
+```
 
 ## Inspect the Code
 
@@ -125,7 +139,7 @@ pub fn process_compiled_instruction(
     process_inner_instructions(output, inst_index, meta, accounts, trx_hash, timestamp, parameters); // 3.
 }
 ```
-1. The `instruction.program_id_index` indicates the position of the program account in the accounts array. For example, if `program_index_id = 5`, it means that program account will be at position number 5 in the `accounts` array.
+1. The `instruction.program_id_index` indicates the position of the program account in the accounts array. For example, if `program_index_id = 5`, it means that the program account will be at position number 5 in the `accounts` array.
 2. If the instruction account is the Token Program Account (i.e. `TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA`), this means that the instruction executed in the transaction has been produced by the Token Program. Therefore, you process the instruction further by calling the `process_token_instruction(...)` function to extract token-related information, such as transfers or mints.
 3. Every top-level instruction holds inner instructions. If the top-level instruction is not from the Token Program, you check if any Inner Instruction is from the Token Program by calling the `process_inner_instructions(...)` function.
 
@@ -172,14 +186,14 @@ pub fn process_inner_instructions(
 }
 ```
 1. The `TransactionStatusMeta` object holds an array with the inner instructions of the transaction (an array of `InnerTransactions` objects).
-2. Because the inner instructions are at the transaction level (contained within the `TransactionStatusMeta`), you keep only the inner transactions belonging to the current top-level instruction. For this purpose, a index variable (`instruction_index`) is passed as a parameter.
+2. Because the inner instructions are at the transaction level (contained within the `TransactionStatusMeta`), you keep only the inner transactions belonging to the current top-level instruction. For this purpose, an index variable (`instruction_index`) is passed as a parameter.
 Essentially, you are matching every top-level instruction with its corresponding `InnerTransactions` object. The filtering should only keep **one** `InnerTransactions` object, as every top-level instruction should only have one `InnerTransactions` object.
 3. The `InnerTransactions` object is a just wrapper for the array of inner transactions. For every `InnerTransactions` object filtered (which should be **only one**), you actually extract the inner instructions.
 4. You iterate over the array of inner instructions.
 5. You only keep Token Program inner instructions.
 6. You process every Token Program inner instruction found further by calling the `process_token_instruction(...)`.
 
-Once you have identified all the Token Program instruction, the `proces_token_instruction(...)` function extracts transfer or mint data from these instructions. To easily extract data from a Token Program instruction, the Substreams relies on the `substreams-solana-program-instructions` Rust crate, which provide useful helper functions.
+Once you have identified all the Token Program instructions, the `proces_token_instruction(...)` function extracts transfer or mint data from these instructions. To easily extract data from a Token Program instruction, the Substreams relies on the `substreams-solana-program-instructions` Rust crate, which provides useful helper functions.
 
 ```rust
 fn process_token_instruction(
@@ -219,7 +233,7 @@ fn process_token_instruction(
     }
 }
 ```
-1. The `TokenInstruction::unpack(...)` function decodes the instruction and allows you to indetify the action executed: `Transfer`, `TransferChecked`, `Mint` or `Burn`.
+1. The `TokenInstruction::unpack(...)` function decodes the instruction and allows you to identify the action executed: `Transfer`, `TransferChecked`, `Mint`, or `Burn`.
 2. Controlled way to handle errors from the `unpack(...)` function.
 3. If there are no errors, then you can handle every action (`Transfer`, `Mint`...) differently.
 4. Handle the `Transfer` instruction.

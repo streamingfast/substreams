@@ -134,16 +134,10 @@ func (e *EthereumContract) GetAddress() eth.Address {
 	return e.address
 }
 
-//	func (e *EthereumContract) SetWithEvents(v bool) {
-//		e.withEvents = v
-//	}
 func (e *EthereumContract) SetWithCalls(v bool) {
 	e.withCalls = v
 }
 
-// //func (e *EthereumContract) GetWithEvents() bool {
-// //	return e.withEvents
-// //}
 func (e *EthereumContract) GetWithCalls() bool {
 	return e.withCalls
 }
@@ -293,8 +287,7 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 				"entityChangeImportVersion":   p.entityChangeImportVersion,
 				"network":                     p.network,
 				"hasDDS":                      p.HasDDS(),
-				//				"withEvents":                  true,
-				"withCalls": withCalls,
+				"withCalls":                   withCalls,
 			}
 
 			zlog.Debug("rendering templated file", zap.String("filename", finalFileName), zap.Any("model", model))
@@ -392,6 +385,7 @@ func BuildCallModels(abi *eth.ABI) (out []codegenCall, err error) {
 		calls := abi.FindFunctionsByName(name)
 
 		for i, call := range calls {
+			// We skip "pure" and "view" functions because they don't affect the state of the chain
 			if call.StateMutability == eth.StateMutabilityPure || call.StateMutability == eth.StateMutabilityView {
 				continue
 			}

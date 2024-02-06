@@ -76,7 +76,7 @@ fn map_{{ $contract.GetName }}_calls(blk: &eth::Block, calls: &mut contract::Cal
                                 call_block_time: Some(blk.timestamp().to_owned()),
                                 call_block_number: blk.number,
                                 call_ordinal: call.begin_ordinal,
-                                call_success: !call.status_reverted,
+                                call_success: !call.state_reverted,
                                 {{- range $protoField, $abiToProtoConversion := $rust.ProtoFieldABIConversionMap }}
                                 {{$protoField}}: {{$abiToProtoConversion}},
                                 {{- end}}
@@ -163,7 +163,7 @@ fn map_{{ $ddsContract.GetName }}_calls(
                                 call_block_time: Some(blk.timestamp().to_owned()),
                                 call_block_number: blk.number,
                                 call_ordinal: call.begin_ordinal,
-                                call_success: !call.status_reverted,
+                                call_success: !call.state_reverted,
                                 call_address: Hex(&call.address).to_string(),
                                 {{- range $protoField, $abiToProtoConversion := $rust.ProtoFieldABIConversionMap }}
                                 {{$protoField}}: {{$abiToProtoConversion}},

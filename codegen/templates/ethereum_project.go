@@ -34,19 +34,25 @@ import (
 var ethereumProject embed.FS
 
 type EthereumContract struct {
-	name               string
-	address            eth.Address
-	events             []codegenEvent
-	abi                *eth.ABI
-	abiContent         string
+	name       string
+	address    eth.Address
+	events     []codegenEvent
+	calls      []codegenCall
+	abi        *eth.ABI
+	abiContent string
+	//withEvents         bool
+	withCalls          bool
 	dynamicDataSources []*DDSContract
 }
 
 type DDSContract struct {
-	name                 string
-	events               []codegenEvent
-	abi                  *eth.ABI
-	abiContent           string
+	name       string
+	events     []codegenEvent
+	calls      []codegenCall
+	abi        *eth.ABI
+	abiContent string
+	//withEvents           bool
+	withCalls            bool
 	creationEvent        string
 	creationAddressField string
 }
@@ -57,6 +63,13 @@ func (c *DDSContract) GetName() string {
 
 func (c *DDSContract) GetEvents() []codegenEvent {
 	return c.events
+}
+func (c *DDSContract) GetCalls() []codegenCall {
+	return c.calls
+}
+
+func (c *DDSContract) HasCalls() bool {
+	return len(c.calls) != 0
 }
 
 func (c *DDSContract) GetCreationEvent() string {
@@ -81,16 +94,30 @@ func (e *EthereumContract) AddDynamicDataSource(
 	abiContent string,
 	creationEvent string,
 	creationAddressField string,
-) error {
+	//withEvents bool,
+	withCalls bool,
+) (err error) {
 
-	events, err := BuildEventModels(abi)
+	var events []codegenEvent
+	//	if withEvents {
+	events, err = BuildEventModels(abi)
 	if err != nil {
 		return fmt.Errorf("build ABI event models for dynamic datasource contract %s: %w", name, err)
+	}
+	//}
+
+	var calls []codegenCall
+	if withCalls {
+		calls, err = BuildCallModels(abi)
+		if err != nil {
+			return fmt.Errorf("build ABI event models for dynamic datasource contract %s: %w", name, err)
+		}
 	}
 
 	e.dynamicDataSources = append(e.dynamicDataSources, &DDSContract{
 		name:                 name,
 		events:               events,
+		calls:                calls,
 		abi:                  abi,
 		abiContent:           abiContent,
 		creationEvent:        creationEvent,
@@ -107,6 +134,14 @@ func (e *EthereumContract) GetAddress() eth.Address {
 	return e.address
 }
 
+func (e *EthereumContract) SetWithCalls(v bool) {
+	e.withCalls = v
+}
+
+func (e *EthereumContract) GetWithCalls() bool {
+	return e.withCalls
+}
+
 func (e *EthereumContract) SetName(name string) {
 	e.name = name
 }
@@ -118,9 +153,20 @@ func (e *EthereumContract) GetName() string {
 func (e *EthereumContract) SetEvents(events []codegenEvent) {
 	e.events = events
 }
+func (e *EthereumContract) SetCalls(calls []codegenCall) {
+	e.calls = calls
+}
 
 func (e *EthereumContract) GetEvents() []codegenEvent {
 	return e.events
+}
+
+func (e *EthereumContract) GetCalls() []codegenCall {
+	return e.calls
+}
+
+func (e *EthereumContract) HasCalls() bool {
+	return len(e.calls) != 0
 }
 
 func (e *EthereumContract) GetAbi() *eth.ABI {
@@ -215,6 +261,20 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 				name = xstrings.ToKebabCase(p.name)
 			}
 
+			var withCalls bool
+			for _, contract := range p.ethereumContracts {
+				if contract.withCalls {
+					withCalls = true
+					break
+				}
+				for _, dds := range contract.dynamicDataSources {
+					if dds.withCalls {
+						withCalls = true
+						break
+					}
+				}
+			}
+
 			model := map[string]any{
 				"name":                        name,
 				"moduleName":                  p.moduleName,
@@ -227,6 +287,7 @@ func (p *EthereumProject) Render() (map[string][]byte, error) {
 				"entityChangeImportVersion":   p.entityChangeImportVersion,
 				"network":                     p.network,
 				"hasDDS":                      p.HasDDS(),
+				"withCalls":                   withCalls,
 			}
 
 			zlog.Debug("rendering templated file", zap.String("filename", finalFileName), zap.Any("model", model))
@@ -312,9 +373,79 @@ func BuildEventModels(abi *eth.ABI) (out []codegenEvent, err error) {
 	return
 }
 
+func BuildCallModels(abi *eth.ABI) (out []codegenCall, err error) {
+	pluralizer := pluralize.NewClient()
+
+	names := keys(abi.FunctionsByNameMap)
+	sort.StringSlice(names).Sort()
+
+	// We allocate as many names + 16 to potentially account for duplicates
+	out = make([]codegenCall, 0, len(names)+16)
+	for _, name := range names {
+		calls := abi.FindFunctionsByName(name)
+
+		for i, call := range calls {
+			// We skip "pure" and "view" functions because they don't affect the state of the chain
+			if call.StateMutability == eth.StateMutabilityPure || call.StateMutability == eth.StateMutabilityView {
+				continue
+			}
+			rustABIStructName := name
+			if len(calls) > 1 { // will result in OriginalName, OriginalName1, OriginalName2
+				rustABIStructName = name + strconv.FormatUint(uint64(i+1), 10)
+			}
+			for i, param := range call.Parameters {
+				if param.Name == "" {
+					param.Name = fmt.Sprintf("param%d", i)
+				}
+			}
+			for i, param := range call.ReturnParameters {
+				if param.Name == "" {
+					param.Name = fmt.Sprintf("param%d", i)
+				}
+			}
+
+			protoFieldName := "call_" + xstrings.ToSnakeCase(pluralizer.Plural(rustABIStructName))
+			// prost will do a to_lower_camel_case() on any struct name
+			rustGeneratedStructName := xstrings.ToCamelCase(xstrings.ToSnakeCase(rustABIStructName))
+			protoMessageName := xstrings.ToCamelCase(xstrings.ToSnakeCase(rustABIStructName) + "Call")
+
+			codegenCall := codegenCall{
+				Rust: &rustCallModel{
+					ABIStructName:              rustGeneratedStructName,
+					ProtoMessageName:           protoMessageName,
+					ProtoOutputModuleFieldName: protoFieldName,
+					TableChangeEntityName:      "call_" + xstrings.ToSnakeCase(rustABIStructName),
+				},
+
+				Proto: &protoCallModel{
+					MessageName:           protoMessageName,
+					OutputModuleFieldName: protoFieldName,
+				},
+			}
+
+			if err := codegenCall.Rust.populateFields(call); err != nil {
+				return nil, fmt.Errorf("populating codegen Rust fields: %w", err)
+			}
+
+			if err := codegenCall.Proto.populateFields(call); err != nil {
+				return nil, fmt.Errorf("populating codegen Proto fields: %w", err)
+			}
+
+			out = append(out, codegenCall)
+		}
+	}
+
+	return
+}
+
 type codegenEvent struct {
 	Rust  *rustEventModel
 	Proto *protoEventModel
+}
+
+type codegenCall struct {
+	Rust  *rustCallModel
+	Proto *protoCallModel
 }
 
 type rustEventModel struct {
@@ -322,6 +453,19 @@ type rustEventModel struct {
 	ProtoMessageName           string
 	ProtoOutputModuleFieldName string
 	TableChangeEntityName      string
+	ProtoFieldABIConversionMap map[string]string
+	ProtoFieldTableChangesMap  map[string]tableChangeSetField
+	ProtoFieldSqlmap           map[string]string
+	ProtoFieldClickhouseMap    map[string]string
+	ProtoFieldGraphQLMap       map[string]string
+}
+
+type rustCallModel struct {
+	ABIStructName              string
+	ProtoMessageName           string
+	ProtoOutputModuleFieldName string
+	TableChangeEntityName      string
+	OutputFieldsString         string
 	ProtoFieldABIConversionMap map[string]string
 	ProtoFieldTableChangesMap  map[string]tableChangeSetField
 	ProtoFieldSqlmap           map[string]string
@@ -401,6 +545,157 @@ func (e *rustEventModel) populateFields(log *eth.LogEventDef) error {
 	}
 
 	return nil
+}
+
+func convertMethodParameters(parameters []*eth.MethodParameter, optionalPrefix string) (
+	tableChangesMap map[string]tableChangeSetField,
+	sqlMap map[string]string,
+	clickhouseMap map[string]string,
+	graphqlMap map[string]string,
+	err error,
+) {
+	tableChangesMap = map[string]tableChangeSetField{}
+	sqlMap = map[string]string{}
+	clickhouseMap = map[string]string{}
+	graphqlMap = map[string]string{}
+
+	for _, parameter := range parameters {
+		name := optionalPrefix + xstrings.ToSnakeCase(parameter.Name)
+		name = sanitizeProtoFieldName(name)
+		columnName := sanitizeTableChangesColumnNames(name)
+
+		toDatabaseChangeSetter, toDatabaseChangeCode := generateFieldTableChangeCode(parameter.Type, "call."+name, true)
+		if toDatabaseChangeCode != SKIP_FIELD {
+			if toDatabaseChangeSetter == "" {
+				err = fmt.Errorf("table change - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
+				return
+			}
+			tableChangesMap[name] = tableChangeSetField{Setter: toDatabaseChangeSetter, ValueAccessCode: toDatabaseChangeCode}
+		}
+
+		toSqlCode := generateFieldSqlTypes(parameter.Type)
+		if toSqlCode != SKIP_FIELD {
+			if toSqlCode == "" {
+				err = fmt.Errorf("sql - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
+				return
+			}
+			sqlMap[columnName] = toSqlCode
+		}
+
+		toClickhouseCode := generateFieldClickhouseTypes(parameter.Type)
+		if toClickhouseCode != SKIP_FIELD {
+			if toClickhouseCode == "" {
+				err = fmt.Errorf("clickhouse - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
+				return
+			}
+			clickhouseMap[columnName] = toClickhouseCode
+		}
+
+		toGraphQLCode := generateFieldGraphQLTypes(parameter.Type)
+		if toGraphQLCode != SKIP_FIELD {
+			if toGraphQLCode == "" {
+				err = fmt.Errorf("graphql - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
+				return
+			}
+			graphqlMap[name] = toGraphQLCode
+		}
+	}
+	return
+}
+
+func methodToABIConversionMaps(
+	parameters []*eth.MethodParameter,
+	outputParameters []*eth.MethodParameter,
+) (
+	abiConversionMap map[string]string,
+	outputString string,
+	err error,
+) {
+	if len(parameters) != 0 {
+		abiConversionMap = make(map[string]string)
+		for _, parameter := range parameters {
+			name := xstrings.ToSnakeCase(parameter.Name)
+			name = sanitizeProtoFieldName(name)
+
+			toProtoCode := generateFieldTransformCode(parameter.Type, "decoded_call."+name, false)
+			if toProtoCode != SKIP_FIELD {
+				if toProtoCode == "" {
+					err = fmt.Errorf("transform - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
+					return
+				}
+				abiConversionMap[name] = toProtoCode
+			}
+		}
+	}
+
+	if len(outputParameters) == 0 {
+		return
+	}
+
+	outputNames := make([]string, len(outputParameters))
+	for i, parameter := range outputParameters {
+		name := "output_" + xstrings.ToSnakeCase(parameter.Name)
+		name = sanitizeProtoFieldName(name)
+		outputNames[i] = name
+
+		toProtoCode := generateFieldTransformCode(parameter.Type, name, false)
+		if toProtoCode != SKIP_FIELD {
+			if toProtoCode == "" {
+				err = fmt.Errorf("transform - field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
+				return
+			}
+			abiConversionMap[name] = toProtoCode
+		}
+	}
+	if len(outputNames) == 1 {
+		outputString = strings.Join(outputNames, ", ")
+	} else {
+		outputString = "(" + strings.Join(outputNames, ", ") + ")"
+	}
+
+	return
+}
+
+func (e *rustCallModel) populateFields(call *eth.MethodDef) error {
+	if len(call.Parameters) == 0 && call.ReturnParameters == nil {
+		return nil
+	}
+
+	paramNames := make([]string, len(call.Parameters))
+	for i := range call.Parameters {
+		paramNames[i] = call.Parameters[i].Name
+	}
+	outputParamNames := make([]string, len(call.ReturnParameters))
+	for i := range call.ReturnParameters {
+		outputParamNames[i] = call.ReturnParameters[i].Name
+	}
+	fmt.Printf("  Generating ABI Calls for %s (%s) => (%s)\n", call.Name, strings.Join(paramNames, ","), strings.Join(outputParamNames, ","))
+
+	var err error
+	e.ProtoFieldTableChangesMap, e.ProtoFieldSqlmap, e.ProtoFieldClickhouseMap, e.ProtoFieldGraphQLMap, err = convertMethodParameters(call.Parameters, "")
+	if err != nil {
+		return err
+	}
+
+	outputTableChanges, outputSql, outputClickhouse, outputGraphQL, err := convertMethodParameters(call.ReturnParameters, "output_")
+	if err != nil {
+		return err
+	}
+	for k, v := range outputTableChanges {
+		e.ProtoFieldTableChangesMap[k] = v
+	}
+	for k, v := range outputSql {
+		e.ProtoFieldSqlmap[k] = v
+	}
+	for k, v := range outputClickhouse {
+		e.ProtoFieldClickhouseMap[k] = v
+	}
+	for k, v := range outputGraphQL {
+		e.ProtoFieldGraphQLMap[k] = v
+	}
+
+	e.ProtoFieldABIConversionMap, e.OutputFieldsString, err = methodToABIConversionMaps(call.Parameters, call.ReturnParameters)
+	return err
 }
 
 func sanitizeProtoFieldName(name string) string {
@@ -688,6 +983,14 @@ type protoEventModel struct {
 	Fields                []protoField
 }
 
+type protoCallModel struct {
+	// MessageName is the name of the message representing this specific call
+	MessageName string
+
+	OutputModuleFieldName string
+	Fields                []protoField
+}
+
 func (e *protoEventModel) populateFields(log *eth.LogEventDef) error {
 	if len(log.Parameters) == 0 {
 		return nil
@@ -696,6 +999,45 @@ func (e *protoEventModel) populateFields(log *eth.LogEventDef) error {
 	e.Fields = make([]protoField, 0, len(log.Parameters))
 	for _, parameter := range log.Parameters {
 		fieldName := xstrings.ToSnakeCase(parameter.Name)
+		fieldName = sanitizeProtoFieldName(fieldName)
+		fieldType := getProtoFieldType(parameter.Type)
+		if fieldType == SKIP_FIELD {
+			continue
+		}
+
+		if fieldType == "" {
+			return fmt.Errorf("field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
+		}
+
+		e.Fields = append(e.Fields, protoField{Name: fieldName, Type: fieldType})
+	}
+
+	return nil
+}
+
+func (e *protoCallModel) populateFields(call *eth.MethodDef) error {
+	if len(call.Parameters) == 0 && len(call.ReturnParameters) == 0 {
+		return nil
+	}
+
+	e.Fields = make([]protoField, 0, len(call.Parameters)+len(call.ReturnParameters))
+
+	for _, parameter := range call.Parameters {
+		fieldName := xstrings.ToSnakeCase(parameter.Name)
+		fieldName = sanitizeProtoFieldName(fieldName)
+		fieldType := getProtoFieldType(parameter.Type)
+		if fieldType == SKIP_FIELD {
+			continue
+		}
+
+		if fieldType == "" {
+			return fmt.Errorf("field type %q on parameter with name %q is not supported right now", parameter.TypeName, parameter.Name)
+		}
+
+		e.Fields = append(e.Fields, protoField{Name: fieldName, Type: fieldType})
+	}
+	for _, parameter := range call.ReturnParameters {
+		fieldName := xstrings.ToSnakeCase("output_" + parameter.Name)
 		fieldName = sanitizeProtoFieldName(fieldName)
 		fieldType := getProtoFieldType(parameter.Type)
 		if fieldType == SKIP_FIELD {

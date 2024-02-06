@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS factory_pool_created (
     "token0" VARCHAR(40),
     "token1" VARCHAR(40)
 ) ENGINE = MergeTree PRIMARY KEY ("evt_tx_hash","evt_index");
+
 CREATE TABLE IF NOT EXISTS pool_burn (
     "evt_tx_hash" VARCHAR(64),
     "evt_index" INT,
@@ -132,5 +133,3 @@ CREATE TABLE IF NOT EXISTS pool_swap (
     "sqrt_price_x96" UInt256,
     "tick" Int32
 ) ENGINE = MergeTree PRIMARY KEY ("evt_tx_hash","evt_index");
-
-

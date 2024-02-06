@@ -71,12 +71,14 @@ func TestNewEthereumTemplateProject(t *testing.T) {
 		targetABI      []byte
 		event          string
 		addressField   string
+		withCalls      bool
 	}
 	type args struct {
 		address            string
 		abi                []byte
 		shortName          string
 		dynamicDataSources []*dds
+		withCalls          bool
 	}
 	tests := []struct {
 		name       string
@@ -196,6 +198,50 @@ func TestNewEthereumTemplateProject(t *testing.T) {
 			},
 			assertion: require.NoError,
 		},
+
+		{
+			name: "dynamic datasource_with_calls",
+			args: []args{
+				{
+					address:   "0x1f98431c8ad98523631ae4a59f267346ea31f984",
+					abi:       fileContent(t, "ethereum/results/dynamic_datasource/abi/factory_contract.abi.json"),
+					shortName: "factory",
+					withCalls: true,
+					dynamicDataSources: []*dds{
+						{
+							targetTypeName: "pool",
+							addressField:   "pool",
+							targetABI:      fileContent(t, "ethereum/results/dynamic_datasource/abi/pool_contract.abi.json"),
+							event:          "PoolCreated",
+							withCalls:      true,
+						},
+					},
+				},
+			},
+			startBlock: 12369621,
+			want: map[string][]byte{
+				"abi/factory_contract.abi.json": fileContent(t, "ethereum/results/dynamic_datasource_with_calls/abi/factory_contract.abi.json"),
+				"abi/pool_contract.abi.json":    fileContent(t, "ethereum/results/dynamic_datasource_with_calls/abi/pool_contract.abi.json"),
+				"proto/contract.proto":          fileContent(t, "./ethereum/results/dynamic_datasource_with_calls/proto/contract.proto"),
+				"src/abi/mod.rs":                fileContent(t, "./ethereum/results/dynamic_datasource_with_calls/src/abi/mod.rs"),
+				"src/pb/mod.rs":                 fileContent(t, "./ethereum/results/dynamic_datasource_with_calls/src/pb/mod.rs"),
+				"src/lib.rs":                    fileContent(t, "./ethereum/results/dynamic_datasource_with_calls/src/lib.rs"),
+				"build.rs":                      fileContent(t, "./ethereum/results/dynamic_datasource_with_calls/build.rs"),
+				"Cargo.lock":                    fileContent(t, "./ethereum/Cargo.lock"),
+				"Cargo.toml":                    fileContent(t, "./ethereum/Cargo.toml"),
+				"Makefile":                      fileContent(t, "./ethereum/Makefile"),
+				"substreams.yaml":               fileContent(t, "./ethereum/results/dynamic_datasource_with_calls/substreams.yaml"),
+				"substreams.sql.yaml":           fileContent(t, "./ethereum/results/dynamic_datasource_with_calls/substreams.sql.yaml"),
+				"substreams.clickhouse.yaml":    fileContent(t, "./ethereum/results/dynamic_datasource_with_calls/substreams.clickhouse.yaml"),
+				"substreams.subgraph.yaml":      fileContent(t, "./ethereum/results/dynamic_datasource_with_calls/substreams.subgraph.yaml"),
+				"rust-toolchain.toml":           fileContent(t, "./ethereum/rust-toolchain.toml"),
+				"schema.sql":                    fileContent(t, "./ethereum/results/dynamic_datasource_with_calls/schema.sql"),
+				"schema.clickhouse.sql":         fileContent(t, "./ethereum/results/dynamic_datasource_with_calls/schema.clickhouse.sql"),
+				"schema.graphql":                fileContent(t, "./ethereum/results/dynamic_datasource_with_calls/schema.graphql"),
+				"subgraph.yaml":                 fileContent(t, "./ethereum/subgraph.yaml"),
+			},
+			assertion: require.NoError,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -211,10 +257,13 @@ func TestNewEthereumTemplateProject(t *testing.T) {
 					abi,
 					string(arg.abi),
 				)
+				if arg.withCalls {
+					ethContract.withCalls = true
+				}
 				for _, dds := range arg.dynamicDataSources {
 					abi, err := eth.ParseABIFromBytes(dds.targetABI)
 					require.NoError(t, err)
-					ethContract.AddDynamicDataSource(dds.targetTypeName, abi, string(dds.targetABI), dds.event, dds.addressField)
+					ethContract.AddDynamicDataSource(dds.targetTypeName, abi, string(dds.targetABI), dds.event, dds.addressField, dds.withCalls)
 				}
 
 				ethereumContracts = append(ethereumContracts, ethContract)
@@ -224,6 +273,12 @@ func TestNewEthereumTemplateProject(t *testing.T) {
 				events, err := BuildEventModels(contract.abi)
 				require.NoError(t, err)
 				contract.SetEvents(events)
+
+				if contract.withCalls {
+					calls, err := BuildCallModels(contract.abi)
+					require.NoError(t, err)
+					contract.SetCalls(calls)
+				}
 			}
 
 			project, err := NewEthereumProject(
@@ -241,7 +296,7 @@ func TestNewEthereumTemplateProject(t *testing.T) {
 			keysExpected := keys(tt.want)
 			keysActual := keys(got)
 
-			require.ElementsMatch(t, keysExpected, keysActual, "Entries key are different")
+			assert.ElementsMatch(t, keysExpected, keysActual, "Entries key are different")
 			for wantEntry, wantContent := range tt.want {
 				filename := strings.ReplaceAll(wantEntry, string(filepath.Separator), "_")
 				wantFilename := filepath.Join(os.TempDir(), fmt.Sprintf("want.%s", filename))

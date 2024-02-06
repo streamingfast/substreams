@@ -40,12 +40,25 @@ modules:
       - store: store_{{ $contract.GetName }}_{{ $ddsContract.GetName }}_created{{ end }}{{ end }}
     output:
       type: proto:contract.v1.Events
+{{- if .withCalls }}
+
+  - name: map_calls
+    kind: map
+    initialBlock: {{ .initialBlock }}
+    inputs:
+      - source: sf.ethereum.type.v2.Block{{ range $contract := .ethereumContracts -}}{{ range $ddsContract := $contract.GetDDS }}
+      - store: store_{{ $contract.GetName }}_{{ $ddsContract.GetName }}_created{{ end }}{{ end }}
+    output:
+      type: proto:contract.v1.Calls
+{{- end }}
 
   - name: db_out
     kind: map
     initialBlock: {{ .initialBlock }}
     inputs:
       - map: map_events
+{{- if .withCalls }}
+      - map: map_calls{{ end }}
     output:
       type: proto:sf.substreams.sink.database.v1.DatabaseChanges
 
@@ -54,6 +67,8 @@ modules:
     initialBlock: {{ .initialBlock }}
     inputs:
       - map: map_events
+{{- if .withCalls }}
+      - map: map_calls{{ end }}
     output:
       type: proto:sf.substreams.entity.v1.EntityChanges
 

@@ -39,7 +39,7 @@ func addHeaders(cmd *cobra.Command, req connect.AnyRequest) error {
 	for _, header := range sflags.MustGetStringSlice(cmd, "header") {
 		parts := strings.Split(header, ": ")
 		if len(parts) != 2 {
-			return fmt.Errorf("invalid value for header: %s. Only one occurence of ': ' is permitted.", header)
+			return fmt.Errorf("invalid value for header: %s. Only one occurence of ': ' is permitted", header)
 		}
 		req.Header().Add(parts[0], parts[1])
 	}

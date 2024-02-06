@@ -23,7 +23,7 @@ substreams_ethereum::init!();
 
 {{ range $i, $contract := .ethereumContracts -}}
 const {{ toUpper $contract.GetName }}_TRACKED_CONTRACT: [u8; 20] = hex!("{{ $contract.GetAddress }}");
-{{ end -}}
+{{ end }}
 
 {{- range $i, $contract := .ethereumContracts }}
 fn map_{{ $contract.GetName }}_events(blk: &eth::Block, events: &mut contract::Events) {
@@ -53,9 +53,45 @@ fn map_{{ $contract.GetName }}_events(blk: &eth::Block, events: &mut contract::E
         .collect());
     {{- end }}
 }
+{{ if $contract.HasCalls }}
+fn map_{{ $contract.GetName }}_calls(blk: &eth::Block, calls: &mut contract::Calls) {
+    {{- range $call := $contract.GetCalls }}
+    {{- $rust := $call.Rust }}
+    calls.{{ $contract.GetName }}_{{ $rust.ProtoOutputModuleFieldName }}.append(&mut blk
+        .transactions()
+        .flat_map(|tx| {
+            tx.calls.iter()
+                .filter(|call| call.address == {{ toUpper $contract.GetName }}_TRACKED_CONTRACT && abi::{{ $contract.GetName }}_contract::functions::{{$rust.ABIStructName}}::match_call(call))
+                .filter_map(|call| {
+                    match abi::{{ $contract.GetName }}_contract::functions::{{$rust.ABIStructName}}::decode(call) {
+                        Ok(decoded_call) => {
+                            {{- if $rust.OutputFieldsString }}
+                            let {{ $rust.OutputFieldsString }} = match abi::{{ $contract.GetName }}_contract::functions::{{$rust.ABIStructName}}::output(&call.return_data) {
+                                Ok({{ $rust.OutputFieldsString }}) => {{`{`}}{{ $rust.OutputFieldsString }}{{`}`}}
+                                Err(_) => Default::default(),
+                            };
+                            {{ end }}
+                            Some(contract::{{ capitalizeFirst $contract.GetName }}{{$rust.ProtoMessageName}} {
+                                call_tx_hash: Hex(&tx.hash).to_string(),
+                                call_block_time: Some(blk.timestamp().to_owned()),
+                                call_block_number: blk.number,
+                                call_ordinal: call.begin_ordinal,
+                                call_success: !call.state_reverted,
+                                {{- range $protoField, $abiToProtoConversion := $rust.ProtoFieldABIConversionMap }}
+                                {{$protoField}}: {{$abiToProtoConversion}},
+                                {{- end}}
+                            })
+                        },
+                        Err(_) => None,
+                    }
+                })
+        })
+        .collect());
+    {{- end }}
+}
+{{ end }}
 
 {{- if $.hasDDS }}
-
 fn is_declared_dds_address(addr: &Vec<u8>, ordinal: u64, dds_store: &store::StoreGetInt64) -> bool {
     //    substreams::log::info!("Checking if address {} is declared dds address", Hex(addr).to_string());
     if dds_store.get_at(ordinal, Hex(addr).to_string()).is_some() {
@@ -99,9 +135,52 @@ fn map_{{ $ddsContract.GetName }}_events(
         .collect());
     {{- end }}
 }
-{{ end }}
+
+{{- if $ddsContract.HasCalls }}
+fn map_{{ $ddsContract.GetName }}_calls(
+    blk: &eth::Block,
+    dds_store: &store::StoreGetInt64,
+    calls: &mut contract::Calls,
+) {
+    {{- range $call := $ddsContract.GetCalls }}
+    {{- $rust := $call.Rust }}
+    calls.{{ $ddsContract.GetName }}_{{ $rust.ProtoOutputModuleFieldName }}.append(&mut blk
+        .transactions()
+        .flat_map(|tx| {
+            tx.calls.iter()
+                .filter(|call| is_declared_dds_address(&call.address, call.begin_ordinal, dds_store) && abi::{{ $ddsContract.GetName }}_contract::functions::{{$rust.ABIStructName}}::match_call(call))
+                .filter_map(|call| {
+                    match abi::{{ $ddsContract.GetName }}_contract::functions::{{$rust.ABIStructName}}::decode(call) {
+                            Ok(decoded_call) => {
+                            {{- if $rust.OutputFieldsString }}
+                            let {{ $rust.OutputFieldsString }} = match abi::{{ $ddsContract.GetName }}_contract::functions::{{$rust.ABIStructName}}::output(&call.return_data) {
+                                Ok({{ $rust.OutputFieldsString }}) => {{`{`}}{{ $rust.OutputFieldsString }}{{`}`}}
+                                Err(_) => Default::default(),
+                            };
+                            {{ end }}
+                            Some(contract::{{ capitalizeFirst $ddsContract.GetName }}{{$rust.ProtoMessageName}} {
+                                call_tx_hash: Hex(&tx.hash).to_string(),
+                                call_block_time: Some(blk.timestamp().to_owned()),
+                                call_block_number: blk.number,
+                                call_ordinal: call.begin_ordinal,
+                                call_success: !call.state_reverted,
+                                call_address: Hex(&call.address).to_string(),
+                                {{- range $protoField, $abiToProtoConversion := $rust.ProtoFieldABIConversionMap }}
+                                {{$protoField}}: {{$abiToProtoConversion}},
+                                {{- end}}
+                            })
+                        },
+                        Err(_) => None,
+                    }
+                })
+        })
+        .collect());
+    {{- end }}
+}
 {{ end }}
 
+{{ end }}
+{{- end }}
 {{- range $i, $contract := .ethereumContracts }}
 fn db_{{ $contract.GetName }}_out(events: &contract::Events, tables: &mut DatabaseChangeTables) {
     // Loop over all the abis events to create table changes
@@ -120,6 +199,27 @@ fn db_{{ $contract.GetName }}_out(events: &contract::Events, tables: &mut Databa
     });
     {{- end}}
 } 
+{{- if $contract.HasCalls }}
+fn db_{{ $contract.GetName }}_calls_out(calls: &contract::Calls, tables: &mut DatabaseChangeTables) {
+    // Loop over all the abis calls to create table changes
+    {{- range $call := $contract.GetCalls }}
+    {{- $rust := $call.Rust }}
+    calls.{{ $contract.GetName }}_{{ $rust.ProtoOutputModuleFieldName }}.iter().for_each(|call| {
+        tables
+            .create_row("{{ $contract.GetName }}_{{ $rust.TableChangeEntityName }}", [("call_tx_hash", call.call_tx_hash.to_string()),("call_ordinal", call.call_ordinal.to_string())])
+            .set("call_block_time", call.call_block_time.as_ref().unwrap())
+            .set("call_block_number", call.call_block_number)
+            .set("call_success", call.call_success)
+            {{- $numberOfAttributes := len $rust.ProtoFieldTableChangesMap }}{{ if eq $numberOfAttributes 0 }};{{ end }}
+            {{- $i := 0 }}
+            {{- range $protoField, $changesToProtoConversion := $rust.ProtoFieldTableChangesMap }}
+            {{ $i = add $i 1 }}.{{$changesToProtoConversion.Setter}}("{{$protoField}}", {{$changesToProtoConversion.ValueAccessCode}}){{if eq $i $numberOfAttributes}};{{ end }}
+            {{- end}}
+    });
+    {{- end}}
+} 
+{{- end }}
+
 {{- range $ddsContract := $contract.GetDDS }}
 fn db_{{ $ddsContract.GetName }}_out(events: &contract::Events, tables: &mut DatabaseChangeTables) {
     // Loop over all the abis events to create table changes
@@ -139,6 +239,27 @@ fn db_{{ $ddsContract.GetName }}_out(events: &contract::Events, tables: &mut Dat
     });
     {{- end}}
 } 
+{{- if $ddsContract.HasCalls }}
+fn db_{{ $ddsContract.GetName }}_calls_out(calls: &contract::Calls, tables: &mut DatabaseChangeTables) {
+    // Loop over all the abis calls to create table changes
+    {{- range $call := $ddsContract.GetCalls }}
+    {{- $rust := $call.Rust }}
+    calls.{{ $ddsContract.GetName }}_{{ $rust.ProtoOutputModuleFieldName }}.iter().for_each(|call| {
+        tables
+            .create_row("{{ $ddsContract.GetName }}_{{ $rust.TableChangeEntityName }}", [("call_tx_hash", call.call_tx_hash.to_string()),("call_ordinal", call.call_ordinal.to_string())])
+            .set("call_block_time", call.call_block_time.as_ref().unwrap())
+            .set("call_block_number", call.call_block_number)
+            .set("call_success", call.call_success)
+            .set("call_address", &call.call_address)
+            {{- $numberOfAttributes := len $rust.ProtoFieldTableChangesMap }}{{ if eq $numberOfAttributes 0 }};{{ end }}
+            {{- $i := 0 }}
+            {{- range $protoField, $changesToProtoConversion := $rust.ProtoFieldTableChangesMap }}
+            {{ $i = add $i 1 }}.{{$changesToProtoConversion.Setter}}("{{$protoField}}", {{$changesToProtoConversion.ValueAccessCode}}){{if eq $i $numberOfAttributes}};{{ end }}
+            {{- end}}
+    });
+    {{- end}}
+} 
+{{- end }}
 
 {{- end }}
 {{- end }}
@@ -161,8 +282,30 @@ fn graph_{{ $contract.GetName }}_out(events: &contract::Events, tables: &mut Ent
             {{ $i = add $i 1 }}.set("{{$protoField}}", {{$changesToProtoConversion.ValueAccessCode}}){{if eq $i $numberOfAttributes}};{{ end }}
             {{- end}}
     });
-{{- end}}
+    {{- end}}
 }
+{{- if $contract.HasCalls }}
+fn graph_{{ $contract.GetName }}_calls_out(calls: &contract::Calls, tables: &mut EntityChangesTables) {
+    // Loop over all the abis calls to create table changes
+    {{- range $call := $contract.GetCalls }}
+    {{- $rust := $call.Rust }}
+    calls.{{ $contract.GetName }}_{{ $rust.ProtoOutputModuleFieldName }}.iter().for_each(|call| {
+        tables
+            .create_row("{{ $contract.GetName }}_{{ $rust.TableChangeEntityName }}", format!("{}-{}", call.call_tx_hash, call.call_ordinal))
+            .set("call_tx_hash", &call.call_tx_hash)
+            .set("call_ordinal", call.call_ordinal)
+            .set("call_block_time", call.call_block_time.as_ref().unwrap())
+            .set("call_block_number", call.call_block_number)
+            .set("call_success", call.call_success)
+            {{- $numberOfAttributes := len $rust.ProtoFieldTableChangesMap }}{{ if eq $numberOfAttributes 0 }};{{ end }}
+            {{- $i := 0 }}
+            {{- range $protoField, $changesToProtoConversion := $rust.ProtoFieldTableChangesMap }}
+            {{ $i = add $i 1 }}.set("{{$protoField}}", {{$changesToProtoConversion.ValueAccessCode}}){{if eq $i $numberOfAttributes}};{{ end }}
+            {{- end}}
+    });
+    {{- end}}
+  }
+{{- end }}
 {{- range $ddsContract := $contract.GetDDS }}
 fn graph_{{ $ddsContract.GetName }}_out(events: &contract::Events, tables: &mut EntityChangesTables) {
     // Loop over all the abis events to create table changes
@@ -182,9 +325,32 @@ fn graph_{{ $ddsContract.GetName }}_out(events: &contract::Events, tables: &mut 
             {{ $i = add $i 1 }}.set("{{$protoField}}", {{$changesToProtoConversion.ValueAccessCode}}){{if eq $i $numberOfAttributes}};{{ end }}
             {{- end}}
     });
-{{- end}}
+    {{- end}}
 }
 
+{{- if $ddsContract.HasCalls }}
+fn graph_{{ $ddsContract.GetName }}_calls_out(calls: &contract::Calls, tables: &mut EntityChangesTables) {
+    // Loop over all the abis calls to create table changes
+    {{- range $call := $ddsContract.GetCalls }}
+    {{- $rust := $call.Rust }}
+    calls.{{ $ddsContract.GetName }}_{{ $rust.ProtoOutputModuleFieldName }}.iter().for_each(|call| {
+        tables
+            .create_row("{{ $ddsContract.GetName }}_{{ $rust.TableChangeEntityName }}", format!("{}-{}", call.call_tx_hash, call.call_ordinal))
+            .set("call_tx_hash", &call.call_tx_hash)
+            .set("call_ordinal", call.call_ordinal)
+            .set("call_block_time", call.call_block_time.as_ref().unwrap())
+            .set("call_block_number", call.call_block_number)
+            .set("call_success", call.call_success)
+            .set("call_address", &call.call_address)
+            {{- $numberOfAttributes := len $rust.ProtoFieldTableChangesMap }}{{ if eq $numberOfAttributes 0 }};{{ end }}
+            {{- $i := 0 }}
+            {{- range $protoField, $changesToProtoConversion := $rust.ProtoFieldTableChangesMap }}
+            {{ $i = add $i 1 }}.set("{{$protoField}}", {{$changesToProtoConversion.ValueAccessCode}}){{if eq $i $numberOfAttributes}};{{ end }}
+            {{- end}}
+    });
+    {{- end}}
+  }
+{{- end }}
 {{- end }}
 {{- end }}
 
@@ -227,27 +393,65 @@ fn map_events(blk: eth::Block) -> Result<contract::Events, substreams::errors::E
     Ok(events)
 }
 
+{{- if .withCalls }}
 #[substreams::handlers::map]
+{{- if .hasDDS }}
+fn map_calls(
+    blk: eth::Block,
+{{- range $contract := .ethereumContracts }}{{ range $ddsContract := $contract.GetDDS }}{{ if $ddsContract.HasCalls }}
+    store_{{ $ddsContract.GetName }}: StoreGetInt64,{{ end }}{{ end }}{{ end }}
+) -> Result<contract::Calls, substreams::errors::Error> {
+{{- else }}
+fn map_calls(blk: eth::Block) -> Result<contract::Calls, substreams::errors::Error> {
+{{- end }}
+    let mut calls = contract::Calls::default();
+    {{- range $i, $contract := .ethereumContracts }}
+{{- if $contract.HasCalls }}
+    map_{{ $contract.GetName }}_calls(&blk, &mut calls);{{ end }}
+{{- range $ddsContract := $contract.GetDDS }}{{ if $ddsContract.HasCalls }}
+    map_{{ $ddsContract.GetName }}_calls(&blk, &store_{{ $ddsContract.GetName }}, &mut calls);{{ end }}{{ end }}
+    {{- end }}
+    Ok(calls)
+}
+{{- end }}
+
+#[substreams::handlers::map]
+{{- if .withCalls }}
+fn db_out(events: contract::Events, calls: contract::Calls) -> Result<DatabaseChanges, substreams::errors::Error> {
+{{- else }}
 fn db_out(events: contract::Events) -> Result<DatabaseChanges, substreams::errors::Error> {
+{{- end }}
     // Initialize Database Changes container
     let mut tables = DatabaseChangeTables::new();
     {{- range $i, $contract := .ethereumContracts }}
     db_{{ $contract.GetName }}_out(&events, &mut tables);
+    {{- if $contract.HasCalls }}
+    db_{{ $contract.GetName }}_calls_out(&calls, &mut tables);{{ end }}
     {{- range $ddsContract := $contract.GetDDS }}
     db_{{ $ddsContract.GetName }}_out(&events, &mut tables);
+    {{- if $ddsContract.HasCalls }}
+    db_{{ $ddsContract.GetName }}_calls_out(&calls, &mut tables);{{ end }}
     {{- end }}
     {{- end }}
     Ok(tables.to_database_changes())
 }
 
 #[substreams::handlers::map]
+{{- if .withCalls }}
+fn graph_out(events: contract::Events, calls: contract::Calls) -> Result<EntityChanges, substreams::errors::Error> {
+{{- else }}
 fn graph_out(events: contract::Events) -> Result<EntityChanges, substreams::errors::Error> {
+{{- end }}
     // Initialize Database Changes container
     let mut tables = EntityChangesTables::new();
     {{- range $i, $contract := .ethereumContracts }}
     graph_{{ $contract.GetName }}_out(&events, &mut tables);
+    {{- if $contract.HasCalls }}
+    graph_{{ $contract.GetName }}_calls_out(&calls, &mut tables);{{ end }}
     {{- range $ddsContract := $contract.GetDDS }}
     graph_{{ $ddsContract.GetName }}_out(&events, &mut tables);
+    {{- if $ddsContract.HasCalls }}
+    graph_{{ $ddsContract.GetName }}_calls_out(&calls, &mut tables);{{ end }}
     {{- end }}
     {{- end }}
     Ok(tables.to_entity_changes())

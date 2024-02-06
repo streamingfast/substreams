@@ -1,0 +1,333 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+package contract.v1;
+
+message Events {
+    repeated factory_FeeAmountEnabled factory_fee_amount_enableds = 1;
+    repeated factory_OwnerChanged factory_owner_changeds = 2;
+    repeated factory_PoolCreated factory_pool_createds = 3;
+    repeated pool_Burn pool_burns = 4;
+    repeated pool_Collect pool_collects = 5;
+    repeated pool_CollectProtocol pool_collect_protocols = 6;
+    repeated pool_Flash pool_flashes = 7;
+    repeated pool_IncreaseObservationCardinalityNext pool_increase_observation_cardinality_nexts = 8;
+    repeated pool_Initialize pool_initializes = 9;
+    repeated pool_Mint pool_mints = 10;
+    repeated pool_SetFeeProtocol pool_set_fee_protocols = 11;
+    repeated pool_Swap pool_swaps = 12;
+}
+
+message Calls {
+    repeated factory_CreatePoolCall factory_call_create_pools = 1;
+    repeated factory_EnableFeeAmountCall factory_call_enable_fee_amounts = 2;
+    repeated factory_SetOwnerCall factory_call_set_owners = 3;
+    repeated pool_BurnCall pool_call_burns = 4;
+    repeated pool_CollectCall pool_call_collects = 5;
+    repeated pool_CollectProtocolCall pool_call_collect_protocols = 6;
+    repeated pool_FlashCall pool_call_flashes = 7;
+    repeated pool_IncreaseObservationCardinalityNextCall pool_call_increase_observation_cardinality_nexts = 8;
+    repeated pool_InitializeCall pool_call_initializes = 9;
+    repeated pool_MintCall pool_call_mints = 10;
+    repeated pool_SetFeeProtocolCall pool_call_set_fee_protocols = 11;
+    repeated pool_SwapCall pool_call_swaps = 12;
+}
+
+
+message factory_FeeAmountEnabled {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    uint64 fee = 5;
+    int64 tick_spacing = 6;
+}
+
+message factory_OwnerChanged {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes old_owner = 5;
+    bytes new_owner = 6;
+}
+
+message factory_PoolCreated {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes token0 = 5;
+    bytes token1 = 6;
+    uint64 fee = 7;
+    int64 tick_spacing = 8;
+    bytes pool = 9;
+}
+
+message factory_CreatePoolCall {
+    string call_tx_hash = 1;
+    google.protobuf.Timestamp call_block_time = 2;
+    uint64 call_block_number = 3;
+    uint64 call_ordinal = 4;
+    bool call_success = 5;
+    bytes token_a = 6;
+    bytes token_b = 7;
+    uint64 fee = 8;
+    bytes output_pool = 9;
+}
+
+message factory_EnableFeeAmountCall {
+    string call_tx_hash = 1;
+    google.protobuf.Timestamp call_block_time = 2;
+    uint64 call_block_number = 3;
+    uint64 call_ordinal = 4;
+    bool call_success = 5;
+    uint64 fee = 6;
+    int64 tick_spacing = 7;
+}
+
+message factory_SetOwnerCall {
+    string call_tx_hash = 1;
+    google.protobuf.Timestamp call_block_time = 2;
+    uint64 call_block_number = 3;
+    uint64 call_ordinal = 4;
+    bool call_success = 5;
+    bytes u_owner = 6;
+}
+
+message pool_Burn {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    string evt_address = 5;
+    bytes owner = 6;
+    int64 tick_lower = 7;
+    int64 tick_upper = 8;
+    string amount = 9;
+    string amount0 = 10;
+    string amount1 = 11;
+}
+
+message pool_Collect {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    string evt_address = 5;
+    bytes owner = 6;
+    bytes recipient = 7;
+    int64 tick_lower = 8;
+    int64 tick_upper = 9;
+    string amount0 = 10;
+    string amount1 = 11;
+}
+
+message pool_CollectProtocol {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    string evt_address = 5;
+    bytes sender = 6;
+    bytes recipient = 7;
+    string amount0 = 8;
+    string amount1 = 9;
+}
+
+message pool_Flash {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    string evt_address = 5;
+    bytes sender = 6;
+    bytes recipient = 7;
+    string amount0 = 8;
+    string amount1 = 9;
+    string paid0 = 10;
+    string paid1 = 11;
+}
+
+message pool_IncreaseObservationCardinalityNext {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    string evt_address = 5;
+    uint64 observation_cardinality_next_old = 6;
+    uint64 observation_cardinality_next_new = 7;
+}
+
+message pool_Initialize {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    string evt_address = 5;
+    string sqrt_price_x96 = 6;
+    int64 tick = 7;
+}
+
+message pool_Mint {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    string evt_address = 5;
+    bytes sender = 6;
+    bytes owner = 7;
+    int64 tick_lower = 8;
+    int64 tick_upper = 9;
+    string amount = 10;
+    string amount0 = 11;
+    string amount1 = 12;
+}
+
+message pool_SetFeeProtocol {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    string evt_address = 5;
+    uint64 fee_protocol0_old = 6;
+    uint64 fee_protocol1_old = 7;
+    uint64 fee_protocol0_new = 8;
+    uint64 fee_protocol1_new = 9;
+}
+
+message pool_Swap {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    string evt_address = 5;
+    bytes sender = 6;
+    bytes recipient = 7;
+    string amount0 = 8;
+    string amount1 = 9;
+    string sqrt_price_x96 = 10;
+    string liquidity = 11;
+    int64 tick = 12;
+}
+
+message pool_BurnCall {
+    string call_tx_hash = 1;
+    google.protobuf.Timestamp call_block_time = 2;
+    uint64 call_block_number = 3;
+    uint64 call_ordinal = 4;
+    bool call_success = 5;
+    string call_address = 6;
+    int64 tick_lower = 7;
+    int64 tick_upper = 8;
+    string amount = 9;
+    string output_amount0 = 10;
+    string output_amount1 = 11;
+}
+
+message pool_CollectCall {
+    string call_tx_hash = 1;
+    google.protobuf.Timestamp call_block_time = 2;
+    uint64 call_block_number = 3;
+    uint64 call_ordinal = 4;
+    bool call_success = 5;
+    string call_address = 6;
+    bytes recipient = 7;
+    int64 tick_lower = 8;
+    int64 tick_upper = 9;
+    string amount0_requested = 10;
+    string amount1_requested = 11;
+    string output_amount0 = 12;
+    string output_amount1 = 13;
+}
+
+message pool_CollectProtocolCall {
+    string call_tx_hash = 1;
+    google.protobuf.Timestamp call_block_time = 2;
+    uint64 call_block_number = 3;
+    uint64 call_ordinal = 4;
+    bool call_success = 5;
+    string call_address = 6;
+    bytes recipient = 7;
+    string amount0_requested = 8;
+    string amount1_requested = 9;
+    string output_amount0 = 10;
+    string output_amount1 = 11;
+}
+
+message pool_FlashCall {
+    string call_tx_hash = 1;
+    google.protobuf.Timestamp call_block_time = 2;
+    uint64 call_block_number = 3;
+    uint64 call_ordinal = 4;
+    bool call_success = 5;
+    string call_address = 6;
+    bytes recipient = 7;
+    string amount0 = 8;
+    string amount1 = 9;
+    bytes data = 10;
+}
+
+message pool_IncreaseObservationCardinalityNextCall {
+    string call_tx_hash = 1;
+    google.protobuf.Timestamp call_block_time = 2;
+    uint64 call_block_number = 3;
+    uint64 call_ordinal = 4;
+    bool call_success = 5;
+    string call_address = 6;
+    uint64 observation_cardinality_next = 7;
+}
+
+message pool_InitializeCall {
+    string call_tx_hash = 1;
+    google.protobuf.Timestamp call_block_time = 2;
+    uint64 call_block_number = 3;
+    uint64 call_ordinal = 4;
+    bool call_success = 5;
+    string call_address = 6;
+    string sqrt_price_x96 = 7;
+}
+
+message pool_MintCall {
+    string call_tx_hash = 1;
+    google.protobuf.Timestamp call_block_time = 2;
+    uint64 call_block_number = 3;
+    uint64 call_ordinal = 4;
+    bool call_success = 5;
+    string call_address = 6;
+    bytes recipient = 7;
+    int64 tick_lower = 8;
+    int64 tick_upper = 9;
+    string amount = 10;
+    bytes data = 11;
+    string output_amount0 = 12;
+    string output_amount1 = 13;
+}
+
+message pool_SetFeeProtocolCall {
+    string call_tx_hash = 1;
+    google.protobuf.Timestamp call_block_time = 2;
+    uint64 call_block_number = 3;
+    uint64 call_ordinal = 4;
+    bool call_success = 5;
+    string call_address = 6;
+    uint64 fee_protocol0 = 7;
+    uint64 fee_protocol1 = 8;
+}
+
+message pool_SwapCall {
+    string call_tx_hash = 1;
+    google.protobuf.Timestamp call_block_time = 2;
+    uint64 call_block_number = 3;
+    uint64 call_ordinal = 4;
+    bool call_success = 5;
+    string call_address = 6;
+    bytes recipient = 7;
+    bool zero_for_one = 8;
+    string amount_specified = 9;
+    string sqrt_price_limit_x96 = 10;
+    bytes data = 11;
+    string output_amount0 = 12;
+    string output_amount1 = 13;
+}

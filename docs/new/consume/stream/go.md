@@ -84,6 +84,7 @@ func main() {
 1. Equivalent to the `network` parameter of the CLI. Specify the network to use for params and initialBlocks, overriding the `network`` field in the Substreams package.
 2. The output type emitted by the module.
 3. The range block to execute. `:` means from the start of the chain up to the latest block.
+The stream will run forever tracking the head of the chain.
 
 The `ReadManifestAndModuleAndBlockRange` will generate several Go structs collected in their corresponding variables (`pkg`, `outputModule`...), which will be used to initialize the sink:
 
@@ -110,6 +111,7 @@ func main() {
 1. Run the Substreams in _production_ mode.
 2. Create a Substreams client, which includes the endpoint and the authentication token.
 This will also work if you have a system environment variable, `SUBSTREAMS_API_TOKEN`, with a valid Substreams token.
+The `false, false` parameters represent the `insecure, plaintext` options (respectively).
 3. Set the block range.
 
 With the sink created, you can now run it:

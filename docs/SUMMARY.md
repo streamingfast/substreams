@@ -18,6 +18,7 @@
     * [SQL Sink](new/consume/sql/sql-sink.md)
   * [Substreams:Stream](new/consume/stream/stream.md)
     * [JavaScript](new/consume/stream/javascript.md)
+    * [Go](new/consume/stream/go.md)
   * [Substreams:Subgraph](new/consume/subgraph/subgraph.md)
   * [Other Ways of Consuming](new/consume/other-sinks/other-sinks.md)
     * [Files](new/consume/other-sinks/files.md)

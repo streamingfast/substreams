@@ -2,7 +2,7 @@
 description: StreamingFast Substreams manifests reference
 ---
 
-# Manifests
+# Manifests Reference
 
 {% hint style="success" %}
 **Tip**: When writing and checking your `substreams.yaml` file, it may help to check your manifest against our [JSON schema](https://json-schema.org/) to ensure there are no problems. JSON schemas can be used in [Jetbrains](https://www.jetbrains.com/help/idea/json.html#ws\_json\_schema\_add\_custom) and [VSCode](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml). Our manifest schema can be seen [here](../../schemas/manifest-schema.json).
@@ -76,26 +76,33 @@ This field should be written in Markdown format.
 
 ### `imports`
 
-The `imports` section references WASM code, compiled protobuf definitions, and module definitions.
+The `imports` section allow you to import third-party Substreams packages. It adds local references to modules in those packages, and pull in the WASM code, Protobuf and modules into the current Package.
 
-{% hint style="success" %}
-**Tip**: Imported modules can be referred to later in the `modules` section of the manifest through the use of a key.
-{% endhint %}
+Relying on imports rather than copying source code from third-party packages allows you to leverage server-side caches, and lower your costs.
 
 Example:
 
 ```yaml
 imports:
+  sol: https://spkg.io/streamingfast/solana-explorer-v0.2.0.spkg
+  # or:
   ethereum: substreams-ethereum-v1.0.0.spkg
-  tokens: ../eth-token/substreams.yaml
-  prices: ../eth-token/substreams.yaml
+  token: ../eth-token/substreams.yaml
+
+...
+
+modules:
+...
+    inputs:
+      - map: sol:map_block_without_votes
+# replacing:
+#    inputs:
+#      - source: sf.solana.type.v1.Block
 ```
 
-The **value is a pointer** to a Substreams manifest or a Substreams [package](packages.md).
+Note the `:` separator that signifies to use the imported namespace, as defined under `imports`.
 
-The filename can be absolute or relative or a remote path prefixed by `http://` or `https://`.
-
-Imports differ across different blockchains. For example, Ethereum-based Substreams modules reference the matching `spkg` file created for the Ethereum blockchain. Solana, and other blockchains, reference a different `spkg` or resources specific to the chosen chain.
+The filename can be absolute or relative or a remote path prefixed by `http://` or `https://`. It can also be an IPFS reference.
 
 ### `protobuf`
 
@@ -157,6 +164,7 @@ The `binaries[name].file` field references a locally compiled [WASM module](http
 {% endhint %}
 
 ### `deriveFrom`
+
 It is possible to override an existing substreams by pointing to an override file in the `run` or `gui` command. This override manifest will have a `deriveFrom` field which points to the original Substreams which is to be overriden. This is useful to port a substreams to one network to another. Example of an override manifest:
 
 ```
@@ -179,15 +187,18 @@ params:
 The `sink` field specifies the sink you want to use to consume your data (for example, a database or a subgraph).
 
 #### Sink `module`
+
 Specifies the name of the module that emits the data to the sink. For example, `db_out` or `graph_out`.
 
 #### Sink `type`
+
 Specifies the service used to consume the data. For example, `sf.substreams.sink.subgraph.v1.Service` for subgraphs, or `sf.substreams.sink.sql.v1.Service` for databases.
 
 #### Sink `config`
+
 Specifies the configuration specific to every sink. This field is different for every sink.
 
-##### Database Config
+**Database Config**
 
 ```
 sink:
@@ -206,16 +217,16 @@ sink:
       run_interval_seconds: 300
 ```
 
-- `schema`: SQL file specifying the schema.
-- `engine`: `postgres` or `clickhouse`.
-- `postgraphile_frontend.enabled`: enables or disables the Postgraphile portal.
-- `pgweb_frontend.enabled`: enables or disables the PGWeb portal.
-- `dbt_config`: specifies the configuration of dbt engine.
-  - `enabled`: enables or disabled the dbt engine.
-  - `files`: path to the dbt models.
-  - `run_interval_seconds`: execution intervals in seconds.
+* `schema`: SQL file specifying the schema.
+* `engine`: `postgres` or `clickhouse`.
+* `postgraphile_frontend.enabled`: enables or disables the Postgraphile portal.
+* `pgweb_frontend.enabled`: enables or disables the PGWeb portal.
+* `dbt_config`: specifies the configuration of dbt engine.
+  * `enabled`: enables or disabled the dbt engine.
+  * `files`: path to the dbt models.
+  * `run_interval_seconds`: execution intervals in seconds.
 
-##### Subgraph Config
+**Subgraph Config**
 
 ```
 sink:
@@ -226,9 +237,8 @@ sink:
     subgraph_yaml: "./subgraph.yaml"
 ```
 
-- `schema`: path to the GraphQL schema.
-- `subgraph_yaml`: path to the Subgraph manifest.
-
+* `schema`: path to the GraphQL schema.
+* `subgraph_yaml`: path to the Subgraph manifest.
 
 ### `modules`
 

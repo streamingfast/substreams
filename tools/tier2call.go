@@ -24,6 +24,7 @@ var tier2CallCmd = &cobra.Command{
 
 func init() {
 	tier2CallCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token")
+	tier2CallCmd.Flags().String("substreams-api-key-envvar", "SUBSTREAMS_API_KEY", "Name of variable containing Substreams Api Key")
 	tier2CallCmd.Flags().StringP("substreams-endpoint", "e", "mainnet.eth.streamingfast.io:443", "Substreams gRPC endpoint")
 	tier2CallCmd.Flags().Bool("insecure", false, "Skip certificate validation on GRPC connection")
 	tier2CallCmd.Flags().Bool("plaintext", false, "Establish GRPC connection in plaintext")
@@ -62,15 +63,22 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("apply params: %w", err)
 	}
 
+	authToken, authType := GetAuth(cmd, "substreams-api-key-envvar", "substreams-api-token-envvar")
 	clientConfig := client.NewSubstreamsClientConfig(
 		mustGetString(cmd, "substreams-endpoint"),
-		ReadAPIToken(cmd, "substreams-api-token-envvar"),
+		authToken,
+		authType,
 		mustGetBool(cmd, "insecure"),
 		mustGetBool(cmd, "plaintext"),
 	)
-	ssClient, _, callOpts, err := client.NewSubstreamsInternalClient(clientConfig)
+	ssClient, _, callOpts, headers, err := client.NewSubstreamsInternalClient(clientConfig)
 	if err != nil {
 		return fmt.Errorf("new internal client: %w", err)
+	}
+
+	// add auth header if available
+	if headers.IsSet() {
+		ctx = metadata.AppendToOutgoingContext(ctx, headers.ToArray()...)
 	}
 	//parse additional-headers flag
 	additionalHeaders := mustGetStringSlice(cmd, "header")

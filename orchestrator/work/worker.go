@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"google.golang.org/grpc/metadata"
 	"io"
 	"sync/atomic"
 	"time"
@@ -172,7 +173,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 	)
 	logger := w.logger
 
-	grpcClient, closeFunc, grpcCallOpts, err := w.clientFactory()
+	grpcClient, closeFunc, grpcCallOpts, headers, err := w.clientFactory()
 	if err != nil {
 		return &Result{Error: fmt.Errorf("unable to create grpc client: %w", err)}
 	}
@@ -188,6 +189,9 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 	defer stats.RecordEndSubrequest(jobIdx)
 
 	ctx = dauth.FromContext(ctx).ToOutgoingGRPCContext(ctx)
+	if headers.IsSet() {
+		ctx = metadata.AppendToOutgoingContext(ctx, headers.ToArray()...)
+	}
 	stream, err := grpcClient.ProcessRange(ctx, request, grpcCallOpts...)
 	if err != nil {
 		if ctx.Err() != nil {

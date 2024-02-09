@@ -261,7 +261,7 @@ func (c *Config) NewInstance() (*Instance, error) {
 		c.StartBlock = int64(sb)
 	}
 
-	ssClient, _, callOpts, err := client.NewSubstreamsClient(c.SubstreamsClientConfig)
+	ssClient, _, callOpts, headers, err := client.NewSubstreamsClient(c.SubstreamsClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("substreams client setup: %w", err)
 	}
@@ -277,6 +277,7 @@ func (c *Config) NewInstance() (*Instance, error) {
 		DebugInitialStoreSnapshotForModules: c.DebugModulesInitialSnapshot,
 	}
 
+	c.Headers = headers.Append(c.Headers)
 	stream := streamui.New(req, ssClient, c.Headers, callOpts)
 
 	if err := req.Validate(); err != nil {

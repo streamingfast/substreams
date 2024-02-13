@@ -16,6 +16,7 @@ package tools
 
 import (
 	"fmt"
+	"github.com/streamingfast/substreams/client"
 	"os"
 	"time"
 
@@ -96,4 +97,31 @@ func ReadAPIToken(cmd *cobra.Command, envFlagName string) string {
 	}
 
 	return os.Getenv("SF_API_TOKEN")
+}
+
+func ReadAPIKey(cmd *cobra.Command, envFlagName string) string {
+	envVar := mustGetString(cmd, envFlagName)
+	value := os.Getenv(envVar)
+	if value != "" {
+		return value
+	}
+
+	return os.Getenv("SUBSTREAMS_API_KEY")
+}
+
+func GetAuth(cmd *cobra.Command, envFlagApiKey, envFlagJwt string) (authToken string, authType client.AuthType) {
+
+	authType = client.None
+
+	if authToken = ReadAPIKey(cmd, envFlagApiKey); authToken != "" {
+		authType = client.ApiKey
+		return
+	}
+
+	if authToken = ReadAPIToken(cmd, envFlagJwt); authToken != "" {
+		authType = client.JWT
+		return
+	}
+
+	return
 }

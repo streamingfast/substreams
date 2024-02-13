@@ -143,6 +143,7 @@ func (a *Tier1App) Run() error {
 	subrequestsClientConfig := client.NewSubstreamsClientConfig(
 		a.config.SubrequestsEndpoint,
 		"",
+		client.None,
 		a.config.SubrequestsInsecure,
 		a.config.SubrequestsPlaintext,
 	)

@@ -9,6 +9,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+* Added support for authentication using api keys. The env variable can be specified with `--substreams-api-key-envvar` and defaults to `SUBSTREAMS_API_KEY`.
+
+## v1.3.5
+
+### Code generation
+
+* Added `substreams init` support for creating a substreams with data from fully-decoded Calls instead of only extracting events.
+
 ## v1.3.4
 
 ### Code generation

@@ -105,7 +105,7 @@ func userConfirm() bool {
 func interceptConnectionError(err error) error {
 	if connectError, ok := err.(*connect.Error); ok {
 		if connectError.Code() == connect.CodeUnavailable {
-			return fmt.Errorf("Cannot connect to sink service: %w. Are you running `substreams alpha service serve` ?", err)
+			return fmt.Errorf("cannot connect to sink service: %w. Are you running `substreams alpha service serve` ?", err)
 		}
 	}
 	return err

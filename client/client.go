@@ -22,9 +22,18 @@ import (
 	_ "google.golang.org/grpc/xds"
 )
 
+type AuthType int
+
+const (
+	None AuthType = iota
+	JWT
+	ApiKey
+)
+
 type SubstreamsClientConfig struct {
 	endpoint  string
-	jwt       string
+	authToken string
+	authType  AuthType
 	insecure  bool
 	plaintext bool
 }
@@ -41,25 +50,31 @@ func (c *SubstreamsClientConfig) PlainText() bool {
 	return c.plaintext
 }
 
-func (c *SubstreamsClientConfig) JWT() string {
-	return c.jwt
+func (c *SubstreamsClientConfig) AuthToken() string {
+	return c.authToken
+}
+
+func (c *SubstreamsClientConfig) AuthType() AuthType {
+	return c.authType
 }
 
 func (c *SubstreamsClientConfig) MarshalLogObject(encoder zapcore.ObjectEncoder) error {
 	encoder.AddString("client_endpoint", c.endpoint)
 	encoder.AddBool("client_plaintext", c.plaintext)
 	encoder.AddBool("client_insecure", c.insecure)
-	encoder.AddBool("jwt_set", c.jwt != "")
+	encoder.AddBool("jwt_set", c.authToken != "" && c.authType == JWT)
+	encoder.AddBool("api_key_set", c.authToken != "" && c.authType == ApiKey)
 
 	return nil
 }
 
-type InternalClientFactory = func() (cli pbssinternal.SubstreamsClient, closeFunc func() error, callOpts []grpc.CallOption, err error)
+type InternalClientFactory = func() (cli pbssinternal.SubstreamsClient, closeFunc func() error, callOpts []grpc.CallOption, headers Headers, err error)
 
-func NewSubstreamsClientConfig(endpoint string, jwt string, insecure bool, plaintext bool) *SubstreamsClientConfig {
+func NewSubstreamsClientConfig(endpoint string, authToken string, authType AuthType, insecure bool, plaintext bool) *SubstreamsClientConfig {
 	return &SubstreamsClientConfig{
 		endpoint:  endpoint,
-		jwt:       jwt,
+		authToken: authToken,
+		authType:  authType,
 		insecure:  insecure,
 		plaintext: plaintext,
 	}
@@ -73,7 +88,7 @@ func NewInternalClientFactory(config *SubstreamsClientConfig) InternalClientFact
 	if bootStrapFilename == "" {
 		zlog.Info("setting up basic grpc client factory (no XDS bootstrap)")
 
-		return func() (cli pbssinternal.SubstreamsClient, closeFunc func() error, callOpts []grpc.CallOption, err error) {
+		return func() (cli pbssinternal.SubstreamsClient, closeFunc func() error, callOpts []grpc.CallOption, headers Headers, err error) {
 			return NewSubstreamsInternalClient(config)
 		}
 	}
@@ -81,39 +96,40 @@ func NewInternalClientFactory(config *SubstreamsClientConfig) InternalClientFact
 	zlog.Info("setting up xds grpc client factory", zap.String("GRPC_XDS_BOOTSTRAP", bootStrapFilename))
 
 	noop := func() error { return nil }
-	cli, _, callOpts, err := NewSubstreamsInternalClient(config)
-	return func() (pbssinternal.SubstreamsClient, func() error, []grpc.CallOption, error) {
-		return cli, noop, callOpts, err
+	cli, _, callOpts, headers, err := NewSubstreamsInternalClient(config)
+	return func() (pbssinternal.SubstreamsClient, func() error, []grpc.CallOption, Headers, error) {
+		return cli, noop, callOpts, headers, err
 	}
 }
 
-func NewSubstreamsInternalClient(config *SubstreamsClientConfig) (cli pbssinternal.SubstreamsClient, closeFunc func() error, callOpts []grpc.CallOption, err error) {
+func NewSubstreamsInternalClient(config *SubstreamsClientConfig) (cli pbssinternal.SubstreamsClient, closeFunc func() error, callOpts []grpc.CallOption, headers Headers, err error) {
 	if config == nil {
-		return nil, nil, nil, fmt.Errorf("substreams client config not set")
+		return nil, nil, nil, nil, fmt.Errorf("substreams client config not set")
 	}
 	endpoint := config.endpoint
-	jwt := config.jwt
+	authToken := config.authToken
+	authType := config.authType
 	usePlainTextConnection := config.plaintext
 	useInsecureTLSConnection := config.insecure
 
 	if !portSuffixRegex.MatchString(endpoint) {
-		return nil, nil, nil, fmt.Errorf("invalid endpoint %q: endpoint's suffix must be a valid port in the form ':<port>', port 443 is usually the right one to use", endpoint)
+		return nil, nil, nil, nil, fmt.Errorf("invalid endpoint %q: endpoint's suffix must be a valid port in the form ':<port>', port 443 is usually the right one to use", endpoint)
 	}
 
 	bootStrapFilename := os.Getenv("GRPC_XDS_BOOTSTRAP")
 
 	var dialOptions []grpc.DialOption
-	skipAuth := jwt == "" || usePlainTextConnection
+	skipAuth := authType == None || usePlainTextConnection
 	if bootStrapFilename != "" {
 		log.Println("Using xDS credentials...")
 		creds, err := xdscreds.NewClientCredentials(xdscreds.ClientOptions{FallbackCreds: insecure.NewCredentials()})
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to create xDS credentials: %v", err)
+			return nil, nil, nil, nil, fmt.Errorf("failed to create xDS credentials: %v", err)
 		}
 		dialOptions = append(dialOptions, grpc.WithTransportCredentials(creds))
 	} else {
 		if useInsecureTLSConnection && usePlainTextConnection {
-			return nil, nil, nil, fmt.Errorf("option --insecure and --plaintext are mutually exclusive, they cannot be both specified at the same time")
+			return nil, nil, nil, nil, fmt.Errorf("option --insecure and --plaintext are mutually exclusive, they cannot be both specified at the same time")
 		}
 		switch {
 		case usePlainTextConnection:
@@ -133,14 +149,19 @@ func NewSubstreamsInternalClient(config *SubstreamsClientConfig) (cli pbssintern
 	zlog.Debug("getting connection", zap.String("endpoint", endpoint))
 	conn, err := dgrpc.NewExternalClient(endpoint, dialOptions...)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("unable to create external gRPC client: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("unable to create external gRPC client: %w", err)
 	}
 	closeFunc = conn.Close
 
 	if !skipAuth {
-		zlog.Debug("creating oauth access", zap.String("endpoint", endpoint))
-		creds := oauth.NewOauthAccess(&oauth2.Token{AccessToken: jwt, TokenType: "Bearer"})
-		callOpts = append(callOpts, grpc.PerRPCCredentials(creds))
+		if authType == JWT {
+			zlog.Debug("creating oauth access", zap.String("endpoint", endpoint))
+			tokenSource := oauth.TokenSource{TokenSource: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: authToken, TokenType: "Bearer"})}
+			callOpts = append(callOpts, grpc.PerRPCCredentials(tokenSource))
+		} else if authType == ApiKey {
+			zlog.Debug("creating api key access", zap.String("endpoint", endpoint))
+			headers = map[string]string{ApiKeyHeader: authToken}
+		}
 	}
 
 	zlog.Debug("creating new client", zap.String("endpoint", endpoint))
@@ -149,33 +170,34 @@ func NewSubstreamsInternalClient(config *SubstreamsClientConfig) (cli pbssintern
 	return
 }
 
-func NewSubstreamsClient(config *SubstreamsClientConfig) (cli pbsubstreamsrpc.StreamClient, closeFunc func() error, callOpts []grpc.CallOption, err error) {
+func NewSubstreamsClient(config *SubstreamsClientConfig) (cli pbsubstreamsrpc.StreamClient, closeFunc func() error, callOpts []grpc.CallOption, headers Headers, err error) {
 	if config == nil {
-		return nil, nil, nil, fmt.Errorf("substreams client config not set")
+		return nil, nil, nil, nil, fmt.Errorf("substreams client config not set")
 	}
 	endpoint := config.endpoint
-	jwt := config.jwt
+	authToken := config.authToken
+	authType := config.authType
 	usePlainTextConnection := config.plaintext
 	useInsecureTLSConnection := config.insecure
 
 	if !portSuffixRegex.MatchString(endpoint) {
-		return nil, nil, nil, fmt.Errorf("invalid endpoint %q: endpoint's suffix must be a valid port in the form ':<port>', port 443 is usually the right one to use", endpoint)
+		return nil, nil, nil, nil, fmt.Errorf("invalid endpoint %q: endpoint's suffix must be a valid port in the form ':<port>', port 443 is usually the right one to use", endpoint)
 	}
 
 	bootStrapFilename := os.Getenv("GRPC_XDS_BOOTSTRAP")
 
 	var dialOptions []grpc.DialOption
-	skipAuth := jwt == "" || usePlainTextConnection
+	skipAuth := authType == None || usePlainTextConnection
 	if bootStrapFilename != "" {
 		log.Println("Using xDS credentials...")
 		creds, err := xdscreds.NewClientCredentials(xdscreds.ClientOptions{FallbackCreds: insecure.NewCredentials()})
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to create xDS credentials: %v", err)
+			return nil, nil, nil, nil, fmt.Errorf("failed to create xDS credentials: %v", err)
 		}
 		dialOptions = append(dialOptions, grpc.WithTransportCredentials(creds))
 	} else {
 		if useInsecureTLSConnection && usePlainTextConnection {
-			return nil, nil, nil, fmt.Errorf("option --insecure and --plaintext are mutually exclusive, they cannot be both specified at the same time")
+			return nil, nil, nil, nil, fmt.Errorf("option --insecure and --plaintext are mutually exclusive, they cannot be both specified at the same time")
 		}
 		switch {
 		case usePlainTextConnection:
@@ -195,14 +217,19 @@ func NewSubstreamsClient(config *SubstreamsClientConfig) (cli pbsubstreamsrpc.St
 	zlog.Debug("getting connection", zap.String("endpoint", endpoint))
 	conn, err := dgrpc.NewExternalClient(endpoint, dialOptions...)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("unable to create external gRPC client: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("unable to create external gRPC client: %w", err)
 	}
 	closeFunc = conn.Close
 
 	if !skipAuth {
-		zlog.Debug("creating oauth access", zap.String("endpoint", endpoint))
-		creds := oauth.NewOauthAccess(&oauth2.Token{AccessToken: jwt, TokenType: "Bearer"})
-		callOpts = append(callOpts, grpc.PerRPCCredentials(creds))
+		if authType == JWT {
+			zlog.Debug("creating oauth access", zap.String("endpoint", endpoint))
+			tokenSource := oauth.TokenSource{TokenSource: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: authToken, TokenType: "Bearer"})}
+			callOpts = append(callOpts, grpc.PerRPCCredentials(tokenSource))
+		} else if authType == ApiKey {
+			zlog.Debug("creating api key access", zap.String("endpoint", endpoint))
+			headers = map[string]string{ApiKeyHeader: authToken}
+		}
 	}
 
 	zlog.Debug("creating new client", zap.String("endpoint", endpoint))

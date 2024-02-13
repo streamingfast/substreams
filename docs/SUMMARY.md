@@ -3,7 +3,6 @@
 * [What is Substreams?](README.md)
 * [Substreams for Solana Developers](new/common/intro-solana.md)
 
-
 ## Documentation
 
 * [Consume Substreams](new/consume/consume.md)
@@ -12,14 +11,15 @@
   * [Packages](new/common/packages.md)
   * [Deployable Services](new/common/deployable-services.md)
   * [Substreams:SQL](new/consume/sql/sql.md)
-    * [Deployable Services](new/consume/sql/deployable-services/introduction.md)
+    * [Deployable Services](documentation/consume/sql/deployable-services/README.md)
       * [Remote Service](new/consume/sql/deployable-services/remote-service.md)
       * [Local Service](new/consume/sql/deployable-services/local-service.md)
     * [SQL Sink](new/consume/sql/sql-sink.md)
   * [Substreams:Stream](new/consume/stream/stream.md)
     * [JavaScript](new/consume/stream/javascript.md)
+    * [Go](new/consume/stream/go.md)
   * [Substreams:Subgraph](new/consume/subgraph/subgraph.md)
-  * [Other Ways of Consuming](new/consume/other-sinks/other-sinks.md)
+  * [Other Ways of Consuming](documentation/consume/other-ways-of-consuming/README.md)
     * [Files](new/consume/other-sinks/files.md)
     * [Key-Value Store](new/consume/other-sinks/kv.md)
     * [MongoDB](new/consume/other-sinks/mongodb.md)
@@ -43,28 +43,26 @@
   * [Deployable Services](new/common/deployable-services.md)
   * [Rust Dependencies](new/develop/rust-crates.md)
   * [Parameterized Modules](new/develop/parameterized-modules.md)
-  * [Chain-Specific Extensions](new/develop/chain-specific/chain-specifi.md)
-    * [EVM Chain-Specific Extensions](new/develop/chain-specific/evm/evm.md)
-      * [Making eth_calls](new/develop/chain-specific/evm/eth-calls.md)
+  * [Chain-Specific Extensions](documentation/develop/chain-specific-extensions/README.md)
+    * [EVM Chain-Specific Extensions](documentation/develop/chain-specific-extensions/evm-chain-specific-extensions/README.md)
+      * [Making eth\_calls](new/develop/chain-specific/evm/eth-calls.md)
   * [Architecture](new/develop/architecture.md)
 
 ## Tutorials
+
 * [EVM](new/tutorials/evm/evm.md)
   * [Exploring Ethereum](new/tutorials/evm/exploring-ethereum/exploring-ethereum.md)
-    * [Mapping Blocks](new/tutorials/evm/exploring-ethereum/map_block_meta_module.md)
-    * [Filter Transactions](new/tutorials/evm/exploring-ethereum/map_filter_transactions_module.md)
-    * [Retrieve Events of a Smart Contract](new/tutorials/evm/exploring-ethereum/map_contract_events_module.md)
+    * [Mapping Blocks](new/tutorials/evm/exploring-ethereum/map\_block\_meta\_module.md)
+    * [Filter Transactions](new/tutorials/evm/exploring-ethereum/map\_filter\_transactions\_module.md)
+    * [Retrieve Events of a Smart Contract](new/tutorials/evm/exploring-ethereum/map\_contract\_events\_module.md)
 * [Solana](new/tutorials/solana/solana.md)
   * [Explore Solana](new/tutorials/solana/explore-solana/explore-solana.md)
     * [Filter Instructions](new/tutorials/solana/explore-solana/filter-instructions.md)
     * [Filter Transactions](new/tutorials/solana/explore-solana/filter-transactions.md)
   * [Token Tracker](new/tutorials/solana/token-tracker/token-tracker.md)
-
-
 * [Rust](new/tutorials/rust/rust.md)
   * [Option struct](new/tutorials/rust/option.md)
   * [Result struct](new/tutorials/rust/result.md)
-
 
 ## Reference & Specs
 

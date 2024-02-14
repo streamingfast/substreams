@@ -1,4 +1,10 @@
-The NFT Trades project extracts NFT trades from different Solana exchanges, such as Tensor, MagicEden, or HadeSwap.
+The NFT Trades project, developed by TopLedger, extracts NFT trades from different Solana exchanges, such as Tensor, MagicEden, or HadeSwap.
+
+## About TopLedger
+
+[TopLedger](https://topledger.xyz/) is SQL-based data discovery and analytics platform focused on Solana. By using Substreams, TopLedger has been able to extract data from the main Solana dapps, thus providing rich analytics products.
+
+TopLedger is an active contributor to the Substreams community and has developed several useful ready-to-use Substreams.
 
 ## Before You Begin
 

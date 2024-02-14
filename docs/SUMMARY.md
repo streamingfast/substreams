@@ -60,6 +60,8 @@
     * [Filter Instructions](new/tutorials/solana/explore-solana/filter-instructions.md)
     * [Filter Transactions](new/tutorials/solana/explore-solana/filter-transactions.md)
   * [Token Tracker](new/tutorials/solana/token-tracker/token-tracker.md)
+  * [TopLedger](new/tutorials/solana/token-tracker/top-ledger.md)
+    * [NFT Trades](new/tutorials/solana/token-tracker/nft-trades.md)
 * [Rust](new/tutorials/rust/rust.md)
   * [Option struct](new/tutorials/rust/option.md)
   * [Result struct](new/tutorials/rust/result.md)

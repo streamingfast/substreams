@@ -14,7 +14,7 @@ First, you must consider whether you want to develop your own Substreams or cons
 - Choose how you want to consume the data:
     - [Send the data to a SQL database.](./../consume/sql/sql.md)
     - [Stream the data from your application.](../consume/stream/stream.md)
-    - [Send the data to a subgraph.]((./../consume/subgraph/subgraph.md))
+    <!-- - [Send the data to a subgraph.]((./../consume/subgraph/subgraph.md)) -->
 
 **If you can't find a Substreams package that fits your needs**, then you can go ahead and develop your own Substreams. The [Develop Substreams](../develop/develop.md) section of the documentation covers everything you need to know about building a Substreams from scratch. At the most basic level, you should cover:
 
@@ -29,7 +29,9 @@ First, you must consider whether you want to develop your own Substreams or cons
 
 ## Tutorials
 
-If you want to deep dive into the code, you can follow one or several of the Solana Tutorials available in the documentation. A good way to start is to complete the [Explore Solana Tutorial](../tutorials/solana/explore-solana/explore-solana.md).
+If you want to deep dive into the code, you can follow one or several of the Solana Tutorials available in the documentation.
+- The [Explore Solana Tutorial](../tutorials/solana/explore-solana/explore-solana.md) will teach you the most basic operations you can perform in a Solana Substreams.
+- The [Solana Token Tracker Tutorial](../tutorials/solana/token-tracker/token-tracker.md) will guide through the code of the [Token Tracker Substreams](https://github.com/streamingfast/solana-token-tracker).
 
 ## The Solana Data Model
 

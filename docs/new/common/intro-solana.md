@@ -31,7 +31,8 @@ First, you must consider whether you want to develop your own Substreams or cons
 
 If you want to deep dive into the code, you can follow one or several of the Solana Tutorials available in the documentation.
 - The [Explore Solana Tutorial](../tutorials/solana/explore-solana/explore-solana.md) will teach you the most basic operations you can perform in a Solana Substreams.
-- The [Solana Token Tracker Tutorial](../tutorials/solana/token-tracker/token-tracker.md) will guide through the code of the [Token Tracker Substreams](https://github.com/streamingfast/solana-token-tracker).
+- The [Solana Token Tracker Tutorial](../tutorials/solana/token-tracker/token-tracker.md) will teach how to track your an SPL token of your choice.
+- The [NFT Trades Tutorial](../tutorials/solana/top-ledger/nft-trades.md) will help you in extracting data from different NFT exchanges.
 
 ## The Solana Data Model
 

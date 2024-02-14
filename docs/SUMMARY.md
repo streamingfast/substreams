@@ -59,7 +59,7 @@
   * [Explore Solana](new/tutorials/solana/explore-solana/explore-solana.md)
     * [Filter Instructions](new/tutorials/solana/explore-solana/filter-instructions.md)
     * [Filter Transactions](new/tutorials/solana/explore-solana/filter-transactions.md)
-  * [Token Tracker](new/tutorials/solana/token-tracker/token-tracker.md)
+  * [SPL Token Tracker](new/tutorials/solana/token-tracker/token-tracker.md)
   * [TopLedger](new/tutorials/solana/top-ledger/top-ledger.md)
     * [NFT Trades](new/tutorials/solana/top-ledger/nft-trades.md)
 * [Rust](new/tutorials/rust/rust.md)

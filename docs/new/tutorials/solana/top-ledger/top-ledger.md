@@ -2,7 +2,7 @@
 
 <figure><img src="../../../../.gitbook/assets/tutorials/topledger-website.png" width="100%" /><figcaption><p>TopLedger Website</p></figcaption></figure>
 
-You can find the Substreams they have built on the [Solana Programs GitHub Repoistory](https://github.com/Topledger/solana-programs). Among the most relevant Substreams you can find:
+You can find the Substreams they have built on the [Solana Programs GitHub Repository](https://github.com/Topledger/solana-programs). Among the most relevant Substreams you can find:
 - [DEX Trades](https://github.com/Topledger/solana-programs/tree/main/dex-trades)
 - [NFT Trades](https://github.com/Topledger/solana-programs/tree/main/nft-trades)
 - [cNFT Trades](https://github.com/Topledger/solana-programs/tree/main/cnft-trades)

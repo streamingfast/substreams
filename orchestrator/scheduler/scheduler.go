@@ -97,7 +97,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 			if !shouldRetry {
 				return nil
 			}
-			cmds = append(cmds, loop.Tick(time.Second, func() loop.Msg { return work.CmdScheduleNextJob() }))
+			cmds = append(cmds, loop.Tick(time.Second, func() loop.Msg { return work.MsgScheduleNextJob{} }))
 			break
 		}
 		workUnit, workRange := s.Stages.NextJob()

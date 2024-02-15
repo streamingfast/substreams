@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -91,10 +92,14 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		}
 
 	case work.MsgScheduleNextJob:
-		if !s.WorkerPool.WorkerAvailable() {
-			return nil
+		avail, shouldRetry := s.WorkerPool.WorkerAvailable()
+		if !avail {
+			if !shouldRetry {
+				return nil
+			}
+			cmds = append(cmds, loop.Tick(time.Second, func() loop.Msg { return work.CmdScheduleNextJob() }))
+			break
 		}
-
 		workUnit, workRange := s.Stages.NextJob()
 		if workRange == nil {
 			return nil

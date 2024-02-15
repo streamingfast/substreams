@@ -1,5 +1,7 @@
 package loop
 
+import "time"
+
 type Msg any
 
 type Cmd func() Msg
@@ -37,5 +39,12 @@ type QuitMsg struct {
 func Quit(err error) Cmd {
 	return func() Msg {
 		return QuitMsg{err}
+	}
+}
+
+func Tick(delay time.Duration, fn func() Msg) Cmd {
+	return func() Msg {
+		time.Sleep(delay)
+		return fn()
 	}
 }

@@ -25,23 +25,33 @@ func Test_workerPoolPool_Borrow_Return(t *testing.T) {
 	})
 
 	assert.Len(t, pi.workers, 2)
-	assert.True(t, pi.WorkerAvailable())
+	avail, shouldRetry := pi.WorkerAvailable()
+	assert.True(t, avail)
+	assert.False(t, shouldRetry)
 	worker1 := pi.Borrow()
 
 	// only one worker available until 4 seconds have passed
-	assert.False(t, pi.WorkerAvailable())
+	avail, shouldRetry = pi.WorkerAvailable()
+	assert.False(t, avail)
+	assert.True(t, shouldRetry)
 
 	// after delay, all workers are available
 	newStarted := (*pi.started).Add(-5 * time.Second)
 	pi.started = &newStarted
 
-	assert.True(t, pi.WorkerAvailable())
+	avail, shouldRetry = pi.WorkerAvailable()
+	assert.True(t, avail)
+	assert.False(t, shouldRetry)
 	worker2 := pi.Borrow()
 
-	assert.False(t, pi.WorkerAvailable())
+	avail, shouldRetry = pi.WorkerAvailable()
+	assert.False(t, avail)
+	assert.False(t, shouldRetry)
 	assert.Panics(t, func() { pi.Borrow() })
 	pi.Return(worker2)
-	assert.True(t, pi.WorkerAvailable())
+	avail, shouldRetry = pi.WorkerAvailable()
+	assert.True(t, avail)
+	assert.False(t, shouldRetry)
 	pi.Return(worker1)
 	assert.Panics(t, func() { pi.Return(worker1) })
 }

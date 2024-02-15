@@ -52,7 +52,8 @@ func NewWorkerPool(ctx context.Context, workerCount int, workerFactory WorkerFac
 }
 
 func (p *WorkerPool) rampupWorkers() {
-	if p.started == nil || time.Since(*p.started) < time.Second*4 {
+	if time.Since(*p.started) < time.Second*4 {
+		// no rampup yet
 		return
 	}
 	for _, w := range p.workers {
@@ -63,25 +64,21 @@ func (p *WorkerPool) rampupWorkers() {
 	p.started = nil
 }
 
-func (p *WorkerPool) WorkerAvailable() bool {
-	p.rampupWorkers()
-	for _, w := range p.workers {
-		if w.State == WorkerFree {
-			return true
-		}
-	}
-	return false
+func (p *WorkerPool) inRampupPhase() bool {
+	return p.started != nil
 }
 
-//func (p *WorkerPool) FreeWorkers() int {
-//	count := 0
-//	for _, w := range p.workers {
-//		if w.State == WorkerFree {
-//			count++
-//		}
-//	}
-//	return count
-//}
+func (p *WorkerPool) WorkerAvailable() (avail bool, shouldRetry bool) {
+	if p.inRampupPhase() {
+		p.rampupWorkers()
+	}
+	for _, w := range p.workers {
+		if w.State == WorkerFree {
+			return true, false
+		}
+	}
+	return false, p.inRampupPhase()
+}
 
 func (p *WorkerPool) Borrow() Worker {
 	for _, status := range p.workers {

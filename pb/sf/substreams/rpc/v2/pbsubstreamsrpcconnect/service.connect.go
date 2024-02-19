@@ -5,9 +5,9 @@
 package pbsubstreamsrpcconnect
 
 import (
+	connect "connectrpc.com/connect"
 	context "context"
 	errors "errors"
-	connect_go "github.com/bufbuild/connect-go"
 	v2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	http "net/http"
 	strings "strings"
@@ -18,16 +18,34 @@ import (
 // generated with a version of connect newer than the one compiled into your binary. You can fix the
 // problem by either regenerating this code with an older version of connect or updating the connect
 // version compiled into your binary.
-const _ = connect_go.IsAtLeastVersion0_1_0
+const _ = connect.IsAtLeastVersion1_13_0
 
 const (
 	// StreamName is the fully-qualified name of the Stream service.
 	StreamName = "sf.substreams.rpc.v2.Stream"
 )
 
+// These constants are the fully-qualified names of the RPCs defined in this package. They're
+// exposed at runtime as Spec.Procedure and as the final two segments of the HTTP route.
+//
+// Note that these are different from the fully-qualified method names used by
+// google.golang.org/protobuf/reflect/protoreflect. To convert from these constants to
+// reflection-formatted method names, remove the leading slash and convert the remaining slash to a
+// period.
+const (
+	// StreamBlocksProcedure is the fully-qualified name of the Stream's Blocks RPC.
+	StreamBlocksProcedure = "/sf.substreams.rpc.v2.Stream/Blocks"
+)
+
+// These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
+var (
+	streamServiceDescriptor      = v2.File_sf_substreams_rpc_v2_service_proto.Services().ByName("Stream")
+	streamBlocksMethodDescriptor = streamServiceDescriptor.Methods().ByName("Blocks")
+)
+
 // StreamClient is a client for the sf.substreams.rpc.v2.Stream service.
 type StreamClient interface {
-	Blocks(context.Context, *connect_go.Request[v2.Request]) (*connect_go.ServerStreamForClient[v2.Response], error)
+	Blocks(context.Context, *connect.Request[v2.Request]) (*connect.ServerStreamForClient[v2.Response], error)
 }
 
 // NewStreamClient constructs a client for the sf.substreams.rpc.v2.Stream service. By default, it
@@ -37,30 +55,31 @@ type StreamClient interface {
 //
 // The URL supplied here should be the base URL for the Connect or gRPC server (for example,
 // http://api.acme.com or https://acme.com/grpc).
-func NewStreamClient(httpClient connect_go.HTTPClient, baseURL string, opts ...connect_go.ClientOption) StreamClient {
+func NewStreamClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) StreamClient {
 	baseURL = strings.TrimRight(baseURL, "/")
 	return &streamClient{
-		blocks: connect_go.NewClient[v2.Request, v2.Response](
+		blocks: connect.NewClient[v2.Request, v2.Response](
 			httpClient,
-			baseURL+"/sf.substreams.rpc.v2.Stream/Blocks",
-			opts...,
+			baseURL+StreamBlocksProcedure,
+			connect.WithSchema(streamBlocksMethodDescriptor),
+			connect.WithClientOptions(opts...),
 		),
 	}
 }
 
 // streamClient implements StreamClient.
 type streamClient struct {
-	blocks *connect_go.Client[v2.Request, v2.Response]
+	blocks *connect.Client[v2.Request, v2.Response]
 }
 
 // Blocks calls sf.substreams.rpc.v2.Stream.Blocks.
-func (c *streamClient) Blocks(ctx context.Context, req *connect_go.Request[v2.Request]) (*connect_go.ServerStreamForClient[v2.Response], error) {
+func (c *streamClient) Blocks(ctx context.Context, req *connect.Request[v2.Request]) (*connect.ServerStreamForClient[v2.Response], error) {
 	return c.blocks.CallServerStream(ctx, req)
 }
 
 // StreamHandler is an implementation of the sf.substreams.rpc.v2.Stream service.
 type StreamHandler interface {
-	Blocks(context.Context, *connect_go.Request[v2.Request], *connect_go.ServerStream[v2.Response]) error
+	Blocks(context.Context, *connect.Request[v2.Request], *connect.ServerStream[v2.Response]) error
 }
 
 // NewStreamHandler builds an HTTP handler from the service implementation. It returns the path on
@@ -68,19 +87,26 @@ type StreamHandler interface {
 //
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
-func NewStreamHandler(svc StreamHandler, opts ...connect_go.HandlerOption) (string, http.Handler) {
-	mux := http.NewServeMux()
-	mux.Handle("/sf.substreams.rpc.v2.Stream/Blocks", connect_go.NewServerStreamHandler(
-		"/sf.substreams.rpc.v2.Stream/Blocks",
+func NewStreamHandler(svc StreamHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	streamBlocksHandler := connect.NewServerStreamHandler(
+		StreamBlocksProcedure,
 		svc.Blocks,
-		opts...,
-	))
-	return "/sf.substreams.rpc.v2.Stream/", mux
+		connect.WithSchema(streamBlocksMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	return "/sf.substreams.rpc.v2.Stream/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case StreamBlocksProcedure:
+			streamBlocksHandler.ServeHTTP(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	})
 }
 
 // UnimplementedStreamHandler returns CodeUnimplemented from all methods.
 type UnimplementedStreamHandler struct{}
 
-func (UnimplementedStreamHandler) Blocks(context.Context, *connect_go.Request[v2.Request], *connect_go.ServerStream[v2.Response]) error {
-	return connect_go.NewError(connect_go.CodeUnimplemented, errors.New("sf.substreams.rpc.v2.Stream.Blocks is not implemented"))
+func (UnimplementedStreamHandler) Blocks(context.Context, *connect.Request[v2.Request], *connect.ServerStream[v2.Response]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("sf.substreams.rpc.v2.Stream.Blocks is not implemented"))
 }

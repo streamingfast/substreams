@@ -5,9 +5,9 @@
 package pbssinternalconnect
 
 import (
+	connect "connectrpc.com/connect"
 	context "context"
 	errors "errors"
-	connect_go "github.com/bufbuild/connect-go"
 	v2 "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	http "net/http"
 	strings "strings"
@@ -18,16 +18,34 @@ import (
 // generated with a version of connect newer than the one compiled into your binary. You can fix the
 // problem by either regenerating this code with an older version of connect or updating the connect
 // version compiled into your binary.
-const _ = connect_go.IsAtLeastVersion0_1_0
+const _ = connect.IsAtLeastVersion1_13_0
 
 const (
 	// SubstreamsName is the fully-qualified name of the Substreams service.
 	SubstreamsName = "sf.substreams.internal.v2.Substreams"
 )
 
+// These constants are the fully-qualified names of the RPCs defined in this package. They're
+// exposed at runtime as Spec.Procedure and as the final two segments of the HTTP route.
+//
+// Note that these are different from the fully-qualified method names used by
+// google.golang.org/protobuf/reflect/protoreflect. To convert from these constants to
+// reflection-formatted method names, remove the leading slash and convert the remaining slash to a
+// period.
+const (
+	// SubstreamsProcessRangeProcedure is the fully-qualified name of the Substreams's ProcessRange RPC.
+	SubstreamsProcessRangeProcedure = "/sf.substreams.internal.v2.Substreams/ProcessRange"
+)
+
+// These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
+var (
+	substreamsServiceDescriptor            = v2.File_sf_substreams_intern_v2_service_proto.Services().ByName("Substreams")
+	substreamsProcessRangeMethodDescriptor = substreamsServiceDescriptor.Methods().ByName("ProcessRange")
+)
+
 // SubstreamsClient is a client for the sf.substreams.internal.v2.Substreams service.
 type SubstreamsClient interface {
-	ProcessRange(context.Context, *connect_go.Request[v2.ProcessRangeRequest]) (*connect_go.ServerStreamForClient[v2.ProcessRangeResponse], error)
+	ProcessRange(context.Context, *connect.Request[v2.ProcessRangeRequest]) (*connect.ServerStreamForClient[v2.ProcessRangeResponse], error)
 }
 
 // NewSubstreamsClient constructs a client for the sf.substreams.internal.v2.Substreams service. By
@@ -37,30 +55,31 @@ type SubstreamsClient interface {
 //
 // The URL supplied here should be the base URL for the Connect or gRPC server (for example,
 // http://api.acme.com or https://acme.com/grpc).
-func NewSubstreamsClient(httpClient connect_go.HTTPClient, baseURL string, opts ...connect_go.ClientOption) SubstreamsClient {
+func NewSubstreamsClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) SubstreamsClient {
 	baseURL = strings.TrimRight(baseURL, "/")
 	return &substreamsClient{
-		processRange: connect_go.NewClient[v2.ProcessRangeRequest, v2.ProcessRangeResponse](
+		processRange: connect.NewClient[v2.ProcessRangeRequest, v2.ProcessRangeResponse](
 			httpClient,
-			baseURL+"/sf.substreams.internal.v2.Substreams/ProcessRange",
-			opts...,
+			baseURL+SubstreamsProcessRangeProcedure,
+			connect.WithSchema(substreamsProcessRangeMethodDescriptor),
+			connect.WithClientOptions(opts...),
 		),
 	}
 }
 
 // substreamsClient implements SubstreamsClient.
 type substreamsClient struct {
-	processRange *connect_go.Client[v2.ProcessRangeRequest, v2.ProcessRangeResponse]
+	processRange *connect.Client[v2.ProcessRangeRequest, v2.ProcessRangeResponse]
 }
 
 // ProcessRange calls sf.substreams.internal.v2.Substreams.ProcessRange.
-func (c *substreamsClient) ProcessRange(ctx context.Context, req *connect_go.Request[v2.ProcessRangeRequest]) (*connect_go.ServerStreamForClient[v2.ProcessRangeResponse], error) {
+func (c *substreamsClient) ProcessRange(ctx context.Context, req *connect.Request[v2.ProcessRangeRequest]) (*connect.ServerStreamForClient[v2.ProcessRangeResponse], error) {
 	return c.processRange.CallServerStream(ctx, req)
 }
 
 // SubstreamsHandler is an implementation of the sf.substreams.internal.v2.Substreams service.
 type SubstreamsHandler interface {
-	ProcessRange(context.Context, *connect_go.Request[v2.ProcessRangeRequest], *connect_go.ServerStream[v2.ProcessRangeResponse]) error
+	ProcessRange(context.Context, *connect.Request[v2.ProcessRangeRequest], *connect.ServerStream[v2.ProcessRangeResponse]) error
 }
 
 // NewSubstreamsHandler builds an HTTP handler from the service implementation. It returns the path
@@ -68,19 +87,26 @@ type SubstreamsHandler interface {
 //
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
-func NewSubstreamsHandler(svc SubstreamsHandler, opts ...connect_go.HandlerOption) (string, http.Handler) {
-	mux := http.NewServeMux()
-	mux.Handle("/sf.substreams.internal.v2.Substreams/ProcessRange", connect_go.NewServerStreamHandler(
-		"/sf.substreams.internal.v2.Substreams/ProcessRange",
+func NewSubstreamsHandler(svc SubstreamsHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	substreamsProcessRangeHandler := connect.NewServerStreamHandler(
+		SubstreamsProcessRangeProcedure,
 		svc.ProcessRange,
-		opts...,
-	))
-	return "/sf.substreams.internal.v2.Substreams/", mux
+		connect.WithSchema(substreamsProcessRangeMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	return "/sf.substreams.internal.v2.Substreams/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case SubstreamsProcessRangeProcedure:
+			substreamsProcessRangeHandler.ServeHTTP(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	})
 }
 
 // UnimplementedSubstreamsHandler returns CodeUnimplemented from all methods.
 type UnimplementedSubstreamsHandler struct{}
 
-func (UnimplementedSubstreamsHandler) ProcessRange(context.Context, *connect_go.Request[v2.ProcessRangeRequest], *connect_go.ServerStream[v2.ProcessRangeResponse]) error {
-	return connect_go.NewError(connect_go.CodeUnimplemented, errors.New("sf.substreams.internal.v2.Substreams.ProcessRange is not implemented"))
+func (UnimplementedSubstreamsHandler) ProcessRange(context.Context, *connect.Request[v2.ProcessRangeRequest], *connect.ServerStream[v2.ProcessRangeResponse]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("sf.substreams.internal.v2.Substreams.ProcessRange is not implemented"))
 }

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/bufbuild/connect-go"
+	"connectrpc.com/connect"
 	"github.com/spf13/cobra"
 	cli "github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"

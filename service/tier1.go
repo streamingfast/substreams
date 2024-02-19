@@ -26,7 +26,7 @@ import (
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/shutter"
 
-	"github.com/bufbuild/connect-go"
+	"connectrpc.com/connect"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metrics"

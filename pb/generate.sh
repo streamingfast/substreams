@@ -122,7 +122,7 @@ function checks() {
     echo ""
     echo "To fix your problem, perform this command:"
     echo ""
-    echo "  go install github.com/bufbuild/connect-go/cmd/protoc-gen-connect-go@latest"
+    echo "  go install connectrpc.com/connect/cmd/protoc-gen-connect-go@latest"
     echo ""
     echo "If everything is working as expetcted, the command:"
     echo ""

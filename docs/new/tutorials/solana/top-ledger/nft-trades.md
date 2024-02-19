@@ -8,7 +8,7 @@ TopLedger is an active contributor to the Substreams community and has developed
 
 ## Before You Begin
 
-The Solana Token Tracker Substreams requires medium to advanced Substreams knowledge. If this is the first time you are using Substreams, make sure you:
+The NFT Trades Substreams requires medium to advanced Substreams knowledge. If this is the first time you are using Substreams, make sure you:
 
 - Read the [Develop Substreams](../../../develop/develop.md) section, which will teach you the basics of the developing Substreams modules.
 - Complete the [Explore Solana](../explore-solana/explore-solana.md) tutorial, which will assist you in understanding the main pieces of the Solana Substreams.
@@ -75,7 +75,8 @@ Every `dapp` file has a `parse_trade_instruction` function, which is responsible
 You can use the Substreams CLI to run the project:
 
 ```bash
-substreams gui -e mainnet.sol.streamingfast.io:443 substreams.yaml map_block -s 200321235 -t +1
+substreams gui -e mainnet.sol.streamingfast.io:443 \
+    substreams.yaml map_block -s 200321235 -t +1
 ```
 
 <figure><img src="../../../../.gitbook/assets/tutorials/nft-trades-gui.png" width="100%" /><figcaption><p>Substreams Execution in the GUI</p></figcaption></figure>

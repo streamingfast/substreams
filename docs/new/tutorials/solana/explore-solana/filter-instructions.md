@@ -61,25 +61,23 @@ Let's inspect the module function:
 
 ```rust
 #[substreams::handlers::map]
-fn map_filter_instructions(params: String, blk: Block) -> Result<Instructions, Vec<substreams::errors::Error>> {
+fn map_filter_instructions(params: String, blk: Block) -> Result<Instructions, substreams::errors::Error> {
     let filters = parse_filters_from_params(params)?; // 1.
 
-    let mut instructions : Vec<Instruction> = Vec::new();
+    let instructions : Vec<Instruction> = blk.transactions().flat_map(|tx| { // 2.
+        let msg = tx.transaction.as_ref().unwrap().message.as_ref().unwrap(); // 3.
+        let acct_keys = tx.resolved_accounts(); // 4.
 
-    blk.transactions_owned().into_iter().for_each(|tx| { // 2.
-        let msg = tx.transaction.clone().unwrap().message.unwrap(); // 3.
-        let acct_keys = tx.resolved_accounts();  // 4.
-        let insts : Vec<Instruction> = msg.instructions.iter() // 5.
+        msg.instructions.iter() // 5.
             .filter(|inst| apply_filter(inst, &filters, &acct_keys)) // 6.
-            .map(|inst| {
-            Instruction { // 7.
+            .map(|inst| { // 7.
+            Instruction {
                 program_id: bs58::encode(acct_keys[inst.program_id_index as usize].to_vec()).into_string(),
                 accounts: inst.accounts.iter().map(|acct| bs58::encode(acct_keys[*acct as usize].to_vec()).into_string()).collect(),
-                data: bs58::encode(inst.data.clone()).into_string(),
+                data: bs58::encode(&inst.data).into_string(),
             }
-        }).collect();
-        instructions.extend(insts);
-    });
+        }).collect::<Vec<_>>()
+    }).collect();
 
     Ok(Instructions { instructions })
 }

@@ -62,6 +62,7 @@
     * [Filter Transactions](new/tutorials/solana/explore-solana/filter-transactions.md)
   * [SPL Token Tracker](new/tutorials/solana/token-tracker/token-tracker.md)
   * [NFT Trades](new/tutorials/solana/top-ledger/nft-trades.md)
+  * [DEX Trades](new/tutorials/solana/top-ledger/dex-trades.md)
 * [Rust](new/tutorials/rust/rust.md)
   * [Option struct](new/tutorials/rust/option.md)
   * [Result struct](new/tutorials/rust/result.md)

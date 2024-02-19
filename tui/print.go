@@ -2,6 +2,7 @@ package tui
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -123,6 +124,37 @@ func (ui *TUI) printJSONBlockDeltas(modName string, blockNum uint64, deltas []*p
 
 func indent(in []byte) []byte {
 	return bytes.Replace(in, []byte("\n"), []byte("\n    "), -1)
+}
+
+func (ui *TUI) bytesBlockScopedData(
+	output *pbsubstreamsrpc.MapModuleOutput,
+	debugMapOutputs []*pbsubstreamsrpc.MapModuleOutput,
+	debugStoreOutputs []*pbsubstreamsrpc.StoreModuleOutput,
+	clock *pbsubstreams.Clock,
+) error {
+	// Print the primary output value if it's part of the message types you're interested in
+	if _, ok := ui.msgTypes[output.Name]; ok {
+		if len(output.MapOutput.Value) != 0 {
+			encodedValue := base64.StdEncoding.EncodeToString(output.MapOutput.Value)
+			fmt.Println(encodedValue)
+		}
+	}
+
+	for _, out := range debugStoreOutputs {
+		if _, ok := ui.msgTypes[out.Name]; !ok {
+			continue
+		}
+		if len(out.DebugStoreDeltas) != 0 {
+			if out.DebugInfo != nil && out.DebugInfo.Cached {
+				fmt.Println(cachedValues(out.Name))
+			}
+			if err := ui.printJSONBlockDeltas(out.Name, clock.Number, out.DebugStoreDeltas); err != nil {
+				return fmt.Errorf("print json deltas: %w", err)
+			}
+		}
+	}
+
+	return nil
 }
 
 func (ui *TUI) jsonBlockScopedData(

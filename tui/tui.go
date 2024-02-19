@@ -121,6 +121,7 @@ func (ui *TUI) configureOutputMode(outputMode string) error {
 	case OutputModeJSONL:
 	case OutputModeJSON:
 		ui.prettyPrintOutput = true
+	case OutputModeBytes:
 	default:
 		panic(fmt.Errorf("unhandled output mode %q", ui.outputMode))
 	}
@@ -167,6 +168,8 @@ func (ui *TUI) IncomingMessage(ctx context.Context, resp *pbsubstreamsrpc.Respon
 		if ui.outputMode == OutputModeTUI {
 			ui.ensureTerminalUnlocked()
 			return ui.decoratedBlockScopedData(m.BlockScopedData.Output, m.BlockScopedData.DebugMapOutputs, m.BlockScopedData.DebugStoreOutputs, m.BlockScopedData.Clock)
+		} else if ui.outputMode == OutputModeBytes {
+			return ui.bytesBlockScopedData(m.BlockScopedData.Output, m.BlockScopedData.DebugMapOutputs, m.BlockScopedData.DebugStoreOutputs, m.BlockScopedData.Clock)
 		} else {
 			return ui.jsonBlockScopedData(m.BlockScopedData.Output, m.BlockScopedData.DebugMapOutputs, m.BlockScopedData.DebugStoreOutputs, m.BlockScopedData.Clock)
 		}
@@ -194,7 +197,8 @@ func (ui *TUI) IncomingMessage(ctx context.Context, resp *pbsubstreamsrpc.Respon
 		if ui.outputMode == OutputModeTUI {
 			ui.ensureTerminalLocked()
 			ui.prog.Send(m)
-		} else {
+		} else if ui.outputMode != OutputModeBytes {
+			// avoid printing this so it can be piped easily into a file.
 			fmt.Printf("TraceID: %s\n", m.Session.TraceId)
 		}
 

@@ -26,8 +26,8 @@ require (
 
 require (
 	connectrpc.com/connect v1.15.0
+	connectrpc.com/grpcreflect v1.2.0
 	github.com/alecthomas/chroma v0.10.0
-	github.com/bufbuild/connect-grpcreflect-go v1.0.0
 	github.com/bytecodealliance/wasmtime-go/v4 v4.0.0
 	github.com/charmbracelet/bubbles v0.15.0
 	github.com/charmbracelet/bubbletea v0.23.1
@@ -72,10 +72,8 @@ require (
 
 require (
 	connectrpc.com/grpchealth v1.3.0 // indirect
-	connectrpc.com/grpcreflect v1.2.0 // indirect
 	connectrpc.com/otelconnect v0.7.0 // indirect
 	github.com/bobg/go-generics/v2 v2.1.1 // indirect
-	github.com/bufbuild/connect-go v1.7.0 // indirect
 	github.com/felixge/httpsnoop v1.0.1 // indirect
 	github.com/google/s2a-go v0.1.7 // indirect
 	github.com/iancoleman/strcase v0.2.0 // indirect

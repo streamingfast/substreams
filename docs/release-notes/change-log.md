@@ -11,8 +11,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Backend (through firehose-core)
 * Added support for authentication using api keys. The env variable can be specified with `--substreams-api-key-envvar` and defaults to `SUBSTREAMS_API_KEY`.
 * Fixed bug in scheduler ramp-up function sometimes waiting before raising the number of workers
+* Added `trace_id` in grpc authentication calls
+* Bumped connect-go library to new "connectrpc.com/connect" location
 
 ## v1.3.5
 

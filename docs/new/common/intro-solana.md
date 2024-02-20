@@ -33,6 +33,7 @@ If you want to deep dive into the code, you can follow one or several of the Sol
 - The [Explore Solana Tutorial](../tutorials/solana/explore-solana/explore-solana.md) will teach you the most basic operations you can perform in a Solana Substreams.
 - The [Solana Token Tracker Tutorial](../tutorials/solana/token-tracker/token-tracker.md) will teach how to track an SPL token of your choice.
 - The [NFT Trades Tutorial](../tutorials/solana/top-ledger/nft-trades.md) will help you in extracting data from different NFT exchanges.
+- The [DEX Trades Tutorial](../tutorials/solana/top-ledger/dex-trades.md) will help you in extracting data from different decentralized exchanges.
 
 ## The Solana Data Model
 

@@ -1,5 +1,5 @@
 ---
-description: Learn how to authenticate with a Substreams Provider
+description: StreamingFast Substreams authentication reference
 ---
 
 Running a Substreams involves sending your package (`.spkg`) to a a Substreams provider for execution. Usually, Substreams provider will require you to authenticate to avoid abuses on the service.

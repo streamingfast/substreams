@@ -163,23 +163,18 @@ The `binaries[name].file` field references a locally compiled [WASM module](http
 **Tip**: The WASM file referenced by the `binary` field is picked up and packaged into an `.spkg` when invoking the [`pack`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#pack) and [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) commands through the [`substreams` CLI](command-line-interface.md).
 {% endhint %}
 
-### `deriveFrom`
+### network
 
-It is possible to override an existing substreams by pointing to an override file in the `run` or `gui` command. This override manifest will have a `deriveFrom` field which points to the original Substreams which is to be overriden. This is useful to port a substreams to one network to another. Example of an override manifest:
+The `network` field specifies the blockchain where the Substreams will be executed.
 
+```yaml
+network: solana
 ```
-deriveFrom: path/to/mainnet-substreams.spkg # This can also be a remote url
 
-package:
-  name: "polygon-substreams"
-  version: "100.0.0"
+or
 
-network: polygon
-
-initialBlocks:
-  module1: 17500000
-params:
-  module1: "address=2a75ca72679cf1299936d6104d825c9654489058"
+```yaml
+network: ethereum
 ```
 
 ### sink

@@ -1,49 +1,29 @@
 
-Getting started with Substreams is very easy! If you have the Substreams CLI installed in your computer, you can use the `substreams init` command to initialize a Substreams project from a smart contract.
+Getting started with Substreams is very easy! Depending on the blockchain that you want to use, the best way to get started might change:
 
-Given a smart contract address, the `substreams init` command will download the contract's ABI, inspect it and create a Substreams that extracts all the events.
+{% tabs %}
+{% tab title="Solana" %}
+If you want to extract data from Solana, you can take a look at the [Tutorials](../tutorials/solana/solana.md) section, which covers the development of several useful Substreams (SPL tokens, NFT trades, DEX trades...). The [Substreams for Solana Developers](../common/intro-solana.md) section is really useful if this is your first time using Substreams.
 
-{% embed url="https://www.youtube.com/watch?v=vWYuOczDiAA&" %}
+The [Substreams Explorer](../tutorials/solana/explore-solana/explore-solana.md) teaches you to most basic extractions you can perform on Solana. More tooling will be developed for Solana soon.
+{% endtab %}
+
+{% tab title="EVM" %}
+If you have a specific smart contract that you want to extract data from, the `substreams init` initializes a Substreams project that extract the events from the smart contract.
+
+## Tracking a Smart Contract
+
+{% embed url="https://www.youtube.com/watch?v=vWYuOczDiAA" %}
 Initialize a Substreams project
 {% endembed %}
 
-## Initialize the Project
+## Tracking a Factory Smart Contract (Dynamic Datasource)
 
-1. Run `substreams init`:
+The `substreams init` command also offers you the possibility to easily track a factory smart contract (in Substreams terminology, a _dynamic datasource_). The following video covers how easy it is to get started with factory contracts on Substreams.
 
-```bash
-substreams init
-```
+{% embed url="https://www.youtube.com/watch?v=Vn11ovfSpNU" %}
+Initialize a Substreams project
+{% endembed %}
 
-2. Provide a name for the project:
-
-```bash
-✗ Project name (lowercase, numbers, undescores):
-```
-
-3. Select what protocol you want to use (e.g. Ethereum):
-
-```bash
-? Select protocol: 
-  ▸ Ethereum
-    Other
-```
-
-4. Select what chain to use (Ethereum Mainnet, BNB, Polygon...):
-
-```bash
-? Select Ethereum chain: 
-  ▸ Mainnet
-    BNB
-    Polygon
-    Goerli
-↓   Mumbai
-```
-
-5. Input the smart contrat address. If you do not provider an addressm the "Bored Ape Yacht Club" smart contract will be used:
-
-```bash
-✔ Contract address to track (leave empty to use "Bored Ape Yacht Club"):
-```
-
-After providing all the previous information, a new Substreams project will be generated. You can now start coding!
+{% endtab %}
+{% endtabs %}

@@ -3,7 +3,9 @@ Getting started with Substreams is very easy! Depending on the blockchain that y
 
 {% tabs %}
 {% tab title="Solana" %}
-If you want to extract data from Solana, you can take a look at the [Tutorials](../tutorials/overview.md) section, which covers the development of several useful Substreams (SPL tokens, NFT trades, DEX trades...).
+If you want to extract data from Solana, you can take a look at the [Tutorials](../tutorials/solana/solana.md) section, which covers the development of several useful Substreams (SPL tokens, NFT trades, DEX trades...). The [Substreams for Solana Developers](../common/intro-solana.md) section is really useful if this is your first time using Substreams.
+
+The [Substreams Explorer](../tutorials/solana/explore-solana/explore-solana.md) teaches you to most basic extractions you can perform on Solana. More tooling will be developed for Solana soon.
 {% endtab %}
 
 {% tab title="EVM" %}

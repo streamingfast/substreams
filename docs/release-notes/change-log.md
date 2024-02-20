@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Fixed bug in scheduler ramp-up function sometimes waiting before raising the number of workers
 * Added `trace_id` in grpc authentication calls
 * Bumped connect-go library to new "connectrpc.com/connect" location
+* Enable gRPC reflection API on tier1 substreams service
 
 ## v1.3.5
 

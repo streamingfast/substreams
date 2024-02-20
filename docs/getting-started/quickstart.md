@@ -6,12 +6,11 @@ description: Get off the ground by using Substreams by StreamingFast
 
 ## Run your first Substreams
 
-You will first need to get a StreamingFast API **key** from [https://app.streamingfast.io](https://app.streamingfast.io). Using this API key, retrieve an API **token** by using:
+You will first need to get a StreamingFast API **key** from [https://app.streamingfast.io](https://app.streamingfast.io). Set it in your STREAMINGFAST_API_KEY environment variable.
 
 {% code overflow="wrap" %}
 ```bash
-export STREAMINGFAST_KEY=server_123123 # Use your own API key
-export SUBSTREAMS_API_TOKEN=$(curl https://auth.streamingfast.io/v1/auth/issue -s --data-binary '{"api_key":"'$STREAMINGFAST_KEY'"}' | jq -r .token)
+export STREAMINGFAST_API_KEY=server_123123 # Use your own API key
 ```
 {% endcode %}
 

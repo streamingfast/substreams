@@ -29,6 +29,8 @@ type Tier2Config struct {
 	WASMExtensions  []wasm.WASMExtensioner
 	PipelineOptions []pipeline.PipelineOptioner
 
+	MaximumConcurrentRequests uint64
+
 	Tracing bool
 }
 
@@ -86,6 +88,8 @@ func (a *Tier2App) Run() error {
 		opts = append(opts, service.WithModuleExecutionTracing())
 	}
 
+	opts = append(opts, service.WithReadinessFunc(a.setReadiness))
+
 	svc, err := service.NewTier2(
 		a.logger,
 		mergedBlocksStore,
@@ -131,6 +135,10 @@ func (a *Tier2App) IsReady(ctx context.Context) bool {
 	}
 
 	return a.isReady.Load()
+}
+
+func (a *Tier2App) setReadiness(ready bool) {
+	a.isReady.Store(ready)
 }
 
 // Validate inspects itself to determine if the current config is valid according to

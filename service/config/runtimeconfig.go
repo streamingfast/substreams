@@ -21,6 +21,7 @@ type RuntimeConfig struct {
 	WorkerFactory   work.WorkerFactory
 
 	ModuleExecutionTracing bool
+	MaxConcurrentRequests  int64
 }
 
 func NewRuntimeConfig(

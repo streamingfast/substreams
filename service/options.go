@@ -55,3 +55,14 @@ func WithModuleExecutionTracing() Option {
 		}
 	}
 }
+
+func WithReadinessFunc(f func(bool)) Option {
+	return func(a anyTierService) {
+		switch s := a.(type) {
+		case *Tier1Service:
+			// not used
+		case *Tier2Service:
+			s.setReadyFunc = f
+		}
+	}
+}

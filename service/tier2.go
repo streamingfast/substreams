@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 
 	"connectrpc.com/connect"
 	"github.com/streamingfast/bstream"
@@ -47,6 +48,10 @@ type Tier2Service struct {
 	runtimeConfig     config.RuntimeConfig
 	tracer            ttrace.Tracer
 	logger            *zap.Logger
+
+	setReadyFunc              func(bool)
+	currentConcurrentRequests int64
+	connectionCountMutex      sync.RWMutex
 }
 
 const protoPkfPrefix = "type.googleapis.com/"
@@ -120,6 +125,26 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	// and not only the `grpcError` one which is a subset view of the full `err`.
 	var err error
 	ctx := streamSrv.Context()
+
+	overloaded := true
+	s.connectionCountMutex.Lock()
+	if s.runtimeConfig.MaxConcurrentRequests == 0 || s.currentConcurrentRequests < s.runtimeConfig.MaxConcurrentRequests {
+		overloaded = false
+	}
+	if overloaded {
+		defer s.connectionCountMutex.Unlock()
+		return connect.NewError(connect.CodeUnavailable, fmt.Errorf("service overloaded"))
+	}
+
+	s.currentConcurrentRequests++
+	s.setReadyFunc(s.runtimeConfig.MaxConcurrentRequests == 0 || s.currentConcurrentRequests <= s.runtimeConfig.MaxConcurrentRequests)
+	defer func() {
+		s.connectionCountMutex.Lock()
+		s.currentConcurrentRequests--
+		s.setReadyFunc(s.runtimeConfig.MaxConcurrentRequests == 0 || s.currentConcurrentRequests < s.runtimeConfig.MaxConcurrentRequests)
+		s.connectionCountMutex.Unlock()
+	}()
+	s.connectionCountMutex.Unlock()
 
 	// TODO: use stage and segment numbers when implemented
 	stage := request.OutputModule

@@ -49,4 +49,15 @@ For example, the SQL sink establishes a gRPC connection with the Substreams prov
 
 Forks are really common in blockchain. Essentially, a fork occurs when the path of the blockchain diverges (i.e. there are two or more different paths available because different the nodes involved do not agree on the correct path).
 
-The `BlockUndoSignal` object of the response is used to keep track of forks. In Substreams, you are reading real-time data, so if a fork occurs, you may read blocks from the incorrect path. When the blockchain resolves the fork and eventually chooses a path, you will have to _unread_ all the incorrect blocks (i.e. discard all the blocks belonging to the incorrect path of the fork). The `BlockUndoSignal` contains the latest valid block of the blockchain.
+The `BlockUndoSignal` object of the response is used to keep track of forks. In Substreams, you are reading real-time data, so if a fork occurs, you may read blocks from the incorrect path. When the blockchain resolves the fork and eventually chooses a path, you will have to _unread_ all the incorrect blocks (i.e. discard all the blocks belonging to the incorrect path of the fork). The `BlockUndoSignal` contains the latest valid block of the blockchain and a cursor:
+
+```protobuf
+message BlockUndoSignal {
+  sf.substreams.v1.BlockRef last_valid_block = 1;
+  string last_valid_cursor = 2;
+}
+```
+
+{% hint style="info" %}
+If you commit cursors in the BlockUndoSignals, you don’t need to mind about disconnections amid forks. It will bring you back exactly where you left off, even if it was mid-ways through a fork.
+{% endhint %}

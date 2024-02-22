@@ -1,32 +1,17 @@
 syntax = "proto3";
 
 package sf.substreams.internal.v2;
+
 import "google/protobuf/any.proto";
+import "sf/substreams/v1/deltas.proto";
+
 option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2;pbssinternal";
-
-message StoreDeltas {
-  repeated StoreDelta store_deltas = 1;
-}
-
-message StoreDelta {
-  enum Operation {
-    UNSET = 0;
-    CREATE = 1;
-    UPDATE = 2;
-    DELETE = 3;
-  }
-  Operation operation = 1;
-  uint64 ordinal = 2;
-  string key = 3;
-  bytes old_value = 4;
-  bytes new_value = 5;
-}
 
 message ModuleOutput {
     string module_name = 1;
     oneof data {
             google.protobuf.Any map_output = 2;
-            StoreDeltas store_deltas = 3;
+            sf.substreams.v1.StoreDeltas store_deltas = 3;
     }
     repeated string logs = 4;
     bool debug_logs_truncated = 5;

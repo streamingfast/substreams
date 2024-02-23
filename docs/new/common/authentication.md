@@ -38,7 +38,7 @@ Use your API Key to obtain an authentication token using `curl`:
 
 ```bash
 # lifetime is the token duration in seconds
-curl -s https://auth.streamingfast.io/v1/auth/issue --data-binary '{"api_key": "your-api-key", "lifetime", 3600}'
+curl -s https://auth.streamingfast.io/v1/auth/issue --data-binary '{"api_key": "your-api-key", "lifetime": 3600}'
 ```
 ### Use it in your requests
 

@@ -175,7 +175,7 @@ applyParams( // 3.
 // ...code omitted...
 
 for await (const response of streamBlocks(transport, request)) { // 4.
-
+    // ...code omitted...
 }
 ```
 1. Import the `applyParams` function.

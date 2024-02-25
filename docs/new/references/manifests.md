@@ -177,6 +177,14 @@ or
 network: ethereum
 ```
 
+### image
+
+The `image` field specifies the icon displayed for the Substreams package, which is used in the [Substreams Regsitry](https://substreams.dev). The path is relative to the folder where the manifest is.
+
+```yaml
+image: ./ethereum-icon.png
+```
+
 ### sink
 
 The `sink` field specifies the sink you want to use to consume your data (for example, a database or a subgraph).

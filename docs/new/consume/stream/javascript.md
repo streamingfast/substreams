@@ -146,3 +146,40 @@ const main = async () => {
 Now, you can send the data anywhere and create your own custom sink! If you have created a sink and you think it can be reused by other developers, [let us know on Discord](https://discord.gg/jZwqxJAvRs)!
 
 The previous code is availalble [on GitHub](https://gist.github.com/enoldev/b9f32e045f47675bd5c20f92246aed84).
+
+### Passing Parameters
+
+The `@substreams/core` package exposes an `applyParams(...)` function, which allows you to dynamically pass parameters to the Substreams.
+
+```javascript
+// ...imports omitted...
+import { applyParams } from '@substreams/core'; // 1.
+
+const pkg = await fetchPackage() // 2.
+const registry = createRegistry(pkg);
+
+const transport = createConnectTransport({
+    baseUrl: "https://mainnet.sol.streamingfast.io:443",
+    interceptors: [createAuthInterceptor(TOKEN)],
+    useBinaryFormat: true,
+    jsonOptions: {
+        typeRegistry: registry,
+    },
+});
+
+applyParams( // 3.
+    [`${MODULE}=parameter_name=parameter_value`],
+    pkg.modules.modules
+);
+
+// ...code omitted...
+
+for await (const response of streamBlocks(transport, request)) { // 4.
+    // ...code omitted...
+}
+```
+1. Import the `applyParams` function.
+2. Download the `spkg` file and create the package abstraction.
+3. Apply the parameters to the package module(s). The formart should be:
+`module_name=parameter_name=parameter_value`.
+4. Stream blocks.

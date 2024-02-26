@@ -12,6 +12,9 @@ func sendMetering(meter dmetering.Meter, userID, apiKeyID, ip, userMeta, endpoin
 	bytesRead := meter.BytesReadDelta()
 	bytesWritten := meter.BytesWrittenDelta()
 
+	inputBytes := meter.GetCount("wasm_input_bytes")
+	meter.ResetCount("wasm_input_bytes")
+
 	event := dmetering.Event{
 		UserID:    userID,
 		ApiKeyID:  apiKeyID,
@@ -20,10 +23,11 @@ func sendMetering(meter dmetering.Meter, userID, apiKeyID, ip, userMeta, endpoin
 
 		Endpoint: endpoint,
 		Metrics: map[string]float64{
-			"egress_bytes":  float64(proto.Size(resp)),
-			"written_bytes": float64(bytesWritten),
-			"read_bytes":    float64(bytesRead),
-			"message_count": 1,
+			"egress_bytes":     float64(proto.Size(resp)),
+			"written_bytes":    float64(bytesWritten),
+			"read_bytes":       float64(bytesRead),
+			"wasm_input_bytes": float64(inputBytes),
+			"message_count":    1,
 		},
 		Timestamp: time.Now(),
 	}

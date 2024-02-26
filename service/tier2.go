@@ -134,6 +134,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 
 	ctx = logging.WithLogger(ctx, logger)
 	ctx = dmetering.WithBytesMeter(ctx)
+	ctx = dmetering.WithCounter(ctx, "wasm_input_bytes")
 	ctx = reqctx.WithTracer(ctx, s.tracer)
 
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/request")

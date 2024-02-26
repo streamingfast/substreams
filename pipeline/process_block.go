@@ -236,6 +236,8 @@ func (p *Pipeline) handleStepNew(ctx context.Context, block *pbbstream.Block, cl
 		return fmt.Errorf("pre block hook: %w", err)
 	}
 
+	dmetering.GetBytesMeter(ctx).CountInc("wasm_input_bytes", len(block.Payload.Value))
+
 	if err := p.executeModules(ctx, execOutput); err != nil {
 		return fmt.Errorf("execute modules: %w", err)
 	}

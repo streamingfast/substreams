@@ -176,6 +176,7 @@ func (s *Tier1Service) Blocks(
 	ctx = logging.WithLogger(ctx, logger)
 	ctx = reqctx.WithTracer(ctx, s.tracer)
 	ctx = dmetering.WithBytesMeter(ctx)
+	ctx = dmetering.WithCounter(ctx, "wasm_input_bytes")
 
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier1/request")
 	defer span.EndWithErr(&err)

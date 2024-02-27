@@ -75,7 +75,8 @@ type Pipeline struct {
 	// (for chains with potential block skips)
 	lastFinalClock *pbsubstreams.Clock
 
-	traceID string
+	traceID      string
+	blockStepMap map[bstream.StepType]uint64
 }
 
 func New(
@@ -102,6 +103,7 @@ func New(
 		execoutStorage:  execoutStorage,
 		forkHandler:     NewForkHandler(),
 		traceID:         traceID,
+		blockStepMap:    make(map[bstream.StepType]uint64),
 		startTime:       time.Now(),
 	}
 	for _, opt := range opts {

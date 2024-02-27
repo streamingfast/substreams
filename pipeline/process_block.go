@@ -87,18 +87,20 @@ func (p *Pipeline) processBlock(
 	reorgJunctionBlock bstream.BlockRef,
 ) (err error) {
 	var eof bool
+
 	switch step {
 	case bstream.StepUndo:
+		p.blockStepMap[bstream.StepUndo]++
 		if err = p.handleStepUndo(ctx, clock, cursor, reorgJunctionBlock); err != nil {
 			return fmt.Errorf("step undo: %w", err)
 		}
-
 	case bstream.StepStalled:
+		p.blockStepMap[bstream.StepStalled]++
 		if err := p.handleStepStalled(clock); err != nil {
 			return fmt.Errorf("step stalled: %w", err)
 		}
-
 	case bstream.StepNew:
+		p.blockStepMap[bstream.StepNew]++
 		// metering of live blocks
 		payload := block.Payload.Value
 		dmetering.GetBytesMeter(ctx).AddBytesRead(len(payload))
@@ -111,6 +113,7 @@ func (p *Pipeline) processBlock(
 			eof = true
 		}
 	case bstream.StepNewIrreversible:
+		p.blockStepMap[bstream.StepNewIrreversible]++
 		err := p.handleStepNew(ctx, block, clock, cursor)
 		if err != nil && err != io.EOF {
 			return fmt.Errorf("step new irr: handler step new: %w", err)
@@ -122,12 +125,24 @@ func (p *Pipeline) processBlock(
 		if err != nil {
 			return fmt.Errorf("handling step irreversible: %w", err)
 		}
-
 	case bstream.StepIrreversible:
+		p.blockStepMap[bstream.StepIrreversible]++
 		err = p.handleStepFinal(clock)
 		if err != nil {
 			return fmt.Errorf("handling step irreversible: %w", err)
 		}
+	}
+
+	if block.Number%500 == 0 {
+		logger := reqctx.Logger(ctx)
+		// log the total number of StepNew and StepNewIrreversible blocks, and the ratio of the two
+		logger.Debug("block stats",
+			zap.String("trace_id", p.traceID),
+			zap.Uint64("block_num", block.Number),
+			zap.Uint64("step_new", p.blockStepMap[bstream.StepNew]),
+			zap.Uint64("step_new_irreversible", p.blockStepMap[bstream.StepNewIrreversible]),
+			zap.Float64("ratio", float64(p.blockStepMap[bstream.StepNewIrreversible])/float64(p.blockStepMap[bstream.StepNew])),
+		)
 	}
 
 	if eof {

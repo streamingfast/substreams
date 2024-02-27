@@ -334,7 +334,7 @@ func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbs
 			return connect.NewError(connect.CodeUnavailable, err)
 		}
 
-		sendMetering(meter, userID, apiKeyID, ip, userMeta, "sf.substreams.internal.v2/ProcessRange", resp)
+		sendMetering(meter, userID, apiKeyID, ip, userMeta, "sf.substreams.internal.v2/ProcessRange", resp, logger)
 		return nil
 	}
 }

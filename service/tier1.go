@@ -538,7 +538,7 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 			return connect.NewError(connect.CodeUnavailable, err)
 		}
 
-		sendMetering(meter, userID, apiKeyID, ip, userMeta, "sf.substreams.rpc.v2/Blocks", resp)
+		sendMetering(meter, userID, apiKeyID, ip, userMeta, "sf.substreams.rpc.v2/Blocks", resp, logger)
 		return nil
 	}
 }

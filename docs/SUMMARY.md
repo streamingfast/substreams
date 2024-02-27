@@ -25,6 +25,7 @@
     * [Key-Value Store](new/consume/other-sinks/kv.md)
     * [MongoDB](new/consume/other-sinks/mongodb.md)
     * [Prometheus](new/consume/other-sinks/prometheus.md)
+    * [PubSub](new/consume/other-sinks/pubsub.md)
 * [Develop Substreams](new/develop/develop.md)
   * [Install the CLI](new/common/installing-the-cli.md)
   * [Authentication](new/common/authentication.md)

@@ -20,8 +20,7 @@ substreams run -e mainnet.eth.streamingfast.io:443 \
 The `--start-block` flag specifies the starting block of the Substreams (i.e. at which block the Substreams will start indexing data)
 
 {% hint style="info" %}
-**Note**: .
-In Solana, `--start-block` specifies the **slot**, not the block numnber.
+**Note**: In Solana, `--start-block` specifies the **slot**, not the block numnber.
 {% endhint %}
 
 ### Substreams `run`

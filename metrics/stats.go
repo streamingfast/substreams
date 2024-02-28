@@ -532,16 +532,6 @@ func (s *Stats) Stage(module string) (uint32, *pbsubstreamsrpc.Stage) {
 	return 0, nil
 }
 
-func (s *Stats) processedBlocksFromJobs(moduleName string) (count uint64) {
-	stageIdx, _ := s.Stage(moduleName)
-	for _, job := range s.runningJobs {
-		if job.Stage >= stageIdx { // higher stages will RE-RUN that module, so they include it too
-			count += job.ProcessedBlocks
-		}
-	}
-	return
-}
-
 func (s *Stats) RemoteBytesConsumption() (read uint64, written uint64) {
 	read = s.completedJobsBytesRead
 	written = s.completedJobsBytesWritten

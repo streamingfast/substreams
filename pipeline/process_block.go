@@ -137,7 +137,6 @@ func (p *Pipeline) processBlock(
 		logger := reqctx.Logger(ctx)
 		// log the total number of StepNew and StepNewIrreversible blocks, and the ratio of the two
 		logger.Debug("block stats",
-			zap.String("trace_id", p.traceID),
 			zap.Uint64("block_num", block.Number),
 			zap.Uint64("step_new", p.blockStepMap[bstream.StepNew]),
 			zap.Uint64("step_new_irreversible", p.blockStepMap[bstream.StepNewIrreversible]),

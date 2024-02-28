@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -42,7 +43,8 @@ type Stages struct {
 	stages []*Stage
 
 	// segmentStates is a matrix of segment and stages
-	segmentStates []stageStates // segmentStates[offsetSegment][StageIndex]
+	segmentStates  []stageStates // segmentStates[offsetSegment][StageIndex]
+	lastStatUpdate time.Time
 
 	// If you're processing at 12M blocks, offset 12,000 segments, so you don't need to allocate 12k empty elements.
 	// Any previous segment is assumed to have completed successfully, and any stores that we sync'd prior to this offset
@@ -151,14 +153,18 @@ func (s *Stages) AllStoresCompleted() bool {
 	return true
 }
 
+// UpdateStats is gated to be called at most once per second. It runs the first time it is called.
 func (s *Stages) UpdateStats() {
+	if time.Since(s.lastStatUpdate) < 1*time.Second {
+		return
+	}
+	s.lastStatUpdate = time.Now()
 	out := make([]*pbsubstreamsrpc.Stage, len(s.stages))
 
 	for i := range s.stages {
-		var mods []string
-		for _, mod := range s.stages[i].allExecutedModules {
-			mods = append(mods, mod)
-		}
+
+		mods := make([]string, len(s.stages[i].allExecutedModules))
+		_ = copy(mods, s.stages[i].allExecutedModules)
 
 		var br []*block.Range
 		for segmentIdx, segment := range s.segmentStates {

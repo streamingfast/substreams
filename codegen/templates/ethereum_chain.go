@@ -39,6 +39,15 @@ var EthereumChainsByID = map[string]*EthereumChain{
 		FirehoseEndpoint:       "polygon.streamingfast.io:443",
 		Network:                "polygon",
 	},
+	"Arbitrum": {
+		DisplayName:            "Arbitrum",
+		ExplorerLink:           "https://arbiscan.io",
+		ApiEndpoint:            "https://api.arbiscan.io",
+		DefaultContractAddress: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
+		DefaultContractName:    "WETH Token",
+		FirehoseEndpoint:       "arb-one.streamingfast.io:443",
+		Network:                "arbitrum",
+	},
 	"Goerli": {
 		DisplayName:            "Goerli Testnet",
 		ExplorerLink:           "https://goerli.etherscan.io",

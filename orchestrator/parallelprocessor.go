@@ -42,6 +42,48 @@ func BuildParallelProcessor(
 	stages := stage.NewStages(ctx, outputGraph, reqPlan, storeConfigs, traceID)
 	sched.Stages = stages
 
+	// OPTIMIZATION: We should fetch the ExecOut files too, and see if they
+	// cover some of the ranges that we're after.
+	// We don't need to plan work for ranges where we have ExecOut
+	// already.
+	// BUT we'll need to have stores to be able to schedule work after
+	// so there's a mix of FullKV stores and ExecOut files we need
+	// to check.  We can push the `segmentCompleted` based on the
+	// execout files.
+
+	// The previous code did what? Just assumed there was ExecOut files
+	// prior to the latest Complete snapshot?
+
+	// FIXME: Is the state map the final reference for the progress we've made?
+	// Shouldn't that be processed by the scheduler a little bit?
+	// What if we have discovered a bunch of ExecOut files and the scheduler
+	// would decide not to use the very first stores as a sign of what is complete?
+	// Well, perhaps those wouldn't hurt, because here we're _sure_ they're
+	// done and the Scheduler could send Progress messages when the above decision
+	// is taken.
+
+	// FIXME: Are all the progress messages properly sent? When we skip some stores and mark them complete,
+	// for whatever reason,
+
+	if reqPlan.ReadExecOut != nil {
+		execOutSegmenter := reqPlan.WriteOutSegmenter()
+		// note: since we are *NOT* in a sub-request and are setting up output module is a map
+		requestedModule := outputGraph.OutputModule()
+		if requestedModule.GetKindStore() != nil {
+			panic("logic error: should not get a store as outputModule on tier 1")
+		}
+
+		walker := execoutStorage.NewFileWalker(requestedModule.Name, execOutSegmenter)
+
+		sched.ExecOutWalker = orchestratorExecout.NewWalker(
+			ctx,
+			requestedModule,
+			walker,
+			reqPlan.ReadExecOut,
+			stream,
+		)
+	}
+
 	// we may be here only for mapper, without stores
 	if reqPlan.BuildStores != nil {
 		err := stages.FetchStoresState(
@@ -71,48 +113,6 @@ func BuildParallelProcessor(
 	if os.Getenv("SUBSTREAMS_DEBUG_SCHEDULER_STATE") == "true" {
 		fmt.Println("Initial state:")
 		fmt.Print(stages.StatesString())
-	}
-
-	// OPTIMIZATION: We should fetch the ExecOut files too, and see if they
-	// cover some of the ranges that we're after.
-	// We don't need to plan work for ranges where we have ExecOut
-	// already.
-	// BUT we'll need to have stores to be able to schedule work after
-	// so there's a mix of FullKV stores and ExecOut files we need
-	// to check.  We can push the `segmentCompleted` based on the
-	// execout files.
-
-	// The previous code did what? Just assumed there was ExecOut files
-	// prior to the latest Complete snapshot?
-
-	// FIXME: Is the state map the final reference for the progress we've made?
-	// Shouldn't that be processed by the scheduler a little bit?
-	// What if we have discovered a bunch of ExecOut files and the scheduler
-	// would decide not to use the very first stores as a sign of what is complete?
-	// Well, perhaps those wouldn't hurt, because here we're _sure_ they're
-	// done and the Scheduler could send Progress messages when the above decision
-	// is taken.
-
-	// FIXME: Are all the progress messages properly sent? When we skip some stores and mark them complete,
-	// for whatever reason,
-
-	if reqPlan.WriteExecOut != nil {
-		execOutSegmenter := reqPlan.WriteOutSegmenter()
-		// note: since we are *NOT* in a sub-request and are setting up output module is a map
-		requestedModule := outputGraph.OutputModule()
-		if requestedModule.GetKindStore() != nil {
-			panic("logic error: should not get a store as outputModule on tier 1")
-		}
-
-		walker := execoutStorage.NewFileWalker(requestedModule.Name, execOutSegmenter)
-
-		sched.ExecOutWalker = orchestratorExecout.NewWalker(
-			ctx,
-			requestedModule,
-			walker,
-			reqPlan.ReadExecOut,
-			stream,
-		)
 	}
 
 	// OPTIMIZE(abourget): take all of the ExecOut files that exist

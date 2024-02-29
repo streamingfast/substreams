@@ -533,6 +533,9 @@ func (s *Stats) Stage(module string) (uint32, *pbsubstreamsrpc.Stage) {
 }
 
 func (s *Stats) RemoteBytesConsumption() (read uint64, written uint64) {
+	s.Lock()
+	defer s.Unlock()
+
 	read = s.completedJobsBytesRead
 	written = s.completedJobsBytesWritten
 	for _, j := range s.runningJobs {

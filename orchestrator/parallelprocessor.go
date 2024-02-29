@@ -54,6 +54,18 @@ func BuildParallelProcessor(
 		if err != nil {
 			return nil, fmt.Errorf("fetch stores storage state: %w", err)
 		}
+	} else {
+		err := stages.FetchStoresState(
+			ctx,
+			reqPlan.WriteOutSegmenter(),
+			storeConfigs,
+			execoutStorage,
+			traceID,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("fetch stores storage state: %w", err)
+		}
+
 	}
 
 	if os.Getenv("SUBSTREAMS_DEBUG_SCHEDULER_STATE") == "true" {

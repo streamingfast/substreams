@@ -12,6 +12,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## Unreleased
 
 ### Backend (through firehose-core)
+
+* Performance: prevent reprocessing jobs when there is only a mapper in production mode and everything is already cached
+* Performance: prevent "UpdateStats" from running too often and affecting performance
 * Added support for authentication using api keys. The env variable can be specified with `--substreams-api-key-envvar` and defaults to `SUBSTREAMS_API_KEY`.
 * Fixed bug in scheduler ramp-up function sometimes waiting before raising the number of workers
 * Added `trace_id` in grpc authentication calls

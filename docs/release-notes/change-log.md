@@ -9,14 +9,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v1.3.6
+
+This release brings important server-side improvements regarding performance, especially while processing over historical blocks in production-mode.
 
 ### Backend (through firehose-core)
 
 * Performance: prevent reprocessing jobs when there is only a mapper in production mode and everything is already cached
-* Performance: prevent "UpdateStats" from running too often and affecting performance
+* Performance: prevent "UpdateStats" from running too often and stalling other operations when running with a high parallel jobs count
+* Performance: fixed bug in scheduler ramp-up function sometimes waiting before raising the number of workers
 * Added support for authentication using api keys. The env variable can be specified with `--substreams-api-key-envvar` and defaults to `SUBSTREAMS_API_KEY`.
-* Fixed bug in scheduler ramp-up function sometimes waiting before raising the number of workers
+* Added the output module's hash to the "incoming request"
 * Added `trace_id` in grpc authentication calls
 * Bumped connect-go library to new "connectrpc.com/connect" location
 

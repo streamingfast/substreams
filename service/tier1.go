@@ -199,6 +199,17 @@ func (s *Tier1Service) Blocks(
 	if request.Modules == nil {
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("missing modules in request"))
 	}
+
+	if err := outputmodules.ValidateTier1Request(request, s.blockType); err != nil {
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("validate request: %w", err))
+	}
+
+	outputGraph, err := outputmodules.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules)
+	if err != nil {
+		return bsstream.NewErrInvalidArg(err.Error())
+	}
+	outputModuleHash := outputGraph.ModuleHashes().Get(request.OutputModule)
+
 	moduleNames := make([]string, len(request.Modules.Modules))
 	for i := 0; i < len(moduleNames); i++ {
 		moduleNames[i] = request.Modules.Modules[i].Name
@@ -209,6 +220,7 @@ func (s *Tier1Service) Blocks(
 		zap.String("cursor", request.StartCursor),
 		zap.Strings("modules", moduleNames),
 		zap.String("output_module", request.OutputModule),
+		zap.String("output_module_hash", outputModuleHash),
 	}
 	fields = append(fields, zap.Bool("production_mode", request.ProductionMode))
 	if auth := dauth.FromContext(ctx); auth != nil {
@@ -229,17 +241,8 @@ func (s *Tier1Service) Blocks(
 	metrics.ActiveSubstreams.Inc()
 	defer metrics.ActiveSubstreams.Dec()
 
-	if err := outputmodules.ValidateTier1Request(request, s.blockType); err != nil {
-		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("validate request: %w", err))
-	}
-
-	outputGraph, err := outputmodules.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules)
-	if err != nil {
-		return bsstream.NewErrInvalidArg(err.Error())
-	}
-
 	requestID := fmt.Sprintf("%s:%d:%d:%s:%t:%t:%s",
-		outputGraph.ModuleHashes().Get(request.OutputModule),
+		outputModuleHash,
 		request.StartBlockNum,
 		request.StopBlockNum,
 		request.StartCursor,

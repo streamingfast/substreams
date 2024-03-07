@@ -11,6 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+* Fixed `substreams init` generated The Graph GraphQL regarding wrong `Bool` types.
+
 * The `substreams init` command can now be used on Arbitrum Mainnet network.
 
 ## v1.3.6

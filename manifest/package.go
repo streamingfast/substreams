@@ -120,11 +120,23 @@ func (r *manifestConverter) manifestToPkg(manif *Manifest) (*pbsubstreams.Packag
 }
 
 func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package, err error) {
+	doc := m.Package.Doc
+	if doc == "" {
+		readmePath := filepath.Join(m.Workdir, "README.md")
+		if _, err := os.Stat(readmePath); err == nil {
+			content, err := os.ReadFile(readmePath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read README.md: %w", err)
+			}
+			doc = string(content)
+		}
+	}
+
 	pkgMeta := &pbsubstreams.PackageMetadata{
 		Version: m.Package.Version,
 		Url:     m.Package.URL,
 		Name:    m.Package.Name,
-		Doc:     m.Package.Doc,
+		Doc:     doc,
 	}
 	pkg = &pbsubstreams.Package{
 		Version:     1,

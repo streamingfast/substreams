@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## Unreleased
 
 * Pick up docs from the README.md or README in the same directory as the manifest, when top-level package.doc is empty
+* Tier2 service now supports a maximum concurrent requests limit. Default set to 0 (unlimited). 
 
 ## v1.3.7
 

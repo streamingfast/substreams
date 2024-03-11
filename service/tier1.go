@@ -70,6 +70,8 @@ type Tier1Service struct {
 	getRecentFinalBlock func() (uint64, error)
 	resolveCursor       pipeline.CursorResolver
 	getHeadBlock        func() (uint64, error)
+
+	maximumTier2Retries uint64
 }
 
 func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {

@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"google.golang.org/grpc/metadata"
 	"io"
 	"sync/atomic"
 	"time"
+
+	"google.golang.org/grpc/metadata"
 
 	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/derr"
@@ -102,7 +103,8 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *blo
 		var res *Result
 		retryIdx := 0
 		startTime := time.Now()
-		err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+		maxRetries := 100 //TODO: make this configurable
+		err := derr.RetryContext(ctx, uint64(maxRetries), func(ctx context.Context) error {
 			res = w.work(ctx, request, moduleNames, upstream)
 			err := res.Error
 			switch err.(type) {

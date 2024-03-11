@@ -79,7 +79,6 @@ func (r *manifestConverter) validateManifest(manif *Manifest) error {
 		case "":
 			if s.Use == "" {
 				return fmt.Errorf("stream %q: missing 'use' attribute for a module not specifying any kind", s.Name)
-
 			}
 
 			if err := validateModuleWithUse(s); err != nil {
@@ -116,9 +115,53 @@ func handleUseModules(pkg *pbsubstreams.Package, manif *Manifest) error {
 			pkgPbModule.BinaryEntrypoint = usedModule.BinaryEntrypoint
 
 			for index, input := range pkgPbModule.Inputs {
-				if input != usedModule.Inputs[index] {
-					return fmt.Errorf("module %q: use module %q has different inputs", mod.Name, mod.Use)
+				usedModuleInput := usedModule.Inputs[index]
+				if input.GetParams() != nil {
+					if usedModuleInput.GetParams() == nil {
+						return fmt.Errorf("module %q: input %q is not a params type", mod.Name, input.String())
+					}
+					if input.GetParams().Value != usedModuleInput.GetParams().Value {
+						return fmt.Errorf("module %q: input %q has different value than the used module %q: input %q", mod.Name, input.String(), mod.Use, usedModuleInput.String())
+					}
 				}
+				if input.GetSource() != nil {
+					if usedModuleInput.GetSource() == nil {
+						return fmt.Errorf("module %q: input %q is not a source type", mod.Name, input.String())
+					}
+					if input.GetSource() != usedModuleInput.GetSource() {
+						return fmt.Errorf("module %q: input %q has different source than the used module %q: input %q", mod.Name, input.String(), mod.Use, usedModuleInput.String())
+					}
+				}
+				if input.GetStore() != nil {
+					if usedModuleInput.GetStore() == nil {
+						return fmt.Errorf("module %q: input %q is not a store type", mod.Name, input.String())
+					}
+					if input.GetStore().GetMode() != usedModuleInput.GetStore().GetMode() {
+						return fmt.Errorf("module %q: input %q has different mode than the used module %q: input %q", mod.Name, input.String(), mod.Use, usedModuleInput.String())
+					}
+
+					inputStoreModuleName := input.GetStore().ModuleName
+					usedModuleStoreMapModuleName := usedModuleInput.GetStore().ModuleName
+					if packageModulesMapping[inputStoreModuleName].Output != packageModulesMapping[usedModuleStoreMapModuleName].Output {
+						return fmt.Errorf("module %q: input %q has different output than the used module %q: input %q", mod.Name, input.String(), mod.Use, usedModuleInput.String())
+					}
+
+				}
+				if input.GetMap() != nil {
+					if usedModuleInput.GetMap() == nil {
+						return fmt.Errorf("module %q: input %q is not a map type", mod.Name, input.String())
+					}
+
+					inputMapModuleName := input.GetMap().ModuleName
+					usedModuleInputMapModuleName := usedModuleInput.GetMap().ModuleName
+					if packageModulesMapping[inputMapModuleName].Output != packageModulesMapping[usedModuleInputMapModuleName].Output {
+						return fmt.Errorf("module %q: input %q has different output than the used module %q: input %q", mod.Name, input.String(), mod.Use, usedModuleInput.String())
+					}
+				}
+			}
+
+			if pkgPbModule.InitialBlock == 0 {
+				pkgPbModule.InitialBlock = usedModule.InitialBlock
 			}
 
 			pkgPbModule.Output = usedModule.Output

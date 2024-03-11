@@ -11,11 +11,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
-* Pick up docs from the README.md or README in the same directory as the manifest, when top-level package.doc is empty
-* Tier2 service now supports a maximum concurrent requests limit. Default set to 0 (unlimited). 
-* Improved file listing performance for Google Storage backends by 25%
+* Pick up docs from the README.md or README in the same directory as the manifest, when top-level `package.doc` field is empty.
+*
+Tier2 service now supports a maximum concurrent requests limit. Default set to 0 (unlimited).
+
+* Improved file listing performance for Google Storage backends by 25%.
+
 * Tier2 will now read back mapper outputs (if they exist) to prevent running them again. Additionally, it will not read back the full blocks if its inputs can be satisfied from existing cached mapper outputs.
-* Tier2 will skip processing completely if the output_module is a mapper that has already been processed (ex: when multiple requests are indexing the same data at the same time)
+
+* Tier2 will skip processing completely if the `output_module` is a mapper that has already been processed (ex: when multiple requests are indexing the same data at the same time)
+
+* [Operator] Readiness metric for Substreams tier1 app is now named `substreams_tier1` (was mistakenly called `firehose` before).
+
+* [Operator] Added back deadiness metric for Substreams tiere app (named `substreams_tier2`).
+
+* [Operator] Added metric `substreams_tier1_active_worker_request` which gives the number of active Substreams worker requests a tier1 app is currently doing against tier2 nodes.
+
+* [Operator] Added metric `substreams_tier_1worker_request_counter` which gives the total Substreams worker requests a tier1 app made against tier2 nodes.
 
 ## v1.3.7
 

@@ -186,7 +186,7 @@ func (a *Tier1App) Run() error {
 			a.logger.Info("waiting until hub is real-time synced")
 			select {
 			case <-forkableHub.Ready:
-				metrics.AppReadiness.SetReady()
+				metrics.AppReadinessTier1.SetReady()
 			case <-a.Terminating():
 				return
 			}

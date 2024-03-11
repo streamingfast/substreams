@@ -131,6 +131,8 @@ func (s *Tier2Service) incrementConcurrentRequests() {
 	s.connectionCountMutex.Lock()
 	defer s.connectionCountMutex.Unlock()
 
+	s.logger.Debug("incrementing concurrent requests", zap.Int64("current_concurrent_requests", s.currentConcurrentRequests))
+
 	s.currentConcurrentRequests++
 	s.setOverloaded()
 }
@@ -139,12 +141,19 @@ func (s *Tier2Service) decrementConcurrentRequests() {
 	s.connectionCountMutex.Lock()
 	defer s.connectionCountMutex.Unlock()
 
+	s.logger.Debug("decrementing concurrent requests", zap.Int64("current_concurrent_requests", s.currentConcurrentRequests))
+
 	s.currentConcurrentRequests--
 	s.setOverloaded()
 }
 
 func (s *Tier2Service) setOverloaded() {
 	overloaded := s.runtimeConfig.MaxConcurrentRequests != 0 && s.currentConcurrentRequests >= s.runtimeConfig.MaxConcurrentRequests
+
+	if overloaded {
+		s.logger.Debug("service is overloaded", zap.Int64("current_concurrent_requests", s.currentConcurrentRequests), zap.Int64("max_concurrent_requests", s.runtimeConfig.MaxConcurrentRequests))
+	}
+
 	s.setReadyFunc(!overloaded)
 }
 

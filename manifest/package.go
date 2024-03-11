@@ -2,13 +2,12 @@ package manifest
 
 import (
 	"fmt"
-	"os"
-	"path"
-	"path/filepath"
-
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"os"
+	"path"
+	"path/filepath"
 )
 
 type manifestConverter struct {
@@ -120,15 +119,17 @@ func (r *manifestConverter) manifestToPkg(manif *Manifest) (*pbsubstreams.Packag
 }
 
 func (m *Manifest) readFileFromName(filename string) ([]byte, error) {
-	if _, err := os.Stat(filepath.Join(m.Workdir, filename)); err == nil {
-		filePath := filepath.Join(m.Workdir, filename)
-		content, err := os.ReadFile(filePath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read %s: %w", filename, err)
-		}
-		return content, nil
+	fileNameFound, err := searchExistingCaseInsensitiveFileName(m.Workdir, filename)
+	if err != nil {
+		return nil, err
 	}
-	return nil, nil
+
+	filePath := filepath.Join(m.Workdir, fileNameFound)
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read %s: %w", fileNameFound, err)
+	}
+	return content, nil
 }
 
 func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package, err error) {
@@ -136,17 +137,18 @@ func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package
 	if doc == "" {
 		readmeContent, err := m.readFileFromName("README.md")
 		if err != nil {
-			return nil, fmt.Errorf("reading file: %w", err)
-		}
-		if readmeContent == nil {
-			readmeContent, err = m.readFileFromName("README")
-			if err != nil {
+			if !os.IsNotExist(err) {
 				return nil, fmt.Errorf("reading file: %w", err)
 			}
+			readmeContent, err = m.readFileFromName("README")
+			if err != nil {
+				if !os.IsNotExist(err) {
+					return nil, fmt.Errorf("reading file: %w", err)
+				}
+			}
 		}
-		if readmeContent != nil {
-			doc = string(readmeContent)
-		}
+
+		doc = string(readmeContent)
 	}
 
 	pkgMeta := &pbsubstreams.PackageMetadata{

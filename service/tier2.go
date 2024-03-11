@@ -123,6 +123,7 @@ func NewTier2(
 func (s *Tier2Service) isOverloaded() bool {
 	s.connectionCountMutex.RLock()
 	defer s.connectionCountMutex.RUnlock()
+	s.logger.Debug("checking if service is overloaded", zap.Int64("current_concurrent_requests", s.currentConcurrentRequests), zap.Int64("max_concurrent_requests", s.runtimeConfig.MaxConcurrentRequests))
 	return s.runtimeConfig.MaxConcurrentRequests != 0 && s.currentConcurrentRequests >= s.runtimeConfig.MaxConcurrentRequests
 }
 

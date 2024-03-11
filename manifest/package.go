@@ -119,12 +119,41 @@ func (r *manifestConverter) manifestToPkg(manif *Manifest) (*pbsubstreams.Packag
 	return pkg, protoDefinitions, r.sinkConfigDynamicMessage, nil
 }
 
+func (m *Manifest) readFileFromName(filename string) ([]byte, error) {
+	if _, err := os.Stat(filepath.Join(m.Workdir, filename)); err == nil {
+		filePath := filepath.Join(m.Workdir, filename)
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read %s: %w", filename, err)
+		}
+		return content, nil
+	}
+	return nil, nil
+}
+
 func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package, err error) {
+	doc := m.Package.Doc
+	if doc == "" {
+		readmeContent, err := m.readFileFromName("README.md")
+		if err != nil {
+			return nil, fmt.Errorf("reading file: %w", err)
+		}
+		if readmeContent == nil {
+			readmeContent, err = m.readFileFromName("README")
+			if err != nil {
+				return nil, fmt.Errorf("reading file: %w", err)
+			}
+		}
+		if readmeContent != nil {
+			doc = string(readmeContent)
+		}
+	}
+
 	pkgMeta := &pbsubstreams.PackageMetadata{
 		Version: m.Package.Version,
 		Url:     m.Package.URL,
 		Name:    m.Package.Name,
-		Doc:     m.Package.Doc,
+		Doc:     doc,
 	}
 	pkg = &pbsubstreams.Package{
 		Version:     1,

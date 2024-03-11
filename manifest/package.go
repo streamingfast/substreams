@@ -128,7 +128,7 @@ func handleUseModules(pkg *pbsubstreams.Package, manif *Manifest) error {
 					if usedModuleInput.GetSource() == nil {
 						return fmt.Errorf("module %q: input %q is not a source type", mod.Name, input.String())
 					}
-					if input.GetSource() != usedModuleInput.GetSource() {
+					if input.GetSource().Type != usedModuleInput.GetSource().Type {
 						return fmt.Errorf("module %q: input %q has different source than the used module %q: input %q", mod.Name, input.String(), mod.Use, usedModuleInput.String())
 					}
 				}
@@ -142,7 +142,7 @@ func handleUseModules(pkg *pbsubstreams.Package, manif *Manifest) error {
 
 					inputStoreModuleName := input.GetStore().ModuleName
 					usedModuleStoreMapModuleName := usedModuleInput.GetStore().ModuleName
-					if packageModulesMapping[inputStoreModuleName].Output != packageModulesMapping[usedModuleStoreMapModuleName].Output {
+					if packageModulesMapping[inputStoreModuleName].Output.Type != packageModulesMapping[usedModuleStoreMapModuleName].Output.Type {
 						return fmt.Errorf("module %q: input %q has different output than the used module %q: input %q", mod.Name, input.String(), mod.Use, usedModuleInput.String())
 					}
 
@@ -154,7 +154,8 @@ func handleUseModules(pkg *pbsubstreams.Package, manif *Manifest) error {
 
 					inputMapModuleName := input.GetMap().ModuleName
 					usedModuleInputMapModuleName := usedModuleInput.GetMap().ModuleName
-					if packageModulesMapping[inputMapModuleName].Output != packageModulesMapping[usedModuleInputMapModuleName].Output {
+					if packageModulesMapping[inputMapModuleName].Output.Type != packageModulesMapping[usedModuleInputMapModuleName].Output.Type {
+						fmt.Printf("Module Output One %q, two %q", packageModulesMapping[inputMapModuleName].Output, packageModulesMapping[usedModuleInputMapModuleName].Output)
 						return fmt.Errorf("module %q: input %q has different output than the used module %q: input %q", mod.Name, input.String(), mod.Use, usedModuleInput.String())
 					}
 				}

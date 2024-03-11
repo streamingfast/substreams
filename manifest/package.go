@@ -119,26 +119,33 @@ func (r *manifestConverter) manifestToPkg(manif *Manifest) (*pbsubstreams.Packag
 	return pkg, protoDefinitions, r.sinkConfigDynamicMessage, nil
 }
 
+func (m *Manifest) readFileFromName(filename string) ([]byte, error) {
+	if _, err := os.Stat(filepath.Join(m.Workdir, filename)); err == nil {
+		filePath := filepath.Join(m.Workdir, filename)
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read %s: %w", filename, err)
+		}
+		return content, nil
+	}
+	return nil, nil
+}
+
 func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package, err error) {
 	doc := m.Package.Doc
 	if doc == "" {
-		var readmePath string
-		if _, err := os.Stat(filepath.Join(m.Workdir, "README.md")); err == nil {
-			readmePath = filepath.Join(m.Workdir, "README.md")
-			content, err := os.ReadFile(readmePath)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read README.md: %w", err)
-			}
-			doc = string(content)
+		readmeContent, err := m.readFileFromName("README.md")
+		if err != nil {
+			return nil, fmt.Errorf("reading file: %w", err)
 		}
-
-		if _, err := os.Stat(filepath.Join(m.Workdir, "README")); err == nil {
-			readmePath = filepath.Join(m.Workdir, "README")
-			content, err := os.ReadFile(readmePath)
+		if readmeContent == nil {
+			readmeContent, err = m.readFileFromName("README")
 			if err != nil {
-				return nil, fmt.Errorf("failed to read README: %w", err)
+				return nil, fmt.Errorf("reading file: %w", err)
 			}
-			doc = string(content)
+		}
+		if readmeContent != nil {
+			doc = string(readmeContent)
 		}
 	}
 

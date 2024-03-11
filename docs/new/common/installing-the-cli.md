@@ -45,10 +45,6 @@ Visit the [Buf website](https://buf.build/) for additional information and [inst
 
 Used for connecting to endpoints, streaming data in real time, and packaging custom modules.
 
-{% hint style="success" %}
-**Tip**_:_ [Check the official Github repository](https://github.com/streamingfast/substreams/releases) to get the **latest** [**`substreams` CLI**](../reference-and-specs/command-line-interface.md) **release available**.
-{% endhint %}
-
 ### Homebrew installation
 
 ```
@@ -57,9 +53,20 @@ brew install streamingfast/tap/substreams
 
 ### Pre-compiled binary installation
 
+There are several CLI binaries available for different operating systems. Choose the correct platform in the [CLI releases page](https://github.com/streamingfast/substreams/releases).
+
+If you are on MacOS, you can use the following command:
+
+```bash
+LINK=$(curl -s https://api.github.com/repos/streamingfast/substreams/releases/latest | awk "/download.url.*$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m)/ {print \$2}" | sed 's/"//g')
+curl -L  $LINK  | tar zxf -
+```
+
+If you are on Linux, you can use the following command:
+
 ```bash
 # Use correct binary for your platform
-LINK=$(curl -s https://api.github.com/repos/streamingfast/substreams/releases/latest | awk '/download.url.*linux/ {print $2}' | sed 's/"//g')
+LINK=$(curl -s https://api.github.com/repos/streamingfast/substreams/releases/latest | awk "/download.url.*linux_$(uname -m)/ {print \$2}" | sed 's/"//g')
 curl -L  $LINK  | tar zxf -
 ```
 

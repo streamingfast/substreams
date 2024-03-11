@@ -153,8 +153,7 @@ func (r *manifestConverter) manifestToPkg(manif *Manifest) (*pbsubstreams.Packag
 		return nil, nil, nil, fmt.Errorf("error parsing sink configuration: %w", err)
 	}
 
-	err = handleUseModules(pkg, manif)
-	if err != nil {
+	if err := handleUseModules(pkg, manif); err != nil {
 		return nil, nil, nil, fmt.Errorf("error handling use modules: %w", err)
 	}
 

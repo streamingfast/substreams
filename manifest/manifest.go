@@ -93,6 +93,7 @@ type Module struct {
 
 	Inputs []*Input     `yaml:"inputs"`
 	Output StreamOutput `yaml:"output"`
+	Use    string       `yaml:"use"`
 }
 
 type Input struct {
@@ -177,6 +178,26 @@ func (i *Input) parse() error {
 		return nil
 	}
 	return fmt.Errorf("input has an unknown or mixed types; expect one, and only one of: 'params', 'map', 'store' or 'source'")
+}
+
+func validateModuleWithUse(module *Module) error {
+	if module.Output.Type != "" {
+		return fmt.Errorf("module %q: 'output.type' cannot be set when 'use' is set", module.Name)
+	}
+
+	if module.UpdatePolicy != "" {
+		return fmt.Errorf("module %q: 'output.updatePolicy' cannot be set when 'use' is set", module.Name)
+	}
+
+	if module.Binary != "" {
+		return fmt.Errorf("module %q: 'binary' cannot be set when 'use' is set", module.Name)
+	}
+
+	if module.ValueType != "" {
+		return fmt.Errorf("module %q: 'valueType' cannot be set when 'use' is set", module.Name)
+	}
+
+	return nil
 }
 
 func validateStoreBuilder(module *Module) error {

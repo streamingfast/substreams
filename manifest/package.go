@@ -76,6 +76,15 @@ func (r *manifestConverter) validateManifest(manif *Manifest) error {
 			if err := validateStoreBuilder(s); err != nil {
 				return fmt.Errorf("stream %q: %w", s.Name, err)
 			}
+		case "":
+			if s.Use == "" {
+				return fmt.Errorf("stream %q: missing 'use' attribute for a module not specifying any kind", s.Name)
+
+			}
+
+			if err := validateModuleWithUse(s); err != nil {
+				return fmt.Errorf("stream %q: %w", s.Name, err)
+			}
 
 		default:
 			return fmt.Errorf("stream %q: invalid kind %q", s.Name, s.Kind)
@@ -87,6 +96,35 @@ func (r *manifestConverter) validateManifest(manif *Manifest) error {
 		}
 	}
 
+	return nil
+}
+
+func handleUseModules(pkg *pbsubstreams.Package, manif *Manifest) error {
+	packageModulesMapping := make(map[string]*pbsubstreams.Module)
+	for _, module := range pkg.Modules.Modules {
+		packageModulesMapping[module.Name] = module
+	}
+
+	for _, mod := range manif.Modules {
+		if mod.Use != "" {
+			usedModule, found := packageModulesMapping[mod.Use]
+			if !found {
+				return fmt.Errorf("module %q: use module %q not found", mod.Name, mod.Use)
+			}
+			pkgPbModule := packageModulesMapping[mod.Name]
+			pkgPbModule.BinaryIndex = usedModule.BinaryIndex
+			pkgPbModule.BinaryEntrypoint = usedModule.BinaryEntrypoint
+
+			for index, input := range pkgPbModule.Inputs {
+				if input != usedModule.Inputs[index] {
+					return fmt.Errorf("module %q: use module %q has different inputs", mod.Name, mod.Use)
+				}
+			}
+
+			pkgPbModule.Output = usedModule.Output
+			pkgPbModule.Kind = usedModule.Kind
+		}
+	}
 	return nil
 }
 
@@ -113,6 +151,11 @@ func (r *manifestConverter) manifestToPkg(manif *Manifest) (*pbsubstreams.Packag
 
 	if err := r.loadSinkConfig(pkg, manif); err != nil {
 		return nil, nil, nil, fmt.Errorf("error parsing sink configuration: %w", err)
+	}
+
+	err = handleUseModules(pkg, manif)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("error handling use modules: %w", err)
 	}
 
 	return pkg, protoDefinitions, r.sinkConfigDynamicMessage, nil
@@ -186,8 +229,8 @@ func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package
 			pkg.Networks[k] = params
 		}
 	}
-
 	moduleCodeIndexes := map[string]int{}
+
 	for _, mod := range m.Modules {
 		pbmeta := &pbsubstreams.ModuleMetadata{
 			Doc: mod.Doc,

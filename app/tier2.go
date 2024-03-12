@@ -88,6 +88,9 @@ func (a *Tier2App) Run() error {
 		opts = append(opts, service.WithModuleExecutionTracing())
 	}
 
+	if a.config.MaximumConcurrentRequests > 0 {
+		opts = append(opts, service.WithMaxConcurrentRequests(a.config.MaximumConcurrentRequests))
+	}
 	opts = append(opts, service.WithReadinessFunc(a.setReadiness))
 
 	svc, err := service.NewTier2(

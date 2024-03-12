@@ -103,7 +103,7 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *blo
 		var res *Result
 		retryIdx := 0
 		startTime := time.Now()
-		maxRetries := 100 //TODO: make this configurable
+		maxRetries := 720 //TODO: make this configurable
 		err := derr.RetryContext(ctx, uint64(maxRetries), func(ctx context.Context) error {
 			res = w.work(ctx, request, moduleNames, upstream)
 			err := res.Error

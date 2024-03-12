@@ -141,11 +141,6 @@ func (a *Tier2App) IsReady(ctx context.Context) bool {
 }
 
 func (a *Tier2App) setReadiness(ready bool) {
-	if a.isReady.Load() && !ready {
-		a.logger.Debug("setting app readiness to false")
-	} else if !a.isReady.Load() && ready {
-		a.logger.Debug("setting app readiness to true")
-	}
 	a.isReady.Store(ready)
 }
 

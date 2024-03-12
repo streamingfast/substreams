@@ -45,6 +45,22 @@ The details of the run command are:
 **Tip**: Passing a different `-s` or `--start-block` runs prior modules at a higher speed. Output is provided at the requested start block, keeping snapshots along the way if you want to process it again.
 {% endhint %}
 
+#### Headers
+
+The `-H` option in of the `run` or `gui` command allows you to dynamically pass headers with the gRPC request. This is useful when overriding default parameters in the Substreams execution.
+
+##### X-Sf-Substreams-Parallel-Jobs Header
+
+The `X-Sf-Substreams-Parallel-Jobs` header sets the number of parallel jobs to use in the Substreams execution. By default, 10 jobs are used.
+
+```bash
+substreams run -e mainnet.eth.streamingfast.io:443 \
+   -t +1 \
+   -H "X-Sf-Substreams-Parallel-Jobs: 20" \
+   ./substreams.yaml \
+   module_name
+```
+
 #### Run example with output
 
 {% code title="substreams run " overflow="wrap" %}

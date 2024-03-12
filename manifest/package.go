@@ -104,69 +104,76 @@ func handleUseModules(pkg *pbsubstreams.Package, manif *Manifest) error {
 		packageModulesMapping[module.Name] = module
 	}
 
-	for _, mod := range manif.Modules {
-		if mod.Use != "" {
-			usedModule, found := packageModulesMapping[mod.Use]
+	for _, manifestModule := range manif.Modules {
+		if manifestModule.Use != "" {
+			usedModule, found := packageModulesMapping[manifestModule.Use]
 			if !found {
-				return fmt.Errorf("module %q: use module %q not found", mod.Name, mod.Use)
+				return fmt.Errorf("module %q: use module %q not found", manifestModule.Name, manifestModule.Use)
 			}
-			pkgPbModule := packageModulesMapping[mod.Name]
-			pkgPbModule.BinaryIndex = usedModule.BinaryIndex
-			pkgPbModule.BinaryEntrypoint = usedModule.BinaryEntrypoint
+			moduleWithUse := packageModulesMapping[manifestModule.Name]
 
-			for index, input := range pkgPbModule.Inputs {
-				usedModuleInput := usedModule.Inputs[index]
-				if input.GetParams() != nil {
-					if usedModuleInput.GetParams() == nil {
-						return fmt.Errorf("module %q: input %q is not a params type", mod.Name, input.String())
-					}
-					if input.GetParams().Value != usedModuleInput.GetParams().Value {
-						return fmt.Errorf("module %q: input %q has different value than the used module %q: input %q", mod.Name, input.String(), mod.Use, usedModuleInput.String())
-					}
-				}
-				if input.GetSource() != nil {
-					if usedModuleInput.GetSource() == nil {
-						return fmt.Errorf("module %q: input %q is not a source type", mod.Name, input.String())
-					}
-					if input.GetSource().Type != usedModuleInput.GetSource().Type {
-						return fmt.Errorf("module %q: input %q has different source than the used module %q: input %q", mod.Name, input.String(), mod.Use, usedModuleInput.String())
-					}
-				}
-				if input.GetStore() != nil {
-					if usedModuleInput.GetStore() == nil {
-						return fmt.Errorf("module %q: input %q is not a store type", mod.Name, input.String())
-					}
-					if input.GetStore().GetMode() != usedModuleInput.GetStore().GetMode() {
-						return fmt.Errorf("module %q: input %q has different mode than the used module %q: input %q", mod.Name, input.String(), mod.Use, usedModuleInput.String())
-					}
-
-					inputStoreModuleName := input.GetStore().ModuleName
-					usedModuleStoreMapModuleName := usedModuleInput.GetStore().ModuleName
-					if packageModulesMapping[inputStoreModuleName].Output.Type != packageModulesMapping[usedModuleStoreMapModuleName].Output.Type {
-						return fmt.Errorf("module %q: input %q has different output than the used module %q: input %q", mod.Name, input.String(), mod.Use, usedModuleInput.String())
-					}
-
-				}
-				if input.GetMap() != nil {
-					if usedModuleInput.GetMap() == nil {
-						return fmt.Errorf("module %q: input %q is not a map type", mod.Name, input.String())
-					}
-
-					inputMapModuleName := input.GetMap().ModuleName
-					usedModuleInputMapModuleName := usedModuleInput.GetMap().ModuleName
-					if packageModulesMapping[inputMapModuleName].Output.Type != packageModulesMapping[usedModuleInputMapModuleName].Output.Type {
-						fmt.Printf("Module Output One %q, two %q", packageModulesMapping[inputMapModuleName].Output, packageModulesMapping[usedModuleInputMapModuleName].Output)
-						return fmt.Errorf("module %q: input %q has different output than the used module %q: input %q", mod.Name, input.String(), mod.Use, usedModuleInput.String())
-					}
-				}
+			if err := checkEqualInputs(moduleWithUse, usedModule, manifestModule, packageModulesMapping); err != nil {
+				return fmt.Errorf("checking inputs for module %q: %w", manifestModule.Name, err)
 			}
 
-			if pkgPbModule.InitialBlock == 0 {
-				pkgPbModule.InitialBlock = usedModule.InitialBlock
+			moduleWithUse.BinaryIndex = usedModule.BinaryIndex
+			moduleWithUse.BinaryEntrypoint = usedModule.BinaryEntrypoint
+
+			if moduleWithUse.InitialBlock == 0 {
+				moduleWithUse.InitialBlock = usedModule.InitialBlock
 			}
 
-			pkgPbModule.Output = usedModule.Output
-			pkgPbModule.Kind = usedModule.Kind
+			moduleWithUse.Output = usedModule.Output
+			moduleWithUse.Kind = usedModule.Kind
+		}
+	}
+	return nil
+}
+
+func checkEqualInputs(moduleWithUse, usedModule *pbsubstreams.Module, manifestModuleWithUse *Module, packageModulesMapping map[string]*pbsubstreams.Module) error {
+	for index, input := range moduleWithUse.Inputs {
+		usedModuleInput := usedModule.Inputs[index]
+		if input.GetParams() != nil {
+			if usedModuleInput.GetParams() == nil {
+				return fmt.Errorf("module %q: input %q is not a params type", manifestModuleWithUse.Name, input.String())
+			}
+			if input.GetParams().Value != usedModuleInput.GetParams().Value {
+				return fmt.Errorf("module %q: input %q has different value than the used module %q: input %q", manifestModuleWithUse.Name, input.String(), manifestModuleWithUse.Use, usedModuleInput.String())
+			}
+		}
+		if input.GetSource() != nil {
+			if usedModuleInput.GetSource() == nil {
+				return fmt.Errorf("module %q: input %q is not a source type", manifestModuleWithUse.Name, input.String())
+			}
+			if input.GetSource().Type != usedModuleInput.GetSource().Type {
+				return fmt.Errorf("module %q: input %q has different source than the used module %q: input %q", manifestModuleWithUse.Name, input.String(), manifestModuleWithUse.Use, usedModuleInput.String())
+			}
+		}
+		if input.GetStore() != nil {
+			if usedModuleInput.GetStore() == nil {
+				return fmt.Errorf("module %q: input %q is not a store type", manifestModuleWithUse.Name, input.String())
+			}
+			if input.GetStore().GetMode() != usedModuleInput.GetStore().GetMode() {
+				return fmt.Errorf("module %q: input %q has different mode than the used module %q: input %q", manifestModuleWithUse.Name, input.String(), manifestModuleWithUse.Use, usedModuleInput.String())
+			}
+
+			inputStoreModuleName := input.GetStore().ModuleName
+			usedModuleStoreMapModuleName := usedModuleInput.GetStore().ModuleName
+			if packageModulesMapping[inputStoreModuleName].Output.Type != packageModulesMapping[usedModuleStoreMapModuleName].Output.Type {
+				return fmt.Errorf("module %q: input %q has different output than the used module %q: input %q", manifestModuleWithUse.Name, input.String(), manifestModuleWithUse.Use, usedModuleInput.String())
+			}
+
+		}
+		if input.GetMap() != nil {
+			if usedModuleInput.GetMap() == nil {
+				return fmt.Errorf("module %q: input %q is not a map type", manifestModuleWithUse.Name, input.String())
+			}
+
+			inputMapModuleName := input.GetMap().ModuleName
+			usedModuleInputMapModuleName := usedModuleInput.GetMap().ModuleName
+			if packageModulesMapping[inputMapModuleName].Output.Type != packageModulesMapping[usedModuleInputMapModuleName].Output.Type {
+				return fmt.Errorf("module %q: input %q has different output than the used module %q: input %q", manifestModuleWithUse.Name, input.String(), manifestModuleWithUse.Use, usedModuleInput.String())
+			}
 		}
 	}
 	return nil

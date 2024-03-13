@@ -235,3 +235,142 @@ func TestValidateManifest(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateModules(t *testing.T) {
+	cases := []struct {
+		name          string
+		modules       *pbsubstreams.Modules
+		expectedError string
+	}{
+		{
+			name: "sunny path",
+			modules: &pbsubstreams.Modules{
+				Modules: []*pbsubstreams.Module{
+					{
+						Name:             "test_module",
+						BinaryEntrypoint: "test_module",
+						InitialBlock:     uint64(62),
+						Kind: &pbsubstreams.Module_KindMap_{
+							KindMap: &pbsubstreams.Module_KindMap{
+								OutputType: "sf.database.v1.changes",
+							},
+						},
+						Inputs: []*pbsubstreams.Module_Input{
+							{Input: &pbsubstreams.Module_Input_Source_{Source: &pbsubstreams.Module_Input_Source{Type: "sf.database.v1.changes"}}},
+						},
+						Output: &pbsubstreams.Module_Output{
+							Type: "sf.entity.v1.changes",
+						},
+						BlockFilter: &pbsubstreams.Module_BlockFilter{
+							Module: "block_index",
+							Query:  "This is my query",
+						},
+					},
+
+					{
+						Name:             "block_index",
+						BinaryEntrypoint: "block_index",
+						Kind:             &pbsubstreams.Module_KindBlockIndex_{KindBlockIndex: &pbsubstreams.Module_KindBlockIndex{OutputType: "sf.substreams.index.v1.Keys"}},
+						Output: &pbsubstreams.Module_Output{
+							Type: "sf.substreams.index.v1.Keys",
+						},
+					},
+				},
+			},
+			expectedError: "",
+		},
+		{
+			name: "wrong blockfilter module",
+			modules: &pbsubstreams.Modules{
+				Modules: []*pbsubstreams.Module{
+					{
+						Name:             "test_module",
+						BinaryEntrypoint: "test_module",
+						InitialBlock:     uint64(62),
+						Kind: &pbsubstreams.Module_KindMap_{
+							KindMap: &pbsubstreams.Module_KindMap{
+								OutputType: "sf.database.v1.changes",
+							},
+						},
+						Inputs: []*pbsubstreams.Module_Input{
+							{Input: &pbsubstreams.Module_Input_Source_{Source: &pbsubstreams.Module_Input_Source{Type: "sf.database.v1.changes"}}},
+						},
+						Output: &pbsubstreams.Module_Output{
+							Type: "sf.entity.v1.changes",
+						},
+						BlockFilter: &pbsubstreams.Module_BlockFilter{
+							Module: "wrong_module",
+							Query:  "This is my query",
+						},
+					},
+
+					{
+						Name:             "block_index",
+						BinaryEntrypoint: "block_index",
+						Kind:             &pbsubstreams.Module_KindBlockIndex_{KindBlockIndex: &pbsubstreams.Module_KindBlockIndex{OutputType: "sf.substreams.index.v1.Keys"}},
+						Output: &pbsubstreams.Module_Output{
+							Type: "sf.substreams.index.v1.Keys",
+						},
+					},
+				},
+			},
+			expectedError: "checking block filter for module \"test_module\": block filter module \"wrong_module\" not found",
+		},
+		{
+			name: "wrong blockfilter module output type",
+			modules: &pbsubstreams.Modules{
+				Modules: []*pbsubstreams.Module{
+					{
+						Name:             "test_module",
+						BinaryEntrypoint: "test_module",
+						InitialBlock:     uint64(62),
+						Kind: &pbsubstreams.Module_KindMap_{
+							KindMap: &pbsubstreams.Module_KindMap{
+								OutputType: "sf.database.v1.changes",
+							},
+						},
+						Inputs: []*pbsubstreams.Module_Input{
+							{Input: &pbsubstreams.Module_Input_Source_{Source: &pbsubstreams.Module_Input_Source{Type: "sf.database.v1.changes"}}},
+						},
+						Output: &pbsubstreams.Module_Output{
+							Type: "sf.entity.v1.changes",
+						},
+						BlockFilter: &pbsubstreams.Module_BlockFilter{
+							Module: "map_module",
+							Query:  "This is my query",
+						},
+					},
+					{
+						Name:             "map_module",
+						BinaryEntrypoint: "0",
+						InitialBlock:     uint64(1),
+						Kind: &pbsubstreams.Module_KindMap_{
+							KindMap: &pbsubstreams.Module_KindMap{
+								OutputType: "sf.streamingfast.test.v1",
+							},
+						},
+						Inputs: []*pbsubstreams.Module_Input{
+							{Input: &pbsubstreams.Module_Input_Source_{Source: &pbsubstreams.Module_Input_Source{Type: "sf.database.v1.changes"}}},
+						},
+						Output: &pbsubstreams.Module_Output{
+							Type: "sf.streamingfast.test.v1",
+						},
+					},
+				},
+			},
+			expectedError: "checking block filter for module \"test_module\": block filter module \"map_module\" not of 'block_index' kind",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			err := ValidateModules(c.modules)
+			if c.expectedError == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			require.Equal(t, c.expectedError, err.Error())
+		})
+	}
+}

@@ -21,8 +21,10 @@ import (
 
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/substreams"
+	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/metrics"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/pipeline/cache"
 	"github.com/streamingfast/substreams/pipeline/exec"
@@ -299,7 +301,26 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		)
 	}
 
-	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, execOutWriter, s.blockType)
+	existingExecOuts := make(map[string]*execout.File)
+	for name, c := range execOutputConfigs.ConfigMap {
+		if c.ModuleKind() == pbsubstreams.ModuleKindStore {
+			continue // TODO @stepd add support for store modules
+		}
+		file, err := c.ReadFile(ctx, &block.Range{StartBlock: request.StartBlockNum, ExclusiveEndBlock: request.StopBlockNum})
+		if err != nil {
+			continue
+		}
+		if name == request.OutputModule {
+			logger.Info("found existing exec output for output_module, skipping run", zap.String("output_module", name))
+			return nil
+
+		}
+		existingExecOuts[name] = file
+	}
+	// TODO @stepd: check through all inputs if we need blocks, if not, we can set up another kind of pipeline from the existing outputconfigs
+	//	outputGraph.UsedModules()[0].Inputs[0].GetInput()
+
+	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, execOutWriter, s.blockType, existingExecOuts)
 	if err != nil {
 		return fmt.Errorf("error building caching engine: %w", err)
 	}
@@ -328,6 +349,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		zap.String("output_module", request.OutputModule),
 		zap.Uint32("stage", request.Stage),
 	)
+	// TODO @stepd: don't need to set up tier2 stores if we're not going to use them
 	if err := pipe.InitTier2Stores(ctx); err != nil {
 		return fmt.Errorf("error building pipeline: %w", err)
 	}

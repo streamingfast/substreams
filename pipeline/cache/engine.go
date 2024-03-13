@@ -27,11 +27,12 @@ type Engine struct {
 	blockType         string
 	reversibleBuffers map[uint64]*execout.Buffer // block num to modules' outputs for that given block
 	execOutputWriter  *execout.Writer            // moduleName => irreversible File
-	runtimeConfig     config.RuntimeConfig       // TODO(abourget): Deprecated: remove this as it's not used
+	existingExecOuts  map[string]*execout.File
+	runtimeConfig     config.RuntimeConfig // TODO(abourget): Deprecated: remove this as it's not used
 	logger            *zap.Logger
 }
 
-func NewEngine(ctx context.Context, runtimeConfig config.RuntimeConfig, execOutWriter *execout.Writer, blockType string) (*Engine, error) {
+func NewEngine(ctx context.Context, runtimeConfig config.RuntimeConfig, execOutWriter *execout.Writer, blockType string, existingExecOuts map[string]*execout.File) (*Engine, error) {
 	e := &Engine{
 		ctx:               ctx,
 		runtimeConfig:     runtimeConfig,
@@ -39,19 +40,25 @@ func NewEngine(ctx context.Context, runtimeConfig config.RuntimeConfig, execOutW
 		execOutputWriter:  execOutWriter,
 		logger:            reqctx.Logger(ctx),
 		blockType:         blockType,
+		existingExecOuts:  existingExecOuts,
 	}
 	return e, nil
 }
 
-func (e *Engine) NewBuffer(block *pbbstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) (execout.ExecutionOutput, error) {
-	execOutBuf, err := execout.NewBuffer(e.blockType, block, clock)
+func (e *Engine) NewBuffer(optionalBlock *pbbstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) (execout.ExecutionOutput, error) {
+	out, err := execout.NewBuffer(e.blockType, optionalBlock, clock)
 	if err != nil {
 		return nil, fmt.Errorf("setting up map: %w", err)
 	}
 
-	e.reversibleBuffers[clock.Number] = execOutBuf
+	e.reversibleBuffers[clock.Number] = out
+	for moduleName, existingExecOut := range e.existingExecOuts {
+		if val, ok := existingExecOut.Get(clock); ok {
+			out.Set(moduleName, val)
+		}
+	}
 
-	return execOutBuf, nil
+	return out, nil
 }
 
 func (e *Engine) HandleUndo(clock *pbsubstreams.Clock) {

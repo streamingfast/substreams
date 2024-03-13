@@ -19,18 +19,21 @@ type Buffer struct {
 }
 
 func NewBuffer(blockType string, block *pbbstream.Block, clock *pbsubstreams.Clock) (*Buffer, error) {
-	blkBytes := block.Payload.Value
+	values := make(map[string][]byte)
+
 	clockBytes, err := proto.Marshal(clock)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling clock %d %q: %w", clock.Number, clock.Id, err)
 	}
+	values[wasm.ClockType] = clockBytes
+
+	if block != nil {
+		values[blockType] = block.Payload.Value
+	}
 
 	return &Buffer{
-		clock: clock,
-		values: map[string][]byte{
-			blockType:      blkBytes,
-			wasm.ClockType: clockBytes,
-		},
+		clock:  clock,
+		values: values,
 	}, nil
 }
 
@@ -43,7 +46,7 @@ func (i *Buffer) Get(moduleName string) (value []byte, cached bool, err error) {
 	if !found {
 		return nil, false, NotFound
 	}
-	return val, false, nil
+	return val, true, nil
 }
 
 func (i *Buffer) Set(moduleName string, value []byte) (err error) {

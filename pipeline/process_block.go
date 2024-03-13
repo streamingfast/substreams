@@ -23,6 +23,25 @@ import (
 	"github.com/streamingfast/substreams/storage/execout"
 )
 
+func (p *Pipeline) ProcessFromExecOutput(
+	ctx context.Context,
+	clock *pbsubstreams.Clock,
+	cursor *bstream.Cursor,
+) (err error) {
+	// TODO @stepd: add metrics back here too
+	p.gate.processBlock(clock.Number, bstream.StepNewIrreversible)
+	execOutput, err := p.execOutputCache.NewBuffer(nil, clock, cursor)
+	if err != nil {
+		return fmt.Errorf("setting up exec output: %w", err)
+	}
+
+	if err = p.processBlock(ctx, execOutput, clock, cursor, bstream.StepNewIrreversible, nil); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (p *Pipeline) ProcessBlock(block *pbbstream.Block, obj interface{}) (err error) {
 	ctx := p.ctx
 

@@ -317,8 +317,8 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		}
 		existingExecOuts[name] = file
 	}
-	// TODO @stepd: check through all inputs if we need blocks, if not, we can set up another kind of pipeline from the existing outputconfigs
-	//	outputGraph.UsedModules()[0].Inputs[0].GetInput()
+
+	skipBlocks, skipStores := checkSkipBlocksAndStores(existingExecOuts, outputGraph, s.blockType)
 
 	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, execOutWriter, s.blockType, existingExecOuts)
 	if err != nil {
@@ -349,31 +349,93 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		zap.String("output_module", request.OutputModule),
 		zap.Uint32("stage", request.Stage),
 	)
-	// TODO @stepd: don't need to set up tier2 stores if we're not going to use them
-	if err := pipe.InitTier2Stores(ctx); err != nil {
-		return fmt.Errorf("error building pipeline: %w", err)
+
+	if err := pipe.Init(ctx); err != nil {
+		return fmt.Errorf("error during pipeline init: %w", err)
+	}
+	if !skipStores {
+		if err := pipe.InitTier2Stores(ctx); err != nil {
+			return fmt.Errorf("error building pipeline: %w", err)
+		}
 	}
 
 	var streamErr error
-	blockStream, err := s.streamFactoryFunc(
-		ctx,
-		pipe,
-		int64(requestDetails.ResolvedStartBlockNum),
-		request.StopBlockNum,
-		"",
-		true,
-		false,
-		logger.Named("stream"),
-	)
-	if err != nil {
-		return fmt.Errorf("error getting stream: %w", err)
+	if skipBlocks {
+		var referenceMapper *execout.File
+		for k, v := range existingExecOuts {
+			referenceMapper = v
+			logger.Info("running from mapper", zap.String("module", k))
+			break
+		}
+
+		ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/pipeline/mapper_stream")
+		for _, v := range referenceMapper.SortedItems() {
+			if v.BlockNum < request.StartBlockNum || v.BlockNum >= request.StopBlockNum {
+				panic("reading from mapper, block was out of range") // we don't want to have this case undetected
+			}
+			clock := &pbsubstreams.Clock{
+				Id:        v.BlockId,
+				Number:    v.BlockNum,
+				Timestamp: v.Timestamp,
+			}
+
+			cursor := &bstream.Cursor{
+				Step:      bstream.StepNewIrreversible,
+				Block:     bstream.NewBlockRef(v.BlockId, v.BlockNum),
+				LIB:       bstream.NewBlockRef(v.BlockId, v.BlockNum),
+				HeadBlock: bstream.NewBlockRef(v.BlockId, v.BlockNum),
+			}
+
+			if err := pipe.ProcessFromExecOutput(ctx, clock, cursor); err != nil {
+				span.EndWithErr(&err)
+				return err
+			}
+		}
+		streamErr = io.EOF
+		span.EndWithErr(&streamErr)
+	} else {
+		blockStream, err := s.streamFactoryFunc(
+			ctx,
+			pipe,
+			int64(requestDetails.ResolvedStartBlockNum),
+			request.StopBlockNum,
+			"",
+			true,
+			false,
+			logger.Named("stream"),
+		)
+		if err != nil {
+			return fmt.Errorf("error getting stream: %w", err)
+		}
+
+		ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/pipeline/blocks_stream")
+		streamErr = blockStream.Run(ctx)
+		span.EndWithErr(&streamErr)
 	}
 
-	ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/pipeline/blocks_stream")
-	streamErr = blockStream.Run(ctx)
-	span.EndWithErr(&streamErr)
-
 	return pipe.OnStreamTerminated(ctx, streamErr)
+}
+
+func checkSkipBlocksAndStores(existingExecOuts map[string]*execout.File, outputGraph *outputmodules.Graph, blockType string) (skipBlocks, skipStores bool) {
+	if len(existingExecOuts) == 0 {
+		return
+	}
+	skipBlocks = true
+	skipStores = true
+	for _, module := range outputGraph.UsedModules() {
+		if existingExecOuts[module.Name] != nil {
+			continue
+		}
+		for _, input := range module.Inputs {
+			if src := input.GetSource(); src != nil && src.Type == blockType {
+				skipBlocks = false
+			}
+			if input.GetStore() != nil {
+				skipStores = false
+			}
+		}
+	}
+	return
 }
 
 func (s *Tier2Service) buildPipelineOptions(ctx context.Context, request *pbssinternal.ProcessRangeRequest) (opts []pipeline.Option) {

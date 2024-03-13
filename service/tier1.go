@@ -468,6 +468,9 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		zap.String("output_module", request.OutputModule),
 	)
 
+	if err := pipe.Init(ctx); err != nil {
+		return fmt.Errorf("error during pipeline init: %w", err)
+	}
 	if err := pipe.InitTier1StoresAndBackprocess(ctx, reqPlan); err != nil {
 		return fmt.Errorf("error during init_stores_and_backprocess: %w", err)
 	}

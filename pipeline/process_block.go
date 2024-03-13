@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+	"github.com/streamingfast/dmetering"
 
 	"github.com/streamingfast/bstream"
 	"go.uber.org/zap"
@@ -28,7 +29,6 @@ func (p *Pipeline) ProcessFromExecOutput(
 	clock *pbsubstreams.Clock,
 	cursor *bstream.Cursor,
 ) (err error) {
-	// TODO @stepd: add metrics back here too
 	p.gate.processBlock(clock.Number, bstream.StepNewIrreversible)
 	execOutput, err := p.execOutputCache.NewBuffer(nil, clock, cursor)
 	if err != nil {
@@ -122,11 +122,8 @@ func (p *Pipeline) processBlock(
 		}
 	case bstream.StepNew:
 		p.blockStepMap[bstream.StepNew]++
-		// metering of live blocks
-		// FIXME stepd
-		//payload := block.Payload.Value
-		//dmetering.GetBytesMeter(ctx).AddBytesRead(len(payload))
 
+		dmetering.GetBytesMeter(ctx).AddBytesRead(execOutput.Len())
 		err = p.handleStepNew(ctx, clock, cursor, execOutput)
 		if err != nil && err != io.EOF {
 			return fmt.Errorf("step new: handler step new: %w", err)
@@ -268,9 +265,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 		return fmt.Errorf("pre block hook: %w", err)
 	}
 
-	// FIXME stepd
-	//dmetering.GetBytesMeter(ctx).CountInc("wasm_input_bytes", len(block.Payload.Value))
-
+	dmetering.GetBytesMeter(ctx).CountInc("wasm_input_bytes", execOutput.Len())
 	if err := p.executeModules(ctx, execOutput); err != nil {
 		return fmt.Errorf("execute modules: %w", err)
 	}

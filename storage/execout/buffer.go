@@ -18,6 +18,14 @@ type Buffer struct {
 	clock  *pbsubstreams.Clock
 }
 
+func (b *Buffer) Len() (out int) {
+	for _, v := range b.values {
+		out += len(v)
+	}
+
+	return
+}
+
 func NewBuffer(blockType string, block *pbbstream.Block, clock *pbsubstreams.Clock) (*Buffer, error) {
 	values := make(map[string][]byte)
 

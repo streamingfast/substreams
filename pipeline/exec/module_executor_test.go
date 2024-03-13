@@ -25,6 +25,10 @@ func (t *MockExecOutput) Clock() *pbsubstreams.Clock {
 	return t.clockFunc()
 }
 
+func (t *MockExecOutput) Len() int {
+	return 0
+}
+
 func (t *MockExecOutput) Get(name string) ([]byte, bool, error) {
 	v, ok := t.cacheMap[name]
 	if !ok {

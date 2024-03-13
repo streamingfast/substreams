@@ -105,7 +105,7 @@ func NewStages(
 			segmenter = reqPlan.StoresSegmenter()
 		}
 
-		var moduleStates []*ModuleState
+		var moduleStates []*StoreModuleState
 		stageLowestInitBlock := layer[0].InitialBlock
 		for _, mod := range layer {
 			modSegmenter := segmenter.WithInitialBlock(mod.InitialBlock)
@@ -169,7 +169,7 @@ func (s *Stages) UpdateStats() {
 		var br []*block.Range
 		for segmentIdx, segment := range s.segmentStates {
 			state := segment[i]
-			segmenter := s.stages[i].moduleStates[0].segmenter
+			segmenter := s.stages[i].storeModuleStates[0].segmenter
 			if state == UnitCompleted || state == UnitPartialPresent || state == UnitMerging {
 				if rng := segmenter.Range(segmentIdx + s.segmentOffset); rng != nil {
 					br = append(br, rng)
@@ -426,7 +426,7 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 		if stage.kind != KindStore {
 			continue
 		}
-		for _, modState := range stage.moduleStates {
+		for _, modState := range stage.storeModuleStates {
 			fullKV, err := modState.getStore(s.ctx, exclusiveEndBlock)
 			if err != nil {
 				return nil, fmt.Errorf("stores didn't sync up properly, expected store %q to be at block %d but was at %d: %w", modState.name, exclusiveEndBlock, modState.lastBlockInStore, err)
@@ -461,7 +461,7 @@ func (s *Stages) StatesString() string {
 }
 
 func (s *Stages) StageModules(stage int) (out []string) {
-	for _, modState := range s.stages[stage].moduleStates {
+	for _, modState := range s.stages[stage].storeModuleStates {
 		out = append(out, modState.name)
 	}
 	return

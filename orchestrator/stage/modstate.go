@@ -11,7 +11,7 @@ import (
 )
 
 // An individual module's progress towards synchronizing its `store`
-type ModuleState struct {
+type StoreModuleState struct {
 	name   string
 	logger *zap.Logger
 
@@ -23,8 +23,8 @@ type ModuleState struct {
 	lastBlockInStore uint64
 }
 
-func NewModuleState(logger *zap.Logger, name string, segmenter *block.Segmenter, storeConfig *store.Config) *ModuleState {
-	return &ModuleState{
+func NewModuleState(logger *zap.Logger, name string, segmenter *block.Segmenter, storeConfig *store.Config) *StoreModuleState {
+	return &StoreModuleState{
 		name:        name,
 		segmenter:   segmenter,
 		logger:      logger,
@@ -32,7 +32,7 @@ func NewModuleState(logger *zap.Logger, name string, segmenter *block.Segmenter,
 	}
 }
 
-func (s *ModuleState) getStore(ctx context.Context, exclusiveEndBlock uint64) (*store.FullKV, error) {
+func (s *StoreModuleState) getStore(ctx context.Context, exclusiveEndBlock uint64) (*store.FullKV, error) {
 	if s.lastBlockInStore == exclusiveEndBlock && s.cachedStore != nil {
 		return s.cachedStore, nil
 	}
@@ -50,7 +50,7 @@ func (s *ModuleState) getStore(ctx context.Context, exclusiveEndBlock uint64) (*
 	return loadStore, nil
 }
 
-func (s *ModuleState) derivePartialKV(initialBlock uint64) *store.PartialKV {
+func (s *StoreModuleState) derivePartialKV(initialBlock uint64) *store.PartialKV {
 	return s.storeConfig.NewPartialKV(initialBlock, s.logger)
 }
 

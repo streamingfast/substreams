@@ -14,7 +14,7 @@ type Stage struct {
 	// The module's stores have been sync'd up to this segment, and are complete.
 	segmentCompleted int
 
-	moduleStates []*ModuleState
+	storeModuleStates []*StoreModuleState
 
 	// allExecutedModules is all the store+mapper executed specifically for this stage
 	allExecutedModules []string
@@ -29,14 +29,14 @@ type Stage struct {
 	asyncWork *llerrgroup.Group
 }
 
-func NewStage(idx int, kind Kind, segmenter *block.Segmenter, moduleStates []*ModuleState, allExecutedModules []string) *Stage {
+func NewStage(idx int, kind Kind, segmenter *block.Segmenter, moduleStates []*StoreModuleState, allExecutedModules []string) *Stage {
 	return &Stage{
 		idx:                idx,
 		kind:               kind,
 		allExecutedModules: allExecutedModules,
 		segmenter:          segmenter,
 		segmentCompleted:   segmenter.FirstIndex() - 1,
-		moduleStates:       moduleStates,
+		storeModuleStates:  moduleStates,
 		syncWork:           llerrgroup.New(250),
 		asyncWork:          llerrgroup.New(250),
 	}

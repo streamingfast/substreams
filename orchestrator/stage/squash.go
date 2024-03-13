@@ -25,7 +25,7 @@ func (s *Stages) multiSquash(stage *Stage, mergeUnit Unit) error {
 	}
 
 	// Launch parallel jobs to merge all stages' stores.
-	for _, modState := range stage.moduleStates {
+	for _, modState := range stage.storeModuleStates {
 		if mergeUnit.Segment < modState.segmenter.FirstIndex() {
 			continue
 		}
@@ -53,7 +53,7 @@ func (s *Stages) multiSquash(stage *Stage, mergeUnit Unit) error {
 // to load that compete store, and squash the next partial segment.
 // We keep the cache of the latest FullKV store, to speed up things
 // if they are linear
-func (s *Stages) singleSquash(stage *Stage, modState *ModuleState, mergeUnit Unit) error {
+func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUnit Unit) error {
 	metrics := mergeMetrics{}
 	metrics.start = time.Now()
 

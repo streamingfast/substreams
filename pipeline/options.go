@@ -1,15 +1,9 @@
 package pipeline
 
 import (
-	"context"
-
 	"github.com/streamingfast/substreams"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 )
-
-type PipelineOptioner interface {
-	PipelineOptions(ctx context.Context, startBlock, stopBlock uint64, requestID string) []Option
-}
 
 type Option func(p *Pipeline)
 

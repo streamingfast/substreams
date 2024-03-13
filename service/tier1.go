@@ -57,8 +57,8 @@ type Tier1Service struct {
 	ssconnect.UnimplementedStreamHandler
 
 	blockType          string
-	wasmExtensions     []wasm.WASMExtensioner
-	pipelineOptions    []pipeline.PipelineOptioner
+	wasmExtensions     map[string]map[string]wasm.WASMExtension
+	wasmParams         map[string]string
 	failedRequestsLock sync.RWMutex
 	failedRequests     map[string]*recordedFailure
 	streamFactoryFunc  StreamFactoryFunc
@@ -70,7 +70,10 @@ type Tier1Service struct {
 	resolveCursor       pipeline.CursorResolver
 	getHeadBlock        func() (uint64, error)
 
-	maximumTier2Retries uint64
+	maximumTier2Retries    uint64
+	tier2RequestParameters reqctx.Tier2RequestParameters
+
+	pipelineOptions []pipeline.Option
 }
 
 func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
@@ -111,12 +114,13 @@ func NewTier1(
 	stateBundleSize uint64,
 
 	substreamsClientConfig *client.SubstreamsClientConfig,
+	tier2RequestParameters reqctx.Tier2RequestParameters,
 	opts ...Option,
 ) (*Tier1Service, error) {
 
 	clientFactory := client.NewInternalClientFactory(substreamsClientConfig)
 
-	runtimeConfig := config.NewRuntimeConfig(
+	runtimeConfig := config.NewTier1RuntimeConfig(
 		stateBundleSize,
 		parallelSubRequests,
 		10,
@@ -127,6 +131,7 @@ func NewTier1(
 			return work.NewRemoteWorker(clientFactory, logger)
 		},
 	)
+
 	sf := &StreamFactory{
 		mergedBlocksStore: mergedBlocksStore,
 		forkedBlocksStore: forkedBlocksStore,
@@ -137,16 +142,19 @@ func NewTier1(
 	if err != nil {
 		return nil, fmt.Errorf("getting block type from stream factory: %w", err)
 	}
+	tier2RequestParameters.BlockType = blockType
+	tier2RequestParameters.StateBundleSize = runtimeConfig.StateBundleSize
 
 	logger.Info("launching tier1 service", zap.Reflect("client_config", substreamsClientConfig), zap.String("block_type", blockType), zap.Bool("with_live", hub != nil))
 	s := &Tier1Service{
-		Shutter:        shutter.New(),
-		runtimeConfig:  runtimeConfig,
-		blockType:      blockType,
-		tracer:         tracing.GetTracer(),
-		failedRequests: make(map[string]*recordedFailure),
-		resolveCursor:  pipeline.NewCursorResolver(hub, mergedBlocksStore, forkedBlocksStore),
-		logger:         logger,
+		Shutter:                shutter.New(),
+		runtimeConfig:          runtimeConfig,
+		blockType:              blockType,
+		tracer:                 tracing.GetTracer(),
+		failedRequests:         make(map[string]*recordedFailure),
+		resolveCursor:          pipeline.NewCursorResolver(hub, mergedBlocksStore, forkedBlocksStore),
+		logger:                 logger,
+		tier2RequestParameters: tier2RequestParameters,
 	}
 
 	s.streamFactoryFunc = sf.New
@@ -167,7 +175,6 @@ func (s *Tier1Service) Blocks(
 	req *connect.Request[pbsubstreamsrpc.Request],
 	stream *connect.ServerStream[pbsubstreamsrpc.Response],
 ) error {
-
 	// We keep `err` here as the unaltered error from `blocks` call, this is used in the EndSpan to record the full error
 	// and not only the `grpcError` one which is a subset view of the full `err`.
 	var err error
@@ -178,6 +185,7 @@ func (s *Tier1Service) Blocks(
 	ctx = reqctx.WithTracer(ctx, s.tracer)
 	ctx = dmetering.WithBytesMeter(ctx)
 	ctx = dmetering.WithCounter(ctx, "wasm_input_bytes")
+	ctx = reqctx.WithTier2RequestParameters(ctx, s.tier2RequestParameters)
 
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier1/request")
 	defer span.EndWithErr(&err)
@@ -420,7 +428,8 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		return fmt.Errorf("error building caching engine: %w", err)
 	}
 
-	opts := s.buildPipelineOptions(ctx)
+	//opts := s.buildPipelineOptions(ctx)
+	var opts []pipeline.Option
 	if undoSignal != nil {
 		opts = append(opts, pipeline.WithPendingUndoMessage(
 			&pbsubstreamsrpc.Response{
@@ -523,13 +532,13 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	return pipe.OnStreamTerminated(ctx, streamErr)
 }
 
-func (s *Tier1Service) buildPipelineOptions(ctx context.Context) (opts []pipeline.Option) {
-	reqDetails := reqctx.Details(ctx)
-	for _, pipeOpts := range s.pipelineOptions {
-		opts = append(opts, pipeOpts.PipelineOptions(ctx, reqDetails.ResolvedStartBlockNum, reqDetails.StopBlockNum, reqDetails.UniqueIDString())...)
-	}
-	return
-}
+//func (s *Tier1Service) buildPipelineOptions(ctx context.Context) (opts []pipeline.Option) {
+//	reqDetails := reqctx.Details(ctx)
+//	for _, pipeOpts := range s.pipelineOptions {
+//		opts = append(opts, pipeOpts.PipelineOptions(ctx, reqDetails.ResolvedStartBlockNum, reqDetails.StopBlockNum, reqDetails.UniqueIDString())...)
+//	}
+//	return
+//}
 
 func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logger, streamSrv *connect.ServerStream[pbsubstreamsrpc.Response]) substreams.ResponseFunc {
 	auth := dauth.FromContext(ctx)
@@ -553,7 +562,7 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 			return connect.NewError(connect.CodeUnavailable, err)
 		}
 
-		sendMetering(meter, userID, apiKeyID, ip, userMeta, "sf.substreams.rpc.v2/Blocks", resp, logger)
+		sendMetering(ctx, meter, userID, apiKeyID, ip, userMeta, "sf.substreams.rpc.v2/Blocks", resp, logger)
 		return nil
 	}
 }

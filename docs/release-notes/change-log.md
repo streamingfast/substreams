@@ -9,6 +9,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.5.0 (Unreleased)
+
+* Tier2 is now chain agnostic. All chain-specific flags and configurations are now passed from Tier1 to Tier2 in the internal ProcessRange request. This allows for a single Tier2 instance to handle multiple chains.
+* Removed PipelineOptioner interface, as it was no longer needed.
+* WASMExtensioner interface has been modified to allow for WASM extensions to be more easily managed between Tier1 and Tier2. 
+
 ## v1.4.0
 
 ### Client

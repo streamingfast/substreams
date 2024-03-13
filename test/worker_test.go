@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"testing"
 
 	"go.uber.org/atomic"
@@ -34,7 +35,13 @@ func (w *TestWorker) ID() string {
 func (w *TestWorker) Work(ctx context.Context, unit stage.Unit, workRange *block.Range, moduleNames []string, upstream *response.Stream) loop.Cmd {
 	w.t.Helper()
 
-	request := work.NewRequest(reqctx.Details(ctx), unit.Stage, workRange)
+	ctx = reqctx.WithTier2RequestParameters(ctx, reqctx.Tier2RequestParameters{
+		BlockType:            "sf.substreams.v1.test.Block",
+		StateBundleSize:      10,
+		StateStoreURL:        filepath.Join(w.testTempDir, "test.store"),
+		StateStoreDefaultTag: "tag",
+	})
+	request := work.NewRequest(ctx, reqctx.Details(ctx), unit.Stage, workRange)
 
 	logger := reqctx.Logger(ctx)
 	logger = logger.With(zap.Uint64("workerId", w.id))

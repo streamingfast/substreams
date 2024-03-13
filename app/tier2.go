@@ -7,27 +7,19 @@ import (
 
 	dauth "github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetrics"
-	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/service"
-	"github.com/streamingfast/substreams/wasm"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
 )
 
 type Tier2Config struct {
-	MergedBlocksStoreURL string
-	GRPCListenAddr       string // gRPC address where this app will listen to
-	ServiceDiscoveryURL  *url.URL
+	GRPCListenAddr      string // gRPC address where this app will listen to
+	ServiceDiscoveryURL *url.URL
 
-	StateStoreURL        string
-	StateStoreDefaultTag string
-	StateBundleSize      uint64
-
-	WASMExtensions  []wasm.WASMExtensioner
-	PipelineOptions []pipeline.PipelineOptioner
+	PipelineOptions []pipeline.Option
 
 	MaximumConcurrentRequests uint64
 
@@ -65,24 +57,10 @@ func (a *Tier2App) Run() error {
 		return fmt.Errorf("invalid app config: %w", err)
 	}
 
-	mergedBlocksStore, err := dstore.NewDBinStore(a.config.MergedBlocksStoreURL)
-	if err != nil {
-		return fmt.Errorf("failed setting up block store from url %q: %w", a.config.MergedBlocksStoreURL, err)
-	}
-
-	stateStore, err := dstore.NewStore(a.config.StateStoreURL, "zst", "zstd", true)
-	if err != nil {
-		return fmt.Errorf("failed setting up state store from url %q: %w", a.config.StateStoreURL, err)
-	}
-
 	var opts []service.Option
-	for _, ext := range a.config.WASMExtensions {
-		opts = append(opts, service.WithWASMExtension(ext))
-	}
-
-	for _, opt := range a.config.PipelineOptions {
-		opts = append(opts, service.WithPipelineOptions(opt))
-	}
+	//for _, opt := range a.config.PipelineOptions {
+	//	opts = append(opts, service.WithPipelineOptions(opt))
+	//}
 
 	if a.config.Tracing {
 		opts = append(opts, service.WithModuleExecutionTracing())
@@ -95,10 +73,6 @@ func (a *Tier2App) Run() error {
 
 	svc, err := service.NewTier2(
 		a.logger,
-		mergedBlocksStore,
-		stateStore,
-		a.config.StateStoreDefaultTag,
-		a.config.StateBundleSize,
 		opts...,
 	)
 	if err != nil {

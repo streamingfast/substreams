@@ -173,6 +173,7 @@ func TestHandleUseModules(t *testing.T) {
 }
 
 func TestValidateManifest(t *testing.T) {
+	var initialBlock uint64 = 123
 	cases := []struct {
 		name          string
 		manifest      *Manifest
@@ -181,6 +182,7 @@ func TestValidateManifest(t *testing.T) {
 		{
 			name: "sunny path",
 			manifest: &Manifest{
+				SpecVersion: "v0.1.0",
 				Modules: []*Module{
 					{Name: "basic_index", Kind: "blockIndex", Output: StreamOutput{"proto:sf.substreams.index.v1.Keys"}},
 				},
@@ -188,26 +190,48 @@ func TestValidateManifest(t *testing.T) {
 			expectedError: "",
 		},
 		{
-			name: "incorrect block filter module",
+			name: "block index with different output",
 			manifest: &Manifest{
+				SpecVersion: "v0.1.0",
 				Modules: []*Module{
-					{Name: "bd_module", Kind: "blockIndex", Output: StreamOutput{"proto:sf.substreams.test"}, BlockFilter: BlockFilter{Module: "basic", Query: "this is my query"}},
+					{Name: "basic_index", Kind: "blockIndex", Output: StreamOutput{"proto:sf.substreams.test"}},
 				},
 			},
-			expectedError: "",
+			expectedError: "stream \"basic_index\": block index module must have output type 'proto:sf.substreams.index.v1.Keys'",
+		},
+		{
+			name: "block index with inputs",
+			manifest: &Manifest{
+				SpecVersion: "v0.1.0",
+				Modules: []*Module{
+					{Name: "basic_index", Kind: "blockIndex", Inputs: []*Input{{Source: "proto:sf.database.v1.changes"}}, Output: StreamOutput{"proto:sf.substreams.index.v1.Keys"}},
+				},
+			},
+			expectedError: "stream \"basic_index\": block index module cannot have inputs",
+		},
+		{
+			name: "block index with initialBlock",
+			manifest: &Manifest{
+				SpecVersion: "v0.1.0",
+				Modules: []*Module{
+					{Name: "basic_index", Kind: "blockIndex", InitialBlock: &initialBlock, Output: StreamOutput{"proto:sf.substreams.index.v1.Keys"}},
+				},
+			},
+			expectedError: "stream \"basic_index\": block index module cannot have initial block",
 		},
 	}
 
-	manifestConverter := newManifestConverter("test", true)
+	manifestConv := newManifestConverter("test", true)
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			fmt.Println("Modules", c.manifest.Modules)
-			err := manifestConverter.validateManifest(c.manifest)
-			if c.expectedError != "" {
+			err := manifestConv.validateManifest(c.manifest)
+			if c.expectedError == "" {
 				require.NoError(t, err)
 				return
 			}
 			require.Error(t, err)
+			require.Equal(t, c.expectedError, err.Error())
 		})
 	}
 }

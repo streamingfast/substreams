@@ -3,10 +3,11 @@ package exec
 import (
 	"context"
 	"fmt"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 
 	"google.golang.org/protobuf/proto"
 
-	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"
@@ -27,7 +28,7 @@ func (e *StoreModuleExecutor) Name() string   { return e.moduleName }
 func (e *StoreModuleExecutor) String() string { return e.Name() }
 
 func (e *StoreModuleExecutor) applyCachedOutput(value []byte) error {
-	deltas := &pbssinternal.StoreDeltas{}
+	deltas := &pbsubstreams.StoreDeltas{}
 	err := proto.Unmarshal(value, deltas)
 	if err != nil {
 		return fmt.Errorf("unmarshalling output deltas: %w", err)
@@ -53,7 +54,7 @@ func (e *StoreModuleExecutor) HasValidOutput() bool {
 }
 
 func (e *StoreModuleExecutor) wrapDeltas() ([]byte, *pbssinternal.ModuleOutput, error) {
-	deltas := &pbssinternal.StoreDeltas{
+	deltas := &pbsubstreams.StoreDeltas{
 		StoreDeltas: e.outputStore.GetDeltas(),
 	}
 
@@ -71,7 +72,7 @@ func (e *StoreModuleExecutor) wrapDeltas() ([]byte, *pbssinternal.ModuleOutput, 
 }
 
 func (e *StoreModuleExecutor) toModuleOutput(data []byte) (*pbssinternal.ModuleOutput, error) {
-	deltas := &pbssinternal.StoreDeltas{}
+	deltas := &pbsubstreams.StoreDeltas{}
 	err := proto.Unmarshal(data, deltas)
 	if err != nil {
 		return nil, fmt.Errorf("unmarshalling output deltas: %w", err)

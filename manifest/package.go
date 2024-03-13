@@ -80,6 +80,20 @@ func (r *manifestConverter) validateManifest(manif *Manifest) error {
 			if s.Use != "" {
 				return fmt.Errorf("stream %q: 'use' is not allowed for kind 'store'", s.Name)
 			}
+		case ModuleKindBlockIndex:
+			if s.Inputs != nil {
+				return fmt.Errorf("stream %q: block index module cannot have inputs", s.Name)
+			}
+
+			if s.InitialBlock != nil {
+				return fmt.Errorf("stream %q: block index module cannot have initial block", s.Name)
+			}
+
+			//TODO: Validate the output type
+			if s.Output.Type != "proto:sf.substreams.index.v1.Keys" {
+				return fmt.Errorf("stream %q: block index module must have output type 'proto:sf.substreams.index.v1.Keys'", s.Name)
+			}
+
 		case "":
 			if s.Use == "" {
 				return fmt.Errorf("module kind not specified for %q", s.Name)
@@ -261,7 +275,6 @@ func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package
 				}
 			}
 		}
-
 		doc = string(readmeContent)
 	}
 
@@ -271,11 +284,13 @@ func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package
 		Name:    m.Package.Name,
 		Doc:     doc,
 	}
+
 	pkg = &pbsubstreams.Package{
-		Version:     1,
-		PackageMeta: []*pbsubstreams.PackageMetadata{pkgMeta},
-		Modules:     &pbsubstreams.Modules{},
-		Network:     m.Network,
+		Version:      1,
+		PackageMeta:  []*pbsubstreams.PackageMetadata{pkgMeta},
+		Modules:      &pbsubstreams.Modules{},
+		Network:      m.Network,
+		BlockFilters: m.BlockFilters,
 	}
 
 	if m.Networks != nil {

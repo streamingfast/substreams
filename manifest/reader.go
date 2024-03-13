@@ -533,6 +533,64 @@ func duplicateStringInput(in *pbsubstreams.Module_Input) string {
 	}
 }
 
+func checkValidBlockFilter(mod *pbsubstreams.Module, mapModuleKind map[string]pbsubstreams.ModuleKind) error {
+	blockFilter := mod.GetBlockFilter()
+	if blockFilter != nil {
+		seekModName := blockFilter.GetModule()
+		seekModuleKind, found := mapModuleKind[seekModName]
+		if !found {
+			return fmt.Errorf("block filter module %q not found", blockFilter.Module)
+		}
+		if seekModuleKind != pbsubstreams.ModuleKindBlockIndex {
+			return fmt.Errorf("block filter module %q not of 'block_index' kind", blockFilter.Module)
+		}
+	}
+	return nil
+}
+
+func checkValidInputs(mod *pbsubstreams.Module, mapModuleKind map[string]pbsubstreams.ModuleKind) error {
+	for idx, in := range mod.Inputs {
+		switch i := in.Input.(type) {
+		case *pbsubstreams.Module_Input_Params_:
+			if idx != 0 {
+				return fmt.Errorf("module %q: input %d: params must be first input", mod.Name, idx)
+			}
+		case *pbsubstreams.Module_Input_Source_:
+			if i.Source.Type == "" {
+				return fmt.Errorf("module %q: source type empty", mod.Name)
+			}
+		case *pbsubstreams.Module_Input_Map_:
+			seekMod := i.Map.ModuleName
+			seekModuleKind, found := mapModuleKind[seekMod]
+			if !found {
+				return fmt.Errorf("module %q: map input named %q not found", mod.Name, seekMod)
+			}
+
+			if seekModuleKind != pbsubstreams.ModuleKindMap {
+				return fmt.Errorf("module %q: input %d: referenced module %q not of 'map' kind", mod.Name, idx, seekMod)
+			}
+
+		case *pbsubstreams.Module_Input_Store_:
+			seekMod := i.Store.ModuleName
+			seekModuleKind, found := mapModuleKind[seekMod]
+			if !found {
+				return fmt.Errorf("module %q: store input named %q not found", mod.Name, seekMod)
+			}
+
+			if seekModuleKind != pbsubstreams.ModuleKindStore {
+				return fmt.Errorf("module %q: input %d: referenced module %q not of 'store' kind", mod.Name, idx, seekMod)
+			}
+
+			switch i.Store.Mode {
+			case pbsubstreams.Module_Input_Store_GET, pbsubstreams.Module_Input_Store_DELTAS:
+			default:
+				return fmt.Errorf("module %q: input index %d: unknown store mode value %d", mod.Name, idx, i.Store.Mode)
+			}
+		}
+	}
+	return nil
+}
+
 // ValidateModules is run both by the client _and_ the server.
 func ValidateModules(mods *pbsubstreams.Modules) error {
 	var sumCode int
@@ -551,6 +609,14 @@ func ValidateModules(mods *pbsubstreams.Modules) error {
 		return fmt.Errorf("limit of 100 modules reached")
 	}
 
+	mapModuleKind := make(map[string]pbsubstreams.ModuleKind)
+	for _, mod := range mods.Modules {
+		if _, found := mapModuleKind[mod.Name]; found {
+			return fmt.Errorf("module %q: duplicate module name", mod.Name)
+		}
+		mapModuleKind[mod.Name] = mod.ModuleKind()
+	}
+
 	for _, mod := range mods.Modules {
 		for _, segment := range strings.Split(mod.Name, ":") {
 			if !moduleNameRegexp.MatchString(segment) {
@@ -562,51 +628,14 @@ func ValidateModules(mods *pbsubstreams.Modules) error {
 			return fmt.Errorf("limit of 30 inputs for a given module (%q) reached", mod.Name)
 		}
 
-		for idx, in := range mod.Inputs {
-			switch i := in.Input.(type) {
-			case *pbsubstreams.Module_Input_Params_:
-				if idx != 0 {
-					return fmt.Errorf("module %q: input %d: params must be first input", mod.Name, idx)
-				}
-			case *pbsubstreams.Module_Input_Source_:
-				if i.Source.Type == "" {
-					return fmt.Errorf("module %q: source type empty", mod.Name)
-				}
-			case *pbsubstreams.Module_Input_Map_:
-				seekMod := i.Map.ModuleName
-				var found bool
-				for _, mod2 := range mods.Modules {
-					if mod2.Name == seekMod {
-						found = true
-						if _, ok := mod2.Kind.(*pbsubstreams.Module_KindMap_); !ok {
-							return fmt.Errorf("module %q: input %d: referenced module %q not of 'map' kind", mod.Name, idx, seekMod)
-						}
-					}
-				}
-				if !found {
-					return fmt.Errorf("module %q: map input named %q not found", mod.Name, seekMod)
-				}
-			case *pbsubstreams.Module_Input_Store_:
-				seekMod := i.Store.ModuleName
-				var found bool
-				for _, mod2 := range mods.Modules {
-					if mod2.Name == seekMod {
-						found = true
-						if _, ok := mod2.Kind.(*pbsubstreams.Module_KindStore_); !ok {
-							return fmt.Errorf("module %q: input %d: referenced module %q not of 'store' kind", mod.Name, idx, seekMod)
-						}
-					}
-				}
-				if !found {
-					return fmt.Errorf("module %q: store input named %q not found", mod.Name, seekMod)
-				}
+		err := checkValidBlockFilter(mod, mapModuleKind)
+		if err != nil {
+			return fmt.Errorf("checking block filter for module %q: %w", mod.Name, err)
+		}
 
-				switch i.Store.Mode {
-				case pbsubstreams.Module_Input_Store_GET, pbsubstreams.Module_Input_Store_DELTAS:
-				default:
-					return fmt.Errorf("module %q: input index %d: unknown store mode value %d", mod.Name, idx, i.Store.Mode)
-				}
-			}
+		err = checkValidInputs(mod, mapModuleKind)
+		if err != nil {
+			return fmt.Errorf("checking inputs for module %q: %w", mod.Name, err)
 		}
 	}
 

@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"regexp"
 
-	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-func (b *baseStore) ApplyDelta(delta *pbssinternal.StoreDelta) {
+func (b *baseStore) ApplyDelta(delta *pbsubstreams.StoreDelta) {
 	// Keys need to have at least one character, and mustn't start with 0xFF is reserved for internal use.
 	if len(delta.Key) == 0 {
 		panic(fmt.Sprintf("key invalid, must be at least 1 character for module %q", b.name))
@@ -20,7 +20,7 @@ func (b *baseStore) ApplyDelta(delta *pbssinternal.StoreDelta) {
 	oldSize := uint64(len(delta.OldValue))
 	keySize := uint64(len(delta.Key))
 	switch delta.Operation {
-	case pbssinternal.StoreDelta_UPDATE:
+	case pbsubstreams.StoreDelta_UPDATE:
 		b.kv[delta.Key] = delta.NewValue
 		switch {
 		case newSize > oldSize:
@@ -29,12 +29,12 @@ func (b *baseStore) ApplyDelta(delta *pbssinternal.StoreDelta) {
 			b.totalSizeBytes -= (oldSize - newSize)
 		}
 
-	case pbssinternal.StoreDelta_CREATE:
+	case pbsubstreams.StoreDelta_CREATE:
 		b.kv[delta.Key] = delta.NewValue
 		b.totalSizeBytes += newSize
 		b.totalSizeBytes += keySize
 
-	case pbssinternal.StoreDelta_DELETE:
+	case pbsubstreams.StoreDelta_DELETE:
 		delete(b.kv, delta.Key)
 		b.totalSizeBytes -= oldSize
 		b.totalSizeBytes -= keySize
@@ -52,7 +52,7 @@ func storeTooBigError(storeName string, size, limit uint64) error {
 	return fmt.Errorf("store %q became too big at %d, maximum size: %d", storeName, size, limit)
 }
 
-func (b *baseStore) ApplyDeltasReverse(deltas []*pbssinternal.StoreDelta) {
+func (b *baseStore) ApplyDeltasReverse(deltas []*pbsubstreams.StoreDelta) {
 	for i := len(deltas) - 1; i >= 0; i-- {
 		delta := deltas[i]
 
@@ -60,7 +60,7 @@ func (b *baseStore) ApplyDeltasReverse(deltas []*pbssinternal.StoreDelta) {
 		oldSize := uint64(len(delta.OldValue))
 		keySize := uint64(len(delta.Key))
 		switch delta.Operation {
-		case pbssinternal.StoreDelta_UPDATE:
+		case pbsubstreams.StoreDelta_UPDATE:
 			b.kv[delta.Key] = delta.OldValue
 			switch {
 			case newSize > oldSize:
@@ -69,12 +69,12 @@ func (b *baseStore) ApplyDeltasReverse(deltas []*pbssinternal.StoreDelta) {
 				b.totalSizeBytes += (oldSize - newSize)
 			}
 
-		case pbssinternal.StoreDelta_CREATE:
+		case pbsubstreams.StoreDelta_CREATE:
 			delete(b.kv, delta.Key)
 			b.totalSizeBytes -= newSize
 			b.totalSizeBytes -= keySize
 
-		case pbssinternal.StoreDelta_DELETE:
+		case pbsubstreams.StoreDelta_DELETE:
 			b.kv[delta.Key] = delta.OldValue
 			b.totalSizeBytes += oldSize
 			b.totalSizeBytes += keySize
@@ -83,11 +83,11 @@ func (b *baseStore) ApplyDeltasReverse(deltas []*pbssinternal.StoreDelta) {
 	}
 }
 
-func (b *baseStore) GetDeltas() []*pbssinternal.StoreDelta {
+func (b *baseStore) GetDeltas() []*pbsubstreams.StoreDelta {
 	return b.deltas
 }
 
-func (b *baseStore) SetDeltas(deltas []*pbssinternal.StoreDelta) {
+func (b *baseStore) SetDeltas(deltas []*pbsubstreams.StoreDelta) {
 	b.deltas = deltas
 	for _, delta := range deltas {
 		b.ApplyDelta(delta)

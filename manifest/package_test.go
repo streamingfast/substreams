@@ -1,6 +1,7 @@
 package manifest
 
 import (
+	"fmt"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"testing"
 
@@ -167,6 +168,46 @@ func TestHandleUseModules(t *testing.T) {
 			for index, mod := range c.pkg.Modules.Modules {
 				require.Equal(t, mod.String(), c.expectedOutputModules[index].String())
 			}
+		})
+	}
+}
+
+func TestValidateManifest(t *testing.T) {
+	cases := []struct {
+		name          string
+		manifest      *Manifest
+		expectedError string
+	}{
+		{
+			name: "sunny path",
+			manifest: &Manifest{
+				Modules: []*Module{
+					{Name: "basic_index", Kind: "blockIndex", Output: StreamOutput{"proto:sf.substreams.index.v1.Keys"}},
+				},
+			},
+			expectedError: "",
+		},
+		{
+			name: "incorrect block filter module",
+			manifest: &Manifest{
+				Modules: []*Module{
+					{Name: "bd_module", Kind: "blockIndex", Output: StreamOutput{"proto:sf.substreams.test"}, BlockFilter: BlockFilter{Module: "basic", Query: "this is my query"}},
+				},
+			},
+			expectedError: "",
+		},
+	}
+
+	manifestConverter := newManifestConverter("test", true)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			fmt.Println("Modules", c.manifest.Modules)
+			err := manifestConverter.validateManifest(c.manifest)
+			if c.expectedError != "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
 		})
 	}
 }

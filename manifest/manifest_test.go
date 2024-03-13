@@ -77,6 +77,42 @@ inputs:
 				Inputs: []*Input{{Source: "proto:sf.ethereum.type.v1.Block"}, {Store: "pairs"}, {Map: "map_clocks"}},
 			},
 		},
+		{
+			name: "basic index",
+			rawYamlInput: `---
+name: basic_index
+kind: blockIndex
+output:
+    type: proto:sf.substreams.index.v1.Keys
+`,
+			expectedOutput: Module{
+				Kind:   ModuleKindBlockIndex,
+				Name:   "basic_index",
+				Output: StreamOutput{Type: "proto:sf.substreams.index.v1.Keys"},
+			},
+		},
+		{
+			name: "basic with block filter",
+			rawYamlInput: `---
+name: bf_module
+kind: map
+blockFilter:
+ module: basic_index
+ query: this is my query
+output:
+    type: proto:sf.substreams.database.changes.v1
+`,
+
+			expectedOutput: Module{
+				Kind:   ModuleKindMap,
+				Name:   "bf_module",
+				Output: StreamOutput{Type: "proto:sf.substreams.database.changes.v1"},
+				BlockFilter: BlockFilter{
+					Module: "basic_index",
+					Query:  "this is my query",
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {

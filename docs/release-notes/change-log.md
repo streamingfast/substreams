@@ -11,6 +11,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+* Implement a `use` feature, enabling a module to use an existing module by overriding its inputs or initial block. (Inputs should have the same output type than override module's inputs).
+  Check a usage of this new feature on the [substreams-db-graph-converter](https://github.com/streamingfast/substreams-db-graph-converter/) repository. 
+
 * Pick up docs from the README.md or README in the same directory as the manifest, when top-level package.doc is empty
 * Tier2 service now supports a maximum concurrent requests limit. Default set to 0 (unlimited). 
 * Improved file listing performance for Google Storage backends by 25%

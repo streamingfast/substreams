@@ -61,6 +61,22 @@ inputs:
 				Inputs:       []*Input{{Source: "proto:sf.ethereum.type.v1.Block"}, {Store: "pairs"}},
 			},
 		},
+		{
+			name: "basic module with use",
+			rawYamlInput: `---
+name: use_module
+use: converter:dbout_to_graphout
+inputs:
+  - source: proto:sf.ethereum.type.v1.Block
+  - store: pairs
+  - map: map_clocks
+`,
+			expectedOutput: Module{
+				Name:   "use_module",
+				Use:    "converter:dbout_to_graphout",
+				Inputs: []*Input{{Source: "proto:sf.ethereum.type.v1.Block"}, {Store: "pairs"}, {Map: "map_clocks"}},
+			},
+		},
 	}
 
 	for _, tt := range tests {

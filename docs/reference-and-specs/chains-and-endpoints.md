@@ -30,8 +30,7 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 | NEAR     | [`sf.near.type.v1.Block`](https://github.com/streamingfast/firehose-near/blob/develop/proto/sf/near/type/v1/type.proto)                       |                                                                                                                       |
 | Solana   | [`sf.solana.type.v1.Block`](https://github.com/streamingfast/firehose-solana/blob/develop/proto/sf/solana/type/v1/type.proto)                 | [solana-v0.1.0.spkg](https://github.com/streamingfast/sf-solana/releases/download/v0.1.0/solana-v0.1.0.spkg)          |
 | Cosmos   | [`sf.cosmos.type.v1.Block`](https://github.com/figment-networks/proto-cosmos/blob/main/sf/cosmos/type/v1/type.proto)                          |                                                                                                                       |
-| Arweave  | [`sf.arweave.type.v1.Block`](https://github.com/streamingfast/firehose-arweave/blob/develop/proto/sf/arweave/type/v1/type.proto)              |                                                                                                                       |
-| Aptos    | [`aptos.extractor.v1.Block`](https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-protos/proto/aptos/extractor/v1/extractor.proto) |                                                                                                                       |
+| Arweave  | [`sf.arweave.type.v1.Block`](https://github.com/streamingfast/firehose-arweave/blob/develop/proto/sf/arweave/type/v1/type.proto)              |                                                                                                                       |                                                                                                              |
 | Bitcoin  | [`sf.bitcoin.type.v1.Block`](https://github.com/streamingfast/firehose-bitcoin/blob/develop/proto/sf/bitcoin/type/v1/type.proto)              |                                                                                                                       |
 
 ## Endpoints
@@ -50,7 +49,6 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 * **NEAR Testnet**: `testnet.near.streamingfast.io:443`
 * **Solana mainnet-beta**: `mainnet.sol.streamingfast.io:443`
 * **Arweave Mainnet**: `mainnet.arweave.streamingfast.io:443`
-* **Aptos Testnet**: `testnet.aptos.streamingfast.io:443`
 * **Bitcoin Mainnet**: `mainnet.btc.streamingfast.io:443`
 
 ## Others

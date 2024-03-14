@@ -25,7 +25,6 @@ func newManifestConverter(inputPath string, skipSourceCodeImportValidation bool)
 }
 
 func (r *manifestConverter) Convert(manif *Manifest) (*pbsubstreams.Package, []*desc.FileDescriptor, *dynamic.Message, error) {
-
 	if err := r.expandManifestVariables(manif); err != nil {
 		return nil, nil, nil, err
 	}
@@ -56,7 +55,6 @@ func (r *manifestConverter) expandManifestVariables(manif *Manifest) error {
 }
 
 func (r *manifestConverter) validateManifest(manif *Manifest) error {
-
 	if manif.SpecVersion != "v0.1.0" {
 		return fmt.Errorf("invalid 'specVersion', must be v0.1.0")
 	}
@@ -72,9 +70,15 @@ func (r *manifestConverter) validateManifest(manif *Manifest) error {
 			if s.Output.Type == "" {
 				return fmt.Errorf("stream %q: missing 'output.type' for kind 'map'", s.Name)
 			}
+			if s.Use != "" {
+				return fmt.Errorf("stream %q: 'use' is not allowed for kind 'map'", s.Name)
+			}
 		case ModuleKindStore:
 			if err := validateStoreBuilder(s); err != nil {
 				return fmt.Errorf("stream %q: %w", s.Name, err)
+			}
+			if s.Use != "" {
+				return fmt.Errorf("stream %q: 'use' is not allowed for kind 'store'", s.Name)
 			}
 		case "":
 			if s.Use == "" {

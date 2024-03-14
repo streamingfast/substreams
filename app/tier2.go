@@ -111,9 +111,12 @@ func (a *Tier2App) Run() error {
 		return fmt.Errorf("failed to setup trust authenticator: %w", err)
 	}
 
+	a.OnTerminating(func(_ error) { metrics.AppReadinessTier2.SetNotReady() })
+
 	go func() {
 		a.logger.Info("launching gRPC server")
 		a.isReady.CompareAndSwap(false, true)
+		metrics.AppReadinessTier2.SetReady()
 
 		err := service.ListenTier2(a.config.GRPCListenAddr, a.config.ServiceDiscoveryURL, svc, trustAuth, a.logger, a.HealthCheck)
 		a.Shutdown(err)

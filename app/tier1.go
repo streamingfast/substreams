@@ -177,6 +177,8 @@ func (a *Tier1App) Run() error {
 	}
 
 	a.OnTerminating(func(err error) {
+		metrics.AppReadinessTier1.SetNotReady()
+
 		svc.Shutdown(err)
 		time.Sleep(2 * time.Second) // enough time to send termination grpc responses
 	})
@@ -186,7 +188,7 @@ func (a *Tier1App) Run() error {
 			a.logger.Info("waiting until hub is real-time synced")
 			select {
 			case <-forkableHub.Ready:
-				metrics.AppReadiness.SetReady()
+				metrics.AppReadinessTier1.SetReady()
 			case <-a.Terminating():
 				return
 			}

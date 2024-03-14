@@ -292,7 +292,8 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	outputModule := outputGraph.OutputModule()
 
 	var execOutWriter *execout.Writer
-	if !outputGraph.StagedUsedModules()[request.Stage].LastLayer().IsStoreLayer() {
+	isOutputMapperStage := !outputGraph.StagedUsedModules()[request.Stage].LastLayer().IsStoreLayer()
+	if isOutputMapperStage {
 		execOutWriter = execout.NewWriter(
 			requestDetails.ResolvedStartBlockNum,
 			requestDetails.StopBlockNum,
@@ -310,10 +311,9 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		if err != nil {
 			continue
 		}
-		if name == request.OutputModule {
+		if isOutputMapperStage && name == request.OutputModule {
 			logger.Info("found existing exec output for output_module, skipping run", zap.String("output_module", name))
 			return nil
-
 		}
 		existingExecOuts[name] = file
 	}
@@ -423,7 +423,7 @@ func checkSkipBlocksAndStores(existingExecOuts map[string]*execout.File, outputG
 	skipBlocks = true
 	skipStores = true
 	for _, module := range outputGraph.UsedModules() {
-		if existingExecOuts[module.Name] != nil {
+		if existingExecOuts[module.Name] != nil && outputGraph.OutputModule().Name != module.Name { // we don't skip the store if that store is actually our output module
 			continue
 		}
 		for _, input := range module.Inputs {

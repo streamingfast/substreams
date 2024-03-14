@@ -78,7 +78,7 @@ func (r *manifestConverter) validateManifest(manif *Manifest) error {
 			}
 		case "":
 			if s.Use == "" {
-				return fmt.Errorf("stream %q: missing 'use' attribute for a module not specifying any kind", s.Name)
+				return fmt.Errorf("module kind not specified for %q", s.Name)
 			}
 
 			if err := validateModuleWithUse(s); err != nil {
@@ -88,6 +88,7 @@ func (r *manifestConverter) validateManifest(manif *Manifest) error {
 		default:
 			return fmt.Errorf("stream %q: invalid kind %q", s.Name, s.Kind)
 		}
+
 		for idx, input := range s.Inputs {
 			if err := input.parse(); err != nil {
 				return fmt.Errorf("module %q: invalid input [%d]: %w", s.Name, idx, err)
@@ -105,27 +106,29 @@ func handleUseModules(pkg *pbsubstreams.Package, manif *Manifest) error {
 	}
 
 	for _, manifestModule := range manif.Modules {
-		if manifestModule.Use != "" {
-			usedModule, found := packageModulesMapping[manifestModule.Use]
-			if !found {
-				return fmt.Errorf("module %q: use module %q not found", manifestModule.Name, manifestModule.Use)
-			}
-			moduleWithUse := packageModulesMapping[manifestModule.Name]
-
-			if err := checkEqualInputs(moduleWithUse, usedModule, manifestModule, packageModulesMapping); err != nil {
-				return fmt.Errorf("checking inputs for module %q: %w", manifestModule.Name, err)
-			}
-
-			moduleWithUse.BinaryIndex = usedModule.BinaryIndex
-			moduleWithUse.BinaryEntrypoint = usedModule.BinaryEntrypoint
-
-			if moduleWithUse.InitialBlock == 0 {
-				moduleWithUse.InitialBlock = usedModule.InitialBlock
-			}
-
-			moduleWithUse.Output = usedModule.Output
-			moduleWithUse.Kind = usedModule.Kind
+		if manifestModule.Use == "" {
+			continue
 		}
+
+		usedModule, found := packageModulesMapping[manifestModule.Use]
+		if !found {
+			return fmt.Errorf("module %q: use module %q not found", manifestModule.Name, manifestModule.Use)
+		}
+		moduleWithUse := packageModulesMapping[manifestModule.Name]
+
+		if err := checkEqualInputs(moduleWithUse, usedModule, manifestModule, packageModulesMapping); err != nil {
+			return fmt.Errorf("checking inputs for module %q: %w", manifestModule.Name, err)
+		}
+
+		moduleWithUse.BinaryIndex = usedModule.BinaryIndex
+		moduleWithUse.BinaryEntrypoint = usedModule.BinaryEntrypoint
+
+		if moduleWithUse.InitialBlock == 0 {
+			moduleWithUse.InitialBlock = usedModule.InitialBlock
+		}
+
+		moduleWithUse.Output = usedModule.Output
+		moduleWithUse.Kind = usedModule.Kind
 	}
 	return nil
 }
@@ -140,6 +143,7 @@ func checkEqualInputs(moduleWithUse, usedModule *pbsubstreams.Module, manifestMo
 			if input.GetParams().Value != usedModuleInput.GetParams().Value {
 				return fmt.Errorf("module %q: input %q has different value than the used module %q: input %q", manifestModuleWithUse.Name, input.String(), manifestModuleWithUse.Use, usedModuleInput.String())
 			}
+			continue
 		}
 		if input.GetSource() != nil {
 			if usedModuleInput.GetSource() == nil {
@@ -148,6 +152,7 @@ func checkEqualInputs(moduleWithUse, usedModule *pbsubstreams.Module, manifestMo
 			if input.GetSource().Type != usedModuleInput.GetSource().Type {
 				return fmt.Errorf("module %q: input %q has different source than the used module %q: input %q", manifestModuleWithUse.Name, input.String(), manifestModuleWithUse.Use, usedModuleInput.String())
 			}
+			continue
 		}
 		if input.GetStore() != nil {
 			if usedModuleInput.GetStore() == nil {
@@ -158,10 +163,21 @@ func checkEqualInputs(moduleWithUse, usedModule *pbsubstreams.Module, manifestMo
 			}
 
 			inputStoreModuleName := input.GetStore().ModuleName
+			_, found := packageModulesMapping[inputStoreModuleName]
+			if !found {
+				return fmt.Errorf("module %q: input %q store module %q not found", manifestModuleWithUse.Name, input.String(), inputStoreModuleName)
+			}
+
 			usedModuleStoreMapModuleName := usedModuleInput.GetStore().ModuleName
+			_, found = packageModulesMapping[usedModuleStoreMapModuleName]
+			if !found {
+				return fmt.Errorf("module %q: input %q store module %q not found", manifestModuleWithUse.Name, usedModuleInput.String(), usedModuleStoreMapModuleName)
+			}
+
 			if packageModulesMapping[inputStoreModuleName].Output.Type != packageModulesMapping[usedModuleStoreMapModuleName].Output.Type {
 				return fmt.Errorf("module %q: input %q has different output than the used module %q: input %q", manifestModuleWithUse.Name, input.String(), manifestModuleWithUse.Use, usedModuleInput.String())
 			}
+			continue
 
 		}
 		if input.GetMap() != nil {
@@ -170,10 +186,21 @@ func checkEqualInputs(moduleWithUse, usedModule *pbsubstreams.Module, manifestMo
 			}
 
 			inputMapModuleName := input.GetMap().ModuleName
+			_, found := packageModulesMapping[inputMapModuleName]
+			if !found {
+				return fmt.Errorf("module %q: input %q map module %q not found", manifestModuleWithUse.Name, input.String(), inputMapModuleName)
+			}
+
 			usedModuleInputMapModuleName := usedModuleInput.GetMap().ModuleName
+			_, found = packageModulesMapping[usedModuleInputMapModuleName]
+			if !found {
+				return fmt.Errorf("module %q: input %q map module %q not found", manifestModuleWithUse.Name, usedModuleInput.String(), usedModuleInputMapModuleName)
+			}
+
 			if packageModulesMapping[inputMapModuleName].Output.Type != packageModulesMapping[usedModuleInputMapModuleName].Output.Type {
 				return fmt.Errorf("module %q: input %q has different output than the used module %q: input %q", manifestModuleWithUse.Name, input.String(), manifestModuleWithUse.Use, usedModuleInput.String())
 			}
+			continue
 		}
 	}
 	return nil

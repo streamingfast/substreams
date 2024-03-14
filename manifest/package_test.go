@@ -219,6 +219,19 @@ func TestValidateManifest(t *testing.T) {
 			},
 			expectedError: "stream \"basic_index\": block index module cannot have initial block",
 		},
+		{
+			name: "block index with block filter",
+			manifest: &Manifest{
+				SpecVersion: "v0.1.0",
+				Modules: []*Module{
+					{Name: "basic_index", Kind: "blockIndex", BlockFilter: &BlockFilter{
+						Module: "my_module",
+						Query:  "test query",
+					}, Output: StreamOutput{"proto:sf.substreams.index.v1.Keys"}},
+				},
+			},
+			expectedError: "stream \"basic_index\": block index module cannot have block filter",
+		},
 	}
 
 	manifestConv := newManifestConverter("test", true)

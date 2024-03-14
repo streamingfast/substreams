@@ -10,9 +10,8 @@ import (
 	"regexp"
 	"strings"
 
-	"gopkg.in/yaml.v3"
-
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"gopkg.in/yaml.v3"
 )
 
 const UNSET = math.MaxUint64
@@ -84,11 +83,11 @@ type Protobuf struct {
 }
 
 type Module struct {
-	Name         string      `yaml:"name"`
-	Doc          string      `yaml:"doc"`
-	Kind         string      `yaml:"kind"`
-	InitialBlock *uint64     `yaml:"initialBlock"`
-	BlockFilter  BlockFilter `yaml:"blockFilter"`
+	Name         string       `yaml:"name"`
+	Doc          string       `yaml:"doc"`
+	Kind         string       `yaml:"kind"`
+	InitialBlock *uint64      `yaml:"initialBlock"`
+	BlockFilter  *BlockFilter `yaml:"blockFilter"`
 
 	UpdatePolicy string `yaml:"updatePolicy"`
 	ValueType    string `yaml:"valueType"`
@@ -302,7 +301,7 @@ func (m *Module) ToProtoWASM(codeIndex uint32) (*pbsubstreams.Module, error) {
 }
 
 func (m *Module) setBlockFilterToProto(pbModule *pbsubstreams.Module) {
-	if m.BlockFilter.Module != "" {
+	if m.BlockFilter != nil {
 		pbModule.BlockFilter = &pbsubstreams.Module_BlockFilter{
 			Module: m.BlockFilter.Module,
 			Query:  m.BlockFilter.Query,

@@ -89,7 +89,10 @@ func (r *manifestConverter) validateManifest(manif *Manifest) error {
 				return fmt.Errorf("stream %q: block index module cannot have initial block", s.Name)
 			}
 
-			//TODO: Validate the output type
+			if s.BlockFilter != nil {
+				return fmt.Errorf("stream %q: block index module cannot have block filter", s.Name)
+			}
+
 			if s.Output.Type != "proto:sf.substreams.index.v1.Keys" {
 				return fmt.Errorf("stream %q: block index module must have output type 'proto:sf.substreams.index.v1.Keys'", s.Name)
 			}

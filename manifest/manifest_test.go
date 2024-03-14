@@ -107,7 +107,7 @@ output:
 				Kind:   ModuleKindMap,
 				Name:   "bf_module",
 				Output: StreamOutput{Type: "proto:sf.substreams.database.changes.v1"},
-				BlockFilter: BlockFilter{
+				BlockFilter: &BlockFilter{
 					Module: "basic_index",
 					Query:  "this is my query",
 				},

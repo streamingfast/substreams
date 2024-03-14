@@ -9,12 +9,12 @@ import (
 	"sync"
 
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+	"github.com/streamingfast/dmetering"
 
 	"github.com/streamingfast/bstream"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/substreams/metrics"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -23,6 +23,24 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
 )
+
+func (p *Pipeline) ProcessFromExecOutput(
+	ctx context.Context,
+	clock *pbsubstreams.Clock,
+	cursor *bstream.Cursor,
+) (err error) {
+	p.gate.processBlock(clock.Number, bstream.StepNewIrreversible)
+	execOutput, err := p.execOutputCache.NewBuffer(nil, clock, cursor)
+	if err != nil {
+		return fmt.Errorf("setting up exec output: %w", err)
+	}
+
+	if err = p.processBlock(ctx, execOutput, clock, cursor, bstream.StepNewIrreversible, nil); err != nil {
+		return err
+	}
+
+	return nil
+}
 
 func (p *Pipeline) ProcessBlock(block *pbbstream.Block, obj interface{}) (err error) {
 	ctx := p.ctx
@@ -51,12 +69,16 @@ func (p *Pipeline) ProcessBlock(block *pbbstream.Block, obj interface{}) (err er
 		step = bstream.StepNewIrreversible // with finalBlocksOnly, we never get NEW signals so we fake any 'irreversible' signal as both
 	}
 
-	finalBlockHeight := obj.(bstream.Stepable).FinalBlockHeight()
 	reorgJunctionBlock := obj.(bstream.Stepable).ReorgJunctionBlock()
 
 	reqctx.ReqStats(ctx).RecordBlock(block.AsRef())
 	p.gate.processBlock(block.Number, step)
-	if err = p.processBlock(ctx, block, clock, cursor, step, finalBlockHeight, reorgJunctionBlock); err != nil {
+	execOutput, err := p.execOutputCache.NewBuffer(block, clock, cursor)
+	if err != nil {
+		return fmt.Errorf("setting up exec output: %w", err)
+	}
+
+	if err = p.processBlock(ctx, execOutput, clock, cursor, step, reorgJunctionBlock); err != nil {
 		return err // watch out, io.EOF needs to go through undecorated
 	}
 	return
@@ -79,11 +101,10 @@ func blockRefToPB(block bstream.BlockRef) *pbsubstreams.BlockRef {
 
 func (p *Pipeline) processBlock(
 	ctx context.Context,
-	block *pbbstream.Block,
+	execOutput execout.ExecutionOutput,
 	clock *pbsubstreams.Clock,
 	cursor *bstream.Cursor,
 	step bstream.StepType,
-	finalBlockHeight uint64,
 	reorgJunctionBlock bstream.BlockRef,
 ) (err error) {
 	var eof bool
@@ -101,11 +122,9 @@ func (p *Pipeline) processBlock(
 		}
 	case bstream.StepNew:
 		p.blockStepMap[bstream.StepNew]++
-		// metering of live blocks
-		payload := block.Payload.Value
-		dmetering.GetBytesMeter(ctx).AddBytesRead(len(payload))
 
-		err = p.handleStepNew(ctx, block, clock, cursor)
+		dmetering.GetBytesMeter(ctx).AddBytesRead(execOutput.Len())
+		err = p.handleStepNew(ctx, clock, cursor, execOutput)
 		if err != nil && err != io.EOF {
 			return fmt.Errorf("step new: handler step new: %w", err)
 		}
@@ -114,7 +133,7 @@ func (p *Pipeline) processBlock(
 		}
 	case bstream.StepNewIrreversible:
 		p.blockStepMap[bstream.StepNewIrreversible]++
-		err := p.handleStepNew(ctx, block, clock, cursor)
+		err = p.handleStepNew(ctx, clock, cursor, execOutput)
 		if err != nil && err != io.EOF {
 			return fmt.Errorf("step new irr: handler step new: %w", err)
 		}
@@ -133,11 +152,11 @@ func (p *Pipeline) processBlock(
 		}
 	}
 
-	if block.Number%500 == 0 {
+	if clock.Number%500 == 0 {
 		logger := reqctx.Logger(ctx)
 		// log the total number of StepNew and StepNewIrreversible blocks, and the ratio of the two
 		logger.Debug("block stats",
-			zap.Uint64("block_num", block.Number),
+			zap.Uint64("block_num", clock.Number),
 			zap.Uint64("step_new", p.blockStepMap[bstream.StepNew]),
 			zap.Uint64("step_new_irreversible", p.blockStepMap[bstream.StepNewIrreversible]),
 			zap.Float64("ratio", float64(p.blockStepMap[bstream.StepNewIrreversible])/float64(p.blockStepMap[bstream.StepNew])),
@@ -197,7 +216,7 @@ func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
 	return nil
 }
 
-func (p *Pipeline) handleStepNew(ctx context.Context, block *pbbstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) (err error) {
+func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput) (err error) {
 	p.insideReorgUpTo = nil
 	reqDetails := reqctx.Details(ctx)
 
@@ -241,17 +260,12 @@ func (p *Pipeline) handleStepNew(ctx context.Context, block *pbbstream.Block, cl
 	}
 
 	logger := reqctx.Logger(ctx)
-	execOutput, err := p.execOutputCache.NewBuffer(block, clock, cursor)
-	if err != nil {
-		return fmt.Errorf("setting up exec output: %w", err)
-	}
 
 	if err := p.runPreBlockHooks(ctx, clock); err != nil {
 		return fmt.Errorf("pre block hook: %w", err)
 	}
 
-	dmetering.GetBytesMeter(ctx).CountInc("wasm_input_bytes", len(block.Payload.Value))
-
+	dmetering.GetBytesMeter(ctx).CountInc("wasm_input_bytes", execOutput.Len())
 	if err := p.executeModules(ctx, execOutput); err != nil {
 		return fmt.Errorf("execute modules: %w", err)
 	}
@@ -270,7 +284,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, block *pbbstream.Block, cl
 	}
 
 	p.stores.resetStores()
-	logger.Debug("block processed", zap.Uint64("block_num", block.Number))
+	logger.Debug("block processed", zap.Uint64("block_num", clock.Number))
 	return nil
 }
 

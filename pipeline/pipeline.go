@@ -112,7 +112,7 @@ func New(
 	return pipe
 }
 
-func (p *Pipeline) init(ctx context.Context) (err error) {
+func (p *Pipeline) Init(ctx context.Context) (err error) {
 	reqDetails := reqctx.Details(ctx)
 
 	p.forkHandler.registerUndoHandler(func(clock *pbsubstreams.Clock, moduleOutputs []*pbssinternal.ModuleOutput) {
@@ -138,9 +138,6 @@ func (p *Pipeline) init(ctx context.Context) (err error) {
 }
 
 func (p *Pipeline) InitTier2Stores(ctx context.Context) (err error) {
-	if err := p.init(ctx); err != nil {
-		return err
-	}
 
 	storeMap, err := p.setupSubrequestStores(ctx)
 	if err != nil {
@@ -156,9 +153,6 @@ func (p *Pipeline) InitTier2Stores(ctx context.Context) (err error) {
 }
 
 func (p *Pipeline) InitTier1StoresAndBackprocess(ctx context.Context, reqPlan *plan.RequestPlan) (err error) {
-	if err := p.init(ctx); err != nil {
-		return err
-	}
 
 	if reqPlan.RequiresParallelProcessing() {
 		storeMap, err := p.runParallelProcess(ctx, reqPlan)

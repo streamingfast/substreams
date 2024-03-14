@@ -7,6 +7,7 @@ import (
 )
 
 type ExecutionOutputGetter interface {
+	Len() int
 	Clock() *pbsubstreams.Clock
 	Get(name string) (value []byte, cached bool, err error)
 }

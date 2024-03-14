@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package sf.substreams.index.v1;
+option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/index/v1;pbsubstreams";
+
+
+message Keys {
+  repeated string keys = 1;
+}
+

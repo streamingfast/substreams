@@ -10,9 +10,8 @@ import (
 	"regexp"
 	"strings"
 
-	"gopkg.in/yaml.v3"
-
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"gopkg.in/yaml.v3"
 )
 
 const UNSET = math.MaxUint64
@@ -24,8 +23,9 @@ func init() {
 }
 
 const (
-	ModuleKindStore = "store"
-	ModuleKindMap   = "map"
+	ModuleKindStore      = "store"
+	ModuleKindMap        = "map"
+	ModuleKindBlockIndex = "blockIndex"
 )
 
 // Manifest is a YAML structure used to create a Package and its list
@@ -39,9 +39,10 @@ type Manifest struct {
 	Modules     []*Module         `yaml:"modules"`
 	Params      map[string]string `yaml:"params"`
 
-	Network  string                    `yaml:"network"`
-	Networks map[string]*NetworkParams `yaml:"networks"`
-	Sink     *Sink                     `yaml:"sink"`
+	BlockFilters map[string]string         `yaml:"blockFilters"`
+	Network      string                    `yaml:"network"`
+	Networks     map[string]*NetworkParams `yaml:"networks"`
+	Sink         *Sink                     `yaml:"sink"`
 
 	Graph   *ModuleGraph `yaml:"-"`
 	Workdir string       `yaml:"-"`
@@ -82,10 +83,11 @@ type Protobuf struct {
 }
 
 type Module struct {
-	Name         string  `yaml:"name"`
-	Doc          string  `yaml:"doc"`
-	Kind         string  `yaml:"kind"`
-	InitialBlock *uint64 `yaml:"initialBlock"`
+	Name         string       `yaml:"name"`
+	Doc          string       `yaml:"doc"`
+	Kind         string       `yaml:"kind"`
+	InitialBlock *uint64      `yaml:"initialBlock"`
+	BlockFilter  *BlockFilter `yaml:"blockFilter"`
 
 	UpdatePolicy string `yaml:"updatePolicy"`
 	ValueType    string `yaml:"valueType"`
@@ -94,6 +96,11 @@ type Module struct {
 	Inputs []*Input     `yaml:"inputs"`
 	Output StreamOutput `yaml:"output"`
 	Use    string       `yaml:"use"`
+}
+
+type BlockFilter struct {
+	Module string `yaml:"module"`
+	Query  string `yaml:"query"`
 }
 
 type Input struct {
@@ -282,12 +289,24 @@ func (m *Module) ToProtoWASM(codeIndex uint32) (*pbsubstreams.Module, error) {
 
 	m.setOutputToProto(out)
 	m.setKindToProto(out)
+
+	m.setBlockFilterToProto(out)
+
 	err := m.setInputsToProto(out)
 	if err != nil {
 		return nil, fmt.Errorf("setting input for module, %s: %w", m.Name, err)
 	}
 
 	return out, nil
+}
+
+func (m *Module) setBlockFilterToProto(pbModule *pbsubstreams.Module) {
+	if m.BlockFilter != nil {
+		pbModule.BlockFilter = &pbsubstreams.Module_BlockFilter{
+			Module: m.BlockFilter.Module,
+			Query:  m.BlockFilter.Query,
+		}
+	}
 }
 
 func (m *Module) setInputsToProto(pbModule *pbsubstreams.Module) error {

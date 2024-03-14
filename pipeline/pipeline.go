@@ -336,7 +336,7 @@ func toRPCStoreModuleOutputs(in *pbssinternal.ModuleOutput) (out *pbsubstreamsrp
 	}
 }
 
-func toRPCDeltas(in *pbssinternal.StoreDeltas) (out []*pbsubstreamsrpc.StoreDelta) {
+func toRPCDeltas(in *pbsubstreams.StoreDeltas) (out []*pbsubstreamsrpc.StoreDelta) {
 	if len(in.StoreDeltas) == 0 {
 		return nil
 	}
@@ -354,13 +354,13 @@ func toRPCDeltas(in *pbssinternal.StoreDeltas) (out []*pbsubstreamsrpc.StoreDelt
 	return
 }
 
-func toRPCOperation(in pbssinternal.StoreDelta_Operation) (out pbsubstreamsrpc.StoreDelta_Operation) {
+func toRPCOperation(in pbsubstreams.StoreDelta_Operation) (out pbsubstreamsrpc.StoreDelta_Operation) {
 	switch in {
-	case pbssinternal.StoreDelta_UPDATE:
+	case pbsubstreams.StoreDelta_UPDATE:
 		return pbsubstreamsrpc.StoreDelta_UPDATE
-	case pbssinternal.StoreDelta_CREATE:
+	case pbsubstreams.StoreDelta_CREATE:
 		return pbsubstreamsrpc.StoreDelta_CREATE
-	case pbssinternal.StoreDelta_DELETE:
+	case pbsubstreams.StoreDelta_DELETE:
 		return pbsubstreamsrpc.StoreDelta_DELETE
 	}
 	return pbsubstreamsrpc.StoreDelta_UNSET

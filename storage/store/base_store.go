@@ -3,7 +3,6 @@ package store
 import (
 	"fmt"
 
-	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage/store/marshaller"
 	"go.uber.org/zap"
@@ -14,7 +13,7 @@ type baseStore struct {
 	*Config
 
 	kv             map[string][]byte          // kv is the state, and assumes all deltas were already applied to it.
-	deltas         []*pbssinternal.StoreDelta // deltas are always deltas for the given block.
+	deltas         []*pbsubstreams.StoreDelta // deltas are always deltas for the given block.
 	lastOrdinal    uint64
 	marshaller     marshaller.Marshaller
 	totalSizeBytes uint64

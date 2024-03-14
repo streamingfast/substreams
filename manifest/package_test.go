@@ -1,6 +1,7 @@
 package manifest
 
 import (
+	"fmt"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"testing"
 
@@ -167,6 +168,232 @@ func TestHandleUseModules(t *testing.T) {
 			for index, mod := range c.pkg.Modules.Modules {
 				require.Equal(t, mod.String(), c.expectedOutputModules[index].String())
 			}
+		})
+	}
+}
+
+func TestValidateManifest(t *testing.T) {
+	var initialBlock uint64 = 123
+	cases := []struct {
+		name          string
+		manifest      *Manifest
+		expectedError string
+	}{
+		{
+			name: "sunny path",
+			manifest: &Manifest{
+				SpecVersion: "v0.1.0",
+				Modules: []*Module{
+					{Name: "basic_index", Kind: "blockIndex", Inputs: []*Input{{Map: "proto:sf.database.v1.changes"}}, Output: StreamOutput{"proto:sf.substreams.index.v1.Keys"}},
+				},
+			},
+			expectedError: "",
+		},
+		{
+			name: "block index with different output",
+			manifest: &Manifest{
+				SpecVersion: "v0.1.0",
+				Modules: []*Module{
+					{Name: "basic_index", Kind: "blockIndex", Inputs: []*Input{{Map: "proto:sf.database.v1.changes"}}, Output: StreamOutput{"proto:sf.substreams.test"}},
+				},
+			},
+			expectedError: "stream \"basic_index\": block index module must have output type 'proto:sf.substreams.index.v1.Keys'",
+		},
+		{
+			name: "block index with params input",
+			manifest: &Manifest{
+				SpecVersion: "v0.1.0",
+				Modules: []*Module{
+					{Name: "basic_index", Kind: "blockIndex", Inputs: []*Input{{Params: "proto:sf.database.v1.changes"}}, Output: StreamOutput{"proto:sf.substreams.index.v1.Keys"}},
+				},
+			},
+			expectedError: "stream \"basic_index\": block index module cannot have params input",
+		},
+		{
+			name: "block index without input",
+			manifest: &Manifest{
+				SpecVersion: "v0.1.0",
+				Modules: []*Module{
+					{Name: "basic_index", Kind: "blockIndex", Output: StreamOutput{"proto:sf.substreams.index.v1.Keys"}},
+				},
+			},
+			expectedError: "stream \"basic_index\": block index module should have inputs",
+		},
+		{
+			name: "block index with initialBlock",
+			manifest: &Manifest{
+				SpecVersion: "v0.1.0",
+				Modules: []*Module{
+					{Name: "basic_index", Kind: "blockIndex", Inputs: []*Input{{Map: "proto:sf.database.v1.changes"}}, InitialBlock: &initialBlock, Output: StreamOutput{"proto:sf.substreams.index.v1.Keys"}},
+				},
+			},
+			expectedError: "stream \"basic_index\": block index module cannot have initial block",
+		},
+		{
+			name: "block index with block filter",
+			manifest: &Manifest{
+				SpecVersion: "v0.1.0",
+				Modules: []*Module{
+					{Name: "basic_index", Kind: "blockIndex", BlockFilter: &BlockFilter{
+						Module: "my_module",
+						Query:  "test query",
+					}, Inputs: []*Input{{Map: "proto:sf.database.v1.changes"}}, Output: StreamOutput{"proto:sf.substreams.index.v1.Keys"}},
+				},
+			},
+			expectedError: "stream \"basic_index\": block index module cannot have block filter",
+		},
+	}
+
+	manifestConv := newManifestConverter("test", true)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			fmt.Println("Modules", c.manifest.Modules)
+			err := manifestConv.validateManifest(c.manifest)
+			if c.expectedError == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			require.Equal(t, c.expectedError, err.Error())
+		})
+	}
+}
+
+func TestValidateModules(t *testing.T) {
+	cases := []struct {
+		name          string
+		modules       *pbsubstreams.Modules
+		expectedError string
+	}{
+		{
+			name: "sunny path",
+			modules: &pbsubstreams.Modules{
+				Modules: []*pbsubstreams.Module{
+					{
+						Name:             "test_module",
+						BinaryEntrypoint: "test_module",
+						InitialBlock:     uint64(62),
+						Kind: &pbsubstreams.Module_KindMap_{
+							KindMap: &pbsubstreams.Module_KindMap{
+								OutputType: "sf.database.v1.changes",
+							},
+						},
+						Inputs: []*pbsubstreams.Module_Input{
+							{Input: &pbsubstreams.Module_Input_Source_{Source: &pbsubstreams.Module_Input_Source{Type: "sf.database.v1.changes"}}},
+						},
+						Output: &pbsubstreams.Module_Output{
+							Type: "sf.entity.v1.changes",
+						},
+						BlockFilter: &pbsubstreams.Module_BlockFilter{
+							Module: "block_index",
+							Query:  "This is my query",
+						},
+					},
+
+					{
+						Name:             "block_index",
+						BinaryEntrypoint: "block_index",
+						Kind:             &pbsubstreams.Module_KindBlockIndex_{KindBlockIndex: &pbsubstreams.Module_KindBlockIndex{OutputType: "sf.substreams.index.v1.Keys"}},
+						Output: &pbsubstreams.Module_Output{
+							Type: "sf.substreams.index.v1.Keys",
+						},
+					},
+				},
+			},
+			expectedError: "",
+		},
+		{
+			name: "wrong blockfilter module",
+			modules: &pbsubstreams.Modules{
+				Modules: []*pbsubstreams.Module{
+					{
+						Name:             "test_module",
+						BinaryEntrypoint: "test_module",
+						InitialBlock:     uint64(62),
+						Kind: &pbsubstreams.Module_KindMap_{
+							KindMap: &pbsubstreams.Module_KindMap{
+								OutputType: "sf.database.v1.changes",
+							},
+						},
+						Inputs: []*pbsubstreams.Module_Input{
+							{Input: &pbsubstreams.Module_Input_Source_{Source: &pbsubstreams.Module_Input_Source{Type: "sf.database.v1.changes"}}},
+						},
+						Output: &pbsubstreams.Module_Output{
+							Type: "sf.entity.v1.changes",
+						},
+						BlockFilter: &pbsubstreams.Module_BlockFilter{
+							Module: "wrong_module",
+							Query:  "This is my query",
+						},
+					},
+
+					{
+						Name:             "block_index",
+						BinaryEntrypoint: "block_index",
+						Kind:             &pbsubstreams.Module_KindBlockIndex_{KindBlockIndex: &pbsubstreams.Module_KindBlockIndex{OutputType: "sf.substreams.index.v1.Keys"}},
+						Output: &pbsubstreams.Module_Output{
+							Type: "sf.substreams.index.v1.Keys",
+						},
+					},
+				},
+			},
+			expectedError: "checking block filter for module \"test_module\": block filter module \"wrong_module\" not found",
+		},
+		{
+			name: "wrong blockfilter module output type",
+			modules: &pbsubstreams.Modules{
+				Modules: []*pbsubstreams.Module{
+					{
+						Name:             "test_module",
+						BinaryEntrypoint: "test_module",
+						InitialBlock:     uint64(62),
+						Kind: &pbsubstreams.Module_KindMap_{
+							KindMap: &pbsubstreams.Module_KindMap{
+								OutputType: "sf.database.v1.changes",
+							},
+						},
+						Inputs: []*pbsubstreams.Module_Input{
+							{Input: &pbsubstreams.Module_Input_Source_{Source: &pbsubstreams.Module_Input_Source{Type: "sf.database.v1.changes"}}},
+						},
+						Output: &pbsubstreams.Module_Output{
+							Type: "sf.entity.v1.changes",
+						},
+						BlockFilter: &pbsubstreams.Module_BlockFilter{
+							Module: "map_module",
+							Query:  "This is my query",
+						},
+					},
+					{
+						Name:             "map_module",
+						BinaryEntrypoint: "0",
+						InitialBlock:     uint64(1),
+						Kind: &pbsubstreams.Module_KindMap_{
+							KindMap: &pbsubstreams.Module_KindMap{
+								OutputType: "sf.streamingfast.test.v1",
+							},
+						},
+						Inputs: []*pbsubstreams.Module_Input{
+							{Input: &pbsubstreams.Module_Input_Source_{Source: &pbsubstreams.Module_Input_Source{Type: "sf.database.v1.changes"}}},
+						},
+						Output: &pbsubstreams.Module_Output{
+							Type: "sf.streamingfast.test.v1",
+						},
+					},
+				},
+			},
+			expectedError: "checking block filter for module \"test_module\": block filter module \"map_module\" not of 'block_index' kind",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			err := ValidateModules(c.modules)
+			if c.expectedError == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			require.Equal(t, c.expectedError, err.Error())
 		})
 	}
 }

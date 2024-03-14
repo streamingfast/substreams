@@ -20,6 +20,7 @@ message Module {
   oneof kind {
     KindMap kind_map = 2;
     KindStore kind_store = 3;
+    KindBlockIndex kind_block_index = 10;
   };
 
   uint32 binary_index = 4;
@@ -30,6 +31,13 @@ message Module {
 
   uint64 initial_block = 8;
 
+  BlockFilter block_filter = 9;
+
+
+  message BlockFilter {
+    string module = 1;
+    string query = 2;
+  }
   message KindMap {
     string output_type = 1;
   }
@@ -61,6 +69,10 @@ message Module {
       // Provides a store where you can `append()` keys, where two stores merge by concatenating the bytes in order.
       UPDATE_POLICY_APPEND = 6;
     }
+  }
+
+  message KindBlockIndex {
+    string output_type = 1;
   }
 
   message Input {

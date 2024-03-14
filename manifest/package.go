@@ -81,8 +81,14 @@ func (r *manifestConverter) validateManifest(manif *Manifest) error {
 				return fmt.Errorf("stream %q: 'use' is not allowed for kind 'store'", s.Name)
 			}
 		case ModuleKindBlockIndex:
-			if s.Inputs != nil {
-				return fmt.Errorf("stream %q: block index module cannot have inputs", s.Name)
+			if s.Inputs == nil {
+				return fmt.Errorf("stream %q: block index module should have inputs", s.Name)
+			}
+
+			for _, input := range s.Inputs {
+				if input.IsParams() {
+					return fmt.Errorf("stream %q: block index module cannot have params input", s.Name)
+				}
 			}
 
 			if s.InitialBlock != nil {

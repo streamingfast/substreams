@@ -184,7 +184,7 @@ func TestValidateManifest(t *testing.T) {
 			manifest: &Manifest{
 				SpecVersion: "v0.1.0",
 				Modules: []*Module{
-					{Name: "basic_index", Kind: "blockIndex", Output: StreamOutput{"proto:sf.substreams.index.v1.Keys"}},
+					{Name: "basic_index", Kind: "blockIndex", Inputs: []*Input{{Map: "proto:sf.database.v1.changes"}}, Output: StreamOutput{"proto:sf.substreams.index.v1.Keys"}},
 				},
 			},
 			expectedError: "",
@@ -194,27 +194,37 @@ func TestValidateManifest(t *testing.T) {
 			manifest: &Manifest{
 				SpecVersion: "v0.1.0",
 				Modules: []*Module{
-					{Name: "basic_index", Kind: "blockIndex", Output: StreamOutput{"proto:sf.substreams.test"}},
+					{Name: "basic_index", Kind: "blockIndex", Inputs: []*Input{{Map: "proto:sf.database.v1.changes"}}, Output: StreamOutput{"proto:sf.substreams.test"}},
 				},
 			},
 			expectedError: "stream \"basic_index\": block index module must have output type 'proto:sf.substreams.index.v1.Keys'",
 		},
 		{
-			name: "block index with inputs",
+			name: "block index with params input",
 			manifest: &Manifest{
 				SpecVersion: "v0.1.0",
 				Modules: []*Module{
-					{Name: "basic_index", Kind: "blockIndex", Inputs: []*Input{{Source: "proto:sf.database.v1.changes"}}, Output: StreamOutput{"proto:sf.substreams.index.v1.Keys"}},
+					{Name: "basic_index", Kind: "blockIndex", Inputs: []*Input{{Params: "proto:sf.database.v1.changes"}}, Output: StreamOutput{"proto:sf.substreams.index.v1.Keys"}},
 				},
 			},
-			expectedError: "stream \"basic_index\": block index module cannot have inputs",
+			expectedError: "stream \"basic_index\": block index module cannot have params input",
+		},
+		{
+			name: "block index without input",
+			manifest: &Manifest{
+				SpecVersion: "v0.1.0",
+				Modules: []*Module{
+					{Name: "basic_index", Kind: "blockIndex", Output: StreamOutput{"proto:sf.substreams.index.v1.Keys"}},
+				},
+			},
+			expectedError: "stream \"basic_index\": block index module should have inputs",
 		},
 		{
 			name: "block index with initialBlock",
 			manifest: &Manifest{
 				SpecVersion: "v0.1.0",
 				Modules: []*Module{
-					{Name: "basic_index", Kind: "blockIndex", InitialBlock: &initialBlock, Output: StreamOutput{"proto:sf.substreams.index.v1.Keys"}},
+					{Name: "basic_index", Kind: "blockIndex", Inputs: []*Input{{Map: "proto:sf.database.v1.changes"}}, InitialBlock: &initialBlock, Output: StreamOutput{"proto:sf.substreams.index.v1.Keys"}},
 				},
 			},
 			expectedError: "stream \"basic_index\": block index module cannot have initial block",
@@ -227,7 +237,7 @@ func TestValidateManifest(t *testing.T) {
 					{Name: "basic_index", Kind: "blockIndex", BlockFilter: &BlockFilter{
 						Module: "my_module",
 						Query:  "test query",
-					}, Output: StreamOutput{"proto:sf.substreams.index.v1.Keys"}},
+					}, Inputs: []*Input{{Map: "proto:sf.database.v1.changes"}}, Output: StreamOutput{"proto:sf.substreams.index.v1.Keys"}},
 				},
 			},
 			expectedError: "stream \"basic_index\": block index module cannot have block filter",

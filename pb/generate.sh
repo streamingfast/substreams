@@ -52,6 +52,7 @@ function generate_system() {
     "$PROTO/sf/substreams/v1/modules.proto" \
     "$PROTO/sf/substreams/v1/package.proto" \
     "$PROTO/sf/substreams/v1/clock.proto" \
+    "$PROTO/sf/substreams/index/v1/keys.proto" \
     "$PROTO/sf/substreams/rpc/v2/service.proto" \
     "$PROTO/sf/substreams/sink/service/v1/service.proto" \
     "$PROTO/google/protobuf/any.proto" \

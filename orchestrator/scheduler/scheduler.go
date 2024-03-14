@@ -81,7 +81,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 
 	switch msg := msg.(type) {
 	case work.MsgJobSucceeded:
-		metrics.ActiveWorkerRequest.Dec()
+		metrics.Tier1ActiveWorkerRequest.Dec()
 
 		s.Stages.MarkSegmentPartialPresent(msg.Unit)
 		s.WorkerPool.Return(msg.Worker)
@@ -113,8 +113,8 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		s.logger.Info("scheduling work", zap.Object("unit", workUnit))
 		modules := s.Stages.StageModules(workUnit.Stage)
 
-		metrics.ActiveWorkerRequest.Inc()
-		metrics.WorkerRequestCounter.Inc()
+		metrics.Tier1ActiveWorkerRequest.Inc()
+		metrics.Tier1WorkerRequestCounter.Inc()
 
 		return loop.Batch(
 			worker.Work(s.ctx, workUnit, workRange, modules, s.stream),
@@ -122,7 +122,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		)
 
 	case work.MsgJobFailed:
-		metrics.ActiveWorkerRequest.Dec()
+		metrics.Tier1ActiveWorkerRequest.Dec()
 
 		cmds = append(cmds, loop.Quit(msg.Error))
 

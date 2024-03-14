@@ -177,6 +177,8 @@ func (a *Tier1App) Run() error {
 	}
 
 	a.OnTerminating(func(err error) {
+		metrics.AppReadinessTier1.SetNotReady()
+
 		svc.Shutdown(err)
 		time.Sleep(2 * time.Second) // enough time to send termination grpc responses
 	})

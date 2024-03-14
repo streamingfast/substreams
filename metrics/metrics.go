@@ -19,10 +19,11 @@ var SquashesLaunched = MetricSet.NewCounter("substreams_total_squashes_launched"
 var SquashersStarted = MetricSet.NewCounter("substreams_total_squash_processes_launched", "Counter for Total squash processes launched, used for rate")
 var SquashersEnded = MetricSet.NewCounter("substreams_total_squash_processes_closed", "Counter for Total squash processes closed, used for active processes")
 
-var ActiveWorkerRequest = MetricSet.NewGauge("substreams_active_worker_request", "Number of active Substreams worker requests a tier1 app is currently doing against tier2 nodes")
-var WorkerRequestCounter = MetricSet.NewCounter("substreams_worker_request_counter", "Counter for total Substreams worker requests a tier1 app made against tier2 nodes")
+var Tier1ActiveWorkerRequest = MetricSet.NewGauge("substreams_tier1_active_worker_request", "Number of active Substreams worker requests a tier1 app is currently doing against tier2 nodes")
+var Tier1WorkerRequestCounter = MetricSet.NewCounter("substreams_tier1_request_counter", "Counter for total Substreams worker requests a tier1 app made against tier2 nodes")
 
 var AppReadinessTier1 = MetricSet.NewAppReadiness("substreams_tier1")
+var AppReadinessTier2 = MetricSet.NewAppReadiness("substreams_tier2")
 
 var registerOnce sync.Once
 

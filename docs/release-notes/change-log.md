@@ -25,9 +25,9 @@ Tier2 service now supports a maximum concurrent requests limit. Default set to 0
 
 * [Operator] Added back deadiness metric for Substreams tiere app (named `substreams_tier2`).
 
-* [Operator] Added metric `substreams_tier1_active_worker_request` which gives the number of active Substreams worker requests a tier1 app is currently doing against tier2 nodes.
+* [Operator] Added metric `substreams_tier1_active_worker_requests` which gives the number of active Substreams worker requests a tier1 app is currently doing against tier2 nodes.
 
-* [Operator] Added metric `substreams_tier_1worker_request_counter` which gives the total Substreams worker requests a tier1 app made against tier2 nodes.
+* [Operator] Added metric `substreams_tier1_worker_request_counter` which gives the total Substreams worker requests a tier1 app made against tier2 nodes.
 
 ## v1.3.7
 

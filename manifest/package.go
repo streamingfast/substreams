@@ -25,7 +25,6 @@ func newManifestConverter(inputPath string, skipSourceCodeImportValidation bool)
 }
 
 func (r *manifestConverter) Convert(manif *Manifest) (*pbsubstreams.Package, []*desc.FileDescriptor, *dynamic.Message, error) {
-
 	if err := r.expandManifestVariables(manif); err != nil {
 		return nil, nil, nil, err
 	}
@@ -56,7 +55,6 @@ func (r *manifestConverter) expandManifestVariables(manif *Manifest) error {
 }
 
 func (r *manifestConverter) validateManifest(manif *Manifest) error {
-
 	if manif.SpecVersion != "v0.1.0" {
 		return fmt.Errorf("invalid 'specVersion', must be v0.1.0")
 	}
@@ -72,17 +70,129 @@ func (r *manifestConverter) validateManifest(manif *Manifest) error {
 			if s.Output.Type == "" {
 				return fmt.Errorf("stream %q: missing 'output.type' for kind 'map'", s.Name)
 			}
+			if s.Use != "" {
+				return fmt.Errorf("stream %q: 'use' is not allowed for kind 'map'", s.Name)
+			}
 		case ModuleKindStore:
 			if err := validateStoreBuilder(s); err != nil {
+				return fmt.Errorf("stream %q: %w", s.Name, err)
+			}
+			if s.Use != "" {
+				return fmt.Errorf("stream %q: 'use' is not allowed for kind 'store'", s.Name)
+			}
+		case "":
+			if s.Use == "" {
+				return fmt.Errorf("module kind not specified for %q", s.Name)
+			}
+
+			if err := validateModuleWithUse(s); err != nil {
 				return fmt.Errorf("stream %q: %w", s.Name, err)
 			}
 
 		default:
 			return fmt.Errorf("stream %q: invalid kind %q", s.Name, s.Kind)
 		}
+
 		for idx, input := range s.Inputs {
 			if err := input.parse(); err != nil {
 				return fmt.Errorf("module %q: invalid input [%d]: %w", s.Name, idx, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func handleUseModules(pkg *pbsubstreams.Package, manif *Manifest) error {
+	packageModulesMapping := make(map[string]*pbsubstreams.Module)
+	for _, module := range pkg.Modules.Modules {
+		packageModulesMapping[module.Name] = module
+	}
+
+	for _, manifestModule := range manif.Modules {
+		if manifestModule.Use == "" {
+			continue
+		}
+
+		usedModule, found := packageModulesMapping[manifestModule.Use]
+		if !found {
+			return fmt.Errorf("module %q: use module %q not found", manifestModule.Name, manifestModule.Use)
+		}
+		moduleWithUse := packageModulesMapping[manifestModule.Name]
+
+		if err := checkEqualInputs(moduleWithUse, usedModule, manifestModule, packageModulesMapping); err != nil {
+			return fmt.Errorf("checking inputs for module %q: %w", manifestModule.Name, err)
+		}
+
+		moduleWithUse.BinaryIndex = usedModule.BinaryIndex
+		moduleWithUse.BinaryEntrypoint = usedModule.BinaryEntrypoint
+
+		moduleWithUse.Output = usedModule.Output
+		moduleWithUse.Kind = usedModule.Kind
+	}
+	return nil
+}
+
+func checkEqualInputs(moduleWithUse, usedModule *pbsubstreams.Module, manifestModuleWithUse *Module, packageModulesMapping map[string]*pbsubstreams.Module) error {
+	for index, input := range moduleWithUse.Inputs {
+		usedModuleInput := usedModule.Inputs[index]
+
+		switch {
+		case input.GetSource() != nil:
+			if usedModuleInput.GetSource() == nil {
+				return fmt.Errorf("module %q: input %q is not a source type", manifestModuleWithUse.Name, input.String())
+			}
+			if input.GetSource().Type != usedModuleInput.GetSource().Type {
+				return fmt.Errorf("module %q: input %q has different source than the used module %q: input %q", manifestModuleWithUse.Name, input.String(), manifestModuleWithUse.Use, usedModuleInput.String())
+			}
+
+		case input.GetParams() != nil:
+			if usedModuleInput.GetParams() == nil {
+				return fmt.Errorf("module %q: input %q is not a params type", manifestModuleWithUse.Name, input.String())
+			}
+			if input.GetParams().Value != usedModuleInput.GetParams().Value {
+				return fmt.Errorf("module %q: input %q has different value than the used module %q: input %q", manifestModuleWithUse.Name, input.String(), manifestModuleWithUse.Use, usedModuleInput.String())
+			}
+
+		case input.GetStore() != nil:
+			if usedModuleInput.GetStore() == nil {
+				return fmt.Errorf("module %q: input %q is not a store type", manifestModuleWithUse.Name, input.String())
+			}
+			if input.GetStore().GetMode() != usedModuleInput.GetStore().GetMode() {
+				return fmt.Errorf("module %q: input %q has different mode than the used module %q: input %q", manifestModuleWithUse.Name, input.String(), manifestModuleWithUse.Use, usedModuleInput.String())
+			}
+
+			curMod, found := packageModulesMapping[input.GetStore().ModuleName]
+			if !found {
+				return fmt.Errorf("module %q: input %q store module %q not found", manifestModuleWithUse.Name, input.String(), input.GetStore().ModuleName)
+			}
+
+			usedMod, found := packageModulesMapping[usedModuleInput.GetStore().ModuleName]
+			if !found {
+				return fmt.Errorf("module %q: input %q store module %q not found", manifestModuleWithUse.Name, usedModuleInput.String(), usedModuleInput.GetStore().ModuleName)
+			}
+
+			if curMod.Output.Type != usedMod.Output.Type {
+				return fmt.Errorf("module %q: input %q has different output than the used module %q: input %q", manifestModuleWithUse.Name, input.String(), manifestModuleWithUse.Use, usedModuleInput.String())
+			}
+
+		case input.GetMap() != nil:
+			if usedModuleInput.GetMap() == nil {
+				return fmt.Errorf("module %q: input %q is not a map type", manifestModuleWithUse.Name, input.String())
+			}
+
+			curMod, found := packageModulesMapping[input.GetMap().ModuleName]
+			if !found {
+				return fmt.Errorf("module %q: input %q map module %q not found", manifestModuleWithUse.Name, input.String(), input.GetMap().ModuleName)
+			}
+
+			usedMod, found := packageModulesMapping[usedModuleInput.GetMap().ModuleName]
+			if !found {
+				return fmt.Errorf("module %q: input %q map module %q not found", manifestModuleWithUse.Name, usedModuleInput.String(), usedModuleInput.GetMap().ModuleName)
+			}
+
+			if curMod.Output.Type != usedMod.Output.Type {
+				return fmt.Errorf("module %q: input %q has different output than the used module %q: input %q", manifestModuleWithUse.Name, input.String(), manifestModuleWithUse.Use, usedModuleInput.String())
 			}
 		}
 	}
@@ -113,6 +223,10 @@ func (r *manifestConverter) manifestToPkg(manif *Manifest) (*pbsubstreams.Packag
 
 	if err := r.loadSinkConfig(pkg, manif); err != nil {
 		return nil, nil, nil, fmt.Errorf("error parsing sink configuration: %w", err)
+	}
+
+	if err := handleUseModules(pkg, manif); err != nil {
+		return nil, nil, nil, fmt.Errorf("error handling use modules: %w", err)
 	}
 
 	return pkg, protoDefinitions, r.sinkConfigDynamicMessage, nil
@@ -186,8 +300,8 @@ func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package
 			pkg.Networks[k] = params
 		}
 	}
-
 	moduleCodeIndexes := map[string]int{}
+
 	for _, mod := range m.Modules {
 		pbmeta := &pbsubstreams.ModuleMetadata{
 			Doc: mod.Doc,

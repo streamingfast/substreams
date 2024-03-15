@@ -21,9 +21,19 @@ type Graph struct {
 	schedulableAncestorsMap map[string][]string    // modules that are ancestors (therefore dependencies) of a given module
 }
 
-func (g *Graph) OutputModule() *pbsubstreams.Module   { return g.outputModule }
-func (g *Graph) Stores() []*pbsubstreams.Module       { return g.stores }
-func (g *Graph) UsedModules() []*pbsubstreams.Module  { return g.usedModules }
+func (g *Graph) OutputModule() *pbsubstreams.Module  { return g.outputModule }
+func (g *Graph) Stores() []*pbsubstreams.Module      { return g.stores }
+func (g *Graph) UsedModules() []*pbsubstreams.Module { return g.usedModules }
+func (g *Graph) UsedModulesUpToStage(stage int) (out []*pbsubstreams.Module) {
+	for i := 0; i <= int(stage); i++ {
+		for _, layer := range g.StagedUsedModules()[i] {
+			for _, mod := range layer {
+				out = append(out, mod)
+			}
+		}
+	}
+	return
+}
 func (g *Graph) StagedUsedModules() ExecutionStages   { return g.stagedUsedModules }
 func (g *Graph) IsOutputModule(name string) bool      { return g.outputModule.Name == name }
 func (g *Graph) ModuleHashes() *manifest.ModuleHashes { return g.moduleHashes }
@@ -100,8 +110,8 @@ func (e ExecutionStages) LastStage() StageLayers {
 // a layer of mappers, followed by a layer of stores.
 type StageLayers []LayerModules
 
-func (l StageLayers) isStoreStage() bool {
-	return l.LastLayer().IsStoreLayer()
+func (l StageLayers) IsLastStage() bool {
+	return !l.LastLayer().IsStoreLayer()
 }
 
 func (l StageLayers) LastLayer() LayerModules {

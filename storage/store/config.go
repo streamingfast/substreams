@@ -9,6 +9,7 @@ import (
 	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
 
+	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage/store/marshaller"
 )
@@ -91,6 +92,11 @@ func (c *Config) ModuleInitialBlock() uint64 {
 
 func (c *Config) NewFullKV(logger *zap.Logger) *FullKV {
 	return &FullKV{c.newBaseStore(logger), "N/A"}
+}
+
+func (c *Config) ExistsFullKV(ctx context.Context, upTo uint64) (bool, error) {
+	filename := FullStateFileName(block.NewRange(c.moduleInitialBlock, upTo))
+	return c.objStore.FileExists(ctx, filename)
 }
 
 func (c *Config) NewPartialKV(initialBlock uint64, logger *zap.Logger) *PartialKV {

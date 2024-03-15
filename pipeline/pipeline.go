@@ -194,7 +194,7 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 
 	lastStage := len(p.executionStages) - 1
 	for stageIdx, stage := range p.executionStages {
-		if stageIdx > *p.highestStage {
+		if p.highestStage != nil && stageIdx > *p.highestStage {
 			break // skip stores for stages that we're not running
 		}
 		isLastStage := stageIdx == lastStage

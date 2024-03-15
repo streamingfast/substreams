@@ -198,8 +198,11 @@ func TestOneStoreOneMap(t *testing.T) {
 			production:            false,
 			expectedResponseCount: 4,
 			expectFiles: []string{
-				"states/0000000010-0000000001.kv",
-				"states/0000000020-0000000001.kv",
+
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000001-0000000010.output", // store outputs
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000010-0000000020.output",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.kv", // store states
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000020-0000000001.kv",
 				//				"states/0000000025-0000000020.00000000000000000000000000000000.partial", // produced, then deleted
 			},
 		},
@@ -211,8 +214,10 @@ func TestOneStoreOneMap(t *testing.T) {
 			production:            false,
 			expectedResponseCount: 7,
 			expectFiles: []string{
-				"states/0000000010-0000000001.kv",
-				"states/0000000020-0000000001.kv",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000001-0000000010.output", // store outputs
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000010-0000000020.output",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.kv", // store states
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000020-0000000001.kv",
 				// "states/0000000025-0000000020.00000000000000000000000000000000.partial", // produced, then deleted
 				//"states/0000000030-0000000001.kv", // Again, backprocess wouldn't save this one, nor does it need to.
 			},
@@ -225,9 +230,11 @@ func TestOneStoreOneMap(t *testing.T) {
 			production:            true,
 			expectedResponseCount: 4,
 			expectFiles: []string{
-				"states/0000000010-0000000001.kv",
-				"states/0000000020-0000000001.kv",
-				"outputs/0000000020-0000000027.output",
+				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000020-0000000027.output",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000001-0000000010.output",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000010-0000000020.output",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.kv",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000020-0000000001.kv",
 			},
 		},
 		{
@@ -238,9 +245,11 @@ func TestOneStoreOneMap(t *testing.T) {
 			production:            true,
 			expectedResponseCount: 4,
 			expectFiles: []string{
-				"states/0000000010-0000000001.kv",
-				"states/0000000020-0000000001.kv",
-				"outputs/0000000020-0000000029.output",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000001-0000000010.output", //store
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000010-0000000020.output",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.kv",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000020-0000000001.kv",
+				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000020-0000000029.output", // map
 			},
 		},
 		{
@@ -251,11 +260,14 @@ func TestOneStoreOneMap(t *testing.T) {
 			production:            true,
 			expectedResponseCount: 13,
 			expectFiles: []string{
-				"states/0000000010-0000000001.kv",
-				"states/0000000020-0000000001.kv",
-				"states/0000000030-0000000001.kv",
-				"outputs/0000000020-0000000030.output",
-				"outputs/0000000030-0000000038.output",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000001-0000000010.output", // store
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000010-0000000020.output",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000020-0000000030.output",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.kv",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000020-0000000001.kv",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000030-0000000001.kv",
+				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000020-0000000030.output", // map
+				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000030-0000000038.output",
 			},
 		},
 		{
@@ -266,7 +278,7 @@ func TestOneStoreOneMap(t *testing.T) {
 			production:            true,
 			expectedResponseCount: 2,
 			expectFiles: []string{
-				"outputs/0000000001-0000000008.output",
+				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000001-0000000008.output",
 			},
 		},
 		{
@@ -278,7 +290,7 @@ func TestOneStoreOneMap(t *testing.T) {
 			expectedResponseCount: 8,
 			expectFiles: []string{
 				//"states/0000000010-0000000001.kv", // TODO: not sure why this would have been produced with the prior code..
-				"outputs/0000000001-0000000008.output",
+				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000001-0000000008.output",
 			},
 		},
 		{
@@ -292,11 +304,13 @@ func TestOneStoreOneMap(t *testing.T) {
 			},
 			expectedResponseCount: 28,
 			expectFiles: []string{
-				"states/0000000010-0000000001.kv",
-				"states/0000000020-0000000001.kv",
-				"outputs/0000000001-0000000010.output",
-				"outputs/0000000010-0000000020.output",
-				"outputs/0000000020-0000000029.output",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000001-0000000010.output",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000010-0000000020.output",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.kv",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000020-0000000001.kv",
+				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000001-0000000010.output",
+				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000010-0000000020.output",
+				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000020-0000000029.output",
 
 				// Existing partial files are not re-used
 				//"states/0000000010-0000000001.00000000000000000000000000000000.partial", // FIXME: perhaps wasn't deleted before?
@@ -314,15 +328,18 @@ func TestOneStoreOneMap(t *testing.T) {
 			},
 			expectedResponseCount: 28,
 			expectFiles: []string{
-				"states/0000000010-0000000001.kv",
-				"states/0000000020-0000000001.kv",
-				"outputs/0000000001-0000000010.output",
-				"outputs/0000000010-0000000020.output",
-				"outputs/0000000020-0000000029.output",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.kv",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000020-0000000001.kv",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000001-0000000010.output",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000010-0000000020.output",
+
+				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000001-0000000010.output",
+				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000010-0000000020.output",
+				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000020-0000000029.output",
 
 				// Existing partial files are not re-used
-				"states/0000000010-0000000001.11111111111111111111.partial",
-				"states/0000000010-0000000001.22222222222222222222.partial",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.11111111111111111111.partial",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.22222222222222222222.partial",
 			},
 		},
 		{
@@ -337,14 +354,16 @@ func TestOneStoreOneMap(t *testing.T) {
 			},
 			expectedResponseCount: 28,
 			expectFiles: []string{
-				"states/0000000010-0000000001.kv",
-				"states/0000000020-0000000001.kv",
-				"outputs/0000000001-0000000010.output",
-				"outputs/0000000010-0000000020.output",
-				"outputs/0000000020-0000000029.output",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.kv",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000020-0000000001.kv",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000001-0000000010.output",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000010-0000000020.output",
+				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000001-0000000010.output",
+				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000010-0000000020.output",
+				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000020-0000000029.output",
 
 				// Existing partial files are not re-used
-				"states/0000000010-0000000001.partial",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.partial",
 			},
 		},
 		{
@@ -360,15 +379,18 @@ func TestOneStoreOneMap(t *testing.T) {
 			},
 			expectedResponseCount: 28,
 			expectFiles: []string{
-				"states/0000000010-0000000001.kv",
-				"states/0000000020-0000000001.kv",
-				"outputs/0000000001-0000000010.output",
-				"outputs/0000000010-0000000020.output",
-				"outputs/0000000020-0000000029.output",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.kv",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000020-0000000001.kv",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000001-0000000010.output",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000010-0000000020.output",
+
+				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000001-0000000010.output",
+				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000010-0000000020.output",
+				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000020-0000000029.output",
 
 				// Existing partial files are not re-used
-				"states/0000000010-0000000001.partial",
-				"states/0000000010-0000000001.11111111111111111111.partial",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.partial",
+				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.11111111111111111111.partial",
 			},
 		},
 	}
@@ -376,7 +398,7 @@ func TestOneStoreOneMap(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			run := newTestRun(t, test.startBlock, test.linearBlock, test.stopBlock, "assert_test_store_add_i64")
 			run.ProductionMode = test.production
-			run.ParallelSubrequests = 5
+			run.ParallelSubrequests = 1
 			run.PreWork = test.preWork
 			require.NoError(t, run.Run(t, test.name))
 
@@ -514,7 +536,7 @@ func assertFiles(t *testing.T, tempDir string, wantedFiles ...string) {
 			seenPartialSpkg = true
 			continue
 		}
-		actualFiles = append(actualFiles, filepath.Join(parts[4:]...))
+		actualFiles = append(actualFiles, filepath.Join(parts[3:]...))
 	}
 
 	assert.True(t, seenPartialSpkg, "substreams.partial.spkg should be produced")

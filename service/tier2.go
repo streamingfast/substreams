@@ -288,10 +288,11 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("configuring stores: %w", err)
 	}
 	stores := pipeline.NewStores(ctx, storeConfigs, s.runtimeConfig.StateBundleSize, requestDetails.ResolvedStartBlockNum, request.StopBlockNum, true)
+	isCompleteRange := request.StopBlockNum%s.runtimeConfig.StateBundleSize == 0
 
 	// note all modules that are not in 'modulesRequiredToRun' are still iterated in 'pipeline.executeModules', but they will skip actual execution when they see that the cache provides the data
 	// This way, stores get updated at each block from the cached execouts without the actual execution of the module
-	modulesRequiredToRun, existingExecOuts, execOutWriters, err := evaluateModulesRequiredToRun(ctx, logger, outputGraph, request.Stage, request.StartBlockNum, request.StopBlockNum, request.OutputModule, execOutputConfigs, storeConfigs)
+	modulesRequiredToRun, existingExecOuts, execOutWriters, err := evaluateModulesRequiredToRun(ctx, logger, outputGraph, request.Stage, request.StartBlockNum, request.StopBlockNum, isCompleteRange, request.OutputModule, execOutputConfigs, storeConfigs)
 	if err != nil {
 		return fmt.Errorf("evaluating required modules: %w", err)
 	}
@@ -405,6 +406,7 @@ func evaluateModulesRequiredToRun(
 	stage uint32,
 	startBlock uint64,
 	stopBlock uint64,
+	isCompleteRange bool,
 	outputModule string,
 	execoutConfigs *execout.Configs,
 	storeConfigs store.ConfigMap,
@@ -456,6 +458,10 @@ func evaluateModulesRequiredToRun(
 		if _, exists := existingExecOuts[name]; exists {
 			continue // for stores that need to be run for the partials, but already have cached execution outputs
 		}
+		if !isCompleteRange && name != outputModule {
+			// if we are not running a complete range, we can skip writing the outputs of every module except the requested outputModule if it's in our stage
+			continue
+		}
 		execoutWriters[name] = execout.NewWriter(
 			startBlock,
 			stopBlock,
@@ -478,11 +484,11 @@ func canSkipBlocks(existingExecOuts map[string]*execout.File, requiredModules ma
 		}
 		for _, input := range module.Inputs {
 			if src := input.GetSource(); src != nil && src.Type == blockType {
-				return true
+				return false
 			}
 		}
 	}
-	return false
+	return true
 }
 
 func (s *Tier2Service) buildPipelineOptions(ctx context.Context, request *pbssinternal.ProcessRangeRequest) (opts []pipeline.Option) {

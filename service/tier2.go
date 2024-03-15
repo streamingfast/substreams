@@ -278,7 +278,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("internal error setting store: %w", err)
 	}
 
-	execOutputConfigs, err := execout.NewConfigs(cacheStore, outputGraph.UsedModules(), outputGraph.ModuleHashes(), s.runtimeConfig.StateBundleSize, logger)
+	execOutputConfigs, err := execout.NewConfigs(cacheStore, outputGraph.UsedModulesUpToStage(int(request.Stage)), outputGraph.ModuleHashes(), s.runtimeConfig.StateBundleSize, logger)
 	if err != nil {
 		return fmt.Errorf("new config map: %w", err)
 	}
@@ -288,39 +288,22 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("configuring stores: %w", err)
 	}
 	stores := pipeline.NewStores(ctx, storeConfigs, s.runtimeConfig.StateBundleSize, requestDetails.ResolvedStartBlockNum, request.StopBlockNum, true)
+	isCompleteRange := request.StopBlockNum%s.runtimeConfig.StateBundleSize == 0
 
-	outputModule := outputGraph.OutputModule()
-
-	var execOutWriter *execout.Writer
-	isOutputMapperStage := !outputGraph.StagedUsedModules()[request.Stage].LastLayer().IsStoreLayer()
-	if isOutputMapperStage {
-		execOutWriter = execout.NewWriter(
-			requestDetails.ResolvedStartBlockNum,
-			requestDetails.StopBlockNum,
-			outputModule.Name,
-			execOutputConfigs,
-		)
+	// note all modules that are not in 'modulesRequiredToRun' are still iterated in 'pipeline.executeModules', but they will skip actual execution when they see that the cache provides the data
+	// This way, stores get updated at each block from the cached execouts without the actual execution of the module
+	modulesRequiredToRun, existingExecOuts, execOutWriters, err := evaluateModulesRequiredToRun(ctx, logger, outputGraph, request.Stage, request.StartBlockNum, request.StopBlockNum, isCompleteRange, request.OutputModule, execOutputConfigs, storeConfigs)
+	if err != nil {
+		return fmt.Errorf("evaluating required modules: %w", err)
 	}
 
-	existingExecOuts := make(map[string]*execout.File)
-	for name, c := range execOutputConfigs.ConfigMap {
-		if c.ModuleKind() == pbsubstreams.ModuleKindStore {
-			continue // TODO @stepd add support for store modules
-		}
-		file, err := c.ReadFile(ctx, &block.Range{StartBlock: request.StartBlockNum, ExclusiveEndBlock: request.StopBlockNum})
-		if err != nil {
-			continue
-		}
-		if isOutputMapperStage && name == request.OutputModule {
-			logger.Info("found existing exec output for output_module, skipping run", zap.String("output_module", name))
-			return nil
-		}
-		existingExecOuts[name] = file
+	if len(modulesRequiredToRun) == 0 {
+		logger.Info("no modules required to run, skipping")
+		return nil
 	}
 
-	skipBlocks, skipStores := checkSkipBlocksAndStores(existingExecOuts, outputGraph, s.blockType)
-
-	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, execOutWriter, s.blockType, existingExecOuts)
+	// this engine will keep the existingExecOuts to optimize the execution (for inputs from modules that skip execution)
+	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, execOutWriters, s.blockType, existingExecOuts)
 	if err != nil {
 		return fmt.Errorf("error building caching engine: %w", err)
 	}
@@ -353,14 +336,12 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	if err := pipe.Init(ctx); err != nil {
 		return fmt.Errorf("error during pipeline init: %w", err)
 	}
-	if !skipStores {
-		if err := pipe.InitTier2Stores(ctx); err != nil {
-			return fmt.Errorf("error building pipeline: %w", err)
-		}
+	if err := pipe.InitTier2Stores(ctx); err != nil {
+		return fmt.Errorf("error building pipeline: %w", err)
 	}
 
 	var streamErr error
-	if skipBlocks {
+	if canSkipBlocks(existingExecOuts, modulesRequiredToRun, s.blockType) {
 		var referenceMapper *execout.File
 		for k, v := range existingExecOuts {
 			referenceMapper = v
@@ -416,26 +397,98 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	return pipe.OnStreamTerminated(ctx, streamErr)
 }
 
-func checkSkipBlocksAndStores(existingExecOuts map[string]*execout.File, outputGraph *outputmodules.Graph, blockType string) (skipBlocks, skipStores bool) {
-	if len(existingExecOuts) == 0 {
-		return
+// evaluateModulesRequiredToRun will also load the existing execution outputs to be used as cache
+// if it returns no modules at all, it means that we can skip the whole thing
+func evaluateModulesRequiredToRun(
+	ctx context.Context,
+	logger *zap.Logger,
+	outputGraph *outputmodules.Graph,
+	stage uint32,
+	startBlock uint64,
+	stopBlock uint64,
+	isCompleteRange bool,
+	outputModule string,
+	execoutConfigs *execout.Configs,
+	storeConfigs store.ConfigMap,
+) (requiredModules map[string]*pbsubstreams.Module, existingExecOuts map[string]*execout.File, execoutWriters map[string]*execout.Writer, err error) {
+
+	existingExecOuts = make(map[string]*execout.File)
+	requiredModules = make(map[string]*pbsubstreams.Module)
+	execoutWriters = make(map[string]*execout.Writer)
+
+	usedModules := make(map[string]*pbsubstreams.Module)
+	for _, module := range outputGraph.UsedModulesUpToStage(int(stage)) {
+		usedModules[module.Name] = module
 	}
-	skipBlocks = true
-	skipStores = true
-	for _, module := range outputGraph.UsedModules() {
-		if existingExecOuts[module.Name] != nil && outputGraph.OutputModule().Name != module.Name { // we don't skip the store if that store is actually our output module
+
+	runningLastStage := outputGraph.StagedUsedModules()[stage].IsLastStage()
+
+	for name, c := range execoutConfigs.ConfigMap {
+		if _, found := usedModules[name]; !found { // skip modules that are only present in later stages
+			continue
+		}
+
+		file, readErr := c.ReadFile(ctx, &block.Range{StartBlock: startBlock, ExclusiveEndBlock: stopBlock})
+		if readErr != nil {
+			requiredModules[name] = usedModules[name]
+			continue
+		}
+		existingExecOuts[name] = file
+
+		if c.ModuleKind() == pbsubstreams.ModuleKindMap {
+			if runningLastStage && name == outputModule {
+				logger.Info("found existing exec output for output_module, skipping run", zap.String("output_module", name))
+				return nil, nil, nil, nil
+			}
+			continue
+		}
+
+		// TODO when the partial KV stores are back to being 'generic' (without traceID), we will also be able to skip the store if the partial exists
+		storeExists, err := storeConfigs[name].ExistsFullKV(ctx, stopBlock)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("checking file existence: %w", err)
+		}
+		if !storeExists {
+			// some stores may already exist completely on this stage, but others do not, so we keep going but ignore those
+			requiredModules[name] = usedModules[name]
+		}
+	}
+
+	for name := range requiredModules {
+		if _, exists := existingExecOuts[name]; exists {
+			continue // for stores that need to be run for the partials, but already have cached execution outputs
+		}
+		if !isCompleteRange && name != outputModule {
+			// if we are not running a complete range, we can skip writing the outputs of every module except the requested outputModule if it's in our stage
+			continue
+		}
+		execoutWriters[name] = execout.NewWriter(
+			startBlock,
+			stopBlock,
+			name,
+			execoutConfigs,
+		)
+	}
+
+	return
+
+}
+
+func canSkipBlocks(existingExecOuts map[string]*execout.File, requiredModules map[string]*pbsubstreams.Module, blockType string) bool {
+	if len(existingExecOuts) == 0 {
+		return false
+	}
+	for name, module := range requiredModules {
+		if existingExecOuts[name] != nil {
 			continue
 		}
 		for _, input := range module.Inputs {
 			if src := input.GetSource(); src != nil && src.Type == blockType {
-				skipBlocks = false
-			}
-			if input.GetStore() != nil {
-				skipStores = false
+				return false
 			}
 		}
 	}
-	return
+	return true
 }
 
 func (s *Tier2Service) buildPipelineOptions(ctx context.Context, request *pbssinternal.ProcessRangeRequest) (opts []pipeline.Option) {

@@ -371,9 +371,6 @@ func (p *Pipeline) applyExecutionResult(ctx context.Context, executor exec.Modul
 		return fmt.Errorf("execute module: %w", runError)
 	}
 
-	if !hasValidOutput {
-		return nil
-	}
 	p.saveModuleOutput(moduleOutput, executor.Name(), reqctx.Details(ctx).ProductionMode)
 	if err := execOutput.Set(executorName, outputBytes); err != nil {
 		return fmt.Errorf("set output cache: %w", err)

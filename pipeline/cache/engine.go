@@ -26,18 +26,19 @@ type Engine struct {
 	ctx               context.Context
 	blockType         string
 	reversibleBuffers map[uint64]*execout.Buffer // block num to modules' outputs for that given block
-	execOutputWriter  *execout.Writer            // moduleName => irreversible File
+	execOutputWriters map[string]*execout.Writer // moduleName => writer (single file)
 	existingExecOuts  map[string]*execout.File
-	runtimeConfig     config.RuntimeConfig // TODO(abourget): Deprecated: remove this as it's not used
-	logger            *zap.Logger
+
+	runtimeConfig config.RuntimeConfig // TODO(abourget): Deprecated: remove this as it's not used
+	logger        *zap.Logger
 }
 
-func NewEngine(ctx context.Context, runtimeConfig config.RuntimeConfig, execOutWriter *execout.Writer, blockType string, existingExecOuts map[string]*execout.File) (*Engine, error) {
+func NewEngine(ctx context.Context, runtimeConfig config.RuntimeConfig, execOutWriters map[string]*execout.Writer, blockType string, existingExecOuts map[string]*execout.File) (*Engine, error) {
 	e := &Engine{
 		ctx:               ctx,
 		runtimeConfig:     runtimeConfig,
 		reversibleBuffers: map[uint64]*execout.Buffer{},
-		execOutputWriter:  execOutWriter,
+		execOutputWriters: execOutWriters,
 		logger:            reqctx.Logger(ctx),
 		blockType:         blockType,
 		existingExecOuts:  existingExecOuts,
@@ -73,8 +74,8 @@ func (e *Engine) HandleFinal(clock *pbsubstreams.Clock) error {
 		return nil
 	}
 
-	if e.execOutputWriter != nil {
-		e.execOutputWriter.Write(clock, execOutBuf)
+	for _, writer := range e.execOutputWriters {
+		writer.Write(clock, execOutBuf)
 	}
 
 	delete(e.reversibleBuffers, clock.Number)
@@ -88,8 +89,8 @@ func (e *Engine) HandleStalled(clock *pbsubstreams.Clock) error {
 }
 
 func (e *Engine) EndOfStream(lastFinalClock *pbsubstreams.Clock) error {
-	if e.execOutputWriter != nil {
-		e.execOutputWriter.Close(context.Background())
+	for _, writer := range e.execOutputWriters {
+		writer.Close(context.Background())
 	}
 	return nil
 }

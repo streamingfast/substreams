@@ -705,7 +705,11 @@ func loadImports(pkg *pbsubstreams.Package, manif *Manifest) error {
 		importName := kv[0]
 		importPath := manif.resolvePath(kv[1])
 
-		subpkgReader := MustNewReader(importPath)
+		subpkgReader, err := NewReader(importPath)
+		if err != nil {
+			return fmt.Errorf("importing %q: %w", importPath, err)
+		}
+
 		subpkg, _, err := subpkgReader.Read()
 		if err != nil {
 			return fmt.Errorf("importing %q: %w", importPath, err)

@@ -23,7 +23,6 @@ type TestWorker struct {
 	blockProcessedCallBack blockProcessedCallBack
 	testTempDir            string
 	id                     uint64
-	traceID                *string
 }
 
 var workerID atomic.Uint64
@@ -49,7 +48,7 @@ func (w *TestWorker) Work(ctx context.Context, unit stage.Unit, workRange *block
 	)
 
 	return func() loop.Msg {
-		if err := processInternalRequest(w.t, ctx, request, nil, w.newBlockGenerator, w.responseCollector, w.blockProcessedCallBack, w.testTempDir, w.traceID); err != nil {
+		if err := processInternalRequest(w.t, ctx, request, nil, w.newBlockGenerator, w.responseCollector, w.blockProcessedCallBack, w.testTempDir); err != nil {
 			return work.MsgJobFailed{Unit: unit, Error: fmt.Errorf("processing test tier2 request: %w", err)}
 		}
 		logger.Info("worker done running job",

@@ -114,7 +114,6 @@ func moduleRunE(cmd *cobra.Command, args []string) error {
 			module.GetKindStore().UpdatePolicy,
 			module.GetKindStore().ValueType,
 			stateStore,
-			"",
 		)
 		cli.NoError(err, "unable to create store config")
 

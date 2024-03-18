@@ -1,2 +1,2 @@
-generate.sh - Thu 14 Mar 2024 10:02:19 EDT - arnaudberger
-streamingfast/proto revision: 2999cd42d71a82c4adf739557f9520f0609f7b10
+generate.sh - Tue Mar 19 09:09:54 EDT 2024 - stepd
+streamingfast/proto revision: fde3637cef38103a68301d0ca19b3f2af9b6079b

@@ -32,9 +32,8 @@ import (
 // that the Stage is completed, kicking off the next layer of jobs.
 
 type Stages struct {
-	ctx     context.Context
-	logger  *zap.Logger
-	traceID string
+	ctx    context.Context
+	logger *zap.Logger
 
 	globalSegmenter *block.Segmenter // This segmenter covers both the stores and the mapper
 	storeSegmenter  *block.Segmenter // This segmenter covers only jobs needed to build up stores according to the RequestPlan.
@@ -58,7 +57,6 @@ func NewStages(
 	outputGraph *outputmodules.Graph,
 	reqPlan *plan.RequestPlan,
 	storeConfigs store.ConfigMap,
-	traceID string,
 ) (out *Stages) {
 
 	if !reqPlan.RequiresParallelProcessing() {
@@ -70,7 +68,6 @@ func NewStages(
 	stagedModules := outputGraph.StagedUsedModules()
 	out = &Stages{
 		ctx:             ctx,
-		traceID:         traceID,
 		logger:          reqctx.Logger(ctx),
 		globalSegmenter: reqPlan.BackprocessSegmenter(),
 	}

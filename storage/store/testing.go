@@ -53,15 +53,9 @@ func fileFromRanges(kind string, in string, params ...FileInfoParam) FileInfos {
 			param.apply(file)
 		}
 
-		file.Filename = PartialFileName(blockRange, file.TraceID)
+		file.Filename = PartialFileName(blockRange)
 		files[i] = file
 	}
 
 	return files
-}
-
-type TraceIDParam string
-
-func (t TraceIDParam) apply(file *FileInfo) {
-	file.TraceID = string(t)
 }

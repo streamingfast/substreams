@@ -203,7 +203,7 @@ func TestOneStoreOneMap(t *testing.T) {
 				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000010-0000000020.output",
 				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.kv", // store states
 				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000020-0000000001.kv",
-				//				"states/0000000025-0000000020.00000000000000000000000000000000.partial", // produced, then deleted
+				//				"states/0000000025-0000000020.partial", // produced, then deleted
 			},
 		},
 		{
@@ -218,7 +218,7 @@ func TestOneStoreOneMap(t *testing.T) {
 				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000010-0000000020.output",
 				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.kv", // store states
 				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000020-0000000001.kv",
-				// "states/0000000025-0000000020.00000000000000000000000000000000.partial", // produced, then deleted
+				// "states/0000000025-0000000020.partial", // produced, then deleted
 				//"states/0000000030-0000000001.kv", // Again, backprocess wouldn't save this one, nor does it need to.
 			},
 		},
@@ -300,7 +300,7 @@ func TestOneStoreOneMap(t *testing.T) {
 			stopBlock:   29,
 			production:  true,
 			preWork: func(t *testing.T, run *testRun, workerFactory work.WorkerFactory) {
-				partialPreWork(t, 1, 10, 0, run, workerFactory, "00000000000000000000000000000000")
+				partialPreWork(t, 1, 10, 0, run, workerFactory)
 			},
 			expectedResponseCount: 28,
 			expectFiles: []string{
@@ -311,86 +311,6 @@ func TestOneStoreOneMap(t *testing.T) {
 				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000001-0000000010.output",
 				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000010-0000000020.output",
 				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000020-0000000029.output",
-
-				// Existing partial files are not re-used
-				//"states/0000000010-0000000001.00000000000000000000000000000000.partial", // FIXME: perhaps wasn't deleted before?
-			},
-		},
-		{
-			name:        "prod_mode_multiple_partial_different_trace_id",
-			startBlock:  1,
-			linearBlock: 29,
-			stopBlock:   29,
-			production:  true,
-			preWork: func(t *testing.T, run *testRun, workerFactory work.WorkerFactory) {
-				partialPreWork(t, 1, 10, 0, run, workerFactory, "11111111111111111111")
-				partialPreWork(t, 1, 10, 0, run, workerFactory, "22222222222222222222")
-			},
-			expectedResponseCount: 28,
-			expectFiles: []string{
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.kv",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000020-0000000001.kv",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000001-0000000010.output",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000010-0000000020.output",
-
-				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000001-0000000010.output",
-				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000010-0000000020.output",
-				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000020-0000000029.output",
-
-				// Existing partial files are not re-used
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.11111111111111111111.partial",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.22222222222222222222.partial",
-			},
-		},
-		{
-			name:        "prod_mode_partial_legacy_generated",
-			startBlock:  1,
-			linearBlock: 29,
-			stopBlock:   29,
-			production:  true,
-			preWork: func(t *testing.T, run *testRun, workerFactory work.WorkerFactory) {
-				// Using an empty trace id brings up the old behavior where files are not suffixed with a trace id
-				partialPreWork(t, 1, 10, 0, run, workerFactory, "")
-			},
-			expectedResponseCount: 28,
-			expectFiles: []string{
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.kv",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000020-0000000001.kv",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000001-0000000010.output",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000010-0000000020.output",
-				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000001-0000000010.output",
-				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000010-0000000020.output",
-				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000020-0000000029.output",
-
-				// Existing partial files are not re-used
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.partial",
-			},
-		},
-		{
-			name:        "prod_mode_multiple_partial_mixed_legacy_and_new",
-			startBlock:  1,
-			linearBlock: 29,
-			stopBlock:   29,
-			production:  true,
-			preWork: func(t *testing.T, run *testRun, workerFactory work.WorkerFactory) {
-				// Using an empty trace id brings up the old behavior where files are not suffixed with a trace id
-				partialPreWork(t, 1, 10, 0, run, workerFactory, "")
-				partialPreWork(t, 1, 10, 0, run, workerFactory, "11111111111111111111")
-			},
-			expectedResponseCount: 28,
-			expectFiles: []string{
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.kv",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000020-0000000001.kv",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000001-0000000010.output",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000010-0000000020.output",
-
-				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000001-0000000010.output",
-				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000010-0000000020.output",
-				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000020-0000000029.output",
-
-				// Existing partial files are not re-used
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.partial",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.11111111111111111111.partial",
 			},
 		},
 	}
@@ -543,9 +463,8 @@ func assertFiles(t *testing.T, tempDir string, wantedFiles ...string) {
 	assert.ElementsMatch(t, wantedFiles, actualFiles)
 }
 
-func partialPreWork(t *testing.T, start, end uint64, stageIdx int, run *testRun, workerFactory work.WorkerFactory, traceID string) {
+func partialPreWork(t *testing.T, start, end uint64, stageIdx int, run *testRun, workerFactory work.WorkerFactory) {
 	worker := workerFactory(zlog)
-	worker.(*TestWorker).traceID = &traceID
 
 	// FIXME: use the new `Work` interface here, and validate that the
 	// caller to `partialPreWork` doesn't need to be changed too much? :)

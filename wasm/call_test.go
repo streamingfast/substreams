@@ -482,7 +482,7 @@ func Test_CallStoreOps(t *testing.T) {
 
 func newTestCall(updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string) *Call {
 	myStore := dstore.NewMockStore(nil)
-	storeConf, err := store.NewConfig("test", 0, "", updatePolicy, valueType, myStore, "test")
+	storeConf, err := store.NewConfig("test", 0, "", updatePolicy, valueType, myStore)
 	if err != nil {
 		panic("failed")
 	}

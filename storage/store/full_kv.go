@@ -98,6 +98,10 @@ func (s *FullKV) Reset() {
 	s.lastOrdinal = 0
 }
 
+func (p *FullKV) ApplyOps(in []byte) error {
+	return applyOps(in, p.baseStore)
+}
+
 func (s *FullKV) String() string {
 	return fmt.Sprintf("fullKV name %s moduleInitialBlock %d keyCount %d loadedFrom %s deltasCount %d", s.Name(), s.moduleInitialBlock, len(s.kv), s.loadedFrom, len(s.deltas))
 }

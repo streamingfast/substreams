@@ -237,7 +237,6 @@ func processInternalRequest(
 	responseCollector *responseCollector,
 	blockProcessedCallBack blockProcessedCallBack,
 	testTempDir string,
-	traceID *string,
 ) error {
 	t.Helper()
 
@@ -263,7 +262,7 @@ func processInternalRequest(
 	)
 	svc := service.TestNewServiceTier2(runtimeConfig, tr.StreamFactory)
 
-	return svc.TestProcessRange(ctx, request, responseCollector.Collect, traceID)
+	return svc.TestProcessRange(ctx, request, responseCollector.Collect)
 }
 
 func processRequest(

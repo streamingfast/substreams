@@ -1,5 +1,5 @@
 #!/bin/bash -u
-# Copyright 2019 dfuse Platform Inc.
+# Copyright 2024 StreamingFast Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.

@@ -93,7 +93,7 @@ The `index.js` file contains the `main()` function, which runs an infite loop an
 ```js
 const TOKEN = process.env.SUBSTREAMS_API_TOKEN // Substreams token. By default it takes the SUBSTREAMS_API_TOKEN environment variable of your system
 const ENDPOINT = "https://mainnet.eth.streamingfast.io" // Substreams endpont. In this case, Ethereum mainnet
-const SPKG = "https://storage.googleapis.com/substreams-registry/spkg/ethereum-explorer-v0.1.1.spkg" // Substreams package. In this case, taken from the substreams.dev registry
+const SPKG = "https://spkg.io/streamingfast/ethereum-explorer-v0.1.2.spkg" // Substreams package. In this case, taken from the substreams.dev registry
 const MODULE = "map_block_meta"
 const START_BLOCK = '100000'
 const STOP_BLOCK = '+10000'

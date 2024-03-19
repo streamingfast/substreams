@@ -75,7 +75,6 @@ type Pipeline struct {
 	// (for chains with potential block skips)
 	lastFinalClock *pbsubstreams.Clock
 
-	traceID      string
 	blockStepMap map[bstream.StepType]uint64
 }
 
@@ -88,7 +87,6 @@ func New(
 	execOutputCache *cache.Engine,
 	runtimeConfig config.RuntimeConfig,
 	respFunc substreams.ResponseFunc,
-	traceID string,
 	opts ...Option,
 ) *Pipeline {
 	pipe := &Pipeline{
@@ -102,7 +100,6 @@ func New(
 		stores:          stores,
 		execoutStorage:  execoutStorage,
 		forkHandler:     NewForkHandler(),
-		traceID:         traceID,
 		blockStepMap:    make(map[bstream.StepType]uint64),
 		startTime:       time.Now(),
 	}
@@ -262,7 +259,6 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 		p.execoutStorage,
 		p.respFunc,
 		p.stores.configs,
-		p.traceID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("building parallel processor: %w", err)

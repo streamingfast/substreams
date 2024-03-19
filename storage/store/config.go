@@ -10,14 +10,16 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/streamingfast/substreams/block"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage/store/marshaller"
 )
 
 type Config struct {
-	name       string
-	moduleHash string
-	objStore   dstore.Store
+	name         string
+	moduleHash   string
+	objStore     dstore.Store
+	outputsStore dstore.Store
 
 	moduleInitialBlock uint64
 	updatePolicy       pbsubstreams.Module_KindStore_UpdatePolicy
@@ -26,11 +28,6 @@ type Config struct {
 	appendLimit    uint64
 	totalSizeLimit uint64
 	itemSizeLimit  uint64
-
-	// traceID uniquely identifies the connection ID so that store can be
-	// written to unique filename preventing some races when multiple Substreams
-	// request works on the same range.
-	traceID string
 }
 
 func NewConfig(
@@ -40,9 +37,12 @@ func NewConfig(
 	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy,
 	valueType string,
 	store dstore.Store,
-	traceID string,
 ) (*Config, error) {
 	subStore, err := store.SubStore(fmt.Sprintf("%s/states", moduleHash))
+	if err != nil {
+		return nil, fmt.Errorf("creating sub store: %w", err)
+	}
+	outputsStore, err := store.SubStore(fmt.Sprintf("%s/outputs", moduleHash))
 	if err != nil {
 		return nil, fmt.Errorf("creating sub store: %w", err)
 	}
@@ -52,12 +52,12 @@ func NewConfig(
 		updatePolicy:       updatePolicy,
 		valueType:          valueType,
 		objStore:           subStore,
+		outputsStore:       outputsStore,
 		moduleInitialBlock: moduleInitialBlock,
 		moduleHash:         moduleHash,
 		appendLimit:        8_388_608,     // 8MiB = 8 * 1024 * 1024,
 		totalSizeLimit:     1_073_741_824, // 1GiB
 		itemSizeLimit:      10_485_760,    // 10MiB
-		traceID:            traceID,
 	}, nil
 }
 
@@ -99,9 +99,15 @@ func (c *Config) ExistsFullKV(ctx context.Context, upTo uint64) (bool, error) {
 	return c.objStore.FileExists(ctx, filename)
 }
 
+func (c *Config) ExistsPartialKV(ctx context.Context, from, to uint64) (bool, error) {
+	filename := PartialFileName(block.NewRange(from, to))
+	return c.objStore.FileExists(ctx, filename)
+}
+
 func (c *Config) NewPartialKV(initialBlock uint64, logger *zap.Logger) *PartialKV {
 	return &PartialKV{
 		baseStore:    c.newBaseStore(logger),
+		operations:   &pbssinternal.Operations{},
 		initialBlock: initialBlock,
 		seen:         make(map[string]bool),
 	}

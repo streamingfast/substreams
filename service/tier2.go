@@ -221,7 +221,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	logger.Info("incoming substreams ProcessRange request", fields...)
 
 	respFunc := tier2ResponseHandler(ctx, logger, streamSrv)
-	err = s.processRange(ctx, request, respFunc, tracing.GetTraceID(ctx).String())
+	err = s.processRange(ctx, request, respFunc)
 	grpcError = toGRPCError(ctx, err)
 
 	switch status.Code(grpcError) {
@@ -232,7 +232,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	return grpcError
 }
 
-func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc, traceID string) error {
+func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) error {
 	logger := reqctx.Logger(ctx)
 
 	if err := outputmodules.ValidateTier2Request(request, s.blockType); err != nil {
@@ -278,12 +278,23 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("internal error setting store: %w", err)
 	}
 
+	if clonableStore, ok := cacheStore.(dstore.Clonable); ok {
+		cloned, err := clonableStore.Clone(ctx)
+		if err != nil {
+			return fmt.Errorf("cloning store: %w", err)
+		}
+		cloned.SetMeter(dmetering.GetBytesMeter(ctx))
+	}
+	// gs://substreams.streamingfast.store.google/cache/v2/{modulehash}/outputs/00001000-00002000.outputs.zstd
+
+	// gs://substreams.streamingfast.store.google/cache/v2/         {modulehash}/state
+
 	execOutputConfigs, err := execout.NewConfigs(cacheStore, outputGraph.UsedModulesUpToStage(int(request.Stage)), outputGraph.ModuleHashes(), s.runtimeConfig.StateBundleSize, logger)
 	if err != nil {
 		return fmt.Errorf("new config map: %w", err)
 	}
 
-	storeConfigs, err := store.NewConfigMap(cacheStore, outputGraph.Stores(), outputGraph.ModuleHashes(), traceID)
+	storeConfigs, err := store.NewConfigMap(cacheStore, outputGraph.Stores(), outputGraph.ModuleHashes())
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
@@ -322,7 +333,6 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		s.runtimeConfig,
 		respFunc,
 		// This must always be the parent/global trace id, the one that comes from tier1
-		traceID,
 		opts...,
 	)
 
@@ -437,20 +447,28 @@ func evaluateModulesRequiredToRun(
 
 		if c.ModuleKind() == pbsubstreams.ModuleKindMap {
 			if runningLastStage && name == outputModule {
+				// WARNING be careful, if we want to force producing module outputs/stores states for ALL STAGES on the first block range,
+				// this optimization will be in our way..
 				logger.Info("found existing exec output for output_module, skipping run", zap.String("output_module", name))
 				return nil, nil, nil, nil
 			}
 			continue
 		}
 
-		// TODO when the partial KV stores are back to being 'generic' (without traceID), we will also be able to skip the store if the partial exists
+		// if either full or partial kv exists, we can skip the module
 		storeExists, err := storeConfigs[name].ExistsFullKV(ctx, stopBlock)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("checking file existence: %w", err)
+			return nil, nil, nil, fmt.Errorf("checking fullkv file existence: %w", err)
 		}
 		if !storeExists {
-			// some stores may already exist completely on this stage, but others do not, so we keep going but ignore those
-			requiredModules[name] = usedModules[name]
+			partialStoreExists, err := storeConfigs[name].ExistsPartialKV(ctx, startBlock, stopBlock)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("checking partial file existence: %w", err)
+			}
+			if !partialStoreExists {
+				// some stores may already exist completely on this stage, but others do not, so we keep going but ignore those
+				requiredModules[name] = usedModules[name]
+			}
 		}
 	}
 

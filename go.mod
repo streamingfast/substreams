@@ -75,6 +75,7 @@ require (
 	connectrpc.com/grpchealth v1.3.0 // indirect
 	connectrpc.com/otelconnect v0.7.0 // indirect
 	github.com/bits-and-blooms/bitset v1.2.0 // indirect
+	github.com/alecthomas/participle v0.7.1 // indirect
 	github.com/bobg/go-generics/v2 v2.1.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/google/s2a-go v0.1.7 // indirect

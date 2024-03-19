@@ -1,185 +1,235 @@
-## JavaScript
+The [Substreams JavaScript library](https://github.com/substreams-js/substreams-js) enables you to run a Substreams, just like you would through the CLI, but using JavaScript.
 
-The [Substreams JavaScript library](https://github.com/substreams-js/substreams-js) enables you to run a Substreams, just like you would through the CLI, but programatically.
+The library works both on the client-side and on the server-side, but with some small differences. Clone the [Substreams Sink Examples](https://github.com/streamingfast/substreams-sink-examples) repository contains examples several programming language. Then, move to the `javascript` folder.
 
-The library works both on the client-side and the server-side.
+Depending on your needs, you can use the `node` directory (which contains an example using server-side NodeJS) or the `web` directory (which contains an example using client-side JavaScript).
 
-### Installing the Library
+## Install the dependencies
 
-In your JavaScript project, use your preferred JavaScript package manager to install the required dependencies:
+The `package.json` contains all the necessary dependencies to run the application.
 
-1. The Substreams Core library:
+The NodeJS example uses `@connectrpc/connect-node`, while the Web example uses `@connectrpc/connect-web`.
+
+{% tabs %}
+{% tab title="NodeJS" %}
+```json
+{
+    "name": "substreams-js-node-example",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "dependencies": {
+      "@substreams/core": "^0.1.19",
+      "@substreams/manifest": "^0.0.9",
+      "@connectrpc/connect-node": "1.3.0",
+      "@connectrpc/connect": "1.3.0"
+    },
+    "type": "module"
+  }
+```
+{% endtab %}
+
+{% tab title="Web" %}
+```json
+{
+  "name": "substreams-js-web-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "dependencies": {
+    "@substreams/core": "^0.1.19",
+    "@substreams/manifest": "^0.0.9",
+    "@connectrpc/connect-web": "1.4.0",
+    "@connectrpc/connect": "1.4.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^5.1.6"
+  }
+}
+```
+{% endtab %}
+{% endtabs %}
+
+You can install the dependencies by running:
 
 ```bash
-npm install @substreams/core
+npm install
 ```
 
-2. The Substreams Manifest library:
+## Run the Application
 
+{% tabs %}
+{% tab title="NodeJS" %}
 ```bash
-npm install @substreams/manifest
+node index.js
 ```
 
-3. The Protobuf library, which will be used to decode the Substreams response:
+You will start receiving data! 
+{% endtab %}
 
+{% tab title="Web" %}
+The Web example uses [ViteJS](https://vitejs.dev/) to create a development server that runs the application:
 ```bash
-npm install @bufbuild/connect-web
+npm run dev
 ```
 
-### Using the Library
+Then, you can navigate to `https://localhost:5173`. You will start receiving data!
+{% endtab %}
+{% endtabs %}
 
-In order to use the library, you will need:
+## Explore the Application
 
-- A Substreams endpoint.
-- An authentication token (visit https://app.streamingfast.io to get one).
-- A Substreams package (`spkg`).
+When you consume a Substreams package, a long-live gRPC connection is established, therefore, disconnections will happen and should be taken as _normal_. The Substreams keeps track of latest block you consumed by sending a **cursor** to your application. You **must** persist the cursor, so that in the case of a disconnection, you can restart the application from the latest consumed block.
 
-Consider that you want to consume the `map_block_meta` module of the [Ethereum Explorer package](https://github.com/streamingfast/substreams-explorers/tree/main/ethereum-explorer), which is hosted on Google Cloud (`https://storage.googleapis.com/substreams-registry/spkg/ethereum-explorer-v0.1.1.spkg`).
+{% tabs %}
+{% tab title="NodeJS" %}
+The `index.js` file contains the `main()` function, which runs an infite loop and takes care of managing the disconnections.
 
-1. First, let's define a few helper variables:
+```js
+const TOKEN = process.env.SUBSTREAMS_API_TOKEN // Substreams token. By default it takes the SUBSTREAMS_API_TOKEN environment variable of your system
+const ENDPOINT = "https://mainnet.eth.streamingfast.io" // Substreams endpont. In this case, Ethereum mainnet
+const SPKG = "https://storage.googleapis.com/substreams-registry/spkg/ethereum-explorer-v0.1.1.spkg" // Substreams package. In this case, taken from the substreams.dev registry
+const MODULE = "map_block_meta"
+const START_BLOCK = '100000'
+const STOP_BLOCK = '+10000'
 
-```javascript
-const TOKEN = "YOUR_TOKEN" // Your authentication token
-const SPKG = "https://storage.googleapis.com/substreams-registry/spkg/ethereum-explorer-v0.1.1.spkg" // URL of the SPKG
-const MODULE = "map_block_meta" // Name of the Substreams Module to run
-```
-
-2. Use the `fetchSubstream` method from the library to download the Substreams. Then, the `createRegistry` function creates the Protobuf definitions from the package:
-
-```javascript
-const fetchPackage = async () => {
-    return await fetchSubstream(SPKG)
-}
-
+/*
+    Entrypoint of the application.
+    Because of the long-running connection, Substreams will disconnect from time to time.
+    The application MUST handle disconnections and commit the provided cursor to avoid missing information.
+*/
 const main = async () => {
-    // Fetch Substreams
-    const pkg = await fetchPackage()
-    // Create Protobuf registry
-    const registry = createRegistry(pkg);
-}
-```
-
-3. Use the `createConnectTransport` to define the networking details of the connection (Substreams endpoint and authentication token):
-
-```javascript
-const main = async () => {
-    const pkg = await fetchPackage()
+    const pkg = await fetchPackage() // Download 
     const registry = createRegistry(pkg);
 
+    // Create gRPC connection
     const transport = createConnectTransport({
-        // Substreams endpoint
-        baseUrl: "https://api.streamingfast.io",
-        // Authentication token
-        interceptors: [createAuthInterceptor(TOKEN)],
-        useBinaryFormat: true,
-        jsonOptions: {
-            // Protobuf Registry
-            typeRegistry: registry,
-        },
-    });
-}
-```
-
-4. The `createRequest` function encapsulates the information of the execution (package, module, start block and stop block):
-
-```javascript
-const main = async () => {
-    const pkg = await fetchPackage()
-    const registry = createRegistry(pkg);
-
-    const transport = createConnectTransport({
-        baseUrl: "https://api.streamingfast.io",
-        interceptors: [createAuthInterceptor(TOKEN)],
-        useBinaryFormat: true,
-        jsonOptions: {
-            typeRegistry: registry,
-        },
-    });
-
-    // Execution details
-    const request = createRequest({
-        substreamPackage: pkg,
-        outputModule: MODULE,
-        productionMode: true,
-        startBlockNum: 100000,
-        stopBlockNum: '+10',
-    });
-}
-```
-
-5. Finally, you can use the `streamBlocks` function to iterate over the stream of blocks returned by the Substreams endpoint:
-
-```javascript
-const main = async () => {
-    const pkg = await fetchPackage()
-    const registry = createRegistry(pkg);
-
-    const transport = createConnectTransport({
-        baseUrl: "https://api.streamingfast.io",
+        baseUrl: ENDPOINT,
         interceptors: [createAuthInterceptor(TOKEN)],
         useBinaryFormat: true,
         jsonOptions: {
             typeRegistry: registry,
         },
     });
-
-    const request = createRequest({
-        substreamPackage: pkg,
-        outputModule: MODULE,
-        productionMode: true,
-        startBlockNum: 100000,
-        stopBlockNum: '+10',
-    });
-
-    // Iterate over blocks
-    for await (const response of streamBlocks(transport, request)) {
-        const output = unpackMapOutput(response.response, registry);
-
-        if (output !== undefined && !isEmptyMessage(output)) {
-            const outputAsJson = output.toJson({typeRegistry: registry});
-            console.log(outputAsJson)
+    
+    // The infite loop handles disconnections. Every time an disconnection error is thrown, the loop will automatically reconnect
+    // and start consuming from the latest commited cursor.
+    while (true) {
+        try {
+            await stream(pkg, registry, transport);
+        } catch (e) {
+            if (!isErrorRetryable(e)) {
+              console.log(`A fatal error occurred: ${e}`)
+              throw e
+            }
+            console.log(`A retryable error occurred (${e}), retrying after backoff`)
+            console.log(e)
+            // Add backoff from a an easy to use library
         }
     }
 }
 ```
+{% endtab %}
 
-Now, you can send the data anywhere and create your own custom sink! If you have created a sink and you think it can be reused by other developers, [let us know on Discord](https://discord.gg/jZwqxJAvRs)!
+{% tab title="Web" %}
+The `main.js` file contains the `main()` function, which runs an infite loop and takes care of managing the disconnections.
 
-The previous code is availalble [on GitHub](https://gist.github.com/enoldev/b9f32e045f47675bd5c20f92246aed84).
+```js
+const TOKEN = "<SUBTREAMS-TOKEN>" // Substreams token. Put here your Substreams API token.
+const ENDPOINT = "https://mainnet.eth.streamingfast.io" // Substreams endpont. In this case, Ethereum mainnet
+const SPKG = "https://spkg.io/streamingfast/ethereum-explorer-v0.1.2.spkg" // Substreams package. In this case, taken from the substreams.dev registry
+const MODULE = "map_block_meta"
+const START_BLOCK = '100000'
+const STOP_BLOCK = '+10000'
 
-### Passing Parameters
 
-The `@substreams/core` package exposes an `applyParams(...)` function, which allows you to dynamically pass parameters to the Substreams.
+/*
+  Entrypoint of the application.
+  Because of the long-running connection, Substreams will disconnect from time to time.
+  The application MUST handle disconnections and commit the provided cursor to avoid missing information.
+*/
+const main = async () => {
+  const pkg = await fetchPackage();
+  const registry = createRegistry(pkg);
 
-```javascript
-// ...imports omitted...
-import { applyParams } from '@substreams/core'; // 1.
-
-const pkg = await fetchPackage() // 2.
-const registry = createRegistry(pkg);
-
-const transport = createConnectTransport({
-    baseUrl: "https://mainnet.sol.streamingfast.io:443",
-    interceptors: [createAuthInterceptor(TOKEN)],
-    useBinaryFormat: true,
-    jsonOptions: {
-        typeRegistry: registry,
-    },
-});
-
-applyParams( // 3.
-    [`${MODULE}=parameter_name=parameter_value`],
-    pkg.modules.modules
-);
-
-// ...code omitted...
-
-for await (const response of streamBlocks(transport, request)) { // 4.
-    // ...code omitted...
+  const transport = createConnectTransport({
+      baseUrl: ENDPOINT,
+      interceptors: [createAuthInterceptor(TOKEN)],
+      useBinaryFormat: true,
+      jsonOptions: {
+          typeRegistry: registry,
+      },
+  });
+  
+  // The infite loop handles disconnections. Every time an disconnection error is thrown, the loop will automatically reconnect
+  // and start consuming from the latest commited cursor.
+  while (true) {
+      try {
+          await stream(pkg, registry, transport);
+      } catch (e) {
+          if (!isErrorRetryable(e)) {
+            console.log(`A fatal error occurred: ${e}`)
+            throw e
+          }
+          console.log(`A retryable error occurred (${e}), retrying after backoff`)
+          console.log(e)
+      }
+  }
 }
 ```
-1. Import the `applyParams` function.
-2. Download the `spkg` file and create the package abstraction.
-3. Apply the parameters to the package module(s). The formart should be:
-`module_name=parameter_name=parameter_value`.
-4. Stream blocks.
+{% endtab %}
+{% endtabs %}
+
+The `stream()` function establishes the actual streaming connection by calling the `streamBlocks` function. The response of the function is a `StatefulResponse` object, which contains a progress message (containing useful information about the Substreams execution. The `handleProgressMessage()` function handles this message) and a response message (containing the message sent from the server. The `handleResponseMessage()` function decodes this message).
+
+```js
+const stream = async (pkg, registry, transport) => {
+  const request = createRequest({
+      substreamPackage: pkg,
+      outputModule: MODULE,
+      productionMode: true,
+      startBlockNum: START_BLOCK,
+      stopBlockNum: STOP_BLOCK,
+      startCursor: getCursor() ?? undefined
+  });
+  
+  // Stream the blocks
+  for await (const statefulResponse of streamBlocks(transport, request)) {
+       /*
+            Decode the response and handle the message.
+            There different types of response messages that you can receive. You can read more about the response message in the docs:
+            https://substreams.streamingfast.io/documentation/consume/reliability-guarantees#the-response-format
+        */
+        await handleResponseMessage(statefulResponse.response, registry);
+
+        /*
+            Handle the progress message.
+            Regardless of the response message, the progress message is always sent, and gives you useful information about the execution of the Substreams.
+        */
+        handleProgressMessage(statefulResponse.progress, registry);
+  }
+}
+```
+
+There are different kind of response messages that the server can send. The most common are ones `blockScopedData` and `blockUndoSignal`:
+- `blockScopedData`: sent by the server whenever a new block is discovered in the blockchain. Contains all the block information that you can decode.
+- `blockUndoSignal`: sent every time there is a fork in the blockchain. Because you have probably read incorrect blocks in the `blockScopedData` message, you must rewind back to the latest valid block.
+
+```js
+export const handleResponseMessage = async (response, registry) => {
+    switch(response.message.case) {
+        case "blockScopedData":
+            handleBlockScopedDataMessage(response.message.value, registry);
+            break;
+
+        case "blockUndoSignal":
+            handleBlockUndoSignalMessage(response.message.value);
+            break;
+    }
+}
+```

@@ -51,6 +51,7 @@ This release brings important server-side improvements regarding performance, es
 * Added the output module's hash to the "incoming request"
 * Added `trace_id` in grpc authentication calls
 * Bumped connect-go library to new "connectrpc.com/connect" location
+* Enable gRPC reflection API on tier1 substreams service
 
 ## v1.3.5
 

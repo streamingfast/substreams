@@ -104,7 +104,7 @@ const STOP_BLOCK = '+10000'
     The application MUST handle disconnections and commit the provided cursor to avoid missing information.
 */
 const main = async () => {
-    const pkg = await fetchPackage() // Download 
+    const pkg = await fetchPackage() // Download spkg
     const registry = createRegistry(pkg);
 
     // Create gRPC connection
@@ -154,7 +154,7 @@ const STOP_BLOCK = '+10000'
   The application MUST handle disconnections and commit the provided cursor to avoid missing information.
 */
 const main = async () => {
-  const pkg = await fetchPackage();
+  const pkg = await fetchPackage(); // Download spkg
   const registry = createRegistry(pkg);
 
   const transport = createConnectTransport({

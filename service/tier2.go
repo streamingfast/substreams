@@ -284,10 +284,8 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 			return fmt.Errorf("cloning store: %w", err)
 		}
 		cloned.SetMeter(dmetering.GetBytesMeter(ctx))
+		cacheStore = cloned
 	}
-	// gs://substreams.streamingfast.store.google/cache/v2/{modulehash}/outputs/00001000-00002000.outputs.zstd
-
-	// gs://substreams.streamingfast.store.google/cache/v2/         {modulehash}/state
 
 	execOutputConfigs, err := execout.NewConfigs(cacheStore, outputGraph.UsedModulesUpToStage(int(request.Stage)), outputGraph.ModuleHashes(), s.runtimeConfig.StateBundleSize, logger)
 	if err != nil {

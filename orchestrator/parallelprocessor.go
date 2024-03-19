@@ -33,13 +33,12 @@ func BuildParallelProcessor(
 	execoutStorage *execout.Configs,
 	respFunc func(resp substreams.ResponseFromAnyTier) error,
 	storeConfigs store.ConfigMap,
-	traceID string,
 ) (*ParallelProcessor, error) {
 
 	stream := response.New(respFunc)
 	sched := scheduler.New(ctx, stream)
 
-	stages := stage.NewStages(ctx, outputGraph, reqPlan, storeConfigs, traceID)
+	stages := stage.NewStages(ctx, outputGraph, reqPlan, storeConfigs)
 	sched.Stages = stages
 
 	// OPTIMIZATION: We should fetch the ExecOut files too, and see if they
@@ -91,7 +90,6 @@ func BuildParallelProcessor(
 			reqPlan.StoresSegmenter(),
 			storeConfigs,
 			execoutStorage,
-			traceID,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("fetch stores storage state: %w", err)
@@ -102,7 +100,6 @@ func BuildParallelProcessor(
 			reqPlan.WriteOutSegmenter(),
 			storeConfigs,
 			execoutStorage,
-			traceID,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("fetch stores storage state: %w", err)

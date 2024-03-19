@@ -288,7 +288,7 @@ func toRPCPartialFiles(completed *pbssinternal.Completed) (out store.FileInfos) 
 	// stores to all having been processed.
 	out = make(store.FileInfos, len(completed.AllProcessedRanges))
 	for i, b := range completed.AllProcessedRanges {
-		out[i] = store.NewPartialFileInfo("TODO:CHANGE-ME", b.StartBlock, b.EndBlock, completed.TraceId)
+		out[i] = store.NewPartialFileInfo("TODO:CHANGE-ME", b.StartBlock, b.EndBlock)
 	}
 	return
 }

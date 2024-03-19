@@ -19,3 +19,36 @@ message ModuleOutput {
     bool debug_logs_truncated = 5;
     bool cached = 6;
 }
+
+message Operations {
+    repeated Operation operations = 1;
+}
+
+message Operation {
+    enum Type {
+        SET = 0;
+        SET_BYTES = 1;
+        SET_IF_NOT_EXISTS = 2;
+        SET_BYTES_IF_NOT_EXISTS = 3;
+        APPEND = 4;
+        DELETE_PREFIX = 5;
+        SET_MAX_BIG_INT = 6;
+        SET_MAX_INT64 = 7;
+        SET_MAX_FLOAT64 = 8;
+        SET_MAX_BIG_DECIMAL = 9;
+        SET_MIN_BIG_INT = 10;
+        SET_MIN_INT64 = 11;
+        SET_MIN_FLOAT64 = 12;
+        SET_MIN_BIG_DECIMAL = 13;
+        SUM_BIG_INT = 14;
+        SUM_INT64 = 15;
+        SUM_FLOAT64 = 16;
+        SUM_BIG_DECIMAL = 17;
+    }
+
+    Type type = 1;
+	uint64 ord = 2;
+	string key = 3;
+	bytes value = 4;
+
+}

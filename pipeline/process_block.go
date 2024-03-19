@@ -22,6 +22,7 @@ import (
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
+	"github.com/streamingfast/substreams/storage/store"
 )
 
 func (p *Pipeline) ProcessFromExecOutput(
@@ -370,12 +371,23 @@ func (p *Pipeline) applyExecutionResult(ctx context.Context, executor exec.Modul
 		return fmt.Errorf("execute module: %w", runError)
 	}
 
-	p.saveModuleOutput(moduleOutput, executor.Name(), reqctx.Details(ctx).ProductionMode)
-	if err := execOutput.Set(executorName, outputBytes); err != nil {
-		return fmt.Errorf("set output cache: %w", err)
-	}
-	if moduleOutput != nil {
-		p.forkHandler.addReversibleOutput(moduleOutput, execOutput.Clock().Id)
+	if hasValidOutput {
+		p.saveModuleOutput(moduleOutput, executor.Name(), reqctx.Details(ctx).ProductionMode)
+		if err := execOutput.Set(executorName, outputBytes); err != nil {
+			return fmt.Errorf("set output cache: %w", err)
+		}
+		if moduleOutput != nil {
+			p.forkHandler.addReversibleOutput(moduleOutput, execOutput.Clock().Id)
+		}
+	} else { // we are in a partial store
+		if stor, ok := p.GetStoreMap().Get(executorName); ok {
+			if pkvs, ok := stor.(*store.PartialKV); ok {
+				if err := execOutput.Set(executorName, pkvs.ReadOps()); err != nil {
+					return fmt.Errorf("set output cache: %w", err)
+				}
+			}
+
+		}
 	}
 	return nil
 }

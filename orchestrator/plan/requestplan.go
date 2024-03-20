@@ -78,7 +78,7 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphIni
 			if endStoreBoundRange == nil {
 				return nil, fmt.Errorf("store bound range: invalid start block %d for segment interval %d", linearHandoffBlock, segmentInterval)
 			}
-			endStoreBound = endStoreBoundRange.StartBlock
+			endStoreBound = endStoreBoundRange.ExclusiveEndBlock
 		}
 		if scheduleStores {
 			plan.BuildStores = block.NewRange(graphInitBlock, endStoreBound)

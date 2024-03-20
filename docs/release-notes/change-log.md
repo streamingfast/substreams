@@ -11,14 +11,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Client
+
 * Implement a `use` feature, enabling a module to use an existing module by overriding its inputs or initial block. (Inputs should have the same output type than override module's inputs).
   Check a usage of this new feature on the [substreams-db-graph-converter](https://github.com/streamingfast/substreams-db-graph-converter/) repository. 
 
-* Pick up docs from the README.md or README in the same directory as the manifest, when top-level package.doc is empty
+* Fix panic when using '--header (-H)' flag on `gui` command
 
-* Tier2 service now supports a maximum concurrent requests limit. Default set to 0 (unlimited). 
+* When packing substreams, pick up docs from the README.md or README in the same directory as the manifest, when top-level package.doc is empty
 
-* Improved file listing performance for Google Storage backends by 25%
+* Added "Total read bytes" summary at the end of 'substreams run' command
+
+### Server performance
+
+Some redundant reprocessing has been removed, along with a better usage of caches to reduce reading the blocks multiple times when it can be avoided.
 
 * Tier2 will now read back mapper outputs (if they exist) to prevent running them again. Additionally, it will not read back the full blocks if its inputs can be satisfied from existing cached mapper outputs.
 
@@ -30,13 +36,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * Scheduler modification: a stage now waits for the previous stage to have completed the same segment before running, to take advantage of the cached intermediate layers.
 
-* [Operator] Readiness metric for Substreams tier1 app is now named `substreams_tier1` (was mistakenly called `firehose` before).
+* Improved file listing performance for Google Storage backends by 25%
 
-* [Operator] Added back deadiness metric for Substreams tiere app (named `substreams_tier2`).
+### Operator concerns
+* Tier2 service now supports a maximum concurrent requests limit. Default set to 0 (unlimited). 
 
-* [Operator] Added metric `substreams_tier1_active_worker_requests` which gives the number of active Substreams worker requests a tier1 app is currently doing against tier2 nodes.
+* Readiness metric for Substreams tier1 app is now named `substreams_tier1` (was mistakenly called `firehose` before).
 
-* [Operator] Added metric `substreams_tier1_worker_request_counter` which gives the total Substreams worker requests a tier1 app made against tier2 nodes.
+* Added back deadiness metric for Substreams tiere app (named `substreams_tier2`).
+
+* Added metric `substreams_tier1_active_worker_requests` which gives the number of active Substreams worker requests a tier1 app is currently doing against tier2 nodes.
+
+* Added metric `substreams_tier1_worker_request_counter` which gives the total Substreams worker requests a tier1 app made against tier2 nodes.
 
 ## v1.3.7
 

@@ -394,6 +394,15 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		return fmt.Errorf("internal error setting store: %w", err)
 	}
 
+	if clonableStore, ok := cacheStore.(dstore.Clonable); ok {
+		cloned, err := clonableStore.Clone(ctx)
+		if err != nil {
+			return fmt.Errorf("cloning store: %w", err)
+		}
+		cloned.SetMeter(dmetering.GetBytesMeter(ctx))
+		cacheStore = cloned
+	}
+
 	execOutputConfigs, err := execout.NewConfigs(cacheStore, outputGraph.UsedModules(), outputGraph.ModuleHashes(), s.runtimeConfig.StateBundleSize, logger)
 	if err != nil {
 		return fmt.Errorf("new config map: %w", err)

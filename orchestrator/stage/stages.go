@@ -404,7 +404,7 @@ func (s *Stages) dependenciesCompleted(u Unit) bool {
 		return true
 	}
 	for i := u.Stage - 1; i >= 0; i-- {
-		state := s.getState(Unit{Segment: u.Segment - 1, Stage: i})
+		state := s.getState(Unit{Segment: u.Segment, Stage: i})
 		if !(state == UnitCompleted || state == UnitNoOp) {
 			return false
 		}

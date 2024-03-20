@@ -60,9 +60,9 @@ func validateRequest(binaries []*pbsubstreams.Binary, modules *pbsubstreams.Modu
 
 func checkNotImplemented(mods []*pbsubstreams.Module) error {
 	for _, mod := range mods {
-		if mod.ModuleKind() == pbsubstreams.ModuleKindBlockIndex {
-			return fmt.Errorf("block index module is not implemented")
-		}
+		//if mod.ModuleKind() == pbsubstreams.ModuleKindBlockIndex {
+		//	return fmt.Errorf("block index module is not implemented")
+		//}
 		if mod.GetBlockFilter() != nil {
 			return fmt.Errorf("block filter module is not implemented")
 		}

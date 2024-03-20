@@ -301,7 +301,6 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 	}
 	for _, stage := range moduleExecutors {
 		//t0 := time.Now()
-
 		if len(stage) < 2 {
 			//fmt.Println("Linear stage", len(stage))
 			for _, executor := range stage {

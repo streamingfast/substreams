@@ -45,7 +45,7 @@ type Pipeline struct {
 	wasmRuntime     *wasm.Registry
 	outputGraph     *outputmodules.Graph
 	loadedModules   map[uint32]wasm.Module
-	moduleExecutors [][]exec.ModuleExecutor // Staged module executors
+	ModuleExecutors [][]exec.ModuleExecutor // Staged module executors
 	executionStages outputmodules.ExecutionStages
 
 	mapModuleOutput         *pbsubstreamsrpc.MapModuleOutput
@@ -436,12 +436,12 @@ func (p *Pipeline) returnInternalModuleProgressOutputs(clock *pbsubstreams.Clock
 	return nil
 }
 
-// buildModuleExecutors builds the moduleExecutors, and the loadedModules.
+// buildModuleExecutors builds the ModuleExecutors, and the loadedModules.
 func (p *Pipeline) buildModuleExecutors(ctx context.Context) ([][]exec.ModuleExecutor, error) {
-	if p.moduleExecutors != nil {
+	if p.ModuleExecutors != nil {
 		// Eventually, we can invalidate our catch to accomodate the PATCH
 		// and rebuild all the modules, and tear down the previously loaded ones.
-		return p.moduleExecutors, nil
+		return p.ModuleExecutors, nil
 	}
 
 	reqModules := reqctx.Details(ctx).Modules
@@ -516,6 +516,19 @@ func (p *Pipeline) buildModuleExecutors(ctx context.Context) ([][]exec.ModuleExe
 					executor := exec.NewStoreModuleExecutor(baseExecutor, outputStore)
 					moduleExecutors = append(moduleExecutors, executor)
 
+				case *pbsubstreams.Module_KindBlockIndex_:
+					baseExecutor := exec.NewBaseExecutor(
+						ctx,
+						module.Name,
+						mod,
+						p.wasmRuntime.InstanceCacheEnabled(),
+						inputs,
+						entrypoint,
+						tracer,
+					)
+					executor := exec.NewIndexModuleExecutor(baseExecutor)
+					moduleExecutors = append(moduleExecutors, executor)
+
 				default:
 					panic(fmt.Errorf("invalid kind %q input module %q", module.Kind, module.Name))
 				}
@@ -524,12 +537,12 @@ func (p *Pipeline) buildModuleExecutors(ctx context.Context) ([][]exec.ModuleExe
 		}
 	}
 
-	p.moduleExecutors = stagedModuleExecutors
+	p.ModuleExecutors = stagedModuleExecutors
 	return stagedModuleExecutors, nil
 }
 
 func (p *Pipeline) cleanUpModuleExecutors(ctx context.Context) error {
-	for _, stage := range p.moduleExecutors {
+	for _, stage := range p.ModuleExecutors {
 		for _, executor := range stage {
 			if err := executor.Close(ctx); err != nil {
 				return fmt.Errorf("closing module executor %q: %w", executor.Name(), err)

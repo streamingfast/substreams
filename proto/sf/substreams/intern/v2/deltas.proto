@@ -4,6 +4,7 @@ package sf.substreams.internal.v2;
 
 import "google/protobuf/any.proto";
 import "sf/substreams/v1/deltas.proto";
+import "sf/substreams/index/v1/keys.proto";
 
 option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2;pbssinternal";
 
@@ -12,6 +13,7 @@ message ModuleOutput {
     oneof data {
             google.protobuf.Any map_output = 2;
             sf.substreams.v1.StoreDeltas store_deltas = 3;
+            sf.substreams.index.v1.Keys index_keys = 7;
     }
     repeated string logs = 4;
     bool debug_logs_truncated = 5;

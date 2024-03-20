@@ -402,6 +402,12 @@ const (
 
 func (m *Module) setKindToProto(pbModule *pbsubstreams.Module) {
 	switch m.Kind {
+	case ModuleKindBlockIndex:
+		pbModule.Kind = &pbsubstreams.Module_KindBlockIndex_{
+			KindBlockIndex: &pbsubstreams.Module_KindBlockIndex{
+				OutputType: m.Output.Type,
+			},
+		}
 	case ModuleKindMap:
 		pbModule.Kind = &pbsubstreams.Module_KindMap_{
 			KindMap: &pbsubstreams.Module_KindMap{

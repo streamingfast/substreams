@@ -1,6 +1,8 @@
 package pbsubstreams
 
-import "strings"
+import (
+	"strings"
+)
 
 type ModuleKind int
 

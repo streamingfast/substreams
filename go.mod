@@ -27,6 +27,7 @@ require (
 require (
 	connectrpc.com/connect v1.15.0
 	connectrpc.com/grpcreflect v1.2.0
+	github.com/RoaringBitmap/roaring v0.9.4
 	github.com/alecthomas/chroma v0.10.0
 	github.com/bytecodealliance/wasmtime-go/v4 v4.0.0
 	github.com/charmbracelet/bubbles v0.15.0
@@ -73,11 +74,13 @@ require (
 require (
 	connectrpc.com/grpchealth v1.3.0 // indirect
 	connectrpc.com/otelconnect v0.7.0 // indirect
+	github.com/bits-and-blooms/bitset v1.2.0 // indirect
 	github.com/bobg/go-generics/v2 v2.1.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/google/s2a-go v0.1.7 // indirect
 	github.com/iancoleman/strcase v0.2.0 // indirect
 	github.com/mattn/go-sqlite3 v1.14.16 // indirect
+	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.6 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.47.0 // indirect
 	golang.org/x/time v0.5.0 // indirect

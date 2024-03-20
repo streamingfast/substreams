@@ -2,12 +2,13 @@ package manifest
 
 import (
 	"fmt"
-	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/dynamic"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"os"
 	"path"
 	"path/filepath"
+
+	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/dynamic"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 type manifestConverter struct {
@@ -64,7 +65,6 @@ func (r *manifestConverter) validateManifest(manif *Manifest) error {
 
 	for _, s := range manif.Modules {
 		// TODO: let's make sure this is also checked when received in Protobuf in a remote request.
-
 		switch s.Kind {
 		case ModuleKindMap:
 			if s.Output.Type == "" {

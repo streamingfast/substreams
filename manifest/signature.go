@@ -66,6 +66,8 @@ func (m *ModuleHashes) HashModule(modules *pbsubstreams.Modules, module *pbsubst
 		buf.WriteString("map")
 	case *pbsubstreams.Module_KindStore_:
 		buf.WriteString("store")
+	case *pbsubstreams.Module_KindBlockIndex_:
+		buf.WriteString("block_index")
 	default:
 		return nil, fmt.Errorf("invalid module file %T", module.Kind)
 	}

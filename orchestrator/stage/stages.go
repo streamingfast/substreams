@@ -397,9 +397,6 @@ func (s *Stages) allocSegments(segmentIdx int) {
 }
 
 func (s *Stages) dependenciesCompleted(u Unit) bool {
-	if u.Segment <= s.stages[u.Stage].segmenter.FirstIndex() {
-		return true
-	}
 	if u.Stage == 0 {
 		return true
 	}

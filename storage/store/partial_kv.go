@@ -153,25 +153,26 @@ func applyOps(in []byte, store *baseStore) error {
 			store.DeletePrefix(op.Ord, op.Key)
 		case pbssinternal.Operation_SET_MAX_BIG_INT:
 			big := new(big.Int)
-			big.SetBytes(op.Value)
+			big.SetString(string(op.Value), 10)
 			store.SetMaxBigInt(op.Ord, op.Key, big)
 		case pbssinternal.Operation_SET_MAX_INT64:
 			big := new(big.Int)
-			big.SetBytes(op.Value)
+			big.SetString(string(op.Value), 10)
 			val := big.Int64()
 			store.SetMaxInt64(op.Ord, op.Key, val)
 		case pbssinternal.Operation_SET_MAX_FLOAT64:
 			val := math.Float64frombits(binary.LittleEndian.Uint64(op.Value))
 			store.SetMaxFloat64(op.Ord, op.Key, val)
 		case pbssinternal.Operation_SET_MAX_BIG_DECIMAL:
-			val, err := decimal.NewFromString(string(op.Value))
+			val := decimal.Decimal{}
+			err := val.UnmarshalBinary(op.Value)
 			if err != nil {
 				return err
 			}
 			store.SetMaxBigDecimal(op.Ord, op.Key, val)
 		case pbssinternal.Operation_SET_MIN_BIG_INT:
 			big := new(big.Int)
-			big.SetBytes(op.Value)
+			big.SetString(string(op.Value), 10)
 			store.SetMinBigInt(op.Ord, op.Key, big)
 		case pbssinternal.Operation_SET_MIN_INT64:
 			big := new(big.Int)
@@ -182,25 +183,27 @@ func applyOps(in []byte, store *baseStore) error {
 			val := math.Float64frombits(binary.LittleEndian.Uint64(op.Value))
 			store.SetMinFloat64(op.Ord, op.Key, val)
 		case pbssinternal.Operation_SET_MIN_BIG_DECIMAL:
-			val, err := decimal.NewFromString(string(op.Value))
+			val := decimal.Decimal{}
+			err := val.UnmarshalBinary(op.Value)
 			if err != nil {
 				return err
 			}
 			store.SetMinBigDecimal(op.Ord, op.Key, val)
 		case pbssinternal.Operation_SUM_BIG_INT:
 			big := new(big.Int)
-			big.SetBytes(op.Value)
+			big.SetString(string(op.Value), 10)
 			store.SumBigInt(op.Ord, op.Key, big)
 		case pbssinternal.Operation_SUM_INT64:
 			big := new(big.Int)
-			big.SetBytes(op.Value)
+			big.SetString(string(op.Value), 10)
 			val := big.Int64()
 			store.SumInt64(op.Ord, op.Key, val)
 		case pbssinternal.Operation_SUM_FLOAT64:
 			val := math.Float64frombits(binary.LittleEndian.Uint64(op.Value))
 			store.SumFloat64(op.Ord, op.Key, val)
 		case pbssinternal.Operation_SUM_BIG_DECIMAL:
-			val, err := decimal.NewFromString(string(op.Value))
+			val := decimal.Decimal{}
+			err := val.UnmarshalBinary(op.Value)
 			if err != nil {
 				return err
 			}
@@ -285,7 +288,7 @@ func (p *PartialKV) SetMaxBigInt(ord uint64, key string, value *big.Int) {
 		Type:  pbssinternal.Operation_SET_MAX_BIG_INT,
 		Ord:   ord,
 		Key:   key,
-		Value: value.Bytes(),
+		Value: []byte(value.String()),
 	})
 
 	p.baseStore.SetMaxBigInt(ord, key, value)
@@ -299,7 +302,7 @@ func (p *PartialKV) SetMaxInt64(ord uint64, key string, value int64) {
 		Type:  pbssinternal.Operation_SET_MAX_INT64,
 		Ord:   ord,
 		Key:   key,
-		Value: big.Bytes(),
+		Value: []byte(big.String()),
 	})
 	p.baseStore.SetMaxInt64(ord, key, value)
 }
@@ -318,11 +321,15 @@ func (p *PartialKV) SetMaxFloat64(ord uint64, key string, value float64) {
 }
 
 func (p *PartialKV) SetMaxBigDecimal(ord uint64, key string, value decimal.Decimal) {
+	val, err := value.MarshalBinary()
+	if err != nil {
+		panic(err)
+	}
 	p.operations.Operations = append(p.operations.Operations, &pbssinternal.Operation{
 		Type:  pbssinternal.Operation_SET_MAX_BIG_DECIMAL,
 		Ord:   ord,
 		Key:   key,
-		Value: []byte(value.String()),
+		Value: val,
 	})
 
 	p.baseStore.SetMaxBigDecimal(ord, key, value)
@@ -333,7 +340,7 @@ func (p *PartialKV) SetMinBigInt(ord uint64, key string, value *big.Int) {
 		Type:  pbssinternal.Operation_SET_MIN_BIG_INT,
 		Ord:   ord,
 		Key:   key,
-		Value: value.Bytes(),
+		Value: []byte(value.String()),
 	})
 	p.baseStore.SetMinBigInt(ord, key, value)
 }
@@ -345,7 +352,7 @@ func (p *PartialKV) SetMinInt64(ord uint64, key string, value int64) {
 		Type:  pbssinternal.Operation_SET_MIN_INT64,
 		Ord:   ord,
 		Key:   key,
-		Value: big.Bytes(),
+		Value: []byte(big.String()),
 	})
 
 	p.baseStore.SetMinInt64(ord, key, value)
@@ -365,11 +372,15 @@ func (p *PartialKV) SetMinFloat64(ord uint64, key string, value float64) {
 }
 
 func (p *PartialKV) SetMinBigDecimal(ord uint64, key string, value decimal.Decimal) {
+	val, err := value.MarshalBinary()
+	if err != nil {
+		panic(err)
+	}
 	p.operations.Operations = append(p.operations.Operations, &pbssinternal.Operation{
 		Type:  pbssinternal.Operation_SET_MIN_BIG_DECIMAL,
 		Ord:   ord,
 		Key:   key,
-		Value: []byte(value.String()),
+		Value: val,
 	})
 
 	p.baseStore.SetMinBigDecimal(ord, key, value)
@@ -380,7 +391,7 @@ func (p *PartialKV) SumBigInt(ord uint64, key string, value *big.Int) {
 		Type:  pbssinternal.Operation_SUM_BIG_INT,
 		Ord:   ord,
 		Key:   key,
-		Value: value.Bytes(),
+		Value: []byte(value.String()),
 	})
 
 	p.baseStore.SumBigInt(ord, key, value)
@@ -394,7 +405,7 @@ func (p *PartialKV) SumInt64(ord uint64, key string, value int64) {
 		Type:  pbssinternal.Operation_SUM_INT64,
 		Ord:   ord,
 		Key:   key,
-		Value: big.Bytes(),
+		Value: []byte(big.String()),
 	})
 
 	p.baseStore.SumInt64(ord, key, value)
@@ -414,11 +425,15 @@ func (p *PartialKV) SumFloat64(ord uint64, key string, value float64) {
 }
 
 func (p *PartialKV) SumBigDecimal(ord uint64, key string, value decimal.Decimal) {
+	val, err := value.MarshalBinary()
+	if err != nil {
+		panic(err)
+	}
 	p.operations.Operations = append(p.operations.Operations, &pbssinternal.Operation{
 		Type:  pbssinternal.Operation_SUM_BIG_DECIMAL,
 		Ord:   ord,
 		Key:   key,
-		Value: []byte(value.String()),
+		Value: val,
 	})
 
 	p.baseStore.SumBigDecimal(ord, key, value)

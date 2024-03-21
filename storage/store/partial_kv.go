@@ -218,12 +218,19 @@ func (p *PartialKV) ApplyDeltasReverse(deltas []*pbsubstreams.StoreDelta) {
 	panic("caching store cannot be used with deltas")
 }
 
+// apparently this is faster than append() method
+func cloneBytes(b []byte) []byte {
+	out := make([]byte, len(b))
+	copy(out, b)
+	return out
+}
+
 func (p *PartialKV) Set(ord uint64, key string, value string) {
 	p.operations.Operations = append(p.operations.Operations, &pbssinternal.Operation{
 		Type:  pbssinternal.Operation_SET,
 		Ord:   ord,
 		Key:   key,
-		Value: []byte(value),
+		Value: cloneBytes([]byte(value)),
 	})
 
 	p.baseStore.Set(ord, key, value)
@@ -234,7 +241,7 @@ func (p *PartialKV) SetBytes(ord uint64, key string, value []byte) {
 		Type:  pbssinternal.Operation_SET_BYTES,
 		Ord:   ord,
 		Key:   key,
-		Value: value,
+		Value: cloneBytes(value),
 	})
 
 	p.baseStore.SetBytes(ord, key, value)
@@ -245,7 +252,7 @@ func (p *PartialKV) SetIfNotExists(ord uint64, key string, value string) {
 		Type:  pbssinternal.Operation_SET_IF_NOT_EXISTS,
 		Ord:   ord,
 		Key:   key,
-		Value: []byte(value),
+		Value: cloneBytes([]byte(value)),
 	})
 
 	p.baseStore.SetIfNotExists(ord, key, value)
@@ -256,7 +263,7 @@ func (p *PartialKV) SetBytesIfNotExists(ord uint64, key string, value []byte) {
 		Type:  pbssinternal.Operation_SET_BYTES_IF_NOT_EXISTS,
 		Ord:   ord,
 		Key:   key,
-		Value: value,
+		Value: cloneBytes(value),
 	})
 
 	p.baseStore.SetBytesIfNotExists(ord, key, value)
@@ -267,7 +274,7 @@ func (p *PartialKV) Append(ord uint64, key string, value []byte) error {
 		Type:  pbssinternal.Operation_APPEND,
 		Ord:   ord,
 		Key:   key,
-		Value: value,
+		Value: cloneBytes(value),
 	})
 
 	return p.baseStore.Append(ord, key, value)

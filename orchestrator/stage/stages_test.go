@@ -59,32 +59,35 @@ S:.
 M:N`)
 
 	j1, _ := stages.NextJob()
-	assert.Equal(t, 1, j1.Stage)
+	assert.Equal(t, 0, j1.Stage)
 	assert.Equal(t, 0, j1.Segment)
 
 	segmentStateEquals(t, stages, `
+S:S
 S:.
+M:N`)
+
+	stages.forceTransition(0, 0, UnitCompleted)
+
+	segmentStateEquals(t, stages, `
+S:C
+S:.
+M:N`)
+
+	stages.NextJob()
+	assert.Equal(t, 0, j1.Stage)
+	assert.Equal(t, 0, j1.Segment)
+
+	segmentStateEquals(t, stages, `
+S:C
 S:S
 M:N`)
+
+	stages.NextJob()
 
 	stages.forceTransition(0, 1, UnitCompleted)
-
 	segmentStateEquals(t, stages, `
-S:.
-S:C
-M:N`)
-
-	stages.NextJob()
-
-	segmentStateEquals(t, stages, `
-S:S
-S:C
-M:N`)
-
-	stages.NextJob()
-
-	segmentStateEquals(t, stages, `
-S:SS
+S:CS
 S:C.
 M:N.`)
 

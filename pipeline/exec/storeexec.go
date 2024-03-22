@@ -75,7 +75,6 @@ func (e *StoreModuleExecutor) wrapDeltas() ([]byte, *pbssinternal.ModuleOutput, 
 func (e *StoreModuleExecutor) toModuleOutput(data []byte) (*pbssinternal.ModuleOutput, error) {
 	if fullkvs, ok := e.outputStore.(*store.FullKV); ok {
 		deltas := fullkvs.GetDeltas()
-		fullkvs.Reset()
 
 		return &pbssinternal.ModuleOutput{
 			Data: &pbssinternal.ModuleOutput_StoreDeltas{

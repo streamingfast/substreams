@@ -22,9 +22,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * Added "Total read bytes" summary at the end of 'substreams run' command
 
-### Server performance
+### Server performance in "production-mode"
 
-Some redundant reprocessing has been removed, along with a better usage of caches to reduce reading the blocks multiple times when it can be avoided.
+Some redundant reprocessing has been removed, along with a better usage of caches to reduce reading the blocks multiple times when it can be avoided. Concurrent requests may benefit the other's work to a certain extent (up to 75%)
+
+* All module outputs are now cached. (previously, only the last module was cached, along with the "store snapshots", to allow parallel processing). (this will increase disk usage, there is no automatic removal of old module caches)
 
 * Tier2 will now read back mapper outputs (if they exist) to prevent running them again. Additionally, it will not read back the full blocks if its inputs can be satisfied from existing cached mapper outputs.
 
@@ -39,6 +41,7 @@ Some redundant reprocessing has been removed, along with a better usage of cache
 * Improved file listing performance for Google Storage backends by 25%
 
 ### Operator concerns
+
 * Tier2 service now supports a maximum concurrent requests limit. Default set to 0 (unlimited). 
 
 * Readiness metric for Substreams tier1 app is now named `substreams_tier1` (was mistakenly called `firehose` before).

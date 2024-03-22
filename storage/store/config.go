@@ -147,6 +147,13 @@ func (c *Config) ListSnapshotFiles(ctx context.Context, below uint64) (files []*
 				return nil
 			}
 
+			if fileInfo.WithTraceID {
+				if err := c.objStore.DeleteObject(ctx, filename); err != nil { // clean up all old files with traceID in them, they will only slow every next run
+					logger.Warn("cannot delete old partial file with trace_id", zap.String("filename", filename), zap.Error(err))
+				}
+				return nil
+			}
+
 			if fileInfo.Range.StartBlock >= below {
 				return dstore.StopIteration
 			}

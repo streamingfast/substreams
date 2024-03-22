@@ -190,10 +190,7 @@ func applyOps(in []byte, store *baseStore) error {
 		case pbssinternal.Operation_SET_MIN_BIG_INT:
 			store.SetMinBigInt(op.Ord, op.Key, valueToBigInt(op.Value))
 		case pbssinternal.Operation_SET_MIN_INT64:
-			big := new(big.Int)
-			big.SetBytes(op.Value)
-			val := big.Int64()
-			store.SetMinInt64(op.Ord, op.Key, val)
+			store.SetMinInt64(op.Ord, op.Key, valueToInt64(op.Value))
 		case pbssinternal.Operation_SET_MIN_FLOAT64:
 			store.SetMinFloat64(op.Ord, op.Key, valueToFloat64(op.Value))
 		case pbssinternal.Operation_SET_MIN_BIG_DECIMAL:

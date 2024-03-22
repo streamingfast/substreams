@@ -35,10 +35,11 @@ func (f FileInfos) String() string {
 }
 
 type FileInfo struct {
-	ModuleName string
-	Filename   string
-	Range      *block.Range
-	Partial    bool
+	ModuleName  string
+	Filename    string
+	Range       *block.Range
+	Partial     bool
+	WithTraceID bool
 }
 
 func NewCompleteFileInfo(moduleName string, moduleInitialBlock uint64, exclusiveEndBlock uint64) *FileInfo {
@@ -70,10 +71,11 @@ func parseFileName(moduleName, filename string) (*FileInfo, bool) {
 	}
 
 	return &FileInfo{
-		ModuleName: moduleName,
-		Filename:   filename,
-		Range:      block.NewRange(uint64(mustAtoi(res[0][2])), uint64(mustAtoi(res[0][1]))),
-		Partial:    res[0][4] == "partial",
+		ModuleName:  moduleName,
+		Filename:    filename,
+		Range:       block.NewRange(uint64(mustAtoi(res[0][2])), uint64(mustAtoi(res[0][1]))),
+		Partial:     res[0][4] == "partial",
+		WithTraceID: res[0][3] != "",
 	}, true
 }
 

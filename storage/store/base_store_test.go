@@ -81,10 +81,10 @@ func TestFileName(t *testing.T) {
 	stateFileName := FullStateFileName(&block.Range{StartBlock: 100, ExclusiveEndBlock: 10000})
 	require.Equal(t, "0000010000-0000000100.kv", stateFileName)
 
-	partialFileName := PartialFileName(&block.Range{StartBlock: 10000, ExclusiveEndBlock: 20000}, "abc")
-	require.Equal(t, "0000020000-0000010000.abc.partial", partialFileName)
+	partialFileName := PartialFileName(&block.Range{StartBlock: 10000, ExclusiveEndBlock: 20000})
+	require.Equal(t, "0000020000-0000010000.partial", partialFileName)
 
-	partialFileNameLegacy := PartialFileName(&block.Range{StartBlock: 10000, ExclusiveEndBlock: 20000}, "")
+	partialFileNameLegacy := PartialFileName(&block.Range{StartBlock: 10000, ExclusiveEndBlock: 20000})
 	require.Equal(t, "0000020000-0000010000.partial", partialFileNameLegacy)
 }
 

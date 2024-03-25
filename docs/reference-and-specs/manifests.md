@@ -257,6 +257,39 @@ There are two module types for `modules[].kind`:
 * `map`
 * `store`
 
+#### Module `use`
+
+The `use` parameter allows you to define a new module by reusing the function of another module. For example, consider that you have a module called `db_out` that emits the `DatabaseChanges` Protobuf. You want to create another module that maps the `DatabaseChanges` to `EntityChanges`, but you don't want to code it yourself; instead you use a module that is already written.
+
+```yaml
+specVersion: v0.1.0
+package:
+  name: byac
+  version: v0.1.0
+
+imports:
+  converter: https://spkg.io/streamingfast/substreams-db-graph-converter-v0.1.0.spkg
+
+modules:
+...
+  - name: db_out
+    kind: map
+    initialBlock: 12287507
+    inputs:
+      - map: map_events
+    output:
+      type: proto:sf.substreams.sink.database.v1.DatabaseChanges
+
+  - name: graph_out
+    use: converter:dbout_to_graphout
+    inputs:
+      - map: db_out
+```
+
+In the previous example, the `map_events` module emits `DatabaseChanges`. The `graph_out` module converts `DatabaseChanges` to `EntityChanges`, by defining using an already written module (`use: converter:dbout_to_graphout`).
+
+The converter module **must** accept the same input as the one defined in the `inputs` section (in the previous example, `DatabaseChanges`).
+
 #### Module `updatePolicy`
 
 Specifies the merge strategy for two contiguous partial stores produced by parallelized operations.

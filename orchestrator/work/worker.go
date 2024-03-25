@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"google.golang.org/grpc/metadata"
 	"io"
 	"sync/atomic"
 	"time"
+
+	"google.golang.org/grpc/metadata"
 
 	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/derr"
@@ -102,12 +103,23 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *blo
 		var res *Result
 		retryIdx := 0
 		startTime := time.Now()
-		err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+		maxRetries := 720 //TODO: make this configurable
+		var previousError error
+		err := derr.RetryContext(ctx, uint64(maxRetries), func(ctx context.Context) error {
+			w.logger.Info("launching remote worker",
+				zap.Int64("start_block_num", int64(request.StartBlockNum)),
+				zap.Uint64("stop_block_num", request.StopBlockNum),
+				zap.Uint32("stage", request.Stage),
+				zap.String("output_module", request.OutputModule),
+				zap.Int("attempt", retryIdx+1),
+				zap.NamedError("previous_error", previousError),
+			)
+
 			res = w.work(ctx, request, moduleNames, upstream)
 			err := res.Error
 			switch err.(type) {
 			case *RetryableErr:
-				logger.Debug("worker failed with retryable error", zap.Error(err))
+				previousError = err
 				retryIdx++
 				return err
 			default:
@@ -177,12 +189,6 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 	if err != nil {
 		return &Result{Error: fmt.Errorf("unable to create grpc client: %w", err)}
 	}
-
-	w.logger.Info("launching remote worker",
-		zap.Int64("start_block_num", int64(request.StartBlockNum)),
-		zap.Uint64("stop_block_num", request.StopBlockNum),
-		zap.String("output_module", request.OutputModule),
-	)
 
 	stats := reqctx.ReqStats(ctx)
 	jobIdx := stats.RecordNewSubrequest(request.Stage, request.StartBlockNum, request.StopBlockNum)
@@ -286,7 +292,7 @@ func toRPCPartialFiles(completed *pbssinternal.Completed) (out store.FileInfos) 
 	// stores to all having been processed.
 	out = make(store.FileInfos, len(completed.AllProcessedRanges))
 	for i, b := range completed.AllProcessedRanges {
-		out[i] = store.NewPartialFileInfo("TODO:CHANGE-ME", b.StartBlock, b.EndBlock, completed.TraceId)
+		out[i] = store.NewPartialFileInfo("TODO:CHANGE-ME", b.StartBlock, b.EndBlock)
 	}
 	return
 }

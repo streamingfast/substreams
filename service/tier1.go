@@ -17,7 +17,6 @@ import (
 
 	"github.com/streamingfast/bstream/hub"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
-	"github.com/streamingfast/bstream/stream"
 	bsstream "github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetering"
@@ -70,6 +69,8 @@ type Tier1Service struct {
 	getRecentFinalBlock func() (uint64, error)
 	resolveCursor       pipeline.CursorResolver
 	getHeadBlock        func() (uint64, error)
+
+	maximumTier2Retries uint64
 }
 
 func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
@@ -323,7 +324,7 @@ var IsValidCacheTag = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`).MatchString
 func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Request, outputGraph *outputmodules.Graph, respFunc substreams.ResponseFunc) error {
 	chainFirstStreamableBlock := bstream.GetProtocolFirstStreamableBlock
 	if request.StartBlockNum > 0 && request.StartBlockNum < int64(chainFirstStreamableBlock) {
-		return stream.NewErrInvalidArg("invalid start block %d, must be >= %d (the first streamable block of the chain)", request.StartBlockNum, chainFirstStreamableBlock)
+		return bsstream.NewErrInvalidArg("invalid start block %d, must be >= %d (the first streamable block of the chain)", request.StartBlockNum, chainFirstStreamableBlock)
 	} else if request.StartBlockNum < 0 && request.StopBlockNum > 0 {
 		if int64(request.StopBlockNum)+int64(request.StartBlockNum) < int64(chainFirstStreamableBlock) {
 			request.StartBlockNum = int64(chainFirstStreamableBlock)
@@ -383,7 +384,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	}
 
 	if err := outputGraph.ValidateRequestStartBlock(requestDetails.ResolvedStartBlockNum); err != nil {
-		return stream.NewErrInvalidArg(err.Error())
+		return bsstream.NewErrInvalidArg(err.Error())
 	}
 
 	wasmRuntime := wasm.NewRegistry(s.wasmExtensions, s.runtimeConfig.MaxWasmFuel)
@@ -393,19 +394,28 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		return fmt.Errorf("internal error setting store: %w", err)
 	}
 
+	if clonableStore, ok := cacheStore.(dstore.Clonable); ok {
+		cloned, err := clonableStore.Clone(ctx)
+		if err != nil {
+			return fmt.Errorf("cloning store: %w", err)
+		}
+		cloned.SetMeter(dmetering.GetBytesMeter(ctx))
+		cacheStore = cloned
+	}
+
 	execOutputConfigs, err := execout.NewConfigs(cacheStore, outputGraph.UsedModules(), outputGraph.ModuleHashes(), s.runtimeConfig.StateBundleSize, logger)
 	if err != nil {
 		return fmt.Errorf("new config map: %w", err)
 	}
 
-	storeConfigs, err := store.NewConfigMap(cacheStore, outputGraph.Stores(), outputGraph.ModuleHashes(), tracing.GetTraceID(ctx).String())
+	storeConfigs, err := store.NewConfigMap(cacheStore, outputGraph.Stores(), outputGraph.ModuleHashes())
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
 
 	stores := pipeline.NewStores(ctx, storeConfigs, s.runtimeConfig.StateBundleSize, requestDetails.LinearHandoffBlockNum, request.StopBlockNum, false)
 
-	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, nil, s.blockType)
+	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, nil, s.blockType, nil) // we don't read or write ExecOuts on tier1
 	if err != nil {
 		return fmt.Errorf("error building caching engine: %w", err)
 	}
@@ -432,7 +442,6 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		execOutputCacheEngine,
 		s.runtimeConfig,
 		respFunc,
-		tracing.GetTraceID(ctx).String(),
 		opts...,
 	)
 
@@ -467,6 +476,9 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		zap.String("output_module", request.OutputModule),
 	)
 
+	if err := pipe.Init(ctx); err != nil {
+		return fmt.Errorf("error during pipeline init: %w", err)
+	}
 	if err := pipe.InitTier1StoresAndBackprocess(ctx, reqPlan); err != nil {
 		return fmt.Errorf("error during init_stores_and_backprocess: %w", err)
 	}
@@ -618,7 +630,7 @@ func toConnectError(ctx context.Context, err error) error {
 		return connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
-	var errInvalidArg *stream.ErrInvalidArg
+	var errInvalidArg *bsstream.ErrInvalidArg
 	if errors.As(err, &errInvalidArg) {
 		return connect.NewError(connect.CodeInvalidArgument, errInvalidArg)
 	}

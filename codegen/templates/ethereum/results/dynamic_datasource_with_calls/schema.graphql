@@ -34,7 +34,7 @@ type factory_call_create_pool @entity {
     call_block_time: String!
     call_block_number: BigInt!
     call_ordinal: BigInt!
-    call_success: Bool!
+    call_success: Boolean!
     fee: Int!
     output_pool: String!
     token_a: String!
@@ -46,7 +46,7 @@ type factory_call_enable_fee_amount @entity {
     call_block_time: String!
     call_block_number: BigInt!
     call_ordinal: BigInt!
-    call_success: Bool!
+    call_success: Boolean!
     fee: Int!
     tick_spacing: Int!
 }
@@ -56,7 +56,7 @@ type factory_call_set_owner @entity {
     call_block_time: String!
     call_block_number: BigInt!
     call_ordinal: BigInt!
-    call_success: Bool!
+    call_success: Boolean!
     u_owner: String!
 }
 
@@ -182,7 +182,7 @@ type pool_swap @entity {
     call_block_time: String!
     call_block_number: BigInt!
     call_ordinal: BigInt!
-    call_success: Bool!
+    call_success: Boolean!
     call_address: String!
     amount: BigDecimal!
     output_amount0: BigDecimal!
@@ -196,7 +196,7 @@ type pool_call_collect @entity {
     call_block_time: String!
     call_block_number: BigInt!
     call_ordinal: BigInt!
-    call_success: Bool!
+    call_success: Boolean!
     call_address: String!
     amount0_requested: BigDecimal!
     amount1_requested: BigDecimal!
@@ -212,7 +212,7 @@ type pool_call_collect_protocol @entity {
     call_block_time: String!
     call_block_number: BigInt!
     call_ordinal: BigInt!
-    call_success: Bool!
+    call_success: Boolean!
     call_address: String!
     amount0_requested: BigDecimal!
     amount1_requested: BigDecimal!
@@ -226,7 +226,7 @@ type pool_call_flash @entity {
     call_block_time: String!
     call_block_number: BigInt!
     call_ordinal: BigInt!
-    call_success: Bool!
+    call_success: Boolean!
     call_address: String!
     amount0: BigDecimal!
     amount1: BigDecimal!
@@ -239,7 +239,7 @@ type pool_call_increase_observation_cardinality_next @entity {
     call_block_time: String!
     call_block_number: BigInt!
     call_ordinal: BigInt!
-    call_success: Bool!
+    call_success: Boolean!
     call_address: String!
     observation_cardinality_next: Int!
 }
@@ -249,7 +249,7 @@ type pool_call_initialize @entity {
     call_block_time: String!
     call_block_number: BigInt!
     call_ordinal: BigInt!
-    call_success: Bool!
+    call_success: Boolean!
     call_address: String!
     sqrt_price_x96: BigDecimal!
 }
@@ -259,7 +259,7 @@ type pool_call_mint @entity {
     call_block_time: String!
     call_block_number: BigInt!
     call_ordinal: BigInt!
-    call_success: Bool!
+    call_success: Boolean!
     call_address: String!
     amount: BigDecimal!
     data: String!
@@ -275,7 +275,7 @@ type pool_call_set_fee_protocol @entity {
     call_block_time: String!
     call_block_number: BigInt!
     call_ordinal: BigInt!
-    call_success: Bool!
+    call_success: Boolean!
     call_address: String!
     fee_protocol0: Int!
     fee_protocol1: Int!
@@ -286,7 +286,7 @@ type pool_call_swap @entity {
     call_block_time: String!
     call_block_number: BigInt!
     call_ordinal: BigInt!
-    call_success: Bool!
+    call_success: Boolean!
     call_address: String!
     amount_specified: BigDecimal!
     data: String!

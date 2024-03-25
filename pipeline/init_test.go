@@ -64,6 +64,13 @@ func NewExecOutputTesting(t *testing.T, block *pbbstream.Block, clock *pbsubstre
 	}
 }
 
+func (i *ExecOutputTesting) Len() (out int) {
+	for _, v := range i.Values {
+		out += len(v)
+	}
+	return
+}
+
 func (i *ExecOutputTesting) Get(moduleName string) (value []byte, cached bool, err error) {
 	val, found := i.Values[moduleName]
 	if !found {

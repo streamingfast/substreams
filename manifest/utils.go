@@ -60,6 +60,20 @@ func getNetworkEndpointFromEnvironment(networkName string) string {
 	return networkEndpoint
 }
 
+func searchExistingCaseInsensitiveFileName(dir, filename string) (string, error) {
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		return "", fmt.Errorf("reading dir: %w", err)
+	}
+
+	for _, file := range files {
+		if strings.EqualFold(file.Name(), filename) {
+			return file.Name(), nil
+		}
+	}
+	return "", os.ErrNotExist
+}
+
 // TODO: replace by the blockchain-based discovery when available
 var HardcodedEndpoints = map[string]string{
 	"mainnet":        "mainnet.eth.streamingfast.io:443",

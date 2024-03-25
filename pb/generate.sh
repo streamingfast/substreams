@@ -1,5 +1,5 @@
 #!/bin/bash -u
-# Copyright 2019 dfuse Platform Inc.
+# Copyright 2024 StreamingFast Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -52,6 +52,7 @@ function generate_system() {
     "$PROTO/sf/substreams/v1/modules.proto" \
     "$PROTO/sf/substreams/v1/package.proto" \
     "$PROTO/sf/substreams/v1/clock.proto" \
+    "$PROTO/sf/substreams/index/v1/keys.proto" \
     "$PROTO/sf/substreams/rpc/v2/service.proto" \
     "$PROTO/sf/substreams/sink/service/v1/service.proto" \
     "$PROTO/google/protobuf/any.proto" \

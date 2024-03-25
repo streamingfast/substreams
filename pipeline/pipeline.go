@@ -75,7 +75,6 @@ type Pipeline struct {
 	// (for chains with potential block skips)
 	lastFinalClock *pbsubstreams.Clock
 
-	traceID      string
 	blockStepMap map[bstream.StepType]uint64
 }
 
@@ -88,7 +87,6 @@ func New(
 	execOutputCache *cache.Engine,
 	runtimeConfig config.RuntimeConfig,
 	respFunc substreams.ResponseFunc,
-	traceID string,
 	opts ...Option,
 ) *Pipeline {
 	pipe := &Pipeline{
@@ -102,7 +100,6 @@ func New(
 		stores:          stores,
 		execoutStorage:  execoutStorage,
 		forkHandler:     NewForkHandler(),
-		traceID:         traceID,
 		blockStepMap:    make(map[bstream.StepType]uint64),
 		startTime:       time.Now(),
 	}
@@ -112,7 +109,7 @@ func New(
 	return pipe
 }
 
-func (p *Pipeline) init(ctx context.Context) (err error) {
+func (p *Pipeline) Init(ctx context.Context) (err error) {
 	reqDetails := reqctx.Details(ctx)
 
 	p.forkHandler.registerUndoHandler(func(clock *pbsubstreams.Clock, moduleOutputs []*pbssinternal.ModuleOutput) {
@@ -138,9 +135,6 @@ func (p *Pipeline) init(ctx context.Context) (err error) {
 }
 
 func (p *Pipeline) InitTier2Stores(ctx context.Context) (err error) {
-	if err := p.init(ctx); err != nil {
-		return err
-	}
 
 	storeMap, err := p.setupSubrequestStores(ctx)
 	if err != nil {
@@ -156,9 +150,6 @@ func (p *Pipeline) InitTier2Stores(ctx context.Context) (err error) {
 }
 
 func (p *Pipeline) InitTier1StoresAndBackprocess(ctx context.Context, reqPlan *plan.RequestPlan) (err error) {
-	if err := p.init(ctx); err != nil {
-		return err
-	}
 
 	if reqPlan.RequiresParallelProcessing() {
 		storeMap, err := p.runParallelProcess(ctx, reqPlan)
@@ -188,6 +179,7 @@ func (p *Pipeline) setupProcessingModule(reqDetails *reqctx.RequestDetails) {
 	}
 }
 
+// setupSubrequestsStores will prepare stores for all required modules up to the current stage.
 func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Map, err error) {
 	ctx, span := reqctx.WithSpan(ctx, "substreams/pipeline/tier2/store_setup")
 	defer span.EndWithErr(&err)
@@ -199,6 +191,9 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 
 	lastStage := len(p.executionStages) - 1
 	for stageIdx, stage := range p.executionStages {
+		if p.highestStage != nil && stageIdx > *p.highestStage {
+			break // skip stores for stages that we're not running
+		}
 		isLastStage := stageIdx == lastStage
 		layer := stage.LastLayer()
 		if !layer.IsStoreLayer() {
@@ -264,7 +259,6 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 		p.execoutStorage,
 		p.respFunc,
 		p.stores.configs,
-		p.traceID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("building parallel processor: %w", err)
@@ -342,7 +336,7 @@ func toRPCStoreModuleOutputs(in *pbssinternal.ModuleOutput) (out *pbsubstreamsrp
 	}
 }
 
-func toRPCDeltas(in *pbssinternal.StoreDeltas) (out []*pbsubstreamsrpc.StoreDelta) {
+func toRPCDeltas(in *pbsubstreams.StoreDeltas) (out []*pbsubstreamsrpc.StoreDelta) {
 	if len(in.StoreDeltas) == 0 {
 		return nil
 	}
@@ -360,13 +354,13 @@ func toRPCDeltas(in *pbssinternal.StoreDeltas) (out []*pbsubstreamsrpc.StoreDelt
 	return
 }
 
-func toRPCOperation(in pbssinternal.StoreDelta_Operation) (out pbsubstreamsrpc.StoreDelta_Operation) {
+func toRPCOperation(in pbsubstreams.StoreDelta_Operation) (out pbsubstreamsrpc.StoreDelta_Operation) {
 	switch in {
-	case pbssinternal.StoreDelta_UPDATE:
+	case pbsubstreams.StoreDelta_UPDATE:
 		return pbsubstreamsrpc.StoreDelta_UPDATE
-	case pbssinternal.StoreDelta_CREATE:
+	case pbsubstreams.StoreDelta_CREATE:
 		return pbsubstreamsrpc.StoreDelta_CREATE
-	case pbssinternal.StoreDelta_DELETE:
+	case pbsubstreams.StoreDelta_DELETE:
 		return pbsubstreamsrpc.StoreDelta_DELETE
 	}
 	return pbsubstreamsrpc.StoreDelta_UNSET

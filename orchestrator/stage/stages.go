@@ -32,9 +32,8 @@ import (
 // that the Stage is completed, kicking off the next layer of jobs.
 
 type Stages struct {
-	ctx     context.Context
-	logger  *zap.Logger
-	traceID string
+	ctx    context.Context
+	logger *zap.Logger
 
 	globalSegmenter *block.Segmenter // This segmenter covers both the stores and the mapper
 	storeSegmenter  *block.Segmenter // This segmenter covers only jobs needed to build up stores according to the RequestPlan.
@@ -58,7 +57,6 @@ func NewStages(
 	outputGraph *outputmodules.Graph,
 	reqPlan *plan.RequestPlan,
 	storeConfigs store.ConfigMap,
-	traceID string,
 ) (out *Stages) {
 
 	if !reqPlan.RequiresParallelProcessing() {
@@ -70,7 +68,6 @@ func NewStages(
 	stagedModules := outputGraph.StagedUsedModules()
 	out = &Stages{
 		ctx:             ctx,
-		traceID:         traceID,
 		logger:          reqctx.Logger(ctx),
 		globalSegmenter: reqPlan.BackprocessSegmenter(),
 	}
@@ -105,7 +102,7 @@ func NewStages(
 			segmenter = reqPlan.StoresSegmenter()
 		}
 
-		var moduleStates []*ModuleState
+		var moduleStates []*StoreModuleState
 		stageLowestInitBlock := layer[0].InitialBlock
 		for _, mod := range layer {
 			modSegmenter := segmenter.WithInitialBlock(mod.InitialBlock)
@@ -169,7 +166,7 @@ func (s *Stages) UpdateStats() {
 		var br []*block.Range
 		for segmentIdx, segment := range s.segmentStates {
 			state := segment[i]
-			segmenter := s.stages[i].moduleStates[0].segmenter
+			segmenter := s.stages[i].storeModuleStates[0].segmenter
 			if state == UnitCompleted || state == UnitPartialPresent || state == UnitMerging {
 				if rng := segmenter.Range(segmentIdx + s.segmentOffset); rng != nil {
 					br = append(br, rng)
@@ -400,14 +397,11 @@ func (s *Stages) allocSegments(segmentIdx int) {
 }
 
 func (s *Stages) dependenciesCompleted(u Unit) bool {
-	if u.Segment <= s.stages[u.Stage].segmenter.FirstIndex() {
-		return true
-	}
 	if u.Stage == 0 {
 		return true
 	}
 	for i := u.Stage - 1; i >= 0; i-- {
-		state := s.getState(Unit{Segment: u.Segment - 1, Stage: i})
+		state := s.getState(Unit{Segment: u.Segment, Stage: i})
 		if !(state == UnitCompleted || state == UnitNoOp) {
 			return false
 		}
@@ -426,7 +420,7 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 		if stage.kind != KindStore {
 			continue
 		}
-		for _, modState := range stage.moduleStates {
+		for _, modState := range stage.storeModuleStates {
 			fullKV, err := modState.getStore(s.ctx, exclusiveEndBlock)
 			if err != nil {
 				return nil, fmt.Errorf("stores didn't sync up properly, expected store %q to be at block %d but was at %d: %w", modState.name, exclusiveEndBlock, modState.lastBlockInStore, err)
@@ -461,7 +455,7 @@ func (s *Stages) StatesString() string {
 }
 
 func (s *Stages) StageModules(stage int) (out []string) {
-	for _, modState := range s.stages[stage].moduleStates {
+	for _, modState := range s.stages[stage].storeModuleStates {
 		out = append(out, modState.name)
 	}
 	return

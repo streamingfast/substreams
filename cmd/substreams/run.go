@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
+
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
@@ -14,7 +16,6 @@ import (
 	"github.com/streamingfast/substreams/tui"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/metadata"
-	"io"
 )
 
 func init() {
@@ -229,6 +230,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			if err == io.EOF {
 				ui.Cancel()
+				fmt.Println("Total Read Bytes (server-side consumption):", ui.TotalReadBytes)
 				fmt.Println("all done")
 				if testRunner != nil {
 					testRunner.LogResults()

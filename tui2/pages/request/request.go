@@ -265,6 +265,9 @@ func (c *Config) NewInstance() (*Instance, error) {
 	if err != nil {
 		return nil, fmt.Errorf("substreams client setup: %w", err)
 	}
+	if headers == nil {
+		headers = make(map[string]string)
+	}
 
 	req := &pbsubstreamsrpc.Request{
 		StartBlockNum:                       c.StartBlock,

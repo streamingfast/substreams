@@ -29,6 +29,8 @@ type Tier2Config struct {
 	WASMExtensions  []wasm.WASMExtensioner
 	PipelineOptions []pipeline.PipelineOptioner
 
+	MaximumConcurrentRequests uint64
+
 	Tracing bool
 }
 
@@ -86,6 +88,11 @@ func (a *Tier2App) Run() error {
 		opts = append(opts, service.WithModuleExecutionTracing())
 	}
 
+	if a.config.MaximumConcurrentRequests > 0 {
+		opts = append(opts, service.WithMaxConcurrentRequests(a.config.MaximumConcurrentRequests))
+	}
+	opts = append(opts, service.WithReadinessFunc(a.setReadiness))
+
 	svc, err := service.NewTier2(
 		a.logger,
 		mergedBlocksStore,
@@ -104,9 +111,12 @@ func (a *Tier2App) Run() error {
 		return fmt.Errorf("failed to setup trust authenticator: %w", err)
 	}
 
+	a.OnTerminating(func(_ error) { metrics.AppReadinessTier2.SetNotReady() })
+
 	go func() {
 		a.logger.Info("launching gRPC server")
 		a.isReady.CompareAndSwap(false, true)
+		metrics.AppReadinessTier2.SetReady()
 
 		err := service.ListenTier2(a.config.GRPCListenAddr, a.config.ServiceDiscoveryURL, svc, trustAuth, a.logger, a.HealthCheck)
 		a.Shutdown(err)
@@ -131,6 +141,10 @@ func (a *Tier2App) IsReady(ctx context.Context) bool {
 	}
 
 	return a.isReady.Load()
+}
+
+func (a *Tier2App) setReadiness(ready bool) {
+	a.isReady.Store(ready)
 }
 
 // Validate inspects itself to determine if the current config is valid according to

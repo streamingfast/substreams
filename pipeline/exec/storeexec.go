@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+
 	"google.golang.org/protobuf/proto"
 
-	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"
@@ -27,13 +29,12 @@ func (e *StoreModuleExecutor) Name() string   { return e.moduleName }
 func (e *StoreModuleExecutor) String() string { return e.Name() }
 
 func (e *StoreModuleExecutor) applyCachedOutput(value []byte) error {
-	deltas := &pbssinternal.StoreDeltas{}
-	err := proto.Unmarshal(value, deltas)
-	if err != nil {
-		return fmt.Errorf("unmarshalling output deltas: %w", err)
+	if pkvs, ok := e.outputStore.(*store.PartialKV); ok {
+		return pkvs.ApplyOps(value)
 	}
-	e.outputStore.SetDeltas(deltas.StoreDeltas)
-	return nil
+
+	fullkvs := e.outputStore.(*store.FullKV)
+	return fullkvs.ApplyOps(value)
 }
 
 func (e *StoreModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
@@ -53,7 +54,7 @@ func (e *StoreModuleExecutor) HasValidOutput() bool {
 }
 
 func (e *StoreModuleExecutor) wrapDeltas() ([]byte, *pbssinternal.ModuleOutput, error) {
-	deltas := &pbssinternal.StoreDeltas{
+	deltas := &pbsubstreams.StoreDeltas{
 		StoreDeltas: e.outputStore.GetDeltas(),
 	}
 
@@ -70,16 +71,18 @@ func (e *StoreModuleExecutor) wrapDeltas() ([]byte, *pbssinternal.ModuleOutput, 
 	return data, moduleOutput, nil
 }
 
+// toModuleOutput returns nil,nil on partialKV, because we never use the outputs of a partial store directly
 func (e *StoreModuleExecutor) toModuleOutput(data []byte) (*pbssinternal.ModuleOutput, error) {
-	deltas := &pbssinternal.StoreDeltas{}
-	err := proto.Unmarshal(data, deltas)
-	if err != nil {
-		return nil, fmt.Errorf("unmarshalling output deltas: %w", err)
-	}
+	if fullkvs, ok := e.outputStore.(*store.FullKV); ok {
+		deltas := fullkvs.GetDeltas()
 
-	return &pbssinternal.ModuleOutput{
-		Data: &pbssinternal.ModuleOutput_StoreDeltas{
-			StoreDeltas: deltas,
-		},
-	}, nil
+		return &pbssinternal.ModuleOutput{
+			Data: &pbssinternal.ModuleOutput_StoreDeltas{
+				StoreDeltas: &pbsubstreams.StoreDeltas{
+					StoreDeltas: deltas,
+				},
+			},
+		}, nil
+	}
+	return nil, nil
 }

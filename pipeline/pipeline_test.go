@@ -186,7 +186,7 @@ func testConfigMap(t *testing.T, configs []testStoreConfig) store2.ConfigMap {
 	objStore := dstore.NewMockStore(nil)
 
 	for _, conf := range configs {
-		newStore, err := store2.NewConfig(conf.name, conf.initBlock, conf.name, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, "string", objStore, "")
+		newStore, err := store2.NewConfig(conf.name, conf.initBlock, conf.name, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, "string", objStore)
 		require.NoError(t, err)
 		confMap[newStore.Name()] = newStore
 

@@ -40,12 +40,6 @@ func (s *storeSnapshots) Sort() {
 		left := s.Partials[i]
 		right := s.Partials[j]
 
-		// Sort by start block first, then by trace ID so at least we
-		// take partials all from the same producer.
-		if left.Range.StartBlock == right.Range.StartBlock {
-			return left.TraceID < right.TraceID
-		}
-
 		return left.Range.StartBlock < right.Range.StartBlock
 	})
 }

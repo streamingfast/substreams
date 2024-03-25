@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 
 	"connectrpc.com/connect"
 	"github.com/streamingfast/bstream"
@@ -20,8 +21,10 @@ import (
 
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/substreams"
+	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/metrics"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/pipeline/cache"
 	"github.com/streamingfast/substreams/pipeline/exec"
@@ -47,6 +50,10 @@ type Tier2Service struct {
 	runtimeConfig     config.RuntimeConfig
 	tracer            ttrace.Tracer
 	logger            *zap.Logger
+
+	setReadyFunc              func(bool)
+	currentConcurrentRequests int64
+	connectionCountMutex      sync.RWMutex
 }
 
 const protoPkfPrefix = "type.googleapis.com/"
@@ -115,11 +122,49 @@ func NewTier2(
 	return s, nil
 }
 
+func (s *Tier2Service) isOverloaded() bool {
+	s.connectionCountMutex.RLock()
+	defer s.connectionCountMutex.RUnlock()
+
+	isOverloaded := s.runtimeConfig.MaxConcurrentRequests > 0 && s.currentConcurrentRequests >= s.runtimeConfig.MaxConcurrentRequests
+	return isOverloaded
+}
+
+func (s *Tier2Service) incrementConcurrentRequests() {
+	s.connectionCountMutex.Lock()
+	defer s.connectionCountMutex.Unlock()
+
+	s.currentConcurrentRequests++
+	s.setOverloaded()
+}
+
+func (s *Tier2Service) decrementConcurrentRequests() {
+	s.connectionCountMutex.Lock()
+	defer s.connectionCountMutex.Unlock()
+
+	s.currentConcurrentRequests--
+	s.setOverloaded()
+}
+
+func (s *Tier2Service) setOverloaded() {
+	overloaded := s.runtimeConfig.MaxConcurrentRequests != 0 && s.currentConcurrentRequests >= s.runtimeConfig.MaxConcurrentRequests
+	s.setReadyFunc(!overloaded)
+}
+
 func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, streamSrv pbssinternal.Substreams_ProcessRangeServer) (grpcError error) {
 	// We keep `err` here as the unaltered error from `blocks` call, this is used in the EndSpan to record the full error
 	// and not only the `grpcError` one which is a subset view of the full `err`.
 	var err error
 	ctx := streamSrv.Context()
+
+	if s.isOverloaded() {
+		return connect.NewError(connect.CodeUnavailable, fmt.Errorf("service currently overloaded"))
+	}
+
+	s.incrementConcurrentRequests()
+	defer func() {
+		s.decrementConcurrentRequests()
+	}()
 
 	// TODO: use stage and segment numbers when implemented
 	stage := request.OutputModule
@@ -176,7 +221,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	logger.Info("incoming substreams ProcessRange request", fields...)
 
 	respFunc := tier2ResponseHandler(ctx, logger, streamSrv)
-	err = s.processRange(ctx, request, respFunc, tracing.GetTraceID(ctx).String())
+	err = s.processRange(ctx, request, respFunc)
 	grpcError = toGRPCError(ctx, err)
 
 	switch status.Code(grpcError) {
@@ -187,7 +232,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	return grpcError
 }
 
-func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc, traceID string) error {
+func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) error {
 	logger := reqctx.Logger(ctx)
 
 	if err := outputmodules.ValidateTier2Request(request, s.blockType); err != nil {
@@ -233,30 +278,41 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("internal error setting store: %w", err)
 	}
 
-	execOutputConfigs, err := execout.NewConfigs(cacheStore, outputGraph.UsedModules(), outputGraph.ModuleHashes(), s.runtimeConfig.StateBundleSize, logger)
+	if clonableStore, ok := cacheStore.(dstore.Clonable); ok {
+		cloned, err := clonableStore.Clone(ctx)
+		if err != nil {
+			return fmt.Errorf("cloning store: %w", err)
+		}
+		cloned.SetMeter(dmetering.GetBytesMeter(ctx))
+		cacheStore = cloned
+	}
+
+	execOutputConfigs, err := execout.NewConfigs(cacheStore, outputGraph.UsedModulesUpToStage(int(request.Stage)), outputGraph.ModuleHashes(), s.runtimeConfig.StateBundleSize, logger)
 	if err != nil {
 		return fmt.Errorf("new config map: %w", err)
 	}
 
-	storeConfigs, err := store.NewConfigMap(cacheStore, outputGraph.Stores(), outputGraph.ModuleHashes(), traceID)
+	storeConfigs, err := store.NewConfigMap(cacheStore, outputGraph.Stores(), outputGraph.ModuleHashes())
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
 	stores := pipeline.NewStores(ctx, storeConfigs, s.runtimeConfig.StateBundleSize, requestDetails.ResolvedStartBlockNum, request.StopBlockNum, true)
+	isCompleteRange := request.StopBlockNum%s.runtimeConfig.StateBundleSize == 0
 
-	outputModule := outputGraph.OutputModule()
-
-	var execOutWriter *execout.Writer
-	if !outputGraph.StagedUsedModules()[request.Stage].LastLayer().IsStoreLayer() {
-		execOutWriter = execout.NewWriter(
-			requestDetails.ResolvedStartBlockNum,
-			requestDetails.StopBlockNum,
-			outputModule.Name,
-			execOutputConfigs,
-		)
+	// note all modules that are not in 'modulesRequiredToRun' are still iterated in 'pipeline.executeModules', but they will skip actual execution when they see that the cache provides the data
+	// This way, stores get updated at each block from the cached execouts without the actual execution of the module
+	modulesRequiredToRun, existingExecOuts, execOutWriters, err := evaluateModulesRequiredToRun(ctx, logger, outputGraph, request.Stage, request.StartBlockNum, request.StopBlockNum, isCompleteRange, request.OutputModule, execOutputConfigs, storeConfigs)
+	if err != nil {
+		return fmt.Errorf("evaluating required modules: %w", err)
 	}
 
-	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, execOutWriter, s.blockType)
+	if len(modulesRequiredToRun) == 0 {
+		logger.Info("no modules required to run, skipping")
+		return nil
+	}
+
+	// this engine will keep the existingExecOuts to optimize the execution (for inputs from modules that skip execution)
+	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, execOutWriters, s.blockType, existingExecOuts)
 	if err != nil {
 		return fmt.Errorf("error building caching engine: %w", err)
 	}
@@ -275,7 +331,6 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		s.runtimeConfig,
 		respFunc,
 		// This must always be the parent/global trace id, the one that comes from tier1
-		traceID,
 		opts...,
 	)
 
@@ -285,30 +340,171 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		zap.String("output_module", request.OutputModule),
 		zap.Uint32("stage", request.Stage),
 	)
+
+	if err := pipe.Init(ctx); err != nil {
+		return fmt.Errorf("error during pipeline init: %w", err)
+	}
 	if err := pipe.InitTier2Stores(ctx); err != nil {
 		return fmt.Errorf("error building pipeline: %w", err)
 	}
 
 	var streamErr error
-	blockStream, err := s.streamFactoryFunc(
-		ctx,
-		pipe,
-		int64(requestDetails.ResolvedStartBlockNum),
-		request.StopBlockNum,
-		"",
-		true,
-		false,
-		logger.Named("stream"),
-	)
-	if err != nil {
-		return fmt.Errorf("error getting stream: %w", err)
+	if canSkipBlocks(existingExecOuts, modulesRequiredToRun, s.blockType) {
+		var referenceMapper *execout.File
+		for k, v := range existingExecOuts {
+			referenceMapper = v
+			logger.Info("running from mapper", zap.String("module", k))
+			break
+		}
+
+		ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/pipeline/mapper_stream")
+		for _, v := range referenceMapper.SortedItems() {
+			if v.BlockNum < request.StartBlockNum || v.BlockNum >= request.StopBlockNum {
+				panic("reading from mapper, block was out of range") // we don't want to have this case undetected
+			}
+			clock := &pbsubstreams.Clock{
+				Id:        v.BlockId,
+				Number:    v.BlockNum,
+				Timestamp: v.Timestamp,
+			}
+
+			cursor := &bstream.Cursor{
+				Step:      bstream.StepNewIrreversible,
+				Block:     bstream.NewBlockRef(v.BlockId, v.BlockNum),
+				LIB:       bstream.NewBlockRef(v.BlockId, v.BlockNum),
+				HeadBlock: bstream.NewBlockRef(v.BlockId, v.BlockNum),
+			}
+
+			if err := pipe.ProcessFromExecOutput(ctx, clock, cursor); err != nil {
+				span.EndWithErr(&err)
+				return err
+			}
+		}
+		streamErr = io.EOF
+		span.EndWithErr(&streamErr)
+	} else {
+		blockStream, err := s.streamFactoryFunc(
+			ctx,
+			pipe,
+			int64(requestDetails.ResolvedStartBlockNum),
+			request.StopBlockNum,
+			"",
+			true,
+			false,
+			logger.Named("stream"),
+		)
+		if err != nil {
+			return fmt.Errorf("error getting stream: %w", err)
+		}
+
+		ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/pipeline/blocks_stream")
+		streamErr = blockStream.Run(ctx)
+		span.EndWithErr(&streamErr)
 	}
 
-	ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/pipeline/blocks_stream")
-	streamErr = blockStream.Run(ctx)
-	span.EndWithErr(&streamErr)
-
 	return pipe.OnStreamTerminated(ctx, streamErr)
+}
+
+// evaluateModulesRequiredToRun will also load the existing execution outputs to be used as cache
+// if it returns no modules at all, it means that we can skip the whole thing
+func evaluateModulesRequiredToRun(
+	ctx context.Context,
+	logger *zap.Logger,
+	outputGraph *outputmodules.Graph,
+	stage uint32,
+	startBlock uint64,
+	stopBlock uint64,
+	isCompleteRange bool,
+	outputModule string,
+	execoutConfigs *execout.Configs,
+	storeConfigs store.ConfigMap,
+) (requiredModules map[string]*pbsubstreams.Module, existingExecOuts map[string]*execout.File, execoutWriters map[string]*execout.Writer, err error) {
+
+	existingExecOuts = make(map[string]*execout.File)
+	requiredModules = make(map[string]*pbsubstreams.Module)
+	execoutWriters = make(map[string]*execout.Writer)
+
+	usedModules := make(map[string]*pbsubstreams.Module)
+	for _, module := range outputGraph.UsedModulesUpToStage(int(stage)) {
+		usedModules[module.Name] = module
+	}
+
+	runningLastStage := outputGraph.StagedUsedModules()[stage].IsLastStage()
+
+	for name, c := range execoutConfigs.ConfigMap {
+		if _, found := usedModules[name]; !found { // skip modules that are only present in later stages
+			continue
+		}
+
+		file, readErr := c.ReadFile(ctx, &block.Range{StartBlock: startBlock, ExclusiveEndBlock: stopBlock})
+		if readErr != nil {
+			requiredModules[name] = usedModules[name]
+			continue
+		}
+		existingExecOuts[name] = file
+
+		if c.ModuleKind() == pbsubstreams.ModuleKindMap {
+			if runningLastStage && name == outputModule {
+				// WARNING be careful, if we want to force producing module outputs/stores states for ALL STAGES on the first block range,
+				// this optimization will be in our way..
+				logger.Info("found existing exec output for output_module, skipping run", zap.String("output_module", name))
+				return nil, nil, nil, nil
+			}
+			continue
+		}
+
+		// if either full or partial kv exists, we can skip the module
+		storeExists, err := storeConfigs[name].ExistsFullKV(ctx, stopBlock)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("checking fullkv file existence: %w", err)
+		}
+		if !storeExists {
+			partialStoreExists, err := storeConfigs[name].ExistsPartialKV(ctx, startBlock, stopBlock)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("checking partial file existence: %w", err)
+			}
+			if !partialStoreExists {
+				// some stores may already exist completely on this stage, but others do not, so we keep going but ignore those
+				requiredModules[name] = usedModules[name]
+			}
+		}
+	}
+
+	for name := range requiredModules {
+		if _, exists := existingExecOuts[name]; exists {
+			continue // for stores that need to be run for the partials, but already have cached execution outputs
+		}
+		if !isCompleteRange && name != outputModule {
+			// if we are not running a complete range, we can skip writing the outputs of every module except the requested outputModule if it's in our stage
+			continue
+		}
+		execoutWriters[name] = execout.NewWriter(
+			startBlock,
+			stopBlock,
+			name,
+			execoutConfigs,
+		)
+	}
+
+	return
+
+}
+
+func canSkipBlocks(existingExecOuts map[string]*execout.File, requiredModules map[string]*pbsubstreams.Module, blockType string) bool {
+	if len(existingExecOuts) == 0 {
+		return false
+	}
+	for name, module := range requiredModules {
+		if existingExecOuts[name] != nil {
+			continue
+		}
+		for _, input := range module.Inputs {
+			if src := input.GetSource(); src != nil && src.Type == blockType {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func (s *Tier2Service) buildPipelineOptions(ctx context.Context, request *pbssinternal.ProcessRangeRequest) (opts []pipeline.Option) {

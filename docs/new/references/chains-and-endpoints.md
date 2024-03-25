@@ -35,7 +35,7 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 | Arweave  | [`sf.arweave.type.v1.Block`](https://github.com/streamingfast/firehose-arweave/blob/develop/proto/sf/arweave/type/v1/type.proto)              |                                                                                                                       |                                         
 | Bitcoin  | [`sf.bitcoin.type.v1.Block`](https://github.com/streamingfast/firehose-bitcoin/blob/develop/proto/sf/bitcoin/type/v1/type.proto)              |                                                                                                                       |
 
-## StreamingFast Endpoints
+## Official Endpoints
 
 * **Ethereum Mainnet**: `mainnet.eth.streamingfast.io:443`
 * **Ethereum Görli**: `goerli.eth.streamingfast.io:443`
@@ -53,7 +53,9 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 * **Arweave Mainnet**: `mainnet.arweave.streamingfast.io:443`
 * **Bitcoin Mainnet**: `mainnet.btc.streamingfast.io:443`
 
-## Pinax Endpoints
+## Community Endpoints
+
+### Pinax Endpoints
 
 * **Ethereum Mainnet**: `eth.substreams.pinax.network:9000`
 * **Ethereum Görli**: `goerli.substreams.pinax.network:9000`
@@ -64,7 +66,5 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 * **Chapel Testnet**: `bsc.substreams.pinax.network:9000`
 * **NEAR Mainnet**: `near.substreams.pinax.network:9000`
 * **NEAR Testnet**: `neartest.substreams.pinax.network:9000`
-
-## Others
 
 You can support other blockchains for Substreams through Firehose instrumentation. Learn more in the [official Firehose documentation](https://firehose.streamingfast.io/).

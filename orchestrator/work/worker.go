@@ -104,12 +104,22 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *blo
 		retryIdx := 0
 		startTime := time.Now()
 		maxRetries := 720 //TODO: make this configurable
+		var previousError error
 		err := derr.RetryContext(ctx, uint64(maxRetries), func(ctx context.Context) error {
+			w.logger.Info("launching remote worker",
+				zap.Int64("start_block_num", int64(request.StartBlockNum)),
+				zap.Uint64("stop_block_num", request.StopBlockNum),
+				zap.Uint32("stage", request.Stage),
+				zap.String("output_module", request.OutputModule),
+				zap.Int("attempt", retryIdx+1),
+				zap.NamedError("previous_error", previousError),
+			)
+
 			res = w.work(ctx, request, moduleNames, upstream)
 			err := res.Error
 			switch err.(type) {
 			case *RetryableErr:
-				logger.Debug("worker failed with retryable error", zap.Error(err))
+				previousError = err
 				retryIdx++
 				return err
 			default:
@@ -179,12 +189,6 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 	if err != nil {
 		return &Result{Error: fmt.Errorf("unable to create grpc client: %w", err)}
 	}
-
-	w.logger.Info("launching remote worker",
-		zap.Int64("start_block_num", int64(request.StartBlockNum)),
-		zap.Uint64("stop_block_num", request.StopBlockNum),
-		zap.String("output_module", request.OutputModule),
-	)
 
 	stats := reqctx.ReqStats(ctx)
 	jobIdx := stats.RecordNewSubrequest(request.Stage, request.StartBlockNum, request.StopBlockNum)

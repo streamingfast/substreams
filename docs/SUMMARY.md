@@ -20,7 +20,7 @@
     * [JavaScript](new/consume/stream/javascript.md)
     * [Go](new/consume/stream/go.md)
   * [Substreams:Subgraph](new/consume/subgraph/subgraph.md)
-  * [Other Ways of Consuming](documentation/consume/other-ways-of-consuming/README.md)
+  * [Other Ways of Consuming](new/consume/other-sinks/README.md)
     * [Files](new/consume/other-sinks/files.md)
     * [Key-Value Store](new/consume/other-sinks/kv.md)
     * [MongoDB](new/consume/other-sinks/mongodb.md)

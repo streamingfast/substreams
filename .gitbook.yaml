@@ -54,6 +54,14 @@ redirects:
   tutorials/rust/option: ./new/tutorials/rust/option.md
   tutorials/rust/result: ./new/tutorials/rust/result.md
   tutorials/eth-calls: ./new/develop/chain-specific/evm/eth-calls.md
+  documentation/consume/other-ways-of-consuming: ./new/consume/other-sinks/README.md
+  documentation/consume/other-ways-of-consuming/kv: ./new/consume/other-sinks/kv.md
+  documentation/consume/other-ways-of-consuming/mongodb: ./new/consume/other-sinks/mongodb.md
+  documentation/consume/other-ways-of-consuming/files: ./new/consume/other-sinks/files.md
+  documentation/consume/other-ways-of-consuming/prometheus: ./new/consume/other-sinks/prometheus.md
+  documentation/consume/other-ways-of-consuming/pubsub: ./new/consume/other-sinks/pubsub.md
+
+
 
 
 

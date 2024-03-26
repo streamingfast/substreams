@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dgrpc"
@@ -89,8 +90,20 @@ func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := stream.Run(ctx); err != nil {
-		if err != io.EOF {
+	done := make(chan error, 1)
+	go func() {
+		if err := stream.Run(ctx); err != io.EOF {
+			done <- err
+		} else {
+			done <- nil
+		}
+	}()
+
+	select {
+	case <-time.After(10 * time.Second):
+		return "", fmt.Errorf("timeout: unable to get the block type from the stream factory")
+	case err := <-done:
+		if err != nil {
 			return "", err
 		}
 	}

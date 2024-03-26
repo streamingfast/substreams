@@ -58,6 +58,7 @@ require (
 	github.com/streamingfast/sf-tracing v0.0.0-20240209202324-9daa52c71a52
 	github.com/streamingfast/shutter v1.5.0
 	github.com/streamingfast/substreams-sink-sql v1.0.1-0.20231127153906-acf5f3e34330
+	github.com/test-go/testify v1.1.4
 	github.com/tetratelabs/wazero v1.1.0
 	github.com/tidwall/pretty v1.2.1
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.47.0

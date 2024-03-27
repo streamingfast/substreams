@@ -379,7 +379,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	var streamErr error
 	if canSkipBlockSource(existingExecOuts, modulesRequiredToRun, request.BlockType) {
 		maxDistributorLength := int(request.StopBlockNum - requestDetails.ResolvedStartBlockNum)
-		var clocksDistributor map[uint64]*pbsubstreams.Clock
+		clocksDistributor := make(map[uint64]*pbsubstreams.Clock)
 		for _, execOutput := range existingExecOuts {
 			execOutput.ExtractClocks(clocksDistributor)
 			if len(clocksDistributor) >= maxDistributorLength {

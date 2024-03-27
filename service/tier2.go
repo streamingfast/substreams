@@ -179,6 +179,9 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	if err != nil {
 		return connect.NewError(connect.CodeInternal, fmt.Errorf("unable to initialize dmetering: %w", err))
 	}
+	defer func() {
+		emitter.Shutdown(nil)
+	}()
 
 	ctx = context.WithValue(ctx, "event_emitter", emitter)
 

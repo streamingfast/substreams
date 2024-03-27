@@ -11,6 +11,7 @@ import (
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/service"
+	"github.com/streamingfast/substreams/wasm"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
 )
@@ -22,6 +23,7 @@ type Tier2Config struct {
 	PipelineOptions []pipeline.Option
 
 	MaximumConcurrentRequests uint64
+	WASMExtensions            wasm.WASMExtensioner
 
 	Tracing bool
 }
@@ -70,6 +72,10 @@ func (a *Tier2App) Run() error {
 		opts = append(opts, service.WithMaxConcurrentRequests(a.config.MaximumConcurrentRequests))
 	}
 	opts = append(opts, service.WithReadinessFunc(a.setReadiness))
+
+	if a.config.WASMExtensions != nil {
+		opts = append(opts, service.WithWASMExtensioner(a.config.WASMExtensions))
+	}
 
 	svc, err := service.NewTier2(
 		a.logger,

@@ -77,6 +77,7 @@ func NewTier1(logger *zap.Logger, config *Tier1Config, modules *Tier1Modules) *T
 }
 
 func (a *Tier1App) Run() error {
+
 	dmetrics.Register(metrics.MetricSet)
 
 	a.logger.Info("running substreams-tier1", zap.Reflect("config", a.config))
@@ -157,6 +158,11 @@ func (a *Tier1App) Run() error {
 		opts = append(opts, service.WithModuleExecutionTracing())
 	}
 
+	var wasmModules map[string]string
+	if a.config.WASMExtensions != nil {
+		wasmModules = a.config.WASMExtensions.Params()
+	}
+
 	tier2RequestParameters := reqctx.Tier2RequestParameters{
 		NetworkName:          a.config.NetworkName,
 		FirstStreamableBlock: bstream.GetProtocolFirstStreamableBlock,
@@ -164,7 +170,7 @@ func (a *Tier1App) Run() error {
 		StateStoreURL:        a.config.StateStoreURL,
 		StateBundleSize:      a.config.StateBundleSize,
 		StateStoreDefaultTag: a.config.StateStoreDefaultTag,
-		WASMModules:          a.config.WASMExtensions.Params(),
+		WASMModules:          wasmModules,
 	}
 
 	svc, err := service.NewTier1(

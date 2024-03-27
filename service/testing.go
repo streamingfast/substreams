@@ -44,10 +44,10 @@ func (s *Tier1Service) TestBlocks(ctx context.Context, isSubRequest bool, reques
 
 func TestNewServiceTier2(runtimeConfig config.RuntimeConfig, streamFactoryFunc StreamFactoryFunc) *Tier2Service {
 	return &Tier2Service{
-		runtimeConfig:     runtimeConfig,
-		tracer:            nil,
-		logger:            zlog,
-		streamFactoryFunc: streamFactoryFunc,
+		runtimeConfig:             runtimeConfig,
+		tracer:                    nil,
+		logger:                    zlog,
+		streamFactoryFuncOverride: streamFactoryFunc,
 	}
 }
 

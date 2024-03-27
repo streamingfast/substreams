@@ -45,7 +45,7 @@ type Tier2Service struct {
 	tracer         ttrace.Tracer
 	logger         *zap.Logger
 
-	streamFactoryFunc StreamFactoryFunc
+	streamFactoryFuncOverride StreamFactoryFunc
 
 	setReadyFunc              func(bool)
 	currentConcurrentRequests int64
@@ -339,11 +339,14 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("error building pipeline: %w", err)
 	}
 
-	if s.streamFactoryFunc == nil { // in integration tests, we have a special stream factory. we don't want to override it
+	var streamFactoryFunc StreamFactoryFunc
+	if s.streamFactoryFuncOverride != nil { //this is only for testing purposes.
+		streamFactoryFunc = s.streamFactoryFuncOverride
+	} else {
 		sf := &StreamFactory{
 			mergedBlocksStore: mergedBlocksStore,
 		}
-		s.streamFactoryFunc = sf.New
+		streamFactoryFunc = sf.New
 	}
 
 	s.runtimeConfig.StateBundleSize = request.StateBundleSize
@@ -383,7 +386,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		streamErr = io.EOF
 		span.EndWithErr(&streamErr)
 	} else {
-		blockStream, err := s.streamFactoryFunc(
+		blockStream, err := streamFactoryFunc(
 			ctx,
 			pipe,
 			int64(requestDetails.ResolvedStartBlockNum),

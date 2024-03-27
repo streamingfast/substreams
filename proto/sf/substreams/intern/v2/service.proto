@@ -23,7 +23,7 @@ message ProcessRangeRequest {
   sf.substreams.v1.Modules modules = 4;
   uint32 stage = 5; // 0-based index of stage to execute up to
 
-  string network_name = 6;
+  string metering_config = 6;
   uint64 first_streamable_block = 7; // first block that can be streamed
   uint64 last_streamable_block = 8; // last block that can be streamed
 

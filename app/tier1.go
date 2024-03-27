@@ -33,7 +33,7 @@ type Tier1Modules struct {
 }
 
 type Tier1Config struct {
-	NetworkName string
+	MeteringConfig string
 
 	MergedBlocksStoreURL    string
 	OneBlocksStoreURL       string
@@ -164,7 +164,7 @@ func (a *Tier1App) Run() error {
 	}
 
 	tier2RequestParameters := reqctx.Tier2RequestParameters{
-		NetworkName:          a.config.NetworkName,
+		MeteringConfig:       a.config.MeteringConfig,
 		FirstStreamableBlock: bstream.GetProtocolFirstStreamableBlock,
 		MergedBlockStoreURL:  a.config.MergedBlocksStoreURL,
 		StateStoreURL:        a.config.StateStoreURL,

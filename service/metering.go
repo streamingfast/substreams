@@ -35,6 +35,10 @@ func sendMetering(ctx context.Context, meter dmetering.Meter, userID, apiKeyID, 
 		Timestamp: time.Now(),
 	}
 
-	// we send metering even if context is canceled
-	dmetering.Emit(context.WithoutCancel(ctx), event)
+	emitter := ctx.Value("event_emitter").(dmetering.EventEmitter)
+	if emitter == nil {
+		dmetering.Emit(context.WithoutCancel(ctx), event)
+	} else {
+		emitter.Emit(context.WithoutCancel(ctx), event)
+	}
 }

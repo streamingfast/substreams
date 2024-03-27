@@ -532,14 +532,6 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	return pipe.OnStreamTerminated(ctx, streamErr)
 }
 
-//func (s *Tier1Service) buildPipelineOptions(ctx context.Context) (opts []pipeline.Option) {
-//	reqDetails := reqctx.Details(ctx)
-//	for _, pipeOpts := range s.pipelineOptions {
-//		opts = append(opts, pipeOpts.PipelineOptions(ctx, reqDetails.ResolvedStartBlockNum, reqDetails.StopBlockNum, reqDetails.UniqueIDString())...)
-//	}
-//	return
-//}
-
 func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logger, streamSrv *connect.ServerStream[pbsubstreamsrpc.Response]) substreams.ResponseFunc {
 	auth := dauth.FromContext(ctx)
 	userID := auth.UserID()
@@ -562,6 +554,7 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 			return connect.NewError(connect.CodeUnavailable, err)
 		}
 
+		ctx = context.WithValue(ctx, "event_emitter", dmetering.GetDefaultEmitter())
 		sendMetering(ctx, meter, userID, apiKeyID, ip, userMeta, "sf.substreams.rpc.v2/Blocks", resp, logger)
 		return nil
 	}

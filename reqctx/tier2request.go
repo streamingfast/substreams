@@ -3,7 +3,7 @@ package reqctx
 import "context"
 
 type Tier2RequestParameters struct {
-	NetworkName          string
+	MeteringConfig       string
 	FirstStreamableBlock uint64
 
 	MergedBlockStoreURL  string

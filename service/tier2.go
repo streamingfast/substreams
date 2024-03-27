@@ -14,7 +14,6 @@ import (
 	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/dgrpc"
 	"github.com/streamingfast/dmetering"
-	meteringContext "github.com/streamingfast/dmetering/context"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
 	tracing "github.com/streamingfast/sf-tracing"
@@ -176,7 +175,14 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 
 	logger.Info("incoming substreams ProcessRange request", fields...)
 
-	respFunc := tier2ResponseHandler(meteringContext.WithNetwork(ctx, request.NetworkName), logger, streamSrv)
+	emitter, err := dmetering.New(request.MeteringConfig, logger)
+	if err != nil {
+		return connect.NewError(connect.CodeInternal, fmt.Errorf("unable to initialize dmetering: %w", err))
+	}
+
+	ctx = context.WithValue(ctx, "event_emitter", emitter)
+
+	respFunc := tier2ResponseHandler(ctx, logger, streamSrv)
 	err = s.processRange(ctx, request, respFunc)
 	grpcError = toGRPCError(ctx, err)
 

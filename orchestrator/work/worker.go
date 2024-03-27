@@ -98,7 +98,7 @@ func NewRequest(ctx context.Context, req *reqctx.RequestDetails, stageIndex int,
 		OutputModule:  req.OutputModule,
 		Stage:         uint32(stageIndex),
 
-		NetworkName:          tier2ReqParams.NetworkName,
+		MeteringConfig:       tier2ReqParams.MeteringConfig,
 		FirstStreamableBlock: tier2ReqParams.FirstStreamableBlock,
 		MergedBlocksStore:    tier2ReqParams.MergedBlockStoreURL,
 		StateStore:           tier2ReqParams.StateStoreURL,

@@ -51,6 +51,19 @@ func (c *File) SortedItems() (out []*pboutput.Item) {
 	return
 }
 
+func (c *File) ExtractClocks(clocksMap map[uint64]*pbsubstreams.Clock) {
+	for _, item := range c.kv {
+		if _, found := clocksMap[item.BlockNum]; !found {
+			clocksMap[item.BlockNum] = &pbsubstreams.Clock{
+				Number:    item.BlockNum,
+				Id:        item.BlockId,
+				Timestamp: item.Timestamp,
+			}
+		}
+	}
+	return
+}
+
 func (c *File) SetItem(clock *pbsubstreams.Clock, data []byte) {
 	c.Lock()
 	defer c.Unlock()

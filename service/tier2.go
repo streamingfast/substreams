@@ -349,31 +349,23 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	}
 
 	var streamErr error
-	if canSkipBlocks(existingExecOuts, modulesRequiredToRun, s.blockType) {
-		var referenceMapper *execout.File
-		for k, v := range existingExecOuts {
-			referenceMapper = v
-			logger.Info("running from mapper", zap.String("module", k))
-			break
+	if canSkipBlockSource(existingExecOuts, modulesRequiredToRun, s.blockType) {
+		maxDistributorLength := int(request.StopBlockNum - requestDetails.ResolvedStartBlockNum)
+		clocksDistributor := make(map[uint64]*pbsubstreams.Clock)
+		for _, execOutput := range existingExecOuts {
+			execOutput.ExtractClocks(clocksDistributor)
+			if len(clocksDistributor) >= maxDistributorLength {
+				break
+			}
 		}
 
+		sortedClocksDistributor := sortClocksDistributor(clocksDistributor)
 		ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/pipeline/mapper_stream")
-		for _, v := range referenceMapper.SortedItems() {
-			if v.BlockNum < request.StartBlockNum || v.BlockNum >= request.StopBlockNum {
+		for _, clock := range sortedClocksDistributor {
+			if clock.Number < request.StartBlockNum || clock.Number >= request.StopBlockNum {
 				panic("reading from mapper, block was out of range") // we don't want to have this case undetected
 			}
-			clock := &pbsubstreams.Clock{
-				Id:        v.BlockId,
-				Number:    v.BlockNum,
-				Timestamp: v.Timestamp,
-			}
-
-			cursor := &bstream.Cursor{
-				Step:      bstream.StepNewIrreversible,
-				Block:     bstream.NewBlockRef(v.BlockId, v.BlockNum),
-				LIB:       bstream.NewBlockRef(v.BlockId, v.BlockNum),
-				HeadBlock: bstream.NewBlockRef(v.BlockId, v.BlockNum),
-			}
+			cursor := irreversibleCursorFromClock(clock)
 
 			if err := pipe.ProcessFromExecOutput(ctx, clock, cursor); err != nil {
 				span.EndWithErr(&err)
@@ -419,7 +411,6 @@ func evaluateModulesRequiredToRun(
 	execoutConfigs *execout.Configs,
 	storeConfigs store.ConfigMap,
 ) (requiredModules map[string]*pbsubstreams.Module, existingExecOuts map[string]*execout.File, execoutWriters map[string]*execout.Writer, err error) {
-
 	existingExecOuts = make(map[string]*execout.File)
 	requiredModules = make(map[string]*pbsubstreams.Module)
 	execoutWriters = make(map[string]*execout.Writer)
@@ -430,7 +421,6 @@ func evaluateModulesRequiredToRun(
 	}
 
 	runningLastStage := outputGraph.StagedUsedModules()[stage].IsLastStage()
-
 	for name, c := range execoutConfigs.ConfigMap {
 		if _, found := usedModules[name]; !found { // skip modules that are only present in later stages
 			continue
@@ -490,7 +480,7 @@ func evaluateModulesRequiredToRun(
 
 }
 
-func canSkipBlocks(existingExecOuts map[string]*execout.File, requiredModules map[string]*pbsubstreams.Module, blockType string) bool {
+func canSkipBlockSource(existingExecOuts map[string]*execout.File, requiredModules map[string]*pbsubstreams.Module, blockType string) bool {
 	if len(existingExecOuts) == 0 {
 		return false
 	}

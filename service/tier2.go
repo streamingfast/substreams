@@ -112,7 +112,6 @@ func NewTier2(
 	}
 
 	s.streamFactoryFunc = sf.New
-
 	metrics.RegisterMetricSet(logger)
 
 	for _, opt := range opts {
@@ -423,13 +422,20 @@ func evaluateModulesRequiredToRun(
 	existingExecOuts = make(map[string]*execout.File)
 	requiredModules = make(map[string]*pbsubstreams.Module)
 	execoutWriters = make(map[string]*execout.Writer)
-
 	usedModules := make(map[string]*pbsubstreams.Module)
 	for _, module := range outputGraph.UsedModulesUpToStage(int(stage)) {
 		usedModules[module.Name] = module
 	}
 
-	runningLastStage := outputGraph.StagedUsedModules()[stage].IsLastStage()
+	stageUsedModules := outputGraph.StagedUsedModules()[stage]
+	runningLastStage := stageUsedModules.IsLastStage()
+
+	stageUsedModulesName := make(map[string]bool)
+	for _, layer := range stageUsedModules {
+		for _, mod := range layer {
+			stageUsedModulesName[mod.Name] = true
+		}
+	}
 
 	for name, c := range execoutConfigs.ConfigMap {
 		if _, found := usedModules[name]; !found { // skip modules that are only present in later stages
@@ -470,7 +476,7 @@ func evaluateModulesRequiredToRun(
 		}
 	}
 
-	for name := range requiredModules {
+	for name, module := range requiredModules {
 		if _, exists := existingExecOuts[name]; exists {
 			continue // for stores that need to be run for the partials, but already have cached execution outputs
 		}
@@ -478,6 +484,12 @@ func evaluateModulesRequiredToRun(
 			// if we are not running a complete range, we can skip writing the outputs of every module except the requested outputModule if it's in our stage
 			continue
 		}
+		if module.ModuleKind() == pbsubstreams.ModuleKindStore {
+			if _, found := stageUsedModulesName[name]; !found {
+				continue
+			}
+		}
+
 		execoutWriters[name] = execout.NewWriter(
 			startBlock,
 			stopBlock,

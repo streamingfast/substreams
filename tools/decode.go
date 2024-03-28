@@ -107,7 +107,7 @@ func runDecodeStatesModuleRunE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("initializing dstore for %q: %w", storeURL, err)
 	}
 
-	manifestReader, err := manifest.NewReader(manifestPath)
+	manifestReader, err := manifest.NewReader(manifestPath, manifest.SkipPackageValidationReader())
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
@@ -118,9 +118,6 @@ func runDecodeStatesModuleRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	protoFiles := pkg.ProtoFiles
-	if len(protoFiles) == 0 {
-		return fmt.Errorf("no protobuf file definitions in the manifest")
-	}
 
 	hashes := manifest.NewModuleHashes()
 
@@ -180,7 +177,7 @@ func runDecodeOutputsModuleRunE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("initializing dstore for %q: %w", storeURL, err)
 	}
 
-	manifestReader, err := manifest.NewReader(manifestPath)
+	manifestReader, err := manifest.NewReader(manifestPath, manifest.SkipPackageValidationReader())
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
@@ -191,9 +188,6 @@ func runDecodeOutputsModuleRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	protoFiles := pkg.ProtoFiles
-	if len(protoFiles) == 0 {
-		return fmt.Errorf("no protobuf file definitions in the manifest")
-	}
 
 	hashes := manifest.NewModuleHashes()
 

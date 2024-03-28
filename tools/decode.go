@@ -28,7 +28,7 @@ var decodeCmd = &cobra.Command{
 }
 
 var decodeOutputsModuleCmd = &cobra.Command{
-	Use:   "outputs [<manifest_file>] <module_name> <output_url> <block_number> <key>",
+	Use:   "outputs [<manifest_file>] <module_name> <output_url> <block_number>",
 	Short: "Decode outputs base 64 encoded bytes to protobuf data structure",
 	Long: cli.Dedent(`
 		When running this outputs command with a mapper or a store the key will be the block hash.  The manifest is optional as it will try to find a file named
@@ -41,7 +41,7 @@ var decodeOutputsModuleCmd = &cobra.Command{
 		dir-with-manifest store_pools gs://[bucket-url-path] 12487090 token:051cf5178f60e9def5d5a39b2a988a9f914107cb:dprice:eth
 	`)),
 	RunE:         runDecodeOutputsModuleRunE,
-	Args:         cobra.RangeArgs(4, 5),
+	Args:         cobra.RangeArgs(3, 4),
 	SilenceUsage: true,
 }
 
@@ -50,7 +50,7 @@ var decodeStatesModuleCmd = &cobra.Command{
 	Short: "Decode states base 64 encoded bytes to protobuf data structure",
 	Long: cli.Dedent(`
 		Running the states command only works if the module is a store. If it is a map an error message will be returned
-		to the user. The user needs to specify a key as it is required. The manifest is optional as it will try to find a file named
+		to the user. The manifest is optional as it will try to find a file named
 		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml'
 		file in place of '<manifest_file>, or a link to a remote .spkg file, using urls gs://, http(s)://, ipfs://, etc.'.
 	`),
@@ -90,6 +90,7 @@ func runDecodeStatesModuleRunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("converting blockNumber to uint: %w", err)
 	}
+
 	key := args[3]
 
 	zlog.Info("decoding module",
@@ -156,26 +157,22 @@ func runDecodeOutputsModuleRunE(cmd *cobra.Command, args []string) error {
 	saveInterval := mustGetUint64(cmd, "save-interval")
 
 	manifestPath := ""
-	if len(args) == 5 {
+	if len(args) == 4 {
 		manifestPath = args[0]
 		args = args[1:]
 	}
 
 	moduleName := args[0]
 	storeURL := args[1]
-	blockNumber, err := strconv.ParseUint(args[2], 10, 64)
-	if err != nil {
-		return fmt.Errorf("converting blockNumber to uint: %w", err)
-	}
-	key := args[3]
+
+	requestedBlocks := block.ParseRange(args[2]) // FIXME: this panics on error :(
 
 	zlog.Info("decoding module",
 		zap.String("manifest_path", manifestPath),
 		zap.String("module_name", moduleName),
 		zap.String("store_url", storeURL),
-		zap.Uint64("block_number", blockNumber),
+		zap.Stringer("requested_block_range", requestedBlocks),
 		zap.Uint64("save_internal", saveInterval),
-		zap.String("key", key),
 	)
 
 	s, err := dstore.NewStore(storeURL, "zst", "zstd", false)
@@ -204,6 +201,7 @@ func runDecodeOutputsModuleRunE(cmd *cobra.Command, args []string) error {
 	for _, module := range pkg.Modules.Modules {
 		if module.Name == moduleName {
 			matchingModule = module
+
 		}
 	}
 	if matchingModule == nil {
@@ -217,20 +215,23 @@ func runDecodeOutputsModuleRunE(cmd *cobra.Command, args []string) error {
 	moduleHash := hex.EncodeToString(hash)
 	zlog.Info("found module hash", zap.String("hash", moduleHash), zap.String("module", matchingModule.Name))
 
-	startBlock := execout.ComputeStartBlock(blockNumber, saveInterval)
+	startBlock := execout.ComputeStartBlock(requestedBlocks.StartBlock, saveInterval)
+	if startBlock < matchingModule.InitialBlock {
+		startBlock = matchingModule.InitialBlock
+	}
 
 	switch matchingModule.Kind.(type) {
 	case *pbsubstreams.Module_KindMap_:
-		return searchOutputsModule(ctx, blockNumber, startBlock, saveInterval, moduleHash, matchingModule, s, protoFiles)
+		return searchOutputsModule(ctx, requestedBlocks, startBlock, saveInterval, moduleHash, matchingModule, s, protoFiles)
 	case *pbsubstreams.Module_KindStore_:
-		return searchOutputsModule(ctx, blockNumber, startBlock, saveInterval, moduleHash, matchingModule, s, protoFiles)
+		return searchOutputsModule(ctx, requestedBlocks, startBlock, saveInterval, moduleHash, matchingModule, s, protoFiles)
 	}
 	return fmt.Errorf("module has an unknown")
 }
 
 func searchOutputsModule(
 	ctx context.Context,
-	blockNumber,
+	requestedBlocks *block.Range,
 	startBlock,
 	saveInterval uint64,
 	moduleHash string,
@@ -249,11 +250,12 @@ func searchOutputsModule(
 	}
 
 	rng := block.NewRange(startBlock, startBlock-startBlock%saveInterval+saveInterval)
+
 	outputCache := modStore.NewFile(rng)
-	zlog.Info("loading block from store", zap.Uint64("start_block", startBlock), zap.Uint64("block_num", blockNumber))
+	zlog.Info("loading block from store", zap.Uint64("start_block", startBlock), zap.Stringer("requested_block_range", requestedBlocks))
 	if err := outputCache.Load(ctx); err != nil {
 		if err == dstore.ErrNotFound {
-			return fmt.Errorf("can't find cache at block %d storeURL %q", blockNumber, moduleStore.BaseURL().String())
+			return fmt.Errorf("can't find cache at block %d storeURL %q", startBlock, moduleStore.BaseURL().String())
 		}
 
 		if err != nil {
@@ -261,18 +263,21 @@ func searchOutputsModule(
 		}
 	}
 
-	fmt.Println()
-	payloadBytes, found := outputCache.GetAtBlock(blockNumber)
-	if !found {
-		return fmt.Errorf("data not found at block %d", blockNumber)
-	}
+	for i := requestedBlocks.StartBlock; i < requestedBlocks.ExclusiveEndBlock; i++ {
+		payloadBytes, found := outputCache.GetAtBlock(i)
+		if !found {
+			continue
+		}
 
-	if len(payloadBytes) == 0 {
-		fmt.Printf("RecordBlock %d found but payload is empty. Module did not produce data at block num.", blockNumber)
-		return nil
+		fmt.Println("Block", i)
+		if len(payloadBytes) == 0 {
+			continue
+		}
+		if err := printObject(module, protoFiles, payloadBytes); err != nil {
+			return fmt.Errorf("printing object: %w", err)
+		}
 	}
-
-	return printObject(module, protoFiles, payloadBytes)
+	return nil
 }
 
 func searchStateModule(

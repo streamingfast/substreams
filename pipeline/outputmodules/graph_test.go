@@ -42,6 +42,16 @@ func TestGraph_computeStages(t *testing.T) {
 			input:  "Ma Mb:Ma Sc:Mb Md:Sc Se:Md,Sg Mf:Ma Sg:Mf Mh:Se,Ma",
 			expect: "[[Ma] [Mb Mf] [Sc Sg]] [[Md] [Se]] [[Mh]]",
 		},
+		{
+			name:   "sixth graph (block index impl)",
+			input:  "Ia Mb Md:Sc,Ia Sc:Mb",
+			expect: "[[Ia Mb] [Sc]] [[Md]]",
+		},
+		{
+			name:   "seventh graph (block index impl)",
+			input:  "Ia Mb Md:Sc,Ia Sc:Mb Me:Sc Mf:Me,Sg,Ia Sg:Md,Me",
+			expect: "[[Ia Mb] [Sc]] [[Md Me] [Sg]] [[Mf]]",
+		},
 	}
 
 	for _, test := range tests {
@@ -67,12 +77,16 @@ func computeStagesInput(in string) (out []*pbsubstreams.Module) {
 		case 'M':
 			newMod.Kind = &pbsubstreams.Module_KindMap_{KindMap: &pbsubstreams.Module_KindMap{}}
 			newMod.Name = modName[1:]
+		case 'I':
+			newMod.Kind = &pbsubstreams.Module_KindBlockIndex_{KindBlockIndex: &pbsubstreams.Module_KindBlockIndex{}}
+			newMod.Name = modName[1:]
 		default:
 			panic("invalid prefix in word: " + modName)
 		}
 		if len(params) > 1 {
 			for _, input := range strings.Split(params[1], ",") {
 				inputName := input[1:]
+
 				switch input[0] {
 				case 'S':
 					newMod.Inputs = append(newMod.Inputs, &pbsubstreams.Module_Input{Input: &pbsubstreams.Module_Input_Store_{Store: &pbsubstreams.Module_Input_Store{ModuleName: inputName}}})
@@ -82,6 +96,11 @@ func computeStagesInput(in string) (out []*pbsubstreams.Module) {
 					newMod.Inputs = append(newMod.Inputs, &pbsubstreams.Module_Input{Input: &pbsubstreams.Module_Input_Params_{}})
 				case 'R':
 					newMod.Inputs = append(newMod.Inputs, &pbsubstreams.Module_Input{Input: &pbsubstreams.Module_Input_Source_{}})
+				case 'I':
+					newMod.BlockFilter = &pbsubstreams.Module_BlockFilter{
+						Module: inputName,
+						Query:  "",
+					}
 				default:
 					panic("invalid input prefix: " + input)
 				}
@@ -102,6 +121,9 @@ func computeStagesOutput(in ExecutionStages) string {
 				modKind := "S"
 				if l3.GetKindMap() != nil {
 					modKind = "M"
+				}
+				if l3.GetKindBlockIndex() != nil {
+					modKind = "I"
 				}
 				level3 = append(level3, modKind+l3.Name)
 			}

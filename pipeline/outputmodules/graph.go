@@ -139,7 +139,7 @@ func computeStages(mods []*pbsubstreams.Module) (stages ExecutionStages) {
 	modLoop:
 		for _, mod := range mods {
 			switch mod.Kind.(type) {
-			case *pbsubstreams.Module_KindMap_:
+			case *pbsubstreams.Module_KindMap_, *pbsubstreams.Module_KindBlockIndex_:
 				if i%2 == 0 {
 					continue
 				}
@@ -168,6 +168,13 @@ func computeStages(mods []*pbsubstreams.Module) (stages ExecutionStages) {
 					panic(fmt.Errorf("unsupported input type %T", dep.Input))
 				}
 				if !seen[depModName] {
+					continue modLoop
+				}
+			}
+
+			//Check block index dependence
+			if mod.BlockFilter != nil {
+				if !seen[mod.BlockFilter.Module] {
 					continue modLoop
 				}
 			}

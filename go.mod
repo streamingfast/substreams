@@ -52,7 +52,7 @@ require (
 	github.com/schollz/closestmatch v2.1.0+incompatible
 	github.com/shopspring/decimal v1.3.1
 	github.com/streamingfast/dhttp v0.0.2-0.20220314180036-95936809c4b8
-	github.com/streamingfast/dmetering v0.0.0-20240319201447-018aabe46634
+	github.com/streamingfast/dmetering v0.0.0-20240327163525-9249aa9bcceb
 	github.com/streamingfast/dmetrics v0.0.0-20230919161904-206fa8ebd545
 	github.com/streamingfast/eth-go v0.0.0-20230410173454-433bd8803da1
 	github.com/streamingfast/sf-tracing v0.0.0-20240209202324-9daa52c71a52

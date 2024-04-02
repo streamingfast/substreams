@@ -49,7 +49,7 @@ func (r *Registry) NewModule(ctx context.Context, wasmCode []byte) (Module, erro
 	return r.runtimeStack.NewModule(ctx, wasmCode, r)
 }
 
-func NewRegistry(extensions []WASMExtensioner, maxFuel uint64) *Registry {
+func NewRegistry(extensions map[string]map[string]WASMExtension, maxFuel uint64) *Registry {
 	runtimeName := "wazero" // default
 
 	if selectRuntime := os.Getenv("SUBSTREAMS_WASM_RUNTIME"); selectRuntime != "" {
@@ -64,16 +64,14 @@ func NewRegistry(extensions []WASMExtensioner, maxFuel uint64) *Registry {
 	return NewRegistryWithRuntime(runtimeName, extensions, maxFuel)
 }
 
-func NewRegistryWithRuntime(runtimeName string, extensions []WASMExtensioner, maxFuel uint64) *Registry {
+func NewRegistryWithRuntime(runtimeName string, extensions map[string]map[string]WASMExtension, maxFuel uint64) *Registry {
 	r := &Registry{
 		maxFuel: maxFuel,
 	}
 
-	for _, ext := range extensions {
-		for ns, exts := range ext.WASMExtensions() {
-			for name, ext := range exts {
-				r.registerWASMExtension(ns, name, ext)
-			}
+	for ns, exts := range extensions {
+		for name, ext := range exts {
+			r.registerWASMExtension(ns, name, ext)
 		}
 	}
 

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 	"sync"
 
 	"connectrpc.com/connect"
@@ -18,8 +17,6 @@ import (
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
 	tracing "github.com/streamingfast/sf-tracing"
-
-	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/metrics"
@@ -43,75 +40,34 @@ import (
 )
 
 type Tier2Service struct {
-	blockType         string
-	wasmExtensions    []wasm.WASMExtensioner
-	pipelineOptions   []pipeline.PipelineOptioner
-	streamFactoryFunc StreamFactoryFunc
-	runtimeConfig     config.RuntimeConfig
-	tracer            ttrace.Tracer
-	logger            *zap.Logger
+	wasmExtensions func(map[string]string) (map[string]map[string]wasm.WASMExtension, error) //todo: rename
+	runtimeConfig  config.RuntimeConfig
+	tracer         ttrace.Tracer
+	logger         *zap.Logger
+
+	streamFactoryFuncOverride StreamFactoryFunc
 
 	setReadyFunc              func(bool)
 	currentConcurrentRequests int64
 	connectionCountMutex      sync.RWMutex
+
+	tier2RequestParameters *reqctx.Tier2RequestParameters
 }
 
 const protoPkfPrefix = "type.googleapis.com/"
 
-func getBlockTypeFromMergedBlocks(store dstore.Store) (string, error) {
-	var out string
-	fs := bstream.NewFileSource(store, bstream.GetProtocolFirstStreamableBlock, bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
-		out = blk.Payload.TypeUrl
-		return io.EOF
-	}), zlog)
-	fs.Run()
-
-	if err := fs.Err(); err != io.EOF {
-		return "", err
-	}
-	return strings.TrimPrefix(out, protoPkfPrefix), nil
-}
-
 func NewTier2(
 	logger *zap.Logger,
-	mergedBlocksStore dstore.Store,
-
-	stateStore dstore.Store,
-	defaultCacheTag string,
-	stateBundleSize uint64,
-
 	opts ...Option,
-
 ) (*Tier2Service, error) {
+	runtimeConfig := config.NewTier2RuntimeConfig()
 
-	runtimeConfig := config.NewRuntimeConfig(
-		stateBundleSize,
-		0, // tier2 don't send subrequests
-		0, // tier2 don't send subrequests
-		0,
-		stateStore,
-		defaultCacheTag,
-		nil,
-	)
-
-	blockType, err := getBlockTypeFromMergedBlocks(mergedBlocksStore)
-	if err != nil {
-		return nil, fmt.Errorf("getting block type from merged-blocks-store: %w", err)
-	}
-
-	logger.Debug("launching tier2 service", zap.String("block_type", blockType))
 	s := &Tier2Service{
 		runtimeConfig: runtimeConfig,
-		blockType:     blockType,
 		tracer:        tracing.GetTracer(),
 		logger:        logger,
 	}
 
-	sf := &StreamFactory{
-		mergedBlocksStore: mergedBlocksStore,
-	}
-
-	s.streamFactoryFunc = sf.New
 	metrics.RegisterMetricSet(logger)
 
 	for _, opt := range opts {
@@ -219,6 +175,16 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 
 	logger.Info("incoming substreams ProcessRange request", fields...)
 
+	emitter, err := dmetering.New(request.MeteringConfig, logger)
+	if err != nil {
+		return connect.NewError(connect.CodeInternal, fmt.Errorf("unable to initialize dmetering: %w", err))
+	}
+	defer func() {
+		emitter.Shutdown(nil)
+	}()
+
+	ctx = context.WithValue(ctx, "event_emitter", emitter)
+
 	respFunc := tier2ResponseHandler(ctx, logger, streamSrv)
 	err = s.processRange(ctx, request, respFunc)
 	grpcError = toGRPCError(ctx, err)
@@ -234,7 +200,28 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) error {
 	logger := reqctx.Logger(ctx)
 
-	if err := outputmodules.ValidateTier2Request(request, s.blockType); err != nil {
+	s.runtimeConfig.DefaultCacheTag = request.StateStoreDefaultTag
+	s.runtimeConfig.StateBundleSize = request.StateBundleSize
+
+	mergedBlocksStore, err := dstore.NewDBinStore(request.MergedBlocksStore)
+	if cloned, ok := mergedBlocksStore.(dstore.Clonable); ok {
+		mergedBlocksStore, err = cloned.Clone(ctx)
+		if err != nil {
+			return fmt.Errorf("cloning store: %w", err)
+		}
+		mergedBlocksStore.SetMeter(dmetering.GetBytesMeter(ctx))
+	}
+
+	stateStore, err := dstore.NewStore(request.StateStore, "zst", "zstd", false)
+	if cloned, ok := stateStore.(dstore.Clonable); ok {
+		stateStore, err = cloned.Clone(ctx)
+		if err != nil {
+			return fmt.Errorf("cloning store: %w", err)
+		}
+		stateStore.SetMeter(dmetering.GetBytesMeter(ctx))
+	}
+
+	if err := outputmodules.ValidateTier2Request(request); err != nil {
 		return stream.NewErrInvalidArg(fmt.Errorf("validate request: %w", err).Error())
 	}
 
@@ -270,9 +257,13 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return stream.NewErrInvalidArg(err.Error())
 	}
 
-	wasmRuntime := wasm.NewRegistry(s.wasmExtensions, s.runtimeConfig.MaxWasmFuel)
+	exts, err := s.wasmExtensions(request.WasmModules)
+	if err != nil {
+		return fmt.Errorf("loading wasm extensions: %w", err)
+	}
+	wasmRuntime := wasm.NewRegistry(exts, s.runtimeConfig.MaxWasmFuel)
 
-	cacheStore, err := s.runtimeConfig.BaseObjectStore.SubStore(requestDetails.CacheTag)
+	cacheStore, err := stateStore.SubStore(requestDetails.CacheTag)
 	if err != nil {
 		return fmt.Errorf("internal error setting store: %w", err)
 	}
@@ -286,7 +277,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		cacheStore = cloned
 	}
 
-	execOutputConfigs, err := execout.NewConfigs(cacheStore, outputGraph.UsedModulesUpToStage(int(request.Stage)), outputGraph.ModuleHashes(), s.runtimeConfig.StateBundleSize, logger)
+	execOutputConfigs, err := execout.NewConfigs(cacheStore, outputGraph.UsedModulesUpToStage(int(request.Stage)), outputGraph.ModuleHashes(), request.StateBundleSize, logger)
 	if err != nil {
 		return fmt.Errorf("new config map: %w", err)
 	}
@@ -295,8 +286,8 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
-	stores := pipeline.NewStores(ctx, storeConfigs, s.runtimeConfig.StateBundleSize, requestDetails.ResolvedStartBlockNum, request.StopBlockNum, true)
-	isCompleteRange := request.StopBlockNum%s.runtimeConfig.StateBundleSize == 0
+	stores := pipeline.NewStores(ctx, storeConfigs, request.StateBundleSize, requestDetails.ResolvedStartBlockNum, request.StopBlockNum, true)
+	isCompleteRange := request.StopBlockNum%request.StateBundleSize == 0
 
 	// note all modules that are not in 'modulesRequiredToRun' are still iterated in 'pipeline.executeModules', but they will skip actual execution when they see that the cache provides the data
 	// This way, stores get updated at each block from the cached execouts without the actual execution of the module
@@ -311,12 +302,13 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	}
 
 	// this engine will keep the existingExecOuts to optimize the execution (for inputs from modules that skip execution)
-	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, execOutWriters, s.blockType, existingExecOuts)
+	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, execOutWriters, request.BlockType, existingExecOuts)
 	if err != nil {
 		return fmt.Errorf("error building caching engine: %w", err)
 	}
 
-	opts := s.buildPipelineOptions(ctx, request)
+	//opts := s.buildPipelineOptions(ctx, request)
+	var opts []pipeline.Option
 	opts = append(opts, pipeline.WithFinalBlocksOnly())
 	opts = append(opts, pipeline.WithHighestStage(request.Stage))
 
@@ -347,8 +339,20 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("error building pipeline: %w", err)
 	}
 
+	var streamFactoryFunc StreamFactoryFunc
+	if s.streamFactoryFuncOverride != nil { //this is only for testing purposes.
+		streamFactoryFunc = s.streamFactoryFuncOverride
+	} else {
+		sf := &StreamFactory{
+			mergedBlocksStore: mergedBlocksStore,
+		}
+		streamFactoryFunc = sf.New
+	}
+
+	s.runtimeConfig.StateBundleSize = request.StateBundleSize
+
 	var streamErr error
-	if canSkipBlocks(existingExecOuts, modulesRequiredToRun, s.blockType) {
+	if canSkipBlocks(existingExecOuts, modulesRequiredToRun, request.BlockType) {
 		var referenceMapper *execout.File
 		for k, v := range existingExecOuts {
 			referenceMapper = v
@@ -382,7 +386,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		streamErr = io.EOF
 		span.EndWithErr(&streamErr)
 	} else {
-		blockStream, err := s.streamFactoryFunc(
+		blockStream, err := streamFactoryFunc(
 			ctx,
 			pipe,
 			int64(requestDetails.ResolvedStartBlockNum),
@@ -519,13 +523,13 @@ func canSkipBlocks(existingExecOuts map[string]*execout.File, requiredModules ma
 	return true
 }
 
-func (s *Tier2Service) buildPipelineOptions(ctx context.Context, request *pbssinternal.ProcessRangeRequest) (opts []pipeline.Option) {
-	requestDetails := reqctx.Details(ctx)
-	for _, pipeOpts := range s.pipelineOptions {
-		opts = append(opts, pipeOpts.PipelineOptions(ctx, request.StartBlockNum, request.StopBlockNum, requestDetails.UniqueIDString())...)
-	}
-	return
-}
+//func (s *Tier2Service) buildPipelineOptions(ctx context.Context, request *pbssinternal.ProcessRangeRequest) (opts []pipeline.Option) {
+//	requestDetails := reqctx.Details(ctx)
+//	for _, pipeOpts := range s.pipelineOptions {
+//		opts = append(opts, pipeOpts.PipelineOptions(ctx, request.StartBlockNum, request.StopBlockNum, requestDetails.UniqueIDString())...)
+//	}
+//	return
+//}
 
 func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbssinternal.Substreams_ProcessRangeServer) substreams.ResponseFunc {
 	meter := dmetering.GetBytesMeter(ctx)
@@ -542,7 +546,7 @@ func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbs
 			return connect.NewError(connect.CodeUnavailable, err)
 		}
 
-		sendMetering(meter, userID, apiKeyID, ip, userMeta, "sf.substreams.internal.v2/ProcessRange", resp, logger)
+		sendMetering(ctx, meter, userID, apiKeyID, ip, userMeta, "sf.substreams.internal.v2/ProcessRange", resp, logger)
 		return nil
 	}
 }

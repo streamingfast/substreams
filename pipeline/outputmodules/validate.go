@@ -26,12 +26,12 @@ func ValidateTier1Request(request *pbsubstreamsrpc.Request, blockType string) er
 	return nil
 }
 
-func ValidateTier2Request(request *pbssinternal.ProcessRangeRequest, blockType string) error {
+func ValidateTier2Request(request *pbssinternal.ProcessRangeRequest) error {
 	if err := request.Validate(); err != nil {
 		return fmt.Errorf("validate tier2 request: %s", err)
 	}
 
-	err := validateRequest(request.Modules.Binaries, request.Modules, request.OutputModule, blockType)
+	err := validateRequest(request.Modules.Binaries, request.Modules, request.OutputModule, request.BlockType)
 	if err != nil {
 		return err
 	}

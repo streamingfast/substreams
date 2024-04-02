@@ -19,7 +19,7 @@ func (b *baseStore) GetFirst(key string) ([]byte, bool) {
 			return nil, false
 		default:
 			// WARN: is that legit? what if some upstream stream is broken? can we trust all those streams?
-			panic(fmt.Sprintf("invalid value %q for pbssinternal.StoreDelta::Op for key %q", delta.Operation.String(), delta.Key))
+			panic(fmt.Sprintf("invalid value %q for pbsubstreams.StoreDelta::Op for key %q", delta.Operation.String(), delta.Key))
 		}
 
 	}
@@ -41,7 +41,7 @@ func (b *baseStore) HasFirst(key string) bool {
 			return false
 		default:
 			// WARN: is that legit? what if some upstream stream is broken? can we trust all those streams?
-			panic(fmt.Sprintf("invalid value %q for pbssinternal.StoreDelta::Op for key %q", delta.Operation.String(), delta.Key))
+			panic(fmt.Sprintf("invalid value %q for pbsubstreams.StoreDelta::Op for key %q", delta.Operation.String(), delta.Key))
 		}
 
 	}
@@ -63,7 +63,7 @@ func (b *baseStore) GetLast(key string) ([]byte, bool) {
 		case pbsubstreams.StoreDelta_CREATE, pbsubstreams.StoreDelta_UPDATE:
 			return delta.NewValue, true
 		default:
-			panic(fmt.Sprintf("invalid value %q for pbssinternal.StoreDelta::Op for key %q", delta.Operation.String(), delta.Key))
+			panic(fmt.Sprintf("invalid value %q for pbsubstreams.StoreDelta::Op for key %q", delta.Operation.String(), delta.Key))
 		}
 	}
 
@@ -84,7 +84,7 @@ func (b *baseStore) HasLast(key string) bool {
 		case pbsubstreams.StoreDelta_CREATE, pbsubstreams.StoreDelta_UPDATE:
 			return true
 		default:
-			panic(fmt.Sprintf("invalid value %q for pbssinternal.StoreDelta::Op for key %q", delta.Operation.String(), delta.Key))
+			panic(fmt.Sprintf("invalid value %q for pbsubstreams.StoreDelta::Op for key %q", delta.Operation.String(), delta.Key))
 		}
 	}
 
@@ -114,7 +114,7 @@ func (b *baseStore) GetAt(ord uint64, key string) (out []byte, found bool) {
 			found = false
 		default:
 			// WARN: is that legit? what if some upstream stream is broken? can we trust all those streams?
-			panic(fmt.Sprintf("invalid value %q for pbssinternal.StateDelta::Op for key %q", delta.Operation, delta.Key))
+			panic(fmt.Sprintf("invalid value %q for pbsubstreams.StateDelta::Op for key %q", delta.Operation, delta.Key))
 		}
 	}
 	return
@@ -141,7 +141,7 @@ func (b *baseStore) HasAt(ord uint64, key string) bool {
 			found = false
 		default:
 			// WARN: is that legit? what if some upstream stream is broken? can we trust all those streams?
-			panic(fmt.Sprintf("invalid value %q for pbssinternal.StateDelta::Op for key %q", delta.Operation, delta.Key))
+			panic(fmt.Sprintf("invalid value %q for pbsubstreams.StateDelta::Op for key %q", delta.Operation, delta.Key))
 		}
 	}
 

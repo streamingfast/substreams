@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/streamingfast/substreams/reqctx"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/blockstream"
 	"github.com/streamingfast/bstream/hub"
@@ -16,7 +18,6 @@ import (
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metrics"
-	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/service"
 	"github.com/streamingfast/substreams/wasm"
 	"go.uber.org/atomic"
@@ -32,6 +33,8 @@ type Tier1Modules struct {
 }
 
 type Tier1Config struct {
+	MeteringConfig string
+
 	MergedBlocksStoreURL    string
 	OneBlocksStoreURL       string
 	ForkedBlocksStoreURL    string
@@ -49,8 +52,7 @@ type Tier1Config struct {
 	SubrequestsInsecure  bool
 	SubrequestsPlaintext bool
 
-	WASMExtensions  []wasm.WASMExtensioner
-	PipelineOptions []pipeline.PipelineOptioner
+	WASMExtensions wasm.WASMExtensioner
 
 	Tracing bool
 }
@@ -75,6 +77,7 @@ func NewTier1(logger *zap.Logger, config *Tier1Config, modules *Tier1Modules) *T
 }
 
 func (a *Tier1App) Run() error {
+
 	dmetrics.Register(metrics.MetricSet)
 
 	a.logger.Info("running substreams-tier1", zap.Reflect("config", a.config))
@@ -112,7 +115,6 @@ func (a *Tier1App) Run() error {
 
 	if withLive {
 		liveSourceFactory := bstream.SourceFactory(func(h bstream.Handler) bstream.Source {
-
 			return blockstream.NewSource(
 				context.Background(),
 				a.config.BlockStreamAddr,
@@ -148,16 +150,27 @@ func (a *Tier1App) Run() error {
 		a.config.SubrequestsPlaintext,
 	)
 	var opts []service.Option
-	for _, ext := range a.config.WASMExtensions {
-		opts = append(opts, service.WithWASMExtension(ext))
-	}
-
-	for _, opt := range a.config.PipelineOptions {
-		opts = append(opts, service.WithPipelineOptions(opt))
+	if a.config.WASMExtensions != nil {
+		opts = append(opts, service.WithWASMExtensioner(a.config.WASMExtensions))
 	}
 
 	if a.config.Tracing {
 		opts = append(opts, service.WithModuleExecutionTracing())
+	}
+
+	var wasmModules map[string]string
+	if a.config.WASMExtensions != nil {
+		wasmModules = a.config.WASMExtensions.Params()
+	}
+
+	tier2RequestParameters := reqctx.Tier2RequestParameters{
+		MeteringConfig:       a.config.MeteringConfig,
+		FirstStreamableBlock: bstream.GetProtocolFirstStreamableBlock,
+		MergedBlockStoreURL:  a.config.MergedBlocksStoreURL,
+		StateStoreURL:        a.config.StateStoreURL,
+		StateBundleSize:      a.config.StateBundleSize,
+		StateStoreDefaultTag: a.config.StateStoreDefaultTag,
+		WASMModules:          wasmModules,
 	}
 
 	svc, err := service.NewTier1(
@@ -170,6 +183,7 @@ func (a *Tier1App) Run() error {
 		a.config.MaxSubrequests,
 		a.config.StateBundleSize,
 		subrequestsClientConfig,
+		tier2RequestParameters,
 		opts...,
 	)
 	if err != nil {

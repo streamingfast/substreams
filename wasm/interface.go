@@ -7,7 +7,8 @@ import (
 )
 
 type WASMExtensioner interface {
-	WASMExtensions() map[string]map[string]WASMExtension
+	Params() map[string]string // tier1 gives me the params directly, tier2 would return nil
+	WASMExtensions(map[string]string) (map[string]map[string]WASMExtension, error)
 }
 
 // WASMExtension defines the implementation of a function that will

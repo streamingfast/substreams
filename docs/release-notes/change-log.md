@@ -9,11 +9,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v1.5.0 (Unreleased)
+## v1.5.0
+
+## Operators
+
+> [!IMPORTANT]
+> Since the `tier2` services will now get the network information from the `tier1` request, you must make sure that the file paths and network addresses will be the same for both tiers.
+
+> [!TIP]
+> The cached 'partial' files no longer contain the "trace ID" in their filename, preventing accumulation of "unsquashed" partial store files.
+> The system will delete files under '{modulehash}/state' named in this format`{blocknumber}-{blocknumber}.{hexadecimal}.partial.zst` 
+>  (ex: `000002000-000001000.abcdef1234567890abcde.partial.zst`) at runtime, which may take some time on heavily used substreams.
+> It is recommended that you delete all "old .partial.zst files" before upgrading, to prevent the runtime deletion from causing timeouts.
 
 * Tier2 is now chain agnostic. All chain-specific flags and configurations are now passed from Tier1 to Tier2 in the internal ProcessRange request. This allows for a single Tier2 instance to handle multiple chains.
-* Removed PipelineOptioner interface, as it was no longer needed.
-* WASMExtensioner interface has been modified to allow for WASM extensions to be more easily managed between Tier1 and Tier2. 
 
 ## v1.4.0
 

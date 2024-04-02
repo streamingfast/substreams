@@ -140,6 +140,7 @@ func (c *Config) ListSnapshotFiles(ctx context.Context, below uint64) (files []*
 		// We need to clear each time we start because a previous retry could have accumulated a partial state
 		files = nil
 
+		deletedOldFiles := 0
 		return c.objStore.Walk(ctx, "", func(filename string) (err error) {
 			fileInfo, ok := parseFileName(c.Name(), filename)
 			if !ok {
@@ -148,8 +149,13 @@ func (c *Config) ListSnapshotFiles(ctx context.Context, below uint64) (files []*
 			}
 
 			if fileInfo.WithTraceID {
-				if err := c.objStore.DeleteObject(ctx, filename); err != nil { // clean up all old files with traceID in them, they will only slow every next run
-					logger.Warn("cannot delete old partial file with trace_id", zap.String("filename", filename), zap.Error(err))
+				if deletedOldFiles < 100 {
+					go func() {
+						if err := c.objStore.DeleteObject(ctx, filename); err != nil { // clean up all old files with traceID in them, they will only slow every next run
+							logger.Warn("cannot delete old partial file with trace_id", zap.String("filename", filename), zap.Error(err))
+						}
+					}()
+					deletedOldFiles++
 				}
 				return nil
 			}

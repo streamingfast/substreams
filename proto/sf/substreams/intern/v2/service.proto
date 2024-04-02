@@ -27,7 +27,7 @@ message ProcessRangeRequest {
   uint64 first_streamable_block = 7; // first block that can be streamed
   uint64 last_streamable_block = 8; // last block that can be streamed
 
-  map<string, string> wasm_modules = 9;
+  map<string, string> wasm_modules = 9; // TODO: rename to `wasm_extension_configs`
 
   string merged_blocks_store = 10; // store to use for merged blocks
   string state_store = 11; // store to use for substreams state

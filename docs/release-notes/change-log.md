@@ -11,7 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v1.5.0
 
-## Operators
+### Operators
 
 > [!IMPORTANT]
 > Since the `tier2` services will now get the network information from the `tier1` request, you must make sure that the file paths and network addresses will be the same for both tiers.
@@ -59,7 +59,7 @@ Some redundant reprocessing has been removed, along with a better usage of cache
 
 * Readiness metric for Substreams tier1 app is now named `substreams_tier1` (was mistakenly called `firehose` before).
 
-* Added back deadiness metric for Substreams tiere app (named `substreams_tier2`).
+* Added back readiness metric for Substreams tiere app (named `substreams_tier2`).
 
 * Added metric `substreams_tier1_active_worker_requests` which gives the number of active Substreams worker requests a tier1 app is currently doing against tier2 nodes.
 

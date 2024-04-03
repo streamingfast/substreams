@@ -257,9 +257,13 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return stream.NewErrInvalidArg(err.Error())
 	}
 
-	exts, err := s.wasmExtensions(request.WasmModules)
-	if err != nil {
-		return fmt.Errorf("loading wasm extensions: %w", err)
+	var exts map[string]map[string]wasm.WASMExtension
+	if s.wasmExtensions != nil {
+		x, err := s.wasmExtensions(request.WasmModules)
+		if err != nil {
+			return fmt.Errorf("loading wasm extensions: %w", err)
+		}
+		exts = x
 	}
 	wasmRuntime := wasm.NewRegistry(exts, s.runtimeConfig.MaxWasmFuel)
 

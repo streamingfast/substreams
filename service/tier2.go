@@ -186,7 +186,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 		return fmt.Errorf("block type is required in request")
 	case request.StateStore == "":
 		return fmt.Errorf("state store is required in request")
-	case request.StateStore == "":
+	case request.MergedBlocksStore == "":
 		return fmt.Errorf("merged blocks store is required in request")
 	case request.StateBundleSize == 0:
 		return fmt.Errorf("a non-zero state bundle size is required in request")

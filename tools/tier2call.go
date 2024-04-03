@@ -32,10 +32,10 @@ func init() {
 	tier2CallCmd.Flags().StringArrayP("params", "p", nil, "Set a params for parameterizable modules. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
 	tier2CallCmd.Flags().String("metering-plugin", "null://", "Metering configuration")
 	tier2CallCmd.Flags().String("block-type", "sf.ethereum.type.v2.Block", "Block type")
-	tier2CallCmd.Flags().String("merged-blocks-store-url", "", "Merged blocks store")
+	tier2CallCmd.Flags().String("merged-blocks-store-url", "./firehose-data/storage/merged-blocks", "Merged blocks store")
 	tier2CallCmd.Flags().Uint64("state-bundle-size", uint64(1_000), "Interval in blocks at which to save store snapshots and output caches")
 	tier2CallCmd.Flags().String("state-store-url", "./firehose-data/localdata", "Substreams state data storage")
-	tier2CallCmd.Flags().String("state-store-default-tag", "v1", "Substreams state store default tag")
+	tier2CallCmd.Flags().String("state-store-default-tag", "", "Substreams state store default tag")
 
 	Cmd.AddCommand(tier2CallCmd)
 }
@@ -97,12 +97,12 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 		ctx = metadata.AppendToOutgoingContext(ctx, headerArray...)
 	}
 
-	MeteringConfig := mustGetString(cmd, "metering-plugin")
-	BlockType := mustGetString(cmd, "block-type")
-	StateStore := mustGetString(cmd, "state-store-url")
-	StateStoreDefaultTag := mustGetString(cmd, "state-store-default-tag")
-	MergedBlocksStore := mustGetString(cmd, "merged-blocks-store-url")
-	StateBundleSize := mustGetUint64(cmd, "state-bundle-size")
+	meteringConfig := mustGetString(cmd, "metering-plugin")
+	blockType := mustGetString(cmd, "block-type")
+	stateStore := mustGetString(cmd, "state-store-url")
+	stateStoreDefaultTag := mustGetString(cmd, "state-store-default-tag")
+	mergedBlocksStore := mustGetString(cmd, "merged-blocks-store-url")
+	stateBundleSize := mustGetUint64(cmd, "state-bundle-size")
 
 	req, err := ssClient.ProcessRange(ctx, &pbssinternal.ProcessRangeRequest{
 		StartBlockNum:        uint64(startBlock),
@@ -110,12 +110,12 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 		OutputModule:         outputModule,
 		Modules:              pkg.Modules,
 		Stage:                uint32(stage),
-		MeteringConfig:       MeteringConfig,
-		BlockType:            BlockType,
-		MergedBlocksStore:    MergedBlocksStore,
-		StateBundleSize:      StateBundleSize,
-		StateStore:           StateStore,
-		StateStoreDefaultTag: StateStoreDefaultTag,
+		MeteringConfig:       meteringConfig,
+		BlockType:            blockType,
+		MergedBlocksStore:    mergedBlocksStore,
+		StateBundleSize:      stateBundleSize,
+		StateStore:           stateStore,
+		StateStoreDefaultTag: stateStoreDefaultTag,
 	}, callOpts...)
 	if err != nil {
 		return fmt.Errorf("process range request: %w", err)

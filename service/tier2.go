@@ -180,7 +180,6 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	logger.Info("incoming substreams ProcessRange request", fields...)
 
 	switch {
-
 	case request.MeteringConfig == "":
 		return fmt.Errorf("metering config is required in request")
 	case request.BlockType == "":
@@ -222,6 +221,10 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	s.runtimeConfig.StateBundleSize = request.StateBundleSize
 
 	mergedBlocksStore, err := dstore.NewDBinStore(request.MergedBlocksStore)
+	if err != nil {
+		return fmt.Errorf("setting up block store from url %q: %w", request.MergedBlocksStore, err)
+	}
+
 	if cloned, ok := mergedBlocksStore.(dstore.Clonable); ok {
 		mergedBlocksStore, err = cloned.Clone(ctx)
 		if err != nil {

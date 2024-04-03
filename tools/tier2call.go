@@ -30,12 +30,12 @@ func init() {
 	tier2CallCmd.Flags().Bool("plaintext", false, "Establish GRPC connection in plaintext")
 	tier2CallCmd.Flags().StringSliceP("header", "H", nil, "Additional headers to be sent in the substreams request")
 	tier2CallCmd.Flags().StringArrayP("params", "p", nil, "Set a params for parameterizable modules. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
-	tier2CallCmd.Flags().String("common-metering-plugin", "null://", "Metering configuration")
-	tier2CallCmd.Flags().String("block-type", "sf.ethereum.type.v2.Block", "Block type (Default: sf.ethereum.type.v2.Block)")
-	tier2CallCmd.Flags().String("common-merged-blocks-store-url", "", "Merged blocks store")
-	tier2CallCmd.Flags().Uint64("substreams-state-bundle-size", uint64(1_000), "Interval in blocks at which to save store snapshots and output caches")
-	tier2CallCmd.Flags().String("substreams-state-store-url", "{sf-data-dir}/localdata", "Substreams state data storage")
-	tier2CallCmd.Flags().String("substreams-state-store-default-tag", "", "Substreams state store default tag")
+	tier2CallCmd.Flags().String("metering-plugin", "null://", "Metering configuration")
+	tier2CallCmd.Flags().String("block-type", "sf.ethereum.type.v2.Block", "Block type")
+	tier2CallCmd.Flags().String("merged-blocks-store-url", "", "Merged blocks store")
+	tier2CallCmd.Flags().Uint64("state-bundle-size", uint64(1_000), "Interval in blocks at which to save store snapshots and output caches")
+	tier2CallCmd.Flags().String("state-store-url", "./firehose-data/localdata", "Substreams state data storage")
+	tier2CallCmd.Flags().String("state-store-default-tag", "v1", "Substreams state store default tag")
 
 	Cmd.AddCommand(tier2CallCmd)
 }
@@ -97,12 +97,12 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 		ctx = metadata.AppendToOutgoingContext(ctx, headerArray...)
 	}
 
-	MeteringConfig := mustGetString(cmd, "common-metering-plugin")
+	MeteringConfig := mustGetString(cmd, "metering-plugin")
 	BlockType := mustGetString(cmd, "block-type")
-	StateStore := mustGetString(cmd, "substreams-state-store-url")
-	StateStoreDefaultTag := mustGetString(cmd, "substreams-state-store-default-tag")
-	MergedBlocksStore := mustGetString(cmd, "common-merged-blocks-store-url")
-	StateBundleSize := mustGetUint64(cmd, "substreams-state-bundle-size")
+	StateStore := mustGetString(cmd, "state-store-url")
+	StateStoreDefaultTag := mustGetString(cmd, "state-store-default-tag")
+	MergedBlocksStore := mustGetString(cmd, "merged-blocks-store-url")
+	StateBundleSize := mustGetUint64(cmd, "state-bundle-size")
 
 	req, err := ssClient.ProcessRange(ctx, &pbssinternal.ProcessRangeRequest{
 		StartBlockNum:        uint64(startBlock),

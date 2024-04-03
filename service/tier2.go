@@ -186,7 +186,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 		return fmt.Errorf("block type is required in request")
 	case request.StateStore == "":
 		return fmt.Errorf("state store is required in request")
-	case request.MergedBlocksStore == "":
+	case request.StateStore == "":
 		return fmt.Errorf("merged blocks store is required in request")
 	case request.StateBundleSize == 0:
 		return fmt.Errorf("a non-zero state bundle size is required in request")
@@ -221,6 +221,10 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	s.runtimeConfig.StateBundleSize = request.StateBundleSize
 
 	mergedBlocksStore, err := dstore.NewDBinStore(request.MergedBlocksStore)
+	if err != nil {
+		return fmt.Errorf("setting up block store from url %q: %w", request.MergedBlocksStore, err)
+	}
+
 	if cloned, ok := mergedBlocksStore.(dstore.Clonable); ok {
 		mergedBlocksStore, err = cloned.Clone(ctx)
 		if err != nil {

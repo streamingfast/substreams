@@ -180,7 +180,6 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	logger.Info("incoming substreams ProcessRange request", fields...)
 
 	switch {
-
 	case request.MeteringConfig == "":
 		return fmt.Errorf("metering config is required in request")
 	case request.BlockType == "":

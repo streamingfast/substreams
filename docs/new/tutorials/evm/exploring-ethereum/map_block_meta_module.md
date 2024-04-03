@@ -8,7 +8,7 @@ Let's run the Substreams first, and then go through the code.
 
 Running a Substreams usually requires three steps: generating the Rust Protobufs, building the WASM container, and using the Substream CLI to start the streaming. Make sure to run the following commands in the `substreams-explorer/ethereum-explorer` folder:
 
-1. **Generate the Protobuf objects:** The `.proto` files define a data model regardless of any programming language. However, in order to use this model in your Rust application, you must generate the corresponding Rust data structures.
+1. **Generate the Protobuf objects:** The `.proto` files define a data model regardless of any programming language. However, in order to use this model in your Rust application, you must generate the corresponding Rust data structures. Note that running `make protogen` is only necessary when making updates to any file in the proto folder.
 
 ```bash
 make protogen

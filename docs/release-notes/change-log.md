@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## v1.5.1 (Unreleased)
 
 * Fix a panic on tier2 when not using any wasm extension.
+* Fix a thread leak on metering GRPC emitter
 
 ## v1.5.0
 

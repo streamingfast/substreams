@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Fix a panic on tier2 when not using any wasm extension.
 * Fix a thread leak on metering GRPC emitter
 * Rollback scheduler optimisation: different stages can run concurrently if they are schedulable. This will prevent taking much time to execute when restarting close to HEAD.
+* Add `substreams_tier2_active_requests` and `substreams_tier2_request_counter` prometheus metrics
 
 ## v1.5.0
 

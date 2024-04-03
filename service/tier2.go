@@ -107,6 +107,10 @@ func (s *Tier2Service) setOverloaded() {
 }
 
 func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, streamSrv pbssinternal.Substreams_ProcessRangeServer) (grpcError error) {
+	metrics.Tier2ActiveRequests.Inc()
+	metrics.Tier2RequestCounter.Inc()
+	defer metrics.Tier2ActiveRequests.Dec()
+
 	// We keep `err` here as the unaltered error from `blocks` call, this is used in the EndSpan to record the full error
 	// and not only the `grpcError` one which is a subset view of the full `err`.
 	var err error

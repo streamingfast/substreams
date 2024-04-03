@@ -179,6 +179,20 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 
 	logger.Info("incoming substreams ProcessRange request", fields...)
 
+	switch {
+
+	case request.MeteringConfig == "":
+		return fmt.Errorf("metering config is required in request")
+	case request.BlockType == "":
+		return fmt.Errorf("block type is required in request")
+	case request.StateStore == "":
+		return fmt.Errorf("state store is required in request")
+	case request.MergedBlocksStore == "":
+		return fmt.Errorf("merged blocks store is required in request")
+	case request.StateBundleSize == 0:
+		return fmt.Errorf("a non-zero state bundle size is required in request")
+	}
+
 	emitter, err := dmetering.New(request.MeteringConfig, logger)
 	if err != nil {
 		return connect.NewError(connect.CodeInternal, fmt.Errorf("unable to initialize dmetering: %w", err))

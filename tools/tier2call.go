@@ -33,7 +33,7 @@ func init() {
 	tier2CallCmd.Flags().String("metering-plugin", "null://", "Metering configuration")
 	tier2CallCmd.Flags().String("block-type", "sf.ethereum.type.v2.Block", "Block type")
 	tier2CallCmd.Flags().String("merged-blocks-store-url", "./firehose-data/storage/merged-blocks", "Merged blocks store")
-	tier2CallCmd.Flags().Uint64("state-bundle-size", uint64(1_000), "Interval in blocks at which to save store snapshots and output caches")
+	tier2CallCmd.Flags().Uint64("state-bundle-size", uint64(1_000), "State segment size")
 	tier2CallCmd.Flags().String("state-store-url", "./firehose-data/localdata", "Substreams state data storage")
 	tier2CallCmd.Flags().String("state-store-default-tag", "", "Substreams state store default tag")
 

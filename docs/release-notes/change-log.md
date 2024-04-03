@@ -9,12 +9,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v1.5.1 (Unreleased)
+## v1.5.1
 
 * Fix a panic on tier2 when not using any wasm extension.
 * Fix a thread leak on metering GRPC emitter
 * Rollback scheduler optimisation: different stages can run concurrently if they are schedulable. This will prevent taking much time to execute when restarting close to HEAD.
 * Add `substreams_tier2_active_requests` and `substreams_tier2_request_counter` prometheus metrics
+* Fix the `tools tier2call` method to make it work with the new 'generic' tier2 (added necessary flags)
 
 ## v1.5.0
 

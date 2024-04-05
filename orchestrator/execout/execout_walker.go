@@ -2,6 +2,7 @@ package execout
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -68,16 +69,15 @@ func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
 		time.Sleep(waitBefore)
 
 		err := file.Load(r.ctx)
-		if err == dstore.ErrNotFound {
-
+		if errors.Is(err, dstore.ErrNotFound) {
 			return MsgFileNotPresent{NextWait: computeNewWait(waitBefore)}
 		}
 		if err != nil {
-			return loop.Quit(fmt.Errorf("loading %s cache %q: %w", file.ModuleName, file.Filename(), err))
+			return loop.NewQuitMsg(fmt.Errorf("loading %s cache %q: %w", file.ModuleName, file.Filename(), err))
 		}
 
 		if err := r.sendItems(file.SortedItems()); err != nil {
-			return loop.Quit(err)
+			return loop.NewQuitMsg(err)
 		}
 		return MsgFileDownloaded{}
 	}

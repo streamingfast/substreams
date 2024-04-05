@@ -146,7 +146,7 @@ func (c *File) Save(ctx context.Context) error {
 }
 
 func (c *File) String() string {
-	return c.store.ObjectURL("")
+	return c.store.ObjectURL(c.Filename())
 }
 
 func (c *File) MarshalLogObject(enc zapcore.ObjectEncoder) error {

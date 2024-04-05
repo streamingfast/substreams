@@ -75,6 +75,7 @@ func (l *EventLoop) update(msg Msg, cmds chan Cmd) (out Cmd) {
 				l.Send(cmd())
 			}
 		}()
+		return nil
 	}
 
 	return l.updateFunc(msg)

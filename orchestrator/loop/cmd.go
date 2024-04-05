@@ -32,6 +32,10 @@ func Sequence(cmds ...Cmd) Cmd {
 	}
 }
 
+func NewQuitMsg(err error) Msg {
+	return QuitMsg{err}
+}
+
 type QuitMsg struct {
 	err error
 }

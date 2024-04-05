@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 
 	"google.golang.org/protobuf/proto"
 
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"

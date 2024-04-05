@@ -10,7 +10,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func sendMetering(meter dmetering.Meter, userID, apiKeyID, ip, userMeta, endpoint string, resp proto.Message, logger *zap.Logger) {
+func sendMetering(ctx context.Context, meter dmetering.Meter, userID, apiKeyID, ip, userMeta, endpoint string, resp proto.Message, logger *zap.Logger) {
 	bytesRead := meter.BytesReadDelta()
 	bytesWritten := meter.BytesWrittenDelta()
 	egressBytes := proto.Size(resp)
@@ -35,6 +35,10 @@ func sendMetering(meter dmetering.Meter, userID, apiKeyID, ip, userMeta, endpoin
 		Timestamp: time.Now(),
 	}
 
-	// we send metering even if context is canceled
-	dmetering.Emit(context.Background(), event)
+	emitter := ctx.Value("event_emitter").(dmetering.EventEmitter)
+	if emitter == nil {
+		dmetering.Emit(context.WithoutCancel(ctx), event)
+	} else {
+		emitter.Emit(context.WithoutCancel(ctx), event)
+	}
 }

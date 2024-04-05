@@ -18,6 +18,10 @@ type Expression interface {
 	Visit(ctx context.Context, visitor Visitor) error
 }
 
+type HasChildrenExpression interface {
+	GetChildren() []Expression
+}
+
 type AndExpression struct {
 	Children []Expression
 }
@@ -30,6 +34,10 @@ func (e *AndExpression) Visit(ctx context.Context, visitor Visitor) error {
 	return visitor.Visit_And(ctx, e)
 }
 
+func (e *AndExpression) GetChildren() []Expression {
+	return e.Children
+}
+
 type OrExpression struct {
 	Children []Expression
 }
@@ -40,6 +48,10 @@ func orExpr(children ...Expression) *OrExpression {
 
 func (e *OrExpression) Visit(ctx context.Context, visitor Visitor) error {
 	return visitor.Visit_Or(ctx, e)
+}
+
+func (e *OrExpression) GetChildren() []Expression {
+	return e.Children
 }
 
 type ParenthesisExpression struct {

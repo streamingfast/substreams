@@ -327,7 +327,16 @@ func TestOneStoreOneMap(t *testing.T) {
 
 			fmt.Println(mapOutput)
 			assert.Equal(t, test.expectedResponseCount, strings.Count(mapOutput, "\n"))
-			assertFiles(t, run.TempDir, test.expectFiles...)
+
+			withZST := func(s []string) []string {
+				res := make([]string, len(s), len(s))
+				for i, v := range s {
+					res[i] = fmt.Sprintf("%s.zst", v)
+				}
+				return res
+			}
+
+			assertFiles(t, run.TempDir, withZST(test.expectFiles)...)
 		})
 	}
 }
@@ -452,7 +461,7 @@ func assertFiles(t *testing.T, tempDir string, wantedFiles ...string) {
 	var seenPartialSpkg bool
 	for _, f := range producedFiles {
 		parts := strings.Split(f, string(os.PathSeparator))
-		if parts[len(parts)-1] == "substreams.partial.spkg" {
+		if parts[len(parts)-1] == "substreams.partial.spkg.zst" {
 			seenPartialSpkg = true
 			continue
 		}

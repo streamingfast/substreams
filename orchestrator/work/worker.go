@@ -85,18 +85,32 @@ func (w *RemoteWorker) ID() string {
 	return fmt.Sprintf("%d", w.id)
 }
 
-func NewRequest(req *reqctx.RequestDetails, stageIndex int, workRange *block.Range) *pbssinternal.ProcessRangeRequest {
+func NewRequest(ctx context.Context, req *reqctx.RequestDetails, stageIndex int, workRange *block.Range) *pbssinternal.ProcessRangeRequest {
+	tier2ReqParams, ok := reqctx.GetTier2RequestParameters(ctx)
+	if !ok {
+		panic("unable to get tier2 request parameters")
+	}
+
 	return &pbssinternal.ProcessRangeRequest{
 		StartBlockNum: workRange.StartBlock,
 		StopBlockNum:  workRange.ExclusiveEndBlock,
 		Modules:       req.Modules,
 		OutputModule:  req.OutputModule,
 		Stage:         uint32(stageIndex),
+
+		MeteringConfig:       tier2ReqParams.MeteringConfig,
+		FirstStreamableBlock: tier2ReqParams.FirstStreamableBlock,
+		MergedBlocksStore:    tier2ReqParams.MergedBlockStoreURL,
+		StateStore:           tier2ReqParams.StateStoreURL,
+		StateBundleSize:      tier2ReqParams.StateBundleSize,
+		StateStoreDefaultTag: tier2ReqParams.StateStoreDefaultTag,
+		WasmModules:          tier2ReqParams.WASMModules,
+		BlockType:            tier2ReqParams.BlockType,
 	}
 }
 
 func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *block.Range, moduleNames []string, upstream *response.Stream) loop.Cmd {
-	request := NewRequest(reqctx.Details(ctx), unit.Stage, workRange)
+	request := NewRequest(ctx, reqctx.Details(ctx), unit.Stage, workRange)
 	logger := reqctx.Logger(ctx)
 
 	return func() loop.Msg {

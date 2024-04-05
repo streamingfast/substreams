@@ -9,7 +9,7 @@ redirects:
   concepts-and-fundamentals/modules: ./new/common/manifest-modules.md
   developers-guide/creating-protobuf-schema: ./new/develop/creating-protobuf-schemas.md
   developers-guide/creating-your-manifest: ./new/common/manifest-modules.md
-  developers-guide/gui: ./new/common/manifest-modules.md
+  developers-guide/gui: ./new/references/gui.md
   developers-guide/installation-requirements: ./new/common/installing-the-cli.md
   developers-guide/overview: ./new/develop/init-project.md
   developers-guide/parallel-execution: ./new/develop/architecture.md
@@ -60,6 +60,7 @@ redirects:
   documentation/consume/other-ways-of-consuming/files: ./new/consume/other-sinks/files.md
   documentation/consume/other-ways-of-consuming/prometheus: ./new/consume/other-sinks/prometheus.md
   documentation/consume/other-ways-of-consuming/pubsub: ./new/consume/other-sinks/pubsub.md
+
 
 
 

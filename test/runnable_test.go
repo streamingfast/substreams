@@ -240,7 +240,7 @@ func processInternalRequest(
 ) error {
 	t.Helper()
 
-	baseStoreStore, err := dstore.NewStore(filepath.Join(testTempDir, "test.store"), "", "none", true)
+	baseStoreStore, err := dstore.NewStore(filepath.Join(testTempDir, "test.store"), "zst", "zstd", true)
 	require.NoError(t, err)
 
 	taggedStore, err := baseStoreStore.SubStore("tag")
@@ -251,15 +251,14 @@ func processInternalRequest(
 		blockProcessedCallBack: blockProcessedCallBack,
 		blockGeneratorFactory:  newGenerator,
 	}
-	runtimeConfig := config.NewRuntimeConfig(
-		10,
-		0,
-		0,
-		0,
-		baseStoreStore,
-		"tag",
-		workerFactory,
-	)
+
+	runtimeConfig := config.RuntimeConfig{
+		StateBundleSize:            10,
+		DefaultParallelSubrequests: 10,
+		BaseObjectStore:            baseStoreStore,
+		DefaultCacheTag:            "tag",
+		WorkerFactory:              workerFactory,
+	}
 	svc := service.TestNewServiceTier2(runtimeConfig, tr.StreamFactory)
 
 	return svc.TestProcessRange(ctx, request, responseCollector.Collect)
@@ -280,7 +279,7 @@ func processRequest(
 ) error {
 	t.Helper()
 
-	baseStoreStore, err := dstore.NewStore(filepath.Join(testTempDir, "test.store"), "", "none", true)
+	baseStoreStore, err := dstore.NewStore(filepath.Join(testTempDir, "test.store"), "zst", "zstd", true)
 	require.NoError(t, err)
 
 	taggedStore, err := baseStoreStore.SubStore("tag")
@@ -292,15 +291,16 @@ func processRequest(
 		blockProcessedCallBack: blockProcessedCallBack,
 		blockGeneratorFactory:  newGenerator,
 	}
-	runtimeConfig := config.NewRuntimeConfig(
-		10,
-		parallelSubrequests,
-		10,
-		0,
-		baseStoreStore,
-		"tag",
-		workerFactory,
-	)
+
+	runtimeConfig := config.RuntimeConfig{
+		StateBundleSize:            10,
+		DefaultParallelSubrequests: parallelSubrequests,
+		BaseObjectStore:            baseStoreStore,
+		DefaultCacheTag:            "tag",
+		WorkerFactory:              workerFactory,
+		MaxJobsAhead:               10,
+	}
+
 	svc := service.TestNewService(runtimeConfig, linearHandoffBlockNum, tr.StreamFactory)
 	return svc.TestBlocks(ctx, isSubRequest, request, responseCollector.Collect)
 }

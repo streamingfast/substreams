@@ -10,12 +10,31 @@ service Substreams {
   rpc ProcessRange(ProcessRangeRequest) returns (stream ProcessRangeResponse);
 }
 
+// Possible types of WASM modules
+enum WASMModuleType {
+  WASM_MODULE_TYPE_UNSPECIFIED = 0;
+  WASM_MODULE_TYPE_RPC_CALL = 1;
+}
+
 message ProcessRangeRequest {
   uint64 start_block_num = 1;
   uint64 stop_block_num = 2;
   string output_module = 3;
   sf.substreams.v1.Modules modules = 4;
   uint32 stage = 5; // 0-based index of stage to execute up to
+
+  string metering_config = 6;
+  uint64 first_streamable_block = 7; // first block that can be streamed
+  uint64 last_streamable_block = 8; // last block that can be streamed
+
+  map<string, string> wasm_modules = 9; // TODO: rename to `wasm_extension_configs`
+
+  string merged_blocks_store = 10; // store to use for merged blocks
+  string state_store = 11; // store to use for substreams state
+  string state_store_default_tag = 12; // default tag to use for state store
+  uint64 state_bundle_size = 13; // number of blocks to process in a single batch
+
+  string block_type = 14; // block type to process
 }
 
 message ProcessRangeResponse {

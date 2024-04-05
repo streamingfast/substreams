@@ -35,7 +35,11 @@ func (r *storeBoundary) BumpBoundary() {
 }
 
 func (r *storeBoundary) computeBoundaryBlock(atBlockNum uint64) uint64 {
-	return atBlockNum - atBlockNum%r.interval + r.interval
+	v := atBlockNum % r.interval
+	w := atBlockNum - v
+	res := w + r.interval
+	return res
+	//return atBlockNum - atBlockNum%r.interval + r.interval
 }
 
 func (r *storeBoundary) InitNextBoundary(blockNum uint64) {

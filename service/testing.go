@@ -4,6 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/streamingfast/substreams/wasm"
+
+	"github.com/streamingfast/substreams/reqctx"
+
 	"github.com/streamingfast/bstream/stream"
 
 	"github.com/streamingfast/substreams"
@@ -40,14 +44,23 @@ func (s *Tier1Service) TestBlocks(ctx context.Context, isSubRequest bool, reques
 
 func TestNewServiceTier2(runtimeConfig config.RuntimeConfig, streamFactoryFunc StreamFactoryFunc) *Tier2Service {
 	return &Tier2Service{
-		blockType:         "sf.substreams.v1.test.Block",
-		streamFactoryFunc: streamFactoryFunc,
-		runtimeConfig:     runtimeConfig,
-		tracer:            nil,
-		logger:            zlog,
+		runtimeConfig:             runtimeConfig,
+		tracer:                    nil,
+		logger:                    zlog,
+		streamFactoryFuncOverride: streamFactoryFunc,
 	}
 }
 
 func (s *Tier2Service) TestProcessRange(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) error {
+	tier2req, ok := reqctx.GetTier2RequestParameters(ctx)
+	if !ok {
+		return fmt.Errorf("missing tier2 request parameters")
+	}
+	s.tier2RequestParameters = &tier2req
+
+	s.wasmExtensions = func(m map[string]string) (map[string]map[string]wasm.WASMExtension, error) {
+		return make(map[string]map[string]wasm.WASMExtension), nil
+	}
+
 	return s.processRange(ctx, request, respFunc)
 }

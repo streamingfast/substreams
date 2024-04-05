@@ -9,6 +9,30 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.5.2
+
+* Fix a context leak causing tier1 responses to slow down progressively
+
+## v1.5.1
+
+* Fix a panic on tier2 when not using any wasm extension.
+* Fix a thread leak on metering GRPC emitter
+* Rollback scheduler optimisation: different stages can run concurrently if they are schedulable. This will prevent taking much time to execute when restarting close to HEAD.
+* Add `substreams_tier2_active_requests` and `substreams_tier2_request_counter` prometheus metrics
+* Fix the `tools tier2call` method to make it work with the new 'generic' tier2 (added necessary flags)
+
+## v1.5.0
+
+### Operators
+
+* A single substreams-tier2 instance can now serve requests for multiple chains or networks. All network-specific parameters are now passed from Tier1 to Tier2 in the internal ProcessRange request.
+
+> [!IMPORTANT]
+> Since the `tier2` services will now get the network information from the `tier1` request, you must make sure that the file paths and network addresses will be the same for both tiers.
+
+> [!TIP]
+> The cached 'partial' files no longer contain the "trace ID" in their filename, preventing accumulation of "unsquashed" partial store files. The system will delete files under '{modulehash}/state' named in this format`{blocknumber}-{blocknumber}.{hexadecimal}.partial.zst` when it runs into them.
+
 ## v1.4.0
 
 ### Client
@@ -46,7 +70,7 @@ Some redundant reprocessing has been removed, along with a better usage of cache
 
 * Readiness metric for Substreams tier1 app is now named `substreams_tier1` (was mistakenly called `firehose` before).
 
-* Added back deadiness metric for Substreams tiere app (named `substreams_tier2`).
+* Added back readiness metric for Substreams tiere app (named `substreams_tier2`).
 
 * Added metric `substreams_tier1_active_worker_requests` which gives the number of active Substreams worker requests a tier1 app is currently doing against tier2 nodes.
 

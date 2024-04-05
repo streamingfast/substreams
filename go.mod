@@ -27,7 +27,7 @@ require (
 require (
 	connectrpc.com/connect v1.15.0
 	connectrpc.com/grpcreflect v1.2.0
-	github.com/RoaringBitmap/roaring v0.9.4
+	github.com/RoaringBitmap/roaring v1.9.1
 	github.com/alecthomas/chroma v0.10.0
 	github.com/alecthomas/participle v0.7.1
 	github.com/bytecodealliance/wasmtime-go/v4 v4.0.0
@@ -53,7 +53,7 @@ require (
 	github.com/schollz/closestmatch v2.1.0+incompatible
 	github.com/shopspring/decimal v1.3.1
 	github.com/streamingfast/dhttp v0.0.2-0.20220314180036-95936809c4b8
-	github.com/streamingfast/dmetering v0.0.0-20240319201447-018aabe46634
+	github.com/streamingfast/dmetering v0.0.0-20240403142935-dc8bb3bb32c3
 	github.com/streamingfast/dmetrics v0.0.0-20230919161904-206fa8ebd545
 	github.com/streamingfast/eth-go v0.0.0-20230410173454-433bd8803da1
 	github.com/streamingfast/sf-tracing v0.0.0-20240209202324-9daa52c71a52
@@ -75,6 +75,7 @@ require (
 require (
 	connectrpc.com/grpchealth v1.3.0 // indirect
 	connectrpc.com/otelconnect v0.7.0 // indirect
+	github.com/bits-and-blooms/bitset v1.12.0 // indirect
 	github.com/bobg/go-generics/v2 v2.1.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/google/s2a-go v0.1.7 // indirect

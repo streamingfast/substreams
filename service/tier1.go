@@ -251,6 +251,10 @@ func (s *Tier1Service) Blocks(
 			zap.String("key_id", auth.APIKeyID()),
 			zap.String("ip_address", auth.RealIP()),
 		)
+		if auth["x-deployment-id"] != "" {
+			fields = append(fields, zap.String("deployment_id", auth["x-deployment-id"]))
+		}
+
 		if cacheTag := auth.Get("X-Sf-Substreams-Cache-Tag"); cacheTag != "" {
 			fields = append(fields,
 				zap.String("cache_tag", cacheTag),

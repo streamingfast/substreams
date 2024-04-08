@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"connectrpc.com/connect"
-	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/dgrpc"
@@ -448,7 +447,8 @@ func evaluateModulesRequiredToRun(
 	}
 
 	stageUsedModules := outputGraph.StagedUsedModules()[stage]
-	runningLastStage := stageUsedModules.IsLastStage()stageUsedModulesName := make(map[string]bool)
+	runningLastStage := stageUsedModules.IsLastStage()
+	stageUsedModulesName := make(map[string]bool)
 	for _, layer := range stageUsedModules {
 		for _, mod := range layer {
 			stageUsedModulesName[mod.Name] = true

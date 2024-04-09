@@ -76,6 +76,10 @@ func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUni
 			s.logger.Info("got full store from cache instead of partial, reloading", zap.Stringer("store", nextFull))
 			modState.cachedStore = nextFull
 			modState.lastBlockInStore = rng.ExclusiveEndBlock
+			metrics.loadEnd = time.Now()
+
+			s.logger.Info("squashing time metrics", metrics.logFields()...)
+
 			return nil
 		}
 		return fmt.Errorf("loading partial: %q: %w", partialFile.Filename, err)

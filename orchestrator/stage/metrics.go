@@ -19,9 +19,15 @@ type mergeMetrics struct {
 func (m mergeMetrics) logFields() []zap.Field {
 	f := []zap.Field{
 		zap.String("total_time", time.Since(m.start).String()),
-		zap.String("load_time", m.loadEnd.Sub(m.loadStart).String()),
-		zap.String("merge_time", m.mergeEnd.Sub(m.mergeStart).String()),
 	}
+	if !m.loadStart.IsZero() {
+		f = append(f, zap.String("load_time", m.loadEnd.Sub(m.loadStart).String()))
+	}
+
+	if !m.mergeStart.IsZero() {
+		f = append(f, zap.String("merge_time", m.mergeEnd.Sub(m.mergeStart).String()))
+	}
+
 	if !m.saveEnd.IsZero() {
 		f = append(f, zap.String("save_time", m.saveEnd.Sub(m.saveStart).String()))
 	}

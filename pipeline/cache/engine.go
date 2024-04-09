@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	multierror "github.com/hashicorp/go-multierror"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 
 	"github.com/streamingfast/substreams/reqctx"
@@ -89,8 +90,11 @@ func (e *Engine) HandleStalled(clock *pbsubstreams.Clock) error {
 }
 
 func (e *Engine) EndOfStream(lastFinalClock *pbsubstreams.Clock) error {
+	var errs error
 	for _, writer := range e.execOutputWriters {
-		writer.Close(context.Background())
+		if err := writer.Close(context.Background()); err != nil {
+			errs = multierror.Append(errs, err)
+		}
 	}
-	return nil
+	return errs
 }

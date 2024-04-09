@@ -38,6 +38,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1
 	github.com/gertd/go-pluralize v0.2.1
 	github.com/google/uuid v1.6.0
+	github.com/hashicorp/go-multierror v1.1.1
 	github.com/huandu/xstrings v1.4.0
 	github.com/ipfs/go-ipfs-api v0.6.0
 	github.com/itchyny/gojq v0.12.12
@@ -79,6 +80,7 @@ require (
 	github.com/bobg/go-generics/v2 v2.1.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/google/s2a-go v0.1.7 // indirect
+	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/iancoleman/strcase v0.2.0 // indirect
 	github.com/mattn/go-sqlite3 v1.14.16 // indirect
 	github.com/mschoch/smat v0.2.0 // indirect

@@ -43,7 +43,7 @@ func NewConfig(name string, moduleInitialBlock uint64, modKind pbsubstreams.Modu
 
 func (c *Config) NewFile(targetRange *block.Range) *File {
 	return &File{
-		kv:         make(map[string]*pboutput.Item),
+		Kv:         make(map[string]*pboutput.Item),
 		ModuleName: c.name,
 		store:      c.objStore,
 		Range:      targetRange,

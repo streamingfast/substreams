@@ -23,7 +23,6 @@ func (ui *TUI) decoratedBlockScopedData(
 	clock *pbsubstreams.Clock,
 ) error {
 	var s []string
-
 	for _, out := range append([]*pbsubstreamsrpc.MapModuleOutput{output}, debugMapOutputs...) {
 		if _, ok := ui.msgTypes[out.Name]; !ok {
 			continue

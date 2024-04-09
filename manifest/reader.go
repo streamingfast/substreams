@@ -401,7 +401,7 @@ func validatePackage(pkg *pbsubstreams.Package, skipModuleOutputTypeValidation b
 			outputType := i.KindMap.OutputType
 			if !skipModuleOutputTypeValidation {
 				if !strings.HasPrefix(outputType, "proto:") {
-					return fmt.Errorf("module %q incorrect outputTyupe %q valueType must be a proto Message", mod.Name, outputType)
+					return fmt.Errorf("module %q incorrect outputType %q valueType must be a proto Message", mod.Name, outputType)
 				}
 			}
 		case *pbsubstreams.Module_KindStore_:

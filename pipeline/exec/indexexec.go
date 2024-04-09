@@ -4,7 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/RoaringBitmap/roaring/roaring64"
+	"github.com/streamingfast/substreams/reqctx"
+
 	pbindex "github.com/streamingfast/substreams/pb/sf/substreams/index/v1"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/storage/execout"
@@ -14,7 +15,6 @@ import (
 
 type IndexModuleExecutor struct {
 	BaseExecutor
-	indexMapping map[string]*roaring64.Bitmap
 }
 
 func NewIndexModuleExecutor(baseExecutor *BaseExecutor) *IndexModuleExecutor {
@@ -29,9 +29,8 @@ func (i *IndexModuleExecutor) applyCachedOutput([]byte) error {
 }
 
 func (i *IndexModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
-	//TODO: HANDLE exec_index
-	//ctx, span := reqctx.WithModuleExecutionSpan(ctx, "exec_index")
-	//defer span.EndWithErr(&err)
+	ctx, span := reqctx.WithModuleExecutionSpan(ctx, "exec_index")
+	defer span.EndWithErr(&err)
 
 	var call *wasm.Call
 	if call, err = i.wasmCall(reader); err != nil {
@@ -45,18 +44,6 @@ func (i *IndexModuleExecutor) run(ctx context.Context, reader execout.ExecutionO
 	modOut, err := i.toModuleOutput(out)
 	if err != nil {
 		return nil, nil, fmt.Errorf("converting back to module output: %w", err)
-	}
-
-	blockNumber := reader.Clock().Number
-
-	for _, key := range modOut.Data.(*pbssinternal.ModuleOutput_IndexKeys).IndexKeys.Keys {
-		if i.indexMapping == nil {
-			i.indexMapping = make(map[string]*roaring64.Bitmap)
-		}
-		if _, ok := i.indexMapping[key]; !ok {
-			i.indexMapping[key] = roaring64.New()
-		}
-		i.indexMapping[key].Add(blockNumber)
 	}
 
 	return out, modOut, nil

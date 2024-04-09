@@ -24,11 +24,34 @@ type Graph struct {
 func (g *Graph) OutputModule() *pbsubstreams.Module  { return g.outputModule }
 func (g *Graph) Stores() []*pbsubstreams.Module      { return g.stores }
 func (g *Graph) UsedModules() []*pbsubstreams.Module { return g.usedModules }
+func (g *Graph) UsedIndexModules() []*pbsubstreams.Module {
+	indexModules := make([]*pbsubstreams.Module, 0)
+	for _, mod := range g.usedModules {
+		if mod.GetKindBlockIndex() != nil {
+			indexModules = append(indexModules, mod)
+		}
+	}
+	return indexModules
+}
+
 func (g *Graph) UsedModulesUpToStage(stage int) (out []*pbsubstreams.Module) {
 	for i := 0; i <= int(stage); i++ {
 		for _, layer := range g.StagedUsedModules()[i] {
 			for _, mod := range layer {
 				out = append(out, mod)
+			}
+		}
+	}
+	return
+}
+
+func (g *Graph) UsedIndexesModulesUpToStage(stage int) (out []*pbsubstreams.Module) {
+	for i := 0; i <= stage; i++ {
+		for _, layer := range g.StagedUsedModules()[i] {
+			for _, mod := range layer {
+				if mod.GetKindBlockIndex() != nil {
+					out = append(out, mod)
+				}
 			}
 		}
 	}

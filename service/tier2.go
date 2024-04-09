@@ -8,6 +8,8 @@ import (
 	"os"
 	"sync"
 
+	"github.com/streamingfast/substreams/storage/index"
+
 	"connectrpc.com/connect"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/stream"
@@ -311,6 +313,12 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
+
+	indexWriters, err := index.GenerateBlockIndexWriters(cacheStore, outputGraph.UsedIndexesModulesUpToStage(int(request.Stage)), outputGraph.ModuleHashes(), logger, &block.Range{StartBlock: request.StartBlockNum, ExclusiveEndBlock: request.StopBlockNum})
+	if err != nil {
+		return fmt.Errorf("generating block index writers: %w", err)
+	}
+
 	stores := pipeline.NewStores(ctx, storeConfigs, request.StateBundleSize, requestDetails.ResolvedStartBlockNum, request.StopBlockNum, true)
 	isCompleteRange := request.StopBlockNum%request.StateBundleSize == 0
 
@@ -327,7 +335,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	}
 
 	// this engine will keep the existingExecOuts to optimize the execution (for inputs from modules that skip execution)
-	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, execOutWriters, request.BlockType, existingExecOuts)
+	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, execOutWriters, request.BlockType, existingExecOuts, indexWriters)
 	if err != nil {
 		return fmt.Errorf("error building caching engine: %w", err)
 	}

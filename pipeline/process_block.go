@@ -389,6 +389,7 @@ func (p *Pipeline) applyExecutionResult(ctx context.Context, executor exec.Modul
 
 		}
 	}
+
 	return nil
 }
 

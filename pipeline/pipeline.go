@@ -522,6 +522,7 @@ func (p *Pipeline) buildModuleExecutors(ctx context.Context) ([][]exec.ModuleExe
 						entrypoint,
 						tracer,
 					)
+
 					executor := exec.NewIndexModuleExecutor(baseExecutor)
 					moduleExecutors = append(moduleExecutors, executor)
 

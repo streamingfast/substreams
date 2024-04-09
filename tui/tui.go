@@ -80,7 +80,10 @@ func (ui *TUI) Init(outputMode string) error {
 					msgType = modKind.KindStore.ValueType
 				case *pbsubstreams.Module_KindMap_:
 					msgType = modKind.KindMap.OutputType
+				case *pbsubstreams.Module_KindBlockIndex_:
+					msgType = modKind.KindBlockIndex.OutputType
 				}
+
 				msgType = strings.TrimPrefix(msgType, "proto:")
 
 				ui.msgTypes[mod.Name] = msgType
@@ -164,6 +167,7 @@ func (ui *TUI) IncomingMessage(ctx context.Context, resp *pbsubstreamsrpc.Respon
 		if m.BlockScopedData == nil {
 			return nil
 		}
+
 		ui.seenFirstData = true
 		if ui.outputMode == OutputModeTUI {
 			ui.ensureTerminalUnlocked()

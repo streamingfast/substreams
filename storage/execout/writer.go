@@ -14,7 +14,7 @@ import (
 type Writer struct {
 	wg *sync.WaitGroup
 
-	currentFile  *File
+	CurrentFile  *File
 	outputModule string
 }
 
@@ -26,19 +26,19 @@ func NewWriter(initialBlockBoundary, exclusiveEndBlock uint64, outputModule stri
 
 	segmenter := block.NewSegmenter(configs.execOutputSaveInterval, initialBlockBoundary, exclusiveEndBlock)
 	walker := configs.NewFileWalker(outputModule, segmenter)
-	w.currentFile = walker.File()
+	w.CurrentFile = walker.File()
 
 	return w
 }
 
 func (w *Writer) Write(clock *pbsubstreams.Clock, buffer *Buffer) {
 	if val, found := buffer.values[w.outputModule]; found {
-		w.currentFile.SetItem(clock, val)
+		w.CurrentFile.SetItem(clock, val)
 	}
 }
 
 func (w *Writer) Close(ctx context.Context) error {
-	if err := w.currentFile.Save(ctx); err != nil {
+	if err := w.CurrentFile.Save(ctx); err != nil {
 		return fmt.Errorf("flushing exec output writer: %w", err)
 	}
 	return nil

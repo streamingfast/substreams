@@ -30,7 +30,7 @@ type File struct {
 	*block.Range
 
 	ModuleName string
-	kv         map[string]*pboutput.Item
+	Kv         map[string]*pboutput.Item
 	store      dstore.Store
 	logger     *zap.Logger
 }
@@ -42,7 +42,7 @@ func (c *File) Filename() string {
 func (c *File) SortedItems() (out []*pboutput.Item) {
 	// TODO(abourget): eventually, what is saved should be sorted before saving,
 	// or we import a list and Load() automatically sorts what needs to be sorted.
-	for _, item := range c.kv {
+	for _, item := range c.Kv {
 		out = append(out, item)
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -67,14 +67,14 @@ func (c *File) SetItem(clock *pbsubstreams.Clock, data []byte) {
 		Payload: cp,
 	}
 
-	c.kv[clock.Id] = ci
+	c.Kv[clock.Id] = ci
 }
 
 func (c *File) Get(clock *pbsubstreams.Clock) ([]byte, bool) {
 	c.Lock()
 	defer c.Unlock()
 
-	cacheItem, found := c.kv[clock.Id]
+	cacheItem, found := c.Kv[clock.Id]
 
 	if !found {
 		return nil, false
@@ -87,7 +87,7 @@ func (c *File) GetAtBlock(blockNumber uint64) ([]byte, bool) {
 	c.Lock()
 	defer c.Unlock()
 
-	for _, value := range c.kv {
+	for _, value := range c.Kv {
 		if value.BlockNum == blockNumber {
 			return value.Payload, true
 		}
@@ -121,9 +121,9 @@ func (c *File) Load(ctx context.Context) error {
 			return fmt.Errorf("unmarshalling file %s: %w", filename, err)
 		}
 
-		c.kv = outputData.Kv
+		c.Kv = outputData.Kv
 
-		c.logger.Debug("outputs data loaded", zap.Int("output_count", len(c.kv)), zap.Stringer("block_range", c.Range))
+		c.logger.Debug("outputs data loaded", zap.Int("output_count", len(c.Kv)), zap.Stringer("block_range", c.Range))
 		return nil
 	})
 }
@@ -131,7 +131,7 @@ func (c *File) Load(ctx context.Context) error {
 func (c *File) Save(ctx context.Context) error {
 
 	filename := c.Filename()
-	outputData := &pboutput.Map{Kv: c.kv}
+	outputData := &pboutput.Map{Kv: c.Kv}
 	cnt, err := outputData.MarshalFast()
 	if err != nil {
 		return fmt.Errorf("unmarshalling file %s: %w", filename, err)
@@ -156,7 +156,7 @@ func (c *File) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("module", c.ModuleName)
 	enc.AddUint64("start_block", c.Range.StartBlock)
 	enc.AddUint64("end_block", c.Range.ExclusiveEndBlock)
-	enc.AddInt("kv_count", len(c.kv))
+	enc.AddInt("kv_count", len(c.Kv))
 	return nil
 }
 

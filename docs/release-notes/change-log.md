@@ -11,7 +11,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v1.5.3 Unreleased
 
-* Fix a missing error handling when writing output data to files. This could result in tier1 request just "hanging" waiting for the file.
+### Server
+
+* fix missing error handling when writing output data to files. This could result in tier1 request just "hanging" waiting for the file never produced by tier2.
+* fix handling of dstore error in tier1 'execout walker' causing stalling issues on S3 or on unexpected storage errors
+* increase number of retries on storage when writing states or execouts (5 -> 10)
+
+### Gui
+
+* prevent 'gui' command from crashing on 'incomplete' spkgs without moduledocs (when using --skip-package-validation)
 
 ## v1.5.2
 

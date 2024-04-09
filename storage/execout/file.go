@@ -151,7 +151,7 @@ func (c *File) Save(ctx context.Context) error {
 	}
 
 	c.logger.Info("writing execution output file", zap.String("filename", filename))
-	return derr.RetryContext(ctx, 5, func(ctx context.Context) error {
+	return derr.RetryContext(ctx, 10, func(ctx context.Context) error { // more than the usual 5 retries here because if we fail, we have to reprocess the whole segment
 		reader := bytes.NewReader(cnt)
 		err := c.store.WriteObject(ctx, filename, reader)
 		return err

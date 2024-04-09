@@ -123,7 +123,11 @@ func (e *Engine) EndOfStream(lastFinalClock *pbsubstreams.Clock) error {
 				}
 
 				indexWriter.Write(indexes)
-				indexWriter.Close(context.Background())
+
+				//TODO: HANDLE THE ERROR
+				err := indexWriter.Close(context.Background())
+				if err != nil {
+				}
 			}
 		}
 	}

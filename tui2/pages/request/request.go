@@ -190,7 +190,11 @@ func (r *Request) setModulesViewContent() {
 
 func (r *Request) getViewportContent() (string, error) {
 	output := ""
+
 	for i, module := range r.Modules.Modules {
+		if len(r.RequestSummary.ModuleDocs) < i+1 {
+			break
+		}
 		var moduleDoc string
 		var err error
 

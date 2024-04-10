@@ -46,6 +46,11 @@ func (s *Stages) multiSquash(stage *Stage, mergeUnit Unit) error {
 	return stage.syncWork.Wait()
 }
 
+type Result struct {
+	fullKVStore *store.FullKV
+	error       error
+}
+
 // The singleSquash operation's goal is to take the up-most contiguous unit
 // tha is compete, and take the very next partial, squash it and produce a FullKV
 // store.
@@ -75,19 +80,34 @@ func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUni
 
 	// Load
 	metrics.loadStart = time.Now()
-	if err := partialKV.Load(s.ctx, partialFile); err != nil {
-		if nextFull, err := modState.getStore(s.ctx, rng.ExclusiveEndBlock); err == nil { // try to load an already-merged file
 
-			modState.cachedStore = nextFull
-			modState.lastBlockInStore = rng.ExclusiveEndBlock
-			metrics.loadEnd = time.Now()
+	results := make(chan Result, 2)
+	go func() {
+		err := partialKV.Load(s.ctx, partialFile)
+		results <- Result{fullKVStore: nil, error: err}
+	}()
 
-			s.logger.Info("squashing time metrics", metrics.logFields()...)
+	go func() {
+		nextFull, err := modState.getStore(s.ctx, rng.ExclusiveEndBlock)
+		results <- Result{fullKVStore: nextFull, error: err}
+	}()
 
-			return nil
+	result := <-results
+	if result.error != nil {
+		result = <-results
+		if result.error != nil {
+			return fmt.Errorf("loading partial or fullkv: %w", result.error)
 		}
-		return fmt.Errorf("loading partial: %q: %w", partialFile.Filename, err)
 	}
+
+	if result.fullKVStore != nil {
+		modState.cachedStore = result.fullKVStore
+		modState.lastBlockInStore = rng.ExclusiveEndBlock
+		metrics.loadEnd = time.Now()
+		s.logger.Info("squashing time metrics", metrics.logFields()...)
+		return nil
+	}
+
 	metrics.loadEnd = time.Now()
 
 	// Merge

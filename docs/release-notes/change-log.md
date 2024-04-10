@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * fix missing error handling when writing output data to files. This could result in tier1 request just "hanging" waiting for the file never produced by tier2.
 * fix handling of dstore error in tier1 'execout walker' causing stalling issues on S3 or on unexpected storage errors
 * increase number of retries on storage when writing states or execouts (5 -> 10)
+* prevent slow squashing when loading each segment from full KV store (can happen when a stage contains multiple stores)
 
 ### Gui
 

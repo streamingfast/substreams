@@ -7,6 +7,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
 )
@@ -47,8 +48,9 @@ func (s *Stages) multiSquash(stage *Stage, mergeUnit Unit) error {
 }
 
 type Result struct {
-	fullKVStore *store.FullKV
-	error       error
+	partialKVStore *store.PartialKV
+	fullKVStore    *store.FullKV
+	error          error
 }
 
 // The singleSquash operation's goal is to take the up-most contiguous unit
@@ -68,7 +70,6 @@ func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUni
 	rng := modState.segmenter.Range(mergeUnit.Segment)
 	metrics.blockRange = rng
 	partialFile := store.NewPartialFileInfo(modState.name, rng.StartBlock, rng.ExclusiveEndBlock)
-	partialKV := modState.derivePartialKV(rng.StartBlock)
 	segmentEndsOnInterval := modState.segmenter.EndsOnInterval(mergeUnit.Segment)
 
 	// Retrieve store to merge, from cache or load from storage. Allows skipping of segments
@@ -81,32 +82,44 @@ func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUni
 	// Load
 	metrics.loadStart = time.Now()
 
+	ctx, cancel := context.WithCancel(s.ctx)
+
 	results := make(chan Result, 2)
 	go func() {
-		err := partialKV.Load(s.ctx, partialFile)
-		results <- Result{fullKVStore: nil, error: err}
+		partial := modState.derivePartialKV(rng.StartBlock)
+		err := partial.Load(ctx, partialFile)
+		results <- Result{partialKVStore: partial, error: err}
 	}()
 
 	go func() {
-		nextFull, err := modState.getStore(s.ctx, rng.ExclusiveEndBlock)
+		nextFull, err := modState.getStore(ctx, rng.ExclusiveEndBlock)
 		results <- Result{fullKVStore: nextFull, error: err}
 	}()
 
-	result := <-results
-	if result.error != nil {
-		result = <-results
-		if result.error != nil {
-			return fmt.Errorf("loading partial or fullkv: %w", result.error)
+	var partialKV *store.PartialKV
+loop:
+	for i := 0; i < 2; i++ {
+		select {
+		case <-ctx.Done():
+			break loop
+		case result := <-results:
+			if result.error != nil {
+				err = multierror.Append(err, result.error)
+				continue loop
+			}
+			if result.fullKVStore != nil {
+				modState.cachedStore = result.fullKVStore
+				modState.lastBlockInStore = rng.ExclusiveEndBlock
+				metrics.loadEnd = time.Now()
+				s.logger.Info("squashing time metrics", metrics.logFields()...)
+				cancel()
+				return nil
+			}
+			partialKV = result.partialKVStore
+			break loop
 		}
 	}
-
-	if result.fullKVStore != nil {
-		modState.cachedStore = result.fullKVStore
-		modState.lastBlockInStore = rng.ExclusiveEndBlock
-		metrics.loadEnd = time.Now()
-		s.logger.Info("squashing time metrics", metrics.logFields()...)
-		return nil
-	}
+	cancel()
 
 	metrics.loadEnd = time.Now()
 

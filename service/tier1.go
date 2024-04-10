@@ -127,6 +127,7 @@ func NewTier1(
 
 	parallelSubRequests uint64,
 	stateBundleSize uint64,
+	blockType string,
 
 	substreamsClientConfig *client.SubstreamsClientConfig,
 	tier2RequestParameters reqctx.Tier2RequestParameters,
@@ -153,10 +154,14 @@ func NewTier1(
 		hub:               hub,
 	}
 
-	blockType, err := getBlockTypeFromStreamFactory(sf)
-	if err != nil {
-		return nil, fmt.Errorf("getting block type from stream factory: %w", err)
+	var err error
+	if blockType == "" {
+		blockType, err = getBlockTypeFromStreamFactory(sf)
+		if err != nil {
+			return nil, fmt.Errorf("getting block type from stream factory: %w", err)
+		}
 	}
+
 	tier2RequestParameters.BlockType = blockType
 	tier2RequestParameters.StateBundleSize = runtimeConfig.StateBundleSize
 

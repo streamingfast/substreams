@@ -93,27 +93,29 @@ func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	done := make(chan error, 1)
+
+	done := make(chan struct{})
 	go func() {
-		if err := stream.Run(ctx); err != io.EOF {
-			done <- err
-		} else {
-			done <- nil
+		for {
+			select {
+			case <-done:
+				return
+			case <-time.After(10 * time.Second):
+				zlog.Info("waiting to get the block type")
+			}
 		}
 	}()
 
-	select {
-	case <-time.After(10 * time.Second):
-		return "", fmt.Errorf("timeout: unable to get the block type from the stream factory")
-	case err := <-done:
-		if err != nil {
-			return "", err
-		}
+	err = stream.Run(ctx)
+	close(done)
+	if err != io.EOF && err != nil {
+		return "", fmt.Errorf("getting block type: %w", err)
 	}
+
+	zlog.Info("block type fetched", zap.String("type", out))
 
 	return strings.TrimPrefix(out, protoPkfPrefix), nil
 }
-
 func NewTier1(
 	logger *zap.Logger,
 	mergedBlocksStore dstore.Store,

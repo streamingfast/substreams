@@ -83,8 +83,13 @@ func runInfo(cmd *cobra.Command, args []string) error {
 		for _, input := range mod.Inputs {
 			fmt.Printf("Input: %s: %s\n", input.Type, input.Name)
 		}
+		if mod.BlockFilter != nil {
+			fmt.Printf("Block Filter: (using *%s*): `%s`\n", mod.BlockFilter.Module, mod.BlockFilter.Query)
+		}
 
 		switch mod.Kind {
+		case "index":
+			fmt.Println("Output Type:", *mod.OutputType)
 		case "map":
 			fmt.Println("Output Type:", *mod.OutputType)
 		case "store":

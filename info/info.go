@@ -61,15 +61,16 @@ type ProtoFileInfo struct {
 }
 
 type ModulesInfo struct {
-	Name          string        `json:"name"`
-	Kind          string        `json:"kind"`
-	Inputs        []ModuleInput `json:"inputs"`
-	OutputType    *string       `json:"output_type,omitempty"`   //for map inputs
-	ValueType     *string       `json:"value_type,omitempty"`    //for store inputs
-	UpdatePolicy  *string       `json:"update_policy,omitempty"` //for store inputs
-	InitialBlock  uint64        `json:"initial_block"`
-	Documentation *string       `json:"documentation,omitempty"`
-	Hash          string        `json:"hash"`
+	Name          string                           `json:"name"`
+	Kind          string                           `json:"kind"`
+	Inputs        []ModuleInput                    `json:"inputs"`
+	OutputType    *string                          `json:"output_type,omitempty"`   //for map inputs
+	ValueType     *string                          `json:"value_type,omitempty"`    //for store inputs
+	UpdatePolicy  *string                          `json:"update_policy,omitempty"` //for store inputs
+	BlockFilter   *pbsubstreams.Module_BlockFilter `json:"block_filter,omitempty"`
+	InitialBlock  uint64                           `json:"initial_block"`
+	Documentation *string                          `json:"documentation,omitempty"`
+	Hash          string                           `json:"hash"`
 }
 
 type ModuleInput struct {
@@ -134,6 +135,10 @@ func Basic(pkg *pbsubstreams.Package, graph *manifest.ModuleGraph) (*BasicInfo, 
 
 		kind := mod.GetKind()
 		switch v := kind.(type) {
+
+		case *pbsubstreams.Module_KindBlockIndex_:
+			modInfo.Kind = "index"
+			modInfo.OutputType = strPtr(v.KindBlockIndex.OutputType)
 		case *pbsubstreams.Module_KindMap_:
 			modInfo.Kind = "map"
 			modInfo.OutputType = strPtr(v.KindMap.OutputType)
@@ -180,6 +185,8 @@ func Basic(pkg *pbsubstreams.Package, graph *manifest.ModuleGraph) (*BasicInfo, 
 			inputs = append(inputs, inputInfo)
 		}
 		modInfo.Inputs = inputs
+		modInfo.BlockFilter = mod.BlockFilter
+		fmt.Println("hehe", mod.BlockFilter)
 
 		modules = append(modules, modInfo)
 	}

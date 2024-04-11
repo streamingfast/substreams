@@ -1,0 +1,8 @@
+type Block @entity {
+  id: ID!
+  height: BigInt!
+  prev_hash: Bytes!
+  timestamp: BigInt!
+  tx_count: BigInt!
+  event_count: BigInt!
+}

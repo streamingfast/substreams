@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS block (
+    "height" INT,
+    "hash" VARCHAR(64),
+    "prev_hash" VARCHAR(64),
+    "timestamp" INT,
+    "tx_count" INT,
+    "event_count" INT
+) ENGINE = MergeTree PRIMARY KEY ("hash");

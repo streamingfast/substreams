@@ -4,9 +4,9 @@ package codegen
 
 // ENUM(
 //
-//	Ethereum
-//	Starknet
-//	Other
+// Mainnet
+// Sepolia
+// Other
 //
 // )
-type Protocol uint
+type StarknetChain uint

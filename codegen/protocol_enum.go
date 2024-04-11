@@ -14,17 +14,20 @@ import (
 const (
 	// ProtocolEthereum is a Protocol of type Ethereum.
 	ProtocolEthereum Protocol = iota
+	// ProtocolStarknet is a Protocol of type Starknet.
+	ProtocolStarknet
 	// ProtocolOther is a Protocol of type Other.
 	ProtocolOther
 )
 
 var ErrInvalidProtocol = fmt.Errorf("not a valid Protocol, try [%s]", strings.Join(_ProtocolNames, ", "))
 
-const _ProtocolName = "EthereumOther"
+const _ProtocolName = "EthereumStarknetOther"
 
 var _ProtocolNames = []string{
 	_ProtocolName[0:8],
-	_ProtocolName[8:13],
+	_ProtocolName[8:16],
+	_ProtocolName[16:21],
 }
 
 // ProtocolNames returns a list of possible string values of Protocol.
@@ -36,7 +39,8 @@ func ProtocolNames() []string {
 
 var _ProtocolMap = map[Protocol]string{
 	ProtocolEthereum: _ProtocolName[0:8],
-	ProtocolOther:    _ProtocolName[8:13],
+	ProtocolStarknet: _ProtocolName[8:16],
+	ProtocolOther:    _ProtocolName[16:21],
 }
 
 // String implements the Stringer interface.
@@ -55,10 +59,12 @@ func (x Protocol) IsValid() bool {
 }
 
 var _ProtocolValue = map[string]Protocol{
-	_ProtocolName[0:8]:                   ProtocolEthereum,
-	strings.ToLower(_ProtocolName[0:8]):  ProtocolEthereum,
-	_ProtocolName[8:13]:                  ProtocolOther,
-	strings.ToLower(_ProtocolName[8:13]): ProtocolOther,
+	_ProtocolName[0:8]:                    ProtocolEthereum,
+	strings.ToLower(_ProtocolName[0:8]):   ProtocolEthereum,
+	_ProtocolName[8:16]:                   ProtocolStarknet,
+	strings.ToLower(_ProtocolName[8:16]):  ProtocolStarknet,
+	_ProtocolName[16:21]:                  ProtocolOther,
+	strings.ToLower(_ProtocolName[16:21]): ProtocolOther,
 }
 
 // ParseProtocol attempts to convert a string to a Protocol.

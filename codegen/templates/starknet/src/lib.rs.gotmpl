@@ -1,0 +1,55 @@
+mod pb;
+use pb::block::v1 as block;
+use substreams::Hex;
+use substreams_database_change::pb::database::DatabaseChanges;
+use substreams_database_change::tables::Tables as DatabaseChangeTables;
+use substreams_entity_change::pb::entity::EntityChanges;
+use substreams_entity_change::tables::Tables as EntityChangesTables;
+use substreams_starknet::types as starknet;
+
+#[substreams::handlers::map]
+fn map_blocks(raw_block: starknet::Block) -> Result<block::Block, substreams::errors::Error> {
+    Ok(block::Block {
+        height: raw_block.height,
+        hash: raw_block.hash,
+        prev_hash: raw_block.prev_hash,
+        timestamp: raw_block.timestamp,
+        tx_count: raw_block.transactions.len() as u64,
+        event_count: raw_block
+            .transactions
+            .iter()
+            .fold(0, |acc, tx| acc + tx.events.len() as u64),
+    })
+}
+
+#[substreams::handlers::map]
+fn db_out(processed_block: block::Block) -> Result<DatabaseChanges, substreams::errors::Error> {
+    // Initialize Database Changes container
+    let mut tables = DatabaseChangeTables::new();
+
+    tables
+        .create_row("block", [("hash", Hex(&processed_block.hash).to_string())])
+        .set("height", processed_block.height)
+        .set("prev_hash", processed_block.prev_hash)
+        .set("timestamp", processed_block.timestamp)
+        .set("tx_count", processed_block.tx_count)
+        .set("event_count", processed_block.event_count);
+
+    Ok(tables.to_database_changes())
+}
+
+#[substreams::handlers::map]
+fn graph_out(processed_block: block::Block) -> Result<EntityChanges, substreams::errors::Error> {
+    // Initialize Database Changes container
+    let mut tables = EntityChangesTables::new();
+
+    tables
+        .create_row("Block", format!("{}", Hex(&processed_block.hash)))
+        .set("height", processed_block.height)
+        .set("prev_hash", processed_block.prev_hash)
+        .set("timestamp", processed_block.timestamp)
+        .set("tx_count", processed_block.tx_count)
+        .set("event_count", processed_block.event_count);
+
+    Ok(tables.to_entity_changes())
+}

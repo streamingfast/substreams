@@ -52,7 +52,7 @@ func (c *File) SortedItems() (out []*pboutput.Item) {
 }
 
 func (c *File) ExtractClocks(clocksMap map[uint64]*pbsubstreams.Clock) {
-	for _, item := range c.kv {
+	for _, item := range c.Kv {
 		if _, found := clocksMap[item.BlockNum]; !found {
 			clocksMap[item.BlockNum] = &pbsubstreams.Clock{
 				Number:    item.BlockNum,

@@ -20,7 +20,7 @@ func TestExtractClocks(t *testing.T) {
 			name: "sunny path",
 			file: File{
 				ModuleName: "sunny_path",
-				kv:         map[string]*pboutput.Item{"id1": {BlockNum: 1, BlockId: "1"}, "id2": {BlockNum: 2, BlockId: "3"}},
+				Kv:         map[string]*pboutput.Item{"id1": {BlockNum: 1, BlockId: "1"}, "id2": {BlockNum: 2, BlockId: "3"}},
 			},
 			clocksDistributor: map[uint64]*pbsubstreams.Clock{},
 			expectedResult:    map[uint64]*pbsubstreams.Clock{1: {Number: 1, Id: "1"}, 2: {Number: 2, Id: "3"}},

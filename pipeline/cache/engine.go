@@ -115,7 +115,7 @@ func (e *Engine) EndOfStream(lastFinalClock *pbsubstreams.Clock) error {
 					extractedKeys := &pbindex.Keys{}
 					err := proto.Unmarshal(blockIndexOutput, extractedKeys)
 					if err != nil {
-						return fmt.Errorf("unmarshalling index keys from %w outputs: %w", currentFile.ModuleName, err)
+						return fmt.Errorf("unmarshalling index keys from %s outputs: %w", currentFile.ModuleName, err)
 					}
 
 					for _, key := range extractedKeys.Keys {
@@ -128,9 +128,9 @@ func (e *Engine) EndOfStream(lastFinalClock *pbsubstreams.Clock) error {
 
 				indexWriter.Write(indexes)
 
-				//TODO: HANDLE THE ERROR
 				err := indexWriter.Close(context.Background())
 				if err != nil {
+					errs = multierror.Append(errs, err)
 				}
 			}
 		}

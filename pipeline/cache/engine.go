@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	multierror "github.com/hashicorp/go-multierror"
 	pbindex "github.com/streamingfast/substreams/pb/sf/substreams/index/v1"
 
 	"github.com/RoaringBitmap/roaring/roaring64"
@@ -99,8 +100,11 @@ func (e *Engine) HandleStalled(clock *pbsubstreams.Clock) error {
 }
 
 func (e *Engine) EndOfStream(lastFinalClock *pbsubstreams.Clock) error {
+	var errs error
 	for _, writer := range e.execOutputWriters {
-		writer.Close(context.Background())
+		if err := writer.Close(context.Background()); err != nil {
+			errs = multierror.Append(errs, err)
+		}
 		currentFile := writer.CurrentFile
 
 		if e.indexWriters != nil {
@@ -132,5 +136,5 @@ func (e *Engine) EndOfStream(lastFinalClock *pbsubstreams.Clock) error {
 		}
 	}
 
-	return nil
+	return errs
 }

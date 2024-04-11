@@ -45,6 +45,7 @@ type Tier1Config struct {
 
 	StateStoreURL        string
 	StateStoreDefaultTag string
+	BlockType            string
 	StateBundleSize      uint64
 
 	MaxSubrequests       uint64
@@ -182,6 +183,7 @@ func (a *Tier1App) Run() error {
 		a.config.StateStoreDefaultTag,
 		a.config.MaxSubrequests,
 		a.config.StateBundleSize,
+		a.config.BlockType,
 		subrequestsClientConfig,
 		tier2RequestParameters,
 		opts...,

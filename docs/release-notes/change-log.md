@@ -9,6 +9,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.5.3 Unreleased
+
+### Server
+
+* handle block type when creating tier1, if not specified it'll auto-detect the block type, else use it. 
+* fix missing error handling when writing output data to files. This could result in tier1 request just "hanging" waiting for the file never produced by tier2.
+* fix handling of dstore error in tier1 'execout walker' causing stalling issues on S3 or on unexpected storage errors
+* increase number of retries on storage when writing states or execouts (5 -> 10)
+
+### Gui
+
+* prevent 'gui' command from crashing on 'incomplete' spkgs without moduledocs (when using --skip-package-validation)
+
 ## v1.5.2
 
 * Fix a context leak causing tier1 responses to slow down progressively

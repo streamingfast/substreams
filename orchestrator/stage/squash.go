@@ -56,8 +56,12 @@ func (s *Stages) multiSquash(stage *Stage, mergeUnit Unit) error {
 func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUnit Unit) error {
 	metrics := mergeMetrics{}
 	metrics.start = time.Now()
+	metrics.stage = stage.idx
+	metrics.moduleName = modState.name
+	metrics.moduleHash = modState.storeConfig.ModuleHash()
 
 	rng := modState.segmenter.Range(mergeUnit.Segment)
+	metrics.blockRange = rng
 	partialFile := store.NewPartialFileInfo(modState.name, rng.StartBlock, rng.ExclusiveEndBlock)
 	partialKV := modState.derivePartialKV(rng.StartBlock)
 	segmentEndsOnInterval := modState.segmenter.EndsOnInterval(mergeUnit.Segment)
@@ -73,9 +77,13 @@ func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUni
 	metrics.loadStart = time.Now()
 	if err := partialKV.Load(s.ctx, partialFile); err != nil {
 		if nextFull, err := modState.getStore(s.ctx, rng.ExclusiveEndBlock); err == nil { // try to load an already-merged file
-			s.logger.Info("got full store from cache instead of partial, reloading", zap.Stringer("store", nextFull))
+
 			modState.cachedStore = nextFull
 			modState.lastBlockInStore = rng.ExclusiveEndBlock
+			metrics.loadEnd = time.Now()
+
+			s.logger.Info("squashing time metrics", metrics.logFields()...)
+
 			return nil
 		}
 		return fmt.Errorf("loading partial: %q: %w", partialFile.Filename, err)

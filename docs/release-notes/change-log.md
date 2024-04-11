@@ -9,14 +9,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v1.5.3 Unreleased
+## v1.5.3
+
+Performance, memory leak and bug fixes
 
 ### Server
 
-* handle block type when creating tier1, if not specified it'll auto-detect the block type, else use it. 
+* fix memory leak on substreams execution (by bumping wazero dependency)
+* prevent substreams-tier1 stopping if blocktype auto-detection times out
+* allow specifying blocktype directly in Tier1 config to skip auto-detection
 * fix missing error handling when writing output data to files. This could result in tier1 request just "hanging" waiting for the file never produced by tier2.
 * fix handling of dstore error in tier1 'execout walker' causing stalling issues on S3 or on unexpected storage errors
 * increase number of retries on storage when writing states or execouts (5 -> 10)
+* prevent slow squashing when loading each segment from full KV store (can happen when a stage contains multiple stores)
 
 ### Gui
 

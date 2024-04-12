@@ -142,9 +142,11 @@ func (s *Stages) AllStoresCompleted() bool {
 		if stage.kind != KindStore {
 			continue
 		}
-		state := s.getState(Unit{Segment: lastSegment, Stage: idx})
-		if state != UnitCompleted && state != UnitNoOp {
-			return false
+		for seg := s.storeSegmenter.FirstIndex(); seg <= lastSegment; seg++ {
+			state := s.getState(Unit{Segment: seg, Stage: idx})
+			if state != UnitCompleted && state != UnitNoOp {
+				return false
+			}
 		}
 	}
 	return true

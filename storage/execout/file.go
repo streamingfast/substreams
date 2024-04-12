@@ -236,10 +236,6 @@ func pad(blockNumber uint64) string {
 	return fmt.Sprintf("%010d", blockNumber)
 }
 
-func ComputeStartBlock(startBlock uint64, saveBlockInterval uint64) uint64 {
-	return startBlock - startBlock%saveBlockInterval
-}
-
 func getExclusiveEndBlock(filename string) (uint64, error) {
 	endBlock := strings.Split(strings.Split(filename, "-")[1], ".")[0]
 	parsedInt, err := strconv.ParseInt(strings.TrimLeft(endBlock, "0"), 10, 64)

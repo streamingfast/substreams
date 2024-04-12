@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/RoaringBitmap/roaring/roaring64"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dmetering"
 	"go.opentelemetry.io/otel"
@@ -51,6 +52,7 @@ type Pipeline struct {
 	mapModuleOutput         *pbsubstreamsrpc.MapModuleOutput
 	extraMapModuleOutputs   []*pbsubstreamsrpc.MapModuleOutput
 	extraStoreModuleOutputs []*pbsubstreamsrpc.StoreModuleOutput
+	blockIndices            map[string]map[string]*roaring64.Bitmap
 
 	respFunc         substreams.ResponseFunc
 	lastProgressSent time.Time
@@ -434,6 +436,7 @@ func (p *Pipeline) returnInternalModuleProgressOutputs(clock *pbsubstreams.Clock
 
 // buildModuleExecutors builds the ModuleExecutors, and the loadedModules.
 func (p *Pipeline) buildModuleExecutors(ctx context.Context) ([][]exec.ModuleExecutor, error) {
+	//  TODO: get the moduleExecutors needed for the current blocks, based on indices.. maybe filter out from a full list
 	if p.ModuleExecutors != nil {
 		// Eventually, we can invalidate our catch to accomodate the PATCH
 		// and rebuild all the modules, and tear down the previously loaded ones.

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 
 	"google.golang.org/protobuf/proto"
 
@@ -71,6 +72,43 @@ func (f *File) Save(ctx context.Context) error {
 		err := f.store.WriteObject(ctx, filename, reader)
 		return err
 	})
+}
+
+func (f *File) Load(ctx context.Context) error {
+	pbIndexesMap := pbindexes.Map{}
+
+	filename := f.Filename()
+	file, err := f.store.OpenObject(ctx, filename)
+	if err != nil {
+		return err
+	}
+	content, err := io.ReadAll(file)
+	if err != nil {
+		return err
+	}
+
+	err = proto.Unmarshal(content, &pbIndexesMap)
+	if err != nil {
+		return err
+	}
+
+	f.indexes = make(map[string]*roaring64.Bitmap)
+
+	for k, v := range pbIndexesMap.Indexes {
+		f.indexes[k] = roaring64.New()
+		_, err := f.indexes[k].FromUnsafeBytes(v)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (f *File) Print() {
+	for k, v := range f.indexes {
+		fmt.Printf("%s: %v\n", k, v.ToArray())
+	}
 }
 
 func (f *File) Filename() string {

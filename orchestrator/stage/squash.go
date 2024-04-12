@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
 )
@@ -49,17 +50,53 @@ func (s *Stages) multiSquash(stage *Stage, mergeUnit Unit) error {
 
 type Result struct {
 	partialKVStore *store.PartialKV
+	partialFile    *store.FileInfo
 	fullKVStore    *store.FullKV
 	error          error
 }
 
-// The singleSquash operation's goal is to take the up-most contiguous unit
-// tha is compete, and take the very next partial, squash it and produce a FullKV
-// store.
-// If we happen to have some FullKV stores in the middle, then our goal is
-// to load that compete store, and squash the next partial segment.
-// We keep the cache of the latest FullKV store, to speed up things
-// if they are linear
+func getPartialOrFullKV(ctx context.Context, modState *StoreModuleState, rng *block.Range) (*store.PartialKV, *store.FileInfo, *store.FullKV, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	results := make(chan Result, 2)
+	go func() {
+		partialFile := store.NewPartialFileInfo(modState.name, rng.StartBlock, rng.ExclusiveEndBlock)
+		partial := modState.derivePartialKV(rng.StartBlock)
+		err := partial.Load(ctx, partialFile)
+		results <- Result{partialKVStore: partial, partialFile: partialFile, error: err}
+	}()
+
+	go func() {
+		nextFull, err := modState.getStore(ctx, rng.ExclusiveEndBlock)
+		results <- Result{fullKVStore: nextFull, error: err}
+	}()
+
+	var err error
+	for i := 0; i < 2; i++ {
+		select {
+		case <-ctx.Done():
+			err = multierror.Append(err, ctx.Err())
+			return nil, nil, nil, err
+
+		case result := <-results:
+			if result.error != nil {
+				err = multierror.Append(err, result.error)
+				break // from select
+			}
+			if result.fullKVStore != nil {
+				return nil, nil, result.fullKVStore, nil
+			}
+			if result.partialKVStore != nil {
+				return result.partialKVStore, result.partialFile, nil, nil
+			}
+		}
+	}
+	return nil, nil, nil, fmt.Errorf("getting partial or full kv: %w", err)
+}
+
+// singleSquash gets the current fullKV and merges the next partialKV into it.
+// If there is an existing fullKV at the destination (next segment), it will be loaded instead (whichever file is seen first)
 func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUnit Unit) error {
 	metrics := mergeMetrics{}
 	metrics.start = time.Now()
@@ -69,7 +106,6 @@ func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUni
 
 	rng := modState.segmenter.Range(mergeUnit.Segment)
 	metrics.blockRange = rng
-	partialFile := store.NewPartialFileInfo(modState.name, rng.StartBlock, rng.ExclusiveEndBlock)
 	segmentEndsOnInterval := modState.segmenter.EndsOnInterval(mergeUnit.Segment)
 
 	// Retrieve store to merge, from cache or load from storage. Allows skipping of segments
@@ -81,53 +117,28 @@ func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUni
 
 	// Load
 	metrics.loadStart = time.Now()
-
-	ctx, cancel := context.WithCancel(s.ctx)
-
-	results := make(chan Result, 2)
-	go func() {
-		partial := modState.derivePartialKV(rng.StartBlock)
-		err := partial.Load(ctx, partialFile)
-		results <- Result{partialKVStore: partial, error: err}
-	}()
-
-	go func() {
-		nextFull, err := modState.getStore(ctx, rng.ExclusiveEndBlock)
-		results <- Result{fullKVStore: nextFull, error: err}
-	}()
-
-	var partialKV *store.PartialKV
-loop:
-	for i := 0; i < 2; i++ {
-		select {
-		case <-ctx.Done():
-			break loop
-		case result := <-results:
-			if result.error != nil {
-				err = multierror.Append(err, result.error)
-				continue loop
-			}
-			if result.fullKVStore != nil {
-				modState.cachedStore = result.fullKVStore
-				modState.lastBlockInStore = rng.ExclusiveEndBlock
-				metrics.loadEnd = time.Now()
-				s.logger.Info("squashing time metrics", metrics.logFields()...)
-				cancel()
-				return nil
-			}
-			partialKV = result.partialKVStore
-			break loop
-		}
+	partialKV, partialFile, newFullKV, err := getPartialOrFullKV(s.ctx, modState, rng)
+	if err != nil {
+		return err
 	}
-	cancel()
-
 	metrics.loadEnd = time.Now()
+	if s.ctx.Err() != nil {
+		return s.ctx.Err()
+	}
+
+	if newFullKV != nil {
+		modState.cachedStore = newFullKV
+		modState.lastBlockInStore = rng.ExclusiveEndBlock
+		s.logger.Info("squashing time metrics (skipped, loaded from full kv)", metrics.logFields()...)
+		return nil
+	}
 
 	// Merge
 	metrics.mergeStart = time.Now()
 	if err := fullKV.Merge(partialKV); err != nil {
 		return fmt.Errorf("merging: %w", err)
 	}
+
 	modState.lastBlockInStore = rng.ExclusiveEndBlock
 	metrics.mergeEnd = time.Now()
 

@@ -9,6 +9,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.5.4 (unreleased)
+
+* fix a possible panic() when an request is interrupted during the file loading phase of a squashing operation.
+* fix a rare possibility of stalling if only some fullkv stores caches were deleted, but further segments were still present.
+
 ## v1.5.3
 
 Performance, memory leak and bug fixes

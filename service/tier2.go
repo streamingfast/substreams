@@ -484,6 +484,10 @@ func evaluateModulesRequiredToRun(
 			continue
 		}
 
+		if c.ModuleKind() == pbsubstreams.ModuleKindBlockIndex {
+			continue
+		}
+
 		// if either full or partial kv exists, we can skip the module
 		storeExists, err := storeConfigs[name].ExistsFullKV(ctx, stopBlock)
 		if err != nil {

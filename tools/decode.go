@@ -150,7 +150,7 @@ func runDecodeStatesModuleRunE(cmd *cobra.Command, args []string) error {
 	moduleHash := hex.EncodeToString(hash)
 	zlog.Info("found module hash", zap.String("hash", moduleHash), zap.String("module", matchingModule.Name))
 
-	startBlock := blockNumber - blockNumber%saveBlockInterval
+	startBlock := blockNumber - blockNumber%saveInterval
 
 	switch matchingModule.Kind.(type) {
 	case *pbsubstreams.Module_KindMap_:

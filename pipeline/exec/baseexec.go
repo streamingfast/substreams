@@ -7,6 +7,7 @@ import (
 
 	ttrace "go.opentelemetry.io/otel/trace"
 
+	"github.com/RoaringBitmap/roaring/roaring64"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/wasm"
@@ -21,6 +22,7 @@ type BaseExecutor struct {
 	wasmModule    wasm.Module
 	wasmArguments []wasm.Argument
 	entrypoint    string
+	blockIndices  *roaring64.Bitmap
 	tracer        ttrace.Tracer
 
 	instanceCacheEnabled bool
@@ -32,10 +34,11 @@ type BaseExecutor struct {
 	executionStack []string
 }
 
-func NewBaseExecutor(ctx context.Context, moduleName string, wasmModule wasm.Module, cacheEnabled bool, wasmArguments []wasm.Argument, entrypoint string, tracer ttrace.Tracer) *BaseExecutor {
+func NewBaseExecutor(ctx context.Context, moduleName string, wasmModule wasm.Module, cacheEnabled bool, wasmArguments []wasm.Argument, blockIndices *roaring64.Bitmap, entrypoint string, tracer ttrace.Tracer) *BaseExecutor {
 	return &BaseExecutor{
 		ctx:                  ctx,
 		moduleName:           moduleName,
+		blockIndices:         blockIndices,
 		wasmModule:           wasmModule,
 		instanceCacheEnabled: cacheEnabled,
 		wasmArguments:        wasmArguments,
@@ -47,6 +50,9 @@ func NewBaseExecutor(ctx context.Context, moduleName string, wasmModule wasm.Mod
 //var Timer time.Duration
 
 func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (call *wasm.Call, err error) {
+	if e.blockIndices != nil && !e.blockIndices.Contains(uint64(outputGetter.Clock().Number)) {
+		return nil, nil
+	}
 	e.logs = nil
 	e.logsTruncated = false
 	e.executionStack = nil

@@ -8,7 +8,11 @@ import (
 )
 
 func RoaringBitmapsApply(expr Expression, bitmaps map[string]*roaring64.Bitmap) *roaring64.Bitmap {
-	return roaringQuerier{bitmaps: bitmaps}.apply(expr)
+	out := roaringQuerier{bitmaps: bitmaps}.apply(expr)
+	if out == nil {
+		return roaring64.New()
+	}
+	return out
 }
 
 type roaringRange struct {

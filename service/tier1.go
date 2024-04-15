@@ -73,8 +73,6 @@ type Tier1Service struct {
 
 	maximumTier2Retries    uint64
 	tier2RequestParameters reqctx.Tier2RequestParameters
-
-	pipelineOptions []pipeline.Option
 }
 
 func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
@@ -470,6 +468,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		ctx,
 		outputGraph,
 		stores,
+		nil,
 		execOutputConfigs,
 		wasmRuntime,
 		execOutputCacheEngine,

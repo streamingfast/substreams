@@ -38,19 +38,22 @@ func (w *Writer) Close(ctx context.Context) error {
 	return nil
 }
 
-func GenerateBlockIndexWriters(baseStore dstore.Store, indexModules []*pbsubstreams.Module, ModuleHashes *manifest.ModuleHashes, logger *zap.Logger, blockRange *block.Range) (map[string]*Writer, error) {
-	indexFiles := make(map[string]*File)
+func GenerateBlockIndexWriters(ctx context.Context, baseStore dstore.Store, indexModules []*pbsubstreams.Module, ModuleHashes *manifest.ModuleHashes, logger *zap.Logger, blockRange *block.Range) (writers map[string]*Writer, existingIndices map[string]map[string]*roaring64.Bitmap, err error) {
+	writers = make(map[string]*Writer)
+	existingIndices = make(map[string]map[string]*roaring64.Bitmap)
+
 	for _, module := range indexModules {
 		currentFile, err := NewFile(baseStore, ModuleHashes.Get(module.Name), module.Name, logger, blockRange)
 		if err != nil {
-			return nil, fmt.Errorf("creating new index file for %q: %w", module.Name, err)
+			return nil, nil, fmt.Errorf("creating new index file for %q: %w", module.Name, err)
 		}
-		indexFiles[module.Name] = currentFile
+		if err := currentFile.Load(ctx); err == nil {
+			existingIndices[module.Name] = currentFile.indexes
+			continue
+		}
+		writers[module.Name] = NewWriter(currentFile)
+
 	}
 
-	indexWriters := make(map[string]*Writer)
-	for moduleName, file := range indexFiles {
-		indexWriters[moduleName] = NewWriter(file)
-	}
-	return indexWriters, nil
+	return
 }

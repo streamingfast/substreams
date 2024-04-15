@@ -235,6 +235,10 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	}
 
 	stateStore, err := dstore.NewStore(request.StateStore, "zst", "zstd", false)
+	if err != nil {
+		return fmt.Errorf("getting store: %w", err)
+	}
+
 	if cloned, ok := stateStore.(dstore.Clonable); ok {
 		stateStore, err = cloned.Clone(ctx)
 		if err != nil {
@@ -313,7 +317,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("configuring stores: %w", err)
 	}
 
-	indexWriters, err := index.GenerateBlockIndexWriters(cacheStore, outputGraph.UsedIndexesModulesUpToStage(int(request.Stage)), outputGraph.ModuleHashes(), logger, &block.Range{StartBlock: request.StartBlockNum, ExclusiveEndBlock: request.StopBlockNum})
+	indexWriters, blockIndices, err := index.GenerateBlockIndexWriters(ctx, cacheStore, outputGraph.UsedIndexesModulesUpToStage(int(request.Stage)), outputGraph.ModuleHashes(), logger, &block.Range{StartBlock: request.StartBlockNum, ExclusiveEndBlock: request.StopBlockNum})
 	if err != nil {
 		return fmt.Errorf("generating block index writers: %w", err)
 	}
@@ -348,6 +352,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		ctx,
 		outputGraph,
 		stores,
+		blockIndices,
 		execOutputConfigs,
 		wasmRuntime,
 		execOutputCacheEngine,

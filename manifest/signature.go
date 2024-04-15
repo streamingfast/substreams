@@ -90,6 +90,12 @@ func (m *ModuleHashes) HashModule(modules *pbsubstreams.Modules, module *pbsubst
 		}
 		buf.WriteString(value)
 	}
+	if module.BlockFilter != nil {
+		buf.WriteString("block_filter_module!")
+		buf.WriteString(module.BlockFilter.Module)
+		buf.WriteString("block_filter_query!")
+		buf.WriteString(module.BlockFilter.Query)
+	}
 
 	buf.WriteString("ancestors")
 	ancestors, _ := graph.AncestorsOf(module.Name)

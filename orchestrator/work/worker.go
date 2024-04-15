@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -22,6 +23,7 @@ import (
 
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/client"
+	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/orchestrator/response"
 	"github.com/streamingfast/substreams/orchestrator/stage"
@@ -133,6 +135,10 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *blo
 			err := res.Error
 			switch err.(type) {
 			case *RetryableErr:
+				metrics.Tier1WorkerRetryCounter.Inc()
+				if err != nil && strings.Contains(err.Error(), "service currently overloaded") {
+					metrics.Tier1WorkerRejectedOverloadedCounter.Inc()
+				}
 				previousError = err
 				retryIdx++
 				return err

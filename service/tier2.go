@@ -369,24 +369,37 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		zap.Uint32("stage", request.Stage),
 	)
 
+	s.runtimeConfig.StateBundleSize = request.StateBundleSize
+
 	if err := pipe.Init(ctx); err != nil {
 		return fmt.Errorf("error during pipeline init: %w", err)
 	}
+
 	if err := pipe.InitTier2Stores(ctx); err != nil {
 		return fmt.Errorf("error building pipeline: %w", err)
 	}
 
-	var streamFactoryFunc StreamFactoryFunc
-	if s.streamFactoryFuncOverride != nil { //this is only for testing purposes.
-		streamFactoryFunc = s.streamFactoryFuncOverride
-	} else {
-		sf := &StreamFactory{
-			mergedBlocksStore: mergedBlocksStore,
-		}
-		streamFactoryFunc = sf.New
+	if err := pipe.BuildModuleExecutors(ctx); err != nil {
+		return fmt.Errorf("error building module executors: %w", err)
 	}
 
-	s.runtimeConfig.StateBundleSize = request.StateBundleSize
+	allExecutorsExcludedByBlockIndex := true
+excludable:
+	for _, stage := range pipe.ModuleExecutors {
+		for _, executor := range stage {
+			if existingExecOuts[executor.Name()] != nil {
+				continue
+			}
+			if !executor.BlockIndexExcludesAllBlocks() {
+				allExecutorsExcludedByBlockIndex = false
+				break excludable
+			}
+		}
+	}
+	if allExecutorsExcludedByBlockIndex {
+		// TODO: when we have a way to skip the whole thing, we should do it here
+		logger.Info("all executors are excluded by block index. We could skip the whole thing (but we still need the clocks in the outputs, so we won't.)")
+	}
 
 	var streamErr error
 	if canSkipBlockSource(existingExecOuts, modulesRequiredToRun, request.BlockType) {
@@ -414,25 +427,34 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		}
 		streamErr = io.EOF
 		span.EndWithErr(&streamErr)
-	} else {
-		blockStream, err := streamFactoryFunc(
-			ctx,
-			pipe,
-			int64(requestDetails.ResolvedStartBlockNum),
-			request.StopBlockNum,
-			"",
-			true,
-			false,
-			logger.Named("stream"),
-		)
-		if err != nil {
-			return fmt.Errorf("error getting stream: %w", err)
-		}
-
-		ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/pipeline/blocks_stream")
-		streamErr = blockStream.Run(ctx)
-		span.EndWithErr(&streamErr)
+		return pipe.OnStreamTerminated(ctx, streamErr)
 	}
+	sf := &StreamFactory{
+		mergedBlocksStore: mergedBlocksStore,
+	}
+	streamFactoryFunc := sf.New
+
+	if s.streamFactoryFuncOverride != nil { //this is only for testing purposes.
+		streamFactoryFunc = s.streamFactoryFuncOverride
+	}
+
+	blockStream, err := streamFactoryFunc(
+		ctx,
+		pipe,
+		int64(requestDetails.ResolvedStartBlockNum),
+		request.StopBlockNum,
+		"",
+		true,
+		false,
+		logger.Named("stream"),
+	)
+	if err != nil {
+		return fmt.Errorf("error getting stream: %w", err)
+	}
+
+	ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/pipeline/blocks_stream")
+	streamErr = blockStream.Run(ctx)
+	span.EndWithErr(&streamErr)
 
 	return pipe.OnStreamTerminated(ctx, streamErr)
 }

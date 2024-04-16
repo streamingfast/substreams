@@ -53,7 +53,7 @@ type Pipeline struct {
 	mapModuleOutput         *pbsubstreamsrpc.MapModuleOutput
 	extraMapModuleOutputs   []*pbsubstreamsrpc.MapModuleOutput
 	extraStoreModuleOutputs []*pbsubstreamsrpc.StoreModuleOutput
-	blockIndices            map[string]map[string]*roaring64.Bitmap
+	preexistingBlockIndices map[string]map[string]*roaring64.Bitmap
 
 	respFunc         substreams.ResponseFunc
 	lastProgressSent time.Time
@@ -94,19 +94,19 @@ func New(
 	opts ...Option,
 ) *Pipeline {
 	pipe := &Pipeline{
-		ctx:             ctx,
-		gate:            newGate(ctx),
-		execOutputCache: execOutputCache,
-		runtimeConfig:   runtimeConfig,
-		blockIndices:    indices,
-		outputGraph:     outputGraph,
-		wasmRuntime:     wasmRuntime,
-		respFunc:        respFunc,
-		stores:          stores,
-		execoutStorage:  execoutStorage,
-		forkHandler:     NewForkHandler(),
-		blockStepMap:    make(map[bstream.StepType]uint64),
-		startTime:       time.Now(),
+		ctx:                     ctx,
+		gate:                    newGate(ctx),
+		execOutputCache:         execOutputCache,
+		runtimeConfig:           runtimeConfig,
+		preexistingBlockIndices: indices,
+		outputGraph:             outputGraph,
+		wasmRuntime:             wasmRuntime,
+		respFunc:                respFunc,
+		stores:                  stores,
+		execoutStorage:          execoutStorage,
+		forkHandler:             NewForkHandler(),
+		blockStepMap:            make(map[bstream.StepType]uint64),
+		startTime:               time.Now(),
 	}
 	for _, opt := range opts {
 		opt(pipe)
@@ -437,13 +437,12 @@ func (p *Pipeline) returnInternalModuleProgressOutputs(clock *pbsubstreams.Clock
 	return nil
 }
 
-// buildModuleExecutors builds the ModuleExecutors, and the loadedModules.
-func (p *Pipeline) buildModuleExecutors(ctx context.Context) ([][]exec.ModuleExecutor, error) {
-	//  TODO: get the moduleExecutors needed for the current blocks, based on indices.. maybe filter out from a full list
+// BuildModuleExecutors builds the ModuleExecutors, and the loadedModules.
+func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 	if p.ModuleExecutors != nil {
 		// Eventually, we can invalidate our catch to accomodate the PATCH
 		// and rebuild all the modules, and tear down the previously loaded ones.
-		return p.ModuleExecutors, nil
+		return nil
 	}
 
 	reqModules := reqctx.Details(ctx).Modules
@@ -459,7 +458,7 @@ func (p *Pipeline) buildModuleExecutors(ctx context.Context) ([][]exec.ModuleExe
 				code := reqModules.Binaries[module.BinaryIndex]
 				m, err := p.wasmRuntime.NewModule(ctx, code.Content)
 				if err != nil {
-					return nil, fmt.Errorf("new wasm module: %w", err)
+					return fmt.Errorf("new wasm module: %w", err)
 				}
 				loadedModules[module.BinaryIndex] = m
 			}
@@ -475,19 +474,17 @@ func (p *Pipeline) buildModuleExecutors(ctx context.Context) ([][]exec.ModuleExe
 			for _, module := range layer {
 				inputs, err := p.renderWasmInputs(module)
 				if err != nil {
-					return nil, fmt.Errorf("module %q: get wasm inputs: %w", module.Name, err)
+					return fmt.Errorf("module %q: get wasm inputs: %w", module.Name, err)
 				}
 				var moduleBlockFilter *roaring64.Bitmap
 				if module.BlockFilter != nil {
-					indices := p.blockIndices[module.BlockFilter.Module]
-					if indices == nil {
-						return nil, fmt.Errorf("block indices for module %q not found", module.BlockFilter.Module)
+					if indices := p.preexistingBlockIndices[module.BlockFilter.Module]; indices != nil {
+						expr, err := sqe.Parse(ctx, module.BlockFilter.Query)
+						if err != nil {
+							return fmt.Errorf("parse block filter: %q: %w", module.BlockFilter.Query, err)
+						}
+						moduleBlockFilter = sqe.RoaringBitmapsApply(expr, indices)
 					}
-					expr, err := sqe.Parse(ctx, module.BlockFilter.Query)
-					if err != nil {
-						return nil, fmt.Errorf("parse block filter: %q: %w", module.BlockFilter.Query, err)
-					}
-					moduleBlockFilter = sqe.RoaringBitmapsApply(expr, indices)
 				}
 
 				entrypoint := module.BinaryEntrypoint
@@ -515,7 +512,7 @@ func (p *Pipeline) buildModuleExecutors(ctx context.Context) ([][]exec.ModuleExe
 
 					outputStore, found := p.stores.StoreMap.Get(module.Name)
 					if !found {
-						return nil, fmt.Errorf("store %q not found", module.Name)
+						return fmt.Errorf("store %q not found", module.Name)
 					}
 					inputs = append(inputs, wasm.NewStoreWriterOutput(module.Name, outputStore, updatePolicy, valueType))
 
@@ -556,7 +553,7 @@ func (p *Pipeline) buildModuleExecutors(ctx context.Context) ([][]exec.ModuleExe
 	}
 
 	p.ModuleExecutors = stagedModuleExecutors
-	return stagedModuleExecutors, nil
+	return nil
 }
 
 func (p *Pipeline) cleanUpModuleExecutors(ctx context.Context) error {

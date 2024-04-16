@@ -296,11 +296,12 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 	p.mapModuleOutput = nil
 	p.extraMapModuleOutputs = nil
 	p.extraStoreModuleOutputs = nil
-	moduleExecutors, err := p.buildModuleExecutors(ctx)
-	if err != nil {
+
+	// they may be already built, but we call this function every time to enable future dynamic changes
+	if err := p.BuildModuleExecutors(ctx); err != nil {
 		return fmt.Errorf("building wasm module tree: %w", err)
 	}
-	for _, stage := range moduleExecutors {
+	for _, stage := range p.ModuleExecutors {
 		//t0 := time.Now()
 		if len(stage) < 2 {
 			//fmt.Println("Linear stage", len(stage))

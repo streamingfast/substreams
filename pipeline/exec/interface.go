@@ -17,6 +17,8 @@ type ModuleExecutor interface {
 	toModuleOutput(data []byte) (*pbssinternal.ModuleOutput, error)
 	HasValidOutput() bool
 
+	BlockIndexExcludesAllBlocks() bool
+
 	lastExecutionLogs() (logs []string, truncated bool)
 	lastExecutionStack() []string
 }

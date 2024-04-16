@@ -119,6 +119,13 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 	return
 }
 
+func (e *BaseExecutor) BlockIndexExcludesAllBlocks() bool {
+	if e.blockIndices != nil && e.blockIndices.IsEmpty() {
+		return true
+	}
+	return false
+}
+
 func (e *BaseExecutor) Close(ctx context.Context) error {
 	if e.cachedInstance != nil {
 		return e.cachedInstance.Close(ctx)

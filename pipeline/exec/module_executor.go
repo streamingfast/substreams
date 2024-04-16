@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/streamingfast/substreams/sqe"
 	"github.com/streamingfast/substreams/storage/execout"
 	"google.golang.org/protobuf/proto"
 
@@ -12,6 +13,7 @@ import (
 
 	"github.com/streamingfast/substreams/reqctx"
 
+	pbindex "github.com/streamingfast/substreams/pb/sf/substreams/index/v1"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 )
 
@@ -28,6 +30,21 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 	span.SetAttributes(attribute.String("substreams.module.name", modName))
 
 	logger.Debug("running module")
+
+	if expr := executor.BlockIndexExpression(); expr != nil {
+		indexedKeys, _, err := execOutput.Get(executor.BlockIndexModule())
+		if err != nil {
+			return nil, nil, fmt.Errorf("getting index module output for keys: %w", err)
+		}
+		keys := &pbindex.Keys{}
+		if err := proto.Unmarshal(indexedKeys, keys); err != nil {
+			return nil, nil, fmt.Errorf("parsing index module output as keys: %w", err)
+		}
+		if !sqe.KeysApply(expr, sqe.NewFromIndexKeys(keys)) {
+			// skip execution of module on this block because it is filtered out.
+			return nil, nil, nil
+		}
+	}
 
 	cached, outputBytes, err := getCachedOutput(execOutput, executor)
 	if err != nil {

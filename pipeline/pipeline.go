@@ -477,13 +477,19 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 					return fmt.Errorf("module %q: get wasm inputs: %w", module.Name, err)
 				}
 				var moduleBlockFilter *roaring64.Bitmap
+				var moduleBlockFilterExpression sqe.Expression
+				var moduleBlockFilterModule string
 				if module.BlockFilter != nil {
+					expr, err := sqe.Parse(ctx, module.BlockFilter.Query)
+					if err != nil {
+						return fmt.Errorf("parse block filter: %q: %w", module.BlockFilter.Query, err)
+					}
+
 					if indices := p.preexistingBlockIndices[module.BlockFilter.Module]; indices != nil {
-						expr, err := sqe.Parse(ctx, module.BlockFilter.Query)
-						if err != nil {
-							return fmt.Errorf("parse block filter: %q: %w", module.BlockFilter.Query, err)
-						}
 						moduleBlockFilter = sqe.RoaringBitmapsApply(expr, indices)
+					} else {
+						moduleBlockFilterExpression = expr
+						moduleBlockFilterModule = module.BlockFilter.Module
 					}
 				}
 
@@ -500,6 +506,8 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 						p.wasmRuntime.InstanceCacheEnabled(),
 						inputs,
 						moduleBlockFilter,
+						moduleBlockFilterExpression,
+						moduleBlockFilterModule,
 						entrypoint,
 						tracer,
 					)
@@ -523,6 +531,8 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 						p.wasmRuntime.InstanceCacheEnabled(),
 						inputs,
 						moduleBlockFilter,
+						moduleBlockFilterExpression,
+						moduleBlockFilterModule,
 						entrypoint,
 						tracer,
 					)
@@ -537,6 +547,8 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 						p.wasmRuntime.InstanceCacheEnabled(),
 						inputs,
 						moduleBlockFilter,
+						moduleBlockFilterExpression,
+						moduleBlockFilterModule,
 						entrypoint,
 						tracer,
 					)

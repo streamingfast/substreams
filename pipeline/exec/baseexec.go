@@ -9,6 +9,7 @@ import (
 
 	"github.com/RoaringBitmap/roaring/roaring64"
 	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/substreams/sqe"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/wasm"
 )
@@ -22,8 +23,11 @@ type BaseExecutor struct {
 	wasmModule    wasm.Module
 	wasmArguments []wasm.Argument
 	entrypoint    string
-	blockIndices  *roaring64.Bitmap
-	tracer        ttrace.Tracer
+	blockIndices  *roaring64.Bitmap // pre-applied
+
+	blockIndexExpression sqe.Expression // applied on-the-fly, from the block index module outputs
+	blockIndexModule     string
+	tracer               ttrace.Tracer
 
 	instanceCacheEnabled bool
 	cachedInstance       wasm.Instance
@@ -34,11 +38,13 @@ type BaseExecutor struct {
 	executionStack []string
 }
 
-func NewBaseExecutor(ctx context.Context, moduleName string, wasmModule wasm.Module, cacheEnabled bool, wasmArguments []wasm.Argument, blockIndices *roaring64.Bitmap, entrypoint string, tracer ttrace.Tracer) *BaseExecutor {
+func NewBaseExecutor(ctx context.Context, moduleName string, wasmModule wasm.Module, cacheEnabled bool, wasmArguments []wasm.Argument, blockIndices *roaring64.Bitmap, blockIndexExpression sqe.Expression, blockIndexModule, entrypoint string, tracer ttrace.Tracer) *BaseExecutor {
 	return &BaseExecutor{
 		ctx:                  ctx,
 		moduleName:           moduleName,
 		blockIndices:         blockIndices,
+		blockIndexExpression: blockIndexExpression,
+		blockIndexModule:     blockIndexModule,
 		wasmModule:           wasmModule,
 		instanceCacheEnabled: cacheEnabled,
 		wasmArguments:        wasmArguments,
@@ -117,6 +123,14 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 		e.executionStack = call.ExecutionStack
 	}
 	return
+}
+
+func (e *BaseExecutor) BlockIndexExpression() sqe.Expression {
+	return e.blockIndexExpression
+}
+
+func (e *BaseExecutor) BlockIndexModule() string {
+	return e.blockIndexModule
 }
 
 func (e *BaseExecutor) BlockIndexExcludesAllBlocks() bool {

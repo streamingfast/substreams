@@ -101,6 +101,8 @@ func mapTestExecutor(t *testing.T, ctx context.Context, name string) *exec.Mappe
 				wasm.NewSourceInput("sf.substreams.v1.test.Block"),
 			},
 			nil,
+			nil,
+			"",
 			name,
 			otel.GetTracerProvider().Tracer("test"),
 		),

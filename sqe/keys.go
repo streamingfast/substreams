@@ -10,7 +10,7 @@ type KeysQuerier struct {
 	blockKeys map[string]struct{}
 }
 
-func NewFromIndexKeys(indexKeys pbindex.Keys) KeysQuerier {
+func NewFromIndexKeys(indexKeys *pbindex.Keys) KeysQuerier {
 	blockKeys := make(map[string]struct{}, len(indexKeys.Keys))
 	for _, key := range indexKeys.Keys {
 		blockKeys[key] = struct{}{}

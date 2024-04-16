@@ -4,6 +4,7 @@ import (
 	"context"
 
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+	"github.com/streamingfast/substreams/sqe"
 	"github.com/streamingfast/substreams/storage/execout"
 )
 
@@ -18,6 +19,8 @@ type ModuleExecutor interface {
 	HasValidOutput() bool
 
 	BlockIndexExcludesAllBlocks() bool
+	BlockIndexExpression() sqe.Expression
+	BlockIndexModule() string
 
 	lastExecutionLogs() (logs []string, truncated bool)
 	lastExecutionStack() []string

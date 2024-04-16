@@ -19,7 +19,7 @@ func TestApplyKeys(t *testing.T) {
 		"mint":     {},
 	}
 
-	blockKeys := keysQuerier{blockKeys: kv}
+	blockKeys := KeysQuerier{blockKeys: kv}
 
 	// Matrix-based test cases
 	testCases := []struct {

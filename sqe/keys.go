@@ -1,16 +1,28 @@
 package sqe
 
-import "fmt"
+import (
+	"fmt"
 
-type keysQuerier struct {
+	pbindex "github.com/streamingfast/substreams/pb/sf/substreams/index/v1"
+)
+
+type KeysQuerier struct {
 	blockKeys map[string]struct{}
 }
 
-func KeysApply(expr Expression, blockKeys keysQuerier) bool {
+func NewFromIndexKeys(indexKeys pbindex.Keys) KeysQuerier {
+	blockKeys := make(map[string]struct{}, len(indexKeys.Keys))
+	for _, key := range indexKeys.Keys {
+		blockKeys[key] = struct{}{}
+	}
+
+	return KeysQuerier{blockKeys: blockKeys}
+}
+func KeysApply(expr Expression, blockKeys KeysQuerier) bool {
 	return blockKeys.apply(expr)
 }
 
-func (k keysQuerier) apply(expr Expression) bool {
+func (k KeysQuerier) apply(expr Expression) bool {
 	switch v := expr.(type) {
 	case *KeyTerm:
 		if k.blockKeys == nil {

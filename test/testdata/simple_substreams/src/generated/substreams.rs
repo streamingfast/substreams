@@ -5,6 +5,13 @@ use substreams::errors::Error;
 pub struct Substreams{}
 
 pub trait SubstreamsTrait {
+    fn test_index(
+        block: pb::test::Block,
+    ) -> Result<pb::keys::Keys, Error>;
+
+    fn assert_test_index(
+        block: pb::test::Block,
+    ) -> Result<pb::test::Boolean, Error>;
 
     fn test_map(
         params: String,
@@ -483,6 +490,11 @@ pub trait SubstreamsTrait {
         store: substreams::store::StoreSetInt64,
     );
 
+    fn assert_all_test_index(
+        assert_test_index: pb::test::Boolean,
+        store: substreams::store::StoreSetInt64,
+    );
+
     fn assert_all_test(
         assert_all_test_delete_prefix: substreams::store::StoreGetInt64,
         assert_all_test_string: substreams::store::StoreGetInt64,
@@ -490,6 +502,7 @@ pub trait SubstreamsTrait {
         assert_all_test_float64: substreams::store::StoreGetInt64,
         assert_all_test_bigint: substreams::store::StoreGetInt64,
         assert_all_test_bigdecimal: substreams::store::StoreGetInt64,
+        assert_all_test_index: substreams::store::StoreGetInt64,
     ) -> Result<pb::test::Boolean, Error>;
 }
 

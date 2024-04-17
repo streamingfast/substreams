@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"os"
@@ -9,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/streamingfast/substreams/manifest"
 
 	"github.com/streamingfast/bstream"
 	"github.com/stretchr/testify/assert"
@@ -180,6 +183,9 @@ func TestForkHandling(t *testing.T) {
 }
 
 func TestOneStoreOneMap(t *testing.T) {
+	testStoreAddI64Hash := hex.EncodeToString([]byte("setup_test_store_add_i64"))
+	assertTestStoreAddI64Hash := hex.EncodeToString([]byte("assert_test_store_add_i64"))
+
 	tests := []struct {
 		name                  string
 		startBlock            int64
@@ -199,10 +205,10 @@ func TestOneStoreOneMap(t *testing.T) {
 			expectedResponseCount: 4,
 			expectFiles: []string{
 
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000001-0000000010.output", // store outputs
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000010-0000000020.output",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.kv", // store states
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000020-0000000001.kv",
+				testStoreAddI64Hash + "/outputs/0000000001-0000000010.output", // store outputs
+				testStoreAddI64Hash + "/outputs/0000000010-0000000020.output",
+				testStoreAddI64Hash + "/states/0000000010-0000000001.kv", // store states
+				testStoreAddI64Hash + "/states/0000000020-0000000001.kv",
 				//				"states/0000000025-0000000020.partial", // produced, then deleted
 			},
 		},
@@ -214,10 +220,10 @@ func TestOneStoreOneMap(t *testing.T) {
 			production:            false,
 			expectedResponseCount: 7,
 			expectFiles: []string{
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000001-0000000010.output", // store outputs
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000010-0000000020.output",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.kv", // store states
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000020-0000000001.kv",
+				testStoreAddI64Hash + "/outputs/0000000001-0000000010.output", // store outputs
+				testStoreAddI64Hash + "/outputs/0000000010-0000000020.output",
+				testStoreAddI64Hash + "/states/0000000010-0000000001.kv", // store states
+				testStoreAddI64Hash + "/states/0000000020-0000000001.kv",
 				// "states/0000000025-0000000020.partial", // produced, then deleted
 				//"states/0000000030-0000000001.kv", // Again, backprocess wouldn't save this one, nor does it need to.
 			},
@@ -230,11 +236,11 @@ func TestOneStoreOneMap(t *testing.T) {
 			production:            true,
 			expectedResponseCount: 4,
 			expectFiles: []string{
-				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000020-0000000027.output",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000001-0000000010.output",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000010-0000000020.output",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.kv",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000020-0000000001.kv",
+				assertTestStoreAddI64Hash + "/outputs/0000000020-0000000027.output",
+				testStoreAddI64Hash + "/outputs/0000000001-0000000010.output",
+				testStoreAddI64Hash + "/outputs/0000000010-0000000020.output",
+				testStoreAddI64Hash + "/states/0000000010-0000000001.kv",
+				testStoreAddI64Hash + "/states/0000000020-0000000001.kv",
 			},
 		},
 		{
@@ -245,11 +251,11 @@ func TestOneStoreOneMap(t *testing.T) {
 			production:            true,
 			expectedResponseCount: 4,
 			expectFiles: []string{
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000001-0000000010.output", //store
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000010-0000000020.output",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.kv",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000020-0000000001.kv",
-				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000020-0000000029.output", // map
+				testStoreAddI64Hash + "/outputs/0000000001-0000000010.output", //store
+				testStoreAddI64Hash + "/outputs/0000000010-0000000020.output",
+				testStoreAddI64Hash + "/states/0000000010-0000000001.kv",
+				testStoreAddI64Hash + "/states/0000000020-0000000001.kv",
+				assertTestStoreAddI64Hash + "/outputs/0000000020-0000000029.output", // map
 			},
 		},
 		{
@@ -260,14 +266,14 @@ func TestOneStoreOneMap(t *testing.T) {
 			production:            true,
 			expectedResponseCount: 13,
 			expectFiles: []string{
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000001-0000000010.output", // store
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000010-0000000020.output",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000020-0000000030.output",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.kv",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000020-0000000001.kv",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000030-0000000001.kv",
-				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000020-0000000030.output", // map
-				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000030-0000000038.output",
+				testStoreAddI64Hash + "/outputs/0000000001-0000000010.output", // store
+				testStoreAddI64Hash + "/outputs/0000000010-0000000020.output",
+				testStoreAddI64Hash + "/outputs/0000000020-0000000030.output",
+				testStoreAddI64Hash + "/states/0000000010-0000000001.kv",
+				testStoreAddI64Hash + "/states/0000000020-0000000001.kv",
+				testStoreAddI64Hash + "/states/0000000030-0000000001.kv",
+				assertTestStoreAddI64Hash + "/outputs/0000000020-0000000030.output", // map
+				assertTestStoreAddI64Hash + "/outputs/0000000030-0000000038.output",
 			},
 		},
 		{
@@ -278,7 +284,7 @@ func TestOneStoreOneMap(t *testing.T) {
 			production:            true,
 			expectedResponseCount: 2,
 			expectFiles: []string{
-				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000001-0000000008.output",
+				assertTestStoreAddI64Hash + "/outputs/0000000001-0000000008.output",
 			},
 		},
 		{
@@ -290,7 +296,7 @@ func TestOneStoreOneMap(t *testing.T) {
 			expectedResponseCount: 8,
 			expectFiles: []string{
 				//"states/0000000010-0000000001.kv", // TODO: not sure why this would have been produced with the prior code..
-				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000001-0000000008.output",
+				assertTestStoreAddI64Hash + "/outputs/0000000001-0000000008.output",
 			},
 		},
 		{
@@ -304,16 +310,19 @@ func TestOneStoreOneMap(t *testing.T) {
 			},
 			expectedResponseCount: 28,
 			expectFiles: []string{
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000001-0000000010.output",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000010-0000000020.output",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.kv",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000020-0000000001.kv",
-				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000001-0000000010.output",
-				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000010-0000000020.output",
-				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000020-0000000029.output",
+				testStoreAddI64Hash + "/outputs/0000000001-0000000010.output",
+				testStoreAddI64Hash + "/outputs/0000000010-0000000020.output",
+				testStoreAddI64Hash + "/states/0000000010-0000000001.kv",
+				testStoreAddI64Hash + "/states/0000000020-0000000001.kv",
+				assertTestStoreAddI64Hash + "/outputs/0000000001-0000000010.output",
+				assertTestStoreAddI64Hash + "/outputs/0000000010-0000000020.output",
+				assertTestStoreAddI64Hash + "/outputs/0000000020-0000000029.output",
 			},
 		},
 	}
+
+	manifest.UseSimpleHash = true
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			run := newTestRun(t, test.startBlock, test.linearBlock, test.stopBlock, "assert_test_store_add_i64")

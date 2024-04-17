@@ -11,6 +11,8 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
+var UseSimpleHash = false
+
 type ModuleHash []byte
 
 type ModuleHashes struct {
@@ -45,6 +47,14 @@ func (m *ModuleHashes) Iter(cb func(hash, name string) error) error {
 }
 
 func (m *ModuleHashes) HashModule(modules *pbsubstreams.Modules, module *pbsubstreams.Module, graph *ModuleGraph) (ModuleHash, error) {
+	//Simplified hash for testing purposes
+	if UseSimpleHash {
+		return m.hashModuleSimple(modules, module, graph)
+	}
+	return m.hashModule(modules, module, graph)
+}
+
+func (m *ModuleHashes) hashModule(modules *pbsubstreams.Modules, module *pbsubstreams.Module, graph *ModuleGraph) (ModuleHash, error) {
 	m.mu.RLock()
 	if cachedHash := m.cache[module.Name]; cachedHash != nil {
 		m.mu.RUnlock()
@@ -118,6 +128,12 @@ func (m *ModuleHashes) HashModule(modules *pbsubstreams.Modules, module *pbsubst
 	m.cache[module.Name] = output
 	m.mu.Unlock()
 	return output, nil
+}
+
+func (m *ModuleHashes) hashModuleSimple(modules *pbsubstreams.Modules, module *pbsubstreams.Module, graph *ModuleGraph) (ModuleHash, error) {
+	hash := []byte(module.Name)
+	m.cache[module.Name] = hash
+	return hash, nil
 }
 
 func inputName(input *pbsubstreams.Module_Input) (string, error) {

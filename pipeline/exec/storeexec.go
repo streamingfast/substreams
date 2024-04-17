@@ -38,7 +38,7 @@ func (e *StoreModuleExecutor) applyCachedOutput(value []byte) error {
 }
 
 func (e *StoreModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
-	ctx, span := reqctx.WithModuleExecutionSpan(ctx, "exec_store")
+	_, span := reqctx.WithModuleExecutionSpan(ctx, "exec_store")
 	defer span.EndWithErr(&err)
 
 	if _, err := e.wasmCall(reader); err != nil {

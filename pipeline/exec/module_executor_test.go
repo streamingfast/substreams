@@ -34,7 +34,7 @@ func (t *MockExecOutput) Len() int {
 func (t *MockExecOutput) Get(name string) ([]byte, bool, error) {
 	v, ok := t.cacheMap[name]
 	if !ok {
-		return nil, false, execout.NotFound
+		return nil, false, execout.ErrNotFound
 	}
 	return v, true, nil
 }
@@ -45,8 +45,7 @@ func (t *MockExecOutput) Set(name string, value []byte) (err error) {
 }
 
 type MockModuleExecutor struct {
-	name       string
-	outputType string
+	name string
 
 	RunFunc      func(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData *pbssinternal.ModuleOutput, err error)
 	ApplyFunc    func(value []byte) error

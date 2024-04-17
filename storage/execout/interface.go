@@ -22,4 +22,4 @@ type ExecutionOutput interface {
 	ExecutionOutputSetter
 }
 
-var NotFound = errors.New("inputs module value not found")
+var ErrNotFound = errors.New("inputs module value not found")

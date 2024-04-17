@@ -113,7 +113,7 @@ func (p *Pipeline) processBlock(
 	switch step {
 	case bstream.StepUndo:
 		p.blockStepMap[bstream.StepUndo]++
-		if err = p.handleStepUndo(ctx, clock, cursor, reorgJunctionBlock); err != nil {
+		if err = p.handleStepUndo(clock, cursor, reorgJunctionBlock); err != nil {
 			return fmt.Errorf("step undo: %w", err)
 		}
 	case bstream.StepStalled:
@@ -176,9 +176,9 @@ func (p *Pipeline) handleStepStalled(clock *pbsubstreams.Clock) error {
 	return nil
 }
 
-func (p *Pipeline) handleStepUndo(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, reorgJunctionBlock bstream.BlockRef) error {
+func (p *Pipeline) handleStepUndo(clock *pbsubstreams.Clock, cursor *bstream.Cursor, reorgJunctionBlock bstream.BlockRef) error {
 
-	if err := p.forkHandler.handleUndo(clock, cursor); err != nil {
+	if err := p.forkHandler.handleUndo(clock); err != nil {
 		return fmt.Errorf("reverting outputs: %w", err)
 	}
 
@@ -228,7 +228,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 			if reqDetails.IsTier2Request {
 				sendError = p.returnInternalModuleProgressOutputs(clock, forceSend)
 			} else {
-				sendError = p.returnRPCModuleProgressOutputs(clock, forceSend)
+				sendError = p.returnRPCModuleProgressOutputs(forceSend)
 			}
 			if err == nil {
 				err = sendError

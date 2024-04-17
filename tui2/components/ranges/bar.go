@@ -17,7 +17,6 @@ type Bar struct {
 	name           string
 	modules        []string
 	targetEndBlock uint64
-	totalBlocks    uint64
 
 	ranges ranges
 }

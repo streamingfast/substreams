@@ -35,7 +35,6 @@ var loggerFuncs = []funcs{
 			}
 
 			call.AppendLog(message)
-			return
 		}),
 	},
 }

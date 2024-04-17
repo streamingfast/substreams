@@ -6,7 +6,9 @@ import (
 	"io"
 
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace/noop"
 
+	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/metrics"
 	"go.opentelemetry.io/otel/codes"
@@ -33,7 +35,7 @@ func Tracer(ctx context.Context) ttrace.Tracer {
 	if t, ok := tracer.(ttrace.Tracer); ok {
 		return t
 	}
-	return ttrace.NewNoopTracerProvider().Tracer("")
+	return noop.NewTracerProvider().Tracer("")
 }
 
 func WithTracer(ctx context.Context, tracer ttrace.Tracer) context.Context {
@@ -69,6 +71,22 @@ func WithSpan(ctx context.Context, name string) (context.Context, ISpan) {
 	ctx, nativeSpan := Tracer(ctx).Start(ctx, name)
 	s := &span{Span: nativeSpan, name: name}
 	return context.WithValue(ctx, spanKey, s), s
+}
+
+type emitterKeyType struct{}
+
+var emitterKey = emitterKeyType{}
+
+func Emitter(ctx context.Context) dmetering.EventEmitter {
+	emitter := ctx.Value(emitterKey)
+	if t, ok := emitter.(dmetering.EventEmitter); ok {
+		return t
+	}
+	return nil
+}
+
+func WithEmitter(ctx context.Context, emitter dmetering.EventEmitter) context.Context {
+	return context.WithValue(ctx, emitterKey, emitter)
 }
 
 type ISpan interface {

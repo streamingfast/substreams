@@ -11,6 +11,7 @@ import (
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
+	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/descriptorpb"
@@ -88,7 +89,7 @@ func init() {
 
 func runDecodeStatesModuleRunE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
-	saveInterval := mustGetUint64(cmd, "save-interval")
+	saveInterval := sflags.MustGetUint64(cmd, "save-interval")
 
 	manifestPath := ""
 	if len(args) == 5 {
@@ -163,7 +164,7 @@ func runDecodeStatesModuleRunE(cmd *cobra.Command, args []string) error {
 
 func runDecodeIndexModuleRunE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
-	saveInterval := mustGetUint64(cmd, "save-interval")
+	saveInterval := sflags.MustGetUint64(cmd, "save-interval")
 
 	manifestPath := ""
 	if len(args) == 4 {
@@ -244,7 +245,7 @@ func runDecodeIndexModuleRunE(cmd *cobra.Command, args []string) error {
 
 func runDecodeOutputsModuleRunE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
-	saveInterval := mustGetUint64(cmd, "save-interval")
+	saveInterval := sflags.MustGetUint64(cmd, "save-interval")
 
 	manifestPath := ""
 	if len(args) == 4 {
@@ -345,9 +346,7 @@ func searchOutputsModule(
 			return fmt.Errorf("can't find cache at block %d storeURL %q", startBlock, moduleStore.BaseURL().String())
 		}
 
-		if err != nil {
-			return fmt.Errorf("loading cache %s file %s : %w", moduleStore.BaseURL(), outputCache.String(), err)
-		}
+		return fmt.Errorf("loading cache %s file %s : %w", moduleStore.BaseURL(), outputCache.String(), err)
 	}
 
 	for i := requestedBlocks.StartBlock; i < requestedBlocks.ExclusiveEndBlock; i++ {

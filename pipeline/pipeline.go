@@ -59,7 +59,6 @@ type Pipeline struct {
 	lastProgressSent time.Time
 
 	startTime      time.Time
-	modulesStats   map[string]*pbssinternal.ModuleStats
 	stores         *Stores
 	execoutStorage *execout.Configs
 
@@ -387,7 +386,7 @@ func toRPCMapModuleOutputs(in *pbssinternal.ModuleOutput) (out *pbsubstreamsrpc.
 	}
 }
 
-func (p *Pipeline) returnRPCModuleProgressOutputs(clock *pbsubstreams.Clock, forceOutput bool) error {
+func (p *Pipeline) returnRPCModuleProgressOutputs(forceOutput bool) error {
 	if time.Since(p.lastProgressSent) < progressMessageInterval && !forceOutput {
 		return nil
 	}

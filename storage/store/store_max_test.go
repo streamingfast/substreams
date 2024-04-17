@@ -73,8 +73,7 @@ func TestStoreSetMaxBigInt(t *testing.T) {
 
 func TestStoreSetMaxInt64(t *testing.T) {
 	int64ptr := func(i int64) *int64 {
-		var p *int64
-		p = new(int64)
+		p := new(int64)
 		*p = i
 		return p
 	}
@@ -140,8 +139,7 @@ func TestStoreSetMaxInt64(t *testing.T) {
 
 func TestStoreSetMaxFloat64(t *testing.T) {
 	float64ptr := func(i float64) *float64 {
-		var p *float64
-		p = new(float64)
+		p := new(float64)
 		*p = i
 		return p
 	}

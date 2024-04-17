@@ -103,7 +103,7 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 
 func getCachedOutput(execOutput execout.ExecutionOutputGetter, executor ModuleExecutor) (bool, []byte, error) {
 	output, cached, err := execOutput.Get(executor.Name())
-	if err != nil && err != execout.NotFound {
+	if err != nil && err != execout.ErrNotFound {
 		return false, nil, fmt.Errorf("get cached output: %w", err)
 	}
 	return cached, output, nil

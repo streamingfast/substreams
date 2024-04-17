@@ -606,11 +606,14 @@ func prompt(label string, opts *promptOptions) (string, error) {
 		templates.Valid = `{{ "?" | blue}} {{ . | bold }} {{ "[y/N]" | faint}} `
 		templates.Invalid = templates.Valid
 	}
-
+	def := ""
+	if opts != nil {
+		def = opts.Default
+	}
 	prompt := promptui.Prompt{
 		Label:     label,
 		Templates: templates,
-		Default:   opts.Default,
+		Default:   def,
 	}
 	if opts != nil && opts.Validate != nil {
 		prompt.Validate = opts.Validate

@@ -305,13 +305,7 @@ func convertYAMLtoJSONCompat(i any, resolvePath func(in string) string, scope st
 
 		if opts.LoadFromFile {
 
-			if strings.HasPrefix(x, "@@") { // support previous behavior
-				x = x[1:]
-			}
-
-			if strings.HasPrefix(x, "@") { // support previous behavior
-				x = x[1:]
-			}
+			x = strings.TrimPrefix(x, "@") // support previous behavior
 
 			cnt, err := os.ReadFile(resolvePath(x))
 			if err != nil {

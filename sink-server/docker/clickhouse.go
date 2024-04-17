@@ -7,10 +7,9 @@ import (
 	"time"
 
 	"github.com/docker/cli/cli/compose/types"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-func (e *DockerEngine) newClickhouse(deploymentID string, pkg *pbsubstreams.Package) (types.ServiceConfig, string, error) {
+func (e *DockerEngine) newClickhouse(deploymentID string) (types.ServiceConfig, string, error) {
 	name := fmt.Sprintf("%s-clickhouse", deploymentID)
 
 	dataFolder := filepath.Join(e.dir, deploymentID, "data", "clickhouse")

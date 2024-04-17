@@ -49,14 +49,14 @@ func runInfo(cmd *cobra.Command, args []string) error {
 		outputModule = args[1]
 	}
 
-	outputSinkconfigFilesPath := mustGetString(cmd, "output-sinkconfig-files-path")
+	outputSinkconfigFilesPath := sflags.MustGetString(cmd, "output-sinkconfig-files-path")
 
 	info, err := info.Extended(manifestPath, outputModule, sflags.MustGetBool(cmd, "skip-package-validation"))
 	if err != nil {
 		return err
 	}
 
-	if mustGetBool(cmd, "json") {
+	if sflags.MustGetBool(cmd, "json") {
 		res, err := json.MarshalIndent(info, "", "  ")
 		if err != nil {
 			return err
@@ -137,9 +137,7 @@ func runInfo(cmd *cobra.Command, args []string) error {
 			var layerDefs []string
 			for _, l := range layers {
 				var mods []string
-				for _, m := range l {
-					mods = append(mods, m)
-				}
+				mods = append(mods, l...)
 				layerDefs = append(layerDefs, fmt.Sprintf(`["%s"]`, strings.Join(mods, `","`)))
 			}
 			fmt.Printf("Stage %d: [%s]\n", i, strings.Join(layerDefs, `,`))

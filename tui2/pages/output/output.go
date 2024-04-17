@@ -505,15 +505,6 @@ func (o *Output) jumpToNextMatchingBlock() tea.Cmd {
 	}
 }
 
-func (o *Output) getActiveModuleIndex() int {
-	for i, mod := range o.moduleSelector.Modules {
-		if mod == o.active.Module {
-			return i
-		}
-	}
-	return 0
-}
-
 func (o *Output) hasDataForBlock(num uint64) bool {
 	for _, b := range o.blockSelector.BlocksWithData {
 		if b == num {

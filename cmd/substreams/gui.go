@@ -74,12 +74,18 @@ func runGui(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	productionMode := mustGetBool(cmd, "production-mode")
-	debugModulesOutput := mustGetStringSlice(cmd, "debug-modules-output")
+	productionMode := sflags.MustGetBool(cmd, "production-mode")
+	debugModulesOutput := sflags.MustGetStringSlice(cmd, "debug-modules-output")
+	if len(debugModulesOutput) == 0 {
+		debugModulesOutput = nil
+	}
 	if debugModulesOutput != nil && productionMode {
 		return fmt.Errorf("cannot set 'debug-modules-output' in 'production-mode'")
 	}
-	debugModulesInitialSnapshot := mustGetStringSlice(cmd, "debug-modules-initial-snapshot")
+	debugModulesInitialSnapshot := sflags.MustGetStringSlice(cmd, "debug-modules-initial-snapshot")
+	if len(debugModulesInitialSnapshot) == 0 {
+		debugModulesInitialSnapshot = nil
+	}
 
 	outputModule := args[0]
 	network := sflags.MustGetString(cmd, "network")
@@ -108,7 +114,7 @@ func runGui(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
-	endpoint, err := manifest.ExtractNetworkEndpoint(pkg.Network, mustGetString(cmd, "substreams-endpoint"), zlog)
+	endpoint, err := manifest.ExtractNetworkEndpoint(pkg.Network, sflags.MustGetString(cmd, "substreams-endpoint"), zlog)
 	if err != nil {
 		return fmt.Errorf("extracting endpoint: %w", err)
 	}
@@ -118,8 +124,8 @@ func runGui(cmd *cobra.Command, args []string) error {
 		endpoint,
 		authToken,
 		authType,
-		mustGetBool(cmd, "insecure"),
-		mustGetBool(cmd, "plaintext"),
+		sflags.MustGetBool(cmd, "insecure"),
+		sflags.MustGetBool(cmd, "plaintext"),
 	)
 
 	homeDir, err := os.UserHomeDir()
@@ -134,7 +140,7 @@ func runGui(cmd *cobra.Command, args []string) error {
 		homeDir = filepath.Join(homeDir, ".config", "substreams")
 	}
 
-	cursor := mustGetString(cmd, "cursor")
+	cursor := sflags.MustGetString(cmd, "cursor")
 
 	fmt.Println("Launching Substreams GUI...")
 
@@ -171,12 +177,12 @@ func runGui(cmd *cobra.Command, args []string) error {
 		OutputModule:                outputModule,
 		SubstreamsClientConfig:      substreamsClientConfig,
 		HomeDir:                     homeDir,
-		Vcr:                         mustGetBool(cmd, "replay"),
-		Headers:                     parseHeaders(mustGetStringSlice(cmd, "header")),
+		Vcr:                         sflags.MustGetBool(cmd, "replay"),
+		Headers:                     parseHeaders(sflags.MustGetStringSlice(cmd, "header")),
 		Cursor:                      cursor,
 		StartBlock:                  startBlock,
 		StopBlock:                   stopBlock,
-		FinalBlocksOnly:             mustGetBool(cmd, "final-blocks-only"),
+		FinalBlocksOnly:             sflags.MustGetBool(cmd, "final-blocks-only"),
 		Params:                      params,
 		ReaderOptions:               readerOptions,
 	}

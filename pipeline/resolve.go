@@ -197,7 +197,7 @@ type junctionBlockGetter struct {
 	currentHead        bstream.BlockRef
 }
 
-var Done = errors.New("done")
+var ErrDone = errors.New("done")
 
 func (j *junctionBlockGetter) ProcessBlock(block *pbbstream.Block, obj interface{}) error {
 	j.currentHead = obj.(bstream.Cursorable).Cursor().HeadBlock
@@ -205,10 +205,10 @@ func (j *junctionBlockGetter) ProcessBlock(block *pbbstream.Block, obj interface
 	stepable := obj.(bstream.Stepable)
 	switch {
 	case stepable.Step().Matches(bstream.StepNew):
-		return Done
+		return ErrDone
 	case stepable.Step().Matches(bstream.StepUndo):
 		j.reorgJunctionBlock = stepable.ReorgJunctionBlock()
-		return Done
+		return ErrDone
 	}
 	// ignoring other steps
 	return nil
@@ -230,7 +230,7 @@ func NewCursorResolver(hub *hub.ForkableHub, mergedBlocksStore, forkedBlocksStor
 		case <-src.Terminated():
 		}
 
-		if !errors.Is(src.Err(), Done) {
+		if !errors.Is(src.Err(), ErrDone) {
 			headBlock := cursor.HeadBlock
 			if headNum, headID, _, _, err := hub.HeadInfo(); err == nil {
 				headBlock = bstream.NewBlockRef(headID, headNum)

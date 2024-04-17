@@ -10,8 +10,6 @@ import (
 	"github.com/streamingfast/bstream/stream"
 	"go.uber.org/zap"
 
-	"github.com/streamingfast/substreams/block"
-	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/reqctx"
 )
 
@@ -57,14 +55,4 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, err error) error {
 	}
 
 	return nil
-}
-
-func toPBInternalBlockRanges(in block.Ranges) (out []*pbssinternal.BlockRange) {
-	for _, r := range in {
-		out = append(out, &pbssinternal.BlockRange{
-			StartBlock: r.StartBlock,
-			EndBlock:   r.ExclusiveEndBlock,
-		})
-	}
-	return
 }

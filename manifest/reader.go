@@ -55,7 +55,6 @@ type Reader struct {
 
 	// cached values
 	protoDefinitions         []*desc.FileDescriptor
-	sinkConfigJSON           string
 	sinkConfigDynamicMessage *dynamic.Message
 
 	collectProtoDefinitionsFunc func(protoDefinitions []*desc.FileDescriptor)

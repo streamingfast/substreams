@@ -71,7 +71,6 @@ type Tier1Service struct {
 	resolveCursor       pipeline.CursorResolver
 	getHeadBlock        func() (uint64, error)
 
-	maximumTier2Retries    uint64
 	tier2RequestParameters reqctx.Tier2RequestParameters
 }
 
@@ -562,7 +561,7 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 	userMeta := auth.Meta()
 	ip := auth.RealIP()
 	meter := dmetering.GetBytesMeter(ctx)
-	ctx = context.WithValue(ctx, "event_emitter", dmetering.GetDefaultEmitter())
+	ctx = reqctx.WithEmitter(ctx, dmetering.GetDefaultEmitter())
 
 	return func(respAny substreams.ResponseFromAnyTier) error {
 		resp := respAny.(*pbsubstreamsrpc.Response)
@@ -578,7 +577,7 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 			return connect.NewError(connect.CodeUnavailable, err)
 		}
 
-		sendMetering(ctx, meter, userID, apiKeyID, ip, userMeta, "sf.substreams.rpc.v2/Blocks", resp, logger)
+		sendMetering(ctx, meter, userID, apiKeyID, ip, userMeta, "sf.substreams.rpc.v2/Blocks", resp)
 		return nil
 	}
 }

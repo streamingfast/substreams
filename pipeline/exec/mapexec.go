@@ -32,7 +32,7 @@ func (e *MapperModuleExecutor) String() string { return e.Name() }
 func (e *MapperModuleExecutor) applyCachedOutput([]byte) error { return nil }
 
 func (e *MapperModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
-	ctx, span := reqctx.WithModuleExecutionSpan(ctx, "exec_map")
+	_, span := reqctx.WithModuleExecutionSpan(ctx, "exec_map")
 	defer span.EndWithErr(&err)
 
 	var call *wasm.Call

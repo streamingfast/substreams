@@ -201,7 +201,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 		emitter.Shutdown(nil)
 	}()
 
-	ctx = context.WithValue(ctx, "event_emitter", emitter)
+	ctx = reqctx.WithEmitter(ctx, dmetering.GetDefaultEmitter())
 
 	respFunc := tier2ResponseHandler(ctx, logger, streamSrv)
 	err = s.processRange(ctx, request, respFunc)
@@ -606,7 +606,7 @@ func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbs
 			return connect.NewError(connect.CodeUnavailable, err)
 		}
 
-		sendMetering(ctx, meter, userID, apiKeyID, ip, userMeta, "sf.substreams.internal.v2/ProcessRange", resp, logger)
+		sendMetering(ctx, meter, userID, apiKeyID, ip, userMeta, "sf.substreams.internal.v2/ProcessRange", resp)
 		return nil
 	}
 }

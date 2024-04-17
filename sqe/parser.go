@@ -209,18 +209,6 @@ func (p *Parser) parseParenthesisExpression(depth int) (Expression, error) {
 	return &ParenthesisExpression{child}, nil
 }
 
-func (p *Parser) parseNotExpression(depth int) (Expression, error) {
-	// Consume minus sign
-	p.l.mustLexNext()
-
-	child, err := p.parseUnaryExpression(depth)
-	if err != nil {
-		return nil, fmt.Errorf("invalid expression after minus sign: %w", err)
-	}
-
-	return &NotExpression{child}, nil
-}
-
 func (p *Parser) parseKeyTerm() (Expression, error) {
 	token := p.l.mustLexNext()
 

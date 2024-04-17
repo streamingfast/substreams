@@ -25,9 +25,13 @@ func (i *instance) Close(ctx context.Context) error {
 	return i.Module.Close(ctx)
 }
 
+type instanceKeyType struct{}
+
+var instanceKey = instanceKeyType{}
+
 func instanceFromContext(ctx context.Context) *instance {
-	return ctx.Value("instance").(*instance)
+	return ctx.Value(instanceKey).(*instance)
 }
 func withInstanceContext(ctx context.Context, inst *instance) context.Context {
-	return context.WithValue(ctx, "instance", inst)
+	return context.WithValue(ctx, instanceKey, inst)
 }

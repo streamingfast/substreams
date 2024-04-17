@@ -329,7 +329,7 @@ func TestOneStoreOneMap(t *testing.T) {
 			assert.Equal(t, test.expectedResponseCount, strings.Count(mapOutput, "\n"))
 
 			withZST := func(s []string) []string {
-				res := make([]string, len(s), len(s))
+				res := make([]string, len(s))
 				for i, v := range s {
 					res[i] = fmt.Sprintf("%s.zst", v)
 				}

@@ -34,7 +34,7 @@ func (b *baseStore) set(ord uint64, key string, value []byte) {
 	}
 
 	if len(key) == 0 {
-		panic(fmt.Sprintf("invalid key"))
+		panic(fmt.Sprintf("invalid key %q", key))
 	}
 
 	b.bumpOrdinal(ord)

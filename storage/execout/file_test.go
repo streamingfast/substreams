@@ -12,13 +12,13 @@ import (
 func TestExtractClocks(t *testing.T) {
 	cases := []struct {
 		name              string
-		file              File
+		file              *File
 		clocksDistributor map[uint64]*pbsubstreams.Clock
 		expectedResult    map[uint64]*pbsubstreams.Clock
 	}{
 		{
 			name: "sunny path",
-			file: File{
+			file: &File{
 				ModuleName: "sunny_path",
 				Kv:         map[string]*pboutput.Item{"id1": {BlockNum: 1, BlockId: "1"}, "id2": {BlockNum: 2, BlockId: "3"}},
 			},

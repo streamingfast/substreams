@@ -74,7 +74,7 @@ func (i *ExecOutputTesting) Len() (out int) {
 func (i *ExecOutputTesting) Get(moduleName string) (value []byte, cached bool, err error) {
 	val, found := i.Values[moduleName]
 	if !found {
-		return nil, false, execout.NotFound
+		return nil, false, execout.ErrNotFound
 	}
 	return val, false, nil
 }

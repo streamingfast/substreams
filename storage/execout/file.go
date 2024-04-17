@@ -5,10 +5,8 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"math"
 	"sort"
 	"strconv"
-	"strings"
 	"sync"
 
 	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
@@ -61,7 +59,6 @@ func (c *File) ExtractClocks(clocksMap map[uint64]*pbsubstreams.Clock) {
 			}
 		}
 	}
-	return
 }
 
 func (c *File) SetItem(clock *pbsubstreams.Clock, data []byte) {
@@ -173,78 +170,8 @@ func (c *File) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	return nil
 }
 
-//
-//func listContinuousCacheRanges(cachedRanges block.Ranges, from uint64) block.Ranges {
-//	cachedRangeCount := len(cachedRanges)
-//	var out block.Ranges
-//	for i, r := range cachedRanges {
-//		if r.StartBlock < from {
-//			continue
-//		}
-//		out = append(out, r)
-//		if cachedRangeCount > i+1 {
-//			next := cachedRanges[i+1]
-//			if next.StartBlock != r.ExclusiveEndBlock { //continuous seq broken
-//				break
-//			}
-//		}
-//	}
-//
-//	return out
-//}
-
-func findBlockRange(ctx context.Context, store dstore.Store, prefixStartBlock uint64) (*block.Range, bool, error) {
-	var exclusiveEndBlock uint64
-
-	paddedBlock := pad(prefixStartBlock)
-
-	var files []string
-	err := derr.RetryContext(ctx, 3, func(ctx context.Context) (err error) {
-		files, err = store.ListFiles(ctx, paddedBlock, math.MaxInt64)
-		return
-	})
-	if err != nil {
-		return nil, false, fmt.Errorf("walking prefix for padded block %s: %w", paddedBlock, err)
-	}
-
-	if len(files) == 0 {
-		return nil, false, nil
-	}
-
-	biggestEndBlock := uint64(0)
-
-	for _, file := range files {
-		endBlock, err := getExclusiveEndBlock(file)
-		if err != nil {
-			return nil, false, fmt.Errorf("getting exclusive end block from file %s: %w", file, err)
-		}
-		if endBlock > biggestEndBlock {
-			biggestEndBlock = endBlock
-		}
-	}
-
-	exclusiveEndBlock = biggestEndBlock
-
-	return block.NewRange(prefixStartBlock, exclusiveEndBlock), true, nil
-}
-
 func computeDBinFilename(startBlock, stopBlock uint64) string {
 	return fmt.Sprintf("%010d-%010d.output", startBlock, stopBlock)
-}
-
-func pad(blockNumber uint64) string {
-	return fmt.Sprintf("%010d", blockNumber)
-}
-
-func getExclusiveEndBlock(filename string) (uint64, error) {
-	endBlock := strings.Split(strings.Split(filename, "-")[1], ".")[0]
-	parsedInt, err := strconv.ParseInt(strings.TrimLeft(endBlock, "0"), 10, 64)
-
-	if err != nil {
-		return 0, fmt.Errorf("parsing int %d: %w", parsedInt, err)
-	}
-
-	return uint64(parsedInt), nil
 }
 
 func mustAtoi(s string) int {

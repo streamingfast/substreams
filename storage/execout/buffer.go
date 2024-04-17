@@ -52,7 +52,7 @@ func (i *Buffer) Clock() *pbsubstreams.Clock {
 func (i *Buffer) Get(moduleName string) (value []byte, cached bool, err error) {
 	val, found := i.values[moduleName]
 	if !found {
-		return nil, false, NotFound
+		return nil, false, ErrNotFound
 	}
 	return val, true, nil
 }

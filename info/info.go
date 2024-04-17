@@ -186,7 +186,6 @@ func Basic(pkg *pbsubstreams.Package, graph *manifest.ModuleGraph) (*BasicInfo, 
 		}
 		modInfo.Inputs = inputs
 		modInfo.BlockFilter = mod.BlockFilter
-		fmt.Println("hehe", mod.BlockFilter)
 
 		modules = append(modules, modInfo)
 	}

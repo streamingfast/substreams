@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v1.5.5 (unreleased)
 
+### Fixes
+
+* bump wazero execution to fix issue with certain substreams causing the server process to freeze
+
 ### Add
 
 * add `substreams_tier1_worker_retry_counter` metric to count all worker errors returned by tier2

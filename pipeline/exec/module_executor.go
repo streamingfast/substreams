@@ -31,7 +31,16 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 
 	logger.Debug("running module")
 
+	// skip from existing block index
+	if existingIndices := executor.BlockIndices(); existingIndices != nil && !existingIndices.Contains(uint64(execOutput.Clock().Number)) {
+		emptyOutput, _ := executor.toModuleOutput(nil)
+		return emptyOutput, nil, nil
+	}
+
+	// skip from block index expression generated on the fly
 	if expr := executor.BlockIndexExpression(); expr != nil {
+		// TODO: we could memoize the unmarshalled version of this into the execOutput
+		// ex: execOutput.MemoizeThis(my_keymap)
 		indexedKeys, _, err := execOutput.Get(executor.BlockIndexModule())
 		if err != nil {
 			return nil, nil, fmt.Errorf("getting index module output for keys: %w", err)
@@ -42,7 +51,8 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 		}
 		if !sqe.KeysApply(expr, sqe.NewFromIndexKeys(keys)) {
 			// skip execution of module on this block because it is filtered out.
-			return nil, nil, nil
+			emptyOutput, _ := executor.toModuleOutput(nil)
+			return emptyOutput, nil, nil
 		}
 	}
 

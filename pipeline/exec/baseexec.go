@@ -56,9 +56,6 @@ func NewBaseExecutor(ctx context.Context, moduleName string, wasmModule wasm.Mod
 //var Timer time.Duration
 
 func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (call *wasm.Call, err error) {
-	if e.blockIndices != nil && !e.blockIndices.Contains(uint64(outputGetter.Clock().Number)) {
-		return nil, nil
-	}
 	e.logs = nil
 	e.logsTruncated = false
 	e.executionStack = nil
@@ -123,6 +120,10 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 		e.executionStack = call.ExecutionStack
 	}
 	return
+}
+
+func (e *BaseExecutor) BlockIndices() *roaring64.Bitmap {
+	return e.blockIndices
 }
 
 func (e *BaseExecutor) BlockIndexExpression() sqe.Expression {

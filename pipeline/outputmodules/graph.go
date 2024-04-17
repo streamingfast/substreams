@@ -2,6 +2,7 @@ package outputmodules
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -111,12 +112,22 @@ func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *
 	return nil
 }
 
+// computeLowestInitBlock finds the lowest initial block of all modules that are not block indexes.
+// if there are only blockIndex types of modules, it returns 0, because blockIndex modules are always at 0.
 func computeLowestInitBlock(modules []*pbsubstreams.Module) (out uint64) {
-	lowest := modules[0].InitialBlock
+	var atLeastOneModuleThatIsNotAnIndex bool
+	lowest := uint64(math.MaxUint64)
 	for _, mod := range modules {
+		if mod.GetKindBlockIndex() != nil {
+			continue
+		}
+		atLeastOneModuleThatIsNotAnIndex = true
 		if mod.InitialBlock < lowest {
 			lowest = mod.InitialBlock
 		}
+	}
+	if !atLeastOneModuleThatIsNotAnIndex {
+		return 0
 	}
 	return lowest
 }

@@ -102,6 +102,7 @@ func NewStages(
 			segmenter = reqPlan.StoresSegmenter()
 		}
 
+		// FIXME: stepd this goes against the indexes logic
 		var moduleStates []*StoreModuleState
 		stageLowestInitBlock := layer[0].InitialBlock
 		for _, mod := range layer {

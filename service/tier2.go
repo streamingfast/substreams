@@ -317,7 +317,15 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("configuring stores: %w", err)
 	}
 
-	indexWriters, blockIndices, err := index.GenerateBlockIndexWriters(ctx, cacheStore, outputGraph.UsedIndexesModulesUpToStage(int(request.Stage)), outputGraph.ModuleHashes(), logger, &block.Range{StartBlock: request.StartBlockNum, ExclusiveEndBlock: request.StopBlockNum})
+	indexWriters, blockIndices, err := index.GenerateBlockIndexWriters(
+		ctx,
+		cacheStore,
+		outputGraph.UsedIndexesModulesUpToStage(int(request.Stage)),
+		outputGraph.ModuleHashes(),
+		logger,
+		&block.Range{StartBlock: request.StartBlockNum, ExclusiveEndBlock: request.StopBlockNum},
+		request.StateBundleSize,
+	)
 	if err != nil {
 		return fmt.Errorf("generating block index writers: %w", err)
 	}

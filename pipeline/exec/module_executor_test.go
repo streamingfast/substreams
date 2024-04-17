@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/RoaringBitmap/roaring/roaring64"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 
@@ -59,6 +60,7 @@ var _ ModuleExecutor = (*MockModuleExecutor)(nil)
 
 func (t *MockModuleExecutor) BlockIndexExcludesAllBlocks() bool    { return false }
 func (t *MockModuleExecutor) BlockIndexExpression() sqe.Expression { return nil }
+func (t *MockModuleExecutor) BlockIndices() *roaring64.Bitmap      { return nil }
 func (t *MockModuleExecutor) BlockIndexModule() string             { return "" }
 func (t *MockModuleExecutor) Name() string                         { return t.name }
 func (t *MockModuleExecutor) String() string                       { return fmt.Sprintf("TestModuleExecutor(%s)", t.name) }

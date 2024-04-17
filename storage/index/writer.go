@@ -38,9 +38,22 @@ func (w *Writer) Close(ctx context.Context) error {
 	return nil
 }
 
-func GenerateBlockIndexWriters(ctx context.Context, baseStore dstore.Store, indexModules []*pbsubstreams.Module, ModuleHashes *manifest.ModuleHashes, logger *zap.Logger, blockRange *block.Range) (writers map[string]*Writer, existingIndices map[string]map[string]*roaring64.Bitmap, err error) {
+// startblock=500
+// look for 0->1000
+
+// GenrateBlockIndexWriters will only generate writers for modules that have no preexisting index file and that are aligned with the bundle size
+func GenerateBlockIndexWriters(ctx context.Context, baseStore dstore.Store, indexModules []*pbsubstreams.Module, ModuleHashes *manifest.ModuleHashes, logger *zap.Logger, blockRange *block.Range, bundleSize uint64) (writers map[string]*Writer, existingIndices map[string]map[string]*roaring64.Bitmap, err error) {
 	writers = make(map[string]*Writer)
 	existingIndices = make(map[string]map[string]*roaring64.Bitmap)
+
+	isAligned := blockRange.StartBlock%bundleSize == 0 && blockRange.ExclusiveEndBlock%bundleSize == 0
+	if !isAligned { // we align it, but won't write it because it would be missing blocks...
+		alignedStartBlock := blockRange.StartBlock - (blockRange.StartBlock % bundleSize)
+		blockRange = &block.Range{
+			StartBlock:        alignedStartBlock,
+			ExclusiveEndBlock: alignedStartBlock + bundleSize,
+		}
+	}
 
 	for _, module := range indexModules {
 		currentFile, err := NewFile(baseStore, ModuleHashes.Get(module.Name), module.Name, logger, blockRange)
@@ -49,6 +62,10 @@ func GenerateBlockIndexWriters(ctx context.Context, baseStore dstore.Store, inde
 		}
 		if err := currentFile.Load(ctx); err == nil {
 			existingIndices[module.Name] = currentFile.indexes
+			continue
+		}
+
+		if !isAligned {
 			continue
 		}
 		writers[module.Name] = NewWriter(currentFile)

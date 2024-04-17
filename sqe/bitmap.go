@@ -33,7 +33,6 @@ type roaringQuerier struct {
 }
 
 func (q roaringQuerier) apply(expr Expression) *roaring64.Bitmap {
-
 	switch v := expr.(type) {
 	case *KeyTerm:
 		return q.bitmaps[v.Value.Value]

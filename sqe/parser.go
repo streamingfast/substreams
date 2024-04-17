@@ -175,7 +175,7 @@ func (p *Parser) parseUnaryExpression(depth int) (Expression, error) {
 	case p.l.isLeftParenthesis(token):
 		return p.parseParenthesisExpression(depth)
 	case p.l.isNotOperator(token):
-		return p.parseNotExpression(depth)
+		return nil, fmt.Errorf("NOT operator (-) is not supported in the block filter")
 	default:
 		return nil, parserError(fmt.Sprintf("expected a key term, minus sign or left parenthesis, got %s", p.l.getTokenType(token)), token.Pos)
 	}

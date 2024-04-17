@@ -1,6 +1,7 @@
 package manifest
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -9,6 +10,7 @@ import (
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/sqe"
 )
 
 type manifestConverter struct {
@@ -64,6 +66,12 @@ func (r *manifestConverter) validateManifest(manif *Manifest) error {
 	// TODO: put a limit on the SIZE of the WASM payload (max 10MB per binary?)
 
 	for _, s := range manif.Modules {
+		if s.BlockFilter != nil {
+			ctx := context.Background()
+			if err := validateQuery(ctx, s.BlockFilter.Query); err != nil {
+				return fmt.Errorf("stream %q: %w", s.Name, err)
+			}
+		}
 		// TODO: let's make sure this is also checked when received in Protobuf in a remote request.
 		switch s.Kind {
 		case ModuleKindMap:
@@ -126,6 +134,13 @@ func (r *manifestConverter) validateManifest(manif *Manifest) error {
 	return nil
 }
 
+func validateQuery(ctx context.Context, query string) error {
+	_, err := sqe.Parse(ctx, query)
+	if err != nil {
+		return fmt.Errorf("invalid query: %w", err)
+	}
+	return nil
+}
 func handleUseModules(pkg *pbsubstreams.Package, manif *Manifest) error {
 	packageModulesMapping := make(map[string]*pbsubstreams.Module)
 	for _, module := range pkg.Modules.Modules {

@@ -200,20 +200,7 @@ func checkEqualInputs(moduleWithUse, usedModule *pbsubstreams.Module, manifestMo
 				return fmt.Errorf("module %q: input %q has different mode than the used module %q: input %q", manifestModuleWithUse.Name, input.String(), manifestModuleWithUse.Use, usedModuleInput.String())
 			}
 
-			curMod, found := packageModulesMapping[input.GetStore().ModuleName]
-			if !found {
-				return fmt.Errorf("module %q: input %q store module %q not found", manifestModuleWithUse.Name, input.String(), input.GetStore().ModuleName)
-			}
-
-			usedMod, found := packageModulesMapping[usedModuleInput.GetStore().ModuleName]
-			if !found {
-				return fmt.Errorf("module %q: input %q store module %q not found", manifestModuleWithUse.Name, usedModuleInput.String(), usedModuleInput.GetStore().ModuleName)
-			}
-
-			if curMod.Output.Type != usedMod.Output.Type {
-				return fmt.Errorf("module %q: input %q has different output than the used module %q: input %q", manifestModuleWithUse.Name, input.String(), manifestModuleWithUse.Use, usedModuleInput.String())
-			}
-
+			// we don't check output, we'll overwrite it with the used module
 		case input.GetMap() != nil:
 			if usedModuleInput.GetMap() == nil {
 				return fmt.Errorf("module %q: input %q is not a map type", manifestModuleWithUse.Name, input.String())

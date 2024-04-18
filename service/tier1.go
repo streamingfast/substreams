@@ -160,7 +160,7 @@ func NewTier1(
 	}
 
 	tier2RequestParameters.BlockType = blockType
-	tier2RequestParameters.StateBundleSize = runtimeConfig.StateBundleSize
+	tier2RequestParameters.StateBundleSize = runtimeConfig.SegmentSize
 
 	logger.Info("launching tier1 service", zap.Reflect("client_config", substreamsClientConfig), zap.String("block_type", blockType), zap.Bool("with_live", hub != nil))
 	s := &Tier1Service{
@@ -432,7 +432,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		cacheStore = cloned
 	}
 
-	execOutputConfigs, err := execout.NewConfigs(cacheStore, outputGraph.UsedModules(), outputGraph.ModuleHashes(), s.runtimeConfig.StateBundleSize, logger)
+	execOutputConfigs, err := execout.NewConfigs(cacheStore, outputGraph.UsedModules(), outputGraph.ModuleHashes(), s.runtimeConfig.SegmentSize, logger)
 	if err != nil {
 		return fmt.Errorf("new config map: %w", err)
 	}
@@ -442,7 +442,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		return fmt.Errorf("configuring stores: %w", err)
 	}
 
-	stores := pipeline.NewStores(ctx, storeConfigs, s.runtimeConfig.StateBundleSize, requestDetails.LinearHandoffBlockNum, request.StopBlockNum, false)
+	stores := pipeline.NewStores(ctx, storeConfigs, s.runtimeConfig.SegmentSize, requestDetails.LinearHandoffBlockNum, request.StopBlockNum, false)
 
 	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, nil, s.blockType, nil, nil) // we don't read or write ExecOuts on tier1
 	if err != nil {
@@ -485,7 +485,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 
 	reqPlan, err := plan.BuildTier1RequestPlan(
 		requestDetails.ProductionMode,
-		s.runtimeConfig.StateBundleSize,
+		s.runtimeConfig.SegmentSize,
 		outputGraph.LowestInitBlock(),
 		requestDetails.ResolvedStartBlockNum,
 		requestDetails.LinearHandoffBlockNum,

@@ -223,7 +223,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 
 	if p.respFunc != nil {
 		defer func() {
-			forceSend := (clock.Number+1)%p.runtimeConfig.StateBundleSize == 0 || err != nil
+			forceSend := (clock.Number+1)%p.runtimeConfig.SegmentSize == 0 || err != nil
 			var sendError error
 			if reqDetails.IsTier2Request {
 				sendError = p.returnInternalModuleProgressOutputs(clock, forceSend)

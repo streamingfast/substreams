@@ -17,7 +17,7 @@ import (
 )
 
 var tier2CallCmd = &cobra.Command{
-	Use:   "tier2call <manifest_url> <output_module> <stage_number> <start_block> <end_block>",
+	Use:   "tier2call <manifest_url> <output_module> <stage_number> <segment_number>",
 	Short: "Calls a tier2 service, for internal inspection",
 	Args:  cobra.ExactArgs(5),
 	RunE:  tier2CallE,
@@ -47,9 +47,7 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 	manifestPath := args[0]
 	outputModule := args[1]
 	stage, _ := strconv.ParseUint(args[2], 10, 32)
-	startBlock, _ := strconv.ParseInt(args[3], 10, 64)
-	stopBlock, _ := strconv.ParseInt(args[4], 10, 64)
-
+	segmentNumber, _ := strconv.ParseUint(args[3], 10, 32)
 	manifestReader, err := manifest.NewReader(manifestPath)
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
@@ -105,11 +103,9 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 	mergedBlocksStore := sflags.MustGetString(cmd, "merged-blocks-store-url")
 	stateBundleSize := sflags.MustGetUint64(cmd, "state-bundle-size")
 
-	segment := uint64(startBlock) / stateBundleSize
-
 	req, err := ssClient.ProcessRange(ctx, &pbssinternal.ProcessRangeRequest{
 		SegmentSize:          stateBundleSize,
-		SegmentNumber:        segment,
+		SegmentNumber:        segmentNumber,
 		OutputModule:         outputModule,
 		Modules:              pkg.Modules,
 		Stage:                uint32(stage),

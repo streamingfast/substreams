@@ -253,7 +253,7 @@ func processInternalRequest(
 	}
 
 	runtimeConfig := config.RuntimeConfig{
-		StateBundleSize:            10,
+		SegmentSize:                10,
 		DefaultParallelSubrequests: 10,
 		BaseObjectStore:            baseStoreStore,
 		DefaultCacheTag:            "tag",
@@ -293,7 +293,7 @@ func processRequest(
 	}
 
 	runtimeConfig := config.RuntimeConfig{
-		StateBundleSize:            10,
+		SegmentSize:                10,
 		DefaultParallelSubrequests: parallelSubrequests,
 		BaseObjectStore:            baseStoreStore,
 		DefaultCacheTag:            "tag",

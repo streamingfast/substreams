@@ -82,7 +82,6 @@ func (c *Config) ListSnapshotFiles(ctx context.Context, inRange *bstream.Range) 
 }
 
 func (c *Config) ReadFile(ctx context.Context, inrange *block.Range) (*File, error) {
-
 	file := c.NewFile(inrange)
 	if err := file.Load(ctx); err != nil {
 		return nil, err

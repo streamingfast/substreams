@@ -221,7 +221,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	logger := reqctx.Logger(ctx)
 
 	s.runtimeConfig.DefaultCacheTag = request.StateStoreDefaultTag
-	s.runtimeConfig.StateBundleSize = request.SegmentSize
+	s.runtimeConfig.SegmentSize = request.SegmentSize
 
 	mergedBlocksStore, err := dstore.NewDBinStore(request.MergedBlocksStore)
 	if err != nil {
@@ -311,6 +311,9 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 
 	//	executionConfig
 
+	startBlock := request.SegmentNumber * request.SegmentSize
+	stopBlock := startBlock + request.SegmentSize
+
 	execOutputConfigs, err := execout.NewConfigs(
 		cacheStore,
 		outputGraph.UsedModulesUpToStage(int(request.Stage)),
@@ -332,19 +335,19 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		outputGraph.UsedIndexesModulesUpToStage(int(request.Stage)),
 		outputGraph.ModuleHashes(),
 		logger,
-		&block.Range{StartBlock: request.StartBlockNum, ExclusiveEndBlock: request.StopBlockNum},
-		request.StateBundleSize,
+		&block.Range{StartBlock: startBlock, ExclusiveEndBlock: stopBlock},
+		request.SegmentSize,
 	)
 	if err != nil {
 		return fmt.Errorf("generating block index writers: %w", err)
 	}
 
-	stores := pipeline.NewStores(ctx, storeConfigs, request.StateBundleSize, requestDetails.ResolvedStartBlockNum, request.StopBlockNum, true)
-	isCompleteRange := request.StopBlockNum%request.StateBundleSize == 0
+	stores := pipeline.NewStores(ctx, storeConfigs, request.SegmentSize, requestDetails.ResolvedStartBlockNum, stopBlock, true)
+	isCompleteRange := stopBlock%request.SegmentSize == 0
 
 	// note all modules that are not in 'modulesRequiredToRun' are still iterated in 'pipeline.executeModules', but they will skip actual execution when they see that the cache provides the data
 	// This way, stores get updated at each block from the cached execouts without the actual execution of the module
-	modulesRequiredToRun, existingExecOuts, execOutWriters, err := evaluateModulesRequiredToRun(ctx, logger, outputGraph, request.Stage, request.StartBlockNum, request.StopBlockNum, isCompleteRange, request.OutputModule, execOutputConfigs, storeConfigs)
+	modulesRequiredToRun, existingExecOuts, execOutWriters, err := evaluateModulesRequiredToRun(ctx, logger, outputGraph, request.Stage, startBlock, stopBlock, isCompleteRange, request.OutputModule, execOutputConfigs, storeConfigs)
 	if err != nil {
 		return fmt.Errorf("evaluating required modules: %w", err)
 	}
@@ -381,12 +384,11 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 
 	logger.Debug("initializing tier2 pipeline",
 		zap.Uint64("request_start_block", requestDetails.ResolvedStartBlockNum),
-		zap.Uint64("request_stop_block", request.StopBlockNum),
 		zap.String("output_module", request.OutputModule),
 		zap.Uint32("stage", request.Stage),
 	)
 
-	s.runtimeConfig.StateBundleSize = request.StateBundleSize
+	s.runtimeConfig.SegmentSize = request.SegmentSize
 
 	if err := pipe.Init(ctx); err != nil {
 		return fmt.Errorf("error during pipeline init: %w", err)
@@ -432,7 +434,7 @@ excludable:
 		sortedClocksDistributor := sortClocksDistributor(clocksDistributor)
 		ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/pipeline/mapper_stream")
 		for _, clock := range sortedClocksDistributor {
-			if clock.Number < request.StartBlockNum || clock.Number >= request.StopBlockNum {
+			if clock.Number < startBlock || clock.Number >= stopBlock {
 				panic("reading from mapper, block was out of range") // we don't want to have this case undetected
 			}
 			cursor := irreversibleCursorFromClock(clock)
@@ -459,7 +461,7 @@ excludable:
 		ctx,
 		pipe,
 		int64(requestDetails.ResolvedStartBlockNum),
-		request.StopBlockNum,
+		stopBlock,
 		"",
 		true,
 		false,

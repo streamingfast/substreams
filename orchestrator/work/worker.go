@@ -195,7 +195,7 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *blo
 func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, moduleNames []string, upstream *response.Stream) *Result {
 	var err error
 
-	ctx, span := reqctx.WithSpan(ctx, fmt.Sprintf("substreams/tier1/schedule/%s/%d-%d", request.OutputModule, request.SegmentNumber))
+	ctx, span := reqctx.WithSpan(ctx, fmt.Sprintf("substreams/tier1/schedule/%s/%d", request.OutputModule, request.SegmentNumber))
 	defer span.EndWithErr(&err)
 	span.SetAttributes(
 		attribute.String("substreams.output_module", request.OutputModule),

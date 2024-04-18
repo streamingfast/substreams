@@ -40,6 +40,63 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+/*
+
+// layer is one verticle with dependencies
+
+stage 1:
+* map1
+* store1
+
+[[map1,store1]]
+
+stage 2: preload store1
+* map2
+* store2(reads: store1, map2)          * store3 (reads: store1)
+  -> each block, apply changes to store1
+
+[[store2],[store3]]
+
+stage 3:
+[[mapout]]
+
+*/
+
+type tier2ExecutionPlan struct {
+	stagedLayeredModules [][][]*ModuleExecutionConfig
+	// stages // layers // modules
+}
+
+/*
+	for _, block := range blocks {
+
+		for layer := range layeredModules {
+			wg.Add(1)
+			go run executeWASMModuleSequencially(layer, block)
+		}
+		wg.Wait()
+	}
+*/
+
+type ModuleExecutionConfig struct {
+	name       string
+	moduleHash string
+	objStore   dstore.Store
+
+	skipExecution bool
+	cachedOutputs map[string][]byte // ??
+	blockFilter   *BlockFilter
+
+	modKind            pbsubstreams.ModuleKind
+	moduleInitialBlock uint64
+
+	logger *zap.Logger
+}
+
+type BlockFilter struct {
+	preexistingExecOuts map[uint64]struct{}
+}
+
 type Tier2Service struct {
 	wasmExtensions func(map[string]string) (map[string]map[string]wasm.WASMExtension, error) //todo: rename
 	runtimeConfig  config.RuntimeConfig
@@ -309,11 +366,12 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		cacheStore = cloned
 	}
 
-	//	executionConfig
+	// BEGIN
 
 	startBlock := request.SegmentNumber * request.SegmentSize
 	stopBlock := startBlock + request.SegmentSize
 
+	// 1. too specific to execution outputs... map[moduleName]*execOutput.Config
 	execOutputConfigs, err := execout.NewConfigs(
 		cacheStore,
 		outputGraph.UsedModulesUpToStage(int(request.Stage)),
@@ -324,11 +382,13 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("new config map: %w", err)
 	}
 
+	// 2. too specific to stores... map[moduleName]*store.Config
 	storeConfigs, err := store.NewConfigMap(cacheStore, outputGraph.Stores(), outputGraph.ModuleHashes())
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
 
+	// 3. we don't have a index.Config
 	indexWriters, blockIndices, err := index.GenerateBlockIndexWriters(
 		ctx,
 		cacheStore,
@@ -345,12 +405,16 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	stores := pipeline.NewStores(ctx, storeConfigs, request.SegmentSize, requestDetails.ResolvedStartBlockNum, stopBlock, true)
 	isCompleteRange := stopBlock%request.SegmentSize == 0
 
+	// 4. what defines the list of modules that should be executed ?? right now : only the presence of the existingExecOuts
+
 	// note all modules that are not in 'modulesRequiredToRun' are still iterated in 'pipeline.executeModules', but they will skip actual execution when they see that the cache provides the data
 	// This way, stores get updated at each block from the cached execouts without the actual execution of the module
 	modulesRequiredToRun, existingExecOuts, execOutWriters, err := evaluateModulesRequiredToRun(ctx, logger, outputGraph, request.Stage, startBlock, stopBlock, isCompleteRange, request.OutputModule, execOutputConfigs, storeConfigs)
 	if err != nil {
 		return fmt.Errorf("evaluating required modules: %w", err)
 	}
+
+	//// END
 
 	if len(modulesRequiredToRun) == 0 {
 		logger.Info("no modules required to run, skipping")

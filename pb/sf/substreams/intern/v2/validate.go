@@ -7,8 +7,8 @@ import (
 )
 
 func (r *ProcessRangeRequest) Validate() error {
-	if r.StartBlockNum >= r.StopBlockNum {
-		return fmt.Errorf("stop block %d should be higher than start block %d", r.StopBlockNum, r.StartBlockNum)
+	if r.StopBlockNum != 0 {
+		return fmt.Errorf("invalid protocol: update your tier1")
 	}
 
 	if r.Modules == nil {

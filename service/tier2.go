@@ -128,9 +128,11 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 
 	// TODO: use stage and segment numbers when implemented
 	stage := request.OutputModule
+	startBlock := request.SegmentNumber * request.SegmentSize
 	segment := fmt.Sprintf("%d:%d",
-		request.StartBlockNum,
-		request.StopBlockNum)
+		startBlock,
+		startBlock+request.SegmentSize,
+	)
 
 	logger := reqctx.Logger(ctx).Named("tier2").With(
 		zap.String("stage", stage),
@@ -158,8 +160,8 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	}
 
 	fields := []zap.Field{
-		zap.Uint64("start_block", request.StartBlockNum),
-		zap.Uint64("stop_block", request.StopBlockNum),
+		zap.Uint64("segment_number", request.SegmentNumber),
+		zap.Uint64("segment_size", request.SegmentSize),
 		zap.Uint32("stage", request.Stage),
 		zap.Strings("modules", moduleNames),
 		zap.String("output_module", request.OutputModule),
@@ -189,7 +191,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 		return fmt.Errorf("state store is required in request")
 	case request.MergedBlocksStore == "":
 		return fmt.Errorf("merged blocks store is required in request")
-	case request.StateBundleSize == 0:
+	case request.SegmentSize == 0:
 		return fmt.Errorf("a non-zero state bundle size is required in request")
 	}
 
@@ -219,7 +221,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	logger := reqctx.Logger(ctx)
 
 	s.runtimeConfig.DefaultCacheTag = request.StateStoreDefaultTag
-	s.runtimeConfig.StateBundleSize = request.StateBundleSize
+	s.runtimeConfig.StateBundleSize = request.SegmentSize
 
 	mergedBlocksStore, err := dstore.NewDBinStore(request.MergedBlocksStore)
 	if err != nil {
@@ -285,7 +287,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 
 	var exts map[string]map[string]wasm.WASMExtension
 	if s.wasmExtensions != nil {
-		x, err := s.wasmExtensions(request.WasmModules)
+		x, err := s.wasmExtensions(request.WasmExtensionConfigs)
 		if err != nil {
 			return fmt.Errorf("loading wasm extensions: %w", err)
 		}
@@ -307,7 +309,14 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		cacheStore = cloned
 	}
 
-	execOutputConfigs, err := execout.NewConfigs(cacheStore, outputGraph.UsedModulesUpToStage(int(request.Stage)), outputGraph.ModuleHashes(), request.StateBundleSize, logger)
+	//	executionConfig
+
+	execOutputConfigs, err := execout.NewConfigs(
+		cacheStore,
+		outputGraph.UsedModulesUpToStage(int(request.Stage)),
+		outputGraph.ModuleHashes(),
+		request.SegmentSize,
+		logger)
 	if err != nil {
 		return fmt.Errorf("new config map: %w", err)
 	}

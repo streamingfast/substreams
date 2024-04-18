@@ -3,7 +3,7 @@ package pbssinternal
 import "encoding/json"
 
 func (x *ProcessRangeRequest) WasmConfig(module string) string {
-	return x.WasmModules[module]
+	return x.WasmExtensionConfigs[module]
 }
 
 type RPCCallWasmModuleConfiguration struct {

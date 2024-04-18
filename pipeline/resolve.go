@@ -72,15 +72,18 @@ func BuildRequestDetails(
 }
 
 func BuildRequestDetailsFromSubrequest(request *pbssinternal.ProcessRangeRequest) (req *reqctx.RequestDetails) {
+	startBlock := request.SegmentNumber * request.SegmentSize
+	stopBlock := startBlock + request.SegmentSize
+
 	req = &reqctx.RequestDetails{
 		Modules:               request.Modules,
 		OutputModule:          request.OutputModule,
 		ProductionMode:        true,
 		IsTier2Request:        true,
 		Tier2Stage:            int(request.Stage),
-		StopBlockNum:          request.StopBlockNum,
-		LinearHandoffBlockNum: request.StopBlockNum,
-		ResolvedStartBlockNum: request.StartBlockNum,
+		StopBlockNum:          stopBlock,
+		LinearHandoffBlockNum: stopBlock,
+		ResolvedStartBlockNum: startBlock,
 		UniqueID:              nextUniqueID(),
 	}
 	return req

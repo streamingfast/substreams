@@ -105,16 +105,17 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 	mergedBlocksStore := sflags.MustGetString(cmd, "merged-blocks-store-url")
 	stateBundleSize := sflags.MustGetUint64(cmd, "state-bundle-size")
 
+	segment := uint64(startBlock) / stateBundleSize
+
 	req, err := ssClient.ProcessRange(ctx, &pbssinternal.ProcessRangeRequest{
-		StartBlockNum:        uint64(startBlock),
-		StopBlockNum:         uint64(stopBlock),
+		SegmentSize:          stateBundleSize,
+		SegmentNumber:        segment,
 		OutputModule:         outputModule,
 		Modules:              pkg.Modules,
 		Stage:                uint32(stage),
 		MeteringConfig:       meteringConfig,
 		BlockType:            blockType,
 		MergedBlocksStore:    mergedBlocksStore,
-		StateBundleSize:      stateBundleSize,
 		StateStore:           stateStore,
 		StateStoreDefaultTag: stateStoreDefaultTag,
 	}, callOpts...)

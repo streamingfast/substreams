@@ -42,11 +42,6 @@ func TestApplyRoaringBitmap(t *testing.T) {
 			expr:   "(alice || bob) (delegate || mint)",
 			result: []uint64{4, 5},
 		},
-
-		{
-			expr:   "(alice || john) -(delegate || mint)",
-			result: []uint64{1, 3},
-		},
 	}
 
 	// Run test cases

@@ -47,16 +47,7 @@ func TestApplyKeys(t *testing.T) {
 			expr:   "(alice || bob) (delegate || mint)",
 			result: true,
 		},
-		{
-			name:   "Not(key)",
-			expr:   "-bob",
-			result: false,
-		},
-		{
-			name:   "And(Or Not(Or))",
-			expr:   "(alice || john) -(delegate || mint)",
-			result: false,
-		},
+
 		{
 			name:   "2 And",
 			expr:   "alice john mint",

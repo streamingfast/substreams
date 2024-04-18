@@ -11,6 +11,7 @@ import (
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/wasm"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type IndexModuleExecutor struct {
@@ -57,8 +58,8 @@ func (i *IndexModuleExecutor) toModuleOutput(data []byte) (*pbssinternal.ModuleO
 	}
 
 	return &pbssinternal.ModuleOutput{
-		Data: &pbssinternal.ModuleOutput_IndexKeys{
-			IndexKeys: &indexKeys,
+		Data: &pbssinternal.ModuleOutput_MapOutput{
+			MapOutput: &anypb.Any{TypeUrl: "type.googleapis.com/sf.substreams.index.v1.Keys", Value: data},
 		},
 	}, nil
 }

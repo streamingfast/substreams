@@ -375,6 +375,7 @@ func toRPCMapModuleOutputs(in *pbssinternal.ModuleOutput) (out *pbsubstreamsrpc.
 	if data == nil {
 		return nil
 	}
+
 	return &pbsubstreamsrpc.MapModuleOutput{
 		Name:      in.ModuleName,
 		MapOutput: data,

@@ -13,7 +13,6 @@ message ModuleOutput {
     oneof data {
             google.protobuf.Any map_output = 2;
             sf.substreams.v1.StoreDeltas store_deltas = 3;
-            sf.substreams.index.v1.Keys index_keys = 7;
     }
     repeated string logs = 4;
     bool debug_logs_truncated = 5;

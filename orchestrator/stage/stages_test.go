@@ -10,7 +10,7 @@ import (
 
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/orchestrator/plan"
-	"github.com/streamingfast/substreams/pipeline/outputmodules"
+	"github.com/streamingfast/substreams/pipeline/exec"
 )
 
 func TestNewStages(t *testing.T) {
@@ -20,7 +20,7 @@ func TestNewStages(t *testing.T) {
 
 	stages := NewStages(
 		context.Background(),
-		outputmodules.TestGraphStagedModules(5, 7, 12, 22, 25),
+		exec.TestGraphStagedModules(5, 7, 12, 22, 25),
 		reqPlan,
 		nil,
 	)
@@ -45,7 +45,7 @@ func TestNewStagesNextJobs(t *testing.T) {
 	assert.Equal(t, "interval=10, stores=[5, 40), map_write=[5, 40), map_read=[5, 40), linear=[nil)", reqPlan.String())
 	stages := NewStages(
 		context.Background(),
-		outputmodules.TestGraphStagedModules(5, 5, 5, 5, 5),
+		exec.TestGraphStagedModules(5, 5, 5, 5, 5),
 		reqPlan,
 		nil,
 	)

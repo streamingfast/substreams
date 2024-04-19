@@ -6,7 +6,7 @@ import (
 
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/pipeline/outputmodules"
+	"github.com/streamingfast/substreams/pipeline/exec"
 	"google.golang.org/protobuf/types/descriptorpb"
 )
 
@@ -245,12 +245,12 @@ func ExtendedWithPackage(pkg *pbsubstreams.Package, graph *manifest.ModuleGraph,
 
 	var stages [][][]string
 	if outputModule != "" {
-		outputGraph, err := outputmodules.NewOutputModuleGraph(outputModule, true, pkg.Modules)
+		execGraph, err := exec.NewOutputModuleGraph(outputModule, true, pkg.Modules)
 		if err != nil {
 			return nil, fmt.Errorf("creating output module graph: %w", err)
 		}
-		stages = make([][][]string, 0, len(outputGraph.StagedUsedModules()))
-		for _, layers := range outputGraph.StagedUsedModules() {
+		stages = make([][][]string, 0, len(execGraph.StagedUsedModules()))
+		for _, layers := range execGraph.StagedUsedModules() {
 			var layerDefs [][]string
 			for _, l := range layers {
 				var mods []string

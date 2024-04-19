@@ -21,7 +21,6 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/cache"
 	"github.com/streamingfast/substreams/pipeline/exec"
-	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/sqe"
@@ -45,10 +44,10 @@ type Pipeline struct {
 	postJobHooks       []substreams.PostJobHook
 
 	wasmRuntime     *wasm.Registry
-	outputGraph     *outputmodules.Graph
+	execGraph       *exec.Graph
 	loadedModules   map[uint32]wasm.Module
 	ModuleExecutors [][]exec.ModuleExecutor // Staged module executors
-	executionStages outputmodules.ExecutionStages
+	executionStages exec.ExecutionStages
 
 	mapModuleOutput         *pbsubstreamsrpc.MapModuleOutput
 	extraMapModuleOutputs   []*pbsubstreamsrpc.MapModuleOutput
@@ -82,7 +81,7 @@ type Pipeline struct {
 
 func New(
 	ctx context.Context,
-	outputGraph *outputmodules.Graph,
+	execGraph *exec.Graph,
 	stores *Stores,
 	indices map[string]map[string]*roaring64.Bitmap,
 	execoutStorage *execout.Configs,
@@ -98,7 +97,7 @@ func New(
 		execOutputCache:         execOutputCache,
 		runtimeConfig:           runtimeConfig,
 		preexistingBlockIndices: indices,
-		outputGraph:             outputGraph,
+		execGraph:               execGraph,
 		wasmRuntime:             wasmRuntime,
 		respFunc:                respFunc,
 		stores:                  stores,
@@ -124,7 +123,7 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 
 	p.setupProcessingModule(reqDetails)
 
-	stagedModules := p.outputGraph.StagedUsedModules()
+	stagedModules := p.execGraph.StagedUsedModules()
 
 	// truncate stages to highest scheduled stage
 	if highest := p.highestStage; highest != nil {
@@ -259,7 +258,7 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 		reqPlan,
 		p.runtimeConfig,
 		int(reqDetails.MaxParallelJobs),
-		p.outputGraph,
+		p.execGraph,
 		p.execoutStorage,
 		p.respFunc,
 		p.stores.configs,
@@ -302,7 +301,7 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 }
 
 func (p *Pipeline) isOutputModule(name string) bool {
-	return p.outputGraph.IsOutputModule(name)
+	return p.execGraph.IsOutputModule(name)
 }
 
 func (p *Pipeline) runPostJobHooks(ctx context.Context, clock *pbsubstreams.Clock) {

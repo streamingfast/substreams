@@ -12,7 +12,7 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/orchestrator/plan"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
-	"github.com/streamingfast/substreams/pipeline/outputmodules"
+	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
 )
@@ -54,7 +54,7 @@ type stageStates []UnitState
 
 func NewStages(
 	ctx context.Context,
-	outputGraph *outputmodules.Graph,
+	execGraph *exec.Graph,
 	reqPlan *plan.RequestPlan,
 	storeConfigs store.ConfigMap,
 ) (out *Stages) {
@@ -65,7 +65,7 @@ func NewStages(
 
 	logger := reqctx.Logger(ctx)
 
-	stagedModules := outputGraph.StagedUsedModules()
+	stagedModules := execGraph.StagedUsedModules()
 	out = &Stages{
 		ctx:             ctx,
 		logger:          reqctx.Logger(ctx),
@@ -123,7 +123,7 @@ func NewStages(
 	return out
 }
 
-func layerKind(layer outputmodules.LayerModules) Kind {
+func layerKind(layer exec.LayerModules) Kind {
 	if layer.IsStoreLayer() {
 		return KindStore
 	}

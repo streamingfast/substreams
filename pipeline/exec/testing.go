@@ -1,4 +1,4 @@
-package outputmodules
+package exec
 
 import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"

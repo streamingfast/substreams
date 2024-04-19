@@ -26,7 +26,6 @@ import (
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/pipeline/cache"
 	"github.com/streamingfast/substreams/pipeline/exec"
-	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/storage/execout"
@@ -164,7 +163,7 @@ func (s *Tier2Service) setOverloaded() {
 	s.setReadyFunc(!overloaded)
 }
 
-func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, streamSrv pbssinternal.Substreams_ProcessRangeServer) (grpcError error) {
+func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, streamSrv pbssinternal.Substreams_ProcessRangeServer) error {
 	metrics.Tier2ActiveRequests.Inc()
 	metrics.Tier2RequestCounter.Inc()
 	defer metrics.Tier2ActiveRequests.Dec()
@@ -183,18 +182,9 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 		s.decrementConcurrentRequests()
 	}()
 
-	// TODO: use stage and segment numbers when implemented
 	stage := request.OutputModule
-	startBlock := request.SegmentNumber * request.SegmentSize
-	segment := fmt.Sprintf("%d:%d",
-		startBlock,
-		startBlock+request.SegmentSize,
-	)
 
-	logger := reqctx.Logger(ctx).Named("tier2").With(
-		zap.String("stage", stage),
-		zap.String("segment", segment),
-	)
+	logger := reqctx.Logger(ctx).Named("tier2").With(zap.String("stage", stage), zap.Uint64("segment_number", request.SegmentNumber))
 
 	ctx = logging.WithLogger(ctx, logger)
 	ctx = dmetering.WithBytesMeter(ctx)
@@ -217,7 +207,6 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	}
 
 	fields := []zap.Field{
-		zap.Uint64("segment_number", request.SegmentNumber),
 		zap.Uint64("segment_size", request.SegmentSize),
 		zap.Uint32("stage", request.Stage),
 		zap.Strings("modules", moduleNames),
@@ -239,17 +228,8 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 
 	logger.Info("incoming substreams ProcessRange request", fields...)
 
-	switch {
-	case request.MeteringConfig == "":
-		return fmt.Errorf("metering config is required in request")
-	case request.BlockType == "":
-		return fmt.Errorf("block type is required in request")
-	case request.StateStore == "":
-		return fmt.Errorf("state store is required in request")
-	case request.MergedBlocksStore == "":
-		return fmt.Errorf("merged blocks store is required in request")
-	case request.SegmentSize == 0:
-		return fmt.Errorf("a non-zero state bundle size is required in request")
+	if err := ValidateTier2Request(request); err != nil {
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("validate request: %w", err))
 	}
 
 	emitter, err := dmetering.New(request.MeteringConfig, logger)
@@ -264,7 +244,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 
 	respFunc := tier2ResponseHandler(ctx, logger, streamSrv)
 	err = s.processRange(ctx, request, respFunc)
-	grpcError = toGRPCError(ctx, err)
+	grpcError := toGRPCError(ctx, err)
 
 	switch status.Code(grpcError) {
 	case codes.Unknown, codes.Internal, codes.Unavailable:
@@ -274,45 +254,28 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	return grpcError
 }
 
+func (s *Tier2Service) getWASMRegistry(wasmExtensionConfigs map[string]string) (*wasm.Registry, error) {
+	var exts map[string]map[string]wasm.WASMExtension
+	if s.wasmExtensions != nil {
+		x, err := s.wasmExtensions(wasmExtensionConfigs) // sets eth_call extensions to wasm machine, ex., for ethereum
+		if err != nil {
+			return nil, fmt.Errorf("loading wasm extensions: %w", err)
+		}
+		exts = x
+	}
+	return wasm.NewRegistry(exts, s.runtimeConfig.MaxWasmFuel), nil
+}
+
 func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) error {
 	logger := reqctx.Logger(ctx)
-
-	s.runtimeConfig.DefaultCacheTag = request.StateStoreDefaultTag
 	s.runtimeConfig.SegmentSize = request.SegmentSize
 
-	mergedBlocksStore, err := dstore.NewDBinStore(request.MergedBlocksStore)
+	mergedBlocksStore, cacheStore, err := s.getStores(ctx, request)
 	if err != nil {
-		return fmt.Errorf("setting up block store from url %q: %w", request.MergedBlocksStore, err)
+		return err
 	}
 
-	if cloned, ok := mergedBlocksStore.(dstore.Clonable); ok {
-		mergedBlocksStore, err = cloned.Clone(ctx)
-		if err != nil {
-			return fmt.Errorf("cloning store: %w", err)
-		}
-		mergedBlocksStore.SetMeter(dmetering.GetBytesMeter(ctx))
-	}
-
-	stateStore, err := dstore.NewStore(request.StateStore, "zst", "zstd", false)
-	if err != nil {
-		return fmt.Errorf("getting store: %w", err)
-	}
-
-	if cloned, ok := stateStore.(dstore.Clonable); ok {
-		stateStore, err = cloned.Clone(ctx)
-		if err != nil {
-			return fmt.Errorf("cloning store: %w", err)
-		}
-		stateStore.SetMeter(dmetering.GetBytesMeter(ctx))
-	}
-
-	if err := outputmodules.ValidateTier2Request(request); err != nil {
-		return stream.NewErrInvalidArg(fmt.Errorf("validate request: %w", err).Error())
-	}
-
-	// FIXME: here, we validate that we have only modules on the same
-	// stage, otherwise we fall back.
-	outputGraph, err := outputmodules.NewOutputModuleGraph(request.OutputModule, true, request.Modules)
+	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, true, request.Modules)
 	if err != nil {
 		return stream.NewErrInvalidArg(err.Error())
 	}
@@ -323,77 +286,42 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		ctx = reqctx.WithModuleExecutionTracing(ctx)
 	}
 
-	requestDetails.CacheTag = s.runtimeConfig.DefaultCacheTag
-	if auth := dauth.FromContext(ctx); auth != nil {
-		if cacheTag := auth.Get("X-Sf-Substreams-Cache-Tag"); cacheTag != "" {
-			if IsValidCacheTag(cacheTag) {
-				requestDetails.CacheTag = cacheTag
-			} else {
-				return fmt.Errorf("invalid value for X-Sf-Substreams-Cache-Tag %s, should only contain letters, numbers, hyphens and undescores", cacheTag)
-			}
-		}
-	}
-
 	var requestStats *metrics.Stats
-	ctx, requestStats = setupRequestStats(ctx, requestDetails, outputGraph, true)
+	ctx, requestStats = setupRequestStats(ctx, requestDetails, execGraph.ModuleHashes().Get(requestDetails.OutputModule), true)
 	defer requestStats.LogAndClose()
 
-	if err := outputGraph.ValidateRequestStartBlock(requestDetails.ResolvedStartBlockNum); err != nil {
-		return stream.NewErrInvalidArg(err.Error())
-	}
-
-	var exts map[string]map[string]wasm.WASMExtension
-	if s.wasmExtensions != nil {
-		x, err := s.wasmExtensions(request.WasmExtensionConfigs)
-		if err != nil {
-			return fmt.Errorf("loading wasm extensions: %w", err)
-		}
-		exts = x
-	}
-	wasmRuntime := wasm.NewRegistry(exts, s.runtimeConfig.MaxWasmFuel)
-
-	cacheStore, err := stateStore.SubStore(requestDetails.CacheTag)
+	wasmRegistry, err := s.getWASMRegistry(request.WasmExtensionConfigs)
 	if err != nil {
-		return fmt.Errorf("internal error setting store: %w", err)
+		return err
 	}
 
-	if clonableStore, ok := cacheStore.(dstore.Clonable); ok {
-		cloned, err := clonableStore.Clone(ctx)
-		if err != nil {
-			return fmt.Errorf("cloning store: %w", err)
-		}
-		cloned.SetMeter(dmetering.GetBytesMeter(ctx))
-		cacheStore = cloned
-	}
+	startBlock := request.StartBlock()
+	stopBlock := request.StopBlock()
 
-	// BEGIN
-
-	startBlock := request.SegmentNumber * request.SegmentSize
-	stopBlock := startBlock + request.SegmentSize
-
-	// 1. too specific to execution outputs... map[moduleName]*execOutput.Config
 	execOutputConfigs, err := execout.NewConfigs(
 		cacheStore,
-		outputGraph.UsedModulesUpToStage(int(request.Stage)),
-		outputGraph.ModuleHashes(),
+		execGraph.UsedModulesUpToStage(int(request.Stage)),
+		execGraph.ModuleHashes(),
 		request.SegmentSize,
 		logger)
 	if err != nil {
 		return fmt.Errorf("new config map: %w", err)
 	}
 
-	// 2. too specific to stores... map[moduleName]*store.Config
-	storeConfigs, err := store.NewConfigMap(cacheStore, outputGraph.Stores(), outputGraph.ModuleHashes())
+	storeConfigs, err := store.NewConfigMap(cacheStore, execGraph.Stores(), execGraph.ModuleHashes())
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
+
+	// FIXME implement this instead of GenearteBlockIndexWriters
+	//	indexConfigs, err := index.NewConfigMap(cacheStore, execGraph.UsedIndexesModulesUpToStage(int(request.Stage)), execGraph.ModuleHashes())
 
 	// 3. we don't have a index.Config
 	indexWriters, blockIndices, err := index.GenerateBlockIndexWriters(
 		ctx,
 		cacheStore,
-		outputGraph.UsedIndexesModulesUpToStage(int(request.Stage)),
-		outputGraph.ModuleHashes(),
+		execGraph.UsedIndexesModulesUpToStage(int(request.Stage)),
+		execGraph.ModuleHashes(),
 		logger,
 		&block.Range{StartBlock: startBlock, ExclusiveEndBlock: stopBlock},
 		request.SegmentSize,
@@ -402,14 +330,50 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("generating block index writers: %w", err)
 	}
 
+	// map[string]executionConfig
+	//
+	// type executionConfig struct{
+	// 	runExecution bool
+	//  produceDownstreamOutputs bool
+	//  produceSnapshotOutputs bool
+	//  produceEventOutputs bool
+	//  blockFilter BlockFilter
+	// }
+
+	// type BlockFilter {
+	//	 preexistingExecOuts map[uint64]struct{}
+	// }
+
+	//	bf := BlockFilter{}
+	//
+	//	bf.Apply(keys) // NOOP if preexistingExecOuts ...
+	//	if bf.ShouldSkip(block.Number) {
+	//		return
+	//	}
+
+	// for each module:
+
+	// * execute it for real ?
+	// * produce outputs for the next modules ? (store: deltas, map: outputs, index: keys)
+	//     --> downstreamOutput() -> goes into the cache for next module to read (store: kvdelta, mapper: outputs, index: keys)
+	//   if we don't execute a required module, it probably already has its outputs in the downstreamOutput cache
+
+	// * produce outputs to write in the cache store
+	//     --> snapshotOutput() -> store: snapshot (full or partial!), mapper: nil, index: roaringBitmap
+	//      --> eventOutput()  -> store: kvops,  mapper: outputs, index: nil
+
+	// initialBlock (block at which we start executing that specific module, also used to determine the filenames of the outputs, ex: 00001012-10002000)
+
 	stores := pipeline.NewStores(ctx, storeConfigs, request.SegmentSize, requestDetails.ResolvedStartBlockNum, stopBlock, true)
 	isCompleteRange := stopBlock%request.SegmentSize == 0
 
 	// 4. what defines the list of modules that should be executed ?? right now : only the presence of the existingExecOuts
 
+	// TODO: replace this with generation of an execution Config, that is initialized using the indexConfig, execOutputConfig and the storeConfig
+	//
 	// note all modules that are not in 'modulesRequiredToRun' are still iterated in 'pipeline.executeModules', but they will skip actual execution when they see that the cache provides the data
 	// This way, stores get updated at each block from the cached execouts without the actual execution of the module
-	modulesRequiredToRun, existingExecOuts, execOutWriters, err := evaluateModulesRequiredToRun(ctx, logger, outputGraph, request.Stage, startBlock, stopBlock, isCompleteRange, request.OutputModule, execOutputConfigs, storeConfigs)
+	modulesRequiredToRun, existingExecOuts, execOutWriters, err := evaluateModulesRequiredToRun(ctx, logger, execGraph, request.Stage, startBlock, stopBlock, isCompleteRange, request.OutputModule, execOutputConfigs, storeConfigs)
 	if err != nil {
 		return fmt.Errorf("evaluating required modules: %w", err)
 	}
@@ -434,11 +398,11 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 
 	pipe := pipeline.New(
 		ctx,
-		outputGraph,
+		execGraph,
 		stores,
 		blockIndices,
 		execOutputConfigs,
-		wasmRuntime,
+		wasmRegistry,
 		execOutputCacheEngine,
 		s.runtimeConfig,
 		respFunc,
@@ -542,12 +506,60 @@ excludable:
 	return pipe.OnStreamTerminated(ctx, streamErr)
 }
 
+func (s *Tier2Service) getStores(ctx context.Context, request *pbssinternal.ProcessRangeRequest) (mergedBlocksStore, cacheStore dstore.Store, err error) {
+
+	mergedBlocksStore, err = dstore.NewDBinStore(request.MergedBlocksStore)
+	if err != nil {
+		return nil, nil, fmt.Errorf("setting up block store from url %q: %w", request.MergedBlocksStore, err)
+	}
+
+	if cloned, ok := mergedBlocksStore.(dstore.Clonable); ok {
+		mergedBlocksStore, err = cloned.Clone(ctx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("cloning store: %w", err)
+		}
+		mergedBlocksStore.SetMeter(dmetering.GetBytesMeter(ctx))
+	}
+
+	stateStore, err := dstore.NewStore(request.StateStore, "zst", "zstd", false)
+	if err != nil {
+		return nil, nil, fmt.Errorf("getting store: %w", err)
+	}
+
+	cacheTag := request.StateStoreDefaultTag
+	if auth := dauth.FromContext(ctx); auth != nil {
+		if ct := auth.Get("X-Sf-Substreams-Cache-Tag"); ct != "" {
+			if IsValidCacheTag(ct) {
+				cacheTag = ct
+			} else {
+				return nil, nil, fmt.Errorf("invalid value for X-Sf-Substreams-Cache-Tag %s, should only contain letters, numbers, hyphens and undescores", ct)
+			}
+		}
+	}
+
+	cacheStore, err = stateStore.SubStore(cacheTag)
+	if err != nil {
+		return nil, nil, fmt.Errorf("internal error setting store: %w", err)
+	}
+
+	if clonableStore, ok := cacheStore.(dstore.Clonable); ok {
+		cloned, err := clonableStore.Clone(ctx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("cloning store: %w", err)
+		}
+		cloned.SetMeter(dmetering.GetBytesMeter(ctx))
+		cacheStore = cloned
+	}
+
+	return
+}
+
 // evaluateModulesRequiredToRun will also load the existing execution outputs to be used as cache
 // if it returns no modules at all, it means that we can skip the whole thing
 func evaluateModulesRequiredToRun(
 	ctx context.Context,
 	logger *zap.Logger,
-	outputGraph *outputmodules.Graph,
+	execGraph *exec.Graph,
 	stage uint32,
 	startBlock uint64,
 	stopBlock uint64,
@@ -560,11 +572,11 @@ func evaluateModulesRequiredToRun(
 	requiredModules = make(map[string]*pbsubstreams.Module)
 	execoutWriters = make(map[string]*execout.Writer)
 	usedModules := make(map[string]*pbsubstreams.Module)
-	for _, module := range outputGraph.UsedModulesUpToStage(int(stage)) {
+	for _, module := range execGraph.UsedModulesUpToStage(int(stage)) {
 		usedModules[module.Name] = module
 	}
 
-	stageUsedModules := outputGraph.StagedUsedModules()[stage]
+	stageUsedModules := execGraph.StagedUsedModules()[stage]
 	runningLastStage := stageUsedModules.IsLastStage()
 	stageUsedModulesName := make(map[string]bool)
 	for _, layer := range stageUsedModules {

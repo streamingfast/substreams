@@ -9,7 +9,7 @@ import (
 
 	"github.com/streamingfast/substreams/block"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
-	"github.com/streamingfast/substreams/pipeline/outputmodules"
+	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
 )
@@ -57,7 +57,7 @@ func (s *Stores) resetStores() {
 }
 
 // flushStores is called only for Tier2 request, as to not save reversible stores.
-func (s *Stores) flushStores(ctx context.Context, executionStages outputmodules.ExecutionStages, blockNum uint64) (err error) {
+func (s *Stores) flushStores(ctx context.Context, executionStages exec.ExecutionStages, blockNum uint64) (err error) {
 	if s.StoreMap == nil {
 		return // fast exit for cases without stores or no linear processing
 	}
@@ -75,7 +75,7 @@ func (s *Stores) flushStores(ctx context.Context, executionStages outputmodules.
 	return nil
 }
 
-func (s *Stores) saveStoresSnapshots(ctx context.Context, lastLayer outputmodules.LayerModules, stage int, boundaryBlock uint64) (err error) {
+func (s *Stores) saveStoresSnapshots(ctx context.Context, lastLayer exec.LayerModules, stage int, boundaryBlock uint64) (err error) {
 	for _, mod := range lastLayer {
 		store := s.StoreMap[mod.Name]
 		s.logger.Info("flushing store at boundary", zap.Uint64("boundary", boundaryBlock), zap.String("store", mod.Name), zap.Int("stage", stage))

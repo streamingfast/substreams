@@ -12,7 +12,7 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/scheduler"
 	"github.com/streamingfast/substreams/orchestrator/stage"
 	"github.com/streamingfast/substreams/orchestrator/work"
-	"github.com/streamingfast/substreams/pipeline/outputmodules"
+	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"
@@ -29,7 +29,7 @@ func BuildParallelProcessor(
 	reqPlan *plan.RequestPlan,
 	runtimeConfig config.RuntimeConfig,
 	maxParallelJobs int,
-	outputGraph *outputmodules.Graph,
+	execGraph *exec.Graph,
 	execoutStorage *execout.Configs,
 	respFunc func(resp substreams.ResponseFromAnyTier) error,
 	storeConfigs store.ConfigMap,
@@ -38,7 +38,7 @@ func BuildParallelProcessor(
 	stream := response.New(respFunc)
 	sched := scheduler.New(ctx, stream)
 
-	stages := stage.NewStages(ctx, outputGraph, reqPlan, storeConfigs)
+	stages := stage.NewStages(ctx, execGraph, reqPlan, storeConfigs)
 	sched.Stages = stages
 
 	// OPTIMIZATION: We should fetch the ExecOut files too, and see if they
@@ -67,7 +67,7 @@ func BuildParallelProcessor(
 	if reqPlan.ReadExecOut != nil {
 		execOutSegmenter := reqPlan.WriteOutSegmenter()
 		// note: since we are *NOT* in a sub-request and are setting up output module is a map
-		requestedModule := outputGraph.OutputModule()
+		requestedModule := execGraph.OutputModule()
 		if requestedModule.GetKindStore() != nil {
 			panic("logic error: should not get a store as outputModule on tier 1")
 		}

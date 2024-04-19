@@ -29,3 +29,11 @@ func ToWasmModuleTypeArray(s []string) []WASMModuleType {
 	}
 	return result
 }
+
+func (r *ProcessRangeRequest) StartBlock() uint64 {
+	return r.SegmentNumber * r.SegmentSize
+}
+
+func (r *ProcessRangeRequest) StopBlock() uint64 {
+	return r.SegmentNumber*r.SegmentSize + r.SegmentSize
+}

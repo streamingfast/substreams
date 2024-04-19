@@ -1,4 +1,4 @@
-package outputmodules
+package exec
 
 import (
 	"fmt"

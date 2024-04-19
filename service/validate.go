@@ -1,4 +1,4 @@
-package outputmodules
+package service
 
 import (
 	"fmt"

@@ -21,7 +21,6 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
 	"github.com/streamingfast/substreams/pipeline/exec"
-	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/reqctx"
 	store2 "github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
@@ -59,7 +58,7 @@ func TestPipeline_runExecutor(t *testing.T) {
 			ctx = reqctx.WithReqStats(ctx, metrics.NewReqStats(&metrics.Config{}, zap.NewNop()))
 			pipe := &Pipeline{
 				forkHandler: NewForkHandler(),
-				outputGraph: outputmodules.TestNew(),
+				execGraph:   exec.TestNew(),
 			}
 			clock := &pbsubstreams.Clock{Id: test.block.Id, Number: test.block.Number}
 			execOutput := NewExecOutputTesting(t, bstreamBlk(t, test.block), clock)
@@ -140,19 +139,19 @@ func TestSetupSubrequestStores(t *testing.T) {
 		storeModuleKind := &pbsubstreams.Module_KindStore_{KindStore: &pbsubstreams.Module_KindStore{}}
 		p := Pipeline{
 			stores: &Stores{configs: confMap},
-			executionStages: outputmodules.ExecutionStages{
-				outputmodules.StageLayers{
-					outputmodules.LayerModules{
+			executionStages: exec.ExecutionStages{
+				exec.StageLayers{
+					exec.LayerModules{
 						&pbsubstreams.Module{Name: "mod1", Kind: storeModuleKind},
 					},
 				},
-				outputmodules.StageLayers{
-					outputmodules.LayerModules{
+				exec.StageLayers{
+					exec.LayerModules{
 						&pbsubstreams.Module{Name: "mod2", Kind: storeModuleKind},
 					},
 				},
-				outputmodules.StageLayers{
-					outputmodules.LayerModules{
+				exec.StageLayers{
+					exec.LayerModules{
 						&pbsubstreams.Module{Name: "mod3", Kind: storeModuleKind},
 					},
 				},

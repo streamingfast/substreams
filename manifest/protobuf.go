@@ -1,15 +1,19 @@
 package manifest
 
 import (
+	"bytes"
 	"fmt"
+	"io"
+	"os"
+	"strings"
 
 	"github.com/jhump/protoreflect/desc"
 
 	"github.com/jhump/protoreflect/desc/protoparse"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pb/system"
+	sfproto "github.com/streamingfast/substreams/proto"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 )
 
@@ -42,6 +46,14 @@ func loadProtobufs(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.FileDesc
 	parser := &protoparse.Parser{
 		ImportPaths:           importPaths,
 		IncludeSourceCodeInfo: true,
+		Accessor: func(filename string) (io.ReadCloser, error) {
+			// This is a workaround for protoparse's parser that does not honor extensions (google.protobuf.FieldOptions) without access to the full source:
+			// the source 'sf/substreams/options.proto' file is provided through go_embed, simulating that the file exists on disk.
+			if strings.HasSuffix(filename, sfproto.OptionsPath) {
+				return io.NopCloser(bytes.NewReader(sfproto.OptionsSource)), nil
+			}
+			return os.Open(filename)
+		},
 	}
 
 	for _, file := range manif.Protobuf.Files {
@@ -59,44 +71,6 @@ func loadProtobufs(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.FileDesc
 	}
 
 	return customFiles, nil
-}
-
-type ext struct {
-}
-
-func (e ext) New() protoreflect.Value {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (e ext) Zero() protoreflect.Value {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (e ext) TypeDescriptor() protoreflect.ExtensionTypeDescriptor {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (e ext) ValueOf(i interface{}) protoreflect.Value {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (e ext) InterfaceOf(value protoreflect.Value) interface{} {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (e ext) IsValidValue(value protoreflect.Value) bool {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (e ext) IsValidInterface(i interface{}) bool {
-	//TODO implement me
-	panic("implement me")
 }
 
 func readSystemProtobufs() (*descriptorpb.FileDescriptorSet, error) {

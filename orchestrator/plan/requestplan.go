@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/streamingfast/substreams/block"
-	"github.com/streamingfast/substreams/utils"
 )
 
 // RequestPlan lays out the configuration of the components to accomplish
@@ -51,48 +50,58 @@ func (p *RequestPlan) RequiresParallelProcessing() bool {
 	return p.WriteExecOut != nil || p.BuildStores != nil
 }
 
-func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphInitBlock, resolvedStartBlock, linearHandoffBlock, exclusiveEndBlock uint64, scheduleStores bool) *RequestPlan {
+func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphInitBlock, resolvedStartBlock, linearHandoffBlock, exclusiveEndBlock uint64, scheduleStores bool) (*RequestPlan, error) {
 	if exclusiveEndBlock != 0 && linearHandoffBlock > exclusiveEndBlock {
-		panic(fmt.Sprintf("invalid linearHandoff %d when building plan, it should always be capped at exclusiveEndBlock %d", linearHandoffBlock, exclusiveEndBlock))
+		return nil, fmt.Errorf("end block %d cannot be prior to the linear handoff block %d", exclusiveEndBlock, linearHandoffBlock)
 	}
 	if resolvedStartBlock < graphInitBlock {
-		panic(fmt.Errorf("start block cannot be prior to the lowest init block in the requested module graph (%d)", graphInitBlock))
+		return nil, fmt.Errorf("start block cannot be prior to the lowest init block in the requested module graph (%d)", graphInitBlock)
 	}
 
 	segmenter := block.NewSegmenter(segmentInterval, graphInitBlock, exclusiveEndBlock)
 	plan := &RequestPlan{
 		segmentInterval: segmentInterval,
 	}
-	if linearHandoffBlock != exclusiveEndBlock {
-		// assumes exclusiveEndBlock isn't 0, because linearHandoffBlock cannot be 0
+	if linearHandoffBlock != exclusiveEndBlock ||
+		linearHandoffBlock == 0 { // ex: unbound dev mode
 		plan.LinearPipeline = block.NewRange(linearHandoffBlock, exclusiveEndBlock)
 	}
 	if resolvedStartBlock == linearHandoffBlock && graphInitBlock == resolvedStartBlock {
-		return plan
+		return plan, nil
 	}
 	if productionMode {
 		storesStopOnBound := plan.LinearPipeline == nil
 		endStoreBound := linearHandoffBlock
 		if storesStopOnBound {
 			segmentIdx := segmenter.IndexForEndBlock(linearHandoffBlock)
-			endStoreBound = segmenter.Range(segmentIdx).StartBlock
+			endStoreBoundRange := segmenter.Range(segmentIdx)
+			if endStoreBoundRange == nil {
+				return nil, fmt.Errorf("store bound range: invalid start block %d for segment interval %d", linearHandoffBlock, segmentInterval)
+			}
+			endStoreBound = endStoreBoundRange.ExclusiveEndBlock
 		}
 		if scheduleStores {
 			plan.BuildStores = block.NewRange(graphInitBlock, endStoreBound)
 		}
 
-		startExecOutAtBlock := utils.MaxOf(resolvedStartBlock, graphInitBlock)
-		startExecOutAtSegment := segmenter.IndexForStartBlock(startExecOutAtBlock)
-		writeExecOutStartBlock := segmenter.Range(startExecOutAtSegment).StartBlock
-		plan.WriteExecOut = block.NewRange(writeExecOutStartBlock, linearHandoffBlock)
-		plan.ReadExecOut = block.NewRange(resolvedStartBlock, linearHandoffBlock)
+		if resolvedStartBlock <= linearHandoffBlock {
+			startExecOutAtBlock := max(resolvedStartBlock, graphInitBlock)
+			startExecOutAtSegment := segmenter.IndexForStartBlock(startExecOutAtBlock)
+			writeExecOutStartBlockRange := segmenter.Range(startExecOutAtSegment)
+			if writeExecOutStartBlockRange == nil {
+				return nil, fmt.Errorf("write execout range: invalid start block %d for segment interval %d", startExecOutAtBlock, segmentInterval)
+			}
+			writeExecOutStartBlock := writeExecOutStartBlockRange.StartBlock
+			plan.WriteExecOut = block.NewRange(writeExecOutStartBlock, linearHandoffBlock)
+			plan.ReadExecOut = block.NewRange(resolvedStartBlock, linearHandoffBlock)
+		}
 	} else { /* dev mode */
 		if scheduleStores {
 			plan.BuildStores = block.NewRange(graphInitBlock, linearHandoffBlock)
 		}
 		plan.WriteExecOut = nil
 	}
-	return plan
+	return plan, nil
 }
 
 func (p *RequestPlan) StoresSegmenter() *block.Segmenter {
@@ -107,8 +116,8 @@ func (p *RequestPlan) BackprocessSegmenter() *block.Segmenter {
 	}
 	return block.NewSegmenter(
 		p.segmentInterval,
-		utils.MinOf(p.BuildStores.StartBlock, p.WriteExecOut.StartBlock),
-		utils.MaxOf(p.BuildStores.ExclusiveEndBlock, p.WriteExecOut.ExclusiveEndBlock),
+		min(p.BuildStores.StartBlock, p.WriteExecOut.StartBlock),
+		max(p.BuildStores.ExclusiveEndBlock, p.WriteExecOut.ExclusiveEndBlock),
 	)
 }
 

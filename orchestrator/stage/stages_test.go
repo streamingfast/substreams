@@ -15,14 +15,14 @@ import (
 
 func TestNewStages(t *testing.T) {
 	//seg := block.NewSegmenter(10, 5, 75)
-	reqPlan := plan.BuildTier1RequestPlan(true, 10, 5, 5, 75, 75, true)
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 75, 75, true)
+	assert.NoError(t, err)
 
 	stages := NewStages(
 		context.Background(),
 		outputmodules.TestGraphStagedModules(5, 7, 12, 22, 25),
 		reqPlan,
 		nil,
-		"trace",
 	)
 
 	assert.Equal(t, 8, stages.globalSegmenter.Count()) // from 5 to 75
@@ -34,20 +34,20 @@ func TestNewStages(t *testing.T) {
 
 	assert.Equal(t, block.ParseRange("5-10"), stages.storeSegmenter.Range(0))
 	assert.Equal(t, block.ParseRange("10-20"), stages.storeSegmenter.Range(1))
-	assert.Nil(t, stages.storeSegmenter.Range(7))
+	assert.Equal(t, block.ParseRange("70-75"), stages.storeSegmenter.Range(7))
 	assert.Equal(t, block.ParseRange("70-75"), stages.globalSegmenter.Range(7))
 }
 
 func TestNewStagesNextJobs(t *testing.T) {
 	//seg := block.NewSegmenter(10, 5, 50)
-	reqPlan := plan.BuildTier1RequestPlan(true, 10, 5, 5, 50, 50, true)
-	assert.Equal(t, "interval=10, stores=[5, 40), map_write=[5, 50), map_read=[5, 50), linear=[nil)", reqPlan.String())
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 40, 40, true)
+	assert.NoError(t, err)
+	assert.Equal(t, "interval=10, stores=[5, 40), map_write=[5, 40), map_read=[5, 40), linear=[nil)", reqPlan.String())
 	stages := NewStages(
 		context.Background(),
 		outputmodules.TestGraphStagedModules(5, 5, 5, 5, 5),
 		reqPlan,
 		nil,
-		"trace",
 	)
 
 	stages.allocSegments(0)
@@ -135,11 +135,6 @@ M:NC.`)
 
 	stages.NextJob()
 
-	segmentStateEquals(t, stages, `
-S:CCSS
-S:CSS.
-M:NC..`)
-
 	_, r := stages.NextJob()
 	assert.Nil(t, r)
 
@@ -148,20 +143,6 @@ S:CCSS
 S:CSS.
 M:NC..`)
 
-	//	segmentStateEquals(t, stages, `
-	//S:CCSSS...
-	//S:CSS.....
-	//M:NC......`)
-	//
-	//	stages.NextJob()
-	//
-	//	segmentStateEquals(t, stages, `
-	//S:CCSSSS..
-	//S:CSS.....
-	//M:NC......`)
-	//
-	//	_, r := stages.NextJob()
-	//	assert.Nil(t, r)
 	stages.MarkSegmentPartialPresent(id(2, 0))
 
 	segmentStateEquals(t, stages, `
@@ -169,10 +150,10 @@ S:CCPS
 S:CSS.
 M:NC..`)
 
-	_, r = stages.NextJob()
-	assert.Nil(t, r)
 	stages.MarkSegmentMerging(id(2, 0))
 
+	_, r = stages.NextJob()
+	assert.Nil(t, r)
 	segmentStateEquals(t, stages, `
 S:CCMS
 S:CSS.

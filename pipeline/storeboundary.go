@@ -35,7 +35,11 @@ func (r *storeBoundary) BumpBoundary() {
 }
 
 func (r *storeBoundary) computeBoundaryBlock(atBlockNum uint64) uint64 {
-	return atBlockNum - atBlockNum%r.interval + r.interval
+	v := atBlockNum % r.interval
+	w := atBlockNum - v
+	res := w + r.interval
+	return res
+	//return atBlockNum - atBlockNum%r.interval + r.interval
 }
 
 func (r *storeBoundary) InitNextBoundary(blockNum uint64) {
@@ -58,7 +62,7 @@ func (r *storeBoundary) GetStoreFlushRanges(isSubRequest bool, reqStopBlockNum u
 	}
 
 	out := []uint64{}
-	for v, _ := range boundaries {
+	for v := range boundaries {
 		out = append(out, v)
 	}
 	sort.Slice(out, func(i, j int) bool {

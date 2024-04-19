@@ -18,12 +18,12 @@ func InitTestGenerator(t *testing.T) *Generator {
 		protoDefinitions = pd
 	}))
 
-	pkg, err := manifestReader.Read()
+	pkg, _, err := manifestReader.Read()
 	if err != nil {
 		panic(fmt.Errorf("reading manifest file %s :%w", manifestPath, err))
 	}
 
-	manif, err := manifest.LoadManifestFile(manifestPath)
+	manif, err := manifest.LoadManifestFile(manifestPath, ".")
 	require.NoError(t, err)
 
 	return NewGenerator(pkg, manif, protoDefinitions, "")

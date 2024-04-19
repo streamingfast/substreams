@@ -5,13 +5,12 @@ import (
 	"net/url"
 	"strings"
 
-	connect_go "github.com/bufbuild/connect-go"
+	connect_go "connectrpc.com/connect"
 	"github.com/streamingfast/dauth"
 	dauthconnect "github.com/streamingfast/dauth/middleware/connect"
 	dauthgrpc "github.com/streamingfast/dauth/middleware/grpc"
-
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
-	connectweb "github.com/streamingfast/dgrpc/server/connect-web"
+	connectweb "github.com/streamingfast/dgrpc/server/connectrpc"
 	"github.com/streamingfast/dgrpc/server/factory"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	ssconnect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcconnect"
@@ -51,6 +50,7 @@ func ListenTier1(
 
 	options = append(options, dgrpcserver.WithConnectInterceptor(dauthconnect.NewAuthInterceptor(auth, logger)))
 	options = append(options, dgrpcserver.WithConnectStrictContentType(false))
+	options = append(options, dgrpcserver.WithReflection(ssconnect.StreamName))
 
 	streamHandlerGetter := func(opts ...connect_go.HandlerOption) (string, http.Handler) {
 		return ssconnect.NewStreamHandler(svc, opts...)

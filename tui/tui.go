@@ -3,10 +3,11 @@ package tui
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/substreams/tools/test"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/streamingfast/substreams/tools/test"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jhump/protoreflect/desc"
@@ -33,8 +34,9 @@ type TUI struct {
 	outputMode        OutputMode
 	prettyPrintOutput bool
 
-	prog          *tea.Program
-	seenFirstData bool
+	prog           *tea.Program
+	seenFirstData  bool
+	TotalReadBytes uint64
 
 	msgDescs       map[string]*desc.MessageDescriptor
 	decodeMsgTypes map[string]func(in []byte) string
@@ -170,14 +172,14 @@ func (ui *TUI) IncomingMessage(ctx context.Context, resp *pbsubstreamsrpc.Respon
 			return ui.jsonBlockScopedData(m.BlockScopedData.Output, m.BlockScopedData.DebugMapOutputs, m.BlockScopedData.DebugStoreOutputs, m.BlockScopedData.Clock)
 		}
 	case *pbsubstreamsrpc.Response_Progress:
-		if ui.seenFirstData {
-			ui.formatPostDataProgress(m)
-		} else {
+		if m.Progress.ProcessedBytes != nil {
+			ui.TotalReadBytes = m.Progress.ProcessedBytes.TotalBytesRead
+		}
+
+		if !ui.seenFirstData {
 			if ui.outputMode == OutputModeTUI {
 				ui.ensureTerminalLocked()
-				for _, module := range m.Progress.Modules {
-					ui.prog.Send(module)
-				}
+				ui.prog.Send(m.Progress)
 			}
 		}
 	case *pbsubstreamsrpc.Response_DebugSnapshotData:

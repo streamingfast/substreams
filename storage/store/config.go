@@ -9,14 +9,17 @@ import (
 	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
 
+	"github.com/streamingfast/substreams/block"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage/store/marshaller"
 )
 
 type Config struct {
-	name       string
-	moduleHash string
-	objStore   dstore.Store
+	name         string
+	moduleHash   string
+	objStore     dstore.Store
+	outputsStore dstore.Store
 
 	moduleInitialBlock uint64
 	updatePolicy       pbsubstreams.Module_KindStore_UpdatePolicy
@@ -25,11 +28,6 @@ type Config struct {
 	appendLimit    uint64
 	totalSizeLimit uint64
 	itemSizeLimit  uint64
-
-	// traceID uniquely identifies the connection ID so that store can be
-	// written to unique filename preventing some races when multiple Substreams
-	// request works on the same range.
-	traceID string
 }
 
 func NewConfig(
@@ -39,9 +37,12 @@ func NewConfig(
 	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy,
 	valueType string,
 	store dstore.Store,
-	traceID string,
 ) (*Config, error) {
 	subStore, err := store.SubStore(fmt.Sprintf("%s/states", moduleHash))
+	if err != nil {
+		return nil, fmt.Errorf("creating sub store: %w", err)
+	}
+	outputsStore, err := store.SubStore(fmt.Sprintf("%s/outputs", moduleHash))
 	if err != nil {
 		return nil, fmt.Errorf("creating sub store: %w", err)
 	}
@@ -51,12 +52,12 @@ func NewConfig(
 		updatePolicy:       updatePolicy,
 		valueType:          valueType,
 		objStore:           subStore,
+		outputsStore:       outputsStore,
 		moduleInitialBlock: moduleInitialBlock,
 		moduleHash:         moduleHash,
 		appendLimit:        8_388_608,     // 8MiB = 8 * 1024 * 1024,
 		totalSizeLimit:     1_073_741_824, // 1GiB
 		itemSizeLimit:      10_485_760,    // 10MiB
-		traceID:            traceID,
 	}, nil
 }
 
@@ -93,9 +94,20 @@ func (c *Config) NewFullKV(logger *zap.Logger) *FullKV {
 	return &FullKV{c.newBaseStore(logger), "N/A"}
 }
 
+func (c *Config) ExistsFullKV(ctx context.Context, upTo uint64) (bool, error) {
+	filename := FullStateFileName(block.NewRange(c.moduleInitialBlock, upTo))
+	return c.objStore.FileExists(ctx, filename)
+}
+
+func (c *Config) ExistsPartialKV(ctx context.Context, from, to uint64) (bool, error) {
+	filename := PartialFileName(block.NewRange(from, to))
+	return c.objStore.FileExists(ctx, filename)
+}
+
 func (c *Config) NewPartialKV(initialBlock uint64, logger *zap.Logger) *PartialKV {
 	return &PartialKV{
 		baseStore:    c.newBaseStore(logger),
+		operations:   &pbssinternal.Operations{},
 		initialBlock: initialBlock,
 		seen:         make(map[string]bool),
 	}
@@ -128,10 +140,23 @@ func (c *Config) ListSnapshotFiles(ctx context.Context, below uint64) (files []*
 		// We need to clear each time we start because a previous retry could have accumulated a partial state
 		files = nil
 
+		deletedOldFiles := 0
 		return c.objStore.Walk(ctx, "", func(filename string) (err error) {
 			fileInfo, ok := parseFileName(c.Name(), filename)
 			if !ok {
 				logger.Warn("seen snapshot file that we don't know how to parse", zap.String("filename", filename))
+				return nil
+			}
+
+			if fileInfo.WithTraceID {
+				if deletedOldFiles < 100 {
+					go func() {
+						if err := c.objStore.DeleteObject(ctx, filename); err != nil { // clean up all old files with traceID in them, they will only slow every next run
+							logger.Warn("cannot delete old partial file with trace_id", zap.String("filename", filename), zap.Error(err))
+						}
+					}()
+					deletedOldFiles++
+				}
 				return nil
 			}
 

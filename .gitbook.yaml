@@ -2,3 +2,69 @@ root: ./docs/
 
 structure:
   summary: SUMMARY.md
+
+redirects:
+  concepts-and-fundamentals/benefits: ./README.md
+  concepts-and-fundamentals/fundamentals: ./README.md
+  concepts-and-fundamentals/modules: ./new/common/manifest-modules.md
+  developers-guide/creating-protobuf-schema: ./new/develop/creating-protobuf-schemas.md
+  developers-guide/creating-your-manifest: ./new/common/manifest-modules.md
+  developers-guide/gui: ./new/references/gui.md
+  developers-guide/installation-requirements: ./new/common/installing-the-cli.md
+  developers-guide/overview: ./new/develop/init-project.md
+  developers-guide/parallel-execution: ./new/develop/architecture.md
+  developers-guide/running-substreams: ./new/common/running-substreams.md
+  developers-guide/modules/inputs: ./new/develop/modules/inputs.md
+  developers-guide/modules/outputs: ./new/develop/modules/outputs.md
+  developers-guide/modules/setting-up-handlers: ./new/develop/modules/setting-up-handlers.md
+  developers-guide/modules/types: ./new/develop/modules/types.md
+  developers-guide/modules/writing-module-handlers: ./new/develop/modules/writing-module-handlers.md
+  developers-guide/cookbook/advanced-params: ./new/develop/parameterized-modules.md
+  developers-guide/cookbook/aggregation-windows: ./new/develop/modules/aggregation-windows.md
+  developers-guide/cookbook/dynamic-data-sources: ./new/develop/modules/dynamic-data-sources.md
+  developers-guide/cookbook/factory-params: ./new/develop/parameterized-modules.md
+  developers-guide/cookbook/keys-in-stores: ./new/develop/modules/keys-in-stores.md
+  developers-guide/sink-targets/substreams-powered-subgraph: ./new/consume/subgraph/subgraph.md
+  developers-guide/sink-targets/substreams-sink-sql: ./new/consume/sql/sql.md
+  developers-guide/sink-targets/substreams-sink-files: ./new/consume/other-sinks/files.md
+  developers-guide/sink-targets/substreams-sink-kv: ./new/consume/other-sinks/kv.md
+  developers-guide/sink-targets/substreams-sink-mongodb: ./new/consume/other-sinks/mongodb.md
+  developers-guide/sink-targets/substreams-sink-prometheus: ./new/consume/other-sinks/prometheus.md
+  getting-started/installing-the-cli: ./new/common/installing-the-cli.md
+  getting-started/quickstart: ./new/develop/init-project.md
+  references-and-specs/chains-and-endpoints: ./new/references/chains-and-endpoints.md
+  references-and-specs/command-line-interface: ./new/references/command-line-interface.md
+  references-and-specs/examples: ./new/tutorials/overview.md
+  references-and-specs/gui: ./new/references/gui.md
+  references-and-specs/faq: ./new/references/faq.md
+  references-and-specs/manifests: ./new/references/manifests.md
+  references-and-specs/packages: ./new/common/packages.md
+  references-and-specs/rust-crates: ./new/develop/rust-crates.md
+  glossary/glossary: ./new/references/glossary.md
+  quick-access/change-log: ./new/references/change-log.md
+  tutorials/from-ethereum-address-to-sql: ./new/consume/sql/deployable-services/remote-service.md
+  tutorials/substreams-sql: ./new/consume/sql/deployable-services/local-service.md
+  tutorials/exploring-ethereum: ./new/tutorials/evm/exploring-ethereum.md
+  tutorials/exploring-ethereum/overview: ./new/tutorials/evm/exploring-ethereum.md
+  tutorials/exploring-ethereum/map_block_meta_module: ./new/tutorials/evm/exploring-ethereum/map_block_meta_module.md
+  tutorials/exploring-ethereum/map_filter_transactions_module: ./new/tutorials/evm/exploring-ethereum/map_filter_transactions_module.md
+  tutorials/exploring-ethereum/map_contract_events_module: ./new/tutorials/evm/exploring-ethereum/map_contract_events_module.md
+  tutorials/rust/overview: ./new/tutorials/rust/overview.md
+  tutorials/rust: ./new/tutorials/rust/overview.md
+  tutorials/rust/option: ./new/tutorials/rust/option.md
+  tutorials/rust/result: ./new/tutorials/rust/result.md
+  tutorials/eth-calls: ./new/develop/chain-specific/evm/eth-calls.md
+  documentation/consume/other-ways-of-consuming: ./new/consume/other-sinks/README.md
+  documentation/consume/other-ways-of-consuming/kv: ./new/consume/other-sinks/kv.md
+  documentation/consume/other-ways-of-consuming/mongodb: ./new/consume/other-sinks/mongodb.md
+  documentation/consume/other-ways-of-consuming/files: ./new/consume/other-sinks/files.md
+  documentation/consume/other-ways-of-consuming/prometheus: ./new/consume/other-sinks/prometheus.md
+  documentation/consume/other-ways-of-consuming/pubsub: ./new/consume/other-sinks/pubsub.md
+
+
+
+
+
+
+
+

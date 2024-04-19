@@ -1,0 +1,83 @@
+specVersion: v0.1.0
+package:
+  name: {{ .moduleName }}
+  version: v0.1.0
+
+imports:
+  sql: https://github.com/streamingfast/substreams-sink-sql/releases/download/protodefs-v{{ .sqlImportVersion }}/substreams-sink-sql-protodefs-v{{ .sqlImportVersion }}.spkg
+  graph: https://github.com/streamingfast/substreams-sink-subgraph/releases/download/v{{ .graphImportVersion }}/substreams-sink-subgraph-protodefs-v{{ .graphImportVersion }}.spkg
+  database_change: https://github.com/streamingfast/substreams-sink-database-changes/releases/download/v{{ .databaseChangeImportVersion }}/substreams-database-change-v{{ .databaseChangeImportVersion }}.spkg
+  entity: https://github.com/streamingfast/substreams-entity-change/releases/download/v{{ .entityChangeImportVersion }}/substreams-entity-change-v{{ .entityChangeImportVersion }}.spkg
+
+protobuf:
+  files:
+    - contract.proto
+  importPaths:
+    - ./proto
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: ./target/wasm32-unknown-unknown/release/substreams.wasm
+
+modules:
+{{- range $contract := .ethereumContracts -}}
+{{- range $ddsContract := $contract.GetDDS }}
+  - name: store_{{ $contract.GetName }}_{{ $ddsContract.GetName }}_created
+    kind: store
+    initialBlock: {{ $.initialBlock }}
+    updatePolicy: set
+    valueType: proto:dynamic_datasource
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+{{ end -}}
+{{- end }}
+  - name: map_events
+    kind: map
+    initialBlock: {{ .initialBlock }}
+    inputs:
+      - source: sf.ethereum.type.v2.Block{{ range $contract := .ethereumContracts -}}{{ range $ddsContract := $contract.GetDDS }}
+      - store: store_{{ $contract.GetName }}_{{ $ddsContract.GetName }}_created{{ end }}{{ end }}
+    output:
+      type: proto:contract.v1.Events
+{{- if .withCalls }}
+
+  - name: map_calls
+    kind: map
+    initialBlock: {{ .initialBlock }}
+    inputs:
+      - source: sf.ethereum.type.v2.Block{{ range $contract := .ethereumContracts -}}{{ range $ddsContract := $contract.GetDDS }}
+      - store: store_{{ $contract.GetName }}_{{ $ddsContract.GetName }}_created{{ end }}{{ end }}
+    output:
+      type: proto:contract.v1.Calls
+{{- end }}
+
+  - name: db_out
+    kind: map
+    initialBlock: {{ .initialBlock }}
+    inputs:
+      - map: map_events
+{{- if .withCalls }}
+      - map: map_calls{{ end }}
+    output:
+      type: proto:sf.substreams.sink.database.v1.DatabaseChanges
+
+  - name: graph_out
+    kind: map
+    initialBlock: {{ .initialBlock }}
+    inputs:
+      - map: map_events
+{{- if .withCalls }}
+      - map: map_calls{{ end }}
+    output:
+      type: proto:sf.substreams.entity.v1.EntityChanges
+
+network: {{ .network }}
+
+sink:
+  module: graph_out
+  type: sf.substreams.sink.subgraph.v1.Service
+  config:
+    schema: "./schema.graphql"
+    subgraph_yaml: "./subgraph.yaml"
+    postgres_direct_protocol_access: true

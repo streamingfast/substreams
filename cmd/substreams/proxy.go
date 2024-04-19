@@ -7,18 +7,18 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/bufbuild/connect-go"
-	grpcreflect "github.com/bufbuild/connect-grpcreflect-go"
+	"connectrpc.com/connect"
+	grpcreflect "connectrpc.com/grpcreflect"
 	"github.com/rs/cors"
 	"github.com/spf13/cobra"
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/h2c"
-
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	pbrpcsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	ssconnect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcconnect"
 	"github.com/streamingfast/substreams/tools"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
+	"google.golang.org/grpc/metadata"
 )
 
 var proxyCmd = &cobra.Command{
@@ -56,7 +56,7 @@ func (cs *ConnectServer) Blocks(
 			return fmt.Errorf("manifest reader: %w", err)
 		}
 
-		pkg, err := manifestReader.Read()
+		pkg, _, err := manifestReader.Read()
 		if err != nil {
 			return fmt.Errorf("read manifest %q: %w", cs.Manifest, err)
 		}
@@ -67,7 +67,7 @@ func (cs *ConnectServer) Blocks(
 		newReq.StartBlockNum = int64(cs.StartBlock)
 	}
 
-	ssClient, connClose, callOpts, err := client.NewSubstreamsClient(cs.SubstreamsClientConfig)
+	ssClient, connClose, callOpts, headers, err := client.NewSubstreamsClient(cs.SubstreamsClientConfig)
 	if err != nil {
 		return fmt.Errorf("substreams client setup: %w", err)
 	}
@@ -77,6 +77,9 @@ func (cs *ConnectServer) Blocks(
 		return fmt.Errorf("validate request: %w", err)
 	}
 
+	if headers.IsSet() {
+		ctx = metadata.AppendToOutgoingContext(ctx, headers.ToArray()...)
+	}
 	cli, err := ssClient.Blocks(ctx, newReq, callOpts...)
 	if err != nil {
 		return fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err)
@@ -99,6 +102,7 @@ func (cs *ConnectServer) Blocks(
 func init() {
 	proxyCmd.Flags().StringP("substreams-endpoint", "e", "mainnet.eth.streamingfast.io:443", "Substreams gRPC endpoint")
 	proxyCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token")
+	proxyCmd.Flags().String("substreams-api-key-envvar", "SUBSTREAMS_API_KEY", "Name of variable containing Substreams Api Key")
 	proxyCmd.Flags().String("listen-addr", "localhost:8080", "listen on this address (unencrypted)")
 	proxyCmd.Flags().BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
 	proxyCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
@@ -112,9 +116,11 @@ func runProxy(cmd *cobra.Command, args []string) error {
 	addr := mustGetString(cmd, "listen-addr")
 	fmt.Println("listening on", addr)
 
+	authToken, authType := tools.GetAuth(cmd, "substreams-api-key-envvar", "substreams-api-token-envvar")
 	substreamsClientConfig := client.NewSubstreamsClientConfig(
 		mustGetString(cmd, "substreams-endpoint"),
-		tools.ReadAPIToken(cmd, "substreams-api-token-envvar"),
+		authToken,
+		authType,
 		mustGetBool(cmd, "insecure"),
 		mustGetBool(cmd, "plaintext"),
 	)

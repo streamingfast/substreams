@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,6 +36,7 @@ func init() {
 		replaced by "-") and "<version>" is "package.version" value. You can use "{version}" which resolves
 		to "package.version".
 	`))
+	//packCmd.Flags().StringArrayP("config", "c", []string{}, cli.FlagDescription(`path to a configuration file that contains overrides for the manifest`))
 }
 
 func runPack(cmd *cobra.Command, args []string) error {
@@ -51,16 +51,12 @@ func runPack(cmd *cobra.Command, args []string) error {
 	}
 
 	if !manifestReader.IsLocalManifest() {
-		return fmt.Errorf(`"pack" can only be use to pack local manifest file`)
+		return fmt.Errorf(`"pack" can only be used to pack local manifest file`)
 	}
 
-	pkg, err := manifestReader.Read()
+	pkg, _, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("reading manifest %q: %w", manifestPath, err)
-	}
-
-	if _, err = manifest.NewModuleGraph(pkg.Modules.Modules); err != nil {
-		return fmt.Errorf("processing module graph %w", err)
 	}
 
 	originalOutputFile := maybeGetString(cmd, "output-file")
@@ -82,7 +78,7 @@ func runPack(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("marshalling package: %w", err)
 	}
 
-	if err := ioutil.WriteFile(resolvedOutputFile, cnt, 0644); err != nil {
+	if err := os.WriteFile(resolvedOutputFile, cnt, 0644); err != nil {
 		fmt.Println("")
 		return fmt.Errorf("writing file: %w", err)
 	}

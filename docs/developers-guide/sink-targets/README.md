@@ -48,8 +48,8 @@ The [`substreams-eth-block-meta`](https://github.com/streamingfast/substreams-et
 
 StreamingFast provides several tools to assist database persistence for Substreams.
 
-* **PostgreSQL:** A command line tool to [sync a Substreams with a PosgreSQL database](https://github.com/streamingfast/substreams-sink-postgres)
-* **MongoDB:** A command line tool to [sync a Substream with a MongoDB database](https://github.com/streamingfast/substreams-sink-mongodb)
+* **SQL:** A command line tool to [sync a Substreams with an SQL database](https://github.com/streamingfast/substreams-sink-sql) (currently supported drivers are PostgresSQL and Clickhouse)
+* **MongoDB:** A command line tool to [sync a Substreams with a MongoDB database](https://github.com/streamingfast/substreams-sink-mongodb)
 * **File-based storage:** A command line tool to [sync a Substreams to file-based storage](https://github.com/streamingfast/substreams-sink-files)
 * **Key-value-based storage:** A command line tool to [sync a Substreams to a key-value store](https://github.com/streamingfast/substreams-sink-kv) -- see [tutorial](substreams-sink-kv.md)
 
@@ -58,13 +58,13 @@ StreamingFast provides several tools to assist database persistence for Substrea
 StreamingFast provides tools allowing you to route blockchain data to a few different types of data storage sinks, or means of importation. StreamingFast sink tools aren’t the only options. Existing applications, databases, and other tools are fed by blockchain data captured by Substreams.
 
 {% hint style="success" %}
-**Tip**: To get inspiration for writing your own sink study the examples provided by StreamingFast. One example is a database, such as Oracle, lacking Substreams sink tools. Study the [PostgreSQL Sink](https://github.com/streamingfast/substreams-sink-postgres) tool and its codebase to understand how to construct your own data-sinking solution.
+**Tip**: To get inspiration for writing your own sink study the examples provided by StreamingFast. One example is a database, such as Oracle, lacking Substreams sink tools. Study the [SQL Sink](https://github.com/streamingfast/substreams-sink-sqk) tool and its codebase to understand how to construct your own data-sinking solution.
 {% endhint %}
 
 Protobufs are designed to use for transferring data out of Substreams into the data sink. Protobufs aren’t tied to any particular technology stack or language, enabling you to capture, further process, use and store data provided by Substreams in different capacities.
 
 {% hint style="info" %}
-**Note**: Through careful design of the Substreams manifest, modules, and protobufs you can craft your output data in a variety of ways. One option, as seen in the [PostgreSQL example](https://github.com/streamingfast/substreams-sink-postgres) is through a single `output` protobuf. The flexibility of Substreams design however allows for other strategies, including multiple protobufs and modules.
+**Note**: Through careful design of the Substreams manifest, modules, and protobufs you can craft your output data in a variety of ways. One option, as seen in the [SQL example](https://github.com/streamingfast/substreams-sink-sql) is through a single `output` protobuf. The flexibility of Substreams design however allows for other strategies, including multiple protobufs and modules.
 {% endhint %}
 
 You need to examine and account for the format and any requirements of the end environment you want your data routed into. The specifics of how data is ingested by the sink determine the design of the `output` from Substreams.

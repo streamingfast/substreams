@@ -22,8 +22,7 @@ type File struct {
 	path   string
 }
 
-const ReplayMagicString = "rpl"
-const ReplayFileVersion = 1
+const ReplayContentType = "rpl-v1"
 const ReplayFilename = "replay.log"
 
 type Option func(*File)
@@ -56,7 +55,7 @@ func (f *File) OpenForWriting() error {
 		return fmt.Errorf("open replay file for writing: %w", err)
 	}
 	f.writer = dbin.NewWriter(fl)
-	if err := f.writer.WriteHeader(ReplayMagicString, ReplayFileVersion); err != nil {
+	if err := f.writer.WriteHeader(ReplayContentType); err != nil {
 		return fmt.Errorf("write replay header: %w", err)
 	}
 	return nil
@@ -70,12 +69,12 @@ func (f *File) ReadReplay() (out stream.ReplayBundle, err error) {
 	defer fl.Close()
 
 	reader := dbin.NewReader(fl)
-	header, ver, err := reader.ReadHeader()
+	header, err := reader.ReadHeader()
 	if err != nil {
 		return nil, fmt.Errorf("reading replay log header: %w", err)
 	}
-	if header != ReplayMagicString || ver != ReplayFileVersion {
-		return nil, fmt.Errorf("invalid replay file format/version header %q version %d", header, ver)
+	if header.ContentType != ReplayContentType {
+		return nil, fmt.Errorf("invalid replay file content type %q", header.ContentType)
 	}
 	for {
 		anyBytes, err := reader.ReadMessage()

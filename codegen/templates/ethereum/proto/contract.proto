@@ -1,41 +1,51 @@
 syntax = "proto3";
 
+import "google/protobuf/timestamp.proto";
+
 package contract.v1;
 
 message Events {
-    repeated Approval approvals = 1;
-    repeated ApprovalForAll approval_for_alls = 2;
-    repeated OwnershipTransferred ownership_transferreds = 3;
-    repeated Transfer transfers = 4;
+    repeated bayc_Approval bayc_approvals = 1;
+    repeated bayc_ApprovalForAll bayc_approval_for_alls = 2;
+    repeated bayc_OwnershipTransferred bayc_ownership_transferreds = 3;
+    repeated bayc_Transfer bayc_transfers = 4;
 }
 
-message Approval {
-    string trx_hash = 1;
-    uint32 log_index = 2;
-    bytes owner = 3;
-    bytes approved = 4;
-    string token_id = 5;
+message bayc_Approval {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes owner = 5;
+    bytes approved = 6;
+    string token_id = 7;
 }
 
-message ApprovalForAll {
-    string trx_hash = 1;
-    uint32 log_index = 2;
-    bytes owner = 3;
-    bytes operator = 4;
-    bool approved = 5;
+message bayc_ApprovalForAll {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes owner = 5;
+    bytes operator = 6;
+    bool approved = 7;
 }
 
-message OwnershipTransferred {
-    string trx_hash = 1;
-    uint32 log_index = 2;
-    bytes previous_owner = 3;
-    bytes new_owner = 4;
+message bayc_OwnershipTransferred {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes previous_owner = 5;
+    bytes new_owner = 6;
 }
 
-message Transfer {
-    string trx_hash = 1;
-    uint32 log_index = 2;
-    bytes from = 3;
-    bytes to = 4;
-    string token_id = 5;
+message bayc_Transfer {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes from = 5;
+    bytes to = 6;
+    string token_id = 7;
 }

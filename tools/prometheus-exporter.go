@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc/metadata"
 	"io"
 	"net/http"
 	"strconv"
@@ -43,6 +44,7 @@ var prometheusCmd = &cobra.Command{
 func init() {
 	prometheusCmd.Flags().String("listen-addr", ":9102", "prometheus listen address")
 	prometheusCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token")
+	prometheusCmd.Flags().String("substreams-api-key-envvar", "SUBSTREAMS_API_KEY", "Name of variable containing Substreams Api Key")
 	prometheusCmd.Flags().BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
 	prometheusCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
 	prometheusCmd.Flags().Duration("lookup_interval", time.Second*20, "endpoints will be polled at this interval")
@@ -70,14 +72,14 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
 
-	pkg, err := manifestReader.Read()
+	pkg, _, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("reading manifest %q: %w", manifestPath, err)
 	}
 
 	outputStreamName := moduleName
 
-	apiToken := ReadAPIToken(cmd, "substreams-api-token-envvar")
+	authToken, authType := GetAuth(cmd, "substreams-api-key-envvar", "substreams-api-token-envvar")
 	insecure := mustGetBool(cmd, "insecure")
 	plaintext := mustGetBool(cmd, "plaintext")
 	interval := mustGetDuration(cmd, "lookup_interval")
@@ -85,7 +87,8 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 	for _, endpoint := range endpoints {
 		substreamsClientConfig := client.NewSubstreamsClientConfig(
 			endpoint,
-			apiToken,
+			authToken,
+			authType,
 			insecure,
 			plaintext,
 		)
@@ -136,12 +139,16 @@ func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.Subs
 
 		ctx, cancel := context.WithTimeout(context.Background(), pollingTimeout)
 		begin := time.Now()
-		ssClient, connClose, callOpts, err := client.NewSubstreamsClient(substreamsClientConfig)
+		ssClient, connClose, callOpts, headers, err := client.NewSubstreamsClient(substreamsClientConfig)
 		if err != nil {
 			zlog.Error("substreams client setup", zap.Error(err))
 			maybeMarkFailure(endpoint, begin, counter)
 			cancel()
 			continue
+		}
+
+		if headers.IsSet() {
+			ctx = metadata.AppendToOutgoingContext(ctx, headers.ToArray()...)
 		}
 
 		subReq := &pbsubstreamsrpc.Request{

@@ -1,7 +1,5 @@
 package block
 
-import "github.com/streamingfast/substreams/utils"
-
 // TODO(abourget): The Segmenter is a new SegmentedRange system, that takes an index so
 // the caller can always keep track of just one number, and we can obtain the corresponding
 // Range for the segment. We can obtain info on the Segment too (if it's Partial, Complete, etc..)
@@ -70,7 +68,7 @@ func (s *Segmenter) firstRange() *Range {
 	}
 	floorLowerBound := s.initialBlock - s.initialBlock%s.interval
 	upperBound := floorLowerBound + s.interval
-	return NewRange(s.initialBlock, utils.MinOf(upperBound, s.exclusiveEndBlock))
+	return NewRange(s.initialBlock, min(upperBound, s.exclusiveEndBlock))
 }
 
 func (s *Segmenter) followingRange(idx int) *Range {
@@ -79,7 +77,7 @@ func (s *Segmenter) followingRange(idx int) *Range {
 	}
 	baseBlock := uint64(idx) * s.interval
 	upperBound := baseBlock + s.interval
-	return NewRange(baseBlock, utils.MinOf(upperBound, s.exclusiveEndBlock))
+	return NewRange(baseBlock, min(upperBound, s.exclusiveEndBlock))
 }
 
 func (s *Segmenter) IndexForStartBlock(blockNum uint64) int {

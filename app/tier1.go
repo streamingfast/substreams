@@ -6,16 +6,18 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/streamingfast/substreams/reqctx"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/blockstream"
 	"github.com/streamingfast/bstream/hub"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	dauth "github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metrics"
-	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/service"
 	"github.com/streamingfast/substreams/wasm"
 	"go.uber.org/atomic"
@@ -27,9 +29,12 @@ type Tier1Modules struct {
 	Authenticator         dauth.Authenticator
 	HeadTimeDriftMetric   *dmetrics.HeadTimeDrift
 	HeadBlockNumberMetric *dmetrics.HeadBlockNum
+	CheckPendingShutDown  func() bool
 }
 
 type Tier1Config struct {
+	MeteringConfig string
+
 	MergedBlocksStoreURL    string
 	OneBlocksStoreURL       string
 	ForkedBlocksStoreURL    string
@@ -40,19 +45,17 @@ type Tier1Config struct {
 
 	StateStoreURL        string
 	StateStoreDefaultTag string
-	StateBundleSize      uint64
 	BlockType            string
+	StateBundleSize      uint64
 
 	MaxSubrequests       uint64
 	SubrequestsEndpoint  string
 	SubrequestsInsecure  bool
 	SubrequestsPlaintext bool
 
-	WASMExtensions  []wasm.WASMExtensioner
-	PipelineOptions []pipeline.PipelineOptioner
+	WASMExtensions wasm.WASMExtensioner
 
-	RequestStats bool
-	Tracing      bool
+	Tracing bool
 }
 
 type Tier1App struct {
@@ -75,6 +78,7 @@ func NewTier1(logger *zap.Logger, config *Tier1Config, modules *Tier1Modules) *T
 }
 
 func (a *Tier1App) Run() error {
+
 	dmetrics.Register(metrics.MetricSet)
 
 	a.logger.Info("running substreams-tier1", zap.Reflect("config", a.config))
@@ -112,13 +116,12 @@ func (a *Tier1App) Run() error {
 
 	if withLive {
 		liveSourceFactory := bstream.SourceFactory(func(h bstream.Handler) bstream.Source {
-
 			return blockstream.NewSource(
 				context.Background(),
 				a.config.BlockStreamAddr,
 				2,
-				bstream.HandlerFunc(func(blk *bstream.Block, obj interface{}) error {
-					a.modules.HeadBlockNumberMetric.SetUint64(blk.Num())
+				bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
+					a.modules.HeadBlockNumberMetric.SetUint64(blk.Number)
 					a.modules.HeadTimeDriftMetric.SetBlockTime(blk.Time())
 					return h.ProcessBlock(blk, obj)
 				}),
@@ -143,41 +146,55 @@ func (a *Tier1App) Run() error {
 	subrequestsClientConfig := client.NewSubstreamsClientConfig(
 		a.config.SubrequestsEndpoint,
 		"",
+		client.None,
 		a.config.SubrequestsInsecure,
 		a.config.SubrequestsPlaintext,
 	)
 	var opts []service.Option
-	for _, ext := range a.config.WASMExtensions {
-		opts = append(opts, service.WithWASMExtension(ext))
-	}
-
-	for _, opt := range a.config.PipelineOptions {
-		opts = append(opts, service.WithPipelineOptions(opt))
+	if a.config.WASMExtensions != nil {
+		opts = append(opts, service.WithWASMExtensioner(a.config.WASMExtensions))
 	}
 
 	if a.config.Tracing {
 		opts = append(opts, service.WithModuleExecutionTracing())
 	}
 
-	if a.config.RequestStats {
-		opts = append(opts, service.WithRequestStats())
+	var wasmModules map[string]string
+	if a.config.WASMExtensions != nil {
+		wasmModules = a.config.WASMExtensions.Params()
 	}
 
-	svc := service.NewTier1(
+	tier2RequestParameters := reqctx.Tier2RequestParameters{
+		MeteringConfig:       a.config.MeteringConfig,
+		FirstStreamableBlock: bstream.GetProtocolFirstStreamableBlock,
+		MergedBlockStoreURL:  a.config.MergedBlocksStoreURL,
+		StateStoreURL:        a.config.StateStoreURL,
+		StateBundleSize:      a.config.StateBundleSize,
+		StateStoreDefaultTag: a.config.StateStoreDefaultTag,
+		WASMModules:          wasmModules,
+	}
+
+	svc, err := service.NewTier1(
 		a.logger,
 		mergedBlocksStore,
 		forkedBlocksStore,
 		forkableHub,
 		stateStore,
 		a.config.StateStoreDefaultTag,
-		a.config.BlockType,
 		a.config.MaxSubrequests,
 		a.config.StateBundleSize,
+		a.config.BlockType,
 		subrequestsClientConfig,
+		tier2RequestParameters,
 		opts...,
 	)
+	if err != nil {
+		return err
+	}
 
 	a.OnTerminating(func(err error) {
+		metrics.AppReadinessTier1.SetNotReady()
+
 		svc.Shutdown(err)
 		time.Sleep(2 * time.Second) // enough time to send termination grpc responses
 	})
@@ -187,14 +204,14 @@ func (a *Tier1App) Run() error {
 			a.logger.Info("waiting until hub is real-time synced")
 			select {
 			case <-forkableHub.Ready:
-				metrics.AppReadiness.SetReady()
+				metrics.AppReadinessTier1.SetReady()
 			case <-a.Terminating():
 				return
 			}
 		}
 
 		a.logger.Info("launching gRPC server", zap.Bool("live_support", withLive))
-		a.isReady.CAS(false, true)
+		a.isReady.CompareAndSwap(false, true)
 
 		err := service.ListenTier1(a.config.GRPCListenAddr, svc, a.modules.Authenticator, a.logger, a.HealthCheck)
 		a.Shutdown(err)
@@ -214,6 +231,10 @@ func (a *Tier1App) IsReady(ctx context.Context) bool {
 		return false
 	}
 	if !a.modules.Authenticator.Ready(ctx) {
+		return false
+	}
+
+	if a.modules.CheckPendingShutDown != nil && a.modules.CheckPendingShutDown() {
 		return false
 	}
 

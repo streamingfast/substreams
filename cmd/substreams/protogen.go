@@ -18,6 +18,8 @@ var protogenCmd = &cobra.Command{
 		Generate Rust bindings from a package. The manifest is optional as it will try to find a file named
 		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml'
 		file in place of '<manifest_file>', or a link to a remote .spkg file, using urls gs://, http(s)://, ipfs://, etc.'.
+		
+		Note: if you have a data structure with an attribute that starts with an underscore, buf generate will remove the underscore.
 	`),
 	RunE:         runProtogen,
 	Args:         cobra.RangeArgs(0, 1),
@@ -51,7 +53,11 @@ func runProtogen(cmd *cobra.Command, args []string) error {
 		manifestPath = args[0]
 	}
 
-	manifestReader, err := manifest.NewReader(manifestPath, manifest.SkipSourceCodeReader(), manifest.SkipModuleOutputTypeValidationReader())
+	readerOptions := []manifest.Option{
+		manifest.SkipSourceCodeReader(),
+		manifest.SkipModuleOutputTypeValidationReader(),
+	}
+	manifestReader, err := manifest.NewReader(manifestPath, readerOptions...)
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
@@ -63,13 +69,9 @@ func runProtogen(cmd *cobra.Command, args []string) error {
 		outputPath = newOutputPath
 	}
 
-	pkg, err := manifestReader.Read()
+	pkg, _, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("reading manifest %q: %w", manifestPath, err)
-	}
-
-	if _, err = manifest.NewModuleGraph(pkg.Modules.Modules); err != nil {
-		return fmt.Errorf("processing module graph %w", err)
 	}
 
 	generator := codegen.NewProtoGenerator(outputPath, excludePaths, generateMod)

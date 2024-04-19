@@ -6,9 +6,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 
+	"github.com/streamingfast/substreams/metrics"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
 )
 
@@ -20,6 +23,10 @@ type MockExecOutput struct {
 
 func (t *MockExecOutput) Clock() *pbsubstreams.Clock {
 	return t.clockFunc()
+}
+
+func (t *MockExecOutput) Len() int {
+	return 0
 }
 
 func (t *MockExecOutput) Get(name string) ([]byte, bool, error) {
@@ -91,6 +98,8 @@ func (t *MockModuleExecutor) lastExecutionStack() []string {
 
 func TestModuleExecutorRunner_Run_HappyPath(t *testing.T) {
 	ctx := context.Background()
+
+	ctx = reqctx.WithReqStats(ctx, metrics.NewReqStats(&metrics.Config{}, zap.NewNop()))
 	executor := &MockModuleExecutor{
 		name: "test",
 		RunFunc: func(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {

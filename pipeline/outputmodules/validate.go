@@ -26,12 +26,12 @@ func ValidateTier1Request(request *pbsubstreamsrpc.Request, blockType string) er
 	return nil
 }
 
-func ValidateTier2Request(request *pbssinternal.ProcessRangeRequest, blockType string) error {
+func ValidateTier2Request(request *pbssinternal.ProcessRangeRequest) error {
 	if err := request.Validate(); err != nil {
 		return fmt.Errorf("validate tier2 request: %s", err)
 	}
 
-	err := validateRequest(request.Modules.Binaries, request.Modules, request.OutputModule, blockType)
+	err := validateRequest(request.Modules.Binaries, request.Modules, request.OutputModule, request.BlockType)
 	if err != nil {
 		return err
 	}
@@ -50,6 +50,22 @@ func validateRequest(binaries []*pbsubstreams.Binary, modules *pbsubstreams.Modu
 
 	if err := validateModuleGraph(modules.Modules, outputModule, blockType); err != nil {
 		return err
+	}
+
+	if err := checkNotImplemented(modules.Modules); err != nil {
+		return fmt.Errorf("checking feature not implemented: %w", err)
+	}
+	return nil
+}
+
+func checkNotImplemented(mods []*pbsubstreams.Module) error {
+	for _, mod := range mods {
+		if mod.ModuleKind() == pbsubstreams.ModuleKindBlockIndex {
+			return fmt.Errorf("block index module is not implemented")
+		}
+		if mod.GetBlockFilter() != nil {
+			return fmt.Errorf("block filter module is not implemented")
+		}
 	}
 	return nil
 }

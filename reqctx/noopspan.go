@@ -6,37 +6,37 @@ import (
 	ttrace "go.opentelemetry.io/otel/trace"
 )
 
-// noopSpan is an implementation of span that preforms no operations.
-type noopSpan struct{}
+// NoopSpan is an implementation of span that preforms no operations.
+type NoopSpan struct{}
 
-func (n *noopSpan) EndWithErr(e *error) {}
+func (n *NoopSpan) EndWithErr(e *error) {}
 
 // SpanContext returns an empty span context.
-func (n *noopSpan) SpanContext() ttrace.SpanContext { return ttrace.SpanContext{} }
+func (n *NoopSpan) SpanContext() ttrace.SpanContext { return ttrace.SpanContext{} }
 
 // IsRecording always returns false.
-func (n *noopSpan) IsRecording() bool { return false }
+func (n *NoopSpan) IsRecording() bool { return false }
 
 // SetStatus does nothing.
-func (n *noopSpan) SetStatus(codes.Code, string) {}
+func (n *NoopSpan) SetStatus(codes.Code, string) {}
 
 // SetError does nothing.
-func (n *noopSpan) SetError(bool) {}
+func (n *NoopSpan) SetError(bool) {}
 
 // SetAttributes does nothing.
-func (n *noopSpan) SetAttributes(...attribute.KeyValue) {}
+func (n *NoopSpan) SetAttributes(...attribute.KeyValue) {}
 
 // End does nothing.
-func (n *noopSpan) End(...ttrace.SpanEndOption) {}
+func (n *NoopSpan) End(...ttrace.SpanEndOption) {}
 
 // RecordError does nothing.
-func (n *noopSpan) RecordError(error, ...ttrace.EventOption) {}
+func (n *NoopSpan) RecordError(error, ...ttrace.EventOption) {}
 
 // AddEvent does nothing.
-func (n *noopSpan) AddEvent(string, ...ttrace.EventOption) {}
+func (n *NoopSpan) AddEvent(string, ...ttrace.EventOption) {}
 
 // SetName does nothing.
-func (n *noopSpan) SetName(string) {}
+func (n *NoopSpan) SetName(string) {}
 
 // TracerProvider returns a no-op TracerProvider.
-func (n *noopSpan) TracerProvider() ttrace.TracerProvider { return ttrace.NewNoopTracerProvider() }
+func (n *NoopSpan) TracerProvider() ttrace.TracerProvider { return ttrace.NewNoopTracerProvider() }

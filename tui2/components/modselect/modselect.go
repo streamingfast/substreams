@@ -24,12 +24,13 @@ type ModSelect struct {
 	moduleGraph *manifest.ModuleGraph
 }
 
-func New(c common.Common, manifestPath string) *ModSelect {
+func New(c common.Common, graph *manifest.ModuleGraph) *ModSelect {
+
 	return &ModSelect{
 		seen:         map[string]bool{},
 		ModulesIndex: map[string]int{},
 		Common:       c,
-		moduleGraph:  manifest.MustNewModuleGraph(manifest.MustNewReader(manifestPath).MustRead().Modules.Modules),
+		moduleGraph:  graph,
 	}
 }
 

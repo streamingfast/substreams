@@ -51,6 +51,19 @@ func (c *File) SortedItems() (out []*pboutput.Item) {
 	return
 }
 
+func (c *File) ExtractClocks(clocksMap map[uint64]*pbsubstreams.Clock) {
+	for _, item := range c.kv {
+		if _, found := clocksMap[item.BlockNum]; !found {
+			clocksMap[item.BlockNum] = &pbsubstreams.Clock{
+				Number:    item.BlockNum,
+				Id:        item.BlockId,
+				Timestamp: item.Timestamp,
+			}
+		}
+	}
+	return
+}
+
 func (c *File) SetItem(clock *pbsubstreams.Clock, data []byte) {
 	c.Lock()
 	defer c.Unlock()
@@ -138,7 +151,7 @@ func (c *File) Save(ctx context.Context) error {
 	}
 
 	c.logger.Info("writing execution output file", zap.String("filename", filename))
-	return derr.RetryContext(ctx, 5, func(ctx context.Context) error {
+	return derr.RetryContext(ctx, 10, func(ctx context.Context) error { // more than the usual 5 retries here because if we fail, we have to reprocess the whole segment
 		reader := bytes.NewReader(cnt)
 		err := c.store.WriteObject(ctx, filename, reader)
 		return err
@@ -146,7 +159,7 @@ func (c *File) Save(ctx context.Context) error {
 }
 
 func (c *File) String() string {
-	return c.store.ObjectURL("")
+	return c.store.ObjectURL(c.Filename())
 }
 
 func (c *File) MarshalLogObject(enc zapcore.ObjectEncoder) error {

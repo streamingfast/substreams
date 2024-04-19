@@ -1,7 +1,7 @@
 package integration
 
 import (
-	"github.com/streamingfast/bstream"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/storage/store"
 )
@@ -9,7 +9,7 @@ import (
 type blockProcessedCallBack func(ctx *execContext)
 
 type execContext struct {
-	block     *bstream.Block
+	block     *pbbstream.Block
 	stores    store.Map
 	baseStore dstore.Store
 }

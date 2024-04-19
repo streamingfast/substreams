@@ -17,7 +17,6 @@ func (s *Stages) FetchStoresState(
 	segmenter *block.Segmenter,
 	storeConfigMap store.ConfigMap,
 	execoutConfigs *execout.Configs,
-	traceID string,
 ) error {
 	completes := make(unitMap)
 	partials := make(unitMap)
@@ -27,11 +26,11 @@ func (s *Stages) FetchStoresState(
 	var mapperName string
 	var mapperFiles execout.FileInfos
 	if lastStage := s.stages[len(s.stages)-1]; lastStage.kind == KindMap {
-		if len(lastStage.moduleStates) != 1 {
+		if len(lastStage.storeModuleStates) != 1 {
 			panic("assertion: mapper stage should contain a single module")
 		}
 
-		mapperName = lastStage.moduleStates[0].name
+		mapperName = lastStage.storeModuleStates[0].name
 		conf := execoutConfigs.ConfigMap[mapperName]
 		// TODO: OPTIMIZATION: get the actual needed range for execOutputs to optimize lookup
 
@@ -51,7 +50,7 @@ func (s *Stages) FetchStoresState(
 		return fmt.Errorf("fetching stores storage state: %w", err)
 	}
 	for stageIdx, stage := range s.stages {
-		moduleCount := len(stage.moduleStates)
+		moduleCount := len(stage.storeModuleStates)
 
 		if stage.kind == KindMap {
 			if mapperFiles == nil {
@@ -75,7 +74,7 @@ func (s *Stages) FetchStoresState(
 			continue
 		}
 
-		for _, mod := range stage.moduleStates {
+		for _, mod := range stage.storeModuleStates {
 			files := state.Snapshots[mod.name]
 			modSegmenter := mod.segmenter
 
@@ -101,9 +100,6 @@ func (s *Stages) FetchStoresState(
 					continue
 				}
 				if !rng.Equals(partial.Range) {
-					continue
-				}
-				if traceID != partial.TraceID {
 					continue
 				}
 				unit := Unit{Stage: stageIdx, Segment: segmentIdx}

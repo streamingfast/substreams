@@ -21,7 +21,7 @@ func saveStore(ctx context.Context, store dstore.Store, filename string, content
 		store.SetMeter(dmetering.GetBytesMeter(ctx))
 	}
 
-	return derr.RetryContext(ctx, 5, func(ctx context.Context) error {
+	return derr.RetryContext(ctx, 10, func(ctx context.Context) error { // more than the usual 5 retries because if we fail, we have to reprocess the whole segment
 		return store.WriteObject(ctx, filename, bytes.NewReader(content))
 	})
 }

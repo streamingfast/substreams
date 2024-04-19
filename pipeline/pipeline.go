@@ -7,12 +7,14 @@ import (
 	"time"
 
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/dmetering"
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/orchestrator"
 	"github.com/streamingfast/substreams/orchestrator/plan"
+	"github.com/streamingfast/substreams/orchestrator/response"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -53,6 +55,8 @@ type Pipeline struct {
 	respFunc         substreams.ResponseFunc
 	lastProgressSent time.Time
 
+	startTime      time.Time
+	modulesStats   map[string]*pbssinternal.ModuleStats
 	stores         *Stores
 	execoutStorage *execout.Configs
 
@@ -71,7 +75,7 @@ type Pipeline struct {
 	// (for chains with potential block skips)
 	lastFinalClock *pbsubstreams.Clock
 
-	traceID string
+	blockStepMap map[bstream.StepType]uint64
 }
 
 func New(
@@ -83,7 +87,6 @@ func New(
 	execOutputCache *cache.Engine,
 	runtimeConfig config.RuntimeConfig,
 	respFunc substreams.ResponseFunc,
-	traceID string,
 	opts ...Option,
 ) *Pipeline {
 	pipe := &Pipeline{
@@ -97,7 +100,8 @@ func New(
 		stores:          stores,
 		execoutStorage:  execoutStorage,
 		forkHandler:     NewForkHandler(),
-		traceID:         traceID,
+		blockStepMap:    make(map[bstream.StepType]uint64),
+		startTime:       time.Now(),
 	}
 	for _, opt := range opts {
 		opt(pipe)
@@ -105,7 +109,7 @@ func New(
 	return pipe
 }
 
-func (p *Pipeline) init(ctx context.Context) (err error) {
+func (p *Pipeline) Init(ctx context.Context) (err error) {
 	reqDetails := reqctx.Details(ctx)
 
 	p.forkHandler.registerUndoHandler(func(clock *pbsubstreams.Clock, moduleOutputs []*pbssinternal.ModuleOutput) {
@@ -131,9 +135,6 @@ func (p *Pipeline) init(ctx context.Context) (err error) {
 }
 
 func (p *Pipeline) InitTier2Stores(ctx context.Context) (err error) {
-	if err := p.init(ctx); err != nil {
-		return err
-	}
 
 	storeMap, err := p.setupSubrequestStores(ctx)
 	if err != nil {
@@ -143,15 +144,12 @@ func (p *Pipeline) InitTier2Stores(ctx context.Context) (err error) {
 	p.stores.SetStoreMap(storeMap)
 
 	logger := reqctx.Logger(ctx)
-	logger.Info("stores loaded", zap.Object("stores", p.stores.StoreMap), zap.Int("stage", reqctx.Details(ctx).Tier2Stage))
+	logger.Debug("stores loaded", zap.Object("stores", p.stores.StoreMap), zap.Int("stage", reqctx.Details(ctx).Tier2Stage))
 
 	return nil
 }
 
 func (p *Pipeline) InitTier1StoresAndBackprocess(ctx context.Context, reqPlan *plan.RequestPlan) (err error) {
-	if err := p.init(ctx); err != nil {
-		return err
-	}
 
 	if reqPlan.RequiresParallelProcessing() {
 		storeMap, err := p.runParallelProcess(ctx, reqPlan)
@@ -181,6 +179,7 @@ func (p *Pipeline) setupProcessingModule(reqDetails *reqctx.RequestDetails) {
 	}
 }
 
+// setupSubrequestsStores will prepare stores for all required modules up to the current stage.
 func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Map, err error) {
 	ctx, span := reqctx.WithSpan(ctx, "substreams/pipeline/tier2/store_setup")
 	defer span.EndWithErr(&err)
@@ -192,6 +191,9 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 
 	lastStage := len(p.executionStages) - 1
 	for stageIdx, stage := range p.executionStages {
+		if p.highestStage != nil && stageIdx > *p.highestStage {
+			break // skip stores for stages that we're not running
+		}
 		isLastStage := stageIdx == lastStage
 		layer := stage.LastLayer()
 		if !layer.IsStoreLayer() {
@@ -257,22 +259,40 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 		p.execoutStorage,
 		p.respFunc,
 		p.stores.configs,
-		p.traceID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("building parallel processor: %w", err)
 	}
 
-	logger.Info("starting parallel processing")
+	stats := reqctx.ReqStats(ctx)
+	progressCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go func() {
+		stream := response.New(p.respFunc)
 
-	t0 := time.Now()
+		meter := dmetering.GetBytesMeter(ctx)
+		for {
+			select {
+			case <-time.After(time.Millisecond * 500):
+				stagesProgress := stats.Stages()
+				jobs := stats.JobsStats()
+				modStats := stats.AggregatedModulesStats()
+				remoteBytesRead, remoteBytesWritten := stats.RemoteBytesConsumption()
+
+				stream.SendModulesStats(modStats, stagesProgress, jobs, meter.BytesRead()+remoteBytesRead, meter.BytesWritten()+remoteBytesWritten)
+			case <-progressCtx.Done():
+				return
+			}
+		}
+	}()
+
+	logger.Debug("starting parallel processing")
+
 	storeMap, err = parallelProcessor.Run(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("parallel processing run: %w", err)
 	}
-	reqStats.RecordParallelDuration(time.Since(t0))
-
-	p.processingModule = nil
+	reqStats.RecordInitializationComplete()
 
 	return storeMap, nil
 }
@@ -316,7 +336,7 @@ func toRPCStoreModuleOutputs(in *pbssinternal.ModuleOutput) (out *pbsubstreamsrp
 	}
 }
 
-func toRPCDeltas(in *pbssinternal.StoreDeltas) (out []*pbsubstreamsrpc.StoreDelta) {
+func toRPCDeltas(in *pbsubstreams.StoreDeltas) (out []*pbsubstreamsrpc.StoreDelta) {
 	if len(in.StoreDeltas) == 0 {
 		return nil
 	}
@@ -334,13 +354,13 @@ func toRPCDeltas(in *pbssinternal.StoreDeltas) (out []*pbsubstreamsrpc.StoreDelt
 	return
 }
 
-func toRPCOperation(in pbssinternal.StoreDelta_Operation) (out pbsubstreamsrpc.StoreDelta_Operation) {
+func toRPCOperation(in pbsubstreams.StoreDelta_Operation) (out pbsubstreamsrpc.StoreDelta_Operation) {
 	switch in {
-	case pbssinternal.StoreDelta_UPDATE:
+	case pbsubstreams.StoreDelta_UPDATE:
 		return pbsubstreamsrpc.StoreDelta_UPDATE
-	case pbssinternal.StoreDelta_CREATE:
+	case pbsubstreams.StoreDelta_CREATE:
 		return pbsubstreamsrpc.StoreDelta_CREATE
-	case pbssinternal.StoreDelta_DELETE:
+	case pbsubstreams.StoreDelta_DELETE:
 		return pbsubstreamsrpc.StoreDelta_DELETE
 	}
 	return pbsubstreamsrpc.StoreDelta_UNSET
@@ -362,49 +382,52 @@ func toRPCMapModuleOutputs(in *pbssinternal.ModuleOutput) (out *pbsubstreamsrpc.
 	}
 }
 
-func (p *Pipeline) returnRPCModuleProgressOutputs(clock *pbsubstreams.Clock) error {
-	var progress []*pbsubstreamsrpc.ModuleProgress
-	if p.processingModule != nil {
-		progress = append(progress, &pbsubstreamsrpc.ModuleProgress{
-			Name: p.processingModule.name,
-			Type: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges_{
-				ProcessedRanges: &pbsubstreamsrpc.ModuleProgress_ProcessedRanges{
-					ProcessedRanges: []*pbsubstreamsrpc.BlockRange{
-						{
-							StartBlock: p.processingModule.initialBlockNum,
-							EndBlock:   clock.Number,
-						},
-					},
-				},
-			},
-		})
+func (p *Pipeline) returnRPCModuleProgressOutputs(clock *pbsubstreams.Clock, forceOutput bool) error {
+	if time.Since(p.lastProgressSent) < progressMessageInterval && !forceOutput {
+		return nil
 	}
-	if p.respFunc != nil {
-		if err := p.respFunc(substreams.NewModulesProgressResponse(progress)); err != nil {
-			return fmt.Errorf("calling return func: %w", err)
-		}
+	p.lastProgressSent = time.Now()
+
+	stats := reqctx.ReqStats(p.ctx)
+	stream := response.New(p.respFunc)
+	stagesProgress := stats.Stages()
+	jobs := stats.JobsStats()
+	modStats := stats.AggregatedModulesStats()
+
+	meter := dmetering.GetBytesMeter(p.ctx)
+	remoteBytesRead, remoteBytesWritten := stats.RemoteBytesConsumption()
+	return stream.SendModulesStats(modStats, stagesProgress, jobs, meter.BytesRead()+remoteBytesRead, meter.BytesWritten()+remoteBytesWritten)
+
+}
+
+func (p *Pipeline) toInternalUpdate(clock *pbsubstreams.Clock) *pbssinternal.Update {
+	meter := dmetering.GetBytesMeter(p.ctx)
+
+	return &pbssinternal.Update{
+		ProcessedBlocks:   clock.Number - p.processingModule.initialBlockNum,
+		DurationMs:        uint64(time.Since(p.startTime).Milliseconds()),
+		TotalBytesRead:    meter.BytesRead(),
+		TotalBytesWritten: meter.BytesWritten(),
+		ModulesStats:      reqctx.ReqStats(p.ctx).LocalModulesStats(),
 	}
-	return nil
 }
 
 func (p *Pipeline) returnInternalModuleProgressOutputs(clock *pbsubstreams.Clock, forceOutput bool) error {
-	if p.respFunc != nil {
-		if forceOutput || time.Since(p.lastProgressSent) > progressMessageInterval {
-			p.lastProgressSent = time.Now()
-			out := &pbssinternal.ProcessRangeResponse{
-				ModuleName: p.processingModule.name,
-				Type: &pbssinternal.ProcessRangeResponse_ProcessedRange{
-					ProcessedRange: &pbssinternal.BlockRange{
-						StartBlock: p.processingModule.initialBlockNum,
-						EndBlock:   clock.Number,
-					},
-				},
-			}
+	if time.Since(p.lastProgressSent) < progressMessageInterval && !forceOutput {
+		return nil
+	}
+	p.lastProgressSent = time.Now()
 
-			if err := p.respFunc(out); err != nil {
-				return fmt.Errorf("calling return func: %w", err)
-			}
-		}
+	upd := p.toInternalUpdate(clock)
+
+	out := &pbssinternal.ProcessRangeResponse{
+		Type: &pbssinternal.ProcessRangeResponse_Update{
+			Update: upd,
+		},
+	}
+
+	if err := p.respFunc(out); err != nil {
+		return fmt.Errorf("calling return func: %w", err)
 	}
 	return nil
 }

@@ -3,17 +3,20 @@ package pipeline
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/streamingfast/bstream"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/streamingfast/substreams/manifest"
+	"github.com/streamingfast/substreams/metrics"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
@@ -53,13 +56,14 @@ func TestPipeline_runExecutor(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := reqctx.WithRequest(context.Background(), &reqctx.RequestDetails{})
+			ctx = reqctx.WithReqStats(ctx, metrics.NewReqStats(&metrics.Config{}, zap.NewNop()))
 			pipe := &Pipeline{
 				forkHandler: NewForkHandler(),
 				outputGraph: outputmodules.TestNew(),
 			}
 			clock := &pbsubstreams.Clock{Id: test.block.Id, Number: test.block.Number}
 			execOutput := NewExecOutputTesting(t, bstreamBlk(t, test.block), clock)
-			executor := mapTestExecutor(t, test.moduleName)
+			executor := mapTestExecutor(t, ctx, test.moduleName)
 			res := pipe.execute(ctx, executor, execOutput)
 			err := pipe.applyExecutionResult(ctx, executor, res, execOutput)
 			require.NoError(t, err)
@@ -70,7 +74,7 @@ func TestPipeline_runExecutor(t *testing.T) {
 	}
 }
 
-func mapTestExecutor(t *testing.T, name string) *exec.MapperModuleExecutor {
+func mapTestExecutor(t *testing.T, ctx context.Context, name string) *exec.MapperModuleExecutor {
 	pkg := manifest.TestReadManifest(t, "../test/testdata/substreams-test-v0.1.0.spkg")
 
 	binaryIndex := uint32(0)
@@ -82,15 +86,13 @@ func mapTestExecutor(t *testing.T, name string) *exec.MapperModuleExecutor {
 	binary := pkg.Modules.Binaries[binaryIndex]
 	require.Greater(t, len(binary.Content), 1)
 
-	ctx := context.Background()
-
 	registry := wasm.NewRegistry(nil, 0)
 	module, err := registry.NewModule(ctx, binary.Content)
 	require.NoError(t, err)
 
 	return exec.NewMapperModuleExecutor(
 		exec.NewBaseExecutor(
-			context.Background(),
+			ctx,
 			name,
 			module,
 			false, // could exercice with cache enabled too
@@ -105,21 +107,21 @@ func mapTestExecutor(t *testing.T, name string) *exec.MapperModuleExecutor {
 	)
 }
 
-func bstreamBlk(t *testing.T, blk *pbsubstreamstest.Block) *bstream.Block {
-	payload, err := proto.Marshal(blk)
+func bstreamBlk(t *testing.T, blk *pbsubstreamstest.Block) *pbbstream.Block {
+
+	payload, err := anypb.New(blk)
 	require.NoError(t, err)
 
-	bb := &bstream.Block{
+	bb := &pbbstream.Block{
 		Id:             blk.Id,
 		Number:         blk.Number,
-		PreviousId:     "",
-		Timestamp:      time.Time{},
+		ParentId:       "",
+		Timestamp:      &timestamppb.Timestamp{},
 		LibNum:         0,
 		PayloadKind:    0,
 		PayloadVersion: 0,
+		Payload:        payload,
 	}
-	_, err = bstream.MemoryBlockPayloadSetter(bb, payload)
-	require.NoError(t, err)
 
 	return bb
 }
@@ -184,7 +186,7 @@ func testConfigMap(t *testing.T, configs []testStoreConfig) store2.ConfigMap {
 	objStore := dstore.NewMockStore(nil)
 
 	for _, conf := range configs {
-		newStore, err := store2.NewConfig(conf.name, conf.initBlock, conf.name, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, "string", objStore, "")
+		newStore, err := store2.NewConfig(conf.name, conf.initBlock, conf.name, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, "string", objStore)
 		require.NoError(t, err)
 		confMap[newStore.Name()] = newStore
 

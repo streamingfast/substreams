@@ -1,0 +1,166 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+package contract.v1;
+
+message Events {
+    repeated factory_FeeAmountEnabled factory_fee_amount_enableds = 1;
+    repeated factory_OwnerChanged factory_owner_changeds = 2;
+    repeated factory_PoolCreated factory_pool_createds = 3;
+    repeated pool_Burn pool_burns = 4;
+    repeated pool_Collect pool_collects = 5;
+    repeated pool_CollectProtocol pool_collect_protocols = 6;
+    repeated pool_Flash pool_flashes = 7;
+    repeated pool_IncreaseObservationCardinalityNext pool_increase_observation_cardinality_nexts = 8;
+    repeated pool_Initialize pool_initializes = 9;
+    repeated pool_Mint pool_mints = 10;
+    repeated pool_SetFeeProtocol pool_set_fee_protocols = 11;
+    repeated pool_Swap pool_swaps = 12;
+}
+
+message factory_FeeAmountEnabled {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    uint64 fee = 5;
+    int64 tick_spacing = 6;
+}
+
+message factory_OwnerChanged {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes old_owner = 5;
+    bytes new_owner = 6;
+}
+
+message factory_PoolCreated {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes token0 = 5;
+    bytes token1 = 6;
+    uint64 fee = 7;
+    int64 tick_spacing = 8;
+    bytes pool = 9;
+}
+
+message pool_Burn {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    string evt_address = 5;
+    bytes owner = 6;
+    int64 tick_lower = 7;
+    int64 tick_upper = 8;
+    string amount = 9;
+    string amount0 = 10;
+    string amount1 = 11;
+}
+
+message pool_Collect {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    string evt_address = 5;
+    bytes owner = 6;
+    bytes recipient = 7;
+    int64 tick_lower = 8;
+    int64 tick_upper = 9;
+    string amount0 = 10;
+    string amount1 = 11;
+}
+
+message pool_CollectProtocol {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    string evt_address = 5;
+    bytes sender = 6;
+    bytes recipient = 7;
+    string amount0 = 8;
+    string amount1 = 9;
+}
+
+message pool_Flash {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    string evt_address = 5;
+    bytes sender = 6;
+    bytes recipient = 7;
+    string amount0 = 8;
+    string amount1 = 9;
+    string paid0 = 10;
+    string paid1 = 11;
+}
+
+message pool_IncreaseObservationCardinalityNext {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    string evt_address = 5;
+    uint64 observation_cardinality_next_old = 6;
+    uint64 observation_cardinality_next_new = 7;
+}
+
+message pool_Initialize {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    string evt_address = 5;
+    string sqrt_price_x96 = 6;
+    int64 tick = 7;
+}
+
+message pool_Mint {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    string evt_address = 5;
+    bytes sender = 6;
+    bytes owner = 7;
+    int64 tick_lower = 8;
+    int64 tick_upper = 9;
+    string amount = 10;
+    string amount0 = 11;
+    string amount1 = 12;
+}
+
+message pool_SetFeeProtocol {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    string evt_address = 5;
+    uint64 fee_protocol0_old = 6;
+    uint64 fee_protocol1_old = 7;
+    uint64 fee_protocol0_new = 8;
+    uint64 fee_protocol1_new = 9;
+}
+
+message pool_Swap {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    string evt_address = 5;
+    bytes sender = 6;
+    bytes recipient = 7;
+    string amount0 = 8;
+    string amount1 = 9;
+    string sqrt_price_x96 = 10;
+    string liquidity = 11;
+    int64 tick = 12;
+}

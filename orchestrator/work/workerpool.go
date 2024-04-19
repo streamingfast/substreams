@@ -2,6 +2,7 @@ package work
 
 import (
 	"context"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -10,6 +11,7 @@ import (
 
 type WorkerPool struct {
 	workers []*WorkerStatus
+	started *time.Time
 }
 
 type WorkerState int
@@ -17,6 +19,7 @@ type WorkerState int
 const (
 	WorkerFree WorkerState = iota
 	WorkerWorking
+	WorkerInitialWait
 )
 
 type WorkerStatus struct {
@@ -27,39 +30,55 @@ type WorkerStatus struct {
 func NewWorkerPool(ctx context.Context, workerCount int, workerFactory WorkerFactory) *WorkerPool {
 	logger := reqctx.Logger(ctx)
 
-	logger.Info("initializing worker pool", zap.Int("worker_count", workerCount))
+	logger.Debug("initializing worker pool", zap.Int("worker_count", workerCount))
 
 	workers := make([]*WorkerStatus, workerCount)
 	for i := 0; i < workerCount; i++ {
+		state := WorkerFree
+		if i > 0 {
+			state = WorkerInitialWait
+		}
 		workers[i] = &WorkerStatus{
 			Worker: workerFactory(logger),
-			State:  WorkerFree,
+			State:  state,
 		}
 	}
 
+	now := time.Now()
 	return &WorkerPool{
 		workers: workers,
+		started: &now,
 	}
 }
 
-func (p *WorkerPool) WorkerAvailable() bool {
+func (p *WorkerPool) rampupWorkers() {
+	if time.Since(*p.started) < time.Second*4 {
+		// no rampup yet
+		return
+	}
 	for _, w := range p.workers {
-		if w.State == WorkerFree {
-			return true
+		if w.State == WorkerInitialWait {
+			w.State = WorkerFree
 		}
 	}
-	return false
+	p.started = nil
 }
 
-//func (p *WorkerPool) FreeWorkers() int {
-//	count := 0
-//	for _, w := range p.workers {
-//		if w.State == WorkerFree {
-//			count++
-//		}
-//	}
-//	return count
-//}
+func (p *WorkerPool) inRampupPhase() bool {
+	return p.started != nil
+}
+
+func (p *WorkerPool) WorkerAvailable() (avail bool, shouldRetry bool) {
+	if p.inRampupPhase() {
+		p.rampupWorkers()
+	}
+	for _, w := range p.workers {
+		if w.State == WorkerFree {
+			return true, false
+		}
+	}
+	return false, p.inRampupPhase()
+}
 
 func (p *WorkerPool) Borrow() Worker {
 	for _, status := range p.workers {

@@ -3,8 +3,9 @@ package exec
 import (
 	"context"
 	"fmt"
+
 	"github.com/streamingfast/substreams/storage/execout"
-	"time"
+	"google.golang.org/protobuf/proto"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
@@ -44,17 +45,29 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 			return moduleOutput, outputBytes, fmt.Errorf("converting output to module output: %w", err)
 		}
 
+		if moduleOutput == nil {
+			return nil, nil, nil // output from PartialKV is always nil, we cannot use it
+		}
+
+		// For store modules, the output in cache is in "operations", but we get the proper store deltas in "toModuleOutput", so we need to transform back those deltas into outputBytes
+		if storeDeltas := moduleOutput.GetStoreDeltas(); storeDeltas != nil {
+			outputBytes, err = proto.Marshal(moduleOutput.GetStoreDeltas())
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+
 		fillModuleOutputMetadata(executor, moduleOutput)
 		moduleOutput.Cached = true
 		return moduleOutput, outputBytes, nil
 	}
 
-	t0 := time.Now()
+	uid := reqctx.ReqStats(ctx).RecordModuleWasmBlockBegin(modName)
 	outputBytes, moduleOutput, err := executor.run(ctx, execOutput)
 	if err != nil {
 		return nil, nil, fmt.Errorf("execute: %w", err)
 	}
-	reqctx.ReqStats(ctx).RecordModuleExecDuration(time.Since(t0))
+	reqctx.ReqStats(ctx).RecordModuleWasmBlockEnd(modName, uid)
 
 	fillModuleOutputMetadata(executor, moduleOutput)
 
@@ -75,5 +88,4 @@ func fillModuleOutputMetadata(executor ModuleExecutor, in *pbssinternal.ModuleOu
 	in.ModuleName = executor.Name()
 	in.Logs = logs
 	in.DebugLogsTruncated = truncated
-	return
 }

@@ -75,7 +75,7 @@ func (s *FullKV) Save(endBoundaryBlock uint64) (*FileInfo, *fileWriter, error) {
 
 	file := NewCompleteFileInfo(s.name, s.moduleInitialBlock, endBoundaryBlock)
 
-	s.logger.Info("saving store",
+	s.logger.Debug("saving store",
 		zap.String("file_name", file.Filename),
 		zap.Object("block_range", file.Range),
 	)
@@ -95,6 +95,10 @@ func (s *FullKV) Reset() {
 	}
 	s.deltas = nil
 	s.lastOrdinal = 0
+}
+
+func (p *FullKV) ApplyOps(in []byte) error {
+	return applyOps(in, p.baseStore)
 }
 
 func (s *FullKV) String() string {

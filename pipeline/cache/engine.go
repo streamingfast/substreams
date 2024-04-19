@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	multierror "github.com/hashicorp/go-multierror"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+
 	"github.com/streamingfast/substreams/reqctx"
 
 	"github.com/streamingfast/bstream"
@@ -24,32 +27,40 @@ type Engine struct {
 	ctx               context.Context
 	blockType         string
 	reversibleBuffers map[uint64]*execout.Buffer // block num to modules' outputs for that given block
-	execOutputWriter  *execout.Writer            // moduleName => irreversible File
-	runtimeConfig     config.RuntimeConfig       // TODO(abourget): Deprecated: remove this as it's not used
-	logger            *zap.Logger
+	execOutputWriters map[string]*execout.Writer // moduleName => writer (single file)
+	existingExecOuts  map[string]*execout.File
+
+	runtimeConfig config.RuntimeConfig // TODO(abourget): Deprecated: remove this as it's not used
+	logger        *zap.Logger
 }
 
-func NewEngine(ctx context.Context, runtimeConfig config.RuntimeConfig, execOutWriter *execout.Writer, blockType string) (*Engine, error) {
+func NewEngine(ctx context.Context, runtimeConfig config.RuntimeConfig, execOutWriters map[string]*execout.Writer, blockType string, existingExecOuts map[string]*execout.File) (*Engine, error) {
 	e := &Engine{
 		ctx:               ctx,
 		runtimeConfig:     runtimeConfig,
 		reversibleBuffers: map[uint64]*execout.Buffer{},
-		execOutputWriter:  execOutWriter,
+		execOutputWriters: execOutWriters,
 		logger:            reqctx.Logger(ctx),
 		blockType:         blockType,
+		existingExecOuts:  existingExecOuts,
 	}
 	return e, nil
 }
 
-func (e *Engine) NewBuffer(block *bstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) (execout.ExecutionOutput, error) {
-	execOutBuf, err := execout.NewBuffer(e.blockType, block, clock)
+func (e *Engine) NewBuffer(optionalBlock *pbbstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) (execout.ExecutionOutput, error) {
+	out, err := execout.NewBuffer(e.blockType, optionalBlock, clock)
 	if err != nil {
 		return nil, fmt.Errorf("setting up map: %w", err)
 	}
 
-	e.reversibleBuffers[clock.Number] = execOutBuf
+	e.reversibleBuffers[clock.Number] = out
+	for moduleName, existingExecOut := range e.existingExecOuts {
+		if val, ok := existingExecOut.Get(clock); ok {
+			out.Set(moduleName, val)
+		}
+	}
 
-	return execOutBuf, nil
+	return out, nil
 }
 
 func (e *Engine) HandleUndo(clock *pbsubstreams.Clock) {
@@ -64,8 +75,8 @@ func (e *Engine) HandleFinal(clock *pbsubstreams.Clock) error {
 		return nil
 	}
 
-	if e.execOutputWriter != nil {
-		e.execOutputWriter.Write(clock, execOutBuf)
+	for _, writer := range e.execOutputWriters {
+		writer.Write(clock, execOutBuf)
 	}
 
 	delete(e.reversibleBuffers, clock.Number)
@@ -79,8 +90,11 @@ func (e *Engine) HandleStalled(clock *pbsubstreams.Clock) error {
 }
 
 func (e *Engine) EndOfStream(lastFinalClock *pbsubstreams.Clock) error {
-	if e.execOutputWriter != nil {
-		e.execOutputWriter.Close(context.Background())
+	var errs error
+	for _, writer := range e.execOutputWriters {
+		if err := writer.Close(context.Background()); err != nil {
+			errs = multierror.Append(errs, err)
+		}
 	}
-	return nil
+	return errs
 }

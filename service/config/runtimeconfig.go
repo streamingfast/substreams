@@ -1,9 +1,9 @@
 package config
 
 import (
-	"github.com/streamingfast/dstore"
-
 	"github.com/streamingfast/substreams/orchestrator/work"
+
+	"github.com/streamingfast/dstore"
 )
 
 // RuntimeConfig is a global configuration for the service.
@@ -20,11 +20,11 @@ type RuntimeConfig struct {
 	DefaultCacheTag string // appended to BaseObjectStore unless overriden by auth layer
 	WorkerFactory   work.WorkerFactory
 
-	WithRequestStats       bool
 	ModuleExecutionTracing bool
+	MaxConcurrentRequests  int64
 }
 
-func NewRuntimeConfig(
+func NewTier1RuntimeConfig(
 	stateBundleSize uint64,
 	parallelSubrequests uint64,
 	maxJobsAhead uint64,
@@ -44,4 +44,8 @@ func NewRuntimeConfig(
 		// overridden by Tier Options
 		ModuleExecutionTracing: false,
 	}
+}
+
+func NewTier2RuntimeConfig() RuntimeConfig {
+	return RuntimeConfig{} //values overridden by options
 }

@@ -1,92 +1,171 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/streamingfast/cli"
+	"github.com/streamingfast/cli/sflags"
+	"github.com/streamingfast/substreams/info"
 
 	"github.com/spf13/cobra"
-	"github.com/streamingfast/substreams/manifest"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-//	var manifestCmd = &cobra.Command{
-//		Use:          "manifest",
-//		SilenceUsage: true,
-//	}
+func init() {
+	infoCmd.Flags().String("output-sinkconfig-files-path", "", "if non-empty, any sinkconfig field of type 'bytes' that was packed from a file will be written to that path")
+	infoCmd.Flags().Bool("skip-package-validation", false, "Do not perform any validation when reading substreams package")
+}
+
 var infoCmd = &cobra.Command{
-	Use:   "info [<manifest_file>]",
+	Use:   "info [<manifest_file> [<output_module>]]",
 	Short: "Display package modules and docs",
 	Long: cli.Dedent(`
 		Display package modules and docs. The manifest is optional as it will try to find a file named
 		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains
 		a 'substreams.yaml' file in place of '<manifest_file>, or a link to a remote .spkg file, using urls gs://, http(s)://, ipfs://, etc.'.
+		Specify an "output_module" to see how processing can be divided in different stages to produce the requested output.
 	`),
 	RunE:         runInfo,
-	Args:         cobra.RangeArgs(0, 1),
+	Args:         cobra.RangeArgs(0, 2),
 	SilenceUsage: true,
 }
 
 func init() {
+	infoCmd.Flags().Bool("json", false, "Output as JSON")
 	rootCmd.AddCommand(infoCmd)
 }
 
 func runInfo(cmd *cobra.Command, args []string) error {
 	manifestPath := ""
-	if len(args) == 1 {
+	if len(args) != 0 {
 		manifestPath = args[0]
 	}
 
-	manifestReader, err := manifest.NewReader(manifestPath)
+	var outputModule string
+	if len(args) == 2 {
+		outputModule = args[1]
+	}
+
+	outputSinkconfigFilesPath := mustGetString(cmd, "output-sinkconfig-files-path")
+
+	info, err := info.Extended(manifestPath, outputModule, sflags.MustGetBool(cmd, "skip-package-validation"))
 	if err != nil {
-		return fmt.Errorf("manifest reader: %w", err)
+		return err
 	}
 
-	pkg, err := manifestReader.Read()
-	if err != nil {
-		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
+	if mustGetBool(cmd, "json") {
+		res, err := json.MarshalIndent(info, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(res))
+		return nil
 	}
 
-	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
-	if err != nil {
-		return fmt.Errorf("creating module graph: %w", err)
+	fmt.Println("Package name:", info.Name)
+	fmt.Println("Version:", info.Version)
+	if doc := info.Documentation; doc != nil && *doc != "" {
+		fmt.Println("Doc: " + strings.Replace(*doc, "\n", "\n  ", -1))
 	}
-
-	fmt.Println("Package name:", pkg.PackageMeta[0].Name)
-	fmt.Println("Version:", pkg.PackageMeta[0].Version)
-	if doc := pkg.PackageMeta[0].Doc; doc != "" {
-		fmt.Println("Doc: " + strings.Replace(doc, "\n", "\n  ", -1))
+	if info.Image != nil {
+		fmt.Printf("Image: [embedded image: %d bytes]\n", len(info.Image))
 	}
-
-	hashes := manifest.NewModuleHashes()
 
 	fmt.Println("Modules:")
 	fmt.Println("----")
-	for modIdx, module := range pkg.Modules.Modules {
-		fmt.Println("Name:", module.Name)
-		fmt.Println("Initial block:", module.InitialBlock)
-		kind := module.GetKind()
-		switch v := kind.(type) {
-		case *pbsubstreams.Module_KindMap_:
-			fmt.Println("Kind: map")
-			fmt.Println("Output Type:", v.KindMap.OutputType)
-		case *pbsubstreams.Module_KindStore_:
-			fmt.Println("Kind: store")
-			fmt.Println("Value Type:", v.KindStore.ValueType)
-			fmt.Println("Update Policy:", v.KindStore.UpdatePolicy)
+	for _, mod := range info.Modules {
+		fmt.Println("Name:", mod.Name)
+		fmt.Println("Initial block:", mod.InitialBlock)
+		fmt.Println("Kind:", mod.Kind)
+		for _, input := range mod.Inputs {
+			fmt.Printf("Input: %s: %s\n", input.Type, input.Name)
+		}
+
+		switch mod.Kind {
+		case "map":
+			fmt.Println("Output Type:", *mod.OutputType)
+		case "store":
+			fmt.Println("Value Type:", *mod.ValueType)
+			fmt.Println("Update Policy:", *mod.UpdatePolicy)
 		default:
 			fmt.Println("Kind: Unknown")
 		}
 
-		hashes.HashModule(pkg.Modules, module, graph)
-
-		fmt.Println("Hash:", hashes.Get(module.Name))
-		moduleMeta := pkg.ModuleMeta[modIdx]
-		if moduleMeta != nil && moduleMeta.Doc != "" {
-			fmt.Println("Doc: " + strings.Replace(moduleMeta.Doc, "\n", "\n  ", -1))
+		fmt.Println("Hash:", mod.Hash)
+		if doc := mod.Documentation; doc != nil && *doc != "" {
+			fmt.Println("Doc: ", *doc)
 		}
 		fmt.Println("")
+	}
+
+	if info.Network != "" {
+		fmt.Printf("Network: %s\n", info.Network)
+		fmt.Println("")
+	}
+
+	if info.Networks != nil {
+		fmt.Println("Networks:")
+		for network, params := range info.Networks {
+			fmt.Printf("  %s:\n", network)
+			if params.InitialBlocks != nil {
+				fmt.Println("    Initial Blocks:")
+			}
+			for mod, start := range params.InitialBlocks {
+				fmt.Printf("      - %s: %d\n", mod, start)
+			}
+			if params.Params != nil {
+				fmt.Println("    Params:")
+			}
+			for mod, p := range params.Params {
+				fmt.Printf("      - %s: %q\n", mod, p)
+			}
+			fmt.Println("")
+		}
+	}
+
+	if outputModule != "" {
+		stages := info.ExecutionStages
+		for i, layers := range stages {
+			var layerDefs []string
+			for _, l := range layers {
+				var mods []string
+				for _, m := range l {
+					mods = append(mods, m)
+				}
+				layerDefs = append(layerDefs, fmt.Sprintf(`["%s"]`, strings.Join(mods, `","`)))
+			}
+			fmt.Printf("Stage %d: [%s]\n", i, strings.Join(layerDefs, `,`))
+		}
+	}
+
+	if info.SinkInfo != nil {
+		fmt.Println("Sink config:")
+		fmt.Println("----")
+		fmt.Println("type:", info.SinkInfo.TypeUrl)
+
+		fmt.Println("configs:")
+		fmt.Println(info.SinkInfo.Configs)
+
+		if outputSinkconfigFilesPath != "" && info.SinkInfo.Files != nil {
+			if err := os.MkdirAll(outputSinkconfigFilesPath, 0755); err != nil {
+				return err
+			}
+			fmt.Println("output files:")
+			for k, v := range info.SinkInfo.Files {
+				filename := filepath.Join(outputSinkconfigFilesPath, k)
+				f, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+				if err != nil {
+					return err
+				}
+				if _, err := f.Write(v); err != nil {
+					return err
+				}
+				fmt.Printf("  - %q written to %q\n", k, filename)
+			}
+		}
 	}
 
 	return nil

@@ -1,0 +1,68 @@
+{{- range $idx, $contract := .ethereumContracts }}
+{{- range $event := $contract.GetEvents }}
+{{- $rust := $event.Rust }}
+{{- $numberOfAttributes := len $rust.ProtoFieldTableChangesMap -}}
+CREATE TABLE IF NOT EXISTS {{ $contract.GetName }}_{{ $rust.TableChangeEntityName }} (
+    "evt_tx_hash" VARCHAR(64),
+    "evt_index" INT,
+    "evt_block_time" TIMESTAMP,
+    "evt_block_number" UInt64{{ if ne $numberOfAttributes 0 }},{{ end -}}
+    {{- $i := 0 }}
+    {{- range $fieldName, $sqlType := $rust.ProtoFieldClickhouseMap }}
+    {{ $i = add $i 1 }}{{ $fieldName }} {{ $sqlType }}{{ if eq $i $numberOfAttributes }}{{ else }},{{ end }}
+    {{- end}}
+) ENGINE = MergeTree PRIMARY KEY ("evt_tx_hash","evt_index");
+{{ end }}
+{{- if $contract.HasCalls }}
+{{- range $call := $contract.GetCalls }}
+{{- $rust := $call.Rust }}
+{{- $numberOfAttributes := len $rust.ProtoFieldTableChangesMap }}
+CREATE TABLE IF NOT EXISTS {{ $contract.GetName }}_{{ $rust.TableChangeEntityName }} (
+    "call_tx_hash" VARCHAR(64),
+    "call_block_time" TIMESTAMP,
+    "call_block_number" UInt64,
+    "call_ordinal" INT,
+    "call_success" BOOL{{ if ne $numberOfAttributes 0 }},{{ end -}}
+    {{- $i := 0 }}
+    {{- range $fieldName, $sqlType := $rust.ProtoFieldClickhouseMap }}
+    {{ $i = add $i 1 }}{{ $fieldName }} {{ $sqlType }}{{ if eq $i $numberOfAttributes }}{{ else }},{{ end }}
+    {{- end}}
+) ENGINE = MergeTree PRIMARY KEY ("call_tx_hash","call_ordinal");
+{{- end }}
+{{- end }}
+{{- range $ddsContract := $contract.GetDDS }}
+{{- range $event := $ddsContract.GetEvents }}
+{{- $rust := $event.Rust }}
+{{- $numberOfAttributes := len $rust.ProtoFieldTableChangesMap }}
+CREATE TABLE IF NOT EXISTS {{ $ddsContract.GetName }}_{{ $rust.TableChangeEntityName }} (
+    "evt_tx_hash" VARCHAR(64),
+    "evt_index" INT,
+    "evt_block_time" TIMESTAMP,
+    "evt_block_number" UInt64,
+    "evt_address" VARCHAR(40){{ if ne $numberOfAttributes 0 }},{{ end -}}
+    {{- $i := 0 }}
+    {{- range $fieldName, $sqlType := $rust.ProtoFieldClickhouseMap }}
+    {{ $i = add $i 1 }}{{ $fieldName }} {{ $sqlType }}{{ if eq $i $numberOfAttributes }}{{ else }},{{ end }}
+    {{- end}}
+) ENGINE = MergeTree PRIMARY KEY ("evt_tx_hash","evt_index");
+{{- end }}
+{{- if $ddsContract.HasCalls }}
+{{- range $call := $ddsContract.GetCalls }}
+{{- $rust := $call.Rust }}
+{{- $numberOfAttributes := len $rust.ProtoFieldTableChangesMap }}
+CREATE TABLE IF NOT EXISTS {{ $ddsContract.GetName }}_{{ $rust.TableChangeEntityName }} (
+    "call_tx_hash" VARCHAR(64),
+    "call_block_time" TIMESTAMP,
+    "call_block_number" UInt64,
+    "call_ordinal" INT,
+    "call_success" BOOL,
+    "call_address" VARCHAR(40){{ if ne $numberOfAttributes 0 }},{{ end -}}
+    {{- $i := 0 }}
+    {{- range $fieldName, $sqlType := $rust.ProtoFieldClickhouseMap }}
+    {{ $i = add $i 1 }}{{ $fieldName }} {{ $sqlType }}{{ if eq $i $numberOfAttributes }}{{ else }},{{ end }}
+    {{- end}}
+) ENGINE = MergeTree PRIMARY KEY ("call_tx_hash","call_ordinal");
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

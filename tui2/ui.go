@@ -37,7 +37,7 @@ type UI struct {
 	msgDescs      map[string]*manifest.ModuleDescriptor
 	stream        *streamui.Stream
 	replayLog     *replaylog.File
-	requestConfig *request.RequestConfig // all boilerplate to pass down to refresh
+	requestConfig *request.Config // all boilerplate to pass down to refresh
 
 	common.Common
 	currentModalFunc common.ModalUpdateFunc
@@ -49,12 +49,12 @@ type UI struct {
 	tabs             *tabs.Tabs
 }
 
-func New(reqConfig *request.RequestConfig) (*UI, error) {
+func New(reqConfig *request.Config) (*UI, error) {
 	c := common.Common{
 		Styles: styles.DefaultStyles(),
 	}
 
-	out, err := output.New(c, reqConfig.ManifestPath, reqConfig.OutputModule, reqConfig)
+	out, err := output.New(c, reqConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -204,13 +204,6 @@ func (ui *UI) forceRefresh() {
 }
 
 func (ui *UI) View() string {
-	switch ui.activePage {
-	case progressPage:
-		if time.Since(ui.lastView) < time.Millisecond*100 {
-			return ui.memoized
-		}
-		ui.lastView = time.Now()
-	}
 	headline := ui.Styles.Header.Render("Substreams GUI")
 
 	if ui.stream != nil {
@@ -226,13 +219,12 @@ func (ui *UI) View() string {
 		headline = ui.Styles.Header.Copy().Foreground(color).Render("Substreams GUI")
 	}
 
-	ui.memoized = lipgloss.JoinVertical(0,
+	return lipgloss.JoinVertical(0,
 		headline,
 		ui.Styles.Tabs.Render(ui.tabs.View()),
 		ui.pages[ui.activePage].View(),
 		ui.footer.View(),
 	)
-	return ui.memoized
 }
 
 func (ui *UI) restartStream() tea.Cmd {

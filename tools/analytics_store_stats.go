@@ -49,14 +49,9 @@ func StoreStatsE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
 
-	pkg, err := manifestReader.Read()
+	pkg, graph, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
-	}
-
-	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
-	if err != nil {
-		return fmt.Errorf("creating module graph: %w", err)
 	}
 
 	wg := sync.WaitGroup{}
@@ -114,7 +109,6 @@ func StoreStatsE(cmd *cobra.Command, args []string) error {
 				module.GetKind().(*pbsubstreams.Module_KindStore_).KindStore.UpdatePolicy,
 				module.GetKind().(*pbsubstreams.Module_KindStore_).KindStore.ValueType,
 				baseDStore,
-				"",
 			)
 			if err != nil {
 				zlog.Error("creating store config", zap.Error(err))

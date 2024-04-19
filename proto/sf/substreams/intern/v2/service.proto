@@ -10,23 +10,74 @@ service Substreams {
   rpc ProcessRange(ProcessRangeRequest) returns (stream ProcessRangeResponse);
 }
 
+// Possible types of WASM modules
+enum WASMModuleType {
+  WASM_MODULE_TYPE_UNSPECIFIED = 0;
+  WASM_MODULE_TYPE_RPC_CALL = 1;
+}
+
 message ProcessRangeRequest {
   uint64 start_block_num = 1;
   uint64 stop_block_num = 2;
   string output_module = 3;
   sf.substreams.v1.Modules modules = 4;
   uint32 stage = 5; // 0-based index of stage to execute up to
+
+  string metering_config = 6;
+  uint64 first_streamable_block = 7; // first block that can be streamed
+  uint64 last_streamable_block = 8; // last block that can be streamed
+
+  map<string, string> wasm_modules = 9; // TODO: rename to `wasm_extension_configs`
+
+  string merged_blocks_store = 10; // store to use for merged blocks
+  string state_store = 11; // store to use for substreams state
+  string state_store_default_tag = 12; // default tag to use for state store
+  uint64 state_bundle_size = 13; // number of blocks to process in a single batch
+
+  string block_type = 14; // block type to process
 }
 
 message ProcessRangeResponse {
-  string module_name = 1;
+  reserved 1;// previously string module_name = 1;
+
+  reserved 2; // previously in oneof(type): BlockRange processed_range
+  reserved 3; // previously in oneof(type): ProcessedBytes processed_bytes
 
   oneof type {
-    BlockRange processed_range = 2;
-    ProcessedBytes processed_bytes = 3;
     Failed failed = 4;
     Completed completed = 5;
+    Update update = 6;
   }
+  
+}
+
+message Update {
+    uint64 duration_ms = 1;
+    uint64 processed_blocks = 2;
+    uint64 total_bytes_read = 3;
+    uint64 total_bytes_written = 4;
+
+    repeated ModuleStats modules_stats = 5;
+}
+
+message ModuleStats {
+    string name = 1;
+    uint64 processing_time_ms = 2;
+    uint64 store_operation_time_ms = 3;
+    uint64 store_read_count = 4;
+
+    repeated ExternalCallMetric external_call_metrics = 5;
+
+    // store-specific (will be 0 on mappers)
+    uint64 store_write_count = 10;
+    uint64 store_deleteprefix_count = 11;
+    uint64 store_size_bytes = 12;
+}
+
+message ExternalCallMetric {
+    string name = 1;
+    uint64 count = 2;
+    uint64 time_ms = 3;
 }
 
 message Completed {
@@ -41,14 +92,6 @@ message Completed {
   // is not yet updated to produce a trace id and a such, the tier1 should
   // generate a legacy partial file name.
   string trace_id = 2;
-}
-
-message ProcessedBytes {
-  uint64 total_bytes_read = 1;
-  uint64 total_bytes_written = 2;
-  uint64 bytes_read_delta = 3;
-  uint64 bytes_written_delta = 4;
-  uint64 nano_seconds_delta = 5;
 }
 
 message Failed {

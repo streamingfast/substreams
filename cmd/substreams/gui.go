@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/streamingfast/substreams/manifest"
-
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
+	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/substreams/client"
+	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/tools"
 	"github.com/streamingfast/substreams/tui2"
 	"github.com/streamingfast/substreams/tui2/pages/request"
@@ -20,7 +20,9 @@ import (
 
 func init() {
 	guiCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token")
-	guiCmd.Flags().StringP("substreams-endpoint", "e", "mainnet.eth.streamingfast.io:443", "Substreams gRPC endpoint")
+	guiCmd.Flags().String("substreams-api-key-envvar", "SUBSTREAMS_API_KEY", "Name of variable containing Substreams Api Key")
+	guiCmd.Flags().StringP("substreams-endpoint", "e", "", "Substreams gRPC endpoint. If empty, will be replaced by the SUBSTREAMS_ENDPOINT_{network_name} environment variable, where `network_name` is determined from the substreams manifest. Some network names have default endpoints.")
+	guiCmd.Flags().String("network", "", "Specify the network to use for params and initialBlocks, overriding the 'network' field in the substreams package")
 	guiCmd.Flags().Bool("insecure", false, "Skip certificate validation on GRPC connection")
 	guiCmd.Flags().Bool("plaintext", false, "Establish GRPC connection in plaintext")
 	guiCmd.Flags().StringSliceP("header", "H", nil, "Additional headers to be sent in the substreams request")
@@ -33,6 +35,7 @@ func init() {
 	guiCmd.Flags().Bool("production-mode", false, "Enable Production Mode, with high-speed parallel processing")
 	guiCmd.Flags().StringArrayP("params", "p", nil, "Set a params for parameterizable modules. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
 	guiCmd.Flags().Bool("replay", false, "Replay saved session into GUI from replay.bin")
+	guiCmd.Flags().Bool("skip-package-validation", false, "Do not perform any validation when reading substreams package")
 	rootCmd.AddCommand(guiCmd)
 }
 
@@ -59,9 +62,11 @@ func runGui(cmd *cobra.Command, args []string) error {
 		manifestPath = args[0]
 		args = args[1:]
 	} else {
-		if cli.DirectoryExists(args[0]) || cli.FileExists(args[0]) || strings.Contains(args[0], ".") {
-			return fmt.Errorf("parameter entered likely a manifest file, don't forget to include a '<module_name>' in your command")
+		// Check common error where manifest is provided by module name is missing
+		if manifest.IsLikelyManifestInput(args[0]) {
+			return fmt.Errorf("missing <module_name> argument, check 'substreams run --help' for more information")
 		}
+
 		// At this point, we assume the user invoked `substreams run <module_name>` so we `resolveManifestFile` using the empty string since no argument has been passed.
 		manifestPath, err = resolveManifestFile("")
 		if err != nil {
@@ -77,26 +82,45 @@ func runGui(cmd *cobra.Command, args []string) error {
 	debugModulesInitialSnapshot := mustGetStringSlice(cmd, "debug-modules-initial-snapshot")
 
 	outputModule := args[0]
+	network := sflags.MustGetString(cmd, "network")
+	paramsString := sflags.MustGetStringArray(cmd, "params")
+	params, err := manifest.ParseParams(paramsString)
+	if err != nil {
+		return fmt.Errorf("parsing params: %w", err)
+	}
 
-	substreamsClientConfig := client.NewSubstreamsClientConfig(
-		mustGetString(cmd, "substreams-endpoint"),
-		tools.ReadAPIToken(cmd, "substreams-api-token-envvar"),
-		mustGetBool(cmd, "insecure"),
-		mustGetBool(cmd, "plaintext"),
-	)
+	readerOptions := []manifest.Option{
+		manifest.WithOverrideOutputModule(outputModule),
+		manifest.WithOverrideNetwork(network),
+		manifest.WithParams(params),
+	}
+	if sflags.MustGetBool(cmd, "skip-package-validation") {
+		readerOptions = append(readerOptions, manifest.SkipPackageValidationReader())
+	}
 
-	manifestReader, err := manifest.NewReader(manifestPath)
+	manifestReader, err := manifest.NewReader(manifestPath, readerOptions...)
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
-	pkg, err := manifestReader.Read()
+
+	pkg, graph, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
-	params := mustGetStringArray(cmd, "params")
-	if err := manifest.ApplyParams(params, pkg); err != nil {
-		return err
+
+	endpoint, err := manifest.ExtractNetworkEndpoint(pkg.Network, mustGetString(cmd, "substreams-endpoint"), zlog)
+	if err != nil {
+		return fmt.Errorf("extracting endpoint: %w", err)
 	}
+
+	authToken, authType := tools.GetAuth(cmd, "substreams-api-key-envvar", "substreams-api-token-envvar")
+	substreamsClientConfig := client.NewSubstreamsClientConfig(
+		endpoint,
+		authToken,
+		authType,
+		mustGetBool(cmd, "insecure"),
+		mustGetBool(cmd, "plaintext"),
+	)
 
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -116,13 +140,30 @@ func runGui(cmd *cobra.Command, args []string) error {
 
 	startBlock, readFromModule, err := readStartBlockFlag(cmd, "start-block")
 	if err != nil {
+		return fmt.Errorf("start block: %w", err)
+	}
+
+	stopBlock, err := readStopBlockFlag(cmd, startBlock, "stop-block", cursor != "")
+	if err != nil {
 		return fmt.Errorf("stop block: %w", err)
 	}
 
-	stopBlock := mustGetString(cmd, "stop-block")
+	if readFromModule { // need to tweak the stop block here
+		sb, err := graph.ModuleInitialBlock(outputModule)
+		if err != nil {
+			return fmt.Errorf("getting module start block: %w", err)
+		}
+		startBlock := int64(sb)
+		stopBlock, err = readStopBlockFlag(cmd, startBlock, "stop-block", cursor != "")
+		if err != nil {
+			return fmt.Errorf("stop block: %w", err)
+		}
+	}
 
-	requestConfig := &request.RequestConfig{
+	requestConfig := &request.Config{
 		ManifestPath:                manifestPath,
+		Pkg:                         pkg,
+		Graph:                       graph,
 		ReadFromModule:              readFromModule,
 		ProdMode:                    productionMode,
 		DebugModulesOutput:          debugModulesOutput,
@@ -137,6 +178,7 @@ func runGui(cmd *cobra.Command, args []string) error {
 		StopBlock:                   stopBlock,
 		FinalBlocksOnly:             mustGetBool(cmd, "final-blocks-only"),
 		Params:                      params,
+		ReaderOptions:               readerOptions,
 	}
 
 	ui, err := tui2.New(requestConfig)

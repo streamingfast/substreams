@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"go.uber.org/zap"
 
+	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/orchestrator/execout"
 	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/orchestrator/response"
@@ -67,6 +69,7 @@ func (s *Scheduler) Init() loop.Cmd {
 }
 
 func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
+	defer s.Stages.UpdateStats()
 
 	if os.Getenv("SUBSTREAMS_DEBUG_SCHEDULER_STATE") == "true" {
 		fmt.Print(s.Stages.StatesString())
@@ -78,6 +81,8 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 
 	switch msg := msg.(type) {
 	case work.MsgJobSucceeded:
+		metrics.Tier1ActiveWorkerRequest.Dec()
+
 		s.Stages.MarkSegmentPartialPresent(msg.Unit)
 		s.WorkerPool.Return(msg.Worker)
 
@@ -90,10 +95,14 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		}
 
 	case work.MsgScheduleNextJob:
-		if !s.WorkerPool.WorkerAvailable() {
-			return nil
+		avail, shouldRetry := s.WorkerPool.WorkerAvailable()
+		if !avail {
+			if !shouldRetry {
+				return nil
+			}
+			cmds = append(cmds, loop.Tick(time.Second, func() loop.Msg { return work.MsgScheduleNextJob{} }))
+			break
 		}
-
 		workUnit, workRange := s.Stages.NextJob()
 		if workRange == nil {
 			return nil
@@ -103,12 +112,18 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 
 		s.logger.Info("scheduling work", zap.Object("unit", workUnit))
 		modules := s.Stages.StageModules(workUnit.Stage)
+
+		metrics.Tier1ActiveWorkerRequest.Inc()
+		metrics.Tier1WorkerRequestCounter.Inc()
+
 		return loop.Batch(
 			worker.Work(s.ctx, workUnit, workRange, modules, s.stream),
 			work.CmdScheduleNextJob(),
 		)
 
 	case work.MsgJobFailed:
+		metrics.Tier1ActiveWorkerRequest.Dec()
+
 		cmds = append(cmds, loop.Quit(msg.Error))
 
 	case stage.MsgMergeFinished:
@@ -156,14 +171,18 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 
 	}
 
-	//if len(cmds) != 0 {
-	//	fmt.Printf("Schedule: %T %+v\n", cmds, cmds)
-	//}
 	return loop.Batch(cmds...)
 }
 
 func (s *Scheduler) cmdShutdownWhenComplete() loop.Cmd {
 	if s.outputStreamCompleted && s.storesSyncCompleted {
+
+		var fields []zap.Field
+		if s.ExecOutWalker != nil {
+			start, current, end := s.ExecOutWalker.Progress()
+			fields = append(fields, zap.Int("cached_output_start", start), zap.Int("cached_output_current", current), zap.Int("cached_output_end", end))
+		}
+		s.logger.Info("scheduler: stores and cached_outputs stream completed, switching to live", fields...)
 		return func() loop.Msg {
 			err := s.Stages.WaitAsyncWork()
 			return loop.Quit(err)()
@@ -173,7 +192,13 @@ func (s *Scheduler) cmdShutdownWhenComplete() loop.Cmd {
 		s.logger.Info("scheduler: waiting for output stream and stores to complete")
 	}
 	if !s.outputStreamCompleted && s.storesSyncCompleted {
-		s.logger.Info("scheduler: waiting for output stream to complete, stores ready")
+
+		var fields []zap.Field
+		if s.ExecOutWalker != nil {
+			start, current, end := s.ExecOutWalker.Progress()
+			fields = append(fields, zap.Int("cached_output_start", start), zap.Int("cached_output_current", current), zap.Int("cached_output_end", end))
+		}
+		s.logger.Info("scheduler: waiting for output stream to complete, stores ready", fields...)
 	}
 	if s.outputStreamCompleted && !s.storesSyncCompleted {
 		s.logger.Info("scheduler: waiting for stores to complete, output stream completed")

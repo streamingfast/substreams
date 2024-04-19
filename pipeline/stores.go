@@ -79,6 +79,11 @@ func (s *Stores) saveStoresSnapshots(ctx context.Context, lastLayer outputmodule
 	for _, mod := range lastLayer {
 		store := s.StoreMap[mod.Name]
 		s.logger.Info("flushing store at boundary", zap.Uint64("boundary", boundaryBlock), zap.String("store", mod.Name), zap.Int("stage", stage))
+		// TODO when partials are generic again, we can also check if PartialKV exists and skip if it does.
+		exists, _ := s.configs[mod.Name].ExistsFullKV(ctx, boundaryBlock)
+		if exists {
+			continue
+		}
 		if err := s.saveStoreSnapshot(ctx, store, boundaryBlock); err != nil {
 			return fmt.Errorf("save store snapshot %q: %w", mod.Name, err)
 		}

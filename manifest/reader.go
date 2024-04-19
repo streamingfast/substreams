@@ -1,10 +1,10 @@
 package manifest
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -14,14 +14,17 @@ import (
 	"time"
 
 	ipfs "github.com/ipfs/go-ipfs-api"
-	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/streamingfast/dstore"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"go.uber.org/zap"
 	"golang.org/x/mod/semver"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/jhump/protoreflect/desc"
+	"github.com/streamingfast/cli"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"go.uber.org/zap"
 	"gopkg.in/yaml.v2"
+	yaml3 "gopkg.in/yaml.v3"
 )
 
 var IPFSURL string
@@ -30,54 +33,43 @@ var httpClient = &http.Client{
 	Timeout: 30 * time.Second,
 }
 
-type Options func(r *Reader) *Reader
-
-func SkipSourceCodeReader() Options {
-	return func(r *Reader) *Reader {
-		r.skipSourceCodeImportValidation = true
-		return r
+func hasRemotePrefix(in string) bool {
+	for _, prefix := range []string{"https://", "http://", "ipfs://", "gs://", "s3://", "az://"} {
+		if strings.HasPrefix(in, prefix) {
+			return true
+		}
 	}
-}
 
-func SkipModuleOutputTypeValidationReader() Options {
-	return func(r *Reader) *Reader {
-		r.skipModuleOutputTypeValidation = true
-		return r
-	}
-}
-
-func SkipPackageValidationReader() Options {
-	return func(r *Reader) *Reader {
-		r.skipPackageValidation = true
-		return r
-	}
-}
-
-func WithCollectProtoDefinitions(f func(protoDefinitions []*desc.FileDescriptor)) Options {
-	return func(r *Reader) *Reader {
-		r.collectProtoDefinitionsFunc = f
-		return r
-	}
+	return false
 }
 
 type Reader struct {
-	resolvedInput               string
-	collectProtoDefinitionsFunc func(protoDefinitions []*desc.FileDescriptor)
+	currentData []byte
+
+	originalInput string
+	currentInput  string
+
+	workingDir string
+
+	pkg *pbsubstreams.Package
 
 	// cached values
 	protoDefinitions         []*desc.FileDescriptor
 	sinkConfigJSON           string
 	sinkConfigDynamicMessage *dynamic.Message
 
+	collectProtoDefinitionsFunc func(protoDefinitions []*desc.FileDescriptor)
+
 	//options
 	skipSourceCodeImportValidation bool
 	skipModuleOutputTypeValidation bool
 	skipPackageValidation          bool
-
-	constructorErr error
+	overrideNetwork                string
+	overrideOutputModule           string
+	params                         map[string]string
 }
 
-func NewReader(input string, opts ...Options) (*Reader, error) {
+func NewReader(input string, opts ...Option) (*Reader, error) {
 	workingDir, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get working directory: %w", err)
@@ -86,278 +78,304 @@ func NewReader(input string, opts ...Options) (*Reader, error) {
 	return newReader(input, workingDir, opts...)
 }
 
-func MustNewReader(input string, opts ...Options) *Reader {
-	reader, err := NewReader(input, opts...)
+func MustNewReader(input string, opts ...Option) *Reader {
+	r, err := NewReader(input)
 	if err != nil {
 		panic(err)
 	}
 
-	return reader
+	return r
 }
 
-func newReader(input string, workingDir string, opts ...Options) (*Reader, error) {
-	r := &Reader{resolvedInput: input}
-	for _, opt := range opts {
-		r = opt(r)
+func newReader(input, workingDir string, opts ...Option) (*Reader, error) {
+	r := &Reader{
+		originalInput: input,
+		workingDir:    workingDir,
 	}
 
-	var err error
-	r.resolvedInput, err = resolveInput(input, workingDir)
-	if err != nil {
-		return nil, fmt.Errorf("invalid Substreams manifest %q: %w", input, err)
+	if err := r.resolveInputPath(); err != nil {
+		return nil, err
+	}
+
+	for _, opt := range opts {
+		opt(r)
 	}
 
 	return r, nil
 }
 
-func resolveInput(input string, workingDir string) (string, error) {
-	if isRemotePackage(input) {
-		return input, nil
-	}
-
-	// If empty, assign input to be `pwd`/substreams.yaml
-	if input == "" {
-		input = filepath.Join(workingDir, "substreams.yaml")
-	}
-
-	// It's supposed to be a directory or a file, so we should be able to stat it and it should exists
-	stat, err := os.Stat(input)
+func (r *Reader) Read() (*pbsubstreams.Package, *ModuleGraph, error) {
+	pkg, err := r.resolvePkg()
 	if err != nil {
-		// Stat error already says 'stat' so no wrapping
-		return "", err
+		return nil, nil, err
 	}
 
-	// If it's a directory, we look actually for '<input>/substreams.yaml'
-	if stat.IsDir() {
-		input = filepath.Join(input, "substreams.yaml")
+	if !r.skipPackageValidation {
+		if err := validatePackage(pkg, r.skipModuleOutputTypeValidation); err != nil {
+			return nil, nil, fmt.Errorf("package validation failed: %w", err)
+		}
+
+		if err := ValidateModules(pkg.Modules); err != nil {
+			return nil, nil, fmt.Errorf("module validation failed: %w", err)
+		}
 	}
 
-	return input, nil
-}
-
-func (r *Reader) ResolvedInput() string {
-	return r.resolvedInput
-}
-
-func (r *Reader) MustRead() *pbsubstreams.Package {
-	pkg, err := r.Read()
+	graph, err := NewModuleGraph(pkg.Modules.Modules)
 	if err != nil {
-		panic(err)
+		return nil, nil, err
 	}
 
-	return pkg
-}
-
-func (r *Reader) Read() (*pbsubstreams.Package, error) {
-	if r.constructorErr != nil {
-		return nil, r.constructorErr
+	if r.overrideNetwork != "" {
+		pkg.Network = r.overrideNetwork
 	}
 
-	workingDir, err := os.Getwd()
-	if err != nil {
-		return nil, fmt.Errorf("unable to get working directory: %w", err)
-	}
-
-	return r.read(workingDir)
-}
-
-func (r *Reader) read(workingDir string) (*pbsubstreams.Package, error) {
-	if r.IsRemotePackage() {
-		return r.newPkgFromURL(r.resolvedInput)
-	}
-
-	input := r.resolvedInput
-	if strings.HasSuffix(input, ".yaml") {
-		pkg, protoDefinitions, err := r.newPkgFromManifest(input)
+	if pkg.Networks != nil {
+		importIncludedModules, err := dependentImportedModules(graph, r.overrideOutputModule)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		if r.collectProtoDefinitionsFunc != nil {
-			r.collectProtoDefinitionsFunc(protoDefinitions)
+
+		if pkg.Network == "" {
+			return nil, nil, fmt.Errorf("no network specified in package, but networks are defined")
 		}
-		r.protoDefinitions = protoDefinitions
-		return pkg, nil
+		if err := validateNetworks(pkg, importIncludedModules, pkg.Network); err != nil {
+			return nil, nil, err
+		}
+		if err := ApplyNetwork(pkg.Network, pkg); err != nil {
+			return nil, nil, err
+		}
 	}
 
-	return r.newPkgFromFile(input)
+	// applied on top of network-specific params
+	if r.params != nil {
+		if err := ApplyParams(r.params, pkg); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	if err := computeInitialBlock(pkg.Modules.Modules, graph); err != nil {
+		return nil, nil, err
+	}
+
+	return pkg, graph, nil
 }
 
-// IsRemotePackage determines if reader's input to read the manifest is a remote file accessible over
-// HTTP/HTTPS, Google Cloud Storage, S3 or Azure Storage.
-func (r *Reader) IsRemotePackage() bool {
-	return isRemotePackage(r.resolvedInput)
+func (r *Reader) read() error {
+	input := r.currentInput
+	if r.IsRemotePackage(input) {
+		return r.readRemote(input)
+	}
+
+	return r.readLocal(input)
 }
 
-func isRemotePackage(in string) bool {
-	u, err := url.Parse(in)
+func (r *Reader) readRemote(input string) error {
+	u, err := url.Parse(input)
 	if err != nil {
-		return false
-	}
-
-	return u.Scheme == "http" || u.Scheme == "https" || u.Scheme == "gs" || u.Scheme == "s3" || u.Scheme == "az" || u.Scheme == "ipfs"
-}
-
-// IsLocalManifest determines if reader's input to read the manifest is a local manifest file, which is determined
-// by ensure it's not a remote package and if the file end with `.yaml`.
-func (r *Reader) IsLocalManifest() bool {
-	if r.IsRemotePackage() {
-		return false
-	}
-
-	return strings.HasSuffix(r.resolvedInput, ".yaml")
-}
-
-func (r *Reader) newPkgFromFile(inputFilePath string) (pkg *pbsubstreams.Package, err error) {
-	cnt, err := os.ReadFile(inputFilePath)
-	if err != nil {
-		return nil, fmt.Errorf("error reading %q: %w", inputFilePath, err)
-	}
-
-	return r.fromContents(cnt)
-}
-
-func (r *Reader) newPkgFromURL(fileURL string) (pkg *pbsubstreams.Package, err error) {
-	u, err := url.Parse(fileURL)
-	if err != nil {
-		panic(fmt.Errorf("fileURL %q should have been valid by that execution point but it seems it was not: %w", fileURL, err))
+		return fmt.Errorf("unable to parse url %q: %w", input, err)
 	}
 
 	if u.Scheme == "gs" || u.Scheme == "s3" || u.Scheme == "az" {
-		return r.newPkgFromStore(fileURL)
+		return r.readFromStore(input)
 	}
 
 	if u.Scheme == "ipfs" {
-		return r.newPkgFromIPFS(u.Host)
+		return r.readFromIPFS(u.Host)
 	}
 
-	resp, err := httpClient.Get(fileURL)
-	if err != nil {
-		return nil, fmt.Errorf("error downloading %q: %w", fileURL, err)
-	}
-
-	cnt, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading %q: %w", fileURL, err)
-	}
-
-	return r.fromContents(cnt)
+	return r.readFromHttp(input)
 }
 
-func (r *Reader) newPkgFromStore(fileURL string) (pkg *pbsubstreams.Package, err error) {
+func (r *Reader) readFromHttp(input string) error {
+	resp, err := httpClient.Get(input)
+	if err != nil {
+		return fmt.Errorf("error downloading %q: %w", input, err)
+	}
+
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("error reading %q: %w", input, err)
+	}
+
+	r.currentData = b
+	return nil
+}
+
+func (r *Reader) readFromStore(input string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	cnt, err := dstore.ReadObject(ctx, fileURL)
+	b, err := dstore.ReadObject(ctx, input)
 	if err != nil {
-		return nil, fmt.Errorf("error reading %q: %w", fileURL, err)
+		return fmt.Errorf("error reading %q: %w", input, err)
 	}
 
-	return r.fromContents(cnt)
+	r.currentData = b
+	return nil
 }
 
-type subgraphManifest struct {
-	DataSources []struct {
-		Kind   string `yaml:"kind"`
-		Source struct {
-			Package struct {
-				File map[string]string `yaml:"file"`
-			} `yaml:"package"`
-		} `yaml:"source"`
-	} `yaml:"dataSources"`
-}
-
-func readIPFSContent(hash string, sh *ipfs.Shell) ([]byte, error) {
-	readCloser, err := sh.Cat(hash)
-	if err != nil {
-		return nil, err
+func (r *Reader) readFromIPFS(input string) error {
+	readIPFSContent := func(hash string, sh *ipfs.Shell) ([]byte, error) {
+		readCloser, err := sh.Cat(hash)
+		if err != nil {
+			return nil, err
+		}
+		defer readCloser.Close()
+		return io.ReadAll(readCloser)
 	}
-	defer readCloser.Close()
-	return ioutil.ReadAll(readCloser)
-}
 
-func (r *Reader) newPkgFromIPFS(hash string) (pkg *pbsubstreams.Package, err error) {
 	sh := ipfs.NewShell(IPFSURL)
 	sh.SetTimeout(IPFSTimeout)
 
-	cnt, err := readIPFSContent(hash, sh)
+	b, err := readIPFSContent(input, sh)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("unable to read ipfs content %q: %w", input, err)
+	}
+
+	r.currentData = b
+
+	type subgraphManifest struct {
+		DataSources []struct {
+			Kind   string `yaml:"kind"`
+			Source struct {
+				Package struct {
+					File map[string]string `yaml:"file"`
+				} `yaml:"package"`
+			} `yaml:"source"`
+		} `yaml:"dataSources"`
 	}
 
 	manifest := &subgraphManifest{}
-	err = yaml.Unmarshal(cnt, manifest)
+	err = yaml.Unmarshal(b, manifest)
 	if err != nil || len(manifest.DataSources) == 0 {
-		// not a valid manifest, maybe it's the spkg itself
-		return r.fromContents(cnt)
+		// not a valid manifest, it is probably the spkg itself
+		return nil
 	}
+
+	r.currentData = nil
 
 	if manifest.DataSources[0].Kind != "substreams" {
-		return nil, fmt.Errorf("given ipfs hash is not a substreams-based subgraph")
+		return fmt.Errorf("given ipfs hash is not a substreams-based subgraph")
 	}
 
-	spkgHash := manifest.DataSources[0].Source.Package.File["/"]
+	var spkgHash string
+	if len(manifest.DataSources) > 0 && manifest.DataSources[0].Source.Package.File != nil {
+		spkgHash = manifest.DataSources[0].Source.Package.File["/"]
+	}
 
-	cnt, err = readIPFSContent(spkgHash, sh)
+	if spkgHash == "" {
+		return fmt.Errorf("no spkg hash found in manifest")
+	}
+
+	b, err = readIPFSContent(spkgHash, sh)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("unable to read spkg from ipfs %q: %w", spkgHash, err)
 	}
 
-	return r.fromContents(cnt)
+	r.currentData = b
+	return nil
 }
 
-func (r *Reader) newPkgFromManifest(inputPath string) (pkg *pbsubstreams.Package, protoDefinitions []*desc.FileDescriptor, err error) {
-	manif, err := LoadManifestFile(inputPath)
+func (r *Reader) readLocal(input string) error {
+	b, err := os.ReadFile(input)
 	if err != nil {
-		return nil, nil, err
+		return fmt.Errorf("unable to read file %q: %w", input, err)
 	}
 
-	pkg, protoDefinitions, err = r.manifestToPkg(manif)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if err := r.validate(pkg); err != nil {
-		return nil, nil, fmt.Errorf("failed validation: %w", err)
-	}
-
-	return pkg, protoDefinitions, nil
+	r.currentData = b
+	return nil
 }
 
-func (r *Reader) fromContents(contents []byte) (pkg *pbsubstreams.Package, err error) {
-	pkg = &pbsubstreams.Package{}
-	if err := proto.Unmarshal(contents, pkg); err != nil {
-		return nil, fmt.Errorf("unmarshalling: %w", err)
+func (r *Reader) resolveInputPath() error {
+	input := r.originalInput
+	if r.IsRemotePackage(input) {
+		r.currentInput = input
+		return nil
 	}
 
-	if err := r.validate(pkg); err != nil {
-		return nil, fmt.Errorf("validation failed: %w", err)
+	if input == "" {
+		r.currentInput = filepath.Join(r.workingDir, "substreams.yaml")
+		return nil
+	}
+
+	stat, err := os.Stat(input)
+	if err != nil {
+		return fmt.Errorf("unable to stat input file %q: %w", input, err)
+	}
+
+	if stat.IsDir() {
+		r.currentInput = filepath.Join(input, "substreams.yaml")
+		return nil
+	}
+
+	r.currentInput = input
+
+	return nil
+}
+
+func (r *Reader) getPkg() (*pbsubstreams.Package, error) {
+	if r.currentData == nil {
+		return nil, fmt.Errorf("no result available")
+	}
+
+	if strings.HasSuffix(r.currentInput, ".yaml") || strings.HasSuffix(r.currentInput, ".yml") {
+		manif := &Manifest{}
+		decoder := yaml3.NewDecoder(bytes.NewReader(r.currentData))
+		decoder.KnownFields(true)
+
+		if err := decoder.Decode(&manif); err != nil {
+			return nil, fmt.Errorf("unable to unmarshal manifest: %w", err)
+		}
+
+		pkg, err := r.newPkgFromManifest(manif)
+		if err != nil {
+			return nil, fmt.Errorf("unable to convert manifest to package: %w", err)
+		}
+
+		return pkg, nil
+	}
+
+	pkg := &pbsubstreams.Package{}
+	err := proto.Unmarshal(r.currentData, pkg)
+	if err != nil {
+		return nil, fmt.Errorf("unable to unmarshal package: %w", err)
 	}
 
 	return pkg, nil
 }
 
-func (r *Reader) validate(pkg *pbsubstreams.Package) error {
-	if !r.skipPackageValidation {
-		if err := r.validatePackage(pkg); err != nil {
-			return fmt.Errorf("package validation failed: %w", err)
+func dependentImportedModules(graph *ModuleGraph, outputModule string) (map[string]bool, error) {
+	out := make(map[string]bool)
+
+	outputModulesToCheck := make(map[string]bool)
+	if outputModule != "" {
+		outputModulesToCheck[outputModule] = true
+	} else {
+		for _, mod := range graph.Modules() {
+			if !strings.Contains(mod, ":") {
+				outputModulesToCheck[mod] = true
+			}
 		}
 	}
 
-	if err := ValidateModules(pkg.Modules); err != nil {
-		return fmt.Errorf("module validation failed: %w", err)
+	for mod := range outputModulesToCheck {
+		if !strings.Contains(mod, ":") {
+			ancestors, err := graph.AncestorsOf(mod)
+			if err != nil {
+				return nil, fmt.Errorf("unable to get ancestors of module %q: %w", mod, err)
+			}
+			for _, ancestor := range ancestors {
+				if strings.Contains(ancestor.Name, ":") {
+					out[ancestor.Name] = true
+				}
+			}
+		}
 	}
-	return nil
+
+	return out, nil
 }
 
-// validatePackage validates a package just produced or just read from
-// disk.
-//
-// validatePackage is run only by the client, as the server doesn't
-// have access to the full Package.
-//
-// WARN: put ANY MODULES validation that need to be applied by the
-// server in `ValidateModules`.
-func (r *Reader) validatePackage(pkg *pbsubstreams.Package) error {
+func validatePackage(pkg *pbsubstreams.Package, skipModuleOutputTypeValidation bool) error {
 	if len(pkg.ModuleMeta) != len(pkg.Modules.Modules) {
 		return fmt.Errorf("inconsistent package, metadata for modules not same length as modules list")
 	}
@@ -381,14 +399,14 @@ func (r *Reader) validatePackage(pkg *pbsubstreams.Package) error {
 		switch i := mod.Kind.(type) {
 		case *pbsubstreams.Module_KindMap_:
 			outputType := i.KindMap.OutputType
-			if !r.skipModuleOutputTypeValidation {
+			if !skipModuleOutputTypeValidation {
 				if !strings.HasPrefix(outputType, "proto:") {
 					return fmt.Errorf("module %q incorrect outputTyupe %q valueType must be a proto Message", mod.Name, outputType)
 				}
 			}
 		case *pbsubstreams.Module_KindStore_:
 			valueType := i.KindStore.ValueType
-			if !r.skipModuleOutputTypeValidation {
+			if !skipModuleOutputTypeValidation {
 				if strings.HasPrefix(valueType, "proto:") {
 					// any store with a prototype is considered valid
 				} else if !storeValidTypes[valueType] {
@@ -426,6 +444,77 @@ func (r *Reader) validatePackage(pkg *pbsubstreams.Package) error {
 	return nil
 }
 
+func (r *Reader) newPkgFromManifest(manif *Manifest) (*pbsubstreams.Package, error) {
+	converter := newManifestConverter(r.currentInput, r.skipSourceCodeImportValidation)
+	pkg, descriptors, dynMessage, err := converter.Convert(manif)
+	if err != nil {
+		return nil, err
+	}
+	r.sinkConfigDynamicMessage = dynMessage
+
+	if r.collectProtoDefinitionsFunc != nil {
+		r.collectProtoDefinitionsFunc(descriptors)
+	}
+	r.protoDefinitions = descriptors
+	return pkg, nil
+}
+
+func (r *Reader) resolvePkg() (*pbsubstreams.Package, error) {
+	if r.pkg != nil {
+		return r.pkg, nil
+	}
+
+	err := r.read()
+	if err != nil {
+		return nil, err
+	}
+
+	pkg, err := r.getPkg()
+	if err != nil {
+		return nil, fmt.Errorf("unable to get package: %w", err)
+	}
+
+	r.pkg = pkg
+	return pkg, nil
+}
+
+// IsRemotePackage determines if reader's input to read the manifest is a remote file accessible over
+// HTTP/HTTPS, Google Cloud Storage, S3 or Azure Storage.
+func (r *Reader) IsRemotePackage(input string) bool {
+	return hasRemotePrefix(input)
+}
+
+// IsLocalManifest determines if reader's input to read the manifest is a local manifest file, which is determined
+// by ensure it's not a remote package and if the file end with `.yaml` or `.yml`.
+func (r *Reader) IsLocalManifest() bool {
+	if r.IsRemotePackage(r.currentInput) {
+		return false
+	}
+
+	return strings.HasSuffix(r.currentInput, ".yaml") || strings.HasSuffix(r.currentInput, ".yml")
+}
+
+// IsLikelyManifestInput determines if the input is likely a manifest input, which is determined
+// by checking:
+//   - If the input starts with remote prefix ("https://", "http://", "ipfs://", "gs://", "s3://", "az://")
+//   - If the input ends with `.yaml`
+//   - If the input is a directory (we check for path separator)
+func IsLikelyManifestInput(in string) bool {
+	if hasRemotePrefix(in) {
+		return true
+	}
+
+	if strings.HasSuffix(in, ".yaml") {
+		return true
+	}
+
+	if strings.Contains(in, string(os.PathSeparator)) {
+		return true
+	}
+
+	return cli.DirectoryExists(in) || cli.FileExists(in)
+}
+
 func duplicateStringInput(in *pbsubstreams.Module_Input) string {
 	if in == nil {
 		return ""
@@ -442,6 +531,64 @@ func duplicateStringInput(in *pbsubstreams.Module_Input) string {
 	default:
 		return ""
 	}
+}
+
+func checkValidBlockFilter(mod *pbsubstreams.Module, mapModuleKind map[string]pbsubstreams.ModuleKind) error {
+	blockFilter := mod.GetBlockFilter()
+	if blockFilter != nil {
+		seekModName := blockFilter.GetModule()
+		seekModuleKind, found := mapModuleKind[seekModName]
+		if !found {
+			return fmt.Errorf("block filter module %q not found", blockFilter.Module)
+		}
+		if seekModuleKind != pbsubstreams.ModuleKindBlockIndex {
+			return fmt.Errorf("block filter module %q not of 'block_index' kind", blockFilter.Module)
+		}
+	}
+	return nil
+}
+
+func checkValidInputs(mod *pbsubstreams.Module, mapModuleKind map[string]pbsubstreams.ModuleKind) error {
+	for idx, in := range mod.Inputs {
+		switch i := in.Input.(type) {
+		case *pbsubstreams.Module_Input_Params_:
+			if idx != 0 {
+				return fmt.Errorf("module %q: input %d: params must be first input", mod.Name, idx)
+			}
+		case *pbsubstreams.Module_Input_Source_:
+			if i.Source.Type == "" {
+				return fmt.Errorf("module %q: source type empty", mod.Name)
+			}
+		case *pbsubstreams.Module_Input_Map_:
+			seekMod := i.Map.ModuleName
+			seekModuleKind, found := mapModuleKind[seekMod]
+			if !found {
+				return fmt.Errorf("module %q: map input named %q not found", mod.Name, seekMod)
+			}
+
+			if seekModuleKind != pbsubstreams.ModuleKindMap {
+				return fmt.Errorf("module %q: input %d: referenced module %q not of 'map' kind", mod.Name, idx, seekMod)
+			}
+
+		case *pbsubstreams.Module_Input_Store_:
+			seekMod := i.Store.ModuleName
+			seekModuleKind, found := mapModuleKind[seekMod]
+			if !found {
+				return fmt.Errorf("module %q: store input named %q not found", mod.Name, seekMod)
+			}
+
+			if seekModuleKind != pbsubstreams.ModuleKindStore {
+				return fmt.Errorf("module %q: input %d: referenced module %q not of 'store' kind", mod.Name, idx, seekMod)
+			}
+
+			switch i.Store.Mode {
+			case pbsubstreams.Module_Input_Store_GET, pbsubstreams.Module_Input_Store_DELTAS:
+			default:
+				return fmt.Errorf("module %q: input index %d: unknown store mode value %d", mod.Name, idx, i.Store.Mode)
+			}
+		}
+	}
+	return nil
 }
 
 // ValidateModules is run both by the client _and_ the server.
@@ -462,6 +609,14 @@ func ValidateModules(mods *pbsubstreams.Modules) error {
 		return fmt.Errorf("limit of 100 modules reached")
 	}
 
+	mapModuleKind := make(map[string]pbsubstreams.ModuleKind)
+	for _, mod := range mods.Modules {
+		if _, found := mapModuleKind[mod.Name]; found {
+			return fmt.Errorf("module %q: duplicate module name", mod.Name)
+		}
+		mapModuleKind[mod.Name] = mod.ModuleKind()
+	}
+
 	for _, mod := range mods.Modules {
 		for _, segment := range strings.Split(mod.Name, ":") {
 			if !moduleNameRegexp.MatchString(segment) {
@@ -473,59 +628,22 @@ func ValidateModules(mods *pbsubstreams.Modules) error {
 			return fmt.Errorf("limit of 30 inputs for a given module (%q) reached", mod.Name)
 		}
 
-		for idx, in := range mod.Inputs {
-			switch i := in.Input.(type) {
-			case *pbsubstreams.Module_Input_Params_:
-				if idx != 0 {
-					return fmt.Errorf("module %q: input %d: params must be first input", mod.Name, idx)
-				}
-			case *pbsubstreams.Module_Input_Source_:
-				if i.Source.Type == "" {
-					return fmt.Errorf("module %q: source type empty", mod.Name)
-				}
-			case *pbsubstreams.Module_Input_Map_:
-				seekMod := i.Map.ModuleName
-				var found bool
-				for _, mod2 := range mods.Modules {
-					if mod2.Name == seekMod {
-						found = true
-						if _, ok := mod2.Kind.(*pbsubstreams.Module_KindMap_); !ok {
-							return fmt.Errorf("module %q: input %d: referenced module %q not of 'map' kind", mod.Name, idx, seekMod)
-						}
-					}
-				}
-				if !found {
-					return fmt.Errorf("module %q: map input named %q not found", mod.Name, seekMod)
-				}
-			case *pbsubstreams.Module_Input_Store_:
-				seekMod := i.Store.ModuleName
-				var found bool
-				for _, mod2 := range mods.Modules {
-					if mod2.Name == seekMod {
-						found = true
-						if _, ok := mod2.Kind.(*pbsubstreams.Module_KindStore_); !ok {
-							return fmt.Errorf("module %q: input %d: referenced module %q not of 'store' kind", mod.Name, idx, seekMod)
-						}
-					}
-				}
-				if !found {
-					return fmt.Errorf("module %q: store input named %q not found", mod.Name, seekMod)
-				}
+		err := checkValidBlockFilter(mod, mapModuleKind)
+		if err != nil {
+			return fmt.Errorf("checking block filter for module %q: %w", mod.Name, err)
+		}
 
-				switch i.Store.Mode {
-				case pbsubstreams.Module_Input_Store_GET, pbsubstreams.Module_Input_Store_DELTAS:
-				default:
-					return fmt.Errorf("module %q: input index %d: unknown store mode value %d", mod.Name, idx, i.Store.Mode)
-				}
-			}
+		err = checkValidInputs(mod, mapModuleKind)
+		if err != nil {
+			return fmt.Errorf("checking inputs for module %q: %w", mod.Name, err)
 		}
 	}
 
 	return nil
 }
 
-func LoadManifestFile(inputPath string) (*Manifest, error) {
-	m, err := decodeYamlManifestFromFile(inputPath)
+func LoadManifestFile(inputPath, workingDir string) (*Manifest, error) {
+	m, err := decodeYamlManifestFromFile(inputPath, workingDir)
 	if err != nil {
 		return nil, fmt.Errorf("decoding yaml: %w", err)
 	}
@@ -580,13 +698,19 @@ func LoadManifestFile(inputPath string) (*Manifest, error) {
 	return m, nil
 }
 
+// loop through the Manifest, and get the `imports` statements,
+// pull the Package files from Disk, and merge them into this one
 func loadImports(pkg *pbsubstreams.Package, manif *Manifest) error {
 	for _, kv := range manif.Imports {
 		importName := kv[0]
 		importPath := manif.resolvePath(kv[1])
 
-		subpkgReader := MustNewReader(importPath)
-		subpkg, err := subpkgReader.Read()
+		subpkgReader, err := NewReader(importPath)
+		if err != nil {
+			return fmt.Errorf("importing %q: %w", importPath, err)
+		}
+
+		subpkg, _, err := subpkgReader.Read()
 		if err != nil {
 			return fmt.Errorf("importing %q: %w", importPath, err)
 		}
@@ -594,24 +718,58 @@ func loadImports(pkg *pbsubstreams.Package, manif *Manifest) error {
 		prefixModules(subpkg.Modules.Modules, importName)
 		reindexAndMergePackage(subpkg, pkg)
 		mergeProtoFiles(subpkg, pkg)
+		mergeNetworks(subpkg, pkg, importName)
 	}
-	// loop through the Manifest, and get the `imports` statements,
-	// pull the Package files from Disk, and merge them into this one
+
+	return nil
+}
+
+var PNGHeader = []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}
+var JPGHeader = []byte{0xff, 0xd8, 0xff}
+var WebPHeader = []byte{0x52, 0x49, 0x46, 0x46}
+
+func loadImage(pkg *pbsubstreams.Package, manif *Manifest) error {
+	path := manif.resolvePath(manif.Package.Image)
+	img, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	maxSize := 2 * 1024 * 1024
+	if len(img) > maxSize {
+		return fmt.Errorf("image %q is too big: %d bytes. (Max: %d bytes)", path, len(img), maxSize)
+	}
+	if len(img) < 16 { // prevent error on magic header check, also 16 bytes is way too small.
+		return fmt.Errorf("invalid image file: too small (%d bytes)", len(img))
+	}
+
+	switch {
+	case len(img) > 8 && bytes.Equal(img[0:8], PNGHeader):
+	case bytes.Equal(img[0:3], JPGHeader):
+	case bytes.Equal(img[0:4], WebPHeader):
+	default:
+		return fmt.Errorf("unsupported file format for %q. Only JPEG, PNG and WebP images are supported", path)
+	}
+
+	pkg.Image = img
 	return nil
 }
 
 const PrefixSeparator = ":"
 
+func withPrefix(val, prefix string) string {
+	return prefix + PrefixSeparator + val
+}
+
 func prefixModules(mods []*pbsubstreams.Module, prefix string) {
 	for _, mod := range mods {
-		mod.Name = prefix + PrefixSeparator + mod.Name
+		mod.Name = withPrefix(mod.Name, prefix)
 		for idx, inputIface := range mod.Inputs {
 			switch input := inputIface.Input.(type) {
 			case *pbsubstreams.Module_Input_Source_:
 			case *pbsubstreams.Module_Input_Store_:
-				input.Store.ModuleName = prefix + PrefixSeparator + input.Store.ModuleName
+				input.Store.ModuleName = withPrefix(input.Store.ModuleName, prefix)
 			case *pbsubstreams.Module_Input_Map_:
-				input.Map.ModuleName = prefix + PrefixSeparator + input.Map.ModuleName
+				input.Map.ModuleName = withPrefix(input.Map.ModuleName, prefix)
 			case *pbsubstreams.Module_Input_Params_:
 			default:
 				panic(fmt.Sprintf("module %q: input index %d: unsupported module input type %s", mod.Name, idx, inputIface.Input))
@@ -661,116 +819,6 @@ func mergeProtoFiles(src, dest *pbsubstreams.Package) {
 	// TODO: eventually, we want the last Message type to win, or perhaps we'd search in reverse order
 	// upon `print` or generation? The thing is we'll want tools like `protoc` and `buf` to use the most
 	// recent, but it'll simply go in list order..
-}
-
-// manifestToPkg will take a Manifest object, most likely generated from a YAML file, and will create a Proto Pakcage object
-// in some cases we do not want to validate the package and ensure that all the code and dependencies are there fro example
-// when we are using the generated package transitively
-func (r *Reader) manifestToPkg(m *Manifest) (*pbsubstreams.Package, []*desc.FileDescriptor, error) {
-	pkg, err := r.convertToPkg(m)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to convert manifest to pkg: %w", err)
-	}
-
-	protoDefinitions, err := loadProtobufs(pkg, m)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error loading protobuf: %w", err)
-	}
-
-	if err := loadImports(pkg, m); err != nil {
-		return nil, nil, fmt.Errorf("error loading imports: %w", err)
-	}
-
-	if err := r.loadSinkConfig(pkg, m); err != nil {
-		return nil, nil, fmt.Errorf("error parsing sink configuration: %w", err)
-	}
-
-	return pkg, protoDefinitions, nil
-}
-
-func (r *Reader) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package, err error) {
-	pkgMeta := &pbsubstreams.PackageMetadata{
-		Version: m.Package.Version,
-		Url:     m.Package.URL,
-		Name:    m.Package.Name,
-		Doc:     m.Package.Doc,
-	}
-	pkg = &pbsubstreams.Package{
-		Version:     1,
-		PackageMeta: []*pbsubstreams.PackageMetadata{pkgMeta},
-		Modules:     &pbsubstreams.Modules{},
-		Network:     m.Network,
-	}
-
-	moduleCodeIndexes := map[string]int{}
-	for _, mod := range m.Modules {
-		pbmeta := &pbsubstreams.ModuleMetadata{
-			Doc: mod.Doc,
-		}
-		var pbmod *pbsubstreams.Module
-
-		binaryName := "default"
-		implicit := ""
-		if mod.Binary != "" {
-			binaryName = mod.Binary
-			implicit = "(implicit) "
-		}
-		binaryDef, found := m.Binaries[binaryName]
-		if !found {
-			return nil, fmt.Errorf("module %q refers to %sbinary %q, which is not defined in the 'binaries' section of the manifest", mod.Name, implicit, binaryName)
-		}
-
-		switch binaryDef.Type {
-		case "wasm/rust-v1":
-			// OPTIM(abourget): also check if it's not already in
-			// `Binaries`, by comparing its, length + hash or value.
-			codeIndex, found := moduleCodeIndexes[binaryDef.File]
-			if !found {
-				codePath := m.resolvePath(binaryDef.File)
-				var byteCode []byte
-				if !r.skipSourceCodeImportValidation {
-					byteCode, err = os.ReadFile(codePath)
-					if err != nil {
-						return nil, fmt.Errorf("failed to read source code %q: %w", codePath, err)
-					}
-				}
-				pkg.Modules.Binaries = append(pkg.Modules.Binaries, &pbsubstreams.Binary{Type: binaryDef.Type, Content: byteCode})
-				codeIndex = len(pkg.Modules.Binaries) - 1
-				moduleCodeIndexes[binaryDef.File] = codeIndex
-			}
-			pbmod, err = mod.ToProtoWASM(uint32(codeIndex))
-		default:
-			return nil, fmt.Errorf("module %q: invalid code type %q", mod.Name, binaryDef.Type)
-		}
-		if err != nil {
-			return nil, err
-		}
-
-		pkg.ModuleMeta = append(pkg.ModuleMeta, pbmeta)
-		pkg.Modules.Modules = append(pkg.Modules.Modules, pbmod)
-	}
-
-	for modName, paramValue := range m.Params {
-		var modFound bool
-		for _, mod := range pkg.Modules.Modules {
-			if mod.Name == modName {
-				if len(mod.Inputs) == 0 {
-					return nil, fmt.Errorf("params value defined for module %q but module has no inputs defined, add 'params: string' to 'inputs' for module", modName)
-				}
-				p := mod.Inputs[0].GetParams()
-				if p == nil {
-					return nil, fmt.Errorf("params value defined for module %q: module %q does not have 'params' as its first input type", modName, modName)
-				}
-				p.Value = paramValue
-				modFound = true
-			}
-		}
-		if !modFound {
-			return nil, fmt.Errorf("params value defined for module %q, but such module is not defined", modName)
-		}
-	}
-
-	return
 }
 
 var storeValidTypes = map[string]bool{

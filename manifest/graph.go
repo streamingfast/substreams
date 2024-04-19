@@ -67,19 +67,7 @@ func NewModuleGraph(modules []*pbsubstreams.Module) (*ModuleGraph, error) {
 		return nil, fmt.Errorf("modules graph has a cycle")
 	}
 
-	if err := computeInitialBlock(modules, g); err != nil {
-		return nil, err
-	}
-
 	return g, nil
-}
-
-func MustNewModuleGraph(modules []*pbsubstreams.Module) *ModuleGraph {
-	g, err := NewModuleGraph(modules)
-	if err != nil {
-		panic(err)
-	}
-	return g
 }
 
 // ResetGraphHashes is to be called when you want to force a recomputation of the module hashes.
@@ -339,6 +327,19 @@ func (g *ModuleGraph) ChildrenOf(moduleName string) ([]*pbsubstreams.Module, err
 	})
 
 	return res, nil
+}
+
+func (g *ModuleGraph) HasStatefulDependencies(moduleName string) (bool, error) {
+	stores, err := g.StoresDownTo(moduleName)
+	if err != nil {
+		return false, fmt.Errorf("getting stores down to %s: %w", moduleName, err)
+	}
+
+	if len(stores) > 0 {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func (g *ModuleGraph) StoresDownTo(moduleName string) ([]*pbsubstreams.Module, error) {

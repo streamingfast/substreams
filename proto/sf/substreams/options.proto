@@ -1,0 +1,19 @@
+syntax = "proto3";
+package sf.substreams;
+
+option go_package = "github.com/streamingfast/substreams/pb/sf/substreams;pbsubstreams";
+import "google/protobuf/descriptor.proto";
+
+message FieldOptions {
+  // this option informs the `substreams pack` command that it should treat the corresponding manifest value as a path to a file, putting its content as bytes in this field. 
+  // must be applied to a `bytes` or `string` field
+  bool load_from_file = 1;
+
+  // this option informs the `substreams pack` command that it should treat the corresponding manifest value as a path to a folder, zipping its content and putting the zip content as bytes in this field.
+  // must be applied to a `bytes` field
+  bool zip_from_folder = 2;
+}
+
+extend google.protobuf.FieldOptions {
+  optional FieldOptions options = 2200;
+}

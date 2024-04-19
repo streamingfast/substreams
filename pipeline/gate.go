@@ -9,17 +9,17 @@ import (
 )
 
 type gate struct {
-	requestStartBlockNum uint64
-	disabled             bool
-	passed               bool
-	snapshotSent         bool
+	startBlockNum uint64
+	disabled      bool
+	passed        bool
+	snapshotSent  bool
 }
 
 func newGate(ctx context.Context) *gate {
 	reqDetails := reqctx.Details(ctx)
 	return &gate{
-		disabled:             reqDetails.IsTier2Request,
-		requestStartBlockNum: reqDetails.ResolvedStartBlockNum,
+		disabled:      reqDetails.IsTier2Request,
+		startBlockNum: reqDetails.LinearGateBlockNum,
 	}
 }
 
@@ -28,7 +28,7 @@ func (g *gate) processBlock(blockNum uint64, step bstream.StepType) {
 		return
 	}
 
-	if blockTriggersGate(blockNum, g.requestStartBlockNum, step) {
+	if blockTriggersGate(blockNum, g.startBlockNum, step) {
 		g.passed = true
 	}
 }

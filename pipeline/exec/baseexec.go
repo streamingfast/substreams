@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/wasm"
 	ttrace "go.opentelemetry.io/otel/trace"
@@ -76,8 +77,9 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 		clock := outputGetter.Clock()
 		var inst wasm.Instance
 
+		stats := reqctx.ReqStats(e.ctx)
 		//t0 := time.Now()
-		call = wasm.NewCall(clock, e.moduleName, e.entrypoint, e.wasmArguments)
+		call = wasm.NewCall(clock, e.moduleName, e.entrypoint, stats, e.wasmArguments)
 		inst, err = e.wasmModule.ExecuteNewCall(e.ctx, call, e.cachedInstance, e.wasmArguments)
 		//Timer += time.Since(t0)
 		if panicErr := call.Err(); panicErr != nil {
@@ -85,10 +87,13 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 				message:    panicErr.Error(),
 				stackTrace: call.ExecutionStack,
 			}
-			return nil, fmt.Errorf("block %d: module %q: %w: %s", clock.Number, e.moduleName, ErrWasmDeterministicExec, errExecutor.Error())
+			return nil, fmt.Errorf("block %d: module %q: general wasm execution panicked: %w: %s", clock.Number, e.moduleName, ErrWasmDeterministicExec, errExecutor.Error())
 		}
 		if err != nil {
-			return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %v", clock.Number, e.moduleName, err)
+			if err := e.ctx.Err(); err != nil {
+				return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %w", clock.Number, e.moduleName, err)
+			}
+			return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %w: %s", clock.Number, e.moduleName, ErrWasmDeterministicExec, err)
 		}
 		if e.instanceCacheEnabled {
 			if err := inst.Cleanup(e.ctx); err != nil {

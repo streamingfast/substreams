@@ -2,15 +2,15 @@ package service
 
 import (
 	"context"
+	"fmt"
 
+	"connectrpc.com/connect"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type StreamFactory struct {
@@ -41,7 +41,7 @@ func (sf *StreamFactory) New(
 	if cursor != "" {
 		cur, err := bstream.CursorFromOpaque(cursor)
 		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid StartCursor %q: %s", cursor, err)
+			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid StartCursor %q: %w", cursor, err))
 		}
 		if cursorIsTarget {
 			options = append(options, stream.WithTargetCursor(cur))

@@ -1,5 +1,5 @@
 #!/bin/bash -u
-# Copyright 2019 dfuse Platform Inc.
+# Copyright 2024 StreamingFast Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -48,10 +48,13 @@ function generate_system() {
   fi
 
   protoc -I$PROTO \
+    "$PROTO/sf/substreams/options.proto" \
     "$PROTO/sf/substreams/v1/modules.proto" \
     "$PROTO/sf/substreams/v1/package.proto" \
     "$PROTO/sf/substreams/v1/clock.proto" \
+    "$PROTO/sf/substreams/index/v1/keys.proto" \
     "$PROTO/sf/substreams/rpc/v2/service.proto" \
+    "$PROTO/sf/substreams/sink/service/v1/service.proto" \
     "$PROTO/google/protobuf/any.proto" \
     "$PROTO/google/protobuf/descriptor.proto" \
     "$PROTO/google/protobuf/timestamp.proto" \
@@ -114,13 +117,13 @@ function checks() {
     exit 1
   fi
 
-  result=`printf "" | protoc-gen-connect-go --version 2>&1 | grep -Eo '1\.[4-9]+\.[0-9]+'`
+  result=`printf "" | protoc-gen-connect-go --version 2>&1 | grep -Eo '1\.([4-9]|[1-9][0-9]+)\.[0-9]+'`
   if [[ "$result" == "" ]]; then
     echo "Plugin 'protoc-gen-connect-go' is either missing or is not recent enough (at `which protoc-gen-connect-go || echo N/A`)."
     echo ""
     echo "To fix your problem, perform this command:"
     echo ""
-    echo "  go install github.com/bufbuild/connect-go/cmd/protoc-gen-connect-go@latest"
+    echo "  go install connectrpc.com/connect/cmd/protoc-gen-connect-go@latest"
     echo ""
     echo "If everything is working as expetcted, the command:"
     echo ""

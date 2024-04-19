@@ -6,6 +6,4 @@ import (
 
 var zlog, tracer = logging.RootLogger("substreams", "github.com/streamingfast/substreams/cmd/substreams")
 
-func init() {
-	logging.InstantiateLoggers(logging.WithSwitcherServerAutoStart())
-}
+// loggers are instantiated in 'setup()' func

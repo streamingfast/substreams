@@ -252,7 +252,7 @@ var StateFuncs = []funcs{
 	},
 	{
 		"has_at",
-		[]parm{i32, i32, i32, i32},
+		[]parm{i32, i64, i32, i32},
 		[]parm{i32},
 		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
 			storeIndex := uint32(stack[0])

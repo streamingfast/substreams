@@ -1,0 +1,147 @@
+type factory_fee_amount_enabled @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    fee: Int!
+    tick_spacing: Int!
+}
+type factory_owner_changed @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    new_owner: String!
+    old_owner: String!
+}
+type factory_pool_created @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    fee: Int!
+    pool: String!
+    tick_spacing: Int!
+    token0: String!
+    token1: String!
+}
+
+type pool_burn @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    evt_address: String!
+    amount: BigDecimal!
+    amount0: BigDecimal!
+    amount1: BigDecimal!
+    owner: String!
+    tick_lower: Int!
+    tick_upper: Int!
+}
+type pool_collect @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    evt_address: String!
+    amount0: BigDecimal!
+    amount1: BigDecimal!
+    owner: String!
+    recipient: String!
+    tick_lower: Int!
+    tick_upper: Int!
+}
+type pool_collect_protocol @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    evt_address: String!
+    amount0: BigDecimal!
+    amount1: BigDecimal!
+    recipient: String!
+    sender: String!
+}
+type pool_flash @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    evt_address: String!
+    amount0: BigDecimal!
+    amount1: BigDecimal!
+    paid0: BigDecimal!
+    paid1: BigDecimal!
+    recipient: String!
+    sender: String!
+}
+type pool_increase_observation_cardinality_next @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    evt_address: String!
+    observation_cardinality_next_new: Int!
+    observation_cardinality_next_old: Int!
+}
+type pool_initialize @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    evt_address: String!
+    sqrt_price_x96: BigDecimal!
+    tick: Int!
+}
+type pool_mint @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    evt_address: String!
+    amount: BigDecimal!
+    amount0: BigDecimal!
+    amount1: BigDecimal!
+    owner: String!
+    sender: String!
+    tick_lower: Int!
+    tick_upper: Int!
+}
+type pool_set_fee_protocol @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    evt_address: String!
+    fee_protocol0_new: Int!
+    fee_protocol0_old: Int!
+    fee_protocol1_new: Int!
+    fee_protocol1_old: Int!
+}
+type pool_swap @entity {
+    id: ID!
+    evt_tx_hash: String!
+    evt_index: BigInt!
+    evt_block_time: String!
+    evt_block_number: BigInt!
+    evt_address: String!
+    amount0: BigDecimal!
+    amount1: BigDecimal!
+    liquidity: BigDecimal!
+    recipient: String!
+    sender: String!
+    sqrt_price_x96: BigDecimal!
+    tick: Int!
+}

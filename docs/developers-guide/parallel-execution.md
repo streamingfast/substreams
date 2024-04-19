@@ -12,7 +12,7 @@ Parallel execution addresses the problem of the slow single linear execution of 
 
 The server will define an execution schedule and take the module's dependencies into consideration. The server's execution schedule is a list of pairs of (`module, range`), where range contains `N` blocks. This is a configurable value set to 25K blocks, on the server.
 
-The single map_transfer module will fulfill a request from 0 - 75,000. The server's execution plan returns the results of `[(map_transfer, 0 -> 24,999), (map_transfer, 25,000 -> 74,999), (map_transfer, 50,000 -> 74,999)]`.
+The single map_transfer module will fulfill a request from 0 - 75,000. The server's execution plan returns the results of `[(map_transfer, 0 -> 24,999), (map_transfer, 25,000 -> 49,999), (map_transfer, 50,000 -> 74,999)]`.
 
 The three pairs will be simultaneously executed by the server handling caching of the output of the store. For stores, an additional step will combine the store keys across multiple segments producing a unified and linear view of the store's state.
 

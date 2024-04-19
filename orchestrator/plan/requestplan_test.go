@@ -92,7 +92,7 @@ func TestBuildConfig(t *testing.T) {
 			resolvedStartBlock:        738,
 			linearHandoffBlock:        742,
 			exclusiveEndBlock:         742,
-			expectStoresRange:         "621-700",
+			expectStoresRange:         "621-742",
 			expectWriteExecOutRange:   "700-742",
 			expectReadExecOutRange:    "738-742",
 			expectLinearPipelineRange: "nil",
@@ -106,7 +106,7 @@ func TestBuildConfig(t *testing.T) {
 			resolvedStartBlock:        738,
 			linearHandoffBlock:        800,
 			exclusiveEndBlock:         800,
-			expectStoresRange:         "621-700",
+			expectStoresRange:         "621-800",
 			expectWriteExecOutRange:   "700-800",
 			expectReadExecOutRange:    "738-800",
 			expectLinearPipelineRange: "nil",
@@ -134,7 +134,7 @@ func TestBuildConfig(t *testing.T) {
 			resolvedStartBlock:        738,
 			linearHandoffBlock:        842,
 			exclusiveEndBlock:         842,
-			expectStoresRange:         "621-800",
+			expectStoresRange:         "621-842",
 			expectWriteExecOutRange:   "700-842",
 			expectReadExecOutRange:    "738-842",
 			expectLinearPipelineRange: "nil",
@@ -176,7 +176,7 @@ func TestBuildConfig(t *testing.T) {
 			resolvedStartBlock:        10,
 			linearHandoffBlock:        20,
 			exclusiveEndBlock:         20,
-			expectStoresRange:         "5-5", // this 'empty' store range only exists to keep proper stage idx on execout mapper
+			expectStoresRange:         "5-20",
 			expectWriteExecOutRange:   "5-20",
 			expectReadExecOutRange:    "10-20",
 			expectLinearPipelineRange: "nil",
@@ -209,6 +209,34 @@ func TestBuildConfig(t *testing.T) {
 			expectReadExecOutRange:    "105-300",
 			expectLinearPipelineRange: "300-0",
 		},
+		{
+			name:                      "req in live segment development",
+			storeInterval:             10,
+			productionMode:            true,
+			needsStores:               false,
+			graphInitBlock:            5,
+			resolvedStartBlock:        105,
+			linearHandoffBlock:        100,
+			exclusiveEndBlock:         0,
+			expectStoresRange:         "nil",
+			expectWriteExecOutRange:   "nil",
+			expectReadExecOutRange:    "nil",
+			expectLinearPipelineRange: "100-0",
+		},
+		{
+			name:                      "req in live segment development",
+			storeInterval:             10,
+			productionMode:            false,
+			needsStores:               false,
+			graphInitBlock:            5,
+			resolvedStartBlock:        105,
+			linearHandoffBlock:        100,
+			exclusiveEndBlock:         0,
+			expectStoresRange:         "nil",
+			expectWriteExecOutRange:   "nil",
+			expectReadExecOutRange:    "nil",
+			expectLinearPipelineRange: "100-0",
+		},
 
 		// This panics because we don't accept a start block prior to the graph init block.
 		// Maybe we can unblock that in the future, but it's not really useful.
@@ -224,7 +252,8 @@ func TestBuildConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			res := BuildTier1RequestPlan(tt.productionMode, uint64(tt.storeInterval), tt.graphInitBlock, tt.resolvedStartBlock, tt.linearHandoffBlock, tt.exclusiveEndBlock, tt.needsStores)
+			res, err := BuildTier1RequestPlan(tt.productionMode, uint64(tt.storeInterval), tt.graphInitBlock, tt.resolvedStartBlock, tt.linearHandoffBlock, tt.exclusiveEndBlock, tt.needsStores)
+			assert.Nil(t, err)
 			assert.Equal(t, tt.expectStoresRange, tostr(res.BuildStores), "buildStores")
 			assert.Equal(t, tt.expectWriteExecOutRange, tostr(res.WriteExecOut), "writeExecOut")
 			assert.Equal(t, tt.expectLinearPipelineRange, tostr(res.LinearPipeline), "linearPipeline")

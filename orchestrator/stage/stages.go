@@ -4,16 +4,17 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/orchestrator/plan"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
-	"github.com/streamingfast/substreams/utils"
 )
 
 // NOTE:
@@ -31,9 +32,8 @@ import (
 // that the Stage is completed, kicking off the next layer of jobs.
 
 type Stages struct {
-	ctx     context.Context
-	logger  *zap.Logger
-	traceID string
+	ctx    context.Context
+	logger *zap.Logger
 
 	globalSegmenter *block.Segmenter // This segmenter covers both the stores and the mapper
 	storeSegmenter  *block.Segmenter // This segmenter covers only jobs needed to build up stores according to the RequestPlan.
@@ -42,7 +42,8 @@ type Stages struct {
 	stages []*Stage
 
 	// segmentStates is a matrix of segment and stages
-	segmentStates []stageStates // segmentStates[offsetSegment][StageIndex]
+	segmentStates  []stageStates // segmentStates[offsetSegment][StageIndex]
+	lastStatUpdate time.Time
 
 	// If you're processing at 12M blocks, offset 12,000 segments, so you don't need to allocate 12k empty elements.
 	// Any previous segment is assumed to have completed successfully, and any stores that we sync'd prior to this offset
@@ -56,7 +57,6 @@ func NewStages(
 	outputGraph *outputmodules.Graph,
 	reqPlan *plan.RequestPlan,
 	storeConfigs store.ConfigMap,
-	traceID string,
 ) (out *Stages) {
 
 	if !reqPlan.RequiresParallelProcessing() {
@@ -68,7 +68,6 @@ func NewStages(
 	stagedModules := outputGraph.StagedUsedModules()
 	out = &Stages{
 		ctx:             ctx,
-		traceID:         traceID,
 		logger:          reqctx.Logger(ctx),
 		globalSegmenter: reqPlan.BackprocessSegmenter(),
 	}
@@ -78,9 +77,15 @@ func NewStages(
 	if reqPlan.WriteExecOut != nil {
 		out.mapSegmenter = reqPlan.WriteOutSegmenter()
 	}
-	for idx, stageLayer := range stagedModules {
-		mods := stageLayer.LastLayer()
-		kind := layerKind(mods)
+	for idx, stageLayers := range stagedModules {
+		var allModules []string
+		for _, layer := range stageLayers {
+			for _, mod := range layer {
+				allModules = append(allModules, mod.Name)
+			}
+		}
+		layer := stageLayers.LastLayer()
+		kind := layerKind(layer)
 
 		if kind == KindMap && reqPlan.WriteExecOut == nil {
 			continue
@@ -97,18 +102,18 @@ func NewStages(
 			segmenter = reqPlan.StoresSegmenter()
 		}
 
-		var moduleStates []*ModuleState
-		stageLowestInitBlock := mods[0].InitialBlock
-		for _, mod := range mods {
+		var moduleStates []*StoreModuleState
+		stageLowestInitBlock := layer[0].InitialBlock
+		for _, mod := range layer {
 			modSegmenter := segmenter.WithInitialBlock(mod.InitialBlock)
 			modState := NewModuleState(logger, mod.Name, modSegmenter, storeConfigs[mod.Name])
 			moduleStates = append(moduleStates, modState)
 
-			stageLowestInitBlock = utils.MinOf(stageLowestInitBlock, mod.InitialBlock)
+			stageLowestInitBlock = min(stageLowestInitBlock, mod.InitialBlock)
 		}
 
 		stageSegmenter := segmenter.WithInitialBlock(stageLowestInitBlock)
-		stage := NewStage(idx, kind, stageSegmenter, moduleStates)
+		stage := NewStage(idx, kind, stageSegmenter, moduleStates, allModules)
 		out.stages = append(out.stages, stage)
 	}
 
@@ -137,26 +142,59 @@ func (s *Stages) AllStoresCompleted() bool {
 		if stage.kind != KindStore {
 			continue
 		}
-		state := s.getState(Unit{Segment: lastSegment, Stage: idx})
-		if state != UnitCompleted && state != UnitNoOp {
-			return false
+		for seg := s.storeSegmenter.FirstIndex(); seg <= lastSegment; seg++ {
+			state := s.getState(Unit{Segment: seg, Stage: idx})
+			if state != UnitCompleted && state != UnitNoOp {
+				return false
+			}
 		}
 	}
 	return true
 }
 
-func (s *Stages) InitialProgressMessages() map[string]block.Ranges {
-	out := make(map[string]block.Ranges)
-	for segmentIdx, segment := range s.segmentStates {
-		for stageIdx, state := range segment {
-			if state == UnitCompleted {
-				for _, mod := range s.stages[stageIdx].moduleStates {
-					rng := mod.segmenter.Range(segmentIdx + s.segmentOffset)
-					if rng != nil {
-						out[mod.name] = append(out[mod.name], rng)
-					}
+// UpdateStats is gated to be called at most once per second. It runs the first time it is called.
+func (s *Stages) UpdateStats() {
+	if time.Since(s.lastStatUpdate) < 1*time.Second {
+		return
+	}
+	s.lastStatUpdate = time.Now()
+	out := make([]*pbsubstreamsrpc.Stage, len(s.stages))
+
+	for i := range s.stages {
+
+		mods := make([]string, len(s.stages[i].allExecutedModules))
+		_ = copy(mods, s.stages[i].allExecutedModules)
+
+		var br []*block.Range
+		for segmentIdx, segment := range s.segmentStates {
+			state := segment[i]
+			segmenter := s.stages[i].storeModuleStates[0].segmenter
+			if state == UnitCompleted || state == UnitPartialPresent || state == UnitMerging {
+				if rng := segmenter.Range(segmentIdx + s.segmentOffset); rng != nil {
+					br = append(br, rng)
 				}
 			}
+		}
+		blockRanges := block.Ranges(br).SortAndDedupe().Merged()
+
+		out[i] = &pbsubstreamsrpc.Stage{
+			Modules:         mods,
+			CompletedRanges: toProtoRanges(blockRanges),
+		}
+	}
+
+	reqctx.ReqStats(s.ctx).RecordStages(out)
+}
+
+func toProtoRanges(in block.Ranges) []*pbsubstreamsrpc.BlockRange {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]*pbsubstreamsrpc.BlockRange, len(in))
+	for i := range in {
+		out[i] = &pbsubstreamsrpc.BlockRange{
+			StartBlock: in[i].StartBlock,
+			EndBlock:   in[i].ExclusiveEndBlock,
 		}
 	}
 	return out
@@ -387,7 +425,7 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 		if stage.kind != KindStore {
 			continue
 		}
-		for _, modState := range stage.moduleStates {
+		for _, modState := range stage.storeModuleStates {
 			fullKV, err := modState.getStore(s.ctx, exclusiveEndBlock)
 			if err != nil {
 				return nil, fmt.Errorf("stores didn't sync up properly, expected store %q to be at block %d but was at %d: %w", modState.name, exclusiveEndBlock, modState.lastBlockInStore, err)
@@ -422,7 +460,7 @@ func (s *Stages) StatesString() string {
 }
 
 func (s *Stages) StageModules(stage int) (out []string) {
-	for _, modState := range s.stages[stage].moduleStates {
+	for _, modState := range s.stages[stage].storeModuleStates {
 		out = append(out, modState.name)
 	}
 	return

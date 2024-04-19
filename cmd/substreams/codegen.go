@@ -42,9 +42,8 @@ func runCodeGen(cmd *cobra.Command, args []string) error {
 	}
 
 	var protoDefinitions []*desc.FileDescriptor
-	manifestReader, err := manifest.NewReader(manifestPath, manifest.SkipSourceCodeReader(), manifest.WithCollectProtoDefinitions(func(pd []*desc.FileDescriptor) {
-		protoDefinitions = pd
-	}))
+
+	manifestReader, err := manifest.NewReader(manifestPath, manifest.SkipSourceCodeReader(), manifest.WithCollectProtoDefinitions(func(pd []*desc.FileDescriptor) { protoDefinitions = pd }))
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
@@ -54,11 +53,11 @@ func runCodeGen(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("computing working directory: %w", err)
 	}
 	workingDir := filepath.Dir(manifestAbsPath)
-	manif, err := manifest.LoadManifestFile(manifestAbsPath)
+	manif, err := manifest.LoadManifestFile(manifestAbsPath, workingDir)
 	if err != nil {
 		return fmt.Errorf("loading manifest: %w", err)
 	}
-	pkg, err := manifestReader.Read()
+	pkg, _, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("reading manifest %q: %w", manifestPath, err)
 	}

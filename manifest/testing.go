@@ -11,6 +11,7 @@ var five = uint64(5)
 var ten = uint64(10)
 var twenty = uint64(20)
 var thirty = uint64(30)
+var fourty = uint64(40)
 
 // NewTestModules can be used in foreign packages for their test suite
 func NewSimpleTestModules() []*pbsubstreams.Module {
@@ -231,7 +232,7 @@ func TestReadManifest(t testing.T, manifestPath string) *pbsubstreams.Package {
 	t.Helper()
 
 	manifestReader := MustNewReader(manifestPath)
-	pkg, err := manifestReader.Read()
+	pkg, _, err := manifestReader.Read()
 	require.NoError(t, err)
 	return pkg
 }

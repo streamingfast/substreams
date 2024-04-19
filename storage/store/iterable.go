@@ -12,3 +12,7 @@ func (b *baseStore) Iter(f func(key string, value []byte) error) error {
 	}
 	return nil
 }
+
+func (b *baseStore) SizeBytes() uint64 {
+	return b.totalSizeBytes
+}

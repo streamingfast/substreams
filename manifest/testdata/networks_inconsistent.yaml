@@ -1,0 +1,35 @@
+specVersion: v0.1.0
+package:
+  name: testnetworks
+  version: v0.1.0
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: binaries/dummy.wasm
+
+modules:
+  - name: mod1
+    kind: map
+    inputs:
+      - source: sf.test.Block
+    output:
+      type: proto:test
+
+  - name: mod2
+    kind: map
+    inputs:
+      - params: string
+      - map: mod1
+    output:
+      type: proto:test
+
+network: mainnet
+
+networks:
+  mainnet:
+    initialBlock:
+      mod1: 200
+  sepolia:
+    initialBlock:
+      mod2: 400

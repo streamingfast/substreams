@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/wasm"
@@ -186,12 +185,14 @@ func addExtensionFunctions(ctx context.Context, runtime wazero.Runtime, registry
 					data := readBytes(inst, ptr, length)
 					call := wasm.FromContext(ctx)
 
-					t0 := time.Now()
+					metricID := reqctx.ReqStats(ctx).RecordModuleWasmExternalCallBegin(call.ModuleName, fmt.Sprintf("%s:%s", namespace, importName))
+
 					out, err := f(ctx, reqctx.Details(ctx).UniqueIDString(), call.Clock, data)
 					if err != nil {
 						panic(fmt.Errorf(`running wasm extension "%s::%s": %w`, namespace, importName, err))
 					}
-					reqctx.ReqStats(ctx).RecordWasmExtDuration(importName, time.Since(t0))
+
+					reqctx.ReqStats(ctx).RecordModuleWasmExternalCallEnd(call.ModuleName, fmt.Sprintf("%s:%s", namespace, importName), metricID)
 
 					if ctx.Err() == context.Canceled {
 						// Sometimes long-running extensions will come back to a canceled context.

@@ -2,6 +2,10 @@ package manifest
 
 import (
 	"fmt"
+	"os"
+	"strings"
+
+	"go.uber.org/zap"
 
 	"gopkg.in/yaml.v3"
 )
@@ -26,4 +30,82 @@ func (s *mapSlice) UnmarshalYAML(n *yaml.Node) error {
 	}
 
 	return nil
+}
+
+func ExtractNetworkEndpoint(networkFromManifest, fromFlag string, logger *zap.Logger) (string, error) {
+	if fromFlag != "" {
+		return fromFlag, nil
+	}
+
+	if networkFromManifest == "" {
+		logger.Warn("DEPRECATION WARNING: This substreams does not define a 'network' field. To allow endpoint inference, define a 'network' field in your Substreams manifest. See --help for more information. Assuming 'mainnet' as network")
+		networkFromManifest = "mainnet"
+	}
+
+	if endpoint := getNetworkEndpointFromEnvironment(networkFromManifest); endpoint != "" {
+		logger.Info("using endpoint from environment", zap.String("manifest_network", networkFromManifest), zap.String("endpoint", endpoint))
+		return endpoint, nil
+	}
+
+	if ep, ok := HardcodedEndpoints[networkFromManifest]; ok {
+		logger.Info("using endpoint from hardcoded list", zap.String("manifest_network", networkFromManifest), zap.String("endpoint", ep))
+		return ep, nil
+	}
+
+	return "", fmt.Errorf("cannot determine endpoint for network %q: make sure that you set SUBSTREAMS_ENDPOINTS_CONFIG_%s environment variable to a valid endpoint, or use the endpoint flag", networkFromManifest, strings.ToUpper(networkFromManifest))
+}
+
+func getNetworkEndpointFromEnvironment(networkName string) string {
+	networkEndpoint := os.Getenv(fmt.Sprintf("SUBSTREAMS_ENDPOINTS_CONFIG_%s", strings.ToUpper(networkName)))
+	return networkEndpoint
+}
+
+func searchExistingCaseInsensitiveFileName(dir, filename string) (string, error) {
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		return "", fmt.Errorf("reading dir: %w", err)
+	}
+
+	for _, file := range files {
+		if strings.EqualFold(file.Name(), filename) {
+			return file.Name(), nil
+		}
+	}
+	return "", os.ErrNotExist
+}
+
+// TODO: replace by the blockchain-based discovery when available
+var HardcodedEndpoints = map[string]string{
+	"mainnet":        "mainnet.eth.streamingfast.io:443",
+	"matic":          "polygon.streamingfast.io:443",
+	"polygon":        "polygon.streamingfast.io:443",
+	"goerli":         "goerli.eth.streamingfast.io:443",
+	"mumbai":         "mumbai.streamingfast.io:443",
+	"bnb":            "bnb.streamingfast.io:443",
+	"bsc":            "bnb.streamingfast.io:443",
+	"sepolia":        "sepolia.eth.streamingfast.io:443",
+	"holesky":        "holesky.eth.streamingfast.io:443",
+	"near":           "mainnet.near.streamingfast.io:443",
+	"near-mainnet":   "mainnet.near.streamingfast.io:443",
+	"near-testnet":   "testnet.near.streamingfast.io:443",
+	"arbitrum":       "arb-one.streamingfast.io:443",
+	"arb":            "arb-one.streamingfast.io:443",
+	"arb-one":        "arb-one.streamingfast.io:443",
+	"solana":         "mainnet.sol.streamingfast.io:443",
+	"sol":            "mainnet.sol.streamingfast.io:443",
+	"solana-mainnet": "mainnet.sol.streamingfast.io:443",
+	"optimism":       "optimism.streamingfast.io:443",
+	"bitcoin":        "btc-mainnet.streamingfast.io:443",
+	"chapel":         "chapel.substreams.pinax.network:443",
+	// antelope chains
+	"eos":       "eos.substreams.pinax.network:443",
+	"jungle4":   "jungle4.substreams.pinax.network:443",
+	"kylin":     "kylin.substreams.pinax.network:443",
+	"wax":       "wax.substreams.pinax.network:443",
+	"waxtest":   "waxtest.substreams.pinax.network:443",
+	"telos":     "telos.substreams.pinax.network:443",
+	"telostest": "telostest.substreams.pinax.network:443",
+	"ore":       "ore.substreams.pinax.network:443",
+	"orestage":  "orestage.substreams.pinax.network:443",
+	"ux":        "ux.substreams.pinax.network:443",
 }

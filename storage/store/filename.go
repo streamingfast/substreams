@@ -35,11 +35,11 @@ func (f FileInfos) String() string {
 }
 
 type FileInfo struct {
-	ModuleName string
-	Filename   string
-	Range      *block.Range
-	TraceID    string
-	Partial    bool
+	ModuleName  string
+	Filename    string
+	Range       *block.Range
+	Partial     bool
+	WithTraceID bool
 }
 
 func NewCompleteFileInfo(moduleName string, moduleInitialBlock uint64, exclusiveEndBlock uint64) *FileInfo {
@@ -53,14 +53,13 @@ func NewCompleteFileInfo(moduleName string, moduleInitialBlock uint64, exclusive
 	}
 }
 
-func NewPartialFileInfo(moduleName string, start uint64, exclusiveEndBlock uint64, traceID string) *FileInfo {
+func NewPartialFileInfo(moduleName string, start uint64, exclusiveEndBlock uint64) *FileInfo {
 	bRange := block.NewRange(start, exclusiveEndBlock)
 
 	return &FileInfo{
 		ModuleName: moduleName,
-		Filename:   PartialFileName(bRange, traceID),
+		Filename:   PartialFileName(bRange),
 		Range:      bRange,
-		TraceID:    traceID,
 		Partial:    true,
 	}
 }
@@ -72,21 +71,16 @@ func parseFileName(moduleName, filename string) (*FileInfo, bool) {
 	}
 
 	return &FileInfo{
-		ModuleName: moduleName,
-		Filename:   filename,
-		Range:      block.NewRange(uint64(mustAtoi(res[0][2])), uint64(mustAtoi(res[0][1]))),
-		TraceID:    res[0][3],
-		Partial:    res[0][4] == "partial",
+		ModuleName:  moduleName,
+		Filename:    filename,
+		Range:       block.NewRange(uint64(mustAtoi(res[0][2])), uint64(mustAtoi(res[0][1]))),
+		Partial:     res[0][4] == "partial",
+		WithTraceID: res[0][3] != "",
 	}, true
 }
 
-func PartialFileName(r *block.Range, traceID string) string {
-	if traceID == "" {
-		// Generate legacy partial filename
-		return fmt.Sprintf("%010d-%010d.partial", r.ExclusiveEndBlock, r.StartBlock)
-	}
-
-	return fmt.Sprintf("%010d-%010d.%s.partial", r.ExclusiveEndBlock, r.StartBlock, traceID)
+func PartialFileName(r *block.Range) string {
+	return fmt.Sprintf("%010d-%010d.partial", r.ExclusiveEndBlock, r.StartBlock)
 }
 
 func FullStateFileName(r *block.Range) string {

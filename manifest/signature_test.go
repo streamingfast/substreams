@@ -88,8 +88,8 @@ func Test_HashModule(t *testing.T) {
 		{
 			file: "testdata/with-params.yaml",
 			hashes: map[string]string{
-				"mod1": "551398cb7d52f5e6dfaa09ea5800afe647c8c853",
-				"mod2": "3591fd3507951ab63668d3e4093e9bd797aea2fa",
+				"mod1": "a9f22492be1fb13050c07f1502d5a6e78577dd80",
+				"mod2": "6aca30692dfa835efe09fbf51b0a1735ea3b3155",
 			},
 		},
 	}
@@ -99,10 +99,9 @@ func Test_HashModule(t *testing.T) {
 			reader, err := NewReader(test.file)
 			require.NoError(t, err)
 
-			manifest, err := reader.Read()
+			manifest, graph, err := reader.Read()
 			require.NoError(t, err)
 
-			graph, _ := NewModuleGraph(manifest.Modules.Modules)
 			hashes := NewModuleHashes()
 			compare := map[string]string{}
 			for _, mod := range graph.modules {

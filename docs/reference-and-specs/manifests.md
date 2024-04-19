@@ -48,7 +48,7 @@ The `package.name` field is used to identify the package.
 
 The `package.name` field infers the filename when the [`pack`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#pack) command is run by using `substreams.yaml` as a flag for the Substreams package.
 
-The content of the `name` field must match the regular expression: `^([a-zA-Z][a-zA-Z0-9_]{0,63})$`
+The content of the `name` field must match the regular expression: `^([a-zA-Z][a-zA-Z0-9_]{0,63})$`. For consistency, use the `snake_case` naming convention.
 
 The regular expression ruleset translates to the following:
 
@@ -64,13 +64,19 @@ The `package.version` field identifies the package for the Substreams module.
 **Note**: The`package.version` **must respect** [Semantic Versioning, version 2.0](https://semver.org/)
 {% endhint %}
 
-#### package.url
+#### `package.url``
 
 The `package.url` field identifies and helps users discover the source of the Substreams package.
 
-#### package.doc
+#### `package.image``
 
-The `package.doc` field is the documentation string of the package. The first line is a short description and longer documentation proceeds a blank line.
+The `package.image` field can specify a path to an image (JPEG, PNG or WebP, < 2MiB) that will be embedded in the .spkg to represent the substreams on a website like https://substreams.dev.
+
+#### `package.doc`
+
+The `package.doc` field is the documentation string of the package. The first line is used by the different UIs as a short-form description.
+
+This field should be written in Markdown format.
 
 ### `imports`
 
@@ -85,7 +91,7 @@ Example:
 ```yaml
 imports:
   ethereum: substreams-ethereum-v1.0.0.spkg
-  tokens: ../eth-token/substreams.yaml
+  tokens: https://github.com/streamingfast/substreams-erc20-balance-changes/releases/download/v1.2.0/erc20-balance-changes-v1.2.0.spkg
   prices: ../eth-token/substreams.yaml
 ```
 
@@ -118,7 +124,7 @@ The Substreams packager loads files in any of the listed `importPaths`.
 
 Protobufs and modules are packaged together to help Substreams clients decode the incoming streams. Protobufs are not sent to the Substreams server in network requests.
 
-[Learn more about Google Protocol Buffers](https://developers.google.com/protocol-buffers) in the official documentation provided by Google.
+[Learn more about Google Protocol Buffers](https://protobuf.dev/) in the official documentation provided by Google.
 
 ### `binaries`
 
@@ -154,6 +160,44 @@ The `binaries[name].file` field references a locally compiled [WASM module](http
 **Tip**: The WASM file referenced by the `binary` field is picked up and packaged into an `.spkg` when invoking the [`pack`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#pack) and [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) commands through the [`substreams` CLI](command-line-interface.md).
 {% endhint %}
 
+### `deriveFrom`
+It is possible to override an existing substreams by pointing to an override file in the `run` or `gui` command. This override manifest will have a `deriveFrom` field which points to the original Substreams which is to be overriden. This is useful to port a substreams to one network to another. Example of an override manifest:
+
+```
+deriveFrom: path/to/mainnet-substreams.spkg # This can also be a remote url
+
+package:
+  name: "polygon-substreams"
+  version: "100.0.0"
+
+network: polygon
+
+initialBlocks:
+  module1: 17500000
+params:
+  module1: "address=2a75ca72679cf1299936d6104d825c9654489058"
+```
+
+### sink
+
+The `sink` field specifies the sink you want to use to consume your data (for example, a database or a subgraph).
+
+#### Sink `module`
+Specifies the name of the module that emits the data to the sink. For example, `db_out` or `graph_out`.
+
+#### Sink `type`
+Specifies the service used to consume the data. For example, `sf.substreams.sink.subgraph.v1.Service` for subgraphs, or `sf.substreams.sink.sql.v1.Service` for databases.
+
+#### Sink `config`
+Specifies the configuration specific to every sink. This field is different for every sink.
+
+##### Database Config
+
+
+##### Subgraph Config
+
+
+
 ### `modules`
 
 This example shows one map module, named `events_extractor` and one store module, named `totals` :
@@ -169,6 +213,10 @@ This example shows one map module, named `events_extractor` and one store module
       - store: myimport:prices
     output:
       type: proto:my.types.v1.Events
+    doc:
+      This module extracts events
+      
+      Use in such and such situations
 
   - name: totals
     kind: store
@@ -182,11 +230,11 @@ This example shows one map module, named `events_extractor` and one store module
 
 #### Module `name`
 
-The identifier for the module, prefixed by a letter, followed by a maximum of 64 characters of `[a-zA-Z0-9_]`. The [same rules applied to the `package.name`](manifests.md#package.name) field applies to the module `name`.
+The identifier for the module, prefixed by a letter, followed by a maximum of 64 characters of `[a-zA-Z0-9_]`. The [same rules applied to the `package.name`](manifests.md#package.name) field applies to the module `name`, including the convention to use `snake_case` names.
 
 The module `name` is the reference identifier used on the command line for the `substreams` [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command. The module `name` is also used in the [`inputs`](manifests.md#modules-.inputs) defined in the Substreams manifest.
 
-The module `name` also corresponds to the **name of the Rust function** invoked on the compiled WASM code upon execution. The module `name` is the same `#[substreams::handlers::map]` as defined in the Rust \_\_ code\_.\_ Maps and stores both work in the same fashion.
+The module `name` also corresponds to the **name of the Rust function** invoked on the compiled WASM code upon execution. The module `name` is the same `#[substreams::handlers::map]` as defined in the Rust code. Maps and stores both work in the same fashion.
 
 {% hint style="warning" %}
 **Important**_:_ When importing another package, all module names are prefixed by the package's name and a colon. Prefixing ensures there are no name clashes across multiple imported packages and almost any name can be safely used for a module `name`.
@@ -200,12 +248,47 @@ If all the inputs have the same `initialBlock`, the field can be omitted and its
 
 `initialBlock` becomes **mandatory** **when inputs have different values**.
 
+The `initialBlock` of a module can be defined per-network in the `networks` section.
+
 #### Module `kind`
 
 There are two module types for `modules[].kind`:
 
 * `map`
 * `store`
+
+#### Module `use`
+
+The `use` parameter allows you to define a new module by reusing the function of another module. For example, consider that you have a module called `db_out` that emits the `DatabaseChanges` Protobuf. You want to create another module that maps the `DatabaseChanges` to `EntityChanges`, but you don't want to code it yourself; instead you use a module that is already written.
+
+```yaml
+specVersion: v0.1.0
+package:
+  name: byac
+  version: v0.1.0
+
+imports:
+  converter: https://spkg.io/streamingfast/substreams-db-graph-converter-v0.1.0.spkg
+
+modules:
+...
+  - name: db_out
+    kind: map
+    initialBlock: 12287507
+    inputs:
+      - map: map_events
+    output:
+      type: proto:sf.substreams.sink.database.v1.DatabaseChanges
+
+  - name: graph_out
+    use: converter:dbout_to_graphout
+    inputs:
+      - map: db_out
+```
+
+In the previous example, the `map_events` module emits `DatabaseChanges`. The `graph_out` module converts `DatabaseChanges` to `EntityChanges`, by defining using an already written module (`use: converter:dbout_to_graphout`).
+
+The converter module **must** accept the same input as the one defined in the `inputs` section (in the previous example, `DatabaseChanges`).
 
 #### Module `updatePolicy`
 
@@ -296,6 +379,10 @@ The value for `type` is always prefixed using `proto:` followed by a definition 
 **Tip**: The module `output` field is only available for modules of `kind: map`.
 {% endhint %}
 
+#### Module `doc`
+
+This field should contain Markdown documentation of the module. Use it to describe how to use the params, or what to expect from the module.
+
 ### `params`
 
 The `params` mapping changes the default values for modules' parameterizable inputs.
@@ -320,3 +407,29 @@ my_mod.inputs[0].params.value = "myvalue"
 {% endcode %}
 
 which would be inserted just before starting the stream.
+
+Params that are defined under `networks` do not need to be repeated here (their value will be overwritten)
+
+### `network`
+
+The `network` field specifies the default network to be used with this Substreams. It will help the client choose an endpoint if necessary, and will be used as the default value when applying the values defined under `networks`.
+
+### `networks`
+
+The `networks` allows specifying per-network `params` and `initialBlock` for each module:
+
+```yaml
+networks:
+  mainnet:
+    initialBlock:
+      mod1: 200
+      lib:mod1: 400
+    params:
+      mod2: "addr=0x1234"
+  sepolia:
+    [...]
+```
+
+You can override values for modules imported from other .spkg.
+
+Every local module specified under `networks` must have a value for **each network**

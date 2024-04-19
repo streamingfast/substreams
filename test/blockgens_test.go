@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
-	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"google.golang.org/protobuf/types/known/anypb"
+
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 
 	"github.com/streamingfast/bstream/forkable"
 
@@ -59,7 +62,7 @@ func (g *ForkBlockGenerator) Generate() []*GeneratedBlock {
 	}
 	options = append(options, forkable.WithInclusiveLIB(g.initialLIB))
 
-	forquable := forkable.New(bstream.HandlerFunc(func(blk *bstream.Block, obj interface{}) error {
+	forquable := forkable.New(bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
 		forkableObject := obj.(*forkable.ForkableObject)
 		generatedBlocks = append(generatedBlocks, &GeneratedBlock{
 			block: blk,
@@ -77,20 +80,17 @@ func (g *ForkBlockGenerator) Generate() []*GeneratedBlock {
 			Id:     f.blockRef.ID(),
 			Number: f.blockRef.Num(),
 		}
-		bytesBlock, err := proto.Marshal(block)
+		anyBlock, err := anypb.New(block)
 		if err != nil {
 			panic("bad block")
 		}
-		bsBlock := &bstream.Block{
-			Id:         block.Id,
-			Number:     block.Number,
-			PreviousId: f.previousID,
-			Timestamp:  time.Now(),
-			LibNum:     f.libBlockRef.Num(),
-		}
-		bsBlock, err = bstream.MemoryBlockPayloadSetter(bsBlock, bytesBlock)
-		if err != nil {
-			panic("block bytes not good")
+		bsBlock := &pbbstream.Block{
+			Id:        block.Id,
+			Number:    block.Number,
+			ParentId:  f.previousID,
+			Timestamp: timestamppb.Now(),
+			LibNum:    f.libBlockRef.Num(),
+			Payload:   anyBlock,
 		}
 		err = forquable.ProcessBlock(bsBlock, nil)
 		if err != nil {
@@ -157,7 +157,7 @@ func (g *ForkBlockGenerator) Generate() []*GeneratedBlock {
 //}
 
 type GeneratedBlock struct {
-	block *bstream.Block
+	block *pbbstream.Block
 	obj   *Obj
 }
 
@@ -179,18 +179,18 @@ func (g LinearBlockGenerator) Generate() []*GeneratedBlock {
 			Id:     blockRef.ID(),
 			Number: blockRef.Num(),
 		}
-		bytesBlock, err := proto.Marshal(block)
+		anyBlock, err := anypb.New(block)
 		if err != nil {
 			panic("bad block")
 		}
-		bsBlock := &bstream.Block{
-			Id:         block.Id,
-			Number:     block.Number,
-			PreviousId: "",
-			Timestamp:  time.Now(),
-			LibNum:     blockLIBRef.Num(),
+		bsBlock := &pbbstream.Block{
+			Id:        block.Id,
+			Number:    block.Number,
+			ParentId:  "",
+			Timestamp: timestamppb.Now(),
+			LibNum:    blockLIBRef.Num(),
+			Payload:   anyBlock,
 		}
-		bsBlock, err = bstream.MemoryBlockPayloadSetter(bsBlock, bytesBlock)
 		generatedBlocks = append(generatedBlocks, &GeneratedBlock{
 			block: bsBlock,
 			obj: &Obj{

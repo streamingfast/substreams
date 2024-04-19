@@ -4,6 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/streamingfast/substreams/wasm"
+
+	"github.com/streamingfast/substreams/reqctx"
+
 	"github.com/streamingfast/bstream/stream"
 
 	"github.com/streamingfast/substreams"
@@ -11,17 +15,7 @@ import (
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/service/config"
-	"github.com/streamingfast/substreams/storage/store"
 )
-
-// TestTraceID must be used everywhere a TraceID is required. It must be the same
-// between tier1 and tier2, otherwise tier1 will not find the file produced by
-// tier2 correctly.
-var TestTraceID = "00000000000000000000000000000000"
-
-func TestTraceIDParam() store.TraceIDParam {
-	return store.TraceIDParam(TestTraceID)
-}
 
 func TestNewService(runtimeConfig config.RuntimeConfig, linearHandoffBlockNum uint64, streamFactoryFunc StreamFactoryFunc) *Tier1Service {
 	return &Tier1Service{
@@ -50,18 +44,23 @@ func (s *Tier1Service) TestBlocks(ctx context.Context, isSubRequest bool, reques
 
 func TestNewServiceTier2(runtimeConfig config.RuntimeConfig, streamFactoryFunc StreamFactoryFunc) *Tier2Service {
 	return &Tier2Service{
-		blockType:         "sf.substreams.v1.test.Block",
-		streamFactoryFunc: streamFactoryFunc,
-		runtimeConfig:     runtimeConfig,
-		tracer:            nil,
-		logger:            zlog,
+		runtimeConfig:             runtimeConfig,
+		tracer:                    nil,
+		logger:                    zlog,
+		streamFactoryFuncOverride: streamFactoryFunc,
 	}
 }
 
-func (s *Tier2Service) TestProcessRange(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc, traceID *string) error {
-	if traceID == nil {
-		traceID = &TestTraceID
+func (s *Tier2Service) TestProcessRange(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) error {
+	tier2req, ok := reqctx.GetTier2RequestParameters(ctx)
+	if !ok {
+		return fmt.Errorf("missing tier2 request parameters")
+	}
+	s.tier2RequestParameters = &tier2req
+
+	s.wasmExtensions = func(m map[string]string) (map[string]map[string]wasm.WASMExtension, error) {
+		return make(map[string]map[string]wasm.WASMExtension), nil
 	}
 
-	return s.processRange(ctx, request, respFunc, *traceID)
+	return s.processRange(ctx, request, respFunc)
 }

@@ -5,20 +5,25 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"sync/atomic"
+	"time"
+
+	"google.golang.org/grpc/metadata"
 
 	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/derr"
+	"github.com/streamingfast/dgrpc"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
+	otelCodes "go.opentelemetry.io/otel/codes"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
-	grpcCodes "google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	"google.golang.org/grpc/codes"
 
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/client"
+	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/orchestrator/response"
 	"github.com/streamingfast/substreams/orchestrator/stage"
@@ -82,28 +87,60 @@ func (w *RemoteWorker) ID() string {
 	return fmt.Sprintf("%d", w.id)
 }
 
-func NewRequest(req *reqctx.RequestDetails, stageIndex int, workRange *block.Range) *pbssinternal.ProcessRangeRequest {
+func NewRequest(ctx context.Context, req *reqctx.RequestDetails, stageIndex int, workRange *block.Range) *pbssinternal.ProcessRangeRequest {
+	tier2ReqParams, ok := reqctx.GetTier2RequestParameters(ctx)
+	if !ok {
+		panic("unable to get tier2 request parameters")
+	}
+
 	return &pbssinternal.ProcessRangeRequest{
 		StartBlockNum: workRange.StartBlock,
 		StopBlockNum:  workRange.ExclusiveEndBlock,
 		Modules:       req.Modules,
 		OutputModule:  req.OutputModule,
 		Stage:         uint32(stageIndex),
+
+		MeteringConfig:       tier2ReqParams.MeteringConfig,
+		FirstStreamableBlock: tier2ReqParams.FirstStreamableBlock,
+		MergedBlocksStore:    tier2ReqParams.MergedBlockStoreURL,
+		StateStore:           tier2ReqParams.StateStoreURL,
+		StateBundleSize:      tier2ReqParams.StateBundleSize,
+		StateStoreDefaultTag: tier2ReqParams.StateStoreDefaultTag,
+		WasmModules:          tier2ReqParams.WASMModules,
+		BlockType:            tier2ReqParams.BlockType,
 	}
 }
 
 func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *block.Range, moduleNames []string, upstream *response.Stream) loop.Cmd {
-	request := NewRequest(reqctx.Details(ctx), unit.Stage, workRange)
+	request := NewRequest(ctx, reqctx.Details(ctx), unit.Stage, workRange)
 	logger := reqctx.Logger(ctx)
 
 	return func() loop.Msg {
 		var res *Result
-		err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+		retryIdx := 0
+		startTime := time.Now()
+		maxRetries := 720 //TODO: make this configurable
+		var previousError error
+		err := derr.RetryContext(ctx, uint64(maxRetries), func(ctx context.Context) error {
+			w.logger.Info("launching remote worker",
+				zap.Int64("start_block_num", int64(request.StartBlockNum)),
+				zap.Uint64("stop_block_num", request.StopBlockNum),
+				zap.Uint32("stage", request.Stage),
+				zap.String("output_module", request.OutputModule),
+				zap.Int("attempt", retryIdx+1),
+				zap.NamedError("previous_error", previousError),
+			)
+
 			res = w.work(ctx, request, moduleNames, upstream)
 			err := res.Error
 			switch err.(type) {
 			case *RetryableErr:
-				logger.Debug("worker failed with retryable error", zap.Error(err))
+				metrics.Tier1WorkerRetryCounter.Inc()
+				if err != nil && strings.Contains(err.Error(), "service currently overloaded") {
+					metrics.Tier1WorkerRejectedOverloadedCounter.Inc()
+				}
+				previousError = err
+				retryIdx++
 				return err
 			default:
 				if err != nil {
@@ -117,17 +154,35 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *blo
 			if errors.Is(err, context.Canceled) {
 				logger.Debug("job canceled", zap.Object("unit", unit), zap.Error(err))
 			} else {
-				logger.Info("job failed", zap.Object("unit", unit), zap.Error(err))
+				logger.Warn("job failed", zap.Object("unit", unit), zap.Error(err))
 			}
+
+			timeTook := time.Since(startTime)
+			logger.Warn(
+				"incomplete job",
+				zap.Object("unit", unit),
+				zap.Int("number_of_tries", retryIdx),
+				zap.Strings("module_name", moduleNames),
+				zap.Duration("duration", timeTook),
+				zap.Float64("num_of_blocks_per_sec", float64(request.StopBlockNum-request.StartBlockNum)/timeTook.Seconds()),
+			)
 			return MsgJobFailed{Unit: unit, Error: err}
 		}
 
 		if err := ctx.Err(); err != nil {
-			logger.Info("job not completed", zap.Object("unit", unit), zap.Error(err))
+			logger.Warn("job not completed", zap.Object("unit", unit), zap.Error(err))
 			return MsgJobFailed{Unit: unit, Error: err}
 		}
 
-		logger.Info("job completed", zap.Object("unit", unit))
+		timeTook := time.Since(startTime)
+		logger.Debug(
+			"job completed",
+			zap.Object("unit", unit),
+			zap.Int("number_of_tries", retryIdx),
+			zap.Strings("module_name", moduleNames),
+			zap.Float64("duration", timeTook.Seconds()),
+			zap.Float64("processing_time_per_block", timeTook.Seconds()/float64(request.StopBlockNum-request.StartBlockNum)),
+		)
 		return MsgJobSucceeded{
 			Unit:   unit,
 			Worker: w,
@@ -150,18 +205,19 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 	)
 	logger := w.logger
 
-	grpcClient, closeFunc, grpcCallOpts, err := w.clientFactory()
+	grpcClient, closeFunc, grpcCallOpts, headers, err := w.clientFactory()
 	if err != nil {
 		return &Result{Error: fmt.Errorf("unable to create grpc client: %w", err)}
 	}
 
-	w.logger.Info("launching remote worker",
-		zap.Int64("start_block_num", int64(request.StartBlockNum)),
-		zap.Uint64("stop_block_num", request.StopBlockNum),
-		zap.String("output_module", request.OutputModule),
-	)
+	stats := reqctx.ReqStats(ctx)
+	jobIdx := stats.RecordNewSubrequest(request.Stage, request.StartBlockNum, request.StopBlockNum)
+	defer stats.RecordEndSubrequest(jobIdx)
 
 	ctx = dauth.FromContext(ctx).ToOutgoingGRPCContext(ctx)
+	if headers.IsSet() {
+		ctx = metadata.AppendToOutgoingContext(ctx, headers.ToArray()...)
+	}
 	stream, err := grpcClient.ProcessRange(ctx, request, grpcCallOpts...)
 	if err != nil {
 		if ctx.Err() != nil {
@@ -208,35 +264,22 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 
 		if resp != nil {
 			switch r := resp.Type.(type) {
-			case *pbssinternal.ProcessRangeResponse_ProcessedRange:
-				// push some updates for all those stages, altogether
-				err := upstream.RPCRangeProgressResponse(moduleNames, r.ProcessedRange.StartBlock, r.ProcessedRange.EndBlock)
-				if err != nil {
-					if ctx.Err() != nil {
-						return &Result{Error: ctx.Err()}
-					}
-					span.SetStatus(codes.Error, err.Error())
-					return &Result{
-						Error: NewRetryableErr(fmt.Errorf("sending progress: %w", err)),
-					}
-				}
-
-			case *pbssinternal.ProcessRangeResponse_ProcessedBytes:
-				/// ignore
+			case *pbssinternal.ProcessRangeResponse_Update:
+				stats.RecordJobUpdate(jobIdx, r.Update)
 
 			case *pbssinternal.ProcessRangeResponse_Failed:
 				// FIXME(abourget): we do NOT emit those Failed objects anymore. There was a flow
 				// for that that would pick up the errors, and pack the remaining logs
 				// and reasons into a message. This is nowhere to be found now.
 
-				upstream.RPCFailedProgressResponse(resp.ModuleName, r.Failed.Reason, r.Failed.Logs, r.Failed.LogsTruncated)
+				upstream.RPCFailedProgressResponse(r.Failed.Reason, r.Failed.Logs, r.Failed.LogsTruncated)
 
-				err := fmt.Errorf("module %s failed on host: %s", resp.ModuleName, r.Failed.Reason)
-				span.SetStatus(codes.Error, err.Error())
+				err := fmt.Errorf("work failed on remote host: %s", r.Failed.Reason)
+				span.SetStatus(otelCodes.Error, err.Error())
 				return &Result{Error: err}
 
 			case *pbssinternal.ProcessRangeResponse_Completed:
-				logger.Info("worker done")
+				logger.Debug("worker done")
 				return &Result{
 					PartialFilesWritten: toRPCPartialFiles(r.Completed),
 				}
@@ -250,10 +293,8 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 			if ctx.Err() != nil {
 				return &Result{Error: ctx.Err()}
 			}
-			if s, ok := status.FromError(err); ok {
-				if s.Code() == grpcCodes.InvalidArgument {
-					return &Result{Error: err}
-				}
+			if grpcErr := dgrpc.AsGRPCError(err); grpcErr.Code() == codes.InvalidArgument {
+				return &Result{Error: err}
 			}
 			return &Result{
 				Error: NewRetryableErr(fmt.Errorf("receiving stream resp: %w", err)),
@@ -271,7 +312,7 @@ func toRPCPartialFiles(completed *pbssinternal.Completed) (out store.FileInfos) 
 	// stores to all having been processed.
 	out = make(store.FileInfos, len(completed.AllProcessedRanges))
 	for i, b := range completed.AllProcessedRanges {
-		out[i] = store.NewPartialFileInfo("TODO:CHANGE-ME", b.StartBlock, b.EndBlock, completed.TraceId)
+		out[i] = store.NewPartialFileInfo("TODO:CHANGE-ME", b.StartBlock, b.EndBlock)
 	}
 	return
 }

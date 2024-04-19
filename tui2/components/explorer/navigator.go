@@ -80,12 +80,6 @@ type Navigator struct {
 
 type Option func(*Navigator)
 
-func WithManifestFilePath(path string) Option {
-	return func(n *Navigator) {
-		n.graph = manifest.MustNewModuleGraph(manifest.MustNewReader(path).MustRead().Modules.Modules)
-	}
-}
-
 func WithModuleGraph(graph *manifest.ModuleGraph) Option {
 	return func(n *Navigator) {
 		n.graph = graph
@@ -527,9 +521,9 @@ func (n *Navigator) View() string {
 
 		var inputsWithLabel []string
 		if len(parents) > 0 {
-			inputsWithLabel = append([]string{"INPUTS", spaces}, current)
+			inputsWithLabel = []string{"INPUTS", spaces, current}
 		} else {
-			inputsWithLabel = append([]string{"\n", spaces})
+			inputsWithLabel = []string{"\n", spaces}
 		}
 		leftSide = lipgloss.JoinVertical(lipgloss.Center, append([]string{spaces}, inputsWithLabel...)...)
 
@@ -540,18 +534,18 @@ func (n *Navigator) View() string {
 		if len(grandchildren) > 0 {
 			consumersWithLabel = append([]string{"CONSUMERS", spaces}, grandchildren...)
 		} else {
-			consumersWithLabel = append([]string{"\n", spaces})
+			consumersWithLabel = []string{"\n", spaces}
 		}
 		rightSide = lipgloss.JoinVertical(lipgloss.Center, consumersWithLabel...)
-		rightPreviewSide = lipgloss.JoinVertical(lipgloss.Left, append([]string{spaces})...)
+		rightPreviewSide = lipgloss.JoinVertical(lipgloss.Left, spaces)
 	} else if n.InParentColumn {
-		leftPreviewSide = lipgloss.JoinVertical(lipgloss.Right, append([]string{spaces})...)
+		leftPreviewSide = lipgloss.JoinVertical(lipgloss.Right, spaces)
 
 		var inputsWithLabel []string
 		if len(grandparents) > 0 {
 			inputsWithLabel = append([]string{"INPUTS", spaces}, grandparents...)
 		} else {
-			inputsWithLabel = append([]string{"\n", spaces})
+			inputsWithLabel = []string{"\n", spaces}
 		}
 		leftSide = lipgloss.JoinVertical(lipgloss.Center, inputsWithLabel...)
 
@@ -562,7 +556,7 @@ func (n *Navigator) View() string {
 		if len(current) > 0 {
 			consumersWithLabel = []string{"CONSUMERS", spaces, current}
 		} else {
-			consumersWithLabel = append([]string{"\n", spaces})
+			consumersWithLabel = []string{"\n", spaces}
 		}
 		rightSide = lipgloss.JoinVertical(lipgloss.Center, consumersWithLabel...)
 
@@ -576,7 +570,7 @@ func (n *Navigator) View() string {
 		if len(parents) > 0 {
 			inputsWithLabel = append([]string{"INPUTS", spaces}, parents...)
 		} else {
-			inputsWithLabel = append([]string{"\n", spaces})
+			inputsWithLabel = []string{"\n", spaces}
 		}
 		leftSide = lipgloss.JoinVertical(lipgloss.Center, inputsWithLabel...)
 
@@ -605,7 +599,7 @@ func (n *Navigator) View() string {
 	)
 	res := lipgloss.JoinVertical(0,
 		content,
-		fmt.Sprintf("%s", n.getRemainingLines(verticalSpace)),
+		n.getRemainingLines(verticalSpace),
 	)
 
 	return res

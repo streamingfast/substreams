@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"sync/atomic"
 
+	"connectrpc.com/connect"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+	"github.com/streamingfast/substreams/manifest"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
-	grpccodes "google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -41,12 +43,30 @@ func BuildRequestDetails(
 		return nil, nil, err
 	}
 
-	linearHandoff, err := computeLiveHandoffBlockNum(request.ProductionMode, req.ResolvedStartBlockNum, request.StopBlockNum, getRecentFinalBlock)
+	moduleHasStatefulDependencies := true
+	if req.Modules != nil { // because of tests which do not define modules in the request. too annoying to add this to tests for now. (TODO)
+		graph, err := manifest.NewModuleGraph(request.Modules.Modules)
+		if err != nil {
+			return nil, nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid modules: %w", err))
+		}
+
+		moduleHasStatefulDependencies, err = graph.HasStatefulDependencies(request.OutputModule)
+		if err != nil {
+			return nil, nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid output module: %w", err))
+		}
+	}
+
+	linearHandoff, err := computeLinearHandoffBlockNum(request.ProductionMode, req.ResolvedStartBlockNum, request.StopBlockNum, getRecentFinalBlock, moduleHasStatefulDependencies)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	req.LinearHandoffBlockNum = linearHandoff
+
+	req.LinearGateBlockNum = req.LinearHandoffBlockNum
+	if req.ResolvedStartBlockNum > req.LinearHandoffBlockNum {
+		req.LinearGateBlockNum = req.ResolvedStartBlockNum
+	}
 
 	return
 }
@@ -72,7 +92,7 @@ func nextUniqueID() uint64 {
 	return uniqueRequestIDCounter.Add(1)
 }
 
-func computeLiveHandoffBlockNum(productionMode bool, startBlock, stopBlock uint64, getRecentFinalBlockFunc func() (uint64, error)) (uint64, error) {
+func computeLinearHandoffBlockNum(productionMode bool, startBlock, stopBlock uint64, getRecentFinalBlockFunc func() (uint64, error), stateRequired bool) (uint64, error) {
 	if productionMode {
 		maxHandoff, err := getRecentFinalBlockFunc()
 		if err != nil {
@@ -84,13 +104,20 @@ func computeLiveHandoffBlockNum(productionMode bool, startBlock, stopBlock uint6
 		if stopBlock == 0 {
 			return maxHandoff, nil
 		}
-		return minOf(stopBlock, maxHandoff), nil
+		return min(stopBlock, maxHandoff), nil
 	}
+
+	//if no state required, we don't need to ever back-process blocks. we can start flowing blocks right away from the start block
+	if !stateRequired {
+		return startBlock, nil
+	}
+
 	maxHandoff, err := getRecentFinalBlockFunc()
 	if err != nil {
 		return startBlock, nil
 	}
-	return minOf(startBlock, maxHandoff), nil
+
+	return min(startBlock, maxHandoff), nil
 }
 
 // resolveStartBlockNum will occasionally modify or remove the cursor inside the request
@@ -119,7 +146,11 @@ func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, res
 
 	cursor, err := bstream.CursorFromOpaque(req.StartCursor)
 	if err != nil {
-		return 0, "", nil, status.Errorf(grpccodes.InvalidArgument, "invalid StartCursor %q: %s", cursor, err.Error())
+		return 0, "", nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid StartCursor %q: %w", cursor, err))
+	}
+
+	if req.StopBlockNum > 0 && req.StopBlockNum < cursor.Block.Num() {
+		return 0, "", nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("StartCursor %q is after StopBlockNum %d", cursor, req.StopBlockNum))
 	}
 
 	if cursor.IsOnFinalBlock() {
@@ -129,7 +160,7 @@ func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, res
 
 	reorgJunctionBlock, head, err := resolveCursor(ctx, cursor)
 	if err != nil {
-		return 0, "", nil, status.Errorf(grpccodes.InvalidArgument, "cannot resolve StartCursor %q: %s", cursor, err.Error())
+		return 0, "", nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("cannot resolve StartCursor %q: %s", cursor, err.Error()))
 	}
 	var undoSignal *pbsubstreamsrpc.BlockUndoSignal
 	resolvedCursor := cursor
@@ -168,7 +199,7 @@ type junctionBlockGetter struct {
 
 var Done = errors.New("done")
 
-func (j *junctionBlockGetter) ProcessBlock(block *bstream.Block, obj interface{}) error {
+func (j *junctionBlockGetter) ProcessBlock(block *pbbstream.Block, obj interface{}) error {
 	j.currentHead = obj.(bstream.Cursorable).Cursor().HeadBlock
 
 	stepable := obj.(bstream.Stepable)
@@ -185,7 +216,6 @@ func (j *junctionBlockGetter) ProcessBlock(block *bstream.Block, obj interface{}
 }
 
 func NewCursorResolver(hub *hub.ForkableHub, mergedBlocksStore, forkedBlocksStore dstore.Store) CursorResolver {
-
 	return func(ctx context.Context, cursor *bstream.Cursor) (reorgJunctionBlock, currentHead bstream.BlockRef, err error) {
 		jctBlkGetter := &junctionBlockGetter{}
 		src := hub.SourceFromCursor(cursor, jctBlkGetter)
@@ -210,11 +240,4 @@ func NewCursorResolver(hub *hub.ForkableHub, mergedBlocksStore, forkedBlocksStor
 
 		return jctBlkGetter.reorgJunctionBlock, jctBlkGetter.currentHead, nil
 	}
-}
-
-func minOf(a, b uint64) uint64 {
-	if a < b {
-		return a
-	}
-	return b
 }

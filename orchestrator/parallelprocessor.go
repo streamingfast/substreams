@@ -33,37 +33,13 @@ func BuildParallelProcessor(
 	execoutStorage *execout.Configs,
 	respFunc func(resp substreams.ResponseFromAnyTier) error,
 	storeConfigs store.ConfigMap,
-	traceID string,
 ) (*ParallelProcessor, error) {
 
 	stream := response.New(respFunc)
 	sched := scheduler.New(ctx, stream)
 
-	stages := stage.NewStages(ctx, outputGraph, reqPlan, storeConfigs, traceID)
+	stages := stage.NewStages(ctx, outputGraph, reqPlan, storeConfigs)
 	sched.Stages = stages
-
-	// we may be here only for mapper, without stores
-	if reqPlan.BuildStores != nil {
-		err := stages.FetchStoresState(
-			ctx,
-			reqPlan.StoresSegmenter(),
-			storeConfigs,
-			execoutStorage,
-			traceID,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("fetch stores storage state: %w", err)
-		}
-	}
-
-	if os.Getenv("SUBSTREAMS_DEBUG_SCHEDULER_STATE") == "true" {
-		fmt.Println("Initial state:")
-		fmt.Print(stages.StatesString())
-	}
-
-	if err := stream.InitialProgressMessages(stages.InitialProgressMessages()); err != nil {
-		return nil, fmt.Errorf("initial progress: %w", err)
-	}
 
 	// OPTIMIZATION: We should fetch the ExecOut files too, and see if they
 	// cover some of the ranges that we're after.
@@ -88,7 +64,7 @@ func BuildParallelProcessor(
 	// FIXME: Are all the progress messages properly sent? When we skip some stores and mark them complete,
 	// for whatever reason,
 
-	if reqPlan.WriteExecOut != nil {
+	if reqPlan.ReadExecOut != nil {
 		execOutSegmenter := reqPlan.WriteOutSegmenter()
 		// note: since we are *NOT* in a sub-request and are setting up output module is a map
 		requestedModule := outputGraph.OutputModule()
@@ -105,6 +81,35 @@ func BuildParallelProcessor(
 			reqPlan.ReadExecOut,
 			stream,
 		)
+	}
+
+	// we may be here only for mapper, without stores
+	if reqPlan.BuildStores != nil {
+		err := stages.FetchStoresState(
+			ctx,
+			reqPlan.StoresSegmenter(),
+			storeConfigs,
+			execoutStorage,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("fetch stores storage state: %w", err)
+		}
+	} else {
+		err := stages.FetchStoresState(
+			ctx,
+			reqPlan.WriteOutSegmenter(),
+			storeConfigs,
+			execoutStorage,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("fetch stores storage state: %w", err)
+		}
+
+	}
+
+	if os.Getenv("SUBSTREAMS_DEBUG_SCHEDULER_STATE") == "true" {
+		fmt.Println("Initial state:")
+		fmt.Print(stages.StatesString())
 	}
 
 	// OPTIMIZE(abourget): take all of the ExecOut files that exist
@@ -132,6 +137,10 @@ func BuildParallelProcessor(
 		scheduler: sched,
 		reqPlan:   reqPlan,
 	}, nil
+}
+
+func (b *ParallelProcessor) Stages() *stage.Stages {
+	return b.scheduler.Stages
 }
 
 func (b *ParallelProcessor) Run(ctx context.Context) (storeMap store.Map, err error) {

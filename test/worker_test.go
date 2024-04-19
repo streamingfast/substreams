@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"testing"
 
 	"go.uber.org/atomic"
@@ -23,7 +24,6 @@ type TestWorker struct {
 	blockProcessedCallBack blockProcessedCallBack
 	testTempDir            string
 	id                     uint64
-	traceID                *string
 }
 
 var workerID atomic.Uint64
@@ -35,7 +35,13 @@ func (w *TestWorker) ID() string {
 func (w *TestWorker) Work(ctx context.Context, unit stage.Unit, workRange *block.Range, moduleNames []string, upstream *response.Stream) loop.Cmd {
 	w.t.Helper()
 
-	request := work.NewRequest(reqctx.Details(ctx), unit.Stage, workRange)
+	ctx = reqctx.WithTier2RequestParameters(ctx, reqctx.Tier2RequestParameters{
+		BlockType:            "sf.substreams.v1.test.Block",
+		StateBundleSize:      10,
+		StateStoreURL:        filepath.Join(w.testTempDir, "test.store"),
+		StateStoreDefaultTag: "tag",
+	})
+	request := work.NewRequest(ctx, reqctx.Details(ctx), unit.Stage, workRange)
 
 	logger := reqctx.Logger(ctx)
 	logger = logger.With(zap.Uint64("workerId", w.id))
@@ -49,7 +55,7 @@ func (w *TestWorker) Work(ctx context.Context, unit stage.Unit, workRange *block
 	)
 
 	return func() loop.Msg {
-		if err := processInternalRequest(w.t, ctx, request, nil, w.newBlockGenerator, w.responseCollector, w.blockProcessedCallBack, w.testTempDir, w.traceID); err != nil {
+		if err := processInternalRequest(w.t, ctx, request, nil, w.newBlockGenerator, w.responseCollector, w.blockProcessedCallBack, w.testTempDir); err != nil {
 			return work.MsgJobFailed{Unit: unit, Error: fmt.Errorf("processing test tier2 request: %w", err)}
 		}
 		logger.Info("worker done running job",

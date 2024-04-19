@@ -3,7 +3,6 @@ package request
 import (
 	"fmt"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/streamingfast/substreams/client"
@@ -21,21 +20,23 @@ import (
 	"github.com/streamingfast/substreams/tui2/common"
 )
 
-type NewRequestInstance *RequestInstance
+type NewRequestInstance *Instance
 
 type BlockContext struct {
 	Module   string
 	BlockNum uint64
 }
 
-type RequestConfig struct {
+type Config struct {
 	ManifestPath                string
+	Pkg                         *pbsubstreams.Package
+	Graph                       *manifest.ModuleGraph
 	ReadFromModule              bool
 	ProdMode                    bool
 	DebugModulesOutput          []string
 	DebugModulesInitialSnapshot []string
 	StartBlock                  int64
-	StopBlock                   string
+	StopBlock                   uint64
 	FinalBlocksOnly             bool
 	Headers                     map[string]string
 	OutputModule                string
@@ -43,16 +44,17 @@ type RequestConfig struct {
 	HomeDir                     string
 	Vcr                         bool
 	Cursor                      string
-	Params                      []string
+	Params                      map[string]string
+	ReaderOptions               []manifest.Option
 }
 
-type RequestInstance struct {
+type Instance struct {
 	Stream         *streamui.Stream
 	MsgDescs       map[string]*manifest.ModuleDescriptor
 	ReplayLog      *replaylog.File
 	RequestSummary *Summary
 	Modules        *pbsubstreams.Modules
-	RefreshCtx     *RequestConfig
+	RefreshCtx     *Config
 	Graph          *manifest.ModuleGraph
 }
 
@@ -62,7 +64,6 @@ type Request struct {
 	RequestSummary     *Summary
 	Modules            *pbsubstreams.Modules
 	manifestView       viewport.Model
-	modulesViewContent string
 	traceId            string
 	resolvedStartBlock uint64
 	linearHandoffBlock uint64
@@ -71,7 +72,6 @@ type Request struct {
 }
 
 func New(c common.Common) *Request {
-
 	return &Request{
 		Common:       c,
 		manifestView: viewport.New(24, 80),
@@ -94,12 +94,8 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		r.params = make(map[string][]string)
 		if msg.RequestSummary.Params != nil {
-			for _, p := range msg.RequestSummary.Params {
-				kv := strings.SplitN(p, "=", 2)
-				if len(kv) != 2 {
-					panic("invalid params in gui")
-				}
-				r.params[kv[0]] = append(r.params[kv[0]], kv[1])
+			for k, v := range msg.RequestSummary.Params {
+				r.params[k] = append(r.params[k], v)
 			}
 		}
 		r.setModulesViewContent()
@@ -141,6 +137,7 @@ func (r *Request) renderRequestSummary() string {
 		"Production mode: ",
 		"Trace ID: ",
 		"Parallel Workers: ",
+		// TODO: add docs field
 	}
 
 	handoffStr := ""
@@ -148,54 +145,62 @@ func (r *Request) renderRequestSummary() string {
 		handoffStr = fmt.Sprintf(" (handoff: %d)", r.linearHandoffBlock)
 	}
 
+	paramsStrings := make([]string, 0, len(summary.Params))
+	for k, v := range summary.Params {
+		paramsStrings = append(paramsStrings, fmt.Sprintf("%s=%s", k, v))
+	}
+
 	values := []string{
-		fmt.Sprintf("%s", summary.Manifest),
-		fmt.Sprintf("%s", summary.Endpoint),
+		summary.Manifest,
+		summary.Endpoint,
 		fmt.Sprintf("%d%s", r.resolvedStartBlock, handoffStr),
-		strings.Join(summary.Params, ", "),
+		strings.Join(paramsStrings, ", "),
 		fmt.Sprintf("%v", summary.ProductionMode),
 		r.traceId,
 		fmt.Sprintf("%d", r.parallelWorkers),
 	}
 	if len(summary.InitialSnapshot) > 0 {
 		labels = append(labels, "Initial snapshots: ")
-		values = append(values, fmt.Sprintf("%s", strings.Join(summary.InitialSnapshot, ", ")))
+		values = append(values, strings.Join(summary.InitialSnapshot, ", "))
 	}
 
 	style := lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(r.Width - 2)
 
 	return style.Render(
-		lipgloss.NewStyle().Padding(1, 2, 1, 2).Render(lipgloss.JoinHorizontal(0.5,
-			lipgloss.JoinVertical(0, labels...),
-			lipgloss.JoinVertical(0, values...),
-		)),
+		lipgloss.NewStyle().Padding(1, 2, 1, 2).Render(
+			lipgloss.JoinHorizontal(
+				0.5,
+				lipgloss.JoinVertical(0, labels...),
+				lipgloss.JoinVertical(0, values...),
+			),
+		),
 	)
 }
 
 func (r *Request) SetSize(w, h int) {
 	r.Common.SetSize(w, h)
 	r.manifestView.Width = w
-	r.manifestView.Height = h - 11
+	r.manifestView.Height = h - 16
 }
 
 func (r *Request) setModulesViewContent() {
 	content, _ := r.getViewportContent()
-	r.modulesViewContent = content
 	r.manifestView.SetContent(content)
 }
 
 func (r *Request) getViewportContent() (string, error) {
 	output := ""
+
 	for i, module := range r.Modules.Modules {
-
+		if len(r.RequestSummary.ModuleDocs) < i+1 {
+			break
+		}
 		var moduleDoc string
-
 		var err error
-		if i <= len(r.RequestSummary.Docs)-1 {
-			moduleDoc, err = r.getViewPortDropdown(r.RequestSummary.Docs[i], module)
-			if err != nil {
-				return "", fmt.Errorf("getting module doc: %w", err)
-			}
+
+		moduleDoc, err = r.getViewPortDropdown(r.RequestSummary.ModuleDocs[i])
+		if err != nil {
+			return "", fmt.Errorf("getting module doc: %w", err)
 		}
 
 		output += fmt.Sprintf("%s\n\n", module.Name)
@@ -219,8 +224,8 @@ func (r *Request) getViewportContent() (string, error) {
 	return lipgloss.NewStyle().Padding(2, 4, 1, 4).Render(output), nil
 }
 
-func (r *Request) getViewPortDropdown(metadata *pbsubstreams.PackageMetadata, module *pbsubstreams.Module) (string, error) {
-	content, err := glamouriseModuleDoc(metadata, module)
+func (r *Request) getViewPortDropdown(moduleMetadata *pbsubstreams.ModuleMetadata) (string, error) {
+	content, err := glamorizeDoc(moduleMetadata.GetDoc())
 	if err != nil {
 		return "", fmt.Errorf("getting module docs: %w", err)
 	}
@@ -228,13 +233,13 @@ func (r *Request) getViewPortDropdown(metadata *pbsubstreams.PackageMetadata, mo
 	return content, nil
 }
 
-func glamouriseModuleDoc(metadata *pbsubstreams.PackageMetadata, module *pbsubstreams.Module) (string, error) {
+func glamorizeDoc(doc string) (string, error) {
 	markdown := ""
 
-	if metadata.GetDoc() != "" {
-		markdown += "# " + fmt.Sprintf("docs: \n")
+	if doc != "" {
+		markdown += "# " + "docs: \n"
 		markdown += "\n"
-		markdown += metadata.GetDoc()
+		markdown += doc
 		markdown += "\n"
 	}
 	markdown += "\n\n"
@@ -251,54 +256,39 @@ func glamouriseModuleDoc(metadata *pbsubstreams.PackageMetadata, module *pbsubst
 	return out, nil
 }
 
-func (c *RequestConfig) NewInstance() (*RequestInstance, error) {
-	graph, pkg, err := readManifest(c.ManifestPath)
-	if err != nil {
-		return nil, fmt.Errorf("graph and package setup: %w", err)
-	}
+func (c *Config) NewInstance() (*Instance, error) {
 	if c.ReadFromModule {
-		sb, err := graph.ModuleInitialBlock(c.OutputModule)
+		sb, err := c.Graph.ModuleInitialBlock(c.OutputModule)
 		if err != nil {
 			return nil, fmt.Errorf("getting module start block: %w", err)
 		}
 		c.StartBlock = int64(sb)
 	}
 
-	stopBlock, err := resolveStopBlock(c.StopBlock, c.StartBlock)
-	if err != nil {
-		return nil, fmt.Errorf("stop block: %w", err)
-	}
-
-	if err := manifest.ApplyParams(c.Params, pkg); err != nil {
-		return nil, err
-	}
-
-	ssClient, _, callOpts, err := client.NewSubstreamsClient(c.SubstreamsClientConfig)
+	ssClient, _, callOpts, headers, err := client.NewSubstreamsClient(c.SubstreamsClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("substreams client setup: %w", err)
 	}
-	//defer connClose()
+	if headers == nil {
+		headers = make(map[string]string)
+	}
 
 	req := &pbsubstreamsrpc.Request{
 		StartBlockNum:                       c.StartBlock,
 		StartCursor:                         c.Cursor,
 		FinalBlocksOnly:                     c.FinalBlocksOnly,
-		StopBlockNum:                        stopBlock,
-		Modules:                             pkg.Modules,
+		StopBlockNum:                        uint64(c.StopBlock),
+		Modules:                             c.Pkg.Modules,
 		OutputModule:                        c.OutputModule,
 		ProductionMode:                      c.ProdMode,
 		DebugInitialStoreSnapshotForModules: c.DebugModulesInitialSnapshot,
 	}
 
+	c.Headers = headers.Append(c.Headers)
 	stream := streamui.New(req, ssClient, c.Headers, callOpts)
 
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validate request: %w", err)
-	}
-
-	toPrint := c.DebugModulesOutput
-	if toPrint == nil {
-		toPrint = []string{c.OutputModule}
 	}
 
 	replayLogFilePath := filepath.Join(c.HomeDir, "replay.log")
@@ -318,7 +308,7 @@ func (c *RequestConfig) NewInstance() (*RequestInstance, error) {
 	debugLogPath := filepath.Join(c.HomeDir, "debug.log")
 	tea.LogToFile(debugLogPath, "gui:")
 
-	msgDescs, err := manifest.BuildMessageDescriptors(pkg)
+	msgDescs, err := manifest.BuildMessageDescriptors(c.Pkg)
 	if err != nil {
 		return nil, fmt.Errorf("building message descriptors: %w", err)
 	}
@@ -328,58 +318,19 @@ func (c *RequestConfig) NewInstance() (*RequestInstance, error) {
 		Endpoint:        c.SubstreamsClientConfig.Endpoint(),
 		ProductionMode:  c.ProdMode,
 		InitialSnapshot: req.DebugInitialStoreSnapshotForModules,
-		Docs:            pkg.PackageMeta,
+		Docs:            c.Pkg.PackageMeta,
+		ModuleDocs:      c.Pkg.ModuleMeta,
 		Params:          c.Params,
 	}
 
-	substreamRequirements := &RequestInstance{
-		stream,
-		msgDescs,
-		replayLog,
-		requestSummary,
-		pkg.Modules,
-		c,
-		graph,
+	substreamRequirements := &Instance{
+		Stream:         stream,
+		MsgDescs:       msgDescs,
+		ReplayLog:      replayLog,
+		RequestSummary: requestSummary,
+		Modules:        c.Pkg.Modules,
+		Graph:          c.Graph,
 	}
 
 	return substreamRequirements, nil
-}
-
-func readManifest(manifestPath string) (*manifest.ModuleGraph, *pbsubstreams.Package, error) {
-	manifestReader, err := manifest.NewReader(manifestPath)
-	if err != nil {
-		return nil, nil, fmt.Errorf("manifest reader: %w", err)
-	}
-
-	pkg, err := manifestReader.Read()
-	if err != nil {
-		return nil, nil, fmt.Errorf("read manifest %q: %w", manifestPath, err)
-	}
-
-	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
-	if err != nil {
-		return nil, nil, fmt.Errorf("creating module graph: %w", err)
-	}
-	return graph, pkg, nil
-}
-
-func resolveStopBlock(stopBlock string, startBlock int64) (uint64, error) {
-	isRelative := strings.HasPrefix(stopBlock, "+")
-	if isRelative {
-		stopBlock = strings.TrimPrefix(stopBlock, "+")
-		if startBlock < 0 {
-			return 0, fmt.Errorf("cannot have start block negative with relative stop block")
-		}
-	}
-
-	endBlock, err := strconv.ParseUint(stopBlock, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("end block is invalid: %w", err)
-	}
-
-	if isRelative {
-		return uint64(startBlock) + endBlock, nil
-	}
-
-	return endBlock, nil
 }

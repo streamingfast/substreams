@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 
+	"github.com/streamingfast/substreams/metrics"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage/store"
 )
@@ -481,12 +482,12 @@ func Test_CallStoreOps(t *testing.T) {
 
 func newTestCall(updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string) *Call {
 	myStore := dstore.NewMockStore(nil)
-	storeConf, err := store.NewConfig("test", 0, "", updatePolicy, valueType, myStore, "test")
+	storeConf, err := store.NewConfig("test", 0, "", updatePolicy, valueType, myStore)
 	if err != nil {
 		panic("failed")
 	}
 	outStore := storeConf.NewFullKV(zap.NewNop())
-	return &Call{updatePolicy: updatePolicy, valueType: valueType, outputStore: outStore}
+	return &Call{updatePolicy: updatePolicy, valueType: valueType, outputStore: outStore, stats: metrics.NewReqStats(&metrics.Config{}, zap.NewNop())}
 }
 
 func expectPanic(t *testing.T, shouldPanic bool, c *Call, f func(c *Call)) {

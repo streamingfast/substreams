@@ -7,7 +7,6 @@ import (
 
 	dauth "github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetrics"
-	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/pipeline"
@@ -18,33 +17,34 @@ import (
 )
 
 type Tier2Config struct {
-	MergedBlocksStoreURL string
-	GRPCListenAddr       string // gRPC address where this app will listen to
-	ServiceDiscoveryURL  *url.URL
+	GRPCListenAddr      string // gRPC address where this app will listen to
+	ServiceDiscoveryURL *url.URL
 
-	StateStoreURL        string
-	StateStoreDefaultTag string
-	StateBundleSize      uint64
-	BlockType            string
+	PipelineOptions []pipeline.Option
 
-	WASMExtensions  []wasm.WASMExtensioner
-	PipelineOptions []pipeline.PipelineOptioner
+	MaximumConcurrentRequests uint64
+	WASMExtensions            wasm.WASMExtensioner
 
-	RequestStats bool
-	Tracing      bool
+	Tracing bool
 }
 
 type Tier2App struct {
 	*shutter.Shutter
 	config  *Tier2Config
+	modules *Tier2Modules
 	logger  *zap.Logger
 	isReady *atomic.Bool
 }
 
-func NewTier2(logger *zap.Logger, config *Tier2Config) *Tier2App {
+type Tier2Modules struct {
+	CheckPendingShutDown func() bool
+}
+
+func NewTier2(logger *zap.Logger, config *Tier2Config, modules *Tier2Modules) *Tier2App {
 	return &Tier2App{
 		Shutter: shutter.New(),
 		config:  config,
+		modules: modules,
 		logger:  logger,
 
 		isReady: atomic.NewBool(false),
@@ -59,42 +59,31 @@ func (a *Tier2App) Run() error {
 		return fmt.Errorf("invalid app config: %w", err)
 	}
 
-	mergedBlocksStore, err := dstore.NewDBinStore(a.config.MergedBlocksStoreURL)
-	if err != nil {
-		return fmt.Errorf("failed setting up block store from url %q: %w", a.config.MergedBlocksStoreURL, err)
-	}
-
-	stateStore, err := dstore.NewStore(a.config.StateStoreURL, "zst", "zstd", true)
-	if err != nil {
-		return fmt.Errorf("failed setting up state store from url %q: %w", a.config.StateStoreURL, err)
-	}
-
 	var opts []service.Option
-	for _, ext := range a.config.WASMExtensions {
-		opts = append(opts, service.WithWASMExtension(ext))
-	}
-
-	for _, opt := range a.config.PipelineOptions {
-		opts = append(opts, service.WithPipelineOptions(opt))
-	}
+	//for _, opt := range a.config.PipelineOptions {
+	//	opts = append(opts, service.WithPipelineOptions(opt))
+	//}
 
 	if a.config.Tracing {
 		opts = append(opts, service.WithModuleExecutionTracing())
 	}
 
-	if a.config.RequestStats {
-		opts = append(opts, service.WithRequestStats())
+	if a.config.MaximumConcurrentRequests > 0 {
+		opts = append(opts, service.WithMaxConcurrentRequests(a.config.MaximumConcurrentRequests))
+	}
+	opts = append(opts, service.WithReadinessFunc(a.setReadiness))
+
+	if a.config.WASMExtensions != nil {
+		opts = append(opts, service.WithWASMExtensioner(a.config.WASMExtensions))
 	}
 
-	svc := service.NewTier2(
+	svc, err := service.NewTier2(
 		a.logger,
-		mergedBlocksStore,
-		stateStore,
-		a.config.StateStoreDefaultTag,
-		a.config.StateBundleSize,
-		a.config.BlockType,
 		opts...,
 	)
+	if err != nil {
+		return err
+	}
 
 	// tier2 always trusts the headers sent from tier1
 	trustAuth, err := dauth.New("trust://", a.logger)
@@ -102,9 +91,12 @@ func (a *Tier2App) Run() error {
 		return fmt.Errorf("failed to setup trust authenticator: %w", err)
 	}
 
+	a.OnTerminating(func(_ error) { metrics.AppReadinessTier2.SetNotReady() })
+
 	go func() {
 		a.logger.Info("launching gRPC server")
-		a.isReady.CAS(false, true)
+		a.isReady.CompareAndSwap(false, true)
+		metrics.AppReadinessTier2.SetReady()
 
 		err := service.ListenTier2(a.config.GRPCListenAddr, a.config.ServiceDiscoveryURL, svc, trustAuth, a.logger, a.HealthCheck)
 		a.Shutdown(err)
@@ -124,7 +116,15 @@ func (a *Tier2App) IsReady(ctx context.Context) bool {
 		return false
 	}
 
+	if a.modules.CheckPendingShutDown != nil && a.modules.CheckPendingShutDown() {
+		return false
+	}
+
 	return a.isReady.Load()
+}
+
+func (a *Tier2App) setReadiness(ready bool) {
+	a.isReady.Store(ready)
 }
 
 // Validate inspects itself to determine if the current config is valid according to

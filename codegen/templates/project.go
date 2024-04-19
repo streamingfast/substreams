@@ -1,6 +1,9 @@
 package templates
 
-import "text/template"
+import (
+	"strings"
+	"text/template"
+)
 
 type Project interface {
 	Render() (map[string][]byte, error)
@@ -16,4 +19,7 @@ var ProjectGeneratorFuncs = template.FuncMap{
 	"add": func(left int, right int) int {
 		return left + right
 	},
+	"sanitizeProtoFieldName": sanitizeProtoFieldName,
+	"toUpper":                strings.ToUpper,
+	"capitalizeFirst":        strings.Title,
 }

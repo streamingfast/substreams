@@ -18,6 +18,7 @@ type RequestDetails struct {
 	ResolvedCursor        string
 
 	LinearHandoffBlockNum uint64
+	LinearGateBlockNum    uint64
 	StopBlockNum          uint64
 	MaxParallelJobs       uint64
 	CacheTag              string
@@ -38,10 +39,6 @@ func (d *RequestDetails) IsOutputModule(modName string) bool {
 
 func (d *RequestDetails) ShouldReturnWrittenPartials(modName string) bool {
 	return d.IsTier2Request && d.IsOutputModule(modName)
-}
-
-func (d *RequestDetails) ShouldReturnProgressMessages() bool {
-	return d.IsTier2Request
 }
 
 func (d *RequestDetails) ShouldStreamCachedOutputs() bool {

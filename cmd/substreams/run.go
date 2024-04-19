@@ -3,13 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
-	"google.golang.org/grpc/metadata"
 	"io"
-	"strconv"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
+	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -17,11 +15,14 @@ import (
 	"github.com/streamingfast/substreams/tools/test"
 	"github.com/streamingfast/substreams/tui"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/metadata"
 )
 
 func init() {
-	runCmd.Flags().StringP("substreams-endpoint", "e", "mainnet.eth.streamingfast.io:443", "Substreams gRPC endpoint")
+	runCmd.Flags().StringP("substreams-endpoint", "e", "", "Substreams gRPC endpoint. If empty, will be replaced by the SUBSTREAMS_ENDPOINT_{network_name} environment variable, where `network_name` is determined from the substreams manifest. Some network names have default endpoints.")
 	runCmd.Flags().String("substreams-api-token-envvar", "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token")
+	runCmd.Flags().String("substreams-api-key-envvar", "SUBSTREAMS_API_KEY", "Name of variable containing Substreams Api Key")
+	runCmd.Flags().String("network", "", "Specify the network to use for params and initialBlocks, overriding the 'network' field in the substreams package")
 	runCmd.Flags().StringP("start-block", "s", "", "Start block to stream from. If empty, will be replaced by initialBlock of the first module you are streaming. If negative, will be resolved by the server relative to the chain head")
 	runCmd.Flags().StringP("cursor", "c", "", "Cursor to stream from. Leave blank for no cursor")
 	runCmd.Flags().StringP("stop-block", "t", "0", "Stop block to end stream at, exclusively. If the start-block is positive, a '+' prefix can indicate 'relative to start-block'")
@@ -33,6 +34,7 @@ func init() {
 	runCmd.Flags().StringSlice("debug-modules-output", nil, "List of modules from which to print outputs, deltas and logs (Unavailable in Production Mode)")
 	runCmd.Flags().StringSliceP("header", "H", nil, "Additional headers to be sent in the substreams request")
 	runCmd.Flags().Bool("production-mode", false, "Enable Production Mode, with high-speed parallel processing")
+	runCmd.Flags().Bool("skip-package-validation", false, "Do not perform any validation when reading substreams package")
 	runCmd.Flags().StringArrayP("params", "p", nil, "Set a params for parameterizable modules. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
 	runCmd.Flags().String("test-file", "", "runs a test file")
 	runCmd.Flags().Bool("test-verbose", false, "print out all the results")
@@ -59,6 +61,11 @@ func runRun(cmd *cobra.Command, args []string) error {
 	var manifestPath, outputModule string
 	if len(args) == 1 {
 		outputModule = args[0]
+
+		// Check common error where manifest is provided by module name is missing
+		if manifest.IsLikelyManifestInput(outputModule) {
+			return fmt.Errorf("missing <module_name> argument, check 'substreams run --help' for more information")
+		}
 	} else {
 		manifestPath = args[0]
 		outputModule = args[1]
@@ -66,18 +73,35 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	outputMode := mustGetString(cmd, "output")
 
-	manifestReader, err := manifest.NewReader(manifestPath)
+	network := sflags.MustGetString(cmd, "network")
+	paramsString := sflags.MustGetStringArray(cmd, "params")
+	params, err := manifest.ParseParams(paramsString)
+	if err != nil {
+		return fmt.Errorf("parsing params: %w", err)
+	}
+
+	readerOptions := []manifest.Option{
+		manifest.WithOverrideOutputModule(outputModule),
+		manifest.WithOverrideNetwork(network),
+		manifest.WithParams(params),
+	}
+	if sflags.MustGetBool(cmd, "skip-package-validation") {
+		readerOptions = append(readerOptions, manifest.SkipPackageValidationReader())
+	}
+
+	manifestReader, err := manifest.NewReader(manifestPath, readerOptions...)
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
 
-	pkg, err := manifestReader.Read()
+	pkg, graph, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
-	if err := manifest.ApplyParams(mustGetStringArray(cmd, "params"), pkg); err != nil {
-		return err
+	endpoint, err := manifest.ExtractNetworkEndpoint(pkg.Network, mustGetString(cmd, "substreams-endpoint"), zlog)
+	if err != nil {
+		return fmt.Errorf("extracting endpoint: %w", err)
 	}
 
 	msgDescs, err := manifest.BuildMessageDescriptors(pkg)
@@ -103,11 +127,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	debugModulesInitialSnapshot := mustGetStringSlice(cmd, "debug-modules-initial-snapshot")
 
-	graph, err := manifest.NewModuleGraph(pkg.Modules.Modules)
-	if err != nil {
-		return fmt.Errorf("creating module graph: %w", err)
-	}
-
 	startBlock, readFromModule, err := readStartBlockFlag(cmd, "start-block")
 	if err != nil {
 		return fmt.Errorf("stop block: %w", err)
@@ -121,27 +140,31 @@ func runRun(cmd *cobra.Command, args []string) error {
 		startBlock = int64(sb)
 	}
 
+	authToken, authType := tools.GetAuth(cmd, "substreams-api-key-envvar", "substreams-api-token-envvar")
 	substreamsClientConfig := client.NewSubstreamsClientConfig(
-		mustGetString(cmd, "substreams-endpoint"),
-		tools.ReadAPIToken(cmd, "substreams-api-token-envvar"),
+		endpoint,
+		authToken,
+		authType,
 		mustGetBool(cmd, "insecure"),
 		mustGetBool(cmd, "plaintext"),
 	)
 
-	ssClient, connClose, callOpts, err := client.NewSubstreamsClient(substreamsClientConfig)
+	ssClient, connClose, callOpts, headers, err := client.NewSubstreamsClient(substreamsClientConfig)
 	if err != nil {
 		return fmt.Errorf("substreams client setup: %w", err)
 	}
 	defer connClose()
 
-	stopBlock, err := readStopBlockFlag(cmd, startBlock, "stop-block")
+	cursorStr := mustGetString(cmd, "cursor")
+
+	stopBlock, err := readStopBlockFlag(cmd, startBlock, "stop-block", cursorStr != "")
 	if err != nil {
 		return fmt.Errorf("stop block: %w", err)
 	}
 
 	req := &pbsubstreamsrpc.Request{
 		StartBlockNum:                       startBlock,
-		StartCursor:                         mustGetString(cmd, "cursor"),
+		StartCursor:                         cursorStr,
 		StopBlockNum:                        stopBlock,
 		FinalBlocksOnly:                     mustGetBool(cmd, "final-blocks-only"),
 		Modules:                             pkg.Modules,
@@ -174,6 +197,10 @@ func runRun(cmd *cobra.Command, args []string) error {
 	})
 	defer cancel()
 
+	// add additional authorization headers
+	if headers.IsSet() {
+		streamCtx = metadata.AppendToOutgoingContext(streamCtx, headers.ToArray()...)
+	}
 	//parse additional-headers flag
 	additionalHeaders := mustGetStringSlice(cmd, "header")
 	if additionalHeaders != nil {
@@ -203,6 +230,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			if err == io.EOF {
 				ui.Cancel()
+				fmt.Println("Total Read Bytes (server-side consumption):", ui.TotalReadBytes)
 				fmt.Println("all done")
 				if testRunner != nil {
 					testRunner.LogResults()
@@ -220,48 +248,4 @@ func runRun(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	}
-}
-
-func readStartBlockFlag(cmd *cobra.Command, flagName string) (int64, bool, error) {
-	val, err := cmd.Flags().GetString(flagName)
-	if err != nil {
-		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
-	}
-	if val == "" {
-		return 0, true, nil
-	}
-
-	startBlock, err := strconv.ParseInt(val, 10, 64)
-	if err != nil {
-		return 0, false, fmt.Errorf("start block is invalid: %w", err)
-	}
-
-	return startBlock, false, nil
-}
-
-func readStopBlockFlag(cmd *cobra.Command, startBlock int64, flagName string) (uint64, error) {
-	val, err := cmd.Flags().GetString(flagName)
-	if err != nil {
-		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
-	}
-
-	isRelative := strings.HasPrefix(val, "+")
-	if isRelative {
-		if startBlock < 0 {
-			return 0, fmt.Errorf("relative end block is supported only with an absolute start block")
-		}
-
-		val = strings.TrimPrefix(val, "+")
-	}
-
-	endBlock, err := strconv.ParseUint(val, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("end block is invalid: %w", err)
-	}
-
-	if isRelative {
-		return uint64(startBlock) + endBlock, nil
-	}
-
-	return endBlock, nil
 }

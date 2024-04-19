@@ -2,7 +2,6 @@ package outputmodules
 
 import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/utils"
 )
 
 func TestNew() *Graph {
@@ -15,10 +14,10 @@ func TestNew() *Graph {
 
 func TestGraphStagedModules(initialBlock1, ib2, ib3, ib4, ib5 uint64) *Graph {
 	lowest := initialBlock1
-	lowest = utils.MinOf(lowest, ib2)
-	lowest = utils.MinOf(lowest, ib3)
-	lowest = utils.MinOf(lowest, ib4)
-	lowest = utils.MinOf(lowest, ib5)
+	lowest = min(lowest, ib2)
+	lowest = min(lowest, ib3)
+	lowest = min(lowest, ib4)
+	lowest = min(lowest, ib5)
 	return &Graph{
 		lowestInitBlock: lowest,
 		stagedUsedModules: ExecutionStages{

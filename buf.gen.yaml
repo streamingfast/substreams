@@ -13,6 +13,6 @@ plugins:
     opt:
       - paths=source_relative
       - require_unimplemented_servers=false
-  - name: connect-go
+  - plugin: buf.build/connectrpc/go:v1.15.0
     out: pb
     opt: paths=source_relative

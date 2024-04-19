@@ -3,7 +3,7 @@ package store
 import (
 	"fmt"
 
-	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 func (b *baseStore) GetFirst(key string) ([]byte, bool) {
@@ -13,13 +13,13 @@ func (b *baseStore) GetFirst(key string) ([]byte, bool) {
 		}
 
 		switch delta.Operation {
-		case pbssinternal.StoreDelta_DELETE, pbssinternal.StoreDelta_UPDATE:
+		case pbsubstreams.StoreDelta_DELETE, pbsubstreams.StoreDelta_UPDATE:
 			return delta.OldValue, true
-		case pbssinternal.StoreDelta_CREATE:
+		case pbsubstreams.StoreDelta_CREATE:
 			return nil, false
 		default:
 			// WARN: is that legit? what if some upstream stream is broken? can we trust all those streams?
-			panic(fmt.Sprintf("invalid value %q for pbssinternal.StoreDelta::Op for key %q", delta.Operation.String(), delta.Key))
+			panic(fmt.Sprintf("invalid value %q for pbsubstreams.StoreDelta::Op for key %q", delta.Operation.String(), delta.Key))
 		}
 
 	}
@@ -35,13 +35,13 @@ func (b *baseStore) HasFirst(key string) bool {
 		}
 
 		switch delta.Operation {
-		case pbssinternal.StoreDelta_DELETE, pbssinternal.StoreDelta_UPDATE:
+		case pbsubstreams.StoreDelta_DELETE, pbsubstreams.StoreDelta_UPDATE:
 			return true
-		case pbssinternal.StoreDelta_CREATE:
+		case pbsubstreams.StoreDelta_CREATE:
 			return false
 		default:
 			// WARN: is that legit? what if some upstream stream is broken? can we trust all those streams?
-			panic(fmt.Sprintf("invalid value %q for pbssinternal.StoreDelta::Op for key %q", delta.Operation.String(), delta.Key))
+			panic(fmt.Sprintf("invalid value %q for pbsubstreams.StoreDelta::Op for key %q", delta.Operation.String(), delta.Key))
 		}
 
 	}
@@ -58,12 +58,12 @@ func (b *baseStore) GetLast(key string) ([]byte, bool) {
 		}
 
 		switch delta.Operation {
-		case pbssinternal.StoreDelta_DELETE:
+		case pbsubstreams.StoreDelta_DELETE:
 			return nil, false
-		case pbssinternal.StoreDelta_CREATE, pbssinternal.StoreDelta_UPDATE:
+		case pbsubstreams.StoreDelta_CREATE, pbsubstreams.StoreDelta_UPDATE:
 			return delta.NewValue, true
 		default:
-			panic(fmt.Sprintf("invalid value %q for pbssinternal.StoreDelta::Op for key %q", delta.Operation.String(), delta.Key))
+			panic(fmt.Sprintf("invalid value %q for pbsubstreams.StoreDelta::Op for key %q", delta.Operation.String(), delta.Key))
 		}
 	}
 
@@ -79,12 +79,12 @@ func (b *baseStore) HasLast(key string) bool {
 		}
 
 		switch delta.Operation {
-		case pbssinternal.StoreDelta_DELETE:
+		case pbsubstreams.StoreDelta_DELETE:
 			return false
-		case pbssinternal.StoreDelta_CREATE, pbssinternal.StoreDelta_UPDATE:
+		case pbsubstreams.StoreDelta_CREATE, pbsubstreams.StoreDelta_UPDATE:
 			return true
 		default:
-			panic(fmt.Sprintf("invalid value %q for pbssinternal.StoreDelta::Op for key %q", delta.Operation.String(), delta.Key))
+			panic(fmt.Sprintf("invalid value %q for pbsubstreams.StoreDelta::Op for key %q", delta.Operation.String(), delta.Key))
 		}
 	}
 
@@ -106,15 +106,15 @@ func (b *baseStore) GetAt(ord uint64, key string) (out []byte, found bool) {
 		}
 
 		switch delta.Operation {
-		case pbssinternal.StoreDelta_DELETE, pbssinternal.StoreDelta_UPDATE:
+		case pbsubstreams.StoreDelta_DELETE, pbsubstreams.StoreDelta_UPDATE:
 			out = delta.OldValue
 			found = true
-		case pbssinternal.StoreDelta_CREATE:
+		case pbsubstreams.StoreDelta_CREATE:
 			out = nil
 			found = false
 		default:
 			// WARN: is that legit? what if some upstream stream is broken? can we trust all those streams?
-			panic(fmt.Sprintf("invalid value %q for pbssinternal.StateDelta::Op for key %q", delta.Operation, delta.Key))
+			panic(fmt.Sprintf("invalid value %q for pbsubstreams.StateDelta::Op for key %q", delta.Operation, delta.Key))
 		}
 	}
 	return
@@ -135,13 +135,13 @@ func (b *baseStore) HasAt(ord uint64, key string) bool {
 		}
 
 		switch delta.Operation {
-		case pbssinternal.StoreDelta_DELETE, pbssinternal.StoreDelta_UPDATE:
+		case pbsubstreams.StoreDelta_DELETE, pbsubstreams.StoreDelta_UPDATE:
 			found = true
-		case pbssinternal.StoreDelta_CREATE:
+		case pbsubstreams.StoreDelta_CREATE:
 			found = false
 		default:
 			// WARN: is that legit? what if some upstream stream is broken? can we trust all those streams?
-			panic(fmt.Sprintf("invalid value %q for pbssinternal.StateDelta::Op for key %q", delta.Operation, delta.Key))
+			panic(fmt.Sprintf("invalid value %q for pbsubstreams.StateDelta::Op for key %q", delta.Operation, delta.Key))
 		}
 	}
 

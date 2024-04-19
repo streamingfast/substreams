@@ -3,7 +3,6 @@ package codegen
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -71,13 +70,13 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package, showBufContent
 			fmt.Println("---")
 		}
 
-		if err := ioutil.WriteFile("buf.gen.yaml", []byte(content), 0644); err != nil {
+		if err := os.WriteFile("buf.gen.yaml", []byte(content), 0644); err != nil {
 			return fmt.Errorf("error writing buf.gen.yaml: %w", err)
 		}
-		defer func() {
-			// Too bad if there is an error, nothing we can do
-			_ = os.Remove("buf.gen.yaml")
-		}()
+		//defer func() {
+		//	// Too bad if there is an error, nothing we can do
+		//	_ = os.Remove("buf.gen.yaml")
+		//}()
 	}
 
 	cmdArgs := []string{
@@ -93,6 +92,12 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package, showBufContent
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	if err := c.Run(); err != nil {
+		if strings.Contains(err.Error(), "not authenticated") {
+			return fmt.Errorf("error executing 'buf':: %w. Make sure that you don't have expired credentials in $HOME/.netrc (You do not need to be authenticated, but you cannot have wrong or expired credentials)", err)
+		}
+		if strings.Contains(err.Error(), "not found") {
+			return fmt.Errorf("error executing 'buf':: %w. Make sure that you have the 'buf' CLI installed: https://buf.build/product/cli", err)
+		}
 		return fmt.Errorf("error executing 'buf':: %w", err)
 	}
 

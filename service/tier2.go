@@ -335,8 +335,8 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	// type executionConfig struct{
 	// 	runExecution bool
 	//  produceDownstreamOutputs bool
-	//  produceSnapshotOutputs bool
-	//  produceEventOutputs bool
+	//  produceSnapshotOutputs bool --> we need a writer
+	//  produceEventOutputs bool --> we need a writer
 	//  blockFilter BlockFilter
 	// }
 
@@ -355,7 +355,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 
 	// * execute it for real ?
 	// * produce outputs for the next modules ? (store: deltas, map: outputs, index: keys)
-	//     --> downstreamOutput() -> goes into the cache for next module to read (store: kvdelta, mapper: outputs, index: keys)
+	//     --> RunModule() returns the moduleOutput that goes into the cache for next module to read (store: kvdelta, mapper: outputs, index: keys)
 	//   if we don't execute a required module, it probably already has its outputs in the downstreamOutput cache
 
 	// * produce outputs to write in the cache store

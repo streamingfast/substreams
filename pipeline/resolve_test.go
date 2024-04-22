@@ -241,8 +241,8 @@ func TestBuildRequestDetails(t *testing.T) {
 		100,
 	)
 	require.NoError(t, err)
-	assert.Equal(t, 10, int(req.ResolvedStartBlockNum))
-	assert.Equal(t, 10, int(req.LinearHandoffBlockNum))
+	assert.Equal(t, 10, int(req.ResolvedStartBlockNum), "resolved start block")
+	assert.Equal(t, 0, int(req.LinearHandoffBlockNum), "linear handoff blocknum")
 
 	req, _, err = BuildRequestDetails(
 		context.Background(),
@@ -263,5 +263,5 @@ func TestBuildRequestDetails(t *testing.T) {
 	)
 	require.NoError(t, err)
 	assert.Equal(t, 10, int(req.ResolvedStartBlockNum))
-	assert.Equal(t, 999, int(req.LinearHandoffBlockNum))
+	assert.Equal(t, 900, int(req.LinearHandoffBlockNum))
 }

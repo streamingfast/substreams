@@ -10,6 +10,7 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStoreSetMaxBigInt(t *testing.T) {
@@ -59,6 +60,7 @@ func TestStoreSetMaxBigInt(t *testing.T) {
 			initTestStore(test.store, test.key, test.existingValue) // b.kv = []{}
 
 			test.store.SetMaxBigInt(0, test.key, test.value)
+			require.NoError(t, test.store.Flush())
 			actual, found := test.store.GetAt(0, test.key)
 			if !found {
 				t.Errorf("value not found")
@@ -124,6 +126,7 @@ func TestStoreSetMaxInt64(t *testing.T) {
 			initTestStore(test.store, test.key, test.existingValue)
 
 			test.store.SetMaxInt64(0, test.key, test.value)
+			require.NoError(t, test.store.Flush())
 			actual, found := test.store.GetAt(0, test.key)
 			if !found {
 				t.Errorf("value not found")
@@ -190,6 +193,7 @@ func TestStoreSetMaxFloat64(t *testing.T) {
 			initTestStore(test.store, test.key, test.existingValue)
 
 			test.store.SetMaxFloat64(0, test.key, test.value)
+			require.NoError(t, test.store.Flush())
 			actual, found := test.store.GetAt(0, test.key)
 			if !found {
 				t.Errorf("value not found")
@@ -251,6 +255,7 @@ func TestStoreSetMaxBigFloat(t *testing.T) {
 			initTestStore(test.store, test.key, test.existingValue)
 
 			test.store.SetMaxBigDecimal(0, test.key, test.value)
+			require.NoError(t, test.store.Flush())
 			actual, found := test.store.GetAt(0, test.key)
 			if !found {
 				t.Errorf("value not found")

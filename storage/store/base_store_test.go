@@ -17,6 +17,7 @@ func TestStore(t *testing.T) {
 	s.Set(0, "1", "val1")
 	s.Set(1, "1", "val2")
 	s.Set(3, "1", "val3")
+	require.NoError(t, s.Flush())
 	s.Reset()
 	s.Set(0, "1", "val4")
 	s.Set(1, "1", "val5")
@@ -26,6 +27,7 @@ func TestStore(t *testing.T) {
 	s.Set(7, "3", "bar")
 	s.DeletePrefix(8, "3")
 	s.Set(9, "4", "baz")
+	require.NoError(t, s.Flush())
 
 	var found bool
 

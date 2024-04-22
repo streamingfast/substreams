@@ -45,6 +45,9 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 	for _, prefix := range kvPartialStore.DeletedPrefixes {
 		b.DeletePrefix(kvPartialStore.lastOrdinal, prefix)
 	}
+	if err := b.Flush(); err != nil {
+		return err
+	}
 	if len(kvPartialStore.DeletedPrefixes) > 0 {
 		b.logger.Debug("merging: applied delete prefixes", zap.Duration("duration", time.Since(partialKvTime)))
 	}

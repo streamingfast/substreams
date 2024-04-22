@@ -5,6 +5,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/streamingfast/dstore"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/require"
 )
@@ -31,6 +32,7 @@ func newTestBaseStore(
 	require.NoError(t, err)
 	return &baseStore{
 		Config:     config,
+		pendingOps: &pbssinternal.Operations{},
 		kv:         make(map[string][]byte),
 		logger:     zap.NewNop(),
 		marshaller: &marshaller.Binary{},

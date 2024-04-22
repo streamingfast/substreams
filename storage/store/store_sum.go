@@ -5,9 +5,19 @@ import (
 	"strconv"
 
 	"github.com/shopspring/decimal"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 )
 
 func (b *baseStore) SumBigInt(ord uint64, key string, value *big.Int) {
+	b.pendingOps.Add(&pbssinternal.Operation{
+		Type:  pbssinternal.Operation_SUM_BIG_INT,
+		Ord:   ord,
+		Key:   key,
+		Value: bigIntToBytes(value),
+	})
+}
+
+func (b *baseStore) sumBigInt(ord uint64, key string, value *big.Int) {
 	sum := new(big.Int)
 	val, found := b.GetAt(ord, key)
 	if !found {
@@ -24,6 +34,15 @@ func (b *baseStore) SumBigInt(ord uint64, key string, value *big.Int) {
 }
 
 func (b *baseStore) SumInt64(ord uint64, key string, value int64) {
+	b.pendingOps.Add(&pbssinternal.Operation{
+		Type:  pbssinternal.Operation_SUM_INT64,
+		Ord:   ord,
+		Key:   key,
+		Value: int64ToBytes(value),
+	})
+}
+
+func (b *baseStore) sumInt64(ord uint64, key string, value int64) {
 	var sum int64
 	val, found := b.GetAt(ord, key)
 	if !found {
@@ -40,6 +59,15 @@ func (b *baseStore) SumInt64(ord uint64, key string, value int64) {
 }
 
 func (b *baseStore) SumFloat64(ord uint64, key string, value float64) {
+	b.pendingOps.Add(&pbssinternal.Operation{
+		Type:  pbssinternal.Operation_SUM_FLOAT64,
+		Ord:   ord,
+		Key:   key,
+		Value: float64ToBytes(value),
+	})
+}
+
+func (b *baseStore) sumFloat64(ord uint64, key string, value float64) {
 	var sum float64
 	val, found := b.GetAt(ord, key)
 	if !found {
@@ -56,6 +84,15 @@ func (b *baseStore) SumFloat64(ord uint64, key string, value float64) {
 }
 
 func (b *baseStore) SumBigDecimal(ord uint64, key string, value decimal.Decimal) {
+	b.pendingOps.Add(&pbssinternal.Operation{
+		Type:  pbssinternal.Operation_SUM_BIG_DECIMAL,
+		Ord:   ord,
+		Key:   key,
+		Value: bigDecimalToBytes(value),
+	})
+}
+
+func (b *baseStore) sumBigDecimal(ord uint64, key string, value decimal.Decimal) {
 	v, found := b.GetAt(ord, key)
 	if !found {
 		b.set(ord, key, []byte(value.String()))

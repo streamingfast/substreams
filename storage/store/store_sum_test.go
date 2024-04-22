@@ -44,6 +44,7 @@ func TestStoreSumBigInt(t *testing.T) {
 			}
 
 			b.SumBigInt(0, test.key, test.value)
+			require.NoError(t, b.Flush())
 			actual, found := b.GetAt(0, test.key)
 			if !found {
 				t.Errorf("value not found")
@@ -89,6 +90,7 @@ func TestStoreSumInt64(t *testing.T) {
 			}
 
 			b.SumInt64(0, test.key, test.value)
+			require.NoError(t, b.Flush())
 			actual, found := b.GetAt(0, test.key)
 			if !found {
 				t.Errorf("value not found")
@@ -135,6 +137,7 @@ func TestStoreSumFloat64(t *testing.T) {
 			}
 
 			b.SumFloat64(0, test.key, test.value)
+			require.NoError(t, b.Flush())
 			actual, found := b.GetAt(0, test.key)
 			if !found {
 				t.Errorf("value not found")
@@ -180,6 +183,7 @@ func TestStoreSumBigFloat(t *testing.T) {
 			}
 
 			b.SumBigDecimal(0, test.key, test.value)
+			require.NoError(t, b.Flush())
 			actual, found := b.GetAt(0, test.key)
 			if !found {
 				t.Errorf("value not found")

@@ -9,6 +9,7 @@ import (
 	"github.com/shopspring/decimal"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStoreSetMinBigInt(t *testing.T) {
@@ -58,6 +59,7 @@ func TestStoreSetMinBigInt(t *testing.T) {
 			initTestStore(test.store, test.key, test.existingValue)
 
 			test.store.SetMinBigInt(0, test.key, test.value)
+			require.NoError(t, test.store.Flush())
 			actual, found := test.store.GetAt(0, test.key)
 			if !found {
 				t.Errorf("value not found")
@@ -123,6 +125,7 @@ func TestStoreSetMinInt64(t *testing.T) {
 			initTestStore(test.store, test.key, test.existingValue)
 
 			test.store.SetMinInt64(0, test.key, test.value)
+			require.NoError(t, test.store.Flush())
 			actual, found := test.store.GetAt(0, test.key)
 			if !found {
 				t.Errorf("value not found")
@@ -189,6 +192,7 @@ func TestStoreSetMinFloat64(t *testing.T) {
 			initTestStore(test.store, test.key, test.existingValue)
 
 			test.store.SetMinFloat64(0, test.key, test.value)
+			require.NoError(t, test.store.Flush())
 			actual, found := test.store.GetAt(0, test.key)
 			if !found {
 				t.Errorf("value not found")
@@ -250,6 +254,7 @@ func TestStoreSetMinBigFloat(t *testing.T) {
 			initTestStore(test.store, test.key, test.existingValue)
 
 			test.store.SetMinBigDecimal(0, test.key, test.value)
+			require.NoError(t, test.store.Flush())
 			actual, found := test.store.GetAt(0, test.key)
 			if !found {
 				t.Errorf("value not found")

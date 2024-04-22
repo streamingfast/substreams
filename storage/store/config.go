@@ -64,6 +64,7 @@ func NewConfig(
 func (c *Config) newBaseStore(logger *zap.Logger) *baseStore {
 	return &baseStore{
 		Config:     c,
+		pendingOps: &pbssinternal.Operations{},
 		kv:         make(map[string][]byte),
 		logger:     logger.Named("store").With(zap.String("store_name", c.name), zap.String("module_hash", c.moduleHash)),
 		marshaller: marshaller.Default(),
@@ -107,7 +108,6 @@ func (c *Config) ExistsPartialKV(ctx context.Context, from, to uint64) (bool, er
 func (c *Config) NewPartialKV(initialBlock uint64, logger *zap.Logger) *PartialKV {
 	return &PartialKV{
 		baseStore:    c.newBaseStore(logger),
-		operations:   &pbssinternal.Operations{},
 		initialBlock: initialBlock,
 		seen:         make(map[string]bool),
 	}

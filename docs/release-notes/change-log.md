@@ -15,6 +15,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * bump wazero execution to fix issue with certain substreams causing the server process to freeze
 
+### Changes
+
+* Allow unordered ordinals to be applied from the substreams (automatic ordering before flushing to stores)
+
 ### Add
 
 * add `substreams_tier1_worker_retry_counter` metric to count all worker errors returned by tier2

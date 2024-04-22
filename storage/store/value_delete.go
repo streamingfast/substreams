@@ -4,28 +4,19 @@ import (
 	"sort"
 	"strings"
 
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-//func (s *baseStore) Del(ord uint64, key string) {
-//	s.bumpOrdinal(ord)
-//
-//	val, found := s.GetLast(key)
-//	if found {
-//		delta := &pbsubstreams.StoreDelta{
-//			Operation: pbsubstreams.StoreDelta_DELETE,
-//			Ordinal:   ord,
-//			Key:       key,
-//			OldValue:  val,
-//			NewValue:  nil,
-//		}
-//		s.ApplyDelta(delta)
-//		s.deltas = append(s.deltas, delta)
-//	}
-//}
-
 func (b *baseStore) DeletePrefix(ord uint64, prefix string) {
-	b.bumpOrdinal(ord)
+	b.pendingOps.Add(&pbssinternal.Operation{
+		Type: pbssinternal.Operation_DELETE_PREFIX,
+		Ord:  ord,
+		Key:  prefix,
+	})
+}
+
+func (b *baseStore) deletePrefix(ord uint64, prefix string) {
 
 	var deltas []*pbsubstreams.StoreDelta
 	for key, val := range b.kv {

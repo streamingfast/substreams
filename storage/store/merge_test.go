@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
@@ -394,7 +395,8 @@ func newPartialStore(kv map[string][]byte, updatePolicy pbsubstreams.Module_Kind
 
 func newStore(kv map[string][]byte, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string) *FullKV {
 	b := &baseStore{
-		kv: kv,
+		kv:         kv,
+		pendingOps: &pbssinternal.Operations{},
 		Config: &Config{
 			updatePolicy: updatePolicy,
 			valueType:    valueType,

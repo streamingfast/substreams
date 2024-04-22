@@ -1,8 +1,21 @@
 package store
 
-import "fmt"
+import (
+	"fmt"
 
-func (b *baseStore) Append(ord uint64, key string, value []byte) error {
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+)
+
+func (b *baseStore) Append(ord uint64, key string, value []byte) {
+	b.pendingOps.Add(&pbssinternal.Operation{
+		Type:  pbssinternal.Operation_APPEND,
+		Ord:   ord,
+		Key:   key,
+		Value: cloneBytes(value),
+	})
+}
+
+func (b *baseStore) append(ord uint64, key string, value []byte) error {
 	var newVal []byte
 	oldVal, found := b.GetAt(ord, key)
 	if !found {

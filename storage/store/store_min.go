@@ -6,9 +6,19 @@ import (
 	"strconv"
 
 	"github.com/shopspring/decimal"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 )
 
 func (b *baseStore) SetMinBigInt(ord uint64, key string, value *big.Int) {
+	b.pendingOps.Add(&pbssinternal.Operation{
+		Type:  pbssinternal.Operation_SET_MIN_BIG_INT,
+		Ord:   ord,
+		Key:   key,
+		Value: bigIntToBytes(value),
+	})
+}
+
+func (b *baseStore) setMinBigInt(ord uint64, key string, value *big.Int) {
 	min := new(big.Int)
 	val, found := b.GetAt(ord, key)
 	if !found {
@@ -25,6 +35,15 @@ func (b *baseStore) SetMinBigInt(ord uint64, key string, value *big.Int) {
 }
 
 func (b *baseStore) SetMinInt64(ord uint64, key string, value int64) {
+	b.pendingOps.Add(&pbssinternal.Operation{
+		Type:  pbssinternal.Operation_SET_MIN_INT64,
+		Ord:   ord,
+		Key:   key,
+		Value: int64ToBytes(value),
+	})
+}
+
+func (b *baseStore) setMinInt64(ord uint64, key string, value int64) {
 	var min int64
 	val, found := b.GetAt(ord, key)
 	if !found {
@@ -41,6 +60,15 @@ func (b *baseStore) SetMinInt64(ord uint64, key string, value int64) {
 }
 
 func (b *baseStore) SetMinFloat64(ord uint64, key string, value float64) {
+	b.pendingOps.Add(&pbssinternal.Operation{
+		Type:  pbssinternal.Operation_SET_MIN_FLOAT64,
+		Ord:   ord,
+		Key:   key,
+		Value: float64ToBytes(value),
+	})
+}
+
+func (b *baseStore) setMinFloat64(ord uint64, key string, value float64) {
 	var min float64
 	val, found := b.GetAt(ord, key)
 	if !found {
@@ -58,6 +86,15 @@ func (b *baseStore) SetMinFloat64(ord uint64, key string, value float64) {
 }
 
 func (b *baseStore) SetMinBigDecimal(ord uint64, key string, value decimal.Decimal) {
+	b.pendingOps.Add(&pbssinternal.Operation{
+		Type:  pbssinternal.Operation_SET_MIN_BIG_DECIMAL,
+		Ord:   ord,
+		Key:   key,
+		Value: bigDecimalToBytes(value),
+	})
+}
+
+func (b *baseStore) setMinBigDecimal(ord uint64, key string, value decimal.Decimal) {
 	val, found := b.GetAt(ord, key)
 	if !found {
 		b.set(ord, key, []byte(value.String()))

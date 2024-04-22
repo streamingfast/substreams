@@ -4,23 +4,44 @@ import (
 	"fmt"
 	"strings"
 
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 func (b *baseStore) SetBytesIfNotExists(ord uint64, key string, value []byte) {
-	b.setIfNotExists(ord, key, value)
+	b.pendingOps.Add(&pbssinternal.Operation{
+		Type:  pbssinternal.Operation_SET_BYTES_IF_NOT_EXISTS,
+		Ord:   ord,
+		Key:   key,
+		Value: cloneBytes(value),
+	})
 }
 
 func (b *baseStore) SetIfNotExists(ord uint64, key string, value string) {
-	b.setIfNotExists(ord, key, []byte(value))
+	b.pendingOps.Add(&pbssinternal.Operation{
+		Type:  pbssinternal.Operation_SET_IF_NOT_EXISTS,
+		Ord:   ord,
+		Key:   key,
+		Value: cloneBytes([]byte(value)),
+	})
 }
 
 func (b *baseStore) SetBytes(ord uint64, key string, value []byte) {
-	b.set(ord, key, value)
+	b.pendingOps.Add(&pbssinternal.Operation{
+		Type:  pbssinternal.Operation_SET_BYTES,
+		Ord:   ord,
+		Key:   key,
+		Value: cloneBytes(value),
+	})
 }
 
 func (b *baseStore) Set(ord uint64, key string, value string) {
-	b.set(ord, key, []byte(value))
+	b.pendingOps.Add(&pbssinternal.Operation{
+		Type:  pbssinternal.Operation_SET,
+		Ord:   ord,
+		Key:   key,
+		Value: cloneBytes([]byte(value)),
+	})
 }
 
 func (b *baseStore) set(ord uint64, key string, value []byte) {
@@ -36,9 +57,6 @@ func (b *baseStore) set(ord uint64, key string, value []byte) {
 	if len(key) == 0 {
 		panic(fmt.Sprintf("invalid key"))
 	}
-
-	b.bumpOrdinal(ord)
-
 	cpValue := make([]byte, len(value))
 	copy(cpValue, value)
 
@@ -71,8 +89,6 @@ func (b *baseStore) setIfNotExists(ord uint64, key string, value []byte) {
 	if found {
 		return
 	}
-
-	b.bumpOrdinal(ord)
 
 	cpValue := make([]byte, len(value))
 	copy(cpValue, value)

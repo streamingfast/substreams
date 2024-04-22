@@ -3,9 +3,13 @@ package store
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
+	"math/big"
 
+	"github.com/shopspring/decimal"
 	"github.com/streamingfast/dmetering"
 
 	"github.com/streamingfast/derr"
@@ -51,4 +55,35 @@ func loadStore(ctx context.Context, store dstore.Store, filename string) (out []
 		return nil
 	})
 	return out, err
+}
+
+// apparently this is faster than append() method
+func cloneBytes(b []byte) []byte {
+	out := make([]byte, len(b))
+	copy(out, b)
+	return out
+}
+
+func bigIntToBytes(i *big.Int) []byte {
+	return []byte(i.String())
+}
+
+func float64ToBytes(f float64) []byte {
+	var buf [8]byte
+	binary.LittleEndian.PutUint64(buf[:], math.Float64bits(f))
+	return buf[:]
+}
+
+func int64ToBytes(i int64) []byte {
+	big := new(big.Int)
+	big.SetInt64(i)
+	return []byte(big.String())
+}
+
+func bigDecimalToBytes(d decimal.Decimal) []byte {
+	val, err := d.MarshalBinary()
+	if err != nil {
+		panic(err)
+	}
+	return val
 }

@@ -29,12 +29,7 @@ func (e *StoreModuleExecutor) Name() string   { return e.moduleName }
 func (e *StoreModuleExecutor) String() string { return e.Name() }
 
 func (e *StoreModuleExecutor) applyCachedOutput(value []byte) error {
-	if pkvs, ok := e.outputStore.(*store.PartialKV); ok {
-		return pkvs.ApplyOps(value)
-	}
-
-	fullkvs := e.outputStore.(*store.FullKV)
-	return fullkvs.ApplyOps(value)
+	return e.outputStore.ApplyOps(value)
 }
 
 func (e *StoreModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
@@ -54,6 +49,10 @@ func (e *StoreModuleExecutor) HasValidOutput() bool {
 }
 
 func (e *StoreModuleExecutor) wrapDeltas() ([]byte, *pbssinternal.ModuleOutput, error) {
+	if err := e.outputStore.Flush(); err != nil {
+		return nil, nil, err
+	}
+
 	deltas := &pbsubstreams.StoreDeltas{
 		StoreDeltas: e.outputStore.GetDeltas(),
 	}

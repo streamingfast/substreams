@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/streamingfast/dstore"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/storage/store/marshaller"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -26,6 +27,7 @@ func TestFullKV_Save_Load_Empty_MapNotNil(t *testing.T) {
 		baseStore: &baseStore{
 			kv: map[string][]byte{},
 
+			pendingOps: &pbssinternal.Operations{},
 			logger:     zap.NewNop(),
 			marshaller: marshaller.Default(),
 
@@ -46,6 +48,7 @@ func TestFullKV_Save_Load_Empty_MapNotNil(t *testing.T) {
 		baseStore: &baseStore{
 			kv: map[string][]byte{},
 
+			pendingOps: &pbssinternal.Operations{},
 			logger:     zap.NewNop(),
 			marshaller: marshaller.Default(),
 

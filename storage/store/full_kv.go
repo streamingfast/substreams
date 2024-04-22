@@ -6,6 +6,7 @@ import (
 
 	"go.uber.org/zap"
 
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/storage/store/marshaller"
 )
 
@@ -24,6 +25,7 @@ func (s *FullKV) Marshaller() marshaller.Marshaller {
 func (s *FullKV) DerivePartialStore(initialBlock uint64) *PartialKV {
 	b := &baseStore{
 		Config:     s.Config,
+		pendingOps: &pbssinternal.Operations{},
 		kv:         make(map[string][]byte),
 		logger:     s.logger,
 		marshaller: marshaller.Default(),
@@ -88,18 +90,6 @@ func (s *FullKV) Save(endBoundaryBlock uint64) (*FileInfo, *fileWriter, error) {
 	}
 
 	return file, fw, nil
-}
-
-func (s *FullKV) Reset() {
-	if tracer.Enabled() {
-		s.logger.Debug("flushing store", zap.Int("delta_count", len(s.deltas)), zap.Int("entry_count", len(s.kv)))
-	}
-	s.deltas = nil
-	s.lastOrdinal = 0
-}
-
-func (p *FullKV) ApplyOps(in []byte) error {
-	return applyOps(in, p.baseStore)
 }
 
 func (s *FullKV) String() string {

@@ -131,9 +131,7 @@ func (c *Call) DoSetIfNotExists(ord uint64, key string, value []byte) {
 func (c *Call) DoAppend(ord uint64, key string, value []byte) {
 	now := time.Now()
 	c.validateSimple("append", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, key)
-	if err := c.outputStore.Append(ord, key, value); err != nil {
-		c.ReturnError(fmt.Errorf("appending to store: %w", err))
-	}
+	c.outputStore.Append(ord, key, value)
 	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
 }
 func (c *Call) DoDeletePrefix(ord uint64, prefix string) {

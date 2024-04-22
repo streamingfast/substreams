@@ -14,6 +14,8 @@ type Store interface {
 	InitialBlock() uint64
 	SizeBytes() uint64
 
+	Flush() error
+
 	Loadable
 	Savable
 	Iterable
@@ -75,8 +77,10 @@ type Iterable interface {
 type DeltaAccessor interface {
 	SetDeltas([]*pbsubstreams.StoreDelta)
 	GetDeltas() []*pbsubstreams.StoreDelta
+	Flush() error
 	ApplyDeltasReverse(deltas []*pbsubstreams.StoreDelta)
 	ApplyDelta(delta *pbsubstreams.StoreDelta)
+	ApplyOps(in []byte) error
 }
 
 type Reader interface {
@@ -109,7 +113,7 @@ type ConditionalKeySetter interface {
 }
 
 type Appender interface {
-	Append(ord uint64, key string, value []byte) error
+	Append(ord uint64, key string, value []byte)
 }
 
 type Deleter interface {

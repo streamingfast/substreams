@@ -193,6 +193,7 @@ func testConfigMap(t *testing.T, configs []testStoreConfig) store2.ConfigMap {
 		if conf.writtenUpTo != 0 {
 			fullKV := newStore.NewFullKV(zap.NewNop())
 			fullKV.Set(0, "k", "v")
+			require.NoError(t, fullKV.Flush())
 			_, writer, err := fullKV.Save(conf.writtenUpTo)
 			require.NoError(t, err)
 			require.NoError(t, writer.Write(context.Background()))

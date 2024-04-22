@@ -27,7 +27,8 @@ func BuildRequestDetails(
 	request *pbsubstreamsrpc.Request,
 	getRecentFinalBlock getBlockFunc,
 	resolveCursor CursorResolver,
-	getHeadBlock getBlockFunc) (req *reqctx.RequestDetails, undoSignal *pbsubstreamsrpc.BlockUndoSignal, err error) {
+	getHeadBlock getBlockFunc,
+	segmentSize uint64) (req *reqctx.RequestDetails, undoSignal *pbsubstreamsrpc.BlockUndoSignal, err error) {
 	req = &reqctx.RequestDetails{
 		Modules:                             request.Modules,
 		OutputModule:                        request.OutputModule,
@@ -56,7 +57,7 @@ func BuildRequestDetails(
 		}
 	}
 
-	linearHandoff, err := computeLinearHandoffBlockNum(request.ProductionMode, req.ResolvedStartBlockNum, request.StopBlockNum, getRecentFinalBlock, moduleHasStatefulDependencies)
+	linearHandoff, err := computeLinearHandoffBlockNum(request.ProductionMode, req.ResolvedStartBlockNum, request.StopBlockNum, getRecentFinalBlock, moduleHasStatefulDependencies, segmentSize)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -92,19 +93,25 @@ func nextUniqueID() uint64 {
 	return uniqueRequestIDCounter.Add(1)
 }
 
-func computeLinearHandoffBlockNum(productionMode bool, startBlock, stopBlock uint64, getRecentFinalBlockFunc func() (uint64, error), stateRequired bool) (uint64, error) {
+func computeLinearHandoffBlockNum(productionMode bool, startBlock, stopBlock uint64, getRecentFinalBlockFunc func() (uint64, error), stateRequired bool, boundaryModulo uint64) (uint64, error) {
+	//get value of of next boundary after stopBlock
 	if productionMode {
-		maxHandoff, err := getRecentFinalBlockFunc()
+		nextBoundary := stopBlock - (stopBlock % boundaryModulo) + boundaryModulo
+
+		libHandoff, err := getRecentFinalBlockFunc()
 		if err != nil {
 			if stopBlock == 0 {
 				return 0, fmt.Errorf("cannot determine a recent finalized block: %w", err)
 			}
-			return stopBlock, nil
+			return nextBoundary, nil
 		}
-		if stopBlock == 0 {
-			return maxHandoff, nil
+		libHandoffBoundary := libHandoff - (libHandoff % boundaryModulo)
+
+		if stopBlock == 0 || libHandoff < stopBlock {
+			return libHandoffBoundary, nil
 		}
-		return min(stopBlock, maxHandoff), nil
+
+		return nextBoundary, nil
 	}
 
 	//if no state required, we don't need to ever back-process blocks. we can start flowing blocks right away from the start block
@@ -112,12 +119,15 @@ func computeLinearHandoffBlockNum(productionMode bool, startBlock, stopBlock uin
 		return startBlock, nil
 	}
 
-	maxHandoff, err := getRecentFinalBlockFunc()
-	if err != nil {
-		return startBlock, nil
-	}
+	prevBoundary := startBlock - (startBlock % boundaryModulo)
 
-	return min(startBlock, maxHandoff), nil
+	libHandoff, err := getRecentFinalBlockFunc()
+	if err != nil {
+		return prevBoundary, nil
+	}
+	libHandoffBoundary := libHandoff - (libHandoff % boundaryModulo)
+
+	return min(prevBoundary, libHandoffBoundary), nil
 }
 
 // resolveStartBlockNum will occasionally modify or remove the cursor inside the request

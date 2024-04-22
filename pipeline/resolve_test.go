@@ -172,8 +172,9 @@ func Test_resolveStartBlockNum(t *testing.T) {
 	}
 }
 
-func Test_computeLiveHandoffBlockNum(t *testing.T) {
+func Test_computeLinaerHandoffBlockNum(t *testing.T) {
 	tests := []struct {
+		name             string
 		liveHubAvailable bool
 		recentBlockNum   uint64
 		prodMode         bool
@@ -183,39 +184,23 @@ func Test_computeLiveHandoffBlockNum(t *testing.T) {
 		expectError      bool
 		stateRequired    bool
 	}{
-		// prod (start-block ignored)
-		{true, 100, true, 10, 0, 100, false, true},
-		{true, 100, true, 10, 150, 100, false, true},
-		{true, 100, true, 10, 50, 50, false, true},
-		{false, 0, true, 10, 50, 50, false, true},
-		{false, 0, true, 10, 0, 0, true, true},
+		// development mode
+		{"g1_start_stop_same_boundary", true, 500, false, 138, 142, 100, false, true},
+		{"g1_start_stop_same_boundary_livehub_fails", false, 500, false, 138, 142, 100, false, true},
+		{"g2_start_stop_across_boundary", true, 500, false, 138, 242, 100, false, true},
+		{"g2_start_stop_across_boundary_livehub_fails", true, 500, false, 138, 242, 100, false, true},
 
-		// prod (start-block ignored) (state not required)
-		{true, 100, true, 10, 0, 100, false, false},
-		{true, 100, true, 10, 150, 100, false, false},
-		{true, 100, true, 10, 50, 50, false, false},
-		{false, 0, true, 10, 50, 50, false, false},
-		{false, 0, true, 10, 0, 0, true, false},
-
-		// non-prod (stop-block ignored) (state required)
-		{true, 100, false, 10, 0, 10, false, true},
-		{true, 100, false, 10, 9999, 10, false, true},
-		{true, 100, false, 150, 0, 100, false, true},
-		{true, 100, false, 150, 9999, 100, false, true},
-		{false, 0, false, 150, 0, 150, false, true},
-		{false, 0, false, 150, 9999, 150, false, true},
-
-		// non-prod (stop-block ignored) (state not required)
-		{true, 100, false, 10, 0, 10, false, false},
-		{true, 100, false, 10, 9999, 10, false, false},
-		{true, 100, false, 150, 0, 150, false, false},
-		{true, 100, false, 150, 9999, 150, false, false},
-		{false, 0, false, 150, 0, 150, false, false},
-		{false, 0, false, 150, 9999, 150, false, false},
+		// production mode
+		{"g4_start_stop_same_boundary", true, 500, true, 138, 142, 200, false, true},
+		{"g5_start_stop_across_boundary", true, 500, true, 138, 242, 300, false, true},
+		{"g6_lib_between_start_and_stop", true, 342, true, 121, 498, 300, false, true},
+		{"g6_lib_between_start_and_stop_livehub_fails", false, 342, true, 121, 498, 500, false, true},
+		{"g7_stop_block_infinity", true, 342, true, 121, 0, 300, false, true},
+		{"g7_stop_block_infinity_livehub_fails", false, 342, true, 121, 0, 300, true, true},
 	}
 
 	for _, test := range tests {
-		t.Run("", func(t *testing.T) {
+		t.Run(test.name, func(t *testing.T) {
 			got, err := computeLinearHandoffBlockNum(
 				test.prodMode,
 				test.startBlockNum,
@@ -225,7 +210,7 @@ func Test_computeLiveHandoffBlockNum(t *testing.T) {
 						return 0, fmt.Errorf("live not available")
 					}
 					return test.recentBlockNum, nil
-				}, test.stateRequired)
+				}, test.stateRequired, 100)
 			if test.expectError {
 				assert.Error(t, err)
 			} else {
@@ -253,6 +238,7 @@ func TestBuildRequestDetails(t *testing.T) {
 			t.Error("should not pass here")
 			return 0, nil
 		},
+		100,
 	)
 	require.NoError(t, err)
 	assert.Equal(t, 10, int(req.ResolvedStartBlockNum))
@@ -273,6 +259,7 @@ func TestBuildRequestDetails(t *testing.T) {
 			t.Error("should not pass here")
 			return 0, nil
 		},
+		100,
 	)
 	require.NoError(t, err)
 	assert.Equal(t, 10, int(req.ResolvedStartBlockNum))

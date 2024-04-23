@@ -209,7 +209,6 @@ func TestOneStoreOneMap(t *testing.T) {
 				testStoreAddI64Hash + "/outputs/0000000010-0000000020.output",
 				testStoreAddI64Hash + "/states/0000000010-0000000001.kv", // store states
 				testStoreAddI64Hash + "/states/0000000020-0000000001.kv",
-				//				"states/0000000025-0000000020.partial", // produced, then deleted
 			},
 		},
 		{
@@ -224,19 +223,16 @@ func TestOneStoreOneMap(t *testing.T) {
 				testStoreAddI64Hash + "/outputs/0000000010-0000000020.output",
 				testStoreAddI64Hash + "/states/0000000010-0000000001.kv", // store states
 				testStoreAddI64Hash + "/states/0000000020-0000000001.kv",
-				// "states/0000000025-0000000020.partial", // produced, then deleted
-				//"states/0000000030-0000000001.kv", // Again, backprocess wouldn't save this one, nor does it need to.
 			},
 		},
 		{
 			name:                  "prod_mode_back_forward_to_lib",
 			startBlock:            25,
-			linearBlock:           27,
+			linearBlock:           20,
 			stopBlock:             29,
 			production:            true,
 			expectedResponseCount: 4,
 			expectFiles: []string{
-				assertTestStoreAddI64Hash + "/outputs/0000000020-0000000027.output",
 				testStoreAddI64Hash + "/outputs/0000000001-0000000010.output",
 				testStoreAddI64Hash + "/outputs/0000000010-0000000020.output",
 				testStoreAddI64Hash + "/states/0000000010-0000000001.kv",
@@ -246,77 +242,60 @@ func TestOneStoreOneMap(t *testing.T) {
 		{
 			name:                  "prod_mode_back_forward_to_stop",
 			startBlock:            25,
-			linearBlock:           29,
-			stopBlock:             29,
+			linearBlock:           30,
+			stopBlock:             30,
 			production:            true,
-			expectedResponseCount: 4,
+			expectedResponseCount: 5,
 			expectFiles: []string{
 				testStoreAddI64Hash + "/outputs/0000000001-0000000010.output", //store
-				testStoreAddI64Hash + "/outputs/0000000010-0000000020.output",
-				testStoreAddI64Hash + "/states/0000000010-0000000001.kv",
-				testStoreAddI64Hash + "/states/0000000020-0000000001.kv",
-				assertTestStoreAddI64Hash + "/outputs/0000000020-0000000029.output", // map
-			},
-		},
-		{
-			name:                  "prod_mode_back_forward_to_stop_passed_boundary",
-			startBlock:            25,
-			linearBlock:           38,
-			stopBlock:             38,
-			production:            true,
-			expectedResponseCount: 13,
-			expectFiles: []string{
-				testStoreAddI64Hash + "/outputs/0000000001-0000000010.output", // store
 				testStoreAddI64Hash + "/outputs/0000000010-0000000020.output",
 				testStoreAddI64Hash + "/outputs/0000000020-0000000030.output",
 				testStoreAddI64Hash + "/states/0000000010-0000000001.kv",
 				testStoreAddI64Hash + "/states/0000000020-0000000001.kv",
 				testStoreAddI64Hash + "/states/0000000030-0000000001.kv",
 				assertTestStoreAddI64Hash + "/outputs/0000000020-0000000030.output", // map
-				assertTestStoreAddI64Hash + "/outputs/0000000030-0000000038.output",
 			},
 		},
 		{
-			name:                  "prod_mode_start_before_linear_and_firstboundary",
-			startBlock:            7,
-			linearBlock:           8,
-			stopBlock:             9,
+			name:                  "prod_mode_back_forward_to_stop_passed_boundary",
+			startBlock:            25,
+			linearBlock:           40,
+			stopBlock:             41,
 			production:            true,
-			expectedResponseCount: 2,
+			expectedResponseCount: 16,
 			expectFiles: []string{
-				assertTestStoreAddI64Hash + "/outputs/0000000001-0000000008.output",
-			},
-		},
-		{
-			name:                  "prod_mode_start_before_linear_then_pass_firstboundary",
-			startBlock:            7,
-			linearBlock:           8,
-			stopBlock:             15,
-			production:            true,
-			expectedResponseCount: 8,
-			expectFiles: []string{
-				//"states/0000000010-0000000001.kv", // TODO: not sure why this would have been produced with the prior code..
-				assertTestStoreAddI64Hash + "/outputs/0000000001-0000000008.output",
+				testStoreAddI64Hash + "/outputs/0000000001-0000000010.output", // store
+				testStoreAddI64Hash + "/outputs/0000000010-0000000020.output",
+				testStoreAddI64Hash + "/outputs/0000000020-0000000030.output",
+				testStoreAddI64Hash + "/outputs/0000000030-0000000040.output",
+				testStoreAddI64Hash + "/states/0000000010-0000000001.kv",
+				testStoreAddI64Hash + "/states/0000000020-0000000001.kv",
+				testStoreAddI64Hash + "/states/0000000030-0000000001.kv",
+				testStoreAddI64Hash + "/states/0000000040-0000000001.kv",
+				assertTestStoreAddI64Hash + "/outputs/0000000020-0000000030.output", // map
+				assertTestStoreAddI64Hash + "/outputs/0000000030-0000000040.output",
 			},
 		},
 		{
 			name:        "prod_mode_partial_existing",
 			startBlock:  1,
-			linearBlock: 29,
-			stopBlock:   29,
+			linearBlock: 30,
+			stopBlock:   30,
 			production:  true,
 			preWork: func(t *testing.T, run *testRun, workerFactory work.WorkerFactory) {
 				partialPreWork(t, 1, 10, 0, run, workerFactory)
 			},
-			expectedResponseCount: 28,
+			expectedResponseCount: 29,
 			expectFiles: []string{
 				testStoreAddI64Hash + "/outputs/0000000001-0000000010.output",
 				testStoreAddI64Hash + "/outputs/0000000010-0000000020.output",
+				testStoreAddI64Hash + "/outputs/0000000020-0000000030.output",
 				testStoreAddI64Hash + "/states/0000000010-0000000001.kv",
 				testStoreAddI64Hash + "/states/0000000020-0000000001.kv",
+				testStoreAddI64Hash + "/states/0000000030-0000000001.kv",
 				assertTestStoreAddI64Hash + "/outputs/0000000001-0000000010.output",
 				assertTestStoreAddI64Hash + "/outputs/0000000010-0000000020.output",
-				assertTestStoreAddI64Hash + "/outputs/0000000020-0000000029.output",
+				assertTestStoreAddI64Hash + "/outputs/0000000020-0000000030.output",
 			},
 		},
 	}

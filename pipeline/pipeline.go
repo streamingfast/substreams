@@ -539,6 +539,9 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 					moduleExecutors = append(moduleExecutors, executor)
 
 				case *pbsubstreams.Module_KindBlockIndex_:
+					if indices := p.preexistingBlockIndices[module.Name]; indices != nil {
+						break // don't execute index modules that are useless
+					}
 					baseExecutor := exec.NewBaseExecutor(
 						ctx,
 						module.Name,

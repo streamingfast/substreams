@@ -66,17 +66,6 @@ type tier2ExecutionPlan struct {
 	// stages // layers // modules
 }
 
-/*
-	for _, block := range blocks {
-
-		for layer := range layeredModules {
-			wg.Add(1)
-			go run executeWASMModuleSequencially(layer, block)
-		}
-		wg.Wait()
-	}
-*/
-
 type ModuleExecutionConfig struct {
 	name       string
 	moduleHash string
@@ -313,10 +302,6 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("configuring stores: %w", err)
 	}
 
-	// FIXME implement this instead of GenearteBlockIndexWriters
-	//	indexConfigs, err := index.NewConfigMap(cacheStore, execGraph.UsedIndexesModulesUpToStage(int(request.Stage)), execGraph.ModuleHashes())
-
-	// 3. we don't have a index.Config
 	indexWriters, blockIndices, err := index.GenerateBlockIndexWriters(
 		ctx,
 		cacheStore,
@@ -330,49 +315,15 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("generating block index writers: %w", err)
 	}
 
-	// map[string]executionConfig
-	//
-	// type executionConfig struct{
-	// 	runExecution bool
-	//  produceDownstreamOutputs bool
-	//  produceSnapshotOutputs bool --> we need a writer
-	//  produceEventOutputs bool --> we need a writer
-	//  blockFilter BlockFilter
-	// }
-
-	// type BlockFilter {
-	//	 preexistingExecOuts map[uint64]struct{}
-	// }
-
-	//	bf := BlockFilter{}
-	//
-	//	bf.Apply(keys) // NOOP if preexistingExecOuts ...
-	//	if bf.ShouldSkip(block.Number) {
-	//		return
-	//	}
-
-	// for each module:
-
-	// * execute it for real ?
-	// * produce outputs for the next modules ? (store: deltas, map: outputs, index: keys)
-	//     --> RunModule() returns the moduleOutput that goes into the cache for next module to read (store: kvdelta, mapper: outputs, index: keys)
-	//   if we don't execute a required module, it probably already has its outputs in the downstreamOutput cache
-
-	// * produce outputs to write in the cache store
-	//     --> snapshotOutput() -> store: snapshot (full or partial!), mapper: nil, index: roaringBitmap
-	//      --> eventOutput()  -> store: kvops,  mapper: outputs, index: nil
-
-	// initialBlock (block at which we start executing that specific module, also used to determine the filenames of the outputs, ex: 00001012-10002000)
+	// types of exec outputs per module type:
+	//              downstream        files
+	//	store:         deltas         kvops
+	//  mapper:         same           same
+	//  index:          keys            --
 
 	stores := pipeline.NewStores(ctx, storeConfigs, request.SegmentSize, requestDetails.ResolvedStartBlockNum, stopBlock, true)
 	isCompleteRange := stopBlock%request.SegmentSize == 0
 
-	// 4. what defines the list of modules that should be executed ?? right now : only the presence of the existingExecOuts
-
-	// TODO: replace this with generation of an execution Config, that is initialized using the indexConfig, execOutputConfig and the storeConfig
-	//
-	// note all modules that are not in 'modulesRequiredToRun' are still iterated in 'pipeline.executeModules', but they will skip actual execution when they see that the cache provides the data
-	// This way, stores get updated at each block from the cached execouts without the actual execution of the module
 	modulesRequiredToRun, existingExecOuts, execOutWriters, err := evaluateModulesRequiredToRun(ctx, logger, execGraph, request.Stage, startBlock, stopBlock, isCompleteRange, request.OutputModule, execOutputConfigs, storeConfigs)
 	if err != nil {
 		return fmt.Errorf("evaluating required modules: %w", err)

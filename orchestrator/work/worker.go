@@ -165,6 +165,7 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *blo
 				zap.Strings("module_name", moduleNames),
 				zap.Duration("duration", timeTook),
 				zap.Float64("num_of_blocks_per_sec", float64(request.StopBlockNum-request.StartBlockNum)/timeTook.Seconds()),
+				zap.Error(err),
 			)
 			return MsgJobFailed{Unit: unit, Error: err}
 		}
@@ -175,7 +176,7 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *blo
 		}
 
 		timeTook := time.Since(startTime)
-		logger.Debug(
+		logger.Info(
 			"job completed",
 			zap.Object("unit", unit),
 			zap.Int("number_of_tries", retryIdx),

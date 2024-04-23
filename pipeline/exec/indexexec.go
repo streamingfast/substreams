@@ -29,13 +29,13 @@ func (i *IndexModuleExecutor) applyCachedOutput([]byte) error {
 	return nil
 }
 
-func (i *IndexModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
+func (i *IndexModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, outForFiles []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
 	_, span := reqctx.WithModuleExecutionSpan(ctx, "exec_index")
 	defer span.EndWithErr(&err)
 
 	var call *wasm.Call
 	if call, err = i.wasmCall(reader); err != nil {
-		return nil, nil, fmt.Errorf("maps wasm call: %w", err)
+		return nil, nil, nil, fmt.Errorf("maps wasm call: %w", err)
 	}
 
 	if call != nil {
@@ -44,10 +44,10 @@ func (i *IndexModuleExecutor) run(ctx context.Context, reader execout.ExecutionO
 
 	modOut, err := i.toModuleOutput(out)
 	if err != nil {
-		return nil, nil, fmt.Errorf("converting back to module output: %w", err)
+		return nil, nil, nil, fmt.Errorf("converting back to module output: %w", err)
 	}
 
-	return out, modOut, nil
+	return out, nil, modOut, nil // no output for files from an index module
 }
 
 func (i *IndexModuleExecutor) toModuleOutput(data []byte) (*pbssinternal.ModuleOutput, error) {
@@ -66,4 +66,7 @@ func (i *IndexModuleExecutor) toModuleOutput(data []byte) (*pbssinternal.ModuleO
 
 func (i *IndexModuleExecutor) HasValidOutput() bool {
 	return true
+}
+func (i *IndexModuleExecutor) HasOutputForFiles() bool {
+	return false
 }

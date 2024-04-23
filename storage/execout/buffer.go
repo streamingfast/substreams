@@ -13,9 +13,17 @@ import (
 
 // Buffer holds the values produced by modules and exchanged between them
 // as a sort of buffer.
+// Here are the types of exec outputs per module type:
+//
+//	               values         valuesForFileOutput
+//	---------------------------------------------------
+//	store:         deltas               kvops
+//	mapper:         data              same data
+//	index:          keys                 --
 type Buffer struct {
-	values map[string][]byte
-	clock  *pbsubstreams.Clock
+	values              map[string][]byte
+	valuesForFileOutput map[string][]byte
+	clock               *pbsubstreams.Clock
 }
 
 func (b *Buffer) Len() (out int) {
@@ -40,8 +48,9 @@ func NewBuffer(blockType string, block *pbbstream.Block, clock *pbsubstreams.Clo
 	}
 
 	return &Buffer{
-		clock:  clock,
-		values: values,
+		clock:               clock,
+		values:              values,
+		valuesForFileOutput: make(map[string][]byte),
 	}, nil
 }
 
@@ -59,5 +68,10 @@ func (i *Buffer) Get(moduleName string) (value []byte, cached bool, err error) {
 
 func (i *Buffer) Set(moduleName string, value []byte) (err error) {
 	i.values[moduleName] = value
+	return nil
+}
+
+func (i *Buffer) SetFileOutput(moduleName string, value []byte) (err error) {
+	i.valuesForFileOutput[moduleName] = value
 	return nil
 }

@@ -284,13 +284,11 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	if err != nil {
 		return fmt.Errorf("creating execution plan: %w", err)
 	}
-
-	stores := pipeline.NewStores(ctx, storeConfigs, request.SegmentSize, requestDetails.ResolvedStartBlockNum, stopBlock, true, executionPlan.StoresToWrite)
-
-	if len(executionPlan.RequiredModules) == 0 {
+	if executionPlan == nil || len(executionPlan.RequiredModules) == 0 {
 		logger.Info("no modules required to run, skipping")
 		return nil
 	}
+	stores := pipeline.NewStores(ctx, storeConfigs, request.SegmentSize, requestDetails.ResolvedStartBlockNum, stopBlock, true, executionPlan.StoresToWrite)
 
 	// this engine will keep the ExistingExecOuts to optimize the execution (for inputs from modules that skip execution)
 	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, executionPlan.ExecoutWriters, request.BlockType, executionPlan.ExistingExecOuts, executionPlan.IndexWriters)
@@ -647,7 +645,6 @@ func GetExecutionPlan(
 			}
 
 			existingIndices[name] = indexFile.Indices
-			break
 
 		case pbsubstreams.ModuleKindMap:
 			file, readErr := c.ReadFile(ctx, &block.Range{StartBlock: startBlock, ExclusiveEndBlock: stopBlock})

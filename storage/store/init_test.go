@@ -32,7 +32,7 @@ func newTestBaseStore(
 	require.NoError(t, err)
 	return &baseStore{
 		Config:     config,
-		pendingOps: &pbssinternal.Operations{},
+		kvOps:      &pbssinternal.Operations{},
 		kv:         make(map[string][]byte),
 		logger:     zap.NewNop(),
 		marshaller: &marshaller.Binary{},

@@ -32,7 +32,7 @@ func NewWriter(initialBlockBoundary, exclusiveEndBlock uint64, outputModule stri
 }
 
 func (w *Writer) Write(clock *pbsubstreams.Clock, buffer *Buffer) {
-	if val, found := buffer.values[w.outputModule]; found {
+	if val, found := buffer.valuesForFileOutput[w.outputModule]; found {
 		w.CurrentFile.SetItem(clock, val)
 	}
 }

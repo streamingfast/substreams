@@ -93,10 +93,13 @@ func nextUniqueID() uint64 {
 	return uniqueRequestIDCounter.Add(1)
 }
 
-func computeLinearHandoffBlockNum(productionMode bool, startBlock, stopBlock uint64, getRecentFinalBlockFunc func() (uint64, error), stateRequired bool, boundaryModulo uint64) (uint64, error) {
+func computeLinearHandoffBlockNum(productionMode bool, startBlock, stopBlock uint64, getRecentFinalBlockFunc func() (uint64, error), stateRequired bool, segmentSize uint64) (uint64, error) {
 	//get value of of next boundary after stopBlock
 	if productionMode {
-		nextBoundary := stopBlock - (stopBlock % boundaryModulo) + boundaryModulo
+		nextBoundary := stopBlock
+		if remainder := (stopBlock % segmentSize); remainder != 0 {
+			nextBoundary = nextBoundary - remainder + segmentSize
+		}
 
 		libHandoff, err := getRecentFinalBlockFunc()
 		if err != nil {
@@ -105,7 +108,7 @@ func computeLinearHandoffBlockNum(productionMode bool, startBlock, stopBlock uin
 			}
 			return nextBoundary, nil
 		}
-		libHandoffBoundary := libHandoff - (libHandoff % boundaryModulo)
+		libHandoffBoundary := libHandoff - (libHandoff % segmentSize)
 
 		if stopBlock == 0 || libHandoff < stopBlock {
 			return libHandoffBoundary, nil
@@ -119,13 +122,13 @@ func computeLinearHandoffBlockNum(productionMode bool, startBlock, stopBlock uin
 		return startBlock, nil
 	}
 
-	prevBoundary := startBlock - (startBlock % boundaryModulo)
+	prevBoundary := startBlock - (startBlock % segmentSize)
 
 	libHandoff, err := getRecentFinalBlockFunc()
 	if err != nil {
 		return prevBoundary, nil
 	}
-	libHandoffBoundary := libHandoff - (libHandoff % boundaryModulo)
+	libHandoffBoundary := libHandoff - (libHandoff % segmentSize)
 
 	return min(prevBoundary, libHandoffBoundary), nil
 }

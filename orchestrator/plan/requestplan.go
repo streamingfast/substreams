@@ -59,7 +59,8 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphIni
 	plan := &RequestPlan{
 		segmentInterval: segmentInterval,
 	}
-	if linearHandoffBlock != exclusiveEndBlock ||
+	if linearHandoffBlock < exclusiveEndBlock ||
+		exclusiveEndBlock == 0 ||
 		linearHandoffBlock == 0 { // ex: unbound dev mode
 		plan.LinearPipeline = block.NewRange(linearHandoffBlock, exclusiveEndBlock)
 	}
@@ -67,18 +68,9 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphIni
 		return plan, nil
 	}
 	if productionMode {
-		storesStopOnBound := plan.LinearPipeline == nil
-		endStoreBound := linearHandoffBlock
-		if storesStopOnBound {
-			segmentIdx := segmenter.IndexForEndBlock(linearHandoffBlock)
-			endStoreBoundRange := segmenter.Range(segmentIdx)
-			if endStoreBoundRange == nil {
-				return nil, fmt.Errorf("store bound range: invalid start block %d for segment interval %d", linearHandoffBlock, segmentInterval)
-			}
-			endStoreBound = endStoreBoundRange.ExclusiveEndBlock
-		}
+		storesEnd := linearHandoffBlock
 		if scheduleStores {
-			plan.BuildStores = block.NewRange(graphInitBlock, endStoreBound)
+			plan.BuildStores = block.NewRange(graphInitBlock, storesEnd)
 		}
 
 		if resolvedStartBlock <= linearHandoffBlock {
@@ -90,7 +82,7 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphIni
 			}
 			writeExecOutStartBlock := writeExecOutStartBlockRange.StartBlock
 			plan.WriteExecOut = block.NewRange(writeExecOutStartBlock, linearHandoffBlock)
-			plan.ReadExecOut = block.NewRange(resolvedStartBlock, linearHandoffBlock)
+			plan.ReadExecOut = block.NewRange(resolvedStartBlock, exclusiveEndBlock)
 		}
 	} else { /* dev mode */
 		if scheduleStores {

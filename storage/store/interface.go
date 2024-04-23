@@ -77,6 +77,7 @@ type Iterable interface {
 type DeltaAccessor interface {
 	SetDeltas([]*pbsubstreams.StoreDelta)
 	GetDeltas() []*pbsubstreams.StoreDelta
+	ReadOps() []byte
 	Flush() error
 	ApplyDeltasReverse(deltas []*pbsubstreams.StoreDelta)
 	ApplyDelta(delta *pbsubstreams.StoreDelta)

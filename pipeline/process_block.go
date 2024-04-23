@@ -22,7 +22,6 @@ import (
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
-	"github.com/streamingfast/substreams/storage/store"
 )
 
 func (p *Pipeline) ProcessFromExecOutput(
@@ -332,9 +331,10 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 }
 
 type resultObj struct {
-	output *pbssinternal.ModuleOutput
-	bytes  []byte
-	err    error
+	output        *pbssinternal.ModuleOutput
+	bytes         []byte
+	bytesForFiles []byte
+	err           error
 }
 
 func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, execOutput execout.ExecutionOutput) resultObj {
@@ -343,23 +343,22 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 	executorName := executor.Name()
 	logger.Debug("executing", zap.Uint64("block", execOutput.Clock().Number), zap.String("module_name", executorName))
 
-	moduleOutput, outputBytes, runError := exec.RunModule(ctx, executor, execOutput)
-	return resultObj{moduleOutput, outputBytes, runError}
+	moduleOutput, outputBytes, outputBytesFiles, runError := exec.RunModule(ctx, executor, execOutput)
+	return resultObj{moduleOutput, outputBytes, outputBytesFiles, runError}
 }
 
 func (p *Pipeline) applyExecutionResult(ctx context.Context, executor exec.ModuleExecutor, res resultObj, execOutput execout.ExecutionOutput) (err error) {
 	executorName := executor.Name()
-	hasValidOutput := executor.HasValidOutput()
 
 	moduleOutput, outputBytes, runError := res.output, res.bytes, res.err
 	if runError != nil {
-		if hasValidOutput {
+		if executor.HasValidOutput() {
 			p.saveModuleOutput(moduleOutput, executor.Name(), reqctx.Details(ctx).ProductionMode)
 		}
 		return fmt.Errorf("execute module: %w", runError)
 	}
 
-	if hasValidOutput {
+	if executor.HasValidOutput() {
 		p.saveModuleOutput(moduleOutput, executor.Name(), reqctx.Details(ctx).ProductionMode)
 		if err := execOutput.Set(executorName, outputBytes); err != nil {
 			return fmt.Errorf("set output cache: %w", err)
@@ -367,20 +366,18 @@ func (p *Pipeline) applyExecutionResult(ctx context.Context, executor exec.Modul
 		if moduleOutput != nil {
 			p.forkHandler.addReversibleOutput(moduleOutput, execOutput.Clock().Id)
 		}
-	} else { // we are in a partial store
-		if stor, ok := p.GetStoreMap().Get(executorName); ok {
-			if pkvs, ok := stor.(*store.PartialKV); ok {
-				if err := execOutput.Set(executorName, pkvs.ReadOps()); err != nil {
-					return fmt.Errorf("set output cache: %w", err)
-				}
-			}
+	}
 
+	if executor.HasOutputForFiles() {
+		if err := execOutput.SetFileOutput(executorName, res.bytesForFiles); err != nil {
+			return fmt.Errorf("set output cache: %w", err)
 		}
 	}
 
 	return nil
 }
 
+// this will be sent to the requestor
 func (p *Pipeline) saveModuleOutput(output *pbssinternal.ModuleOutput, moduleName string, isProduction bool) {
 	if p.isOutputModule(moduleName) {
 		p.mapModuleOutput = toRPCMapModuleOutputs(output)

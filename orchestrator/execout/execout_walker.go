@@ -102,6 +102,9 @@ func (r *Walker) sendItems(sortedItems []*pboutput.Item) error {
 		if item.BlockNum < r.StartBlock {
 			continue
 		}
+		if item.BlockNum >= r.ExclusiveEndBlock {
+			return nil
+		}
 
 		blockScopedData, err := toBlockScopedData(r.module, item)
 		if err != nil {

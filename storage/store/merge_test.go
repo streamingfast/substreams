@@ -395,8 +395,8 @@ func newPartialStore(kv map[string][]byte, updatePolicy pbsubstreams.Module_Kind
 
 func newStore(kv map[string][]byte, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string) *FullKV {
 	b := &baseStore{
-		kv:         kv,
-		pendingOps: &pbssinternal.Operations{},
+		kv:    kv,
+		kvOps: &pbssinternal.Operations{},
 		Config: &Config{
 			updatePolicy: updatePolicy,
 			valueType:    valueType,

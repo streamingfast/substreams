@@ -32,25 +32,28 @@ func (e *StoreModuleExecutor) applyCachedOutput(value []byte) error {
 	return e.outputStore.ApplyOps(value)
 }
 
-func (e *StoreModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
+func (e *StoreModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, outForFiles []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
 	_, span := reqctx.WithModuleExecutionSpan(ctx, "exec_store")
 	defer span.EndWithErr(&err)
 
 	if _, err := e.wasmCall(reader); err != nil {
-		return nil, nil, fmt.Errorf("store wasm call: %w", err)
+		return nil, nil, nil, fmt.Errorf("store wasm call: %w", err)
 	}
 
-	return e.wrapDeltas()
+	return e.wrapDeltasAndOps()
 }
 
 func (e *StoreModuleExecutor) HasValidOutput() bool {
 	_, ok := e.outputStore.(*store.FullKV)
 	return ok
 }
+func (e *StoreModuleExecutor) HasOutputForFiles() bool {
+	return true
+}
 
-func (e *StoreModuleExecutor) wrapDeltas() ([]byte, *pbssinternal.ModuleOutput, error) {
+func (e *StoreModuleExecutor) wrapDeltasAndOps() ([]byte, []byte, *pbssinternal.ModuleOutput, error) {
 	if err := e.outputStore.Flush(); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	deltas := &pbsubstreams.StoreDeltas{
@@ -59,15 +62,16 @@ func (e *StoreModuleExecutor) wrapDeltas() ([]byte, *pbssinternal.ModuleOutput, 
 
 	data, err := proto.Marshal(deltas)
 	if err != nil {
-		return nil, nil, fmt.Errorf("caching: marshalling delta: %w", err)
+		return nil, nil, nil, fmt.Errorf("caching: marshalling delta: %w", err)
 	}
+	dataForFiles := e.outputStore.ReadOps()
 
 	moduleOutput := &pbssinternal.ModuleOutput{
 		Data: &pbssinternal.ModuleOutput_StoreDeltas{
 			StoreDeltas: deltas,
 		},
 	}
-	return data, moduleOutput, nil
+	return data, dataForFiles, moduleOutput, nil
 }
 
 // toModuleOutput returns nil,nil on partialKV, because we never use the outputs of a partial store directly

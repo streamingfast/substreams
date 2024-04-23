@@ -206,13 +206,20 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 			storeConfig := p.stores.configs[mod.Name]
 
 			if isLastStage {
-				partialStore := storeConfig.NewPartialKV(reqDetails.ResolvedStartBlockNum, logger)
+				initialBlock := reqDetails.ResolvedStartBlockNum
+				if storeConfig.ModuleInitialBlock() > reqDetails.ResolvedStartBlockNum {
+					if storeConfig.ModuleInitialBlock() > reqDetails.StopBlockNum {
+						continue
+					}
+					initialBlock = storeConfig.ModuleInitialBlock()
+				}
+				partialStore := storeConfig.NewPartialKV(initialBlock, logger)
 				storeMap.Set(partialStore)
 
 			} else {
 				fullStore := storeConfig.NewFullKV(logger)
 
-				if fullStore.InitialBlock() != reqDetails.ResolvedStartBlockNum {
+				if fullStore.InitialBlock() < reqDetails.ResolvedStartBlockNum {
 					file := store.NewCompleteFileInfo(fullStore.Name(), fullStore.InitialBlock(), reqDetails.ResolvedStartBlockNum)
 					// FIXME: run debugging session with conditional breakpoint
 					// `request.Stage == 1 && request.StartBlockNum == 20`

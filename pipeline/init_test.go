@@ -45,8 +45,9 @@ func assertProtoEqual(t *testing.T, expected proto.Message, actual proto.Message
 }
 
 type ExecOutputTesting struct {
-	Values map[string][]byte
-	clock  *pbsubstreams.Clock
+	Values         map[string][]byte
+	ValuesForFiles map[string][]byte
+	clock          *pbsubstreams.Clock
 }
 
 func NewExecOutputTesting(t *testing.T, block *pbbstream.Block, clock *pbsubstreams.Clock) *ExecOutputTesting {
@@ -61,6 +62,7 @@ func NewExecOutputTesting(t *testing.T, block *pbbstream.Block, clock *pbsubstre
 			"sf.substreams.v1.test.Block": blkBytes,
 			"sf.substreams.v1.Clock":      clockBytes,
 		},
+		ValuesForFiles: map[string][]byte{},
 	}
 }
 
@@ -81,6 +83,11 @@ func (i *ExecOutputTesting) Get(moduleName string) (value []byte, cached bool, e
 
 func (i *ExecOutputTesting) Set(moduleName string, value []byte) (err error) {
 	i.Values[moduleName] = value
+	return nil
+}
+
+func (i *ExecOutputTesting) SetFileOutput(moduleName string, value []byte) (err error) {
+	i.ValuesForFiles[moduleName] = value
 	return nil
 }
 

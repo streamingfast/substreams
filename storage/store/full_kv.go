@@ -25,7 +25,7 @@ func (s *FullKV) Marshaller() marshaller.Marshaller {
 func (s *FullKV) DerivePartialStore(initialBlock uint64) *PartialKV {
 	b := &baseStore{
 		Config:     s.Config,
-		pendingOps: &pbssinternal.Operations{},
+		kvOps:      &pbssinternal.Operations{},
 		kv:         make(map[string][]byte),
 		logger:     s.logger,
 		marshaller: marshaller.Default(),

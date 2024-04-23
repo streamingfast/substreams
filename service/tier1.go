@@ -439,7 +439,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		return fmt.Errorf("configuring stores: %w", err)
 	}
 
-	stores := pipeline.NewStores(ctx, storeConfigs, s.runtimeConfig.SegmentSize, requestDetails.LinearHandoffBlockNum, request.StopBlockNum, false)
+	stores := pipeline.NewStores(ctx, storeConfigs, s.runtimeConfig.SegmentSize, requestDetails.LinearHandoffBlockNum, request.StopBlockNum, false, nil)
 
 	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, nil, s.blockType, nil, nil) // we don't read or write ExecOuts on tier1
 	if err != nil {

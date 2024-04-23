@@ -61,7 +61,7 @@ func GenerateBlockIndexWriters(ctx context.Context, baseStore dstore.Store, inde
 			return nil, nil, fmt.Errorf("creating new index file for %q: %w", module.Name, err)
 		}
 		if err := currentFile.Load(ctx); err == nil {
-			existingIndices[module.Name] = currentFile.indexes
+			existingIndices[module.Name] = currentFile.Indices
 			continue
 		}
 

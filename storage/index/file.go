@@ -18,11 +18,12 @@ import (
 )
 
 type File struct {
-	blockRange *block.Range
-	store      dstore.Store
-	moduleName string
-	indexes    map[string]*roaring64.Bitmap
-	logger     *zap.Logger
+	blockRange         *block.Range
+	store              dstore.Store
+	moduleName         string
+	moduleInitialBlock uint64
+	Indices            map[string]*roaring64.Bitmap
+	logger             *zap.Logger
 }
 
 func NewFile(baseStore dstore.Store, moduleHash string, moduleName string, logger *zap.Logger, blockRange *block.Range) (*File, error) {
@@ -38,13 +39,13 @@ func NewFile(baseStore dstore.Store, moduleHash string, moduleName string, logge
 	}, nil
 }
 
-func (f *File) Set(indexes map[string]*roaring64.Bitmap) {
-	f.indexes = indexes
+func (f *File) Set(indices map[string]*roaring64.Bitmap) {
+	f.Indices = indices
 }
 
-func convertIndexesMapToBytes(indexes map[string]*roaring64.Bitmap) (map[string][]byte, error) {
-	out := make(map[string][]byte, len(indexes))
-	for key, value := range indexes {
+func convertIndexesMapToBytes(indices map[string]*roaring64.Bitmap) (map[string][]byte, error) {
+	out := make(map[string][]byte, len(indices))
+	for key, value := range indices {
 		valueToBytes, err := value.ToBytes()
 		if err != nil {
 			return nil, fmt.Errorf("converting bitmap to bytes: %w", err)
@@ -56,17 +57,17 @@ func convertIndexesMapToBytes(indexes map[string]*roaring64.Bitmap) (map[string]
 
 func (f *File) Save(ctx context.Context) error {
 	filename := f.Filename()
-	convertedIndexes, err := convertIndexesMapToBytes(f.indexes)
+	convertedIndexes, err := convertIndexesMapToBytes(f.Indices)
 	if err != nil {
-		return fmt.Errorf("converting indexes to bytes: %w", err)
+		return fmt.Errorf("converting Indices to bytes: %w", err)
 	}
 	pbIndexesMap := pbindexes.Map{Indexes: convertedIndexes}
 	cnt, err := proto.Marshal(&pbIndexesMap)
 	if err != nil {
-		return fmt.Errorf("marshalling indexes: %w", err)
+		return fmt.Errorf("marshalling Indices: %w", err)
 	}
 
-	f.logger.Info("writing indexes file", zap.String("filename", filename))
+	f.logger.Info("writing Indices file", zap.String("filename", filename))
 	return derr.RetryContext(ctx, 5, func(ctx context.Context) error {
 		reader := bytes.NewReader(cnt)
 		err := f.store.WriteObject(ctx, filename, reader)
@@ -92,11 +93,11 @@ func (f *File) Load(ctx context.Context) error {
 		return err
 	}
 
-	f.indexes = make(map[string]*roaring64.Bitmap)
+	f.Indices = make(map[string]*roaring64.Bitmap)
 
 	for k, v := range pbIndexesMap.Indexes {
-		f.indexes[k] = roaring64.New()
-		_, err := f.indexes[k].FromUnsafeBytes(v)
+		f.Indices[k] = roaring64.New()
+		_, err := f.Indices[k].FromUnsafeBytes(v)
 		if err != nil {
 			return err
 		}
@@ -106,7 +107,7 @@ func (f *File) Load(ctx context.Context) error {
 }
 
 func (f *File) Print() {
-	for k, v := range f.indexes {
+	for k, v := range f.Indices {
 		fmt.Printf("%s: %v\n", k, v.ToArray())
 	}
 }

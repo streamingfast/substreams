@@ -82,7 +82,11 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphIni
 			}
 			writeExecOutStartBlock := writeExecOutStartBlockRange.StartBlock
 			plan.WriteExecOut = block.NewRange(writeExecOutStartBlock, linearHandoffBlock)
-			plan.ReadExecOut = block.NewRange(resolvedStartBlock, exclusiveEndBlock)
+			readEndBlock := linearHandoffBlock
+			if exclusiveEndBlock != 0 && exclusiveEndBlock < linearHandoffBlock {
+				readEndBlock = exclusiveEndBlock
+			}
+			plan.ReadExecOut = block.NewRange(resolvedStartBlock, readEndBlock)
 		}
 	} else { /* dev mode */
 		if scheduleStores {

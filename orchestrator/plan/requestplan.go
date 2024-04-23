@@ -69,7 +69,7 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphIni
 	}
 	if productionMode {
 		storesEnd := linearHandoffBlock
-		if scheduleStores {
+		if scheduleStores && storesEnd > graphInitBlock {
 			plan.BuildStores = block.NewRange(graphInitBlock, storesEnd)
 		}
 
@@ -89,7 +89,7 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphIni
 			plan.ReadExecOut = block.NewRange(resolvedStartBlock, readEndBlock)
 		}
 	} else { /* dev mode */
-		if scheduleStores {
+		if scheduleStores && linearHandoffBlock > graphInitBlock {
 			plan.BuildStores = block.NewRange(graphInitBlock, linearHandoffBlock)
 		}
 		plan.WriteExecOut = nil

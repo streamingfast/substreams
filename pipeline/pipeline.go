@@ -25,6 +25,7 @@ import (
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/sqe"
 	"github.com/streamingfast/substreams/storage/execout"
+	"github.com/streamingfast/substreams/storage/index"
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
 )
@@ -482,21 +483,18 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 				if err != nil {
 					return fmt.Errorf("module %q: get wasm inputs: %w", module.Name, err)
 				}
-				var moduleBlockFilter *roaring64.Bitmap
-				var moduleBlockFilterExpression sqe.Expression
-				var moduleBlockFilterModule string
+				var moduleBlockIndex *index.BlockIndex
 				if module.BlockFilter != nil {
 					expr, err := sqe.Parse(ctx, module.BlockFilter.Query)
 					if err != nil {
 						return fmt.Errorf("parse block filter: %q: %w", module.BlockFilter.Query, err)
 					}
+					var precomputedBitmap *roaring64.Bitmap
 
 					if indices := p.preexistingBlockIndices[module.BlockFilter.Module]; indices != nil {
-						moduleBlockFilter = sqe.RoaringBitmapsApply(expr, indices)
-					} else {
-						moduleBlockFilterExpression = expr
-						moduleBlockFilterModule = module.BlockFilter.Module
+						precomputedBitmap = sqe.RoaringBitmapsApply(expr, indices)
 					}
+					moduleBlockIndex = index.NewBlockIndex(expr, module.BlockFilter.Module, precomputedBitmap)
 				}
 
 				entrypoint := module.BinaryEntrypoint
@@ -512,9 +510,7 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 						mod,
 						p.wasmRuntime.InstanceCacheEnabled(),
 						inputs,
-						moduleBlockFilter,
-						moduleBlockFilterExpression,
-						moduleBlockFilterModule,
+						moduleBlockIndex,
 						entrypoint,
 						tracer,
 					)
@@ -538,9 +534,7 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 						mod,
 						p.wasmRuntime.InstanceCacheEnabled(),
 						inputs,
-						moduleBlockFilter,
-						moduleBlockFilterExpression,
-						moduleBlockFilterModule,
+						moduleBlockIndex,
 						entrypoint,
 						tracer,
 					)
@@ -558,9 +552,7 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 						mod,
 						p.wasmRuntime.InstanceCacheEnabled(),
 						inputs,
-						moduleBlockFilter,
-						moduleBlockFilterExpression,
-						moduleBlockFilterModule,
+						moduleBlockIndex,
 						entrypoint,
 						tracer,
 					)

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/streamingfast/substreams/sqe"
 	"github.com/streamingfast/substreams/storage/execout"
+	"github.com/streamingfast/substreams/storage/index"
 	"google.golang.org/protobuf/proto"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -13,9 +13,26 @@ import (
 
 	"github.com/streamingfast/substreams/reqctx"
 
-	pbindex "github.com/streamingfast/substreams/pb/sf/substreams/index/v1"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 )
+
+func skipFromIndex(index *index.BlockIndex, execOutput execout.ExecutionOutputGetter) bool {
+	if index == nil {
+		return false
+	}
+
+	if index.Precomputed() {
+		return index.Skip(uint64(execOutput.Clock().Number))
+	}
+
+	indexedKeys, _, err := execOutput.Get(index.IndexModule)
+	if err != nil {
+		panic(fmt.Errorf("getting index module output for keys: %w", err))
+	}
+
+	return index.SkipFromKeys(indexedKeys)
+
+}
 
 func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.ExecutionOutputGetter) (*pbssinternal.ModuleOutput, []byte, []byte, error) {
 	logger := reqctx.Logger(ctx)
@@ -31,29 +48,9 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 
 	logger.Debug("running module")
 
-	// skip from existing block index
-	if existingIndices := executor.BlockIndices(); existingIndices != nil && !existingIndices.Contains(uint64(execOutput.Clock().Number)) {
+	if skipFromIndex(executor.BlockIndex(), execOutput) {
 		emptyOutput, _ := executor.toModuleOutput(nil)
 		return emptyOutput, nil, nil, nil
-	}
-
-	// skip from block index expression generated on the fly
-	if expr := executor.BlockIndexExpression(); expr != nil {
-		// TODO: we could memoize the unmarshalled version of this into the execOutput
-		// ex: execOutput.MemoizeThis(my_keymap)
-		indexedKeys, _, err := execOutput.Get(executor.BlockIndexModule())
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("getting index module output for keys: %w", err)
-		}
-		keys := &pbindex.Keys{}
-		if err := proto.Unmarshal(indexedKeys, keys); err != nil {
-			return nil, nil, nil, fmt.Errorf("parsing index module output as keys: %w", err)
-		}
-		if !sqe.KeysApply(expr, sqe.NewFromIndexKeys(keys)) {
-			// skip execution of module on this block because it is filtered out.
-			emptyOutput, _ := executor.toModuleOutput(nil)
-			return emptyOutput, nil, nil, nil
-		}
 	}
 
 	cached, outputBytes, err := getCachedOutput(execOutput, executor)

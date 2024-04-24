@@ -342,7 +342,7 @@ excludable:
 			if executionPlan.ExistingExecOuts[executor.Name()] != nil {
 				continue
 			}
-			if !executor.BlockIndexExcludesAllBlocks() {
+			if !executor.BlockIndex().ExcludesAllBlocks() {
 				allExecutorsExcludedByBlockIndex = false
 				break excludable
 			}

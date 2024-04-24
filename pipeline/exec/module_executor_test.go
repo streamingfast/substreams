@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/RoaringBitmap/roaring/roaring64"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 
@@ -13,8 +12,8 @@ import (
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
-	"github.com/streamingfast/substreams/sqe"
 	"github.com/streamingfast/substreams/storage/execout"
+	"github.com/streamingfast/substreams/storage/index"
 )
 
 type MockExecOutput struct {
@@ -57,17 +56,13 @@ type MockModuleExecutor struct {
 
 var _ ModuleExecutor = (*MockModuleExecutor)(nil)
 
-func (t *MockModuleExecutor) BlockIndexExcludesAllBlocks() bool    { return false }
-func (t *MockModuleExecutor) BlockIndexExpression() sqe.Expression { return nil }
-
 func (t *MockModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, outForFiles []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
 	if t.RunFunc != nil {
 		return t.RunFunc(ctx, reader)
 	}
 	return nil, nil, nil, fmt.Errorf("not implemented")
 }
-func (t *MockModuleExecutor) BlockIndices() *roaring64.Bitmap { return nil }
-func (t *MockModuleExecutor) BlockIndexModule() string        { return "" }
+func (t *MockModuleExecutor) BlockIndex() *index.BlockIndex   { return nil }
 func (t *MockModuleExecutor) RunsOnBlock(_ uint64) bool       { return true }
 func (t *MockModuleExecutor) Name() string                    { return t.name }
 func (t *MockModuleExecutor) String() string                  { return fmt.Sprintf("TestModuleExecutor(%s)", t.name) }

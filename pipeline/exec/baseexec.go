@@ -7,10 +7,9 @@ import (
 
 	ttrace "go.opentelemetry.io/otel/trace"
 
-	"github.com/RoaringBitmap/roaring/roaring64"
 	"github.com/streamingfast/substreams/reqctx"
-	"github.com/streamingfast/substreams/sqe"
 	"github.com/streamingfast/substreams/storage/execout"
+	"github.com/streamingfast/substreams/storage/index"
 	"github.com/streamingfast/substreams/wasm"
 )
 
@@ -24,11 +23,8 @@ type BaseExecutor struct {
 	wasmModule    wasm.Module
 	wasmArguments []wasm.Argument
 	entrypoint    string
-	blockIndices  *roaring64.Bitmap // pre-applied
-
-	blockIndexExpression sqe.Expression // applied on-the-fly, from the block index module outputs
-	blockIndexModule     string
-	tracer               ttrace.Tracer
+	blockIndex    *index.BlockIndex
+	tracer        ttrace.Tracer
 
 	instanceCacheEnabled bool
 	cachedInstance       wasm.Instance
@@ -39,14 +35,12 @@ type BaseExecutor struct {
 	executionStack []string
 }
 
-func NewBaseExecutor(ctx context.Context, moduleName string, initialBlock uint64, wasmModule wasm.Module, cacheEnabled bool, wasmArguments []wasm.Argument, blockIndices *roaring64.Bitmap, blockIndexExpression sqe.Expression, blockIndexModule, entrypoint string, tracer ttrace.Tracer) *BaseExecutor {
+func NewBaseExecutor(ctx context.Context, moduleName string, initialBlock uint64, wasmModule wasm.Module, cacheEnabled bool, wasmArguments []wasm.Argument, blockIndex *index.BlockIndex, entrypoint string, tracer ttrace.Tracer) *BaseExecutor {
 	return &BaseExecutor{
 		ctx:                  ctx,
 		initialBlock:         initialBlock,
+		blockIndex:           blockIndex,
 		moduleName:           moduleName,
-		blockIndices:         blockIndices,
-		blockIndexExpression: blockIndexExpression,
-		blockIndexModule:     blockIndexModule,
 		wasmModule:           wasmModule,
 		instanceCacheEnabled: cacheEnabled,
 		wasmArguments:        wasmArguments,
@@ -127,27 +121,12 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 	return
 }
 
-func (e *BaseExecutor) BlockIndices() *roaring64.Bitmap {
-	return e.blockIndices
-}
-
-func (e *BaseExecutor) BlockIndexExpression() sqe.Expression {
-	return e.blockIndexExpression
-}
-
-func (e *BaseExecutor) BlockIndexModule() string {
-	return e.blockIndexModule
+func (e *BaseExecutor) BlockIndex() *index.BlockIndex {
+	return e.blockIndex
 }
 
 func (e *BaseExecutor) RunsOnBlock(blockNum uint64) bool {
 	return blockNum >= e.initialBlock
-}
-
-func (e *BaseExecutor) BlockIndexExcludesAllBlocks() bool {
-	if e.blockIndices != nil && e.blockIndices.IsEmpty() {
-		return true
-	}
-	return false
 }
 
 func (e *BaseExecutor) Close(ctx context.Context) error {

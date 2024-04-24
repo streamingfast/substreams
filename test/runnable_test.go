@@ -58,8 +58,8 @@ type testRun struct {
 	TempDir   string
 }
 
-func newTestRun(t *testing.T, startBlock int64, linearHandoffBlock, exclusiveEndBlock uint64, moduleName string) *testRun {
-	pkg := manifest.TestReadManifest(t, "./testdata/substreams-test-v0.1.0.spkg")
+func newTestRun(t *testing.T, startBlock int64, linearHandoffBlock, exclusiveEndBlock uint64, moduleName string, manifestPath string) *testRun {
+	pkg := manifest.TestReadManifest(t, manifestPath)
 
 	return &testRun{Package: pkg, StartBlock: startBlock, ExclusiveEndBlock: exclusiveEndBlock, ModuleName: moduleName, LinearHandoffBlockNum: linearHandoffBlock}
 }

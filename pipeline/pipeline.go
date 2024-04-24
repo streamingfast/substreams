@@ -508,6 +508,7 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 					baseExecutor := exec.NewBaseExecutor(
 						ctx,
 						module.Name,
+						module.InitialBlock,
 						mod,
 						p.wasmRuntime.InstanceCacheEnabled(),
 						inputs,
@@ -533,6 +534,7 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 					baseExecutor := exec.NewBaseExecutor(
 						ctx,
 						module.Name,
+						module.InitialBlock,
 						mod,
 						p.wasmRuntime.InstanceCacheEnabled(),
 						inputs,
@@ -552,6 +554,7 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 					baseExecutor := exec.NewBaseExecutor(
 						ctx,
 						module.Name,
+						module.InitialBlock,
 						mod,
 						p.wasmRuntime.InstanceCacheEnabled(),
 						inputs,

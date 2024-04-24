@@ -25,6 +25,8 @@ type ModuleExecutor interface {
 	BlockIndexModule() string
 	BlockIndices() *roaring64.Bitmap
 
+	RunsOnBlock(blockNum uint64) bool
+
 	lastExecutionLogs() (logs []string, truncated bool)
 	lastExecutionStack() []string
 }

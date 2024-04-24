@@ -68,6 +68,7 @@ func (t *MockModuleExecutor) run(ctx context.Context, reader execout.ExecutionOu
 }
 func (t *MockModuleExecutor) BlockIndices() *roaring64.Bitmap { return nil }
 func (t *MockModuleExecutor) BlockIndexModule() string        { return "" }
+func (t *MockModuleExecutor) RunsOnBlock(_ uint64) bool       { return true }
 func (t *MockModuleExecutor) Name() string                    { return t.name }
 func (t *MockModuleExecutor) String() string                  { return fmt.Sprintf("TestModuleExecutor(%s)", t.name) }
 func (t *MockModuleExecutor) Close(ctx context.Context) error { return nil }

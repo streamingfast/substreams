@@ -20,6 +20,7 @@ type BaseExecutor struct {
 	ctx context.Context
 
 	moduleName    string
+	initialBlock  uint64
 	wasmModule    wasm.Module
 	wasmArguments []wasm.Argument
 	entrypoint    string
@@ -38,9 +39,10 @@ type BaseExecutor struct {
 	executionStack []string
 }
 
-func NewBaseExecutor(ctx context.Context, moduleName string, wasmModule wasm.Module, cacheEnabled bool, wasmArguments []wasm.Argument, blockIndices *roaring64.Bitmap, blockIndexExpression sqe.Expression, blockIndexModule, entrypoint string, tracer ttrace.Tracer) *BaseExecutor {
+func NewBaseExecutor(ctx context.Context, moduleName string, initialBlock uint64, wasmModule wasm.Module, cacheEnabled bool, wasmArguments []wasm.Argument, blockIndices *roaring64.Bitmap, blockIndexExpression sqe.Expression, blockIndexModule, entrypoint string, tracer ttrace.Tracer) *BaseExecutor {
 	return &BaseExecutor{
 		ctx:                  ctx,
+		initialBlock:         initialBlock,
 		moduleName:           moduleName,
 		blockIndices:         blockIndices,
 		blockIndexExpression: blockIndexExpression,
@@ -61,7 +63,7 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 	e.executionStack = nil
 
 	hasInput := false
-	for _, input := range e.wasmArguments {
+	for i, input := range e.wasmArguments {
 		switch v := input.(type) {
 		case *wasm.StoreWriterOutput:
 		case *wasm.StoreReaderInput:
@@ -72,7 +74,7 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 			hasInput = true
 			data, _, err := outputGetter.Get(v.Name())
 			if err != nil {
-				return nil, fmt.Errorf("input data for %q: %w", v.Name(), err)
+				return nil, fmt.Errorf("input data for %q, param %d: %w", v.Name(), i, err)
 			}
 			v.SetValue(data)
 		default:
@@ -132,6 +134,10 @@ func (e *BaseExecutor) BlockIndexExpression() sqe.Expression {
 
 func (e *BaseExecutor) BlockIndexModule() string {
 	return e.blockIndexModule
+}
+
+func (e *BaseExecutor) RunsOnBlock(blockNum uint64) bool {
+	return blockNum >= e.initialBlock
 }
 
 func (e *BaseExecutor) BlockIndexExcludesAllBlocks() bool {

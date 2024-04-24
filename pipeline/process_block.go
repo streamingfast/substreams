@@ -292,6 +292,9 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 		if len(stage) < 2 {
 			//fmt.Println("Linear stage", len(stage))
 			for _, executor := range stage {
+				if !executor.RunsOnBlock(execOutput.Clock().Number) {
+					continue
+				}
 				res := p.execute(ctx, executor, execOutput)
 				if err := p.applyExecutionResult(ctx, executor, res, execOutput); err != nil {
 					return fmt.Errorf("applying executor results %q: %w", executor.Name(), res.err)
@@ -302,6 +305,9 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 			wg := sync.WaitGroup{}
 			//fmt.Println("Parallelized in stage", stageIdx, len(stage))
 			for i, executor := range stage {
+				if !executor.RunsOnBlock(execOutput.Clock().Number) {
+					continue
+				}
 				wg.Add(1)
 				i := i
 				executor := executor

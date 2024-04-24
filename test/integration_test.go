@@ -330,7 +330,7 @@ func TestOneStoreOneMap(t *testing.T) {
 }
 
 func TestStoreDeletePrefix(t *testing.T) {
-	run := newTestRun(t, 30, 41, 41, "assert_test_store_delete_prefix")
+	run := newTestRun(t, 30, 40, 42, "assert_test_store_delete_prefix")
 	run.BlockProcessedCallback = func(ctx *execContext) {
 		if ctx.block.Number == 40 {
 			s, storeFound := ctx.stores.Get("test_store_delete_prefix")

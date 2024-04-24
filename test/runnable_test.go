@@ -330,7 +330,7 @@ func (r *TestRunner) Run(context.Context) error {
 		err := r.pipe.ProcessBlock(blk, generatedBlock.obj)
 
 		if err != nil && !errors.Is(err, io.EOF) {
-			return fmt.Errorf("process block: %w", err)
+			return fmt.Errorf("process block %d: %w", blk.Number, err)
 		}
 		if errors.Is(err, io.EOF) {
 			return err

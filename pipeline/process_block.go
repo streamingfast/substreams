@@ -282,6 +282,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 	p.mapModuleOutput = nil
 	p.extraMapModuleOutputs = nil
 	p.extraStoreModuleOutputs = nil
+	blockNum := execOutput.Clock().Number
 
 	// they may be already built, but we call this function every time to enable future dynamic changes
 	if err := p.BuildModuleExecutors(ctx); err != nil {
@@ -292,12 +293,12 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 		if len(stage) < 2 {
 			//fmt.Println("Linear stage", len(stage))
 			for _, executor := range stage {
-				if !executor.RunsOnBlock(execOutput.Clock().Number) {
+				if !executor.RunsOnBlock(blockNum) {
 					continue
 				}
 				res := p.execute(ctx, executor, execOutput)
 				if err := p.applyExecutionResult(ctx, executor, res, execOutput); err != nil {
-					return fmt.Errorf("applying executor results %q: %w", executor.Name(), res.err)
+					return fmt.Errorf("applying executor results %q on block %d: %w", executor.Name(), blockNum, res.err)
 				}
 			}
 		} else {
@@ -306,6 +307,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 			//fmt.Println("Parallelized in stage", stageIdx, len(stage))
 			for i, executor := range stage {
 				if !executor.RunsOnBlock(execOutput.Clock().Number) {
+					results[i] = resultObj{skipped: true}
 					continue
 				}
 				wg.Add(1)
@@ -320,13 +322,16 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 			wg.Wait()
 
 			for i, result := range results {
+				if result.skipped {
+					continue
+				}
 				executor := stage[i]
 				if result.err != nil {
 					//p.returnFailureProgress(ctx, err, executor)
 					return fmt.Errorf("running executor %q: %w", executor.Name(), result.err)
 				}
 				if err := p.applyExecutionResult(ctx, executor, result, execOutput); err != nil {
-					return fmt.Errorf("applying executor results %q: %w", executor.Name(), result.err)
+					return fmt.Errorf("applying executor results %q on block %d: %w", executor.Name(), blockNum, result.err)
 				}
 			}
 		}
@@ -341,6 +346,7 @@ type resultObj struct {
 	bytes         []byte
 	bytesForFiles []byte
 	err           error
+	skipped       bool
 }
 
 func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, execOutput execout.ExecutionOutput) resultObj {
@@ -350,7 +356,7 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 	logger.Debug("executing", zap.Uint64("block", execOutput.Clock().Number), zap.String("module_name", executorName))
 
 	moduleOutput, outputBytes, outputBytesFiles, runError := exec.RunModule(ctx, executor, execOutput)
-	return resultObj{moduleOutput, outputBytes, outputBytesFiles, runError}
+	return resultObj{moduleOutput, outputBytes, outputBytesFiles, runError, false}
 }
 
 func (p *Pipeline) applyExecutionResult(ctx context.Context, executor exec.ModuleExecutor, res resultObj, execOutput execout.ExecutionOutput) (err error) {

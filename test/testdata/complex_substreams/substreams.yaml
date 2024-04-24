@@ -72,6 +72,7 @@ modules:
     updatePolicy: set
     valueType: int64
     inputs:
+      - source: sf.substreams.v1.test.Block
       - store: test_second_store   
 
   - name: assert_test_third_store
@@ -79,7 +80,7 @@ modules:
     initialBlock: 20
     inputs:
       - source: sf.substreams.v1.test.Block
-      - store: test_second_store
+      - store: test_third_store
     output: 
       type: proto:sf.substreams.v1.test.Boolean          
 

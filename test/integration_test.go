@@ -300,7 +300,7 @@ func TestOneStoreOneMap(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			run := newTestRun(t, test.startBlock, test.linearBlock, test.stopBlock, "assert_test_store_add_i64", "./testdata/substreams-test-v0.1.0.spkg")
+			run := newTestRun(t, test.startBlock, test.linearBlock, test.stopBlock, "assert_test_store_add_i64", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 			run.ProductionMode = test.production
 			run.ParallelSubrequests = 1
 			run.PreWork = test.preWork
@@ -326,7 +326,7 @@ func TestOneStoreOneMap(t *testing.T) {
 }
 
 func TestStoreDeletePrefix(t *testing.T) {
-	run := newTestRun(t, 30, 40, 42, "assert_test_store_delete_prefix", "./testdata/substreams-test-v0.1.0.spkg")
+	run := newTestRun(t, 30, 40, 42, "assert_test_store_delete_prefix", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 	run.BlockProcessedCallback = func(ctx *execContext) {
 		if ctx.block.Number == 40 {
 			s, storeFound := ctx.stores.Get("test_store_delete_prefix")
@@ -340,7 +340,7 @@ func TestStoreDeletePrefix(t *testing.T) {
 
 func TestAllAssertions(t *testing.T) {
 	// Relies on `assert_all_test` having modInit == 1, so
-	run := newTestRun(t, 1, 31, 31, "assert_all_test", "./testdata/substreams-test-v0.1.0.spkg")
+	run := newTestRun(t, 1, 31, 31, "assert_all_test", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 
 	require.NoError(t, run.Run(t, "assert_all_test"))
 
@@ -350,7 +350,7 @@ func TestAllAssertions(t *testing.T) {
 }
 
 func Test_SimpleMapModule(t *testing.T) {
-	run := newTestRun(t, 10000, 10001, 10001, "test_map", "./testdata/substreams-test-v0.1.0.spkg")
+	run := newTestRun(t, 10000, 10001, 10001, "test_map", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 	run.Params = map[string]string{"test_map": "my test params"}
 	run.NewBlockGenerator = func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
 		return &LinearBlockGenerator{
@@ -365,7 +365,7 @@ func Test_SimpleMapModule(t *testing.T) {
 }
 
 func Test_Early(t *testing.T) {
-	run := newTestRun(t, 12, 14, 14, "test_map", "./testdata/substreams-test-v0.1.0.spkg")
+	run := newTestRun(t, 12, 14, 14, "test_map", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 	run.Params = map[string]string{"test_map": "my test params"}
 	run.ProductionMode = true
 	run.NewBlockGenerator = func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
@@ -380,7 +380,7 @@ func Test_Early(t *testing.T) {
 }
 
 func TestEarlyWithEmptyStore(t *testing.T) {
-	run := newTestRun(t, 2, 4, 4, "assert_test_store_delete_prefix", "./testdata/substreams-test-v0.1.0.spkg")
+	run := newTestRun(t, 2, 4, 4, "assert_test_store_delete_prefix", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 	run.ProductionMode = true
 
 	var foundBlock3 bool
@@ -396,7 +396,7 @@ func TestEarlyWithEmptyStore(t *testing.T) {
 }
 
 func Test_SingleMapModule_FileWalker(t *testing.T) {
-	run := newTestRun(t, 200, 250, 300, "test_map", "./testdata/substreams-test-v0.1.0.spkg")
+	run := newTestRun(t, 200, 250, 300, "test_map", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 	run.Params = map[string]string{"test_map": "my test params"}
 	run.ProductionMode = true
 	run.NewBlockGenerator = func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {

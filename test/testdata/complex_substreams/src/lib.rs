@@ -46,7 +46,7 @@ fn test_second_store(block: test::Block, first_store: StoreGetInt64, second_stor
 
 #[substreams::handlers::store]
 fn test_third_store(block: test::Block, second_store: StoreGetInt64, third_store: StoreSetInt64) {
-    let block_counter = second_store.get_last( "block_counter_from_first_store").unwrap();
+    let block_counter = second_store.get_last("block_counter_from_first_store").unwrap();
     third_store.set(0, format!("block_counter_from_second_store"), &block_counter)
 }
 
@@ -85,7 +85,7 @@ fn assert_test_third_store(block: test::Block, third_store: StoreGetInt64) -> Re
         assert!(block_counter.is_none());
         return Ok(test::Boolean { result: true })
     }
-    
+
     assert_eq!(block_counter.unwrap(), (block.number - 19) as i64);
     Ok(test::Boolean { result: true })
 }

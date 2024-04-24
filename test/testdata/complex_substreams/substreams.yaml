@@ -1,0 +1,85 @@
+specVersion: v0.1.0
+package:
+  name: complex_substreams
+  version: v0.1.0
+
+imports:
+
+protobuf:
+  files:
+    - contract.proto
+  importPaths:
+    - ./proto
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: ./target/wasm32-unknown-unknown/release/substreams.wasm
+
+modules:
+  - name: test_index
+    kind: blockIndex
+    initialBlock: 0
+    inputs:
+      - source: sf.substreams.v1.test.Block
+    output:
+      type: proto:sf.substreams.index.v1.Keys
+
+  - name: test_first_store 
+    kind: store
+    initialBlock: 20
+    updatePolicy: add
+    valueType: int64
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_first_store
+    kind: store
+    initialBlock: 20
+    inputs:
+      - store: test_first_store
+    output: 
+      type: proto:sf.substreams.v1.test.Boolean  
+
+  - name: test_second_store 
+    kind: store
+    initialBlock: 30
+    updatePolicy: set
+    valueType: int64
+    inputs:
+      - store: test_first_store   
+
+  - name: assert_test_second_store
+    kind: store
+    initialBlock: 30
+    inputs:
+      - store: test_second_store
+    output: 
+      type: proto:sf.substreams.v1.test.Boolean      
+
+  - name: test_third_store 
+    kind: store
+    initialBlock: 40
+    updatePolicy: set
+    valueType: int64
+    inputs:
+      - store: test_second_store   
+
+  - name: assert_test_third_store
+    kind: store
+    initialBlock: 40
+    inputs:
+      - store: test_third_store
+    output: 
+      type: proto:sf.substreams.v1.test.Boolean          
+
+  - name: 
+    kind: test_map_output
+    initialBlock: 50
+    inputs:
+      - store: test_third_store
+      - source: sf.substreams.v1.test.Block 
+    output:
+      type: proto:sf.substreams.v1.test.MapResult
+
+network: mainnet

@@ -4,7 +4,6 @@ version = "0.0.1"
 edition = "2021"
 
 [lib]
-name = "substreams"
 crate-type = ["cdylib"]
 
 [dependencies]
@@ -13,7 +12,7 @@ num-bigint = "0.4"
 num-traits = "0.2.15"
 prost = "0.11"
 prost-types = "0.11"
-substreams = "0.5"
+substreams = { version = "0.5.13" }
 
 # Required so that ethabi > ethereum-types build correctly under wasm32-unknown-unknown
 [target.wasm32-unknown-unknown.dependencies]

@@ -627,22 +627,22 @@ func (p *Pipeline) renderWasmInputs(module *pbsubstreams.Module) (out []wasm.Arg
 		case *pbsubstreams.Module_Input_Params_:
 			out = append(out, wasm.NewParamsInput(input.GetParams().GetValue()))
 		case *pbsubstreams.Module_Input_Map_:
-			out = append(out, wasm.NewMapInput(in.Map.ModuleName))
+			out = append(out, wasm.NewMapInput(in.Map.ModuleName, p.execGraph.ModulesInitBlocks()[in.Map.ModuleName]))
 		case *pbsubstreams.Module_Input_Store_:
 			inputName := input.GetStore().ModuleName
 			if input.GetStore().Mode == pbsubstreams.Module_Input_Store_DELTAS {
-				out = append(out, wasm.NewMapInput(inputName))
+				out = append(out, wasm.NewMapInput(inputName, p.execGraph.ModulesInitBlocks()[inputName]))
 			} else {
 				inputStore, found := storeAccessor.Get(inputName)
 				if !found {
 					return nil, fmt.Errorf("store %q npt found", inputName)
 				}
-				out = append(out, wasm.NewStoreReaderInput(inputName, inputStore))
+				out = append(out, wasm.NewStoreReaderInput(inputName, inputStore, p.execGraph.ModulesInitBlocks()[inputName]))
 			}
 		case *pbsubstreams.Module_Input_Source_:
 			// in.Source.Type checking against `blockType` is already done
 			// upfront in `validateGraph`.
-			out = append(out, wasm.NewSourceInput(in.Source.Type))
+			out = append(out, wasm.NewSourceInput(in.Source.Type, 0))
 		default:
 			return nil, fmt.Errorf("invalid input struct for module %q", module.Name)
 		}

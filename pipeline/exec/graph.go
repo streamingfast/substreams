@@ -14,6 +14,7 @@ type Graph struct {
 	stagedUsedModules     ExecutionStages        // all modules that need to be processed (requested directly or a required module ancestor)
 	moduleHashes          *manifest.ModuleHashes
 	stores                []*pbsubstreams.Module // subset of allModules: only the stores
+	modulesInitBlocks     map[string]uint64
 	lowestInitBlock       uint64
 	lowestStoresInitBlock *uint64
 	outputModule          *pbsubstreams.Module
@@ -63,6 +64,7 @@ func (g *Graph) IsOutputModule(name string) bool      { return g.outputModule.Na
 func (g *Graph) ModuleHashes() *manifest.ModuleHashes { return g.moduleHashes }
 func (g *Graph) LowestInitBlock() uint64              { return g.lowestInitBlock }
 func (g *Graph) LowestStoresInitBlock() *uint64       { return g.lowestStoresInitBlock }
+func (g *Graph) ModulesInitBlocks() map[string]uint64 { return g.modulesInitBlocks }
 
 func NewOutputModuleGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules) (out *Graph, err error) {
 	out = &Graph{
@@ -88,6 +90,12 @@ func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *
 	}
 	g.usedModules = processModules
 	g.stagedUsedModules = computeStages(processModules)
+
+	g.modulesInitBlocks = map[string]uint64{}
+	for _, mod := range processModules {
+		g.modulesInitBlocks[mod.Name] = mod.InitialBlock
+	}
+
 	g.lowestInitBlock = computeLowestInitBlock(processModules)
 	g.lowestStoresInitBlock = computeLowestStoresInitBlock(processModules)
 	if err := g.hashModules(graph); err != nil {

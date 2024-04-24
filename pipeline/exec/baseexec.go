@@ -71,12 +71,12 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 		case *wasm.ParamsInput:
 			hasInput = true
 		case wasm.ValueArgument:
+			if !v.Active(outputGetter.Clock().Number) {
+				break // skipping input that is not active at this block
+			}
 			hasInput = true
 			data, _, err := outputGetter.Get(v.Name())
 			if err != nil {
-				if err == execout.ErrNotFound {
-					break // some of our inputs may be skipped
-				}
 				return nil, fmt.Errorf("input data for %q, param %d: %w", v.Name(), i, err)
 			}
 			v.SetValue(data)

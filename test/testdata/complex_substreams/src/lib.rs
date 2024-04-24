@@ -34,25 +34,25 @@ fn assert_test_index(blk: test::Block, keys: keys::Keys) -> Result<test::Boolean
 
 
 #[substreams::handlers::store]
-fn test_first_store(block: test::Block, first_store: StoreAddInt64) {
+fn test_first_store_init_20(block: test::Block, first_store: StoreAddInt64) {
     first_store.add(0, "block_counter", 1);
 }
 
 #[substreams::handlers::store]
-fn test_second_store(block: test::Block, first_store: StoreGetInt64, second_store: StoreSetInt64) {
+fn test_second_store_init_30(block: test::Block, first_store: StoreGetInt64, second_store: StoreSetInt64) {
     let block_counter = first_store.get_last("block_counter").unwrap();
     second_store.set(0, format!("block_counter_from_first_store"), &block_counter)
 }
 
 #[substreams::handlers::store]
-fn test_third_store(block: test::Block, second_store: StoreGetInt64, third_store: StoreSetInt64) {
+fn test_third_store_init_40(block: test::Block, second_store: StoreGetInt64, third_store: StoreSetInt64) {
     let block_counter = second_store.get_last("block_counter_from_first_store").unwrap();
     third_store.set(0, format!("block_counter_from_second_store"), &block_counter)
 }
 
 
 #[substreams::handlers::map]
-fn assert_test_first_store(block: test::Block, first_store: StoreGetInt64) -> Result<test::Boolean, Error> {
+fn assert_test_first_store_init_20(block: test::Block, first_store: StoreGetInt64) -> Result<test::Boolean, Error> {
     let block_counter = first_store.get_last("block_counter");
 
     if block.number < 20 {
@@ -65,7 +65,7 @@ fn assert_test_first_store(block: test::Block, first_store: StoreGetInt64) -> Re
 }
 
 #[substreams::handlers::map]
-fn assert_test_second_store(block: test::Block, second_store: StoreGetInt64) -> Result<test::Boolean, Error> {
+fn assert_test_second_store_init_20(block: test::Block, second_store: StoreGetInt64) -> Result<test::Boolean, Error> {
     let block_counter = second_store.get_last("block_counter_from_first_store");
 
     if block.number < 30 {
@@ -78,7 +78,7 @@ fn assert_test_second_store(block: test::Block, second_store: StoreGetInt64) -> 
 }
 
 #[substreams::handlers::map]
-fn assert_test_third_store(block: test::Block, third_store: StoreGetInt64) -> Result<test::Boolean, Error> {
+fn assert_test_third_store_init_20(block: test::Block, third_store: StoreGetInt64) -> Result<test::Boolean, Error> {
     let block_counter = third_store.get_last("block_counter_from_second_store");
 
     if block.number < 40 {
@@ -91,7 +91,7 @@ fn assert_test_third_store(block: test::Block, third_store: StoreGetInt64) -> Re
 }
 
 #[substreams::handlers::map]
-fn all_test_assert(result_one: test::Boolean, result_two: test::Boolean, result_three: test::Boolean) -> Result<test::Boolean, Error> {
+fn all_test_assert_init_20(result_one: test::Boolean, result_two: test::Boolean, result_three: test::Boolean) -> Result<test::Boolean, Error> {
     //
     Ok(test::Boolean { result: true })
 }

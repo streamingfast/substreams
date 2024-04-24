@@ -7,10 +7,36 @@ import (
 )
 
 func TestAllAssertionsInComplex(t *testing.T) {
-	// Relies on `assert_all_test` having modInit == 1, so
-	run := newTestRun(t, 20, 100, 120, "all_test_assert", "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg")
+	cases := []struct {
+		name               string
+		startBlock         uint64
+		linearHandoffBlock uint64
+		exclusiveEndBlock  uint64
+		moduleName         string
+	}{
+		{
+			name:               "sunny path",
+			startBlock:         20,
+			linearHandoffBlock: 100,
+			exclusiveEndBlock:  120,
+			moduleName:         "all_test_assert_init_20",
+		},
 
-	require.NoError(t, run.Run(t, "all_test_assert"))
+		{
+			name:               "failing test",
+			startBlock:         50,
+			linearHandoffBlock: 100,
+			exclusiveEndBlock:  120,
+			moduleName:         "all_test_assert_init_20",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			run := newTestRun(t, int64(c.startBlock), c.linearHandoffBlock, c.exclusiveEndBlock, c.moduleName, "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg")
+			require.NoError(t, run.Run(t, c.moduleName))
+		})
+	}
 
 	//assert.Len(t, listFiles(t, run.TempDir), 90) // All these .kv files on disk
 	// TODO: we don't produce those files when in linear mode..

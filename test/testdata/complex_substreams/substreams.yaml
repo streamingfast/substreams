@@ -30,7 +30,7 @@ modules:
     output:
       type: proto:sf.substreams.v1.test.Boolean
 
-  - name: test_first_store 
+  - name: test_first_store_init_20
     kind: store
     initialBlock: 20
     updatePolicy: add
@@ -38,68 +38,68 @@ modules:
     inputs:
       - source: sf.substreams.v1.test.Block
 
-  - name: assert_test_first_store
+  - name: assert_test_first_store_init_20
     kind: map
     initialBlock: 20
     inputs:
       - source: sf.substreams.v1.test.Block
-      - store: test_first_store
+      - store: test_first_store_init_20
     output: 
       type: proto:sf.substreams.v1.test.Boolean  
 
-  - name: test_second_store 
+  - name: test_second_store_init_30 
     kind: store
     initialBlock: 30
     updatePolicy: set
     valueType: int64
     inputs:
       - source: sf.substreams.v1.test.Block
-      - store: test_first_store   
+      - store: test_first_store_init_20   
       
 
-  - name: assert_test_second_store
+  - name: assert_test_second_store_init_20
     kind: map
     initialBlock: 20
     inputs:
       - source: sf.substreams.v1.test.Block
-      - store: test_second_store
+      - store: test_second_store_init_30
     output: 
       type: proto:sf.substreams.v1.test.Boolean      
 
-  - name: test_third_store 
+  - name: test_third_store_init_40 
     kind: store
     initialBlock: 40
     updatePolicy: set
     valueType: int64
     inputs:
       - source: sf.substreams.v1.test.Block
-      - store: test_second_store   
+      - store: test_second_store_init_30   
 
-  - name: assert_test_third_store
+  - name: assert_test_third_store_init_20
     kind: map
     initialBlock: 20
     inputs:
       - source: sf.substreams.v1.test.Block
-      - store: test_third_store
+      - store: test_third_store_init_40
     output: 
       type: proto:sf.substreams.v1.test.Boolean          
 
-  - name: all_test_assert
+  - name: all_test_assert_init_20
     kind: map 
     initialBlock: 20 
     inputs:
-      - map: assert_test_first_store
-      - map: assert_test_second_store
-      - map: assert_test_third_store
+      - map: assert_test_first_store_init_20
+      - map: assert_test_second_store_init_20
+      - map: assert_test_third_store_init_20
     output:
       type: proto:sf.substreams.v1.test.Boolean  
               
-  - name: test_map_output
+  - name: test_map_output_init_50
     kind: map
     initialBlock: 50
     inputs:
       - source: sf.substreams.v1.test.Block
-      - store: test_third_store
+      - store: test_third_store_init_40
     output:
       type: proto:sf.substreams.v1.test.MapResult
 

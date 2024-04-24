@@ -128,7 +128,7 @@ func TestForkHandling(t *testing.T) {
 	for _, test := range tests {
 
 		t.Run(test.name, func(t *testing.T) {
-			run := newTestRun(t, 1, 1, 7, test.module, "./testdata/substreams-test-v0.1.0.spkg")
+			run := newTestRun(t, 1, 1, 7, test.module, "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 			run.NewBlockGenerator = func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
 				return &ForkBlockGenerator{
 					initialLIB:    bstream.NewBlockRef("0a", 0),

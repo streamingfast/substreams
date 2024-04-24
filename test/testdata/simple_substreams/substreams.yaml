@@ -843,7 +843,7 @@ modules:
 
   - name : assert_all_test_index 
     kind: store
-    initialBlock: 1
+    initialBlock: 10
     updatePolicy: set
     valueType: int64
     inputs:

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/test-go/testify/require"
 
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -56,7 +57,8 @@ func TestGraph_computeStages(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			out := computeStages(computeStagesInput(test.input))
+			out, err := computeStages(computeStagesInput(test.input), nil)
+			require.NoError(t, err)
 			assert.Equal(t, test.expect, computeStagesOutput(out))
 		})
 	}
@@ -82,6 +84,10 @@ func computeStagesInput(in string) (out []*pbsubstreams.Module) {
 			newMod.Name = modName[1:]
 		default:
 			panic("invalid prefix in word: " + modName)
+		}
+		// we set at least one block source so it doesn't fail the validation
+		newMod.Inputs = []*pbsubstreams.Module_Input{
+			{Input: &pbsubstreams.Module_Input_Source_{Source: &pbsubstreams.Module_Input_Source{Type: "test.block"}}},
 		}
 		if len(params) > 1 {
 			for _, input := range strings.Split(params[1], ",") {

@@ -89,11 +89,14 @@ func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *
 		return fmt.Errorf("building execution moduleGraph: %w", err)
 	}
 	g.usedModules = processModules
-	g.stagedUsedModules = computeStages(processModules)
-
 	g.modulesInitBlocks = map[string]uint64{}
-	for _, mod := range processModules {
+	for _, mod := range g.usedModules {
 		g.modulesInitBlocks[mod.Name] = mod.InitialBlock
+	}
+
+	g.stagedUsedModules, err = computeStages(g.usedModules, g.modulesInitBlocks)
+	if err != nil {
+		return err
 	}
 
 	g.lowestInitBlock = computeLowestInitBlock(processModules)
@@ -190,7 +193,7 @@ func (l LayerModules) IsStoreLayer() bool {
 	return l[0].GetKindStore() != nil
 }
 
-func computeStages(mods []*pbsubstreams.Module) (stages ExecutionStages) {
+func computeStages(mods []*pbsubstreams.Module, initBlocks map[string]uint64) (stages ExecutionStages, err error) {
 	seen := map[string]bool{}
 
 	var layers StageLayers
@@ -217,23 +220,35 @@ func computeStages(mods []*pbsubstreams.Module) (stages ExecutionStages) {
 				continue
 			}
 
+			var validInputsAtInitialBlock bool
 			for _, dep := range mod.Inputs {
 				var depModName string
 				switch input := dep.Input.(type) {
 				case *pbsubstreams.Module_Input_Params_:
 					continue
 				case *pbsubstreams.Module_Input_Source_:
+					validInputsAtInitialBlock = true
 					continue
 				case *pbsubstreams.Module_Input_Map_:
 					depModName = input.Map.ModuleName
+					if mod.InitialBlock >= initBlocks[depModName] {
+						validInputsAtInitialBlock = true
+					}
 				case *pbsubstreams.Module_Input_Store_:
 					depModName = input.Store.ModuleName
+					if mod.InitialBlock >= initBlocks[depModName] {
+						validInputsAtInitialBlock = true
+					}
 				default:
 					panic(fmt.Errorf("unsupported input type %T", dep.Input))
 				}
 				if !seen[depModName] {
 					continue modLoop
 				}
+			}
+
+			if !validInputsAtInitialBlock {
+				return nil, fmt.Errorf("module %q has no input available at its initial block %d", mod.Name, mod.InitialBlock)
 			}
 
 			//Check block index dependence
@@ -266,7 +281,7 @@ func computeStages(mods []*pbsubstreams.Module) (stages ExecutionStages) {
 		}
 	}
 
-	return stages
+	return stages, nil
 }
 
 func computeOutputModule(mods []*pbsubstreams.Module, outputModule string) *pbsubstreams.Module {

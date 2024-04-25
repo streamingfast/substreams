@@ -74,7 +74,7 @@ func TestPipeline_runExecutor(t *testing.T) {
 }
 
 func mapTestExecutor(t *testing.T, ctx context.Context, name string) *exec.MapperModuleExecutor {
-	pkg := manifest.TestReadManifest(t, "../test/testdata/substreams-test-v0.1.0.spkg")
+	pkg := manifest.TestReadManifest(t, "../test/testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 
 	binaryIndex := uint32(0)
 	for _, module := range pkg.Modules.Modules {

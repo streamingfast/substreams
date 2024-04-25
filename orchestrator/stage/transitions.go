@@ -1,5 +1,7 @@
 package stage
 
+import "fmt"
+
 /*
 Transitions:
 
@@ -136,11 +138,11 @@ func (s *Stages) transition(u Unit, to UnitState, allowedPreviousStates ...UnitS
 			return
 		}
 	}
-	invalidTransition(prev, to)
+	invalidTransition(prev, to, u)
 }
 
-func invalidTransition(prev, next UnitState) {
-	panic("invalid transition from " + prev.String() + " to " + next.String())
+func invalidTransition(prev, next UnitState, u Unit) {
+	panic(fmt.Sprintf("invalid transition from %q to %q on unit [stage: %d, segment: %d]", prev.String(), next.String(), u.Stage, u.Segment))
 }
 
 func (s *Stages) forceTransition(segment int, stage int, to UnitState) {

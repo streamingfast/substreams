@@ -319,7 +319,7 @@ func (s *Stages) getState(u Unit) UnitState {
 	index := u.Segment - s.segmentOffset
 	if index >= len(s.segmentStates) {
 		return UnitPending
-	} else if index < 0 {
+	} else if index < 0 || (len(s.stages) != 0 && u.Segment < s.stages[u.Stage].segmenter.FirstIndex()) {
 		return UnitNoOp
 	} else {
 		return s.segmentStates[index][u.Stage]

@@ -13,16 +13,32 @@ func TestAllAssertionsInComplex(t *testing.T) {
 		linearHandoffBlock uint64
 		exclusiveEndBlock  uint64
 		moduleName         string
+		expectError        bool
 	}{
 		{
-			name:               "sunny path",
+			name:               "startblock too low",
+			startBlock:         10,
+			linearHandoffBlock: 20,
+			exclusiveEndBlock:  80,
+			moduleName:         "all_assert_init_20",
+			expectError:        true,
+		},
+		{
+			name:               "linear mode test",
+			startBlock:         20,
+			linearHandoffBlock: 20,
+			exclusiveEndBlock:  80,
+			moduleName:         "all_assert_init_20",
+		},
+		{
+			name:               "starting before unaligned stores test",
 			startBlock:         20,
 			linearHandoffBlock: 100,
 			exclusiveEndBlock:  120,
 			moduleName:         "all_assert_init_20",
 		},
 		{
-			name:               "failing test",
+			name:               "starting after unaligned stores test",
 			startBlock:         50,
 			linearHandoffBlock: 100,
 			exclusiveEndBlock:  120,
@@ -33,7 +49,12 @@ func TestAllAssertionsInComplex(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			run := newTestRun(t, int64(c.startBlock), c.linearHandoffBlock, c.exclusiveEndBlock, c.moduleName, "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg")
-			require.NoError(t, run.Run(t, c.moduleName))
+			err := run.Run(t, c.moduleName)
+			if c.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
 		})
 	}
 

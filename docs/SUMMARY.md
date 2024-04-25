@@ -20,6 +20,8 @@
     * [JavaScript](new/consume/stream/javascript.md)
     * [Go](new/consume/stream/go.md)
   * [Substreams:Subgraph](new/consume/subgraph/subgraph.md)
+    * [Graph Out](new/consume/subgraph/graph-out.md)
+    * [Triggers](new/consume/subgraph/triggers.md)
   * [Other Ways of Consuming](new/consume/other-sinks/README.md)
     * [Files](new/consume/other-sinks/files.md)
     * [Key-Value Store](new/consume/other-sinks/kv.md)

@@ -344,7 +344,7 @@ func (r *TestRunner) Run(context.Context) error {
 			})
 		}
 	}
-	return nil
+	return io.EOF
 }
 
 type Obj struct {

@@ -86,7 +86,8 @@ graph codegen
 
 ### Inspect the Code
 
-- The `subgraph.yaml` file defines the Substreams triggers as a data source:
+- The `subgraph.yaml` file defines the Substreams triggers as a data source.
+The subgraph will be deploy on Ethereum Mainnet (`mainnet`).
 
 ```yaml
 specVersion: 1.0.0
@@ -97,7 +98,7 @@ schema:
 dataSources:
   - kind: substreams
     name: Transaction
-    network: mainnet
+    network: mainnet # Ethereum mainnet
     source:
       startBlock: 17239000
       package:

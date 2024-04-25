@@ -516,7 +516,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		return fmt.Errorf("error during init_stores_and_backprocess: %w", err)
 	}
 	if reqPlan.LinearPipeline == nil {
-		return pipe.OnStreamTerminated(ctx, nil)
+		return pipe.OnStreamTerminated(ctx, io.EOF)
 	}
 
 	var streamErr error

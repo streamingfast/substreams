@@ -19,7 +19,7 @@ func TestAllAssertionsInComplex(t *testing.T) {
 			startBlock:         20,
 			linearHandoffBlock: 100,
 			exclusiveEndBlock:  120,
-			moduleName:         "all_test_assert_init_20",
+			moduleName:         "all_assert_init_20",
 		},
 
 		{

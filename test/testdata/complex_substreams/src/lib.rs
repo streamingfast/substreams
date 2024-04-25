@@ -7,6 +7,7 @@ use substreams::prelude::*;
 use substreams::store::StoreAdd;
 use substreams::store::StoreNew;
 use crate::pb::test::Block;
+use substreams::{store, Hex};
 
 
 
@@ -65,8 +66,50 @@ fn assert_test_first_store_init_20(block: test::Block, first_store: StoreGetInt6
 }
 
 #[substreams::handlers::map]
+fn assert_test_first_store_deltas_init_20(block: test::Block, first_store: store::Deltas<DeltaInt64>) -> Result<test::Boolean, Error> {
+    let mut block_counter = None;
+
+    first_store
+    .deltas
+    .iter()
+    .for_each(|delta| match delta.key.as_str() {
+        "block_counter" => block_counter = Some(delta.new_value),
+        x => panic!("unhandled key {}", x),
+    });
+
+    if block.number < 20 {
+        assert!(block_counter.is_none());
+        return Ok(test::Boolean { result: true })
+    }
+
+    assert_eq!(block_counter.unwrap(), (block.number - 19) as i64);
+    Ok(test::Boolean { result: true })
+}
+
+#[substreams::handlers::map]
 fn assert_test_second_store_init_20(block: test::Block, second_store: StoreGetInt64) -> Result<test::Boolean, Error> {
     let block_counter = second_store.get_last("block_counter_from_first_store");
+
+    if block.number < 30 {
+        assert!(block_counter.is_none());
+        return Ok(test::Boolean { result: true })
+    }
+
+    assert_eq!(block_counter.unwrap(), (block.number - 19) as i64);
+    Ok(test::Boolean { result: true })
+}
+
+#[substreams::handlers::map]
+fn assert_test_second_store_deltas_init_20(block: test::Block, second_store: store::Deltas<DeltaInt64>) -> Result<test::Boolean, Error> {
+    let mut block_counter = None;
+
+    second_store
+    .deltas
+    .iter()
+    .for_each(|delta| match delta.key.as_str() {
+        "block_counter_from_first_store" => block_counter = Some(delta.new_value),
+        x => panic!("unhandled key {}", x),
+    });
 
     if block.number < 30 {
         assert!(block_counter.is_none());
@@ -91,13 +134,35 @@ fn assert_test_third_store_init_20(block: test::Block, third_store: StoreGetInt6
 }
 
 #[substreams::handlers::map]
-fn all_test_assert_init_20(result_one: test::Boolean, result_two: test::Boolean, result_three: test::Boolean) -> Result<test::Boolean, Error> {
-    //
+fn assert_test_third_store_deltas_init_20(block: test::Block, third_store: store::Deltas<DeltaInt64>) -> Result<test::Boolean, Error> {
+    let mut block_counter = None;
+
+    third_store
+    .deltas
+    .iter()
+    .for_each(|delta| match delta.key.as_str() {
+        "block_counter_from_second_store" => block_counter = Some(delta.new_value),
+        x => panic!("unhandled key {}", x),
+    });
+
+    if block.number < 40 {
+        assert!(block_counter.is_none());
+        return Ok(test::Boolean { result: true })
+    }
+
+    assert_eq!(block_counter.unwrap(), (block.number - 19) as i64);
     Ok(test::Boolean { result: true })
 }
 
 #[substreams::handlers::map]
-fn test_map_output(block: test::Block, third_store: StoreGetInt64) -> Result<test::MapResult, substreams::errors::Error> {
+fn all_test_assert_init_20(result_one: test::Boolean, result_two: test::Boolean, result_three: test::Boolean, result_fourth: test::Boolean, result_fifth: test::Boolean, result_sixth: test::Boolean) -> Result<test::Boolean, Error> {
+    //
+    Ok(test::Boolean { result: true })
+}
+
+
+#[substreams::handlers::map]
+fn test_map_output_init_50(block: test::Block, third_store: StoreGetInt64) -> Result<test::MapResult, substreams::errors::Error> {
     let fake_block_number = third_store.get_last("block_counter_from_second_store").unwrap() as u64;
 
     let out = test::MapResult {

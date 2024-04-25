@@ -96,7 +96,7 @@ schema:
   file: ./schema.graphql
 dataSources:
   - kind: substreams
-    name: Contract
+    name: Transaction
     network: mainnet
     source:
       startBlock: 17239000
@@ -118,19 +118,19 @@ import * as assembly from "./pb/assembly"; // 1.
 import { Transaction } from "../generated/schema"; // 2.
 
 export function handleTransactions(bytes: Uint8Array): void {
-    let transactions = assembly.eth.transaction.v1.Transactions.decode(bytes.buffer); // 3.
-    if (transactions.transactions.length == 0) {
-        log.info("No contracts found", []);
+    let transactions = assembly.eth.transaction.v1.Transactions.decode(bytes.buffer).transactions;
+    if (transactions.length == 0) {
+        log.info("No transactions found", []);
         return;
-    } else {
-        // Loop through all contracts
-        for (let i = 0; i < transactions.transactions.length; i++) {
-            let transaction = transactions.transactions[i];
-            let entity = new Transaction(transaction.hash); // 4.
-            entity.from = transaction.from;
-            entity.to = transaction.to;
-            entity.save();
-        }
+    }
+
+    for (let i = 0; i < transactions.length; i++) {
+        let transaction = transactions[i];
+
+        let entity = new Transaction(transaction.hash);
+        entity.from = transaction.from;
+        entity.to = transaction.to;
+        entity.save();
     }
 }
 ```

@@ -14,6 +14,15 @@ import (
 // pair of `[2]string` where index 0 is the key and index 1 is the value).
 type mapSlice [][2]string
 
+func (s mapSlice) MarshalYAML() (interface{}, error) {
+	m := map[string]string{}
+	for _, kv := range s {
+		m[kv[0]] = kv[1]
+	}
+
+	return m, nil
+}
+
 func (s *mapSlice) UnmarshalYAML(n *yaml.Node) error {
 	if n.Kind != yaml.MappingNode {
 		return fmt.Errorf("expected map")

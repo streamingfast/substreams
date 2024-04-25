@@ -10,8 +10,9 @@ import (
 	"regexp"
 	"strings"
 
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"gopkg.in/yaml.v3"
+
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 const UNSET = math.MaxUint64
@@ -31,18 +32,18 @@ const (
 // Manifest is a YAML structure used to create a Package and its list
 // of Modules. The notion of a manifest does not live in protobuf definitions.
 type Manifest struct {
-	SpecVersion string            `yaml:"specVersion"` // check that it equals v0.1.0
-	Package     PackageMeta       `yaml:"package"`
-	Protobuf    Protobuf          `yaml:"protobuf"`
-	Imports     mapSlice          `yaml:"imports"`
-	Binaries    map[string]Binary `yaml:"binaries"`
-	Modules     []*Module         `yaml:"modules"`
-	Params      map[string]string `yaml:"params"`
+	SpecVersion string            `yaml:"specVersion,omitempty"` // check that it equals v0.1.0
+	Package     PackageMeta       `yaml:"package,omitempty"`
+	Protobuf    Protobuf          `yaml:"protobuf,omitempty"`
+	Imports     mapSlice          `yaml:"imports,omitempty"`
+	Binaries    map[string]Binary `yaml:"binaries,omitempty"`
+	Modules     []*Module         `yaml:"modules,omitempty"`
+	Params      map[string]string `yaml:"params,omitempty"`
 
-	BlockFilters map[string]string         `yaml:"blockFilters"`
-	Network      string                    `yaml:"network"`
-	Networks     map[string]*NetworkParams `yaml:"networks"`
-	Sink         *Sink                     `yaml:"sink"`
+	BlockFilters map[string]string         `yaml:"blockFilters,omitempty"`
+	Network      string                    `yaml:"network,omitempty"`
+	Networks     map[string]*NetworkParams `yaml:"networks,omitempty"`
+	Sink         *Sink                     `yaml:"sink,omitempty"`
 
 	Graph   *ModuleGraph `yaml:"-"`
 	Workdir string       `yaml:"-"`
@@ -54,9 +55,9 @@ type NetworkParams struct {
 }
 
 type Sink struct {
-	Type   string      `yaml:"type"`
-	Module string      `yaml:"module"`
-	Config interface{} `yaml:"config"`
+	Type   string      `yaml:"type,omitempty"`
+	Module string      `yaml:"module,omitempty"`
+	Config interface{} `yaml:"config,omitempty"`
 }
 
 var httpSchemePrefixRegex = regexp.MustCompile("^https?://")
@@ -70,60 +71,60 @@ func (m *Manifest) resolvePath(path string) string {
 }
 
 type PackageMeta struct {
-	Name    string `yaml:"name"`
-	Version string `yaml:"version"` // Semver for package authors
-	URL     string `yaml:"url"`
-	Doc     string `yaml:"doc"`
-	Image   string `yaml:"image"`
+	Name    string `yaml:"name,omitempty"`
+	Version string `yaml:"version,omitempty"` // Semver for package authors
+	URL     string `yaml:"url,omitempty"`
+	Doc     string `yaml:"doc,omitempty"`
+	Image   string `yaml:"image,omitempty"`
 }
 
 type Protobuf struct {
-	Files       []string `yaml:"files"`
-	ImportPaths []string `yaml:"importPaths"`
+	Files       []string `yaml:"files,omitempty"`
+	ImportPaths []string `yaml:"importPaths,omitempty"`
 }
 
 type Module struct {
-	Name         string       `yaml:"name"`
-	Doc          string       `yaml:"doc"`
-	Kind         string       `yaml:"kind"`
-	InitialBlock *uint64      `yaml:"initialBlock"`
-	BlockFilter  *BlockFilter `yaml:"blockFilter"`
+	Name         string       `yaml:"name,omitempty"`
+	Doc          string       `yaml:"doc,omitempty"`
+	Kind         string       `yaml:"kind,omitempty"`
+	InitialBlock *uint64      `yaml:"initialBlock,omitempty"`
+	BlockFilter  *BlockFilter `yaml:"blockFilter,omitempty"`
 
-	UpdatePolicy string `yaml:"updatePolicy"`
-	ValueType    string `yaml:"valueType"`
-	Binary       string `yaml:"binary"`
+	UpdatePolicy string `yaml:"updatePolicy,omitempty"`
+	ValueType    string `yaml:"valueType,omitempty"`
+	Binary       string `yaml:"binary,omitempty"`
 
-	Inputs []*Input     `yaml:"inputs"`
-	Output StreamOutput `yaml:"output"`
-	Use    string       `yaml:"use"`
+	Inputs []*Input     `yaml:"inputs,omitempty"`
+	Output StreamOutput `yaml:"output,omitempty"`
+	Use    string       `yaml:"use,omitempty"`
 }
 
 type BlockFilter struct {
-	Module string `yaml:"module"`
-	Query  string `yaml:"query"`
+	Module string `yaml:"module,omitempty"`
+	Query  string `yaml:"query,omitempty"`
 }
 
 type Input struct {
-	Source string `yaml:"source"`
-	Store  string `yaml:"store"`
-	Map    string `yaml:"map"`
-	Params string `yaml:"params"`
+	Source string `yaml:"source,omitempty"`
+	Store  string `yaml:"store,omitempty"`
+	Map    string `yaml:"map,omitempty"`
+	Params string `yaml:"params,omitempty"`
 
-	Mode string `yaml:"mode"`
+	Mode string `yaml:"mode,omitempty"`
 }
 
 type Binary struct {
-	File                string            `yaml:"file"`
-	Type                string            `yaml:"type"`
-	Native              string            `yaml:"native"`
+	File                string            `yaml:"file,omitempty"`
+	Type                string            `yaml:"type,omitempty"`
+	Native              string            `yaml:"native,omitempty"`
 	Content             []byte            `yaml:"-"`
-	Entrypoint          string            `yaml:"entrypoint"`
-	ProtoPackageMapping map[string]string `yaml:"protoPackageMapping"`
+	Entrypoint          string            `yaml:"entrypoint,omitempty"`
+	ProtoPackageMapping map[string]string `yaml:"protoPackageMapping,omitempty"`
 }
 
 type StreamOutput struct {
 	// For 'map'
-	Type string `yaml:"type"`
+	Type string `yaml:"type,omitempty"`
 }
 
 func decodeYamlManifestFromFile(yamlFilePath, workingDir string) (out *Manifest, err error) {

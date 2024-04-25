@@ -63,10 +63,6 @@ func (s *Stores) flushStores(ctx context.Context, executionStages exec.Execution
 	if s.StoreMap == nil {
 		return // fast exit for cases without stores or no linear processing
 	}
-	lastLayer := executionStages.LastStage().LastLayer()
-	if !lastLayer.IsStoreLayer() {
-		return nil
-	}
 
 	boundaryIntervals := s.bounder.GetStoreFlushRanges(s.isTier2Request, s.bounder.requestStopBlock, blockNum)
 	for _, boundaryBlock := range boundaryIntervals {

@@ -174,7 +174,6 @@ func TestHandleUseModules(t *testing.T) {
 }
 
 func TestValidateManifest(t *testing.T) {
-	var initialBlock uint64 = 123
 	cases := []struct {
 		name          string
 		manifest      *Manifest

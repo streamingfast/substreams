@@ -2,8 +2,9 @@ package manifest
 
 import (
 	"fmt"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"testing"
+
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 
 	"github.com/stretchr/testify/require"
 )
@@ -218,16 +219,6 @@ func TestValidateManifest(t *testing.T) {
 				},
 			},
 			expectedError: "stream \"basic_index\": block index module should have inputs",
-		},
-		{
-			name: "block index with initialBlock",
-			manifest: &Manifest{
-				SpecVersion: "v0.1.0",
-				Modules: []*Module{
-					{Name: "basic_index", Kind: "blockIndex", Inputs: []*Input{{Map: "proto:sf.database.v1.changes"}}, InitialBlock: &initialBlock, Output: StreamOutput{"proto:sf.substreams.index.v1.Keys"}},
-				},
-			},
-			expectedError: "stream \"basic_index\": block index module cannot have initial block",
 		},
 		{
 			name: "block index with block filter",

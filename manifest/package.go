@@ -99,10 +99,6 @@ func (r *manifestConverter) validateManifest(manif *Manifest) error {
 				}
 			}
 
-			if s.InitialBlock != nil {
-				return fmt.Errorf("stream %q: block index module cannot have initial block", s.Name)
-			}
-
 			if s.BlockFilter != nil {
 				return fmt.Errorf("stream %q: block index module cannot have block filter", s.Name)
 			}

@@ -16,7 +16,8 @@ protobuf:
 
 modules:
   - name: index
-    kind: map
+    initialBlock: 20 
+    kind: blockIndex
     inputs:
       - source: sf.substreams.v1.test.Block
     output:

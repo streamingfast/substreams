@@ -180,6 +180,7 @@ fn map_output_init_50(block: test::Block, third_store: StoreGetInt64) -> Result<
 #[substreams::handlers::map]
 fn second_map_output_init_50(block: test::Block, third_store: StoreGetInt64, fourth_store: StoreGetInt64) -> Result<test::MapResult, substreams::errors::Error> {
     let fake_counter = third_store.get_last("block_counter_from_second_store").unwrap() as u64;
+    
     let fake_counter_times_two = fourth_store.get_last("block_counter_from_second_store_times_two").unwrap() as u64;
 
     let out = test::MapResult {

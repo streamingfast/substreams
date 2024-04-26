@@ -96,10 +96,9 @@ func NewRequest(ctx context.Context, req *reqctx.RequestDetails, stageIndex int,
 	segment := uint64(workRange.StartBlock) / tier2ReqParams.StateBundleSize
 
 	return &pbssinternal.ProcessRangeRequest{
-		Modules:      req.Modules,
-		OutputModule: req.OutputModule,
-		Stage:        uint32(stageIndex),
-
+		Modules:              req.Modules,
+		OutputModule:         req.OutputModule,
+		Stage:                uint32(stageIndex),
 		MeteringConfig:       tier2ReqParams.MeteringConfig,
 		FirstStreamableBlock: tier2ReqParams.FirstStreamableBlock,
 		MergedBlocksStore:    tier2ReqParams.MergedBlockStoreURL,

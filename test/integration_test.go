@@ -320,7 +320,7 @@ func TestOneStoreOneMap(t *testing.T) {
 				return res
 			}
 
-			assertFiles(t, run.TempDir, withZST(test.expectFiles)...)
+			assertFiles(t, run.TempDir, true, withZST(test.expectFiles)...)
 		})
 	}
 }
@@ -438,7 +438,7 @@ func listFiles(t *testing.T, tempDir string) []string {
 	return storedFiles
 }
 
-func assertFiles(t *testing.T, tempDir string, wantedFiles ...string) {
+func assertFiles(t *testing.T, tempDir string, expectPartialSpkg bool, wantedFiles ...string) {
 	producedFiles := listFiles(t, tempDir)
 
 	actualFiles := make([]string, 0, len(producedFiles))
@@ -452,7 +452,10 @@ func assertFiles(t *testing.T, tempDir string, wantedFiles ...string) {
 		actualFiles = append(actualFiles, filepath.Join(parts[3:]...))
 	}
 
-	assert.True(t, seenPartialSpkg, "substreams.partial.spkg should be produced")
+	if expectPartialSpkg {
+		assert.True(t, seenPartialSpkg, "substreams.partial.spkg should be produced")
+	}
+
 	assert.ElementsMatch(t, wantedFiles, actualFiles)
 }
 

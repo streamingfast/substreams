@@ -41,6 +41,8 @@ func loadStore(ctx context.Context, store dstore.Store, filename string) (out []
 
 	err = derr.RetryContext(ctx, 5, func(ctx context.Context) error {
 		r, err := store.OpenObject(ctx, filename)
+		x := store.ObjectPath(filename)
+		fmt.Println(x)
 		if err != nil {
 			return fmt.Errorf("opening file: %w", err)
 		}

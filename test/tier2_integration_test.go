@@ -23,6 +23,7 @@ func TestTier2Call(t *testing.T) {
 	mapInit50 := hex.EncodeToString([]byte("map_output_init_50"))
 	firstStoreInit20 := hex.EncodeToString([]byte("first_store_init_20"))
 	secondStoreInit30 := hex.EncodeToString([]byte("second_store_init_30"))
+	thirdStoreInit40 := hex.EncodeToString([]byte("third_store_init_40"))
 
 	ctx := context.Background()
 	cases := []struct {
@@ -36,6 +37,12 @@ func TestTier2Call(t *testing.T) {
 		preCreatedFiles      []string
 		expectRemainingFiles []string
 	}{
+		// Complex substreams package : "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg"
+		//Stage 0: [["first_store_init_20"]]
+		//Stage 1: [["second_store_init_30"]]
+		//Stage 2: [["third_store_init_40"]]
+		//Stage 3: [["map_output_init_50"]]
+
 		{
 			name:            "test1",
 			startBlock:      10,
@@ -52,15 +59,28 @@ func TestTier2Call(t *testing.T) {
 			name:            "check full kv production in previous stages",
 			startBlock:      50,
 			endBlock:        60,
-			stage:           3,
+			stage:           2,
 			moduleName:      "map_output_init_50",
 			stateBundleSize: 10,
 			manifestPath:    "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg",
 			preCreatedFiles: []string{
 				firstStoreInit20 + "/states/0000000050-0000000020.kv.zst",
+				secondStoreInit30 + "/states/0000000050-0000000030.kv.zst",
+				//thirdStoreInit40 + "/states/0000000050-0000000040.kv.zst",
 			},
+
 			expectRemainingFiles: []string{
-				mapInit50 + "/outputs/0000000010-0000000020.output",
+				firstStoreInit20 + "/states/0000000060-0000000020.kv",
+				secondStoreInit30 + "/states/0000000060-0000000030.kv",
+				thirdStoreInit40 + "/states/0000000060-0000000040.kv",
+
+				firstStoreInit20 + "/states/0000000050-0000000020.kv",
+				firstStoreInit20 + "/outputs/0000000050-0000000060.output",
+				secondStoreInit30 + "/states/0000000050-0000000030.kv",
+				secondStoreInit30 + "/outputs/0000000050-0000000060.output",
+				thirdStoreInit40 + "/states/0000000050-0000000040.kv",
+				thirdStoreInit40 + "/outputs/0000000050-0000000060.output",
+				mapInit50 + "/outputs/0000000050-0000000060.output",
 			},
 		},
 	}

@@ -26,7 +26,7 @@ func TestTier2Call(t *testing.T) {
 	firstStoreInit20 := hex.EncodeToString([]byte("first_store_init_20"))
 	secondStoreInit30 := hex.EncodeToString([]byte("second_store_init_30"))
 	thirdStoreInit40 := hex.EncodeToString([]byte("third_store_init_40"))
-	fourthStoreInit50 := hex.EncodeToString([]byte("fourth_store_init_50"))
+	fourthStoreInit52 := hex.EncodeToString([]byte("fourth_store_init_52"))
 
 	ctx := context.Background()
 	cases := []struct {
@@ -92,7 +92,7 @@ func TestTier2Call(t *testing.T) {
 		// Output module : second_map_output_init_50
 		//Stage 0: [["first_store_init_20"]]
 		//Stage 1: [["second_store_init_30"]]
-		//Stage 2: [["third_store_init_40","fourth_store_init_50"]]
+		//Stage 2: [["third_store_init_40","fourth_store_init_52"]]
 		//Stage 3: [["second_map_output_init_50"]]
 		{
 			name:            "stores with different initial blocks on the same stage",
@@ -121,8 +121,8 @@ func TestTier2Call(t *testing.T) {
 				thirdStoreInit40 + "/outputs/0000000050-0000000060.output",
 				secondMapInit50 + "/outputs/0000000050-0000000060.output",
 
-				fourthStoreInit50 + "/states/0000000060-0000000050.kv",
-				fourthStoreInit50 + "/outputs/0000000050-0000000060.output",
+				fourthStoreInit52 + "/states/0000000060-0000000052.kv",
+				fourthStoreInit52 + "/outputs/0000000052-0000000060.output",
 			},
 		},
 	}

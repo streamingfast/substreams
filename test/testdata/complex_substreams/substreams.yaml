@@ -97,6 +97,15 @@ modules:
       - source: sf.substreams.v1.test.Block
       - store: second_store_init_30   
 
+  - name: fourth_store_init_50
+    kind: store
+    initialBlock: 50
+    updatePolicy: set
+    valueType: int64
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: second_store_init_30
+
   - name: assert_third_store_init_20
     kind: map
     initialBlock: 20
@@ -138,4 +147,14 @@ modules:
       - store: third_store_init_40
     output:
       type: proto:sf.substreams.v1.test.MapResult
+
+  - name: second_map_output_init_50
+    kind: map
+    initialBlock: 50
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: third_store_init_40
+      - store: fourth_store_init_50
+    output:
+        type: proto:sf.substreams.v1.test.MapResult
 

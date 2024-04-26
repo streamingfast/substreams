@@ -51,6 +51,11 @@ fn third_store_init_40(block: test::Block, second_store: StoreGetInt64, third_st
     third_store.set(0, format!("block_counter_from_second_store"), &block_counter)
 }
 
+#[substreams::handlers::store]
+fn fourth_store_init_50(block: test::Block, second_store: StoreGetInt64, fourth_store: StoreSetInt64) {
+    let block_counter_times_two = second_store.get_last("block_counter_from_first_store").unwrap()*2;
+    fourth_store.set(0, format!("block_counter_from_second_store_times_two"), &block_counter_times_two)
+}
 
 #[substreams::handlers::map]
 fn assert_first_store_init_20(block: test::Block, first_store: StoreGetInt64) -> Result<test::Boolean, Error> {
@@ -160,18 +165,31 @@ fn all_assert_init_20(result_one: test::Boolean, result_two: test::Boolean, resu
     Ok(test::Boolean { result: true })
 }
 
-
 #[substreams::handlers::map]
 fn map_output_init_50(block: test::Block, third_store: StoreGetInt64) -> Result<test::MapResult, substreams::errors::Error> {
-    let fake_block_number = third_store.get_last("block_counter_from_second_store").unwrap() as u64;
+    let fake_counter = third_store.get_last("block_counter_from_second_store").unwrap() as u64;
 
     let out = test::MapResult {
-        block_number: fake_block_number,
+        block_number: fake_counter,
         block_hash: block.id,
     };
 
     Ok(out)
 }
+
+#[substreams::handlers::map]
+fn second_map_output_init_50(block: test::Block, third_store: StoreGetInt64, fourth_store: StoreGetInt64) -> Result<test::MapResult, substreams::errors::Error> {
+    let fake_counter = third_store.get_last("block_counter_from_second_store").unwrap() as u64;
+    let fake_counter_times_two = fourth_store.get_last("block_counter_from_second_store_times_two").unwrap() as u64;
+
+    let out = test::MapResult {
+        block_number: fake_counter + fake_counter_times_two,
+        block_hash: block.id,
+    };
+
+    Ok(out)
+}
+
 
 
 

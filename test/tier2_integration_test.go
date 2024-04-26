@@ -26,7 +26,7 @@ func TestTier2Call(t *testing.T) {
 	firstStoreInit20 := hex.EncodeToString([]byte("first_store_init_20"))
 	secondStoreInit30 := hex.EncodeToString([]byte("second_store_init_30"))
 	thirdStoreInit40 := hex.EncodeToString([]byte("third_store_init_40"))
-	//fourthStoreInit50 := hex.EncodeToString([]byte("fourth_store_init_50"))
+	fourthStoreInit50 := hex.EncodeToString([]byte("fourth_store_init_50"))
 
 	ctx := context.Background()
 	cases := []struct {
@@ -120,6 +120,9 @@ func TestTier2Call(t *testing.T) {
 				thirdStoreInit40 + "/states/0000000050-0000000040.kv",
 				thirdStoreInit40 + "/outputs/0000000050-0000000060.output",
 				secondMapInit50 + "/outputs/0000000050-0000000060.output",
+
+				fourthStoreInit50 + "/states/0000000060-0000000050.kv",
+				fourthStoreInit50 + "/outputs/0000000050-0000000060.output",
 			},
 		},
 	}

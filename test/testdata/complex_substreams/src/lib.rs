@@ -52,7 +52,7 @@ fn third_store_init_40(block: test::Block, second_store: StoreGetInt64, third_st
 }
 
 #[substreams::handlers::store]
-fn fourth_store_init_50(block: test::Block, second_store: StoreGetInt64, fourth_store: StoreSetInt64) {
+fn fourth_store_init_52(block: test::Block, second_store: StoreGetInt64, fourth_store: StoreSetInt64) {
     let block_counter_times_two = second_store.get_last("block_counter_from_first_store").unwrap()*2;
     fourth_store.set(0, format!("block_counter_from_second_store_times_two"), &block_counter_times_two)
 }

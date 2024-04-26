@@ -139,9 +139,9 @@ modules:
     output:
       type: proto:sf.substreams.v1.test.Boolean  
               
-  - name: map_output_init_50
+  - name: map_output_init_52
     kind: map
-    initialBlock: 50
+    initialBlock: 52
     inputs:
       - source: sf.substreams.v1.test.Block
       - store: third_store_init_40

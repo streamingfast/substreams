@@ -65,7 +65,7 @@ func TestTier2Call(t *testing.T) {
 		stateBundleSize       uint64
 		manifestPath          string
 		preCreatedFiles       []string
-		preCreatedIndices     preCreatedIndices
+		preCreatedIndices     *preCreatedIndices
 		expectRemainingFiles  []string
 		mapOutputFileToCheck  string
 		expectedSkippedBlocks map[uint64]struct{}
@@ -155,7 +155,7 @@ func TestTier2Call(t *testing.T) {
 			stateBundleSize: 10,
 			manifestPath:    "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg",
 
-			preCreatedIndices: preCreatedIndices{
+			preCreatedIndices: &preCreatedIndices{
 				fileName: blockIndexInit60 + "/index/0000000070-0000000080.index",
 				indices:  map[string]*roaring64.Bitmap{"even": randomIndicesRange},
 			},
@@ -180,7 +180,6 @@ func TestTier2Call(t *testing.T) {
 			moduleName:      "map_using_index_init_70",
 			stateBundleSize: 10,
 			manifestPath:    "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg",
-			preCreatedFiles: []string{},
 
 			expectRemainingFiles: []string{
 				blockIndexInit60 + "/index/0000000070-0000000080.index",
@@ -200,8 +199,10 @@ func TestTier2Call(t *testing.T) {
 			err := createFiles(extendedTempDir, test.preCreatedFiles)
 			require.NoError(t, err)
 
-			err = createIndexFile(ctx, extendedTempDir, test.preCreatedIndices.fileName, test.preCreatedIndices.indices)
-			require.NoError(t, err)
+			if test.preCreatedIndices != nil {
+				err = createIndexFile(ctx, extendedTempDir, test.preCreatedIndices.fileName, test.preCreatedIndices.indices)
+				require.NoError(t, err)
+			}
 
 			pkg := manifest.TestReadManifest(t, test.manifestPath)
 
@@ -295,8 +296,6 @@ func checkBlockSkippedInOutputFile(ctx context.Context, extendedTempDir, checked
 	if err = outputData.UnmarshalFast(bytes); err != nil {
 		return fmt.Errorf("unmarshalling file %s: %w", checkedFile, err)
 	}
-
-	fmt.Println("Output Data", outputData)
 
 	for _, item := range outputData.Kv {
 		if _, found := expectedSkippedBlock[item.BlockNum]; found {

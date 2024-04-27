@@ -25,7 +25,6 @@ fn index_init_60(blk: test::Block) -> Result<keys::Keys, substreams::errors::Err
 
 #[substreams::handlers::map]
 fn map_using_index_init_70(blk: test::Block) -> Result<test::Boolean, Error> {
-    assert!(blk.number % 2 == 0, "expected even block number");
     Ok(test::Boolean { result: true })    
 }
 

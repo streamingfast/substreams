@@ -43,7 +43,7 @@ func (f *File) Set(indices map[string]*roaring64.Bitmap) {
 	f.Indices = indices
 }
 
-func convertIndexesMapToBytes(indices map[string]*roaring64.Bitmap) (map[string][]byte, error) {
+func ConvertIndexesMapToBytes(indices map[string]*roaring64.Bitmap) (map[string][]byte, error) {
 	out := make(map[string][]byte, len(indices))
 	for key, value := range indices {
 		valueToBytes, err := value.ToBytes()
@@ -57,7 +57,7 @@ func convertIndexesMapToBytes(indices map[string]*roaring64.Bitmap) (map[string]
 
 func (f *File) Save(ctx context.Context) error {
 	filename := f.Filename()
-	convertedIndexes, err := convertIndexesMapToBytes(f.Indices)
+	convertedIndexes, err := ConvertIndexesMapToBytes(f.Indices)
 	if err != nil {
 		return fmt.Errorf("converting Indices to bytes: %w", err)
 	}

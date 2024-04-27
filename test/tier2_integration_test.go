@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
@@ -8,6 +9,13 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	pbindexes "github.com/streamingfast/substreams/storage/index/pb"
+	"google.golang.org/protobuf/proto"
+
+	"github.com/streamingfast/substreams/storage/index"
+
+	"github.com/RoaringBitmap/roaring/roaring64"
 
 	"github.com/streamingfast/dstore"
 
@@ -22,6 +30,11 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 )
 
+type preCreatedIndices struct {
+	fileName string
+	indices  map[string]*roaring64.Bitmap
+}
+
 func TestTier2Call(t *testing.T) {
 	manifest.UseSimpleHash = true
 	mapInit50 := hex.EncodeToString([]byte("map_output_init_50"))
@@ -34,6 +47,14 @@ func TestTier2Call(t *testing.T) {
 	blockIndexInit60 := hex.EncodeToString([]byte("index_init_60"))
 	mapUsingIndexInit70 := hex.EncodeToString([]byte("map_using_index_init_70"))
 
+	randomIndicesRange := roaring64.New()
+	randomIndicesRange.AddInt(70)
+	randomIndicesRange.AddInt(71)
+	randomIndicesRange.AddInt(72)
+	randomIndicesRange.AddInt(73)
+	randomIndicesRange.AddInt(74)
+	randomIndicesRange.AddInt(76)
+
 	ctx := context.Background()
 	cases := []struct {
 		name                  string
@@ -44,6 +65,7 @@ func TestTier2Call(t *testing.T) {
 		stateBundleSize       uint64
 		manifestPath          string
 		preCreatedFiles       []string
+		preCreatedIndices     preCreatedIndices
 		expectRemainingFiles  []string
 		mapOutputFileToCheck  string
 		expectedSkippedBlocks map[uint64]struct{}
@@ -120,12 +142,38 @@ func TestTier2Call(t *testing.T) {
 				fourthStoreInit52 + "/outputs/0000000052-0000000060.output",
 			},
 		},
+		// This test is checking the index file loading when file already existing
+		// Complex substreams package : "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg"
+		// Output module : map_using_index with block filter on even keys
+		//Stage 0: [["index"],["map_using_index"]]
+		{
+			name:            "test index_init_60 with map_using_index_init_70 filtering through key 'even' with pre-existing random indices",
+			startBlock:      70,
+			endBlock:        80,
+			stage:           0,
+			moduleName:      "map_using_index_init_70",
+			stateBundleSize: 10,
+			manifestPath:    "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg",
+
+			preCreatedIndices: preCreatedIndices{
+				fileName: blockIndexInit60 + "/index/0000000070-0000000080.index",
+				indices:  map[string]*roaring64.Bitmap{"even": randomIndicesRange},
+			},
+
+			expectRemainingFiles: []string{
+				mapUsingIndexInit70 + "/outputs/0000000070-0000000080.output",
+				blockIndexInit60 + "/index/0000000070-0000000080.index",
+			},
+
+			mapOutputFileToCheck:  mapUsingIndexInit70 + "/outputs/0000000070-0000000080.output",
+			expectedSkippedBlocks: map[uint64]struct{}{75: {}, 77: {}, 78: {}, 79: {}, 80: {}},
+		},
 
 		// Complex substreams package : "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg"
 		// Output module : map_using_index with block filter on even keys
 		//Stage 0: [["index"],["map_using_index"]]
 		{
-			name:            "test index_init_60 with map_using_index_init_70 ",
+			name:            "test index_init_60 with map_using_index_init_70 filtering through key 'even'",
 			startBlock:      70,
 			endBlock:        80,
 			stage:           0,
@@ -150,6 +198,9 @@ func TestTier2Call(t *testing.T) {
 
 			extendedTempDir := filepath.Join(testTempDir, "test.store", "tag")
 			err := createFiles(extendedTempDir, test.preCreatedFiles)
+			require.NoError(t, err)
+
+			err = createIndexFile(ctx, extendedTempDir, test.preCreatedIndices.fileName, test.preCreatedIndices.indices)
 			require.NoError(t, err)
 
 			pkg := manifest.TestReadManifest(t, test.manifestPath)
@@ -200,7 +251,7 @@ func TestTier2Call(t *testing.T) {
 
 func createFiles(extendedTempDir string, files []string) error {
 	for _, file := range files {
-		err := createFile(extendedTempDir, file)
+		_, err := createFile(extendedTempDir, file)
 		if err != nil {
 			return err
 		}
@@ -208,20 +259,20 @@ func createFiles(extendedTempDir string, files []string) error {
 	return nil
 }
 
-func createFile(extendedTempDir string, file string) error {
+func createFile(extendedTempDir string, file string) (*os.File, error) {
 	desiredPath := filepath.Join(extendedTempDir, file)
 
 	err := os.MkdirAll(filepath.Dir(desiredPath), os.ModePerm)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	_, err = os.Create(desiredPath)
+	createdFile, err := os.Create(desiredPath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return createdFile, nil
 }
 
 func checkBlockSkippedInOutputFile(ctx context.Context, extendedTempDir, checkedFile string, expectedSkippedBlock map[uint64]struct{}) error {
@@ -245,10 +296,38 @@ func checkBlockSkippedInOutputFile(ctx context.Context, extendedTempDir, checked
 		return fmt.Errorf("unmarshalling file %s: %w", checkedFile, err)
 	}
 
+	fmt.Println("Output Data", outputData)
+
 	for _, item := range outputData.Kv {
 		if _, found := expectedSkippedBlock[item.BlockNum]; found {
-			return fmt.Errorf("item should not exist for this block")
+			return fmt.Errorf("item should not exist for this block %d", item.BlockNum)
 		}
+	}
+
+	return nil
+}
+
+func createIndexFile(ctx context.Context, extendedTempDir string, filename string, indices map[string]*roaring64.Bitmap) error {
+	data, err := index.ConvertIndexesMapToBytes(indices)
+	if err != nil {
+		return fmt.Errorf("converting indices into bytes")
+	}
+
+	pbIndexesMap := pbindexes.Map{Indexes: data}
+	cnt, err := proto.Marshal(&pbIndexesMap)
+	if err != nil {
+		return fmt.Errorf("marshalling Indices: %w", err)
+	}
+
+	store, err := dstore.NewStore(extendedTempDir, "zst", "zstd", false)
+	if err != nil {
+		return fmt.Errorf("initializing dstore for %q: %w", extendedTempDir, err)
+	}
+
+	reader := bytes.NewReader(cnt)
+	err = store.WriteObject(ctx, filename, reader)
+	if err != nil {
+		return fmt.Errorf("writing file %s : %w", filename, err)
 	}
 
 	return nil

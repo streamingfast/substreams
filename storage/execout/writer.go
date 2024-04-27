@@ -14,16 +14,16 @@ import (
 type Writer struct {
 	wg *sync.WaitGroup
 
-	CurrentFile   *File
-	outputModule  string
-	isIndexWriter bool
+	CurrentFile      *File
+	outputModule     string
+	isWriterForIndex bool
 }
 
-func NewWriter(initialBlockBoundary, exclusiveEndBlock uint64, outputModule string, configs *Configs, isIndexWriter bool) *Writer {
+func NewWriter(initialBlockBoundary, exclusiveEndBlock uint64, outputModule string, configs *Configs, isWriterForIndex bool) *Writer {
 	w := &Writer{
-		wg:            &sync.WaitGroup{},
-		outputModule:  outputModule,
-		isIndexWriter: isIndexWriter,
+		wg:               &sync.WaitGroup{},
+		outputModule:     outputModule,
+		isWriterForIndex: isWriterForIndex,
 	}
 
 	segmenter := block.NewSegmenter(configs.execOutputSaveInterval, initialBlockBoundary, exclusiveEndBlock)
@@ -41,7 +41,7 @@ func (w *Writer) Write(clock *pbsubstreams.Clock, buffer *Buffer) {
 
 func (w *Writer) Close(ctx context.Context) error {
 	// Skip outputs file saving for blockIndex module
-	if w.isIndexWriter {
+	if w.isWriterForIndex {
 		return nil
 	}
 

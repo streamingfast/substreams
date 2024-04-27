@@ -3,18 +3,18 @@ package index
 import (
 	"fmt"
 
+	"github.com/streamingfast/substreams/block"
+
 	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
 )
 
 type Config struct {
-	name       string
-	moduleHash string
-	objStore   dstore.Store
-
+	name               string
+	moduleHash         string
+	objStore           dstore.Store
 	moduleInitialBlock uint64
-
-	logger *zap.Logger
+	logger             *zap.Logger
 }
 
 func NewConfig(name string, moduleInitialBlock uint64, moduleHash string, baseStore dstore.Store, logger *zap.Logger) (*Config, error) {
@@ -32,11 +32,12 @@ func NewConfig(name string, moduleInitialBlock uint64, moduleHash string, baseSt
 	}, nil
 }
 
-func (c *Config) NewFile() *File {
+func (c *Config) NewFile(targetRange *block.Range) *File {
 	return &File{
 		moduleInitialBlock: c.moduleInitialBlock,
 		store:              c.objStore,
 		moduleName:         c.name,
 		logger:             c.logger,
+		blockRange:         targetRange,
 	}
 }

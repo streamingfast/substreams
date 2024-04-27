@@ -68,5 +68,5 @@ func (i *IndexModuleExecutor) HasValidOutput() bool {
 	return true
 }
 func (i *IndexModuleExecutor) HasOutputForFiles() bool {
-	return false
+	return true
 }

@@ -636,7 +636,7 @@ func GetExecutionPlan(
 
 		switch mod.ModuleKind() {
 		case pbsubstreams.ModuleKindBlockIndex:
-			indexFile := indexConfigs.ConfigMap[name].NewFile()
+			indexFile := indexConfigs.ConfigMap[name].NewFile(&block.Range{StartBlock: startBlock, ExclusiveEndBlock: stopBlock})
 			err := indexFile.Load(ctx)
 			if err != nil {
 				requiredModules[name] = usedModules[name]
@@ -698,12 +698,19 @@ func GetExecutionPlan(
 			writerStartBlock = module.InitialBlock
 		}
 
+		var isIndexWriter bool
+		if module.ModuleKind() == pbsubstreams.ModuleKindBlockIndex {
+			isIndexWriter = true
+		}
+
 		execoutWriters[name] = execout.NewWriter(
 			writerStartBlock,
 			stopBlock,
 			name,
 			execoutConfigs,
+			isIndexWriter,
 		)
+
 	}
 
 	return &ExecutionPlan{

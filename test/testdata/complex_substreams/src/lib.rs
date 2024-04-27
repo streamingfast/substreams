@@ -12,7 +12,7 @@ use substreams::{store, Hex};
 
 
 #[substreams::handlers::map]
-fn index(blk: test::Block) -> Result<keys::Keys, substreams::errors::Error> {
+fn index_init_60(blk: test::Block) -> Result<keys::Keys, substreams::errors::Error> {
     let mut keys = keys::Keys::default();
     if blk.number % 2 == 0 {
         keys.keys.push("even".to_string());
@@ -24,13 +24,9 @@ fn index(blk: test::Block) -> Result<keys::Keys, substreams::errors::Error> {
 }
 
 #[substreams::handlers::map]
-fn assert_index(blk: test::Block, keys: keys::Keys) -> Result<test::Boolean, Error> {
-    if blk.number % 2 == 0 {
-        assert!(keys.keys[0] == "even"); 
-        } else {
-        assert!(keys.keys[0] == "odd"); 
-    } 
-    Ok(test::Boolean { result: true })
+fn map_using_index_init_70(blk: test::Block) -> Result<test::Boolean, Error> {
+    assert!(blk.number % 2 == 0, "expected even block number");
+    Ok(test::Boolean { result: true })    
 }
 
 

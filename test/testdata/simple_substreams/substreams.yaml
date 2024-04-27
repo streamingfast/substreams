@@ -22,6 +22,7 @@ binaries:
 modules:
   - name: test_index
     kind: blockIndex
+    initialBlock: 1
     inputs:
       - source: sf.substreams.v1.test.Block
     output:
@@ -29,7 +30,7 @@ modules:
 
   - name: assert_test_index
     kind: map
-    initialBlock: 10
+    initialBlock: 1
     inputs:
       - source: sf.substreams.v1.test.Block
     blockFilter:

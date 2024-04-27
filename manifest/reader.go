@@ -532,7 +532,7 @@ func duplicateStringInput(in *pbsubstreams.Module_Input) string {
 	}
 }
 
-func checkValidBlockFilter(mod *pbsubstreams.Module, mapModuleKind map[string]pbsubstreams.ModuleKind) error {
+func checkValidBlockFilter(mod *pbsubstreams.Module, mapModuleKind map[string]pbsubstreams.ModuleKind, mapModules map[string]*pbsubstreams.Module) error {
 	blockFilter := mod.GetBlockFilter()
 	if blockFilter != nil {
 		seekModName := blockFilter.GetModule()
@@ -540,9 +540,20 @@ func checkValidBlockFilter(mod *pbsubstreams.Module, mapModuleKind map[string]pb
 		if !found {
 			return fmt.Errorf("block filter module %q not found", blockFilter.Module)
 		}
+
 		if seekModuleKind != pbsubstreams.ModuleKindBlockIndex {
 			return fmt.Errorf("block filter module %q not of 'block_index' kind", blockFilter.Module)
 		}
+
+		seekModule, found := mapModules[seekModName]
+		if !found {
+			return fmt.Errorf("block filter module %q not found", blockFilter.Module)
+		}
+
+		if seekModule.InitialBlock > mod.InitialBlock {
+			return fmt.Errorf("block filter module %q cannot have an init block greater than module %q init block", blockFilter.Module, mod.Name)
+		}
+
 	}
 	return nil
 }
@@ -609,10 +620,12 @@ func ValidateModules(mods *pbsubstreams.Modules) error {
 	}
 
 	mapModuleKind := make(map[string]pbsubstreams.ModuleKind)
+	mapModules := make(map[string]*pbsubstreams.Module)
 	for _, mod := range mods.Modules {
 		if _, found := mapModuleKind[mod.Name]; found {
 			return fmt.Errorf("module %q: duplicate module name", mod.Name)
 		}
+		mapModules[mod.Name] = mod
 		mapModuleKind[mod.Name] = mod.ModuleKind()
 	}
 
@@ -627,7 +640,7 @@ func ValidateModules(mods *pbsubstreams.Modules) error {
 			return fmt.Errorf("limit of 30 inputs for a given module (%q) reached", mod.Name)
 		}
 
-		err := checkValidBlockFilter(mod, mapModuleKind)
+		err := checkValidBlockFilter(mod, mapModuleKind, mapModules)
 		if err != nil {
 			return fmt.Errorf("checking block filter for module %q: %w", mod.Name, err)
 		}

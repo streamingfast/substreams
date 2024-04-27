@@ -15,19 +15,22 @@ protobuf:
     - ../../../proto
 
 modules:
-  - name: index
-    initialBlock: 20 
+  - name: index_init_60
+    initialBlock: 60 
     kind: blockIndex
     inputs:
       - source: sf.substreams.v1.test.Block
     output:
       type: proto:sf.substreams.index.v1.Keys
 
-  - name: assert_index
+  - name: map_using_index_init_70
     kind: map
+    initialBlock: 70
     inputs:
-      - source: sf.substreams.v1.test.Block
-      - map: index 
+      - source: sf.substreams.v1.test.Block 
+    blockFilter:
+      module: index_init_60
+      query: even   
     output:
       type: proto:sf.substreams.v1.test.Boolean
 
@@ -155,7 +158,7 @@ modules:
     inputs:
       - source: sf.substreams.v1.test.Block
       - store: third_store_init_40
-      - store: fourth_store_init_52
+      - store: fourth_store_init_52          
     output:
         type: proto:sf.substreams.v1.test.MapResult
 

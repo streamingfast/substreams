@@ -14,14 +14,16 @@ import (
 type Writer struct {
 	wg *sync.WaitGroup
 
-	CurrentFile  *File
-	outputModule string
+	CurrentFile   *File
+	outputModule  string
+	isIndexWriter bool
 }
 
-func NewWriter(initialBlockBoundary, exclusiveEndBlock uint64, outputModule string, configs *Configs) *Writer {
+func NewWriter(initialBlockBoundary, exclusiveEndBlock uint64, outputModule string, configs *Configs, isIndexWriter bool) *Writer {
 	w := &Writer{
-		wg:           &sync.WaitGroup{},
-		outputModule: outputModule,
+		wg:            &sync.WaitGroup{},
+		outputModule:  outputModule,
+		isIndexWriter: isIndexWriter,
 	}
 
 	segmenter := block.NewSegmenter(configs.execOutputSaveInterval, initialBlockBoundary, exclusiveEndBlock)
@@ -38,6 +40,11 @@ func (w *Writer) Write(clock *pbsubstreams.Clock, buffer *Buffer) {
 }
 
 func (w *Writer) Close(ctx context.Context) error {
+	// Skip outputs file saving for blockIndex module
+	if w.isIndexWriter {
+		return nil
+	}
+
 	if err := w.CurrentFile.Save(ctx); err != nil {
 		return fmt.Errorf("flushing exec output writer: %w", err)
 	}

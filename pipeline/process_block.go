@@ -342,11 +342,12 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 }
 
 type resultObj struct {
-	output        *pbssinternal.ModuleOutput
-	bytes         []byte
-	bytesForFiles []byte
-	err           error
-	skipped       bool
+	output           *pbssinternal.ModuleOutput
+	bytes            []byte
+	bytesForFiles    []byte
+	err              error
+	skipped          bool
+	skippedFromIndex bool
 }
 
 func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, execOutput execout.ExecutionOutput) resultObj {
@@ -355,8 +356,8 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 	executorName := executor.Name()
 	logger.Debug("executing", zap.Uint64("block", execOutput.Clock().Number), zap.String("module_name", executorName))
 
-	moduleOutput, outputBytes, outputBytesFiles, runError := exec.RunModule(ctx, executor, execOutput)
-	return resultObj{moduleOutput, outputBytes, outputBytesFiles, runError, false}
+	moduleOutput, outputBytes, outputBytesFiles, runError, skippedFromIndex := exec.RunModule(ctx, executor, execOutput)
+	return resultObj{moduleOutput, outputBytes, outputBytesFiles, runError, false, skippedFromIndex}
 }
 
 func (p *Pipeline) applyExecutionResult(ctx context.Context, executor exec.ModuleExecutor, res resultObj, execOutput execout.ExecutionOutput) (err error) {
@@ -380,7 +381,7 @@ func (p *Pipeline) applyExecutionResult(ctx context.Context, executor exec.Modul
 		}
 	}
 
-	if executor.HasOutputForFiles() {
+	if !res.skippedFromIndex && executor.HasOutputForFiles() {
 		if err := execOutput.SetFileOutput(executorName, res.bytesForFiles); err != nil {
 			return fmt.Errorf("set output cache: %w", err)
 		}

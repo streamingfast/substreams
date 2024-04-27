@@ -4,9 +4,14 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/streamingfast/dstore"
+
+	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
 
 	"github.com/streamingfast/substreams/manifest"
 
@@ -19,7 +24,6 @@ import (
 
 func TestTier2Call(t *testing.T) {
 	manifest.UseSimpleHash = true
-	testMap := hex.EncodeToString([]byte("index"))
 	mapInit50 := hex.EncodeToString([]byte("map_output_init_50"))
 	secondMapInit50 := hex.EncodeToString([]byte("second_map_output_init_50"))
 
@@ -27,32 +31,23 @@ func TestTier2Call(t *testing.T) {
 	secondStoreInit30 := hex.EncodeToString([]byte("second_store_init_30"))
 	thirdStoreInit40 := hex.EncodeToString([]byte("third_store_init_40"))
 	fourthStoreInit52 := hex.EncodeToString([]byte("fourth_store_init_52"))
+	blockIndexInit60 := hex.EncodeToString([]byte("index_init_60"))
+	mapUsingIndexInit70 := hex.EncodeToString([]byte("map_using_index_init_70"))
 
 	ctx := context.Background()
 	cases := []struct {
-		name                 string
-		startBlock           uint64
-		endBlock             uint64
-		stage                int
-		moduleName           string
-		stateBundleSize      uint64
-		manifestPath         string
-		preCreatedFiles      []string
-		expectRemainingFiles []string
+		name                  string
+		startBlock            uint64
+		endBlock              uint64
+		stage                 int
+		moduleName            string
+		stateBundleSize       uint64
+		manifestPath          string
+		preCreatedFiles       []string
+		expectRemainingFiles  []string
+		mapOutputFileToCheck  string
+		expectedSkippedBlocks map[uint64]struct{}
 	}{
-		{
-			name:            "test1",
-			startBlock:      10,
-			endBlock:        20,
-			stage:           0,
-			moduleName:      "index",
-			stateBundleSize: 10,
-			manifestPath:    "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg",
-			expectRemainingFiles: []string{
-				testMap + "/outputs/0000000010-0000000020.output",
-			},
-		},
-
 		// Complex substreams package : "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg"
 		// Output module : map_output_init_50
 		//Stage 0: [["first_store_init_20"]]
@@ -125,6 +120,28 @@ func TestTier2Call(t *testing.T) {
 				fourthStoreInit52 + "/outputs/0000000052-0000000060.output",
 			},
 		},
+
+		// Complex substreams package : "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg"
+		// Output module : map_using_index with block filter on even keys
+		//Stage 0: [["index"],["map_using_index"]]
+		{
+			name:            "test index_init_60 with map_using_index_init_70 ",
+			startBlock:      70,
+			endBlock:        80,
+			stage:           0,
+			moduleName:      "map_using_index_init_70",
+			stateBundleSize: 10,
+			manifestPath:    "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg",
+			preCreatedFiles: []string{},
+
+			expectRemainingFiles: []string{
+				blockIndexInit60 + "/index/0000000070-0000000080.index",
+				mapUsingIndexInit70 + "/outputs/0000000070-0000000080.output",
+			},
+
+			mapOutputFileToCheck:  mapUsingIndexInit70 + "/outputs/0000000070-0000000080.output",
+			expectedSkippedBlocks: map[uint64]struct{}{71: {}, 73: {}, 75: {}, 77: {}, 79: {}},
+		},
 	}
 
 	for _, test := range cases {
@@ -171,6 +188,11 @@ func TestTier2Call(t *testing.T) {
 			}
 
 			assertFiles(t, testTempDir, false, withZST(test.expectRemainingFiles)...)
+
+			outputFileToCheck := test.mapOutputFileToCheck
+			if outputFileToCheck != "" {
+				err = checkBlockSkippedInOutputFile(ctx, extendedTempDir, outputFileToCheck, test.expectedSkippedBlocks)
+			}
 			require.NoError(t, err)
 		})
 	}
@@ -197,6 +219,36 @@ func createFile(extendedTempDir string, file string) error {
 	_, err = os.Create(desiredPath)
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func checkBlockSkippedInOutputFile(ctx context.Context, extendedTempDir, checkedFile string, expectedSkippedBlock map[uint64]struct{}) error {
+	s, err := dstore.NewStore(extendedTempDir, "zst", "zstd", false)
+	if err != nil {
+		return fmt.Errorf("initializing dstore for %q: %w", extendedTempDir, err)
+	}
+
+	fileReader, err := s.OpenObject(ctx, checkedFile)
+	if err != nil {
+		return fmt.Errorf("opening file %w", err)
+	}
+
+	bytes, err := io.ReadAll(fileReader)
+	if err != nil {
+		return fmt.Errorf("reading store file %w", err)
+	}
+
+	outputData := &pboutput.Map{}
+	if err = outputData.UnmarshalFast(bytes); err != nil {
+		return fmt.Errorf("unmarshalling file %s: %w", checkedFile, err)
+	}
+
+	for _, item := range outputData.Kv {
+		if _, found := expectedSkippedBlock[item.BlockNum]; found {
+			return fmt.Errorf("item should not exist for this block")
+		}
 	}
 
 	return nil

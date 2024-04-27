@@ -139,7 +139,6 @@ func (c *File) Load(ctx context.Context) error {
 }
 
 func (c *File) Save(ctx context.Context) error {
-
 	filename := c.Filename()
 	outputData := &pboutput.Map{Kv: c.Kv}
 	cnt, err := outputData.MarshalFast()

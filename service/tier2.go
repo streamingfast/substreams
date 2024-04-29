@@ -634,9 +634,14 @@ func GetExecutionPlan(
 
 		c := execoutConfigs.ConfigMap[name]
 
+		moduleStartBlock := startBlock
+		if mod.InitialBlock > startBlock {
+			moduleStartBlock = mod.InitialBlock
+		}
+
 		switch mod.ModuleKind() {
 		case pbsubstreams.ModuleKindBlockIndex:
-			indexFile := indexConfigs.ConfigMap[name].NewFile(&block.Range{StartBlock: startBlock, ExclusiveEndBlock: stopBlock})
+			indexFile := indexConfigs.ConfigMap[name].NewFile(&block.Range{StartBlock: moduleStartBlock, ExclusiveEndBlock: stopBlock})
 			err := indexFile.Load(ctx)
 			if err != nil {
 				requiredModules[name] = usedModules[name]
@@ -647,7 +652,7 @@ func GetExecutionPlan(
 			existingIndices[name] = indexFile.Indices
 
 		case pbsubstreams.ModuleKindMap:
-			file, readErr := c.ReadFile(ctx, &block.Range{StartBlock: startBlock, ExclusiveEndBlock: stopBlock})
+			file, readErr := c.ReadFile(ctx, &block.Range{StartBlock: moduleStartBlock, ExclusiveEndBlock: stopBlock})
 			if readErr != nil {
 				requiredModules[name] = usedModules[name]
 				break
@@ -660,7 +665,7 @@ func GetExecutionPlan(
 			}
 
 		case pbsubstreams.ModuleKindStore:
-			file, readErr := c.ReadFile(ctx, &block.Range{StartBlock: startBlock, ExclusiveEndBlock: stopBlock})
+			file, readErr := c.ReadFile(ctx, &block.Range{StartBlock: moduleStartBlock, ExclusiveEndBlock: stopBlock})
 			if readErr != nil {
 				requiredModules[name] = usedModules[name]
 			} else {
@@ -674,7 +679,7 @@ func GetExecutionPlan(
 				return nil, fmt.Errorf("checking fullkv file existence: %w", err)
 			}
 			if !storeExists {
-				partialStoreExists, err := storeConfigs[name].ExistsPartialKV(ctx, startBlock, stopBlock)
+				partialStoreExists, err := storeConfigs[name].ExistsPartialKV(ctx, moduleStartBlock, stopBlock)
 				if err != nil {
 					return nil, fmt.Errorf("checking partial file existence: %w", err)
 				}

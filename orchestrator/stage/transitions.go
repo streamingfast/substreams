@@ -109,12 +109,19 @@ func (s *Stages) MarkSegmentPending(u Unit) {
 	)
 }
 
-func (s *Stages) MarkJobSuccess(u Unit) {
+func (s *Stages) MarkJobSuccess(u Unit) (shadowedUnits []Unit) {
 	s.MarkSegmentPartialPresent(u)
 
-	for i := u.Stage - 1; i >= 0; i-- {
-		s.MarkSegmentCompletedIndirectly(Unit{Segment: u.Segment, Stage: i})
+	if s.shadowable(u.Segment) {
+		for i := u.Stage - 1; i >= 0; i-- {
+			u2 := Unit{Segment: u.Segment, Stage: i}
+			if s.getState(u2) == UnitShadowed {
+				s.transition(u2, UnitPartialPresent, UnitShadowed) // we let the squasher pretend it is partial, because squashing can occur from full or from partial
+				shadowedUnits = append(shadowedUnits, u2)
+			}
+		}
 	}
+	return
 }
 
 func (s *Stages) MarkSegmentPartialPresent(u Unit) {
@@ -128,16 +135,6 @@ func (s *Stages) markSegmentScheduled(u Unit) {
 	s.transition(u, UnitScheduled,
 		UnitPending, // after scheduling some work (NextJob())
 	)
-}
-
-func (s *Stages) MarkSegmentCompletedIndirectly(u Unit) {
-	s.transition(u, UnitCompleted,
-		UnitMerging,
-		UnitScheduled,
-		UnitShadowed,
-		UnitPending,
-		UnitNoOp,
-		UnitCompleted)
 }
 
 func (s *Stages) markSegmentCompleted(u Unit) {

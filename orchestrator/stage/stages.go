@@ -397,20 +397,22 @@ func (s *Stages) NextJob() (Unit, *block.Range) {
 	return Unit{}, nil
 }
 
-func (s *Stages) markShadowedUnits(segmentIdx int) (someShadowed bool) {
+func (s *Stages) shadowable(segmentIdx int) bool {
 	if len(s.stages) < 2 {
+		return false
+	}
+	return segmentIdx-s.segmentOffset <= len(s.stages)-1
+}
+
+func (s *Stages) markShadowedUnits(segmentIdx int) (someShadowed bool) {
+	if !s.shadowable(segmentIdx) {
 		return
 	}
 
-	stagesLen := len(s.stages)
 	relSegmentOrdinal := segmentIdx - s.segmentOffset
-	if relSegmentOrdinal > stagesLen-1 {
-		return
-	}
-
 	s.allocSegments(segmentIdx)
 
-	lastStage := stagesLen - 1
+	lastStage := len(s.stages) - 1
 	for stageIdx := lastStage - 1; stageIdx >= relSegmentOrdinal; stageIdx-- { // skip the last stage
 		unit := Unit{Segment: segmentIdx, Stage: stageIdx}
 		segmentState := s.getState(unit)
@@ -450,8 +452,8 @@ func (s *Stages) dependenciesCompleted(u Unit) bool {
 		state := s.getState(Unit{Segment: u.Segment, Stage: i})
 		switch state {
 		case UnitCompleted, UnitNoOp:
-		case UnitShadowed:
-			// if the direct parent stage is shadowed, we need the previous segment's previous stage to be completed
+		case UnitShadowed, UnitPartialPresent:
+			// if the direct parent stage is shadowed or UnitPartialPresent, we need the previous segment's previous stage to be completed
 			if previousSegmentParent != UnitCompleted && previousSegmentParent != UnitNoOp {
 				return false
 			}

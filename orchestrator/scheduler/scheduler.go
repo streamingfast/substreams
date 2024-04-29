@@ -83,11 +83,24 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 	case work.MsgJobSucceeded:
 		metrics.Tier1ActiveWorkerRequest.Dec()
 
-		s.Stages.MarkJobSuccess(msg.Unit)
+		shadowedUnits := s.Stages.MarkJobSuccess(msg.Unit)
 		s.WorkerPool.Return(msg.Worker)
 
+		tryMerge := s.Stages.CmdTryMerge(msg.Unit.Stage)
+		if shadowedUnits == nil {
+			cmds = append(cmds, tryMerge)
+		} else {
+			multi := []loop.Cmd{tryMerge}
+			for _, u := range shadowedUnits {
+				multi = append(multi, s.Stages.CmdTryMerge(u.Stage))
+			}
+
+			cmds = append(cmds,
+				loop.Batch(multi...),
+			)
+		}
+
 		cmds = append(cmds,
-			s.Stages.CmdTryMerge(msg.Unit.Stage),
 			work.CmdScheduleNextJob(),
 		)
 		if s.ExecOutWalker != nil {

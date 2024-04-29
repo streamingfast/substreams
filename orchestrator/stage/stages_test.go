@@ -92,9 +92,12 @@ func TestNewStageNextJobs(t *testing.T) {
 
 	stages.MarkJobSuccess(unit(0, 2))
 	segmentStateEquals(t, stages, `
-		S:CSS
-		S:CZ.
+		S:PSS
+		S:PZ.
 		M:P..`)
+
+	merge(unit(0, 0))
+	merge(unit(0, 1))
 
 	assert.Equal(t, unit(3, 0), nextJob())
 	segmentStateEquals(t, stages, `
@@ -141,24 +144,59 @@ func TestNewStageNextJobs(t *testing.T) {
 		M:PS...`)
 
 	stages.MarkJobSuccess(unit(2, 1))
-	merge(unit(2, 1))
 	segmentStateEquals(t, stages, `
 		S:CCCCS
-		S:CZCS.
+		S:CZPS.
 		M:PS...`)
 
-	assert.Equal(t, unit(2, 2), nextJob())
-	segmentStateEquals(t, stages, `
-		S:CCCCS
-		S:CZCS.
-		M:PSS..`)
+	noNextJob()
 
 	stages.MarkJobSuccess(unit(1, 2))
 	segmentStateEquals(t, stages, `
 		S:CCCCS
-		S:CCCS.
+		S:CPPS.
+		M:PP...`)
+
+	noNextJob()
+
+	stages.MarkJobSuccess(unit(4, 0))
+
+	assert.Equal(t, unit(4, 1), nextJob())
+	segmentStateEquals(t, stages, `
+		S:CCCCP
+		S:CPPSS
+		M:PP...`)
+
+	merge(unit(1, 1))
+	merge(unit(2, 1))
+	segmentStateEquals(t, stages, `
+		S:CCCCP
+		S:CCCSS
+		M:PP...`)
+
+	assert.Equal(t, unit(2, 2), nextJob())
+	segmentStateEquals(t, stages, `
+		S:CCCCP
+		S:CCCSS
 		M:PPS..`)
 
+	stages.MarkJobSuccess(unit(3, 1))
+	stages.MarkJobSuccess(unit(4, 1))
+	assert.Equal(t, unit(3, 2), nextJob())
+
+	segmentStateEquals(t, stages, `
+		S:CCCCP
+		S:CCCPP
+		M:PPSS.`)
+
+	noNextJob()
+
+	merge(unit(3, 1))
+	assert.Equal(t, unit(4, 2), nextJob())
+	segmentStateEquals(t, stages, `
+		S:CCCCP
+		S:CCCCP
+		M:PPSSS`)
 }
 
 func segmentStateEquals(t *testing.T, s *Stages, segments string) {

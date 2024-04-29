@@ -356,7 +356,7 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 	executorName := executor.Name()
 	logger.Debug("executing", zap.Uint64("block", execOutput.Clock().Number), zap.String("module_name", executorName))
 
-	moduleOutput, outputBytes, outputBytesFiles, runError, skippedFromIndex := exec.RunModule(ctx, executor, execOutput)
+	moduleOutput, outputBytes, outputBytesFiles, skippedFromIndex, runError := exec.RunModule(ctx, executor, execOutput)
 	return resultObj{moduleOutput, outputBytes, outputBytesFiles, runError, false, skippedFromIndex}
 }
 

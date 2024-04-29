@@ -109,6 +109,14 @@ func (s *Stages) MarkSegmentPending(u Unit) {
 	)
 }
 
+func (s *Stages) MarkJobSuccess(u Unit) {
+	s.MarkSegmentPartialPresent(u)
+
+	for i := u.Stage - 1; i >= 0; i-- {
+		s.MarkSegmentCompletedIndirectly(Unit{Segment: u.Segment, Stage: i})
+	}
+}
+
 func (s *Stages) MarkSegmentPartialPresent(u Unit) {
 	s.transition(u, UnitPartialPresent,
 		UnitScheduled, // reported by working completing its generation of a partial
@@ -122,10 +130,24 @@ func (s *Stages) markSegmentScheduled(u Unit) {
 	)
 }
 
+func (s *Stages) MarkSegmentCompletedIndirectly(u Unit) {
+	s.transition(u, UnitCompleted,
+		UnitMerging,
+		UnitScheduled,
+		UnitShadowed,
+		UnitPending,
+		UnitNoOp,
+		UnitCompleted)
+}
+
 func (s *Stages) markSegmentCompleted(u Unit) {
 	s.transition(u, UnitCompleted,
 		UnitPending, // from an initial storage state snapshot
 		UnitMerging, // from the Squasher's merge operations completing
+		UnitScheduled,
+		UnitShadowed,
+		UnitNoOp,
+		UnitCompleted, // in case it got completed indirectly
 	)
 }
 

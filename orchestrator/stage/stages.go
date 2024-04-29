@@ -352,15 +352,14 @@ func (s *Stages) NextJob() (Unit, *block.Range) {
 	// OPTIMIZATION: eventually, we can push `segmentsOffset`
 	//  each time contiguous segments are completed for all stages.
 
+	lastStage := len(s.stages) - 1
 	for segmentIdx := s.globalSegmenter.FirstIndex(); segmentIdx <= s.globalSegmenter.LastIndex(); segmentIdx++ {
-		for stageIdx := len(s.stages) - 1; stageIdx >= 0; stageIdx-- {
+		someShadowed := s.markShadowedUnits(segmentIdx)
+		for stageIdx := lastStage; stageIdx >= 0; stageIdx-- {
 			stage := s.stages[stageIdx]
 			unit := Unit{Segment: segmentIdx, Stage: stageIdx}
 			segmentState := s.getState(unit)
 			if segmentState != UnitPending {
-				continue
-			}
-			if segmentState == UnitNoOp {
 				continue
 			}
 			if segmentIdx < stage.segmenter.FirstIndex() {
@@ -381,11 +380,49 @@ func (s *Stages) NextJob() (Unit, *block.Range) {
 				continue
 			}
 
+			if someShadowed && stageIdx == lastStage {
+				for i := 0; i < len(s.stages); i++ {
+					u := Unit{Segment: segmentIdx, Stage: i}
+					if st := s.getState(u); st == UnitPending {
+						s.markSegmentScheduled(u)
+						return u, r
+					}
+				}
+			}
+
 			s.markSegmentScheduled(unit)
 			return unit, r
 		}
 	}
 	return Unit{}, nil
+}
+
+func (s *Stages) markShadowedUnits(segmentIdx int) (someShadowed bool) {
+	if len(s.stages) < 2 {
+		return
+	}
+
+	stagesLen := len(s.stages)
+	relSegmentOrdinal := segmentIdx - s.segmentOffset
+	if relSegmentOrdinal > stagesLen-1 {
+		return
+	}
+
+	s.allocSegments(segmentIdx)
+
+	lastStage := stagesLen - 1
+	for stageIdx := lastStage - 1; stageIdx >= relSegmentOrdinal; stageIdx-- { // skip the last stage
+		unit := Unit{Segment: segmentIdx, Stage: stageIdx}
+		segmentState := s.getState(unit)
+		if segmentState != UnitCompleted && segmentState != UnitNoOp {
+			nextState := s.getState(Unit{Segment: segmentIdx, Stage: stageIdx + 1})
+			if nextState == UnitPending || nextState == UnitScheduled || nextState == UnitMerging || nextState == UnitShadowed {
+				s.setState(unit, UnitShadowed)
+				someShadowed = true
+			}
+		}
+	}
+	return
 }
 
 func (s *Stages) allocSegments(segmentIdx int) {
@@ -406,9 +443,19 @@ func (s *Stages) dependenciesCompleted(u Unit) bool {
 	if u.Stage == 0 {
 		return true
 	}
+
+	previousSegmentParent := s.getState(Unit{Segment: u.Segment - 1, Stage: u.Stage - 1})
+
 	for i := u.Stage - 1; i >= 0; i-- {
-		state := s.getState(Unit{Segment: u.Segment - 1, Stage: i})
-		if !(state == UnitCompleted || state == UnitNoOp) {
+		state := s.getState(Unit{Segment: u.Segment, Stage: i})
+		switch state {
+		case UnitCompleted, UnitNoOp:
+		case UnitShadowed:
+			// if the direct parent stage is shadowed, we need the previous segment's previous stage to be completed
+			if previousSegmentParent != UnitCompleted && previousSegmentParent != UnitNoOp {
+				return false
+			}
+		default:
 			return false
 		}
 	}
@@ -453,6 +500,7 @@ func (s *Stages) StatesString() string {
 				UnitMerging:        "M",
 				UnitCompleted:      "C",
 				UnitNoOp:           "N",
+				UnitShadowed:       "Z",
 			}[segment[i]])
 		}
 		out.WriteString("\n")

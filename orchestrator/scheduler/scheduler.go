@@ -83,7 +83,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 	case work.MsgJobSucceeded:
 		metrics.Tier1ActiveWorkerRequest.Dec()
 
-		s.Stages.MarkSegmentPartialPresent(msg.Unit)
+		s.Stages.MarkJobSuccess(msg.Unit)
 		s.WorkerPool.Return(msg.Worker)
 
 		cmds = append(cmds,

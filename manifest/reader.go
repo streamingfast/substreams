@@ -532,22 +532,17 @@ func duplicateStringInput(in *pbsubstreams.Module_Input) string {
 	}
 }
 
-func checkValidBlockFilter(mod *pbsubstreams.Module, mapModuleKind map[string]pbsubstreams.ModuleKind, mapModules map[string]*pbsubstreams.Module) error {
+func checkValidBlockFilter(mod *pbsubstreams.Module, mapModules map[string]*pbsubstreams.Module) error {
 	blockFilter := mod.GetBlockFilter()
 	if blockFilter != nil {
 		seekModName := blockFilter.GetModule()
-		seekModuleKind, found := mapModuleKind[seekModName]
-		if !found {
-			return fmt.Errorf("block filter module %q not found", blockFilter.Module)
-		}
-
-		if seekModuleKind != pbsubstreams.ModuleKindBlockIndex {
-			return fmt.Errorf("block filter module %q not of 'block_index' kind", blockFilter.Module)
-		}
-
 		seekModule, found := mapModules[seekModName]
 		if !found {
 			return fmt.Errorf("block filter module %q not found", blockFilter.Module)
+		}
+
+		if seekModule.ModuleKind() != pbsubstreams.ModuleKindBlockIndex {
+			return fmt.Errorf("block filter module %q not of 'block_index' kind", blockFilter.Module)
 		}
 
 		if seekModule.InitialBlock > mod.InitialBlock {

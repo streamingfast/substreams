@@ -635,7 +635,7 @@ func ValidateModules(mods *pbsubstreams.Modules) error {
 			return fmt.Errorf("limit of 30 inputs for a given module (%q) reached", mod.Name)
 		}
 
-		err := checkValidBlockFilter(mod, mapModuleKind, mapModules)
+		err := checkValidBlockFilter(mod, mapModules)
 		if err != nil {
 			return fmt.Errorf("checking block filter for module %q: %w", mod.Name, err)
 		}

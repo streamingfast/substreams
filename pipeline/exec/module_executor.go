@@ -34,7 +34,7 @@ func skipFromIndex(index *index.BlockIndex, execOutput execout.ExecutionOutputGe
 
 }
 
-func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.ExecutionOutputGetter) (*pbssinternal.ModuleOutput, []byte, []byte, error, bool) {
+func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.ExecutionOutputGetter) (*pbssinternal.ModuleOutput, []byte, []byte, bool, error) {
 	logger := reqctx.Logger(ctx)
 	modName := executor.Name()
 
@@ -50,52 +50,52 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 
 	if skipFromIndex(executor.BlockIndex(), execOutput) {
 		emptyOutput, _ := executor.toModuleOutput(nil)
-		return emptyOutput, nil, nil, nil, true
+		return emptyOutput, nil, nil, true, nil
 	}
 
 	cached, outputBytes, err := getCachedOutput(execOutput, executor)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("check cache output exists: %w", err), false
+		return nil, nil, nil, false, fmt.Errorf("check cache output exists: %w", err)
 	}
 	span.SetAttributes(attribute.Bool("substreams.module.cached", cached))
 
 	if cached {
 		if err = executor.applyCachedOutput(outputBytes); err != nil {
-			return nil, nil, nil, fmt.Errorf("apply cached output: %w", err), false
+			return nil, nil, nil, false, fmt.Errorf("apply cached output: %w", err)
 		}
 
 		moduleOutput, err := executor.toModuleOutput(outputBytes)
 		if err != nil {
-			return moduleOutput, outputBytes, nil, fmt.Errorf("converting output to module output: %w", err), false
+			return moduleOutput, outputBytes, nil, false, fmt.Errorf("converting output to module output: %w", err)
 		}
 
 		if moduleOutput == nil {
-			return nil, nil, nil, nil, false // output from PartialKV is always nil, we cannot use it
+			return nil, nil, nil, false, nil // output from PartialKV is always nil, we cannot use it
 		}
 
 		// For store modules, the output in cache is in "operations", but we get the proper store deltas in "toModuleOutput", so we need to transform back those deltas into outputBytes
 		if storeDeltas := moduleOutput.GetStoreDeltas(); storeDeltas != nil {
 			outputBytes, err = proto.Marshal(moduleOutput.GetStoreDeltas())
 			if err != nil {
-				return nil, nil, nil, err, false
+				return nil, nil, nil, false, err
 			}
 		}
 
 		fillModuleOutputMetadata(executor, moduleOutput)
 		moduleOutput.Cached = true
-		return moduleOutput, outputBytes, nil, nil, false
+		return moduleOutput, outputBytes, nil, false, nil
 	}
 
 	uid := reqctx.ReqStats(ctx).RecordModuleWasmBlockBegin(modName)
 	outputBytes, outputForFiles, moduleOutput, err := executor.run(ctx, execOutput)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("execute: %w", err), false
+		return nil, nil, nil, false, fmt.Errorf("execute: %w", err)
 	}
 	reqctx.ReqStats(ctx).RecordModuleWasmBlockEnd(modName, uid)
 
 	fillModuleOutputMetadata(executor, moduleOutput)
 
-	return moduleOutput, outputBytes, outputForFiles, nil, false
+	return moduleOutput, outputBytes, outputForFiles, false, nil
 }
 
 func getCachedOutput(execOutput execout.ExecutionOutputGetter, executor ModuleExecutor) (bool, []byte, error) {

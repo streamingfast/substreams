@@ -25,7 +25,9 @@ require (
 )
 
 require (
-	connectrpc.com/connect v1.15.0
+	buf.build/gen/go/bufbuild/reflect/connectrpc/go v1.16.1-20240117202343-bf8f65e8876c.1
+	buf.build/gen/go/bufbuild/reflect/protocolbuffers/go v1.33.0-20240117202343-bf8f65e8876c.1
+	connectrpc.com/connect v1.16.1
 	connectrpc.com/grpcreflect v1.2.0
 	github.com/alecthomas/chroma v0.10.0
 	github.com/alecthomas/participle v0.7.1

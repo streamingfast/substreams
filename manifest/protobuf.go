@@ -2,13 +2,17 @@ package manifest
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strings"
 
+	"buf.build/gen/go/bufbuild/reflect/connectrpc/go/buf/reflect/v1beta1/reflectv1beta1connect"
+	reflectv1beta1 "buf.build/gen/go/bufbuild/reflect/protocolbuffers/go/buf/reflect/v1beta1"
+	"connectrpc.com/connect"
 	"github.com/jhump/protoreflect/desc"
-
 	"github.com/jhump/protoreflect/desc/protoparse"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pb/system"
@@ -71,6 +75,44 @@ func loadProtobufs(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.FileDesc
 	}
 
 	return customFiles, nil
+}
+
+func loadDefinitionFromBufBuild(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.FileDescriptor, error) {
+	var out []*desc.FileDescriptor
+	for _, url := range manif.Protobuf.BufBuildUrls {
+
+		authToken := os.Getenv("BUFBUILD_AUTH_TOKEN")
+		if authToken == "" {
+			return nil, fmt.Errorf("missing BUFBUILD_AUTH_TOKEN")
+		}
+
+		client := reflectv1beta1connect.NewFileDescriptorSetServiceClient(
+			http.DefaultClient,
+			"https://buf.build",
+		)
+
+		request := connect.NewRequest(&reflectv1beta1.GetFileDescriptorSetRequest{
+			Module: url,
+		})
+
+		request.Header().Set("Authorization", "Bearer "+authToken)
+		fileDescriptorSet, err := client.GetFileDescriptorSet(context.Background(), request)
+		if err != nil {
+			return nil, fmt.Errorf("getting file descriptor set for %s: %w", url, err)
+		}
+
+		fd, err := desc.CreateFileDescriptorFromSet(fileDescriptorSet.Msg.FileDescriptorSet)
+		if err != nil {
+			return nil, fmt.Errorf("creating file descriptor from set for %s: %w", url, err)
+		}
+		out = append(out, fd)
+	}
+
+	for _, fd := range out {
+		pkg.ProtoFiles = append(pkg.ProtoFiles, fd.AsFileDescriptorProto())
+	}
+
+	return out, nil
 }
 
 func readSystemProtobufs() (*descriptorpb.FileDescriptorSet, error) {

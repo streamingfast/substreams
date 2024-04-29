@@ -2,12 +2,13 @@ package manifest
 
 import (
 	"fmt"
-	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/dynamic"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"os"
 	"path"
 	"path/filepath"
+
+	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/dynamic"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 type manifestConverter struct {
@@ -233,6 +234,12 @@ func (r *manifestConverter) manifestToPkg(manif *Manifest) (*pbsubstreams.Packag
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error loading protobuf: %w", err)
 	}
+
+	bufBuildDefinition, err := loadDefinitionFromBufBuild(pkg, manif)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("error loading protobuf: %w", err)
+	}
+	protoDefinitions = append(protoDefinitions, bufBuildDefinition...)
 
 	if manif.Package.Image != "" {
 		if err := loadImage(pkg, manif); err != nil {

@@ -9,6 +9,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.6 (Unreleased)
+
+### Highlights
+
+> **Note** Upgrading to v1.6 will require changing the tier1 and tier2 versions concurrently.
+
+* *Index Modules* and *Block Filter* can now be used to speed up processing and reduce the amount of parsed data.
+* Substreams output can now skip blocks a *Block Filter* is used.
+* Maximum Tier1 output speed improved for data that is already processed
+
+### Added
+
+* New environment variable `SUBSTREAMS_WORKERS_RAMPUP_TIME` can specify the initial delay before tier1 will reach the number of tier2 concurrent requests.
+
+### Changed
+
+*  Previous value for `SUBSTREAMS_WORKERS_RAMPUP_TIME` was `4s`, now set to `0`, disabling the mechanism by default.
+
 ## v1.5.5
 
 ### Fixes

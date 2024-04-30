@@ -31,6 +31,8 @@ type File struct {
 	Kv         map[string]*pboutput.Item
 	store      dstore.Store
 	logger     *zap.Logger
+	loaded     bool
+	loadedSize uint64
 }
 
 func (c *File) Filename() string {
@@ -107,10 +109,16 @@ func (c *File) GetAtBlock(blockNumber uint64) ([]byte, bool) {
 }
 
 func (c *File) Load(ctx context.Context) error {
+	c.Lock()
+	defer c.Unlock()
+	if c.loaded {
+		return nil
+	}
+
 	filename := computeDBinFilename(c.Range.StartBlock, c.Range.ExclusiveEndBlock)
 	c.logger.Debug("loading execout file", zap.String("file_name", filename), zap.Object("block_range", c.Range))
 
-	return derr.RetryContext(ctx, 5, func(ctx context.Context) error {
+	err := derr.RetryContext(ctx, 5, func(ctx context.Context) error {
 		objectReader, err := c.store.OpenObject(ctx, filename)
 		if err == dstore.ErrNotFound {
 			return derr.NewFatalError(err)
@@ -125,6 +133,7 @@ func (c *File) Load(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("reading store file %s: %w", filename, err)
 		}
+		c.loadedSize = uint64(len(bytes))
 
 		outputData := &pboutput.Map{}
 		if err = outputData.UnmarshalFast(bytes); err != nil {
@@ -136,6 +145,10 @@ func (c *File) Load(ctx context.Context) error {
 		c.logger.Debug("outputs data loaded", zap.Int("output_count", len(c.Kv)), zap.Stringer("block_range", c.Range))
 		return nil
 	})
+	if err == nil {
+		c.loaded = true
+	}
+	return err
 }
 
 func (c *File) Save(ctx context.Context) error {

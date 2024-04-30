@@ -64,6 +64,7 @@ func (r *Walker) IsWorking() bool {
 
 func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
 	file := r.fileWalker.File()
+	r.fileWalker.PreloadNext(r.ctx)
 
 	return func() loop.Msg {
 		time.Sleep(waitBefore)

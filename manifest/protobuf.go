@@ -29,7 +29,6 @@ func loadProtobufs(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.FileDesc
 	}
 	seen := map[string]bool{}
 	for _, file := range systemFiles.File {
-		fmt.Println("Grrrr: system proto file", file.GetName())
 		pkg.ProtoFiles = append(pkg.ProtoFiles, file)
 		seen[*file.Name] = true
 	}

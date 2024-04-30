@@ -23,6 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * add `substreams_tier1_worker_retry_counter` metric to count all worker errors returned by tier2
 * add `substreams_tier1_worker_rejected_overloaded_counter` metric to count only worker errors with string "service currently overloaded"
+* add `google/protobuf/duration.proto` to system proto files
 * Support for buf build urls in substreams manifest. Ex.:
 ```yaml
 protobuf:

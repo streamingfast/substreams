@@ -350,8 +350,8 @@ excludable:
 		}
 	}
 	if allExecutorsExcludedByBlockIndex {
-		// TODO: when we have a way to skip the whole thing, we should do it here
-		logger.Info("all executors are excluded by block index. We could skip the whole thing (but we still need the clocks in the outputs, so we won't.)")
+		logger.Info("all executors are excluded by block index. Skipping execution of segment")
+		return pipe.OnStreamTerminated(ctx, io.EOF)
 	}
 
 	var streamErr error

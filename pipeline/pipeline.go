@@ -9,9 +9,6 @@ import (
 	"github.com/RoaringBitmap/roaring/roaring64"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dmetering"
-	"go.opentelemetry.io/otel"
-	"go.uber.org/zap"
-
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/orchestrator"
 	"github.com/streamingfast/substreams/orchestrator/plan"
@@ -28,6 +25,8 @@ import (
 	"github.com/streamingfast/substreams/storage/index"
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
+	"go.opentelemetry.io/otel"
+	"go.uber.org/zap"
 )
 
 type processingModule struct {

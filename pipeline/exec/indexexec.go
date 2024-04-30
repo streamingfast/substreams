@@ -47,7 +47,7 @@ func (i *IndexModuleExecutor) run(ctx context.Context, reader execout.ExecutionO
 		return nil, nil, nil, fmt.Errorf("converting back to module output: %w", err)
 	}
 
-	return out, nil, modOut, nil // no output for files from an index module
+	return out, out, modOut, nil
 }
 
 func (i *IndexModuleExecutor) toModuleOutput(data []byte) (*pbssinternal.ModuleOutput, error) {

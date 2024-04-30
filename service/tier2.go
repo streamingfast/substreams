@@ -284,6 +284,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	if err != nil {
 		return fmt.Errorf("creating execution plan: %w", err)
 	}
+
 	if executionPlan == nil || len(executionPlan.RequiredModules) == 0 {
 		logger.Info("no modules required to run, skipping")
 		return nil

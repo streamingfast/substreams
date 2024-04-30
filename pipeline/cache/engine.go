@@ -4,11 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	pbindex "github.com/streamingfast/substreams/pb/sf/substreams/index/v1"
+
 	"github.com/RoaringBitmap/roaring/roaring64"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
-	pbindex "github.com/streamingfast/substreams/pb/sf/substreams/index/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
@@ -96,6 +97,7 @@ func (e *Engine) HandleStalled(clock *pbsubstreams.Clock) error {
 
 func (e *Engine) EndOfStream(lastFinalClock *pbsubstreams.Clock) error {
 	var errs error
+
 	for _, writer := range e.execOutputWriters {
 		if err := writer.Close(context.Background()); err != nil {
 			errs = multierror.Append(errs, err)

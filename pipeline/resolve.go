@@ -7,17 +7,15 @@ import (
 	"sync/atomic"
 
 	"connectrpc.com/connect"
-	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
-	"github.com/streamingfast/substreams/manifest"
-
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/hub"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dstore"
-	"go.uber.org/zap"
-
+	"github.com/streamingfast/substreams/manifest"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/reqctx"
+	"go.uber.org/zap"
 )
 
 type getBlockFunc func() (uint64, error)

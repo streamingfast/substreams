@@ -8,13 +8,9 @@ import (
 	"runtime/debug"
 	"sync"
 
+	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dmetering"
-
-	"github.com/streamingfast/bstream"
-	"go.uber.org/zap"
-	"google.golang.org/protobuf/types/known/timestamppb"
-
 	"github.com/streamingfast/substreams/metrics"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -22,6 +18,8 @@ import (
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
+	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func (p *Pipeline) ProcessFromExecOutput(
@@ -357,6 +355,7 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 	logger.Debug("executing", zap.Uint64("block", execOutput.Clock().Number), zap.String("module_name", executorName))
 
 	moduleOutput, outputBytes, outputBytesFiles, skippedFromIndex, runError := exec.RunModule(ctx, executor, execOutput)
+
 	return resultObj{moduleOutput, outputBytes, outputBytesFiles, runError, false, skippedFromIndex}
 }
 

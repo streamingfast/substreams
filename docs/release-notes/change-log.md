@@ -23,6 +23,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * add `substreams_tier1_worker_retry_counter` metric to count all worker errors returned by tier2
 * add `substreams_tier1_worker_rejected_overloaded_counter` metric to count only worker errors with string "service currently overloaded"
+* Support for buf build urls in substreams manifest. Ex.:
+```yaml
+protobuf:
+  buf_build:
+    - buf.build/streamingfast/firehose-cosmos
+```
 
 ## v1.5.4
 

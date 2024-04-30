@@ -1,3 +1,7 @@
+buf.build/gen/go/bufbuild/reflect/connectrpc/go v1.16.1-20240117202343-bf8f65e8876c.1 h1:UITHLAtIrN0+SNbpYlNs3ca/Xme048ecetS6DD3t6E8=
+buf.build/gen/go/bufbuild/reflect/connectrpc/go v1.16.1-20240117202343-bf8f65e8876c.1/go.mod h1:8aC0AUYVzAH5wP6/43Z89/0un0nvZyf+PVSeeaHyYyg=
+buf.build/gen/go/bufbuild/reflect/protocolbuffers/go v1.33.0-20240117202343-bf8f65e8876c.1 h1:9ROfgUJtdplIn+2PvUB+Z7HMRVBIsU0uCPAcPfes98I=
+buf.build/gen/go/bufbuild/reflect/protocolbuffers/go v1.33.0-20240117202343-bf8f65e8876c.1/go.mod h1:TF9ggHlVzYnMjBa4v+ghV6daBmQ0AU4KaAMezoCmX9c=
 cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
 cloud.google.com/go v0.34.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
 cloud.google.com/go v0.38.0/go.mod h1:990N+gfupTy94rShfmMCWGDn0LpTmnzTp2qbd1dvSRU=
@@ -66,8 +70,8 @@ cloud.google.com/go/storage v1.38.0/go.mod h1:tlUADB0mAb9BgYls9lq+8MGkfzOXuLrnHX
 cloud.google.com/go/trace v1.0.0/go.mod h1:4iErSByzxkyHWzzlAj63/Gmjz0NH1ASqhJguHpGcr6A=
 cloud.google.com/go/trace v1.10.5 h1:0pr4lIKJ5XZFYD9GtxXEWr0KkVeigc3wlGpZco0X1oA=
 cloud.google.com/go/trace v1.10.5/go.mod h1:9hjCV1nGBCtXbAE4YK7OqJ8pmPYSxPA0I67JwRd5s3M=
-connectrpc.com/connect v1.15.0 h1:lFdeCbZrVVDydAqwr4xGV2y+ULn+0Z73s5JBj2LikWo=
-connectrpc.com/connect v1.15.0/go.mod h1:bQmjpDY8xItMnttnurVgOkHUBMRT9cpsNi2O4AjKhmA=
+connectrpc.com/connect v1.16.1 h1:rOdrK/RTI/7TVnn3JsVxt3n028MlTRwmK5Q4heSpjis=
+connectrpc.com/connect v1.16.1/go.mod h1:XpZAduBQUySsb4/KO5JffORVkDI4B6/EYPi7N8xpNZw=
 connectrpc.com/grpchealth v1.3.0 h1:FA3OIwAvuMokQIXQrY5LbIy8IenftksTP/lG4PbYN+E=
 connectrpc.com/grpchealth v1.3.0/go.mod h1:3vpqmX25/ir0gVgW6RdnCPPZRcR6HvqtXX5RNPmDXHM=
 connectrpc.com/grpcreflect v1.2.0 h1:Q6og1S7HinmtbEuBvARLNwYmTbhEGRpHDhqrPNlmK+U=

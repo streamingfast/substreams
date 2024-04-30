@@ -79,8 +79,9 @@ type PackageMeta struct {
 }
 
 type Protobuf struct {
-	Files       []string `yaml:"files,omitempty"`
-	ImportPaths []string `yaml:"importPaths,omitempty"`
+	BufBuildUrls []string `yaml:"buf_build,omitempty"`
+	Files        []string `yaml:"files,omitempty"`
+	ImportPaths  []string `yaml:"importPaths,omitempty"`
 }
 
 type Module struct {

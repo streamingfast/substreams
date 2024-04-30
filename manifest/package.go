@@ -232,6 +232,12 @@ func (r *manifestConverter) manifestToPkg(manif *Manifest) (*pbsubstreams.Packag
 		return nil, nil, nil, fmt.Errorf("error loading protobuf: %w", err)
 	}
 
+	bufBuildDefinition, err := loadDefinitionFromBufBuild(pkg, manif)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("error loading protobuf: %w", err)
+	}
+	protoDefinitions = append(protoDefinitions, bufBuildDefinition...)
+
 	if manif.Package.Image != "" {
 		if err := loadImage(pkg, manif); err != nil {
 			return nil, nil, nil, fmt.Errorf("error loading image: %w", err)

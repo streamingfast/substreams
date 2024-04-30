@@ -18,7 +18,7 @@ Every Substreams project contains three main pieces:
 - **The source code:** the Rust functions that extract the actual data from the blockchain.
 - **The Substreams manifest:** the `substreams.yaml` file contains the configuration of your Substreams.
 
-// image
+<figure><img src="../../../../.gitbook/assets/tutorials/injective-project-structure.png" width="100%" /></figure>
 
 1. The `proto` folder contains the Protobuf definitions for the output of your Substreams.
 In this example, only a `BlockStats` Protobuf is defined as the output of the Substreams.
@@ -87,8 +87,6 @@ substreams gui substreams.yaml block_to_stats \
  -e mainnet.injective.streamingfast.io:443 \
  --start-block=64987400 --stop-block=+1000
 ```
-
-// image
 
 Review the [GUI Reference](../../../references/gui.md) to get more information on how to use this utility.
 

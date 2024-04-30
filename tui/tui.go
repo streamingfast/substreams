@@ -19,7 +19,7 @@ import (
 
 //go:generate go-enum -f=$GOFILE --nocase --marshal --names
 
-// ENUM(TUI, JSON, JSONL)
+// ENUM(TUI, JSON, JSONL, CLOCK)
 type OutputMode uint
 
 type TUI struct {
@@ -123,6 +123,8 @@ func (ui *TUI) configureOutputMode(outputMode string) error {
 	case OutputModeTUI:
 		ui.prettyPrintOutput = true
 	case OutputModeJSONL:
+	case OutputModeCLOCK:
+		fmt.Println("Writing clock information only (no data)")
 	case OutputModeJSON:
 		ui.prettyPrintOutput = true
 	default:
@@ -147,11 +149,14 @@ func (ui *TUI) Cancel() {
 func (ui *TUI) IncomingMessage(ctx context.Context, resp *pbsubstreamsrpc.Response, testRunner *test.Runner) error {
 	switch m := resp.Message.(type) {
 	case *pbsubstreamsrpc.Response_BlockUndoSignal:
-		if ui.outputMode == OutputModeTUI {
+		switch ui.outputMode {
+		case OutputModeTUI:
 			printUndo(m.BlockUndoSignal.LastValidBlock, m.BlockUndoSignal.LastValidCursor)
 			ui.ensureTerminalUnlocked()
-		} else {
+		case OutputModeJSON, OutputModeJSONL:
 			printUndoJSON(m.BlockUndoSignal.LastValidBlock, m.BlockUndoSignal.LastValidCursor)
+		case OutputModeCLOCK:
+			fmt.Println("UNDO:", m.BlockUndoSignal.LastValidBlock)
 		}
 
 	case *pbsubstreamsrpc.Response_BlockScopedData:
@@ -161,10 +166,14 @@ func (ui *TUI) IncomingMessage(ctx context.Context, resp *pbsubstreamsrpc.Respon
 			}
 		}
 
-		if ui.outputMode == OutputModeTUI {
-			printClock(m.BlockScopedData)
-		}
 		if m.BlockScopedData == nil {
+			return nil
+		}
+		switch ui.outputMode {
+		case OutputModeTUI:
+			printClock(m.BlockScopedData)
+		case OutputModeCLOCK:
+			printClock(m.BlockScopedData)
 			return nil
 		}
 

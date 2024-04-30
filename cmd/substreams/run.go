@@ -29,7 +29,7 @@ func init() {
 	runCmd.Flags().Bool("final-blocks-only", false, "Only process blocks that have pass finality, to prevent any reorg and undo signal by staying further away from the chain HEAD")
 	runCmd.Flags().Bool("insecure", false, "Skip certificate validation on GRPC connection")
 	runCmd.Flags().Bool("plaintext", false, "Establish GRPC connection in plaintext")
-	runCmd.Flags().StringP("output", "o", "", "Output mode. Defaults to 'ui' when in a TTY is present, and 'json' otherwise")
+	runCmd.Flags().StringP("output", "o", "", "Output mode, one of: [ui, json, jsonl, clock] Defaults to 'ui' when in a TTY is present, and 'json' otherwise")
 	runCmd.Flags().StringSlice("debug-modules-initial-snapshot", nil, "List of 'store' modules from which to print the initial data snapshot (Unavailable in Production Mode)")
 	runCmd.Flags().StringSlice("debug-modules-output", nil, "List of modules from which to print outputs, deltas and logs (Unavailable in Production Mode)")
 	runCmd.Flags().StringSliceP("header", "H", nil, "Additional headers to be sent in the substreams request")

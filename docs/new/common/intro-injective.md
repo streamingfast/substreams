@@ -1,4 +1,4 @@
-**With Substreams, you can extract data from the Injective blockchain**. Then, you can consume the data in several ways, such as streaming or a SQL database.
+**With Substreams, you can extract data from the Injective blockchain**. Then, you can consume the data in several ways, such as streaming or using a SQL database.
 
 <figure><img src="../../.gitbook/assets/intro/injective-logo.png" width="100%" /></figure>
 
@@ -29,7 +29,9 @@ First, you must consider whether you want to develop your own Substreams or cons
 
 Substreams provides you access to the raw full Injective block through a [Protobuf schema](https://protobuf.dev/). You can use the [Block Protobuf](https://github.com/streamingfast/firehose-cosmos/blob/develop/cosmos/pb/sf/cosmos/type/v1/block.pb.go#L75) to retrieve all the information contained in an Injective block, such as transactions or events.
 
-All Cosmos blockchains share the same data model, so the [Block Protobuf](https://github.com/streamingfast/firehose-cosmos/blob/develop/cosmos/pb/sf/cosmos/type/v1/block.pb.go#L75) used for Injective is the same for any other Cosmos blockchain.
+{% hint style="info" %}
+**Note**: All Cosmos blockchains share the same data model, so the [Block Protobuf](https://github.com/streamingfast/firehose-cosmos/blob/develop/cosmos/pb/sf/cosmos/type/v1/block.pb.go#L75) used for Injective is the same for any other Cosmos blockchain.
+{% endhint %}
 
 You can use the Rust programming language to access this `Block` object and select which specific data you want to retrieve from the blockchain. For example, the following example receives the `Block` object as a parameter and returns a user-defined object, `BlockStats`.
 
@@ -56,3 +58,7 @@ pub fn block_to_stats(block: Block) -> Result<BlockStats, Error> { // 1.
 **Output:** `BlockStats` object, which is defined by the user and is consumable from the outside world.
 2. Creation of the `BlockStats` object.
 3. Add data from the `Block` Injective object to user-defined `BlockStats` object.
+
+## Next Steps
+
+To start developing Injective Substreams, take a look at the [BlockStats tutorial](../tutorials/cosmos/injective/block-stats.md), which inspects the code of a very simple Substreams. It's the best way to get familiar with the Substreams concepts!

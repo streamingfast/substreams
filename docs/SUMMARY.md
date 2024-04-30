@@ -2,6 +2,7 @@
 
 * [What is Substreams?](README.md)
 * [Substreams for Solana Developers](new/common/intro-solana.md)
+* [Substreams for Injective Developers](new/common/intro-injective.md)
 
 ## Documentation
 
@@ -66,6 +67,9 @@
   * [SPL Token Tracker](new/tutorials/solana/token-tracker/token-tracker.md)
   * [NFT Trades](new/tutorials/solana/top-ledger/nft-trades.md)
   * [DEX Trades](new/tutorials/solana/top-ledger/dex-trades.md)
+* [Cosmos](new/tutorials/cosmos/cosmos.md)
+  * [Injective](new/tutorials/cosmos/injective/injective.md.md)
+    * [BlockStats](new/tutorials/cosmos/injective/block-stats.md)
 * [Rust](new/tutorials/rust/rust.md)
   * [Option struct](new/tutorials/rust/option.md)
   * [Result struct](new/tutorials/rust/result.md)

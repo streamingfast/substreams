@@ -26,7 +26,6 @@ import (
 	"github.com/streamingfast/substreams/pipeline/cache"
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/reqctx"
-	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/index"
 	"github.com/streamingfast/substreams/storage/store"
@@ -60,7 +59,6 @@ type BlockFilter struct {
 
 type Tier2Service struct {
 	wasmExtensions func(map[string]string) (map[string]map[string]wasm.WASMExtension, error) //todo: rename
-	runtimeConfig  config.RuntimeConfig
 	tracer         ttrace.Tracer
 	logger         *zap.Logger
 
@@ -68,6 +66,8 @@ type Tier2Service struct {
 
 	setReadyFunc              func(bool)
 	currentConcurrentRequests int64
+	maxConcurrentRequests     uint64
+	moduleExecutionTracing    bool
 	connectionCountMutex      sync.RWMutex
 
 	tier2RequestParameters *reqctx.Tier2RequestParameters
@@ -79,12 +79,10 @@ func NewTier2(
 	logger *zap.Logger,
 	opts ...Option,
 ) (*Tier2Service, error) {
-	runtimeConfig := config.NewTier2RuntimeConfig()
 
 	s := &Tier2Service{
-		runtimeConfig: runtimeConfig,
-		tracer:        tracing.GetTracer(),
-		logger:        logger,
+		tracer: tracing.GetTracer(),
+		logger: logger,
 	}
 
 	metrics.RegisterMetricSet(logger)
@@ -100,7 +98,7 @@ func (s *Tier2Service) isOverloaded() bool {
 	s.connectionCountMutex.RLock()
 	defer s.connectionCountMutex.RUnlock()
 
-	isOverloaded := s.runtimeConfig.MaxConcurrentRequests > 0 && s.currentConcurrentRequests >= s.runtimeConfig.MaxConcurrentRequests
+	isOverloaded := s.maxConcurrentRequests > 0 && uint64(s.currentConcurrentRequests) >= s.maxConcurrentRequests
 	return isOverloaded
 }
 
@@ -121,7 +119,7 @@ func (s *Tier2Service) decrementConcurrentRequests() {
 }
 
 func (s *Tier2Service) setOverloaded() {
-	overloaded := s.runtimeConfig.MaxConcurrentRequests != 0 && s.currentConcurrentRequests >= s.runtimeConfig.MaxConcurrentRequests
+	overloaded := s.maxConcurrentRequests != 0 && uint64(s.currentConcurrentRequests) >= s.maxConcurrentRequests
 	s.setReadyFunc(!overloaded)
 }
 
@@ -225,12 +223,11 @@ func (s *Tier2Service) getWASMRegistry(wasmExtensionConfigs map[string]string) (
 		}
 		exts = x
 	}
-	return wasm.NewRegistry(exts, s.runtimeConfig.MaxWasmFuel), nil
+	return wasm.NewRegistry(exts), nil
 }
 
 func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) error {
 	logger := reqctx.Logger(ctx)
-	s.runtimeConfig.SegmentSize = request.SegmentSize
 
 	mergedBlocksStore, cacheStore, err := s.getStores(ctx, request)
 	if err != nil {
@@ -244,7 +241,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 
 	requestDetails := pipeline.BuildRequestDetailsFromSubrequest(request)
 	ctx = reqctx.WithRequest(ctx, requestDetails)
-	if s.runtimeConfig.ModuleExecutionTracing {
+	if s.moduleExecutionTracing {
 		ctx = reqctx.WithModuleExecutionTracing(ctx)
 	}
 
@@ -292,7 +289,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	stores := pipeline.NewStores(ctx, storeConfigs, request.SegmentSize, requestDetails.ResolvedStartBlockNum, stopBlock, true, executionPlan.StoresToWrite)
 
 	// this engine will keep the ExistingExecOuts to optimize the execution (for inputs from modules that skip execution)
-	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, executionPlan.ExecoutWriters, request.BlockType, executionPlan.ExistingExecOuts, executionPlan.IndexWriters)
+	execOutputCacheEngine, err := cache.NewEngine(ctx, executionPlan.ExecoutWriters, request.BlockType, executionPlan.ExistingExecOuts, executionPlan.IndexWriters)
 	if err != nil {
 		return fmt.Errorf("error building caching engine: %w", err)
 	}
@@ -310,7 +307,8 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		execOutputConfigs,
 		wasmRegistry,
 		execOutputCacheEngine,
-		s.runtimeConfig,
+		request.SegmentSize,
+		nil,
 		respFunc,
 		// This must always be the parent/global trace id, the one that comes from tier1
 		opts...,
@@ -321,8 +319,6 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		zap.String("output_module", request.OutputModule),
 		zap.Uint32("stage", request.Stage),
 	)
-
-	s.runtimeConfig.SegmentSize = request.SegmentSize
 
 	if err := pipe.Init(ctx); err != nil {
 		return fmt.Errorf("error during pipeline init: %w", err)

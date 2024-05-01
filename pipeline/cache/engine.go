@@ -12,7 +12,6 @@ import (
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
-	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/index"
 	"go.uber.org/zap"
@@ -33,14 +32,12 @@ type Engine struct {
 	existingExecOuts  map[string]*execout.File
 	indexWriters      map[string]*index.Writer
 
-	runtimeConfig config.RuntimeConfig // TODO(abourget): Deprecated: remove this as it's not used
-	logger        *zap.Logger
+	logger *zap.Logger
 }
 
-func NewEngine(ctx context.Context, runtimeConfig config.RuntimeConfig, execOutWriters map[string]*execout.Writer, blockType string, existingExecOuts map[string]*execout.File, indexWriters map[string]*index.Writer) (*Engine, error) {
+func NewEngine(ctx context.Context, execOutWriters map[string]*execout.Writer, blockType string, existingExecOuts map[string]*execout.File, indexWriters map[string]*index.Writer) (*Engine, error) {
 	e := &Engine{
 		ctx:               ctx,
-		runtimeConfig:     runtimeConfig,
 		reversibleBuffers: map[uint64]*execout.Buffer{},
 		execOutputWriters: execOutWriters,
 		logger:            reqctx.Logger(ctx),

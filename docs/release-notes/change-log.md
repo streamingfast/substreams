@@ -27,6 +27,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 *  Previous value for `SUBSTREAMS_WORKERS_RAMPUP_TIME` was `4s`, now set to `0`, disabling the mechanism by default.
 
+## v1.5.6 (Unreleased)
+
+### Fixes
+
+* Fix bug where substreams tier2 would sometimes write outputs with the wrong tag (leaked from another tier1 request)
+
+### Remove
+
+* Removed MaxWasmFuel since it is not supported in Wazero
+
 ## v1.5.5
 
 ### Fixes
@@ -41,6 +51,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * add `substreams_tier1_worker_retry_counter` metric to count all worker errors returned by tier2
 * add `substreams_tier1_worker_rejected_overloaded_counter` metric to count only worker errors with string "service currently overloaded"
+* add `google/protobuf/duration.proto` to system proto files
 * Support for buf build urls in substreams manifest. Ex.:
 ```yaml
 protobuf:

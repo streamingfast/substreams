@@ -83,6 +83,10 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 			panic("unknown wasm argument type")
 		}
 	}
+	if !hasInput {
+		return nil, ErrNoInput
+	}
+
 	// This allows us to skip the execution of the VM if there are no inputs.
 	// This assumption should either be configurable by the manifest, or clearly documented:
 	//  state builders will not be called if their input streams are 0 bytes length (and there is no
@@ -123,7 +127,7 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 		e.logsTruncated = call.ReachedLogsMaxByteCount()
 		e.executionStack = call.ExecutionStack
 	}
-	return nil, ErrNoInput
+	return
 }
 
 func (e *BaseExecutor) BlockIndex() *index.BlockIndex {

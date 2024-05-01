@@ -368,7 +368,7 @@ func (p *Pipeline) applyExecutionResult(ctx context.Context, executor exec.Modul
 	}
 
 	if executor.HasValidOutput() {
-		p.saveModuleOutput(moduleOutput, executor.Name(), reqctx.Details(ctx).ProductionMode, res.skippedFromIndex)
+		p.saveModuleOutput(moduleOutput, executor.Name(), reqctx.Details(ctx).ProductionMode)
 	}
 
 	if !res.skippedFromIndex && executor.HasValidOutput() {
@@ -390,15 +390,12 @@ func (p *Pipeline) applyExecutionResult(ctx context.Context, executor exec.Modul
 }
 
 // this will be sent to the requestor
-func (p *Pipeline) saveModuleOutput(output *pbssinternal.ModuleOutput, moduleName string, isProduction bool, skippedFromIndex bool) {
+func (p *Pipeline) saveModuleOutput(output *pbssinternal.ModuleOutput, moduleName string, isProduction bool) {
 	if p.isOutputModule(moduleName) {
-		if skippedFromIndex {
-			p.mapModuleOutput = nil
-		}
 		p.mapModuleOutput = toRPCMapModuleOutputs(output)
 		return
 	}
-	if isProduction || skippedFromIndex {
+	if isProduction {
 		return
 	}
 

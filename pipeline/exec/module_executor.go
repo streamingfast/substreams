@@ -2,6 +2,7 @@ package exec
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/streamingfast/substreams/storage/execout"
@@ -89,6 +90,9 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 	uid := reqctx.ReqStats(ctx).RecordModuleWasmBlockBegin(modName)
 	outputBytes, outputForFiles, moduleOutput, err := executor.run(ctx, execOutput)
 	if err != nil {
+		if errors.Is(err, ErrNoInput) {
+			return nil, nil, nil, true, nil
+		}
 		return nil, nil, nil, false, fmt.Errorf("execute: %w", err)
 	}
 	reqctx.ReqStats(ctx).RecordModuleWasmBlockEnd(modName, uid)

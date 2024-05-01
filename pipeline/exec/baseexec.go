@@ -49,7 +49,8 @@ func NewBaseExecutor(ctx context.Context, moduleName string, initialBlock uint64
 	}
 }
 
-//var Timer time.Duration
+// var Timer time.Duration
+var ErrNoInput = errors.New("no input")
 
 func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (call *wasm.Call, err error) {
 	e.logs = nil
@@ -72,13 +73,10 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 			data, _, err := outputGetter.Get(v.Name())
 			if err != nil {
 				if errors.Is(err, execout.ErrNotFound) {
-					fmt.Println("FIOUUUU", outputGetter.Clock().Number)
 					break
 				}
 				return nil, fmt.Errorf("input data for %q, param %d: %w", v.Name(), i, err)
 			}
-			fmt.Println("MERDE", outputGetter.Clock().Number)
-
 			hasInput = true
 			v.SetValue(data)
 		default:
@@ -125,7 +123,7 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 		e.logsTruncated = call.ReachedLogsMaxByteCount()
 		e.executionStack = call.ExecutionStack
 	}
-	return
+	return nil, ErrNoInput
 }
 
 func (e *BaseExecutor) BlockIndex() *index.BlockIndex {

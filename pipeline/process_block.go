@@ -364,14 +364,14 @@ func (p *Pipeline) applyExecutionResult(ctx context.Context, executor exec.Modul
 
 	moduleOutput, outputBytes, runError := res.output, res.bytes, res.err
 	if runError != nil {
-		if executor.HasValidOutput() {
-			p.saveModuleOutput(moduleOutput, executor.Name(), reqctx.Details(ctx).ProductionMode)
-		}
 		return fmt.Errorf("execute module: %w", runError)
 	}
 
+	if executor.HasValidOutput() {
+		p.saveModuleOutput(moduleOutput, executor.Name(), reqctx.Details(ctx).ProductionMode, res.skippedFromIndex)
+	}
+
 	if !res.skippedFromIndex && executor.HasValidOutput() {
-		p.saveModuleOutput(moduleOutput, executor.Name(), reqctx.Details(ctx).ProductionMode)
 		if err := execOutput.Set(executorName, outputBytes); err != nil {
 			return fmt.Errorf("set output cache: %w", err)
 		}
@@ -390,12 +390,15 @@ func (p *Pipeline) applyExecutionResult(ctx context.Context, executor exec.Modul
 }
 
 // this will be sent to the requestor
-func (p *Pipeline) saveModuleOutput(output *pbssinternal.ModuleOutput, moduleName string, isProduction bool) {
+func (p *Pipeline) saveModuleOutput(output *pbssinternal.ModuleOutput, moduleName string, isProduction bool, skippedFromIndex bool) {
 	if p.isOutputModule(moduleName) {
+		if skippedFromIndex {
+			p.mapModuleOutput = nil
+		}
 		p.mapModuleOutput = toRPCMapModuleOutputs(output)
 		return
 	}
-	if isProduction {
+	if isProduction || skippedFromIndex {
 		return
 	}
 

@@ -72,10 +72,12 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 			data, _, err := outputGetter.Get(v.Name())
 			if err != nil {
 				if errors.Is(err, execout.ErrNotFound) {
+					fmt.Println("FIOUUUU", outputGetter.Clock().Number)
 					break
 				}
 				return nil, fmt.Errorf("input data for %q, param %d: %w", v.Name(), i, err)
 			}
+			fmt.Println("MERDE", outputGetter.Clock().Number)
 
 			hasInput = true
 			v.SetValue(data)

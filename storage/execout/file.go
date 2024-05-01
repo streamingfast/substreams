@@ -63,7 +63,7 @@ func (c *File) ExtractClocks(clocksMap map[uint64]*pbsubstreams.Clock) {
 	}
 }
 
-func (c *File) SetItem(clock *pbsubstreams.Clock, data []byte) {
+func (c *File) SetItem(clock *pbsubstreams.Clock, data []byte, isExecSkippedFromIndex bool) {
 	c.Lock()
 	defer c.Unlock()
 
@@ -76,23 +76,28 @@ func (c *File) SetItem(clock *pbsubstreams.Clock, data []byte) {
 		Timestamp: clock.Timestamp,
 		// TODO(abourget): remove the `Cursor` from this `pboutput.Item` struct,
 		//  as we're only going to store irreversible stuff now.
-		Payload: cp,
+		IsSkippedFromIndex: isExecSkippedFromIndex,
+		Payload:            cp,
 	}
 
 	c.Kv[clock.Id] = ci
 }
 
-func (c *File) Get(clock *pbsubstreams.Clock) ([]byte, bool) {
+func (c *File) Get(clock *pbsubstreams.Clock) ([]byte, bool, bool) {
 	c.Lock()
 	defer c.Unlock()
 
 	cacheItem, found := c.Kv[clock.Id]
 
 	if !found {
-		return nil, false
+		return nil, false, false
 	}
 
-	return cacheItem.Payload, found
+	if cacheItem.IsSkippedFromIndex {
+		return nil, found, true
+	}
+
+	return cacheItem.Payload, found, false
 }
 
 func (c *File) GetAtBlock(blockNumber uint64) ([]byte, bool) {

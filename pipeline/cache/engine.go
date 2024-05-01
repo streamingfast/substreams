@@ -59,8 +59,12 @@ func (e *Engine) NewBuffer(optionalBlock *pbbstream.Block, clock *pbsubstreams.C
 
 	e.reversibleBuffers[clock.Number] = out
 	for moduleName, existingExecOut := range e.existingExecOuts {
-		if val, ok := existingExecOut.Get(clock); ok {
-			out.Set(moduleName, val)
+		//TODO: Handle SKIPPED INDEX CASE
+		if val, ok, isSkippedFromIndex := existingExecOut.Get(clock); ok {
+			err = out.Set(moduleName, val, isSkippedFromIndex)
+			if err != nil {
+				return nil, fmt.Errorf("setting existing exec output for %s: %w", moduleName, err)
+			}
 		}
 	}
 
@@ -82,8 +86,6 @@ func (e *Engine) HandleFinal(clock *pbsubstreams.Clock) error {
 	for _, writer := range e.execOutputWriters {
 		writer.Write(clock, execOutBuf)
 	}
-
-	//TODO: Save all indexes from the execOut of blockIndexes modules
 
 	delete(e.reversibleBuffers, clock.Number)
 

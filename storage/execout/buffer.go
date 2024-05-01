@@ -23,11 +23,13 @@ import (
 type Buffer struct {
 	values              map[string][]byte
 	valuesForFileOutput map[string][]byte
-	clock               *pbsubstreams.Clock
+
+	isExecSkippedFromIndex map[string]bool
+	clock                  *pbsubstreams.Clock
 }
 
-func (b *Buffer) Len() (out int) {
-	for _, v := range b.values {
+func (i *Buffer) Len() (out int) {
+	for _, v := range i.values {
 		out += len(v)
 	}
 
@@ -48,9 +50,10 @@ func NewBuffer(blockType string, block *pbbstream.Block, clock *pbsubstreams.Clo
 	}
 
 	return &Buffer{
-		clock:               clock,
-		values:              values,
-		valuesForFileOutput: make(map[string][]byte),
+		clock:                  clock,
+		values:                 values,
+		valuesForFileOutput:    make(map[string][]byte),
+		isExecSkippedFromIndex: make(map[string]bool),
 	}, nil
 }
 
@@ -66,12 +69,27 @@ func (i *Buffer) Get(moduleName string) (value []byte, cached bool, err error) {
 	return val, true, nil
 }
 
-func (i *Buffer) Set(moduleName string, value []byte) (err error) {
+func (i *Buffer) Set(moduleName string, value []byte, isSkippedFromIndex bool) (err error) {
+	if isSkippedFromIndex {
+		i.isExecSkippedFromIndex[moduleName] = true
+		return nil
+	}
+
 	i.values[moduleName] = value
 	return nil
 }
 
-func (i *Buffer) SetFileOutput(moduleName string, value []byte) (err error) {
+func (i *Buffer) SetFileOutput(moduleName string, value []byte, isSkippedFromIndex bool) (err error) {
+	if isSkippedFromIndex {
+		i.isExecSkippedFromIndex[moduleName] = true
+		i.valuesForFileOutput[moduleName] = nil
+		return nil
+	}
+
 	i.valuesForFileOutput[moduleName] = value
 	return nil
+}
+
+func (i *Buffer) IsSkippedFromIndex(moduleName string) bool {
+	return i.isExecSkippedFromIndex[moduleName]
 }

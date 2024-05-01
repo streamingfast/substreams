@@ -19,4 +19,5 @@ message Item {
     bytes payload = 3;
     google.protobuf.Timestamp timestamp = 4;
     string cursor = 5;
+    bool isSkippedFromIndex = 6;
 }

@@ -68,6 +68,11 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 			if !v.Active(outputGetter.Clock().Number) {
 				break // skipping input that is not active at this block
 			}
+
+			if outputGetter.IsSkippedFromIndex(v.Name()) {
+				break // skipping input that are filtered out by the index
+			}
+
 			hasInput = true
 			data, _, err := outputGetter.Get(v.Name())
 			if err != nil {

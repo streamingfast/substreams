@@ -370,9 +370,9 @@ func (p *Pipeline) applyExecutionResult(ctx context.Context, executor exec.Modul
 		return fmt.Errorf("execute module: %w", runError)
 	}
 
-	if executor.HasValidOutput() {
+	if !res.skippedFromIndex && executor.HasValidOutput() {
 		p.saveModuleOutput(moduleOutput, executor.Name(), reqctx.Details(ctx).ProductionMode)
-		if err := execOutput.Set(executorName, outputBytes, res.skippedFromIndex); err != nil {
+		if err := execOutput.Set(executorName, outputBytes); err != nil {
 			return fmt.Errorf("set output cache: %w", err)
 		}
 		if moduleOutput != nil {
@@ -380,8 +380,8 @@ func (p *Pipeline) applyExecutionResult(ctx context.Context, executor exec.Modul
 		}
 	}
 
-	if executor.HasOutputForFiles() {
-		if err := execOutput.SetFileOutput(executorName, res.bytesForFiles, res.skippedFromIndex); err != nil {
+	if !res.skippedFromIndex && executor.HasOutputForFiles() {
+		if err := execOutput.SetFileOutput(executorName, res.bytesForFiles); err != nil {
 			return fmt.Errorf("set output cache: %w", err)
 		}
 	}

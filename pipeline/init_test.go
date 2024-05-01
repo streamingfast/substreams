@@ -81,18 +81,14 @@ func (i *ExecOutputTesting) Get(moduleName string) (value []byte, cached bool, e
 	return val, false, nil
 }
 
-func (i *ExecOutputTesting) Set(moduleName string, value []byte, isSkippedFromIndex bool) (err error) {
+func (i *ExecOutputTesting) Set(moduleName string, value []byte) (err error) {
 	i.Values[moduleName] = value
 	return nil
 }
 
-func (i *ExecOutputTesting) SetFileOutput(moduleName string, value []byte, isSkippedFromIndex bool) (err error) {
+func (i *ExecOutputTesting) SetFileOutput(moduleName string, value []byte) (err error) {
 	i.ValuesForFiles[moduleName] = value
 	return nil
-}
-
-func (i *ExecOutputTesting) IsSkippedFromIndex(moduleName string) bool {
-	return false
 }
 
 func (i *ExecOutputTesting) Clock() *pbsubstreams.Clock {

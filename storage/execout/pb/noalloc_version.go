@@ -326,6 +326,7 @@ func (m *Item) UnmarshalVTNoAlloc(dAtA []byte) error {
 			//m.Cursor = string(dAtA[iNdEx:postIndex])
 			m.Cursor = unsafeGetString(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
+
 		default:
 			iNdEx = preIndex
 			skippy, err := skip(dAtA[iNdEx:])

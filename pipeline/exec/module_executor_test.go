@@ -43,10 +43,6 @@ func (t *MockExecOutput) Set(name string, value []byte) (err error) {
 	return nil
 }
 
-func (t *MockExecOutput) IsSkippedFromIndex(moduleName string) bool {
-	return false
-}
-
 type MockModuleExecutor struct {
 	name string
 

@@ -293,16 +293,16 @@ func checkBlockSkippedInOutputFile(ctx context.Context, extendedTempDir, checked
 	}
 
 	outputData := &pboutput.Map{}
+
 	if err = outputData.UnmarshalFast(ctn); err != nil {
 		return fmt.Errorf("unmarshalling file %s: %w", checkedFile, err)
 	}
 
 	for _, item := range outputData.Kv {
-		fmt.Println("Item", item.IsSkippedFromIndex, item.BlockNum)
-		//_, found := expectedSkippedBlock[item.BlockNum]
-		//if found && !item.IsSkippedFromIndex {
-		//	return fmt.Errorf("block %d should have been skipped", item.BlockNum)
-		//}
+		_, found := expectedSkippedBlock[item.BlockNum]
+		if found {
+			return fmt.Errorf("block %d should have been skipped", item.BlockNum)
+		}
 	}
 
 	return nil

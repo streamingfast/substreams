@@ -69,15 +69,15 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 				break // skipping input that is not active at this block
 			}
 
-			if outputGetter.IsSkippedFromIndex(v.Name()) {
-				break // skipping input that are filtered out by the index
+			data, _, err := outputGetter.Get(v.Name())
+			if err != nil {
+				if errors.Is(err, execout.ErrNotFound) {
+					break
+				}
+				return nil, fmt.Errorf("input data for %q, param %d: %w", v.Name(), i, err)
 			}
 
 			hasInput = true
-			data, _, err := outputGetter.Get(v.Name())
-			if err != nil {
-				return nil, fmt.Errorf("input data for %q, param %d: %w", v.Name(), i, err)
-			}
 			v.SetValue(data)
 		default:
 			panic("unknown wasm argument type")

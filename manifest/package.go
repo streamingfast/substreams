@@ -68,7 +68,7 @@ func (r *manifestConverter) validateManifest(manif *Manifest) error {
 	for _, s := range manif.Modules {
 		if s.BlockFilter != nil {
 			ctx := context.Background()
-			if err := validateQuery(ctx, s.BlockFilter.Query); err != nil {
+			if err := validateQuery(ctx, s.BlockFilter.Query, manif.Params[s.Name]); err != nil {
 				return fmt.Errorf("stream %q: %w", s.Name, err)
 			}
 		}
@@ -130,8 +130,20 @@ func (r *manifestConverter) validateManifest(manif *Manifest) error {
 	return nil
 }
 
-func validateQuery(ctx context.Context, query string) error {
-	_, err := sqe.Parse(ctx, query)
+func validateQuery(ctx context.Context, query BlockFilterQuery, param string) error {
+	var q string
+	switch {
+	case query.String != "" && query.Params:
+		return fmt.Errorf("only one of 'string' or 'params' can be set")
+	case query.String != "":
+		q = query.String
+	case query.Params:
+		q = param
+	default:
+		return fmt.Errorf("missing query")
+	}
+
+	_, err := sqe.Parse(ctx, q)
 	if err != nil {
 		return fmt.Errorf("invalid query: %w", err)
 	}

@@ -226,7 +226,7 @@ func TestValidateManifest(t *testing.T) {
 				Modules: []*Module{
 					{Name: "basic_index", Kind: "blockIndex", BlockFilter: &BlockFilter{
 						Module: "my_module",
-						Query:  "test query",
+						Query:  BlockFilterQuery{String: "test query"},
 					}, Inputs: []*Input{{Map: "proto:sf.database.v1.changes"}}, Output: StreamOutput{"proto:sf.substreams.index.v1.Keys"}},
 				},
 			},
@@ -276,7 +276,7 @@ func TestValidateModules(t *testing.T) {
 						},
 						BlockFilter: &pbsubstreams.Module_BlockFilter{
 							Module: "block_index",
-							Query:  "This is my query",
+							Query:  &pbsubstreams.Module_BlockFilter_QueryString{QueryString: "This is my query"},
 						},
 					},
 
@@ -313,7 +313,7 @@ func TestValidateModules(t *testing.T) {
 						},
 						BlockFilter: &pbsubstreams.Module_BlockFilter{
 							Module: "wrong_module",
-							Query:  "This is my query",
+							Query:  &pbsubstreams.Module_BlockFilter_QueryString{QueryString: "This is my query"},
 						},
 					},
 
@@ -350,7 +350,7 @@ func TestValidateModules(t *testing.T) {
 						},
 						BlockFilter: &pbsubstreams.Module_BlockFilter{
 							Module: "map_module",
-							Query:  "This is my query",
+							Query:  &pbsubstreams.Module_BlockFilter_QueryString{QueryString: "This is my query"},
 						},
 					},
 					{

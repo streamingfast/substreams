@@ -1,6 +1,7 @@
 package pbsubstreams
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -11,6 +12,25 @@ const (
 	ModuleKindMap
 	ModuleKindBlockIndex
 )
+
+func (m *Module) BlockFilterQueryString() (string, error) {
+	if m.BlockFilter == nil {
+		return "", nil
+	}
+	switch q := m.BlockFilter.Query.(type) {
+	case *Module_BlockFilter_QueryString:
+		return q.QueryString, nil
+	case *Module_BlockFilter_QueryFromParams:
+		for _, input := range m.Inputs {
+			if p := input.GetParams(); p != nil {
+				return p.Value, nil
+			}
+		}
+		return "", fmt.Errorf("getting blockFilterQueryString: no params input")
+	default:
+		return "", fmt.Errorf("getting blockFilterQueryString: unsupported query type")
+	}
+}
 
 func (x *Module) ModuleKind() ModuleKind {
 	switch x.Kind.(type) {

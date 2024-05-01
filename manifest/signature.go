@@ -104,7 +104,11 @@ func (m *ModuleHashes) hashModule(modules *pbsubstreams.Modules, module *pbsubst
 		buf.WriteString("block_filter_module!")
 		buf.WriteString(module.BlockFilter.Module)
 		buf.WriteString("block_filter_query!")
-		buf.WriteString(module.BlockFilter.Query)
+		qs, err := module.BlockFilterQueryString()
+		if err != nil {
+			return nil, err
+		}
+		buf.WriteString(qs)
 	}
 
 	buf.WriteString("ancestors")

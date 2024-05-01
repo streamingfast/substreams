@@ -105,7 +105,7 @@ func computeStagesInput(in string) (out []*pbsubstreams.Module) {
 				case 'I':
 					newMod.BlockFilter = &pbsubstreams.Module_BlockFilter{
 						Module: inputName,
-						Query:  "",
+						Query:  &pbsubstreams.Module_BlockFilter_QueryString{QueryString: "test"},
 					}
 				default:
 					panic("invalid input prefix: " + input)

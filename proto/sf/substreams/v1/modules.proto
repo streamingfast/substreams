@@ -33,11 +33,17 @@ message Module {
 
   BlockFilter block_filter = 9;
 
-
   message BlockFilter {
     string module = 1;
-    string query = 2;
+    oneof query {
+      string query_string = 2;
+      QueryFromParams query_from_params = 3;
+      // QueryFromStore query_from_store_keys = 3;
+    };
   }
+
+  message QueryFromParams {}
+
   message KindMap {
     string output_type = 1;
   }

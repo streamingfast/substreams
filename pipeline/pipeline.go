@@ -484,7 +484,11 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 				}
 				var moduleBlockIndex *index.BlockIndex
 				if module.BlockFilter != nil {
-					expr, err := sqe.Parse(ctx, module.BlockFilter.Query)
+					qs, err := module.BlockFilterQueryString()
+					if err != nil {
+						return err
+					}
+					expr, err := sqe.Parse(ctx, qs)
 					if err != nil {
 						return fmt.Errorf("parse block filter: %q: %w", module.BlockFilter.Query, err)
 					}

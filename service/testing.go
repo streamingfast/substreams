@@ -42,9 +42,9 @@ func (s *Tier1Service) TestBlocks(ctx context.Context, isSubRequest bool, reques
 	return s.blocks(ctx, request, outputGraph, respFunc)
 }
 
-func TestNewServiceTier2(runtimeConfig config.RuntimeConfig, streamFactoryFunc StreamFactoryFunc) *Tier2Service {
+func TestNewServiceTier2(moduleExecutionTracing bool, streamFactoryFunc StreamFactoryFunc) *Tier2Service {
 	return &Tier2Service{
-		runtimeConfig:             runtimeConfig,
+		moduleExecutionTracing:    moduleExecutionTracing,
 		tracer:                    nil,
 		logger:                    zlog,
 		streamFactoryFuncOverride: streamFactoryFunc,

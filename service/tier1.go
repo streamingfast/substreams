@@ -140,7 +140,6 @@ func NewTier1(
 		stateBundleSize,
 		parallelSubRequests,
 		10,
-		0,
 		stateStore,
 		defaultCacheTag,
 		func(logger *zap.Logger) work.Worker {
@@ -419,7 +418,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		return bsstream.NewErrInvalidArg(err.Error())
 	}
 
-	wasmRuntime := wasm.NewRegistry(s.wasmExtensions, s.runtimeConfig.MaxWasmFuel)
+	wasmRuntime := wasm.NewRegistry(s.wasmExtensions)
 
 	cacheStore, err := s.runtimeConfig.BaseObjectStore.SubStore(requestDetails.CacheTag)
 	if err != nil {
@@ -447,7 +446,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 
 	stores := pipeline.NewStores(ctx, storeConfigs, s.runtimeConfig.StateBundleSize, requestDetails.LinearHandoffBlockNum, request.StopBlockNum, false)
 
-	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, nil, s.blockType, nil) // we don't read or write ExecOuts on tier1
+	execOutputCacheEngine, err := cache.NewEngine(ctx, nil, s.blockType, nil) // we don't read or write ExecOuts on tier1
 	if err != nil {
 		return fmt.Errorf("error building caching engine: %w", err)
 	}
@@ -473,7 +472,8 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		execOutputConfigs,
 		wasmRuntime,
 		execOutputCacheEngine,
-		s.runtimeConfig,
+		s.runtimeConfig.StateBundleSize,
+		s.runtimeConfig.WorkerFactory,
 		respFunc,
 		opts...,
 	)

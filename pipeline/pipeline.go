@@ -15,6 +15,7 @@ import (
 	"github.com/streamingfast/substreams/orchestrator"
 	"github.com/streamingfast/substreams/orchestrator/plan"
 	"github.com/streamingfast/substreams/orchestrator/response"
+	"github.com/streamingfast/substreams/orchestrator/work"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -22,7 +23,6 @@ import (
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/reqctx"
-	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
@@ -34,8 +34,9 @@ type processingModule struct {
 }
 
 type Pipeline struct {
-	ctx           context.Context
-	runtimeConfig config.RuntimeConfig
+	ctx             context.Context
+	stateBundleSize uint64
+	workerFactory   work.WorkerFactory
 
 	pendingUndoMessage *pbsubstreamsrpc.Response
 	preBlockHooks      []substreams.BlockHook
@@ -85,7 +86,8 @@ func New(
 	execoutStorage *execout.Configs,
 	wasmRuntime *wasm.Registry,
 	execOutputCache *cache.Engine,
-	runtimeConfig config.RuntimeConfig,
+	stateBundleSize uint64,
+	workerFactory work.WorkerFactory,
 	respFunc substreams.ResponseFunc,
 	opts ...Option,
 ) *Pipeline {
@@ -93,7 +95,8 @@ func New(
 		ctx:             ctx,
 		gate:            newGate(ctx),
 		execOutputCache: execOutputCache,
-		runtimeConfig:   runtimeConfig,
+		stateBundleSize: stateBundleSize,
+		workerFactory:   workerFactory,
 		outputGraph:     outputGraph,
 		wasmRuntime:     wasmRuntime,
 		respFunc:        respFunc,
@@ -253,7 +256,7 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 	parallelProcessor, err := orchestrator.BuildParallelProcessor(
 		ctx,
 		reqPlan,
-		p.runtimeConfig,
+		p.workerFactory,
 		int(reqDetails.MaxParallelJobs),
 		p.outputGraph,
 		p.execoutStorage,

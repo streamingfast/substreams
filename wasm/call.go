@@ -60,21 +60,6 @@ func NewCall(clock *pbsubstreams.Clock, moduleName string, entrypoint string, st
 	return call
 }
 
-//func (m *Module) NewCall(clock *pbsubstreams.Clock, moduleName string, entrypoint string, arguments []Argument) (*Call, error) {
-// FIXME: that's to prevent calls when context was closed, protect in the caller?
-//if m.isClosed {
-//	panic("module is closed")
-//}
-
-// FIXME: Replace by `context.Context`, and should speed up execution.
-//if i.registry.maxFuel != 0 {
-//	if remaining, _ := i.wasmStore.ConsumeFuel(i.registry.maxFuel); remaining != 0 {
-//		i.wasmStore.ConsumeFuel(remaining) // don't accumulate fuel from previous executions
-//	}
-//	i.wasmStore.AddFuel(i.registry.maxFuel)
-//}
-//}
-
 func (c *Call) Err() error {
 	if c.panicError != nil {
 		return c.panicError

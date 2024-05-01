@@ -86,7 +86,7 @@ func mapTestExecutor(t *testing.T, ctx context.Context, name string) *exec.Mappe
 	binary := pkg.Modules.Binaries[binaryIndex]
 	require.Greater(t, len(binary.Content), 1)
 
-	registry := wasm.NewRegistry(nil, 0)
+	registry := wasm.NewRegistry(nil)
 	module, err := registry.NewModule(ctx, binary.Content)
 	require.NoError(t, err)
 

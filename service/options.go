@@ -8,24 +8,13 @@ type anyTierService interface{}
 
 type Option func(anyTierService)
 
-func WithMaxWasmFuelPerBlockModule(maxFuel uint64) Option {
-	return func(a anyTierService) {
-		switch s := a.(type) {
-		case *Tier1Service:
-			s.runtimeConfig.MaxWasmFuel = maxFuel
-		case *Tier2Service:
-			s.runtimeConfig.MaxWasmFuel = maxFuel
-		}
-	}
-}
-
 func WithModuleExecutionTracing() Option {
 	return func(a anyTierService) {
 		switch s := a.(type) {
 		case *Tier1Service:
 			s.runtimeConfig.ModuleExecutionTracing = true
 		case *Tier2Service:
-			s.runtimeConfig.ModuleExecutionTracing = true
+			s.moduleExecutionTracing = true
 		}
 	}
 }
@@ -53,7 +42,7 @@ func WithMaxConcurrentRequests(max uint64) Option {
 		case *Tier1Service:
 			// not used
 		case *Tier2Service:
-			s.runtimeConfig.MaxConcurrentRequests = int64(max)
+			s.maxConcurrentRequests = max
 		}
 	}
 

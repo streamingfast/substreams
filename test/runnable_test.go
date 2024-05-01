@@ -252,14 +252,14 @@ func processInternalRequest(
 		blockGeneratorFactory:  newGenerator,
 	}
 
-	runtimeConfig := config.RuntimeConfig{
-		StateBundleSize:            10,
-		DefaultParallelSubrequests: 10,
-		BaseObjectStore:            baseStoreStore,
-		DefaultCacheTag:            "tag",
-		WorkerFactory:              workerFactory,
-	}
-	svc := service.TestNewServiceTier2(runtimeConfig, tr.StreamFactory)
+	//runtimeConfig := config.RuntimeConfig{
+	//	StateBundleSize:            10,
+	//	DefaultParallelSubrequests: 10,
+	//	BaseObjectStore:            baseStoreStore,
+	//	DefaultCacheTag:            "tag",
+	//	WorkerFactory:              workerFactory,
+	//}
+	svc := service.TestNewServiceTier2(false, tr.StreamFactory)
 
 	return svc.TestProcessRange(ctx, request, responseCollector.Collect)
 }

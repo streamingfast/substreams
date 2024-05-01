@@ -13,7 +13,6 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/stage"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
-	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"
 )
@@ -27,7 +26,7 @@ type ParallelProcessor struct {
 func BuildParallelProcessor(
 	ctx context.Context,
 	reqPlan *plan.RequestPlan,
-	runtimeConfig config.RuntimeConfig,
+	workerFactory work.WorkerFactory,
 	maxParallelJobs int,
 	outputGraph *outputmodules.Graph,
 	execoutStorage *execout.Configs,
@@ -130,7 +129,7 @@ func BuildParallelProcessor(
 	//  -
 	//  This is an optimization and is not solved herein.
 
-	workerPool := work.NewWorkerPool(ctx, maxParallelJobs, runtimeConfig.WorkerFactory)
+	workerPool := work.NewWorkerPool(ctx, maxParallelJobs, workerFactory)
 	sched.WorkerPool = workerPool
 
 	return &ParallelProcessor{

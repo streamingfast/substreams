@@ -26,7 +26,6 @@ import (
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/reqctx"
-	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
@@ -40,7 +39,6 @@ import (
 
 type Tier2Service struct {
 	wasmExtensions func(map[string]string) (map[string]map[string]wasm.WASMExtension, error) //todo: rename
-	runtimeConfig  config.RuntimeConfig
 	tracer         ttrace.Tracer
 	logger         *zap.Logger
 
@@ -48,6 +46,8 @@ type Tier2Service struct {
 
 	setReadyFunc              func(bool)
 	currentConcurrentRequests int64
+	maxConcurrentRequests     uint64
+	moduleExecutionTracing    bool
 	connectionCountMutex      sync.RWMutex
 
 	tier2RequestParameters *reqctx.Tier2RequestParameters
@@ -59,12 +59,10 @@ func NewTier2(
 	logger *zap.Logger,
 	opts ...Option,
 ) (*Tier2Service, error) {
-	runtimeConfig := config.NewTier2RuntimeConfig()
 
 	s := &Tier2Service{
-		runtimeConfig: runtimeConfig,
-		tracer:        tracing.GetTracer(),
-		logger:        logger,
+		tracer: tracing.GetTracer(),
+		logger: logger,
 	}
 
 	metrics.RegisterMetricSet(logger)
@@ -80,7 +78,7 @@ func (s *Tier2Service) isOverloaded() bool {
 	s.connectionCountMutex.RLock()
 	defer s.connectionCountMutex.RUnlock()
 
-	isOverloaded := s.runtimeConfig.MaxConcurrentRequests > 0 && s.currentConcurrentRequests >= s.runtimeConfig.MaxConcurrentRequests
+	isOverloaded := s.maxConcurrentRequests > 0 && uint64(s.currentConcurrentRequests) >= s.maxConcurrentRequests
 	return isOverloaded
 }
 
@@ -101,7 +99,7 @@ func (s *Tier2Service) decrementConcurrentRequests() {
 }
 
 func (s *Tier2Service) setOverloaded() {
-	overloaded := s.runtimeConfig.MaxConcurrentRequests != 0 && s.currentConcurrentRequests >= s.runtimeConfig.MaxConcurrentRequests
+	overloaded := s.maxConcurrentRequests != 0 && uint64(s.currentConcurrentRequests) >= s.maxConcurrentRequests
 	s.setReadyFunc(!overloaded)
 }
 
@@ -216,9 +214,6 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) error {
 	logger := reqctx.Logger(ctx)
 
-	s.runtimeConfig.DefaultCacheTag = request.StateStoreDefaultTag
-	s.runtimeConfig.StateBundleSize = request.StateBundleSize
-
 	mergedBlocksStore, err := dstore.NewDBinStore(request.MergedBlocksStore)
 	if err != nil {
 		return fmt.Errorf("setting up block store from url %q: %w", request.MergedBlocksStore, err)
@@ -254,11 +249,11 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 
 	requestDetails := pipeline.BuildRequestDetailsFromSubrequest(request)
 	ctx = reqctx.WithRequest(ctx, requestDetails)
-	if s.runtimeConfig.ModuleExecutionTracing {
+	if s.moduleExecutionTracing {
 		ctx = reqctx.WithModuleExecutionTracing(ctx)
 	}
 
-	requestDetails.CacheTag = s.runtimeConfig.DefaultCacheTag
+	requestDetails.CacheTag = request.StateStoreDefaultTag
 	if auth := dauth.FromContext(ctx); auth != nil {
 		if cacheTag := auth.Get("X-Sf-Substreams-Cache-Tag"); cacheTag != "" {
 			if IsValidCacheTag(cacheTag) {
@@ -285,7 +280,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		}
 		exts = x
 	}
-	wasmRuntime := wasm.NewRegistry(exts, s.runtimeConfig.MaxWasmFuel)
+	wasmRuntime := wasm.NewRegistry(exts)
 
 	cacheStore, err := stateStore.SubStore(requestDetails.CacheTag)
 	if err != nil {
@@ -326,7 +321,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	}
 
 	// this engine will keep the existingExecOuts to optimize the execution (for inputs from modules that skip execution)
-	execOutputCacheEngine, err := cache.NewEngine(ctx, s.runtimeConfig, execOutWriters, request.BlockType, existingExecOuts)
+	execOutputCacheEngine, err := cache.NewEngine(ctx, execOutWriters, request.BlockType, existingExecOuts)
 	if err != nil {
 		return fmt.Errorf("error building caching engine: %w", err)
 	}
@@ -343,7 +338,8 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		execOutputConfigs,
 		wasmRuntime,
 		execOutputCacheEngine,
-		s.runtimeConfig,
+		request.StateBundleSize,
+		nil,
 		respFunc,
 		// This must always be the parent/global trace id, the one that comes from tier1
 		opts...,
@@ -372,8 +368,6 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		}
 		streamFactoryFunc = sf.New
 	}
-
-	s.runtimeConfig.StateBundleSize = request.StateBundleSize
 
 	var streamErr error
 	if canSkipBlockSource(existingExecOuts, modulesRequiredToRun, request.BlockType) {

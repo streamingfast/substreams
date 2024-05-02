@@ -22,13 +22,23 @@ import (
 )
 
 func loadProtobufs(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.FileDescriptor, error) {
+
+	seen := map[string]bool{}
+	for _, file := range pkg.ProtoFiles {
+		seen[*file.Name] = true
+	}
+
 	// System protos
 	systemFiles, err := readSystemProtobufs()
 	if err != nil {
 		return nil, err
 	}
-	seen := map[string]bool{}
+
 	for _, file := range systemFiles.File {
+		if _, found := seen[*file.Name]; found {
+			continue
+		}
+
 		pkg.ProtoFiles = append(pkg.ProtoFiles, file)
 		seen[*file.Name] = true
 	}
@@ -58,6 +68,14 @@ func loadProtobufs(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.FileDesc
 			}
 			return os.Open(filename)
 		},
+		LookupImportProto: func(file string) (*descriptorpb.FileDescriptorProto, error) {
+			for _, protoFile := range pkg.ProtoFiles {
+				if protoFile.GetName() == file {
+					return protoFile, nil
+				}
+			}
+			return nil, fmt.Errorf("proto file %q not found in package", file)
+		},
 	}
 
 	for _, file := range manif.Protobuf.Files {
@@ -77,9 +95,9 @@ func loadProtobufs(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.FileDesc
 	return customFiles, nil
 }
 
-func loadDefinitionFromBufBuild(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.FileDescriptor, error) {
+func loadDescriptorSets(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.FileDescriptor, error) {
 	var out []*desc.FileDescriptor
-	for _, url := range manif.Protobuf.BufBuildUrls {
+	for _, url := range manif.Protobuf.DescriptorSets {
 
 		authToken := os.Getenv("BUFBUILD_AUTH_TOKEN")
 		if authToken == "" {

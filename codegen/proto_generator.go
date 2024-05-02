@@ -35,7 +35,6 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package, showBufContent
 	}
 
 	if err := os.WriteFile(spkgTemporaryFilePath, cnt, 0644); err != nil {
-		fmt.Println("")
 		return fmt.Errorf("writing %q: %w", spkgTemporaryFilePath, err)
 	}
 

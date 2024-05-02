@@ -230,12 +230,16 @@ func (r *manifestConverter) manifestToPkg(manif *Manifest) (*pbsubstreams.Packag
 		return nil, nil, nil, fmt.Errorf("failed to convert manifest to pkg: %w", err)
 	}
 
+	if err := loadImports(pkg, manif); err != nil {
+		return nil, nil, nil, fmt.Errorf("error loading imports: %w", err)
+	}
+
 	protoDefinitions, err := loadProtobufs(pkg, manif)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error loading protobuf: %w", err)
 	}
 
-	bufBuildDefinition, err := loadDefinitionFromBufBuild(pkg, manif)
+	bufBuildDefinition, err := loadDescriptorSets(pkg, manif)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error loading protobuf: %w", err)
 	}
@@ -245,10 +249,6 @@ func (r *manifestConverter) manifestToPkg(manif *Manifest) (*pbsubstreams.Packag
 		if err := loadImage(pkg, manif); err != nil {
 			return nil, nil, nil, fmt.Errorf("error loading image: %w", err)
 		}
-	}
-
-	if err := loadImports(pkg, manif); err != nil {
-		return nil, nil, nil, fmt.Errorf("error loading imports: %w", err)
 	}
 
 	if err := r.loadSinkConfig(pkg, manif); err != nil {

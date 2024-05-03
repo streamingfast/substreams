@@ -454,7 +454,7 @@ func (p *Pipeline) buildModuleExecutors(ctx context.Context) ([][]exec.ModuleExe
 					continue
 				}
 				code := reqModules.Binaries[module.BinaryIndex]
-				m, err := p.wasmRuntime.NewModule(ctx, code.Content)
+				m, err := p.wasmRuntime.NewModule(ctx, code.Content, code.Type)
 				if err != nil {
 					return nil, fmt.Errorf("new wasm module: %w", err)
 				}

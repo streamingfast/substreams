@@ -1,0 +1,26 @@
+specVersion: v0.1.0
+package:
+  name: mytinytest
+  version: v0.1.1
+
+protobuf:
+  files:
+    - my.proto
+  importPaths:
+    - ./proto
+
+binaries:
+  default:
+    type: wasip1/tinygo-v1  # wasm/rust-v1
+    file: ./wasm.wasm
+
+network: mainnet
+
+modules:
+  - name: map_test
+    kind: map
+    initialBlock: 12360600
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+    output:
+      type: proto:my.Block

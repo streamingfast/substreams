@@ -53,7 +53,7 @@ func NewCall(clock *pbsubstreams.Clock, moduleName string, entrypoint string, st
 		case ValueArgument:
 			// Handled in ÈxecuteNewCall()
 		default:
-			panic("unknown wasm argument type")
+			panic(fmt.Sprintf("unknown wasm argument type %T", v))
 		}
 	}
 

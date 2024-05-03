@@ -51,6 +51,7 @@ require (
 	github.com/muesli/reflow v0.3.0
 	github.com/muesli/termenv v0.13.0
 	github.com/prometheus/client_golang v1.16.0
+	github.com/protocolbuffers/protoscope v0.0.0-20221109213918-8e7a6aafa2c9
 	github.com/rs/cors v1.10.0
 	github.com/schollz/closestmatch v2.1.0+incompatible
 	github.com/shopspring/decimal v1.3.1
@@ -60,6 +61,7 @@ require (
 	github.com/streamingfast/eth-go v0.0.0-20230410173454-433bd8803da1
 	github.com/streamingfast/sf-tracing v0.0.0-20240209202324-9daa52c71a52
 	github.com/streamingfast/shutter v1.5.0
+	github.com/streamingfast/substreams-sdk-go v0.0.0-20240110154316-5fb21a7a330b
 	github.com/streamingfast/substreams-sink-sql v1.0.1-0.20231127153906-acf5f3e34330
 	github.com/test-go/testify v1.1.4
 	github.com/tetratelabs/wazero v1.7.1

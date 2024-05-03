@@ -4,9 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/tetratelabs/wazero/api"
-
 	"github.com/streamingfast/substreams/wasm"
+	"github.com/tetratelabs/wazero/api"
 )
 
 type parm = api.ValueType
@@ -23,7 +22,7 @@ type funcs struct {
 	f      api.GoModuleFunction
 }
 
-var stateFuncs = []funcs{
+var StateFuncs = []funcs{
 	{
 		"set",
 		[]parm{i64, i32, i32, i32, i32},
@@ -323,7 +322,7 @@ var stateFuncs = []funcs{
 	},
 }
 
-func setStackAndOutput(ctx context.Context, stack []uint64, call *wasm.Call, found bool, inst *instance, outputPtr uint32, value []byte) {
+func setStackAndOutput(ctx context.Context, stack []uint64, call *wasm.Call, found bool, inst *Instance, outputPtr uint32, value []byte) {
 	if !found {
 		stack[0] = 0
 	} else {

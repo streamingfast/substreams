@@ -6,9 +6,17 @@ import (
 	"github.com/tetratelabs/wazero/api"
 )
 
-type instance struct {
+func NewInstance(mod api.Module, memFuncs runtimeSauce) *Instance {
+	return &Instance{
+		Module:       mod,
+		runtimeSauce: memFuncs,
+	}
+}
+
+type Instance struct {
 	api.Module
-	allocations []allocation
+	allocations  []allocation
+	runtimeSauce runtimeSauce
 }
 
 type allocation struct {
@@ -16,18 +24,18 @@ type allocation struct {
 	length uint32
 }
 
-func (i *instance) Cleanup(ctx context.Context) error {
+func (i *Instance) Cleanup(ctx context.Context) error {
 	deallocate(ctx, i)
 	return nil
 }
 
-func (i *instance) Close(ctx context.Context) error {
+func (i *Instance) Close(ctx context.Context) error {
 	return i.Module.Close(ctx)
 }
 
-func instanceFromContext(ctx context.Context) *instance {
-	return ctx.Value("instance").(*instance)
+func instanceFromContext(ctx context.Context) *Instance {
+	return ctx.Value("instance").(*Instance)
 }
-func withInstanceContext(ctx context.Context, inst *instance) context.Context {
+func WithInstanceContext(ctx context.Context, inst *Instance) context.Context {
 	return context.WithValue(ctx, "instance", inst)
 }

@@ -20,7 +20,7 @@ import (
 
 func main() {
 	ctx := context.Background()
-	wasmRuntime := wasm.NewRegistryWithRuntime("wasi", nil, 0)
+	wasmRuntime := wasm.NewRegistryWithRuntime("wasi", nil)
 	code, err := os.ReadFile("/Users/colindickson/code/dfuse/substreams/wasm/bench/substreams_wasi_go/main.wasm")
 	blockReader, err := os.Open("/Users/colindickson/code/dfuse/substreams/wasm/bench/cmd/wasigo/testdata/block.binpb")
 	if err != nil {
@@ -46,7 +46,7 @@ func main() {
 			wasm.NewStoreWriterOutput("out", createStore(ctx, "out"), 1, "string"),
 		)
 
-		call := wasm.NewCall(nil, "mapBlock", "mapBlock", args)
+		call := wasm.NewCall(nil, "mapBlock", "mapBlock", nil, args)
 		_, err = module.ExecuteNewCall(ctx, call, instance, args)
 		if err != nil {
 			panic(fmt.Errorf("executing call: %w", err))
@@ -80,7 +80,7 @@ func createStore(ctx context.Context, name string) *store.FullKV {
 	if err != nil {
 		panic(err)
 	}
-	storeConfig, err := store.NewConfig(name, 0, "hash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "string", ds, "trace.id.1")
+	storeConfig, err := store.NewConfig(name, 0, "hash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "string", ds)
 	if err != nil {
 		panic(err)
 	}

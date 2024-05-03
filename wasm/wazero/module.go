@@ -20,6 +20,7 @@ type Module struct {
 	wazModuleConfig wazero.ModuleConfig
 	hostModules     []wazero.CompiledModule
 	userModule      wazero.CompiledModule
+	runtimeSauce    runtimeSauce
 }
 
 func init() {
@@ -36,11 +37,15 @@ func newModule(ctx context.Context, wasmCode []byte, wasmCodeType string, regist
 
 	runtime := wazero.NewRuntimeWithConfig(ctx, runtimeConfig)
 
+	var runtimeSauce runtimeSauce
 	switch wasmCodeType {
-	case "rust/wasip1":
+	case "wasip1/tinygo-v1":
+		runtimeSauce = TinyGoSauce
 		wasi_snapshot_preview1.MustInstantiate(ctx, runtime)
+	case "wasm/rust-v1":
+		runtimeSauce = RustBasedSauce
 	default:
-		//
+		panic(fmt.Errorf("unsupported WASM code type: %s", wasmCodeType)) // should have panic'd well before this point
 	}
 
 	hostModules, err := addExtensionFunctions(ctx, runtime, registry)
@@ -68,13 +73,13 @@ func newModule(ctx context.Context, wasmCode []byte, wasmCodeType string, regist
 		return nil, fmt.Errorf("creating new module: %w", err)
 	}
 
-	//funcs := mod.ExportedFunctions()
-	//if funcs["alloc"] == nil {
-	//	return nil, fmt.Errorf("missing required functions: alloc")
-	//}
-	//if funcs["dealloc"] == nil {
-	//	return nil, fmt.Errorf("missing required functions: dealloc")
-	//}
+	funcs := mod.ExportedFunctions()
+	if funcs[runtimeSauce.allocFunc] == nil {
+		return nil, fmt.Errorf("missing required functions: %s", runtimeSauce.allocFunc)
+	}
+	if funcs[runtimeSauce.deallocFunc] == nil {
+		return nil, fmt.Errorf("missing required functions: %s", runtimeSauce.deallocFunc)
+	}
 
 	wazConfig := wazero.NewModuleConfig()
 
@@ -83,6 +88,7 @@ func newModule(ctx context.Context, wasmCode []byte, wasmCodeType string, regist
 		wazRuntime:      runtime,
 		userModule:      mod,
 		hostModules:     hostModules,
+		runtimeSauce:    runtimeSauce,
 	}, nil
 }
 
@@ -108,7 +114,7 @@ func (m *Module) NewInstance(ctx context.Context) (out wasm.Instance, err error)
 		return nil, fmt.Errorf("could not instantiate wasm module: %w", err)
 	}
 
-	return &Instance{Module: mod}, nil
+	return NewInstance(mod, m.runtimeSauce), nil
 }
 
 func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInstance wasm.Instance, arguments []wasm.Argument) (out wasm.Instance, err error) {
@@ -121,7 +127,7 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 			return nil, fmt.Errorf("could not instantiate wasm module: %w", err)
 		}
 	}
-	inst := &Instance{Module: mod}
+	inst := NewInstance(mod, m.runtimeSauce)
 
 	f := mod.ExportedFunction(call.Entrypoint)
 	if f == nil {
@@ -139,6 +145,7 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 		case wasm.ValueArgument:
 			cnt := v.Value()
 			ptr, err := writeToHeap(ctx, inst, true, cnt)
+			fmt.Println("WRITING TO HEAP", input.Name(), len(cnt), call.Clock.Number)
 			if err != nil {
 				return nil, fmt.Errorf("writing %s to heap: %w", input.Name(), err)
 			}

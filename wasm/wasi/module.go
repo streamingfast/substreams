@@ -32,6 +32,7 @@ type Module struct {
 }
 
 func init() {
+	// TODO: we'd need to hook that into the list of "BinaryTypes" so it can be enabled on a per-request basis
 	wasm.RegisterModuleFactory("wasi", wasm.ModuleFactoryFunc(newModule))
 }
 
@@ -69,11 +70,11 @@ func (m *Module) NewInstance(ctx context.Context) (out wasm.Instance, err error)
 		return nil, fmt.Errorf("could not instantiate wasm module: %w", err)
 	}
 
-	return &sfwazero.Instance{}, nil
+	return sfwazero.NewInstance(nil, sfwazero.TinyGoSauce), nil
 }
 
 func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, wasmInstance wasm.Instance, arguments []wasm.Argument) (out wasm.Instance, err error) {
-	inst := &sfwazero.Instance{}
+	inst := sfwazero.NewInstance(nil, sfwazero.TinyGoSauce)
 
 	argsData, err := marshallArgs(arguments)
 	if err != nil {
@@ -104,7 +105,7 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, wasmInstan
 		if exitErr, ok := err.(*sys.ExitError); ok && exitErr.ExitCode() != 0 {
 			fmt.Fprintf(os.Stderr, "exit_code: %d\n", exitErr.ExitCode())
 		} else if !ok {
-			log.Panicln(err)
+			log.Panicln(fmt.Errorf("error in InstantiateModule: %w", err))
 		}
 	}
 

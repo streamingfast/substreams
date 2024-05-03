@@ -129,6 +129,13 @@ func (l LayerModules) IsStoreLayer() bool {
 func computeStages(mods []*pbsubstreams.Module) (stages ExecutionStages) {
 	seen := map[string]bool{}
 
+	// Layers pre-define the list of modules that have all of their dependencies
+	// satisfied.
+	// If you have a stage like this:
+	//      M1
+	//      M2
+	//      S1
+	// then the Store `S1` would depend on module M2, so it would not
 	var layers StageLayers
 
 	for i := 0; ; i++ {
@@ -149,6 +156,7 @@ func computeStages(mods []*pbsubstreams.Module) (stages ExecutionStages) {
 				}
 			}
 
+			// We've scheduled this module in a previous layer.
 			if seen[mod.Name] {
 				continue
 			}
@@ -167,6 +175,10 @@ func computeStages(mods []*pbsubstreams.Module) (stages ExecutionStages) {
 				default:
 					panic(fmt.Errorf("unsupported input type %T", dep.Input))
 				}
+				// The moment we see a module that has a single dependency that is
+				// unmet, we ditch the layer and start a new one.
+				// The next iteration, we'll change the layer type. That's how we
+				// achieve layers such as MAP, MAP, STORE layers.
 				if !seen[depModName] {
 					continue modLoop
 				}

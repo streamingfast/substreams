@@ -54,7 +54,6 @@ type Instance struct {
 	ReplayLog      *replaylog.File
 	RequestSummary *Summary
 	Modules        *pbsubstreams.Modules
-	RefreshCtx     *Config
 	Graph          *manifest.ModuleGraph
 }
 

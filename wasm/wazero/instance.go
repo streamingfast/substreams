@@ -6,9 +6,17 @@ import (
 	"github.com/tetratelabs/wazero/api"
 )
 
+func NewInstance(mod api.Module, memFuncs runtimeSauce) *Instance {
+	return &Instance{
+		Module:       mod,
+		runtimeSauce: memFuncs,
+	}
+}
+
 type Instance struct {
 	api.Module
-	allocations []allocation
+	allocations  []allocation
+	runtimeSauce runtimeSauce
 }
 
 type allocation struct {

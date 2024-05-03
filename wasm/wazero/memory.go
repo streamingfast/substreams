@@ -8,10 +8,25 @@ import (
 	"github.com/tetratelabs/wazero/api"
 )
 
+// const AllocFunction = "alloc"
+// const DeallocFunction = "dealloc"
+// const AllocFunction = "malloc"
+// const DeallocFunction = "free"
+
+// runtimeSauce is the flavor of the WASM runtime we have, and its configuration.
+// Feel free to rename this to something better :)
+type runtimeSauce struct {
+	allocFunc   string
+	deallocFunc string
+}
+
+var RustBasedSauce = runtimeSauce{"alloc", "dealloc"}
+var TinyGoSauce = runtimeSauce{"malloc", "free"}
+
 func writeToHeap(ctx context.Context, inst *Instance, track bool, data []byte) (uint32, error) {
 	size := len(data)
 	stack := []uint64{uint64(size)}
-	if err := inst.ExportedFunction("alloc").CallWithStack(ctx, stack); err != nil {
+	if err := inst.ExportedFunction(inst.runtimeSauce.allocFunc).CallWithStack(ctx, stack); err != nil {
 		return 0, fmt.Errorf("alloc from: %w", err)
 	}
 	ptr := uint32(stack[0])
@@ -42,7 +57,7 @@ func writeOutputToHeap(ctx context.Context, inst *Instance, outputPtr uint32, va
 
 func deallocate(ctx context.Context, i *Instance) {
 	//t0 := time.Now()
-	dealloc := i.ExportedFunction("dealloc")
+	dealloc := i.ExportedFunction(i.runtimeSauce.deallocFunc)
 	for _, alloc := range i.allocations {
 		//fmt.Println("  dealloc", alloc.ptr, alloc.length)
 		if err := dealloc.CallWithStack(ctx, []uint64{uint64(alloc.ptr), uint64(alloc.length)}); err != nil {

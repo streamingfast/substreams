@@ -19,6 +19,7 @@ var LoggerFuncs = []funcs{
 			message := readStringFromStack(mod, stack[0:])
 			length := uint32(stack[1])
 			call := wasm.FromContext(ctx)
+			//fmt.Println("IN HEREEEEEEEEEEEEEEEEEEEEEEEEEEEEE", stack, call.ReachedLogsMaxByteCount(), message)
 
 			if call.ReachedLogsMaxByteCount() {
 				// Early exit, we don't even need to collect the message as we would not store it anyway
@@ -30,7 +31,7 @@ var LoggerFuncs = []funcs{
 			}
 
 			if tracer.Enabled() {
-				zlog.Debug(message, zap.String("module_name", call.ModuleName))
+				zlog.Debug(message, zap.String("module_name", call.ModuleName), zap.String("log_source", "wasm"))
 			}
 			call.AppendLog(message)
 			return

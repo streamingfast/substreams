@@ -526,6 +526,8 @@ github.com/prometheus/common v0.44.0 h1:+5BrQJwiBB9xsMygAB3TNvpQKOwlkc25LbISbrdO
 github.com/prometheus/common v0.44.0/go.mod h1:ofAIvZbQ1e/nugmZGz4/qCb9Ap1VoSTIO7x0VV9VvuY=
 github.com/prometheus/procfs v0.11.0 h1:5EAgkfkMl659uZPbe9AS2N68a7Cc1TJbPEuGzFuRbyk=
 github.com/prometheus/procfs v0.11.0/go.mod h1:nwNm2aOCAYw8uTR/9bWRREkZFxAUcWzPHWJq+XBB/FM=
+github.com/protocolbuffers/protoscope v0.0.0-20221109213918-8e7a6aafa2c9 h1:arwj11zP0yJIxIRiDn22E0H8PxfF7TsTrc2wIPFIsf4=
+github.com/protocolbuffers/protoscope v0.0.0-20221109213918-8e7a6aafa2c9/go.mod h1:SKZx6stCn03JN3BOWTwvVIO2ajMkb/zQdTceXYhKw/4=
 github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a/go.mod h1:bCqnVzQkZxMG4s8nGwiZ5l3QUCyqpo9Y+/ZMZ9VjZe4=
 github.com/rivo/uniseg v0.1.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
 github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
@@ -602,6 +604,8 @@ github.com/streamingfast/sf-tracing v0.0.0-20240209202324-9daa52c71a52 h1:D9M3b2
 github.com/streamingfast/sf-tracing v0.0.0-20240209202324-9daa52c71a52/go.mod h1:VRhdIrTjQSsc9cryNR18HTS32rgrHxQYwmoUOSEhpFA=
 github.com/streamingfast/shutter v1.5.0 h1:NpzDYzj0HVpSiDJVO/FFSL6QIK/YKOxY0gJAtyaTOgs=
 github.com/streamingfast/shutter v1.5.0/go.mod h1:B/T6efqdeMGbGwjzPS1ToXzYZI4kDzI5/u4I+7qbjY8=
+github.com/streamingfast/substreams-sdk-go v0.0.0-20240110154316-5fb21a7a330b h1:O00ZKnNHVHrIEzS/dr+w07H3c0qP2JZwE6XS9scJZSY=
+github.com/streamingfast/substreams-sdk-go v0.0.0-20240110154316-5fb21a7a330b/go.mod h1:TJXOmIAPY+FJvosBoMAiQeZzi32QiBXzCTSgVsss9Oo=
 github.com/streamingfast/substreams-sink-sql v1.0.1-0.20231127153906-acf5f3e34330 h1:svW/I3N8vW2JqJwE/cWXiULOEZi6eslxA60xHVqDaXk=
 github.com/streamingfast/substreams-sink-sql v1.0.1-0.20231127153906-acf5f3e34330/go.mod h1:4Zd5Re1SrhXDnO3VJh/FJcn64SyZPqAv6gFPjbyqMYI=
 github.com/streamingfast/validator v0.0.0-20210812013448-b9da5752ce14 h1:/HCMj7plThWPFXsj/O8f+zDIAtXciwP4rK6tb+9UvPQ=

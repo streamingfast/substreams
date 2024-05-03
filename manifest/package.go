@@ -2,12 +2,13 @@ package manifest
 
 import (
 	"fmt"
-	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/dynamic"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"os"
 	"path"
 	"path/filepath"
+
+	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/dynamic"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 type manifestConverter struct {
@@ -344,7 +345,7 @@ func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package
 		}
 
 		switch binaryDef.Type {
-		case "wasm/rust-v1":
+		case "wasm/rust-v1", "wasip1/tinygo-v1":
 			// OPTIM(abourget): also check if it's not already in
 			// `Binaries`, by comparing its, length + hash or value.
 			codeIndex, found := moduleCodeIndexes[binaryDef.File]

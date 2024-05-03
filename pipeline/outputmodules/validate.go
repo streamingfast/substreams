@@ -102,9 +102,9 @@ func validateBinaryTypes(bins []*pbsubstreams.Binary) error {
 	for _, binary := range bins {
 		switch binary.Type {
 		case "wasm/rust-v1":
-		case "wasm/wasip1":
+		case "wasip1/tinygo-v1":
 		default:
-			return fmt.Errorf(`unsupported binary type: %q, please use "wasm/rust-v1" or "wasm/wasip1"`, binary.Type)
+			return fmt.Errorf(`unsupported binary type: %q, please use "wasm/rust-v1" or "wasip1/tinygo-v1"`, binary.Type)
 		}
 	}
 	return nil

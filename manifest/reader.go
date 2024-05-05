@@ -782,6 +782,10 @@ func prefixModules(mods []*pbsubstreams.Module, prefix string) {
 				panic(fmt.Sprintf("module %q: input index %d: unsupported module input type %s", mod.Name, idx, inputIface.Input))
 			}
 		}
+
+		if mod.BlockFilter != nil {
+			mod.BlockFilter.Module = withPrefix(mod.BlockFilter.Module, prefix)
+		}
 	}
 }
 

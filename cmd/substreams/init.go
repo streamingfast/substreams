@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +18,9 @@ import (
 	"strings"
 	"time"
 
+	connect "connectrpc.com/connect"
+	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
@@ -24,6 +28,9 @@ import (
 	"github.com/streamingfast/eth-go"
 	"github.com/streamingfast/substreams/codegen"
 	"github.com/streamingfast/substreams/codegen/templates"
+	pbconvo "github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1"
+	"github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1/pbconvoconnect"
+	"golang.org/x/net/http2"
 )
 
 // Some developers centric environment override to make it faster to iterate on `substreams init` command
@@ -63,6 +70,120 @@ func init() {
 }
 
 func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
+	opts := []connect.ClientOption{
+		connect.WithGRPC(),
+	}
+	httpClient := &http.Client{
+		Transport: &http2.Transport{
+			AllowHTTP: true,
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+	}
+	client := pbconvoconnect.NewConversationClient(httpClient, "https://localhost:9000", opts...)
+	conn := client.Converse(context.Background())
+	err := conn.Send(&pbconvo.UserInput{
+		Entry: &pbconvo.UserInput_Start_{
+			Start: &pbconvo.UserInput_Start{
+				TopicId: "ethereum_dynamic_data_source",
+			},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed sending start message: %w", err)
+	}
+
+	var lastState string
+	for {
+		resp, err := conn.Receive()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return fmt.Errorf("receive message from conversation client: %w", err)
+		}
+		if resp.State != "" {
+			lastState = resp.State
+		}
+
+		switch msg := resp.Entry.(type) {
+		case *pbconvo.SystemOutput_Ack:
+		case *pbconvo.SystemOutput_Message_:
+			style := "light"
+			if lipgloss.HasDarkBackground() {
+				style = "dark"
+			}
+
+			if msg.Message.Style == "error" {
+				fmt.Println("⚠️ ⚠️ ⚠️")
+			}
+
+			out, err := glamour.Render(msg.Message.Markdown, style)
+			if err != nil {
+				return fmt.Errorf("failed rendering markdown from server: %q, %w", out, err)
+			}
+			fmt.Println(out)
+
+			if msg.Message.Style == "error" {
+				fmt.Println("⚠️ ⚠️ ⚠️")
+			}
+
+		case *pbconvo.SystemOutput_ImageWithText_:
+		case *pbconvo.SystemOutput_ListSelect_:
+			input := msg.ListSelect
+			input.Labels
+			fmt.Println("Select between options:")
+			fmt.Println(msg.ListSelect.Labels)
+			fmt.Println(msg.ListSelect.Values)
+			fmt.Printf("%#v\n", msg.ListSelect)
+
+			// prompt for a list selection, one or many, etc..
+		case *pbconvo.SystemOutput_TextInput_:
+			input := msg.TextInput
+			opts := &promptOptions{}
+			if input.ValidationRegexp != "" {
+				validationRE, err := regexp.Compile(input.ValidationRegexp)
+				if err != nil {
+					return fmt.Errorf("invalid regexp received from server (%q) to validate text input: %w", msg.TextInput.ValidationRegexp, err)
+				}
+				opts.Validate = func(userInput string) error {
+					matched := validationRE.MatchString(userInput)
+					if !matched {
+						return errors.New(input.ValidationErrorMessage)
+					}
+					return nil
+				}
+			}
+			res, err := prompt(input.Description, opts)
+			if err != nil {
+				return fmt.Errorf("error prompting for text input: %w", err)
+			}
+
+			if err := conn.Send(&pbconvo.UserInput{
+				FromActionId: resp.ActionId,
+				Entry: &pbconvo.UserInput_TextInput{
+					TextInput: res,
+				},
+			}); err != nil {
+				return fmt.Errorf("error sending message: %w", err)
+			}
+		case *pbconvo.SystemOutput_Loading_:
+			if msg.Loading.Loading {
+				if msg.Loading.Label != "" {
+					fmt.Println("Loading...", msg.Loading.Label)
+				} else {
+					fmt.Println("Loading...")
+				}
+			} else {
+				fmt.Println("  done.")
+			}
+		default:
+			fmt.Printf("Received unknown message type: %T\n", resp.Entry)
+		}
+	}
+
+	return nil
 	relativeWorkingDir := "."
 	if len(args) == 1 {
 		relativeWorkingDir = args[0]

@@ -27,7 +27,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 *  Previous value for `SUBSTREAMS_WORKERS_RAMPUP_TIME` was `4s`, now set to `0`, disabling the mechanism by default.
 
-## v1.5.6 (Unreleased)
+## v1.5.6
 
 ### Fixes
 

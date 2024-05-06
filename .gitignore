@@ -13,3 +13,5 @@ target
 /build
 /sink-data
 replay.log
+*.wasm
+/wasm/bench/substreams_tiny_go/main.wasm

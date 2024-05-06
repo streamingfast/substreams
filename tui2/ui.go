@@ -146,7 +146,6 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		ui.stream = msg.Stream
 		ui.msgDescs = msg.MsgDescs
 		ui.replayLog = msg.ReplayLog
-		ui.requestConfig = msg.RefreshCtx
 		cmds = append(cmds, ui.stream.Init())
 	case streamui.Msg:
 		switch msg {

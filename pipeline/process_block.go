@@ -51,7 +51,11 @@ func (p *Pipeline) ProcessBlock(block *pbbstream.Block, obj interface{}) (err er
 					return
 				}
 			}
-			err = fmt.Errorf("panic at block %s: %s", block, r)
+			truncatedBlock := block.String()
+			if len(truncatedBlock) > 1024 {
+				truncatedBlock = truncatedBlock[:1024] + "..."
+			}
+			err = fmt.Errorf("panic at block %d: %s [%s]", block.Number, r, truncatedBlock)
 			logger.Error("panic while process block", zap.Uint64("block_num", block.Number), zap.Error(err))
 			logger.Error(string(debug.Stack()))
 		}

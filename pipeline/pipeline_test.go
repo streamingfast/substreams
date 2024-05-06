@@ -86,7 +86,7 @@ func mapTestExecutor(t *testing.T, ctx context.Context, name string) *exec.Mappe
 	require.Greater(t, len(binary.Content), 1)
 
 	registry := wasm.NewRegistry(nil)
-	module, err := registry.NewModule(ctx, binary.Content)
+	module, err := registry.NewModule(ctx, binary.Content, binary.Type)
 	require.NoError(t, err)
 
 	return exec.NewMapperModuleExecutor(

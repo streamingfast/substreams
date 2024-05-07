@@ -14,6 +14,7 @@ type FileWalker struct {
 	segmenter *block.Segmenter
 	segment   int
 
+	IsLocal          bool
 	buffer           map[int]*File
 	bufferLock       sync.Mutex
 	previousFileSize atomic.Uint64
@@ -22,6 +23,7 @@ type FileWalker struct {
 func (c *Config) NewFileWalker(segmenter *block.Segmenter) *FileWalker {
 	return &FileWalker{
 		config:    c,
+		IsLocal:   c.objStore.BaseURL().Scheme == "file",
 		segmenter: segmenter,
 		segment:   segmenter.FirstIndex(),
 		buffer:    make(map[int]*File),

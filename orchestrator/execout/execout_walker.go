@@ -71,7 +71,7 @@ func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
 
 		err := file.Load(r.ctx)
 		if errors.Is(err, dstore.ErrNotFound) {
-			return MsgFileNotPresent{NextWait: computeNewWait(waitBefore)}
+			return MsgFileNotPresent{NextWait: computeNewWait(waitBefore, r.fileWalker.IsLocal)}
 		}
 		if err != nil {
 			return loop.NewQuitMsg(fmt.Errorf("loading %s cache %q: %w", file.ModuleName, file.Filename(), err))
@@ -84,13 +84,16 @@ func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
 	}
 }
 
-func computeNewWait(previousWait time.Duration) time.Duration {
+func computeNewWait(previousWait time.Duration, storeIsLocal bool) time.Duration {
+	if storeIsLocal {
+		return 50 * time.Millisecond
+	}
 	if previousWait == 0 {
 		return 500 * time.Millisecond
 	}
-	newWait := previousWait * 2
-	if newWait > 4*time.Second {
-		return 4 * time.Second
+	newWait := previousWait + 250*time.Millisecond
+	if newWait > 2*time.Second {
+		return 2 * time.Second
 	}
 	return newWait
 }

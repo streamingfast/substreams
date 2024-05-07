@@ -103,7 +103,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	for {
 		resp, err := conn.Receive()
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 			// TODO: reconnect, and send the Hydrate message to continue the conversation...
@@ -231,6 +231,49 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			}); err != nil {
 				return fmt.Errorf("error sending message: %w", err)
 			}
+
+		case *pbconvo.SystemOutput_Confirm_:
+			input := msg.Confirm
+
+			var returnValue bool
+			inputField := huh.NewConfirm().
+				Title(input.Prompt).
+				Affirmative(input.AcceptButtonLabel).
+				Negative(input.DeclineButtonLabel).
+				Description(input.Description).
+				Value(&returnValue)
+
+			err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run()
+			if err != nil {
+				return fmt.Errorf("failed taking confirmation input: %w", err)
+			}
+
+			// 			┃ Should I build the Substreams package?
+			// ┃
+			// ┃   Yes, build it     No, cancel everything
+
+			affirm := input.AcceptButtonLabel
+			deny := input.DeclineButtonLabel
+			if returnValue {
+				affirm = lipgloss.NewStyle().Bold(true).Render(affirm)
+			} else {
+				deny = lipgloss.NewStyle().Bold(true).Render(deny)
+			}
+			fmt.Println("┃ ", input.Prompt)
+			fmt.Println("┃ ")
+			fmt.Println("┃  " + affirm + "     " + deny)
+
+			if err := sendFunc(&pbconvo.UserInput{
+				FromActionId: resp.ActionId,
+				Entry: &pbconvo.UserInput_Confirmation_{
+					Confirmation: &pbconvo.UserInput_Confirmation{
+						Affirmative: returnValue,
+					},
+				},
+			}); err != nil {
+				return fmt.Errorf("error sending confirmation: %w", err)
+			}
+
 		case *pbconvo.SystemOutput_Loading_:
 			input := msg.Loading
 			if input.Loading {

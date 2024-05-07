@@ -125,6 +125,14 @@ func (p *RequestPlan) WriteOutSegmenter() *block.Segmenter {
 	return block.NewSegmenter(p.segmentInterval, p.WriteExecOut.StartBlock, p.WriteExecOut.ExclusiveEndBlock)
 }
 
+func (p *RequestPlan) ReadOutSegmenter(outputModuleInitialBlock uint64) *block.Segmenter {
+	startBlock := p.WriteExecOut.StartBlock
+	if outputModuleInitialBlock > startBlock {
+		startBlock = outputModuleInitialBlock
+	}
+	return block.NewSegmenter(p.segmentInterval, startBlock, p.WriteExecOut.ExclusiveEndBlock)
+}
+
 func (p *RequestPlan) String() string {
 	return fmt.Sprintf("interval=%d, stores=%s, map_write=%s, map_read=%s, linear=%s", p.segmentInterval, p.BuildStores, p.WriteExecOut, p.ReadExecOut, p.LinearPipeline)
 }

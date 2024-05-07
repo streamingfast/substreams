@@ -64,13 +64,13 @@ func BuildParallelProcessor(
 	// for whatever reason,
 
 	if reqPlan.ReadExecOut != nil {
-		execOutSegmenter := reqPlan.WriteOutSegmenter()
 		// note: since we are *NOT* in a sub-request and are setting up output module is a map
 		requestedModule := execGraph.OutputModule()
 		if requestedModule.GetKindStore() != nil {
 			panic("logic error: should not get a store as outputModule on tier 1")
 		}
 
+		execOutSegmenter := reqPlan.ReadOutSegmenter(requestedModule.InitialBlock)
 		walker := execoutStorage.NewFileWalker(requestedModule.Name, execOutSegmenter)
 
 		sched.ExecOutWalker = orchestratorExecout.NewWalker(

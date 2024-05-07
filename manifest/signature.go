@@ -102,7 +102,15 @@ func (m *ModuleHashes) hashModule(modules *pbsubstreams.Modules, module *pbsubst
 	}
 	if module.BlockFilter != nil {
 		buf.WriteString("block_filter_module!")
-		buf.WriteString(module.BlockFilter.Module)
+		blockfilterModule, err := graph.Module(module.BlockFilter.Module)
+		if err != nil {
+			return nil, fmt.Errorf("cannot hash module %q: cannot find block filter module %q", module.Name, module.BlockFilter.Module)
+		}
+		blockFilterModuleHash, err := m.hashModule(modules, blockfilterModule, graph)
+		if err != nil {
+			return nil, fmt.Errorf("cannot hash module %q: cannot get hash of its blockfiltermodule %q", module.Name, module.BlockFilter.Module)
+		}
+		buf.WriteString(string(blockFilterModuleHash))
 		buf.WriteString("block_filter_query!")
 		qs, err := module.BlockFilterQueryString()
 		if err != nil {

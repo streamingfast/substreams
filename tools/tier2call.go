@@ -19,7 +19,7 @@ import (
 var tier2CallCmd = &cobra.Command{
 	Use:   "tier2call <manifest_url> <output_module> <stage_number> <segment_number>",
 	Short: "Calls a tier2 service, for internal inspection",
-	Args:  cobra.ExactArgs(5),
+	Args:  cobra.ExactArgs(4),
 	RunE:  tier2CallE,
 }
 

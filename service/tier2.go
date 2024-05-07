@@ -229,7 +229,7 @@ func (s *Tier2Service) getWASMRegistry(wasmExtensionConfigs map[string]string) (
 func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) error {
 	logger := reqctx.Logger(ctx)
 
-	mergedBlocksStore, cacheStore, err := s.getStores(ctx, request)
+	mergedBlocksStore, cacheStore, unmeteredCacheStore, err := s.getStores(ctx, request)
 	if err != nil {
 		return err
 	}
@@ -272,7 +272,8 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("configuring stores: %w", err)
 	}
 
-	indexConfigs, err := index.NewConfigs(cacheStore, execGraph.UsedIndexesModulesUpToStage(int(request.Stage)), execGraph.ModuleHashes(), logger)
+	// indexes are not metered: we want users to use them as much as possible
+	indexConfigs, err := index.NewConfigs(unmeteredCacheStore, execGraph.UsedIndexesModulesUpToStage(int(request.Stage)), execGraph.ModuleHashes(), logger)
 	if err != nil {
 		return fmt.Errorf("configuring indexes: %w", err)
 	}
@@ -408,24 +409,24 @@ excludable:
 	return pipe.OnStreamTerminated(ctx, streamErr)
 }
 
-func (s *Tier2Service) getStores(ctx context.Context, request *pbssinternal.ProcessRangeRequest) (mergedBlocksStore, cacheStore dstore.Store, err error) {
+func (s *Tier2Service) getStores(ctx context.Context, request *pbssinternal.ProcessRangeRequest) (mergedBlocksStore, cacheStore, unmeteredCacheStore dstore.Store, err error) {
 
 	mergedBlocksStore, err = dstore.NewDBinStore(request.MergedBlocksStore)
 	if err != nil {
-		return nil, nil, fmt.Errorf("setting up block store from url %q: %w", request.MergedBlocksStore, err)
+		return nil, nil, nil, fmt.Errorf("setting up block store from url %q: %w", request.MergedBlocksStore, err)
 	}
 
 	if cloned, ok := mergedBlocksStore.(dstore.Clonable); ok {
 		mergedBlocksStore, err = cloned.Clone(ctx)
 		if err != nil {
-			return nil, nil, fmt.Errorf("cloning store: %w", err)
+			return nil, nil, nil, fmt.Errorf("cloning store: %w", err)
 		}
 		mergedBlocksStore.SetMeter(dmetering.GetBytesMeter(ctx))
 	}
 
 	stateStore, err := dstore.NewStore(request.StateStore, "zst", "zstd", false)
 	if err != nil {
-		return nil, nil, fmt.Errorf("getting store: %w", err)
+		return nil, nil, nil, fmt.Errorf("getting store: %w", err)
 	}
 
 	cacheTag := request.StateStoreDefaultTag
@@ -434,20 +435,20 @@ func (s *Tier2Service) getStores(ctx context.Context, request *pbssinternal.Proc
 			if IsValidCacheTag(ct) {
 				cacheTag = ct
 			} else {
-				return nil, nil, fmt.Errorf("invalid value for X-Sf-Substreams-Cache-Tag %s, should only contain letters, numbers, hyphens and undescores", ct)
+				return nil, nil, nil, fmt.Errorf("invalid value for X-Sf-Substreams-Cache-Tag %s, should only contain letters, numbers, hyphens and undescores", ct)
 			}
 		}
 	}
 
-	cacheStore, err = stateStore.SubStore(cacheTag)
+	unmeteredCacheStore, err = stateStore.SubStore(cacheTag)
 	if err != nil {
-		return nil, nil, fmt.Errorf("internal error setting store: %w", err)
+		return nil, nil, nil, fmt.Errorf("internal error setting store: %w", err)
 	}
 
-	if clonableStore, ok := cacheStore.(dstore.Clonable); ok {
+	if clonableStore, ok := unmeteredCacheStore.(dstore.Clonable); ok {
 		cloned, err := clonableStore.Clone(ctx)
 		if err != nil {
-			return nil, nil, fmt.Errorf("cloning store: %w", err)
+			return nil, nil, nil, fmt.Errorf("cloning store: %w", err)
 		}
 		cloned.SetMeter(dmetering.GetBytesMeter(ctx))
 		cacheStore = cloned

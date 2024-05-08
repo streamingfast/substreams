@@ -70,16 +70,18 @@ func BuildParallelProcessor(
 			panic("logic error: should not get a store as outputModule on tier 1")
 		}
 
-		execOutSegmenter := reqPlan.ReadOutSegmenter(requestedModule.InitialBlock)
-		walker := execoutStorage.NewFileWalker(requestedModule.Name, execOutSegmenter)
+		if requestedModule.GetKindMap() != nil {
+			execOutSegmenter := reqPlan.ReadOutSegmenter(requestedModule.InitialBlock)
+			walker := execoutStorage.NewFileWalker(requestedModule.Name, execOutSegmenter)
 
-		sched.ExecOutWalker = orchestratorExecout.NewWalker(
-			ctx,
-			requestedModule,
-			walker,
-			reqPlan.ReadExecOut,
-			stream,
-		)
+			sched.ExecOutWalker = orchestratorExecout.NewWalker(
+				ctx,
+				requestedModule,
+				walker,
+				reqPlan.ReadExecOut,
+				stream,
+			)
+		}
 	}
 
 	// we may be here only for mapper, without stores

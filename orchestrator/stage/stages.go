@@ -42,8 +42,9 @@ type Stages struct {
 	stages []*Stage
 
 	// segmentStates is a matrix of segment and stages
-	segmentStates  []stageStates // segmentStates[offsetSegment][StageIndex]
-	lastStatUpdate time.Time
+	segmentStates       []stageStates // segmentStates[offsetSegment][StageIndex]
+	lastStatUpdate      time.Time
+	outputModuleIsIndex bool
 
 	// If you're processing at 12M blocks, offset 12,000 segments, so you don't need to allocate 12k empty elements.
 	// Any previous segment is assumed to have completed successfully, and any stores that we sync'd prior to this offset
@@ -67,9 +68,10 @@ func NewStages(
 
 	stagedModules := execGraph.StagedUsedModules()
 	out = &Stages{
-		ctx:             ctx,
-		logger:          reqctx.Logger(ctx),
-		globalSegmenter: reqPlan.BackprocessSegmenter(),
+		ctx:                 ctx,
+		logger:              reqctx.Logger(ctx),
+		globalSegmenter:     reqPlan.BackprocessSegmenter(),
+		outputModuleIsIndex: execGraph.OutputModule().GetKindBlockIndex() != nil,
 	}
 	if reqPlan.BuildStores != nil {
 		out.storeSegmenter = reqPlan.StoresSegmenter()
@@ -102,7 +104,6 @@ func NewStages(
 			segmenter = reqPlan.StoresSegmenter()
 		}
 
-		// FIXME: stepd this goes against the indexes logic
 		var moduleStates []*StoreModuleState
 		stageLowestInitBlock := layer[0].InitialBlock
 		for _, mod := range layer {
@@ -128,6 +129,23 @@ func layerKind(layer exec.LayerModules) Kind {
 		return KindStore
 	}
 	return KindMap
+}
+
+func (s *Stages) OutputModuleIsIndex() bool {
+	return s.outputModuleIsIndex
+}
+
+func (s *Stages) LastStageCompleted() bool {
+	lastSegment := s.mapSegmenter.LastIndex()
+
+	idx := len(s.stages) - 1
+	for seg := s.mapSegmenter.FirstIndex(); seg <= lastSegment; seg++ {
+		state := s.getState(Unit{Segment: seg, Stage: idx})
+		if state != UnitCompleted && state != UnitPartialPresent && state != UnitNoOp {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Stages) AllStoresCompleted() bool {

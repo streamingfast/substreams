@@ -194,6 +194,12 @@ func (s *Scheduler) cmdShutdownWhenComplete() loop.Cmd {
 		if s.ExecOutWalker != nil {
 			start, current, end := s.ExecOutWalker.Progress()
 			fields = append(fields, zap.Int("cached_output_start", start), zap.Int("cached_output_current", current), zap.Int("cached_output_end", end))
+		} else {
+			// we may be creating an index
+			if s.Stages.OutputModuleIsIndex() && !s.Stages.LastStageCompleted() {
+				s.logger.Info("scheduler: waiting for last stage to complete because output module is an index")
+				return nil
+			}
 		}
 		s.logger.Info("scheduler: stores and cached_outputs stream completed, switching to live", fields...)
 		return func() loop.Msg {

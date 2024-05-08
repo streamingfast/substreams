@@ -70,6 +70,7 @@ func BuildParallelProcessor(
 			panic("logic error: should not get a store as outputModule on tier 1")
 		}
 
+		// no ReadExecOut if output type is an index
 		if requestedModule.GetKindMap() != nil {
 			execOutSegmenter := reqPlan.ReadOutSegmenter(requestedModule.InitialBlock)
 			walker := execoutStorage.NewFileWalker(requestedModule.Name, execOutSegmenter)

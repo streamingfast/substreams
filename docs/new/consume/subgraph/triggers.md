@@ -51,7 +51,7 @@ Following the previous example, the [Substreams Sink Examples](https://github.co
 
 - The Graph CLI, to build and deploy the subgraph.
 - Node (>17) and NPM installed.
-- The `protoc` command installed, to generate the Protobuf schemas.
+- The `buf` command installed, to generate the Protobuf schemas.
 
 ### Install the Dependencies
 
@@ -73,10 +73,13 @@ npm install
 - Generate the Substreams Protobufs:
 
 ```bash
-protoc --plugin=./node_modules/protobuf-as/bin/protoc-gen-as --as_out=src/pb/ ./proto/*.proto
+buf generate --exclude-path="sf/substreams" --type="eth.transaction.v1.Transactions" ethereum-explorer-v0.1.2.spkg#format=bin
 ```
 
-The previous command takes any Protobuf file contained in the `proto` folder and generates a TypeScript model in the `src/pb` folder, so that you can import the TS code into your subgraph.
+The previous command generates the Substreams Protobuf contained in the `ethereum-explorer-v0.1.2.spkg` package.
+In this example, you only want to import the `eth.transaction.v1.Transactions` object.
+
+The Protobuf object is generated in AssemblyScript, so you can import it in the subgraph code.
 
 - Generate the subgraph schema:
 

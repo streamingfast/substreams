@@ -35,7 +35,10 @@ type roaringQuerier struct {
 func (q roaringQuerier) apply(expr Expression) *roaring64.Bitmap {
 	switch v := expr.(type) {
 	case *KeyTerm:
-		return q.bitmaps[v.Value.Value]
+		if out, ok := q.bitmaps[v.Value.Value]; ok {
+			return out
+		}
+		return roaring64.New()
 
 	case *AndExpression, *OrExpression:
 		children := v.(HasChildrenExpression).GetChildren()

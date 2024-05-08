@@ -52,5 +52,9 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, err error) error {
 		return fmt.Errorf("step new irr: stores end of stream: %w", err)
 	}
 
+	err = p.returnRPCModuleProgressOutputs(true)
+	if err != nil {
+		return fmt.Errorf("returning rpc module progress outputs: %w", err)
+	}
 	return nil
 }

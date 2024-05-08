@@ -417,13 +417,17 @@ func (p *Pipeline) returnRPCModuleProgressOutputs(forceOutput bool) error {
 func (p *Pipeline) toInternalUpdate(clock *pbsubstreams.Clock) *pbssinternal.Update {
 	meter := dmetering.GetBytesMeter(p.ctx)
 
-	return &pbssinternal.Update{
-		ProcessedBlocks:   clock.Number - p.processingModule.initialBlockNum,
+	out := &pbssinternal.Update{
 		DurationMs:        uint64(time.Since(p.startTime).Milliseconds()),
 		TotalBytesRead:    meter.BytesRead(),
 		TotalBytesWritten: meter.BytesWritten(),
 		ModulesStats:      reqctx.ReqStats(p.ctx).LocalModulesStats(),
 	}
+
+	if clock != nil {
+		out.ProcessedBlocks = clock.Number - p.processingModule.initialBlockNum
+	}
+	return out
 }
 
 func (p *Pipeline) returnInternalModuleProgressOutputs(clock *pbsubstreams.Clock, forceOutput bool) error {

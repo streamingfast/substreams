@@ -484,6 +484,100 @@ func (*SystemOutput_Loading_) isSystemOutput_Entry() {}
 
 func (*SystemOutput_DownloadFiles_) isSystemOutput_Entry() {}
 
+type DiscoveryRequest struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	SearchTerms string `protobuf:"bytes,1,opt,name=search_terms,json=searchTerms,proto3" json:"search_terms,omitempty"`
+}
+
+func (x *DiscoveryRequest) Reset() {
+	*x = DiscoveryRequest{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[3]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *DiscoveryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DiscoveryRequest) ProtoMessage() {}
+
+func (x *DiscoveryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[3]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DiscoveryRequest.ProtoReflect.Descriptor instead.
+func (*DiscoveryRequest) Descriptor() ([]byte, []int) {
+	return file_sf_codegen_conversation_v1_conversation_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *DiscoveryRequest) GetSearchTerms() string {
+	if x != nil {
+		return x.SearchTerms
+	}
+	return ""
+}
+
+type DiscoveryResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	ConversationTopics []*DiscoveryResponse_Topic `protobuf:"bytes,1,rep,name=conversation_topics,json=conversationTopics,proto3" json:"conversation_topics,omitempty"`
+}
+
+func (x *DiscoveryResponse) Reset() {
+	*x = DiscoveryResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[4]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *DiscoveryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DiscoveryResponse) ProtoMessage() {}
+
+func (x *DiscoveryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[4]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DiscoveryResponse.ProtoReflect.Descriptor instead.
+func (*DiscoveryResponse) Descriptor() ([]byte, []int) {
+	return file_sf_codegen_conversation_v1_conversation_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *DiscoveryResponse) GetConversationTopics() []*DiscoveryResponse_Topic {
+	if x != nil {
+		return x.ConversationTopics
+	}
+	return nil
+}
+
 type UserInput_Start struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -496,7 +590,7 @@ type UserInput_Start struct {
 func (x *UserInput_Start) Reset() {
 	*x = UserInput_Start{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[3]
+		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[5]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -509,7 +603,7 @@ func (x *UserInput_Start) String() string {
 func (*UserInput_Start) ProtoMessage() {}
 
 func (x *UserInput_Start) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[3]
+	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[5]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -554,7 +648,7 @@ type UserInput_Hydrate struct {
 func (x *UserInput_Hydrate) Reset() {
 	*x = UserInput_Hydrate{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[4]
+		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[6]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -567,7 +661,7 @@ func (x *UserInput_Hydrate) String() string {
 func (*UserInput_Hydrate) ProtoMessage() {}
 
 func (x *UserInput_Hydrate) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[4]
+	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[6]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -624,7 +718,7 @@ type UserInput_Upload struct {
 func (x *UserInput_Upload) Reset() {
 	*x = UserInput_Upload{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[5]
+		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[7]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -637,7 +731,7 @@ func (x *UserInput_Upload) String() string {
 func (*UserInput_Upload) ProtoMessage() {}
 
 func (x *UserInput_Upload) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[5]
+	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[7]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -686,7 +780,7 @@ type UserInput_Selection struct {
 func (x *UserInput_Selection) Reset() {
 	*x = UserInput_Selection{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[6]
+		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[8]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -699,7 +793,7 @@ func (x *UserInput_Selection) String() string {
 func (*UserInput_Selection) ProtoMessage() {}
 
 func (x *UserInput_Selection) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[6]
+	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[8]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -740,7 +834,7 @@ type UserInput_Confirmation struct {
 func (x *UserInput_Confirmation) Reset() {
 	*x = UserInput_Confirmation{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[7]
+		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[9]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -753,7 +847,7 @@ func (x *UserInput_Confirmation) String() string {
 func (*UserInput_Confirmation) ProtoMessage() {}
 
 func (x *UserInput_Confirmation) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[7]
+	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[9]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -788,7 +882,7 @@ type SystemOutput_Message struct {
 func (x *SystemOutput_Message) Reset() {
 	*x = SystemOutput_Message{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[8]
+		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[10]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -801,7 +895,7 @@ func (x *SystemOutput_Message) String() string {
 func (*SystemOutput_Message) ProtoMessage() {}
 
 func (x *SystemOutput_Message) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[8]
+	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[10]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -843,7 +937,7 @@ type SystemOutput_ImageWithText struct {
 func (x *SystemOutput_ImageWithText) Reset() {
 	*x = SystemOutput_ImageWithText{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[9]
+		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[11]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -856,7 +950,7 @@ func (x *SystemOutput_ImageWithText) String() string {
 func (*SystemOutput_ImageWithText) ProtoMessage() {}
 
 func (x *SystemOutput_ImageWithText) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[9]
+	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[11]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -904,7 +998,7 @@ type SystemOutput_ListSelect struct {
 func (x *SystemOutput_ListSelect) Reset() {
 	*x = SystemOutput_ListSelect{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[10]
+		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[12]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -917,7 +1011,7 @@ func (x *SystemOutput_ListSelect) String() string {
 func (*SystemOutput_ListSelect) ProtoMessage() {}
 
 func (x *SystemOutput_ListSelect) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[10]
+	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[12]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -997,6 +1091,7 @@ type SystemOutput_TextInput struct {
 	Prompt                 string `protobuf:"bytes,8,opt,name=prompt,proto3" json:"prompt,omitempty"`
 	Description            string `protobuf:"bytes,1,opt,name=description,proto3" json:"description,omitempty"` // Markdown
 	Placeholder            string `protobuf:"bytes,2,opt,name=placeholder,proto3" json:"placeholder,omitempty"`
+	DefaultValue           string `protobuf:"bytes,9,opt,name=default_value,json=defaultValue,proto3" json:"default_value,omitempty"`
 	MultiLine              int32  `protobuf:"varint,3,opt,name=multi_line,json=multiLine,proto3" json:"multi_line,omitempty"` // Number of lines if multiline box.
 	ValidationRegexp       string `protobuf:"bytes,4,opt,name=validation_regexp,json=validationRegexp,proto3" json:"validation_regexp,omitempty"`
 	ValidationErrorMessage string `protobuf:"bytes,5,opt,name=validation_error_message,json=validationErrorMessage,proto3" json:"validation_error_message,omitempty"`
@@ -1007,7 +1102,7 @@ type SystemOutput_TextInput struct {
 func (x *SystemOutput_TextInput) Reset() {
 	*x = SystemOutput_TextInput{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[11]
+		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[13]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1020,7 +1115,7 @@ func (x *SystemOutput_TextInput) String() string {
 func (*SystemOutput_TextInput) ProtoMessage() {}
 
 func (x *SystemOutput_TextInput) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[11]
+	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[13]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1053,6 +1148,13 @@ func (x *SystemOutput_TextInput) GetDescription() string {
 func (x *SystemOutput_TextInput) GetPlaceholder() string {
 	if x != nil {
 		return x.Placeholder
+	}
+	return ""
+}
+
+func (x *SystemOutput_TextInput) GetDefaultValue() string {
+	if x != nil {
+		return x.DefaultValue
 	}
 	return ""
 }
@@ -1104,7 +1206,7 @@ type SystemOutput_Loading struct {
 func (x *SystemOutput_Loading) Reset() {
 	*x = SystemOutput_Loading{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[12]
+		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[14]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1117,7 +1219,7 @@ func (x *SystemOutput_Loading) String() string {
 func (*SystemOutput_Loading) ProtoMessage() {}
 
 func (x *SystemOutput_Loading) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[12]
+	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[14]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1158,7 +1260,7 @@ type SystemOutput_DownloadFiles struct {
 func (x *SystemOutput_DownloadFiles) Reset() {
 	*x = SystemOutput_DownloadFiles{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[13]
+		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[15]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1171,7 +1273,7 @@ func (x *SystemOutput_DownloadFiles) String() string {
 func (*SystemOutput_DownloadFiles) ProtoMessage() {}
 
 func (x *SystemOutput_DownloadFiles) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[13]
+	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[15]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1208,7 +1310,7 @@ type SystemOutput_DownloadFile struct {
 func (x *SystemOutput_DownloadFile) Reset() {
 	*x = SystemOutput_DownloadFile{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[14]
+		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[16]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1221,7 +1323,7 @@ func (x *SystemOutput_DownloadFile) String() string {
 func (*SystemOutput_DownloadFile) ProtoMessage() {}
 
 func (x *SystemOutput_DownloadFile) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[14]
+	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[16]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1279,7 +1381,7 @@ type SystemOutput_Confirm struct {
 func (x *SystemOutput_Confirm) Reset() {
 	*x = SystemOutput_Confirm{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[15]
+		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[17]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1292,7 +1394,7 @@ func (x *SystemOutput_Confirm) String() string {
 func (*SystemOutput_Confirm) ProtoMessage() {}
 
 func (x *SystemOutput_Confirm) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[15]
+	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[17]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1332,6 +1434,85 @@ func (x *SystemOutput_Confirm) GetAcceptButtonLabel() string {
 func (x *SystemOutput_Confirm) GetDeclineButtonLabel() string {
 	if x != nil {
 		return x.DeclineButtonLabel
+	}
+	return ""
+}
+
+type DiscoveryResponse_Topic struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Id          string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Title       string `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	Description string `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	IconUrl     string `protobuf:"bytes,4,opt,name=icon_url,json=iconUrl,proto3" json:"icon_url,omitempty"`
+	Endpoint    string `protobuf:"bytes,5,opt,name=endpoint,proto3" json:"endpoint,omitempty"` // if not the same as this one
+}
+
+func (x *DiscoveryResponse_Topic) Reset() {
+	*x = DiscoveryResponse_Topic{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[18]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *DiscoveryResponse_Topic) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DiscoveryResponse_Topic) ProtoMessage() {}
+
+func (x *DiscoveryResponse_Topic) ProtoReflect() protoreflect.Message {
+	mi := &file_sf_codegen_conversation_v1_conversation_proto_msgTypes[18]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DiscoveryResponse_Topic.ProtoReflect.Descriptor instead.
+func (*DiscoveryResponse_Topic) Descriptor() ([]byte, []int) {
+	return file_sf_codegen_conversation_v1_conversation_proto_rawDescGZIP(), []int{4, 0}
+}
+
+func (x *DiscoveryResponse_Topic) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *DiscoveryResponse_Topic) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *DiscoveryResponse_Topic) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *DiscoveryResponse_Topic) GetIconUrl() string {
+	if x != nil {
+		return x.IconUrl
+	}
+	return ""
+}
+
+func (x *DiscoveryResponse_Topic) GetEndpoint() string {
+	if x != nil {
+		return x.Endpoint
 	}
 	return ""
 }
@@ -1408,7 +1589,7 @@ var file_sf_codegen_conversation_v1_conversation_proto_rawDesc = []byte{
 	0x30, 0x0a, 0x0c, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x72, 0x6d, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x12,
 	0x20, 0x0a, 0x0b, 0x61, 0x66, 0x66, 0x69, 0x72, 0x6d, 0x61, 0x74, 0x69, 0x76, 0x65, 0x18, 0x01,
 	0x20, 0x01, 0x28, 0x08, 0x52, 0x0b, 0x61, 0x66, 0x66, 0x69, 0x72, 0x6d, 0x61, 0x74, 0x69, 0x76,
-	0x65, 0x42, 0x07, 0x0a, 0x05, 0x65, 0x6e, 0x74, 0x72, 0x79, 0x22, 0xb6, 0x10, 0x0a, 0x0c, 0x53,
+	0x65, 0x42, 0x07, 0x0a, 0x05, 0x65, 0x6e, 0x74, 0x72, 0x79, 0x22, 0xdb, 0x10, 0x0a, 0x0c, 0x53,
 	0x79, 0x73, 0x74, 0x65, 0x6d, 0x4f, 0x75, 0x74, 0x70, 0x75, 0x74, 0x12, 0x15, 0x0a, 0x06, 0x6d,
 	0x73, 0x67, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x05, 0x6d, 0x73, 0x67,
 	0x49, 0x64, 0x12, 0x1e, 0x0a, 0x0b, 0x66, 0x72, 0x6f, 0x6d, 0x5f, 0x6d, 0x73, 0x67, 0x5f, 0x69,
@@ -1491,63 +1672,92 @@ var file_sf_codegen_conversation_v1_conversation_proto_rawDesc = []byte{
 	0x6e, 0x4c, 0x61, 0x62, 0x65, 0x6c, 0x22, 0x27, 0x0a, 0x0a, 0x53, 0x65, 0x6c, 0x65, 0x63, 0x74,
 	0x54, 0x79, 0x70, 0x65, 0x12, 0x0c, 0x0a, 0x08, 0x44, 0x52, 0x4f, 0x50, 0x44, 0x4f, 0x57, 0x4e,
 	0x10, 0x00, 0x12, 0x0b, 0x0a, 0x07, 0x42, 0x55, 0x54, 0x54, 0x4f, 0x4e, 0x53, 0x10, 0x01, 0x1a,
-	0xcb, 0x02, 0x0a, 0x09, 0x54, 0x65, 0x78, 0x74, 0x49, 0x6e, 0x70, 0x75, 0x74, 0x12, 0x16, 0x0a,
+	0xf0, 0x02, 0x0a, 0x09, 0x54, 0x65, 0x78, 0x74, 0x49, 0x6e, 0x70, 0x75, 0x74, 0x12, 0x16, 0x0a,
 	0x06, 0x70, 0x72, 0x6f, 0x6d, 0x70, 0x74, 0x18, 0x08, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x70,
 	0x72, 0x6f, 0x6d, 0x70, 0x74, 0x12, 0x20, 0x0a, 0x0b, 0x64, 0x65, 0x73, 0x63, 0x72, 0x69, 0x70,
 	0x74, 0x69, 0x6f, 0x6e, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x64, 0x65, 0x73, 0x63,
 	0x72, 0x69, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x12, 0x20, 0x0a, 0x0b, 0x70, 0x6c, 0x61, 0x63, 0x65,
 	0x68, 0x6f, 0x6c, 0x64, 0x65, 0x72, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x70, 0x6c,
-	0x61, 0x63, 0x65, 0x68, 0x6f, 0x6c, 0x64, 0x65, 0x72, 0x12, 0x1d, 0x0a, 0x0a, 0x6d, 0x75, 0x6c,
-	0x74, 0x69, 0x5f, 0x6c, 0x69, 0x6e, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x05, 0x52, 0x09, 0x6d,
-	0x75, 0x6c, 0x74, 0x69, 0x4c, 0x69, 0x6e, 0x65, 0x12, 0x2b, 0x0a, 0x11, 0x76, 0x61, 0x6c, 0x69,
-	0x64, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x72, 0x65, 0x67, 0x65, 0x78, 0x70, 0x18, 0x04, 0x20,
-	0x01, 0x28, 0x09, 0x52, 0x10, 0x76, 0x61, 0x6c, 0x69, 0x64, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x52,
-	0x65, 0x67, 0x65, 0x78, 0x70, 0x12, 0x38, 0x0a, 0x18, 0x76, 0x61, 0x6c, 0x69, 0x64, 0x61, 0x74,
-	0x69, 0x6f, 0x6e, 0x5f, 0x65, 0x72, 0x72, 0x6f, 0x72, 0x5f, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67,
-	0x65, 0x18, 0x05, 0x20, 0x01, 0x28, 0x09, 0x52, 0x16, 0x76, 0x61, 0x6c, 0x69, 0x64, 0x61, 0x74,
-	0x69, 0x6f, 0x6e, 0x45, 0x72, 0x72, 0x6f, 0x72, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x12,
-	0x2e, 0x0a, 0x13, 0x73, 0x75, 0x62, 0x6d, 0x69, 0x74, 0x5f, 0x62, 0x75, 0x74, 0x74, 0x6f, 0x6e,
-	0x5f, 0x6c, 0x61, 0x62, 0x65, 0x6c, 0x18, 0x06, 0x20, 0x01, 0x28, 0x09, 0x52, 0x11, 0x73, 0x75,
-	0x62, 0x6d, 0x69, 0x74, 0x42, 0x75, 0x74, 0x74, 0x6f, 0x6e, 0x4c, 0x61, 0x62, 0x65, 0x6c, 0x12,
-	0x2c, 0x0a, 0x12, 0x73, 0x75, 0x62, 0x6d, 0x69, 0x74, 0x5f, 0x62, 0x75, 0x74, 0x74, 0x6f, 0x6e,
-	0x5f, 0x69, 0x63, 0x6f, 0x6e, 0x18, 0x07, 0x20, 0x01, 0x28, 0x09, 0x52, 0x10, 0x73, 0x75, 0x62,
-	0x6d, 0x69, 0x74, 0x42, 0x75, 0x74, 0x74, 0x6f, 0x6e, 0x49, 0x63, 0x6f, 0x6e, 0x1a, 0x39, 0x0a,
-	0x07, 0x4c, 0x6f, 0x61, 0x64, 0x69, 0x6e, 0x67, 0x12, 0x18, 0x0a, 0x07, 0x6c, 0x6f, 0x61, 0x64,
-	0x69, 0x6e, 0x67, 0x18, 0x01, 0x20, 0x01, 0x28, 0x08, 0x52, 0x07, 0x6c, 0x6f, 0x61, 0x64, 0x69,
-	0x6e, 0x67, 0x12, 0x14, 0x0a, 0x05, 0x6c, 0x61, 0x62, 0x65, 0x6c, 0x18, 0x02, 0x20, 0x01, 0x28,
-	0x09, 0x52, 0x05, 0x6c, 0x61, 0x62, 0x65, 0x6c, 0x1a, 0x5c, 0x0a, 0x0d, 0x44, 0x6f, 0x77, 0x6e,
-	0x6c, 0x6f, 0x61, 0x64, 0x46, 0x69, 0x6c, 0x65, 0x73, 0x12, 0x4b, 0x0a, 0x05, 0x66, 0x69, 0x6c,
-	0x65, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x35, 0x2e, 0x73, 0x66, 0x2e, 0x63, 0x6f,
+	0x61, 0x63, 0x65, 0x68, 0x6f, 0x6c, 0x64, 0x65, 0x72, 0x12, 0x23, 0x0a, 0x0d, 0x64, 0x65, 0x66,
+	0x61, 0x75, 0x6c, 0x74, 0x5f, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x09, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x0c, 0x64, 0x65, 0x66, 0x61, 0x75, 0x6c, 0x74, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x12, 0x1d,
+	0x0a, 0x0a, 0x6d, 0x75, 0x6c, 0x74, 0x69, 0x5f, 0x6c, 0x69, 0x6e, 0x65, 0x18, 0x03, 0x20, 0x01,
+	0x28, 0x05, 0x52, 0x09, 0x6d, 0x75, 0x6c, 0x74, 0x69, 0x4c, 0x69, 0x6e, 0x65, 0x12, 0x2b, 0x0a,
+	0x11, 0x76, 0x61, 0x6c, 0x69, 0x64, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x72, 0x65, 0x67, 0x65,
+	0x78, 0x70, 0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x10, 0x76, 0x61, 0x6c, 0x69, 0x64, 0x61,
+	0x74, 0x69, 0x6f, 0x6e, 0x52, 0x65, 0x67, 0x65, 0x78, 0x70, 0x12, 0x38, 0x0a, 0x18, 0x76, 0x61,
+	0x6c, 0x69, 0x64, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x65, 0x72, 0x72, 0x6f, 0x72, 0x5f, 0x6d,
+	0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x18, 0x05, 0x20, 0x01, 0x28, 0x09, 0x52, 0x16, 0x76, 0x61,
+	0x6c, 0x69, 0x64, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x45, 0x72, 0x72, 0x6f, 0x72, 0x4d, 0x65, 0x73,
+	0x73, 0x61, 0x67, 0x65, 0x12, 0x2e, 0x0a, 0x13, 0x73, 0x75, 0x62, 0x6d, 0x69, 0x74, 0x5f, 0x62,
+	0x75, 0x74, 0x74, 0x6f, 0x6e, 0x5f, 0x6c, 0x61, 0x62, 0x65, 0x6c, 0x18, 0x06, 0x20, 0x01, 0x28,
+	0x09, 0x52, 0x11, 0x73, 0x75, 0x62, 0x6d, 0x69, 0x74, 0x42, 0x75, 0x74, 0x74, 0x6f, 0x6e, 0x4c,
+	0x61, 0x62, 0x65, 0x6c, 0x12, 0x2c, 0x0a, 0x12, 0x73, 0x75, 0x62, 0x6d, 0x69, 0x74, 0x5f, 0x62,
+	0x75, 0x74, 0x74, 0x6f, 0x6e, 0x5f, 0x69, 0x63, 0x6f, 0x6e, 0x18, 0x07, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x10, 0x73, 0x75, 0x62, 0x6d, 0x69, 0x74, 0x42, 0x75, 0x74, 0x74, 0x6f, 0x6e, 0x49, 0x63,
+	0x6f, 0x6e, 0x1a, 0x39, 0x0a, 0x07, 0x4c, 0x6f, 0x61, 0x64, 0x69, 0x6e, 0x67, 0x12, 0x18, 0x0a,
+	0x07, 0x6c, 0x6f, 0x61, 0x64, 0x69, 0x6e, 0x67, 0x18, 0x01, 0x20, 0x01, 0x28, 0x08, 0x52, 0x07,
+	0x6c, 0x6f, 0x61, 0x64, 0x69, 0x6e, 0x67, 0x12, 0x14, 0x0a, 0x05, 0x6c, 0x61, 0x62, 0x65, 0x6c,
+	0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x6c, 0x61, 0x62, 0x65, 0x6c, 0x1a, 0x5c, 0x0a,
+	0x0d, 0x44, 0x6f, 0x77, 0x6e, 0x6c, 0x6f, 0x61, 0x64, 0x46, 0x69, 0x6c, 0x65, 0x73, 0x12, 0x4b,
+	0x0a, 0x05, 0x66, 0x69, 0x6c, 0x65, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x35, 0x2e,
+	0x73, 0x66, 0x2e, 0x63, 0x6f, 0x64, 0x65, 0x67, 0x65, 0x6e, 0x2e, 0x63, 0x6f, 0x6e, 0x76, 0x65,
+	0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x53, 0x79, 0x73, 0x74, 0x65,
+	0x6d, 0x4f, 0x75, 0x74, 0x70, 0x75, 0x74, 0x2e, 0x44, 0x6f, 0x77, 0x6e, 0x6c, 0x6f, 0x61, 0x64,
+	0x46, 0x69, 0x6c, 0x65, 0x52, 0x05, 0x66, 0x69, 0x6c, 0x65, 0x73, 0x1a, 0x7a, 0x0a, 0x0c, 0x44,
+	0x6f, 0x77, 0x6e, 0x6c, 0x6f, 0x61, 0x64, 0x46, 0x69, 0x6c, 0x65, 0x12, 0x1a, 0x0a, 0x08, 0x66,
+	0x69, 0x6c, 0x65, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x66,
+	0x69, 0x6c, 0x65, 0x6e, 0x61, 0x6d, 0x65, 0x12, 0x12, 0x0a, 0x04, 0x74, 0x79, 0x70, 0x65, 0x18,
+	0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x74, 0x79, 0x70, 0x65, 0x12, 0x18, 0x0a, 0x07, 0x63,
+	0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x63, 0x6f,
+	0x6e, 0x74, 0x65, 0x6e, 0x74, 0x12, 0x20, 0x0a, 0x0b, 0x64, 0x65, 0x73, 0x63, 0x72, 0x69, 0x70,
+	0x74, 0x69, 0x6f, 0x6e, 0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x64, 0x65, 0x73, 0x63,
+	0x72, 0x69, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x1a, 0xa5, 0x01, 0x0a, 0x07, 0x43, 0x6f, 0x6e, 0x66,
+	0x69, 0x72, 0x6d, 0x12, 0x16, 0x0a, 0x06, 0x70, 0x72, 0x6f, 0x6d, 0x70, 0x74, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x09, 0x52, 0x06, 0x70, 0x72, 0x6f, 0x6d, 0x70, 0x74, 0x12, 0x20, 0x0a, 0x0b, 0x64,
+	0x65, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x18, 0x04, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x0b, 0x64, 0x65, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x12, 0x2e, 0x0a,
+	0x13, 0x61, 0x63, 0x63, 0x65, 0x70, 0x74, 0x5f, 0x62, 0x75, 0x74, 0x74, 0x6f, 0x6e, 0x5f, 0x6c,
+	0x61, 0x62, 0x65, 0x6c, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x11, 0x61, 0x63, 0x63, 0x65,
+	0x70, 0x74, 0x42, 0x75, 0x74, 0x74, 0x6f, 0x6e, 0x4c, 0x61, 0x62, 0x65, 0x6c, 0x12, 0x30, 0x0a,
+	0x14, 0x64, 0x65, 0x63, 0x6c, 0x69, 0x6e, 0x65, 0x5f, 0x62, 0x75, 0x74, 0x74, 0x6f, 0x6e, 0x5f,
+	0x6c, 0x61, 0x62, 0x65, 0x6c, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x12, 0x64, 0x65, 0x63,
+	0x6c, 0x69, 0x6e, 0x65, 0x42, 0x75, 0x74, 0x74, 0x6f, 0x6e, 0x4c, 0x61, 0x62, 0x65, 0x6c, 0x42,
+	0x07, 0x0a, 0x05, 0x65, 0x6e, 0x74, 0x72, 0x79, 0x22, 0x35, 0x0a, 0x10, 0x44, 0x69, 0x73, 0x63,
+	0x6f, 0x76, 0x65, 0x72, 0x79, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x21, 0x0a, 0x0c,
+	0x73, 0x65, 0x61, 0x72, 0x63, 0x68, 0x5f, 0x74, 0x65, 0x72, 0x6d, 0x73, 0x18, 0x01, 0x20, 0x01,
+	0x28, 0x09, 0x52, 0x0b, 0x73, 0x65, 0x61, 0x72, 0x63, 0x68, 0x54, 0x65, 0x72, 0x6d, 0x73, 0x22,
+	0x82, 0x02, 0x0a, 0x11, 0x44, 0x69, 0x73, 0x63, 0x6f, 0x76, 0x65, 0x72, 0x79, 0x52, 0x65, 0x73,
+	0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x64, 0x0a, 0x13, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73,
+	0x61, 0x74, 0x69, 0x6f, 0x6e, 0x5f, 0x74, 0x6f, 0x70, 0x69, 0x63, 0x73, 0x18, 0x01, 0x20, 0x03,
+	0x28, 0x0b, 0x32, 0x33, 0x2e, 0x73, 0x66, 0x2e, 0x63, 0x6f, 0x64, 0x65, 0x67, 0x65, 0x6e, 0x2e,
+	0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x76, 0x31, 0x2e,
+	0x44, 0x69, 0x73, 0x63, 0x6f, 0x76, 0x65, 0x72, 0x79, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73,
+	0x65, 0x2e, 0x54, 0x6f, 0x70, 0x69, 0x63, 0x52, 0x12, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73,
+	0x61, 0x74, 0x69, 0x6f, 0x6e, 0x54, 0x6f, 0x70, 0x69, 0x63, 0x73, 0x1a, 0x86, 0x01, 0x0a, 0x05,
+	0x54, 0x6f, 0x70, 0x69, 0x63, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28,
+	0x09, 0x52, 0x02, 0x69, 0x64, 0x12, 0x14, 0x0a, 0x05, 0x74, 0x69, 0x74, 0x6c, 0x65, 0x18, 0x02,
+	0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x74, 0x69, 0x74, 0x6c, 0x65, 0x12, 0x20, 0x0a, 0x0b, 0x64,
+	0x65, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x0b, 0x64, 0x65, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x12, 0x19, 0x0a,
+	0x08, 0x69, 0x63, 0x6f, 0x6e, 0x5f, 0x75, 0x72, 0x6c, 0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x07, 0x69, 0x63, 0x6f, 0x6e, 0x55, 0x72, 0x6c, 0x12, 0x1a, 0x0a, 0x08, 0x65, 0x6e, 0x64, 0x70,
+	0x6f, 0x69, 0x6e, 0x74, 0x18, 0x05, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x65, 0x6e, 0x64, 0x70,
+	0x6f, 0x69, 0x6e, 0x74, 0x32, 0xdf, 0x01, 0x0a, 0x13, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73,
+	0x61, 0x74, 0x69, 0x6f, 0x6e, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x5f, 0x0a, 0x08,
+	0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x65, 0x12, 0x25, 0x2e, 0x73, 0x66, 0x2e, 0x63, 0x6f,
 	0x64, 0x65, 0x67, 0x65, 0x6e, 0x2e, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69,
-	0x6f, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x53, 0x79, 0x73, 0x74, 0x65, 0x6d, 0x4f, 0x75, 0x74, 0x70,
-	0x75, 0x74, 0x2e, 0x44, 0x6f, 0x77, 0x6e, 0x6c, 0x6f, 0x61, 0x64, 0x46, 0x69, 0x6c, 0x65, 0x52,
-	0x05, 0x66, 0x69, 0x6c, 0x65, 0x73, 0x1a, 0x7a, 0x0a, 0x0c, 0x44, 0x6f, 0x77, 0x6e, 0x6c, 0x6f,
-	0x61, 0x64, 0x46, 0x69, 0x6c, 0x65, 0x12, 0x1a, 0x0a, 0x08, 0x66, 0x69, 0x6c, 0x65, 0x6e, 0x61,
-	0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x66, 0x69, 0x6c, 0x65, 0x6e, 0x61,
-	0x6d, 0x65, 0x12, 0x12, 0x0a, 0x04, 0x74, 0x79, 0x70, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09,
-	0x52, 0x04, 0x74, 0x79, 0x70, 0x65, 0x12, 0x18, 0x0a, 0x07, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e,
-	0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x63, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74,
-	0x12, 0x20, 0x0a, 0x0b, 0x64, 0x65, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x18,
-	0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x64, 0x65, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x69,
-	0x6f, 0x6e, 0x1a, 0xa5, 0x01, 0x0a, 0x07, 0x43, 0x6f, 0x6e, 0x66, 0x69, 0x72, 0x6d, 0x12, 0x16,
-	0x0a, 0x06, 0x70, 0x72, 0x6f, 0x6d, 0x70, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06,
-	0x70, 0x72, 0x6f, 0x6d, 0x70, 0x74, 0x12, 0x20, 0x0a, 0x0b, 0x64, 0x65, 0x73, 0x63, 0x72, 0x69,
-	0x70, 0x74, 0x69, 0x6f, 0x6e, 0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x64, 0x65, 0x73,
-	0x63, 0x72, 0x69, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x12, 0x2e, 0x0a, 0x13, 0x61, 0x63, 0x63, 0x65,
-	0x70, 0x74, 0x5f, 0x62, 0x75, 0x74, 0x74, 0x6f, 0x6e, 0x5f, 0x6c, 0x61, 0x62, 0x65, 0x6c, 0x18,
-	0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x11, 0x61, 0x63, 0x63, 0x65, 0x70, 0x74, 0x42, 0x75, 0x74,
-	0x74, 0x6f, 0x6e, 0x4c, 0x61, 0x62, 0x65, 0x6c, 0x12, 0x30, 0x0a, 0x14, 0x64, 0x65, 0x63, 0x6c,
-	0x69, 0x6e, 0x65, 0x5f, 0x62, 0x75, 0x74, 0x74, 0x6f, 0x6e, 0x5f, 0x6c, 0x61, 0x62, 0x65, 0x6c,
-	0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x12, 0x64, 0x65, 0x63, 0x6c, 0x69, 0x6e, 0x65, 0x42,
-	0x75, 0x74, 0x74, 0x6f, 0x6e, 0x4c, 0x61, 0x62, 0x65, 0x6c, 0x42, 0x07, 0x0a, 0x05, 0x65, 0x6e,
-	0x74, 0x72, 0x79, 0x32, 0x6f, 0x0a, 0x0c, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74,
-	0x69, 0x6f, 0x6e, 0x12, 0x5f, 0x0a, 0x08, 0x43, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x65, 0x12,
-	0x25, 0x2e, 0x73, 0x66, 0x2e, 0x63, 0x6f, 0x64, 0x65, 0x67, 0x65, 0x6e, 0x2e, 0x63, 0x6f, 0x6e,
-	0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x55, 0x73, 0x65,
-	0x72, 0x49, 0x6e, 0x70, 0x75, 0x74, 0x1a, 0x28, 0x2e, 0x73, 0x66, 0x2e, 0x63, 0x6f, 0x64, 0x65,
-	0x67, 0x65, 0x6e, 0x2e, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e,
-	0x2e, 0x76, 0x31, 0x2e, 0x53, 0x79, 0x73, 0x74, 0x65, 0x6d, 0x4f, 0x75, 0x74, 0x70, 0x75, 0x74,
-	0x28, 0x01, 0x30, 0x01, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x6f, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x55, 0x73, 0x65, 0x72, 0x49, 0x6e, 0x70, 0x75, 0x74, 0x1a,
+	0x28, 0x2e, 0x73, 0x66, 0x2e, 0x63, 0x6f, 0x64, 0x65, 0x67, 0x65, 0x6e, 0x2e, 0x63, 0x6f, 0x6e,
+	0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x53, 0x79, 0x73,
+	0x74, 0x65, 0x6d, 0x4f, 0x75, 0x74, 0x70, 0x75, 0x74, 0x28, 0x01, 0x30, 0x01, 0x12, 0x67, 0x0a,
+	0x08, 0x44, 0x69, 0x73, 0x63, 0x6f, 0x76, 0x65, 0x72, 0x12, 0x2c, 0x2e, 0x73, 0x66, 0x2e, 0x63,
+	0x6f, 0x64, 0x65, 0x67, 0x65, 0x6e, 0x2e, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74,
+	0x69, 0x6f, 0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x44, 0x69, 0x73, 0x63, 0x6f, 0x76, 0x65, 0x72, 0x79,
+	0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x2d, 0x2e, 0x73, 0x66, 0x2e, 0x63, 0x6f, 0x64,
+	0x65, 0x67, 0x65, 0x6e, 0x2e, 0x63, 0x6f, 0x6e, 0x76, 0x65, 0x72, 0x73, 0x61, 0x74, 0x69, 0x6f,
+	0x6e, 0x2e, 0x76, 0x31, 0x2e, 0x44, 0x69, 0x73, 0x63, 0x6f, 0x76, 0x65, 0x72, 0x79, 0x52, 0x65,
+	0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -1563,51 +1773,57 @@ func file_sf_codegen_conversation_v1_conversation_proto_rawDescGZIP() []byte {
 }
 
 var file_sf_codegen_conversation_v1_conversation_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_sf_codegen_conversation_v1_conversation_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_sf_codegen_conversation_v1_conversation_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_sf_codegen_conversation_v1_conversation_proto_goTypes = []interface{}{
 	(SystemOutput_ListSelect_SelectType)(0), // 0: sf.codegen.conversation.v1.SystemOutput.ListSelect.SelectType
 	(*Empty)(nil),                           // 1: sf.codegen.conversation.v1.Empty
 	(*UserInput)(nil),                       // 2: sf.codegen.conversation.v1.UserInput
 	(*SystemOutput)(nil),                    // 3: sf.codegen.conversation.v1.SystemOutput
-	(*UserInput_Start)(nil),                 // 4: sf.codegen.conversation.v1.UserInput.Start
-	(*UserInput_Hydrate)(nil),               // 5: sf.codegen.conversation.v1.UserInput.Hydrate
-	(*UserInput_Upload)(nil),                // 6: sf.codegen.conversation.v1.UserInput.Upload
-	(*UserInput_Selection)(nil),             // 7: sf.codegen.conversation.v1.UserInput.Selection
-	(*UserInput_Confirmation)(nil),          // 8: sf.codegen.conversation.v1.UserInput.Confirmation
-	(*SystemOutput_Message)(nil),            // 9: sf.codegen.conversation.v1.SystemOutput.Message
-	(*SystemOutput_ImageWithText)(nil),      // 10: sf.codegen.conversation.v1.SystemOutput.ImageWithText
-	(*SystemOutput_ListSelect)(nil),         // 11: sf.codegen.conversation.v1.SystemOutput.ListSelect
-	(*SystemOutput_TextInput)(nil),          // 12: sf.codegen.conversation.v1.SystemOutput.TextInput
-	(*SystemOutput_Loading)(nil),            // 13: sf.codegen.conversation.v1.SystemOutput.Loading
-	(*SystemOutput_DownloadFiles)(nil),      // 14: sf.codegen.conversation.v1.SystemOutput.DownloadFiles
-	(*SystemOutput_DownloadFile)(nil),       // 15: sf.codegen.conversation.v1.SystemOutput.DownloadFile
-	(*SystemOutput_Confirm)(nil),            // 16: sf.codegen.conversation.v1.SystemOutput.Confirm
+	(*DiscoveryRequest)(nil),                // 4: sf.codegen.conversation.v1.DiscoveryRequest
+	(*DiscoveryResponse)(nil),               // 5: sf.codegen.conversation.v1.DiscoveryResponse
+	(*UserInput_Start)(nil),                 // 6: sf.codegen.conversation.v1.UserInput.Start
+	(*UserInput_Hydrate)(nil),               // 7: sf.codegen.conversation.v1.UserInput.Hydrate
+	(*UserInput_Upload)(nil),                // 8: sf.codegen.conversation.v1.UserInput.Upload
+	(*UserInput_Selection)(nil),             // 9: sf.codegen.conversation.v1.UserInput.Selection
+	(*UserInput_Confirmation)(nil),          // 10: sf.codegen.conversation.v1.UserInput.Confirmation
+	(*SystemOutput_Message)(nil),            // 11: sf.codegen.conversation.v1.SystemOutput.Message
+	(*SystemOutput_ImageWithText)(nil),      // 12: sf.codegen.conversation.v1.SystemOutput.ImageWithText
+	(*SystemOutput_ListSelect)(nil),         // 13: sf.codegen.conversation.v1.SystemOutput.ListSelect
+	(*SystemOutput_TextInput)(nil),          // 14: sf.codegen.conversation.v1.SystemOutput.TextInput
+	(*SystemOutput_Loading)(nil),            // 15: sf.codegen.conversation.v1.SystemOutput.Loading
+	(*SystemOutput_DownloadFiles)(nil),      // 16: sf.codegen.conversation.v1.SystemOutput.DownloadFiles
+	(*SystemOutput_DownloadFile)(nil),       // 17: sf.codegen.conversation.v1.SystemOutput.DownloadFile
+	(*SystemOutput_Confirm)(nil),            // 18: sf.codegen.conversation.v1.SystemOutput.Confirm
+	(*DiscoveryResponse_Topic)(nil),         // 19: sf.codegen.conversation.v1.DiscoveryResponse.Topic
 }
 var file_sf_codegen_conversation_v1_conversation_proto_depIdxs = []int32{
 	1,  // 0: sf.codegen.conversation.v1.UserInput.ack:type_name -> sf.codegen.conversation.v1.Empty
-	4,  // 1: sf.codegen.conversation.v1.UserInput.start:type_name -> sf.codegen.conversation.v1.UserInput.Start
+	6,  // 1: sf.codegen.conversation.v1.UserInput.start:type_name -> sf.codegen.conversation.v1.UserInput.Start
 	1,  // 2: sf.codegen.conversation.v1.UserInput.end:type_name -> sf.codegen.conversation.v1.Empty
-	7,  // 3: sf.codegen.conversation.v1.UserInput.selection:type_name -> sf.codegen.conversation.v1.UserInput.Selection
-	8,  // 4: sf.codegen.conversation.v1.UserInput.confirmation:type_name -> sf.codegen.conversation.v1.UserInput.Confirmation
-	6,  // 5: sf.codegen.conversation.v1.UserInput.file:type_name -> sf.codegen.conversation.v1.UserInput.Upload
+	9,  // 3: sf.codegen.conversation.v1.UserInput.selection:type_name -> sf.codegen.conversation.v1.UserInput.Selection
+	10, // 4: sf.codegen.conversation.v1.UserInput.confirmation:type_name -> sf.codegen.conversation.v1.UserInput.Confirmation
+	8,  // 5: sf.codegen.conversation.v1.UserInput.file:type_name -> sf.codegen.conversation.v1.UserInput.Upload
 	1,  // 6: sf.codegen.conversation.v1.SystemOutput.ack:type_name -> sf.codegen.conversation.v1.Empty
-	9,  // 7: sf.codegen.conversation.v1.SystemOutput.message:type_name -> sf.codegen.conversation.v1.SystemOutput.Message
-	10, // 8: sf.codegen.conversation.v1.SystemOutput.image_with_text:type_name -> sf.codegen.conversation.v1.SystemOutput.ImageWithText
-	11, // 9: sf.codegen.conversation.v1.SystemOutput.list_select:type_name -> sf.codegen.conversation.v1.SystemOutput.ListSelect
-	12, // 10: sf.codegen.conversation.v1.SystemOutput.text_input:type_name -> sf.codegen.conversation.v1.SystemOutput.TextInput
-	16, // 11: sf.codegen.conversation.v1.SystemOutput.confirm:type_name -> sf.codegen.conversation.v1.SystemOutput.Confirm
-	13, // 12: sf.codegen.conversation.v1.SystemOutput.loading:type_name -> sf.codegen.conversation.v1.SystemOutput.Loading
-	14, // 13: sf.codegen.conversation.v1.SystemOutput.download_files:type_name -> sf.codegen.conversation.v1.SystemOutput.DownloadFiles
-	5,  // 14: sf.codegen.conversation.v1.UserInput.Start.hydrate:type_name -> sf.codegen.conversation.v1.UserInput.Hydrate
-	0,  // 15: sf.codegen.conversation.v1.SystemOutput.ListSelect.select_type:type_name -> sf.codegen.conversation.v1.SystemOutput.ListSelect.SelectType
-	15, // 16: sf.codegen.conversation.v1.SystemOutput.DownloadFiles.files:type_name -> sf.codegen.conversation.v1.SystemOutput.DownloadFile
-	2,  // 17: sf.codegen.conversation.v1.Conversation.Converse:input_type -> sf.codegen.conversation.v1.UserInput
-	3,  // 18: sf.codegen.conversation.v1.Conversation.Converse:output_type -> sf.codegen.conversation.v1.SystemOutput
-	18, // [18:19] is the sub-list for method output_type
-	17, // [17:18] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	11, // 7: sf.codegen.conversation.v1.SystemOutput.message:type_name -> sf.codegen.conversation.v1.SystemOutput.Message
+	12, // 8: sf.codegen.conversation.v1.SystemOutput.image_with_text:type_name -> sf.codegen.conversation.v1.SystemOutput.ImageWithText
+	13, // 9: sf.codegen.conversation.v1.SystemOutput.list_select:type_name -> sf.codegen.conversation.v1.SystemOutput.ListSelect
+	14, // 10: sf.codegen.conversation.v1.SystemOutput.text_input:type_name -> sf.codegen.conversation.v1.SystemOutput.TextInput
+	18, // 11: sf.codegen.conversation.v1.SystemOutput.confirm:type_name -> sf.codegen.conversation.v1.SystemOutput.Confirm
+	15, // 12: sf.codegen.conversation.v1.SystemOutput.loading:type_name -> sf.codegen.conversation.v1.SystemOutput.Loading
+	16, // 13: sf.codegen.conversation.v1.SystemOutput.download_files:type_name -> sf.codegen.conversation.v1.SystemOutput.DownloadFiles
+	19, // 14: sf.codegen.conversation.v1.DiscoveryResponse.conversation_topics:type_name -> sf.codegen.conversation.v1.DiscoveryResponse.Topic
+	7,  // 15: sf.codegen.conversation.v1.UserInput.Start.hydrate:type_name -> sf.codegen.conversation.v1.UserInput.Hydrate
+	0,  // 16: sf.codegen.conversation.v1.SystemOutput.ListSelect.select_type:type_name -> sf.codegen.conversation.v1.SystemOutput.ListSelect.SelectType
+	17, // 17: sf.codegen.conversation.v1.SystemOutput.DownloadFiles.files:type_name -> sf.codegen.conversation.v1.SystemOutput.DownloadFile
+	2,  // 18: sf.codegen.conversation.v1.ConversationService.Converse:input_type -> sf.codegen.conversation.v1.UserInput
+	4,  // 19: sf.codegen.conversation.v1.ConversationService.Discover:input_type -> sf.codegen.conversation.v1.DiscoveryRequest
+	3,  // 20: sf.codegen.conversation.v1.ConversationService.Converse:output_type -> sf.codegen.conversation.v1.SystemOutput
+	5,  // 21: sf.codegen.conversation.v1.ConversationService.Discover:output_type -> sf.codegen.conversation.v1.DiscoveryResponse
+	20, // [20:22] is the sub-list for method output_type
+	18, // [18:20] is the sub-list for method input_type
+	18, // [18:18] is the sub-list for extension type_name
+	18, // [18:18] is the sub-list for extension extendee
+	0,  // [0:18] is the sub-list for field type_name
 }
 
 func init() { file_sf_codegen_conversation_v1_conversation_proto_init() }
@@ -1653,7 +1869,7 @@ func file_sf_codegen_conversation_v1_conversation_proto_init() {
 			}
 		}
 		file_sf_codegen_conversation_v1_conversation_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*UserInput_Start); i {
+			switch v := v.(*DiscoveryRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1665,7 +1881,7 @@ func file_sf_codegen_conversation_v1_conversation_proto_init() {
 			}
 		}
 		file_sf_codegen_conversation_v1_conversation_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*UserInput_Hydrate); i {
+			switch v := v.(*DiscoveryResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1677,7 +1893,7 @@ func file_sf_codegen_conversation_v1_conversation_proto_init() {
 			}
 		}
 		file_sf_codegen_conversation_v1_conversation_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*UserInput_Upload); i {
+			switch v := v.(*UserInput_Start); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1689,7 +1905,7 @@ func file_sf_codegen_conversation_v1_conversation_proto_init() {
 			}
 		}
 		file_sf_codegen_conversation_v1_conversation_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*UserInput_Selection); i {
+			switch v := v.(*UserInput_Hydrate); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1701,7 +1917,7 @@ func file_sf_codegen_conversation_v1_conversation_proto_init() {
 			}
 		}
 		file_sf_codegen_conversation_v1_conversation_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*UserInput_Confirmation); i {
+			switch v := v.(*UserInput_Upload); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1713,7 +1929,7 @@ func file_sf_codegen_conversation_v1_conversation_proto_init() {
 			}
 		}
 		file_sf_codegen_conversation_v1_conversation_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*SystemOutput_Message); i {
+			switch v := v.(*UserInput_Selection); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1725,7 +1941,7 @@ func file_sf_codegen_conversation_v1_conversation_proto_init() {
 			}
 		}
 		file_sf_codegen_conversation_v1_conversation_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*SystemOutput_ImageWithText); i {
+			switch v := v.(*UserInput_Confirmation); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1737,7 +1953,7 @@ func file_sf_codegen_conversation_v1_conversation_proto_init() {
 			}
 		}
 		file_sf_codegen_conversation_v1_conversation_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*SystemOutput_ListSelect); i {
+			switch v := v.(*SystemOutput_Message); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1749,7 +1965,7 @@ func file_sf_codegen_conversation_v1_conversation_proto_init() {
 			}
 		}
 		file_sf_codegen_conversation_v1_conversation_proto_msgTypes[11].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*SystemOutput_TextInput); i {
+			switch v := v.(*SystemOutput_ImageWithText); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1761,7 +1977,7 @@ func file_sf_codegen_conversation_v1_conversation_proto_init() {
 			}
 		}
 		file_sf_codegen_conversation_v1_conversation_proto_msgTypes[12].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*SystemOutput_Loading); i {
+			switch v := v.(*SystemOutput_ListSelect); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1773,7 +1989,7 @@ func file_sf_codegen_conversation_v1_conversation_proto_init() {
 			}
 		}
 		file_sf_codegen_conversation_v1_conversation_proto_msgTypes[13].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*SystemOutput_DownloadFiles); i {
+			switch v := v.(*SystemOutput_TextInput); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1785,7 +2001,7 @@ func file_sf_codegen_conversation_v1_conversation_proto_init() {
 			}
 		}
 		file_sf_codegen_conversation_v1_conversation_proto_msgTypes[14].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*SystemOutput_DownloadFile); i {
+			switch v := v.(*SystemOutput_Loading); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1797,7 +2013,43 @@ func file_sf_codegen_conversation_v1_conversation_proto_init() {
 			}
 		}
 		file_sf_codegen_conversation_v1_conversation_proto_msgTypes[15].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*SystemOutput_DownloadFiles); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_sf_codegen_conversation_v1_conversation_proto_msgTypes[16].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*SystemOutput_DownloadFile); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_sf_codegen_conversation_v1_conversation_proto_msgTypes[17].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*SystemOutput_Confirm); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_sf_codegen_conversation_v1_conversation_proto_msgTypes[18].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*DiscoveryResponse_Topic); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1834,7 +2086,7 @@ func file_sf_codegen_conversation_v1_conversation_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_sf_codegen_conversation_v1_conversation_proto_rawDesc,
 			NumEnums:      1,
-			NumMessages:   16,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

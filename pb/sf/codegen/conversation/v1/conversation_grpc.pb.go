@@ -19,48 +19,50 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	Conversation_Converse_FullMethodName = "/sf.codegen.conversation.v1.Conversation/Converse"
+	ConversationService_Converse_FullMethodName = "/sf.codegen.conversation.v1.ConversationService/Converse"
+	ConversationService_Discover_FullMethodName = "/sf.codegen.conversation.v1.ConversationService/Discover"
 )
 
-// ConversationClient is the client API for Conversation service.
+// ConversationServiceClient is the client API for ConversationService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type ConversationClient interface {
-	Converse(ctx context.Context, opts ...grpc.CallOption) (Conversation_ConverseClient, error)
+type ConversationServiceClient interface {
+	Converse(ctx context.Context, opts ...grpc.CallOption) (ConversationService_ConverseClient, error)
+	Discover(ctx context.Context, in *DiscoveryRequest, opts ...grpc.CallOption) (*DiscoveryResponse, error)
 }
 
-type conversationClient struct {
+type conversationServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewConversationClient(cc grpc.ClientConnInterface) ConversationClient {
-	return &conversationClient{cc}
+func NewConversationServiceClient(cc grpc.ClientConnInterface) ConversationServiceClient {
+	return &conversationServiceClient{cc}
 }
 
-func (c *conversationClient) Converse(ctx context.Context, opts ...grpc.CallOption) (Conversation_ConverseClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Conversation_ServiceDesc.Streams[0], Conversation_Converse_FullMethodName, opts...)
+func (c *conversationServiceClient) Converse(ctx context.Context, opts ...grpc.CallOption) (ConversationService_ConverseClient, error) {
+	stream, err := c.cc.NewStream(ctx, &ConversationService_ServiceDesc.Streams[0], ConversationService_Converse_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &conversationConverseClient{stream}
+	x := &conversationServiceConverseClient{stream}
 	return x, nil
 }
 
-type Conversation_ConverseClient interface {
+type ConversationService_ConverseClient interface {
 	Send(*UserInput) error
 	Recv() (*SystemOutput, error)
 	grpc.ClientStream
 }
 
-type conversationConverseClient struct {
+type conversationServiceConverseClient struct {
 	grpc.ClientStream
 }
 
-func (x *conversationConverseClient) Send(m *UserInput) error {
+func (x *conversationServiceConverseClient) Send(m *UserInput) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *conversationConverseClient) Recv() (*SystemOutput, error) {
+func (x *conversationServiceConverseClient) Recv() (*SystemOutput, error) {
 	m := new(SystemOutput)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -68,51 +70,64 @@ func (x *conversationConverseClient) Recv() (*SystemOutput, error) {
 	return m, nil
 }
 
-// ConversationServer is the server API for Conversation service.
-// All implementations should embed UnimplementedConversationServer
+func (c *conversationServiceClient) Discover(ctx context.Context, in *DiscoveryRequest, opts ...grpc.CallOption) (*DiscoveryResponse, error) {
+	out := new(DiscoveryResponse)
+	err := c.cc.Invoke(ctx, ConversationService_Discover_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ConversationServiceServer is the server API for ConversationService service.
+// All implementations should embed UnimplementedConversationServiceServer
 // for forward compatibility
-type ConversationServer interface {
-	Converse(Conversation_ConverseServer) error
+type ConversationServiceServer interface {
+	Converse(ConversationService_ConverseServer) error
+	Discover(context.Context, *DiscoveryRequest) (*DiscoveryResponse, error)
 }
 
-// UnimplementedConversationServer should be embedded to have forward compatible implementations.
-type UnimplementedConversationServer struct {
+// UnimplementedConversationServiceServer should be embedded to have forward compatible implementations.
+type UnimplementedConversationServiceServer struct {
 }
 
-func (UnimplementedConversationServer) Converse(Conversation_ConverseServer) error {
+func (UnimplementedConversationServiceServer) Converse(ConversationService_ConverseServer) error {
 	return status.Errorf(codes.Unimplemented, "method Converse not implemented")
 }
+func (UnimplementedConversationServiceServer) Discover(context.Context, *DiscoveryRequest) (*DiscoveryResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Discover not implemented")
+}
 
-// UnsafeConversationServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to ConversationServer will
+// UnsafeConversationServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to ConversationServiceServer will
 // result in compilation errors.
-type UnsafeConversationServer interface {
-	mustEmbedUnimplementedConversationServer()
+type UnsafeConversationServiceServer interface {
+	mustEmbedUnimplementedConversationServiceServer()
 }
 
-func RegisterConversationServer(s grpc.ServiceRegistrar, srv ConversationServer) {
-	s.RegisterService(&Conversation_ServiceDesc, srv)
+func RegisterConversationServiceServer(s grpc.ServiceRegistrar, srv ConversationServiceServer) {
+	s.RegisterService(&ConversationService_ServiceDesc, srv)
 }
 
-func _Conversation_Converse_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(ConversationServer).Converse(&conversationConverseServer{stream})
+func _ConversationService_Converse_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(ConversationServiceServer).Converse(&conversationServiceConverseServer{stream})
 }
 
-type Conversation_ConverseServer interface {
+type ConversationService_ConverseServer interface {
 	Send(*SystemOutput) error
 	Recv() (*UserInput, error)
 	grpc.ServerStream
 }
 
-type conversationConverseServer struct {
+type conversationServiceConverseServer struct {
 	grpc.ServerStream
 }
 
-func (x *conversationConverseServer) Send(m *SystemOutput) error {
+func (x *conversationServiceConverseServer) Send(m *SystemOutput) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *conversationConverseServer) Recv() (*UserInput, error) {
+func (x *conversationServiceConverseServer) Recv() (*UserInput, error) {
 	m := new(UserInput)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -120,17 +135,40 @@ func (x *conversationConverseServer) Recv() (*UserInput, error) {
 	return m, nil
 }
 
-// Conversation_ServiceDesc is the grpc.ServiceDesc for Conversation service.
+func _ConversationService_Discover_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DiscoveryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConversationServiceServer).Discover(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConversationService_Discover_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConversationServiceServer).Discover(ctx, req.(*DiscoveryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// ConversationService_ServiceDesc is the grpc.ServiceDesc for ConversationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var Conversation_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "sf.codegen.conversation.v1.Conversation",
-	HandlerType: (*ConversationServer)(nil),
-	Methods:     []grpc.MethodDesc{},
+var ConversationService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "sf.codegen.conversation.v1.ConversationService",
+	HandlerType: (*ConversationServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Discover",
+			Handler:    _ConversationService_Discover_Handler,
+		},
+	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "Converse",
-			Handler:       _Conversation_Converse_Handler,
+			Handler:       _ConversationService_Converse_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},

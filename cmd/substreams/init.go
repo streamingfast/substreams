@@ -41,6 +41,8 @@ var initCmd = &cobra.Command{
 }
 
 func init() {
+	initCmd.Flags().String("type", "discover", "ID of the code generator to use. Use 'discover' to list available ones.")
+
 	if x := os.Getenv("ETHERSCAN_API_KEY"); x != "" {
 		etherscanAPIKey = x
 	}
@@ -51,6 +53,38 @@ var INIT_TRACE = false
 var WITH_ACCESSIBLE = false
 
 func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
+	opts := []connect.ClientOption{
+		connect.WithGRPC(),
+	}
+	// TODO:  make the `endpoint` here point to `https://codegen.substreams.dev` by default.
+	// WARN: when it's not `localhost` in the hostname, don't flip `InsecureSkipVerify` to true!
+	httpClient := &http.Client{
+		Transport: &http2.Transport{
+			AllowHTTP: true,
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+	}
+	client := pbconvoconnect.NewConversationServiceClient(httpClient, "https://localhost:9000", opts...)
+
+	topicType := mustGetString(cmd, "type")
+	if topicType == "discover" {
+		resp, err := client.Discover(context.Background(), connect.NewRequest(&pbconvo.DiscoveryRequest{}))
+		if err != nil {
+			return fmt.Errorf("failed to call discovery endpoint: %w", err)
+		}
+		_ = resp.Msg
+		fmt.Println("Here is a list of available code generators to help you out:")
+		fmt.Println("")
+		// TODO: display the discovery, and start the topic from the selected element.
+		for idx, topic := range resp.Msg.ConversationTopics {
+			fmt.Printf("%d. %s - %s\n%s\n\n", idx+1, bold(topic.Id), topic.Title, topic.Description)
+		}
+		fmt.Println("Run `substreams init --type` with the desired code generator ID to start a new project.")
+		return nil
+	}
+
 	var lastState string
 	if _, err := os.Stat("substreams.codegen.state"); err == nil {
 		fmt.Println("The file 'substreams.codegen.state', was detected, reloading state from that point on.")
@@ -63,18 +97,6 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		// TODO: otherwise here, we should ensure that the directory is empty... (or use the specified sub-directory?)
 	}
 
-	opts := []connect.ClientOption{
-		connect.WithGRPC(),
-	}
-	httpClient := &http.Client{
-		Transport: &http2.Transport{
-			AllowHTTP: true,
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
-	}
-	client := pbconvoconnect.NewConversationClient(httpClient, "https://localhost:9000", opts...)
 	conn := client.Converse(context.Background())
 	sendFunc := func(msg *pbconvo.UserInput) error {
 		if INIT_TRACE {
@@ -115,6 +137,14 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		if INIT_TRACE {
 			cnt, _ := json.MarshalIndent(resp.Entry, "", "  ")
 			fmt.Printf("INPUT: %T %s\n", resp.Entry, string(cnt))
+			fmt.Println("Saving state to substreams.codegen.state")
+		}
+
+		// TODO: reformat the JSON code into a yaml file or something? Make it editable and readable easily?
+		// Nothing fixes the format of the state atm, but we could agree on a format, and fixate JSON or YAML.
+		// JSON is probably better for interchange.
+		if err = os.WriteFile("substreams.codegen.state", []byte(lastState), 0644); err != nil {
+			return fmt.Errorf("couldn't write codegen state: %w", err)
 		}
 
 		switch msg := resp.Entry.(type) {
@@ -174,7 +204,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			fmt.Println("┃ ", input.Instructions)
 			for _, opt := range options {
 				if opt.Value == selection {
-					fmt.Println("┃ -", lipgloss.NewStyle().Bold(true).Render(opt.Key))
+					fmt.Println("┃ -", bold(opt.Key))
 				} else {
 					fmt.Println("┃ -", opt.Key)
 				}
@@ -201,6 +231,9 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				Description(input.Description).
 				Placeholder(input.Placeholder).
 				Value(&returnValue)
+			if input.DefaultValue != "" {
+				inputField.Suggestions([]string{input.DefaultValue})
+			}
 
 			if input.ValidationRegexp != "" {
 				validationRE, err := regexp.Compile(input.ValidationRegexp)
@@ -221,7 +254,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("failed taking input: %w", err)
 			}
 
-			fmt.Println("┃ ", input.Prompt+":", lipgloss.NewStyle().Bold(true).Render(returnValue))
+			fmt.Println("┃ ", input.Prompt+":", bold(returnValue))
 
 			if err := sendFunc(&pbconvo.UserInput{
 				FromActionId: resp.ActionId,
@@ -248,16 +281,12 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("failed taking confirmation input: %w", err)
 			}
 
-			// 			┃ Should I build the Substreams package?
-			// ┃
-			// ┃   Yes, build it     No, cancel everything
-
 			affirm := input.AcceptButtonLabel
 			deny := input.DeclineButtonLabel
 			if returnValue {
-				affirm = lipgloss.NewStyle().Bold(true).Render(affirm)
+				affirm = bold(affirm)
 			} else {
-				deny = lipgloss.NewStyle().Bold(true).Render(deny)
+				deny = bold(deny)
 			}
 			fmt.Println("┃ ", input.Prompt)
 			fmt.Println("┃ ")
@@ -320,17 +349,16 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("failed confirming: %w", err)
 			}
 
+			// TODO: offer to write to a different place, or add ` (1)` at the end of the filename
+			// if there's conflict.
 			if unpackSource {
+				// TODO: unzip the input.Files[1].Content into the `spkgRoot` directory.
 				fmt.Println("Unzipping", input.Files[1].Filename, "into ./"+spkgRoot)
 				fmt.Println("TODO...")
 			}
 
-			fmt.Println("Saving state to substreams.codegen.state")
-			err = os.WriteFile("substreams.codegen.state", []byte(lastState), 0644)
-			if err != nil {
-				return fmt.Errorf("couldn't write codegen state: %w", err)
-			}
-
+			// TODO: shouldn't this be controlled by the remote end? Maybe there's some follow-up messages,
+			// maybe we'll be building three modules in a swift?
 			fmt.Println("")
 			fmt.Println("Everything done!")
 
@@ -359,4 +387,8 @@ func toMarkdown(input string) string {
 		panic(fmt.Errorf("failed rendering markdown %q: %w", input, err))
 	}
 	return out
+}
+
+func bold(input string) string {
+	return lipgloss.NewStyle().Bold(true).Render(input)
 }

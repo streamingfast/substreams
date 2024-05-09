@@ -79,9 +79,15 @@ type PackageMeta struct {
 }
 
 type Protobuf struct {
-	DescriptorSets []string `yaml:"descriptorSets,omitempty"`
-	Files          []string `yaml:"files,omitempty"`
-	ImportPaths    []string `yaml:"importPaths,omitempty"`
+	DescriptorSets []*BufImport `yaml:"descriptorSets,omitempty"`
+	Files          []string     `yaml:"files,omitempty"`
+	ImportPaths    []string     `yaml:"importPaths,omitempty"`
+}
+
+type BufImport struct {
+	Module  string   `yaml:"module"`
+	Version string   `yaml:"version"`
+	Symbols []string `yaml:"symbols"`
 }
 
 type Module struct {

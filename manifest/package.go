@@ -252,6 +252,7 @@ func (r *manifestConverter) manifestToPkg(manif *Manifest) (*pbsubstreams.Packag
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error loading protobuf: %w", err)
 	}
+
 	protoDefinitions = append(protoDefinitions, bufBuildDefinition...)
 
 	if manif.Package.Image != "" {

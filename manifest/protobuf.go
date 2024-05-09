@@ -96,8 +96,13 @@ func loadProtobufs(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.FileDesc
 }
 
 func loadDescriptorSets(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.FileDescriptor, error) {
+	seen := map[string]bool{}
+	for _, file := range pkg.ProtoFiles {
+		seen[*file.Name] = true
+	}
+
 	var out []*desc.FileDescriptor
-	for _, url := range manif.Protobuf.DescriptorSets {
+	for _, descriptor := range manif.Protobuf.DescriptorSets {
 
 		authToken := os.Getenv("BUFBUILD_AUTH_TOKEN")
 		if authToken == "" {
@@ -110,20 +115,25 @@ func loadDescriptorSets(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.Fil
 		)
 
 		request := connect.NewRequest(&reflectv1beta1.GetFileDescriptorSetRequest{
-			Module: url,
+			Module:  descriptor.Module,
+			Symbols: descriptor.Symbols,
+			Version: descriptor.Version,
 		})
 
 		request.Header().Set("Authorization", "Bearer "+authToken)
 		fileDescriptorSet, err := client.GetFileDescriptorSet(context.Background(), request)
 		if err != nil {
-			return nil, fmt.Errorf("getting file descriptor set for %s: %w", url, err)
+			return nil, fmt.Errorf("getting file descriptor set for %s: %w", descriptor.Module, err)
 		}
 
-		fd, err := desc.CreateFileDescriptorFromSet(fileDescriptorSet.Msg.FileDescriptorSet)
-		if err != nil {
-			return nil, fmt.Errorf("creating file descriptor from set for %s: %w", url, err)
+		fdMap, err := desc.CreateFileDescriptorsFromSet(fileDescriptorSet.Msg.FileDescriptorSet)
+
+		for _, fd := range fdMap {
+			if _, found := seen[fd.GetName()]; found {
+				continue
+			}
+			out = append(out, fd)
 		}
-		out = append(out, fd)
 	}
 
 	for _, fd := range out {

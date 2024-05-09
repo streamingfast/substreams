@@ -9,23 +9,43 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v1.6 (Unreleased)
+## v1.6.0
+
+### Upgrading
+
+> **Note** Upgrading to v1.6.0 will require changing the tier1 and tier2 versions concurrently, as the internal protocol has changed.
 
 ### Highlights
 
-> **Note** Upgrading to v1.6 will require changing the tier1 and tier2 versions concurrently.
+#### Index Modules and Block Filter
 
 * *Index Modules* and *Block Filter* can now be used to speed up processing and reduce the amount of parsed data.
-* Substreams output can now skip blocks a *Block Filter* is used.
+* When indexes are used along with the `BlockFilter` attribute on a mapper, blocks can be skipped completely: they will not be run in downstreams modules or sent in the output stream, except in live segment or in dev-mode, where an empty 'clock' is still sent.
+* See https://github.com/streamingfast/substreams-foundational-modules for an example implementation
+* Blocks that are skipped will still appear in the metering as "read bytes" (unless a full segment is skipped), but the index stores themselves are not "metered"
+
+#### Scheduling / speed improvements
+
+* The scheduler no longer duplicates work in the first segments of a request with multiple stages.
+* Fix all issues with running a substreams where modules have different "initial blocks"
 * Maximum Tier1 output speed improved for data that is already processed
+* Tier1 'FileWalker' now polls more aggressively on local filesystem to prevent extra seconds of wait time.
+
+### Fixed
+
+* Fix a bug in the `gui` that would crash when trying to `r`estart the stream.
+* fix total read bytes in case data already cache
 
 ### Added
 
 * New environment variable `SUBSTREAMS_WORKERS_RAMPUP_TIME` can specify the initial delay before tier1 will reach the number of tier2 concurrent requests.
+* Add 'clock' output to `substreams run` command, useful mostly for performance testing or pre-caching
+* (alpha) Introduce the `wasip1/tinygo-v1` binary type.
 
-### Changed
+### Changed / Removed
 
-*  Previous value for `SUBSTREAMS_WORKERS_RAMPUP_TIME` was `4s`, now set to `0`, disabling the mechanism by default.
+* Disabled `otelcol://` tracing protocol, its mere presence affected performance.
+* Previous value for `SUBSTREAMS_WORKERS_RAMPUP_TIME` was `4s`, now set to `0`, disabling the mechanism by default.
 
 ## v1.5.6
 

@@ -130,6 +130,74 @@ func TestStore_Merge(t *testing.T) {
 			},
 		},
 		{
+			name: "set_sum_int",
+			latest: newPartialStore(map[string][]byte{
+				"one": []byte("set:1"),
+				"two": []byte("sum:2"),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, manifest.OutputValueTypeInt64, nil),
+			prev: newStore(map[string][]byte{
+				"one":   []byte("sum:1"),
+				"three": []byte("sum:3"),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, manifest.OutputValueTypeInt64),
+			expectedError: false,
+			expectedKV: map[string][]byte{
+				"one":   []byte("sum:1"),
+				"two":   []byte("sum:2"),
+				"three": []byte("sum:3"),
+			},
+		},
+		{
+			name: "set_sum_float",
+			latest: newPartialStore(map[string][]byte{
+				"one": []byte("set:1.1"),
+				"two": []byte("sum:2.2"),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, manifest.OutputValueTypeFloat64, nil),
+			prev: newStore(map[string][]byte{
+				"one":   []byte("sum:1.1"),
+				"three": []byte("sum:3.3"),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, manifest.OutputValueTypeFloat64),
+			expectedError: false,
+			expectedKV: map[string][]byte{
+				"one":   []byte("sum:1.1"),
+				"two":   []byte("sum:2.2"),
+				"three": []byte("sum:3.3"),
+			},
+		},
+		{
+			name: "set_sum_big_int",
+			latest: newPartialStore(map[string][]byte{
+				"one": []byte("set:1"),
+				"two": []byte("sum:2"),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, manifest.OutputValueTypeBigInt, nil),
+			prev: newStore(map[string][]byte{
+				"one":   []byte("sum:1"),
+				"three": []byte("sum:3"),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, manifest.OutputValueTypeBigInt),
+			expectedError: false,
+			expectedKV: map[string][]byte{
+				"one":   []byte("sum:1"),
+				"two":   []byte("sum:2"),
+				"three": []byte("sum:3"),
+			},
+		},
+		{
+			name: "set_sum_big_decimal",
+			latest: newPartialStore(map[string][]byte{
+				"one": []byte("set:1.1"),
+				"two": []byte("sum:2.2"),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, manifest.OutputValueTypeBigDecimal, nil),
+			prev: newStore(map[string][]byte{
+				"one":   []byte("sum:1.1"),
+				"three": []byte("sum:3.3"),
+			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, manifest.OutputValueTypeBigDecimal),
+			expectedError: false,
+			expectedKV: map[string][]byte{
+				"one":   []byte("sum:1.1"),
+				"two":   []byte("sum:2.2"),
+				"three": []byte("sum:3.3"),
+			},
+		},
+		{
 			name: "sum_big_int",
 			latest: newPartialStore(map[string][]byte{
 				"one": []byte("1"),
@@ -354,8 +422,15 @@ func TestStore_Merge(t *testing.T) {
 
 			for k, v := range test.prev.kv {
 				if test.latest.valueType == manifest.OutputValueTypeBigDecimal {
-					actual, _ := foundOrZeroBigFloat(v, true).Float64()
-					expected, _ := foundOrZeroBigFloat(test.expectedKV[k], true).Float64()
+					var actual, expected float64
+					if test.prev.UpdatePolicy() == pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM {
+						actual = foundOrZeroPrefixedFloat(v, true)
+						expected = foundOrZeroPrefixedFloat(test.expectedKV[k], true)
+					} else {
+						actual, _ = foundOrZeroBigFloat(v, true).Float64()
+						expected, _ = foundOrZeroBigFloat(test.expectedKV[k], true).Float64()
+					}
+
 					assert.InDelta(t, actual, expected, 0.01)
 				} else {
 					expected := string(test.expectedKV[k])
@@ -366,15 +441,22 @@ func TestStore_Merge(t *testing.T) {
 
 			for k, v := range test.expectedKV {
 				if test.latest.valueType == manifest.OutputValueTypeBigDecimal {
-					actual, _ := foundOrZeroBigFloat(v, true).Float64()
-					expected, _ := foundOrZeroBigFloat(test.prev.kv[k], true).Float64()
+					var actual, expected float64
+					if test.prev.UpdatePolicy() == pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM {
+						actual = foundOrZeroPrefixedFloat(v, true)
+						expected = foundOrZeroPrefixedFloat(test.expectedKV[k], true)
+					} else {
+						actual, _ = foundOrZeroBigFloat(v, true).Float64()
+						expected, _ = foundOrZeroBigFloat(test.expectedKV[k], true).Float64()
+					}
+
 					assert.InDelta(t, actual, expected, 0.01)
 				} else {
 					expected := string(test.prev.kv[k])
 					actual := string(v)
 					assert.Equal(t, expected, actual)
 				}
-				assert.Nil(t, test.prev.deltas, "merge should not keep leftover deltas")
+				assert.Nil(t, test.prev.deltas, "merge sh   ould not keep leftover deltas")
 				assert.Zero(t, test.prev.lastOrdinal, "merge should not keep non-zero lastOrdinal")
 			}
 		})

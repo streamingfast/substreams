@@ -60,7 +60,7 @@ func (b *baseStore) set(ord uint64, key string, value []byte) {
 	cpValue := make([]byte, len(value))
 	copy(cpValue, value)
 
-	val, found := b.GetLast(key)
+	val, found := b.getLast(key)
 	var delta *pbsubstreams.StoreDelta
 	if found {
 		delta = &pbsubstreams.StoreDelta{
@@ -85,7 +85,7 @@ func (b *baseStore) set(ord uint64, key string, value []byte) {
 }
 
 func (b *baseStore) setIfNotExists(ord uint64, key string, value []byte) {
-	_, found := b.GetLast(key)
+	_, found := b.getLast(key)
 	if found {
 		return
 	}

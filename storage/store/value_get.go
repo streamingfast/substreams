@@ -1,12 +1,13 @@
 package store
 
 import (
+	"bytes"
 	"fmt"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-func (b *baseStore) GetFirst(key string) ([]byte, bool) {
+func (b *baseStore) getFirst(key string) ([]byte, bool) {
 	for _, delta := range b.deltas {
 		if delta.Key != key {
 			continue
@@ -21,10 +22,21 @@ func (b *baseStore) GetFirst(key string) ([]byte, bool) {
 			// WARN: is that legit? what if some upstream stream is broken? can we trust all those streams?
 			panic(fmt.Sprintf("invalid value %q for pbsubstreams.StoreDelta::Op for key %q", delta.Operation.String(), delta.Key))
 		}
-
 	}
 
 	val, found := b.kv[key]
+	return val, found
+}
+
+func (b *baseStore) GetFirst(key string) ([]byte, bool) {
+	val, found := b.getFirst(key)
+
+	if found && b.UpdatePolicy() == pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM &&
+		(bytes.HasPrefix(val, []byte("sum:")) || bytes.HasPrefix(val, []byte("set:"))) {
+
+		val = val[4:]
+	}
+
 	return val, found
 }
 
@@ -50,7 +62,7 @@ func (b *baseStore) HasFirst(key string) bool {
 	return found
 }
 
-func (b *baseStore) GetLast(key string) ([]byte, bool) {
+func (b *baseStore) getLast(key string) ([]byte, bool) {
 	for i := len(b.deltas) - 1; i >= 0; i-- {
 		delta := b.deltas[i]
 		if delta.Key != key {
@@ -68,6 +80,18 @@ func (b *baseStore) GetLast(key string) ([]byte, bool) {
 	}
 
 	val, found := b.kv[key]
+	return val, found
+}
+
+func (b *baseStore) GetLast(key string) ([]byte, bool) {
+	val, found := b.getLast(key)
+
+	if found && b.UpdatePolicy() == pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM &&
+		(bytes.HasPrefix(val, []byte("sum:")) || bytes.HasPrefix(val, []byte("set:"))) {
+
+		val = val[4:]
+	}
+
 	return val, found
 }
 
@@ -92,9 +116,8 @@ func (b *baseStore) HasLast(key string) bool {
 	return found
 }
 
-// GetAt returns the key for the state that includes the processing of `ord`.
-func (b *baseStore) GetAt(ord uint64, key string) (out []byte, found bool) {
-	out, found = b.GetLast(key)
+func (b *baseStore) getAt(ord uint64, key string) (out []byte, found bool) {
+	out, found = b.getLast(key)
 
 	for i := len(b.deltas) - 1; i >= 0; i-- {
 		delta := b.deltas[i]
@@ -117,6 +140,20 @@ func (b *baseStore) GetAt(ord uint64, key string) (out []byte, found bool) {
 			panic(fmt.Sprintf("invalid value %q for pbsubstreams.StateDelta::Op for key %q", delta.Operation, delta.Key))
 		}
 	}
+
+	return
+}
+
+// GetAt returns the key for the state that includes the processing of `ord`.
+func (b *baseStore) GetAt(ord uint64, key string) (out []byte, found bool) {
+	out, found = b.getAt(ord, key)
+
+	if found && b.UpdatePolicy() == pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM &&
+		(bytes.HasPrefix(out, []byte("sum:")) || bytes.HasPrefix(out, []byte("set:"))) {
+
+		out = out[4:]
+	}
+
 	return
 }
 

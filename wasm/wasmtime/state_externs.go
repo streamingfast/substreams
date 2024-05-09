@@ -27,6 +27,30 @@ func (i *instance) deletePrefix(ord int64, keyPtr, keyLength int32) {
 	i.CurrentCall.DoDeletePrefix(uint64(ord), prefix)
 }
 
+func (i *instance) setSumInt64(ord int64, keyPtr, keyLength int32, valPtr, valLength int32) {
+	key := i.Heap.ReadString(keyPtr, keyLength)
+	value := i.Heap.ReadString(valPtr, valLength)
+	i.CurrentCall.DoSetSumInt64(uint64(ord), key, value)
+}
+
+func (i *instance) setSumFloat64(ord int64, keyPtr, keyLength int32, valPtr, valLength int32) {
+	key := i.Heap.ReadString(keyPtr, keyLength)
+	value := i.Heap.ReadString(valPtr, valLength)
+	i.CurrentCall.DoSetSumFloat64(uint64(ord), key, value)
+}
+
+func (i *instance) setSumBigInt(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
+	key := i.Heap.ReadString(keyPtr, keyLength)
+	value := i.Heap.ReadString(valPtr, valLength)
+	i.CurrentCall.DoSetSumBigInt(uint64(ord), key, value)
+}
+
+func (i *instance) setSumBigDecimal(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
+	key := i.Heap.ReadString(keyPtr, keyLength)
+	value := i.Heap.ReadString(valPtr, valLength)
+	i.CurrentCall.DoSetSumBigDecimal(uint64(ord), key, value)
+}
+
 func (i *instance) addBigInt(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
 	key := i.Heap.ReadString(keyPtr, keyLength)
 	value := i.Heap.ReadString(valPtr, valLength)

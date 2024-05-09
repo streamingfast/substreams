@@ -30,7 +30,8 @@ modules:
       - source: sf.substreams.v1.test.Block 
     blockFilter:
       module: index_init_60
-      query: even   
+      query:
+        string: even
     output:
       type: proto:sf.substreams.v1.test.Boolean
 
@@ -161,4 +162,3 @@ modules:
       - store: fourth_store_init_52          
     output:
         type: proto:sf.substreams.v1.test.MapResult
-

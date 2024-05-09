@@ -1,6 +1,7 @@
 package store
 
 import (
+	"bytes"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -117,14 +118,87 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 		case manifest.OutputValueTypeBigFloat:
 			fallthrough
 		case manifest.OutputValueTypeBigDecimal:
+			sum := func(a, b decimal.Decimal) decimal.Decimal {
+				return a.Add(b)
+			}
 			for k, v := range kvPartialStore.kv {
 				v0b, fv0 := b.kv[k]
 				v0 := foundOrZeroBigDecimal(v0b, fv0)
 				v1 := foundOrZeroBigDecimal(v, true)
-				b.setKV(k, []byte(v0.Add(v1).String()))
+				b.setKV(k, []byte(sum(v0, v1).String()))
 			}
 		default:
 			return fmt.Errorf("update policy %q not supported for value type %q", b.updatePolicy, b.valueType)
+		}
+	case pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM:
+		switch intoValueTypeLower {
+		case manifest.OutputValueTypeInt64:
+			sum := func(a, b int64) int64 {
+				return a + b
+			}
+			for k, v := range kvPartialStore.kv {
+				if bytes.HasPrefix(v, []byte("set:")) {
+					newV := bytes.Join([][]byte{[]byte("sum:"), v[4:]}, nil)
+					b.setKV(k, newV)
+				} else {
+					//  add both numbers by parsing out the int64 after the ":" in the value
+					v0b, fv0 := b.kv[k]
+					v0 := foundOrZeroPrefixedInt64(v0b, fv0)
+					v1 := foundOrZeroPrefixedInt64(v, true)
+					b.setKV(k, []byte(fmt.Sprintf("sum:%d", sum(v0, v1))))
+				}
+			}
+		case manifest.OutputValueTypeFloat64:
+			sum := func(a, b float64) float64 {
+				return a + b
+			}
+			for k, v := range kvPartialStore.kv {
+				if bytes.HasPrefix(v, []byte("set:")) {
+					b.setKV(k, floatToPrefixedBytes("sum:", bytesToFloat(v[4:])))
+				} else {
+					//  add both numbers by parsing out the float64 after the ":" in the value
+					v0b, fv0 := b.kv[k]
+					v0 := foundOrZeroPrefixedFloat(v0b, fv0)
+					v1 := foundOrZeroPrefixedFloat(v, true)
+					b.setKV(k, floatToPrefixedBytes("sum:", sum(v0, v1)))
+				}
+			}
+		case manifest.OutputValueTypeBigInt:
+			sum := func(a, b *big.Int) *big.Int {
+				return new(big.Int).Add(a, b)
+			}
+			for k, v := range kvPartialStore.kv {
+				if bytes.HasPrefix(v, []byte("set:")) {
+					newV := bytes.Join([][]byte{[]byte("sum:"), v[4:]}, nil)
+					b.setKV(k, newV)
+				} else {
+					//  add both numbers by parsing out the int64 after the ":" in the value
+					v0b, fv0 := b.kv[k]
+					v0 := foundOrZeroPrefixedBigInt(v0b, fv0)
+					v1 := foundOrZeroPrefixedBigInt(v, true)
+					b.setKV(k, []byte(fmt.Sprintf("sum:%d", sum(v0, v1))))
+				}
+			}
+		case manifest.OutputValueTypeBigFloat:
+			fallthrough
+		case manifest.OutputValueTypeBigDecimal:
+			sum := func(a, b decimal.Decimal) decimal.Decimal {
+				return a.Add(b)
+			}
+			for k, v := range kvPartialStore.kv {
+				if bytes.HasPrefix(v, []byte("set:")) {
+					b.setKV(k, []byte(fmt.Sprintf("sum:%s", string(v[4:]))))
+				} else {
+					//  add both numbers by parsing out the float64 after the ":" in the value
+					v0b, fv0 := b.kv[k]
+					v0 := foundOrZeroPrefixedBigDecimal(v0b, fv0)
+					v1 := foundOrZeroPrefixedBigDecimal(v, true)
+					b.setKV(k, bytes.Join([][]byte{
+						[]byte("sum:"),
+						[]byte(sum(v0, v1).String()),
+					}, nil))
+				}
+			}
 		}
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX:
 		switch intoValueTypeLower {
@@ -302,11 +376,46 @@ func foundOrZeroInt64(in []byte, found bool) int64 {
 	return int64(val)
 }
 
+func foundOrZeroPrefixedInt64(in []byte, found bool) int64 {
+	if !found {
+		return 0
+	}
+	val, err := strconv.ParseInt(string(in[4:]), 10, 64)
+	if err != nil {
+		return 0
+	}
+	return int64(val)
+}
+
+func foundOrZeroPrefixedFloat(in []byte, found bool) float64 {
+	if !found {
+		return 0
+	}
+
+	val, err := strconv.ParseFloat(string(in[4:]), 64)
+	if err != nil {
+		return 0
+	}
+	return val
+}
+
 func foundOrZeroBigDecimal(in []byte, found bool) decimal.Decimal {
 	if !found {
 		return decimal.NewFromInt(0)
 	}
 	out, err := decimal.NewFromString(string(in))
+	if err != nil {
+		panic(err)
+	}
+	return out.Truncate(34)
+}
+
+func foundOrZeroPrefixedBigDecimal(in []byte, found bool) decimal.Decimal {
+	if !found {
+		return decimal.NewFromInt(0)
+	}
+
+	out, err := decimal.NewFromString(string(in[4:]))
 	if err != nil {
 		panic(err)
 	}
@@ -325,6 +434,13 @@ func foundOrZeroBigInt(in []byte, found bool) *big.Int {
 		return new(big.Int)
 	}
 	return bytesToBigInt(in)
+}
+
+func foundOrZeroPrefixedBigInt(in []byte, found bool) *big.Int {
+	if !found {
+		return new(big.Int)
+	}
+	return bytesToBigInt(in[4:])
 }
 
 func foundOrZeroFloat(in []byte, found bool) float64 {
@@ -347,6 +463,15 @@ func strToBigFloat(in string) *big.Float {
 	return newFloat.SetPrec(100)
 }
 
+func strToFloat(in string) float64 {
+	newFloat, _, err := big.ParseFloat(in, 10, 100, big.ToNearestEven)
+	if err != nil {
+		panic(fmt.Sprintf("cannot load float %q: %s", in, err))
+	}
+	f, _ := newFloat.SetPrec(100).Float64()
+	return f
+}
+
 func strToBigInt(in string) *big.Int {
 	bi := &big.Int{}
 	_, success := bi.SetString(in, 10)
@@ -354,6 +479,10 @@ func strToBigInt(in string) *big.Int {
 		panic(fmt.Sprintf("cannot load int %q", in))
 	}
 	return bi
+}
+
+func bytesToFloat(in []byte) float64 {
+	return strToFloat(string(in))
 }
 
 func bytesToBigFloat(in []byte) *big.Float {
@@ -370,4 +499,16 @@ func floatToStr(f float64) string {
 
 func floatToBytes(f float64) []byte {
 	return []byte(floatToStr(f))
+}
+
+func floatToPrefixedBytes(prefix string, f float64) []byte {
+	return []byte(fmt.Sprintf("%s%s", prefix, floatToStr(f)))
+}
+
+func bigFloatToStr(f *big.Float) string {
+	return f.Text('g', -1)
+}
+
+func bigFloatToBytes(f *big.Float) []byte {
+	return []byte(bigFloatToStr(f))
 }

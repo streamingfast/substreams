@@ -35,6 +35,10 @@ func BuildMessageDescriptors(pkg *pbsubstreams.Package) (out map[string]*ModuleD
 		case *pbsubstreams.Module_KindMap_:
 			msgType = modKind.KindMap.OutputType
 			desc.MapOutputType = msgType
+
+		case *pbsubstreams.Module_KindBlockIndex_:
+			msgType = modKind.KindBlockIndex.OutputType
+			desc.MapOutputType = msgType
 		}
 		if strings.HasPrefix(msgType, "proto:") {
 			msgType = strings.TrimPrefix(msgType, "proto:")

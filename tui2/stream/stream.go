@@ -58,8 +58,8 @@ type Status int
 
 const (
 	StatusRunning Status = 0
-	StatusError          = 1
-	StatusStopped        = 2
+	StatusError   Status = 1
+	StatusStopped Status = 2
 )
 
 func (s *Stream) StreamStatus() Status {

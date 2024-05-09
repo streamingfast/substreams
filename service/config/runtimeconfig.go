@@ -9,7 +9,7 @@ import (
 // RuntimeConfig is a global configuration for the service.
 // It is passed down and should not be modified unless cloned.
 type RuntimeConfig struct {
-	StateBundleSize uint64
+	SegmentSize uint64
 
 	MaxJobsAhead               uint64 // limit execution of depencency jobs so they don't go too far ahead of the modules that depend on them (ex: module X is 2 million blocks ahead of module Y that depends on it, we don't want to schedule more module X jobs until Y caught up a little bit)
 	DefaultParallelSubrequests uint64 // how many sub-jobs to launch for a given user
@@ -23,7 +23,7 @@ type RuntimeConfig struct {
 }
 
 func NewTier1RuntimeConfig(
-	stateBundleSize uint64,
+	segmentSize uint64,
 	parallelSubrequests uint64,
 	maxJobsAhead uint64,
 	baseObjectStore dstore.Store,
@@ -31,7 +31,7 @@ func NewTier1RuntimeConfig(
 	workerFactory work.WorkerFactory,
 ) RuntimeConfig {
 	return RuntimeConfig{
-		StateBundleSize:            stateBundleSize,
+		SegmentSize:                segmentSize,
 		DefaultParallelSubrequests: parallelSubrequests,
 		MaxJobsAhead:               maxJobsAhead,
 		BaseObjectStore:            baseObjectStore,

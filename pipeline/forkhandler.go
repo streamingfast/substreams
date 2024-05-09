@@ -1,7 +1,6 @@
 package pipeline
 
 import (
-	"github.com/streamingfast/bstream"
 	"sync"
 
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
@@ -38,7 +37,6 @@ func (f *ForkHandler) registerUndoHandler(handler UndoHandler) {
 
 func (f *ForkHandler) handleUndo(
 	clock *pbsubstreams.Clock,
-	cursor *bstream.Cursor,
 ) error {
 	f.mu.RLock()
 	defer f.mu.RUnlock()

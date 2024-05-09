@@ -5,7 +5,6 @@ import "sort"
 type storeBoundary struct {
 	nextBoundary     uint64
 	interval         uint64
-	isSubRequest     bool
 	requestStopBlock uint64
 	stopBlockReached bool
 }

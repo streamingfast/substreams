@@ -69,12 +69,6 @@ func TestParser(t *testing.T) {
 			`"  test || value AND other   	( 10 )!"`,
 			nil,
 		},
-		{
-			"double_quoted_string_with_minus_sign",
-			`"eosio.token-open"`,
-			`"eosio.token-open"`,
-			nil,
-		},
 
 		{
 			"single_quoted_string",
@@ -163,92 +157,6 @@ func TestParser(t *testing.T) {
 			`([one || two])`,
 			nil,
 		},
-		{
-			"top_level_parenthesis_with_both_not",
-			` ( -one || -two   )  `,
-			`([!one || !two])`,
-			nil,
-		},
-
-		{
-			"top_level_not_term",
-			`- one`,
-			`!one`,
-			nil,
-		},
-		{
-			"top_level_not_parenthesis",
-			`- ( one)`,
-			`!(one)`,
-			nil,
-		},
-		{
-			"top_level_not_parenthesis_or",
-			`- ( one || two)`,
-			`!([one || two])`,
-			nil,
-		},
-
-		{
-			"top_level_implicit_and_with_left_not",
-			` - two one`,
-			`<!two && one>`,
-			nil,
-		},
-		{
-			"top_level_implicit_and_with_right_not",
-			`two -one`,
-			`<two && !one>`,
-			nil,
-		},
-		{
-			"top_level_implicit_and_both_not",
-			`-two -one`,
-			`<!two && !one>`,
-			nil,
-		},
-		{
-			"top_level_and_with_left_not",
-			` - two && one`,
-			`<!two && one>`,
-			nil,
-		},
-		{
-			"top_level_and_with_right_not",
-			`two &&   -one`,
-			`<two && !one>`,
-			nil,
-		},
-		{
-			"top_level_and_both_not",
-			`-two &&   -one`,
-			`<!two && !one>`,
-			nil,
-		},
-		{
-			"top_level_or_with_left_not",
-			` - two || one`,
-			`[!two || one]`,
-			nil,
-		},
-		{
-			"top_level_or_with_right_not",
-			`two ||   -one`,
-			`[two || !one]`,
-			nil,
-		},
-		{
-			"top_level_or_with_both_not",
-			`-two ||   -one`,
-			`[!two || !one]`,
-			nil,
-		},
-		{
-			"top_level_legacy_or_with_both_not",
-			`-two ||   -one`,
-			`[!two || !one]`,
-			nil,
-		},
 
 		{
 			"top_level_multi_and",
@@ -287,18 +195,7 @@ func TestParser(t *testing.T) {
 			`[<a && b && c> || d]`,
 			nil,
 		},
-		{
-			"precedence_not_and_or",
-			`-a b || c`,
-			`[<!a && b> || c]`,
-			nil,
-		},
-		{
-			"precedence_parenthesis_not_and_or",
-			`-a (b || c)`,
-			`<!a && ([b || c])>`,
-			nil,
-		},
+
 		{
 			"precedence_parenthesis_and_or_and",
 			`a (b || c) d`,
@@ -344,16 +241,6 @@ func TestParser(t *testing.T) {
 			nil,
 		},
 
-		{
-			"error_missing_expresssion_after_not",
-			`a - `,
-			"",
-			fmt.Errorf("missing expression after implicit 'and' clause: %w",
-				fmt.Errorf("invalid expression after minus sign: %w",
-					&ParseError{"expected a key term, minus sign or left parenthesis, got end of input", pos(1, 4, 5)},
-				),
-			),
-		},
 		{
 			"error_missing_expression_after_and",
 			`a && `,

@@ -347,15 +347,6 @@ func strToBigFloat(in string) *big.Float {
 	return newFloat.SetPrec(100)
 }
 
-func strToFloat(in string) float64 {
-	newFloat, _, err := big.ParseFloat(in, 10, 100, big.ToNearestEven)
-	if err != nil {
-		panic(fmt.Sprintf("cannot load float %q: %s", in, err))
-	}
-	f, _ := newFloat.SetPrec(100).Float64()
-	return f
-}
-
 func strToBigInt(in string) *big.Int {
 	bi := &big.Int{}
 	_, success := bi.SetString(in, 10)
@@ -379,12 +370,4 @@ func floatToStr(f float64) string {
 
 func floatToBytes(f float64) []byte {
 	return []byte(floatToStr(f))
-}
-
-func bigFloatToStr(f *big.Float) string {
-	return f.Text('g', -1)
-}
-
-func bigFloatToBytes(f *big.Float) []byte {
-	return []byte(bigFloatToStr(f))
 }

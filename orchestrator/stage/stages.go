@@ -12,7 +12,7 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/orchestrator/plan"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
-	"github.com/streamingfast/substreams/pipeline/outputmodules"
+	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
 )
@@ -42,8 +42,9 @@ type Stages struct {
 	stages []*Stage
 
 	// segmentStates is a matrix of segment and stages
-	segmentStates  []stageStates // segmentStates[offsetSegment][StageIndex]
-	lastStatUpdate time.Time
+	segmentStates       []stageStates // segmentStates[offsetSegment][StageIndex]
+	lastStatUpdate      time.Time
+	outputModuleIsIndex bool
 
 	// If you're processing at 12M blocks, offset 12,000 segments, so you don't need to allocate 12k empty elements.
 	// Any previous segment is assumed to have completed successfully, and any stores that we sync'd prior to this offset
@@ -54,7 +55,7 @@ type stageStates []UnitState
 
 func NewStages(
 	ctx context.Context,
-	outputGraph *outputmodules.Graph,
+	execGraph *exec.Graph,
 	reqPlan *plan.RequestPlan,
 	storeConfigs store.ConfigMap,
 ) (out *Stages) {
@@ -65,11 +66,12 @@ func NewStages(
 
 	logger := reqctx.Logger(ctx)
 
-	stagedModules := outputGraph.StagedUsedModules()
+	stagedModules := execGraph.StagedUsedModules()
 	out = &Stages{
-		ctx:             ctx,
-		logger:          reqctx.Logger(ctx),
-		globalSegmenter: reqPlan.BackprocessSegmenter(),
+		ctx:                 ctx,
+		logger:              reqctx.Logger(ctx),
+		globalSegmenter:     reqPlan.BackprocessSegmenter(),
+		outputModuleIsIndex: execGraph.OutputModule().GetKindBlockIndex() != nil,
 	}
 	if reqPlan.BuildStores != nil {
 		out.storeSegmenter = reqPlan.StoresSegmenter()
@@ -122,11 +124,28 @@ func NewStages(
 	return out
 }
 
-func layerKind(layer outputmodules.LayerModules) Kind {
+func layerKind(layer exec.LayerModules) Kind {
 	if layer.IsStoreLayer() {
 		return KindStore
 	}
 	return KindMap
+}
+
+func (s *Stages) OutputModuleIsIndex() bool {
+	return s.outputModuleIsIndex
+}
+
+func (s *Stages) LastStageCompleted() bool {
+	lastSegment := s.mapSegmenter.LastIndex()
+
+	idx := len(s.stages) - 1
+	for seg := s.mapSegmenter.FirstIndex(); seg <= lastSegment; seg++ {
+		state := s.getState(Unit{Segment: seg, Stage: idx})
+		if state != UnitCompleted && state != UnitPartialPresent && state != UnitNoOp {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Stages) AllStoresCompleted() bool {
@@ -318,7 +337,7 @@ func (s *Stages) getState(u Unit) UnitState {
 	index := u.Segment - s.segmentOffset
 	if index >= len(s.segmentStates) {
 		return UnitPending
-	} else if index < 0 {
+	} else if index < 0 || (len(s.stages) != 0 && u.Segment < s.stages[u.Stage].segmenter.FirstIndex()) {
 		return UnitNoOp
 	} else {
 		return s.segmentStates[index][u.Stage]
@@ -351,15 +370,14 @@ func (s *Stages) NextJob() (Unit, *block.Range) {
 	// OPTIMIZATION: eventually, we can push `segmentsOffset`
 	//  each time contiguous segments are completed for all stages.
 
+	lastStage := len(s.stages) - 1
 	for segmentIdx := s.globalSegmenter.FirstIndex(); segmentIdx <= s.globalSegmenter.LastIndex(); segmentIdx++ {
-		for stageIdx := len(s.stages) - 1; stageIdx >= 0; stageIdx-- {
+		someShadowed := s.markShadowedUnits(segmentIdx)
+		for stageIdx := lastStage; stageIdx >= 0; stageIdx-- {
 			stage := s.stages[stageIdx]
 			unit := Unit{Segment: segmentIdx, Stage: stageIdx}
 			segmentState := s.getState(unit)
 			if segmentState != UnitPending {
-				continue
-			}
-			if segmentState == UnitNoOp {
 				continue
 			}
 			if segmentIdx < stage.segmenter.FirstIndex() {
@@ -380,11 +398,51 @@ func (s *Stages) NextJob() (Unit, *block.Range) {
 				continue
 			}
 
+			if someShadowed && stageIdx == lastStage {
+				for i := 0; i < len(s.stages); i++ {
+					u := Unit{Segment: segmentIdx, Stage: i}
+					if st := s.getState(u); st == UnitPending {
+						s.markSegmentScheduled(u)
+						return u, r
+					}
+				}
+			}
+
 			s.markSegmentScheduled(unit)
 			return unit, r
 		}
 	}
 	return Unit{}, nil
+}
+
+func (s *Stages) shadowable(segmentIdx int) bool {
+	if len(s.stages) < 2 {
+		return false
+	}
+	return segmentIdx-s.segmentOffset <= len(s.stages)-1
+}
+
+func (s *Stages) markShadowedUnits(segmentIdx int) (someShadowed bool) {
+	if !s.shadowable(segmentIdx) {
+		return
+	}
+
+	relSegmentOrdinal := segmentIdx - s.segmentOffset
+	s.allocSegments(segmentIdx)
+
+	lastStage := len(s.stages) - 1
+	for stageIdx := lastStage - 1; stageIdx >= relSegmentOrdinal; stageIdx-- { // skip the last stage
+		unit := Unit{Segment: segmentIdx, Stage: stageIdx}
+		segmentState := s.getState(unit)
+		if segmentState != UnitCompleted && segmentState != UnitNoOp {
+			nextState := s.getState(Unit{Segment: segmentIdx, Stage: stageIdx + 1})
+			if nextState == UnitPending || nextState == UnitScheduled || nextState == UnitMerging || nextState == UnitShadowed {
+				s.setState(unit, UnitShadowed)
+				someShadowed = true
+			}
+		}
+	}
+	return
 }
 
 func (s *Stages) allocSegments(segmentIdx int) {
@@ -405,9 +463,19 @@ func (s *Stages) dependenciesCompleted(u Unit) bool {
 	if u.Stage == 0 {
 		return true
 	}
+
+	previousSegmentParent := s.getState(Unit{Segment: u.Segment - 1, Stage: u.Stage - 1})
+
 	for i := u.Stage - 1; i >= 0; i-- {
-		state := s.getState(Unit{Segment: u.Segment - 1, Stage: i})
-		if !(state == UnitCompleted || state == UnitNoOp) {
+		state := s.getState(Unit{Segment: u.Segment, Stage: i})
+		switch state {
+		case UnitCompleted, UnitNoOp:
+		case UnitShadowed, UnitPartialPresent:
+			// if the direct parent stage is shadowed or UnitPartialPresent, we need the previous segment's previous stage to be completed
+			if previousSegmentParent != UnitCompleted && previousSegmentParent != UnitNoOp {
+				return false
+			}
+		default:
 			return false
 		}
 	}
@@ -452,6 +520,7 @@ func (s *Stages) StatesString() string {
 				UnitMerging:        "M",
 				UnitCompleted:      "C",
 				UnitNoOp:           "N",
+				UnitShadowed:       "Z",
 			}[segment[i]])
 		}
 		out.WriteString("\n")

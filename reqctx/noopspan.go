@@ -4,6 +4,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	ttrace "go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 )
 
 // NoopSpan is an implementation of span that preforms no operations.
@@ -39,4 +40,4 @@ func (n *NoopSpan) AddEvent(string, ...ttrace.EventOption) {}
 func (n *NoopSpan) SetName(string) {}
 
 // TracerProvider returns a no-op TracerProvider.
-func (n *NoopSpan) TracerProvider() ttrace.TracerProvider { return ttrace.NewNoopTracerProvider() }
+func (n *NoopSpan) TracerProvider() ttrace.TracerProvider { return noop.NewTracerProvider() }

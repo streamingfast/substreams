@@ -1,6 +1,7 @@
 package manifest
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -9,6 +10,7 @@ import (
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/sqe"
 )
 
 type manifestConverter struct {
@@ -64,8 +66,13 @@ func (r *manifestConverter) validateManifest(manif *Manifest) error {
 	// TODO: put a limit on the SIZE of the WASM payload (max 10MB per binary?)
 
 	for _, s := range manif.Modules {
+		if s.BlockFilter != nil {
+			ctx := context.Background()
+			if err := validateQuery(ctx, s.BlockFilter.Query, manif.Params[s.Name]); err != nil {
+				return fmt.Errorf("stream %q: %w", s.Name, err)
+			}
+		}
 		// TODO: let's make sure this is also checked when received in Protobuf in a remote request.
-
 		switch s.Kind {
 		case ModuleKindMap:
 			if s.Output.Type == "" {
@@ -90,10 +97,6 @@ func (r *manifestConverter) validateManifest(manif *Manifest) error {
 				if input.IsParams() {
 					return fmt.Errorf("stream %q: block index module cannot have params input", s.Name)
 				}
-			}
-
-			if s.InitialBlock != nil {
-				return fmt.Errorf("stream %q: block index module cannot have initial block", s.Name)
 			}
 
 			if s.BlockFilter != nil {
@@ -127,6 +130,25 @@ func (r *manifestConverter) validateManifest(manif *Manifest) error {
 	return nil
 }
 
+func validateQuery(ctx context.Context, query BlockFilterQuery, param string) error {
+	var q string
+	switch {
+	case query.String != "" && query.Params:
+		return fmt.Errorf("only one of 'string' or 'params' can be set")
+	case query.String != "":
+		q = query.String
+	case query.Params:
+		q = param
+	default:
+		return fmt.Errorf("missing query")
+	}
+
+	_, err := sqe.Parse(ctx, q)
+	if err != nil {
+		return fmt.Errorf("invalid query: %w", err)
+	}
+	return nil
+}
 func handleUseModules(pkg *pbsubstreams.Package, manif *Manifest) error {
 	packageModulesMapping := make(map[string]*pbsubstreams.Module)
 	for _, module := range pkg.Modules.Modules {
@@ -186,20 +208,7 @@ func checkEqualInputs(moduleWithUse, usedModule *pbsubstreams.Module, manifestMo
 				return fmt.Errorf("module %q: input %q has different mode than the used module %q: input %q", manifestModuleWithUse.Name, input.String(), manifestModuleWithUse.Use, usedModuleInput.String())
 			}
 
-			curMod, found := packageModulesMapping[input.GetStore().ModuleName]
-			if !found {
-				return fmt.Errorf("module %q: input %q store module %q not found", manifestModuleWithUse.Name, input.String(), input.GetStore().ModuleName)
-			}
-
-			usedMod, found := packageModulesMapping[usedModuleInput.GetStore().ModuleName]
-			if !found {
-				return fmt.Errorf("module %q: input %q store module %q not found", manifestModuleWithUse.Name, usedModuleInput.String(), usedModuleInput.GetStore().ModuleName)
-			}
-
-			if curMod.Output.Type != usedMod.Output.Type {
-				return fmt.Errorf("module %q: input %q has different output than the used module %q: input %q", manifestModuleWithUse.Name, input.String(), manifestModuleWithUse.Use, usedModuleInput.String())
-			}
-
+			// we don't check output, we'll overwrite it with the used module
 		case input.GetMap() != nil:
 			if usedModuleInput.GetMap() == nil {
 				return fmt.Errorf("module %q: input %q is not a map type", manifestModuleWithUse.Name, input.String())

@@ -27,7 +27,7 @@ func TestFullKV_Save_Load_Empty_MapNotNil(t *testing.T) {
 		baseStore: &baseStore{
 			kv: map[string][]byte{},
 
-			pendingOps: &pbssinternal.Operations{},
+			kvOps:      &pbssinternal.Operations{},
 			logger:     zap.NewNop(),
 			marshaller: marshaller.Default(),
 
@@ -48,7 +48,7 @@ func TestFullKV_Save_Load_Empty_MapNotNil(t *testing.T) {
 		baseStore: &baseStore{
 			kv: map[string][]byte{},
 
-			pendingOps: &pbssinternal.Operations{},
+			kvOps:      &pbssinternal.Operations{},
 			logger:     zap.NewNop(),
 			marshaller: marshaller.Default(),
 

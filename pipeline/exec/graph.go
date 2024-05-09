@@ -1,21 +1,23 @@
-package outputmodules
+package exec
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 type Graph struct {
-	requestModules    *pbsubstreams.Modules
-	usedModules       []*pbsubstreams.Module // all modules that need to be processed (requested directly or a required module ancestor)
-	stagedUsedModules ExecutionStages        // all modules that need to be processed (requested directly or a required module ancestor)
-	moduleHashes      *manifest.ModuleHashes
-	stores            []*pbsubstreams.Module // subset of allModules: only the stores
-	lowestInitBlock   uint64
-
-	outputModule *pbsubstreams.Module
+	requestModules        *pbsubstreams.Modules
+	usedModules           []*pbsubstreams.Module // all modules that need to be processed (requested directly or a required module ancestor)
+	stagedUsedModules     ExecutionStages        // all modules that need to be processed (requested directly or a required module ancestor)
+	moduleHashes          *manifest.ModuleHashes
+	stores                []*pbsubstreams.Module // subset of allModules: only the stores
+	modulesInitBlocks     map[string]uint64
+	lowestInitBlock       uint64
+	lowestStoresInitBlock *uint64
+	outputModule          *pbsubstreams.Module
 
 	schedulableModules      []*pbsubstreams.Module // stores and output mappers needed to execute to produce output for all `output_modules`.
 	schedulableAncestorsMap map[string][]string    // modules that are ancestors (therefore dependencies) of a given module
@@ -24,6 +26,16 @@ type Graph struct {
 func (g *Graph) OutputModule() *pbsubstreams.Module  { return g.outputModule }
 func (g *Graph) Stores() []*pbsubstreams.Module      { return g.stores }
 func (g *Graph) UsedModules() []*pbsubstreams.Module { return g.usedModules }
+func (g *Graph) UsedIndexModules() []*pbsubstreams.Module {
+	indexModules := make([]*pbsubstreams.Module, 0)
+	for _, mod := range g.usedModules {
+		if mod.GetKindBlockIndex() != nil {
+			indexModules = append(indexModules, mod)
+		}
+	}
+	return indexModules
+}
+
 func (g *Graph) UsedModulesUpToStage(stage int) (out []*pbsubstreams.Module) {
 	for i := 0; i <= int(stage); i++ {
 		for _, layer := range g.StagedUsedModules()[i] {
@@ -34,10 +46,25 @@ func (g *Graph) UsedModulesUpToStage(stage int) (out []*pbsubstreams.Module) {
 	}
 	return
 }
+
+func (g *Graph) UsedIndexesModulesUpToStage(stage int) (out []*pbsubstreams.Module) {
+	for i := 0; i <= stage; i++ {
+		for _, layer := range g.StagedUsedModules()[i] {
+			for _, mod := range layer {
+				if mod.GetKindBlockIndex() != nil {
+					out = append(out, mod)
+				}
+			}
+		}
+	}
+	return
+}
 func (g *Graph) StagedUsedModules() ExecutionStages   { return g.stagedUsedModules }
 func (g *Graph) IsOutputModule(name string) bool      { return g.outputModule.Name == name }
 func (g *Graph) ModuleHashes() *manifest.ModuleHashes { return g.moduleHashes }
 func (g *Graph) LowestInitBlock() uint64              { return g.lowestInitBlock }
+func (g *Graph) LowestStoresInitBlock() *uint64       { return g.lowestStoresInitBlock }
+func (g *Graph) ModulesInitBlocks() map[string]uint64 { return g.modulesInitBlocks }
 
 func NewOutputModuleGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules) (out *Graph, err error) {
 	out = &Graph{
@@ -62,9 +89,18 @@ func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *
 		return fmt.Errorf("building execution moduleGraph: %w", err)
 	}
 	g.usedModules = processModules
-	g.stagedUsedModules = computeStages(processModules)
-	g.lowestInitBlock = computeLowestInitBlock(processModules)
+	g.modulesInitBlocks = map[string]uint64{}
+	for _, mod := range g.usedModules {
+		g.modulesInitBlocks[mod.Name] = mod.InitialBlock
+	}
 
+	g.stagedUsedModules, err = computeStages(g.usedModules, g.modulesInitBlocks)
+	if err != nil {
+		return err
+	}
+
+	g.lowestInitBlock = computeLowestInitBlock(processModules)
+	g.lowestStoresInitBlock = computeLowestStoresInitBlock(processModules)
 	if err := g.hashModules(graph); err != nil {
 		return fmt.Errorf("cannot hash module: %w", err)
 	}
@@ -88,12 +124,43 @@ func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *
 	return nil
 }
 
-func computeLowestInitBlock(modules []*pbsubstreams.Module) (out uint64) {
-	lowest := modules[0].InitialBlock
+// computeLowestStoresInitBlock finds the lowest initial block of all store modules.
+func computeLowestStoresInitBlock(modules []*pbsubstreams.Module) (out *uint64) {
+	lowest := uint64(math.MaxUint64)
+	countStores := 0
 	for _, mod := range modules {
+		if mod.GetKindStore() != nil {
+			countStores += 1
+			if mod.InitialBlock < lowest {
+				lowest = mod.InitialBlock
+			}
+		}
+	}
+
+	// No stores in the modules
+	if countStores == 0 {
+		return nil
+	}
+
+	return &lowest
+}
+
+// computeLowestInitBlock finds the lowest initial block of all modules that are not block indexes.
+// if there are only blockIndex types of modules, it returns 0, because blockIndex modules are always at 0.
+func computeLowestInitBlock(modules []*pbsubstreams.Module) (out uint64) {
+	var atLeastOneModuleThatIsNotAnIndex bool
+	lowest := uint64(math.MaxUint64)
+	for _, mod := range modules {
+		if mod.GetKindBlockIndex() != nil {
+			continue
+		}
+		atLeastOneModuleThatIsNotAnIndex = true
 		if mod.InitialBlock < lowest {
 			lowest = mod.InitialBlock
 		}
+	}
+	if !atLeastOneModuleThatIsNotAnIndex {
+		return 0
 	}
 	return lowest
 }
@@ -126,7 +193,7 @@ func (l LayerModules) IsStoreLayer() bool {
 	return l[0].GetKindStore() != nil
 }
 
-func computeStages(mods []*pbsubstreams.Module) (stages ExecutionStages) {
+func computeStages(mods []*pbsubstreams.Module, initBlocks map[string]uint64) (stages ExecutionStages, err error) {
 	seen := map[string]bool{}
 
 	// Layers pre-define the list of modules that have all of their dependencies
@@ -146,7 +213,7 @@ func computeStages(mods []*pbsubstreams.Module) (stages ExecutionStages) {
 	modLoop:
 		for _, mod := range mods {
 			switch mod.Kind.(type) {
-			case *pbsubstreams.Module_KindMap_:
+			case *pbsubstreams.Module_KindMap_, *pbsubstreams.Module_KindBlockIndex_:
 				if i%2 == 0 {
 					continue
 				}
@@ -161,17 +228,25 @@ func computeStages(mods []*pbsubstreams.Module) (stages ExecutionStages) {
 				continue
 			}
 
+			var validInputsAtInitialBlock bool
 			for _, dep := range mod.Inputs {
 				var depModName string
 				switch input := dep.Input.(type) {
 				case *pbsubstreams.Module_Input_Params_:
 					continue
 				case *pbsubstreams.Module_Input_Source_:
+					validInputsAtInitialBlock = true
 					continue
 				case *pbsubstreams.Module_Input_Map_:
 					depModName = input.Map.ModuleName
+					if mod.InitialBlock >= initBlocks[depModName] {
+						validInputsAtInitialBlock = true
+					}
 				case *pbsubstreams.Module_Input_Store_:
 					depModName = input.Store.ModuleName
+					if mod.InitialBlock >= initBlocks[depModName] {
+						validInputsAtInitialBlock = true
+					}
 				default:
 					panic(fmt.Errorf("unsupported input type %T", dep.Input))
 				}
@@ -180,6 +255,17 @@ func computeStages(mods []*pbsubstreams.Module) (stages ExecutionStages) {
 				// The next iteration, we'll change the layer type. That's how we
 				// achieve layers such as MAP, MAP, STORE layers.
 				if !seen[depModName] {
+					continue modLoop
+				}
+			}
+
+			if !validInputsAtInitialBlock {
+				return nil, fmt.Errorf("module %q has no input available at its initial block %d", mod.Name, mod.InitialBlock)
+			}
+
+			//Check block index dependence
+			if mod.BlockFilter != nil {
+				if !seen[mod.BlockFilter.Module] {
 					continue modLoop
 				}
 			}
@@ -207,7 +293,7 @@ func computeStages(mods []*pbsubstreams.Module) (stages ExecutionStages) {
 		}
 	}
 
-	return stages
+	return stages, nil
 }
 
 func computeOutputModule(mods []*pbsubstreams.Module, outputModule string) *pbsubstreams.Module {

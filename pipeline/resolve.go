@@ -7,17 +7,15 @@ import (
 	"sync/atomic"
 
 	"connectrpc.com/connect"
-	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
-	"github.com/streamingfast/substreams/manifest"
-
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/hub"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dstore"
-	"go.uber.org/zap"
-
+	"github.com/streamingfast/substreams/manifest"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/reqctx"
+	"go.uber.org/zap"
 )
 
 type getBlockFunc func() (uint64, error)
@@ -27,7 +25,8 @@ func BuildRequestDetails(
 	request *pbsubstreamsrpc.Request,
 	getRecentFinalBlock getBlockFunc,
 	resolveCursor CursorResolver,
-	getHeadBlock getBlockFunc) (req *reqctx.RequestDetails, undoSignal *pbsubstreamsrpc.BlockUndoSignal, err error) {
+	getHeadBlock getBlockFunc,
+	segmentSize uint64) (req *reqctx.RequestDetails, undoSignal *pbsubstreamsrpc.BlockUndoSignal, err error) {
 	req = &reqctx.RequestDetails{
 		Modules:                             request.Modules,
 		OutputModule:                        request.OutputModule,
@@ -56,7 +55,7 @@ func BuildRequestDetails(
 		}
 	}
 
-	linearHandoff, err := computeLinearHandoffBlockNum(request.ProductionMode, req.ResolvedStartBlockNum, request.StopBlockNum, getRecentFinalBlock, moduleHasStatefulDependencies)
+	linearHandoff, err := computeLinearHandoffBlockNum(request.ProductionMode, req.ResolvedStartBlockNum, request.StopBlockNum, getRecentFinalBlock, moduleHasStatefulDependencies, segmentSize)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -78,9 +77,9 @@ func BuildRequestDetailsFromSubrequest(request *pbssinternal.ProcessRangeRequest
 		ProductionMode:        true,
 		IsTier2Request:        true,
 		Tier2Stage:            int(request.Stage),
-		StopBlockNum:          request.StopBlockNum,
-		LinearHandoffBlockNum: request.StopBlockNum,
-		ResolvedStartBlockNum: request.StartBlockNum,
+		StopBlockNum:          request.StopBlock(),
+		LinearHandoffBlockNum: request.StopBlock(),
+		ResolvedStartBlockNum: request.StartBlock(),
 		UniqueID:              nextUniqueID(),
 	}
 	return req
@@ -92,19 +91,28 @@ func nextUniqueID() uint64 {
 	return uniqueRequestIDCounter.Add(1)
 }
 
-func computeLinearHandoffBlockNum(productionMode bool, startBlock, stopBlock uint64, getRecentFinalBlockFunc func() (uint64, error), stateRequired bool) (uint64, error) {
+func computeLinearHandoffBlockNum(productionMode bool, startBlock, stopBlock uint64, getRecentFinalBlockFunc func() (uint64, error), stateRequired bool, segmentSize uint64) (uint64, error) {
+	//get value of of next boundary after stopBlock
 	if productionMode {
-		maxHandoff, err := getRecentFinalBlockFunc()
+		nextBoundary := stopBlock
+		if remainder := (stopBlock % segmentSize); remainder != 0 {
+			nextBoundary = nextBoundary - remainder + segmentSize
+		}
+
+		libHandoff, err := getRecentFinalBlockFunc()
 		if err != nil {
 			if stopBlock == 0 {
 				return 0, fmt.Errorf("cannot determine a recent finalized block: %w", err)
 			}
-			return stopBlock, nil
+			return nextBoundary, nil
 		}
-		if stopBlock == 0 {
-			return maxHandoff, nil
+		libHandoffBoundary := libHandoff - (libHandoff % segmentSize)
+
+		if stopBlock == 0 || libHandoff < stopBlock {
+			return libHandoffBoundary, nil
 		}
-		return min(stopBlock, maxHandoff), nil
+
+		return nextBoundary, nil
 	}
 
 	//if no state required, we don't need to ever back-process blocks. we can start flowing blocks right away from the start block
@@ -112,12 +120,15 @@ func computeLinearHandoffBlockNum(productionMode bool, startBlock, stopBlock uin
 		return startBlock, nil
 	}
 
-	maxHandoff, err := getRecentFinalBlockFunc()
-	if err != nil {
-		return startBlock, nil
-	}
+	prevBoundary := startBlock - (startBlock % segmentSize)
 
-	return min(startBlock, maxHandoff), nil
+	libHandoff, err := getRecentFinalBlockFunc()
+	if err != nil {
+		return prevBoundary, nil
+	}
+	libHandoffBoundary := libHandoff - (libHandoff % segmentSize)
+
+	return min(prevBoundary, libHandoffBoundary), nil
 }
 
 // resolveStartBlockNum will occasionally modify or remove the cursor inside the request
@@ -197,7 +208,7 @@ type junctionBlockGetter struct {
 	currentHead        bstream.BlockRef
 }
 
-var Done = errors.New("done")
+var ErrDone = errors.New("done")
 
 func (j *junctionBlockGetter) ProcessBlock(block *pbbstream.Block, obj interface{}) error {
 	j.currentHead = obj.(bstream.Cursorable).Cursor().HeadBlock
@@ -205,10 +216,10 @@ func (j *junctionBlockGetter) ProcessBlock(block *pbbstream.Block, obj interface
 	stepable := obj.(bstream.Stepable)
 	switch {
 	case stepable.Step().Matches(bstream.StepNew):
-		return Done
+		return ErrDone
 	case stepable.Step().Matches(bstream.StepUndo):
 		j.reorgJunctionBlock = stepable.ReorgJunctionBlock()
-		return Done
+		return ErrDone
 	}
 	// ignoring other steps
 	return nil
@@ -230,7 +241,7 @@ func NewCursorResolver(hub *hub.ForkableHub, mergedBlocksStore, forkedBlocksStor
 		case <-src.Terminated():
 		}
 
-		if !errors.Is(src.Err(), Done) {
+		if !errors.Is(src.Err(), ErrDone) {
 			headBlock := cursor.HeadBlock
 			if headNum, headID, _, _, err := hub.HeadInfo(); err == nil {
 				headBlock = bstream.NewBlockRef(headID, headNum)

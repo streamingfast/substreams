@@ -83,11 +83,24 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 	case work.MsgJobSucceeded:
 		metrics.Tier1ActiveWorkerRequest.Dec()
 
-		s.Stages.MarkSegmentPartialPresent(msg.Unit)
+		shadowedUnits := s.Stages.MarkJobSuccess(msg.Unit)
 		s.WorkerPool.Return(msg.Worker)
 
+		tryMerge := s.Stages.CmdTryMerge(msg.Unit.Stage)
+		if shadowedUnits == nil {
+			cmds = append(cmds, tryMerge)
+		} else {
+			multi := []loop.Cmd{tryMerge}
+			for _, u := range shadowedUnits {
+				multi = append(multi, s.Stages.CmdTryMerge(u.Stage))
+			}
+
+			cmds = append(cmds,
+				loop.Batch(multi...),
+			)
+		}
+
 		cmds = append(cmds,
-			s.Stages.CmdTryMerge(msg.Unit.Stage),
 			work.CmdScheduleNextJob(),
 		)
 		if s.ExecOutWalker != nil {
@@ -181,6 +194,12 @@ func (s *Scheduler) cmdShutdownWhenComplete() loop.Cmd {
 		if s.ExecOutWalker != nil {
 			start, current, end := s.ExecOutWalker.Progress()
 			fields = append(fields, zap.Int("cached_output_start", start), zap.Int("cached_output_current", current), zap.Int("cached_output_end", end))
+		} else {
+			// we may be creating an index
+			if s.Stages.OutputModuleIsIndex() && !s.Stages.LastStageCompleted() {
+				s.logger.Info("scheduler: waiting for last stage to complete because output module is an index")
+				return nil
+			}
 		}
 		s.logger.Info("scheduler: stores and cached_outputs stream completed, switching to live", fields...)
 		return func() loop.Msg {

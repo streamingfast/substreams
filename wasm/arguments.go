@@ -20,6 +20,7 @@ type ValueArgument interface {
 	Argument
 	Value() []byte
 	SetValue([]byte)
+	Active(blk uint64) bool
 }
 
 type ProtoScopeValueArgument interface {
@@ -29,11 +30,16 @@ type ProtoScopeValueArgument interface {
 // implementations
 
 type BaseArgument struct {
-	name string
+	name         string
+	initialBlock uint64
 }
 
 func (b *BaseArgument) Name() string {
 	return b.name
+}
+
+func (b *BaseArgument) Active(blk uint64) bool {
+	return blk >= b.initialBlock
 }
 
 type BaseValueArgument struct {
@@ -48,10 +54,11 @@ type SourceInput struct {
 	BaseValueArgument
 }
 
-func NewSourceInput(name string) *SourceInput {
+func NewSourceInput(name string, initialBlock uint64) *SourceInput {
 	return &SourceInput{
 		BaseArgument: BaseArgument{
-			name: name,
+			name:         name,
+			initialBlock: initialBlock,
 		},
 	}
 }
@@ -65,10 +72,11 @@ type MapInput struct {
 	BaseValueArgument
 }
 
-func NewMapInput(name string) *MapInput {
+func NewMapInput(name string, initialBlock uint64) *MapInput {
 	return &MapInput{
 		BaseArgument: BaseArgument{
-			name: name,
+			name:         name,
+			initialBlock: initialBlock,
 		},
 	}
 }
@@ -82,10 +90,11 @@ type StoreDeltaInput struct {
 	BaseValueArgument
 }
 
-func NewStoreDeltaInput(name string) *StoreDeltaInput {
+func NewStoreDeltaInput(name string, initialBlock uint64) *StoreDeltaInput {
 	return &StoreDeltaInput{
 		BaseArgument: BaseArgument{
-			name: name,
+			name:         name,
+			initialBlock: initialBlock,
 		},
 	}
 }
@@ -99,10 +108,11 @@ type StoreReaderInput struct {
 	Store store.Store
 }
 
-func NewStoreReaderInput(name string, store store.Store) *StoreReaderInput {
+func NewStoreReaderInput(name string, store store.Store, initialBlock uint64) *StoreReaderInput {
 	return &StoreReaderInput{
 		BaseArgument: BaseArgument{
-			name: name,
+			name:         name,
+			initialBlock: initialBlock,
 		},
 		Store: store,
 	}
@@ -118,7 +128,8 @@ type StoreWriterOutput struct {
 func NewStoreWriterOutput(name string, store store.Store, updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueType string) *StoreWriterOutput {
 	return &StoreWriterOutput{
 		BaseArgument: BaseArgument{
-			name: name,
+			name:         name,
+			initialBlock: 0,
 		},
 		Store:        store,
 		UpdatePolicy: updatePolicy,
@@ -134,7 +145,8 @@ type ParamsInput struct {
 func NewParamsInput(value string) *ParamsInput {
 	return &ParamsInput{
 		BaseArgument: BaseArgument{
-			name: "params",
+			name:         "params",
+			initialBlock: 0,
 		},
 		BaseValueArgument: BaseValueArgument{
 			value: []byte(value),

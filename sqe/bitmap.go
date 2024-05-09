@@ -8,7 +8,11 @@ import (
 )
 
 func RoaringBitmapsApply(expr Expression, bitmaps map[string]*roaring64.Bitmap) *roaring64.Bitmap {
-	return roaringQuerier{bitmaps: bitmaps}.apply(expr)
+	out := roaringQuerier{bitmaps: bitmaps}.apply(expr)
+	if out == nil {
+		return roaring64.New()
+	}
+	return out
 }
 
 type roaringRange struct {
@@ -29,10 +33,12 @@ type roaringQuerier struct {
 }
 
 func (q roaringQuerier) apply(expr Expression) *roaring64.Bitmap {
-
 	switch v := expr.(type) {
 	case *KeyTerm:
-		return q.bitmaps[v.Value.Value]
+		if out, ok := q.bitmaps[v.Value.Value]; ok {
+			return out
+		}
+		return roaring64.New()
 
 	case *AndExpression, *OrExpression:
 		children := v.(HasChildrenExpression).GetChildren()

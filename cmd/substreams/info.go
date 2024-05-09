@@ -49,14 +49,14 @@ func runInfo(cmd *cobra.Command, args []string) error {
 		outputModule = args[1]
 	}
 
-	outputSinkconfigFilesPath := mustGetString(cmd, "output-sinkconfig-files-path")
+	outputSinkconfigFilesPath := sflags.MustGetString(cmd, "output-sinkconfig-files-path")
 
 	info, err := info.Extended(manifestPath, outputModule, sflags.MustGetBool(cmd, "skip-package-validation"))
 	if err != nil {
 		return err
 	}
 
-	if mustGetBool(cmd, "json") {
+	if sflags.MustGetBool(cmd, "json") {
 		res, err := json.MarshalIndent(info, "", "  ")
 		if err != nil {
 			return err
@@ -83,8 +83,13 @@ func runInfo(cmd *cobra.Command, args []string) error {
 		for _, input := range mod.Inputs {
 			fmt.Printf("Input: %s: %s\n", input.Type, input.Name)
 		}
+		if mod.BlockFilter != nil {
+			fmt.Printf("Block Filter: (using *%s*): `%s`\n", mod.BlockFilter.Module, mod.BlockFilter.Query)
+		}
 
 		switch mod.Kind {
+		case "index":
+			fmt.Println("Output Type:", *mod.OutputType)
 		case "map":
 			fmt.Println("Output Type:", *mod.OutputType)
 		case "store":
@@ -132,9 +137,7 @@ func runInfo(cmd *cobra.Command, args []string) error {
 			var layerDefs []string
 			for _, l := range layers {
 				var mods []string
-				for _, m := range l {
-					mods = append(mods, m)
-				}
+				mods = append(mods, l...)
 				layerDefs = append(layerDefs, fmt.Sprintf(`["%s"]`, strings.Join(mods, `","`)))
 			}
 			fmt.Printf("Stage %d: [%s]\n", i, strings.Join(layerDefs, `,`))

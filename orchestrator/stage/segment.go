@@ -11,6 +11,7 @@ const (
 	UnitPartialPresent
 	UnitScheduled // Means the job was scheduled for execution
 	UnitMerging   // A partial is being merged
+	UnitShadowed  // will not be run directly, its outputs are created by the last stage of this segment
 	UnitCompleted // End state. A store has been snapshot for this segment, and we have gone over in the per-request squasher
 	UnitNoOp      // State given to a unit that does not need scheduling. Mostly for map segments where we know in advance we won't consume the output.
 )
@@ -34,6 +35,8 @@ func (s UnitState) String() string {
 		return "Merging"
 	case UnitCompleted:
 		return "Completed"
+	case UnitShadowed:
+		return "Shadowed"
 	case UnitNoOp:
 		return "NoOp"
 	default:

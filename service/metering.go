@@ -4,13 +4,12 @@ import (
 	"context"
 	"time"
 
-	"go.uber.org/zap"
-
 	"github.com/streamingfast/dmetering"
+	"github.com/streamingfast/substreams/reqctx"
 	"google.golang.org/protobuf/proto"
 )
 
-func sendMetering(ctx context.Context, meter dmetering.Meter, userID, apiKeyID, ip, userMeta, endpoint string, resp proto.Message, logger *zap.Logger) {
+func sendMetering(ctx context.Context, meter dmetering.Meter, userID, apiKeyID, ip, userMeta, endpoint string, resp proto.Message) {
 	bytesRead := meter.BytesReadDelta()
 	bytesWritten := meter.BytesWrittenDelta()
 	egressBytes := proto.Size(resp)
@@ -35,7 +34,7 @@ func sendMetering(ctx context.Context, meter dmetering.Meter, userID, apiKeyID, 
 		Timestamp: time.Now(),
 	}
 
-	emitter := ctx.Value("event_emitter").(dmetering.EventEmitter)
+	emitter := reqctx.Emitter(ctx)
 	if emitter == nil {
 		dmetering.Emit(context.WithoutCancel(ctx), event)
 	} else {

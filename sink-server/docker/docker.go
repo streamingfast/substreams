@@ -95,7 +95,7 @@ func (e *DockerEngine) CheckVersion() error {
 		return nil
 	}
 
-	return fmt.Errorf("Cannot determine docker compose version %q. Upgrade your Docker engine here: https://docs.docker.com/engine/install/", ver)
+	return fmt.Errorf("cannot determine docker compose version %q. Upgrade your Docker engine here: https://docs.docker.com/engine/install/", ver)
 }
 
 func (e *DockerEngine) writeDeploymentInfo(deploymentID string, usedPorts []uint32, runMeFirst []string, svcInfo map[string]string, pkg *pbsubstreams.Package) error {
@@ -144,7 +144,7 @@ func (e *DockerEngine) Create(ctx context.Context, deploymentID string, pkg *pbs
 		return nil, fmt.Errorf("this substreams-sink engine only supports a single active deployment. Stop any active sink before launching another one or use `sink-update`")
 	}
 
-	manifest, usedPorts, serviceInfo, runMeFirst, err := e.createManifest(ctx, deploymentID, e.token, pkg)
+	manifest, usedPorts, serviceInfo, runMeFirst, err := e.createManifest(ctx, deploymentID, pkg)
 	if err != nil {
 		return nil, fmt.Errorf("creating manifest from package: %w", err)
 	}
@@ -179,7 +179,7 @@ func (e *DockerEngine) Update(ctx context.Context, deploymentID string, pkg *pbs
 		}
 	}
 
-	manifest, usedPorts, serviceInfo, runMeFirst, err := e.createManifest(ctx, deploymentID, e.token, pkg)
+	manifest, usedPorts, serviceInfo, runMeFirst, err := e.createManifest(ctx, deploymentID, pkg)
 	if err != nil {
 		return fmt.Errorf("creating manifest from package: %w", err)
 	}
@@ -219,8 +219,6 @@ func (e *DockerEngine) otherDeploymentIsActive(ctx context.Context, deploymentID
 	}
 	return false
 }
-
-var reasonInternalError = "internal error"
 
 func (e *DockerEngine) Info(ctx context.Context, deploymentID string, zlog *zap.Logger) (*pbsinksvc.InfoResponse, error) {
 	cmd := exec.Command("docker", "compose", "ps", "--format", "json")
@@ -414,8 +412,7 @@ func (e *DockerEngine) Resume(ctx context.Context, deploymentID string, _ pbsink
 		}
 	}
 
-	var cmd *exec.Cmd
-	cmd = exec.Command("docker", "compose", "up", "-d", "--wait")
+	cmd := exec.Command("docker", "compose", "up", "-d", "--wait")
 	cmd.Dir = filepath.Join(e.dir, deploymentID)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -522,9 +519,9 @@ func (e *DockerEngine) Shutdown(ctx context.Context, _ error, zlog *zap.Logger) 
 	return err
 }
 
-func (e *DockerEngine) createManifest(ctx context.Context, deploymentID string, token string, pkg *pbsubstreams.Package) (content []byte, usedPorts []uint32, servicesDesc map[string]string, runMeFirst []string, err error) {
+func (e *DockerEngine) createManifest(ctx context.Context, deploymentID string, pkg *pbsubstreams.Package) (content []byte, usedPorts []uint32, servicesDesc map[string]string, runMeFirst []string, err error) {
 	if pkg.SinkConfig.TypeUrl != "sf.substreams.sink.sql.v1.Service" {
-		return nil, nil, nil, nil, fmt.Errorf("invalid sinkconfig type: %q. Only sf.substreams.sink.sql.v1.Service is supported for now.", pkg.SinkConfig.TypeUrl)
+		return nil, nil, nil, nil, fmt.Errorf("invalid sinkconfig type: %q, only sf.substreams.sink.sql.v1.Service is supported for now", pkg.SinkConfig.TypeUrl)
 	}
 	sinkConfig := &pbsql.Service{}
 	if err := pkg.SinkConfig.UnmarshalTo(sinkConfig); err != nil {
@@ -539,7 +536,7 @@ func (e *DockerEngine) createManifest(ctx context.Context, deploymentID string, 
 
 	switch sinkConfig.Engine {
 	case pbsql.Service_clickhouse:
-		db, dbMotd, err := e.newClickhouse(deploymentID, pkg)
+		db, dbMotd, err := e.newClickhouse(deploymentID)
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("creating clickhouse deployment: %w", err)
 		}
@@ -550,7 +547,7 @@ func (e *DockerEngine) createManifest(ctx context.Context, deploymentID string, 
 		isClickhouse = true
 
 	case pbsql.Service_postgres, pbsql.Service_unset:
-		pg, pgMotd, err := e.newPostgres(deploymentID, pkg)
+		pg, pgMotd, err := e.newPostgres(deploymentID)
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("creating postgres deployment: %w", err)
 		}
@@ -602,9 +599,7 @@ func (e *DockerEngine) createManifest(ctx context.Context, deploymentID string, 
 
 		if dbt != nil {
 			servicesDesc[dbt.Name] = motd
-			if dbt != nil {
-				services = append(services, *dbt)
-			}
+			services = append(services, *dbt)
 		} else {
 			servicesDesc["dbt"] = motd
 		}

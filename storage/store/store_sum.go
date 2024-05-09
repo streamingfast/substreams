@@ -9,7 +9,7 @@ import (
 )
 
 func (b *baseStore) SumBigInt(ord uint64, key string, value *big.Int) {
-	b.pendingOps.Add(&pbssinternal.Operation{
+	b.kvOps.Add(&pbssinternal.Operation{
 		Type:  pbssinternal.Operation_SUM_BIG_INT,
 		Ord:   ord,
 		Key:   key,
@@ -34,7 +34,7 @@ func (b *baseStore) sumBigInt(ord uint64, key string, value *big.Int) {
 }
 
 func (b *baseStore) SumInt64(ord uint64, key string, value int64) {
-	b.pendingOps.Add(&pbssinternal.Operation{
+	b.kvOps.Add(&pbssinternal.Operation{
 		Type:  pbssinternal.Operation_SUM_INT64,
 		Ord:   ord,
 		Key:   key,
@@ -59,7 +59,7 @@ func (b *baseStore) sumInt64(ord uint64, key string, value int64) {
 }
 
 func (b *baseStore) SumFloat64(ord uint64, key string, value float64) {
-	b.pendingOps.Add(&pbssinternal.Operation{
+	b.kvOps.Add(&pbssinternal.Operation{
 		Type:  pbssinternal.Operation_SUM_FLOAT64,
 		Ord:   ord,
 		Key:   key,
@@ -84,7 +84,7 @@ func (b *baseStore) sumFloat64(ord uint64, key string, value float64) {
 }
 
 func (b *baseStore) SumBigDecimal(ord uint64, key string, value decimal.Decimal) {
-	b.pendingOps.Add(&pbssinternal.Operation{
+	b.kvOps.Add(&pbssinternal.Operation{
 		Type:  pbssinternal.Operation_SUM_BIG_DECIMAL,
 		Ord:   ord,
 		Key:   key,

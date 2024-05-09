@@ -14,8 +14,8 @@ import (
 type baseStore struct {
 	*Config
 
-	kv         map[string][]byte        // kv is the state, and assumes all deltas were already applied to it.
-	pendingOps *pbssinternal.Operations // operations to the curent block called from the WASM module
+	kv    map[string][]byte        // kv is the state, and assumes all deltas were already applied to it.
+	kvOps *pbssinternal.Operations // operations to the curent block called from the WASM module
 	// deltas are always deltas for the given block. they are produced when store is flushed
 	// 	and used to read back in the store at different ordinals
 	deltas         []*pbsubstreams.StoreDelta
@@ -48,13 +48,13 @@ func (b *baseStore) Reset() {
 	if tracer.Enabled() {
 		b.logger.Debug("flushing store", zap.Int("delta_count", len(b.deltas)), zap.Int("entry_count", len(b.kv)), zap.Uint64("total_size_bytes", b.totalSizeBytes))
 	}
-	b.pendingOps = &pbssinternal.Operations{}
+	b.kvOps = &pbssinternal.Operations{}
 	b.deltas = nil
 	b.lastOrdinal = 0
 }
 
 func (b *baseStore) ReadOps() []byte {
-	data, err := proto.Marshal(b.pendingOps)
+	data, err := proto.Marshal(b.kvOps)
 	if err != nil {
 		panic(err)
 	}
@@ -74,13 +74,13 @@ func (b *baseStore) ApplyOps(in []byte) error {
 	if err := proto.Unmarshal(in, ops); err != nil {
 		return err
 	}
-	b.pendingOps = ops
+	b.kvOps = ops
 	return b.Flush()
 }
 
 func (b *baseStore) Flush() error {
-	b.pendingOps.Sort()
-	for _, op := range b.pendingOps.Operations {
+	b.kvOps.Sort()
+	for _, op := range b.kvOps.Operations {
 		switch op.Type {
 		case pbssinternal.Operation_SET:
 			b.set(op.Ord, op.Key, op.Value)

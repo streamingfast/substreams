@@ -50,42 +50,34 @@ func (p *RequestPlan) RequiresParallelProcessing() bool {
 	return p.WriteExecOut != nil || p.BuildStores != nil
 }
 
-func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphInitBlock, resolvedStartBlock, linearHandoffBlock, exclusiveEndBlock uint64, scheduleStores bool) (*RequestPlan, error) {
-	if exclusiveEndBlock != 0 && linearHandoffBlock > exclusiveEndBlock {
-		return nil, fmt.Errorf("end block %d cannot be prior to the linear handoff block %d", exclusiveEndBlock, linearHandoffBlock)
-	}
-	if resolvedStartBlock < graphInitBlock {
-		return nil, fmt.Errorf("start block cannot be prior to the lowest init block in the requested module graph (%d)", graphInitBlock)
+func BuildTier1RequestPlan(productionMode bool, segmentInterval, lowestInitialBlock, resolvedStartBlock, linearHandoffBlock, exclusiveEndBlock uint64, scheduleStores bool) (*RequestPlan, error) {
+	if resolvedStartBlock < lowestInitialBlock {
+		return nil, fmt.Errorf("start block cannot be prior to the lowest init block in the requested module graph (%d)", lowestInitialBlock)
 	}
 
-	segmenter := block.NewSegmenter(segmentInterval, graphInitBlock, exclusiveEndBlock)
+	segmenter := block.NewSegmenter(segmentInterval, lowestInitialBlock, exclusiveEndBlock)
 	plan := &RequestPlan{
 		segmentInterval: segmentInterval,
 	}
-	if linearHandoffBlock != exclusiveEndBlock ||
+
+	if linearHandoffBlock < exclusiveEndBlock ||
+		exclusiveEndBlock == 0 ||
 		linearHandoffBlock == 0 { // ex: unbound dev mode
 		plan.LinearPipeline = block.NewRange(linearHandoffBlock, exclusiveEndBlock)
 	}
-	if resolvedStartBlock == linearHandoffBlock && graphInitBlock == resolvedStartBlock {
+
+	if resolvedStartBlock == linearHandoffBlock && lowestInitialBlock == resolvedStartBlock {
 		return plan, nil
 	}
+
 	if productionMode {
-		storesStopOnBound := plan.LinearPipeline == nil
-		endStoreBound := linearHandoffBlock
-		if storesStopOnBound {
-			segmentIdx := segmenter.IndexForEndBlock(linearHandoffBlock)
-			endStoreBoundRange := segmenter.Range(segmentIdx)
-			if endStoreBoundRange == nil {
-				return nil, fmt.Errorf("store bound range: invalid start block %d for segment interval %d", linearHandoffBlock, segmentInterval)
-			}
-			endStoreBound = endStoreBoundRange.ExclusiveEndBlock
-		}
-		if scheduleStores {
-			plan.BuildStores = block.NewRange(graphInitBlock, endStoreBound)
+		storesEnd := linearHandoffBlock
+		if scheduleStores && storesEnd > lowestInitialBlock {
+			plan.BuildStores = block.NewRange(lowestInitialBlock, storesEnd)
 		}
 
 		if resolvedStartBlock <= linearHandoffBlock {
-			startExecOutAtBlock := max(resolvedStartBlock, graphInitBlock)
+			startExecOutAtBlock := max(resolvedStartBlock, lowestInitialBlock)
 			startExecOutAtSegment := segmenter.IndexForStartBlock(startExecOutAtBlock)
 			writeExecOutStartBlockRange := segmenter.Range(startExecOutAtSegment)
 			if writeExecOutStartBlockRange == nil {
@@ -93,11 +85,15 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval uint64, graphIni
 			}
 			writeExecOutStartBlock := writeExecOutStartBlockRange.StartBlock
 			plan.WriteExecOut = block.NewRange(writeExecOutStartBlock, linearHandoffBlock)
-			plan.ReadExecOut = block.NewRange(resolvedStartBlock, linearHandoffBlock)
+			readEndBlock := linearHandoffBlock
+			if exclusiveEndBlock != 0 && exclusiveEndBlock < linearHandoffBlock {
+				readEndBlock = exclusiveEndBlock
+			}
+			plan.ReadExecOut = block.NewRange(resolvedStartBlock, readEndBlock)
 		}
 	} else { /* dev mode */
-		if scheduleStores {
-			plan.BuildStores = block.NewRange(graphInitBlock, linearHandoffBlock)
+		if scheduleStores && linearHandoffBlock > lowestInitialBlock {
+			plan.BuildStores = block.NewRange(lowestInitialBlock, linearHandoffBlock)
 		}
 		plan.WriteExecOut = nil
 	}
@@ -127,6 +123,14 @@ func (p *RequestPlan) ModuleSegmenter(modInitBlock uint64) *block.Segmenter {
 
 func (p *RequestPlan) WriteOutSegmenter() *block.Segmenter {
 	return block.NewSegmenter(p.segmentInterval, p.WriteExecOut.StartBlock, p.WriteExecOut.ExclusiveEndBlock)
+}
+
+func (p *RequestPlan) ReadOutSegmenter(outputModuleInitialBlock uint64) *block.Segmenter {
+	startBlock := p.WriteExecOut.StartBlock
+	if outputModuleInitialBlock > startBlock {
+		startBlock = outputModuleInitialBlock
+	}
+	return block.NewSegmenter(p.segmentInterval, startBlock, p.WriteExecOut.ExclusiveEndBlock)
 }
 
 func (p *RequestPlan) String() string {

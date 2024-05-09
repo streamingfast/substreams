@@ -20,6 +20,25 @@ binaries:
       my.types.v1: "pb::my_types_v1"
 
 modules:
+  - name: test_index
+    kind: blockIndex
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+    output:
+      type: proto:sf.substreams.index.v1.Keys
+
+  - name: assert_test_index
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+    blockFilter:
+      module: test_index
+      query: even  
+    output:
+      type: proto:sf.substreams.v1.test.MapResult
+
   - name: test_map
     kind: map
     initialBlock: 10
@@ -823,6 +842,14 @@ modules:
     inputs:
       - map: assert_test_store_delete_prefix
 
+  - name : assert_all_test_index 
+    kind: store
+    initialBlock: 10
+    updatePolicy: set
+    valueType: int64
+    inputs:
+      - map: assert_test_index
+
   - name: assert_all_test
     kind: map
     initialBlock: 1
@@ -833,6 +860,7 @@ modules:
       - store: assert_all_test_float64
       - store: assert_all_test_bigint
       - store: assert_all_test_bigdecimal
+      - store: assert_all_test_index
     output:
       type: proto:sf.substreams.v1.test.Boolean
 

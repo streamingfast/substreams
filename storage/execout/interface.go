@@ -21,6 +21,7 @@ type ExecutionOutputSetter interface {
 type ExecutionOutput interface {
 	ExecutionOutputGetter
 	ExecutionOutputSetter
+	DeleteCache(name string)
 }
 
 var ErrNotFound = errors.New("inputs module value not found")

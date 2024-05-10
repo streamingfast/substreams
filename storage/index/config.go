@@ -36,7 +36,7 @@ func (c *Config) NewFile(targetRange *block.Range) *File {
 	return &File{
 		moduleInitialBlock: c.moduleInitialBlock,
 		store:              c.objStore,
-		moduleName:         c.name,
+		ModuleName:         c.name,
 		logger:             c.logger,
 		blockRange:         targetRange,
 	}

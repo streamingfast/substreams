@@ -77,3 +77,7 @@ func (i *Buffer) SetFileOutput(moduleName string, value []byte) (err error) {
 
 	return nil
 }
+
+func (i *Buffer) DeleteCache(moduleName string) {
+	delete(i.values, moduleName)
+}

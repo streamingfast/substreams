@@ -50,6 +50,10 @@ type ExecOutputTesting struct {
 	clock          *pbsubstreams.Clock
 }
 
+func (i *ExecOutputTesting) DeleteCache(name string) {
+	delete(i.Values, name)
+}
+
 func NewExecOutputTesting(t *testing.T, block *pbbstream.Block, clock *pbsubstreams.Clock) *ExecOutputTesting {
 	blkBytes := block.Payload.Value
 

@@ -12,6 +12,7 @@ import (
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/substreams/metrics"
+	pbindex "github.com/streamingfast/substreams/pb/sf/substreams/index/v1"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -19,6 +20,7 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -259,6 +261,26 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 		return fmt.Errorf("execute modules: %w", err)
 	}
 
+	for _, indexWriter := range p.execOutputCache.IndexWriters {
+		indexOutput, _, err := execOutput.Get(indexWriter.IndexFile.ModuleName)
+		if err != nil {
+			if errors.Is(err, execout.ErrNotFound) {
+				continue
+			}
+			return fmt.Errorf("getting index module output: %w", err)
+		}
+
+		extractedKeys := &pbindex.Keys{}
+		err = proto.Unmarshal(indexOutput, extractedKeys)
+		if err != nil {
+			return fmt.Errorf("unmarshalling index keys from %s exec outputs", indexWriter.IndexFile.ModuleName)
+		}
+
+		p.execOutputCache.IndexWriters[indexWriter.IndexFile.ModuleName].Write(extractedKeys, clock.Number)
+
+		execOutput.DeleteCache(indexWriter.IndexFile.ModuleName)
+	}
+
 	if p.gate.shouldSendOutputs() {
 		logger.Debug("will return module outputs")
 		if p.pendingUndoMessage != nil {
@@ -290,6 +312,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 	if err := p.BuildModuleExecutors(ctx); err != nil {
 		return fmt.Errorf("building wasm module tree: %w", err)
 	}
+
 	for _, stage := range p.ModuleExecutors {
 		//t0 := time.Now()
 		if len(stage) < 2 {
@@ -365,7 +388,7 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 
 func (p *Pipeline) applyExecutionResult(ctx context.Context, executor exec.ModuleExecutor, res resultObj, execOutput execout.ExecutionOutput) (err error) {
 	executorName := executor.Name()
-
+	executor.BlockIndex()
 	moduleOutput, outputBytes, runError := res.output, res.bytes, res.err
 	if runError != nil {
 		return fmt.Errorf("execute module: %w", runError)

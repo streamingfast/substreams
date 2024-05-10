@@ -44,7 +44,7 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, err error) error {
 
 	// TODO(abourget): check, in the tier1, there might not be a `lastFinalClock`
 	// if we just didn't run the `streamFactoryFunc`
-	if err := p.execOutputCache.EndOfStream(p.lastFinalClock); err != nil {
+	if err := p.execOutputCache.EndOfStream(); err != nil {
 		return fmt.Errorf("end of stream: %w", err)
 	}
 

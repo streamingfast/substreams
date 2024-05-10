@@ -12,27 +12,28 @@ import (
 
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/manifest"
+	pbindex "github.com/streamingfast/substreams/pb/sf/substreams/index/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 type Writer struct {
-	indexFile *File
+	IndexFile *File
 }
 
 func NewWriter(indexFile *File) *Writer {
 	return &Writer{
-		indexFile: indexFile,
+		IndexFile: indexFile,
 	}
 }
 
-func (w *Writer) Write(indexes map[string]*roaring64.Bitmap) {
-	w.indexFile.Set(indexes)
+func (w *Writer) Write(outputKeys *pbindex.Keys, blockNum uint64) {
+	w.IndexFile.Set(outputKeys, blockNum)
 }
 
 func (w *Writer) Close(ctx context.Context) error {
-	err := w.indexFile.Save(ctx)
+	err := w.IndexFile.Save(ctx)
 	if err != nil {
-		return fmt.Errorf("saving index file %s: %w", w.indexFile.moduleName, err)
+		return fmt.Errorf("saving index file %s: %w", w.IndexFile.ModuleName, err)
 	}
 
 	return nil

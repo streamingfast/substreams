@@ -8,6 +8,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
+	pbindex "github.com/streamingfast/substreams/pb/sf/substreams/index/v1"
 	pbindexes "github.com/streamingfast/substreams/storage/index/pb"
 
 	"github.com/RoaringBitmap/roaring/roaring64"
@@ -20,7 +21,7 @@ import (
 type File struct {
 	blockRange         *block.Range
 	store              dstore.Store
-	moduleName         string
+	ModuleName         string
 	moduleInitialBlock uint64
 	Indices            map[string]*roaring64.Bitmap
 	logger             *zap.Logger
@@ -34,13 +35,23 @@ func NewFile(baseStore dstore.Store, moduleHash string, moduleName string, logge
 	return &File{
 		blockRange: blockRange,
 		store:      subStore,
-		moduleName: moduleName,
+		ModuleName: moduleName,
 		logger:     logger,
+		Indices:    make(map[string]*roaring64.Bitmap),
 	}, nil
 }
 
-func (f *File) Set(indices map[string]*roaring64.Bitmap) {
-	f.Indices = indices
+func (f *File) Set(outputKeys *pbindex.Keys, blockNum uint64) {
+	if f.Indices == nil {
+		f.Indices = make(map[string]*roaring64.Bitmap)
+	}
+	for _, key := range outputKeys.Keys {
+		if _, ok := f.Indices[key]; !ok {
+			f.Indices[key] = roaring64.New()
+		}
+
+		f.Indices[key].Add(blockNum)
+	}
 }
 
 func ConvertIndexesMapToBytes(indices map[string]*roaring64.Bitmap) (map[string][]byte, error) {

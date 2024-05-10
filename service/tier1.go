@@ -365,6 +365,10 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		return fmt.Errorf("build request details: %w", err)
 	}
 
+	if requestDetails.ResolvedStartBlockNum == request.StopBlockNum {
+		return bsstream.NewErrInvalidArg("start block and stop block are the same")
+	}
+
 	requestDetails.MaxParallelJobs = s.runtimeConfig.DefaultParallelSubrequests
 	cacheTag := s.runtimeConfig.DefaultCacheTag
 	if auth := dauth.FromContext(ctx); auth != nil {

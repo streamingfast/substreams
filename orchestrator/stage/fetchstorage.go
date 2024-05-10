@@ -34,11 +34,14 @@ func (s *Stages) FetchStoresState(
 		conf := execoutConfigs.ConfigMap[mapperName]
 
 		if upToBlock != 0 {
-			files, err := conf.ListSnapshotFiles(ctx, bstream.NewInclusiveRange(segmenter.InitialBlock(), upToBlock))
-			if err != nil {
-				return fmt.Errorf("fetching mapper storage state: %w", err)
+			from := segmenter.InitialBlock()
+			if upToBlock != from {
+				files, err := conf.ListSnapshotFiles(ctx, bstream.NewInclusiveRange(from, upToBlock))
+				if err != nil {
+					return fmt.Errorf("fetching mapper storage state: %w", err)
+				}
+				mapperFiles = files
 			}
-			mapperFiles = files
 		}
 	}
 

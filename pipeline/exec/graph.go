@@ -233,6 +233,9 @@ func computeStages(mods []*pbsubstreams.Module, initBlocks map[string]uint64) (s
 				var depModName string
 				switch input := dep.Input.(type) {
 				case *pbsubstreams.Module_Input_Params_:
+					if len(mod.Inputs) == 1 {
+						validInputsAtInitialBlock = true // special case where a module has only params as input, to extract the clock
+					}
 					continue
 				case *pbsubstreams.Module_Input_Source_:
 					validInputsAtInitialBlock = true

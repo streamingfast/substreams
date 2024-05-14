@@ -106,7 +106,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		return conn.Send(msg)
 	}
 	startMsg := &pbconvo.UserInput_Start{
-		TopicId: "ethereum_dynamic_data_source_v1",
+		TopicId: topicType,
 	}
 	if lastState != "" {
 		// ALSO store in that state file the `conversation` ID and version (ethereum_dynamic_data_source_v1)

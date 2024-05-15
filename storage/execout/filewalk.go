@@ -18,21 +18,39 @@ type FileWalker struct {
 	buffer           map[int]*File
 	bufferLock       sync.Mutex
 	previousFileSize atomic.Uint64
+
+	currentlyPreloadingSegments map[int]chan bool
+	currentlyPreloadingLock     sync.RWMutex
 }
 
 func (c *Config) NewFileWalker(segmenter *block.Segmenter) *FileWalker {
 	return &FileWalker{
-		config:    c,
-		IsLocal:   c.objStore.BaseURL().Scheme == "file",
-		segmenter: segmenter,
-		segment:   segmenter.FirstIndex(),
-		buffer:    make(map[int]*File),
+		config:                      c,
+		IsLocal:                     c.objStore.BaseURL().Scheme == "file",
+		segmenter:                   segmenter,
+		segment:                     segmenter.FirstIndex(),
+		buffer:                      make(map[int]*File),
+		currentlyPreloadingSegments: make(map[int]chan bool),
 	}
 }
 
 // File returns the current segment's file.
 // If the current segment is out of ranges, returns nil.
 func (fw *FileWalker) File() *File {
+	fw.currentlyPreloadingLock.RLock()
+	wait, ok := fw.currentlyPreloadingSegments[fw.segment]
+	fw.currentlyPreloadingLock.RUnlock()
+
+	if ok {
+		// wait for the file to be loaded. this channel is closed when the file is loaded
+		<-wait
+
+		// remove the segment from the map
+		fw.currentlyPreloadingLock.Lock()
+		delete(fw.currentlyPreloadingSegments, fw.segment)
+		fw.currentlyPreloadingLock.Unlock()
+	}
+
 	rng := fw.segmenter.Range(fw.segment)
 	if rng == nil {
 		return nil
@@ -40,8 +58,10 @@ func (fw *FileWalker) File() *File {
 
 	fw.bufferLock.Lock()
 	defer fw.bufferLock.Unlock()
+
 	if file, found := fw.buffer[fw.segment]; found {
 		delete(fw.buffer, fw.segment)
+		file.preloaded = true
 		return file
 	}
 
@@ -54,12 +74,12 @@ func (fw *FileWalker) PreloadNext(ctx context.Context) {
 	fw.bufferLock.Lock()
 	defer fw.bufferLock.Unlock()
 	fw.preload(ctx, fw.segment+1)
+
 	// we can preload two next files if they are small enough.
 	// More than 2 shows no performance improvement and gobbles up memory.
 	if fw.segment != fw.segmenter.FirstIndex() && fw.previousFileSize.Load() < 104_857_600 {
 		fw.preload(ctx, fw.segment+2)
 	}
-
 }
 
 func (fw *FileWalker) preload(ctx context.Context, seg int) {
@@ -71,19 +91,53 @@ func (fw *FileWalker) preload(ctx context.Context, seg int) {
 		return
 	}
 
+	fw.currentlyPreloadingLock.Lock()
+	fw.currentlyPreloadingSegments[seg] = make(chan bool)
+	fw.currentlyPreloadingLock.Unlock()
+
 	f := fw.config.NewFile(rng)
-	go func() {
-		if err := f.Load(ctx); err == nil {
+	fw.buffer[seg] = f
+
+	go func(file *File) {
+		defer func() {
+			fw.currentlyPreloadingLock.Lock()
+			if _, found := fw.currentlyPreloadingSegments[seg]; found {
+				close(fw.currentlyPreloadingSegments[seg])
+			}
+			fw.currentlyPreloadingLock.Unlock()
+		}()
+
+		if err := file.Load(ctx); err == nil {
 			// purposefully ignoring preload errors
 			fw.previousFileSize.Store(f.loadedSize)
 		}
-	}()
-	fw.buffer[seg] = f
+	}(f)
 }
 
 // Move to the next
 func (fw *FileWalker) Next() {
 	fw.segment++
+
+	fw.bufferLock.Lock()
+	keys := make([]int, 0, len(fw.buffer))
+	for k := range fw.buffer {
+		keys = append(keys, k)
+	}
+	fw.bufferLock.Unlock()
+
+	// delete older segments from the buffer
+	for _, k := range keys {
+		if k < fw.segment {
+			fw.bufferLock.Lock()
+			fw.currentlyPreloadingLock.Lock()
+
+			delete(fw.buffer, k)
+			delete(fw.currentlyPreloadingSegments, k)
+
+			fw.currentlyPreloadingLock.Unlock()
+			fw.bufferLock.Unlock()
+		}
+	}
 }
 
 func (fw *FileWalker) IsDone() bool {

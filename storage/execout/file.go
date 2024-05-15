@@ -32,6 +32,7 @@ type File struct {
 	store      dstore.Store
 	logger     *zap.Logger
 	loaded     bool
+	preloaded  bool //for testing purposes
 	loadedSize uint64
 }
 

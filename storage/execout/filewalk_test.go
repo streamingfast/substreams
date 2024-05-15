@@ -66,29 +66,41 @@ func NewTestFileWalker() *FileWalker {
 	}
 }
 
-func TestFileWalker_PreloadNext(t *testing.T) {
+func TestFileWalker_Preloading(t *testing.T) {
 	walker := NewTestFileWalker()
+
+	// first preload will only load first segment
 	walker.PreloadNext(context.Background())
 	assert.Len(t, walker.buffer, 1)
 
 	walker.Next()
 	assert.Len(t, walker.buffer, 1)
 
+	// since we are no longer on the first segment, next preload will load the next two segments
 	walker.PreloadNext(context.Background())
 	assert.Len(t, walker.buffer, 3)
+	assert.Len(t, walker.currentlyPreloadingSegments, 3)
 
+	// skip two
 	walker.Next()
 	walker.Next()
 
+	// two files should have been deleted from the buffer
 	assert.Len(t, walker.buffer, 1)
+	assert.Len(t, walker.currentlyPreloadingSegments, 1)
 
+	// check that resulting file is preloaded
 	f := walker.File()
 	assert.True(t, f.preloaded)
 
+	// currently preloading segment should have been removed during the reading of the file
+	assert.Len(t, walker.currentlyPreloadingSegments, 0)
+
+	// skip and check that nothing is preloaded anymore
 	walker.Next()
 	assert.Len(t, walker.buffer, 0)
 
+	// check that resulting file is not preloaded
 	f = walker.File()
 	assert.False(t, f.preloaded)
-	walker.Next()
 }

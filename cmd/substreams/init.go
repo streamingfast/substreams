@@ -148,7 +148,6 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		}
 
 		switch msg := resp.Entry.(type) {
-		case *pbconvo.SystemOutput_Ack:
 		case *pbconvo.SystemOutput_Message_:
 
 			msgString := msg.Message.Markdown
@@ -258,8 +257,8 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 
 			if err := sendFunc(&pbconvo.UserInput{
 				FromActionId: resp.ActionId,
-				Entry: &pbconvo.UserInput_TextInput{
-					TextInput: returnValue,
+				Entry: &pbconvo.UserInput_TextInput_{
+					TextInput: &pbconvo.UserInput_TextInput{Value: returnValue},
 				},
 			}); err != nil {
 				return fmt.Errorf("error sending message: %w", err)

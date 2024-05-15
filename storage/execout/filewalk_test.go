@@ -3,7 +3,6 @@ package execout
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"testing"
 
@@ -92,6 +91,4 @@ func TestFileWalker_PreloadNext(t *testing.T) {
 	f = walker.File()
 	assert.False(t, f.preloaded)
 	walker.Next()
-
-	fmt.Println(walker)
 }

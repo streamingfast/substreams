@@ -179,12 +179,8 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			optionsMap := make(map[string]string)
 			for i := 0; i < len(input.Labels); i++ {
 				entry := huh.Option[string]{
-					Key: input.Labels[i],
-				}
-				if len(input.Values)-1 > i {
-					entry.Value = input.Values[i]
-				} else {
-					entry.Value = input.Labels[i]
+					Key:   input.Labels[i],
+					Value: input.Values[i],
 				}
 				options = append(options, entry)
 				optionsMap[entry.Value] = entry.Key

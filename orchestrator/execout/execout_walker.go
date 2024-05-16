@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -21,6 +22,13 @@ import (
 	"github.com/streamingfast/substreams/storage/execout"
 	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
 )
+
+var disablePreloadExecFiles bool
+
+func init() {
+	e := os.Getenv("SUBSTREAMS_DISABLE_PRELOAD_EXEC_FILES")
+	disablePreloadExecFiles = e == "" || e == "0" || e == "false"
+}
 
 type Walker struct {
 	ctx context.Context
@@ -64,7 +72,9 @@ func (r *Walker) IsWorking() bool {
 
 func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
 	file := r.fileWalker.File()
-	r.fileWalker.PreloadNext(r.ctx)
+	if !disablePreloadExecFiles {
+		r.fileWalker.PreloadNext(r.ctx)
+	}
 
 	return func() loop.Msg {
 		time.Sleep(waitBefore)

@@ -3,14 +3,11 @@ package execout
 import (
 	"fmt"
 
-	"github.com/streamingfast/substreams/block"
-
-	"go.uber.org/zap"
-
 	"github.com/streamingfast/dstore"
-
+	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"go.uber.org/zap"
 )
 
 type Configs struct {
@@ -48,5 +45,5 @@ func (c *Configs) NewFile(moduleName string, targetRange *block.Range) *File {
 }
 
 func (c *Configs) NewFileWalker(moduleName string, segmenter *block.Segmenter) *FileWalker {
-	return c.ConfigMap[moduleName].NewFileWalker(segmenter)
+	return NewFileWalker(c.ConfigMap[moduleName], segmenter, c.logger)
 }

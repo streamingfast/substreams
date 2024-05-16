@@ -35,7 +35,8 @@ modules:
       - source: sf.substreams.v1.test.Block
     blockFilter:
       module: test_index
-      query: even  
+      query:
+        string: even
     output:
       type: proto:sf.substreams.v1.test.MapResult
 

@@ -3,6 +3,8 @@ package cache
 import (
 	"context"
 	"fmt"
+	"runtime"
+	"time"
 
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/streamingfast/bstream"
@@ -96,6 +98,9 @@ func (e *Engine) HandleStalled(clock *pbsubstreams.Clock) error {
 func (e *Engine) EndOfStream() error {
 	var errs error
 
+	fmt.Println("MEMORY LOG BEFORE CLOSING")
+	logMemoryUsage(e.logger)
+
 	for _, writer := range e.execOutputWriters {
 		if err := writer.Close(context.Background()); err != nil {
 			errs = multierror.Append(errs, err)
@@ -110,5 +115,22 @@ func (e *Engine) EndOfStream() error {
 		}
 	}
 
+	time.Sleep(500 * time.Millisecond)
+	fmt.Println("MEMORY LOG AFTER CLOSING")
+	logMemoryUsage(e.logger)
+
 	return errs
+}
+
+const BytesPerMegabyte = 1024 * 1024
+
+func logMemoryUsage(logger *zap.Logger) {
+	var memStats runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&memStats)
+
+	logger.Info("file store memory allocation stats",
+		zap.Uint64("Heap ALLOC", memStats.HeapAlloc/BytesPerMegabyte),
+		zap.Uint64("Heap Objects", memStats.HeapObjects),
+	)
 }

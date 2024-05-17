@@ -46,6 +46,12 @@ func TestParser(t *testing.T) {
 			nil,
 		},
 		{
+			"single_key_term_with_dot_in_it",
+			`some.action`,
+			`some.action`,
+			nil,
+		},
+		{
 			"single_key_term_multi_spaces",
 			"  \t transfer",
 			`transfer`,

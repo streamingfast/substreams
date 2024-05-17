@@ -21,7 +21,7 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 )
 
-func loadProtobufs(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.FileDescriptor, error) {
+func loadLocalProtobufs(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.FileDescriptor, error) {
 
 	seen := map[string]bool{}
 	for _, file := range pkg.ProtoFiles {
@@ -106,7 +106,7 @@ func loadDescriptorSets(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.Fil
 
 		authToken := os.Getenv("BUFBUILD_AUTH_TOKEN")
 		if authToken == "" {
-			return nil, fmt.Errorf("missing BUFBUILD_AUTH_TOKEN")
+			return nil, fmt.Errorf("missing BUFBUILD_AUTH_TOKEN; go into your account at https://buf.build/settings/user to create an API key")
 		}
 
 		client := reflectv1beta1connect.NewFileDescriptorSetServiceClient(

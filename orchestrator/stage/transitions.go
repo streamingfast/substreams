@@ -1,5 +1,7 @@
 package stage
 
+import "fmt"
+
 /*
 Transitions:
 
@@ -107,6 +109,21 @@ func (s *Stages) MarkSegmentPending(u Unit) {
 	)
 }
 
+func (s *Stages) MarkJobSuccess(u Unit) (shadowedUnits []Unit) {
+	s.MarkSegmentPartialPresent(u)
+
+	if s.shadowable(u.Segment) {
+		for i := u.Stage - 1; i >= 0; i-- {
+			u2 := Unit{Segment: u.Segment, Stage: i}
+			if s.getState(u2) == UnitShadowed {
+				s.transition(u2, UnitPartialPresent, UnitShadowed) // we let the squasher pretend it is partial, because squashing can occur from full or from partial
+				shadowedUnits = append(shadowedUnits, u2)
+			}
+		}
+	}
+	return
+}
+
 func (s *Stages) MarkSegmentPartialPresent(u Unit) {
 	s.transition(u, UnitPartialPresent,
 		UnitScheduled, // reported by working completing its generation of a partial
@@ -124,6 +141,10 @@ func (s *Stages) markSegmentCompleted(u Unit) {
 	s.transition(u, UnitCompleted,
 		UnitPending, // from an initial storage state snapshot
 		UnitMerging, // from the Squasher's merge operations completing
+		UnitScheduled,
+		UnitShadowed,
+		UnitNoOp,
+		UnitCompleted, // in case it got completed indirectly
 	)
 }
 
@@ -136,11 +157,11 @@ func (s *Stages) transition(u Unit, to UnitState, allowedPreviousStates ...UnitS
 			return
 		}
 	}
-	invalidTransition(prev, to)
+	invalidTransition(prev, to, u)
 }
 
-func invalidTransition(prev, next UnitState) {
-	panic("invalid transition from " + prev.String() + " to " + next.String())
+func invalidTransition(prev, next UnitState, u Unit) {
+	panic(fmt.Sprintf("invalid transition from %q to %q on unit [stage: %d, segment: %d]", prev.String(), next.String(), u.Stage, u.Segment))
 }
 
 func (s *Stages) forceTransition(segment int, stage int, to UnitState) {

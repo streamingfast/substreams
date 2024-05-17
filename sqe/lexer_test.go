@@ -2,7 +2,6 @@ package sqe
 
 import (
 	"bytes"
-	"fmt"
 	"testing"
 
 	lex "github.com/alecthomas/participle/lexer"
@@ -51,7 +50,7 @@ func tokensList(t *testing.T, input string) (out []string) {
 	require.NoError(t, err)
 
 	for _, token := range tokens {
-		out = append(out, fmt.Sprintf("%s", lexer.getTokenType(token)))
+		out = append(out, lexer.getTokenType(token))
 	}
 
 	return

@@ -26,7 +26,12 @@ type Config struct {
 }
 
 func NewConfig(name string, moduleInitialBlock uint64, modKind pbsubstreams.ModuleKind, moduleHash string, baseStore dstore.Store, logger *zap.Logger) (*Config, error) {
-	subStore, err := baseStore.SubStore(fmt.Sprintf("%s/outputs", moduleHash))
+	subName := fmt.Sprintf("%s/outputs", moduleHash)
+	if modKind == pbsubstreams.ModuleKindBlockIndex {
+		subName = fmt.Sprintf("%s/index", moduleHash)
+	}
+
+	subStore, err := baseStore.SubStore(subName)
 	if err != nil {
 		return nil, fmt.Errorf("creating sub store: %w", err)
 	}
@@ -43,7 +48,7 @@ func NewConfig(name string, moduleInitialBlock uint64, modKind pbsubstreams.Modu
 
 func (c *Config) NewFile(targetRange *block.Range) *File {
 	return &File{
-		kv:         make(map[string]*pboutput.Item),
+		Kv:         make(map[string]*pboutput.Item),
 		ModuleName: c.name,
 		store:      c.objStore,
 		Range:      targetRange,
@@ -61,7 +66,16 @@ func (c *Config) ListSnapshotFiles(ctx context.Context, inRange *bstream.Range) 
 		files = nil
 
 		return c.objStore.WalkFrom(ctx, "", computeDBinFilename(inRange.StartBlock(), 0), func(filename string) (err error) {
-			fileInfo, err := parseFileName(filename)
+			var fileInfo *FileInfo
+
+			switch c.modKind {
+			case pbsubstreams.ModuleKindBlockIndex:
+				fileInfo, err = parseIndexFileName(filename)
+			case pbsubstreams.ModuleKindMap:
+				fileInfo, err = parseExecoutFileName(filename)
+			default:
+				return fmt.Errorf("wrong module kind: %v", c.modKind)
+			}
 			if err != nil {
 				c.logger.Warn("seen exec output file that we don't know how to parse", zap.String("filename", filename), zap.Error(err))
 				return nil
@@ -82,7 +96,6 @@ func (c *Config) ListSnapshotFiles(ctx context.Context, inRange *bstream.Range) 
 }
 
 func (c *Config) ReadFile(ctx context.Context, inrange *block.Range) (*File, error) {
-
 	file := c.NewFile(inrange)
 	if err := file.Load(ctx); err != nil {
 		return nil, err

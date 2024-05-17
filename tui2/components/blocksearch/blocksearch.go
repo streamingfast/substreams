@@ -1,10 +1,11 @@
 package blocksearch
 
 import (
-	"github.com/streamingfast/substreams/tui2/components/blockselect"
-	"github.com/streamingfast/substreams/tui2/components/search"
 	"strconv"
 	"strings"
+
+	"github.com/streamingfast/substreams/tui2/components/blockselect"
+	"github.com/streamingfast/substreams/tui2/components/search"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -115,12 +116,6 @@ func (s *BlockSearch) cancelModal() tea.Cmd {
 
 func (s *BlockSearch) SetMatchCount(count int) {
 	s.timesFound = count
-}
-
-func (s *BlockSearch) applyBlockSearchQuery(query string) tea.Cmd {
-	return func() tea.Msg {
-		return ApplyBlockSearchQueryMsg(query)
-	}
 }
 
 func (s *BlockSearch) CheckValidQuery() (uint64, error) {

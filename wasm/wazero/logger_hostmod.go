@@ -34,7 +34,6 @@ var LoggerFuncs = []funcs{
 				zlog.Debug(message, zap.String("module_name", call.ModuleName), zap.String("log_source", "wasm"))
 			}
 			call.AppendLog(message)
-			return
 		}),
 	},
 }

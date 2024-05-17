@@ -32,6 +32,9 @@ func NewModuleState(logger *zap.Logger, name string, segmenter *block.Segmenter,
 	}
 }
 
+func (s *StoreModuleState) Name() string {
+	return s.name
+}
 func (s *StoreModuleState) getStore(ctx context.Context, exclusiveEndBlock uint64) (*store.FullKV, error) {
 	if s.lastBlockInStore == exclusiveEndBlock && s.cachedStore != nil {
 		return s.cachedStore, nil

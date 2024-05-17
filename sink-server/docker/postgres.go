@@ -7,10 +7,9 @@ import (
 	"time"
 
 	"github.com/docker/cli/cli/compose/types"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-func (e *DockerEngine) newPostgres(deploymentID string, pkg *pbsubstreams.Package) (types.ServiceConfig, string, error) {
+func (e *DockerEngine) newPostgres(deploymentID string) (types.ServiceConfig, string, error) {
 	name := fmt.Sprintf("%s-postgres", deploymentID)
 	localPort := uint32(5432) // TODO: assign dynamically
 

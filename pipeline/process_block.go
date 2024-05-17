@@ -8,13 +8,9 @@ import (
 	"runtime/debug"
 	"sync"
 
+	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dmetering"
-
-	"github.com/streamingfast/bstream"
-	"go.uber.org/zap"
-	"google.golang.org/protobuf/types/known/timestamppb"
-
 	"github.com/streamingfast/substreams/metrics"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -22,7 +18,8 @@ import (
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
-	"github.com/streamingfast/substreams/storage/store"
+	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func (p *Pipeline) ProcessFromExecOutput(
@@ -117,7 +114,7 @@ func (p *Pipeline) processBlock(
 	switch step {
 	case bstream.StepUndo:
 		p.blockStepMap[bstream.StepUndo]++
-		if err = p.handleStepUndo(ctx, clock, cursor, reorgJunctionBlock); err != nil {
+		if err = p.handleStepUndo(clock, cursor, reorgJunctionBlock); err != nil {
 			return fmt.Errorf("step undo: %w", err)
 		}
 	case bstream.StepStalled:
@@ -180,9 +177,9 @@ func (p *Pipeline) handleStepStalled(clock *pbsubstreams.Clock) error {
 	return nil
 }
 
-func (p *Pipeline) handleStepUndo(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, reorgJunctionBlock bstream.BlockRef) error {
+func (p *Pipeline) handleStepUndo(clock *pbsubstreams.Clock, cursor *bstream.Cursor, reorgJunctionBlock bstream.BlockRef) error {
 
-	if err := p.forkHandler.handleUndo(clock, cursor); err != nil {
+	if err := p.forkHandler.handleUndo(clock); err != nil {
 		return fmt.Errorf("reverting outputs: %w", err)
 	}
 
@@ -232,7 +229,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 			if reqDetails.IsTier2Request {
 				sendError = p.returnInternalModuleProgressOutputs(clock, forceSend)
 			} else {
-				sendError = p.returnRPCModuleProgressOutputs(clock, forceSend)
+				sendError = p.returnRPCModuleProgressOutputs(forceSend)
 			}
 			if err == nil {
 				err = sendError
@@ -242,19 +239,6 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 
 	if isBlockOverStopBlock(clock.Number, reqDetails.StopBlockNum) {
 		return io.EOF
-	}
-
-	// FIXME: when handling the real-time segment, it's dangerous
-	// to save the stores, as they might have components that get
-	// reverted, and we won't go change the stores then.
-	// So we _shouldn't_ save the stores unless we're in irreversible-only
-	// mode. Basically, tier1 shouldn't save unless it's a StepNewIrreversible
-	// (we're in a historical segment)
-	// When we're in the real-time segment, we shouldn't save anything.
-	if reqDetails.IsTier2Request {
-		if err := p.stores.flushStores(ctx, p.executionStages, clock.Number); err != nil {
-			return fmt.Errorf("step new irr: stores end of stream: %w", err)
-		}
 	}
 
 	// note: if we start on a forked cursor, the undo signal will appear BEFORE we send the snapshot
@@ -300,19 +284,23 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 	p.mapModuleOutput = nil
 	p.extraMapModuleOutputs = nil
 	p.extraStoreModuleOutputs = nil
-	moduleExecutors, err := p.buildModuleExecutors(ctx)
-	if err != nil {
+	blockNum := execOutput.Clock().Number
+
+	// they may be already built, but we call this function every time to enable future dynamic changes
+	if err := p.BuildModuleExecutors(ctx); err != nil {
 		return fmt.Errorf("building wasm module tree: %w", err)
 	}
-	for _, stage := range moduleExecutors {
+	for _, stage := range p.ModuleExecutors {
 		//t0 := time.Now()
-
 		if len(stage) < 2 {
 			//fmt.Println("Linear stage", len(stage))
 			for _, executor := range stage {
+				if !executor.RunsOnBlock(blockNum) {
+					continue
+				}
 				res := p.execute(ctx, executor, execOutput)
 				if err := p.applyExecutionResult(ctx, executor, res, execOutput); err != nil {
-					return fmt.Errorf("applying executor results %q: %w", executor.Name(), res.err)
+					return fmt.Errorf("applying executor results %q on block %d: %w", executor.Name(), blockNum, res.err)
 				}
 			}
 		} else {
@@ -320,6 +308,10 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 			wg := sync.WaitGroup{}
 			//fmt.Println("Parallelized in stage", stageIdx, len(stage))
 			for i, executor := range stage {
+				if !executor.RunsOnBlock(execOutput.Clock().Number) {
+					results[i] = resultObj{skipped: true}
+					continue
+				}
 				wg.Add(1)
 				i := i
 				executor := executor
@@ -332,13 +324,16 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 			wg.Wait()
 
 			for i, result := range results {
+				if result.skipped {
+					continue
+				}
 				executor := stage[i]
 				if result.err != nil {
 					//p.returnFailureProgress(ctx, err, executor)
 					return fmt.Errorf("running executor %q: %w", executor.Name(), result.err)
 				}
 				if err := p.applyExecutionResult(ctx, executor, result, execOutput); err != nil {
-					return fmt.Errorf("applying executor results %q: %w", executor.Name(), result.err)
+					return fmt.Errorf("applying executor results %q on block %d: %w", executor.Name(), blockNum, result.err)
 				}
 			}
 		}
@@ -349,9 +344,12 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 }
 
 type resultObj struct {
-	output *pbssinternal.ModuleOutput
-	bytes  []byte
-	err    error
+	output           *pbssinternal.ModuleOutput
+	bytes            []byte
+	bytesForFiles    []byte
+	err              error
+	skipped          bool
+	skippedFromIndex bool
 }
 
 func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, execOutput execout.ExecutionOutput) resultObj {
@@ -360,43 +358,42 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 	executorName := executor.Name()
 	logger.Debug("executing", zap.Uint64("block", execOutput.Clock().Number), zap.String("module_name", executorName))
 
-	moduleOutput, outputBytes, runError := exec.RunModule(ctx, executor, execOutput)
-	return resultObj{moduleOutput, outputBytes, runError}
+	moduleOutput, outputBytes, outputBytesFiles, skippedFromIndex, runError := exec.RunModule(ctx, executor, execOutput)
+
+	return resultObj{moduleOutput, outputBytes, outputBytesFiles, runError, false, skippedFromIndex}
 }
 
 func (p *Pipeline) applyExecutionResult(ctx context.Context, executor exec.ModuleExecutor, res resultObj, execOutput execout.ExecutionOutput) (err error) {
 	executorName := executor.Name()
-	hasValidOutput := executor.HasValidOutput()
 
 	moduleOutput, outputBytes, runError := res.output, res.bytes, res.err
 	if runError != nil {
-		if hasValidOutput {
-			p.saveModuleOutput(moduleOutput, executor.Name(), reqctx.Details(ctx).ProductionMode)
-		}
 		return fmt.Errorf("execute module: %w", runError)
 	}
 
-	if hasValidOutput {
+	if executor.HasValidOutput() {
 		p.saveModuleOutput(moduleOutput, executor.Name(), reqctx.Details(ctx).ProductionMode)
+	}
+
+	if !res.skippedFromIndex && executor.HasValidOutput() {
 		if err := execOutput.Set(executorName, outputBytes); err != nil {
 			return fmt.Errorf("set output cache: %w", err)
 		}
 		if moduleOutput != nil {
 			p.forkHandler.addReversibleOutput(moduleOutput, execOutput.Clock().Id)
 		}
-	} else { // we are in a partial store
-		if stor, ok := p.GetStoreMap().Get(executorName); ok {
-			if pkvs, ok := stor.(*store.PartialKV); ok {
-				if err := execOutput.Set(executorName, pkvs.ReadOps()); err != nil {
-					return fmt.Errorf("set output cache: %w", err)
-				}
-			}
+	}
 
+	if !res.skippedFromIndex && executor.HasOutputForFiles() {
+		if err := execOutput.SetFileOutput(executorName, res.bytesForFiles); err != nil {
+			return fmt.Errorf("set output cache: %w", err)
 		}
 	}
+
 	return nil
 }
 
+// this will be sent to the requestor
 func (p *Pipeline) saveModuleOutput(output *pbssinternal.ModuleOutput, moduleName string, isProduction bool) {
 	if p.isOutputModule(moduleName) {
 		p.mapModuleOutput = toRPCMapModuleOutputs(output)

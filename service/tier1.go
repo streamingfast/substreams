@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -38,7 +37,6 @@ import (
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/pipeline/cache"
 	"github.com/streamingfast/substreams/pipeline/exec"
-	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/storage/execout"
@@ -71,10 +69,7 @@ type Tier1Service struct {
 	resolveCursor       pipeline.CursorResolver
 	getHeadBlock        func() (uint64, error)
 
-	maximumTier2Retries    uint64
 	tier2RequestParameters reqctx.Tier2RequestParameters
-
-	pipelineOptions []pipeline.Option
 }
 
 func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
@@ -162,7 +157,7 @@ func NewTier1(
 	}
 
 	tier2RequestParameters.BlockType = blockType
-	tier2RequestParameters.StateBundleSize = runtimeConfig.StateBundleSize
+	tier2RequestParameters.StateBundleSize = runtimeConfig.SegmentSize
 
 	logger.Info("launching tier1 service", zap.Reflect("client_config", substreamsClientConfig), zap.String("block_type", blockType), zap.Bool("with_live", hub != nil))
 	s := &Tier1Service{
@@ -228,15 +223,15 @@ func (s *Tier1Service) Blocks(
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("missing modules in request"))
 	}
 
-	if err := outputmodules.ValidateTier1Request(request, s.blockType); err != nil {
+	if err := ValidateTier1Request(request, s.blockType); err != nil {
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("validate request: %w", err))
 	}
 
-	outputGraph, err := outputmodules.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules)
+	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules)
 	if err != nil {
 		return bsstream.NewErrInvalidArg(err.Error())
 	}
-	outputModuleHash := outputGraph.ModuleHashes().Get(request.OutputModule)
+	outputModuleHash := execGraph.ModuleHashes().Get(request.OutputModule)
 
 	moduleNames := make([]string, len(request.Modules.Modules))
 	for i := 0; i < len(moduleNames); i++ {
@@ -301,7 +296,7 @@ func (s *Tier1Service) Blocks(
 		}
 	}()
 
-	err = s.blocks(runningContext, request, outputGraph, respFunc)
+	err = s.blocks(runningContext, request, execGraph, respFunc)
 
 	if connectError := toConnectError(runningContext, err); connectError != nil {
 		switch connect.CodeOf(connectError) {
@@ -322,7 +317,7 @@ func (s *Tier1Service) Blocks(
 	return nil
 }
 
-func (s *Tier1Service) writePackage(ctx context.Context, request *pbsubstreamsrpc.Request, outputGraph *outputmodules.Graph) error {
+func (s *Tier1Service) writePackage(ctx context.Context, request *pbsubstreamsrpc.Request, execGraph *exec.Graph, cacheStore dstore.Store) error {
 	asPackage := &pbsubstreams.Package{
 		Modules:    request.Modules,
 		ModuleMeta: []*pbsubstreams.ModuleMetadata{},
@@ -333,8 +328,7 @@ func (s *Tier1Service) writePackage(ctx context.Context, request *pbsubstreamsrp
 		return fmt.Errorf("marshalling package: %w", err)
 	}
 
-	modulePath := filepath.Join(reqctx.Details(ctx).CacheTag, outputGraph.ModuleHashes().Get(request.OutputModule))
-	moduleStore, err := s.runtimeConfig.BaseObjectStore.SubStore(modulePath)
+	moduleStore, err := cacheStore.SubStore(execGraph.ModuleHashes().Get(request.OutputModule))
 	if err != nil {
 		return fmt.Errorf("getting substore: %w", err)
 	}
@@ -352,7 +346,7 @@ func (s *Tier1Service) writePackage(ctx context.Context, request *pbsubstreamsrp
 
 var IsValidCacheTag = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`).MatchString
 
-func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Request, outputGraph *outputmodules.Graph, respFunc substreams.ResponseFunc) error {
+func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Request, execGraph *exec.Graph, respFunc substreams.ResponseFunc) error {
 	chainFirstStreamableBlock := bstream.GetProtocolFirstStreamableBlock
 	if request.StartBlockNum > 0 && request.StartBlockNum < int64(chainFirstStreamableBlock) {
 		return bsstream.NewErrInvalidArg("invalid start block %d, must be >= %d (the first streamable block of the chain)", request.StartBlockNum, chainFirstStreamableBlock)
@@ -366,31 +360,35 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 
 	logger := reqctx.Logger(ctx)
 
-	requestDetails, undoSignal, err := pipeline.BuildRequestDetails(ctx, request, s.getRecentFinalBlock, s.resolveCursor, s.getHeadBlock)
+	requestDetails, undoSignal, err := pipeline.BuildRequestDetails(ctx, request, s.getRecentFinalBlock, s.resolveCursor, s.getHeadBlock, s.runtimeConfig.SegmentSize)
 	if err != nil {
 		return fmt.Errorf("build request details: %w", err)
 	}
 
+	if requestDetails.ResolvedStartBlockNum == request.StopBlockNum && request.StopBlockNum != 0 {
+		return bsstream.NewErrInvalidArg("start block and stop block are the same")
+	}
+
 	requestDetails.MaxParallelJobs = s.runtimeConfig.DefaultParallelSubrequests
-	requestDetails.CacheTag = s.runtimeConfig.DefaultCacheTag
+	cacheTag := s.runtimeConfig.DefaultCacheTag
 	if auth := dauth.FromContext(ctx); auth != nil {
 		if parallelJobs := auth.Get("X-Sf-Substreams-Parallel-Jobs"); parallelJobs != "" {
 			if ll, err := strconv.ParseUint(parallelJobs, 10, 64); err == nil {
 				requestDetails.MaxParallelJobs = ll
 			}
 		}
-		if cacheTag := auth.Get("X-Sf-Substreams-Cache-Tag"); cacheTag != "" {
-			if IsValidCacheTag(cacheTag) {
-				requestDetails.CacheTag = cacheTag
+		if ct := auth.Get("X-Sf-Substreams-Cache-Tag"); ct != "" {
+			if IsValidCacheTag(ct) {
+				cacheTag = ct
 			} else {
-				return fmt.Errorf("invalid value for X-Sf-Substreams-Cache-Tag %s, should only contain letters, numbers, hyphens and undescores", cacheTag)
+				return fmt.Errorf("invalid value for X-Sf-Substreams-Cache-Tag %s, should only contain letters, numbers, hyphens and undescores", ct)
 			}
 		}
 
 	}
 
 	var requestStats *metrics.Stats
-	ctx, requestStats = setupRequestStats(ctx, requestDetails, outputGraph, false)
+	ctx, requestStats = setupRequestStats(ctx, requestDetails, execGraph.ModuleHashes().Get(requestDetails.OutputModule), false)
 	defer requestStats.LogAndClose()
 
 	traceId := tracing.GetTraceID(ctx).String()
@@ -410,17 +408,13 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		ctx = reqctx.WithModuleExecutionTracing(ctx)
 	}
 
-	if err := s.writePackage(ctx, request, outputGraph); err != nil {
-		logger.Warn("cannot write package", zap.Error(err))
-	}
-
-	if err := outputGraph.ValidateRequestStartBlock(requestDetails.ResolvedStartBlockNum); err != nil {
+	if err := execGraph.ValidateRequestStartBlock(requestDetails.ResolvedStartBlockNum); err != nil {
 		return bsstream.NewErrInvalidArg(err.Error())
 	}
 
 	wasmRuntime := wasm.NewRegistry(s.wasmExtensions)
 
-	cacheStore, err := s.runtimeConfig.BaseObjectStore.SubStore(requestDetails.CacheTag)
+	cacheStore, err := s.runtimeConfig.BaseObjectStore.SubStore(cacheTag)
 	if err != nil {
 		return fmt.Errorf("internal error setting store: %w", err)
 	}
@@ -434,19 +428,23 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		cacheStore = cloned
 	}
 
-	execOutputConfigs, err := execout.NewConfigs(cacheStore, outputGraph.UsedModules(), outputGraph.ModuleHashes(), s.runtimeConfig.StateBundleSize, logger)
+	if err := s.writePackage(ctx, request, execGraph, cacheStore); err != nil {
+		logger.Warn("cannot write package", zap.Error(err))
+	}
+
+	execOutputConfigs, err := execout.NewConfigs(cacheStore, execGraph.UsedModules(), execGraph.ModuleHashes(), s.runtimeConfig.SegmentSize, logger)
 	if err != nil {
 		return fmt.Errorf("new config map: %w", err)
 	}
 
-	storeConfigs, err := store.NewConfigMap(cacheStore, outputGraph.Stores(), outputGraph.ModuleHashes())
+	storeConfigs, err := store.NewConfigMap(cacheStore, execGraph.Stores(), execGraph.ModuleHashes())
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
 
-	stores := pipeline.NewStores(ctx, storeConfigs, s.runtimeConfig.StateBundleSize, requestDetails.LinearHandoffBlockNum, request.StopBlockNum, false)
+	stores := pipeline.NewStores(ctx, storeConfigs, s.runtimeConfig.SegmentSize, requestDetails.LinearHandoffBlockNum, request.StopBlockNum, false, nil)
 
-	execOutputCacheEngine, err := cache.NewEngine(ctx, nil, s.blockType, nil) // we don't read or write ExecOuts on tier1
+	execOutputCacheEngine, err := cache.NewEngine(ctx, nil, s.blockType, nil, nil) // we don't read or write ExecOuts on tier1
 	if err != nil {
 		return fmt.Errorf("error building caching engine: %w", err)
 	}
@@ -467,12 +465,13 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 
 	pipe := pipeline.New(
 		ctx,
-		outputGraph,
+		execGraph,
 		stores,
+		nil,
 		execOutputConfigs,
 		wasmRuntime,
 		execOutputCacheEngine,
-		s.runtimeConfig.StateBundleSize,
+		s.runtimeConfig.SegmentSize,
 		s.runtimeConfig.WorkerFactory,
 		respFunc,
 		opts...,
@@ -483,12 +482,12 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	// needs to be produced.
 	// But it seems a bit more involved in here.
 
-	scheduleStores := outputGraph.StagedUsedModules()[0].LastLayer().IsStoreLayer()
+	scheduleStores := execGraph.StagedUsedModules()[0].LastLayer().IsStoreLayer()
 
 	reqPlan, err := plan.BuildTier1RequestPlan(
 		requestDetails.ProductionMode,
-		s.runtimeConfig.StateBundleSize,
-		outputGraph.LowestInitBlock(),
+		s.runtimeConfig.SegmentSize,
+		execGraph.LowestInitBlock(),
 		requestDetails.ResolvedStartBlockNum,
 		requestDetails.LinearHandoffBlockNum,
 		requestDetails.StopBlockNum,
@@ -563,7 +562,7 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 	userMeta := auth.Meta()
 	ip := auth.RealIP()
 	meter := dmetering.GetBytesMeter(ctx)
-	ctx = context.WithValue(ctx, "event_emitter", dmetering.GetDefaultEmitter())
+	ctx = reqctx.WithEmitter(ctx, dmetering.GetDefaultEmitter())
 
 	return func(respAny substreams.ResponseFromAnyTier) error {
 		resp := respAny.(*pbsubstreamsrpc.Response)
@@ -579,12 +578,12 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 			return connect.NewError(connect.CodeUnavailable, err)
 		}
 
-		sendMetering(ctx, meter, userID, apiKeyID, ip, userMeta, "sf.substreams.rpc.v2/Blocks", resp, logger)
+		sendMetering(ctx, meter, userID, apiKeyID, ip, userMeta, "sf.substreams.rpc.v2/Blocks", resp)
 		return nil
 	}
 }
 
-func setupRequestStats(ctx context.Context, requestDetails *reqctx.RequestDetails, graph *outputmodules.Graph, tier2 bool) (context.Context, *metrics.Stats) {
+func setupRequestStats(ctx context.Context, requestDetails *reqctx.RequestDetails, outputModuleGraph string, tier2 bool) (context.Context, *metrics.Stats) {
 	logger := reqctx.Logger(ctx)
 	auth := dauth.FromContext(ctx)
 	stats := metrics.NewReqStats(&metrics.Config{
@@ -592,7 +591,7 @@ func setupRequestStats(ctx context.Context, requestDetails *reqctx.RequestDetail
 		ApiKeyID:         auth.APIKeyID(),
 		Tier2:            tier2,
 		OutputModule:     requestDetails.OutputModule,
-		OutputModuleHash: graph.ModuleHashes().Get(requestDetails.OutputModule),
+		OutputModuleHash: outputModuleGraph,
 		ProductionMode:   requestDetails.ProductionMode,
 	}, logger)
 	return reqctx.WithReqStats(ctx, stats), stats

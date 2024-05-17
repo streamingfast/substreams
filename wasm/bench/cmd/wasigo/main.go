@@ -41,8 +41,8 @@ func main() {
 		args := args(
 			wasm.NewParamsInput("{key.1: 'value.1'}"),
 			blockInputFile("/Users/colindickson/code/dfuse/substreams/wasm/bench/cmd/wasigo/testdata/block.binpb"),
-			wasm.NewStoreReaderInput("store.reader.1", createStore(ctx, "store.reader.1")),
-			wasm.NewStoreReaderInput("store.reader.2", createStore(ctx, "store.reader.2")),
+			wasm.NewStoreReaderInput("store.reader.1", createStore(ctx, "store.reader.1"), 0),
+			wasm.NewStoreReaderInput("store.reader.2", createStore(ctx, "store.reader.2"), 0),
 			wasm.NewStoreWriterOutput("out", createStore(ctx, "out"), 1, "string"),
 		)
 
@@ -105,7 +105,7 @@ func blockInputFile(filename string) wasm.Argument {
 		panic(fmt.Errorf("reading input file: %w", err))
 	}
 
-	input := wasm.NewSourceInput("sf.ethereum.type.v2.Block")
+	input := wasm.NewSourceInput("sf.ethereum.type.v2.Block", 0)
 	input.SetValue(content)
 
 	return input

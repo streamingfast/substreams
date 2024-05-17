@@ -122,7 +122,7 @@ func blockInputFile(t require.TestingT, filename string) wasm.Argument {
 	content, err := os.ReadFile(filename)
 	require.NoError(t, err)
 
-	input := wasm.NewSourceInput("sf.ethereum.type.v2.Block")
+	input := wasm.NewSourceInput("sf.ethereum.type.v2.Block", 0)
 	input.SetValue(content)
 
 	return input

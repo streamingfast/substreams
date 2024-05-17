@@ -14,6 +14,7 @@ type ExecutionOutputGetter interface {
 
 type ExecutionOutputSetter interface {
 	Set(name string, value []byte) (err error)
+	SetFileOutput(name string, value []byte) (err error)
 }
 
 // ExecutionOutput gets/sets execution output for a given graph at a given block
@@ -22,4 +23,4 @@ type ExecutionOutput interface {
 	ExecutionOutputSetter
 }
 
-var NotFound = errors.New("inputs module value not found")
+var ErrNotFound = errors.New("inputs module value not found")

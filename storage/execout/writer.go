@@ -14,31 +14,38 @@ import (
 type Writer struct {
 	wg *sync.WaitGroup
 
-	currentFile  *File
-	outputModule string
+	CurrentFile      *File
+	outputModule     string
+	isWriterForIndex bool
 }
 
-func NewWriter(initialBlockBoundary, exclusiveEndBlock uint64, outputModule string, configs *Configs) *Writer {
+func NewWriter(initialBlockBoundary, exclusiveEndBlock uint64, outputModule string, configs *Configs, isWriterForIndex bool) *Writer {
 	w := &Writer{
-		wg:           &sync.WaitGroup{},
-		outputModule: outputModule,
+		wg:               &sync.WaitGroup{},
+		outputModule:     outputModule,
+		isWriterForIndex: isWriterForIndex,
 	}
 
 	segmenter := block.NewSegmenter(configs.execOutputSaveInterval, initialBlockBoundary, exclusiveEndBlock)
 	walker := configs.NewFileWalker(outputModule, segmenter)
-	w.currentFile = walker.File()
+	w.CurrentFile = walker.File()
 
 	return w
 }
 
 func (w *Writer) Write(clock *pbsubstreams.Clock, buffer *Buffer) {
-	if val, found := buffer.values[w.outputModule]; found {
-		w.currentFile.SetItem(clock, val)
+	if val, found := buffer.valuesForFileOutput[w.outputModule]; found {
+		w.CurrentFile.SetItem(clock, val)
 	}
 }
 
 func (w *Writer) Close(ctx context.Context) error {
-	if err := w.currentFile.Save(ctx); err != nil {
+	// Skip outputs file saving for blockIndex module
+	if w.isWriterForIndex {
+		return nil
+	}
+
+	if err := w.CurrentFile.Save(ctx); err != nil {
 		return fmt.Errorf("flushing exec output writer: %w", err)
 	}
 	return nil

@@ -11,6 +11,7 @@ import (
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
+	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/descriptorpb"
@@ -19,6 +20,7 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage/execout"
+	"github.com/streamingfast/substreams/storage/index"
 	"github.com/streamingfast/substreams/storage/store"
 )
 
@@ -36,9 +38,9 @@ var decodeOutputsModuleCmd = &cobra.Command{
 		file in place of '<manifest_file>, or a link to a remote .spkg file, using urls gs://, http(s)://, ipfs://, etc.'.
 	`),
 	Example: string(cli.ExamplePrefixed("substreams tools decode outputs", `
-		map_pools_created gs://[bucket-url-path] 12487090 pool:c772a65917d5da983b7fc3c9cfbfb53ef01aef7e
-		uniswap-v3.spkg store_pools gs://[bucket-url-path] 12487090 pool:c772a65917d5da983b7fc3c9cfbfb53ef01aef7e
-		dir-with-manifest store_pools gs://[bucket-url-path] 12487090 token:051cf5178f60e9def5d5a39b2a988a9f914107cb:dprice:eth
+		map_pools_created gs://[bucket-url-path] 12487090
+		uniswap-v3.spkg store_pools gs://[bucket-url-path] 12487090
+		dir-with-manifest store_pools gs://[bucket-url-path] 12487090
 	`)),
 	RunE:         runDecodeOutputsModuleRunE,
 	Args:         cobra.RangeArgs(3, 4),
@@ -64,19 +66,30 @@ var decodeStatesModuleCmd = &cobra.Command{
 	SilenceUsage: true,
 }
 
+var decodeIndexModuleCmd = &cobra.Command{
+	Use:   "index [<manifest_file>] <module_name> <output_url> <block_number>",
+	Short: "Decode index file and print the key/values",
+	Example: string(cli.ExamplePrefixed("substreams tools decode index", `
+		map_pools_created gs://[bucket-url-path] 12487090 pool:c772a65917d5da983b7fc3c9cfbfb53ef01aef7e
+	`)),
+	RunE:         runDecodeIndexModuleRunE,
+	Args:         cobra.RangeArgs(3, 4),
+	SilenceUsage: true,
+}
+
 func init() {
-	decodeOutputsModuleCmd.Flags().Uint64("save-interval", 1000, "Output save interval")
-	decodeStatesModuleCmd.Flags().Uint64("save-interval", 1000, "states save interval")
+	decodeCmd.PersistentFlags().Uint64("save-interval", 1000, "Save interval (segment size)")
 
 	decodeCmd.AddCommand(decodeOutputsModuleCmd)
 	decodeCmd.AddCommand(decodeStatesModuleCmd)
+	decodeCmd.AddCommand(decodeIndexModuleCmd)
 
 	Cmd.AddCommand(decodeCmd)
 }
 
 func runDecodeStatesModuleRunE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
-	saveInterval := mustGetUint64(cmd, "save-interval")
+	saveInterval := sflags.MustGetUint64(cmd, "save-interval")
 
 	manifestPath := ""
 	if len(args) == 5 {
@@ -138,7 +151,7 @@ func runDecodeStatesModuleRunE(cmd *cobra.Command, args []string) error {
 	moduleHash := hex.EncodeToString(hash)
 	zlog.Info("found module hash", zap.String("hash", moduleHash), zap.String("module", matchingModule.Name))
 
-	startBlock := execout.ComputeStartBlock(blockNumber, saveInterval)
+	startBlock := blockNumber - blockNumber%saveInterval
 
 	switch matchingModule.Kind.(type) {
 	case *pbsubstreams.Module_KindMap_:
@@ -149,9 +162,90 @@ func runDecodeStatesModuleRunE(cmd *cobra.Command, args []string) error {
 	return fmt.Errorf("module has an unknown")
 }
 
+func runDecodeIndexModuleRunE(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
+	saveInterval := sflags.MustGetUint64(cmd, "save-interval")
+
+	manifestPath := ""
+	if len(args) == 4 {
+		manifestPath = args[0]
+		args = args[1:]
+	}
+
+	moduleName := args[0]
+	storeURL := args[1]
+	blockNumber, err := strconv.ParseUint(args[2], 10, 64)
+	if err != nil {
+		return fmt.Errorf("converting blockNumber to uint: %w", err)
+	}
+
+	zlog.Info("decoding module",
+		zap.String("manifest_path", manifestPath),
+		zap.String("module_name", moduleName),
+		zap.String("store_url", storeURL),
+		zap.Uint64("block_number", blockNumber),
+		zap.Uint64("save_internal", saveInterval),
+	)
+
+	objStore, err := dstore.NewStore(storeURL, "zst", "zstd", false)
+	if err != nil {
+		return fmt.Errorf("initializing dstore for %q: %w", storeURL, err)
+	}
+
+	manifestReader, err := manifest.NewReader(manifestPath, manifest.SkipPackageValidationReader())
+	if err != nil {
+		return fmt.Errorf("manifest reader: %w", err)
+	}
+
+	pkg, graph, err := manifestReader.Read()
+	if err != nil {
+		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
+	}
+
+	hashes := manifest.NewModuleHashes()
+
+	var matchingModule *pbsubstreams.Module
+	for _, module := range pkg.Modules.Modules {
+		if module.Name == moduleName {
+			matchingModule = module
+		}
+	}
+	if matchingModule == nil {
+		return fmt.Errorf("module %q not found", moduleName)
+	}
+
+	hash, err := hashes.HashModule(pkg.Modules, matchingModule, graph)
+	if err != nil {
+		panic(err)
+	}
+	moduleHash := hex.EncodeToString(hash)
+	zlog.Info("found module hash", zap.String("hash", moduleHash), zap.String("module", matchingModule.Name))
+
+	switch matchingModule.Kind.(type) {
+	case *pbsubstreams.Module_KindBlockIndex_:
+	default:
+		return fmt.Errorf("not a block index module")
+	}
+
+	endBlock := blockNumber - (blockNumber % saveInterval) + saveInterval
+
+	indexFile, err := index.NewFile(objStore, moduleHash, matchingModule.Name, zlog, block.NewRange(blockNumber, endBlock))
+	if err != nil {
+		return fmt.Errorf("instantiating index file: %w", err)
+	}
+	if err := indexFile.Load(ctx); err != nil {
+		return fmt.Errorf("loading index file: %w", err)
+	}
+
+	indexFile.Print()
+	fmt.Printf("done")
+
+	return nil
+}
+
 func runDecodeOutputsModuleRunE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
-	saveInterval := mustGetUint64(cmd, "save-interval")
+	saveInterval := sflags.MustGetUint64(cmd, "save-interval")
 
 	manifestPath := ""
 	if len(args) == 4 {
@@ -209,7 +303,7 @@ func runDecodeOutputsModuleRunE(cmd *cobra.Command, args []string) error {
 	moduleHash := hex.EncodeToString(hash)
 	zlog.Info("found module hash", zap.String("hash", moduleHash), zap.String("module", matchingModule.Name))
 
-	startBlock := execout.ComputeStartBlock(requestedBlocks.StartBlock, saveInterval)
+	startBlock := requestedBlocks.StartBlock - requestedBlocks.StartBlock%saveInterval
 	if startBlock < matchingModule.InitialBlock {
 		startBlock = matchingModule.InitialBlock
 	}
@@ -252,9 +346,7 @@ func searchOutputsModule(
 			return fmt.Errorf("can't find cache at block %d storeURL %q", startBlock, moduleStore.BaseURL().String())
 		}
 
-		if err != nil {
-			return fmt.Errorf("loading cache %s file %s : %w", moduleStore.BaseURL(), outputCache.String(), err)
-		}
+		return fmt.Errorf("loading cache %s file %s : %w", moduleStore.BaseURL(), outputCache.String(), err)
 	}
 
 	for i := requestedBlocks.StartBlock; i < requestedBlocks.ExclusiveEndBlock; i++ {

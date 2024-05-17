@@ -10,7 +10,7 @@ import (
 )
 
 func (b *baseStore) SetMinBigInt(ord uint64, key string, value *big.Int) {
-	b.pendingOps.Add(&pbssinternal.Operation{
+	b.kvOps.Add(&pbssinternal.Operation{
 		Type:  pbssinternal.Operation_SET_MIN_BIG_INT,
 		Ord:   ord,
 		Key:   key,
@@ -35,7 +35,7 @@ func (b *baseStore) setMinBigInt(ord uint64, key string, value *big.Int) {
 }
 
 func (b *baseStore) SetMinInt64(ord uint64, key string, value int64) {
-	b.pendingOps.Add(&pbssinternal.Operation{
+	b.kvOps.Add(&pbssinternal.Operation{
 		Type:  pbssinternal.Operation_SET_MIN_INT64,
 		Ord:   ord,
 		Key:   key,
@@ -60,7 +60,7 @@ func (b *baseStore) setMinInt64(ord uint64, key string, value int64) {
 }
 
 func (b *baseStore) SetMinFloat64(ord uint64, key string, value float64) {
-	b.pendingOps.Add(&pbssinternal.Operation{
+	b.kvOps.Add(&pbssinternal.Operation{
 		Type:  pbssinternal.Operation_SET_MIN_FLOAT64,
 		Ord:   ord,
 		Key:   key,
@@ -86,7 +86,7 @@ func (b *baseStore) setMinFloat64(ord uint64, key string, value float64) {
 }
 
 func (b *baseStore) SetMinBigDecimal(ord uint64, key string, value decimal.Decimal) {
-	b.pendingOps.Add(&pbssinternal.Operation{
+	b.kvOps.Add(&pbssinternal.Operation{
 		Type:  pbssinternal.Operation_SET_MIN_BIG_DECIMAL,
 		Ord:   ord,
 		Key:   key,

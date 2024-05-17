@@ -3,6 +3,27 @@ use substreams::errors::Error;
 use crate::pb;
 use crate::generated::substreams::{Substreams, SubstreamsTrait};
 
+#[no_mangle]
+pub extern "C" fn test_index(
+    block_ptr: *mut u8,
+    block_len: usize,
+) {
+    substreams::register_panic_hook();
+    let func = ||-> Result<pb::keys::Keys, Error> {        
+
+        let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
+
+        Substreams::test_index(
+            block,
+        )
+    };
+
+    let result = func();
+    if result.is_err() {
+        panic!("{:?}", &result.err().unwrap());
+    }
+    substreams::output(result.unwrap());
+}
 
 #[no_mangle]
 pub extern "C" fn test_map(
@@ -82,6 +103,26 @@ pub extern "C" fn assert_test_store_delete_prefix(
         Substreams::assert_test_store_delete_prefix(block,
             test_store_delete_prefix,
             
+        )
+    };
+    let result = func();
+    if result.is_err() {
+        panic!("{:?}", &result.err().unwrap());
+    }
+    substreams::output(result.unwrap());
+}
+
+#[no_mangle]
+pub extern "C" fn assert_test_index(
+    block_ptr: *mut u8,
+    block_len: usize,
+) {
+    substreams::register_panic_hook();
+    let func = ||-> Result<pb::test::Boolean, Error>{
+        
+        let block: pb::test::Block = substreams::proto::decode_ptr(block_ptr, block_len).unwrap();
+
+        Substreams::assert_test_index(block
         )
     };
     let result = func();
@@ -2092,6 +2133,25 @@ pub extern "C" fn assert_all_test_delete_prefix(
 }
 
 #[no_mangle]
+pub extern "C" fn assert_all_test_index(
+    assert_test_index_ptr: *mut u8,
+    assert_test_index_len: usize,
+) {
+    substreams::register_panic_hook();
+    let func = ||{
+        
+        let store: substreams::store::StoreSetInt64 = substreams::store::StoreSetInt64::new();
+        
+        let assert_test_index_prefix: pb::test::Boolean = substreams::proto::decode_ptr(assert_test_index_ptr, assert_test_index_len).unwrap();
+
+        Substreams::assert_all_test_index(assert_test_index_prefix,
+            store,
+        )
+    };
+    func()
+}
+
+#[no_mangle]
 pub extern "C" fn assert_all_test(
     assert_all_test_delete_prefix_ptr: u32,
     assert_all_test_string_ptr: u32,
@@ -2099,6 +2159,7 @@ pub extern "C" fn assert_all_test(
     assert_all_test_float64_ptr: u32,
     assert_all_test_bigint_ptr: u32,
     assert_all_test_bigdecimal_ptr: u32,
+    assert_all_test_index_ptr: u32,
 ) {
     substreams::register_panic_hook();
     let func = ||-> Result<pb::test::Boolean, Error>{
@@ -2109,6 +2170,7 @@ pub extern "C" fn assert_all_test(
         let assert_all_test_float64: substreams::store::StoreGetInt64 = substreams::store::StoreGetInt64::new(assert_all_test_float64_ptr);
         let assert_all_test_bigint: substreams::store::StoreGetInt64 = substreams::store::StoreGetInt64::new(assert_all_test_bigint_ptr);
         let assert_all_test_bigdecimal: substreams::store::StoreGetInt64 = substreams::store::StoreGetInt64::new(assert_all_test_bigdecimal_ptr);
+        let assert_all_test_index: substreams::store::StoreGetInt64 = substreams::store::StoreGetInt64::new(assert_all_test_index_ptr);
 
         Substreams::assert_all_test(assert_all_test_delete_prefix,
             assert_all_test_string,
@@ -2116,7 +2178,7 @@ pub extern "C" fn assert_all_test(
             assert_all_test_float64,
             assert_all_test_bigint,
             assert_all_test_bigdecimal,
-            
+            assert_all_test_index,
         )
     };
     let result = func();

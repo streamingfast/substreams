@@ -79,9 +79,15 @@ type PackageMeta struct {
 }
 
 type Protobuf struct {
-	DescriptorSets []string `yaml:"descriptorSets,omitempty"`
-	Files          []string `yaml:"files,omitempty"`
-	ImportPaths    []string `yaml:"importPaths,omitempty"`
+	DescriptorSets []*BufImport `yaml:"descriptorSets,omitempty"`
+	Files          []string     `yaml:"files,omitempty"`
+	ImportPaths    []string     `yaml:"importPaths,omitempty"`
+}
+
+type BufImport struct {
+	Module  string   `yaml:"module"`
+	Version string   `yaml:"version"`
+	Symbols []string `yaml:"symbols"`
 }
 
 type Module struct {
@@ -101,8 +107,14 @@ type Module struct {
 }
 
 type BlockFilter struct {
-	Module string `yaml:"module,omitempty"`
-	Query  string `yaml:"query,omitempty"`
+	Module string           `yaml:"module,omitempty"`
+	Query  BlockFilterQuery `yaml:"query,omitempty"`
+}
+
+type BlockFilterQuery struct {
+	String string `yaml:"string,omitempty"`
+	Params bool   `yaml:"params,omitempty"`
+	// Store string `yaml:"store,omitempty"`
 }
 
 type Input struct {
@@ -304,10 +316,19 @@ func (m *Module) ToProtoWASM(codeIndex uint32) (*pbsubstreams.Module, error) {
 
 func (m *Module) setBlockFilterToProto(pbModule *pbsubstreams.Module) {
 	if m.BlockFilter != nil {
-		pbModule.BlockFilter = &pbsubstreams.Module_BlockFilter{
+		bf := &pbsubstreams.Module_BlockFilter{
 			Module: m.BlockFilter.Module,
-			Query:  m.BlockFilter.Query,
 		}
+		switch {
+		case m.BlockFilter.Query.String != "":
+			bf.Query = &pbsubstreams.Module_BlockFilter_QueryString{
+				QueryString: m.BlockFilter.Query.String,
+			}
+		case m.BlockFilter.Query.Params:
+			bf.Query = &pbsubstreams.Module_BlockFilter_QueryFromParams{}
+		}
+
+		pbModule.BlockFilter = bf
 	}
 }
 
@@ -404,6 +425,12 @@ const (
 
 func (m *Module) setKindToProto(pbModule *pbsubstreams.Module) {
 	switch m.Kind {
+	case ModuleKindBlockIndex:
+		pbModule.Kind = &pbsubstreams.Module_KindBlockIndex_{
+			KindBlockIndex: &pbsubstreams.Module_KindBlockIndex{
+				OutputType: m.Output.Type,
+			},
+		}
 	case ModuleKindMap:
 		pbModule.Kind = &pbsubstreams.Module_KindMap_{
 			KindMap: &pbsubstreams.Module_KindMap{

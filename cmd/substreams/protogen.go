@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
+	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/substreams/codegen"
 	"github.com/streamingfast/substreams/manifest"
 	"go.uber.org/zap"
@@ -43,10 +44,10 @@ func init() {
 }
 
 func runProtogen(cmd *cobra.Command, args []string) error {
-	outputPath := mustGetString(cmd, "output-path")
-	excludePaths := mustGetStringArray(cmd, "exclude-paths")
-	generateMod := mustGetBool(cmd, "generate-mod-rs")
-	showGeneratedBufGen := mustGetBool(cmd, "show-generated-buf-gen")
+	outputPath := sflags.MustGetString(cmd, "output-path")
+	excludePaths := sflags.MustGetStringArray(cmd, "exclude-paths")
+	generateMod := sflags.MustGetBool(cmd, "generate-mod-rs")
+	showGeneratedBufGen := sflags.MustGetBool(cmd, "show-generated-buf-gen")
 
 	manifestPath := ""
 	if len(args) == 1 {

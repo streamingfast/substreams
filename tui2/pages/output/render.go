@@ -49,20 +49,15 @@ func (o *Output) wrapLogs(log string) string {
 }
 
 type renderedOutput struct {
-	plainErrorReceived string
-	plainLogs          string
-	plainJSON          string
-	plainOutput        string
+	plainLogs   string
+	plainJSON   string
+	plainOutput string
 
 	error error
 
 	styledError *strings.Builder
 	styledLogs  *strings.Builder
 	styledJSON  string
-}
-
-func (r *renderedOutput) highlighted() string {
-	return ""
 }
 
 func (o *Output) renderedOutput(in *pbsubstreamsrpc.AnyModuleOutput, withStyle bool) (out *renderedOutput) {

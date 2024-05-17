@@ -2,10 +2,11 @@ package store
 
 import (
 	"errors"
+
 	"go.uber.org/zap/zapcore"
 )
 
-var NotFound = errors.New("store not found")
+var ErrNotFound = errors.New("store not found")
 
 type Getter interface {
 	Get(name string) (Store, bool)

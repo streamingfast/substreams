@@ -58,7 +58,6 @@ function generate_system() {
     "$PROTO/google/protobuf/any.proto" \
     "$PROTO/google/protobuf/descriptor.proto" \
     "$PROTO/google/protobuf/timestamp.proto" \
-    "$PROTO/google/protobuf/duration.proto" \
     --include_source_info \
     --descriptor_set_out "$1"
 }

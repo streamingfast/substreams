@@ -50,8 +50,8 @@ func (w *TestWorker) Work(ctx context.Context, unit stage.Unit, workRange *block
 	logger.Info("worker running test job",
 		zap.Strings("stage_modules", moduleNames),
 		zap.Int("stage", unit.Stage),
-		zap.Uint64("start_block_num", request.StartBlockNum),
-		zap.Uint64("stop_block_num", request.StopBlockNum),
+		zap.Uint64("segment size", request.SegmentSize),
+		zap.Uint64("segment number", request.SegmentNumber),
 	)
 
 	return func() loop.Msg {
@@ -60,8 +60,8 @@ func (w *TestWorker) Work(ctx context.Context, unit stage.Unit, workRange *block
 		}
 		logger.Info("worker done running job",
 			zap.String("output_module", request.OutputModule),
-			zap.Uint64("start_block_num", request.StartBlockNum),
-			zap.Uint64("stop_block_num", request.StopBlockNum),
+			zap.Uint64("segment size", request.SegmentSize),
+			zap.Uint64("segment number", request.SegmentNumber),
 			zap.Int("stage", unit.Stage),
 		)
 

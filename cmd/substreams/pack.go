@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
+	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/substreams/manifest"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
@@ -59,7 +60,8 @@ func runPack(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("reading manifest %q: %w", manifestPath, err)
 	}
 
-	originalOutputFile := maybeGetString(cmd, "output-file")
+	originalOutputFile, _ := sflags.GetString(cmd, "output-file")
+
 	resolvedOutputFile := resolveOutputFile(originalOutputFile, map[string]string{
 		"manifestDir":     filepath.Dir(manifestPath),
 		"spkgDefaultName": fmt.Sprintf("%s-%s.spkg", strings.Replace(pkg.PackageMeta[0].Name, "_", "-", -1), pkg.PackageMeta[0].Version),

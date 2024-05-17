@@ -209,12 +209,13 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				}
 			}
 
+			fmt.Println("MAMA", optionsMap[selection], selection, selectField.GetKey(), selectField.GetValue())
 			if err := sendFunc(&pbconvo.UserInput{
 				FromActionId: resp.ActionId,
 				Entry: &pbconvo.UserInput_Selection_{
 					Selection: &pbconvo.UserInput_Selection{
 						Label: optionsMap[selection],
-						Value: selectField.GetValue().(string),
+						Value: selectField.GetKey(),
 					},
 				},
 			}); err != nil {

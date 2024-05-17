@@ -20,6 +20,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
+	"github.com/streamingfast/cli/sflags"
 	pbconvo "github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1"
 	"github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1/pbconvoconnect"
 	"golang.org/x/net/http2"
@@ -68,7 +69,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	}
 	client := pbconvoconnect.NewConversationServiceClient(httpClient, "https://localhost:9000", opts...)
 
-	topicType := mustGetString(cmd, "type")
+	topicType := sflags.MustGetString(cmd, "type")
 	if topicType == "discover" {
 		resp, err := client.Discover(context.Background(), connect.NewRequest(&pbconvo.DiscoveryRequest{}))
 		if err != nil {

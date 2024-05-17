@@ -3,7 +3,8 @@ package execout
 import (
 	"context"
 	"sync"
-	"sync/atomic"
+
+	"go.uber.org/zap"
 
 	"github.com/streamingfast/substreams/block"
 )
@@ -14,19 +15,21 @@ type FileWalker struct {
 	segmenter *block.Segmenter
 	segment   int
 
-	IsLocal          bool
-	buffer           map[int]*File
-	bufferLock       sync.Mutex
-	previousFileSize atomic.Uint64
+	IsLocal    bool
+	buffer     map[int]*File
+	bufferLock sync.Mutex
+
+	logger *zap.Logger
 }
 
-func (c *Config) NewFileWalker(segmenter *block.Segmenter) *FileWalker {
+func NewFileWalker(c *Config, segmenter *block.Segmenter, logger *zap.Logger) *FileWalker {
 	return &FileWalker{
 		config:    c,
 		IsLocal:   c.objStore.BaseURL().Scheme == "file",
 		segmenter: segmenter,
 		segment:   segmenter.FirstIndex(),
 		buffer:    make(map[int]*File),
+		logger:    logger,
 	}
 }
 
@@ -54,12 +57,6 @@ func (fw *FileWalker) PreloadNext(ctx context.Context) {
 	fw.bufferLock.Lock()
 	defer fw.bufferLock.Unlock()
 	fw.preload(ctx, fw.segment+1)
-	// we can preload two next files if they are small enough.
-	// More than 2 shows no performance improvement and gobbles up memory.
-	if fw.segment != fw.segmenter.FirstIndex() && fw.previousFileSize.Load() < 104_857_600 {
-		fw.preload(ctx, fw.segment+2)
-	}
-
 }
 
 func (fw *FileWalker) preload(ctx context.Context, seg int) {
@@ -74,8 +71,6 @@ func (fw *FileWalker) preload(ctx context.Context, seg int) {
 	f := fw.config.NewFile(rng)
 	go func() {
 		if err := f.Load(ctx); err == nil {
-			// purposefully ignoring preload errors
-			fw.previousFileSize.Store(f.loadedSize)
 		}
 	}()
 	fw.buffer[seg] = f
@@ -84,6 +79,21 @@ func (fw *FileWalker) preload(ctx context.Context, seg int) {
 // Move to the next
 func (fw *FileWalker) Next() {
 	fw.segment++
+
+	fw.bufferLock.Lock()
+	defer fw.bufferLock.Unlock()
+
+	// delete old buffer
+	oldBuffersFound := 0
+	for k := range fw.buffer {
+		if k < fw.segment {
+			oldBuffersFound++
+			delete(fw.buffer, k)
+		}
+	}
+	if oldBuffersFound > 0 {
+		fw.logger.Warn("deleted old buffers", zap.String("module", fw.config.name), zap.Int("count", oldBuffersFound))
+	}
 }
 
 func (fw *FileWalker) IsDone() bool {

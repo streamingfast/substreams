@@ -42,7 +42,7 @@ var initCmd = &cobra.Command{
 }
 
 func init() {
-	initCmd.Flags().String("type", "discover", "ID of the code generator to use. Use 'discover' to list available ones.")
+	initCmd.Flags().String("generator", "discover", "Identifier of the code generator to use. Use 'discover' to list available ones.")
 
 	if x := os.Getenv("ETHERSCAN_API_KEY"); x != "" {
 		etherscanAPIKey = x
@@ -52,6 +52,11 @@ func init() {
 
 var INIT_TRACE = false
 var WITH_ACCESSIBLE = false
+
+type initStateFormat struct {
+	GeneratorID string          `json:"generator"`
+	State       json.RawMessage `json:"state"`
+}
 
 func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	opts := []connect.ClientOption{
@@ -69,8 +74,28 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	}
 	client := pbconvoconnect.NewConversationServiceClient(httpClient, "https://localhost:9000", opts...)
 
-	topicType := sflags.MustGetString(cmd, "type")
-	if topicType == "discover" {
+	var lastState = initStateFormat{}
+	if _, err := os.Stat("generator.json"); err == nil {
+		fmt.Println("The file 'generator.json', was detected, reloading state from that point on.")
+		stateBytes, err := os.ReadFile("generator.json")
+		if err != nil {
+			return fmt.Errorf("failed to read codegen state file: %w", err)
+		}
+		if err := json.Unmarshal(stateBytes, &lastState); err != nil {
+			return fmt.Errorf("failed to unmarshal generator state file: %w", err)
+		}
+	} else {
+		// TODO: otherwise here, we should ensure that the directory is empty... (or use the specified sub-directory?)
+	}
+
+	generatorID := sflags.MustGetString(cmd, "generator")
+
+	if lastState.GeneratorID != "" && generatorID != "discover" && generatorID != lastState.GeneratorID {
+		fmt.Println("Mismatch between the generator ID in `generator.json` and the one specified on the command line.")
+		return fmt.Errorf("generator ID mismatch: %q != %q", generatorID, lastState.GeneratorID)
+	}
+
+	if generatorID == "discover" {
 		resp, err := client.Discover(context.Background(), connect.NewRequest(&pbconvo.DiscoveryRequest{}))
 		if err != nil {
 			return fmt.Errorf("failed to call discovery endpoint: %w", err)
@@ -79,23 +104,15 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		fmt.Println("Here is a list of available code generators to help you out:")
 		fmt.Println("")
 		// TODO: display the discovery, and start the topic from the selected element.
-		for idx, topic := range resp.Msg.ConversationTopics {
-			fmt.Printf("%d. %s - %s\n%s\n\n", idx+1, bold(topic.Id), topic.Title, topic.Description)
+		for idx, generator := range resp.Msg.Generators {
+			fmt.Printf("%d. %s - %s\n%s\n\n", idx+1, bold(generator.Id), generator.Title, generator.Description)
 		}
 		fmt.Println("Run `substreams init --type` with the desired code generator ID to start a new project.")
 		return nil
-	}
-
-	var lastState string
-	if _, err := os.Stat("substreams.codegen.state"); err == nil {
-		fmt.Println("The file 'substreams.codegen.state', was detected, reloading state from that point on.")
-		stateBytes, err := os.ReadFile("substreams.codegen.state")
-		if err != nil {
-			return fmt.Errorf("failed to read codegen state file: %w", err)
-		}
-		lastState = string(stateBytes)
 	} else {
-		// TODO: otherwise here, we should ensure that the directory is empty... (or use the specified sub-directory?)
+		if lastState.GeneratorID == "" {
+			lastState.GeneratorID = generatorID
+		}
 	}
 
 	conn := client.Converse(context.Background())
@@ -107,11 +124,10 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		return conn.Send(msg)
 	}
 	startMsg := &pbconvo.UserInput_Start{
-		TopicId: topicType,
+		GeneratorId: generatorID,
 	}
-	if lastState != "" {
-		// ALSO store in that state file the `conversation` ID and version (ethereum_dynamic_data_source_v1)
-		startMsg.Hydrate = &pbconvo.UserInput_Hydrate{SavedState: lastState}
+	if lastState.State != nil {
+		startMsg.Hydrate = &pbconvo.UserInput_Hydrate{SavedState: string(lastState.State)}
 	}
 	err := sendFunc(&pbconvo.UserInput{
 		Entry: &pbconvo.UserInput_Start_{
@@ -130,22 +146,26 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				break
 			}
 			// TODO: reconnect, and send the Hydrate message to continue the conversation...
-			return fmt.Errorf("connection error: %w (state=%q)", err, lastState)
+			return fmt.Errorf("connection error: %w", err)
 		}
 		if resp.State != "" {
-			lastState = resp.State
+			lastState.State = []byte(resp.State)
 		}
 		if INIT_TRACE {
 			cnt, _ := json.MarshalIndent(resp.Entry, "", "  ")
 			fmt.Printf("INPUT: %T %s\n", resp.Entry, string(cnt))
-			fmt.Println("Saving state to substreams.codegen.state")
+			fmt.Println("Saving state to generator.json")
 		}
 
 		// TODO: reformat the JSON code into a yaml file or something? Make it editable and readable easily?
 		// Nothing fixes the format of the state atm, but we could agree on a format, and fixate JSON or YAML.
 		// JSON is probably better for interchange.
-		if err = os.WriteFile("substreams.codegen.state", []byte(lastState), 0644); err != nil {
-			return fmt.Errorf("couldn't write codegen state: %w", err)
+		cnt, err := json.MarshalIndent(lastState, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal generator state: %w", err)
+		}
+		if err = os.WriteFile("generator.json", cnt, 0644); err != nil {
+			return fmt.Errorf("error writing generator state %w", err)
 		}
 
 		switch msg := resp.Entry.(type) {
@@ -173,6 +193,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 
 			if len(input.Labels) == 0 && len(input.Values) == 0 {
 				fmt.Println("Hmm, the server sent no option to select from (!)")
+				// TODO: notify the server? stop the process?!
 				continue
 			}
 
@@ -205,14 +226,15 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					fmt.Println("┃ -", opt.Key)
 				}
 			}
+			fmt.Println("")
 
-			fmt.Println("MAMA", optionsMap[selection], selection, selectField.GetKey(), selectField.GetValue())
+			//fmt.Println("MAMA", optionsMap[selection], selection, selectField.GetValue())
 			if err := sendFunc(&pbconvo.UserInput{
 				FromActionId: resp.ActionId,
 				Entry: &pbconvo.UserInput_Selection_{
 					Selection: &pbconvo.UserInput_Selection{
 						Label: optionsMap[selection],
-						Value: selectField.GetKey(),
+						Value: selection,
 					},
 				},
 			}); err != nil {
@@ -252,6 +274,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			}
 
 			fmt.Println("┃ ", input.Prompt+":", bold(returnValue))
+			fmt.Println("")
 
 			if err := sendFunc(&pbconvo.UserInput{
 				FromActionId: resp.ActionId,

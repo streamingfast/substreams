@@ -243,17 +243,20 @@ func (r *manifestConverter) manifestToPkg(manif *Manifest) (*pbsubstreams.Packag
 		return nil, nil, nil, fmt.Errorf("error loading imports: %w", err)
 	}
 
-	protoDefinitions, err := loadProtobufs(pkg, manif)
+	var protoFiles []*desc.FileDescriptor
+
+	fromBufBuild, err := loadDescriptorSets(pkg, manif)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("error loading protobuf: %w", err)
+	}
+	protoFiles = append(protoFiles, fromBufBuild...)
+
+	fromLocalFiles, err := loadLocalProtobufs(pkg, manif)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error loading protobuf: %w", err)
 	}
 
-	bufBuildDefinition, err := loadDescriptorSets(pkg, manif)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error loading protobuf: %w", err)
-	}
-
-	protoDefinitions = append(protoDefinitions, bufBuildDefinition...)
+	protoFiles = append(protoFiles, fromLocalFiles...)
 
 	if manif.Package.Image != "" {
 		if err := loadImage(pkg, manif); err != nil {
@@ -269,7 +272,7 @@ func (r *manifestConverter) manifestToPkg(manif *Manifest) (*pbsubstreams.Packag
 		return nil, nil, nil, fmt.Errorf("error handling use modules: %w", err)
 	}
 
-	return pkg, protoDefinitions, r.sinkConfigDynamicMessage, nil
+	return pkg, protoFiles, r.sinkConfigDynamicMessage, nil
 }
 
 func (m *Manifest) readFileFromName(filename string) ([]byte, error) {

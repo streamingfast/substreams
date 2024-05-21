@@ -1,0 +1,19 @@
+specVersion: v0.1.0
+package:
+  name: "substreams_with_unknown_exports"
+  version: v0.1.0
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: ./target/wasm32-unknown-unknown/release/substreams_with_unknown_exports.wasm
+
+modules:
+  - name: map_block
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.substreams.v1.test.Block
+    output:
+      type: proto:google.protobuf.Any
+

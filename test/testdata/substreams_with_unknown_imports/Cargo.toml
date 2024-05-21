@@ -1,0 +1,21 @@
+[package]
+name = "substreams-with-unknown-exports"
+version = "0.1.0"
+description = "Substream test project"
+edition = "2021"
+repository = "n/a"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+prost = "^0.11.0"
+prost-types = "^0.11.0"
+substreams = "0.5.17"
+solana-program = "1.18"
+solana-sdk-macro = "1.18"
+
+[profile.release]
+lto = true
+opt-level = 's'
+strip = "debuginfo"

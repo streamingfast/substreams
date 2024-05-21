@@ -176,8 +176,43 @@ func (m *Module) instantiateModule(ctx context.Context) (api.Module, error) {
 			return nil, fmt.Errorf("instantiating host module %q: %w", hostMod.Name(), err)
 		}
 	}
+
+	// This must happen after the host modules are instantiated and just before we actually instantiate the user module.
+	// This is to ensure that we do not bind moddules that would be provided by us.
+	for moduleName, byModule := range m.gatherUnboundedModuleImports() {
+		hostMod, err := addUnboundedModule(ctx, m.wazRuntime, moduleName, byModule)
+		if err != nil {
+			return nil, fmt.Errorf("creating unbounded module %q: %w", moduleName, err)
+		}
+
+		_, err = m.wazRuntime.InstantiateModule(ctx, hostMod, m.wazModuleConfig.WithName(hostMod.Name()))
+		if err != nil {
+			return nil, fmt.Errorf("instantiating unbounded module %q: %w", moduleName, err)
+		}
+	}
+
 	mod, err := m.wazRuntime.InstantiateModule(ctx, m.userModule, m.wazModuleConfig.WithName(""))
 	return mod, err
+}
+
+func (m *Module) gatherUnboundedModuleImports() map[string]map[string]api.FunctionDefinition {
+	importsByModule := map[string]map[string]api.FunctionDefinition{}
+	for _, definition := range m.userModule.ImportedFunctions() {
+		moduleName, importName, _ := definition.Import()
+		if m.wazRuntime.Module(moduleName) != nil {
+			continue
+		}
+
+		byModule, found := importsByModule[moduleName]
+		if !found {
+			byModule = make(map[string]api.FunctionDefinition)
+			importsByModule[moduleName] = byModule
+		}
+
+		byModule[importName] = definition
+	}
+
+	return importsByModule
 }
 
 func addExtensionFunctions(ctx context.Context, runtime wazero.Runtime, registry *wasm.Registry) (out []wazero.CompiledModule, err error) {
@@ -228,6 +263,20 @@ func AddHostFunctions(ctx context.Context, runtime wazero.Runtime, moduleName st
 			WithGoModuleFunction(f.f, f.input, f.output).
 			WithName(f.name).
 			Export(f.name)
+	}
+	return build.Compile(ctx)
+}
+
+func addUnboundedModule(ctx context.Context, runtime wazero.Runtime, moduleName string, imports map[string]api.FunctionDefinition) (wazero.CompiledModule, error) {
+	build := runtime.NewHostModuleBuilder(moduleName)
+
+	for importName, f := range imports {
+		build.NewFunctionBuilder().
+			WithGoFunction(api.GoFunc(func(ctx context.Context, stack []uint64) {
+				panic(fmt.Errorf("you are trying to call %q from module %q for which Substreams provided a dummy"+
+					" implementation, you are allowed to have it referenced but it's forbidden to call it since"+
+					" we cannot provide a real implementation for it", importName, moduleName))
+			}), f.ParamTypes(), f.ResultTypes()).WithName(importName).Export(importName)
 	}
 	return build.Compile(ctx)
 }

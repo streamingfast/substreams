@@ -11,7 +11,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## 1.7.0
 
-* added store with update policy `set_sum` which allows the store to either sum a numerical value, or set it to a new value.
+* Added store with update policy `set_sum` which allows the store to either sum a numerical value, or set it to a new value.
+
+* Re-added Ethereum Sepolia support in `substreams init`.
+
+* Fixed a bug with the new `descriptorSets` feature that wasn't ordered properly to correctly generate Protobuf bindings.
 
 ## v1.6.2
 
@@ -20,7 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v1.6.1
 
-* Revert sanity check to support the special case of a substreams with only 'params' as input. This allows a chain-agnostic event to be sent, along with the clock. 
+* Revert sanity check to support the special case of a substreams with only 'params' as input. This allows a chain-agnostic event to be sent, along with the clock.
 * Fix error handling when resolved start-block == stop-block and stop-block is defined as non-zero
 
 ## v1.6.0
@@ -148,7 +152,7 @@ Performance, memory leak and bug fixes
 ### Client
 
 * Implement a `use` feature, enabling a module to use an existing module by overriding its inputs or initial block. (Inputs should have the same output type than override module's inputs).
-  Check a usage of this new feature on the [substreams-db-graph-converter](https://github.com/streamingfast/substreams-db-graph-converter/) repository. 
+  Check a usage of this new feature on the [substreams-db-graph-converter](https://github.com/streamingfast/substreams-db-graph-converter/) repository.
 
 * Fix panic when using '--header (-H)' flag on `gui` command
 
@@ -176,7 +180,7 @@ Some redundant reprocessing has been removed, along with a better usage of cache
 
 ### Operator concerns
 
-* Tier2 service now supports a maximum concurrent requests limit. Default set to 0 (unlimited). 
+* Tier2 service now supports a maximum concurrent requests limit. Default set to 0 (unlimited).
 
 * Readiness metric for Substreams tier1 app is now named `substreams_tier1` (was mistakenly called `firehose` before).
 

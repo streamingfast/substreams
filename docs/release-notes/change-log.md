@@ -11,7 +11,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v1.7.1 (Unreleased)
 
-* Substreams clients now enable gzip compression over the network (already supported by servers)
+### Highlights
+
+- Substreams engine is now able run Rust code that depends on `solana_program` in Solana land to decode and `alloy/ether-rs` in Ethereum land
+
+#### How to use `solana_program` or `alloy/ether-rs`
+
+Those libraries when used in a `wasm32-unknown-unknown` context creates in a bunch of [wasmbindgen](https://rustwasm.github.io/wasm-bindgen/) imports in the resulting Substreams Rust code, imports that led to runtime errors because Substreams engine didn't know about those special imports until today.
+
+The Substreams engine is now able to "shims" those `wasmbindgen` imports enabling you to run code that depends libraries like `solana_program` and `alloy/ether-rs` which are known to pull those `wasmbindgen` imports. This is going to work as long as you do not actually call those special imports, which is almost always the case in normal usage of those libraries.
+
+To enable this feature, you need to explicitly opt-in by appending a `+wasm-bindgen-shims` at the end of the binary's type in your Substreams manifest:
+
+```yaml
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: <some_file>
+```
+
+to become
+
+```yaml
+binaries:
+  default:
+    type: wasm/rust-v1+wasm-bindgen-shims
+    file: <some_file>
+```
+
+### Others
+
+* Substreams clients now enable gzip compression over the network (already supported by servers).
+
+* Substreams binary type can now be optionally composed of runtime extensions by appending a `+<extension>,[<extesions...>]` at the end of the binary type. Extensions are `key[=value]` that are runtime specifics.
+
+  > [!NOTE]
+  > If you were a library author and parsing generic Substreams manifest(s), you will now need to handle that possibility in the binary type. If you were reading the field without any processing, you don't have to change nothing.
 
 ## v1.7.0
 

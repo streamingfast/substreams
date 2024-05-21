@@ -2,6 +2,8 @@ package wasm
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
@@ -63,6 +65,20 @@ type Instance interface {
 	// freed from memory.  When using cached instances, this won't be called between
 	// each execution, but only at the end of a user's request.
 	Close(ctx context.Context) error
+}
+
+func ParseWASMCodeType(wasmCodeType string) (string, RuntimeExtensions, error) {
+	wasmCodeTypeID, rawExtensions, hasExtensions := strings.Cut(wasmCodeType, "+")
+	if !hasExtensions {
+		return wasmCodeTypeID, nil, nil
+	}
+
+	extensions, err := ParseRuntimeExtensions(rawExtensions)
+	if err != nil {
+		return "", nil, fmt.Errorf("parse extensions: %w", err)
+	}
+
+	return wasmCodeTypeID, extensions, nil
 }
 
 var runtimes = map[string]ModuleFactory{}

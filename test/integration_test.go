@@ -364,6 +364,23 @@ func Test_SimpleMapModule(t *testing.T) {
 	require.NoError(t, run.Run(t, "test_map"))
 }
 
+func Test_WASMBindgenShims(t *testing.T) {
+	run := newTestRun(t, 12, 14, 14, "map_block", "./testdata/wasmbindgen_substreams/wasmbindgen-substreams-v0.1.0.spkg")
+	run.NewBlockGenerator = func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+		return &LinearBlockGenerator{
+			startBlock:         startBlock,
+			inclusiveStopBlock: inclusiveStopBlock + 10,
+		}
+	}
+	run.ParallelSubrequests = 1
+
+	require.NoError(t, run.Run(t, "test_wasmbindgenshims"))
+
+	mapOutput := run.MapOutput("map_block")
+	fmt.Println(mapOutput)
+
+}
+
 func Test_Early(t *testing.T) {
 	run := newTestRun(t, 12, 14, 14, "test_map", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 	run.Params = map[string]string{"test_map": "my test params"}

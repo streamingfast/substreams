@@ -57,6 +57,14 @@ var EthereumChainsByID = map[string]*EthereumChain{
 		FirehoseEndpoint:       "goerli.eth.streamingfast.io:443",
 		Network:                "goerli",
 	},
+	"Sepolia": {
+		DisplayName:            "Sepolia Testnet",
+		ExplorerLink:           "https://sepolia.etherscan.io",
+		ApiEndpoint:            "https://api-sepolia.etherscan.io",
+		DefaultContractAddress: "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
+		DefaultContractName:    "UNI Token",
+		FirehoseEndpoint:       "sepolia.streamingfast.io:443",
+	},
 	"Mumbai": {
 		DisplayName:            "Mumbai Testnet",
 		ExplorerLink:           "https://mumbai.polygonscan.com",
@@ -66,14 +74,6 @@ var EthereumChainsByID = map[string]*EthereumChain{
 		FirehoseEndpoint:       "mumbai.streamingfast.io:443",
 		Network:                "mumbai",
 	},
-	// "Sepolia": {
-	// 	DisplayName:            "Sepolia Testnet",
-	// 	ExplorerLink:           "https://sepolia.etherscan.io",
-	// 	ApiEndpoint:            "https://api-sepolia.etherscan.io",
-	// 	DefaultContractAddress: "0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984",
-	// 	DefaultContractName:    "UNI Token",
-	// 	FirehoseEndpoint:       "sepolia.streamingfast.io:443",
-	// },
 }
 
 func init() {

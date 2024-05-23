@@ -47,6 +47,7 @@
   * [Reliability Guarantees](new/common/reliability-guarantees.md)
   * [Deployable Services](new/common/deployable-services.md)
   * [Rust Dependencies](new/develop/rust-crates.md)
+  * [Indexes](new/develop/indexes.md)
   * [Parameterized Modules](new/develop/parameterized-modules.md)
   * [Chain-Specific Extensions](documentation/develop/chain-specific-extensions/README.md)
     * [EVM Chain-Specific Extensions](documentation/develop/chain-specific-extensions/evm-chain-specific-extensions/README.md)

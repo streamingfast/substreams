@@ -611,8 +611,8 @@ func methodToABIConversionMaps(
 	outputString string,
 	err error,
 ) {
+	abiConversionMap = make(map[string]string)
 	if len(parameters) != 0 {
-		abiConversionMap = make(map[string]string)
 		for _, parameter := range parameters {
 			name := xstrings.ToSnakeCase(parameter.Name)
 			name = sanitizeProtoFieldName(name)

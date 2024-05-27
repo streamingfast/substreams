@@ -44,6 +44,13 @@ func TestAllAssertionsInComplex(t *testing.T) {
 			exclusiveEndBlock:  120,
 			moduleName:         "all_assert_init_20",
 		},
+		{
+			name:               "set sum",
+			startBlock:         0,
+			linearHandoffBlock: 100,
+			exclusiveEndBlock:  120,
+			moduleName:         "assert_set_sum_store_0",
+		},
 	}
 
 	for _, c := range cases {

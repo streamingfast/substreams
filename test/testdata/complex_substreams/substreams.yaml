@@ -162,3 +162,20 @@ modules:
       - store: fourth_store_init_52          
     output:
         type: proto:sf.substreams.v1.test.MapResult
+
+  - name: set_sum_store_init_0
+    kind: store
+    initialBlock: 0
+    updatePolicy: set_sum
+    valueType: int64
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_set_sum_store_0
+    kind: map
+    initialBlock: 0
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: set_sum_store_init_0
+    output:
+      type: proto:sf.substreams.v1.test.Boolean

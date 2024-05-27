@@ -4,11 +4,11 @@ use crate::pb::test;
 use crate::pb::keys;
 use substreams::errors::Error;
 use substreams::prelude::*;
-use substreams::store::StoreAdd;
+use substreams::store::{StoreAdd, StoreSetSum, StoreSetSumInt64};
 use substreams::store::StoreNew;
 use crate::pb::test::Block;
 use substreams::{store, Hex};
-
+use log::log;
 
 
 #[substreams::handlers::map]
@@ -194,6 +194,37 @@ fn second_map_output_init_50(block: test::Block, third_store: StoreGetInt64, fou
     Ok(out)
 }
 
+#[substreams::handlers::store]
+fn set_sum_store_init_0(block: test::Block, set_sum_store: StoreSetSumInt64) {
+    if block.number < 80 {
+        set_sum_store.sum(0, "sum", block.number as i64);
+    } else {
+        set_sum_store.set(0, "sum", 99999);
+    }
+}
+
+#[substreams::handlers::map]
+fn assert_set_sum_store_0(block: test::Block, set_sum_store: StoreGetInt64) -> Result<test::Boolean, Error> {
+    let expected_sum: i64;
+    if block.number == 0 {
+        expected_sum = 0;
+    } else if block.number == 1 {
+        expected_sum = 1;
+    } else {
+        expected_sum = ((block.number * (block.number + 1)) / 2) as i64;
+    }
+
+    let sum = set_sum_store.get_last("sum").unwrap();
+    log::info!("sum: {}", sum);
+
+    if block.number < 80 {
+        assert_eq!(sum, expected_sum);
+    } else {
+        assert_eq!(sum, 99999);
+    }
+
+    Ok(test::Boolean { result: true })
+}
 
 
 

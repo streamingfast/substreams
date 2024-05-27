@@ -59,6 +59,7 @@ The `updatePolicy` also defines the merging strategy for identical keys found in
 | `add`               | `int64`, `bigint`, `bigfloat`, `float64` | Values are summed up                                                                                                                                                                                                             |
 | `min`               | `int64`, `bigint`, `bigfloat`, `float64` | The lowest value is kept                                                                                                                                                                                                         |
 | `max`               | `int64`, `bigint`, `bigfloat`, `float64` | The highest value is kept                                                                                                                                                                                                        |
+| `set_sum`           | `int64`, `bigint`, `bigfloat`, `float64` | This type has two methods: `set` to set the value, or `sum` to add the given value to the current value.                                                                                                                         |
 | `append`            | `string`, `bytes`                        | Both keys are concatenated in order. Appended values are limited to 8Kb.  Aggregation pattern examples are available in the [`lib.rs`](https://github.com/streamingfast/substreams-uniswap-v3/blob/develop/src/lib.rs#L760) file |
 
 {% hint style="success" %}
@@ -112,4 +113,8 @@ The definition of `store` method behavior is:
 
 {% hint style="info" %}
 **Note:** When a `store` is set as an input to the module, it is read-only and you cannot modify, update or mutate them.
+{% endhint %}
+
+{% hint style="info" %}
+**Note:** The deltas for a `set_sum` store type are always of type `bytes`, because the values are prepended with either "sum:" or "set:", depending on the method used.
 {% endhint %}

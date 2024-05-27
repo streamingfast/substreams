@@ -226,5 +226,35 @@ fn assert_set_sum_store_0(block: test::Block, set_sum_store: StoreGetInt64) -> R
     Ok(test::Boolean { result: true })
 }
 
+#[substreams::handlers::map]
+fn assert_set_sum_store_deltas_0(block: test::Block, set_sum_store: store::Deltas<DeltaBytes>) -> Result<test::Boolean, Error> {
+    set_sum_store.deltas.iter().for_each(|delta| {
+        if block.number < 80 {
+            if block.number == 0 {
+
+            } else {
+                let old_prefix = &delta.old_value[0..3];
+                assert_eq!(String::from_utf8(old_prefix.into()).unwrap(), "sum");
+            }
+
+            let new_prefix = &delta.new_value[0..3];
+            assert_eq!(String::from_utf8(new_prefix.into()).unwrap(), "sum");
+        } else {
+            if block.number == 80 {
+                let old_prefix = &delta.old_value[0..3];
+                assert_eq!(String::from_utf8(old_prefix.into()).unwrap(), "sum");
+            } else {
+                let old_prefix = &delta.old_value[0..3];
+                assert_eq!(String::from_utf8(old_prefix.into()).unwrap(), "set");
+            }
+
+            let prefix = &delta.new_value[0..3];
+            assert_eq!(String::from_utf8(prefix.into()).unwrap(), "set");
+        }
+    });
+
+    Ok(test::Boolean { result: true })
+}
+
 
 

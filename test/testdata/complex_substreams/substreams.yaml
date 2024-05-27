@@ -179,3 +179,13 @@ modules:
       - store: set_sum_store_init_0
     output:
       type: proto:sf.substreams.v1.test.Boolean
+
+  - name: assert_set_sum_store_deltas_0
+    kind: map
+    initialBlock: 0
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: set_sum_store_init_0
+        mode: deltas
+    output:
+      type: proto:sf.substreams.v1.test.Boolean

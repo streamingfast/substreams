@@ -217,6 +217,74 @@ func stateDataToFile(ctx context.Context, parts []string, data []byte) error {
 			}
 			call.DoAddBigDecimal(uint64(ordinal), key, i)
 		}
+	case "setsum":
+		cmd := parts[3]
+		var sum bool
+		switch cmd {
+		case "set":
+		case "sum":
+			sum = true
+		default:
+			return fmt.Errorf("unknown command %q", cmd)
+		}
+
+		ord := parts[4]
+		ordinal, err := strconv.Atoi(ord)
+		if err != nil {
+			return fmt.Errorf("parsing ordinal %q: %w", ord, err)
+		}
+		key := parts[5]
+		dataType := parts[2]
+		switch dataType {
+		case "int64":
+			i, err := int64FromByteString(data)
+			if err != nil {
+				return fmt.Errorf("parsing int64 from byte string: %w", err)
+			}
+			var value string
+			if sum {
+				value = fmt.Sprintf("sum:%d", i)
+			} else {
+				value = fmt.Sprintf("set:%d", i)
+			}
+			call.DoSetSumInt64(uint64(ordinal), key, value)
+		case "float64":
+			i, err := float64FromByteString(data)
+			if err != nil {
+				return fmt.Errorf("parsing float64 from byte string: %w", err)
+			}
+			var value string
+			if sum {
+				value = fmt.Sprintf("sum:%f", i)
+			} else {
+				value = fmt.Sprintf("set:%f", i)
+			}
+			call.DoSetSumFloat64(uint64(ordinal), key, value)
+		case "bigint":
+			i, err := bigIntStringFromByteString(data)
+			if err != nil {
+				return fmt.Errorf("parsing big int from byte string: %w", err)
+			}
+			var value string
+			if sum {
+				value = fmt.Sprintf("sum:%s", i)
+			} else {
+				value = fmt.Sprintf("set:%s", i)
+			}
+			call.DoSetSumBigInt(uint64(ordinal), key, value)
+		case "bigfloat":
+			i, err := bigFloatStringFromByteString(data)
+			if err != nil {
+				return fmt.Errorf("parsing big float from byte string: %w", err)
+			}
+			var value string
+			if sum {
+				value = fmt.Sprintf("sum:%s", i)
+			} else {
+				value = fmt.Sprintf("set:%s", i)
+			}
+			call.DoSetSumBigDecimal(uint64(ordinal), key, value)
+		}
 	case "max":
 		ord := parts[3]
 		ordinal, err := strconv.Atoi(ord)

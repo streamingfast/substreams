@@ -156,6 +156,34 @@ func (c *Call) DoAddFloat64(ord uint64, key string, value float64) {
 	c.outputStore.SumFloat64(ord, key, value)
 	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
 }
+func (c *Call) DoSetSumBigInt(ord uint64, key string, value string) {
+	now := time.Now()
+	c.validateSimple("set_sum_bigint", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, key)
+
+	c.outputStore.SetSumBigInt(ord, key, []byte(value))
+	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+}
+func (c *Call) DoSetSumBigDecimal(ord uint64, key string, value string) {
+	now := time.Now()
+	c.validateSimple("set_sum_bigdecimal", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, key)
+
+	c.outputStore.SetSumBigDecimal(ord, key, []byte(value))
+	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+}
+func (c *Call) DoSetSumInt64(ord uint64, key string, value string) {
+	now := time.Now()
+	c.validateSimple("set_sum_int64", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, key)
+
+	c.outputStore.SetSumInt64(ord, key, []byte(value))
+	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+}
+func (c *Call) DoSetSumFloat64(ord uint64, key string, value string) {
+	now := time.Now()
+	c.validateSimple("set_sum_float64", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, key)
+
+	c.outputStore.SetSumFloat64(ord, key, []byte(value))
+	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+}
 func (c *Call) DoSetMinInt64(ord uint64, key string, value int64) {
 	now := time.Now()
 	c.validateWithValueType("set_min_int64", pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, "int64", key)

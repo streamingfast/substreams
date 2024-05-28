@@ -262,6 +262,10 @@ func validateStoreBuilder(module *Module) error {
 		"set_if_not_exists:bigint",
 		"set_if_not_exists:int64",
 		"set_if_not_exists:float64",
+		"set_sum:bigint",
+		"set_sum:int64",
+		"set_sum:bigdecimal",
+		"set_sum:float64",
 		"append:bytes",
 		"append:string",
 	}
@@ -421,6 +425,7 @@ const (
 	UpdatePolicyMax            = "max"
 	UpdatePolicyMin            = "min"
 	UpdatePolicyAppend         = "append"
+	UpdatePolicySetSum         = "set_sum"
 )
 
 func (m *Module) setKindToProto(pbModule *pbsubstreams.Module) {
@@ -452,6 +457,8 @@ func (m *Module) setKindToProto(pbModule *pbsubstreams.Module) {
 			updatePolicy = pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN
 		case UpdatePolicyAppend:
 			updatePolicy = pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND
+		case UpdatePolicySetSum:
+			updatePolicy = pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM
 		default:
 			panic(fmt.Sprintf("invalid update policy %s", m.UpdatePolicy))
 		}

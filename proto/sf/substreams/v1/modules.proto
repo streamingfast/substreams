@@ -74,6 +74,8 @@ message Module {
       UPDATE_POLICY_MAX = 5;
       // Provides a store where you can `append()` keys, where two stores merge by concatenating the bytes in order.
       UPDATE_POLICY_APPEND = 6;
+      // Provides a store with both `set()` and `sum()` functions.
+      UPDATE_POLICY_SET_SUM = 7;
     }
   }
 

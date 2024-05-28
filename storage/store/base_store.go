@@ -132,6 +132,14 @@ func (b *baseStore) Flush() error {
 				return err
 			}
 			b.sumBigDecimal(op.Ord, op.Key, val)
+		case pbssinternal.Operation_SET_SUM_INT64:
+			b.setSumInt64(op.Ord, op.Key, op.Value)
+		case pbssinternal.Operation_SET_SUM_FLOAT64:
+			b.setSumFloat64(op.Ord, op.Key, op.Value)
+		case pbssinternal.Operation_SET_SUM_BIG_DECIMAL:
+			b.setSumBigDecimal(op.Ord, op.Key, op.Value)
+		case pbssinternal.Operation_SET_SUM_BIG_INT:
+			b.setSumBigInt(op.Ord, op.Key, op.Value)
 		}
 		b.lastOrdinal = op.Ord
 	}

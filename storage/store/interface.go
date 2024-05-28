@@ -47,6 +47,11 @@ type Store interface {
 	SumInt64Setter
 	SumFloat64Setter
 	SumBigDecimalSetter
+
+	SetSumInt64Setter
+	SetSumFloat64Setter
+	SetSumBigIntSetter
+	SetSumBigDecimalSetter
 }
 
 type PartialStore interface {
@@ -162,4 +167,17 @@ type SumFloat64Setter interface {
 }
 type SumBigDecimalSetter interface {
 	SumBigDecimal(ord uint64, key string, value decimal.Decimal)
+}
+
+type SetSumInt64Setter interface {
+	SetSumInt64(ord uint64, key string, value []byte)
+}
+type SetSumFloat64Setter interface {
+	SetSumFloat64(ord uint64, key string, value []byte)
+}
+type SetSumBigIntSetter interface {
+	SetSumBigInt(ord uint64, key string, value []byte)
+}
+type SetSumBigDecimalSetter interface {
+	SetSumBigDecimal(ord uint64, key string, value []byte)
 }

@@ -1,2 +1,2 @@
-generate.sh - Thu May  9 15:30:42 EDT 2024 - cbillett
-streamingfast/proto revision: cc24a209c93bf8f4df465a9103c645f2a3d0b13d
+generate.sh - Tue May 14 10:56:19 EDT 2024 - colindickson
+streamingfast/proto revision: a80e97b992e57aced986e8fc42a68ffd8ef75e0c

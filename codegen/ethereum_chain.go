@@ -9,7 +9,7 @@ package codegen
 // Polygon
 // Goerli
 // Mumbai
-// // Sepolia
+// Sepolia
 // Other
 //
 // )

@@ -312,6 +312,7 @@ The values for `modules[].updatePolicy` are defined using specific rules stating
 * `add`, sum the two keys' values
 * `min`, min between two keys' values
 * `max`, max between two keys' values
+* `set_sum`, either `set` the value or `sum` the two keys' values
 
 #### Module `valueType`
 

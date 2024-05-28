@@ -127,6 +127,58 @@ var StateFuncs = []funcs{
 		}),
 	},
 	{
+		"set_sum_bigint",
+		[]parm{i64, i32, i32, i32, i32},
+		[]parm{},
+		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
+			ord := stack[0]
+			key := readStringFromStack(mod, stack[1:])
+			value := readStringFromStack(mod, stack[3:])
+			call := wasm.FromContext(ctx)
+
+			call.DoSetSumBigInt(ord, key, value)
+		}),
+	},
+	{
+		"set_sum_bigdecimal",
+		[]parm{i64, i32, i32, i32, i32},
+		[]parm{},
+		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
+			ord := stack[0]
+			key := readStringFromStack(mod, stack[1:])
+			value := readStringFromStack(mod, stack[3:])
+			call := wasm.FromContext(ctx)
+
+			call.DoSetSumBigDecimal(ord, key, value)
+		}),
+	},
+	{
+		"set_sum_int64",
+		[]parm{i64, i32, i32, i32, i32},
+		[]parm{},
+		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
+			ord := stack[0]
+			key := readStringFromStack(mod, stack[1:])
+			value := readStringFromStack(mod, stack[3:])
+			call := wasm.FromContext(ctx)
+
+			call.DoSetSumInt64(ord, key, value)
+		}),
+	},
+	{
+		"set_sum_float64",
+		[]parm{i64, i32, i32, i32, i32},
+		[]parm{},
+		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
+			ord := stack[0]
+			key := readStringFromStack(mod, stack[1:])
+			value := readStringFromStack(mod, stack[3:])
+			call := wasm.FromContext(ctx)
+
+			call.DoSetSumFloat64(ord, key, value)
+		}),
+	},
+	{
 		"set_min_int64",
 		[]parm{i64, i32, i32, i64},
 		[]parm{},

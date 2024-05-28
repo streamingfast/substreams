@@ -43,6 +43,10 @@ message Operation {
         SUM_INT64 = 15;
         SUM_FLOAT64 = 16;
         SUM_BIG_DECIMAL = 17;
+        SET_SUM_INT64 = 18;
+        SET_SUM_FLOAT64 = 19;
+        SET_SUM_BIG_INT = 20;
+        SET_SUM_BIG_DECIMAL = 21;
     }
 
     Type type = 1;

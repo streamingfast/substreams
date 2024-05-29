@@ -1,6 +1,8 @@
 package main
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -107,7 +109,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		for idx, generator := range resp.Msg.Generators {
 			fmt.Printf("%d. %s - %s\n%s\n\n", idx+1, bold(generator.Id), generator.Title, generator.Description)
 		}
-		fmt.Println("Run `substreams init --type` with the desired code generator ID to start a new project.")
+		fmt.Println("Run `substreams init --generator` with the desired code generator ID to start a new project.")
 		return nil
 	} else {
 		if lastState.GeneratorID == "" {
@@ -129,6 +131,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	if lastState.State != nil {
 		startMsg.Hydrate = &pbconvo.UserInput_Hydrate{SavedState: string(lastState.State)}
 	}
+
 	err := sendFunc(&pbconvo.UserInput{
 		Entry: &pbconvo.UserInput_Start_{
 			Start: startMsg,
@@ -170,11 +173,11 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 
 		switch msg := resp.Entry.(type) {
 		case *pbconvo.SystemOutput_Message_:
-
 			msgString := msg.Message.Markdown
 			if msg.Message.Style == "error" {
 				msgString = "⚠️ " + msg.Message.Markdown
 			}
+
 			fmt.Print(toMarkdown(msgString))
 
 		case *pbconvo.SystemOutput_ImageWithText_:
@@ -325,6 +328,8 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 
 		case *pbconvo.SystemOutput_Loading_:
 			input := msg.Loading
+
+			fmt.Println("INPUT LOADING", input.Loading)
 			if input.Loading {
 				if loadingCh != nil {
 					loadingCh <- false
@@ -339,8 +344,8 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				if loadingCh != nil {
 					loadingCh <- true
 					loadingCh = nil
+					fmt.Println(msg.Loading.Label)
 				}
-				fmt.Println(msg.Loading.Label)
 			}
 
 		case *pbconvo.SystemOutput_DownloadFiles_:
@@ -349,6 +354,10 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			for _, file := range input.Files {
 				fmt.Printf("  - %s (%s)\n", file.Filename, file.Type)
 				fmt.Println(toMarkdown(file.Description))
+			}
+
+			if len(input.Files) == 0 {
+				return fmt.Errorf("no files to download")
 			}
 
 			spkgRoot := filepath.Base(input.Files[0].Filename)
@@ -364,22 +373,63 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				Inline(true).
 				Value(&unpackSource)
 
-			err := huh.NewForm(huh.NewGroup(confirm)).WithAccessible(WITH_ACCESSIBLE).Run()
+			err = huh.NewForm(huh.NewGroup(confirm)).WithAccessible(WITH_ACCESSIBLE).Run()
 			if err != nil {
 				return fmt.Errorf("failed confirming: %w", err)
 			}
 
 			// TODO: offer to write to a different place, or add ` (1)` at the end of the filename
+
+			//Saving zip file
+			err := os.WriteFile(input.Files[0].Filename, input.Files[0].Content, os.ModePerm)
+			if err != nil {
+				return fmt.Errorf("saving zip file %q: %w", input.Files[0].Filename, err)
+			}
 			// if there's conflict.
 			if unpackSource {
-				// TODO: unzip the input.Files[1].Content into the `spkgRoot` directory.
-				fmt.Println("Unzipping", input.Files[1].Filename, "into ./"+spkgRoot)
-				fmt.Println("TODO...")
+				fileData := input.Files[0].Content
+				reader := bytes.NewReader(fileData)
+				zipReader, err := zip.NewReader(reader, int64(len(fileData)))
+				if err != nil {
+					return err
+				}
+
+				for _, f := range zipReader.File {
+					filePath := filepath.Join(spkgRoot, f.Name)
+					srcFile, err := f.Open()
+					if err != nil {
+						return err
+					}
+					defer srcFile.Close()
+
+					if f.FileInfo().IsDir() {
+						if err := os.MkdirAll(filePath, os.ModePerm); err != nil {
+							panic(err)
+						}
+						continue
+					}
+
+					if err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
+						panic(err)
+					}
+
+					destFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+					if err != nil {
+						return err
+					}
+					defer destFile.Close()
+
+					if _, err = io.Copy(destFile, srcFile); err != nil {
+						return err
+					}
+					fmt.Println("Unzipping", input.Files[0].Filename, "into ./"+spkgRoot)
+					fmt.Println("TODO...")
+				}
+
 			}
 
 			// TODO: shouldn't this be controlled by the remote end? Maybe there's some follow-up messages,
 			// maybe we'll be building three modules in a swift?
-			fmt.Println("")
 			fmt.Println("Everything done!")
 
 			return nil

@@ -132,6 +132,7 @@ func loadDescriptorSets(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.Fil
 			if _, found := seen[fd.GetName()]; found {
 				continue
 			}
+			seen[fd.GetName()] = true
 			out = append(out, fd)
 		}
 	}

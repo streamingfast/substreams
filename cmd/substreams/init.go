@@ -329,7 +329,6 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		case *pbconvo.SystemOutput_Loading_:
 			input := msg.Loading
 
-			fmt.Println("INPUT LOADING", input.Loading)
 			if input.Loading {
 				if loadingCh != nil {
 					loadingCh <- false
@@ -338,6 +337,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				go func(loadingCh chan bool) {
 					_ = spinner.New().Title(msg.Loading.Label).Action(func() {
 						<-loadingCh
+						fmt.Println(msg.Loading.Label)
 					}).Run()
 				}(loadingCh)
 			} else {
@@ -364,80 +364,94 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			spkgRoot = strings.TrimSuffix(spkgRoot, filepath.Ext(spkgRoot))
 			spkgRoot = strings.TrimSuffix(spkgRoot, ".")
 
-			var unpackSource bool
-			confirm := huh.NewConfirm().
-				Title("Unzip source code? ").
-				Description(toMarkdown("Will unpack in **" + spkgRoot + "**")).
-				Affirmative("Yes, unzip sources").
-				Negative("No, I just want the .spkg").
-				Inline(true).
-				Value(&unpackSource)
+			switch input.Files[0].Type {
+			case "application/x-zip":
+				//RECEIVING SOURCE.ZIP
+				var unpackSource bool
+				confirm := huh.NewConfirm().
+					Title("Unzip source code? ").
+					Description(toMarkdown("Will unpack in **" + spkgRoot + "**")).
+					Affirmative("Yes, unzip sources").
+					Negative("No, I just want the .spkg").
+					Inline(true).
+					Value(&unpackSource)
 
-			err = huh.NewForm(huh.NewGroup(confirm)).WithAccessible(WITH_ACCESSIBLE).Run()
-			if err != nil {
-				return fmt.Errorf("failed confirming: %w", err)
-			}
-
-			// TODO: offer to write to a different place, or add ` (1)` at the end of the filename
-
-			//Saving zip file
-			err := os.WriteFile(input.Files[0].Filename, input.Files[0].Content, os.ModePerm)
-			if err != nil {
-				return fmt.Errorf("saving zip file %q: %w", input.Files[0].Filename, err)
-			}
-			// if there's conflict.
-			if unpackSource {
-				fileData := input.Files[0].Content
-				reader := bytes.NewReader(fileData)
-				zipReader, err := zip.NewReader(reader, int64(len(fileData)))
+				err = huh.NewForm(huh.NewGroup(confirm)).WithAccessible(WITH_ACCESSIBLE).Run()
 				if err != nil {
-					return err
+					return fmt.Errorf("failed confirming: %w", err)
 				}
 
-				for _, f := range zipReader.File {
-					filePath := filepath.Join(spkgRoot, f.Name)
-					srcFile, err := f.Open()
+				// TODO: offer to write to a different place, or add ` (1)` at the end of the filename
+
+				//Saving zip file
+				err := os.WriteFile(input.Files[0].Filename, input.Files[0].Content, os.ModePerm)
+				if err != nil {
+					return fmt.Errorf("saving zip file %q: %w", input.Files[0].Filename, err)
+				}
+				// if there's conflict.
+				if unpackSource {
+					fileData := input.Files[0].Content
+					reader := bytes.NewReader(fileData)
+					zipReader, err := zip.NewReader(reader, int64(len(fileData)))
 					if err != nil {
 						return err
 					}
-					defer srcFile.Close()
 
-					if f.FileInfo().IsDir() {
-						if err := os.MkdirAll(filePath, os.ModePerm); err != nil {
+					for _, f := range zipReader.File {
+						filePath := filepath.Join(spkgRoot, f.Name)
+						srcFile, err := f.Open()
+						if err != nil {
+							return err
+						}
+						defer srcFile.Close()
+
+						if f.FileInfo().IsDir() {
+							if err := os.MkdirAll(filePath, os.ModePerm); err != nil {
+								panic(err)
+							}
+							continue
+						}
+
+						if err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
 							panic(err)
 						}
-						continue
+
+						destFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+						if err != nil {
+							return err
+						}
+						defer destFile.Close()
+
+						if _, err = io.Copy(destFile, srcFile); err != nil {
+							return err
+						}
+						fmt.Println("Unzipping", input.Files[0].Filename, "into ./"+spkgRoot)
+						fmt.Println("TODO...")
 					}
 
-					if err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
-						panic(err)
-					}
-
-					destFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
-					if err != nil {
-						return err
-					}
-					defer destFile.Close()
-
-					if _, err = io.Copy(destFile, srcFile); err != nil {
-						return err
-					}
-					fmt.Println("Unzipping", input.Files[0].Filename, "into ./"+spkgRoot)
-					fmt.Println("TODO...")
 				}
 
+			case "application/x-protobuf; messageType=\"sf.substreams.v1.Package\"":
+				//RECEIVING SPKG
+				filePath := filepath.Join(spkgRoot, input.Files[1].Filename)
+				err = os.WriteFile(filePath, input.Files[1].Content, os.ModePerm)
+				if err != nil {
+					return fmt.Errorf("saving spkg file : %w", err)
+				}
+
+				fmt.Println("Compilation Logs:")
+				fmt.Println(string(input.Files[2].Content))
 			}
-
-			// TODO: shouldn't this be controlled by the remote end? Maybe there's some follow-up messages,
-			// maybe we'll be building three modules in a swift?
-			fmt.Println("Everything done!")
-
-			return nil
-
 		default:
 			fmt.Printf("Received unknown message type: %T\n", resp.Entry)
+
 		}
 	}
+
+	// TODO: shouldn't this be controlled by the remote end? Maybe there's some follow-up messages,
+	// maybe we'll be building three modules in a swift?
+
+	fmt.Println("Everything done!")
 
 	return nil
 }

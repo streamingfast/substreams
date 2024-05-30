@@ -15,7 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Substreams engine is now able run Rust code that depends on `solana_program` in Solana land to decode and `alloy/ether-rs` in Ethereum land
 
-#### How to use `solana_program` or `alloy/ether-rs`
+#### How to use `solana_program` or `alloy`/`ether-rs`
 
 Those libraries when used in a `wasm32-unknown-unknown` context creates in a bunch of [wasmbindgen](https://rustwasm.github.io/wasm-bindgen/) imports in the resulting Substreams Rust code, imports that led to runtime errors because Substreams engine didn't know about those special imports until today.
 
@@ -47,6 +47,10 @@ binaries:
 
   > [!NOTE]
   > If you were a library author and parsing generic Substreams manifest(s), you will now need to handle that possibility in the binary type. If you were reading the field without any processing, you don't have to change nothing.
+
+* Fixed a failure in protogen where duplicate files would "appear multiple times" and fail.
+
+* Fixed bug with block rate underflow in `gui`.
 
 ## v1.7.0
 

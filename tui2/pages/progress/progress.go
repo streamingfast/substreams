@@ -185,6 +185,10 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			newBars[i] = newBar
 		}
 
+		if totalProcessedBlocks < p.lastCheckpointBlocks {
+			break
+		}
+
 		var mustResize bool
 		if len(newSlowestJobs) != len(p.slowestJobs) {
 			mustResize = true

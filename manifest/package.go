@@ -363,7 +363,12 @@ func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package
 			return nil, fmt.Errorf("module %q refers to %sbinary %q, which is not defined in the 'binaries' section of the manifest", mod.Name, implicit, binaryName)
 		}
 
-		switch binaryDef.Type {
+		wasmCodeTypeID, _ := SplitBinaryType(binaryDef.Type)
+		if err != nil {
+			return nil, fmt.Errorf("module %q: invalid code type %q: %w", mod.Name, binaryDef.Type, err)
+		}
+
+		switch wasmCodeTypeID {
 		case "wasm/rust-v1", "wasip1/tinygo-v1":
 			// OPTIM(abourget): also check if it's not already in
 			// `Binaries`, by comparing its, length + hash or value.

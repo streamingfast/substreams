@@ -41,6 +41,8 @@ binaries:
 
 ### Others
 
+* substreams.yaml now supports `localPath` attribute under  `protobuf.descriptorSets`, so you can pre-build a descriptor set using `buf build --as-file-descriptor-set -o myfile.binpb` and add it directly to your substreams package.
+
 * Substreams clients now enable gzip compression over the network (already supported by servers).
 
 * Substreams binary type can now be optionally composed of runtime extensions by appending a `+<extension>,[<extesions...>]` at the end of the binary type. Extensions are `key[=value]` that are runtime specifics.

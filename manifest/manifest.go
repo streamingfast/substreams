@@ -85,9 +85,10 @@ type Protobuf struct {
 }
 
 type BufImport struct {
-	Module  string   `yaml:"module"`
-	Version string   `yaml:"version"`
-	Symbols []string `yaml:"symbols"`
+	LocalPath string   `yaml:"localPath,omitempty"`
+	Module    string   `yaml:"module"`
+	Version   string   `yaml:"version"`
+	Symbols   []string `yaml:"symbols"`
 }
 
 type Module struct {

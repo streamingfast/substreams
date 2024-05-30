@@ -52,7 +52,7 @@ func init() {
 	rootCmd.AddCommand(initCmd)
 }
 
-var INIT_TRACE = true
+var INIT_TRACE = false
 var WITH_ACCESSIBLE = false
 
 type initStateFormat struct {

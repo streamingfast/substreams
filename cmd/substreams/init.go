@@ -52,7 +52,7 @@ func init() {
 	rootCmd.AddCommand(initCmd)
 }
 
-var INIT_TRACE = false
+var INIT_TRACE = true
 var WITH_ACCESSIBLE = false
 
 type initStateFormat struct {
@@ -334,12 +334,14 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					loadingCh <- false
 				}
 				loadingCh = make(chan bool)
+
 				go func(loadingCh chan bool) {
 					_ = spinner.New().Title(msg.Loading.Label).Action(func() {
 						<-loadingCh
 						fmt.Println(msg.Loading.Label)
 					}).Run()
 				}(loadingCh)
+
 			} else {
 				if loadingCh != nil {
 					loadingCh <- true
@@ -360,87 +362,102 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("no files to download")
 			}
 
-			spkgRoot := filepath.Base(input.Files[0].Filename)
-			spkgRoot = strings.TrimSuffix(spkgRoot, filepath.Ext(spkgRoot))
-			spkgRoot = strings.TrimSuffix(spkgRoot, ".")
+			for _, inputFile := range input.Files {
+				switch inputFile.Type {
+				case "application/x-zip":
+					//RECEIVING SOURCE.ZIP
+					zipRoot := getDefaultDirFromFilename(inputFile.Filename)
 
-			switch input.Files[0].Type {
-			case "application/x-zip":
-				//RECEIVING SOURCE.ZIP
-				var unpackSource bool
-				confirm := huh.NewConfirm().
-					Title("Unzip source code? ").
-					Description(toMarkdown("Will unpack in **" + spkgRoot + "**")).
-					Affirmative("Yes, unzip sources").
-					Negative("No, I just want the .spkg").
-					Inline(true).
-					Value(&unpackSource)
+					var savingDest string
+					inputField := huh.NewInput().Title("In which directory do you want to store your source code?").Value(&savingDest)
 
-				err = huh.NewForm(huh.NewGroup(confirm)).WithAccessible(WITH_ACCESSIBLE).Run()
-				if err != nil {
-					return fmt.Errorf("failed confirming: %w", err)
-				}
+					inputField.Suggestions([]string{zipRoot})
 
-				// TODO: offer to write to a different place, or add ` (1)` at the end of the filename
+					inputField.Validate(func(userInput string) error {
+						fileInfo, err := os.Stat(userInput)
+						if err != nil {
+							if os.IsNotExist(err) {
+								return fmt.Errorf("directory %q does not exist", userInput)
+							}
+							return fmt.Errorf("error checking directory: %w", err)
+						}
 
-				//Saving zip file
-				err := os.WriteFile(input.Files[0].Filename, input.Files[0].Content, os.ModePerm)
-				if err != nil {
-					return fmt.Errorf("saving zip file %q: %w", input.Files[0].Filename, err)
-				}
-				// if there's conflict.
-				if unpackSource {
-					fileData := input.Files[0].Content
-					reader := bytes.NewReader(fileData)
-					zipReader, err := zip.NewReader(reader, int64(len(fileData)))
+						if !fileInfo.IsDir() {
+							return errors.New("the path is not a directory")
+						}
+
+						return nil
+					})
+
+					err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run()
 					if err != nil {
-						return err
+						return fmt.Errorf("failed taking input: %w", err)
 					}
 
-					for _, f := range zipReader.File {
-						filePath := filepath.Join(spkgRoot, f.Name)
-						srcFile, err := f.Open()
+					zipRoot = savingDest
+
+					var unpackSource bool
+					confirm := huh.NewConfirm().
+						Title("Unzip source code? ").
+						Description(toMarkdown("Will unpack in **" + savingDest + "**")).
+						Affirmative("Yes, unzip sources").
+						Negative("No").
+						Inline(true).
+						Value(&unpackSource)
+
+					err = huh.NewForm(huh.NewGroup(confirm)).WithAccessible(WITH_ACCESSIBLE).Run()
+					if err != nil {
+						return fmt.Errorf("failed confirming: %w", err)
+					}
+
+					// TODO: offer to write to a different place, or add ` (1)` at the end of the filename
+
+					//Saving zip file
+					err = os.WriteFile(inputFile.Filename, inputFile.Content, os.ModePerm)
+					if err != nil {
+						return fmt.Errorf("saving zip file %q: %w", inputFile.Filename, err)
+					}
+
+					// if there's conflict.
+					if unpackSource {
+						zipContent := inputFile.Content
+						err := unzipFile(zipContent, zipRoot)
 						if err != nil {
-							return err
+							return fmt.Errorf("unzipping file: %w", err)
 						}
-						defer srcFile.Close()
-
-						if f.FileInfo().IsDir() {
-							if err := os.MkdirAll(filePath, os.ModePerm); err != nil {
-								panic(err)
-							}
-							continue
-						}
-
-						if err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
-							panic(err)
-						}
-
-						destFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
-						if err != nil {
-							return err
-						}
-						defer destFile.Close()
-
-						if _, err = io.Copy(destFile, srcFile); err != nil {
-							return err
-						}
-						fmt.Println("Unzipping", input.Files[0].Filename, "into ./"+spkgRoot)
+						fmt.Println("Unzipping", inputFile.Filename, "into ./"+zipRoot)
 						fmt.Println("TODO...")
 					}
 
-				}
+				case "application/x-protobuf; messageType=\"sf.substreams.v1.Package\"":
+					//RECEIVING SPKG
+					spkgRoot := getDefaultDirFromFilename(inputFile.Filename)
 
-			case "application/x-protobuf; messageType=\"sf.substreams.v1.Package\"":
-				//RECEIVING SPKG
-				filePath := filepath.Join(spkgRoot, input.Files[1].Filename)
-				err = os.WriteFile(filePath, input.Files[1].Content, os.ModePerm)
-				if err != nil {
-					return fmt.Errorf("saving spkg file : %w", err)
-				}
+					filePath := filepath.Join(spkgRoot, inputFile.Filename)
 
-				fmt.Println("Compilation Logs:")
-				fmt.Println(string(input.Files[2].Content))
+					if _, err := os.Stat(filePath); err == nil {
+						overwrite, err := creatingOverwriteForm(filePath)
+						if err != nil {
+							return fmt.Errorf(": %w", err)
+						}
+
+						if !overwrite {
+							fmt.Println("Skipping", filePath)
+							continue
+						}
+					}
+
+					err = os.WriteFile(filePath, inputFile.Content, os.ModePerm)
+					if err != nil {
+						return fmt.Errorf("saving spkg file : %w", err)
+					}
+
+				case "text/plain":
+					fmt.Println("Compilation Logs:")
+					fmt.Println(string(inputFile.Content))
+				default:
+					fmt.Println("Unknown file type:", inputFile.Type)
+				}
 			}
 		default:
 			fmt.Printf("Received unknown message type: %T\n", resp.Entry)
@@ -452,13 +469,19 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	// maybe we'll be building three modules in a swift?
 
 	fmt.Println("Everything done!")
-
 	return nil
 }
 
 type initListElement struct {
 	Label string
 	Value string
+}
+
+func getDefaultDirFromFilename(filename string) string {
+	spkgRoot := filepath.Base(filename)
+	spkgRoot = strings.TrimSuffix(spkgRoot, filepath.Ext(spkgRoot))
+	spkgRoot = strings.TrimSuffix(spkgRoot, ".")
+	return spkgRoot
 }
 
 func toMarkdown(input string) string {
@@ -475,4 +498,73 @@ func toMarkdown(input string) string {
 
 func bold(input string) string {
 	return lipgloss.NewStyle().Bold(true).Render(input)
+}
+
+func unzipFile(zipContent []byte, zipRoot string) error {
+	reader := bytes.NewReader(zipContent)
+	zipReader, err := zip.NewReader(reader, int64(len(zipContent)))
+	if err != nil {
+		return err
+	}
+
+	for _, f := range zipReader.File {
+		filePath := filepath.Join(zipRoot, f.Name)
+
+		if _, err := os.Stat(filePath); err == nil {
+			overwrite, err := creatingOverwriteForm(filePath)
+			if err != nil {
+				return fmt.Errorf(": %w", err)
+			}
+
+			if !overwrite {
+				fmt.Println("Skipping", filePath)
+				continue
+			}
+		}
+
+		srcFile, err := f.Open()
+		if err != nil {
+			return err
+		}
+		defer srcFile.Close()
+
+		if f.FileInfo().IsDir() {
+			if err := os.MkdirAll(filePath, os.ModePerm); err != nil {
+				return (err)
+			}
+			continue
+		}
+
+		if err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
+			return (err)
+		}
+		destFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+		if err != nil {
+			return err
+		}
+		defer destFile.Close()
+
+		if _, err = io.Copy(destFile, srcFile); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func creatingOverwriteForm(path string) (bool, error) {
+	var overwrite bool
+	confirm := huh.NewConfirm().
+		Title("File already exists").
+		Description(toMarkdown("Do you want to overwrite **" + path + "**?")).
+		Affirmative("Yes, overwrite").
+		Negative("No").
+		Inline(true).
+		Value(&overwrite)
+
+	err := huh.NewForm(huh.NewGroup(confirm)).WithAccessible(WITH_ACCESSIBLE).Run()
+	if err != nil {
+		return false, fmt.Errorf("failed confirming: %w", err)
+	}
+
+	return overwrite, nil
 }

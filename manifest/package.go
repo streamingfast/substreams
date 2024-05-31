@@ -196,9 +196,6 @@ func checkEqualInputs(moduleWithUse, usedModule *pbsubstreams.Module, manifestMo
 			if usedModuleInput.GetParams() == nil {
 				return fmt.Errorf("module %q: input %q is not a params type", manifestModuleWithUse.Name, input.String())
 			}
-			if input.GetParams().Value != usedModuleInput.GetParams().Value {
-				return fmt.Errorf("module %q: input %q has different value than the used module %q: input %q", manifestModuleWithUse.Name, input.String(), manifestModuleWithUse.Use, usedModuleInput.String())
-			}
 
 		case input.GetStore() != nil:
 			if usedModuleInput.GetStore() == nil {
@@ -347,9 +344,19 @@ func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package
 	moduleCodeIndexes := map[string]int{}
 
 	for _, mod := range m.Modules {
-		pbmeta := &pbsubstreams.ModuleMetadata{
+		pkg.ModuleMeta = append(pkg.ModuleMeta, &pbsubstreams.ModuleMetadata{
 			Doc: mod.Doc,
+		})
+
+		if mod.Use != "" {
+			pbmod, err := mod.ToProtoWASM(0) // the binary index and module will be overriden by th 'use'
+			if err != nil {
+				return nil, err
+			}
+			pkg.Modules.Modules = append(pkg.Modules.Modules, pbmod)
+			continue
 		}
+
 		var pbmod *pbsubstreams.Module
 
 		binaryName := "default"
@@ -394,7 +401,6 @@ func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package
 			return nil, err
 		}
 
-		pkg.ModuleMeta = append(pkg.ModuleMeta, pbmeta)
 		pkg.Modules.Modules = append(pkg.Modules.Modules, pbmod)
 	}
 

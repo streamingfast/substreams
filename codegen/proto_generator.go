@@ -96,6 +96,7 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package, showBufContent
 		}
 		if strings.Contains(err.Error(), "not found") {
 			return fmt.Errorf("error executing 'buf':: %w. Make sure that you have the 'buf' CLI installed: https://buf.build/product/cli", err)
+
 		}
 		return fmt.Errorf("error executing 'buf':: %w", err)
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/jhump/protoreflect/dynamic"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/sqe"
+	"google.golang.org/protobuf/proto"
 )
 
 type manifestConverter struct {
@@ -66,7 +67,7 @@ func (r *manifestConverter) validateManifest(manif *Manifest) error {
 	// TODO: put a limit on the SIZE of the WASM payload (max 10MB per binary?)
 
 	for _, s := range manif.Modules {
-		if s.BlockFilter != nil {
+		if s.BlockFilter != nil && !s.BlockFilter.IsEmpty() {
 			ctx := context.Background()
 			if err := validateQuery(ctx, s.BlockFilter.Query, manif.Params[s.Name]); err != nil {
 				return fmt.Errorf("stream %q: %w", s.Name, err)
@@ -149,6 +150,7 @@ func validateQuery(ctx context.Context, query BlockFilterQuery, param string) er
 	}
 	return nil
 }
+
 func handleUseModules(pkg *pbsubstreams.Package, manif *Manifest) error {
 	packageModulesMapping := make(map[string]*pbsubstreams.Module)
 	for _, module := range pkg.Modules.Modules {
@@ -166,8 +168,12 @@ func handleUseModules(pkg *pbsubstreams.Package, manif *Manifest) error {
 		}
 		moduleWithUse := packageModulesMapping[manifestModule.Name]
 
-		if err := checkEqualInputs(moduleWithUse, usedModule, manifestModule, packageModulesMapping); err != nil {
+		if err := checkUseInputs(moduleWithUse, usedModule, manifestModule, packageModulesMapping); err != nil {
 			return fmt.Errorf("checking inputs for module %q: %w", manifestModule.Name, err)
+		}
+
+		if moduleWithUse.BlockFilter == nil {
+			moduleWithUse.BlockFilter = usedModule.BlockFilter
 		}
 
 		moduleWithUse.BinaryIndex = usedModule.BinaryIndex
@@ -179,7 +185,20 @@ func handleUseModules(pkg *pbsubstreams.Package, manif *Manifest) error {
 	return nil
 }
 
-func checkEqualInputs(moduleWithUse, usedModule *pbsubstreams.Module, manifestModuleWithUse *Module, packageModulesMapping map[string]*pbsubstreams.Module) error {
+func isEmptyMessage(msg *pbsubstreams.Module_BlockFilter) bool {
+	emptyMessage := &pbsubstreams.Module_BlockFilter{}
+	return proto.Equal(msg, emptyMessage)
+}
+
+func checkUseInputs(moduleWithUse, usedModule *pbsubstreams.Module, manifestModuleWithUse *Module, packageModulesMapping map[string]*pbsubstreams.Module) error {
+	if moduleWithUse.Inputs == nil {
+		moduleWithUse.Inputs = usedModule.Inputs
+	}
+
+	if len(moduleWithUse.Inputs) != len(usedModule.Inputs) {
+		return fmt.Errorf("module %q inputs count mismatch with the used module %q", manifestModuleWithUse.Name, manifestModuleWithUse.Use)
+	}
+
 	for index, input := range moduleWithUse.Inputs {
 		usedModuleInput := usedModule.Inputs[index]
 
@@ -205,7 +224,6 @@ func checkEqualInputs(moduleWithUse, usedModule *pbsubstreams.Module, manifestMo
 				return fmt.Errorf("module %q: input %q has different mode than the used module %q: input %q", manifestModuleWithUse.Name, input.String(), manifestModuleWithUse.Use, usedModuleInput.String())
 			}
 
-			// we don't check output, we'll overwrite it with the used module
 		case input.GetMap() != nil:
 			if usedModuleInput.GetMap() == nil {
 				return fmt.Errorf("module %q: input %q is not a map type", manifestModuleWithUse.Name, input.String())
@@ -244,32 +262,71 @@ func (r *manifestConverter) manifestToPkg(manif *Manifest) (*pbsubstreams.Packag
 
 	fromBufBuild, err := loadDescriptorSets(pkg, manif)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error loading protobuf: %w", err)
+		return nil, nil, nil, fmt.Errorf("loading protobuf: %w", err)
 	}
 	protoFiles = append(protoFiles, fromBufBuild...)
 
 	fromLocalFiles, err := loadLocalProtobufs(pkg, manif)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error loading protobuf: %w", err)
+		return nil, nil, nil, fmt.Errorf("loading protobuf: %w", err)
 	}
 
 	protoFiles = append(protoFiles, fromLocalFiles...)
 
 	if manif.Package.Image != "" {
 		if err := loadImage(pkg, manif); err != nil {
-			return nil, nil, nil, fmt.Errorf("error loading image: %w", err)
+			return nil, nil, nil, fmt.Errorf("loading image: %w", err)
 		}
 	}
 
 	if err := r.loadSinkConfig(pkg, manif); err != nil {
-		return nil, nil, nil, fmt.Errorf("error parsing sink configuration: %w", err)
+		return nil, nil, nil, fmt.Errorf("parsing sink configuration: %w", err)
 	}
 
 	if err := handleUseModules(pkg, manif); err != nil {
-		return nil, nil, nil, fmt.Errorf("error handling use modules: %w", err)
+		return nil, nil, nil, fmt.Errorf("handling use modules: %w", err)
 	}
 
+	if err := handleParams(pkg, manif); err != nil {
+		return nil, nil, nil, fmt.Errorf("handling params: %w", err)
+	}
+
+	//Set all empty blockFilter to nil (enables to  override blockFilter by nil for used modules)
+	handleEmptyBlockFilter(pkg, manif)
+
 	return pkg, protoFiles, r.sinkConfigDynamicMessage, nil
+}
+
+func handleEmptyBlockFilter(pkg *pbsubstreams.Package, manif *Manifest) {
+	for _, mod := range pkg.Modules.Modules {
+		if isEmptyMessage(mod.BlockFilter) {
+			mod.BlockFilter = nil
+		}
+	}
+}
+
+func handleParams(pkg *pbsubstreams.Package, manif *Manifest) error {
+	for modName, paramValue := range manif.Params {
+		var modFound bool
+		for _, mod := range pkg.Modules.Modules {
+			if mod.Name == modName {
+				if len(mod.Inputs) == 0 {
+					return fmt.Errorf("params value defined for module %q but module has no inputs defined, add 'params: string' to 'inputs' for module", modName)
+				}
+
+				p := mod.Inputs[0].GetParams()
+				if p == nil {
+					return fmt.Errorf("params value defined for module %q: module %q does not have 'params' as its first input type", modName, modName)
+				}
+				p.Value = paramValue
+				modFound = true
+			}
+		}
+		if !modFound {
+			return fmt.Errorf("params value defined for module %q, but such module is not defined", modName)
+		}
+	}
+	return nil
 }
 
 func (m *Manifest) readFileFromName(filename string) ([]byte, error) {
@@ -353,7 +410,13 @@ func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package
 			if err != nil {
 				return nil, err
 			}
+
+			if err != nil {
+				return nil, fmt.Errorf("handling used module %q for module: %w", mod.Use, mod.Name, err)
+			}
+
 			pkg.Modules.Modules = append(pkg.Modules.Modules, pbmod)
+
 			continue
 		}
 
@@ -402,26 +465,6 @@ func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package
 		}
 
 		pkg.Modules.Modules = append(pkg.Modules.Modules, pbmod)
-	}
-
-	for modName, paramValue := range m.Params {
-		var modFound bool
-		for _, mod := range pkg.Modules.Modules {
-			if mod.Name == modName {
-				if len(mod.Inputs) == 0 {
-					return nil, fmt.Errorf("params value defined for module %q but module has no inputs defined, add 'params: string' to 'inputs' for module", modName)
-				}
-				p := mod.Inputs[0].GetParams()
-				if p == nil {
-					return nil, fmt.Errorf("params value defined for module %q: module %q does not have 'params' as its first input type", modName, modName)
-				}
-				p.Value = paramValue
-				modFound = true
-			}
-		}
-		if !modFound {
-			return nil, fmt.Errorf("params value defined for module %q, but such module is not defined", modName)
-		}
 	}
 
 	return

@@ -112,6 +112,10 @@ type BlockFilter struct {
 	Query  BlockFilterQuery `yaml:"query,omitempty"`
 }
 
+func (bf *BlockFilter) IsEmpty() bool {
+	return bf.Module == "" && bf.Query.String == "" && !bf.Query.Params
+}
+
 type BlockFilterQuery struct {
 	String string `yaml:"string,omitempty"`
 	Params bool   `yaml:"params,omitempty"`

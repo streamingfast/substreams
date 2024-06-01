@@ -10,13 +10,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [Unreleased]
+## v1.7.2
+
+### Improvements on the `use` attribute
 
 - If module with `use` attribute has not `inputs` at all, inputs are replaced by used module inputs
 - If module with `use` attribute has no `blockFilter`, it's replaced by used module `blockFilter`
 - If `blockFilter` is set to `{}`, it will be considered as `nil` in the spkg, enabling module with `use` 
   attribute to override the `blockFilter` by a `nil` one
-
 
 ## v1.7.1
 

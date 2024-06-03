@@ -129,7 +129,7 @@ func (a *Tier1App) Run() error {
 			)
 		})
 
-		forkableHub = hub.NewForkableHub(liveSourceFactory, 500, oneBlocksStore)
+		forkableHub = hub.NewForkableHub(liveSourceFactory, 200, oneBlocksStore)
 		forkableHub.OnTerminated(a.Shutdown)
 
 		go forkableHub.Run()

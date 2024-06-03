@@ -109,6 +109,9 @@ func computeLinearHandoffBlockNum(productionMode bool, startBlock, stopBlock uin
 		libHandoffBoundary := libHandoff - (libHandoff % segmentSize)
 
 		if stopBlock == 0 || libHandoff < stopBlock {
+			if !stateRequired && startBlock > libHandoffBoundary {
+				return startBlock, nil
+			}
 			return libHandoffBoundary, nil
 		}
 

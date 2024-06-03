@@ -412,7 +412,7 @@ func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package
 			}
 
 			if err != nil {
-				return nil, fmt.Errorf("handling used module %q for module: %w", mod.Use, mod.Name, err)
+				return nil, fmt.Errorf("handling used module %q for module %q: %w", mod.Use, mod.Name, err)
 			}
 
 			pkg.Modules.Modules = append(pkg.Modules.Modules, pbmod)

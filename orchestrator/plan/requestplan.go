@@ -76,7 +76,7 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval, lowestInitialBl
 			plan.BuildStores = block.NewRange(lowestInitialBlock, storesEnd)
 		}
 
-		if resolvedStartBlock <= linearHandoffBlock {
+		if resolvedStartBlock < linearHandoffBlock {
 			startExecOutAtBlock := max(resolvedStartBlock, lowestInitialBlock)
 			startExecOutAtSegment := segmenter.IndexForStartBlock(startExecOutAtBlock)
 			writeExecOutStartBlockRange := segmenter.Range(startExecOutAtSegment)

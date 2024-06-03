@@ -371,13 +371,11 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					var savingDest string
 					inputField := huh.NewInput().Title("In which directory do you want to store your source code?").Value(&savingDest)
 
-					inputField.Suggestions([]string{zipRoot})
-
 					inputField.Validate(func(userInput string) error {
 						fileInfo, err := os.Stat(userInput)
 						if err != nil {
 							if os.IsNotExist(err) {
-								return fmt.Errorf("directory %q does not exist", userInput)
+								return nil
 							}
 							return fmt.Errorf("error checking directory: %w", err)
 						}
@@ -410,12 +408,10 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 						return fmt.Errorf("failed confirming: %w", err)
 					}
 
-					// TODO: offer to write to a different place, or add ` (1)` at the end of the filename
-
-					//Saving zip file
-					err = os.WriteFile(inputFile.Filename, inputFile.Content, os.ModePerm)
+					sourcePath := filepath.Join(zipRoot, inputFile.Filename)
+					err = saveDownloadFile(sourcePath, inputFile)
 					if err != nil {
-						return fmt.Errorf("saving zip file %q: %w", inputFile.Filename, err)
+						return fmt.Errorf("saving zip file: %w", err)
 					}
 
 					// if there's conflict.
@@ -447,9 +443,9 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 						}
 					}
 
-					err = os.WriteFile(filePath, inputFile.Content, os.ModePerm)
+					err = saveDownloadFile(spkgRoot, inputFile)
 					if err != nil {
-						return fmt.Errorf("saving spkg file : %w", err)
+						return fmt.Errorf("saving spkg file: %w", err)
 					}
 
 				case "text/plain":
@@ -475,6 +471,20 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 type initListElement struct {
 	Label string
 	Value string
+}
+
+func saveDownloadFile(path string, inputFile *pbconvo.SystemOutput_DownloadFile) (err error) {
+	dir := filepath.Dir(path)
+	err = os.MkdirAll(dir, os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("creating sub-directory %q: %w", path, err)
+	}
+
+	err = os.WriteFile(path, inputFile.Content, os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("saving zip file %q: %w", inputFile.Filename, err)
+	}
+	return nil
 }
 
 func getDefaultDirFromFilename(filename string) string {

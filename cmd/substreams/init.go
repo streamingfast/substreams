@@ -262,8 +262,9 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				if err != nil {
 					return fmt.Errorf("invalid regexp received from server (%q) to validate text input: %w", msg.TextInput.ValidationRegexp, err)
 				}
+
 				inputField.Validate(func(userInput string) error {
-					matched := validationRE.MatchString(userInput)
+					matched := validationRE.MatchString(strings.TrimRight(returnValue, " "))
 					if !matched {
 						return errors.New(input.ValidationErrorMessage)
 					}
@@ -282,7 +283,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			if err := sendFunc(&pbconvo.UserInput{
 				FromActionId: resp.ActionId,
 				Entry: &pbconvo.UserInput_TextInput_{
-					TextInput: &pbconvo.UserInput_TextInput{Value: returnValue},
+					TextInput: &pbconvo.UserInput_TextInput{Value: strings.TrimRight(returnValue, " ")},
 				},
 			}); err != nil {
 				return fmt.Errorf("error sending message: %w", err)
@@ -421,7 +422,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 						if err != nil {
 							return fmt.Errorf("unzipping file: %w", err)
 						}
-						fmt.Println("Unzipping", inputFile.Filename, "into ./"+zipRoot)
+						fmt.Println("Unzipping", inputFile.Filename, "into"+zipRoot)
 						fmt.Println("TODO...")
 					}
 
@@ -478,6 +479,19 @@ func saveDownloadFile(path string, inputFile *pbconvo.SystemOutput_DownloadFile)
 	err = os.MkdirAll(dir, os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("creating sub-directory %q: %w", path, err)
+	}
+
+	overwrite := true
+	if _, err := os.Stat(path); err == nil {
+		overwrite, err = creatingOverwriteForm(path)
+		if err != nil {
+			return fmt.Errorf(": %w", err)
+		}
+	}
+
+	if !overwrite {
+		fmt.Println("Skipping", path)
+		return nil
 	}
 
 	err = os.WriteFile(path, inputFile.Content, os.ModePerm)

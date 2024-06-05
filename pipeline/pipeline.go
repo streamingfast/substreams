@@ -6,26 +6,27 @@ import (
 	"strings"
 	"time"
 
+	"github.com/RoaringBitmap/roaring/roaring64"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dmetering"
-	"go.opentelemetry.io/otel"
-	"go.uber.org/zap"
-
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/orchestrator"
 	"github.com/streamingfast/substreams/orchestrator/plan"
 	"github.com/streamingfast/substreams/orchestrator/response"
+	"github.com/streamingfast/substreams/orchestrator/work"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/cache"
 	"github.com/streamingfast/substreams/pipeline/exec"
-	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/reqctx"
-	"github.com/streamingfast/substreams/service/config"
+	"github.com/streamingfast/substreams/sqe"
 	"github.com/streamingfast/substreams/storage/execout"
+	"github.com/streamingfast/substreams/storage/index"
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
+	"go.opentelemetry.io/otel"
+	"go.uber.org/zap"
 )
 
 type processingModule struct {
@@ -34,8 +35,9 @@ type processingModule struct {
 }
 
 type Pipeline struct {
-	ctx           context.Context
-	runtimeConfig config.RuntimeConfig
+	ctx             context.Context
+	stateBundleSize uint64
+	workerFactory   work.WorkerFactory
 
 	pendingUndoMessage *pbsubstreamsrpc.Response
 	preBlockHooks      []substreams.BlockHook
@@ -43,20 +45,20 @@ type Pipeline struct {
 	postJobHooks       []substreams.PostJobHook
 
 	wasmRuntime     *wasm.Registry
-	outputGraph     *outputmodules.Graph
+	execGraph       *exec.Graph
 	loadedModules   map[uint32]wasm.Module
-	moduleExecutors [][]exec.ModuleExecutor // Staged module executors
-	executionStages outputmodules.ExecutionStages
+	ModuleExecutors [][]exec.ModuleExecutor // Staged module executors
+	executionStages exec.ExecutionStages
 
 	mapModuleOutput         *pbsubstreamsrpc.MapModuleOutput
 	extraMapModuleOutputs   []*pbsubstreamsrpc.MapModuleOutput
 	extraStoreModuleOutputs []*pbsubstreamsrpc.StoreModuleOutput
+	preexistingBlockIndices map[string]map[string]*roaring64.Bitmap
 
 	respFunc         substreams.ResponseFunc
 	lastProgressSent time.Time
 
 	startTime      time.Time
-	modulesStats   map[string]*pbssinternal.ModuleStats
 	stores         *Stores
 	execoutStorage *execout.Configs
 
@@ -80,28 +82,32 @@ type Pipeline struct {
 
 func New(
 	ctx context.Context,
-	outputGraph *outputmodules.Graph,
+	execGraph *exec.Graph,
 	stores *Stores,
+	indices map[string]map[string]*roaring64.Bitmap,
 	execoutStorage *execout.Configs,
 	wasmRuntime *wasm.Registry,
 	execOutputCache *cache.Engine,
-	runtimeConfig config.RuntimeConfig,
+	stateBundleSize uint64,
+	workerFactory work.WorkerFactory,
 	respFunc substreams.ResponseFunc,
 	opts ...Option,
 ) *Pipeline {
 	pipe := &Pipeline{
-		ctx:             ctx,
-		gate:            newGate(ctx),
-		execOutputCache: execOutputCache,
-		runtimeConfig:   runtimeConfig,
-		outputGraph:     outputGraph,
-		wasmRuntime:     wasmRuntime,
-		respFunc:        respFunc,
-		stores:          stores,
-		execoutStorage:  execoutStorage,
-		forkHandler:     NewForkHandler(),
-		blockStepMap:    make(map[bstream.StepType]uint64),
-		startTime:       time.Now(),
+		ctx:                     ctx,
+		gate:                    newGate(ctx),
+		execOutputCache:         execOutputCache,
+		stateBundleSize:         stateBundleSize,
+		workerFactory:           workerFactory,
+		preexistingBlockIndices: indices,
+		execGraph:               execGraph,
+		wasmRuntime:             wasmRuntime,
+		respFunc:                respFunc,
+		stores:                  stores,
+		execoutStorage:          execoutStorage,
+		forkHandler:             NewForkHandler(),
+		blockStepMap:            make(map[bstream.StepType]uint64),
+		startTime:               time.Now(),
 	}
 	for _, opt := range opts {
 		opt(pipe)
@@ -120,7 +126,7 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 
 	p.setupProcessingModule(reqDetails)
 
-	stagedModules := p.outputGraph.StagedUsedModules()
+	stagedModules := p.execGraph.StagedUsedModules()
 
 	// truncate stages to highest scheduled stage
 	if highest := p.highestStage; highest != nil {
@@ -203,13 +209,20 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 			storeConfig := p.stores.configs[mod.Name]
 
 			if isLastStage {
-				partialStore := storeConfig.NewPartialKV(reqDetails.ResolvedStartBlockNum, logger)
+				initialBlock := reqDetails.ResolvedStartBlockNum
+				if storeConfig.ModuleInitialBlock() > reqDetails.ResolvedStartBlockNum {
+					if storeConfig.ModuleInitialBlock() > reqDetails.StopBlockNum {
+						continue
+					}
+					initialBlock = storeConfig.ModuleInitialBlock()
+				}
+				partialStore := storeConfig.NewPartialKV(initialBlock, logger)
 				storeMap.Set(partialStore)
 
 			} else {
 				fullStore := storeConfig.NewFullKV(logger)
 
-				if fullStore.InitialBlock() != reqDetails.ResolvedStartBlockNum {
+				if fullStore.InitialBlock() < reqDetails.ResolvedStartBlockNum {
 					file := store.NewCompleteFileInfo(fullStore.Name(), fullStore.InitialBlock(), reqDetails.ResolvedStartBlockNum)
 					// FIXME: run debugging session with conditional breakpoint
 					// `request.Stage == 1 && request.StartBlockNum == 20`
@@ -253,9 +266,9 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 	parallelProcessor, err := orchestrator.BuildParallelProcessor(
 		ctx,
 		reqPlan,
-		p.runtimeConfig,
+		p.workerFactory,
 		int(reqDetails.MaxParallelJobs),
-		p.outputGraph,
+		p.execGraph,
 		p.execoutStorage,
 		p.respFunc,
 		p.stores.configs,
@@ -298,7 +311,7 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 }
 
 func (p *Pipeline) isOutputModule(name string) bool {
-	return p.outputGraph.IsOutputModule(name)
+	return p.execGraph.IsOutputModule(name)
 }
 
 func (p *Pipeline) runPostJobHooks(ctx context.Context, clock *pbsubstreams.Clock) {
@@ -371,6 +384,7 @@ func toRPCMapModuleOutputs(in *pbssinternal.ModuleOutput) (out *pbsubstreamsrpc.
 	if data == nil {
 		return nil
 	}
+
 	return &pbsubstreamsrpc.MapModuleOutput{
 		Name:      in.ModuleName,
 		MapOutput: data,
@@ -382,7 +396,7 @@ func toRPCMapModuleOutputs(in *pbssinternal.ModuleOutput) (out *pbsubstreamsrpc.
 	}
 }
 
-func (p *Pipeline) returnRPCModuleProgressOutputs(clock *pbsubstreams.Clock, forceOutput bool) error {
+func (p *Pipeline) returnRPCModuleProgressOutputs(forceOutput bool) error {
 	if time.Since(p.lastProgressSent) < progressMessageInterval && !forceOutput {
 		return nil
 	}
@@ -403,13 +417,17 @@ func (p *Pipeline) returnRPCModuleProgressOutputs(clock *pbsubstreams.Clock, for
 func (p *Pipeline) toInternalUpdate(clock *pbsubstreams.Clock) *pbssinternal.Update {
 	meter := dmetering.GetBytesMeter(p.ctx)
 
-	return &pbssinternal.Update{
-		ProcessedBlocks:   clock.Number - p.processingModule.initialBlockNum,
+	out := &pbssinternal.Update{
 		DurationMs:        uint64(time.Since(p.startTime).Milliseconds()),
 		TotalBytesRead:    meter.BytesRead(),
 		TotalBytesWritten: meter.BytesWritten(),
 		ModulesStats:      reqctx.ReqStats(p.ctx).LocalModulesStats(),
 	}
+
+	if clock != nil {
+		out.ProcessedBlocks = clock.Number - p.processingModule.initialBlockNum
+	}
+	return out
 }
 
 func (p *Pipeline) returnInternalModuleProgressOutputs(clock *pbsubstreams.Clock, forceOutput bool) error {
@@ -432,12 +450,12 @@ func (p *Pipeline) returnInternalModuleProgressOutputs(clock *pbsubstreams.Clock
 	return nil
 }
 
-// buildModuleExecutors builds the moduleExecutors, and the loadedModules.
-func (p *Pipeline) buildModuleExecutors(ctx context.Context) ([][]exec.ModuleExecutor, error) {
-	if p.moduleExecutors != nil {
+// BuildModuleExecutors builds the ModuleExecutors, and the loadedModules.
+func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
+	if p.ModuleExecutors != nil {
 		// Eventually, we can invalidate our catch to accomodate the PATCH
 		// and rebuild all the modules, and tear down the previously loaded ones.
-		return p.moduleExecutors, nil
+		return nil
 	}
 
 	reqModules := reqctx.Details(ctx).Modules
@@ -451,9 +469,9 @@ func (p *Pipeline) buildModuleExecutors(ctx context.Context) ([][]exec.ModuleExe
 					continue
 				}
 				code := reqModules.Binaries[module.BinaryIndex]
-				m, err := p.wasmRuntime.NewModule(ctx, code.Content)
+				m, err := p.wasmRuntime.NewModule(ctx, code.Content, code.Type)
 				if err != nil {
-					return nil, fmt.Errorf("new wasm module: %w", err)
+					return fmt.Errorf("new wasm module: %w", err)
 				}
 				loadedModules[module.BinaryIndex] = m
 			}
@@ -469,7 +487,24 @@ func (p *Pipeline) buildModuleExecutors(ctx context.Context) ([][]exec.ModuleExe
 			for _, module := range layer {
 				inputs, err := p.renderWasmInputs(module)
 				if err != nil {
-					return nil, fmt.Errorf("module %q: get wasm inputs: %w", module.Name, err)
+					return fmt.Errorf("module %q: get wasm inputs: %w", module.Name, err)
+				}
+				var moduleBlockIndex *index.BlockIndex
+				if module.BlockFilter != nil {
+					qs, err := module.BlockFilterQueryString()
+					if err != nil {
+						return err
+					}
+					expr, err := sqe.Parse(ctx, qs)
+					if err != nil {
+						return fmt.Errorf("parse block filter: %q: %w", module.BlockFilter.Query, err)
+					}
+					var precomputedBitmap *roaring64.Bitmap
+
+					if indices := p.preexistingBlockIndices[module.BlockFilter.Module]; indices != nil {
+						precomputedBitmap = sqe.RoaringBitmapsApply(expr, indices)
+					}
+					moduleBlockIndex = index.NewBlockIndex(expr, module.BlockFilter.Module, precomputedBitmap)
 				}
 
 				entrypoint := module.BinaryEntrypoint
@@ -481,9 +516,11 @@ func (p *Pipeline) buildModuleExecutors(ctx context.Context) ([][]exec.ModuleExe
 					baseExecutor := exec.NewBaseExecutor(
 						ctx,
 						module.Name,
+						module.InitialBlock,
 						mod,
 						p.wasmRuntime.InstanceCacheEnabled(),
 						inputs,
+						moduleBlockIndex,
 						entrypoint,
 						tracer,
 					)
@@ -496,20 +533,41 @@ func (p *Pipeline) buildModuleExecutors(ctx context.Context) ([][]exec.ModuleExe
 
 					outputStore, found := p.stores.StoreMap.Get(module.Name)
 					if !found {
-						return nil, fmt.Errorf("store %q not found", module.Name)
+						return fmt.Errorf("store %q not found", module.Name)
 					}
 					inputs = append(inputs, wasm.NewStoreWriterOutput(module.Name, outputStore, updatePolicy, valueType))
 
 					baseExecutor := exec.NewBaseExecutor(
 						ctx,
 						module.Name,
+						module.InitialBlock,
 						mod,
 						p.wasmRuntime.InstanceCacheEnabled(),
 						inputs,
+						moduleBlockIndex,
 						entrypoint,
 						tracer,
 					)
 					executor := exec.NewStoreModuleExecutor(baseExecutor, outputStore)
+					moduleExecutors = append(moduleExecutors, executor)
+
+				case *pbsubstreams.Module_KindBlockIndex_:
+					if indices := p.preexistingBlockIndices[module.Name]; indices != nil {
+						break // don't execute index modules that are useless
+					}
+					baseExecutor := exec.NewBaseExecutor(
+						ctx,
+						module.Name,
+						module.InitialBlock,
+						mod,
+						p.wasmRuntime.InstanceCacheEnabled(),
+						inputs,
+						moduleBlockIndex,
+						entrypoint,
+						tracer,
+					)
+
+					executor := exec.NewIndexModuleExecutor(baseExecutor)
 					moduleExecutors = append(moduleExecutors, executor)
 
 				default:
@@ -520,12 +578,12 @@ func (p *Pipeline) buildModuleExecutors(ctx context.Context) ([][]exec.ModuleExe
 		}
 	}
 
-	p.moduleExecutors = stagedModuleExecutors
-	return stagedModuleExecutors, nil
+	p.ModuleExecutors = stagedModuleExecutors
+	return nil
 }
 
 func (p *Pipeline) cleanUpModuleExecutors(ctx context.Context) error {
-	for _, stage := range p.moduleExecutors {
+	for _, stage := range p.ModuleExecutors {
 		for _, executor := range stage {
 			if err := executor.Close(ctx); err != nil {
 				return fmt.Errorf("closing module executor %q: %w", executor.Name(), err)
@@ -548,6 +606,10 @@ func returnModuleDataOutputs(
 	extraStoreModuleOutputs []*pbsubstreamsrpc.StoreModuleOutput,
 	respFunc substreams.ResponseFunc,
 ) error {
+	if mapModuleOutput == nil {
+		return nil
+	}
+
 	out := &pbsubstreamsrpc.BlockScopedData{
 		Clock:             clock,
 		Output:            mapModuleOutput,
@@ -571,22 +633,22 @@ func (p *Pipeline) renderWasmInputs(module *pbsubstreams.Module) (out []wasm.Arg
 		case *pbsubstreams.Module_Input_Params_:
 			out = append(out, wasm.NewParamsInput(input.GetParams().GetValue()))
 		case *pbsubstreams.Module_Input_Map_:
-			out = append(out, wasm.NewMapInput(in.Map.ModuleName))
+			out = append(out, wasm.NewMapInput(in.Map.ModuleName, p.execGraph.ModulesInitBlocks()[in.Map.ModuleName]))
 		case *pbsubstreams.Module_Input_Store_:
 			inputName := input.GetStore().ModuleName
 			if input.GetStore().Mode == pbsubstreams.Module_Input_Store_DELTAS {
-				out = append(out, wasm.NewMapInput(inputName))
+				out = append(out, wasm.NewMapInput(inputName, p.execGraph.ModulesInitBlocks()[inputName]))
 			} else {
 				inputStore, found := storeAccessor.Get(inputName)
 				if !found {
 					return nil, fmt.Errorf("store %q npt found", inputName)
 				}
-				out = append(out, wasm.NewStoreReaderInput(inputName, inputStore))
+				out = append(out, wasm.NewStoreReaderInput(inputName, inputStore, p.execGraph.ModulesInitBlocks()[inputName]))
 			}
 		case *pbsubstreams.Module_Input_Source_:
 			// in.Source.Type checking against `blockType` is already done
 			// upfront in `validateGraph`.
-			out = append(out, wasm.NewSourceInput(in.Source.Type))
+			out = append(out, wasm.NewSourceInput(in.Source.Type, 0))
 		default:
 			return nil, fmt.Errorf("invalid input struct for module %q", module.Name)
 		}

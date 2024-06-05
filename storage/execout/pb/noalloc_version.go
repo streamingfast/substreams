@@ -2,11 +2,11 @@ package pboutputcache
 
 import (
 	fmt "fmt"
+	io "io"
+	"unsafe"
+
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	io "io"
-	reflect "reflect"
-	"unsafe"
 )
 
 // Get the string from a '[]byte' without any allocation
@@ -127,15 +127,6 @@ func (m *Array) UnmarshalVTNoAlloc(dAtA []byte) error {
 		return io.ErrUnexpectedEOF
 	}
 	return nil
-}
-
-// Get the bytes of a `string` variable without doing any allocation, useful for writing to storage
-// with high efficiency. This method exists because `[]byte(stringVar)` does an allocation, by using
-// this method, you avoid this allocation.
-//
-// See https://stackoverflow.com/q/59209493/697930 for full discussion
-func unsafeGetBytes(s string) []byte {
-	return unsafe.Slice((*byte)(unsafe.Pointer((*reflect.StringHeader)(unsafe.Pointer(&s)).Data)), len(s))
 }
 
 func (m *Item) UnmarshalVTNoAlloc(dAtA []byte) error {
@@ -335,6 +326,7 @@ func (m *Item) UnmarshalVTNoAlloc(dAtA []byte) error {
 			//m.Cursor = string(dAtA[iNdEx:postIndex])
 			m.Cursor = unsafeGetString(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
+
 		default:
 			iNdEx = preIndex
 			skippy, err := skip(dAtA[iNdEx:])

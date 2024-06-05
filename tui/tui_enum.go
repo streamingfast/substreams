@@ -18,16 +18,19 @@ const (
 	OutputModeJSON
 	// OutputModeJSONL is a OutputMode of type JSONL.
 	OutputModeJSONL
+	// OutputModeCLOCK is a OutputMode of type CLOCK.
+	OutputModeCLOCK
 )
 
 var ErrInvalidOutputMode = fmt.Errorf("not a valid OutputMode, try [%s]", strings.Join(_OutputModeNames, ", "))
 
-const _OutputModeName = "TUIJSONJSONL"
+const _OutputModeName = "TUIJSONJSONLCLOCK"
 
 var _OutputModeNames = []string{
 	_OutputModeName[0:3],
 	_OutputModeName[3:7],
 	_OutputModeName[7:12],
+	_OutputModeName[12:17],
 }
 
 // OutputModeNames returns a list of possible string values of OutputMode.
@@ -41,6 +44,7 @@ var _OutputModeMap = map[OutputMode]string{
 	OutputModeTUI:   _OutputModeName[0:3],
 	OutputModeJSON:  _OutputModeName[3:7],
 	OutputModeJSONL: _OutputModeName[7:12],
+	OutputModeCLOCK: _OutputModeName[12:17],
 }
 
 // String implements the Stringer interface.
@@ -59,12 +63,14 @@ func (x OutputMode) IsValid() bool {
 }
 
 var _OutputModeValue = map[string]OutputMode{
-	_OutputModeName[0:3]:                   OutputModeTUI,
-	strings.ToLower(_OutputModeName[0:3]):  OutputModeTUI,
-	_OutputModeName[3:7]:                   OutputModeJSON,
-	strings.ToLower(_OutputModeName[3:7]):  OutputModeJSON,
-	_OutputModeName[7:12]:                  OutputModeJSONL,
-	strings.ToLower(_OutputModeName[7:12]): OutputModeJSONL,
+	_OutputModeName[0:3]:                    OutputModeTUI,
+	strings.ToLower(_OutputModeName[0:3]):   OutputModeTUI,
+	_OutputModeName[3:7]:                    OutputModeJSON,
+	strings.ToLower(_OutputModeName[3:7]):   OutputModeJSON,
+	_OutputModeName[7:12]:                   OutputModeJSONL,
+	strings.ToLower(_OutputModeName[7:12]):  OutputModeJSONL,
+	_OutputModeName[12:17]:                  OutputModeCLOCK,
+	strings.ToLower(_OutputModeName[12:17]): OutputModeCLOCK,
 }
 
 // ParseOutputMode attempts to convert a string to a OutputMode.

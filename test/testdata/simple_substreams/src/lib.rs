@@ -1,5 +1,4 @@
 mod generated;
-
 use prost::encoding::float;
 use prost::Message;
 use std::borrow::Borrow;
@@ -30,14 +29,31 @@ use substreams::{
 
 use crate::pb::test;
 use crate::pb::test::Block;
+use crate::pb::keys;
 
 mod pb;
+
 
 const TO_SET: i64 = 100;
 const TO_ADD: i64 = 1;
 const TO_SUBTRACT: i64 = -1;
 
 impl generated::substreams::SubstreamsTrait for generated::substreams::Substreams {
+    fn test_index(block: test::Block) -> Result<keys::Keys, errors::Error> {
+        let mut keys = keys::Keys::default();
+        if block.number % 2 == 0 {
+            keys.keys.push("even".to_string());
+        } else {
+            keys.keys.push("odd".to_string());
+        }
+        Ok(keys)
+    }
+
+    fn assert_test_index(blk: test::Block) -> Result<test::Boolean, errors::Error> {
+        assert!(blk.number % 2 == 0, "expected even block number");
+        Ok(test::Boolean { result: true })
+    }
+
     fn test_map(params: String, blk: test::Block) -> Result<test::MapResult, errors::Error> {
         let out = test::MapResult {
             block_number: blk.number,
@@ -1446,6 +1462,13 @@ impl generated::substreams::SubstreamsTrait for generated::substreams::Substream
         //
     }
 
+    fn assert_all_test_index(
+        assert_test_index: pb::test::Boolean,
+        store: substreams::store::StoreSetInt64,
+    ) {
+        //
+    }
+
     fn assert_all_test(
         assert_all_test_delete_prefix: StoreGetInt64,
         assert_all_test_string: StoreGetInt64,
@@ -1453,6 +1476,7 @@ impl generated::substreams::SubstreamsTrait for generated::substreams::Substream
         assert_all_test_float64: StoreGetInt64,
         assert_all_test_bigint: StoreGetInt64,
         assert_all_test_bigdecimal: StoreGetInt64,
+        assert_all_test_index : StoreGetInt64,
     ) -> Result<test::Boolean, Error> {
         return Ok(test::Boolean { result: true });
     }

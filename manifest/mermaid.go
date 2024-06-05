@@ -63,7 +63,7 @@ func generateMermaidGraph(mods *pbsubstreams.Modules) string {
 				str.WriteString(fmt.Sprintf("  %s --> %s;\n", name, s.Name))
 			case *pbsubstreams.Module_Input_Store_:
 				name := input.Store.ModuleName
-				mode := strings.ToLower(fmt.Sprintf("%s", input.Store.Mode))
+				mode := strings.ToLower(input.Store.Mode.String())
 				if mode == "deltas" {
 					str.WriteString(fmt.Sprintf("  %s -- deltas --> %s;\n", name, s.Name))
 				} else {

@@ -2,8 +2,9 @@ package manifest
 
 import (
 	"fmt"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"testing"
+
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 
 	"github.com/stretchr/testify/require"
 )
@@ -173,7 +174,6 @@ func TestHandleUseModules(t *testing.T) {
 }
 
 func TestValidateManifest(t *testing.T) {
-	var initialBlock uint64 = 123
 	cases := []struct {
 		name          string
 		manifest      *Manifest
@@ -220,23 +220,13 @@ func TestValidateManifest(t *testing.T) {
 			expectedError: "stream \"basic_index\": block index module should have inputs",
 		},
 		{
-			name: "block index with initialBlock",
-			manifest: &Manifest{
-				SpecVersion: "v0.1.0",
-				Modules: []*Module{
-					{Name: "basic_index", Kind: "blockIndex", Inputs: []*Input{{Map: "proto:sf.database.v1.changes"}}, InitialBlock: &initialBlock, Output: StreamOutput{"proto:sf.substreams.index.v1.Keys"}},
-				},
-			},
-			expectedError: "stream \"basic_index\": block index module cannot have initial block",
-		},
-		{
 			name: "block index with block filter",
 			manifest: &Manifest{
 				SpecVersion: "v0.1.0",
 				Modules: []*Module{
 					{Name: "basic_index", Kind: "blockIndex", BlockFilter: &BlockFilter{
 						Module: "my_module",
-						Query:  "test query",
+						Query:  BlockFilterQuery{String: "test query"},
 					}, Inputs: []*Input{{Map: "proto:sf.database.v1.changes"}}, Output: StreamOutput{"proto:sf.substreams.index.v1.Keys"}},
 				},
 			},
@@ -286,7 +276,7 @@ func TestValidateModules(t *testing.T) {
 						},
 						BlockFilter: &pbsubstreams.Module_BlockFilter{
 							Module: "block_index",
-							Query:  "This is my query",
+							Query:  &pbsubstreams.Module_BlockFilter_QueryString{QueryString: "This is my query"},
 						},
 					},
 
@@ -323,7 +313,7 @@ func TestValidateModules(t *testing.T) {
 						},
 						BlockFilter: &pbsubstreams.Module_BlockFilter{
 							Module: "wrong_module",
-							Query:  "This is my query",
+							Query:  &pbsubstreams.Module_BlockFilter_QueryString{QueryString: "This is my query"},
 						},
 					},
 
@@ -360,7 +350,7 @@ func TestValidateModules(t *testing.T) {
 						},
 						BlockFilter: &pbsubstreams.Module_BlockFilter{
 							Module: "map_module",
-							Query:  "This is my query",
+							Query:  &pbsubstreams.Module_BlockFilter_QueryString{QueryString: "This is my query"},
 						},
 					},
 					{

@@ -16,7 +16,6 @@ import (
 	"github.com/streamingfast/substreams/tui2/pages/progress"
 	"github.com/streamingfast/substreams/tui2/pages/request"
 	"github.com/streamingfast/substreams/tui2/replaylog"
-	"github.com/streamingfast/substreams/tui2/stream"
 	streamui "github.com/streamingfast/substreams/tui2/stream"
 	"github.com/streamingfast/substreams/tui2/styles"
 	"github.com/streamingfast/substreams/tui2/tabs"
@@ -31,7 +30,6 @@ const (
 )
 
 type UI struct {
-	memoized string
 	lastView time.Time
 
 	msgDescs      map[string]*manifest.ModuleDescriptor
@@ -44,8 +42,6 @@ type UI struct {
 	pages            []common.Component
 	activePage       page
 	footer           *footer.Footer
-	showFooter       bool
-	error            error
 	tabs             *tabs.Tabs
 }
 
@@ -150,7 +146,6 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		ui.stream = msg.Stream
 		ui.msgDescs = msg.MsgDescs
 		ui.replayLog = msg.ReplayLog
-		ui.requestConfig = msg.RefreshCtx
 		cmds = append(cmds, ui.stream.Init())
 	case streamui.Msg:
 		switch msg {
@@ -209,11 +204,11 @@ func (ui *UI) View() string {
 	if ui.stream != nil {
 		var color lipgloss.TerminalColor
 		switch ui.stream.StreamStatus() {
-		case stream.StatusRunning:
+		case streamui.StatusRunning:
 			color = ui.Styles.StreamRunningColor
-		case stream.StatusStopped:
+		case streamui.StatusStopped:
 			color = ui.Styles.StreamStoppedColor
-		case stream.StatusError:
+		case streamui.StatusError:
 			color = ui.Styles.StreamErrorColor
 		}
 		headline = ui.Styles.Header.Copy().Foreground(color).Render("Substreams GUI")

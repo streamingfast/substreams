@@ -13,6 +13,7 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
+	"github.com/streamingfast/substreams/storage/index"
 )
 
 type MockExecOutput struct {
@@ -32,7 +33,7 @@ func (t *MockExecOutput) Len() int {
 func (t *MockExecOutput) Get(name string) ([]byte, bool, error) {
 	v, ok := t.cacheMap[name]
 	if !ok {
-		return nil, false, execout.NotFound
+		return nil, false, execout.ErrNotFound
 	}
 	return v, true, nil
 }
@@ -43,10 +44,9 @@ func (t *MockExecOutput) Set(name string, value []byte) (err error) {
 }
 
 type MockModuleExecutor struct {
-	name       string
-	outputType string
+	name string
 
-	RunFunc      func(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData *pbssinternal.ModuleOutput, err error)
+	RunFunc      func(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, outForFiles []byte, moduleOutputData *pbssinternal.ModuleOutput, err error)
 	ApplyFunc    func(value []byte) error
 	LogsFunc     func() (logs []string, truncated bool)
 	StackFunc    func() []string
@@ -56,17 +56,19 @@ type MockModuleExecutor struct {
 
 var _ ModuleExecutor = (*MockModuleExecutor)(nil)
 
+func (t *MockModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, outForFiles []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
+	if t.RunFunc != nil {
+		return t.RunFunc(ctx, reader)
+	}
+	return nil, nil, nil, fmt.Errorf("not implemented")
+}
+func (t *MockModuleExecutor) BlockIndex() *index.BlockIndex   { return nil }
+func (t *MockModuleExecutor) RunsOnBlock(_ uint64) bool       { return true }
 func (t *MockModuleExecutor) Name() string                    { return t.name }
 func (t *MockModuleExecutor) String() string                  { return fmt.Sprintf("TestModuleExecutor(%s)", t.name) }
 func (t *MockModuleExecutor) Close(ctx context.Context) error { return nil }
 func (t *MockModuleExecutor) HasValidOutput() bool            { return t.cacheable }
-
-func (t *MockModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
-	if t.RunFunc != nil {
-		return t.RunFunc(ctx, reader)
-	}
-	return nil, nil, fmt.Errorf("not implemented")
-}
+func (t *MockModuleExecutor) HasOutputForFiles() bool         { return false }
 
 func (t *MockModuleExecutor) applyCachedOutput(value []byte) error {
 	if t.ApplyFunc != nil {
@@ -102,8 +104,8 @@ func TestModuleExecutorRunner_Run_HappyPath(t *testing.T) {
 	ctx = reqctx.WithReqStats(ctx, metrics.NewReqStats(&metrics.Config{}, zap.NewNop()))
 	executor := &MockModuleExecutor{
 		name: "test",
-		RunFunc: func(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
-			return []byte("test"), &pbssinternal.ModuleOutput{
+		RunFunc: func(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, outForFiles []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
+			return []byte("test"), nil, &pbssinternal.ModuleOutput{
 				Data: &pbssinternal.ModuleOutput_MapOutput{
 					MapOutput: nil,
 				},
@@ -117,7 +119,7 @@ func TestModuleExecutorRunner_Run_HappyPath(t *testing.T) {
 		cacheMap: make(map[string][]byte),
 	}
 
-	moduleOutput, _, err := RunModule(ctx, executor, output)
+	moduleOutput, _, _, _, err := RunModule(ctx, executor, output)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,8 +135,8 @@ func TestModuleExecutorRunner_Run_CachedOutput(t *testing.T) {
 
 	executor := &MockModuleExecutor{
 		name: "test",
-		RunFunc: func(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
-			return []byte("test"), &pbssinternal.ModuleOutput{
+		RunFunc: func(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, outForFiles []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
+			return []byte("test"), nil, &pbssinternal.ModuleOutput{
 				Data: &pbssinternal.ModuleOutput_MapOutput{
 					MapOutput: nil,
 				},
@@ -161,7 +163,7 @@ func TestModuleExecutorRunner_Run_CachedOutput(t *testing.T) {
 		},
 	}
 
-	moduleOutput, _, err := RunModule(ctx, executor, output)
+	moduleOutput, _, _, _, err := RunModule(ctx, executor, output)
 	if err != nil {
 		t.Fatal(err)
 	}

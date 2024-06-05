@@ -5,10 +5,8 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"math"
 	"sort"
 	"strconv"
-	"strings"
 	"sync"
 
 	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
@@ -30,9 +28,11 @@ type File struct {
 	*block.Range
 
 	ModuleName string
-	kv         map[string]*pboutput.Item
+	Kv         map[string]*pboutput.Item
 	store      dstore.Store
 	logger     *zap.Logger
+	loaded     bool
+	loadedSize uint64
 }
 
 func (c *File) Filename() string {
@@ -42,7 +42,7 @@ func (c *File) Filename() string {
 func (c *File) SortedItems() (out []*pboutput.Item) {
 	// TODO(abourget): eventually, what is saved should be sorted before saving,
 	// or we import a list and Load() automatically sorts what needs to be sorted.
-	for _, item := range c.kv {
+	for _, item := range c.Kv {
 		out = append(out, item)
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -52,7 +52,7 @@ func (c *File) SortedItems() (out []*pboutput.Item) {
 }
 
 func (c *File) ExtractClocks(clocksMap map[uint64]*pbsubstreams.Clock) {
-	for _, item := range c.kv {
+	for _, item := range c.Kv {
 		if _, found := clocksMap[item.BlockNum]; !found {
 			clocksMap[item.BlockNum] = &pbsubstreams.Clock{
 				Number:    item.BlockNum,
@@ -61,7 +61,6 @@ func (c *File) ExtractClocks(clocksMap map[uint64]*pbsubstreams.Clock) {
 			}
 		}
 	}
-	return
 }
 
 func (c *File) SetItem(clock *pbsubstreams.Clock, data []byte) {
@@ -80,14 +79,14 @@ func (c *File) SetItem(clock *pbsubstreams.Clock, data []byte) {
 		Payload: cp,
 	}
 
-	c.kv[clock.Id] = ci
+	c.Kv[clock.Id] = ci
 }
 
 func (c *File) Get(clock *pbsubstreams.Clock) ([]byte, bool) {
 	c.Lock()
 	defer c.Unlock()
 
-	cacheItem, found := c.kv[clock.Id]
+	cacheItem, found := c.Kv[clock.Id]
 
 	if !found {
 		return nil, false
@@ -100,7 +99,7 @@ func (c *File) GetAtBlock(blockNumber uint64) ([]byte, bool) {
 	c.Lock()
 	defer c.Unlock()
 
-	for _, value := range c.kv {
+	for _, value := range c.Kv {
 		if value.BlockNum == blockNumber {
 			return value.Payload, true
 		}
@@ -110,10 +109,16 @@ func (c *File) GetAtBlock(blockNumber uint64) ([]byte, bool) {
 }
 
 func (c *File) Load(ctx context.Context) error {
+	c.Lock()
+	defer c.Unlock()
+	if c.loaded {
+		return nil
+	}
+
 	filename := computeDBinFilename(c.Range.StartBlock, c.Range.ExclusiveEndBlock)
 	c.logger.Debug("loading execout file", zap.String("file_name", filename), zap.Object("block_range", c.Range))
 
-	return derr.RetryContext(ctx, 5, func(ctx context.Context) error {
+	err := derr.RetryContext(ctx, 5, func(ctx context.Context) error {
 		objectReader, err := c.store.OpenObject(ctx, filename)
 		if err == dstore.ErrNotFound {
 			return derr.NewFatalError(err)
@@ -128,23 +133,27 @@ func (c *File) Load(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("reading store file %s: %w", filename, err)
 		}
+		c.loadedSize = uint64(len(bytes))
 
 		outputData := &pboutput.Map{}
 		if err = outputData.UnmarshalFast(bytes); err != nil {
 			return fmt.Errorf("unmarshalling file %s: %w", filename, err)
 		}
 
-		c.kv = outputData.Kv
+		c.Kv = outputData.Kv
 
-		c.logger.Debug("outputs data loaded", zap.Int("output_count", len(c.kv)), zap.Stringer("block_range", c.Range))
+		c.logger.Debug("outputs data loaded", zap.Int("output_count", len(c.Kv)), zap.Stringer("block_range", c.Range))
 		return nil
 	})
+	if err == nil {
+		c.loaded = true
+	}
+	return err
 }
 
 func (c *File) Save(ctx context.Context) error {
-
 	filename := c.Filename()
-	outputData := &pboutput.Map{Kv: c.kv}
+	outputData := &pboutput.Map{Kv: c.Kv}
 	cnt, err := outputData.MarshalFast()
 	if err != nil {
 		return fmt.Errorf("unmarshalling file %s: %w", filename, err)
@@ -169,86 +178,12 @@ func (c *File) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("module", c.ModuleName)
 	enc.AddUint64("start_block", c.Range.StartBlock)
 	enc.AddUint64("end_block", c.Range.ExclusiveEndBlock)
-	enc.AddInt("kv_count", len(c.kv))
+	enc.AddInt("kv_count", len(c.Kv))
 	return nil
-}
-
-//
-//func listContinuousCacheRanges(cachedRanges block.Ranges, from uint64) block.Ranges {
-//	cachedRangeCount := len(cachedRanges)
-//	var out block.Ranges
-//	for i, r := range cachedRanges {
-//		if r.StartBlock < from {
-//			continue
-//		}
-//		out = append(out, r)
-//		if cachedRangeCount > i+1 {
-//			next := cachedRanges[i+1]
-//			if next.StartBlock != r.ExclusiveEndBlock { //continuous seq broken
-//				break
-//			}
-//		}
-//	}
-//
-//	return out
-//}
-
-func findBlockRange(ctx context.Context, store dstore.Store, prefixStartBlock uint64) (*block.Range, bool, error) {
-	var exclusiveEndBlock uint64
-
-	paddedBlock := pad(prefixStartBlock)
-
-	var files []string
-	err := derr.RetryContext(ctx, 3, func(ctx context.Context) (err error) {
-		files, err = store.ListFiles(ctx, paddedBlock, math.MaxInt64)
-		return
-	})
-	if err != nil {
-		return nil, false, fmt.Errorf("walking prefix for padded block %s: %w", paddedBlock, err)
-	}
-
-	if len(files) == 0 {
-		return nil, false, nil
-	}
-
-	biggestEndBlock := uint64(0)
-
-	for _, file := range files {
-		endBlock, err := getExclusiveEndBlock(file)
-		if err != nil {
-			return nil, false, fmt.Errorf("getting exclusive end block from file %s: %w", file, err)
-		}
-		if endBlock > biggestEndBlock {
-			biggestEndBlock = endBlock
-		}
-	}
-
-	exclusiveEndBlock = biggestEndBlock
-
-	return block.NewRange(prefixStartBlock, exclusiveEndBlock), true, nil
 }
 
 func computeDBinFilename(startBlock, stopBlock uint64) string {
 	return fmt.Sprintf("%010d-%010d.output", startBlock, stopBlock)
-}
-
-func pad(blockNumber uint64) string {
-	return fmt.Sprintf("%010d", blockNumber)
-}
-
-func ComputeStartBlock(startBlock uint64, saveBlockInterval uint64) uint64 {
-	return startBlock - startBlock%saveBlockInterval
-}
-
-func getExclusiveEndBlock(filename string) (uint64, error) {
-	endBlock := strings.Split(strings.Split(filename, "-")[1], ".")[0]
-	parsedInt, err := strconv.ParseInt(strings.TrimLeft(endBlock, "0"), 10, 64)
-
-	if err != nil {
-		return 0, fmt.Errorf("parsing int %d: %w", parsedInt, err)
-	}
-
-	return uint64(parsedInt), nil
 }
 
 func mustAtoi(s string) int {

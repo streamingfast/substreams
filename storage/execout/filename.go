@@ -8,9 +8,11 @@ import (
 )
 
 var cacheFilenameRegex *regexp.Regexp
+var indexFilenameRegex *regexp.Regexp
 
 func init() {
 	cacheFilenameRegex = regexp.MustCompile(`([\d]+)-([\d]+)\.output`)
+	indexFilenameRegex = regexp.MustCompile(`([\d]+)-([\d]+)\.index`)
 }
 
 type FileInfos = []*FileInfo
@@ -20,8 +22,8 @@ type FileInfo struct {
 	BlockRange *block.Range
 }
 
-func parseFileName(filename string) (*FileInfo, error) {
-	blockRange, err := fileNameToRange(filename)
+func parseExecoutFileName(filename string) (*FileInfo, error) {
+	blockRange, err := fileNameToRange(filename, cacheFilenameRegex)
 	if err != nil {
 		return nil, fmt.Errorf("parsing filename %q: %w", filename, err)
 	}
@@ -30,8 +32,20 @@ func parseFileName(filename string) (*FileInfo, error) {
 		BlockRange: blockRange,
 	}, nil
 }
-func fileNameToRange(filename string) (*block.Range, error) {
-	res := cacheFilenameRegex.FindAllStringSubmatch(filename, 1)
+
+func parseIndexFileName(filename string) (*FileInfo, error) {
+	blockRange, err := fileNameToRange(filename, indexFilenameRegex)
+	if err != nil {
+		return nil, fmt.Errorf("parsing filename %q: %w", filename, err)
+	}
+	return &FileInfo{
+		Filename:   filename,
+		BlockRange: blockRange,
+	}, nil
+}
+
+func fileNameToRange(filename string, regex *regexp.Regexp) (*block.Range, error) {
+	res := regex.FindAllStringSubmatch(filename, 1)
 	if len(res) != 1 {
 		return nil, fmt.Errorf("invalid output cache filename, %q", filename)
 	}

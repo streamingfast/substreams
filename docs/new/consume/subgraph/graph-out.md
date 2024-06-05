@@ -1,0 +1,1 @@
+You can find information about Substreams-powered Subgraphs in [The Graph documentation](https://thegraph.com/docs/en/cookbook/substreams-powered-subgraphs/).

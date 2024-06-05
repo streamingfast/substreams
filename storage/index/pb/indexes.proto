@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package sf.substreams.index.v1;
+option go_package = "github.com/streamingfast/substreams/storage/index/pb;pbindexes";
+
+message Map {
+  map<string, bytes> indexes = 1;
+}
+

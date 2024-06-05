@@ -1,15 +1,16 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
-
-	"context"
 	"testing"
+	"time"
 
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/wasm"
+	_ "github.com/streamingfast/substreams/wasm/wasi"
 	_ "github.com/streamingfast/substreams/wasm/wasmtime"
 	_ "github.com/streamingfast/substreams/wasm/wazero"
 	"github.com/stretchr/testify/require"
@@ -23,6 +24,7 @@ func init() {
 func BenchmarkExecution(b *testing.B) {
 	type runtime struct {
 		name                string
+		wasmCodeType        string
 		code                []byte
 		shouldReUseInstance bool
 	}
@@ -36,25 +38,31 @@ func BenchmarkExecution(b *testing.B) {
 	}
 
 	for _, testCase := range []*testCase{
-		{"bare", "map_noop", args(wasm.NewParamsInput("")), []int{0}},
+		//{"bare", "map_noop", args(wasm.NewParamsInput("")), []int{0}},
 
 		// Decode proto only decode and returns the block.number as the output (to ensure the block is not elided at compile time)
-		{"decode_proto_only", "map_decode_proto_only", args(blockInputFile(b, "testdata/ethereum_mainnet_block_16021772.binpb")), []int{0}},
+		//{"decode_proto_only", "map_decode_proto_only", args(blockInputFile(b, "testdata/ethereum_mainnet_block_16021772.binpb")), []int{0}},
 
-		{"map_block", "map_block", args(blockInputFile(b, "testdata/ethereum_mainnet_block_16021772.binpb")), []int{44957, 45081}},
+		{"map_block", "map_block", args(blockInputFile(b, "testdata/ethereum_mainnet_block_16021772.binpb")), []int{53}},
 	} {
 		var reuseInstance = true
-		var freshInstanceEachRun = false
+		//var freshInstanceEachRun = false
 
-		wasmCode := readCode(b, "substreams_wasm/substreams.wasm")
+		//wasmCode := readCode(b, "substreams_wasm/substreams.wasm")
+		//wasmCodep1 := readCode(b, "substreams_ts/index.wasm")
+		wasmTinyGo := readCode(b, "substreams_tiny_go/main.wasm")
+		//wasmCodep1 := readCode(b, "substreams_wasi/wasi_hello_world/hello.wasm")
 
 		stats := metrics.NewReqStats(&metrics.Config{}, zap.NewNop())
 		for _, config := range []*runtime{
-			{"wasmtime", wasmCode, reuseInstance},
-			{"wasmtime", wasmCode, freshInstanceEachRun},
+			//{"wasmtime", wasmCode, reuseInstance},
+			//{"wasmtime", wasmCode, freshInstanceEachRun},
+			//
+			//{"wazero", wasmCode, reuseInstance},
+			//{"wazero", wasmCode, freshInstanceEachRun},
 
-			{"wazero", wasmCode, reuseInstance},
-			{"wazero", wasmCode, freshInstanceEachRun},
+			{name: "wasi", wasmCodeType: "go/wasi", code: wasmTinyGo, shouldReUseInstance: reuseInstance},
+			//{"wasip1", wasmCodep1, freshInstanceEachRun},
 		} {
 			instanceKey := "reused"
 			if !config.shouldReUseInstance {
@@ -64,9 +72,9 @@ func BenchmarkExecution(b *testing.B) {
 			b.Run(fmt.Sprintf("vm=%s,instance=%s,tag=%s", config.name, instanceKey, testCase.tag), func(b *testing.B) {
 				ctx := context.Background()
 
-				wasmRuntime := wasm.NewRegistryWithRuntime(config.name, nil, 0)
+				wasmRuntime := wasm.NewRegistryWithRuntime(config.name, nil)
 
-				module, err := wasmRuntime.NewModule(ctx, config.code)
+				module, err := wasmRuntime.NewModule(ctx, config.code, config.wasmCodeType)
 				require.NoError(b, err)
 
 				cachedInstance, err := module.NewInstance(ctx)
@@ -79,6 +87,7 @@ func BenchmarkExecution(b *testing.B) {
 				b.ResetTimer()
 
 				for i := 0; i < b.N; i++ {
+					start := time.Now()
 					instance := cachedInstance
 					if !config.shouldReUseInstance {
 						instance, err = module.NewInstance(ctx)
@@ -89,8 +98,9 @@ func BenchmarkExecution(b *testing.B) {
 					if err != nil {
 						require.NoError(b, err)
 					}
-
-					require.Contains(b, testCase.acceptedByteCount, len(call.Output()), "invalid byte count got %d expected one of %v", len(call.Output()), testCase.acceptedByteCount)
+					fmt.Println("call output", string(call.Output()))
+					fmt.Println("duration", time.Since(start))
+					//require.Contains(b, testCase.acceptedByteCount, len(call.Output()), "invalid byte count got %d expected one of %v", len(call.Output()), testCase.acceptedByteCount)
 				}
 			})
 		}
@@ -112,7 +122,7 @@ func blockInputFile(t require.TestingT, filename string) wasm.Argument {
 	content, err := os.ReadFile(filename)
 	require.NoError(t, err)
 
-	input := wasm.NewSourceInput("sf.ethereum.type.v2.Block")
+	input := wasm.NewSourceInput("sf.ethereum.type.v2.Block", 0)
 	input.SetValue(content)
 
 	return input

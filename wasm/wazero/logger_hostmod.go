@@ -5,13 +5,12 @@ import (
 	"fmt"
 
 	"github.com/dustin/go-humanize"
+	"github.com/streamingfast/substreams/wasm"
 	"github.com/tetratelabs/wazero/api"
 	"go.uber.org/zap"
-
-	"github.com/streamingfast/substreams/wasm"
 )
 
-var loggerFuncs = []funcs{
+var LoggerFuncs = []funcs{
 	{
 		"println",
 		[]parm{i32, i32}, // ptr, len
@@ -20,6 +19,7 @@ var loggerFuncs = []funcs{
 			message := readStringFromStack(mod, stack[0:])
 			length := uint32(stack[1])
 			call := wasm.FromContext(ctx)
+			//fmt.Println("IN HEREEEEEEEEEEEEEEEEEEEEEEEEEEEEE", stack, call.ReachedLogsMaxByteCount(), message)
 
 			if call.ReachedLogsMaxByteCount() {
 				// Early exit, we don't even need to collect the message as we would not store it anyway
@@ -31,11 +31,9 @@ var loggerFuncs = []funcs{
 			}
 
 			if tracer.Enabled() {
-				zlog.Debug(message, zap.String("module_name", call.ModuleName))
+				zlog.Debug(message, zap.String("module_name", call.ModuleName), zap.String("log_source", "wasm"))
 			}
-
 			call.AppendLog(message)
-			return
 		}),
 	},
 }

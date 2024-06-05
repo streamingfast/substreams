@@ -9,7 +9,139 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v1.5.5 (unreleased)
+## Unreleased
+
+* Fixed Substreams tier1 active worker request metrics that was not decrementing fully correctly.
+* Add 'compressed' boolean field to the 'incoming request' log
+
+## v1.7.3
+
+### Server-side improvements
+
+* Faster bootstrapping through bstream improvements, now only loads and keeps 200 blocks below LIB to link with merged blocks.
+* Fixed delay in serving requests close to chain HEAD when using production-mode
+
+## v1.7.2
+
+### Improvements on the `use` attribute
+
+- If module with `use` attribute has not `inputs` at all, inputs are replaced by used module inputs
+- If module with `use` attribute has no `blockFilter`, it's replaced by used module `blockFilter`
+- If `blockFilter` is set to `{}`, it will be considered as `nil` in the spkg, enabling module with `use`
+  attribute to override the `blockFilter` by a `nil` one
+
+## v1.7.1
+
+### Highlights
+
+- Substreams engine is now able run Rust code that depends on `solana_program` in Solana land to decode and `alloy/ether-rs` in Ethereum land
+
+#### How to use `solana_program` or `alloy`/`ether-rs`
+
+Those libraries when used in a `wasm32-unknown-unknown` context creates in a bunch of [wasmbindgen](https://rustwasm.github.io/wasm-bindgen/) imports in the resulting Substreams Rust code, imports that led to runtime errors because Substreams engine didn't know about those special imports until today.
+
+The Substreams engine is now able to "shims" those `wasmbindgen` imports enabling you to run code that depends libraries like `solana_program` and `alloy/ether-rs` which are known to pull those `wasmbindgen` imports. This is going to work as long as you do not actually call those special imports. Normal usage of those libraries don't accidentally call those methods normally. If they are called, the WASM module will fail at runtime and stall the Substreams module from going forward.
+
+To enable this feature, you need to explicitly opt-in by appending a `+wasm-bindgen-shims` at the end of the binary's type in your Substreams manifest:
+
+```yaml
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: <some_file>
+```
+
+to become
+
+```yaml
+binaries:
+  default:
+    type: wasm/rust-v1+wasm-bindgen-shims
+    file: <some_file>
+```
+
+### Others
+
+* substreams.yaml now supports `localPath` attribute under  `protobuf.descriptorSets`, so you can pre-build a descriptor set using `buf build --as-file-descriptor-set -o myfile.binpb` and add it directly to your substreams package.
+
+* Substreams clients now enable gzip compression over the network (already supported by servers).
+
+* Substreams binary type can now be optionally composed of runtime extensions by appending a `+<extension>,[<extesions...>]` at the end of the binary type. Extensions are `key[=value]` that are runtime specifics.
+
+  > [!NOTE]
+  > If you were a library author and parsing generic Substreams manifest(s), you will now need to handle that possibility in the binary type. If you were reading the field without any processing, you don't have to change nothing.
+
+* Fixed a failure in protogen where duplicate files would "appear multiple times" and fail.
+
+* Fixed bug with block rate underflow in `gui`.
+
+## v1.7.0
+
+* Added store with update policy `set_sum` which allows the store to either sum a numerical value, or set it to a new value.
+
+* Re-added Ethereum Sepolia support in `substreams init`.
+
+* Fixed a bug with the new `descriptorSets` feature that wasn't ordered properly to correctly generate Protobuf bindings.
+
+## v1.6.2
+
+* execout: preload only one file instead of two, log if undeleted caches found
+* execout: add environment variable SUBSTREAMS_DISABLE_PRELOAD_EXEC_FILES to disable file preloading
+
+## v1.6.1
+
+* Revert sanity check to support the special case of a substreams with only 'params' as input. This allows a chain-agnostic event to be sent, along with the clock.
+* Fix error handling when resolved start-block == stop-block and stop-block is defined as non-zero
+
+## v1.6.0
+
+### Upgrading
+
+> **Note** Upgrading to v1.6.0 will require changing the tier1 and tier2 versions concurrently, as the internal protocol has changed.
+
+### Highlights
+
+#### Index Modules and Block Filter
+
+* *Index Modules* and *Block Filter* can now be used to speed up processing and reduce the amount of parsed data.
+* When indexes are used along with the `BlockFilter` attribute on a mapper, blocks can be skipped completely: they will not be run in downstreams modules or sent in the output stream, except in live segment or in dev-mode, where an empty 'clock' is still sent.
+* See https://github.com/streamingfast/substreams-foundational-modules for an example implementation
+* Blocks that are skipped will still appear in the metering as "read bytes" (unless a full segment is skipped), but the index stores themselves are not "metered"
+
+#### Scheduling / speed improvements
+
+* The scheduler no longer duplicates work in the first segments of a request with multiple stages.
+* Fix all issues with running a substreams where modules have different "initial blocks"
+* Maximum Tier1 output speed improved for data that is already processed
+* Tier1 'FileWalker' now polls more aggressively on local filesystem to prevent extra seconds of wait time.
+
+### Fixed
+
+* Fix a bug in the `gui` that would crash when trying to `r`estart the stream.
+* fix total read bytes in case data already cache
+
+### Added
+
+* New environment variable `SUBSTREAMS_WORKERS_RAMPUP_TIME` can specify the initial delay before tier1 will reach the number of tier2 concurrent requests.
+* Add 'clock' output to `substreams run` command, useful mostly for performance testing or pre-caching
+* (alpha) Introduce the `wasip1/tinygo-v1` binary type.
+
+### Changed / Removed
+
+* Disabled `otelcol://` tracing protocol, its mere presence affected performance.
+* Previous value for `SUBSTREAMS_WORKERS_RAMPUP_TIME` was `4s`, now set to `0`, disabling the mechanism by default.
+
+## v1.5.6
+
+### Fixes
+
+* Fix bug where substreams tier2 would sometimes write outputs with the wrong tag (leaked from another tier1 request)
+
+### Remove
+
+* Removed MaxWasmFuel since it is not supported in Wazero
+
+## v1.5.5
 
 ### Fixes
 
@@ -23,6 +155,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * add `substreams_tier1_worker_retry_counter` metric to count all worker errors returned by tier2
 * add `substreams_tier1_worker_rejected_overloaded_counter` metric to count only worker errors with string "service currently overloaded"
+* add `google/protobuf/duration.proto` to system proto files
 * Support for buf build urls in substreams manifest. Ex.:
 ```yaml
 protobuf:
@@ -85,7 +218,7 @@ Performance, memory leak and bug fixes
 ### Client
 
 * Implement a `use` feature, enabling a module to use an existing module by overriding its inputs or initial block. (Inputs should have the same output type than override module's inputs).
-  Check a usage of this new feature on the [substreams-db-graph-converter](https://github.com/streamingfast/substreams-db-graph-converter/) repository. 
+  Check a usage of this new feature on the [substreams-db-graph-converter](https://github.com/streamingfast/substreams-db-graph-converter/) repository.
 
 * Fix panic when using '--header (-H)' flag on `gui` command
 
@@ -113,7 +246,7 @@ Some redundant reprocessing has been removed, along with a better usage of cache
 
 ### Operator concerns
 
-* Tier2 service now supports a maximum concurrent requests limit. Default set to 0 (unlimited). 
+* Tier2 service now supports a maximum concurrent requests limit. Default set to 0 (unlimited).
 
 * Readiness metric for Substreams tier1 app is now named `substreams_tier1` (was mistakenly called `firehose` before).
 

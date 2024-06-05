@@ -4,9 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/tetratelabs/wazero/api"
-
 	"github.com/streamingfast/substreams/wasm"
+	"github.com/tetratelabs/wazero/api"
 )
 
 type parm = api.ValueType
@@ -23,7 +22,7 @@ type funcs struct {
 	f      api.GoModuleFunction
 }
 
-var stateFuncs = []funcs{
+var StateFuncs = []funcs{
 	{
 		"set",
 		[]parm{i64, i32, i32, i32, i32},
@@ -125,6 +124,58 @@ var stateFuncs = []funcs{
 			call := wasm.FromContext(ctx)
 
 			call.DoAddFloat64(ord, key, value)
+		}),
+	},
+	{
+		"set_sum_bigint",
+		[]parm{i64, i32, i32, i32, i32},
+		[]parm{},
+		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
+			ord := stack[0]
+			key := readStringFromStack(mod, stack[1:])
+			value := readStringFromStack(mod, stack[3:])
+			call := wasm.FromContext(ctx)
+
+			call.DoSetSumBigInt(ord, key, value)
+		}),
+	},
+	{
+		"set_sum_bigdecimal",
+		[]parm{i64, i32, i32, i32, i32},
+		[]parm{},
+		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
+			ord := stack[0]
+			key := readStringFromStack(mod, stack[1:])
+			value := readStringFromStack(mod, stack[3:])
+			call := wasm.FromContext(ctx)
+
+			call.DoSetSumBigDecimal(ord, key, value)
+		}),
+	},
+	{
+		"set_sum_int64",
+		[]parm{i64, i32, i32, i32, i32},
+		[]parm{},
+		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
+			ord := stack[0]
+			key := readStringFromStack(mod, stack[1:])
+			value := readStringFromStack(mod, stack[3:])
+			call := wasm.FromContext(ctx)
+
+			call.DoSetSumInt64(ord, key, value)
+		}),
+	},
+	{
+		"set_sum_float64",
+		[]parm{i64, i32, i32, i32, i32},
+		[]parm{},
+		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
+			ord := stack[0]
+			key := readStringFromStack(mod, stack[1:])
+			value := readStringFromStack(mod, stack[3:])
+			call := wasm.FromContext(ctx)
+
+			call.DoSetSumFloat64(ord, key, value)
 		}),
 	},
 	{
@@ -323,7 +374,7 @@ var stateFuncs = []funcs{
 	},
 }
 
-func setStackAndOutput(ctx context.Context, stack []uint64, call *wasm.Call, found bool, inst *instance, outputPtr uint32, value []byte) {
+func setStackAndOutput(ctx context.Context, stack []uint64, call *wasm.Call, found bool, inst *Instance, outputPtr uint32, value []byte) {
 	if !found {
 		stack[0] = 0
 	} else {

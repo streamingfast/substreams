@@ -4,10 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"go.uber.org/zap"
-
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/storage/store/marshaller"
+	"go.uber.org/zap"
 )
 
 var _ Store = (*FullKV)(nil)
@@ -25,7 +24,7 @@ func (s *FullKV) Marshaller() marshaller.Marshaller {
 func (s *FullKV) DerivePartialStore(initialBlock uint64) *PartialKV {
 	b := &baseStore{
 		Config:     s.Config,
-		pendingOps: &pbssinternal.Operations{},
+		kvOps:      &pbssinternal.Operations{},
 		kv:         make(map[string][]byte),
 		logger:     s.logger,
 		marshaller: marshaller.Default(),

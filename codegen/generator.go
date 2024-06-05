@@ -49,18 +49,6 @@ var tplMod string
 //go:embed templates/generator/pb_mod.gotmpl
 var tplPbMod string
 
-//go:embed templates/generator/buildsh.gotmpl
-var tplBuildSh string
-
-//go:embed templates/generator/cargotoml.gotmpl
-var tplCargoToml string
-
-//go:embed templates/generator/manifestyaml.gotmpl
-var tplManifestYaml string
-
-//go:embed templates/generator/rusttoolchain.gotmpl
-var tplRustToolchain string
-
 var StoreType = map[string]string{
 	"bytes":      "Raw",
 	"string":     "String",
@@ -368,7 +356,7 @@ func (e *Engine) ReadableStoreType(store *manifest.Module, input *manifest.Input
 	}
 
 	if p == manifest.UpdatePolicyAppend {
-		return fmt.Sprintf("substreams::store::StoreGetRaw")
+		return "substreams::store::StoreGetRaw"
 	}
 
 	t = maybeTranslateType(t)

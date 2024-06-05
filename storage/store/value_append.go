@@ -7,7 +7,7 @@ import (
 )
 
 func (b *baseStore) Append(ord uint64, key string, value []byte) {
-	b.pendingOps.Add(&pbssinternal.Operation{
+	b.kvOps.Add(&pbssinternal.Operation{
 		Type:  pbssinternal.Operation_APPEND,
 		Ord:   ord,
 		Key:   key,

@@ -61,6 +61,13 @@ func NewModuleGraph(modules []*pbsubstreams.Module) (*ModuleGraph, error) {
 
 			g.inputOrderIndex[module.Name][moduleName] = j
 		}
+		if module.BlockFilter != nil {
+			moduleName := module.BlockFilter.Module
+			if j, found := g.moduleIndex[moduleName]; found {
+				g.AddCost(i, j, 1)
+				g.inputOrderIndex[module.Name][moduleName] = j
+			}
+		}
 	}
 
 	if !graph.Acyclic(g) {

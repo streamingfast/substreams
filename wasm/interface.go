@@ -2,6 +2,8 @@ package wasm
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
@@ -25,13 +27,13 @@ type WASMExtension func(ctx context.Context, requestID string, clock *pbsubstrea
 // WASM VM specific implementation to create a new Module, which is an abstraction
 // around a runtime and pre-compiled WASM modules.
 type ModuleFactory interface {
-	NewModule(ctx context.Context, code []byte, registry *Registry) (module Module, err error)
+	NewModule(ctx context.Context, wasmCode []byte, wasmCodeType string, registry *Registry) (module Module, err error)
 }
 
-type ModuleFactoryFunc func(ctx context.Context, wasmCode []byte, registry *Registry) (module Module, err error)
+type ModuleFactoryFunc func(ctx context.Context, wasmCode []byte, wasmCodeType string, registry *Registry) (module Module, err error)
 
-func (f ModuleFactoryFunc) NewModule(ctx context.Context, wasmCode []byte, registry *Registry) (module Module, err error) {
-	return f(ctx, wasmCode, registry)
+func (f ModuleFactoryFunc) NewModule(ctx context.Context, wasmCode []byte, wasmCodeType string, registry *Registry) (module Module, err error) {
+	return f(ctx, wasmCode, wasmCodeType, registry)
 }
 
 // A Module is a cached or pre-compiled version able to generate new isolated
@@ -63,6 +65,20 @@ type Instance interface {
 	// freed from memory.  When using cached instances, this won't be called between
 	// each execution, but only at the end of a user's request.
 	Close(ctx context.Context) error
+}
+
+func ParseWASMCodeType(wasmCodeType string) (string, RuntimeExtensions, error) {
+	wasmCodeTypeID, rawExtensions, hasExtensions := strings.Cut(wasmCodeType, "+")
+	if !hasExtensions {
+		return wasmCodeTypeID, nil, nil
+	}
+
+	extensions, err := ParseRuntimeExtensions(rawExtensions)
+	if err != nil {
+		return "", nil, fmt.Errorf("parse extensions: %w", err)
+	}
+
+	return wasmCodeTypeID, extensions, nil
 }
 
 var runtimes = map[string]ModuleFactory{}

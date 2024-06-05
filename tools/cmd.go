@@ -15,10 +15,10 @@
 package tools
 
 import (
-	"fmt"
-	"github.com/streamingfast/substreams/client"
 	"os"
-	"time"
+
+	"github.com/streamingfast/cli/sflags"
+	"github.com/streamingfast/substreams/client"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
@@ -34,63 +34,8 @@ var ExamplePrefixed = func(prefix, in string) string {
 	return string(cli.ExamplePrefixed(prefix, in))
 }
 
-func mustGetString(cmd *cobra.Command, flagName string) string {
-	val, err := cmd.Flags().GetString(flagName)
-	if err != nil {
-		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
-	}
-	return val
-}
-
-func mustGetInt64(cmd *cobra.Command, flagName string) int64 {
-	val, err := cmd.Flags().GetInt64(flagName)
-	if err != nil {
-		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
-	}
-	return val
-}
-func mustGetUint64(cmd *cobra.Command, flagName string) uint64 {
-	val, err := cmd.Flags().GetUint64(flagName)
-	if err != nil {
-		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
-	}
-	return val
-}
-func mustGetBool(cmd *cobra.Command, flagName string) bool {
-	val, err := cmd.Flags().GetBool(flagName)
-	if err != nil {
-		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
-	}
-	return val
-}
-func mustGetDuration(cmd *cobra.Command, flagName string) time.Duration {
-	val, err := cmd.Flags().GetDuration(flagName)
-	if err != nil {
-		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
-	}
-	return val
-}
-func mustGetStringSlice(cmd *cobra.Command, flagName string) []string {
-	val, err := cmd.Flags().GetStringSlice(flagName)
-	if err != nil {
-		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
-	}
-	if len(val) == 0 {
-		return nil
-	}
-	return val
-}
-
-func mustGetStringArray(cmd *cobra.Command, flagName string) []string {
-	val, err := cmd.Flags().GetStringArray(flagName)
-	if err != nil {
-		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
-	}
-	return val
-}
-
 func ReadAPIToken(cmd *cobra.Command, envFlagName string) string {
-	envVar := mustGetString(cmd, envFlagName)
+	envVar := sflags.MustGetString(cmd, envFlagName)
 	value := os.Getenv(envVar)
 	if value != "" {
 		return value
@@ -100,7 +45,7 @@ func ReadAPIToken(cmd *cobra.Command, envFlagName string) string {
 }
 
 func ReadAPIKey(cmd *cobra.Command, envFlagName string) string {
-	envVar := mustGetString(cmd, envFlagName)
+	envVar := sflags.MustGetString(cmd, envFlagName)
 	value := os.Getenv(envVar)
 	if value != "" {
 		return value

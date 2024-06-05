@@ -11,6 +11,7 @@ import (
 	grpcreflect "connectrpc.com/grpcreflect"
 	"github.com/rs/cors"
 	"github.com/spf13/cobra"
+	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	pbrpcsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -113,22 +114,22 @@ func init() {
 }
 
 func runProxy(cmd *cobra.Command, args []string) error {
-	addr := mustGetString(cmd, "listen-addr")
+	addr := sflags.MustGetString(cmd, "listen-addr")
 	fmt.Println("listening on", addr)
 
 	authToken, authType := tools.GetAuth(cmd, "substreams-api-key-envvar", "substreams-api-token-envvar")
 	substreamsClientConfig := client.NewSubstreamsClientConfig(
-		mustGetString(cmd, "substreams-endpoint"),
+		sflags.MustGetString(cmd, "substreams-endpoint"),
 		authToken,
 		authType,
-		mustGetBool(cmd, "insecure"),
-		mustGetBool(cmd, "plaintext"),
+		sflags.MustGetBool(cmd, "insecure"),
+		sflags.MustGetBool(cmd, "plaintext"),
 	)
 
 	cs := &ConnectServer{
-		Manifest:               mustGetString(cmd, "force-manifest"),
+		Manifest:               sflags.MustGetString(cmd, "force-manifest"),
 		SubstreamsClientConfig: substreamsClientConfig,
-		StartBlock:             mustGetUint64(cmd, "force-start-block"),
+		StartBlock:             sflags.MustGetUint64(cmd, "force-start-block"),
 	}
 
 	reflector := grpcreflect.NewStaticReflector(

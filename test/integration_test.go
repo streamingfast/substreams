@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"os"
@@ -11,16 +12,14 @@ import (
 	"time"
 
 	"github.com/streamingfast/bstream"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/orchestrator/stage"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	"github.com/streamingfast/substreams/reqctx"
-
-	//_ "github.com/streamingfast/substreams/wasm/wasmtime"
 	_ "github.com/streamingfast/substreams/wasm/wazero"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestForkHandling(t *testing.T) {
@@ -65,7 +64,7 @@ func TestForkHandling(t *testing.T) {
 				{blockRef: bstream.NewBlockRef("5b", 5), previousID: "4b", libBlockRef: bstream.NewBlockRef("0a", 0)},
 				{blockRef: bstream.NewBlockRef("5a", 5), previousID: "4a", libBlockRef: bstream.NewBlockRef("0a", 0)},
 				{blockRef: bstream.NewBlockRef("6a", 6), previousID: "5a", libBlockRef: bstream.NewBlockRef("4a", 4)},
-				{blockRef: bstream.NewBlockRef("7a", 6), previousID: "6a", libBlockRef: bstream.NewBlockRef("4a", 4)},
+				{blockRef: bstream.NewBlockRef("7a", 7), previousID: "6a", libBlockRef: bstream.NewBlockRef("4a", 4)},
 			},
 			expectedResponseNames: []response{
 				{id: "1a", output: "assert_test_store_add_bigint"},
@@ -129,7 +128,7 @@ func TestForkHandling(t *testing.T) {
 	for _, test := range tests {
 
 		t.Run(test.name, func(t *testing.T) {
-			run := newTestRun(t, 1, 1, 7, test.module)
+			run := newTestRun(t, 1, 1, 7, test.module, "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 			run.NewBlockGenerator = func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
 				return &ForkBlockGenerator{
 					initialLIB:    bstream.NewBlockRef("0a", 0),
@@ -180,6 +179,9 @@ func TestForkHandling(t *testing.T) {
 }
 
 func TestOneStoreOneMap(t *testing.T) {
+	testStoreAddI64Hash := hex.EncodeToString([]byte("setup_test_store_add_i64"))
+	assertTestStoreAddI64Hash := hex.EncodeToString([]byte("assert_test_store_add_i64"))
+
 	tests := []struct {
 		name                  string
 		startBlock            int64
@@ -199,11 +201,10 @@ func TestOneStoreOneMap(t *testing.T) {
 			expectedResponseCount: 4,
 			expectFiles: []string{
 
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000001-0000000010.output", // store outputs
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000010-0000000020.output",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.kv", // store states
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000020-0000000001.kv",
-				//				"states/0000000025-0000000020.partial", // produced, then deleted
+				testStoreAddI64Hash + "/outputs/0000000001-0000000010.output", // store outputs
+				testStoreAddI64Hash + "/outputs/0000000010-0000000020.output",
+				testStoreAddI64Hash + "/states/0000000010-0000000001.kv", // store states
+				testStoreAddI64Hash + "/states/0000000020-0000000001.kv",
 			},
 		},
 		{
@@ -214,109 +215,92 @@ func TestOneStoreOneMap(t *testing.T) {
 			production:            false,
 			expectedResponseCount: 7,
 			expectFiles: []string{
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000001-0000000010.output", // store outputs
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000010-0000000020.output",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.kv", // store states
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000020-0000000001.kv",
-				// "states/0000000025-0000000020.partial", // produced, then deleted
-				//"states/0000000030-0000000001.kv", // Again, backprocess wouldn't save this one, nor does it need to.
+				testStoreAddI64Hash + "/outputs/0000000001-0000000010.output", // store outputs
+				testStoreAddI64Hash + "/outputs/0000000010-0000000020.output",
+				testStoreAddI64Hash + "/states/0000000010-0000000001.kv", // store states
+				testStoreAddI64Hash + "/states/0000000020-0000000001.kv",
 			},
 		},
 		{
 			name:                  "prod_mode_back_forward_to_lib",
 			startBlock:            25,
-			linearBlock:           27,
+			linearBlock:           20,
 			stopBlock:             29,
 			production:            true,
 			expectedResponseCount: 4,
 			expectFiles: []string{
-				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000020-0000000027.output",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000001-0000000010.output",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000010-0000000020.output",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.kv",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000020-0000000001.kv",
+				testStoreAddI64Hash + "/outputs/0000000001-0000000010.output",
+				testStoreAddI64Hash + "/outputs/0000000010-0000000020.output",
+				testStoreAddI64Hash + "/states/0000000010-0000000001.kv",
+				testStoreAddI64Hash + "/states/0000000020-0000000001.kv",
 			},
 		},
 		{
 			name:                  "prod_mode_back_forward_to_stop",
 			startBlock:            25,
-			linearBlock:           29,
-			stopBlock:             29,
+			linearBlock:           30,
+			stopBlock:             30,
 			production:            true,
-			expectedResponseCount: 4,
+			expectedResponseCount: 5,
 			expectFiles: []string{
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000001-0000000010.output", //store
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000010-0000000020.output",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.kv",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000020-0000000001.kv",
-				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000020-0000000029.output", // map
+				testStoreAddI64Hash + "/outputs/0000000001-0000000010.output", //store
+				testStoreAddI64Hash + "/outputs/0000000010-0000000020.output",
+				testStoreAddI64Hash + "/outputs/0000000020-0000000030.output",
+				testStoreAddI64Hash + "/states/0000000010-0000000001.kv",
+				testStoreAddI64Hash + "/states/0000000020-0000000001.kv",
+				testStoreAddI64Hash + "/states/0000000030-0000000001.kv",
+				assertTestStoreAddI64Hash + "/outputs/0000000020-0000000030.output", // map
 			},
 		},
 		{
 			name:                  "prod_mode_back_forward_to_stop_passed_boundary",
 			startBlock:            25,
-			linearBlock:           38,
-			stopBlock:             38,
+			linearBlock:           40,
+			stopBlock:             41,
 			production:            true,
-			expectedResponseCount: 13,
+			expectedResponseCount: 16,
 			expectFiles: []string{
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000001-0000000010.output", // store
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000010-0000000020.output",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000020-0000000030.output",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.kv",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000020-0000000001.kv",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000030-0000000001.kv",
-				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000020-0000000030.output", // map
-				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000030-0000000038.output",
-			},
-		},
-		{
-			name:                  "prod_mode_start_before_linear_and_firstboundary",
-			startBlock:            7,
-			linearBlock:           8,
-			stopBlock:             9,
-			production:            true,
-			expectedResponseCount: 2,
-			expectFiles: []string{
-				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000001-0000000008.output",
-			},
-		},
-		{
-			name:                  "prod_mode_start_before_linear_then_pass_firstboundary",
-			startBlock:            7,
-			linearBlock:           8,
-			stopBlock:             15,
-			production:            true,
-			expectedResponseCount: 8,
-			expectFiles: []string{
-				//"states/0000000010-0000000001.kv", // TODO: not sure why this would have been produced with the prior code..
-				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000001-0000000008.output",
+				testStoreAddI64Hash + "/outputs/0000000001-0000000010.output", // store
+				testStoreAddI64Hash + "/outputs/0000000010-0000000020.output",
+				testStoreAddI64Hash + "/outputs/0000000020-0000000030.output",
+				testStoreAddI64Hash + "/outputs/0000000030-0000000040.output",
+				testStoreAddI64Hash + "/states/0000000010-0000000001.kv",
+				testStoreAddI64Hash + "/states/0000000020-0000000001.kv",
+				testStoreAddI64Hash + "/states/0000000030-0000000001.kv",
+				testStoreAddI64Hash + "/states/0000000040-0000000001.kv",
+				assertTestStoreAddI64Hash + "/outputs/0000000020-0000000030.output", // map
+				assertTestStoreAddI64Hash + "/outputs/0000000030-0000000040.output",
 			},
 		},
 		{
 			name:        "prod_mode_partial_existing",
 			startBlock:  1,
-			linearBlock: 29,
-			stopBlock:   29,
+			linearBlock: 30,
+			stopBlock:   30,
 			production:  true,
 			preWork: func(t *testing.T, run *testRun, workerFactory work.WorkerFactory) {
 				partialPreWork(t, 1, 10, 0, run, workerFactory)
 			},
-			expectedResponseCount: 28,
+			expectedResponseCount: 29,
 			expectFiles: []string{
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000001-0000000010.output",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/outputs/0000000010-0000000020.output",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000010-0000000001.kv",
-				"ebd5bb65aaf4471e468efea126f27dbddb37b59e/states/0000000020-0000000001.kv",
-				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000001-0000000010.output",
-				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000010-0000000020.output",
-				"3574de26d590713344b911bbc1c3bf3305ccb906/outputs/0000000020-0000000029.output",
+				testStoreAddI64Hash + "/outputs/0000000001-0000000010.output",
+				testStoreAddI64Hash + "/outputs/0000000010-0000000020.output",
+				testStoreAddI64Hash + "/outputs/0000000020-0000000030.output",
+				testStoreAddI64Hash + "/states/0000000010-0000000001.kv",
+				testStoreAddI64Hash + "/states/0000000020-0000000001.kv",
+				testStoreAddI64Hash + "/states/0000000030-0000000001.kv",
+				assertTestStoreAddI64Hash + "/outputs/0000000001-0000000010.output",
+				assertTestStoreAddI64Hash + "/outputs/0000000010-0000000020.output",
+				assertTestStoreAddI64Hash + "/outputs/0000000020-0000000030.output",
 			},
 		},
 	}
+
+	manifest.UseSimpleHash = true
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			run := newTestRun(t, test.startBlock, test.linearBlock, test.stopBlock, "assert_test_store_add_i64")
+			run := newTestRun(t, test.startBlock, test.linearBlock, test.stopBlock, "assert_test_store_add_i64", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 			run.ProductionMode = test.production
 			run.ParallelSubrequests = 1
 			run.PreWork = test.preWork
@@ -329,20 +313,20 @@ func TestOneStoreOneMap(t *testing.T) {
 			assert.Equal(t, test.expectedResponseCount, strings.Count(mapOutput, "\n"))
 
 			withZST := func(s []string) []string {
-				res := make([]string, len(s), len(s))
+				res := make([]string, len(s))
 				for i, v := range s {
 					res[i] = fmt.Sprintf("%s.zst", v)
 				}
 				return res
 			}
 
-			assertFiles(t, run.TempDir, withZST(test.expectFiles)...)
+			assertFiles(t, run.TempDir, true, withZST(test.expectFiles)...)
 		})
 	}
 }
 
 func TestStoreDeletePrefix(t *testing.T) {
-	run := newTestRun(t, 30, 41, 41, "assert_test_store_delete_prefix")
+	run := newTestRun(t, 30, 40, 42, "assert_test_store_delete_prefix", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 	run.BlockProcessedCallback = func(ctx *execContext) {
 		if ctx.block.Number == 40 {
 			s, storeFound := ctx.stores.Get("test_store_delete_prefix")
@@ -356,7 +340,7 @@ func TestStoreDeletePrefix(t *testing.T) {
 
 func TestAllAssertions(t *testing.T) {
 	// Relies on `assert_all_test` having modInit == 1, so
-	run := newTestRun(t, 1, 31, 31, "assert_all_test")
+	run := newTestRun(t, 1, 31, 31, "assert_all_test", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 
 	require.NoError(t, run.Run(t, "assert_all_test"))
 
@@ -366,7 +350,7 @@ func TestAllAssertions(t *testing.T) {
 }
 
 func Test_SimpleMapModule(t *testing.T) {
-	run := newTestRun(t, 10000, 10001, 10001, "test_map")
+	run := newTestRun(t, 10000, 10001, 10001, "test_map", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 	run.Params = map[string]string{"test_map": "my test params"}
 	run.NewBlockGenerator = func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
 		return &LinearBlockGenerator{
@@ -380,8 +364,25 @@ func Test_SimpleMapModule(t *testing.T) {
 	require.NoError(t, run.Run(t, "test_map"))
 }
 
+func Test_WASMBindgenShims(t *testing.T) {
+	run := newTestRun(t, 12, 14, 14, "map_block", "./testdata/wasmbindgen_substreams/wasmbindgen-substreams-v0.1.0.spkg")
+	run.NewBlockGenerator = func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+		return &LinearBlockGenerator{
+			startBlock:         startBlock,
+			inclusiveStopBlock: inclusiveStopBlock + 10,
+		}
+	}
+	run.ParallelSubrequests = 1
+
+	require.NoError(t, run.Run(t, "test_wasmbindgenshims"))
+
+	mapOutput := run.MapOutput("map_block")
+	fmt.Println(mapOutput)
+
+}
+
 func Test_Early(t *testing.T) {
-	run := newTestRun(t, 12, 14, 14, "test_map")
+	run := newTestRun(t, 12, 14, 14, "test_map", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 	run.Params = map[string]string{"test_map": "my test params"}
 	run.ProductionMode = true
 	run.NewBlockGenerator = func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
@@ -396,7 +397,7 @@ func Test_Early(t *testing.T) {
 }
 
 func TestEarlyWithEmptyStore(t *testing.T) {
-	run := newTestRun(t, 2, 4, 4, "assert_test_store_delete_prefix")
+	run := newTestRun(t, 2, 4, 4, "assert_test_store_delete_prefix", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 	run.ProductionMode = true
 
 	var foundBlock3 bool
@@ -412,7 +413,7 @@ func TestEarlyWithEmptyStore(t *testing.T) {
 }
 
 func Test_SingleMapModule_FileWalker(t *testing.T) {
-	run := newTestRun(t, 200, 250, 300, "test_map")
+	run := newTestRun(t, 200, 250, 300, "test_map", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 	run.Params = map[string]string{"test_map": "my test params"}
 	run.ProductionMode = true
 	run.NewBlockGenerator = func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
@@ -454,7 +455,7 @@ func listFiles(t *testing.T, tempDir string) []string {
 	return storedFiles
 }
 
-func assertFiles(t *testing.T, tempDir string, wantedFiles ...string) {
+func assertFiles(t *testing.T, tempDir string, expectPartialSpkg bool, wantedFiles ...string) {
 	producedFiles := listFiles(t, tempDir)
 
 	actualFiles := make([]string, 0, len(producedFiles))
@@ -468,7 +469,10 @@ func assertFiles(t *testing.T, tempDir string, wantedFiles ...string) {
 		actualFiles = append(actualFiles, filepath.Join(parts[3:]...))
 	}
 
-	assert.True(t, seenPartialSpkg, "substreams.partial.spkg should be produced")
+	if expectPartialSpkg {
+		assert.True(t, seenPartialSpkg, "substreams.partial.spkg should be produced")
+	}
+
 	assert.ElementsMatch(t, wantedFiles, actualFiles)
 }
 
@@ -479,7 +483,7 @@ func partialPreWork(t *testing.T, start, end uint64, stageIdx int, run *testRun,
 	// caller to `partialPreWork` doesn't need to be changed too much? :)
 	segmenter := block.NewSegmenter(10, 0, 0)
 	unit := stage.Unit{Segment: segmenter.IndexForStartBlock(start), Stage: stageIdx}
-	ctx := reqctx.WithRequest(run.Context, &reqctx.RequestDetails{Modules: run.Package.Modules, OutputModule: run.ModuleName, CacheTag: "tag"})
+	ctx := reqctx.WithRequest(run.Context, &reqctx.RequestDetails{Modules: run.Package.Modules, OutputModule: run.ModuleName})
 	cmd := worker.Work(ctx, unit, block.NewRange(start, end), []string{run.ModuleName}, nil)
 	result := cmd()
 	msg, ok := result.(work.MsgJobSucceeded)

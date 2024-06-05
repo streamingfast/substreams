@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -21,6 +22,13 @@ import (
 	"github.com/streamingfast/substreams/storage/execout"
 	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
 )
+
+var disablePreloadExecFiles bool
+
+func init() {
+	e := os.Getenv("SUBSTREAMS_DISABLE_PRELOAD_EXEC_FILES")
+	disablePreloadExecFiles = e == "" || e == "0" || e == "false"
+}
 
 type Walker struct {
 	ctx context.Context
@@ -64,13 +72,16 @@ func (r *Walker) IsWorking() bool {
 
 func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
 	file := r.fileWalker.File()
+	if !disablePreloadExecFiles {
+		r.fileWalker.PreloadNext(r.ctx)
+	}
 
 	return func() loop.Msg {
 		time.Sleep(waitBefore)
 
 		err := file.Load(r.ctx)
 		if errors.Is(err, dstore.ErrNotFound) {
-			return MsgFileNotPresent{NextWait: computeNewWait(waitBefore)}
+			return MsgFileNotPresent{NextWait: computeNewWait(waitBefore, r.fileWalker.IsLocal)}
 		}
 		if err != nil {
 			return loop.NewQuitMsg(fmt.Errorf("loading %s cache %q: %w", file.ModuleName, file.Filename(), err))
@@ -83,13 +94,16 @@ func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
 	}
 }
 
-func computeNewWait(previousWait time.Duration) time.Duration {
+func computeNewWait(previousWait time.Duration, storeIsLocal bool) time.Duration {
+	if storeIsLocal {
+		return 50 * time.Millisecond
+	}
 	if previousWait == 0 {
 		return 500 * time.Millisecond
 	}
-	newWait := previousWait * 2
-	if newWait > 4*time.Second {
-		return 4 * time.Second
+	newWait := previousWait + 250*time.Millisecond
+	if newWait > 2*time.Second {
+		return 2 * time.Second
 	}
 	return newWait
 }
@@ -101,6 +115,9 @@ func (r *Walker) sendItems(sortedItems []*pboutput.Item) error {
 		}
 		if item.BlockNum < r.StartBlock {
 			continue
+		}
+		if item.BlockNum >= r.ExclusiveEndBlock {
+			return nil
 		}
 
 		blockScopedData, err := toBlockScopedData(r.module, item)

@@ -88,8 +88,6 @@ func (s *StreamFactory) GetRecentFinalBlock() (uint64, error) {
 	if finalBlockNum > bstream.GetProtocolFirstStreamableBlock+200 {
 		finalBlockNum -= finalBlockNum % 100
 		finalBlockNum -= 100
-	} else if finalBlockNum > bstream.GetProtocolFirstStreamableBlock+200 {
-		finalBlockNum -= finalBlockNum % 100
 	}
 
 	return finalBlockNum, err

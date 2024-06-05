@@ -3,7 +3,6 @@ package tools
 import (
 	"context"
 	"fmt"
-	"google.golang.org/grpc/metadata"
 	"io"
 	"net/http"
 	"strconv"
@@ -11,7 +10,10 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/grpc/metadata"
+
 	"github.com/streamingfast/cli"
+	"github.com/streamingfast/cli/sflags"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -65,7 +67,10 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 	blockHeight := args[2]
 
 	blockNum, err := strconv.ParseInt(blockHeight, 10, 64)
-	addr := mustGetString(cmd, "listen-addr")
+	if err != nil {
+		return err
+	}
+	addr := sflags.MustGetString(cmd, "listen-addr")
 
 	manifestReader, err := manifest.NewReader(manifestPath)
 	if err != nil {
@@ -80,10 +85,10 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 	outputStreamName := moduleName
 
 	authToken, authType := GetAuth(cmd, "substreams-api-key-envvar", "substreams-api-token-envvar")
-	insecure := mustGetBool(cmd, "insecure")
-	plaintext := mustGetBool(cmd, "plaintext")
-	interval := mustGetDuration(cmd, "lookup_interval")
-	timeout := mustGetDuration(cmd, "lookup_timeout")
+	insecure := sflags.MustGetBool(cmd, "insecure")
+	plaintext := sflags.MustGetBool(cmd, "plaintext")
+	interval := sflags.MustGetDuration(cmd, "lookup_interval")
+	timeout := sflags.MustGetDuration(cmd, "lookup_timeout")
 	for _, endpoint := range endpoints {
 		substreamsClientConfig := client.NewSubstreamsClientConfig(
 			endpoint,

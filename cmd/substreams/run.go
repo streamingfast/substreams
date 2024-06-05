@@ -29,7 +29,7 @@ func init() {
 	runCmd.Flags().Bool("final-blocks-only", false, "Only process blocks that have pass finality, to prevent any reorg and undo signal by staying further away from the chain HEAD")
 	runCmd.Flags().Bool("insecure", false, "Skip certificate validation on GRPC connection")
 	runCmd.Flags().Bool("plaintext", false, "Establish GRPC connection in plaintext")
-	runCmd.Flags().StringP("output", "o", "", "Output mode. Defaults to 'ui' when in a TTY is present, and 'json' otherwise")
+	runCmd.Flags().StringP("output", "o", "", "Output mode, one of: [ui, json, jsonl, clock] Defaults to 'ui' when in a TTY is present, and 'json' otherwise")
 	runCmd.Flags().StringSlice("debug-modules-initial-snapshot", nil, "List of 'store' modules from which to print the initial data snapshot (Unavailable in Production Mode)")
 	runCmd.Flags().StringSlice("debug-modules-output", nil, "List of modules from which to print outputs, deltas and logs (Unavailable in Production Mode)")
 	runCmd.Flags().StringSliceP("header", "H", nil, "Additional headers to be sent in the substreams request")
@@ -71,7 +71,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		outputModule = args[1]
 	}
 
-	outputMode := mustGetString(cmd, "output")
+	outputMode := sflags.MustGetString(cmd, "output")
 
 	network := sflags.MustGetString(cmd, "network")
 	paramsString := sflags.MustGetStringArray(cmd, "params")
@@ -99,7 +99,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
-	endpoint, err := manifest.ExtractNetworkEndpoint(pkg.Network, mustGetString(cmd, "substreams-endpoint"), zlog)
+	endpoint, err := manifest.ExtractNetworkEndpoint(pkg.Network, sflags.MustGetString(cmd, "substreams-endpoint"), zlog)
 	if err != nil {
 		return fmt.Errorf("extracting endpoint: %w", err)
 	}
@@ -110,22 +110,28 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 
 	var testRunner *test.Runner
-	testFile := mustGetString(cmd, "test-file")
+	testFile := sflags.MustGetString(cmd, "test-file")
 	if testFile != "" {
 		zlog.Info("running test runner", zap.String(testFile, testFile))
-		testRunner, err = test.NewRunner(testFile, msgDescs, mustGetBool(cmd, "test-verbose"), zlog)
+		testRunner, err = test.NewRunner(testFile, msgDescs, sflags.MustGetBool(cmd, "test-verbose"), zlog)
 		if err != nil {
 			return fmt.Errorf("failed to setup test runner: %w", err)
 		}
 	}
 
-	productionMode := mustGetBool(cmd, "production-mode")
-	debugModulesOutput := mustGetStringSlice(cmd, "debug-modules-output")
+	productionMode := sflags.MustGetBool(cmd, "production-mode")
+	debugModulesOutput := sflags.MustGetStringSlice(cmd, "debug-modules-output")
+	if len(debugModulesOutput) == 0 {
+		debugModulesOutput = nil
+	}
 	if debugModulesOutput != nil && productionMode {
 		return fmt.Errorf("cannot set 'debug-modules-output' in 'production-mode'")
 	}
 
-	debugModulesInitialSnapshot := mustGetStringSlice(cmd, "debug-modules-initial-snapshot")
+	debugModulesInitialSnapshot := sflags.MustGetStringSlice(cmd, "debug-modules-initial-snapshot")
+	if len(debugModulesInitialSnapshot) == 0 {
+		debugModulesInitialSnapshot = nil
+	}
 
 	startBlock, readFromModule, err := readStartBlockFlag(cmd, "start-block")
 	if err != nil {
@@ -145,8 +151,8 @@ func runRun(cmd *cobra.Command, args []string) error {
 		endpoint,
 		authToken,
 		authType,
-		mustGetBool(cmd, "insecure"),
-		mustGetBool(cmd, "plaintext"),
+		sflags.MustGetBool(cmd, "insecure"),
+		sflags.MustGetBool(cmd, "plaintext"),
 	)
 
 	ssClient, connClose, callOpts, headers, err := client.NewSubstreamsClient(substreamsClientConfig)
@@ -155,7 +161,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 	defer connClose()
 
-	cursorStr := mustGetString(cmd, "cursor")
+	cursorStr := sflags.MustGetString(cmd, "cursor")
 
 	stopBlock, err := readStopBlockFlag(cmd, startBlock, "stop-block", cursorStr != "")
 	if err != nil {
@@ -166,7 +172,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		StartBlockNum:                       startBlock,
 		StartCursor:                         cursorStr,
 		StopBlockNum:                        stopBlock,
-		FinalBlocksOnly:                     mustGetBool(cmd, "final-blocks-only"),
+		FinalBlocksOnly:                     sflags.MustGetBool(cmd, "final-blocks-only"),
 		Modules:                             pkg.Modules,
 		OutputModule:                        outputModule,
 		ProductionMode:                      productionMode,
@@ -202,7 +208,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		streamCtx = metadata.AppendToOutgoingContext(streamCtx, headers.ToArray()...)
 	}
 	//parse additional-headers flag
-	additionalHeaders := mustGetStringSlice(cmd, "header")
+	additionalHeaders := sflags.MustGetStringSlice(cmd, "header")
 	if additionalHeaders != nil {
 		res := parseHeaders(additionalHeaders)
 		headerArray := make([]string, 0, len(res)*2)

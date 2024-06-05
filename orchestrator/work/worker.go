@@ -93,20 +93,20 @@ func NewRequest(ctx context.Context, req *reqctx.RequestDetails, stageIndex int,
 		panic("unable to get tier2 request parameters")
 	}
 
-	return &pbssinternal.ProcessRangeRequest{
-		StartBlockNum: workRange.StartBlock,
-		StopBlockNum:  workRange.ExclusiveEndBlock,
-		Modules:       req.Modules,
-		OutputModule:  req.OutputModule,
-		Stage:         uint32(stageIndex),
+	segment := uint64(workRange.StartBlock) / tier2ReqParams.StateBundleSize
 
+	return &pbssinternal.ProcessRangeRequest{
+		Modules:              req.Modules,
+		OutputModule:         req.OutputModule,
+		Stage:                uint32(stageIndex),
 		MeteringConfig:       tier2ReqParams.MeteringConfig,
 		FirstStreamableBlock: tier2ReqParams.FirstStreamableBlock,
 		MergedBlocksStore:    tier2ReqParams.MergedBlockStoreURL,
 		StateStore:           tier2ReqParams.StateStoreURL,
-		StateBundleSize:      tier2ReqParams.StateBundleSize,
+		SegmentSize:          tier2ReqParams.StateBundleSize,
+		SegmentNumber:        segment,
 		StateStoreDefaultTag: tier2ReqParams.StateStoreDefaultTag,
-		WasmModules:          tier2ReqParams.WASMModules,
+		WasmExtensionConfigs: tier2ReqParams.WASMModules,
 		BlockType:            tier2ReqParams.BlockType,
 	}
 }
@@ -123,8 +123,7 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *blo
 		var previousError error
 		err := derr.RetryContext(ctx, uint64(maxRetries), func(ctx context.Context) error {
 			w.logger.Info("launching remote worker",
-				zap.Int64("start_block_num", int64(request.StartBlockNum)),
-				zap.Uint64("stop_block_num", request.StopBlockNum),
+				zap.Uint64("segment", request.SegmentNumber),
 				zap.Uint32("stage", request.Stage),
 				zap.String("output_module", request.OutputModule),
 				zap.Int("attempt", retryIdx+1),
@@ -164,7 +163,7 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *blo
 				zap.Int("number_of_tries", retryIdx),
 				zap.Strings("module_name", moduleNames),
 				zap.Duration("duration", timeTook),
-				zap.Float64("num_of_blocks_per_sec", float64(request.StopBlockNum-request.StartBlockNum)/timeTook.Seconds()),
+				zap.Float64("num_of_blocks_per_sec", float64(request.SegmentSize)/timeTook.Seconds()),
 				zap.Error(err),
 			)
 			return MsgJobFailed{Unit: unit, Error: err}
@@ -182,7 +181,7 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *blo
 			zap.Int("number_of_tries", retryIdx),
 			zap.Strings("module_name", moduleNames),
 			zap.Float64("duration", timeTook.Seconds()),
-			zap.Float64("processing_time_per_block", timeTook.Seconds()/float64(request.StopBlockNum-request.StartBlockNum)),
+			zap.Float64("processing_time_per_block", timeTook.Seconds()/float64(request.SegmentSize)),
 		)
 		return MsgJobSucceeded{
 			Unit:   unit,
@@ -194,14 +193,17 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *blo
 }
 
 func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, moduleNames []string, upstream *response.Stream) *Result {
+	metrics.Tier1ActiveWorkerRequest.Inc()
+	metrics.Tier1WorkerRequestCounter.Inc()
+	defer metrics.Tier1ActiveWorkerRequest.Dec()
+
 	var err error
 
-	ctx, span := reqctx.WithSpan(ctx, fmt.Sprintf("substreams/tier1/schedule/%s/%d-%d", request.OutputModule, request.StartBlockNum, request.StopBlockNum))
+	ctx, span := reqctx.WithSpan(ctx, fmt.Sprintf("substreams/tier1/schedule/%s/%d", request.OutputModule, request.SegmentNumber))
 	defer span.EndWithErr(&err)
 	span.SetAttributes(
 		attribute.String("substreams.output_module", request.OutputModule),
-		attribute.Int64("substreams.start_block", int64(request.StartBlockNum)),
-		attribute.Int64("substreams.stop_block", int64(request.StopBlockNum)),
+		attribute.Int64("substreams.segment_number", int64(request.SegmentNumber)),
 		attribute.Int64("substreams.worker_id", int64(w.id)),
 	)
 	logger := w.logger
@@ -212,7 +214,8 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 	}
 
 	stats := reqctx.ReqStats(ctx)
-	jobIdx := stats.RecordNewSubrequest(request.Stage, request.StartBlockNum, request.StopBlockNum)
+	startBlock := request.SegmentNumber * request.SegmentSize
+	jobIdx := stats.RecordNewSubrequest(request.Stage, startBlock, startBlock+request.SegmentSize)
 	defer stats.RecordEndSubrequest(jobIdx)
 
 	ctx = dauth.FromContext(ctx).ToOutgoingGRPCContext(ctx)

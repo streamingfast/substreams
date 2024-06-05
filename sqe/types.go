@@ -3,7 +3,6 @@ package sqe
 import (
 	"context"
 	"fmt"
-	"strings"
 )
 
 type Visitor interface {
@@ -93,21 +92,6 @@ func (e *KeyTerm) Visit(ctx context.Context, visitor Visitor) error {
 type StringLiteral struct {
 	Value       string
 	QuotingChar string
-}
-
-const restrictedLiteralChars = `'":,-()[] ` + "\n" + "\t"
-
-func stringLiteral(in string) *StringLiteral {
-	stringLiteral := &StringLiteral{Value: in}
-	if strings.ContainsAny(in, restrictedLiteralChars) {
-		stringLiteral.QuotingChar = "\""
-	}
-
-	return stringLiteral
-}
-
-func (e *StringLiteral) isValue() bool {
-	return true
 }
 
 func (e *StringLiteral) Literal() string {

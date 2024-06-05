@@ -95,7 +95,7 @@ func (v *DepthFirstVisitor) executeCallback(ctx context.Context, e Expression, c
 		return false, nil
 	}
 
-	if v.stopped == true {
+	if v.stopped {
 		return true, nil
 	}
 

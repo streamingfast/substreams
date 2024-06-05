@@ -10,7 +10,7 @@ import (
 
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/orchestrator/plan"
-	"github.com/streamingfast/substreams/pipeline/outputmodules"
+	"github.com/streamingfast/substreams/pipeline/exec"
 )
 
 func TestNewStages(t *testing.T) {
@@ -20,7 +20,7 @@ func TestNewStages(t *testing.T) {
 
 	stages := NewStages(
 		context.Background(),
-		outputmodules.TestGraphStagedModules(5, 7, 12, 22, 25),
+		exec.TestGraphStagedModules(5, 7, 12, 22, 25),
 		reqPlan,
 		nil,
 	)
@@ -38,155 +38,165 @@ func TestNewStages(t *testing.T) {
 	assert.Equal(t, block.ParseRange("70-75"), stages.globalSegmenter.Range(7))
 }
 
-func TestNewStagesNextJobs(t *testing.T) {
-	//seg := block.NewSegmenter(10, 5, 50)
-	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 40, 40, true)
+func unit(seg, stage int) Unit {
+	return Unit{Segment: seg, Stage: stage}
+}
+
+func TestNewStageNextJobs(t *testing.T) {
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 50, 50, true)
 	assert.NoError(t, err)
-	assert.Equal(t, "interval=10, stores=[5, 40), map_write=[5, 40), map_read=[5, 40), linear=[nil)", reqPlan.String())
+	assert.Equal(t, "interval=10, stores=[5, 50), map_write=[5, 50), map_read=[5, 50), linear=[nil)", reqPlan.String())
 	stages := NewStages(
 		context.Background(),
-		outputmodules.TestGraphStagedModules(5, 5, 5, 5, 5),
+		exec.TestGraphStagedModules(5, 5, 5, 5, 5),
 		reqPlan,
 		nil,
 	)
 
-	stages.allocSegments(0)
-	stages.setState(Unit{Stage: 2, Segment: 0}, UnitNoOp)
+	noNextJob := func() {
+		_, r := stages.NextJob()
+		assert.Nil(t, r)
+	}
+
+	nextJob := func() Unit {
+		j, r := stages.NextJob()
+		if r == nil {
+			t.Error("no next job")
+		}
+		return j
+	}
+
+	merge := func(u Unit) {
+		stages.forceTransition(u.Segment, u.Stage, UnitMerging)
+		stages.MergeCompleted(u)
+	}
+
+	assert.Equal(t, unit(0, 2), nextJob())
 
 	segmentStateEquals(t, stages, `
-S:.
-S:.
-M:N`)
+		S:Z
+		S:Z
+		M:S`)
 
-	j1, _ := stages.NextJob()
-	assert.Equal(t, 1, j1.Stage)
-	assert.Equal(t, 0, j1.Segment)
+	assert.Equal(t, unit(1, 0), nextJob())
+	segmentStateEquals(t, stages, `
+		S:ZS
+		S:ZZ
+		M:S.`)
+
+	assert.Equal(t, unit(2, 0), nextJob())
+	segmentStateEquals(t, stages, `
+		S:ZSS
+		S:ZZ.
+		M:S..`)
+
+	stages.MarkJobSuccess(unit(0, 2))
+	segmentStateEquals(t, stages, `
+		S:PSS
+		S:PZ.
+		M:P..`)
+
+	merge(unit(0, 0))
+	merge(unit(0, 1))
+
+	assert.Equal(t, unit(3, 0), nextJob())
+	segmentStateEquals(t, stages, `
+		S:CSSS
+		S:CZ..
+		M:P...`)
+
+	stages.MarkJobSuccess(unit(1, 0))
+	merge(unit(1, 0))
+	segmentStateEquals(t, stages, `
+		S:CCSS
+		S:CZ..
+		M:P...`)
+
+	assert.Equal(t, unit(1, 2), nextJob())
+	segmentStateEquals(t, stages, `
+		S:CCSS
+		S:CZ..
+		M:PS..`)
+
+	assert.Equal(t, unit(4, 0), nextJob())
+	segmentStateEquals(t, stages, `
+		S:CCSSS
+		S:CZ...
+		M:PS...`)
+
+	noNextJob()
+
+	stages.MarkJobSuccess(unit(2, 0))
+	merge(unit(2, 0))
+	stages.MarkJobSuccess(unit(3, 0))
+	merge(unit(3, 0))
 
 	segmentStateEquals(t, stages, `
-S:.
-S:S
-M:N`)
+		S:CCCCS
+		S:CZ...
+		M:PS...`)
 
-	stages.forceTransition(0, 1, UnitCompleted)
+	assert.Equal(t, unit(2, 1), nextJob())
+	assert.Equal(t, unit(3, 1), nextJob())
+	segmentStateEquals(t, stages, `
+		S:CCCCS
+		S:CZSS.
+		M:PS...`)
+
+	stages.MarkJobSuccess(unit(2, 1))
+	segmentStateEquals(t, stages, `
+		S:CCCCS
+		S:CZPS.
+		M:PS...`)
+
+	noNextJob()
+
+	stages.MarkJobSuccess(unit(1, 2))
+	segmentStateEquals(t, stages, `
+		S:CCCCS
+		S:CPPS.
+		M:PP...`)
+
+	noNextJob()
+
+	stages.MarkJobSuccess(unit(4, 0))
+
+	assert.Equal(t, unit(4, 1), nextJob())
+	segmentStateEquals(t, stages, `
+		S:CCCCP
+		S:CPPSS
+		M:PP...`)
+
+	merge(unit(1, 1))
+	merge(unit(2, 1))
+	segmentStateEquals(t, stages, `
+		S:CCCCP
+		S:CCCSS
+		M:PP...`)
+
+	assert.Equal(t, unit(2, 2), nextJob())
+	segmentStateEquals(t, stages, `
+		S:CCCCP
+		S:CCCSS
+		M:PPS..`)
+
+	stages.MarkJobSuccess(unit(3, 1))
+	stages.MarkJobSuccess(unit(4, 1))
+	assert.Equal(t, unit(3, 2), nextJob())
 
 	segmentStateEquals(t, stages, `
-S:.
-S:C
-M:N`)
+		S:CCCCP
+		S:CCCPP
+		M:PPSS.`)
 
-	stages.NextJob()
+	noNextJob()
 
+	merge(unit(3, 1))
+	assert.Equal(t, unit(4, 2), nextJob())
 	segmentStateEquals(t, stages, `
-S:S
-S:C
-M:N`)
-
-	stages.NextJob()
-
-	segmentStateEquals(t, stages, `
-S:SS
-S:C.
-M:N.`)
-
-	stages.forceTransition(0, 0, UnitCompleted)
-	stages.NextJob()
-
-	segmentStateEquals(t, stages, `
-S:CS
-S:C.
-M:NS`)
-
-	stages.forceTransition(1, 0, UnitCompleted)
-	stages.NextJob()
-
-	segmentStateEquals(t, stages, `
-S:CC
-S:CS
-M:NS`)
-
-	stages.NextJob()
-
-	segmentStateEquals(t, stages, `
-S:CC.
-S:CSS
-M:NS.`)
-
-	stages.MarkSegmentPartialPresent(id(1, 2))
-
-	segmentStateEquals(t, stages, `
-S:CC.
-S:CSS
-M:NP.`)
-
-	stages.MarkSegmentMerging(id(1, 2))
-
-	segmentStateEquals(t, stages, `
-S:CC.
-S:CSS
-M:NM.`)
-
-	stages.markSegmentCompleted(id(1, 2))
-	stages.NextJob()
-
-	segmentStateEquals(t, stages, `
-S:CCS
-S:CSS
-M:NC.`)
-
-	stages.NextJob()
-
-	_, r := stages.NextJob()
-	assert.Nil(t, r)
-
-	segmentStateEquals(t, stages, `
-S:CCSS
-S:CSS.
-M:NC..`)
-
-	stages.MarkSegmentPartialPresent(id(2, 0))
-
-	segmentStateEquals(t, stages, `
-S:CCPS
-S:CSS.
-M:NC..`)
-
-	stages.MarkSegmentMerging(id(2, 0))
-
-	_, r = stages.NextJob()
-	assert.Nil(t, r)
-	segmentStateEquals(t, stages, `
-S:CCMS
-S:CSS.
-M:NC..`)
-
-	_, r = stages.NextJob()
-	assert.Nil(t, r)
-	stages.markSegmentCompleted(id(2, 0))
-
-	segmentStateEquals(t, stages, `
-S:CCCS
-S:CSS.
-M:NC..`)
-
-	stages.NextJob()
-
-	segmentStateEquals(t, stages, `
-S:CCCS
-S:CSSS
-M:NC..`)
-
-	stages.forceTransition(1, 1, UnitCompleted)
-	stages.NextJob()
-
-	segmentStateEquals(t, stages, `
-S:CCCS
-S:CCSS
-M:NCS.`)
-
-}
-
-func id(segment, stage int) Unit {
-	return Unit{Stage: stage, Segment: segment}
+		S:CCCCP
+		S:CCCCP
+		M:PPSSS`)
 }
 
 func segmentStateEquals(t *testing.T, s *Stages, segments string) {
@@ -194,7 +204,13 @@ func segmentStateEquals(t *testing.T, s *Stages, segments string) {
 
 	out := s.StatesString()
 
-	assert.Equal(t, strings.TrimSpace(segments), strings.TrimSpace(out))
+	lines := strings.FieldsFunc(segments, func(c rune) bool { return c == '\n' || c == '\r' })
+	for i := range lines {
+		lines[i] = strings.TrimSpace(lines[i])
+	}
+	canon := strings.Join(lines, "\n")
+
+	assert.Equal(t, canon, strings.TrimSpace(out))
 }
 
 func TestStages_previousUnitComplete(t *testing.T) {

@@ -19,11 +19,8 @@ func init() {
 	wasm.RegisterModuleFactory("wasmtime", wasm.ModuleFactoryFunc(newModule))
 }
 
-func newModule(ctx context.Context, wasmCode []byte, registry *wasm.Registry) (wasm.Module, error) {
+func newModule(ctx context.Context, wasmCode []byte, wasmCodeType string, registry *wasm.Registry) (wasm.Module, error) {
 	cfg := wasmtime.NewConfig()
-	if registry.MaxFuel() != 0 {
-		cfg.SetConsumeFuel(true)
-	}
 	engine := wasmtime.NewEngineWithConfig(cfg)
 
 	module, err := wasmtime.NewModule(engine, wasmCode)
@@ -76,14 +73,6 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 	entrypoint := export.Func()
 	if entrypoint == nil {
 		return nil, fmt.Errorf("failed to get exported function %q", entrypoint)
-	}
-
-	maxFuel := m.registry.MaxFuel()
-	if maxFuel != 0 {
-		if remaining, _ := inst.wasmStore.ConsumeFuel(maxFuel); remaining != 0 {
-			inst.wasmStore.ConsumeFuel(remaining) // don't accumulate fuel from previous executions
-		}
-		inst.wasmStore.AddFuel(maxFuel)
 	}
 
 	var args []interface{}

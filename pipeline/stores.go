@@ -9,7 +9,7 @@ import (
 
 	"github.com/streamingfast/substreams/block"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
-	"github.com/streamingfast/substreams/pipeline/outputmodules"
+	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
 )
@@ -24,9 +24,10 @@ type Stores struct {
 	// tier1 to tier2.
 	partialsWritten block.Ranges // when backprocessing, to report back to orchestrator
 	tier            string
+	storesToWrite   map[string]struct{}
 }
 
-func NewStores(ctx context.Context, storeConfigs store.ConfigMap, storeSnapshotSaveInterval, requestStartBlockNum, stopBlockNum uint64, isTier2Request bool) *Stores {
+func NewStores(ctx context.Context, storeConfigs store.ConfigMap, storeSnapshotSaveInterval, requestStartBlockNum, stopBlockNum uint64, isTier2Request bool, storesToWrite map[string]struct{}) *Stores {
 	// FIXME(abourget): a StoreBoundary should exist for EACH Store
 	//  because the module's Initial Block could change the range of each
 	//  store.
@@ -41,6 +42,7 @@ func NewStores(ctx context.Context, storeConfigs store.ConfigMap, storeSnapshotS
 		bounder:        bounder,
 		tier:           tier,
 		logger:         reqctx.Logger(ctx),
+		storesToWrite:  storesToWrite,
 	}
 }
 
@@ -57,35 +59,32 @@ func (s *Stores) resetStores() {
 }
 
 // flushStores is called only for Tier2 request, as to not save reversible stores.
-func (s *Stores) flushStores(ctx context.Context, executionStages outputmodules.ExecutionStages, blockNum uint64) (err error) {
+func (s *Stores) flushStores(ctx context.Context, executionStages exec.ExecutionStages, blockNum uint64) (err error) {
 	if s.StoreMap == nil {
 		return // fast exit for cases without stores or no linear processing
-	}
-	lastLayer := executionStages.LastStage().LastLayer()
-	if !lastLayer.IsStoreLayer() {
-		return nil
 	}
 
 	boundaryIntervals := s.bounder.GetStoreFlushRanges(s.isTier2Request, s.bounder.requestStopBlock, blockNum)
 	for _, boundaryBlock := range boundaryIntervals {
-		if err := s.saveStoresSnapshots(ctx, lastLayer, len(executionStages)-1, boundaryBlock); err != nil {
+		if err := s.saveStoresSnapshots(ctx, len(executionStages)-1, boundaryBlock); err != nil {
 			return fmt.Errorf("saving stores snapshot at bound %d: %w", boundaryBlock, err)
 		}
 	}
 	return nil
 }
 
-func (s *Stores) saveStoresSnapshots(ctx context.Context, lastLayer outputmodules.LayerModules, stage int, boundaryBlock uint64) (err error) {
-	for _, mod := range lastLayer {
-		store := s.StoreMap[mod.Name]
-		s.logger.Info("flushing store at boundary", zap.Uint64("boundary", boundaryBlock), zap.String("store", mod.Name), zap.Int("stage", stage))
+func (s *Stores) saveStoresSnapshots(ctx context.Context, stage int, boundaryBlock uint64) (err error) {
+	for mod := range s.storesToWrite {
+		store := s.StoreMap[mod]
+		s.logger.Info("flushing store at boundary", zap.Uint64("boundary", boundaryBlock), zap.String("store", mod), zap.Int("stage", stage))
 		// TODO when partials are generic again, we can also check if PartialKV exists and skip if it does.
-		exists, _ := s.configs[mod.Name].ExistsFullKV(ctx, boundaryBlock)
-		if exists {
+		existsFullKv, _ := s.configs[mod].ExistsFullKV(ctx, boundaryBlock)
+		if existsFullKv {
 			continue
 		}
+
 		if err := s.saveStoreSnapshot(ctx, store, boundaryBlock); err != nil {
-			return fmt.Errorf("save store snapshot %q: %w", mod.Name, err)
+			return fmt.Errorf("save store snapshot %q: %w", mod, err)
 		}
 	}
 	return nil

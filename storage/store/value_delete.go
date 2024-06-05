@@ -9,7 +9,7 @@ import (
 )
 
 func (b *baseStore) DeletePrefix(ord uint64, prefix string) {
-	b.pendingOps.Add(&pbssinternal.Operation{
+	b.kvOps.Add(&pbssinternal.Operation{
 		Type: pbssinternal.Operation_DELETE_PREFIX,
 		Ord:  ord,
 		Key:  prefix,

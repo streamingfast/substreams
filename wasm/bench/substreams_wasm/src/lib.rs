@@ -33,15 +33,7 @@ fn map_block(blk: Block) -> Result<DatabaseChanges, Error> {
     };
 
     let block_number_str = blk.header.as_ref().unwrap().number.to_string();
-    let block_timestamp_str = blk
-        .header
-        .as_ref()
-        .unwrap()
-        .timestamp
-        .as_ref()
-        .unwrap()
-        .seconds
-        .to_string();
+    let block_timestamp_str = blk.timestamp_seconds();
 
     for trx in blk.transaction_traces {
         if trx.status != TransactionTraceStatus::Succeeded as i32 {

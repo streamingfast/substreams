@@ -4,6 +4,7 @@ package sf.substreams.internal.v2;
 
 import "google/protobuf/any.proto";
 import "sf/substreams/v1/deltas.proto";
+import "sf/substreams/index/v1/keys.proto";
 
 option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2;pbssinternal";
 
@@ -42,6 +43,10 @@ message Operation {
         SUM_INT64 = 15;
         SUM_FLOAT64 = 16;
         SUM_BIG_DECIMAL = 17;
+        SET_SUM_INT64 = 18;
+        SET_SUM_FLOAT64 = 19;
+        SET_SUM_BIG_INT = 20;
+        SET_SUM_BIG_DECIMAL = 21;
     }
 
     Type type = 1;

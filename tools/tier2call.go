@@ -10,15 +10,16 @@ import (
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc/metadata"
 
+	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 )
 
 var tier2CallCmd = &cobra.Command{
-	Use:   "tier2call <manifest_url> <output_module> <stage_number> <start_block> <end_block>",
+	Use:   "tier2call <manifest_url> <output_module> <stage_number> <segment_number>",
 	Short: "Calls a tier2 service, for internal inspection",
-	Args:  cobra.ExactArgs(5),
+	Args:  cobra.ExactArgs(4),
 	RunE:  tier2CallE,
 }
 
@@ -46,9 +47,7 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 	manifestPath := args[0]
 	outputModule := args[1]
 	stage, _ := strconv.ParseUint(args[2], 10, 32)
-	startBlock, _ := strconv.ParseInt(args[3], 10, 64)
-	stopBlock, _ := strconv.ParseInt(args[4], 10, 64)
-
+	segmentNumber, _ := strconv.ParseUint(args[3], 10, 32)
 	manifestReader, err := manifest.NewReader(manifestPath)
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
@@ -59,7 +58,7 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
-	params, err := manifest.ParseParams(mustGetStringArray(cmd, "params"))
+	params, err := manifest.ParseParams(sflags.MustGetStringArray(cmd, "params"))
 	if err != nil {
 		return fmt.Errorf("parsing params: %w", err)
 	}
@@ -70,11 +69,11 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 
 	authToken, authType := GetAuth(cmd, "substreams-api-key-envvar", "substreams-api-token-envvar")
 	clientConfig := client.NewSubstreamsClientConfig(
-		mustGetString(cmd, "substreams-endpoint"),
+		sflags.MustGetString(cmd, "substreams-endpoint"),
 		authToken,
 		authType,
-		mustGetBool(cmd, "insecure"),
-		mustGetBool(cmd, "plaintext"),
+		sflags.MustGetBool(cmd, "insecure"),
+		sflags.MustGetBool(cmd, "plaintext"),
 	)
 	ssClient, _, callOpts, headers, err := client.NewSubstreamsInternalClient(clientConfig)
 	if err != nil {
@@ -86,8 +85,8 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 		ctx = metadata.AppendToOutgoingContext(ctx, headers.ToArray()...)
 	}
 	//parse additional-headers flag
-	additionalHeaders := mustGetStringSlice(cmd, "header")
-	if additionalHeaders != nil {
+	additionalHeaders := sflags.MustGetStringSlice(cmd, "header")
+	if len(additionalHeaders) != 0 {
 		res := parseHeaders(additionalHeaders)
 		headerArray := make([]string, 0, len(res)*2)
 		for k, v := range res {
@@ -97,23 +96,22 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 		ctx = metadata.AppendToOutgoingContext(ctx, headerArray...)
 	}
 
-	meteringConfig := mustGetString(cmd, "metering-plugin")
-	blockType := mustGetString(cmd, "block-type")
-	stateStore := mustGetString(cmd, "state-store-url")
-	stateStoreDefaultTag := mustGetString(cmd, "state-store-default-tag")
-	mergedBlocksStore := mustGetString(cmd, "merged-blocks-store-url")
-	stateBundleSize := mustGetUint64(cmd, "state-bundle-size")
+	meteringConfig := sflags.MustGetString(cmd, "metering-plugin")
+	blockType := sflags.MustGetString(cmd, "block-type")
+	stateStore := sflags.MustGetString(cmd, "state-store-url")
+	stateStoreDefaultTag := sflags.MustGetString(cmd, "state-store-default-tag")
+	mergedBlocksStore := sflags.MustGetString(cmd, "merged-blocks-store-url")
+	stateBundleSize := sflags.MustGetUint64(cmd, "state-bundle-size")
 
 	req, err := ssClient.ProcessRange(ctx, &pbssinternal.ProcessRangeRequest{
-		StartBlockNum:        uint64(startBlock),
-		StopBlockNum:         uint64(stopBlock),
+		SegmentSize:          stateBundleSize,
+		SegmentNumber:        segmentNumber,
 		OutputModule:         outputModule,
 		Modules:              pkg.Modules,
 		Stage:                uint32(stage),
 		MeteringConfig:       meteringConfig,
 		BlockType:            blockType,
 		MergedBlocksStore:    mergedBlocksStore,
-		StateBundleSize:      stateBundleSize,
 		StateStore:           stateStore,
 		StateStoreDefaultTag: stateStoreDefaultTag,
 	}, callOpts...)

@@ -19,8 +19,6 @@ import (
 	"github.com/streamingfast/substreams/tui2/stream"
 )
 
-type refreshProgress tea.Msg
-
 type Progress struct {
 	common.Common
 
@@ -30,7 +28,6 @@ type Progress struct {
 	targetBlock uint64
 
 	progressView     viewport.Model
-	progressUpdates  int
 	dataPayloads     int
 	slowestJobs      []string
 	slowestModules   []string
@@ -70,31 +67,27 @@ func (p *Progress) Init() tea.Cmd {
 }
 
 func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmds []tea.Cmd
+	var outCmd tea.Cmd
 
-	switch msg.(type) {
+	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.(tea.KeyMsg).String() {
+		switch msg.String() {
 		case "m":
 			p.bars.Mode = (p.bars.Mode + 1) % 3
 			p.progressView.SetContent(p.bars.View())
 		}
-		var cmd tea.Cmd
-		p.progressView, cmd = p.progressView.Update(msg)
-		cmds = append(cmds, cmd)
+		p.progressView, outCmd = p.progressView.Update(msg)
 
 	case *pbsubstreamsrpc.SessionInit:
-		sessionInit := msg.(*pbsubstreamsrpc.SessionInit)
-		linearHandoff := sessionInit.LinearHandoffBlock
-		p.targetBlock = sessionInit.ResolvedStartBlock
+		linearHandoff := msg.LinearHandoffBlock
+		p.targetBlock = msg.ResolvedStartBlock
 		p.dataPayloads = 0
-		p.maxParallelWorkers = sessionInit.MaxParallelWorkers
+		p.maxParallelWorkers = msg.MaxParallelWorkers
 		p.bars = ranges.NewBars(p.Common, linearHandoff)
 		p.bars.Init()
 	case *pbsubstreamsrpc.BlockScopedData:
 		p.dataPayloads += 1
 	case *pbsubstreamsrpc.ModulesProgress:
-		msg := msg.(*pbsubstreamsrpc.ModulesProgress)
 		newBars := make([]*ranges.Bar, len(msg.Stages))
 
 		var totalProcessedBlocks uint64
@@ -192,6 +185,10 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			newBars[i] = newBar
 		}
 
+		if totalProcessedBlocks < p.lastCheckpointBlocks {
+			break
+		}
+
 		var mustResize bool
 		if len(newSlowestJobs) != len(p.slowestJobs) {
 			mustResize = true
@@ -229,7 +226,7 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		p.progressView.SetContent(p.bars.View())
 	case stream.StreamErrorMsg:
 		p.state = "Error"
-		p.curErr = msg.(stream.StreamErrorMsg).Error()
+		p.curErr = msg.Error()
 		p.SetSize(p.Common.Width, p.Common.Height)
 
 		return p, nil
@@ -247,7 +244,7 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		p.state = "Replayed from log"
 	}
 
-	return p, nil
+	return p, outCmd
 }
 
 var labels = []string{

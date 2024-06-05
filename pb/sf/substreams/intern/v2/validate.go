@@ -7,16 +7,23 @@ import (
 )
 
 func (r *ProcessRangeRequest) Validate() error {
-	if r.StartBlockNum >= r.StopBlockNum {
-		return fmt.Errorf("stop block %d should be higher than start block %d", r.StopBlockNum, r.StartBlockNum)
-	}
-
-	if r.Modules == nil {
+	switch {
+	case r.StopBlockNum != 0:
+		return fmt.Errorf("invalid protocol: update your tier1")
+	case r.Modules == nil:
 		return fmt.Errorf("no modules found in request")
-	}
-
-	if r.OutputModule == "" {
+	case r.OutputModule == "":
 		return fmt.Errorf("no output module defined in request")
+	case r.MeteringConfig == "":
+		return fmt.Errorf("metering config is required in request")
+	case r.BlockType == "":
+		return fmt.Errorf("block type is required in request")
+	case r.StateStore == "":
+		return fmt.Errorf("state store is required in request")
+	case r.MergedBlocksStore == "":
+		return fmt.Errorf("merged blocks store is required in request")
+	case r.SegmentSize == 0:
+		return fmt.Errorf("a non-zero state bundle size is required in request")
 	}
 
 	seenStores := map[string]bool{}

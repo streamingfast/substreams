@@ -11,6 +11,8 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
+var UseSimpleHash = false
+
 type ModuleHash []byte
 
 type ModuleHashes struct {
@@ -45,6 +47,14 @@ func (m *ModuleHashes) Iter(cb func(hash, name string) error) error {
 }
 
 func (m *ModuleHashes) HashModule(modules *pbsubstreams.Modules, module *pbsubstreams.Module, graph *ModuleGraph) (ModuleHash, error) {
+	//Simplified hash for testing purposes
+	if UseSimpleHash {
+		return m.hashModuleSimple(modules, module, graph)
+	}
+	return m.hashModule(modules, module, graph)
+}
+
+func (m *ModuleHashes) hashModule(modules *pbsubstreams.Modules, module *pbsubstreams.Module, graph *ModuleGraph) (ModuleHash, error) {
 	m.mu.RLock()
 	if cachedHash := m.cache[module.Name]; cachedHash != nil {
 		m.mu.RUnlock()
@@ -66,6 +76,8 @@ func (m *ModuleHashes) HashModule(modules *pbsubstreams.Modules, module *pbsubst
 		buf.WriteString("map")
 	case *pbsubstreams.Module_KindStore_:
 		buf.WriteString("store")
+	case *pbsubstreams.Module_KindBlockIndex_:
+		buf.WriteString("block_index")
 	default:
 		return nil, fmt.Errorf("invalid module file %T", module.Kind)
 	}
@@ -87,6 +99,24 @@ func (m *ModuleHashes) HashModule(modules *pbsubstreams.Modules, module *pbsubst
 			return nil, err
 		}
 		buf.WriteString(value)
+	}
+	if module.BlockFilter != nil {
+		buf.WriteString("block_filter_module!")
+		blockfilterModule, err := graph.Module(module.BlockFilter.Module)
+		if err != nil {
+			return nil, fmt.Errorf("cannot hash module %q: cannot find block filter module %q", module.Name, module.BlockFilter.Module)
+		}
+		blockFilterModuleHash, err := m.hashModule(modules, blockfilterModule, graph)
+		if err != nil {
+			return nil, fmt.Errorf("cannot hash module %q: cannot get hash of its blockfiltermodule %q", module.Name, module.BlockFilter.Module)
+		}
+		buf.WriteString(string(blockFilterModuleHash))
+		buf.WriteString("block_filter_query!")
+		qs, err := module.BlockFilterQueryString()
+		if err != nil {
+			return nil, err
+		}
+		buf.WriteString(qs)
 	}
 
 	buf.WriteString("ancestors")
@@ -110,6 +140,12 @@ func (m *ModuleHashes) HashModule(modules *pbsubstreams.Modules, module *pbsubst
 	m.cache[module.Name] = output
 	m.mu.Unlock()
 	return output, nil
+}
+
+func (m *ModuleHashes) hashModuleSimple(modules *pbsubstreams.Modules, module *pbsubstreams.Module, graph *ModuleGraph) (ModuleHash, error) {
+	hash := []byte(module.Name)
+	m.cache[module.Name] = hash
+	return hash, nil
 }
 
 func inputName(input *pbsubstreams.Module_Input) (string, error) {

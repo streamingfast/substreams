@@ -92,13 +92,14 @@ output:
 			},
 		},
 		{
-			name: "basic with block filter",
+			name: "basic with block filter string",
 			rawYamlInput: `---
 name: bf_module
 kind: map
 blockFilter:
  module: basic_index
- query: this is my query
+ query:
+   string: this is my query
 output:
     type: proto:sf.substreams.database.changes.v1
 `,
@@ -109,7 +110,33 @@ output:
 				Output: StreamOutput{Type: "proto:sf.substreams.database.changes.v1"},
 				BlockFilter: &BlockFilter{
 					Module: "basic_index",
-					Query:  "this is my query",
+					Query:  BlockFilterQuery{String: "this is my query"},
+				},
+			},
+		},
+		{
+			name: "basic with block filter from params",
+			rawYamlInput: `---
+name: bf_module
+kind: map
+blockFilter:
+ module: basic_index
+ query:
+   params: true
+inputs:
+  - params: string
+output:
+    type: proto:sf.substreams.database.changes.v1
+`,
+
+			expectedOutput: Module{
+				Kind:   ModuleKindMap,
+				Name:   "bf_module",
+				Inputs: []*Input{{Params: "string"}},
+				Output: StreamOutput{Type: "proto:sf.substreams.database.changes.v1"},
+				BlockFilter: &BlockFilter{
+					Module: "basic_index",
+					Query:  BlockFilterQuery{Params: true},
 				},
 			},
 		},

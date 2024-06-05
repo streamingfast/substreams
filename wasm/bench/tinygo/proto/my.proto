@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package my;
+
+option go_package = "github.com/streamingfast/tinygo-test/pb";
+
+message Block {
+  int32 ver = 1;
+  // Hash is the block's hash.
+  bytes hash = 2;
+  // Number is the block's height at which this block was mined.
+  uint64 number = 3;
+  uint64 size = 4;
+  BlockHeader header = 5;
+}
+
+message BlockHeader {
+  bytes parent_hash = 1;
+  // Uncle hash of the block, some reference it as `sha3Uncles`, but `sha3`` is badly worded, so we prefer `uncle_hash`, also
+  // referred as `ommers` in EIP specification.
+  //
+  // If the Block containing this `BlockHeader` has been produced using the Proof of Stake
+  // consensus algorithm, this field will actually be constant and set to `0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347`.
+  bytes uncle_hash = 2;
+  bytes coinbase = 3;
+  bytes state_root = 4;
+  bytes transactions_root = 5;
+  bytes receipt_root = 6;
+  bytes logs_bloom = 7;
+}

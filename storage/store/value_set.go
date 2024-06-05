@@ -9,7 +9,7 @@ import (
 )
 
 func (b *baseStore) SetBytesIfNotExists(ord uint64, key string, value []byte) {
-	b.pendingOps.Add(&pbssinternal.Operation{
+	b.kvOps.Add(&pbssinternal.Operation{
 		Type:  pbssinternal.Operation_SET_BYTES_IF_NOT_EXISTS,
 		Ord:   ord,
 		Key:   key,
@@ -18,7 +18,7 @@ func (b *baseStore) SetBytesIfNotExists(ord uint64, key string, value []byte) {
 }
 
 func (b *baseStore) SetIfNotExists(ord uint64, key string, value string) {
-	b.pendingOps.Add(&pbssinternal.Operation{
+	b.kvOps.Add(&pbssinternal.Operation{
 		Type:  pbssinternal.Operation_SET_IF_NOT_EXISTS,
 		Ord:   ord,
 		Key:   key,
@@ -27,7 +27,7 @@ func (b *baseStore) SetIfNotExists(ord uint64, key string, value string) {
 }
 
 func (b *baseStore) SetBytes(ord uint64, key string, value []byte) {
-	b.pendingOps.Add(&pbssinternal.Operation{
+	b.kvOps.Add(&pbssinternal.Operation{
 		Type:  pbssinternal.Operation_SET_BYTES,
 		Ord:   ord,
 		Key:   key,
@@ -36,7 +36,7 @@ func (b *baseStore) SetBytes(ord uint64, key string, value []byte) {
 }
 
 func (b *baseStore) Set(ord uint64, key string, value string) {
-	b.pendingOps.Add(&pbssinternal.Operation{
+	b.kvOps.Add(&pbssinternal.Operation{
 		Type:  pbssinternal.Operation_SET,
 		Ord:   ord,
 		Key:   key,
@@ -55,12 +55,12 @@ func (b *baseStore) set(ord uint64, key string, value []byte) {
 	}
 
 	if len(key) == 0 {
-		panic(fmt.Sprintf("invalid key"))
+		panic(fmt.Sprintf("invalid key %q", key))
 	}
 	cpValue := make([]byte, len(value))
 	copy(cpValue, value)
 
-	val, found := b.GetLast(key)
+	val, found := b.getLast(key)
 	var delta *pbsubstreams.StoreDelta
 	if found {
 		delta = &pbsubstreams.StoreDelta{
@@ -85,7 +85,7 @@ func (b *baseStore) set(ord uint64, key string, value []byte) {
 }
 
 func (b *baseStore) setIfNotExists(ord uint64, key string, value []byte) {
-	_, found := b.GetLast(key)
+	_, found := b.getLast(key)
 	if found {
 		return
 	}

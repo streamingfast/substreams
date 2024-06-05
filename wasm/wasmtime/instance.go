@@ -117,6 +117,10 @@ func (i *instance) registerStateImports(linker *wasmtime.Linker) error {
 	functions["set_if_not_exists"] = i.setIfNotExists
 	functions["append"] = i.append
 	functions["delete_prefix"] = i.deletePrefix
+	functions["set_sum_int64"] = i.setSumInt64
+	functions["set_sum_float64"] = i.setSumFloat64
+	functions["set_sum_bigint"] = i.setSumBigInt
+	functions["set_sum_bigdecimal"] = i.setSumBigDecimal
 	functions["add_bigint"] = i.addBigInt
 	functions["add_bigdecimal"] = i.addBigDecimal
 	functions["add_bigfloat"] = i.addBigDecimal

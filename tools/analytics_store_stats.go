@@ -31,7 +31,7 @@ func init() {
 	analyticsCmd.AddCommand(analyticsStoreStatsCmd)
 }
 
-var EmptyStoreError = errors.New("store is empty")
+var ErrEmptyStore = errors.New("store is empty")
 
 func StoreStatsE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
@@ -63,7 +63,7 @@ func StoreStatsE(cmd *cobra.Command, args []string) error {
 	go func() {
 		start := time.Now()
 		wg.Wait()
-		zlog.Debug("finished getting store stats", zap.Duration("duration", time.Now().Sub(start)))
+		zlog.Debug("finished getting store stats", zap.Duration("duration", time.Since(start)))
 		close(statsStream)
 	}()
 
@@ -92,7 +92,7 @@ func StoreStatsE(cmd *cobra.Command, args []string) error {
 
 			start := time.Now()
 			defer func() {
-				zlog.Debug("finished getting store stats for module", zap.String("module", module.Name), zap.Duration("duration", time.Now().Sub(start)))
+				zlog.Debug("finished getting store stats for module", zap.String("module", module.Name), zap.Duration("duration", time.Since(start)))
 			}()
 
 			defer wg.Done()
@@ -119,7 +119,7 @@ func StoreStatsE(cmd *cobra.Command, args []string) error {
 
 			stateStore, fileInfos, err := getStore(ctx, conf, math.MaxUint64)
 			if err != nil {
-				if errors.Is(err, EmptyStoreError) {
+				if errors.Is(err, ErrEmptyStore) {
 					zlog.Debug("skipping empty store", zap.String("module", module.Name))
 					statsStream <- storeStats
 					return
@@ -158,7 +158,6 @@ func StoreStatsE(cmd *cobra.Command, args []string) error {
 			}
 
 			statsStream <- storeStats
-			return
 		}(module)
 	}
 
@@ -242,11 +241,11 @@ func getStore(ctx context.Context, conf *store.Config, below uint64) (store.Stor
 	if err != nil {
 		return nil, nil, fmt.Errorf("listing snapshot files: %w", err)
 	}
-	zlog.Debug("listing snapshot files", zap.Duration("duration", time.Now().Sub(start)))
+	zlog.Debug("listing snapshot files", zap.Duration("duration", time.Since(start)))
 
 	if len(files) == 0 {
 		zlog.Debug("store is empty", zap.String("module", conf.Name()), zap.String("hash", conf.ModuleHash()))
-		return nil, nil, EmptyStoreError
+		return nil, nil, ErrEmptyStore
 	}
 
 	kvFiles := make([]*store.FileInfo, 0, len(files))
@@ -259,14 +258,14 @@ func getStore(ctx context.Context, conf *store.Config, below uint64) (store.Stor
 
 	if len(kvFiles) == 0 {
 		zlog.Debug("store only contains partial files", zap.String("module", conf.Name()), zap.String("hash", conf.ModuleHash()))
-		return nil, nil, EmptyStoreError
+		return nil, nil, ErrEmptyStore
 	}
 
 	start = time.Now()
 	sort.Slice(kvFiles, func(i, j int) bool { //reverse sort
 		return kvFiles[i].Range.ExclusiveEndBlock >= kvFiles[j].Range.ExclusiveEndBlock
 	})
-	zlog.Debug("sorting snapshot files", zap.Duration("duration", time.Now().Sub(start)))
+	zlog.Debug("sorting snapshot files", zap.Duration("duration", time.Since(start)))
 
 	var latestFiles []*store.FileInfo
 	if len(kvFiles) > 5 {
@@ -283,7 +282,7 @@ func getStore(ctx context.Context, conf *store.Config, below uint64) (store.Stor
 	if err != nil {
 		return nil, nil, fmt.Errorf("loading store: %w", err)
 	}
-	zlog.Debug("loading store", zap.Duration("duration", time.Now().Sub(start)))
+	zlog.Debug("loading store", zap.Duration("duration", time.Since(start)))
 
 	return s, latestFiles, nil
 }
@@ -291,7 +290,7 @@ func getStore(ctx context.Context, conf *store.Config, below uint64) (store.Stor
 func calculateStoreStats(stateStore store.Store, stats *StoreStats) error {
 	start := time.Now()
 	defer func() {
-		zlog.Debug("calculating store stats", zap.Duration("duration", time.Now().Sub(start)))
+		zlog.Debug("calculating store stats", zap.Duration("duration", time.Since(start)))
 	}()
 
 	keyStats := &KeyStats{}

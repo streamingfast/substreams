@@ -21,14 +21,24 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 )
 
-func loadProtobufs(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.FileDescriptor, error) {
+func loadLocalProtobufs(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.FileDescriptor, error) {
+
+	seen := map[string]bool{}
+	for _, file := range pkg.ProtoFiles {
+		seen[*file.Name] = true
+	}
+
 	// System protos
 	systemFiles, err := readSystemProtobufs()
 	if err != nil {
 		return nil, err
 	}
-	seen := map[string]bool{}
+
 	for _, file := range systemFiles.File {
+		if _, found := seen[*file.Name]; found {
+			continue
+		}
+
 		pkg.ProtoFiles = append(pkg.ProtoFiles, file)
 		seen[*file.Name] = true
 	}
@@ -58,6 +68,14 @@ func loadProtobufs(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.FileDesc
 			}
 			return os.Open(filename)
 		},
+		LookupImportProto: func(file string) (*descriptorpb.FileDescriptorProto, error) {
+			for _, protoFile := range pkg.ProtoFiles {
+				if protoFile.GetName() == file {
+					return protoFile, nil
+				}
+			}
+			return nil, fmt.Errorf("proto file %q not found in package", file)
+		},
 	}
 
 	for _, file := range manif.Protobuf.Files {
@@ -77,13 +95,44 @@ func loadProtobufs(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.FileDesc
 	return customFiles, nil
 }
 
-func loadDefinitionFromBufBuild(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.FileDescriptor, error) {
+func loadDescriptorSets(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.FileDescriptor, error) {
+	seen := map[string]bool{}
+	for _, file := range pkg.ProtoFiles {
+		seen[*file.Name] = true
+	}
+
 	var out []*desc.FileDescriptor
-	for _, url := range manif.Protobuf.BufBuildUrls {
+	var outProto []*descriptorpb.FileDescriptorProto
+	for _, descriptor := range manif.Protobuf.DescriptorSets {
+
+		if descriptor.LocalPath != "" {
+			f, err := os.Open(descriptor.LocalPath)
+			if err != nil {
+				return nil, fmt.Errorf("error opening local protobuf descriptor file %q: %w", descriptor.LocalPath, err)
+			}
+			defer f.Close()
+
+			b, err := io.ReadAll(f)
+			if err != nil {
+				return nil, fmt.Errorf("error reading local protobuf descriptor file %q: %w", descriptor.LocalPath, err)
+			}
+
+			protoDescContainer := &pbsubstreams.Package{}
+			proto.Unmarshal(b, protoDescContainer)
+
+			for _, fdProto := range protoDescContainer.ProtoFiles {
+				if _, found := seen[fdProto.GetName()]; found {
+					continue
+				}
+				seen[fdProto.GetName()] = true
+				outProto = append(outProto, fdProto)
+			}
+			continue
+		}
 
 		authToken := os.Getenv("BUFBUILD_AUTH_TOKEN")
 		if authToken == "" {
-			return nil, fmt.Errorf("missing BUFBUILD_AUTH_TOKEN")
+			return nil, fmt.Errorf("missing BUFBUILD_AUTH_TOKEN; go into your account at https://buf.build/settings/user to create an API key")
 		}
 
 		client := reflectv1beta1connect.NewFileDescriptorSetServiceClient(
@@ -92,25 +141,35 @@ func loadDefinitionFromBufBuild(pkg *pbsubstreams.Package, manif *Manifest) ([]*
 		)
 
 		request := connect.NewRequest(&reflectv1beta1.GetFileDescriptorSetRequest{
-			Module: url,
+			Module:  descriptor.Module,
+			Symbols: descriptor.Symbols,
+			Version: descriptor.Version,
 		})
 
 		request.Header().Set("Authorization", "Bearer "+authToken)
 		fileDescriptorSet, err := client.GetFileDescriptorSet(context.Background(), request)
 		if err != nil {
-			return nil, fmt.Errorf("getting file descriptor set for %s: %w", url, err)
+			return nil, fmt.Errorf("getting file descriptor set for %s: %w", descriptor.Module, err)
 		}
 
-		fd, err := desc.CreateFileDescriptorFromSet(fileDescriptorSet.Msg.FileDescriptorSet)
+		fdMap, err := desc.CreateFileDescriptorsFromSet(fileDescriptorSet.Msg.FileDescriptorSet)
 		if err != nil {
-			return nil, fmt.Errorf("creating file descriptor from set for %s: %w", url, err)
+			return nil, fmt.Errorf("creating file descriptors from set: %w", err)
 		}
-		out = append(out, fd)
+
+		for _, fd := range fdMap {
+			if _, found := seen[fd.GetName()]; found {
+				continue
+			}
+			seen[fd.GetName()] = true
+			out = append(out, fd)
+		}
 	}
 
 	for _, fd := range out {
 		pkg.ProtoFiles = append(pkg.ProtoFiles, fd.AsFileDescriptorProto())
 	}
+	pkg.ProtoFiles = append(pkg.ProtoFiles, outProto...)
 
 	return out, nil
 }

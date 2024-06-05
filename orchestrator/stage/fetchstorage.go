@@ -32,14 +32,16 @@ func (s *Stages) FetchStoresState(
 
 		mapperName = lastStage.storeModuleStates[0].name
 		conf := execoutConfigs.ConfigMap[mapperName]
-		// TODO: OPTIMIZATION: get the actual needed range for execOutputs to optimize lookup
 
 		if upToBlock != 0 {
-			files, err := conf.ListSnapshotFiles(ctx, bstream.NewInclusiveRange(0, upToBlock))
-			if err != nil {
-				return fmt.Errorf("fetching mapper storage state: %w", err)
+			from := segmenter.InitialBlock()
+			if upToBlock != from {
+				files, err := conf.ListSnapshotFiles(ctx, bstream.NewInclusiveRange(from, upToBlock))
+				if err != nil {
+					return fmt.Errorf("fetching mapper storage state: %w", err)
+				}
+				mapperFiles = files
 			}
-			mapperFiles = files
 		}
 	}
 

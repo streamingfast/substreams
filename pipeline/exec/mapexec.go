@@ -4,13 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"google.golang.org/protobuf/types/known/anypb"
-
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
-	"github.com/streamingfast/substreams/storage/execout"
-
 	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/wasm"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type MapperModuleExecutor struct {
@@ -33,13 +31,13 @@ func (e *MapperModuleExecutor) String() string { return e.Name() }
 // and in this case, we don't do anything
 func (e *MapperModuleExecutor) applyCachedOutput([]byte) error { return nil }
 
-func (e *MapperModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
-	ctx, span := reqctx.WithModuleExecutionSpan(ctx, "exec_map")
+func (e *MapperModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, outForFiles []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
+	_, span := reqctx.WithModuleExecutionSpan(ctx, "exec_map")
 	defer span.EndWithErr(&err)
 
 	var call *wasm.Call
 	if call, err = e.wasmCall(reader); err != nil {
-		return nil, nil, fmt.Errorf("maps wasm call: %w", err)
+		return nil, nil, nil, fmt.Errorf("maps wasm call: %w", err)
 	}
 
 	if call != nil {
@@ -48,10 +46,10 @@ func (e *MapperModuleExecutor) run(ctx context.Context, reader execout.Execution
 
 	modOut, err := e.toModuleOutput(out)
 	if err != nil {
-		return nil, nil, fmt.Errorf("converting back to module output: %w", err)
+		return nil, nil, nil, fmt.Errorf("converting back to module output: %w", err)
 	}
 
-	return out, modOut, nil
+	return out, out, modOut, nil // same output for files or for the module
 }
 
 func (e *MapperModuleExecutor) toModuleOutput(data []byte) (*pbssinternal.ModuleOutput, error) {
@@ -63,5 +61,9 @@ func (e *MapperModuleExecutor) toModuleOutput(data []byte) (*pbssinternal.Module
 }
 
 func (e *MapperModuleExecutor) HasValidOutput() bool {
+	return true
+}
+
+func (e *MapperModuleExecutor) HasOutputForFiles() bool {
 	return true
 }

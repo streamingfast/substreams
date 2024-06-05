@@ -70,7 +70,7 @@ func deployE(cmd *cobra.Command, args []string) error {
 	pkg.Networks = nil // we don't want to send this to the server, so it does not apply network values again, possibly losing the overriden params
 
 	paramsMap := make(map[string]string)
-	for _, param := range mustGetStringArray(cmd, "deployment-params") {
+	for _, param := range sflags.MustGetStringArray(cmd, "deployment-params") {
 		parts := strings.SplitN(param, "=", 2)
 		if len(parts) != 2 {
 			return fmt.Errorf("invalid parameter format: %q", param)

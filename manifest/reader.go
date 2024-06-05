@@ -55,7 +55,6 @@ type Reader struct {
 
 	// cached values
 	protoDefinitions         []*desc.FileDescriptor
-	sinkConfigJSON           string
 	sinkConfigDynamicMessage *dynamic.Message
 
 	collectProtoDefinitionsFunc func(protoDefinitions []*desc.FileDescriptor)
@@ -401,7 +400,7 @@ func validatePackage(pkg *pbsubstreams.Package, skipModuleOutputTypeValidation b
 			outputType := i.KindMap.OutputType
 			if !skipModuleOutputTypeValidation {
 				if !strings.HasPrefix(outputType, "proto:") {
-					return fmt.Errorf("module %q incorrect outputTyupe %q valueType must be a proto Message", mod.Name, outputType)
+					return fmt.Errorf("module %q incorrect outputType %q valueType must be a proto Message", mod.Name, outputType)
 				}
 			}
 		case *pbsubstreams.Module_KindStore_:
@@ -533,17 +532,23 @@ func duplicateStringInput(in *pbsubstreams.Module_Input) string {
 	}
 }
 
-func checkValidBlockFilter(mod *pbsubstreams.Module, mapModuleKind map[string]pbsubstreams.ModuleKind) error {
+func checkValidBlockFilter(mod *pbsubstreams.Module, mapModules map[string]*pbsubstreams.Module) error {
 	blockFilter := mod.GetBlockFilter()
 	if blockFilter != nil {
 		seekModName := blockFilter.GetModule()
-		seekModuleKind, found := mapModuleKind[seekModName]
+		seekModule, found := mapModules[seekModName]
 		if !found {
 			return fmt.Errorf("block filter module %q not found", blockFilter.Module)
 		}
-		if seekModuleKind != pbsubstreams.ModuleKindBlockIndex {
+
+		if seekModule.ModuleKind() != pbsubstreams.ModuleKindBlockIndex {
 			return fmt.Errorf("block filter module %q not of 'block_index' kind", blockFilter.Module)
 		}
+
+		if seekModule.InitialBlock > mod.InitialBlock {
+			return fmt.Errorf("block filter module %q cannot have an init block greater than module %q init block", blockFilter.Module, mod.Name)
+		}
+
 	}
 	return nil
 }
@@ -610,10 +615,12 @@ func ValidateModules(mods *pbsubstreams.Modules) error {
 	}
 
 	mapModuleKind := make(map[string]pbsubstreams.ModuleKind)
+	mapModules := make(map[string]*pbsubstreams.Module)
 	for _, mod := range mods.Modules {
 		if _, found := mapModuleKind[mod.Name]; found {
 			return fmt.Errorf("module %q: duplicate module name", mod.Name)
 		}
+		mapModules[mod.Name] = mod
 		mapModuleKind[mod.Name] = mod.ModuleKind()
 	}
 
@@ -628,7 +635,7 @@ func ValidateModules(mods *pbsubstreams.Modules) error {
 			return fmt.Errorf("limit of 30 inputs for a given module (%q) reached", mod.Name)
 		}
 
-		err := checkValidBlockFilter(mod, mapModuleKind)
+		err := checkValidBlockFilter(mod, mapModules)
 		if err != nil {
 			return fmt.Errorf("checking block filter for module %q: %w", mod.Name, err)
 		}
@@ -774,6 +781,10 @@ func prefixModules(mods []*pbsubstreams.Module, prefix string) {
 			default:
 				panic(fmt.Sprintf("module %q: input index %d: unsupported module input type %s", mod.Name, idx, inputIface.Input))
 			}
+		}
+
+		if mod.BlockFilter != nil {
+			mod.BlockFilter.Module = withPrefix(mod.BlockFilter.Module, prefix)
 		}
 	}
 }

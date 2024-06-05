@@ -21,7 +21,6 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
 	"github.com/streamingfast/substreams/pipeline/exec"
-	"github.com/streamingfast/substreams/pipeline/outputmodules"
 	"github.com/streamingfast/substreams/reqctx"
 	store2 "github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
@@ -59,7 +58,7 @@ func TestPipeline_runExecutor(t *testing.T) {
 			ctx = reqctx.WithReqStats(ctx, metrics.NewReqStats(&metrics.Config{}, zap.NewNop()))
 			pipe := &Pipeline{
 				forkHandler: NewForkHandler(),
-				outputGraph: outputmodules.TestNew(),
+				execGraph:   exec.TestNew(),
 			}
 			clock := &pbsubstreams.Clock{Id: test.block.Id, Number: test.block.Number}
 			execOutput := NewExecOutputTesting(t, bstreamBlk(t, test.block), clock)
@@ -75,7 +74,7 @@ func TestPipeline_runExecutor(t *testing.T) {
 }
 
 func mapTestExecutor(t *testing.T, ctx context.Context, name string) *exec.MapperModuleExecutor {
-	pkg := manifest.TestReadManifest(t, "../test/testdata/substreams-test-v0.1.0.spkg")
+	pkg := manifest.TestReadManifest(t, "../test/testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 
 	binaryIndex := uint32(0)
 	for _, module := range pkg.Modules.Modules {
@@ -86,20 +85,22 @@ func mapTestExecutor(t *testing.T, ctx context.Context, name string) *exec.Mappe
 	binary := pkg.Modules.Binaries[binaryIndex]
 	require.Greater(t, len(binary.Content), 1)
 
-	registry := wasm.NewRegistry(nil, 0)
-	module, err := registry.NewModule(ctx, binary.Content)
+	registry := wasm.NewRegistry(nil)
+	module, err := registry.NewModule(ctx, binary.Content, binary.Type)
 	require.NoError(t, err)
 
 	return exec.NewMapperModuleExecutor(
 		exec.NewBaseExecutor(
 			ctx,
 			name,
+			0,
 			module,
 			false, // could exercice with cache enabled too
 			[]wasm.Argument{
 				wasm.NewParamsInput("my test params"),
-				wasm.NewSourceInput("sf.substreams.v1.test.Block"),
+				wasm.NewSourceInput("sf.substreams.v1.test.Block", 0),
 			},
+			nil,
 			name,
 			otel.GetTracerProvider().Tracer("test"),
 		),
@@ -137,19 +138,19 @@ func TestSetupSubrequestStores(t *testing.T) {
 		storeModuleKind := &pbsubstreams.Module_KindStore_{KindStore: &pbsubstreams.Module_KindStore{}}
 		p := Pipeline{
 			stores: &Stores{configs: confMap},
-			executionStages: outputmodules.ExecutionStages{
-				outputmodules.StageLayers{
-					outputmodules.LayerModules{
+			executionStages: exec.ExecutionStages{
+				exec.StageLayers{
+					exec.LayerModules{
 						&pbsubstreams.Module{Name: "mod1", Kind: storeModuleKind},
 					},
 				},
-				outputmodules.StageLayers{
-					outputmodules.LayerModules{
+				exec.StageLayers{
+					exec.LayerModules{
 						&pbsubstreams.Module{Name: "mod2", Kind: storeModuleKind},
 					},
 				},
-				outputmodules.StageLayers{
-					outputmodules.LayerModules{
+				exec.StageLayers{
+					exec.LayerModules{
 						&pbsubstreams.Module{Name: "mod3", Kind: storeModuleKind},
 					},
 				},
@@ -219,6 +220,7 @@ func withTestRequest(t *testing.T, outputModule string, startBlock uint64) conte
 		func() (uint64, error) { return 0, nil },
 		newTestCursorResolver().resolveCursor,
 		func() (uint64, error) { return 0, nil },
+		100,
 	)
 	require.NoError(t, err)
 	return reqctx.WithRequest(context.Background(), req)

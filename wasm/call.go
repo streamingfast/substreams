@@ -53,27 +53,12 @@ func NewCall(clock *pbsubstreams.Clock, moduleName string, entrypoint string, st
 		case ValueArgument:
 			// Handled in ÈxecuteNewCall()
 		default:
-			panic("unknown wasm argument type")
+			panic(fmt.Sprintf("unknown wasm argument type %T", v))
 		}
 	}
 
 	return call
 }
-
-//func (m *Module) NewCall(clock *pbsubstreams.Clock, moduleName string, entrypoint string, arguments []Argument) (*Call, error) {
-// FIXME: that's to prevent calls when context was closed, protect in the caller?
-//if m.isClosed {
-//	panic("module is closed")
-//}
-
-// FIXME: Replace by `context.Context`, and should speed up execution.
-//if i.registry.maxFuel != 0 {
-//	if remaining, _ := i.wasmStore.ConsumeFuel(i.registry.maxFuel); remaining != 0 {
-//		i.wasmStore.ConsumeFuel(remaining) // don't accumulate fuel from previous executions
-//	}
-//	i.wasmStore.AddFuel(i.registry.maxFuel)
-//}
-//}
 
 func (c *Call) Err() error {
 	if c.panicError != nil {
@@ -169,6 +154,34 @@ func (c *Call) DoAddFloat64(ord uint64, key string, value float64) {
 	now := time.Now()
 	c.validateWithValueType("add_float64", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, "float64", key)
 	c.outputStore.SumFloat64(ord, key, value)
+	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+}
+func (c *Call) DoSetSumBigInt(ord uint64, key string, value string) {
+	now := time.Now()
+	c.validateSimple("set_sum_bigint", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, key)
+
+	c.outputStore.SetSumBigInt(ord, key, []byte(value))
+	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+}
+func (c *Call) DoSetSumBigDecimal(ord uint64, key string, value string) {
+	now := time.Now()
+	c.validateSimple("set_sum_bigdecimal", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, key)
+
+	c.outputStore.SetSumBigDecimal(ord, key, []byte(value))
+	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+}
+func (c *Call) DoSetSumInt64(ord uint64, key string, value string) {
+	now := time.Now()
+	c.validateSimple("set_sum_int64", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, key)
+
+	c.outputStore.SetSumInt64(ord, key, []byte(value))
+	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+}
+func (c *Call) DoSetSumFloat64(ord uint64, key string, value string) {
+	now := time.Now()
+	c.validateSimple("set_sum_float64", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, key)
+
+	c.outputStore.SetSumFloat64(ord, key, []byte(value))
 	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
 }
 func (c *Call) DoSetMinInt64(ord uint64, key string, value int64) {

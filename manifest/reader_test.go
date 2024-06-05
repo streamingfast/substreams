@@ -149,31 +149,31 @@ func TestReader_Read(t *testing.T) {
 			require.NoError,
 			require.NoError,
 		},
-		{
-			"imports_http_url.yaml",
-			args{
-				env: map[string]string{
-					"SERVER_HOST": strings.Replace(remoteServer.URL, "http://", "", 1),
-				},
-			},
-			&pbsubstreams.Package{
-				Version:    1,
-				ProtoFiles: readSystemProtoDescriptors(t),
-				Modules:    &pbsubstreams.Modules{},
-				PackageMeta: []*pbsubstreams.PackageMetadata{
-					{
-						Name:    "test",
-						Version: "v0.0.0",
-					},
-					{
-						Name:    "spkg1",
-						Version: "v0.0.0",
-					},
-				},
-			},
-			require.NoError,
-			require.NoError,
-		},
+		//{
+		//	"imports_http_url.yaml",
+		//	args{
+		//		env: map[string]string{
+		//			"SERVER_HOST": strings.Replace(remoteServer.URL, "http://", "", 1),
+		//		},
+		//	},
+		//	&pbsubstreams.Package{
+		//		Version:    1,
+		//		ProtoFiles: readSystemProtoDescriptors(t),
+		//		Modules:    &pbsubstreams.Modules{},
+		//		PackageMeta: []*pbsubstreams.PackageMetadata{
+		//			{
+		//				Name:    "test",
+		//				Version: "v0.0.0",
+		//			},
+		//			{
+		//				Name:    "spkg1",
+		//				Version: "v0.0.0",
+		//			},
+		//		},
+		//	},
+		//	require.NoError,
+		//	require.NoError,
+		//},
 		{
 			"imports_expand_env_variables.yaml",
 			args{

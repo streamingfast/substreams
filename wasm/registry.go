@@ -15,7 +15,6 @@ import (
 // and from which we instantiate Instances (one for each executions within each blocks).
 type Registry struct {
 	Extensions           map[string]map[string]WASMExtension
-	maxFuel              uint64
 	runtimeStack         ModuleFactory
 	instanceCacheEnabled bool
 }
@@ -42,14 +41,13 @@ func (r *Registry) registerWASMExtension(namespace string, importName string, ex
 	}
 	r.Extensions[namespace][importName] = ext
 }
-func (r *Registry) MaxFuel() uint64            { return r.maxFuel }
 func (r *Registry) InstanceCacheEnabled() bool { return r.instanceCacheEnabled }
 
-func (r *Registry) NewModule(ctx context.Context, wasmCode []byte) (Module, error) {
-	return r.runtimeStack.NewModule(ctx, wasmCode, r)
+func (r *Registry) NewModule(ctx context.Context, wasmCode []byte, wasmCodeType string) (Module, error) {
+	return r.runtimeStack.NewModule(ctx, wasmCode, wasmCodeType, r)
 }
 
-func NewRegistry(extensions map[string]map[string]WASMExtension, maxFuel uint64) *Registry {
+func NewRegistry(extensions map[string]map[string]WASMExtension) *Registry {
 	runtimeName := "wazero" // default
 
 	if selectRuntime := os.Getenv("SUBSTREAMS_WASM_RUNTIME"); selectRuntime != "" {
@@ -57,17 +55,16 @@ func NewRegistry(extensions map[string]map[string]WASMExtension, maxFuel uint64)
 		if selectedRuntime == nil {
 			panic(fmt.Errorf("could not find wasm runtime specified by `SUBSTREAMS_WASM_RUNTIME` env var: %q", selectRuntime))
 		}
+		runtimeName = selectRuntime
 	} else {
 		zlog.Info("using default wasm runtime", zap.String("runtime", runtimeName))
 	}
 
-	return NewRegistryWithRuntime(runtimeName, extensions, maxFuel)
+	return NewRegistryWithRuntime(runtimeName, extensions)
 }
 
-func NewRegistryWithRuntime(runtimeName string, extensions map[string]map[string]WASMExtension, maxFuel uint64) *Registry {
-	r := &Registry{
-		maxFuel: maxFuel,
-	}
+func NewRegistryWithRuntime(runtimeName string, extensions map[string]map[string]WASMExtension) *Registry {
+	r := &Registry{}
 
 	for ns, exts := range extensions {
 		for name, ext := range exts {

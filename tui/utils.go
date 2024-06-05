@@ -34,7 +34,7 @@ func (r ranges) Covered(lo, hi uint64) bool {
 func (r ranges) String() string {
 	var out []string
 	for _, m := range r {
-		out = append(out, fmt.Sprintf("%s", m.String()))
+		out = append(out, m.String())
 	}
 	return strings.Join(out, ", ")
 }
@@ -90,8 +90,6 @@ func (u updatedRanges) LoHi() (lo uint64, hi uint64) {
 
 func (u updatedRanges) Lo() uint64 { a, _ := u.LoHi(); return a }
 func (u updatedRanges) Hi() uint64 { _, b := u.LoHi(); return b }
-
-type newRange map[string]blockRange
 
 func mergeRangeLists(prevRanges ranges, newRange *blockRange) ranges {
 	// fmt.Println("merge input, prevRanges:", prevRanges, "new range:", newRange)

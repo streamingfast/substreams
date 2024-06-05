@@ -37,6 +37,9 @@ var initCmd = &cobra.Command{
 
 		If you have an Etherscan API Key, you can set it to "ETHERSCAN_API_KEY" environment variable, it will be used to
 		fetch the ABIs and contract information.
+
+		Example: 
+			substreams init --generator ethereum_init_v1
 	`),
 	RunE:         runSubstreamsInitE,
 	Args:         cobra.RangeArgs(0, 1),
@@ -45,6 +48,7 @@ var initCmd = &cobra.Command{
 
 func init() {
 	initCmd.Flags().String("generator", "discover", "Identifier of the code generator to use. Use 'discover' to list available ones.")
+	initCmd.Flags().Bool("local-dev", false, "Run the generator in local development mode.")
 
 	if x := os.Getenv("ETHERSCAN_API_KEY"); x != "" {
 		etherscanAPIKey = x
@@ -64,8 +68,17 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	opts := []connect.ClientOption{
 		connect.WithGRPC(),
 	}
+
 	// TODO:  make the `endpoint` here point to `https://codegen.substreams.dev` by default.
 	// WARN: when it's not `localhost` in the hostname, don't flip `InsecureSkipVerify` to true!
+
+	localDev := sflags.MustGetBool(cmd, "local-dev")
+	initConvoURL := "https://codegen.substreams.dev"
+
+	if localDev {
+		initConvoURL = "https://localhost:9001"
+	}
+
 	httpClient := &http.Client{
 		Transport: &http2.Transport{
 			AllowHTTP: true,
@@ -74,7 +87,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			},
 		},
 	}
-	client := pbconvoconnect.NewConversationServiceClient(httpClient, "https://localhost:9000", opts...)
+	client := pbconvoconnect.NewConversationServiceClient(httpClient, initConvoURL, opts...)
 
 	var lastState = initStateFormat{}
 	if _, err := os.Stat("generator.json"); err == nil {
@@ -90,6 +103,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		// TODO: otherwise here, we should ensure that the directory is empty... (or use the specified sub-directory?)
 	}
 
+	//TODO: the way it is handled right now, this should not be a flag, but a required argument
 	generatorID := sflags.MustGetString(cmd, "generator")
 
 	if lastState.GeneratorID != "" && generatorID != "discover" && generatorID != lastState.GeneratorID {

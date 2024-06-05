@@ -193,6 +193,10 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *blo
 }
 
 func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, moduleNames []string, upstream *response.Stream) *Result {
+	metrics.Tier1ActiveWorkerRequest.Inc()
+	metrics.Tier1WorkerRequestCounter.Inc()
+	defer metrics.Tier1ActiveWorkerRequest.Dec()
+
 	var err error
 
 	ctx, span := reqctx.WithSpan(ctx, fmt.Sprintf("substreams/tier1/schedule/%s/%d", request.OutputModule, request.SegmentNumber))

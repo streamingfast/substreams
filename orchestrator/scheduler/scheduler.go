@@ -8,7 +8,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/orchestrator/execout"
 	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/orchestrator/response"
@@ -81,8 +80,6 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 
 	switch msg := msg.(type) {
 	case work.MsgJobSucceeded:
-		metrics.Tier1ActiveWorkerRequest.Dec()
-
 		shadowedUnits := s.Stages.MarkJobSuccess(msg.Unit)
 		s.WorkerPool.Return(msg.Worker)
 
@@ -126,17 +123,12 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		s.logger.Info("scheduling work", zap.Object("unit", workUnit))
 		modules := s.Stages.StageModules(workUnit.Stage)
 
-		metrics.Tier1ActiveWorkerRequest.Inc()
-		metrics.Tier1WorkerRequestCounter.Inc()
-
 		return loop.Batch(
 			worker.Work(s.ctx, workUnit, workRange, modules, s.stream),
 			work.CmdScheduleNextJob(),
 		)
 
 	case work.MsgJobFailed:
-		metrics.Tier1ActiveWorkerRequest.Dec()
-
 		cmds = append(cmds, loop.Quit(msg.Error))
 
 	case stage.MsgMergeFinished:

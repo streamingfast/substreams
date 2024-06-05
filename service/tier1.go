@@ -237,6 +237,7 @@ func (s *Tier1Service) Blocks(
 	for i := 0; i < len(moduleNames); i++ {
 		moduleNames[i] = request.Modules.Modules[i].Name
 	}
+
 	fields := []zap.Field{
 		zap.Int64("start_block", request.StartBlockNum),
 		zap.Uint64("stop_block", request.StopBlockNum),
@@ -244,6 +245,7 @@ func (s *Tier1Service) Blocks(
 		zap.Strings("modules", moduleNames),
 		zap.String("output_module", request.OutputModule),
 		zap.String("output_module_hash", outputModuleHash),
+		zap.Bool("compressed", req.Header().Get("grpc-Accept-Encoding") == "gzip"),
 	}
 	fields = append(fields, zap.Bool("production_mode", request.ProductionMode))
 	if auth := dauth.FromContext(ctx); auth != nil {

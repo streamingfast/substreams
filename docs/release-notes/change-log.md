@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## Unreleased
 
 * Fixed Substreams tier1 active worker request metrics that was not decrementing fully correctly.
+* Add 'compressed' boolean field to the 'incoming request' log
 
 ## v1.7.3
 

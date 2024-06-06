@@ -75,6 +75,8 @@
     * [Simple Substreams Example](new/tutorials/cosmos/injective/block-stats.md)
     * [Foundational Modules](new/tutorials/cosmos/injective/foundational.md)
     * [Dojo DEX USDT Volume Subgraph Example](new/tutorials/cosmos/injective/usdt-exchanges.md)
+* [Graph Node](new/tutorials/graph-node/graph-node.md)
+  * [Local Development](new/tutorials/graph-node/local-development.md)
 * [Rust](new/tutorials/rust/rust.md)
   * [Option struct](new/tutorials/rust/option.md)
   * [Result struct](new/tutorials/rust/result.md)

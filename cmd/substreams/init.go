@@ -245,7 +245,6 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			}
 			fmt.Println("")
 
-			//fmt.Println("MAMA", optionsMap[selection], selection, selectField.GetValue())
 			if err := sendFunc(&pbconvo.UserInput{
 				FromActionId: resp.ActionId,
 				Entry: &pbconvo.UserInput_Selection_{
@@ -370,23 +369,25 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			fmt.Println("Files:")
 			for _, file := range input.Files {
 				fmt.Printf("  - %s (%s)\n", file.Filename, file.Type)
-				fmt.Println(toMarkdown(file.Description))
+				fmt.Println(file.Description)
 			}
 
 			if len(input.Files) == 0 {
 				return fmt.Errorf("no files to download")
 			}
 
+			sendDownloadedFilesConfirmation := false
 			for _, inputFile := range input.Files {
 				switch inputFile.Type {
 				case "application/x-zip":
 					//RECEIVING SOURCE.ZIP
-					zipRoot := getDefaultDirFromFilename(inputFile.Filename)
+					// zipRoot := getDefaultDirFromFilename(inputFile.Filename)
 
 					var savingDest string
 					inputField := huh.NewInput().Title("In which directory do you want to store your source code?").Value(&savingDest)
 
 					inputField.Validate(func(userInput string) error {
+						fmt.Println("Checking directory", userInput)
 						fileInfo, err := os.Stat(userInput)
 						if err != nil {
 							if os.IsNotExist(err) {
@@ -407,7 +408,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 						return fmt.Errorf("failed taking input: %w", err)
 					}
 
-					zipRoot = savingDest
+					zipRoot := savingDest
 
 					var unpackSource bool
 					confirm := huh.NewConfirm().
@@ -440,6 +441,8 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 						fmt.Println("TODO...")
 					}
 
+					sendDownloadedFilesConfirmation = true
+
 				case "application/x-protobuf; messageType=\"sf.substreams.v1.Package\"":
 					//RECEIVING SPKG
 					spkgRoot := getDefaultDirFromFilename(inputFile.Filename)
@@ -470,9 +473,23 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					fmt.Println("Unknown file type:", inputFile.Type)
 				}
 			}
+
+			// only need to send a confirmation when not downloading spkg files
+			if sendDownloadedFilesConfirmation {
+				if err := sendFunc(&pbconvo.UserInput{
+					FromActionId: resp.ActionId,
+					Entry: &pbconvo.UserInput_DownloadedFiles_{
+						DownloadedFiles: &pbconvo.UserInput_DownloadedFiles{
+							Affirmative: true,
+						},
+					},
+				}); err != nil {
+					return fmt.Errorf("error sending confirmation: %w", err)
+				}
+			}
+
 		default:
 			fmt.Printf("Received unknown message type: %T\n", resp.Entry)
-
 		}
 	}
 
@@ -490,7 +507,7 @@ type initListElement struct {
 
 func saveDownloadFile(path string, inputFile *pbconvo.SystemOutput_DownloadFile) (err error) {
 	dir := filepath.Dir(path)
-	err = os.MkdirAll(dir, os.ModePerm)
+	err = os.MkdirAll(dir, 0755)
 	if err != nil {
 		return fmt.Errorf("creating sub-directory %q: %w", path, err)
 	}
@@ -508,7 +525,7 @@ func saveDownloadFile(path string, inputFile *pbconvo.SystemOutput_DownloadFile)
 		return nil
 	}
 
-	err = os.WriteFile(path, inputFile.Content, os.ModePerm)
+	err = os.WriteFile(path, inputFile.Content, 0644)
 	if err != nil {
 		return fmt.Errorf("saving zip file %q: %w", inputFile.Filename, err)
 	}

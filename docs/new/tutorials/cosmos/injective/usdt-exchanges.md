@@ -1,4 +1,4 @@
-The [USDT Exchanges Volume Subgraph]() tracks the historical USDT volume for the `INJ-USDT` pair in the Dojo DEX.
+The [USDT Exchanges Volume Subgraph](https://github.com/streamingfast/injective-subgraph-template) tracks the historical USDT volume for the `INJ-USDT` pair in the Dojo DEX.
 The subgraph uses the [Substreams triggers](../../../consume/subgraph/triggers.md) to import data from the Injective foundational modules.
 
 ## Before You Begin
@@ -137,7 +137,7 @@ If it is the first trade, then the entity will not exist, and it must be created
 
 You can test your Substreams-powered Subgraph by deploying to a local Graph Node set-up. Take a look at the the [Graph Node Local Development tutorial](../../graph-node/local-development.md), which provides information on how to spin up a local environment for Graph Node.
 
-First, [Substreams Development Environment GitHub respository](https://github.com/streamingfast/substreams-dev-environment) and move to the `graph-node` folder. Execute the `start.sh` command with the Injective information (make sure you have Docker running in your computer).
+First, clone the [Substreams Development Environment GitHub respository](https://github.com/streamingfast/substreams-dev-environment) and move to the `graph-node` folder. Execute the `start.sh` command with the Injective information (make sure you have Docker running in your computer).
 
 ```bash
 ./start.sh injective-mainnet https://mainnet.injective.streamingfast.io:443

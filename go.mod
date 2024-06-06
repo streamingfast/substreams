@@ -13,7 +13,7 @@ require (
 	github.com/streamingfast/dauth v0.0.0-20240219205130-bfe428489338
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
 	github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1
-	github.com/streamingfast/dgrpc v0.0.0-20240219152146-57bb131c39ca
+	github.com/streamingfast/dgrpc v0.0.0-20240423143010-f36784700c9a
 	github.com/streamingfast/dstore v0.1.1-0.20240311181234-470a7a84936f
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
 	github.com/streamingfast/pbgo v0.0.6-0.20231120172814-537d034aad5e
@@ -64,6 +64,7 @@ require (
 	github.com/streamingfast/shutter v1.5.0
 	github.com/streamingfast/substreams-sdk-go v0.0.0-20240110154316-5fb21a7a330b
 	github.com/streamingfast/substreams-sink-sql v1.0.1-0.20231127153906-acf5f3e34330
+	github.com/streamingfast/substreams/remotebuild v0.0.0-20240605005322-fb56102ba033
 	github.com/test-go/testify v1.1.4
 	github.com/tetratelabs/wazero v1.7.1
 	github.com/tidwall/pretty v1.2.1
@@ -71,25 +72,28 @@ require (
 	go.opentelemetry.io/otel v1.24.0
 	go.opentelemetry.io/otel/trace v1.24.0
 	go.uber.org/atomic v1.10.0
-	golang.org/x/mod v0.12.0
+	golang.org/x/mod v0.17.0
 	golang.org/x/net v0.22.0
 	golang.org/x/oauth2 v0.18.0
 	google.golang.org/grpc v1.64.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
+// replace github.com/streamingfast/substreams/remotebuild v0.0.0-20240604193227-fe8c0b6697e4 => /Users/eduardvoiculescu/git/streamingfast/substreams/remotebuild
+
 require (
 	connectrpc.com/grpchealth v1.3.0 // indirect
 	connectrpc.com/otelconnect v0.7.0 // indirect
 	github.com/bits-and-blooms/bitset v1.12.0 // indirect
-	github.com/bobg/go-generics/v2 v2.1.1 // indirect
+	github.com/bmatcuk/doublestar/v4 v4.6.1 // indirect
+	github.com/bobg/go-generics/v2 v2.2.2 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/google/s2a-go v0.1.7 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/iancoleman/strcase v0.3.0 // indirect
-	github.com/mattn/go-sqlite3 v1.14.16 // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.6 // indirect
+	github.com/sercand/kuberesolver/v5 v5.1.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0 // indirect
 	go.uber.org/goleak v1.3.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
@@ -214,8 +218,8 @@ require (
 	go.opentelemetry.io/otel/sdk v1.23.1 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/crypto v0.21.0 // indirect
-	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1
-	golang.org/x/sync v0.6.0 // indirect
+	golang.org/x/exp v0.0.0-20240531132922-fd00a4e0eefc
+	golang.org/x/sync v0.7.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/term v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect

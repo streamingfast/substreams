@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+option go_package = "github.com/streamingfast/substreams/pb/sf/codegen/remotebuild/v1;pbbuildv1";
+
+package sf.codegen.remotebuild.v1;
+
+service BuildService {
+  rpc Build(BuildRequest) returns (BuildResponse);
+}
+
+message BuildRequest {
+  // Zip file with source code to unzip in a temporary directory.
+  bytes source_code = 1;
+
+  // Environment vars, passed to `exec.Command()`
+  repeated string env = 2;
+
+  // Double star glob pattern to collect after the build has succeeded
+  string collect_pattern = 3;
+}
+
+message BuildResponse {
+  string error = 1;
+  string logs = 2;
+
+  // Return only the .spkg for the output
+  repeated BuildArtifact artifacts = 3;
+  
+  message BuildArtifact {
+    string filename = 1;
+    bytes content = 2;
+  }
+}

@@ -1,0 +1,18 @@
+version: v1
+managed:
+  # We are now using managed mode for now because I did not find how to support `;pbsubstreams` package
+  # which we use currently. It's not a big problem for now but I didn't want to change anything. We
+  # might revisit that later.
+  enabled: false
+plugins:
+  - name: go
+    out: pb
+    opt: paths=source_relative
+  - plugin: go-grpc
+    out: pb
+    opt:
+      - paths=source_relative
+      - require_unimplemented_servers=false
+  - plugin: buf.build/connectrpc/go:v1.15.0
+    out: pb
+    opt: paths=source_relative

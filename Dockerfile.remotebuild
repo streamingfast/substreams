@@ -1,0 +1,55 @@
+FROM rust:1.78-alpine as rust-builder
+
+FROM golang:1.22-alpine3.19
+
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH \
+    RUST_VERSION=1.78.0
+
+COPY --from=rust-builder /usr/local/cargo /usr/local/cargo/
+COPY --from=rust-builder /usr/local/rustup /usr/local/rustup/
+
+# Install needed rustup components
+RUN rustup component add rustfmt && cargo install rustfmt || true
+RUN rustup default stable
+RUN rustup target add wasm32-unknown-unknown
+
+# Install build essentials and curl
+RUN apk update && apk add curl build-base sccache
+
+# Set the Shared Compilation Cache for Cargo to use sccache
+# This greatly improves build times when running concurrent builds
+ENV RUSTC_WRAPPER=/usr/bin/sccache
+
+# Install buf
+RUN GO111MODULE=on GOBIN=/usr/local/bin go install github.com/bufbuild/buf/cmd/buf@v1.32.2
+
+# Build substreams cli
+# RUN curl -s https://api.github.com/repos/streamingfast/substreams/releases/latest | awk "/download.url.*linux_$(uname -m)/ {print \$2}" | sed 's/"//g' | curl -L $1  | tar zxf -
+
+WORKDIR /app/data
+
+# Add the entire cli source code
+COPY . ./substreams-cli
+
+WORKDIR /app/data/substreams-cli
+
+# Install the substreams cli
+RUN go install ./cmd/substreams
+
+WORKDIR /app/data
+
+# Remove all the source code to have a smaller image
+RUN rm -r substreams-cli
+
+# Add only the remotebuild source code
+COPY remotebuild remotebuild
+
+EXPOSE 9000
+
+WORKDIR /app/data/remotebuild
+
+RUN go install .
+
+ENTRYPOINT [ "remotebuild" ]

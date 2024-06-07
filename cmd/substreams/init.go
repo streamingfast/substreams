@@ -369,14 +369,20 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			fmt.Println("Files:")
 			for _, file := range input.Files {
 				fmt.Printf("  - %s (%s)\n", file.Filename, file.Type)
-				fmt.Println(file.Description)
+				if file.Description != "" {
+					fmt.Println(file.Description)
+				}
 			}
+
+			// let the terminal breath a little
+			fmt.Println()
 
 			if len(input.Files) == 0 {
 				return fmt.Errorf("no files to download")
 			}
 
 			sendDownloadedFilesConfirmation := false
+			downloadedFilesfolderPath := ""
 			for _, inputFile := range input.Files {
 				switch inputFile.Type {
 				case "application/x-zip":
@@ -409,14 +415,16 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					}
 
 					zipRoot := savingDest
+					downloadedFilesfolderPath = zipRoot
+
+					// the multiple \n are not a mistake, it's to have a blank line before the next message
+					fmt.Printf("\nSource code will be saved in %s\n\n", zipRoot)
 
 					var unpackSource bool
 					confirm := huh.NewConfirm().
 						Title("Unzip source code? ").
-						Description(toMarkdown("Will unpack in **" + savingDest + "**")).
 						Affirmative("Yes, unzip sources").
 						Negative("No").
-						Inline(true).
 						Value(&unpackSource)
 
 					err = huh.NewForm(huh.NewGroup(confirm)).WithAccessible(WITH_ACCESSIBLE).Run()
@@ -433,23 +441,19 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					// if there's conflict.
 					if unpackSource {
 						zipContent := inputFile.Content
+						fmt.Printf("Unzipping %s into %s", inputFile.Filename, zipRoot)
 						err := unzipFile(zipContent, zipRoot)
 						if err != nil {
 							return fmt.Errorf("unzipping file: %w", err)
 						}
-						fmt.Println("Unzipping", inputFile.Filename, "into"+zipRoot)
-						fmt.Println("TODO...")
 					}
 
 					sendDownloadedFilesConfirmation = true
 
 				case "application/x-protobuf; messageType=\"sf.substreams.v1.Package\"":
-					//RECEIVING SPKG
-					spkgRoot := getDefaultDirFromFilename(inputFile.Filename)
+					filePath := inputFile.Filename
 
-					filePath := filepath.Join(spkgRoot, inputFile.Filename)
-
-					if _, err := os.Stat(filePath); err == nil {
+					if _, err := os.Stat(inputFile.Filename); err == nil {
 						overwrite, err := creatingOverwriteForm(filePath)
 						if err != nil {
 							return fmt.Errorf(": %w", err)
@@ -461,7 +465,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 						}
 					}
 
-					err = saveDownloadFile(spkgRoot, inputFile)
+					err = saveDownloadFile(filePath, inputFile)
 					if err != nil {
 						return fmt.Errorf("saving spkg file: %w", err)
 					}
@@ -469,6 +473,13 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				case "text/plain":
 					fmt.Println("Compilation Logs:")
 					fmt.Println(string(inputFile.Content))
+
+				case "text/plain; option:\"save\"":
+					err := os.WriteFile(inputFile.Filename, inputFile.Content, 0644)
+					if err != nil {
+						return fmt.Errorf("saving file: %w", err)
+					}
+
 				default:
 					fmt.Println("Unknown file type:", inputFile.Type)
 				}
@@ -480,7 +491,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					FromActionId: resp.ActionId,
 					Entry: &pbconvo.UserInput_DownloadedFiles_{
 						DownloadedFiles: &pbconvo.UserInput_DownloadedFiles{
-							Affirmative: true,
+							FolderPath: downloadedFilesfolderPath,
 						},
 					},
 				}); err != nil {
@@ -530,13 +541,6 @@ func saveDownloadFile(path string, inputFile *pbconvo.SystemOutput_DownloadFile)
 		return fmt.Errorf("saving zip file %q: %w", inputFile.Filename, err)
 	}
 	return nil
-}
-
-func getDefaultDirFromFilename(filename string) string {
-	spkgRoot := filepath.Base(filename)
-	spkgRoot = strings.TrimSuffix(spkgRoot, filepath.Ext(spkgRoot))
-	spkgRoot = strings.TrimSuffix(spkgRoot, ".")
-	return spkgRoot
 }
 
 func toMarkdown(input string) string {
@@ -609,11 +613,9 @@ func unzipFile(zipContent []byte, zipRoot string) error {
 func creatingOverwriteForm(path string) (bool, error) {
 	var overwrite bool
 	confirm := huh.NewConfirm().
-		Title("File already exists").
-		Description(toMarkdown("Do you want to overwrite **" + path + "**?")).
+		Title(fmt.Sprintf("File already exists, Do you want to overwrite %s ?", path)).
 		Affirmative("Yes, overwrite").
 		Negative("No").
-		Inline(true).
 		Value(&overwrite)
 
 	err := huh.NewForm(huh.NewGroup(confirm)).WithAccessible(WITH_ACCESSIBLE).Run()

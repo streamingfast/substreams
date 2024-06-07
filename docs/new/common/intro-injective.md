@@ -53,7 +53,9 @@ Although developing a Substreams-powered subgraph should be easy enough without 
 - [Authentication](./authentication.md)
 - [Packages](./packages.md)
 - [Injective Foundational Modules](../tutorials/cosmos/injective/foundational.md)
+- [Set up a subgraph local environment](../tutorials/graph-node/local-development.md)
 - [Injective Subgraph Example](../tutorials/cosmos/injective/usdt-exchanges.md)
+- [Publish to The Graph decentralized network](../tutorials/graph-node/publish-decentralized-network.md)
 
 ## Use Subtreams Directly
 

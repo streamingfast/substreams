@@ -418,7 +418,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					downloadedFilesfolderPath = zipRoot
 
 					// the multiple \n are not a mistake, it's to have a blank line before the next message
-					fmt.Printf("\nSource code will be saved in %s\n\n", zipRoot)
+					fmt.Printf("\nSource code will be saved in %s\n", zipRoot)
 
 					var unpackSource bool
 					confirm := huh.NewConfirm().
@@ -441,7 +441,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					// if there's conflict.
 					if unpackSource {
 						zipContent := inputFile.Content
-						fmt.Printf("Unzipping %s into %s", inputFile.Filename, zipRoot)
+						fmt.Printf("Unzipping %s into %s\n", inputFile.Filename, zipRoot)
 						err := unzipFile(zipContent, zipRoot)
 						if err != nil {
 							return fmt.Errorf("unzipping file: %w", err)

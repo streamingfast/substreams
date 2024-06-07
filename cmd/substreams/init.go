@@ -25,6 +25,7 @@ import (
 	"github.com/streamingfast/cli/sflags"
 	pbconvo "github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1"
 	"github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1/pbconvoconnect"
+	"github.com/tidwall/gjson"
 	"golang.org/x/net/http2"
 )
 
@@ -386,10 +387,14 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			for _, inputFile := range input.Files {
 				switch inputFile.Type {
 				case "application/x-zip":
-					//RECEIVING SOURCE.ZIP
-					// zipRoot := getDefaultDirFromFilename(inputFile.Filename)
 
-					var savingDest string
+					savingDest := "output"
+					if projectName := gjson.GetBytes(lastState.State, "name").String(); projectName != "" {
+						savingDest = projectName
+					}
+					if cwd, err := os.Getwd(); err == nil {
+						savingDest = filepath.Join(cwd, savingDest)
+					}
 					inputField := huh.NewInput().Title("In which directory do you want to store your source code?").Value(&savingDest)
 
 					inputField.Validate(func(userInput string) error {

@@ -353,16 +353,16 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				go func(loadingCh chan bool) {
 					_ = spinner.New().Title(msg.Loading.Label).Action(func() {
 						<-loadingCh
-						fmt.Println(msg.Loading.Label)
 					}).Run()
 				}(loadingCh)
 
 			} else {
+				// reset loading channel
 				if loadingCh != nil {
 					loadingCh <- true
 					loadingCh = nil
-					fmt.Println(msg.Loading.Label)
 				}
+				fmt.Println(msg.Loading.Label)
 			}
 
 		case *pbconvo.SystemOutput_DownloadFiles_:
@@ -456,21 +456,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					sendDownloadedFilesConfirmation = true
 
 				case "application/x-protobuf; messageType=\"sf.substreams.v1.Package\"":
-					filePath := inputFile.Filename
-
-					if _, err := os.Stat(inputFile.Filename); err == nil {
-						overwrite, err := creatingOverwriteForm(filePath)
-						if err != nil {
-							return fmt.Errorf(": %w", err)
-						}
-
-						if !overwrite {
-							fmt.Println("Skipping", filePath)
-							continue
-						}
-					}
-
-					err = saveDownloadFile(filePath, inputFile)
+					err = saveDownloadFile(inputFile.Filename, inputFile)
 					if err != nil {
 						return fmt.Errorf("saving spkg file: %w", err)
 					}

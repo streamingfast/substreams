@@ -1,0 +1,1 @@
+The Graph Node is the software that indexers run to index subgraphs. This section contains useful tutorial on the usage and development of the Graph Node, specifically in the Substreams context.

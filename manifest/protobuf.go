@@ -102,7 +102,33 @@ func loadDescriptorSets(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.Fil
 	}
 
 	var out []*desc.FileDescriptor
+	var outProto []*descriptorpb.FileDescriptorProto
 	for _, descriptor := range manif.Protobuf.DescriptorSets {
+
+		if descriptor.LocalPath != "" {
+			f, err := os.Open(descriptor.LocalPath)
+			if err != nil {
+				return nil, fmt.Errorf("error opening local protobuf descriptor file %q: %w", descriptor.LocalPath, err)
+			}
+			defer f.Close()
+
+			b, err := io.ReadAll(f)
+			if err != nil {
+				return nil, fmt.Errorf("error reading local protobuf descriptor file %q: %w", descriptor.LocalPath, err)
+			}
+
+			protoDescContainer := &pbsubstreams.Package{}
+			proto.Unmarshal(b, protoDescContainer)
+
+			for _, fdProto := range protoDescContainer.ProtoFiles {
+				if _, found := seen[fdProto.GetName()]; found {
+					continue
+				}
+				seen[fdProto.GetName()] = true
+				outProto = append(outProto, fdProto)
+			}
+			continue
+		}
 
 		authToken := os.Getenv("BUFBUILD_AUTH_TOKEN")
 		if authToken == "" {
@@ -127,11 +153,15 @@ func loadDescriptorSets(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.Fil
 		}
 
 		fdMap, err := desc.CreateFileDescriptorsFromSet(fileDescriptorSet.Msg.FileDescriptorSet)
+		if err != nil {
+			return nil, fmt.Errorf("creating file descriptors from set: %w", err)
+		}
 
 		for _, fd := range fdMap {
 			if _, found := seen[fd.GetName()]; found {
 				continue
 			}
+			seen[fd.GetName()] = true
 			out = append(out, fd)
 		}
 	}
@@ -139,6 +169,7 @@ func loadDescriptorSets(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.Fil
 	for _, fd := range out {
 		pkg.ProtoFiles = append(pkg.ProtoFiles, fd.AsFileDescriptorProto())
 	}
+	pkg.ProtoFiles = append(pkg.ProtoFiles, outProto...)
 
 	return out, nil
 }

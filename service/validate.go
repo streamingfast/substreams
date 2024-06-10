@@ -7,6 +7,7 @@ import (
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/wasm"
 )
 
 // Deprecated: use ValidateTier1Request
@@ -85,11 +86,16 @@ func validateModuleGraph(mods []*pbsubstreams.Module, outputModule string, block
 
 func validateBinaryTypes(bins []*pbsubstreams.Binary) error {
 	for _, binary := range bins {
-		switch binary.Type {
+		wasmCodeTypeID, _, err := wasm.ParseWASMCodeType(binary.Type)
+		if err != nil {
+			return fmt.Errorf("parse wasm type %q: %w", binary.Type, err)
+		}
+
+		switch wasmCodeTypeID {
 		case "wasm/rust-v1":
 		case "wasip1/tinygo-v1":
 		default:
-			return fmt.Errorf(`unsupported binary type: %q, please use "wasm/rust-v1" or "wasip1/tinygo-v1"`, binary.Type)
+			return fmt.Errorf(`unsupported binary type: %q, please use "wasm/rust-v1" or "wasip1/tinygo-v1"`, wasmCodeTypeID)
 		}
 	}
 	return nil

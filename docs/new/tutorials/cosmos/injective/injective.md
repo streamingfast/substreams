@@ -1,0 +1,1 @@
+The section contains tutorials showcasing how to develop a Substreams that can extract data from the Cosmos ecosystem, specifically for the Injective blockchain.

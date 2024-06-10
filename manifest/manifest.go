@@ -85,9 +85,10 @@ type Protobuf struct {
 }
 
 type BufImport struct {
-	Module  string   `yaml:"module"`
-	Version string   `yaml:"version"`
-	Symbols []string `yaml:"symbols"`
+	LocalPath string   `yaml:"localPath,omitempty"`
+	Module    string   `yaml:"module"`
+	Version   string   `yaml:"version"`
+	Symbols   []string `yaml:"symbols"`
 }
 
 type Module struct {
@@ -109,6 +110,10 @@ type Module struct {
 type BlockFilter struct {
 	Module string           `yaml:"module,omitempty"`
 	Query  BlockFilterQuery `yaml:"query,omitempty"`
+}
+
+func (bf *BlockFilter) IsEmpty() bool {
+	return bf.Module == "" && bf.Query.String == "" && !bf.Query.Params
 }
 
 type BlockFilterQuery struct {

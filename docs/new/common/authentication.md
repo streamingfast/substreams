@@ -25,7 +25,7 @@ The substreams server expects the `X-Api-Key` header to be set with your API key
 Set the token as an `ENV` variable through the terminal by using:
 
 ```bash
-export SUBSTREAMS_API_KEY="server_0123456789abcdef0123456789abcdef"
+export SUBSTREAMS_API_KEY="server_********************************"
 ```
 
 The `substreams` [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) and [`gui`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#gui) commands check the `SUBSTREAMS_API_KEY` environment variable for the key by default. You can change that with the `--substreams-api-key-envvar` flag.

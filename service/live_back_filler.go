@@ -14,7 +14,7 @@ import (
 )
 
 type LiveBackFiller struct {
-	nextHandler          bstream.Handler
+	NextHandler          bstream.Handler
 	irreversibleBlock    chan uint64
 	currentSegment       uint64
 	segmentSize          uint64
@@ -23,7 +23,7 @@ type LiveBackFiller struct {
 
 func NewLiveBackFiller(nextHandler bstream.Handler, segmentSize uint64, linearHandoff uint64) *LiveBackFiller {
 	return &LiveBackFiller{
-		nextHandler:       nextHandler,
+		NextHandler:       nextHandler,
 		irreversibleBlock: make(chan uint64),
 		currentSegment:    linearHandoff / segmentSize,
 		segmentSize:       segmentSize,
@@ -33,12 +33,12 @@ func NewLiveBackFiller(nextHandler bstream.Handler, segmentSize uint64, linearHa
 func (l *LiveBackFiller) ProcessBlock(blk *pbbstream.Block, obj interface{}) (err error) {
 	step := obj.(bstream.Stepable).Step()
 	if !(step.Matches(bstream.StepIrreversible)) {
-		return l.nextHandler.ProcessBlock(blk, obj)
+		return l.NextHandler.ProcessBlock(blk, obj)
 	}
 
 	l.irreversibleBlock <- blk.Number
 
-	return l.nextHandler.ProcessBlock(blk, obj)
+	return l.NextHandler.ProcessBlock(blk, obj)
 }
 
 func (l *LiveBackFiller) RequestBackProcessing(ctx context.Context, logger *zap.Logger, liveCachingRequest *pbssinternal.ProcessRangeRequest, clientFactory client.InternalClientFactory) error {

@@ -12,6 +12,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/streamingfast/substreams/block"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dgrpc"
 
@@ -140,6 +143,7 @@ func NewTier1(
 		func(logger *zap.Logger) work.Worker {
 			return work.NewRemoteWorker(clientFactory, logger)
 		},
+		clientFactory,
 	)
 
 	sf := &StreamFactory{
@@ -434,7 +438,9 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		logger.Warn("cannot write package", zap.Error(err))
 	}
 
-	execOutputConfigs, err := execout.NewConfigs(cacheStore, execGraph.UsedModules(), execGraph.ModuleHashes(), s.runtimeConfig.SegmentSize, logger)
+	segmentSize := s.runtimeConfig.SegmentSize
+
+	execOutputConfigs, err := execout.NewConfigs(cacheStore, execGraph.UsedModules(), execGraph.ModuleHashes(), segmentSize, logger)
 	if err != nil {
 		return fmt.Errorf("new config map: %w", err)
 	}
@@ -444,7 +450,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		return fmt.Errorf("configuring stores: %w", err)
 	}
 
-	stores := pipeline.NewStores(ctx, storeConfigs, s.runtimeConfig.SegmentSize, requestDetails.LinearHandoffBlockNum, request.StopBlockNum, false, nil)
+	stores := pipeline.NewStores(ctx, storeConfigs, segmentSize, requestDetails.LinearHandoffBlockNum, request.StopBlockNum, false, nil)
 
 	execOutputCacheEngine, err := cache.NewEngine(ctx, nil, s.blockType, nil, nil) // we don't read or write ExecOuts on tier1
 	if err != nil {
@@ -473,7 +479,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		execOutputConfigs,
 		wasmRuntime,
 		execOutputCacheEngine,
-		s.runtimeConfig.SegmentSize,
+		segmentSize,
 		s.runtimeConfig.WorkerFactory,
 		respFunc,
 		opts...,
@@ -488,7 +494,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 
 	reqPlan, err := plan.BuildTier1RequestPlan(
 		requestDetails.ProductionMode,
-		s.runtimeConfig.SegmentSize,
+		segmentSize,
 		execGraph.LowestInitBlock(),
 		requestDetails.ResolvedStartBlockNum,
 		requestDetails.LinearHandoffBlockNum,
@@ -536,9 +542,31 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		zap.String("cursor", cursor),
 	)
 
+	liveCacheHandler := NewLiveCacheProcessor(pipe, segmentSize)
+
+	// Live Caching
+	go func() {
+		logger.Info("Start live caching", zap.Uint64("linear handoff block", requestDetails.LinearHandoffBlockNum), zap.Uint64("stop block", request.StopBlockNum))
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case segmentNumber := <-liveCacheHandler.segmentCompleted:
+				requestStart := segmentNumber * segmentSize
+				requestStop := (segmentNumber + 1) * segmentSize
+
+				liveCachingRange := block.NewRange(requestStart, requestStop)
+				liveCachingRequest := work.NewRequest(ctx, reqctx.Details(ctx), execGraph.OutputModuleStageIndex(), liveCachingRange)
+
+				liveCacheHandler.RequestBackProcessing(ctx, logger, liveCachingRequest, s.runtimeConfig.ClientFactory)
+			}
+			return
+		}
+	}()
+
 	blockStream, err := s.streamFactoryFunc(
 		ctx,
-		pipe,
+		liveCacheHandler,
 		int64(requestDetails.LinearHandoffBlockNum),
 		request.StopBlockNum,
 		cursor,
@@ -583,6 +611,75 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 		sendMetering(ctx, meter, userID, apiKeyID, ip, userMeta, "sf.substreams.rpc.v2/Blocks", resp)
 		return nil
 	}
+}
+
+type LiveCacheHandler struct {
+	pipe                 *pipeline.Pipeline
+	segmentCompleted     chan uint64
+	currentSegment       uint64
+	segmentSize          uint64
+	receivedBlockNumbers map[uint64]struct{}
+}
+
+func NewLiveCacheProcessor(pipe *pipeline.Pipeline, segmentSize uint64) *LiveCacheHandler {
+	return &LiveCacheHandler{
+		pipe:             pipe,
+		segmentCompleted: nil,
+		//Calculate currentSegment from linearHandoffBlockNum
+		currentSegment:       0,
+		segmentSize:          segmentSize,
+		receivedBlockNumbers: make(map[uint64]struct{}),
+	}
+}
+
+func (l *LiveCacheHandler) ProcessBlock(blk *pbbstream.Block, obj interface{}) (err error) {
+	step := obj.(bstream.Stepable).Step()
+	if step == bstream.StepIrreversible || step == bstream.StepNewIrreversible {
+		l.receivedBlockNumbers[blk.Number] = struct{}{}
+	}
+
+	segmentStart := l.currentSegment * l.segmentSize
+	segmentEnd := (l.currentSegment + 1) * l.segmentSize
+
+	for i := segmentStart; i < segmentEnd; i++ {
+		if _, exist := l.receivedBlockNumbers[i]; !exist {
+			break
+		}
+
+		l.segmentCompleted <- l.currentSegment
+		l.currentSegment++
+		segmentStart = l.currentSegment * l.segmentSize
+		segmentEnd = (l.currentSegment + 1) * l.segmentSize
+	}
+
+	err = l.pipe.ProcessBlock(blk, obj)
+	if err != nil {
+		return fmt.Errorf("processing live cache: %w", err)
+	}
+	return nil
+}
+
+func (l *LiveCacheHandler) RequestBackProcessing(ctx context.Context, logger *zap.Logger, liveCachingRequest *pbssinternal.ProcessRangeRequest, clientFactory client.InternalClientFactory) {
+	grpcClient, closeFunc, grpcCallOpts, _, err := clientFactory()
+	if err != nil {
+		logger.Warn("failed to create live cache grpc client", zap.Error(err))
+	}
+
+	stream, err := grpcClient.ProcessRange(ctx, liveCachingRequest, grpcCallOpts...)
+	if err != nil {
+		logger.Warn("failed to create live cache", zap.Uint64("segmentStart", liveCachingRequest.StartBlock()), zap.Uint64("segmentEnd", liveCachingRequest.StopBlock()), zap.Error(err))
+	}
+
+	defer func() {
+		if err := stream.CloseSend(); err != nil {
+			logger.Warn("failed to close live caching stream on job termination", zap.Error(err))
+		}
+		if err := closeFunc(); err != nil {
+			logger.Warn("failed to close live caching grpc client on job termination", zap.Error(err))
+		}
+	}()
+
+	closeFunc()
 }
 
 func setupRequestStats(ctx context.Context, requestDetails *reqctx.RequestDetails, outputModuleGraph string, tier2 bool) (context.Context, *metrics.Stats) {

@@ -65,6 +65,14 @@ type initStateFormat struct {
 	State       json.RawMessage `json:"state"`
 }
 
+type UserState struct {
+	downloadedFilesfolderPath string
+}
+
+func newUserState() *UserState {
+	return &UserState{}
+}
+
 func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	opts := []connect.ClientOption{
 		connect.WithGRPC(),
@@ -155,6 +163,8 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed sending start message: %w", err)
 	}
+
+	userState := newUserState()
 
 	var loadingCh chan bool
 	for {
@@ -383,7 +393,6 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			}
 
 			sendDownloadedFilesConfirmation := false
-			downloadedFilesfolderPath := ""
 			for _, inputFile := range input.Files {
 				switch inputFile.Type {
 				case "application/x-zip":
@@ -420,7 +429,6 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					}
 
 					zipRoot := savingDest
-					downloadedFilesfolderPath = zipRoot
 
 					// the multiple \n are not a mistake, it's to have a blank line before the next message
 					fmt.Printf("\nSource code will be saved in %s\n", zipRoot)
@@ -453,10 +461,12 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 						}
 					}
 
+					userState.downloadedFilesfolderPath = zipRoot
 					sendDownloadedFilesConfirmation = true
 
 				case "application/x-protobuf; messageType=\"sf.substreams.v1.Package\"":
-					err = saveDownloadFile(inputFile.Filename, inputFile)
+					fullPath := filepath.Join(userState.downloadedFilesfolderPath, inputFile.Filename)
+					err = saveDownloadFile(fullPath, inputFile)
 					if err != nil {
 						return fmt.Errorf("saving spkg file: %w", err)
 					}
@@ -466,7 +476,8 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					fmt.Println(string(inputFile.Content))
 
 				case "text/plain; option:\"save\"":
-					err := os.WriteFile(inputFile.Filename, inputFile.Content, 0644)
+					fullPath := filepath.Join(userState.downloadedFilesfolderPath, inputFile.Filename)
+					err := os.WriteFile(fullPath, inputFile.Content, 0644)
 					if err != nil {
 						return fmt.Errorf("saving file: %w", err)
 					}
@@ -481,9 +492,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				if err := sendFunc(&pbconvo.UserInput{
 					FromActionId: resp.ActionId,
 					Entry: &pbconvo.UserInput_DownloadedFiles_{
-						DownloadedFiles: &pbconvo.UserInput_DownloadedFiles{
-							FolderPath: downloadedFilesfolderPath,
-						},
+						DownloadedFiles: &pbconvo.UserInput_DownloadedFiles{},
 					},
 				}); err != nil {
 					return fmt.Errorf("error sending confirmation: %w", err)

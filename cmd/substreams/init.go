@@ -33,6 +33,7 @@ var (
 	devInitProtocol                = os.Getenv("SUBSTREAMS_DEV_INIT_PROTOCOL")
 	devInitEthereumTrackedContract = os.Getenv("SUBSTREAMS_DEV_INIT_ETHEREUM_TRACKED_CONTRACT")
 	devInitEthereumChain           = os.Getenv("SUBSTREAMS_DEV_INIT_ETHEREUM_CHAIN")
+	devInitStarknetChain           = os.Getenv("SUBSTREAMS_DEV_INIT_STARKNET_CHAIN")
 )
 
 var errInitUnsupportedChain = errors.New("unsupported chain")
@@ -171,6 +172,43 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 
 		if err := renderProjectFilesIn(project, absoluteProjectDir); err != nil {
 			return fmt.Errorf("render Ethereum %s project: %w", chain.DisplayName, err)
+		}
+
+	case codegen.ProtocolStarknet:
+		chainSelected, err := promptStarknetChain()
+		if err != nil {
+			return fmt.Errorf("running chain prompt: %w", err)
+		}
+		if chainSelected == codegen.StarknetChainOther {
+			fmt.Println()
+			fmt.Println("We haven't added any templates for your selected chain quite yet")
+			fmt.Println()
+			fmt.Println("Come join us in discord at https://discord.gg/u8amUbGBgF and suggest templates/chains you want to see!")
+			fmt.Println()
+			return errInitUnsupportedChain
+		}
+
+		// Since Starknet contract ABI decoding has not been implemented yet, for any chain selected we
+		// would simply generate a template that collects block information. Unlike with Ethereum,  We
+		// don't need to prompt users for any additional info here.
+
+		chain := templates.StarknetChainsByID[chainSelected.String()]
+		if chain == nil {
+			return fmt.Errorf("unknown chain: %s", chainSelected.String())
+		}
+
+		fmt.Println("Writing project files")
+		project, err := templates.NewStarknetProject(
+			projectName,
+			moduleName,
+			chain,
+		)
+		if err != nil {
+			return fmt.Errorf("new Starknet %s project: %w", chain.DisplayName, err)
+		}
+
+		if err := renderProjectFilesIn(project, absoluteProjectDir); err != nil {
+			return fmt.Errorf("render Starknet %s project: %w", chain.DisplayName, err)
 		}
 
 	case codegen.ProtocolOther:
@@ -572,6 +610,44 @@ func promptEthereumChain() (codegen.EthereumChain, error) {
 	}
 
 	var chain codegen.EthereumChain
+	if err := chain.UnmarshalText([]byte(selection)); err != nil {
+		panic(fmt.Errorf("impossible, selecting hard-coded value from enum itself, something is really wrong here"))
+	}
+
+	return chain, nil
+}
+
+func promptStarknetChain() (codegen.StarknetChain, error) {
+	if devInitStarknetChain != "" {
+		// It's ok to panic, we expect the dev to put in a valid Starknet chain
+		chain, err := codegen.ParseStarknetChain(devInitStarknetChain)
+		if err != nil {
+			panic(fmt.Errorf("invalid chain: %w", err))
+		}
+
+		return chain, nil
+	}
+
+	choice := promptui.Select{
+		Label: "Select Starknet chain",
+		Items: codegen.StarknetChainNames(),
+		Templates: &promptui.SelectTemplates{
+			Selected: `{{ "Starknet chain:" | faint }} {{ . }}`,
+		},
+		HideHelp: true,
+	}
+
+	_, selection, err := choice.Run()
+	if err != nil {
+		if errors.Is(err, promptui.ErrInterrupt) {
+			// We received Ctrl-C, users wants to abort, nothing else to do, quit immediately
+			os.Exit(1)
+		}
+
+		return codegen.StarknetChainOther, fmt.Errorf("running chain prompt: %w", err)
+	}
+
+	var chain codegen.StarknetChain
 	if err := chain.UnmarshalText([]byte(selection)); err != nil {
 		panic(fmt.Errorf("impossible, selecting hard-coded value from enum itself, something is really wrong here"))
 	}

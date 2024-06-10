@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+package block.v1;
+
+message Block {
+    uint64 height = 1;
+    bytes hash = 2;
+    bytes prev_hash = 3;
+    uint64 timestamp = 4;
+    uint64 tx_count = 5;
+    uint64 event_count = 6;
+}

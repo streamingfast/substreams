@@ -1,0 +1,21 @@
+[package]
+name = "{{ .name }}"
+version = "0.0.1"
+edition = "2021"
+
+[lib]
+name = "substreams"
+crate-type = ["cdylib"]
+
+[dependencies]
+prost = "0.11"
+prost-types = "0.11"
+substreams = "0.5"
+substreams-database-change = "1"
+substreams-entity-change = "1"
+substreams-starknet = "0.1"
+
+[profile.release]
+lto = true
+opt-level = 's'
+strip = "debuginfo"

@@ -146,7 +146,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				endpoint = " (" + gen.Endpoint + ")"
 			}
 			entry := huh.Option[*pbconvo.DiscoveryResponse_Generator]{
-				Key:   fmt.Sprintf("%s%s - %s", gen.Id, endpoint, gen.Description),
+				Key:   fmt.Sprintf("%s%s - %s", gen.Id, endpoint, gen.Title),
 				Value: gen,
 			}
 			options = append(options, entry)
@@ -161,6 +161,15 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		err = huh.NewForm(huh.NewGroup(selectField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run()
 		if err != nil {
 			return fmt.Errorf("failed taking input: %w", err)
+		}
+
+		fmt.Println("┃ ", bold("Selected code generator:"), codegen.Id, "-", codegen.Title)
+		for i, desc := range strings.Split(codegen.Description, "\n") {
+			dd := desc
+			if i == 0 {
+				dd = bold("Description: ") + desc
+			}
+			fmt.Println("┃ ", dd)
 		}
 		lastState.GeneratorID = codegen.Id
 		generatorID = codegen.Id

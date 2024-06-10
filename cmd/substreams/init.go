@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -90,11 +91,17 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	transport := &http2.Transport{}
 	switch {
 	case strings.HasPrefix(initConvoURL, "https://localhost"):
+		// don't check certificate on local host
 		transport.TLSClientConfig = &tls.Config{
 			InsecureSkipVerify: true,
 		}
 	case strings.HasPrefix(initConvoURL, "http://"):
+		// support for http2 without TLS
 		transport.AllowHTTP = true
+		transport.DialTLSContext = func(ctx context.Context, network, addr string, cfg *tls.Config) (net.Conn, error) {
+			d := net.Dialer{}
+			return d.DialContext(ctx, network, addr)
+		}
 	}
 
 	client := pbconvoconnect.NewConversationServiceClient(&http.Client{Transport: transport}, initConvoURL, opts...)

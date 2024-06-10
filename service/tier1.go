@@ -12,8 +12,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/streamingfast/derr"
+
 	"github.com/streamingfast/substreams/block"
-	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dgrpc"
@@ -542,31 +543,50 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		zap.String("cursor", cursor),
 	)
 
-	liveCacheHandler := NewLiveCacheProcessor(pipe, segmentSize)
+	liveBackFiller := NewLiveBackFiller(pipe, segmentSize, requestDetails.LinearHandoffBlockNum)
 
-	// Live Caching
 	go func() {
-		logger.Info("Start live caching", zap.Uint64("linear handoff block", requestDetails.LinearHandoffBlockNum), zap.Uint64("stop block", request.StopBlockNum))
+		logger.Info("start live caching", zap.Uint64("linear handoff block", requestDetails.LinearHandoffBlockNum), zap.Uint64("stop block", request.StopBlockNum))
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case segmentNumber := <-liveCacheHandler.segmentCompleted:
-				requestStart := segmentNumber * segmentSize
-				requestStop := (segmentNumber + 1) * segmentSize
+			case blockNumber := <-liveBackFiller.irreversibleBlock:
 
-				liveCachingRange := block.NewRange(requestStart, requestStop)
-				liveCachingRequest := work.NewRequest(ctx, reqctx.Details(ctx), execGraph.OutputModuleStageIndex(), liveCachingRange)
+				targetSegment := blockNumber / liveBackFiller.segmentSize
 
-				liveCacheHandler.RequestBackProcessing(ctx, logger, liveCachingRequest, s.runtimeConfig.ClientFactory)
+				for targetSegment > liveBackFiller.currentSegment {
+					requestStart := liveBackFiller.currentSegment * liveBackFiller.segmentSize
+					requestStop := (liveBackFiller.currentSegment + 1) * liveBackFiller.segmentSize
+
+					liveBackFillerRange := block.NewRange(requestStart, requestStop)
+
+					liveBackFillerRequest := work.NewRequest(ctx, reqctx.Details(ctx), execGraph.OutputModuleStageIndex(), liveBackFillerRange)
+
+					logger.Info("process live back filling", zap.Uint64("segment_start", requestStart), zap.Uint64("segment_end", requestStop))
+
+					err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+						err = liveBackFiller.RequestBackProcessing(ctx, logger, liveBackFillerRequest, s.runtimeConfig.ClientFactory)
+						if err != nil {
+							return err
+						}
+
+						return nil
+					})
+					if err != nil {
+						logger.Warn("processing live caching", zap.Error(err), zap.Uint64("segment_start", requestStart), zap.Uint64("segment_end", requestStop))
+					}
+
+					liveBackFiller.currentSegment++
+				}
+
 			}
-			return
 		}
 	}()
 
 	blockStream, err := s.streamFactoryFunc(
 		ctx,
-		liveCacheHandler,
+		liveBackFiller,
 		int64(requestDetails.LinearHandoffBlockNum),
 		request.StopBlockNum,
 		cursor,
@@ -611,75 +631,6 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 		sendMetering(ctx, meter, userID, apiKeyID, ip, userMeta, "sf.substreams.rpc.v2/Blocks", resp)
 		return nil
 	}
-}
-
-type LiveCacheHandler struct {
-	pipe                 *pipeline.Pipeline
-	segmentCompleted     chan uint64
-	currentSegment       uint64
-	segmentSize          uint64
-	receivedBlockNumbers map[uint64]struct{}
-}
-
-func NewLiveCacheProcessor(pipe *pipeline.Pipeline, segmentSize uint64) *LiveCacheHandler {
-	return &LiveCacheHandler{
-		pipe:             pipe,
-		segmentCompleted: nil,
-		//Calculate currentSegment from linearHandoffBlockNum
-		currentSegment:       0,
-		segmentSize:          segmentSize,
-		receivedBlockNumbers: make(map[uint64]struct{}),
-	}
-}
-
-func (l *LiveCacheHandler) ProcessBlock(blk *pbbstream.Block, obj interface{}) (err error) {
-	step := obj.(bstream.Stepable).Step()
-	if step == bstream.StepIrreversible || step == bstream.StepNewIrreversible {
-		l.receivedBlockNumbers[blk.Number] = struct{}{}
-	}
-
-	segmentStart := l.currentSegment * l.segmentSize
-	segmentEnd := (l.currentSegment + 1) * l.segmentSize
-
-	for i := segmentStart; i < segmentEnd; i++ {
-		if _, exist := l.receivedBlockNumbers[i]; !exist {
-			break
-		}
-
-		l.segmentCompleted <- l.currentSegment
-		l.currentSegment++
-		segmentStart = l.currentSegment * l.segmentSize
-		segmentEnd = (l.currentSegment + 1) * l.segmentSize
-	}
-
-	err = l.pipe.ProcessBlock(blk, obj)
-	if err != nil {
-		return fmt.Errorf("processing live cache: %w", err)
-	}
-	return nil
-}
-
-func (l *LiveCacheHandler) RequestBackProcessing(ctx context.Context, logger *zap.Logger, liveCachingRequest *pbssinternal.ProcessRangeRequest, clientFactory client.InternalClientFactory) {
-	grpcClient, closeFunc, grpcCallOpts, _, err := clientFactory()
-	if err != nil {
-		logger.Warn("failed to create live cache grpc client", zap.Error(err))
-	}
-
-	stream, err := grpcClient.ProcessRange(ctx, liveCachingRequest, grpcCallOpts...)
-	if err != nil {
-		logger.Warn("failed to create live cache", zap.Uint64("segmentStart", liveCachingRequest.StartBlock()), zap.Uint64("segmentEnd", liveCachingRequest.StopBlock()), zap.Error(err))
-	}
-
-	defer func() {
-		if err := stream.CloseSend(); err != nil {
-			logger.Warn("failed to close live caching stream on job termination", zap.Error(err))
-		}
-		if err := closeFunc(); err != nil {
-			logger.Warn("failed to close live caching grpc client on job termination", zap.Error(err))
-		}
-	}()
-
-	closeFunc()
 }
 
 func setupRequestStats(ctx context.Context, requestDetails *reqctx.RequestDetails, outputModuleGraph string, tier2 bool) (context.Context, *metrics.Stats) {

@@ -14,12 +14,14 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	connect "connectrpc.com/connect"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/huh/spinner"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/dustin/go-humanize"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
@@ -33,14 +35,12 @@ var initCmd = &cobra.Command{
 	Use:   "init [<path>]",
 	Short: "Initialize a new, working Substreams project from scratch",
 	Long: cli.Dedent(`
-		Initialize a new, working Substreams project from scratch. The path parameter is optional,
-		with your current working directory being the default value.
 
-		If you have an Etherscan API Key, you can set it to "ETHERSCAN_API_KEY" environment variable, it will be used to
-		fetch the ABIs and contract information.
+		Initialize a new Substreams project using a remote code generator.		
+		State will be saved to 'generator.json'
 
 		Example: 
-			substreams init --generator ethereum_init_v1
+			substreams init
 	`),
 	RunE:         runSubstreamsInitE,
 	Args:         cobra.RangeArgs(0, 1),
@@ -48,12 +48,7 @@ var initCmd = &cobra.Command{
 }
 
 func init() {
-	initCmd.Flags().String("generator", "discover", "Identifier of the code generator to use. Use 'discover' to list available ones.")
-	initCmd.Flags().Bool("local-dev", false, "Run the generator in local development mode.")
-
-	if x := os.Getenv("ETHERSCAN_API_KEY"); x != "" {
-		etherscanAPIKey = x
-	}
+	initCmd.Flags().String("discovery-endpoint", "https://codegen.substreams.dev", "Endpoint used to discover code generators")
 	rootCmd.AddCommand(initCmd)
 }
 
@@ -73,71 +68,95 @@ func newUserState() *UserState {
 	return &UserState{}
 }
 
+func readGeneratorState() (*initStateFormat, error) {
+	stateBytes, err := os.ReadFile("generator.json")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read codegen state file: %w", err)
+	}
+	var state = &initStateFormat{}
+	if err := json.Unmarshal(stateBytes, state); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal generator state file: %w", err)
+	}
+	return state, nil
+}
+
 func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	opts := []connect.ClientOption{
 		connect.WithGRPC(),
 	}
 
-	// TODO:  make the `endpoint` here point to `https://codegen.substreams.dev` by default.
-	// WARN: when it's not `localhost` in the hostname, don't flip `InsecureSkipVerify` to true!
+	initConvoURL := sflags.MustGetString(cmd, "discovery-endpoint")
 
-	localDev := sflags.MustGetBool(cmd, "local-dev")
-	initConvoURL := "https://codegen.substreams.dev"
-
-	if localDev {
-		initConvoURL = "https://localhost:9001"
+	transport := &http2.Transport{}
+	switch {
+	case strings.HasPrefix(initConvoURL, "https://localhost"):
+		transport.TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: true,
+		}
+	case strings.HasPrefix(initConvoURL, "http://"):
+		transport.AllowHTTP = true
 	}
 
-	httpClient := &http.Client{
-		Transport: &http2.Transport{
-			AllowHTTP: true,
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
-	}
-	client := pbconvoconnect.NewConversationServiceClient(httpClient, initConvoURL, opts...)
+	client := pbconvoconnect.NewConversationServiceClient(&http.Client{Transport: transport}, initConvoURL, opts...)
 
-	var lastState = initStateFormat{}
-	if _, err := os.Stat("generator.json"); err == nil {
-		fmt.Println("The file 'generator.json', was detected, reloading state from that point on.")
-		stateBytes, err := os.ReadFile("generator.json")
+	var lastState = &initStateFormat{}
+	if s, err := os.Stat("generator.json"); err == nil {
+		state, err := readGeneratorState()
 		if err != nil {
-			return fmt.Errorf("failed to read codegen state file: %w", err)
+			return fmt.Errorf("state file 'generator.json' file exists, but is invalid: %w", err)
 		}
-		if err := json.Unmarshal(stateBytes, &lastState); err != nil {
-			return fmt.Errorf("failed to unmarshal generator state file: %w", err)
+
+		useGenerator := true
+		inputField := huh.NewConfirm().
+			Title(fmt.Sprintf("State file 'generator.json' was found (%s - %s). Do you want to start from there ?", state.GeneratorID, humanize.Time(s.ModTime()))).
+			Value(&useGenerator)
+
+		if err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run(); err != nil {
+			return fmt.Errorf("failed taking confirmation input: %w", err)
 		}
-	} else {
-		// TODO: otherwise here, we should ensure that the directory is empty... (or use the specified sub-directory?)
+
+		if useGenerator {
+			lastState = state
+		} else {
+			newName := fmt.Sprintf("generator.%d.json", time.Now().Unix())
+			os.Rename("generator.json", newName)
+			fmt.Printf("File 'generator.json' renamed to %s\n", newName)
+		}
 	}
 
-	//TODO: the way it is handled right now, this should not be a flag, but a required argument
-	generatorID := sflags.MustGetString(cmd, "generator")
-
-	if lastState.GeneratorID != "" && generatorID != "discover" && generatorID != lastState.GeneratorID {
-		fmt.Println("Mismatch between the generator ID in `generator.json` and the one specified on the command line.")
-		return fmt.Errorf("generator ID mismatch: %q != %q", generatorID, lastState.GeneratorID)
-	}
-
-	if generatorID == "discover" {
+	generatorID := lastState.GeneratorID
+	if generatorID == "" {
+		fmt.Printf("Getting available code generators from %s...\n\n", initConvoURL)
 		resp, err := client.Discover(context.Background(), connect.NewRequest(&pbconvo.DiscoveryRequest{}))
 		if err != nil {
 			return fmt.Errorf("failed to call discovery endpoint: %w", err)
 		}
-		_ = resp.Msg
-		fmt.Println("Here is a list of available code generators to help you out:")
-		fmt.Println("")
-		// TODO: display the discovery, and start the topic from the selected element.
-		for idx, generator := range resp.Msg.Generators {
-			fmt.Printf("%d. %s - %s\n%s\n\n", idx+1, bold(generator.Id), generator.Title, generator.Description)
+
+		var options []huh.Option[*pbconvo.DiscoveryResponse_Generator]
+		for _, gen := range resp.Msg.Generators {
+			endpoint := ""
+			if gen.Endpoint != "" {
+				endpoint = " (" + gen.Endpoint + ")"
+			}
+			entry := huh.Option[*pbconvo.DiscoveryResponse_Generator]{
+				Key:   fmt.Sprintf("%s%s - %s", gen.Id, endpoint, gen.Description),
+				Value: gen,
+			}
+			options = append(options, entry)
 		}
-		fmt.Println("Run `substreams init --generator` with the desired code generator ID to start a new project.")
-		return nil
-	} else {
-		if lastState.GeneratorID == "" {
-			lastState.GeneratorID = generatorID
+
+		var codegen *pbconvo.DiscoveryResponse_Generator
+		selectField := huh.NewSelect[*pbconvo.DiscoveryResponse_Generator]().
+			Title("Choose the code generator that you want to use to bootstrap your project").
+			Options(options...).
+			Value(&codegen)
+
+		err = huh.NewForm(huh.NewGroup(selectField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run()
+		if err != nil {
+			return fmt.Errorf("failed taking input: %w", err)
 		}
+		lastState.GeneratorID = codegen.Id
+		generatorID = codegen.Id
 	}
 
 	conn := client.Converse(context.Background())

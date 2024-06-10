@@ -12,6 +12,8 @@ target
 /codegen/test_substreams/src/
 /build
 /sink-data
+/generator*.json
 replay.log
 *.wasm
 /wasm/bench/substreams_tiny_go/main.wasm
+generator.json

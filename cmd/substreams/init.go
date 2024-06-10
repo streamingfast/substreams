@@ -1,888 +1,646 @@
 package main
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
-	"github.com/manifoldco/promptui"
+	connect "connectrpc.com/connect"
+	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/huh/spinner"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/dustin/go-humanize"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
-	"github.com/streamingfast/dhttp"
-	"github.com/streamingfast/eth-go"
-	"github.com/streamingfast/substreams/codegen"
-	"github.com/streamingfast/substreams/codegen/templates"
+	"github.com/streamingfast/cli/sflags"
+	pbconvo "github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1"
+	"github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1/pbconvoconnect"
+	"github.com/tidwall/gjson"
+	"golang.org/x/net/http2"
 )
-
-// Some developers centric environment override to make it faster to iterate on `substreams init` command
-var (
-	devInitSourceDirectory         = os.Getenv("SUBSTREAMS_DEV_INIT_SOURCE_DIRECTORY")
-	devInitProjectName             = os.Getenv("SUBSTREAMS_DEV_INIT_PROJECT_NAME")
-	devInitProtocol                = os.Getenv("SUBSTREAMS_DEV_INIT_PROTOCOL")
-	devInitEthereumTrackedContract = os.Getenv("SUBSTREAMS_DEV_INIT_ETHEREUM_TRACKED_CONTRACT")
-	devInitEthereumChain           = os.Getenv("SUBSTREAMS_DEV_INIT_ETHEREUM_CHAIN")
-)
-
-var errInitUnsupportedChain = errors.New("unsupported chain")
-var errInitUnsupportedProtocol = errors.New("unsupported protocol")
 
 var initCmd = &cobra.Command{
 	Use:   "init [<path>]",
 	Short: "Initialize a new, working Substreams project from scratch",
 	Long: cli.Dedent(`
-		Initialize a new, working Substreams project from scratch. The path parameter is optional,
-		with your current working directory being the default value.
 
-		If you have an Etherscan API Key, you can set it to "ETHERSCAN_API_KEY" environment variable, it will be used to
-		fetch the ABIs and contract information.
+		Initialize a new Substreams project using a remote code generator.		
+		State will be saved to 'generator.json'
+
+		Example: 
+			substreams init
 	`),
 	RunE:         runSubstreamsInitE,
 	Args:         cobra.RangeArgs(0, 1),
 	SilenceUsage: true,
 }
 
-var etherscanAPIKey = "YourApiKeyToken"
-
 func init() {
-	if x := os.Getenv("ETHERSCAN_API_KEY"); x != "" {
-		etherscanAPIKey = x
-	}
+	initCmd.Flags().String("discovery-endpoint", "https://codegen.substreams.dev", "Endpoint used to discover code generators")
 	rootCmd.AddCommand(initCmd)
 }
 
+var INIT_TRACE = false
+var WITH_ACCESSIBLE = false
+
+type initStateFormat struct {
+	GeneratorID string          `json:"generator"`
+	State       json.RawMessage `json:"state"`
+}
+
+type UserState struct {
+	downloadedFilesfolderPath string
+}
+
+func newUserState() *UserState {
+	return &UserState{}
+}
+
+func readGeneratorState() (*initStateFormat, error) {
+	stateBytes, err := os.ReadFile("generator.json")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read codegen state file: %w", err)
+	}
+	var state = &initStateFormat{}
+	if err := json.Unmarshal(stateBytes, state); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal generator state file: %w", err)
+	}
+	return state, nil
+}
+
 func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
-	relativeWorkingDir := "."
-	if len(args) == 1 {
-		relativeWorkingDir = args[0]
+	opts := []connect.ClientOption{
+		connect.WithGRPC(),
 	}
 
-	if devInitSourceDirectory != "" {
-		relativeWorkingDir = devInitSourceDirectory
+	initConvoURL := sflags.MustGetString(cmd, "discovery-endpoint")
+
+	transport := &http2.Transport{}
+	switch {
+	case strings.HasPrefix(initConvoURL, "https://localhost"):
+		transport.TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: true,
+		}
+	case strings.HasPrefix(initConvoURL, "http://"):
+		transport.AllowHTTP = true
 	}
 
-	absoluteWorkingDir, err := filepath.Abs(relativeWorkingDir)
-	if err != nil {
-		return fmt.Errorf("getting absolute path of %q: %w", relativeWorkingDir, err)
+	client := pbconvoconnect.NewConversationServiceClient(&http.Client{Transport: transport}, initConvoURL, opts...)
+
+	var lastState = &initStateFormat{}
+	if s, err := os.Stat("generator.json"); err == nil {
+		state, err := readGeneratorState()
+		if err != nil {
+			return fmt.Errorf("state file 'generator.json' file exists, but is invalid: %w", err)
+		}
+
+		useGenerator := true
+		inputField := huh.NewConfirm().
+			Title(fmt.Sprintf("State file 'generator.json' was found (%s - %s). Do you want to start from there ?", state.GeneratorID, humanize.Time(s.ModTime()))).
+			Value(&useGenerator)
+
+		if err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run(); err != nil {
+			return fmt.Errorf("failed taking confirmation input: %w", err)
+		}
+
+		if useGenerator {
+			lastState = state
+		} else {
+			newName := fmt.Sprintf("generator.%d.json", time.Now().Unix())
+			os.Rename("generator.json", newName)
+			fmt.Printf("File 'generator.json' renamed to %s\n", newName)
+		}
 	}
 
-	projectName, moduleName, err := promptProjectName(absoluteWorkingDir)
-	if err != nil {
-		return fmt.Errorf("running project name prompt: %w", err)
-	}
-
-	absoluteProjectDir := filepath.Join(absoluteWorkingDir, projectName)
-
-	protocol, err := promptProtocol()
-	if err != nil {
-		return fmt.Errorf("running protocol prompt: %w", err)
-	}
-
-	switch protocol {
-	case codegen.ProtocolEthereum:
-		chainSelected, err := promptEthereumChain()
+	generatorID := lastState.GeneratorID
+	if generatorID == "" {
+		fmt.Printf("Getting available code generators from %s...\n\n", initConvoURL)
+		resp, err := client.Discover(context.Background(), connect.NewRequest(&pbconvo.DiscoveryRequest{}))
 		if err != nil {
-			return fmt.Errorf("running chain prompt: %w", err)
-		}
-		if chainSelected == codegen.EthereumChainOther {
-			fmt.Println()
-			fmt.Println("We haven't added any templates for your selected chain quite yet")
-			fmt.Println()
-			fmt.Println("Come join us in discord at https://discord.gg/u8amUbGBgF and suggest templates/chains you want to see!")
-			fmt.Println()
-			return errInitUnsupportedChain
+			return fmt.Errorf("failed to call discovery endpoint: %w", err)
 		}
 
-		chain := templates.EthereumChainsByID[chainSelected.String()]
-		if chain == nil {
-			return fmt.Errorf("unknown chain: %s", chainSelected.String())
-		}
-
-		ethereumContracts, err := promptEthereumVerifiedContracts(eth.MustNewAddress(chain.DefaultContractAddress), chain.DefaultContractName)
-		if err != nil {
-			return fmt.Errorf("running contract prompt: %w", err)
-		}
-
-		fmt.Printf("Tracking %d contract(s), let's define a short name for each contract\n", len(ethereumContracts))
-		ethereumContracts, err = promptEthereumContractShortNames(ethereumContracts)
-		if err != nil {
-			return fmt.Errorf("running short name contract prompt: %w", err)
-		}
-
-		fmt.Printf("Retrieving %s contract information (ABI & creation block)\n", chain.DisplayName)
-		// Get contract abiContents & parse them
-		ethereumContracts, err = getAndSetContractABIs(cmd.Context(), ethereumContracts, chain)
-		if err != nil {
-			return fmt.Errorf("getting %s contract ABI: %w", chain.DisplayName, err)
-		}
-
-		// Get contract creation block
-		lowestStartBlock, err := getContractCreationBlock(cmd.Context(), ethereumContracts, chain)
-		if err != nil {
-			// FIXME: not sure if we should simplify set the contract block num to zero by default
-			return fmt.Errorf("getting %s contract creating block: %w", chain.DisplayName, err)
-		}
-
-		for _, contract := range ethereumContracts {
-			fmt.Printf("Generating ABI Event models for %s\n", contract.GetName())
-			events, err := templates.BuildEventModels(contract.GetAbi())
-			if err != nil {
-				return fmt.Errorf("build ABI event models for contract [%s - %s]: %w", contract.GetAddress(), contract.GetName(), err)
+		var options []huh.Option[*pbconvo.DiscoveryResponse_Generator]
+		for _, gen := range resp.Msg.Generators {
+			endpoint := ""
+			if gen.Endpoint != "" {
+				endpoint = " (" + gen.Endpoint + ")"
 			}
-			contract.SetEvents(events)
-			if contract.GetWithCalls() {
-				fmt.Printf("Generating ABI Call models for %s\n", contract.GetName())
-				calls, err := templates.BuildCallModels(contract.GetAbi())
-				if err != nil {
-					return fmt.Errorf("build ABI call models for contract [%s - %s]: %w", contract.GetAddress(), contract.GetName(), err)
-				}
-				contract.SetCalls(calls)
+			entry := huh.Option[*pbconvo.DiscoveryResponse_Generator]{
+				Key:   fmt.Sprintf("%s%s - %s", gen.Id, endpoint, gen.Description),
+				Value: gen,
 			}
+			options = append(options, entry)
 		}
 
-		// Ask for any dynamic datasources
-		ethereumContracts, err = promptEthereumDynamicDataSources(cmd.Context(), ethereumContracts, chain)
+		var codegen *pbconvo.DiscoveryResponse_Generator
+		selectField := huh.NewSelect[*pbconvo.DiscoveryResponse_Generator]().
+			Title("Choose the code generator that you want to use to bootstrap your project").
+			Options(options...).
+			Value(&codegen)
+
+		err = huh.NewForm(huh.NewGroup(selectField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run()
 		if err != nil {
-			return fmt.Errorf("running dynamic datasources prompt, %s, %w", chain.DisplayName, err)
+			return fmt.Errorf("failed taking input: %w", err)
 		}
+		lastState.GeneratorID = codegen.Id
+		generatorID = codegen.Id
+	}
 
-		fmt.Println("Writing project files")
-		project, err := templates.NewEthereumProject(
-			projectName,
-			moduleName,
-			chain,
-			ethereumContracts,
-			lowestStartBlock,
-		)
-		if err != nil {
-			return fmt.Errorf("new Ethereum %s project: %w", chain.DisplayName, err)
+	conn := client.Converse(context.Background())
+	sendFunc := func(msg *pbconvo.UserInput) error {
+		if INIT_TRACE {
+			cnt, _ := json.MarshalIndent(msg.Entry, "", "  ")
+			fmt.Printf("OUTPUT: %T %s\n", msg.Entry, string(cnt))
 		}
-
-		if err := renderProjectFilesIn(project, absoluteProjectDir); err != nil {
-			return fmt.Errorf("render Ethereum %s project: %w", chain.DisplayName, err)
-		}
-
-	case codegen.ProtocolOther:
-		fmt.Println()
-		fmt.Println("We haven't added any templates for your selected protocol quite yet")
-		fmt.Println()
-		fmt.Println("Come join us in discord at https://discord.gg/u8amUbGBgF and suggest templates/chains you want to see!")
-		fmt.Println()
-		return errInitUnsupportedProtocol
+		return conn.Send(msg)
+	}
+	startMsg := &pbconvo.UserInput_Start{
+		GeneratorId: generatorID,
+	}
+	if lastState.State != nil {
+		startMsg.Hydrate = &pbconvo.UserInput_Hydrate{SavedState: string(lastState.State)}
 	}
 
-	fmt.Println("Generating Protobuf Rust code")
-	if err := protogenSubstreams(absoluteProjectDir); err != nil {
-		return fmt.Errorf("protobuf generation: %w", err)
-	}
-
-	fmt.Printf("Project %q initialized at %q\n", projectName, absoluteWorkingDir)
-	fmt.Println()
-	fmt.Println("Run 'make build' to build the wasm code.")
-	fmt.Println()
-	fmt.Println("The following substreams.yaml files have been created with different sink targets:")
-	fmt.Println(" * substreams.yaml: no sink target")
-	fmt.Println(" * substreams.sql.yaml: PostgreSQL sink")
-	fmt.Println(" * substreams.clickhouse.yaml: Clickhouse sink")
-	fmt.Println(" * substreams.subgraph.yaml: Sink into Substreams-based subgraph")
-
-	return nil
-}
-
-func protogenSubstreams(absoluteProjectDir string) error {
-	cmd := exec.Command("substreams", "protogen", `--exclude-paths`, `sf/substreams,google`)
-	cmd.Dir = absoluteProjectDir
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		fmt.Println(string(output))
-		return fmt.Errorf("running %q failed: %w", cmd, err)
-	}
-
-	return nil
-}
-
-func renderProjectFilesIn(project templates.Project, absoluteProjectDir string) error {
-	files, err := project.Render()
-	if err != nil {
-		return fmt.Errorf("render project: %w", err)
-	}
-
-	for relativeFile, content := range files {
-		file := filepath.Join(absoluteProjectDir, strings.ReplaceAll(relativeFile, "/", string(os.PathSeparator)))
-
-		directory := filepath.Dir(file)
-		if err := os.MkdirAll(directory, os.ModePerm); err != nil {
-			return fmt.Errorf("create directory %q: %w", directory, err)
-		}
-
-		if err := os.WriteFile(file, content, 0644); err != nil {
-			// remove directory, we want a complete e2e file generation
-			e := os.RemoveAll(directory)
-			if e != nil {
-				return fmt.Errorf("removing directory %s: %w and write file: %w", directory, e, err)
-			}
-			return fmt.Errorf("write file: %w", err)
-		}
-	}
-
-	return nil
-}
-
-// We accept _ here because they are used across developers. we sanitize it later when
-// used within Substreams module.
-var moduleNameRegexp = regexp.MustCompile(`^([a-z][a-z0-9_]{0,63})$`)
-
-func promptProjectName(absoluteSrcDir string) (string, string, error) {
-	if name := devInitProjectName; name != "" {
-		return name, projectNameToModuleName(name), nil
-	}
-
-	projectName, err := prompt("Project name (lowercase, numbers, undescores)", &promptOptions{
-		Validate: func(input string) error {
-			ok := moduleNameRegexp.MatchString(input)
-			if !ok {
-				return fmt.Errorf("invalid name: must match %s", moduleNameRegexp)
-			}
-
-			if cli.DirectoryExists(input) {
-				return fmt.Errorf("project %q already exist in %q", input, absoluteSrcDir)
-			}
-
-			return nil
+	err := sendFunc(&pbconvo.UserInput{
+		Entry: &pbconvo.UserInput_Start_{
+			Start: startMsg,
 		},
 	})
 	if err != nil {
-		return "", "", err
+		return fmt.Errorf("failed sending start message: %w", err)
 	}
 
-	return projectName, projectNameToModuleName(projectName), nil
-}
+	userState := newUserState()
 
-func projectNameToModuleName(in string) string {
-	return strings.ReplaceAll(in, "-", "_")
-}
-
-func promptEthereumVerifiedContracts(defaultAddress eth.Address, defaultContractName string) ([]*templates.EthereumContract, error) {
-	if devInitEthereumTrackedContract != "" {
-		// It's ok to panic, we expect the dev to put in a valid Ethereum address
-		return []*templates.EthereumContract{
-			templates.NewEthereumContract("", eth.MustNewAddress(devInitEthereumTrackedContract), nil, ""),
-		}, nil
-	}
-
-	var ethContracts []*templates.EthereumContract
-
-	inputOrDefaultFunc := func(input string) (eth.Address, error) {
-		if input == "" {
-			return defaultAddress, nil
-		}
-		return eth.NewAddress(input)
-	}
-
-	inputOrEmptyFunc := func(input string) (eth.Address, error) {
-		if input == "" {
-			return nil, nil
-		}
-		return eth.NewAddress(input)
-	}
-
-	firstContractAddress, err := promptContractAddress(fmt.Sprintf("Contract address to track (leave empty to use %q)", defaultContractName), inputOrDefaultFunc)
-	if err != nil {
-		return nil, err
-	}
-
-	ethContracts = append(ethContracts, templates.NewEthereumContract("", firstContractAddress, nil, ""))
-
-	if bytes.Equal(firstContractAddress, defaultAddress) {
-		return ethContracts, nil
-	}
-
+	var loadingCh chan bool
 	for {
-		contractAddr, err := promptContractAddress("Would you like to track another contract? (Leave empty if not)", inputOrEmptyFunc)
+		resp, err := conn.Receive()
 		if err != nil {
-			return nil, err
-		}
-
-		if contractAddr == nil {
-			return ethContracts, nil
-		}
-		ethContracts = append(ethContracts, templates.NewEthereumContract("", contractAddr, nil, ""))
-	}
-}
-
-func promptContractAddress(message string, inputFuncCheck func(input string) (eth.Address, error)) (eth.Address, error) {
-	return promptT(message, inputFuncCheck, &promptOptions{
-		Validate: func(input string) error {
-			if input == "" {
-				return nil
+			if errors.Is(err, io.EOF) {
+				break
 			}
-			_, err := eth.NewAddress(input)
+			// TODO: reconnect, and send the Hydrate message to continue the conversation...
+			return fmt.Errorf("connection error: %w", err)
+		}
+		if resp.State != "" {
+			lastState.State = []byte(resp.State)
+		}
+		if INIT_TRACE {
+			cnt, _ := json.MarshalIndent(resp.Entry, "", "  ")
+			fmt.Printf("INPUT: %T %s\n", resp.Entry, string(cnt))
+			fmt.Println("Saving state to generator.json")
+		}
+
+		// TODO: reformat the JSON code into a yaml file or something? Make it editable and readable easily?
+		// Nothing fixes the format of the state atm, but we could agree on a format, and fixate JSON or YAML.
+		// JSON is probably better for interchange.
+		cnt, err := json.MarshalIndent(lastState, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal generator state: %w", err)
+		}
+		if err = os.WriteFile("generator.json", cnt, 0644); err != nil {
+			return fmt.Errorf("error writing generator state %w", err)
+		}
+
+		switch msg := resp.Entry.(type) {
+		case *pbconvo.SystemOutput_Message_:
+			msgString := msg.Message.Markdown
+			if msg.Message.Style == "error" {
+				msgString = "⚠️ " + msg.Message.Markdown
+			}
+
+			fmt.Print(toMarkdown(msgString))
+
+		case *pbconvo.SystemOutput_ImageWithText_:
+			input := msg.ImageWithText
+			if input.ImgUrl != "" {
+				fmt.Println("View image here:", input.ImgUrl)
+			}
+			if input.Markdown != "" {
+				fmt.Println(toMarkdown(input.Markdown))
+			}
+
+		case *pbconvo.SystemOutput_ListSelect_:
+			input := msg.ListSelect
+
+			//fmt.Println(toMarkdown(input.Instructions))
+
+			if len(input.Labels) == 0 && len(input.Values) == 0 {
+				fmt.Println("Hmm, the server sent no option to select from (!)")
+				// TODO: notify the server? stop the process?!
+				continue
+			}
+
+			var options []huh.Option[string]
+			optionsMap := make(map[string]string)
+			for i := 0; i < len(input.Labels); i++ {
+				entry := huh.Option[string]{
+					Key:   input.Labels[i],
+					Value: input.Values[i],
+				}
+				options = append(options, entry)
+				optionsMap[entry.Value] = entry.Key
+			}
+			var selection string
+			selectField := huh.NewSelect[string]().
+				Title(input.Instructions).
+				Options(options...).
+				Value(&selection)
+
+			err := huh.NewForm(huh.NewGroup(selectField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run()
 			if err != nil {
-				return fmt.Errorf("invalid address: %w", err)
+				return fmt.Errorf("failed taking input: %w", err)
 			}
-			return nil
-		},
-	})
-}
 
-var shortNameRegexp = regexp.MustCompile(`^([a-z][a-z0-9]{0,63})$`)
+			fmt.Println("┃ ", input.Instructions)
+			for _, opt := range options {
+				if opt.Value == selection {
+					fmt.Println("┃ -", bold(opt.Key))
+				} else {
+					fmt.Println("┃ -", opt.Key)
+				}
+			}
+			fmt.Println("")
 
-func promptEthereumContractShortNames(ethereumContracts []*templates.EthereumContract) ([]*templates.EthereumContract, error) {
-	for _, contract := range ethereumContracts {
-		shortName, err := prompt(fmt.Sprintf("Choose a short name for %s (lowercase and numbers only)", contract.GetAddress()), &promptOptions{
-			Validate: func(input string) error {
-				ok := shortNameRegexp.MatchString(input)
-				if !ok {
-					return fmt.Errorf("invalid name: must match %s", shortNameRegexp)
+			if err := sendFunc(&pbconvo.UserInput{
+				FromActionId: resp.ActionId,
+				Entry: &pbconvo.UserInput_Selection_{
+					Selection: &pbconvo.UserInput_Selection{
+						Label: optionsMap[selection],
+						Value: selection,
+					},
+				},
+			}); err != nil {
+				return fmt.Errorf("error sending message: %w", err)
+			}
+
+		case *pbconvo.SystemOutput_TextInput_:
+			input := msg.TextInput
+
+			var returnValue string
+			inputField := huh.NewInput().
+				Title(input.Prompt).
+				Description(input.Description).
+				Placeholder(input.Placeholder).
+				Value(&returnValue)
+			if input.DefaultValue != "" {
+				inputField.Suggestions([]string{input.DefaultValue})
+			}
+
+			if input.ValidationRegexp != "" {
+				validationRE, err := regexp.Compile(input.ValidationRegexp)
+				if err != nil {
+					return fmt.Errorf("invalid regexp received from server (%q) to validate text input: %w", msg.TextInput.ValidationRegexp, err)
 				}
 
-				return nil
-			},
-		})
-		if err != nil {
-			return nil, err
-		}
-		contract.SetName(shortName)
-
-		withCalls, err := promptCallOrEvents()
-		if err != nil {
-			return nil, err
-		}
-		contract.SetWithCalls(withCalls)
-	}
-
-	return ethereumContracts, nil
-}
-
-func promptEthereumDynamicDataSources(ctx context.Context, ethereumContracts []*templates.EthereumContract, chain *templates.EthereumChain) ([]*templates.EthereumContract, error) {
-	dds, err := promptConfirm("Would you like to track a dynamic datasource", &promptOptions{
-		PromptTemplates: &promptui.PromptTemplates{
-			Success: `{{ "Track a dynamic datasource:" | faint }} `,
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if !dds {
-		return ethereumContracts, nil
-	}
-
-	selected := ethereumContracts[0]
-	if len(ethereumContracts) != 1 {
-		contractNames := make([]string, len(ethereumContracts))
-		for i := range ethereumContracts {
-			contractNames[i] = ethereumContracts[i].GetName()
-		}
-
-		choice := promptui.Select{
-			Label: "Select the factory contract",
-			Items: contractNames,
-			Templates: &promptui.SelectTemplates{
-				Selected: `{{ "Contract:" | faint }} {{ . }}`,
-			},
-			HideHelp: true,
-		}
-		idx, _, err := choice.Run()
-		if err != nil {
-			return nil, err
-		}
-		selected = ethereumContracts[idx]
-	}
-
-	events := selected.GetEvents()
-	fmt.Println("Select the event on the factory that triggers the creation of a dynamic datasource:")
-	eventNames := make([]string, len(events))
-	for i := range events {
-		eventNames[i] = events[i].Rust.ABIStructName
-	}
-
-	choice := promptui.Select{
-		Label: "Select the event",
-		Items: eventNames,
-		Templates: &promptui.SelectTemplates{
-			Selected: `{{ "Event:" | faint }} {{ . }}`,
-		},
-		HideHelp: true,
-	}
-	idx, _, err := choice.Run()
-	if err != nil {
-		return nil, err
-	}
-	selectedEventName := events[idx].Rust.ABIStructName
-
-	fmt.Println("Select the field on the factory event that provides the address of the dynamic datasource:")
-	eventFields := events[idx].Proto.Fields
-	eventFieldNames := make([]string, len(eventFields))
-	for i, eventField := range eventFields {
-		eventFieldNames[i] = eventField.Name
-	}
-
-	choice = promptui.Select{
-		Label: "Select the event field",
-		Items: eventFieldNames,
-		Templates: &promptui.SelectTemplates{
-			Selected: `{{ "Field:" | faint }} {{ . }}`,
-		},
-		HideHelp: true,
-	}
-	_, selectedEventField, err := choice.Run()
-	if err != nil {
-		return nil, err
-	}
-
-	shortName, err := prompt("Choose a short name for the created datasource, (lowercase and numbers only)", &promptOptions{
-		Default: selectedEventField,
-		Validate: func(input string) error {
-			ok := shortNameRegexp.MatchString(input)
-			if !ok {
-				return fmt.Errorf("invalid name: must match %s", shortNameRegexp)
+				inputField.Validate(func(userInput string) error {
+					matched := validationRE.MatchString(strings.TrimRight(returnValue, " "))
+					if !matched {
+						return errors.New(input.ValidationErrorMessage)
+					}
+					return nil
+				})
 			}
 
-			return nil
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	withCalls, err := promptCallOrEvents()
-	if err != nil {
-		return nil, err
-	}
-
-	referenceContractAddress, err := promptContractAddress(
-		"Enter a reference contract address to fetch the ABI",
-		func(input string) (eth.Address, error) {
-			return eth.NewAddress(input)
-		})
-	if err != nil {
-		return nil, err
-	}
-	abi, abiContent, err := getContractABIFollowingProxy(ctx, referenceContractAddress, chain)
-	if err != nil {
-		return nil, fmt.Errorf("getting contract ABI for %s: %w", referenceContractAddress, err)
-	}
-
-	fmt.Println("adding dynamic datasource", shortName, selectedEventName, selectedEventField)
-	selected.AddDynamicDataSource(shortName, abi, abiContent, selectedEventName, selectedEventField, withCalls)
-
-	return ethereumContracts, nil
-}
-
-func promptCallOrEvents() (calls bool, err error) {
-	choice := promptui.Select{
-		Label:    "Select the type of data that you want to extract from this contract:",
-		Items:    []string{"Events only", "Events + Calls"},
-		HideHelp: true,
-	}
-	resp, _, err := choice.Run()
-	if err != nil {
-		return false, err
-	}
-
-	switch resp {
-	case 0:
-		return false, nil
-	case 1:
-		return true, nil
-	}
-
-	panic("impossible choice")
-}
-
-func promptProtocol() (codegen.Protocol, error) {
-	if devInitProtocol != "" {
-		// It's ok to panic, we expect the dev to put in a valid Ethereum address
-		protocol, err := codegen.ParseProtocol(devInitProtocol)
-		if err != nil {
-			panic(fmt.Errorf("invalid protocol: %w", err))
-		}
-
-		return protocol, nil
-	}
-
-	choice := promptui.Select{
-		Label: "Select protocol",
-		Items: codegen.ProtocolNames(),
-		Templates: &promptui.SelectTemplates{
-			Selected: `{{ "Protocol:" | faint }} {{ . }}`,
-		},
-		HideHelp: true,
-	}
-
-	_, selection, err := choice.Run()
-	if err != nil {
-		if errors.Is(err, promptui.ErrInterrupt) {
-			// We received Ctrl-C, users wants to abort, nothing else to do, quit immediately
-			os.Exit(1)
-		}
-
-		return codegen.ProtocolOther, fmt.Errorf("running protocol prompt: %w", err)
-	}
-
-	var protocol codegen.Protocol
-	if err := protocol.UnmarshalText([]byte(selection)); err != nil {
-		panic(fmt.Errorf("impossible, selecting hard-coded value from enum itself, something is really wrong here"))
-	}
-
-	return protocol, nil
-}
-
-func promptEthereumChain() (codegen.EthereumChain, error) {
-	if devInitEthereumChain != "" {
-		// It's ok to panic, we expect the dev to put in a valid Ethereum chain
-		chain, err := codegen.ParseEthereumChain(devInitEthereumChain)
-		if err != nil {
-			panic(fmt.Errorf("invalid chain: %w", err))
-		}
-
-		return chain, nil
-	}
-
-	choice := promptui.Select{
-		Label: "Select Ethereum chain",
-		Items: codegen.EthereumChainNames(),
-		Templates: &promptui.SelectTemplates{
-			Selected: `{{ "Ethereum chain:" | faint }} {{ . }}`,
-		},
-		HideHelp: true,
-	}
-
-	_, selection, err := choice.Run()
-	if err != nil {
-		if errors.Is(err, promptui.ErrInterrupt) {
-			// We received Ctrl-C, users wants to abort, nothing else to do, quit immediately
-			os.Exit(1)
-		}
-
-		return codegen.EthereumChainOther, fmt.Errorf("running chain prompt: %w", err)
-	}
-
-	var chain codegen.EthereumChain
-	if err := chain.UnmarshalText([]byte(selection)); err != nil {
-		panic(fmt.Errorf("impossible, selecting hard-coded value from enum itself, something is really wrong here"))
-	}
-
-	return chain, nil
-}
-
-type promptOptions struct {
-	Validate        promptui.ValidateFunc
-	IsConfirm       bool
-	PromptTemplates *promptui.PromptTemplates
-	Default         string
-}
-
-var confirmPromptRegex = regexp.MustCompile("(y|Y|n|N|No|Yes|YES|NO)")
-
-func prompt(label string, opts *promptOptions) (string, error) {
-	var templates *promptui.PromptTemplates
-
-	if opts != nil {
-		templates = opts.PromptTemplates
-	}
-
-	if templates == nil {
-		templates = &promptui.PromptTemplates{
-			Success: `{{ . | faint }}{{ ":" | faint}} `,
-		}
-	}
-
-	if opts != nil && opts.IsConfirm {
-		// We have no differences
-		templates.Valid = `{{ "?" | blue}} {{ . | bold }} {{ "[y/N]" | faint}} `
-		templates.Invalid = templates.Valid
-	}
-	def := ""
-	if opts != nil {
-		def = opts.Default
-	}
-	prompt := promptui.Prompt{
-		Label:     label,
-		Templates: templates,
-		Default:   def,
-	}
-	if opts != nil && opts.Validate != nil {
-		prompt.Validate = opts.Validate
-	}
-
-	if opts != nil && opts.IsConfirm {
-		prompt.Validate = func(in string) error {
-			if !confirmPromptRegex.MatchString(in) {
-				return errors.New("answer with y/yes/Yes or n/no/No")
+			err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run()
+			if err != nil {
+				return fmt.Errorf("failed taking input: %w", err)
 			}
 
-			return nil
+			fmt.Println("┃ ", input.Prompt+":", bold(returnValue))
+			fmt.Println("")
+
+			if err := sendFunc(&pbconvo.UserInput{
+				FromActionId: resp.ActionId,
+				Entry: &pbconvo.UserInput_TextInput_{
+					TextInput: &pbconvo.UserInput_TextInput{Value: strings.TrimRight(returnValue, " ")},
+				},
+			}); err != nil {
+				return fmt.Errorf("error sending message: %w", err)
+			}
+
+		case *pbconvo.SystemOutput_Confirm_:
+			input := msg.Confirm
+
+			var returnValue bool
+			inputField := huh.NewConfirm().
+				Title(input.Prompt).
+				Affirmative(input.AcceptButtonLabel).
+				Negative(input.DeclineButtonLabel).
+				Description(input.Description).
+				Value(&returnValue)
+
+			err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run()
+			if err != nil {
+				return fmt.Errorf("failed taking confirmation input: %w", err)
+			}
+
+			affirm := input.AcceptButtonLabel
+			deny := input.DeclineButtonLabel
+			if returnValue {
+				affirm = bold(affirm)
+			} else {
+				deny = bold(deny)
+			}
+			fmt.Println("┃ ", input.Prompt)
+			fmt.Println("┃ ")
+			fmt.Println("┃  " + affirm + "     " + deny)
+
+			if err := sendFunc(&pbconvo.UserInput{
+				FromActionId: resp.ActionId,
+				Entry: &pbconvo.UserInput_Confirmation_{
+					Confirmation: &pbconvo.UserInput_Confirmation{
+						Affirmative: returnValue,
+					},
+				},
+			}); err != nil {
+				return fmt.Errorf("error sending confirmation: %w", err)
+			}
+
+		case *pbconvo.SystemOutput_Loading_:
+			input := msg.Loading
+
+			if input.Loading {
+				if loadingCh != nil {
+					loadingCh <- false
+				}
+				loadingCh = make(chan bool)
+
+				go func(loadingCh chan bool) {
+					_ = spinner.New().Title(msg.Loading.Label).Action(func() {
+						<-loadingCh
+					}).Run()
+				}(loadingCh)
+
+			} else {
+				// reset loading channel
+				if loadingCh != nil {
+					loadingCh <- true
+					loadingCh = nil
+				}
+				fmt.Println(msg.Loading.Label)
+			}
+
+		case *pbconvo.SystemOutput_DownloadFiles_:
+			input := msg.DownloadFiles
+			fmt.Println("Files:")
+			for _, file := range input.Files {
+				fmt.Printf("  - %s (%s)\n", file.Filename, file.Type)
+				if file.Description != "" {
+					fmt.Println(file.Description)
+				}
+			}
+
+			// let the terminal breath a little
+			fmt.Println()
+
+			if len(input.Files) == 0 {
+				return fmt.Errorf("no files to download")
+			}
+
+			sendDownloadedFilesConfirmation := false
+			for _, inputFile := range input.Files {
+				switch inputFile.Type {
+				case "application/x-zip":
+
+					savingDest := "output"
+					if projectName := gjson.GetBytes(lastState.State, "name").String(); projectName != "" {
+						savingDest = projectName
+					}
+					if cwd, err := os.Getwd(); err == nil {
+						savingDest = filepath.Join(cwd, savingDest)
+					}
+					inputField := huh.NewInput().Title("In which directory do you want to store your source code?").Value(&savingDest)
+
+					inputField.Validate(func(userInput string) error {
+						fmt.Println("Checking directory", userInput)
+						fileInfo, err := os.Stat(userInput)
+						if err != nil {
+							if os.IsNotExist(err) {
+								return nil
+							}
+							return fmt.Errorf("error checking directory: %w", err)
+						}
+
+						if !fileInfo.IsDir() {
+							return errors.New("the path is not a directory")
+						}
+
+						return nil
+					})
+
+					err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run()
+					if err != nil {
+						return fmt.Errorf("failed taking input: %w", err)
+					}
+
+					zipRoot := savingDest
+
+					// the multiple \n are not a mistake, it's to have a blank line before the next message
+					fmt.Printf("\nSource code will be saved in %s\n", zipRoot)
+
+					var unpackSource bool
+					confirm := huh.NewConfirm().
+						Title("Unzip source code? ").
+						Affirmative("Yes, unzip sources").
+						Negative("No").
+						Value(&unpackSource)
+
+					err = huh.NewForm(huh.NewGroup(confirm)).WithAccessible(WITH_ACCESSIBLE).Run()
+					if err != nil {
+						return fmt.Errorf("failed confirming: %w", err)
+					}
+
+					sourcePath := filepath.Join(zipRoot, inputFile.Filename)
+					err = saveDownloadFile(sourcePath, inputFile)
+					if err != nil {
+						return fmt.Errorf("saving zip file: %w", err)
+					}
+
+					// if there's conflict.
+					if unpackSource {
+						zipContent := inputFile.Content
+						fmt.Printf("Unzipping %s into %s\n", inputFile.Filename, zipRoot)
+						err := unzipFile(zipContent, zipRoot)
+						if err != nil {
+							return fmt.Errorf("unzipping file: %w", err)
+						}
+					}
+
+					userState.downloadedFilesfolderPath = zipRoot
+					sendDownloadedFilesConfirmation = true
+
+				case "application/x-protobuf; messageType=\"sf.substreams.v1.Package\"":
+					fullPath := filepath.Join(userState.downloadedFilesfolderPath, inputFile.Filename)
+					err = saveDownloadFile(fullPath, inputFile)
+					if err != nil {
+						return fmt.Errorf("saving spkg file: %w", err)
+					}
+
+				case "text/plain":
+					fmt.Println("Compilation Logs:")
+					fmt.Println(string(inputFile.Content))
+
+				case "text/plain; option:\"save\"":
+					fullPath := filepath.Join(userState.downloadedFilesfolderPath, inputFile.Filename)
+					err := os.WriteFile(fullPath, inputFile.Content, 0644)
+					if err != nil {
+						return fmt.Errorf("saving file: %w", err)
+					}
+
+				default:
+					fmt.Println("Unknown file type:", inputFile.Type)
+				}
+			}
+
+			// only need to send a confirmation when not downloading spkg files
+			if sendDownloadedFilesConfirmation {
+				if err := sendFunc(&pbconvo.UserInput{
+					FromActionId: resp.ActionId,
+					Entry: &pbconvo.UserInput_DownloadedFiles_{
+						DownloadedFiles: &pbconvo.UserInput_DownloadedFiles{},
+					},
+				}); err != nil {
+					return fmt.Errorf("error sending confirmation: %w", err)
+				}
+			}
+
+		default:
+			fmt.Printf("Received unknown message type: %T\n", resp.Entry)
 		}
 	}
 
-	choice, err := prompt.Run()
-	if err != nil {
-		if errors.Is(err, promptui.ErrInterrupt) {
-			// We received Ctrl-C, users wants to abort, nothing else to do, quit immediately
-			os.Exit(1)
-		}
+	// TODO: shouldn't this be controlled by the remote end? Maybe there's some follow-up messages,
+	// maybe we'll be building three modules in a swift?
 
-		if prompt.IsConfirm && errors.Is(err, promptui.ErrAbort) {
-			return "false", nil
-		}
-
-		return "", fmt.Errorf("running prompt: %w", err)
-	}
-
-	return choice, nil
+	fmt.Println("Everything done!")
+	return nil
 }
 
-// promptT is just like [prompt] but accepts a transformer that transform the `string` into the generic type T.
-func promptT[T any](label string, transformer func(string) (T, error), opts *promptOptions) (T, error) {
-	choice, err := prompt(label, opts)
-	if err == nil {
-		return transformer(choice)
-	}
-
-	var empty T
-	return empty, err
+type initListElement struct {
+	Label string
+	Value string
 }
 
-// promptConfirm is just like [prompt] but enforce `IsConfirm` and returns a boolean which is either
-// `true` for yes answer or `false` for a no answer.
-func promptConfirm(label string, opts *promptOptions) (bool, error) {
-	if opts == nil {
-		opts = &promptOptions{}
-	}
-
-	opts.IsConfirm = true
-	transform := func(in string) (bool, error) {
-		in = strings.ToLower(in)
-		return in == "y" || in == "yes", nil
-	}
-
-	return promptT(label, transform, opts)
-}
-
-var httpClient = http.Client{
-	Transport: dhttp.NewLoggingRoundTripper(zlog, tracer, http.DefaultTransport),
-	Timeout:   30 * time.Second,
-}
-
-// getProxyContractImplementation returns the implementation address and a timer to wait before next call
-func getProxyContractImplementation(ctx context.Context, address eth.Address, endpoint string) (*eth.Address, *time.Timer, error) {
-	// check for proxy contract's implementation
-	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/api?module=contract&action=getsourcecode&address=%s&apiKey=%s", endpoint, address.Pretty(), etherscanAPIKey), nil)
-
+func saveDownloadFile(path string, inputFile *pbconvo.SystemOutput_DownloadFile) (err error) {
+	dir := filepath.Dir(path)
+	err = os.MkdirAll(dir, 0755)
 	if err != nil {
-		return nil, nil, fmt.Errorf("new request: %w", err)
+		return fmt.Errorf("creating sub-directory %q: %w", path, err)
 	}
 
-	res, err := httpClient.Do(req)
-	if err != nil {
-		return nil, nil, fmt.Errorf("getting contract abi from etherscan: %w", err)
-	}
-	defer res.Body.Close()
-
-	type Response struct {
-		Message string `json:"message"` // ex: `OK-Missing/Invalid API Key, rate limit of 1/5sec applied`
-		Result  []struct {
-			Implementation string `json:"Implementation"`
-			// ContractName string `json:"ContractName"`
-		} `json:"result"`
-	}
-
-	var response Response
-
-	bod, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, nil, err
-	}
-	if err := json.NewDecoder(bytes.NewReader(bod)).Decode(&response); err != nil {
-		return nil, nil, fmt.Errorf("unmarshaling %s: %w", string(bod), err)
-	}
-
-	timer := timerUntilNextCall(response.Message)
-
-	if len(response.Result) == 0 {
-		return nil, timer, nil
-	}
-
-	if len(response.Result[0].Implementation) != 42 {
-		return nil, timer, nil
-	}
-
-	addr, err := eth.NewAddress(response.Result[0].Implementation)
-	if err != nil {
-		return nil, timer, err
-	}
-	return &addr, timer, nil
-}
-
-func timerUntilNextCall(msg string) *time.Timer {
-	// etherscan-specific
-	if strings.HasPrefix(msg, "OK-Missing/Invalid API Key") {
-		return time.NewTimer(time.Second * 5)
-	}
-	return time.NewTimer(time.Millisecond * 400)
-}
-
-func getContractABI(ctx context.Context, address eth.Address, endpoint string) (*eth.ABI, string, *time.Timer, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/api?module=contract&action=getabi&address=%s&apiKey=%s", endpoint, address.Pretty(), etherscanAPIKey), nil)
-	if err != nil {
-		return nil, "", nil, fmt.Errorf("new request: %w", err)
-	}
-
-	res, err := httpClient.Do(req)
-	if err != nil {
-		return nil, "", nil, fmt.Errorf("getting contract abi from etherscan: %w", err)
-	}
-	defer res.Body.Close()
-
-	type Response struct {
-		Message string      `json:"message"` // ex: `OK-Missing/Invalid API Key, rate limit of 1/5sec applied`
-		Result  interface{} `json:"result"`
-	}
-
-	var response Response
-	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		return nil, "", nil, fmt.Errorf("unmarshaling: %w", err)
-	}
-
-	timer := timerUntilNextCall(response.Message)
-
-	abiContent, ok := response.Result.(string)
-	if !ok {
-		return nil, "", timer, fmt.Errorf(`invalid response "Result" field type, expected "string" got "%T"`, response.Result)
-	}
-
-	ethABI, err := eth.ParseABIFromBytes([]byte(abiContent))
-	if err != nil {
-		return nil, "", timer, fmt.Errorf("parsing abi %q: %w", abiContent, err)
-	}
-	return ethABI, abiContent, timer, err
-}
-
-func getContractABIFollowingProxy(ctx context.Context, contractAddress eth.Address, chain *templates.EthereumChain) (*eth.ABI, string, error) {
-	abi, abiContent, wait, err := getContractABI(ctx, contractAddress, chain.ApiEndpoint)
-	if err != nil {
-		return nil, "", err
-	}
-
-	<-wait.C
-	implementationAddress, wait, err := getProxyContractImplementation(ctx, contractAddress, chain.ApiEndpoint)
-	if err != nil {
-		return nil, "", err
-	}
-	<-wait.C
-
-	if implementationAddress != nil {
-		implementationABI, implementationABIContent, wait, err := getContractABI(ctx, *implementationAddress, chain.ApiEndpoint)
+	overwrite := true
+	if _, err := os.Stat(path); err == nil {
+		overwrite, err = creatingOverwriteForm(path)
 		if err != nil {
-			return nil, "", err
+			return fmt.Errorf(": %w", err)
 		}
-		for k, v := range implementationABI.LogEventsMap {
-			abi.LogEventsMap[k] = append(abi.LogEventsMap[k], v...)
-		}
-
-		for k, v := range implementationABI.LogEventsByNameMap {
-			abi.LogEventsByNameMap[k] = append(abi.LogEventsByNameMap[k], v...)
-		}
-
-		abiAsArray := []map[string]interface{}{}
-		if err := json.Unmarshal([]byte(abiContent), &abiAsArray); err != nil {
-			return nil, "", fmt.Errorf("unmarshalling abiContent as array: %w", err)
-		}
-
-		implementationABIAsArray := []map[string]interface{}{}
-		if err := json.Unmarshal([]byte(implementationABIContent), &implementationABIAsArray); err != nil {
-			return nil, "", fmt.Errorf("unmarshalling implementationABIContent as array: %w", err)
-		}
-
-		abiAsArray = append(abiAsArray, implementationABIAsArray...)
-
-		content, err := json.Marshal(abiAsArray)
-		if err != nil {
-			return nil, "", fmt.Errorf("re-marshalling ABI")
-		}
-		abiContent = string(content)
-
-		fmt.Printf("Fetched contract ABI for Implementation %s of Proxy %s\n", *implementationAddress, contractAddress)
-		<-wait.C
 	}
-	return abi, abiContent, nil
 
+	if !overwrite {
+		fmt.Println("Skipping", path)
+		return nil
+	}
+
+	err = os.WriteFile(path, inputFile.Content, 0644)
+	if err != nil {
+		return fmt.Errorf("saving zip file %q: %w", inputFile.Filename, err)
+	}
+	return nil
 }
 
-func getAndSetContractABIs(ctx context.Context, contracts []*templates.EthereumContract, chain *templates.EthereumChain) ([]*templates.EthereumContract, error) {
-	for _, contract := range contracts {
-		abi, abiContent, err := getContractABIFollowingProxy(ctx, contract.GetAddress(), chain)
-		if err != nil {
-			return nil, fmt.Errorf("getting contract ABI for %s: %w", contract.GetAddress(), err)
-		}
-
-		//fmt.Println("this is the complete abiContent after merge", abiContent)
-		contract.SetAbiContent(abiContent)
-		contract.SetAbi(abi)
-
-		fmt.Printf("Fetched contract ABI for %s\n", contract.GetAddress())
+func toMarkdown(input string) string {
+	style := "light"
+	if lipgloss.HasDarkBackground() {
+		style = "dark"
 	}
-
-	return contracts, nil
+	out, err := glamour.Render(input, style)
+	if err != nil {
+		panic(fmt.Errorf("failed rendering markdown %q: %w", input, err))
+	}
+	return out
 }
 
-func getContractCreationBlock(ctx context.Context, contracts []*templates.EthereumContract, chain *templates.EthereumChain) (uint64, error) {
-	var lowestStartBlock uint64 = math.MaxUint64
-	for _, contract := range contracts {
-		req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("%s/api?module=account&action=txlist&address=%s&page=1&offset=1&sort=asc&apikey=%s", chain.ApiEndpoint, contract.GetAddress().Pretty(), etherscanAPIKey), nil)
-		if err != nil {
-			return 0, fmt.Errorf("new request: %w", err)
-		}
+func bold(input string) string {
+	return lipgloss.NewStyle().Bold(true).Render(input)
+}
 
-		res, err := httpClient.Do(req)
-		if err != nil {
-			return 0, fmt.Errorf("failed request to etherscan: %w", err)
-		}
-		defer res.Body.Close()
-
-		type Response struct {
-			Status  string `json:"status"`
-			Message string `json:"message"`
-			Result  []struct {
-				BlockNumber string `json:"blockNumber"`
-			} `json:"result"`
-		}
-
-		var response Response
-		if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-			return 0, fmt.Errorf("unmarshaling: %w", err)
-		}
-
-		if len(response.Result) == 0 {
-			return 0, fmt.Errorf("empty result from response %v", response)
-		}
-
-		<-timerUntilNextCall(response.Message).C
-
-		blockNum, err := strconv.ParseUint(response.Result[0].BlockNumber, 10, 64)
-		if err != nil {
-			return 0, fmt.Errorf("parsing block number: %w", err)
-		}
-
-		if blockNum < lowestStartBlock {
-			lowestStartBlock = blockNum
-		}
-
-		fmt.Printf("Fetched initial block %d for %s (lowest %d)\n", blockNum, contract.GetAddress(), lowestStartBlock)
+func unzipFile(zipContent []byte, zipRoot string) error {
+	reader := bytes.NewReader(zipContent)
+	zipReader, err := zip.NewReader(reader, int64(len(zipContent)))
+	if err != nil {
+		return err
 	}
-	return lowestStartBlock, nil
+
+	for _, f := range zipReader.File {
+		filePath := filepath.Join(zipRoot, f.Name)
+
+		if _, err := os.Stat(filePath); err == nil {
+			overwrite, err := creatingOverwriteForm(filePath)
+			if err != nil {
+				return fmt.Errorf(": %w", err)
+			}
+
+			if !overwrite {
+				fmt.Println("Skipping", filePath)
+				continue
+			}
+		}
+
+		srcFile, err := f.Open()
+		if err != nil {
+			return err
+		}
+		defer srcFile.Close()
+
+		if f.FileInfo().IsDir() {
+			if err := os.MkdirAll(filePath, os.ModePerm); err != nil {
+				return (err)
+			}
+			continue
+		}
+
+		if err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
+			return (err)
+		}
+		destFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+		if err != nil {
+			return err
+		}
+		defer destFile.Close()
+
+		if _, err = io.Copy(destFile, srcFile); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func creatingOverwriteForm(path string) (bool, error) {
+	var overwrite bool
+	confirm := huh.NewConfirm().
+		Title(fmt.Sprintf("File already exists, Do you want to overwrite %s ?", path)).
+		Affirmative("Yes, overwrite").
+		Negative("No").
+		Value(&overwrite)
+
+	err := huh.NewForm(huh.NewGroup(confirm)).WithAccessible(WITH_ACCESSIBLE).Run()
+	if err != nil {
+		return false, fmt.Errorf("failed confirming: %w", err)
+	}
+
+	return overwrite, nil
 }

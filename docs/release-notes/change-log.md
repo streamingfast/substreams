@@ -11,8 +11,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
-* Fixed Substreams tier1 active worker request metrics that was not decrementing fully correctly.
+### Remote Code Generation
+
+The `substreams init` command now fetches a list of available 'code generators' to "https://codegen.substreams.dev".
+Upon selection of a code generator, it launches an interactive session to gather the information necessary to build your substreams.
+This allows flexibility and getting anything from "skeleton" of a substreams for a given chain up to a fully built .spkg file with subgraph bindings.
+
+### Added
 * Add 'compressed' boolean field to the 'incoming request' log
+
+### Fixed
+* Fixed Substreams tier1 active worker request metrics that was not decrementing correctly.
+
+### Removed
+* Removed local ethereum codegen.
 
 ## v1.7.3
 

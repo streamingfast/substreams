@@ -104,6 +104,8 @@ func TestBackFiller(t *testing.T) {
 				require.NoError(t, err)
 			}
 
+			time.Sleep(2 * time.Second)
+
 			require.Equal(t, c.expectedSegmentProcessed, segmentProcessed)
 		})
 	}
@@ -127,6 +129,5 @@ func (t *testObject) ReorgJunctionBlock() bstream.BlockRef {
 type testNextHandler struct{}
 
 func (t *testNextHandler) ProcessBlock(blk *pbbstream.Block, obj interface{}) (err error) {
-	time.Sleep(1 * time.Millisecond)
 	return nil
 }

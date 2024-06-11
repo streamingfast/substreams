@@ -38,7 +38,7 @@ var initCmd = &cobra.Command{
 	Long: cli.Dedent(`
 
 		Initialize a new Substreams project using a remote code generator.		
-		State will be saved to 'generator.json'
+		State will be saved to 'generator.json' by default.
 
 		Example: 
 			substreams init
@@ -50,6 +50,7 @@ var initCmd = &cobra.Command{
 
 func init() {
 	initCmd.Flags().String("discovery-endpoint", "https://codegen.substreams.dev", "Endpoint used to discover code generators")
+	initCmd.Flags().String("state-file", "./generator.json", "File to load/save the state of the code generator")
 	rootCmd.AddCommand(initCmd)
 }
 
@@ -69,8 +70,8 @@ func newUserState() *UserState {
 	return &UserState{}
 }
 
-func readGeneratorState() (*initStateFormat, error) {
-	stateBytes, err := os.ReadFile("generator.json")
+func readGeneratorState(stateFile string) (*initStateFormat, error) {
+	stateBytes, err := os.ReadFile(stateFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read codegen state file: %w", err)
 	}
@@ -87,6 +88,10 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	}
 
 	initConvoURL := sflags.MustGetString(cmd, "discovery-endpoint")
+	stateFile := sflags.MustGetString(cmd, "state-file")
+	if !strings.HasSuffix(stateFile, ".json") {
+		return fmt.Errorf("state file must have a .json extension")
+	}
 
 	transport := &http2.Transport{}
 	switch {
@@ -107,15 +112,15 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	client := pbconvoconnect.NewConversationServiceClient(&http.Client{Transport: transport}, initConvoURL, opts...)
 
 	var lastState = &initStateFormat{}
-	if s, err := os.Stat("generator.json"); err == nil {
-		state, err := readGeneratorState()
+	if s, err := os.Stat(stateFile); err == nil {
+		state, err := readGeneratorState(stateFile)
 		if err != nil {
-			return fmt.Errorf("state file 'generator.json' file exists, but is invalid: %w", err)
+			return fmt.Errorf("state file %q file exists, but is invalid: %w", stateFile, err)
 		}
 
 		useGenerator := true
 		inputField := huh.NewConfirm().
-			Title(fmt.Sprintf("State file 'generator.json' was found (%s - %s). Do you want to start from there ?", state.GeneratorID, humanize.Time(s.ModTime()))).
+			Title(fmt.Sprintf("State file %q was found (%s - %s). Do you want to start from there ?", stateFile, state.GeneratorID, humanize.Time(s.ModTime()))).
 			Value(&useGenerator)
 
 		if err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run(); err != nil {
@@ -125,9 +130,9 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		if useGenerator {
 			lastState = state
 		} else {
-			newName := fmt.Sprintf("generator.%d.json", time.Now().Unix())
-			os.Rename("generator.json", newName)
-			fmt.Printf("File 'generator.json' renamed to %s\n", newName)
+			newName := fmt.Sprintf("%s.%d.json", strings.TrimSuffix(stateFile, ".json"), time.Now().Unix())
+			os.Rename(stateFile, newName)
+			fmt.Printf("File %q renamed to %q\n", stateFile, newName)
 		}
 	}
 
@@ -217,7 +222,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		if INIT_TRACE {
 			cnt, _ := json.MarshalIndent(resp.Entry, "", "  ")
 			fmt.Printf("INPUT: %T %s\n", resp.Entry, string(cnt))
-			fmt.Println("Saving state to generator.json")
+			fmt.Printf("Saving state to %q\n", stateFile)
 		}
 
 		// TODO: reformat the JSON code into a yaml file or something? Make it editable and readable easily?
@@ -227,7 +232,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to marshal generator state: %w", err)
 		}
-		if err = os.WriteFile("generator.json", cnt, 0644); err != nil {
+		if err = os.WriteFile(stateFile, cnt, 0644); err != nil {
 			return fmt.Errorf("error writing generator state %w", err)
 		}
 

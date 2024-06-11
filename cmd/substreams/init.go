@@ -473,32 +473,18 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					// the multiple \n are not a mistake, it's to have a blank line before the next message
 					fmt.Printf("\nSource code will be saved in %s\n", zipRoot)
 
-					var unpackSource bool
-					confirm := huh.NewConfirm().
-						Title("Unzip source code? ").
-						Affirmative("Yes, unzip sources").
-						Negative("No").
-						Value(&unpackSource)
-
-					err = huh.NewForm(huh.NewGroup(confirm)).WithAccessible(WITH_ACCESSIBLE).Run()
-					if err != nil {
-						return fmt.Errorf("failed confirming: %w", err)
-					}
-
 					sourcePath := filepath.Join(zipRoot, inputFile.Filename)
 					err = saveDownloadFile(sourcePath, inputFile)
 					if err != nil {
 						return fmt.Errorf("saving zip file: %w", err)
 					}
 
-					// if there's conflict.
-					if unpackSource {
-						zipContent := inputFile.Content
-						fmt.Printf("Unzipping %s into %s\n", inputFile.Filename, zipRoot)
-						err := unzipFile(zipContent, zipRoot)
-						if err != nil {
-							return fmt.Errorf("unzipping file: %w", err)
-						}
+					// always unzip files from source.zip received in the request
+					zipContent := inputFile.Content
+					fmt.Printf("Unzipping %s into %s\n", inputFile.Filename, zipRoot)
+					err = unzipFile(zipContent, zipRoot)
+					if err != nil {
+						return fmt.Errorf("unzipping file: %w", err)
 					}
 
 					userState.downloadedFilesfolderPath = zipRoot

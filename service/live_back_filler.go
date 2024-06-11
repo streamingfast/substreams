@@ -17,7 +17,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type RequestBackProcessingFunc = func(ctx context.Context, logger *zap.Logger, liveBackFillerRequest *pbssinternal.ProcessRangeRequest, clientFactory client.InternalClientFactory, jobCompleted chan struct{}, jobFailed *bool)
+type RequestBackProcessingFunc = func(ctx context.Context, logger *zap.Logger, blockRange *block.Range, stageToProcess int, clientFactory client.InternalClientFactory, jobCompleted chan struct{}, jobFailed *bool)
 
 type LiveBackFiller struct {
 	RequestBackProcessing RequestBackProcessingFunc
@@ -26,15 +26,21 @@ type LiveBackFiller struct {
 	currentSegment        uint64
 	segmentSize           uint64
 	receivedBlockNumbers  map[uint64]struct{}
+	logger                *zap.Logger
+	stageToProcess        int
+	clientFactory         client.InternalClientFactory
 }
 
-func NewLiveBackFiller(nextHandler bstream.Handler, segmentSize uint64, linearHandoff uint64, requestBackProcessing RequestBackProcessingFunc) *LiveBackFiller {
+func NewLiveBackFiller(nextHandler bstream.Handler, logger *zap.Logger, stageToProcess int, segmentSize uint64, linearHandoff uint64, clientFactory client.InternalClientFactory, requestBackProcessing RequestBackProcessingFunc) *LiveBackFiller {
 	return &LiveBackFiller{
 		RequestBackProcessing: requestBackProcessing,
+		stageToProcess:        stageToProcess,
 		NextHandler:           nextHandler,
 		irreversibleBlock:     make(chan uint64),
 		currentSegment:        linearHandoff / segmentSize,
 		segmentSize:           segmentSize,
+		logger:                logger,
+		clientFactory:         clientFactory,
 	}
 }
 
@@ -49,7 +55,9 @@ func (l *LiveBackFiller) ProcessBlock(blk *pbbstream.Block, obj interface{}) (er
 	return l.NextHandler.ProcessBlock(blk, obj)
 }
 
-func RequestBackProcessing(ctx context.Context, logger *zap.Logger, liveBackFillerRequest *pbssinternal.ProcessRangeRequest, clientFactory client.InternalClientFactory, jobCompleted chan struct{}, jobFailed *bool) {
+func RequestBackProcessing(ctx context.Context, logger *zap.Logger, blockRange *block.Range, stageToProcess int, clientFactory client.InternalClientFactory, jobCompleted chan struct{}, jobFailed *bool) {
+	liveBackFillerRequest := work.NewRequest(ctx, reqctx.Details(ctx), stageToProcess, blockRange)
+
 	err := derr.RetryContext(ctx, 999, func(ctx context.Context) error {
 		err := requestBackProcessing(ctx, logger, liveBackFillerRequest, clientFactory)
 		if err != nil {
@@ -101,8 +109,8 @@ func requestBackProcessing(ctx context.Context, logger *zap.Logger, liveCachingR
 	return nil
 }
 
-func (l *LiveBackFiller) Start(ctx context.Context, logger *zap.Logger, stage int, clientFactory client.InternalClientFactory) {
-	logger.Info("start live back filler", zap.Uint64("current_segment", l.currentSegment))
+func (l *LiveBackFiller) Start(ctx context.Context) {
+	l.logger.Info("start live back filler", zap.Uint64("current_segment", l.currentSegment))
 
 	var targetSegment uint64
 	var jobFailed bool
@@ -131,16 +139,14 @@ func (l *LiveBackFiller) Start(ctx context.Context, logger *zap.Logger, stage in
 
 		segmentStart := l.currentSegment * l.segmentSize
 		segmentEnd := (l.currentSegment + 1) * l.segmentSize
-		mergedBlockIsWritten := (blockNumber - segmentStart) < 120
+		mergedBlockIsWritten := (blockNumber - segmentStart) > 120
 
 		if (targetSegment > l.currentSegment) && mergedBlockIsWritten {
 
 			liveBackFillerRange := block.NewRange(segmentStart, segmentEnd)
 
-			liveBackFillerRequest := work.NewRequest(ctx, reqctx.Details(ctx), stage, liveBackFillerRange)
-
 			jobProcessing = true
-			go RequestBackProcessing(ctx, logger, liveBackFillerRequest, clientFactory, jobCompleted, &jobFailed)
+			go l.RequestBackProcessing(ctx, l.logger, liveBackFillerRange, l.stageToProcess, l.clientFactory, jobCompleted, &jobFailed)
 		}
 	}
 }

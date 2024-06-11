@@ -539,9 +539,9 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		zap.String("cursor", cursor),
 	)
 
-	liveBackFiller := NewLiveBackFiller(pipe, segmentSize, requestDetails.LinearHandoffBlockNum, RequestBackProcessing)
+	liveBackFiller := NewLiveBackFiller(pipe, logger, execGraph.OutputModuleStageIndex(), segmentSize, requestDetails.LinearHandoffBlockNum, s.runtimeConfig.ClientFactory, RequestBackProcessing)
 
-	go liveBackFiller.Start(ctx, logger, execGraph.OutputModuleStageIndex(), s.runtimeConfig.ClientFactory)
+	go liveBackFiller.Start(ctx)
 
 	blockStream, err := s.streamFactoryFunc(
 		ctx,

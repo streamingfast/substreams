@@ -4,7 +4,11 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"time"
+
+	"github.com/streamingfast/derr"
+	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/orchestrator/work"
+	"github.com/streamingfast/substreams/reqctx"
 
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
@@ -13,20 +17,24 @@ import (
 	"go.uber.org/zap"
 )
 
+type RequestBackProcessingFunc = func(ctx context.Context, logger *zap.Logger, liveBackFillerRequest *pbssinternal.ProcessRangeRequest, clientFactory client.InternalClientFactory, jobCompleted chan struct{}, jobFailed *bool)
+
 type LiveBackFiller struct {
-	NextHandler          bstream.Handler
-	irreversibleBlock    chan uint64
-	currentSegment       uint64
-	segmentSize          uint64
-	receivedBlockNumbers map[uint64]struct{}
+	RequestBackProcessing RequestBackProcessingFunc
+	NextHandler           bstream.Handler
+	irreversibleBlock     chan uint64
+	currentSegment        uint64
+	segmentSize           uint64
+	receivedBlockNumbers  map[uint64]struct{}
 }
 
-func NewLiveBackFiller(nextHandler bstream.Handler, segmentSize uint64, linearHandoff uint64) *LiveBackFiller {
+func NewLiveBackFiller(nextHandler bstream.Handler, segmentSize uint64, linearHandoff uint64, requestBackProcessing RequestBackProcessingFunc) *LiveBackFiller {
 	return &LiveBackFiller{
-		NextHandler:       nextHandler,
-		irreversibleBlock: make(chan uint64),
-		currentSegment:    linearHandoff / segmentSize,
-		segmentSize:       segmentSize,
+		RequestBackProcessing: requestBackProcessing,
+		NextHandler:           nextHandler,
+		irreversibleBlock:     make(chan uint64),
+		currentSegment:        linearHandoff / segmentSize,
+		segmentSize:           segmentSize,
 	}
 }
 
@@ -41,7 +49,24 @@ func (l *LiveBackFiller) ProcessBlock(blk *pbbstream.Block, obj interface{}) (er
 	return l.NextHandler.ProcessBlock(blk, obj)
 }
 
-func (l *LiveBackFiller) RequestBackProcessing(ctx context.Context, logger *zap.Logger, liveCachingRequest *pbssinternal.ProcessRangeRequest, clientFactory client.InternalClientFactory) error {
+func RequestBackProcessing(ctx context.Context, logger *zap.Logger, liveBackFillerRequest *pbssinternal.ProcessRangeRequest, clientFactory client.InternalClientFactory, jobCompleted chan struct{}, jobFailed *bool) {
+	err := derr.RetryContext(ctx, 999, func(ctx context.Context) error {
+		err := requestBackProcessing(ctx, logger, liveBackFillerRequest, clientFactory)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		*jobFailed = true
+		logger.Warn("job failed while processing live caching", zap.Error(err), zap.Uint64("segment_processed", liveBackFillerRequest.SegmentNumber))
+	}
+
+	jobCompleted <- struct{}{}
+}
+
+func requestBackProcessing(ctx context.Context, logger *zap.Logger, liveCachingRequest *pbssinternal.ProcessRangeRequest, clientFactory client.InternalClientFactory) error {
 	grpcClient, closeFunc, grpcCallOpts, _, err := clientFactory()
 	if err != nil {
 		logger.Warn("failed to create live cache grpc client", zap.Error(err))
@@ -53,29 +78,13 @@ func (l *LiveBackFiller) RequestBackProcessing(ctx context.Context, logger *zap.
 		return fmt.Errorf("getting stream: %w", err)
 	}
 
-	doneCh := make(chan struct{})
-	errCh := make(chan error)
-
-	go func() {
-		for {
-			_, err := stream.Recv()
-			if err != nil {
-				if err == io.EOF {
-					close(doneCh)
-					return
-				}
-				errCh <- fmt.Errorf("receiving stream: %w", err)
+	for {
+		_, err = stream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				break
 			}
 		}
-	}()
-
-	select {
-	case <-time.After(10 * time.Second):
-		return fmt.Errorf("time exceeded")
-	case err = <-errCh:
-		return err
-	case <-doneCh:
-		break
 	}
 
 	defer func() {
@@ -90,4 +99,48 @@ func (l *LiveBackFiller) RequestBackProcessing(ctx context.Context, logger *zap.
 	closeFunc()
 
 	return nil
+}
+
+func (l *LiveBackFiller) Start(ctx context.Context, logger *zap.Logger, stage int, clientFactory client.InternalClientFactory) {
+	logger.Info("start live back filler", zap.Uint64("current_segment", l.currentSegment))
+
+	var targetSegment uint64
+	var jobFailed bool
+	var jobProcessing bool
+	var blockNumber uint64
+	jobCompleted := make(chan struct{})
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-jobCompleted:
+			jobProcessing = false
+			l.currentSegment++
+		case blockNumber = <-l.irreversibleBlock:
+			targetSegment = blockNumber / l.segmentSize
+		}
+
+		if jobFailed {
+			// We don't want to run more jobs if one has failed permanently
+			continue
+		}
+
+		if jobProcessing {
+			continue
+		}
+
+		segmentStart := l.currentSegment * l.segmentSize
+		segmentEnd := (l.currentSegment + 1) * l.segmentSize
+		mergedBlockIsWritten := (blockNumber - segmentStart) < 120
+
+		if (targetSegment > l.currentSegment) && mergedBlockIsWritten {
+
+			liveBackFillerRange := block.NewRange(segmentStart, segmentEnd)
+
+			liveBackFillerRequest := work.NewRequest(ctx, reqctx.Details(ctx), stage, liveBackFillerRange)
+
+			jobProcessing = true
+			go RequestBackProcessing(ctx, logger, liveBackFillerRequest, clientFactory, jobCompleted, &jobFailed)
+		}
+	}
 }

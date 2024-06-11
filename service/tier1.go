@@ -12,10 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/streamingfast/derr"
-
-	"github.com/streamingfast/substreams/block"
-
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dgrpc"
 
@@ -543,46 +539,9 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		zap.String("cursor", cursor),
 	)
 
-	liveBackFiller := NewLiveBackFiller(pipe, segmentSize, requestDetails.LinearHandoffBlockNum)
+	liveBackFiller := NewLiveBackFiller(pipe, segmentSize, requestDetails.LinearHandoffBlockNum, RequestBackProcessing)
 
-	go func() {
-		logger.Info("start live caching", zap.Uint64("linear handoff block", requestDetails.LinearHandoffBlockNum), zap.Uint64("stop block", request.StopBlockNum))
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case blockNumber := <-liveBackFiller.irreversibleBlock:
-
-				targetSegment := blockNumber / liveBackFiller.segmentSize
-
-				for targetSegment > liveBackFiller.currentSegment {
-					requestStart := liveBackFiller.currentSegment * liveBackFiller.segmentSize
-					requestStop := (liveBackFiller.currentSegment + 1) * liveBackFiller.segmentSize
-
-					liveBackFillerRange := block.NewRange(requestStart, requestStop)
-
-					liveBackFillerRequest := work.NewRequest(ctx, reqctx.Details(ctx), execGraph.OutputModuleStageIndex(), liveBackFillerRange)
-
-					logger.Info("process live back filling", zap.Uint64("segment_start", requestStart), zap.Uint64("segment_end", requestStop))
-
-					err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
-						err = liveBackFiller.RequestBackProcessing(ctx, logger, liveBackFillerRequest, s.runtimeConfig.ClientFactory)
-						if err != nil {
-							return err
-						}
-
-						return nil
-					})
-					if err != nil {
-						logger.Warn("processing live caching", zap.Error(err), zap.Uint64("segment_start", requestStart), zap.Uint64("segment_end", requestStop))
-					}
-
-					liveBackFiller.currentSegment++
-				}
-
-			}
-		}
-	}()
+	go liveBackFiller.Start(ctx, logger, execGraph.OutputModuleStageIndex(), s.runtimeConfig.ClientFactory)
 
 	blockStream, err := s.streamFactoryFunc(
 		ctx,

@@ -58,7 +58,7 @@ Although developing a Substreams-powered Subgraph should be easy enough without 
 - [Injective Subgraph Example](../tutorials/cosmos/injective/usdt-exchanges.md)
 - [Publish to The Graph decentralized network](../tutorials/graph-node/publish-decentralized-network.md)
 
-## Use Subtreams Directly
+## Use Substreams Directly
 
 If you don't want to use subgraphs, you can consume or develop a Substreams module.
 

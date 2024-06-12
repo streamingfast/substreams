@@ -81,7 +81,6 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 **Mode Network (Mainnet)**: `mode.substreams.pinax.network:443`
 **NEAR (Mainnet)**: `near.substreams.pinax.network:443`
 **NEAR (Testnet)**: `neartest.substreams.pinax.network:443`
-**Optimism (Mainnet)**: `optimism.substreams.pinax.network:443`
 **Polygon (Mainnet)**: `polygon.substreams.pinax.network:443`
 **Polygon Amoy (Testnet)**: `amoy.substreams.pinax.network:443`
 **Telos (Mainnet)**: `telos.substreams.pinax.network:443`

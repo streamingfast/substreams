@@ -435,7 +435,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			sendDownloadedFilesConfirmation := false
 			for _, inputFile := range input.Files {
 				switch inputFile.Type {
-				case "application/x-zip+decompress": // our custom mime type to always decompress the file upon arrival
+				case "application/x-zip+extract": // our custom mime type to always extract the file upon arrival
 
 					savingDest := "output"
 					if projectName := gjson.GetBytes(lastState.State, "name").String(); projectName != "" {

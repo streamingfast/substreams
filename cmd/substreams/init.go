@@ -435,7 +435,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			sendDownloadedFilesConfirmation := false
 			for _, inputFile := range input.Files {
 				switch inputFile.Type {
-				case "application/x-zip":
+				case "application/x-zip+decompress": // our custom mime type to always decompress the file upon arrival
 
 					savingDest := "output"
 					if projectName := gjson.GetBytes(lastState.State, "name").String(); projectName != "" {
@@ -444,7 +444,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					if cwd, err := os.Getwd(); err == nil {
 						savingDest = filepath.Join(cwd, savingDest)
 					}
-					inputField := huh.NewInput().Title("In which directory do you want to store your source code?").Value(&savingDest)
+					inputField := huh.NewInput().Title("In which directory do you want to download the project?").Value(&savingDest)
 
 					inputField.Validate(func(userInput string) error {
 						fmt.Println("Checking directory", userInput)
@@ -471,7 +471,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					zipRoot := savingDest
 
 					// the multiple \n are not a mistake, it's to have a blank line before the next message
-					fmt.Printf("\nSource code will be saved in %s\n", zipRoot)
+					fmt.Printf("\nProject will be saved in %s\n", zipRoot)
 
 					sourcePath := filepath.Join(zipRoot, inputFile.Filename)
 					err = saveDownloadFile(sourcePath, inputFile)
@@ -479,7 +479,6 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 						return fmt.Errorf("saving zip file: %w", err)
 					}
 
-					// always unzip files from source.zip received in the request
 					zipContent := inputFile.Content
 					fmt.Printf("Unzipping %s into %s\n", inputFile.Filename, zipRoot)
 					err = unzipFile(zipContent, zipRoot)
@@ -490,26 +489,16 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					userState.downloadedFilesfolderPath = zipRoot
 					sendDownloadedFilesConfirmation = true
 
-				case "application/x-protobuf; messageType=\"sf.substreams.v1.Package\"":
+				default:
+					// "application/x-protobuf; messageType=\"sf.substreams.v1.Package\""
+					// "application/zip", "application/x-zip"
+					// "text/plain":
 					fullPath := filepath.Join(userState.downloadedFilesfolderPath, inputFile.Filename)
 					err = saveDownloadFile(fullPath, inputFile)
 					if err != nil {
 						return fmt.Errorf("saving spkg file: %w", err)
 					}
 
-				case "text/plain":
-					fmt.Println("Compilation Logs:")
-					fmt.Println(string(inputFile.Content))
-
-				case "text/plain; option:\"save\"":
-					fullPath := filepath.Join(userState.downloadedFilesfolderPath, inputFile.Filename)
-					err := os.WriteFile(fullPath, inputFile.Content, 0644)
-					if err != nil {
-						return fmt.Errorf("saving file: %w", err)
-					}
-
-				default:
-					fmt.Println("Unknown file type:", inputFile.Type)
 				}
 			}
 

@@ -59,34 +59,34 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 
 ### Pinax Endpoints
 
-**Arbitrum One (Mainnet)**: `arbone.substreams.pinax.network:443`
-**Arbitrum Sepolia (Testnet)**: `arbsepolia.substreams.pinax.network:443`
-**Arweave (Mainnet)**: `arweave.substreams.pinax.network:443`
-**Base (Mainnet)**: `base.substreams.pinax.network:443`
-**BNB (Mainnet)**: `bsc.substreams.pinax.network:443`
-**BNB Chapel (Testnet)**: `bsc.substreams.pinax.network:443`
-**Bitcoin (Mainnet)**: `bitcoin.substreams.pinax.network:443`
-**EOS (Mainnet)**: `eos.substreams.pinax.network:443`
-**EOS (Mainnet) EVM**: `eosevm.substreams.pinax.network:443`
-**EOS Jungle4 (Testnet)**: `jungle4.substreams.pinax.network:443`
-**EOS Kylin (Testnet)**: `kylin.substreams.pinax.network:443`
-**Ethereum (Mainnet)**: `eth.substreams.pinax.network:443`
-**Ethereum (Mainnet) Consensus Layer**: `eth-cl.substreams.pinax.network:443`
-**Ethereum Holesky (Testnet)**: `holesky.substreams.pinax.network:443`
-**Ethereum Holesky (Testnet) Consensus Layer**: `holesky-cl.substreams.pinax.network:443`
-**Ethereum Sepolia (Testnet)**: `sepolia.substreams.pinax.network:443`
-**Ethereum Sepolia (Testnet) Consensus Layer**: `sepolia-cl.substreams.pinax.network:443`
-**Gnosis (Mainnet) Consensus Layer**: `gnosis-cl.substreams.pinax.network:443`
-**Gnosis Chiado (Testnet) Consensus Layer**: `chiado-cl.substreams.pinax.network:443`
-**Mode Network (Mainnet)**: `mode.substreams.pinax.network:443`
-**NEAR (Mainnet)**: `near.substreams.pinax.network:443`
-**NEAR (Testnet)**: `neartest.substreams.pinax.network:443`
-**Polygon (Mainnet)**: `polygon.substreams.pinax.network:443`
-**Polygon Amoy (Testnet)**: `amoy.substreams.pinax.network:443`
-**Telos (Mainnet)**: `telos.substreams.pinax.network:443`
-**Telos (Testnet)**: `telostest.substreams.pinax.network:443`
-**Cosmos Theta (Testnet)**: `theta.substreams.pinax.network:443`
-**WAX (Mainnet)**: `wax.substreams.pinax.network:443`
-**WAX (Testnet)**: `waxtest.substreams.pinax.network:443`
+* **Arbitrum One (Mainnet)**: `arbone.substreams.pinax.network:443`
+* **Arbitrum Sepolia (Testnet)**: `arbsepolia.substreams.pinax.network:443`
+* **Arweave (Mainnet)**: `arweave.substreams.pinax.network:443`
+* **Base (Mainnet)**: `base.substreams.pinax.network:443`
+* **BNB (Mainnet)**: `bsc.substreams.pinax.network:443`
+* **BNB Chapel (Testnet)**: `bsc.substreams.pinax.network:443`
+* **Bitcoin (Mainnet)**: `bitcoin.substreams.pinax.network:443`
+* **EOS (Mainnet)**: `eos.substreams.pinax.network:443`
+* **EOS (Mainnet) EVM**: `eosevm.substreams.pinax.network:443`
+* **EOS Jungle4 (Testnet)**: `jungle4.substreams.pinax.network:443`
+* **EOS Kylin (Testnet)**: `kylin.substreams.pinax.network:443`
+* **Ethereum (Mainnet)**: `eth.substreams.pinax.network:443`
+* **Ethereum (Mainnet) Consensus Layer**: `eth-cl.substreams.pinax.network:443`
+* **Ethereum Holesky (Testnet)**: `holesky.substreams.pinax.network:443`
+* **Ethereum Holesky (Testnet) Consensus Layer**: `holesky-cl.substreams.pinax.network:443`
+* **Ethereum Sepolia (Testnet)**: `sepolia.substreams.pinax.network:443`
+* **Ethereum Sepolia (Testnet) Consensus Layer**: `sepolia-cl.substreams.pinax.network:443`
+* **Gnosis (Mainnet) Consensus Layer**: `gnosis-cl.substreams.pinax.network:443`
+* **Gnosis Chiado (Testnet) Consensus Layer**: `chiado-cl.substreams.pinax.network:443`
+* **Mode Network (Mainnet)**: `mode.substreams.pinax.network:443`
+* **NEAR (Mainnet)**: `near.substreams.pinax.network:443`
+* **NEAR (Testnet)**: `neartest.substreams.pinax.network:443`
+* **Polygon (Mainnet)**: `polygon.substreams.pinax.network:443`
+* **Polygon Amoy (Testnet)**: `amoy.substreams.pinax.network:443`
+* **Telos (Mainnet)**: `telos.substreams.pinax.network:443`
+* **Telos (Testnet)**: `telostest.substreams.pinax.network:443`
+* **Cosmos Theta (Testnet)**: `theta.substreams.pinax.network:443`
+* **WAX (Mainnet)**: `wax.substreams.pinax.network:443`
+* **WAX (Testnet)**: `waxtest.substreams.pinax.network:443`
 
 You can support other blockchains for Substreams through Firehose instrumentation. Learn more in the [official Firehose documentation](https://firehose.streamingfast.io/).

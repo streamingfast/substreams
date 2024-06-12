@@ -17,7 +17,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type RequestBackProcessingFunc = func(ctx context.Context, logger *zap.Logger, blockRange *block.Range, stageToProcess int, clientFactory client.InternalClientFactory, jobCompleted chan struct{}, jobFailed *bool)
+type RequestBackProcessingFunc = func(ctx context.Context, logger *zap.Logger, blockRange *block.Range, stageToProcess int, clientFactory client.InternalClientFactory, jobCompleted chan error)
 
 type LiveBackFiller struct {
 	RequestBackProcessing RequestBackProcessingFunc
@@ -55,7 +55,7 @@ func (l *LiveBackFiller) ProcessBlock(blk *pbbstream.Block, obj interface{}) (er
 	return l.NextHandler.ProcessBlock(blk, obj)
 }
 
-func RequestBackProcessing(ctx context.Context, logger *zap.Logger, blockRange *block.Range, stageToProcess int, clientFactory client.InternalClientFactory, jobCompleted chan struct{}, jobFailed *bool) {
+func RequestBackProcessing(ctx context.Context, logger *zap.Logger, blockRange *block.Range, stageToProcess int, clientFactory client.InternalClientFactory, jobResult chan error) {
 	liveBackFillerRequest := work.NewRequest(ctx, reqctx.Details(ctx), stageToProcess, blockRange)
 
 	err := derr.RetryContext(ctx, 999, func(ctx context.Context) error {
@@ -66,12 +66,8 @@ func RequestBackProcessing(ctx context.Context, logger *zap.Logger, blockRange *
 
 		return nil
 	})
-	if err != nil {
-		*jobFailed = true
-		logger.Warn("job failed while processing live caching", zap.Error(err), zap.Uint64("segment_processed", liveBackFillerRequest.SegmentNumber))
-	}
 
-	jobCompleted <- struct{}{}
+	jobResult <- err
 }
 
 func requestBackProcessing(ctx context.Context, logger *zap.Logger, liveCachingRequest *pbssinternal.ProcessRangeRequest, clientFactory client.InternalClientFactory) error {
@@ -116,12 +112,17 @@ func (l *LiveBackFiller) Start(ctx context.Context) {
 	var jobFailed bool
 	var jobProcessing bool
 	var blockNumber uint64
-	jobCompleted := make(chan struct{})
+	jobResult := make(chan error)
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-jobCompleted:
+		case err := <-jobResult:
+			if err != nil {
+				l.logger.Warn("job failed while processing live caching", zap.Error(err), zap.Uint64("segment_processed", l.currentSegment))
+				jobFailed = true
+				break
+			}
 			jobProcessing = false
 			l.currentSegment++
 		case blockNumber = <-l.irreversibleBlock:
@@ -146,7 +147,7 @@ func (l *LiveBackFiller) Start(ctx context.Context) {
 			liveBackFillerRange := block.NewRange(segmentStart, segmentEnd)
 
 			jobProcessing = true
-			go l.RequestBackProcessing(ctx, l.logger, liveBackFillerRange, l.stageToProcess, l.clientFactory, jobCompleted, &jobFailed)
+			go l.RequestBackProcessing(ctx, l.logger, liveBackFillerRange, l.stageToProcess, l.clientFactory, jobResult)
 		}
 	}
 }

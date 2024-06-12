@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -52,7 +53,7 @@ func TestBackFiller(t *testing.T) {
 			},
 			linearHandoff:            100,
 			errorBackProcessing:      true,
-			expectedSegmentProcessed: []uint64{},
+			expectedSegmentProcessed: []uint64{11},
 		},
 
 		{
@@ -77,17 +78,18 @@ func TestBackFiller(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			testHandler := &testNextHandler{}
 			testLogger := zap.NewNop()
-			segmentProcessed := make([]uint64, 0)
+			segmentProcessed := make(chan uint64)
 
-			RequestBackProcessingTest := func(ctx context.Context, logger *zap.Logger, blockRange *block.Range, stageToProcess int, clientFactory client.InternalClientFactory, jobCompleted chan struct{}, jobFailed *bool) {
+			RequestBackProcessingTest := func(ctx context.Context, logger *zap.Logger, blockRange *block.Range, stageToProcess int, clientFactory client.InternalClientFactory, jobResult chan error) {
+				var err error
 				if c.errorBackProcessing {
-					*jobFailed = true
-				} else {
-					segmentNumber := blockRange.ExclusiveEndBlock / c.segmentSize
-					segmentProcessed = append(segmentProcessed, segmentNumber)
+					err = fmt.Errorf("fail")
 				}
 
-				jobCompleted <- struct{}{}
+				segmentNumber := blockRange.ExclusiveEndBlock / c.segmentSize
+				segmentProcessed <- segmentNumber
+
+				jobResult <- err
 			}
 
 			testLiveBackFiller := NewLiveBackFiller(testHandler, testLogger, c.stageToProcess, c.segmentSize, c.linearHandoff, nil, RequestBackProcessingTest)
@@ -104,9 +106,27 @@ func TestBackFiller(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			time.Sleep(2 * time.Second)
+			done := make(chan struct{})
+			receivedSegmentProcessed := make([]uint64, 0)
+			go func() {
+				for process := range segmentProcessed {
+					receivedSegmentProcessed = append(receivedSegmentProcessed, process)
+					if len(receivedSegmentProcessed) == len(c.expectedSegmentProcessed) {
+						close(done)
+						return
+					}
+				}
+				panic("should not reach here")
+			}()
 
-			require.Equal(t, c.expectedSegmentProcessed, segmentProcessed)
+			select {
+			case <-done:
+			case <-time.After(1 * time.Second):
+				fmt.Println("timeout")
+				t.Fail()
+			}
+
+			require.Equal(t, c.expectedSegmentProcessed, receivedSegmentProcessed)
 		})
 	}
 }
@@ -126,7 +146,8 @@ func (t *testObject) ReorgJunctionBlock() bstream.BlockRef {
 	return nil
 }
 
-type testNextHandler struct{}
+type testNextHandler struct {
+}
 
 func (t *testNextHandler) ProcessBlock(blk *pbbstream.Block, obj interface{}) (err error) {
 	return nil

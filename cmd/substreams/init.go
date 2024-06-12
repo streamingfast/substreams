@@ -432,7 +432,6 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("no files to download")
 			}
 
-			sendDownloadedFilesConfirmation := false
 			for _, inputFile := range input.Files {
 				switch inputFile.Type {
 				case "application/x-zip+extract": // our custom mime type to always extract the file upon arrival
@@ -487,7 +486,6 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					}
 
 					userState.downloadedFilesfolderPath = zipRoot
-					sendDownloadedFilesConfirmation = true
 
 				default:
 					// "application/x-protobuf; messageType=\"sf.substreams.v1.Package\""
@@ -502,16 +500,13 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				}
 			}
 
-			// only need to send a confirmation when not downloading spkg files
-			if sendDownloadedFilesConfirmation {
-				if err := sendFunc(&pbconvo.UserInput{
-					FromActionId: resp.ActionId,
-					Entry: &pbconvo.UserInput_DownloadedFiles_{
-						DownloadedFiles: &pbconvo.UserInput_DownloadedFiles{},
-					},
-				}); err != nil {
-					return fmt.Errorf("error sending confirmation: %w", err)
-				}
+			if err := sendFunc(&pbconvo.UserInput{
+				FromActionId: resp.ActionId,
+				Entry: &pbconvo.UserInput_DownloadedFiles_{
+					DownloadedFiles: &pbconvo.UserInput_DownloadedFiles{},
+				},
+			}); err != nil {
+				return fmt.Errorf("error sending confirmation: %w", err)
 			}
 
 		default:

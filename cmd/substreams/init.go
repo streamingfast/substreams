@@ -216,9 +216,11 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			// TODO: reconnect, and send the Hydrate message to continue the conversation...
 			return fmt.Errorf("connection error: %w", err)
 		}
+
 		if resp.State != "" {
 			lastState.State = []byte(resp.State)
 		}
+
 		if INIT_TRACE {
 			cnt, _ := json.MarshalIndent(resp.Entry, "", "  ")
 			fmt.Printf("INPUT: %T %s\n", resp.Entry, string(cnt))
@@ -232,6 +234,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to marshal generator state: %w", err)
 		}
+
 		if err = os.WriteFile(stateFile, cnt, 0644); err != nil {
 			return fmt.Errorf("error writing generator state %w", err)
 		}
@@ -432,6 +435,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("no files to download")
 			}
 
+			overwriteForm := NewOverwriteForm()
 			for _, inputFile := range input.Files {
 				switch inputFile.Type {
 				case "application/x-zip+extract": // our custom mime type to always extract the file upon arrival
@@ -440,11 +444,12 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					if projectName := gjson.GetBytes(lastState.State, "name").String(); projectName != "" {
 						savingDest = projectName
 					}
+
 					if cwd, err := os.Getwd(); err == nil {
 						savingDest = filepath.Join(cwd, savingDest)
 					}
-					inputField := huh.NewInput().Title("In which directory do you want to download the project?").Value(&savingDest)
 
+					inputField := huh.NewInput().Title("In which directory do you want to download the project?").Value(&savingDest)
 					inputField.Validate(func(userInput string) error {
 						fmt.Println("Checking directory", userInput)
 						fileInfo, err := os.Stat(userInput)
@@ -473,14 +478,14 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					fmt.Printf("\nProject will be saved in %s\n", zipRoot)
 
 					sourcePath := filepath.Join(zipRoot, inputFile.Filename)
-					err = saveDownloadFile(sourcePath, inputFile)
+					err = saveDownloadFile(sourcePath, overwriteForm, inputFile)
 					if err != nil {
 						return fmt.Errorf("saving zip file: %w", err)
 					}
 
 					zipContent := inputFile.Content
 					fmt.Printf("Unzipping %s into %s\n", inputFile.Filename, zipRoot)
-					err = unzipFile(zipContent, zipRoot)
+					err = unzipFile(overwriteForm, zipContent, zipRoot)
 					if err != nil {
 						return fmt.Errorf("unzipping file: %w", err)
 					}
@@ -492,7 +497,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					// "application/zip", "application/x-zip"
 					// "text/plain":
 					fullPath := filepath.Join(userState.downloadedFilesfolderPath, inputFile.Filename)
-					err = saveDownloadFile(fullPath, inputFile)
+					err = saveDownloadFile(fullPath, overwriteForm, inputFile)
 					if err != nil {
 						return fmt.Errorf("saving spkg file: %w", err)
 					}
@@ -521,29 +526,25 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-type initListElement struct {
-	Label string
-	Value string
-}
-
-func saveDownloadFile(path string, inputFile *pbconvo.SystemOutput_DownloadFile) (err error) {
+func saveDownloadFile(path string, overwriteForm *OverwriteForm, inputFile *pbconvo.SystemOutput_DownloadFile) (err error) {
 	dir := filepath.Dir(path)
 	err = os.MkdirAll(dir, 0755)
 	if err != nil {
 		return fmt.Errorf("creating sub-directory %q: %w", path, err)
 	}
 
-	overwrite := true
-	if _, err := os.Stat(path); err == nil {
-		overwrite, err = creatingOverwriteForm(path)
-		if err != nil {
-			return fmt.Errorf(": %w", err)
-		}
-	}
+	if !overwriteForm.OverwriteAll {
+		if _, err := os.Stat(path); err == nil {
+			err = overwriteForm.createOverwriteForm(path)
+			if err != nil {
+				return fmt.Errorf(": %w", err)
+			}
 
-	if !overwrite {
-		fmt.Println("Skipping", path)
-		return nil
+			if !overwriteForm.Overwrite {
+				fmt.Println("Skipping", path)
+				return nil
+			}
+		}
 	}
 
 	err = os.WriteFile(path, inputFile.Content, 0644)
@@ -569,7 +570,7 @@ func bold(input string) string {
 	return lipgloss.NewStyle().Bold(true).Render(input)
 }
 
-func unzipFile(zipContent []byte, zipRoot string) error {
+func unzipFile(overwriteForm *OverwriteForm, zipContent []byte, zipRoot string) error {
 	reader := bytes.NewReader(zipContent)
 	zipReader, err := zip.NewReader(reader, int64(len(zipContent)))
 	if err != nil {
@@ -579,15 +580,17 @@ func unzipFile(zipContent []byte, zipRoot string) error {
 	for _, f := range zipReader.File {
 		filePath := filepath.Join(zipRoot, f.Name)
 
-		if _, err := os.Stat(filePath); err == nil {
-			overwrite, err := creatingOverwriteForm(filePath)
-			if err != nil {
-				return fmt.Errorf(": %w", err)
-			}
+		if !overwriteForm.OverwriteAll {
+			if _, err := os.Stat(filePath); err == nil {
+				err := overwriteForm.createOverwriteForm(filePath)
+				if err != nil {
+					return fmt.Errorf(": %w", err)
+				}
 
-			if !overwrite {
-				fmt.Println("Skipping", filePath)
-				continue
+				if !overwriteForm.Overwrite {
+					fmt.Println("Skipping", filePath)
+					continue
+				}
 			}
 		}
 
@@ -620,18 +623,56 @@ func unzipFile(zipContent []byte, zipRoot string) error {
 	return nil
 }
 
-func creatingOverwriteForm(path string) (bool, error) {
-	var overwrite bool
-	confirm := huh.NewConfirm().
-		Title(fmt.Sprintf("File already exists, Do you want to overwrite %s ?", path)).
-		Affirmative("Yes, overwrite").
-		Negative("No").
-		Value(&overwrite)
+type OverwriteForm struct {
+	Overwrite    bool
+	OverwriteAll bool
+}
 
-	err := huh.NewForm(huh.NewGroup(confirm)).WithAccessible(WITH_ACCESSIBLE).Run()
-	if err != nil {
-		return false, fmt.Errorf("failed confirming: %w", err)
+func NewOverwriteForm() *OverwriteForm {
+	return &OverwriteForm{
+		Overwrite:    false,
+		OverwriteAll: false,
+	}
+}
+
+func (f *OverwriteForm) createOverwriteForm(path string) error {
+	options := []huh.Option[string]{
+		{
+			Key:   "No",
+			Value: "no",
+		},
+		{
+			Key:   "Yes, overwrite",
+			Value: "yes",
+		},
+		{
+			Key:   "Yes, overwrite all",
+			Value: "yes_all",
+		},
 	}
 
-	return overwrite, nil
+	var selection string
+	selectField := huh.NewSelect[string]().
+		Title(fmt.Sprintf("File already exists, Do you want to overwrite %s ?", path)).
+		Options(options...).
+		Value(&selection)
+
+	err := huh.NewForm(huh.NewGroup(selectField)).WithAccessible(WITH_ACCESSIBLE).Run()
+	if err != nil {
+		f.Overwrite = false
+		return fmt.Errorf("failed confirming: %w", err)
+	}
+
+	switch selection {
+	case "no":
+		f.Overwrite = false
+	case "yes":
+		f.Overwrite = true
+	case "yes_all":
+		fmt.Println("Overwriting all files", f.Overwrite, f.OverwriteAll)
+		f.Overwrite = true
+		f.OverwriteAll = true
+	}
+
+	return nil
 }

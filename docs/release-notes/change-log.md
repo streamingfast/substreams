@@ -9,16 +9,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
-
-### Fixed
-
-* Truncate error messages log lines to 18k characters to prevent them from disappearing through some load balancers.
-
-### Added
-
-* Add a substreams `live back filler` once substreams tier1 is requested in `production mode`. 
-  It enables, create `substreams cache` when block are processed live on tier1. 
+## v1.8.0
 
 ### Remote Code Generation
 
@@ -28,12 +19,14 @@ This allows flexibility and getting anything from "skeleton" of a substreams for
 
 ### Added
 * Add 'compressed' boolean field to the 'incoming request' log
+* Add a substreams `live back filler`, so a request running close to HEAD in production-mode on tier1 will trigger jobs on tier2 when boundaries are passed by final blocks, backfilling the cache. These jobs will be "unmetered".
 
 ### Fixed
 * Fixed Substreams tier1 active worker request metrics that was not decrementing correctly.
+* Truncate error messages log lines to 18k characters to prevent them from disappearing through some load balancers.
 
 ### Removed
-* Removed local ethereum codegen.
+* Removed local ethereum code generation from `init` command.
 
 ## v1.7.3
 

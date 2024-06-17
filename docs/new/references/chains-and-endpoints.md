@@ -54,6 +54,7 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 * **Arweave Mainnet**: `mainnet.arweave.streamingfast.io:443`
 * **Bitcoin Mainnet**: `mainnet.btc.streamingfast.io:443`
 * **Injective Mainnet**: `mainnet.injective.streamingfast.io:443`
+* **Injective Testnet**: `testnet.injective.streamingfast.io:443`
 
 ## Community Endpoints
 

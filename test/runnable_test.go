@@ -318,7 +318,15 @@ type TestRunner struct {
 }
 
 func (r *TestRunner) StreamFactory(_ context.Context, h bstream.Handler, startBlockNum int64, stopBlockNum uint64, _ string, _ bool, _ bool, _ *zap.Logger) (service.Streamable, error) {
-	r.pipe = h.(*pipeline.Pipeline)
+	var liveBackFiller *service.LiveBackFiller
+
+	if liveBackFillerHandler, ok := h.(*service.LiveBackFiller); ok {
+		liveBackFiller = liveBackFillerHandler
+		r.pipe = liveBackFiller.NextHandler.(*pipeline.Pipeline)
+	} else if pipelineHandler, ok := h.(*pipeline.Pipeline); ok { // Check if h is of type *pipeline.Pipeline
+		r.pipe = pipelineHandler
+	}
+
 	r.Shutter = shutter.New()
 	r.generator = r.blockGeneratorFactory(uint64(startBlockNum), stopBlockNum)
 	return r, nil

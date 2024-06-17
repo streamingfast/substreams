@@ -65,6 +65,7 @@ func (g *Graph) ModuleHashes() *manifest.ModuleHashes { return g.moduleHashes }
 func (g *Graph) LowestInitBlock() uint64              { return g.lowestInitBlock }
 func (g *Graph) LowestStoresInitBlock() *uint64       { return g.lowestStoresInitBlock }
 func (g *Graph) ModulesInitBlocks() map[string]uint64 { return g.modulesInitBlocks }
+func (g *Graph) OutputModuleStageIndex() int          { return len(g.stagedUsedModules) - 1 }
 
 func NewOutputModuleGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules) (out *Graph, err error) {
 	out = &Graph{

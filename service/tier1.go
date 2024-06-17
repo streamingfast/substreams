@@ -140,6 +140,7 @@ func NewTier1(
 		func(logger *zap.Logger) work.Worker {
 			return work.NewRemoteWorker(clientFactory, logger)
 		},
+		clientFactory,
 	)
 
 	sf := &StreamFactory{
@@ -434,7 +435,9 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		logger.Warn("cannot write package", zap.Error(err))
 	}
 
-	execOutputConfigs, err := execout.NewConfigs(cacheStore, execGraph.UsedModules(), execGraph.ModuleHashes(), s.runtimeConfig.SegmentSize, logger)
+	segmentSize := s.runtimeConfig.SegmentSize
+
+	execOutputConfigs, err := execout.NewConfigs(cacheStore, execGraph.UsedModules(), execGraph.ModuleHashes(), segmentSize, logger)
 	if err != nil {
 		return fmt.Errorf("new config map: %w", err)
 	}
@@ -444,7 +447,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		return fmt.Errorf("configuring stores: %w", err)
 	}
 
-	stores := pipeline.NewStores(ctx, storeConfigs, s.runtimeConfig.SegmentSize, requestDetails.LinearHandoffBlockNum, request.StopBlockNum, false, nil)
+	stores := pipeline.NewStores(ctx, storeConfigs, segmentSize, requestDetails.LinearHandoffBlockNum, request.StopBlockNum, false, nil)
 
 	execOutputCacheEngine, err := cache.NewEngine(ctx, nil, s.blockType, nil, nil) // we don't read or write ExecOuts on tier1
 	if err != nil {
@@ -473,7 +476,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		execOutputConfigs,
 		wasmRuntime,
 		execOutputCacheEngine,
-		s.runtimeConfig.SegmentSize,
+		segmentSize,
 		s.runtimeConfig.WorkerFactory,
 		respFunc,
 		opts...,
@@ -488,7 +491,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 
 	reqPlan, err := plan.BuildTier1RequestPlan(
 		requestDetails.ProductionMode,
-		s.runtimeConfig.SegmentSize,
+		segmentSize,
 		execGraph.LowestInitBlock(),
 		requestDetails.ResolvedStartBlockNum,
 		requestDetails.LinearHandoffBlockNum,
@@ -536,9 +539,18 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		zap.String("cursor", cursor),
 	)
 
+	var streamHandler bstream.Handler
+	if requestDetails.ProductionMode {
+		liveBackFiller := NewLiveBackFiller(pipe, logger, execGraph.OutputModuleStageIndex(), segmentSize, requestDetails.LinearHandoffBlockNum, s.runtimeConfig.ClientFactory, RequestBackProcessing)
+		go liveBackFiller.Start(ctx)
+		streamHandler = liveBackFiller
+	} else {
+		streamHandler = pipe
+	}
+
 	blockStream, err := s.streamFactoryFunc(
 		ctx,
-		pipe,
+		streamHandler,
 		int64(requestDetails.LinearHandoffBlockNum),
 		request.StopBlockNum,
 		cursor,

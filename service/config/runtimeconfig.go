@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/orchestrator/work"
 
 	"github.com/streamingfast/dstore"
@@ -15,10 +16,10 @@ type RuntimeConfig struct {
 	DefaultParallelSubrequests uint64 // how many sub-jobs to launch for a given user
 	// derives substores `states/`, for `store` modules snapshots (full and partial)
 	// and `outputs/` for execution output of both `map` and `store` module kinds
-	BaseObjectStore dstore.Store
-	DefaultCacheTag string // appended to BaseObjectStore unless overriden by auth layer
-	WorkerFactory   work.WorkerFactory
-
+	BaseObjectStore        dstore.Store
+	DefaultCacheTag        string // appended to BaseObjectStore unless overriden by auth layer
+	WorkerFactory          work.WorkerFactory
+	ClientFactory          client.InternalClientFactory
 	ModuleExecutionTracing bool
 }
 
@@ -29,6 +30,7 @@ func NewTier1RuntimeConfig(
 	baseObjectStore dstore.Store,
 	defaultCacheTag string,
 	workerFactory work.WorkerFactory,
+	clientFactory client.InternalClientFactory,
 ) RuntimeConfig {
 	return RuntimeConfig{
 		SegmentSize:                segmentSize,
@@ -37,6 +39,7 @@ func NewTier1RuntimeConfig(
 		BaseObjectStore:            baseObjectStore,
 		DefaultCacheTag:            defaultCacheTag,
 		WorkerFactory:              workerFactory,
+		ClientFactory:              clientFactory,
 		// overridden by Tier Options
 		ModuleExecutionTracing: false,
 	}

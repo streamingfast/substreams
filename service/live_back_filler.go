@@ -17,6 +17,9 @@ import (
 	"go.uber.org/zap"
 )
 
+const finalBlockDelay = 120
+const backfillRetries = 999 // no point in failing "early". It may be failing because merged blocks are lagging behind a little bit.
+
 type RequestBackProcessingFunc = func(ctx context.Context, logger *zap.Logger, blockRange *block.Range, stageToProcess int, clientFactory client.InternalClientFactory, jobCompleted chan error)
 
 type LiveBackFiller struct {
@@ -25,7 +28,6 @@ type LiveBackFiller struct {
 	irreversibleBlock     chan uint64
 	currentSegment        uint64
 	segmentSize           uint64
-	receivedBlockNumbers  map[uint64]struct{}
 	logger                *zap.Logger
 	stageToProcess        int
 	clientFactory         client.InternalClientFactory
@@ -58,9 +60,10 @@ func (l *LiveBackFiller) ProcessBlock(blk *pbbstream.Block, obj interface{}) (er
 func RequestBackProcessing(ctx context.Context, logger *zap.Logger, blockRange *block.Range, stageToProcess int, clientFactory client.InternalClientFactory, jobResult chan error) {
 	liveBackFillerRequest := work.NewRequest(ctx, reqctx.Details(ctx), stageToProcess, blockRange)
 
-	err := derr.RetryContext(ctx, 999, func(ctx context.Context) error {
+	err := derr.RetryContext(ctx, backfillRetries, func(ctx context.Context) error {
 		err := requestBackProcessing(ctx, logger, liveBackFillerRequest, clientFactory)
 		if err != nil {
+			logger.Debug("retryable error while live backprocessing", zap.Error(err))
 			return err
 		}
 
@@ -71,12 +74,13 @@ func RequestBackProcessing(ctx context.Context, logger *zap.Logger, blockRange *
 }
 
 func requestBackProcessing(ctx context.Context, logger *zap.Logger, liveCachingRequest *pbssinternal.ProcessRangeRequest, clientFactory client.InternalClientFactory) error {
+	zlog.Debug("request live back filling", zap.Uint64("start_block", liveCachingRequest.StartBlock()), zap.Uint64("end_block", liveCachingRequest.StopBlock()))
+
 	grpcClient, closeFunc, grpcCallOpts, _, err := clientFactory()
 	if err != nil {
-		logger.Warn("failed to create live cache grpc client", zap.Error(err))
+		return fmt.Errorf("failed to create live cache grpc client: %w", err)
 	}
 
-	zlog.Debug("request live back filling", zap.Uint64("start_block", liveCachingRequest.StartBlock()), zap.Uint64("end_block", liveCachingRequest.StopBlock()))
 	stream, err := grpcClient.ProcessRange(ctx, liveCachingRequest, grpcCallOpts...)
 	if err != nil {
 		return fmt.Errorf("getting stream: %w", err)
@@ -140,7 +144,7 @@ func (l *LiveBackFiller) Start(ctx context.Context) {
 
 		segmentStart := l.currentSegment * l.segmentSize
 		segmentEnd := (l.currentSegment + 1) * l.segmentSize
-		mergedBlockIsWritten := (blockNumber - segmentStart) > 120
+		mergedBlockIsWritten := (blockNumber - segmentStart) > finalBlockDelay
 
 		if (targetSegment > l.currentSegment) && mergedBlockIsWritten {
 

@@ -11,6 +11,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Fixed
+
+* Truncate error messages log lines to 18k characters to prevent them from disappearing through some load balancers.
+
+### Added
+
 * Add a substreams `live back filler` once substreams tier1 is requested in `production mode`. 
   It enables, create `substreams cache` when block are processed live on tier1. 
 

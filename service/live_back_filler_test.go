@@ -21,83 +21,62 @@ func TestBackFiller(t *testing.T) {
 	cases := []struct {
 		name                     string
 		segmentSize              uint64
-		blocks                   []*pbbstream.Block
+		startRange               uint64
+		endRange                 uint64
 		linearHandoff            uint64
 		stageToProcess           int
 		errorBackProcessing      bool
 		expectedSegmentProcessed []uint64
 	}{
+		// In those cases, from startRange to endRange, blocks are processed using a testSource.
+		// In the back filler, once a block is processed above next current segment + 120, the current segment should be requested to tier2 (be cached).
+		// That's why in the `sunny path` test case, only the segment 11 is processed. From linearHandOff=100, the first request is sent to tier2,
+		// once block 231 > 11 (next segment) * 10 (segment size)  + 120 (finalBlockDelay).
+
 		{
-			name:        "sunny path",
-			segmentSize: 10,
-			blocks: []*pbbstream.Block{
-				{Number: 199},
-				{Number: 200},
-				{Number: 201},
-				{Number: 202},
-				{Number: 223},
-				{Number: 323},
-			},
+			name:                     "sunny path",
+			segmentSize:              10,
+			startRange:               101,
+			endRange:                 231,
 			linearHandoff:            100,
 			errorBackProcessing:      false,
 			expectedSegmentProcessed: []uint64{11},
 		},
 		{
-			name:        "with job failing",
-			segmentSize: 10,
-			blocks: []*pbbstream.Block{
-				{Number: 199},
-				{Number: 200},
-				{Number: 201},
-				{Number: 202},
-				{Number: 223},
-				{Number: 323},
-			},
+			name:                     "with job failing",
+			segmentSize:              10,
+			startRange:               101,
+			endRange:                 231,
 			linearHandoff:            100,
 			errorBackProcessing:      true,
 			expectedSegmentProcessed: []uint64{11},
 		},
 
 		{
-			name:        "processing multiple segments",
-			segmentSize: 10,
-			blocks: []*pbbstream.Block{
-				{Number: 199},
-				{Number: 200},
-				{Number: 201},
-				{Number: 202},
-				{Number: 223},
-				{Number: 260},
-				{Number: 270},
-			},
+			name:                     "processing multiple segments",
+			segmentSize:              10,
+			startRange:               101,
+			endRange:                 261,
 			linearHandoff:            100,
 			errorBackProcessing:      false,
 			expectedSegmentProcessed: []uint64{11, 12, 13, 14},
 		},
 
 		{
-			name:        "big segment size",
-			segmentSize: 1000,
-			blocks: []*pbbstream.Block{
-				{Number: 101},
-				{Number: 1001},
-				{Number: 2021},
-			},
+			name:                     "big segment size",
+			segmentSize:              1000,
+			startRange:               101,
+			endRange:                 2021,
 			linearHandoff:            100,
 			errorBackProcessing:      false,
 			expectedSegmentProcessed: []uint64{1},
 		},
 
 		{
-			name:        "multiple big segment size",
-			segmentSize: 1000,
-			blocks: []*pbbstream.Block{
-				{Number: 101},
-				{Number: 1001},
-				{Number: 2021},
-				{Number: 3021},
-				{Number: 4023},
-			},
+			name:                     "multiple big segment size",
+			segmentSize:              1000,
+			startRange:               101,
+			endRange:                 4023,
 			linearHandoff:            100,
 			errorBackProcessing:      false,
 			expectedSegmentProcessed: []uint64{1, 2, 3},
@@ -131,7 +110,11 @@ func TestBackFiller(t *testing.T) {
 
 			go testSource.Run()
 
-			for _, block := range c.blocks {
+			//Start from fromBlocks, to toBlocks
+			for currentBlockNum := c.startRange; currentBlockNum <= c.endRange; currentBlockNum++ {
+				fmt.Println("pushing block", currentBlockNum)
+				block := &pbbstream.Block{
+					Number: currentBlockNum}
 				obj := &testObject{step: bstream.StepIrreversible}
 				err := testSource.Push(block, obj)
 				require.NoError(t, err)
@@ -156,7 +139,6 @@ func TestBackFiller(t *testing.T) {
 				fmt.Println("timeout")
 				t.Fail()
 			}
-
 			require.Equal(t, c.expectedSegmentProcessed, receivedSegmentProcessed)
 		})
 	}

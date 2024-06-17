@@ -31,7 +31,7 @@ func TestBackFiller(t *testing.T) {
 		// In those cases, from startRange to endRange, blocks are processed using a testSource.
 		// In the back filler, once a block is processed above next current segment + 120, the current segment should be requested to tier2 (be cached).
 		// That's why in the `sunny path` test case, only the segment 11 is processed. From linearHandOff=100, the first request is sent to tier2,
-		// once block 231 > 11 (next segment) * 10 (segment size)  + 120 (finalBlockDelay).
+		// once block 231 > 11 (next segment) * 10 (segment size)  + 120 (finalBlockDelay) is processed.
 
 		{
 			name:                     "sunny path",

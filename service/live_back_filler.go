@@ -144,7 +144,7 @@ func (l *LiveBackFiller) Start(ctx context.Context) {
 
 		segmentStart := l.currentSegment * l.segmentSize
 		segmentEnd := (l.currentSegment + 1) * l.segmentSize
-		mergedBlockIsWritten := (blockNumber - segmentStart) > finalBlockDelay
+		mergedBlockIsWritten := (blockNumber - segmentEnd) > finalBlockDelay
 
 		if (targetSegment > l.currentSegment) && mergedBlockIsWritten {
 

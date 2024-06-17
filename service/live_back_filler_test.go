@@ -36,6 +36,7 @@ func TestBackFiller(t *testing.T) {
 				{Number: 201},
 				{Number: 202},
 				{Number: 223},
+				{Number: 323},
 			},
 			linearHandoff:            100,
 			errorBackProcessing:      false,
@@ -50,6 +51,7 @@ func TestBackFiller(t *testing.T) {
 				{Number: 201},
 				{Number: 202},
 				{Number: 223},
+				{Number: 323},
 			},
 			linearHandoff:            100,
 			errorBackProcessing:      true,
@@ -66,10 +68,39 @@ func TestBackFiller(t *testing.T) {
 				{Number: 202},
 				{Number: 223},
 				{Number: 260},
+				{Number: 270},
 			},
 			linearHandoff:            100,
 			errorBackProcessing:      false,
 			expectedSegmentProcessed: []uint64{11, 12, 13, 14},
+		},
+
+		{
+			name:        "big segment size",
+			segmentSize: 1000,
+			blocks: []*pbbstream.Block{
+				{Number: 101},
+				{Number: 1001},
+				{Number: 2021},
+			},
+			linearHandoff:            100,
+			errorBackProcessing:      false,
+			expectedSegmentProcessed: []uint64{1},
+		},
+
+		{
+			name:        "multiple big segment size",
+			segmentSize: 1000,
+			blocks: []*pbbstream.Block{
+				{Number: 101},
+				{Number: 1001},
+				{Number: 2021},
+				{Number: 3021},
+				{Number: 4023},
+			},
+			linearHandoff:            100,
+			errorBackProcessing:      false,
+			expectedSegmentProcessed: []uint64{1, 2, 3},
 		},
 	}
 

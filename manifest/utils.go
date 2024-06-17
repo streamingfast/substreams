@@ -107,6 +107,7 @@ var HardcodedEndpoints = map[string]string{
 	"bitcoin":           "btc-mainnet.streamingfast.io:443",
 	"chapel":            "chapel.substreams.pinax.network:443",
 	"injective-mainnet": "mainnet.injective.streamingfast.io:443",
+	"injective-testnet": "testnet.injective.streamingfast.io:443",
 
 	// antelope chains
 	"eos":       "eos.substreams.pinax.network:443",

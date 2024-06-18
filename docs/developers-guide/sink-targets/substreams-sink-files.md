@@ -114,7 +114,7 @@ The output type for sink is a list of lines. The line content can be any type an
 
 ```yaml
 imports:
-  sink_files: https://github.com/streamingfast/substreams-sink-files/releases/download/v0.2.0/substreams-sink-files-v0.2.0.spkg
+  sink_files: https://github.com/streamingfast/substreams-sink-files/releases/download/v2.1.0/substreams-sink-files-v2.1.0.spkg
 
 binaries:
   default:

@@ -669,7 +669,6 @@ func (f *OverwriteForm) createOverwriteForm(path string) error {
 	case "yes":
 		f.Overwrite = true
 	case "yes_all":
-		fmt.Println("Overwriting all files", f.Overwrite, f.OverwriteAll)
 		f.Overwrite = true
 		f.OverwriteAll = true
 	}

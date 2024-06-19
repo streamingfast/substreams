@@ -88,6 +88,8 @@ var HardcodedEndpoints = map[string]string{
 	"mainnet":           "mainnet.eth.streamingfast.io:443",
 	"matic":             "polygon.streamingfast.io:443",
 	"polygon":           "polygon.streamingfast.io:443",
+	"amoy":              "amoy.substreams.pinax.network:443",
+	"polygon-amoy":      "amoy.substreams.pinax.network:443",
 	"goerli":            "goerli.eth.streamingfast.io:443",
 	"mumbai":            "mumbai.streamingfast.io:443",
 	"bnb":               "bnb.streamingfast.io:443",

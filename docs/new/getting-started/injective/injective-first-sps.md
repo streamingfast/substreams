@@ -53,9 +53,17 @@ The [entities defined in the GraphQL schema](https://thegraph.com/docs/en/develo
 
 4. The `subgraph.yaml` file is the configuration file of the subgraph. It defines the source code of the subgraph (in this case, Substreams) and the handler that will receive the data extracted from Injective (in this case, the `handleEvents` function).
 
+## Build the Project
+
+Before deploying your subgraph, you must install and generate all the necessary code:
+1. Run `npm install` to install the dependencies of the project.
+2. Run `npm run generate` to generate the output of the Substreams (i.e. the Injective event list) in AssemblyScript. This allows you to access the output of the Substreams inside the AssemblyScript code.
+In this case, the `EventList` object, representing a list of Injective events, is generated
+3. Run `npm run codegen` to generate the subgraph entities that you have defined in the `schema.graphql` file.
+
 ## Test the Subgraph
 
-A subgraph project is really an NPM-based project, so first you must install all the dependencies by running `npm install`.
+After installing all the necessary depdendencies of the project, you are now able to deploy the subgraph a local Graph Node.
 
 In a production environment, you will publish your subgraph to the [The Graph decentralized network](https://thegraph.com/docs/en/publishing/publishing-a-subgraph/) (note that The Graph Studio, the hosted testing environment, is not supported for Injective).
 

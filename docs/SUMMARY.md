@@ -6,7 +6,7 @@
 
 * [Getting Started](new/getting-started/intro-getting-started.md)
   * [EVM](new/getting-started/evm/intro-evm.md)
-  * [Solana](new/getting-started/evm/intro-solana.md)
+  * [Solana](new/getting-started/solana/intro-solana.md)
   * [Injective](new/getting-started/injective/intro-injective.md)
     * [Your First Injective Subgraph](new/getting-started/injective/injective-first-sps.md)
 * [Consume Substreams](new/consume/consume.md)

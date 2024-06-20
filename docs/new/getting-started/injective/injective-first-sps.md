@@ -30,7 +30,7 @@ If you input `wasm` and `injective.exchange.v1beta1.EventCancelDerivativeOrder` 
 
 7. `Package build`: whether you want the Substreams package to the built.
 The Substreams package is the binary that extracts all the data from the Injective blockchain.
-**Always select `Yes, build it`. Otherwise, you'd have to _unzip_ the project and built it yourself.**
+**Always select `Yes, build it`. Otherwise, you'd have to _unzip_ the project and build it yourself.**
 
 8. `Directory`: lastly, choose the directory where you want to create the project.
 
@@ -49,7 +49,7 @@ Now, let's inspect the project and understand all the files created. In an IDE o
 The Graph Node (i.e. the software that runs your subgraph) uses the `spkg` file to extract the Injective data and provide it as AssemblyScript code to the `handleEvents` function.
 
 3. The `schema.graphql` file contains the subgraph entities. You can use this file to define the output model of your subgraph.
-The entities defined in the GraphQL schema are generated into AssemblyScript code by running the `graph codegen`.
+The [entities defined in the GraphQL schema](https://thegraph.com/docs/en/developing/creating-a-subgraph/#the-graphql-schema) are generated into AssemblyScript code by running the `graph codegen`.
 
 4. The `subgraph.yaml` file is the configuration file of the subgraph. It defines the source code of the subgraph (in this case, Substreams) and the handler that will receive the data extracted from Injective (in this case, the `handleEvents` function).
 
@@ -57,9 +57,9 @@ The entities defined in the GraphQL schema are generated into AssemblyScript cod
 
 A subgraph project is really an NPM-based project, so first you must install all the dependencies by running `npm install`.
 
-In a production environment, you will publish your subgraph to the (The Graph decentralized network)[https://thegraph.com/docs/en/publishing/publishing-a-subgraph/] (note that The Graph Studio, the hosted testing environment, is not supported for Injective).
+In a production environment, you will publish your subgraph to the [The Graph decentralized network](https://thegraph.com/docs/en/publishing/publishing-a-subgraph/) (note that The Graph Studio, the hosted testing environment, is not supported for Injective).
 
-Before publishing to decentralized network, you can test your subgraph locally, thus not incurring in any costs associated with the deployment. You can run a Graph Node instance (the software that indexers use) in a Docker environment, and replicate the deployment locally.
+**Before publishing to decentralized network, you can test your subgraph locally**, thus not incurring in any costs associated with the deployment. You can run a Graph Node instance (the software that indexers use) in a Docker environment, and replicate the deployment locally.
 
 In the project that you created previously, the `dev-environment` folders contains all the necessary files to spin up a Docker-based Graph Node environment (note that you will need Docker installed and available in your computer).
 

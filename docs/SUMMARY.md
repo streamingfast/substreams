@@ -1,11 +1,14 @@
 # Table of contents
 
 * [What is Substreams?](README.md)
-* [Substreams for Solana Developers](new/common/intro-solana.md)
-* [Substreams for Injective Developers](new/common/intro-injective.md)
 
 ## Documentation
 
+* [Getting Started](new/getting-started/intro-getting-started.md)
+  * [EVM](new/getting-started/evm/intro-evm.md)
+  * [Solana](new/getting-started/evm/intro-solana.md)
+  * [Injective](new/getting-started/injective/intro-injective.md)
+    * [Your First Injective Subgraph](new/getting-started/injective/injective-first-sps.md)
 * [Consume Substreams](new/consume/consume.md)
   * [Install the CLI](new/common/installing-the-cli.md)
   * [Authentication](new/common/authentication.md)

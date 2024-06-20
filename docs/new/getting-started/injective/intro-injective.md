@@ -1,6 +1,6 @@
 **With Substreams, you can extract data from the Injective blockchain**. Then, you can consume the data in several ways, such as a subgraph, through gRPC streaming, using a SQL database and many more.
 
-<figure><img src="../../.gitbook/assets/intro/injective-logo.png" width="100%" /></figure>
+<figure><img src="../../../.gitbook/assets/intro/injective-logo.png" width="100%" /></figure>
 
 # Getting Started
 
@@ -48,7 +48,7 @@ dataSources:
 1. The Substreams package you want to import into your subgraph.
 2. The module (contained within the package) that you want to consume data from.
 
-Although developing a Substreams-powered Subgraph should be easy enough without knowing about the internal of Substreams, we still recommend to go through the following sections of the documentation:
+Although developing a Substreams-powered Subgraph should be easy enough without knowing about the internals of Substreams, we still recommend to go through the following sections of the documentation:
 
 - [Install the Substreams CLI](./installing-the-cli.md)
 - [Authentication](./authentication.md)

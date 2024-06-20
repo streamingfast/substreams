@@ -35,7 +35,7 @@
 * [Develop Substreams](new/develop/develop.md)
   * [Install the CLI](new/common/installing-the-cli.md)
   * [Authentication](new/common/authentication.md)
-  * [Quickstart](new/develop/init-project.md)
+  <!--* [Quickstart](new/develop/init-project.md)-->
   * [Manifest & Modules](new/common/manifest-modules.md)
     * [Module types](new/develop/modules/types.md)
     * [Inputs](new/develop/modules/inputs.md)

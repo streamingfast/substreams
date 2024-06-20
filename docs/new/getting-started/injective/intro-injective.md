@@ -66,22 +66,23 @@ First, you must consider whether you want to develop your own Substreams or cons
 
 **If you have found a Substreams package that fits your needs**, then explore the [Consume Substreams](../consume/consume.md) section. At the most basic level you should cover:
 
-- [Install the Substreams CLI](./installing-the-cli.md)
-- [Authentication](./authentication.md)
-- [Packages](./packages.md)
+- [Install the Substreams CLI](../../common/installing-the-cli.md)
+- [Authentication](../../common/authentication.md)
+- [Packages](../../common/packages.md)
 - Choose how you want to consume the data:
-    - [Send the data to a SQL database.](./../consume/sql/sql.md)
-    - [Stream the data from your application.](../consume/stream/stream.md)
+    - [Send the data to a SQL database.](../../consume/sql/sql.md)
+    - [Stream the data from your application.](../../consume/stream/stream.md)
+    - [Send the data to a subgraph.](../../consume/subgraph/subgraph.md)
 
 **If you can't find a Substreams package that fits your needs**, then you can go ahead and develop your own Substreams by writing a Rust program. The [Develop Substreams](../develop/develop.md) section of the documentation covers everything you need to know about building a Substreams from scratch. At the most basic level, you should cover:
 
-- [Install the Substreams CLI](./installing-the-cli.md)
-- [Authentication](./authentication.md)
-- [Manifest & Modules](./../common/manifest-modules.md)
-- [Protobuf defitions](./../develop/creating-protobuf-schemas.md)
-- [Packages](./packages.md)
-- [Run a Substreams](./running-substreams.md)
-- [Choose how you want to consume the data](./../consume/consume.md)
+- [Install the Substreams CLI](../../common/installing-the-cli.md)
+- [Authentication](../../common/authentication.md)
+- [Manifest & Modules](../../common/manifest-modules.md)
+- [Protobuf defitions](../../develop/creating-protobuf-schemas.md)
+- [Packages](../../common/packages.md)
+- [Run a Substreams](../../common/running-substreams.md)
+- [Choose how you want to consume the data](../../consume/consume.md)
 
 ## The Injective Data Model
 

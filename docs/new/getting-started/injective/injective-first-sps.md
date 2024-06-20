@@ -66,18 +66,22 @@ In the project that you created previously, the `dev-environment` folders contai
 1. Spin up the environment by running the `dev-environment/start.sh` script.
 This script will create a Graph Node instance, a Postgres node and an IPFS node (all these dependencies are necessary for the local Graph Node to succesfully work).
 
-2. Once the Graph Node has started, in another command-line session, create a new subgraph using the Graph CLI:
+2. Once the Graph Node has started, in another command-line session, create a new subgraph using the NPM scripts provided in the project:
+
+{% hint style="info" %}
+**Note**: The NPM scripts, defined in the `scripts` section of the `package.json` file, are just a wrapped of the Graph CLI commands.
+{% endhint %}
 
 ```bash
-graph create subgraph1 --node=http://localhost:8020
+npm run create-local
 ```
 
-The previous command connects to the local Graph Node (`http://localhost:8020`) and creates a subgraph called `subgraph1`. You can always remove the subgraph using the `graph remove` command.
+The previous command connects to the local Graph Node and creates a subgraph. You can always remove the subgraph using the `npm run remove-local` command.
 
 3. Deploy the subgraph.
 
 ```bash
-graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 subgraph1
+npm run deploy-local
 ```
 
-The previous command deploys the `subgraph1` command to the local Graph Node. You can now go back to the logs of the local Graph Node and see the subgraph indexing.
+The previous command deploys the subgraph to the local Graph Node. You can now go back to the logs of the local Graph Node and check out the subgraph indexing.

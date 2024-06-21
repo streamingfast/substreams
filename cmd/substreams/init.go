@@ -314,15 +314,13 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		case *pbconvo.SystemOutput_TextInput_:
 			input := msg.TextInput
 
-			var returnValue string
+			returnValue := input.DefaultValue
+
 			inputField := huh.NewInput().
 				Title(input.Prompt).
 				Description(input.Description).
 				Placeholder(input.Placeholder).
 				Value(&returnValue)
-			if input.DefaultValue != "" {
-				inputField.Suggestions([]string{input.DefaultValue})
-			}
 
 			if input.ValidationRegexp != "" {
 				validationRE, err := regexp.Compile(input.ValidationRegexp)

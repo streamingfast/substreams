@@ -107,6 +107,33 @@ The definition of `store` method behavior is:
 * The `get_first` method first goes through the current block's deltas in reverse order, before querying the store, in case the key being queried was mutated in the block.
 * The `get_at` method unwinds deltas up to a specific ordinal, ensuring values for keys set midway through a block are still reachable.
 
+**Example:**
+
+Consider that you have a store with the following values:
+
+```rust
+let store = StoreUSDPrice {
+   Block: #1000,
+   Deltas: [
+      Ord: 1, Key: "usd", Type: UPDATE, OldValue: 1.45, NewValue: 1.54,
+      Ord: 2, Key: "usd", Type: DELETE, OldValue: 1.54, NewValue: <nil>,
+      Ord: 3, Key: "usd", Type: INSERT, OldValue: <nil>, NewValue: 1.47,
+      Ord: 4, Key: "usd", Type: UPDATE, OldValue: 1.47, NewValue: 1.65,
+   ]
+}
+```
+
+- `store.get_first() == "1.45"`: you get the _OldValue_ of the first delta, which is equivalent to `StoreUSDPrice(Block #999).get_last()`
+- `store.get_last() == "1.65"`: you get the _NewValue_ of the last delta which is the state at end of Block #1000
+- `store.get_at(1) == "1.47"`: you get the _NewValue_ of the delta with _Ord == 1_, or the closest ordinal is Ord: 1 does not exist
+
+The current implementation is as follows:
+- Start with value = get_last() (1.65)
+- Iterate ord 4, value = detla.OldValue (1.47)
+- Iterate ord 3, value = delta.OldValue (<nil>)
+- Iterate ord 2, value = delta.OldValue (1.54)
+- Iterate ord 1, ordinal == 1, return value (1.54)
+
 #### `deltas mode`
 
 `deltas` mode provides the module with **all the changes** occurring in the source `store` module. Updates, creates, and deletes of the keys mutated during the block processing become available.

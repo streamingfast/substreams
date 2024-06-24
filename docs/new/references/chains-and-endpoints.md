@@ -31,8 +31,7 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 | Ethereum | [`sf.ethereum.type.v2.Block`](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto)           | [ethereum-v0.10.4.spkg](https://github.com/streamingfast/sf-ethereum/releases/download/v0.10.2/ethereum-v0.10.4.spkg) |
 | NEAR     | [`sf.near.type.v1.Block`](https://github.com/streamingfast/firehose-near/blob/develop/proto/sf/near/type/v1/type.proto)                       |                                                                                                                       |
 | Solana   | [`sf.solana.type.v1.Block`](https://github.com/streamingfast/firehose-solana/blob/develop/proto/sf/solana/type/v1/type.proto)                 | [solana-v0.1.0.spkg](https://github.com/streamingfast/sf-solana/releases/download/v0.1.0/solana-v0.1.0.spkg)          |
-| Cosmos   | [`sf.cosmos.type.v2.Block`](https://github.com/streamingfast/firehose-cosmos/blob/develop/cosmos/pb/sf/cosmos/type/v2/block.pb.go#L75)                          |                                                                                                                       |
-| Arweave  | [`sf.arweave.type.v1.Block`](https://github.com/streamingfast/firehose-arweave/blob/develop/proto/sf/arweave/type/v1/type.proto)              |                                                                                                                       |                                                                                                       
+| Cosmos   | [`sf.cosmos.type.v2.Block`](https://github.com/streamingfast/firehose-cosmos/blob/develop/cosmos/pb/sf/cosmos/type/v2/block.pb.go#L75)                          |                                                                                                                       |                                                                                                                       |                                                                                                       
 | Bitcoin  | [`sf.bitcoin.type.v1.Block`](https://github.com/streamingfast/firehose-bitcoin/blob/develop/proto/sf/bitcoin/type/v1/type.proto)              |                                                                                                                       |
 | Antelope  | [`sf.antelope.type.v1.Block`](https://buf.build/pinax/firehose-antelope/docs/main:sf.antelope.type.v1#sf.antelope.type.v1.Block)              |                                                                                                                       |
 
@@ -51,7 +50,6 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 * **NEAR Mainnet**: `mainnet.near.streamingfast.io:443`
 * **NEAR Testnet**: `testnet.near.streamingfast.io:443`
 * **Solana mainnet-beta**: `mainnet.sol.streamingfast.io:443`
-* **Arweave Mainnet**: `mainnet.arweave.streamingfast.io:443`
 * **Bitcoin Mainnet**: `mainnet.btc.streamingfast.io:443`
 * **Injective Mainnet**: `mainnet.injective.streamingfast.io:443`
 * **Injective Testnet**: `testnet.injective.streamingfast.io:443`

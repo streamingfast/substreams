@@ -249,6 +249,7 @@ func (s *Tier1Service) Blocks(
 		zap.Bool("compressed", req.Header().Get("grpc-Accept-Encoding") == "gzip"),
 	}
 	fields = append(fields, zap.Bool("production_mode", request.ProductionMode))
+	fields = append(fields, zap.Bool("noop_mode", request.NoopMode))
 	if auth := dauth.FromContext(ctx); auth != nil {
 		fields = append(fields,
 			zap.String("user_id", auth.UserID()),

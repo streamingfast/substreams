@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/streamingfast/substreams"
 	orchestratorExecout "github.com/streamingfast/substreams/orchestrator/execout"
+
+	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/orchestrator/plan"
 	"github.com/streamingfast/substreams/orchestrator/response"
 	"github.com/streamingfast/substreams/orchestrator/scheduler"

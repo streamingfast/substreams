@@ -47,6 +47,8 @@ message Request {
 
   // Available only in developer mode
   repeated string debug_initial_store_snapshot_for_modules = 10;
+  
+  bool noop_mode = 11;
 }
 
 

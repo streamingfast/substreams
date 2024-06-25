@@ -89,6 +89,7 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval, lowestInitialBl
 			if exclusiveEndBlock != 0 && exclusiveEndBlock < linearHandoffBlock {
 				readEndBlock = exclusiveEndBlock
 			}
+
 			plan.ReadExecOut = block.NewRange(resolvedStartBlock, readEndBlock)
 		}
 	} else { /* dev mode */

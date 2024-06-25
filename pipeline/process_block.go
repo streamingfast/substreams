@@ -64,7 +64,7 @@ func (p *Pipeline) ProcessBlock(block *pbbstream.Block, obj interface{}) (err er
 	metrics.BlockBeginProcess.Inc()
 	defer metrics.BlockEndProcess.Inc()
 
-	clock := blockToClock(block)
+	clock := BlockToClock(block)
 	cursor := obj.(bstream.Cursorable).Cursor()
 	step := obj.(bstream.Stepable).Step()
 	if p.finalBlocksOnly && step == bstream.StepIrreversible {
@@ -86,7 +86,7 @@ func (p *Pipeline) ProcessBlock(block *pbbstream.Block, obj interface{}) (err er
 	return
 }
 
-func blockToClock(block *pbbstream.Block) *pbsubstreams.Clock {
+func BlockToClock(block *pbbstream.Block) *pbsubstreams.Clock {
 	return &pbsubstreams.Clock{
 		Number:    block.Number,
 		Id:        block.Id,

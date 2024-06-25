@@ -542,6 +542,13 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	var streamHandler bstream.Handler
 	if requestDetails.ProductionMode {
 		liveBackFiller := NewLiveBackFiller(pipe, logger, execGraph.OutputModuleStageIndex(), segmentSize, requestDetails.LinearHandoffBlockNum, s.runtimeConfig.ClientFactory, RequestBackProcessing)
+
+		// In noop mode, the pipe handler is overwritten by a NoopHandler which produces no outputs.
+		if request.NoopMode {
+			noopHandler := NewNoopHandler(respFunc)
+			liveBackFiller = NewLiveBackFiller(noopHandler, logger, execGraph.OutputModuleStageIndex(), segmentSize, requestDetails.LinearHandoffBlockNum, s.runtimeConfig.ClientFactory, RequestBackProcessing)
+		}
+
 		go liveBackFiller.Start(ctx)
 		streamHandler = liveBackFiller
 	} else {

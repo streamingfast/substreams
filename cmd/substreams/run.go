@@ -34,7 +34,6 @@ func init() {
 	runCmd.Flags().StringSlice("debug-modules-output", nil, "List of modules from which to print outputs, deltas and logs (Unavailable in Production Mode)")
 	runCmd.Flags().StringSliceP("header", "H", nil, "Additional headers to be sent in the substreams request")
 	runCmd.Flags().Bool("production-mode", false, "Enable Production Mode, with high-speed parallel processing")
-	runCmd.Flags().Bool("noop-mode", false, "Enable Noop Mode, with no processing of live data")
 	runCmd.Flags().Bool("skip-package-validation", false, "Do not perform any validation when reading substreams package")
 	runCmd.Flags().StringArrayP("params", "p", nil, "Set a params for parameterizable modules. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
 	runCmd.Flags().String("test-file", "", "runs a test file")
@@ -129,8 +128,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("cannot set 'debug-modules-output' in 'production-mode'")
 	}
 
-	noopMode := sflags.MustGetBool(cmd, "noop-mode")
-
 	debugModulesInitialSnapshot := sflags.MustGetStringSlice(cmd, "debug-modules-initial-snapshot")
 	if len(debugModulesInitialSnapshot) == 0 {
 		debugModulesInitialSnapshot = nil
@@ -179,7 +176,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 		Modules:                             pkg.Modules,
 		OutputModule:                        outputModule,
 		ProductionMode:                      productionMode,
-		NoopMode:                            noopMode,
 		DebugInitialStoreSnapshotForModules: debugModulesInitialSnapshot,
 	}
 

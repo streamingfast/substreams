@@ -417,10 +417,49 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			}
 
 		case *pbconvo.SystemOutput_DownloadFiles_:
+
+			if userState.downloadedFilesfolderPath == "" {
+				savingDest := "output"
+				if projectName := gjson.GetBytes(lastState.State, "name").String(); projectName != "" {
+					savingDest = projectName
+				}
+
+				if cwd, err := os.Getwd(); err == nil {
+					savingDest = filepath.Join(cwd, savingDest)
+				}
+
+				inputField := huh.NewInput().Title("In which directory do you want to download the project?").Value(&savingDest)
+				inputField.Validate(func(userInput string) error {
+					fmt.Println("Checking directory", userInput)
+					fileInfo, err := os.Stat(userInput)
+					if err != nil {
+						if os.IsNotExist(err) {
+							return nil
+						}
+						return fmt.Errorf("error checking directory: %w", err)
+					}
+
+					if !fileInfo.IsDir() {
+						return errors.New("the path is not a directory")
+					}
+
+					return nil
+				})
+
+				err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run()
+				if err != nil {
+					return fmt.Errorf("failed taking input: %w", err)
+				}
+
+				// the multiple \n are not a mistake, it's to have a blank line before the next message
+				fmt.Printf("\nProject will be saved in %s\n", savingDest)
+				userState.downloadedFilesfolderPath = savingDest
+			}
+
 			input := msg.DownloadFiles
 			fmt.Println("Files:")
 			for _, file := range input.Files {
-				fmt.Printf("  - %s (%s)\n", file.Filename, file.Type)
+				fmt.Printf("  - %s (%s)\n", filepath.Join(userState.downloadedFilesfolderPath, file.Filename), file.Type)
 				if file.Description != "" {
 					fmt.Println(file.Description)
 				}
@@ -437,43 +476,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			for _, inputFile := range input.Files {
 				switch inputFile.Type {
 				case "application/x-zip+extract": // our custom mime type to always extract the file upon arrival
-
-					savingDest := "output"
-					if projectName := gjson.GetBytes(lastState.State, "name").String(); projectName != "" {
-						savingDest = projectName
-					}
-
-					if cwd, err := os.Getwd(); err == nil {
-						savingDest = filepath.Join(cwd, savingDest)
-					}
-
-					inputField := huh.NewInput().Title("In which directory do you want to download the project?").Value(&savingDest)
-					inputField.Validate(func(userInput string) error {
-						fmt.Println("Checking directory", userInput)
-						fileInfo, err := os.Stat(userInput)
-						if err != nil {
-							if os.IsNotExist(err) {
-								return nil
-							}
-							return fmt.Errorf("error checking directory: %w", err)
-						}
-
-						if !fileInfo.IsDir() {
-							return errors.New("the path is not a directory")
-						}
-
-						return nil
-					})
-
-					err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run()
-					if err != nil {
-						return fmt.Errorf("failed taking input: %w", err)
-					}
-
-					zipRoot := savingDest
-
-					// the multiple \n are not a mistake, it's to have a blank line before the next message
-					fmt.Printf("\nProject will be saved in %s\n", zipRoot)
+					zipRoot := userState.downloadedFilesfolderPath
 
 					sourcePath := filepath.Join(zipRoot, inputFile.Filename)
 					err = saveDownloadFile(sourcePath, overwriteForm, inputFile)
@@ -488,8 +491,6 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 						return fmt.Errorf("unzipping file: %w", err)
 					}
 
-					userState.downloadedFilesfolderPath = zipRoot
-
 				default:
 					// "application/x-protobuf; messageType=\"sf.substreams.v1.Package\""
 					// "application/zip", "application/x-zip"
@@ -497,7 +498,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					fullPath := filepath.Join(userState.downloadedFilesfolderPath, inputFile.Filename)
 					err = saveDownloadFile(fullPath, overwriteForm, inputFile)
 					if err != nil {
-						return fmt.Errorf("saving spkg file: %w", err)
+						return fmt.Errorf("saving file: %w", err)
 					}
 
 				}

@@ -6,6 +6,8 @@
 
 * [Getting Started](new/getting-started/intro-getting-started.md)
   * [EVM](new/getting-started/evm/intro-evm.md)
+    * [Your First Ethereum Subgraph](new/getting-started/evm/evm-first-sps.md)
+    * [Your First SQL Substreams](new/getting-started/evm/emv-first-sql.md)
   * [Solana](new/getting-started/solana/intro-solana.md)
   * [Injective](new/getting-started/injective/intro-injective.md)
     * [Your First Injective Subgraph](new/getting-started/injective/injective-first-sps.md)

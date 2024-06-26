@@ -6,7 +6,6 @@ The `substreams init` command allows you to easily auto-generate several types o
 - [Get an authentication token](../../common/authentication.md)
 - [Install the Graph CLI](https://thegraph.com/docs/en/quick-start/#2-install-the-graph-cli)
 
-
 ## Create the Project
 
 The `substreams init` command allows you choose among several code-generation tools, depending on your needs. In this example, you will create an EVM Substreams module that streams data to a subgraph.
@@ -62,7 +61,7 @@ Depending on the options you choose in the codegen tool, the files created might
 
 In an IDE of your choice (e.g. VSCode), open the project.
 
-// image
+<figure><img src="../../../.gitbook/assets/intro/evm-quickstart-subgraph-project.png" width="100%" /></figure>
 
 1. The `src/mappings.ts` file contains the source of the subgraph. Here, you define the `handleEvents` function, which receives all the filtered events from the Substreams. You can manipulate and aggregate the events to create the subgraph entities that you need.
 
@@ -73,7 +72,7 @@ The Graph Node (i.e. the software that runs your subgraph) uses the `spkg` file 
 3. The `schema.graphql` file contains the subgraph entities. You can use this file to define the output model of your subgraph.
 The [entities defined in the GraphQL schema](https://thegraph.com/docs/en/developing/creating-a-subgraph/#the-graphql-schema) are generated into AssemblyScript code by running the `graph codegen`.
 
-4. The `subgraph.yaml` file is the configuration file of the subgraph. It defines the source code of the subgraph (in this case, Substreams) and the handler that will receive the data extracted from Injective (in this case, the `handleEvents` function).
+4. The `subgraph.yaml` file is the configuration file of the subgraph. It defines the source code of the subgraph (in this case, Substreams) and the handler that will receive the data extracted from the blockchain (in this case, the `handleEvents` function).
 
 ## Build the Project
 
@@ -114,4 +113,4 @@ npm run deploy-local
 
 The previous command deploys the subgraph to the local Graph Node. You can now go back to the logs of the local Graph Node and check out the subgraph indexing.
 
-In a production environment, you will publish your subgraph to the [The Graph decentralized network](https://thegraph.com/docs/en/publishing/publishing-a-subgraph/) (note that The Graph Studio, the hosted testing environment, is not supported for Injective).
+In a production environment, you will publish your subgraph to the [The Graph decentralized network](https://thegraph.com/docs/en/publishing/publishing-a-subgraph/) (note for EVM chains you can also use The Graph Studio).

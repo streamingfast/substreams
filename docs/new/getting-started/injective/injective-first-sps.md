@@ -13,17 +13,17 @@ The `substreams init` command allows you choose among several code-generation to
 1. In a command-line terminal, run `substreams init`.
 You can choose among several project types.
 
-2. Choose `injective-subgraph`.
+1. Choose `injective-subgraph`.
 Now, you will input the parameters needed to create your Injective Substreams-powered Subgraph.
 
-3. `Project name`: give a name to your project.
+1. `Project name`: give a name to your project.
 This will be the name of the folder in your filesystem.
 
-4. `Chain`: you can choose to index data on `Injective Mainnet` or `Injective Testnet`.
+1. `Chain`: you can choose to index data on `Injective Mainnet` or `Injective Testnet`.
 
-5. `Start block`: first block where your Subgraph starts indexing data.
+1. `Start block`: first block where your Subgraph starts indexing data.
 
-6. `Filtering options`: the Injective data that you will received will be filtered based on the events (e.g. using the event type of the event attributes). There are several options:
+1. `Filtering options`: the Injective data that you will received will be filtered based on the events (e.g. using the event type of the event attributes). There are several options:
     - `Specific events`: you get a list of events filtered by the event type and/or the event attributes. Note that you will **only** get the events specified.
     - `All events in transactions where at least one event matches your query`: in this case, you get **all** the events of the transaction as long as one event matches your criteria within the transaction.
     - `Full transactions where at least one event matches your query`: you get a list transactions containing at least one of the events specified.
@@ -32,7 +32,9 @@ The [Injective Explorer](https://explorer.injective.network/) gives you informat
 
 <figure><img src="../../../.gitbook/assets/intro/injective-quickstart-event-type.png" width="100%" /></figure>
 
-8. `Directory`: lastly, choose the directory where you want to create the project.
+Then, you will be asked to input the _type_ and/or _attributes_ that you want to use for the filtering.
+
+1. `Directory`: lastly, choose the directory where you want to create the project.
 
 Done! A new Substreams-powered Subgraph project will be created in the specified directory.
 

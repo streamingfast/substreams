@@ -16,7 +16,7 @@ Now, you will input the parameters needed to create your EVM SQL Substreams.
 
 3. `Project name`: give a name to the project. This will be used to create the folder in your computer.
 
-4. `Select the chain`: select the EVM chain (Arbitrum, Ethereum Mainnet, Polygon...)
+4. `Select the chain`: select the EVM chain (Arbitrum, Ethereum Mainnet, Polygon...).
 
 5. `Contract address`: input the smart contract address that you want to index.
 The ABI will be fetched from the corresponding blockchain scanner (e.g. Etherscan or Arbiscan). This might take a few seconds to complete.
@@ -33,7 +33,7 @@ The ABI will be fetched from the corresponding blockchain scanner (e.g. Ethersca
 
 10. `Is it a factory contract?`: choose whether the smart contract is a factory contract. If it is, you will be required to provide the event that signals the creation of new contracts and the address of one of the created contracts (so that the ABI can be retrieved).
 
-11. `Add another contract`: choose if you want to index another contract. You track as many contracts as you need.
+11. `Add another contract`: choose if you want to index another contract. You can track as many contracts as you need.
 
 13. `Directory`: choose the directory where the project will be created.
 
@@ -43,6 +43,10 @@ The Substreams package is the binary that extracts all the data from the blockch
 
 ## Inspect the Project
 
+Open the generated project in an IDE of your choice (e.g. VSCode).
+
+<figure><img src="../../../.gitbook/assets/intro/quickstart-sql-project.png" width="100%" /></figure>
+
 1. The `dev-environment` folder contains the Docker Compose file to spin up a local PostgreSQL database.
 
 2. The `schema.sql` file defines the SQL schema used in the database. The corresponding tables will be created based on the ABI of the smart contract.
@@ -51,7 +55,7 @@ The Substreams package is the binary that extracts all the data from the blockch
 
 ## Run the Substreams and Store the Data in a Database
 
-In order to feed the data into PostgreSQL, you will need the [sql-substreams-sink]() binary. The `sql-subsreams-sink` binary will execute the `.spkg` file (i.e. run the Substreams) and send the data to Postgres. Essentially, it acts as a bridge between the Substreams execution and the PostgreSQL database.
+In order to feed the data into PostgreSQL, you will need the [substreams-sql-sink](https://substreams.streamingfast.io/documentation/consume/sql/sql-sink) binary. The `substreams-sql-sink` binary will execute the `.spkg` file (i.e. run the Substreams) and send the data to Postgres. Essentially, it acts as a bridge between the Substreams execution and the PostgreSQL database.
 
 1. Get the `sink-sql-binary`:
 

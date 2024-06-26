@@ -35,6 +35,8 @@ The ABI will be fetched from the corresponding blockchain scanner (e.g. Ethersca
 
 11. `Add another contract`: choose if you want to index another contract. You can track as many contracts as you need.
 
+1. `SQL type`: you can choose the driver: PosgreSQL or Clickhouse.
+
 13. `Directory`: choose the directory where the project will be created.
 
 14. `Package build`: whether you want the Substreams package to the built.

@@ -4,37 +4,23 @@ Substreams allows you to easily extract data from the the Solana blockchain. Wit
 
 ## Getting Started
 
-First, you must consider whether you want to develop your own Substreams or consume a ready-to-use Substreams. It is possible that someone has already built a Substreams package to extract the data you want; you can explore Substreams packages in the [Substreams Registry](https://substreams.dev).
+There are two main concepts in Substreams: packages and modules. Essentially, **a _module_ is a Rust function that contains definitions to extract data from the blockchain**. Modules are grouped in **_packages_, which are binary files (`.spkg`) that contain one or several modules**. For example, you might have a package called `ethereum-common`, which has two modules: `get_transactions` and `get_events`.
 
-**If you have found a Substreams package that fits your needs**, then explore the [Consume Substreams](../consume/consume.md) section. At the most basic level you should cover:
+Developing a Substreams module requires some knowledge of Rust, but the **code-generation tools provided by the Substreams CLI make it so easy to bootstrap a Substreams project**.
 
-- [Install the Substreams CLI](../../common/installing-the-cli.md)
-- [Authentication](../../common/authentication.md)
-- [Packages](../../common/packages.md)
-- Choose how you want to consume the data:
-    - [Send the data to a SQL database.](../../consume/sql/sql.md)
-    - [Stream the data from your application.](../../consume/stream/stream.md)
-    - [Send the data to a subgraph.](../../consume/subgraph/subgraph.md)
+To consume Ethereum data with The Graph you have two options:
 
-**If you can't find a Substreams package that fits your needs**, then you can go ahead and develop your own Substreams. The [Develop Substreams](../develop/develop.md) section of the documentation covers everything you need to know about building a Substreams from scratch. At the most basic level, you should cover:
+**- Substreams-powered Subgraphs:** you import a Substreams module into the subgraph. Essentially, Substreams acts just as the extraction layer, but the business logic lives in the subgraph. The Substreams only provides _raw_ data (you use AssemblyScript to code your subgraph).
 
-- [Install the Substreams CLI](../../common/installing-the-cli.md)
-- [Authentication](../../common/authentication.md)
-- [Manifest & Modules](../../common/manifest-modules.md)
-- [Protobuf defitions](../../develop/creating-protobuf-schemas.md)
-- [Packages](../../common/packages.md)
-- [Run a Substreams](../../common/running-substreams.md)
-- [Choose how you want to consume the data](../../consume/consume.md)
+**- Substreams directly:** you develop your own Substreams module (you use Rust to code your Substreams). Then, you can choose how to consume the data (SQL, Prometheus, streaming...).
 
-## The Ethereum Data Model
+Choosing one over the other is up to you. Consider the needs of your application and the skills needed to develop.
 
-Substreams provides you access to the raw full Ethereum block through a [Protobuf schema](https://protobuf.dev/). You can use the [Block Protobuf](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto#L51) to retrieve all the information contained in an Ethereum block, such as transactions or events.
-
-{% hint style="info" %}
-**Note**: All EVM blockchains share the same data model, so the [Block Protobuf](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto#L51) used for Ethereum is the same for any other EVM blockchain, such as Arbitrum or Polygon.
+{% hint style="success" %}
+**Tip**: If you do not know what subgraphs are, please take a look at [The Graph documentation](https://thegraph.com/docs/en/quick-start/).
 {% endhint %}
 
-## Tutorials
+To get started, start auto-generating your Substreams using the `substreams init` command:
 
-The [Exploring Ethereum Substreams](../../tutorials/evm/exploring-ethereum/exploring-ethereum.md) tutorial will guide through the most basic concepts of Substreams.
-
+- [Create Your First Substreams-powered Subgraph](../evm/evm-first-sps.md)
+- [Create Your First SQL Substreams](../evm/emv-first-sql.md)

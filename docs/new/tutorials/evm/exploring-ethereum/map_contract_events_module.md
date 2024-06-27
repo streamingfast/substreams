@@ -2,6 +2,12 @@
 
 Given a smart contract address passed as a parameter, this module returns the logs attached to the contract.
 
+{% hint style="success" %}
+**Tip**: This tutorial teaches you how to build a Substreams from scratch.
+
+Remember that you can auto-generate your Substreams module by usig the [code-generation tools](../../../getting-started/evm/emv-first-sql.md).
+{% endhint %}
+
 ### Running the Substreams
 
 First, generate the Protobuf modules and build the Rust code:

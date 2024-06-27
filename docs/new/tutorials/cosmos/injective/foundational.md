@@ -2,6 +2,8 @@ The [Injective Foundational Substreams](https://github.com/streamingfast/substre
 
 You can use the Injective Foundational Modules as the input for your Substreams or subgraph.
 
+The Foundational Modules are the base of the code generation tools provided by the Substreams CLI.
+
 ## Before You Begin
 
 - [Install the Substreams CLI](../../../common/installing-the-cli.md)

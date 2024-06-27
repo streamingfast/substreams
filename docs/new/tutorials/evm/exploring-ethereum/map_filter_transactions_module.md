@@ -3,6 +3,12 @@
 This module iterates over all the blockchain transactions and filters them by some of their fields (the `from` and `to` fields).
 For example, if you want to retrieve all the transactions initiated by the address `0xb6692f7ae54e89da0269c1bfd685ccdfd41d2bf7`, you set the filter `from = 0xb6692f7ae54e89da0269c1bfd685ccdfd41d2bf7`.
 
+{% hint style="success" %}
+**Tip**: This tutorial teaches you how to build a Substreams from scratch.
+
+Remember that you can auto-generate your Substreams module by usig the [code-generation tools](../../../getting-started/evm/emv-first-sql.md).
+{% endhint %}
+
 ### Running the Substreams
 
 First, generate the Protobuf modules and build the Rust code:

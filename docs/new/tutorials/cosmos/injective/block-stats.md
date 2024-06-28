@@ -1,6 +1,10 @@
 The [BlockStats Susbtreams](https://github.com/streamingfast/substreams-cosmos-block-stats) is a very basic Substreams, extracting data from the Injective blockchain.
 
-If this is your first experience with Substreams, take a look at the [Substreams for Injective developers](./../../../common/intro-injective.md) page to get started with Substreams.
+{% hint style="success" %}
+**Tip**: This tutorial teaches you how to build a Substreams from scratch.
+
+Remember that you can auto-generate your Substreams module by usig the [code-generation tools](../../../getting-started/injective/injective-first-sql.md).
+{% endhint %}
 
 ## Before You Begin
 

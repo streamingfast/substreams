@@ -1,4 +1,11 @@
 The [USDT Exchanges Volume Subgraph](https://github.com/streamingfast/injective-subgraph-template) tracks the historical USDT volume for the `INJ-USDT` pair in the Dojo DEX.
+
+{% hint style="success" %}
+**Tip**: This tutorial teaches you how to build a Substreams from scratch.
+
+Remember that you can auto-generate your Substreams module by usig the [code-generation tools](../../../getting-started/injective/injective-first-sps.md).
+{% endhint %}
+
 The subgraph uses the [Substreams triggers](../../../consume/subgraph/triggers.md) to import data from the Injective foundational modules.
 
 ## Before You Begin

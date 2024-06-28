@@ -1,11 +1,17 @@
 # Table of contents
 
 * [What is Substreams?](README.md)
-* [Substreams for Solana Developers](new/common/intro-solana.md)
-* [Substreams for Injective Developers](new/common/intro-injective.md)
 
 ## Documentation
 
+* [Getting Started](new/getting-started/intro-getting-started.md)
+  * [EVM](new/getting-started/evm/intro-evm.md)
+    * [Your First Ethereum Subgraph](new/getting-started/evm/evm-first-sps.md)
+    * [Your First EVM SQL Substreams](new/getting-started/evm/emv-first-sql.md)
+  * [Solana](new/getting-started/solana/intro-solana.md)
+  * [Injective](new/getting-started/injective/intro-injective.md)
+    * [Your First Injective Subgraph](new/getting-started/injective/injective-first-sps.md)
+    * [Your First Injective SQL Substreams](new/getting-started/injective/injective-first-sql.md)
 * [Consume Substreams](new/consume/consume.md)
   * [Install the CLI](new/common/installing-the-cli.md)
   * [Authentication](new/common/authentication.md)
@@ -32,7 +38,7 @@
 * [Develop Substreams](new/develop/develop.md)
   * [Install the CLI](new/common/installing-the-cli.md)
   * [Authentication](new/common/authentication.md)
-  * [Quickstart](new/develop/init-project.md)
+  <!--* [Quickstart](new/develop/init-project.md)-->
   * [Manifest & Modules](new/common/manifest-modules.md)
     * [Module types](new/develop/modules/types.md)
     * [Inputs](new/develop/modules/inputs.md)

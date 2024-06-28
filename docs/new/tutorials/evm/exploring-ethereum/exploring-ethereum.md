@@ -2,6 +2,12 @@
 
 Getting started with Substreams might feel challenging, but you are not alone! The Substreams Explorers are a set of projects, modules, and code samples that allow you to _explore_ and discover the main features of Substreams.
 
+{% hint style="success" %}
+**Tip**: This tutorial teaches you how to build a Substreams from scratch.
+
+Remember that you can auto-generate your Substreams module by usig the [code-generation tools](../../../getting-started/evm/emv-first-sql.md).
+{% endhint %}
+
 As you already know, Substreams supports streaming from several blockchains, and every blockchain holds a different data model. This is why the data structures used change from one blockchain to the other. For example, an Ethereum block is represented by the [`sf.ethereum.type.v2.Block`](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto) Rust struct, while a Near block is represented by [`sf.near.type.v1.Block`](https://github.com/streamingfast/firehose-near/blob/develop/proto/sf/near/type/v1/type.proto).
 
 ## Before You Begin

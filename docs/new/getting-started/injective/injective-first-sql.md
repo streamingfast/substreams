@@ -52,9 +52,9 @@ Open the generated project in an IDE of your choice (e.g. VSCode).
 
 ## Run the Substreams and Store the Data in a Database
 
-In order to feed the data into PostgreSQL, you will need the [sql-substreams-sink](https://substreams.streamingfast.io/documentation/consume/sql/sql-sink) binary. The `sql-subsreams-sink` binary will execute the `.spkg` file (i.e. run the Substreams) and send the data to Postgres. Essentially, it acts as a bridge between the Substreams execution and the PostgreSQL database.
+In order to feed the data into PostgreSQL, you will need the [substreams-sink-sql](https://substreams.streamingfast.io/documentation/consume/sql/sql-sink) binary. The `substreams-sink-sql` binary will execute the `.spkg` file (i.e. run the Substreams) and send the data to Postgres. Essentially, it acts as a bridge between the Substreams execution and the PostgreSQL database.
 
-1. Get the `sink-sql-binary`:
+1. Get the `substreams-sink-sql` binary:
 
 ```bash
 make get-sink-sql-binary

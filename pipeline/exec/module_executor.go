@@ -90,7 +90,7 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 	uid := reqctx.ReqStats(ctx).RecordModuleWasmBlockBegin(modName)
 	outputBytes, outputForFiles, moduleOutput, err := executor.run(ctx, execOutput)
 	if err != nil {
-		if errors.Is(err, ErrNoInput) {
+		if errors.Is(err, ErrNoInput) || errors.Is(err, ErrSkippedOutput) {
 			return nil, nil, nil, true, nil
 		}
 		return nil, nil, nil, false, fmt.Errorf("execute: %w", err)

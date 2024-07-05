@@ -50,6 +50,7 @@ func NewBaseExecutor(ctx context.Context, moduleName string, initialBlock uint64
 
 // var Timer time.Duration
 var ErrNoInput = errors.New("no input")
+var ErrSkippedOutput = errors.New("skipped output") // willfully skipped output (through intrinsic)
 
 func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (call *wasm.Call, err error) {
 	e.logs = nil

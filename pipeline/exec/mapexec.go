@@ -39,6 +39,9 @@ func (e *MapperModuleExecutor) run(ctx context.Context, reader execout.Execution
 	if call, err = e.wasmCall(reader); err != nil {
 		return nil, nil, nil, fmt.Errorf("maps wasm call: %w", err)
 	}
+	if call.CanSkipOutput() {
+		return nil, nil, nil, ErrSkippedOutput
+	}
 
 	if call != nil {
 		out = call.Output()

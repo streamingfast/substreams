@@ -24,8 +24,9 @@ type Call struct {
 
 	valueType string
 
-	returnValue []byte
-	panicError  *PanicError
+	returnValue     []byte
+	skipEmptyOutput bool
+	panicError      *PanicError
 
 	Logs           []string
 	LogsByteCount  uint64
@@ -73,6 +74,14 @@ func (c *Call) Output() []byte {
 func (c *Call) SetReturnValue(msg []byte) {
 	c.returnValue = make([]byte, len(msg))
 	copy(c.returnValue, msg)
+}
+
+func (c *Call) SkipEmptyOutput() {
+	c.skipEmptyOutput = true
+}
+
+func (c *Call) CanSkipOutput() bool {
+	return c.skipEmptyOutput && len(c.returnValue) == 0
 }
 
 func (c *Call) SetPanicError(message string, filename string, lineNo int, colNo int) {

@@ -36,4 +36,13 @@ var envFuncs = []funcs{
 			call.SetReturnValue(msg)
 		}),
 	},
+	{
+		"skip_empty_output",
+		[]parm{},
+		[]parm{},
+		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
+			call := wasm.FromContext(ctx)
+			call.SkipEmptyOutput()
+		}),
+	},
 }

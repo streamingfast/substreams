@@ -309,7 +309,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 			//fmt.Println("Parallelized in stage", stageIdx, len(stage))
 			for i, executor := range stage {
 				if !executor.RunsOnBlock(execOutput.Clock().Number) {
-					results[i] = resultObj{skipped: true}
+					results[i] = resultObj{not_runnable: true}
 					continue
 				}
 				wg.Add(1)
@@ -324,7 +324,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 			wg.Wait()
 
 			for i, result := range results {
-				if result.skipped {
+				if result.not_runnable {
 					continue
 				}
 				executor := stage[i]
@@ -344,12 +344,12 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 }
 
 type resultObj struct {
-	output           *pbssinternal.ModuleOutput
-	bytes            []byte
-	bytesForFiles    []byte
-	err              error
-	skipped          bool
-	skippedFromIndex bool
+	output         *pbssinternal.ModuleOutput
+	bytes          []byte
+	bytesForFiles  []byte
+	err            error
+	not_runnable   bool
+	skipped_output bool
 }
 
 func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, execOutput execout.ExecutionOutput) resultObj {
@@ -358,9 +358,16 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 	executorName := executor.Name()
 	logger.Debug("executing", zap.Uint64("block", execOutput.Clock().Number), zap.String("module_name", executorName))
 
-	moduleOutput, outputBytes, outputBytesFiles, skippedFromIndex, runError := exec.RunModule(ctx, executor, execOutput)
+	moduleOutput, outputBytes, outputBytesFiles, skipped, runError := exec.RunModule(ctx, executor, execOutput)
 
-	return resultObj{moduleOutput, outputBytes, outputBytesFiles, runError, false, skippedFromIndex}
+	return resultObj{
+		output:         moduleOutput,
+		bytes:          outputBytes,
+		bytesForFiles:  outputBytesFiles,
+		err:            runError,
+		not_runnable:   false,
+		skipped_output: skipped,
+	}
 }
 
 func (p *Pipeline) applyExecutionResult(ctx context.Context, executor exec.ModuleExecutor, res resultObj, execOutput execout.ExecutionOutput) (err error) {
@@ -375,7 +382,10 @@ func (p *Pipeline) applyExecutionResult(ctx context.Context, executor exec.Modul
 		p.saveModuleOutput(moduleOutput, executor.Name(), reqctx.Details(ctx).ProductionMode)
 	}
 
-	if !res.skippedFromIndex && executor.HasValidOutput() {
+	// we skip outputs on tier2 only, tier1 means either dev-mode or live segment, where we output everything
+	skip_output := res.skipped_output && reqctx.Details(ctx).IsTier2Request
+
+	if !skip_output && executor.HasValidOutput() {
 		if err := execOutput.Set(executorName, outputBytes); err != nil {
 			return fmt.Errorf("set output cache: %w", err)
 		}
@@ -384,7 +394,7 @@ func (p *Pipeline) applyExecutionResult(ctx context.Context, executor exec.Modul
 		}
 	}
 
-	if !res.skippedFromIndex && executor.HasOutputForFiles() {
+	if !skip_output && executor.HasOutputForFiles() {
 		if err := execOutput.SetFileOutput(executorName, res.bytesForFiles); err != nil {
 			return fmt.Errorf("set output cache: %w", err)
 		}

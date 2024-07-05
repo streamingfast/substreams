@@ -88,18 +88,23 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 	}
 
 	uid := reqctx.ReqStats(ctx).RecordModuleWasmBlockBegin(modName)
+	var skippedOutput bool
+
 	outputBytes, outputForFiles, moduleOutput, err := executor.run(ctx, execOutput)
-	if err != nil {
-		if errors.Is(err, ErrNoInput) || errors.Is(err, ErrSkippedOutput) {
-			return nil, nil, nil, true, nil
-		}
+	switch {
+	case errors.Is(err, ErrSkippedOutput):
+		skippedOutput = true
+	case errors.Is(err, ErrNoInput):
+		return nil, nil, nil, true, nil
+	case err != nil:
 		return nil, nil, nil, false, fmt.Errorf("execute: %w", err)
 	}
+
 	reqctx.ReqStats(ctx).RecordModuleWasmBlockEnd(modName, uid)
 
 	fillModuleOutputMetadata(executor, moduleOutput)
 
-	return moduleOutput, outputBytes, outputForFiles, false, nil
+	return moduleOutput, outputBytes, outputForFiles, skippedOutput, nil
 }
 
 func getCachedOutput(execOutput execout.ExecutionOutputGetter, executor ModuleExecutor) (bool, []byte, error) {

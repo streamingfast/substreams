@@ -238,6 +238,15 @@ func (s *Tier1Service) Blocks(
 	for i := 0; i < len(moduleNames); i++ {
 		moduleNames[i] = request.Modules.Modules[i].Name
 	}
+	var compressed bool
+	for _, vv := range req.Header().Values("grpc-Accept-Encoding") {
+		for _, v := range strings.Split(vv, ",") {
+			if v == "gzip" {
+				compressed = true
+				break
+			}
+		}
+	}
 
 	fields := []zap.Field{
 		zap.Int64("start_block", request.StartBlockNum),
@@ -246,7 +255,7 @@ func (s *Tier1Service) Blocks(
 		zap.Strings("modules", moduleNames),
 		zap.String("output_module", request.OutputModule),
 		zap.String("output_module_hash", outputModuleHash),
-		zap.Bool("compressed", req.Header().Get("grpc-Accept-Encoding") == "gzip"),
+		zap.Bool("compressed", compressed),
 	}
 	fields = append(fields, zap.Bool("production_mode", request.ProductionMode))
 	fields = append(fields, zap.Bool("noop_mode", request.NoopMode))

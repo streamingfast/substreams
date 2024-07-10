@@ -342,9 +342,8 @@ An identifier referring to the [`binaries`](manifests.md#binaries) section of th
 The `modules[].binary` field overrides which binary is used from the `binaries` declaration section. This means multiple WASM files can be bundled in the Package.
 
 ```yaml
-...
-  - modules:
-    name: hello
+modules:
+  - name: hello
     binary: other
   ...
 ```

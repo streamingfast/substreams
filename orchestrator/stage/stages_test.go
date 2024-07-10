@@ -2,6 +2,7 @@ package stage
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -228,6 +229,79 @@ func TestStages_previousUnitComplete(t *testing.T) {
 	assert.False(t, s.previousUnitComplete(u01)) // u00 not complete
 	s.setState(u00, UnitCompleted)
 	assert.True(t, s.previousUnitComplete(u01)) // u00 is now complete
+}
+
+func TestStages_setShadowableSegment(t *testing.T) {
+	tests := []struct {
+		startSegment     int
+		stages           []stageStates
+		expectShadowable int
+	}{
+		{
+			startSegment: 10,
+			stages: []stageStates{
+				{UnitCompleted, UnitCompleted},
+			},
+			expectShadowable: 10,
+		},
+		{
+			startSegment:     11,
+			stages:           []stageStates{},
+			expectShadowable: 10,
+		},
+		{
+			startSegment: 11,
+			stages: []stageStates{
+				{UnitCompleted, UnitCompleted},
+				{UnitPending, UnitPending},
+			},
+			expectShadowable: 11,
+		},
+		{
+			startSegment: 20,
+			stages: []stageStates{
+				{UnitCompleted, UnitCompleted},
+				{UnitCompleted, UnitCompleted},
+				{UnitPartialPresent, UnitCompleted},
+				{UnitPartialPresent, UnitPending},
+			},
+			expectShadowable: 12,
+		},
+		{
+			startSegment: 20,
+			stages: []stageStates{
+				{UnitCompleted, UnitCompleted},
+				{UnitCompleted, UnitCompleted},
+				{UnitCompleted, UnitCompleted},
+				{UnitCompleted, UnitCompleted},
+				{UnitCompleted, UnitCompleted},
+				{UnitCompleted, UnitCompleted},
+				{UnitCompleted, UnitCompleted},
+				{UnitCompleted, UnitCompleted},
+				{UnitCompleted, UnitCompleted},
+				{UnitCompleted, UnitCompleted},
+			},
+			expectShadowable: 20,
+		},
+	}
+
+	for i, tt := range tests {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			s := Stages{
+				storeSegmenter: block.NewSegmenter(10, 100, 200),
+				segmentOffset:  10,
+				segmentStates:  tt.stages,
+				stages:         make([]*Stage, 2),
+			}
+			for i := 0; i < 2; i++ {
+				s.stages[i] = &Stage{
+					segmenter: s.storeSegmenter,
+				}
+			}
+			s.setShadowableSegment(tt.startSegment)
+			assert.Equal(t, tt.expectShadowable, s.shadowableSegment)
+		})
+	}
 }
 
 func TestStages_allocSegments(t *testing.T) {

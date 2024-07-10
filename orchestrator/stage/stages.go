@@ -50,6 +50,9 @@ type Stages struct {
 	// Any previous segment is assumed to have completed successfully, and any stores that we sync'd prior to this offset
 	// are assumed to have been either fully loaded, or merged up until this offset.
 	segmentOffset int
+
+	// first segment where we can run directly the higher stages (shadowing the lower stages)
+	shadowableSegment int
 }
 type stageStates []UnitState
 
@@ -415,11 +418,28 @@ func (s *Stages) NextJob() (Unit, *block.Range) {
 	return Unit{}, nil
 }
 
+// setShadowableSegment sets the value to the first segment between
+// "segmentOffset" and "startBlockSegment" (incl.) for which all the dependencies are completed
+func (s *Stages) setShadowableSegment(startBlockSegment int) {
+	s.shadowableSegment = s.segmentOffset
+	if len(s.stages) < 2 {
+		return
+	}
+	for seg := s.segmentOffset + 1; seg <= startBlockSegment; seg++ {
+		for stg := 0; stg <= len(s.stages)-2; stg++ {
+			if !s.previousUnitComplete(Unit{Segment: seg, Stage: stg}) {
+				return
+			}
+		}
+		s.shadowableSegment = seg
+	}
+}
+
 func (s *Stages) shadowable(segmentIdx int) bool {
 	if len(s.stages) < 2 {
 		return false
 	}
-	return segmentIdx-s.segmentOffset <= len(s.stages)-1
+	return segmentIdx-s.shadowableSegment <= len(s.stages)-1
 }
 
 func (s *Stages) markShadowedUnits(segmentIdx int) (someShadowed bool) {
@@ -427,11 +447,11 @@ func (s *Stages) markShadowedUnits(segmentIdx int) (someShadowed bool) {
 		return
 	}
 
-	relSegmentOrdinal := segmentIdx - s.segmentOffset
+	relSegmentOrdinal := segmentIdx - s.shadowableSegment
 	s.allocSegments(segmentIdx)
 
 	lastStage := len(s.stages) - 1
-	for stageIdx := lastStage - 1; stageIdx >= relSegmentOrdinal; stageIdx-- { // skip the last stage
+	for stageIdx := lastStage - 1; stageIdx >= relSegmentOrdinal && stageIdx >= 0; stageIdx-- { // skip the last stage
 		unit := Unit{Segment: segmentIdx, Stage: stageIdx}
 		segmentState := s.getState(unit)
 		if segmentState != UnitCompleted && segmentState != UnitNoOp {

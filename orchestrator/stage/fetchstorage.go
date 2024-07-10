@@ -6,6 +6,7 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
 
 	"github.com/streamingfast/substreams/storage/store"
@@ -119,10 +120,8 @@ func (s *Stages) FetchStoresState(
 
 		s.MoveSegmentCompletedForward(stageIdx)
 	}
-
-	// loop all stages
-	// loop all segments, check whether they are complete
-
+	// right after we fetch the state on disk, we can determine the shadowable segments
+	s.setShadowableSegment(segmenter.IndexForStartBlock(reqctx.Details(ctx).ResolvedStartBlockNum))
 	return nil
 }
 

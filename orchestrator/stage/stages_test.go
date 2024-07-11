@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/test-go/testify/require"
 
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/orchestrator/plan"
@@ -198,6 +199,140 @@ func TestNewStageNextJobs(t *testing.T) {
 		S:CCCCP
 		S:CCCCP
 		M:PPSSS`)
+}
+
+func assertNoNextJob(t *testing.T, stages *Stages) {
+	_, r := stages.NextJob()
+	assert.Nil(t, r)
+}
+
+func nextJob(t *testing.T, stages *Stages) Unit {
+	j, r := stages.NextJob()
+	if r == nil {
+		t.Error("no next job")
+	}
+	return j
+}
+
+func TestShadowSimple(t *testing.T) {
+
+	reqPlan, err := plan.BuildTier1RequestPlan(
+		true, // production mode
+		10,   // segmentInterval
+		5,    // lowestInitialBlock
+		5,    // resolvedStartBlock
+		50,   //linearHandoffBlock
+		50,   //effectiveEndBlock
+		true, // scheduleStores
+	)
+	assert.NoError(t, err)
+	assert.Equal(t, "interval=10, stores=[5, 50), map_write=[5, 50), map_read=[5, 50), linear=[nil)", reqPlan.String())
+
+	stages := NewStages(
+		context.Background(),
+		exec.TestGraphStagedModules(5, 5, 5, 5, 5),
+		reqPlan,
+		nil,
+	)
+
+	segmentStateEquals(t, stages, `
+		S:
+		S:
+		M:`)
+
+	stages.shadowableSegment = 0
+	stages.markShadowedUnits(0)
+	segmentStateEquals(t, stages, `
+		S:Z
+		S:Z
+		M:.`)
+
+	assert.Equal(t, unit(0, 2), nextJob(t, stages))
+	segmentStateEquals(t, stages, `
+		S:Z
+		S:Z
+		M:S`)
+
+	assert.Equal(t, unit(1, 0), nextJob(t, stages))
+	assert.Equal(t, unit(2, 0), nextJob(t, stages))
+	segmentStateEquals(t, stages, `
+		S:ZSS
+		S:ZZ.
+		M:S..`)
+}
+
+func TestShadowStartAfter(t *testing.T) {
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 30, 90, 90, true)
+	assert.NoError(t, err)
+	assert.Equal(t, "interval=10, stores=[5, 90), map_write=[30, 90), map_read=[30, 90), linear=[nil)", reqPlan.String())
+
+	stages := NewStages(
+		context.Background(),
+		exec.TestGraphStagedModules(5, 5, 5, 5, 5),
+		reqPlan,
+		nil,
+	)
+
+	stages.markSegmentCompleted(unit(0, 0))
+	stages.markSegmentCompleted(unit(0, 1))
+	stages.markSegmentCompleted(unit(1, 0))
+	stages.markSegmentCompleted(unit(1, 1))
+
+	segmentStateEquals(t, stages, `
+		S:CC.
+		S:CC.
+		M:NNN`)
+
+	stages.setShadowableSegment(3)
+	require.Equal(t, 2, stages.shadowableSegment) // 4 is the first segment that has all its dependencies
+	for i := 0; i <= 3; i++ {
+		stages.markShadowedUnits(i) // called from 'offsetSegment` (0) to `startSegment` (4)
+	}
+	segmentStateEquals(t, stages, `
+	        	            S:CCZ.
+        	            	S:CC.Z
+        	            	M:NNN.`)
+
+	assert.Equal(t, unit(2, 1), nextJob(t, stages))
+	assert.Equal(t, unit(3, 0), nextJob(t, stages))
+	assert.Equal(t, unit(4, 0), nextJob(t, stages))
+}
+
+func TestShadowStartAfter2(t *testing.T) {
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 40, 90, 90, true)
+	assert.NoError(t, err)
+	assert.Equal(t, "interval=10, stores=[5, 90), map_write=[40, 90), map_read=[40, 90), linear=[nil)", reqPlan.String())
+
+	stages := NewStages(
+		context.Background(),
+		exec.TestGraphStagedModules(5, 5, 5, 5, 5),
+		reqPlan,
+		nil,
+	)
+
+	stages.markSegmentCompleted(unit(0, 0))
+	stages.markSegmentCompleted(unit(0, 1))
+	stages.markSegmentCompleted(unit(1, 0))
+	stages.markSegmentCompleted(unit(1, 1))
+
+	segmentStateEquals(t, stages, `
+		S:CC..
+		S:CC..
+		M:NNNN`)
+
+	stages.setShadowableSegment(4)
+	require.Equal(t, 2, stages.shadowableSegment) // 4 is the first segment that has all its dependencies
+	for i := 0; i <= 4; i++ {
+		stages.markShadowedUnits(i) // called from 'offsetSegment` (0) to `startSegment` (4)
+	}
+	segmentStateEquals(t, stages, `
+	        	            S:CCZ..
+        	            	S:CC...
+        	            	M:NNNN.`)
+
+	assert.Equal(t, unit(2, 1), nextJob(t, stages))
+	assert.Equal(t, unit(3, 0), nextJob(t, stages))
+	assert.Equal(t, unit(4, 0), nextJob(t, stages))
 }
 
 func segmentStateEquals(t *testing.T, s *Stages, segments string) {

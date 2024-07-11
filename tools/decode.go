@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -14,10 +15,12 @@ import (
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/index"
@@ -312,7 +315,7 @@ func runDecodeOutputsModuleRunE(cmd *cobra.Command, args []string) error {
 	case *pbsubstreams.Module_KindMap_:
 		return searchOutputsModule(ctx, requestedBlocks, startBlock, saveInterval, moduleHash, matchingModule, s, protoFiles)
 	case *pbsubstreams.Module_KindStore_:
-		return searchOutputsModule(ctx, requestedBlocks, startBlock, saveInterval, moduleHash, matchingModule, s, protoFiles)
+		return searchOutputsModuleKvOps(ctx, requestedBlocks, startBlock, saveInterval, moduleHash, matchingModule, s)
 	}
 	return fmt.Errorf("module has an unknown")
 }
@@ -340,6 +343,7 @@ func searchOutputsModule(
 	rng := block.NewRange(startBlock, startBlock-startBlock%saveInterval+saveInterval)
 
 	outputCache := modStore.NewFile(rng)
+	fmt.Println("filename:", outputCache.FullFilename())
 	zlog.Info("loading block from store", zap.Uint64("start_block", startBlock), zap.Stringer("requested_block_range", requestedBlocks))
 	if err := outputCache.Load(ctx); err != nil {
 		if err == dstore.ErrNotFound {
@@ -366,6 +370,55 @@ func searchOutputsModule(
 	return nil
 }
 
+func searchOutputsModuleKvOps(
+	ctx context.Context,
+	requestedBlocks *block.Range,
+	startBlock,
+	saveInterval uint64,
+	moduleHash string,
+	module *pbsubstreams.Module,
+	stateStore dstore.Store,
+) error {
+	modStore, err := execout.NewConfig(module.Name, module.InitialBlock, pbsubstreams.ModuleKindMap, moduleHash, stateStore, zlog)
+	if err != nil {
+		return fmt.Errorf("execout new config: %w", err)
+	}
+
+	moduleStore, err := stateStore.SubStore(moduleHash + "/outputs")
+	if err != nil {
+		return fmt.Errorf("can't find substore for hash %q: %w", moduleHash, err)
+	}
+
+	rng := block.NewRange(startBlock, startBlock-startBlock%saveInterval+saveInterval)
+
+	outputCache := modStore.NewFile(rng)
+	fmt.Println("filename:", outputCache.FullFilename())
+	zlog.Info("loading block from store", zap.Uint64("start_block", startBlock), zap.Stringer("requested_block_range", requestedBlocks))
+	if err := outputCache.Load(ctx); err != nil {
+		if err == dstore.ErrNotFound {
+			return fmt.Errorf("can't find cache at block %d storeURL %q", startBlock, moduleStore.BaseURL().String())
+		}
+
+		return fmt.Errorf("loading cache %s file %s : %w", moduleStore.BaseURL(), outputCache.String(), err)
+	}
+
+	for i := requestedBlocks.StartBlock; i < requestedBlocks.ExclusiveEndBlock; i++ {
+		payloadBytes, found := outputCache.GetAtBlock(i)
+		if !found {
+			continue
+		}
+
+		fmt.Println("Block", i)
+		if len(payloadBytes) == 0 {
+			continue
+		}
+		if err := printKVOps(payloadBytes); err != nil {
+			return fmt.Errorf("printing object: %w", err)
+		}
+	}
+	return nil
+}
+
 func searchStateModule(
 	ctx context.Context,
 	startBlock uint64,
@@ -386,11 +439,27 @@ func searchStateModule(
 		return fmt.Errorf("unable to load file: %w", err)
 	}
 
+	fmt.Println("filename:", stateStore.BaseURL().JoinPath(moduleHash, "states", file.Filename+".zst").String())
+
 	bytes, found := moduleStore.GetLast(key)
 	if !found {
 		return fmt.Errorf("no data found for %q", key)
 	}
 	return printObject(module, protoFiles, bytes)
+}
+
+func printKVOps(data []byte) error {
+	kvOps := &pbssinternal.Operations{}
+	if err := proto.Unmarshal(data, kvOps); err != nil {
+		return fmt.Errorf("unmarshalling kvOps: %w", err)
+	}
+
+	asJSON, err := json.Marshal(kvOps)
+	if err != nil {
+		return fmt.Errorf("marshalling back as json: %w", err)
+	}
+	fmt.Println(string(asJSON))
+	return nil
 }
 
 func printObject(module *pbsubstreams.Module, protoFiles []*descriptorpb.FileDescriptorProto, data []byte) error {

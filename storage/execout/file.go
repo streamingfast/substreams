@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path"
 	"sort"
 	"strconv"
 	"sync"
@@ -35,6 +36,9 @@ type File struct {
 	loadedSize uint64
 }
 
+func (c *File) FullFilename() string {
+	return path.Join(c.store.BaseURL().String(), c.Filename())
+}
 func (c *File) Filename() string {
 	return computeDBinFilename(c.Range.StartBlock, c.Range.ExclusiveEndBlock)
 }

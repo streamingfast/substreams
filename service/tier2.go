@@ -337,8 +337,21 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 excludable:
 	for _, stage := range pipe.ModuleExecutors {
 		for _, executor := range stage {
-			if executionPlan.ExistingExecOuts[executor.Name()] != nil {
-				continue
+			switch executor := executor.(type) {
+			case *exec.MapperModuleExecutor:
+				if executionPlan.ExistingExecOuts[executor.Name()] != nil {
+					continue
+				}
+			case *exec.IndexModuleExecutor:
+				if executionPlan.ExistingIndices[executor.Name()] != nil {
+					continue
+				}
+			case *exec.StoreModuleExecutor:
+				if executionPlan.ExistingExecOuts[executor.Name()] != nil {
+					if _, ok := executionPlan.StoresToWrite[executor.Name()]; !ok {
+						continue
+					}
+				}
 			}
 			if !executor.BlockIndex().ExcludesAllBlocks() {
 				allExecutorsExcludedByBlockIndex = false

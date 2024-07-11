@@ -9,17 +9,31 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v1.9.0
 
-- Expose a new intrinsic to modules: `skip_empty_output`, which causes the module output to be skipped if it has zero bytes. Be careful, a protobuf object with all its default values will have zero bytes.
+### Important BUG FIX
+
+* Fix a bug introduced in v1.6.0 that could result in corrupted store "state" file if all 
+  the "outputs" were already cached for a module in a given segment (rare occurence)
+* We recommend clearing your substreams cache after this upgrade and re-processing or 
+  validating your data if you use stores.
+
+### Fixed
+
+* substreams 'tools decode state' now correctly prints the `kvops` when pointing to store output files
+
+### Added
+
+* Expose a new intrinsic to modules: `skip_empty_output`, which causes the module output to be skipped if it has zero bytes. (Watch out, a protobuf object with all its default values will have zero bytes)
+* Improve schedule order (faster time to first block) for substreams with multiple stages when starting mid-chain 
 
 ## v1.8.2
 
-- `substreams init` (code generation): fix displaying of saved path in filenames
+* `substreams init` (code generation): fix displaying of saved path in filenames
 
 ## v1.8.1
 
-- Add a `NoopMode` to the `Tier1` enabling to avoid sending data back to requester while processing live.
+* Add a `NoopMode` to the `Tier1` enabling to avoid sending data back to requester while processing live.
 
 ## v1.8.0
 

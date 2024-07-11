@@ -144,7 +144,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 
 	stage := request.OutputModule
 
-	logger := reqctx.Logger(ctx).Named("tier2").With(zap.String("stage", stage), zap.Uint64("segment_number", request.SegmentNumber))
+	logger := reqctx.Logger(ctx).Named("tier2").With(zap.String("output_module", stage), zap.Uint64("segment_number", request.SegmentNumber))
 
 	ctx = logging.WithLogger(ctx, logger)
 	ctx = dmetering.WithBytesMeter(ctx)

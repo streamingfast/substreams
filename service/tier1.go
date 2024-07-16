@@ -228,6 +228,9 @@ func (s *Tier1Service) Blocks(
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("validate request: %w", err))
 	}
 
+	// this tweaks the actual request so all initialBlocks are correct with the given chain firstStreamableBlock
+	pbsubstreams.ApplyFirstStreamableBlockToModules(bstream.GetProtocolFirstStreamableBlock, request.Modules.Modules)
+
 	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules)
 	if err != nil {
 		return bsstream.NewErrInvalidArg(err.Error())

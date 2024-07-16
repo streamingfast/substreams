@@ -9,6 +9,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.9.1 (Unreleased)
+
+### Fixed
+
+Fixed substreams hanging in production-mode on chains with a 'first-streamable-block' higher than 0:
+
+* all initialBlocks will be 'bumped' to the first-streamable-block if it is higher
+* this will affect the module hashes: use `substreams info --first-streamable-block=<block_num>` to see how a value will affect your modules
+* modules with initialBlocks higher than the first-streamable-block of a chain will be unaffected.
+
 ## v1.9.0
 
 ### Important BUG FIX

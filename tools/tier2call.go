@@ -35,6 +35,7 @@ func init() {
 	tier2CallCmd.Flags().String("block-type", "sf.ethereum.type.v2.Block", "Block type")
 	tier2CallCmd.Flags().String("merged-blocks-store-url", "./firehose-data/storage/merged-blocks", "Merged blocks store")
 	tier2CallCmd.Flags().Uint64("state-bundle-size", uint64(1_000), "State segment size")
+	tier2CallCmd.Flags().Uint64("first-streamable-block", 0, "First Streamable block on the chain (usually 0 or 1, some networks start at arbitrary block numbers)")
 	tier2CallCmd.Flags().String("state-store-url", "./firehose-data/localdata", "Substreams state data storage")
 	tier2CallCmd.Flags().String("state-store-default-tag", "", "Substreams state store default tag")
 
@@ -102,6 +103,7 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 	stateStoreDefaultTag := sflags.MustGetString(cmd, "state-store-default-tag")
 	mergedBlocksStore := sflags.MustGetString(cmd, "merged-blocks-store-url")
 	stateBundleSize := sflags.MustGetUint64(cmd, "state-bundle-size")
+	firstStreamableBlock := sflags.MustGetUint64(cmd, "first-streamable-block")
 
 	req, err := ssClient.ProcessRange(ctx, &pbssinternal.ProcessRangeRequest{
 		SegmentSize:          stateBundleSize,
@@ -111,6 +113,7 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 		Stage:                uint32(stage),
 		MeteringConfig:       meteringConfig,
 		BlockType:            blockType,
+		FirstStreamableBlock: firstStreamableBlock,
 		MergedBlocksStore:    mergedBlocksStore,
 		StateStore:           stateStore,
 		StateStoreDefaultTag: stateStoreDefaultTag,

@@ -128,6 +128,9 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	metrics.Tier2RequestCounter.Inc()
 	defer metrics.Tier2ActiveRequests.Dec()
 
+	// this tweaks the actual request so all initialBlocks are correct with the given chain firstStreamableBlock
+	pbsubstreams.ApplyFirstStreamableBlockToModules(request.FirstStreamableBlock, request.Modules.Modules)
+
 	// We keep `err` here as the unaltered error from `blocks` call, this is used in the EndSpan to record the full error
 	// and not only the `grpcError` one which is a subset view of the full `err`.
 	var err error

@@ -22,6 +22,13 @@ func (n NoopHandler) ProcessBlock(blk *pbbstream.Block, obj interface{}) (err er
 	clock := pipeline.BlockToClock(blk)
 
 	step := obj.(bstream.Stepable).Step()
+	switch step {
+	case bstream.StepIrreversible,
+		bstream.StepNewIrreversible,
+		bstream.StepNew:
+	default:
+		return nil
+	}
 
 	cursor := &bstream.Cursor{
 		Step:      step,

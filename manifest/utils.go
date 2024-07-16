@@ -110,6 +110,9 @@ var HardcodedEndpoints = map[string]string{
 	"chapel":            "chapel.substreams.pinax.network:443",
 	"injective-mainnet": "mainnet.injective.streamingfast.io:443",
 	"injective-testnet": "testnet.injective.streamingfast.io:443",
+	"sei":               "evm-mainnet.sei.streamingfast.io:443",
+	"sei-mainnet":       "evm-mainnet.sei.streamingfast.io:443",
+	"sei-evm-mainnet":   "evm-mainnet.sei.streamingfast.io:443",
 
 	// antelope chains
 	"eos":       "eos.substreams.pinax.network:443",

@@ -12,9 +12,9 @@ You can directly authenticate with The Graph Market (https://thegraph.market) by
 
 ### Get the JWT Token
 
-1. Navigate to the https://thegraph.market. Log in your account or create a new account if you don't have one.
+1. Navigate to the [https://thegraph.market](https://thegraph.market). Log in your account or create a new account if you don't have one.
 
-2. Click on `Dashboard` or nagivate to https://thegraph.market/dashboard.
+2. Click on `Dashboard` or nagivate to [https://thegraph.market/dashboard](https://thegraph.market/dashboard).
 
 <figure><img src="../../.gitbook/assets/intro/thegraphmarket.png" width="100%" /></figure>
 
@@ -39,7 +39,7 @@ Just replace `<YOUR-JWT-TOKEN>` with the actual JWT token.
 
 ### Verify the Authentication Works
 
-To verify that everything works correctly, you run a pre-built Substreams. In this following example, you run the [ERC20 Balance Changes Substreams](https://substreams.dev/streamingfast/erc20-balance-changes/) against Ethereum Mainnet (`mainnet.eth.streamingfast.io:443`) endpoint of StreamingFast.
+To verify that everything works correctly, you can run a pre-built Substreams. In the following example, you run the [ERC20 Balance Changes Substreams](https://substreams.dev/streamingfast/erc20-balance-changes/) against the Ethereum Mainnet endpoint (`mainnet.eth.streamingfast.io:443`) of StreamingFast.
 
 ```bash
 substreams gui \

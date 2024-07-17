@@ -15,6 +15,7 @@ import (
 
 	ipfs "github.com/ipfs/go-ipfs-api"
 	"github.com/jhump/protoreflect/dynamic"
+	"github.com/klauspost/compress/zstd"
 	"github.com/streamingfast/dstore"
 	"golang.org/x/mod/semver"
 	"google.golang.org/protobuf/proto"
@@ -190,6 +191,22 @@ func (r *Reader) readFromHttp(input string) error {
 	if err != nil {
 		return fmt.Errorf("error downloading %q: %w", input, err)
 	}
+	defer resp.Body.Close()
+
+	if u, err := url.Parse(input); err == nil {
+		if strings.HasSuffix(u.Path, ".zst") || strings.HasSuffix(u.Path, ".zstd") {
+			zstdReader, err := zstd.NewReader(resp.Body)
+			if err != nil {
+				return fmt.Errorf("unable to create zstd reader: %w", err)
+			}
+			data, err := io.ReadAll(zstdReader)
+			if err != nil {
+				return fmt.Errorf("error reading file: %w", err)
+			}
+			r.currentData = data
+			return nil
+		}
+	}
 
 	b, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -204,13 +221,30 @@ func (r *Reader) readFromStore(input string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	b, err := dstore.ReadObject(ctx, input)
+	store, filename, err := dstore.NewStoreFromFileURL(input)
 	if err != nil {
-		return fmt.Errorf("error reading %q: %w", input, err)
+		return fmt.Errorf("unable to create store from %q: %w", input, err)
+	}
+	reader, err := store.OpenObject(ctx, filename)
+	if err != nil {
+		return fmt.Errorf("unable to read %q: %w", filename, err)
+	}
+	defer reader.Close()
+
+	if strings.HasSuffix(filename, ".zst") || strings.HasSuffix(filename, ".zstd") {
+		zstdReader, err := zstd.NewReader(reader)
+		if err != nil {
+			return fmt.Errorf("unable to create zstd reader: %w", err)
+		}
+		r.currentData, err = io.ReadAll(zstdReader)
+		if err != nil {
+			return fmt.Errorf("error reading file: %w", err)
+		}
+		return nil
 	}
 
-	r.currentData = b
-	return nil
+	r.currentData, err = io.ReadAll(reader)
+	return err
 }
 
 func (r *Reader) readFromIPFS(input string) error {
@@ -276,12 +310,31 @@ func (r *Reader) readFromIPFS(input string) error {
 }
 
 func (r *Reader) readLocal(input string) error {
-	b, err := os.ReadFile(input)
+	f, err := os.Open(input)
+	if err != nil {
+		return fmt.Errorf("unable to open file %q: %w", input, err)
+	}
+	defer f.Close()
+
+	if strings.HasSuffix(input, ".zst") || strings.HasSuffix(input, ".zstd") {
+		zstdReader, err := zstd.NewReader(f)
+		if err != nil {
+			return fmt.Errorf("unable to setup zstdReader on file %q: %w", input, err)
+		}
+		data, err := io.ReadAll(zstdReader)
+		if err != nil {
+			return fmt.Errorf("unable to read file %q: %w", input, err)
+		}
+		r.currentData = data
+		return nil
+	}
+
+	data, err := io.ReadAll(f)
 	if err != nil {
 		return fmt.Errorf("unable to read file %q: %w", input, err)
 	}
 
-	r.currentData = b
+	r.currentData = data
 	return nil
 }
 

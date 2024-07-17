@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v1.9.2 (unreleased)
 
+### Added
+
+* Added support for directly reading spkg file that is compressed with zstd (from http, gs, s3, azure or local)
+
 ### Fixed
 
 * Prevent Noop handler from sending outputs with 'Stalled' step in cursor (which breaks substreams-sink-kv)

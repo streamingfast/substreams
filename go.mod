@@ -32,6 +32,7 @@ require (
 	github.com/RoaringBitmap/roaring v1.9.1
 	github.com/alecthomas/chroma v0.10.0
 	github.com/alecthomas/participle v0.7.1
+	github.com/bmatcuk/doublestar/v4 v4.6.1
 	github.com/bytecodealliance/wasmtime-go/v4 v4.0.0
 	github.com/charmbracelet/bubbles v0.18.0
 	github.com/charmbracelet/bubbletea v0.26.3
@@ -152,7 +153,7 @@ require (
 	github.com/ipfs/go-cid v0.4.0 // indirect
 	github.com/itchyny/timefmt-go v0.1.5 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
-	github.com/klauspost/compress v1.16.6 // indirect
+	github.com/klauspost/compress v1.16.6
 	github.com/klauspost/cpuid/v2 v2.2.3 // indirect
 	github.com/libp2p/go-buffer-pool v0.1.0 // indirect
 	github.com/libp2p/go-flow-metrics v0.1.0 // indirect

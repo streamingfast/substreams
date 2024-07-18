@@ -1,0 +1,9 @@
+{{- range $entityName, $entityMapping := $.GetEntities }}
+type {{ $entityName }} @entity {
+    id: ID!
+    {{- range $fieldName, $graphqlType := $entityMapping }}
+    {{ $fieldName }}: {{ $graphqlType }}
+    {{- end }}
+}
+
+{{ end -}}

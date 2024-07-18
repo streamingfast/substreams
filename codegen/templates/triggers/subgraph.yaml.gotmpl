@@ -1,0 +1,19 @@
+specVersion: 1.0.0
+description: {{ .Name }} Substreams-powered-Subgraph
+indexerHints:
+  prune: auto
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: substreams
+    name: test
+    network: {{ .Network }}
+    source:
+      package:
+        moduleName: {{ $.GetModuleName }}
+        file: {{ $.SubstreamsKebabName }}-v0.1.0.spkg
+    mapping:
+      apiVersion: 0.0.7
+      kind: substreams/graph-entities
+      file: ./src/mappings.ts
+      handler: handleTriggers

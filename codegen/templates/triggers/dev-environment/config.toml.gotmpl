@@ -1,0 +1,22 @@
+[general]
+
+[store]
+[store.primary]
+connection = "postgresql://graph-node:let-me-in@postgres:5432/graph-node"
+weight = 1
+pool_size = 10
+
+[chains]
+ingestor = "block_ingestor_node"
+
+[chains.{{ .ChainName }}]
+protocol = "substreams"
+shard = "primary"
+provider = [
+    { label = "substreams", details = { type = "substreams", url = "https://{{ $.ChainEndpoint }}", token = "$SUBSTREAMS_API_TOKEN", conn_pool_size = 1 } },
+]
+
+[deployment]
+[[deployment.rule]]
+shard = "primary"
+indexers = ["default"]

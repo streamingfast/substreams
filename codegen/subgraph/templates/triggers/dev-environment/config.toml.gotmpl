@@ -9,7 +9,7 @@ pool_size = 10
 [chains]
 ingestor = "block_ingestor_node"
 
-[chains.{{ .ChainName }}]
+[chains.{{ .Network }}]
 protocol = "substreams"
 shard = "primary"
 provider = [

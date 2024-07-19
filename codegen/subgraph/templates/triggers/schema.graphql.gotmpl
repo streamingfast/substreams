@@ -1,0 +1,11 @@
+{{- range $entityName, $entity := $.GetEntities }}
+type {{ $entity.NameAsEntity }} @entity {
+    id: ID!
+    {{- range $fieldName, $graphqlType := $entity.NestedEntitiesMapping }}
+    {{ $fieldName }}: {{ $graphqlType }}
+    {{- end }}
+    {{if  $entity.HasClassicTypes }}
+    jsonValue: String!
+    {{- end -}}
+}
+{{- end }}

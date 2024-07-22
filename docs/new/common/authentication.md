@@ -4,69 +4,50 @@ description: StreamingFast Substreams authentication reference
 
 # Authentication
 
-Running a Substreams involves sending your package (`.spkg`) to a a Substreams provider for execution. Usually, Substreams provider will require you to authenticate to avoid abuses on the service.
+Running a Substreams involves sending your package (`.spkg`) to a a Substreams provider for execution. Usually, the Substreams provider will require you to authenticate to avoid abuses on the service.
 
-### Authentication with StreamingFast
+## Authentication with The Graph Market
 
-Authentication can be done either directly from an API key or from a derived JWT.
+You can directly authenticate with The Graph Market (https://thegraph.market) by creating a new API key and obtaining the corresponding JWT token. 
 
-#### Get your API key
+### Get the JWT Token
 
-First, obtain an API key by visiting our Portal:
+1. Navigate to the [https://thegraph.market](https://thegraph.market). Log in your account or create a new account if you don't have one.
 
-* [https://app.streamingfast.io](https://app.streamingfast.io)
+2. Click on `Dashboard` or nagivate to [https://thegraph.market/dashboard](https://thegraph.market/dashboard).
+
+<figure><img src="../../.gitbook/assets/intro/thegraphmarket.png" width="100%" /></figure>
+
+3. Then, click on `Create New Key`.
+You will be provided with a JWT token. Copy and save this token in a safe place.
+
+### Use the JWT Token
+
+Once you have your JWT token, you can you it to consume data in Substreams. By default, the Substreams execution will inspect the `SUBSTREAMS_API_TOKEN` environment variable in your computer looking for a valid JWT token.
+
+Setting the local environment variable might vary depending on your operating system. For Unix-like operating systems (Mac and Linux):
+
+1. Open a command-line terminal.
+
+2. Run the following command.
+
+```bash
+export SUBSTREAMS_API_TOKEN="<YOUR-JWT-TOKEN>"
+```
+
+Just replace `<YOUR-JWT-TOKEN>` with the actual JWT token.
+
+### Verify the Authentication Works
+
+To verify that everything works correctly, you can run a pre-built Substreams. In the following example, you run the [ERC20 Balance Changes Substreams](https://substreams.dev/streamingfast/erc20-balance-changes/) against the Ethereum Mainnet endpoint (`mainnet.eth.streamingfast.io:443`) of StreamingFast.
+
+```bash
+substreams gui \
+  https://spkg.io/streamingfast/erc20-balance-changes-v1.2.0.spkg \
+  map_valid_balance_changes \
+  -e mainnet.eth.streamingfast.io:443 \
+  --start-block 1397553
+  --stop-block +10
+```
 
 The StreamingFast team is also available on [Discord](https://discord.gg/jZwqxJAvRs) to help you.
-
-#### Authenticate with your API key
-
-The substreams server expects the `X-Api-Key` header to be set with your API key. Here's how you do it in the terminal:
-
-Set the token as an `ENV` variable through the terminal by using:
-
-```bash
-export SUBSTREAMS_API_KEY="server_********************************"
-```
-
-The `substreams` [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) and [`gui`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#gui) commands check the `SUBSTREAMS_API_KEY` environment variable for the key by default. You can change that with the `--substreams-api-key-envvar` flag.
-
-#### Authentication using a JWT (optional)
-
-Streamingfast also provides a way to generate a token (JWT) from your API key and use it as authentication. The advantage of that method is that you can manage the JWT expiration, more suitable for using in web apps or tighter security standards.
-
-#### Request your authentication token
-
-Use your API Key to obtain an authentication token using `curl`:
-
-```bash
-# lifetime is the token duration in seconds
-curl -s https://auth.streamingfast.io/v1/auth/issue --data-binary '{"api_key": "your-api-key", "lifetime": 3600}'
-```
-
-#### Use it in your requests
-
-The substreams server expects the standard `Authorization: bearer your_api_key` header format for JWT-based authentication. Here's how you do it in the terminal:
-
-```bash
-export SUBSTREAMS_API_TOKEN="your_token"
-```
-
-The `substreams` [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) and [`gui`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#gui) commands check the `SUBSTREAMS_API_TOKEN` environment variable for the token by default. You can change that with the `--substreams-api-token-envvar` flag.
-
-#### All-in-one bash function
-
-Place this function in your terminal profile (`.bashrc` or `.zshrc`), for a quick all-in-one token fetcher:
-
-```bash
-export STREAMINGFAST_KEY=server_YOUR_KEY_HERE
-function sftoken {
-  export SUBSTREAMS_API_TOKEN=$(curl https://auth.streamingfast.io/v1/auth/issue -s --data-binary '{"api_key":"'$STREAMINGFAST_KEY'"}' | jq -r .token)
-  echo "Token set on in SUBSTREAMS_API_TOKEN"
-}
-```
-
-Then obtain a new key and set it in your environment by running:
-
-```bash
-$ sftoken
-```

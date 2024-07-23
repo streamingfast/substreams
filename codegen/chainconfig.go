@@ -1,4 +1,4 @@
-package subgraph
+package codegen
 
 type ChainConfig struct {
 	ID               string // Public

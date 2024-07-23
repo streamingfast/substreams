@@ -1,0 +1,7 @@
+{{ if $.HasExampleEntity }}
+CREATE TABLE IF NOT EXISTS {{ $contract.Identifier }}_{{ $rust.TableChangeEntityName }} (
+) ENGINE = MergeTree PRIMARY KEY ("evt_tx_hash","evt_index");
+{{- else }}
+CREATE TABLE IF NOT EXISTS MyEntity (
+) ENGINE = MergeTree PRIMARY KEY ("evt_tx_hash","evt_index");
+{{- end }}

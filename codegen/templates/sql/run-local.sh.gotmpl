@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+
+set -e
+
+ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+if [[ -z $SUBSTREAMS_API_TOKEN ]]; then
+  echo "Please set SUBSTREAMS_API_TOKEN in your environment"
+  exit 1
+fi
+
+if [[ -z $DATABASE_DSN ]]; then
+  DATABASE_DSN={{ if eq $.SqlOutputFlavor "clickhouse" }}"clickhouse://default:@localhost:9000/default"{{ else }}"postgres://dev-node:insecure-change-me-in-prod@localhost:5432/dev-node?sslmode=disable"{{ end }}
+fi
+
+if [ ! -f {{ $.KebabName }}-v0.1.0.spkg ]; then
+  echo "Missing {{ $.KebabName }}-v0.1.0.spkg file. Please build the substreams first. (unzip substreams_src.zip and run 'make build' in the substreams directory, then copy the file here)"
+  exit 1
+fi
+
+echo ""
+echo "----- Running docker environment -----"
+echo ""
+sleep 1
+docker compose -f $ROOT/dev-environment/docker-compose.yml up -d --wait
+
+echo ""
+echo "----- Getting a fresh copy of substreams-sink-sql under ./bin -----"
+echo ""
+make get-sink-sql-binary
+
+echo ""
+echo "----- Set up substreams-sink-sql -----"
+echo ""
+sleep 1
+make setup-sink
+
+echo ""
+echo "----- Run substreams-sink-sql -----"
+{{- if eq $.SqlOutputFlavor "clickhouse" }}
+echo "Run the following commands in another terminal"
+echo "docker exec -it {docker_id} sh"
+echo "clickhouse-client"
+echo "select * from events;"
+{{ else}}
+echo "Navigate to http://localhost:8081 and run SQL queries"
+{{- end }}
+echo ""
+sleep 1
+make run-sink

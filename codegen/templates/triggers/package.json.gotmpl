@@ -5,7 +5,7 @@
     "codegen": "graph codegen",
     "build": "graph build",
     "publish": "graph publish",
-    "generate": "buf generate --type=\"{{ $.GetModuleOutputProtoPath}}\" {{ $.SubstreamsKebabName }}-v0.1.0.spkg#format=bin",
+    "generate": "buf generate --type=\"{{ $.GetOutputProtoPath}}\" {{ $.SubstreamsKebabName }}-v0.1.0.spkg#format=bin",
     "deploy": "graph deploy --node https://api.studio.thegraph.com/deploy/ {{ .Name }}",
     "create-local": "graph create --node http://localhost:8020/ {{ .Name }}",
     "remove-local": "graph remove --node http://localhost:8020/ {{ .Name }}",

@@ -42,6 +42,7 @@ require (
 	github.com/charmbracelet/lipgloss v0.11.0
 	github.com/docker/cli v24.0.6+incompatible
 	github.com/dustin/go-humanize v1.0.1
+	github.com/golang-cz/textcase v1.2.1
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/ipfs/go-ipfs-api v0.6.0

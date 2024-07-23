@@ -2,11 +2,13 @@ package codegen
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/streamingfast/substreams/codegen/subgraph"
 )
 
 var Cmd = &cobra.Command{Use: "codegen", Short: "Code generator for substreams"}
 
 func init() {
-	Cmd.AddCommand(subgraph.SubgraphCmd)
+	SubgraphCmd.Flags().Bool("with-dev-env", false, "generate graph node dev environment")
+
+	Cmd.AddCommand(SubgraphCmd)
+	Cmd.AddCommand(SQLCmd)
 }

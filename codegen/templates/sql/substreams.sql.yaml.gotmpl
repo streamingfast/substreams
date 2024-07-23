@@ -1,0 +1,10 @@
+{{ template "substreams.yaml.gotmpl" . }}
+
+sink:
+  module: db_out
+  type: sf.substreams.sink.sql.v1.Service
+  config:
+    schema: "./schema.sql"
+    engine: postgres
+    postgraphile_frontend:
+      enabled: true

@@ -1,0 +1,59 @@
+# Fill out database using substreams as source
+
+This repository contains all the keys to launch a local `substreams-sink-sql` instance using a substreams source.
+It will allow you to fill out your database with data from the substreams source.
+
+## Table of Contents
+  - [Pre-requisites](#pre-requisites)
+  {{- if .FlavorIsClickHouse}}
+  - [Launch Clickhouse database](#launch-clickhouse-database)
+  {{- end}}
+  {{- if .FlavorIsPostgresSQL}}
+  - [Launch PostgresSQL database](#launch-postressql-database)
+  {{- end}}
+  - [Setup Sink](#setup-sink)
+  - [Run Sink](#run-sink)
+
+### Pre-requisites
+
+- Install the `substreams-sink-sql` binary using the following command:
+```bash
+make get-sink-sql-binary
+```
+> [!NOTE]
+> The `substreams-sink-sql` binary is downloaded to the `bin` directory.
+
+{{- if .FlavorIsClickHouse}}
+### Launch Clickhouse database
+Once the sink binary is installed, you can launch a local Clickhouse database using the `docker-compose-yml` in the `dev-environment` directory.
+To do so, you can use the following make command:
+```bash
+make launch-clickhouse-db
+```
+{{- end}}
+
+{{- if .FlavorIsPostgresSQL}}
+### Launch PostgresSQL database
+Once the sink binary is installed, you can launch a local PostgresSQL database using the `docker-compose-yml` in the `dev-environment` directory.
+To do so, you can use the following make command:
+```bash
+make launch-postgresql-db
+```
+{{- end}}
+
+### Setup Sink
+After starting your database, you need to setup tour sink with a `DNS` to connect the sink to your database. You need also your build substreams package.
+If you run your clickhouse database with the provided `dev-environment`, you can use the following command:
+
+```bash
+make setup-sink
+```
+
+### Run Sink
+Once the sink is setup, you can now run a substreams sink to fill out your database with data based on the substreams source.
+Run the following command to start it:
+```bash
+make run-sink
+```
+> [!NOTE]
+> When running sink, do not forget to provide a substreams JWT Token or an API key enabling you to use the substreams source.

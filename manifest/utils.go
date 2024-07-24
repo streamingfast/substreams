@@ -98,7 +98,6 @@ var HardcodedEndpoints = map[string]string{
 	"holesky":           "holesky.eth.streamingfast.io:443",
 	"near":              "mainnet.near.streamingfast.io:443",
 	"near-mainnet":      "mainnet.near.streamingfast.io:443",
-	"near-testnet":      "testnet.near.streamingfast.io:443",
 	"arbitrum":          "arb-one.streamingfast.io:443",
 	"arb":               "arb-one.streamingfast.io:443",
 	"arb-one":           "arb-one.streamingfast.io:443",
@@ -113,6 +112,9 @@ var HardcodedEndpoints = map[string]string{
 	"sei":               "evm-mainnet.sei.streamingfast.io:443",
 	"sei-mainnet":       "evm-mainnet.sei.streamingfast.io:443",
 	"sei-evm-mainnet":   "evm-mainnet.sei.streamingfast.io:443",
+	"starknet-mainnet":  "mainnet.starknet.streamingfast.io:443",
+	"starknet":          "mainnet.starknet.streamingfast.io:443",
+	"starknet-testnet":  "testnet.starknet.streamingfast.io:443",
 
 	// antelope chains
 	"eos":       "eos.substreams.pinax.network:443",

@@ -22,6 +22,7 @@ type Project struct {
 	OutputDescriptor *descriptorpb.DescriptorProto
 	protoTypeMapping map[string]*descriptorpb.DescriptorProto
 	ExampleEntity    *ExampleEntity
+	SpkgProjectName  string
 }
 
 type ExampleEntity struct {
@@ -31,13 +32,14 @@ type ExampleEntity struct {
 	ID               string
 }
 
-func NewProject(name, network string, module *pbsubstreams.Module, outputDescriptor *descriptorpb.DescriptorProto, protoTypeMapping map[string]*descriptorpb.DescriptorProto) *Project {
+func NewProject(name, spkgProjectName, network string, module *pbsubstreams.Module, outputDescriptor *descriptorpb.DescriptorProto, protoTypeMapping map[string]*descriptorpb.DescriptorProto) *Project {
 	return &Project{
 		Network:          network,
 		Name:             name,
 		Module:           module,
 		OutputDescriptor: outputDescriptor,
 		protoTypeMapping: protoTypeMapping,
+		SpkgProjectName:  spkgProjectName,
 	}
 }
 

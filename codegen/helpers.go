@@ -121,6 +121,16 @@ func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bo
 
 	projectName := pkg.GetPackageMeta()[0].Name
 
+	spkgProjectName := fmt.Sprintf("%s-%s.spkg", strings.Replace(pkg.PackageMeta[0].Name, "_", "-", -1), pkg.PackageMeta[0].Version)
+	_, err = os.Stat(spkgProjectName + ".spkg")
+
+	if os.IsNotExist(err) {
+		red := "\033[31m"
+		reset := "\033[0m"
+
+		fmt.Printf("%sThe substreams package %q does not exist, make sure to run `substreams pack` command first%s\n\n!", red, spkgProjectName, reset)
+	}
+
 	messageDescriptor, err := searchForMessageTypeIntoPackage(pkg, requestedModule.Output.Type)
 	if err != nil {
 		return fmt.Errorf("searching for message type: %w", err)
@@ -132,12 +142,12 @@ func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bo
 		return fmt.Errorf("network not found in your manifest file")
 	}
 
-	project := NewProject(projectName, pkg.Network, requestedModule, messageDescriptor, protoTypeMapping)
+	project := NewProject(projectName, spkgProjectName, pkg.Network, requestedModule, messageDescriptor, protoTypeMapping)
 
 	// Create an example entity from the output descriptor
 	project.BuildExampleEntity()
 
-	fmt.Println("Rendering project files for Substreams-powered-subgraph...")
+	fmt.Println("Rendering project files for Substreams-powered-subgraph...\n")
 
 	projectFiles, err := project.Render(outputType, withDevEnv)
 	if err != nil {
@@ -151,18 +161,18 @@ func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bo
 
 	_, err = os.Stat("subgraph")
 	if !os.IsNotExist(err) {
-		fmt.Println("A subgraph directory is already existing...")
+		fmt.Println("A subgraph directory is already existing...\n")
 		saveDir, err = createSaveDirForm("subgraph-2")
 		if err != nil {
 			return fmt.Errorf("creating save dir form: %w", err)
 		}
 	}
 
-	fmt.Println("Writing to directory:", saveDir)
+	fmt.Println("Writing to directory:\n", saveDir)
 
 	err = saveProjectFiles(projectFiles, saveDir)
 	if err != nil {
-		fmt.Println("saving project files: %w", err)
+		return fmt.Errorf("saving project files: %w", err)
 	}
 
 	return nil

@@ -82,10 +82,6 @@ func processMessage(message *descriptorpb.DescriptorProto, parentName string, pr
 }
 
 func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bool) error {
-	_, err := os.Stat(".devcontainer")
-
-	isInDevContainer := !os.IsNotExist(err)
-
 	reader, err := manifest.NewReader(manifestPath)
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
@@ -153,10 +149,12 @@ func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bo
 		saveDir = filepath.Join(cwd, saveDir)
 	}
 
-	if !isInDevContainer {
-		saveDir, err = createSaveDirForm(saveDir)
+	_, err = os.Stat("subgraph")
+	if !os.IsNotExist(err) {
+		fmt.Println("A subgraph directory is already existing...")
+		saveDir, err = createSaveDirForm("subgraph-2")
 		if err != nil {
-			fmt.Println("creating save directory: %w", err)
+			return fmt.Errorf("creating save dir form: %w", err)
 		}
 	}
 
@@ -171,7 +169,7 @@ func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bo
 }
 
 func createSaveDirForm(saveDir string) (string, error) {
-	inputField := huh.NewInput().Title("In which directory do you want to generate the project?").Value(&saveDir)
+	inputField := huh.NewInput().Title("In which sub-directory do you want to generate the project?").Value(&saveDir)
 	var WITH_ACCESSIBLE = false
 
 	err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run()
@@ -207,7 +205,7 @@ func saveProjectFiles(projectFiles map[string][]byte, saveDir string) error {
 
 func createRequestModuleForm(labels []string) (string, error) {
 	if len(labels) == 0 {
-		fmt.Println("Hmm, the server sent no option to select from (!)")
+		fmt.Println("No labels found...")
 	}
 
 	var options []huh.Option[string]

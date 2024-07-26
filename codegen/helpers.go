@@ -122,7 +122,7 @@ func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bo
 	projectName := pkg.GetPackageMeta()[0].Name
 
 	spkgProjectName := fmt.Sprintf("%s-%s.spkg", strings.Replace(pkg.PackageMeta[0].Name, "_", "-", -1), pkg.PackageMeta[0].Version)
-	_, err = os.Stat(spkgProjectName + ".spkg")
+	_, err = os.Stat(spkgProjectName)
 
 	if os.IsNotExist(err) {
 		red := "\033[31m"

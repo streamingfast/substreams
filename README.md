@@ -4,8 +4,6 @@
 
 # Substreams
 
-> Developer preview
-
 Substreams is a powerful blockchain indexing technology, developed for The Graph Network.
 
 Substreams enables developers to write Rust modules, composing data streams alongside the community, and provides extremely high performance indexing by virtue of parallelization, in a streaming-first fashion.

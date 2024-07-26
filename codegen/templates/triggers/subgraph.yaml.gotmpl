@@ -1,12 +1,12 @@
 specVersion: 1.0.0
-description: {{ .Name }} Substreams-powered-Subgraph
+description: {{toKebabCase .Name }} Substreams-powered-Subgraph
 indexerHints:
   prune: auto
 schema:
   file: ./schema.graphql
 dataSources:
   - kind: substreams
-    name: test
+    name: {{ .Name }}
     network: {{ .Network }}
     source:
       package:

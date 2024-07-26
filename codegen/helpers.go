@@ -75,13 +75,13 @@ func getExistingProtoTypes(protoFiles []*descriptorpb.FileDescriptorProto) map[s
 
 func processMessage(message *descriptorpb.DescriptorProto, parentName string, protoTypeMapping map[string]*descriptorpb.DescriptorProto) {
 	for _, nestedMessage := range message.NestedType {
-		currentName := "." + parentName + "." + nestedMessage.GetName()
+		currentName := parentName + "." + nestedMessage.GetName()
 		protoTypeMapping[currentName] = nestedMessage
 		processMessage(nestedMessage, currentName, protoTypeMapping)
 	}
 }
 
-func buildGenerateCommandFromArgs(manifestPath, moduleName, networkName, outputType string, withDevEnv bool) error {
+func buildGenerateCommandFromArgs(manifestPath, moduleName, outputType string, withDevEnv bool) error {
 	reader, err := manifest.NewReader(manifestPath)
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
@@ -115,7 +115,12 @@ func buildGenerateCommandFromArgs(manifestPath, moduleName, networkName, outputT
 	}
 
 	protoTypeMapping := getExistingProtoTypes(pkg.ProtoFiles)
-	project := NewProject(projectName, networkName, requestedModule, messageDescriptor, protoTypeMapping)
+
+	if pkg.Network == "" {
+		return fmt.Errorf("network not found in your manifest file")
+	}
+
+	project := NewProject(projectName, pkg.Network, requestedModule, messageDescriptor, protoTypeMapping)
 
 	// Create an example entity from the output descriptor
 	project.BuildExampleEntity()
@@ -139,7 +144,7 @@ func buildGenerateCommandFromArgs(manifestPath, moduleName, networkName, outputT
 }
 
 func createSaveDirForm() (string, error) {
-	saveDir := "output_sps"
+	saveDir := "subgraph"
 	if cwd, err := os.Getwd(); err == nil {
 		saveDir = filepath.Join(cwd, saveDir)
 	}

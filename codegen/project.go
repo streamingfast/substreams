@@ -41,7 +41,7 @@ func NewProject(name, network string, module *pbsubstreams.Module, outputDescrip
 	}
 }
 
-func (p *Project) BuildExampleEntity() {
+func (p *Project) BuildExampleEntity() error {
 	for _, field := range p.OutputDescriptor.Field {
 		if *field.Type == descriptorpb.FieldDescriptorProto_TYPE_MESSAGE {
 			if *field.Label == descriptorpb.FieldDescriptorProto_LABEL_REPEATED {
@@ -49,9 +49,13 @@ func (p *Project) BuildExampleEntity() {
 				name := splitMessagePath[len(splitMessagePath)-1]
 
 				p.ExampleEntity = &ExampleEntity{
-					NameAsProtoField: field.GetName(),
+					NameAsProtoField: textcase.CamelCase(field.GetName()),
 					NameAsEntity:     "My" + name,
 					Name:             name,
+				}
+
+				if p.protoTypeMapping[*field.TypeName] == nil {
+					return fmt.Errorf("nested message type: %q not found", *field.TypeName)
 				}
 
 				for _, nestedMessageField := range p.protoTypeMapping[*field.TypeName].Field {
@@ -65,7 +69,7 @@ func (p *Project) BuildExampleEntity() {
 			}
 		}
 	}
-	return
+	return nil
 }
 
 func (p *Project) ExampleEntityHasID() bool {
@@ -106,7 +110,12 @@ func (p *Project) GetOutputProtobufPath() string {
 	return protobufPath
 }
 
-func (p *Project) ChainEndpoint() string { return ChainConfigByID[p.Network].FirehoseEndpoint }
+func (p *Project) ChainEndpoint() (string, error) {
+	if ChainConfigByID[p.Network] == nil {
+		return "", fmt.Errorf("network %q not found", p.Network)
+	}
+	return ChainConfigByID[p.Network].FirehoseEndpoint, nil
+}
 
 func (p *Project) Render(outputType string, withDevEnv bool) (projectFiles map[string][]byte, err error) {
 	projectFiles = map[string][]byte{}
@@ -115,7 +124,9 @@ func (p *Project) Render(outputType string, withDevEnv bool) (projectFiles map[s
 		"arr": func(els ...any) []any {
 			return els
 		},
-		"toLower": strings.ToLower,
+		"toLower":     strings.ToLower,
+		"toCamelCase": textcase.CamelCase,
+		"toKebabCase": textcase.KebabCase,
 	}
 
 	tpls, err := ParseFS(funcMap, templatesFS, "**/*.gotmpl")
@@ -127,7 +138,6 @@ func (p *Project) Render(outputType string, withDevEnv bool) (projectFiles map[s
 	switch outputType {
 	case outputTypeSubgraph:
 		templateFiles = map[string]string{
-			"triggers/Makefile.gotmpl":        "Makefile",
 			"triggers/buf.gen.yaml":           "buf.gen.yaml",
 			"triggers/package.json.gotmpl":    "package.json",
 			"triggers/tsconfig.json":          "tsconfig.json",

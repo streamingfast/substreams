@@ -81,7 +81,11 @@ func processMessage(message *descriptorpb.DescriptorProto, parentName string, pr
 	}
 }
 
-func buildGenerateCommandFromArgs(manifestPath, moduleName, outputType string, withDevEnv bool) error {
+func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bool) error {
+	_, err := os.Stat(".devcontainer")
+
+	isInDevContainer := !os.IsNotExist(err)
+
 	reader, err := manifest.NewReader(manifestPath)
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
@@ -92,7 +96,19 @@ func buildGenerateCommandFromArgs(manifestPath, moduleName, outputType string, w
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
-	requestedModule, err := getModule(pkg, moduleName)
+	moduleNames := []string{}
+	for _, module := range pkg.Modules.Modules {
+		if module.Output != nil {
+			moduleNames = append(moduleNames, module.Name)
+		}
+	}
+
+	selectedModule, err := createRequestModuleForm(moduleNames)
+	if err != nil {
+		return fmt.Errorf("creating request module form: %w", err)
+	}
+
+	requestedModule, err := getModule(pkg, selectedModule)
 	if err != nil {
 		return fmt.Errorf("getting module: %w", err)
 	}
@@ -130,9 +146,16 @@ func buildGenerateCommandFromArgs(manifestPath, moduleName, outputType string, w
 		return fmt.Errorf("rendering project files: %w", err)
 	}
 
-	saveDir, err := createSaveDirForm()
-	if err != nil {
-		fmt.Println("creating save directory: %w", err)
+	saveDir := "subgraph"
+	if cwd, err := os.Getwd(); err == nil {
+		saveDir = filepath.Join(cwd, saveDir)
+	}
+
+	if !isInDevContainer {
+		saveDir, err = createSaveDirForm(saveDir)
+		if err != nil {
+			fmt.Println("creating save directory: %w", err)
+		}
 	}
 
 	err = saveProjectFiles(projectFiles, saveDir)
@@ -143,12 +166,7 @@ func buildGenerateCommandFromArgs(manifestPath, moduleName, outputType string, w
 	return nil
 }
 
-func createSaveDirForm() (string, error) {
-	saveDir := "subgraph"
-	if cwd, err := os.Getwd(); err == nil {
-		saveDir = filepath.Join(cwd, saveDir)
-	}
-
+func createSaveDirForm(saveDir string) (string, error) {
 	inputField := huh.NewInput().Title("In which directory do you want to generate the project?").Value(&saveDir)
 	var WITH_ACCESSIBLE = false
 
@@ -181,4 +199,32 @@ func saveProjectFiles(projectFiles map[string][]byte, saveDir string) error {
 	}
 
 	return nil
+}
+
+func createRequestModuleForm(labels []string) (string, error) {
+	if len(labels) == 0 {
+		fmt.Println("Hmm, the server sent no option to select from (!)")
+	}
+
+	var options []huh.Option[string]
+	optionsMap := make(map[string]string)
+	for i := 0; i < len(labels); i++ {
+		entry := huh.Option[string]{
+			Key:   labels[i],
+			Value: labels[i],
+		}
+		options = append(options, entry)
+		optionsMap[entry.Value] = entry.Key
+	}
+	var selection string
+	selectField := huh.NewSelect[string]().
+		Options(options...).
+		Value(&selection)
+
+	err := huh.NewForm(huh.NewGroup(selectField)).WithTheme(huh.ThemeCharm()).Run()
+	if err != nil {
+		return "", fmt.Errorf("failed taking input: %w", err)
+	}
+
+	return selection, nil
 }

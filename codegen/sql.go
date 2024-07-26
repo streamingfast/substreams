@@ -16,10 +16,9 @@ var SQLCmd = &cobra.Command{
 
 func generateSQLEnv(cmd *cobra.Command, args []string) error {
 	manifestPath := args[0]
-	moduleName := args[1]
 	withDevEnv := sflags.MustGetBool(cmd, "with-dev-env")
 
-	err := buildGenerateCommandFromArgs(manifestPath, moduleName, outputTypeSubgraph, withDevEnv)
+	err := buildGenerateCommandFromArgs(manifestPath, outputTypeSubgraph, withDevEnv)
 	if err != nil {
 		return fmt.Errorf("building generate command: %w", err)
 	}

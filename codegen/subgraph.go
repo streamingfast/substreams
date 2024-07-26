@@ -8,27 +8,21 @@ import (
 )
 
 var SubgraphCmd = &cobra.Command{
-	Use:   "subgraph [<manifest_url>] <module_name>",
+	Use:   "subgraph [<manifest_url>]",
 	Short: "Generate subgraph dev environment from substreams manifest",
-	Args:  cobra.RangeArgs(1, 2),
+	Args:  cobra.RangeArgs(0, 1),
 	RunE:  generateSubgraphEnv,
 }
 
 func generateSubgraphEnv(cmd *cobra.Command, args []string) error {
 	manifestPath := ""
-	moduleName := ""
-	if len(args) == 2 {
-		manifestPath = args[0]
-		moduleName = args[1]
-	}
-
 	if len(args) == 1 {
-		moduleName = args[0]
+		manifestPath = args[0]
 	}
 
 	withDevEnv := sflags.MustGetBool(cmd, "with-dev-env")
 
-	err := buildGenerateCommandFromArgs(manifestPath, moduleName, outputTypeSubgraph, withDevEnv)
+	err := buildGenerateCommandFromArgs(manifestPath, outputTypeSubgraph, withDevEnv)
 	if err != nil {
 		return fmt.Errorf("building generate command: %w", err)
 	}

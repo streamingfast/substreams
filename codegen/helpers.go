@@ -221,7 +221,7 @@ func createRequestModuleForm(labels []string) (string, error) {
 		Options(options...).
 		Value(&selection)
 
-	err := huh.NewForm(huh.NewGroup(selectField)).WithTheme(huh.ThemeCharm()).Run()
+	err := huh.NewForm(huh.NewGroup(selectField).Title("Choose your module:")).WithTheme(huh.ThemeCharm()).Run()
 	if err != nil {
 		return "", fmt.Errorf("failed taking input: %w", err)
 	}

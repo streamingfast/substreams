@@ -82,6 +82,7 @@ type Protobuf struct {
 	DescriptorSets []*BufImport `yaml:"descriptorSets,omitempty"`
 	Files          []string     `yaml:"files,omitempty"`
 	ImportPaths    []string     `yaml:"importPaths,omitempty"`
+	ExcludePaths   []string     `yaml:"excludePaths,omitempty"`
 }
 
 type BufImport struct {
@@ -138,6 +139,7 @@ type Binary struct {
 	Content             []byte            `yaml:"-"`
 	Entrypoint          string            `yaml:"entrypoint,omitempty"`
 	ProtoPackageMapping map[string]string `yaml:"protoPackageMapping,omitempty"`
+	Build               string            `yaml:"build,omitempty"`
 }
 
 type StreamOutput struct {

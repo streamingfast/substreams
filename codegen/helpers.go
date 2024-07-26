@@ -141,6 +141,8 @@ func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bo
 	// Create an example entity from the output descriptor
 	project.BuildExampleEntity()
 
+	fmt.Println("Rendering project files for Substreams-powered-subgraph...")
+
 	projectFiles, err := project.Render(outputType, withDevEnv)
 	if err != nil {
 		return fmt.Errorf("rendering project files: %w", err)
@@ -157,6 +159,8 @@ func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bo
 			fmt.Println("creating save directory: %w", err)
 		}
 	}
+
+	fmt.Println("Writing to directory:", saveDir)
 
 	err = saveProjectFiles(projectFiles, saveDir)
 	if err != nil {
@@ -216,12 +220,15 @@ func createRequestModuleForm(labels []string) (string, error) {
 		options = append(options, entry)
 		optionsMap[entry.Value] = entry.Key
 	}
+
 	var selection string
 	selectField := huh.NewSelect[string]().
+		Title("Please select a mapper module to build the subgraph from:").
 		Options(options...).
 		Value(&selection)
 
-	err := huh.NewForm(huh.NewGroup(selectField).Title("Choose your module:")).WithTheme(huh.ThemeCharm()).Run()
+	form := huh.NewForm(huh.NewGroup(selectField)).WithTheme(huh.ThemeCharm())
+	err := form.Run()
 	if err != nil {
 		return "", fmt.Errorf("failed taking input: %w", err)
 	}

@@ -121,9 +121,6 @@ func (p *Project) Render(outputType string, withDevEnv bool) (projectFiles map[s
 	projectFiles = map[string][]byte{}
 
 	funcMap := template.FuncMap{
-		"arr": func(els ...any) []any {
-			return els
-		},
 		"toLower":     strings.ToLower,
 		"toCamelCase": textcase.CamelCase,
 		"toKebabCase": textcase.KebabCase,

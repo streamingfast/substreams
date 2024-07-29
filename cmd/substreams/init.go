@@ -474,8 +474,6 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					lastIndex := strings.LastIndex(f.Name, "/")
 					var description string
 					switch f.Name[lastIndex+1:] {
-					case "test_contract.abi.json":
-						description = "Contract ABI definition"
 					case "contract.proto":
 						description = "File containing the contract proto definition"
 					case "build.rs":
@@ -493,61 +491,64 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					case "mod.rs":
 						description = "Rust module definitions file"
 					default:
-						fmt.Println("  ")
-						continue
+						if !strings.Contains(f.Name[lastIndex+1:], "contract.abi.json") {
+							fmt.Println("  ")
+							continue
+						}
+
+						description = "File containing the contract ABI definition"
 					}
 					fmt.Printf("  %s\n\n", description)
 				}
+			}
+			// let the terminal breath a little
+			fmt.Println()
 
-				// let the terminal breath a little
-				fmt.Println()
+			if len(input.Files) == 0 {
+				return fmt.Errorf("no files to download")
+			}
 
-				if len(input.Files) == 0 {
-					return fmt.Errorf("no files to download")
-				}
+			overwriteForm := NewOverwriteForm()
 
-				overwriteForm := NewOverwriteForm()
-
-				for _, inputFile := range input.Files {
-					switch inputFile.Type {
-					case "application/x-zip+extract": // our custom mime type to always extract the file upon arrival
-						if inputFile.Content == nil {
-							continue
-						}
-
-						zipRoot := userState.downloadedFilesfolderPath
-
-						zipContent := inputFile.Content
-						err = unzipFile(overwriteForm, zipContent, zipRoot)
-						if err != nil {
-							return fmt.Errorf("unzipping file: %w", err)
-						}
-
-					default:
-						// "application/x-protobuf; messageType=\"sf.substreams.v1.Package\""
-						// "application/zip", "application/x-zip"
-						// "text/plain":
-						if inputFile.Content == nil {
-							continue
-						}
-
-						fullPath := filepath.Join(userState.downloadedFilesfolderPath, inputFile.Filename)
-						err = saveDownloadFile(fullPath, overwriteForm, inputFile)
-						if err != nil {
-							return fmt.Errorf("saving file: %w", err)
-						}
-
+			for _, inputFile := range input.Files {
+				switch inputFile.Type {
+				case "application/x-zip+extract": // our custom mime type to always extract the file upon arrival
+					if inputFile.Content == nil {
+						continue
 					}
-				}
 
-				if err := sendFunc(&pbconvo.UserInput{
-					FromActionId: resp.ActionId,
-					Entry: &pbconvo.UserInput_DownloadedFiles_{
-						DownloadedFiles: &pbconvo.UserInput_DownloadedFiles{},
-					},
-				}); err != nil {
-					return fmt.Errorf("error sending confirmation: %w", err)
+					zipRoot := userState.downloadedFilesfolderPath
+
+					zipContent := inputFile.Content
+					err = unzipFile(overwriteForm, zipContent, zipRoot)
+					if err != nil {
+						return fmt.Errorf("unzipping file: %w", err)
+					}
+
+				default:
+					// "application/x-protobuf; messageType=\"sf.substreams.v1.Package\""
+					// "application/zip", "application/x-zip"
+					// "text/plain":
+					if inputFile.Content == nil {
+						continue
+					}
+
+					fullPath := filepath.Join(userState.downloadedFilesfolderPath, inputFile.Filename)
+					err = saveDownloadFile(fullPath, overwriteForm, inputFile)
+					if err != nil {
+						return fmt.Errorf("saving file: %w", err)
+					}
+
 				}
+			}
+
+			if err := sendFunc(&pbconvo.UserInput{
+				FromActionId: resp.ActionId,
+				Entry: &pbconvo.UserInput_DownloadedFiles_{
+					DownloadedFiles: &pbconvo.UserInput_DownloadedFiles{},
+				},
+			}); err != nil {
+				return fmt.Errorf("error sending confirmation: %w", err)
 			}
 
 		default:

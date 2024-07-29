@@ -451,68 +451,90 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				}
 
 				// the multiple \n are not a mistake, it's to have a blank line before the next message
-				fmt.Printf("\nProject will be saved in %s\n", savingDest)
+				fmt.Printf("\nProject will be saved in %s\n\n", savingDest)
 				userState.downloadedFilesfolderPath = savingDest
 			}
 
 			input := msg.DownloadFiles
-			fmt.Println("Files:")
+			fmt.Println(filenameStyle("Files:\n"))
 			for _, file := range input.Files {
-				fmt.Printf("  - %s (%s)\n", filepath.Join(userState.downloadedFilesfolderPath, file.Filename), file.Type)
-				if file.Description != "" {
-					fmt.Println(file.Description)
+				if file.Content == nil {
+					continue
 				}
-			}
 
-			// let the terminal breath a little
-			fmt.Println()
+				reader := bytes.NewReader(file.Content)
+				zipReader, err := zip.NewReader(reader, int64(len(file.Content)))
+				if err != nil {
+					return err
+				}
 
-			if len(input.Files) == 0 {
-				return fmt.Errorf("no files to download")
-			}
+				for _, f := range zipReader.File {
+					fmt.Printf("%s %s\n", filenameStyle("-"), filenameStyle(f.Name))
 
-			overwriteForm := NewOverwriteForm()
+					lastIndex := strings.LastIndex(f.Name, "/")
+					var description string
+					switch f.Name[lastIndex+1:] {
+					case "substreams.yaml":
+						description = "Substreams manifest"
 
-			for _, inputFile := range input.Files {
-				switch inputFile.Type {
-				case "application/x-zip+extract": // our custom mime type to always extract the file upon arrival
-					if inputFile.Content == nil {
+					case "lib.rs":
+						description = "File containing all rust code modules"
+					default:
+						fmt.Println("  ")
 						continue
 					}
-
-					zipRoot := userState.downloadedFilesfolderPath
-
-					zipContent := inputFile.Content
-					fmt.Printf("Unzipping %s into %s\n", inputFile.Filename, zipRoot)
-					err = unzipFile(overwriteForm, zipContent, zipRoot)
-					if err != nil {
-						return fmt.Errorf("unzipping file: %w", err)
-					}
-
-				default:
-					// "application/x-protobuf; messageType=\"sf.substreams.v1.Package\""
-					// "application/zip", "application/x-zip"
-					// "text/plain":
-					if inputFile.Content == nil {
-						continue
-					}
-
-					fullPath := filepath.Join(userState.downloadedFilesfolderPath, inputFile.Filename)
-					err = saveDownloadFile(fullPath, overwriteForm, inputFile)
-					if err != nil {
-						return fmt.Errorf("saving file: %w", err)
-					}
-
+					fmt.Printf("  %s\n\n", description)
 				}
-			}
 
-			if err := sendFunc(&pbconvo.UserInput{
-				FromActionId: resp.ActionId,
-				Entry: &pbconvo.UserInput_DownloadedFiles_{
-					DownloadedFiles: &pbconvo.UserInput_DownloadedFiles{},
-				},
-			}); err != nil {
-				return fmt.Errorf("error sending confirmation: %w", err)
+				// let the terminal breath a little
+				fmt.Println()
+
+				if len(input.Files) == 0 {
+					return fmt.Errorf("no files to download")
+				}
+
+				overwriteForm := NewOverwriteForm()
+
+				for _, inputFile := range input.Files {
+					switch inputFile.Type {
+					case "application/x-zip+extract": // our custom mime type to always extract the file upon arrival
+						if inputFile.Content == nil {
+							continue
+						}
+
+						zipRoot := userState.downloadedFilesfolderPath
+
+						zipContent := inputFile.Content
+						err = unzipFile(overwriteForm, zipContent, zipRoot)
+						if err != nil {
+							return fmt.Errorf("unzipping file: %w", err)
+						}
+
+					default:
+						// "application/x-protobuf; messageType=\"sf.substreams.v1.Package\""
+						// "application/zip", "application/x-zip"
+						// "text/plain":
+						if inputFile.Content == nil {
+							continue
+						}
+
+						fullPath := filepath.Join(userState.downloadedFilesfolderPath, inputFile.Filename)
+						err = saveDownloadFile(fullPath, overwriteForm, inputFile)
+						if err != nil {
+							return fmt.Errorf("saving file: %w", err)
+						}
+
+					}
+				}
+
+				if err := sendFunc(&pbconvo.UserInput{
+					FromActionId: resp.ActionId,
+					Entry: &pbconvo.UserInput_DownloadedFiles_{
+						DownloadedFiles: &pbconvo.UserInput_DownloadedFiles{},
+					},
+				}); err != nil {
+					return fmt.Errorf("error sending confirmation: %w", err)
+				}
 			}
 
 		default:
@@ -573,6 +595,10 @@ func toMarkdown(input string) string {
 
 func bold(input string) string {
 	return lipgloss.NewStyle().Bold(true).Render(input)
+}
+
+func filenameStyle(input string) string {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#9AE3A4")).Render(input)
 }
 
 func unzipFile(overwriteForm *OverwriteForm, zipContent []byte, zipRoot string) error {

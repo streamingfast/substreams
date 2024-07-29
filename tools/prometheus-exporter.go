@@ -31,12 +31,13 @@ var status = prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "substreams_healt
 var requestDurationMs = prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "substreams_healthcheck_duration_ms", Help: "Request full processing time in millisecond"}, []string{"endpoint"})
 
 var prometheusCmd = &cobra.Command{
-	Use:   "prometheus-exporter <endpoint[,endpoint[,...]]> [<manifest>] <module_name> <block_height>",
+	Use:   "prometheus-exporter <endpoint[,endpoint[,endpoint[@<block_height>]],[,...]]> [<manifest>] <module_name> <block_height>",
 	Short: "run substreams client periodically on a single block, exporting the values in prometheus format",
 	Long: cli.Dedent(`
 		Run substreams client periodically on a single block, exporting the values in prometheus format. The manifest is optional as it will try to find a file named
 		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml'
 		file in place of '<manifest_file>, or a link to a remote .spkg file, using urls gs://, http(s)://, ipfs://, etc.'.
+        You can specify a start-block on some endpoints by appending '@<block_height>' to the endpoint URL.
 	`),
 	RunE:         runPrometheus,
 	Args:         cobra.RangeArgs(3, 4),
@@ -90,6 +91,19 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 	interval := sflags.MustGetDuration(cmd, "lookup_interval")
 	timeout := sflags.MustGetDuration(cmd, "lookup_timeout")
 	for _, endpoint := range endpoints {
+
+		startBlock := blockNum
+
+		if parts := strings.Split(endpoint, "@"); len(parts) == 2 {
+			start, err := strconv.ParseUint(parts[1], 10, 64)
+			if err != nil {
+				return fmt.Errorf("invalid endpoint @startBlock format for %q: %w", endpoint, err)
+			}
+
+			endpoint = parts[0]
+			startBlock = int64(start)
+		}
+
 		substreamsClientConfig := client.NewSubstreamsClientConfig(
 			endpoint,
 			authToken,
@@ -97,7 +111,7 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 			insecure,
 			plaintext,
 		)
-		go launchSubstreamsPoller(endpoint, substreamsClientConfig, pkg.Modules, outputStreamName, blockNum, interval, timeout)
+		go launchSubstreamsPoller(endpoint, substreamsClientConfig, pkg.Modules, outputStreamName, startBlock, interval, timeout)
 	}
 
 	promReg := prometheus.NewRegistry()
@@ -136,6 +150,7 @@ func maybeMarkFailure(endpoint string, begin time.Time, counter *failCounter) {
 }
 
 func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.SubstreamsClientConfig, modules *pbsubstreams.Modules, outputStreamName string, blockNum int64, pollingInterval, pollingTimeout time.Duration) {
+
 	sleep := time.Duration(0)
 	counter := newFailCounter()
 	for {

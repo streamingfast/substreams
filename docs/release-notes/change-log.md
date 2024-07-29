@@ -9,6 +9,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+* Tools->prometheus: added the possibility to override the start-block on an endpoint
+
 ## v1.9.3
 
 * Fixed error handling issue in 'backprocessing' causing high CPU usage in tier1 servers

@@ -462,44 +462,8 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					continue
 				}
 
-				reader := bytes.NewReader(file.Content)
-				zipReader, err := zip.NewReader(reader, int64(len(file.Content)))
-				if err != nil {
-					return err
-				}
-
-				for _, f := range zipReader.File {
-					fmt.Printf("%s %s\n", filenameStyle("-"), filenameStyle(f.Name))
-
-					lastIndex := strings.LastIndex(f.Name, "/")
-					var description string
-					switch f.Name[lastIndex+1:] {
-					case "contract.proto":
-						description = "File containing the contract proto definition"
-					case "build.rs":
-						description = "File containing the build script for the project"
-					case "Cargo.toml":
-						description = "Cargo manifest file, a configuration file which defines the project"
-					case "substreams.yaml":
-						description = "Substreams manifest, a configuration file which defines the different modules"
-					case "rust-toolchain.toml":
-						description = "File containing the rust toolchain version"
-					case "lib.rs":
-						description = "Substreams modules definition code in Rust"
-					case ".gitignore":
-						description = "File containing the gitignore rules"
-					case "mod.rs":
-						description = "Rust module definitions file"
-					default:
-						if !strings.Contains(f.Name[lastIndex+1:], "contract.abi.json") {
-							fmt.Println("  ")
-							continue
-						}
-
-						description = "File containing the contract ABI definition"
-					}
-					fmt.Printf("  %s\n\n", description)
-				}
+				fmt.Printf("%s %s\n", filenameStyle("-"), filenameStyle(file.Filename))
+				fmt.Printf("  %s\n\n", file.Description)
 			}
 			// let the terminal breath a little
 			fmt.Println()

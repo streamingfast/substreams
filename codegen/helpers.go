@@ -147,7 +147,7 @@ func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bo
 	// Create an example entity from the output descriptor
 	project.BuildExampleEntity()
 
-	fmt.Println("Rendering project files for Substreams-powered-subgraph...\n")
+	fmt.Println("Rendering project files for Substreams-powered-subgraph...")
 
 	projectFiles, err := project.Render(outputType, withDevEnv)
 	if err != nil {
@@ -161,7 +161,7 @@ func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bo
 
 	_, err = os.Stat("subgraph")
 	if !os.IsNotExist(err) {
-		fmt.Println("A subgraph directory is already existing...\n")
+		fmt.Println("A subgraph directory is already existing...")
 		saveDir, err = createSaveDirForm("subgraph-2")
 		if err != nil {
 			return fmt.Errorf("creating save dir form: %w", err)

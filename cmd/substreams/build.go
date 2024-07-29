@@ -140,35 +140,12 @@ func (p *ProtoBuilder) Build(ctx context.Context) error {
 
 	defaultCmd := []string{"substreams", "protogen", p.manifInfo.Path}
 	if excludes != "" {
-		defaultCmd = append(defaultCmd, []string{`--exclude-paths`, excludes}...)
-	}
-	cmd := exec.CommandContext(ctx, defaultCmd[0], defaultCmd[1:]...)
-
-	stdoutPipe, err := cmd.StdoutPipe()
-	if err != nil {
-		return fmt.Errorf("error creating stdout pipe: %w", err)
-	}
-	stderrPipe, err := cmd.StderrPipe()
-	if err != nil {
-		return fmt.Errorf("error creating stderr pipe: %w", err)
+		defaultCmd = append(defaultCmd, []string{"--exclude-paths", excludes}...)
 	}
 
-	go func() {
-		_, _ = io.Copy(os.Stdout, stdoutPipe)
-	}()
-	go func() {
-		_, _ = io.Copy(os.Stderr, stderrPipe)
-	}()
-
-	fmt.Printf("Running protogen command: `%s`...\n", strings.Join(defaultCmd, " "))
-	err = cmd.Start()
+	err := runCommandInDir(ctx, filepath.Dir(p.manifInfo.Path), defaultCmd)
 	if err != nil {
-		return fmt.Errorf("error starting `%s`: %w", strings.Join(defaultCmd, " "), err)
-	}
-
-	err = cmd.Wait()
-	if err != nil {
-		return fmt.Errorf("error running `%s`: %w", strings.Join(defaultCmd, " "), err)
+		return fmt.Errorf("error running protogen: %w", err)
 	}
 
 	fmt.Printf("Protogen complete.\n")
@@ -263,31 +240,7 @@ func (b *BinaryBuilder) Build(ctx context.Context) error {
 		}
 
 		for _, cmdArgs := range cmds {
-			fmt.Printf("Running build command for binary `%s`: `%s`...\n", binName, strings.Join(cmdArgs, " "))
-			cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
-
-			stdoutPipe, err := cmd.StdoutPipe()
-			if err != nil {
-				return fmt.Errorf("error creating stdout pipe: %w", err)
-			}
-			stderrPipe, err := cmd.StderrPipe()
-			if err != nil {
-				return fmt.Errorf("error creating stderr pipe: %w", err)
-			}
-
-			go func() {
-				_, _ = io.Copy(os.Stdout, stdoutPipe)
-			}()
-			go func() {
-				_, _ = io.Copy(os.Stderr, stderrPipe)
-			}()
-
-			err = cmd.Start()
-			if err != nil {
-				return fmt.Errorf("error starting `%s`: %w", strings.Join(cmdArgs, " "), err)
-			}
-
-			err = cmd.Wait()
+			err = runCommandInDir(ctx, filepath.Dir(b.manifInfo.Path), cmdArgs)
 			if err != nil {
 				return fmt.Errorf("error running `%s`: %w", strings.Join(cmdArgs, " "), err)
 			}
@@ -352,33 +305,9 @@ func newSPKGPacker(manifInfo *manifestInfo) (*SPKGPacker, error) {
 
 func (s *SPKGPacker) Build(ctx context.Context) error {
 	defaultCmd := []string{"substreams", "pack", s.manifInfo.Path}
-	cmd := exec.CommandContext(ctx, defaultCmd[0], defaultCmd[1:]...)
-
-	stdoutPipe, err := cmd.StdoutPipe()
+	err := runCommandInDir(ctx, filepath.Dir(s.manifInfo.Path), defaultCmd)
 	if err != nil {
-		return fmt.Errorf("error creating stdout pipe: %w", err)
-	}
-	stderrPipe, err := cmd.StderrPipe()
-	if err != nil {
-		return fmt.Errorf("error creating stderr pipe: %w", err)
-	}
-
-	go func() {
-		_, _ = io.Copy(os.Stdout, stdoutPipe)
-	}()
-	go func() {
-		_, _ = io.Copy(os.Stderr, stderrPipe)
-	}()
-
-	fmt.Printf("Running pack command: `%s`...\n", strings.Join(defaultCmd, " "))
-	err = cmd.Start()
-	if err != nil {
-		return fmt.Errorf("error starting `%s`: %w", strings.Join(defaultCmd, " "), err)
-	}
-
-	err = cmd.Wait()
-	if err != nil {
-		return fmt.Errorf("error running `%s`: %w", strings.Join(defaultCmd, " "), err)
+		return fmt.Errorf("error running pack: %w", err)
 	}
 
 	fmt.Printf("Pack complete.\n")
@@ -417,4 +346,39 @@ func findManifest() (string, error) {
 	}
 
 	return "", fmt.Errorf("substreams.yaml file not found anywhere in directory path from %s to %s", originalDir, homeDir)
+}
+
+// runCommandInDir runs a command in the specified directory.
+func runCommandInDir(ctx context.Context, dir string, cmdArgs []string) error {
+	cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
+	cmd.Dir = dir
+
+	stdoutPipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("error creating stdout pipe: %w", err)
+	}
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		return fmt.Errorf("error creating stderr pipe: %w", err)
+	}
+
+	go func() {
+		_, _ = io.Copy(os.Stdout, stdoutPipe)
+	}()
+	go func() {
+		_, _ = io.Copy(os.Stderr, stderrPipe)
+	}()
+
+	fmt.Printf("Running command in %s: `%s`...\n", dir, strings.Join(cmdArgs, " "))
+	err = cmd.Start()
+	if err != nil {
+		return fmt.Errorf("error starting `%s`: %w", strings.Join(cmdArgs, " "), err)
+	}
+
+	err = cmd.Wait()
+	if err != nil {
+		return fmt.Errorf("error running `%s`: %w", strings.Join(cmdArgs, " "), err)
+	}
+
+	return nil
 }

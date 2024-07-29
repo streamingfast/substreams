@@ -45,7 +45,7 @@ func runBuildE(cmd *cobra.Command, args []string) error {
 		var err error
 		manifestPath, err = findManifest()
 		if err != nil {
-			return fmt.Errorf("error finding substreams.yaml: %w", err)
+			return fmt.Errorf("error finding manifest: %w", err)
 		}
 	}
 	fmt.Printf("Building manifest file: %s\n", manifestPath)
@@ -393,11 +393,12 @@ func findManifest() (string, error) {
 		return "", fmt.Errorf("error getting user home directory: %w", err)
 	}
 
-	currentDir, err := os.Getwd()
+	originalDir, err := os.Getwd()
 	if err != nil {
 		return "", fmt.Errorf("error getting current directory: %w", err)
 	}
 
+	currentDir := originalDir
 	for {
 		manifestPath := filepath.Join(currentDir, "substreams.yaml")
 		if _, err := os.Stat(manifestPath); err == nil {
@@ -415,5 +416,5 @@ func findManifest() (string, error) {
 		currentDir = parentDir
 	}
 
-	return "", fmt.Errorf("substreams.yaml not found")
+	return "", fmt.Errorf("substreams.yaml file not found anywhere in directory path from %s to %s", originalDir, homeDir)
 }

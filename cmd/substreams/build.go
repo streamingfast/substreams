@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -30,7 +31,7 @@ var buildCmd = &cobra.Command{
 
 func init() {
 	buildCmd.Flags().Bool("no-pack", false, "Do not pack the build output (default false)")
-	buildCmd.Flags().String("manifest", "./substreams.yaml", "Path to the manifest file")
+	buildCmd.Flags().String("manifest", "", "Path to the manifest file")
 	buildCmd.Flags().String("binary", "default", "binary label to build from manifest")
 	rootCmd.AddCommand(buildCmd)
 }
@@ -40,6 +41,15 @@ func runBuildE(cmd *cobra.Command, args []string) error {
 
 	// Parse substreams.yaml
 	manifestPath := sflags.MustGetString(cmd, "manifest")
+	if manifestPath == "" {
+		var err error
+		manifestPath, err = findManifest()
+		if err != nil {
+			return fmt.Errorf("error finding substreams.yaml: %w", err)
+		}
+	}
+	fmt.Printf("Building manifest file: %s\n", manifestPath)
+
 	manif, err := readManifestYaml(manifestPath)
 
 	info := &manifestInfo{
@@ -373,4 +383,37 @@ func (s *SPKGPacker) Build(ctx context.Context) error {
 
 	fmt.Printf("Pack complete.\n")
 	return nil
+}
+
+// findManifest searches for the substreams.yaml file starting from the current directory
+// and moving up to the parent directories until it finds the file or reaches the user's $HOME directory.
+func findManifest() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("error getting user home directory: %w", err)
+	}
+
+	currentDir, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("error getting current directory: %w", err)
+	}
+
+	for {
+		manifestPath := filepath.Join(currentDir, "substreams.yaml")
+		if _, err := os.Stat(manifestPath); err == nil {
+			return manifestPath, nil
+		}
+
+		if currentDir == homeDir {
+			break
+		}
+
+		parentDir := filepath.Dir(currentDir)
+		if parentDir == currentDir {
+			break
+		}
+		currentDir = parentDir
+	}
+
+	return "", fmt.Errorf("substreams.yaml not found")
 }

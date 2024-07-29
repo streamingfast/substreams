@@ -32,14 +32,13 @@ const (
 // Manifest is a YAML structure used to create a Package and its list
 // of Modules. The notion of a manifest does not live in protobuf definitions.
 type Manifest struct {
-	SpecVersion string            `yaml:"specVersion,omitempty"` // check that it equals v0.1.0
-	Package     PackageMeta       `yaml:"package,omitempty"`
-	Protobuf    Protobuf          `yaml:"protobuf,omitempty"`
-	Imports     mapSlice          `yaml:"imports,omitempty"`
-	Binaries    map[string]Binary `yaml:"binaries,omitempty"`
-	Modules     []*Module         `yaml:"modules,omitempty"`
-	Params      map[string]string `yaml:"params,omitempty"`
-
+	SpecVersion  string                    `yaml:"specVersion,omitempty"` // check that it equals v0.1.0
+	Package      PackageMeta               `yaml:"package,omitempty"`
+	Protobuf     Protobuf                  `yaml:"protobuf,omitempty"`
+	Imports      mapSlice                  `yaml:"imports,omitempty"`
+	Binaries     map[string]Binary         `yaml:"binaries,omitempty"`
+	Modules      []*Module                 `yaml:"modules,omitempty"`
+	Params       map[string]string         `yaml:"params,omitempty"`
 	BlockFilters map[string]string         `yaml:"blockFilters,omitempty"`
 	Network      string                    `yaml:"network,omitempty"`
 	Networks     map[string]*NetworkParams `yaml:"networks,omitempty"`

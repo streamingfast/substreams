@@ -32,6 +32,7 @@ require (
 	github.com/RoaringBitmap/roaring v1.9.1
 	github.com/alecthomas/chroma v0.10.0
 	github.com/alecthomas/participle v0.7.1
+	github.com/bmatcuk/doublestar/v4 v4.6.1
 	github.com/bytecodealliance/wasmtime-go/v4 v4.0.0
 	github.com/charmbracelet/bubbles v0.18.0
 	github.com/charmbracelet/bubbletea v0.26.3
@@ -41,6 +42,7 @@ require (
 	github.com/charmbracelet/lipgloss v0.11.0
 	github.com/docker/cli v24.0.6+incompatible
 	github.com/dustin/go-humanize v1.0.1
+	github.com/golang-cz/textcase v1.2.1
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/itchyny/gojq v0.12.12
@@ -146,7 +148,11 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/itchyny/timefmt-go v0.1.5 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
-	github.com/klauspost/compress v1.16.6
+	github.com/klauspost/compress v1.16.6 // indirect
+	github.com/klauspost/cpuid/v2 v2.2.3 // indirect
+	github.com/libp2p/go-buffer-pool v0.1.0 // indirect
+	github.com/libp2p/go-flow-metrics v0.1.0 // indirect
+	github.com/libp2p/go-libp2p v0.26.3 // indirect
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect

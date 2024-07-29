@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	ipfs "github.com/ipfs/go-ipfs-api"
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/klauspost/compress/zstd"
+	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
 	"golang.org/x/mod/semver"
 	"google.golang.org/protobuf/proto"
@@ -247,20 +247,52 @@ func (r *Reader) readFromStore(input string) error {
 	return err
 }
 
-func (r *Reader) readFromIPFS(input string) error {
-	readIPFSContent := func(hash string, sh *ipfs.Shell) ([]byte, error) {
-		readCloser, err := sh.Cat(hash)
-		if err != nil {
-			return nil, err
-		}
-		defer readCloser.Close()
-		return io.ReadAll(readCloser)
+type ipfsClient struct {
+	httpcli *http.Client
+}
+
+func newIPFSClient() *ipfsClient {
+	return &ipfsClient{
+		httpcli: &http.Client{
+			Timeout: IPFSTimeout,
+		},
 	}
+}
 
-	sh := ipfs.NewShell(IPFSURL)
-	sh.SetTimeout(IPFSTimeout)
+func (cli *ipfsClient) read(hash string) ([]byte, error) {
+	url := strings.TrimRight(IPFSURL, "/") + "/api/v0/cat?arg=" + hash
+	var out []byte
 
-	b, err := readIPFSContent(input, sh)
+	err := derr.Retry(5, func(ctx context.Context) error {
+		resp, err := cli.httpcli.Get(url)
+		if err != nil {
+			return fmt.Errorf("unable to get ipfs content %q: %w", hash, err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode >= 500 {
+			return fmt.Errorf("ipfs server error %d", resp.StatusCode)
+		}
+
+		out, err = io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("unable to read ipfs content %q: %w", hash, err)
+		}
+
+		if resp.StatusCode >= 400 {
+			return derr.NewFatalError(fmt.Errorf("ipfs server error code %d: %s", resp.StatusCode, string(out)))
+		}
+
+		return nil
+	})
+	return out, err
+
+}
+
+func (r *Reader) readFromIPFS(input string) error {
+
+	ipfs := newIPFSClient()
+	b, err := ipfs.read(input)
 	if err != nil {
 		return fmt.Errorf("unable to read ipfs content %q: %w", input, err)
 	}
@@ -293,14 +325,14 @@ func (r *Reader) readFromIPFS(input string) error {
 
 	var spkgHash string
 	if len(manifest.DataSources) > 0 && manifest.DataSources[0].Source.Package.File != nil {
-		spkgHash = manifest.DataSources[0].Source.Package.File["/"]
+		spkgHash = strings.TrimPrefix(manifest.DataSources[0].Source.Package.File["/"], "/ipfs/")
 	}
 
 	if spkgHash == "" {
 		return fmt.Errorf("no spkg hash found in manifest")
 	}
 
-	b, err = readIPFSContent(spkgHash, sh)
+	b, err = ipfs.read(spkgHash)
 	if err != nil {
 		return fmt.Errorf("unable to read spkg from ipfs %q: %w", spkgHash, err)
 	}

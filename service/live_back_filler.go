@@ -92,6 +92,7 @@ func requestBackProcessing(ctx context.Context, logger *zap.Logger, liveCachingR
 			if err == io.EOF {
 				break
 			}
+			return err
 		}
 	}
 

@@ -18,6 +18,7 @@ func init() {
 	infoCmd.Flags().String("output-sinkconfig-files-path", "", "if non-empty, any sinkconfig field of type 'bytes' that was packed from a file will be written to that path")
 	infoCmd.Flags().Bool("skip-package-validation", false, "Do not perform any validation when reading substreams package")
 	infoCmd.Flags().Uint64("first-streamable-block", 0, "Apply a chain's 'first-streamable-block' to modules, possibly affecting their initialBlock and hashes")
+	infoCmd.Flags().Bool("used-modules-only", false, "When set, only modules that are used by the output module will be displayed (requires the output_module arg to be set)")
 }
 
 var infoCmd = &cobra.Command{
@@ -53,14 +54,39 @@ func runInfo(cmd *cobra.Command, args []string) error {
 	outputSinkconfigFilesPath := sflags.MustGetString(cmd, "output-sinkconfig-files-path")
 	firstStreamableBlock := sflags.MustGetUint64(cmd, "first-streamable-block")
 	skipPackageValidation := sflags.MustGetBool(cmd, "skip-package-validation")
+	onlyShowUsedModules := sflags.MustGetBool(cmd, "used-modules-only")
 
-	info, err := info.Extended(manifestPath, outputModule, skipPackageValidation, firstStreamableBlock)
+	if onlyShowUsedModules && outputModule == "" {
+		return fmt.Errorf("used-modules-only flag requires the output_module arg to be set")
+	}
+
+	pkgInfo, err := info.Extended(manifestPath, outputModule, skipPackageValidation, firstStreamableBlock)
 	if err != nil {
 		return err
 	}
+	usedModules := make(map[string]bool)
+	if outputModule != "" {
+		for _, layers := range pkgInfo.ExecutionStages {
+			for _, l := range layers {
+				for _, mod := range l {
+					usedModules[mod] = true
+				}
+			}
+		}
+	}
+
+	if onlyShowUsedModules {
+		strippedModules := make([]info.ModulesInfo, 0, len(pkgInfo.Modules))
+		for _, mod := range pkgInfo.Modules {
+			if usedModules[mod.Name] {
+				strippedModules = append(strippedModules, mod)
+			}
+		}
+		pkgInfo.Modules = strippedModules
+	}
 
 	if sflags.MustGetBool(cmd, "json") {
-		res, err := json.MarshalIndent(info, "", "  ")
+		res, err := json.MarshalIndent(pkgInfo, "", "  ")
 		if err != nil {
 			return err
 		}
@@ -68,18 +94,18 @@ func runInfo(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	fmt.Println("Package name:", info.Name)
-	fmt.Println("Version:", info.Version)
-	if doc := info.Documentation; doc != nil && *doc != "" {
+	fmt.Println("Package name:", pkgInfo.Name)
+	fmt.Println("Version:", pkgInfo.Version)
+	if doc := pkgInfo.Documentation; doc != nil && *doc != "" {
 		fmt.Println("Doc: " + strings.Replace(*doc, "\n", "\n  ", -1))
 	}
-	if info.Image != nil {
-		fmt.Printf("Image: [embedded image: %d bytes]\n", len(info.Image))
+	if pkgInfo.Image != nil {
+		fmt.Printf("Image: [embedded image: %d bytes]\n", len(pkgInfo.Image))
 	}
 
 	fmt.Println("Modules:")
 	fmt.Println("----")
-	for _, mod := range info.Modules {
+	for _, mod := range pkgInfo.Modules {
 		fmt.Println("Name:", mod.Name)
 		fmt.Println("Initial block:", mod.InitialBlock)
 		fmt.Println("Kind:", mod.Kind)
@@ -109,14 +135,14 @@ func runInfo(cmd *cobra.Command, args []string) error {
 		fmt.Println("")
 	}
 
-	if info.Network != "" {
-		fmt.Printf("Network: %s\n", info.Network)
+	if pkgInfo.Network != "" {
+		fmt.Printf("Network: %s\n", pkgInfo.Network)
 		fmt.Println("")
 	}
 
-	if info.Networks != nil {
+	if pkgInfo.Networks != nil {
 		fmt.Println("Networks:")
-		for network, params := range info.Networks {
+		for network, params := range pkgInfo.Networks {
 			fmt.Printf("  %s:\n", network)
 			if params.InitialBlocks != nil {
 				fmt.Println("    Initial Blocks:")
@@ -135,7 +161,7 @@ func runInfo(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputModule != "" {
-		stages := info.ExecutionStages
+		stages := pkgInfo.ExecutionStages
 		for i, layers := range stages {
 			var layerDefs []string
 			for _, l := range layers {
@@ -147,20 +173,20 @@ func runInfo(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if info.SinkInfo != nil {
+	if pkgInfo.SinkInfo != nil {
 		fmt.Println("Sink config:")
 		fmt.Println("----")
-		fmt.Println("type:", info.SinkInfo.TypeUrl)
+		fmt.Println("type:", pkgInfo.SinkInfo.TypeUrl)
 
 		fmt.Println("configs:")
-		fmt.Println(info.SinkInfo.Configs)
+		fmt.Println(pkgInfo.SinkInfo.Configs)
 
-		if outputSinkconfigFilesPath != "" && info.SinkInfo.Files != nil {
+		if outputSinkconfigFilesPath != "" && pkgInfo.SinkInfo.Files != nil {
 			if err := os.MkdirAll(outputSinkconfigFilesPath, 0755); err != nil {
 				return err
 			}
 			fmt.Println("output files:")
-			for k, v := range info.SinkInfo.Files {
+			for k, v := range pkgInfo.SinkInfo.Files {
 				filename := filepath.Join(outputSinkconfigFilesPath, k)
 				f, err := os.OpenFile(filename, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 				if err != nil {

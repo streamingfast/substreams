@@ -417,7 +417,6 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			}
 
 		case *pbconvo.SystemOutput_DownloadFiles_:
-
 			if userState.downloadedFilesfolderPath == "" {
 				savingDest := "output"
 				if projectName := gjson.GetBytes(lastState.State, "name").String(); projectName != "" {
@@ -473,16 +472,15 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			}
 
 			overwriteForm := NewOverwriteForm()
+
 			for _, inputFile := range input.Files {
 				switch inputFile.Type {
 				case "application/x-zip+extract": // our custom mime type to always extract the file upon arrival
-					zipRoot := userState.downloadedFilesfolderPath
-
-					sourcePath := filepath.Join(zipRoot, inputFile.Filename)
-					err = saveDownloadFile(sourcePath, overwriteForm, inputFile)
-					if err != nil {
-						return fmt.Errorf("saving zip file: %w", err)
+					if inputFile.Content == nil {
+						continue
 					}
+
+					zipRoot := userState.downloadedFilesfolderPath
 
 					zipContent := inputFile.Content
 					fmt.Printf("Unzipping %s into %s\n", inputFile.Filename, zipRoot)
@@ -495,6 +493,10 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					// "application/x-protobuf; messageType=\"sf.substreams.v1.Package\""
 					// "application/zip", "application/x-zip"
 					// "text/plain":
+					if inputFile.Content == nil {
+						continue
+					}
+
 					fullPath := filepath.Join(userState.downloadedFilesfolderPath, inputFile.Filename)
 					err = saveDownloadFile(fullPath, overwriteForm, inputFile)
 					if err != nil {

@@ -474,11 +474,24 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					lastIndex := strings.LastIndex(f.Name, "/")
 					var description string
 					switch f.Name[lastIndex+1:] {
+					case "test_contract.abi.json":
+						description = "Contract ABI definition"
+					case "contract.proto":
+						description = "File containing the contract proto definition"
+					case "build.rs":
+						description = "File containing the build script for the project"
+					case "Cargo.toml":
+						description = "Cargo manifest file, a configuration file which defines the project"
 					case "substreams.yaml":
-						description = "Substreams manifest"
-
+						description = "Substreams manifest, a configuration file which defines the different modules"
+					case "rust-toolchain.toml":
+						description = "File containing the rust toolchain version"
 					case "lib.rs":
-						description = "File containing all rust code modules"
+						description = "Substreams modules definition code in Rust"
+					case ".gitignore":
+						description = "File containing the gitignore rules"
+					case "mod.rs":
+						description = "Rust module definitions file"
 					default:
 						fmt.Println("  ")
 						continue

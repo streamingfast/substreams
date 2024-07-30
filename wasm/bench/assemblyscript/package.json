@@ -1,20 +1,14 @@
 {
   "dependencies": {
+    "as-proto": "^1.3.0",
+    "as-proto-gen": "^1.3.0",
     "assemblyscript": "^0.27.29"
   },
-  "type": "module",
-  "exports": {
-    ".": {
-      "import": "./build/release.js",
-      "types": "./build/release.d.ts"
-    }
-  },
   "scripts": {
-    "asbuild:debug": "asc assembly/index.ts --target debug",
-    "asbuild:release": "asc assembly/index.ts --target release",
-    "asbuild": "npm run asbuild:debug && npm run asbuild:release",
-    "test": "node tests",
-    "start": "npx serve ."
+    "generate": "substreams pack; buf generate --type=\"my.Block\" myassemblyscript-v0.1.1.spkg#format=bin",    
+    "debug": "asc index.ts -b none -o binary.wasm",
+    "build": "asc index.ts --debug -b raw -o binary.wasm --use abort=",
+    "asbuild": "npm run asbuild:debug && npm run asbuild:release"
   },
   "devDependencies": {
     "assemblyscript": "^0.27.29"

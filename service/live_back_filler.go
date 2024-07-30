@@ -6,7 +6,6 @@ import (
 	"io"
 
 	"github.com/streamingfast/derr"
-	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	"github.com/streamingfast/substreams/reqctx"
 
@@ -20,7 +19,7 @@ import (
 const finalBlockDelay = 120
 const backfillRetries = 999 // no point in failing "early". It may be failing because merged blocks are lagging behind a little bit.
 
-type RequestBackProcessingFunc = func(ctx context.Context, logger *zap.Logger, blockRange *block.Range, stageToProcess int, clientFactory client.InternalClientFactory, jobCompleted chan error)
+type RequestBackProcessingFunc = func(ctx context.Context, logger *zap.Logger, startBlock uint64, stageToProcess int, clientFactory client.InternalClientFactory, jobCompleted chan error)
 
 type LiveBackFiller struct {
 	RequestBackProcessing RequestBackProcessingFunc
@@ -57,8 +56,8 @@ func (l *LiveBackFiller) ProcessBlock(blk *pbbstream.Block, obj interface{}) (er
 	return l.NextHandler.ProcessBlock(blk, obj)
 }
 
-func RequestBackProcessing(ctx context.Context, logger *zap.Logger, blockRange *block.Range, stageToProcess int, clientFactory client.InternalClientFactory, jobResult chan error) {
-	liveBackFillerRequest := work.NewRequest(ctx, reqctx.Details(ctx), stageToProcess, blockRange)
+func RequestBackProcessing(ctx context.Context, logger *zap.Logger, startBlock uint64, stageToProcess int, clientFactory client.InternalClientFactory, jobResult chan error) {
+	liveBackFillerRequest := work.NewRequest(ctx, reqctx.Details(ctx), stageToProcess, startBlock)
 
 	err := derr.RetryContext(ctx, backfillRetries, func(ctx context.Context) error {
 		err := requestBackProcessing(ctx, logger, liveBackFillerRequest, clientFactory)
@@ -149,10 +148,8 @@ func (l *LiveBackFiller) Start(ctx context.Context) {
 
 		if (targetSegment > l.currentSegment) && mergedBlockIsWritten {
 
-			liveBackFillerRange := block.NewRange(segmentStart, segmentEnd)
-
 			jobProcessing = true
-			go l.RequestBackProcessing(ctx, l.logger, liveBackFillerRange, l.stageToProcess, l.clientFactory, jobResult)
+			go l.RequestBackProcessing(ctx, l.logger, segmentStart, l.stageToProcess, l.clientFactory, jobResult)
 		}
 	}
 }

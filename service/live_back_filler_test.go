@@ -6,8 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/streamingfast/substreams/block"
-
 	"github.com/streamingfast/bstream"
 
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
@@ -90,13 +88,13 @@ func TestBackFiller(t *testing.T) {
 			testLogger := zap.NewNop()
 			segmentProcessed := make(chan uint64)
 
-			RequestBackProcessingTest := func(ctx context.Context, logger *zap.Logger, blockRange *block.Range, stageToProcess int, clientFactory client.InternalClientFactory, jobResult chan error) {
+			RequestBackProcessingTest := func(ctx context.Context, logger *zap.Logger, startBlock uint64, stageToProcess int, clientFactory client.InternalClientFactory, jobResult chan error) {
 				var err error
 				if c.errorBackProcessing {
 					err = fmt.Errorf("fail")
 				}
 
-				segmentNumber := blockRange.ExclusiveEndBlock / c.segmentSize
+				segmentNumber := startBlock/c.segmentSize + 1
 				segmentProcessed <- segmentNumber
 
 				jobResult <- err

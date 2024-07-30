@@ -70,6 +70,7 @@ func NewStages(
 	logger := reqctx.Logger(ctx)
 
 	stagedModules := execGraph.StagedUsedModules()
+	modulesInitBlocks := execGraph.ModulesInitBlocks()
 	out = &Stages{
 		ctx:                 ctx,
 		logger:              reqctx.Logger(ctx),
@@ -108,13 +109,13 @@ func NewStages(
 		}
 
 		var moduleStates []*StoreModuleState
-		stageLowestInitBlock := layer[0].InitialBlock
+		stageLowestInitBlock := modulesInitBlocks[layer[0].Name]
 		for _, mod := range layer {
-			modSegmenter := segmenter.WithInitialBlock(mod.InitialBlock)
+			modSegmenter := segmenter.WithInitialBlock(modulesInitBlocks[mod.Name])
 			modState := NewModuleState(logger, mod.Name, modSegmenter, storeConfigs[mod.Name])
 			moduleStates = append(moduleStates, modState)
 
-			stageLowestInitBlock = min(stageLowestInitBlock, mod.InitialBlock)
+			stageLowestInitBlock = min(stageLowestInitBlock, modulesInitBlocks[mod.Name])
 		}
 
 		stageSegmenter := segmenter.WithInitialBlock(stageLowestInitBlock)

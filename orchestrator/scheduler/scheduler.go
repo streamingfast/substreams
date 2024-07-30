@@ -124,7 +124,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		modules := s.Stages.StageModules(workUnit.Stage)
 
 		return loop.Batch(
-			worker.Work(s.ctx, workUnit, workRange, modules, s.stream),
+			worker.Work(s.ctx, workUnit, workRange.StartBlock, modules, s.stream),
 			work.CmdScheduleNextJob(),
 		)
 

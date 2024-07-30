@@ -68,7 +68,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.24.0
 	go.uber.org/atomic v1.10.0
 	golang.org/x/mod v0.12.0
-	golang.org/x/net v0.22.0
+	golang.org/x/net v0.23.0
 	golang.org/x/oauth2 v0.18.0
 	google.golang.org/grpc v1.64.0
 	gopkg.in/yaml.v2 v2.4.0

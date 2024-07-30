@@ -49,7 +49,7 @@ var initCmd = &cobra.Command{
 }
 
 func init() {
-	initCmd.Flags().String("discovery-endpoint", "https://codegen.substreams.dev", "Endpoint used to discover code generators")
+	initCmd.Flags().String("codegen-endpoint", "https://codegen.substreams.dev", "Endpoint used to discover code generators")
 	initCmd.Flags().String("state-file", "./generator.json", "File to load/save the state of the code generator")
 	rootCmd.AddCommand(initCmd)
 }
@@ -87,7 +87,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		connect.WithGRPC(),
 	}
 
-	initConvoURL := sflags.MustGetString(cmd, "discovery-endpoint")
+	initConvoURL := sflags.MustGetString(cmd, "codegen-endpoint")
 	stateFile := sflags.MustGetString(cmd, "state-file")
 	if !strings.HasSuffix(stateFile, ".json") {
 		return fmt.Errorf("state file must have a .json extension")

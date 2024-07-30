@@ -44,7 +44,8 @@ The `valueType` property instructs the Substreams runtime of the data to be save
 | `int64`                        | A string-serialized integer by using int64 arithmetic operations                 |
 | `float64`                      | A string-serialized floating point value, used for float64 arithmetic operations |
 | `bigint`                       | A string-serialized integer, supporting precision of any depth                   |
-| `bigfloat`                     | A string-serialized floating point value, supporting precision up to 100 digits  |
+| `bigfloat` **(DEPRECATED): Use `bigdecimal`**                     | A string-serialized floating point value, supporting precision up to 100 digits  |
+| `bigdecimal`                     | A string-serialized decimal value, supporting precision up to 2^63 decimal places  |
 
 #### `updatePolicy` property
 

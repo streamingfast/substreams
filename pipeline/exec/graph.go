@@ -93,8 +93,10 @@ func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *
 	g.modulesInitBlocks = map[string]uint64{}
 	for _, mod := range g.usedModules {
 		initialBlock := mod.InitialBlock
-		if initialBlock < firstStreamableBlock {
+		if initialBlock == 0 {
 			initialBlock = firstStreamableBlock
+		} else if initialBlock < firstStreamableBlock {
+			return fmt.Errorf("module %q has initial block %d smaller than first streamable block %d", mod.Name, initialBlock, firstStreamableBlock)
 		}
 		g.modulesInitBlocks[mod.Name] = initialBlock
 	}

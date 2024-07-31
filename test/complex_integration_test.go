@@ -62,7 +62,7 @@ func TestAllAssertionsInComplex(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			run := newTestRun(t, int64(c.startBlock), c.linearHandoffBlock, c.exclusiveEndBlock, c.moduleName, "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg")
+			run := newTestRun(t, int64(c.startBlock), c.linearHandoffBlock, c.exclusiveEndBlock, 0, c.moduleName, "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg")
 			err := run.Run(t, c.moduleName)
 			if c.expectError {
 				require.Error(t, err)

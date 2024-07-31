@@ -73,7 +73,8 @@ func BuildParallelProcessor(
 
 		// no ReadExecOut if output type is an index
 		if requestedModule.GetKindMap() != nil {
-			execOutSegmenter := reqPlan.ReadOutSegmenter(requestedModule.InitialBlock)
+			initialBlock := execGraph.ModulesInitBlocks()[requestedModule.Name]
+			execOutSegmenter := reqPlan.ReadOutSegmenter(initialBlock)
 			walker := execoutStorage.NewFileWalker(requestedModule.Name, execOutSegmenter)
 
 			sched.ExecOutWalker = orchestratorExecout.NewWalker(

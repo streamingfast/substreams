@@ -1,0 +1,62 @@
+specVersion: v0.1.0
+package:
+  name: "substreams_test_init0"
+  version: v0.1.0
+
+protobuf:
+  importPaths:
+    - ../simple_substreams/proto
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: ../simple_substreams/target/wasm32-unknown-unknown/release/substreams_test.wasm
+    protoPackageMapping:
+      sf.ethereum.type.v2: "substreams_ethereum::pb::eth::v2"
+      sf.substreams.v1: "substreams::pb::substreams"
+      sf.substreams.v1.test: "pb::test"
+      my.types.v1: "pb::my_types_v1"
+
+modules:
+  - name: test_index
+    kind: blockIndex
+    inputs:
+      - source: sf.substreams.v1.test.Block
+    output:
+      type: proto:sf.substreams.index.v1.Keys
+
+  - name: test_map
+    kind: map
+    inputs:
+      - params: string
+      - source: sf.substreams.v1.test.Block
+    output:
+      type: proto:sf.substreams.v1.test.MapResult
+
+  - name: setup_test_store_add_i64
+    kind: store
+    updatePolicy: add
+    valueType: int64
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_test_store_add_i64
+    kind: map
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_add_i64
+    output:
+      type: proto:sf.substreams.v1.test.Boolean
+
+  - name: assert_test_store_add_i64_deltas
+    kind: map
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: setup_test_store_add_i64
+      - store: setup_test_store_add_i64
+        mode: deltas
+    output:
+      type: proto:sf.substreams.v1.test.Boolean
+
+params:
+  test_map: my test params

@@ -24,9 +24,8 @@ func (r *ProcessRangeRequest) Validate() error {
 		return fmt.Errorf("merged blocks store is required in request")
 	case r.SegmentSize == 0:
 		return fmt.Errorf("a non-zero state bundle size is required in request")
-	case (r.SegmentNumber+1)*r.SegmentSize < r.FirstStreamableBlock:
-		return fmt.Errorf("requested segment is way below the first streamable block")
-
+	case ((r.SegmentNumber+1)*r.SegmentSize - 1) < r.FirstStreamableBlock:
+		return fmt.Errorf("segment is completely below the first streamable block")
 	}
 
 	seenStores := map[string]bool{}

@@ -23,7 +23,6 @@ import (
 
 	"github.com/streamingfast/substreams/manifest"
 
-	"github.com/streamingfast/substreams/block"
 	"github.com/stretchr/testify/require"
 
 	"github.com/streamingfast/substreams/orchestrator/work"
@@ -59,7 +58,7 @@ func TestTier2Call(t *testing.T) {
 	cases := []struct {
 		name                  string
 		startBlock            uint64
-		endBlock              uint64
+		firstStreamableBlock  uint64
 		stage                 int
 		moduleName            string
 		stateBundleSize       uint64
@@ -79,7 +78,6 @@ func TestTier2Call(t *testing.T) {
 		{
 			name:            "check full kv production in previous stages",
 			startBlock:      50,
-			endBlock:        60,
 			stage:           3,
 			moduleName:      "map_output_init_50",
 			stateBundleSize: 10,
@@ -105,6 +103,119 @@ func TestTier2Call(t *testing.T) {
 			},
 		},
 
+		// Simple substreams package with initialBlock==0 : "./testdata/simple_substreams_init0/substreams-test-init0-v0.1.0.spkg"
+		// Output module : test_map
+		//Stage 0: [["test_map"]]
+		{
+			name:                 "first streamble block",
+			startBlock:           10,
+			firstStreamableBlock: 18,
+			stage:                0,
+			moduleName:           "test_map",
+			stateBundleSize:      10,
+			manifestPath:         "./testdata/simple_substreams_init0/substreams-test-init0-v0.1.0.spkg",
+			preCreatedFiles:      nil,
+
+			expectRemainingFiles: []string{
+				"746573745f6d6170/outputs/0000000018-0000000020.output",
+			},
+		},
+
+		// Simple substreams package with initialBlock==0 : "./testdata/simple_substreams_init0/substreams-test-init0-v0.1.0.spkg"
+		// Output module : test_map
+		//Stage 0: [["test_store_add_i64"]]
+		//Stage 1: [["assert_test_store_add_i64"]] (not run)
+		{
+			name:                 "first streamble block with store",
+			startBlock:           10,
+			firstStreamableBlock: 18,
+			stage:                0,
+			moduleName:           "assert_test_store_add_i64",
+			stateBundleSize:      10,
+			manifestPath:         "./testdata/simple_substreams_init0/substreams-test-init0-v0.1.0.spkg",
+			preCreatedFiles:      nil,
+
+			expectRemainingFiles: []string{
+				"73657475705f746573745f73746f72655f6164645f693634/outputs/0000000018-0000000020.output",
+				"73657475705f746573745f73746f72655f6164645f693634/states/0000000020-0000000018.partial",
+			},
+		},
+
+		// Simple substreams package with initialBlock==0 : "./testdata/simple_substreams_init0/substreams-test-init0-v0.1.0.spkg"
+		// Output module : test_map
+		//Stage 0: [["test_store_add_i64"]]
+		//Stage 1: [["assert_test_store_add_i64"]]
+		{
+			name:                 "first streamble block with store all stages together",
+			startBlock:           10,
+			firstStreamableBlock: 18,
+			stage:                1,
+			moduleName:           "assert_test_store_add_i64",
+			stateBundleSize:      10,
+			manifestPath:         "./testdata/simple_substreams_init0/substreams-test-init0-v0.1.0.spkg",
+			preCreatedFiles:      nil,
+
+			expectRemainingFiles: []string{
+				"73657475705f746573745f73746f72655f6164645f693634/outputs/0000000018-0000000020.output",
+				"73657475705f746573745f73746f72655f6164645f693634/states/0000000020-0000000018.kv", // kv store done directly
+				"6173736572745f746573745f73746f72655f6164645f693634/outputs/0000000018-0000000020.output",
+			},
+		},
+
+		// Simple substreams package with initialBlock==0 : "./testdata/simple_substreams_init0/substreams-test-init0-v0.1.0.spkg"
+		// Output module : test_map
+		//Stage 0: [["test_store_add_i64"]]
+		//Stage 1: [["assert_test_store_add_i64"]] (not run)
+		{
+			name:                 "first streamble block with store second segment",
+			startBlock:           20,
+			firstStreamableBlock: 18,
+			stage:                0,
+			moduleName:           "assert_test_store_add_i64",
+			stateBundleSize:      10,
+			manifestPath:         "./testdata/simple_substreams_init0/substreams-test-init0-v0.1.0.spkg",
+			preCreatedFiles: []string{
+				"73657475705f746573745f73746f72655f6164645f693634/outputs/0000000018-0000000020.output.zst",
+				"73657475705f746573745f73746f72655f6164645f693634/states/0000000020-0000000018.partial.zst",
+			},
+
+			expectRemainingFiles: []string{
+				"73657475705f746573745f73746f72655f6164645f693634/outputs/0000000018-0000000020.output",
+				"73657475705f746573745f73746f72655f6164645f693634/states/0000000020-0000000018.partial",
+
+				"73657475705f746573745f73746f72655f6164645f693634/outputs/0000000020-0000000030.output",
+				"73657475705f746573745f73746f72655f6164645f693634/states/0000000030-0000000020.partial",
+			},
+		},
+
+		// Simple substreams package with initialBlock==0 : "./testdata/simple_substreams_init0/substreams-test-init0-v0.1.0.spkg"
+		// Output module : test_map
+		//Stage 0: [["test_store_add_i64"]]
+		//Stage 1: [["assert_test_store_add_i64"]]
+		{
+			name:                 "first streamble block with store second stage",
+			startBlock:           20,
+			firstStreamableBlock: 18,
+			stage:                1,
+			moduleName:           "assert_test_store_add_i64",
+			stateBundleSize:      10,
+			manifestPath:         "./testdata/simple_substreams_init0/substreams-test-init0-v0.1.0.spkg",
+			preCreatedFiles: []string{
+				"73657475705f746573745f73746f72655f6164645f693634/outputs/0000000018-0000000020.output.zst",
+				"73657475705f746573745f73746f72655f6164645f693634/states/0000000020-0000000018.kv.zst",
+			},
+
+			expectRemainingFiles: []string{
+				"73657475705f746573745f73746f72655f6164645f693634/outputs/0000000018-0000000020.output",
+				"73657475705f746573745f73746f72655f6164645f693634/states/0000000020-0000000018.kv",
+
+				"73657475705f746573745f73746f72655f6164645f693634/outputs/0000000020-0000000030.output",
+				"73657475705f746573745f73746f72655f6164645f693634/states/0000000030-0000000018.kv",
+
+				"6173736572745f746573745f73746f72655f6164645f693634/outputs/0000000020-0000000030.output",
+			},
+		},
+
 		// Complex substreams package : "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg"
 		// Output module : second_map_output_init_50
 		//Stage 0: [["first_store_init_20"]]
@@ -114,7 +225,6 @@ func TestTier2Call(t *testing.T) {
 		{
 			name:            "stores with different initial blocks on the same stage",
 			startBlock:      50,
-			endBlock:        60,
 			stage:           3,
 			moduleName:      "second_map_output_init_50",
 			stateBundleSize: 10,
@@ -149,7 +259,6 @@ func TestTier2Call(t *testing.T) {
 		{
 			name:            "test index_init_60 with map_using_index_init_70 filtering through key 'even' with pre-existing random indices",
 			startBlock:      70,
-			endBlock:        80,
 			stage:           0,
 			moduleName:      "map_using_index_init_70",
 			stateBundleSize: 10,
@@ -175,7 +284,6 @@ func TestTier2Call(t *testing.T) {
 		{
 			name:            "test index_init_60 with map_using_index_init_70 filtering through key 'even'",
 			startBlock:      70,
-			endBlock:        80,
 			stage:           0,
 			moduleName:      "map_using_index_init_70",
 			stateBundleSize: 10,
@@ -210,8 +318,11 @@ func TestTier2Call(t *testing.T) {
 
 			ctx = reqctx.WithTier2RequestParameters(ctx, reqctx.Tier2RequestParameters{
 				BlockType:            "sf.substreams.v1.test.Block",
+				FirstStreamableBlock: test.firstStreamableBlock,
 				StateBundleSize:      test.stateBundleSize,
 				StateStoreURL:        filepath.Join(testTempDir, "test.store"),
+				MeteringConfig:       "some_metering_config",
+				MergedBlockStoreURL:  "some_merged_block_store_url",
 				StateStoreDefaultTag: "tag",
 			})
 
@@ -224,9 +335,8 @@ func TestTier2Call(t *testing.T) {
 				}
 			}
 
-			workRange := block.NewRange(test.startBlock, test.endBlock)
-
-			request := work.NewRequest(ctx, reqctx.Details(ctx), test.stage, workRange)
+			request := work.NewRequest(ctx, reqctx.Details(ctx), test.stage, test.startBlock)
+			require.NoError(t, request.Validate())
 
 			err = processInternalRequest(t, ctx, request, nil, newBlockGenerator, responseCollector, nil, testTempDir)
 			require.NoError(t, err)

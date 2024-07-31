@@ -479,6 +479,7 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 	}
 
 	p.loadedModules = loadedModules
+	modulesInitBlocks := p.execGraph.ModulesInitBlocks()
 
 	var stagedModuleExecutors [][]exec.ModuleExecutor
 	for _, stage := range p.executionStages {
@@ -516,7 +517,7 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 					baseExecutor := exec.NewBaseExecutor(
 						ctx,
 						module.Name,
-						module.InitialBlock,
+						modulesInitBlocks[module.Name],
 						mod,
 						p.wasmRuntime.InstanceCacheEnabled(),
 						inputs,
@@ -540,7 +541,7 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 					baseExecutor := exec.NewBaseExecutor(
 						ctx,
 						module.Name,
-						module.InitialBlock,
+						modulesInitBlocks[module.Name],
 						mod,
 						p.wasmRuntime.InstanceCacheEnabled(),
 						inputs,
@@ -558,7 +559,7 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 					baseExecutor := exec.NewBaseExecutor(
 						ctx,
 						module.Name,
-						module.InitialBlock,
+						modulesInitBlocks[module.Name],
 						mod,
 						p.wasmRuntime.InstanceCacheEnabled(),
 						inputs,

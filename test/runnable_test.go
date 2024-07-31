@@ -46,6 +46,7 @@ type testRun struct {
 	NewBlockGenerator      BlockGeneratorFactory
 	BlockProcessedCallback blockProcessedCallBack
 	LinearHandoffBlockNum  uint64 // defaults to the request's StopBlock, so no linear handoff, only backprocessing
+	FirstStreamableBlock   uint64
 	ProductionMode         bool
 	// PreWork can be done to perform tier2 work in advance, to simulate when
 	// pre-existing data is available in different conditions
@@ -58,10 +59,10 @@ type testRun struct {
 	TempDir   string
 }
 
-func newTestRun(t *testing.T, startBlock int64, linearHandoffBlock, exclusiveEndBlock uint64, moduleName string, manifestPath string) *testRun {
+func newTestRun(t *testing.T, startBlock int64, linearHandoffBlock, exclusiveEndBlock, firstStreamableBlock uint64, moduleName string, manifestPath string) *testRun {
 	pkg := manifest.TestReadManifest(t, manifestPath)
 
-	return &testRun{Package: pkg, StartBlock: startBlock, ExclusiveEndBlock: exclusiveEndBlock, ModuleName: moduleName, LinearHandoffBlockNum: linearHandoffBlock}
+	return &testRun{Package: pkg, StartBlock: startBlock, ExclusiveEndBlock: exclusiveEndBlock, FirstStreamableBlock: firstStreamableBlock, ModuleName: moduleName, LinearHandoffBlockNum: linearHandoffBlock}
 }
 
 func (f *testRun) Run(t *testing.T, testName string) error {
@@ -135,6 +136,7 @@ func (f *testRun) Run(t *testing.T, testName string) error {
 			blockProcessedCallBack: f.BlockProcessedCallback,
 			testTempDir:            testTempDir,
 			id:                     workerID.Inc(),
+			firstStreamableBlock:   f.FirstStreamableBlock,
 		}
 	}
 
@@ -317,7 +319,7 @@ type TestRunner struct {
 	generator TestBlockGenerator
 }
 
-func (r *TestRunner) StreamFactory(_ context.Context, h bstream.Handler, startBlockNum int64, stopBlockNum uint64, _ string, _ bool, _ bool, _ *zap.Logger) (service.Streamable, error) {
+func (r *TestRunner) StreamFactory(ctx context.Context, h bstream.Handler, startBlockNum int64, stopBlockNum uint64, _ string, _ bool, _ bool, _ *zap.Logger) (service.Streamable, error) {
 	var liveBackFiller *service.LiveBackFiller
 
 	if liveBackFillerHandler, ok := h.(*service.LiveBackFiller); ok {
@@ -327,8 +329,17 @@ func (r *TestRunner) StreamFactory(_ context.Context, h bstream.Handler, startBl
 		r.pipe = pipelineHandler
 	}
 
+	firstStreamableBlock := bstream.GetProtocolFirstStreamableBlock
+	if tier2ReqParams, ok := reqctx.GetTier2RequestParameters(ctx); ok {
+		firstStreamableBlock = tier2ReqParams.FirstStreamableBlock
+	}
+
 	r.Shutter = shutter.New()
-	r.generator = r.blockGeneratorFactory(uint64(startBlockNum), stopBlockNum)
+	factoryFirstBlock := uint64(startBlockNum)
+	if factoryFirstBlock < firstStreamableBlock {
+		factoryFirstBlock = firstStreamableBlock
+	}
+	r.generator = r.blockGeneratorFactory(factoryFirstBlock, stopBlockNum)
 	return r, nil
 }
 

@@ -219,7 +219,7 @@ func Basic(pkg *pbsubstreams.Package, graph *manifest.ModuleGraph) (*BasicInfo, 
 	return manifestInfo, nil
 }
 
-func Extended(manifestPath string, outputModule string, skipValidation bool, firstStreamableBlock uint64) (*ExtendedInfo, error) {
+func Extended(manifestPath string, outputModule string, skipValidation bool) (*ExtendedInfo, error) {
 	var opts []manifest.Option
 	if skipValidation {
 		opts = append(opts, manifest.SkipPackageValidationReader())
@@ -234,8 +234,6 @@ func Extended(manifestPath string, outputModule string, skipValidation bool, fir
 		return nil, fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
-	pbsubstreams.ApplyFirstStreamableBlockToModules(firstStreamableBlock, pkg.Modules.Modules)
-
 	return ExtendedWithPackage(pkg, graph, outputModule)
 }
 
@@ -247,7 +245,7 @@ func ExtendedWithPackage(pkg *pbsubstreams.Package, graph *manifest.ModuleGraph,
 
 	var stages [][][]string
 	if outputModule != "" {
-		execGraph, err := exec.NewOutputModuleGraph(outputModule, true, pkg.Modules)
+		execGraph, err := exec.NewOutputModuleGraph(outputModule, true, pkg.Modules, 0)
 		if err != nil {
 			return nil, fmt.Errorf("creating output module graph: %w", err)
 		}

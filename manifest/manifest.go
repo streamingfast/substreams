@@ -70,11 +70,12 @@ func (m *Manifest) resolvePath(path string) string {
 }
 
 type PackageMeta struct {
-	Name    string `yaml:"name,omitempty"`
-	Version string `yaml:"version,omitempty"` // Semver for package authors
-	URL     string `yaml:"url,omitempty"`
-	Doc     string `yaml:"doc,omitempty"`
-	Image   string `yaml:"image,omitempty"`
+	Name        string `yaml:"name,omitempty"`
+	Version     string `yaml:"version,omitempty"` // Semver for package authors
+	URL         string `yaml:"url,omitempty"`
+	Doc         string `yaml:"doc,omitempty"`
+	Description string `yaml:"description,omitempty"`
+	Image       string `yaml:"image,omitempty"`
 }
 
 type Protobuf struct {

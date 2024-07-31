@@ -364,10 +364,11 @@ func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package
 	doc = string(readmeContent)
 
 	pkgMeta := &pbsubstreams.PackageMetadata{
-		Version: m.Package.Version,
-		Url:     m.Package.URL,
-		Name:    m.Package.Name,
-		Doc:     doc,
+		Version:     m.Package.Version,
+		Url:         m.Package.URL,
+		Name:        m.Package.Name,
+		Description: m.Package.Description,
+		Doc:         doc,
 	}
 
 	pkg = &pbsubstreams.Package{

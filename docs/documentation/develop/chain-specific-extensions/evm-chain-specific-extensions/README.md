@@ -1,2 +1,0 @@
-# EVM Chain-Specific Extensions
-

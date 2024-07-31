@@ -11,14 +11,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+* Added an execution timeout of 3 minutes per block by default (can be overriden in tier1/tier2 Configs) -- this is useful when an external (eth_call) is stuck on a forked block hash.
 * Tools->prometheus: added the possibility to override the start-block on an endpoint
+* Revert 'initialBlocks' changes from v1.9.1 because a 'changing module hash' causes more trouble.
 
 ## v1.9.3
 
 * Fixed error handling issue in 'backprocessing' causing high CPU usage in tier1 servers
 * Fixed handling of packages referenced by `ipfs://` URL (now simply using /api/v0/cat?arg=...)
 * Added `--used-modules-only` flag to `substreams info` to only show modules that are in execution tree for the given output_module
-* Revert 'initialBlocks' changes from v1.9.1 because a 'changing module hash' causes more trouble.
 
 ## v1.9.2
 

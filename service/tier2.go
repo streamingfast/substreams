@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"sync"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/RoaringBitmap/roaring/roaring64"
@@ -69,6 +70,7 @@ type Tier2Service struct {
 	maxConcurrentRequests     uint64
 	moduleExecutionTracing    bool
 	connectionCountMutex      sync.RWMutex
+	blockExecutionTimeout     time.Duration
 
 	tier2RequestParameters *reqctx.Tier2RequestParameters
 }
@@ -81,8 +83,9 @@ func NewTier2(
 ) (*Tier2Service, error) {
 
 	s := &Tier2Service{
-		tracer: tracing.GetTracer(),
-		logger: logger,
+		tracer:                tracing.GetTracer(),
+		logger:                logger,
+		blockExecutionTimeout: 3 * time.Minute,
 	}
 
 	metrics.RegisterMetricSet(logger)
@@ -313,7 +316,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		request.SegmentSize,
 		nil,
 		respFunc,
-		// This must always be the parent/global trace id, the one that comes from tier1
+		s.blockExecutionTimeout,
 		opts...,
 	)
 

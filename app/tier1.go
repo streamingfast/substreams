@@ -42,6 +42,7 @@ type Tier1Config struct {
 	GRPCListenAddr          string        // gRPC address where this app will listen to
 	GRPCShutdownGracePeriod time.Duration // The duration we allow for gRPC connections to terminate gracefully prior forcing shutdown
 	ServiceDiscoveryURL     *url.URL
+	BlockExecutionTimeout   time.Duration
 
 	StateStoreURL        string
 	StateStoreDefaultTag string
@@ -149,6 +150,10 @@ func (a *Tier1App) Run() error {
 
 	if a.config.Tracing {
 		opts = append(opts, service.WithModuleExecutionTracing())
+	}
+
+	if a.config.BlockExecutionTimeout != 0 {
+		opts = append(opts, service.WithBlockExecutionTimeout(a.config.BlockExecutionTimeout))
 	}
 
 	var wasmModules map[string]string

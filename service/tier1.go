@@ -55,15 +55,16 @@ type Tier1Service struct {
 	*shutter.Shutter
 	ssconnect.UnimplementedStreamHandler
 
-	blockType          string
-	wasmExtensions     map[string]map[string]wasm.WASMExtension
-	wasmParams         map[string]string
-	failedRequestsLock sync.RWMutex
-	failedRequests     map[string]*recordedFailure
-	streamFactoryFunc  StreamFactoryFunc
-	runtimeConfig      config.RuntimeConfig
-	tracer             ttrace.Tracer
-	logger             *zap.Logger
+	blockType             string
+	wasmExtensions        map[string]map[string]wasm.WASMExtension
+	wasmParams            map[string]string
+	failedRequestsLock    sync.RWMutex
+	failedRequests        map[string]*recordedFailure
+	streamFactoryFunc     StreamFactoryFunc
+	blockExecutionTimeout time.Duration
+	runtimeConfig         config.RuntimeConfig
+	tracer                ttrace.Tracer
+	logger                *zap.Logger
 
 	getRecentFinalBlock func() (uint64, error)
 	resolveCursor       pipeline.CursorResolver
@@ -170,6 +171,7 @@ func NewTier1(
 		resolveCursor:          pipeline.NewCursorResolver(hub, mergedBlocksStore, forkedBlocksStore),
 		logger:                 logger,
 		tier2RequestParameters: tier2RequestParameters,
+		blockExecutionTimeout:  3 * time.Minute,
 	}
 
 	s.streamFactoryFunc = sf.New
@@ -489,6 +491,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		segmentSize,
 		s.runtimeConfig.WorkerFactory,
 		respFunc,
+		s.blockExecutionTimeout,
 		opts...,
 	)
 

@@ -1,6 +1,8 @@
 package service
 
 import (
+	"time"
+
 	"github.com/streamingfast/substreams/wasm"
 )
 
@@ -15,6 +17,17 @@ func WithModuleExecutionTracing() Option {
 			s.runtimeConfig.ModuleExecutionTracing = true
 		case *Tier2Service:
 			s.moduleExecutionTracing = true
+		}
+	}
+}
+
+func WithBlockExecutionTimeout(timeout time.Duration) Option {
+	return func(a anyTierService) {
+		switch s := a.(type) {
+		case *Tier1Service:
+			s.blockExecutionTimeout = timeout
+		case *Tier2Service:
+			s.blockExecutionTimeout = timeout
 		}
 	}
 }

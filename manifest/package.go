@@ -345,21 +345,23 @@ func (m *Manifest) readFileFromName(filename string) ([]byte, error) {
 
 func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package, err error) {
 	doc := m.Package.Doc
-	if doc == "" {
-		readmeContent, err := m.readFileFromName("README.md")
+	if doc != "" {
+		fmt.Println("Deprecated: the 'package.doc' field is deprecated. The README.md file is picked up instead.")
+	}
+	readmeContent, err := m.readFileFromName("README.md")
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return nil, fmt.Errorf("reading file: %w", err)
+		}
+		readmeContent, err = m.readFileFromName("README")
 		if err != nil {
 			if !os.IsNotExist(err) {
 				return nil, fmt.Errorf("reading file: %w", err)
 			}
-			readmeContent, err = m.readFileFromName("README")
-			if err != nil {
-				if !os.IsNotExist(err) {
-					return nil, fmt.Errorf("reading file: %w", err)
-				}
-			}
+			fmt.Println("Warning: README.md file not found, no documentation will be packaged")
 		}
-		doc = string(readmeContent)
 	}
+	doc = string(readmeContent)
 
 	pkgMeta := &pbsubstreams.PackageMetadata{
 		Version: m.Package.Version,

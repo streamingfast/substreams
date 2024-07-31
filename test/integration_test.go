@@ -182,6 +182,9 @@ func TestOneStoreOneMap(t *testing.T) {
 	testStoreAddI64Hash := hex.EncodeToString([]byte("setup_test_store_add_i64"))
 	assertTestStoreAddI64Hash := hex.EncodeToString([]byte("assert_test_store_add_i64"))
 
+	defaultSPKG := "./testdata/simple_substreams/substreams-test-v0.1.0.spkg"
+	zeroInitialBlockSPKG := "./testdata/simple_substreams_init0/substreams-test-init0-v0.1.0.spkg"
+
 	tests := []struct {
 		name                  string
 		startBlock            int64
@@ -191,10 +194,13 @@ func TestOneStoreOneMap(t *testing.T) {
 		production            bool
 		preWork               testPreWork
 		expectedResponseCount int
+		spkg                  string
 		expectFiles           []string
+		expectError           string
 	}{
 		{
 			name:                  "dev_mode_backprocess",
+			spkg:                  defaultSPKG,
 			startBlock:            25,
 			linearBlock:           25,
 			stopBlock:             29,
@@ -210,6 +216,7 @@ func TestOneStoreOneMap(t *testing.T) {
 		},
 		{
 			name:                  "dev_mode_backprocess_then_save_state",
+			spkg:                  defaultSPKG,
 			startBlock:            25,
 			linearBlock:           25,
 			stopBlock:             32,
@@ -224,6 +231,7 @@ func TestOneStoreOneMap(t *testing.T) {
 		},
 		{
 			name:                  "prod_mode_back_forward_to_lib",
+			spkg:                  defaultSPKG,
 			startBlock:            25,
 			linearBlock:           20,
 			stopBlock:             29,
@@ -238,6 +246,7 @@ func TestOneStoreOneMap(t *testing.T) {
 		},
 		{
 			name:                  "prod_mode_back_forward_to_stop",
+			spkg:                  defaultSPKG,
 			startBlock:            25,
 			linearBlock:           30,
 			stopBlock:             30,
@@ -255,6 +264,7 @@ func TestOneStoreOneMap(t *testing.T) {
 		},
 		{
 			name:                  "prod_mode_back_forward_to_stop_nonzero_first_streamable",
+			spkg:                  zeroInitialBlockSPKG,
 			firstStreamableBlock:  16,
 			startBlock:            0,
 			linearBlock:           30,
@@ -271,7 +281,19 @@ func TestOneStoreOneMap(t *testing.T) {
 			},
 		},
 		{
+			name:                 "nonzero_first_streamable on nonzero module",
+			spkg:                 defaultSPKG,
+			firstStreamableBlock: 16,
+			startBlock:           0,
+			linearBlock:          30,
+			stopBlock:            30,
+			production:           true,
+			expectError:          "running test: module graph: module \"setup_test_store_add_i64\" has initial block 1 smaller than first streamable block 16",
+		},
+
+		{
 			name:                  "prod_mode_back_forward_to_stop_passed_boundary",
+			spkg:                  defaultSPKG,
 			startBlock:            25,
 			linearBlock:           40,
 			stopBlock:             41,
@@ -292,6 +314,7 @@ func TestOneStoreOneMap(t *testing.T) {
 		},
 		{
 			name:        "prod_mode_partial_existing",
+			spkg:        defaultSPKG,
 			startBlock:  1,
 			linearBlock: 30,
 			stopBlock:   30,
@@ -319,12 +342,18 @@ func TestOneStoreOneMap(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			bstream.GetProtocolFirstStreamableBlock = test.firstStreamableBlock // set for tier1 request to grab
-			run := newTestRun(t, test.startBlock, test.linearBlock, test.stopBlock, test.firstStreamableBlock, "assert_test_store_add_i64", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
+			run := newTestRun(t, test.startBlock, test.linearBlock, test.stopBlock, test.firstStreamableBlock, "assert_test_store_add_i64", test.spkg)
 
 			run.ProductionMode = test.production
 			run.ParallelSubrequests = 1
 			run.PreWork = test.preWork
-			require.NoError(t, run.Run(t, test.name))
+			err := run.Run(t, test.name)
+			if test.expectError != "" {
+				assert.Error(t, err)
+				assert.Equal(t, err.Error(), test.expectError)
+				return
+			}
+			require.NoError(t, err)
 
 			mapOutput := run.MapOutput("assert_test_store_add_i64")
 			assert.Contains(t, mapOutput, `assert_test_store_add_i64: 0801`)

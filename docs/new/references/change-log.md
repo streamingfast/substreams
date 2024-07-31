@@ -1,105 +1,20 @@
 # Change log
-All notable changes to the Substreams project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 {% hint style="info" %}
 Substreams builds upon Firehose.\
 Keep track of [Firehose releases and Data model updates](https://firehose.streamingfast.io/release-notes/change-logs) in the Firehose documentation.
 {% endhint %}
 
-## v1.3.5
+All notable changes to this project will be documented in this file.
 
-### Code generation
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-* Added `substreams init` support for creating a substreams with data from fully-decoded Calls instead of only extracting events.
-
-## v1.3.4
-
-### Code generation
-
-* Added `substreams init` support for creating a substreams with the "Dynamic DataSources" pattern (ex: a `Factory` contract creating `pool` contracts through the `PoolCreated` event)
-* Changed `substreams init` to always add prefixes the tables and entities with the project name
-* Fixed `substreams init` support for unnamed params and topics on log events
-
-## v1.3.3
-
-* Fixed `substreams init` generated code when dealing with Ethereum ABI events containing array types.
-
-  > [!NOTE]
-  > For now, the generated code only works with Postgres, an upcoming revision is going to lift that constraint.
-
-## v1.3.2
-
-* Fixed `store.has_at` Wazero signature which was defined as `has_at(storeIdx: i32, ord: i32, key_ptr: i32, key_len: i32)` but should have been `has_at(storeIdx: i32, ord: i64, key_ptr: i32, key_len: i32)`.
-* Fixed the local `substreams alpha service serve` ClickHouse deployment which was failing with a message regarding fork handling.
-* Catch more cases of WASM deterministic errors as `InvalidArgument`.
-* Added some output-stream info to logs.
-
-## v1.3.1
-
-### Server
-
-* Fixed error-passing between tier2 and tier1 (tier1 will not retry sending requests that fail deterministicly to tier2)
-* Tier1 will now schedule a single job on tier2, quickly ramping up to the requested number of workers after 4 seconds of delay, to catch early exceptions
-* "store became too big" is now considered a deterministic error and returns code "InvalidArgument"
-
-## v1.3.0
-
-### Highlights
-
-* Support new `networks` configuration block in `substreams.yaml` to override modules' *params* and *initial_block*. Network can be specified at run-time, avoiding the need for separate spkg files for each chain.
-* [BREAKING CHANGE] Remove the support for the `deriveFrom` overrides. The `imports`, along with the new `networks` feature, should provide a better mechanism to cover the use cases that `deriveFrom` tried to address.
-
-> [!NOTE]
-> These changes are all handled in the substreams CLI, applying the necessary changes to the package before sending the requests. The Substreams server endpoints do not need to be upgraded to support it.
-
-### Added
-
-* Added `networks` field at the top level of the manifest definition, with `initialBlock` and `params` overrides for each module. See the substreams.yaml.example file in the repository or https://substreams.streamingfast.io/reference-and-specs/manifests for more details and example usage.
-* The networks `params` and `initialBlock`` overrides for the chosen network are applied to the module directly before being sent to the server. All network configurations are kept when packing an .spkg file.
-* Added the `--network` flag for choosing the network on `run`, `gui` and `alpha service deploy` commands. Default behavior is to use the one defined as `network` in the manifest. 
-* Added the `--endpoint` flag to `substreams alpha service serve` to specify substreams endpoint to connect to
-* Added endpoints for Antelope chains
-* Command 'substreams info' now shows the params
-
-### Removed
-
-* Removed the handling of the `DeriveFrom` keyword in manifest, this override feature is going away.
-* Removed the `--skip-package-validation`` option only on run/gui/inspect/info
-
-### Changed
-
-* Added the `--params` flag to `alpha service deploy` to apply per-module parameters to the substreams before pushing it. 
-* Renamed the `--parameters` flag to  `--deployment-params` in `alpha service deploy`, to clarify the intent of those parameters (given to the endpoint, not applied to the substreams modules)
-* Small improvement on `substreams gui` command: no longer reads the .spkg multiple times with different behavior during its process.
-
-## v1.2.0
-
-### Client
-
-* Fixed bug in `substreams init` with numbers in ABI types
-
-### Backend
-
-* Return the correct GRPC code instead of wrapping it under an "Unknown" error. "Clean shutdown" now returns CodeUnavailable. This is compatible with previous substreams clients like substreams-sql which should retry automatically.
-* Upgraded components to manage the new block encapsulation format in merged-blocks and on the wire required for firehose-core v1.0.0
-
-## v1.1.22
-
-### alpha service deployments
-
-* Fix fuzzy matching when endpoint require auth headers
-* Fix panic in "serve" when trying to delete a non-existing deployment
-* Add validation check of substreams package before sending deploy request to server
-
-## v1.1.21
+## Unreleased
 
 ### Changed
 
 * Codegen: substreams-database-change to v1.3, properly generates primary key to support chain reorgs in postgres sink.
-* Sink server commands all moved from `substreams alpha sink-*` to `substreams alpha service *`
-* Sink server: support for deploying sinks with DBT configuration, so that users can deploy their own DBT models (supported on postgres and clickhouse sinks). Example manifest file segment:
+*   Sink server: support for deploying sinks with DBT configuration, so that users can deploy their own DBT models (supported on postgres and clickhouse sinks). Example manifest file segment:
 
     ```yaml
     [...]

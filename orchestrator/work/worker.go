@@ -21,7 +21,6 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 
-	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/orchestrator/loop"
@@ -41,10 +40,10 @@ type Result struct {
 
 type Worker interface {
 	ID() string
-	Work(ctx context.Context, unit stage.Unit, workRange *block.Range, moduleNames []string, upstream *response.Stream) loop.Cmd // *Result
+	Work(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream) loop.Cmd // *Result
 }
 
-func NewWorkerFactoryFromFunc(f func(ctx context.Context, unit stage.Unit, workRange *block.Range, moduleNames []string, upstream *response.Stream) loop.Cmd) *SimpleWorkerFactory {
+func NewWorkerFactoryFromFunc(f func(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream) loop.Cmd) *SimpleWorkerFactory {
 	return &SimpleWorkerFactory{
 		f:  f,
 		id: atomic.AddUint64(&lastWorkerID, 1),
@@ -52,12 +51,12 @@ func NewWorkerFactoryFromFunc(f func(ctx context.Context, unit stage.Unit, workR
 }
 
 type SimpleWorkerFactory struct {
-	f  func(ctx context.Context, unit stage.Unit, workRange *block.Range, moduleNames []string, upstream *response.Stream) loop.Cmd
+	f  func(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream) loop.Cmd
 	id uint64
 }
 
-func (f SimpleWorkerFactory) Work(ctx context.Context, unit stage.Unit, workRange *block.Range, moduleNames []string, upstream *response.Stream) loop.Cmd {
-	return f.f(ctx, unit, workRange, moduleNames, upstream)
+func (f SimpleWorkerFactory) Work(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream) loop.Cmd {
+	return f.f(ctx, unit, startBlock, moduleNames, upstream)
 }
 
 func (f SimpleWorkerFactory) ID() string {
@@ -87,13 +86,13 @@ func (w *RemoteWorker) ID() string {
 	return fmt.Sprintf("%d", w.id)
 }
 
-func NewRequest(ctx context.Context, req *reqctx.RequestDetails, stageIndex int, workRange *block.Range) *pbssinternal.ProcessRangeRequest {
+func NewRequest(ctx context.Context, req *reqctx.RequestDetails, stageIndex int, startBlock uint64) *pbssinternal.ProcessRangeRequest {
 	tier2ReqParams, ok := reqctx.GetTier2RequestParameters(ctx)
 	if !ok {
 		panic("unable to get tier2 request parameters")
 	}
 
-	segment := uint64(workRange.StartBlock) / tier2ReqParams.StateBundleSize
+	segment := startBlock / tier2ReqParams.StateBundleSize
 
 	return &pbssinternal.ProcessRangeRequest{
 		Modules:              req.Modules,
@@ -111,8 +110,8 @@ func NewRequest(ctx context.Context, req *reqctx.RequestDetails, stageIndex int,
 	}
 }
 
-func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *block.Range, moduleNames []string, upstream *response.Stream) loop.Cmd {
-	request := NewRequest(ctx, reqctx.Details(ctx), unit.Stage, workRange)
+func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream) loop.Cmd {
+	request := NewRequest(ctx, reqctx.Details(ctx), unit.Stage, startBlock)
 	logger := reqctx.Logger(ctx)
 
 	return func() loop.Msg {
@@ -192,7 +191,7 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, workRange *blo
 	}
 }
 
-func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, moduleNames []string, upstream *response.Stream) *Result {
+func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, _ []string, upstream *response.Stream) *Result {
 	metrics.Tier1ActiveWorkerRequest.Inc()
 	metrics.Tier1WorkerRequestCounter.Inc()
 	defer metrics.Tier1ActiveWorkerRequest.Dec()

@@ -80,6 +80,9 @@ func (p *Pipeline) ProcessBlock(block *pbbstream.Block, obj interface{}) (err er
 		return fmt.Errorf("setting up exec output: %w", err)
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, p.executionTimeout)
+	defer cancel()
+
 	if err = p.processBlock(ctx, execOutput, clock, cursor, step, reorgJunctionBlock); err != nil {
 		return err // watch out, io.EOF needs to go through undecorated
 	}
@@ -285,6 +288,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 	p.extraMapModuleOutputs = nil
 	p.extraStoreModuleOutputs = nil
 	blockNum := execOutput.Clock().Number
+	block := fmt.Sprintf("%d (%s)", blockNum, execOutput.Clock().Id)
 
 	// they may be already built, but we call this function every time to enable future dynamic changes
 	if err := p.BuildModuleExecutors(ctx); err != nil {
@@ -300,7 +304,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 				}
 				res := p.execute(ctx, executor, execOutput)
 				if err := p.applyExecutionResult(ctx, executor, res, execOutput); err != nil {
-					return fmt.Errorf("applying executor results %q on block %d: %w", executor.Name(), blockNum, res.err)
+					return fmt.Errorf("applying executor results %q on block %s: %w", executor.Name(), block, res.err)
 				}
 			}
 		} else {
@@ -333,7 +337,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 					return fmt.Errorf("running executor %q: %w", executor.Name(), result.err)
 				}
 				if err := p.applyExecutionResult(ctx, executor, result, execOutput); err != nil {
-					return fmt.Errorf("applying executor results %q on block %d: %w", executor.Name(), blockNum, result.err)
+					return fmt.Errorf("applying executor results %q on block %s: %w", executor.Name(), block, result.err)
 				}
 			}
 		}

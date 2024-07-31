@@ -9,7 +9,6 @@ import (
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
 
-	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/orchestrator/response"
 	"github.com/streamingfast/substreams/orchestrator/stage"
@@ -24,6 +23,7 @@ type TestWorker struct {
 	blockProcessedCallBack blockProcessedCallBack
 	testTempDir            string
 	id                     uint64
+	firstStreamableBlock   uint64
 }
 
 var workerID atomic.Uint64
@@ -32,7 +32,7 @@ func (w *TestWorker) ID() string {
 	return fmt.Sprintf("%d", w.id)
 }
 
-func (w *TestWorker) Work(ctx context.Context, unit stage.Unit, workRange *block.Range, moduleNames []string, upstream *response.Stream) loop.Cmd {
+func (w *TestWorker) Work(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream) loop.Cmd {
 	w.t.Helper()
 
 	ctx = reqctx.WithTier2RequestParameters(ctx, reqctx.Tier2RequestParameters{
@@ -40,8 +40,9 @@ func (w *TestWorker) Work(ctx context.Context, unit stage.Unit, workRange *block
 		StateBundleSize:      10,
 		StateStoreURL:        filepath.Join(w.testTempDir, "test.store"),
 		StateStoreDefaultTag: "tag",
+		FirstStreamableBlock: w.firstStreamableBlock,
 	})
-	request := work.NewRequest(ctx, reqctx.Details(ctx), unit.Stage, workRange)
+	request := work.NewRequest(ctx, reqctx.Details(ctx), unit.Stage, startBlock)
 
 	logger := reqctx.Logger(ctx)
 	logger = logger.With(zap.Uint64("workerId", w.id))

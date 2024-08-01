@@ -11,12 +11,14 @@ import (
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/tui2/replaylog"
 	streamui "github.com/streamingfast/substreams/tui2/stream"
+	"github.com/streamingfast/substreams/tui2/styles"
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/tui2/common"
@@ -193,53 +195,43 @@ func (r *Request) renderRequestSummary() string {
 	if r.RequestSummary == nil {
 		return ""
 	}
-	summary := r.RequestSummary
-	labels := []string{
-		"Package: ",
-		"Endpoint: ",
-		"Start Block: ",
-		"Parameters: ",
-		"Production mode: ",
-		"Trace ID: ",
-		"Parallel Workers: ",
-		// TODO: add docs field
-	}
 
 	handoffStr := ""
 	if r.resolvedStartBlock != r.linearHandoffBlock {
 		handoffStr = fmt.Sprintf(" (handoff: %d)", r.linearHandoffBlock)
 	}
-
+	summary := r.RequestSummary
 	paramsStrings := make([]string, 0, len(summary.Params))
 	for k, v := range summary.Params {
 		paramsStrings = append(paramsStrings, fmt.Sprintf("%s=%s", k, v))
 	}
 
-	values := []string{
-		summary.Manifest,
-		summary.Endpoint,
-		fmt.Sprintf("%d%s", r.resolvedStartBlock, handoffStr),
-		strings.Join(paramsStrings, ", "),
-		fmt.Sprintf("%v", summary.ProductionMode),
-		r.traceId,
-		fmt.Sprintf("%d", r.parallelWorkers),
+	rows := [][]string{
+		{"Package:", summary.Manifest},
+		{"Endpoint:", summary.Endpoint},
+		{"Start Block:", fmt.Sprintf("%d%s", r.resolvedStartBlock, handoffStr)},
+		{"Parameters:", fmt.Sprintf("%v", summary.Params)},
+		{"Production mode:", fmt.Sprintf("%v", summary.ProductionMode)},
+		{"Trace ID:", r.traceId},
+		{"Parallel Workers:", fmt.Sprintf("%d", r.parallelWorkers)},
 	}
+
 	if len(summary.InitialSnapshot) > 0 {
-		labels = append(labels, "Initial snapshots: ")
-		values = append(values, strings.Join(summary.InitialSnapshot, ", "))
+		rows = append(rows, []string{"Initial snapshots:", strings.Join(summary.InitialSnapshot, ", ")})
 	}
 
-	style := lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(r.Width - 2)
+	t := table.New().Border(lipgloss.Border{}).Width(r.Width - 2).Rows(rows...).StyleFunc(func(row, col int) lipgloss.Style {
+		color := styles.RequestOddRow
+		if row%2 == 0 {
+			color = styles.RequestEvenRow
+		}
+		if col == 0 {
+			return color.Align(lipgloss.Right)
+		}
+		return color
+	})
 
-	return style.Render(
-		lipgloss.NewStyle().Padding(1, 2, 1, 2).Render(
-			lipgloss.JoinHorizontal(
-				0.5,
-				lipgloss.JoinVertical(0, labels...),
-				lipgloss.JoinVertical(0, values...),
-			),
-		),
-	)
+	return t.Render()
 }
 
 func (r *Request) setModulesViewContent() {

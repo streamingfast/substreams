@@ -40,6 +40,12 @@ type modSelectStyle struct {
 //hashColor := lipgloss.Color("185")
 
 var (
+	// Some colors
+	purple    = lipgloss.Color("99")
+	gray      = lipgloss.Color("245")
+	lightGray = lipgloss.Color("241")
+
+	// Some styles
 	ActiveBorderColor = lipgloss.AdaptiveColor{Dark: "62", Light: "81"}
 
 	InactiveBorderColor = lipgloss.AdaptiveColor{Dark: "241", Light: "250"}
@@ -195,6 +201,11 @@ var (
 			SetString("│").
 			Padding(0, 1).
 			Foreground(lipgloss.AdaptiveColor{Dark: "238", Light: "251"})
+
+	RequestCell    = lipgloss.NewStyle().Padding(0, 1)
+	RequestOddRow  = RequestCell.Foreground(gray)
+	RequestEvenRow = RequestCell.Foreground(lightGray)
+	RequestRight   = RequestCell.Align(lipgloss.Right)
 
 	BlockSelect = blockSelectStyle{
 		Box:                  lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true),

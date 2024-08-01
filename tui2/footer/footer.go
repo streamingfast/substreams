@@ -67,7 +67,7 @@ func (f *Footer) View() string {
 	if f.keymap == nil {
 		return ""
 	}
-	s := styles.Footer.Copy().
+	s := styles.Footer.
 		Width(f.Width)
 	helpView := f.help.View(f.keymap)
 	return lipgloss.NewStyle().Margin(0, 1).Render(s.Render(helpView))

@@ -80,9 +80,6 @@ func (p *Pipeline) ProcessBlock(block *pbbstream.Block, obj interface{}) (err er
 		return fmt.Errorf("setting up exec output: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, p.executionTimeout)
-	defer cancel()
-
 	if err = p.processBlock(ctx, execOutput, clock, cursor, step, reorgJunctionBlock); err != nil {
 		return err // watch out, io.EOF needs to go through undecorated
 	}
@@ -294,6 +291,10 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 	if err := p.BuildModuleExecutors(ctx); err != nil {
 		return fmt.Errorf("building wasm module tree: %w", err)
 	}
+
+	// the ctx is cached in the built moduleExecutors so we only activate timeout here
+	ctx, cancel := context.WithTimeout(ctx, p.executionTimeout)
+	defer cancel()
 	for _, stage := range p.ModuleExecutors {
 		//t0 := time.Now()
 		if len(stage) < 2 {

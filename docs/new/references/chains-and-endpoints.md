@@ -53,6 +53,11 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 * **Bitcoin Mainnet**: `mainnet.btc.streamingfast.io:443`
 * **Injective Mainnet**: `mainnet.injective.streamingfast.io:443`
 * **Injective Testnet**: `testnet.injective.streamingfast.io:443`
+* **Sei Mainnet (EVM)**: `evm-mainnet.sei.streamingfast.io:443`
+* **Starknet Mainnet**: `mainnet.starknet.streamingfast.io`
+* **Base Mainnet**: `base-mainnet.streamingfast.io:443`
+
+
 
 ## Community Endpoints
 

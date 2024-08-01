@@ -49,7 +49,11 @@ var initCmd = &cobra.Command{
 }
 
 func init() {
-	initCmd.Flags().String("codegen-endpoint", "https://codegen.substreams.dev", "Endpoint used to discover code generators")
+	defaultEndpoint := "https://codegen.substreams.dev"
+	if newValue := os.Getenv("SUBSTREAMS_INIT_CODEGEN_ENDPOINT"); newValue != "" {
+		defaultEndpoint = newValue
+	}
+	initCmd.Flags().String("codegen-endpoint", defaultEndpoint, "Endpoint used to discover code generators")
 	initCmd.Flags().String("state-file", "./generator.json", "File to load/save the state of the code generator")
 	rootCmd.AddCommand(initCmd)
 }

@@ -1,12 +1,7 @@
 package common
 
-import (
-	"github.com/streamingfast/substreams/tui2/styles"
-)
-
 // Common is a struct all components should embed.
 type Common struct {
-	Styles *styles.Styles
 	Width  int
 	Height int
 }

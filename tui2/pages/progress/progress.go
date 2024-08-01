@@ -17,6 +17,7 @@ import (
 	"github.com/streamingfast/substreams/tui2/components/ranges"
 	"github.com/streamingfast/substreams/tui2/replaylog"
 	"github.com/streamingfast/substreams/tui2/stream"
+	"github.com/streamingfast/substreams/tui2/styles"
 )
 
 type Progress struct {
@@ -163,7 +164,7 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			for i := range stage.Modules {
 				displayedModules[i] = stage.Modules[i]
 				if squashingModules[stage.Modules[i]] {
-					displayedModules[i] += lipgloss.NewStyle().Foreground(p.Styles.StreamErrorColor).Render("(S)")
+					displayedModules[i] += lipgloss.NewStyle().Foreground(styles.StreamErrorColor).Render("(S)")
 				}
 			}
 
@@ -302,7 +303,7 @@ func (p *Progress) View() string {
 		fmt.Sprintf("%s / %s", humanize.Bytes(p.totalBytesRead), humanize.Bytes(p.totalBytesWritten)),
 		fmt.Sprintf("%d", p.targetBlock),
 		fmt.Sprintf("%d", p.dataPayloads),
-		p.Styles.StatusBarValue.Render(p.state + p.replayState),
+		styles.StatusBarValue.Render(p.state + p.replayState),
 	}
 
 	components := []string{
@@ -313,7 +314,7 @@ func (p *Progress) View() string {
 	}
 
 	if p.state == "Error" {
-		components = append(components, lipgloss.NewStyle().Background(p.Styles.StreamErrorColor).Width(p.Width).Render(p.curErrFormated))
+		components = append(components, lipgloss.NewStyle().Background(styles.StreamErrorColor).Width(p.Width).Render(p.curErrFormated))
 	}
 
 	components = append(components,
@@ -331,7 +332,7 @@ func (p *Progress) View() string {
 	}
 
 	if p.slowestSquashing != nil {
-		components = append(components, lipgloss.NewStyle().MarginLeft(2).Foreground(p.Styles.StreamErrorColor).Render("Slow Squashing: "+strings.Join(p.slowestSquashing, ", ")))
+		components = append(components, lipgloss.NewStyle().MarginLeft(2).Foreground(styles.StreamErrorColor).Render("Slow Squashing: "+strings.Join(p.slowestSquashing, ", ")))
 	}
 
 	return lipgloss.JoinVertical(0, components...)
@@ -359,5 +360,5 @@ func (p *Progress) SetSize(w, h int) {
 	}
 	p.progressView.Width = w
 	p.progressView.Height = h - headerHeight - footerHeight
-	p.Styles.StatusBarValue.Width(p.Common.Width - labelsMaxLen()) // adjust status bar width to force word wrap: full width - labels width
+	styles.StatusBarValue.Width(p.Common.Width - labelsMaxLen()) // adjust status bar width to force word wrap: full width - labels width
 }

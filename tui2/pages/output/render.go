@@ -14,6 +14,7 @@ import (
 
 	"github.com/golang/protobuf/jsonpb"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	"github.com/streamingfast/substreams/tui2/styles"
 
 	"github.com/muesli/termenv"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -68,7 +69,7 @@ func (o *Output) renderedOutput(in *pbsubstreamsrpc.AnyModuleOutput, withStyle b
 	dynamic.SetDefaultBytesRepresentation(o.bytesRepresentation)
 
 	if o.errReceived != nil {
-		out.styledError.WriteString(o.Styles.Output.ErrorLine.Render(o.errReceived.Error()))
+		out.styledError.WriteString(styles.Output.ErrorLine.Render(o.errReceived.Error()))
 	}
 	if o.logsEnabled {
 		if debugInfo := in.DebugInfo(); debugInfo != nil {
@@ -76,8 +77,8 @@ func (o *Output) renderedOutput(in *pbsubstreamsrpc.AnyModuleOutput, withStyle b
 			for _, log := range debugInfo.Logs {
 				plainLogs = append(plainLogs, fmt.Sprintf("log: %s", log))
 				if withStyle {
-					out.styledLogs.WriteString(o.Styles.Output.LogLabel.Render("log: "))
-					out.styledLogs.WriteString(o.Styles.Output.LogLine.Render(o.wrapLogs(log)))
+					out.styledLogs.WriteString(styles.Output.LogLabel.Render("log: "))
+					out.styledLogs.WriteString(styles.Output.LogLine.Render(o.wrapLogs(log)))
 					out.styledLogs.WriteString("\n")
 				}
 			}
@@ -116,7 +117,7 @@ func (o *Output) renderedOutput(in *pbsubstreamsrpc.AnyModuleOutput, withStyle b
 func (o *Output) renderPayload(in *renderedOutput) string {
 	out := &strings.Builder{}
 	if in.error != nil {
-		out.WriteString(o.Styles.Output.ErrorLine.Render(in.error.Error()))
+		out.WriteString(styles.Output.ErrorLine.Render(in.error.Error()))
 		out.WriteString("\n")
 	}
 	if o.errReceived != nil {

@@ -6,6 +6,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/streamingfast/substreams/tui2/common"
+	"github.com/streamingfast/substreams/tui2/styles"
 )
 
 // SelectTabMsg is a message that contains the index of the tab to select.
@@ -17,6 +18,7 @@ type ActiveTabMsg int
 // Tabs is bubbletea component that displays a list of tabs.
 type Tabs struct {
 	common.Common
+
 	tabs         []string
 	activeTab    int
 	TabSeparator lipgloss.Style
@@ -24,6 +26,7 @@ type Tabs struct {
 	TabActive    lipgloss.Style
 	TabDot       lipgloss.Style
 	UseDot       bool
+	LogoStyle    lipgloss.Style
 }
 
 // New creates a new Tabs component.
@@ -32,9 +35,9 @@ func New(c common.Common, tabs []string) *Tabs {
 		Common:       c,
 		tabs:         tabs,
 		activeTab:    0,
-		TabSeparator: c.Styles.TabSeparator,
-		TabInactive:  c.Styles.TabInactive,
-		TabActive:    c.Styles.TabActive,
+		TabSeparator: styles.TabSeparator,
+		TabInactive:  styles.TabInactive,
+		TabActive:    styles.TabActive,
 	}
 	r.Height = 2
 	return r
@@ -70,27 +73,22 @@ func (t *Tabs) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View implements tea.Model.
 func (t *Tabs) View() string {
-	s := strings.Builder{}
-	sep := t.TabSeparator
+	var tabs []string
+
 	for i, tab := range t.tabs {
-		style := t.TabInactive.Copy()
-		prefix := "  "
+		label := styles.TabLabel.Render(tab)
 		if i == t.activeTab {
-			style = t.TabActive.Copy()
-			prefix = t.TabDot.Render("• ")
-		}
-		if t.UseDot {
-			s.WriteString(prefix)
-		}
-		s.WriteString(style.Render(tab))
-		if i != len(t.tabs)-1 {
-			s.WriteString(sep.String())
+			tabs = append(tabs, styles.TabActive.Render(label))
+		} else {
+			tabs = append(tabs, styles.TabInactive.Render(label))
 		}
 	}
-	return lipgloss.NewStyle().
-		MaxWidth(t.Width).
-		Border(lipgloss.HiddenBorder(), false, false, true, false).
-		Render(s.String())
+	tabsView := lipgloss.JoinHorizontal(1.0, tabs...)
+
+	logoTab := t.LogoStyle.Render("Substreams GUI")
+	fill := max(t.Width-lipgloss.Width(tabsView)-lipgloss.Width(logoTab)+1, 0)
+
+	return lipgloss.JoinHorizontal(1.0, tabsView, strings.Repeat("─", fill), logoTab)
 }
 
 func (t *Tabs) activeTabCmd() tea.Msg {

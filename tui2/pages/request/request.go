@@ -3,6 +3,7 @@ package request
 import (
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/streamingfast/substreams/client"
@@ -14,6 +15,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -60,6 +62,12 @@ type Instance struct {
 type Request struct {
 	common.Common
 
+	form               *huh.Form
+	formStartBlock     string
+	formStopBlock      string
+	formEndpoint       string
+	formModuleSelected string
+
 	RequestSummary     *Summary
 	Modules            *pbsubstreams.Modules
 	manifestView       viewport.Model
@@ -78,13 +86,50 @@ func New(c common.Common) *Request {
 }
 
 func (r *Request) Init() tea.Cmd {
+	r.form = huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Key("module").
+				Value(&r.formModuleSelected).
+				Inline(true).
+				Options(huh.NewOptions("map_things_events_calls", "graph_out")...).
+				Title("Select module to stream:"),
+			huh.NewInput().
+				Key("start_block").
+				Value(&r.formStartBlock).
+				Inline(true).
+				Validate(func(s string) error {
+					if !regexp.MustCompile(`^\d+$`).MatchString(s) {
+						return fmt.Errorf("specify only numbers")
+					}
+					return nil
+				}).
+				Title("Enter the start block number:"),
+			huh.NewInput().
+				Key("stop_block").
+				Inline(true).
+				Value(&r.formStopBlock).
+				Validate(func(s string) error {
+					if !regexp.MustCompile(`^[\+\-]?\d+$`).MatchString(s) {
+						return fmt.Errorf("specify only numbers, optionally prefixed by - or +")
+					}
+					return nil
+				}).
+				Title("Stream to block:").
+				Description("You can specify relative block numbers with - (to head) or + (to start block) prefixes."),
+		),
+	)
 	return tea.Batch(
 		r.manifestView.Init(),
+		r.form.Init(),
 	)
 }
 
 func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
+
+	_, cmd := r.form.Update(msg)
+	cmds = append(cmds, cmd)
 
 	switch msg := msg.(type) {
 	case NewRequestInstance:
@@ -111,22 +156,43 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return r, tea.Batch(cmds...)
 }
 
+func (r *Request) SetSize(w, h int) {
+	r.Common.SetSize(w, h)
+
+	summaryHeight := lipgloss.Height(r.renderRequestSummary())
+	formHeight := lipgloss.Height(r.renderForm())
+	r.manifestView.Height = max(h-summaryHeight-formHeight-2 /* for borders */, 0)
+	r.manifestView.Width = w
+}
+
 func (r *Request) View() string {
-	lineCount := r.manifestView.TotalLineCount()
-	progress := float64(r.manifestView.YOffset+r.manifestView.Height-1) / float64(lineCount) * 100.0
-
-	requestContent := lipgloss.JoinVertical(0,
-		lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(r.Width-2).Render(r.manifestView.View()),
-		lipgloss.NewStyle().MarginLeft(r.Width-len(fmt.Sprint(lineCount))-15).Render(fmt.Sprintf("%.1f%% of %v lines", progress, lineCount)),
-	)
-
-	return lipgloss.JoinVertical(0,
+	out := lipgloss.JoinVertical(0,
+		r.renderForm(),
 		r.renderRequestSummary(),
-		requestContent,
+		r.renderManifestView(),
 	)
+	//fmt.Println("OUTPUT", lipgloss.Height(out), r.Height)
+	return out
+}
+
+func (r *Request) renderForm() string {
+	return lipgloss.NewStyle().MaxHeight(6).Render(r.form.View())
+}
+
+func (r *Request) renderManifestView() string {
+	return lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), true).
+		Width(r.Width - 2).
+		MaxHeight(r.manifestView.Height + 2 /* for borders */).
+		Render(
+			r.manifestView.View(),
+		)
 }
 
 func (r *Request) renderRequestSummary() string {
+	if r.RequestSummary == nil {
+		return ""
+	}
 	summary := r.RequestSummary
 	labels := []string{
 		"Package: ",
@@ -174,12 +240,6 @@ func (r *Request) renderRequestSummary() string {
 			),
 		),
 	)
-}
-
-func (r *Request) SetSize(w, h int) {
-	r.Common.SetSize(w, h)
-	r.manifestView.Width = w
-	r.manifestView.Height = h - 16
 }
 
 func (r *Request) setModulesViewContent() {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/tui2/common"
+	"github.com/streamingfast/substreams/tui2/styles"
 )
 
 // A vertical bar that allows you to select a module that has been seen
@@ -118,10 +119,10 @@ func (m *ModSelect) View() string {
 
 	alignRight := lipgloss.NewStyle().Width(sidePartsWidth + 4).Align(lipgloss.Right)
 	alignLeft := lipgloss.NewStyle().Width(sidePartsWidth + 4).Align(lipgloss.Left)
-	return m.Styles.ModSelect.Box.MaxWidth(m.Width).Render(
+	return styles.ModSelect.Box.MaxWidth(m.Width).Render(
 		lipgloss.JoinHorizontal(0.5,
 			alignRight.Render(leftModules),
-			m.Styles.ModSelect.SelectedModule.Render(activeModule),
+			styles.ModSelect.SelectedModule.Render(activeModule),
 			alignLeft.Render(rightModules),
 		),
 	)

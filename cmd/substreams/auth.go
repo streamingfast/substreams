@@ -25,9 +25,9 @@ func runAuthE(cmd *cobra.Command, args []string) error {
 
 	fmt.Println("Open this link to authenticate on The Graph Market:")
 	if localDevelopment == "true" {
-		color.Blue("http://localhost:3000/dev-onboarding")
+		color.Blue("http://localhost:3000/auth/substreams-devenv")
 	} else {
-		color.Blue("https://thegraph.market/dev-onboarding")
+		color.Blue("https://thegraph.market/auth/substreams-devenv")
 	}
 
 	fmt.Println()

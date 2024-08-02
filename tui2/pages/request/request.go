@@ -146,6 +146,26 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		r.setModulesViewContent()
 	case tea.KeyMsg:
+		// COuld we support:
+		// `s` to change `start block`
+		// `t` to change stop block
+		// `m` and `M` module to use module search/module fuzzy search in the `request` tab, and pick from there
+		// `p` to change parameters (?)
+		// `e` to change endpoint
+		// `m` to change manifest path
+		// `v` to change vcr mode
+		// `h` to change headers
+		// `o` to change output module
+		// `d` to change debug modules
+		// `i` to change debug initial snapshot
+		// `f` to change final blocks only
+		// `g` to change read from module
+		// `b` to change home dir
+		// `w` to change substreams client config
+		// `z` to change reader options
+		// `a` for advanced options (shows Final Blocks Only switcher)
+		// `c` to change cursor
+
 		var cmd tea.Cmd
 		r.manifestView, cmd = r.manifestView.Update(msg)
 		cmds = append(cmds, cmd)

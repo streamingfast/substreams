@@ -1,4 +1,4 @@
-Substreams allows you to easily extract data from the the Solana blockchain. With Substreams, you can retrieve transactions, instructions or accounts, taking advantage of its powerful streaming technology. It's super fast!
+Substreams allows you to easily extract data from EVM blockchains. With Substreams, you can retrieve transactions, instructions or accounts, taking advantage of its powerful streaming technology. It's super fast!
 
 <figure><img src="../../../.gitbook/assets/intro/ethereum-logo.png" width="100%" /></figure>
 

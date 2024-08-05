@@ -7,7 +7,6 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/tui2/common"
-	"github.com/streamingfast/substreams/tui2/styles"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -15,9 +14,7 @@ func getTestNavigator() *Navigator {
 	modules := newTestModules()
 	graph := newTestGraph(modules)
 
-	c := common.Common{
-		Styles: styles.DefaultStyles(),
-	}
+	c := common.Common{}
 
 	nav, err := New("X", c, WithModuleGraph(graph))
 	if err != nil {

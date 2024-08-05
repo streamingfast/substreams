@@ -1,0 +1,11 @@
+{{if $.HasExampleEntity }}
+type {{ $.ExampleEntity.NameAsEntity }} @entity {
+    id: ID!
+    count: Int!
+}
+{{ else }}
+type MyEntity @entity {
+    id: ID!
+    count: Int!
+}
+{{- end }}

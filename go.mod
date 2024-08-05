@@ -32,15 +32,18 @@ require (
 	github.com/RoaringBitmap/roaring v1.9.1
 	github.com/alecthomas/chroma v0.10.0
 	github.com/alecthomas/participle v0.7.1
+	github.com/bmatcuk/doublestar/v4 v4.6.1
 	github.com/bytecodealliance/wasmtime-go/v4 v4.0.0
 	github.com/charmbracelet/bubbles v0.18.0
 	github.com/charmbracelet/bubbletea v0.26.3
-	github.com/charmbracelet/glamour v0.6.0
+	github.com/charmbracelet/glamour v0.7.0
 	github.com/charmbracelet/huh v0.4.2
 	github.com/charmbracelet/huh/spinner v0.0.0-20240506212404-0a3504046bcb
 	github.com/charmbracelet/lipgloss v0.11.0
 	github.com/docker/cli v24.0.6+incompatible
 	github.com/dustin/go-humanize v1.0.1
+	github.com/fatih/color v1.13.0
+	github.com/golang-cz/textcase v1.2.1
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/itchyny/gojq v0.12.12
@@ -68,7 +71,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.24.0
 	go.uber.org/atomic v1.10.0
 	golang.org/x/mod v0.12.0
-	golang.org/x/net v0.22.0
+	golang.org/x/net v0.23.0
 	golang.org/x/oauth2 v0.18.0
 	google.golang.org/grpc v1.64.0
 	gopkg.in/yaml.v2 v2.4.0
@@ -77,6 +80,7 @@ require (
 require (
 	connectrpc.com/grpchealth v1.3.0 // indirect
 	connectrpc.com/otelconnect v0.7.0 // indirect
+	github.com/alecthomas/chroma/v2 v2.8.0 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.12.0 // indirect
 	github.com/bobg/go-generics/v2 v2.1.1 // indirect
@@ -91,6 +95,7 @@ require (
 	github.com/google/s2a-go v0.1.7 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/manifoldco/promptui v0.9.0 // indirect
+	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-sqlite3 v1.14.16 // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.6 // indirect
@@ -154,7 +159,7 @@ require (
 	github.com/mattn/go-localereader v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
-	github.com/microcosm-cc/bluemonday v1.0.21 // indirect
+	github.com/microcosm-cc/bluemonday v1.0.25 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect
@@ -178,8 +183,8 @@ require (
 	github.com/teris-io/shortid v0.0.0-20171029131806-771a37caa5cf // indirect
 	github.com/tidwall/gjson v1.14.1
 	github.com/tidwall/match v1.1.1 // indirect
-	github.com/yuin/goldmark v1.5.2 // indirect
-	github.com/yuin/goldmark-emoji v1.0.1 // indirect
+	github.com/yuin/goldmark v1.5.4 // indirect
+	github.com/yuin/goldmark-emoji v1.0.2 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.9.0 // indirect
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.23.1 // indirect

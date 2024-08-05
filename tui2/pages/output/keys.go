@@ -29,6 +29,7 @@ func (o *Output) FullHelp() [][]key.Binding {
 		{
 			keymap.PrevNextBlock,
 			keymap.UpDown,
+			keymap.GoToBlock,
 		},
 		{
 			keymap.Search,
@@ -36,11 +37,14 @@ func (o *Output) FullHelp() [][]key.Binding {
 			keymap.PrevNextMatchedBlock,
 		},
 		{
+			keymap.ModGraphView,
 			keymap.ModuleSearch,
 			keymap.RestartStream,
 		},
 		{
 			keymap.Help,
+			keymap.TabShiftTab,
+			keymap.Quit,
 		},
 	}
 }

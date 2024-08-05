@@ -46,9 +46,7 @@ type UI struct {
 }
 
 func New(reqConfig *request.Config) (*UI, error) {
-	c := common.Common{
-		Styles: styles.DefaultStyles(),
-	}
+	c := common.Common{}
 
 	out, err := output.New(c, reqConfig)
 	if err != nil {
@@ -133,7 +131,7 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return ui, tea.Quit
 		case "?":
 			ui.footer.SetShowAll(!ui.footer.ShowAll())
-			ui.SetSize(ui.Width, ui.Height)
+			ui.resize()
 		case "r":
 			return ui, ui.restartStream()
 		}
@@ -157,12 +155,12 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		ui.forceRefresh()
 		ui.activePage = page(msg)
 		ui.footer.SetKeyMap(ui.pages[ui.activePage])
-		ui.SetSize(ui.Width, ui.Height)
+		ui.resize()
 	case tabs.ActiveTabMsg:
 		ui.forceRefresh()
 		ui.activePage = page(msg)
 		ui.footer.SetKeyMap(ui.pages[ui.activePage])
-		ui.SetSize(ui.Width, ui.Height) // For when the footer changes size here
+		ui.resize()
 	}
 
 	if ui.stream != nil {
@@ -184,13 +182,14 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (ui *UI) SetSize(w, h int) {
 	ui.Common.SetSize(w, h)
+	ui.resize()
+}
+func (ui *UI) resize() {
 	footerHeight := ui.footer.Height()
-	ui.footer.SetSize(w, footerHeight)
-	tabsHeight := ui.tabs.Height
-	ui.tabs.SetSize(w, tabsHeight)
-	headerHeight := 3
+	ui.footer.SetSize(ui.Width, footerHeight)
+	ui.tabs.SetSize(ui.Width, 3)
 	for _, pg := range ui.pages {
-		pg.SetSize(w, h-headerHeight-tabsHeight-footerHeight)
+		pg.SetSize(ui.Width, ui.Height-ui.tabs.Height-footerHeight)
 	}
 }
 
@@ -199,24 +198,23 @@ func (ui *UI) forceRefresh() {
 }
 
 func (ui *UI) View() string {
-	headline := ui.Styles.Header.Render("Substreams GUI")
+	ui.tabs.LogoStyle = styles.Logo
 
 	if ui.stream != nil {
 		var color lipgloss.TerminalColor
 		switch ui.stream.StreamStatus() {
 		case streamui.StatusRunning:
-			color = ui.Styles.StreamRunningColor
+			color = styles.StreamRunningColor
 		case streamui.StatusStopped:
-			color = ui.Styles.StreamStoppedColor
+			color = styles.StreamStoppedColor
 		case streamui.StatusError:
-			color = ui.Styles.StreamErrorColor
+			color = styles.StreamErrorColor
 		}
-		headline = ui.Styles.Header.Copy().Foreground(color).Render("Substreams GUI")
+		ui.tabs.LogoStyle = styles.Logo.Foreground(color)
 	}
 
 	return lipgloss.JoinVertical(0,
-		headline,
-		ui.Styles.Tabs.Render(ui.tabs.View()),
+		styles.Tabs.Render(ui.tabs.View()),
 		ui.pages[ui.activePage].View(),
 		ui.footer.View(),
 	)

@@ -3,6 +3,7 @@ package request
 import (
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/streamingfast/substreams/client"
@@ -10,11 +11,14 @@ import (
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/tui2/replaylog"
 	streamui "github.com/streamingfast/substreams/tui2/stream"
+	"github.com/streamingfast/substreams/tui2/styles"
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/tui2/common"
@@ -60,6 +64,12 @@ type Instance struct {
 type Request struct {
 	common.Common
 
+	form               *huh.Form
+	formStartBlock     string
+	formStopBlock      string
+	formEndpoint       string
+	formModuleSelected string
+
 	RequestSummary     *Summary
 	Modules            *pbsubstreams.Modules
 	manifestView       viewport.Model
@@ -78,13 +88,50 @@ func New(c common.Common) *Request {
 }
 
 func (r *Request) Init() tea.Cmd {
+	r.form = huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Key("module").
+				Value(&r.formModuleSelected).
+				Inline(true).
+				Options(huh.NewOptions("map_things_events_calls", "graph_out")...).
+				Title("Select module to stream:"),
+			huh.NewInput().
+				Key("start_block").
+				Value(&r.formStartBlock).
+				Inline(true).
+				Validate(func(s string) error {
+					if !regexp.MustCompile(`^\d+$`).MatchString(s) {
+						return fmt.Errorf("specify only numbers")
+					}
+					return nil
+				}).
+				Title("Enter the start block number:"),
+			huh.NewInput().
+				Key("stop_block").
+				Inline(true).
+				Value(&r.formStopBlock).
+				Validate(func(s string) error {
+					if !regexp.MustCompile(`^[\+\-]?\d+$`).MatchString(s) {
+						return fmt.Errorf("specify only numbers, optionally prefixed by - or +")
+					}
+					return nil
+				}).
+				Title("Stream to block:").
+				Description("You can specify relative block numbers with - (to head) or + (to start block) prefixes."),
+		),
+	)
 	return tea.Batch(
 		r.manifestView.Init(),
+		r.form.Init(),
 	)
 }
 
 func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
+
+	_, cmd := r.form.Update(msg)
+	cmds = append(cmds, cmd)
 
 	switch msg := msg.(type) {
 	case NewRequestInstance:
@@ -99,6 +146,26 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		r.setModulesViewContent()
 	case tea.KeyMsg:
+		// COuld we support:
+		// `s` to change `start block`
+		// `t` to change stop block
+		// `m` and `M` module to use module search/module fuzzy search in the `request` tab, and pick from there
+		// `p` to change parameters (?)
+		// `e` to change endpoint
+		// `m` to change manifest path
+		// `v` to change vcr mode
+		// `h` to change headers
+		// `o` to change output module
+		// `d` to change debug modules
+		// `i` to change debug initial snapshot
+		// `f` to change final blocks only
+		// `g` to change read from module
+		// `b` to change home dir
+		// `w` to change substreams client config
+		// `z` to change reader options
+		// `a` for advanced options (shows Final Blocks Only switcher)
+		// `c` to change cursor
+
 		var cmd tea.Cmd
 		r.manifestView, cmd = r.manifestView.Update(msg)
 		cmds = append(cmds, cmd)
@@ -111,75 +178,80 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return r, tea.Batch(cmds...)
 }
 
+func (r *Request) SetSize(w, h int) {
+	r.Common.SetSize(w, h)
+
+	summaryHeight := lipgloss.Height(r.renderRequestSummary())
+	formHeight := lipgloss.Height(r.renderForm())
+	r.manifestView.Height = max(h-summaryHeight-formHeight-2 /* for borders */, 0)
+	r.manifestView.Width = w
+}
+
 func (r *Request) View() string {
-	lineCount := r.manifestView.TotalLineCount()
-	progress := float64(r.manifestView.YOffset+r.manifestView.Height-1) / float64(lineCount) * 100.0
-
-	requestContent := lipgloss.JoinVertical(0,
-		lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(r.Width-2).Render(r.manifestView.View()),
-		lipgloss.NewStyle().MarginLeft(r.Width-len(fmt.Sprint(lineCount))-15).Render(fmt.Sprintf("%.1f%% of %v lines", progress, lineCount)),
-	)
-
-	return lipgloss.JoinVertical(0,
+	out := lipgloss.JoinVertical(0,
+		r.renderForm(),
 		r.renderRequestSummary(),
-		requestContent,
+		r.renderManifestView(),
 	)
+	//fmt.Println("OUTPUT", lipgloss.Height(out), r.Height)
+	return out
+}
+
+func (r *Request) renderForm() string {
+	return lipgloss.NewStyle().MaxHeight(6).Render(r.form.View())
+}
+
+func (r *Request) renderManifestView() string {
+	return lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), true).
+		Width(r.Width - 2).
+		MaxHeight(r.manifestView.Height + 2 /* for borders */).
+		Render(
+			r.manifestView.View(),
+		)
 }
 
 func (r *Request) renderRequestSummary() string {
-	summary := r.RequestSummary
-	labels := []string{
-		"Package: ",
-		"Endpoint: ",
-		"Start Block: ",
-		"Parameters: ",
-		"Production mode: ",
-		"Trace ID: ",
-		"Parallel Workers: ",
-		// TODO: add docs field
+	if r.RequestSummary == nil {
+		return ""
 	}
 
 	handoffStr := ""
 	if r.resolvedStartBlock != r.linearHandoffBlock {
 		handoffStr = fmt.Sprintf(" (handoff: %d)", r.linearHandoffBlock)
 	}
-
+	summary := r.RequestSummary
 	paramsStrings := make([]string, 0, len(summary.Params))
 	for k, v := range summary.Params {
 		paramsStrings = append(paramsStrings, fmt.Sprintf("%s=%s", k, v))
 	}
 
-	values := []string{
-		summary.Manifest,
-		summary.Endpoint,
-		fmt.Sprintf("%d%s", r.resolvedStartBlock, handoffStr),
-		strings.Join(paramsStrings, ", "),
-		fmt.Sprintf("%v", summary.ProductionMode),
-		r.traceId,
-		fmt.Sprintf("%d", r.parallelWorkers),
+	rows := [][]string{
+		{"Package:", summary.Manifest},
+		{"Endpoint:", summary.Endpoint},
+		{"Start Block:", fmt.Sprintf("%d%s", r.resolvedStartBlock, handoffStr)},
+		{"Parameters:", fmt.Sprintf("%v", summary.Params)},
+		{"Production mode:", fmt.Sprintf("%v", summary.ProductionMode)},
+		{"Trace ID:", r.traceId},
+		{"Parallel Workers:", fmt.Sprintf("%d", r.parallelWorkers)},
 	}
+
 	if len(summary.InitialSnapshot) > 0 {
-		labels = append(labels, "Initial snapshots: ")
-		values = append(values, strings.Join(summary.InitialSnapshot, ", "))
+		rows = append(rows, []string{"Initial snapshots:", strings.Join(summary.InitialSnapshot, ", ")})
 	}
 
-	style := lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(r.Width - 2)
+	t := table.New().Border(lipgloss.Border{}).Width(r.Width - 2).Rows(rows...).StyleFunc(func(row, col int) lipgloss.Style {
+		color := styles.RequestOddRow
+		if row%2 == 0 {
+			color = styles.RequestEvenRow
+		}
+		if col == 0 {
+			return color.Align(lipgloss.Right)
+		}
+		return color
+	})
 
-	return style.Render(
-		lipgloss.NewStyle().Padding(1, 2, 1, 2).Render(
-			lipgloss.JoinHorizontal(
-				0.5,
-				lipgloss.JoinVertical(0, labels...),
-				lipgloss.JoinVertical(0, values...),
-			),
-		),
-	)
-}
-
-func (r *Request) SetSize(w, h int) {
-	r.Common.SetSize(w, h)
-	r.manifestView.Width = w
-	r.manifestView.Height = h - 16
+	return t.Render()
 }
 
 func (r *Request) setModulesViewContent() {

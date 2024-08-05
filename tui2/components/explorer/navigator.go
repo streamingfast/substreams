@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/tui2/common"
+	"github.com/streamingfast/substreams/tui2/styles"
 )
 
 type NavigatorMemory struct {
@@ -414,15 +415,15 @@ func (n *Navigator) View() string {
 
 		// colorize the module
 		if op == n.SelectedModule {
-			parents[i] = n.Styles.Navigator.SelectedModule.Render(p)
+			parents[i] = styles.Navigator.SelectedModule.Render(p)
 		} else if op == n.HighlightedModule {
-			parents[i] = n.Styles.Navigator.HighlightedModule.Render(p)
+			parents[i] = styles.Navigator.HighlightedModule.Render(p)
 		} else {
 			selectable := n.selectableModules[op]
 			if selectable {
-				parents[i] = n.Styles.Navigator.SelectableModule.Render(p)
+				parents[i] = styles.Navigator.SelectableModule.Render(p)
 			} else {
-				parents[i] = n.Styles.Navigator.UnselectableModule.Render(p)
+				parents[i] = styles.Navigator.UnselectableModule.Render(p)
 			}
 		}
 	}
@@ -455,15 +456,15 @@ func (n *Navigator) View() string {
 
 		// colorize the module
 		if oc == n.SelectedModule {
-			children[i] = n.Styles.Navigator.SelectedModule.Render(c)
+			children[i] = styles.Navigator.SelectedModule.Render(c)
 		} else if oc == n.HighlightedModule {
-			children[i] = n.Styles.Navigator.HighlightedModule.Render(c)
+			children[i] = styles.Navigator.HighlightedModule.Render(c)
 		} else {
 			selectable := n.selectableModules[oc]
 			if selectable {
-				children[i] = n.Styles.Navigator.SelectableModule.Render(c)
+				children[i] = styles.Navigator.SelectableModule.Render(c)
 			} else {
-				children[i] = n.Styles.Navigator.UnselectableModule.Render(c)
+				children[i] = styles.Navigator.UnselectableModule.Render(c)
 			}
 		}
 	}
@@ -483,31 +484,31 @@ func (n *Navigator) View() string {
 		for i, p := range preview {
 			if p == n.HighlightedModule {
 				if p == n.SelectedModule {
-					preview[i] = " [" + n.Styles.Navigator.SelectedModule.Render(p) + "] "
+					preview[i] = " [" + styles.Navigator.SelectedModule.Render(p) + "] "
 				} else {
-					preview[i] = " [" + n.Styles.Navigator.HighlightedModule.Render(p) + "] "
+					preview[i] = " [" + styles.Navigator.HighlightedModule.Render(p) + "] "
 				}
 			} else if p == n.SelectedModule {
-				preview[i] = " " + n.Styles.Navigator.SelectedModule.Render(p) + " "
+				preview[i] = " " + styles.Navigator.SelectedModule.Render(p) + " "
 			} else {
-				preview[i] = n.Styles.Navigator.Preview.Render(p)
+				preview[i] = styles.Navigator.Preview.Render(p)
 			}
 		}
 		current = lipgloss.JoinVertical(lipgloss.Center, preview...)
 	} else {
 		if current == n.HighlightedModule {
-			current = n.Styles.Navigator.HighlightedModule.Render(" [") + n.Styles.Navigator.SelectedModule.Render(current) + n.Styles.Navigator.HighlightedModule.Render("] ")
+			current = styles.Navigator.HighlightedModule.Render(" [") + styles.Navigator.SelectedModule.Render(current) + styles.Navigator.HighlightedModule.Render("] ")
 		} else {
-			current = n.Styles.Navigator.SelectedModule.Render(" " + current + " ")
+			current = styles.Navigator.SelectedModule.Render(" " + current + " ")
 		}
 	}
 
 	for i, g := range grandparents {
-		grandparents[i] = n.Styles.Navigator.Preview.Render(g)
+		grandparents[i] = styles.Navigator.Preview.Render(g)
 	}
 
 	for i, g := range grandchildren {
-		grandchildren[i] = n.Styles.Navigator.Preview.Render(g)
+		grandchildren[i] = styles.Navigator.Preview.Render(g)
 	}
 
 	var leftPreviewSide string

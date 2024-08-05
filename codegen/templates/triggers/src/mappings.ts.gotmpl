@@ -1,0 +1,41 @@
+import { Protobuf } from "as-proto/assembly";
+import { {{ $.OutputName}} as {{ $.ProtoOutputName }} } from "./pb/{{ $.GetOutputProtobufPath }}";
+{{- if $.HasExampleEntity }}
+import { {{ $.ExampleEntity.NameAsEntity }} } from "../generated/schema";
+{{- else }}
+import { MyEntity } from "../generated/schema";
+{{- end }}
+
+export function handleTriggers(bytes: Uint8Array): void {
+  const {{ $.ProtoOutputNameToSnake }} = Protobuf.decode<{{ $.ProtoOutputName }}>(bytes, {{ $.ProtoOutputName}}.decode);
+
+  {{ if $.HasExampleEntity -}}
+  for (let i=0; i<{{$.ProtoOutputNameToSnake}}.{{ $.ExampleEntity.NameAsProtoField }}.length; i++) {
+    const {{ toLower $.ExampleEntity.Name }} = {{ $.ProtoOutputNameToSnake }}.{{ $.ExampleEntity.NameAsProtoField }}[i];
+    {{ if $.ExampleEntityHasID }}
+    // Create a new {{ toLower $.ExampleEntity.Name }} using {{ $.ExampleEntity.ID}} as ID
+    let my_entity_id: string = ({{ toLower $.ExampleEntity.Name }}.{{$.ExampleEntity.ID }} + i).toString();
+    const my_entity = new {{ $.ExampleEntity.NameAsEntity }}(my_entity_id);
+    my_entity.count = 1;
+    {{ else }}
+    // No ID field was found for {{ $.ExampleEntity.Name }}, we are using index as ID
+    const my_entity = new {{ $.ExampleEntity.NameAsEntity }}(i);
+    my_entity.count = 1;
+    {{- end }}
+    my_entity.save();
+  }
+
+  {{- else}}
+  if (MyEntity.load("1") == null) {
+    const my_entity = new MyEntity();
+    my_entity.count = 1;
+    my_entity.save();
+  } else {
+    let my_entity := MyEntity.load("1")
+    my_entity.count += 1
+    my_entity.save()
+  }
+  {{- end }}
+}
+
+

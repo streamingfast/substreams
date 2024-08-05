@@ -6,6 +6,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/streamingfast/substreams/tui2/common"
+	"github.com/streamingfast/substreams/tui2/styles"
 )
 
 // ToggleFooterMsg is a message sent to show/hide the footer.
@@ -23,10 +24,10 @@ type Footer struct {
 // New creates a new Footer.
 func New(c common.Common, keymap help.KeyMap) *Footer {
 	h := help.New()
-	h.Styles.ShortKey = c.Styles.HelpKey
-	h.Styles.ShortDesc = c.Styles.HelpValue
-	h.Styles.FullKey = c.Styles.HelpKey
-	h.Styles.FullDesc = c.Styles.HelpValue
+	h.Styles.ShortKey = styles.HelpKey
+	h.Styles.ShortDesc = styles.HelpValue
+	h.Styles.FullKey = styles.HelpKey
+	h.Styles.FullDesc = styles.HelpValue
 	f := &Footer{
 		Common: c,
 		help:   h,
@@ -40,7 +41,7 @@ func New(c common.Common, keymap help.KeyMap) *Footer {
 func (f *Footer) SetSize(width, height int) {
 	f.Common.SetSize(width, height)
 	f.help.Width = width -
-		f.Styles.Footer.GetHorizontalFrameSize()
+		styles.Footer.GetHorizontalFrameSize()
 }
 
 // Init implements tea.Model.
@@ -66,7 +67,7 @@ func (f *Footer) View() string {
 	if f.keymap == nil {
 		return ""
 	}
-	s := f.Styles.Footer.Copy().
+	s := styles.Footer.
 		Width(f.Width)
 	helpView := f.help.View(f.keymap)
 	return lipgloss.NewStyle().Margin(0, 1).Render(s.Render(helpView))

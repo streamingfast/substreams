@@ -8,8 +8,8 @@ import (
 
 func (r *Request) ShortHelp() []key.Binding {
 	return []key.Binding{
+		keymap.TabShiftTab,
 		keymap.UpDown,
-		keymap.ToggleProgressDisplayMode,
 		keymap.RestartStream,
 		keymap.Help,
 		keymap.Quit,
@@ -18,11 +18,11 @@ func (r *Request) ShortHelp() []key.Binding {
 func (r *Request) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{
-			keymap.UpDown,
-			keymap.UpDownPage,
+			keymap.TabShiftTab,
 		},
 		{
-			keymap.ToggleProgressDisplayMode,
+			keymap.UpDown,
+			keymap.UpDownPage,
 		},
 		{
 			keymap.RestartStream,

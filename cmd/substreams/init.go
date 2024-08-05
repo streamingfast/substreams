@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	connect "connectrpc.com/connect"
+	"connectrpc.com/connect"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/huh/spinner"
@@ -49,7 +49,11 @@ var initCmd = &cobra.Command{
 }
 
 func init() {
-	initCmd.Flags().String("discovery-endpoint", "https://codegen.substreams.dev", "Endpoint used to discover code generators")
+	defaultEndpoint := "https://codegen.substreams.dev"
+	if newValue := os.Getenv("SUBSTREAMS_INIT_CODEGEN_ENDPOINT"); newValue != "" {
+		defaultEndpoint = newValue
+	}
+	initCmd.Flags().String("codegen-endpoint", defaultEndpoint, "Endpoint used to discover code generators")
 	initCmd.Flags().String("state-file", "./generator.json", "File to load/save the state of the code generator")
 	rootCmd.AddCommand(initCmd)
 }
@@ -87,7 +91,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		connect.WithGRPC(),
 	}
 
-	initConvoURL := sflags.MustGetString(cmd, "discovery-endpoint")
+	initConvoURL := sflags.MustGetString(cmd, "codegen-endpoint")
 	stateFile, stateFileFlagProvided := sflags.MustGetStringProvided(cmd, "state-file")
 	if !strings.HasSuffix(stateFile, ".json") {
 		return fmt.Errorf("state file must have a .json extension")
@@ -424,7 +428,6 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			}
 
 		case *pbconvo.SystemOutput_DownloadFiles_:
-
 			if userState.downloadedFilesfolderPath == "" {
 				savingDest := "output"
 				if projectName := gjson.GetBytes(lastState.State, "name").String(); projectName != "" {
@@ -459,19 +462,20 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				}
 
 				// the multiple \n are not a mistake, it's to have a blank line before the next message
-				fmt.Printf("\nProject will be saved in %s\n", savingDest)
+				fmt.Printf("\nProject will be saved in %s\n\n", savingDest)
 				userState.downloadedFilesfolderPath = savingDest
 			}
 
 			input := msg.DownloadFiles
-			fmt.Println("Files:")
+			fmt.Println(filenameStyle("Files:\n"))
 			for _, file := range input.Files {
-				fmt.Printf("  - %s (%s)\n", filepath.Join(userState.downloadedFilesfolderPath, file.Filename), file.Type)
-				if file.Description != "" {
-					fmt.Println(file.Description)
+				if file.Content == nil {
+					continue
 				}
-			}
 
+				fmt.Printf("%s %s\n", filenameStyle("-"), filenameStyle(file.Filename))
+				fmt.Printf("  %s\n\n", file.Description)
+			}
 			// let the terminal breath a little
 			fmt.Println()
 
@@ -480,19 +484,17 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			}
 
 			overwriteForm := NewOverwriteForm()
+
 			for _, inputFile := range input.Files {
 				switch inputFile.Type {
 				case "application/x-zip+extract": // our custom mime type to always extract the file upon arrival
-					zipRoot := userState.downloadedFilesfolderPath
-
-					sourcePath := filepath.Join(zipRoot, inputFile.Filename)
-					err = saveDownloadFile(sourcePath, overwriteForm, inputFile)
-					if err != nil {
-						return fmt.Errorf("saving zip file: %w", err)
+					if inputFile.Content == nil {
+						continue
 					}
 
+					zipRoot := userState.downloadedFilesfolderPath
+
 					zipContent := inputFile.Content
-					fmt.Printf("Unzipping %s into %s\n", inputFile.Filename, zipRoot)
 					err = unzipFile(overwriteForm, zipContent, zipRoot)
 					if err != nil {
 						return fmt.Errorf("unzipping file: %w", err)
@@ -502,6 +504,10 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					// "application/x-protobuf; messageType=\"sf.substreams.v1.Package\""
 					// "application/zip", "application/x-zip"
 					// "text/plain":
+					if inputFile.Content == nil {
+						continue
+					}
+
 					fullPath := filepath.Join(userState.downloadedFilesfolderPath, inputFile.Filename)
 					err = saveDownloadFile(fullPath, overwriteForm, inputFile)
 					if err != nil {
@@ -578,6 +584,10 @@ func toMarkdown(input string) string {
 
 func bold(input string) string {
 	return lipgloss.NewStyle().Bold(true).Render(input)
+}
+
+func filenameStyle(input string) string {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("#9AE3A4")).Render(input)
 }
 
 func unzipFile(overwriteForm *OverwriteForm, zipContent []byte, zipRoot string) error {

@@ -2,11 +2,11 @@ syntax = "proto3";
 
 package sf.substreams.v1;
 
-option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/v1;pbsubstreams";
-
-import "google/protobuf/descriptor.proto";
 import "google/protobuf/any.proto";
+import "google/protobuf/descriptor.proto";
 import "sf/substreams/v1/modules.proto";
+
+option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/v1;pbsubstreams";
 
 message Package {
   // Needs to be one so this file can be used _directly_ as a
@@ -27,9 +27,9 @@ message Package {
   // image is the bytes to a JPEG, WebP or PNG file. Max size is 2 MiB
   bytes image = 12;
 
-   map<string, NetworkParams> networks = 13;
+  map<string, NetworkParams> networks = 13;
 
-   map<string, string> block_filters = 14;
+  map<string, string> block_filters = 14;
 }
 
 message NetworkParams {
@@ -42,6 +42,7 @@ message PackageMetadata {
   string url = 2;
   string name = 3;
   string doc = 4;
+  string description = 5;
 }
 
 message ModuleMetadata {

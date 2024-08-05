@@ -17,7 +17,6 @@ import (
 func init() {
 	infoCmd.Flags().String("output-sinkconfig-files-path", "", "if non-empty, any sinkconfig field of type 'bytes' that was packed from a file will be written to that path")
 	infoCmd.Flags().Bool("skip-package-validation", false, "Do not perform any validation when reading substreams package")
-	infoCmd.Flags().Uint64("first-streamable-block", 0, "Apply a chain's 'first-streamable-block' to modules, possibly affecting their initialBlock and hashes")
 	infoCmd.Flags().Bool("used-modules-only", false, "When set, only modules that are used by the output module will be displayed (requires the output_module arg to be set)")
 }
 
@@ -52,7 +51,6 @@ func runInfo(cmd *cobra.Command, args []string) error {
 	}
 
 	outputSinkconfigFilesPath := sflags.MustGetString(cmd, "output-sinkconfig-files-path")
-	firstStreamableBlock := sflags.MustGetUint64(cmd, "first-streamable-block")
 	skipPackageValidation := sflags.MustGetBool(cmd, "skip-package-validation")
 	onlyShowUsedModules := sflags.MustGetBool(cmd, "used-modules-only")
 
@@ -60,7 +58,7 @@ func runInfo(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("used-modules-only flag requires the output_module arg to be set")
 	}
 
-	pkgInfo, err := info.Extended(manifestPath, outputModule, skipPackageValidation, firstStreamableBlock)
+	pkgInfo, err := info.Extended(manifestPath, outputModule, skipPackageValidation)
 	if err != nil {
 		return err
 	}

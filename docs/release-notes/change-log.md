@@ -11,10 +11,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+* Added an execution timeout of 3 minutes per block by default (can be overriden in tier1/tier2 Configs) -- this is useful when an external (eth_call) is stuck on a forked block hash.
 * Tools->prometheus: added the possibility to override the start-block on an endpoint
-* Changes to the `substreams.yaml` manifest file:
-  * Deprecated: the `package.doc` field, as a long-form doc. The README.md file, sibling to `substreams.yaml` is picked up instead. This is the same behavior as `npm`.
-  * Added field `package.description`. This will be displayed on https://substreams.dev. This is also similar to what `npm` does, and makes understanding the purpose of the package easier.
+* Revert 'initialBlocks' changes from v1.9.1 because a 'changing module hash' causes more trouble.
 
 ## v1.9.3
 

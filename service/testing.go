@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/wasm"
 
 	"github.com/streamingfast/substreams/reqctx"
@@ -34,7 +35,7 @@ func TestNewService(runtimeConfig config.RuntimeConfig, linearHandoffBlockNum ui
 }
 
 func (s *Tier1Service) TestBlocks(ctx context.Context, isSubRequest bool, request *pbsubstreamsrpc.Request, respFunc substreams.ResponseFunc) error {
-	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules)
+	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules, bstream.GetProtocolFirstStreamableBlock)
 	if err != nil {
 		return stream.NewErrInvalidArg(err.Error())
 	}

@@ -67,18 +67,18 @@ func (g *Graph) LowestStoresInitBlock() *uint64       { return g.lowestStoresIni
 func (g *Graph) ModulesInitBlocks() map[string]uint64 { return g.modulesInitBlocks }
 func (g *Graph) OutputModuleStageIndex() int          { return len(g.stagedUsedModules) - 1 }
 
-func NewOutputModuleGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules) (out *Graph, err error) {
+func NewOutputModuleGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules, firstStreamableBlock uint64) (out *Graph, err error) {
 	out = &Graph{
 		requestModules: modules,
 	}
-	if err := out.computeGraph(outputModule, productionMode, modules); err != nil {
+	if err := out.computeGraph(outputModule, productionMode, modules, firstStreamableBlock); err != nil {
 		return nil, fmt.Errorf("module graph: %w", err)
 	}
 
 	return out, nil
 }
 
-func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules) error {
+func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules, firstStreamableBlock uint64) error {
 	graph, err := manifest.NewModuleGraph(modules.Modules)
 	if err != nil {
 		return fmt.Errorf("compute graph: %w", err)
@@ -92,7 +92,13 @@ func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *
 	g.usedModules = processModules
 	g.modulesInitBlocks = map[string]uint64{}
 	for _, mod := range g.usedModules {
-		g.modulesInitBlocks[mod.Name] = mod.InitialBlock
+		initialBlock := mod.InitialBlock
+		if initialBlock == 0 {
+			initialBlock = firstStreamableBlock
+		} else if initialBlock < firstStreamableBlock {
+			return fmt.Errorf("module %q has initial block %d smaller than first streamable block %d", mod.Name, initialBlock, firstStreamableBlock)
+		}
+		g.modulesInitBlocks[mod.Name] = initialBlock
 	}
 
 	g.stagedUsedModules, err = computeStages(g.usedModules, g.modulesInitBlocks)
@@ -100,8 +106,8 @@ func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *
 		return err
 	}
 
-	g.lowestInitBlock = computeLowestInitBlock(processModules)
-	g.lowestStoresInitBlock = computeLowestStoresInitBlock(processModules)
+	g.lowestInitBlock = computeLowestInitBlock(processModules, firstStreamableBlock)
+	g.lowestStoresInitBlock = computeLowestStoresInitBlock(processModules, firstStreamableBlock)
 	if err := g.hashModules(graph); err != nil {
 		return fmt.Errorf("cannot hash module: %w", err)
 	}
@@ -126,7 +132,7 @@ func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *
 }
 
 // computeLowestStoresInitBlock finds the lowest initial block of all store modules.
-func computeLowestStoresInitBlock(modules []*pbsubstreams.Module) (out *uint64) {
+func computeLowestStoresInitBlock(modules []*pbsubstreams.Module, firstStreamableBlock uint64) (out *uint64) {
 	lowest := uint64(math.MaxUint64)
 	countStores := 0
 	for _, mod := range modules {
@@ -143,12 +149,15 @@ func computeLowestStoresInitBlock(modules []*pbsubstreams.Module) (out *uint64) 
 		return nil
 	}
 
+	if lowest < firstStreamableBlock {
+		return &firstStreamableBlock
+	}
 	return &lowest
 }
 
 // computeLowestInitBlock finds the lowest initial block of all modules that are not block indexes.
 // if there are only blockIndex types of modules, it returns 0, because blockIndex modules are always at 0.
-func computeLowestInitBlock(modules []*pbsubstreams.Module) (out uint64) {
+func computeLowestInitBlock(modules []*pbsubstreams.Module, firstStreamableBlock uint64) (out uint64) {
 	var atLeastOneModuleThatIsNotAnIndex bool
 	lowest := uint64(math.MaxUint64)
 	for _, mod := range modules {
@@ -161,7 +170,10 @@ func computeLowestInitBlock(modules []*pbsubstreams.Module) (out uint64) {
 		}
 	}
 	if !atLeastOneModuleThatIsNotAnIndex {
-		return 0
+		return firstStreamableBlock
+	}
+	if lowest < firstStreamableBlock {
+		return firstStreamableBlock
 	}
 	return lowest
 }
@@ -243,12 +255,12 @@ func computeStages(mods []*pbsubstreams.Module, initBlocks map[string]uint64) (s
 					continue
 				case *pbsubstreams.Module_Input_Map_:
 					depModName = input.Map.ModuleName
-					if mod.InitialBlock >= initBlocks[depModName] {
+					if initBlocks[mod.Name] >= initBlocks[depModName] {
 						validInputsAtInitialBlock = true
 					}
 				case *pbsubstreams.Module_Input_Store_:
 					depModName = input.Store.ModuleName
-					if mod.InitialBlock >= initBlocks[depModName] {
+					if initBlocks[mod.Name] >= initBlocks[depModName] {
 						validInputsAtInitialBlock = true
 					}
 				default:
@@ -264,7 +276,7 @@ func computeStages(mods []*pbsubstreams.Module, initBlocks map[string]uint64) (s
 			}
 
 			if !validInputsAtInitialBlock {
-				return nil, fmt.Errorf("module %q has no input available at its initial block %d", mod.Name, mod.InitialBlock)
+				return nil, fmt.Errorf("module %q has no input available at its initial block %d", mod.Name, initBlocks[mod.Name])
 			}
 
 			//Check block index dependence

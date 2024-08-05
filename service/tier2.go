@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"sync"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/RoaringBitmap/roaring/roaring64"
@@ -69,6 +70,7 @@ type Tier2Service struct {
 	maxConcurrentRequests     uint64
 	moduleExecutionTracing    bool
 	connectionCountMutex      sync.RWMutex
+	blockExecutionTimeout     time.Duration
 
 	tier2RequestParameters *reqctx.Tier2RequestParameters
 }
@@ -81,8 +83,9 @@ func NewTier2(
 ) (*Tier2Service, error) {
 
 	s := &Tier2Service{
-		tracer: tracing.GetTracer(),
-		logger: logger,
+		tracer:                tracing.GetTracer(),
+		logger:                logger,
+		blockExecutionTimeout: 3 * time.Minute,
 	}
 
 	metrics.RegisterMetricSet(logger)
@@ -128,9 +131,6 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	metrics.Tier2RequestCounter.Inc()
 	defer metrics.Tier2ActiveRequests.Dec()
 
-	// this tweaks the actual request so all initialBlocks are correct with the given chain firstStreamableBlock
-	pbsubstreams.ApplyFirstStreamableBlockToModules(request.FirstStreamableBlock, request.Modules.Modules)
-
 	// We keep `err` here as the unaltered error from `blocks` call, this is used in the EndSpan to record the full error
 	// and not only the `grpcError` one which is a subset view of the full `err`.
 	var err error
@@ -174,6 +174,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 		zap.Uint32("stage", request.Stage),
 		zap.Strings("modules", moduleNames),
 		zap.String("output_module", request.OutputModule),
+		zap.Uint64("first_streamable_block", request.FirstStreamableBlock),
 	}
 
 	if auth := dauth.FromContext(ctx); auth != nil {
@@ -237,7 +238,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return err
 	}
 
-	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, true, request.Modules)
+	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, true, request.Modules, request.FirstStreamableBlock)
 	if err != nil {
 		return stream.NewErrInvalidArg(err.Error())
 	}
@@ -265,18 +266,19 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		execGraph.UsedModulesUpToStage(int(request.Stage)),
 		execGraph.ModuleHashes(),
 		request.SegmentSize,
+		request.FirstStreamableBlock,
 		logger)
 	if err != nil {
 		return fmt.Errorf("new config map: %w", err)
 	}
 
-	storeConfigs, err := store.NewConfigMap(cacheStore, execGraph.Stores(), execGraph.ModuleHashes())
+	storeConfigs, err := store.NewConfigMap(cacheStore, execGraph.Stores(), execGraph.ModuleHashes(), request.FirstStreamableBlock)
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
 
 	// indexes are not metered: we want users to use them as much as possible
-	indexConfigs, err := index.NewConfigs(unmeteredCacheStore, execGraph.UsedIndexesModulesUpToStage(int(request.Stage)), execGraph.ModuleHashes(), logger)
+	indexConfigs, err := index.NewConfigs(unmeteredCacheStore, execGraph.UsedIndexesModulesUpToStage(int(request.Stage)), execGraph.ModuleHashes(), request.FirstStreamableBlock, logger)
 	if err != nil {
 		return fmt.Errorf("configuring indexes: %w", err)
 	}
@@ -314,7 +316,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		request.SegmentSize,
 		nil,
 		respFunc,
-		// This must always be the parent/global trace id, the one that comes from tier1
+		s.blockExecutionTimeout,
 		opts...,
 	)
 

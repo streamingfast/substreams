@@ -114,10 +114,6 @@ func (r *Reader) Read() (*pbsubstreams.Package, *ModuleGraph, error) {
 		if err := validatePackage(pkg, r.skipModuleOutputTypeValidation); err != nil {
 			return nil, nil, fmt.Errorf("package validation failed: %w", err)
 		}
-
-		if err := ValidateModules(pkg.Modules); err != nil {
-			return nil, nil, fmt.Errorf("module validation failed: %w", err)
-		}
 	}
 
 	graph, err := NewModuleGraph(pkg.Modules.Modules)
@@ -155,6 +151,12 @@ func (r *Reader) Read() (*pbsubstreams.Package, *ModuleGraph, error) {
 
 	if err := computeInitialBlock(pkg.Modules.Modules, graph); err != nil {
 		return nil, nil, err
+	}
+
+	if !r.skipPackageValidation { // we validate here because the 'unset' module initial blocks are computed above
+		if err := ValidateModules(pkg.Modules); err != nil {
+			return nil, nil, fmt.Errorf("module validation failed: %w", err)
+		}
 	}
 
 	return pkg, graph, nil

@@ -13,14 +13,6 @@ const (
 	ModuleKindBlockIndex
 )
 
-func ApplyFirstStreamableBlockToModules(firstStreamableBlock uint64, modules []*Module) {
-	for _, mod := range modules {
-		if mod.InitialBlock < firstStreamableBlock {
-			mod.InitialBlock = firstStreamableBlock
-		}
-	}
-}
-
 func (m *Module) BlockFilterQueryString() (string, error) {
 	if m.BlockFilter == nil {
 		return "", nil

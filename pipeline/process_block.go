@@ -285,11 +285,16 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 	p.extraMapModuleOutputs = nil
 	p.extraStoreModuleOutputs = nil
 	blockNum := execOutput.Clock().Number
+	block := fmt.Sprintf("%d (%s)", blockNum, execOutput.Clock().Id)
 
 	// they may be already built, but we call this function every time to enable future dynamic changes
 	if err := p.BuildModuleExecutors(ctx); err != nil {
 		return fmt.Errorf("building wasm module tree: %w", err)
 	}
+
+	// the ctx is cached in the built moduleExecutors so we only activate timeout here
+	ctx, cancel := context.WithTimeout(ctx, p.executionTimeout)
+	defer cancel()
 	for _, stage := range p.ModuleExecutors {
 		//t0 := time.Now()
 		if len(stage) < 2 {
@@ -300,7 +305,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 				}
 				res := p.execute(ctx, executor, execOutput)
 				if err := p.applyExecutionResult(ctx, executor, res, execOutput); err != nil {
-					return fmt.Errorf("applying executor results %q on block %d: %w", executor.Name(), blockNum, res.err)
+					return fmt.Errorf("applying executor results %q on block %s: %w", executor.Name(), block, res.err)
 				}
 			}
 		} else {
@@ -333,7 +338,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 					return fmt.Errorf("running executor %q: %w", executor.Name(), result.err)
 				}
 				if err := p.applyExecutionResult(ctx, executor, result, execOutput); err != nil {
-					return fmt.Errorf("applying executor results %q on block %d: %w", executor.Name(), blockNum, result.err)
+					return fmt.Errorf("applying executor results %q on block %s: %w", executor.Name(), block, result.err)
 				}
 			}
 		}

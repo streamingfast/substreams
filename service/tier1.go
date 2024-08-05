@@ -55,15 +55,16 @@ type Tier1Service struct {
 	*shutter.Shutter
 	ssconnect.UnimplementedStreamHandler
 
-	blockType          string
-	wasmExtensions     map[string]map[string]wasm.WASMExtension
-	wasmParams         map[string]string
-	failedRequestsLock sync.RWMutex
-	failedRequests     map[string]*recordedFailure
-	streamFactoryFunc  StreamFactoryFunc
-	runtimeConfig      config.RuntimeConfig
-	tracer             ttrace.Tracer
-	logger             *zap.Logger
+	blockType             string
+	wasmExtensions        map[string]map[string]wasm.WASMExtension
+	wasmParams            map[string]string
+	failedRequestsLock    sync.RWMutex
+	failedRequests        map[string]*recordedFailure
+	streamFactoryFunc     StreamFactoryFunc
+	blockExecutionTimeout time.Duration
+	runtimeConfig         config.RuntimeConfig
+	tracer                ttrace.Tracer
+	logger                *zap.Logger
 
 	getRecentFinalBlock func() (uint64, error)
 	resolveCursor       pipeline.CursorResolver
@@ -170,6 +171,7 @@ func NewTier1(
 		resolveCursor:          pipeline.NewCursorResolver(hub, mergedBlocksStore, forkedBlocksStore),
 		logger:                 logger,
 		tier2RequestParameters: tier2RequestParameters,
+		blockExecutionTimeout:  3 * time.Minute,
 	}
 
 	s.streamFactoryFunc = sf.New
@@ -228,10 +230,7 @@ func (s *Tier1Service) Blocks(
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("validate request: %w", err))
 	}
 
-	// this tweaks the actual request so all initialBlocks are correct with the given chain firstStreamableBlock
-	pbsubstreams.ApplyFirstStreamableBlockToModules(bstream.GetProtocolFirstStreamableBlock, request.Modules.Modules)
-
-	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules)
+	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules, bstream.GetProtocolFirstStreamableBlock)
 	if err != nil {
 		return bsstream.NewErrInvalidArg(err.Error())
 	}
@@ -450,12 +449,12 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 
 	segmentSize := s.runtimeConfig.SegmentSize
 
-	execOutputConfigs, err := execout.NewConfigs(cacheStore, execGraph.UsedModules(), execGraph.ModuleHashes(), segmentSize, logger)
+	execOutputConfigs, err := execout.NewConfigs(cacheStore, execGraph.UsedModules(), execGraph.ModuleHashes(), segmentSize, chainFirstStreamableBlock, logger)
 	if err != nil {
 		return fmt.Errorf("new config map: %w", err)
 	}
 
-	storeConfigs, err := store.NewConfigMap(cacheStore, execGraph.Stores(), execGraph.ModuleHashes())
+	storeConfigs, err := store.NewConfigMap(cacheStore, execGraph.Stores(), execGraph.ModuleHashes(), chainFirstStreamableBlock)
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
@@ -492,6 +491,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		segmentSize,
 		s.runtimeConfig.WorkerFactory,
 		respFunc,
+		s.blockExecutionTimeout,
 		opts...,
 	)
 

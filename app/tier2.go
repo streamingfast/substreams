@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"time"
 
 	dauth "github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetrics"
@@ -24,6 +25,7 @@ type Tier2Config struct {
 
 	MaximumConcurrentRequests uint64
 	WASMExtensions            wasm.WASMExtensioner
+	BlockExecutionTimeout     time.Duration
 
 	Tracing bool
 }
@@ -71,6 +73,11 @@ func (a *Tier2App) Run() error {
 	if a.config.MaximumConcurrentRequests > 0 {
 		opts = append(opts, service.WithMaxConcurrentRequests(a.config.MaximumConcurrentRequests))
 	}
+
+	if a.config.BlockExecutionTimeout != 0 {
+		opts = append(opts, service.WithBlockExecutionTimeout(a.config.BlockExecutionTimeout))
+	}
+
 	opts = append(opts, service.WithReadinessFunc(a.setReadiness))
 
 	if a.config.WASMExtensions != nil {

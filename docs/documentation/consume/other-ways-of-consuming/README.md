@@ -1,2 +1,0 @@
-# Other Ways of Consuming
-

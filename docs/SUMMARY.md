@@ -95,5 +95,5 @@
 * [Manifests Reference](new/references/manifests.md)
 * [GUI Reference](new/references/gui.md)
 * [Glossary](new/references/glossary.md)
-* [Change log](new/references/change-log.md)
+* [Change log](release-notes/change-log.md)
 * [FAQ](new/references/faq.md)

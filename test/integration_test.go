@@ -128,7 +128,7 @@ func TestForkHandling(t *testing.T) {
 	for _, test := range tests {
 
 		t.Run(test.name, func(t *testing.T) {
-			run := newTestRun(t, 1, 1, 7, test.module, "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
+			run := newTestRun(t, 1, 1, 7, 0, test.module, "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 			run.NewBlockGenerator = func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
 				return &ForkBlockGenerator{
 					initialLIB:    bstream.NewBlockRef("0a", 0),
@@ -182,18 +182,25 @@ func TestOneStoreOneMap(t *testing.T) {
 	testStoreAddI64Hash := hex.EncodeToString([]byte("setup_test_store_add_i64"))
 	assertTestStoreAddI64Hash := hex.EncodeToString([]byte("assert_test_store_add_i64"))
 
+	defaultSPKG := "./testdata/simple_substreams/substreams-test-v0.1.0.spkg"
+	zeroInitialBlockSPKG := "./testdata/simple_substreams_init0/substreams-test-init0-v0.1.0.spkg"
+
 	tests := []struct {
 		name                  string
 		startBlock            int64
 		linearBlock           uint64
 		stopBlock             uint64
+		firstStreamableBlock  uint64
 		production            bool
 		preWork               testPreWork
 		expectedResponseCount int
+		spkg                  string
 		expectFiles           []string
+		expectError           string
 	}{
 		{
 			name:                  "dev_mode_backprocess",
+			spkg:                  defaultSPKG,
 			startBlock:            25,
 			linearBlock:           25,
 			stopBlock:             29,
@@ -209,6 +216,7 @@ func TestOneStoreOneMap(t *testing.T) {
 		},
 		{
 			name:                  "dev_mode_backprocess_then_save_state",
+			spkg:                  defaultSPKG,
 			startBlock:            25,
 			linearBlock:           25,
 			stopBlock:             32,
@@ -223,6 +231,7 @@ func TestOneStoreOneMap(t *testing.T) {
 		},
 		{
 			name:                  "prod_mode_back_forward_to_lib",
+			spkg:                  defaultSPKG,
 			startBlock:            25,
 			linearBlock:           20,
 			stopBlock:             29,
@@ -237,6 +246,7 @@ func TestOneStoreOneMap(t *testing.T) {
 		},
 		{
 			name:                  "prod_mode_back_forward_to_stop",
+			spkg:                  defaultSPKG,
 			startBlock:            25,
 			linearBlock:           30,
 			stopBlock:             30,
@@ -253,7 +263,37 @@ func TestOneStoreOneMap(t *testing.T) {
 			},
 		},
 		{
+			name:                  "prod_mode_back_forward_to_stop_nonzero_first_streamable",
+			spkg:                  zeroInitialBlockSPKG,
+			firstStreamableBlock:  16,
+			startBlock:            0,
+			linearBlock:           30,
+			stopBlock:             30,
+			production:            true,
+			expectedResponseCount: 14,
+			expectFiles: []string{
+				assertTestStoreAddI64Hash + "/outputs/0000000016-0000000020.output", // map
+				assertTestStoreAddI64Hash + "/outputs/0000000020-0000000030.output", // map
+				testStoreAddI64Hash + "/outputs/0000000016-0000000020.output",
+				testStoreAddI64Hash + "/outputs/0000000020-0000000030.output",
+				testStoreAddI64Hash + "/states/0000000020-0000000016.kv",
+				testStoreAddI64Hash + "/states/0000000030-0000000016.kv",
+			},
+		},
+		{
+			name:                 "nonzero_first_streamable on nonzero module",
+			spkg:                 defaultSPKG,
+			firstStreamableBlock: 16,
+			startBlock:           0,
+			linearBlock:          30,
+			stopBlock:            30,
+			production:           true,
+			expectError:          "running test: module graph: module \"setup_test_store_add_i64\" has initial block 1 smaller than first streamable block 16",
+		},
+
+		{
 			name:                  "prod_mode_back_forward_to_stop_passed_boundary",
+			spkg:                  defaultSPKG,
 			startBlock:            25,
 			linearBlock:           40,
 			stopBlock:             41,
@@ -274,12 +314,13 @@ func TestOneStoreOneMap(t *testing.T) {
 		},
 		{
 			name:        "prod_mode_partial_existing",
+			spkg:        defaultSPKG,
 			startBlock:  1,
 			linearBlock: 30,
 			stopBlock:   30,
 			production:  true,
 			preWork: func(t *testing.T, run *testRun, workerFactory work.WorkerFactory) {
-				partialPreWork(t, 1, 10, 0, run, workerFactory)
+				partialPreWork(t, 1, 0, run, workerFactory)
 			},
 			expectedResponseCount: 29,
 			expectFiles: []string{
@@ -300,11 +341,19 @@ func TestOneStoreOneMap(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			run := newTestRun(t, test.startBlock, test.linearBlock, test.stopBlock, "assert_test_store_add_i64", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
+			bstream.GetProtocolFirstStreamableBlock = test.firstStreamableBlock // set for tier1 request to grab
+			run := newTestRun(t, test.startBlock, test.linearBlock, test.stopBlock, test.firstStreamableBlock, "assert_test_store_add_i64", test.spkg)
+
 			run.ProductionMode = test.production
 			run.ParallelSubrequests = 1
 			run.PreWork = test.preWork
-			require.NoError(t, run.Run(t, test.name))
+			err := run.Run(t, test.name)
+			if test.expectError != "" {
+				assert.Error(t, err)
+				assert.Equal(t, err.Error(), test.expectError)
+				return
+			}
+			require.NoError(t, err)
 
 			mapOutput := run.MapOutput("assert_test_store_add_i64")
 			assert.Contains(t, mapOutput, `assert_test_store_add_i64: 0801`)
@@ -326,7 +375,7 @@ func TestOneStoreOneMap(t *testing.T) {
 }
 
 func TestStoreDeletePrefix(t *testing.T) {
-	run := newTestRun(t, 30, 40, 42, "assert_test_store_delete_prefix", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
+	run := newTestRun(t, 30, 40, 42, 0, "assert_test_store_delete_prefix", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 	run.BlockProcessedCallback = func(ctx *execContext) {
 		if ctx.block.Number == 40 {
 			s, storeFound := ctx.stores.Get("test_store_delete_prefix")
@@ -340,7 +389,7 @@ func TestStoreDeletePrefix(t *testing.T) {
 
 func TestAllAssertions(t *testing.T) {
 	// Relies on `assert_all_test` having modInit == 1, so
-	run := newTestRun(t, 1, 31, 31, "assert_all_test", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
+	run := newTestRun(t, 1, 31, 31, 0, "assert_all_test", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 
 	require.NoError(t, run.Run(t, "assert_all_test"))
 
@@ -350,7 +399,7 @@ func TestAllAssertions(t *testing.T) {
 }
 
 func Test_SimpleMapModule(t *testing.T) {
-	run := newTestRun(t, 10000, 10001, 10001, "test_map", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
+	run := newTestRun(t, 10000, 10001, 10001, 0, "test_map", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 	run.Params = map[string]string{"test_map": "my test params"}
 	run.NewBlockGenerator = func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
 		return &LinearBlockGenerator{
@@ -365,7 +414,7 @@ func Test_SimpleMapModule(t *testing.T) {
 }
 
 func Test_WASMBindgenShims(t *testing.T) {
-	run := newTestRun(t, 12, 14, 14, "map_block", "./testdata/wasmbindgen_substreams/wasmbindgen-substreams-v0.1.0.spkg")
+	run := newTestRun(t, 12, 14, 14, 0, "map_block", "./testdata/wasmbindgen_substreams/wasmbindgen-substreams-v0.1.0.spkg")
 	run.NewBlockGenerator = func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
 		return &LinearBlockGenerator{
 			startBlock:         startBlock,
@@ -382,7 +431,7 @@ func Test_WASMBindgenShims(t *testing.T) {
 }
 
 func Test_Early(t *testing.T) {
-	run := newTestRun(t, 12, 14, 14, "test_map", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
+	run := newTestRun(t, 12, 14, 14, 0, "test_map", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 	run.Params = map[string]string{"test_map": "my test params"}
 	run.ProductionMode = true
 	run.NewBlockGenerator = func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
@@ -397,7 +446,7 @@ func Test_Early(t *testing.T) {
 }
 
 func TestEarlyWithEmptyStore(t *testing.T) {
-	run := newTestRun(t, 2, 4, 4, "assert_test_store_delete_prefix", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
+	run := newTestRun(t, 2, 4, 4, 0, "assert_test_store_delete_prefix", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 	run.ProductionMode = true
 
 	var foundBlock3 bool
@@ -413,7 +462,7 @@ func TestEarlyWithEmptyStore(t *testing.T) {
 }
 
 func Test_SingleMapModule_FileWalker(t *testing.T) {
-	run := newTestRun(t, 200, 250, 300, "test_map", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
+	run := newTestRun(t, 200, 250, 300, 0, "test_map", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 	run.Params = map[string]string{"test_map": "my test params"}
 	run.ProductionMode = true
 	run.NewBlockGenerator = func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
@@ -476,7 +525,7 @@ func assertFiles(t *testing.T, tempDir string, expectPartialSpkg bool, wantedFil
 	assert.ElementsMatch(t, wantedFiles, actualFiles)
 }
 
-func partialPreWork(t *testing.T, start, end uint64, stageIdx int, run *testRun, workerFactory work.WorkerFactory) {
+func partialPreWork(t *testing.T, start uint64, stageIdx int, run *testRun, workerFactory work.WorkerFactory) {
 	worker := workerFactory(zlog)
 
 	// FIXME: use the new `Work` interface here, and validate that the
@@ -484,7 +533,7 @@ func partialPreWork(t *testing.T, start, end uint64, stageIdx int, run *testRun,
 	segmenter := block.NewSegmenter(10, 0, 0)
 	unit := stage.Unit{Segment: segmenter.IndexForStartBlock(start), Stage: stageIdx}
 	ctx := reqctx.WithRequest(run.Context, &reqctx.RequestDetails{Modules: run.Package.Modules, OutputModule: run.ModuleName})
-	cmd := worker.Work(ctx, unit, block.NewRange(start, end), []string{run.ModuleName}, nil)
+	cmd := worker.Work(ctx, unit, start, []string{run.ModuleName}, nil)
 	result := cmd()
 	msg, ok := result.(work.MsgJobSucceeded)
 	require.True(t, ok)

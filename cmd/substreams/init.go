@@ -92,9 +92,13 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	}
 
 	initConvoURL := sflags.MustGetString(cmd, "codegen-endpoint")
-	stateFile := sflags.MustGetString(cmd, "state-file")
+	stateFile, stateFileFlagProvided := sflags.MustGetStringProvided(cmd, "state-file")
 	if !strings.HasSuffix(stateFile, ".json") {
 		return fmt.Errorf("state file must have a .json extension")
+	}
+
+	if stateFileFlagProvided && !cli.FileExists(stateFile) {
+		return fmt.Errorf("state file %q does not exist", stateFile)
 	}
 
 	transport := &http2.Transport{}
@@ -122,21 +126,24 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("state file %q file exists, but is invalid: %w", stateFile, err)
 		}
 
-		useGenerator := true
-		inputField := huh.NewConfirm().
-			Title(fmt.Sprintf("State file %q was found (%s - %s). Do you want to start from there ?", stateFile, state.GeneratorID, humanize.Time(s.ModTime()))).
-			Value(&useGenerator)
+		lastState = state
 
-		if err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run(); err != nil {
-			return fmt.Errorf("failed taking confirmation input: %w", err)
-		}
+		if !stateFileFlagProvided {
+			useGenerator := true
+			inputField := huh.NewConfirm().
+				Title(fmt.Sprintf("State file %q was found (%s - %s). Do you want to start from there ?", stateFile, state.GeneratorID, humanize.Time(s.ModTime()))).
+				Value(&useGenerator)
 
-		if useGenerator {
-			lastState = state
-		} else {
-			newName := fmt.Sprintf("%s.%d.json", strings.TrimSuffix(stateFile, ".json"), time.Now().Unix())
-			os.Rename(stateFile, newName)
-			fmt.Printf("File %q renamed to %q\n", stateFile, newName)
+			if err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run(); err != nil {
+				return fmt.Errorf("failed taking confirmation input: %w", err)
+			}
+
+			if !useGenerator {
+				lastState = &initStateFormat{}
+				newName := fmt.Sprintf("%s.%s.json", strings.TrimSuffix(stateFile, ".json"), time.Now().Format("2006-01-02T15-04-05"))
+				os.Rename(stateFile, newName)
+				fmt.Printf("File %q renamed to %q\n", stateFile, newName)
+			}
 		}
 	}
 

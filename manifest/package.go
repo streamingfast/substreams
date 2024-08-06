@@ -411,10 +411,6 @@ func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package
 		if mod.Use != "" {
 			pbmod, err := mod.ToProtoWASM(0) // the binary index and module will be overriden by th 'use'
 			if err != nil {
-				return nil, err
-			}
-
-			if err != nil {
 				return nil, fmt.Errorf("handling used module %q for module %q: %w", mod.Use, mod.Name, err)
 			}
 
@@ -437,9 +433,6 @@ func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package
 		}
 
 		wasmCodeTypeID, _ := SplitBinaryType(binaryDef.Type)
-		if err != nil {
-			return nil, fmt.Errorf("module %q: invalid code type %q: %w", mod.Name, binaryDef.Type, err)
-		}
 
 		switch wasmCodeTypeID {
 		case "wasm/rust-v1", "wasip1/tinygo-v1":

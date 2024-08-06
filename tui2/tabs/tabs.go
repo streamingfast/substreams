@@ -55,10 +55,10 @@ func (t *Tabs) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "tab":
+		case "tab", "right":
 			t.activeTab = (t.activeTab + 1) % len(t.tabs)
 			cmds = append(cmds, t.activeTabCmd)
-		case "shift+tab":
+		case "shift+tab", "left":
 			t.activeTab = (t.activeTab - 1 + len(t.tabs)) % len(t.tabs)
 			cmds = append(cmds, t.activeTabCmd)
 		}
@@ -71,7 +71,6 @@ func (t *Tabs) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return t, tea.Batch(cmds...)
 }
 
-// View implements tea.Model.
 func (t *Tabs) View() string {
 	var tabs []string
 
@@ -88,7 +87,7 @@ func (t *Tabs) View() string {
 	logoTab := t.LogoStyle.Render("Substreams GUI")
 	fill := max(t.Width-lipgloss.Width(tabsView)-lipgloss.Width(logoTab)+1, 0)
 
-	return lipgloss.JoinHorizontal(1.0, tabsView, strings.Repeat("─", fill), logoTab)
+	return lipgloss.JoinHorizontal(1.0, logoTab, tabsView, strings.Repeat("─", fill))
 }
 
 func (t *Tabs) activeTabCmd() tea.Msg {

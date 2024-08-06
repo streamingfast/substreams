@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"google.golang.org/grpc"
@@ -170,7 +169,7 @@ func (s *Stream) routeNextMessage(resp *pbsubstreamsrpc.Response) tea.Msg {
 	case *pbsubstreamsrpc.Response_BlockScopedData:
 		return m.BlockScopedData
 	case *pbsubstreamsrpc.Response_Progress:
-		log.Printf("Progress response: %T %v", resp, resp)
+		//log.Printf("Progress response: %T %v", resp, resp)
 		return m.Progress
 	case *pbsubstreamsrpc.Response_DebugSnapshotData:
 		return m.DebugSnapshotData

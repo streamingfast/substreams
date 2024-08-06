@@ -1,6 +1,8 @@
 package footer
 
 import (
+	"log"
+
 	"github.com/charmbracelet/bubbles/help"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -53,6 +55,7 @@ func (f *Footer) Init() tea.Cmd {
 func (f *Footer) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case UpdateKeyMapMsg:
+		log.Println("Updating keymap in footer")
 		f.keymap = msg
 	}
 	return f, nil

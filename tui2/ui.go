@@ -9,8 +9,6 @@ import (
 
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/tui2/common"
-	"github.com/streamingfast/substreams/tui2/components/modsearch"
-	"github.com/streamingfast/substreams/tui2/components/search"
 	"github.com/streamingfast/substreams/tui2/footer"
 	"github.com/streamingfast/substreams/tui2/pages/output"
 	"github.com/streamingfast/substreams/tui2/pages/progress"
@@ -38,11 +36,11 @@ type UI struct {
 	requestConfig *request.Config // all boilerplate to pass down to refresh
 
 	common.Common
-	currentModalFunc common.ModalUpdateFunc
-	pages            []common.Component
-	activePage       page
-	footer           *footer.Footer
-	tabs             *tabs.Tabs
+	modalComponent common.Component
+	pages          []common.Component
+	activePage     page
+	footer         *footer.Footer
+	tabs           *tabs.Tabs
 }
 
 func New(reqConfig *request.Config) (*UI, error) {
@@ -55,7 +53,7 @@ func New(reqConfig *request.Config) (*UI, error) {
 	ui := &UI{
 		Common: c,
 		pages: []common.Component{
-			request.New(c),
+			request.New(c, reqConfig),
 			progress.New(c),
 			out,
 		},
@@ -110,21 +108,23 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		ui.forceRefresh()
 		ui.SetSize(msg.Width, msg.Height)
-	case common.SetModalUpdateFuncMsg:
-		ui.currentModalFunc = common.ModalUpdateFunc(msg)
-	case search.ApplySearchQueryMsg:
-		ui.currentModalFunc = nil
-	case modsearch.ApplyModuleSearchQueryMsg:
-		ui.currentModalFunc = nil
+	case common.SetModalComponentMsg:
+		log.Printf("Setting modal component %T", msg)
+		if msg != nil {
+			cmds = append(cmds, msg.Init())
+		}
+		ui.modalComponent = msg
+		ui.resize()
+	case common.CancelModalMsg:
+		ui.modalComponent = nil
+		ui.footer.SetKeyMap(ui.pages[ui.activePage])
 	case tea.KeyMsg:
 		ui.forceRefresh()
 		if msg.String() == "ctrl+c" {
 			return ui, tea.Quit
 		}
-		if ui.currentModalFunc != nil {
-			_, cmd := ui.currentModalFunc(msg)
-			cmds = append(cmds, cmd)
-			return ui, tea.Batch(cmds...)
+		if ui.modalComponent != nil {
+			break
 		}
 		switch msg.String() {
 		case "q":
@@ -167,13 +167,19 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, ui.stream.Update(msg))
 	}
 
-	_, cmd := ui.footer.Update(msg)
-	cmds = append(cmds, cmd)
-	_, cmd = ui.tabs.Update(msg)
-	cmds = append(cmds, cmd)
-	for _, pg := range ui.pages {
-		if _, cmd = pg.Update(msg); cmd != nil {
-			cmds = append(cmds, cmd)
+	if ui.modalComponent != nil {
+		m, cmd := ui.modalComponent.Update(msg)
+		ui.modalComponent = m.(common.Component)
+		cmds = append(cmds, cmd)
+	} else {
+		_, cmd := ui.footer.Update(msg)
+		cmds = append(cmds, cmd)
+		_, cmd = ui.tabs.Update(msg)
+		cmds = append(cmds, cmd)
+		for _, pg := range ui.pages {
+			if _, cmd = pg.Update(msg); cmd != nil {
+				cmds = append(cmds, cmd)
+			}
 		}
 	}
 
@@ -188,6 +194,10 @@ func (ui *UI) resize() {
 	footerHeight := ui.footer.Height()
 	ui.footer.SetSize(ui.Width, footerHeight)
 	ui.tabs.SetSize(ui.Width, 3)
+	if ui.modalComponent != nil {
+		// -2 for border at render time.
+		ui.modalComponent.SetSize(ui.Width-2, ui.Height-footerHeight-2)
+	}
 	for _, pg := range ui.pages {
 		pg.SetSize(ui.Width, ui.Height-ui.tabs.Height-footerHeight)
 	}
@@ -213,11 +223,24 @@ func (ui *UI) View() string {
 		ui.tabs.LogoStyle = styles.Logo.Foreground(color)
 	}
 
-	return lipgloss.JoinVertical(0,
+	main := lipgloss.JoinVertical(0,
 		styles.Tabs.Render(ui.tabs.View()),
 		ui.pages[ui.activePage].View(),
 		ui.footer.View(),
 	)
+
+	if ui.modalComponent != nil {
+		_, ok := ui.modalComponent.(common.IsInlineModal)
+		if !ok {
+			modalView := styles.ModalBox.Render(ui.modalComponent.View())
+			width := lipgloss.Width(modalView) / 2
+			height := lipgloss.Height(modalView) / 2
+			main = styles.PlaceOverlay(width, height, modalView, main, true)
+		}
+	}
+
+	return main
+	// TODO: render the modal on top, with its dimensions.
 }
 
 func (ui *UI) restartStream() tea.Cmd {

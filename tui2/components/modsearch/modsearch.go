@@ -1,42 +1,50 @@
 package modsearch
 
 import (
-	"log"
-
-	"github.com/charmbracelet/bubbles/textinput"
-	"github.com/charmbracelet/bubbles/viewport"
+	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 
 	"github.com/streamingfast/substreams/tui2/common"
+	"github.com/streamingfast/substreams/tui2/keymap"
 )
 
-type DisableModuleSearch bool
-type ApplyModuleSearchQueryMsg string
-type UpdateModuleSearchQueryMsg string
-
 type ModuleSearch struct {
-	common.Common
-	input textinput.Model
-
-	matchesView viewport.Model
-
-	seenModules      []string
-	matchingModules  []string
-	highlightedIndex int
+	list.Model
 }
 
 func New(c common.Common) *ModuleSearch {
-	input := textinput.New()
-	input.Placeholder = ""
-	input.Prompt = "/"
-	input.CharLimit = 256
-	input.Width = 80
-	return &ModuleSearch{
-		Common:      c,
-		input:       input,
-		matchesView: viewport.New(24, 79),
+	delegate := list.NewDefaultDelegate()
+	delegate.UpdateFunc = func(msg tea.Msg, m *list.Model) tea.Cmd {
+		it, ok := m.SelectedItem().(item)
+		if !ok {
+			return nil
+		}
+
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch msg.String() {
+			case "enter":
+				return tea.Sequence(common.EmitModuleSelectedMsg(it.Title()), common.CancelModalCmd())
+			}
+		}
+		return nil
 	}
+	delegate.ShowDescription = false
+	delegate.SetSpacing(0)
+	lst := list.New(nil, delegate, c.Width, c.Height)
+	lst.SetStatusBarItemName("module", "modules")
+	lst.Title = "Select module (/ to filter)"
+	//lst.SetFilteringEnabled(true)
+	lst.DisableQuitKeybindings()
+	lst.AdditionalShortHelpKeys = func() []key.Binding {
+		return []key.Binding{keymap.EscapeModal}
+	}
+	mod := &ModuleSearch{
+		Model: lst,
+	}
+	mod.SetSize(c.Width, c.Height)
+	return mod
 }
 
 func (m *ModuleSearch) Init() tea.Cmd {
@@ -44,129 +52,54 @@ func (m *ModuleSearch) Init() tea.Cmd {
 }
 
 func (m *ModuleSearch) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmds []tea.Cmd
-msgSwitch:
 	switch msg := msg.(type) {
-	case common.UpdateSeenModulesMsg:
-		log.Println("Updated seen modules!", msg)
-		m.seenModules = msg
 	case tea.KeyMsg:
-		if m.input.Focused() {
-			switch msg.String() {
-			case "enter":
-				m.input.Blur()
-				cmds = append(cmds, m.cancelModuleModal(), m.emitDisableMsg, common.EmitModuleSelectedMsg(m.selectedModule()))
-				break msgSwitch
-			case "backspace":
-				if m.input.Value() == "" {
-					cmds = append(cmds, m.cancelModuleModal(), m.emitDisableMsg)
-				}
-			case "up":
-				if m.highlightedIndex != 0 {
-					m.highlightedIndex--
-				}
-			case "down":
-				if m.highlightedIndex != len(m.matchingModules)-1 {
-					m.highlightedIndex++
-				}
-			default:
-				m.highlightedIndex = 0
-			}
-			var cmd tea.Cmd
-			m.input, cmd = m.input.Update(msg)
-			cmds = append(cmds, cmd)
-			m.updateViewport()
+		switch msg.String() {
+		case "esc":
+			return m, common.CancelModalCmd()
 		}
 	}
 
-	return m, tea.Batch(cmds...)
-}
-
-func (m *ModuleSearch) selectedModule() string {
-	if m.highlightedIndex >= len(m.matchingModules) {
-		return ""
-	}
-	return m.matchingModules[m.highlightedIndex]
-}
-
-func (m *ModuleSearch) updateViewport() {
-	m.matchesView.SetContent(m.renderMatches(m.input.Value()))
-}
-
-func (m *ModuleSearch) InitInput() tea.Cmd {
-	m.input.Focus()
-	m.input.SetValue("")
-	m.updateViewport()
-	m.highlightedIndex = 0
-	return func() tea.Msg {
-		return common.SetModalUpdateFuncMsg(m.Update)
-	}
-}
-
-func (m *ModuleSearch) renderMatches(query string) string {
-	var matchingMods []string
-	for _, mod := range m.seenModules {
-		if containsPortions(mod, query) {
-			matchingMods = append(matchingMods, mod)
-		}
-	}
-	if len(matchingMods) == 0 {
-		m.highlightedIndex = 0
-		return ""
-	}
-
-	if m.highlightedIndex >= len(matchingMods) {
-		m.highlightedIndex = len(matchingMods) - 1
-	}
-
-	m.matchingModules = matchingMods
-
-	var rows []string
-	maxHeight := m.matchesView.Height - 2
-	for idx, modName := range matchingMods {
-		if idx >= maxHeight {
-			break
-		}
-		if idx == m.highlightedIndex {
-			rows = append(rows, lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("12")).Render(modName))
-		} else {
-			rows = append(rows, modName)
-		}
-	}
-
-	out := lipgloss.JoinVertical(0, rows...)
-	return out
-}
-
-func containsPortions(modName, query string) bool {
-	queryIndex := 0
-	for _, r := range modName {
-		if queryIndex < len(query) && r == rune(query[queryIndex]) {
-			queryIndex++
-		}
-	}
-	return queryIndex == len(query)
+	var cmd tea.Cmd
+	m.Model, cmd = m.Model.Update(msg)
+	return m, cmd
 }
 
 func (m *ModuleSearch) View() string {
-	return lipgloss.JoinVertical(0,
-		m.input.View(),
-		lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true).Width(m.Width).Render(m.matchesView.View()),
-	)
+	return m.Model.View()
 }
 
 func (m *ModuleSearch) SetSize(w, h int) {
-	m.Common.SetSize(w, h)
-	m.matchesView.Width = w
-	m.matchesView.Height = h - 3
+	m.Model.SetSize(
+		min(w-12, 60),
+		min(h-6, 20)-3,
+	)
+}
+func (m *ModuleSearch) GetWidth() int  { return m.Model.Width() }
+func (m *ModuleSearch) GetHeight() int { return m.Model.Height() }
+
+type item struct {
+	modName string
 }
 
-func (m *ModuleSearch) cancelModuleModal() tea.Cmd {
-	return func() tea.Msg {
-		return common.SetModalUpdateFuncMsg(nil)
+func (i item) FilterValue() string { return i.modName }
+func (i item) Title() string       { return i.modName }
+func (i item) Description() string { return "none" }
+
+func (m *ModuleSearch) SetListItems(mods []string) {
+	var matchingMods []list.Item
+	for _, mod := range mods {
+		matchingMods = append(matchingMods, item{modName: mod})
 	}
+	m.Model.SetItems(matchingMods)
+	m.Model.SettingFilter()
 }
 
-func (m *ModuleSearch) emitDisableMsg() tea.Msg {
-	return DisableModuleSearch(true)
+func (m *ModuleSearch) SetSelected(moduleName string) {
+	for idx, it := range m.Model.Items() {
+		if it.(item).modName == moduleName {
+			m.Model.Select(idx)
+			return
+		}
+	}
 }

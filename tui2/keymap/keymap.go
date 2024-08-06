@@ -3,6 +3,12 @@ package keymap
 import "github.com/charmbracelet/bubbles/key"
 
 var k = key.WithKeys("")
+var EscapeModal = key.NewBinding(key.WithHelp("esc", "Dismiss dialog"), k)
+var SearchSwitchJQ = key.NewBinding(key.WithHelp("/", "Switch to jq search mode (on empty line)"), k)
+var GeneralSearchEnter = key.NewBinding(key.WithHelp("enter", "Search"), k)
+var EnterAcceptValue = key.NewBinding(key.WithHelp("enter", "Accept value"), k)
+var ModSearchEnter = key.NewBinding(key.WithHelp("enter", "Use module"), k)
+var GeneralSearchBackspace = key.NewBinding(key.WithHelp("backspace", "Cancel search with empty box"), k)
 var TabShiftTab = key.NewBinding(key.WithHelp("tab/shift-tab", "Main nav"), k)
 var PrevNextModule = key.NewBinding(key.WithHelp("u/i", "Modules nav"), k)
 var PrevNextBlock = key.NewBinding(key.WithHelp("o/p", "Blocks nav"), k)

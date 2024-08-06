@@ -6,7 +6,9 @@ import (
 
 	"github.com/streamingfast/substreams/tui2/components/blockselect"
 	"github.com/streamingfast/substreams/tui2/components/search"
+	"github.com/streamingfast/substreams/tui2/keymap"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -46,44 +48,60 @@ func (s *BlockSearch) SetSize(w, h int) {
 	s.input.Width = w
 }
 func (s *BlockSearch) Init() tea.Cmd {
+	s.input.Focus()
+	s.input.SetValue("")
+	s.Current = ""
+	s.input.Prompt = "go-to block: "
+	s.historyPointer = 0
 	return nil
 }
 
+func (s *BlockSearch) ShortHelp() []key.Binding {
+	return []key.Binding{
+		keymap.GeneralSearchEnter,
+		keymap.GeneralSearchBackspace,
+	}
+}
+func (s *BlockSearch) FullHelp() [][]key.Binding { return common.ShortToFullHelp(s) }
+
 func (s *BlockSearch) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+
+	// TODO: change into a simple `huh` form, in a Modal dialog, take the output and dispatch the message.
+
 	var cmds []tea.Cmd
 msgSwitch:
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if s.input.Focused() {
-			switch msg.String() {
-			case "enter":
-				if s.input.Value() == "" {
-					s.input.Blur()
-					cmds = append(cmds, s.cancelModal(), s.clearSearch)
-				} else {
-					newQuery := s.input.Value()
-					s.Current = newQuery
-					s.History = append(s.History, newQuery)
-					uintQuery, err := s.CheckValidQuery()
-					if err != nil {
-						break
-					}
-					cmds = append(cmds, s.cancelModal())
-					cmds = append(cmds, func() tea.Msg { return blockselect.BlockChangedMsg(uintQuery) })
-					cmds = append(cmds, s.clearSearch)
-					s.input.Blur()
-					break msgSwitch
-				}
-			case "backspace":
-				if s.input.Value() == "" {
-					s.input.Blur()
-					cmds = append(cmds, s.cancelModal(), s.clearSearch)
-				}
-			}
-			var cmd tea.Cmd
-			s.input, cmd = s.input.Update(msg)
-			cmds = append(cmds, cmd)
+		if !s.input.Focused() {
+			break
 		}
+		switch msg.String() {
+		case "enter":
+			if s.input.Value() == "" {
+				s.input.Blur()
+				cmds = append(cmds, common.CancelModalCmd())
+			} else {
+				newQuery := s.input.Value()
+				s.Current = newQuery
+				s.History = append(s.History, newQuery)
+				uintQuery, err := s.CheckValidQuery()
+				if err != nil {
+					break
+				}
+				s.input.Blur()
+				cmds = append(cmds, func() tea.Msg { return blockselect.BlockChangedMsg(uintQuery) })
+				cmds = append(cmds, common.CancelModalCmd())
+				break msgSwitch
+			}
+		case "backspace":
+			if s.input.Value() == "" {
+				s.input.Blur()
+				cmds = append(cmds, common.CancelModalCmd(), s.clearSearch)
+			}
+		}
+		var cmd tea.Cmd
+		s.input, cmd = s.input.Update(msg)
+		cmds = append(cmds, cmd)
 	}
 
 	return s, tea.Batch(cmds...)
@@ -95,23 +113,6 @@ func (s *BlockSearch) View() string {
 
 func (s *BlockSearch) clearSearch() tea.Msg {
 	return search.SearchClearedMsg(true)
-}
-
-func (s *BlockSearch) InitInput() tea.Cmd {
-	s.input.Focus()
-	s.input.SetValue("")
-	s.Current = ""
-	s.input.Prompt = "go-to block: "
-	s.historyPointer = 0
-	return func() tea.Msg {
-		return common.SetModalUpdateFuncMsg(s.Update)
-	}
-}
-
-func (s *BlockSearch) cancelModal() tea.Cmd {
-	return func() tea.Msg {
-		return common.SetModalUpdateFuncMsg(nil)
-	}
 }
 
 func (s *BlockSearch) SetMatchCount(count int) {

@@ -3,10 +3,12 @@ package search
 import (
 	"fmt"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/streamingfast/substreams/tui2/common"
+	"github.com/streamingfast/substreams/tui2/keymap"
 )
 
 type UpdateMatchingBlocks map[uint64]bool
@@ -49,8 +51,27 @@ func (s *Search) SetSize(w, h int) {
 	s.input.Width = w
 }
 func (s *Search) Init() tea.Cmd {
+	s.input.Focus()
+	s.input.SetValue("")
+	s.jqMode = false
+	s.Current = SearchQuery{}
+	s.applyPrompt()
+	s.historyPointer = 0
 	return nil
 }
+
+func (s *Search) ShortHelp() []key.Binding {
+	out := []key.Binding{
+		keymap.GeneralSearchEnter,
+		keymap.GeneralSearchBackspace,
+		keymap.UpDown,
+	}
+	if s.input.Value() == "" {
+		out = append(out, keymap.SearchSwitchJQ)
+	}
+	return out
+}
+func (s *Search) FullHelp() [][]key.Binding { return common.ShortToFullHelp(s) }
 
 func (s *Search) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
@@ -92,7 +113,7 @@ msgSwitch:
 					JQMode: s.jqMode,
 				}
 
-				cmds = append(cmds, s.CancelModal())
+				cmds = append(cmds, common.CancelModalCmd())
 
 				if newQuery.Query != "" {
 					s.Current = newQuery
@@ -106,7 +127,7 @@ msgSwitch:
 			case "backspace":
 				if s.input.Value() == "" {
 					s.input.Blur()
-					cmds = append(cmds, s.CancelModal(), s.clearSearch)
+					cmds = append(cmds, common.CancelModalCmd(), s.clearSearch)
 				}
 			}
 
@@ -119,13 +140,7 @@ msgSwitch:
 	return s, tea.Batch(cmds...)
 }
 
-func (s *Search) applyPrompt() {
-	if s.jqMode {
-		s.input.Prompt = "jq: "
-	} else {
-		s.input.Prompt = "/"
-	}
-}
+func (s *Search) IsInlineModal() {}
 
 func (s *Search) View() string {
 	if !s.input.Focused() {
@@ -135,26 +150,16 @@ func (s *Search) View() string {
 	}
 }
 
+func (s *Search) applyPrompt() {
+	if s.jqMode {
+		s.input.Prompt = "jq: "
+	} else {
+		s.input.Prompt = "/"
+	}
+}
+
 func (s *Search) clearSearch() tea.Msg {
 	return SearchClearedMsg(true)
-}
-
-func (s *Search) InitInput() tea.Cmd {
-	s.input.Focus()
-	s.input.SetValue("")
-	s.jqMode = false
-	s.Current = SearchQuery{}
-	s.applyPrompt()
-	s.historyPointer = 0
-	return func() tea.Msg {
-		return common.SetModalUpdateFuncMsg(s.Update)
-	}
-}
-
-func (s *Search) CancelModal() tea.Cmd {
-	return func() tea.Msg {
-		return common.SetModalUpdateFuncMsg(nil)
-	}
 }
 
 func (s *Search) SetMatchCount(count int) {

@@ -3,18 +3,17 @@ package output
 import (
 	"sort"
 
-	"github.com/streamingfast/substreams/tui2/components/explorer"
-
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jhump/protoreflect/dynamic"
-	"github.com/streamingfast/substreams/tui2/components/blocksearch"
 
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/tui2/common"
+	"github.com/streamingfast/substreams/tui2/components/blocksearch"
 	"github.com/streamingfast/substreams/tui2/components/blockselect"
+	"github.com/streamingfast/substreams/tui2/components/modgraph"
 	"github.com/streamingfast/substreams/tui2/components/modsearch"
 	"github.com/streamingfast/substreams/tui2/components/modselect"
 	"github.com/streamingfast/substreams/tui2/components/search"
@@ -23,6 +22,7 @@ import (
 
 type Output struct {
 	common.Common
+	*request.Config
 
 	msgDescs       map[string]*manifest.ModuleDescriptor
 	messageFactory *dynamic.MessageFactory
@@ -46,9 +46,8 @@ type Output struct {
 	active            request.BlockContext // module + block
 	outputViewYoffset map[request.BlockContext]int
 
-	moduleSearchEnabled bool
-	moduleSearchView    *modsearch.ModuleSearch
-	//moduleSearchView
+	moduleSearchView *modsearch.ModuleSearch
+
 	outputModule string
 	logsEnabled  bool
 
@@ -64,17 +63,18 @@ type Output struct {
 	blockSearchCtx     *blocksearch.BlockSearch
 
 	moduleNavigatorMode bool
-	moduleNavigator     *explorer.Navigator
+	moduleNavigator     *modgraph.Navigator
 }
 
 func New(c common.Common, config *request.Config) (*Output, error) {
-	nav, err := explorer.New(config.OutputModule, c, explorer.WithModuleGraph(config.Graph))
+	nav, err := modgraph.New(config.OutputModule, c, modgraph.WithModuleGraph(config.Graph))
 	if err != nil {
 		return nil, err
 	}
 
 	output := &Output{
 		Common:              c,
+		Config:              config,
 		blocksPerModule:     make(map[string][]uint64),
 		payloads:            make(map[request.BlockContext]*pbsubstreamsrpc.AnyModuleOutput),
 		blockIDs:            make(map[uint64]string),
@@ -111,7 +111,7 @@ func (o *Output) SetSize(w, h int) {
 	o.outputView.Height = h - 11
 	o.moduleNavigator.FrameHeight = h - 11
 
-	o.moduleSearchView.SetSize(w, o.outputView.Height)
+	o.moduleSearchView.SetSize(w, h)
 	outputViewTopBorder := 1
 	o.outputView.Height = h - o.moduleSelector.Height - o.blockSelector.Height - outputViewTopBorder
 	o.searchCtx.SetSize(w, h)
@@ -126,14 +126,15 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case search.SearchClearedMsg:
 		o.searchEnabled = false
-		o.blockSearchEnabled = false
 		o.setOutputViewContent(true)
-	case modsearch.DisableModuleSearch:
-		o.moduleSearchEnabled = false
+	case common.UpdateSeenModulesMsg:
+		o.moduleSearchView.SetListItems(msg)
 	case search.UpdateMatchingBlocks:
 		o.searchBlockNumsWithMatches = o.orderMatchingBlocks(msg)
+		o.blockSelector.Update(msg)
 	case search.AddMatchingBlock:
 		o.searchBlockNumsWithMatches = append(o.searchBlockNumsWithMatches, uint64(msg))
+		o.blockSelector.Update(msg)
 	case request.NewRequestInstance:
 		o.errReceived = nil
 		o.msgDescs = msg.MsgDescs
@@ -141,6 +142,7 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		o.payloads = make(map[request.BlockContext]*pbsubstreamsrpc.AnyModuleOutput)
 		o.blockIDs = make(map[uint64]string)
 		o.outputView.SetContent("")
+		o.blockSelector.Update(msg)
 	case *pbsubstreamsrpc.BlockScopedData:
 		blockNum := msg.Clock.Number
 
@@ -202,6 +204,9 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		o.outputView.YOffset = o.outputViewYoffset[o.active]
 		o.setOutputViewContent(true)
 		cmds = append(cmds, o.updateMatchingBlocks())
+		_, _ = o.moduleNavigator.Update(msg)
+		o.moduleSearchView.SetSelected(string(msg))
+
 	case blockselect.BlockChangedMsg:
 		if o.hasDataForBlock(uint64(msg)) {
 			newBlock := uint64(msg)
@@ -221,17 +226,16 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			o.setOutputViewContent(true)
 		case "=":
 			o.blockSearchEnabled = !o.blockSearchEnabled
-			cmds = append(cmds, o.blockSearchCtx.InitInput())
+			cmds = append(cmds, common.SetModalComponentCmd(o.blockSearchCtx))
 		case "L":
 			o.logsEnabled = !o.logsEnabled
 			o.setOutputViewContent(true)
 		case "m":
-			o.moduleSearchEnabled = true
 			o.setOutputViewContent(true)
-			return o, o.moduleSearchView.InitInput()
+			cmds = append(cmds, common.SetModalComponentCmd(o.moduleSearchView))
 		case "/":
 			o.searchEnabled = true
-			cmds = append(cmds, o.searchCtx.InitInput())
+			cmds = append(cmds, common.SetModalComponentCmd(o.searchCtx))
 		case "F":
 			o.bytesRepresentation = (o.bytesRepresentation + 1) % 3
 			o.setOutputViewContent(true)
@@ -264,19 +268,11 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		o.setOutputViewContent(false)
 	}
 
-	_, cmd := o.moduleSearchView.Update(msg)
-	cmds = append(cmds, cmd)
-
-	_, cmd = o.moduleSelector.Update(msg)
-	cmds = append(cmds, cmd)
-
-	_, cmd = o.blockSelector.Update(msg)
-	cmds = append(cmds, cmd)
-
+	var cmd tea.Cmd
 	o.outputView, cmd = o.outputView.Update(msg)
 	cmds = append(cmds, cmd)
 
-	_, cmd = o.moduleNavigator.Update(msg)
+	_, cmd = o.moduleSelector.Update(msg)
 	cmds = append(cmds, cmd)
 
 	return o, tea.Batch(cmds...)
@@ -336,20 +332,13 @@ func (o *Output) View() string {
 
 	var searchLine string
 	if o.searchEnabled {
+		// This to be managed by the Modal Dialog box
 		searchLine = o.searchCtx.View()
-	}
-	if o.blockSearchEnabled {
-		searchLine = o.blockSearchCtx.View()
 	}
 
 	o.setOutputViewContent(false)
 
-	var middleBlock string
-	if o.moduleSearchEnabled {
-		middleBlock = o.moduleSearchView.View()
-	} else {
-		middleBlock = o.outputView.View()
-	}
+	middleSection := o.outputView.View()
 
 	if o.moduleNavigatorMode {
 		return lipgloss.JoinVertical(0,
@@ -365,7 +354,7 @@ func (o *Output) View() string {
 		o.moduleSelector.View(),
 		o.blockSelector.View(),
 		"",
-		middleBlock,
+		middleSection,
 		searchLine,
 	)
 	return out

@@ -34,9 +34,6 @@ func (p *Progress) FullHelp() [][]key.Binding {
 		},
 		{
 			keymap.Help,
-			keymap.TabShiftTab,
-		},
-		{
 			keymap.Quit,
 		},
 	}

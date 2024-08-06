@@ -184,7 +184,7 @@ var (
 	}
 
 	Logo = lipgloss.NewStyle().
-		Border(lipgloss.Border{Bottom: "─", Left: "│", BottomLeft: "┴", BottomRight: "┘", TopLeft: "╷"}).
+		Border(lipgloss.Border{Bottom: "─", Left: "", BottomLeft: "─", BottomRight: "─", TopLeft: ""}).
 		Padding(0, 1).
 		Margin(0).
 		Foreground(lipgloss.AdaptiveColor{Dark: "1", Light: "9"}).Bold(true)
@@ -206,6 +206,8 @@ var (
 	RequestOddRow  = RequestCell.Foreground(gray)
 	RequestEvenRow = RequestCell.Foreground(lightGray)
 	RequestRight   = RequestCell.Align(lipgloss.Right)
+
+	ModalBox = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.AdaptiveColor{Dark: "205", Light: "213"})
 
 	BlockSelect = blockSelectStyle{
 		Box:                  lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true),

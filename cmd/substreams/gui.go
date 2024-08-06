@@ -153,6 +153,7 @@ func runGui(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("stop block: %w", err)
 	}
+	rawStopBlock, _ := cmd.Flags().GetString("stop-block")
 
 	if readFromModule { // need to tweak the stop block here
 		sb, err := graph.ModuleInitialBlock(outputModule)
@@ -182,6 +183,7 @@ func runGui(cmd *cobra.Command, args []string) error {
 		Cursor:                      cursor,
 		StartBlock:                  startBlock,
 		StopBlock:                   stopBlock,
+		RawStopBlock:                rawStopBlock,
 		FinalBlocksOnly:             sflags.MustGetBool(cmd, "final-blocks-only"),
 		Params:                      params,
 		ReaderOptions:               readerOptions,

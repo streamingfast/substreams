@@ -2,13 +2,15 @@ package request
 
 import (
 	"fmt"
+	"log"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	"github.com/streamingfast/substreams/tui2/components/dataentry"
+	"github.com/streamingfast/substreams/tui2/components/modsearch"
 	"github.com/streamingfast/substreams/tui2/replaylog"
 	streamui "github.com/streamingfast/substreams/tui2/stream"
 	"github.com/streamingfast/substreams/tui2/styles"
@@ -16,7 +18,6 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
-	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
 
@@ -41,6 +42,7 @@ type Config struct {
 	DebugModulesInitialSnapshot []string
 	StartBlock                  int64
 	StopBlock                   uint64
+	RawStopBlock                string
 	FinalBlocksOnly             bool
 	Headers                     map[string]string
 	OutputModule                string
@@ -63,8 +65,8 @@ type Instance struct {
 
 type Request struct {
 	common.Common
+	*Config
 
-	form               *huh.Form
 	formStartBlock     string
 	formStopBlock      string
 	formEndpoint       string
@@ -80,58 +82,22 @@ type Request struct {
 	params             map[string][]string
 }
 
-func New(c common.Common) *Request {
+func New(c common.Common, conf *Config) *Request {
 	return &Request{
 		Common:       c,
+		Config:       conf,
 		manifestView: viewport.New(24, 80),
 	}
 }
 
 func (r *Request) Init() tea.Cmd {
-	r.form = huh.NewForm(
-		huh.NewGroup(
-			huh.NewSelect[string]().
-				Key("module").
-				Value(&r.formModuleSelected).
-				Inline(true).
-				Options(huh.NewOptions("map_things_events_calls", "graph_out")...).
-				Title("Select module to stream:"),
-			huh.NewInput().
-				Key("start_block").
-				Value(&r.formStartBlock).
-				Inline(true).
-				Validate(func(s string) error {
-					if !regexp.MustCompile(`^\d+$`).MatchString(s) {
-						return fmt.Errorf("specify only numbers")
-					}
-					return nil
-				}).
-				Title("Enter the start block number:"),
-			huh.NewInput().
-				Key("stop_block").
-				Inline(true).
-				Value(&r.formStopBlock).
-				Validate(func(s string) error {
-					if !regexp.MustCompile(`^[\+\-]?\d+$`).MatchString(s) {
-						return fmt.Errorf("specify only numbers, optionally prefixed by - or +")
-					}
-					return nil
-				}).
-				Title("Stream to block:").
-				Description("You can specify relative block numbers with - (to head) or + (to start block) prefixes."),
-		),
-	)
 	return tea.Batch(
 		r.manifestView.Init(),
-		r.form.Init(),
 	)
 }
 
 func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
-
-	_, cmd := r.form.Update(msg)
-	cmds = append(cmds, cmd)
 
 	switch msg := msg.(type) {
 	case NewRequestInstance:
@@ -145,6 +111,19 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		r.setModulesViewContent()
+
+	case common.SetRequestValue:
+		log.Println("Received value", msg.Field, msg.Value)
+		switch msg.Field {
+		case "start-block":
+			r.formStartBlock = msg.Value
+		case "stop-block":
+			r.formStopBlock = msg.Value
+		}
+	case common.ModuleSelectedMsg:
+		log.Println("Setting selected module:", msg)
+		r.Config.OutputModule = string(msg)
+
 	case tea.KeyMsg:
 		// COuld we support:
 		// `s` to change `start block`
@@ -166,9 +145,30 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// `a` for advanced options (shows Final Blocks Only switcher)
 		// `c` to change cursor
 
-		var cmd tea.Cmd
-		r.manifestView, cmd = r.manifestView.Update(msg)
-		cmds = append(cmds, cmd)
+		switch msg.String() {
+		case "s":
+			comp := dataentry.New(r.Common, "start-block", validateNumbersOnly)
+			comp.Input.Prompt("Enter the start block number: ").
+				Description("Block from which to start streaming. Numbers only\n\n")
+			cmds = append(cmds, common.SetModalComponentCmd(comp))
+		case "t":
+			comp := dataentry.New(r.Common, "stop-block", validateNumberOrRelativeValue)
+			comp.Input.Prompt("Enter the stop block number: ").
+				Description("Enter numbers only, with an optional - or + prefix.\n\nYou can specify relative block numbers with - (to head) or + (to start block) prefixes.\n")
+			cmds = append(cmds, common.SetModalComponentCmd(comp))
+		case "m":
+			comp := modsearch.New(r.Common)
+			comp.SetListItems(r.Config.Graph.Modules())
+			cmds = append(cmds, common.SetModalComponentCmd(comp))
+		case "e":
+		case "a":
+
+		default:
+			var cmd tea.Cmd
+			r.manifestView, cmd = r.manifestView.Update(msg)
+			cmds = append(cmds, cmd)
+		}
+
 	case *pbsubstreamsrpc.SessionInit:
 		r.traceId = msg.TraceId
 		r.resolvedStartBlock = msg.ResolvedStartBlock
@@ -182,23 +182,17 @@ func (r *Request) SetSize(w, h int) {
 	r.Common.SetSize(w, h)
 
 	summaryHeight := lipgloss.Height(r.renderRequestSummary())
-	formHeight := lipgloss.Height(r.renderForm())
-	r.manifestView.Height = max(h-summaryHeight-formHeight-2 /* for borders */, 0)
+	r.manifestView.Height = max(h-summaryHeight-2 /* for borders */, 0)
 	r.manifestView.Width = w
 }
 
 func (r *Request) View() string {
 	out := lipgloss.JoinVertical(0,
-		r.renderForm(),
 		r.renderRequestSummary(),
 		r.renderManifestView(),
 	)
 	//fmt.Println("OUTPUT", lipgloss.Height(out), r.Height)
 	return out
-}
-
-func (r *Request) renderForm() string {
-	return lipgloss.NewStyle().MaxHeight(6).Render(r.form.View())
 }
 
 func (r *Request) renderManifestView() string {
@@ -226,10 +220,15 @@ func (r *Request) renderRequestSummary() string {
 		paramsStrings = append(paramsStrings, fmt.Sprintf("%s=%s", k, v))
 	}
 
+	startBlock := fmt.Sprintf("%d%s", r.resolvedStartBlock, handoffStr)
+	startBlock = r.formStartBlock
+
 	rows := [][]string{
 		{"Package:", summary.Manifest},
-		{"Endpoint:", summary.Endpoint},
-		{"Start Block:", fmt.Sprintf("%d%s", r.resolvedStartBlock, handoffStr)},
+		{"[m] Module:", r.Config.OutputModule},
+		{"[e] Endpoint:", summary.Endpoint},
+		{"[s] Start Block:", startBlock},
+		{"[t] Stop Block:", r.Config.RawStopBlock},
 		{"Parameters:", fmt.Sprintf("%v", summary.Params)},
 		{"Production mode:", fmt.Sprintf("%v", summary.ProductionMode)},
 		{"Trace ID:", r.traceId},
@@ -277,7 +276,17 @@ func (r *Request) getViewportContent() (string, error) {
 		output += fmt.Sprintf("%s\n\n", module.Name)
 		output += fmt.Sprintf("	Initial block: %v\n", module.InitialBlock)
 		output += fmt.Sprintln("	Inputs: ")
-		for i := range module.Inputs {
+		for i, input := range module.Inputs {
+			_ = input
+			// switch input.(type) {
+
+			// }
+			// switch module.Inputs[i].(type) {
+			// case *pbsubstreams.ModuleInputBlock:
+			// case *pbsubstreams.ModuleInputCursor:
+			// case *pbsubstreams.ModuleInputParams:
+			// case *pbsubstreams.ModuleInputParams:
+			// }
 			if module.Inputs[i].GetParams() != nil && r.params[module.Name] != nil {
 				output += fmt.Sprintf("		- params: [%s]\n", strings.Join(r.params[module.Name], ", "))
 			} else {

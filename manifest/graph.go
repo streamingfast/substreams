@@ -170,6 +170,19 @@ func (g *ModuleGraph) Modules() []string {
 	return modules
 }
 
+func (g *ModuleGraph) MapModules() []string {
+	var modules []string
+	for _, module := range g.modules {
+		if module.GetKindMap() != nil {
+			modules = append(modules, module.Name)
+		}
+	}
+
+	SortModuleNamesByGraphTopology(modules, g)
+
+	return modules
+}
+
 func (g *ModuleGraph) TopologicalSort() ([]*pbsubstreams.Module, bool) {
 	order, ok := graph.TopSort(g)
 	if !ok {

@@ -96,14 +96,18 @@ func runGui(cmd *cobra.Command, args []string) error {
 	}
 
 	readerOptions := []manifest.Option{
-		manifest.WithOverrideOutputModule(outputModule),
+		manifest.WithOverrideOutputModule(outputModule), // TODO: we'll select this in the UI later..
 		manifest.WithOverrideNetwork(network),
-		manifest.WithParams(params),
+		manifest.WithParams(params), // TODO: bring any params into the Config
 	}
 	if sflags.MustGetBool(cmd, "skip-package-validation") {
 		readerOptions = append(readerOptions, manifest.SkipPackageValidationReader())
 	}
 
+	// TODO: we'll want to do a first read here but also bring the manifestPath into the Config
+	// to make sure we reload the `spkg` or the `substreams.yaml` manifest between runs, if we
+	// restart the stream, to accomodate the `restart stream`, and pick up any changes in the
+	// latest build.
 	manifestReader, err := manifest.NewReader(manifestPath, readerOptions...)
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
@@ -114,6 +118,9 @@ func runGui(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
+	// TODO: bring some of that into the `tui` UI, because the user might change the network
+	// which would change the default endpoint here.. and we would always fallback
+	// on the env vars for finding the endpoint. The user can always tweak the endpoint himself in the UI.
 	endpoint, err := manifest.ExtractNetworkEndpoint(pkg.Network, sflags.MustGetString(cmd, "substreams-endpoint"), zlog)
 	if err != nil {
 		return fmt.Errorf("extracting endpoint: %w", err)
@@ -122,10 +129,10 @@ func runGui(cmd *cobra.Command, args []string) error {
 	authToken, authType := tools.GetAuth(cmd, "substreams-api-key-envvar", "substreams-api-token-envvar")
 	substreamsClientConfig := client.NewSubstreamsClientConfig(
 		endpoint,
-		authToken,
-		authType,
-		sflags.MustGetBool(cmd, "insecure"),
-		sflags.MustGetBool(cmd, "plaintext"),
+		authToken,                            // TODO: bring in Config
+		authType,                             // TODO: bring in Config
+		sflags.MustGetBool(cmd, "insecure"),  // TODO. bring in Config
+		sflags.MustGetBool(cmd, "plaintext"), // TODO: bring in Config
 	)
 
 	homeDir, err := os.UserHomeDir()

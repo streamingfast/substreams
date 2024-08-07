@@ -15,7 +15,6 @@ import (
 	streamui "github.com/streamingfast/substreams/tui2/stream"
 	"github.com/streamingfast/substreams/tui2/styles"
 
-	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
@@ -68,12 +67,10 @@ type Request struct {
 
 	formStartBlock     string
 	formStopBlock      string
-	formEndpoint       string
 	formModuleSelected string
 
 	RequestSummary     *Summary
 	Modules            *pbsubstreams.Modules
-	manifestView       viewport.Model
 	traceId            string
 	resolvedStartBlock uint64
 	linearHandoffBlock uint64
@@ -143,7 +140,8 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, common.SetModalComponentCmd(comp))
 		case "m":
 			comp := modsearch.New(r.Common)
-			comp.SetListItems(r.Config.Graph.Modules())
+			comp.Model.Title = "Select map module to stream (/ to filter)"
+			comp.SetListItems(r.Config.Graph.MapModules())
 			cmds = append(cmds, common.SetModalComponentCmd(comp))
 		case "e":
 		case "a":
@@ -183,6 +181,12 @@ func (r *Request) renderRequestSummary() string {
 	startBlock := fmt.Sprintf("%d%s", r.resolvedStartBlock, handoffStr)
 	//startBlock = r.formStartBlock
 
+	// TODO: we'll reveive `RawStopBlock` in here, let's prepare the value we'll send to the
+	// server and take that out from `gui.go`, into our own hands.
+	// TODO: also bring a RawStartBlock, and have it support `-100` blocks to tap into the
+	// end of the chain.
+	// TODO: the endpoint means we'll need to create a new client altogether, which is done in
+	// the `gui.go` right now.
 	rows := [][]string{
 		{"Package:", summary.Manifest},
 		{"[m] Module:", r.Config.OutputModule},
@@ -208,7 +212,7 @@ func (r *Request) renderRequestSummary() string {
 		return color
 	})
 
-	return t.Render()
+	return lipgloss.NewStyle().Height(r.Height).Render(t.Render())
 }
 
 func (c *Config) NewInstance() (*Instance, error) {
@@ -220,6 +224,10 @@ func (c *Config) NewInstance() (*Instance, error) {
 		c.StartBlock = int64(sb)
 	}
 
+	// TODO: use the latest `endpoint`, create a new `SubstreamsClientConfig`
+	// TODO: if there's an error, we should have a modal dialog box showing the error, instead of
+	// showing in the StatusBar, with a "Confirm" or `esc` to close dialog.
+	// in big red font, and with the appropriate size.
 	ssClient, _, callOpts, headers, err := client.NewSubstreamsClient(c.SubstreamsClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("substreams client setup: %w", err)

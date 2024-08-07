@@ -35,7 +35,7 @@ type preCreatedIndices struct {
 }
 
 func TestTier2Call(t *testing.T) {
-	manifest.UseSimpleHash = true
+	manifest.TestUseSimpleHash = true
 	mapInit50 := hex.EncodeToString([]byte("map_output_init_50"))
 	secondMapInit50 := hex.EncodeToString([]byte("second_map_output_init_50"))
 

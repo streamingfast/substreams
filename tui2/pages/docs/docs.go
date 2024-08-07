@@ -10,9 +10,11 @@ import (
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/tui2/common"
 	"github.com/streamingfast/substreams/tui2/pages/request"
+	"github.com/streamingfast/substreams/tui2/styles"
 )
 
 type Docs struct {
@@ -22,6 +24,8 @@ type Docs struct {
 
 	reqSummary *request.Summary
 	modules    *pbsubstreams.Modules
+	graph      *manifest.ModuleGraph
+	hashes     *manifest.ModuleHashes
 	params     map[string][]string
 }
 
@@ -34,9 +38,15 @@ func New(c common.Common) *Docs {
 	return page
 }
 
-func (d *Docs) setNewRequest(reqSummary *request.Summary, modules *pbsubstreams.Modules) {
+func (d *Docs) setNewRequest(reqSummary *request.Summary, modules *pbsubstreams.Modules, graph *manifest.ModuleGraph) {
 	d.reqSummary = reqSummary
 	d.modules = modules
+	d.graph = graph
+
+	d.hashes = manifest.NewModuleHashes()
+	for _, mod := range modules.Modules {
+		d.hashes.HashModule(modules, mod, graph)
+	}
 
 	d.params = make(map[string][]string)
 	if reqSummary.Params != nil {
@@ -62,7 +72,7 @@ func (d *Docs) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case string:
 		log.Println("message bob", msg)
 	case request.NewRequestInstance:
-		d.setNewRequest(msg.RequestSummary, msg.Modules)
+		d.setNewRequest(msg.RequestSummary, msg.Modules, msg.Graph)
 	}
 	var cmd tea.Cmd
 	d.docsView, cmd = d.docsView.Update(msg)
@@ -89,52 +99,44 @@ func (d *Docs) renderManifestView() string {
 }
 
 func (d *Docs) getViewportContent() (string, error) {
-	output := ""
+	var lines []string
 
 	for i, module := range d.modules.Modules {
 		if len(d.reqSummary.ModuleDocs) < i+1 {
 			break
 		}
-		var moduleDoc string
-		var err error
-
-		moduleDoc, err = d.getViewPortDropdown(d.reqSummary.ModuleDocs[i])
+		moduleDoc, err := d.renderGlamourDoc(d.reqSummary.ModuleDocs[i])
 		if err != nil {
 			return "", fmt.Errorf("getting module doc: %w", err)
 		}
 
-		output += fmt.Sprintf("%s\n\n", module.Name)
-		output += fmt.Sprintf("	Initial block: %v\n", module.InitialBlock)
-		output += fmt.Sprintln("	Inputs: ")
-		for i, input := range module.Inputs {
-			_ = input
-			// switch input.(type) {
-
-			// }
-			// switch module.Inputs[i].(type) {
-			// case *pbsubstreams.ModuleInputBlock:
-			// case *pbsubstreams.ModuleInputCursor:
-			// case *pbsubstreams.ModuleInputParams:
-			// case *pbsubstreams.ModuleInputParams:
-			// }
-			if module.Inputs[i].GetParams() != nil && d.params[module.Name] != nil {
-				output += fmt.Sprintf("		- params: [%s]\n", strings.Join(d.params[module.Name], ", "))
-			} else {
-				output += fmt.Sprintf("		- %s\n", module.Inputs[i])
+		lines = append(lines, styles.DocModuleName.Render(module.Name), "")
+		lines = append(lines, fmt.Sprintf("  • Module hash: %s", d.hashes.Get(module.Name)))
+		lines = append(lines, fmt.Sprintf("  • Initial block: %v", module.InitialBlock))
+		lines = append(lines, "  • Inputs: ")
+		for _, input := range module.Inputs {
+			switch input := input.Input.(type) {
+			case *pbsubstreams.Module_Input_Source_:
+				lines = append(lines, fmt.Sprintf("    - source: %s", input.Source.Type))
+			case *pbsubstreams.Module_Input_Map_:
+				lines = append(lines, fmt.Sprintf("    - map: %s", input.Map.ModuleName))
+			case *pbsubstreams.Module_Input_Store_:
+				lines = append(lines, fmt.Sprintf("    - store: %s (mode: %s)", input.Store.ModuleName, input.Store.Mode.Pretty()))
+			case *pbsubstreams.Module_Input_Params_:
+				//lines = append(lines, fmt.Sprintf("    - params: %s"), input.Params.Value)
+				lines = append(lines, fmt.Sprintf("    - params: %s", strings.Join(d.params[module.Name], ", ")))
 			}
 		}
-		output += fmt.Sprintln("	Outputs: ")
-		output += fmt.Sprintf("		- %s\n", module.Output)
-		output += moduleDoc
-		if i <= len(d.modules.Modules)-1 {
-			output += "\n\n"
+		if module.Output != nil {
+			lines = append(lines, "  • Outputs: "+module.Output.Type)
 		}
+		lines = append(lines, moduleDoc)
 	}
 
-	return lipgloss.NewStyle().Padding(2, 4, 1, 4).Render(output), nil
+	return lipgloss.NewStyle().Padding(2, 4, 1, 4).Render(strings.Join(lines, "\n")), nil
 }
 
-func (d *Docs) getViewPortDropdown(moduleMetadata *pbsubstreams.ModuleMetadata) (string, error) {
+func (d *Docs) renderGlamourDoc(moduleMetadata *pbsubstreams.ModuleMetadata) (string, error) {
 	content, err := glamorizeDoc(moduleMetadata.GetDoc())
 	if err != nil {
 		return "", fmt.Errorf("getting module docs: %w", err)
@@ -147,12 +149,10 @@ func glamorizeDoc(doc string) (string, error) {
 	markdown := ""
 
 	if doc != "" {
-		markdown += "# " + "docs: \n"
-		markdown += "\n"
 		markdown += doc
 		markdown += "\n"
 	}
-	markdown += "\n\n"
+	markdown += "\n"
 
 	style := "light"
 	if lipgloss.HasDarkBackground() {

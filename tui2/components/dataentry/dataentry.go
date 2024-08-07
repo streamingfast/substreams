@@ -1,8 +1,6 @@
 package dataentry
 
 import (
-	"log"
-
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
@@ -47,17 +45,14 @@ func (m *DataEntry) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "esc":
-			log.Println("Escape this thing")
 			return m, common.CancelModalCmd()
 		case "enter":
-			log.Println("Enter in data entry", m.Input.GetKey(), m.Input.GetValue(), m.Input.Error(), m.Form.Errors())
 			if m.Input.Error() == nil {
 				val := m.Input.GetValue().(string)
 				return m, tea.Batch(common.SetRequestValueCmd(m.Input.GetKey(), val), common.CancelModalCmd())
 			}
 		}
 	}
-	log.Println("keys in dataentry", m.Input.GetValue())
 	return m, cmd
 }
 

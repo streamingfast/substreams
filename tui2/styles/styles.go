@@ -207,6 +207,8 @@ var (
 
 	ModalBox = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.AdaptiveColor{Dark: "205", Light: "213"})
 
+	DocModuleName = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Dark: "12", Light: "14"})
+
 	BlockSelect = blockSelectStyle{
 		Box:                  lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true),
 		SelectedBlock:        lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Dark: "12", Light: "14"}).Bold(true),

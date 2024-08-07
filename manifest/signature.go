@@ -11,7 +11,7 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-var UseSimpleHash = false
+var TestUseSimpleHash = false
 
 type ModuleHash []byte
 
@@ -48,7 +48,7 @@ func (m *ModuleHashes) Iter(cb func(hash, name string) error) error {
 
 func (m *ModuleHashes) HashModule(modules *pbsubstreams.Modules, module *pbsubstreams.Module, graph *ModuleGraph) (ModuleHash, error) {
 	//Simplified hash for testing purposes
-	if UseSimpleHash {
+	if TestUseSimpleHash {
 		return m.hashModuleSimple(modules, module, graph)
 	}
 	return m.hashModule(modules, module, graph)

@@ -25,6 +25,7 @@ func CancelModalCmd() tea.Cmd {
 type UpdateSeenModulesMsg []string
 type ModuleSelectedMsg string // Emitted to inform all components that a new module has been selected.
 type BlockSelectedMsg uint64  // Emitted to inform all components that a new block has been selected.
+type GoToOutputMsg struct{}
 
 type SetRequestValue struct {
 	Field string

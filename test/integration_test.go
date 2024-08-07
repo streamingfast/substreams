@@ -337,7 +337,7 @@ func TestOneStoreOneMap(t *testing.T) {
 		},
 	}
 
-	manifest.UseSimpleHash = true
+	manifest.TestUseSimpleHash = true
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

@@ -263,6 +263,7 @@ func (ui *UI) restartStream() tea.Cmd {
 		func() tea.Msg {
 			return streamui.InterruptStreamMsg
 		},
+		tabs.SelectTabCmd(int(outputPage)),
 		func() tea.Msg {
 			return request.NewRequestInstance(requestInstance)
 		},

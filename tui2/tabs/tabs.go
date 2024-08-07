@@ -84,6 +84,17 @@ func (t *Tabs) View() string {
 	}
 	tabsView := lipgloss.JoinHorizontal(1.0, tabs...)
 
+	/*
+	            ▄▄
+	        ▄▄██▀▀
+	   ▁▄▄██▀▀ ▁▄▄
+	   ▔▀▀█▆▄▄ ▔▀▀██▄▄
+	        ▀▀██▄▄▁ ▀▀██▄▄▁
+	            ▀▀▔ ▄▄▆█▀▀▔
+	            ▄▄██▀▀
+	            ▀▀
+	*/
+
 	logoTab := t.LogoStyle.Render("Substreams GUI")
 	fill := max(t.Width-lipgloss.Width(tabsView)-lipgloss.Width(logoTab)+1, 0)
 

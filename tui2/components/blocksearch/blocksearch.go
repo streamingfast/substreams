@@ -37,6 +37,7 @@ func New(c common.Common) *BlockSearch {
 	input.Placeholder = ""
 	input.CharLimit = 1024
 	input.Width = c.Width
+	input.Prompt = "Go to block: "
 	return &BlockSearch{
 		Common: c,
 		input:  input,
@@ -51,7 +52,6 @@ func (s *BlockSearch) Init() tea.Cmd {
 	s.input.Focus()
 	s.input.SetValue("")
 	s.Current = ""
-	s.input.Prompt = "go-to block: "
 	s.historyPointer = 0
 	return nil
 }

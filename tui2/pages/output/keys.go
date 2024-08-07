@@ -12,10 +12,9 @@ func (o *Output) ShortHelp() []key.Binding {
 		keymap.PrevNextBlock,
 		keymap.Search,
 		keymap.ModuleSearch,
-		keymap.Help,
 		keymap.ToggleLogs,
 		keymap.GoToBlock,
-		keymap.ModGraphView,
+		keymap.Help,
 	}
 }
 
@@ -37,8 +36,8 @@ func (o *Output) FullHelp() [][]key.Binding {
 			keymap.PrevNextMatchedBlock,
 		},
 		{
-			keymap.ModGraphView,
 			keymap.ModuleSearch,
+			keymap.ModGraphView,
 			keymap.RestartStream,
 		},
 		{

@@ -17,6 +17,7 @@ import (
 	"github.com/streamingfast/substreams/tui2/components/modsearch"
 	"github.com/streamingfast/substreams/tui2/components/modselect"
 	"github.com/streamingfast/substreams/tui2/components/search"
+	"github.com/streamingfast/substreams/tui2/components/statusbar"
 	"github.com/streamingfast/substreams/tui2/pages/request"
 )
 
@@ -27,6 +28,7 @@ type Output struct {
 	msgDescs       map[string]*manifest.ModuleDescriptor
 	messageFactory *dynamic.MessageFactory
 
+	statusBar          *statusbar.StatusBar
 	moduleSelector     *modselect.ModSelect
 	blockSelector      *blockselect.BlockSelect
 	outputView         viewport.Model
@@ -83,6 +85,7 @@ func New(c common.Common, config *request.Config) (*Output, error) {
 		outputView:          viewport.New(24, 80),
 		messageFactory:      dynamic.NewMessageFactoryWithDefaults(),
 		outputViewYoffset:   map[request.BlockContext]int{},
+		statusBar:           statusbar.New(c),
 		searchCtx:           search.New(c),
 		blockSearchCtx:      blocksearch.New(c),
 		bytesRepresentation: dynamic.BytesAsHex,
@@ -107,14 +110,14 @@ func (o *Output) SetSize(w, h int) {
 	o.Common.SetSize(w, h)
 	o.moduleSelector.SetSize(w, 2)
 	o.blockSelector.SetSize(w, 5)
-	o.outputView.Width = w
-	o.outputView.Height = h - 11
-	o.moduleNavigator.FrameHeight = h - 11
-
+	o.statusBar.SetSize(w, h)
 	o.moduleSearchView.SetSize(w, h)
-	outputViewTopBorder := 1
-	o.outputView.Height = h - o.moduleSelector.Height - o.blockSelector.Height - outputViewTopBorder
 	o.searchCtx.SetSize(w, h)
+
+	o.moduleNavigator.FrameHeight = h - 11
+	outputViewTopBorder := 1
+	o.outputView.Width = w
+	o.outputView.Height = h - o.moduleSelector.Height - o.blockSelector.Height - outputViewTopBorder - o.statusBar.Height
 }
 
 func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -222,7 +225,7 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 		switch msg.String() {
 		case "M":
-			o.moduleNavigatorMode = !o.moduleNavigatorMode
+			//o.moduleNavigatorMode = !o.moduleNavigatorMode
 			o.setOutputViewContent(true)
 		case "=":
 			o.blockSearchEnabled = !o.blockSearchEnabled
@@ -267,6 +270,8 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		o.outputViewYoffset[o.active] = o.outputView.YOffset
 		o.setOutputViewContent(false)
 	}
+
+	_, _ = o.statusBar.Update(msg)
 
 	var cmd tea.Cmd
 	o.outputView, cmd = o.outputView.Update(msg)
@@ -328,27 +333,15 @@ func (o *Output) setOutputViewContent(forcedRender bool) {
 }
 
 func (o *Output) View() string {
-	//curX, curY := o.getMatchingModuleIndexFromString(o.moduleSearchView.highlightedMod)
-
 	var searchLine string
 	if o.searchEnabled {
-		// This to be managed by the Modal Dialog box
 		searchLine = o.searchCtx.View()
 	}
 
 	o.setOutputViewContent(false)
 
 	middleSection := o.outputView.View()
-
-	if o.moduleNavigatorMode {
-		return lipgloss.JoinVertical(0,
-			o.moduleSelector.View(),
-			o.blockSelector.View(),
-			"",
-			o.moduleNavigator.View(),
-			searchLine,
-		)
-	}
+	// TODO: reimplement the `navigator` module.
 
 	out := lipgloss.JoinVertical(0,
 		o.moduleSelector.View(),
@@ -356,6 +349,7 @@ func (o *Output) View() string {
 		"",
 		middleSection,
 		searchLine,
+		o.statusBar.View(),
 	)
 	return out
 }

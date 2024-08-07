@@ -17,7 +17,6 @@ import (
 
 type Docs struct {
 	common.Common
-	*request.Config
 
 	docsView viewport.Model
 
@@ -26,17 +25,16 @@ type Docs struct {
 	params     map[string][]string
 }
 
-func New(c common.Common, config *request.Config) *Docs {
+func New(c common.Common) *Docs {
 	page := &Docs{
 		Common:   c,
-		Config:   config,
 		docsView: viewport.New(c.Width, c.Height),
 		params:   make(map[string][]string),
 	}
 	return page
 }
 
-func (d *Docs) SetNewRequest(reqSummary *request.Summary, modules *pbsubstreams.Modules) {
+func (d *Docs) setNewRequest(reqSummary *request.Summary, modules *pbsubstreams.Modules) {
 	d.reqSummary = reqSummary
 	d.modules = modules
 
@@ -63,7 +61,8 @@ func (d *Docs) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case string:
 		log.Println("message bob", msg)
-
+	case request.NewRequestInstance:
+		d.setNewRequest(msg.RequestSummary, msg.Modules)
 	}
 	var cmd tea.Cmd
 	d.docsView, cmd = d.docsView.Update(msg)

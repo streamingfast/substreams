@@ -16,7 +16,6 @@ import (
 	"github.com/streamingfast/substreams/tui2/common"
 	"github.com/streamingfast/substreams/tui2/components/ranges"
 	"github.com/streamingfast/substreams/tui2/replaylog"
-	"github.com/streamingfast/substreams/tui2/stream"
 	"github.com/streamingfast/substreams/tui2/styles"
 )
 
@@ -34,20 +33,7 @@ type Progress struct {
 	slowestModules   []string
 	slowestSquashing []string
 
-	totalBytesRead    uint64
-	totalBytesWritten uint64
-
-	initCheckpointBlockCount uint64
-	lastCheckpointTime       time.Time
-	lastCheckpointBlocks     uint64
-	lastCheckpointBlockRate  uint64
-
-	maxParallelWorkers uint64
-	bars               *ranges.Bars
-
-	curErr          string
-	curErrFormated  string
-	curErrLineCount int
+	bars *ranges.Bars
 }
 
 func New(c common.Common) *Progress {
@@ -83,15 +69,12 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		linearHandoff := msg.LinearHandoffBlock
 		p.targetBlock = msg.ResolvedStartBlock
 		p.dataPayloads = 0
-		p.maxParallelWorkers = msg.MaxParallelWorkers
 		p.bars = ranges.NewBars(p.Common, linearHandoff)
 		p.bars.Init()
 	case *pbsubstreamsrpc.BlockScopedData:
 		p.dataPayloads += 1
 	case *pbsubstreamsrpc.ModulesProgress:
 		newBars := make([]*ranges.Bar, len(msg.Stages))
-
-		var totalProcessedBlocks uint64
 
 		sort.Slice(msg.RunningJobs, func(i, j int) bool {
 			if msg.RunningJobs[i].DurationMs == 0 {
@@ -109,7 +92,6 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		jobsPerStage := make([]int, len(msg.Stages))
 		slowJobCount := 0
 		for _, j := range msg.RunningJobs {
-			totalProcessedBlocks += j.ProcessedBlocks
 			jobsPerStage[j.Stage]++
 			if slowJobCount < 4 && j.DurationMs > 10000 { // skip 'young' jobs
 				newSlowestJobs = append(newSlowestJobs, fmt.Sprintf("[Stage: %d, Range: %d-%d, Duration: %ds, Blocks/sec: %.1f]", j.Stage, j.StartBlock, j.StopBlock, j.DurationMs/1000, float64(j.ProcessedBlocks)/float64(j.DurationMs/1000)))
@@ -173,7 +155,6 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			br := make([]*ranges.BlockRange, len(stage.CompletedRanges))
 			for j, r := range stage.CompletedRanges {
-				totalProcessedBlocks += (r.EndBlock - r.StartBlock)
 				br[j] = &ranges.BlockRange{
 					Start: r.StartBlock,
 					End:   r.EndBlock,
@@ -184,10 +165,6 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			sort.Slice(br, func(i, j int) bool { return br[i].Start < br[j].Start })
 			newBar := p.bars.NewBar(displayedName, br, displayedModules)
 			newBars[i] = newBar
-		}
-
-		if totalProcessedBlocks < p.lastCheckpointBlocks {
-			break
 		}
 
 		var mustResize bool
@@ -204,53 +181,19 @@ func (p *Progress) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		p.slowestSquashing = newSlowestSquashing
 
-		if elapsed := time.Since(p.lastCheckpointTime); elapsed > 900*time.Millisecond {
-			if p.lastCheckpointBlocks == 0 {
-				p.initCheckpointBlockCount = totalProcessedBlocks
-			} else {
-				blockDiff := totalProcessedBlocks - p.lastCheckpointBlocks
-				p.lastCheckpointBlockRate = blockDiff * 1000 / uint64(elapsed.Milliseconds())
-			}
-			p.lastCheckpointBlocks = totalProcessedBlocks
-			p.lastCheckpointTime = time.Now()
-		}
-
-		if msg.ProcessedBytes != nil {
-			p.totalBytesRead = msg.ProcessedBytes.TotalBytesRead
-			p.totalBytesWritten = msg.ProcessedBytes.TotalBytesWritten
-		}
-
 		if mustResize {
 			p.SetSize(p.Common.Width, p.Common.Height)
 		}
 		p.bars.Update(newBars)
 		p.progressView.SetContent(p.bars.View())
-	case stream.StreamErrorMsg:
-		p.state = "Error"
-		p.curErr = msg.Error()
-		p.SetSize(p.Common.Width, p.Common.Height)
-
-		return p, nil
 	case *replaylog.File:
 		p.replayState = " [saving to replay log]"
-	}
-	switch msg {
-	case stream.ConnectingMsg:
-		p.state = "Connecting"
-	case stream.ConnectedMsg:
-		p.state = "Connected"
-	case stream.EndOfStreamMsg:
-		p.state = "Stream ended"
-	case stream.ReplayedMsg:
-		p.state = "Replayed from log"
 	}
 
 	return p, outCmd
 }
 
 var labels = []string{
-	"Parallel engine blocks processed: ",
-	"Bytes Read / Written: ",
 	"Target block: ",
 	"Data payloads received: ",
 	"Status: ",
@@ -266,41 +209,8 @@ func labelsMaxLen() int {
 	return width
 }
 
-func wrapString(input string, screenWidth int) (string, int) {
-	words := strings.Fields(input)
-	var wrappedString strings.Builder
-	var lineLength int
-	lineCount := 1
-
-	for _, word := range words {
-		wordLen := len(word)
-
-		if lineLength+wordLen+1 > screenWidth {
-			wrappedString.WriteString("\n")
-			lineLength = 0
-			lineCount++
-		}
-
-		if lineLength > 0 {
-			wrappedString.WriteString(" ")
-			lineLength++
-		}
-
-		wrappedString.WriteString(word)
-		lineLength += wordLen
-	}
-
-	return wrappedString.String(), lineCount
-}
-
 func (p *Progress) View() string {
-	maxWorkers := ""
-	if p.maxParallelWorkers != 0 {
-		maxWorkers = fmt.Sprintf(", %d max workers", p.maxParallelWorkers)
-	}
 	infos := []string{
-		fmt.Sprintf("%d (%d per second%s)", p.lastCheckpointBlocks-p.initCheckpointBlockCount, p.lastCheckpointBlockRate, maxWorkers),
-		fmt.Sprintf("%s / %s", humanize.Bytes(p.totalBytesRead), humanize.Bytes(p.totalBytesWritten)),
 		fmt.Sprintf("%d", p.targetBlock),
 		fmt.Sprintf("%d", p.dataPayloads),
 		styles.StatusBarValue.Render(p.state + p.replayState),
@@ -311,10 +221,6 @@ func (p *Progress) View() string {
 			lipgloss.JoinVertical(1, labels...),
 			lipgloss.JoinVertical(0, infos...),
 		)),
-	}
-
-	if p.state == "Error" {
-		components = append(components, lipgloss.NewStyle().Background(styles.StreamErrorColor).Width(p.Width).Render(p.curErrFormated))
 	}
 
 	components = append(components,
@@ -339,11 +245,7 @@ func (p *Progress) View() string {
 }
 
 func (p *Progress) SetSize(w, h int) {
-	if p.curErr != "" {
-		p.curErrFormated, p.curErrLineCount = wrapString(p.curErr, p.Width) // wrapping and linecount always recomputed on SetSize
-	}
-
-	headerHeight := 8 + p.curErrLineCount
+	headerHeight := 8
 	footerHeight := 0
 	if p.slowestModules != nil {
 		footerHeight += len(p.slowestModules) + 2

@@ -58,14 +58,14 @@ func New(reqConfig *request.Config) (*UI, error) {
 			request.New(c, reqConfig),
 			progress.New(c),
 			outputTab,
-			docs.New(c, reqConfig),
+			docs.New(c),
 		},
-		activePage:    progressPage,
-		tabs:          tabs.New(c, []string{"Request", "Progress", "Output", "Docs"}),
+		activePage:    outputPage,
+		tabs:          tabs.New(c, []string{"Request", "Backprocessing", "Output", "Docs"}),
 		requestConfig: reqConfig,
 		replayLog:     replaylog.New(),
 	}
-	ui.footer = footer.New(c, ui.pages[requestPage])
+	ui.footer = footer.New(c, ui.pages[ui.activePage])
 
 	return ui, nil
 }
@@ -83,7 +83,7 @@ func (ui *UI) Init() tea.Cmd {
 		ui.footer.Init(),
 	)
 
-	cmds = append(cmds, tabs.SelectTabCmd(1))
+	cmds = append(cmds, tabs.SelectTabCmd(int(outputPage)))
 
 	return tea.Batch(cmds...)
 }
@@ -147,7 +147,6 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		ui.stream = msg.Stream
 		ui.msgDescs = msg.MsgDescs
 		ui.replayLog = msg.ReplayLog
-		ui.pages[docsPage].(*docs.Docs).SetNewRequest(msg.RequestSummary, msg.Modules)
 		cmds = append(cmds, ui.stream.Init())
 	case streamui.Msg:
 		switch msg {
@@ -171,11 +170,15 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, ui.stream.Update(msg))
 	}
 
+	var holdModalKeys bool
 	if ui.modalComponent != nil {
 		m, cmd := ui.modalComponent.Update(msg)
 		ui.modalComponent = m.(common.Component)
 		cmds = append(cmds, cmd)
-	} else {
+		holdModalKeys = true
+	}
+
+	if _, isKeyMsg := msg.(tea.KeyMsg); !holdModalKeys || !isKeyMsg {
 		_, cmd := ui.footer.Update(msg)
 		cmds = append(cmds, cmd)
 		_, cmd = ui.tabs.Update(msg)
@@ -229,8 +232,8 @@ func (ui *UI) View() string {
 
 	main := lipgloss.JoinVertical(0,
 		styles.Tabs.Render(ui.tabs.View()),
-		ui.pages[ui.activePage].View(),
 		ui.footer.View(),
+		ui.pages[ui.activePage].View(),
 	)
 
 	if ui.modalComponent != nil {

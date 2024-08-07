@@ -30,6 +30,7 @@ func New(c common.Common, keymap help.KeyMap) *Footer {
 	h.Styles.ShortDesc = styles.HelpValue
 	h.Styles.FullKey = styles.HelpKey
 	h.Styles.FullDesc = styles.HelpValue
+	h.Styles.FullSeparator = h.Styles.ShortSeparator
 	f := &Footer{
 		Common: c,
 		help:   h,
@@ -70,10 +71,8 @@ func (f *Footer) View() string {
 	if f.keymap == nil {
 		return ""
 	}
-	s := styles.Footer.
-		Width(f.Width)
 	helpView := f.help.View(f.keymap)
-	return lipgloss.NewStyle().Margin(0, 1).Render(s.Render(helpView))
+	return styles.Footer.Width(f.Width).Render(helpView)
 }
 
 // ShowAll returns whether the full help is shown.

@@ -77,7 +77,6 @@ type Request struct {
 	traceId            string
 	resolvedStartBlock uint64
 	linearHandoffBlock uint64
-	parallelWorkers    uint64
 }
 
 func New(c common.Common, conf *Config) *Request {
@@ -154,7 +153,6 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		r.traceId = msg.TraceId
 		r.resolvedStartBlock = msg.ResolvedStartBlock
 		r.linearHandoffBlock = msg.LinearHandoffBlock
-		r.parallelWorkers = msg.MaxParallelWorkers
 	}
 	return r, tea.Batch(cmds...)
 }
@@ -183,7 +181,7 @@ func (r *Request) renderRequestSummary() string {
 	}
 
 	startBlock := fmt.Sprintf("%d%s", r.resolvedStartBlock, handoffStr)
-	startBlock = r.formStartBlock
+	//startBlock = r.formStartBlock
 
 	rows := [][]string{
 		{"Package:", summary.Manifest},
@@ -191,10 +189,8 @@ func (r *Request) renderRequestSummary() string {
 		{"[e] Endpoint:", summary.Endpoint},
 		{"[s] Start Block:", startBlock},
 		{"[t] Stop Block:", r.Config.RawStopBlock},
-		{"Parameters:", fmt.Sprintf("%v", summary.Params)},
+		{"Parameters:", strings.Join(paramsStrings, "; ")}, // )},
 		{"Production mode:", fmt.Sprintf("%v", summary.ProductionMode)},
-		{"Trace ID:", r.traceId},
-		{"Parallel Workers:", fmt.Sprintf("%d", r.parallelWorkers)},
 	}
 
 	if len(summary.InitialSnapshot) > 0 {

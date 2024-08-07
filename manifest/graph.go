@@ -482,59 +482,81 @@ func (g *ModuleGraph) ModulesDownTo(moduleName string) ([]*pbsubstreams.Module, 
 	return res, nil
 }
 
-//// ArrayLayout returns a 2D array of module indexes. The first layer of the array contains the target module,
-//// and each subsequent layer contains the modules that depend on the modules in the previous layer.
-//// It also returns a map of module indexes to their coordinates in the array.
-//func (g *ModuleGraph) ArrayLayout(targetModule string) ([][]string, map[string][2]int, error) {
-//	_, distances := graph.ShortestPaths(g, g.ModuleIndexFromName(targetModule))
-//
-//	alreadyAdded := map[string]bool{}
-//	distanceMap := map[int64][]int{}
-//
-//	for i, d := range distances {
-//		if d < 0 {
-//			continue
-//		}
-//
-//		module := g.ModuleNameFromIndex(i)
-//		if _, ok := alreadyAdded[module]; ok {
-//			continue
-//		}
-//
-//		if distanceMap[d] == nil {
-//			distanceMap[d] = []int{}
-//		}
-//		distanceMap[d] = append(distanceMap[d], i)
-//	}
-//
-//	var distanceKeys []int64
-//	for k := range distanceMap {
-//		distanceKeys = append(distanceKeys, k)
-//	}
-//	sort.Slice(distanceKeys, func(i, j int) bool {
-//		return distanceKeys[i] < distanceKeys[j]
-//	})
-//
-//	res := make([][]string, len(distanceKeys))
-//
-//	for i, d := range distanceKeys {
-//		tmp := distanceMap[d]
-//		strRow := make([]string, len(tmp))
-//		for j, idx := range tmp {
-//			strRow[j] = g.ModuleNameFromIndex(idx)
-//		}
-//		res[i] = strRow
-//	}
-//
-//	locationIndex := make(map[string][2]int)
-//	for i, col := range res {
-//		for j, modIdx := range col {
-//			locationIndex[modIdx] = [2]int{i, j}
-//		}
-//	}
-//
-//	return res, locationIndex, nil
-//}
+func (g *ModuleGraph) Roots() []*pbsubstreams.Module {
+	var roots []*pbsubstreams.Module
+	for _, module := range g.modules {
+		if g.OutDegree(module.Name) == 0 {
+			roots = append(roots, module)
+		}
+	}
+	return roots
+}
+
+func (g *ModuleGraph) RootNames() []string {
+	var roots []string
+	for _, module := range g.Roots() {
+		roots = append(roots, module.Name)
+	}
+	return roots
+}
+
+func (g *ModuleGraph) InDegree(moduleName string) int {
+	// calculate the in-degree of a module
+	moduleIndex, found := g.moduleIndex[moduleName]
+	if !found {
+		return 0
+	}
+
+	var degree int
+	for _, v := range g.moduleIndex {
+		if v == moduleIndex {
+			continue
+		}
+		if g.Edge(v, moduleIndex) {
+			degree++
+		}
+	}
+
+	return degree
+}
+
+func (g *ModuleGraph) Leafs() []*pbsubstreams.Module {
+	var leafs []*pbsubstreams.Module
+	for _, module := range g.modules {
+		if g.InDegree(module.Name) == 0 {
+			leafs = append(leafs, module)
+		}
+	}
+	return leafs
+}
+
+func (g *ModuleGraph) LeafNames() []string {
+	var leafs []string
+	for _, module := range g.Leafs() {
+		leafs = append(leafs, module.Name)
+	}
+	return leafs
+}
+
+func (g *ModuleGraph) OutDegree(moduleName string) int {
+	// calculate the out-degree of a module
+	moduleIndex, found := g.moduleIndex[moduleName]
+	if !found {
+		return 0
+	}
+
+	var degree int
+	for _, v := range g.moduleIndex {
+		if v == moduleIndex {
+			continue
+		}
+		if g.Edge(moduleIndex, v) {
+			degree++
+		}
+	}
+
+	return degree
+}
 
 func (g *ModuleGraph) ModuleInitialBlock(moduleName string) (uint64, error) {
 	if moduleIndex, found := g.moduleIndex[moduleName]; found {

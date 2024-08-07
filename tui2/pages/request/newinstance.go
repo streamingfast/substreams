@@ -19,6 +19,14 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+type SetupNewInstanceMsg struct {
+	StartStream bool
+}
+
+func SetupNewInstanceCmd(startStream bool) tea.Cmd {
+	return func() tea.Msg { return SetupNewInstanceMsg{StartStream: startStream} }
+}
+
 type NewRequestInstance *Instance
 
 type Config struct {
@@ -42,7 +50,6 @@ type Config struct {
 	Vcr                         bool
 	Cursor                      string
 	Params                      string
-	ReaderOptions               []manifest.Option
 }
 
 type Instance struct {
@@ -87,6 +94,13 @@ func (c *Config) NewInstance() (out *Instance, err error) {
 	pkg, graph, err := manifestReader.Read()
 	if err != nil {
 		return nil, fmt.Errorf("parsing package at %q: %w", c.ManifestPath, err)
+	}
+
+	if c.OutputModule == "" {
+		mods, ok := graph.TopologicalSort()
+		if ok {
+			c.OutputModule = mods[0].Name
+		}
 	}
 
 	/* PHASE THIS OUT SOME DAY! */

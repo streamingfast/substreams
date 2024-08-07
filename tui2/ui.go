@@ -62,7 +62,7 @@ func New(reqConfig *request.Config) (*UI, error) {
 			outputTab,
 			docs.New(c),
 		},
-		activePage:    outputPage,
+		activePage:    requestPage,
 		tabs:          tabs.New(c, []string{"Request", "Backprocessing", "Output", "Docs"}),
 		requestConfig: reqConfig,
 		replayLog:     replaylog.New(),
@@ -85,7 +85,7 @@ func (ui *UI) Init() tea.Cmd {
 		ui.footer.Init(),
 	)
 
-	cmds = append(cmds, tabs.SelectTabCmd(int(outputPage)))
+	cmds = append(cmds, tabs.SelectTabCmd(int(requestPage)))
 
 	return tea.Batch(cmds...)
 }
@@ -125,6 +125,8 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case common.CancelModalMsg:
 		ui.modalComponent = nil
 		ui.footer.SetKeyMap(ui.pages[ui.activePage])
+	case request.SetupNewInstanceMsg:
+		return ui, ui.setupNewInstance(msg.StartStream)
 	case tea.KeyMsg:
 		ui.forceRefresh()
 		if msg.String() == "ctrl+c" {
@@ -140,7 +142,7 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			ui.footer.SetShowAll(!ui.footer.ShowAll())
 			ui.resize()
 		case "r":
-			return ui, ui.setupNewInstance(true)
+			return ui, request.SetupNewInstanceCmd(true)
 		}
 		_, cmd := ui.tabs.Update(msg)
 		cmds = append(cmds, cmd)
@@ -249,7 +251,7 @@ func (ui *UI) View() string {
 			contents := ui.modalComponent.View()
 			style := styles.ModalBox
 			if fullWidth {
-				style = styles.FullWidthModalBox.Width(ui.Width)
+				style = styles.FullWidthModalBox.Width(ui.Width - 2)
 			}
 			modalView := style.Render(contents)
 			x := ui.Width/2 - lipgloss.Width(modalView)/2

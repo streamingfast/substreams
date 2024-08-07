@@ -17,8 +17,10 @@ type DataEntry struct {
 
 func New(c common.Common, field string, validation func(input string) error) *DataEntry {
 	input := huh.NewInput().
-		Validate(validation).
 		Key(field)
+	if validation != nil {
+		input.Validate(validation)
+	}
 	input.WithAccessible(true)
 
 	form := huh.NewForm(huh.NewGroup(input).WithShowErrors(true)).WithTheme(huh.ThemeCharm())
@@ -29,6 +31,10 @@ func New(c common.Common, field string, validation func(input string) error) *Da
 		Input:      input,
 		Form:       form,
 	}
+}
+
+func (m *DataEntry) SetValue(val string) {
+	m.Input.Value(&val)
 }
 
 func (m *DataEntry) Init() tea.Cmd {

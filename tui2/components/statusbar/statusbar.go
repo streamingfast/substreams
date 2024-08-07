@@ -63,6 +63,8 @@ func (s *StatusBar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case *pbsubstreamsrpc.ModulesProgress:
 		if s.state == "Connected" {
 			s.state = "Backprocessing"
+			// TODO: when we detect we're backprocessing, let's switch the tab.
+			//tabs.SelectTabCmd(int(outputPage))
 		}
 		if msg.ProcessedBytes != nil {
 			s.totalBytesRead = msg.ProcessedBytes.TotalBytesRead

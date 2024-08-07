@@ -13,7 +13,6 @@ import (
 	"github.com/streamingfast/substreams/tui2/common"
 	"github.com/streamingfast/substreams/tui2/components/blocksearch"
 	"github.com/streamingfast/substreams/tui2/components/blockselect"
-	"github.com/streamingfast/substreams/tui2/components/modgraph"
 	"github.com/streamingfast/substreams/tui2/components/modsearch"
 	"github.com/streamingfast/substreams/tui2/components/modselect"
 	"github.com/streamingfast/substreams/tui2/components/search"
@@ -64,15 +63,15 @@ type Output struct {
 	blockSearchEnabled bool
 	blockSearchCtx     *blocksearch.BlockSearch
 
-	moduleNavigatorMode bool
-	moduleNavigator     *modgraph.Navigator
+	// moduleNavigatorMode bool
+	// moduleNavigator     *modgraph.Navigator
 }
 
 func New(c common.Common, config *request.Config) (*Output, error) {
-	nav, err := modgraph.New(config.OutputModule, c, modgraph.WithModuleGraph(config.Graph))
-	if err != nil {
-		return nil, err
-	}
+	// nav, err := modgraph.New(config.OutputModule, c, modgraph.WithModuleGraph(config.Graph))
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	output := &Output{
 		Common:              c,
@@ -89,11 +88,11 @@ func New(c common.Common, config *request.Config) (*Output, error) {
 		searchCtx:           search.New(c),
 		blockSearchCtx:      blocksearch.New(c),
 		bytesRepresentation: dynamic.BytesAsHex,
-		moduleSearchView:    modsearch.New(c),
+		moduleSearchView:    modsearch.New(c, "output"),
 		outputModule:        config.OutputModule,
 		logsEnabled:         true,
-		moduleNavigator:     nav,
-		firstBlockSeen:      true,
+		//moduleNavigator:     nav,
+		firstBlockSeen: true,
 	}
 	return output, nil
 }
@@ -114,7 +113,7 @@ func (o *Output) SetSize(w, h int) {
 	o.moduleSearchView.SetSize(w, h)
 	o.searchCtx.SetSize(w, h)
 
-	o.moduleNavigator.FrameHeight = h - 11
+	//o.moduleNavigator.FrameHeight = h - 11
 	outputViewTopBorder := 1
 	o.outputView.Width = w
 	o.outputView.Height = h - o.moduleSelector.Height - o.blockSelector.Height - outputViewTopBorder - o.statusBar.Height
@@ -202,13 +201,16 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		o.setOutputViewContent(true)
 		cmds = append(cmds, o.updateMatchingBlocks())
 	case common.ModuleSelectedMsg:
-		o.active.Module = string(msg)
+		if msg.Target != "output" {
+			break
+		}
+		o.active.Module = msg.ModuleName
 		o.blockSelector.SetAvailableBlocks(o.blocksPerModule[o.active.Module])
 		o.outputView.YOffset = o.outputViewYoffset[o.active]
 		o.setOutputViewContent(true)
 		cmds = append(cmds, o.updateMatchingBlocks())
-		_, _ = o.moduleNavigator.Update(msg)
-		o.moduleSearchView.SetSelected(string(msg))
+		//_, _ = o.moduleNavigator.Update(msg)
+		o.moduleSearchView.SetSelected(msg.ModuleName)
 
 	case blockselect.BlockChangedMsg:
 		if o.hasDataForBlock(uint64(msg)) {
@@ -226,7 +228,7 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "M":
 			//o.moduleNavigatorMode = !o.moduleNavigatorMode
-			o.setOutputViewContent(true)
+			//o.setOutputViewContent(true)
 		case "=":
 			o.blockSearchEnabled = !o.blockSearchEnabled
 			cmds = append(cmds, common.SetModalComponentCmd(o.blockSearchCtx))

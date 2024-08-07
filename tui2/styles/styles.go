@@ -114,6 +114,12 @@ var (
 			Foreground(lipgloss.AdaptiveColor{Dark: "252", Light: "242"}).
 			MarginLeft(2)
 
+	StreamButton = lipgloss.NewStyle().
+			Foreground(lipgloss.AdaptiveColor{Dark: "230", Light: "220"}).
+			Background(lipgloss.AdaptiveColor{Dark: "204", Light: "211"}).
+			Padding(1, 4).
+			Border(lipgloss.RoundedBorder())
+
 	Spinner = lipgloss.NewStyle().
 		MarginTop(1).
 		MarginLeft(2).
@@ -206,7 +212,7 @@ var (
 	RequestRight   = RequestCell.Align(lipgloss.Right)
 
 	ModalBox          = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.AdaptiveColor{Dark: "205", Light: "213"})
-	FullWidthModalBox = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.AdaptiveColor{Dark: "205", Light: "213"}).BorderLeft(false).BorderRight(false)
+	FullWidthModalBox = ModalBox //.BorderLeft(false).BorderRight(false)
 
 	DocModuleName = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Dark: "12", Light: "14"})
 

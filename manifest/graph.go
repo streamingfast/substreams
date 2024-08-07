@@ -173,7 +173,7 @@ func (g *ModuleGraph) Modules() []string {
 func (g *ModuleGraph) MapModules() []string {
 	var modules []string
 	for _, module := range g.modules {
-		if module.GetKindMap() != nil {
+		if _, ok := module.Kind.(*pbsubstreams.Module_KindMap_); ok {
 			modules = append(modules, module.Name)
 		}
 	}

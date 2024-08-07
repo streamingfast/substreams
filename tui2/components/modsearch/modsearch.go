@@ -13,7 +13,7 @@ type ModuleSearch struct {
 	list.Model
 }
 
-func New(c common.Common) *ModuleSearch {
+func New(c common.Common, target string) *ModuleSearch {
 	delegate := list.NewDefaultDelegate()
 	delegate.UpdateFunc = func(msg tea.Msg, m *list.Model) tea.Cmd {
 		it, ok := m.SelectedItem().(item)
@@ -25,7 +25,7 @@ func New(c common.Common) *ModuleSearch {
 		case tea.KeyMsg:
 			switch msg.String() {
 			case "enter":
-				return tea.Sequence(common.EmitModuleSelectedMsg(it.Title()), common.CancelModalCmd())
+				return tea.Sequence(common.EmitModuleSelectedCmd(it.Title(), target), common.CancelModalCmd())
 			}
 		}
 		return nil

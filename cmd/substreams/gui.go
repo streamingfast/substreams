@@ -12,7 +12,6 @@ import (
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/substreams/client"
-	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/tools"
 	"github.com/streamingfast/substreams/tui2"
 	"github.com/streamingfast/substreams/tui2/pages/request"
@@ -85,30 +84,21 @@ func runGui(cmd *cobra.Command, args []string) (err error) {
 	network := sflags.MustGetString(cmd, "network")
 	paramsString := sflags.MustGetStringArray(cmd, "params")
 
-	readerOptions := []manifest.Option{}
-	if sflags.MustGetBool(cmd, "skip-package-validation") {
-		readerOptions = append(readerOptions, manifest.SkipPackageValidationReader())
-	}
+	// readerOptions := []manifest.Option{}
+	// if sflags.MustGetBool(cmd, "skip-package-validation") {
+	// 	readerOptions = append(readerOptions, manifest.SkipPackageValidationReader())
+	// }
 
-	// TODO: we'll want to do a first read here but also bring the manifestPath into the Config
-	// to make sure we reload the `spkg` or the `substreams.yaml` manifest between runs, if we
-	// restart the stream, to accomodate the `restart stream`, and pick up any changes in the
-	// latest build.
-	manifestReader, err := manifest.NewReader(manifestPath, readerOptions...)
-	if err != nil {
-		return fmt.Errorf("manifest reader: %w", err)
-	}
+	// manifestReader, err := manifest.NewReader(manifestPath, readerOptions...)
+	// if err != nil {
+	// 	return fmt.Errorf("manifest reader: %w", err)
+	// }
 
-	pkg, graph, err := manifestReader.Read()
-	if err != nil {
-		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
-	}
+	// pkg, graph, err := manifestReader.Read()
+	// if err != nil {
+	// 	return fmt.Errorf("read manifest %q: %w", manifestPath, err)
+	// }
 
-	// TODO: bring some of that into the `tui` UI, because the user might change the network
-	// which would change the default endpoint here.. and we would always fallback
-	// on the env vars for finding the endpoint. The user can always tweak the endpoint himself in the UI.
-	//
-	//	manifest.ExtractNetworkEndpoint(pkg.Network, "", zlog)
 	endpoint := sflags.MustGetString(cmd, "substreams-endpoint")
 
 	authToken, authType := tools.GetAuth(cmd, "substreams-api-key-envvar", "substreams-api-token-envvar")
@@ -140,10 +130,10 @@ func runGui(cmd *cobra.Command, args []string) (err error) {
 	stopBlock := sflags.MustGetString(cmd, "stop-block")
 
 	requestConfig := &request.Config{
-		ManifestPath:                manifestPath,
-		Pkg:                         pkg,
-		SkipPackageValidation:       sflags.MustGetBool(cmd, "skip-package-validation"),
-		Graph:                       graph,
+		ManifestPath: manifestPath,
+		// Pkg:                         pkg,
+		SkipPackageValidation: sflags.MustGetBool(cmd, "skip-package-validation"),
+		// Graph:                       graph,
 		ProdMode:                    productionMode,
 		DebugModulesOutput:          debugModulesOutput,
 		DebugModulesInitialSnapshot: debugModulesInitialSnapshot,
@@ -159,7 +149,7 @@ func runGui(cmd *cobra.Command, args []string) (err error) {
 		StopBlock:                   stopBlock,
 		FinalBlocksOnly:             sflags.MustGetBool(cmd, "final-blocks-only"),
 		Params:                      strings.Join(paramsString, "\n"),
-		ReaderOptions:               readerOptions,
+		// ReaderOptions:               readerOptions,
 	}
 
 	ui, err := tui2.New(requestConfig)

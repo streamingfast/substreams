@@ -147,7 +147,10 @@ func (n *Navigator) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case common.ModuleSelectedMsg:
-		newModule := string(msg)
+		if msg.Target != "output" {
+			break
+		}
+		newModule := msg.ModuleName
 		parents, children, err := n.graph.Context(newModule)
 		if err != nil {
 			break
@@ -342,7 +345,7 @@ func (n *Navigator) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			n.CurrentGrandParentPreviewColumn = []string{}
 			n.CurrentPreviewColumn = []string{}
 
-			cmds = append(cmds, common.EmitModuleSelectedMsg(n.SelectedModule))
+			cmds = append(cmds, common.EmitModuleSelectedCmd(n.SelectedModule, "output"))
 		}
 	}
 
@@ -350,7 +353,7 @@ func (n *Navigator) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (n *Navigator) dispatchModuleSelected() tea.Msg {
-	return common.EmitModuleSelectedMsg(n.HighlightedModule)
+	return common.EmitModuleSelectedCmd(n.HighlightedModule, "output")
 }
 
 func tallestCol(arrs ...[]string) int {

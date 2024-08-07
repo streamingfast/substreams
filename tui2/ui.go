@@ -10,6 +10,7 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/tui2/common"
 	"github.com/streamingfast/substreams/tui2/footer"
+	"github.com/streamingfast/substreams/tui2/pages/docs"
 	"github.com/streamingfast/substreams/tui2/pages/output"
 	"github.com/streamingfast/substreams/tui2/pages/progress"
 	"github.com/streamingfast/substreams/tui2/pages/request"
@@ -25,6 +26,7 @@ const (
 	requestPage page = iota
 	progressPage
 	outputPage
+	docsPage
 )
 
 type UI struct {
@@ -46,7 +48,7 @@ type UI struct {
 func New(reqConfig *request.Config) (*UI, error) {
 	c := common.Common{}
 
-	out, err := output.New(c, reqConfig)
+	outputTab, err := output.New(c, reqConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -55,14 +57,15 @@ func New(reqConfig *request.Config) (*UI, error) {
 		pages: []common.Component{
 			request.New(c, reqConfig),
 			progress.New(c),
-			out,
+			outputTab,
+			docs.New(c, reqConfig),
 		},
 		activePage:    progressPage,
-		tabs:          tabs.New(c, []string{"Request", "Progress", "Output"}),
+		tabs:          tabs.New(c, []string{"Request", "Progress", "Output", "Docs"}),
 		requestConfig: reqConfig,
 		replayLog:     replaylog.New(),
 	}
-	ui.footer = footer.New(c, ui.pages[0])
+	ui.footer = footer.New(c, ui.pages[requestPage])
 
 	return ui, nil
 }
@@ -144,6 +147,7 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		ui.stream = msg.Stream
 		ui.msgDescs = msg.MsgDescs
 		ui.replayLog = msg.ReplayLog
+		ui.pages[docsPage].(*docs.Docs).SetNewRequest(msg.RequestSummary, msg.Modules)
 		cmds = append(cmds, ui.stream.Init())
 	case streamui.Msg:
 		switch msg {

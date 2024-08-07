@@ -17,7 +17,6 @@ import (
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
 
@@ -79,21 +78,17 @@ type Request struct {
 	resolvedStartBlock uint64
 	linearHandoffBlock uint64
 	parallelWorkers    uint64
-	params             map[string][]string
 }
 
 func New(c common.Common, conf *Config) *Request {
 	return &Request{
-		Common:       c,
-		Config:       conf,
-		manifestView: viewport.New(24, 80),
+		Common: c,
+		Config: conf,
 	}
 }
 
 func (r *Request) Init() tea.Cmd {
-	return tea.Batch(
-		r.manifestView.Init(),
-	)
+	return nil
 }
 
 func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -102,15 +97,6 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case NewRequestInstance:
 		r.RequestSummary = msg.RequestSummary
-		r.Modules = msg.Modules
-
-		r.params = make(map[string][]string)
-		if msg.RequestSummary.Params != nil {
-			for k, v := range msg.RequestSummary.Params {
-				r.params[k] = append(r.params[k], v)
-			}
-		}
-		r.setModulesViewContent()
 
 	case common.SetRequestValue:
 		log.Println("Received value", msg.Field, msg.Value)
@@ -162,11 +148,6 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, common.SetModalComponentCmd(comp))
 		case "e":
 		case "a":
-
-		default:
-			var cmd tea.Cmd
-			r.manifestView, cmd = r.manifestView.Update(msg)
-			cmds = append(cmds, cmd)
 		}
 
 	case *pbsubstreamsrpc.SessionInit:
@@ -180,29 +161,10 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (r *Request) SetSize(w, h int) {
 	r.Common.SetSize(w, h)
-
-	summaryHeight := lipgloss.Height(r.renderRequestSummary())
-	r.manifestView.Height = max(h-summaryHeight-2 /* for borders */, 0)
-	r.manifestView.Width = w
 }
 
 func (r *Request) View() string {
-	out := lipgloss.JoinVertical(0,
-		r.renderRequestSummary(),
-		r.renderManifestView(),
-	)
-	//fmt.Println("OUTPUT", lipgloss.Height(out), r.Height)
-	return out
-}
-
-func (r *Request) renderManifestView() string {
-	return lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder(), true).
-		Width(r.Width - 2).
-		MaxHeight(r.manifestView.Height + 2 /* for borders */).
-		Render(
-			r.manifestView.View(),
-		)
+	return r.renderRequestSummary()
 }
 
 func (r *Request) renderRequestSummary() string {
@@ -251,89 +213,6 @@ func (r *Request) renderRequestSummary() string {
 	})
 
 	return t.Render()
-}
-
-func (r *Request) setModulesViewContent() {
-	content, _ := r.getViewportContent()
-	r.manifestView.SetContent(content)
-}
-
-func (r *Request) getViewportContent() (string, error) {
-	output := ""
-
-	for i, module := range r.Modules.Modules {
-		if len(r.RequestSummary.ModuleDocs) < i+1 {
-			break
-		}
-		var moduleDoc string
-		var err error
-
-		moduleDoc, err = r.getViewPortDropdown(r.RequestSummary.ModuleDocs[i])
-		if err != nil {
-			return "", fmt.Errorf("getting module doc: %w", err)
-		}
-
-		output += fmt.Sprintf("%s\n\n", module.Name)
-		output += fmt.Sprintf("	Initial block: %v\n", module.InitialBlock)
-		output += fmt.Sprintln("	Inputs: ")
-		for i, input := range module.Inputs {
-			_ = input
-			// switch input.(type) {
-
-			// }
-			// switch module.Inputs[i].(type) {
-			// case *pbsubstreams.ModuleInputBlock:
-			// case *pbsubstreams.ModuleInputCursor:
-			// case *pbsubstreams.ModuleInputParams:
-			// case *pbsubstreams.ModuleInputParams:
-			// }
-			if module.Inputs[i].GetParams() != nil && r.params[module.Name] != nil {
-				output += fmt.Sprintf("		- params: [%s]\n", strings.Join(r.params[module.Name], ", "))
-			} else {
-				output += fmt.Sprintf("		- %s\n", module.Inputs[i])
-			}
-		}
-		output += fmt.Sprintln("	Outputs: ")
-		output += fmt.Sprintf("		- %s\n", module.Output)
-		output += moduleDoc
-		if i <= len(r.Modules.Modules)-1 {
-			output += "\n\n"
-		}
-	}
-
-	return lipgloss.NewStyle().Padding(2, 4, 1, 4).Render(output), nil
-}
-
-func (r *Request) getViewPortDropdown(moduleMetadata *pbsubstreams.ModuleMetadata) (string, error) {
-	content, err := glamorizeDoc(moduleMetadata.GetDoc())
-	if err != nil {
-		return "", fmt.Errorf("getting module docs: %w", err)
-	}
-
-	return content, nil
-}
-
-func glamorizeDoc(doc string) (string, error) {
-	markdown := ""
-
-	if doc != "" {
-		markdown += "# " + "docs: \n"
-		markdown += "\n"
-		markdown += doc
-		markdown += "\n"
-	}
-	markdown += "\n\n"
-
-	style := "light"
-	if lipgloss.HasDarkBackground() {
-		style = "dark"
-	}
-	out, err := glamour.Render(markdown, style)
-	if err != nil {
-		return "", fmt.Errorf("GlamouriseItem: %w", err)
-	}
-
-	return out, nil
 }
 
 func (c *Config) NewInstance() (*Instance, error) {

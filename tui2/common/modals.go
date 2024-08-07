@@ -10,6 +10,9 @@ type CancelModalMsg struct{} // Emitted by components to close itselt
 type IsInlineModal interface {
 	IsInlineModal()
 }
+type IsFullWidthModal interface {
+	IsFullWidthModal()
+}
 
 func SetModalComponentCmd(comp Component) tea.Cmd {
 	return func() tea.Msg {

@@ -41,7 +41,7 @@ func init() {
 
 // guiCmd represents the command to run substreams remotely
 var guiCmd = &cobra.Command{
-	Use:   "gui [<manifest>] [<module_name>]",
+	Use:   "gui [<manifest> [<module_name>]]",
 	Short: "Stream module outputs from a given package on a remote endpoint",
 	Long: cli.Dedent(`
 		Stream module output from a given package on a remote endpoint. The manifest is optional as it will try to find a file named
@@ -49,24 +49,19 @@ var guiCmd = &cobra.Command{
 		file in place of '<manifest_file>, or a link to a remote .spkg file, using urls gs://, http(s)://, ipfs://, etc.'.
 	`),
 	RunE:         runGui,
-	Args:         cobra.RangeArgs(1, 2),
+	Args:         cobra.RangeArgs(0, 2),
 	SilenceUsage: true,
 }
 
-func runGui(cmd *cobra.Command, args []string) error {
-	// TODO: DRY up this and `run` .. such duplication here.
-
-	manifestPath := ""
-	var err error
+func runGui(cmd *cobra.Command, args []string) (err error) {
+	var manifestPath string
+	var outputModule string
 	if len(args) == 2 {
 		manifestPath = args[0]
-		args = args[1:]
+		outputModule = args[1]
+	} else if len(args) == 1 {
+		manifestPath = args[0]
 	} else {
-		// Check common error where manifest is provided by module name is missing
-		if manifest.IsLikelyManifestInput(args[0]) {
-			return fmt.Errorf("missing <module_name> argument, check 'substreams run --help' for more information")
-		}
-
 		// At this point, we assume the user invoked `substreams run <module_name>` so we `resolveManifestFile` using the empty string since no argument has been passed.
 		manifestPath, err = resolveManifestFile("")
 		if err != nil {
@@ -87,19 +82,10 @@ func runGui(cmd *cobra.Command, args []string) error {
 		debugModulesInitialSnapshot = nil
 	}
 
-	outputModule := args[0]
 	network := sflags.MustGetString(cmd, "network")
 	paramsString := sflags.MustGetStringArray(cmd, "params")
-	params, err := manifest.ParseParams(paramsString)
-	if err != nil {
-		return fmt.Errorf("parsing params: %w", err)
-	}
 
-	readerOptions := []manifest.Option{
-		manifest.WithOverrideOutputModule(outputModule), // TODO: we'll select this in the UI later..
-		manifest.WithOverrideNetwork(network),
-		manifest.WithParams(params), // TODO: bring any params into the Config
-	}
+	readerOptions := []manifest.Option{}
 	if sflags.MustGetBool(cmd, "skip-package-validation") {
 		readerOptions = append(readerOptions, manifest.SkipPackageValidationReader())
 	}
@@ -121,18 +107,16 @@ func runGui(cmd *cobra.Command, args []string) error {
 	// TODO: bring some of that into the `tui` UI, because the user might change the network
 	// which would change the default endpoint here.. and we would always fallback
 	// on the env vars for finding the endpoint. The user can always tweak the endpoint himself in the UI.
-	endpoint, err := manifest.ExtractNetworkEndpoint(pkg.Network, sflags.MustGetString(cmd, "substreams-endpoint"), zlog)
-	if err != nil {
-		return fmt.Errorf("extracting endpoint: %w", err)
-	}
+	//
+	//	manifest.ExtractNetworkEndpoint(pkg.Network, "", zlog)
+	endpoint := sflags.MustGetString(cmd, "substreams-endpoint")
 
 	authToken, authType := tools.GetAuth(cmd, "substreams-api-key-envvar", "substreams-api-token-envvar")
 	substreamsClientConfig := client.NewSubstreamsClientConfig(
 		endpoint,
-		authToken,                            // TODO: bring in Config
-		authType,                             // TODO: bring in Config
-		sflags.MustGetBool(cmd, "insecure"),  // TODO. bring in Config
-		sflags.MustGetBool(cmd, "plaintext"), // TODO: bring in Config
+		authToken, authType,
+		sflags.MustGetBool(cmd, "insecure"),
+		sflags.MustGetBool(cmd, "plaintext"),
 	)
 
 	homeDir, err := os.UserHomeDir()
@@ -151,38 +135,21 @@ func runGui(cmd *cobra.Command, args []string) error {
 
 	fmt.Println("Launching Substreams GUI...")
 
-	startBlock, readFromModule, err := readStartBlockFlag(cmd, "start-block")
-	if err != nil {
-		return fmt.Errorf("start block: %w", err)
-	}
+	startBlock := sflags.MustGetString(cmd, "start-block")
 
-	stopBlock, err := readStopBlockFlag(cmd, startBlock, "stop-block", cursor != "")
-	if err != nil {
-		return fmt.Errorf("stop block: %w", err)
-	}
-	rawStopBlock, _ := cmd.Flags().GetString("stop-block")
-
-	if readFromModule { // need to tweak the stop block here
-		sb, err := graph.ModuleInitialBlock(outputModule)
-		if err != nil {
-			return fmt.Errorf("getting module start block: %w", err)
-		}
-		startBlock := int64(sb)
-		stopBlock, err = readStopBlockFlag(cmd, startBlock, "stop-block", cursor != "")
-		if err != nil {
-			return fmt.Errorf("stop block: %w", err)
-		}
-	}
+	stopBlock := sflags.MustGetString(cmd, "stop-block")
 
 	requestConfig := &request.Config{
 		ManifestPath:                manifestPath,
 		Pkg:                         pkg,
+		SkipPackageValidation:       sflags.MustGetBool(cmd, "skip-package-validation"),
 		Graph:                       graph,
-		ReadFromModule:              readFromModule,
 		ProdMode:                    productionMode,
 		DebugModulesOutput:          debugModulesOutput,
 		DebugModulesInitialSnapshot: debugModulesInitialSnapshot,
+		Endpoint:                    endpoint,
 		OutputModule:                outputModule,
+		OverrideNetwork:             network,
 		SubstreamsClientConfig:      substreamsClientConfig,
 		HomeDir:                     homeDir,
 		Vcr:                         sflags.MustGetBool(cmd, "replay"),
@@ -190,9 +157,8 @@ func runGui(cmd *cobra.Command, args []string) error {
 		Cursor:                      cursor,
 		StartBlock:                  startBlock,
 		StopBlock:                   stopBlock,
-		RawStopBlock:                rawStopBlock,
 		FinalBlocksOnly:             sflags.MustGetBool(cmd, "final-blocks-only"),
-		Params:                      params,
+		Params:                      strings.Join(paramsString, "\n"),
 		ReaderOptions:               readerOptions,
 	}
 

@@ -205,7 +205,8 @@ var (
 	RequestEvenRow = RequestCell.Foreground(lightGray)
 	RequestRight   = RequestCell.Align(lipgloss.Right)
 
-	ModalBox = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.AdaptiveColor{Dark: "205", Light: "213"})
+	ModalBox          = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.AdaptiveColor{Dark: "205", Light: "213"})
+	FullWidthModalBox = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.AdaptiveColor{Dark: "205", Light: "213"}).BorderLeft(false).BorderRight(false)
 
 	DocModuleName = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Dark: "12", Light: "14"})
 

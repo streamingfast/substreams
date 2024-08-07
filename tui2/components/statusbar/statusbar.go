@@ -7,7 +7,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/ansi"
 	"github.com/dustin/go-humanize"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/tui2/common"
@@ -110,7 +109,7 @@ func (s *StatusBar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (s *StatusBar) View() string {
-	var components []string
+	var line1, line2 []string
 
 	// [ BACKPROCESSING ]  Press 'p' to see progress.
 
@@ -126,32 +125,36 @@ func (s *StatusBar) View() string {
 			"%s (%d blocks)",
 			state, s.dataPayloads,
 		)
+	case "ERROR":
+		errMsg := s.error.Error()
+		if len(errMsg) > 20 {
+			errMsg = errMsg[:20] + "..."
+		}
+		state = fmt.Sprintf("%s: %s", state, errMsg)
 	}
 
-	components = append(components, styles.StatusBarKey.Render(state))
+	line1 = append(line1, styles.StatusBarKey.Render(state))
 
-	components = append(components, styles.StatusBarBranch.Render(
+	line1 = append(line1, styles.StatusBarBranch.Render(
 		fmt.Sprintf("%s read / %s written", humanize.Bytes(s.totalBytesRead), humanize.Bytes(s.totalBytesWritten)),
 	))
 
 	if s.maxParallelWorkers != 0 {
-		components = append(components, styles.StatusBarHelp.Render(
+		line1 = append(line1, styles.StatusBarHelp.Render(
 			fmt.Sprintf("%d max workers", s.maxParallelWorkers),
 		))
 	}
 
-	components = append(components, styles.StatusBarInfo.Render("trace id: "+s.traceId))
+	line2 = append(line2, styles.StatusBarInfo.Render("trace id: "+s.traceId))
 
-	components = append(components, styles.StatusBarValue.Render(fmt.Sprintf("handoff: %d", s.linearHandoffBlock)))
-	components = append(components, styles.StatusBarBranch.Render(fmt.Sprintf("start block: %d", s.resolveStartBlock)))
+	line2 = append(line2, styles.StatusBarValue.Render(fmt.Sprintf("handoff: %d", s.linearHandoffBlock)))
+	line2 = append(line2, styles.StatusBarBranch.Render(fmt.Sprintf("start block: %d", s.resolveStartBlock)))
 
-	line1 := lipgloss.JoinHorizontal(lipgloss.Center, components...)
+	fullLine1 := lipgloss.JoinHorizontal(lipgloss.Center, line1...)
+	fullLine2 := lipgloss.JoinHorizontal(lipgloss.Center, line2...)
 
-	if s.error != nil {
-		formatted := ansi.Wrap(s.error.Error(), s.Width, "") // wrapping and linecount always recomputed on SetSize
-		return lipgloss.JoinVertical(0, line1, styles.StreamError.Width(s.Width).Render(formatted))
-	}
-	return line1
+	twoLines := lipgloss.JoinVertical(0, fullLine1, fullLine2)
+	return twoLines
 }
 
 func (s *StatusBar) SetSize(width, height int) {

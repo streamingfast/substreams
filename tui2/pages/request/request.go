@@ -3,19 +3,14 @@ package request
 import (
 	"fmt"
 	"log"
-	"path/filepath"
+	"regexp"
 	"strings"
 
-	"github.com/streamingfast/substreams/client"
-	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
-	"github.com/streamingfast/substreams/tui2/components/dataentry"
-	"github.com/streamingfast/substreams/tui2/components/modsearch"
-	"github.com/streamingfast/substreams/tui2/replaylog"
-	streamui "github.com/streamingfast/substreams/tui2/stream"
 	"github.com/streamingfast/substreams/tui2/styles"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
 
@@ -23,51 +18,27 @@ import (
 	"github.com/streamingfast/substreams/tui2/common"
 )
 
-type NewRequestInstance *Instance
-
 type BlockContext struct {
 	Module   string
 	BlockNum uint64
-}
-
-type Config struct {
-	ManifestPath                string
-	Pkg                         *pbsubstreams.Package
-	Graph                       *manifest.ModuleGraph
-	ReadFromModule              bool
-	ProdMode                    bool
-	DebugModulesOutput          []string
-	DebugModulesInitialSnapshot []string
-	StartBlock                  int64
-	StopBlock                   uint64
-	RawStopBlock                string
-	FinalBlocksOnly             bool
-	Headers                     map[string]string
-	OutputModule                string
-	SubstreamsClientConfig      *client.SubstreamsClientConfig
-	HomeDir                     string
-	Vcr                         bool
-	Cursor                      string
-	Params                      map[string]string
-	ReaderOptions               []manifest.Option
-}
-
-type Instance struct {
-	Stream         *streamui.Stream
-	MsgDescs       map[string]*manifest.ModuleDescriptor
-	ReplayLog      *replaylog.File
-	RequestSummary *Summary
-	Modules        *pbsubstreams.Modules
-	Graph          *manifest.ModuleGraph
 }
 
 type Request struct {
 	common.Common
 	*Config
 
+	form            *huh.Form
+	inputEndpoint   *huh.Input
+	inputModule     *huh.Select[string]
+	inputStartBlock *huh.Input
+	inputStopBlock  *huh.Input
+	inputParams     *huh.Text
+	inputConfirm    *huh.Confirm
+
 	formStartBlock     string
 	formStopBlock      string
 	formModuleSelected string
+	formEndpoint       string
 
 	RequestSummary     *Summary
 	Modules            *pbsubstreams.Modules
@@ -84,68 +55,97 @@ func New(c common.Common, conf *Config) *Request {
 }
 
 func (r *Request) Init() tea.Cmd {
-	return nil
+	r.inputEndpoint = huh.NewInput().
+		Key("endpoint").
+		Value(&r.formEndpoint).
+		Inline(false).
+		Title("Endpoint (without https://):")
+	r.inputModule = huh.NewSelect[string]().
+		Key("module").
+		Inline(true).
+		Options(huh.NewOptions("loading...")...).
+		Title("Top-level module to stream:")
+	r.inputStartBlock = huh.NewInput().
+		Key("start-block").
+		Value(&r.formStartBlock).
+		Inline(true).
+		Validate(func(s string) error {
+			if !regexp.MustCompile(`^\d+$`).MatchString(s) {
+				return fmt.Errorf("specify only numbers")
+			}
+			return nil
+		}).
+		Description("Supports negative number, relative to head. Empty value defaults to module's start block.").
+		Title("Start block:")
+	r.inputStopBlock = huh.NewInput().
+		Key("stop-block").
+		Inline(true).
+		Validate(func(s string) error {
+			if s != "" {
+				if !regexp.MustCompile(`^[\+\-]?\d+$`).MatchString(s) {
+					return fmt.Errorf("specify only numbers, optionally prefixed by - or +")
+				}
+			}
+			return nil
+		}).
+		Title("Stop block:").
+		Description("Supports + prefix, relative to start block. Empty means never stop.")
+	r.inputParams = huh.NewText().
+		Key("params").
+		//Inline(true).
+		Validate(func(s string) error {
+			if strings.TrimSpace(s) != "" {
+				if !regexp.MustCompile(`^(\w+=[^,]+\n)*(\w+=[^,]+)$`).MatchString(s) {
+					return fmt.Errorf("specify only key=value pairs separated by newlines")
+				}
+			}
+			return nil
+		}).
+		Title("Per-module parameters:").
+		Description("Specify using 'module_name=value', one per line.")
+	r.inputConfirm = huh.NewConfirm().Affirmative("Run").Negative("").
+		Key("confirm").
+		Title("")
+	r.form = huh.NewForm(huh.NewGroup(r.inputEndpoint, r.inputModule, r.inputStartBlock, r.inputStopBlock, r.inputParams, r.inputConfirm))
+	return r.form.Init()
 }
 
 func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
+	formModel, cmd := r.form.Update(msg)
+	if formModel != nil {
+		r.form = formModel.(*huh.Form)
+	}
+	cmds = append(cmds, cmd)
+
 	switch msg := msg.(type) {
 	case NewRequestInstance:
 		r.RequestSummary = msg.RequestSummary
+		r.inputModule.Options(huh.NewOptions(r.Graph.MapModules()...)...)
+		r.inputEndpoint.Value(&r.Config.Endpoint)
+		r.inputModule.Value(&r.Config.OutputModule)
+		r.inputStartBlock.Value(&r.Config.StartBlock)
+		r.inputStopBlock.Value(&r.Config.StopBlock)
+		r.inputParams.Value(&r.Config.Params)
 
-	case common.SetRequestValue:
-		log.Println("Received value", msg.Field, msg.Value)
-		switch msg.Field {
-		case "start-block":
-			r.formStartBlock = msg.Value
-		case "stop-block":
-			r.formStopBlock = msg.Value
-		}
+	// case common.SetRequestValue:
+	// 	log.Println("Received value", msg.Field, msg.Value)
+	// 	switch msg.Field {
+	// 	case "module":
+	// 		r.Config.OutputModule = msg.Value
+	// 	case "start-block":
+	// 		r.Config.StartBlock = msg.Value
+	// 	case "params":
+	// 		r.Config.RawParams = strings.Split(msg.Value, "\n")
+	// 	case "stop-block":
+	// 		r.Config.StopBlock = msg.Value
+	// 	case "endpoint":
+	// 		r.Config.SubstreamsClientConfig.SetEndpoint(msg.Value)
+	// 	}
 	case common.ModuleSelectedMsg:
 		log.Println("Setting selected module:", msg)
 		r.Config.OutputModule = string(msg)
-
-	case tea.KeyMsg:
-		// COuld we support:
-		// `s` to change `start block`
-		// `t` to change stop block
-		// `m` and `M` module to use module search/module fuzzy search in the `request` tab, and pick from there
-		// `p` to change parameters (?)
-		// `e` to change endpoint
-		// `m` to change manifest path
-		// `v` to change vcr mode
-		// `h` to change headers
-		// `o` to change output module
-		// `d` to change debug modules
-		// `i` to change debug initial snapshot
-		// `f` to change final blocks only
-		// `g` to change read from module
-		// `b` to change home dir
-		// `w` to change substreams client config
-		// `z` to change reader options
-		// `a` for advanced options (shows Final Blocks Only switcher)
-		// `c` to change cursor
-
-		switch msg.String() {
-		case "s":
-			comp := dataentry.New(r.Common, "start-block", validateNumbersOnly)
-			comp.Input.Prompt("Enter the start block number: ").
-				Description("Block from which to start streaming. Numbers only\n\n")
-			cmds = append(cmds, common.SetModalComponentCmd(comp))
-		case "t":
-			comp := dataentry.New(r.Common, "stop-block", validateNumberOrRelativeValue)
-			comp.Input.Prompt("Enter the stop block number: ").
-				Description("Enter numbers only, with an optional - or + prefix.\n\nYou can specify relative block numbers with - (to head) or + (to start block) prefixes.\n")
-			cmds = append(cmds, common.SetModalComponentCmd(comp))
-		case "m":
-			comp := modsearch.New(r.Common)
-			comp.Model.Title = "Select map module to stream (/ to filter)"
-			comp.SetListItems(r.Config.Graph.MapModules())
-			cmds = append(cmds, common.SetModalComponentCmd(comp))
-		case "e":
-		case "a":
-		}
 
 	case *pbsubstreamsrpc.SessionInit:
 		r.traceId = msg.TraceId
@@ -157,143 +157,48 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (r *Request) SetSize(w, h int) {
 	r.Common.SetSize(w, h)
+	summaryHeight := lipgloss.Height(r.renderRequestSummary())
+	r.form.WithHeight(h - summaryHeight)
 }
 
 func (r *Request) View() string {
-	return r.renderRequestSummary()
+	return lipgloss.JoinVertical(lipgloss.Top,
+		r.renderRequestSummary(),
+		r.renderForm(),
+	)
+}
+func (r *Request) renderForm() string {
+	return r.form.View()
 }
 
 func (r *Request) renderRequestSummary() string {
-	if r.RequestSummary == nil {
-		return ""
-	}
-
-	handoffStr := ""
-	if r.resolvedStartBlock != r.linearHandoffBlock {
-		handoffStr = fmt.Sprintf(" (handoff: %d)", r.linearHandoffBlock)
-	}
-	summary := r.RequestSummary
-	paramsStrings := make([]string, 0, len(summary.Params))
-	for k, v := range summary.Params {
-		paramsStrings = append(paramsStrings, fmt.Sprintf("%s=%s", k, v))
-	}
-
-	startBlock := fmt.Sprintf("%d%s", r.resolvedStartBlock, handoffStr)
-	//startBlock = r.formStartBlock
-
-	// TODO: we'll reveive `RawStopBlock` in here, let's prepare the value we'll send to the
-	// server and take that out from `gui.go`, into our own hands.
-	// TODO: also bring a RawStartBlock, and have it support `-100` blocks to tap into the
-	// end of the chain.
-	// TODO: the endpoint means we'll need to create a new client altogether, which is done in
-	// the `gui.go` right now.
 	rows := [][]string{
-		{"Package:", summary.Manifest},
-		{"[m] Module:", r.Config.OutputModule},
-		{"[e] Endpoint:", summary.Endpoint},
-		{"[s] Start Block:", startBlock},
-		{"[t] Stop Block:", r.Config.RawStopBlock},
-		{"Parameters:", strings.Join(paramsStrings, "; ")}, // )},
-		{"Production mode:", fmt.Sprintf("%v", summary.ProductionMode)},
+		{"Package:", r.Config.ManifestPath},
+		{"Endpoint:", r.Config.Endpoint},
+		{"Network:", r.Config.OverrideNetwork},
+		{"", ""},
+		{"Module:", r.Config.OutputModule},
+		{"Block range:", fmt.Sprintf("%s -> %s", r.Config.StartBlock, r.Config.StopBlock)},
+		{"Module params:", r.Config.Params},
+		{"", ""},
+		{"Production mode:", fmt.Sprintf("%v", r.Config.ProdMode)},
+	}
+	if len(r.Config.DebugModulesInitialSnapshot) > 0 {
+		rows = append(rows, []string{"Initial snapshots:", strings.Join(r.Config.DebugModulesInitialSnapshot, ", ")})
 	}
 
-	if len(summary.InitialSnapshot) > 0 {
-		rows = append(rows, []string{"Initial snapshots:", strings.Join(summary.InitialSnapshot, ", ")})
-	}
+	t := table.New().Border(lipgloss.Border{}).Width(r.Width - 2).StyleFunc(alternateCenteredTable).Rows(rows...)
 
-	t := table.New().Border(lipgloss.Border{}).Width(r.Width - 2).Rows(rows...).StyleFunc(func(row, col int) lipgloss.Style {
-		color := styles.RequestOddRow
-		if row%2 == 0 {
-			color = styles.RequestEvenRow
-		}
-		if col == 0 {
-			return color.Align(lipgloss.Right)
-		}
-		return color
-	})
-
-	return lipgloss.NewStyle().Height(r.Height).Render(t.Render())
+	return lipgloss.NewStyle().Render(t.Render())
 }
 
-func (c *Config) NewInstance() (*Instance, error) {
-	if c.ReadFromModule {
-		sb, err := c.Graph.ModuleInitialBlock(c.OutputModule)
-		if err != nil {
-			return nil, fmt.Errorf("getting module start block: %w", err)
-		}
-		c.StartBlock = int64(sb)
+func alternateCenteredTable(row, col int) lipgloss.Style {
+	color := styles.RequestOddRow
+	if row%2 == 0 {
+		color = styles.RequestEvenRow
 	}
-
-	// TODO: use the latest `endpoint`, create a new `SubstreamsClientConfig`
-	// TODO: if there's an error, we should have a modal dialog box showing the error, instead of
-	// showing in the StatusBar, with a "Confirm" or `esc` to close dialog.
-	// in big red font, and with the appropriate size.
-	ssClient, _, callOpts, headers, err := client.NewSubstreamsClient(c.SubstreamsClientConfig)
-	if err != nil {
-		return nil, fmt.Errorf("substreams client setup: %w", err)
+	if col == 0 {
+		return color.Align(lipgloss.Right)
 	}
-	if headers == nil {
-		headers = make(map[string]string)
-	}
-
-	req := &pbsubstreamsrpc.Request{
-		StartBlockNum:                       c.StartBlock,
-		StartCursor:                         c.Cursor,
-		FinalBlocksOnly:                     c.FinalBlocksOnly,
-		StopBlockNum:                        uint64(c.StopBlock),
-		Modules:                             c.Pkg.Modules,
-		OutputModule:                        c.OutputModule,
-		ProductionMode:                      c.ProdMode,
-		DebugInitialStoreSnapshotForModules: c.DebugModulesInitialSnapshot,
-	}
-
-	c.Headers = headers.Append(c.Headers)
-	stream := streamui.New(req, ssClient, c.Headers, callOpts)
-
-	if err := req.Validate(); err != nil {
-		return nil, fmt.Errorf("validate request: %w", err)
-	}
-
-	replayLogFilePath := filepath.Join(c.HomeDir, "replay.log")
-	replayLog := replaylog.New(replaylog.WithPath(replayLogFilePath))
-	if c.Vcr {
-		stream.ReplayBundle, err = replayLog.ReadReplay()
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		if err := replayLog.OpenForWriting(); err != nil {
-			return nil, err
-		}
-		//defer replayLog.Close()
-	}
-
-	debugLogPath := filepath.Join(c.HomeDir, "debug.log")
-	tea.LogToFile(debugLogPath, "gui:")
-
-	msgDescs, err := manifest.BuildMessageDescriptors(c.Pkg)
-	if err != nil {
-		return nil, fmt.Errorf("building message descriptors: %w", err)
-	}
-
-	requestSummary := &Summary{
-		Manifest:        c.ManifestPath,
-		Endpoint:        c.SubstreamsClientConfig.Endpoint(),
-		ProductionMode:  c.ProdMode,
-		InitialSnapshot: req.DebugInitialStoreSnapshotForModules,
-		Docs:            c.Pkg.PackageMeta,
-		ModuleDocs:      c.Pkg.ModuleMeta,
-		Params:          c.Params,
-	}
-
-	substreamRequirements := &Instance{
-		Stream:         stream,
-		MsgDescs:       msgDescs,
-		ReplayLog:      replayLog,
-		RequestSummary: requestSummary,
-		Modules:        c.Pkg.Modules,
-		Graph:          c.Graph,
-	}
-
-	return substreamRequirements, nil
+	return color
 }

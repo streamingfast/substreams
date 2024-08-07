@@ -42,7 +42,7 @@ func (o *Output) FullHelp() [][]key.Binding {
 		},
 		{
 			keymap.Help,
-			keymap.TabShiftTab,
+			keymap.MainNavigation,
 			keymap.Quit,
 		},
 	}

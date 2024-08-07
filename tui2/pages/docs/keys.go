@@ -9,8 +9,9 @@ import (
 
 func (d *Docs) ShortHelp() []key.Binding {
 	return []key.Binding{
+		keymap.UpDown,
+		keymap.MainNavigation,
 		keymap.Help,
-		keymap.TabShiftTab,
 		keymap.Quit,
 	}
 }

@@ -8,7 +8,7 @@ import (
 
 func (r *Request) ShortHelp() []key.Binding {
 	return []key.Binding{
-		keymap.TabShiftTab,
+		keymap.MainNavigation,
 		keymap.UpDown,
 		keymap.RestartStream,
 		keymap.Help,
@@ -18,7 +18,7 @@ func (r *Request) ShortHelp() []key.Binding {
 func (r *Request) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{
-			keymap.TabShiftTab,
+			keymap.MainNavigation,
 		},
 		{
 			keymap.UpDown,

@@ -9,12 +9,14 @@ import (
 
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/tui2/common"
+	"github.com/streamingfast/substreams/tui2/components/errorbox"
 	"github.com/streamingfast/substreams/tui2/footer"
 	"github.com/streamingfast/substreams/tui2/pages/docs"
 	"github.com/streamingfast/substreams/tui2/pages/output"
 	"github.com/streamingfast/substreams/tui2/pages/progress"
 	"github.com/streamingfast/substreams/tui2/pages/request"
 	"github.com/streamingfast/substreams/tui2/replaylog"
+	"github.com/streamingfast/substreams/tui2/stream"
 	streamui "github.com/streamingfast/substreams/tui2/stream"
 	"github.com/streamingfast/substreams/tui2/styles"
 	"github.com/streamingfast/substreams/tui2/tabs"
@@ -73,7 +75,7 @@ func New(reqConfig *request.Config) (*UI, error) {
 func (ui *UI) Init() tea.Cmd {
 	var cmds []tea.Cmd
 
-	cmds = append(cmds, ui.restartStream())
+	cmds = append(cmds, ui.setupNewInstance(false))
 	for _, pg := range ui.pages {
 		cmds = append(cmds, pg.Init())
 	}
@@ -111,6 +113,8 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		ui.forceRefresh()
 		ui.SetSize(msg.Width, msg.Height)
+	case stream.StreamErrorMsg:
+		cmds = append(cmds, common.SetModalComponentCmd(errorbox.New(ui.Common, msg.Error())))
 	case common.SetModalComponentMsg:
 		log.Printf("Setting modal component %T", msg)
 		if msg != nil {
@@ -136,7 +140,7 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			ui.footer.SetShowAll(!ui.footer.ShowAll())
 			ui.resize()
 		case "r":
-			return ui, ui.restartStream()
+			return ui, ui.setupNewInstance(true)
 		}
 		_, cmd := ui.tabs.Update(msg)
 		cmds = append(cmds, cmd)
@@ -147,7 +151,9 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		ui.stream = msg.Stream
 		ui.msgDescs = msg.MsgDescs
 		ui.replayLog = msg.ReplayLog
-		cmds = append(cmds, ui.stream.Init())
+		if msg.StartStream {
+			cmds = append(cmds, ui.stream.Init())
+		}
 	case streamui.Msg:
 		switch msg {
 		case streamui.ConnectingMsg:
@@ -239,40 +245,54 @@ func (ui *UI) View() string {
 	if ui.modalComponent != nil {
 		_, ok := ui.modalComponent.(common.IsInlineModal)
 		if !ok {
-			modalView := styles.ModalBox.Render(ui.modalComponent.View())
-			width := lipgloss.Width(modalView) / 2
-			height := lipgloss.Height(modalView) / 2
-			main = styles.PlaceOverlay(width, height, modalView, main, true)
+			_, fullWidth := ui.modalComponent.(common.IsFullWidthModal)
+			contents := ui.modalComponent.View()
+			style := styles.ModalBox
+			if fullWidth {
+				style = styles.FullWidthModalBox.Width(ui.Width)
+			}
+			modalView := style.Render(contents)
+			x := ui.Width/2 - lipgloss.Width(modalView)/2
+			y := ui.Height/2 - lipgloss.Height(modalView)/2
+			if fullWidth {
+				x = 0
+			}
+			main = styles.PlaceOverlay(x, y, modalView, main, true)
 		}
 	}
 
 	return main
-	// TODO: render the modal on top, with its dimensions.
 }
 
-func (ui *UI) restartStream() tea.Cmd {
+func (ui *UI) setupNewInstance(startStream bool) tea.Cmd {
+	var cmds []tea.Cmd
 	ui.stream = nil
-	requestInstance, err := ui.requestConfig.NewInstance()
+	reqInstance, err := ui.requestConfig.NewInstance()
 	if err != nil {
-		return func() tea.Msg {
-			return streamui.StreamErrorMsg(err)
-		}
+		return func() tea.Msg { return streamui.StreamErrorMsg(err) }
+	}
+	reqInstance.StartStream = startStream
+
+	if startStream {
+		cmds = append(cmds,
+			func() tea.Msg { return streamui.InterruptStreamMsg },
+			tabs.SelectTabCmd(int(outputPage)),
+		)
+	}
+	cmds = append(cmds, func() tea.Msg {
+		return request.NewRequestInstance(reqInstance)
+	})
+	if startStream {
+		cmds = append(cmds,
+			func() tea.Msg {
+				if ui.replayLog.IsWriting() {
+					return ui.replayLog
+				}
+				return nil
+			},
+		)
+
 	}
 
-	return tea.Sequence(
-		func() tea.Msg {
-			return streamui.InterruptStreamMsg
-		},
-		tabs.SelectTabCmd(int(outputPage)),
-		func() tea.Msg {
-			return request.NewRequestInstance(requestInstance)
-		},
-
-		func() tea.Msg {
-			if ui.replayLog.IsWriting() {
-				return ui.replayLog
-			}
-			return nil
-		},
-	)
+	return tea.Sequence(cmds...)
 }

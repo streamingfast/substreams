@@ -43,6 +43,10 @@ func (c *SubstreamsClientConfig) Endpoint() string {
 	return c.endpoint
 }
 
+func (c *SubstreamsClientConfig) SetEndpoint(endpoint string) {
+	c.endpoint = endpoint
+}
+
 func (c *SubstreamsClientConfig) Insecure() bool {
 	return c.insecure
 }

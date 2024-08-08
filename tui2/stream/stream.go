@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"google.golang.org/grpc"
@@ -106,8 +107,13 @@ func (s *Stream) Update(msg tea.Msg) tea.Cmd {
 	case StreamErrorMsg:
 		s.err = msg
 	case *pbsubstreamsrpc.BlockScopedData:
-		s.seenBlockData = true
-		return tea.Batch(func() tea.Msg { return StreamingMsg }, s.readNextMessage)
+		var cmds []tea.Cmd
+		if !s.seenBlockData {
+			s.seenBlockData = true
+			cmds = append(cmds, func() tea.Msg { return StreamingMsg })
+		}
+		cmds = append(cmds, s.readNextMessage)
+		return tea.Batch(cmds...)
 	case *pbsubstreamsrpc.ModulesProgress:
 		var cmds []tea.Cmd
 		if !s.seenBlockData && !s.sentBackprocessingMsg {
@@ -171,6 +177,10 @@ func (s *Stream) readNextMessage() tea.Msg {
 		if err != nil {
 			if err == io.EOF {
 				s.err = io.EOF
+				return EndOfStreamMsg
+			}
+			if strings.Contains(err.Error(), "code = Canceled desc = context canceled") {
+				s.err = err
 				return EndOfStreamMsg
 			}
 			return StreamErrorMsg(fmt.Errorf("read next message: %w", err))

@@ -115,10 +115,15 @@ var (
 			MarginLeft(2)
 
 	StreamButton = lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Dark: "230", Light: "220"}).
-			Background(lipgloss.AdaptiveColor{Dark: "204", Light: "211"}).
 			Padding(1, 4).
 			Border(lipgloss.RoundedBorder())
+
+	StreamButtonStart = StreamButton.
+				Foreground(lipgloss.AdaptiveColor{Dark: "8", Light: "8"}).  // Darkish color
+				Background(lipgloss.AdaptiveColor{Dark: "46", Light: "46"}) // Bright green color
+	StreamButtonStop = StreamButton.
+				Foreground(lipgloss.AdaptiveColor{Dark: "15", Light: "15"}).  // White color
+				Background(lipgloss.AdaptiveColor{Dark: "160", Light: "160"}) // Reddish color
 
 	Spinner = lipgloss.NewStyle().
 		MarginTop(1).
@@ -186,6 +191,9 @@ var (
 		BottomLeft:  "┘",
 		BottomRight: "└",
 	}
+
+	LogoASCII = lipgloss.NewStyle().
+			Foreground(lipgloss.AdaptiveColor{Dark: "208", Light: "208"})
 
 	Logo = lipgloss.NewStyle().
 		Border(lipgloss.Border{Bottom: "─", Left: "", BottomLeft: "─", BottomRight: "─", TopLeft: ""}).

@@ -157,12 +157,22 @@ func loadSubstreamsAuthEnvFile(manifestPath string) {
 	_, err := os.Stat(authFile)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return
+			authFile = ".substreams.env"
+			_, err := os.Stat(authFile)
+			if err != nil {
+				if os.IsNotExist(err) {
+					return
+				} else {
+					fmt.Printf("Error reading stats on auth file: %v: %s\n", authFile, err.Error())
+					return
+				}
+			}
 		} else {
 			fmt.Printf("Error reading stats on auth file: %v: %s\n", authFile, err.Error())
 			return
 		}
 	}
+
 	cnt, err := os.ReadFile(authFile)
 	if err != nil {
 		fmt.Printf("Error reading auth file: %v: %s\n", authFile, err.Error())

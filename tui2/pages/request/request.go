@@ -7,6 +7,7 @@ import (
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/tui2/components/dataentry"
 	"github.com/streamingfast/substreams/tui2/components/modsearch"
+	"github.com/streamingfast/substreams/tui2/stream"
 	"github.com/streamingfast/substreams/tui2/styles"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -17,6 +18,17 @@ import (
 	"github.com/streamingfast/substreams/tui2/common"
 )
 
+const LogoASCII = `
+         ▄▄
+     ▄▄██▀▀
+▁▄▄██▀▀ ▁▄▄
+▔▀▀█▆▄▄ ▔▀▀██▄▄
+     ▀▀██▄▄▁ ▀▀██▄▄▁
+         ▀▀▔ ▄▄▆█▀▀▔
+         ▄▄██▀▀
+         ▀▀
+`
+
 type BlockContext struct {
 	Module   string
 	BlockNum uint64
@@ -26,6 +38,7 @@ type Request struct {
 	common.Common
 	*Config
 
+	isStreaming        bool
 	RequestSummary     *Summary
 	Modules            *pbsubstreams.Modules
 	traceId            string
@@ -58,6 +71,9 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			r.Config.OutputModule = msg.Value
 		case "start-block":
 			r.Config.StartBlock = msg.Value
+			if strings.HasPrefix(msg.Value, "-") {
+				r.Config.StopBlock = ""
+			}
 		case "stop-block":
 			r.Config.StopBlock = msg.Value
 		case "endpoint":
@@ -96,7 +112,12 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "a":
 		case "p":
 		case "enter":
-			cmds = append(cmds, SetupNewInstanceCmd(true))
+			if r.isStreaming {
+				cmds = append(cmds, func() tea.Msg { return stream.InterruptStreamMsg })
+			} else {
+				r.isStreaming = true
+				cmds = append(cmds, SetupNewInstanceCmd(true))
+			}
 		}
 	case common.ModuleSelectedMsg:
 		if msg.Target == "request" {
@@ -107,6 +128,13 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		r.traceId = msg.TraceId
 		r.resolvedStartBlock = msg.ResolvedStartBlock
 		r.linearHandoffBlock = msg.LinearHandoffBlock
+	case stream.StreamErrorMsg:
+		r.isStreaming = false
+	case stream.Msg:
+		switch msg {
+		case stream.EndOfStreamMsg:
+			r.isStreaming = false
+		}
 	}
 	return r, tea.Batch(cmds...)
 }
@@ -152,7 +180,17 @@ func (r *Request) renderRequestSummary() string {
 	}
 	rows = append(rows,
 		[]string{"", ""},
-		[]string{"", styles.StreamButton.Render("STREAM <enter>")},
+	)
+
+	if r.isStreaming {
+		rows = append(rows, []string{"", styles.StreamButtonStop.Render("STOP <enter>")})
+	} else {
+		rows = append(rows, []string{"", styles.StreamButtonStart.Render("STREAM <enter>")})
+	}
+
+	rows = append(rows,
+		[]string{"", ""},
+		[]string{"", styles.LogoASCII.Render(LogoASCII)},
 	)
 
 	t := table.New().Border(lipgloss.Border{}).Width(r.Width - 2).StyleFunc(alternateCenteredTable).Rows(rows...)

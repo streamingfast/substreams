@@ -138,8 +138,25 @@ func (d *Docs) getViewportContent() (string, error) {
 			return "", fmt.Errorf("rendering module %q doc: %w", module.Name, err)
 		}
 
-		lines = append(lines, styles.DocModuleName.Render(module.Name), "")
+		moduleName := module.Name
+		switch module.Kind.(type) {
+		case *pbsubstreams.Module_KindBlockIndex_:
+			moduleName = moduleName + " [block index]"
+		case *pbsubstreams.Module_KindStore_:
+			moduleName = moduleName + " [store]"
+		case *pbsubstreams.Module_KindMap_:
+			moduleName = moduleName + " [map]"
+		}
+
+		lines = append(lines, styles.DocModuleName.Render(moduleName), "")
 		lines = append(lines, fmt.Sprintf("  • Module hash: %s", d.hashes.Get(module.Name)))
+		if kind, ok := module.Kind.(*pbsubstreams.Module_KindStore_); ok {
+			lines = append(lines, fmt.Sprintf("  • Store policy: %s %s", kind.KindStore.UpdatePolicy.Pretty(), kind.KindStore.ValueType))
+		}
+		// Already shown in `Outputs`
+		// if kind, ok := module.Kind.(*pbsubstreams.Module_KindBlockIndex_); ok {
+		// 	lines = append(lines, fmt.Sprintf("  • Index type: %s", kind.KindBlockIndex.OutputType))
+		// }
 		lines = append(lines, fmt.Sprintf("  • Initial block: %v", module.InitialBlock))
 		lines = append(lines, "  • Inputs: ")
 		for _, input := range module.Inputs {

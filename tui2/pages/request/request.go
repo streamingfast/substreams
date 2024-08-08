@@ -127,8 +127,11 @@ func (r *Request) renderRequestSummary() string {
 		startBlockInt, _ := r.Config.Graph.ModuleInitialBlock(r.Config.OutputModule)
 		startBlock = fmt.Sprintf("%d (module's initial block)", startBlockInt)
 	}
+	packageName := r.Config.ManifestPath
+	packageMeta := r.Config.Pkg.PackageMeta[0]
+	packageName = fmt.Sprintf("%s (%s-%s)", packageName, packageMeta.Name, packageMeta.Version)
 	rows := [][]string{
-		{"Package:", r.Config.ManifestPath},
+		{"Package:", packageName},
 		{fmt.Sprintf("Endpoint %s:", styles.HelpKey.Render("<e>")), r.Config.Endpoint},
 		{"Network:", r.Config.OverrideNetwork},
 		{"", ""},
@@ -136,18 +139,25 @@ func (r *Request) renderRequestSummary() string {
 		{fmt.Sprintf("Start block %s:", styles.HelpKey.Render("<s>")), startBlock},
 		{fmt.Sprintf("Stop block %s:", styles.HelpKey.Render("<t>")), r.Config.StopBlock},
 		{"Module params:", r.Config.Params},
-		{"", ""},
-		{"Production mode:", fmt.Sprintf("%v", r.Config.ProdMode)},
-		{"", ""},
-		{"", styles.StreamButton.Render("STREAM <enter>")},
 	}
 	if len(r.Config.DebugModulesInitialSnapshot) > 0 {
-		rows = append(rows, []string{"Initial snapshots:", strings.Join(r.Config.DebugModulesInitialSnapshot, ", ")})
+		rows = append(rows,
+			[]string{"Initial snapshots:", strings.Join(r.Config.DebugModulesInitialSnapshot, ", ")},
+		)
 	}
+	if r.Config.ProdMode {
+		rows = append(rows,
+			[]string{"Production mode:", fmt.Sprintf("%v", r.Config.ProdMode)},
+		)
+	}
+	rows = append(rows,
+		[]string{"", ""},
+		[]string{"", styles.StreamButton.Render("STREAM <enter>")},
+	)
 
 	t := table.New().Border(lipgloss.Border{}).Width(r.Width - 2).StyleFunc(alternateCenteredTable).Rows(rows...)
 
-	return lipgloss.NewStyle().Height(r.Height).Render(t.Render())
+	return lipgloss.NewStyle().Height(r.Height).MaxHeight(r.Height).Render(t.Render())
 }
 
 func alternateCenteredTable(row, col int) lipgloss.Style {

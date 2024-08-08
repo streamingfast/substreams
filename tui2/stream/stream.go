@@ -17,6 +17,8 @@ type Msg int
 const (
 	ConnectingMsg Msg = iota
 	ConnectedMsg
+	BackprocessingMsg
+	StreamingMsg
 	InterruptStreamMsg
 	EndOfStreamMsg
 	ReplayedMsg
@@ -30,10 +32,12 @@ type ResponseUnknownMsg string
 type Stream struct {
 	ReplayBundle ReplayBundle
 
-	req            *pbsubstreamsrpc.Request
-	client         pbsubstreamsrpc.StreamClient
-	callOpts       []grpc.CallOption
-	targetEndBlock uint64
+	seenBlockData         bool
+	sentBackprocessingMsg bool
+	req                   *pbsubstreamsrpc.Request
+	client                pbsubstreamsrpc.StreamClient
+	callOpts              []grpc.CallOption
+	targetEndBlock        uint64
 
 	headers       map[string]string
 	ctx           context.Context
@@ -101,11 +105,23 @@ func (s *Stream) Update(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case StreamErrorMsg:
 		s.err = msg
-	case *pbsubstreamsrpc.BlockScopedData,
-		*pbsubstreamsrpc.ModulesProgress,
-		*pbsubstreamsrpc.InitialSnapshotData,
+	case *pbsubstreamsrpc.BlockScopedData:
+		s.seenBlockData = true
+		return tea.Batch(func() tea.Msg { return StreamingMsg }, s.readNextMessage)
+	case *pbsubstreamsrpc.ModulesProgress:
+		var cmds []tea.Cmd
+		if !s.seenBlockData && !s.sentBackprocessingMsg {
+			s.sentBackprocessingMsg = true
+			cmds = append(cmds, func() tea.Msg { return BackprocessingMsg })
+		}
+		cmds = append(cmds, s.readNextMessage)
+		return tea.Batch(cmds...)
+	case *pbsubstreamsrpc.SessionInit:
+		s.seenBlockData = false
+		s.sentBackprocessingMsg = false
+		return s.readNextMessage
+	case *pbsubstreamsrpc.InitialSnapshotData,
 		*pbsubstreamsrpc.InitialSnapshotComplete,
-		*pbsubstreamsrpc.SessionInit,
 		ResponseUnknownMsg:
 		return s.readNextMessage
 	case Msg:

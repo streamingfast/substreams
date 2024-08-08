@@ -158,9 +158,10 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case streamui.Msg:
 		switch msg {
-		case streamui.ConnectingMsg:
-		case streamui.EndOfStreamMsg:
-		case streamui.InterruptStreamMsg:
+		case streamui.BackprocessingMsg:
+			cmds = append(cmds, tabs.SelectTabCmd(int(progressPage)))
+		case streamui.StreamingMsg:
+			cmds = append(cmds, tabs.SelectTabCmd(int(outputPage)))
 		}
 	case tabs.SelectTabMsg:
 		ui.forceRefresh()
@@ -278,7 +279,6 @@ func (ui *UI) setupNewInstance(startStream bool) tea.Cmd {
 	if startStream {
 		cmds = append(cmds,
 			func() tea.Msg { return streamui.InterruptStreamMsg },
-			tabs.SelectTabCmd(int(outputPage)),
 		)
 	}
 	cmds = append(cmds, func() tea.Msg {

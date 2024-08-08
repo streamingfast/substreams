@@ -101,13 +101,41 @@ func (d *Docs) renderManifestView() string {
 func (d *Docs) getViewportContent() (string, error) {
 	var lines []string
 
+	for idx, pkgMeta := range d.reqSummary.Docs {
+		pkgDoc, err := glamorizeDoc(pkgMeta.Doc)
+		if err != nil {
+			return "", fmt.Errorf("rendering package doc idx %d: %w", idx, err)
+		}
+
+		lines = append(lines,
+			fmt.Sprintf("Package %d: %s-%s", idx+1, pkgMeta.Name, pkgMeta.Version),
+		)
+		if pkgMeta.Description != "" {
+			lines = append(lines, "Description: "+pkgMeta.Description)
+		}
+		if pkgDoc != "" {
+			lines = append(lines,
+				"",
+				pkgDoc,
+			)
+		}
+	}
+
+	lines = append(lines,
+		lipgloss.PlaceHorizontal(
+			d.Width-styles.DocBox.GetHorizontalFrameSize(), lipgloss.Center,
+			" MODULES ", lipgloss.WithWhitespaceChars("-"),
+		),
+		"",
+	)
+
 	for i, module := range d.modules.Modules {
 		if len(d.reqSummary.ModuleDocs) < i+1 {
 			break
 		}
-		moduleDoc, err := d.renderGlamourDoc(d.reqSummary.ModuleDocs[i])
+		moduleDoc, err := glamorizeDoc(d.reqSummary.ModuleDocs[i].Doc)
 		if err != nil {
-			return "", fmt.Errorf("getting module doc: %w", err)
+			return "", fmt.Errorf("rendering module %q doc: %w", module.Name, err)
 		}
 
 		lines = append(lines, styles.DocModuleName.Render(module.Name), "")
@@ -133,16 +161,7 @@ func (d *Docs) getViewportContent() (string, error) {
 		lines = append(lines, moduleDoc)
 	}
 
-	return lipgloss.NewStyle().Padding(2, 4, 1, 4).Render(strings.Join(lines, "\n")), nil
-}
-
-func (d *Docs) renderGlamourDoc(moduleMetadata *pbsubstreams.ModuleMetadata) (string, error) {
-	content, err := glamorizeDoc(moduleMetadata.GetDoc())
-	if err != nil {
-		return "", fmt.Errorf("getting module docs: %w", err)
-	}
-
-	return content, nil
+	return styles.DocBox.Render(strings.Join(lines, "\n")), nil
 }
 
 func glamorizeDoc(doc string) (string, error) {

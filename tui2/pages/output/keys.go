@@ -8,12 +8,11 @@ import (
 
 func (o *Output) ShortHelp() []key.Binding {
 	return []key.Binding{
-		keymap.PrevNextModule,
 		keymap.PrevNextBlock,
 		keymap.Search,
 		keymap.ModuleSearch,
 		keymap.ToggleLogs,
-		keymap.GoToBlock,
+		keymap.UpDown,
 		keymap.Help,
 	}
 }

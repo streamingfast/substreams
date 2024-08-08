@@ -58,14 +58,8 @@ func (s *StatusBar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		s.dataPayloads = 0
 	case *pbsubstreamsrpc.BlockScopedData:
 		s.dataPayloads += 1
-		s.state = "Streaming"
 
 	case *pbsubstreamsrpc.ModulesProgress:
-		if s.state == "Connected" {
-			s.state = "Backprocessing"
-			// TODO: when we detect we're backprocessing, let's switch the tab.
-			//tabs.SelectTabCmd(int(outputPage))
-		}
 		if msg.ProcessedBytes != nil {
 			s.totalBytesRead = msg.ProcessedBytes.TotalBytesRead
 			s.totalBytesWritten = msg.ProcessedBytes.TotalBytesWritten
@@ -99,6 +93,10 @@ func (s *StatusBar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg {
 	case stream.ConnectingMsg:
 		s.state = "Connecting"
+	case stream.BackprocessingMsg:
+		s.state = "Backprocessing"
+	case stream.StreamingMsg:
+		s.state = "Streaming"
 	case stream.ConnectedMsg:
 		s.state = "Connected"
 	case stream.EndOfStreamMsg:

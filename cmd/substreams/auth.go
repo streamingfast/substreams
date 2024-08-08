@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/fatih/color"
-
+	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
 
@@ -24,38 +24,47 @@ func runAuthE(cmd *cobra.Command, args []string) error {
 	localDevelopment := os.Getenv("LOCAL_DEVELOPMENT")
 
 	fmt.Println("Open this link to authenticate on The Graph Market:")
+	linkStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("12"))
 	if localDevelopment == "true" {
-		color.Blue("http://localhost:3000/auth/substreams-devenv")
+		fmt.Println(linkStyle.Render("http://localhost:3000/auth/substreams-devenv"))
 	} else {
-		color.Blue("https://thegraph.market/auth/substreams-devenv")
+		fmt.Println(linkStyle.Render("https://thegraph.market/auth/substreams-devenv"))
 	}
-
-	fmt.Println()
-	fmt.Print("Then paste the token here: ")
 
 	var token string
-	_, err := fmt.Scanln(&token)
-	if err != nil {
-		return fmt.Errorf("error reading token: %w", err)
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				EchoMode(huh.EchoModePassword).
+				Title("After retrieving your token, paste it here:").
+				Inline(true).
+				Value(&token).
+				Validate(func(s string) error {
+					if s == "" {
+						return fmt.Errorf("token cannot be empty")
+					}
+					return nil
+				}),
+		),
+	)
+
+	fmt.Println("")
+	if err := form.Run(); err != nil {
+		return fmt.Errorf("error running form: %w", err)
 	}
 
-	if token == "" {
-		return fmt.Errorf("token cannot be empty")
-	}
+	fmt.Println("Writing `./.substreams.env`.  NOTE: Add it to `.gitignore`.")
+	fmt.Println("")
 
-	fmt.Println()
-	fmt.Println("Writing `./.substreams.env`")
-	fmt.Println()
-	fmt.Println("Please add `.substreams.env` to your `.gitignore`.")
-	fmt.Println()
-
-	err = os.WriteFile(".substreams.env", []byte(fmt.Sprintf("export SUBSTREAMS_API_TOKEN=%s\n", token)), 0644)
+	err := os.WriteFile(".substreams.env", []byte(fmt.Sprintf("export SUBSTREAMS_API_TOKEN=%s\n", token)), 0644)
 	if err != nil {
 		return fmt.Errorf("writing .substreams.env file: %w", err)
 	}
 
 	fmt.Println("Load credentials in current terminal with:")
-	color.Blue(" . ./.substreams.env")
+	fmt.Println("")
+
+	fmt.Println(linkStyle.Render("       . ./.substreams.env"))
 
 	return nil
 }

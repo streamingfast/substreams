@@ -84,22 +84,9 @@ func runGui(cmd *cobra.Command, args []string) (err error) {
 	network := sflags.MustGetString(cmd, "network")
 	paramsString := sflags.MustGetStringArray(cmd, "params")
 
-	// readerOptions := []manifest.Option{}
-	// if sflags.MustGetBool(cmd, "skip-package-validation") {
-	// 	readerOptions = append(readerOptions, manifest.SkipPackageValidationReader())
-	// }
-
-	// manifestReader, err := manifest.NewReader(manifestPath, readerOptions...)
-	// if err != nil {
-	// 	return fmt.Errorf("manifest reader: %w", err)
-	// }
-
-	// pkg, graph, err := manifestReader.Read()
-	// if err != nil {
-	// 	return fmt.Errorf("read manifest %q: %w", manifestPath, err)
-	// }
-
 	endpoint := sflags.MustGetString(cmd, "substreams-endpoint")
+
+	loadSubstreamsAuthEnvFile(manifestPath)
 
 	authToken, authType := tools.GetAuth(cmd, "substreams-api-key-envvar", "substreams-api-token-envvar")
 	substreamsClientConfig := client.NewSubstreamsClientConfig(
@@ -162,6 +149,41 @@ func runGui(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	return nil
+}
+
+func loadSubstreamsAuthEnvFile(manifestPath string) {
+	projectPath := filepath.Dir(manifestPath)
+	authFile := filepath.Join(projectPath, ".substreams.env")
+	_, err := os.Stat(authFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return
+		} else {
+			fmt.Printf("Error reading stats on auth file: %v: %s\n", authFile, err.Error())
+			return
+		}
+	}
+	cnt, err := os.ReadFile(authFile)
+	if err != nil {
+		fmt.Printf("Error reading auth file: %v: %s\n", authFile, err.Error())
+		return
+	}
+
+	lines := strings.Split(string(cnt), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "export") {
+			continue
+		}
+		line = strings.TrimPrefix(line, "export ")
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			key := strings.TrimSpace(parts[0])
+			value := strings.TrimSpace(parts[1])
+			fmt.Printf("Reading %s from %s\n", key, authFile)
+			os.Setenv(key, value)
+		}
+	}
 }
 
 // resolveManifestFile is solely nowadays by `substreams gui`. That is because manifest.Reader

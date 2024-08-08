@@ -5,11 +5,14 @@ import (
 	"regexp"
 )
 
+var positiveNegativeNumbers = regexp.MustCompile(`^[\-]?\d+$`)
+
 func validateNumbersOnly(in string) error {
-	for _, r := range in {
-		if r < '0' || r > '9' {
-			return fmt.Errorf("only numbers are allowed")
-		}
+	if in == "" {
+		return nil
+	}
+	if !positiveNegativeNumbers.MatchString(in) {
+		return fmt.Errorf("only numbers allowed (positive and negative)")
 	}
 	return nil
 }

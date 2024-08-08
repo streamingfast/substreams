@@ -6,10 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/streamingfast/substreams/manifest"
-
 	"github.com/charmbracelet/huh"
-
+	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"google.golang.org/protobuf/types/descriptorpb"
 )

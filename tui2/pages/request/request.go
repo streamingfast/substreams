@@ -72,7 +72,7 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "s":
 			comp := dataentry.New(r.Common, "start-block", validateNumbersOnly)
 			comp.Input.Prompt("Enter the start block number: ").
-				Description("Block from which to start streaming. Numbers only\n\n")
+				Description("Block from which to start streaming. Numbers only. Negative means relative to chain head.\n\n")
 			comp.SetValue(r.Config.StartBlock)
 			cmds = append(cmds, common.SetModalComponentCmd(comp))
 		case "t":

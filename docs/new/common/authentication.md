@@ -24,8 +24,14 @@ To authenticate with The Graph Market, you need to generate a JWT token. Follow 
 
    ![Dashboard](../../.gitbook/assets/intro/thegraphmarket.png)
 
-3. **Generate a New API Key**:
+3. **Create a New API Key**:
    - In the dashboard, click on `Create New Key`.
+   - Input a recognizable name for future reference.
+   - This is not the _authentication token_, but a key to generate tokens.
+
+4. **Generate an API Token**:
+   - Click the **...** beside your new key.
+   - Click **Generate token**
    - The system will generate a JWT token. **Copy** and **save** this token securely, as it will be required for authentication.
 
 ## Step 2: Set the JWT Token as an Environment Variable

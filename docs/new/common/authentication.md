@@ -1,53 +1,66 @@
----
-description: StreamingFast Substreams authentication reference
----
+# Substreams Authentication Guide
 
-# Authentication
+This guide explains how to authenticate when running a Substreams package (`.spkg`) with a provider, specifically using The Graph Market.
 
-Running a Substreams involves sending your package (`.spkg`) to a a Substreams provider for execution. Usually, the Substreams provider will require you to authenticate to avoid abuses on the service.
+## Overview
 
-## Authentication with The Graph Market
+Substreams require authentication to ensure secure and controlled access to providers. This guide focuses on obtaining and using a JWT token from The Graph Market to authenticate your Substreams execution.
 
-You can directly authenticate with The Graph Market (https://thegraph.market) by creating a new API key and obtaining the corresponding JWT token. 
+## Prerequisites
 
-### Get the JWT Token
+- A Substreams package (`.spkg`) ready to deploy.
+- An account with [The Graph Market](https://thegraph.market).
 
-1. Navigate to the [https://thegraph.market](https://thegraph.market). Log in your account or create a new account if you don't have one.
+## Step 1: Obtain a JWT Token
 
-2. Click on `Dashboard` or nagivate to [https://thegraph.market/dashboard](https://thegraph.market/dashboard).
+To authenticate with The Graph Market, you need to generate a JWT token. Follow these steps:
 
-<figure><img src="../../.gitbook/assets/intro/thegraphmarket.png" width="100%" /></figure>
+1. **Log in to The Graph Market**: 
+   - Visit [https://thegraph.market](https://thegraph.market).
+   - Log in to your existing account or create a new one if you don't have an account.
 
-3. Then, click on `Create New Key`.
-You will be provided with a JWT token. Copy and save this token in a safe place.
+2. **Access the Dashboard**: 
+   - Click on `Dashboard` in the navigation menu or go directly to [https://thegraph.market/dashboard](https://thegraph.market/dashboard).
 
-### Use the JWT Token
+   ![Dashboard](../../.gitbook/assets/intro/thegraphmarket.png)
 
-Once you have your JWT token, you can you it to consume data in Substreams. By default, the Substreams execution will inspect the `SUBSTREAMS_API_TOKEN` environment variable in your computer looking for a valid JWT token.
+3. **Generate a New API Key**:
+   - In the dashboard, click on `Create New Key`.
+   - The system will generate a JWT token. **Copy** and **save** this token securely, as it will be required for authentication.
 
-Setting the local environment variable might vary depending on your operating system. For Unix-like operating systems (Mac and Linux):
+## Step 2: Set the JWT Token as an Environment Variable
 
-1. Open a command-line terminal.
+To authenticate Substreams on your local machine, you need to set the JWT token as an environment variable.
 
-2. Run the following command.
+### Unix-like Systems (macOS, Linux)
 
-```bash
-export SUBSTREAMS_API_TOKEN="<YOUR-JWT-TOKEN>"
-```
+1. **Open a terminal** on your machine.
 
-Just replace `<YOUR-JWT-TOKEN>` with the actual JWT token.
+2. **Set the environment variable** using the following command:
 
-### Verify the Authentication Works
+   ```bash
+   export SUBSTREAMS_API_TOKEN="<YOUR-JWT-TOKEN>"
+   ```
 
-To verify that everything works correctly, you can run a pre-built Substreams. In the following example, you run the [ERC20 Balance Changes Substreams](https://substreams.dev/streamingfast/erc20-balance-changes/) against the Ethereum Mainnet endpoint (`mainnet.eth.streamingfast.io:443`) of StreamingFast.
+   Replace `<YOUR-JWT-TOKEN>` with the JWT token you obtained earlier.
 
-```bash
-substreams gui \
-  https://spkg.io/streamingfast/erc20-balance-changes-v1.2.0.spkg \
-  map_valid_balance_changes \
-  -e mainnet.eth.streamingfast.io:443 \
-  --start-block 1397553
-  --stop-block +10
-```
+## Step 3: Verify Authentication
 
-The StreamingFast team is also available on [Discord](https://discord.gg/jZwqxJAvRs) to help you.
+To ensure that your authentication is set up correctly, you can run a test Substreams. Here's how:
+
+1. Run the following command in your terminal to execute the ERC20 Balance Changes Substreams on the Ethereum Mainnet:
+
+   ```bash
+   substreams gui \
+     https://spkg.io/streamingfast/erc20-balance-changes-v1.2.0.spkg \
+     map_valid_balance_changes \
+     -e mainnet.eth.streamingfast.io:443 \
+     --start-block 1397553 \
+     --stop-block +10
+   ```
+
+2. Verify that the Substreams runs without errors, confirming that your authentication is successful.
+
+## Need Help?
+
+If you encounter any issues or have questions, the StreamingFast team is available on [Discord](https://discord.gg/jZwqxJAvRs) to assist you.

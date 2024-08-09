@@ -1,8 +1,10 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
@@ -24,12 +26,14 @@ func runAuthE(cmd *cobra.Command, args []string) error {
 	localDevelopment := os.Getenv("LOCAL_DEVELOPMENT")
 
 	fmt.Println("Open this link to authenticate on The Graph Market:")
+	fmt.Println()
 	linkStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("12"))
 	if localDevelopment == "true" {
-		fmt.Println(linkStyle.Render("http://localhost:3000/auth/substreams-devenv"))
+		fmt.Println("    " + linkStyle.Render("http://localhost:3000/auth/substreams-devenv"))
 	} else {
-		fmt.Println(linkStyle.Render("https://thegraph.market/auth/substreams-devenv"))
+		fmt.Println("    " + linkStyle.Render("https://thegraph.market/auth/substreams-devenv"))
 	}
+	fmt.Println("")
 
 	var token string
 	form := huh.NewForm(
@@ -41,14 +45,16 @@ func runAuthE(cmd *cobra.Command, args []string) error {
 				Value(&token).
 				Validate(func(s string) error {
 					if s == "" {
-						return fmt.Errorf("token cannot be empty")
+						return errors.New("token cannot be empty")
+					}
+					if strings.HasPrefix(s, "server_") {
+						return errors.New("You've copied an API key, not a JWT token. Obtain a JWT from the link above, or by Generating an API Token in the The Graph Market Dashboard.")
 					}
 					return nil
 				}),
 		),
 	)
 
-	fmt.Println("")
 	if err := form.Run(); err != nil {
 		return fmt.Errorf("error running form: %w", err)
 	}
@@ -63,8 +69,8 @@ func runAuthE(cmd *cobra.Command, args []string) error {
 
 	fmt.Println("Load credentials in current terminal with:")
 	fmt.Println("")
-
 	fmt.Println(linkStyle.Render("       . ./.substreams.env"))
+	fmt.Println()
 
 	return nil
 }

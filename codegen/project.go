@@ -143,10 +143,10 @@ func (p *Project) Render(outputType string, withDevEnv bool) (projectFiles map[s
 			"triggers/subgraph.yaml.gotmpl":   "subgraph.yaml",
 			"triggers/schema.graphql.gotmpl":  "schema.graphql",
 			"triggers/src/mappings.ts.gotmpl": "src/mappings.ts",
-			"triggers/run-local.sh.gotmpl":    "run-local.sh",
 		}
 
 		if withDevEnv {
+			templateFiles["triggers/run-local.sh.gotmpl"] = "run-local.sh"
 			templateFiles["triggers/dev-environment/docker-compose.yml"] = "dev-environment/docker-compose.yml"
 			templateFiles["triggers/dev-environment/start.sh"] = "dev-environment/start.sh"
 			templateFiles["triggers/dev-environment/config.toml.gotmpl"] = "dev-environment/config.toml"

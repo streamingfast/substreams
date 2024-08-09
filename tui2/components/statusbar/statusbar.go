@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/dustin/go-humanize"
+	"github.com/jhump/protoreflect/dynamic"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/tui2/common"
 	"github.com/streamingfast/substreams/tui2/stream"
@@ -23,11 +24,12 @@ type StatusBar struct {
 	linearHandoffBlock uint64
 	resolveStartBlock  uint64
 
-	dataPayloads uint64
+	bytesRepresentation dynamic.BytesRepresentation
+	showLogs            bool
 
-	totalBytesRead    uint64
-	totalBytesWritten uint64
-
+	dataPayloads             uint64
+	totalBytesRead           uint64
+	totalBytesWritten        uint64
 	initCheckpointBlockCount uint64
 	lastCheckpointTime       time.Time
 	lastCheckpointBlocks     uint64
@@ -39,6 +41,14 @@ func New(c common.Common) *StatusBar {
 	return &StatusBar{
 		Common: c,
 	}
+}
+
+func (s *StatusBar) SetBytesRepresentation(in dynamic.BytesRepresentation) {
+	s.bytesRepresentation = in
+}
+
+func (s *StatusBar) SetShowLogs(v bool) {
+	s.showLogs = v
 }
 
 func (s *StatusBar) Init() tea.Cmd {
@@ -138,6 +148,7 @@ func (s *StatusBar) View() string {
 	line1 = append(line1, styles.StatusBarBranch.Render(
 		fmt.Sprintf("%s read / %s written", humanize.Bytes(s.totalBytesRead), humanize.Bytes(s.totalBytesWritten)),
 	))
+	line1 = append(line1, styles.StatusBarHelp.Render("logs: "+showHide(s.showLogs)))
 
 	if s.maxParallelWorkers != 0 {
 		line1 = append(line1, styles.StatusBarHelp.Render(
@@ -146,7 +157,7 @@ func (s *StatusBar) View() string {
 	}
 
 	line2 = append(line2, styles.StatusBarInfo.Render("trace id: "+s.traceId))
-
+	line2 = append(line2, styles.StatusBarHelp.Render("bytes as: "+bytesRepr(s.bytesRepresentation)))
 	line2 = append(line2, styles.StatusBarValue.Render(fmt.Sprintf("handoff: %d", s.linearHandoffBlock)))
 	line2 = append(line2, styles.StatusBarBranch.Render(fmt.Sprintf("start block: %d", s.resolveStartBlock)))
 

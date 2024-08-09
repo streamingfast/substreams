@@ -59,7 +59,7 @@ func (s *BlockSearch) Init() tea.Cmd {
 func (s *BlockSearch) ShortHelp() []key.Binding {
 	return []key.Binding{
 		keymap.GeneralSearchEnter,
-		keymap.GeneralSearchBackspace,
+		keymap.EscapeModal,
 	}
 }
 func (s *BlockSearch) FullHelp() [][]key.Binding { return common.ShortToFullHelp(s) }
@@ -93,11 +93,8 @@ msgSwitch:
 				cmds = append(cmds, common.CancelModalCmd())
 				break msgSwitch
 			}
-		case "backspace":
-			if s.input.Value() == "" {
-				s.input.Blur()
-				cmds = append(cmds, common.CancelModalCmd(), s.clearSearch)
-			}
+		case "esc":
+			cmds = append(cmds, tea.Sequence(s.clearSearch, common.CancelModalCmd()))
 		}
 		var cmd tea.Cmd
 		s.input, cmd = s.input.Update(msg)

@@ -94,6 +94,7 @@ func New(c common.Common, config *request.Config) (*Output, error) {
 		//moduleNavigator:     nav,
 		firstBlockSeen: true,
 	}
+	output.statusBar.SetShowLogs(output.logsEnabled)
 	return output, nil
 }
 
@@ -234,6 +235,7 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, common.SetModalComponentCmd(o.blockSearchCtx))
 		case "L":
 			o.logsEnabled = !o.logsEnabled
+			o.statusBar.SetShowLogs(o.logsEnabled)
 			o.setOutputViewContent(true)
 		case "m":
 			o.setOutputViewContent(true)
@@ -243,6 +245,7 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, common.SetModalComponentCmd(o.searchCtx))
 		case "F":
 			o.bytesRepresentation = (o.bytesRepresentation + 1) % 3
+			o.statusBar.SetBytesRepresentation(o.bytesRepresentation)
 			o.setOutputViewContent(true)
 		case "N":
 			for i := len(o.searchMatchingOutputViewOffsets) - 1; i >= 0; i-- {

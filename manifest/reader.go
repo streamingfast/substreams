@@ -695,7 +695,7 @@ func ValidateModules(mods *pbsubstreams.Modules) error {
 		sumCode += len(binary.Content)
 	}
 	if sumCode > 300_000_000 {
-		return fmt.Errorf("limit of 100MB of module code size reached")
+		return fmt.Errorf("limit of 300MB of module code size reached")
 	}
 	if len(mods.Modules) > 100 {
 		return fmt.Errorf("limit of 100 modules reached")

@@ -72,19 +72,19 @@ func BuildParallelProcessor(
 		}
 
 		// no ReadExecOut if output type is an index
-		if requestedModule.GetKindMap() != nil {
-			initialBlock := execGraph.ModulesInitBlocks()[requestedModule.Name]
-			execOutSegmenter := reqPlan.ReadOutSegmenter(initialBlock)
-			walker := execoutStorage.NewFileWalker(requestedModule.Name, execOutSegmenter)
+		//if requestedModule.GetKindMap() != nil { this is breaking the sink-substreams-????-common... since they do not receive any cursor
+		initialBlock := execGraph.ModulesInitBlocks()[requestedModule.Name]
+		execOutSegmenter := reqPlan.ReadOutSegmenter(initialBlock)
+		walker := execoutStorage.NewFileWalker(requestedModule.Name, execOutSegmenter)
 
-			sched.ExecOutWalker = orchestratorExecout.NewWalker(
-				ctx,
-				requestedModule,
-				walker,
-				reqPlan.ReadExecOut,
-				stream,
-			)
-		}
+		sched.ExecOutWalker = orchestratorExecout.NewWalker(
+			ctx,
+			requestedModule,
+			walker,
+			reqPlan.ReadExecOut,
+			stream,
+		)
+		//}
 	}
 
 	// we may be here only for mapper, without stores

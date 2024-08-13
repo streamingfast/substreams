@@ -124,7 +124,6 @@ func (p *Pipeline) processBlock(
 		}
 	case bstream.StepNew:
 		p.blockStepMap[bstream.StepNew]++
-
 		err = p.handleStepNew(ctx, clock, cursor, execOutput)
 		if err != nil && err != io.EOF {
 			return fmt.Errorf("step new: handler step new: %w", err)

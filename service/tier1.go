@@ -575,9 +575,11 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		step := obj.(bstream.Stepable).Step()
 		switch step {
 		case bstream.StepNewIrreversible:
-			// comes from disk, already metered by dstore meters
-		default: // all other cases are live
-			dmetering.GetBytesMeter(ctx).CountInc("live_bytes_read", len(blk.Payload.GetValue()))
+			dmetering.GetBytesMeter(ctx).CountInc("uncompressed_bytes_read", len(blk.Payload.GetValue()))
+		default:
+			// all other cases are live blocks to be metered
+			dmetering.GetBytesMeter(ctx).AddBytesRead(len(blk.Payload.GetValue()))
+			dmetering.GetBytesMeter(ctx).CountInc("uncompressed_live_bytes_read", len(blk.Payload.GetValue()))
 		}
 
 		return streamHandler.ProcessBlock(blk, obj)

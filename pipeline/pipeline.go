@@ -159,7 +159,6 @@ func (p *Pipeline) InitTier2Stores(ctx context.Context) (err error) {
 }
 
 func (p *Pipeline) InitTier1StoresAndBackprocess(ctx context.Context, reqPlan *plan.RequestPlan) (err error) {
-
 	if reqPlan.RequiresParallelProcessing() {
 		storeMap, err := p.runParallelProcess(ctx, reqPlan)
 		if err != nil {

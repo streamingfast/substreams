@@ -33,7 +33,7 @@ type RequestPlan struct {
 	// store snapshots.
 	WriteExecOut *block.Range // Can be nil
 
-	// When WriteExecOut produces files, we might want to start reading
+	// When ReadExecOut produces files, we might want to start reading
 	// blocks only a bit further down a file (if boundary is at 20,
 	// the request's start block might be 25). This will instruct
 	// the output stream to start at that block number.

@@ -34,7 +34,7 @@ func TestNavigator_Init(t *testing.T) {
 func TestNavigator_Update_ModuleSelectedMsg(t *testing.T) {
 	nav := getTestNavigator()
 
-	msg := common.ModuleSelectedMsg{ModuleName: "A"}
+	msg := common.ModuleSelectedMsg{ModuleName: "A", Target: "output"}
 	_, cmd := nav.Update(msg)
 
 	assert.Equal(t, "A", nav.SelectedModule)

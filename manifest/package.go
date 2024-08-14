@@ -359,8 +359,10 @@ func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package
 				return nil, fmt.Errorf("reading file: %w", err)
 			}
 			fmt.Println("Warning: README.md file not found, no documentation will be packaged")
+			err = nil
 		}
 	}
+
 	doc = string(readmeContent)
 
 	pkgMeta := &pbsubstreams.PackageMetadata{
@@ -453,11 +455,12 @@ func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package
 				moduleCodeIndexes[binaryDef.File] = codeIndex
 			}
 			pbmod, err = mod.ToProtoWASM(uint32(codeIndex))
+			if err != nil {
+				return nil, err
+			}
+
 		default:
 			return nil, fmt.Errorf("module %q: invalid code type %q", mod.Name, binaryDef.Type)
-		}
-		if err != nil {
-			return nil, err
 		}
 
 		pkg.Modules.Modules = append(pkg.Modules.Modules, pbmod)

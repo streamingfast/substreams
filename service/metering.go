@@ -17,11 +17,11 @@ func sendMetering(ctx context.Context, meter dmetering.Meter, userID, apiKeyID, 
 	inputBytes := meter.GetCount("wasm_input_bytes")
 	meter.ResetCount("wasm_input_bytes")
 
-	uncompressedBytesRead := meter.GetCount("uncompressed_bytes_read")
-	meter.ResetCount("uncompressed_bytes_read")
+	uncompressedBytesRead := meter.GetCount("uncompressed_read_bytes")
+	meter.ResetCount("uncompressed_read_bytes")
 
-	uncompressedLiveBytesRead := meter.GetCount("uncompressed_live_bytes_read")
-	meter.ResetCount("uncompressed_live_bytes_read")
+	uncompressedLiveBytesRead := meter.GetCount("uncompressed_live_read_bytes")
+	meter.ResetCount("uncompressed_live_read_bytes")
 
 	event := dmetering.Event{
 		UserID:    userID,
@@ -35,8 +35,8 @@ func sendMetering(ctx context.Context, meter dmetering.Meter, userID, apiKeyID, 
 			"written_bytes":                float64(bytesWritten),
 			"read_bytes":                   float64(bytesRead),
 			"wasm_input_bytes":             float64(inputBytes),
-			"uncompressed_bytes_read":      float64(uncompressedBytesRead),
-			"uncompressed_live_bytes_read": float64(uncompressedLiveBytesRead),
+			"uncompressed_read_bytes":      float64(uncompressedBytesRead),
+			"uncompressed_live_read_bytes": float64(uncompressedLiveBytesRead),
 			"message_count":                1,
 		},
 		Timestamp: time.Now(),

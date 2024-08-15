@@ -50,6 +50,8 @@ func (sf *StreamFactory) New(
 		}
 	}
 
+	// WARN: we wouldn't instrument for metering here, as it would be taken care of by the liveSourceMiddleeware i mplicitly (the ForkableHub which consumes this
+	// forked block store, will pipe the blocks into handlers as `step.New`)
 	forkedBlocksStore := sf.forkedBlocksStore
 	if clonable, ok := forkedBlocksStore.(dstore.Clonable); ok {
 		var err error
@@ -57,11 +59,12 @@ func (sf *StreamFactory) New(
 		if err != nil {
 			return nil, err
 		}
-		forkedBlocksStore.SetMeter(dmetering.GetBytesMeter(ctx))
+		forkedBlocksStore.SetMeter(dmetering.GetUncompressedForkedBlocksTHing(ctx))
 	} else {
 		logger.Debug("forkedBlocksStore cannot be cloned, will not be metered")
 	}
 
+	// WARN: we _wouldn'_t instrument this with `dstore`, because those we know will end up
 	mergedBlocksStore := sf.mergedBlocksStore
 	if clonable, ok := mergedBlocksStore.(dstore.Clonable); ok {
 		var err error

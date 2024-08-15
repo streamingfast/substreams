@@ -434,11 +434,15 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		return fmt.Errorf("internal error setting store: %w", err)
 	}
 
+	// WARN: this still needs ot be metered, but with a different name?
+	// Uncompressed? `uncompressed_cache_read_bytes`
 	if clonableStore, ok := cacheStore.(dstore.Clonable); ok {
 		cloned, err := clonableStore.Clone(ctx)
 		if err != nil {
 			return fmt.Errorf("cloning store: %w", err)
 		}
+		// WARN: here we'd want a `io.Writer` assigned to `cloned.CompressedWriterMiddleware()`,
+		// `cloned.CompressedReaderMiddleware()`, `cloned.UncompressedReaderMiddleware()`, `cloned.UncompressedWriterMiddleware()`
 		cloned.SetMeter(dmetering.GetBytesMeter(ctx))
 		cacheStore = cloned
 	}

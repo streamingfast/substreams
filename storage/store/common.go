@@ -16,7 +16,28 @@ import (
 	"github.com/streamingfast/dstore"
 )
 
+type MyReadMeter interface {
+	Read() ([]byte, error)
+}
+
+func NewReadMeter(r io.Reader) MyReadMeter {
+	return &readMeter{r: r}
+}
+
+type readMeter struct {
+	r io.Reader
+}
+
+func (r *readMeter) Read() ([]byte, error) {
+	n, err := r.r.Read(buf)
+	//DO THE DEED
+	if err!= nil {
+		return nil, err
+	}
+return 
+
 func saveStore(ctx context.Context, store dstore.Store, filename string, content []byte) (err error) {
+	// WARN: We'd need to have those be meterable, with GetBytesMeter AND `uncompressed_kvstore_read_bytes` and `uncompressed_kvstore_written_bytes`
 	if cloned, ok := store.(dstore.Clonable); ok {
 		store, err = cloned.Clone(ctx)
 		if err != nil {

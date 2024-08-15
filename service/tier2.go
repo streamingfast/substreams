@@ -434,6 +434,7 @@ func (s *Tier2Service) getStores(ctx context.Context, request *pbssinternal.Proc
 		return nil, nil, nil, fmt.Errorf("setting up block store from url %q: %w", request.MergedBlocksStore, err)
 	}
 
+	// WARN: This would be handled by the new JoiningSource instrumentation in the consumer of this `getStores()` function.
 	if cloned, ok := mergedBlocksStore.(dstore.Clonable); ok {
 		mergedBlocksStore, err = cloned.Clone(ctx)
 		if err != nil {
@@ -442,6 +443,7 @@ func (s *Tier2Service) getStores(ctx context.Context, request *pbssinternal.Proc
 		mergedBlocksStore.SetMeter(dmetering.GetBytesMeter(ctx))
 	}
 
+	// WARN: this one is metered below (LET'S KEEP THE TWO BITS OF CODE CLOSE)
 	stateStore, err := dstore.NewStore(request.StateStore, "zst", "zstd", false)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("getting store: %w", err)
@@ -468,6 +470,8 @@ func (s *Tier2Service) getStores(ctx context.Context, request *pbssinternal.Proc
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("cloning store: %w", err)
 		}
+		// WARN: also do the `Uncompressed/Writer/Reader/Middleware` thing, with proper keys and
+		// backwards compatibility (GetBytesMeter too)
 		cloned.SetMeter(dmetering.GetBytesMeter(ctx))
 		cacheStore = cloned
 	}

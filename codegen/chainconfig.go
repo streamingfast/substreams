@@ -110,4 +110,16 @@ var ChainConfigByID = map[string]*ChainConfig{
 		Network:          "solana",
 		FirehoseEndpoint: "mainnet.solana.streamingfast.io:443",
 	},
+	"vara-mainnet": {
+		DisplayName:      "Vara Mainnet",
+		ExplorerLink:     "https://vara.subscan.io/",
+		FirehoseEndpoint: "mainnet.vara.streamingfast.io:443",
+		Network:          "vara-mainnet",
+	},
+	"vara-testnet": {
+		DisplayName:      "Vara Testnet",
+		ExplorerLink:     "",
+		FirehoseEndpoint: "testnet.vara.streamingfast.io:443",
+		Network:          "vara-testnet",
+	},
 }

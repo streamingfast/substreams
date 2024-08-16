@@ -467,14 +467,16 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			}
 
 			input := msg.DownloadFiles
-			fmt.Println(filenameStyle("Files:\n"))
+			fmt.Println(filenameStyle("Files:"))
 			for _, file := range input.Files {
 				if file.Content == nil {
 					continue
 				}
 
-				fmt.Printf("%s %s\n", filenameStyle("-"), filenameStyle(file.Filename))
-				fmt.Printf("  %s\n\n", file.Description)
+				fmt.Printf("  %s %s\n", filenameStyle("-"), filenameStyle(file.Filename))
+				if file.Description != "" {
+					fmt.Printf("\t%s\n\n", file.Description)
+				}
 			}
 			// let the terminal breath a little
 			fmt.Println()

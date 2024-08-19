@@ -31,3 +31,20 @@ Helpful information people found through the use of third-party libraries and Su
 [Specifying dependencies from Git repositories](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#specifying-dependencies-from-git-repositories) is possible in Rust, but it is **NOT recommended** by the Substreams team, as they are not fully tested and can bring bugs to your Substreams project.
 
 The Substreams team recommends using the templates provided in the [Examples section](examples.md) as a starting point to develop your Substreams application.
+
+### Logs
+
+The `substreams` crate allows you to log data in the Substreams execution for debugging purposes. The `std::println(...)` function of Rust won't work in Substreams.
+
+Use the `substreams::log::pritnln(...)` function in your Rust code to log data during the execution.
+
+```rust
+#[substreams::handlers::map]
+fn all_transactions_without_votes(blk: Block) -> Result<Transactions, substreams::errors::Error> {
+    let transactions: Vec<ConfirmedTransaction> = blk.transactions.into_iter().collect();
+
+    substreams::log::println(format!("Number of transactions:{}", transactions.len()));
+
+    Ok(Transactions { transactions })
+}
+```

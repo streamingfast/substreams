@@ -661,22 +661,22 @@ func NewOverwriteForm() *OverwriteForm {
 func (f *OverwriteForm) createOverwriteForm(path string) error {
 	options := []huh.Option[string]{
 		{
-			Key:   "No",
-			Value: "no",
+			Key:   "Yes, overwrite all",
+			Value: "yes_all",
 		},
 		{
 			Key:   "Yes, overwrite",
 			Value: "yes",
 		},
 		{
-			Key:   "Yes, overwrite all",
-			Value: "yes_all",
+			Key:   "No",
+			Value: "no",
 		},
 	}
 
 	var selection string
 	selectField := huh.NewSelect[string]().
-		Title(fmt.Sprintf("File already exists, Do you want to overwrite %s ?", path)).
+		Title(fmt.Sprintf("File already exists, do you want to overwrite %s ?", path)).
 		Options(options...).
 		Value(&selection)
 

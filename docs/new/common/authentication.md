@@ -61,7 +61,7 @@ To ensure that your authentication is set up correctly, you can run a test Subst
      https://spkg.io/streamingfast/erc20-balance-changes-v1.2.0.spkg \
      map_valid_balance_changes \
      -e mainnet.eth.streamingfast.io:443 \
-     --start-block 1397553 \
+     --start-block 10397553 \
      --stop-block +10
    ```
 

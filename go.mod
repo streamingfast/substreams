@@ -8,13 +8,13 @@ require (
 	github.com/jhump/protoreflect v1.14.0
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/streamingfast/bstream v0.0.2-0.20240603153252-ec8d37625188
+	github.com/streamingfast/bstream v0.0.2-0.20240819202225-ca1b790abf0b
 	github.com/streamingfast/cli v0.0.4-0.20230825151644-8cc84512cd80
 	github.com/streamingfast/dauth v0.0.0-20240219205130-bfe428489338
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
 	github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1
 	github.com/streamingfast/dgrpc v0.0.0-20240219152146-57bb131c39ca
-	github.com/streamingfast/dstore v0.1.1-0.20240311181234-470a7a84936f
+	github.com/streamingfast/dstore v0.1.1-0.20240826190906-91345d4a31f2
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
 	github.com/streamingfast/pbgo v0.0.6-0.20240823134334-812f6a16c5cb
 	github.com/stretchr/testify v1.8.4
@@ -57,7 +57,7 @@ require (
 	github.com/rs/cors v1.10.0
 	github.com/schollz/closestmatch v2.1.0+incompatible
 	github.com/shopspring/decimal v1.3.1
-	github.com/streamingfast/dmetering v0.0.0-20240403142935-dc8bb3bb32c3
+	github.com/streamingfast/dmetering v0.0.0-20240816165719-51768d3da951
 	github.com/streamingfast/dmetrics v0.0.0-20230919161904-206fa8ebd545
 	github.com/streamingfast/sf-tracing v0.0.0-20240430173521-888827872b90
 	github.com/streamingfast/shutter v1.5.0

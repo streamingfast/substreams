@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dstore"
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/shutter"
@@ -319,7 +320,7 @@ type TestRunner struct {
 	generator TestBlockGenerator
 }
 
-func (r *TestRunner) StreamFactory(ctx context.Context, h bstream.Handler, startBlockNum int64, stopBlockNum uint64, _ string, _ bool, _ bool, _ *zap.Logger) (service.Streamable, error) {
+func (r *TestRunner) StreamFactory(ctx context.Context, h bstream.Handler, startBlockNum int64, stopBlockNum uint64, _ string, _ bool, _ bool, _ *zap.Logger, extraOpts ...stream.Option) (service.Streamable, error) {
 	var liveBackFiller *service.LiveBackFiller
 
 	if liveBackFillerHandler, ok := h.(*service.LiveBackFiller); ok {

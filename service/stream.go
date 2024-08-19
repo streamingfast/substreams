@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 
-	"connectrpc.com/connect"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/substreams/metering"
+
+	"connectrpc.com/connect"
 	"go.uber.org/zap"
 )
 
@@ -28,6 +30,7 @@ func (sf *StreamFactory) New(
 	finalBlocksOnly bool,
 	cursorIsTarget bool,
 	logger *zap.Logger,
+	extraOpts ...stream.Option,
 ) (Streamable, error) {
 	options := []stream.Option{
 		stream.WithStopBlock(stopBlockNum),
@@ -53,10 +56,11 @@ func (sf *StreamFactory) New(
 	forkedBlocksStore := sf.forkedBlocksStore
 	if clonable, ok := forkedBlocksStore.(dstore.Clonable); ok {
 		var err error
-		forkedBlocksStore, err = clonable.Clone(ctx)
+		forkedBlocksStore, err = clonable.Clone(ctx, metering.WithForkedBlockBytesReadMeteringOptions(dmetering.GetBytesMeter(ctx), logger)...)
 		if err != nil {
 			return nil, err
 		}
+		//todo: (deprecated)
 		forkedBlocksStore.SetMeter(dmetering.GetBytesMeter(ctx))
 	} else {
 		logger.Debug("forkedBlocksStore cannot be cloned, will not be metered")
@@ -65,22 +69,29 @@ func (sf *StreamFactory) New(
 	mergedBlocksStore := sf.mergedBlocksStore
 	if clonable, ok := mergedBlocksStore.(dstore.Clonable); ok {
 		var err error
-		mergedBlocksStore, err = clonable.Clone(ctx)
+		mergedBlocksStore, err = clonable.Clone(ctx, metering.WithBlockBytesReadMeteringOptions(dmetering.GetBytesMeter(ctx), logger)...)
 		if err != nil {
 			return nil, err
 		}
+		//todo: (deprecated)
 		mergedBlocksStore.SetMeter(dmetering.GetBytesMeter(ctx))
 	} else {
 		logger.Debug("mergedBlocksStore cannot be cloned, will not be metered")
 	}
 
-	return stream.New(
+	for _, opt := range extraOpts {
+		options = append(options, opt)
+	}
+
+	factory := stream.New(
 		forkedBlocksStore,
 		mergedBlocksStore,
 		sf.hub,
 		startBlockNum,
 		h,
-		options...), nil
+		options...)
+
+	return factory, nil
 }
 
 func (s *StreamFactory) GetRecentFinalBlock() (uint64, error) {

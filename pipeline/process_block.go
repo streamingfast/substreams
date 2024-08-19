@@ -11,6 +11,7 @@ import (
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dmetering"
+	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/metrics"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -125,7 +126,10 @@ func (p *Pipeline) processBlock(
 	case bstream.StepNew:
 		p.blockStepMap[bstream.StepNew]++
 
+		// legacy metering
+		//todo: (deprecated)
 		dmetering.GetBytesMeter(ctx).AddBytesRead(execOutput.Len())
+
 		err = p.handleStepNew(ctx, clock, cursor, execOutput)
 		if err != nil && err != io.EOF {
 			return err
@@ -254,7 +258,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 		return fmt.Errorf("pre block hook: %w", err)
 	}
 
-	dmetering.GetBytesMeter(ctx).CountInc("wasm_input_bytes", execOutput.Len())
+	dmetering.GetBytesMeter(ctx).CountInc(metering.MeterWasmInputBytes, execOutput.Len())
 	if err := p.executeModules(ctx, execOutput); err != nil {
 		return fmt.Errorf("execute modules: %w", err)
 	}

@@ -9,19 +9,22 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/shopspring/decimal"
-	"github.com/streamingfast/dmetering"
-
 	"github.com/streamingfast/derr"
+	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/substreams/metering"
+	"github.com/streamingfast/substreams/reqctx"
+
+	"github.com/shopspring/decimal"
 )
 
 func saveStore(ctx context.Context, store dstore.Store, filename string, content []byte) (err error) {
 	if cloned, ok := store.(dstore.Clonable); ok {
-		store, err = cloned.Clone(ctx)
+		store, err = cloned.Clone(ctx, metering.WithBytesMeteringOptions(dmetering.GetBytesMeter(ctx), reqctx.Logger(ctx))...)
 		if err != nil {
 			return fmt.Errorf("cloning store: %w", err)
 		}
+		//todo: (deprecated)
 		store.SetMeter(dmetering.GetBytesMeter(ctx))
 	}
 
@@ -32,10 +35,11 @@ func saveStore(ctx context.Context, store dstore.Store, filename string, content
 
 func loadStore(ctx context.Context, store dstore.Store, filename string) (out []byte, err error) {
 	if cloned, ok := store.(dstore.Clonable); ok {
-		store, err = cloned.Clone(ctx)
+		store, err = cloned.Clone(ctx, metering.WithBytesMeteringOptions(dmetering.GetBytesMeter(ctx), reqctx.Logger(ctx))...)
 		if err != nil {
 			return nil, fmt.Errorf("cloning store: %w", err)
 		}
+		//todo: (deprecated)
 		store.SetMeter(dmetering.GetBytesMeter(ctx))
 	}
 

@@ -104,7 +104,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 
 	for _, file := range files {
 		if r.MatchString(file.Name()) {
-			return fmt.Errorf("substreams project already exists in this directory: %q. Try creating a new one in a new directory", file.Name())
+			return fmt.Errorf("substreams project already exists in this directory: %q. Try running 'substreams init' in a new directory", file.Name())
 		}
 	}
 

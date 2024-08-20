@@ -118,7 +118,9 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 		var res *Result
 		retryIdx := 0
 		startTime := time.Now()
-		maxRetries := 720 //TODO: make this configurable
+		maxRetries := 720         //TODO: make this configurable
+		maxExecutionTimeouts := 3 //TODO: make this configurable
+		executionTimeouts := 0
 		var previousError error
 		err := derr.RetryContext(ctx, uint64(maxRetries), func(ctx context.Context) error {
 			w.logger.Info("launching remote worker",
@@ -126,6 +128,7 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 				zap.Uint32("stage", request.Stage),
 				zap.String("output_module", request.OutputModule),
 				zap.Int("attempt", retryIdx+1),
+				zap.Int("execution_timeouts", executionTimeouts),
 				zap.NamedError("previous_error", previousError),
 			)
 
@@ -136,9 +139,14 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 				metrics.Tier1WorkerRetryCounter.Inc()
 				if err != nil && strings.Contains(err.Error(), "service currently overloaded") {
 					metrics.Tier1WorkerRejectedOverloadedCounter.Inc()
+				} else if strings.Contains(err.Error(), "DeadlineExceeded") {
+					executionTimeouts++
 				}
 				previousError = err
 				retryIdx++
+				if executionTimeouts >= maxExecutionTimeouts {
+					return derr.NewFatalError(fmt.Errorf("segment starting at block %d timed out %d times, giving up. Last error: %w", request.SegmentNumber*request.SegmentSize, executionTimeouts, err))
+				}
 				return err
 			default:
 				if err != nil {

@@ -57,7 +57,7 @@ func (s *Tier1Service) errorFromRecordedFailure(id string, isProductionMode bool
 	return nil
 }
 
-// Error: rpc error: code = InvalidArgument desc = step new irr: handler step new: execute modules: applying executor results ... store wasm call: block 300: module "store_eth_stats": wasm execution failed ...
+// Error: rpc error: code = InvalidArgument desc = execute modules: applying executor results ... store wasm call: block 300: module "store_eth_stats": wasm execution failed ...
 var blockFailureRE = regexp.MustCompile(`store wasm call: block ([0-9]*): module "([^"]*)"`)
 
 func (s *Tier1Service) recordFailure(requestID string, err error) {

@@ -32,6 +32,7 @@ func (i *IndexModuleExecutor) applyCachedOutput([]byte) error {
 func (i *IndexModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, outForFiles []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
 	_, span := reqctx.WithModuleExecutionSpan(ctx, "exec_index")
 	defer span.EndWithErr(&err)
+	i.ctx = ctx
 
 	var call *wasm.Call
 	if call, err = i.wasmCall(reader); err != nil {

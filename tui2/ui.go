@@ -11,6 +11,7 @@ import (
 	"github.com/streamingfast/substreams/tui2/common"
 	"github.com/streamingfast/substreams/tui2/components/errorbox"
 	"github.com/streamingfast/substreams/tui2/footer"
+	"github.com/streamingfast/substreams/tui2/pages/build"
 	"github.com/streamingfast/substreams/tui2/pages/docs"
 	"github.com/streamingfast/substreams/tui2/pages/output"
 	"github.com/streamingfast/substreams/tui2/pages/progress"
@@ -29,6 +30,7 @@ const (
 	progressPage
 	outputPage
 	docsPage
+	buildPage
 )
 
 type UI struct {
@@ -61,9 +63,10 @@ func New(reqConfig *request.Config) (*UI, error) {
 			progress.New(c),
 			outputTab,
 			docs.New(c),
+			build.New(c),
 		},
 		activePage:    requestPage,
-		tabs:          tabs.New(c, []string{"Request", "Backprocessing", "Output", "Docs"}),
+		tabs:          tabs.New(c, []string{"Request", "Backprocessing", "Output", "Docs", "Build"}),
 		requestConfig: reqConfig,
 		replayLog:     replaylog.New(),
 	}
@@ -107,6 +110,7 @@ func (ui *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	return ui.update(msg)
 }
+
 func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {

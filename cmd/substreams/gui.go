@@ -12,6 +12,7 @@ import (
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/substreams/client"
+	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/tools"
 	"github.com/streamingfast/substreams/tui2"
 	"github.com/streamingfast/substreams/tui2/pages/request"
@@ -66,6 +67,20 @@ func runGui(cmd *cobra.Command, args []string) (err error) {
 		if err != nil {
 			return fmt.Errorf("resolving manifest: %w", err)
 		}
+	}
+
+	// Safe guard to ensure that the manifest file exists
+	manifestReader, err := manifest.NewReader(manifestPath)
+	if err != nil {
+		return fmt.Errorf("manifest reader: %w", err)
+	}
+
+	_, _, err = manifestReader.Read()
+	if err != nil {
+		if manifestReader.IsRemotePackage(manifestPath) {
+			fmt.Println("Are you sure the package is available? If you are using a remote package, make sure the URL is correct.")
+		}
+		return fmt.Errorf("reading package: %w", err)
 	}
 
 	productionMode := sflags.MustGetBool(cmd, "production-mode")

@@ -1,0 +1,25 @@
+specVersion: v0.1.0
+package:
+  name: evmexample
+  version: v0.1.0
+
+protobuf:
+  excludePaths:
+    - sf/substreams
+    - google
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: binaries/dummy.wasm
+
+modules:
+  - name: mod1
+    kind: map
+    initialBlock: 0
+    inputs:
+      - source: sf.test.Block
+    output:
+      type: proto:test
+
+network: mainnet

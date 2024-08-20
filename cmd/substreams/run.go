@@ -94,17 +94,21 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
 
-	pkg, graph, err := manifestReader.Read()
+	pkgBundle, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
-	endpoint, err := manifest.ExtractNetworkEndpoint(pkg.Network, sflags.MustGetString(cmd, "substreams-endpoint"), zlog)
+	if pkgBundle == nil {
+		return fmt.Errorf("no package found")
+	}
+
+	endpoint, err := manifest.ExtractNetworkEndpoint(pkgBundle.Package.Network, sflags.MustGetString(cmd, "substreams-endpoint"), zlog)
 	if err != nil {
 		return fmt.Errorf("extracting endpoint: %w", err)
 	}
 
-	msgDescs, err := manifest.BuildMessageDescriptors(pkg)
+	msgDescs, err := manifest.BuildMessageDescriptors(pkgBundle.Package)
 	if err != nil {
 		return fmt.Errorf("building message descriptors: %w", err)
 	}
@@ -139,7 +143,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 
 	if readFromModule {
-		sb, err := graph.ModuleInitialBlock(outputModule)
+		sb, err := pkgBundle.Graph.ModuleInitialBlock(outputModule)
 		if err != nil {
 			return fmt.Errorf("getting module start block: %w", err)
 		}
@@ -173,7 +177,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		StartCursor:                         cursorStr,
 		StopBlockNum:                        stopBlock,
 		FinalBlocksOnly:                     sflags.MustGetBool(cmd, "final-blocks-only"),
-		Modules:                             pkg.Modules,
+		Modules:                             pkgBundle.Package.Modules,
 		OutputModule:                        outputModule,
 		ProductionMode:                      productionMode,
 		DebugInitialStoreSnapshotForModules: debugModulesInitialSnapshot,
@@ -187,7 +191,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		toPrint = []string{outputModule}
 	}
 
-	ui := tui.New(req, pkg, toPrint)
+	ui := tui.New(req, pkgBundle.Package, toPrint)
 	if err := ui.Init(outputMode); err != nil {
 		return fmt.Errorf("TUI initialization: %w", err)
 	}

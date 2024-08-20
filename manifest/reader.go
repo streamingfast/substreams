@@ -104,36 +104,29 @@ func newReader(input, workingDir string, opts ...Option) (*Reader, error) {
 	return r, nil
 }
 
-// TODO: return a Manifest object, so we can read the ExcludePaths, the `Binaries[0].File` locations relative to `substreams.yaml` for local access.
-// Of course the Manfiest wouldn't exist unless you read an actual `.yaml` file.
-// func (r *Reader) Read() (*ManifestBundle, error) {
-type ManifestBundle struct {
+type PackageBundle struct {
 	Package      *pbsubstreams.Package
 	Manifest     *Manifest
 	ManifestPath string
 	Graph        *ModuleGraph
 }
 
-// Also absorb the resolution, and unify with `cmd/substreams/gui.go:resolveManifestFile` which needs the ManifestPath.
-// We also want a robust and clean resolution algorithm to pick up a parent `substreams.yaml` if the input is "", and
-// we want to search for the right manifest is you specified `substreams.sql.yaml` for instance (right now it falls back
-// on `substreams.yaml`, which you haven't specified).
-
-func (r *Reader) Read() (*pbsubstreams.Package, *ModuleGraph, error) {
-	pkg, err := r.resolvePkg()
+func (r *Reader) Read() (*PackageBundle, error) {
+	mb := &PackageBundle{}
+	pkg, manif, err := r.resolvePkg()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if !r.skipPackageValidation {
 		if err := validatePackage(pkg, r.skipModuleOutputTypeValidation); err != nil {
-			return nil, nil, fmt.Errorf("package validation failed: %w", err)
+			return nil, fmt.Errorf("package validation failed: %w", err)
 		}
 	}
 
 	graph, err := NewModuleGraph(pkg.Modules.Modules)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if r.overrideNetwork != "" {
@@ -143,38 +136,43 @@ func (r *Reader) Read() (*pbsubstreams.Package, *ModuleGraph, error) {
 	if pkg.Networks != nil {
 		importIncludedModules, err := dependentImportedModules(graph, r.overrideOutputModule)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		if pkg.Network == "" {
-			return nil, nil, fmt.Errorf("no network specified in package, but networks are defined")
+			return nil, fmt.Errorf("no network specified in package, but networks are defined")
 		}
 		if err := validateNetworks(pkg, importIncludedModules, pkg.Network); err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		if err := ApplyNetwork(pkg.Network, pkg); err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 	}
 
 	// applied on top of network-specific params
 	if r.params != nil {
 		if err := ApplyParams(r.params, pkg); err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 	}
 
 	if err := computeInitialBlock(pkg.Modules.Modules, graph); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if !r.skipPackageValidation { // we validate here because the 'unset' module initial blocks are computed above
 		if err := ValidateModules(pkg.Modules); err != nil {
-			return nil, nil, fmt.Errorf("module validation failed: %w", err)
+			return nil, fmt.Errorf("module validation failed: %w", err)
 		}
 	}
 
-	return pkg, graph, nil
+	mb.Package = pkg
+	mb.Graph = graph
+	mb.Manifest = manif
+	mb.ManifestPath = r.currentInput
+
+	return mb, nil
 }
 
 func (r *Reader) read() error {
@@ -414,9 +412,9 @@ func (r *Reader) resolveInputPath() error {
 	return nil
 }
 
-func (r *Reader) getPkg() (*pbsubstreams.Package, error) {
+func (r *Reader) getPkg() (*pbsubstreams.Package, *Manifest, error) {
 	if r.currentData == nil {
-		return nil, fmt.Errorf("no result available")
+		return nil, nil, fmt.Errorf("no result available")
 	}
 
 	if strings.HasSuffix(r.currentInput, ".yaml") || strings.HasSuffix(r.currentInput, ".yml") {
@@ -425,24 +423,24 @@ func (r *Reader) getPkg() (*pbsubstreams.Package, error) {
 		decoder.KnownFields(true)
 
 		if err := decoder.Decode(&manif); err != nil {
-			return nil, fmt.Errorf("unable to unmarshal manifest: %w", err)
+			return nil, nil, fmt.Errorf("unable to unmarshal manifest: %w", err)
 		}
 
 		pkg, err := r.newPkgFromManifest(manif)
 		if err != nil {
-			return nil, fmt.Errorf("unable to convert manifest to package: %w", err)
+			return nil, nil, fmt.Errorf("unable to convert manifest to package: %w", err)
 		}
 
-		return pkg, nil
+		return pkg, manif, nil
 	}
 
 	pkg := &pbsubstreams.Package{}
 	err := proto.Unmarshal(r.currentData, pkg)
 	if err != nil {
-		return nil, fmt.Errorf("unable to unmarshal package: %w", err)
+		return nil, nil, fmt.Errorf("unable to unmarshal package: %w", err)
 	}
 
-	return pkg, nil
+	return pkg, nil, nil
 }
 
 func dependentImportedModules(graph *ModuleGraph, outputModule string) (map[string]bool, error) {
@@ -560,23 +558,23 @@ func (r *Reader) newPkgFromManifest(manif *Manifest) (*pbsubstreams.Package, err
 	return pkg, nil
 }
 
-func (r *Reader) resolvePkg() (*pbsubstreams.Package, error) {
+func (r *Reader) resolvePkg() (*pbsubstreams.Package, *Manifest, error) {
 	if r.pkg != nil {
-		return r.pkg, nil
+		return r.pkg, nil, nil
 	}
 
 	err := r.read()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	pkg, err := r.getPkg()
+	pkg, manif, err := r.getPkg()
 	if err != nil {
-		return nil, fmt.Errorf("unable to get package: %w", err)
+		return nil, nil, fmt.Errorf("unable to get package: %w", err)
 	}
 
 	r.pkg = pkg
-	return pkg, nil
+	return pkg, manif, nil
 }
 
 // IsRemotePackage determines if reader's input to read the manifest is a remote file accessible over
@@ -819,11 +817,16 @@ func loadImports(pkg *pbsubstreams.Package, manif *Manifest) error {
 			return fmt.Errorf("importing %q: %w", importPath, err)
 		}
 
-		subpkg, _, err := subpkgReader.Read()
+		pkgBundle, err := subpkgReader.Read()
 		if err != nil {
 			return fmt.Errorf("importing %q: %w", importPath, err)
 		}
 
+		if pkgBundle == nil {
+			return fmt.Errorf("importing %q: no package found", importPath)
+		}
+
+		subpkg := pkgBundle.Package
 		prefixModules(subpkg.Modules.Modules, importName)
 		reindexAndMergePackage(subpkg, pkg)
 		mergeProtoFiles(subpkg, pkg)

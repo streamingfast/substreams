@@ -99,13 +99,14 @@ func Test_HashModule(t *testing.T) {
 			reader, err := NewReader(test.file)
 			require.NoError(t, err)
 
-			manifest, graph, err := reader.Read()
+			pkgBundle, err := reader.Read()
 			require.NoError(t, err)
+			require.NotNil(t, pkgBundle)
 
 			hashes := NewModuleHashes()
 			compare := map[string]string{}
-			for _, mod := range graph.modules {
-				hash, err := hashes.HashModule(manifest.Modules, mod, graph)
+			for _, mod := range pkgBundle.Graph.modules {
+				hash, err := hashes.HashModule(pkgBundle.Package.Modules, mod, pkgBundle.Graph)
 				require.NoError(t, err)
 				compare[mod.Name] = hex.EncodeToString(hash)
 			}

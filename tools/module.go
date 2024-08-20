@@ -59,8 +59,14 @@ func moduleRunE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
 
-	pkg, graph, err := manifestReader.Read()
+	pkgBundle, err := manifestReader.Read()
 	cli.NoError(err, "Read Substreams manifest")
+	if pkgBundle == nil {
+		return fmt.Errorf("no package found")
+	}
+
+	pkg := pkgBundle.Package
+	graph := pkgBundle.Graph
 
 	module, err := graph.Module(moduleName)
 	cli.NoError(err, "unable to get module")

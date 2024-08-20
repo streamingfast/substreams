@@ -86,10 +86,16 @@ func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bo
 		return fmt.Errorf("manifest reader: %w", err)
 	}
 
-	pkg, _, err := reader.Read()
+	pkgBundle, err := reader.Read()
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
+
+	if pkgBundle == nil {
+		return fmt.Errorf("no package found")
+	}
+
+	pkg := pkgBundle.Package
 
 	moduleNames := []string{}
 	for _, module := range pkg.Modules.Modules {

@@ -75,7 +75,7 @@ func runGui(cmd *cobra.Command, args []string) (err error) {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
 
-	_, _, err = manifestReader.Read()
+	_, err = manifestReader.Read()
 	if err != nil {
 		if manifestReader.IsRemotePackage(manifestPath) {
 			fmt.Println("Are you sure the package is available? If you are using a remote package, make sure the URL is correct.")

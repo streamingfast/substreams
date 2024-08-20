@@ -55,17 +55,22 @@ func runPack(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf(`"pack" can only be used to pack local manifest file`)
 	}
 
-	pkg, _, err := manifestReader.Read()
+	pkgBundle, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("reading manifest %q: %w", manifestPath, err)
 	}
 
+	if pkgBundle == nil {
+		return fmt.Errorf("no package found")
+	}
+
 	originalOutputFile, _ := sflags.GetString(cmd, "output-file")
 
+	packageMetadata := pkgBundle.Package.PackageMeta[0]
 	resolvedOutputFile := resolveOutputFile(originalOutputFile, map[string]string{
 		"manifestDir":     filepath.Dir(manifestPath),
-		"spkgDefaultName": fmt.Sprintf("%s-%s.spkg", strings.Replace(pkg.PackageMeta[0].Name, "_", "-", -1), pkg.PackageMeta[0].Version),
-		"version":         pkg.PackageMeta[0].Version,
+		"spkgDefaultName": fmt.Sprintf("%s-%s.spkg", strings.Replace(packageMetadata.Name, "_", "-", -1), packageMetadata.Version),
+		"version":         packageMetadata.Version,
 	})
 
 	zlog.Debug("resolved output file", zap.String("original", originalOutputFile), zap.String("resolved", resolvedOutputFile))
@@ -75,7 +80,7 @@ func runPack(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("create output directories: %w", err)
 	}
 
-	cnt, err := proto.Marshal(pkg)
+	cnt, err := proto.Marshal(pkgBundle.Package)
 	if err != nil {
 		return fmt.Errorf("marshalling package: %w", err)
 	}

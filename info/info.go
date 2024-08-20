@@ -229,12 +229,16 @@ func Extended(manifestPath string, outputModule string, skipValidation bool) (*E
 		return nil, fmt.Errorf("manifest reader: %w", err)
 	}
 
-	pkg, graph, err := reader.Read()
+	pkgBundle, err := reader.Read()
 	if err != nil {
 		return nil, fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
-	return ExtendedWithPackage(pkg, graph, outputModule)
+	if pkgBundle == nil {
+		return nil, fmt.Errorf("no package found")
+	}
+
+	return ExtendedWithPackage(pkgBundle.Package, pkgBundle.Graph, outputModule)
 }
 
 func ExtendedWithPackage(pkg *pbsubstreams.Package, graph *manifest.ModuleGraph, outputModule string) (*ExtendedInfo, error) {

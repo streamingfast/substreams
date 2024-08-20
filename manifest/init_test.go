@@ -10,8 +10,11 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func assertProtoEqual(t *testing.T, expected proto.Message, actual proto.Message) {
+func assertProtoEqual(t *testing.T, expected proto.Message, actual proto.Message, skip bool) {
 	t.Helper()
+	if skip {
+		return
+	}
 
 	if !proto.Equal(expected, actual) {
 		expectedAsJSON, err := protojson.Marshal(expected)

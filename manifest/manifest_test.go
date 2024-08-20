@@ -170,9 +170,11 @@ output:
 
 func TestManifest_ToProto(t *testing.T) {
 	reader := MustNewReader("./test/test_manifest.yaml")
-	pkg, _, err := reader.Read()
+	pkgBundle, err := reader.Read()
 	require.NoError(t, err)
+	require.NotNil(t, pkgBundle)
 
+	pkg := pkgBundle.Package
 	pbManifest := pkg.Modules
 
 	require.Equal(t, 1, len(pbManifest.Binaries))

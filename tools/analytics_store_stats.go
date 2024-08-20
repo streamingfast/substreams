@@ -49,10 +49,16 @@ func StoreStatsE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
 
-	pkg, graph, err := manifestReader.Read()
+	pkgBundle, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
+
+	if pkgBundle == nil {
+		return fmt.Errorf("no package found")
+	}
+
+	pkg := pkgBundle.Package
 
 	wg := sync.WaitGroup{}
 	wg.Add(len(pkg.Modules.Modules))
@@ -73,7 +79,7 @@ func StoreStatsE(cmd *cobra.Command, args []string) error {
 			done := make(chan any)
 			defer close(done)
 
-			moduleHash, err := hashes.HashModule(pkg.Modules, module, graph)
+			moduleHash, err := hashes.HashModule(pkg.Modules, module, pkgBundle.Graph)
 			if err != nil {
 				panic(err)
 			}
@@ -166,7 +172,7 @@ func StoreStatsE(cmd *cobra.Command, args []string) error {
 	}
 
 	//sort the modules for consistent output
-	sortedModules, _ := graph.TopologicalSort()
+	sortedModules, _ := pkgBundle.Graph.TopologicalSort()
 	sortedModulesIndex := make(map[string]int, len(sortedModules))
 	for i, module := range sortedModules {
 		sortedModulesIndex[module.Name] = i

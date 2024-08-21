@@ -240,11 +240,16 @@ func (ui *TUI) ensureTerminalLocked() {
 	ui.prog = tea.NewProgram(newModel(ui))
 	go func() {
 		if _, err := ui.prog.Run(); err != nil {
+			if strings.Contains(err.Error(), context.Canceled.Error()) {
+				// Weird case where we need to check the error string message to know the underlying error
+				// The error returned is a fmt.wrapError which contains the context.Canceled error
+				return
+			}
 			if err != tea.ErrProgramKilled {
 				// tea library handles the error weirdly. It will return  an ErrProgramKilled when
 				// the context has been canceled. This occurs when the program shutdowns, which should not
 				// actually be an error
-				fmt.Printf("Failed bubble tea program: %s\n", err)
+				fmt.Printf("Failed bubble tea program: %s %T\n", err, err)
 			}
 		}
 	}()

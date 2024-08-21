@@ -23,8 +23,6 @@ type BuildInstance struct {
 }
 
 func NewBuild(manifestPath string) (*BuildInstance, error) {
-	// TODO: could we call the same code that is used in substreams build
-	//       instead of starting a sub process?
 	cmd := exec.Command("substreams", "build", manifestPath)
 	buildOut := buildoutput.New(cmd)
 

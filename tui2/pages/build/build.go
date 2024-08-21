@@ -15,10 +15,11 @@ import (
 type Build struct {
 	common.Common
 
-	ManifestPath    string
-	BuildOutputMsgs []string
-	buildView       viewport.Model
-	params          map[string][]string
+	ManifestPath       string
+	BuildOutputMsgs    []string
+	BuildOutputErrMsgs []string
+	buildView          viewport.Model
+	params             map[string][]string
 }
 
 func New(c common.Common, manifestPath string) *Build {
@@ -48,6 +49,7 @@ func (b *Build) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		log.Println(msg)
 	case NewBuildInstance:
 		b.BuildOutputMsgs = []string{}
+		b.BuildOutputErrMsgs = []string{}
 	case buildoutput.BuildOutputMsg:
 		b.BuildOutputMsgs = append(b.BuildOutputMsgs, msg.Msg)
 	}
@@ -57,11 +59,12 @@ func (b *Build) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (b *Build) View() string {
+	outputMsgs := strings.Join(b.BuildOutputMsgs, "\n")
 	return lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder(), true).
 		Width(b.Width - 2).
 		Height(b.buildView.Height + 2 /* for borders */).
 		Render(
-			strings.Join(b.BuildOutputMsgs, "\n"),
+			outputMsgs,
 		)
 }

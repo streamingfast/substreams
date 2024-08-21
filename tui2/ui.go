@@ -162,12 +162,6 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case build.NewBuildInstance:
 		ui.buildOut = msg.BuildOut
 		cmds = append(cmds, ui.buildOut.Init())
-	// case buildoutput.BuildOutputMsg:
-	// if ui.buildOut != nil {
-	// 	cmds = append(cmds, ui.buildOut.Update(msg))
-	// }
-	case buildoutput.BuildOutput:
-		// cmds = append(cmds, tabs.SelectTabCmd(int(buildPage)))
 	case buildoutput.Msg:
 		switch msg {
 		case buildoutput.BuildStarted:

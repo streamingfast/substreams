@@ -22,14 +22,14 @@ type BuildOutputMsg struct {
 }
 
 type BuildOutput struct {
-	Cmd        *exec.Cmd
-	StdScanner *bufio.Scanner
-	ErrScanner *bufio.Scanner
+	Cmd      *exec.Cmd
+	outputCh chan string
 }
 
 func New(cmd *exec.Cmd) *BuildOutput {
 	return &BuildOutput{
-		Cmd: cmd,
+		Cmd:      cmd,
+		outputCh: make(chan string, 99999),
 	}
 }
 
@@ -48,33 +48,50 @@ func (b *BuildOutput) Init() tea.Cmd {
 		}
 	}
 
+	stdScanner := bufio.NewScanner(stdout)
+	errScanner := bufio.NewScanner(stdErr)
+
+	go func() {
+		for stdScanner.Scan() {
+			b.outputCh <- stdScanner.Text()
+		}
+	}()
+
+	go func() {
+		for errScanner.Scan() {
+			b.outputCh <- errScanner.Text()
+		}
+	}()
+
 	if err := b.Cmd.Start(); err != nil {
 		return func() tea.Msg {
 			return fmt.Errorf("failed to start command: %w", err)
 		}
 	}
 
-	b.StdScanner = bufio.NewScanner(stdout)
-	b.ErrScanner = bufio.NewScanner(stdErr)
 	return func() tea.Msg {
 		return BuildStarted
 	}
 }
 
 func (b *BuildOutput) Update(msg tea.Msg) tea.Cmd {
+	switch msg {
+	case BuildDoneSuccess:
+		return func() tea.Msg {
+			return nil
+		}
+	case BuildDoneFailure:
+		return func() tea.Msg {
+			return nil
+		}
+	}
 	return b.readNextLine
 }
 
 func (b *BuildOutput) readNextLine() tea.Msg {
-	if b.StdScanner.Scan() {
-		return BuildOutputMsg{
-			Msg: b.StdScanner.Text(),
-		}
-	}
+	msg := <-b.outputCh
 
-	if b.StdScanner.Err() != nil {
-		return BuildDoneFailure
+	return BuildOutputMsg{
+		Msg: msg,
 	}
-
-	return BuildDoneSuccess
 }

@@ -8,8 +8,8 @@ import (
 )
 
 var SQLCmd = &cobra.Command{
-	Use:   "subgraph <manifest_url> <module_name>",
-	Short: "Generate subgraph dev environment from substreams manifest",
+	Use:   "sql <manifest_url> <module_name>",
+	Short: "Generate sql dev environment from substreams manifest",
 	Args:  cobra.ExactArgs(3),
 	RunE:  generateSQLEnv,
 }

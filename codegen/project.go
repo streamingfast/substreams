@@ -21,15 +21,13 @@ type Project struct {
 	Module           *pbsubstreams.Module
 	OutputDescriptor *descriptorpb.DescriptorProto
 	protoTypeMapping map[string]*descriptorpb.DescriptorProto
-	ExampleEntity    *ExampleEntity
+	Entities         []*Entity
 	SpkgProjectName  string
 }
 
-type ExampleEntity struct {
-	Name             string
-	NameAsProtoField string
-	NameAsEntity     string
-	ID               string
+type Entity struct {
+	Name string
+	Type string
 }
 
 func NewProject(name, spkgProjectName, network string, module *pbsubstreams.Module, outputDescriptor *descriptorpb.DescriptorProto, protoTypeMapping map[string]*descriptorpb.DescriptorProto) *Project {
@@ -45,43 +43,76 @@ func NewProject(name, spkgProjectName, network string, module *pbsubstreams.Modu
 
 func (p *Project) BuildExampleEntity() error {
 	for _, field := range p.OutputDescriptor.Field {
-		if *field.Type == descriptorpb.FieldDescriptorProto_TYPE_MESSAGE {
-			if *field.Label == descriptorpb.FieldDescriptorProto_LABEL_REPEATED {
-				splitMessagePath := strings.Split(*field.TypeName, ".")
-				name := splitMessagePath[len(splitMessagePath)-1]
-
-				p.ExampleEntity = &ExampleEntity{
-					NameAsProtoField: textcase.CamelCase(field.GetName()),
-					NameAsEntity:     "My" + name,
-					Name:             name,
-				}
-
-				if p.protoTypeMapping[*field.TypeName] == nil {
-					return fmt.Errorf("nested message type: %q not found", *field.TypeName)
-				}
-
-				for _, nestedMessageField := range p.protoTypeMapping[*field.TypeName].Field {
-					switch *nestedMessageField.Type {
-					case descriptorpb.FieldDescriptorProto_TYPE_STRING, descriptorpb.FieldDescriptorProto_TYPE_INT64, descriptorpb.FieldDescriptorProto_TYPE_UINT64, descriptorpb.FieldDescriptorProto_TYPE_UINT32, descriptorpb.FieldDescriptorProto_TYPE_BYTES:
-						p.ExampleEntity.ID = textcase.CamelCase(nestedMessageField.GetName())
-					default:
-						continue
-					}
-				}
-			}
+		switch field.GetType() {
+		case descriptorpb.FieldDescriptorProto_TYPE_DOUBLE:
+		case descriptorpb.FieldDescriptorProto_TYPE_FLOAT:
+		case descriptorpb.FieldDescriptorProto_TYPE_INT64:
+		case descriptorpb.FieldDescriptorProto_TYPE_UINT64:
+			name := textcase.CamelCase(field.GetName())
+			p.Entities = append(p.Entities, &Entity{
+				Type: SubgraphType(BigInt).String(),
+				Name: name,
+			})
+		case descriptorpb.FieldDescriptorProto_TYPE_INT32:
+		case descriptorpb.FieldDescriptorProto_TYPE_FIXED64:
+		case descriptorpb.FieldDescriptorProto_TYPE_FIXED32:
+		case descriptorpb.FieldDescriptorProto_TYPE_BOOL:
+		case descriptorpb.FieldDescriptorProto_TYPE_STRING:
+			name := textcase.CamelCase(field.GetName())
+			p.Entities = append(p.Entities, &Entity{
+				Type: SubgraphType(String).String(),
+				Name: name,
+			})
+		case descriptorpb.FieldDescriptorProto_TYPE_MESSAGE, descriptorpb.FieldDescriptorProto_TYPE_GROUP:
+			// Let's not support the nested message and groups for now as it is more complex
+			// and would probably require foreign tables / subgraph entities to work
+			// not even sure this works as of today
+			panic("not supported for the moment")
+		case descriptorpb.FieldDescriptorProto_TYPE_BYTES:
+		case descriptorpb.FieldDescriptorProto_TYPE_UINT32:
+		case descriptorpb.FieldDescriptorProto_TYPE_ENUM:
+		case descriptorpb.FieldDescriptorProto_TYPE_SFIXED32:
+		case descriptorpb.FieldDescriptorProto_TYPE_SFIXED64:
+		case descriptorpb.FieldDescriptorProto_TYPE_SINT32:
+		case descriptorpb.FieldDescriptorProto_TYPE_SINT64:
 		}
+
+		// if field.GetType() == descriptorpb.FieldDescriptorProto_TYPE_MESSAGE {
+		// 	if *field.Label == descriptorpb.FieldDescriptorProto_LABEL_REPEATED {
+		//		splitMessagePath := strings.Split(typeName, ".")
+		//		name splitMessagePath[len(splitMessagePath)-1]
+
+		// 		p.Entities = append(p.Entities, &Entity{
+		// 			// NameAsProtoField: textcase.CamelCase(field.GetName()),
+		// 			// NameAsEntity:     "My" + name,
+		// 			Name:             name,
+		// 		})
+
+		// 		if p.protoTypeMapping[*field.TypeName] == nil {
+		// 			return fmt.Errorf("nested message type: %q not found", *field.TypeName)
+		// 		}
+
+		// 		for _, nestedMessageField := range p.protoTypeMapping[*field.TypeName].Field {
+		// 			switch *nestedMessageField.Type {
+		// 			case descriptorpb.FieldDescriptorProto_TYPE_STRING, descriptorpb.FieldDescriptorProto_TYPE_INT64, descriptorpb.FieldDescriptorProto_TYPE_UINT64, descriptorpb.FieldDescriptorProto_TYPE_UINT32, descriptorpb.FieldDescriptorProto_TYPE_BYTES:
+		// 				p.Entity.ID = textcase.CamelCase(nestedMessageField.GetName())
+		// 			default:
+		// 				continue
+		// 			}
+		// 		}
+		// 	}
+		// }
 	}
 	return nil
 }
 
-func (p *Project) ExampleEntityHasID() bool {
-	return p.ExampleEntity.ID != ""
-}
+// func (p *Project) ExampleEntityHasID() bool {
+// 	return p.Entity.ID != ""
+// }
 
-func (p *Project) HasExampleEntity() bool {
-	return p.ExampleEntity != nil
-
-}
+// func (p *Project) HasExampleEntity() bool {
+// 	return p.Entity != nil
+// }
 
 func (p *Project) SubstreamsKebabName() string {
 	return strings.ReplaceAll(p.Name, "_", "-")
@@ -120,6 +151,8 @@ func (p *Project) ChainEndpoint() (string, error) {
 }
 
 func (p *Project) Render(outputType string, withDevEnv bool) (projectFiles map[string][]byte, err error) {
+	// TODO: here we have the entities, we want to loop over them and then render the templates
+	// in respect to the types and the names which come out of the protobuf
 	projectFiles = map[string][]byte{}
 
 	funcMap := template.FuncMap{

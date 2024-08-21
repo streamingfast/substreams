@@ -104,19 +104,20 @@ func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bo
 		}
 	}
 
-	selectedModule, err := createSelectForm(moduleNames, "Please select a mapper module to build the subgraph from:")
-	if err != nil {
-		return fmt.Errorf("creating request module form: %w", err)
-	}
+	// selectedModule, err := createSelectForm(moduleNames, "Please select a mapper module to build the subgraph from:")
+	// if err != nil {
+	// 	return fmt.Errorf("creating request module form: %w", err)
+	// }
 
-	requestedModule, err := getModule(pkg, selectedModule)
+	// requestedModule, err := getModule(pkg, selectedModule)
+	requestedModule, err := getModule(pkg, "map_my_data")
 	if err != nil {
 		return fmt.Errorf("getting module: %w", err)
 	}
 
 	if outputType == outputTypeSQL {
 		if requestedModule.Output.Type != "proto:sf.substreams.sink.database.v1.DatabaseChanges" {
-			return fmt.Errorf("requested module shoud have proto:sf.substreams.sink.database.v1.DatabaseChanges as output type")
+			return fmt.Errorf("requested module should have proto:sf.substreams.sink.database.v1.DatabaseChanges as output type")
 		}
 	}
 
@@ -146,7 +147,7 @@ func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bo
 	currentNetwork := pkg.Network
 	if currentNetwork == "" {
 		labels := []string{}
-		for label, _ := range ChainConfigByID {
+		for label := range ChainConfigByID {
 			labels = append(labels, label)
 		}
 
@@ -163,7 +164,11 @@ func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bo
 	// Create an example entity from the output descriptor
 	project.BuildExampleEntity()
 
-	fmt.Println("Rendering project files for Substreams-powered-subgraph...")
+	if outputType == outputTypeSQL {
+		fmt.Println("Rendering project files for Substreams Sink SQL...")
+	} else {
+		fmt.Println("Rendering project files for Substreams-powered-subgraph...")
+	}
 
 	projectFiles, err := project.Render(outputType, withDevEnv)
 	if err != nil {

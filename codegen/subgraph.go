@@ -22,7 +22,7 @@ func generateSubgraphEnv(cmd *cobra.Command, args []string) error {
 
 	withDevEnv := sflags.MustGetBool(cmd, "with-dev-env")
 
-	err := buildGenerateCommandFromArgs(manifestPath, outputTypeSubgraph, withDevEnv)
+	err := buildGenerateCommandFromArgs(manifestPath, Subgraph, withDevEnv)
 	if err != nil {
 		return fmt.Errorf("building generate command: %w", err)
 	}

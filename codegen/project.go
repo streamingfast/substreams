@@ -21,60 +21,94 @@ type Project struct {
 	Module           *pbsubstreams.Module
 	OutputDescriptor *descriptorpb.DescriptorProto
 	protoTypeMapping map[string]*descriptorpb.DescriptorProto
-	Entities         []*Entity
+	EntityTypes      []EntityType
 	SpkgProjectName  string
+	OutputType       OutputType
 }
 
-type Entity struct {
-	Name string
-	Type string
+func (p *Project) AddSubgraphEntityType(name string, ttype SubgraphType) {
+	p.EntityTypes = append(p.EntityTypes, &SubgraphEntityType{
+		Name: name,
+		Type: ttype,
+	})
 }
 
-func NewProject(name, spkgProjectName, network string, module *pbsubstreams.Module, outputDescriptor *descriptorpb.DescriptorProto, protoTypeMapping map[string]*descriptorpb.DescriptorProto) *Project {
+func (p *Project) AddSQLEntityType(name string, ttype SqlType) {
+	p.EntityTypes = append(p.EntityTypes, &SQLEntityType{
+		Name: name,
+		Type: ttype,
+	})
+}
+
+func NewProject(
+	name string,
+	spkgProjectName string,
+	network string,
+	module *pbsubstreams.Module,
+	outputDescriptor *descriptorpb.DescriptorProto,
+	protoTypeMapping map[string]*descriptorpb.DescriptorProto,
+	outputType OutputType,
+) *Project {
 	return &Project{
 		Network:          network,
 		Name:             name,
 		Module:           module,
 		OutputDescriptor: outputDescriptor,
+		EntityTypes:      []EntityType{},
 		protoTypeMapping: protoTypeMapping,
 		SpkgProjectName:  spkgProjectName,
+		OutputType:       outputType,
 	}
 }
 
-func (p *Project) BuildExampleEntity() error {
+func (p *Project) BuildOutputEntity() error {
 	for _, field := range p.OutputDescriptor.Field {
+		name := textcase.CamelCase(field.GetName())
 		switch field.GetType() {
-		case descriptorpb.FieldDescriptorProto_TYPE_DOUBLE:
-		case descriptorpb.FieldDescriptorProto_TYPE_FLOAT:
-		case descriptorpb.FieldDescriptorProto_TYPE_INT64:
-		case descriptorpb.FieldDescriptorProto_TYPE_UINT64:
-			name := textcase.CamelCase(field.GetName())
-			p.Entities = append(p.Entities, &Entity{
-				Type: SubgraphType(BigInt).String(),
-				Name: name,
-			})
+		case descriptorpb.FieldDescriptorProto_TYPE_DOUBLE,
+			descriptorpb.FieldDescriptorProto_TYPE_FLOAT,
+			descriptorpb.FieldDescriptorProto_TYPE_INT64,
+			descriptorpb.FieldDescriptorProto_TYPE_UINT64,
+			descriptorpb.FieldDescriptorProto_TYPE_FIXED64,
+			descriptorpb.FieldDescriptorProto_TYPE_FIXED32,
+			descriptorpb.FieldDescriptorProto_TYPE_UINT32,
+			descriptorpb.FieldDescriptorProto_TYPE_SFIXED32,
+			descriptorpb.FieldDescriptorProto_TYPE_SFIXED64,
+			descriptorpb.FieldDescriptorProto_TYPE_SINT32,
+			descriptorpb.FieldDescriptorProto_TYPE_SINT64:
+
+			if p.OutputType == Subgraph {
+				p.AddSubgraphEntityType(name, SubgraphBigInt)
+			}
+
 		case descriptorpb.FieldDescriptorProto_TYPE_INT32:
-		case descriptorpb.FieldDescriptorProto_TYPE_FIXED64:
-		case descriptorpb.FieldDescriptorProto_TYPE_FIXED32:
+			if p.OutputType == Subgraph {
+				p.AddSubgraphEntityType(name, SubgraphInt)
+			}
+
 		case descriptorpb.FieldDescriptorProto_TYPE_BOOL:
+			if p.OutputType == Subgraph {
+				p.AddSubgraphEntityType(name, SubgraphBoolean)
+			}
+
 		case descriptorpb.FieldDescriptorProto_TYPE_STRING:
-			name := textcase.CamelCase(field.GetName())
-			p.Entities = append(p.Entities, &Entity{
-				Type: SubgraphType(String).String(),
-				Name: name,
-			})
-		case descriptorpb.FieldDescriptorProto_TYPE_MESSAGE, descriptorpb.FieldDescriptorProto_TYPE_GROUP:
+			if p.OutputType == Subgraph {
+				p.AddSubgraphEntityType(name, SubgraphString)
+			}
+
+		case descriptorpb.FieldDescriptorProto_TYPE_MESSAGE,
+			descriptorpb.FieldDescriptorProto_TYPE_GROUP,
+			descriptorpb.FieldDescriptorProto_TYPE_ENUM:
 			// Let's not support the nested message and groups for now as it is more complex
 			// and would probably require foreign tables / subgraph entities to work
 			// not even sure this works as of today
-			panic("not supported for the moment")
+			fmt.Println("skipping message, group and enum - not supported for the moment")
+
 		case descriptorpb.FieldDescriptorProto_TYPE_BYTES:
-		case descriptorpb.FieldDescriptorProto_TYPE_UINT32:
-		case descriptorpb.FieldDescriptorProto_TYPE_ENUM:
-		case descriptorpb.FieldDescriptorProto_TYPE_SFIXED32:
-		case descriptorpb.FieldDescriptorProto_TYPE_SFIXED64:
-		case descriptorpb.FieldDescriptorProto_TYPE_SINT32:
-		case descriptorpb.FieldDescriptorProto_TYPE_SINT64:
+			if p.OutputType == Subgraph {
+				p.AddSubgraphEntityType(name, SubgraphBytes)
+			}
+
 		}
 
 		// if field.GetType() == descriptorpb.FieldDescriptorProto_TYPE_MESSAGE {
@@ -110,9 +144,9 @@ func (p *Project) BuildExampleEntity() error {
 // 	return p.Entity.ID != ""
 // }
 
-// func (p *Project) HasExampleEntity() bool {
-// 	return p.Entity != nil
-// }
+func (p *Project) HasExampleEntity() bool {
+	return len(p.EntityTypes) > 0
+}
 
 func (p *Project) SubstreamsKebabName() string {
 	return strings.ReplaceAll(p.Name, "_", "-")
@@ -150,9 +184,9 @@ func (p *Project) ChainEndpoint() (string, error) {
 	return ChainConfigByID[p.Network].FirehoseEndpoint, nil
 }
 
-func (p *Project) Render(outputType string, withDevEnv bool) (projectFiles map[string][]byte, err error) {
-	// TODO: here we have the entities, we want to loop over them and then render the templates
-	// in respect to the types and the names which come out of the protobuf
+func (p *Project) Render(withDevEnv bool) (projectFiles map[string][]byte, err error) {
+	//TODO: currently, we only support the simple use case of minimal codegens
+	// Need to update this and supporte more complicated use cases
 	projectFiles = map[string][]byte{}
 
 	funcMap := template.FuncMap{
@@ -167,8 +201,8 @@ func (p *Project) Render(outputType string, withDevEnv bool) (projectFiles map[s
 	}
 
 	var templateFiles map[string]string
-	switch outputType {
-	case outputTypeSubgraph:
+	switch p.OutputType {
+	case Subgraph:
 		templateFiles = map[string]string{
 			"triggers/buf.gen.yaml":           "buf.gen.yaml",
 			"triggers/package.json.gotmpl":    "package.json",
@@ -184,7 +218,7 @@ func (p *Project) Render(outputType string, withDevEnv bool) (projectFiles map[s
 			templateFiles["triggers/dev-environment/start.sh"] = "dev-environment/start.sh"
 			templateFiles["triggers/dev-environment/config.toml.gotmpl"] = "dev-environment/config.toml"
 		}
-	case outputTypeSQL:
+	case Sql:
 		templateFiles = map[string]string{
 			"sql/Makefile.gotmpl": "Makefile",
 		}

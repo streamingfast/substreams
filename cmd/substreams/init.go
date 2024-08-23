@@ -182,8 +182,14 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			if gen.Endpoint != "" {
 				endpoint = " (" + gen.Endpoint + ")"
 			}
+
+			key := fmt.Sprintf("%-20s - %s", gen.Id, gen.Title)
+			if endpoint != "" {
+				key = fmt.Sprintf("%-20s %-20s - %s", gen.Id, endpoint, gen.Title)
+			}
+
 			entry := huh.Option[*pbconvo.DiscoveryResponse_Generator]{
-				Key:   fmt.Sprintf("%s%s - %s", gen.Id, endpoint, gen.Title),
+				Key:   key,
 				Value: gen,
 			}
 			options = append(options, entry)

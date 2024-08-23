@@ -156,16 +156,30 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		}
 
 		var options []huh.Option[*pbconvo.DiscoveryResponse_Generator]
+
+		maxLen := 0
+
+		genMapping := make(map[string]*pbconvo.DiscoveryResponse_Generator)
 		for _, gen := range resp.Msg.Generators {
 			endpoint := ""
 			if gen.Endpoint != "" {
 				endpoint = " (" + gen.Endpoint + ")"
 			}
+
+			if len(gen.Id+endpoint) > maxLen {
+				maxLen = len(gen.Id + endpoint)
+			}
+
+			genMapping[gen.Id+endpoint] = gen
+		}
+
+		for key, gen := range genMapping {
 			entry := huh.Option[*pbconvo.DiscoveryResponse_Generator]{
-				Key:   fmt.Sprintf("%s%s - %s", gen.Id, endpoint, gen.Title),
+				Key:   fmt.Sprintf("%-*s - %s", maxLen, key, gen.Title),
 				Value: gen,
 			}
 			options = append(options, entry)
+
 		}
 
 		var codegen *pbconvo.DiscoveryResponse_Generator

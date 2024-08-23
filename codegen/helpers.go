@@ -106,7 +106,6 @@ func buildGenerateCommandFromArgs(manifestPath string, outputType OutputType, wi
 		return fmt.Errorf("creating request module form: %w", err)
 	}
 
-	// requestedModule, err := getModule(pkg, selectedModule)
 	requestedModule, err := getModule(pkg, selectedModule)
 	if err != nil {
 		return fmt.Errorf("getting module: %w", err)

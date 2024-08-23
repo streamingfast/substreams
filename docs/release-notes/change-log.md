@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+* Add `sf.substreams.rpc.v2.EndpointInfo/Info` endpoint (if the infoserver is given as a module, i.e. from firehose-core)
 * Add `substreams auth` command, to authenticate via `thegraph.market` and to get a dev API Key.
 * Rename `--discovery-endpoint` into `codegen-endpoint` in `substreams init` command. 
 * Add `substreams codegen subgraph` command that takes a substreams `module` and an `spkg` and that generates a simple `subgraph` from the `module` output.  

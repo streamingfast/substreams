@@ -8,6 +8,7 @@ import (
 	connect "connectrpc.com/connect"
 	context "context"
 	errors "errors"
+	v21 "github.com/streamingfast/pbgo/sf/firehose/v2"
 	v2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	http "net/http"
 	strings "strings"
@@ -23,6 +24,8 @@ const _ = connect.IsAtLeastVersion1_13_0
 const (
 	// StreamName is the fully-qualified name of the Stream service.
 	StreamName = "sf.substreams.rpc.v2.Stream"
+	// EndpointInfoName is the fully-qualified name of the EndpointInfo service.
+	EndpointInfoName = "sf.substreams.rpc.v2.EndpointInfo"
 )
 
 // These constants are the fully-qualified names of the RPCs defined in this package. They're
@@ -35,12 +38,16 @@ const (
 const (
 	// StreamBlocksProcedure is the fully-qualified name of the Stream's Blocks RPC.
 	StreamBlocksProcedure = "/sf.substreams.rpc.v2.Stream/Blocks"
+	// EndpointInfoInfoProcedure is the fully-qualified name of the EndpointInfo's Info RPC.
+	EndpointInfoInfoProcedure = "/sf.substreams.rpc.v2.EndpointInfo/Info"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
 var (
-	streamServiceDescriptor      = v2.File_sf_substreams_rpc_v2_service_proto.Services().ByName("Stream")
-	streamBlocksMethodDescriptor = streamServiceDescriptor.Methods().ByName("Blocks")
+	streamServiceDescriptor          = v2.File_sf_substreams_rpc_v2_service_proto.Services().ByName("Stream")
+	streamBlocksMethodDescriptor     = streamServiceDescriptor.Methods().ByName("Blocks")
+	endpointInfoServiceDescriptor    = v2.File_sf_substreams_rpc_v2_service_proto.Services().ByName("EndpointInfo")
+	endpointInfoInfoMethodDescriptor = endpointInfoServiceDescriptor.Methods().ByName("Info")
 )
 
 // StreamClient is a client for the sf.substreams.rpc.v2.Stream service.
@@ -109,4 +116,72 @@ type UnimplementedStreamHandler struct{}
 
 func (UnimplementedStreamHandler) Blocks(context.Context, *connect.Request[v2.Request], *connect.ServerStream[v2.Response]) error {
 	return connect.NewError(connect.CodeUnimplemented, errors.New("sf.substreams.rpc.v2.Stream.Blocks is not implemented"))
+}
+
+// EndpointInfoClient is a client for the sf.substreams.rpc.v2.EndpointInfo service.
+type EndpointInfoClient interface {
+	Info(context.Context, *connect.Request[v21.InfoRequest]) (*connect.Response[v21.InfoResponse], error)
+}
+
+// NewEndpointInfoClient constructs a client for the sf.substreams.rpc.v2.EndpointInfo service. By
+// default, it uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses,
+// and sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the
+// connect.WithGRPC() or connect.WithGRPCWeb() options.
+//
+// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
+// http://api.acme.com or https://acme.com/grpc).
+func NewEndpointInfoClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) EndpointInfoClient {
+	baseURL = strings.TrimRight(baseURL, "/")
+	return &endpointInfoClient{
+		info: connect.NewClient[v21.InfoRequest, v21.InfoResponse](
+			httpClient,
+			baseURL+EndpointInfoInfoProcedure,
+			connect.WithSchema(endpointInfoInfoMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+	}
+}
+
+// endpointInfoClient implements EndpointInfoClient.
+type endpointInfoClient struct {
+	info *connect.Client[v21.InfoRequest, v21.InfoResponse]
+}
+
+// Info calls sf.substreams.rpc.v2.EndpointInfo.Info.
+func (c *endpointInfoClient) Info(ctx context.Context, req *connect.Request[v21.InfoRequest]) (*connect.Response[v21.InfoResponse], error) {
+	return c.info.CallUnary(ctx, req)
+}
+
+// EndpointInfoHandler is an implementation of the sf.substreams.rpc.v2.EndpointInfo service.
+type EndpointInfoHandler interface {
+	Info(context.Context, *connect.Request[v21.InfoRequest]) (*connect.Response[v21.InfoResponse], error)
+}
+
+// NewEndpointInfoHandler builds an HTTP handler from the service implementation. It returns the
+// path on which to mount the handler and the handler itself.
+//
+// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
+// and JSON codecs. They also support gzip compression.
+func NewEndpointInfoHandler(svc EndpointInfoHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	endpointInfoInfoHandler := connect.NewUnaryHandler(
+		EndpointInfoInfoProcedure,
+		svc.Info,
+		connect.WithSchema(endpointInfoInfoMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	return "/sf.substreams.rpc.v2.EndpointInfo/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case EndpointInfoInfoProcedure:
+			endpointInfoInfoHandler.ServeHTTP(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+}
+
+// UnimplementedEndpointInfoHandler returns CodeUnimplemented from all methods.
+type UnimplementedEndpointInfoHandler struct{}
+
+func (UnimplementedEndpointInfoHandler) Info(context.Context, *connect.Request[v21.InfoRequest]) (*connect.Response[v21.InfoResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sf.substreams.rpc.v2.EndpointInfo.Info is not implemented"))
 }

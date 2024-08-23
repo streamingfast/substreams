@@ -6,6 +6,9 @@ import (
 	"net/url"
 	"time"
 
+	"connectrpc.com/connect"
+	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcconnect"
+	ssconnect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcconnect"
 	"github.com/streamingfast/substreams/reqctx"
 
 	"github.com/streamingfast/bstream"
@@ -15,6 +18,7 @@ import (
 	dauth "github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/dstore"
+	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metrics"
@@ -30,6 +34,12 @@ type Tier1Modules struct {
 	HeadTimeDriftMetric   *dmetrics.HeadTimeDrift
 	HeadBlockNumberMetric *dmetrics.HeadBlockNum
 	CheckPendingShutDown  func() bool
+	InfoServer            InfoServer
+}
+
+type InfoServer interface {
+	Init(ctx context.Context, fhub *hub.ForkableHub, mergedBlocksStore dstore.Store, oneBlockStore dstore.Store, logger *zap.Logger) error
+	Info(ctx context.Context, request *pbfirehose.InfoRequest) (*pbfirehose.InfoResponse, error)
 }
 
 type Tier1Config struct {
@@ -197,6 +207,16 @@ func (a *Tier1App) Run() error {
 	})
 
 	go func() {
+		var infoServer ssconnect.EndpointInfoHandler
+		if a.modules.InfoServer != nil {
+			a.logger.Info("waiting until info server is ready")
+			infoServer = &InfoServerWrapper{a.modules.InfoServer}
+			if err := a.modules.InfoServer.Init(context.Background(), forkableHub, mergedBlocksStore, oneBlocksStore, a.logger); err != nil {
+				a.Shutdown(fmt.Errorf("cannot initialize info server: %w", err))
+				return
+			}
+		}
+
 		if withLive {
 			a.logger.Info("waiting until hub is real-time synced")
 			select {
@@ -210,7 +230,7 @@ func (a *Tier1App) Run() error {
 		a.logger.Info("launching gRPC server", zap.Bool("live_support", withLive))
 		a.isReady.CompareAndSwap(false, true)
 
-		err := service.ListenTier1(a.config.GRPCListenAddr, svc, a.modules.Authenticator, a.logger, a.HealthCheck)
+		err := service.ListenTier1(a.config.GRPCListenAddr, svc, infoServer, a.modules.Authenticator, a.logger, a.HealthCheck)
 		a.Shutdown(err)
 	}()
 
@@ -242,4 +262,19 @@ func (a *Tier1App) IsReady(ctx context.Context) bool {
 // substreams rules.
 func (config *Tier1Config) Validate() error {
 	return nil
+}
+
+var _ pbsubstreamsrpcconnect.EndpointInfoHandler = (*InfoServerWrapper)(nil)
+
+type InfoServerWrapper struct {
+	rpcInfoServer InfoServer
+}
+
+// Info implements pbsubstreamsrpcconnect.EndpointInfoHandler.
+func (i *InfoServerWrapper) Info(ctx context.Context, req *connect.Request[pbfirehose.InfoRequest]) (*connect.Response[pbfirehose.InfoResponse], error) {
+	resp, err := i.rpcInfoServer.Info(ctx, req.Msg)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(resp), nil
 }

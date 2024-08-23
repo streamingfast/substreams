@@ -16,7 +16,7 @@ require (
 	github.com/streamingfast/dgrpc v0.0.0-20240219152146-57bb131c39ca
 	github.com/streamingfast/dstore v0.1.1-0.20240311181234-470a7a84936f
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
-	github.com/streamingfast/pbgo v0.0.6-0.20231120172814-537d034aad5e
+	github.com/streamingfast/pbgo v0.0.6-0.20240823134334-812f6a16c5cb
 	github.com/stretchr/testify v1.8.4
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869
 	go.uber.org/zap v1.26.0
@@ -40,9 +40,9 @@ require (
 	github.com/charmbracelet/huh v0.5.2
 	github.com/charmbracelet/huh/spinner v0.0.0-20240806005253-b7436a76999a
 	github.com/charmbracelet/lipgloss v0.12.1
+	github.com/charmbracelet/x/ansi v0.1.4
 	github.com/docker/cli v24.0.6+incompatible
 	github.com/dustin/go-humanize v1.0.1
-	github.com/fatih/color v1.13.0
 	github.com/golang-cz/textcase v1.2.1
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-multierror v1.1.1
@@ -85,7 +85,6 @@ require (
 	github.com/bits-and-blooms/bitset v1.12.0 // indirect
 	github.com/bobg/go-generics/v2 v2.2.2 // indirect
 	github.com/catppuccin/go v0.2.0 // indirect
-	github.com/charmbracelet/x/ansi v0.1.4 // indirect
 	github.com/charmbracelet/x/exp/strings v0.0.0-20240722160745-212f7b056ed0 // indirect
 	github.com/charmbracelet/x/input v0.1.3 // indirect
 	github.com/charmbracelet/x/term v0.1.1 // indirect
@@ -95,8 +94,6 @@ require (
 	github.com/google/s2a-go v0.1.7 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/manifoldco/promptui v0.9.0 // indirect
-	github.com/mattn/go-colorable v0.1.12 // indirect
-	github.com/mattn/go-sqlite3 v1.14.17 // indirect
 	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.6 // indirect

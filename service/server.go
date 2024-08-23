@@ -40,6 +40,7 @@ func GetCommonServerOptions(listenAddr string, logger *zap.Logger, healthcheck d
 func ListenTier1(
 	addr string,
 	svc *Tier1Service,
+	infoService ssconnect.EndpointInfoHandler,
 	auth dauth.Authenticator,
 	logger *zap.Logger,
 	healthcheck dgrpcserver.HealthCheck,
@@ -55,9 +56,18 @@ func ListenTier1(
 	streamHandlerGetter := func(opts ...connect_go.HandlerOption) (string, http.Handler) {
 		return ssconnect.NewStreamHandler(svc, opts...)
 	}
+	handlerGetters := []connectweb.HandlerGetter{streamHandlerGetter}
+
+	if infoService != nil {
+		infoHandlerGetter := func(opts ...connect_go.HandlerOption) (string, http.Handler) {
+			out, outh := ssconnect.NewEndpointInfoHandler(infoService, opts...)
+			return out, outh
+		}
+		handlerGetters = append(handlerGetters, infoHandlerGetter)
+	}
 
 	options = append(options, dgrpcserver.WithPermissiveCORS())
-	srv := connectweb.New([]connectweb.HandlerGetter{streamHandlerGetter}, options...)
+	srv := connectweb.New(handlerGetters, options...)
 	addr = strings.ReplaceAll(addr, "*", "")
 	srv.Launch(addr)
 	<-srv.Terminated()

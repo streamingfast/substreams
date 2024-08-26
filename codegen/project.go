@@ -25,6 +25,7 @@ type Project struct {
 	SpkgProjectName  string
 	ManifestPath     string
 	OutputType       OutputType
+	Flavor           string
 }
 
 func (p *Project) AddSubgraphEntityType(name string, ttype SubgraphType) {
@@ -49,6 +50,7 @@ func NewProject(
 	outputDescriptor *descriptorpb.DescriptorProto,
 	protoTypeMapping map[string]*descriptorpb.DescriptorProto,
 	outputType OutputType,
+	flavor string,
 ) *Project {
 	return &Project{
 		Network:          network,
@@ -60,6 +62,7 @@ func NewProject(
 		SpkgProjectName:  spkgProjectName,
 		ManifestPath:     manifestPath,
 		OutputType:       outputType,
+		Flavor:           flavor,
 	}
 }
 
@@ -244,7 +247,7 @@ func (p *Project) Render(withDevEnv bool) (projectFiles map[string][]byte, err e
 			"sql/rust-toolchain.toml": "rust-toolchain.toml",
 		}
 
-		switch flavor {
+		switch p.Flavor {
 		case "PostgresSQL":
 			templateFiles["sql/schema.sql.gotmpl"] = "schema.sql"
 			templateFiles["sql/substreams.sql.yaml.gotmpl"] = "substreams.yaml"

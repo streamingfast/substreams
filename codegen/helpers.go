@@ -97,7 +97,7 @@ func buildGenerateCommandFromArgs(manifestPath string, outputType OutputType, wi
 	moduleNames := []string{}
 	for _, module := range pkg.Modules.Modules {
 		if module.Output != nil {
-			if outputType == outputTypeSQL {
+			if outputType == Sql {
 				if module.Output.Type == "proto:sf.substreams.sink.database.v1.DatabaseChanges" {
 					fmt.Printf("Module %s has database changes as output type. That means you can directly sink data from it, to an SQL database, using `substreams-sink-sql` binary...\n\n", module.Name)
 					continueCmd, err := askContinueCmd()
@@ -172,7 +172,7 @@ func buildGenerateCommandFromArgs(manifestPath string, outputType OutputType, wi
 		currentNetwork = selectedNetwork
 	}
 
-	project := NewProject(projectName, spkgProjectName, currentNetwork, manifestPath, requestedModule, messageDescriptor, protoTypeMapping, outputType)
+	project := NewProject(projectName, spkgProjectName, currentNetwork, manifestPath, requestedModule, messageDescriptor, protoTypeMapping, outputType, flavor)
 
 	err = project.BuildOutputEntity()
 	if err != nil {

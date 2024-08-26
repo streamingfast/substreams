@@ -11,15 +11,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Server
 * Add `sf.substreams.rpc.v2.EndpointInfo/Info` endpoint (if the infoserver is given as a module, i.e. from firehose-core)
+* Add an execution timeout of 3 minutes per block by default (can be overriden in tier1/tier2 Configs) -- this is useful when an external (eth_call) is stuck on a forked block hash.
+* Revert 'initialBlocks' changes from v1.9.1 because a 'changing module hash' causes more trouble.
+* Wazero: bump v1.8.0 and activate caching of precompiled wasm modules in `/tmp/wazero` to decrease compilation time
+
+### Client
 * Add `substreams auth` command, to authenticate via `thegraph.market` and to get a dev API Key.
 * Rename `--discovery-endpoint` into `codegen-endpoint` in `substreams init` command. 
 * Add `substreams codegen subgraph` command that takes a substreams `module` and an `spkg` and that generates a simple `subgraph` from the `module` output.  
 * On `substreams init` command, if flag `--state-file` is provided, the state file is used by default for project generation.
 * In `substreams init` command, the state file is named using a `Date format` and not using `Unix` anymore.
-* Added an execution timeout of 3 minutes per block by default (can be overriden in tier1/tier2 Configs) -- this is useful when an external (eth_call) is stuck on a forked block hash.
 * Tools->prometheus: added the possibility to override the start-block on an endpoint
-* Revert 'initialBlocks' changes from v1.9.1 because a 'changing module hash' causes more trouble.
 
 ## v1.9.3
 

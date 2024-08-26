@@ -10,6 +10,7 @@ import (
 	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcconnect"
 	ssconnect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcconnect"
 	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/substreams/wasm/wazero"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/blockstream"
@@ -53,6 +54,7 @@ type Tier1Config struct {
 	GRPCShutdownGracePeriod time.Duration // The duration we allow for gRPC connections to terminate gracefully prior forcing shutdown
 	ServiceDiscoveryURL     *url.URL
 	BlockExecutionTimeout   time.Duration
+	TmpDir                  string
 
 	StateStoreURL        string
 	StateStoreDefaultTag string
@@ -164,6 +166,10 @@ func (a *Tier1App) Run() error {
 
 	if a.config.BlockExecutionTimeout != 0 {
 		opts = append(opts, service.WithBlockExecutionTimeout(a.config.BlockExecutionTimeout))
+	}
+
+	if a.config.TmpDir != "" {
+		wazero.SetTempDir(a.config.TmpDir)
 	}
 
 	var wasmModules map[string]string

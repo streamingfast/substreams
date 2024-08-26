@@ -3,6 +3,8 @@ package wazero
 import (
 	"context"
 	"fmt"
+	"os"
+	"path"
 	"sync"
 
 	"github.com/streamingfast/substreams/reqctx"
@@ -24,19 +26,27 @@ type Module struct {
 	runtimeExtensions wasm.RuntimeExtensions
 }
 
+var wazeroTmpDir = path.Join(os.TempDir(), "wazero") // default value can be overridden by setting this variable from the app
+
+func SetTempDir(dir string) {
+	wazeroTmpDir = path.Join(dir, "wazero")
+}
+
 func init() {
 	wasm.RegisterModuleFactory("wazero", wasm.ModuleFactoryFunc(newModule))
 }
 
 func newModule(ctx context.Context, wasmCode []byte, wasmCodeType string, registry *wasm.Registry) (wasm.Module, error) {
-	// What's the effect of `ctx` here? Will it kill all the WASM if it cancels?
-	// TODO: try with: wazero.NewRuntimeConfigCompiler()
-	// TODO: try config := wazero.NewRuntimeConfig().WithCompilationCache(cache)
-	runtimeConfig := wazero.NewRuntimeConfigCompiler()
-	// TODO: can we use some caching in the RuntimeConfig so perhaps we reuse
-	// things across runtimes creations?
 
-	runtime := wazero.NewRuntimeWithConfig(ctx, runtimeConfig)
+	// The CacheWithDir offers a way to share the cache between runtimes concurrently
+	// we can't just share the 'cache': we would get concurrency issues
+	cache, err := wazero.NewCompilationCacheWithDir(wazeroTmpDir)
+	if err != nil {
+		return nil, err
+	}
+
+	// What's the effect of `ctx` here? Will it kill all the WASM if it cancels?
+	runtime := wazero.NewRuntimeWithConfig(ctx, wazero.NewRuntimeConfig().WithCompilationCache(cache))
 
 	wasmCodeTypeID, runtimeExtensions, err := wasm.ParseWASMCodeType(wasmCodeType)
 	if err != nil {

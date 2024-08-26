@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
-	"github.com/streamingfast/substreams/manifest"
-
 	"github.com/charmbracelet/huh"
-
+	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"google.golang.org/protobuf/types/descriptorpb"
 )
@@ -99,7 +98,7 @@ func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bo
 		}
 	}
 
-	selectedModule, err := createRequestModuleForm(moduleNames)
+	selectedModule, err := createSelectForm(moduleNames, "Please select a mapper module to build the subgraph from:")
 	if err != nil {
 		return fmt.Errorf("creating request module form: %w", err)
 	}
@@ -138,11 +137,22 @@ func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bo
 
 	protoTypeMapping := getExistingProtoTypes(pkg.ProtoFiles)
 
-	if pkg.Network == "" {
-		return fmt.Errorf("network not found in your manifest file")
+	currentNetwork := pkg.Network
+	if currentNetwork == "" {
+		labels := []string{}
+		for label, _ := range ChainConfigByID {
+			labels = append(labels, label)
+		}
+
+		selectedNetwork, err := createSelectForm(labels, "Please select a network to build the subgraph from:")
+		if err != nil {
+			return fmt.Errorf("creating network form: %w", err)
+		}
+
+		currentNetwork = selectedNetwork
 	}
 
-	project := NewProject(projectName, spkgProjectName, pkg.Network, requestedModule, messageDescriptor, protoTypeMapping)
+	project := NewProject(projectName, spkgProjectName, currentNetwork, requestedModule, messageDescriptor, protoTypeMapping)
 
 	// Create an example entity from the output descriptor
 	project.BuildExampleEntity()
@@ -213,10 +223,12 @@ func saveProjectFiles(projectFiles map[string][]byte, saveDir string) error {
 	return nil
 }
 
-func createRequestModuleForm(labels []string) (string, error) {
+func createSelectForm(labels []string, title string) (string, error) {
 	if len(labels) == 0 {
 		fmt.Println("No labels found...")
 	}
+
+	sort.Strings(labels)
 
 	var options []huh.Option[string]
 	optionsMap := make(map[string]string)
@@ -231,7 +243,7 @@ func createRequestModuleForm(labels []string) (string, error) {
 
 	var selection string
 	selectField := huh.NewSelect[string]().
-		Title("Please select a mapper module to build the subgraph from:").
+		Title(title).
 		Options(options...).
 		Value(&selection)
 

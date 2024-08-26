@@ -49,7 +49,7 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, err error) error {
 	}
 
 	if err := p.stores.flushStores(ctx, p.executionStages, reqDetails.StopBlockNum); err != nil {
-		return fmt.Errorf("step new irr: stores end of stream: %w", err)
+		return fmt.Errorf("flushing stores on termination: %w", err)
 	}
 
 	if reqctx.Details(ctx).IsTier2Request {

@@ -8,7 +8,7 @@ import (
 
 func (p *Progress) ShortHelp() []key.Binding {
 	return []key.Binding{
-		keymap.TabShiftTab,
+		keymap.MainNavigation,
 		keymap.UpDown,
 		keymap.ToggleProgressDisplayMode,
 		keymap.RestartStream,
@@ -20,7 +20,7 @@ func (p *Progress) ShortHelp() []key.Binding {
 func (p *Progress) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{
-			keymap.TabShiftTab,
+			keymap.MainNavigation,
 		},
 		{
 			keymap.UpDown,
@@ -34,9 +34,6 @@ func (p *Progress) FullHelp() [][]key.Binding {
 		},
 		{
 			keymap.Help,
-			keymap.TabShiftTab,
-		},
-		{
 			keymap.Quit,
 		},
 	}

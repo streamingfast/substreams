@@ -265,6 +265,7 @@ func (t *TinyGoDependencyValidator) ValidateDependency(ctx context.Context) erro
 	//run tinygo version on the machine.  error if exit code not 0
 	fmt.Printf("Checking for tinygo on the system...\n")
 	cmd := exec.CommandContext(ctx, "tinygo", "version")
+	cmd.Env = os.Environ()
 	err := cmd.Run()
 	if err != nil {
 		return fmt.Errorf(`error validating presence of tinygo on machine: %w\n
@@ -281,6 +282,7 @@ func (c *CargoDependencyValidator) ValidateDependency(ctx context.Context) error
 	//run cargo version on the machine.  error if exit code not 0
 	fmt.Printf("Checking for cargo on the system...\n")
 	cmd := exec.CommandContext(ctx, "cargo", "--version")
+	cmd.Env = os.Environ()
 	err := cmd.Run()
 	if err != nil {
 		return fmt.Errorf(`error validating presence of rust cargo on machine: %w\n
@@ -351,6 +353,7 @@ func findManifest() (string, error) {
 // runCommandInDir runs a command in the specified directory.
 func runCommandInDir(ctx context.Context, dir string, cmdArgs []string) error {
 	cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
+	cmd.Env = append(os.Environ(), "CARGO_TERM_COLOR=always")
 	cmd.Dir = dir
 
 	stdoutPipe, err := cmd.StdoutPipe()

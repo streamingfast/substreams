@@ -8,14 +8,12 @@ import (
 
 func (o *Output) ShortHelp() []key.Binding {
 	return []key.Binding{
-		keymap.PrevNextModule,
 		keymap.PrevNextBlock,
 		keymap.Search,
 		keymap.ModuleSearch,
-		keymap.Help,
 		keymap.ToggleLogs,
-		keymap.GoToBlock,
-		keymap.ModGraphView,
+		keymap.UpDown,
+		keymap.Help,
 	}
 }
 
@@ -37,13 +35,13 @@ func (o *Output) FullHelp() [][]key.Binding {
 			keymap.PrevNextMatchedBlock,
 		},
 		{
-			keymap.ModGraphView,
 			keymap.ModuleSearch,
+			keymap.ModGraphView,
 			keymap.RestartStream,
 		},
 		{
 			keymap.Help,
-			keymap.TabShiftTab,
+			keymap.MainNavigation,
 			keymap.Quit,
 		},
 	}

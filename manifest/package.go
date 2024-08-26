@@ -359,8 +359,10 @@ func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package
 				return nil, fmt.Errorf("reading file: %w", err)
 			}
 			fmt.Println("Warning: README.md file not found, no documentation will be packaged")
+			err = nil
 		}
 	}
+
 	doc = string(readmeContent)
 
 	pkgMeta := &pbsubstreams.PackageMetadata{
@@ -411,10 +413,6 @@ func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package
 		if mod.Use != "" {
 			pbmod, err := mod.ToProtoWASM(0) // the binary index and module will be overriden by th 'use'
 			if err != nil {
-				return nil, err
-			}
-
-			if err != nil {
 				return nil, fmt.Errorf("handling used module %q for module %q: %w", mod.Use, mod.Name, err)
 			}
 
@@ -437,9 +435,6 @@ func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package
 		}
 
 		wasmCodeTypeID, _ := SplitBinaryType(binaryDef.Type)
-		if err != nil {
-			return nil, fmt.Errorf("module %q: invalid code type %q: %w", mod.Name, binaryDef.Type, err)
-		}
 
 		switch wasmCodeTypeID {
 		case "wasm/rust-v1", "wasip1/tinygo-v1":
@@ -460,11 +455,12 @@ func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package
 				moduleCodeIndexes[binaryDef.File] = codeIndex
 			}
 			pbmod, err = mod.ToProtoWASM(uint32(codeIndex))
+			if err != nil {
+				return nil, err
+			}
+
 		default:
 			return nil, fmt.Errorf("module %q: invalid code type %q", mod.Name, binaryDef.Type)
-		}
-		if err != nil {
-			return nil, err
 		}
 
 		pkg.Modules.Modules = append(pkg.Modules.Modules, pbmod)

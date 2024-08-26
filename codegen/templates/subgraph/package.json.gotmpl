@@ -1,15 +1,15 @@
 {
   "name": "{{ .Name }}",
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "scripts": {
-    "codegen": "graph codegen",
-    "build": "graph build",
-    "publish": "graph publish",
+    "protogen": "graph codegen",
     "generate": "buf generate --type=\"{{ $.GetOutputProtoPath}}\" ../{{ $.SpkgProjectName}}#format=bin",
-    "deploy": "graph deploy --node https://api.studio.thegraph.com/deploy/ {{ .Name }}",
+    "build": "graph build",
     "create-local": "graph create --node http://localhost:8020/ {{ .Name }}",
     "remove-local": "graph remove --node http://localhost:8020/ {{ .Name }}",
     "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 {{ .Name }} --version-label=v0.0.1",
+    "deploy": "graph deploy --node https://api.studio.thegraph.com/deploy/ {{ .Name }}",
+    "publish": "graph publish",
     "test": "graph test"
   },
   "dependencies": {

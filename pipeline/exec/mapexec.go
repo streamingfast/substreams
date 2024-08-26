@@ -35,6 +35,7 @@ func (e *MapperModuleExecutor) run(ctx context.Context, reader execout.Execution
 	_, span := reqctx.WithModuleExecutionSpan(ctx, "exec_map")
 	defer span.EndWithErr(&err)
 
+	e.ctx = ctx
 	var call *wasm.Call
 	if call, err = e.wasmCall(reader); err != nil {
 		return nil, nil, nil, fmt.Errorf("maps wasm call: %w", err)

@@ -104,6 +104,21 @@ func newReader(input, workingDir string, opts ...Option) (*Reader, error) {
 	return r, nil
 }
 
+// TODO: return a Manifest object, so we can read the ExcludePaths, the `Binaries[0].File` locations relative to `substreams.yaml` for local access.
+// Of course the Manfiest wouldn't exist unless you read an actual `.yaml` file.
+// func (r *Reader) Read() (*ManifestBundle, error) {
+type ManifestBundle struct {
+	Package      *pbsubstreams.Package
+	Manifest     *Manifest
+	ManifestPath string
+	Graph        *ModuleGraph
+}
+
+// Also absorb the resolution, and unify with `cmd/substreams/gui.go:resolveManifestFile` which needs the ManifestPath.
+// We also want a robust and clean resolution algorithm to pick up a parent `substreams.yaml` if the input is "", and
+// we want to search for the right manifest is you specified `substreams.sql.yaml` for instance (right now it falls back
+// on `substreams.yaml`, which you haven't specified).
+
 func (r *Reader) Read() (*pbsubstreams.Package, *ModuleGraph, error) {
 	pkg, err := r.resolvePkg()
 	if err != nil {
@@ -694,8 +709,8 @@ func ValidateModules(mods *pbsubstreams.Modules) error {
 	for _, binary := range mods.Binaries {
 		sumCode += len(binary.Content)
 	}
-	if sumCode > 100_000_000 {
-		return fmt.Errorf("limit of 100MB of module code size reached")
+	if sumCode > 300_000_000 {
+		return fmt.Errorf("limit of 300MB of module code size reached")
 	}
 	if len(mods.Modules) > 100 {
 		return fmt.Errorf("limit of 100 modules reached")

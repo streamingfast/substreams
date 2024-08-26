@@ -27,7 +27,7 @@ func GetCommonServerOptions(listenAddr string, logger *zap.Logger, healthcheck d
 		dgrpcserver.WithHealthCheck(dgrpcserver.HealthCheckOverGRPC|dgrpcserver.HealthCheckOverHTTP, healthcheck),
 		dgrpcserver.WithPostUnaryInterceptor(otelgrpc.UnaryServerInterceptor(otelgrpc.WithTracerProvider(tracerProvider))),
 		dgrpcserver.WithPostStreamInterceptor(otelgrpc.StreamServerInterceptor(otelgrpc.WithTracerProvider(tracerProvider))),
-		dgrpcserver.WithGRPCServerOptions(grpc.MaxRecvMsgSize(25 * 1024 * 1024)),
+		dgrpcserver.WithGRPCServerOptions(grpc.MaxRecvMsgSize(1024 * 1024 * 1024)),
 	}
 	if strings.Contains(listenAddr, "*") {
 		options = append(options, dgrpcserver.WithInsecureServer())

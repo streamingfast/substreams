@@ -47,13 +47,16 @@ func (m *ModSelect) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "u":
 			newSelection := (m.Selected - 1 + len(m.Modules)) % len(m.Modules)
-			cmds = append(cmds, common.EmitModuleSelectedMsg(m.Modules[newSelection]))
+			cmds = append(cmds, common.EmitModuleSelectedCmd(m.Modules[newSelection], "output"))
 		case "i":
 			newSelection := (m.Selected + 1) % len(m.Modules)
-			cmds = append(cmds, common.EmitModuleSelectedMsg(m.Modules[newSelection]))
+			cmds = append(cmds, common.EmitModuleSelectedCmd(m.Modules[newSelection], "output"))
 		}
 	case common.ModuleSelectedMsg:
-		m.Selected = m.ModulesIndex[string(msg)]
+		if msg.Target != "output" {
+			break
+		}
+		m.Selected = m.ModulesIndex[msg.ModuleName]
 		log.Println("Module selected dude", msg, m.Selected)
 	}
 	return m, tea.Batch(cmds...)

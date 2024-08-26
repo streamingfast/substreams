@@ -10,4 +10,6 @@ type Component interface {
 	tea.Model
 	help.KeyMap
 	SetSize(width, height int)
+	GetWidth() int
+	GetHeight() int
 }

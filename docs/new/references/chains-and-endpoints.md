@@ -8,7 +8,7 @@ description: StreamingFast Substreams chains and endpoints
 
 The different blockchains have separate endpoints that Substreams uses. You will use the endpoint that matches the blockchain you've selected for your development initiative.
 
-### Supported blockchains and protobuf models
+### Supported blockchains and Protobuf models
 
 There are different Substreams providers that you can use. StreamingFast and Pinax are the largest providers currently.
 
@@ -31,9 +31,24 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 | Ethereum | [`sf.ethereum.type.v2.Block`](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto)           | [ethereum-v0.10.4.spkg](https://github.com/streamingfast/sf-ethereum/releases/download/v0.10.2/ethereum-v0.10.4.spkg) |
 | NEAR     | [`sf.near.type.v1.Block`](https://github.com/streamingfast/firehose-near/blob/develop/proto/sf/near/type/v1/type.proto)                       |                                                                                                                       |
 | Solana   | [`sf.solana.type.v1.Block`](https://github.com/streamingfast/firehose-solana/blob/develop/proto/sf/solana/type/v1/type.proto)                 | [solana-v0.1.0.spkg](https://github.com/streamingfast/sf-solana/releases/download/v0.1.0/solana-v0.1.0.spkg)          |
-| Cosmos   | [`sf.cosmos.type.v2.Block`](https://github.com/streamingfast/firehose-cosmos/blob/develop/cosmos/pb/sf/cosmos/type/v2/block.pb.go#L75)                          |                                                                                                                       |                                                                                                                       |                                                                                                       
+| Cosmos   | [`sf.cosmos.type.v2.Block`](https://github.com/streamingfast/firehose-cosmos/blob/develop/cosmos/proto/sf/cosmos/type/v2/block.proto#L10)                          |                                                                                                                       |                                                                                                                       |                                                                                                       
 | Bitcoin  | [`sf.bitcoin.type.v1.Block`](https://github.com/streamingfast/firehose-bitcoin/blob/develop/proto/sf/bitcoin/type/v1/type.proto)              |                                                                                                                       |
 | Antelope  | [`sf.antelope.type.v1.Block`](https://buf.build/pinax/firehose-antelope/docs/main:sf.antelope.type.v1#sf.antelope.type.v1.Block)              |                                                                                                                       |
+| Starknet  | [`sf.starknet.type.v1.Block`](https://github.com/streamingfast/firehose-starknet/blob/main/proto/sf/starknet/type/v1/block.proto#L8)              |                                                                                                                       |
+| Gara  | [`sf.gear.type.v1.Block`](https://github.com/streamingfast/firehose-gear/blob/main/proto/sf/gear/type/v1/block.proto#L7)              |                                                                                                                       |
+
+### EVM Extended vs Base Block Model
+
+For EVM chains, the are two different types of `Block` models: _Extended_ and _Base_:
+
+* An **Extended Block** is produced by a full node instrumentation integration, thus containing a rich data model (balance changes, internal calls, storage changes...).
+* A **Base Block** is produced by a _RPC Poller_ integration, which essentially means that only the data exposed by an RPC endpoint can be included in the data model.
+
+The following table summarizes the different data contained in each type of `Block`.
+
+<figure><img src="../../.gitbook/assets/intro/base-extended-block.png" alt="" width="100%"><figcaption><p>Base vs. Extended Block Data Available</p></figcaption></figure>
+
+The data missing in the Base Block makes the corresponding Protobuf field empty. For example, if you try to read _internal call_ on a Base Block, the list will be empty.
 
 ## Official Endpoints
 
@@ -54,8 +69,10 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 * **Injective Mainnet**: `mainnet.injective.streamingfast.io:443`
 * **Injective Testnet**: `testnet.injective.streamingfast.io:443`
 * **Sei Mainnet (EVM)**: `evm-mainnet.sei.streamingfast.io:443`
-* **Starknet Mainnet**: `mainnet.starknet.streamingfast.io`
+* **Starknet Mainnet**: `mainnet.starknet.streamingfast.io:443`
 * **Base Mainnet**: `base-mainnet.streamingfast.io:443`
+* **Vara Mainnet**: `mainnet.vara.streamingfast.io:443`
+* **Vara Testnet**: `testnet.vara.streamingfast.io:443`
 
 ## Community Endpoints
 

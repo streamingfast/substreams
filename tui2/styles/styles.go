@@ -54,6 +54,8 @@ var (
 	StreamStoppedColor = lipgloss.AdaptiveColor{Dark: "2", Light: "10"}
 	StreamErrorColor   = lipgloss.AdaptiveColor{Dark: "9", Light: "9"}
 
+	StreamError = lipgloss.NewStyle().Background(StreamErrorColor)
+
 	ServerName = lipgloss.NewStyle().
 			Height(1).
 			MarginLeft(1).
@@ -83,16 +85,13 @@ var (
 			Foreground(lipgloss.AdaptiveColor{Dark: "241", Light: "250"}).
 			Align(lipgloss.Right)
 
-	Footer = lipgloss.NewStyle().
-		MarginTop(1).
-		Padding(0, 1).
-		Height(1)
+	Footer = lipgloss.NewStyle().MarginBottom(1).MarginLeft(1).MarginRight(1)
 
-	HelpKey = lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Dark: "241", Light: "250"})
+	HelpKey = lipgloss.NewStyle().Bold(true).
+		Foreground(lipgloss.AdaptiveColor{Dark: "14", Light: "233"})
 
 	HelpValue = lipgloss.NewStyle().
-			Foreground(lipgloss.AdaptiveColor{Dark: "239", Light: "252"})
+			Foreground(lipgloss.AdaptiveColor{Dark: "248", Light: "239"})
 
 	HelpDivider = lipgloss.NewStyle().
 			Foreground(lipgloss.AdaptiveColor{Dark: "237", Light: "254"}).
@@ -114,6 +113,17 @@ var (
 	ErrorBody = lipgloss.NewStyle().
 			Foreground(lipgloss.AdaptiveColor{Dark: "252", Light: "242"}).
 			MarginLeft(2)
+
+	StreamButton = lipgloss.NewStyle().
+			Padding(1, 4).
+			Border(lipgloss.RoundedBorder())
+
+	StreamButtonStart = StreamButton.
+				Foreground(lipgloss.AdaptiveColor{Dark: "8", Light: "8"}).  // Darkish color
+				Background(lipgloss.AdaptiveColor{Dark: "46", Light: "46"}) // Bright green color
+	StreamButtonStop = StreamButton.
+				Foreground(lipgloss.AdaptiveColor{Dark: "15", Light: "15"}).  // White color
+				Background(lipgloss.AdaptiveColor{Dark: "160", Light: "160"}) // Reddish color
 
 	Spinner = lipgloss.NewStyle().
 		MarginTop(1).
@@ -156,8 +166,7 @@ var (
 			Background(lipgloss.AdaptiveColor{Dark: "237", Light: "254"}).
 			Foreground(lipgloss.AdaptiveColor{Dark: "243", Light: "248"})
 
-	Tabs = lipgloss.NewStyle().
-		Height(1)
+	Tabs = lipgloss.NewStyle()
 
 	TabLabel = lipgloss.NewStyle().
 			Margin(0, 1)
@@ -183,8 +192,11 @@ var (
 		BottomRight: "└",
 	}
 
+	LogoASCII = lipgloss.NewStyle().
+			Foreground(lipgloss.AdaptiveColor{Dark: "208", Light: "208"})
+
 	Logo = lipgloss.NewStyle().
-		Border(lipgloss.Border{Bottom: "─", Left: "│", BottomLeft: "┴", BottomRight: "┘", TopLeft: "╷"}).
+		Border(lipgloss.Border{Bottom: "─", Left: "", BottomLeft: "─", BottomRight: "─", TopLeft: ""}).
 		Padding(0, 1).
 		Margin(0).
 		Foreground(lipgloss.AdaptiveColor{Dark: "1", Light: "9"}).Bold(true)
@@ -206,6 +218,12 @@ var (
 	RequestOddRow  = RequestCell.Foreground(gray)
 	RequestEvenRow = RequestCell.Foreground(lightGray)
 	RequestRight   = RequestCell.Align(lipgloss.Right)
+
+	ModalBox          = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.AdaptiveColor{Dark: "205", Light: "213"})
+	FullWidthModalBox = ModalBox //.BorderLeft(false).BorderRight(false)
+
+	DocModuleName = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Dark: "12", Light: "14"})
+	DocBox        = lipgloss.NewStyle().Padding(1, 2)
 
 	BlockSelect = blockSelectStyle{
 		Box:                  lipgloss.NewStyle().Border(lipgloss.NormalBorder(), true),

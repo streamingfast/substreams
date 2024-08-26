@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"google.golang.org/grpc"
@@ -18,6 +18,8 @@ type Msg int
 const (
 	ConnectingMsg Msg = iota
 	ConnectedMsg
+	BackprocessingMsg
+	StreamingMsg
 	InterruptStreamMsg
 	EndOfStreamMsg
 	ReplayedMsg
@@ -31,10 +33,12 @@ type ResponseUnknownMsg string
 type Stream struct {
 	ReplayBundle ReplayBundle
 
-	req            *pbsubstreamsrpc.Request
-	client         pbsubstreamsrpc.StreamClient
-	callOpts       []grpc.CallOption
-	targetEndBlock uint64
+	seenBlockData         bool
+	sentBackprocessingMsg bool
+	req                   *pbsubstreamsrpc.Request
+	client                pbsubstreamsrpc.StreamClient
+	callOpts              []grpc.CallOption
+	targetEndBlock        uint64
 
 	headers       map[string]string
 	ctx           context.Context
@@ -102,11 +106,28 @@ func (s *Stream) Update(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case StreamErrorMsg:
 		s.err = msg
-	case *pbsubstreamsrpc.BlockScopedData,
-		*pbsubstreamsrpc.ModulesProgress,
-		*pbsubstreamsrpc.InitialSnapshotData,
+	case *pbsubstreamsrpc.BlockScopedData:
+		var cmds []tea.Cmd
+		if !s.seenBlockData {
+			s.seenBlockData = true
+			cmds = append(cmds, func() tea.Msg { return StreamingMsg })
+		}
+		cmds = append(cmds, s.readNextMessage)
+		return tea.Batch(cmds...)
+	case *pbsubstreamsrpc.ModulesProgress:
+		var cmds []tea.Cmd
+		if !s.seenBlockData && !s.sentBackprocessingMsg {
+			s.sentBackprocessingMsg = true
+			cmds = append(cmds, func() tea.Msg { return BackprocessingMsg })
+		}
+		cmds = append(cmds, s.readNextMessage)
+		return tea.Batch(cmds...)
+	case *pbsubstreamsrpc.SessionInit:
+		s.seenBlockData = false
+		s.sentBackprocessingMsg = false
+		return s.readNextMessage
+	case *pbsubstreamsrpc.InitialSnapshotData,
 		*pbsubstreamsrpc.InitialSnapshotComplete,
-		*pbsubstreamsrpc.SessionInit,
 		ResponseUnknownMsg:
 		return s.readNextMessage
 	case Msg:
@@ -158,6 +179,10 @@ func (s *Stream) readNextMessage() tea.Msg {
 				s.err = io.EOF
 				return EndOfStreamMsg
 			}
+			if strings.Contains(err.Error(), "code = Canceled desc = context canceled") {
+				s.err = err
+				return EndOfStreamMsg
+			}
 			return StreamErrorMsg(fmt.Errorf("read next message: %w", err))
 		}
 		return s.routeNextMessage(resp)
@@ -170,7 +195,7 @@ func (s *Stream) routeNextMessage(resp *pbsubstreamsrpc.Response) tea.Msg {
 	case *pbsubstreamsrpc.Response_BlockScopedData:
 		return m.BlockScopedData
 	case *pbsubstreamsrpc.Response_Progress:
-		log.Printf("Progress response: %T %v", resp, resp)
+		//log.Printf("Progress response: %T %v", resp, resp)
 		return m.Progress
 	case *pbsubstreamsrpc.Response_DebugSnapshotData:
 		return m.DebugSnapshotData

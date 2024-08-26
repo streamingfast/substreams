@@ -154,3 +154,33 @@ Depending on the crate you use to decode params string, you can pass them to Sub
 ```bash
 substreams gui map_whale_transfers -p map_whale_transfers="address[]=aaa..aaa&address[]=bbb..bbb&amount=100"
 ```
+
+## Parameters Per Network
+
+It also possible to specify parameters per network. For example, consider that you want to specify a specific parameter for Ethereum and a different one for Solana.
+
+The syntax to specify the parameters per network in your manifest uses the top-level `networks` block.
+
+```yaml
+...
+
+networks:
+    <NETWORK-NAME>:
+        params: 
+            <MODULE-NAME>: “value”
+
+...
+```
+
+For example, if you want to specify a parameter for the `my-module` module on Ethereum Mainnet:
+
+```yaml
+...
+
+networks:
+    mainnet:
+        params: 
+            my-module: “value”
+
+...
+```

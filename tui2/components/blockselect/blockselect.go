@@ -71,8 +71,8 @@ func (b *BlockSelect) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (b *BlockSelect) View() string {
-	if b.Width < 4 || b.highBlock == 0 || b.lowBlock == 0 || b.highBlock == b.lowBlock {
-		return ""
+	if b.Width < 4 { // || b.highBlock == 0 || b.lowBlock == 0 || b.highBlock == b.lowBlock {
+		return "\n\n\n\n"
 	}
 
 	bins := float64(b.Width - styles.BlockSelect.Box.GetVerticalBorderSize())

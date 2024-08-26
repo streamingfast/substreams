@@ -128,7 +128,7 @@ func (p *Pipeline) processBlock(
 		dmetering.GetBytesMeter(ctx).AddBytesRead(execOutput.Len())
 		err = p.handleStepNew(ctx, clock, cursor, execOutput)
 		if err != nil && err != io.EOF {
-			return fmt.Errorf("step new: handler step new: %w", err)
+			return err
 		}
 		if err == io.EOF {
 			eof = true
@@ -137,20 +137,20 @@ func (p *Pipeline) processBlock(
 		p.blockStepMap[bstream.StepNewIrreversible]++
 		err = p.handleStepNew(ctx, clock, cursor, execOutput)
 		if err != nil && err != io.EOF {
-			return fmt.Errorf("step new irr: handler step new: %w", err)
+			return err
 		}
 		if err == io.EOF {
 			eof = true
 		}
 		err = p.handleStepFinal(clock)
 		if err != nil {
-			return fmt.Errorf("handling step irreversible: %w", err)
+			return err
 		}
 	case bstream.StepIrreversible:
 		p.blockStepMap[bstream.StepIrreversible]++
 		err = p.handleStepFinal(clock)
 		if err != nil {
-			return fmt.Errorf("handling step irreversible: %w", err)
+			return err
 		}
 	}
 

@@ -487,3 +487,43 @@ func TestModuleGraph_ComputeInitialBlocks_WithThreeParentsEachContainingAInitial
 	err = computeInitialBlock(testModules, graph)
 	assert.Equal(t, `cannot deterministically determine the initialBlock for module "D"; multiple inputs have conflicting initial blocks defined or inherited`, err.Error())
 }
+
+func TestLeafs(t *testing.T) {
+	g, err := NewModuleGraph(testModules)
+	assert.NoError(t, err)
+
+	leafs := g.Leafs()
+
+	var res []string
+	for _, p := range leafs {
+		res = append(res, p.Name)
+	}
+
+	//get names of leafs
+	leafNames := make([]string, 0, len(leafs))
+	for _, leaf := range leafs {
+		leafNames = append(leafNames, leaf.Name)
+	}
+
+	require.Equal(t, []string{"F", "K", "H", "MapDependsOnStore"}, leafNames)
+}
+
+func TestRoots(t *testing.T) {
+	g, err := NewModuleGraph(testModules)
+	assert.NoError(t, err)
+
+	roots := g.Roots()
+
+	var res []string
+	for _, p := range roots {
+		res = append(res, p.Name)
+	}
+
+	//get names of roots
+	rootNames := make([]string, 0, len(roots))
+	for _, root := range roots {
+		rootNames = append(rootNames, root.Name)
+	}
+
+	require.Equal(t, []string{"As", "Am", "H", "SimpleStore"}, rootNames)
+}

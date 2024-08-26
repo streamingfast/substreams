@@ -35,6 +35,7 @@ func (e *StoreModuleExecutor) applyCachedOutput(value []byte) error {
 func (e *StoreModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, outForFiles []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
 	_, span := reqctx.WithModuleExecutionSpan(ctx, "exec_store")
 	defer span.EndWithErr(&err)
+	e.ctx = ctx
 
 	if _, err := e.wasmCall(reader); err != nil {
 		return nil, nil, nil, fmt.Errorf("store wasm call: %w", err)

@@ -92,9 +92,13 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	}
 
 	initConvoURL := sflags.MustGetString(cmd, "codegen-endpoint")
-	stateFile := sflags.MustGetString(cmd, "state-file")
+	stateFile, stateFileFlagProvided := sflags.MustGetStringProvided(cmd, "state-file")
 	if !strings.HasSuffix(stateFile, ".json") {
 		return fmt.Errorf("state file must have a .json extension")
+	}
+
+	if stateFileFlagProvided && !cli.FileExists(stateFile) {
+		return fmt.Errorf("state file %q does not exist", stateFile)
 	}
 
 	transport := &http2.Transport{}
@@ -122,21 +126,24 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("state file %q file exists, but is invalid: %w", stateFile, err)
 		}
 
-		useGenerator := true
-		inputField := huh.NewConfirm().
-			Title(fmt.Sprintf("State file %q was found (%s - %s). Do you want to start from there ?", stateFile, state.GeneratorID, humanize.Time(s.ModTime()))).
-			Value(&useGenerator)
+		lastState = state
 
-		if err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run(); err != nil {
-			return fmt.Errorf("failed taking confirmation input: %w", err)
-		}
+		if !stateFileFlagProvided {
+			useGenerator := true
+			inputField := huh.NewConfirm().
+				Title(fmt.Sprintf("State file %q was found (%s - %s). Do you want to start from there ?", stateFile, state.GeneratorID, humanize.Time(s.ModTime()))).
+				Value(&useGenerator)
 
-		if useGenerator {
-			lastState = state
-		} else {
-			newName := fmt.Sprintf("%s.%d.json", strings.TrimSuffix(stateFile, ".json"), time.Now().Unix())
-			os.Rename(stateFile, newName)
-			fmt.Printf("File %q renamed to %q\n", stateFile, newName)
+			if err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run(); err != nil {
+				return fmt.Errorf("failed taking confirmation input: %w", err)
+			}
+
+			if !useGenerator {
+				lastState = &initStateFormat{}
+				newName := fmt.Sprintf("%s.%s.json", strings.TrimSuffix(stateFile, ".json"), time.Now().Format("2006-01-02T15-04-05"))
+				os.Rename(stateFile, newName)
+				fmt.Printf("File %q renamed to %q\n", stateFile, newName)
+			}
 		}
 	}
 
@@ -149,16 +156,30 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		}
 
 		var options []huh.Option[*pbconvo.DiscoveryResponse_Generator]
+
+		maxLen := 0
+
+		genMapping := make(map[string]*pbconvo.DiscoveryResponse_Generator)
 		for _, gen := range resp.Msg.Generators {
 			endpoint := ""
 			if gen.Endpoint != "" {
 				endpoint = " (" + gen.Endpoint + ")"
 			}
+
+			if len(gen.Id+endpoint) > maxLen {
+				maxLen = len(gen.Id + endpoint)
+			}
+
+			genMapping[gen.Id+endpoint] = gen
+		}
+
+		for key, gen := range genMapping {
 			entry := huh.Option[*pbconvo.DiscoveryResponse_Generator]{
-				Key:   fmt.Sprintf("%s%s - %s", gen.Id, endpoint, gen.Title),
+				Key:   fmt.Sprintf("%-*s - %s", maxLen, key, gen.Title),
 				Value: gen,
 			}
 			options = append(options, entry)
+
 		}
 
 		var codegen *pbconvo.DiscoveryResponse_Generator
@@ -460,14 +481,16 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			}
 
 			input := msg.DownloadFiles
-			fmt.Println(filenameStyle("Files:\n"))
+			fmt.Println(filenameStyle("Files:"))
 			for _, file := range input.Files {
 				if file.Content == nil {
 					continue
 				}
 
-				fmt.Printf("%s %s\n", filenameStyle("-"), filenameStyle(file.Filename))
-				fmt.Printf("  %s\n\n", file.Description)
+				fmt.Printf("  %s %s\n", filenameStyle("-"), filenameStyle(file.Filename))
+				if file.Description != "" {
+					fmt.Printf("\t%s\n\n", file.Description)
+				}
 			}
 			// let the terminal breath a little
 			fmt.Println()
@@ -565,10 +588,11 @@ func toMarkdown(input string) string {
 		style = "dark"
 	}
 
-	renderer, err := glamour.NewTermRenderer(glamour.WithWordWrap(160), glamour.WithStandardStyle(style))
+	renderer, err := glamour.NewTermRenderer(glamour.WithWordWrap(0), glamour.WithStandardStyle(style))
 	if err != nil {
 		panic(fmt.Errorf("failed rendering markdown %q: %w", input, err))
 	}
+
 	out, err := renderer.Render(input)
 	if err != nil {
 		panic(fmt.Errorf("failed rendering markdown %q: %w", input, err))
@@ -652,22 +676,22 @@ func NewOverwriteForm() *OverwriteForm {
 func (f *OverwriteForm) createOverwriteForm(path string) error {
 	options := []huh.Option[string]{
 		{
-			Key:   "No",
-			Value: "no",
+			Key:   "Yes, overwrite all",
+			Value: "yes_all",
 		},
 		{
 			Key:   "Yes, overwrite",
 			Value: "yes",
 		},
 		{
-			Key:   "Yes, overwrite all",
-			Value: "yes_all",
+			Key:   "No",
+			Value: "no",
 		},
 	}
 
 	var selection string
 	selectField := huh.NewSelect[string]().
-		Title(fmt.Sprintf("File already exists, Do you want to overwrite %s ?", path)).
+		Title(fmt.Sprintf("File already exists, do you want to overwrite %s ?", path)).
 		Options(options...).
 		Value(&selection)
 

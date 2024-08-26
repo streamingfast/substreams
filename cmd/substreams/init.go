@@ -87,6 +87,27 @@ func readGeneratorState(stateFile string) (*initStateFormat, error) {
 }
 
 func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
+	r, err := regexp.Compile("substreams.*.yaml")
+	if err != nil {
+		return fmt.Errorf("failed to compile regexp: %w", err)
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to read current directory: %w", err)
+	}
+
+	files, err := os.ReadDir(cwd)
+	if err != nil {
+		return fmt.Errorf("failed to read current directory: %w", err)
+	}
+
+	for _, file := range files {
+		if r.MatchString(file.Name()) {
+			return fmt.Errorf("substreams project already exists in this directory: %q. Try running 'substreams init' in a new directory", file.Name())
+		}
+	}
+
 	opts := []connect.ClientOption{
 		connect.WithGRPC(),
 	}
@@ -166,16 +187,13 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				endpoint = " (" + gen.Endpoint + ")"
 			}
 
-			if len(gen.Id+endpoint) > maxLen {
-				maxLen = len(gen.Id + endpoint)
+			key := fmt.Sprintf("%-20s - %s", gen.Id, gen.Title)
+			if endpoint != "" {
+				key = fmt.Sprintf("%-20s %-20s - %s", gen.Id, endpoint, gen.Title)
 			}
 
-			genMapping[gen.Id+endpoint] = gen
-		}
-
-		for key, gen := range genMapping {
 			entry := huh.Option[*pbconvo.DiscoveryResponse_Generator]{
-				Key:   fmt.Sprintf("%-*s - %s", maxLen, key, gen.Title),
+				Key:   key,
 				Value: gen,
 			}
 			options = append(options, entry)
@@ -220,7 +238,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		startMsg.Hydrate = &pbconvo.UserInput_Hydrate{SavedState: string(lastState.State)}
 	}
 
-	err := sendFunc(&pbconvo.UserInput{
+	err = sendFunc(&pbconvo.UserInput{
 		Entry: &pbconvo.UserInput_Start_{
 			Start: startMsg,
 		},

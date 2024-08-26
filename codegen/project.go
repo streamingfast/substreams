@@ -21,68 +21,133 @@ type Project struct {
 	Module           *pbsubstreams.Module
 	OutputDescriptor *descriptorpb.DescriptorProto
 	protoTypeMapping map[string]*descriptorpb.DescriptorProto
-	ExampleEntity    *ExampleEntity
+	EntityTypes      []EntityType
 	SpkgProjectName  string
 	ManifestPath     string
+	OutputType       OutputType
 }
 
-type ExampleEntity struct {
-	Name             string
-	NameAsProtoField string
-	NameAsEntity     string
-	ID               string
+func (p *Project) AddSubgraphEntityType(name string, ttype SubgraphType) {
+	p.EntityTypes = append(p.EntityTypes, &SubgraphEntityType{
+		Name: name,
+		Type: ttype,
+	})
 }
 
-func NewProject(name, spkgProjectName, network, manifestPath string, module *pbsubstreams.Module, outputDescriptor *descriptorpb.DescriptorProto, protoTypeMapping map[string]*descriptorpb.DescriptorProto) *Project {
+func (p *Project) AddSQLEntityType(name string, ttype SqlType) {
+	p.EntityTypes = append(p.EntityTypes, &SQLEntityType{
+		Name: name,
+		Type: ttype,
+	})
+}
+
+func NewProject(
+	name string,
+	spkgProjectName string,
+	network, manifestPath string,
+	module *pbsubstreams.Module,
+	outputDescriptor *descriptorpb.DescriptorProto,
+	protoTypeMapping map[string]*descriptorpb.DescriptorProto,
+	outputType OutputType,
+) *Project {
 	return &Project{
 		Network:          network,
 		Name:             name,
 		Module:           module,
 		OutputDescriptor: outputDescriptor,
+		EntityTypes:      []EntityType{},
 		protoTypeMapping: protoTypeMapping,
 		SpkgProjectName:  spkgProjectName,
 		ManifestPath:     manifestPath,
+		OutputType:       outputType,
 	}
 }
 
-func (p *Project) BuildExampleEntity() error {
+func (p *Project) BuildOutputEntity() error {
 	for _, field := range p.OutputDescriptor.Field {
-		if *field.Type == descriptorpb.FieldDescriptorProto_TYPE_MESSAGE {
-			if *field.Label == descriptorpb.FieldDescriptorProto_LABEL_REPEATED {
-				splitMessagePath := strings.Split(*field.TypeName, ".")
-				name := splitMessagePath[len(splitMessagePath)-1]
+		name := textcase.CamelCase(field.GetName())
+		switch field.GetType() {
+		case descriptorpb.FieldDescriptorProto_TYPE_DOUBLE,
+			descriptorpb.FieldDescriptorProto_TYPE_FLOAT,
+			descriptorpb.FieldDescriptorProto_TYPE_INT64,
+			descriptorpb.FieldDescriptorProto_TYPE_UINT64,
+			descriptorpb.FieldDescriptorProto_TYPE_FIXED64,
+			descriptorpb.FieldDescriptorProto_TYPE_FIXED32,
+			descriptorpb.FieldDescriptorProto_TYPE_UINT32,
+			descriptorpb.FieldDescriptorProto_TYPE_SFIXED32,
+			descriptorpb.FieldDescriptorProto_TYPE_SFIXED64,
+			descriptorpb.FieldDescriptorProto_TYPE_SINT32,
+			descriptorpb.FieldDescriptorProto_TYPE_SINT64:
 
-				p.ExampleEntity = &ExampleEntity{
-					NameAsProtoField: textcase.CamelCase(field.GetName()),
-					NameAsEntity:     "My" + name,
-					Name:             name,
-				}
-
-				if p.protoTypeMapping[*field.TypeName] == nil {
-					return fmt.Errorf("nested message type: %q not found", *field.TypeName)
-				}
-
-				for _, nestedMessageField := range p.protoTypeMapping[*field.TypeName].Field {
-					switch *nestedMessageField.Type {
-					case descriptorpb.FieldDescriptorProto_TYPE_STRING, descriptorpb.FieldDescriptorProto_TYPE_INT64, descriptorpb.FieldDescriptorProto_TYPE_UINT64, descriptorpb.FieldDescriptorProto_TYPE_UINT32, descriptorpb.FieldDescriptorProto_TYPE_BYTES:
-						p.ExampleEntity.ID = textcase.CamelCase(nestedMessageField.GetName())
-					default:
-						continue
-					}
-				}
+			if p.OutputType == Subgraph {
+				p.AddSubgraphEntityType(name, SubgraphBigInt)
 			}
+
+		case descriptorpb.FieldDescriptorProto_TYPE_INT32:
+			if p.OutputType == Subgraph {
+				p.AddSubgraphEntityType(name, SubgraphInt)
+			}
+
+		case descriptorpb.FieldDescriptorProto_TYPE_BOOL:
+			if p.OutputType == Subgraph {
+				p.AddSubgraphEntityType(name, SubgraphBoolean)
+			}
+
+		case descriptorpb.FieldDescriptorProto_TYPE_STRING:
+			if p.OutputType == Subgraph {
+				p.AddSubgraphEntityType(name, SubgraphString)
+			}
+
+		case descriptorpb.FieldDescriptorProto_TYPE_MESSAGE,
+			descriptorpb.FieldDescriptorProto_TYPE_GROUP,
+			descriptorpb.FieldDescriptorProto_TYPE_ENUM:
+			// Let's not support the nested message and groups for now as it is more complex
+			// and would probably require foreign tables / subgraph entities to work
+			// not even sure this works as of today
+			fmt.Println("skipping message, group and enum - not supported for the moment")
+
+		case descriptorpb.FieldDescriptorProto_TYPE_BYTES:
+			if p.OutputType == Subgraph {
+				p.AddSubgraphEntityType(name, SubgraphBytes)
+			}
+
 		}
+
+		// if field.GetType() == descriptorpb.FieldDescriptorProto_TYPE_MESSAGE {
+		// 	if *field.Label == descriptorpb.FieldDescriptorProto_LABEL_REPEATED {
+		//		splitMessagePath := strings.Split(typeName, ".")
+		//		name splitMessagePath[len(splitMessagePath)-1]
+
+		// 		p.Entities = append(p.Entities, &Entity{
+		// 			// NameAsProtoField: textcase.CamelCase(field.GetName()),
+		// 			// NameAsEntity:     "My" + name,
+		// 			Name:             name,
+		// 		})
+
+		// 		if p.protoTypeMapping[*field.TypeName] == nil {
+		// 			return fmt.Errorf("nested message type: %q not found", *field.TypeName)
+		// 		}
+
+		// 		for _, nestedMessageField := range p.protoTypeMapping[*field.TypeName].Field {
+		// 			switch *nestedMessageField.Type {
+		// 			case descriptorpb.FieldDescriptorProto_TYPE_STRING, descriptorpb.FieldDescriptorProto_TYPE_INT64, descriptorpb.FieldDescriptorProto_TYPE_UINT64, descriptorpb.FieldDescriptorProto_TYPE_UINT32, descriptorpb.FieldDescriptorProto_TYPE_BYTES:
+		// 				p.Entity.ID = textcase.CamelCase(nestedMessageField.GetName())
+		// 			default:
+		// 				continue
+		// 			}
+		// 		}
+		// 	}
+		// }
 	}
 	return nil
 }
 
-func (p *Project) ExampleEntityHasID() bool {
-	return p.ExampleEntity.ID != ""
-}
+// func (p *Project) ExampleEntityHasID() bool {
+// 	return p.Entity.ID != ""
+// }
 
 func (p *Project) HasExampleEntity() bool {
-	return p.ExampleEntity != nil
-
+	return len(p.EntityTypes) > 0
 }
 
 func (p *Project) SQLImportVersion() string            { return "1.0.7" }
@@ -136,7 +201,9 @@ func (p *Project) ChainEndpoint() (string, error) {
 	return ChainConfigByID[p.Network].FirehoseEndpoint, nil
 }
 
-func (p *Project) Render(outputType, flavor string, withDevEnv bool) (projectFiles map[string][]byte, err error) {
+func (p *Project) Render(withDevEnv bool) (projectFiles map[string][]byte, err error) {
+	//TODO: currently, we only support the simple use case of minimal codegens
+	// Need to update this and supporte more complicated use cases
 	projectFiles = map[string][]byte{}
 
 	funcMap := template.FuncMap{
@@ -151,8 +218,8 @@ func (p *Project) Render(outputType, flavor string, withDevEnv bool) (projectFil
 	}
 
 	var templateFiles map[string]string
-	switch outputType {
-	case outputTypeSubgraph:
+	switch p.OutputType {
+	case Subgraph:
 		templateFiles = map[string]string{
 			"subgraph/buf.gen.yaml":           "buf.gen.yaml",
 			"subgraph/package.json.gotmpl":    "package.json",
@@ -169,7 +236,7 @@ func (p *Project) Render(outputType, flavor string, withDevEnv bool) (projectFil
 			templateFiles["subgraph/dev-environment/start.sh"] = "dev-environment/start.sh"
 			templateFiles["subgraph/dev-environment/config.toml.gotmpl"] = "dev-environment/config.toml"
 		}
-	case outputTypeSQL:
+	case Sql:
 		templateFiles = map[string]string{
 			"sql/src/lib.rs.gotmpl":   "src/lib.rs",
 			"sql/Cargo.toml.gotmpl":   "Cargo.toml",

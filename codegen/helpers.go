@@ -13,9 +13,6 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 )
 
-const outputTypeSQL = "sql"
-const outputTypeSubgraph = "subgraph"
-
 func getModule(pkg *pbsubstreams.Package, moduleName string) (*pbsubstreams.Module, error) {
 	existingModules := pkg.GetModules().GetModules()
 	for _, module := range existingModules {
@@ -80,16 +77,22 @@ func processMessage(message *descriptorpb.DescriptorProto, parentName string, pr
 	}
 }
 
-func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bool) error {
+func buildGenerateCommandFromArgs(manifestPath string, outputType OutputType, withDevEnv bool) error {
 	reader, err := manifest.NewReader(manifestPath)
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
 
-	pkg, _, err := reader.Read()
+	pkgBundle, err := reader.Read()
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
+
+	if pkgBundle == nil {
+		return fmt.Errorf("no package found")
+	}
+
+	pkg := pkgBundle.Package
 
 	moduleNames := []string{}
 	for _, module := range pkg.Modules.Modules {
@@ -124,7 +127,7 @@ func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bo
 	}
 
 	var flavor string
-	if outputType == outputTypeSQL {
+	if outputType == Sql {
 		flavor, err = createSelectForm([]string{"PostgresSQL", "ClickHouse"}, "Please select a SQL flavor:")
 		if err != nil {
 			return fmt.Errorf("creating sql flavor form: %w", err)
@@ -157,7 +160,7 @@ func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bo
 	currentNetwork := pkg.Network
 	if currentNetwork == "" {
 		labels := []string{}
-		for label, _ := range ChainConfigByID {
+		for label := range ChainConfigByID {
 			labels = append(labels, label)
 		}
 
@@ -169,22 +172,27 @@ func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bo
 		currentNetwork = selectedNetwork
 	}
 
-	project := NewProject(projectName, spkgProjectName, currentNetwork, manifestPath, requestedModule, messageDescriptor, protoTypeMapping)
+	project := NewProject(projectName, spkgProjectName, currentNetwork, manifestPath, requestedModule, messageDescriptor, protoTypeMapping, outputType)
 
-	// Create an example entity from the output descriptor
-	err = project.BuildExampleEntity()
+	err = project.BuildOutputEntity()
 	if err != nil {
-		return fmt.Errorf("building example entity: %w", err)
+		return fmt.Errorf("building output entity: %w", err)
 	}
 
-	projectFiles, err := project.Render(outputType, flavor, withDevEnv)
+	if outputType == Sql {
+		fmt.Println("Rendering project files for Substreams Sink SQL...")
+	} else {
+		fmt.Println("Rendering project files for Substreams-powered-subgraph...")
+	}
+
+	projectFiles, err := project.Render(withDevEnv)
 	if err != nil {
 		return fmt.Errorf("rendering project files: %w", err)
 	}
 
 	saveDir := "subgraph"
 
-	if outputType == outputTypeSQL {
+	if outputType == Sql {
 		saveDir = "sql"
 	}
 

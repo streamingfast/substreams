@@ -12,6 +12,7 @@ func (p *Progress) ShortHelp() []key.Binding {
 		keymap.UpDown,
 		keymap.ToggleProgressDisplayMode,
 		keymap.RestartStream,
+		keymap.Build,
 		keymap.Help,
 		keymap.Quit,
 	}
@@ -31,6 +32,9 @@ func (p *Progress) FullHelp() [][]key.Binding {
 		},
 		{
 			keymap.RestartStream,
+		},
+		{
+			keymap.Build,
 		},
 		{
 			keymap.Help,

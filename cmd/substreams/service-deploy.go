@@ -55,19 +55,19 @@ func deployE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	pkg, _, err := reader.Read()
+	pkgBundle, err := reader.Read()
 	if err != nil {
 		return err
 	}
 
-	if pkg.SinkConfig == nil {
+	if pkgBundle.Package.SinkConfig == nil {
 		return fmt.Errorf("cannot deploy package %q: it does not contain a sink_config section", file)
 	}
-	if pkg.SinkModule == "" {
+	if pkgBundle.Package.SinkModule == "" {
 		return fmt.Errorf("cannot deploy package %q: it does not specify a sink_module", file)
 	}
 
-	pkg.Networks = nil // we don't want to send this to the server, so it does not apply network values again, possibly losing the overriden params
+	pkgBundle.Package.Networks = nil // we don't want to send this to the server, so it does not apply network values again, possibly losing the overriden params
 
 	paramsMap := make(map[string]string)
 	for _, param := range sflags.MustGetStringArray(cmd, "deployment-params") {
@@ -87,7 +87,7 @@ func deployE(cmd *cobra.Command, args []string) error {
 	}
 
 	req := connect.NewRequest(&pbsinksvc.DeployRequest{
-		SubstreamsPackage: pkg,
+		SubstreamsPackage: pkgBundle.Package,
 		Parameters:        deployParams,
 		DevelopmentMode:   !sflags.MustGetBool(cmd, "prod"),
 	})

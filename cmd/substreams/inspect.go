@@ -39,14 +39,18 @@ func runInspect(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
 
-	pkg, _, err := manifestReader.Read()
+	pkgBundle, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("reading manifest %q: %w", manifestPath, err)
 	}
 
+	if pkgBundle == nil {
+		return fmt.Errorf("no package found")
+	}
+
 	filename := filepath.Join(os.TempDir(), "package.spkg")
 
-	cnt, err := proto.Marshal(pkg)
+	cnt, err := proto.Marshal(pkgBundle.Package)
 	if err != nil {
 		return fmt.Errorf("marshalling package: %w", err)
 	}

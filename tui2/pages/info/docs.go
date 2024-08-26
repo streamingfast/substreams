@@ -70,7 +70,7 @@ func (d *Info) SetSize(w, h int) {
 func (d *Info) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case string:
-		log.Println("message bob", msg)
+		log.Println(msg)
 	case request.NewRequestInstance:
 		d.setNewRequest(msg.RequestSummary, msg.Modules, msg.Graph)
 	}

@@ -2,7 +2,7 @@
   "name": "{{ .Name }}",
   "license": "Apache-2.0",
   "scripts": {
-    "protogen": "graph codegen",
+    "codegen": "graph codegen",
     "generate": "buf generate --type=\"{{ $.GetOutputProtoPath}}\" ../{{ $.SpkgProjectName}}#format=bin",
     "build": "graph build",
     "create-local": "graph create --node http://localhost:8020/ {{ .Name }}",

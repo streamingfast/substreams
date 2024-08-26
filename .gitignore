@@ -1,6 +1,7 @@
 *~
 .envrc
 .env.release
+.env
 .DS_Store
 .idea
 .vscode
@@ -17,3 +18,4 @@ replay.log
 *.wasm
 /wasm/bench/substreams_tiny_go/main.wasm
 generator.json
+devel/codegen

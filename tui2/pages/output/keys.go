@@ -12,6 +12,7 @@ func (o *Output) ShortHelp() []key.Binding {
 		keymap.Search,
 		keymap.ModuleSearch,
 		keymap.ToggleLogs,
+		keymap.Build,
 		keymap.UpDown,
 		keymap.Help,
 	}
@@ -38,6 +39,9 @@ func (o *Output) FullHelp() [][]key.Binding {
 			keymap.ModuleSearch,
 			keymap.ModGraphView,
 			keymap.RestartStream,
+		},
+		{
+			keymap.Build,
 		},
 		{
 			keymap.Help,

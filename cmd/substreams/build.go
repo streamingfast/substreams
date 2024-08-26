@@ -51,6 +51,9 @@ func runBuildE(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Building manifest file: %s\n", manifestPath)
 
 	manif, err := readManifestYaml(manifestPath)
+	if err != nil {
+		return fmt.Errorf("error reading manifest: %w", err)
+	}
 
 	info := &manifestInfo{
 		Path:     manifestPath,

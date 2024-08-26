@@ -8,9 +8,11 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/streamingfast/substreams/manifest"
+	"github.com/streamingfast/substreams/tui2/buildoutput"
 	"github.com/streamingfast/substreams/tui2/common"
 	"github.com/streamingfast/substreams/tui2/components/errorbox"
 	"github.com/streamingfast/substreams/tui2/footer"
+	"github.com/streamingfast/substreams/tui2/pages/build"
 	"github.com/streamingfast/substreams/tui2/pages/info"
 	"github.com/streamingfast/substreams/tui2/pages/output"
 	"github.com/streamingfast/substreams/tui2/pages/progress"
@@ -29,6 +31,7 @@ const (
 	progressPage
 	outputPage
 	infoPage
+	buildPage
 )
 
 type UI struct {
@@ -38,6 +41,7 @@ type UI struct {
 	stream        *streamui.Stream
 	replayLog     *replaylog.File
 	requestConfig *request.Config // all boilerplate to pass down to refresh
+	buildOut      *buildoutput.BuildOutput
 
 	common.Common
 	modalComponent common.Component
@@ -61,9 +65,10 @@ func New(reqConfig *request.Config) (*UI, error) {
 			progress.New(c),
 			outputTab,
 			info.New(c),
+			build.New(c, reqConfig.ManifestPath),
 		},
 		activePage:    requestPage,
-		tabs:          tabs.New(c, []string{"Request", "Backprocessing", "Output", "Info"}),
+		tabs:          tabs.New(c, []string{"Request", "Backprocessing", "Output", "Info", "Build"}),
 		requestConfig: reqConfig,
 		replayLog:     replaylog.New(),
 	}
@@ -107,6 +112,7 @@ func (ui *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	return ui.update(msg)
 }
+
 func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
@@ -125,8 +131,7 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case common.CancelModalMsg:
 		ui.modalComponent = nil
 		ui.footer.SetKeyMap(ui.pages[ui.activePage])
-	case request.SetupNewInstanceMsg:
-		return ui, ui.setupNewInstance(msg.StartStream)
+
 	case tea.KeyMsg:
 		ui.forceRefresh()
 		if msg.String() == "ctrl+c" {
@@ -143,12 +148,28 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			ui.resize()
 		case "r":
 			return ui, request.SetupNewInstanceCmd(true)
+		case "b":
+			return ui, build.SetupNewBuildCmd()
 		}
 		_, cmd := ui.tabs.Update(msg)
 		cmds = append(cmds, cmd)
 		_, cmd = ui.pages[ui.activePage].Update(msg)
 		cmds = append(cmds, cmd)
 		return ui, tea.Batch(cmds...)
+
+	case build.SetupNewBuildMsg:
+		return ui, ui.setupNewBuild()
+	case build.NewBuildInstance:
+		ui.buildOut = msg.BuildOut
+		cmds = append(cmds, ui.buildOut.Init())
+	case buildoutput.Msg:
+		switch msg {
+		case buildoutput.BuildStarted:
+			cmds = append(cmds, tabs.SelectTabCmd(int(buildPage)))
+		}
+
+	case request.SetupNewInstanceMsg:
+		return ui, ui.setupNewInstance(msg.StartStream)
 	case request.NewRequestInstance:
 		ui.stream = msg.Stream
 		ui.msgDescs = msg.MsgDescs
@@ -156,6 +177,7 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.StartStream {
 			cmds = append(cmds, ui.stream.Init())
 		}
+
 	case streamui.Msg:
 		switch msg {
 		case streamui.BackprocessingMsg:
@@ -163,6 +185,7 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case streamui.StreamingMsg:
 			cmds = append(cmds, tabs.SelectTabCmd(int(outputPage)))
 		}
+
 	case tabs.SelectTabMsg:
 		ui.forceRefresh()
 		ui.activePage = page(msg)
@@ -177,6 +200,10 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	if ui.stream != nil {
 		cmds = append(cmds, ui.stream.Update(msg))
+	}
+
+	if ui.buildOut != nil {
+		cmds = append(cmds, ui.buildOut.Update(msg))
 	}
 
 	var holdModalKeys bool
@@ -297,4 +324,15 @@ func (ui *UI) setupNewInstance(startStream bool) tea.Cmd {
 	}
 
 	return tea.Sequence(cmds...)
+}
+
+func (ui *UI) setupNewBuild() tea.Cmd {
+	buildInstance, err := build.NewBuild(ui.requestConfig.ManifestPath)
+	if err != nil {
+		return func() tea.Msg { return err }
+	}
+
+	return func() tea.Msg {
+		return build.NewBuildInstance(buildInstance)
+	}
 }

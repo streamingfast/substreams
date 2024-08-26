@@ -163,6 +163,7 @@ func decodeYamlManifestFromFile(yamlFilePath, workingDir string) (out *Manifest,
 	if err := decoder.Decode(&out); err != nil {
 		return nil, fmt.Errorf("decoding manifest content: %w", err)
 	}
+
 	return
 }
 

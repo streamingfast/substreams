@@ -564,6 +564,7 @@ func toMarkdown(input string) string {
 	if lipgloss.HasDarkBackground() {
 		style = "dark"
 	}
+
 	renderer, err := glamour.NewTermRenderer(glamour.WithWordWrap(160), glamour.WithStandardStyle(style))
 	if err != nil {
 		panic(fmt.Errorf("failed rendering markdown %q: %w", input, err))

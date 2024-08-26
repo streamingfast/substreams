@@ -137,26 +137,34 @@ func (p *Project) Render(outputType string, withDevEnv bool) (projectFiles map[s
 	switch outputType {
 	case outputTypeSubgraph:
 		templateFiles = map[string]string{
-			"triggers/buf.gen.yaml":           "buf.gen.yaml",
-			"triggers/package.json.gotmpl":    "package.json",
-			"triggers/tsconfig.json":          "tsconfig.json",
-			"triggers/subgraph.yaml.gotmpl":   "subgraph.yaml",
-			"triggers/schema.graphql.gotmpl":  "schema.graphql",
-			"triggers/src/mappings.ts.gotmpl": "src/mappings.ts",
+			"subgraph/buf.gen.yaml":           "buf.gen.yaml",
+			"subgraph/package.json.gotmpl":    "package.json",
+			"subgraph/tsconfig.json":          "tsconfig.json",
+			"subgraph/subgraph.yaml.gotmpl":   "subgraph.yaml",
+			"subgraph/schema.graphql.gotmpl":  "schema.graphql",
+			"subgraph/src/mappings.ts.gotmpl": "src/mappings.ts",
 			"triggers/run-local.sh.gotmpl":    "run-local.sh",
 		}
 
 		if withDevEnv {
-			templateFiles["triggers/dev-environment/docker-compose.yml"] = "dev-environment/docker-compose.yml"
-			templateFiles["triggers/dev-environment/start.sh"] = "dev-environment/start.sh"
-			templateFiles["triggers/dev-environment/config.toml.gotmpl"] = "dev-environment/config.toml"
+			templateFiles["subgraph/run-local.sh.gotmpl"] = "run-local.sh"
+			templateFiles["subgraph/dev-environment/docker-compose.yml"] = "dev-environment/docker-compose.yml"
+			templateFiles["subgraph/dev-environment/start.sh"] = "dev-environment/start.sh"
+			templateFiles["subgraph/dev-environment/config.toml.gotmpl"] = "dev-environment/config.toml"
 		}
 	case outputTypeSQL:
 		templateFiles = map[string]string{
-			"sql/Makefile.gotmpl": "Makefile",
+			"sql/sql.yaml.gotmpl":   "sql.yaml",
+			"sql/schema.sql.gotmpl": "schema.sql",
+			"sql/src/lib.rs.gotmpl": "src/lib.rs",
+			"sql/README.md":         "README.md",
 		}
 		if withDevEnv {
-			templateFiles[""] = ""
+			panic("not implemented yet")
+			//templateFiles["sql/run-local.sh.gotmpl"] = "run-local.sh"
+			//templateFiles["sql/dev-environment/docker-compose.yml"] = "dev-environment/docker-compose.yml"
+			//templateFiles["sql/dev-environment/start.sh"] = "dev-environment/start.sh"
+			//templateFiles["sql/dev-environment/config.toml.gotmpl"] = "dev-environment/config.toml"
 		}
 	}
 

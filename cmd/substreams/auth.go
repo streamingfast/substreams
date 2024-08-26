@@ -54,7 +54,7 @@ func runAuthE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("writing .substreams.env file: %w", err)
 	}
 
-	fmt.Println("Load credentials in current terminal with:")
+	fmt.Println("Load credentials in current terminal with the following command:")
 	color.Blue(" . ./.substreams.env")
 
 	return nil

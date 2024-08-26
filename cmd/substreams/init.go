@@ -187,13 +187,16 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				endpoint = " (" + gen.Endpoint + ")"
 			}
 
-			key := fmt.Sprintf("%-20s - %s", gen.Id, gen.Title)
-			if endpoint != "" {
-				key = fmt.Sprintf("%-20s %-20s - %s", gen.Id, endpoint, gen.Title)
+			if len(gen.Id+endpoint) > maxLen {
+				maxLen = len(gen.Id + endpoint)
 			}
 
+			genMapping[gen.Id+endpoint] = gen
+		}
+
+		for key, gen := range genMapping {
 			entry := huh.Option[*pbconvo.DiscoveryResponse_Generator]{
-				Key:   key,
+				Key:   fmt.Sprintf("%-*s - %s", maxLen, key, gen.Title),
 				Value: gen,
 			}
 			options = append(options, entry)

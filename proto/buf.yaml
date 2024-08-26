@@ -1,7 +1,7 @@
 version: v1
 name: buf.build/streamingfast/substreams
 
-deps: []
+deps: ["buf.build/streamingfast/firehose"]
 
 build:
   excludes:

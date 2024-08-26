@@ -13,6 +13,7 @@ import (
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/service"
 	"github.com/streamingfast/substreams/wasm"
+	"github.com/streamingfast/substreams/wasm/wazero"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
 )
@@ -26,6 +27,7 @@ type Tier2Config struct {
 	MaximumConcurrentRequests uint64
 	WASMExtensions            wasm.WASMExtensioner
 	BlockExecutionTimeout     time.Duration
+	TmpDir                    string
 
 	Tracing bool
 }
@@ -80,6 +82,9 @@ func (a *Tier2App) Run() error {
 
 	opts = append(opts, service.WithReadinessFunc(a.setReadiness))
 
+	if a.config.TmpDir != "" {
+		wazero.SetTempDir(a.config.TmpDir)
+	}
 	if a.config.WASMExtensions != nil {
 		opts = append(opts, service.WithWASMExtensioner(a.config.WASMExtensions))
 	}

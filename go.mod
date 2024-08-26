@@ -16,7 +16,7 @@ require (
 	github.com/streamingfast/dgrpc v0.0.0-20240219152146-57bb131c39ca
 	github.com/streamingfast/dstore v0.1.1-0.20240311181234-470a7a84936f
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
-	github.com/streamingfast/pbgo v0.0.6-0.20231120172814-537d034aad5e
+	github.com/streamingfast/pbgo v0.0.6-0.20240823134334-812f6a16c5cb
 	github.com/stretchr/testify v1.8.4
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869
 	go.uber.org/zap v1.26.0
@@ -64,7 +64,7 @@ require (
 	github.com/streamingfast/substreams-sdk-go v0.0.0-20240110154316-5fb21a7a330b
 	github.com/streamingfast/substreams-sink-sql v1.0.1-0.20231127153906-acf5f3e34330
 	github.com/test-go/testify v1.1.4
-	github.com/tetratelabs/wazero v1.7.1
+	github.com/tetratelabs/wazero v1.8.0
 	github.com/tidwall/pretty v1.2.1
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.49.0
 	go.opentelemetry.io/otel v1.24.0

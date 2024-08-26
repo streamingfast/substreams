@@ -11,7 +11,7 @@ import (
 	"github.com/streamingfast/substreams/tui2/common"
 	"github.com/streamingfast/substreams/tui2/components/errorbox"
 	"github.com/streamingfast/substreams/tui2/footer"
-	"github.com/streamingfast/substreams/tui2/pages/docs"
+	"github.com/streamingfast/substreams/tui2/pages/info"
 	"github.com/streamingfast/substreams/tui2/pages/output"
 	"github.com/streamingfast/substreams/tui2/pages/progress"
 	"github.com/streamingfast/substreams/tui2/pages/request"
@@ -28,7 +28,7 @@ const (
 	requestPage page = iota
 	progressPage
 	outputPage
-	docsPage
+	infoPage
 )
 
 type UI struct {
@@ -60,10 +60,10 @@ func New(reqConfig *request.Config) (*UI, error) {
 			request.New(c, reqConfig),
 			progress.New(c),
 			outputTab,
-			docs.New(c),
+			info.New(c),
 		},
 		activePage:    requestPage,
-		tabs:          tabs.New(c, []string{"Request", "Backprocessing", "Output", "Docs"}),
+		tabs:          tabs.New(c, []string{"Request", "Backprocessing", "Output", "Info"}),
 		requestConfig: reqConfig,
 		replayLog:     replaylog.New(),
 	}

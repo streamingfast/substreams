@@ -1,4 +1,4 @@
-package docs
+package info
 
 import (
 	"fmt"
@@ -17,7 +17,7 @@ import (
 	"github.com/streamingfast/substreams/tui2/styles"
 )
 
-type Docs struct {
+type Info struct {
 	common.Common
 
 	docsView viewport.Model
@@ -29,8 +29,8 @@ type Docs struct {
 	params     map[string][]string
 }
 
-func New(c common.Common) *Docs {
-	page := &Docs{
+func New(c common.Common) *Info {
+	page := &Info{
 		Common:   c,
 		docsView: viewport.New(c.Width, c.Height),
 		params:   make(map[string][]string),
@@ -38,7 +38,7 @@ func New(c common.Common) *Docs {
 	return page
 }
 
-func (d *Docs) setNewRequest(reqSummary *request.Summary, modules *pbsubstreams.Modules, graph *manifest.ModuleGraph) {
+func (d *Info) setNewRequest(reqSummary *request.Summary, modules *pbsubstreams.Modules, graph *manifest.ModuleGraph) {
 	d.reqSummary = reqSummary
 	d.modules = modules
 	d.graph = graph
@@ -57,17 +57,17 @@ func (d *Docs) setNewRequest(reqSummary *request.Summary, modules *pbsubstreams.
 	d.setModulesViewContent()
 }
 
-func (d *Docs) Init() tea.Cmd {
+func (d *Info) Init() tea.Cmd {
 	return d.docsView.Init()
 }
 
-func (d *Docs) SetSize(w, h int) {
+func (d *Info) SetSize(w, h int) {
 	d.Common.SetSize(w, h)
 	d.docsView.Height = max(h-2 /* for borders */, 0)
 	d.docsView.Width = w
 }
 
-func (d *Docs) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (d *Info) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case string:
 		log.Println("message bob", msg)
@@ -79,16 +79,16 @@ func (d *Docs) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return d, cmd
 }
 
-func (d *Docs) View() string {
+func (d *Info) View() string {
 	return d.renderManifestView()
 }
 
-func (d *Docs) setModulesViewContent() {
+func (d *Info) setModulesViewContent() {
 	content, _ := d.getViewportContent()
 	d.docsView.SetContent(content)
 }
 
-func (d *Docs) renderManifestView() string {
+func (d *Info) renderManifestView() string {
 	return lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder(), true).
 		Width(d.Width - 2).
@@ -98,7 +98,7 @@ func (d *Docs) renderManifestView() string {
 		)
 }
 
-func (d *Docs) getViewportContent() (string, error) {
+func (d *Info) getViewportContent() (string, error) {
 	var lines []string
 
 	for idx, pkgMeta := range d.reqSummary.Docs {

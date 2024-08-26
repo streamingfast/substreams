@@ -1,4 +1,4 @@
-package docs
+package info
 
 import (
 	"github.com/charmbracelet/bubbles/key"
@@ -7,7 +7,7 @@ import (
 	"github.com/streamingfast/substreams/tui2/keymap"
 )
 
-func (d *Docs) ShortHelp() []key.Binding {
+func (d *Info) ShortHelp() []key.Binding {
 	return []key.Binding{
 		keymap.UpDown,
 		keymap.MainNavigation,
@@ -16,6 +16,6 @@ func (d *Docs) ShortHelp() []key.Binding {
 	}
 }
 
-func (d *Docs) FullHelp() [][]key.Binding {
+func (d *Info) FullHelp() [][]key.Binding {
 	return common.ShortToFullHelp(d)
 }

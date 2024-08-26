@@ -23,6 +23,7 @@ type Project struct {
 	protoTypeMapping map[string]*descriptorpb.DescriptorProto
 	ExampleEntity    *ExampleEntity
 	SpkgProjectName  string
+	ManifestPath     string
 }
 
 type ExampleEntity struct {
@@ -32,7 +33,7 @@ type ExampleEntity struct {
 	ID               string
 }
 
-func NewProject(name, spkgProjectName, network string, module *pbsubstreams.Module, outputDescriptor *descriptorpb.DescriptorProto, protoTypeMapping map[string]*descriptorpb.DescriptorProto) *Project {
+func NewProject(name, spkgProjectName, network, manifestPath string, module *pbsubstreams.Module, outputDescriptor *descriptorpb.DescriptorProto, protoTypeMapping map[string]*descriptorpb.DescriptorProto) *Project {
 	return &Project{
 		Network:          network,
 		Name:             name,
@@ -40,6 +41,7 @@ func NewProject(name, spkgProjectName, network string, module *pbsubstreams.Modu
 		OutputDescriptor: outputDescriptor,
 		protoTypeMapping: protoTypeMapping,
 		SpkgProjectName:  spkgProjectName,
+		ManifestPath:     manifestPath,
 	}
 }
 
@@ -83,12 +85,19 @@ func (p *Project) HasExampleEntity() bool {
 
 }
 
+func (p *Project) SQLImportVersion() string            { return "1.0.7" }
+func (p *Project) DatabaseChangeImportVersion() string { return "1.2.1" }
+
 func (p *Project) SubstreamsKebabName() string {
 	return strings.ReplaceAll(p.Name, "_", "-")
 }
 
 func (p *Project) GetModuleName() string {
 	return p.Module.Name
+}
+
+func (p *Project) SpkgNameWithoutExt() string {
+	return strings.TrimSuffix(p.SpkgProjectName, ".spkg")
 }
 
 func (p *Project) OutputName() string {
@@ -103,6 +112,10 @@ func (p *Project) ProtoOutputNameToSnake() string {
 	return textcase.SnakeCase("proto" + p.OutputDescriptor.GetName())
 }
 
+func (p *Project) SQLExtensionName() string {
+	return textcase.SnakeCase(p.Name + "_sql")
+}
+
 func (p *Project) GetOutputProtoPath() string {
 	return p.Module.Output.Type[strings.LastIndex(p.Module.Output.Type, ":")+1:]
 }
@@ -112,6 +125,10 @@ func (p *Project) GetOutputProtobufPath() string {
 	return protobufPath
 }
 
+func (p *Project) GetRustOutputProtobufPath() string {
+	return strings.ReplaceAll(p.GetOutputProtoPath(), ".", "::")
+}
+
 func (p *Project) ChainEndpoint() (string, error) {
 	if ChainConfigByID[p.Network] == nil {
 		return "", fmt.Errorf("network %q not found", p.Network)
@@ -119,7 +136,7 @@ func (p *Project) ChainEndpoint() (string, error) {
 	return ChainConfigByID[p.Network].FirehoseEndpoint, nil
 }
 
-func (p *Project) Render(outputType string, withDevEnv bool) (projectFiles map[string][]byte, err error) {
+func (p *Project) Render(outputType, flavor string, withDevEnv bool) (projectFiles map[string][]byte, err error) {
 	projectFiles = map[string][]byte{}
 
 	funcMap := template.FuncMap{
@@ -154,11 +171,23 @@ func (p *Project) Render(outputType string, withDevEnv bool) (projectFiles map[s
 		}
 	case outputTypeSQL:
 		templateFiles = map[string]string{
-			"sql/sql.yaml.gotmpl":   "sql.yaml",
-			"sql/schema.sql.gotmpl": "schema.sql",
-			"sql/src/lib.rs.gotmpl": "src/lib.rs",
-			"sql/README.md":         "README.md",
+			"sql/src/lib.rs.gotmpl":   "src/lib.rs",
+			"sql/Cargo.toml.gotmpl":   "Cargo.toml",
+			"sql/README.md":           "README.md",
+			"sql/rust-toolchain.toml": "rust-toolchain.toml",
 		}
+
+		switch flavor {
+		case "PostgresSQL":
+			templateFiles["sql/schema.sql.gotmpl"] = "schema.sql"
+			templateFiles["sql/substreams.sql.yaml.gotmpl"] = "substreams.yaml"
+		case "ClickHouse":
+			templateFiles["sql/schema.clickhouse.sql.gotmpl"] = "schema.sql"
+			templateFiles["sql/substreams.clickhouse.yaml.gotmpl"] = "substreams.yaml"
+		default:
+			panic("flavor not supported")
+		}
+
 		if withDevEnv {
 			panic("not implemented yet")
 			//templateFiles["sql/run-local.sh.gotmpl"] = "run-local.sh"

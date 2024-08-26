@@ -8,17 +8,21 @@ import (
 )
 
 var SQLCmd = &cobra.Command{
-	Use:   "subgraph <manifest_url> <module_name>",
-	Short: "Generate subgraph dev environment from substreams manifest",
-	Args:  cobra.ExactArgs(3),
+	Use:   "sql [<manifest_url>]",
+	Short: "Generate sql extension from substreams manifest",
+	Args:  cobra.RangeArgs(0, 1),
 	RunE:  generateSQLEnv,
 }
 
 func generateSQLEnv(cmd *cobra.Command, args []string) error {
-	manifestPath := args[0]
+	manifestPath := ""
+	if len(args) == 1 {
+		manifestPath = args[0]
+	}
+
 	withDevEnv := sflags.MustGetBool(cmd, "with-dev-env")
 
-	err := buildGenerateCommandFromArgs(manifestPath, outputTypeSubgraph, withDevEnv)
+	err := buildGenerateCommandFromArgs(manifestPath, outputTypeSQL, withDevEnv)
 	if err != nil {
 		return fmt.Errorf("building generate command: %w", err)
 	}

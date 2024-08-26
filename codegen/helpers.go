@@ -94,6 +94,21 @@ func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bo
 	moduleNames := []string{}
 	for _, module := range pkg.Modules.Modules {
 		if module.Output != nil {
+			if outputType == outputTypeSQL {
+				if module.Output.Type == "proto:sf.substreams.sink.database.v1.DatabaseChanges" {
+					fmt.Printf("Module %s has database changes as output type. That means you can directly sink data from it, to an SQL database, using `substreams-sink-sql` binary...\n\n", module.Name)
+					continueCmd, err := askContinueCmd()
+					if err != nil {
+						return fmt.Errorf("asking for continue command: %w", err)
+					}
+
+					if !continueCmd {
+						return nil
+					}
+					continue
+				}
+			}
+
 			moduleNames = append(moduleNames, module.Name)
 		}
 	}
@@ -108,9 +123,11 @@ func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bo
 		return fmt.Errorf("getting module: %w", err)
 	}
 
+	var flavor string
 	if outputType == outputTypeSQL {
-		if requestedModule.Output.Type != "proto:sf.substreams.sink.database.v1.DatabaseChanges" {
-			return fmt.Errorf("requested module shoud have proto:sf.substreams.sink.database.v1.DatabaseChanges as output type")
+		flavor, err = createSelectForm([]string{"PostgresSQL", "ClickHouse"}, "Please select a SQL flavor:")
+		if err != nil {
+			return fmt.Errorf("creating sql flavor form: %w", err)
 		}
 	}
 
@@ -152,27 +169,33 @@ func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bo
 		currentNetwork = selectedNetwork
 	}
 
-	project := NewProject(projectName, spkgProjectName, currentNetwork, requestedModule, messageDescriptor, protoTypeMapping)
+	project := NewProject(projectName, spkgProjectName, currentNetwork, manifestPath, requestedModule, messageDescriptor, protoTypeMapping)
 
 	// Create an example entity from the output descriptor
-	project.BuildExampleEntity()
+	err = project.BuildExampleEntity()
+	if err != nil {
+		return fmt.Errorf("building example entity: %w", err)
+	}
 
-	fmt.Println("Rendering project files for Substreams-powered-subgraph...")
-
-	projectFiles, err := project.Render(outputType, withDevEnv)
+	projectFiles, err := project.Render(outputType, flavor, withDevEnv)
 	if err != nil {
 		return fmt.Errorf("rendering project files: %w", err)
 	}
 
 	saveDir := "subgraph"
+
+	if outputType == outputTypeSQL {
+		saveDir = "sql"
+	}
+
 	if cwd, err := os.Getwd(); err == nil {
 		saveDir = filepath.Join(cwd, saveDir)
 	}
 
-	_, err = os.Stat("subgraph")
+	_, err = os.Stat(saveDir)
 	if !os.IsNotExist(err) {
-		fmt.Println("A subgraph directory is already existing...")
-		saveDir, err = createSaveDirForm("subgraph-2")
+		fmt.Printf("A %s directory is already existing...", saveDir)
+		saveDir, err = createSaveDirForm(fmt.Sprintf("%s-2", saveDir))
 		if err != nil {
 			return fmt.Errorf("creating save dir form: %w", err)
 		}
@@ -254,4 +277,20 @@ func createSelectForm(labels []string, title string) (string, error) {
 	}
 
 	return selection, nil
+}
+
+func askContinueCmd() (bool, error) {
+	var continueCmd bool
+	inputField := huh.NewConfirm().
+		Title(fmt.Sprintf("Do you still want to proceed?")).
+		Affirmative("Yes").
+		Negative("No").
+		Value(&continueCmd)
+
+	err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huh.ThemeCharm()).WithAccessible(false).Run()
+	if err != nil {
+		return false, fmt.Errorf("failed taking confirmation input: %w", err)
+	}
+
+	return continueCmd, nil
 }

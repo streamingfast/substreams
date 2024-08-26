@@ -1,1 +1,16 @@
+mod pb;
 
+use core::panic;
+use substreams_database_change::pb::database::DatabaseChanges;
+use substreams_database_change::tables::Tables as DatabaseChangeTables;
+use crate::pb::{{ .GetRustOutputProtobufPath }};
+
+#[substreams::handlers::map]
+fn db_out(input: {{ .OutputName }}) -> Result<DatabaseChanges, substreams::errors::Error> {
+    let mut tables = DatabaseChangeTables::new();
+    let mut i = 0;
+
+    substreams::skip_empty_output();
+
+    Ok(tables.to_database_changes())
+}

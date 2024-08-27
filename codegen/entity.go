@@ -1,6 +1,15 @@
 package codegen
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/golang-cz/textcase"
+)
+
+type EntityInfo struct {
+	HasAnID     bool
+	IDFieldName string
+}
 
 type EntityType interface {
 	ToEntityTypeOut() string
@@ -12,7 +21,16 @@ type SQLEntityType struct {
 }
 
 func (e *SQLEntityType) ToEntityTypeOut() string {
-	return "TODO"
+	switch e.Type {
+	case SqlDecimal, SqlText, SqlBytes, SqlInt, SqlBoolean:
+		return fmt.Sprintf("input.%s", textcase.SnakeCase(e.Name))
+	default:
+		panic("unsupported type")
+	}
+}
+
+func (e *SQLEntityType) ToSQLType() string {
+	return fmt.Sprintf(`"%s": %s,`, e.Name, e.Type)
 }
 
 type SubgraphEntityType struct {

@@ -1,9 +1,11 @@
-CREATE TABLE IF NOT EXISTS "events" (
-    "trx_hash" VARCHAR(64),
-    "evt_idx" VARCHAR(64),
-    "attr_idx" VARCHAR(64),
-    "type" VARCHAR(128),
-    "key" VARCHAR(128),
-    "value" TEXT,
-    PRIMARY KEY (trx_hash, evt_idx, attr_idx)
+CREATE TABLE IF NOT EXISTS "{{ .OutputName }}" (
+  {{- range $entity := $.EntityTypes }}
+  {{ $entity.ToSQLType }}
+  {{- end }}
+  {{- if .EntityInfo.HasAnID }}
+  PRIMARY KEY ({{ .EntityInfo.IDFieldName }})
+  {{- else }}
+  "id", VARCHAR(64),
+  PRIMARY KEY (id)
+  {{- end }}
 )

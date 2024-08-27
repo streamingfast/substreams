@@ -30,7 +30,17 @@ func (t SubgraphType) String() string {
 
 type SqlType string
 
+const (
+	SqlText    SqlType = "TEXT"
+	SqlBoolean SqlType = "BOOL"
+	SqlInt     SqlType = "Int"
+	SqlDecimal SqlType = "DECIMAL"
+	SqlVARCHAR SqlType = "VARCHAR(40)"
+	SqlBytes   SqlType = "BYTEA"
+)
+
 func (t SqlType) String() string {
+
 	return string(t)
 }
 
@@ -39,9 +49,6 @@ VARCHAR(40)
 BOOL
 TEXT
 INT
-DECIMAL
-INT
-DECIMAL
 DECIMAL
 */
 

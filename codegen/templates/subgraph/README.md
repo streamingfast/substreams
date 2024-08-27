@@ -1,4 +1,4 @@
-# Substreams-powered Subgraph for {{ .Name }}
+# Substreams-powered Subgraph 
 
 ## Modules
 

@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/golang-cz/textcase"
 
 	"github.com/charmbracelet/huh"
 	"github.com/streamingfast/substreams/manifest"
@@ -96,24 +99,26 @@ func buildGenerateCommandFromArgs(manifestPath string, outputType OutputType, wi
 
 	moduleNames := []string{}
 	for _, module := range pkg.Modules.Modules {
-		if module.Output != nil {
-			if outputType == Sql {
-				if module.Output.Type == "proto:sf.substreams.sink.database.v1.DatabaseChanges" {
-					fmt.Printf("Module %s has database changes as output type. That means you can directly sink data from it, to an SQL database, using `substreams-sink-sql` binary...\n\n", module.Name)
-					continueCmd, err := askContinueCmd()
-					if err != nil {
-						return fmt.Errorf("asking for continue command: %w", err)
-					}
-
-					if !continueCmd {
-						return nil
-					}
-					continue
-				}
-			}
-
-			moduleNames = append(moduleNames, module.Name)
+		if module.ModuleKind() == pbsubstreams.ModuleKindBlockIndex || module.ModuleKind() == pbsubstreams.ModuleKindStore || module.Output == nil {
+			continue
 		}
+
+		if outputType == Sql {
+			if module.Output.Type == "proto:sf.substreams.sink.database.v1.DatabaseChanges" {
+				fmt.Printf("Module %s has database changes as output type. That means you can directly sink data from it, to an SQL database, using `substreams-sink-sql` binary...\n\n", module.Name)
+				continueCmd, err := askContinueCmd()
+				if err != nil {
+					return fmt.Errorf("asking for continue command: %w", err)
+				}
+
+				if !continueCmd {
+					return nil
+				}
+				continue
+			}
+		}
+
+		moduleNames = append(moduleNames, module.Name)
 	}
 
 	selectedModule, err := createSelectForm(moduleNames, "Please select a mapper module to build the subgraph from:")
@@ -170,6 +175,10 @@ func buildGenerateCommandFromArgs(manifestPath string, outputType OutputType, wi
 		}
 
 		currentNetwork = selectedNetwork
+	}
+
+	if manifestPath == "" {
+		manifestPath = "../" + spkgProjectName
 	}
 
 	project := NewProject(projectName, spkgProjectName, currentNetwork, manifestPath, requestedModule, messageDescriptor, protoTypeMapping, outputType, flavor)
@@ -245,6 +254,14 @@ func saveProjectFiles(projectFiles map[string][]byte, saveDir string) error {
 			return fmt.Errorf("creating directory %s: %w", filepath.Dir(filePath), err)
 		}
 
+		if strings.HasSuffix(fileName, ".sh") {
+			err = os.WriteFile(filePath, fileContent, 0755)
+			if err != nil {
+				return fmt.Errorf("saving file %s: %w", filePath, err)
+			}
+			continue
+		}
+
 		err = os.WriteFile(filePath, fileContent, 0644)
 		if err != nil {
 			return fmt.Errorf("saving file %s: %w", filePath, err)
@@ -301,4 +318,16 @@ func askContinueCmd() (bool, error) {
 	}
 
 	return continueCmd, nil
+}
+
+func toProtoPascalCase(input string) string {
+	input = textcase.PascalCase(input)
+
+	reg := regexp.MustCompile(`(\d+)([a-zA-Z])`)
+
+	input = reg.ReplaceAllStringFunc(input, func(match string) string {
+		return match[:len(match)-1] + strings.ToUpper(string(match[len(match)-1]))
+	})
+
+	return input
 }

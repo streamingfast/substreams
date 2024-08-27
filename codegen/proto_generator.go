@@ -86,6 +86,8 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package, showBufContent
 		cmdArgs = append(cmdArgs, "--exclude-path", excludePath)
 	}
 
+	cmdArgs = append(cmdArgs, "--include-imports")
+
 	fmt.Printf("Running: buf %s\n", strings.Join(cmdArgs, " "))
 	c := exec.Command("buf", cmdArgs...)
 	c.Stdin = os.Stdin

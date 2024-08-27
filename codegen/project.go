@@ -8,9 +8,8 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/golang-cz/textcase"
-
 	"github.com/bmatcuk/doublestar/v4"
+	"github.com/golang-cz/textcase"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"google.golang.org/protobuf/types/descriptorpb"
 )
@@ -22,6 +21,7 @@ type Project struct {
 	OutputDescriptor *descriptorpb.DescriptorProto
 	protoTypeMapping map[string]*descriptorpb.DescriptorProto
 	EntityTypes      []EntityType
+	EntityInfo       EntityInfo
 	SpkgProjectName  string
 	ManifestPath     string
 	OutputType       OutputType
@@ -58,6 +58,7 @@ func NewProject(
 		Module:           module,
 		OutputDescriptor: outputDescriptor,
 		EntityTypes:      []EntityType{},
+		EntityInfo:       EntityInfo{},
 		protoTypeMapping: protoTypeMapping,
 		SpkgProjectName:  spkgProjectName,
 		ManifestPath:     manifestPath,
@@ -68,6 +69,11 @@ func NewProject(
 
 func (p *Project) BuildOutputEntity() error {
 	for _, field := range p.OutputDescriptor.Field {
+		if strings.ToLower(field.GetName()) == "id" {
+			p.EntityInfo.HasAnID = true
+			p.EntityInfo.IDFieldName = field.GetName()
+		}
+
 		name := textcase.CamelCase(field.GetName())
 		switch field.GetType() {
 		case descriptorpb.FieldDescriptorProto_TYPE_DOUBLE,
@@ -86,6 +92,10 @@ func (p *Project) BuildOutputEntity() error {
 				p.AddSubgraphEntityType(name, SubgraphBigInt)
 			}
 
+			if p.OutputType == Sql {
+				p.AddSQLEntityType(name, SqlInt)
+			}
+
 		case descriptorpb.FieldDescriptorProto_TYPE_INT32:
 			if p.OutputType == Subgraph {
 				p.AddSubgraphEntityType(name, SubgraphInt)
@@ -95,10 +105,16 @@ func (p *Project) BuildOutputEntity() error {
 			if p.OutputType == Subgraph {
 				p.AddSubgraphEntityType(name, SubgraphBoolean)
 			}
+			if p.OutputType == Sql {
+				p.AddSQLEntityType(name, SqlBoolean)
+			}
 
 		case descriptorpb.FieldDescriptorProto_TYPE_STRING:
 			if p.OutputType == Subgraph {
 				p.AddSubgraphEntityType(name, SubgraphString)
+			}
+			if p.OutputType == Sql {
+				p.AddSQLEntityType(name, SqlText)
 			}
 
 		case descriptorpb.FieldDescriptorProto_TYPE_MESSAGE,
@@ -113,7 +129,9 @@ func (p *Project) BuildOutputEntity() error {
 			if p.OutputType == Subgraph {
 				p.AddSubgraphEntityType(name, SubgraphBytes)
 			}
-
+			if p.OutputType == Sql {
+				p.AddSQLEntityType(name, SqlText)
+			}
 		}
 
 		// if field.GetType() == descriptorpb.FieldDescriptorProto_TYPE_MESSAGE {
@@ -194,7 +212,11 @@ func (p *Project) GetOutputProtobufPath() string {
 }
 
 func (p *Project) GetRustOutputProtobufPath() string {
-	return strings.ReplaceAll(p.GetOutputProtoPath(), ".", "::")
+	splitPath := strings.Split(p.GetOutputProtoPath(), ".")
+
+	splitPath[len(splitPath)-1] = toProtoPascalCase(splitPath[len(splitPath)-1])
+
+	return strings.Join(splitPath, "::")
 }
 
 func (p *Project) ChainEndpoint() (string, error) {
@@ -210,9 +232,10 @@ func (p *Project) Render(withDevEnv bool) (projectFiles map[string][]byte, err e
 	projectFiles = map[string][]byte{}
 
 	funcMap := template.FuncMap{
-		"toLower":     strings.ToLower,
-		"toCamelCase": textcase.CamelCase,
-		"toKebabCase": textcase.KebabCase,
+		"toLower":      strings.ToLower,
+		"toCamelCase":  textcase.CamelCase,
+		"toKebabCase":  textcase.KebabCase,
+		"toPascalCase": toProtoPascalCase,
 	}
 
 	tpls, err := ParseFS(funcMap, templatesFS, "**/*.gotmpl")

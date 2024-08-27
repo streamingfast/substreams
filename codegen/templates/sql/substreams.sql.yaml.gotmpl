@@ -7,7 +7,10 @@ package:
 
 protobuf:
   excludePaths:
-    - sf/substreams
+    - sf/substreams/sink
+    - sf/substreams/v1
+    - sf/substreams/index
+    - sf/substreams/intern
     - google
 
 network: {{ .Network }}
@@ -25,7 +28,7 @@ modules:
   - name: db_out
     kind: map
     inputs:
-      - source: {{ .Name }}:{{ .Module.Output.Type }}
+      - map: {{ .Name }}:{{ .Module.Name }}
     output:
       type: proto:sf.substreams.sink.database.v1.DatabaseChanges
 

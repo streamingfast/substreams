@@ -94,7 +94,7 @@ var HardcodedEndpoints = map[string]string{
 	"mumbai":            "mumbai.streamingfast.io:443",
 	"bnb":               "bnb.streamingfast.io:443",
 	"bsc":               "bnb.streamingfast.io:443",
-	"base": 			 "base-mainnet.streamingfast.io:443",
+	"base":              "base-mainnet.streamingfast.io:443",
 	"sepolia":           "sepolia.eth.streamingfast.io:443",
 	"holesky":           "holesky.eth.streamingfast.io:443",
 	"near":              "mainnet.near.streamingfast.io:443",

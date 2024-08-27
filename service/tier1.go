@@ -202,6 +202,8 @@ func (s *Tier1Service) Blocks(
 	ctx = reqctx.WithTracer(ctx, s.tracer)
 	ctx = dmetering.WithBytesMeter(ctx)
 	ctx = dmetering.WithCounter(ctx, "wasm_input_bytes")
+	ctx = dmetering.WithCounter(ctx, "live_bytes_uncompressed")
+	ctx = dmetering.WithCounter(ctx, "stored_bytes_uncompressed")
 	ctx = reqctx.WithTier2RequestParameters(ctx, s.tier2RequestParameters)
 
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier1/request")
@@ -568,9 +570,26 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		streamHandler = pipe
 	}
 
+	// We need to meter the bytes read from the live stream, as they are not metered by the dstore meters
+	blockMeteredHandlerFunc := bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
+		step := obj.(bstream.Stepable).Step()
+		switch step {
+		case bstream.StepNewIrreversible:
+			// already metered by the store in compressed bytes.
+			// we will meter them here for potential future use
+			dmetering.GetBytesMeter(ctx).CountInc("uncompressed_read_bytes", len(blk.Payload.GetValue()))
+		default:
+			// all other cases are live blocks to be metered
+			dmetering.GetBytesMeter(ctx).AddBytesRead(len(blk.Payload.GetValue()))
+			dmetering.GetBytesMeter(ctx).CountInc("uncompressed_live_read_bytes", len(blk.Payload.GetValue()))
+		}
+
+		return streamHandler.ProcessBlock(blk, obj)
+	})
+
 	blockStream, err := s.streamFactoryFunc(
 		ctx,
-		streamHandler,
+		blockMeteredHandlerFunc,
 		int64(requestDetails.LinearHandoffBlockNum),
 		request.StopBlockNum,
 		cursor,

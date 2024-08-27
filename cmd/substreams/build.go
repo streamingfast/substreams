@@ -39,11 +39,16 @@ func init() {
 func runBuildE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
+	var manifestPath string
+	if len(args) > 1 && args[1] != "" {
+		manifestPath = args[1]
+	} else {
+		manifestPath = sflags.MustGetString(cmd, "manifest")
+	}
 	// Parse substreams.yaml
-	manifestPath := sflags.MustGetString(cmd, "manifest")
 	if manifestPath == "" {
 		var err error
-		manifestPath, err = findManifest()
+		manifestPath, err = findManifest(manifestPath)
 		if err != nil {
 			return fmt.Errorf("error finding manifest: %w", err)
 		}
@@ -318,17 +323,13 @@ func (s *SPKGPacker) Build(ctx context.Context) error {
 
 // findManifest searches for the substreams.yaml file starting from the current directory
 // and moving up to the parent directories until it finds the file or reaches the user's $HOME directory.
-func findManifest() (string, error) {
+func findManifest(originalPath string) (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("error getting user home directory: %w", err)
 	}
 
-	originalDir, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("error getting current directory: %w", err)
-	}
-
+	originalDir := filepath.Dir(originalPath)
 	currentDir := originalDir
 	for {
 		manifestPath := filepath.Join(currentDir, "substreams.yaml")

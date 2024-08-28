@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Revert 'initialBlocks' changes from v1.9.1 because a 'changing module hash' causes more trouble.
 * Wazero: bump v1.8.0 and activate caching of precompiled wasm modules in `/tmp/wazero` to decrease compilation time
 * Metering update: more detailed metering with addition of new metrics (`live_uncompressed_read_bytes`, `live_uncompressed_read_forked_bytes`, `file_uncompressed_read_bytes`, `file_uncompressed_read_forked_bytes`, `file_compressed_read_forked_bytes`, `file_compressed_read_bytes`, `file_uncompressed_write_bytes`, `file_compressed_write_bytes`).  *DEPRECATION WARNING*: `bytes_read` and `bytes_written` metrics will be removed in the future, please use the new metrics for metering instead.
+* Manifest reader: increase timeout of remote spkg fetch to 5 minutes, up from 30 seconds
 
 ### Client
 * Add `substreams auth` command, to authenticate via `thegraph.market` and to get a dev API Key.

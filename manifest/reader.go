@@ -28,10 +28,12 @@ import (
 	yaml3 "gopkg.in/yaml.v3"
 )
 
+var remoteFetchTimeout = 5 * time.Minute
+
 var IPFSURL string
 var IPFSTimeout time.Duration
 var httpClient = &http.Client{
-	Timeout: 30 * time.Second,
+	Timeout: remoteFetchTimeout,
 }
 
 func hasRemotePrefix(in string) bool {
@@ -235,7 +237,7 @@ func (r *Reader) readFromHttp(input string) error {
 }
 
 func (r *Reader) readFromStore(input string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), remoteFetchTimeout)
 	defer cancel()
 
 	store, filename, err := dstore.NewStoreFromFileURL(input)

@@ -256,7 +256,6 @@ func (p *Project) Render(withDevEnv bool) (projectFiles map[string][]byte, err e
 		}
 
 		if withDevEnv {
-			templateFiles["triggers/run-local.sh.gotmpl"] = "run-local.sh"
 			templateFiles["subgraph/run-local.sh.gotmpl"] = "run-local.sh"
 			templateFiles["subgraph/dev-environment/docker-compose.yml"] = "dev-environment/docker-compose.yml"
 			templateFiles["subgraph/dev-environment/start.sh"] = "dev-environment/start.sh"

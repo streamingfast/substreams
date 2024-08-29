@@ -28,7 +28,6 @@ import (
 	"github.com/streamingfast/cli/sflags"
 	pbconvo "github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1"
 	"github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1/pbconvoconnect"
-	"github.com/tidwall/gjson"
 	"golang.org/x/net/http2"
 )
 
@@ -64,14 +63,6 @@ var WITH_ACCESSIBLE = false
 type initStateFormat struct {
 	GeneratorID string          `json:"generator"`
 	State       json.RawMessage `json:"state"`
-}
-
-type UserState struct {
-	downloadedFilesfolderPath string
-}
-
-func newUserState() *UserState {
-	return &UserState{}
 }
 
 func readGeneratorState(stateFile string) (*initStateFormat, error) {
@@ -249,8 +240,6 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed sending start message: %w", err)
 	}
-
-	userState := newUserState()
 
 	var loadingCh chan bool
 	for {
@@ -463,43 +452,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			}
 
 		case *pbconvo.SystemOutput_DownloadFiles_:
-			if userState.downloadedFilesfolderPath == "" {
-				savingDest := "output"
-				if projectName := gjson.GetBytes(lastState.State, "name").String(); projectName != "" {
-					savingDest = projectName
-				}
-
-				if cwd, err := os.Getwd(); err == nil {
-					savingDest = filepath.Join(cwd, savingDest)
-				}
-
-				inputField := huh.NewInput().Title("In which directory do you want to download the project?").Value(&savingDest)
-				inputField.Validate(func(userInput string) error {
-					fmt.Println("Checking directory", userInput)
-					fileInfo, err := os.Stat(userInput)
-					if err != nil {
-						if os.IsNotExist(err) {
-							return nil
-						}
-						return fmt.Errorf("error checking directory: %w", err)
-					}
-
-					if !fileInfo.IsDir() {
-						return errors.New("the path is not a directory")
-					}
-
-					return nil
-				})
-
-				err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run()
-				if err != nil {
-					return fmt.Errorf("failed taking input: %w", err)
-				}
-
-				// the multiple \n are not a mistake, it's to have a blank line before the next message
-				fmt.Printf("\nProject will be saved in %s\n\n", savingDest)
-				userState.downloadedFilesfolderPath = savingDest
-			}
+			savingDest, _ := os.Getwd()
 
 			input := msg.DownloadFiles
 			fmt.Println(filenameStyle("Files:"))
@@ -529,7 +482,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 						continue
 					}
 
-					zipRoot := userState.downloadedFilesfolderPath
+					zipRoot := savingDest
 
 					zipContent := inputFile.Content
 					err = unzipFile(overwriteForm, zipContent, zipRoot)
@@ -545,7 +498,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 						continue
 					}
 
-					fullPath := filepath.Join(userState.downloadedFilesfolderPath, inputFile.Filename)
+					fullPath := filepath.Join(savingDest, inputFile.Filename)
 					err = saveDownloadFile(fullPath, overwriteForm, inputFile)
 					if err != nil {
 						return fmt.Errorf("saving file: %w", err)

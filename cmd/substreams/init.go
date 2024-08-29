@@ -529,6 +529,33 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 }
 
 func saveDownloadFile(path string, overwriteForm *OverwriteForm, inputFile *pbconvo.SystemOutput_DownloadFile) (err error) {
+	if inputFile.Filename == ".gitignore" {
+		fmt.Println("TEST")
+		if _, err := os.Stat(path); err == nil {
+			// Add .gitignore current inputFile content to the existing .gitignore file
+			existingContent, err := os.ReadFile(path)
+			if err != nil {
+				return fmt.Errorf("reading existing .gitignore file: %w", err)
+			}
+
+			mergedContent := append(existingContent, inputFile.Content...)
+
+			err = os.WriteFile(path, mergedContent, 0644)
+			if err != nil {
+				return fmt.Errorf("saving merged .gitignore file %q: %w", inputFile.Filename, err)
+			}
+
+			return nil
+		}
+
+		err = os.WriteFile(path, inputFile.Content, 0644)
+		if err != nil {
+			return fmt.Errorf("saving zip file %q: %w", inputFile.Filename, err)
+		}
+
+		return nil
+	}
+
 	dir := filepath.Dir(path)
 	err = os.MkdirAll(dir, 0755)
 	if err != nil {

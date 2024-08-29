@@ -253,6 +253,7 @@ func (p *Project) Render(withDevEnv bool) (projectFiles map[string][]byte, err e
 			"subgraph/subgraph.yaml.gotmpl":   "subgraph.yaml",
 			"subgraph/schema.graphql.gotmpl":  "schema.graphql",
 			"subgraph/src/mappings.ts.gotmpl": "src/mappings.ts",
+			"subgraph/README.md":              "README.md",
 		}
 
 		if withDevEnv {

@@ -99,6 +99,10 @@ func buildGenerateCommandFromArgs(manifestPath string, outputType OutputType, wi
 
 	moduleNames := []string{}
 	for _, module := range pkg.Modules.Modules {
+		if strings.Contains(module.Name, ":") {
+			continue
+		}
+
 		if module.ModuleKind() == pbsubstreams.ModuleKindBlockIndex || module.ModuleKind() == pbsubstreams.ModuleKindStore || module.Output == nil {
 			continue
 		}

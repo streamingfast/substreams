@@ -456,26 +456,24 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 
 			input := msg.DownloadFiles
 			fmt.Println(filenameStyle("Files:"))
-			for _, file := range input.Files {
-				if file.Content == nil {
-					continue
-				}
-
-				fmt.Printf("  %s %s\n", filenameStyle("-"), filenameStyle(file.Filename))
-				if file.Description != "" {
-					fmt.Printf("\t%s\n\n", file.Description)
-				}
-			}
-			// let the terminal breath a little
-			fmt.Println()
-
 			if len(input.Files) == 0 {
 				return fmt.Errorf("no files to download")
 			}
 
+			// let the terminal breath a little
+			// fmt.Println()
+
 			overwriteForm := NewOverwriteForm()
 
 			for _, inputFile := range input.Files {
+				if inputFile.Content == nil {
+					continue
+				}
+
+				fmt.Printf("  %s %s\n", filenameStyle("-"), filenameStyle(inputFile.Filename))
+				if inputFile.Description != "" {
+					fmt.Printf("\t%s\n", inputFile.Description)
+				}
 				switch inputFile.Type {
 				case "application/x-zip+extract": // our custom mime type to always extract the file upon arrival
 					if inputFile.Content == nil {
@@ -505,6 +503,8 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					}
 
 				}
+
+				fmt.Println()
 			}
 
 			if err := sendFunc(&pbconvo.UserInput{
@@ -530,7 +530,6 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 
 func saveDownloadFile(path string, overwriteForm *OverwriteForm, inputFile *pbconvo.SystemOutput_DownloadFile) (err error) {
 	if inputFile.Filename == ".gitignore" {
-		fmt.Println("TEST")
 		if _, err := os.Stat(path); err == nil {
 			// Add .gitignore current inputFile content to the existing .gitignore file
 			existingContent, err := os.ReadFile(path)
@@ -538,9 +537,32 @@ func saveDownloadFile(path string, overwriteForm *OverwriteForm, inputFile *pbco
 				return fmt.Errorf("reading existing .gitignore file: %w", err)
 			}
 
-			mergedContent := append(existingContent, inputFile.Content...)
+			// append the new .gitignore content, deduping entries
+			existingValues := make(map[string]struct{})
+			for _, line := range strings.Split(string(existingContent), "\n") {
+				existingValues[line] = struct{}{}
+			}
 
-			err = os.WriteFile(path, mergedContent, 0644)
+			var appendValues []string
+			for _, line := range strings.Split(string(inputFile.Content), "\n") {
+				if _, ok := existingValues[line]; !ok {
+					appendValues = append(appendValues, line)
+				}
+			}
+			appendBytes := []byte(strings.Join(appendValues, "\n"))
+
+			var out []byte
+			if appendValues != nil {
+				fmt.Println("\t-- content appended to existing .gitignore\n")
+				out = append(existingContent, []byte("\n# Added by substreams init")...)
+				out = append(out, appendBytes...)
+				out = append(out, []byte("\n")...)
+			} else {
+				fmt.Println("\t-- skipped as it contained no new .gitignore entries\n")
+				out = existingContent
+			}
+
+			err = os.WriteFile(path, out, 0644)
 			if err != nil {
 				return fmt.Errorf("saving merged .gitignore file %q: %w", inputFile.Filename, err)
 			}
@@ -563,19 +585,31 @@ func saveDownloadFile(path string, overwriteForm *OverwriteForm, inputFile *pbco
 	}
 
 	if !overwriteForm.OverwriteAll {
-		if _, err := os.Stat(path); err == nil {
-			err = overwriteForm.createOverwriteForm(path)
-			if err != nil {
-				return fmt.Errorf(": %w", err)
-			}
+		if stat, err := os.Lstat(path); err == nil {
+			if stat.Mode().Type() == os.ModeSymlink && inputFile.Filename == "README.md" { // we always overwrite a 'symlink README.md' to match our canonical dev flow
+				target, err := os.Readlink(path)
+				if err != nil {
+					return fmt.Errorf("reading existing symlink %s: %w", path, err)
+				}
 
-			if !overwriteForm.Overwrite {
-				fmt.Println("Skipping", path)
-				return nil
+				lipgloss.NewStyle().Italic(true)
+				fmt.Printf("\t-- previous symlink (README.md -> %s) automatically replaced\n", target)
+			} else {
+				err = overwriteForm.createOverwriteForm(path)
+				if err != nil {
+					return fmt.Errorf(": %w", err)
+				}
+
+				if !overwriteForm.Overwrite {
+					fmt.Println("Skipping", path)
+					return nil
+				}
 			}
 		}
 	}
-
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("attempting to delete existing file %s: %w", path, err)
+	}
 	err = os.WriteFile(path, inputFile.Content, 0644)
 	if err != nil {
 		return fmt.Errorf("saving zip file %q: %w", inputFile.Filename, err)
@@ -647,9 +681,9 @@ func unzipFile(overwriteForm *OverwriteForm, zipContent []byte, zipRoot string) 
 		}
 
 		if err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
-			return (err)
+			return err
 		}
-		destFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+		destFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, f.Mode())
 		if err != nil {
 			return err
 		}

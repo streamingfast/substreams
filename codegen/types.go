@@ -13,7 +13,7 @@ func (t OutputType) String() string {
 
 type SubgraphType string
 
-const (
+var (
 	SubgraphBytes      SubgraphType = "Bytes"
 	SubgraphString     SubgraphType = "String"
 	SubgraphBoolean    SubgraphType = "Boolean"
@@ -28,21 +28,22 @@ func (t SubgraphType) String() string {
 	return string(t)
 }
 
-type SqlType string
+type SQLType string
 
-const (
-	SqlText    SqlType = "TEXT"
-	SqlBoolean SqlType = "BOOL"
-	SqlInt     SqlType = "Int"
-	SqlDecimal SqlType = "DECIMAL"
-	SqlVARCHAR SqlType = "VARCHAR(40)"
-	SqlBytes   SqlType = "BYTEA"
+var (
+	PostgresSqlText    SQLType = "TEXT"
+	PostgresSqlBoolean SQLType = "BOOL"
+	PostgresSqlInt     SQLType = "Int"
+	PostgresSqlDecimal SQLType = "DECIMAL"
+	PostgresSqlBytes   SQLType = "BYTEA"
+	ClickhouseString   SQLType = "String"
+	ClickhouseBoolean  SQLType = "Bool"
+	ClickhouseUInt32   SQLType = "UInt32"
+	ClickhouseInt32    SQLType = "Int32"
+	ClickhouseUInt64   SQLType = "UInt64"
+	ClickhouseInt64    SQLType = "Int64"
+	ClickhouseDecimal  SQLType = "Decimal64(%d)"
 )
-
-func (t SqlType) String() string {
-
-	return string(t)
-}
 
 /*
 VARCHAR(40)
@@ -51,8 +52,6 @@ TEXT
 INT
 DECIMAL
 */
-
-type ClickhouseType int
 
 /*
 VARCHAR(40)

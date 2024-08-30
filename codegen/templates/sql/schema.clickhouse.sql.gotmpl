@@ -1,8 +1,13 @@
 CREATE TABLE IF NOT EXISTS events (
-    "trx_hash" VARCHAR(64),
-    "evt_idx" VARCHAR(64),
-    "attr_idx" VARCHAR(64),
-    "type" VARCHAR(128),
-    "key" VARCHAR(128),
-    "value" TEXT,
-) ENGINE = MergeTree PRIMARY KEY ("trx_hash","evt_idx", "attr_idx");
+    {{- range $entity := $.EntityTypes }}
+    {{ $entity.ToSQLType }}
+    {{- end }}
+    {{- if not .EntityInfo.HasAnID }}
+    "id", VARCHAR(64),
+    {{- end }}
+)
+{{- if .EntityInfo.HasAnID }}
+ENGINE = MergeTree PRIMARY KEY ({{ .EntityInfo.IDFieldName }})
+{{- else }}
+ENGINE = MergeTree PRIMARY KEY (id)
+{{- end }}

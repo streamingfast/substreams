@@ -28,18 +28,202 @@ type Project struct {
 	Flavor           string
 }
 
-func (p *Project) AddSubgraphEntityType(name string, ttype SubgraphType) {
-	p.EntityTypes = append(p.EntityTypes, &SubgraphEntityType{
-		Name: name,
-		Type: ttype,
-	})
+func (p *Project) AddSubgraphEntityType(name string, field *descriptorpb.FieldDescriptorProto) {
+	subgraphtype := func() *SubgraphType {
+		switch field.GetType() {
+		case
+			descriptorpb.FieldDescriptorProto_TYPE_UINT64,
+			descriptorpb.FieldDescriptorProto_TYPE_FIXED64,
+			descriptorpb.FieldDescriptorProto_TYPE_FIXED32,
+			descriptorpb.FieldDescriptorProto_TYPE_UINT32,
+			descriptorpb.FieldDescriptorProto_TYPE_SFIXED32,
+			descriptorpb.FieldDescriptorProto_TYPE_SINT32,
+			descriptorpb.FieldDescriptorProto_TYPE_SINT64,
+			descriptorpb.FieldDescriptorProto_TYPE_INT64,
+			descriptorpb.FieldDescriptorProto_TYPE_SFIXED64:
+			return &SubgraphBigInt
+		case descriptorpb.FieldDescriptorProto_TYPE_FLOAT, descriptorpb.FieldDescriptorProto_TYPE_DOUBLE:
+			return &SubgraphBigDecimal
+		case descriptorpb.FieldDescriptorProto_TYPE_INT32:
+			return &SubgraphInt
+		case descriptorpb.FieldDescriptorProto_TYPE_BOOL:
+			return &SubgraphBoolean
+		case descriptorpb.FieldDescriptorProto_TYPE_STRING:
+			return &SubgraphString
+		case descriptorpb.FieldDescriptorProto_TYPE_MESSAGE,
+			descriptorpb.FieldDescriptorProto_TYPE_GROUP,
+			descriptorpb.FieldDescriptorProto_TYPE_ENUM:
+			// Let's not support the nested message and groups for now as it is more complex
+			// and would probably require foreign tables / subgraph entities to work
+			// not even sure this works as of today
+			fmt.Printf("skipping message, group and enum - not supported for the moment ")
+			return nil
+		case descriptorpb.FieldDescriptorProto_TYPE_BYTES:
+			return &SubgraphBytes
+		// if field.GetType() == descriptorpb.FieldDescriptorProto_TYPE_MESSAGE {
+		// 	if *field.Label == descriptorpb.FieldDescriptorProto_LABEL_REPEATED {
+		//		splitMessagePath := strings.Split(typeName, ".")
+		//		name splitMessagePath[len(splitMessagePath)-1]
+
+		// 		p.Entities = append(p.Entities, &Entity{
+		// 			// NameAsProtoField: textcase.CamelCase(field.GetName()),
+		// 			// NameAsEntity:     "My" + name,
+		// 			Name:             name,
+		// 		})
+
+		// 		if p.protoTypeMapping[*field.TypeName] == nil {
+		// 			return fmt.Errorf("nested message type: %q not found", *field.TypeName)
+		// 		}
+
+		// 		for _, nestedMessageField := range p.protoTypeMapping[*field.TypeName].Field {
+		// 			switch *nestedMessageField.Type {
+		// 			case descriptorpb.FieldDescriptorProto_TYPE_STRING, descriptorpb.FieldDescriptorProto_TYPE_INT64, descriptorpb.FieldDescriptorProto_TYPE_UINT64, descriptorpb.FieldDescriptorProto_TYPE_UINT32, descriptorpb.FieldDescriptorProto_TYPE_BYTES:
+		// 				p.Entity.ID = textcase.CamelCase(nestedMessageField.GetName())
+		// 			default:
+		// 				continue
+		// 			}
+		// 		}
+		// 	}
+		// }
+		default:
+			panic("field type not supported")
+		}
+	}()
+
+	if subgraphtype != nil {
+		p.EntityTypes = append(p.EntityTypes, &SubgraphEntityType{name, *subgraphtype})
+	}
 }
 
-func (p *Project) AddSQLEntityType(name string, ttype SqlType) {
-	p.EntityTypes = append(p.EntityTypes, &SQLEntityType{
-		Name: name,
-		Type: ttype,
-	})
+func (p *Project) AddPostgreSQL(name string, field *descriptorpb.FieldDescriptorProto) {
+	postgreSqltype := func() *SQLType {
+		switch field.GetType() {
+		case
+			descriptorpb.FieldDescriptorProto_TYPE_UINT64,
+			descriptorpb.FieldDescriptorProto_TYPE_FIXED64,
+			descriptorpb.FieldDescriptorProto_TYPE_FIXED32,
+			descriptorpb.FieldDescriptorProto_TYPE_UINT32,
+			descriptorpb.FieldDescriptorProto_TYPE_SFIXED32,
+			descriptorpb.FieldDescriptorProto_TYPE_SINT32,
+			descriptorpb.FieldDescriptorProto_TYPE_SINT64,
+			descriptorpb.FieldDescriptorProto_TYPE_INT64,
+			descriptorpb.FieldDescriptorProto_TYPE_SFIXED64,
+			descriptorpb.FieldDescriptorProto_TYPE_INT32:
+			return &PostgresSqlInt
+		case descriptorpb.FieldDescriptorProto_TYPE_FLOAT, descriptorpb.FieldDescriptorProto_TYPE_DOUBLE:
+			return &PostgresSqlDecimal
+		case descriptorpb.FieldDescriptorProto_TYPE_BOOL:
+			return &PostgresSqlBoolean
+		case descriptorpb.FieldDescriptorProto_TYPE_STRING:
+			return &PostgresSqlText
+		case descriptorpb.FieldDescriptorProto_TYPE_MESSAGE,
+			descriptorpb.FieldDescriptorProto_TYPE_GROUP,
+			descriptorpb.FieldDescriptorProto_TYPE_ENUM:
+			// Let's not support the nested message and groups for now as it is more complex
+			// and would probably require foreign tables / subgraph entities to work
+			// not even sure this works as of today
+			fmt.Printf("skipping message, group and enum - not supported for the moment ")
+			return nil
+		case descriptorpb.FieldDescriptorProto_TYPE_BYTES:
+			return &PostgresSqlBytes
+		// if field.GetType() == descriptorpb.FieldDescriptorProto_TYPE_MESSAGE {
+		// 	if *field.Label == descriptorpb.FieldDescriptorProto_LABEL_REPEATED {
+		//		splitMessagePath := strings.Split(typeName, ".")
+		//		name splitMessagePath[len(splitMessagePath)-1]
+
+		// 		p.Entities = append(p.Entities, &Entity{
+		// 			// NameAsProtoField: textcase.CamelCase(field.GetName()),
+		// 			// NameAsEntity:     "My" + name,
+		// 			Name:             name,
+		// 		})
+
+		// 		if p.protoTypeMapping[*field.TypeName] == nil {
+		// 			return fmt.Errorf("nested message type: %q not found", *field.TypeName)
+		// 		}
+
+		// 		for _, nestedMessageField := range p.protoTypeMapping[*field.TypeName].Field {
+		// 			switch *nestedMessageField.Type {
+		// 			case descriptorpb.FieldDescriptorProto_TYPE_STRING, descriptorpb.FieldDescriptorProto_TYPE_INT64, descriptorpb.FieldDescriptorProto_TYPE_UINT64, descriptorpb.FieldDescriptorProto_TYPE_UINT32, descriptorpb.FieldDescriptorProto_TYPE_BYTES:
+		// 				p.Entity.ID = textcase.CamelCase(nestedMessageField.GetName())
+		// 			default:
+		// 				continue
+		// 			}
+		// 		}
+		// 	}
+		// }
+		default:
+			fmt.Printf("unsupported type %s", field.GetType())
+			return nil
+		}
+	}()
+
+	if postgreSqltype != nil {
+		p.EntityTypes = append(p.EntityTypes, &SQLEntityType{name, *postgreSqltype})
+	}
+}
+
+func (p *Project) AddClickHouseSQLType(name string, field *descriptorpb.FieldDescriptorProto) {
+	clickhouseSqlType := func() *SQLType {
+		switch field.GetType() {
+		case descriptorpb.FieldDescriptorProto_TYPE_BOOL:
+			return &ClickhouseBoolean
+		case descriptorpb.FieldDescriptorProto_TYPE_STRING:
+			return &ClickhouseString
+		case descriptorpb.FieldDescriptorProto_TYPE_BYTES:
+			return &ClickhouseString
+		case descriptorpb.FieldDescriptorProto_TYPE_FLOAT, descriptorpb.FieldDescriptorProto_TYPE_DOUBLE:
+			return &ClickhouseDecimal
+		case descriptorpb.FieldDescriptorProto_TYPE_UINT32:
+			return &ClickhouseUInt32
+		case descriptorpb.FieldDescriptorProto_TYPE_SFIXED32, descriptorpb.FieldDescriptorProto_TYPE_INT32, descriptorpb.FieldDescriptorProto_TYPE_SINT32, descriptorpb.FieldDescriptorProto_TYPE_FIXED32:
+			return &ClickhouseInt32
+		case descriptorpb.FieldDescriptorProto_TYPE_UINT64:
+			return &ClickhouseUInt64
+		case descriptorpb.FieldDescriptorProto_TYPE_SFIXED64, descriptorpb.FieldDescriptorProto_TYPE_FIXED64, descriptorpb.FieldDescriptorProto_TYPE_INT64, descriptorpb.FieldDescriptorProto_TYPE_SINT64:
+			return &ClickhouseInt64
+
+		case descriptorpb.FieldDescriptorProto_TYPE_MESSAGE,
+			descriptorpb.FieldDescriptorProto_TYPE_GROUP,
+			descriptorpb.FieldDescriptorProto_TYPE_ENUM:
+			// Let's not support the nested message and groups for now as it is more complex
+			// and would probably require foreign tables / subgraph entities to work
+			// not even sure this works as of today
+			fmt.Printf("skipping message, group and enum - not supported for the moment ")
+			return nil
+		// if field.GetType() == descriptorpb.FieldDescriptorProto_TYPE_MESSAGE {
+		// 	if *field.Label == descriptorpb.FieldDescriptorProto_LABEL_REPEATED {
+		//		splitMessagePath := strings.Split(typeName, ".")
+		//		name splitMessagePath[len(splitMessagePath)-1]
+
+		// 		p.Entities = append(p.Entities, &Entity{
+		// 			// NameAsProtoField: textcase.CamelCase(field.GetName()),
+		// 			// NameAsEntity:     "My" + name,
+		// 			Name:             name,
+		// 		})
+
+		// 		if p.protoTypeMapping[*field.TypeName] == nil {
+		// 			return fmt.Errorf("nested message type: %q not found", *field.TypeName)
+		// 		}
+
+		// 		for _, nestedMessageField := range p.protoTypeMapping[*field.TypeName].Field {
+		// 			switch *nestedMessageField.Type {
+		// 			case descriptorpb.FieldDescriptorProto_TYPE_STRING, descriptorpb.FieldDescriptorProto_TYPE_INT64, descriptorpb.FieldDescriptorProto_TYPE_UINT64, descriptorpb.FieldDescriptorProto_TYPE_UINT32, descriptorpb.FieldDescriptorProto_TYPE_BYTES:
+		// 				p.Entity.ID = textcase.CamelCase(nestedMessageField.GetName())
+		// 			default:
+		// 				continue
+		// 			}
+		// 		}
+		// 	}
+		// }
+		default:
+			fmt.Printf("unsupported type %s", field.GetType())
+			return nil
+		}
+	}()
+
+	if clickhouseSqlType != nil {
+		p.EntityTypes = append(p.EntityTypes, &SQLEntityType{name, *clickhouseSqlType})
+	}
 }
 
 func NewProject(
@@ -74,91 +258,16 @@ func (p *Project) BuildOutputEntity() error {
 			p.EntityInfo.IDFieldName = field.GetName()
 		}
 
-		name := textcase.CamelCase(field.GetName())
-		switch field.GetType() {
-		case descriptorpb.FieldDescriptorProto_TYPE_DOUBLE,
-			descriptorpb.FieldDescriptorProto_TYPE_FLOAT,
-			descriptorpb.FieldDescriptorProto_TYPE_INT64,
-			descriptorpb.FieldDescriptorProto_TYPE_UINT64,
-			descriptorpb.FieldDescriptorProto_TYPE_FIXED64,
-			descriptorpb.FieldDescriptorProto_TYPE_FIXED32,
-			descriptorpb.FieldDescriptorProto_TYPE_UINT32,
-			descriptorpb.FieldDescriptorProto_TYPE_SFIXED32,
-			descriptorpb.FieldDescriptorProto_TYPE_SFIXED64,
-			descriptorpb.FieldDescriptorProto_TYPE_SINT32,
-			descriptorpb.FieldDescriptorProto_TYPE_SINT64:
-
-			if p.OutputType == Subgraph {
-				p.AddSubgraphEntityType(name, SubgraphBigInt)
-			}
-
-			if p.OutputType == Sql {
-				p.AddSQLEntityType(name, SqlInt)
-			}
-
-		case descriptorpb.FieldDescriptorProto_TYPE_INT32:
-			if p.OutputType == Subgraph {
-				p.AddSubgraphEntityType(name, SubgraphInt)
-			}
-
-		case descriptorpb.FieldDescriptorProto_TYPE_BOOL:
-			if p.OutputType == Subgraph {
-				p.AddSubgraphEntityType(name, SubgraphBoolean)
-			}
-			if p.OutputType == Sql {
-				p.AddSQLEntityType(name, SqlBoolean)
-			}
-
-		case descriptorpb.FieldDescriptorProto_TYPE_STRING:
-			if p.OutputType == Subgraph {
-				p.AddSubgraphEntityType(name, SubgraphString)
-			}
-			if p.OutputType == Sql {
-				p.AddSQLEntityType(name, SqlText)
-			}
-
-		case descriptorpb.FieldDescriptorProto_TYPE_MESSAGE,
-			descriptorpb.FieldDescriptorProto_TYPE_GROUP,
-			descriptorpb.FieldDescriptorProto_TYPE_ENUM:
-			// Let's not support the nested message and groups for now as it is more complex
-			// and would probably require foreign tables / subgraph entities to work
-			// not even sure this works as of today
-			fmt.Println("skipping message, group and enum - not supported for the moment")
-
-		case descriptorpb.FieldDescriptorProto_TYPE_BYTES:
-			if p.OutputType == Subgraph {
-				p.AddSubgraphEntityType(name, SubgraphBytes)
-			}
-			if p.OutputType == Sql {
-				p.AddSQLEntityType(name, SqlText)
-			}
+		var entityType EntityType
+		if p.OutputType == "Subgraph" {
+			p.AddSubgraphEntityType(field.GetName(), field)
+			p.EntityTypes = append(p.EntityTypes, entityType)
 		}
 
-		// if field.GetType() == descriptorpb.FieldDescriptorProto_TYPE_MESSAGE {
-		// 	if *field.Label == descriptorpb.FieldDescriptorProto_LABEL_REPEATED {
-		//		splitMessagePath := strings.Split(typeName, ".")
-		//		name splitMessagePath[len(splitMessagePath)-1]
+		if p.OutputType == "sql" {
 
-		// 		p.Entities = append(p.Entities, &Entity{
-		// 			// NameAsProtoField: textcase.CamelCase(field.GetName()),
-		// 			// NameAsEntity:     "My" + name,
-		// 			Name:             name,
-		// 		})
+		}
 
-		// 		if p.protoTypeMapping[*field.TypeName] == nil {
-		// 			return fmt.Errorf("nested message type: %q not found", *field.TypeName)
-		// 		}
-
-		// 		for _, nestedMessageField := range p.protoTypeMapping[*field.TypeName].Field {
-		// 			switch *nestedMessageField.Type {
-		// 			case descriptorpb.FieldDescriptorProto_TYPE_STRING, descriptorpb.FieldDescriptorProto_TYPE_INT64, descriptorpb.FieldDescriptorProto_TYPE_UINT64, descriptorpb.FieldDescriptorProto_TYPE_UINT32, descriptorpb.FieldDescriptorProto_TYPE_BYTES:
-		// 				p.Entity.ID = textcase.CamelCase(nestedMessageField.GetName())
-		// 			default:
-		// 				continue
-		// 			}
-		// 		}
-		// 	}
-		// }
 	}
 	return nil
 }

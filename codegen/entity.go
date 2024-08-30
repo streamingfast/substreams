@@ -17,20 +17,15 @@ type EntityType interface {
 
 type SQLEntityType struct {
 	Name string
-	Type SqlType
+	Type SQLType
 }
 
 func (e *SQLEntityType) ToEntityTypeOut() string {
-	switch e.Type {
-	case SqlDecimal, SqlText, SqlBytes, SqlInt, SqlBoolean:
-		return fmt.Sprintf("input.%s", textcase.SnakeCase(e.Name))
-	default:
-		panic("unsupported type")
-	}
+	return fmt.Sprintf("input.%s", textcase.SnakeCase(e.Name))
 }
 
 func (e *SQLEntityType) ToSQLType() string {
-	return fmt.Sprintf(`"%s": %s,`, e.Name, e.Type)
+	return fmt.Sprintf(`"%s" %s,`, e.Name, e.Type)
 }
 
 type SubgraphEntityType struct {
@@ -40,15 +35,7 @@ type SubgraphEntityType struct {
 
 func (e *SubgraphEntityType) ToEntityTypeOut() string {
 	switch e.Type {
-	case SubgraphBytes:
-		return fmt.Sprintf("input.%s", e.Name)
-	case SubgraphString:
-		return fmt.Sprintf("input.%s", e.Name)
-	case SubgraphBoolean:
-		return fmt.Sprintf("input.%s", e.Name)
-	case SubgraphInt:
-		return fmt.Sprintf("input.%s", e.Name)
-	case SubgraphInt8:
+	case SubgraphBytes, SubgraphString, SubgraphBoolean, SubgraphInt, SubgraphInt8:
 		return fmt.Sprintf("input.%s", e.Name)
 	case SubgraphBigInt:
 		return fmt.Sprintf("BigInt.fromString(input.%s.toString())", e.Name)

@@ -27,5 +27,17 @@ func generateSQLEnv(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("building generate command: %w", err)
 	}
 
+	input := fmt.Sprintf(
+		"Your Substreams SQL Extension is now generated!\n\n" +
+			"**Now follow the next steps:**\n\n" +
+			"Open the sql directory:\n\n" +
+			"`cd sql`\n\n" +
+			"Build the substreams package:\n\n" +
+			"`substreams build`\n\n" +
+			"Sink data into your database:\n\n" +
+			"`substreams-sink-sql`\n\n",
+	)
+	fmt.Println(ToMarkdown(input))
+
 	return nil
 }

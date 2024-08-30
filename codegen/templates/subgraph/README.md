@@ -9,7 +9,7 @@ _Describe important modules here_
 
 ```bash
 npm install
-npm run generate  # Generate protobuf bindings
+npm run protogen  # Generate protobuf bindings
 npm run codegen   # Generate subgraph mapping types
 npm run build
 ```

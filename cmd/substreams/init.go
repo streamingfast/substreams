@@ -281,7 +281,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				msgString = "⚠️ " + msg.Message.Markdown
 			}
 
-			fmt.Print(toMarkdown(msgString))
+			fmt.Print(ToMarkdown(msgString))
 
 		case *pbconvo.SystemOutput_ImageWithText_:
 			input := msg.ImageWithText
@@ -289,7 +289,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				fmt.Println("View image here:", input.ImgUrl)
 			}
 			if input.Markdown != "" {
-				fmt.Println(toMarkdown(input.Markdown))
+				fmt.Println(ToMarkdown(input.Markdown))
 			}
 
 		case *pbconvo.SystemOutput_ListSelect_:
@@ -617,7 +617,7 @@ func saveDownloadFile(path string, overwriteForm *OverwriteForm, inputFile *pbco
 	return nil
 }
 
-func toMarkdown(input string) string {
+func ToMarkdown(input string) string {
 	style := "light"
 	if lipgloss.HasDarkBackground() {
 		style = "dark"

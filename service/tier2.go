@@ -11,7 +11,10 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/RoaringBitmap/roaring/roaring64"
+	"github.com/streamingfast/bstream"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/bstream/stream"
+	bsstream "github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/dgrpc"
 	"github.com/streamingfast/dmetering"
@@ -20,6 +23,7 @@ import (
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/metrics"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -151,7 +155,6 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 
 	ctx = logging.WithLogger(ctx, logger)
 	ctx = dmetering.WithBytesMeter(ctx)
-	ctx = dmetering.WithCounter(ctx, "wasm_input_bytes")
 	ctx = reqctx.WithTracer(ctx, s.tracer)
 
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/request")
@@ -406,6 +409,21 @@ excludable:
 		streamFactoryFunc = s.streamFactoryFuncOverride
 	}
 
+	fileSourceMiddlewareHandler := func(next bstream.Handler) bstream.Handler {
+		return bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
+			stepable, ok := obj.(bstream.Stepable)
+			if ok {
+				step := stepable.Step()
+				if step.Matches(bstream.StepNew) {
+					dmetering.GetBytesMeter(ctx).CountInc(metering.MeterFileUncompressedReadBytes, len(blk.GetPayload().GetValue()))
+				} else {
+					dmetering.GetBytesMeter(ctx).CountInc(metering.MeterFileUncompressedReadForkedBytes, len(blk.GetPayload().GetValue()))
+				}
+			}
+			return next.ProcessBlock(blk, obj)
+		})
+	}
+
 	blockStream, err := streamFactoryFunc(
 		ctx,
 		pipe,
@@ -415,6 +433,7 @@ excludable:
 		true,
 		false,
 		logger.Named("stream"),
+		bsstream.WithFileSourceHandlerMiddleware(fileSourceMiddlewareHandler),
 	)
 	if err != nil {
 		return fmt.Errorf("error getting stream: %w", err)
@@ -428,18 +447,9 @@ excludable:
 }
 
 func (s *Tier2Service) getStores(ctx context.Context, request *pbssinternal.ProcessRangeRequest) (mergedBlocksStore, cacheStore, unmeteredCacheStore dstore.Store, err error) {
-
 	mergedBlocksStore, err = dstore.NewDBinStore(request.MergedBlocksStore)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("setting up block store from url %q: %w", request.MergedBlocksStore, err)
-	}
-
-	if cloned, ok := mergedBlocksStore.(dstore.Clonable); ok {
-		mergedBlocksStore, err = cloned.Clone(ctx)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("cloning store: %w", err)
-		}
-		mergedBlocksStore.SetMeter(dmetering.GetBytesMeter(ctx))
 	}
 
 	stateStore, err := dstore.NewStore(request.StateStore, "zst", "zstd", false)
@@ -464,10 +474,11 @@ func (s *Tier2Service) getStores(ctx context.Context, request *pbssinternal.Proc
 	}
 
 	if clonableStore, ok := unmeteredCacheStore.(dstore.Clonable); ok {
-		cloned, err := clonableStore.Clone(ctx)
+		cloned, err := clonableStore.Clone(ctx, metering.WithBytesMeteringOptions(dmetering.GetBytesMeter(ctx), reqctx.Logger(ctx))...)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("cloning store: %w", err)
 		}
+		//todo: (deprecated)
 		cloned.SetMeter(dmetering.GetBytesMeter(ctx))
 		cacheStore = cloned
 	}
@@ -492,14 +503,6 @@ func canSkipBlockSource(existingExecOuts map[string]*execout.File, requiredModul
 	return true
 }
 
-//func (s *Tier2Service) buildPipelineOptions(ctx context.Context, request *pbssinternal.ProcessRangeRequest) (opts []pipeline.Option) {
-//	requestDetails := reqctx.Details(ctx)
-//	for _, pipeOpts := range s.pipelineOptions {
-//		opts = append(opts, pipeOpts.PipelineOptions(ctx, request.StartBlockNum, request.StopBlockNum, requestDetails.UniqueIDString())...)
-//	}
-//	return
-//}
-
 func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbssinternal.Substreams_ProcessRangeServer) substreams.ResponseFunc {
 	meter := dmetering.GetBytesMeter(ctx)
 	auth := dauth.FromContext(ctx)
@@ -515,7 +518,7 @@ func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbs
 			return connect.NewError(connect.CodeUnavailable, err)
 		}
 
-		sendMetering(ctx, meter, userID, apiKeyID, ip, userMeta, "sf.substreams.internal.v2/ProcessRange", resp)
+		metering.Send(ctx, meter, userID, apiKeyID, ip, userMeta, "sf.substreams.internal.v2/ProcessRange", resp)
 		return nil
 	}
 }

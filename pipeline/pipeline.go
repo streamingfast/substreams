@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/streamingfast/substreams/metering"
+
 	"github.com/RoaringBitmap/roaring/roaring64"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dmetering"
@@ -286,6 +288,7 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 		stream := response.New(p.respFunc)
 
 		meter := dmetering.GetBytesMeter(ctx)
+
 		for {
 			select {
 			case <-time.After(time.Millisecond * 500):
@@ -294,7 +297,7 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 				modStats := stats.AggregatedModulesStats()
 				remoteBytesRead, remoteBytesWritten := stats.RemoteBytesConsumption()
 
-				stream.SendModulesStats(modStats, stagesProgress, jobs, meter.BytesRead()+remoteBytesRead, meter.BytesWritten()+remoteBytesWritten)
+				stream.SendModulesStats(modStats, stagesProgress, jobs, metering.GetTotalBytesRead(meter)+remoteBytesRead, metering.GetTotalBytesWritten(meter)+remoteBytesWritten)
 			case <-progressCtx.Done():
 				return
 			}
@@ -412,7 +415,7 @@ func (p *Pipeline) returnRPCModuleProgressOutputs(forceOutput bool) error {
 
 	meter := dmetering.GetBytesMeter(p.ctx)
 	remoteBytesRead, remoteBytesWritten := stats.RemoteBytesConsumption()
-	return stream.SendModulesStats(modStats, stagesProgress, jobs, meter.BytesRead()+remoteBytesRead, meter.BytesWritten()+remoteBytesWritten)
+	return stream.SendModulesStats(modStats, stagesProgress, jobs, metering.GetTotalBytesRead(meter)+remoteBytesRead, metering.GetTotalBytesWritten(meter)+remoteBytesWritten)
 
 }
 
@@ -421,8 +424,8 @@ func (p *Pipeline) toInternalUpdate(clock *pbsubstreams.Clock) *pbssinternal.Upd
 
 	out := &pbssinternal.Update{
 		DurationMs:        uint64(time.Since(p.startTime).Milliseconds()),
-		TotalBytesRead:    meter.BytesRead(),
-		TotalBytesWritten: meter.BytesWritten(),
+		TotalBytesRead:    metering.GetTotalBytesRead(meter),
+		TotalBytesWritten: metering.GetTotalBytesWritten(meter),
 		ModulesStats:      reqctx.ReqStats(p.ctx).LocalModulesStats(),
 	}
 

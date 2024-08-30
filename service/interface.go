@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/bstream/stream"
 	"go.uber.org/zap"
 )
 
@@ -14,7 +15,8 @@ type StreamFactoryFunc func(ctx context.Context,
 	cursor string,
 	finalBlocksOnly bool,
 	cursorIsTarget bool,
-	logger *zap.Logger) (Streamable, error)
+	logger *zap.Logger,
+	extraOpts ...stream.Option) (Streamable, error)
 
 type Streamable interface {
 	Run(ctx context.Context) error

@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/streamingfast/substreams/metering"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dgrpc"
 
@@ -201,7 +203,6 @@ func (s *Tier1Service) Blocks(
 	ctx = logging.WithLogger(ctx, logger)
 	ctx = reqctx.WithTracer(ctx, s.tracer)
 	ctx = dmetering.WithBytesMeter(ctx)
-	ctx = dmetering.WithCounter(ctx, "wasm_input_bytes")
 	ctx = reqctx.WithTier2RequestParameters(ctx, s.tier2RequestParameters)
 
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier1/request")
@@ -435,10 +436,11 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	}
 
 	if clonableStore, ok := cacheStore.(dstore.Clonable); ok {
-		cloned, err := clonableStore.Clone(ctx)
+		cloned, err := clonableStore.Clone(ctx, metering.WithBytesMeteringOptions(dmetering.GetBytesMeter(ctx), logger)...)
 		if err != nil {
 			return fmt.Errorf("cloning store: %w", err)
 		}
+		//todo: (deprecated)
 		cloned.SetMeter(dmetering.GetBytesMeter(ctx))
 		cacheStore = cloned
 	}
@@ -568,6 +570,36 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		streamHandler = pipe
 	}
 
+	liveSourceMiddlewareHandler := func(next bstream.Handler) bstream.Handler {
+		return bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
+			stepable, ok := obj.(bstream.Stepable)
+			if ok {
+				step := stepable.Step()
+				if step.Matches(bstream.StepNew) {
+					dmetering.GetBytesMeter(ctx).CountInc(metering.MeterLiveUncompressedReadBytes, len(blk.GetPayload().GetValue()))
+				} else {
+					dmetering.GetBytesMeter(ctx).CountInc(metering.MeterLiveUncompressedReadForkedBytes, len(blk.GetPayload().GetValue()))
+				}
+			}
+			return next.ProcessBlock(blk, obj)
+		})
+	}
+
+	fileSourceMiddlewareHandler := func(next bstream.Handler) bstream.Handler {
+		return bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
+			stepable, ok := obj.(bstream.Stepable)
+			if ok {
+				step := stepable.Step()
+				if step.Matches(bstream.StepNew) {
+					dmetering.GetBytesMeter(ctx).CountInc(metering.MeterFileUncompressedReadBytes, len(blk.GetPayload().GetValue()))
+				} else {
+					dmetering.GetBytesMeter(ctx).CountInc(metering.MeterFileUncompressedReadForkedBytes, len(blk.GetPayload().GetValue()))
+				}
+			}
+			return next.ProcessBlock(blk, obj)
+		})
+	}
+
 	blockStream, err := s.streamFactoryFunc(
 		ctx,
 		streamHandler,
@@ -577,6 +609,8 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		request.FinalBlocksOnly,
 		cursorIsTarget,
 		logger.Named("stream"),
+		bsstream.WithLiveSourceHandlerMiddleware(liveSourceMiddlewareHandler),
+		bsstream.WithFileSourceHandlerMiddleware(fileSourceMiddlewareHandler),
 	)
 	if err != nil {
 		return fmt.Errorf("error getting stream: %w", err)
@@ -612,7 +646,7 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 			return connect.NewError(connect.CodeUnavailable, err)
 		}
 
-		sendMetering(ctx, meter, userID, apiKeyID, ip, userMeta, "sf.substreams.rpc.v2/Blocks", resp)
+		metering.Send(ctx, meter, userID, apiKeyID, ip, userMeta, "sf.substreams.rpc.v2/Blocks", resp)
 		return nil
 	}
 }

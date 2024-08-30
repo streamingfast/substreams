@@ -59,7 +59,7 @@
   * [Chain-Specific Extensions](new/develop/chain-specific/overview.md)
     * [EVM Chain-Specific Extensions](new/develop/chain-specific/evm-chain-specific/overview.md)
       * [Making eth\_calls](new/develop/chain-specific/evm/eth-calls.md)
-  * [Test Locally](new/documentation/develop/test-locally.md)
+  * [Test Locally](new/develop/test-locally.md)
   * [Architecture](new/develop/architecture.md)
 
 ## Tutorials

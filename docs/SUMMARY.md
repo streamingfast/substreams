@@ -56,10 +56,10 @@
   * [Rust Dependencies](new/develop/rust-crates.md)
   * [Indexes](new/develop/indexes.md)
   * [Parameterized Modules](new/develop/parameterized-modules.md)
-  * [Chain-Specific Extensions](documentation/develop/chain-specific-extensions/README.md)
-    * [EVM Chain-Specific Extensions](documentation/develop/chain-specific-extensions/evm-chain-specific-extensions/README.md)
+  * [Chain-Specific Extensions](new/develop/chain-specific/overview.md)
+    * [EVM Chain-Specific Extensions](new/develop/chain-specific/evm-chain-specific/overview.md)
       * [Making eth\_calls](new/develop/chain-specific/evm/eth-calls.md)
-  * [Test Locally](documentation/develop/test-locally.md)
+  * [Test Locally](new/develop/test-locally.md)
   * [Architecture](new/develop/architecture.md)
 
 ## Tutorials

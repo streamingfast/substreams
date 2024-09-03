@@ -624,6 +624,7 @@ func ToMarkdown(input string) string {
 	}
 
 	renderer, err := glamour.NewTermRenderer(glamour.WithWordWrap(0), glamour.WithStandardStyle(style))
+
 	if err != nil {
 		panic(fmt.Errorf("failed rendering markdown %q: %w", input, err))
 	}

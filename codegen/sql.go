@@ -37,7 +37,7 @@ func generateSQLEnv(cmd *cobra.Command, args []string) error {
 			"Sink data into your database:\n\n" +
 			"`substreams-sink-sql`\n\n",
 	)
-	fmt.Println(ToMarkdown(input))
+	printMardown(input)
 
 	return nil
 }

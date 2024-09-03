@@ -27,6 +27,7 @@ binaries:
 modules:
   - name: db_out
     kind: map
+    initialBlock: {{ .ModuleInitialBlock }}
     inputs:
       - map: {{ .Name }}:{{ .Module.Name }}
     output:

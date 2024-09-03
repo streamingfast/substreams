@@ -95,7 +95,7 @@ func (p *Project) AddSubgraphEntityType(name string, field *descriptorpb.FieldDe
 	}
 }
 
-func (p *Project) AddPostgreSQL(name string, field *descriptorpb.FieldDescriptorProto) {
+func (p *Project) AddPostgreSQLType(name string, field *descriptorpb.FieldDescriptorProto) {
 	postgreSqltype := func() *SQLType {
 		switch field.GetType() {
 		case
@@ -258,14 +258,17 @@ func (p *Project) BuildOutputEntity() error {
 			p.EntityInfo.IDFieldName = field.GetName()
 		}
 
-		var entityType EntityType
 		if p.OutputType == "Subgraph" {
 			p.AddSubgraphEntityType(field.GetName(), field)
-			p.EntityTypes = append(p.EntityTypes, entityType)
 		}
 
 		if p.OutputType == "sql" {
-
+			if p.Flavor == "PostgresSQL" {
+				p.AddPostgreSQLType(field.GetName(), field)
+			}
+			if p.Flavor == "ClickHouse" {
+				p.AddClickHouseSQLType(field.GetName(), field)
+			}
 		}
 
 	}
@@ -289,6 +292,10 @@ func (p *Project) SubstreamsKebabName() string {
 
 func (p *Project) GetModuleName() string {
 	return p.Module.Name
+}
+
+func (p *Project) ModuleInitialBlock() uint64 {
+	return p.Module.InitialBlock
 }
 
 func (p *Project) SpkgNameWithoutExt() string {

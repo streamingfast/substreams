@@ -109,7 +109,8 @@ func buildGenerateCommandFromArgs(manifestPath string, outputType OutputType, wi
 
 		if outputType == Sql {
 			if module.Output.Type == "proto:sf.substreams.sink.database.v1.DatabaseChanges" {
-				fmt.Printf("Module %s has database changes as output type. That means you can directly sink data from it, to an SQL database, using `substreams-sink-sql` binary...\n\n", module.Name)
+				input := fmt.Sprintf("A module `%s` has database changes as output type... That means you can directly sink data from it, to an SQL database, using `substreams-sink-sql` binary...\n\n", module.Name)
+				printMardown(input)
 				continueCmd, err := askContinueCmd()
 				if err != nil {
 					return fmt.Errorf("asking for continue command: %w", err)
@@ -334,4 +335,8 @@ func toProtoPascalCase(input string) string {
 	})
 
 	return input
+}
+
+func printMardown(input string) {
+	fmt.Println(input)
 }

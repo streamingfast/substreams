@@ -1,25 +1,34 @@
 # substreams.yaml
 specVersion: v0.1.0
 package:
-  name: {{ .Name }}
+  name: {{  .SQLExtensionName }}
   version: v0.1.0
 
-network: {{ .ChainName }}
+protobuf:
+  excludePaths:
+    - sf/substreams/sink
+    - sf/substreams/v1
+    - sf/substreams/index
+    - sf/substreams/intern
+    - google
+
+network: {{ .Network }}
 imports:
-  database_change: https://github.com/streamingfast/substreams-database-change/releases/download/v1.1.1/substreams-database-change-v1.1.1.spkg
-  sql: https://github.com/streamingfast/substreams-sink-sql/releases/download/protodefs-v1.0.7/substreams-sink-sql-protodefs-v1.0.7.spkg
+  sql: https://github.com/streamingfast/substreams-sink-sql/releases/download/protodefs-v{{ .SQLImportVersion }}/substreams-sink-sql-protodefs-v{{ .SQLImportVersion }}.spkg
+  database_change: https://github.com/streamingfast/substreams-sink-database-changes/releases/download/v{{ .DatabaseChangeImportVersion }}/substreams-database-change-v{{ .DatabaseChangeImportVersion }}.spkg
+  {{ .Name }}: {{ .ManifestPath }}
 
 binaries:
   default:
     type: wasm/rust-v1
-    file: target/wasm32-unknown-unknown/release/{{ .Name }}.wasm
+    file: target/wasm32-unknown-unknown/release/{{ .SQLExtensionName }}.wasm
 
 modules:
   - name: db_out
       kind: map
-      initialBlock: {{ .InitialBlock }}
+      initialBlock: {{ .ModuleInitialBlock }}
       inputs:
-        - map: {{ .ModuleName }}
+        - map: {{ .Name }}:{{ .Module.Name }}
       output:
         type: proto:sf.substreams.sink.database.v1.DatabaseChanges
 
@@ -33,3 +42,4 @@ sink:
       enabled: false
     rest_frontend:
       enabled: false
+

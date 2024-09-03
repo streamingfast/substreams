@@ -338,5 +338,5 @@ func toProtoPascalCase(input string) string {
 }
 
 func printMardown(input string) {
-	fmt.Println(input)
+	fmt.Println(ToMarkdown(input))
 }

@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS events (
     {{ $entity.ToSQLType }}
     {{- end }}
     {{- if not .EntityInfo.HasAnID }}
-    "id", VARCHAR(64),
+    "id" VARCHAR(64),
     {{- end }}
 )
 {{- if .EntityInfo.HasAnID }}

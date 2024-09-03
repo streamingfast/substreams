@@ -350,6 +350,7 @@ func (p *Project) Render(withDevEnv bool) (projectFiles map[string][]byte, err e
 	funcMap := template.FuncMap{
 		"toLower":      strings.ToLower,
 		"toCamelCase":  textcase.CamelCase,
+		"toSnakeCase":  textcase.SnakeCase,
 		"toKebabCase":  textcase.KebabCase,
 		"toPascalCase": toProtoPascalCase,
 	}

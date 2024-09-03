@@ -27,7 +27,7 @@ fn db_out(input: {{ toPascalCase .OutputName }}) -> Result<DatabaseChanges, subs
     row.set("id", format!("{:x}", result));
     {{- end }}
     {{- range $entity := $.EntityTypes }}
-    row.set("{{ toCamelCase $entity.Name }}", {{ $entity.ToEntityTypeOut }});
+    row.set("{{ toSnakeCase $entity.Name }}", {{ $entity.ToEntityTypeOut }});
     {{- end }}
 
     Ok(tables.to_database_changes())

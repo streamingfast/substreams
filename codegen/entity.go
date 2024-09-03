@@ -25,7 +25,7 @@ func (e *SQLEntityType) ToEntityTypeOut() string {
 }
 
 func (e *SQLEntityType) ToSQLType() string {
-	return fmt.Sprintf(`"%s" %s,`, e.Name, e.Type)
+	return fmt.Sprintf(`"%s" %s,`, textcase.SnakeCase(e.Name), e.Type)
 }
 
 type SubgraphEntityType struct {

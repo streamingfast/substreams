@@ -52,81 +52,94 @@ func NewBaseExecutor(ctx context.Context, moduleName string, initialBlock uint64
 var ErrNoInput = errors.New("no input")
 var ErrSkippedOutput = errors.New("skipped output") // willfully skipped output (through intrinsic)
 
+// getWasmArgumentValues return the values for each argument of type wasm.ValueArgument.
+// An empty value is returned as an empty byte slice, while a missing (skipped) value is returned as nil.
+func getWasmArgumentValues(wasmArguments []wasm.Argument, outputGetter execout.ExecutionOutputGetter) (map[string][]byte, error) {
+	out := make(map[string][]byte)
+	for i, input := range wasmArguments {
+		switch v := input.(type) {
+		case *wasm.MapInput, *wasm.StoreDeltaInput, *wasm.SourceInput:
+			val, _, err := outputGetter.Get((v.Name()))
+			if err != nil {
+				if errors.Is(err, execout.ErrNotFound) {
+					out[v.Name()] = nil // skipped inputs are exposed to the wasm module as nil values
+					break
+				}
+				return nil, fmt.Errorf("input data for %q, param %d: %w", v.Name(), i, err)
+			}
+			if val == nil {
+				out[v.Name()] = []byte{} // empty inputs that are not skipped are exposed as an empty byte slice
+			} else {
+				out[v.Name()] = val
+			}
+		}
+	}
+	return out, nil
+}
+
+func canSkipExecution(wasmArgumentValues map[string][]byte) bool {
+	if wasmArgumentValues["sf.substreams.v1.Clock"] != nil && len(wasmArgumentValues) == 1 {
+		return false // never skip if the only 'ArgumentValue' input is a clock
+	}
+
+	for k, v := range wasmArgumentValues {
+		if v != nil && k != "sf.substreams.v1.Clock" {
+			return false
+		}
+	}
+
+	// we have no input to send
+	return true
+}
+
 func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (call *wasm.Call, err error) {
 	e.logs = nil
 	e.logsTruncated = false
 	e.executionStack = nil
 
-	hasInput := false
-	for i, input := range e.wasmArguments {
-		switch v := input.(type) {
-		case *wasm.StoreWriterOutput:
-		case *wasm.StoreReaderInput:
-			hasInput = true
-		case *wasm.ParamsInput:
-			hasInput = true
-		case wasm.ValueArgument:
-			if !v.Active(outputGetter.Clock().Number) {
-				break // skipping input that is not active at this block
-			}
-
-			data, _, err := outputGetter.Get(v.Name())
-			if err != nil {
-				if errors.Is(err, execout.ErrNotFound) {
-					break
-				}
-				return nil, fmt.Errorf("input data for %q, param %d: %w", v.Name(), i, err)
-			}
-			hasInput = true
-			v.SetValue(data)
-		default:
-			panic("unknown wasm argument type")
-		}
+	argValues, err := getWasmArgumentValues(e.wasmArguments, outputGetter)
+	if err != nil {
+		return nil, err
 	}
-	if !hasInput {
+
+	if canSkipExecution(argValues) {
 		return nil, ErrNoInput
 	}
 
-	// This allows us to skip the execution of the VM if there are no inputs.
-	// This assumption should either be configurable by the manifest, or clearly documented:
-	//  state builders will not be called if their input streams are 0 bytes length (and there is no
-	//  state store in read mode)
-	if hasInput {
-		clock := outputGetter.Clock()
-		var inst wasm.Instance
+	clock := outputGetter.Clock()
+	var inst wasm.Instance
 
-		stats := reqctx.ReqStats(e.ctx)
-		//t0 := time.Now()
-		call = wasm.NewCall(clock, e.moduleName, e.entrypoint, stats, e.wasmArguments)
-		inst, err = e.wasmModule.ExecuteNewCall(e.ctx, call, e.cachedInstance, e.wasmArguments)
-		//Timer += time.Since(t0)
-		if panicErr := call.Err(); panicErr != nil {
-			errExecutor := &ErrorExecutor{
-				message:    panicErr.Error(),
-				stackTrace: call.ExecutionStack,
-			}
-			return nil, fmt.Errorf("block %d: module %q: general wasm execution panicked: %w: %s", clock.Number, e.moduleName, ErrWasmDeterministicExec, errExecutor.Error())
+	stats := reqctx.ReqStats(e.ctx)
+	//t0 := time.Now()
+	call = wasm.NewCall(clock, e.moduleName, e.entrypoint, stats, e.wasmArguments)
+	inst, err = e.wasmModule.ExecuteNewCall(e.ctx, call, e.cachedInstance, e.wasmArguments, argValues)
+	//Timer += time.Since(t0)
+	if panicErr := call.Err(); panicErr != nil {
+		errExecutor := &ErrorExecutor{
+			message:    panicErr.Error(),
+			stackTrace: call.ExecutionStack,
 		}
-		if err != nil {
-			if ctxErr := e.ctx.Err(); ctxErr != nil {
-				return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %w, %w", clock.Number, e.moduleName, err, ctxErr)
-			}
-			return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %w: %s", clock.Number, e.moduleName, ErrWasmDeterministicExec, err)
-		}
-		if e.instanceCacheEnabled {
-			if err := inst.Cleanup(e.ctx); err != nil {
-				return nil, fmt.Errorf("block %d: module %q: failed to cleanup module: %w", clock.Number, e.moduleName, err)
-			}
-			e.cachedInstance = inst
-		} else {
-			if err := inst.Close(e.ctx); err != nil {
-				return nil, fmt.Errorf("block %d: module %q: failed to close module: %w", clock.Number, e.moduleName, err)
-			}
-		}
-		e.logs = call.Logs
-		e.logsTruncated = call.ReachedLogsMaxByteCount()
-		e.executionStack = call.ExecutionStack
+		return nil, fmt.Errorf("block %d: module %q: general wasm execution panicked: %w: %s", clock.Number, e.moduleName, ErrWasmDeterministicExec, errExecutor.Error())
 	}
+	if err != nil {
+		if ctxErr := e.ctx.Err(); ctxErr != nil {
+			return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %w, %w", clock.Number, e.moduleName, err, ctxErr)
+		}
+		return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %w: %s", clock.Number, e.moduleName, ErrWasmDeterministicExec, err)
+	}
+	if e.instanceCacheEnabled {
+		if err := inst.Cleanup(e.ctx); err != nil {
+			return nil, fmt.Errorf("block %d: module %q: failed to cleanup module: %w", clock.Number, e.moduleName, err)
+		}
+		e.cachedInstance = inst
+	} else {
+		if err := inst.Close(e.ctx); err != nil {
+			return nil, fmt.Errorf("block %d: module %q: failed to close module: %w", clock.Number, e.moduleName, err)
+		}
+	}
+	e.logs = call.Logs
+	e.logsTruncated = call.ReachedLogsMaxByteCount()
+	e.executionStack = call.ExecutionStack
 	return
 }
 

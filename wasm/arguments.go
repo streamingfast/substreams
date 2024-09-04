@@ -16,15 +16,8 @@ type Argument interface {
 	Name() string
 }
 
-type ValueArgument interface {
-	Argument
-	Value() []byte
-	SetValue([]byte)
-	Active(blk uint64) bool
-}
-
 type ProtoScopeValueArgument interface {
-	ProtoScopeValue() string
+	ProtoScopeValue([]byte) string
 }
 
 // implementations
@@ -38,20 +31,8 @@ func (b *BaseArgument) Name() string {
 	return b.name
 }
 
-func (b *BaseArgument) Active(blk uint64) bool {
-	return blk >= b.initialBlock
-}
-
-type BaseValueArgument struct {
-	value []byte
-}
-
-func (b *BaseValueArgument) Value() []byte        { return b.value }
-func (b *BaseValueArgument) SetValue(data []byte) { b.value = data }
-
 type SourceInput struct {
 	BaseArgument
-	BaseValueArgument
 }
 
 func NewSourceInput(name string, initialBlock uint64) *SourceInput {
@@ -63,13 +44,12 @@ func NewSourceInput(name string, initialBlock uint64) *SourceInput {
 	}
 }
 
-func (i *SourceInput) ProtoScopeValue() string {
-	return "{" + protoscope.Write(i.value, protoscope.WriterOptions{}) + "}"
+func (i *SourceInput) ProtoScopeValue(value []byte) string {
+	return "{" + protoscope.Write(value, protoscope.WriterOptions{}) + "}"
 }
 
 type MapInput struct {
 	BaseArgument
-	BaseValueArgument
 }
 
 func NewMapInput(name string, initialBlock uint64) *MapInput {
@@ -81,13 +61,12 @@ func NewMapInput(name string, initialBlock uint64) *MapInput {
 	}
 }
 
-func (i *MapInput) ProtoScopeValue() string {
-	return fmt.Sprintf("%d", i.value)
+func (i *MapInput) ProtoScopeValue(value []byte) string {
+	return fmt.Sprintf("%d", value)
 }
 
 type StoreDeltaInput struct {
 	BaseArgument
-	BaseValueArgument
 }
 
 func NewStoreDeltaInput(name string, initialBlock uint64) *StoreDeltaInput {
@@ -99,8 +78,8 @@ func NewStoreDeltaInput(name string, initialBlock uint64) *StoreDeltaInput {
 	}
 }
 
-func (i *StoreDeltaInput) ProtoScopeValue() string {
-	return "{" + protoscope.Write(i.value, protoscope.WriterOptions{}) + "}"
+func (i *StoreDeltaInput) ProtoScopeValue(value []byte) string {
+	return "{" + protoscope.Write(value, protoscope.WriterOptions{}) + "}"
 }
 
 type StoreReaderInput struct {
@@ -138,8 +117,8 @@ func NewStoreWriterOutput(name string, store store.Store, updatePolicy pbsubstre
 }
 
 type ParamsInput struct {
+	value []byte
 	BaseArgument
-	BaseValueArgument
 }
 
 func NewParamsInput(value string) *ParamsInput {
@@ -148,12 +127,15 @@ func NewParamsInput(value string) *ParamsInput {
 			name:         "params",
 			initialBlock: 0,
 		},
-		BaseValueArgument: BaseValueArgument{
-			value: []byte(value),
-		},
+		value: []byte(value),
 	}
 }
-func (i *ParamsInput) ProtoScopeValue() string {
+
+func (i *ParamsInput) Value() []byte {
+	return i.value
+}
+
+func (i *ParamsInput) ProtoScopeValue(value []byte) string {
 	//todo: need to encode the value
-	return fmt.Sprintf("{\"%s\"}", string(i.value))
+	return fmt.Sprintf("{\"%s\"}", string(value))
 }

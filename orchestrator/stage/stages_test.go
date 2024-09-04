@@ -34,10 +34,10 @@ func TestNewStages(t *testing.T) {
 	assert.Equal(t, 8, stages.storeSegmenter.IndexForStartBlock(80), "index out of range still returned here")
 	assert.Nil(t, stages.storeSegmenter.Range(8), "out of range")
 
-	assert.Equal(t, block.ParseRange("5-10"), stages.storeSegmenter.Range(0))
-	assert.Equal(t, block.ParseRange("10-20"), stages.storeSegmenter.Range(1))
-	assert.Equal(t, block.ParseRange("70-75"), stages.storeSegmenter.Range(7))
-	assert.Equal(t, block.ParseRange("70-75"), stages.globalSegmenter.Range(7))
+	assert.Equal(t, block.MustParseRange("5-10"), stages.storeSegmenter.Range(0))
+	assert.Equal(t, block.MustParseRange("10-20"), stages.storeSegmenter.Range(1))
+	assert.Equal(t, block.MustParseRange("70-75"), stages.storeSegmenter.Range(7))
+	assert.Equal(t, block.MustParseRange("70-75"), stages.globalSegmenter.Range(7))
 }
 
 func unit(seg, stage int) Unit {

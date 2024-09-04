@@ -40,7 +40,7 @@ func fileFromRange(kind string, in string, params ...FileInfoParam) *FileInfo {
 }
 
 func fileFromRanges(kind string, in string, params ...FileInfoParam) FileInfos {
-	ranges := block.ParseRanges(in)
+	ranges := block.MustParseRanges(in)
 
 	files := make([]*FileInfo, len(ranges))
 	for i, blockRange := range ranges {

@@ -5,9 +5,9 @@ import (
 	"strings"
 )
 
-func ParseRanges(in string) (out Ranges) {
+func MustParseRanges(in string) (out Ranges) {
 	for _, e := range strings.Split(in, ",") {
-		newRange := ParseRange(strings.Trim(e, " "))
+		newRange := MustParseRange(strings.Trim(e, " "))
 		if newRange != nil {
 			out = append(out, newRange)
 		}

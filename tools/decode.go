@@ -82,6 +82,7 @@ var decodeIndexModuleCmd = &cobra.Command{
 
 func init() {
 	decodeCmd.PersistentFlags().Uint64("save-interval", 1000, "Save interval (segment size)")
+	decodeCmd.PersistentFlags().Bool("use-test-simple-hash", false, "Use the 'simple hashing' function to get module hashes instead of regular hashes, for testing purposes")
 
 	decodeCmd.AddCommand(decodeOutputsModuleCmd)
 	decodeCmd.AddCommand(decodeStatesModuleCmd)
@@ -93,6 +94,7 @@ func init() {
 func runDecodeStatesModuleRunE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	saveInterval := sflags.MustGetUint64(cmd, "save-interval")
+	manifest.TestUseSimpleHash = sflags.MustGetBool(cmd, "use-test-simple-hash")
 
 	manifestPath := ""
 	if len(args) == 5 {
@@ -168,6 +170,7 @@ func runDecodeStatesModuleRunE(cmd *cobra.Command, args []string) error {
 func runDecodeIndexModuleRunE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	saveInterval := sflags.MustGetUint64(cmd, "save-interval")
+	manifest.TestUseSimpleHash = sflags.MustGetBool(cmd, "use-test-simple-hash")
 
 	manifestPath := ""
 	if len(args) == 4 {
@@ -249,6 +252,7 @@ func runDecodeIndexModuleRunE(cmd *cobra.Command, args []string) error {
 func runDecodeOutputsModuleRunE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	saveInterval := sflags.MustGetUint64(cmd, "save-interval")
+	manifest.TestUseSimpleHash = sflags.MustGetBool(cmd, "use-test-simple-hash")
 
 	manifestPath := ""
 	if len(args) == 4 {
@@ -259,7 +263,10 @@ func runDecodeOutputsModuleRunE(cmd *cobra.Command, args []string) error {
 	moduleName := args[0]
 	storeURL := args[1]
 
-	requestedBlocks := block.ParseRange(args[2]) // FIXME: this panics on error :(
+	requestedBlocks, err := block.ParseRange(args[2], saveInterval)
+	if err != nil {
+		return fmt.Errorf("parsing range %q: %w", args[2], err)
+	}
 
 	zlog.Info("decoding module",
 		zap.String("manifest_path", manifestPath),

@@ -513,11 +513,17 @@ func canSkipBlockSource(existingExecOuts map[string]*execout.File, requiredModul
 
 func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbssinternal.Substreams_ProcessRangeServer) substreams.ResponseFunc {
 	meter := dmetering.GetBytesMeter(ctx)
-	auth := dauth.FromContext(ctx)
-	userID := auth.UserID()
-	apiKeyID := auth.APIKeyID()
-	userMeta := auth.Meta()
-	ip := auth.RealIP()
+
+	var userID, apiKeyID, userMeta, ip string
+	if auth := dauth.FromContext(ctx); auth != nil {
+		userID = auth.UserID()
+		apiKeyID = auth.APIKeyID()
+		userMeta = auth.Meta()
+		ip = auth.RealIP()
+		logger.Info("auth information available in tier2 response handler", zap.String("user_id", userID), zap.String("key_id", apiKeyID), zap.String("ip_address", ip))
+	} else {
+		logger.Warn("no auth information available in tier2 response handler")
+	}
 
 	return func(respAny substreams.ResponseFromAnyTier) error {
 		resp := respAny.(*pbssinternal.ProcessRangeResponse)
@@ -526,6 +532,13 @@ func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbs
 			return connect.NewError(connect.CodeUnavailable, err)
 		}
 
+		logger.Info("sending metering event",
+			zap.String("user_id", userID),
+			zap.String("key_id", apiKeyID),
+			zap.String("ip_address", ip),
+			zap.String("user_meta", userMeta),
+			zap.String("endpoint", "sf.substreams.internal.v2/ProcessRange"),
+		)
 		metering.Send(ctx, meter, userID, apiKeyID, ip, userMeta, "sf.substreams.internal.v2/ProcessRange", resp)
 		return nil
 	}

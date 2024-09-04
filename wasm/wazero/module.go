@@ -180,7 +180,6 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 		}
 	}
 
-	fmt.Println("calling it", mod.Name())
 	_, err = f.Call(wasm.WithContext(WithInstanceContext(ctx, inst), call), args...)
 	if err != nil {
 		return inst, fmt.Errorf("call: %w", err)

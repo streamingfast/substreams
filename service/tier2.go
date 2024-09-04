@@ -178,6 +178,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 		zap.Strings("modules", moduleNames),
 		zap.String("output_module", request.OutputModule),
 		zap.Uint64("first_streamable_block", request.FirstStreamableBlock),
+		zap.String("metering_config", request.MeteringConfig),
 	}
 
 	if auth := dauth.FromContext(ctx); auth != nil {
@@ -191,6 +192,13 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 				zap.String("cache_tag", cacheTag),
 			)
 		}
+	} else {
+		logger.Warn("no auth information available")
+		fields = append(fields,
+			zap.String("user_id", ""),
+			zap.String("key_id", ""),
+			zap.String("ip_address", ""),
+		)
 	}
 
 	logger.Info("incoming substreams ProcessRange request", fields...)
@@ -207,7 +215,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 		emitter.Shutdown(nil)
 	}()
 
-	ctx = reqctx.WithEmitter(ctx, dmetering.GetDefaultEmitter())
+	ctx = reqctx.WithEmitter(ctx, emitter)
 
 	respFunc := tier2ResponseHandler(ctx, logger, streamSrv)
 	err = s.processRange(ctx, request, respFunc)

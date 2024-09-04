@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
 	pbindexes "github.com/streamingfast/substreams/storage/index/pb"
 	"google.golang.org/protobuf/proto"
 
@@ -23,6 +24,7 @@ import (
 
 	"github.com/streamingfast/substreams/manifest"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/streamingfast/substreams/orchestrator/work"
@@ -45,6 +47,8 @@ func TestTier2Call(t *testing.T) {
 	fourthStoreInit52 := hex.EncodeToString([]byte("fourth_store_init_52"))
 	blockIndexInit60 := hex.EncodeToString([]byte("index_init_60"))
 	mapUsingIndexInit70 := hex.EncodeToString([]byte("map_using_index_init_70"))
+	mapHybridInputClock70 := hex.EncodeToString([]byte("map_hybrid_input_clock_70"))
+	mapHybridInputBlock70 := hex.EncodeToString([]byte("map_hybrid_input_block_70"))
 
 	randomIndicesRange := roaring64.New()
 	randomIndicesRange.AddInt(70)
@@ -68,6 +72,8 @@ func TestTier2Call(t *testing.T) {
 		expectRemainingFiles  []string
 		mapOutputFileToCheck  string
 		expectedSkippedBlocks map[uint64]struct{}
+
+		mapOutputFilesToDeepInspectForKeys map[string]map[uint64]any
 	}{
 		// Complex substreams package : "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg"
 		// Output module : map_output_init_50
@@ -100,6 +106,20 @@ func TestTier2Call(t *testing.T) {
 				thirdStoreInit40 + "/states/0000000050-0000000040.kv",
 				thirdStoreInit40 + "/outputs/0000000050-0000000060.output",
 				mapInit50 + "/outputs/0000000050-0000000060.output",
+			},
+			mapOutputFilesToDeepInspectForKeys: map[string]map[uint64]any{
+				mapInit50 + "/outputs/0000000050-0000000060.output": {
+					50: &pbsubstreamstest.MapResult{BlockNumber: 1, BlockHash: "block-50"}, // blockNumber is just used as a counter in this mapper
+					51: &pbsubstreamstest.MapResult{BlockNumber: 2, BlockHash: "block-51"},
+					52: &pbsubstreamstest.MapResult{BlockNumber: 3, BlockHash: "block-52"},
+					53: &pbsubstreamstest.MapResult{BlockNumber: 4, BlockHash: "block-53"},
+					54: &pbsubstreamstest.MapResult{BlockNumber: 5, BlockHash: "block-54"},
+					55: &pbsubstreamstest.MapResult{BlockNumber: 6, BlockHash: "block-55"},
+					56: &pbsubstreamstest.MapResult{BlockNumber: 7, BlockHash: "block-56"},
+					57: &pbsubstreamstest.MapResult{BlockNumber: 8, BlockHash: "block-57"},
+					58: &pbsubstreamstest.MapResult{BlockNumber: 9, BlockHash: "block-58"},
+					59: &pbsubstreamstest.MapResult{BlockNumber: 10, BlockHash: "block-59"},
+				},
 			},
 		},
 
@@ -275,7 +295,65 @@ func TestTier2Call(t *testing.T) {
 			},
 
 			mapOutputFileToCheck:  mapUsingIndexInit70 + "/outputs/0000000070-0000000080.output",
-			expectedSkippedBlocks: map[uint64]struct{}{75: {}, 77: {}, 78: {}, 79: {}, 80: {}},
+			expectedSkippedBlocks: map[uint64]struct{}{75: {}, 77: {}, 78: {}, 79: {}, 80: {}}, // faked with the randomIndicesRange above
+		},
+		// This test checks that a module receiving data from both a filtered map and a Clock
+		// does not trigger on every block, even when the index is being created in the same run
+		{
+			name:            "hybrid input with clock and filtered map",
+			startBlock:      70,
+			stage:           0,
+			moduleName:      "map_hybrid_input_clock_70",
+			stateBundleSize: 10,
+			manifestPath:    "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg",
+
+			expectRemainingFiles: []string{
+				mapUsingIndexInit70 + "/outputs/0000000070-0000000080.output",
+				mapHybridInputClock70 + "/outputs/0000000070-0000000080.output",
+				blockIndexInit60 + "/index/0000000070-0000000080.index",
+			},
+
+			mapOutputFilesToDeepInspectForKeys: map[string]map[uint64]any{
+				mapHybridInputClock70 + "/outputs/0000000070-0000000080.output": {
+					70: &pbsubstreamstest.Boolean{Result: true},
+					72: &pbsubstreamstest.Boolean{Result: true},
+					74: &pbsubstreamstest.Boolean{Result: true},
+					76: &pbsubstreamstest.Boolean{Result: true},
+					78: &pbsubstreamstest.Boolean{Result: true},
+				},
+			},
+		},
+
+		// This test checks that a module receiving data from both a filtered map and another source
+		// does not keep ghost values on every block, even when the index is being created in the same run
+		{
+			name:            "hybrid input with block and filtered map",
+			startBlock:      70,
+			stage:           0,
+			moduleName:      "map_hybrid_input_block_70",
+			stateBundleSize: 10,
+			manifestPath:    "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg",
+
+			expectRemainingFiles: []string{
+				mapUsingIndexInit70 + "/outputs/0000000070-0000000080.output",
+				mapHybridInputBlock70 + "/outputs/0000000070-0000000080.output",
+				blockIndexInit60 + "/index/0000000070-0000000080.index",
+			},
+
+			mapOutputFilesToDeepInspectForKeys: map[string]map[uint64]any{
+				mapHybridInputBlock70 + "/outputs/0000000070-0000000080.output": {
+					70: &pbsubstreamstest.Boolean{Result: true},
+					71: &pbsubstreamstest.Boolean{Result: false},
+					72: &pbsubstreamstest.Boolean{Result: true},
+					73: &pbsubstreamstest.Boolean{Result: false},
+					74: &pbsubstreamstest.Boolean{Result: true},
+					75: &pbsubstreamstest.Boolean{Result: false},
+					76: &pbsubstreamstest.Boolean{Result: true},
+					77: &pbsubstreamstest.Boolean{Result: false},
+					78: &pbsubstreamstest.Boolean{Result: true},
+					79: &pbsubstreamstest.Boolean{Result: false},
+				},
+			},
 		},
 
 		// Complex substreams package : "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg"
@@ -355,6 +433,11 @@ func TestTier2Call(t *testing.T) {
 			if outputFileToCheck != "" {
 				err = checkBlockSkippedInOutputFile(ctx, extendedTempDir, outputFileToCheck, test.expectedSkippedBlocks)
 			}
+
+			for outputFile, expectedKeys := range test.mapOutputFilesToDeepInspectForKeys {
+				assert.NoError(t, deepInspectOutputFile(ctx, extendedTempDir, outputFile, expectedKeys))
+			}
+
 			require.NoError(t, err)
 		})
 	}
@@ -386,26 +469,87 @@ func createFile(extendedTempDir string, file string) (*os.File, error) {
 	return createdFile, nil
 }
 
-func checkBlockSkippedInOutputFile(ctx context.Context, extendedTempDir, checkedFile string, expectedSkippedBlock map[uint64]struct{}) error {
-	s, err := dstore.NewStore(extendedTempDir, "zst", "zstd", false)
+func deepInspectOutputFile(ctx context.Context, extendedTempDir, outputFile string, expectedResults map[uint64]any) error {
+	outputData, err := readOutputFile(ctx, extendedTempDir, outputFile)
 	if err != nil {
-		return fmt.Errorf("initializing dstore for %q: %w", extendedTempDir, err)
+		return err
 	}
 
-	fileReader, err := s.OpenObject(ctx, checkedFile)
+	seenBlocks := make(map[uint64]struct{})
+	for _, item := range outputData.Kv {
+		seenBlocks[item.BlockNum] = struct{}{}
+
+		expected, found := expectedResults[item.BlockNum]
+		if !found {
+			return fmt.Errorf("expected block %d to be skipped", item.BlockNum)
+		}
+		switch v := expected.(type) {
+		case *pbsubstreamstest.MapResult:
+			res := pbsubstreamstest.MapResult{}
+			if err := proto.Unmarshal(item.Payload, &res); err != nil {
+				return fmt.Errorf("unmarshaling payload at block %d: %w", item.BlockNum, err)
+			}
+
+			if expectedResults[item.BlockNum] == nil {
+				return fmt.Errorf("unexpected block number %d", item.BlockNum)
+			}
+			if !proto.Equal(&res, v) {
+				return fmt.Errorf("results do not match for block %d: expected %+v, got %+v", item.BlockNum, expectedResults[item.BlockNum], res)
+			}
+		case *pbsubstreamstest.Boolean:
+			res := pbsubstreamstest.Boolean{}
+			if err := proto.Unmarshal(item.Payload, &res); err != nil {
+				return fmt.Errorf("unmarshaling payload at block %d: %w", item.BlockNum, err)
+			}
+
+			if expectedResults[item.BlockNum] == nil {
+				return fmt.Errorf("unexpected block number %d", item.BlockNum)
+			}
+			if !proto.Equal(&res, v) {
+				return fmt.Errorf("results do not match for block %d: expected %+v, got %+v", item.BlockNum, expectedResults[item.BlockNum], res)
+			}
+		default:
+			return fmt.Errorf("unexpected type %T", v)
+		}
+	}
+
+	for k := range expectedResults {
+		if _, found := seenBlocks[k]; !found {
+			return fmt.Errorf("block %d not found in output file", k)
+		}
+	}
+	return nil
+
+}
+
+func readOutputFile(ctx context.Context, extendedTempDir, outputFile string) (*pboutput.Map, error) {
+	s, err := dstore.NewStore(extendedTempDir, "zst", "zstd", false)
 	if err != nil {
-		return fmt.Errorf("opening file %w", err)
+		return nil, fmt.Errorf("initializing dstore for %q: %w", extendedTempDir, err)
+	}
+
+	fileReader, err := s.OpenObject(ctx, outputFile)
+	if err != nil {
+		return nil, fmt.Errorf("opening file %w", err)
 	}
 
 	ctn, err := io.ReadAll(fileReader)
 	if err != nil {
-		return fmt.Errorf("reading store file %w", err)
+		return nil, fmt.Errorf("reading store file %w", err)
 	}
 
 	outputData := &pboutput.Map{}
 
 	if err = outputData.UnmarshalFast(ctn); err != nil {
-		return fmt.Errorf("unmarshalling file %s: %w", checkedFile, err)
+		return nil, fmt.Errorf("unmarshalling file %s: %w", outputFile, err)
+	}
+	return outputData, nil
+}
+
+func checkBlockSkippedInOutputFile(ctx context.Context, extendedTempDir, checkedFile string, expectedSkippedBlock map[uint64]struct{}) error {
+	outputData, err := readOutputFile(ctx, extendedTempDir, checkedFile)
+	if err != nil {
+		return err
 	}
 
 	for _, item := range outputData.Kv {

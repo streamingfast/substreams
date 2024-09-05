@@ -14,11 +14,30 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
 	"go.uber.org/zap"
 )
 
 type getBlockFunc func() (uint64, error)
+
+func reprocStateRequired(startBlock uint64, outputModule string, modules []*pbsubstreams.Module) (bool, error) {
+	graph, err := manifest.NewModuleGraph(modules)
+	if err != nil {
+		return false, err
+	}
+	requiredStores, err := graph.StoresDownTo(outputModule)
+	if err != nil {
+		return false, err
+	}
+
+	for _, store := range requiredStores {
+		if store.InitialBlock < startBlock {
+			return true, nil
+		}
+	}
+	return false, nil
+}
 
 func BuildRequestDetails(
 	ctx context.Context,
@@ -38,20 +57,13 @@ func BuildRequestDetails(
 
 	req.ResolvedStartBlockNum, req.ResolvedCursor, undoSignal, err = resolveStartBlockNum(ctx, request, resolveCursor, getHeadBlock)
 
-	if err != nil {
-		return nil, nil, err
-	}
-
-	moduleHasStatefulDependencies := true
-	if req.Modules != nil { // because of tests which do not define modules in the request. too annoying to add this to tests for now. (TODO)
-		graph, err := manifest.NewModuleGraph(request.Modules.Modules)
+	var moduleHasStatefulDependencies bool
+	if request.Modules == nil {
+		moduleHasStatefulDependencies = true // FIXME this is for test compatibility, it never happens in real life
+	} else {
+		moduleHasStatefulDependencies, err = reprocStateRequired(req.ResolvedStartBlockNum, request.OutputModule, request.Modules.Modules)
 		if err != nil {
 			return nil, nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid modules: %w", err))
-		}
-
-		moduleHasStatefulDependencies, err = graph.HasStatefulDependencies(request.OutputModule)
-		if err != nil {
-			return nil, nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid output module: %w", err))
 		}
 	}
 

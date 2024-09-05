@@ -20,6 +20,7 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -271,7 +272,17 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 			}
 		}
 		p.pendingUndoMessage = nil
-		if err = returnModuleDataOutputs(clock, cursor, p.mapModuleOutput, p.extraMapModuleOutputs, p.extraStoreModuleOutputs, p.respFunc); err != nil {
+
+		// LIVE and DEV mode always receive module data outputs, even when they are empty
+		// so they can follow progress (and dev also gets debug output...)
+		mapModuleOutput := p.mapModuleOutput
+		if mapModuleOutput == nil && !reqDetails.IsTier2Request {
+			mapModuleOutput = &pbsubstreamsrpc.MapModuleOutput{
+				Name:      reqDetails.OutputModule,
+				MapOutput: &anypb.Any{},
+			}
+		}
+		if err = returnModuleDataOutputs(clock, cursor, mapModuleOutput, p.extraMapModuleOutputs, p.extraStoreModuleOutputs, p.respFunc); err != nil {
 			return fmt.Errorf("failed to return module data output: %w", err)
 		}
 	}
@@ -391,8 +402,7 @@ func (p *Pipeline) applyExecutionResult(ctx context.Context, executor exec.Modul
 		p.saveModuleOutput(moduleOutput, executor.Name(), reqctx.Details(ctx).ProductionMode)
 	}
 
-	// we skip outputs on tier2 only, tier1 means either dev-mode or live segment, where we output everything
-	skip_output := res.skipped_output && reqctx.Details(ctx).IsTier2Request
+	skip_output := res.skipped_output
 
 	if !skip_output && executor.HasValidOutput() {
 		if err := execOutput.Set(executorName, outputBytes); err != nil {

@@ -17,7 +17,7 @@ import (
 
 func TestNewStages(t *testing.T) {
 	//seg := block.NewSegmenter(10, 5, 75)
-	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 75, 75, true)
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 5, 75, 75, true)
 	assert.NoError(t, err)
 
 	stages := NewStages(
@@ -45,7 +45,7 @@ func unit(seg, stage int) Unit {
 }
 
 func TestNewStageNextJobs(t *testing.T) {
-	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 50, 50, true)
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 5, 50, 50, true)
 	assert.NoError(t, err)
 	assert.Equal(t, "interval=10, stores=[5, 50), map_write=[5, 50), map_read=[5, 50), linear=[nil)", reqPlan.String())
 	stages := NewStages(
@@ -220,6 +220,7 @@ func TestShadowSimple(t *testing.T) {
 		true, // production mode
 		10,   // segmentInterval
 		5,    // lowestInitialBlock
+		5,    // lowestStoreInitialBlock
 		5,    // resolvedStartBlock
 		50,   //linearHandoffBlock
 		50,   //effectiveEndBlock
@@ -262,7 +263,7 @@ func TestShadowSimple(t *testing.T) {
 }
 
 func TestShadowStartAfter(t *testing.T) {
-	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 30, 90, 90, true)
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 30, 90, 90, true)
 	assert.NoError(t, err)
 	assert.Equal(t, "interval=10, stores=[5, 90), map_write=[30, 90), map_read=[30, 90), linear=[nil)", reqPlan.String())
 
@@ -299,7 +300,7 @@ func TestShadowStartAfter(t *testing.T) {
 }
 
 func TestShadowStartAfter2(t *testing.T) {
-	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 40, 90, 90, true)
+	reqPlan, err := plan.BuildTier1RequestPlan(true, 10, 5, 5, 40, 90, 90, true)
 	assert.NoError(t, err)
 	assert.Equal(t, "interval=10, stores=[5, 90), map_write=[40, 90), map_read=[40, 90), linear=[nil)", reqPlan.String())
 

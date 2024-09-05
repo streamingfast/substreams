@@ -50,7 +50,7 @@ func (p *RequestPlan) RequiresParallelProcessing() bool {
 	return p.WriteExecOut != nil || p.BuildStores != nil
 }
 
-func BuildTier1RequestPlan(productionMode bool, segmentInterval, lowestInitialBlock, resolvedStartBlock, linearHandoffBlock, exclusiveEndBlock uint64, scheduleStores bool) (*RequestPlan, error) {
+func BuildTier1RequestPlan(productionMode bool, segmentInterval, lowestInitialBlock, lowestStoreInitialBlock, resolvedStartBlock, linearHandoffBlock, exclusiveEndBlock uint64, scheduleStores bool) (*RequestPlan, error) {
 	if resolvedStartBlock < lowestInitialBlock {
 		return nil, fmt.Errorf("start block cannot be prior to the lowest init block in the requested module graph (%d)", lowestInitialBlock)
 	}
@@ -72,8 +72,8 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval, lowestInitialBl
 
 	if productionMode {
 		storesEnd := linearHandoffBlock
-		if scheduleStores && storesEnd > lowestInitialBlock {
-			plan.BuildStores = block.NewRange(lowestInitialBlock, storesEnd)
+		if scheduleStores && storesEnd > lowestStoreInitialBlock {
+			plan.BuildStores = block.NewRange(lowestStoreInitialBlock, storesEnd)
 		}
 
 		if resolvedStartBlock < linearHandoffBlock {
@@ -93,8 +93,8 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval, lowestInitialBl
 			plan.ReadExecOut = block.NewRange(resolvedStartBlock, readEndBlock)
 		}
 	} else { /* dev mode */
-		if scheduleStores && linearHandoffBlock > lowestInitialBlock {
-			plan.BuildStores = block.NewRange(lowestInitialBlock, linearHandoffBlock)
+		if scheduleStores && linearHandoffBlock > lowestStoreInitialBlock {
+			plan.BuildStores = block.NewRange(lowestStoreInitialBlock, linearHandoffBlock)
 		}
 		plan.WriteExecOut = nil
 	}

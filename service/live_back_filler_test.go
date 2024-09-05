@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/streamingfast/substreams/reqctx"
+
 	"github.com/streamingfast/bstream"
 
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
@@ -89,6 +91,8 @@ func TestBackFiller(t *testing.T) {
 			segmentProcessed := make(chan uint64)
 
 			RequestBackProcessingTest := func(ctx context.Context, logger *zap.Logger, startBlock uint64, stageToProcess int, clientFactory client.InternalClientFactory, jobResult chan error) {
+				require.True(t, reqctx.HasBackfillerRequest(ctx))
+
 				var err error
 				if c.errorBackProcessing {
 					err = fmt.Errorf("fail")

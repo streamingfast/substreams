@@ -5,14 +5,15 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/streamingfast/derr"
-	"github.com/streamingfast/substreams/orchestrator/work"
-	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/dauth"
 
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+	"github.com/streamingfast/derr"
 	"github.com/streamingfast/substreams/client"
+	"github.com/streamingfast/substreams/orchestrator/work"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+	"github.com/streamingfast/substreams/reqctx"
 	"go.uber.org/zap"
 )
 
@@ -110,6 +111,9 @@ func requestBackProcessing(ctx context.Context, logger *zap.Logger, liveCachingR
 }
 
 func (l *LiveBackFiller) Start(ctx context.Context) {
+	ctx = dauth.FromContext(ctx).ToOutgoingGRPCContext(ctx)
+	ctx = reqctx.WithBackfillerRequest(ctx)
+
 	l.logger.Info("start live back filler", zap.Uint64("current_segment", l.currentSegment))
 
 	var targetSegment uint64
@@ -147,7 +151,6 @@ func (l *LiveBackFiller) Start(ctx context.Context) {
 		mergedBlockIsWritten := (blockNumber - segmentEnd) > finalBlockDelay
 
 		if (targetSegment > l.currentSegment) && mergedBlockIsWritten {
-
 			jobProcessing = true
 			go l.RequestBackProcessing(ctx, l.logger, segmentStart, l.stageToProcess, l.clientFactory, jobResult)
 		}

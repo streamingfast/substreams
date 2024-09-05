@@ -2,6 +2,7 @@ package metering
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/streamingfast/dmetering"
@@ -77,6 +78,10 @@ func GetTotalBytesWritten(meter dmetering.Meter) uint64 {
 }
 
 func Send(ctx context.Context, meter dmetering.Meter, userID, apiKeyID, ip, userMeta, endpoint string, resp proto.Message) {
+	if reqctx.IsBackfillerRequest(ctx) {
+		endpoint = fmt.Sprintf("%s%s", endpoint, "Backfill")
+	}
+
 	bytesRead := meter.BytesReadDelta()
 	bytesWritten := meter.BytesWrittenDelta()
 	egressBytes := proto.Size(resp)

@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -54,6 +55,7 @@ func init() {
 	}
 	initCmd.Flags().String("codegen-endpoint", defaultEndpoint, "Endpoint used to discover code generators")
 	initCmd.Flags().String("state-file", "./generator.json", "File to load/save the state of the code generator")
+	initCmd.Flags().Bool("force-download-cwd", false, "Force download at current dir")
 	rootCmd.AddCommand(initCmd)
 }
 
@@ -453,8 +455,30 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 
 		case *pbconvo.SystemOutput_DownloadFiles_:
 			savingDest, _ := os.Getwd()
-
 			input := msg.DownloadFiles
+
+			forceDownloadProvided, _ := sflags.MustGetBoolProvided(cmd, "force-download-cwd")
+			if forceDownloadProvided {
+				for _, inputFile := range input.Files {
+					fullpath := path.Join(savingDest, inputFile.Filename)
+					fileDir := path.Dir(fullpath)
+
+					err = os.MkdirAll(fileDir, os.ModePerm)
+					if err != nil {
+						return fmt.Errorf("creating directory %q: %w", fileDir, err)
+					}
+
+					err = os.WriteFile(fullpath, inputFile.Content, 0777)
+					if err != nil {
+						if !os.IsNotExist(err) {
+							return fmt.Errorf("writing file %q: %w", fullpath, err)
+						}
+					}
+				}
+				fmt.Println("Everything done!")
+				return nil
+			}
+
 			fmt.Println(filenameStyle("Files:"))
 			if len(input.Files) == 0 {
 				return fmt.Errorf("no files to download")

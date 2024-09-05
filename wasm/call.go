@@ -51,7 +51,7 @@ func NewCall(clock *pbsubstreams.Clock, moduleName string, entrypoint string, st
 			call.valueType = v.ValueType
 		case *StoreReaderInput:
 			call.inputStores = append(call.inputStores, v.Store)
-		case ValueArgument:
+		case *MapInput, *StoreDeltaInput, *ParamsInput, *SourceInput:
 			// Handled in ÈxecuteNewCall()
 		default:
 			panic(fmt.Sprintf("unknown wasm argument type %T", v))

@@ -38,16 +38,17 @@ func main() {
 	start := time.Now()
 
 	for i := 0; i < 1; i++ {
+		argsVals := blockInputFile("/Users/colindickson/code/dfuse/substreams/wasm/bench/cmd/wasigo/testdata/block.binpb")
 		args := args(
 			wasm.NewParamsInput("{key.1: 'value.1'}"),
-			blockInputFile("/Users/colindickson/code/dfuse/substreams/wasm/bench/cmd/wasigo/testdata/block.binpb"),
+			argsVals.arg,
 			wasm.NewStoreReaderInput("store.reader.1", createStore(ctx, "store.reader.1"), 0),
 			wasm.NewStoreReaderInput("store.reader.2", createStore(ctx, "store.reader.2"), 0),
 			wasm.NewStoreWriterOutput("out", createStore(ctx, "out"), 1, "string"),
 		)
 
 		call := wasm.NewCall(nil, "mapBlock", "mapBlock", nil, args)
-		_, err = module.ExecuteNewCall(ctx, call, instance, args)
+		_, err = module.ExecuteNewCall(ctx, call, instance, args, map[string][]byte{argsVals.arg.Name(): argsVals.val})
 		if err != nil {
 			panic(fmt.Errorf("executing call: %w", err))
 		}
@@ -75,7 +76,7 @@ func main() {
 
 }
 
-func createStore(ctx context.Context, name string) *store.FullKV {
+func createStore(_ context.Context, name string) *store.FullKV {
 	ds, err := dstore.NewStore("file:///tmp/"+name, "kv", "", true)
 	if err != nil {
 		panic(err)
@@ -99,14 +100,20 @@ func args(ins ...wasm.Argument) []wasm.Argument {
 	return ins
 }
 
-func blockInputFile(filename string) wasm.Argument {
+func blockInputFile(filename string) *argWithValue {
 	content, err := os.ReadFile(filename)
 	if err != nil {
 		panic(fmt.Errorf("reading input file: %w", err))
 	}
 
 	input := wasm.NewSourceInput("sf.ethereum.type.v2.Block", 0)
-	input.SetValue(content)
+	return &argWithValue{
+		arg: input,
+		val: content,
+	}
+}
 
-	return input
+type argWithValue struct {
+	arg wasm.Argument
+	val []byte
 }

@@ -32,7 +32,7 @@ func BenchmarkExecution(b *testing.B) {
 	type testCase struct {
 		tag        string
 		entrypoint string
-		arguments  []wasm.Argument
+		argument   *argWithValue
 		// Right now there is differences between runtime, so we accept all those values
 		acceptedByteCount []int
 	}
@@ -43,7 +43,7 @@ func BenchmarkExecution(b *testing.B) {
 		// Decode proto only decode and returns the block.number as the output (to ensure the block is not elided at compile time)
 		//{"decode_proto_only", "map_decode_proto_only", args(blockInputFile(b, "testdata/ethereum_mainnet_block_16021772.binpb")), []int{0}},
 
-		{"map_block", "map_block", args(blockInputFile(b, "testdata/ethereum_mainnet_block_16021772.binpb")), []int{53}},
+		{"map_block", "map_block", blockInputFile(b, "testdata/ethereum_mainnet_block_16021772.binpb"), []int{53}},
 	} {
 		var reuseInstance = true
 		//var freshInstanceEachRun = false
@@ -81,7 +81,7 @@ func BenchmarkExecution(b *testing.B) {
 				require.NoError(b, err)
 				defer cachedInstance.Close(ctx)
 
-				call := wasm.NewCall(nil, testCase.tag, testCase.entrypoint, stats, testCase.arguments)
+				call := wasm.NewCall(nil, testCase.tag, testCase.entrypoint, stats, []wasm.Argument{testCase.argument.arg})
 
 				b.ReportAllocs()
 				b.ResetTimer()
@@ -94,7 +94,7 @@ func BenchmarkExecution(b *testing.B) {
 						require.NoError(b, err)
 					}
 
-					_, err := module.ExecuteNewCall(ctx, call, instance, testCase.arguments)
+					_, err := module.ExecuteNewCall(ctx, call, instance, []wasm.Argument{testCase.argument.arg}, map[string][]byte{testCase.argument.arg.Name(): testCase.argument.val})
 					if err != nil {
 						require.NoError(b, err)
 					}
@@ -118,12 +118,17 @@ func args(ins ...wasm.Argument) []wasm.Argument {
 	return ins
 }
 
-func blockInputFile(t require.TestingT, filename string) wasm.Argument {
+type argWithValue struct {
+	arg wasm.Argument
+	val []byte
+}
+
+func blockInputFile(t require.TestingT, filename string) *argWithValue {
 	content, err := os.ReadFile(filename)
 	require.NoError(t, err)
-
 	input := wasm.NewSourceInput("sf.ethereum.type.v2.Block", 0)
-	input.SetValue(content)
-
-	return input
+	return &argWithValue{
+		arg: input,
+		val: content,
+	}
 }

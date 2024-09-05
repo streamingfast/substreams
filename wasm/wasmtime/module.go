@@ -52,7 +52,7 @@ func (m *Module) NewInstance(ctx context.Context) (instance wasm.Instance, err e
 	return inst, nil
 }
 
-func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInstance wasm.Instance, arguments []wasm.Argument) (returnInstance wasm.Instance, err error) {
+func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInstance wasm.Instance, arguments []wasm.Argument, values map[string][]byte) (returnInstance wasm.Instance, err error) {
 	var inst *instance
 	if cachedInstance != nil {
 		inst = cachedInstance.(*instance)
@@ -84,8 +84,16 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 		case *wasm.StoreReaderInput:
 			inputStoreCount++
 			args = append(args, int32(inputStoreCount-1))
-		case wasm.ValueArgument:
+		case *wasm.ParamsInput:
 			cnt := v.Value()
+			ptr, err := inst.Heap.Write(cnt, input.Name())
+			if err != nil {
+				return nil, fmt.Errorf("writing %s to heap: %w", input.Name(), err)
+			}
+			length := int32(len(cnt))
+			args = append(args, ptr, length)
+		case *wasm.MapInput, *wasm.StoreDeltaInput, *wasm.SourceInput:
+			cnt := values[v.Name()]
 			ptr, err := inst.Heap.Write(cnt, input.Name())
 			if err != nil {
 				return nil, fmt.Errorf("writing %s to heap: %w", input.Name(), err)

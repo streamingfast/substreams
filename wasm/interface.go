@@ -48,7 +48,7 @@ type Module interface {
 	// as the `cachedInstance` argument upon the next call. In which case, the runtime
 	// would benefit from using it back. It is the runtime's responsibility to determine
 	// whether this caching entails risks to determinism (leaking of global state for instance).
-	ExecuteNewCall(ctx context.Context, call *Call, cachedInstance Instance, arguments []Argument) (instance Instance, err error)
+	ExecuteNewCall(ctx context.Context, call *Call, cachedInstance Instance, arguments []Argument, argValues map[string][]byte) (instance Instance, err error)
 
 	// Close gets called when the module can be unloaded at the end of a user's request.
 	Close(ctx context.Context) error

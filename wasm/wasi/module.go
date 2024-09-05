@@ -73,10 +73,10 @@ func (m *Module) NewInstance(ctx context.Context) (out wasm.Instance, err error)
 	return sfwazero.NewInstance(nil, sfwazero.TinyGoSauce), nil
 }
 
-func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, wasmInstance wasm.Instance, arguments []wasm.Argument) (out wasm.Instance, err error) {
+func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, wasmInstance wasm.Instance, arguments []wasm.Argument, argumentValues map[string][]byte) (out wasm.Instance, err error) {
 	inst := sfwazero.NewInstance(nil, sfwazero.TinyGoSauce)
 
-	argsData, err := marshallArgs(arguments)
+	argsData, err := marshallArgs(arguments, argumentValues)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling args: %w", err)
 	}
@@ -166,7 +166,7 @@ func (w *LogWriter) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-func marshallArgs(args []wasm.Argument) ([]byte, error) {
+func marshallArgs(args []wasm.Argument, values map[string][]byte) ([]byte, error) {
 	scopeData := ""
 	fieldCount := 0
 	writeStoreCount := 0
@@ -181,7 +181,8 @@ func marshallArgs(args []wasm.Argument) ([]byte, error) {
 			scopeData += fmt.Sprintf("%d: %d\n", fieldCount, readerStoreCount)
 			readerStoreCount++
 		case wasm.ProtoScopeValueArgument:
-			scopeData += fmt.Sprintf("%d: %s\n", fieldCount, v.ProtoScopeValue())
+			val := values[arg.Name()]
+			scopeData += fmt.Sprintf("%d: %s\n", fieldCount, v.ProtoScopeValue(val))
 		default:
 			panic(fmt.Sprintf("unknown wasm argument type %T", v))
 		}

@@ -91,10 +91,17 @@ func (c *Config) NewInstance() (out *Instance, err error) {
 		return nil, fmt.Errorf("reading package: %w", err)
 	}
 
-	pkg, graph, err := manifestReader.Read()
+	pkgBundle, err := manifestReader.Read()
 	if err != nil {
 		return nil, fmt.Errorf("parsing package at %q: %w", c.ManifestPath, err)
 	}
+
+	if pkgBundle == nil {
+		return nil, fmt.Errorf("no package found")
+	}
+
+	pkg := pkgBundle.Package
+	graph := pkgBundle.Graph
 
 	if c.OutputModule == "" {
 		mods, ok := graph.TopologicalSort()

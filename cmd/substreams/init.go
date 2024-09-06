@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -28,7 +29,6 @@ import (
 	"github.com/streamingfast/cli/sflags"
 	pbconvo "github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1"
 	"github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1/pbconvoconnect"
-	"github.com/tidwall/gjson"
 	"golang.org/x/net/http2"
 )
 
@@ -55,6 +55,7 @@ func init() {
 	}
 	initCmd.Flags().String("codegen-endpoint", defaultEndpoint, "Endpoint used to discover code generators")
 	initCmd.Flags().String("state-file", "./generator.json", "File to load/save the state of the code generator")
+	initCmd.Flags().Bool("force-download-cwd", false, "Force download at current dir")
 	rootCmd.AddCommand(initCmd)
 }
 
@@ -64,14 +65,6 @@ var WITH_ACCESSIBLE = false
 type initStateFormat struct {
 	GeneratorID string          `json:"generator"`
 	State       json.RawMessage `json:"state"`
-}
-
-type UserState struct {
-	downloadedFilesfolderPath string
-}
-
-func newUserState() *UserState {
-	return &UserState{}
 }
 
 func readGeneratorState(stateFile string) (*initStateFormat, error) {
@@ -87,6 +80,27 @@ func readGeneratorState(stateFile string) (*initStateFormat, error) {
 }
 
 func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
+	r, err := regexp.Compile("substreams.*.yaml")
+	if err != nil {
+		return fmt.Errorf("failed to compile regexp: %w", err)
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to read current directory: %w", err)
+	}
+
+	files, err := os.ReadDir(cwd)
+	if err != nil {
+		return fmt.Errorf("failed to read current directory: %w", err)
+	}
+
+	for _, file := range files {
+		if r.MatchString(file.Name()) {
+			return fmt.Errorf("substreams project already exists in this directory: %q. Try running 'substreams init' in a new directory", file.Name())
+		}
+	}
+
 	opts := []connect.ClientOption{
 		connect.WithGRPC(),
 	}
@@ -220,7 +234,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		startMsg.Hydrate = &pbconvo.UserInput_Hydrate{SavedState: string(lastState.State)}
 	}
 
-	err := sendFunc(&pbconvo.UserInput{
+	err = sendFunc(&pbconvo.UserInput{
 		Entry: &pbconvo.UserInput_Start_{
 			Start: startMsg,
 		},
@@ -228,8 +242,6 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed sending start message: %w", err)
 	}
-
-	userState := newUserState()
 
 	var loadingCh chan bool
 	for {
@@ -271,7 +283,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				msgString = "⚠️ " + msg.Message.Markdown
 			}
 
-			fmt.Print(toMarkdown(msgString))
+			fmt.Print(ToMarkdown(msgString))
 
 		case *pbconvo.SystemOutput_ImageWithText_:
 			input := msg.ImageWithText
@@ -279,7 +291,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				fmt.Println("View image here:", input.ImgUrl)
 			}
 			if input.Markdown != "" {
-				fmt.Println(toMarkdown(input.Markdown))
+				fmt.Println(ToMarkdown(input.Markdown))
 			}
 
 		case *pbconvo.SystemOutput_ListSelect_:
@@ -442,73 +454,57 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			}
 
 		case *pbconvo.SystemOutput_DownloadFiles_:
-			if userState.downloadedFilesfolderPath == "" {
-				savingDest := "output"
-				if projectName := gjson.GetBytes(lastState.State, "name").String(); projectName != "" {
-					savingDest = projectName
-				}
-
-				if cwd, err := os.Getwd(); err == nil {
-					savingDest = filepath.Join(cwd, savingDest)
-				}
-
-				inputField := huh.NewInput().Title("In which directory do you want to download the project?").Value(&savingDest)
-				inputField.Validate(func(userInput string) error {
-					fmt.Println("Checking directory", userInput)
-					fileInfo, err := os.Stat(userInput)
-					if err != nil {
-						if os.IsNotExist(err) {
-							return nil
-						}
-						return fmt.Errorf("error checking directory: %w", err)
-					}
-
-					if !fileInfo.IsDir() {
-						return errors.New("the path is not a directory")
-					}
-
-					return nil
-				})
-
-				err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run()
-				if err != nil {
-					return fmt.Errorf("failed taking input: %w", err)
-				}
-
-				// the multiple \n are not a mistake, it's to have a blank line before the next message
-				fmt.Printf("\nProject will be saved in %s\n\n", savingDest)
-				userState.downloadedFilesfolderPath = savingDest
-			}
-
+			savingDest, _ := os.Getwd()
 			input := msg.DownloadFiles
-			fmt.Println(filenameStyle("Files:"))
-			for _, file := range input.Files {
-				if file.Content == nil {
-					continue
-				}
 
-				fmt.Printf("  %s %s\n", filenameStyle("-"), filenameStyle(file.Filename))
-				if file.Description != "" {
-					fmt.Printf("\t%s\n\n", file.Description)
+			forceDownloadProvided, _ := sflags.MustGetBoolProvided(cmd, "force-download-cwd")
+			if forceDownloadProvided {
+				for _, inputFile := range input.Files {
+					fullpath := path.Join(savingDest, inputFile.Filename)
+					fileDir := path.Dir(fullpath)
+
+					err = os.MkdirAll(fileDir, os.ModePerm)
+					if err != nil {
+						return fmt.Errorf("creating directory %q: %w", fileDir, err)
+					}
+
+					err = os.WriteFile(fullpath, inputFile.Content, 0777)
+					if err != nil {
+						if !os.IsNotExist(err) {
+							return fmt.Errorf("writing file %q: %w", fullpath, err)
+						}
+					}
 				}
+				fmt.Println("Everything done!")
+				return nil
 			}
-			// let the terminal breath a little
-			fmt.Println()
 
+			fmt.Println(filenameStyle("Files:"))
 			if len(input.Files) == 0 {
 				return fmt.Errorf("no files to download")
 			}
 
+			// let the terminal breath a little
+			// fmt.Println()
+
 			overwriteForm := NewOverwriteForm()
 
 			for _, inputFile := range input.Files {
+				if inputFile.Content == nil {
+					continue
+				}
+
+				fmt.Printf("  %s %s\n", filenameStyle("-"), filenameStyle(inputFile.Filename))
+				if inputFile.Description != "" {
+					fmt.Printf("\t%s\n", inputFile.Description)
+				}
 				switch inputFile.Type {
 				case "application/x-zip+extract": // our custom mime type to always extract the file upon arrival
 					if inputFile.Content == nil {
 						continue
 					}
 
-					zipRoot := userState.downloadedFilesfolderPath
+					zipRoot := savingDest
 
 					zipContent := inputFile.Content
 					err = unzipFile(overwriteForm, zipContent, zipRoot)
@@ -524,13 +520,15 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 						continue
 					}
 
-					fullPath := filepath.Join(userState.downloadedFilesfolderPath, inputFile.Filename)
+					fullPath := filepath.Join(savingDest, inputFile.Filename)
 					err = saveDownloadFile(fullPath, overwriteForm, inputFile)
 					if err != nil {
 						return fmt.Errorf("saving file: %w", err)
 					}
 
 				}
+
+				fmt.Println()
 			}
 
 			if err := sendFunc(&pbconvo.UserInput{
@@ -555,6 +553,55 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 }
 
 func saveDownloadFile(path string, overwriteForm *OverwriteForm, inputFile *pbconvo.SystemOutput_DownloadFile) (err error) {
+	if inputFile.Filename == ".gitignore" {
+		if _, err := os.Stat(path); err == nil {
+			// Add .gitignore current inputFile content to the existing .gitignore file
+			existingContent, err := os.ReadFile(path)
+			if err != nil {
+				return fmt.Errorf("reading existing .gitignore file: %w", err)
+			}
+
+			// append the new .gitignore content, deduping entries
+			existingValues := make(map[string]struct{})
+			for _, line := range strings.Split(string(existingContent), "\n") {
+				existingValues[line] = struct{}{}
+			}
+
+			var appendValues []string
+			for _, line := range strings.Split(string(inputFile.Content), "\n") {
+				if _, ok := existingValues[line]; !ok {
+					appendValues = append(appendValues, line)
+				}
+			}
+			appendBytes := []byte(strings.Join(appendValues, "\n"))
+
+			var out []byte
+			if appendValues != nil {
+				fmt.Println("\t-- content appended to existing .gitignore\n")
+				out = append(existingContent, []byte("\n# Added by substreams init")...)
+				out = append(out, appendBytes...)
+				out = append(out, []byte("\n")...)
+			} else {
+				fmt.Println("\t-- skipped as it contained no new .gitignore entries\n")
+				out = existingContent
+			}
+
+			err = os.WriteFile(path, out, 0644)
+			if err != nil {
+				return fmt.Errorf("saving merged .gitignore file %q: %w", inputFile.Filename, err)
+			}
+
+			return nil
+		}
+
+		err = os.WriteFile(path, inputFile.Content, 0644)
+		if err != nil {
+			return fmt.Errorf("saving zip file %q: %w", inputFile.Filename, err)
+		}
+
+		return nil
+	}
+
 	dir := filepath.Dir(path)
 	err = os.MkdirAll(dir, 0755)
 	if err != nil {
@@ -562,19 +609,31 @@ func saveDownloadFile(path string, overwriteForm *OverwriteForm, inputFile *pbco
 	}
 
 	if !overwriteForm.OverwriteAll {
-		if _, err := os.Stat(path); err == nil {
-			err = overwriteForm.createOverwriteForm(path)
-			if err != nil {
-				return fmt.Errorf(": %w", err)
-			}
+		if stat, err := os.Lstat(path); err == nil {
+			if stat.Mode().Type() == os.ModeSymlink && inputFile.Filename == "README.md" { // we always overwrite a 'symlink README.md' to match our canonical dev flow
+				target, err := os.Readlink(path)
+				if err != nil {
+					return fmt.Errorf("reading existing symlink %s: %w", path, err)
+				}
 
-			if !overwriteForm.Overwrite {
-				fmt.Println("Skipping", path)
-				return nil
+				lipgloss.NewStyle().Italic(true)
+				fmt.Printf("\t-- previous symlink (README.md -> %s) automatically replaced\n", target)
+			} else {
+				err = overwriteForm.createOverwriteForm(path)
+				if err != nil {
+					return fmt.Errorf(": %w", err)
+				}
+
+				if !overwriteForm.Overwrite {
+					fmt.Println("Skipping", path)
+					return nil
+				}
 			}
 		}
 	}
-
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("attempting to delete existing file %s: %w", path, err)
+	}
 	err = os.WriteFile(path, inputFile.Content, 0644)
 	if err != nil {
 		return fmt.Errorf("saving zip file %q: %w", inputFile.Filename, err)
@@ -582,12 +641,14 @@ func saveDownloadFile(path string, overwriteForm *OverwriteForm, inputFile *pbco
 	return nil
 }
 
-func toMarkdown(input string) string {
+func ToMarkdown(input string) string {
 	style := "light"
 	if lipgloss.HasDarkBackground() {
 		style = "dark"
 	}
+
 	renderer, err := glamour.NewTermRenderer(glamour.WithWordWrap(0), glamour.WithStandardStyle(style))
+
 	if err != nil {
 		panic(fmt.Errorf("failed rendering markdown %q: %w", input, err))
 	}
@@ -645,9 +706,9 @@ func unzipFile(overwriteForm *OverwriteForm, zipContent []byte, zipRoot string) 
 		}
 
 		if err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
-			return (err)
+			return err
 		}
-		destFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+		destFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, f.Mode())
 		if err != nil {
 			return err
 		}

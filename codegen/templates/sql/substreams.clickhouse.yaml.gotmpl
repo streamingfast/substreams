@@ -1,0 +1,45 @@
+# substreams.yaml
+specVersion: v0.1.0
+package:
+  name: {{  .SQLExtensionName }}
+  version: v0.1.0
+
+protobuf:
+  excludePaths:
+    - sf/substreams/sink
+    - sf/substreams/v1
+    - sf/substreams/index
+    - sf/substreams/intern
+    - google
+
+network: {{ .Network }}
+imports:
+  sql: https://github.com/streamingfast/substreams-sink-sql/releases/download/protodefs-v{{ .SQLImportVersion }}/substreams-sink-sql-protodefs-v{{ .SQLImportVersion }}.spkg
+  database_change: https://github.com/streamingfast/substreams-sink-database-changes/releases/download/v{{ .DatabaseChangeImportVersion }}/substreams-database-change-v{{ .DatabaseChangeImportVersion }}.spkg
+  {{ .Name }}: {{ .ManifestPath }}
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: target/wasm32-unknown-unknown/release/{{ .SQLExtensionName }}.wasm
+
+modules:
+  - name: db_out
+      kind: map
+      initialBlock: {{ .ModuleInitialBlock }}
+      inputs:
+        - map: {{ .Name }}:{{ .Module.Name }}
+      output:
+        type: proto:sf.substreams.sink.database.v1.DatabaseChanges
+
+sink:
+  module: db_out
+  type: sf.substreams.sink.sql.v1.Service
+  config:
+    schema: "./schema.sql"
+    engine: clickhouse
+    postgraphile_frontend:
+      enabled: false
+    rest_frontend:
+      enabled: false
+

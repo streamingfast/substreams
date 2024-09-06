@@ -4,11 +4,6 @@ set -e
 
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-example_query="
-{
-}
-"
-
 if [[ -z $SUBSTREAMS_API_TOKEN ]]; then
   echo "Please set SUBSTREAMS_API_TOKEN in your environment"
   exit 1
@@ -48,7 +43,3 @@ echo "----- Running local graph -----"
 echo ""
 sleep 1
 npm run deploy-local
-
-echo "Here is an example query you can run:"
-echo ""
-echo $example_query

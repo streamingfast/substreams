@@ -2,15 +2,15 @@
   "name": "{{ .Name }}",
   "license": "Apache-2.0",
   "scripts": {
-    "protogen": "graph codegen",
-    "generate": "buf generate --type=\"{{ $.GetOutputProtoPath}}\" ../{{ $.SpkgProjectName}}#format=bin",
+    "codegen": "graph codegen",
+    "protogen": "buf generate --type=\"{{ $.GetOutputProtoPath}}\" ../{{ $.SpkgProjectName}}#format=bin; echo ''; echo '^^^ You can safely ignore warnings about \"non-conform Protobuf generation specification\": they come from the assemblyscript buf plugin'; echo ''",
     "build": "graph build",
-    "create-local": "graph create --node http://localhost:8020/ {{ .Name }}",
-    "remove-local": "graph remove --node http://localhost:8020/ {{ .Name }}",
-    "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 {{ .Name }} --version-label=v0.0.1",
+    "create-local": "graph create --node http://${LOCAL_GRAPH_NODE_HOSTNAME:-localhost}:8020/ {{ .Name }}",
+    "deploy-local": "graph deploy --node http://${LOCAL_GRAPH_NODE_HOSTNAME:-localhost}:8020/ --ipfs http://${LOCAL_IPFS_HOSTNAME:-localhost}:5001 {{ .Name }} --version-label=v0.0.1",
     "deploy": "graph deploy --node https://api.studio.thegraph.com/deploy/ {{ .Name }}",
     "publish": "graph publish",
-    "test": "graph test"
+    "test": "graph test",
+    "remove-local": "graph remove --node http://${LOCAL_GRAPH_NODE_HOSTNAME:-localhost}:8020/ {{ .Name }}"
   },
   "dependencies": {
     "@graphprotocol/graph-cli": "^0.73.0",

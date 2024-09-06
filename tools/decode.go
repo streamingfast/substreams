@@ -130,10 +130,17 @@ func runDecodeStatesModuleRunE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
 
-	pkg, graph, err := manifestReader.Read()
+	pkgBundle, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
+
+	if pkgBundle == nil {
+		return fmt.Errorf("no package found")
+	}
+
+	pkg := pkgBundle.Package
+	graph := pkgBundle.Graph
 
 	protoFiles := pkg.ProtoFiles
 
@@ -203,10 +210,17 @@ func runDecodeIndexModuleRunE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
 
-	pkg, graph, err := manifestReader.Read()
+	pkgBundle, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
+
+	if pkgBundle == nil {
+		return fmt.Errorf("no package found")
+	}
+
+	pkg := pkgBundle.Package
+	graph := pkgBundle.Graph
 
 	hashes := manifest.NewModuleHashes()
 
@@ -286,11 +300,17 @@ func runDecodeOutputsModuleRunE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
 
-	pkg, graph, err := manifestReader.Read()
+	pkgBundle, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
+	if pkgBundle == nil {
+		return fmt.Errorf("no package found")
+	}
+
+	pkg := pkgBundle.Package
+	graph := pkgBundle.Graph
 	protoFiles := pkg.ProtoFiles
 
 	hashes := manifest.NewModuleHashes()

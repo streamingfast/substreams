@@ -81,9 +81,12 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package, showBufContent
 	cmdArgs := []string{
 		"generate", spkgTemporaryFilePath + "#format=bin",
 	}
+
 	for _, excludePath := range g.excludedPaths {
 		cmdArgs = append(cmdArgs, "--exclude-path", excludePath)
 	}
+
+	cmdArgs = append(cmdArgs, "--include-imports")
 
 	fmt.Printf("Running: buf %s\n", strings.Join(cmdArgs, " "))
 	c := exec.Command("buf", cmdArgs...)

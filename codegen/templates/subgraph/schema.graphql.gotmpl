@@ -1,0 +1,6 @@
+type MyEntity @entity {
+    id: ID!
+    {{- range $entity := $.EntityTypes }}
+    {{ $entity.ToGraphQLType }}
+    {{- end }}
+}

@@ -54,7 +54,6 @@ func New(c common.Common, conf *Config) *Request {
 }
 
 func (r *Request) Init() tea.Cmd {
-
 	return nil
 }
 

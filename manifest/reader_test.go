@@ -43,11 +43,12 @@ func TestReader_Read(t *testing.T) {
 	}
 
 	tests := []struct {
-		name          string
-		args          args
-		want          *pbsubstreams.Package
-		assertionNew  require.ErrorAssertionFunc
-		assertionRead require.ErrorAssertionFunc
+		name                string
+		args                args
+		want                *pbsubstreams.Package
+		assertionNew        require.ErrorAssertionFunc
+		assertionRead       require.ErrorAssertionFunc
+		skipProtoValidation bool
 	}{
 		{
 			"bare_minimum.yaml",
@@ -65,6 +66,7 @@ func TestReader_Read(t *testing.T) {
 			},
 			require.NoError,
 			require.NoError,
+			false,
 		},
 		{
 			"from_folder",
@@ -82,6 +84,7 @@ func TestReader_Read(t *testing.T) {
 			},
 			require.NoError,
 			require.NoError,
+			false,
 		},
 		{
 			"empty_input",
@@ -102,6 +105,7 @@ func TestReader_Read(t *testing.T) {
 			},
 			require.NoError,
 			require.NoError,
+			false,
 		},
 		{
 			"imports_relative_path.yaml",
@@ -123,6 +127,7 @@ func TestReader_Read(t *testing.T) {
 			},
 			require.NoError,
 			require.NoError,
+			false,
 		},
 		{
 			"binaries_relative_path.yaml",
@@ -148,6 +153,7 @@ func TestReader_Read(t *testing.T) {
 			},
 			require.NoError,
 			require.NoError,
+			false,
 		},
 		//{
 		//	"imports_http_url.yaml",
@@ -203,6 +209,7 @@ func TestReader_Read(t *testing.T) {
 			},
 			require.NoError,
 			require.NoError,
+			false,
 		},
 		{
 			"protobuf_files_relative_path.yaml",
@@ -222,6 +229,7 @@ func TestReader_Read(t *testing.T) {
 			},
 			require.NoError,
 			require.NoError,
+			false,
 		},
 		{
 			"protobuf_importPaths_relative_path.yaml",
@@ -241,6 +249,7 @@ func TestReader_Read(t *testing.T) {
 			},
 			require.NoError,
 			require.NoError,
+			false,
 		},
 		{
 			"protobuf_importPaths_expand_variables.yaml",
@@ -266,6 +275,7 @@ func TestReader_Read(t *testing.T) {
 			},
 			require.NoError,
 			require.NoError,
+			false,
 		},
 		{
 			"invalid_map_module.yaml",
@@ -273,6 +283,7 @@ func TestReader_Read(t *testing.T) {
 			nil,
 			require.NoError,
 			require.Error,
+			false,
 		},
 		{
 			"invalid_unknown_field.yaml",
@@ -280,6 +291,7 @@ func TestReader_Read(t *testing.T) {
 			nil,
 			require.NoError,
 			require.Error,
+			false,
 		},
 		{
 			"networks.yaml",
@@ -320,6 +332,7 @@ func TestReader_Read(t *testing.T) {
 			},
 			require.NoError,
 			require.NoError,
+			false,
 		},
 		{
 			"networks_with_params.yaml",
@@ -358,6 +371,7 @@ func TestReader_Read(t *testing.T) {
 			},
 			require.NoError,
 			require.NoError,
+			false,
 		},
 		{
 			"networks_with_params.yaml",
@@ -398,6 +412,7 @@ func TestReader_Read(t *testing.T) {
 			},
 			require.NoError,
 			require.NoError,
+			false,
 		},
 
 		{
@@ -406,6 +421,7 @@ func TestReader_Read(t *testing.T) {
 			nil,
 			require.NoError,
 			require.Error,
+			false,
 		},
 		{
 			"networks_inconsistent.yaml",
@@ -413,6 +429,15 @@ func TestReader_Read(t *testing.T) {
 			nil,
 			require.NoError,
 			require.Error,
+			false,
+		},
+		{
+			"with-exclude-paths.yaml",
+			args{},
+			nil,
+			require.NoError,
+			require.NoError,
+			true,
 		},
 	}
 	for _, tt := range tests {
@@ -447,9 +472,12 @@ func TestReader_Read(t *testing.T) {
 			r, err := newReader(manifestPath, workingDir, readerOptions...)
 			tt.assertionNew(t, err)
 
-			got, _, err := r.Read()
+			pkgBundle, err := r.Read()
 			tt.assertionRead(t, err)
-			assertProtoEqual(t, tt.want, got)
+
+			if pkgBundle != nil {
+				assertProtoEqual(t, tt.want, pkgBundle.Package, tt.skipProtoValidation)
+			}
 		})
 	}
 }

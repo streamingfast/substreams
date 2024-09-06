@@ -11,6 +11,7 @@ func (r *Request) ShortHelp() []key.Binding {
 		keymap.MainNavigation,
 		keymap.UpDown,
 		keymap.RestartStream,
+		keymap.Build,
 		keymap.Help,
 		keymap.Quit,
 	}
@@ -26,6 +27,9 @@ func (r *Request) FullHelp() [][]key.Binding {
 		},
 		{
 			keymap.RestartStream,
+		},
+		{
+			keymap.Build,
 		},
 		{
 			keymap.Help,

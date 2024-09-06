@@ -37,17 +37,22 @@ func runManifestGraph(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
 
-	pkg, _, err := manifestReader.Read()
+	pkgBundle, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
-	manifest.PrintMermaid(pkg.Modules)
+	if pkgBundle == nil {
+		return fmt.Errorf("no package found")
+	}
+
+	modules := pkgBundle.Package.Modules
+	manifest.PrintMermaid(modules)
 
 	fmt.Println("")
 	fmt.Println("Here is a quick link to see the graph:")
 	fmt.Println("")
-	fmt.Println(manifest.GenerateMermaidLiveURL(pkg.Modules))
+	fmt.Println(manifest.GenerateMermaidLiveURL(modules))
 
 	return nil
 }

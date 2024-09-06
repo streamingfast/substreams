@@ -1,0 +1,13 @@
+CREATE TABLE IF NOT EXISTS events (
+    {{- range $entity := $.EntityTypes }}
+    {{ $entity.ToSQLType }}
+    {{- end }}
+    {{- if not .EntityInfo.HasAnID }}
+    "id" VARCHAR(64),
+    {{- end }}
+)
+{{- if .EntityInfo.HasAnID }}
+ENGINE = MergeTree PRIMARY KEY ({{ .EntityInfo.IDFieldName }})
+{{- else }}
+ENGINE = MergeTree PRIMARY KEY (id)
+{{- end }}

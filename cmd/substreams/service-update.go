@@ -39,9 +39,13 @@ func updateE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	pkg, _, err := reader.Read()
+	pkgBundle, err := reader.Read()
 	if err != nil {
 		return err
+	}
+
+	if pkgBundle == nil {
+		return fmt.Errorf("no package found")
 	}
 
 	cli := pbsinksvcconnect.NewProviderClient(http.DefaultClient, sflags.MustGetString(cmd, "endpoint"))
@@ -69,7 +73,7 @@ func updateE(cmd *cobra.Command, args []string) error {
 	reset := sflags.MustGetBool(cmd, "reset")
 
 	req := connect.NewRequest(&pbsinksvc.UpdateRequest{
-		SubstreamsPackage: pkg,
+		SubstreamsPackage: pkgBundle.Package,
 		DeploymentId:      id,
 		Reset_:            reset,
 	})

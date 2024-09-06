@@ -57,11 +57,16 @@ func (cs *ConnectServer) Blocks(
 			return fmt.Errorf("manifest reader: %w", err)
 		}
 
-		pkg, _, err := manifestReader.Read()
+		pkgBundle, err := manifestReader.Read()
 		if err != nil {
 			return fmt.Errorf("read manifest %q: %w", cs.Manifest, err)
 		}
-		newReq.Modules = pkg.Modules
+
+		if pkgBundle == nil {
+			return fmt.Errorf("no package found")
+		}
+
+		newReq.Modules = pkgBundle.Package.Modules
 	}
 
 	if cs.StartBlock != 0 {

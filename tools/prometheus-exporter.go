@@ -78,9 +78,13 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
 
-	pkg, _, err := manifestReader.Read()
+	pkgBundle, err := manifestReader.Read()
 	if err != nil {
 		return fmt.Errorf("reading manifest %q: %w", manifestPath, err)
+	}
+
+	if pkgBundle == nil {
+		return fmt.Errorf("no package found")
 	}
 
 	outputStreamName := moduleName
@@ -111,7 +115,7 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 			insecure,
 			plaintext,
 		)
-		go launchSubstreamsPoller(endpoint, substreamsClientConfig, pkg.Modules, outputStreamName, startBlock, interval, timeout)
+		go launchSubstreamsPoller(endpoint, substreamsClientConfig, pkgBundle.Package.Modules, outputStreamName, startBlock, interval, timeout)
 	}
 
 	promReg := prometheus.NewRegistry()

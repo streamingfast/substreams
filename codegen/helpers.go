@@ -4,17 +4,17 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/golang-cz/textcase"
 
 	"github.com/charmbracelet/huh"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"google.golang.org/protobuf/types/descriptorpb"
 )
-
-const outputTypeSQL = "sql"
-const outputTypeSubgraph = "subgraph"
 
 func getModule(pkg *pbsubstreams.Package, moduleName string) (*pbsubstreams.Module, error) {
 	existingModules := pkg.GetModules().GetModules()
@@ -80,22 +80,50 @@ func processMessage(message *descriptorpb.DescriptorProto, parentName string, pr
 	}
 }
 
-func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bool) error {
+func buildGenerateCommandFromArgs(manifestPath string, outputType OutputType, withDevEnv bool) error {
 	reader, err := manifest.NewReader(manifestPath)
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
 
-	pkg, _, err := reader.Read()
+	pkgBundle, err := reader.Read()
 	if err != nil {
 		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
 	}
 
+	if pkgBundle == nil {
+		return fmt.Errorf("no package found")
+	}
+
+	pkg := pkgBundle.Package
+
 	moduleNames := []string{}
 	for _, module := range pkg.Modules.Modules {
-		if module.Output != nil {
-			moduleNames = append(moduleNames, module.Name)
+		if strings.Contains(module.Name, ":") {
+			continue
 		}
+
+		if module.ModuleKind() == pbsubstreams.ModuleKindBlockIndex || module.ModuleKind() == pbsubstreams.ModuleKindStore || module.Output == nil {
+			continue
+		}
+
+		if outputType == Sql {
+			if module.Output.Type == "proto:sf.substreams.sink.database.v1.DatabaseChanges" {
+				input := fmt.Sprintf("A module `%s` has database changes as output type... That means you can directly sink data from it, to an SQL database, using `substreams-sink-sql` binary...\n\n", module.Name)
+				printMarkdown(input)
+				continueCmd, err := askContinueCmd()
+				if err != nil {
+					return fmt.Errorf("asking for continue command: %w", err)
+				}
+
+				if !continueCmd {
+					return nil
+				}
+				continue
+			}
+		}
+
+		moduleNames = append(moduleNames, module.Name)
 	}
 
 	selectedModule, err := createSelectForm(moduleNames, "Please select a mapper module to build the subgraph from:")
@@ -108,9 +136,11 @@ func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bo
 		return fmt.Errorf("getting module: %w", err)
 	}
 
-	if outputType == outputTypeSQL {
-		if requestedModule.Output.Type != "proto:sf.substreams.sink.database.v1.DatabaseChanges" {
-			return fmt.Errorf("requested module shoud have proto:sf.substreams.sink.database.v1.DatabaseChanges as output type")
+	var flavor string
+	if outputType == Sql {
+		flavor, err = createSelectForm([]string{"PostgresSQL", "ClickHouse"}, "Please select a SQL flavor:")
+		if err != nil {
+			return fmt.Errorf("creating sql flavor form: %w", err)
 		}
 	}
 
@@ -140,7 +170,7 @@ func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bo
 	currentNetwork := pkg.Network
 	if currentNetwork == "" {
 		labels := []string{}
-		for label, _ := range ChainConfigByID {
+		for label := range ChainConfigByID {
 			labels = append(labels, label)
 		}
 
@@ -152,27 +182,42 @@ func buildGenerateCommandFromArgs(manifestPath, outputType string, withDevEnv bo
 		currentNetwork = selectedNetwork
 	}
 
-	project := NewProject(projectName, spkgProjectName, currentNetwork, requestedModule, messageDescriptor, protoTypeMapping)
+	if manifestPath == "" {
+		manifestPath = "../" + spkgProjectName
+	}
 
-	// Create an example entity from the output descriptor
-	project.BuildExampleEntity()
+	project := NewProject(projectName, spkgProjectName, currentNetwork, manifestPath, requestedModule, messageDescriptor, protoTypeMapping, outputType, flavor)
 
-	fmt.Println("Rendering project files for Substreams-powered-subgraph...")
+	err = project.BuildOutputEntity()
+	if err != nil {
+		return fmt.Errorf("building output entity: %w", err)
+	}
 
-	projectFiles, err := project.Render(outputType, withDevEnv)
+	if outputType == Sql {
+		fmt.Println("Rendering project files for Substreams Sink SQL...")
+	} else {
+		fmt.Println("Rendering project files for Substreams-powered-subgraph...")
+	}
+
+	projectFiles, err := project.Render(withDevEnv)
 	if err != nil {
 		return fmt.Errorf("rendering project files: %w", err)
 	}
 
 	saveDir := "subgraph"
+
+	if outputType == Sql {
+		saveDir = "sql"
+	}
+
 	if cwd, err := os.Getwd(); err == nil {
 		saveDir = filepath.Join(cwd, saveDir)
 	}
 
-	_, err = os.Stat("subgraph")
+	_, err = os.Stat(saveDir)
 	if !os.IsNotExist(err) {
-		fmt.Println("A subgraph directory is already existing...")
-		saveDir, err = createSaveDirForm("subgraph-2")
+		fmt.Printf("A %s directory is already existing...", saveDir)
+		saveDir, err = createSaveDirForm(fmt.Sprintf("%s-2", saveDir))
 		if err != nil {
 			return fmt.Errorf("creating save dir form: %w", err)
 		}
@@ -212,6 +257,14 @@ func saveProjectFiles(projectFiles map[string][]byte, saveDir string) error {
 		err := os.MkdirAll(filepath.Dir(filePath), 0755)
 		if err != nil {
 			return fmt.Errorf("creating directory %s: %w", filepath.Dir(filePath), err)
+		}
+
+		if strings.HasSuffix(fileName, ".sh") {
+			err = os.WriteFile(filePath, fileContent, 0755)
+			if err != nil {
+				return fmt.Errorf("saving file %s: %w", filePath, err)
+			}
+			continue
 		}
 
 		err = os.WriteFile(filePath, fileContent, 0644)
@@ -254,4 +307,36 @@ func createSelectForm(labels []string, title string) (string, error) {
 	}
 
 	return selection, nil
+}
+
+func askContinueCmd() (bool, error) {
+	var continueCmd bool
+	inputField := huh.NewConfirm().
+		Title(fmt.Sprintf("Do you still want to proceed?")).
+		Affirmative("Yes").
+		Negative("No").
+		Value(&continueCmd)
+
+	err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huh.ThemeCharm()).WithAccessible(false).Run()
+	if err != nil {
+		return false, fmt.Errorf("failed taking confirmation input: %w", err)
+	}
+
+	return continueCmd, nil
+}
+
+func toProtoPascalCase(input string) string {
+	input = textcase.PascalCase(input)
+
+	reg := regexp.MustCompile(`(\d+)([a-zA-Z])`)
+
+	input = reg.ReplaceAllStringFunc(input, func(match string) string {
+		return match[:len(match)-1] + strings.ToUpper(string(match[len(match)-1]))
+	})
+
+	return input
+}
+
+func printMarkdown(input string) {
+	fmt.Println(ToMarkdown(input))
 }

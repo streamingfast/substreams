@@ -1,0 +1,11 @@
+CREATE TABLE IF NOT EXISTS "{{ .OutputName }}" (
+  {{- range $entity := $.EntityTypes }}
+  {{ $entity.ToSQLType }}
+  {{- end }}
+  {{- if .EntityInfo.HasAnID }}
+  PRIMARY KEY ({{ .EntityInfo.IDFieldName }})
+  {{- else }}
+  "id" VARCHAR(64),
+  PRIMARY KEY (id)
+  {{- end }}
+)

@@ -55,18 +55,21 @@ var guiCmd = &cobra.Command{
 func runGui(cmd *cobra.Command, args []string) (err error) {
 	var manifestPath string
 	var outputModule string
-	if len(args) == 2 {
-		manifestPath = args[0]
-		outputModule = args[1]
-	} else if len(args) == 1 {
-		manifestPath = args[0]
-	} else {
-		// At this point, we assume the user invoked `substreams run <module_name>` so we `resolveManifestFile` using the empty string since no argument has been passed.
+	switch len(args) {
+	case 0:
 		manifestPath, err = resolveManifestFile("")
 		if err != nil {
 			return fmt.Errorf("resolving manifest: %w", err)
 		}
+	case 1:
+		manifestPath = args[0]
+	case 2:
+		manifestPath = args[0]
+		outputModule = args[1]
+	default:
+		return fmt.Errorf("too many arguments")
 	}
+	// TODO: validate that the manifest is a valid substreams package
 
 	productionMode := sflags.MustGetBool(cmd, "production-mode")
 	debugModulesOutput := sflags.MustGetStringSlice(cmd, "debug-modules-output")

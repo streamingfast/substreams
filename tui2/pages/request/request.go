@@ -151,13 +151,18 @@ func (r *Request) View() string {
 
 func (r *Request) renderRequestSummary() string {
 	startBlock := r.Config.StartBlock
-	if startBlock == "" {
+	if startBlock == "" && r.Config.Graph != nil {
 		startBlockInt, _ := r.Config.Graph.ModuleInitialBlock(r.Config.OutputModule)
 		startBlock = fmt.Sprintf("%d (module's initial block)", startBlockInt)
 	}
 	packageName := r.Config.ManifestPath
-	packageMeta := r.Config.Pkg.PackageMeta[0]
-	packageName = fmt.Sprintf("%s (%s-%s)", packageName, packageMeta.Name, packageMeta.Version)
+	packageMetaName := "unknown"
+	packageMetaVersion := "unknown"
+	if r.Config.Pkg != nil && len(r.Config.Pkg.PackageMeta) > 0 {
+		packageMetaName = r.Config.Pkg.PackageMeta[0].Name
+		packageMetaVersion = r.Config.Pkg.PackageMeta[0].Version
+	}
+	packageName = fmt.Sprintf("%s (%s-%s)", packageName, packageMetaName, packageMetaVersion)
 	rows := [][]string{
 		{"Package:", packageName},
 		{fmt.Sprintf("Endpoint %s:", styles.HelpKey.Render("<e>")), r.Config.Endpoint},

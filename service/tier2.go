@@ -532,7 +532,7 @@ func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbs
 			return connect.NewError(connect.CodeUnavailable, err)
 		}
 
-		logger.Info("sending metering event",
+		logger.Debug("sending metering event",
 			zap.String("user_id", userID),
 			zap.String("key_id", apiKeyID),
 			zap.String("ip_address", ip),

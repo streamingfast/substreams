@@ -9,13 +9,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v1.10.1 (unreleased)
+## v1.10.1
 
 ### Server
 
-* Fix handling of modules that receive both filtered AND unfiltered data as their inputs -> some "repeated entries" may have appeared where no data should have showed up
+* Fix handling of modules that receive both filtered AND unfiltered data as their inputs -> some "repeated entries" could appear where no data should have showed up (invalid outputs / possibly affected caches)
 * Fix stalling on substreams with both map and store with different initialBlocks on the same stage
-* Fix: prevent execution of modules that should be skipped when running live or dev mode
+* Fix: prevent execution of modules that should be skipped when running live or dev mode (different outputs than when running in batch mode on tier2)
+
+### Client
+
+* `substreams gui` fixed a panic occuring if the given package path doesn't exist
+* `substreams init` must now be called from within your project folder (it no longer downloads file in a subdirectory)
+* (since v1.10.0) `substreams gui` no longer accepts "output_module" as a single argument. It either receives nothing, the package, or the package followed by the output_module
 
 ## v1.10.0
 
@@ -34,6 +40,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * On `substreams init` command, if flag `--state-file` is provided, the state file is used by default for project generation.
 * In `substreams init` command, the state file is named using a `Date format` and not using `Unix` anymore.
 * Tools->prometheus: added the possibility to override the start-block on an endpoint
+* `substreams gui` no longer accepts "output_module" as a single argument. It either receives nothing, the package, or the package followed by the output_module
 
 ## v1.9.3
 

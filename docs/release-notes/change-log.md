@@ -13,7 +13,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
-* Fix handling of modules that receive both filtered AND unfiltered data as their inputs -> some "repeated entries" could appear where no data should have showed up (invalid outputs / possibly affected caches)
+> **Note** Since a bug that affected substreams with "skipping blocks" was corrected in this release, any previously produced substreams cache should be considered as possibly corrupted and be eventually replaced
+
+* Fix handling of modules that receive both filtered AND unfiltered data as their inputs -> some "repeated entries" could appear where no data should have showed up
 * Fix stalling on substreams with both map and store with different initialBlocks on the same stage
 * Fix: prevent execution of modules that should be skipped when running live or dev mode (different outputs than when running in batch mode on tier2)
 

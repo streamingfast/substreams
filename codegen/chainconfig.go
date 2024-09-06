@@ -105,9 +105,9 @@ var ChainConfigByID = map[string]*ChainConfig{
 		FirehoseEndpoint: "testnet.starknet.streamingfast.io:443",
 		Network:          "starknet-testnet",
 	},
-	"solana": {
+	"solana-mainnet-beta": {
 		DisplayName:      "Solana Mainnet",
-		Network:          "solana",
+		Network:          "solana-mainnet-beta",
 		FirehoseEndpoint: "mainnet.solana.streamingfast.io:443",
 	},
 	"vara-mainnet": {

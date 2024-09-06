@@ -9,6 +9,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.10.1 (unreleased)
+
+### Server
+
+* Fix handling of modules that receive both filtered AND unfiltered data as their inputs -> some "repeated entries" may have appeared where no data should have showed up
+* Fix stalling on substreams with both map and store with different initialBlocks on the same stage
+* Fix: prevent execution of modules that should be skipped when running live or dev mode
+
 ## v1.10.0
 
 ### Server

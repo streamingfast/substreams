@@ -35,6 +35,24 @@ modules:
     output:
       type: proto:sf.substreams.v1.test.Boolean
 
+  - name: map_hybrid_input_clock_70
+    kind: map
+    initialBlock: 70
+    inputs:
+      - source: sf.substreams.v1.Clock
+      - map: map_using_index_init_70
+    output:
+      type: proto:sf.substreams.v1.test.Boolean
+
+  - name: map_hybrid_input_block_70
+    kind: map
+    initialBlock: 70
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - map: map_using_index_init_70
+    output:
+      type: proto:sf.substreams.v1.test.Boolean
+
   - name: first_store_init_20
     kind: store
     initialBlock: 20

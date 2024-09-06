@@ -503,11 +503,16 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	// But it seems a bit more involved in here.
 
 	scheduleStores := execGraph.StagedUsedModules()[0].LastLayer().IsStoreLayer()
+	var lowestStoresInitBlock uint64
+	if scheduleStores {
+		lowestStoresInitBlock = *execGraph.LowestStoresInitBlock()
+	}
 
 	reqPlan, err := plan.BuildTier1RequestPlan(
 		requestDetails.ProductionMode,
 		segmentSize,
 		execGraph.LowestInitBlock(),
+		lowestStoresInitBlock,
 		requestDetails.ResolvedStartBlockNum,
 		requestDetails.LinearHandoffBlockNum,
 		requestDetails.StopBlockNum,

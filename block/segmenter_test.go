@@ -92,17 +92,17 @@ func TestSegmenter_firstRange(t *testing.T) {
 
 func TestSegmenter_followingRange(t *testing.T) {
 	s := NewSegmenter(10, 1, 100)
-	assert.Equal(t, ParseRange("0-10"), s.followingRange(0))
+	assert.Equal(t, MustParseRange("0-10"), s.followingRange(0))
 	s = NewSegmenter(10, 1, 100)
-	assert.Equal(t, ParseRange("10-20"), s.followingRange(1))
+	assert.Equal(t, MustParseRange("10-20"), s.followingRange(1))
 	s = NewSegmenter(10, 1, 15)
-	assert.Equal(t, ParseRange("10-15"), s.followingRange(1))
+	assert.Equal(t, MustParseRange("10-15"), s.followingRange(1))
 	s = NewSegmenter(10, 1, 25)
-	assert.Equal(t, ParseRange("20-25"), s.followingRange(2))
+	assert.Equal(t, MustParseRange("20-25"), s.followingRange(2))
 	s = NewSegmenter(10, 15, 25)
-	assert.Equal(t, ParseRange("20-25"), s.followingRange(2))
+	assert.Equal(t, MustParseRange("20-25"), s.followingRange(2))
 	s = NewSegmenter(10, 15, 25)
-	assert.Equal(t, ParseRange("10-20"), s.followingRange(1))
+	assert.Equal(t, MustParseRange("10-20"), s.followingRange(1))
 }
 
 func TestSegmenter_Range(t *testing.T) {
@@ -113,15 +113,15 @@ func TestSegmenter_Range(t *testing.T) {
 	assert.Nil(t, s.Range(0))
 	assert.Equal(t, 1, s.FirstIndex())
 	assert.Equal(t, 2, s.LastIndex())
-	assert.Equal(t, ParseRange("15-20"), s.Range(1))
-	assert.Equal(t, ParseRange("20-25"), s.Range(2))
+	assert.Equal(t, MustParseRange("15-20"), s.Range(1))
+	assert.Equal(t, MustParseRange("20-25"), s.Range(2))
 	assert.Nil(t, s.Range(3))
 
 	s = NewSegmenter(10, 1, 99)
 	assert.Equal(t, 10, s.Count())
 	assert.Equal(t, 0, s.FirstIndex())
 	assert.Equal(t, 9, s.LastIndex())
-	assert.Equal(t, ParseRange("90-99"), s.Range(9))
+	assert.Equal(t, MustParseRange("90-99"), s.Range(9))
 	assert.False(t, s.EndsOnInterval(9))
 
 	s = NewSegmenter(10, 1, 15)
@@ -131,7 +131,7 @@ func TestSegmenter_Range(t *testing.T) {
 	assert.Equal(t, 2, s.Count())
 	assert.Equal(t, 0, s.FirstIndex())
 	assert.Equal(t, 1, s.LastIndex())
-	assert.Equal(t, ParseRange("10-20"), s.Range(1))
+	assert.Equal(t, MustParseRange("10-20"), s.Range(1))
 	assert.True(t, s.EndsOnInterval(1))
 
 }

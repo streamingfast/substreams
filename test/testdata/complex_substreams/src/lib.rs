@@ -1,19 +1,18 @@
 mod pb;
 
-use crate::pb::test;
-use crate::pb::keys;
-use substreams::errors::Error;
+use crate::pb::sf::substreams::v1::test;
 use substreams::prelude::*;
 use substreams::store::{StoreAdd, StoreSetSum, StoreSetSumInt64};
 use substreams::store::StoreNew;
-use crate::pb::test::Block;
-use substreams::{store, Hex};
+use crate::pb::sf::substreams::index::v1::Keys;
+use substreams::store;
 use log::log;
+use substreams::errors::Error;
 
 
 #[substreams::handlers::map]
-fn index_init_60(blk: test::Block) -> Result<keys::Keys, substreams::errors::Error> {
-    let mut keys = keys::Keys::default();
+fn index_init_60(blk: test::Block) -> Result<Keys, Error> {
+    let mut keys = Keys::default();
     if blk.number % 2 == 0 {
         keys.keys.push("even".to_string());
     } else {
@@ -28,6 +27,15 @@ fn map_using_index_init_70(blk: test::Block) -> Result<test::Boolean, Error> {
     Ok(test::Boolean { result: true })    
 }
 
+#[substreams::handlers::map]
+fn map_hybrid_input_clock_70(_clock: pb::sf::substreams::v1::Clock, input: test::Boolean) -> Result<test::Boolean, Error> {
+    Ok(test::Boolean { result: input.result })    
+}
+
+#[substreams::handlers::map]
+fn map_hybrid_input_block_70(_block: pb::sf::substreams::v1::test::Block, input: test::Boolean) -> Result<test::Boolean, Error> {
+    Ok(test::Boolean { result: input.result })    
+}
 
 #[substreams::handlers::store]
 fn first_store_init_20(block: test::Block, first_store: StoreAddInt64) {

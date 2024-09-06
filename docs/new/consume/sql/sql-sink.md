@@ -30,11 +30,11 @@ make protogen
 
 To ensure proper setup and functionality, use your installation of the [`substreams` CLI](https://substreams.streamingfast.io/reference-and-specs/command-line-interface) to run the example code.
 
-Use the `make build` and `make stream_db` commands to verify the setup for the example project. Use the included `make` command to build the Substreams module.
+Use the `make build` and `make stream_db_out` commands to verify the setup for the example project. Use the included `make` command to build the Substreams module.
 
 ```bash
 make build
-make stream_db
+make stream_db_out
 ```
 
 ### Module handler for sink

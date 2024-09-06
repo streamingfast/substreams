@@ -612,9 +612,6 @@ func returnModuleDataOutputs(
 	extraStoreModuleOutputs []*pbsubstreamsrpc.StoreModuleOutput,
 	respFunc substreams.ResponseFunc,
 ) error {
-	if mapModuleOutput == nil {
-		return nil
-	}
 
 	out := &pbsubstreamsrpc.BlockScopedData{
 		Clock:             clock,

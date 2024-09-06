@@ -8,20 +8,43 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-func ParseRange(in string) *Range {
-	if in == "" {
-		return nil
+func MustParseRange(in string) *Range {
+	out, err := ParseRange(in, 0)
+	if err != nil {
+		panic(err)
 	}
-	ch := strings.Split(in, "-")
+	return out
+}
+
+func ParseRange(in string, defaultSegmentSize uint64) (*Range, error) {
+	if in == "" {
+		return nil, nil
+	}
+	var ch []string
+	switch {
+	case strings.Contains(in, "-"):
+		ch = strings.Split(in, "-")
+	case strings.Contains(in, ":"):
+		ch = strings.Split(in, ":")
+	default:
+		ch = []string{in}
+	}
+
 	lo, err := strconv.ParseInt(ch[0], 10, 64)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	hi, err := strconv.ParseInt(ch[1], 10, 64)
-	if err != nil {
-		panic(err)
+
+	if len(ch) == 2 {
+		hi, err := strconv.ParseInt(ch[1], 10, 64)
+		return NewRange(uint64(lo), uint64(hi)), err
 	}
-	return NewRange(uint64(lo), uint64(hi))
+
+	if defaultSegmentSize == 0 {
+		return nil, fmt.Errorf("ParseRange: invalid range format: %q", in)
+	}
+
+	return NewRange(uint64(lo), uint64(lo)+defaultSegmentSize), nil
 }
 
 type Range struct {

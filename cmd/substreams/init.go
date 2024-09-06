@@ -577,12 +577,12 @@ func saveDownloadFile(path string, overwriteForm *OverwriteForm, inputFile *pbco
 
 			var out []byte
 			if appendValues != nil {
-				fmt.Println("\t-- content appended to existing .gitignore\n")
+				fmt.Printf("\t-- content appended to existing .gitignore\n\n")
 				out = append(existingContent, []byte("\n# Added by substreams init")...)
 				out = append(out, appendBytes...)
 				out = append(out, []byte("\n")...)
 			} else {
-				fmt.Println("\t-- skipped as it contained no new .gitignore entries\n")
+				fmt.Printf("\t-- skipped as it contained no new .gitignore entries\n\n")
 				out = existingContent
 			}
 

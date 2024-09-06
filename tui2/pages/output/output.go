@@ -34,7 +34,7 @@ type Output struct {
 	lastDisplayContext *displayContext
 	lastOutputContent  string
 
-	lowBlock       uint64
+	lowBlock       *uint64
 	highBlock      uint64
 	firstBlockSeen bool
 
@@ -149,13 +149,13 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case *pbsubstreamsrpc.BlockScopedData:
 		blockNum := msg.Clock.Number
 
-		if o.lowBlock == 0 {
-			o.lowBlock = blockNum
+		if o.lowBlock == nil {
+			o.lowBlock = &blockNum
 		}
 		if o.highBlock < blockNum {
 			o.highBlock = blockNum
 		}
-		o.blockSelector.StretchBounds(o.lowBlock, o.highBlock)
+		o.blockSelector.StretchBounds(*o.lowBlock, o.highBlock)
 
 		o.blockIDs[msg.Clock.Number] = msg.Clock.Id
 		for _, output := range msg.AllModuleOutputs() {

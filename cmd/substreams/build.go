@@ -198,7 +198,7 @@ func (b *BinaryBuilder) getCmdArgs(ctx context.Context, binaryType string) ([][]
 		}
 
 		return [][]string{{"tinygo", "build", "-o", "main.wasm", "-target", "wasi", "-gc", "leaking", "-scheduler", "none", "."}}, nil
-	case "wasm/rust-v1":
+	case "wasm/rust-v1", "wasm/rust-v1+wasm-bindgen-shims":
 		fmt.Printf("`wasm/rust-v1` binary type found...\n")
 		depValidator := &CargoDependencyValidator{}
 		err := depValidator.ValidateDependency(ctx)

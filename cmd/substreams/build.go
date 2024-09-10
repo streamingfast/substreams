@@ -188,7 +188,9 @@ func (b *BinaryBuilder) isBuildRequired() bool {
 }
 
 func (b *BinaryBuilder) getCmdArgs(ctx context.Context, binaryType string) ([][]string, error) {
-	switch binaryType {
+	binaryTypeID, _ := manifest.SplitBinaryType(binaryType)
+
+	switch binaryTypeID {
 	case "wasip1/tinygo-v1":
 		fmt.Printf("`wasip1/tinygo-v1` binary type found...\n")
 		depValidator := &TinyGoDependencyValidator{}
@@ -198,7 +200,7 @@ func (b *BinaryBuilder) getCmdArgs(ctx context.Context, binaryType string) ([][]
 		}
 
 		return [][]string{{"tinygo", "build", "-o", "main.wasm", "-target", "wasi", "-gc", "leaking", "-scheduler", "none", "."}}, nil
-	case "wasm/rust-v1", "wasm/rust-v1+wasm-bindgen-shims":
+	case "wasm/rust-v1":
 		fmt.Printf("`wasm/rust-v1` binary type found...\n")
 		depValidator := &CargoDependencyValidator{}
 		err := depValidator.ValidateDependency(ctx)

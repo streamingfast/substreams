@@ -87,7 +87,7 @@ func New(c common.Common, config *request.Config) (*Output, error) {
 		statusBar:           statusbar.New(c),
 		searchCtx:           search.New(c),
 		blockSearchCtx:      blocksearch.New(c),
-		bytesRepresentation: dynamic.BytesAsHex,
+		bytesRepresentation: dynamic.BytesAsBase64,
 		moduleSearchView:    modsearch.New(c, "output"),
 		outputModule:        config.OutputModule,
 		logsEnabled:         true,

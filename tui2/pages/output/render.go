@@ -166,6 +166,9 @@ func (o *Output) decodeDynamicMessage(msgDesc *manifest.ModuleDescriptor, anyin 
 }
 
 func highlightJSON(in string) string {
+	if len(in) > 1_000_000 {
+		return in
+	}
 	out := &strings.Builder{}
 	profile := "friendly"
 	if lipgloss.HasDarkBackground() {

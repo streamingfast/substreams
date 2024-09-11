@@ -170,12 +170,12 @@ func (r *Request) renderRequestSummary() string {
 		{"Package:", packageName},
 		{fmt.Sprintf("Endpoint %s:", styles.HelpKey.Render("<e>")), r.Config.Endpoint},
 		{"Network:", r.Config.OverrideNetwork},
+		{"Module params:", r.Config.Params + r.Config.DefaultParams},
 		{"JWT", jwt},
 		{"", ""},
 		{fmt.Sprintf("Module %s:", styles.HelpKey.Render("<m>")), r.Config.OutputModule},
 		{fmt.Sprintf("Start block %s:", styles.HelpKey.Render("<s>")), startBlock},
 		{fmt.Sprintf("Stop block %s:", styles.HelpKey.Render("<t>")), r.Config.StopBlock},
-		{"Module params:", r.Config.Params},
 	}
 	if len(r.Config.DebugModulesInitialSnapshot) > 0 {
 		rows = append(rows,

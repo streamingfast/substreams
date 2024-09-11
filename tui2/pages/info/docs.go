@@ -54,6 +54,21 @@ func (d *Info) setNewRequest(reqSummary *request.Summary, modules *pbsubstreams.
 			d.params[k] = append(d.params[k], v)
 		}
 	}
+
+	for _, module := range modules.Modules {
+		moduleName := module.Name
+		for _, input := range module.Inputs {
+			param := input.GetParams()
+			if param != nil {
+				if _, found := d.params[moduleName]; found {
+					continue
+				}
+
+				d.params[moduleName] = append(d.params[moduleName], param.Value)
+			}
+		}
+	}
+
 	d.setModulesViewContent()
 }
 

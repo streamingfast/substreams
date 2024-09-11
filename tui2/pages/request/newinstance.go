@@ -50,6 +50,7 @@ type Config struct {
 	Vcr                         bool
 	Cursor                      string
 	Params                      string
+	DefaultParams               string
 }
 
 type Instance struct {

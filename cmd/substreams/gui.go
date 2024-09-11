@@ -78,7 +78,7 @@ func runGui(cmd *cobra.Command, args []string) (err error) {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
 
-	_, err = manifestReader.Read()
+	packageBundle, err := manifestReader.Read()
 	if err != nil {
 		if manifestReader.IsRemotePackage(manifestPath) {
 			fmt.Println("Are you sure the package is available? If you are using a remote package, make sure the URL is correct.")
@@ -100,7 +100,31 @@ func runGui(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	network := sflags.MustGetString(cmd, "network")
-	paramsString := sflags.MustGetStringArray(cmd, "params")
+	if network == "" {
+		network = packageBundle.Package.Network
+	}
+
+	requestParams := sflags.MustGetStringArray(cmd, "params")
+
+	paramsStringMap := make(map[string]struct{})
+	for _, parameter := range requestParams {
+		moduleName := strings.Split(parameter, "=")[0]
+		paramsStringMap[moduleName] = struct{}{}
+	}
+
+	defaultParams := make([]string, 0)
+	for _, module := range packageBundle.Package.Modules.Modules {
+		moduleName := module.Name
+		for _, input := range module.Inputs {
+			param := input.GetParams()
+			if param != nil {
+				sanitizeParam := moduleName + "=" + param.Value
+				if _, found := paramsStringMap[moduleName]; !found {
+					defaultParams = append(defaultParams, sanitizeParam)
+				}
+			}
+		}
+	}
 
 	endpoint := sflags.MustGetString(cmd, "substreams-endpoint")
 
@@ -153,7 +177,8 @@ func runGui(cmd *cobra.Command, args []string) (err error) {
 		StartBlock:                  startBlock,
 		StopBlock:                   stopBlock,
 		FinalBlocksOnly:             sflags.MustGetBool(cmd, "final-blocks-only"),
-		Params:                      strings.Join(paramsString, "\n"),
+		Params:                      strings.Join(requestParams, "\n"),
+		DefaultParams:               strings.Join(defaultParams, "\n"),
 		// ReaderOptions:               readerOptions,
 	}
 

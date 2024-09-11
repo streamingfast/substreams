@@ -267,6 +267,10 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, o.jumpToPreviousBlock())
 		case "p":
 			cmds = append(cmds, o.jumpToNextBlock())
+		case "g":
+			cmds = append(cmds, o.jumpToFirstBlock())
+		case "G":
+			cmds = append(cmds, o.jumpToLastBlock())
 		case "O":
 			cmds = append(cmds, o.jumpToPreviousMatchingBlock())
 		case "P":
@@ -444,6 +448,26 @@ func (o *Output) jumpToPreviousBlock() tea.Cmd {
 			return nil
 		}
 		return blockselect.BlockChangedMsg(withData[prevIdx])
+	}
+}
+
+func (o *Output) jumpToFirstBlock() tea.Cmd {
+	withData := o.blocksPerModule[o.active.Module]
+	return func() tea.Msg {
+		if len(withData) == 0 {
+			return nil
+		}
+		return blockselect.BlockChangedMsg(withData[0])
+	}
+}
+
+func (o *Output) jumpToLastBlock() tea.Cmd {
+	withData := o.blocksPerModule[o.active.Module]
+	return func() tea.Msg {
+		if len(withData) == 0 {
+			return nil
+		}
+		return blockselect.BlockChangedMsg(withData[len(withData)-1])
 	}
 }
 

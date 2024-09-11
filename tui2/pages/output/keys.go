@@ -9,6 +9,7 @@ import (
 func (o *Output) ShortHelp() []key.Binding {
 	return []key.Binding{
 		keymap.PrevNextBlock,
+		keymap.PrevNextModule,
 		keymap.Search,
 		keymap.ModuleSearch,
 		keymap.ToggleLogs,
@@ -27,6 +28,7 @@ func (o *Output) FullHelp() [][]key.Binding {
 		},
 		{
 			keymap.PrevNextBlock,
+			keymap.FirstLastBlock,
 			keymap.UpDown,
 			keymap.GoToBlock,
 		},

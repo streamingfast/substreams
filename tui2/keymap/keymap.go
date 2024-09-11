@@ -12,6 +12,7 @@ var GeneralSearchBackspace = key.NewBinding(key.WithHelp("backspace", "Cancel se
 var MainNavigation = key.NewBinding(key.WithHelp("←/→/(s-)tab", "Main tabs nav"), k)
 var PrevNextModule = key.NewBinding(key.WithHelp("u/i", "Modules nav"), k)
 var PrevNextBlock = key.NewBinding(key.WithHelp("o/p", "Blocks nav"), k)
+var FirstLastBlock = key.NewBinding(key.WithHelp("g/G", "First and Last blocks nav"), k)
 var Search = key.NewBinding(key.WithHelp("/", "Search"), k)
 var PrevNextMatchedBlock = key.NewBinding(key.WithHelp("O/P", "Matched blocks nav"), k)
 var ModuleSearch = key.NewBinding(key.WithHelp("m", "Select module"), k)

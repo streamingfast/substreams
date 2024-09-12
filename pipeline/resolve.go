@@ -82,6 +82,12 @@ func BuildRequestDetails(
 		req.LinearGateBlockNum = req.ResolvedStartBlockNum
 	}
 
+	// if we start under the linearHandoff, it means we are in an irreversible section of the chain,
+	// the cursor has been resolved to 'resolvedStartBlockNum' and 'undoSignal', so it is not needed anymore
+	if req.ResolvedStartBlockNum < linearHandoff {
+		req.ResolvedCursor = ""
+	}
+
 	return
 }
 

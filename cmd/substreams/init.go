@@ -387,6 +387,9 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			input := msg.Confirm
 
 			var returnValue bool
+			if msg.Confirm.DefaultButton == pbconvo.SystemOutput_Confirm_CONFIRM {
+				returnValue = true
+			}
 			inputField := huh.NewConfirm().
 				Title(input.Prompt).
 				Affirmative(input.AcceptButtonLabel).

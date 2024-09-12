@@ -54,8 +54,8 @@ var ErrSkippedOutput = errors.New("skipped output") // willfully skipped output 
 
 // getWasmArgumentValues return the values for each argument of type wasm.ValueArgument.
 // An empty value is returned as an empty byte slice, while a missing (skipped) value is returned as nil.
-func getWasmArgumentValues(wasmArguments []wasm.Argument, outputGetter execout.ExecutionOutputGetter) (map[string][]byte, error) {
-	out := make(map[string][]byte)
+func getWasmArgumentValues(wasmArguments []wasm.Argument, outputGetter execout.ExecutionOutputGetter) (out map[string][]byte, hasSingleParams bool, err error) {
+	out = make(map[string][]byte)
 	for i, input := range wasmArguments {
 		switch v := input.(type) {
 		case *wasm.MapInput, *wasm.StoreDeltaInput, *wasm.SourceInput:
@@ -65,19 +65,28 @@ func getWasmArgumentValues(wasmArguments []wasm.Argument, outputGetter execout.E
 					out[v.Name()] = nil // skipped inputs are exposed to the wasm module as nil values
 					break
 				}
-				return nil, fmt.Errorf("input data for %q, param %d: %w", v.Name(), i, err)
+				return nil, false, fmt.Errorf("input data for %q, param %d: %w", v.Name(), i, err)
 			}
 			if val == nil {
 				out[v.Name()] = []byte{} // empty inputs that are not skipped are exposed as an empty byte slice
 			} else {
 				out[v.Name()] = val
 			}
+
+		case *wasm.ParamsInput:
+			// special case for 'graph-node head tracker substreams'
+			if len(wasmArguments) == 1 {
+				hasSingleParams = true
+			}
 		}
 	}
-	return out, nil
+	return
 }
 
-func canSkipExecution(wasmArgumentValues map[string][]byte) bool {
+func canSkipExecution(wasmArgumentValues map[string][]byte, hasSingleParams bool) bool {
+	if hasSingleParams {
+		return false
+	}
 	if wasmArgumentValues["sf.substreams.v1.Clock"] != nil && len(wasmArgumentValues) == 1 {
 		return false // never skip if the only 'ArgumentValue' input is a clock
 	}
@@ -97,12 +106,12 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 	e.logsTruncated = false
 	e.executionStack = nil
 
-	argValues, err := getWasmArgumentValues(e.wasmArguments, outputGetter)
+	argValues, hasSingleParams, err := getWasmArgumentValues(e.wasmArguments, outputGetter)
 	if err != nil {
 		return nil, err
 	}
 
-	if canSkipExecution(argValues) {
+	if canSkipExecution(argValues, hasSingleParams) {
 		return nil, ErrNoInput
 	}
 

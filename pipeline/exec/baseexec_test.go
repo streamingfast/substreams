@@ -7,21 +7,32 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/wasm"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetWasmArgumentValues(t *testing.T) {
 	testCases := []struct {
-		name           string
-		wasmArguments  []wasm.Argument
-		expectedValues map[string][]byte
-		outputGetter   mockOutputGetter
-		expectedError  error
+		name               string
+		wasmArguments      []wasm.Argument
+		expectedValues     map[string][]byte
+		outputGetter       mockOutputGetter
+		expectSingleParams bool
+		expectedError      error
 	}{
 		{
 			name:           "Empty wasm arguments",
 			wasmArguments:  []wasm.Argument{},
 			expectedValues: map[string][]byte{},
 			expectedError:  nil,
+		},
+		{
+			name: "single params value",
+			wasmArguments: []wasm.Argument{
+				wasm.NewParamsInput("test"),
+			},
+			expectedValues:     map[string][]byte{},
+			expectSingleParams: true,
+			expectedError:      nil,
 		},
 		{
 			name: "Supported vs unused wasm arguments",
@@ -95,13 +106,19 @@ func TestGetWasmArgumentValues(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			values, err := getWasmArgumentValues(tc.wasmArguments, tc.outputGetter)
+			values, singleParams, err := getWasmArgumentValues(tc.wasmArguments, tc.outputGetter)
 			if err != tc.expectedError {
 				t.Errorf("Expected error: %v, but got: %v", tc.expectedError, err)
 			}
 
 			if len(values) != len(tc.expectedValues) {
 				t.Errorf("Expected %d values, but got %d", len(tc.expectedValues), len(values))
+			}
+
+			if tc.expectSingleParams {
+				assert.True(t, singleParams, "singleParams should be true")
+			} else {
+				assert.False(t, singleParams, "singleParams should be false")
 			}
 
 			for key, expectedValue := range tc.expectedValues {
@@ -122,6 +139,7 @@ func TestCanSkipExecution(t *testing.T) {
 	testCases := []struct {
 		name               string
 		wasmArgumentValues map[string][]byte
+		singleParams       bool
 		expectedResult     bool
 	}{
 		{
@@ -152,6 +170,11 @@ func TestCanSkipExecution(t *testing.T) {
 			expectedResult: true,
 		},
 		{
+			name:           "We have singleParams",
+			singleParams:   true,
+			expectedResult: false,
+		},
+		{
 			name: "Some arguments have nil values, but a Clock exist",
 			wasmArgumentValues: map[string][]byte{
 				"arg1":                   nil,
@@ -171,7 +194,7 @@ func TestCanSkipExecution(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := canSkipExecution(tc.wasmArgumentValues)
+			result := canSkipExecution(tc.wasmArgumentValues, tc.singleParams)
 			if result != tc.expectedResult {
 				t.Errorf("Expected canSkipExecution to return %v, but got %v", tc.expectedResult, result)
 			}

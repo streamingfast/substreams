@@ -56,6 +56,9 @@ func BuildRequestDetails(
 	}
 
 	req.ResolvedStartBlockNum, req.ResolvedCursor, undoSignal, err = resolveStartBlockNum(ctx, request, resolveCursor, getHeadBlock)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	var moduleHasStatefulDependencies bool
 	if request.Modules == nil {

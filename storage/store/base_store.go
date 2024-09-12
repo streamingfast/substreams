@@ -1,7 +1,6 @@
 package store
 
 import (
-	"errors"
 	"fmt"
 
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
@@ -70,32 +69,13 @@ func (b *baseStore) UpdatePolicy() pbsubstreams.Module_KindStore_UpdatePolicy {
 	return b.updatePolicy
 }
 
-func (b *baseStore) ApplyOps(in []byte) (err error) {
-	//recover panics (e.g. from store too big panic in ApplyDeltas)
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Println("Recovered in f", r)
-			// find out exactly what the error was and set err
-			switch x := r.(type) {
-			case string:
-				err = errors.New(x)
-			case error:
-				err = x
-			default:
-				// Fallback err (per specs, error strings should be lowercase w/o punctuation
-				err = errors.New("unknown panic")
-			}
-		}
-	}()
-
+func (b *baseStore) ApplyOps(in []byte) error {
 	ops := &pbssinternal.Operations{}
-	if err = proto.Unmarshal(in, ops); err != nil {
+	if err := proto.Unmarshal(in, ops); err != nil {
 		return err
 	}
 	b.kvOps = ops
-	err = b.Flush()
-
-	return
+	return b.Flush()
 }
 
 func (b *baseStore) Flush() error {

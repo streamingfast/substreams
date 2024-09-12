@@ -141,6 +141,10 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case request.NewRequestInstance:
 		o.errReceived = nil
 		o.msgDescs = msg.MsgDescs
+		o.blocksPerModule = make(map[string][]uint64)
+		o.payloads = make(map[request.BlockContext]*pbsubstreamsrpc.AnyModuleOutput)
+		o.blockIDs = make(map[uint64]string)
+		o.blockSelector.Update(msg)
 
 		// weird issue when the user rebuilds their substreams and runs a new request
 		// the old logs would keep showing

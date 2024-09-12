@@ -2,7 +2,7 @@ Getting started with Substreams is simple using the code-generation tools provid
 
 Substreams supports several blockchains, but the process should be similar for all them.
 
-<figure><img src="../../.gitbook/assets/chains-endpoints.png" alt="" width="100%"><figcaption><p>Protobuf for the different supported chains</p></figcaption></figure>
+<figure><img src="../../../.gitbook/assets/chains-endpoints.png" alt="" width="100%"><figcaption><p>Protobuf for the different supported chains</p></figcaption></figure>
 
 ## Run the Development Environment (Devcontainer)
 

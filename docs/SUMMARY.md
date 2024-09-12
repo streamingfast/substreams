@@ -5,10 +5,10 @@
 ## Documentation
 
 * [How-To-Guides](new/getting-started/intro-how-to-guides.md)
-  * [Your First Substreams Application]
-  * [EVM](new/getting-started/evm/intro-evm.md)
-  * [Solana](new/getting-started/solana/intro-solana.md)
-  * [Injective](new/getting-started/injective/intro-injective.md)
+  * [Your First Substreams Application](new/how-to-guides/your-first-application/intro-your-first-application.md)
+    * [EVM](new/how-to-guides/your-first-application/evm.md)
+    * [Solana](new/how-to-guides/your-first-application/solana.md)
+    * [Injective](new/how-to-guides/your-first-application/injective.md)
 * [Consume Substreams](new/consume/consume.md)
   * [Install the CLI](new/common/installing-the-cli.md)
   * [Authentication](new/common/authentication.md)

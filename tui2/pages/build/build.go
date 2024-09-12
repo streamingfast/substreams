@@ -63,7 +63,7 @@ func (b *Build) View() string {
 	return lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder(), true).
 		Width(b.Width - 2).
-		Height(b.buildView.Height + 2 /* for borders */).
+		Height(b.buildView.Height + 1 /* for borders */).
 		Render(
 			outputMsgs,
 		)

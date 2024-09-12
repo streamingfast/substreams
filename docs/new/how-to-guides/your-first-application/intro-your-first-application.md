@@ -1,8 +1,6 @@
-Getting started with Substreams is simple using the code-generation tools provided by the substreams init command. This command sets up an code-generated Substreams project, from which you can easily build either a subgraph or an SQL-based solution for handling data. The generated framework streamlines the process, allowing you to quickly get up and running with Substreams.
+Getting started with Substreams is simple using the code-generation tools provided by the substreams init command. **This command sets up an code-generated Substreams project, from which you can easily build either a subgraph or an SQL-based solution for handling data**. The generated framework streamlines the process, allowing you to quickly get up and running with Substreams.
 
 Substreams supports several blockchains, but the process should be similar for all them.
-
-<figure><img src="../../../.gitbook/assets/chains-endpoints.png" alt="" width="100%"><figcaption><p>Protobuf for the different supported chains</p></figcaption></figure>
 
 ## Run the Development Environment (Devcontainer)
 

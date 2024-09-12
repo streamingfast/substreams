@@ -62,7 +62,15 @@ redirects:
   documentation/consume/other-ways-of-consuming/pubsub: ./new/consume/other-sinks/pubsub.md
   intro-solana: ./new/getting-started/solana/intro-solana.md
   intro-injective: ./new/getting-started/injective/intro-injective.md
-
+  documentation/intro-getting-started: ./new/how-to-guides/your-first-application/intro-your-first-application.md
+  documentation/intro-getting-started/intro-evm: ./new/how-to-guides/your-first-application/evm.md
+  documentation/intro-getting-started/intro-evm/evm-first-sps: ./new/how-to-guides/your-first-application/evm.md
+  documentation/intro-getting-started/intro-evm/evm-first-sps: ./new/how-to-guides/your-first-application/evm.md
+  documentation/intro-getting-started/intro-evm/emv-first-sql: ./new/how-to-guides/your-first-application/evm.md
+  documentation/intro-getting-started/intro-solana: ./new/how-to-guides/your-first-application/solana.md
+  documentation/intro-getting-started/intro-injective: ./new/how-to-guides/your-first-application/injective.md
+  documentation/intro-getting-started/intro-injective/injective-first-sql: ./new/how-to-guides/your-first-application/injective.md
+  documentation/intro-getting-started/intro-injective/injective-first-sps: ./new/how-to-guides/your-first-application/injective.md
 
 
 

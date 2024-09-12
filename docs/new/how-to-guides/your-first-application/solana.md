@@ -24,4 +24,4 @@ The `substreams init` command includes several ways of initializing your Solana 
 
 The `sol-transactions` path of the codegen, which filters the transactions, relies on the [Solana Foundational Modules](https://github.com/streamingfast/substreams-foundational-modules/tree/develop/solana-common). A Foundational Module extracts the most relevant data from blockchain, so that you don't have to code it yourself.
 
-Specifically, the `sol-transactions` path uses the [filtered_transactions_without_votes](https://github.com/streamingfast/substreams-foundational-modules/blob/develop/solana-common/substreams-v0.2.0.yaml#L49), which accepts a regex (regular expression) as input to filter the transactions.
+Specifically, the `sol-transactions` path uses the [filtered_transactions_without_votes](https://github.com/streamingfast/substreams-foundational-modules/blob/develop/solana-common/substreams-v0.2.0.yaml#L49) module, which accepts a regex (regular expression) as input to filter the transactions.

@@ -21,6 +21,27 @@ The `substreams` CLI exposes many commands to developers enabling a range of fea
 If you choose to not use it, make sure that you are in a directory that contains a substreams.yaml file. Otherwise, you will get a usage error back.
 {% endhint %}
 
+### **`init`**
+
+The `init` command allows you to initialize a Substreams project for several blockchains. It is a conversational-like command: you will be asked several questions and a project with the specicied features will be created for you.
+
+The options included in the `init` command will evolve over time, but every blockchain should, at least, contain one option.
+
+```bash
+substreams init
+```
+
+### **`build`**
+
+The `build` command:
+- Generates the necessary Protobufs specified in the `substreams.yaml` file.
+- Compiles the Rust code.
+- Creates a Substreams package file (`.spkg`).
+
+```bash
+substreams build
+```
+
 ### **`run`**
 
 The `run` command connects to a Substreams endpoint and begins processing data.
@@ -111,7 +132,7 @@ When you run a `gui` session, a file called `replay.log` gets written with the c
 
 You can reload the data without hitting the server again using `--replay`. The data is immediately reloaded in the GUI, ready for more inspection.
 
-### `pack`
+### `pack` **(DEPRECATED: use `build` instead)
 
 The `pack` command builds a shippable, importable package from a `substreams.yaml` manifest file.
 
@@ -220,6 +241,26 @@ modules {
 ```
 {% endcode %}
 
+### **`codegen`**
+
+The `codegen` command generates a code for a specific sink taking as a Substreams module as input. There are two code generators available: `subgraph` and `sql`.
+
+- Subgraph
+
+Generates a Substreams-powered Subgraph project from the Substreams package found in the current folder.
+
+```bash
+substreams codegen subgraph
+```
+
+- SQL
+
+Generates a SQL-based Substreams project from the Substreams package found in the current folder.
+
+```bash
+substreams codegen sql
+```
+
 ### Help
 
 To view a list of available commands and brief explanations in the `substreams` CLI, run the `substreams` command in a terminal passing the `-h` flag. You can use this help reference at any time.
@@ -227,32 +268,5 @@ To view a list of available commands and brief explanations in the `substreams` 
 {% code title="help option" overflow="wrap" %}
 ```bash
 substreams -h
-```
-{% endcode %}
-
-The output of the `help` command will print a message resembling:
-
-{% code title="help output" overflow="wrap" %}
-```bash
-Usage:
-  substreams [command]
-
-Available Commands:
-  completion  Generate the autocompletion script for the specified shell
-  decode
-  graph       Generate mermaid-js graph document
-  help        Help about any command
-  info        Display package modules and docs
-  inspect     Display low-level package structure
-  pack        Build an .spkg out of a .yaml manifest
-  protogen    Generate Rust bindings from a package
-  run         Stream modules from a given package on a remote endpoint
-  tools       Developer tools related to substreams
-
-Flags:
-  -h, --help      help for substreams
-  -v, --version   version for substreams
-
-Use "substreams [command] --help" for more information about a command.
 ```
 {% endcode %}

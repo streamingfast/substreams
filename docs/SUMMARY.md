@@ -4,14 +4,11 @@
 
 ## Documentation
 
-* [Getting Started](new/getting-started/intro-getting-started.md)
+* [How-To-Guides](new/getting-started/intro-how-to-guides.md)
+  * [Your First Substreams Application]
   * [EVM](new/getting-started/evm/intro-evm.md)
-    * [Your First Ethereum Subgraph](new/getting-started/evm/evm-first-sps.md)
-    * [Your First EVM SQL Substreams](new/getting-started/evm/emv-first-sql.md)
   * [Solana](new/getting-started/solana/intro-solana.md)
   * [Injective](new/getting-started/injective/intro-injective.md)
-    * [Your First Injective Subgraph](new/getting-started/injective/injective-first-sps.md)
-    * [Your First Injective SQL Substreams](new/getting-started/injective/injective-first-sql.md)
 * [Consume Substreams](new/consume/consume.md)
   * [Install the CLI](new/common/installing-the-cli.md)
   * [Authentication](new/common/authentication.md)

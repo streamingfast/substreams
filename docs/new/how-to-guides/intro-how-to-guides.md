@@ -1,1 +1,1 @@
-This section contains How-To-Guides.
+This section contains How-To-Guides that will onboard you on different aspects of the Substreams and Substreams-powered Subgraphs development.

@@ -27,9 +27,8 @@ The first step in creating a Substreams project is to scaffold it and generate a
 4. Once all questions are answered, the Substreams project will be generated in the specified folder.
 5. Follow the instructions to build, authenticate, and test in the GUI your Substreams project.
 6. Complete your Substreams project to be fully queryable, either through a Subgraph or directly from your SQL database, ensuring seamless access to the data for analysis and application use.
-    - `substreams codegen subgraph`: The generated project follows the standard subgraph structure, where the `subgraph.yaml` file uses a Substreams package as its data source. By default, the `schema.graphql` and `mappings.ts` files respectively include only a required input ID and the basic code to create one. It's up to you to decide what entities to create based on the data extracted by Substreams. For technical details on how to configure a Subgraph sink, [click here](https://substreams.streamingfast.io/documentation/consume/subgraph).
-    - `substreams codegen sql`: For technical details on how to configure a SQL sink, [click here](https://substreams.streamingfast.io/documentation/consume/sql).
-
+    - `substreams codegen subgraph`: The generated project follows the standard subgraph structure, where the `subgraph.yaml` file uses a Substreams package as its data source. By default, the `schema.graphql` and `mappings.ts` files respectively include only a required input ID and the basic code to create one. It's up to you to decide what entities to create based on the data extracted by Substreams. For technical details on how to configure a Subgraph sink, [click here](../../consume/subgraph/subgraph.md).
+    - `substreams codegen sql`: The generated project contains a `db_out` module, which outputs the data in `DatabaseChanges` format. This is the format that the SQL database can understand.
 
 Please, refer to the corresponding _getting started_ tutorial depending on your needs:
 

@@ -62,12 +62,14 @@ type renderedOutput struct {
 }
 
 func (o *Output) renderedOutput(in *pbsubstreamsrpc.AnyModuleOutput, withStyle bool) (out *renderedOutput) {
-	out = &renderedOutput{styledError: &strings.Builder{}, styledLogs: &strings.Builder{}}
+	out = &renderedOutput{
+		styledError: &strings.Builder{},
+		styledLogs:  &strings.Builder{},
+	}
 	if in == nil {
 		return out
 	}
 	dynamic.SetDefaultBytesRepresentation(o.bytesRepresentation)
-
 	if o.errReceived != nil {
 		out.styledError.WriteString(styles.Output.ErrorLine.Render(o.errReceived.Error()))
 	}

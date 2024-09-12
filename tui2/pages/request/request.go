@@ -162,21 +162,17 @@ func (r *Request) renderRequestSummary() string {
 		packageMetaVersion = r.Config.Pkg.PackageMeta[0].Version
 	}
 	packageName = fmt.Sprintf("%s (%s-%s)", packageName, packageMetaName, packageMetaVersion)
-	authToken := "Auth Token not set, run `substreams auth` to set it"
+	authToken := "No, run `substreams auth` to set it"
 	if r.Config.SubstreamsClientConfig.AuthToken() != "" {
-		if len(r.Config.SubstreamsClientConfig.AuthToken()) < 50 {
-			authToken = r.Config.SubstreamsClientConfig.AuthToken()
-		} else {
-			authToken = fmt.Sprintf("%s...", r.Config.SubstreamsClientConfig.AuthToken()[0:50]) // display only the first 50 characters
-		}
+		authToken = "Yes"
 	}
 	rows := [][]string{
 		{"Package:", packageName},
 		{fmt.Sprintf("Endpoint %s:", styles.HelpKey.Render("<e>")), r.Config.Endpoint},
+		{"Auth Token loaded:", authToken},
 		{"Network:", r.Config.OverrideNetwork},
 		{"Module params:", r.Config.Params + r.Config.DefaultParams},
 		{"", ""},
-		{"Auth Token", authToken},
 		{fmt.Sprintf("Module %s:", styles.HelpKey.Render("<m>")), r.Config.OutputModule},
 		{fmt.Sprintf("Start block %s:", styles.HelpKey.Render("<s>")), startBlock},
 		{fmt.Sprintf("Stop block %s:", styles.HelpKey.Render("<t>")), r.Config.StopBlock},

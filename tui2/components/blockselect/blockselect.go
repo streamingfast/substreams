@@ -117,29 +117,27 @@ func (b *BlockSelect) View() string {
 	}
 
 	var activeBlock string
-	if b.activeBlock != 0 {
-		ptr := int(float64(b.activeBlock-b.lowBlock) / binSize)
-		activeBlock = fmt.Sprintf("%s: %s",
-			styles.BlockSelect.CurrentBlock.Render("Current block"),
-			styles.BlockSelect.SelectedBlock.Render(humanize.Comma(int64(b.activeBlock))),
-		)
+	ptr := int(float64(b.activeBlock-b.lowBlock) / binSize)
+	activeBlock = fmt.Sprintf("%s: %s",
+		styles.BlockSelect.CurrentBlock.Render("Current block"),
+		styles.BlockSelect.SelectedBlock.Render(humanize.Comma(int64(b.activeBlock))),
+	)
 
-		labelLen := lipgloss.Width(activeBlock) + 1
-		if ptr < labelLen {
-			activeBlock = fmt.Sprintf("%s^ %s",
-				strings.Repeat(" ", ptr),
-				activeBlock,
-			)
-		} else {
-			repeatLen := ptr - labelLen
-			if repeatLen < 0 {
-				repeatLen = 0
-			}
-			activeBlock = fmt.Sprintf("%s%s ^",
-				strings.Repeat(" ", repeatLen),
-				activeBlock,
-			)
+	labelLen := lipgloss.Width(activeBlock) + 1
+	if ptr < labelLen {
+		activeBlock = fmt.Sprintf("%s^ %s",
+			strings.Repeat(" ", ptr),
+			activeBlock,
+		)
+	} else {
+		repeatLen := ptr - labelLen
+		if repeatLen < 0 {
+			repeatLen = 0
 		}
+		activeBlock = fmt.Sprintf("%s%s ^",
+			strings.Repeat(" ", repeatLen),
+			activeBlock,
+		)
 	}
 
 	highBlockMargin := len(string(humanize.Comma(int64(b.highBlock)))) + len(string(humanize.Comma(int64(b.highBlock)))) + 2

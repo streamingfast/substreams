@@ -10,6 +10,3 @@ The `evm-events-calls` codegen path relies on one of the [EVM Foundational Modul
 Specifically, the `evm-events-calls` path uses the [filtered_events_and_calls](https://github.com/streamingfast/substreams-foundational-modules/blob/develop/ethereum-common/substreams.yaml#L142) module from the EVM Foundational Modules to retrieve all the events filtered by specific smart contract addresses.
 
 <figure><img src="../../../.gitbook/assets/intro/ethereum-logo.png" width="100%" /></figure>
-
-
-

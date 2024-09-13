@@ -449,6 +449,10 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			savingDest, _ := os.Getwd()
 			input := msg.DownloadFiles
 
+			if len(input.Files) == 0 {
+				return fmt.Errorf("no files to download")
+			}
+
 			forceDownloadProvided, _ := sflags.MustGetBoolProvided(cmd, "force-download-cwd")
 			if forceDownloadProvided {
 				for _, inputFile := range input.Files {
@@ -467,14 +471,10 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 						}
 					}
 				}
-				fmt.Println("Everything done!")
 				return nil
 			}
 
-			fmt.Println(filenameStyle("Files:"))
-			if len(input.Files) == 0 {
-				return fmt.Errorf("no files to download")
-			}
+			fmt.Println("Writing local files:")
 
 			// let the terminal breath a little
 			// fmt.Println()
@@ -486,7 +486,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					continue
 				}
 
-				fmt.Printf("  %s %s\n", filenameStyle("-"), filenameStyle(inputFile.Filename))
+				fmt.Printf("  - %s\n", filenameStyle(inputFile.Filename))
 				if inputFile.Description != "" {
 					fmt.Printf("\t%s\n", inputFile.Description)
 				}
@@ -517,30 +517,13 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					if err != nil {
 						return fmt.Errorf("saving file: %w", err)
 					}
-
 				}
-
-				fmt.Println()
 			}
-
-			if err := sendFunc(&pbconvo.UserInput{
-				FromActionId: resp.ActionId,
-				Entry: &pbconvo.UserInput_DownloadedFiles_{
-					DownloadedFiles: &pbconvo.UserInput_DownloadedFiles{},
-				},
-			}); err != nil {
-				return fmt.Errorf("error sending confirmation: %w", err)
-			}
-
 		default:
 			fmt.Printf("Received unknown message type: %T\n", resp.Entry)
 		}
 	}
 
-	// TODO: shouldn't this be controlled by the remote end? Maybe there's some follow-up messages,
-	// maybe we'll be building three modules in a swift?
-
-	fmt.Println("Everything done!")
 	return nil
 }
 
@@ -588,7 +571,7 @@ func saveDownloadFile(path string, overwriteForm *OverwriteForm, inputFile *pbco
 
 		err = os.WriteFile(path, inputFile.Content, 0644)
 		if err != nil {
-			return fmt.Errorf("saving zip file %q: %w", inputFile.Filename, err)
+			return fmt.Errorf("saving .gitignore file %q: %w", inputFile.Filename, err)
 		}
 
 		return nil
@@ -657,7 +640,7 @@ func bold(input string) string {
 }
 
 func filenameStyle(input string) string {
-	return lipgloss.NewStyle().Foreground(lipgloss.Color("#9AE3A4")).Render(input)
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("34")).Render(input)
 }
 
 func unzipFile(overwriteForm *OverwriteForm, zipContent []byte, zipRoot string) error {

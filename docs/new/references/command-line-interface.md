@@ -132,7 +132,9 @@ When you run a `gui` session, a file called `replay.log` gets written with the c
 
 You can reload the data without hitting the server again using `--replay`. The data is immediately reloaded in the GUI, ready for more inspection.
 
-### `pack` **(DEPRECATED: use `build` instead)
+### `pack` **(DEPRECATED)**
+
+**(DEPRECATED: use `build` instead)**
 
 The `pack` command builds a shippable, importable package from a `substreams.yaml` manifest file.
 

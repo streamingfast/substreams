@@ -6,11 +6,11 @@ Quickly scaffold your first project inside the [Substreams Development Environme
 
 Consult the relevant ecosystem guide to get started using real-time and historical indexed data:
 
-- Solana
-- EVM
-- Injective
+- [Solana](./solana.md)
+- [EVM](./evm.md)
+- [Injective](./injective.md)
 
-## Navigatin the Devcontainer
+## Navigating the Devcontainer
 
 When entering the devcontainer, you can either insert your own `substreams.yaml` file and run `substreams build` to generate the associated Protobuf files, or choose from two auto-generated code-paths:
 

@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### CLI
 
 * Add `substreams tools default-endpoint {network-name}` to help with auto-configuration tools
+* Bump `substreams init` protocol version to "1" to be compatible with new codegen endpoint
 
 ## v1.10.2
 

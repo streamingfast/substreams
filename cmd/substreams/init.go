@@ -221,6 +221,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	}
 	startMsg := &pbconvo.UserInput_Start{
 		GeneratorId: generatorID,
+		Version:     1,
 	}
 	if lastState.State != nil {
 		startMsg.Hydrate = &pbconvo.UserInput_Hydrate{SavedState: string(lastState.State)}

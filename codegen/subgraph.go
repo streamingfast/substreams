@@ -30,20 +30,10 @@ func generateSubgraphEnv(cmd *cobra.Command, args []string) error {
 	input := fmt.Sprintf(
 		"Your Subgraph Powered Subtreams is now generated!\n\n" +
 			"**Now follow the next steps:**\n\n" +
-			"Open the subgraph directory:\n\n" +
-			"`cd subgraph`\n\n" +
-			"Install all the dependencies:\n\n" +
-			"`npm install`\n\n" +
-			"Generate AssemblyScript types:\n\n" +
-			"`npm run codegen`\n\n" +
-			"Generate protobuf:\n\n" +
-			"`npm run protogen`\n\n" +
-			"Build your project:\n\n" +
-			"`npm run build`\n\n" +
-			"Create the subgraph:\n\n" +
-			"`npm run create-local`\n\n" +
-			"Deploy the subgraph:\n\n" +
-			"`npm run deploy-local`\n\n",
+			"`cd subgraph`\n" +
+			"`npm install`\n" +
+			"`npm run generate` # generate AssemblyScript and Protobuf bindings\n" +
+			"`npm run deploy-local` # build and deploy to a local graph-node\n",
 	)
 	fmt.Println(ToMarkdown(input))
 	return nil

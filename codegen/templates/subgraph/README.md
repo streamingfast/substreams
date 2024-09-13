@@ -4,31 +4,21 @@
 
 _Describe important modules here_
 
-
 ## Develop
+
+* Make sure that you have a graph-node running locally (or set LOCAL_GRAPH_NODE_HOSTNAME)
+* You can use the 'devcontainer' from https://github.com/streamingfast/substreams-starter  to set this up for you!
 
 ```bash
 npm install
-npm run protogen  # Generate protobuf bindings
-npm run codegen   # Generate subgraph mapping types
-npm run build
-```
-
-Configure `graph-node` in `.graph-node/config.toml`.
-
-```bash
-substreams auth
-. ./.substreams.dev  # or insert the SUBSTREAMS_API_TOKEN into the `config.toml` file.
-```
-
-Once `graph-node` is ready`, run:
-
-```bash
-npm run create-local
+npm run generate
 npm run deploy-local
+
+# rince and repeat
 npm run remove-local
 ```
 
-### Query a subgraph
+## Deploy
 
-In the devcontainer, you can access the port-forwarded `graph-node` instance at: http://localhost:8000/subgraphs/name/{name_of_your_subgraph}/
+* To studio: `npm run deploy-studio`
+* To the network: `npm run publish`

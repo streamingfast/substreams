@@ -60,3 +60,6 @@ redirects:
   documentation/consume/other-ways-of-consuming/files: ./new/consume/other-sinks/files.md
   documentation/consume/other-ways-of-consuming/prometheus: ./new/consume/other-sinks/prometheus.md
   documentation/consume/other-ways-of-consuming/pubsub: ./new/consume/other-sinks/pubsub.md
+  intro-solana: ./new/how-to-guides/your-first-application/solana.md
+  intro-injective: ./new/how-to-guides/your-first-application/injective.md
+  

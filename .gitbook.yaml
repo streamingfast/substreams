@@ -65,7 +65,6 @@ redirects:
   documentation/intro-getting-started: ./new/how-to-guides/your-first-application/intro-your-first-application.md
   documentation/intro-getting-started/intro-evm: ./new/how-to-guides/your-first-application/evm.md
   documentation/intro-getting-started/intro-evm/evm-first-sps: ./new/how-to-guides/your-first-application/evm.md
-  documentation/intro-getting-started/intro-evm/evm-first-sps: ./new/how-to-guides/your-first-application/evm.md
   documentation/intro-getting-started/intro-evm/emv-first-sql: ./new/how-to-guides/your-first-application/evm.md
   documentation/intro-getting-started/intro-solana: ./new/how-to-guides/your-first-application/solana.md
   documentation/intro-getting-started/intro-injective: ./new/how-to-guides/your-first-application/injective.md

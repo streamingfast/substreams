@@ -307,7 +307,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				options = append(options, entry)
 				optionsMap[entry.Value] = entry.Key
 			}
-			var selection string
+			selection := msg.ListSelect.DefaultValue
 			selectField := huh.NewSelect[string]().
 				Title(input.Instructions).
 				Options(options...).
@@ -386,10 +386,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		case *pbconvo.SystemOutput_Confirm_:
 			input := msg.Confirm
 
-			var returnValue bool
-			if msg.Confirm.DefaultButton == pbconvo.SystemOutput_Confirm_CONFIRM {
-				returnValue = true
-			}
+			returnValue := msg.Confirm.DefaultButton == pbconvo.SystemOutput_Confirm_CONFIRM
 			inputField := huh.NewConfirm().
 				Title(input.Prompt).
 				Affirmative(input.AcceptButtonLabel).

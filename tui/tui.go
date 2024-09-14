@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/tools/test"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -19,7 +20,7 @@ import (
 
 //go:generate go-enum -f=$GOFILE --nocase --marshal --names
 
-// ENUM(TUI, JSON, JSONL, CLOCK)
+// ENUM(TUI, JSON, JSONL, CLOCK, CURSOR)
 type OutputMode uint
 
 type TUI struct {
@@ -123,6 +124,8 @@ func (ui *TUI) configureOutputMode(outputMode string) error {
 	case OutputModeTUI:
 		ui.prettyPrintOutput = true
 	case OutputModeJSONL:
+	case OutputModeCURSOR:
+		fmt.Println("printing cursor only, no data")
 	case OutputModeCLOCK:
 		fmt.Println("Writing clock information only (no data)")
 	case OutputModeJSON:
@@ -157,6 +160,12 @@ func (ui *TUI) IncomingMessage(ctx context.Context, resp *pbsubstreamsrpc.Respon
 			printUndoJSON(m.BlockUndoSignal.LastValidBlock, m.BlockUndoSignal.LastValidCursor)
 		case OutputModeCLOCK:
 			fmt.Println("UNDO:", m.BlockUndoSignal.LastValidBlock)
+		case OutputModeCURSOR:
+			cur, err := bstream.CursorFromOpaque(m.BlockUndoSignal.LastValidCursor)
+			if err != nil {
+				return err
+			}
+			fmt.Println(cur.String())
 		}
 
 	case *pbsubstreamsrpc.Response_BlockScopedData:
@@ -174,6 +183,14 @@ func (ui *TUI) IncomingMessage(ctx context.Context, resp *pbsubstreamsrpc.Respon
 			printClock(m.BlockScopedData)
 		case OutputModeCLOCK:
 			printClock(m.BlockScopedData)
+			return nil
+		case OutputModeCURSOR:
+
+			cur, err := bstream.CursorFromOpaque(resp.GetBlockScopedData().Cursor)
+			if err != nil {
+				return err
+			}
+			fmt.Println(cur.String())
 			return nil
 		}
 

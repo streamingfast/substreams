@@ -193,6 +193,11 @@ func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, res
 		return nextBlock, "", nil, nil
 	}
 
+	if cursor.LIB.Num() > cursor.Block.Num() {
+		reqctx.Logger(ctx).Warn("Received invalid start cursor", zap.String("cursor", cursor.String()))
+		return 0, "", nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("StartCursor is invalid: LIB %d greater than Block %d", cursor.LIB.Num(), cursor.Block.Num()))
+	}
+
 	reorgJunctionBlock, head, err := resolveCursor(ctx, cursor)
 	if err != nil {
 		return 0, "", nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("cannot resolve StartCursor %q: %s", cursor, err.Error()))

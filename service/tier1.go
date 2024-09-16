@@ -259,6 +259,7 @@ func (s *Tier1Service) Blocks(
 		zap.String("output_module", request.OutputModule),
 		zap.String("output_module_hash", outputModuleHash),
 		zap.Bool("compressed", compressed),
+		zap.Bool("final_blocks_only", request.FinalBlocksOnly),
 	}
 	fields = append(fields, zap.Bool("production_mode", request.ProductionMode))
 	fields = append(fields, zap.Bool("noop_mode", request.NoopMode))

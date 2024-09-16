@@ -4,11 +4,10 @@
 
 ## Documentation
 
-* [How-To-Guides](new/getting-started/intro-how-to-guides.md)
-  * [Your First Substreams Application](new/how-to-guides/your-first-application/intro-your-first-application.md)
-    * [EVM](new/how-to-guides/your-first-application/evm.md)
-    * [Solana](new/how-to-guides/your-first-application/solana.md)
-    * [Injective](new/how-to-guides/your-first-application/injective.md)
+* [How-To Guides](new/getting-started/intro-how-to-guides.md)
+  * [Initialize an EVM Substreams Project](new/how-to-guides/your-first-application/evm.md)
+  * [Initialize an Solana Substreams Project](new/how-to-guides/your-first-application/solana.md)
+  * [Initialize an Injective Substreams Project](new/how-to-guides/your-first-application/injective.md)
 * [Consume Substreams](new/consume/consume.md)
   * [Install the CLI](new/common/installing-the-cli.md)
   * [Authentication](new/common/authentication.md)
@@ -88,6 +87,7 @@
 ## Reference & Specs
 
 * [Chains and endpoints](new/references/chains-and-endpoints.md)
+* [Development Container Reference](new/references/devcontainer-ref.md)
 * [Substreams CLI reference](new/references/command-line-interface.md)
 * [Manifests Reference](new/references/manifests.md)
 * [GUI Reference](new/references/gui.md)

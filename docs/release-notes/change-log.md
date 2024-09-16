@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### CLI
 
 * Add `-o cursor` output type to `substreams run` for debugging purposes
+* Fix panic in the whole tier2 process when stores go above the size limit while being read from "kvops" cached changes
 
 ## v1.10.3
 

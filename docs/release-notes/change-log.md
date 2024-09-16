@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v1.10.4 (Unreleased)
 
+### Server
+
+* Fix bug where some invalid cursors may be sent (with 'LIB' being above the block being sent) and add safeguard/loggin if the bug appears again
+
 ### CLI
 
 * Add `-o cursor` output type to `substreams run` for debugging purposes

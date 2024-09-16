@@ -611,8 +611,14 @@ func returnModuleDataOutputs(
 	extraMapModuleOutputs []*pbsubstreamsrpc.MapModuleOutput,
 	extraStoreModuleOutputs []*pbsubstreamsrpc.StoreModuleOutput,
 	respFunc substreams.ResponseFunc,
+	logger *zap.Logger,
 ) error {
 
+	if cursor.Block.Num() < cursor.LIB.Num() {
+		// safeguard for a bug that "may" have been fixed in bstream library
+		logger.Warn("cursor is invalid", zap.Uint64("clock_num", clock.Number), zap.String("cursor", cursor.String()))
+		return fmt.Errorf("internal error 1203")
+	}
 	out := &pbsubstreamsrpc.BlockScopedData{
 		Clock:             clock,
 		Output:            mapModuleOutput,

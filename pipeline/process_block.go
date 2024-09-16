@@ -282,7 +282,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 				MapOutput: &anypb.Any{},
 			}
 		}
-		if err = returnModuleDataOutputs(clock, cursor, mapModuleOutput, p.extraMapModuleOutputs, p.extraStoreModuleOutputs, p.respFunc); err != nil {
+		if err = returnModuleDataOutputs(clock, cursor, mapModuleOutput, p.extraMapModuleOutputs, p.extraStoreModuleOutputs, p.respFunc, logger); err != nil {
 			return fmt.Errorf("failed to return module data output: %w", err)
 		}
 	}

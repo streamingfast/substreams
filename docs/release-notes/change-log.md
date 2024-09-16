@@ -9,16 +9,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v1.10.4 (Unreleased)
+## v1.10.4
 
 ### Server
 
 * Fix bug where some invalid cursors may be sent (with 'LIB' being above the block being sent) and add safeguard/loggin if the bug appears again
+* Fix panic in the whole tier2 process when stores go above the size limit while being read from "kvops" cached changes
 
 ### CLI
 
 * Add `-o cursor` output type to `substreams run` for debugging purposes
-* Fix panic in the whole tier2 process when stores go above the size limit while being read from "kvops" cached changes
 
 ## v1.10.3
 

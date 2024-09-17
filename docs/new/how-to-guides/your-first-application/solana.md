@@ -33,7 +33,7 @@ In this guide, you'll learn how to initialize an Solana-based Substreams project
     Substreams Gui
     ````
 
-## Step 3: Customize your Project: 
+## Step 3: Customize your Project 
 
 After initialization, you can:
 

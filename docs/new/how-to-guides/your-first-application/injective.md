@@ -9,4 +9,3 @@ The `injective-events` codegen path relies on one of the [Injective Foundational
 
 Specifically, the `injective-events` path uses the [filtered_events](https://github.com/streamingfast/substreams-foundational-modules/blob/develop/injective-common/substreams.yaml#L58) module from the Injective Foundational Modules to retrieve all the events filtered by event type and/or attributes.
 
-<figure><img src="../../../.gitbook/assets/intro/injective-logo.png" width="100%" /></figure>

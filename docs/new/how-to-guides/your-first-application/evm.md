@@ -32,7 +32,7 @@ In this guide, you'll learn how to initialize an EVM-based Substreams project. Y
     Substreams Gui
     ````
 
-## Step 3: Customize your Project: 
+## Step 3: Customize your Project 
 
 After initialization, you can:
 

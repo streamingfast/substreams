@@ -366,6 +366,7 @@ func (p *Project) Render(withDevEnv bool) (projectFiles map[string][]byte, err e
 		templateFiles = map[string]string{
 			"subgraph/buf.gen.yaml":           "buf.gen.yaml",
 			"subgraph/package.json.gotmpl":    "package.json",
+			"subgraph/gitignore":              ".gitignore",
 			"subgraph/tsconfig.json":          "tsconfig.json",
 			"subgraph/subgraph.yaml.gotmpl":   "subgraph.yaml",
 			"subgraph/schema.graphql.gotmpl":  "schema.graphql",

@@ -60,7 +60,9 @@ func runBuildE(cmd *cobra.Command, args []string) error {
 		Manifest: manif,
 	}
 
-	protoBuilder, err := newProtoBuilder(info)
+	binaryLabel := sflags.MustGetString(cmd, "binary")
+
+	protoBuilder, err := newProtoBuilder(info, binaryLabel)
 	if err != nil {
 		return fmt.Errorf("error creating proto builder: %w", err)
 	}
@@ -68,8 +70,6 @@ func runBuildE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("error running protogen: %w", err)
 	}
-
-	binaryLabel := sflags.MustGetString(cmd, "binary")
 
 	binaryBuilder, err := newBinaryBuilder(info, binaryLabel)
 	if err != nil {
@@ -125,16 +125,24 @@ type manifestInfo struct {
 }
 
 type ProtoBuilder struct {
-	manifInfo *manifestInfo
+	manifInfo   *manifestInfo
+	binaryLabel string
 }
 
-func newProtoBuilder(manifInfo *manifestInfo) (*ProtoBuilder, error) {
+func newProtoBuilder(manifInfo *manifestInfo, binaryLabel string) (*ProtoBuilder, error) {
 	return &ProtoBuilder{
-		manifInfo: manifInfo,
+		manifInfo:   manifInfo,
+		binaryLabel: binaryLabel,
 	}, nil
 }
 
 func (p *ProtoBuilder) Build(ctx context.Context) error {
+
+	if len(p.manifInfo.Manifest.Binaries) == 0 || !strings.HasPrefix(p.manifInfo.Manifest.Binaries[p.binaryLabel].Type, "wasm/rust-v1") {
+		fmt.Println("Notice: No binaries found of type `wasm/rust-v1`, not generating rust bindings...")
+		return nil
+	}
+
 	excludes := strings.Join(p.manifInfo.Manifest.Protobuf.ExcludePaths, ",")
 	if excludes == "" {
 		fmt.Printf("Notice: No exclude paths found:\n")

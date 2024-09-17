@@ -126,9 +126,15 @@ func buildGenerateCommandFromArgs(manifestPath string, outputType OutputType, wi
 		moduleNames = append(moduleNames, module.Name)
 	}
 
-	selectedModule, err := createSelectForm(moduleNames, "Please select a mapper module to build the subgraph from:")
-	if err != nil {
-		return fmt.Errorf("creating request module form: %w", err)
+	var selectedModule string
+	if len(moduleNames) == 1 {
+		selectedModule = moduleNames[0]
+		fmt.Printf("\nThe substreams module %q will be used as output.\n\n", selectedModule)
+	} else {
+		selectedModule, err = createSelectForm(moduleNames, "Please select a mapper module to build the subgraph from:")
+		if err != nil {
+			return fmt.Errorf("creating request module form: %w", err)
+		}
 	}
 
 	requestedModule, err := getModule(pkg, selectedModule)

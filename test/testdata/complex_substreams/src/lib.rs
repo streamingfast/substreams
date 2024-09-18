@@ -42,6 +42,11 @@ fn first_store_init_20(block: test::Block, first_store: StoreAddInt64) {
 }
 
 #[substreams::handlers::store]
+fn first_store_init_23(block: test::Block, first_store: StoreAddInt64) {
+    first_store.add(0, "block_counter", 1);
+}
+
+#[substreams::handlers::store]
 fn second_store_init_30(block: test::Block, first_store: StoreGetInt64, second_store: StoreSetInt64) {
     let block_counter = first_store.get_last("block_counter").unwrap();
     second_store.set(0, format!("block_counter_from_first_store"), &block_counter)
@@ -73,8 +78,20 @@ fn assert_first_store_init_20(block: test::Block, first_store: StoreGetInt64) ->
 }
 
 #[substreams::handlers::map]
-fn multi_store_different_40(first_store: store::Deltas<DeltaInt64>, second_store: store::Deltas<DeltaInt64>) -> Result<test::Block, Error> {
+fn assert_first_store_init_23(block: test::Block, first_store: StoreGetInt64) -> Result<test::Boolean, Error> {
+    let block_counter = first_store.get_last("block_counter");
 
+    if block.number < 23 {
+        assert!(block_counter.is_none());
+        return Ok(test::Boolean { result: true })
+    }
+
+    assert_eq!(block_counter.unwrap(), (block.number - 22) as i64);
+    Ok(test::Boolean { result: true })
+}
+
+#[substreams::handlers::map]
+fn multi_store_different_40(first_store: store::Deltas<DeltaInt64>, second_store: store::Deltas<DeltaString>) -> Result<test::Block, Error> {
     first_store
     .deltas
     .iter()
@@ -83,17 +100,17 @@ fn multi_store_different_40(first_store: store::Deltas<DeltaInt64>, second_store
         x => panic!("unhandled key {}", x),
     });
 
-    second_store
-    .deltas
-    .iter()
-    .for_each(|delta| match delta.key.as_str() {
-        "block_counter" => log::info!("second_store: block_counter: {}", delta.new_value),
-        x => panic!("unhandled key {}", x),
-    });
-
     Ok(test::Block { 
         id: "1".to_string(),
         number: 1,
+    })
+}
+
+#[substreams::handlers::map]
+fn multi_store_different_23(first_store: store::Deltas<DeltaInt64>, second_store: store::Deltas<DeltaString>) -> Result<test::Block, Error> {
+    Ok(test::Block { 
+        id: "hehehehe".to_string(),
+        number: 5,
     })
 }
 

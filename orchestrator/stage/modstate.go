@@ -41,7 +41,7 @@ func (s *StoreModuleState) getStore(ctx context.Context, exclusiveEndBlock uint6
 	}
 	loadStore := s.storeConfig.NewFullKV(s.logger)
 	moduleInitBlock := s.storeConfig.ModuleInitialBlock()
-	if moduleInitBlock != exclusiveEndBlock {
+	if moduleInitBlock < exclusiveEndBlock { // note that 'endBlock' in a fullKV means the last block inserted in this store, from where we can start
 		fullKVFile := store.NewCompleteFileInfo(s.name, moduleInitBlock, exclusiveEndBlock)
 		err := loadStore.Load(ctx, fullKVFile)
 		if err != nil {

@@ -359,7 +359,6 @@ func TestOneStoreOneMap(t *testing.T) {
 			mapOutput := run.MapOutput("assert_test_store_add_i64")
 			assert.Contains(t, mapOutput, `assert_test_store_add_i64: 0801`)
 
-			fmt.Println(mapOutput)
 			assert.Equal(t, test.expectedResponseCount, strings.Count(mapOutput, "\n"))
 
 			withZST := func(s []string) []string {
@@ -411,6 +410,22 @@ func TestMultipleStoresDifferentStartBlocks(t *testing.T) {
 
 	require.NoError(t, run2.RunWithTempDir(t, "pass two", run.TempDir))
 }
+
+func TestMultipleStoresUnalignedStartBlocksDevMode(t *testing.T) {
+	manifest.TestUseSimpleHash = true
+	// dev mode
+	run2 := newTestRun(t, 23, 999, 30, 0, "multi_store_different_23", "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg")
+	require.NoError(t, run2.Run(t, "dev_mode"))
+	fmt.Println(run2.MapOutput("multi_store_different_23"))
+}
+func TestMultipleStoresUnalignedStartBlocksProdMode(t *testing.T) {
+	manifest.TestUseSimpleHash = true
+	run2 := newTestRun(t, 23, 999, 30, 0, "multi_store_different_23", "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg")
+	run2.ProductionMode = true
+	require.NoError(t, run2.Run(t, "prod_mode"))
+	fmt.Println(run2.MapOutput("multi_store_different_23"))
+}
+
 func TestStoreDeletePrefix(t *testing.T) {
 	run := newTestRun(t, 30, 40, 42, 0, "assert_test_store_delete_prefix", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 	run.BlockProcessedCallback = func(ctx *execContext) {

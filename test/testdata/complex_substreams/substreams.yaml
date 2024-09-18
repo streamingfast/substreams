@@ -81,6 +81,24 @@ modules:
     output: 
       type: proto:sf.substreams.v1.test.Boolean
 
+
+  - name: first_store_init_23
+    kind: store
+    initialBlock: 23
+    updatePolicy: add
+    valueType: int64
+    inputs:
+      - source: sf.substreams.v1.test.Block
+
+  - name: assert_first_store_init_23
+    kind: map
+    initialBlock: 23
+    inputs:
+      - source: sf.substreams.v1.test.Block
+      - store: first_store_init_23
+    output: 
+      type: proto:sf.substreams.v1.test.Boolean  
+
   - name: second_store_init_30 
     kind: store
     initialBlock: 30
@@ -213,7 +231,19 @@ modules:
     initialBlock: 40
     inputs:
       - store: first_store_init_20
+        mode: deltas
       - store: set_sum_store_init_0
+        mode: deltas
     output: 
       type: proto:sf.substreams.v1.test.Block          
 
+  - name: multi_store_different_23
+    kind: map
+    initialBlock: 23
+    inputs:
+      - store: first_store_init_23
+        mode: deltas
+      - store: set_sum_store_init_0
+        mode: deltas
+    output: 
+      type: proto:sf.substreams.v1.test.Block          

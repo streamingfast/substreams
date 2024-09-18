@@ -21,6 +21,7 @@ type TestWorker struct {
 	responseCollector      *responseCollector
 	newBlockGenerator      BlockGeneratorFactory
 	blockProcessedCallBack blockProcessedCallBack
+	jobCallBack            func(stage.Unit)
 	testTempDir            string
 	id                     uint64
 	firstStreamableBlock   uint64
@@ -35,6 +36,9 @@ func (w *TestWorker) ID() string {
 func (w *TestWorker) Work(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream) loop.Cmd {
 	w.t.Helper()
 
+	if w.jobCallBack != nil {
+		w.jobCallBack(unit)
+	}
 	ctx = reqctx.WithTier2RequestParameters(ctx, reqctx.Tier2RequestParameters{
 		BlockType:            "sf.substreams.v1.test.Block",
 		StateBundleSize:      10,

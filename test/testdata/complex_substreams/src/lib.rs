@@ -1,12 +1,11 @@
 mod pb;
 
 use crate::pb::sf::substreams::v1::test;
-use substreams::prelude::*;
+use substreams::{log, prelude::*};
 use substreams::store::{StoreAdd, StoreSetSum, StoreSetSumInt64};
 use substreams::store::StoreNew;
 use crate::pb::sf::substreams::index::v1::Keys;
 use substreams::store;
-use log::log;
 use substreams::errors::Error;
 
 
@@ -71,6 +70,31 @@ fn assert_first_store_init_20(block: test::Block, first_store: StoreGetInt64) ->
 
     assert_eq!(block_counter.unwrap(), (block.number - 19) as i64);
     Ok(test::Boolean { result: true })
+}
+
+#[substreams::handlers::map]
+fn multi_store_different_40(first_store: store::Deltas<DeltaInt64>, second_store: store::Deltas<DeltaInt64>) -> Result<test::Block, Error> {
+
+    first_store
+    .deltas
+    .iter()
+    .for_each(|delta| match delta.key.as_str() {
+        "block_counter" => log::info!("first_store: block_counter: {}", delta.new_value),
+        x => panic!("unhandled key {}", x),
+    });
+
+    second_store
+    .deltas
+    .iter()
+    .for_each(|delta| match delta.key.as_str() {
+        "block_counter" => log::info!("second_store: block_counter: {}", delta.new_value),
+        x => panic!("unhandled key {}", x),
+    });
+
+    Ok(test::Block { 
+        id: "1".to_string(),
+        number: 1,
+    })
 }
 
 #[substreams::handlers::map]

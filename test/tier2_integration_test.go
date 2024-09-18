@@ -49,6 +49,7 @@ func TestTier2Call(t *testing.T) {
 	mapUsingIndexInit70 := hex.EncodeToString([]byte("map_using_index_init_70"))
 	mapHybridInputClock70 := hex.EncodeToString([]byte("map_hybrid_input_clock_70"))
 	mapHybridInputBlock70 := hex.EncodeToString([]byte("map_hybrid_input_block_70"))
+	setSumStoreInit0 := hex.EncodeToString([]byte("set_sum_store_init_0"))
 
 	randomIndicesRange := roaring64.New()
 	randomIndicesRange.AddInt(70)
@@ -353,6 +354,35 @@ func TestTier2Call(t *testing.T) {
 					78: &pbsubstreamstest.Boolean{Result: true},
 					79: &pbsubstreamstest.Boolean{Result: false},
 				},
+			},
+		},
+		{
+			name:            "multi_store_different_40_start_0",
+			startBlock:      0,
+			stage:           0,
+			moduleName:      "multi_store_different_40",
+			stateBundleSize: 10,
+			manifestPath:    "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg",
+
+			expectRemainingFiles: []string{
+				//firstStoreInit20
+				setSumStoreInit0 + "/states/0000000010-0000000000.partial",
+				setSumStoreInit0 + "/outputs/0000000000-0000000010.output",
+			},
+		},
+
+		{
+			name:            "multi_store_different_40_start_10",
+			startBlock:      10,
+			stage:           0,
+			moduleName:      "multi_store_different_40",
+			stateBundleSize: 10,
+			manifestPath:    "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg",
+
+			expectRemainingFiles: []string{
+				//firstStoreInit20
+				setSumStoreInit0 + "/outputs/0000000010-0000000020.output",
+				setSumStoreInit0 + "/states/0000000020-0000000010.partial",
 			},
 		},
 

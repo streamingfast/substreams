@@ -25,6 +25,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/streamingfast/substreams/manifest"
+	"github.com/streamingfast/substreams/orchestrator/stage"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -46,6 +47,7 @@ type testRun struct {
 	ParallelSubrequests    uint64
 	NewBlockGenerator      BlockGeneratorFactory
 	BlockProcessedCallback blockProcessedCallBack
+	JobCallback            func(stage.Unit)
 	LinearHandoffBlockNum  uint64 // defaults to the request's StopBlock, so no linear handoff, only backprocessing
 	FirstStreamableBlock   uint64
 	ProductionMode         bool
@@ -66,7 +68,17 @@ func newTestRun(t *testing.T, startBlock int64, linearHandoffBlock, exclusiveEnd
 	return &testRun{Package: pkg, StartBlock: startBlock, ExclusiveEndBlock: exclusiveEndBlock, FirstStreamableBlock: firstStreamableBlock, ModuleName: moduleName, LinearHandoffBlockNum: linearHandoffBlock}
 }
 
+func (f *testRun) RunWithTempDir(t *testing.T, testName string, tempDir string) error {
+	f.TempDir = tempDir
+	return f.run(t, testName)
+}
+
 func (f *testRun) Run(t *testing.T, testName string) error {
+	f.TempDir = t.TempDir()
+	return f.run(t, testName)
+}
+
+func (f *testRun) run(t *testing.T, testName string) error {
 	ctx := context.Background()
 	if f.Context != nil {
 		ctx = f.Context
@@ -74,8 +86,6 @@ func (f *testRun) Run(t *testing.T, testName string) error {
 
 	ctx = reqctx.WithLogger(ctx, zlog)
 
-	testTempDir := t.TempDir()
-	f.TempDir = testTempDir
 	os.Setenv("TEST_TEMP_DIR", f.TempDir)
 
 	ctx, endFunc := withTestTracing(t, ctx, testName)
@@ -135,7 +145,8 @@ func (f *testRun) Run(t *testing.T, testName string) error {
 			responseCollector:      newResponseCollector(),
 			newBlockGenerator:      newBlockGenerator,
 			blockProcessedCallBack: f.BlockProcessedCallback,
-			testTempDir:            testTempDir,
+			jobCallBack:            f.JobCallback,
+			testTempDir:            f.TempDir,
 			id:                     workerID.Inc(),
 			firstStreamableBlock:   f.FirstStreamableBlock,
 		}
@@ -145,7 +156,7 @@ func (f *testRun) Run(t *testing.T, testName string) error {
 		f.PreWork(t, f, workerFactory)
 	}
 
-	if err := processRequest(t, ctx, request, workerFactory, newBlockGenerator, responseCollector, false, f.BlockProcessedCallback, testTempDir, f.ParallelSubrequests, f.LinearHandoffBlockNum); err != nil {
+	if err := processRequest(t, ctx, request, workerFactory, newBlockGenerator, responseCollector, false, f.BlockProcessedCallback, f.TempDir, f.ParallelSubrequests, f.LinearHandoffBlockNum); err != nil {
 		return fmt.Errorf("running test: %w", err)
 	}
 

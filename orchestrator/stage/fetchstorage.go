@@ -53,7 +53,18 @@ func (s *Stages) FetchStoresState(
 		return fmt.Errorf("fetching stores storage state: %w", err)
 	}
 	for stageIdx, stage := range s.stages {
-		moduleCount := len(stage.storeModuleStates)
+		firstIndexes := make(map[string]int)
+		for _, mod := range stage.storeModuleStates {
+			firstIndexes[mod.name] = mod.segmenter.FirstIndex()
+		}
+		moduleCount := func(unit Unit) (out int) {
+			for _, mod := range stage.storeModuleStates {
+				if unit.Segment >= firstIndexes[mod.name] {
+					out++
+				}
+			}
+			return
+		}
 
 		if stage.kind == KindMap {
 			if mapperFiles == nil {
@@ -69,7 +80,7 @@ func (s *Stages) FetchStoresState(
 					continue
 				}
 				unit := Unit{Stage: stageIdx, Segment: segmentIdx}
-				if allDone := markFound(completes, unit, mapperName, moduleCount); allDone {
+				if allDone := markFound(completes, unit, mapperName, moduleCount(unit)); allDone {
 					s.markSegmentCompleted(unit)
 				}
 			}
@@ -91,7 +102,7 @@ func (s *Stages) FetchStoresState(
 					continue
 				}
 				unit := Unit{Stage: stageIdx, Segment: segmentIdx}
-				if allDone := markFound(completes, unit, mod.name, moduleCount); allDone {
+				if allDone := markFound(completes, unit, mod.name, moduleCount(unit)); allDone {
 					s.markSegmentCompleted(unit)
 				}
 			}
@@ -112,7 +123,7 @@ func (s *Stages) FetchStoresState(
 					continue
 				}
 
-				if allDone := markFound(partials, unit, mod.name, moduleCount); allDone {
+				if allDone := markFound(partials, unit, mod.name, moduleCount(unit)); allDone {
 					s.MarkSegmentPartialPresent(unit)
 				}
 			}

@@ -207,3 +207,13 @@ modules:
         mode: deltas
     output:
       type: proto:sf.substreams.v1.test.Boolean
+
+  - name: multi_store_different_40
+    kind: map
+    initialBlock: 40
+    inputs:
+      - store: first_store_init_20
+      - store: set_sum_store_init_0
+    output: 
+      type: proto:sf.substreams.v1.test.Block          
+

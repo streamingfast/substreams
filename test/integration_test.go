@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -374,6 +375,42 @@ func TestOneStoreOneMap(t *testing.T) {
 	}
 }
 
+func files(t *testing.T, tempDir string) []string {
+	var storedFiles []string
+	require.NoError(t, filepath.Walk(tempDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		storedFiles = append(storedFiles, filepath.Base(path))
+		return nil
+	}))
+	return storedFiles
+}
+
+func TestMultipleStoresDifferentStartBlocks(t *testing.T) {
+	manifest.TestUseSimpleHash = true
+	run := newTestRun(t, 0, 999, 20, 0, "assert_set_sum_store_0", "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg")
+
+	setSumStoreInit0 := hex.EncodeToString([]byte("set_sum_store_init_0"))
+	run.ProductionMode = true
+	require.NoError(t, run.Run(t, "pass_one"))
+	assert.Equal(t, []string{"0000000010-0000000000.kv.zst", "0000000020-0000000000.kv.zst"},
+		files(t, path.Join(run.TempDir, "test.store", "tag", setSumStoreInit0, "states")))
+
+	// run2 will be run on the the same TempDir as the first run
+	run2 := newTestRun(t, 40, 999, 50, 0, "multi_store_different_40", "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg")
+	run2.ProductionMode = true
+	run2.JobCallback = func(unit stage.Unit) {
+		if unit.Segment < 2 {
+			t.Errorf("unexpected job callback for segment %d", unit.Segment)
+		}
+	}
+
+	require.NoError(t, run2.RunWithTempDir(t, "pass two", run.TempDir))
+}
 func TestStoreDeletePrefix(t *testing.T) {
 	run := newTestRun(t, 30, 40, 42, 0, "assert_test_store_delete_prefix", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 	run.BlockProcessedCallback = func(ctx *execContext) {

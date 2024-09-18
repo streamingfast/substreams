@@ -215,9 +215,6 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 			if isLastStage {
 				initialBlock := reqDetails.ResolvedStartBlockNum
 				if storeConfig.ModuleInitialBlock() > reqDetails.ResolvedStartBlockNum {
-					if storeConfig.ModuleInitialBlock() > reqDetails.StopBlockNum {
-						continue
-					}
 					initialBlock = storeConfig.ModuleInitialBlock()
 				}
 				partialStore := storeConfig.NewPartialKV(initialBlock, logger)

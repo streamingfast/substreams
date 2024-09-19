@@ -179,7 +179,31 @@ func (f *testRun) Logs() (out []string) {
 	return
 }
 
-func (f *testRun) MapOutput(modName string) string {
+func (f *testRun) MapOutput(modName string) map[uint64][]byte {
+
+	moduleOutputs := make(map[uint64][]byte)
+	for _, response := range f.Responses {
+		switch r := response.Message.(type) {
+		case *pbsubstreamsrpc.Response_BlockScopedData:
+			for _, output := range r.BlockScopedData.AllModuleOutputs() {
+				if output.Name() != modName {
+					continue
+				}
+				if !output.IsMap() {
+					continue
+				}
+				mapout := output.MapOutput.GetMapOutput()
+				if mapout == nil {
+					continue
+				}
+				moduleOutputs[r.BlockScopedData.Clock.Number] = mapout.Value
+			}
+		}
+	}
+	return moduleOutputs
+}
+
+func (f *testRun) MapOutputString(modName string) string {
 	var moduleOutputs []string
 	for _, response := range f.Responses {
 		switch r := response.Message.(type) {

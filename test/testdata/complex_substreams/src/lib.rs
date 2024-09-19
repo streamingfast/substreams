@@ -108,9 +108,28 @@ fn multi_store_different_40(first_store: store::Deltas<DeltaInt64>, second_store
 
 #[substreams::handlers::map]
 fn multi_store_different_23(first_store: store::Deltas<DeltaInt64>, second_store: store::Deltas<DeltaString>) -> Result<test::Block, Error> {
+    let mut store1_value: i64 = 0;
+    first_store
+    .deltas
+    .iter()
+    .for_each(|delta| match delta.key.as_str() {
+        "block_counter" => store1_value = delta.new_value,
+        x => panic!("unhandled key {}", x),
+    });
+
+    let mut store2_value: String = "".to_string();
+    second_store
+    .deltas
+    .iter()
+    .for_each(|delta| match delta.key.as_str() {
+        "sum" => store2_value = delta.new_value.clone(),
+        x => panic!("unhandled key {}", x),
+    });
+
+
     Ok(test::Block { 
-        id: "hehehehe".to_string(),
-        number: 5,
+        id: "store2:".to_string()+&store2_value.to_string(),
+        number: store1_value as u64,
     })
 }
 

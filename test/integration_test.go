@@ -356,7 +356,7 @@ func TestOneStoreOneMap(t *testing.T) {
 			}
 			require.NoError(t, err)
 
-			mapOutput := run.MapOutput("assert_test_store_add_i64")
+			mapOutput := run.MapOutputString("assert_test_store_add_i64")
 			assert.Contains(t, mapOutput, `assert_test_store_add_i64: 0801`)
 
 			assert.Equal(t, test.expectedResponseCount, strings.Count(mapOutput, "\n"))
@@ -414,16 +414,23 @@ func TestMultipleStoresDifferentStartBlocks(t *testing.T) {
 func TestMultipleStoresUnalignedStartBlocksDevMode(t *testing.T) {
 	manifest.TestUseSimpleHash = true
 	// dev mode
-	run2 := newTestRun(t, 23, 999, 30, 0, "multi_store_different_23", "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg")
-	require.NoError(t, run2.Run(t, "dev_mode"))
-	fmt.Println(run2.MapOutput("multi_store_different_23"))
+	run := newTestRun(t, 23, 999, 30, 0, "multi_store_different_23", "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg")
+	require.NoError(t, run.Run(t, "dev_mode"))
+	outs := run.MapOutput("multi_store_different_23")
+	// ensure that the 20->22 block range is processed by the "set_sum_store_init_0" store
+	assert.Contains(t, string(outs[23]), "store2:sum:276") // 1+2+3+4+5+6+7+8+9+10+11+12+13+14+15+16+17+18+19+20+21+22+23 = 276
+	assert.Contains(t, string(outs[24]), "store2:sum:300") // 276+24 ...
 }
 func TestMultipleStoresUnalignedStartBlocksProdMode(t *testing.T) {
 	manifest.TestUseSimpleHash = true
-	run2 := newTestRun(t, 23, 999, 30, 0, "multi_store_different_23", "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg")
-	run2.ProductionMode = true
-	require.NoError(t, run2.Run(t, "prod_mode"))
-	fmt.Println(run2.MapOutput("multi_store_different_23"))
+	run := newTestRun(t, 23, 999, 30, 0, "multi_store_different_23", "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg")
+	run.ProductionMode = true
+	require.NoError(t, run.Run(t, "prod_mode"))
+
+	outs := run.MapOutput("multi_store_different_23")
+	// ensure that the 20->22 block range is processed by the "set_sum_store_init_0" store
+	assert.Contains(t, string(outs[23]), "store2:sum:276") // 1+2+3+4+5+6+7+8+9+10+11+12+13+14+15+16+17+18+19+20+21+22+23 = 276
+	assert.Contains(t, string(outs[24]), "store2:sum:300") // 276+24 ...
 }
 
 func TestStoreDeletePrefix(t *testing.T) {
@@ -477,7 +484,7 @@ func Test_WASMBindgenShims(t *testing.T) {
 
 	require.NoError(t, run.Run(t, "test_wasmbindgenshims"))
 
-	mapOutput := run.MapOutput("map_block")
+	mapOutput := run.MapOutputString("map_block")
 	fmt.Println(mapOutput)
 
 }

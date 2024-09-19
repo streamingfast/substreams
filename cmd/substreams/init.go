@@ -48,6 +48,8 @@ var initCmd = &cobra.Command{
 	SilenceUsage: true,
 }
 
+var huhTheme *huh.Theme
+
 func init() {
 	defaultEndpoint := "https://codegen.substreams.dev"
 	if newValue := os.Getenv("SUBSTREAMS_INIT_CODEGEN_ENDPOINT"); newValue != "" {
@@ -57,6 +59,10 @@ func init() {
 	initCmd.Flags().String("state-file", "./generator.json", "File to load/save the state of the code generator")
 	initCmd.Flags().Bool("force-download-cwd", false, "Force download at current dir")
 	rootCmd.AddCommand(initCmd)
+
+	huhTheme = huh.ThemeCharm()
+	huhTheme.Focused.Base = huhTheme.Focused.Base.
+		BorderForeground(lipgloss.Color("15"))
 }
 
 var INIT_TRACE = false
@@ -148,7 +154,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				Title(fmt.Sprintf("State file %q was found (%s - %s). Do you want to start from there ?", stateFile, state.GeneratorID, humanize.Time(s.ModTime()))).
 				Value(&useGenerator)
 
-			if err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run(); err != nil {
+			if err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huhTheme).WithAccessible(WITH_ACCESSIBLE).Run(); err != nil {
 				return fmt.Errorf("failed taking confirmation input: %w", err)
 			}
 
@@ -194,19 +200,12 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			Options(options...).
 			Value(&codegen)
 
-		err = huh.NewForm(huh.NewGroup(selectField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run()
+		err = huh.NewForm(huh.NewGroup(selectField)).WithTheme(huhTheme).WithAccessible(WITH_ACCESSIBLE).Run()
 		if err != nil {
 			return fmt.Errorf("failed taking input: %w", err)
 		}
 
-		fmt.Println("┃ ", bold("Selected code generator:"), codegen.Id, "-", codegen.Title)
-		for i, desc := range strings.Split(codegen.Description, "\n") {
-			dd := desc
-			if i == 0 {
-				dd = bold("Description: ") + desc
-			}
-			fmt.Println("┃ ", dd)
-		}
+		fmt.Println(gray("┃"), "Chosen code generator:", bold(codegen.Id), "-", codegen.Title)
 		lastState.GeneratorID = codegen.Id
 		generatorID = codegen.Id
 	}
@@ -314,19 +313,16 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				Options(options...).
 				Value(&selection)
 
-			err := huh.NewForm(huh.NewGroup(selectField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run()
+			err := huh.NewForm(huh.NewGroup(selectField)).WithTheme(huhTheme).WithAccessible(WITH_ACCESSIBLE).Run()
 			if err != nil {
 				return fmt.Errorf("failed taking input: %w", err)
 			}
 
-			fmt.Println("┃ ", input.Instructions)
+			var selectedValue string
 			for _, opt := range options {
-				if opt.Value == selection {
-					fmt.Println("┃ -", bold(opt.Key))
-				} else {
-					fmt.Println("┃ -", opt.Key)
-				}
+				selectedValue = opt.Key
 			}
+			fmt.Println(gray("┃"), input.Instructions+":", bold(selectedValue))
 			fmt.Println("")
 
 			if err := sendFunc(&pbconvo.UserInput{
@@ -367,12 +363,12 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				})
 			}
 
-			err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run()
+			err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huhTheme).WithAccessible(WITH_ACCESSIBLE).Run()
 			if err != nil {
 				return fmt.Errorf("failed taking input: %w", err)
 			}
 
-			fmt.Println("┃ ", input.Prompt+":", bold(returnValue))
+			fmt.Println(gray("┃"), input.Prompt+":", bold(returnValue))
 			fmt.Println("")
 
 			if err := sendFunc(&pbconvo.UserInput{
@@ -395,7 +391,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				Description(input.Description).
 				Value(&returnValue)
 
-			err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run()
+			err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huhTheme).WithAccessible(WITH_ACCESSIBLE).Run()
 			if err != nil {
 				return fmt.Errorf("failed taking confirmation input: %w", err)
 			}
@@ -407,9 +403,9 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			} else {
 				deny = bold(deny)
 			}
-			fmt.Println("┃ ", input.Prompt)
-			fmt.Println("┃ ")
-			fmt.Println("┃  " + affirm + "     " + deny)
+			fmt.Println(gray("┃"), input.Prompt)
+			fmt.Println(gray("┃"))
+			fmt.Println(gray("┃"), affirm+"     "+deny)
 
 			if err := sendFunc(&pbconvo.UserInput{
 				FromActionId: resp.ActionId,
@@ -640,6 +636,10 @@ func bold(input string) string {
 	return lipgloss.NewStyle().Bold(true).Render(input)
 }
 
+func gray(input string) string {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Render(input)
+}
+
 func filenameStyle(input string) string {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color("34")).Render(input)
 }
@@ -731,7 +731,7 @@ func (f *OverwriteForm) createOverwriteForm(path string) error {
 		Options(options...).
 		Value(&selection)
 
-	err := huh.NewForm(huh.NewGroup(selectField)).WithAccessible(WITH_ACCESSIBLE).Run()
+	err := huh.NewForm(huh.NewGroup(selectField)).WithTheme(huhTheme).WithAccessible(WITH_ACCESSIBLE).Run()
 	if err != nil {
 		f.Overwrite = false
 		return fmt.Errorf("failed confirming: %w", err)

@@ -117,7 +117,10 @@ func (b *BlockSelect) View() string {
 	}
 
 	var activeBlock string
-	ptr := int(float64(b.activeBlock-b.lowBlock) / binSize)
+	var ptr int
+	if b.activeBlock > 0 { // avoid division by zero
+		ptr = int(float64(b.activeBlock-b.lowBlock) / binSize)
+	}
 	activeBlock = fmt.Sprintf("%s: %s",
 		styles.BlockSelect.CurrentBlock.Render("Current block"),
 		styles.BlockSelect.SelectedBlock.Render(humanize.Comma(int64(b.activeBlock))),
@@ -134,6 +137,7 @@ func (b *BlockSelect) View() string {
 		if repeatLen < 0 {
 			repeatLen = 0
 		}
+
 		activeBlock = fmt.Sprintf("%s%s ^",
 			strings.Repeat(" ", repeatLen),
 			activeBlock,

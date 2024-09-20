@@ -21,22 +21,26 @@ import (
 
 type getBlockFunc func() (uint64, error)
 
-func reprocStateRequired(startBlock uint64, outputModule string, modules []*pbsubstreams.Module) (bool, error) {
+// if some stores need to gather data from a block below startBlock,
+// we return the lowest block number required, else nil
+func reprocStateRequired(startBlock uint64, outputModule string, modules []*pbsubstreams.Module) (*uint64, error) {
 	graph, err := manifest.NewModuleGraph(modules)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	requiredStores, err := graph.StoresDownTo(outputModule)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
+	var lowest *uint64
 	for _, store := range requiredStores {
 		if store.InitialBlock < startBlock {
-			return true, nil
+			lowest = &store.InitialBlock
 		}
 	}
-	return false, nil
+
+	return lowest, nil
 }
 
 func BuildRequestDetails(
@@ -60,17 +64,18 @@ func BuildRequestDetails(
 		return nil, nil, err
 	}
 
-	var moduleHasStatefulDependencies bool
+	var stateRequiredAt *uint64
 	if request.Modules == nil {
-		moduleHasStatefulDependencies = true // FIXME this is for test compatibility, it never happens in real life
+		x := uint64(0)
+		stateRequiredAt = &x // FIXME this is for test compatibility, it never happens in real life
 	} else {
-		moduleHasStatefulDependencies, err = reprocStateRequired(req.ResolvedStartBlockNum, request.OutputModule, request.Modules.Modules)
+		stateRequiredAt, err = reprocStateRequired(req.ResolvedStartBlockNum, request.OutputModule, request.Modules.Modules)
 		if err != nil {
 			return nil, nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid modules: %w", err))
 		}
 	}
 
-	linearHandoff, err := computeLinearHandoffBlockNum(request.ProductionMode, req.ResolvedStartBlockNum, request.StopBlockNum, getRecentFinalBlock, moduleHasStatefulDependencies, segmentSize)
+	linearHandoff, err := computeLinearHandoffBlockNum(request.ProductionMode, req.ResolvedStartBlockNum, request.StopBlockNum, getRecentFinalBlock, stateRequiredAt, segmentSize)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -112,7 +117,9 @@ func nextUniqueID() uint64 {
 	return uniqueRequestIDCounter.Add(1)
 }
 
-func computeLinearHandoffBlockNum(productionMode bool, startBlock, stopBlock uint64, getRecentFinalBlockFunc func() (uint64, error), stateRequired bool, segmentSize uint64) (uint64, error) {
+func computeLinearHandoffBlockNum(productionMode bool, startBlock, stopBlock uint64, getRecentFinalBlockFunc func() (uint64, error), stateRequiredAt *uint64, segmentSize uint64) (uint64, error) {
+	stateRequired := stateRequiredAt != nil && *stateRequiredAt <= startBlock
+
 	//get value of of next boundary after stopBlock
 	if productionMode {
 		nextBoundary := stopBlock
@@ -145,14 +152,21 @@ func computeLinearHandoffBlockNum(productionMode bool, startBlock, stopBlock uin
 	}
 
 	prevBoundary := startBlock - (startBlock % segmentSize)
-
-	libHandoff, err := getRecentFinalBlockFunc()
-	if err != nil {
-		return prevBoundary, nil
+	linearHandoff := prevBoundary
+	if *stateRequiredAt > prevBoundary {
+		// ex: first store is at block 1010 and we start at 1020
+		// we'll need to start the linear processing at block 1010
+		// if we have even a single store that starts at block 1000 (prevBoundary),
+		// then we need to start at 1000
+		return *stateRequiredAt, nil
 	}
-	libHandoffBoundary := libHandoff - (libHandoff % segmentSize)
 
-	return min(prevBoundary, libHandoffBoundary), nil
+	lib, err := getRecentFinalBlockFunc()
+	if err != nil || linearHandoff <= lib { // no linear handoff above the lib because tier2s cannot read blocks that are not final yet
+		return linearHandoff, nil
+	}
+
+	return lib - (lib % segmentSize), nil
 }
 
 // resolveStartBlockNum will occasionally modify or remove the cursor inside the request

@@ -172,6 +172,10 @@ func Test_resolveStartBlockNum(t *testing.T) {
 	}
 }
 
+func ref(in uint64) *uint64 {
+	return &in
+}
+
 func Test_computeLinaerHandoffBlockNum(t *testing.T) {
 	tests := []struct {
 		name             string
@@ -182,21 +186,23 @@ func Test_computeLinaerHandoffBlockNum(t *testing.T) {
 		stopBlockNum     uint64
 		expectHandoffNum uint64
 		expectError      bool
-		stateRequired    bool
+		stateRequiredAt  *uint64
 	}{
 		// development mode
-		{"g1_start_stop_same_boundary", true, 500, false, 138, 142, 100, false, true},
-		{"g1_start_stop_same_boundary_livehub_fails", false, 500, false, 138, 142, 100, false, true},
-		{"g2_start_stop_across_boundary", true, 500, false, 138, 242, 100, false, true},
-		{"g2_start_stop_across_boundary_livehub_fails", true, 500, false, 138, 242, 100, false, true},
+		{"g1_start_stop_same_boundary", true, 500, false, 138, 142, 100, false, ref(0)},
+		{"g1_start_stop_same_boundary_livehub_fails", false, 500, false, 138, 142, 100, false, ref(0)},
+		{"g2_start_stop_across_boundary", true, 500, false, 138, 242, 100, false, ref(0)},
+		{"g2_start_stop_across_boundary_livehub_fails", true, 500, false, 138, 242, 100, false, ref(0)},
+		{"start_with_state_near", true, 500, false, 138, 242, 135, false, ref(135)},
+		{"start_with_state_near_livehub_fails", true, 500, false, 138, 242, 135, false, ref(135)},
 
 		// production mode
-		{"g4_start_stop_same_boundary", true, 500, true, 138, 142, 200, false, true},
-		{"g5_start_stop_across_boundary", true, 500, true, 138, 242, 300, false, true},
-		{"g6_lib_between_start_and_stop", true, 342, true, 121, 498, 300, false, true},
-		{"g6_lib_between_start_and_stop_livehub_fails", false, 342, true, 121, 498, 500, false, true},
-		{"g7_stop_block_infinity", true, 342, true, 121, 0, 300, false, true},
-		{"g7_stop_block_infinity_livehub_fails", false, 342, true, 121, 0, 300, true, true},
+		{"g4_start_stop_same_boundary", true, 500, true, 138, 142, 200, false, ref(0)},
+		{"g5_start_stop_across_boundary", true, 500, true, 138, 242, 300, false, ref(0)},
+		{"g6_lib_between_start_and_stop", true, 342, true, 121, 498, 300, false, ref(0)},
+		{"g6_lib_between_start_and_stop_livehub_fails", false, 342, true, 121, 498, 500, false, ref(0)},
+		{"g7_stop_block_infinity", true, 342, true, 121, 0, 300, false, ref(0)},
+		{"g7_stop_block_infinity_livehub_fails", false, 342, true, 121, 0, 300, true, ref(0)},
 	}
 
 	for _, test := range tests {
@@ -210,7 +216,7 @@ func Test_computeLinaerHandoffBlockNum(t *testing.T) {
 						return 0, fmt.Errorf("live not available")
 					}
 					return test.recentBlockNum, nil
-				}, test.stateRequired, 100)
+				}, test.stateRequiredAt, 100)
 			if test.expectError {
 				assert.Error(t, err)
 			} else {

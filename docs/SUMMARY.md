@@ -6,7 +6,7 @@
 
 * [How-To Guides](new/getting-started/intro-how-to-guides.md)
   * [Initialize an EVM Substreams Project](new/how-to-guides/your-first-application/evm.md)
-  * [Initialize an Solana Substreams Project](new/how-to-guides/your-first-application/solana.md)
+  * [Initialize a Solana Substreams Project](new/how-to-guides/your-first-application/solana.md)
   * [Initialize an Injective Substreams Project](new/how-to-guides/your-first-application/injective.md)
 * [Consume Substreams](new/consume/consume.md)
   * [Install the CLI](new/common/installing-the-cli.md)

@@ -1,4 +1,4 @@
-In this guide, you'll learn how to initialize an Solana-based Substreams project. You’ll learn how to set up a simple project to extract raw data or filter Solana transactions based on Program IDs and Account IDs.
+In this guide, you'll learn how to initialize a Solana-based Substreams project. You’ll learn how to set up a simple project to extract raw data or filter Solana transactions based on Program IDs and Account IDs.
 
 ## Prerequisites
 

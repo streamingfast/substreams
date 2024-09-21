@@ -64,9 +64,12 @@ redirects:
   intro-injective: ./new/how-to-guides/your-first-application/injective.md
   documentation/intro-getting-started: ./new/how-to-guides/your-first-application/intro-your-first-application.md
   documentation/intro-getting-started/intro-evm: ./new/how-to-guides/your-first-application/evm.md
-  documentation/intro-getting-started/intro-evm/evm-first-sps: ./new/how-to-guides/your-first-application/evm.md
-  documentation/intro-getting-started/intro-evm/emv-first-sql: ./new/how-to-guides/your-first-application/evm.md
-  documentation/intro-getting-started/intro-solana: ./new/how-to-guides/your-first-application/solana.md
-  documentation/intro-getting-started/intro-injective: ./new/how-to-guides/your-first-application/injective.md
-  documentation/intro-getting-started/intro-injective/injective-first-sql: ./new/how-to-guides/your-first-application/injective.md
-  documentation/intro-getting-started/intro-injective/injective-first-sps: ./new/how-to-guides/your-first-application/injective.md
+  documentation/intro-getting-started/intro-evm/evm-first-sps: ./new/how-to-guides/evm.md
+  documentation/intro-getting-started/intro-evm/emv-first-sql: ./new/how-to-guides/evm.md
+  documentation/intro-getting-started/intro-solana: ./new/how-to-guides/solana.md
+  documentation/intro-getting-started/intro-injective: ./new/how-to-guides/injective.md
+  documentation/intro-getting-started/intro-injective/injective-first-sql: ./new/how-to-guides/injective.md
+  documentation/intro-getting-started/intro-injective/injective-first-sps: ./new/how-to-guides/injective.md
+  documentation/how-to-guides/intro-your-first-application/solana: ./new/how-to-guides/solana.md
+  documentation/how-to-guides/intro-your-first-application/evm: ./new/how-to-guides/evm.md
+  documentation/how-to-guides/intro-your-first-application/injective: ./new/how-to-guides/injective.md

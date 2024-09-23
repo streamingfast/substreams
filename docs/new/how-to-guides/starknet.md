@@ -1,24 +1,23 @@
-In this guide, you'll learn how to initialize a Solana-based Substreams project. You’ll learn how to set up a simple project to extract raw data or filter Solana transactions based on Program IDs and Account IDs.
+In this guide, you'll learn how to initialize a Starknet-based Substreams project. You’ll learn how to set up a simple project to extract raw data or filter events from a smart contract.
 
 ## Prerequisites
 
 - Docker and VS Code installed and up-to-date.
 - Visit the [Getting Started Guide](https://github.com/streamingfast/substreams-starter) to initialize your development environment.
 
-## Step 1: Initialize Your Solana Substreams Project
+## Step 1: Initialize Your Starknet Substreams Project
 
 1. Open your development environment and run the following command to initialize your project:
     
     ```bash
     substreams init
     ```
-
-2. You will be given the option to choose between two Solana project options. Select the one that best fits your requirements:
-    - **`sol-minimal`**: This option creates a simple Substreams project that extracts raw data directly from Solana blocks.
-    - **`sol-transactions`**: This option creates a Substreams project that filters Solana transactions based on one or more Program IDs and/or Account IDs, using the cached [Solana Foundational Module](https://substreams.dev/streamingfast/solana-common/v0.3.0).
-
-    Note: The filtered_transactions_without_votes module extracts transactions while excluding voting transactions, reducing data size and costs by 75%. To access voting transactions, use a full Solana block.
     
+2. You will be given the option to choose between two Starknet project options. Select the one that best fits your requirements:
+    - **starknet-minimal**: Creates a simple Substreams that extracts raw data from the block and generates Rust code.
+    - **starknet-events**: Creates a Substreams that extracts Starknet events using the cached [Starknet Foundational Module](https://substreams.dev/streamingfast/starknet-foundational/v0.1.3), filtered by one or more smart contract addresses.
+
+
 ## Step 2: Visualize the Data
 
 1. Create your account [here](https://thegraph.market/) to generate an authentification token (JWT) and pass it as input to: 
@@ -42,13 +41,13 @@ After initialization, you can:
 
 ## Additional Resources
 
-You may find these additional resources helpful for developing your first Solana application.
+You may find these additional resources helpful for developing your first EVM application.
 
 ### Development Container Reference
 
 The [Development Container Reference](../references/devcontainer-ref.md) helps you navigate the complete container and its common errors. 
 
-### Gui Reference
+### GUI Reference
 
 The [GUI reference](../references/gui.md) lets you explore all the tools available in the Substreams GUI.
 

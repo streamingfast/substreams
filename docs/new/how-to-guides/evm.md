@@ -39,8 +39,6 @@ After initialization, you can:
 - Modify your Substreams manifest to include additional filters or configurations.
 - Implement custom processing logic in Rust based on the filtered data retrieved by the foundational module.
 
-For a deeper dive into use cases and details, refer to the [EVM Tutorials](../../tutorials/evm).
-
 ## Additional Resources
 
 You may find these additional resources helpful for developing your first EVM application.

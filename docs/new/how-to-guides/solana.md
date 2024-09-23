@@ -48,13 +48,13 @@ You may find these additional resources helpful for developing your first Solana
 
 ### Development Container Reference
 
-The [Development Container Reference](../../references/devcontainer-ref.md) helps you navigate the complete container and its common errors. 
+The [Development Container Reference](../references/devcontainer-ref.md) helps you navigate the complete container and its common errors. 
 
 ### Gui Reference
 
-The [GUI reference](../../references/gui.md) lets you explore all the tools available in the Substreams GUI.
+The [GUI reference](../references/gui.md) lets you explore all the tools available in the Substreams GUI.
 
 ### Manifests Reference
 
-The [Manifests Reference](../../references/manifests.md) helps you with editing the `substreams.yaml`.
+The [Manifests Reference](../references/manifests.md) helps you with editing the `substreams.yaml`.
 

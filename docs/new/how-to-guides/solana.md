@@ -30,7 +30,7 @@ In this guide, you'll learn how to initialize a Solana-based Substreams project.
 2. Run the following command to visualize and itterate on your filtered data model:
 
     ```bash
-    Substreams Gui
+    substreams gui
     ````
 
 ## Step 3: Customize your Project 
@@ -48,13 +48,13 @@ You may find these additional resources helpful for developing your first Solana
 
 ### Development Container Reference
 
-The [development container reference](../../references/devcontainer-ref) helps you navigate the complete container and its common errors. 
+The [Development Container Reference](../../references/devcontainer-ref.md) helps you navigate the complete container and its common errors. 
 
 ### Gui Reference
 
-The [gui reference](../../references/gui) lets you explore the complete tool of the Pyth contract.
+The [GUI reference](../../references/gui.md) lets you explore all the tools available in the Substreams GUI.
 
 ### Manifests Reference
 
-The [manifests reference](../../references/manifests.md) helps you with editing the `substreams.yaml`.
+The [Manifests Reference](../../references/manifests.md) helps you with editing the `substreams.yaml`.
 

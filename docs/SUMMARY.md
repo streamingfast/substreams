@@ -7,6 +7,7 @@
 * [How-To Guides](new/getting-started/intro-how-to-guides.md)
   * [Initialize an EVM Substreams Project](new/how-to-guides/evm.md)
   * [Initialize a Solana Substreams Project](new/how-to-guides/solana.md)
+  * [Initialize a Starknet Substreams Project](new/how-to-guides/starknet.md)
   * [Initialize an Injective Substreams Project](new/how-to-guides/injective.md)
 * [Consume Substreams](new/consume/consume.md)
   * [Install the CLI](new/common/installing-the-cli.md)

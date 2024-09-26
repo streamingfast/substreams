@@ -418,3 +418,29 @@ my_mod.inputs[0].params.value = "myvalue"
 {% endcode %}
 
 which would be inserted just before starting the stream.
+
+Params that are defined under `networks` do not need to be repeated here (their value will be overwritten)
+
+### `network`
+
+The `network` field specifies the default network to be used with this Substreams. It will help the client choose an endpoint if necessary, and will be used as the default value when applying the values defined under `networks`.
+
+### `networks`
+
+The `networks` allows specifying per-network `params` and `initialBlock` for each module:
+
+```yaml
+networks:
+  mainnet:
+    initialBlock:
+      mod1: 200
+      lib:mod1: 400
+    params:
+      mod2: "addr=0x1234"
+  sepolia:
+    [...]
+```
+
+You can override values for modules imported from other .spkg.
+
+Every local module specified under `networks` must have a value for **each network**

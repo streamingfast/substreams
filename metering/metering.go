@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/streamingfast/substreams/metrics"
+
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/reqctx"
@@ -77,10 +79,12 @@ func GetTotalBytesWritten(meter dmetering.Meter) uint64 {
 	return total
 }
 
-func Send(ctx context.Context, meter dmetering.Meter, userID, apiKeyID, ip, userMeta, endpoint string, resp proto.Message) {
+func Send(ctx context.Context, userID, apiKeyID, ip, userMeta, endpoint string, resp proto.Message) {
 	if reqctx.IsBackfillerRequest(ctx) {
 		endpoint = fmt.Sprintf("%s%s", endpoint, "Backfill")
 	}
+
+	meter := dmetering.GetBytesMeter(ctx)
 
 	bytesRead := meter.BytesReadDelta()
 	bytesWritten := meter.BytesWrittenDelta()
@@ -135,4 +139,6 @@ func Send(ctx context.Context, meter dmetering.Meter, userID, apiKeyID, ip, user
 	} else {
 		emitter.Emit(context.WithoutCancel(ctx), event)
 	}
+
+	metrics.MeteringEvents.Inc()
 }

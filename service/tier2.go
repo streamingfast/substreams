@@ -512,8 +512,6 @@ func canSkipBlockSource(existingExecOuts map[string]*execout.File, requiredModul
 }
 
 func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbssinternal.Substreams_ProcessRangeServer) substreams.ResponseFunc {
-	meter := dmetering.GetBytesMeter(ctx)
-
 	var userID, apiKeyID, userMeta, ip string
 	if auth := dauth.FromContext(ctx); auth != nil {
 		userID = auth.UserID()
@@ -539,7 +537,7 @@ func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbs
 			zap.String("user_meta", userMeta),
 			zap.String("endpoint", "sf.substreams.internal.v2/ProcessRange"),
 		)
-		metering.Send(ctx, meter, userID, apiKeyID, ip, userMeta, "sf.substreams.internal.v2/ProcessRange", resp)
+		metering.Send(ctx, userID, apiKeyID, ip, userMeta, "sf.substreams.internal.v2/ProcessRange", resp)
 		return nil
 	}
 }

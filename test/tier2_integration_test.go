@@ -434,7 +434,7 @@ func TestTier2Call(t *testing.T) {
 				StateStoreDefaultTag: "tag",
 			})
 
-			responseCollector := newResponseCollector()
+			responseCollector := newResponseCollector(ctx)
 
 			newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
 				return &LinearBlockGenerator{

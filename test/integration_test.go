@@ -198,6 +198,8 @@ func TestOneStoreOneMap(t *testing.T) {
 		spkg                  string
 		expectFiles           []string
 		expectError           string
+		expectTier1Events     bool
+		expectTier2Events     bool
 	}{
 		{
 			name:                  "dev_mode_backprocess",
@@ -208,12 +210,13 @@ func TestOneStoreOneMap(t *testing.T) {
 			production:            false,
 			expectedResponseCount: 4,
 			expectFiles: []string{
-
 				testStoreAddI64Hash + "/outputs/0000000001-0000000010.output", // store outputs
 				testStoreAddI64Hash + "/outputs/0000000010-0000000020.output",
 				testStoreAddI64Hash + "/states/0000000010-0000000001.kv", // store states
 				testStoreAddI64Hash + "/states/0000000020-0000000001.kv",
 			},
+			expectTier1Events: true,
+			expectTier2Events: true,
 		},
 		{
 			name:                  "dev_mode_backprocess_then_save_state",
@@ -229,6 +232,8 @@ func TestOneStoreOneMap(t *testing.T) {
 				testStoreAddI64Hash + "/states/0000000010-0000000001.kv", // store states
 				testStoreAddI64Hash + "/states/0000000020-0000000001.kv",
 			},
+			expectTier1Events: true,
+			expectTier2Events: true,
 		},
 		{
 			name:                  "prod_mode_back_forward_to_lib",
@@ -244,6 +249,8 @@ func TestOneStoreOneMap(t *testing.T) {
 				testStoreAddI64Hash + "/states/0000000010-0000000001.kv",
 				testStoreAddI64Hash + "/states/0000000020-0000000001.kv",
 			},
+			expectTier1Events: true,
+			expectTier2Events: true,
 		},
 		{
 			name:                  "prod_mode_back_forward_to_stop",
@@ -262,6 +269,8 @@ func TestOneStoreOneMap(t *testing.T) {
 				testStoreAddI64Hash + "/states/0000000030-0000000001.kv",
 				assertTestStoreAddI64Hash + "/outputs/0000000020-0000000030.output", // map
 			},
+			expectTier1Events: true,
+			expectTier2Events: true,
 		},
 		{
 			name:                  "prod_mode_back_forward_to_stop_nonzero_first_streamable",
@@ -280,6 +289,8 @@ func TestOneStoreOneMap(t *testing.T) {
 				testStoreAddI64Hash + "/states/0000000020-0000000016.kv",
 				testStoreAddI64Hash + "/states/0000000030-0000000016.kv",
 			},
+			expectTier1Events: true,
+			expectTier2Events: true,
 		},
 		{
 			name:                 "nonzero_first_streamable on nonzero module",
@@ -312,6 +323,8 @@ func TestOneStoreOneMap(t *testing.T) {
 				assertTestStoreAddI64Hash + "/outputs/0000000020-0000000030.output", // map
 				assertTestStoreAddI64Hash + "/outputs/0000000030-0000000040.output",
 			},
+			expectTier1Events: true,
+			expectTier2Events: true,
 		},
 		{
 			name:        "prod_mode_partial_existing",
@@ -335,6 +348,8 @@ func TestOneStoreOneMap(t *testing.T) {
 				assertTestStoreAddI64Hash + "/outputs/0000000010-0000000020.output",
 				assertTestStoreAddI64Hash + "/outputs/0000000020-0000000030.output",
 			},
+			expectTier1Events: true,
+			expectTier2Events: true,
 		},
 	}
 
@@ -358,6 +373,24 @@ func TestOneStoreOneMap(t *testing.T) {
 
 			mapOutput := run.MapOutputString("assert_test_store_add_i64")
 			assert.Contains(t, mapOutput, `assert_test_store_add_i64: 0801`)
+
+			var tier1EventsFound bool
+			for _, ev := range run.Events {
+				if ev.Endpoint == "tier1" {
+					tier1EventsFound = true
+					break
+				}
+			}
+			assert.Equal(t, test.expectTier1Events, tier1EventsFound)
+
+			var tier2EventsFound bool
+			for _, ev := range run.Events {
+				if ev.Endpoint == "tier2" {
+					tier2EventsFound = true
+					break
+				}
+			}
+			assert.Equal(t, test.expectTier2Events, tier2EventsFound)
 
 			assert.Equal(t, test.expectedResponseCount, strings.Count(mapOutput, "\n"))
 

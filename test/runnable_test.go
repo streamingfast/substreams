@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/streamingfast/dmetering"
+
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/streamingfast/bstream"
@@ -59,6 +61,7 @@ type testRun struct {
 	Params map[string]string
 
 	Responses []*pbsubstreamsrpc.Response
+	Events    []dmetering.Event
 	TempDir   string
 }
 
@@ -85,6 +88,7 @@ func (f *testRun) run(t *testing.T, testName string) error {
 	}
 
 	ctx = reqctx.WithLogger(ctx, zlog)
+	ctx = dmetering.WithBytesMeter(ctx)
 
 	os.Setenv("TEST_TEMP_DIR", f.TempDir)
 
@@ -127,7 +131,8 @@ func (f *testRun) run(t *testing.T, testName string) error {
 		f.ParallelSubrequests = 1
 	}
 
-	responseCollector := newResponseCollector()
+	ctx = withEventsCollector(ctx, &eventsCollector{})
+	responseCollector := newResponseCollector(ctx)
 
 	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
 		return &LinearBlockGenerator{
@@ -142,7 +147,7 @@ func (f *testRun) run(t *testing.T, testName string) error {
 	workerFactory := func(_ *zap.Logger) work.Worker {
 		return &TestWorker{
 			t:                      t,
-			responseCollector:      newResponseCollector(),
+			responseCollector:      newResponseCollector(ctx),
 			newBlockGenerator:      newBlockGenerator,
 			blockProcessedCallBack: f.BlockProcessedCallback,
 			jobCallBack:            f.JobCallback,
@@ -161,6 +166,7 @@ func (f *testRun) run(t *testing.T, testName string) error {
 	}
 
 	f.Responses = responseCollector.responses
+	f.Events = responseCollector.eventsCollector.Events()
 
 	return nil
 }

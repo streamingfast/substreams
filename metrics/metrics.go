@@ -30,7 +30,7 @@ var Tier2RequestCounter = MetricSet.NewCounter("substreams_tier2_request_counter
 var AppReadinessTier1 = MetricSet.NewAppReadiness("substreams_tier1")
 var AppReadinessTier2 = MetricSet.NewAppReadiness("substreams_tier2")
 
-var MeteringEvents = MetricSet.NewCounter("substreams_metering_events_emitted", "Number of metering events emitted")
+var MeteringEvents = MetricSet.NewCounter("substreams_metering_events_emitted_counter", "Number of metering events emitted")
 
 var registerOnce sync.Once
 

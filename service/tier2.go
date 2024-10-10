@@ -11,8 +11,6 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/RoaringBitmap/roaring/roaring64"
-	"github.com/streamingfast/bstream"
-	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/bstream/stream"
 	bsstream "github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dauth"
@@ -417,21 +415,6 @@ excludable:
 		streamFactoryFunc = s.streamFactoryFuncOverride
 	}
 
-	fileSourceMiddlewareHandler := func(next bstream.Handler) bstream.Handler {
-		return bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
-			stepable, ok := obj.(bstream.Stepable)
-			if ok {
-				step := stepable.Step()
-				if step.Matches(bstream.StepNew) {
-					dmetering.GetBytesMeter(ctx).CountInc(metering.MeterFileUncompressedReadBytes, len(blk.GetPayload().GetValue()))
-				} else {
-					dmetering.GetBytesMeter(ctx).CountInc(metering.MeterFileUncompressedReadForkedBytes, len(blk.GetPayload().GetValue()))
-				}
-			}
-			return next.ProcessBlock(blk, obj)
-		})
-	}
-
 	blockStream, err := streamFactoryFunc(
 		ctx,
 		pipe,
@@ -441,7 +424,7 @@ excludable:
 		true,
 		false,
 		logger.Named("stream"),
-		bsstream.WithFileSourceHandlerMiddleware(fileSourceMiddlewareHandler),
+		bsstream.WithFileSourceHandlerMiddleware(metering.FileSourceMiddlewareHandlerFactory(ctx)),
 	)
 	if err != nil {
 		return fmt.Errorf("error getting stream: %w", err)

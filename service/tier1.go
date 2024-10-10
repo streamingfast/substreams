@@ -576,36 +576,6 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		streamHandler = pipe
 	}
 
-	liveSourceMiddlewareHandler := func(next bstream.Handler) bstream.Handler {
-		return bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
-			stepable, ok := obj.(bstream.Stepable)
-			if ok {
-				step := stepable.Step()
-				if step.Matches(bstream.StepNew) {
-					dmetering.GetBytesMeter(ctx).CountInc(metering.MeterLiveUncompressedReadBytes, len(blk.GetPayload().GetValue()))
-				} else {
-					dmetering.GetBytesMeter(ctx).CountInc(metering.MeterLiveUncompressedReadForkedBytes, len(blk.GetPayload().GetValue()))
-				}
-			}
-			return next.ProcessBlock(blk, obj)
-		})
-	}
-
-	fileSourceMiddlewareHandler := func(next bstream.Handler) bstream.Handler {
-		return bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
-			stepable, ok := obj.(bstream.Stepable)
-			if ok {
-				step := stepable.Step()
-				if step.Matches(bstream.StepNew) {
-					dmetering.GetBytesMeter(ctx).CountInc(metering.MeterFileUncompressedReadBytes, len(blk.GetPayload().GetValue()))
-				} else {
-					dmetering.GetBytesMeter(ctx).CountInc(metering.MeterFileUncompressedReadForkedBytes, len(blk.GetPayload().GetValue()))
-				}
-			}
-			return next.ProcessBlock(blk, obj)
-		})
-	}
-
 	blockStream, err := s.streamFactoryFunc(
 		ctx,
 		streamHandler,
@@ -615,8 +585,8 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		request.FinalBlocksOnly,
 		cursorIsTarget,
 		logger.Named("stream"),
-		bsstream.WithLiveSourceHandlerMiddleware(liveSourceMiddlewareHandler),
-		bsstream.WithFileSourceHandlerMiddleware(fileSourceMiddlewareHandler),
+		bsstream.WithLiveSourceHandlerMiddleware(metering.LiveSourceMiddlewareHandlerFactory(ctx)),
+		bsstream.WithFileSourceHandlerMiddleware(metering.FileSourceMiddlewareHandlerFactory(ctx)),
 	)
 	if err != nil {
 		return fmt.Errorf("error getting stream: %w", err)

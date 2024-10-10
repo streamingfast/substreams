@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/streamingfast/bstream"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+
 	"github.com/streamingfast/substreams/metrics"
 
 	"github.com/streamingfast/dmetering"
@@ -77,6 +80,40 @@ func GetTotalBytesRead(meter dmetering.Meter) uint64 {
 func GetTotalBytesWritten(meter dmetering.Meter) uint64 {
 	total := uint64(meter.GetCount(TotalWriteBytes))
 	return total
+}
+
+func LiveSourceMiddlewareHandlerFactory(ctx context.Context) func(handler bstream.Handler) bstream.Handler {
+	return func(next bstream.Handler) bstream.Handler {
+		return bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
+			stepable, ok := obj.(bstream.Stepable)
+			if ok {
+				step := stepable.Step()
+				if step.Matches(bstream.StepNew) {
+					dmetering.GetBytesMeter(ctx).CountInc(MeterLiveUncompressedReadBytes, len(blk.GetPayload().GetValue()))
+				} else {
+					dmetering.GetBytesMeter(ctx).CountInc(MeterLiveUncompressedReadForkedBytes, len(blk.GetPayload().GetValue()))
+				}
+			}
+			return next.ProcessBlock(blk, obj)
+		})
+	}
+}
+
+func FileSourceMiddlewareHandlerFactory(ctx context.Context) func(handler bstream.Handler) bstream.Handler {
+	return func(next bstream.Handler) bstream.Handler {
+		return bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
+			stepable, ok := obj.(bstream.Stepable)
+			if ok {
+				step := stepable.Step()
+				if step.Matches(bstream.StepNew) {
+					dmetering.GetBytesMeter(ctx).CountInc(MeterFileUncompressedReadBytes, len(blk.GetPayload().GetValue()))
+				} else {
+					dmetering.GetBytesMeter(ctx).CountInc(MeterFileUncompressedReadForkedBytes, len(blk.GetPayload().GetValue()))
+				}
+			}
+			return next.ProcessBlock(blk, obj)
+		})
+	}
 }
 
 func Send(ctx context.Context, userID, apiKeyID, ip, userMeta, endpoint string, resp proto.Message) {

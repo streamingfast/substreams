@@ -7,9 +7,6 @@ import (
 
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
-
-	"github.com/streamingfast/substreams/metrics"
-
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/reqctx"
@@ -18,14 +15,10 @@ import (
 )
 
 const (
-	MeterLiveUncompressedReadBytes       = "live_uncompressed_read_bytes"
-	MeterLiveUncompressedReadForkedBytes = "live_uncompressed_read_forked_bytes"
+	MeterLiveUncompressedReadBytes = "live_uncompressed_read_bytes"
 
 	MeterFileUncompressedReadBytes = "file_uncompressed_read_bytes"
 	MeterFileCompressedReadBytes   = "file_compressed_read_bytes"
-
-	MeterFileUncompressedReadForkedBytes = "file_uncompressed_read_forked_bytes"
-	MeterFileCompressedReadForkedBytes   = "file_compressed_read_forked_bytes"
 
 	MeterFileUncompressedWriteBytes = "file_uncompressed_write_bytes"
 	MeterFileCompressedWriteBytes   = "file_compressed_write_bytes"
@@ -42,14 +35,9 @@ func WithBlockBytesReadMeteringOptions(meter dmetering.Meter, logger *zap.Logger
 		meter.CountInc(MeterFileCompressedReadBytes, n)
 	}))
 
-	return opts
-}
+	// uncompressed read bytes is measured in the file source middleware.
 
-func WithForkedBlockBytesReadMeteringOptions(meter dmetering.Meter, logger *zap.Logger) []dstore.Option {
-	var opts []dstore.Option
-	opts = append(opts, dstore.WithCompressedReadCallback(func(ctx context.Context, n int) {
-		meter.CountInc(MeterFileCompressedReadForkedBytes, n)
-	}))
+	// no writes are done to this store, so no need to measure write bytes
 
 	return opts
 }
@@ -85,13 +73,10 @@ func GetTotalBytesWritten(meter dmetering.Meter) uint64 {
 func LiveSourceMiddlewareHandlerFactory(ctx context.Context) func(handler bstream.Handler) bstream.Handler {
 	return func(next bstream.Handler) bstream.Handler {
 		return bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
-			stepable, ok := obj.(bstream.Stepable)
-			if ok {
+			if stepable, ok := obj.(bstream.Stepable); ok {
 				step := stepable.Step()
 				if step.Matches(bstream.StepNew) {
 					dmetering.GetBytesMeter(ctx).CountInc(MeterLiveUncompressedReadBytes, len(blk.GetPayload().GetValue()))
-				} else {
-					dmetering.GetBytesMeter(ctx).CountInc(MeterLiveUncompressedReadForkedBytes, len(blk.GetPayload().GetValue()))
 				}
 			}
 			return next.ProcessBlock(blk, obj)
@@ -102,13 +87,10 @@ func LiveSourceMiddlewareHandlerFactory(ctx context.Context) func(handler bstrea
 func FileSourceMiddlewareHandlerFactory(ctx context.Context) func(handler bstream.Handler) bstream.Handler {
 	return func(next bstream.Handler) bstream.Handler {
 		return bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
-			stepable, ok := obj.(bstream.Stepable)
-			if ok {
+			if stepable, ok := obj.(bstream.Stepable); ok {
 				step := stepable.Step()
 				if step.Matches(bstream.StepNew) {
 					dmetering.GetBytesMeter(ctx).CountInc(MeterFileUncompressedReadBytes, len(blk.GetPayload().GetValue()))
-				} else {
-					dmetering.GetBytesMeter(ctx).CountInc(MeterFileUncompressedReadForkedBytes, len(blk.GetPayload().GetValue()))
 				}
 			}
 			return next.ProcessBlock(blk, obj)
@@ -130,16 +112,13 @@ func Send(ctx context.Context, userID, apiKeyID, ip, userMeta, endpoint string, 
 	inputBytes := meter.GetCountAndReset(MeterWasmInputBytes)
 
 	liveUncompressedReadBytes := meter.GetCountAndReset(MeterLiveUncompressedReadBytes)
-	liveUncompressedReadForkedBytes := meter.GetCountAndReset(MeterLiveUncompressedReadForkedBytes)
 	fileUncompressedReadBytes := meter.GetCountAndReset(MeterFileUncompressedReadBytes)
-	fileUncompressedReadForkedBytes := meter.GetCountAndReset(MeterFileUncompressedReadForkedBytes)
-	fileCompressedReadForkedBytes := meter.GetCountAndReset(MeterFileCompressedReadForkedBytes)
 	fileCompressedReadBytes := meter.GetCountAndReset(MeterFileCompressedReadBytes)
 
 	fileUncompressedWriteBytes := meter.GetCountAndReset(MeterFileUncompressedWriteBytes)
 	fileCompressedWriteBytes := meter.GetCountAndReset(MeterFileCompressedWriteBytes)
 
-	totalReadBytes := fileCompressedReadBytes + fileCompressedReadForkedBytes + liveUncompressedReadBytes + liveUncompressedReadForkedBytes
+	totalReadBytes := fileUncompressedReadBytes + liveUncompressedReadBytes
 	totalWriteBytes := fileUncompressedWriteBytes
 
 	meter.CountInc(TotalReadBytes, int(totalReadBytes))
@@ -153,19 +132,16 @@ func Send(ctx context.Context, userID, apiKeyID, ip, userMeta, endpoint string, 
 
 		Endpoint: endpoint,
 		Metrics: map[string]float64{
-			"egress_bytes":                       float64(egressBytes),
-			"written_bytes":                      float64(bytesWritten),
-			"read_bytes":                         float64(bytesRead),
-			MeterWasmInputBytes:                  float64(inputBytes),
-			MeterLiveUncompressedReadBytes:       float64(liveUncompressedReadBytes),
-			MeterLiveUncompressedReadForkedBytes: float64(liveUncompressedReadForkedBytes),
-			MeterFileUncompressedReadBytes:       float64(fileUncompressedReadBytes),
-			MeterFileUncompressedReadForkedBytes: float64(fileUncompressedReadForkedBytes),
-			MeterFileCompressedReadForkedBytes:   float64(fileCompressedReadForkedBytes),
-			MeterFileCompressedReadBytes:         float64(fileCompressedReadBytes),
-			MeterFileUncompressedWriteBytes:      float64(fileUncompressedWriteBytes),
-			MeterFileCompressedWriteBytes:        float64(fileCompressedWriteBytes),
-			"message_count":                      1,
+			"egress_bytes":                  float64(egressBytes),
+			"written_bytes":                 float64(bytesWritten),
+			"read_bytes":                    float64(bytesRead),
+			MeterWasmInputBytes:             float64(inputBytes),
+			MeterLiveUncompressedReadBytes:  float64(liveUncompressedReadBytes),
+			MeterFileUncompressedReadBytes:  float64(fileUncompressedReadBytes),
+			MeterFileCompressedReadBytes:    float64(fileCompressedReadBytes),
+			MeterFileUncompressedWriteBytes: float64(fileUncompressedWriteBytes),
+			MeterFileCompressedWriteBytes:   float64(fileCompressedWriteBytes),
+			"message_count":                 1,
 		},
 		Timestamp: time.Now(),
 	}
@@ -176,6 +152,4 @@ func Send(ctx context.Context, userID, apiKeyID, ip, userMeta, endpoint string, 
 	} else {
 		emitter.Emit(context.WithoutCancel(ctx), event)
 	}
-
-	metrics.MeteringEvents.Inc()
 }

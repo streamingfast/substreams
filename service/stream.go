@@ -56,7 +56,7 @@ func (sf *StreamFactory) New(
 	forkedBlocksStore := sf.forkedBlocksStore
 	if clonable, ok := forkedBlocksStore.(dstore.Clonable); ok {
 		var err error
-		forkedBlocksStore, err = clonable.Clone(ctx, metering.WithForkedBlockBytesReadMeteringOptions(dmetering.GetBytesMeter(ctx), logger)...)
+		forkedBlocksStore, err = clonable.Clone(ctx)
 		if err != nil {
 			return nil, err
 		}

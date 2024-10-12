@@ -13,7 +13,6 @@ import (
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/anypb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func TestWithBlockBytesReadMeteringOptions(t *testing.T) {
@@ -90,13 +89,15 @@ func TestFileSourceMiddlewareHandlerFactory(t *testing.T) {
 		ExpectedMetrics map[string]int
 	}
 
+	testBlock := &pbsubstreamstest.Block{
+		Id:     "abc",
+		Number: 123,
+	}
+
 	for _, tt := range []test{
 		{
-			Name: "step new",
-			Block: &pbsubstreamstest.Block{
-				Id:     "abc",
-				Number: 123,
-			},
+			Name:  "step new",
+			Block: testBlock,
 			Obj: &testStepableObject{
 				bstream.StepNew,
 			},
@@ -109,11 +110,8 @@ func TestFileSourceMiddlewareHandlerFactory(t *testing.T) {
 			},
 		},
 		{
-			Name: "step new irreversible",
-			Block: &pbsubstreamstest.Block{
-				Id:     "abc",
-				Number: 123,
-			},
+			Name:  "step new irreversible",
+			Block: testBlock,
 			Obj: &testStepableObject{
 				bstream.StepNewIrreversible,
 			},
@@ -126,11 +124,8 @@ func TestFileSourceMiddlewareHandlerFactory(t *testing.T) {
 			},
 		},
 		{
-			Name: "step undo",
-			Block: &pbsubstreamstest.Block{
-				Id:     "abc",
-				Number: 123,
-			},
+			Name:  "step undo not metered",
+			Block: testBlock,
 			Obj: &testStepableObject{
 				bstream.StepUndo,
 			},
@@ -143,11 +138,8 @@ func TestFileSourceMiddlewareHandlerFactory(t *testing.T) {
 			},
 		},
 		{
-			Name: "step stalled",
-			Block: &pbsubstreamstest.Block{
-				Id:     "abc",
-				Number: 123,
-			},
+			Name:  "step stalled not metered",
+			Block: testBlock,
 			Obj: &testStepableObject{
 				bstream.StepStalled,
 			},
@@ -160,28 +152,8 @@ func TestFileSourceMiddlewareHandlerFactory(t *testing.T) {
 			},
 		},
 		{
-			Name: "step undo",
-			Block: &pbsubstreamstest.Block{
-				Id:     "abc",
-				Number: 123,
-			},
-			Obj: &testStepableObject{
-				bstream.StepUndo,
-			},
-			ExpectedMetrics: map[string]int{
-				MeterFileCompressedReadBytes:    0,
-				MeterFileUncompressedReadBytes:  0,
-				MeterFileUncompressedWriteBytes: 0,
-				MeterFileCompressedWriteBytes:   0,
-				MeterLiveUncompressedReadBytes:  0,
-			},
-		},
-		{
-			Name: "step irreversible",
-			Block: &pbsubstreamstest.Block{
-				Id:     "abc",
-				Number: 123,
-			},
+			Name:  "step irreversible not metered",
+			Block: testBlock,
 			Obj: &testStepableObject{
 				bstream.StepIrreversible,
 			},
@@ -222,13 +194,15 @@ func TestLiveSourceMiddlewareHandlerFactory(t *testing.T) {
 		ExpectedMetrics map[string]int
 	}
 
+	testBlock := &pbsubstreamstest.Block{
+		Id:     "abc",
+		Number: 123,
+	}
+
 	for _, tt := range []test{
 		{
-			Name: "step new",
-			Block: &pbsubstreamstest.Block{
-				Id:     "abc",
-				Number: 123,
-			},
+			Name:  "step new",
+			Block: testBlock,
 			Obj: &testStepableObject{
 				bstream.StepNew,
 			},
@@ -241,13 +215,10 @@ func TestLiveSourceMiddlewareHandlerFactory(t *testing.T) {
 			},
 		},
 		{
-			Name: "step new irreversible",
-			Block: &pbsubstreamstest.Block{
-				Id:     "abc",
-				Number: 123,
-			},
+			Name:  "step new irreversible",
+			Block: testBlock,
 			Obj: &testStepableObject{
-				bstream.StepNewIrreversible,
+				bstream.StepNew,
 			},
 			ExpectedMetrics: map[string]int{
 				MeterFileCompressedReadBytes:    0,
@@ -258,11 +229,8 @@ func TestLiveSourceMiddlewareHandlerFactory(t *testing.T) {
 			},
 		},
 		{
-			Name: "step undo",
-			Block: &pbsubstreamstest.Block{
-				Id:     "abc",
-				Number: 123,
-			},
+			Name:  "step undo not metered",
+			Block: testBlock,
 			Obj: &testStepableObject{
 				bstream.StepUndo,
 			},
@@ -275,11 +243,8 @@ func TestLiveSourceMiddlewareHandlerFactory(t *testing.T) {
 			},
 		},
 		{
-			Name: "step stalled",
-			Block: &pbsubstreamstest.Block{
-				Id:     "abc",
-				Number: 123,
-			},
+			Name:  "step stalled not metered",
+			Block: testBlock,
 			Obj: &testStepableObject{
 				bstream.StepStalled,
 			},
@@ -292,28 +257,8 @@ func TestLiveSourceMiddlewareHandlerFactory(t *testing.T) {
 			},
 		},
 		{
-			Name: "step undo",
-			Block: &pbsubstreamstest.Block{
-				Id:     "abc",
-				Number: 123,
-			},
-			Obj: &testStepableObject{
-				bstream.StepUndo,
-			},
-			ExpectedMetrics: map[string]int{
-				MeterFileCompressedReadBytes:    0,
-				MeterFileUncompressedReadBytes:  0,
-				MeterFileUncompressedWriteBytes: 0,
-				MeterFileCompressedWriteBytes:   0,
-				MeterLiveUncompressedReadBytes:  0,
-			},
-		},
-		{
-			Name: "step irreversible",
-			Block: &pbsubstreamstest.Block{
-				Id:     "abc",
-				Number: 123,
-			},
+			Name:  "step irreversible not metered",
+			Block: testBlock,
 			Obj: &testStepableObject{
 				bstream.StepIrreversible,
 			},
@@ -351,14 +296,9 @@ func bstreamBlk(t *testing.T, blk *pbsubstreamstest.Block) *pbbstream.Block {
 	assert.NoError(t, err)
 
 	bb := &pbbstream.Block{
-		Id:             blk.Id,
-		Number:         blk.Number,
-		ParentId:       "",
-		Timestamp:      &timestamppb.Timestamp{},
-		LibNum:         0,
-		PayloadKind:    0,
-		PayloadVersion: 0,
-		Payload:        payload,
+		Id:      blk.Id,
+		Number:  blk.Number,
+		Payload: payload,
 	}
 
 	return bb

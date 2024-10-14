@@ -293,6 +293,15 @@ func TestLiveSourceMiddlewareHandlerFactory(t *testing.T) {
 	}
 }
 
+func TestAddWasmInputBytes(t *testing.T) {
+	ctx := dmetering.WithBytesMeter(context.Background())
+	meter := dmetering.GetBytesMeter(ctx)
+
+	AddWasmInputBytes(ctx, 10)
+
+	assert.Equal(t, 10, meter.GetCount(MeterWasmInputBytes))
+}
+
 func TestSend(t *testing.T) {
 	ctx := dmetering.WithBytesMeter(context.Background())
 	meter := dmetering.GetBytesMeter(ctx)

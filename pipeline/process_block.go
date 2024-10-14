@@ -256,7 +256,8 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 		return fmt.Errorf("pre block hook: %w", err)
 	}
 
-	dmetering.GetBytesMeter(ctx).CountInc(metering.MeterWasmInputBytes, execOutput.Len())
+	metering.AddWasmInputBytes(ctx, execOutput.Len())
+
 	if err := p.executeModules(ctx, execOutput); err != nil {
 		return fmt.Errorf("execute modules: %w", err)
 	}

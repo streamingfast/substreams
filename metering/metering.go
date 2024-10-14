@@ -60,6 +60,10 @@ func WithBytesMeteringOptions(meter dmetering.Meter, logger *zap.Logger) []dstor
 	return opts
 }
 
+func AddWasmInputBytes(ctx context.Context, n int) {
+	dmetering.GetBytesMeter(ctx).CountInc(MeterWasmInputBytes, n)
+}
+
 func GetTotalBytesRead(meter dmetering.Meter) uint64 {
 	total := uint64(meter.GetCount(TotalReadBytes))
 	return total

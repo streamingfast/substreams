@@ -10,9 +10,10 @@ import (
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/wasm"
-	_ "github.com/streamingfast/substreams/wasm/wasi"
-	_ "github.com/streamingfast/substreams/wasm/wasmtime"
-	_ "github.com/streamingfast/substreams/wasm/wazero"
+
+	//_ "github.com/streamingfast/substreams/wasm/wasi"
+	//_ "github.com/streamingfast/substreams/wasm/wasmtime"
+	//_ "github.com/streamingfast/substreams/wasm/wazero"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
@@ -43,14 +44,14 @@ func BenchmarkExecution(b *testing.B) {
 		// Decode proto only decode and returns the block.number as the output (to ensure the block is not elided at compile time)
 		//{"decode_proto_only", "map_decode_proto_only", args(blockInputFile(b, "testdata/ethereum_mainnet_block_16021772.binpb")), []int{0}},
 
-		{"map_block", "map_block", blockInputFile(b, "testdata/ethereum_mainnet_block_16021772.binpb"), []int{53}},
+		//{"map_block", "map_block", blockInputFile(b, "testdata/ethereum_mainnet_block_16021772.binpb"), []int{53}},
 	} {
-		var reuseInstance = true
+		//var reuseInstance = true
 		//var freshInstanceEachRun = false
 
 		//wasmCode := readCode(b, "substreams_wasm/substreams.wasm")
 		//wasmCodep1 := readCode(b, "substreams_ts/index.wasm")
-		wasmTinyGo := readCode(b, "substreams_tiny_go/main.wasm")
+		//wasmTinyGo := readCode(b, "substreams_tiny_go/main.wasm")
 		//wasmCodep1 := readCode(b, "substreams_wasi/wasi_hello_world/hello.wasm")
 
 		stats := metrics.NewReqStats(&metrics.Config{}, zap.NewNop())
@@ -61,7 +62,7 @@ func BenchmarkExecution(b *testing.B) {
 			//{"wazero", wasmCode, reuseInstance},
 			//{"wazero", wasmCode, freshInstanceEachRun},
 
-			{name: "wasi", wasmCodeType: "go/wasi", code: wasmTinyGo, shouldReUseInstance: reuseInstance},
+			//{name: "wasi", wasmCodeType: "go/wasi", code: wasmTinyGo, shouldReUseInstance: reuseInstance},
 			//{"wasip1", wasmCodep1, freshInstanceEachRun},
 		} {
 			instanceKey := "reused"

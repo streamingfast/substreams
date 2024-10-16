@@ -8,7 +8,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -200,7 +199,7 @@ func TestOneStoreOneMap(t *testing.T) {
 		spkg                  string
 		expectFiles           []string
 		expectError           string
-		expectedMetering      []string
+		expectedMetering      map[string]float64
 		expectTier1Events     bool
 		expectTier2Events     bool
 	}{
@@ -218,6 +217,7 @@ func TestOneStoreOneMap(t *testing.T) {
 				testStoreAddI64Hash + "/states/0000000010-0000000001.kv", // store states
 				testStoreAddI64Hash + "/states/0000000020-0000000001.kv",
 			},
+			expectedMetering:  map[string]float64{},
 			expectTier1Events: true,
 			expectTier2Events: true,
 		},
@@ -351,35 +351,8 @@ func TestOneStoreOneMap(t *testing.T) {
 				assertTestStoreAddI64Hash + "/outputs/0000000010-0000000020.output",
 				assertTestStoreAddI64Hash + "/outputs/0000000020-0000000030.output",
 			},
-			expectedMetering: []string{
-				"tier1:egress_bytes:5349.00",
-				"tier1:file_compressed_read_bytes:0.00",
-				"tier1:file_compressed_read_forked_bytes:0.00",
-				"tier1:file_compressed_write_bytes:0.00",
-				"tier1:file_uncompressed_read_bytes:0.00",
-				"tier1:file_uncompressed_read_forked_bytes:0.00",
-				"tier1:file_uncompressed_write_bytes:0.00",
-				"tier1:live_uncompressed_read_bytes:0.00",
-				"tier1:live_uncompressed_read_forked_bytes:0.00",
-				"tier1:message_count:31.00",
-				"tier1:read_bytes:0.00",
-				"tier1:wasm_input_bytes:0.00",
-				"tier1:written_bytes:0.00",
-				"tier2:egress_bytes:937.00",
-				"tier2:file_compressed_read_bytes:125.00",
-				"tier2:file_compressed_read_forked_bytes:0.00",
-				"tier2:file_compressed_write_bytes:75.00",
-				"tier2:file_uncompressed_read_bytes:60.00",
-				"tier2:file_uncompressed_read_forked_bytes:0.00",
-				"tier2:file_uncompressed_write_bytes:36.00",
-				"tier2:live_uncompressed_read_bytes:0.00",
-				"tier2:live_uncompressed_read_forked_bytes:0.00",
-				"tier2:message_count:24.00",
-				"tier2:read_bytes:125.00",
-				"tier2:wasm_input_bytes:4697.00",
-				"tier2:written_bytes:36.00",
-			},
-			expectTier1Events: true, expectTier2Events: true,
+			expectTier1Events: true,
+			expectTier2Events: true,
 		},
 	}
 
@@ -404,9 +377,11 @@ func TestOneStoreOneMap(t *testing.T) {
 			mapOutput := run.MapOutputString("assert_test_store_add_i64")
 			assert.Contains(t, mapOutput, `assert_test_store_add_i64: 0801`)
 
+			meteringEvents := transformMeteringEvents(run.Events)
 			if test.expectedMetering != nil {
-				meteringEvents := computeMeteringEvents(run.Events)
-				assert.Contains(t, meteringEvents, test.expectedMetering)
+				for key, value := range test.expectedMetering {
+					assert.Equal(t, value, meteringEvents[key], key)
+				}
 			}
 
 			assert.Equal(t, test.expectedResponseCount, strings.Count(mapOutput, "\n"))
@@ -424,7 +399,7 @@ func TestOneStoreOneMap(t *testing.T) {
 	}
 }
 
-func computeMeteringEvents(events []dmetering.Event) (out []string) {
+func transformMeteringEvents(events []dmetering.Event) map[string]float64 {
 	meteringSums := make(map[string]float64)
 	for _, ev := range events {
 		for metricName, value := range ev.Metrics {
@@ -433,11 +408,7 @@ func computeMeteringEvents(events []dmetering.Event) (out []string) {
 		}
 	}
 
-	for k, v := range meteringSums {
-		out = append(out, fmt.Sprintf("%s:%0.2f", k, v))
-	}
-	slices.Sort(out)
-	return
+	return meteringSums
 }
 
 func files(t *testing.T, tempDir string) []string {

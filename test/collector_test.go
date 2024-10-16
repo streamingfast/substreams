@@ -46,6 +46,8 @@ type responseCollector struct {
 	responses         []*pbsubstreamsrpc.Response
 	internalResponses []*pbssinternal.ProcessRangeResponse
 
+	sender *metering.MetricsSender
+
 	ctx context.Context
 }
 
@@ -53,6 +55,7 @@ func newResponseCollector(ctx context.Context) *responseCollector {
 	rc := &responseCollector{}
 	rc.ctx = reqctx.WithEmitter(ctx, rc)
 	rc.eventsCollector = eventsCollectorFromContext(ctx)
+	rc.sender = metering.NewMetricsSender()
 
 	return rc
 }
@@ -61,10 +64,10 @@ func (c *responseCollector) Collect(respAny substreams.ResponseFromAnyTier) erro
 	switch resp := respAny.(type) {
 	case *pbsubstreamsrpc.Response:
 		c.responses = append(c.responses, resp)
-		metering.Send(c.ctx, "test_user", "test_api_key", "10.0.0.1", "test_meta", "tier1", resp)
+		c.sender.Send(c.ctx, "test_user", "test_api_key", "10.0.0.1", "test_meta", "tier1", resp)
 	case *pbssinternal.ProcessRangeResponse:
 		c.internalResponses = append(c.internalResponses, resp)
-		metering.Send(c.ctx, "test_user", "test_api_key", "10.0.0.1", "test_meta", "tier2", resp)
+		c.sender.Send(c.ctx, "test_user", "test_api_key", "10.0.0.1", "test_meta", "tier2", resp)
 	}
 	return nil
 }

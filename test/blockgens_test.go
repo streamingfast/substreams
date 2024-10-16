@@ -5,16 +5,12 @@ import (
 	"strconv"
 	"strings"
 
-	"google.golang.org/protobuf/types/known/timestamppb"
-
-	"google.golang.org/protobuf/types/known/anypb"
-
-	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
-
-	"github.com/streamingfast/bstream/forkable"
-
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/bstream/forkable"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type BlockCursor struct {

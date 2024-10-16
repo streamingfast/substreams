@@ -203,6 +203,7 @@ func (s *Tier1Service) Blocks(
 	ctx = logging.WithLogger(ctx, logger)
 	ctx = reqctx.WithTracer(ctx, s.tracer)
 	ctx = dmetering.WithBytesMeter(ctx)
+	ctx = metering.WithMetricsSender(ctx)
 	ctx = reqctx.WithTier2RequestParameters(ctx, s.tier2RequestParameters)
 
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier1/request")
@@ -607,6 +608,7 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 	ip := auth.RealIP()
 
 	ctx = reqctx.WithEmitter(ctx, dmetering.GetDefaultEmitter())
+	metericsSender := metering.GetMetricsSender(ctx)
 
 	return func(respAny substreams.ResponseFromAnyTier) error {
 		resp := respAny.(*pbsubstreamsrpc.Response)
@@ -622,7 +624,7 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 			return connect.NewError(connect.CodeUnavailable, err)
 		}
 
-		metering.Send(ctx, userID, apiKeyID, ip, userMeta, "sf.substreams.rpc.v2/Blocks", resp)
+		metericsSender.Send(ctx, userID, apiKeyID, ip, userMeta, "sf.substreams.rpc.v2/Blocks", resp)
 		return nil
 	}
 }

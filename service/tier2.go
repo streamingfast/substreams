@@ -154,6 +154,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	ctx = logging.WithLogger(ctx, logger)
 	ctx = dmetering.WithBytesMeter(ctx)
 	ctx = reqctx.WithTracer(ctx, s.tracer)
+	ctx = metering.WithMetricsSender(ctx)
 
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/request")
 	defer span.EndWithErr(&err)
@@ -506,6 +507,8 @@ func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbs
 		logger.Warn("no auth information available in tier2 response handler")
 	}
 
+	metricsSender := metering.GetMetricsSender(ctx)
+
 	return func(respAny substreams.ResponseFromAnyTier) error {
 		resp := respAny.(*pbssinternal.ProcessRangeResponse)
 		if err := streamSrv.Send(resp); err != nil {
@@ -520,7 +523,7 @@ func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbs
 			zap.String("user_meta", userMeta),
 			zap.String("endpoint", "sf.substreams.internal.v2/ProcessRange"),
 		)
-		metering.Send(ctx, userID, apiKeyID, ip, userMeta, "sf.substreams.internal.v2/ProcessRange", resp)
+		metricsSender.Send(ctx, userID, apiKeyID, ip, userMeta, "sf.substreams.internal.v2/ProcessRange", resp)
 		return nil
 	}
 }

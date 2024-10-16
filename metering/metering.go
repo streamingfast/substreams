@@ -3,6 +3,7 @@ package metering
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/streamingfast/bstream"
@@ -102,7 +103,20 @@ func FileSourceMiddlewareHandlerFactory(ctx context.Context) func(handler bstrea
 	}
 }
 
-func Send(ctx context.Context, userID, apiKeyID, ip, userMeta, endpoint string, resp proto.Message) {
+type MetricsSender struct {
+	sync.Mutex
+}
+
+func NewMetricsSender() *MetricsSender {
+	return &MetricsSender{
+		Mutex: sync.Mutex{},
+	}
+}
+
+func (ms *MetricsSender) Send(ctx context.Context, userID, apiKeyID, ip, userMeta, endpoint string, resp proto.Message) {
+	ms.Lock()
+	defer ms.Unlock()
+
 	if reqctx.IsBackfillerRequest(ctx) {
 		endpoint = fmt.Sprintf("%s%s", endpoint, "Backfill")
 	}
@@ -156,4 +170,22 @@ func Send(ctx context.Context, userID, apiKeyID, ip, userMeta, endpoint string, 
 	} else {
 		emitter.Emit(context.WithoutCancel(ctx), event)
 	}
+}
+
+func WithMetricsSender(ctx context.Context) context.Context {
+	//check if already set
+	if GetMetricsSender(ctx) != nil {
+		return ctx
+	}
+
+	sender := NewMetricsSender()
+	return context.WithValue(ctx, "metrics_sender", sender)
+}
+
+func GetMetricsSender(ctx context.Context) *MetricsSender {
+	sender, ok := ctx.Value("metrics_sender").(*MetricsSender)
+	if !ok {
+		panic("metrics sender not set")
+	}
+	return sender
 }

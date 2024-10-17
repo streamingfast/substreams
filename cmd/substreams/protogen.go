@@ -47,7 +47,6 @@ func runProtogen(cmd *cobra.Command, args []string) error {
 	outputPath := sflags.MustGetString(cmd, "output-path")
 	excludePaths := sflags.MustGetStringArray(cmd, "exclude-paths")
 	generateMod := sflags.MustGetBool(cmd, "generate-mod-rs")
-	showGeneratedBufGen := sflags.MustGetBool(cmd, "show-generated-buf-gen")
 
 	manifestPath := ""
 	if len(args) == 1 {
@@ -83,5 +82,5 @@ func runProtogen(cmd *cobra.Command, args []string) error {
 	}
 
 	generator := codegen.NewProtoGenerator(outputPath, excludePaths, generateMod)
-	return generator.GenerateProto(pkgBundle.Package, showGeneratedBufGen)
+	return generator.GenerateProto(pkgBundle.Package)
 }

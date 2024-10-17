@@ -20,6 +20,14 @@ type ProtoGenerator struct {
 }
 
 func NewProtoGenerator(outputPath string, excludedPaths []string, generateMod bool) *ProtoGenerator {
+	if filepath.IsAbs(outputPath) {
+		if wd, err := os.Getwd(); err == nil {
+			if rel, err := filepath.Rel(wd, outputPath); err == nil {
+				outputPath = rel
+			}
+		}
+	}
+
 	return &ProtoGenerator{
 		outputPath:    outputPath,
 		excludedPaths: excludedPaths,
@@ -27,7 +35,7 @@ func NewProtoGenerator(outputPath string, excludedPaths []string, generateMod bo
 	}
 }
 
-func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package, showBufContent bool) error {
+func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
 	spkgTemporaryFilePath := filepath.Join(os.TempDir(), pkg.PackageMeta[0].Name+".tmp.spkg")
 	cnt, err := proto.Marshal(pkg)
 	if err != nil {
@@ -40,13 +48,15 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package, showBufContent
 
 	_, err = os.Stat("buf.gen.yaml")
 	bufFileNotFound := errors.Is(err, os.ErrNotExist)
+	prostVersion := "v0.4.0"
+	prostCrateVersion := "v0.4.1"
 
 	if bufFileNotFound {
 		// Beware, the indentation after initial column is important, it's 2 spaces!
 		content := dedent.Dedent(`
 		    version: v1
 		    plugins:
-		    - plugin: buf.build/community/neoeinstein-prost:v0.2.2
+		    - plugin: buf.build/community/neoeinstein-prost:` + prostVersion + `
 		      out: ` + g.outputPath + `
 		      opt:
 		        - file_descriptor_set=false
@@ -55,27 +65,18 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package, showBufContent
 		if g.generateMod {
 			// Beware, the indentation after initial column is important, it's 2 spaces!
 			content += dedent.Dedent(`
-				- plugin: buf.build/community/neoeinstein-prost-crate:v0.3.1
+				- plugin: buf.build/community/neoeinstein-prost-crate:` + prostCrateVersion + `
 				  out: ` + g.outputPath + `
 				  opt:
 				    - no_features
 			`)
 		}
 
-		if showBufContent {
-			fmt.Println("Writing to temporary 'buf.gen.yaml'")
-			fmt.Println("---")
-			fmt.Println(content)
-			fmt.Println("---")
-		}
+		fmt.Printf("Generating 'buf.gen.yaml' for protobuf generation using neoeinstein-prost %q and neoeinstein-prost-crate %q\n", prostVersion, prostCrateVersion)
 
 		if err := os.WriteFile("buf.gen.yaml", []byte(content), 0644); err != nil {
 			return fmt.Errorf("error writing buf.gen.yaml: %w", err)
 		}
-		//defer func() {
-		//	// Too bad if there is an error, nothing we can do
-		//	_ = os.Remove("buf.gen.yaml")
-		//}()
 	}
 
 	cmdArgs := []string{

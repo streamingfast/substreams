@@ -132,69 +132,81 @@ func TestStore_Merge(t *testing.T) {
 		{
 			name: "set_sum_int",
 			latest: newPartialStore(map[string][]byte{
-				"one": []byte("set:1"),
-				"two": []byte("sum:2"),
+				"one":  []byte("set:1"),
+				"two":  []byte("sum:2"),
+				"four": []byte("sum:2"),
 			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, manifest.OutputValueTypeInt64, nil),
 			prev: newStore(map[string][]byte{
 				"one":   []byte("sum:1"),
 				"three": []byte("sum:3"),
+				"four":  []byte("sum:2"),
 			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, manifest.OutputValueTypeInt64),
 			expectedError: false,
 			expectedKV: map[string][]byte{
 				"one":   []byte("sum:1"),
 				"two":   []byte("sum:2"),
 				"three": []byte("sum:3"),
+				"four":  []byte("sum:4"),
 			},
 		},
 		{
 			name: "set_sum_float",
 			latest: newPartialStore(map[string][]byte{
-				"one": []byte("set:1.1"),
-				"two": []byte("sum:2.2"),
+				"one":  []byte("set:1.1"),
+				"two":  []byte("sum:2.2"),
+				"four": []byte("sum:2.2"),
 			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, manifest.OutputValueTypeFloat64, nil),
 			prev: newStore(map[string][]byte{
 				"one":   []byte("sum:1.1"),
 				"three": []byte("sum:3.3"),
+				"four":  []byte("sum:2.2"),
 			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, manifest.OutputValueTypeFloat64),
 			expectedError: false,
 			expectedKV: map[string][]byte{
 				"one":   []byte("sum:1.1"),
 				"two":   []byte("sum:2.2"),
 				"three": []byte("sum:3.3"),
+				"four":  []byte("sum:4.4"),
 			},
 		},
 		{
 			name: "set_sum_big_int",
 			latest: newPartialStore(map[string][]byte{
-				"one": []byte("set:1"),
-				"two": []byte("sum:2"),
+				"one":  []byte("set:1"),
+				"two":  []byte("sum:2"),
+				"four": []byte("sum:2"),
 			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, manifest.OutputValueTypeBigInt, nil),
 			prev: newStore(map[string][]byte{
 				"one":   []byte("sum:1"),
 				"three": []byte("sum:3"),
+				"four":  []byte("sum:2"),
 			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, manifest.OutputValueTypeBigInt),
 			expectedError: false,
 			expectedKV: map[string][]byte{
 				"one":   []byte("sum:1"),
 				"two":   []byte("sum:2"),
 				"three": []byte("sum:3"),
+				"four":  []byte("sum:4"),
 			},
 		},
 		{
 			name: "set_sum_big_decimal",
 			latest: newPartialStore(map[string][]byte{
-				"one": []byte("set:1.1"),
-				"two": []byte("sum:2.2"),
+				"one":  []byte("set:1.1"),
+				"two":  []byte("sum:2.2"),
+				"four": []byte("sum:2.2"),
 			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, manifest.OutputValueTypeBigDecimal, nil),
 			prev: newStore(map[string][]byte{
 				"one":   []byte("sum:1.1"),
 				"three": []byte("sum:3.3"),
+				"four":  []byte("sum:2.2"),
 			}, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, manifest.OutputValueTypeBigDecimal),
 			expectedError: false,
 			expectedKV: map[string][]byte{
 				"one":   []byte("sum:1.1"),
 				"two":   []byte("sum:2.2"),
 				"three": []byte("sum:3.3"),
+				"four":  []byte("sum:4.4"),
 			},
 		},
 		{

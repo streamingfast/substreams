@@ -63,7 +63,7 @@ func TestStoreSetSumInt64(t *testing.T) {
 			existingValue:       []byte("set:7"),
 			value:               []byte("sum:3"),
 			expectedGetValue:    []byte("10"),
-			expectedActualValue: []byte("sum:10"),
+			expectedActualValue: []byte("set:10"), // always keep a 'set:' prefix
 		},
 	}
 
@@ -150,7 +150,7 @@ func TestStoreSetSumFloat64(t *testing.T) {
 			existingValue:       []byte("set:7.0"),
 			value:               []byte("sum:3.0"),
 			expectedGetValue:    []byte("10"),
-			expectedActualValue: []byte("sum:10"),
+			expectedActualValue: []byte("set:10"),
 		},
 	}
 
@@ -236,7 +236,7 @@ func TestStoreSetSumBigInt(t *testing.T) {
 			existingValue:       []byte("set:7"),
 			value:               []byte("sum:3"),
 			expectedGetValue:    []byte("10"),
-			expectedActualValue: []byte("sum:10"),
+			expectedActualValue: []byte("set:10"),
 		},
 	}
 
@@ -322,7 +322,7 @@ func TestStoreSetSumBigDecimal(t *testing.T) {
 			existingValue:       []byte("set:7.0"),
 			value:               []byte("sum:3.0"),
 			expectedGetValue:    []byte("10"),
-			expectedActualValue: []byte("sum:10"),
+			expectedActualValue: []byte("set:10"), // always keep a 'set:' prefix
 		},
 	}
 

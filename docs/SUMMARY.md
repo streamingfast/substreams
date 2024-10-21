@@ -9,6 +9,7 @@
   * [Initialize a Solana Substreams Project](new/how-to-guides/solana.md)
   * [Initialize a Starknet Substreams Project](new/how-to-guides/starknet.md)
   * [Initialize an Injective Substreams Project](new/how-to-guides/injective.md)
+  * [Initialize a Vara Substreams Project](new/how-to-guides/vara.md)
 * [Consume Substreams](new/consume/consume.md)
   * [Install the CLI](new/common/installing-the-cli.md)
   * [Authentication](new/common/authentication.md)

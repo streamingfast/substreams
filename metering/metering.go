@@ -173,8 +173,7 @@ func (ms *MetricsSender) Send(ctx context.Context, userID, apiKeyID, ip, userMet
 }
 
 func WithMetricsSender(ctx context.Context) context.Context {
-	//check if already set
-	if GetMetricsSender(ctx) != nil {
+	if _, ok := ctx.Value("metrics_sender").(*MetricsSender); ok {
 		return ctx
 	}
 

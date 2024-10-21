@@ -15,8 +15,7 @@ In this guide, you'll learn how to initialize a Vara-based Substreams project. Y
     
 2. You will be given the option to choose between two Vara project options. Select the one that best fits your requirements:
     - **vara-minimal**: Creates a simple Substreams that extracts raw data from the block and generates Rust code.
-    - **starknet-extrinsics**: Creates a Substreams that extracts Vara extrinsics using the cached [Vara Foundational Module](https://substreams.dev/streamingfast/vara-common/v0.1.6).
-
+    - **vara-extrinsics**: Creates a Substreams that extracts Vara transactions filtered specific extrinsics using the cached [Vara Foundational Module](https://substreams.dev/streamingfast/vara-common/v0.1.6).
 
 ## Step 2: Visualize the Data
 

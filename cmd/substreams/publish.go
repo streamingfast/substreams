@@ -13,8 +13,9 @@ import (
 )
 
 func init() {
+	publishCmd.PersistentFlags().String("registry", "https://api.substreams.dev", "Substreams dev endpoint")
+
 	rootCmd.AddCommand(publishCmd)
-	publishCmd.PersistentFlags().String("substreams-dev-endpoint", "http://localhost:9000/sf.substreams.dev.Api/PublishPackage", "Substreams dev endpoint")
 }
 
 var publishCmd = &cobra.Command{
@@ -39,10 +40,12 @@ func runPublish(cmd *cobra.Command, args []string) error {
 	jsonRequest, _ := json.Marshal(request)
 	requestBody := bytes.NewBuffer(jsonRequest)
 
-	substreamsDevEndpoint, err := cmd.Flags().GetString("substreams-dev-endpoint")
+	apiEndpoint, err := cmd.Flags().GetString("registry")
 	if err != nil {
 		return err
 	}
+
+	endpoint := fmt.Sprintf("%s/sf.substreams.dev.Api/PublishPackage", apiEndpoint)
 
 	var netTransport = &http.Transport{
 		Dial: (&net.Dialer{
@@ -55,7 +58,7 @@ func runPublish(cmd *cobra.Command, args []string) error {
 		Transport: netTransport,
 	}
 
-	req, err := http.NewRequest("POST", substreamsDevEndpoint, requestBody)
+	req, err := http.NewRequest("POST", endpoint, requestBody)
 	if err != nil {
 		return err
 	}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -55,10 +56,14 @@ func runRegistryListE(cmd *cobra.Command, args []string) error {
 	listPackagesEndpoint := fmt.Sprintf("%s/sf.substreams.dev.Api/Packages", registryURL)
 	zlog.Debug("listing packages", zap.String("registry_url", listPackagesEndpoint))
 
-	jsonBody := []byte(fmt.Sprintf(`{"featured": %t, "search_filter": "%s"}`, featured, searchFilter))
-	bodyReader := bytes.NewReader(jsonBody)
+	request := &listRequest{
+		Featured:     featured,
+		SearchFilter: searchFilter,
+	}
+	jsonRequest, _ := json.Marshal(request)
+	requestBody := bytes.NewBuffer(jsonRequest)
 
-	req, err := http.NewRequest(http.MethodPost, listPackagesEndpoint, bodyReader)
+	req, err := http.NewRequest(http.MethodPost, listPackagesEndpoint, requestBody)
 	if err != nil {
 		return fmt.Errorf("could not create http request: %w", err)
 	}
@@ -78,4 +83,9 @@ func runRegistryListE(cmd *cobra.Command, args []string) error {
 	fmt.Println(string(resBody))
 
 	return nil
+}
+
+type listRequest struct {
+	Featured     bool   `json:"featured"`
+	SearchFilter string `json:"search_filter"`
 }

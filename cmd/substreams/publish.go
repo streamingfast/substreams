@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -42,7 +44,17 @@ func runPublish(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	httpClient := &http.Client{}
+	var netTransport = &http.Transport{
+		Dial: (&net.Dialer{
+			Timeout: 5 * time.Second,
+		}).Dial,
+		TLSHandshakeTimeout: 5 * time.Second,
+	}
+	var httpClient = &http.Client{
+		Timeout:   time.Second * 60,
+		Transport: netTransport,
+	}
+
 	req, err := http.NewRequest("POST", substreamsDevEndpoint, requestBody)
 	if err != nil {
 		return err

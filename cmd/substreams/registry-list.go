@@ -75,6 +75,10 @@ func runRegistryListE(cmd *cobra.Command, args []string) error {
 	}
 	defer res.Body.Close()
 
+	if res.StatusCode >= http.StatusBadRequest {
+		return fmt.Errorf("failed to list packages: %s", res.Status)
+	}
+
 	resBody, err := io.ReadAll(res.Body)
 	if err != nil {
 		return fmt.Errorf("could not read response body: %w", err)

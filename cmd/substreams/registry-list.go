@@ -67,7 +67,6 @@ func runRegistryListE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("could not create http request: %w", err)
 	}
-
 	req.Header.Set("Content-Type", "application/json")
 
 	res, err := http.DefaultClient.Do(req)

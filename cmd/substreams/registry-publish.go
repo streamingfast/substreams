@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 
+	"go.uber.org/zap"
+
 	"github.com/spf13/cobra"
 )
 
@@ -43,9 +45,10 @@ func runPublish(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	endpoint := fmt.Sprintf("%s/sf.substreams.dev.Api/PublishPackage", apiEndpoint)
+	publishPackageEndpoint := fmt.Sprintf("%s/sf.substreams.dev.Api/PublishPackage", apiEndpoint)
+	zlog.Debug("publishing package", zap.String("registry_url", publishPackageEndpoint))
 
-	req, err := http.NewRequest("POST", endpoint, requestBody)
+	req, err := http.NewRequest("POST", publishPackageEndpoint, requestBody)
 	if err != nil {
 		return err
 	}

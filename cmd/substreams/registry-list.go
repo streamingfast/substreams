@@ -74,6 +74,7 @@ func runRegistryListE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("could not perform http request: %w", err)
 	}
+	defer res.Body.Close()
 
 	resBody, err := io.ReadAll(res.Body)
 	if err != nil {

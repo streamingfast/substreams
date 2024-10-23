@@ -120,6 +120,8 @@ var HardcodedEndpoints = map[string]string{
 	"starknet-testnet":    "testnet.starknet.streamingfast.io:443",
 	"vara-mainnet":        "mainnet.vara.streamingfast.io:443",
 	"vara-testnet":        "testnet.vara.streamingfast.io:443",
+	"mantra-mainnet":      "mainnet.mantra.streamingfast.io",
+	"mantra-testnet":      "testnet.mantra.streamingfast.io",
 
 	// antelope chains
 	"eos":       "eos.substreams.pinax.network:443",

@@ -9,8 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/streamingfast/bstream"
-
 	"connectrpc.com/connect"
 	"github.com/RoaringBitmap/roaring/roaring64"
 	"github.com/streamingfast/bstream/stream"
@@ -208,7 +206,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("validate request: %w", err))
 	}
 
-	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, true, request.Modules, bstream.GetProtocolFirstStreamableBlock)
+	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, true, request.Modules, request.FirstStreamableBlock) //production-mode flag is irrelevant here because it isn't used to calculate the hashes
 	if err != nil {
 		return bsstream.NewErrInvalidArg(err.Error())
 	}

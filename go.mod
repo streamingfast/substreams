@@ -57,7 +57,7 @@ require (
 	github.com/rs/cors v1.10.0
 	github.com/schollz/closestmatch v2.1.0+incompatible
 	github.com/shopspring/decimal v1.3.1
-	github.com/streamingfast/dmetering v0.0.0-20240816165719-51768d3da951
+	github.com/streamingfast/dmetering v0.0.0-20241028183059-d11d4ec85e05
 	github.com/streamingfast/dmetrics v0.0.0-20230919161904-206fa8ebd545
 	github.com/streamingfast/sf-tracing v0.0.0-20240430173521-888827872b90
 	github.com/streamingfast/shutter v1.5.0

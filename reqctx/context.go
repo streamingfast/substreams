@@ -23,6 +23,8 @@ var tracerKey = contextKeyType(2)
 var spanKey = contextKeyType(3)
 var reqStatsKey = contextKeyType(4)
 var moduleExecutionTracingConfigKey = contextKeyType(5)
+var outputModuleHashKey = contextKeyType(6)
+var tier2RequestParametersKeyKey = contextKeyType(7)
 
 func Logger(ctx context.Context) *zap.Logger {
 	return logging.Logger(ctx, zap.NewNop())

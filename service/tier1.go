@@ -219,17 +219,9 @@ func (s *Tier1Service) Blocks(
 		mut.Unlock()
 	}()
 
-	respFunc := tier1ResponseHandler(respContext, &mut, logger, stream)
-
-	span.SetAttributes(attribute.Int64("substreams.tier", 1))
-
 	request := req.Msg
 	if request.Modules == nil {
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("missing modules in request"))
-	}
-
-	if err := ValidateTier1Request(request, s.blockType); err != nil {
-		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("validate request: %w", err))
 	}
 
 	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules, bstream.GetProtocolFirstStreamableBlock)
@@ -237,6 +229,15 @@ func (s *Tier1Service) Blocks(
 		return bsstream.NewErrInvalidArg(err.Error())
 	}
 	outputModuleHash := execGraph.ModuleHashes().Get(request.OutputModule)
+	ctx = reqctx.WithOutputModuleHash(ctx, outputModuleHash)
+
+	respFunc := tier1ResponseHandler(respContext, &mut, logger, stream)
+
+	span.SetAttributes(attribute.Int64("substreams.tier", 1))
+
+	if err := ValidateTier1Request(request, s.blockType); err != nil {
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("validate request: %w", err))
+	}
 
 	moduleNames := make([]string, len(request.Modules.Modules))
 	for i := 0; i < len(moduleNames); i++ {

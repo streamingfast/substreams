@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/streamingfast/bstream"
+
 	"connectrpc.com/connect"
 	"github.com/RoaringBitmap/roaring/roaring64"
 	"github.com/streamingfast/bstream/stream"
@@ -205,6 +207,13 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	if err := ValidateTier2Request(request); err != nil {
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("validate request: %w", err))
 	}
+
+	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, true, request.Modules, bstream.GetProtocolFirstStreamableBlock)
+	if err != nil {
+		return bsstream.NewErrInvalidArg(err.Error())
+	}
+	outputModuleHash := execGraph.ModuleHashes().Get(request.OutputModule)
+	ctx = reqctx.WithOutputModuleHash(ctx, outputModuleHash)
 
 	emitter, err := dmetering.New(request.MeteringConfig, logger)
 	if err != nil {

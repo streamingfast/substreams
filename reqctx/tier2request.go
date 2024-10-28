@@ -16,10 +16,6 @@ type Tier2RequestParameters struct {
 	WASMModules map[string]string
 }
 
-type tier2RequestParametersKey int
-
-const tier2RequestParametersKeyKey = tier2RequestParametersKey(0)
-
 func WithTier2RequestParameters(ctx context.Context, parameters Tier2RequestParameters) context.Context {
 	return context.WithValue(ctx, tier2RequestParametersKeyKey, parameters)
 }

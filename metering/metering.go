@@ -121,6 +121,8 @@ func (ms *MetricsSender) Send(ctx context.Context, userID, apiKeyID, ip, userMet
 		endpoint = fmt.Sprintf("%s%s", endpoint, "Backfill")
 	}
 
+	outputModuleHash := reqctx.OutputModuleHash(ctx)
+
 	meter := dmetering.GetBytesMeter(ctx)
 
 	bytesRead := meter.BytesReadDelta()
@@ -143,10 +145,11 @@ func (ms *MetricsSender) Send(ctx context.Context, userID, apiKeyID, ip, userMet
 	meter.CountInc(TotalWriteBytes, int(totalWriteBytes))
 
 	event := dmetering.Event{
-		UserID:    userID,
-		ApiKeyID:  apiKeyID,
-		IpAddress: ip,
-		Meta:      userMeta,
+		UserID:           userID,
+		ApiKeyID:         apiKeyID,
+		IpAddress:        ip,
+		Meta:             userMeta,
+		OutputModuleHash: outputModuleHash,
 
 		Endpoint: endpoint,
 		Metrics: map[string]float64{

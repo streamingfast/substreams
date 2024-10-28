@@ -31,3 +31,17 @@ func IsBackfillerRequest(ctx context.Context) bool {
 	_, ok = md[backFillerKey]
 	return ok
 }
+
+type outputModuleKeyType int
+
+func WithOutputModuleHash(ctx context.Context, hash string) context.Context {
+	return context.WithValue(ctx, outputModuleHashKey, hash)
+}
+
+func OutputModuleHash(ctx context.Context) string {
+	hash, ok := ctx.Value(outputModuleHashKey).(string)
+	if !ok {
+		return ""
+	}
+	return hash
+}

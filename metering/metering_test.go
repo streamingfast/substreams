@@ -386,8 +386,10 @@ func TestSend(t *testing.T) {
 
 	metericsSender := NewMetricsSender()
 
+	outputModuleHash := "outputModuleHash"
+
 	// Call the Send function
-	metericsSender.Send(ctx, "user1", "apiKey1", "127.0.0.1", "meta", "endpoint", resp)
+	metericsSender.Send(ctx, "user1", "apiKey1", "127.0.0.1", "meta", outputModuleHash, "endpoint", resp)
 
 	// Verify the emitted event
 	assert.Len(t, emitter.events, 1)
@@ -398,6 +400,7 @@ func TestSend(t *testing.T) {
 	assert.Equal(t, "127.0.0.1", event.IpAddress)
 	assert.Equal(t, "meta", event.Meta)
 	assert.Equal(t, "endpoint", event.Endpoint)
+	assert.Equal(t, "outputModuleHash", event.OutputModuleHash)
 	assert.Equal(t, float64(proto.Size(resp)), event.Metrics["egress_bytes"])
 	assert.Equal(t, float64(0), event.Metrics["written_bytes"])
 	assert.Equal(t, float64(0), event.Metrics["read_bytes"])
@@ -448,7 +451,7 @@ func TestSendParallel(t *testing.T) {
 			meter.CountInc(MeterFileCompressedWriteBytes, 600)
 
 			time.Sleep(time.Duration(randomInt()) * time.Nanosecond)
-			metricsSender.Send(ctx, "user1", "apiKey1", "127.0.0.1", "meta", "endpoint", resp)
+			metricsSender.Send(ctx, "user1", "apiKey1", "127.0.0.1", "meta", "outputModuleHash", "endpoint", resp)
 		}()
 	}
 

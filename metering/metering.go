@@ -113,15 +113,13 @@ func NewMetricsSender() *MetricsSender {
 	}
 }
 
-func (ms *MetricsSender) Send(ctx context.Context, userID, apiKeyID, ip, userMeta, endpoint string, resp proto.Message) {
+func (ms *MetricsSender) Send(ctx context.Context, userID, apiKeyID, ip, userMeta, outputModuleHash, endpoint string, resp proto.Message) {
 	ms.Lock()
 	defer ms.Unlock()
 
 	if reqctx.IsBackfillerRequest(ctx) {
 		endpoint = fmt.Sprintf("%s%s", endpoint, "Backfill")
 	}
-
-	outputModuleHash := reqctx.OutputModuleHash(ctx)
 
 	meter := dmetering.GetBytesMeter(ctx)
 

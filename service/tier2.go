@@ -514,6 +514,7 @@ func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbs
 		logger.Warn("no auth information available in tier2 response handler")
 	}
 
+	outputModuleHash := reqctx.OutputModuleHash(ctx)
 	metricsSender := metering.GetMetricsSender(ctx)
 
 	return func(respAny substreams.ResponseFromAnyTier) error {
@@ -530,7 +531,7 @@ func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbs
 			zap.String("user_meta", userMeta),
 			zap.String("endpoint", "sf.substreams.internal.v2/ProcessRange"),
 		)
-		metricsSender.Send(ctx, userID, apiKeyID, ip, userMeta, "sf.substreams.internal.v2/ProcessRange", resp)
+		metricsSender.Send(ctx, userID, apiKeyID, ip, userMeta, outputModuleHash, "sf.substreams.internal.v2/ProcessRange", resp)
 		return nil
 	}
 }

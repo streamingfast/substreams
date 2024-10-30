@@ -209,16 +209,6 @@ func (s *Tier1Service) Blocks(
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier1/request")
 	defer span.EndWithErr(&err)
 
-	// We need to ensure that the response function is NEVER used after this Blocks handler has returned.
-	// We use a context that will be canceled on defer, and a lock to prevent races. The respFunc is used in various threads
-	mut := sync.Mutex{}
-	respContext, cancel := context.WithCancel(ctx)
-	defer func() {
-		mut.Lock()
-		cancel()
-		mut.Unlock()
-	}()
-
 	request := req.Msg
 	if request.Modules == nil {
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("missing modules in request"))
@@ -230,6 +220,16 @@ func (s *Tier1Service) Blocks(
 	}
 	outputModuleHash := execGraph.ModuleHashes().Get(request.OutputModule)
 	ctx = reqctx.WithOutputModuleHash(ctx, outputModuleHash)
+
+	// We need to ensure that the response function is NEVER used after this Blocks handler has returned.
+	// We use a context that will be canceled on defer, and a lock to prevent races. The respFunc is used in various threads
+	mut := sync.Mutex{}
+	respContext, cancel := context.WithCancel(ctx)
+	defer func() {
+		mut.Lock()
+		cancel()
+		mut.Unlock()
+	}()
 
 	respFunc := tier1ResponseHandler(respContext, &mut, logger, stream)
 
@@ -608,6 +608,8 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 	userMeta := auth.Meta()
 	ip := auth.RealIP()
 
+	outputModuleHash := reqctx.OutputModuleHash(ctx)
+
 	ctx = reqctx.WithEmitter(ctx, dmetering.GetDefaultEmitter())
 	metericsSender := metering.GetMetricsSender(ctx)
 
@@ -625,7 +627,7 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 			return connect.NewError(connect.CodeUnavailable, err)
 		}
 
-		metericsSender.Send(ctx, userID, apiKeyID, ip, userMeta, "sf.substreams.rpc.v2/Blocks", resp)
+		metericsSender.Send(ctx, userID, apiKeyID, ip, userMeta, outputModuleHash, "sf.substreams.rpc.v2/Blocks", resp)
 		return nil
 	}
 }

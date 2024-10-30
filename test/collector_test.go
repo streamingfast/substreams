@@ -64,10 +64,10 @@ func (c *responseCollector) Collect(respAny substreams.ResponseFromAnyTier) erro
 	switch resp := respAny.(type) {
 	case *pbsubstreamsrpc.Response:
 		c.responses = append(c.responses, resp)
-		c.sender.Send(c.ctx, "test_user", "test_api_key", "10.0.0.1", "test_meta", "tier1", resp)
+		c.sender.Send(c.ctx, "test_user", "test_api_key", "10.0.0.1", "test_meta", "testOutputHash", "tier1", resp)
 	case *pbssinternal.ProcessRangeResponse:
 		c.internalResponses = append(c.internalResponses, resp)
-		c.sender.Send(c.ctx, "test_user", "test_api_key", "10.0.0.1", "test_meta", "tier2", resp)
+		c.sender.Send(c.ctx, "test_user", "test_api_key", "10.0.0.1", "test_meta", "testOutputHash", "tier2", resp)
 	}
 	return nil
 }

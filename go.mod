@@ -10,7 +10,7 @@ require (
 	github.com/jhump/protoreflect v1.14.0
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/streamingfast/bstream v0.0.2-0.20240916154503-c9c5c8bbeca0
+	github.com/streamingfast/bstream v0.0.2-0.20250108204816-fd52ed027320
 	github.com/streamingfast/cli v0.0.4-0.20241119021815-815afa473375
 	github.com/streamingfast/dauth v0.0.0-20240219205130-bfe428489338
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c

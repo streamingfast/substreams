@@ -726,7 +726,7 @@ func matchGZIPHeader(req *connect.Request[pbsubstreamsrpc.Request]) bool {
 		if compressionHeader[strings.ToLower(k)] {
 			for _, vv := range v {
 				for _, vvv := range strings.Split(vv, ",") {
-					if strings.ToLower(vvv) == compressionValue {
+					if strings.TrimSpace(strings.ToLower(vvv)) == compressionValue {
 						return true
 					}
 				}

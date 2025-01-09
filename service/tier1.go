@@ -192,6 +192,8 @@ func NewTier1(
 	return s, nil
 }
 
+var acceptedCompressionValues = map[string]bool{"gzip": true, "zstd": true}
+
 func (s *Tier1Service) Blocks(
 	ctx context.Context,
 	req *connect.Request[pbsubstreamsrpc.Request],
@@ -213,11 +215,11 @@ func (s *Tier1Service) Blocks(
 	defer span.EndWithErr(&err)
 
 	var compressed bool
-	if matchGZIPHeader(req) {
+	if matchHeader(req, acceptedCompressionValues) {
 		compressed = true
 	}
 	if s.enforceCompression && !compressed {
-		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("Your client does not accept gzip-compressed streams. Check how to enable it on your GRPC or ConnectRPC client"))
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("Your client does not accept gzip- or zstd-compressed streams. Check how to enable it on your GRPC or ConnectRPC client"))
 	}
 
 	request := req.Msg
@@ -718,15 +720,12 @@ func toConnectError(ctx context.Context, err error) error {
 // must be lowercase
 var compressionHeader = map[string]bool{"grpc-accept-encoding": true, "connect-accept-encoding": true}
 
-const compressionValue = "gzip"
-
-func matchGZIPHeader(req *connect.Request[pbsubstreamsrpc.Request]) bool {
-
+func matchHeader(req *connect.Request[pbsubstreamsrpc.Request], expected map[string]bool) bool {
 	for k, v := range req.Header() {
 		if compressionHeader[strings.ToLower(k)] {
 			for _, vv := range v {
 				for _, vvv := range strings.Split(vv, ",") {
-					if strings.TrimSpace(strings.ToLower(vvv)) == compressionValue {
+					if expected[strings.TrimSpace(strings.ToLower(vvv))] {
 						return true
 					}
 				}

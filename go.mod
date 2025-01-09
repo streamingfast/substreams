@@ -15,7 +15,7 @@ require (
 	github.com/streamingfast/dauth v0.0.0-20240219205130-bfe428489338
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
 	github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1
-	github.com/streamingfast/dgrpc v0.0.0-20240219152146-57bb131c39ca
+	github.com/streamingfast/dgrpc v0.0.0-20250109212433-ae21a7f7a01a
 	github.com/streamingfast/dstore v0.1.1-0.20241011152904-9acd6205dc14
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
 	github.com/streamingfast/pbgo v0.0.6-0.20240823134334-812f6a16c5cb
@@ -99,6 +99,7 @@ require (
 	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.6 // indirect
 	github.com/sahilm/fuzzy v0.1.1 // indirect
+	github.com/sercand/kuberesolver/v5 v5.1.1 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0 // indirect
 	go.uber.org/goleak v1.3.0 // indirect

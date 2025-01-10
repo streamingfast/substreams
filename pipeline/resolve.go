@@ -280,6 +280,7 @@ func NewCursorResolver(hub *hub.ForkableHub, mergedBlocksStore, forkedBlocksStor
 		src.Run()
 		select {
 		case <-ctx.Done():
+			src.Shutdown(ctx.Err())
 			return nil, nil, ctx.Err()
 		case <-src.Terminated():
 		}

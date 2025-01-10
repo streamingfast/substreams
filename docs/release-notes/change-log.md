@@ -11,6 +11,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Server-side
+
+* Fix a thread leak in cursor resolution resulting in a bad value for active_connections metric
 * Fix detection of accepted gzip compression when multiple values are sent in the `Grpc-Accept-Encoding` header (ex: Python library)
 * Allow setting subscription channel max capacity via `SOURCE_CHAN_SIZE` env var (default: 100)
 

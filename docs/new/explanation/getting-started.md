@@ -19,7 +19,7 @@ Once you find a package that fits your needs, you can choose how you want to con
 If you can't find a Substreams package that meets your specific needs, you can develop your own. Substreams are built with Rust, so you’ll write functions that extract and filter the data you need from the blockchain. The easiest way to get started is by referring to the [tutorial](../tutorials/intro-to-tutorials.md) section, enabling you to quickly filter data: 
 
 - [EVM](../tutorials/evm.md)
-- [Solana](../tutorials/solana.md)
+- [Solana](../tutorials/solana/solana.md)
 - [Starknet](../tutorials/starknet.md)
 - [Injective](../tutorials/cosmos-compatible/injective.md)
 - [MANTRA](../tutorials/cosmos-compatible/mantra.md)

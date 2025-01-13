@@ -104,7 +104,7 @@ func TestBackFiller(t *testing.T) {
 				jobResult <- err
 			}
 
-			testLiveBackFiller := NewLiveBackFiller(testHandler, testLogger, c.stageToProcess, c.segmentSize, c.linearHandoff, nil, RequestBackProcessingTest)
+			testLiveBackFiller := NewLiveBackFiller(context.Background(), testHandler, testLogger, c.stageToProcess, c.segmentSize, c.linearHandoff, nil, RequestBackProcessingTest)
 
 			go testLiveBackFiller.Start(testContext)
 

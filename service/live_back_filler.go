@@ -31,9 +31,11 @@ type LiveBackFiller struct {
 	logger                *zap.Logger
 	stageToProcess        int
 	clientFactory         client.InternalClientFactory
+
+	ctx context.Context
 }
 
-func NewLiveBackFiller(nextHandler bstream.Handler, logger *zap.Logger, stageToProcess int, segmentSize uint64, linearHandoff uint64, clientFactory client.InternalClientFactory, requestBackProcessing RequestBackProcessingFunc) *LiveBackFiller {
+func NewLiveBackFiller(ctx context.Context, nextHandler bstream.Handler, logger *zap.Logger, stageToProcess int, segmentSize uint64, linearHandoff uint64, clientFactory client.InternalClientFactory, requestBackProcessing RequestBackProcessingFunc) *LiveBackFiller {
 	return &LiveBackFiller{
 		RequestBackProcessing: requestBackProcessing,
 		stageToProcess:        stageToProcess,
@@ -43,6 +45,8 @@ func NewLiveBackFiller(nextHandler bstream.Handler, logger *zap.Logger, stageToP
 		segmentSize:           segmentSize,
 		logger:                logger,
 		clientFactory:         clientFactory,
+
+		ctx: ctx,
 	}
 }
 
@@ -52,7 +56,10 @@ func (l *LiveBackFiller) ProcessBlock(blk *pbbstream.Block, obj interface{}) (er
 		return l.NextHandler.ProcessBlock(blk, obj)
 	}
 
-	l.irreversibleBlock <- blk.Number
+	select {
+	case <-l.ctx.Done():
+	case l.irreversibleBlock <- blk.Number:
+	}
 
 	return l.NextHandler.ProcessBlock(blk, obj)
 }

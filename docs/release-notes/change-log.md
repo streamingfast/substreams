@@ -17,6 +17,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Fix detection of accepted gzip compression when multiple values are sent in the `Grpc-Accept-Encoding` header (ex: Python library)
 * Allow setting subscription channel max capacity via `SOURCE_CHAN_SIZE` env var (default: 100)
 
+### Client-side
+
+* improvements to 'tools prometheus-explorer'
+  - change flags `lookup_interval` and `lookup_timeout` to `--interval` and `--timeout`
+  - now support relative block (default is now: -1) and does not use 'final-blocks-only' flag on request
+  - add `--max-freshness` flag to check for block age (when using relative block)
+  - add `substreams_healthcheck_block_age_ms` prometheus metric
+  - `--block-height` is now a flag instead of a positional argument
+  - improve logging
+  - removed "3 retries" that were built in and causing more confusion
+
 ## v1.11.3
 
 ### Server-side

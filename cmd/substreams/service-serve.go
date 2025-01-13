@@ -38,7 +38,7 @@ var serveCmd = &cobra.Command{
         Listens for "deploy" requests, allowing you to test your deployable units to a local docker-based dev environment.
 	`),
 	PersistentPreRun: func(cmd *cobra.Command, _ []string) {
-		setup(cmd, zapcore.InfoLevel)
+		Setup(cmd, zapcore.InfoLevel)
 	},
 	RunE:         serveE,
 	Args:         cobra.ExactArgs(0),

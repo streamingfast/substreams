@@ -14,7 +14,7 @@ var rootCmd = &cobra.Command{
 	Long:         "Any place where <package> is specified, a 'substreams.yaml', a local '.spkg' file or an https://...spkg file can be specified",
 	SilenceUsage: true,
 	PersistentPreRun: func(cmd *cobra.Command, _ []string) {
-		setup(cmd, zapcore.WarnLevel)
+		Setup(cmd, zapcore.WarnLevel)
 	},
 }
 

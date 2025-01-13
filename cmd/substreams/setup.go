@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-func setup(cmd *cobra.Command, loglevel zapcore.Level) {
+func Setup(cmd *cobra.Command, loglevel zapcore.Level) {
 	setupProfiler()
 	manifest.IPFSURL = sflags.MustGetString(cmd, "ipfs-url")
 	logging.InstantiateLoggers(logging.WithLogLevelSwitcherServerAutoStart(), logging.WithDefaultLevel(loglevel))

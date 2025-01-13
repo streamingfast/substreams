@@ -1,12 +1,10 @@
 package pipeline
 
 import (
+	"connectrpc.com/connect"
 	"context"
 	"errors"
 	"fmt"
-	"sync/atomic"
-
-	"connectrpc.com/connect"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/hub"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
@@ -17,6 +15,7 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
 	"go.uber.org/zap"
+	"sync/atomic"
 )
 
 type getBlockFunc func() (uint64, error)
@@ -279,6 +278,11 @@ func NewCursorResolver(hub *hub.ForkableHub, mergedBlocksStore, forkedBlocksStor
 		if src == nil { // block is out of reversible segment
 			src = bstream.NewFileSourceFromCursor(mergedBlocksStore, forkedBlocksStore, cursor, jctBlkGetter, zap.NewNop())
 		}
+
+		go func() {
+			<-ctx.Done()
+			src.Shutdown(ctx.Err())
+		}()
 
 		src.Run()
 		select {

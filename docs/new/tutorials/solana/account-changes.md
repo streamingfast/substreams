@@ -32,7 +32,7 @@ Using the [Solana Accounts Foundational Module](https://substreams.dev/packages/
 This command will stream account changes directly to your terminal.
 
 ```bash
-substreams run  solana-accounts-foundational filtered_accounts -s -1 -o clock
+substreams run solana-accounts-foundational filtered_accounts -s -1 -o clock
 ```
 
 The Foundational Module has support for filtering on specific accounts and/or owners. You can adjust the query based on your needs.
@@ -41,7 +41,7 @@ This tutorial will continue to guide you through filtering, sinking the data, an
 
 ## Step 2: Sink the Substreams
 
-Consume the account stream [directly in your applicaion](../../how-to-guides/sinks/stream/stream.md) using a callback or make it queryable by using the [SQL-DB sink](../../how-to-guides/sinks/sql/sql-sink.md).
+Consume the account stream [directly in your applicaion](../../how-to-guides/sinks/stream/stream.md) using a callback or make it queryable by using the [Substreams:SQL sink](../../how-to-guides/sinks/sql/sql-sink.md).
 
 ## Step 3: Setting up a Reconnection Policy
 

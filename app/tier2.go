@@ -80,7 +80,7 @@ func (a *Tier2App) Run() error {
 		opts = append(opts, service.WithBlockExecutionTimeout(a.config.BlockExecutionTimeout))
 	}
 
-	opts = append(opts, service.WithReadinessFunc(a.setReadiness))
+	opts = append(opts, service.WithReadinessFunc(a.setIsReady))
 
 	if a.config.TmpDir != "" {
 		wazero.SetTempDir(a.config.TmpDir)
@@ -103,12 +103,11 @@ func (a *Tier2App) Run() error {
 		return fmt.Errorf("failed to setup trust authenticator: %w", err)
 	}
 
-	a.OnTerminating(func(_ error) { metrics.AppReadinessTier2.SetNotReady() })
+	a.OnTerminating(func(_ error) { a.setIsReady(false) })
 
 	go func() {
 		a.logger.Info("launching gRPC server")
-		a.isReady.CompareAndSwap(false, true)
-		metrics.AppReadinessTier2.SetReady()
+		a.setIsReady(false)
 
 		err := service.ListenTier2(a.config.GRPCListenAddr, a.config.ServiceDiscoveryURL, svc, trustAuth, a.logger, a.HealthCheck)
 		a.Shutdown(err)
@@ -135,8 +134,14 @@ func (a *Tier2App) IsReady(ctx context.Context) bool {
 	return a.isReady.Load()
 }
 
-func (a *Tier2App) setReadiness(ready bool) {
+func (a *Tier2App) setIsReady(ready bool) {
 	a.isReady.Store(ready)
+
+	if ready {
+		metrics.AppReadinessTier2.SetReady()
+	} else {
+		metrics.AppReadinessTier2.SetNotReady()
+	}
 }
 
 // Validate inspects itself to determine if the current config is valid according to

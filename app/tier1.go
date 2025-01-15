@@ -7,11 +7,6 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcconnect"
-	ssconnect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcconnect"
-	"github.com/streamingfast/substreams/reqctx"
-	"github.com/streamingfast/substreams/wasm/wazero"
-
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/blockstream"
 	"github.com/streamingfast/bstream/hub"
@@ -23,8 +18,12 @@ import (
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metrics"
+	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcconnect"
+	ssconnect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcconnect"
+	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service"
 	"github.com/streamingfast/substreams/wasm"
+	"github.com/streamingfast/substreams/wasm/wazero"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
 )
@@ -56,11 +55,13 @@ type Tier1Config struct {
 	BlockExecutionTimeout   time.Duration
 	TmpDir                  string
 
-	StateStoreURL        string
-	StateStoreDefaultTag string
-	BlockType            string
-	StateBundleSize      uint64
-	EnforceCompression   bool // refuse incoming requests that do not accept gzip compression (ConnectRPC or GRPC)
+	StateStoreURL           string
+	StateStoreDefaultTag    string
+	BlockType               string
+	StateBundleSize         uint64
+	EnforceCompression      bool // refuse incoming requests that do not accept gzip compression (ConnectRPC or GRPC)
+	ActiveRequestsSoftLimit int  // maximum number of active requests a tier1 app can have with external clients before starting to advertise itself as unready in the health check
+	ActiveRequestsHardLimit int  // maximum number of active requests a tier1 app can have with external clients, refuse with CodeUnavailable if reached
 
 	MaxSubrequests       uint64
 	SubrequestsEndpoint  string
@@ -199,9 +200,12 @@ func (a *Tier1App) Run() error {
 		a.config.MaxSubrequests,
 		a.config.StateBundleSize,
 		a.config.BlockType,
+		a.setIsReady,
 		subrequestsClientConfig,
 		tier2RequestParameters,
 		a.config.EnforceCompression,
+		a.config.ActiveRequestsSoftLimit,
+		a.config.ActiveRequestsHardLimit,
 		opts...,
 	)
 	if err != nil {
@@ -230,14 +234,14 @@ func (a *Tier1App) Run() error {
 			a.logger.Info("waiting until hub is real-time synced")
 			select {
 			case <-forkableHub.Ready:
-				metrics.AppReadinessTier1.SetReady()
+				// Wait until the hub is ready
 			case <-a.Terminating():
 				return
 			}
 		}
 
 		a.logger.Info("launching gRPC server", zap.Bool("live_support", withLive))
-		a.isReady.CompareAndSwap(false, true)
+		a.setIsReady(true)
 
 		err := service.ListenTier1(a.config.GRPCListenAddr, svc, infoServer, a.modules.Authenticator, a.logger, a.HealthCheck)
 		a.Shutdown(err)
@@ -265,6 +269,16 @@ func (a *Tier1App) IsReady(ctx context.Context) bool {
 	}
 
 	return a.isReady.Load()
+}
+
+func (a *Tier1App) setIsReady(ready bool) {
+	if ready {
+		a.isReady.Store(true)
+		metrics.AppReadinessTier1.SetReady()
+	} else {
+		a.isReady.Store(false)
+		metrics.AppReadinessTier1.SetNotReady()
+	}
 }
 
 // Validate inspects itself to determine if the current config is valid according to

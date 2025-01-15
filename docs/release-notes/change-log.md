@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Fix a thread leak in cursor resolution resulting in a bad value for active_connections metric
 * Fix detection of accepted gzip compression when multiple values are sent in the `Grpc-Accept-Encoding` header (ex: Python library)
 * Allow setting subscription channel max capacity via `SOURCE_CHAN_SIZE` env var (default: 100)
+* Added tier1 app configuration option to limit max active requests a single instance can accept before starting to reject them with 'Unavailable' gRPC code.
 
 ### Client-side
 

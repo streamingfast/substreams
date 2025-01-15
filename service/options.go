@@ -67,7 +67,7 @@ func WithReadinessFunc(f func(bool)) Option {
 		case *Tier1Service:
 			// not used
 		case *Tier2Service:
-			s.setReadyFunc = f
+			s.appSetIsReadyState = f
 		}
 	}
 }

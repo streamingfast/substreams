@@ -157,6 +157,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		authType,
 		sflags.MustGetBool(cmd, "insecure"),
 		sflags.MustGetBool(cmd, "plaintext"),
+		"substreams_run",
 	)
 
 	ssClient, connClose, callOpts, headers, err := client.NewSubstreamsClient(substreamsClientConfig)

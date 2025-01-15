@@ -108,6 +108,7 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 			authType,
 			insecure,
 			plaintext,
+			"substreams_prometheus",
 		)
 		var fresh *time.Duration
 		if startBlock < 0 {

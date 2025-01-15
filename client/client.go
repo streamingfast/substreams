@@ -37,6 +37,7 @@ type SubstreamsClientConfig struct {
 	authType  AuthType
 	insecure  bool
 	plaintext bool
+	agent     string
 }
 
 func (c *SubstreamsClientConfig) Endpoint() string {
@@ -75,13 +76,14 @@ func (c *SubstreamsClientConfig) MarshalLogObject(encoder zapcore.ObjectEncoder)
 
 type InternalClientFactory = func() (cli pbssinternal.SubstreamsClient, closeFunc func() error, callOpts []grpc.CallOption, headers Headers, err error)
 
-func NewSubstreamsClientConfig(endpoint string, authToken string, authType AuthType, insecure bool, plaintext bool) *SubstreamsClientConfig {
+func NewSubstreamsClientConfig(endpoint string, authToken string, authType AuthType, insecure bool, plaintext bool, agent string) *SubstreamsClientConfig {
 	return &SubstreamsClientConfig{
 		endpoint:  endpoint,
 		authToken: authToken,
 		authType:  authType,
 		insecure:  insecure,
 		plaintext: plaintext,
+		agent:     agent,
 	}
 }
 
@@ -219,6 +221,7 @@ func NewSubstreamsClient(config *SubstreamsClientConfig) (cli pbsubstreamsrpc.St
 	dialOptions = append(dialOptions, grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()))
 	dialOptions = append(dialOptions, grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()))
 	dialOptions = append(dialOptions, grpc.WithDefaultCallOptions(grpc.UseCompressor(gzip.Name)))
+	dialOptions = append(dialOptions, grpc.WithUserAgent(config.agent))
 
 	zlog.Debug("getting connection", zap.String("endpoint", endpoint))
 	conn, err := dgrpc.NewExternalClient(endpoint, dialOptions...)

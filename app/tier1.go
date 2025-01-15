@@ -155,6 +155,7 @@ func (a *Tier1App) Run() error {
 		client.None,
 		a.config.SubrequestsInsecure,
 		a.config.SubrequestsPlaintext,
+		"substreams_tier1",
 	)
 	var opts []service.Option
 	if a.config.WASMExtensions != nil {

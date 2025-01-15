@@ -28,6 +28,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - improve logging
   - removed "3 retries" that were built in and causing more confusion
 
+* add User-Agent headers depending on the client command
+
 ## v1.11.3
 
 ### Server-side

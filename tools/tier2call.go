@@ -80,6 +80,7 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 		authType,
 		sflags.MustGetBool(cmd, "insecure"),
 		sflags.MustGetBool(cmd, "plaintext"),
+		"substreams_tools",
 	)
 	ssClient, _, callOpts, headers, err := client.NewSubstreamsInternalClient(clientConfig)
 	if err != nil {

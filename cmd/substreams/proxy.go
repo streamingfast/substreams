@@ -129,6 +129,7 @@ func runProxy(cmd *cobra.Command, args []string) error {
 		authType,
 		sflags.MustGetBool(cmd, "insecure"),
 		sflags.MustGetBool(cmd, "plaintext"),
+		"substreams_proxy",
 	)
 
 	cs := &ConnectServer{

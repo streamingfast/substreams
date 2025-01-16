@@ -67,7 +67,9 @@ type Tier2Service struct {
 
 	streamFactoryFuncOverride StreamFactoryFunc
 
-	setReadyFunc              func(bool)
+	// You can call this function to switch the parent app to be ready or not ready influencing the health check,
+	// it's provided by [app.Tier1App] and tied to the health check endpoint.
+	appSetIsReadyState        func(isReady bool)
 	currentConcurrentRequests int64
 	maxConcurrentRequests     uint64
 	moduleExecutionTracing    bool
@@ -125,7 +127,7 @@ func (s *Tier2Service) decrementConcurrentRequests() {
 
 func (s *Tier2Service) setOverloaded() {
 	overloaded := s.maxConcurrentRequests != 0 && uint64(s.currentConcurrentRequests) >= s.maxConcurrentRequests
-	s.setReadyFunc(!overloaded)
+	s.appSetIsReadyState(!overloaded)
 }
 
 func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, streamSrv pbssinternal.Substreams_ProcessRangeServer) error {

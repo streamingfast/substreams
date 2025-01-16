@@ -13,24 +13,22 @@ import (
 	"sync"
 	"time"
 
-	"github.com/streamingfast/substreams/metering"
-
+	"connectrpc.com/connect"
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/dgrpc"
-
 	"github.com/streamingfast/bstream/hub"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	bsstream "github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dauth"
+	"github.com/streamingfast/dgrpc"
 	"github.com/streamingfast/dmetering"
+	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/shutter"
-
-	"connectrpc.com/connect"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/client"
+	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/orchestrator/plan"
 	"github.com/streamingfast/substreams/orchestrator/work"
@@ -69,12 +67,17 @@ type Tier1Service struct {
 	tracer                ttrace.Tracer
 	logger                *zap.Logger
 
+	// You can call this function to switch the parent app to be ready or not ready influencing the health check,
+	// it's provided by [app.Tier1App] and tied to the health check endpoint.
+	appSetIsReadyState  func(isReady bool)
 	getRecentFinalBlock func() (uint64, error)
 	resolveCursor       pipeline.CursorResolver
 	getHeadBlock        func() (uint64, error)
 
-	enforceCompression     bool
-	tier2RequestParameters reqctx.Tier2RequestParameters
+	enforceCompression      bool
+	activeRequestsSoftLimit int
+	activeRequestsHardLimit int
+	tier2RequestParameters  reqctx.Tier2RequestParameters
 }
 
 func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
@@ -129,9 +132,12 @@ func NewTier1(
 	stateBundleSize uint64,
 	blockType string,
 
+	appSetIsReadyState func(isReady bool),
 	substreamsClientConfig *client.SubstreamsClientConfig,
 	tier2RequestParameters reqctx.Tier2RequestParameters,
 	enforceCompression bool,
+	activeRequestsSoftLimit int,
+	activeRequestsHardLimit int,
 	opts ...Option,
 ) (*Tier1Service, error) {
 
@@ -168,16 +174,19 @@ func NewTier1(
 
 	logger.Info("launching tier1 service", zap.Reflect("client_config", substreamsClientConfig), zap.String("block_type", blockType), zap.Bool("with_live", hub != nil))
 	s := &Tier1Service{
-		Shutter:                shutter.New(),
-		runtimeConfig:          runtimeConfig,
-		blockType:              blockType,
-		tracer:                 tracing.GetTracer(),
-		failedRequests:         make(map[string]*recordedFailure),
-		resolveCursor:          pipeline.NewCursorResolver(hub, mergedBlocksStore, forkedBlocksStore),
-		logger:                 logger,
-		tier2RequestParameters: tier2RequestParameters,
-		blockExecutionTimeout:  3 * time.Minute,
-		enforceCompression:     enforceCompression,
+		Shutter:                 shutter.New(),
+		runtimeConfig:           runtimeConfig,
+		blockType:               blockType,
+		tracer:                  tracing.GetTracer(),
+		failedRequests:          make(map[string]*recordedFailure),
+		resolveCursor:           pipeline.NewCursorResolver(hub, mergedBlocksStore, forkedBlocksStore),
+		logger:                  logger,
+		appSetIsReadyState:      appSetIsReadyState,
+		tier2RequestParameters:  tier2RequestParameters,
+		blockExecutionTimeout:   3 * time.Minute,
+		enforceCompression:      enforceCompression,
+		activeRequestsSoftLimit: activeRequestsSoftLimit,
+		activeRequestsHardLimit: activeRequestsHardLimit,
 	}
 
 	s.streamFactoryFunc = sf.New
@@ -218,7 +227,7 @@ func (s *Tier1Service) Blocks(
 		compressed = true
 	}
 	if s.enforceCompression && !compressed {
-		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("Your client does not accept gzip- or zstd-compressed streams. Check how to enable it on your GRPC or ConnectRPC client"))
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("your client does not accept gzip- or zstd-compressed streams. Check how to enable it on your gRPC or ConnectRPC client"))
 	}
 
 	request := req.Msg
@@ -284,10 +293,28 @@ func (s *Tier1Service) Blocks(
 		}
 	}
 
+	status := s.getOverloadedStatus()
+
+	// Set us as unready if the soft limit would be reached by this request
+	if status.softLimitWouldBeReached() {
+		s.appSetIsReadyState(false)
+	}
+
+	// Refuse the request if the hard limit is currently reached by this instance
+	if status.hardLimitReached() {
+		return connect.NewError(connect.CodeUnavailable, fmt.Errorf("service is currently not accepting new requests, re-connect back right away to be balanced to a non-full node"))
+	}
+
 	logger.Info("incoming Substreams Blocks request", fields...)
 	metrics.SubstreamsCounter.Inc()
-	metrics.ActiveSubstreams.Inc()
-	defer metrics.ActiveSubstreams.Dec()
+	metrics.ActiveRequests.Inc()
+	defer func() {
+		metrics.ActiveRequests.Dec()
+
+		if status := s.getOverloadedStatus(); status.canAcceptUpcomingRequests() {
+			s.appSetIsReadyState(true)
+		}
+	}()
 
 	requestID := fmt.Sprintf("%s:%d:%d:%s:%t:%t:%s",
 		outputModuleHash,
@@ -736,4 +763,57 @@ func matchHeader(header http.Header) bool {
 		}
 	}
 	return false
+}
+
+type overloadingStatus struct {
+	// set only if either soft or hard limit set is > 0
+	activeRequestCount int
+	softLimit          int
+	hardLimit          int
+}
+
+// softLimitWouldBeReached returns true if the soft limit would be reached if one more request was added.
+func (s *overloadingStatus) softLimitWouldBeReached() bool {
+	return s.softLimit > 0 && s.activeRequestCount+1 >= s.softLimit
+}
+
+// hardLimitReached returns true if the hard limit is actually reached from the active request count.
+func (s *overloadingStatus) hardLimitReached() bool {
+	return s.hardLimit > 0 && s.activeRequestCount >= s.hardLimit
+}
+
+// canAcceptUpcomingRequests returns true if the service can accept upcoming new requests.
+func (s *overloadingStatus) canAcceptUpcomingRequests() bool {
+	if s.softLimit <= 0 && s.hardLimit <= 0 {
+		return true
+	}
+
+	if s.softLimit > 0 && s.activeRequestCount >= s.softLimit {
+		return false
+	}
+
+	if s.hardLimit > 0 && s.activeRequestCount >= s.hardLimit {
+		return false
+	}
+
+	return true
+}
+
+func (s *Tier1Service) getOverloadedStatus() (status overloadingStatus) {
+	// Never overloaded if both soft & hard limit are 0, -1 or anything less
+	if s.activeRequestsSoftLimit <= 0 && s.activeRequestsHardLimit <= 0 {
+		return
+	}
+
+	activeRequestCount := s.getActiveRequestCount()
+
+	return overloadingStatus{
+		activeRequestCount: activeRequestCount,
+		softLimit:          s.activeRequestsSoftLimit,
+		hardLimit:          s.activeRequestsHardLimit,
+	}
+}
+
+func (s *Tier1Service) getActiveRequestCount() int {
+	return int(dmetrics.NewValueFromMetric(metrics.ActiveRequests, "requests").ValueUint())
 }

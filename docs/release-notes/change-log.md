@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Properly accept and compress responses with `gzip` for browser HTTP clients using ConnectWeb with `Accept-Encoding` header
 * Allow setting subscription channel max capacity via `SOURCE_CHAN_SIZE` env var (default: 100)
 * Added tier1 app configuration option to limit max active requests a single instance can accept before starting to reject them with 'Unavailable' gRPC code.
+* Added tier1 & tier2 app new Prometheus metric `substreams_{tier1,tier2}_rejected_request_counter`, to track rejected request, especially when hard limit is reached.
 
 ### Client-side
 

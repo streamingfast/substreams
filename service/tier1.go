@@ -206,7 +206,13 @@ func (s *Tier1Service) Blocks(
 	ctx context.Context,
 	req *connect.Request[pbsubstreamsrpc.Request],
 	stream *connect.ServerStream[pbsubstreamsrpc.Response],
-) error {
+) (serverErr error) {
+	defer func() {
+		if reason, countAsRejected := metrics.IsRejectedRequestError(serverErr); countAsRejected {
+			metrics.Tier1RejectedRequestCounter.Inc(reason)
+		}
+	}()
+
 	// We keep `err` here as the unaltered error from `blocks` call, this is used in the EndSpan to record the full error
 	// and not only the `grpcError` one which is a subset view of the full `err`.
 	var err error
@@ -297,12 +303,18 @@ func (s *Tier1Service) Blocks(
 
 	// Set us as unready if the soft limit would be reached by this request
 	if status.softLimitWouldBeReached() {
+		s.logger.Debug("soft limit would be reached by this request, setting app as unready",
+			append(fields, zap.Int("active_request_count", status.activeRequestCount), zap.Int("soft_limit", status.softLimit))...,
+		)
 		s.appSetIsReadyState(false)
 	}
 
 	// Refuse the request if the hard limit is currently reached by this instance
 	if status.hardLimitReached() {
-		return connect.NewError(connect.CodeUnavailable, fmt.Errorf("service is currently not accepting new requests, re-connect back right away to be balanced to a non-full node"))
+		s.logger.Info("refusing request, hard limit reached ()",
+			append(fields, zap.Int("active_request_count", status.activeRequestCount), zap.Int("hard_limit", status.hardLimit))...,
+		)
+		return connect.NewError(connect.CodeUnavailable, fmt.Errorf("service under heavy load, please try connecting again"))
 	}
 
 	logger.Info("incoming Substreams Blocks request", fields...)

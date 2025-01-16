@@ -130,10 +130,15 @@ func (s *Tier2Service) setOverloaded() {
 	s.appSetIsReadyState(!overloaded)
 }
 
-func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, streamSrv pbssinternal.Substreams_ProcessRangeServer) error {
+func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, streamSrv pbssinternal.Substreams_ProcessRangeServer) (serverErr error) {
 	metrics.Tier2ActiveRequests.Inc()
 	metrics.Tier2RequestCounter.Inc()
-	defer metrics.Tier2ActiveRequests.Dec()
+	defer func() {
+		metrics.Tier2ActiveRequests.Dec()
+		if reason, countAsRejected := metrics.IsRejectedRequestError(serverErr); countAsRejected {
+			metrics.Tier2RejectedRequestCounter.Inc(reason)
+		}
+	}()
 
 	// We keep `err` here as the unaltered error from `blocks` call, this is used in the EndSpan to record the full error
 	// and not only the `grpcError` one which is a subset view of the full `err`.

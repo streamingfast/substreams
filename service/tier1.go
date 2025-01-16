@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
@@ -192,8 +193,6 @@ func NewTier1(
 	return s, nil
 }
 
-var acceptedCompressionValues = map[string]bool{"gzip": true, "zstd": true}
-
 func (s *Tier1Service) Blocks(
 	ctx context.Context,
 	req *connect.Request[pbsubstreamsrpc.Request],
@@ -215,7 +214,7 @@ func (s *Tier1Service) Blocks(
 	defer span.EndWithErr(&err)
 
 	var compressed bool
-	if matchHeader(req, acceptedCompressionValues) {
+	if matchHeader(req.Header()) {
 		compressed = true
 	}
 	if s.enforceCompression && !compressed {
@@ -718,14 +717,18 @@ func toConnectError(ctx context.Context, err error) error {
 }
 
 // must be lowercase
-var compressionHeader = map[string]bool{"grpc-accept-encoding": true, "connect-accept-encoding": true}
+var compressionHeader = map[string]map[string]bool{
+	"grpc-accept-encoding":    {"gzip": true, "zstd": true},
+	"connect-accept-encoding": {"gzip": true, "zstd": true},
+	"accept-encoding":         {"gzip": true}, // HTTP encoding for connect+proto in browser
+}
 
-func matchHeader(req *connect.Request[pbsubstreamsrpc.Request], expected map[string]bool) bool {
-	for k, v := range req.Header() {
-		if compressionHeader[strings.ToLower(k)] {
+func matchHeader(header http.Header) bool {
+	for k, v := range header {
+		if validEncodings, ok := compressionHeader[strings.ToLower(k)]; ok {
 			for _, vv := range v {
 				for _, vvv := range strings.Split(vv, ",") {
-					if expected[strings.TrimSpace(strings.ToLower(vvv))] {
+					if validEncodings[strings.TrimSpace(strings.ToLower(vvv))] {
 						return true
 					}
 				}

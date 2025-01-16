@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * Fix a thread leak in cursor resolution resulting in a bad value for active_connections metric
 * Fix detection of accepted gzip compression when multiple values are sent in the `Grpc-Accept-Encoding` header (ex: Python library)
+* Properly accept and compress responses with `gzip` for browser HTTP clients using ConnectWeb with `Accept-Encoding` header
 * Allow setting subscription channel max capacity via `SOURCE_CHAN_SIZE` env var (default: 100)
 
 ### Client-side

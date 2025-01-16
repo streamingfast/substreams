@@ -24,10 +24,10 @@ You can easily run a Substreams package by inputting the `.spkg` file in the CLI
 
 ```bash
 substreams gui \
- https://spkg.io/streamingfast/erc20-balance-changes-v1.1.0.spkg \
+ erc20-balance-changes@latest \
  map_balance_changes \
  -e mainnet.eth.streamingfast.io:443 \
- --start-block 1397553
+ --start-block 1397553 \
 ```
 
 ### Creating a Package

@@ -26,10 +26,6 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-var status = prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "substreams_healthcheck_status", Help: "Either 1 for successful subtreams request, or 0 for failure"}, []string{"endpoint"})
-var requestDurationMs = prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "substreams_healthcheck_duration_ms", Help: "Request full processing time in millisecond"}, []string{"endpoint"})
-var blockAgeMs = prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "substreams_healthcheck_block_age_ms", Help: "Age of returned block"}, []string{"endpoint"})
-
 var lastStatus = map[string]bool{}
 var lock = &sync.Mutex{}
 
@@ -40,6 +36,8 @@ var prometheusCmd = &cobra.Command{
 		Run substreams client periodically on a single block, exporting the values in prometheus format.
 	    The manifest can be a local file or a URL to an spkg.
         You can specify a start-block on some endpoints by appending '@<block_height>' to the endpoint URL.
+        You can specify additional prometheus labels as query parameters, e.g. 'my.domain:443?namespace=eth-mainnet'.
+        Specify both togethers like this: 'my.domain:443@-10?namespace=eth-mainnet&region=us-east'.
 	`),
 	RunE:         runPrometheus,
 	Args:         cobra.ExactArgs(3),
@@ -58,6 +56,88 @@ func init() {
 	prometheusCmd.Flags().Duration("timeout", time.Second*10, "endpoints will be considered 'failing' if they don't complete in that duration")
 
 	Cmd.AddCommand(prometheusCmd)
+}
+
+var status *prometheus.GaugeVec
+var requestDurationMs *prometheus.GaugeVec
+var blockAgeMs *prometheus.GaugeVec
+var endpointMap = make(map[string]endpointSpecs)
+
+type endpointSpecs struct {
+	url        string
+	startBlock *int
+	labels     prometheus.Labels
+}
+
+func extractStartblock(in string) (prefix string, startBlock *int, err error) {
+	parts := strings.SplitN(in, "@", 2)
+	switch len(parts) {
+	case 1:
+		return in, nil, nil
+	case 2:
+		prefix = parts[0]
+		var start int
+
+		start, err = strconv.Atoi(parts[1])
+		if err != nil {
+			return "", nil, err
+		}
+		startBlock = &start
+		return
+	}
+	return "", nil, fmt.Errorf("invalid endpoint part: %q", in)
+}
+
+func extractParams(in string) (params map[string]string, err error) {
+	if in == "" {
+		return nil, nil
+	}
+
+	params = make(map[string]string)
+	for _, part := range strings.Split(in, "&") {
+		parts := strings.SplitN(part, "=", 2)
+		switch len(parts) {
+		case 0:
+			return nil, fmt.Errorf("invalid param format: %q", part)
+		case 1:
+			params[parts[0]] = ""
+		case 2:
+			params[parts[0]] = parts[1]
+		}
+	}
+	return params, nil
+}
+
+func parseEndpoint(in string) (endpoint string, startBlock *int, params map[string]string, err error) {
+	parts := strings.SplitN(in, "?", 2)
+
+	switch len(parts) {
+	case 1:
+		endpoint, startBlock, err = extractStartblock(parts[0])
+		if err != nil {
+			return
+		}
+		return
+	case 2:
+		endpoint = parts[0]
+		paramsString := parts[1]
+
+		if strings.Contains(endpoint, "@") {
+			endpoint, startBlock, err = extractStartblock(endpoint)
+			if err != nil {
+				return
+			}
+		} else if strings.Contains(paramsString, "@") {
+			paramsString, startBlock, err = extractStartblock(paramsString)
+			if err != nil {
+				return
+			}
+		}
+		params, err = extractParams(paramsString)
+		return
+	}
+
+	return "", nil, nil, fmt.Errorf("invalid endpoint format: %q", in)
 }
 
 func runPrometheus(cmd *cobra.Command, args []string) error {
@@ -91,15 +171,36 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 	interval := sflags.MustGetDuration(cmd, "interval")
 	timeout := sflags.MustGetDuration(cmd, "timeout")
 	maxFreshness := sflags.MustGetDuration(cmd, "max-freshness")
+
+	allLabels := map[string]bool{"endpoint": true}
+
 	for _, endpoint := range endpoints {
+		url, startBlock, params, err := parseEndpoint(endpoint)
+		if err != nil {
+			return fmt.Errorf("invalid endpoint %q: %w", endpoint, err)
+		}
+
+		labels := prometheus.Labels{"endpoint": url}
+		for k, v := range params {
+			labels[k] = v
+			allLabels[k] = true
+		}
+		endpointMap[url] = endpointSpecs{url: url, startBlock: startBlock, labels: labels}
+	}
+
+	allLabelsSlice := make([]string, 0, len(allLabels))
+	for k := range allLabels {
+		allLabelsSlice = append(allLabelsSlice, k)
+	}
+
+	status = prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "substreams_healthcheck_status", Help: "Either 1 for successful subtreams request, or 0 for failure"}, allLabelsSlice)
+	requestDurationMs = prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "substreams_healthcheck_duration_ms", Help: "Request full processing time in millisecond"}, allLabelsSlice)
+	blockAgeMs = prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "substreams_healthcheck_block_age_ms", Help: "Age of returned block"}, allLabelsSlice)
+
+	for endpoint := range endpointMap {
 		startBlock := blockNum
-		if parts := strings.Split(endpoint, "@"); len(parts) == 2 {
-			start, err := strconv.ParseInt(parts[1], 10, 64)
-			if err != nil {
-				return fmt.Errorf("invalid endpoint @startBlock format for %q: %w", endpoint, err)
-			}
-			endpoint = parts[0]
-			startBlock = start
+		if endpointMap[endpoint].startBlock != nil {
+			startBlock = int64(*endpointMap[endpoint].startBlock)
 		}
 
 		substreamsClientConfig := client.NewSubstreamsClientConfig(
@@ -144,8 +245,8 @@ func markSuccess(endpoint string, begin time.Time) {
 		zlog.Info("endpoint now marked as available", zap.String("endpoint", endpoint))
 	}
 	lastStatus[endpoint] = true
-	status.With(prometheus.Labels{"endpoint": endpoint}).Set(1)
-	requestDurationMs.With(prometheus.Labels{"endpoint": endpoint}).Set(float64(time.Since(begin).Milliseconds()))
+	status.With(endpointMap[endpoint].labels).Set(1)
+	requestDurationMs.With(endpointMap[endpoint].labels).Set(float64(time.Since(begin).Milliseconds()))
 }
 
 func markFailure(endpoint string, begin time.Time, err error) {
@@ -155,8 +256,8 @@ func markFailure(endpoint string, begin time.Time, err error) {
 		zlog.Info("endpoint now marked as unavailable", zap.String("endpoint", endpoint), zap.Error(err))
 		lastStatus[endpoint] = false
 	}
-	status.With(prometheus.Labels{"endpoint": endpoint}).Set(0)
-	requestDurationMs.With(prometheus.Labels{"endpoint": endpoint}).Set(float64(time.Since(begin).Milliseconds()))
+	status.With(endpointMap[endpoint].labels).Set(0)
+	requestDurationMs.With(endpointMap[endpoint].labels).Set(float64(time.Since(begin).Milliseconds()))
 }
 
 func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.SubstreamsClientConfig, modules *pbsubstreams.Modules, outputStreamName string, blockNum int64, pollingInterval, pollingTimeout time.Duration, maxFreshness *time.Duration) {
@@ -225,7 +326,7 @@ func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.Subs
 						break forloop
 					}
 					blockTime := resp.Message.(*pbsubstreamsrpc.Response_BlockScopedData).BlockScopedData.Clock.Timestamp.AsTime()
-					blockAgeMs.With(prometheus.Labels{"endpoint": endpoint}).Set(float64(time.Since(blockTime).Milliseconds()))
+					blockAgeMs.With(endpointMap[endpoint].labels).Set(float64(time.Since(blockTime).Milliseconds()))
 					if age := time.Since(blockTime); age > *maxFreshness {
 						markFailure(endpoint, begin, fmt.Errorf("block is too old: %s", age))
 						zlog.Debug("marking endpoint with failure because of freshness", zap.String("endpoint", endpoint), zap.Duration("duration", time.Since(begin)), zap.Duration("block_age", time.Since(blockTime)))

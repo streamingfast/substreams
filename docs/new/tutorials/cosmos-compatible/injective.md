@@ -4,7 +4,7 @@ Tutorial on Injective
 In this guide, you'll learn how to initialize a Injective-based Substreams project within the Dev Container.
 
 {% hint style="info" %} 
- If you prefer to begin locally within your terminal rather than through the Dev Container (VS Code required), refer to the [Substreams CLI installation guide](../references/cli/installing-the-cli.md).
+ If you prefer to begin locally within your terminal rather than through the Dev Container (VS Code required), refer to the [Substreams CLI installation guide](../../references/cli/installing-the-cli.md).
 {% endhint %}
 
 ## Prerequisites

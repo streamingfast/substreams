@@ -5,7 +5,7 @@ title: Getting Started on EVM
 In this guide, you'll learn how to initialize an EVM-based Substreams project within the Dev Container.
 
 {% hint style="info" %} 
- If you prefer to begin locally within your terminal rather than through the Dev Container (VS Code required), refer to the [Substreams CLI installation guide](../references/cli/installing-the-cli.md).
+ If you prefer to begin locally within your terminal rather than through the Dev Container (VS Code required), refer to the [Substreams CLI installation guide](../../references/cli/installing-the-cli.md).
 {% endhint %}
 
 ## Step 1: Initialize Your EVM Substreams Project

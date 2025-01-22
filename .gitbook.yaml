@@ -70,6 +70,6 @@ redirects:
   documentation/intro-getting-started/intro-injective: ./new/tutorials/cosmos-compatible/injective.md
   documentation/intro-getting-started/intro-injective/injective-first-sql: ./new/tutorials/cosmos-compatible/injective.md
   documentation/intro-getting-started/intro-injective/injective-first-sps: ./new/tutorials/cosmos-compatible/injective.md
-  documentation/how-to-guides/intro-your-first-application/solana: ./new/tutorials/solana.md
-  documentation/how-to-guides/intro-your-first-application/evm: ./new/tutorials/evm.md
-  documentation/how-to-guides/intro-your-first-application/injective: ./new/tutorials/cosmos-compatible/injective.md
+  documentation/how-to-guides/solana: ./new/tutorials/solana.md
+  documentation/how-to-guides/evm: ./new/tutorials/evm.md
+  documentation/how-to-guides/injective: ./new/tutorials/cosmos-compatible/injective.md

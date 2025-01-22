@@ -34,7 +34,7 @@ Within the generated directories, modify your Substreams modules to include addi
 
 ## Step 3: Load the Data
 
-To make your Substreams queryable (as opposed to [direct streaming](../how-to-guides/sinks/stream/stream.md)), you can automatically generate a Subgraph (known as a [Substreams-powered subgraph](https://thegraph.com/docs/en/sps/introduction/)) or SQL-DB sink.
+To make your Substreams queryable (as opposed to [direct streaming](../how-to-guides/sinks/stream/stream.md)), you can automatically generate a Subgraph (known as a [Substreams-powered subgraph](../how-to-guides/sinks/subgraph/triggers.md)) or SQL-DB sink.
 
 ### Subgraph
 

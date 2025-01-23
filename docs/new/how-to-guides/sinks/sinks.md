@@ -8,7 +8,7 @@ Once you find a package that fits your needs, you can choose how you want to con
 - [Subgraph](./subgraph/subgraph.md): Configure an API to meet your data needs and host it on The Graph Network.
 - [Direct Streaming](./stream/stream.md): Stream data directly from your application.
 - [PubSub](./pubsub.md): Send data to a PubSub topic.
-- [Community Sinks](./community): Explore quality community maintained sinks.
+- [Community Sinks](https://docs.substreams.dev/how-to-guides/sinks/community-sinks): Explore quality community maintained sinks.
 
 {% hint style="success" %}
 **Deployable Service**: If you’d like your sink (e.g., SQL or PubSub) to be hosted for you, reach out to the StreamingFast team [here](mailto:sales@streamingfast.io). 

@@ -117,9 +117,21 @@ var ChainConfigByID = map[string]*ChainConfig{
 		Network:          "mantra-testnet",
 	},
 	"mantra-mainnet": {
-		DisplayName:      "Mantra Testnet",
+		DisplayName:      "Mantra Mainnet",
 		ExplorerLink:     "",
 		FirehoseEndpoint: "mainnet.mantra.streamingfast.io:443",
 		Network:          "mantra-mainnet",
+	},
+	"stellar-testnet": {
+		DisplayName:      "Stellar Testnet",
+		ExplorerLink:     "",
+		FirehoseEndpoint: "testnet.stellar.streamingfast.io:443",
+		Network:          "stellar-testnet",
+	},
+	"stellar-mainnet": {
+		DisplayName:      "Stellar Mainnet",
+		ExplorerLink:     "",
+		FirehoseEndpoint: "mainnet.stellar.streamingfast.io:443",
+		Network:          "stellar-mainnet",
 	},
 }

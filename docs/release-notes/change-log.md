@@ -9,26 +9,31 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+- Add Stellar Mainnet and Testnet to the HardcodedEndpoints map.
+
 ## v1.12.1
 
-* Fixed `tier2` app not setting itself as ready on startup
+- Fixed `tier2` app not setting itself as ready on startup
 
-* Added extra ad-hoc prometheus labels 'tools prometheus-explorer' as query params to each endpoint.
+- Added extra ad-hoc prometheus labels 'tools prometheus-explorer' as query params to each endpoint.
 
 ## v1.12.0
 
 ### Server-side
 
-* Fix a thread leak in cursor resolution resulting in a bad value for active_connections metric
-* Fix detection of accepted gzip compression when multiple values are sent in the `Grpc-Accept-Encoding` header (ex: Python library)
-* Properly accept and compress responses with `gzip` for browser HTTP clients using ConnectWeb with `Accept-Encoding` header
-* Allow setting subscription channel max capacity via `SOURCE_CHAN_SIZE` env var (default: 100)
-* Added tier1 app configuration option to limit max active requests a single instance can accept before starting to reject them with 'Unavailable' gRPC code.
-* Added tier1 & tier2 app new Prometheus metric `substreams_{tier1,tier2}_rejected_request_counter`, to track rejected request, especially when hard limit is reached.
+- Fix a thread leak in cursor resolution resulting in a bad value for active_connections metric
+- Fix detection of accepted gzip compression when multiple values are sent in the `Grpc-Accept-Encoding` header (ex: Python library)
+- Properly accept and compress responses with `gzip` for browser HTTP clients using ConnectWeb with `Accept-Encoding` header
+- Allow setting subscription channel max capacity via `SOURCE_CHAN_SIZE` env var (default: 100)
+- Added tier1 app configuration option to limit max active requests a single instance can accept before starting to reject them with 'Unavailable' gRPC code.
+- Added tier1 & tier2 app new Prometheus metric `substreams_{tier1,tier2}_rejected_request_counter`, to track rejected request, especially when hard limit is reached.
 
 ### Client-side
 
-* improvements to 'tools prometheus-explorer'
+- improvements to 'tools prometheus-explorer'
+
   - change flags `lookup_interval` and `lookup_timeout` to `--interval` and `--timeout`
   - now support relative block (default is now: -1) and does not use 'final-blocks-only' flag on request
   - add `--max-freshness` flag to check for block age (when using relative block)
@@ -37,31 +42,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - improve logging
   - removed "3 retries" that were built in and causing more confusion
 
-* add User-Agent headers depending on the client command
+- add User-Agent headers depending on the client command
 
 ## v1.11.3
 
 ### Server-side
 
-* Fixed: detection of gzip compression on 'connect' protocol (js/ts clients)
-* Added: tier1.Config `EnforceCompression` to refuse incoming connections that do not support GZIP compression (default: false)
+- Fixed: detection of gzip compression on 'connect' protocol (js/ts clients)
+- Added: tier1.Config `EnforceCompression` to refuse incoming connections that do not support GZIP compression (default: false)
 
 ## v1.11.2
 
 ### Server-side
 
-* Fix too many memory allocations impacting performance when stores are used
+- Fix too many memory allocations impacting performance when stores are used
 
 ### CLI
 
-* Force topological ordering of protobuf descriptors when 'packing' an spkg (affecting current substreams-js clients)
-* Allow `substreams pack` to be able to do a "re-packing" of an existing spkg file. Useful to apply the protobuf descriptor ordering fix.
+- Force topological ordering of protobuf descriptors when 'packing' an spkg (affecting current substreams-js clients)
+- Allow `substreams pack` to be able to do a "re-packing" of an existing spkg file. Useful to apply the protobuf descriptor ordering fix.
 
 ### Docker image
 
-* Rebuilt of v1.11.1 to generate Docker `latest` tag with revamp Docker image building.
-* Substreams CLI is now built with using Ubuntu 22, previous releases were built using Ubuntu 20.
-* Substreams Docker image is now using `ubuntu:22` as its base, previous releases were built using `ubuntu:20.04`.
+- Rebuilt of v1.11.1 to generate Docker `latest` tag with revamp Docker image building.
+- Substreams CLI is now built with using Ubuntu 22, previous releases were built using Ubuntu 20.
+- Substreams Docker image is now using `ubuntu:22` as its base, previous releases were built using `ubuntu:20.04`.
 
 ## v1.11.1
 

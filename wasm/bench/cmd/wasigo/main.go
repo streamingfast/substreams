@@ -47,7 +47,7 @@ func main() {
 			wasm.NewStoreWriterOutput("out", createStore(ctx, "out"), 1, "string"),
 		)
 
-		call := wasm.NewCall(nil, "mapBlock", "mapBlock", nil, args)
+		call := wasm.NewCall(nil, "mapBlock", "mapBlock", nil, args, false)
 		_, err = module.ExecuteNewCall(ctx, call, instance, args, map[string][]byte{argsVals.arg.Name(): argsVals.val})
 		if err != nil {
 			panic(fmt.Errorf("executing call: %w", err))

@@ -100,7 +100,7 @@ func canSkipExecution(wasmArgumentValues map[string][]byte, hasSingleParams bool
 	return true
 }
 
-func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (call *wasm.Call, err error) {
+func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canSkipEmptyOutput bool) (call *wasm.Call, err error) {
 	e.logs = nil
 	e.logsTruncated = false
 
@@ -118,7 +118,7 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter) (cal
 
 	stats := reqctx.ReqStats(e.ctx)
 	//t0 := time.Now()
-	call = wasm.NewCall(clock, e.moduleName, e.entrypoint, stats, e.wasmArguments)
+	call = wasm.NewCall(clock, e.moduleName, e.entrypoint, stats, e.wasmArguments, canSkipEmptyOutput)
 	inst, err = e.wasmModule.ExecuteNewCall(e.ctx, call, e.cachedInstance, e.wasmArguments, argValues)
 	//Timer += time.Since(t0)
 	if panicErr := call.Err(); panicErr != nil {

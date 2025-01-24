@@ -1,0 +1,26 @@
+{{$engine := . -}}
+[package]
+name = "{{ $engine.ProjectName }}"
+version = "{{ $engine.ProjectVersion }}"
+description = ""
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+ethabi = "17.0"
+hex = "0.4.3"
+hex-literal = "0.3.4"
+prost = "0.10.1"
+
+# Use latest from https://crates.io/crates/substreams
+substreams = "{{ $engine.SubstreamsVersion }}"
+
+# Use latest from https://crates.io/crates/substreams-ethereum
+#substreams-ethereum = "0.1.2"
+
+[build-dependencies]
+anyhow = "1"
+prost-build = "0.10.4"
+substreams-ethereum = "0.1.0"

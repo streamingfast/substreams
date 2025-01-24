@@ -1,0 +1,17 @@
+syntax = "proto3";
+import "my/v1/substreams-options.proto";
+package my.types.v1;
+
+option (rust_module) = "my_types_v1";
+
+message Tests {
+  repeated Test tests = 1;
+}
+
+message Test {
+  string field1 = 1;
+}
+
+message Number {
+  int64 field1 = 1;
+}

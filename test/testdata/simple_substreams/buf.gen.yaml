@@ -1,0 +1,7 @@
+
+version: v1
+plugins:
+- plugin: buf.build/community/neoeinstein-prost:v0.2.2
+  out: /Users/eduardvoiculescu/git/streamingFast/substreams/test/testdata/simple_substreams/src/pb
+  opt:
+    - file_descriptor_set=false

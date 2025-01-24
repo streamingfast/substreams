@@ -17,6 +17,7 @@ binaries:
       sf.ethereum.type.v2: "substreams_ethereum::pb::eth::v2"
       sf.substreams.v1: "substreams::pb::substreams"
       sf.substreams.v1.test: "pb::test"
+      sf.substreams.index.v1: "Keys"
       my.types.v1: "pb::my_types_v1"
 
 modules:
@@ -843,7 +844,7 @@ modules:
     inputs:
       - map: assert_test_store_delete_prefix
 
-  - name : assert_all_test_index 
+  - name: assert_all_test_index
     kind: store
     initialBlock: 10
     updatePolicy: set

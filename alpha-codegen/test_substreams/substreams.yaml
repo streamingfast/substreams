@@ -1,0 +1,83 @@
+specVersion: v0.1.0
+package:
+  name: uniswap_v3
+  version: v0.1.0
+  url: https://github.com/streamingfast/substreams
+  doc: some doc
+### section added to have the manifest validation work, don't need to build anything
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: ./bla/bla
+    protoPackageMapping:
+      sf.ethereum.type.v2: "substreams_ethereum::pb::eth::v2"
+      sf.substreams.v1: "substreams::pb::substreams"
+      my.types.v1: "pb::my_types_v1"
+
+protobuf:
+  files:
+    - my/v1/my.proto
+  importPaths:
+    - ./proto
+
+modules:
+  - name: map_block
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+    output:
+      type: proto:my.types.v1.Tests
+
+  - name: map_block_i64
+    kind: map
+    initialBlock: 1
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+    output:
+      type: proto:my.types.v1.Number
+
+  - name: store_test
+    kind: store
+    initialBlock: 1
+    updatePolicy: set
+    valueType: proto:my.types.v1.Test
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+      - map: map_block
+
+  - name: store_append_string
+    kind: store
+    initialBlock: 1
+    updatePolicy: append
+    valueType: string
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+
+  - name: store_bigint
+    kind: store
+    initialBlock: 1
+    updatePolicy: set
+    valueType: bigint
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+
+  - name: store_test2
+    kind: store
+    initialBlock: 1
+    updatePolicy: set
+    valueType: proto:my.types.v1.Test
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+      - map: map_block
+      - store: store_test
+      - store: store_test
+        mode: deltas
+      - map: map_block_i64
+      - store: store_bigint
+      - store: store_bigint
+        mode: deltas
+      - store: store_append_string
+      - store: store_append_string
+        mode: deltas

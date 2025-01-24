@@ -1,0 +1,32 @@
+[package]
+name = "test_substreams"
+version = "0.0.1"
+description = "Code generation Test Substreams"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+ethabi = "17.0"
+wasm-bindgen = "0.2.79"
+prost = "0.11.0"
+prost-types = "0.11.0"
+hex = "0.4.3"
+#substreams = "^0.3.0"
+substreams = { path = "../../../substreams-rs/substreams" }
+substreams-ethereum = "0.6.2"
+num-bigint = "0.4"
+bigdecimal = "0.3"
+pad = "0.1"
+base64 = "0.13.0"
+stable-hash_legacy = { version = "0.3.3", package = "stable-hash" }
+stable-hash = { version = "0.4.2"}
+thiserror = "1.0.25"
+num-traits = "0.2.15"
+substreams-entity-change = "0.1.0"
+
+[build-dependencies]
+prost-build = "0.11.0"
+anyhow = "1"
+substreams-ethereum = "0.6.2"

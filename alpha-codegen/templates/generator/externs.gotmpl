@@ -1,0 +1,74 @@
+{{$engine := . -}}
+use substreams::prelude::*;
+use substreams::errors::Error;
+use crate::pb;
+use crate::generated::substreams::{Substreams, SubstreamsTrait};
+
+{{range $engine.Manifest.Modules -}}
+{{$module := . -}}
+{{$functionSignature := $engine.FunctionSignature $module}}
+#[no_mangle]
+pub extern "C" fn {{$functionSignature.Name}}(
+{{- range $i, $value := $functionSignature.Arguments}}
+    {{- if  $value.ModuleInput.IsStore }}
+        {{- if eq $value.ModuleInput.Mode "deltas"}}
+    {{$value.Name}}_deltas_ptr: *mut u8,
+    {{$value.Name}}_deltas_len: usize,
+        {{- else}}
+    {{$value.Name}}_ptr: u32,
+        {{- end}}
+    {{- else}}
+    {{$value.Name}}_ptr: *mut u8,
+    {{$value.Name}}_len: usize,
+    {{- end -}}
+    {{- end }}
+) {
+    substreams::register_panic_hook();
+    let func = || {{- if eq $module.Kind "map"}}-> Result<{{$functionSignature.OutputType}}, Error>{{end -}} {
+        {{if eq $module.Kind "store" -}}{{/* This is the store for a store module*/}}
+        {{$engine.WritableStoreDeclaration $module }}
+        {{ end -}}
+
+        {{ range $id, $argument := $functionSignature.Arguments -}}
+            {{- if $argument.ModuleInput.IsStore -}}
+        {{- $m := $engine.MustModule $argument.Name }}
+        {{ $engine.ReadableStoreDeclaration $argument.Name $m $argument.ModuleInput }}
+            {{- end -}}
+            {{- if $argument.ModuleInput.IsMap }}
+        let {{$argument.Name}}: {{$argument.Type}} = substreams::proto::decode_ptr({{$argument.Name}}_ptr, {{$argument.Name}}_len).unwrap();
+            {{- end -}}
+
+            {{- if $argument.ModuleInput.IsSource }}
+        let {{$argument.Name}}: {{$argument.Type}} = substreams::proto::decode_ptr({{$argument.Name}}_ptr, {{$argument.Name}}_len).unwrap();
+            {{- end -}}
+
+            {{- if $argument.ModuleInput.IsParams }}
+        let {{$argument.Name}}: {{$argument.Type}} = std::mem::ManuallyDrop::new(unsafe { String::from_raw_parts({{$argument.Name}}_ptr, {{$argument.Name}}_len, {{$argument.Name}}_len) }).to_string();
+            {{- end -}}
+        {{ end }}
+
+        Substreams::{{.Name}}(
+        {{- range $id, $argument := $functionSignature.Arguments -}}
+            {{- if eq $argument.ModuleInput.Mode "deltas" -}}
+            {{$argument.Name}}_deltas,
+            {{ else -}}
+            {{$argument.Name}},
+            {{ end -}}
+        {{end}}
+        {{- if eq $module.Kind "store" -}}
+            store,
+        {{- end }}
+        )
+    };
+
+    {{- if eq $module.Kind "store"}}
+    func()
+    {{- else}}
+    let result = func();
+    if result.is_err() {
+        panic!("{:?}", &result.err().unwrap());
+    }
+    substreams::output(result.unwrap());
+    {{- end}}
+}
+{{end -}}

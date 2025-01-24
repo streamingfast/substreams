@@ -9,7 +9,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v1.12.2
 
 - Add Stellar Mainnet and Testnet to the HardcodedEndpoints map.
 - Fix a panic when a substreams was using an index as an input which contained empty output

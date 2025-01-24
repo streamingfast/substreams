@@ -52,7 +52,7 @@ message Request {
 
   // Available only in developer mode
   repeated string debug_initial_store_snapshot_for_modules = 10;
-  
+
   bool noop_mode = 11;
 }
 
@@ -91,6 +91,9 @@ message BlockScopedData {
 
   repeated MapModuleOutput debug_map_outputs = 10;
   repeated StoreModuleOutput debug_store_outputs = 11;
+
+  // Signed attestation, enabling economic security as per GIP-0082. Signatures are done using the key specified by SessionInit::attestation_public_key
+  string attestation = 12;
 }
 
 message SessionInit  {
@@ -98,6 +101,9 @@ message SessionInit  {
   uint64 resolved_start_block = 2;
   uint64 linear_handoff_block = 3;
   uint64 max_parallel_workers = 4;
+
+  // Operator's attestation public_key or address, enabling economic security as per GIP-0082.
+  string attestation_public_key = 5;
 }
 
 message InitialSnapshotComplete {

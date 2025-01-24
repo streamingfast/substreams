@@ -24,9 +24,10 @@ type Call struct {
 
 	valueType string
 
-	returnValue     []byte
-	skipEmptyOutput bool
-	panicError      *PanicError
+	returnValue        []byte
+	skipEmptyOutput    bool
+	canSkipEmptyOutput bool // if false, takes precedence over skipEmptyOutput and disables that feature
+	panicError         *PanicError
 
 	Logs           []string
 	LogsByteCount  uint64
@@ -34,7 +35,7 @@ type Call struct {
 	stats          *metrics.Stats
 }
 
-func NewCall(clock *pbsubstreams.Clock, moduleName string, entrypoint string, stats *metrics.Stats, arguments []Argument) *Call {
+func NewCall(clock *pbsubstreams.Clock, moduleName string, entrypoint string, stats *metrics.Stats, arguments []Argument, canSkipEmptyOutput bool) *Call {
 	call := &Call{
 		Clock:      clock,
 		ModuleName: moduleName,
@@ -81,7 +82,7 @@ func (c *Call) SkipEmptyOutput() {
 }
 
 func (c *Call) CanSkipOutput() bool {
-	return c.skipEmptyOutput && len(c.returnValue) == 0
+	return c.canSkipEmptyOutput && c.skipEmptyOutput && len(c.returnValue) == 0
 }
 
 func (c *Call) SetPanicError(message string, filename string, lineNo int, colNo int) {

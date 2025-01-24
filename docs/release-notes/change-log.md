@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## Unreleased
 
 - Add Stellar Mainnet and Testnet to the HardcodedEndpoints map.
+- Fix a panic when a substreams was using an index as an input which contained empty output
 
 ## v1.12.1
 

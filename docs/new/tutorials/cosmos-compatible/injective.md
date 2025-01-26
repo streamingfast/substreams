@@ -42,7 +42,7 @@ To make your Substreams queryable (as opposed to [direct streaming](../how-to-gu
 
 1. Run `substreams codegen subgraph` to initialize the sink, producing the necessary files and function definitions. 
 2. Create your [subgraph mappings](../../how-to-guides/sinks/subgraph/triggers.md) within the `mappings.ts` and associated entities within the `schema.graphql`.
-3.  Deploy
+3. Build and deploy locally or to [Subgraph Studio](https://thegraph.com/studio-pricing/) by running `deploy-studio`.
 
 ### SQL
 

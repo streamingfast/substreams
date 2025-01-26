@@ -13,7 +13,7 @@ The Substreams Dev Container is a tool to help you build your first project. You
 Upon entering the Dev Container, you can either build or import your own `substreams.yaml` and associate modules within the minimal path, or opt for the automatically generated Substreams paths. Then running `Substreams Build` generates the Protobuf files.
 
 - **Minimal**: Starts you with the raw block `.proto` and requires development. This path is intended for experienced users.
-- **Non-Minimal**: Extracts filtered data using network-specific cache and Protobufs from the corresponding Foundational Modules that is built and maintained by the StreamingFast team.
+- **Non-Minimal**: Extracts filtered data using network-specific caches and Protobufs taken from corresponding foundational modules. This path generates a working Substreams out of the box.
 
 To publish your work with the broader community, publish your `.spkg` to [Substreams registry](https://substreams.dev/) using:  
 

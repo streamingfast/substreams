@@ -54,7 +54,7 @@ func ListenTier1(
 
 		options = append(options, dgrpcserver.WithConnectInterceptor(dauthconnect.NewAuthInterceptor(auth, logger)))
 		options = append(options, dgrpcserver.WithConnectStrictContentType(false))
-		options = append(options, dgrpcserver.WithReflection(ssconnect.StreamName))
+		options = append(options, dgrpcserver.WithConnectReflection(ssconnect.StreamName))
 
 		streamHandlerGetter := func(opts ...connect_go.HandlerOption) (string, http.Handler) {
 			return ssconnect.NewStreamHandler(svc, opts...)
@@ -69,7 +69,7 @@ func ListenTier1(
 			handlerGetters = append(handlerGetters, infoHandlerGetter)
 		}
 
-		options = append(options, dgrpcserver.WithPermissiveCORS())
+		options = append(options, dgrpcserver.WithConnectPermissiveCORS())
 		srv := connectweb.New(handlerGetters, options...)
 		servers = append(servers, srv)
 		cleanAddr := strings.ReplaceAll(addr, "*", "")

@@ -92,7 +92,8 @@ message BlockScopedData {
   repeated MapModuleOutput debug_map_outputs = 10;
   repeated StoreModuleOutput debug_store_outputs = 11;
 
-  // Signed attestation, enabling economic security as per GIP-0082. Signatures are done using the key specified by SessionInit::attestation_public_key
+  // Signed attestation, enabling economic security as per GIP-0083. Signatures are 
+  // done using the key specified by SessionInit::attestation_public_key.
   string attestation = 12;
 }
 
@@ -102,7 +103,7 @@ message SessionInit  {
   uint64 linear_handoff_block = 3;
   uint64 max_parallel_workers = 4;
 
-  // Operator's attestation public_key or address, enabling economic security as per GIP-0082.
+  // Operator's attestation public_key or address, enabling economic security as per GIP-0083.
   string attestation_public_key = 5;
 }
 

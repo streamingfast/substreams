@@ -373,7 +373,7 @@ func (s *Tier1Service) Blocks(
 		return connectError
 	}
 
-	logger.Debug("Blocks request completed witout error")
+	logger.Debug("Blocks request completed without error")
 	return nil
 }
 

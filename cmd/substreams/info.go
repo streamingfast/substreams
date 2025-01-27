@@ -19,6 +19,7 @@ func init() {
 	infoCmd.Flags().String("output-sinkconfig-files-path", "", "if non-empty, any sinkconfig field of type 'bytes' that was packed from a file will be written to that path")
 	infoCmd.Flags().Bool("skip-package-validation", false, "Do not perform any validation when reading substreams package")
 	infoCmd.Flags().Bool("used-modules-only", false, "When set, only modules that are used by the output module will be displayed (requires the output_module arg to be set)")
+	infoCmd.Flags().Bool("summarize-hash-types", false, "When set, will also print the hash of the modules, grouped by type and their dependencies on stores")
 }
 
 var infoCmd = &cobra.Command{
@@ -54,6 +55,7 @@ func runInfo(cmd *cobra.Command, args []string) error {
 	outputSinkconfigFilesPath := sflags.MustGetString(cmd, "output-sinkconfig-files-path")
 	skipPackageValidation := sflags.MustGetBool(cmd, "skip-package-validation")
 	onlyShowUsedModules := sflags.MustGetBool(cmd, "used-modules-only")
+	summarizeHashTypes := sflags.MustGetBool(cmd, "summarize-hash-types")
 
 	if onlyShowUsedModules && outputModule == "" {
 		return fmt.Errorf("used-modules-only flag requires the output_module arg to be set")
@@ -108,6 +110,7 @@ func runInfo(cmd *cobra.Command, args []string) error {
 		fmt.Printf("Image: [embedded image: %d bytes]\n", len(pkgInfo.Image))
 	}
 
+	modMap := make(map[string]info.ModulesInfo)
 	fmt.Println("Modules:")
 	fmt.Println("----")
 	for _, mod := range pkgInfo.Modules {
@@ -134,6 +137,7 @@ func runInfo(cmd *cobra.Command, args []string) error {
 		}
 
 		fmt.Println("Hash:", mod.Hash)
+		modMap[mod.Name] = mod
 		if doc := mod.Documentation; doc != nil && *doc != "" {
 			fmt.Println("Doc: ", *doc)
 		}
@@ -165,16 +169,59 @@ func runInfo(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	var mappersDependingOnStores []string
+	var mappersNotDependingOnStores []string
+	var indexesDependingOnStores []string
+	var indexesNotDependingOnStores []string
+	var stores []string
+
 	if outputModule != "" {
 		stages := pkgInfo.ExecutionStages
 		for i, layers := range stages {
 			var layerDefs []string
 			for _, l := range layers {
+				for _, mod := range l {
+					switch modMap[mod].Kind {
+					case "index":
+						if i == 0 {
+							indexesNotDependingOnStores = append(indexesNotDependingOnStores, modMap[mod].Hash)
+						} else {
+							indexesDependingOnStores = append(indexesDependingOnStores, modMap[mod].Hash)
+						}
+					case "map":
+						if i == 0 {
+							mappersNotDependingOnStores = append(mappersNotDependingOnStores, modMap[mod].Hash)
+						} else {
+							mappersDependingOnStores = append(mappersDependingOnStores, modMap[mod].Hash)
+						}
+					case "store":
+						stores = append(stores, modMap[mod].Hash)
+					}
+				}
 				var mods []string
 				mods = append(mods, l...)
 				layerDefs = append(layerDefs, fmt.Sprintf(`["%s"]`, strings.Join(mods, `","`)))
 			}
 			fmt.Printf("Stage %d: [%s]\n", i, strings.Join(layerDefs, `,`))
+		}
+
+		if summarizeHashTypes {
+			fmt.Println("")
+			if mappersDependingOnStores != nil {
+				fmt.Println("Mappers depending on stores:", strings.Join(mappersDependingOnStores, " "))
+			}
+			if mappersNotDependingOnStores != nil {
+				fmt.Println("Mappers NOT depending on stores:", strings.Join(mappersNotDependingOnStores, " "))
+			}
+			if indexesDependingOnStores != nil {
+				fmt.Println("Indexes depending on stores:", strings.Join(indexesDependingOnStores, " "))
+			}
+			if indexesNotDependingOnStores != nil {
+				fmt.Println("Indexes NOT depending on stores:", strings.Join(indexesNotDependingOnStores, " "))
+			}
+			if stores != nil {
+				fmt.Println("Stores:", strings.Join(stores, " "))
+			}
 		}
 	}
 

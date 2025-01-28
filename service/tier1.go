@@ -470,18 +470,19 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	cacheTag := s.runtimeConfig.DefaultCacheTag
 	if auth := dauth.FromContext(ctx); auth != nil {
 		if parallelJobs := auth.Get("X-Sf-Substreams-Parallel-Jobs"); parallelJobs != "" {
-			if ll, err := strconv.ParseUint(parallelJobs, 10, 64); err == nil {
-				requestDetails.MaxParallelJobs = ll
+			if count, err := strconv.ParseUint(parallelJobs, 10, 64); err == nil {
+				requestDetails.MaxParallelJobs = count
 			}
 		}
-		if ct := auth.Get("X-Sf-Substreams-Cache-Tag"); ct != "" {
-			if IsValidCacheTag(ct) {
-				cacheTag = ct
+		if tag := auth.Get("X-Sf-Substreams-Cache-Tag"); tag != "" {
+			if IsValidCacheTag(tag) {
+				cacheTag = tag
 			} else {
-				return fmt.Errorf("invalid value for X-Sf-Substreams-Cache-Tag %s, should only contain letters, numbers, hyphens and undescores", ct)
+				return fmt.Errorf("invalid value for X-Sf-Substreams-Cache-Tag %s, should only contain letters, numbers, hyphens and underscores", tag)
 			}
 		}
 
+		requestDetails.SetStageLayerParallelExecutorCountFromContext(ctx)
 	}
 
 	traceId := tracing.GetTraceID(ctx).String()

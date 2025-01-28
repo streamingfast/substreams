@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"io"
 	"runtime/debug"
-	"sync"
 
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dmetering"
+	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/metrics"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
@@ -20,6 +20,7 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -307,11 +308,13 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 	// the ctx is cached in the built moduleExecutors so we only activate timeout here
 	ctx, cancel := context.WithTimeout(ctx, p.executionTimeout)
 	defer cancel()
-	for _, stage := range p.ModuleExecutors {
-		//t0 := time.Now()
-		if len(stage) < 2 {
-			//fmt.Println("Linear stage", len(stage))
-			for _, executor := range stage {
+
+	maxParallelExecutor := reqctx.MaxStageLayerParallelExecutor(ctx)
+	logging.Logger(ctx, p.stores.logger).Debug("executing stage's layers", zap.Int("layer_count", len(p.StagedModuleExecutors)), zap.Uint64("max_parallel_executor", maxParallelExecutor))
+
+	for _, layer := range p.StagedModuleExecutors {
+		if maxParallelExecutor <= 1 || len(layer) <= 1 {
+			for _, executor := range layer {
 				if !executor.RunsOnBlock(blockNum) {
 					continue
 				}
@@ -321,40 +324,42 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 				}
 			}
 		} else {
-			results := make([]resultObj, len(stage))
-			wg := sync.WaitGroup{}
-			//fmt.Println("Parallelized in stage", stageIdx, len(stage))
-			for i, executor := range stage {
+			results := make([]resultObj, len(layer))
+			wg := errgroup.Group{}
+			wg.SetLimit(int(maxParallelExecutor))
+
+			for i, executor := range layer {
 				if !executor.RunsOnBlock(execOutput.Clock().Number) {
 					results[i] = resultObj{not_runnable: true}
 					continue
 				}
-				wg.Add(1)
-				i := i
-				executor := executor
-				go func() {
-					defer wg.Done()
+
+				wg.Go(func() error {
 					res := p.execute(ctx, executor, execOutput)
 					results[i] = res
-				}()
+
+					return nil
+				})
 			}
-			wg.Wait()
+
+			if err := wg.Wait(); err != nil {
+				return fmt.Errorf("running executors: %w", err)
+			}
 
 			for i, result := range results {
 				if result.not_runnable {
 					continue
 				}
-				executor := stage[i]
+				executor := layer[i]
 				if result.err != nil {
-					//p.returnFailureProgress(ctx, err, executor)
 					return fmt.Errorf("running executor %q: %w", executor.Name(), result.err)
 				}
+
 				if err := p.applyExecutionResult(ctx, executor, result, execOutput); err != nil {
 					return fmt.Errorf("applying executor results %q on block %d (%s): %w", executor.Name(), blockNum, execOutput.Clock(), result.err)
 				}
 			}
 		}
-		//blockDuration += time.Since(t0)
 	}
 
 	return nil

@@ -33,6 +33,7 @@ func BuildParallelProcessor(
 	execoutStorage *execout.Configs,
 	respFunc func(resp substreams.ResponseFromAnyTier) error,
 	storeConfigs store.ConfigMap,
+	noopMode bool,
 ) (*ParallelProcessor, error) {
 
 	stream := response.New(respFunc)
@@ -83,6 +84,7 @@ func BuildParallelProcessor(
 				walker,
 				reqPlan.ReadExecOut,
 				stream,
+				noopMode,
 			)
 		}
 	}

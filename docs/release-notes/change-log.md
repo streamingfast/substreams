@@ -9,6 +9,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Server
+
+* Improve noop-mode: will now only send one signal per bundle, without any data
+
+### Client
+
+* Add `--noop-mode` flag to `substreams run` as a simple way to force the server to generate caches in production-mode.
+
 ## v1.12.2
 
 - Add Stellar Mainnet and Testnet to the HardcodedEndpoints map.

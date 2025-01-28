@@ -38,6 +38,7 @@ type Walker struct {
 	module     *pbsubstreams.Module
 	logger     *zap.Logger
 	working    bool
+	noopMode   bool
 }
 
 func NewWalker(
@@ -46,6 +47,7 @@ func NewWalker(
 	fileWalker *execout.FileWalker,
 	walkRange *block.Range,
 	stream *response.Stream,
+	noopMode bool,
 ) *Walker {
 	logger := reqctx.Logger(ctx)
 	return &Walker{
@@ -54,6 +56,7 @@ func NewWalker(
 		fileWalker: fileWalker,
 		Range:      walkRange,
 		streamOut:  stream,
+		noopMode:   noopMode,
 		logger:     logger,
 	}
 }
@@ -127,6 +130,10 @@ func (r *Walker) sendItems(sortedItems []*pboutput.Item) error {
 
 		if err = r.streamOut.BlockScopedData(blockScopedData); err != nil {
 			return fmt.Errorf("calling response func: %w", err)
+		}
+		if r.noopMode {
+			// only a single message per bundle is sent in noop mode. The sender function will take care of removing the content
+			return nil
 		}
 
 		if blockScopedData.Clock.Number >= r.ExclusiveEndBlock {

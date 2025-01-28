@@ -160,9 +160,9 @@ func (p *Pipeline) InitTier2Stores(ctx context.Context) (err error) {
 	return nil
 }
 
-func (p *Pipeline) InitTier1StoresAndBackprocess(ctx context.Context, reqPlan *plan.RequestPlan) (err error) {
+func (p *Pipeline) InitTier1StoresAndBackprocess(ctx context.Context, reqPlan *plan.RequestPlan, noopMode bool) (err error) {
 	if reqPlan.RequiresParallelProcessing() {
-		storeMap, err := p.runParallelProcess(ctx, reqPlan)
+		storeMap, err := p.runParallelProcess(ctx, reqPlan, noopMode)
 		if err != nil {
 			return fmt.Errorf("run_parallel_process failed: %w", err)
 		}
@@ -252,7 +252,7 @@ func (p *Pipeline) setupEmptyStores(ctx context.Context) store.Map {
 }
 
 // runParallelProcess
-func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.RequestPlan) (storeMap store.Map, err error) {
+func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.RequestPlan, noopMode bool) (storeMap store.Map, err error) {
 	ctx, span := reqctx.WithSpan(ctx, "substreams/pipeline/tier1/parallel_process")
 	defer span.EndWithErr(&err)
 
@@ -273,6 +273,7 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 		p.execoutStorage,
 		p.respFunc,
 		p.stores.configs,
+		noopMode,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("building parallel processor: %w", err)

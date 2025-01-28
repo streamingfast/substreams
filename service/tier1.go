@@ -258,7 +258,7 @@ func (s *Tier1Service) Blocks(
 		mut.Unlock()
 	}()
 
-	respFunc := tier1ResponseHandler(respContext, &mut, logger, stream)
+	respFunc := tier1ResponseHandler(respContext, &mut, logger, stream, request.NoopMode)
 
 	span.SetAttributes(attribute.Int64("substreams.tier", 1))
 
@@ -580,7 +580,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	if err := pipe.Init(ctx); err != nil {
 		return fmt.Errorf("error during pipeline init: %w", err)
 	}
-	if err := pipe.InitTier1StoresAndBackprocess(ctx, reqPlan); err != nil {
+	if err := pipe.InitTier1StoresAndBackprocess(ctx, reqPlan, request.NoopMode); err != nil {
 		return fmt.Errorf("error during init_stores_and_backprocess: %w", err)
 	}
 	if reqPlan.LinearPipeline == nil {
@@ -642,7 +642,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	return pipe.OnStreamTerminated(ctx, streamErr)
 }
 
-func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logger, streamSrv *connect.ServerStream[pbsubstreamsrpc.Response]) substreams.ResponseFunc {
+func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logger, streamSrv *connect.ServerStream[pbsubstreamsrpc.Response], noop bool) substreams.ResponseFunc {
 	auth := dauth.FromContext(ctx)
 	userID := auth.UserID()
 	apiKeyID := auth.APIKeyID()
@@ -662,6 +662,14 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 		// this reponse handler is used in goroutines, sending to streamSrv on closed ctx would panic
 		if ctx.Err() != nil {
 			return ctx.Err()
+		}
+
+		if noop {
+			if data := resp.GetBlockScopedData(); data != nil {
+				data.DebugMapOutputs = nil
+				data.DebugStoreOutputs = nil
+				data.Output = &pbsubstreamsrpc.MapModuleOutput{}
+			}
 		}
 		if err := streamSrv.Send(resp); err != nil {
 			logger.Info("unable to send block probably due to client disconnecting", zap.Error(err))

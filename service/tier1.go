@@ -303,6 +303,24 @@ func (s *Tier1Service) Blocks(
 	}
 
 	outputModuleHash := execGraph.ModuleHashes().Get(request.OutputModule)
+
+	requestID := fmt.Sprintf("%s:%d:%d:%s:%t:%t:%s",
+		outputModuleHash,
+		request.StartBlockNum,
+		request.StopBlockNum,
+		request.StartCursor,
+		request.ProductionMode,
+		request.FinalBlocksOnly,
+		strings.Join(request.DebugInitialStoreSnapshotForModules, ","),
+	)
+
+	//	s.resolveCursor
+	if err := s.errorFromRecordedFailure(requestID, request.ProductionMode, request.StartBlockNum, request.StartCursor); err != nil {
+		fields = append(fields, zap.Error(err), zap.Bool("cached_error", true))
+		logger.Info("refusing Substreams Blocks request", fields...)
+		return err
+	}
+
 	ctx = reqctx.WithOutputModuleHash(ctx, outputModuleHash)
 	fields = append(fields, zap.String("output_module_hash", outputModuleHash))
 
@@ -361,22 +379,6 @@ func (s *Tier1Service) Blocks(
 			s.appSetIsReadyState(true)
 		}
 	}()
-
-	requestID := fmt.Sprintf("%s:%d:%d:%s:%t:%t:%s",
-		outputModuleHash,
-		request.StartBlockNum,
-		request.StopBlockNum,
-		request.StartCursor,
-		request.ProductionMode,
-		request.FinalBlocksOnly,
-		strings.Join(request.DebugInitialStoreSnapshotForModules, ","),
-	)
-
-	//	s.resolveCursor
-	if err := s.errorFromRecordedFailure(requestID, request.ProductionMode, request.StartBlockNum, request.StartCursor); err != nil {
-		logger.Debug("failing fast on known failing request", zap.String("request_id", requestID))
-		return err
-	}
 
 	// On app shutdown, we cancel the running '.blocks()' command,
 	// we catch this situation via IsTerminating() to return a special error.

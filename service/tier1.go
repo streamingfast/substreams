@@ -228,60 +228,37 @@ func (s *Tier1Service) Blocks(
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier1/request")
 	defer span.EndWithErr(&err)
 
+	request := req.Msg
 	var compressed bool
 	if matchHeader(req.Header()) {
 		compressed = true
 	}
-	if s.enforceCompression && !compressed {
-		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("your client does not accept gzip- or zstd-compressed streams. Check how to enable it on your gRPC or ConnectRPC client"))
-	}
 
-	request := req.Msg
-	if request.Modules == nil {
-		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("missing modules in request"))
-	}
-
-	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules, bstream.GetProtocolFirstStreamableBlock)
-	if err != nil {
-		return bsstream.NewErrInvalidArg(err.Error())
-	}
-	outputModuleHash := execGraph.ModuleHashes().Get(request.OutputModule)
-	ctx = reqctx.WithOutputModuleHash(ctx, outputModuleHash)
-
-	// We need to ensure that the response function is NEVER used after this Blocks handler has returned.
-	// We use a context that will be canceled on defer, and a lock to prevent races. The respFunc is used in various threads
-	mut := sync.Mutex{}
-	respContext, cancel := context.WithCancel(ctx)
-	defer func() {
-		mut.Lock()
-		cancel()
-		mut.Unlock()
-	}()
-
-	respFunc := tier1ResponseHandler(respContext, &mut, logger, stream, request.NoopMode)
-
-	span.SetAttributes(attribute.Int64("substreams.tier", 1))
-
-	if err := ValidateTier1Request(request, s.blockType); err != nil {
-		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("validate request: %w", err))
-	}
-
-	moduleNames := make([]string, len(request.Modules.Modules))
-	for i := 0; i < len(moduleNames); i++ {
-		moduleNames[i] = request.Modules.Modules[i].Name
-	}
 	fields := []zap.Field{
 		zap.Int64("start_block", request.StartBlockNum),
 		zap.Uint64("stop_block", request.StopBlockNum),
 		zap.String("cursor", request.StartCursor),
-		zap.Strings("modules", moduleNames),
 		zap.String("output_module", request.OutputModule),
-		zap.String("output_module_hash", outputModuleHash),
 		zap.Bool("compressed", compressed),
 		zap.Bool("final_blocks_only", request.FinalBlocksOnly),
+		zap.Bool("production_mode", request.ProductionMode),
+		zap.Bool("noop_mode", request.NoopMode),
 	}
-	fields = append(fields, zap.Bool("production_mode", request.ProductionMode))
-	fields = append(fields, zap.Bool("noop_mode", request.NoopMode))
+
+	if s.enforceCompression && !compressed {
+		err := connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("your client does not accept gzip- or zstd-compressed streams. Check how to enable it on your gRPC or ConnectRPC client"))
+		fields = append(fields, zap.Error(err))
+		logger.Info("refusing Substreams Blocks request", fields...)
+		return err
+	}
+
+	if request.Modules == nil {
+		err := connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("missing modules in request"))
+		fields = append(fields, zap.Error(err))
+		logger.Info("refusing Substreams Blocks request", fields...)
+		return err
+	}
+
 	if auth := dauth.FromContext(ctx); auth != nil {
 		fields = append(fields,
 			zap.String("user_id", auth.UserID()),
@@ -311,13 +288,70 @@ func (s *Tier1Service) Blocks(
 
 	// Refuse the request if the hard limit is currently reached by this instance
 	if status.hardLimitReached() {
-		s.logger.Info("refusing request, hard limit reached ()",
-			append(fields, zap.Int("active_request_count", status.activeRequestCount), zap.Int("hard_limit", status.hardLimit))...,
-		)
-		return connect.NewError(connect.CodeUnavailable, fmt.Errorf("service under heavy load, please try connecting again"))
+		err := connect.NewError(connect.CodeUnavailable, fmt.Errorf("service under heavy load, please try connecting again"))
+		fields = append(fields, zap.Error(err), zap.Int("active_request_count", status.activeRequestCount), zap.Int("hard_limit", status.hardLimit))
+		logger.Info("refusing Substreams Blocks request", fields...)
+		return err
+	}
+
+	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules, bstream.GetProtocolFirstStreamableBlock)
+	if err != nil {
+		err := bsstream.NewErrInvalidArg(err.Error())
+		fields = append(fields, zap.Error(err))
+		logger.Info("refusing Substreams Blocks request", fields...)
+		return err
+	}
+
+	outputModuleHash := execGraph.ModuleHashes().Get(request.OutputModule)
+	ctx = reqctx.WithOutputModuleHash(ctx, outputModuleHash)
+	fields = append(fields, zap.String("output_module_hash", outputModuleHash))
+
+	usedModules := execGraph.UsedModules()
+
+	var hasStores bool
+	var hasFilter bool
+	moduleNames := make([]string, len(usedModules))
+	for i, module := range usedModules {
+		moduleNames[i] = module.Name
+		if module.GetKindStore() != nil {
+			hasStores = true
+		}
+		if module.BlockFilter != nil {
+			hasFilter = true
+		}
+	}
+	fields = append(fields,
+		zap.Strings("modules", moduleNames),
+		zap.Bool("with_stores", hasStores),
+		zap.Bool("with_blockfilter", hasFilter),
+		zap.Int("module_count", len(usedModules)),
+	)
+
+	// We need to ensure that the response function is NEVER used after this Blocks handler has returned.
+	// We use a context that will be canceled on defer, and a lock to prevent races. The respFunc is used in various threads
+	mut := sync.Mutex{}
+	respContext, cancel := context.WithCancel(ctx)
+	defer func() {
+		mut.Lock()
+		cancel()
+		mut.Unlock()
+	}()
+
+	span.SetAttributes(attribute.Int64("substreams.tier", 1))
+
+	if err := ValidateTier1Request(request, s.blockType); err != nil {
+		err := connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("validate request: %w", err))
+		fields = append(fields, zap.Error(err))
+		logger.Info("refusing Substreams Blocks request", fields...)
+		return err
 	}
 
 	logger.Info("incoming Substreams Blocks request", fields...)
+
+	var reqStats *metrics.Stats
+	ctx, reqStats = setupRequestStats(ctx, request.OutputModule, outputModuleHash, true, true)
+	defer reqStats.LogAndClose()
+
 	metrics.SubstreamsCounter.Inc()
 	metrics.ActiveRequests.Inc()
 	defer func() {
@@ -356,7 +390,9 @@ func (s *Tier1Service) Blocks(
 		}
 	}()
 
+	respFunc := tier1ResponseHandler(respContext, &mut, logger, stream, request.NoopMode, reqStats)
 	err = s.blocks(runningContext, request, execGraph, respFunc)
+	reqStats.SetError(err)
 
 	if connectError := toConnectError(runningContext, err); connectError != nil {
 		switch connect.CodeOf(connectError) {
@@ -366,13 +402,12 @@ func (s *Tier1Service) Blocks(
 			logger.Debug("recording failure on request", zap.String("request_id", requestID))
 			s.recordFailure(requestID, connectError)
 		case connect.CodeCanceled:
-			logger.Info("Blocks request canceled by user", zap.Error(connectError))
+			logger.Debug("Blocks request canceled by user", zap.Error(connectError))
 		default:
 			logger.Warn("Blocks request completed with error", zap.Error(connectError))
 		}
 		return connectError
 	}
-
 	logger.Debug("Blocks request completed without error")
 	return nil
 }
@@ -446,10 +481,6 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		}
 
 	}
-
-	var requestStats *metrics.Stats
-	ctx, requestStats = setupRequestStats(ctx, requestDetails, execGraph.ModuleHashes().Get(requestDetails.OutputModule), false)
-	defer requestStats.LogAndClose()
 
 	traceId := tracing.GetTraceID(ctx).String()
 	respFunc(&pbsubstreamsrpc.Response{
@@ -642,7 +673,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	return pipe.OnStreamTerminated(ctx, streamErr)
 }
 
-func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logger, streamSrv *connect.ServerStream[pbsubstreamsrpc.Response], noop bool) substreams.ResponseFunc {
+func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logger, streamSrv *connect.ServerStream[pbsubstreamsrpc.Response], noop bool, stats *metrics.Stats) substreams.ResponseFunc {
 	auth := dauth.FromContext(ctx)
 	userID := auth.UserID()
 	apiKeyID := auth.APIKeyID()
@@ -664,13 +695,15 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 			return ctx.Err()
 		}
 
-		if noop {
-			if data := resp.GetBlockScopedData(); data != nil {
+		if data := resp.GetBlockScopedData(); data != nil {
+			stats.RecordDataSent()
+			if noop {
 				data.DebugMapOutputs = nil
 				data.DebugStoreOutputs = nil
 				data.Output = &pbsubstreamsrpc.MapModuleOutput{}
 			}
 		}
+
 		if err := streamSrv.Send(resp); err != nil {
 			logger.Info("unable to send block probably due to client disconnecting", zap.Error(err))
 			return connect.NewError(connect.CodeUnavailable, err)
@@ -681,16 +714,16 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 	}
 }
 
-func setupRequestStats(ctx context.Context, requestDetails *reqctx.RequestDetails, outputModuleGraph string, tier2 bool) (context.Context, *metrics.Stats) {
+func setupRequestStats(ctx context.Context, outputModuleName, outputModuleHash string, productionMode, tier2 bool) (context.Context, *metrics.Stats) {
 	logger := reqctx.Logger(ctx)
 	auth := dauth.FromContext(ctx)
 	stats := metrics.NewReqStats(&metrics.Config{
 		UserID:           auth.UserID(),
 		ApiKeyID:         auth.APIKeyID(),
 		Tier2:            tier2,
-		OutputModule:     requestDetails.OutputModule,
-		OutputModuleHash: outputModuleGraph,
-		ProductionMode:   requestDetails.ProductionMode,
+		OutputModule:     outputModuleName,
+		OutputModuleHash: outputModuleHash,
+		ProductionMode:   productionMode,
 	}, logger)
 	return reqctx.WithReqStats(ctx, stats), stats
 }

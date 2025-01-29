@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/streamingfast/substreams/metrics"
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
 	pbindexes "github.com/streamingfast/substreams/storage/index/pb"
 	"google.golang.org/protobuf/proto"
@@ -423,6 +424,7 @@ func TestTier2Call(t *testing.T) {
 			pkg := manifest.TestReadManifest(t, test.manifestPath)
 
 			ctx = reqctx.WithRequest(ctx, &reqctx.RequestDetails{Modules: pkg.Modules, OutputModule: test.moduleName})
+			ctx = reqctx.WithReqStats(ctx, metrics.NewReqStats(&metrics.Config{}, zlog))
 
 			ctx = reqctx.WithTier2RequestParameters(ctx, reqctx.Tier2RequestParameters{
 				BlockType:            "sf.substreams.v1.test.Block",

@@ -34,14 +34,6 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, err error) error {
 		return err
 	}
 
-	logger.Info("stream of blocks ended",
-		zap.Uint64("stop_block_num", reqDetails.StopBlockNum),
-		zap.Bool("eof", errors.Is(err, io.EOF)),
-		zap.Bool("stop_block_reached", errors.Is(err, stream.ErrStopBlockReached)),
-		//zap.Uint64("total_bytes_written", bytesMeter.BytesWritten()),
-		//zap.Uint64("total_bytes_read", bytesMeter.BytesRead()),
-	)
-
 	// TODO(abourget): check, in the tier1, there might not be a `lastFinalClock`
 	// if we just didn't run the `streamFactoryFunc`
 	if err := p.execOutputCache.EndOfStream(p.lastFinalClock); err != nil {

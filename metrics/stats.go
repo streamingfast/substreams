@@ -20,9 +20,10 @@ type Stats struct {
 
 	blockRate *dmetrics.AvgRateCounter
 
-	startTime    time.Time
-	stages       []*pbsubstreamsrpc.Stage
-	initDuration time.Duration
+	startTime       time.Time
+	stages          []*pbsubstreamsrpc.Stage
+	initDuration    time.Duration
+	timeToFirstData time.Duration
 
 	// moduleStats only contain stats from local execution
 	modulesStats map[string]*extendedStats
@@ -37,6 +38,7 @@ type Stats struct {
 	// counter is used to get the next jobIdx
 	counter uint64
 
+	error  error
 	logger *zap.Logger
 }
 
@@ -144,6 +146,10 @@ func NewReqStats(config *Config, logger *zap.Logger) *Stats {
 	}
 }
 
+func (s *Stats) SetError(err error) {
+	s.error = err
+}
+
 type extendedStats struct {
 	*pbssinternal.ModuleStats
 	merging                       bool
@@ -207,6 +213,13 @@ func (s *Stats) RecordInitializationComplete() {
 	s.Lock()
 	defer s.Unlock()
 	s.initDuration = time.Since(s.startTime)
+}
+
+func (s *Stats) RecordDataSent() {
+	// this is always sent linearly, no need to lock
+	if s.timeToFirstData == 0 {
+		s.timeToFirstData = time.Since(s.startTime)
+	}
 }
 
 func (s *Stats) RecordStages(stages []*pbsubstreamsrpc.Stage) {
@@ -601,6 +614,10 @@ func (s *Stats) getZapFields() []zap.Field {
 	if s.config.Tier2 {
 		tier = "tier2"
 	}
+	errorText := ""
+	if s.error != nil {
+		errorText = s.error.Error()
+	}
 
 	out := []zap.Field{
 		zap.String("user_id", s.config.UserID),
@@ -614,6 +631,8 @@ func (s *Stats) getZapFields() []zap.Field {
 		zap.Duration("parallel_duration", s.initDuration),
 		zap.Duration("module_exec_duration", s.moduleExecDuration()),
 		zap.Duration("module_wasm_ext_duration", s.moduleWasmExtDuration()),
+		zap.Duration("time_to_first_data", s.timeToFirstData),
+		zap.String("error", errorText),
 	}
 
 	return out

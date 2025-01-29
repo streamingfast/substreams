@@ -145,43 +145,12 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	var err error
 	ctx := streamSrv.Context()
 
-	if s.isOverloaded() {
-		return connect.NewError(connect.CodeUnavailable, fmt.Errorf("service currently overloaded"))
-	}
-
-	s.incrementConcurrentRequests()
-	defer func() {
-		s.decrementConcurrentRequests()
-	}()
-
 	stage := request.OutputModule
-
 	logger := reqctx.Logger(ctx).Named("tier2").With(zap.String("output_module", stage), zap.Uint64("segment_number", request.SegmentNumber))
-
-	ctx = logging.WithLogger(ctx, logger)
-	ctx = dmetering.WithBytesMeter(ctx)
-	ctx = reqctx.WithTracer(ctx, s.tracer)
-	ctx = metering.WithMetricsSender(ctx)
-
-	ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/request")
-	defer span.EndWithErr(&err)
-	span.SetAttributes(attribute.Int64("substreams.tier", 2))
-
-	hostname := updateStreamHeadersHostname(streamSrv.SetHeader, logger)
-	span.SetAttributes(attribute.String("hostname", hostname))
-
-	if request.Modules == nil {
-		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("missing modules in request"))
-	}
-	moduleNames := make([]string, len(request.Modules.Modules))
-	for i := 0; i < len(moduleNames); i++ {
-		moduleNames[i] = request.Modules.Modules[i].Name
-	}
 
 	fields := []zap.Field{
 		zap.Uint64("segment_size", request.SegmentSize),
 		zap.Uint32("stage", request.Stage),
-		zap.Strings("modules", moduleNames),
 		zap.String("output_module", request.OutputModule),
 		zap.Uint64("first_streamable_block", request.FirstStreamableBlock),
 		zap.String("metering_config", request.MeteringConfig),
@@ -207,21 +176,68 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 		)
 	}
 
-	logger.Info("incoming substreams ProcessRange request", fields...)
+	if s.isOverloaded() {
+		err := connect.NewError(connect.CodeUnavailable, fmt.Errorf("service currently overloaded"))
+		fields = append(fields, zap.Error(err))
+		logger.Info("refusing Substreams ProcessRange request", fields...)
+		return err
+	}
+
+	s.incrementConcurrentRequests()
+	defer func() {
+		s.decrementConcurrentRequests()
+	}()
+
+	ctx = logging.WithLogger(ctx, logger)
+	ctx = dmetering.WithBytesMeter(ctx)
+	ctx = reqctx.WithTracer(ctx, s.tracer)
+	ctx = metering.WithMetricsSender(ctx)
+
+	ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/request")
+	defer span.EndWithErr(&err)
+	span.SetAttributes(attribute.Int64("substreams.tier", 2))
+
+	hostname := updateStreamHeadersHostname(streamSrv.SetHeader, logger)
+	span.SetAttributes(attribute.String("hostname", hostname))
+
+	if request.Modules == nil {
+		err := connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("missing modules in request"))
+		fields = append(fields, zap.Error(err))
+		logger.Info("refusing Substreams ProcessRange request", fields...)
+	}
+	moduleNames := make([]string, len(request.Modules.Modules))
+	for i := 0; i < len(moduleNames); i++ {
+		moduleNames[i] = request.Modules.Modules[i].Name
+	}
+	fields = append(fields, zap.Strings("modules", moduleNames))
 
 	if err := ValidateTier2Request(request); err != nil {
-		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("validate request: %w", err))
+		err = connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("validate request: %w", err))
+		fields = append(fields, zap.Error(err))
+		logger.Info("refusing Substreams ProcessRange request", fields...)
+		return err
 	}
 
 	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, true, request.Modules, request.FirstStreamableBlock) //production-mode flag is irrelevant here because it isn't used to calculate the hashes
 	if err != nil {
-		return bsstream.NewErrInvalidArg(err.Error())
+		err = bsstream.NewErrInvalidArg(err.Error())
+		fields = append(fields, zap.Error(err))
+		logger.Info("refusing Substreams ProcessRange request", fields...)
+		return err
 	}
 	outputModuleHash := execGraph.ModuleHashes().Get(request.OutputModule)
+
+	logger.Info("incoming substreams ProcessRange request", fields...)
+
+	var reqStats *metrics.Stats
+	ctx, reqStats = setupRequestStats(ctx, request.OutputModule, outputModuleHash, true, true)
+	defer reqStats.LogAndClose()
+
 	ctx = reqctx.WithOutputModuleHash(ctx, outputModuleHash)
 
 	emitter, err := dmetering.New(request.MeteringConfig, logger)
 	if err != nil {
+		reqStats.SetError(err)
 		return connect.NewError(connect.CodeInternal, fmt.Errorf("unable to initialize dmetering: %w", err))
 	}
 	defer func() {
@@ -272,10 +288,6 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	if s.moduleExecutionTracing {
 		ctx = reqctx.WithModuleExecutionTracing(ctx)
 	}
-
-	var requestStats *metrics.Stats
-	ctx, requestStats = setupRequestStats(ctx, requestDetails, execGraph.ModuleHashes().Get(requestDetails.OutputModule), true)
-	defer requestStats.LogAndClose()
 
 	wasmRegistry, err := s.getWASMRegistry(request.WasmExtensionConfigs)
 	if err != nil {

@@ -27,6 +27,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/streamingfast/substreams/manifest"
+	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/orchestrator/stage"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
@@ -89,6 +90,7 @@ func (f *testRun) run(t *testing.T, testName string) error {
 
 	ctx = reqctx.WithLogger(ctx, zlog)
 	ctx = dmetering.WithBytesMeter(ctx)
+	ctx = reqctx.WithReqStats(ctx, metrics.NewReqStats(&metrics.Config{}, zlog))
 
 	os.Setenv("TEST_TEMP_DIR", f.TempDir)
 

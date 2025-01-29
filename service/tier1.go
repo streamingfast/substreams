@@ -349,7 +349,7 @@ func (s *Tier1Service) Blocks(
 	logger.Info("incoming Substreams Blocks request", fields...)
 
 	var reqStats *metrics.Stats
-	ctx, reqStats = setupRequestStats(ctx, request.OutputModule, outputModuleHash, true, true)
+	ctx, reqStats = setupRequestStats(ctx, request.OutputModule, outputModuleHash, request.ProductionMode, false)
 	defer reqStats.LogAndClose()
 
 	metrics.SubstreamsCounter.Inc()

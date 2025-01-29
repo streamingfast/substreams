@@ -9,6 +9,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## v1.12.4
+
+### Server
+
+* Fix log regression on 'substreams request stats' (bad value for production_mode/tier)
+
 ## v1.12.3
 
 ### Server

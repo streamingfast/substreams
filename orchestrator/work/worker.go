@@ -64,26 +64,26 @@ func (f SimpleWorkerFactory) ID() string {
 }
 
 // The tracer will be provided by the worker pool, on worker creation
-type WorkerFactory = func(logger *zap.Logger) Worker
+type WorkerFactory = func(ctx context.Context, userID string, traceID string, logger *zap.Logger) (Worker, error)
 
 type RemoteWorker struct {
 	clientFactory client.InternalClientFactory
 	tracer        ttrace.Tracer
 	logger        *zap.Logger
-	id            uint64
+	id            string
 }
 
-func NewRemoteWorker(clientFactory client.InternalClientFactory, logger *zap.Logger) *RemoteWorker {
+func NewRemoteWorker(clientFactory client.InternalClientFactory, id string, logger *zap.Logger) *RemoteWorker {
 	return &RemoteWorker{
 		clientFactory: clientFactory,
 		tracer:        otel.GetTracerProvider().Tracer("worker"),
 		logger:        logger,
-		id:            atomic.AddUint64(&lastWorkerID, 1),
+		id:            id,
 	}
 }
 
 func (w *RemoteWorker) ID() string {
-	return fmt.Sprintf("%d", w.id)
+	return w.id
 }
 
 func NewRequest(ctx context.Context, req *reqctx.RequestDetails, stageIndex int, startBlock uint64) *pbssinternal.ProcessRangeRequest {
@@ -211,7 +211,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 	span.SetAttributes(
 		attribute.String("substreams.output_module", request.OutputModule),
 		attribute.Int64("substreams.segment_number", int64(request.SegmentNumber)),
-		attribute.Int64("substreams.worker_id", int64(w.id)),
+		attribute.String("substreams.worker_id", w.id),
 	)
 	logger := w.logger
 

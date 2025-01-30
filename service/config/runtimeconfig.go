@@ -1,10 +1,9 @@
 package config
 
 import (
-	"github.com/streamingfast/substreams/client"
-	"github.com/streamingfast/substreams/orchestrator/work"
-
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/sf-saas-priv/pb/sf/worker/v1/pbworkerconnect"
+	"github.com/streamingfast/substreams/client"
 )
 
 // RuntimeConfig is a global configuration for the service.
@@ -18,8 +17,8 @@ type RuntimeConfig struct {
 	// and `outputs/` for execution output of both `map` and `store` module kinds
 	BaseObjectStore        dstore.Store
 	DefaultCacheTag        string // appended to BaseObjectStore unless overriden by auth layer
-	WorkerFactory          work.WorkerFactory
 	ClientFactory          client.InternalClientFactory
+	RemoteWorkerPool       pbworkerconnect.WorkerPoolClient
 	ModuleExecutionTracing bool
 }
 
@@ -29,7 +28,7 @@ func NewTier1RuntimeConfig(
 	maxJobsAhead uint64,
 	baseObjectStore dstore.Store,
 	defaultCacheTag string,
-	workerFactory work.WorkerFactory,
+	remoteWorkerPool pbworkerconnect.WorkerPoolClient,
 	clientFactory client.InternalClientFactory,
 ) RuntimeConfig {
 	return RuntimeConfig{
@@ -38,8 +37,8 @@ func NewTier1RuntimeConfig(
 		MaxJobsAhead:               maxJobsAhead,
 		BaseObjectStore:            baseObjectStore,
 		DefaultCacheTag:            defaultCacheTag,
-		WorkerFactory:              workerFactory,
 		ClientFactory:              clientFactory,
+		RemoteWorkerPool:           remoteWorkerPool,
 		// overridden by Tier Options
 		ModuleExecutionTracing: false,
 	}

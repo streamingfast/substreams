@@ -1,0 +1,84 @@
+package work
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	"connectrpc.com/connect"
+	pbworker "github.com/streamingfast/sf-saas-priv/pb/sf/worker/v1"
+	"github.com/streamingfast/sf-saas-priv/pb/sf/worker/v1/pbworkerconnect"
+	"github.com/streamingfast/substreams/client"
+	"github.com/streamingfast/substreams/reqctx"
+	"go.uber.org/zap"
+)
+
+type GlobalWorkerPool struct {
+	userID            string
+	traceID           string
+	startedAt         time.Time
+	firstWorkerServed bool
+
+	remoteWorkerPool pbworkerconnect.WorkerPoolClient
+	logger           *zap.Logger
+	clientFactory    client.InternalClientFactory
+}
+
+func NewGlobalWorkerPool(ctx context.Context, userID string, traceID string, remoteWorkerPool pbworkerconnect.WorkerPoolClient, clientFactory client.InternalClientFactory) *GlobalWorkerPool {
+	logger := reqctx.Logger(ctx)
+
+	logger.Debug("initializing worker pool", zap.String("user_id", userID), zap.String("trace_id", traceID))
+
+	return &GlobalWorkerPool{
+		userID:           userID,
+		traceID:          traceID,
+		remoteWorkerPool: remoteWorkerPool,
+		startedAt:        time.Now(),
+		clientFactory:    clientFactory,
+		logger:           logger,
+	}
+}
+
+var ErrorResourceExhausted = errors.New("resource exhausted")
+
+func (p *GlobalWorkerPool) Borrow(ctx context.Context) (Worker, error) {
+	rampUpCompleted := time.Since(p.startedAt) < time.Second*4
+	if !rampUpCompleted && p.firstWorkerServed {
+		return nil, ErrorResourceExhausted
+	}
+
+	response, err := p.remoteWorkerPool.BorrowWorker(ctx,
+		&connect.Request[pbworker.BorrowWorkerRequest]{
+			Msg: &pbworker.BorrowWorkerRequest{
+				UserId:  p.userID,
+				TraceId: p.traceID,
+			},
+		},
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("borrowing worker for user %q and trace %q: %w", p.userID, p.traceID, err)
+	}
+
+	if response.Msg.Status == pbworker.BorrowWorkerResponse_borrowed {
+		return nil, ErrorResourceExhausted
+	}
+
+	p.firstWorkerServed = true
+	worker := NewRemoteWorker(p.clientFactory, response.Msg.WorkerKey, p.logger)
+	return worker, nil
+}
+
+func (p *GlobalWorkerPool) Return(ctx context.Context, worker Worker) {
+	key := worker.ID()
+	_, err := p.remoteWorkerPool.ReturnWorker(ctx, &connect.Request[pbworker.ReturnWorkerRequest]{
+		Msg: &pbworker.ReturnWorkerRequest{
+			WorkerKey: key,
+		},
+	})
+
+	if err != nil {
+		p.logger.Error("returning worker", zap.Error(err))
+	}
+}

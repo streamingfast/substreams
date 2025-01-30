@@ -3,9 +3,14 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
+	"github.com/streamingfast/dauth"
+	"github.com/streamingfast/sf-saas-priv/pb/sf/worker/v1/pbworkerconnect"
+	tracing "github.com/streamingfast/sf-tracing"
+	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metering"
 
 	"github.com/RoaringBitmap/roaring/roaring64"
@@ -80,7 +85,9 @@ type Pipeline struct {
 	// (for chains with potential block skips)
 	lastFinalClock *pbsubstreams.Clock
 
-	blockStepMap map[bstream.StepType]uint64
+	blockStepMap     map[bstream.StepType]uint64
+	remoteWorkerPool pbworkerconnect.WorkerPoolClient
+	clientFactory    client.InternalClientFactory
 }
 
 func New(
@@ -92,7 +99,8 @@ func New(
 	wasmRuntime *wasm.Registry,
 	execOutputCache *cache.Engine,
 	stateBundleSize uint64,
-	workerFactory work.WorkerFactory,
+	globalWorkerPool pbworkerconnect.WorkerPoolClient,
+	clientFactory client.InternalClientFactory,
 	respFunc substreams.ResponseFunc,
 	executionTimeout time.Duration,
 	opts ...Option,
@@ -102,7 +110,8 @@ func New(
 		gate:                    newGate(ctx),
 		execOutputCache:         execOutputCache,
 		stateBundleSize:         stateBundleSize,
-		workerFactory:           workerFactory,
+		remoteWorkerPool:        globalWorkerPool,
+		clientFactory:           clientFactory,
 		preexistingBlockIndices: indices,
 		execGraph:               execGraph,
 		wasmRuntime:             wasmRuntime,
@@ -260,15 +269,25 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 	reqStats := reqctx.ReqStats(ctx)
 	logger := reqctx.Logger(ctx)
 
+	userID := dauth.FromContext(ctx).UserID()
+	traceID := tracing.GetTraceID(ctx)
+
 	if reqDetails.ShouldStreamCachedOutputs() && p.pendingUndoMessage != nil {
 		p.respFunc(p.pendingUndoMessage)
+	}
+
+	var workerPool work.WorkerPool
+
+	if reflect.ValueOf(p.remoteWorkerPool).IsNil() {
+		workerPool = work.NewGlobalWorkerPool(ctx, userID, traceID.String(), p.remoteWorkerPool, p.clientFactory)
+	} else {
+		workerPool = work.NewSimpleWorkerPool(ctx, int(reqDetails.MaxParallelJobs), p.clientFactory)
 	}
 
 	parallelProcessor, err := orchestrator.BuildParallelProcessor(
 		ctx,
 		reqPlan,
-		p.workerFactory,
-		int(reqDetails.MaxParallelJobs),
+		workerPool,
 		p.execGraph,
 		p.execoutStorage,
 		p.respFunc,

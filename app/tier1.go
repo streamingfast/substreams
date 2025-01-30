@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/dstore"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
+	"github.com/streamingfast/sf-saas-priv/pb/sf/worker/v1/pbworkerconnect"
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metrics"
@@ -190,6 +192,9 @@ func (a *Tier1App) Run() error {
 		WASMModules:          wasmModules,
 	}
 
+	panic("missing pool address ...")
+	remoteWorkerPool := pbworkerconnect.NewWorkerPoolClient(http.DefaultClient, "")
+
 	svc, err := service.NewTier1(
 		a.logger,
 		mergedBlocksStore,
@@ -203,6 +208,7 @@ func (a *Tier1App) Run() error {
 		a.setIsReady,
 		subrequestsClientConfig,
 		tier2RequestParameters,
+		globalWorkerPool,
 		a.config.EnforceCompression,
 		a.config.ActiveRequestsSoftLimit,
 		a.config.ActiveRequestsHardLimit,

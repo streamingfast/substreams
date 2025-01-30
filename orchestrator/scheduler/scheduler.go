@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -24,7 +25,7 @@ type Scheduler struct {
 	stream *response.Stream
 
 	Stages        *stage.Stages
-	WorkerPool    *work.WorkerPool
+	WorkerPool    work.WorkerPool
 	ExecOutWalker *execout.Walker
 
 	logger *zap.Logger
@@ -80,8 +81,9 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 
 	switch msg := msg.(type) {
 	case work.MsgJobSucceeded:
+
 		shadowedUnits := s.Stages.MarkJobSuccess(msg.Unit)
-		s.WorkerPool.Return(msg.Worker)
+		s.WorkerPool.Return(s.ctx, msg.Worker)
 
 		tryMerge := s.Stages.CmdTryMerge(msg.Unit.Stage)
 		if shadowedUnits == nil {
@@ -97,28 +99,25 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 			)
 		}
 
-		cmds = append(cmds,
-			work.CmdScheduleNextJob(),
-		)
 		if s.ExecOutWalker != nil {
 			cmds = append(cmds, execout.CmdDownloadSegment(0))
 		}
 
 	case work.MsgScheduleNextJob:
-		avail, shouldRetry := s.WorkerPool.WorkerAvailable()
-		if !avail {
-			if !shouldRetry {
-				return nil
+		worker, err := s.WorkerPool.Borrow(s.ctx)
+		if err != nil {
+			if errors.Is(err, work.ErrorResourceExhausted) {
+				s.logger.Debug("resource exhausted, retrying", zap.Error(err))
+			} else {
+				s.logger.Error("scheduler: failed to borrow worker", zap.Error(err))
 			}
-			cmds = append(cmds, loop.Tick(time.Second, func() loop.Msg { return work.MsgScheduleNextJob{} }))
+			cmds = append(cmds, loop.Tick(time.Second, func() loop.Msg { return work.CmdScheduleNextJob() }))
 			break
 		}
 		workUnit, workRange := s.Stages.NextJob()
-		if workRange == nil {
+		if workRange == nil { // End of job
 			return nil
 		}
-
-		worker := s.WorkerPool.Borrow()
 
 		s.logger.Info("scheduling work", zap.Object("unit", workUnit))
 		modules := s.Stages.StageModules(workUnit.Stage)
@@ -134,14 +133,12 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 	case stage.MsgMergeFinished:
 		s.Stages.MergeCompleted(msg.Unit)
 		cmds = append(cmds,
-			work.CmdScheduleNextJob(),
 			s.Stages.CmdTryMerge(msg.Stage),
 		)
 
 	case stage.MsgAllStoresCompleted:
 		s.storesSyncCompleted = true
 		cmds = append(cmds,
-			work.CmdScheduleNextJob(), // in case some mapper jobs need scheduling
 			s.cmdShutdownWhenComplete(),
 		)
 

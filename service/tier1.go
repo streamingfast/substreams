@@ -24,6 +24,7 @@ import (
 	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
+	"github.com/streamingfast/sf-saas-priv/pb/sf/worker/v1/pbworkerconnect"
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams"
@@ -31,7 +32,6 @@ import (
 	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/orchestrator/plan"
-	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	ssconnect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcconnect"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -135,6 +135,8 @@ func NewTier1(
 	appSetIsReadyState func(isReady bool),
 	substreamsClientConfig *client.SubstreamsClientConfig,
 	tier2RequestParameters reqctx.Tier2RequestParameters,
+	remoteWorkerPool pbworkerconnect.WorkerPoolClient,
+
 	enforceCompression bool,
 	activeRequestsSoftLimit int,
 	activeRequestsHardLimit int,
@@ -149,9 +151,7 @@ func NewTier1(
 		10,
 		stateStore,
 		defaultCacheTag,
-		func(logger *zap.Logger) work.Worker {
-			return work.NewRemoteWorker(clientFactory, logger)
-		},
+		remoteWorkerPool,
 		clientFactory,
 	)
 
@@ -535,7 +535,8 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		wasmRuntime,
 		execOutputCacheEngine,
 		segmentSize,
-		s.runtimeConfig.WorkerFactory,
+		s.runtimeConfig.RemoteWorkerPool,
+		s.runtimeConfig.ClientFactory,
 		respFunc,
 		s.blockExecutionTimeout,
 		opts...,

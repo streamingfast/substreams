@@ -1,8 +1,10 @@
 package reqctx
 
 import (
+	"context"
 	"strconv"
 
+	"github.com/streamingfast/dauth"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
@@ -17,11 +19,12 @@ type RequestDetails struct {
 	ResolvedStartBlockNum uint64
 	ResolvedCursor        string
 
-	LinearHandoffBlockNum uint64
-	LinearGateBlockNum    uint64
-	StopBlockNum          uint64
-	MaxParallelJobs       uint64
-	UniqueID              uint64
+	LinearHandoffBlockNum         uint64
+	LinearGateBlockNum            uint64
+	StopBlockNum                  uint64
+	MaxParallelJobs               uint64
+	MaxStageLayerParallelExecutor uint64
+	UniqueID                      uint64
 
 	ProductionMode bool
 	IsTier2Request bool
@@ -43,4 +46,19 @@ func (d *RequestDetails) ShouldReturnWrittenPartials(modName string) bool {
 func (d *RequestDetails) ShouldStreamCachedOutputs() bool {
 	return d.ProductionMode &&
 		d.ResolvedStartBlockNum < d.LinearHandoffBlockNum
+}
+
+// SetStageLayerParallelExecutorCountFromContext sets the MaxStageLayerParallelExecutor from the context
+// by first retrieving the dauth trusted headers and then parsing the value from the header, if present.
+func (d *RequestDetails) SetStageLayerParallelExecutorCountFromContext(ctx context.Context) {
+	trustedHeaders := dauth.FromContext(ctx)
+	if trustedHeaders == nil {
+		return
+	}
+
+	if parallelExecutors := trustedHeaders.Get("X-Sf-Substreams-Stage-Layer-Parallel-Executor-Max-Count"); parallelExecutors != "" {
+		if count, err := strconv.ParseUint(parallelExecutors, 10, 64); err == nil {
+			d.MaxStageLayerParallelExecutor = count
+		}
+	}
 }

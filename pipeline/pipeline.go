@@ -47,11 +47,14 @@ type Pipeline struct {
 	postBlockHooks     []substreams.BlockHook
 	postJobHooks       []substreams.PostJobHook
 
-	wasmRuntime     *wasm.Registry
-	execGraph       *exec.Graph
-	loadedModules   map[uint32]wasm.Module
-	ModuleExecutors [][]exec.ModuleExecutor // Staged module executors
-	executionStages exec.ExecutionStages
+	wasmRuntime   *wasm.Registry
+	execGraph     *exec.Graph
+	loadedModules map[uint32]wasm.Module
+	// StagedModuleExecutors represents all the modules within a stage that should be executed. The
+	// first level of the 2D list represents layer within a stage to execute sequentially.
+	// The second level contains modules to execute within a layer, those can be executed concurrently.
+	StagedModuleExecutors [][]exec.ModuleExecutor
+	executionStages       exec.ExecutionStages
 
 	mapModuleOutput         *pbsubstreamsrpc.MapModuleOutput
 	extraMapModuleOutputs   []*pbsubstreamsrpc.MapModuleOutput
@@ -455,7 +458,7 @@ func (p *Pipeline) returnInternalModuleProgressOutputs(clock *pbsubstreams.Clock
 
 // BuildModuleExecutors builds the ModuleExecutors, and the loadedModules.
 func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
-	if p.ModuleExecutors != nil {
+	if p.StagedModuleExecutors != nil {
 		// Eventually, we can invalidate our catch to accomodate the PATCH
 		// and rebuild all the modules, and tear down the previously loaded ones.
 		return nil
@@ -582,13 +585,13 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 		}
 	}
 
-	p.ModuleExecutors = stagedModuleExecutors
+	p.StagedModuleExecutors = stagedModuleExecutors
 	return nil
 }
 
 func (p *Pipeline) cleanUpModuleExecutors(ctx context.Context) error {
-	for _, stage := range p.ModuleExecutors {
-		for _, executor := range stage {
+	for _, layer := range p.StagedModuleExecutors {
+		for _, executor := range layer {
 			if err := executor.Close(ctx); err != nil {
 				return fmt.Errorf("closing module executor %q: %w", executor.Name(), err)
 			}

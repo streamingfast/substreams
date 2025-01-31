@@ -283,7 +283,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return stream.NewErrInvalidArg(err.Error())
 	}
 
-	requestDetails := pipeline.BuildRequestDetailsFromSubrequest(request)
+	requestDetails := pipeline.BuildRequestDetailsFromSubrequest(ctx, request)
 	ctx = reqctx.WithRequest(ctx, requestDetails)
 	if s.moduleExecutionTracing {
 		ctx = reqctx.WithModuleExecutionTracing(ctx)
@@ -376,7 +376,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 
 	allExecutorsExcludedByBlockIndex := true
 excludable:
-	for _, stage := range pipe.ModuleExecutors {
+	for _, stage := range pipe.StagedModuleExecutors {
 		for _, executor := range stage {
 			switch executor := executor.(type) {
 			case *exec.MapperModuleExecutor:

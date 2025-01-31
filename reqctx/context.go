@@ -91,6 +91,37 @@ func WithEmitter(ctx context.Context, emitter dmetering.EventEmitter) context.Co
 	return context.WithValue(ctx, emitterKey, emitter)
 }
 
+const defaultMaxStageLayerParallelExecutorCount = 2
+
+const safeguardMaxStageLayerParallelExecutorCount = 16
+
+// MaxStageLayerParallelExecutor returns the maximum number of parallel executors (e.g. go routines) that can
+// be executed at the same time for a particular stage's layer as configured and accepted by the
+// auth plugin.
+//
+// If the request is in development mode, returns 1. If the value is not set, returns the default
+// value which is 2.
+func MaxStageLayerParallelExecutor(ctx context.Context) uint64 {
+	details := Details(ctx)
+	if details == nil {
+		// Always give at least 1, but there should always be a details object attached to the context
+		return 1
+	}
+
+	if !details.ProductionMode {
+		// In dev mode, we always use 1
+		return 1
+	}
+
+	// If unset, provide default value which is 2 for now
+	if details.MaxStageLayerParallelExecutor == 0 {
+		return defaultMaxStageLayerParallelExecutorCount
+	}
+
+	// Protect in case of misconfiguration to cap at a sane system max value
+	return min(details.MaxStageLayerParallelExecutor, safeguardMaxStageLayerParallelExecutorCount)
+}
+
 type ISpan interface {
 	// End completes the Span. The Span is considered complete and ready to be
 	// delivered through the rest of the telemetry pipeline after this method

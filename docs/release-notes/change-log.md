@@ -9,6 +9,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+* Limit parallel execution of a stage's layer.
+
+  Previously, the engine was executing modules in a stage's layer all in parallel. We now change that behavior, development mode will from now on execute every sequentially and when in production mode will limit parallelism to 2 (hard-coded) for now.
+
+  The auth plugin can control that value dynamically by providing a trusted header `X-Sf-Substreams-Stage-Layer-Parallel-Executor-Max-Count`.
 
 ## v1.12.4
 
@@ -20,8 +27,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
-* Improve noop-mode: will now only send one signal per bundle, without any data
-* Improve logging
+* Improve noop-mode: will now only send one signal per bundle, without any data.
+
+* Improve logging.
 
 ### Client
 

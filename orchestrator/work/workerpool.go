@@ -1,6 +1,8 @@
 package work
 
-import "context"
+import (
+	"context"
+)
 
 type WorkerPool interface {
 	Borrow(ctx context.Context) (Worker, error)

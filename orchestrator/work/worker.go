@@ -61,9 +61,6 @@ func (f SimpleWorkerFactory) ID() string {
 	return fmt.Sprintf("%d", f.id)
 }
 
-// The tracer will be provided by the worker pool, on worker creation
-type WorkerFactory = func(ctx context.Context, userID string, traceID string, logger *zap.Logger) (Worker, error)
-
 type RemoteWorker struct {
 	clientFactory  client.InternalClientFactory
 	tracer         ttrace.Tracer

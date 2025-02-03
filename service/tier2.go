@@ -80,21 +80,23 @@ type Tier2Service struct {
 	connectionCountMutex      sync.RWMutex
 	blockExecutionTimeout     time.Duration
 
-	tier2RequestParameters          *reqctx.Tier2RequestParameters
-	remoteWorkerPool                pbworkerconnect.WorkerPoolClient
-	delayBetweenWorkerKeepAliveCall time.Duration
+	tier2RequestParameters *reqctx.Tier2RequestParameters
+	remoteWorkerClient     pbworkerconnect.WorkerPoolClient
+	workerPoolFactory      work.WorkerPoolFactory
 }
 
 const protoPkfPrefix = "type.googleapis.com/"
 
 func NewTier2(
-	remoteWorkerPool pbworkerconnect.WorkerPoolClient,
+	remoteWorkerClient pbworkerconnect.WorkerPoolClient,
+	workerPoolFactory work.WorkerPoolFactory,
 	logger *zap.Logger,
 	opts ...Option,
 ) (*Tier2Service, error) {
 
 	s := &Tier2Service{
-		remoteWorkerPool:      remoteWorkerPool,
+		remoteWorkerClient:    remoteWorkerClient,
+		workerPoolFactory:     workerPoolFactory,
 		tracer:                tracing.GetTracer(),
 		logger:                logger,
 		blockExecutionTimeout: 3 * time.Minute,
@@ -346,9 +348,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		wasmRegistry,
 		execOutputCacheEngine,
 		request.SegmentSize,
-		s.remoteWorkerPool,
-		0*time.Second,
-		nil,
+		s.workerPoolFactory,
 		respFunc,
 		s.blockExecutionTimeout,
 		opts...,
@@ -456,7 +456,7 @@ excludable:
 	}
 
 	done := make(chan struct{})
-	if reflect.ValueOf(s.remoteWorkerPool).IsNil() {
+	if s.remoteWorkerClient != nil && reflect.ValueOf(s.remoteWorkerClient).IsNil() {
 		workerID, keepAliveDelay, err := work.IncomingParameters(ctx)
 		if err != nil {
 			return fmt.Errorf("getting incoming parameters: %w", err)
@@ -466,7 +466,7 @@ excludable:
 			case <-ctx.Done():
 				return
 			case <-time.After(keepAliveDelay):
-				_, err := s.remoteWorkerPool.KeepAlive(ctx, &connect.Request[pbworker.KeepAliveRequest]{
+				_, err := s.remoteWorkerClient.KeepAlive(ctx, &connect.Request[pbworker.KeepAliveRequest]{
 					Msg: &pbworker.KeepAliveRequest{
 						WorkerKey: workerID,
 					},

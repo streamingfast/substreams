@@ -3,14 +3,9 @@ package pipeline
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
-	"github.com/streamingfast/dauth"
-	"github.com/streamingfast/sf-saas-priv/pb/sf/worker/v1/pbworkerconnect"
-	tracing "github.com/streamingfast/sf-tracing"
-	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metering"
 
 	"github.com/RoaringBitmap/roaring/roaring64"
@@ -44,7 +39,7 @@ type processingModule struct {
 type Pipeline struct {
 	ctx              context.Context
 	stateBundleSize  uint64
-	workerFactory    work.WorkerFactory
+	workerFactory    work.WorkerPoolFactory
 	executionTimeout time.Duration
 
 	pendingUndoMessage *pbsubstreamsrpc.Response
@@ -85,11 +80,8 @@ type Pipeline struct {
 	// (for chains with potential block skips)
 	lastFinalClock *pbsubstreams.Clock
 
-	blockStepMap  map[bstream.StepType]uint64
-	clientFactory client.InternalClientFactory
-
-	remoteWorkerPool     pbworkerconnect.WorkerPoolClient
-	workerKeepAliveDelay time.Duration
+	blockStepMap      map[bstream.StepType]uint64
+	workerPoolFactory work.WorkerPoolFactory
 }
 
 func New(
@@ -101,9 +93,7 @@ func New(
 	wasmRuntime *wasm.Registry,
 	execOutputCache *cache.Engine,
 	stateBundleSize uint64,
-	globalWorkerPool pbworkerconnect.WorkerPoolClient,
-	workerKeepAliveDelay time.Duration,
-	clientFactory client.InternalClientFactory,
+	workerPoolFactory work.WorkerPoolFactory,
 	respFunc substreams.ResponseFunc,
 	executionTimeout time.Duration,
 	opts ...Option,
@@ -113,8 +103,6 @@ func New(
 		gate:                    newGate(ctx),
 		execOutputCache:         execOutputCache,
 		stateBundleSize:         stateBundleSize,
-		remoteWorkerPool:        globalWorkerPool,
-		clientFactory:           clientFactory,
 		preexistingBlockIndices: indices,
 		execGraph:               execGraph,
 		wasmRuntime:             wasmRuntime,
@@ -125,7 +113,7 @@ func New(
 		blockStepMap:            make(map[bstream.StepType]uint64),
 		startTime:               time.Now(),
 		executionTimeout:        executionTimeout,
-		workerKeepAliveDelay:    workerKeepAliveDelay,
+		workerPoolFactory:       workerPoolFactory,
 	}
 	for _, opt := range opts {
 		opt(pipe)
@@ -273,20 +261,11 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 	reqStats := reqctx.ReqStats(ctx)
 	logger := reqctx.Logger(ctx)
 
-	userID := dauth.FromContext(ctx).UserID()
-	traceID := tracing.GetTraceID(ctx)
-
 	if reqDetails.ShouldStreamCachedOutputs() && p.pendingUndoMessage != nil {
 		p.respFunc(p.pendingUndoMessage)
 	}
 
-	var workerPool work.WorkerPool
-	if p.remoteWorkerPool != nil && !reflect.ValueOf(p.remoteWorkerPool).IsNil() {
-		workerPool = work.NewGlobalWorkerPool(ctx, userID, traceID.String(), p.remoteWorkerPool, p.clientFactory, p.workerKeepAliveDelay)
-	} else {
-		workerPool = work.NewSimpleWorkerPool(ctx, int(reqDetails.MaxParallelJobs), p.clientFactory)
-	}
-
+	workerPool := p.workerPoolFactory(ctx)
 	parallelProcessor, err := orchestrator.BuildParallelProcessor(
 		ctx,
 		reqPlan,

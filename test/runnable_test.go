@@ -38,7 +38,7 @@ import (
 	"github.com/streamingfast/substreams/service/config"
 )
 
-type testPreWork func(t *testing.T, run *testRun, workerFactory work.WorkerFactory)
+type testPreWork func(t *testing.T, run *testRun, workerFactory work.WorkerPoolFactory)
 
 type testRun struct {
 	Package                *pbsubstreams.Package
@@ -144,7 +144,7 @@ func (f *testRun) run(t *testing.T, testName string) error {
 		newBlockGenerator = f.NewBlockGenerator
 	}
 
-	workerFactory := func(ctx context.Context, userID string, traceID string, _ *zap.Logger) (work.Worker, error) {
+	workerFactory := func(ctx context.Context) work.Worker {
 		return &TestWorker{
 			t:                      t,
 			responseCollector:      newResponseCollector(ctx),
@@ -154,14 +154,19 @@ func (f *testRun) run(t *testing.T, testName string) error {
 			testTempDir:            f.TempDir,
 			id:                     workerID.Inc(),
 			firstStreamableBlock:   f.FirstStreamableBlock,
-		}, nil
+		}
+	}
+
+	workerPool := work.NewTestWorkerPool(t, workerFactory)
+	workerPoolFactory := func(ctx context.Context) work.WorkerPool {
+		return workerPool
 	}
 
 	if f.PreWork != nil {
-		f.PreWork(t, f, workerFactory)
+		f.PreWork(t, f, workerPoolFactory)
 	}
 
-	if err := processRequest(t, ctx, request, workerFactory, newBlockGenerator, responseCollector, false, f.BlockProcessedCallback, f.TempDir, f.ParallelSubrequests, f.LinearHandoffBlockNum); err != nil {
+	if err := processRequest(t, ctx, request, workerPoolFactory, newBlockGenerator, responseCollector, false, f.BlockProcessedCallback, f.TempDir, f.ParallelSubrequests, f.LinearHandoffBlockNum); err != nil {
 		return fmt.Errorf("running test: %w", err)
 	}
 
@@ -276,7 +281,7 @@ func processInternalRequest(
 	t *testing.T,
 	ctx context.Context,
 	request *pbssinternal.ProcessRangeRequest,
-	workerFactory work.WorkerFactory,
+	workerPoolFactory work.WorkerPoolFactory,
 	newGenerator BlockGeneratorFactory,
 	responseCollector *responseCollector,
 	blockProcessedCallBack blockProcessedCallBack,
@@ -312,7 +317,7 @@ func processRequest(
 	t *testing.T,
 	ctx context.Context,
 	request *pbsubstreamsrpc.Request,
-	workerFactory work.WorkerFactory,
+	workerPoolFactory work.WorkerPoolFactory,
 	newGenerator BlockGeneratorFactory,
 	responseCollector *responseCollector,
 	isSubRequest bool,
@@ -342,6 +347,7 @@ func processRequest(
 		BaseObjectStore:            baseStoreStore,
 		DefaultCacheTag:            "tag",
 		MaxJobsAhead:               10,
+		WorkerPoolFactory:          workerPoolFactory,
 	}
 
 	svc := service.TestNewService(runtimeConfig, linearHandoffBlockNum, tr.StreamFactory)

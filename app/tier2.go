@@ -10,8 +10,8 @@ import (
 	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/sf-saas-priv/pb/sf/worker/v1/pbworkerconnect"
 	"github.com/streamingfast/shutter"
-	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metrics"
+	"github.com/streamingfast/substreams/orchestrator/work"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/service"
 	"github.com/streamingfast/substreams/wasm"
@@ -44,8 +44,8 @@ type Tier2App struct {
 
 type Tier2Modules struct {
 	CheckPendingShutDown func() bool
-	RemoteWorkerPool     pbworkerconnect.WorkerPoolClient
-	ClientFactory        client.InternalClientFactory
+	RemoteWorkerClient   pbworkerconnect.WorkerPoolClient
+	WorkerPoolFactory    work.WorkerPoolFactory
 }
 
 func NewTier2(logger *zap.Logger, config *Tier2Config, modules *Tier2Modules) *Tier2App {
@@ -94,7 +94,8 @@ func (a *Tier2App) Run() error {
 	}
 
 	svc, err := service.NewTier2(
-		a.modules.RemoteWorkerPool,
+		a.modules.RemoteWorkerClient,
+		a.modules.WorkerPoolFactory,
 		a.logger,
 		opts...,
 	)

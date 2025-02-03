@@ -24,7 +24,6 @@ import (
 	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
-	"github.com/streamingfast/sf-saas-priv/pb/sf/worker/v1/pbworkerconnect"
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams"
@@ -32,6 +31,7 @@ import (
 	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/orchestrator/plan"
+	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	ssconnect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcconnect"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -63,7 +63,6 @@ type Tier1Service struct {
 	failedRequests        map[string]*recordedFailure
 	streamFactoryFunc     StreamFactoryFunc
 	blockExecutionTimeout time.Duration
-	workerKeepAliveDelay  time.Duration
 	runtimeConfig         config.RuntimeConfig
 	tracer                ttrace.Tracer
 	logger                *zap.Logger
@@ -136,12 +135,11 @@ func NewTier1(
 	appSetIsReadyState func(isReady bool),
 	substreamsClientConfig *client.SubstreamsClientConfig,
 	tier2RequestParameters reqctx.Tier2RequestParameters,
-	remoteWorkerPool pbworkerconnect.WorkerPoolClient,
+	workerPoolFactory work.WorkerPoolFactory,
 
 	enforceCompression bool,
 	activeRequestsSoftLimit int,
 	activeRequestsHardLimit int,
-	workerKeepAliveDelay time.Duration,
 	opts ...Option,
 ) (*Tier1Service, error) {
 
@@ -153,8 +151,8 @@ func NewTier1(
 		10,
 		stateStore,
 		defaultCacheTag,
-		remoteWorkerPool,
 		clientFactory,
+		workerPoolFactory,
 	)
 
 	sf := &StreamFactory{
@@ -189,7 +187,6 @@ func NewTier1(
 		enforceCompression:      enforceCompression,
 		activeRequestsSoftLimit: activeRequestsSoftLimit,
 		activeRequestsHardLimit: activeRequestsHardLimit,
-		workerKeepAliveDelay:    workerKeepAliveDelay,
 	}
 
 	s.streamFactoryFunc = sf.New
@@ -538,9 +535,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		wasmRuntime,
 		execOutputCacheEngine,
 		segmentSize,
-		s.runtimeConfig.RemoteWorkerPool,
-		s.workerKeepAliveDelay,
-		s.runtimeConfig.ClientFactory,
+		s.runtimeConfig.WorkerPoolFactory,
 		respFunc,
 		s.blockExecutionTimeout,
 		opts...,

@@ -319,11 +319,11 @@ const HeaderWorkerID = "x-sf-worker-id"
 const HeaderWorkerKeepAliveDelay = "x-sf-worker-keep-alive-delay"
 
 func (w *RemoteWorker) SetOutgoingHeaders(ctx context.Context) context.Context {
-	ctx = metadata.AppendToOutgoingContext(ctx,
+	ctxWithHeaders := metadata.AppendToOutgoingContext(ctx,
 		HeaderWorkerID, w.id,
 		HeaderWorkerKeepAliveDelay, w.keepAliveDelay.String(),
 	)
-	return ctx
+	return ctxWithHeaders
 }
 
 func IncomingParameters(ctx context.Context) (workerId string, keepAliveDelay time.Duration, err error) {

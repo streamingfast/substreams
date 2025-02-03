@@ -63,7 +63,7 @@ To ensure that your authentication is set up correctly, you can run a test Subst
      -e mainnet.eth.streamingfast.io:443 \
      --start-block 10397553 \
      --stop-block +10 \
-     --netowork eth
+     --network eth
    ```
 
 2. Verify that the Substreams runs without errors, confirming that your authentication is successful.

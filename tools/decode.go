@@ -169,7 +169,7 @@ func runDecodeStatesModuleRunE(cmd *cobra.Command, args []string) error {
 	case *pbsubstreams.Module_KindMap_:
 		return fmt.Errorf("no states are available for a mapper")
 	case *pbsubstreams.Module_KindStore_:
-		return searchStateModule(ctx, startBlock, moduleHash, key, matchingModule, objStore, protoFiles)
+		return searchStateModule(ctx, startBlock, saveInterval, moduleHash, key, matchingModule, objStore, protoFiles)
 	}
 	return fmt.Errorf("module has an unknown")
 }
@@ -449,13 +449,14 @@ func searchOutputsModuleKvOps(
 func searchStateModule(
 	ctx context.Context,
 	startBlock uint64,
+	segmentSize uint64,
 	moduleHash string,
 	key string,
 	module *pbsubstreams.Module,
 	stateStore dstore.Store,
 	protoFiles []*descriptorpb.FileDescriptorProto,
 ) error {
-	config, err := store.NewConfig(module.Name, module.InitialBlock, moduleHash, module.GetKindStore().GetUpdatePolicy(), module.GetKindStore().GetValueType(), stateStore)
+	config, err := store.NewConfig(module.Name, module.InitialBlock, segmentSize, moduleHash, module.GetKindStore().GetUpdatePolicy(), module.GetKindStore().GetValueType(), stateStore)
 	if err != nil {
 		return fmt.Errorf("initializing store config module %q: %w", module.Name, err)
 	}

@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testSegmentSize = uint64(100)
+
 func newTestBaseStore(
 	t require.TestingT,
 	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy,
@@ -25,7 +27,7 @@ func newTestBaseStore(
 		appendLimit = 10
 	}
 
-	config, err := NewConfig("test", 0, "test.module.hash", updatePolicy, valueType, store)
+	config, err := NewConfig("test", 0, testSegmentSize, "test.module.hash", updatePolicy, valueType, store)
 	config.appendLimit = appendLimit
 	config.totalSizeLimit = 9999
 	config.itemSizeLimit = 10_485_760

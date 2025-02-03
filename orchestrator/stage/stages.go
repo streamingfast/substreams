@@ -2,6 +2,7 @@ package stage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -517,20 +518,57 @@ func (s *Stages) previousUnitComplete(u Unit) bool {
 	return state == UnitCompleted || state == UnitNoOp
 }
 
+type loadedStore struct {
+	name string
+	kv   *store.FullKV
+	err  error
+}
+
 func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
-	out := store.NewMap()
+
+	var storeModuleStates []*StoreModuleState
 	for _, stage := range s.stages {
 		if stage.kind != KindStore {
 			continue
 		}
 		for _, modState := range stage.storeModuleStates {
-			fullKV, err := modState.getStore(s.ctx, exclusiveEndBlock)
-			if err != nil {
-				return nil, fmt.Errorf("stores didn't sync up properly, expected store %q to be at block %d but was at %d: %w", modState.name, exclusiveEndBlock, modState.lastBlockInStore, err)
-			}
-			out[modState.name] = fullKV
+			storeModuleStates = append(storeModuleStates, modState)
 		}
 	}
+
+	out := store.NewMap()
+	if len(storeModuleStates) == 0 {
+		return out, nil
+	}
+
+	loadingChan := make(chan loadedStore, len(storeModuleStates))
+	for _, modState := range storeModuleStates {
+		modState := modState
+		go func() {
+			fullKV, err := modState.getStore(s.ctx, exclusiveEndBlock)
+			loadingChan <- loadedStore{
+				name: modState.name,
+				kv:   fullKV,
+				err:  err,
+			}
+		}()
+	}
+
+	var errs error
+	for loaded := range loadingChan {
+		if loaded.err != nil {
+			errs = errors.Join(errs, fmt.Errorf("while loading %s: %w", loaded.name, loaded.err))
+			continue
+		}
+		out[loaded.name] = loaded.kv
+		if len(out) == len(storeModuleStates) {
+			close(loadingChan)
+		}
+	}
+	if errs != nil {
+		return nil, errs
+	}
+
 	return out, nil
 }
 

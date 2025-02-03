@@ -6,6 +6,7 @@ import (
 
 	"github.com/abourget/llerrgroup"
 	"github.com/spf13/cobra"
+	"github.com/streamingfast/cli/sflags"
 	"go.uber.org/zap"
 )
 
@@ -18,14 +19,16 @@ var cleanUpCmd = &cobra.Command{
 
 func init() {
 	Cmd.AddCommand(cleanUpCmd)
+	cleanUpCmd.Flags().Uint64("segment-size", 1000, "number of blocks in each state file")
 }
 
 // delete all partial files which are already merged into the kv store
 func cleanUpE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
+	segmentSize := sflags.MustGetUint64(cmd, "segment-size")
 	dsn := args[0]
-	store, remoteStore, err := newStore(dsn)
+	store, remoteStore, err := newStore(dsn, segmentSize)
 	if err != nil {
 		return fmt.Errorf("creating store: %w", err)
 	}

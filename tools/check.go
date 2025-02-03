@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/streamingfast/cli/sflags"
 	store2 "github.com/streamingfast/substreams/storage/store"
 	"go.uber.org/zap"
 
@@ -22,12 +23,13 @@ var checkCmd = &cobra.Command{
 
 func init() {
 	Cmd.AddCommand(checkCmd)
+	checkCmd.Flags().Uint64("segment-size", 1000, "number of blocks in each state file")
 }
 
 func checkE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
-	stateStore, _, err := newStore(args[0])
+	stateStore, _, err := newStore(args[0], sflags.MustGetUint64(cmd, "segment-size"))
 	if err != nil {
 		return fmt.Errorf("failed to create store: %w", err)
 	}
@@ -58,13 +60,13 @@ func checkE(cmd *cobra.Command, args []string) error {
 	return err
 }
 
-func newStore(storeURL string) (*store2.FullKV, dstore.Store, error) {
+func newStore(storeURL string, segmentSize uint64) (*store2.FullKV, dstore.Store, error) {
 	remoteStore, err := dstore.NewStore(storeURL, "zst", "zstd", false)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not create store from %s: %w", storeURL, err)
 	}
 
-	config, err := store2.NewConfig("", 0, "", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, "", remoteStore)
+	config, err := store2.NewConfig("", 0, segmentSize, "", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, "", remoteStore)
 	if err != nil {
 		return nil, nil, err
 	}

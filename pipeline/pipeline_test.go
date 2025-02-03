@@ -29,6 +29,8 @@ import (
 	_ "github.com/streamingfast/substreams/wasm/wazero"
 )
 
+const testSegmentSize = uint64(100)
+
 func TestPipeline_runExecutor(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -187,7 +189,7 @@ func testConfigMap(t *testing.T, configs []testStoreConfig) store2.ConfigMap {
 	objStore := dstore.NewMockStore(nil)
 
 	for _, conf := range configs {
-		newStore, err := store2.NewConfig(conf.name, conf.initBlock, conf.name, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, "string", objStore)
+		newStore, err := store2.NewConfig(conf.name, conf.initBlock, testSegmentSize, conf.name, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, "string", objStore)
 		require.NoError(t, err)
 		confMap[newStore.Name()] = newStore
 
@@ -220,7 +222,7 @@ func withTestRequest(t *testing.T, outputModule string, startBlock uint64) conte
 		func() (uint64, error) { return 0, nil },
 		newTestCursorResolver().resolveCursor,
 		func() (uint64, error) { return 0, nil },
-		100,
+		testSegmentSize,
 	)
 	require.NoError(t, err)
 	return reqctx.WithRequest(context.Background(), req)

@@ -39,7 +39,7 @@ func TestConfig_ListSnapshotFiles(t *testing.T) {
 		return nil
 	}
 
-	c := &Config{objStore: testStore}
+	c := &Config{objStore: testStore, segmentSize: 1000}
 
 	files, err := c.ListSnapshotFiles(context.Background(), 10000)
 	require.NoError(t, err)
@@ -50,4 +50,52 @@ func TestConfig_ListSnapshotFiles(t *testing.T) {
 	}
 
 	assert.Equal(t, expectedFiles, actualFiles)
+}
+
+func TestLowestAlignedBoundary(t *testing.T) {
+	tests := []struct {
+		name               string
+		moduleInitialBlock uint64
+		segmentSize        uint64
+		expected           uint64
+	}{
+		{
+			name:               "aligned initial block",
+			moduleInitialBlock: 1000,
+			segmentSize:        100,
+			expected:           1000,
+		},
+		{
+			name:               "unaligned initial block",
+			moduleInitialBlock: 1234,
+			segmentSize:        100,
+			expected:           1300,
+		},
+		{
+			name:               "initial block zero",
+			moduleInitialBlock: 0,
+			segmentSize:        100,
+			expected:           0,
+		},
+		{
+			name:               "large segment size",
+			moduleInitialBlock: 5000,
+			segmentSize:        10000,
+			expected:           10000,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{
+				moduleInitialBlock: tt.moduleInitialBlock,
+				segmentSize:        tt.segmentSize,
+			}
+
+			got := cfg.lowestAlignedBoundary()
+			if got != tt.expected {
+				t.Errorf("lowestAlignedBoundary() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
 }

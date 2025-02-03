@@ -308,7 +308,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("new config map: %w", err)
 	}
 
-	storeConfigs, err := store.NewConfigMap(cacheStore, execGraph.Stores(), execGraph.ModuleHashes(), request.FirstStreamableBlock)
+	storeConfigs, err := store.NewConfigMap(cacheStore, execGraph.Stores(), execGraph.ModuleHashes(), request.FirstStreamableBlock, request.SegmentSize)
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}

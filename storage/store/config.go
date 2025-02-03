@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"runtime/trace"
 
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
@@ -25,6 +26,7 @@ type Config struct {
 	updatePolicy       pbsubstreams.Module_KindStore_UpdatePolicy
 	valueType          string
 
+	segmentSize    uint64
 	appendLimit    uint64
 	totalSizeLimit uint64
 	itemSizeLimit  uint64
@@ -33,6 +35,7 @@ type Config struct {
 func NewConfig(
 	name string,
 	moduleInitialBlock uint64,
+	segmentSize uint64,
 	moduleHash string,
 	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy,
 	valueType string,
@@ -55,6 +58,7 @@ func NewConfig(
 		outputsStore:       outputsStore,
 		moduleInitialBlock: moduleInitialBlock,
 		moduleHash:         moduleHash,
+		segmentSize:        segmentSize,
 		appendLimit:        8_388_608,     // 8MiB = 8 * 1024 * 1024,
 		totalSizeLimit:     1_073_741_824, // 1GiB
 		itemSizeLimit:      10_485_760,    // 10MiB
@@ -130,12 +134,67 @@ func (c *Config) FileSize(ctx context.Context, fileInfo *FileInfo) (int64, error
 	return size, nil
 }
 
+func (c *Config) lowestAlignedBoundary() uint64 {
+	lowestBoundary := c.moduleInitialBlock / c.segmentSize * c.segmentSize
+	if lowestBoundary < c.moduleInitialBlock {
+		lowestBoundary += c.segmentSize
+	}
+	return lowestBoundary
+}
+
+func (c *Config) optimisticGetHighestFullSnapshotFile(ctx context.Context, upTo uint64) *FileInfo {
+	lowestAlignedBoundary := c.lowestAlignedBoundary()
+	if upTo <= (lowestAlignedBoundary + (c.segmentSize * 1000)) {
+		// below 1000 files we don't bother with this optimisation
+		return nil
+	}
+
+	lowestLookupBlock := upTo - c.segmentSize*10 // look for an existing 'fullKV snapshot' in the last 10 segments to skip the full walk
+
+	var highest *FileInfo
+	if err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+		return c.objStore.WalkFrom(ctx, "", fmt.Sprintf("%010d", lowestLookupBlock), func(filename string) error {
+			fileInfo, ok := parseFileName(c.Name(), filename)
+			if !ok || fileInfo.Partial {
+				return nil
+			}
+
+			if fileInfo.Range.ExclusiveEndBlock > upTo {
+				return dstore.StopIteration
+			}
+			// Walk is always in ascending order
+			highest = fileInfo
+			return nil
+		})
+	}); err != nil {
+		return nil
+	}
+
+	return highest
+}
+
 func (c *Config) ListSnapshotFiles(ctx context.Context, below uint64) (files []*FileInfo, err error) {
+	logger := logging.Logger(ctx, zlog)
 	if below == 0 {
+		if trace.IsEnabled() {
+			logger.Debug("no files to list", zap.String("module_hash", c.moduleHash))
+		}
 		return nil, nil
 	}
 
-	logger := logging.Logger(ctx, zlog)
+	if highestFile := c.optimisticGetHighestFullSnapshotFile(ctx, below); highestFile != nil {
+		if trace.IsEnabled() {
+			logger.Debug("found a store fullKV file close to head, optimistically assuming existence of previous segments", zap.String("module_hash", c.moduleHash), zap.String("filename", highestFile.Filename))
+		}
+		lowestAlignedBoundary := c.lowestAlignedBoundary()
+		var files []*FileInfo
+		for i := lowestAlignedBoundary; i <= below; i += c.segmentSize {
+			fileInfo := NewCompleteFileInfo(c.Name(), c.ModuleInitialBlock(), i)
+			files = append(files, fileInfo)
+		}
+		return files, nil
+	}
+
 	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
 		// We need to clear each time we start because a previous retry could have accumulated a partial state
 		files = nil
@@ -160,7 +219,10 @@ func (c *Config) ListSnapshotFiles(ctx context.Context, below uint64) (files []*
 				return nil
 			}
 
-			if fileInfo.Range.StartBlock >= below {
+			if fileInfo.Partial && fileInfo.Range.StartBlock > below {
+				return dstore.StopIteration
+			}
+			if !fileInfo.Partial && fileInfo.Range.ExclusiveEndBlock > below {
 				return dstore.StopIteration
 			}
 

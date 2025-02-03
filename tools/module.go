@@ -7,6 +7,7 @@ import (
 	"math"
 
 	"github.com/streamingfast/cli"
+	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/substreams/manifest"
 	store2 "github.com/streamingfast/substreams/storage/store"
@@ -30,6 +31,7 @@ var moduleCmd = &cobra.Command{
 
 func init() {
 	Cmd.AddCommand(moduleCmd)
+	moduleCmd.Flags().Uint64("segment-size", 1000, "number of blocks in each state file")
 }
 
 func moduleRunE(cmd *cobra.Command, args []string) error {
@@ -116,6 +118,7 @@ func moduleRunE(cmd *cobra.Command, args []string) error {
 		store, err := store2.NewConfig(
 			module.Name,
 			module.InitialBlock,
+			sflags.MustGetUint64(cmd, "segment-size"),
 			moduleHash,
 			module.GetKindStore().UpdatePolicy,
 			module.GetKindStore().ValueType,

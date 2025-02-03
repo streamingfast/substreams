@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
@@ -29,6 +30,7 @@ var analyticsStoreStatsCmd = &cobra.Command{
 
 func init() {
 	analyticsCmd.AddCommand(analyticsStoreStatsCmd)
+	analyticsStoreStatsCmd.Flags().Uint64("segment-size", 1000, "number of blocks in each state file")
 }
 
 var ErrEmptyStore = errors.New("store is empty")
@@ -111,6 +113,7 @@ func StoreStatsE(cmd *cobra.Command, args []string) error {
 			conf, err := store.NewConfig(
 				module.Name,
 				module.InitialBlock,
+				sflags.MustGetUint64(cmd, "segment-size"),
 				hash,
 				module.GetKind().(*pbsubstreams.Module_KindStore_).KindStore.UpdatePolicy,
 				module.GetKind().(*pbsubstreams.Module_KindStore_).KindStore.ValueType,

@@ -1,0 +1,162 @@
+syntax = "proto3";
+
+package sf.codegen.conversation.v1;
+
+option go_package = "sf/codegen/conversation;conversation";
+
+service ConversationService {
+  rpc Converse(stream UserInput) returns (stream SystemOutput);
+  rpc Discover(DiscoveryRequest) returns (DiscoveryResponse);
+}
+
+message Empty {}
+message UserInput {
+  uint32 msg_id = 1; // Monotonic incrementing number
+  uint32 from_msg_id = 2;
+  string from_action_id = 3;
+
+  oneof entry {
+    Start start = 11;
+
+    TextInput text_input = 15;
+    Selection selection = 17;
+    Confirmation confirmation = 18;
+    Upload file = 16;
+    // Deprecated: we don't use this.
+    DownloadedFiles downloaded_files = 20;
+  }
+  message TextInput {
+    string value = 1;
+  }
+  message Start {
+    // generator_id routes the conversation to the right generator backend
+    string generator_id = 1;
+
+    // Hydrate will be present when the user already has a pre-built state, and wants to continue from there.
+    Hydrate hydrate = 2;
+
+    // Version of the supported protocol by the client.
+    // If the code generator requires a more recent client, then it should also report an error, or try to downgrade the conversation protocol.
+    uint32 version = 3;
+  }
+  message Hydrate {
+    // If `saved_payload` is none, then just start a new session.
+    string saved_state = 1; // JSON state from a previous session, to continue where we left off.
+    bytes signature = 2; // HMAC sig from the server for the saved_payload. Optional.
+    uint32 last_msg_id = 3; // whatever
+    bool reset_conversation = 4; // Whether to continue, or to reset the conversation. If this is `false`, it means try to continue (the connection was merely disconnected). Otherwise, it means we're starting anew. Let's give all the options and directions.
+  }
+  message Upload {
+    string mime_type = 1;
+    string filename = 2;
+    bytes content = 3;
+  }
+  message Selection {
+    string label = 1;
+    string value = 2;
+  }
+  message Confirmation {
+    bool affirmative = 1;
+  }
+  // Deprecated: this isn't used
+  message DownloadedFiles {
+    // This is only to return a message to the server that the files were downloaded
+  }
+}
+
+message SystemOutput {
+  uint32 msg_id = 1; // unique message ID
+  uint32 from_msg_id = 2;
+  string action_id = 3; // the type of action that is required here, tags like "confirm_final" or "select_subgraph" or "select_network", so the UI can hook into the response the user will take here.
+  string state = 4; // to be saved each step, if connection drops, Init back with this state
+  bytes state_signature = 5; // Optional, or future ?
+
+  oneof entry {
+    Message message = 15; // Markdown message to display
+    ImageWithText image_with_text = 16;
+    ListSelect list_select = 17;
+    TextInput text_input = 18;
+    Confirm confirm = 21;
+    Loading loading = 19;
+    DownloadFiles download_files = 20;
+  }
+
+  message Message {
+    string markdown = 1;
+    string style = 2;
+  }
+  message ImageWithText {
+    string img_url = 1;
+    string markdown = 2;
+  }
+  message ListSelect {
+    string id = 1; // Deprecated: use `action_id` instead
+    repeated string labels = 2; // These need to be the same length
+    repeated string values = 3;
+    repeated string image_urls = 4; // Optional. If present, same length as the labels and values. Shows a small icon aside of the label text.
+    string instructions = 6; // In Markdown format
+    bool select_many = 8;
+    SelectType select_type = 7;
+    string select_button_label = 5;
+    string default_value = 9;
+
+    enum SelectType {
+      DROPDOWN = 0;
+      BUTTONS = 1;
+    }
+  }
+  message TextInput {
+    string prompt = 8;
+    string description = 1; // Markdown
+    string placeholder = 2;
+    string default_value = 9; // Pre-filled the textbox
+    int32 multi_line = 3; // Number of lines if multiline box.
+    string validation_regexp = 4;
+    string validation_error_message = 5;
+
+    string submit_button_label = 6;
+    string submit_button_icon = 7; // icon name or image_url
+  }
+  message Loading {
+    bool loading = 1;
+    string label = 2;
+    // other fields to format the loader and whatnot
+  }
+  message DownloadFiles {
+    repeated DownloadFile files = 1;
+  }
+  message DownloadFile {
+    string filename = 1;
+    string type = 2;
+    bytes content = 3;
+    string description = 4;
+  }
+  message Confirm {
+    string prompt = 1;
+    string description = 4;
+    string accept_button_label = 2;
+    string decline_button_label = 3;
+    Button default_button = 5;
+    enum Button {
+      UNSET = 0;
+      CONFIRM = 1;
+      DECLINE = 2;
+    }
+  }
+}
+
+message DiscoveryRequest {
+  string search_terms = 1;
+}
+
+message DiscoveryResponse {
+  repeated Generator generators = 1;
+  message Generator {
+    string id = 1;
+    string title = 2;
+    string description = 3;
+    string icon_url = 4;
+    string endpoint = 5; // if not the same as this one
+    string group = 6;
+  }
+}

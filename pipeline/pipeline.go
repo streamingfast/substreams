@@ -85,9 +85,11 @@ type Pipeline struct {
 	// (for chains with potential block skips)
 	lastFinalClock *pbsubstreams.Clock
 
-	blockStepMap     map[bstream.StepType]uint64
-	remoteWorkerPool pbworkerconnect.WorkerPoolClient
-	clientFactory    client.InternalClientFactory
+	blockStepMap  map[bstream.StepType]uint64
+	clientFactory client.InternalClientFactory
+
+	remoteWorkerPool     pbworkerconnect.WorkerPoolClient
+	workerKeepAliveDelay time.Duration
 }
 
 func New(
@@ -100,6 +102,7 @@ func New(
 	execOutputCache *cache.Engine,
 	stateBundleSize uint64,
 	globalWorkerPool pbworkerconnect.WorkerPoolClient,
+	workerKeepAliveDelay time.Duration,
 	clientFactory client.InternalClientFactory,
 	respFunc substreams.ResponseFunc,
 	executionTimeout time.Duration,
@@ -122,6 +125,7 @@ func New(
 		blockStepMap:            make(map[bstream.StepType]uint64),
 		startTime:               time.Now(),
 		executionTimeout:        executionTimeout,
+		workerKeepAliveDelay:    workerKeepAliveDelay,
 	}
 	for _, opt := range opts {
 		opt(pipe)
@@ -277,9 +281,8 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 	}
 
 	var workerPool work.WorkerPool
-
-	if reflect.ValueOf(p.remoteWorkerPool).IsNil() {
-		workerPool = work.NewGlobalWorkerPool(ctx, userID, traceID.String(), p.remoteWorkerPool, p.clientFactory)
+	if p.remoteWorkerPool != nil && !reflect.ValueOf(p.remoteWorkerPool).IsNil() {
+		workerPool = work.NewGlobalWorkerPool(ctx, userID, traceID.String(), p.remoteWorkerPool, p.clientFactory, p.workerKeepAliveDelay)
 	} else {
 		workerPool = work.NewSimpleWorkerPool(ctx, int(reqDetails.MaxParallelJobs), p.clientFactory)
 	}

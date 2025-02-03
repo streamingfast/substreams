@@ -63,6 +63,7 @@ type Tier1Service struct {
 	failedRequests        map[string]*recordedFailure
 	streamFactoryFunc     StreamFactoryFunc
 	blockExecutionTimeout time.Duration
+	workerKeepAliveDelay  time.Duration
 	runtimeConfig         config.RuntimeConfig
 	tracer                ttrace.Tracer
 	logger                *zap.Logger
@@ -140,6 +141,7 @@ func NewTier1(
 	enforceCompression bool,
 	activeRequestsSoftLimit int,
 	activeRequestsHardLimit int,
+	workerKeepAliveDelay time.Duration,
 	opts ...Option,
 ) (*Tier1Service, error) {
 
@@ -187,6 +189,7 @@ func NewTier1(
 		enforceCompression:      enforceCompression,
 		activeRequestsSoftLimit: activeRequestsSoftLimit,
 		activeRequestsHardLimit: activeRequestsHardLimit,
+		workerKeepAliveDelay:    workerKeepAliveDelay,
 	}
 
 	s.streamFactoryFunc = sf.New
@@ -536,6 +539,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		execOutputCacheEngine,
 		segmentSize,
 		s.runtimeConfig.RemoteWorkerPool,
+		s.workerKeepAliveDelay,
 		s.runtimeConfig.ClientFactory,
 		respFunc,
 		s.blockExecutionTimeout,

@@ -144,7 +144,7 @@ func (f *testRun) run(t *testing.T, testName string) error {
 		newBlockGenerator = f.NewBlockGenerator
 	}
 
-	workerFactory := func(_ *zap.Logger) work.Worker {
+	workerFactory := func(ctx context.Context, userID string, traceID string, _ *zap.Logger) (work.Worker, error) {
 		return &TestWorker{
 			t:                      t,
 			responseCollector:      newResponseCollector(ctx),
@@ -154,7 +154,7 @@ func (f *testRun) run(t *testing.T, testName string) error {
 			testTempDir:            f.TempDir,
 			id:                     workerID.Inc(),
 			firstStreamableBlock:   f.FirstStreamableBlock,
-		}
+		}, nil
 	}
 
 	if f.PreWork != nil {
@@ -341,7 +341,6 @@ func processRequest(
 		DefaultParallelSubrequests: parallelSubrequests,
 		BaseObjectStore:            baseStoreStore,
 		DefaultCacheTag:            "tag",
-		WorkerFactory:              workerFactory,
 		MaxJobsAhead:               10,
 	}
 

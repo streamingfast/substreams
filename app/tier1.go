@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"net/url"
 	"time"
 
@@ -37,6 +36,7 @@ type Tier1Modules struct {
 	HeadBlockNumberMetric *dmetrics.HeadBlockNum
 	CheckPendingShutDown  func() bool
 	InfoServer            InfoServer
+	remoteWorkerPool      pbworkerconnect.WorkerPoolClient
 }
 
 type InfoServer interface {
@@ -55,6 +55,7 @@ type Tier1Config struct {
 	GRPCShutdownGracePeriod time.Duration // The duration we allow for gRPC connections to terminate gracefully prior forcing shutdown
 	ServiceDiscoveryURL     *url.URL
 	BlockExecutionTimeout   time.Duration
+	WorkerKeepAliveDelay    time.Duration
 	TmpDir                  string
 
 	StateStoreURL           string
@@ -192,9 +193,6 @@ func (a *Tier1App) Run() error {
 		WASMModules:          wasmModules,
 	}
 
-	panic("missing pool address ...")
-	remoteWorkerPool := pbworkerconnect.NewWorkerPoolClient(http.DefaultClient, "")
-
 	svc, err := service.NewTier1(
 		a.logger,
 		mergedBlocksStore,
@@ -208,10 +206,11 @@ func (a *Tier1App) Run() error {
 		a.setIsReady,
 		subrequestsClientConfig,
 		tier2RequestParameters,
-		globalWorkerPool,
+		a.modules.remoteWorkerPool,
 		a.config.EnforceCompression,
 		a.config.ActiveRequestsSoftLimit,
 		a.config.ActiveRequestsHardLimit,
+		a.config.WorkerKeepAliveDelay,
 		opts...,
 	)
 	if err != nil {

@@ -622,7 +622,9 @@ func assertFiles(t *testing.T, tempDir string, expectPartialSpkg bool, wantedFil
 }
 
 func partialPreWork(t *testing.T, start uint64, stageIdx int, run *testRun, workerFactory work.WorkerFactory) {
-	worker := workerFactory(zlog)
+
+	worker, err := workerFactory(context.Background(), "user.id.1", "trace.id.1", zlog)
+	require.NoError(t, err)
 
 	// FIXME: use the new `Work` interface here, and validate that the
 	// caller to `partialPreWork` doesn't need to be changed too much? :)

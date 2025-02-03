@@ -20,23 +20,25 @@ type GlobalWorkerPool struct {
 	startedAt         time.Time
 	firstWorkerServed bool
 
-	remoteWorkerPool pbworkerconnect.WorkerPoolClient
-	logger           *zap.Logger
-	clientFactory    client.InternalClientFactory
+	remoteWorkerPool     pbworkerconnect.WorkerPoolClient
+	logger               *zap.Logger
+	clientFactory        client.InternalClientFactory
+	workerKeepAliveDelay time.Duration
 }
 
-func NewGlobalWorkerPool(ctx context.Context, userID string, traceID string, remoteWorkerPool pbworkerconnect.WorkerPoolClient, clientFactory client.InternalClientFactory) *GlobalWorkerPool {
+func NewGlobalWorkerPool(ctx context.Context, userID string, traceID string, remoteWorkerPool pbworkerconnect.WorkerPoolClient, clientFactory client.InternalClientFactory, workerKeepAliveDelay time.Duration) *GlobalWorkerPool {
 	logger := reqctx.Logger(ctx)
 
 	logger.Debug("initializing worker pool", zap.String("user_id", userID), zap.String("trace_id", traceID))
 
 	return &GlobalWorkerPool{
-		userID:           userID,
-		traceID:          traceID,
-		remoteWorkerPool: remoteWorkerPool,
-		startedAt:        time.Now(),
-		clientFactory:    clientFactory,
-		logger:           logger,
+		userID:               userID,
+		traceID:              traceID,
+		remoteWorkerPool:     remoteWorkerPool,
+		startedAt:            time.Now(),
+		clientFactory:        clientFactory,
+		workerKeepAliveDelay: workerKeepAliveDelay,
+		logger:               logger,
 	}
 }
 
@@ -66,7 +68,7 @@ func (p *GlobalWorkerPool) Borrow(ctx context.Context) (Worker, error) {
 	}
 
 	p.firstWorkerServed = true
-	worker := NewRemoteWorker(p.clientFactory, response.Msg.WorkerKey, p.logger)
+	worker := NewRemoteWorker(p.clientFactory, response.Msg.WorkerKey, p.workerKeepAliveDelay, p.logger)
 	return worker, nil
 }
 

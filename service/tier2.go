@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"reflect"
 	"sync"
 	"time"
 
@@ -18,11 +19,14 @@ import (
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
+	pbworker "github.com/streamingfast/sf-saas-priv/pb/sf/worker/v1"
+	"github.com/streamingfast/sf-saas-priv/pb/sf/worker/v1/pbworkerconnect"
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/metrics"
+	"github.com/streamingfast/substreams/orchestrator/work"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline"
@@ -76,17 +80,21 @@ type Tier2Service struct {
 	connectionCountMutex      sync.RWMutex
 	blockExecutionTimeout     time.Duration
 
-	tier2RequestParameters *reqctx.Tier2RequestParameters
+	tier2RequestParameters          *reqctx.Tier2RequestParameters
+	remoteWorkerPool                pbworkerconnect.WorkerPoolClient
+	delayBetweenWorkerKeepAliveCall time.Duration
 }
 
 const protoPkfPrefix = "type.googleapis.com/"
 
 func NewTier2(
+	remoteWorkerPool pbworkerconnect.WorkerPoolClient,
 	logger *zap.Logger,
 	opts ...Option,
 ) (*Tier2Service, error) {
 
 	s := &Tier2Service{
+		remoteWorkerPool:      remoteWorkerPool,
 		tracer:                tracing.GetTracer(),
 		logger:                logger,
 		blockExecutionTimeout: 3 * time.Minute,
@@ -338,6 +346,8 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		wasmRegistry,
 		execOutputCacheEngine,
 		request.SegmentSize,
+		s.remoteWorkerPool,
+		0*time.Second,
 		nil,
 		respFunc,
 		s.blockExecutionTimeout,
@@ -445,8 +455,32 @@ excludable:
 		return fmt.Errorf("error getting stream: %w", err)
 	}
 
+	done := make(chan struct{})
+	if reflect.ValueOf(s.remoteWorkerPool).IsNil() {
+		workerID, keepAliveDelay, err := work.IncomingParameters(ctx)
+		if err != nil {
+			return fmt.Errorf("getting incoming parameters: %w", err)
+		}
+		go func() {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(keepAliveDelay):
+				_, err := s.remoteWorkerPool.KeepAlive(ctx, &connect.Request[pbworker.KeepAliveRequest]{
+					Msg: &pbworker.KeepAliveRequest{
+						WorkerKey: workerID,
+					},
+				})
+				if err != nil {
+					s.logger.Error("failed to call keep alive", zap.String("worker_id", workerID), zap.Error(err))
+				}
+			}
+		}()
+	}
+
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/pipeline/blocks_stream")
 	streamErr = blockStream.Run(ctx)
+	close(done)
 	span.EndWithErr(&streamErr)
 
 	return pipe.OnStreamTerminated(ctx, streamErr)

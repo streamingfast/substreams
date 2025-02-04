@@ -8,7 +8,6 @@ import (
 
 	dauth "github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetrics"
-	"github.com/streamingfast/sf-saas-priv/pb/sf/worker/v1/pbworkerconnect"
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/orchestrator/work"
@@ -16,6 +15,7 @@ import (
 	"github.com/streamingfast/substreams/service"
 	"github.com/streamingfast/substreams/wasm"
 	"github.com/streamingfast/substreams/wasm/wazero"
+	"github.com/streamingfast/worker-pool-protocol/pb/sf/worker/v1/pbworkerconnect"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
 )

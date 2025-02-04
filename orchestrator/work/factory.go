@@ -5,10 +5,10 @@ import (
 	"time"
 
 	"github.com/streamingfast/dauth"
-	"github.com/streamingfast/sf-saas-priv/pb/sf/worker/v1/pbworkerconnect"
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/worker-pool-protocol/pb/sf/worker/v1/pbworkerconnect"
 )
 
 type WorkerPoolFactory func(ctx context.Context) WorkerPool

@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	pbworker "github.com/streamingfast/sf-saas-priv/pb/sf/worker/v1"
-	"github.com/streamingfast/sf-saas-priv/pb/sf/worker/v1/pbworkerconnect"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/reqctx"
+	pbworker "github.com/streamingfast/worker-pool-protocol/pb/sf/worker/v1"
+	"github.com/streamingfast/worker-pool-protocol/pb/sf/worker/v1/pbworkerconnect"
 	"go.uber.org/zap"
 )
 

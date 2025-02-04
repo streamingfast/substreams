@@ -66,21 +66,17 @@ func applyResult(res *callResult, call *wasm.Call) error {
 	return res.err
 }
 
-func resultFromCall(call *wasm.Call, err error) *callResult {
-	out := &callResult{
-		clock:          call.Clock,
-		moduleName:     call.ModuleName,
-		entrypoint:     call.Entrypoint,
-		err:            err,
-		panicErr:       call.PanicError,
-		returnValue:    call.Output(),
-		logs:           append([]string{}, call.Logs...),
-		logsByteCount:  call.LogsByteCount,
-		executionStack: append([]string{}, call.ExecutionStack...),
-		executed:       true,
-	}
-
-	return out
+func (res *callResult) updateFromCall(call *wasm.Call, err error) {
+	res.clock = call.Clock
+	res.moduleName = call.ModuleName
+	res.entrypoint = call.Entrypoint
+	res.err = err
+	res.panicErr = call.PanicError
+	res.returnValue = call.Output()
+	res.logs = append([]string{}, call.Logs...)
+	res.logsByteCount = call.LogsByteCount
+	res.executionStack = append([]string{}, call.ExecutionStack...)
+	res.executed = true
 }
 
 func newCtx(ctx context.Context) context.Context {
@@ -120,8 +116,7 @@ func (s *SharedBuffer) Execute(
 	ctx = newCtx(ctx) // detach from executing context
 	inst, err := wasmModule.ExecuteNewCall(ctx, call, nil, wasmArguments, argValues)
 	inst.Close(ctx)
-	res := resultFromCall(call, err)
-	s.callResults[clock.Id][moduleHash] = res
+	result.updateFromCall(call, err)
 
 	return err
 }

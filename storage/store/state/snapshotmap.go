@@ -10,12 +10,12 @@ import (
 	"github.com/streamingfast/substreams/storage/store"
 )
 
-type storeSnapshotsMap struct {
+type StoreSnapshotsMap struct {
 	sync.Mutex
-	Snapshots map[string]*storeSnapshots
+	Snapshots map[string]*StoreSnapshots
 }
 
-func (s *storeSnapshotsMap) String() string {
+func (s *StoreSnapshotsMap) String() string {
 	var out []string
 	for k, v := range s.Snapshots {
 		out = append(out, fmt.Sprintf("store=%s (%s)", k, v))
@@ -23,9 +23,9 @@ func (s *storeSnapshotsMap) String() string {
 	return strings.Join(out, ", ")
 }
 
-func FetchState(ctx context.Context, storeConfigMap store.ConfigMap, below uint64) (*storeSnapshotsMap, error) {
-	state := &storeSnapshotsMap{
-		Snapshots: map[string]*storeSnapshots{},
+func FetchState(ctx context.Context, storeConfigMap store.ConfigMap, from, upto uint64) (*StoreSnapshotsMap, error) {
+	state := &StoreSnapshotsMap{
+		Snapshots: map[string]*StoreSnapshots{},
 	}
 
 	eg := llerrgroup.New(10)
@@ -39,7 +39,7 @@ func FetchState(ctx context.Context, storeConfigMap store.ConfigMap, below uint6
 		storeConfig := config
 
 		eg.Go(func() error {
-			snapshots, err := listSnapshots(ctx, storeConfig, below)
+			snapshots, err := listSnapshots(ctx, storeConfig, from, upto)
 			if err != nil {
 				return err
 			}

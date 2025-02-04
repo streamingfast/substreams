@@ -246,7 +246,7 @@ func initializeStoreStats(conf *store.Config) *StoreStats {
 
 func getStore(ctx context.Context, conf *store.Config, below uint64) (store.Store, []*store.FileInfo, error) {
 	start := time.Now()
-	files, err := conf.ListSnapshotFiles(ctx, below)
+	files, err := conf.ListSnapshotFiles(ctx, 0, below)
 	if err != nil {
 		return nil, nil, fmt.Errorf("listing snapshot files: %w", err)
 	}

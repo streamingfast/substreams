@@ -130,6 +130,14 @@ func NewStages(
 	return out
 }
 
+func (s *Stages) HasStores() bool {
+	return s.storeSegmenter != nil
+}
+
+func (s *Stages) LastStageIsMapper() bool {
+	return s.mapSegmenter != nil
+}
+
 func layerKind(layer exec.LayerModules) Kind {
 	if layer.IsStoreLayer() {
 		return KindStore

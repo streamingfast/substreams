@@ -8,10 +8,10 @@ import (
 	"github.com/streamingfast/substreams/storage/store"
 )
 
-func listSnapshots(ctx context.Context, storeConfig *store.Config, below uint64) (*storeSnapshots, error) {
-	out := &storeSnapshots{}
+func listSnapshots(ctx context.Context, storeConfig *store.Config, from, upto uint64) (*StoreSnapshots, error) {
+	out := &StoreSnapshots{}
 
-	files, err := storeConfig.ListSnapshotFiles(ctx, below)
+	files, err := storeConfig.ListSnapshotFiles(ctx, from, upto)
 	if err != nil {
 		return nil, fmt.Errorf("list snapshots: %w", err)
 	}
@@ -27,12 +27,12 @@ func listSnapshots(ctx context.Context, storeConfig *store.Config, below uint64)
 	return out, nil
 }
 
-type storeSnapshots struct {
+type StoreSnapshots struct {
 	FullKVFiles store.FileInfos // Shortest FullKVs first, largest last.
 	Partials    store.FileInfos // First partials first, last
 }
 
-func (s *storeSnapshots) Sort() {
+func (s *StoreSnapshots) Sort() {
 	sort.SliceStable(s.FullKVFiles, func(i, j int) bool {
 		return s.FullKVFiles[i].Range.ExclusiveEndBlock < s.FullKVFiles[j].Range.ExclusiveEndBlock
 	})
@@ -44,6 +44,6 @@ func (s *storeSnapshots) Sort() {
 	})
 }
 
-func (s *storeSnapshots) String() string {
+func (s *StoreSnapshots) String() string {
 	return fmt.Sprintf("completes=%s, partials=%s", s.FullKVFiles, s.Partials)
 }

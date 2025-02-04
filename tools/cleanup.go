@@ -36,7 +36,7 @@ func cleanUpE(cmd *cobra.Command, args []string) error {
 	highestKVBlock := uint64(0)
 	partialFiles := map[uint64]string{}
 
-	files, err := store.ListSnapshotFiles(ctx, math.MaxUint64)
+	files, err := store.ListSnapshotFiles(ctx, 0, math.MaxUint64)
 	if err != nil {
 		return fmt.Errorf("failed to list snapshots: %w", err)
 	}

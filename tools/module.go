@@ -126,7 +126,7 @@ func moduleRunE(cmd *cobra.Command, args []string) error {
 		)
 		cli.NoError(err, "unable to create store config")
 
-		out, err := store.ListSnapshotFiles(ctx, math.MaxUint64)
+		out, err := store.ListSnapshotFiles(ctx, 0, math.MaxUint64)
 		cli.NoError(err, "list snapshots")
 		for _, o := range out {
 			if o.Partial {

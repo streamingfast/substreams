@@ -94,3 +94,7 @@ func (s *Segmenter) EndsOnInterval(segmentIndex int) bool {
 	}
 	return s.Range(segmentIndex).ExclusiveEndBlock%s.interval == 0
 }
+
+func (s *Segmenter) SegmentSize() uint64 {
+	return s.interval
+}

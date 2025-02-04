@@ -142,57 +142,18 @@ func (c *Config) lowestAlignedBoundary() uint64 {
 	return lowestBoundary
 }
 
-func (c *Config) optimisticGetHighestFullSnapshotFile(ctx context.Context, upTo uint64) *FileInfo {
-	lowestAlignedBoundary := c.lowestAlignedBoundary()
-	if upTo <= (lowestAlignedBoundary + (c.segmentSize * 1000)) {
-		// below 1000 files we don't bother with this optimisation
-		return nil
-	}
-
-	lowestLookupBlock := upTo - c.segmentSize*10 // look for an existing 'fullKV snapshot' in the last 10 segments to skip the full walk
-
-	var highest *FileInfo
-	if err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
-		return c.objStore.WalkFrom(ctx, "", fmt.Sprintf("%010d", lowestLookupBlock), func(filename string) error {
-			fileInfo, ok := parseFileName(c.Name(), filename)
-			if !ok || fileInfo.Partial {
-				return nil
-			}
-
-			if fileInfo.Range.ExclusiveEndBlock > upTo {
-				return dstore.StopIteration
-			}
-			// Walk is always in ascending order
-			highest = fileInfo
-			return nil
-		})
-	}); err != nil {
-		return nil
-	}
-
-	return highest
-}
-
-func (c *Config) ListSnapshotFiles(ctx context.Context, below uint64) (files []*FileInfo, err error) {
+func (c *Config) ListSnapshotFiles(ctx context.Context, from, upto uint64) (files []*FileInfo, err error) {
 	logger := logging.Logger(ctx, zlog)
-	if below == 0 {
+	if upto == 0 {
 		if trace.IsEnabled() {
 			logger.Debug("no files to list", zap.String("module_hash", c.moduleHash))
 		}
 		return nil, nil
 	}
 
-	if highestFile := c.optimisticGetHighestFullSnapshotFile(ctx, below); highestFile != nil {
-		if trace.IsEnabled() {
-			logger.Debug("found a store fullKV file close to head, optimistically assuming existence of previous segments", zap.String("module_hash", c.moduleHash), zap.String("filename", highestFile.Filename))
-		}
-		lowestAlignedBoundary := c.lowestAlignedBoundary()
-		var files []*FileInfo
-		for i := lowestAlignedBoundary; i <= below; i += c.segmentSize {
-			fileInfo := NewCompleteFileInfo(c.Name(), c.ModuleInitialBlock(), i)
-			files = append(files, fileInfo)
-		}
-		return files, nil
+	var fromStr string
+	if from != 0 {
+		fromStr = fmt.Sprintf("%010d", from)
 	}
 
 	err = derr.RetryContext(ctx, 3, func(ctx context.Context) error {
@@ -200,7 +161,7 @@ func (c *Config) ListSnapshotFiles(ctx context.Context, below uint64) (files []*
 		files = nil
 
 		deletedOldFiles := 0
-		return c.objStore.Walk(ctx, "", func(filename string) (err error) {
+		return c.objStore.WalkFrom(ctx, "", fromStr, func(filename string) (err error) {
 			fileInfo, ok := parseFileName(c.Name(), filename)
 			if !ok {
 				logger.Warn("seen snapshot file that we don't know how to parse", zap.String("filename", filename))
@@ -219,10 +180,10 @@ func (c *Config) ListSnapshotFiles(ctx context.Context, below uint64) (files []*
 				return nil
 			}
 
-			if fileInfo.Partial && fileInfo.Range.StartBlock > below {
+			if fileInfo.Partial && fileInfo.Range.StartBlock > upto {
 				return dstore.StopIteration
 			}
-			if !fileInfo.Partial && fileInfo.Range.ExclusiveEndBlock > below {
+			if !fileInfo.Partial && fileInfo.Range.ExclusiveEndBlock > upto {
 				return dstore.StopIteration
 			}
 

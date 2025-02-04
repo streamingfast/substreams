@@ -41,7 +41,7 @@ func TestConfig_ListSnapshotFiles(t *testing.T) {
 
 	c := &Config{objStore: testStore, segmentSize: 1000}
 
-	files, err := c.ListSnapshotFiles(context.Background(), 10000)
+	files, err := c.ListSnapshotFiles(context.Background(), 0, 10000)
 	require.NoError(t, err)
 
 	var actualFiles []string

@@ -89,28 +89,14 @@ func BuildParallelProcessor(
 		}
 	}
 
-	// we may be here only for mapper, without stores
-	if reqPlan.BuildStores != nil {
-		err := stages.FetchStoresState(
-			ctx,
-			reqPlan.StoresSegmenter(),
-			storeConfigs,
-			execoutStorage,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("fetch stores storage state: %w", err)
-		}
-	} else {
-		err := stages.FetchStoresState(
-			ctx,
-			reqPlan.WriteOutSegmenter(),
-			storeConfigs,
-			execoutStorage,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("fetch stores storage state: %w", err)
-		}
-
+	err := stages.FetchCacheState(
+		ctx,
+		storeConfigs,
+		execoutStorage,
+		reqPlan.LinearPipeline != nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("fetch stores storage state: %w", err)
 	}
 
 	if os.Getenv("SUBSTREAMS_DEBUG_SCHEDULER_STATE") == "true" {

@@ -147,7 +147,6 @@ func (f *testRun) run(t *testing.T, testName string) error {
 	count := 0
 	workerFactory := func(ctx context.Context) work.Worker {
 		count++
-		fmt.Println("factoring worker ", count)
 		return &TestWorker{
 			t:                      t,
 			responseCollector:      newResponseCollector(ctx),

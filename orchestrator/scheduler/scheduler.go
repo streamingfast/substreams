@@ -99,6 +99,9 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 			)
 		}
 
+		cmds = append(cmds,
+			work.CmdScheduleNextJob(),
+		)
 		if s.ExecOutWalker != nil {
 			cmds = append(cmds, execout.CmdDownloadSegment(0))
 		}
@@ -133,12 +136,14 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 	case stage.MsgMergeFinished:
 		s.Stages.MergeCompleted(msg.Unit)
 		cmds = append(cmds,
+			work.CmdScheduleNextJob(),
 			s.Stages.CmdTryMerge(msg.Stage),
 		)
 
 	case stage.MsgAllStoresCompleted:
 		s.storesSyncCompleted = true
 		cmds = append(cmds,
+			work.CmdScheduleNextJob(), // in case some mapper jobs need scheduling
 			s.cmdShutdownWhenComplete(),
 		)
 

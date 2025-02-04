@@ -12,20 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/streamingfast/dmetering"
-
-	"go.opentelemetry.io/otel/attribute"
-
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/stream"
+	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dstore"
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/shutter"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"go.opentelemetry.io/otel"
-	"go.uber.org/zap"
-
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/orchestrator/stage"
 	"github.com/streamingfast/substreams/orchestrator/work"
@@ -36,6 +28,11 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service"
 	"github.com/streamingfast/substreams/service/config"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.uber.org/zap"
 )
 
 type testPreWork func(t *testing.T, run *testRun, workerFactory work.WorkerPoolFactory)

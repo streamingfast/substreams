@@ -4,7 +4,7 @@ go 1.22
 
 toolchain go1.23.2
 
-replace github.com/streamingfast/sf-saas-priv => ../sf-saas-priv
+//replace github.com/streamingfast/sf-saas-priv => ../sf-saas-priv
 
 require (
 	github.com/abourget/llerrgroup v0.2.0

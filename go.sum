@@ -554,6 +554,8 @@ github.com/streamingfast/pbgo v0.0.6-0.20240823134334-812f6a16c5cb h1:Xqt4ned9EL
 github.com/streamingfast/pbgo v0.0.6-0.20240823134334-812f6a16c5cb/go.mod h1:eDQjKBYg9BWE2BTaV3UZeLZ5xw05+ywA9RCFTmM1w5Y=
 github.com/streamingfast/protoreflect v0.0.0-20231205191344-4b629d20ce8d h1:33VIARqUqBUKXJcuQoOS1rVSms54tgxhhNCmrLptpLg=
 github.com/streamingfast/protoreflect v0.0.0-20231205191344-4b629d20ce8d/go.mod h1:aBJivEdekmFWYSQ29EE/fN9IanJWJXbtjy3ky0XD/jE=
+github.com/streamingfast/sf-saas-priv v0.0.0-20250129135022-63cbe94e466f h1:6IhtHxkX2tRroxvkw5YBxXUPBPuog4MWho+9XohQVWk=
+github.com/streamingfast/sf-saas-priv v0.0.0-20250129135022-63cbe94e466f/go.mod h1:UTuD3pg3ZwMHloc2GIlAKvO3lnJ0pv0GM08Rt2Kfs8g=
 github.com/streamingfast/sf-tracing v0.0.0-20240430173521-888827872b90 h1:94HllkX4ttYVilo8ZJv05b5z8JiMmqBvv4+Jdgk/+2A=
 github.com/streamingfast/sf-tracing v0.0.0-20240430173521-888827872b90/go.mod h1:e6tKS/udlfXFUTQBYfDDdISfjULvQXet1kBrOeRfgI4=
 github.com/streamingfast/shutter v1.5.0 h1:NpzDYzj0HVpSiDJVO/FFSL6QIK/YKOxY0gJAtyaTOgs=

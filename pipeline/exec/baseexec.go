@@ -102,7 +102,7 @@ func canSkipExecution(wasmArgumentValues map[string][]byte, hasSingleParams bool
 	return true
 }
 
-func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canSkipEmptyOutput bool) (call *wasm.Call, err error) {
+func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canSkipEmptyOutput bool, sharedBuffer *SharedBuffer) (call *wasm.Call, err error) {
 	e.logs = nil
 	e.logsTruncated = false
 
@@ -121,7 +121,16 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canS
 	stats := reqctx.ReqStats(e.ctx)
 	//t0 := time.Now()
 	call = wasm.NewCall(clock, e.moduleName, e.entrypoint, stats, e.wasmArguments, canSkipEmptyOutput)
-	inst, err = e.wasmModule.ExecuteNewCall(e.ctx, call, e.cachedInstance, e.wasmArguments, argValues)
+
+	if sharedBuffer != nil {
+		err = sharedBuffer.Execute(e.ctx, e.wasmModule, e.moduleHash, call, e.wasmArguments, argValues)
+		// note: inst will be nil, so the cachedInstance won't be used on next block
+		//       cachedInstances are only used when instanceCacheEnabled is true
+		//       which is not the case in production
+	} else {
+		inst, err = e.wasmModule.ExecuteNewCall(e.ctx, call, e.cachedInstance, e.wasmArguments, argValues)
+	}
+
 	//Timer += time.Since(t0)
 	if panicErr := call.Err(); panicErr != nil {
 		errExecutor := &ErrorExecutor{
@@ -136,14 +145,16 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canS
 		}
 		return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %w: %s", clock.Number, e.moduleName, ErrWasmDeterministicExec, err)
 	}
-	if e.instanceCacheEnabled {
-		if err := inst.Cleanup(e.ctx); err != nil {
-			return nil, fmt.Errorf("block %d: module %q: failed to cleanup module: %w", clock.Number, e.moduleName, err)
-		}
-		e.cachedInstance = inst
-	} else {
-		if err := inst.Close(e.ctx); err != nil {
-			return nil, fmt.Errorf("block %d: module %q: failed to close module: %w", clock.Number, e.moduleName, err)
+	if inst != nil {
+		if e.instanceCacheEnabled {
+			if err := inst.Cleanup(e.ctx); err != nil {
+				return nil, fmt.Errorf("block %d: module %q: failed to cleanup module: %w", clock.Number, e.moduleName, err)
+			}
+			e.cachedInstance = inst
+		} else {
+			if err := inst.Close(e.ctx); err != nil {
+				return nil, fmt.Errorf("block %d: module %q: failed to close module: %w", clock.Number, e.moduleName, err)
+			}
 		}
 	}
 	e.logs = call.Logs

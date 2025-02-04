@@ -18,6 +18,7 @@ type BaseExecutor struct {
 	ctx context.Context
 
 	moduleName    string
+	moduleHash    string
 	initialBlock  uint64
 	wasmModule    wasm.Module
 	wasmArguments []wasm.Argument
@@ -33,12 +34,13 @@ type BaseExecutor struct {
 	logsTruncated bool
 }
 
-func NewBaseExecutor(ctx context.Context, moduleName string, initialBlock uint64, wasmModule wasm.Module, cacheEnabled bool, wasmArguments []wasm.Argument, blockIndex *index.BlockIndex, entrypoint string, tracer ttrace.Tracer) *BaseExecutor {
+func NewBaseExecutor(ctx context.Context, moduleName, moduleHash string, initialBlock uint64, wasmModule wasm.Module, cacheEnabled bool, wasmArguments []wasm.Argument, blockIndex *index.BlockIndex, entrypoint string, tracer ttrace.Tracer) *BaseExecutor {
 	return &BaseExecutor{
 		ctx:                  ctx,
 		initialBlock:         initialBlock,
 		blockIndex:           blockIndex,
 		moduleName:           moduleName,
+		moduleHash:           moduleHash,
 		wasmModule:           wasmModule,
 		instanceCacheEnabled: cacheEnabled,
 		wasmArguments:        wasmArguments,

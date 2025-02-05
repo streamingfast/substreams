@@ -130,11 +130,6 @@ func loadDescriptorSets(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.Fil
 			continue
 		}
 
-		authToken := os.Getenv("BUFBUILD_AUTH_TOKEN")
-		if authToken == "" {
-			return nil, fmt.Errorf("missing BUFBUILD_AUTH_TOKEN; go into your account at https://buf.build/settings/user to create an API key")
-		}
-
 		client := reflectv1beta1connect.NewFileDescriptorSetServiceClient(
 			http.DefaultClient,
 			"https://buf.build",
@@ -146,7 +141,11 @@ func loadDescriptorSets(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.Fil
 			Version: descriptor.Version,
 		})
 
-		request.Header().Set("Authorization", "Bearer "+authToken)
+		authToken := os.Getenv("BUFBUILD_AUTH_TOKEN")
+		if authToken != "" {
+			request.Header().Set("Authorization", "Bearer "+authToken)
+		}
+
 		fileDescriptorSet, err := client.GetFileDescriptorSet(context.Background(), request)
 		if err != nil {
 			return nil, fmt.Errorf("getting file descriptor set for %s: %w", descriptor.Module, err)

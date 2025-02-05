@@ -11,11 +11,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Server
+
 * Limit parallel execution of a stage's layer.
 
   Previously, the engine was executing modules in a stage's layer all in parallel. We now change that behavior, development mode will from now on execute every sequentially and when in production mode will limit parallelism to 2 (hard-coded) for now.
 
   The auth plugin can control that value dynamically by providing a trusted header `X-Sf-Substreams-Stage-Layer-Parallel-Executor-Max-Count`.
+
+### CLI
+
+* Removed enforcement of `BUFBUILD_AUTH_TOKEN` environment variable when using descriptor sets. It appears there is now a public free tier to query those which should work in most cases.
 
 ## v1.12.4
 

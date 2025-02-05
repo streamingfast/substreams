@@ -24,9 +24,10 @@ type GlobalWorkerPool struct {
 	logger               *zap.Logger
 	clientFactory        client.InternalClientFactory
 	workerKeepAliveDelay time.Duration
+	maxWorkerForTraceID  uint64
 }
 
-func NewGlobalWorkerPool(ctx context.Context, userID string, traceID string, remoteWorkerPool pbworkerconnect.WorkerPoolClient, clientFactory client.InternalClientFactory, workerKeepAliveDelay time.Duration) *GlobalWorkerPool {
+func NewGlobalWorkerPool(ctx context.Context, userID string, traceID string, maxWorkerForTraceID uint64, remoteWorkerPool pbworkerconnect.WorkerPoolClient, clientFactory client.InternalClientFactory, workerKeepAliveDelay time.Duration) *GlobalWorkerPool {
 	logger := reqctx.Logger(ctx)
 
 	logger.Debug("initializing worker pool", zap.String("user_id", userID), zap.String("trace_id", traceID))
@@ -34,6 +35,7 @@ func NewGlobalWorkerPool(ctx context.Context, userID string, traceID string, rem
 	return &GlobalWorkerPool{
 		userID:               userID,
 		traceID:              traceID,
+		maxWorkerForTraceID:  maxWorkerForTraceID,
 		remoteWorkerPool:     remoteWorkerPool,
 		startedAt:            time.Now(),
 		clientFactory:        clientFactory,
@@ -53,8 +55,9 @@ func (p *GlobalWorkerPool) Borrow(ctx context.Context) (Worker, error) {
 	response, err := p.remoteWorkerPool.BorrowWorker(ctx,
 		&connect.Request[pbworker.BorrowWorkerRequest]{
 			Msg: &pbworker.BorrowWorkerRequest{
-				UserId:  p.userID,
-				TraceId: p.traceID,
+				UserId:              p.userID,
+				TraceId:             p.traceID,
+				MaxWorkerForTraceId: int64(p.maxWorkerForTraceID),
 			},
 		},
 	)

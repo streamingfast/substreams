@@ -30,7 +30,8 @@ func NewGlobalWorkerPoolFactory(remoteWorkerPool pbworkerconnect.WorkerPoolClien
 func (f *GlobalWorkerPoolFactory) WorkerPool(ctx context.Context) WorkerPool {
 	userID := dauth.FromContext(ctx).UserID()
 	traceID := tracing.GetTraceID(ctx)
-	workerPool := NewGlobalWorkerPool(ctx, userID, traceID.String(), f.remoteWorkerPool, f.clientFactory, f.workerKeepAliveDelay)
+	reqDetails := reqctx.Details(ctx)
+	workerPool := NewGlobalWorkerPool(ctx, userID, traceID.String(), reqDetails.MaxParallelJobs, f.remoteWorkerPool, f.clientFactory, f.workerKeepAliveDelay)
 
 	return workerPool
 }

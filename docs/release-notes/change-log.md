@@ -13,6 +13,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+* Added 'shared cache' on tier1: execution of modules near the HEAD of the chain will be done once for a given module hash and the result shared between requests.
+  This will reduce CPU usage and increase performance when many requests are using the same modules (ex: foundational modules)
+
 * Limit parallel execution of a stage's layer.
 
   Previously, the engine was executing modules in a stage's layer all in parallel. We now change that behavior, development mode will from now on execute every sequentially and when in production mode will limit parallelism to 2 (hard-coded) for now.

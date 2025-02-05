@@ -520,9 +520,11 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 				switch kind := module.Kind.(type) {
 				case *pbsubstreams.Module_KindMap_:
 					outType := strings.TrimPrefix(module.Output.Type, "proto:")
+
 					baseExecutor := exec.NewBaseExecutor(
 						ctx,
 						module.Name,
+						p.execGraph.ModuleHashes().Get(module.Name),
 						modulesInitBlocks[module.Name],
 						mod,
 						p.wasmRuntime.InstanceCacheEnabled(),
@@ -547,6 +549,7 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 					baseExecutor := exec.NewBaseExecutor(
 						ctx,
 						module.Name,
+						p.execGraph.ModuleHashes().Get(module.Name),
 						modulesInitBlocks[module.Name],
 						mod,
 						p.wasmRuntime.InstanceCacheEnabled(),
@@ -565,6 +568,7 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 					baseExecutor := exec.NewBaseExecutor(
 						ctx,
 						module.Name,
+						p.execGraph.ModuleHashes().Get(module.Name),
 						modulesInitBlocks[module.Name],
 						mod,
 						p.wasmRuntime.InstanceCacheEnabled(),

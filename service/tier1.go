@@ -138,6 +138,7 @@ func NewTier1(
 	enforceCompression bool,
 	activeRequestsSoftLimit int,
 	activeRequestsHardLimit int,
+	sharedCacheSize uint64,
 	opts ...Option,
 ) (*Tier1Service, error) {
 
@@ -188,6 +189,25 @@ func NewTier1(
 		activeRequestsSoftLimit: activeRequestsSoftLimit,
 		activeRequestsHardLimit: activeRequestsHardLimit,
 	}
+
+	go func() {
+		if sharedCacheSize == 0 {
+			zlog.Info("shared cache disabled")
+			return
+		}
+		<-hub.Ready
+		sharedCache := exec.NewSharedCache(sharedCacheSize)
+		hubSrc := hub.SourceFromBlockNum(hub.HeadNum(), sharedCache)
+		if hubSrc == nil {
+			zlog.Error("cannot get blocks source from hub")
+			return
+		}
+		exec.GlobalSharedCache = sharedCache
+		hubSrc.Run()
+		if err := hubSrc.Err(); err != nil {
+			zlog.Info("shared cache source stopped", zap.Error(err))
+		}
+	}()
 
 	s.streamFactoryFunc = sf.New
 	s.getRecentFinalBlock = sf.GetRecentFinalBlock

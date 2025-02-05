@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/index"
@@ -18,6 +19,7 @@ type BaseExecutor struct {
 	ctx context.Context
 
 	moduleName    string
+	moduleHash    string
 	initialBlock  uint64
 	wasmModule    wasm.Module
 	wasmArguments []wasm.Argument
@@ -33,12 +35,13 @@ type BaseExecutor struct {
 	logsTruncated bool
 }
 
-func NewBaseExecutor(ctx context.Context, moduleName string, initialBlock uint64, wasmModule wasm.Module, cacheEnabled bool, wasmArguments []wasm.Argument, blockIndex *index.BlockIndex, entrypoint string, tracer ttrace.Tracer) *BaseExecutor {
+func NewBaseExecutor(ctx context.Context, moduleName, moduleHash string, initialBlock uint64, wasmModule wasm.Module, cacheEnabled bool, wasmArguments []wasm.Argument, blockIndex *index.BlockIndex, entrypoint string, tracer ttrace.Tracer) *BaseExecutor {
 	return &BaseExecutor{
 		ctx:                  ctx,
 		initialBlock:         initialBlock,
 		blockIndex:           blockIndex,
 		moduleName:           moduleName,
+		moduleHash:           moduleHash,
 		wasmModule:           wasmModule,
 		instanceCacheEnabled: cacheEnabled,
 		wasmArguments:        wasmArguments,
@@ -100,7 +103,7 @@ func canSkipExecution(wasmArgumentValues map[string][]byte, hasSingleParams bool
 	return true
 }
 
-func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canSkipEmptyOutput bool) (call *wasm.Call, err error) {
+func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canSkipEmptyOutput bool, sharedCache *SharedCache) (call *wasm.Call, err error) {
 	e.logs = nil
 	e.logsTruncated = false
 
@@ -119,7 +122,14 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canS
 	stats := reqctx.ReqStats(e.ctx)
 	//t0 := time.Now()
 	call = wasm.NewCall(clock, e.moduleName, e.entrypoint, stats, e.wasmArguments, canSkipEmptyOutput)
-	inst, err = e.wasmModule.ExecuteNewCall(e.ctx, call, e.cachedInstance, e.wasmArguments, argValues)
+
+	if sharedCache.Cachable(clock.Number) {
+		err = sharedCache.Execute(e.wasmModule, e.moduleHash, call, e.wasmArguments, argValues)
+	} else {
+		inst, err = e.wasmModule.ExecuteNewCall(e.ctx, call, e.cachedInstance, e.wasmArguments, argValues)
+		metrics.ExecutedWasmModules.Inc()
+	}
+
 	//Timer += time.Since(t0)
 	if panicErr := call.Err(); panicErr != nil {
 		errExecutor := &ErrorExecutor{
@@ -134,14 +144,16 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canS
 		}
 		return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %w: %s", clock.Number, e.moduleName, ErrWasmDeterministicExec, err)
 	}
-	if e.instanceCacheEnabled {
-		if err := inst.Cleanup(e.ctx); err != nil {
-			return nil, fmt.Errorf("block %d: module %q: failed to cleanup module: %w", clock.Number, e.moduleName, err)
-		}
-		e.cachedInstance = inst
-	} else {
-		if err := inst.Close(e.ctx); err != nil {
-			return nil, fmt.Errorf("block %d: module %q: failed to close module: %w", clock.Number, e.moduleName, err)
+	if inst != nil {
+		if e.instanceCacheEnabled {
+			if err := inst.Cleanup(e.ctx); err != nil {
+				return nil, fmt.Errorf("block %d: module %q: failed to cleanup module: %w", clock.Number, e.moduleName, err)
+			}
+			e.cachedInstance = inst
+		} else {
+			if err := inst.Close(e.ctx); err != nil {
+				return nil, fmt.Errorf("block %d: module %q: failed to close module: %w", clock.Number, e.moduleName, err)
+			}
 		}
 	}
 	e.logs = call.Logs

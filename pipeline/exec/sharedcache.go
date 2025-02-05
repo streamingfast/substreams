@@ -3,6 +3,7 @@ package exec
 import (
 	"context"
 	"fmt"
+	"math"
 	"sync"
 
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
@@ -17,19 +18,17 @@ var GlobalSharedCache *SharedCache
 
 type SharedCache struct {
 	sync.Mutex
-	headBlock *atomic.Uint64
-	size      uint64
+	headBlock  *atomic.Uint64
+	sizeBlocks uint64
 	// module_hash -> blockHash -> callEntry
-	callEntries map[string]map[string]*callEntry
+	callEntries map[cacheClock]map[string]*callEntry
 }
 
-const maxUint64 uint64 = 1<<64 - 1
-
-func NewSharedCache(size uint64) *SharedCache {
+func NewSharedCache(sizeBlocks uint64) *SharedCache {
 	return &SharedCache{
-		headBlock:   atomic.NewUint64(maxUint64),
-		size:        size,
-		callEntries: make(map[string]map[string]*callEntry),
+		headBlock:   atomic.NewUint64(math.MaxUint64),
+		sizeBlocks:  sizeBlocks,
+		callEntries: make(map[cacheClock]map[string]*callEntry),
 	}
 }
 
@@ -42,31 +41,29 @@ func (s *SharedCache) ProcessBlock(blk *pbbstream.Block, _ interface{}) error {
 	return nil
 }
 
+type cacheClock struct {
+	id  string
+	num uint64
+}
+
 func (s *SharedCache) cleanup(head uint64) {
-	if head < s.size {
+	if head < s.sizeBlocks {
 		return
 	}
-	// cleanup
-	lowest := head - s.size
-	s.Lock()
-	for clockID, hashesInClock := range s.callEntries {
-		for entryID, entry := range hashesInClock {
-			if entry.clock.Number < lowest {
-				delete(hashesInClock, entryID)
-				if tracer.Enabled() {
-					zlog.Debug("deleting entry", zap.Uint64("clock_num", entry.clock.Number))
-				}
-			}
-		}
-		if len(hashesInClock) == 0 {
-			delete(s.callEntries, clockID)
-			if tracer.Enabled() {
-				zlog.Debug("deleting clockID", zap.String("clock_id", clockID))
-			}
-		}
 
+	// cleanup
+	lowest := head - s.sizeBlocks
+	s.Lock()
+	defer s.Unlock()
+
+	for clock := range s.callEntries {
+		if clock.num < lowest {
+			delete(s.callEntries, clock)
+			if tracer.Enabled() {
+				zlog.Debug("deleting cached entries", zap.Uint64("clock_num", clock.num), zap.String("clock_id", clock.id))
+			}
+		}
 	}
-	s.Unlock()
 }
 
 type callEntry struct {
@@ -78,7 +75,6 @@ type callEntry struct {
 	logsByteCount  uint64
 	executionStack []string
 	returnValue    []byte
-	executed       bool
 
 	err      error
 	panicErr *wasm.PanicError
@@ -86,9 +82,8 @@ type callEntry struct {
 
 func applyResult(res *callEntry, call *wasm.Call) error {
 	if call.Clock.Id != res.clock.Id ||
-		call.Entrypoint != res.entrypoint ||
-		call.ModuleName != res.moduleName {
-		panic(fmt.Sprintf("invalid shared cache data on block %s (%s) for module %s (%s)", call.Clock, res.clock, call.ModuleName, res.moduleName))
+		call.Entrypoint != res.entrypoint {
+		panic(fmt.Sprintf("invalid shared cache data on block %s (%s)", call.Clock, res.clock))
 	}
 
 	call.Logs = append([]string{}, res.logs...)
@@ -109,62 +104,61 @@ func (res *callEntry) updateFromCall(call *wasm.Call, err error) {
 	res.logs = append([]string{}, call.Logs...)
 	res.logsByteCount = call.LogsByteCount
 	res.executionStack = append([]string{}, call.ExecutionStack...)
-	res.executed = true
 }
 
 func (s *SharedCache) Cachable(blockNum uint64) bool {
-	resp := s != nil && blockNum+s.size > s.headBlock.Load()
-	return resp
+	return s != nil && blockNum+s.sizeBlocks > s.headBlock.Load()
 }
 
 func (s *SharedCache) Execute(
-	ctx context.Context,
 	wasmModule wasm.Module,
 	moduleHash string,
 	call *wasm.Call,
 	wasmArguments []wasm.Argument,
 	argValues map[string][]byte,
 ) error {
-	clock := call.Clock
-	var resultLockOwner bool
-
-	s.Lock()
-
-	if s.callEntries[clock.Id] == nil {
-		s.callEntries[clock.Id] = make(map[string]*callEntry)
+	clock := cacheClock{
+		id:  call.Clock.Id,
+		num: call.Clock.Number,
 	}
-	result, ok := s.callEntries[clock.Id][moduleHash]
-	if !ok {
-		result = &callEntry{clock: clock}
-		s.callEntries[clock.Id][moduleHash] = result
-		resultLockOwner = true
+
+	s.Lock() // do not return before unlocking this
+
+	if s.callEntries[clock] == nil {
+		s.callEntries[clock] = make(map[string]*callEntry)
+	}
+	result, found := s.callEntries[clock][moduleHash]
+	if !found {
+		result = &callEntry{clock: call.Clock}
+		s.callEntries[clock][moduleHash] = result
+
+		// this request will actually cause the WASM execution. It locks the 'result' object for writes until it populates it
 		result.Lock()
 		defer result.Unlock()
 	}
 
-	s.Unlock()
+	s.Unlock() // This lock is global, it should never wait for an execution!
 
-	if !resultLockOwner {
-		result.RLock()
-		defer result.RUnlock()
-	}
-
-	if result.executed {
+	if !found {
 		if tracer.Enabled() {
-			zlog.Debug("getting wasm call from cache", zap.String("module_hash", moduleHash), zap.Uint64("block_num", clock.Number))
+			zlog.Debug("executing wasm call", zap.String("module_hash", moduleHash), zap.Uint64("block_num", clock.num))
 		}
-		metrics.SkippedCachedWasmModules.Inc()
-		return applyResult(result, call)
+		metrics.ExecutedWasmModules.Inc()
+		ctx := context.TODO()
+		inst, err := wasmModule.ExecuteNewCall(ctx, call, nil, wasmArguments, argValues)
+		inst.Close(ctx)
+		result.updateFromCall(call, err)
+
+		return err
 	}
+
+	// the "second" request (and subsequent requests) waits here for the "first requestor" to finish the WASM execution
+	result.RLock()
+	defer result.RUnlock()
 
 	if tracer.Enabled() {
-		zlog.Debug("executing wasm call", zap.String("module_hash", moduleHash), zap.Uint64("block_num", clock.Number))
+		zlog.Debug("getting wasm call from cache", zap.String("module_hash", moduleHash), zap.Uint64("block_num", clock.num))
 	}
-	metrics.ExecutedWasmModules.Inc()
-	ctx = context.TODO()
-	inst, err := wasmModule.ExecuteNewCall(ctx, call, nil, wasmArguments, argValues)
-	inst.Close(ctx)
-	result.updateFromCall(call, err)
-
-	return err
+	metrics.SkippedCachedWasmModules.Inc()
+	return applyResult(result, call)
 }

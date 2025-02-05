@@ -43,7 +43,7 @@ type InfoServer interface {
 }
 
 // returns config with default sane values
-func NewTier1Config() *Tier1Config {
+func NewDefaultTier1Config() *Tier1Config {
 	return &Tier1Config{
 		SharedCacheSize:       15,
 		MaxSubrequests:        10,

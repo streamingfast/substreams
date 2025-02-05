@@ -204,6 +204,9 @@ func NewTier1(
 		}
 		exec.GlobalSharedCache = sharedCache
 		hubSrc.Run()
+		if err := hubSrc.Err(); err != nil {
+			zlog.Info("shared cache source stopped", zap.Error(err))
+		}
 	}()
 
 	s.streamFactoryFunc = sf.New

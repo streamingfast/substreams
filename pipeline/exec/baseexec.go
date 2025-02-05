@@ -124,7 +124,7 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canS
 	call = wasm.NewCall(clock, e.moduleName, e.entrypoint, stats, e.wasmArguments, canSkipEmptyOutput)
 
 	if sharedCache.Cachable(clock.Number) {
-		err = sharedCache.Execute(e.ctx, e.wasmModule, e.moduleHash, call, e.wasmArguments, argValues)
+		err = sharedCache.Execute(e.wasmModule, e.moduleHash, call, e.wasmArguments, argValues)
 	} else {
 		inst, err = e.wasmModule.ExecuteNewCall(e.ctx, call, e.cachedInstance, e.wasmArguments, argValues)
 		metrics.ExecutedWasmModules.Inc()

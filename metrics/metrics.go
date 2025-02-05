@@ -37,6 +37,9 @@ var Tier2RejectedRequestCounter = MetricSet.NewCounterVec(
 	"Counter for total Substreams requests the tier2 rejected, by reason (gRPC code reason)",
 )
 
+var ExecutedWasmModules = MetricSet.NewCounter("substreams_executed_wasm_modules", "Counter for total Substreams modules x block for which wasm was executed")
+var SkippedCachedWasmModules = MetricSet.NewCounter("substreams_skipped_cached_wasm_modules", "Counter for total Substreams modules x block that were not executed because they were found in the shared cache")
+
 var AppReadinessTier1 = MetricSet.NewAppReadiness("substreams_tier1")
 var AppReadinessTier2 = MetricSet.NewAppReadiness("substreams_tier2")
 

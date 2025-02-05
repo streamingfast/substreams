@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/index"
@@ -102,7 +103,7 @@ func canSkipExecution(wasmArgumentValues map[string][]byte, hasSingleParams bool
 	return true
 }
 
-func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canSkipEmptyOutput bool, sharedBuffer *SharedBuffer) (call *wasm.Call, err error) {
+func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canSkipEmptyOutput bool, sharedCache *SharedCache) (call *wasm.Call, err error) {
 	e.logs = nil
 	e.logsTruncated = false
 
@@ -122,13 +123,11 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canS
 	//t0 := time.Now()
 	call = wasm.NewCall(clock, e.moduleName, e.entrypoint, stats, e.wasmArguments, canSkipEmptyOutput)
 
-	if sharedBuffer != nil {
-		err = sharedBuffer.Execute(e.ctx, e.wasmModule, e.moduleHash, call, e.wasmArguments, argValues)
-		// note: inst will be nil, so the cachedInstance won't be used on next block
-		//       cachedInstances are only used when instanceCacheEnabled is true
-		//       which is not the case in production
+	if sharedCache.Cachable(clock.Number) {
+		err = sharedCache.Execute(e.ctx, e.wasmModule, e.moduleHash, call, e.wasmArguments, argValues)
 	} else {
 		inst, err = e.wasmModule.ExecuteNewCall(e.ctx, call, e.cachedInstance, e.wasmArguments, argValues)
+		metrics.ExecutedWasmModules.Inc()
 	}
 
 	//Timer += time.Since(t0)

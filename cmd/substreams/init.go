@@ -177,22 +177,8 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			Title      string
 			Generators []*pbconvo.DiscoveryResponse_Generator
 		}
-		titleFromGroup := func(group string) string {
-			switch group {
-			case "evm":
-				return "EVM"
-			case "solana":
-				return "Solana"
-			case "cosmos":
-				return "Cosmos"
-			case "starknet":
-				return "Starknet"
-			}
 
-			return ""
-		}
-
-		var filteredProtocols map[string]*BlockchainProtocolSelector = make(map[string]*BlockchainProtocolSelector)
+		filteredProtocols := make(map[string]*BlockchainProtocolSelector)
 		for _, gen := range resp.Msg.Generators {
 			selector, groupExists := filteredProtocols[gen.Group]
 			if groupExists {
@@ -200,13 +186,13 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			} else {
 				filteredProtocols[gen.Group] = &BlockchainProtocolSelector{
 					Id:         gen.Group,
-					Title:      titleFromGroup(gen.Group),
+					Title:      generatorGroupToProtocolTitle(gen.Group),
 					Generators: []*pbconvo.DiscoveryResponse_Generator{gen},
 				}
 			}
 		}
 
-		var protocolOptions []huh.Option[*BlockchainProtocolSelector]
+		protocolOptions := make([]huh.Option[*BlockchainProtocolSelector], 0, len(filteredProtocols))
 		for _, value := range filteredProtocols {
 			protocolOptions = append(protocolOptions, huh.Option[*BlockchainProtocolSelector]{
 				Key:   value.Title,
@@ -225,9 +211,9 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed taking input: %w", err)
 		}
 
-		fmt.Println(gray("┃"), "Chosen chain: ", bold(selector.Id), "-", selector.Title)
+		fmt.Println(gray("┃"), "Chosen protocol: ", bold(selector.Id), "-", selector.Title)
 
-		var generatorOptions []huh.Option[*pbconvo.DiscoveryResponse_Generator]
+		generatorOptions := make([]huh.Option[*pbconvo.DiscoveryResponse_Generator], 0, len(selector.Generators))
 		for _, gen := range selector.Generators {
 			endpoint := ""
 			if gen.Endpoint != "" {
@@ -246,10 +232,9 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			generatorOptions = append(generatorOptions, entry)
 		}
 
-		fmt.Printf("Testing................")
 		var codegen *pbconvo.DiscoveryResponse_Generator
 		selectGeneratorField := huh.NewSelect[*pbconvo.DiscoveryResponse_Generator]().
-			Title("Choose the chain ecosystem that you want to use to bootstrap your project (EVM, Cosmos, Solana, etc)").
+			Title("Choose the type of project that you want to create.").
 			Options(generatorOptions...).
 			Value(&codegen)
 
@@ -665,6 +650,21 @@ func saveDownloadFile(path string, overwriteForm *OverwriteForm, inputFile *pbco
 		return fmt.Errorf("saving zip file %q: %w", inputFile.Filename, err)
 	}
 	return nil
+}
+
+func generatorGroupToProtocolTitle(group string) string {
+	switch group {
+	case "evm":
+		return "EVM"
+	case "solana":
+		return "Solana"
+	case "cosmos":
+		return "Cosmos"
+	case "starknet":
+		return "Starknet"
+	}
+
+	return ""
 }
 
 func ToMarkdown(input string) string {

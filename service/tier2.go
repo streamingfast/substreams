@@ -454,22 +454,25 @@ excludable:
 	done := make(chan struct{})
 	if s.remoteWorkerClient != nil && !reflect.ValueOf(s.remoteWorkerClient).IsNil() {
 		workerID, keepAliveDelay, err := work.IncomingParameters(ctx)
-		s.logger.Info("got remote worker client, setting up keep alive", zap.String("worker_id", workerID), zap.Duration("keep_alive_delay", keepAliveDelay))
 		if err != nil {
 			return fmt.Errorf("getting incoming parameters: %w", err)
 		}
+		s.logger.Info("got remote worker client, setting up keep alive", zap.String("worker_id", workerID), zap.Duration("keep_alive_delay", keepAliveDelay))
+
 		go func() {
-			select {
-			case <-ctx.Done():
-				return
-			case <-time.After(keepAliveDelay):
-				s.logger.Info("keep alive timer expired, calling keep alive")
-				_, err := s.remoteWorkerClient.KeepAlive(ctx,
-					&pbworker.KeepAliveRequest{
-						WorkerKey: workerID,
-					})
-				if err != nil {
-					s.logger.Error("failed to call keep alive", zap.String("worker_id", workerID), zap.Error(err))
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(keepAliveDelay):
+					s.logger.Info("keep alive timer expired, calling keep alive", zap.String("worker_id", workerID))
+					_, err := s.remoteWorkerClient.KeepAlive(ctx,
+						&pbworker.KeepAliveRequest{
+							WorkerKey: workerID,
+						})
+					if err != nil {
+						s.logger.Error("failed to call keep alive", zap.String("worker_id", workerID), zap.Error(err))
+					}
 				}
 			}
 		}()

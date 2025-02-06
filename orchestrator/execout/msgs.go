@@ -7,15 +7,17 @@ import (
 )
 
 type MsgDownloadSegment struct {
+	loop.IsMsg
 	Wait time.Duration
 }
 
-type MsgFileDownloaded struct{}
+type MsgFileDownloaded struct{ loop.IsMsg }
 type MsgFileNotPresent struct {
+	loop.IsMsg
 	NextWait time.Duration
 } // In which case, simply re-issue the CmdDownloadFile
 
-type MsgWalkerCompleted struct{}
+type MsgWalkerCompleted struct{ loop.IsMsg }
 
 func CmdWalkerCompleted() loop.Cmd {
 	return func() loop.Msg {

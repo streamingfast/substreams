@@ -317,6 +317,7 @@ const HeaderWorkerID = "x-sf-worker-id"
 const HeaderWorkerKeepAliveDelay = "x-sf-worker-keep-alive-delay"
 
 func (w *RemoteWorker) SetOutgoingHeaders(ctx context.Context) context.Context {
+	w.logger.Info("setting outgoing headers", zap.String("worker_id", w.id), zap.Duration("keep_alive_delay", w.keepAliveDelay))
 	ctxWithHeaders := metadata.AppendToOutgoingContext(ctx,
 		HeaderWorkerID, w.id,
 		HeaderWorkerKeepAliveDelay, w.keepAliveDelay.String(),
@@ -331,12 +332,24 @@ func IncomingParameters(ctx context.Context) (workerId string, keepAliveDelay ti
 	}
 
 	stringDuration := md.Get(HeaderWorkerKeepAliveDelay)[0]
+	if stringDuration == "" {
+		return "", time.Duration(0), fmt.Errorf("missing keep alive delay header")
+	}
+
 	duration, err := time.ParseDuration(stringDuration)
 	if err != nil {
 		return "", time.Duration(0), fmt.Errorf("parsing keep alive delay: %w", err)
 	}
 
+	if duration == 0 {
+		return "", time.Duration(0), fmt.Errorf("keep alive delay must be greater than 0. header set to: %s", stringDuration)
+	}
+
 	workerId = md.Get(HeaderWorkerID)[0]
+
+	if workerId == "" {
+		return "", time.Duration(0), fmt.Errorf("missing worker id header")
+	}
 
 	return workerId, duration, nil
 }

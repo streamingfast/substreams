@@ -33,6 +33,8 @@ type Scheduler struct {
 	// Final state:
 	outputStreamCompleted bool
 	storesSyncCompleted   bool
+
+	delayedScheduleNextJob bool
 }
 
 func New(ctx context.Context, stream *response.Stream) *Scheduler {
@@ -58,7 +60,7 @@ func (s *Scheduler) Init() loop.Cmd {
 		s.outputStreamCompleted = true
 	}
 
-	cmds = append(cmds, work.CmdScheduleNextJob())
+	cmds = append(cmds, work.CmdScheduleNextJob("scheduler init"))
 
 	if s.Stages.AllStoresCompleted() {
 		cmds = append(cmds, func() loop.Msg { return stage.MsgAllStoresCompleted{} })
@@ -76,17 +78,10 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		fmt.Print(s.Stages.StatesString())
 		fmt.Printf("Scheduler message: %T %v\n", msg, msg)
 	}
-	//cmd, _ := exec.Command("bash", "-c", "cd "+os.Getenv("TEST_TEMP_DIR")+"; find .").Output()
-	//fmt.Print(string(cmd))
 	var cmds []loop.Cmd
 
 	switch msg := msg.(type) {
-	case loop.Cmd:
-		c := msg()
-		err := fmt.Sprintf("receive loop cmd instead of %T\n", c)
-		panic(err)
 	case work.MsgJobSucceeded:
-
 		shadowedUnits := s.Stages.MarkJobSuccess(msg.Unit)
 		s.WorkerPool.Return(s.ctx, msg.Worker)
 
@@ -105,21 +100,54 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		}
 
 		cmds = append(cmds,
-			work.CmdScheduleNextJob(),
+			work.CmdScheduleNextJob("job succeeded"),
 		)
 		if s.ExecOutWalker != nil {
 			cmds = append(cmds, execout.CmdDownloadSegment(0))
 		}
+
+	case work.DelayedMsgScheduleNextJob:
+		s.delayedScheduleNextJob = false
+
+		return loop.Tick(msg.Delay, work.MsgScheduleNextJob{
+			TriggerBy: "delayed:" + msg.TriggerBy,
+		})
+
 	case work.MsgScheduleNextJob:
+		s.logger.Info("scheduling next job", zap.String("trigger_by", msg.TriggerBy))
 		worker, err := s.WorkerPool.Borrow(s.ctx)
 		if err != nil {
 			if errors.Is(err, work.ErrorResourceExhausted) {
-				s.logger.Debug("resource exhausted, retrying", zap.Error(err))
+				s.logger.Info("resource exhausted", zap.Error(err))
+				if s.delayedScheduleNextJob {
+					s.logger.Info("skipping delayed schedule next job")
+					return nil
+				}
+
+				s.delayedScheduleNextJob = true
+				return loop.Tick(10*time.Second, work.DelayedMsgScheduleNextJob{
+					TriggerBy: "resource exhausted",
+					Delay:     10 * time.Second,
+				})
+			} else if errors.Is(err, work.ErrorResourceExhaustedRampUp) {
+				s.logger.Info("resource exhausted ramp up", zap.Error(err))
+
+				if s.delayedScheduleNextJob {
+					s.logger.Info("skipping ramp up delayed schedule next job")
+					return nil
+				}
+
+				s.delayedScheduleNextJob = true
+				return loop.Tick(10*time.Second, work.DelayedMsgScheduleNextJob{
+					TriggerBy: "resource exhausted ramp up",
+					Delay:     1 * time.Second,
+				})
 			} else {
 				s.logger.Error("scheduler: failed to borrow worker", zap.Error(err))
+				return nil //todo: wrap in a retry loop or just let it go through
 			}
-			return loop.Tick(1*time.Second, work.MsgScheduleNextJob{})
 		}
+		s.logger.Info("worker borrowed", zap.String("worker_id", worker.ID()))
 		workUnit, workRange := s.Stages.NextJob()
 		if workRange == nil { // End of job
 			return nil
@@ -130,7 +158,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 
 		return loop.Batch(
 			worker.Work(s.ctx, workUnit, workRange.StartBlock, modules, s.stream),
-			work.CmdScheduleNextJob(),
+			work.CmdScheduleNextJob("scheduler next job"),
 		)
 
 	case work.MsgJobFailed:
@@ -139,14 +167,14 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 	case stage.MsgMergeFinished:
 		s.Stages.MergeCompleted(msg.Unit)
 		cmds = append(cmds,
-			work.CmdScheduleNextJob(),
+			//work.CmdScheduleNextJob("merge finished"),
 			s.Stages.CmdTryMerge(msg.Stage),
 		)
 
 	case stage.MsgAllStoresCompleted:
 		s.storesSyncCompleted = true
 		cmds = append(cmds,
-			work.CmdScheduleNextJob(), // in case some mapper jobs need scheduling
+			//work.CmdScheduleNextJob("all store completed"), // in case some mapper jobs need scheduling
 			s.cmdShutdownWhenComplete(),
 		)
 

@@ -7,4 +7,5 @@ import (
 type WorkerPool interface {
 	Borrow(ctx context.Context) (Worker, error)
 	Return(ctx context.Context, worker Worker)
+	RampingUp() bool
 }

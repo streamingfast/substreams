@@ -20,6 +20,7 @@ type GlobalWorkerPoolFactory struct {
 }
 
 func NewGlobalWorkerPoolFactory(remoteWorkerPool pbworker.WorkerPoolClient, clientFactory client.InternalClientFactory, workerKeepAliveDelay time.Duration) *GlobalWorkerPoolFactory {
+
 	return &GlobalWorkerPoolFactory{
 		remoteWorkerPool:     remoteWorkerPool,
 		workerKeepAliveDelay: workerKeepAliveDelay,

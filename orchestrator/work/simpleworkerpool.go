@@ -9,11 +9,14 @@ import (
 	"go.uber.org/zap"
 )
 
+//todo: Test Test Test
+
 type SimpleWorkerPool struct {
 	freeWorker        int
 	startedAt         time.Time
 	firstWorkerServed bool
 	clientFactory     client.InternalClientFactory
+	rampingUp         bool
 	logger            *zap.Logger
 }
 
@@ -23,18 +26,26 @@ func NewSimpleWorkerPool(ctx context.Context, workerCount int, clientFactory cli
 	logger := reqctx.Logger(ctx)
 
 	logger.Debug("initializing worker pool", zap.Int("worker_count", workerCount))
-
-	return &SimpleWorkerPool{
+	wp := &SimpleWorkerPool{
 		freeWorker:    workerCount,
 		startedAt:     time.Now(),
 		clientFactory: clientFactory,
+		rampingUp:     true,
 		logger:        logger,
 	}
+
+	go func() {
+		time.Sleep(time.Second * 4)
+		logger.Info("worker pool ramping up completed")
+		wp.rampingUp = false
+
+	}()
+
+	return wp
 }
 
 func (p *SimpleWorkerPool) Borrow(_ context.Context) (Worker, error) {
-	rampUpCompleted := time.Since(p.startedAt) < time.Second*4
-	if !rampUpCompleted && p.firstWorkerServed {
+	if p.rampingUp && p.firstWorkerServed {
 		return nil, ErrorResourceExhausted
 	}
 
@@ -47,6 +58,10 @@ func (p *SimpleWorkerPool) Borrow(_ context.Context) (Worker, error) {
 	worker := NewRemoteWorker(p.clientFactory, "", 0, p.logger)
 	return worker, nil
 
+}
+
+func (p *SimpleWorkerPool) RampingUp() bool {
+	return p.rampingUp
 }
 
 func (p *SimpleWorkerPool) Return(_ context.Context, _ Worker) {

@@ -46,9 +46,9 @@ func Quit(err error) Cmd {
 	}
 }
 
-func Tick(delay time.Duration, fn func() Msg) Cmd {
+func Tick(delay time.Duration, msg Msg) Cmd {
 	return func() Msg {
 		time.Sleep(delay)
-		return fn()
+		return msg
 	}
 }

@@ -37,6 +37,7 @@ type Scheduler struct {
 
 func New(ctx context.Context, stream *response.Stream) *Scheduler {
 	logger := reqctx.Logger(ctx)
+	logger = logger.Named("scheduler")
 	s := &Scheduler{
 		ctx:    ctx,
 		stream: stream,
@@ -80,6 +81,10 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 	var cmds []loop.Cmd
 
 	switch msg := msg.(type) {
+	case loop.Cmd:
+		c := msg()
+		err := fmt.Sprintf("receive loop cmd instead of %T\n", c)
+		panic(err)
 	case work.MsgJobSucceeded:
 
 		shadowedUnits := s.Stages.MarkJobSuccess(msg.Unit)
@@ -105,7 +110,6 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		if s.ExecOutWalker != nil {
 			cmds = append(cmds, execout.CmdDownloadSegment(0))
 		}
-
 	case work.MsgScheduleNextJob:
 		worker, err := s.WorkerPool.Borrow(s.ctx)
 		if err != nil {
@@ -114,8 +118,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 			} else {
 				s.logger.Error("scheduler: failed to borrow worker", zap.Error(err))
 			}
-			cmds = append(cmds, loop.Tick(time.Second, func() loop.Msg { return work.CmdScheduleNextJob() }))
-			break
+			return loop.Tick(1*time.Second, work.MsgScheduleNextJob{})
 		}
 		workUnit, workRange := s.Stages.NextJob()
 		if workRange == nil { // End of job

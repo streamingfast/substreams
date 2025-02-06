@@ -8,18 +8,18 @@ import (
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/reqctx"
-	"github.com/streamingfast/worker-pool-protocol/pb/sf/worker/v1/pbworkerconnect"
+	pbworker "github.com/streamingfast/worker-pool-protocol/pb/sf/worker/v1"
 )
 
 type WorkerPoolFactory func(ctx context.Context) WorkerPool
 
 type GlobalWorkerPoolFactory struct {
 	clientFactory        client.InternalClientFactory
-	remoteWorkerPool     pbworkerconnect.WorkerPoolClient
+	remoteWorkerPool     pbworker.WorkerPoolClient
 	workerKeepAliveDelay time.Duration
 }
 
-func NewGlobalWorkerPoolFactory(remoteWorkerPool pbworkerconnect.WorkerPoolClient, clientFactory client.InternalClientFactory, workerKeepAliveDelay time.Duration) *GlobalWorkerPoolFactory {
+func NewGlobalWorkerPoolFactory(remoteWorkerPool pbworker.WorkerPoolClient, clientFactory client.InternalClientFactory, workerKeepAliveDelay time.Duration) *GlobalWorkerPoolFactory {
 	return &GlobalWorkerPoolFactory{
 		remoteWorkerPool:     remoteWorkerPool,
 		workerKeepAliveDelay: workerKeepAliveDelay,

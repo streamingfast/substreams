@@ -70,6 +70,7 @@ type RemoteWorker struct {
 }
 
 func NewRemoteWorker(clientFactory client.InternalClientFactory, id string, keepAliveDelay time.Duration, logger *zap.Logger) *RemoteWorker {
+	logger = logger.Named("remote-worker")
 	return &RemoteWorker{
 		clientFactory:  clientFactory,
 		tracer:         otel.GetTracerProvider().Tracer("worker"),

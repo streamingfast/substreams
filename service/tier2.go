@@ -36,7 +36,6 @@ import (
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
 	pbworker "github.com/streamingfast/worker-pool-protocol/pb/sf/worker/v1"
-	"github.com/streamingfast/worker-pool-protocol/pb/sf/worker/v1/pbworkerconnect"
 	"go.opentelemetry.io/otel/attribute"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
@@ -81,22 +80,19 @@ type Tier2Service struct {
 	blockExecutionTimeout     time.Duration
 
 	tier2RequestParameters *reqctx.Tier2RequestParameters
-	remoteWorkerClient     pbworkerconnect.WorkerPoolClient
-	workerPoolFactory      work.WorkerPoolFactory
+	remoteWorkerClient     pbworker.WorkerPoolClient
 }
 
 const protoPkfPrefix = "type.googleapis.com/"
 
 func NewTier2(
-	remoteWorkerClient pbworkerconnect.WorkerPoolClient,
-	workerPoolFactory work.WorkerPoolFactory,
+	remoteWorkerClient pbworker.WorkerPoolClient,
 	logger *zap.Logger,
 	opts ...Option,
 ) (*Tier2Service, error) {
 
 	s := &Tier2Service{
 		remoteWorkerClient:    remoteWorkerClient,
-		workerPoolFactory:     workerPoolFactory,
 		tracer:                tracing.GetTracer(),
 		logger:                logger,
 		blockExecutionTimeout: 3 * time.Minute,
@@ -348,7 +344,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		wasmRegistry,
 		execOutputCacheEngine,
 		request.SegmentSize,
-		s.workerPoolFactory,
+		nil,
 		respFunc,
 		s.blockExecutionTimeout,
 		opts...,
@@ -456,8 +452,9 @@ excludable:
 	}
 
 	done := make(chan struct{})
-	if s.remoteWorkerClient != nil && reflect.ValueOf(s.remoteWorkerClient).IsNil() {
+	if s.remoteWorkerClient != nil && !reflect.ValueOf(s.remoteWorkerClient).IsNil() {
 		workerID, keepAliveDelay, err := work.IncomingParameters(ctx)
+		s.logger.Info("got remote worker client, setting up keep alive", zap.String("worker_id", workerID), zap.Duration("keep_alive_delay", keepAliveDelay))
 		if err != nil {
 			return fmt.Errorf("getting incoming parameters: %w", err)
 		}
@@ -466,11 +463,11 @@ excludable:
 			case <-ctx.Done():
 				return
 			case <-time.After(keepAliveDelay):
-				_, err := s.remoteWorkerClient.KeepAlive(ctx, &connect.Request[pbworker.KeepAliveRequest]{
-					Msg: &pbworker.KeepAliveRequest{
+				s.logger.Info("keep alive timer expired, calling keep alive")
+				_, err := s.remoteWorkerClient.KeepAlive(ctx,
+					&pbworker.KeepAliveRequest{
 						WorkerKey: workerID,
-					},
-				})
+					})
 				if err != nil {
 					s.logger.Error("failed to call keep alive", zap.String("worker_id", workerID), zap.Error(err))
 				}

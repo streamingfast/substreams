@@ -195,6 +195,12 @@ func NewTier1(
 			zlog.Info("shared cache disabled")
 			return
 		}
+
+		if hub == nil {
+			zlog.Info("shared cache disabled, no live source configured")
+			return
+		}
+
 		<-hub.Ready
 		sharedCache := exec.NewSharedCache(sharedCacheSize)
 		hubSrc := hub.SourceFromBlockNum(hub.HeadNum(), sharedCache)

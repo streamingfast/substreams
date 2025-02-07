@@ -78,16 +78,14 @@ type ProcessRangeRequest struct {
 	Modules              *v1.Modules       `protobuf:"bytes,4,opt,name=modules,proto3" json:"modules,omitempty"`
 	Stage                uint32            `protobuf:"varint,5,opt,name=stage,proto3" json:"stage,omitempty"` // 0-based index of stage to execute up to
 	MeteringConfig       string            `protobuf:"bytes,6,opt,name=metering_config,json=meteringConfig,proto3" json:"metering_config,omitempty"`
-	FirstStreamableBlock uint64            `protobuf:"varint,7,opt,name=first_streamable_block,json=firstStreamableBlock,proto3" json:"first_streamable_block,omitempty"`                                                                          // first block that can be streamed on that chain
-	WasmExtensionConfigs map[string]string `protobuf:"bytes,9,rep,name=wasm_extension_configs,json=wasmExtensionConfigs,proto3" json:"wasm_extension_configs,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // TODO: rename to `wasm_extension_configs`
-	MergedBlocksStore    string            `protobuf:"bytes,10,opt,name=merged_blocks_store,json=mergedBlocksStore,proto3" json:"merged_blocks_store,omitempty"`                                                                                   // store to use for merged blocks
-	StateStore           string            `protobuf:"bytes,11,opt,name=state_store,json=stateStore,proto3" json:"state_store,omitempty"`                                                                                                          // store to use for substreams state
-	StateStoreDefaultTag string            `protobuf:"bytes,12,opt,name=state_store_default_tag,json=stateStoreDefaultTag,proto3" json:"state_store_default_tag,omitempty"`                                                                        // default tag to use for state store
-	SegmentSize          uint64            `protobuf:"varint,13,opt,name=segment_size,json=segmentSize,proto3" json:"segment_size,omitempty"`                                                                                                      // number of blocks to process in a single batch
-	BlockType            string            `protobuf:"bytes,14,opt,name=block_type,json=blockType,proto3" json:"block_type,omitempty"`                                                                                                             // block type to process
-	SegmentNumber        uint64            `protobuf:"varint,15,opt,name=segment_number,json=segmentNumber,proto3" json:"segment_number,omitempty"`                                                                                                // segment_number * segment_size = start_block_num
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	FirstStreamableBlock uint64            `protobuf:"varint,7,opt,name=first_streamable_block,json=firstStreamableBlock,proto3" json:"first_streamable_block,omitempty"`                                                                                        // first block that can be streamed on that chain
+	WasmExtensionConfigs map[string]string `protobuf:"bytes,9,rep,name=wasm_extension_configs,json=wasmExtensionConfigs,proto3" json:"wasm_extension_configs,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"` // TODO: rename to `wasm_extension_configs`
+	MergedBlocksStore    string            `protobuf:"bytes,10,opt,name=merged_blocks_store,json=mergedBlocksStore,proto3" json:"merged_blocks_store,omitempty"`                                                                                                 // store to use for merged blocks
+	StateStore           string            `protobuf:"bytes,11,opt,name=state_store,json=stateStore,proto3" json:"state_store,omitempty"`                                                                                                                        // store to use for substreams state
+	StateStoreDefaultTag string            `protobuf:"bytes,12,opt,name=state_store_default_tag,json=stateStoreDefaultTag,proto3" json:"state_store_default_tag,omitempty"`                                                                                      // default tag to use for state store
+	SegmentSize          uint64            `protobuf:"varint,13,opt,name=segment_size,json=segmentSize,proto3" json:"segment_size,omitempty"`                                                                                                                    // number of blocks to process in a single batch
+	BlockType            string            `protobuf:"bytes,14,opt,name=block_type,json=blockType,proto3" json:"block_type,omitempty"`                                                                                                                           // block type to process
+	SegmentNumber        uint64            `protobuf:"varint,15,opt,name=segment_number,json=segmentNumber,proto3" json:"segment_number,omitempty"`                                                                                                              // segment_number * segment_size = start_block_num
 }
 
 func (x *ProcessRangeRequest) Reset() {
@@ -210,6 +208,13 @@ func (x *ProcessRangeRequest) GetSegmentNumber() uint64 {
 		return x.SegmentNumber
 	}
 	return 0
+}
+
+func (x *ProcessRangeRequest) GetProductionMode() bool {
+	if x != nil {
+		return x.ProductionMode
+	}
+	return false
 }
 
 type ProcessRangeResponse struct {
@@ -731,7 +736,7 @@ var file_sf_substreams_intern_v2_service_proto_rawDesc = string([]byte{
 	0x76, 0x32, 0x1a, 0x19, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f,
 	0x62, 0x75, 0x66, 0x2f, 0x61, 0x6e, 0x79, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x1a, 0x1e, 0x73,
 	0x66, 0x2f, 0x73, 0x75, 0x62, 0x73, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x73, 0x2f, 0x76, 0x31, 0x2f,
-	0x6d, 0x6f, 0x64, 0x75, 0x6c, 0x65, 0x73, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0xd4, 0x05,
+	0x6d, 0x6f, 0x64, 0x75, 0x6c, 0x65, 0x73, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x22, 0xfd, 0x05,
 	0x0a, 0x13, 0x50, 0x72, 0x6f, 0x63, 0x65, 0x73, 0x73, 0x52, 0x61, 0x6e, 0x67, 0x65, 0x52, 0x65,
 	0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x28, 0x0a, 0x0e, 0x73, 0x74, 0x6f, 0x70, 0x5f, 0x62, 0x6c,
 	0x6f, 0x63, 0x6b, 0x5f, 0x6e, 0x75, 0x6d, 0x18, 0x02, 0x20, 0x01, 0x28, 0x04, 0x42, 0x02, 0x18,
@@ -878,7 +883,7 @@ var file_sf_substreams_intern_v2_service_proto_rawDesc = string([]byte{
 	0x73, 0x75, 0x62, 0x73, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x73, 0x2f, 0x69, 0x6e, 0x74, 0x65, 0x72,
 	0x6e, 0x2f, 0x76, 0x32, 0x3b, 0x70, 0x62, 0x73, 0x73, 0x69, 0x6e, 0x74, 0x65, 0x72, 0x6e, 0x61,
 	0x6c, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
-})
+}
 
 var (
 	file_sf_substreams_intern_v2_service_proto_rawDescOnce sync.Once

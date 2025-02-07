@@ -65,6 +65,7 @@ The data missing in the Base Block makes the corresponding Protobuf field empty.
 - **NEAR Testnet**: `testnet.near.streamingfast.io:443`
 - **Solana Mainnet-Beta**: `mainnet.sol.streamingfast.io:443`
 - **Solana Devnet**: `devnet.sol.streamingfast.io:443`
+- **Solana Accounts**: `accounts.mainnet.sol.streamingfast.io:443`
 - **Bitcoin Mainnet**: `mainnet.btc.streamingfast.io:443`
 - **Injective Mainnet**: `mainnet.injective.streamingfast.io:443`
 - **Injective Testnet**: `testnet.injective.streamingfast.io:443`

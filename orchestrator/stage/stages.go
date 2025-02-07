@@ -16,6 +16,7 @@ import (
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"
 )
 
@@ -53,6 +54,9 @@ type Stages struct {
 	// are assumed to have been either fully loaded, or merged up until this offset.
 	segmentOffset int
 
+	storeConfigs   store.ConfigMap
+	execoutConfigs *execout.Configs
+
 	// first segment where we can run directly the higher stages (shadowing the lower stages)
 	shadowableSegment int
 }
@@ -62,6 +66,7 @@ func NewStages(
 	ctx context.Context,
 	execGraph *exec.Graph,
 	reqPlan *plan.RequestPlan,
+	execoutConfigs *execout.Configs,
 	storeConfigs store.ConfigMap,
 ) (out *Stages) {
 
@@ -78,6 +83,8 @@ func NewStages(
 		logger:              reqctx.Logger(ctx),
 		globalSegmenter:     reqPlan.BackprocessSegmenter(),
 		outputModuleIsIndex: execGraph.OutputModule().GetKindBlockIndex() != nil,
+		execoutConfigs:      execoutConfigs,
+		storeConfigs:        storeConfigs,
 	}
 	if reqPlan.BuildStores != nil {
 		out.storeSegmenter = reqPlan.StoresSegmenter()

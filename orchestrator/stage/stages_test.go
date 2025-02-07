@@ -25,6 +25,7 @@ func TestNewStages(t *testing.T) {
 		exec.TestGraphStagedModules(5, 7, 12, 22, 25),
 		reqPlan,
 		nil,
+		nil,
 	)
 
 	assert.Equal(t, 8, stages.globalSegmenter.Count()) // from 5 to 75
@@ -52,6 +53,7 @@ func TestNewStageNextJobs(t *testing.T) {
 		context.Background(),
 		exec.TestGraphStagedModules(5, 5, 5, 5, 5),
 		reqPlan,
+		nil,
 		nil,
 	)
 
@@ -234,6 +236,7 @@ func TestShadowSimple(t *testing.T) {
 		exec.TestGraphStagedModules(5, 5, 5, 5, 5),
 		reqPlan,
 		nil,
+		nil,
 	)
 
 	segmentStateEquals(t, stages, `
@@ -272,6 +275,7 @@ func TestShadowStartAfter(t *testing.T) {
 		exec.TestGraphStagedModules(5, 5, 5, 5, 5),
 		reqPlan,
 		nil,
+		nil,
 	)
 
 	stages.markSegmentCompleted(unit(0, 0))
@@ -308,6 +312,7 @@ func TestShadowStartAfter2(t *testing.T) {
 		context.Background(),
 		exec.TestGraphStagedModules(5, 5, 5, 5, 5),
 		reqPlan,
+		nil,
 		nil,
 	)
 

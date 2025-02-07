@@ -5,20 +5,17 @@ import (
 	"fmt"
 
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
 
-	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/storage/store/state"
 )
 
 func (s *Stages) FetchStoresState(
 	ctx context.Context,
-	segmenter *block.Segmenter,
-	storeConfigMap store.ConfigMap,
-	execoutConfigs *execout.Configs,
 ) error {
+	segmenter := s.globalSegmenter
+
 	completes := make(unitMap)
 	partials := make(unitMap)
 
@@ -32,7 +29,7 @@ func (s *Stages) FetchStoresState(
 		}
 
 		mapperName = lastStage.storeModuleStates[0].name
-		conf := execoutConfigs.ConfigMap[mapperName]
+		conf := s.execoutConfigs.ConfigMap[mapperName]
 
 		if upToBlock != 0 {
 			from := segmenter.InitialBlock()
@@ -48,7 +45,7 @@ func (s *Stages) FetchStoresState(
 
 	// TODO: OPTIMIZATION: why load stores if there could be ExecOut data present
 	// on disk already, which avoid the need to do _any_ processing whatsoever?
-	state, err := state.FetchState(ctx, storeConfigMap, upToBlock)
+	state, err := state.FetchState(ctx, s.storeConfigs, upToBlock)
 	if err != nil {
 		return fmt.Errorf("fetching stores storage state: %w", err)
 	}

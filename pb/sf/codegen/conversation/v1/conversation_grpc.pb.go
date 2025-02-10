@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             (unknown)
-// source: sf/codegen/conversation/conversation.proto
+// source: sf/codegen/conversation/v1/conversation.proto
 
-package conversation
+package pbconvo
 
 import (
 	context "context"
@@ -148,5 +148,5 @@ var ConversationService_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "sf/codegen/conversation/conversation.proto",
+	Metadata: "sf/codegen/conversation/v1/conversation.proto",
 }

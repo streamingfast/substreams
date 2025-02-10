@@ -43,7 +43,7 @@ const (
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
 var (
-	conversationServiceServiceDescriptor        = v1.File_sf_codegen_conversation_conversation_proto.Services().ByName("ConversationService")
+	conversationServiceServiceDescriptor        = v1.File_sf_codegen_conversation_v1_conversation_proto.Services().ByName("ConversationService")
 	conversationServiceConverseMethodDescriptor = conversationServiceServiceDescriptor.Methods().ByName("Converse")
 	conversationServiceDiscoverMethodDescriptor = conversationServiceServiceDescriptor.Methods().ByName("Discover")
 )

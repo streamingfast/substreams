@@ -175,7 +175,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 	case stage.MsgAllStoresCompleted:
 		s.storesSyncCompleted = true
 		cmds = append(cmds,
-			//work.CmdScheduleNextJob("all store completed"), // in case some mapper jobs need scheduling
+			work.CmdScheduleNextJob("all store completed"), // in case some mapper jobs need scheduling
 			s.cmdShutdownWhenComplete(),
 		)
 

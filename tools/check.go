@@ -2,7 +2,6 @@ package tools
 
 import (
 	"fmt"
-	"math"
 
 	store2 "github.com/streamingfast/substreams/storage/store"
 	"go.uber.org/zap"
@@ -31,7 +30,7 @@ func checkE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create store: %w", err)
 	}
-	files, err := stateStore.ListSnapshotFiles(ctx, math.MaxUint64)
+	files, err := stateStore.ListSnapshotFiles(ctx, 0, nil)
 	if err != nil {
 		return fmt.Errorf("listing snapshots: %w", err)
 	}

@@ -8,10 +8,10 @@ import (
 	"github.com/streamingfast/substreams/storage/store"
 )
 
-func listSnapshots(ctx context.Context, storeConfig *store.Config, below uint64) (*storeSnapshots, error) {
+func listSnapshots(ctx context.Context, storeConfig *store.Config, from, to uint64) (*storeSnapshots, error) {
 	out := &storeSnapshots{}
 
-	files, err := storeConfig.ListSnapshotFiles(ctx, below)
+	files, err := storeConfig.ListSnapshotFiles(ctx, from, &to)
 	if err != nil {
 		return nil, fmt.Errorf("list snapshots: %w", err)
 	}

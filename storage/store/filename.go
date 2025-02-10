@@ -79,6 +79,10 @@ func parseFileName(moduleName, filename string) (*FileInfo, bool) {
 	}, true
 }
 
+func FilenamePrefix(blockNum uint64) string {
+	return fmt.Sprintf("%010d-", blockNum)
+}
+
 func PartialFileName(r *block.Range) string {
 	return fmt.Sprintf("%010d-%010d.partial", r.ExclusiveEndBlock, r.StartBlock)
 }

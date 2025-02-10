@@ -2,7 +2,6 @@ package tools
 
 import (
 	"fmt"
-	"math"
 
 	"github.com/abourget/llerrgroup"
 	"github.com/spf13/cobra"
@@ -33,7 +32,7 @@ func cleanUpE(cmd *cobra.Command, args []string) error {
 	highestKVBlock := uint64(0)
 	partialFiles := map[uint64]string{}
 
-	files, err := store.ListSnapshotFiles(ctx, math.MaxUint64)
+	files, err := store.ListSnapshotFiles(ctx, 0, nil)
 	if err != nil {
 		return fmt.Errorf("failed to list snapshots: %w", err)
 	}

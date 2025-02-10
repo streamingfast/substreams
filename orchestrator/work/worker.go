@@ -171,12 +171,12 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 				zap.Float64("num_of_blocks_per_sec", float64(request.SegmentSize)/timeTook.Seconds()),
 				zap.Error(err),
 			)
-			return MsgJobFailed{Unit: unit, Error: err}
+			return MsgJobFailed{Unit: unit, Worker: w, Error: err}
 		}
 
 		if err := ctx.Err(); err != nil {
 			logger.Warn("job not completed", zap.Object("unit", unit), zap.Error(err))
-			return MsgJobFailed{Unit: unit, Error: err}
+			return MsgJobFailed{Unit: unit, Worker: w, Error: err}
 		}
 
 		timeTook := time.Since(startTime)

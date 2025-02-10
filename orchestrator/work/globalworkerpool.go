@@ -12,14 +12,16 @@ import (
 	"go.uber.org/zap"
 )
 
-//todo: return worker on shutdown
+const Tier2WorkerServiceName = "t2w"
 
 type GlobalWorkerPool struct {
 	userID             string
+	apiKey             string
 	traceID            string
 	startedAt          time.Time
 	rampUpWorkerServed bool
 
+	borrowedWorker         map[string]interface{}
 	remoteWorkerPoolClient pbworker.WorkerPoolClient
 	logger                 *zap.Logger
 	clientFactory          client.InternalClientFactory
@@ -28,7 +30,7 @@ type GlobalWorkerPool struct {
 	rampingUp              bool
 }
 
-func NewGlobalWorkerPool(ctx context.Context, userID string, traceID string, maxWorkerForTraceID uint64, remoteWorkerPoolClient pbworker.WorkerPoolClient, clientFactory client.InternalClientFactory, workerKeepAliveDelay time.Duration) *GlobalWorkerPool {
+func NewGlobalWorkerPool(ctx context.Context, userID string, apiKey string, traceID string, maxWorkerForTraceID uint64, remoteWorkerPoolClient pbworker.WorkerPoolClient, clientFactory client.InternalClientFactory, workerKeepAliveDelay time.Duration) *GlobalWorkerPool {
 	logger := reqctx.Logger(ctx)
 	logger = logger.Named("global-worker-pool")
 
@@ -36,6 +38,7 @@ func NewGlobalWorkerPool(ctx context.Context, userID string, traceID string, max
 
 	wp := &GlobalWorkerPool{
 		userID:                 userID,
+		apiKey:                 apiKey,
 		traceID:                traceID,
 		maxWorkerForTraceID:    maxWorkerForTraceID,
 		remoteWorkerPoolClient: remoteWorkerPoolClient,
@@ -44,7 +47,16 @@ func NewGlobalWorkerPool(ctx context.Context, userID string, traceID string, max
 		workerKeepAliveDelay:   workerKeepAliveDelay,
 		logger:                 logger,
 		rampingUp:              true,
+		borrowedWorker:         make(map[string]interface{}),
 	}
+
+	go func() {
+		<-ctx.Done()
+		for s, _ := range wp.borrowedWorker {
+			logger.Info("returning worker on context cancel", zap.String("worker_key", s))
+			wp.Return(context.Background(), NewRemoteWorker(wp.clientFactory, s, 0, wp.logger))
+		}
+	}()
 
 	go func() {
 		time.Sleep(time.Second * 4)
@@ -66,7 +78,9 @@ func (p *GlobalWorkerPool) Borrow(ctx context.Context) (Worker, error) {
 
 	response, err := p.remoteWorkerPoolClient.BorrowWorker(ctx,
 		&pbworker.BorrowWorkerRequest{
+			Service:             Tier2WorkerServiceName,
 			UserId:              p.userID,
+			ApiKey:              p.apiKey,
 			TraceId:             p.traceID,
 			MaxWorkerForTraceId: int64(p.maxWorkerForTraceID),
 		},
@@ -84,10 +98,13 @@ func (p *GlobalWorkerPool) Borrow(ctx context.Context) (Worker, error) {
 	p.rampUpWorkerServed = true
 	worker := NewRemoteWorker(p.clientFactory, response.WorkerKey, p.workerKeepAliveDelay, p.logger)
 	p.logger.Info("worker borrowed", zap.String("worker_key", response.WorkerKey))
+	p.borrowedWorker[response.WorkerKey] = struct{}{}
+
 	return worker, nil
 }
 
 func (p *GlobalWorkerPool) Return(ctx context.Context, worker Worker) {
+	delete(p.borrowedWorker, worker.ID())
 	key := worker.ID()
 	_, err := p.remoteWorkerPoolClient.ReturnWorker(ctx,
 		&pbworker.ReturnWorkerRequest{

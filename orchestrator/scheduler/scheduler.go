@@ -162,6 +162,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		)
 
 	case work.MsgJobFailed:
+		s.WorkerPool.Return(s.ctx, msg.Worker)
 		cmds = append(cmds, loop.Quit(msg.Error))
 
 	case stage.MsgMergeFinished:

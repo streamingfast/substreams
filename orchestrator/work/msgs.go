@@ -11,8 +11,9 @@ import (
 
 type MsgJobFailed struct {
 	loop.IsMsg
-	Unit  stage.Unit
-	Error error
+	Unit   stage.Unit
+	Worker Worker
+	Error  error
 }
 
 type MsgJobSucceeded struct {

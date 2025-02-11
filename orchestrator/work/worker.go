@@ -331,27 +331,27 @@ func IncomingParameters(ctx context.Context) (workerId string, keepAliveDelay ti
 		return "", time.Duration(0), fmt.Errorf("getting metadata from context")
 	}
 
-	stringDuration := md.Get(HeaderWorkerKeepAliveDelay)[0]
-	if stringDuration == "" {
+	stringDurations := md.Get(HeaderWorkerKeepAliveDelay)
+	if len(stringDurations) != 1 && stringDurations[0] == "" {
 		return "", time.Duration(0), fmt.Errorf("missing keep alive delay header")
 	}
 
-	duration, err := time.ParseDuration(stringDuration)
+	keepAliveDelay, err = time.ParseDuration(stringDurations[0])
 	if err != nil {
 		return "", time.Duration(0), fmt.Errorf("parsing keep alive delay: %w", err)
 	}
 
-	if duration == 0 {
-		return "", time.Duration(0), fmt.Errorf("keep alive delay must be greater than 0. header set to: %s", stringDuration)
+	if keepAliveDelay == 0 {
+		return "", time.Duration(0), fmt.Errorf("keep alive delay must be greater than 0. header set to: %s", keepAliveDelay)
 	}
 
-	workerId = md.Get(HeaderWorkerID)[0]
-
-	if workerId == "" {
+	workerIds := md.Get(HeaderWorkerID)
+	if len(workerIds) != 1 && workerIds[0] == "" {
 		return "", time.Duration(0), fmt.Errorf("missing worker id header")
 	}
+	workerId = workerIds[0]
 
-	return workerId, duration, nil
+	return
 }
 
 func toRPCPartialFiles(completed *pbssinternal.Completed) (out store.FileInfos) {

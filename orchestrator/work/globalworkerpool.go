@@ -16,7 +16,7 @@ const Tier2WorkerServiceName = "t2w"
 
 type GlobalWorkerPool struct {
 	userID             string
-	apiKey             string
+	apiKeyID           string
 	traceID            string
 	startedAt          time.Time
 	rampUpWorkerServed bool
@@ -30,7 +30,7 @@ type GlobalWorkerPool struct {
 	rampingUp              bool
 }
 
-func NewGlobalWorkerPool(ctx context.Context, userID string, apiKey string, traceID string, maxWorkerForTraceID uint64, remoteWorkerPoolClient pbworker.WorkerPoolClient, clientFactory client.InternalClientFactory, workerKeepAliveDelay time.Duration) *GlobalWorkerPool {
+func NewGlobalWorkerPool(ctx context.Context, userID string, apiKeyID string, traceID string, maxWorkerForTraceID uint64, remoteWorkerPoolClient pbworker.WorkerPoolClient, clientFactory client.InternalClientFactory, workerKeepAliveDelay time.Duration) *GlobalWorkerPool {
 	logger := reqctx.Logger(ctx)
 	logger = logger.Named("global-worker-pool")
 
@@ -38,7 +38,7 @@ func NewGlobalWorkerPool(ctx context.Context, userID string, apiKey string, trac
 
 	wp := &GlobalWorkerPool{
 		userID:                 userID,
-		apiKey:                 apiKey,
+		apiKeyID:               apiKeyID,
 		traceID:                traceID,
 		maxWorkerForTraceID:    maxWorkerForTraceID,
 		remoteWorkerPoolClient: remoteWorkerPoolClient,
@@ -80,7 +80,7 @@ func (p *GlobalWorkerPool) Borrow(ctx context.Context) (Worker, error) {
 		&pbworker.BorrowWorkerRequest{
 			Service:             Tier2WorkerServiceName,
 			UserId:              p.userID,
-			ApiKey:              p.apiKey,
+			ApiKeyId:            p.apiKeyID,
 			TraceId:             p.traceID,
 			MaxWorkerForTraceId: int64(p.maxWorkerForTraceID),
 		},

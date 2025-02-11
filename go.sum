@@ -572,8 +572,8 @@ github.com/streamingfast/substreams-sink-sql v1.0.1-0.20231127153906-acf5f3e3433
 github.com/streamingfast/substreams-sink-sql v1.0.1-0.20231127153906-acf5f3e34330/go.mod h1:4Zd5Re1SrhXDnO3VJh/FJcn64SyZPqAv6gFPjbyqMYI=
 github.com/streamingfast/wasmtime-go/v4 v4.0.0-freemem3 h1:raJHR0JWgYiSyX0vZ3leRK/TkNcn4ZUGTf+d64g48KQ=
 github.com/streamingfast/wasmtime-go/v4 v4.0.0-freemem3/go.mod h1:rOffzhrBM87FuXgj23Ss35uFDahjAauERq60QpyCzpE=
-github.com/streamingfast/worker-pool-protocol v0.0.0-20250210151327-520c44e547ab h1:sJk0iTPWMBi0fOHf7yI5489JHBZUWvWcdP7xzAV5ROA=
-github.com/streamingfast/worker-pool-protocol v0.0.0-20250210151327-520c44e547ab/go.mod h1:fq44dFx8K9S3/9QOoIVk0s+ptEscfpQmftLog/9WYU4=
+github.com/streamingfast/worker-pool-protocol v0.0.0-20250211140743-fb8ffbc05fbc h1:WrgK+ECYQpYd5n+IG7rDR88lkaXw3wef1UKlEBvZ6Bs=
+github.com/streamingfast/worker-pool-protocol v0.0.0-20250211140743-fb8ffbc05fbc/go.mod h1:fq44dFx8K9S3/9QOoIVk0s+ptEscfpQmftLog/9WYU4=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.1.1/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.4.0/go.mod h1:YvHI0jy2hoMjB+UWwv71VJQ9isScKT/TqJzVSSt89Yw=

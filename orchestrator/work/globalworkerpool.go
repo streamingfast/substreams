@@ -34,7 +34,7 @@ func NewGlobalWorkerPool(ctx context.Context, userID string, apiKeyID string, tr
 	logger := reqctx.Logger(ctx)
 	logger = logger.Named("global-worker-pool")
 
-	logger.Info("initializing worker pool", zap.String("user_id", userID), zap.String("trace_id", traceID), zap.Uint64("max_worker_for_trace_id", maxWorkerForTraceID), zap.Duration("worker_keep_alive_delay", workerKeepAliveDelay))
+	logger.Info("initializing worker pool", zap.String("user_id", userID), zap.String("api_key_id", apiKeyID), zap.String("trace_id", traceID), zap.Uint64("max_worker_for_trace_id", maxWorkerForTraceID), zap.Duration("worker_keep_alive_delay", workerKeepAliveDelay))
 
 	wp := &GlobalWorkerPool{
 		userID:                 userID,

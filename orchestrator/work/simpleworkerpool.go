@@ -46,7 +46,7 @@ func NewSimpleWorkerPool(ctx context.Context, workerCount int, clientFactory cli
 
 func (p *SimpleWorkerPool) Borrow(_ context.Context) (Worker, error) {
 	if p.rampingUp && p.firstWorkerServed {
-		return nil, ErrorResourceExhausted
+		return nil, ErrorResourceExhaustedRampUp
 	}
 
 	if p.freeWorker == 0 {

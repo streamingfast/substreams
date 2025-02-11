@@ -109,9 +109,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 	case work.DelayedMsgScheduleNextJob:
 		s.delayedScheduleNextJob = false
 
-		return loop.Tick(msg.Delay, work.MsgScheduleNextJob{
-			TriggerBy: "delayed:" + msg.TriggerBy,
-		})
+		return work.CmdScheduleNextJob("delayed:" + msg.TriggerBy)
 
 	case work.MsgScheduleNextJob:
 		s.logger.Info("scheduling next job", zap.String("trigger_by", msg.TriggerBy))
@@ -123,11 +121,10 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 					s.logger.Info("skipping delayed schedule next job")
 					return nil
 				}
-
+				s.logger.Info("scheduling delayed schedule next job")
 				s.delayedScheduleNextJob = true
 				return loop.Tick(10*time.Second, work.DelayedMsgScheduleNextJob{
 					TriggerBy: "resource exhausted",
-					Delay:     10 * time.Second,
 				})
 			} else if errors.Is(err, work.ErrorResourceExhaustedRampUp) {
 				s.logger.Info("resource exhausted ramp up", zap.Error(err))
@@ -136,11 +133,10 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 					s.logger.Info("skipping ramp up delayed schedule next job")
 					return nil
 				}
-
+				s.logger.Info("scheduling delayed schedule next job for ramp up")
 				s.delayedScheduleNextJob = true
-				return loop.Tick(10*time.Second, work.DelayedMsgScheduleNextJob{
+				return loop.Tick(1*time.Second, work.DelayedMsgScheduleNextJob{
 					TriggerBy: "resource exhausted ramp up",
-					Delay:     1 * time.Second,
 				})
 			} else {
 				s.logger.Error("scheduler: failed to borrow worker", zap.Error(err))

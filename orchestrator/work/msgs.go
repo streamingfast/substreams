@@ -1,8 +1,6 @@
 package work
 
 import (
-	"time"
-
 	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/orchestrator/stage"
 )
@@ -38,14 +36,12 @@ func CmdScheduleNextJob(triggerBy string) loop.Cmd {
 type DelayedMsgScheduleNextJob struct {
 	loop.IsMsg
 	TriggerBy string
-	Delay     time.Duration
 }
 
-func CmdDelayedScheduleNextJob(triggerBy string, delay time.Duration) loop.Cmd {
+func CmdDelayedScheduleNextJob(triggerBy string) loop.Cmd {
 	return func() loop.Msg {
 		return DelayedMsgScheduleNextJob{
 			TriggerBy: triggerBy,
-			Delay:     delay,
 		}
 	}
 }

@@ -118,10 +118,10 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 			if errors.Is(err, work.ErrorResourceExhausted) {
 				s.logger.Info("resource exhausted", zap.Error(err))
 				if s.delayedScheduleNextJob {
-					s.logger.Info("skipping delayed schedule next job")
+					s.logger.Debug("skipping delayed schedule next job")
 					return nil
 				}
-				s.logger.Info("scheduling delayed schedule next job")
+				s.logger.Debug("scheduling delayed schedule next job")
 				s.delayedScheduleNextJob = true
 				return loop.Tick(10*time.Second, work.DelayedMsgScheduleNextJob{
 					TriggerBy: "resource exhausted",
@@ -130,10 +130,10 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 				s.logger.Info("resource exhausted ramp up", zap.Error(err))
 
 				if s.delayedScheduleNextJob {
-					s.logger.Info("skipping ramp up delayed schedule next job")
+					s.logger.Debug("skipping ramp up delayed schedule next job")
 					return nil
 				}
-				s.logger.Info("scheduling delayed schedule next job for ramp up")
+				s.logger.Debug("scheduling delayed schedule next job for ramp up")
 				s.delayedScheduleNextJob = true
 				return loop.Tick(1*time.Second, work.DelayedMsgScheduleNextJob{
 					TriggerBy: "resource exhausted ramp up",
@@ -143,13 +143,12 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 				return nil //todo: wrap in a retry loop or just let it go through
 			}
 		}
-		s.logger.Info("worker borrowed", zap.String("worker_id", worker.ID()))
 		workUnit, workRange := s.Stages.NextJob()
 		if workRange == nil { // End of job
 			return nil
 		}
 
-		s.logger.Info("scheduling work", zap.Object("unit", workUnit))
+		s.logger.Info("worker borrowed, scheduling work", zap.String("worker_id", worker.ID()), zap.Object("unit", workUnit))
 		modules := s.Stages.StageModules(workUnit.Stage)
 
 		return loop.Batch(
@@ -163,15 +162,19 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 
 	case stage.MsgMergeFinished:
 		s.Stages.MergeCompleted(msg.Unit)
+		if !s.delayedScheduleNextJob {
+			cmds = append(cmds, work.CmdScheduleNextJob("all store completed"))
+		}
 		cmds = append(cmds,
-			//work.CmdScheduleNextJob("merge finished"),
 			s.Stages.CmdTryMerge(msg.Stage),
 		)
 
 	case stage.MsgAllStoresCompleted:
 		s.storesSyncCompleted = true
+		if !s.delayedScheduleNextJob {
+			cmds = append(cmds, work.CmdScheduleNextJob("all store completed"))
+		}
 		cmds = append(cmds,
-			work.CmdScheduleNextJob("all store completed"), // in case some mapper jobs need scheduling
 			s.cmdShutdownWhenComplete(),
 		)
 

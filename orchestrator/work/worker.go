@@ -332,7 +332,7 @@ func IncomingParameters(ctx context.Context) (workerId string, keepAliveDelay ti
 	}
 
 	stringDurations := md.Get(HeaderWorkerKeepAliveDelay)
-	if len(stringDurations) != 1 && stringDurations[0] == "" {
+	if len(stringDurations) != 1 || stringDurations[0] == "" {
 		return "", time.Duration(0), fmt.Errorf("missing keep alive delay header")
 	}
 
@@ -346,7 +346,7 @@ func IncomingParameters(ctx context.Context) (workerId string, keepAliveDelay ti
 	}
 
 	workerIds := md.Get(HeaderWorkerID)
-	if len(workerIds) != 1 && workerIds[0] == "" {
+	if len(workerIds) != 1 || workerIds[0] == "" {
 		return "", time.Duration(0), fmt.Errorf("missing worker id header")
 	}
 	workerId = workerIds[0]

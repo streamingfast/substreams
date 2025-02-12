@@ -39,7 +39,7 @@ type Scheduler struct {
 
 func New(ctx context.Context, stream *response.Stream) *Scheduler {
 	logger := reqctx.Logger(ctx)
-	logger = logger.Named("scheduler")
+	logger = logger.Named("scheduler").With(zap.Bool("keep", false))
 	s := &Scheduler{
 		ctx:    ctx,
 		stream: stream,

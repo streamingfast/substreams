@@ -317,7 +317,7 @@ const HeaderWorkerID = "x-sf-worker-id"
 const HeaderWorkerKeepAliveDelay = "x-sf-worker-keep-alive-delay"
 
 func (w *RemoteWorker) SetOutgoingHeaders(ctx context.Context) context.Context {
-	w.logger.Info("setting outgoing headers", zap.String("worker_id", w.id), zap.Duration("keep_alive_delay", w.keepAliveDelay))
+	w.logger.Debug("setting outgoing headers", zap.String("worker_id", w.id), zap.Duration("keep_alive_delay", w.keepAliveDelay))
 	ctxWithHeaders := metadata.AppendToOutgoingContext(ctx,
 		HeaderWorkerID, w.id,
 		HeaderWorkerKeepAliveDelay, w.keepAliveDelay.String(),

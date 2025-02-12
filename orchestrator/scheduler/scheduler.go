@@ -163,7 +163,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 	case stage.MsgMergeFinished:
 		s.Stages.MergeCompleted(msg.Unit)
 		if !s.delayedScheduleNextJob {
-			cmds = append(cmds, work.CmdScheduleNextJob("all store completed"))
+			cmds = append(cmds, work.CmdScheduleNextJob("merge finished"))
 		}
 		cmds = append(cmds,
 			s.Stages.CmdTryMerge(msg.Stage),

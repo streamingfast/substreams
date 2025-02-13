@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/streamingfast/derr"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/reqctx"
 	pbworker "github.com/streamingfast/worker-pool-protocol/pb/sf/worker/v1"
@@ -52,7 +53,7 @@ func NewGlobalWorkerPool(ctx context.Context, userID string, apiKeyID string, tr
 
 	go func() {
 		<-ctx.Done()
-		for s, _ := range wp.borrowedWorker {
+		for s := range wp.borrowedWorker {
 			logger.Info("returning worker on context cancel", zap.String("worker_key", s))
 			wp.Return(context.Background(), NewRemoteWorker(wp.clientFactory, s, 0, wp.logger))
 		}
@@ -76,29 +77,44 @@ func (p *GlobalWorkerPool) Borrow(ctx context.Context) (Worker, error) {
 		return nil, ErrorResourceExhaustedRampUp
 	}
 
-	response, err := p.remoteWorkerPoolClient.BorrowWorker(ctx,
-		&pbworker.BorrowWorkerRequest{
-			Service:             Tier2WorkerServiceName,
-			UserId:              p.userID,
-			ApiKeyId:            p.apiKeyID,
-			TraceId:             p.traceID,
-			MaxWorkerForTraceId: int64(p.maxWorkerForTraceID),
-		},
-	)
+	borrowWorkerResp := &pbworker.BorrowWorkerResponse{}
+	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
+		response, err := p.remoteWorkerPoolClient.BorrowWorker(ctx,
+			&pbworker.BorrowWorkerRequest{
+				Service:             Tier2WorkerServiceName,
+				UserId:              p.userID,
+				ApiKeyId:            p.apiKeyID,
+				TraceId:             p.traceID,
+				MaxWorkerForTraceId: int64(p.maxWorkerForTraceID),
+			},
+		)
+
+		if err != nil {
+			return fmt.Errorf("borrowing worker for user %q and trace %q: %w", p.userID, p.traceID, err)
+		}
+
+		borrowWorkerResp = response
+		return nil
+	})
+
+	key := borrowWorkerResp.WorkerKey
+	status := borrowWorkerResp.Status
 
 	if err != nil {
-		return nil, fmt.Errorf("borrowing worker for user %q and trace %q: %w", p.userID, p.traceID, err)
+		p.logger.Error("error borrowing worker, will return free worker", zap.Error(err))
+		key = "FREE.WORKER.KEY"
+		status = pbworker.BorrowWorkerResponse_unset
 	}
 
-	if response.Status == pbworker.BorrowWorkerResponse_resource_exhausted {
-		p.logger.Info("worker pool is exhausted", zap.String("worker_key", response.WorkerKey), zap.String("status", response.Status.String()))
+	if status == pbworker.BorrowWorkerResponse_resource_exhausted {
+		p.logger.Info("worker pool is exhausted", zap.String("worker_key", key), zap.String("status", status.String()))
 		return nil, ErrorResourceExhausted
 	}
 
 	p.rampUpWorkerServed = true
-	worker := NewRemoteWorker(p.clientFactory, response.WorkerKey, p.workerKeepAliveDelay, p.logger)
-	p.logger.Info("worker borrowed", zap.String("worker_key", response.WorkerKey))
-	p.borrowedWorker[response.WorkerKey] = struct{}{}
+	worker := NewRemoteWorker(p.clientFactory, key, p.workerKeepAliveDelay, p.logger)
+	p.logger.Info("worker borrowed", zap.String("worker_key", key))
+	p.borrowedWorker[key] = struct{}{}
 
 	return worker, nil
 }

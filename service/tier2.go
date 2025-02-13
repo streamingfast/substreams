@@ -457,27 +457,30 @@ excludable:
 		if err != nil {
 			s.logger.Warn("getting incoming parameters, must be from a legacy tier 1", zap.Error(err))
 		} else {
-			s.logger.Info("got remote worker client, setting up keep alive", zap.String("worker_id", workerID), zap.Duration("keep_alive_delay", keepAliveDelay))
 
-			go func() {
-				for {
-					select {
-					case <-ctx.Done():
-						return
-					case <-done:
-						return
-					case <-time.After(keepAliveDelay):
-						s.logger.Info("keep alive timer expired, calling keep alive", zap.String("worker_id", workerID), zap.Bool("keep", false))
-						_, err := s.remoteWorkerClient.KeepAlive(ctx,
-							&pbworker.KeepAliveRequest{
-								WorkerKey: workerID,
-							})
-						if err != nil {
-							s.logger.Error("failed to call keep alive", zap.String("worker_id", workerID), zap.Error(err))
+			if workerID != "FREE.WORKER.KEY" {
+				s.logger.Info("got remote worker client, setting up keep alive", zap.String("worker_id", workerID), zap.Duration("keep_alive_delay", keepAliveDelay))
+
+				go func() {
+					for {
+						select {
+						case <-ctx.Done():
+							return
+						case <-done:
+							return
+						case <-time.After(keepAliveDelay):
+							s.logger.Info("keep alive timer expired, calling keep alive", zap.String("worker_id", workerID), zap.Bool("keep", false))
+							_, err := s.remoteWorkerClient.KeepAlive(ctx,
+								&pbworker.KeepAliveRequest{
+									WorkerKey: workerID,
+								})
+							if err != nil {
+								s.logger.Error("failed to call keep alive", zap.String("worker_id", workerID), zap.Error(err))
+							}
 						}
 					}
-				}
-			}()
+				}()
+			}
 		}
 	}
 

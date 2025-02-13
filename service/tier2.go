@@ -464,6 +464,8 @@ excludable:
 					select {
 					case <-ctx.Done():
 						return
+					case <-done:
+						return
 					case <-time.After(keepAliveDelay):
 						s.logger.Info("keep alive timer expired, calling keep alive", zap.String("worker_id", workerID), zap.Bool("keep", false))
 						_, err := s.remoteWorkerClient.KeepAlive(ctx,

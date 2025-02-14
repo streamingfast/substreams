@@ -72,6 +72,16 @@ func New(c common.Common, config *request.Config) (*Output, error) {
 	// 	return nil, err
 	// }
 
+	getBytesEncodingPerNetwork := func(endpoint string) dynamic.BytesRepresentation {
+		if manifest.HardcodedEndpoints["solana-mainnet-beta"] == endpoint {
+			return dynamic.BytesAsBase58
+		}
+
+		return dynamic.BytesAsBase64
+	}
+
+	bytesRepresentation := getBytesEncodingPerNetwork(config.Endpoint)
+
 	output := &Output{
 		Common:              c,
 		Config:              config,
@@ -83,10 +93,10 @@ func New(c common.Common, config *request.Config) (*Output, error) {
 		outputView:          viewport.New(24, 80),
 		messageFactory:      dynamic.NewMessageFactoryWithDefaults(),
 		outputViewYoffset:   map[request.BlockContext]int{},
-		statusBar:           statusbar.New(c),
+		statusBar:           newStatusBarWithBytesRepresentation(c, bytesRepresentation),
 		searchCtx:           search.New(c),
 		blockSearchCtx:      blocksearch.New(c),
-		bytesRepresentation: dynamic.BytesAsBase64,
+		bytesRepresentation: bytesRepresentation,
 		moduleSearchView:    modsearch.New(c, "output"),
 		outputModule:        config.OutputModule,
 		logsEnabled:         true,
@@ -535,4 +545,10 @@ func (o *Output) hasDataForBlock(num uint64) bool {
 		}
 	}
 	return false
+}
+
+func newStatusBarWithBytesRepresentation(c common.Common, bytesRepresentation dynamic.BytesRepresentation) *statusbar.StatusBar {
+	statusBar := statusbar.New(c)
+	statusBar.SetBytesRepresentation(bytesRepresentation)
+	return statusBar
 }

@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -458,7 +459,7 @@ excludable:
 			s.logger.Warn("getting incoming parameters, must be from a legacy tier 1", zap.Error(err))
 		} else {
 
-			if workerID != "FREE.WORKER.KEY" {
+			if strings.HasPrefix(workerID, work.FreeWorkerKeyPrefix) {
 				s.logger.Info("got remote worker client, setting up keep alive", zap.String("worker_id", workerID), zap.Duration("keep_alive_delay", keepAliveDelay))
 
 				go func() {

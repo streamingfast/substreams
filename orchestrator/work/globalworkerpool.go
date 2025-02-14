@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/streamingfast/derr"
@@ -14,6 +15,7 @@ import (
 )
 
 const Tier2WorkerServiceName = "t2w"
+const FreeWorkerKeyPrefix = "FREE.WORKER.KEY:"
 
 type GlobalWorkerPool struct {
 	userID             string
@@ -102,8 +104,12 @@ func (p *GlobalWorkerPool) Borrow(ctx context.Context) (Worker, error) {
 
 	if err != nil {
 		p.logger.Error("error borrowing worker, will return free worker", zap.Error(err))
-		key = "FREE.WORKER.KEY"
-		status = pbworker.BorrowWorkerResponse_unset
+		key = FreeWorkerKeyPrefix + time.Now().String()
+		status = pbworker.BorrowWorkerResponse_borrowed
+
+		if uint64(len(p.borrowedWorker)) < p.maxWorkerForTraceID {
+			status = pbworker.BorrowWorkerResponse_resource_exhausted
+		}
 	}
 
 	if status == pbworker.BorrowWorkerResponse_resource_exhausted {
@@ -121,6 +127,10 @@ func (p *GlobalWorkerPool) Borrow(ctx context.Context) (Worker, error) {
 
 func (p *GlobalWorkerPool) Return(ctx context.Context, worker Worker) {
 	delete(p.borrowedWorker, worker.ID())
+	if strings.HasPrefix(worker.ID(), FreeWorkerKeyPrefix) {
+		return
+	}
+
 	key := worker.ID()
 	_, err := p.remoteWorkerPoolClient.ReturnWorker(ctx,
 		&pbworker.ReturnWorkerRequest{

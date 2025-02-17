@@ -153,13 +153,14 @@ func (a *Tier1App) Run() error {
 		go forkableHub.Run()
 	}
 
-	subrequestsClientConfig := client.NewSubstreamsClientConfig(
+	subRequestsClientConfig := client.NewSubstreamsClientConfig(
 		a.config.SubrequestsEndpoint,
 		"",
 		client.None,
 		a.config.SubrequestsInsecure,
 		a.config.SubrequestsPlaintext,
 		"substreams_tier1",
+		nil,
 	)
 	var opts []service.Option
 	if a.config.WASMExtensions != nil {
@@ -204,7 +205,7 @@ func (a *Tier1App) Run() error {
 		a.config.StateBundleSize,
 		a.config.BlockType,
 		a.setIsReady,
-		subrequestsClientConfig,
+		subRequestsClientConfig,
 		tier2RequestParameters,
 		a.modules.WorkerPoolFactory,
 		a.config.EnforceCompression,

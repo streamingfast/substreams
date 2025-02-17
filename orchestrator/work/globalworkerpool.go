@@ -3,15 +3,14 @@ package work
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
-	"github.com/streamingfast/derr"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/reqctx"
 	pbworker "github.com/streamingfast/worker-pool-protocol/pb/sf/worker/v1"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 )
 
 const Tier2WorkerServiceName = "t2w"
@@ -79,37 +78,32 @@ func (p *GlobalWorkerPool) Borrow(ctx context.Context) (Worker, error) {
 		return nil, ErrorResourceExhaustedRampUp
 	}
 
-	borrowWorkerResp := &pbworker.BorrowWorkerResponse{}
-	err := derr.RetryContext(ctx, 3, func(ctx context.Context) error {
-		response, err := p.remoteWorkerPoolClient.BorrowWorker(ctx,
-			&pbworker.BorrowWorkerRequest{
-				Service:             Tier2WorkerServiceName,
-				UserId:              p.userID,
-				ApiKeyId:            p.apiKeyID,
-				TraceId:             p.traceID,
-				MaxWorkerForTraceId: int64(p.maxWorkerForTraceID),
-			},
-		)
+	borrowWorkerResp, err := p.remoteWorkerPoolClient.BorrowWorker(ctx,
+		&pbworker.BorrowWorkerRequest{
+			Service:             Tier2WorkerServiceName,
+			UserId:              p.userID,
+			ApiKeyId:            p.apiKeyID,
+			TraceId:             p.traceID,
+			MaxWorkerForTraceId: int64(p.maxWorkerForTraceID),
+		},
+		grpc.WaitForReady(false),
+	)
 
-		if err != nil {
-			return fmt.Errorf("borrowing worker for user %q and trace %q: %w", p.userID, p.traceID, err)
-		}
-
-		borrowWorkerResp = response
-		return nil
-	})
-
-	key := borrowWorkerResp.WorkerKey
-	status := borrowWorkerResp.Status
+	key := ""
+	status := pbworker.BorrowWorkerResponse_unset
 
 	if err != nil {
+		borrowWorkerResp = &pbworker.BorrowWorkerResponse{}
 		p.logger.Error("error borrowing worker, will return free worker", zap.Error(err))
 		key = FreeWorkerKeyPrefix + time.Now().String()
 		status = pbworker.BorrowWorkerResponse_borrowed
 
-		if uint64(len(p.borrowedWorker)) < p.maxWorkerForTraceID {
+		if uint64(len(p.borrowedWorker)) >= p.maxWorkerForTraceID {
 			status = pbworker.BorrowWorkerResponse_resource_exhausted
 		}
+	} else {
+		key = borrowWorkerResp.WorkerKey
+		status = borrowWorkerResp.Status
 	}
 
 	if status == pbworker.BorrowWorkerResponse_resource_exhausted {
@@ -135,11 +129,14 @@ func (p *GlobalWorkerPool) Return(ctx context.Context, worker Worker) {
 	_, err := p.remoteWorkerPoolClient.ReturnWorker(ctx,
 		&pbworker.ReturnWorkerRequest{
 			WorkerKey: key,
-		})
+		},
+		grpc.WaitForReady(false),
+	)
 
 	if err != nil {
 		p.logger.Error("returning worker", zap.Error(err))
 	}
+
 	p.rampUpWorkerServed = false
 	p.logger.Info("returning worker", zap.String("worker_key", key))
 }

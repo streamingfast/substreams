@@ -11,6 +11,8 @@ import (
 	"github.com/streamingfast/substreams/storage/store/state"
 )
 
+var firstPassStoresWalkMaxSegments = 50 // arbitrary "small" number of segments to scan for the first pass. Scan time is slow when listing thousands of files in object storage
+
 // fetchCachesState will look at the cache for:
 // 1. the output mapper (if we are in production mode and producing ExecOuts)
 // 2. each store (either:
@@ -100,7 +102,7 @@ stageLoop:
 	// Second pass: we if we didn't see any expected fullKV for a store in our first pass, we scan again, with the full range
 	// Note that we don't reuse the snapshots already fetched: listing a few files twice same few files twice is negligible.
 	if someStoresAreMissingFullKVs {
-		cacheState, err = state.FetchState(ctx, s.storeConfigs, firstPassStoresWalk.StartBlock, firstPassStoresWalk.ExclusiveEndBlock)
+		cacheState, err = state.FetchState(ctx, s.storeConfigs, s.storeSegmenter.InitialBlock(), s.storeSegmenter.ExclusiveEndBlock())
 		if err != nil {
 			return fmt.Errorf("fetching stores storage state: %w", err)
 		}
@@ -205,8 +207,8 @@ func (s *Stages) firstPassStoresWalk() *block.Range {
 	firstIndex := s.storeSegmenter.FirstIndex()
 
 	idx := firstIndex
-	if lastIndex > 10 {
-		idx = lastIndex - 10
+	if lastIndex > firstPassStoresWalkMaxSegments {
+		idx = lastIndex - firstPassStoresWalkMaxSegments
 		if idx < firstIndex {
 			idx = firstIndex
 		}

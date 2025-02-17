@@ -71,6 +71,39 @@ func TestFetchOutputMapperState(t *testing.T) {
 			wantErr:    false,
 		},
 		{
+			name: "mapper fetched optimistically",
+			stages: &Stages{
+				globalSegmenter: segmenter(60, 100),
+				mapSegmenter:    segmenter(60, 100),
+				stages: []*Stage{
+					{
+						segmenter: segmenter(0, 100),
+						storeModuleStates: []*StoreModuleState{
+							{name: "test_mapper"},
+						},
+					},
+				},
+				execoutConfigs: execout.WrapConfigs(10, testLogger, testExecoutConfig(t, "test_mapper", 0, "hash", &dstore.MockStore{
+					WalkFunc:     failWalk(t),
+					WalkFromFunc: failWalkFrom(t),
+					WalkFromToFunc: func(ctx context.Context, prefix, start, end string, f func(string) error) error {
+						_, found := storePreWalked.Get("test_store")
+						if !found {
+							storePreWalked.Set("test_store", true)
+							assert.Equal(t, "0000000060-0000000000.output", start)
+							assert.Equal(t, "0000000099-0000000000.output", end) // ends at 99 because end block is exclusive
+							return nil
+						}
+						t.Fatal("should not call walk on mapper twice")
+						return fmt.Errorf("test failed")
+					},
+				})),
+			},
+			wantStates: `M:`,
+			wantErr:    false,
+		},
+
+		{
 			name: "mapper and store, misaligned",
 			stages: &Stages{
 				globalSegmenter: segmenter(0, 100),
@@ -477,6 +510,8 @@ func TestFetchOutputMapperState(t *testing.T) {
 
 	firstPassStoresWalkMaxSegments = 2 // for tests
 	for _, tt := range tests {
+
+		storePreWalked = cmap.New[bool]() // reset this every pass
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := reqctx.WithRequest(context.TODO(), &reqctx.RequestDetails{
 				ResolvedStartBlockNum: tt.startBlockNum,
@@ -509,7 +544,18 @@ func execoutConfigs(t *testing.T, mappers map[string][]string) *execout.Configs 
 		if err != nil {
 			panic("invalid mapper name, expecting format <name>:<initialBlock>")
 		}
-		configs = append(configs, testExecoutConfig(t, splitName[0], initialBlock, pbsubstreams.ModuleKindMap, "hash", files))
+
+		filesMap := make(map[string][]byte)
+		for _, file := range files {
+			filesMap[file] = nil
+		}
+		store := &dstore.MockStore{
+			Files: filesMap,
+		}
+
+		conf, err := execout.NewConfig(splitName[0], initialBlock, pbsubstreams.ModuleKindMap, "hash", store, testLogger)
+		require.NoError(t, err)
+		configs = append(configs, conf)
 	}
 	return execout.WrapConfigs(10, testLogger, configs...)
 }
@@ -528,15 +574,8 @@ func testStoreConfig(
 	return conf
 }
 
-func testExecoutConfig(t *testing.T, name string, moduleInitialBlock uint64, modKind pbsubstreams.ModuleKind, moduleHash string, files []string) *execout.Config {
-	filesMap := make(map[string][]byte)
-	for _, file := range files {
-		filesMap[file] = nil
-	}
-	store := &dstore.MockStore{
-		Files: filesMap,
-	}
-	conf, err := execout.NewConfig(name, moduleInitialBlock, modKind, moduleHash, store, testLogger)
+func testExecoutConfig(t *testing.T, name string, moduleInitialBlock uint64, moduleHash string, store dstore.Store) *execout.Config {
+	conf, err := execout.NewConfig(name, moduleInitialBlock, pbsubstreams.ModuleKindMap, moduleHash, store, testLogger)
 	require.NoError(t, err)
 	return conf
 }

@@ -5,7 +5,7 @@ Substreams data streams are available on the chains listed [here](../references/
 If your blockchain is not supported, please ask in Discord. Then, consult the relevant ecosystem guide to get started using Substreams real-time data streams:
 
 - [EVM](./evm.md)
-- [Solana](./solana.md)
+- [Solana](./solana/solana.md)
 - [Starknet](./starknet.md)
 - [Injective](./cosmos-compatible/injective.md)
 - [Mantra](./cosmos-compatible/mantra.md)

@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	orchestratorExecout "github.com/streamingfast/substreams/orchestrator/execout"
-
 	"github.com/streamingfast/substreams"
+	orchestratorExecout "github.com/streamingfast/substreams/orchestrator/execout"
 	"github.com/streamingfast/substreams/orchestrator/plan"
 	"github.com/streamingfast/substreams/orchestrator/response"
 	"github.com/streamingfast/substreams/orchestrator/scheduler"
@@ -27,8 +26,7 @@ type ParallelProcessor struct {
 func BuildParallelProcessor(
 	ctx context.Context,
 	reqPlan *plan.RequestPlan,
-	workerFactory work.WorkerFactory,
-	maxParallelJobs int,
+	workerPool work.WorkerPool,
 	execGraph *exec.Graph,
 	execoutStorage *execout.Configs,
 	respFunc func(resp substreams.ResponseFromAnyTier) error,
@@ -136,7 +134,6 @@ func BuildParallelProcessor(
 	//  -
 	//  This is an optimization and is not solved herein.
 
-	workerPool := work.NewWorkerPool(ctx, maxParallelJobs, workerFactory)
 	sched.WorkerPool = workerPool
 
 	return &ParallelProcessor{

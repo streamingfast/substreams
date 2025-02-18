@@ -154,7 +154,7 @@ func NewSubstreamsInternalClient(config *SubstreamsClientConfig) (cli pbssintern
 	dialOptions = append(dialOptions, grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()))
 
 	zlog.Debug("getting connection", zap.String("endpoint", endpoint))
-	conn, err := dgrpc.NewExternalClient(endpoint, dialOptions...)
+	conn, err := dgrpc.NewExternalClientConn(endpoint, dialOptions...)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("unable to create external gRPC client: %w", err)
 	}

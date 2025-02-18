@@ -39,7 +39,7 @@ type processingModule struct {
 type Pipeline struct {
 	ctx              context.Context
 	stateBundleSize  uint64
-	workerFactory    work.WorkerFactory
+	workerFactory    work.WorkerPoolFactory
 	executionTimeout time.Duration
 
 	pendingUndoMessage *pbsubstreamsrpc.Response
@@ -83,7 +83,8 @@ type Pipeline struct {
 	// (for chains with potential block skips)
 	lastFinalClock *pbsubstreams.Clock
 
-	blockStepMap map[bstream.StepType]uint64
+	blockStepMap      map[bstream.StepType]uint64
+	workerPoolFactory work.WorkerPoolFactory
 }
 
 func New(
@@ -95,7 +96,7 @@ func New(
 	wasmRuntime *wasm.Registry,
 	execOutputCache *cache.Engine,
 	stateBundleSize uint64,
-	workerFactory work.WorkerFactory,
+	workerPoolFactory work.WorkerPoolFactory,
 	respFunc substreams.ResponseFunc,
 	executionTimeout time.Duration,
 	opts ...Option,
@@ -105,7 +106,6 @@ func New(
 		gate:                    newGate(ctx),
 		execOutputCache:         execOutputCache,
 		stateBundleSize:         stateBundleSize,
-		workerFactory:           workerFactory,
 		preexistingBlockIndices: indices,
 		execGraph:               execGraph,
 		wasmRuntime:             wasmRuntime,
@@ -116,6 +116,7 @@ func New(
 		blockStepMap:            make(map[bstream.StepType]uint64),
 		startTime:               time.Now(),
 		executionTimeout:        executionTimeout,
+		workerPoolFactory:       workerPoolFactory,
 	}
 	for _, opt := range opts {
 		opt(pipe)
@@ -267,11 +268,11 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 		p.respFunc(p.pendingUndoMessage)
 	}
 
+	workerPool := p.workerPoolFactory(ctx)
 	parallelProcessor, err := orchestrator.BuildParallelProcessor(
 		ctx,
 		reqPlan,
-		p.workerFactory,
-		int(reqDetails.MaxParallelJobs),
+		workerPool,
 		p.execGraph,
 		p.execoutStorage,
 		p.respFunc,

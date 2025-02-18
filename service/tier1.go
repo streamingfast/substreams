@@ -135,6 +135,8 @@ func NewTier1(
 	appSetIsReadyState func(isReady bool),
 	substreamsClientConfig *client.SubstreamsClientConfig,
 	tier2RequestParameters reqctx.Tier2RequestParameters,
+	workerPoolFactory work.WorkerPoolFactory,
+
 	enforceCompression bool,
 	activeRequestsSoftLimit int,
 	activeRequestsHardLimit int,
@@ -150,10 +152,8 @@ func NewTier1(
 		10,
 		stateStore,
 		defaultCacheTag,
-		func(logger *zap.Logger) work.Worker {
-			return work.NewRemoteWorker(clientFactory, logger)
-		},
 		clientFactory,
+		workerPoolFactory,
 	)
 
 	sf := &StreamFactory{
@@ -595,7 +595,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		wasmRuntime,
 		execOutputCacheEngine,
 		segmentSize,
-		s.runtimeConfig.WorkerFactory,
+		s.runtimeConfig.WorkerPoolFactory,
 		respFunc,
 		s.blockExecutionTimeout,
 		opts...,

@@ -18,6 +18,7 @@ import (
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metrics"
+	"github.com/streamingfast/substreams/orchestrator/work"
 	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcconnect"
 	ssconnect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcconnect"
 	"github.com/streamingfast/substreams/reqctx"
@@ -35,6 +36,7 @@ type Tier1Modules struct {
 	HeadBlockNumberMetric *dmetrics.HeadBlockNum
 	CheckPendingShutDown  func() bool
 	InfoServer            InfoServer
+	WorkerPoolFactory     work.WorkerPoolFactory
 }
 
 type InfoServer interface {
@@ -63,6 +65,7 @@ type Tier1Config struct {
 	GRPCShutdownGracePeriod time.Duration // The duration we allow for gRPC connections to terminate gracefully prior forcing shutdown
 	ServiceDiscoveryURL     *url.URL
 	BlockExecutionTimeout   time.Duration
+	WorkerKeepAliveDelay    time.Duration
 	TmpDir                  string
 
 	StateStoreURL           string
@@ -161,7 +164,7 @@ func (a *Tier1App) Run() error {
 		go forkableHub.Run()
 	}
 
-	subrequestsClientConfig := client.NewSubstreamsClientConfig(
+	subRequestsClientConfig := client.NewSubstreamsClientConfig(
 		a.config.SubrequestsEndpoint,
 		"",
 		client.None,
@@ -212,8 +215,9 @@ func (a *Tier1App) Run() error {
 		a.config.StateBundleSize,
 		a.config.BlockType,
 		a.setIsReady,
-		subrequestsClientConfig,
+		subRequestsClientConfig,
 		tier2RequestParameters,
+		a.modules.WorkerPoolFactory,
 		a.config.EnforceCompression,
 		a.config.ActiveRequestsSoftLimit,
 		a.config.ActiveRequestsHardLimit,

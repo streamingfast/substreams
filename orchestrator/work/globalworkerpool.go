@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/streamingfast/substreams/client"
@@ -25,6 +26,7 @@ type GlobalWorkerPool struct {
 	rampUpWorkerServed bool
 
 	borrowedWorker         map[string]interface{}
+	borrowedWorkerMutex    sync.Mutex
 	remoteWorkerPoolClient pbworker.WorkerPoolClient
 	logger                 *zap.Logger
 	clientFactory          client.InternalClientFactory
@@ -55,10 +57,12 @@ func NewGlobalWorkerPool(ctx context.Context, userID string, apiKeyID string, tr
 
 	go func() {
 		<-ctx.Done()
+		wp.borrowedWorkerMutex.Lock()
 		for s := range wp.borrowedWorker {
 			logger.Info("returning worker on context cancel", zap.String("worker_key", s))
 			wp.Return(context.Background(), NewRemoteWorker(wp.clientFactory, s, 0, wp.logger))
 		}
+		wp.borrowedWorkerMutex.Unlock()
 	}()
 
 	go func() {
@@ -115,13 +119,18 @@ func (p *GlobalWorkerPool) Borrow(ctx context.Context) (Worker, error) {
 	p.rampUpWorkerServed = true
 	worker := NewRemoteWorker(p.clientFactory, key, p.workerKeepAliveDelay, p.logger)
 	p.logger.Info("worker borrowed", zap.String("worker_key", key))
+	p.borrowedWorkerMutex.Lock()
 	p.borrowedWorker[key] = struct{}{}
+	p.borrowedWorkerMutex.Unlock()
 
 	return worker, nil
 }
 
 func (p *GlobalWorkerPool) Return(ctx context.Context, worker Worker) {
+	p.borrowedWorkerMutex.Lock()
 	delete(p.borrowedWorker, worker.ID())
+	p.borrowedWorkerMutex.Unlock()
+
 	if strings.HasPrefix(worker.ID(), FreeWorkerKeyPrefix) {
 		return
 	}

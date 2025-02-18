@@ -25,6 +25,7 @@ var reqStatsKey = contextKeyType(4)
 var moduleExecutionTracingConfigKey = contextKeyType(5)
 var outputModuleHashKey = contextKeyType(6)
 var tier2RequestParametersKeyKey = contextKeyType(7)
+var wasmExtensionReqStats = contextKeyType(8)
 
 func Logger(ctx context.Context) *zap.Logger {
 	return logging.Logger(ctx, zap.NewNop())
@@ -50,6 +51,18 @@ func ReqStats(ctx context.Context) *metrics.Stats {
 
 func WithReqStats(ctx context.Context, stats *metrics.Stats) context.Context {
 	return context.WithValue(ctx, reqStatsKey, stats)
+}
+
+func WithWasmExtensionReqStats(ctx context.Context, stats metrics.WasmExtensionStats) context.Context {
+	return context.WithValue(ctx, wasmExtensionReqStats, stats)
+}
+
+func WasmExtensionReqStats(ctx context.Context) metrics.WasmExtensionStats {
+	// if we have full metrics stats, we should use them
+	if metricsStats := ctx.Value(reqStatsKey); metricsStats != nil {
+		return metricsStats.(*metrics.Stats)
+	}
+	return ctx.Value(wasmExtensionReqStats).(metrics.WasmExtensionStats)
 }
 
 func Span(ctx context.Context) ISpan {

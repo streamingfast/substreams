@@ -14,6 +14,7 @@ import (
 )
 
 const Tier2WorkerServiceName = "t2w"
+const Tier1RequestServiceName = "t1r"
 const FreeWorkerKeyPrefix = "FREE.WORKER.KEY:"
 
 type GlobalWorkerPool struct {
@@ -135,6 +136,7 @@ func (p *GlobalWorkerPool) Return(ctx context.Context, worker Worker) {
 
 	if err != nil {
 		p.logger.Error("returning worker", zap.Error(err))
+		//why do not propagate that err...
 	}
 
 	p.rampUpWorkerServed = false

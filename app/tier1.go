@@ -44,6 +44,16 @@ type InfoServer interface {
 	Info(ctx context.Context, request *pbfirehose.InfoRequest) (*pbfirehose.InfoResponse, error)
 }
 
+// returns config with default sane values
+func NewDefaultTier1Config() *Tier1Config {
+	return &Tier1Config{
+		SharedCacheSize:       15,
+		MaxSubrequests:        10,
+		StateBundleSize:       1000,
+		BlockExecutionTimeout: 1 * time.Minute,
+	}
+}
+
 type Tier1Config struct {
 	MeteringConfig string
 
@@ -70,6 +80,7 @@ type Tier1Config struct {
 	SubrequestsEndpoint  string
 	SubrequestsInsecure  bool
 	SubrequestsPlaintext bool
+	SharedCacheSize      uint64
 
 	WASMExtensions wasm.WASMExtensioner
 
@@ -210,6 +221,7 @@ func (a *Tier1App) Run() error {
 		a.config.EnforceCompression,
 		a.config.ActiveRequestsSoftLimit,
 		a.config.ActiveRequestsHardLimit,
+		a.config.SharedCacheSize,
 		opts...,
 	)
 	if err != nil {

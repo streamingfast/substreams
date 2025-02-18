@@ -1,10 +1,12 @@
 package pipeline
 
 import (
-	"connectrpc.com/connect"
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
+
+	"connectrpc.com/connect"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/hub"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
@@ -15,7 +17,6 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
 	"go.uber.org/zap"
-	"sync/atomic"
 )
 
 type getBlockFunc func() (uint64, error)
@@ -48,7 +49,8 @@ func BuildRequestDetails(
 	getRecentFinalBlock getBlockFunc,
 	resolveCursor CursorResolver,
 	getHeadBlock getBlockFunc,
-	segmentSize uint64) (req *reqctx.RequestDetails, undoSignal *pbsubstreamsrpc.BlockUndoSignal, err error) {
+	segmentSize uint64,
+) (req *reqctx.RequestDetails, undoSignal *pbsubstreamsrpc.BlockUndoSignal, err error) {
 	req = &reqctx.RequestDetails{
 		Modules:                             request.Modules,
 		OutputModule:                        request.OutputModule,
@@ -95,7 +97,7 @@ func BuildRequestDetails(
 	return
 }
 
-func BuildRequestDetailsFromSubrequest(request *pbssinternal.ProcessRangeRequest) (req *reqctx.RequestDetails) {
+func BuildRequestDetailsFromSubrequest(ctx context.Context, request *pbssinternal.ProcessRangeRequest) (req *reqctx.RequestDetails) {
 	req = &reqctx.RequestDetails{
 		Modules:               request.Modules,
 		OutputModule:          request.OutputModule,
@@ -107,6 +109,9 @@ func BuildRequestDetailsFromSubrequest(request *pbssinternal.ProcessRangeRequest
 		ResolvedStartBlockNum: request.StartBlock(),
 		UniqueID:              nextUniqueID(),
 	}
+
+	req.SetStageLayerParallelExecutorCountFromContext(ctx)
+
 	return req
 }
 

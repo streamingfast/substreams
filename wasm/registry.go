@@ -57,7 +57,7 @@ func NewRegistry(extensions map[string]map[string]WASMExtension) *Registry {
 		}
 		runtimeName = selectRuntime
 	} else {
-		zlog.Info("using default wasm runtime", zap.String("runtime", runtimeName))
+		zlog.Debug("using default wasm runtime", zap.String("runtime", runtimeName))
 	}
 
 	return NewRegistryWithRuntime(runtimeName, extensions)

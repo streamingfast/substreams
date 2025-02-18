@@ -105,6 +105,7 @@ func NewRequest(ctx context.Context, req *reqctx.RequestDetails, stageIndex int,
 		StateStoreDefaultTag: tier2ReqParams.StateStoreDefaultTag,
 		WasmExtensionConfigs: tier2ReqParams.WASMModules,
 		BlockType:            tier2ReqParams.BlockType,
+		ProductionMode:       req.ProductionMode,
 	}
 }
 

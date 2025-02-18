@@ -37,6 +37,11 @@ message ProcessRangeRequest {
 
   string block_type = 14; // block type to process
   uint64 segment_number = 15; // segment_number * segment_size = start_block_num
+
+  // Whether the tier1 initial request was in production mode or in development mode.
+  // It's possible to have tier2 requests in development mode, for example if the Substreams
+  // needs to back process stores while in development mode.
+  bool production_mode = 16;
 }
 
 message ProcessRangeResponse {
@@ -50,7 +55,7 @@ message ProcessRangeResponse {
     Completed completed = 5;
     Update update = 6;
   }
-  
+
 }
 
 message Update {

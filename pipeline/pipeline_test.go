@@ -93,6 +93,7 @@ func mapTestExecutor(t *testing.T, ctx context.Context, name string) *exec.Mappe
 		exec.NewBaseExecutor(
 			ctx,
 			name,
+			"fakehash",
 			0,
 			module,
 			false, // could exercice with cache enabled too

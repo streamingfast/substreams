@@ -9,7 +9,7 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/streamingfast/bstream v0.0.2-0.20250108204816-fd52ed027320
 	github.com/streamingfast/cli v0.0.4-0.20241119021815-815afa473375
-	github.com/streamingfast/dauth v0.0.0-20240222213226-519afc16cf84
+	github.com/streamingfast/dauth v0.0.0-20250129222106-6e8709b44acf
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
 	github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1
 	github.com/streamingfast/dgrpc v0.0.0-20250115215805-6f4ad2be7eef
@@ -195,7 +195,7 @@ require (
 	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/crypto v0.32.0 // indirect
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
-	golang.org/x/sync v0.10.0 // indirect
+	golang.org/x/sync v0.10.0
 	golang.org/x/sys v0.29.0 // indirect
 	golang.org/x/term v0.28.0 // indirect
 	golang.org/x/text v0.21.0 // indirect

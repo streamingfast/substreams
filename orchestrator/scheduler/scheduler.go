@@ -226,7 +226,7 @@ func (s *Scheduler) cmdShutdownWhenComplete() loop.Cmd {
 				return nil
 			}
 		}
-		s.logger.Info("scheduler: stores and cached_outputs stream completed, switching to live", fields...)
+		s.logger.Info("scheduler: stores and cached_outputs stream completed", fields...)
 		return func() loop.Msg {
 			err := s.Stages.WaitAsyncWork()
 			return loop.Quit(err)()

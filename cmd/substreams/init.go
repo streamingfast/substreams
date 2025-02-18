@@ -172,8 +172,49 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to call discovery endpoint: %w", err)
 		}
 
-		var options []huh.Option[*pbconvo.DiscoveryResponse_Generator]
+		type BlockchainProtocolSelector struct {
+			Id         string
+			Title      string
+			Generators []*pbconvo.DiscoveryResponse_Generator
+		}
+
+		filteredProtocols := make(map[string]*BlockchainProtocolSelector)
 		for _, gen := range resp.Msg.Generators {
+			selector, groupExists := filteredProtocols[gen.Group]
+			if groupExists {
+				selector.Generators = append(selector.Generators, gen)
+			} else {
+				filteredProtocols[gen.Group] = &BlockchainProtocolSelector{
+					Id:         gen.Group,
+					Title:      generatorGroupToProtocolTitle(gen.Group),
+					Generators: []*pbconvo.DiscoveryResponse_Generator{gen},
+				}
+			}
+		}
+
+		protocolOptions := make([]huh.Option[*BlockchainProtocolSelector], 0, len(filteredProtocols))
+		for _, value := range filteredProtocols {
+			protocolOptions = append(protocolOptions, huh.Option[*BlockchainProtocolSelector]{
+				Key:   value.Title,
+				Value: value,
+			})
+		}
+
+		var selector *BlockchainProtocolSelector
+		selectField := huh.NewSelect[*BlockchainProtocolSelector]().
+			Title("Choose the protocol you inted to work with:").
+			Options(protocolOptions...).
+			Value(&selector)
+
+		err = huh.NewForm(huh.NewGroup(selectField)).WithTheme(huhTheme).WithAccessible(WITH_ACCESSIBLE).Run()
+		if err != nil {
+			return fmt.Errorf("failed taking input: %w", err)
+		}
+
+		fmt.Println(gray("┃"), "Chosen protocol: ", bold(selector.Id), "-", selector.Title)
+
+		generatorOptions := make([]huh.Option[*pbconvo.DiscoveryResponse_Generator], 0, len(selector.Generators))
+		for _, gen := range selector.Generators {
 			endpoint := ""
 			if gen.Endpoint != "" {
 				endpoint = " (" + gen.Endpoint + ")"
@@ -188,21 +229,22 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				Key:   key,
 				Value: gen,
 			}
-			options = append(options, entry)
+			generatorOptions = append(generatorOptions, entry)
 		}
 
 		var codegen *pbconvo.DiscoveryResponse_Generator
-		selectField := huh.NewSelect[*pbconvo.DiscoveryResponse_Generator]().
-			Title("Choose the code generator that you want to use to bootstrap your project").
-			Options(options...).
+		selectGeneratorField := huh.NewSelect[*pbconvo.DiscoveryResponse_Generator]().
+			Title("Choose the type of project that you want to create.").
+			Options(generatorOptions...).
 			Value(&codegen)
 
-		err = huh.NewForm(huh.NewGroup(selectField)).WithTheme(huhTheme).WithAccessible(WITH_ACCESSIBLE).Run()
+		err = huh.NewForm(huh.NewGroup(selectGeneratorField)).WithTheme(huhTheme).WithAccessible(WITH_ACCESSIBLE).Run()
 		if err != nil {
 			return fmt.Errorf("failed taking input: %w", err)
 		}
 
-		fmt.Println(gray("┃"), "Chosen code generator:", bold(codegen.Id), "-", codegen.Title)
+		fmt.Println(gray("┃"), "Chosen generator: ", bold(codegen.Id), "-", codegen.Title)
+
 		lastState.GeneratorID = codegen.Id
 		generatorID = codegen.Id
 	}
@@ -608,6 +650,21 @@ func saveDownloadFile(path string, overwriteForm *OverwriteForm, inputFile *pbco
 		return fmt.Errorf("saving zip file %q: %w", inputFile.Filename, err)
 	}
 	return nil
+}
+
+func generatorGroupToProtocolTitle(group string) string {
+	switch group {
+	case "evm":
+		return "EVM"
+	case "solana":
+		return "Solana"
+	case "cosmos":
+		return "Cosmos"
+	case "starknet":
+		return "Starknet"
+	}
+
+	return ""
 }
 
 func ToMarkdown(input string) string {

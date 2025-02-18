@@ -9,8 +9,6 @@ import (
 	"go.uber.org/zap"
 )
 
-//todo: Test Test Test
-
 type SimpleWorkerPool struct {
 	freeWorker        int
 	startedAt         time.Time

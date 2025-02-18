@@ -34,35 +34,11 @@ func BuildParallelProcessor(
 	noopMode bool,
 ) (*ParallelProcessor, error) {
 
-	stream := response.New(respFunc)
-	sched := scheduler.New(ctx, stream)
-
-	stages := stage.NewStages(ctx, execGraph, reqPlan, storeConfigs)
-	sched.Stages = stages
-
-	// OPTIMIZATION: We should fetch the ExecOut files too, and see if they
-	// cover some of the ranges that we're after.
-	// We don't need to plan work for ranges where we have ExecOut
-	// already.
-	// BUT we'll need to have stores to be able to schedule work after
-	// so there's a mix of FullKV stores and ExecOut files we need
-	// to check.  We can push the `segmentCompleted` based on the
-	// execout files.
-
-	// The previous code did what? Just assumed there was ExecOut files
-	// prior to the latest Complete snapshot?
-
-	// FIXME: Is the state map the final reference for the progress we've made?
-	// Shouldn't that be processed by the scheduler a little bit?
-	// What if we have discovered a bunch of ExecOut files and the scheduler
-	// would decide not to use the very first stores as a sign of what is complete?
-	// Well, perhaps those wouldn't hurt, because here we're _sure_ they're
-	// done and the Scheduler could send Progress messages when the above decision
-	// is taken.
-
 	// FIXME: Are all the progress messages properly sent? When we skip some stores and mark them complete,
 	// for whatever reason,
 
+	stream := response.New(respFunc)
+	sched := scheduler.New(ctx, stream)
 	if reqPlan.ReadExecOut != nil {
 		// note: since we are *NOT* in a sub-request and are setting up output module is a map
 		requestedModule := execGraph.OutputModule()
@@ -87,52 +63,17 @@ func BuildParallelProcessor(
 		}
 	}
 
-	// we may be here only for mapper, without stores
-	if reqPlan.BuildStores != nil {
-		err := stages.FetchStoresState(
-			ctx,
-			reqPlan.StoresSegmenter(),
-			storeConfigs,
-			execoutStorage,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("fetch stores storage state: %w", err)
-		}
-	} else {
-		err := stages.FetchStoresState(
-			ctx,
-			reqPlan.WriteOutSegmenter(),
-			storeConfigs,
-			execoutStorage,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("fetch stores storage state: %w", err)
-		}
-
+	stages := stage.NewStages(ctx, execGraph, reqPlan, execoutStorage, storeConfigs)
+	if err := stages.FetchCachesState(ctx); err != nil {
+		return nil, fmt.Errorf("fetch caches storage state: %w", err)
 	}
+
+	sched.Stages = stages
 
 	if os.Getenv("SUBSTREAMS_DEBUG_SCHEDULER_STATE") == "true" {
 		fmt.Println("Initial state:")
 		fmt.Print(stages.StatesString())
 	}
-
-	// OPTIMIZE(abourget): take all of the ExecOut files that exist
-	//  and use that to PUSH back what the Stages need to do.
-	//  So the first Segment to process will not necessarily be
-	//  segment == 0.  We'll need the segment JUST prior to be
-	//  processed though, because we need to continue working on
-	//  the future segments.  This interplays with the segment
-	//  just before.
-	//  -
-	//  In other words, if we can stream out the ExecOut directly, we don't need
-	//  to dispatch work to process them at all.  But we'll need
-	//  to have stores ready to continue segments work.
-	//  SO: we can move forward the processing pipeline, provided
-	//  all of the stages can be continued forward after the
-	//  last ExecOut segment: that we have complete stores for the
-	//  segment where ExecOut finishes.
-	//  -
-	//  This is an optimization and is not solved herein.
 
 	sched.WorkerPool = workerPool
 

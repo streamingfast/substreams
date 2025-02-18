@@ -41,7 +41,8 @@ func TestConfig_ListSnapshotFiles(t *testing.T) {
 
 	c := &Config{objStore: testStore}
 
-	files, err := c.ListSnapshotFiles(context.Background(), 10000)
+	to := uint64(10000)
+	files, err := c.ListSnapshotFiles(context.Background(), 0, &to)
 	require.NoError(t, err)
 
 	var actualFiles []string

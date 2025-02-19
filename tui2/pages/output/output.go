@@ -77,7 +77,7 @@ func New(c common.Common, config *request.Config) (*Output, error) {
 			return dynamic.BytesAsBase58
 		}
 
-		return dynamic.BytesAsBase64
+		return dynamic.BytesAsHex
 	}
 
 	bytesRepresentation := getBytesEncodingPerNetwork(config.Endpoint)

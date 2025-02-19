@@ -611,6 +611,10 @@ func assertFiles(t *testing.T, tempDir string, expectPartialSpkg bool, wantedFil
 			seenPartialSpkg = true
 			continue
 		}
+
+		if parts[len(parts)-1] == "last_used.zst" {
+			continue
+		}
 		actualFiles = append(actualFiles, filepath.Join(parts[3:]...))
 	}
 

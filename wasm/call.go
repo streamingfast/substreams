@@ -37,10 +37,11 @@ type Call struct {
 
 func NewCall(clock *pbsubstreams.Clock, moduleName string, entrypoint string, stats *metrics.Stats, arguments []Argument, canSkipEmptyOutput bool) *Call {
 	call := &Call{
-		Clock:      clock,
-		ModuleName: moduleName,
-		Entrypoint: entrypoint,
-		stats:      stats,
+		Clock:              clock,
+		ModuleName:         moduleName,
+		Entrypoint:         entrypoint,
+		stats:              stats,
+		canSkipEmptyOutput: canSkipEmptyOutput,
 	}
 
 	for _, input := range arguments {

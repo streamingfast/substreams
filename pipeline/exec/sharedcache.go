@@ -9,6 +9,7 @@ import (
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/substreams/metrics"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/wasm"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
@@ -68,13 +69,14 @@ func (s *SharedCache) cleanup(head uint64) {
 
 type callEntry struct {
 	sync.RWMutex
-	clock          *pbsubstreams.Clock
-	moduleName     string
-	entrypoint     string
-	logs           []string
-	logsByteCount  uint64
-	executionStack []string
-	returnValue    []byte
+	clock           *pbsubstreams.Clock
+	moduleName      string
+	entrypoint      string
+	logs            []string
+	logsByteCount   uint64
+	executionStack  []string
+	returnValue     []byte
+	metricsGatherer *metrics.WasmMetricsGatherer
 
 	err      error
 	panicErr *wasm.PanicError
@@ -111,6 +113,7 @@ func (s *SharedCache) Cachable(blockNum uint64) bool {
 }
 
 func (s *SharedCache) Execute(
+	originalContext context.Context,
 	wasmModule wasm.Module,
 	moduleHash string,
 	call *wasm.Call,
@@ -144,10 +147,18 @@ func (s *SharedCache) Execute(
 			zlog.Debug("executing wasm call", zap.String("module_hash", moduleHash), zap.Uint64("block_num", clock.num))
 		}
 		metrics.ExecutedWasmModules.Inc()
-		ctx := context.TODO()
+		result.metricsGatherer = &metrics.WasmMetricsGatherer{}
+
+		// we create a context with just enough for the wasm module executor to work: the UniqueID, and a stats gatherer
+		ctx := reqctx.WithWasmExtensionReqStats(context.TODO(), result.metricsGatherer)
+		ctx = reqctx.WithRequest(ctx, &reqctx.RequestDetails{
+			UniqueID: reqctx.Details(originalContext).UniqueID,
+		})
+
 		inst, err := wasmModule.ExecuteNewCall(ctx, call, nil, wasmArguments, argValues)
 		inst.Close(ctx)
 		result.updateFromCall(call, err)
+		result.metricsGatherer.ApplyToStats(reqctx.ReqStats(originalContext))
 
 		return err
 	}
@@ -160,5 +171,6 @@ func (s *SharedCache) Execute(
 		zlog.Debug("getting wasm call from cache", zap.String("module_hash", moduleHash), zap.Uint64("block_num", clock.num))
 	}
 	metrics.SkippedCachedWasmModules.Inc()
+	result.metricsGatherer.ApplyToStats(reqctx.ReqStats(originalContext))
 	return applyResult(result, call)
 }

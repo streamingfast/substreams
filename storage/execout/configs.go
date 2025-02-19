@@ -45,6 +45,18 @@ func NewConfigs(baseObjectStore dstore.Store, allRequestedModules []*pbsubstream
 	}, nil
 }
 
+func WrapConfigs(execOutputSaveInterval uint64, logger *zap.Logger, confs ...*Config) *Configs {
+	out := &Configs{
+		execOutputSaveInterval: execOutputSaveInterval,
+		logger:                 logger,
+		ConfigMap:              make(map[string]*Config),
+	}
+	for _, conf := range confs {
+		out.ConfigMap[conf.name] = conf
+	}
+	return out
+}
+
 func (c *Configs) NewFile(moduleName string, targetRange *block.Range) *File {
 	return c.ConfigMap[moduleName].NewFile(targetRange)
 }

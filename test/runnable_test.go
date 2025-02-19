@@ -12,20 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/streamingfast/dmetering"
-
-	"go.opentelemetry.io/otel/attribute"
-
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/stream"
+	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dstore"
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/shutter"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"go.opentelemetry.io/otel"
-	"go.uber.org/zap"
-
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/orchestrator/stage"
@@ -37,9 +29,14 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service"
 	"github.com/streamingfast/substreams/service/config"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.uber.org/zap"
 )
 
-type testPreWork func(t *testing.T, run *testRun, workerFactory work.WorkerFactory)
+type testPreWork func(t *testing.T, run *testRun, workerFactory work.WorkerPoolFactory)
 
 type testRun struct {
 	Package                *pbsubstreams.Package
@@ -146,7 +143,9 @@ func (f *testRun) run(t *testing.T, testName string) error {
 		newBlockGenerator = f.NewBlockGenerator
 	}
 
-	workerFactory := func(_ *zap.Logger) work.Worker {
+	count := 0
+	workerFactory := func(ctx context.Context) work.Worker {
+		count++
 		return &TestWorker{
 			t:                      t,
 			responseCollector:      newResponseCollector(ctx),
@@ -159,11 +158,16 @@ func (f *testRun) run(t *testing.T, testName string) error {
 		}
 	}
 
-	if f.PreWork != nil {
-		f.PreWork(t, f, workerFactory)
+	workerPool := work.NewTestWorkerPool(t, workerFactory)
+	workerPoolFactory := func(ctx context.Context) work.WorkerPool {
+		return workerPool
 	}
 
-	if err := processRequest(t, ctx, request, workerFactory, newBlockGenerator, responseCollector, false, f.BlockProcessedCallback, f.TempDir, f.ParallelSubrequests, f.LinearHandoffBlockNum); err != nil {
+	if f.PreWork != nil {
+		f.PreWork(t, f, workerPoolFactory)
+	}
+
+	if err := processRequest(t, ctx, request, workerPoolFactory, newBlockGenerator, responseCollector, false, f.BlockProcessedCallback, f.TempDir, f.ParallelSubrequests, f.LinearHandoffBlockNum); err != nil {
 		return fmt.Errorf("running test: %w", err)
 	}
 
@@ -278,7 +282,7 @@ func processInternalRequest(
 	t *testing.T,
 	ctx context.Context,
 	request *pbssinternal.ProcessRangeRequest,
-	workerFactory work.WorkerFactory,
+	workerPoolFactory work.WorkerPoolFactory,
 	newGenerator BlockGeneratorFactory,
 	responseCollector *responseCollector,
 	blockProcessedCallBack blockProcessedCallBack,
@@ -314,7 +318,7 @@ func processRequest(
 	t *testing.T,
 	ctx context.Context,
 	request *pbsubstreamsrpc.Request,
-	workerFactory work.WorkerFactory,
+	workerPoolFactory work.WorkerPoolFactory,
 	newGenerator BlockGeneratorFactory,
 	responseCollector *responseCollector,
 	isSubRequest bool,
@@ -343,8 +347,8 @@ func processRequest(
 		DefaultParallelSubrequests: parallelSubrequests,
 		BaseObjectStore:            baseStoreStore,
 		DefaultCacheTag:            "tag",
-		WorkerFactory:              workerFactory,
 		MaxJobsAhead:               10,
+		WorkerPoolFactory:          workerPoolFactory,
 	}
 
 	svc := service.TestNewService(runtimeConfig, linearHandoffBlockNum, tr.StreamFactory)

@@ -1,10 +1,9 @@
 package config
 
 import (
+	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/orchestrator/work"
-
-	"github.com/streamingfast/dstore"
 )
 
 // RuntimeConfig is a global configuration for the service.
@@ -18,8 +17,8 @@ type RuntimeConfig struct {
 	// and `outputs/` for execution output of both `map` and `store` module kinds
 	BaseObjectStore        dstore.Store
 	DefaultCacheTag        string // appended to BaseObjectStore unless overriden by auth layer
-	WorkerFactory          work.WorkerFactory
 	ClientFactory          client.InternalClientFactory
+	WorkerPoolFactory      work.WorkerPoolFactory
 	ModuleExecutionTracing bool
 }
 
@@ -29,8 +28,8 @@ func NewTier1RuntimeConfig(
 	maxJobsAhead uint64,
 	baseObjectStore dstore.Store,
 	defaultCacheTag string,
-	workerFactory work.WorkerFactory,
 	clientFactory client.InternalClientFactory,
+	WorkerPoolFactory work.WorkerPoolFactory,
 ) RuntimeConfig {
 	return RuntimeConfig{
 		SegmentSize:                segmentSize,
@@ -38,8 +37,8 @@ func NewTier1RuntimeConfig(
 		MaxJobsAhead:               maxJobsAhead,
 		BaseObjectStore:            baseObjectStore,
 		DefaultCacheTag:            defaultCacheTag,
-		WorkerFactory:              workerFactory,
 		ClientFactory:              clientFactory,
+		WorkerPoolFactory:          WorkerPoolFactory,
 		// overridden by Tier Options
 		ModuleExecutionTracing: false,
 	}

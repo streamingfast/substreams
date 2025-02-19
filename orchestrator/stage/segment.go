@@ -1,6 +1,8 @@
 package stage
 
 import (
+	"fmt"
+
 	"go.uber.org/zap/zapcore"
 )
 
@@ -21,6 +23,10 @@ const (
 type Unit struct {
 	Segment int
 	Stage   int
+}
+
+func (u Unit) String() string {
+	return fmt.Sprintf("Stage: %d Segment: %d", u.Stage, u.Segment)
 }
 
 func (s UnitState) String() string {

@@ -336,7 +336,7 @@ func TestOneStoreOneMap(t *testing.T) {
 			linearBlock: 30,
 			stopBlock:   30,
 			production:  true,
-			preWork: func(t *testing.T, run *testRun, workerFactory work.WorkerFactory) {
+			preWork: func(t *testing.T, run *testRun, workerFactory work.WorkerPoolFactory) {
 				partialPreWork(t, 1, 0, run, workerFactory)
 			},
 			expectedResponseCount: 29,
@@ -621,14 +621,17 @@ func assertFiles(t *testing.T, tempDir string, expectPartialSpkg bool, wantedFil
 	assert.ElementsMatch(t, wantedFiles, actualFiles)
 }
 
-func partialPreWork(t *testing.T, start uint64, stageIdx int, run *testRun, workerFactory work.WorkerFactory) {
-	worker := workerFactory(zlog)
+func partialPreWork(t *testing.T, start uint64, stageIdx int, run *testRun, workerPoolFactory work.WorkerPoolFactory) {
+	ctx := context.Background()
+	workerPool := workerPoolFactory(ctx)
+	worker, err := workerPool.Borrow(context.Background())
+	require.NoError(t, err)
 
 	// FIXME: use the new `Work` interface here, and validate that the
 	// caller to `partialPreWork` doesn't need to be changed too much? :)
 	segmenter := block.NewSegmenter(10, 0, 0)
 	unit := stage.Unit{Segment: segmenter.IndexForStartBlock(start), Stage: stageIdx}
-	ctx := reqctx.WithRequest(run.Context, &reqctx.RequestDetails{Modules: run.Package.Modules, OutputModule: run.ModuleName})
+	ctx = reqctx.WithRequest(run.Context, &reqctx.RequestDetails{Modules: run.Package.Modules, OutputModule: run.ModuleName})
 	cmd := worker.Work(ctx, unit, start, []string{run.ModuleName}, nil)
 	result := cmd()
 	msg, ok := result.(work.MsgJobSucceeded)

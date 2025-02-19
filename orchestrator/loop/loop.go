@@ -63,7 +63,7 @@ func (l *EventLoop) Send(msg Msg) {
 func (l *EventLoop) update(msg Msg, cmds chan Cmd) (out Cmd) {
 	switch msg := msg.(type) {
 	case BatchMsg:
-		for _, cmd := range msg {
+		for _, cmd := range msg.cmds {
 			cmds <- cmd
 		}
 		return nil
@@ -71,7 +71,7 @@ func (l *EventLoop) update(msg Msg, cmds chan Cmd) (out Cmd) {
 	case SequenceMsg:
 		go func() {
 			// Execute commands one at a time, in order.
-			for _, cmd := range msg {
+			for _, cmd := range msg.cmds {
 				l.Send(cmd())
 			}
 		}()

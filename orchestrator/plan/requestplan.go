@@ -102,6 +102,9 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval, lowestInitialBl
 }
 
 func (p *RequestPlan) StoresSegmenter() *block.Segmenter {
+	if p.BuildStores == nil {
+		return nil
+	}
 	return block.NewSegmenter(p.segmentInterval, p.BuildStores.StartBlock, p.BuildStores.ExclusiveEndBlock)
 }
 
@@ -123,6 +126,9 @@ func (p *RequestPlan) ModuleSegmenter(modInitBlock uint64) *block.Segmenter {
 }
 
 func (p *RequestPlan) WriteOutSegmenter() *block.Segmenter {
+	if p.WriteExecOut == nil {
+		return nil
+	}
 	return block.NewSegmenter(p.segmentInterval, p.WriteExecOut.StartBlock, p.WriteExecOut.ExclusiveEndBlock)
 }
 

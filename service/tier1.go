@@ -135,6 +135,8 @@ func NewTier1(
 	appSetIsReadyState func(isReady bool),
 	substreamsClientConfig *client.SubstreamsClientConfig,
 	tier2RequestParameters reqctx.Tier2RequestParameters,
+	workerPoolFactory work.WorkerPoolFactory,
+
 	enforceCompression bool,
 	activeRequestsSoftLimit int,
 	activeRequestsHardLimit int,
@@ -150,10 +152,8 @@ func NewTier1(
 		10,
 		stateStore,
 		defaultCacheTag,
-		func(logger *zap.Logger) work.Worker {
-			return work.NewRemoteWorker(clientFactory, logger)
-		},
 		clientFactory,
+		workerPoolFactory,
 	)
 
 	sf := &StreamFactory{
@@ -467,6 +467,20 @@ func (s *Tier1Service) writePackage(ctx context.Context, request *pbsubstreamsrp
 	return nil
 }
 
+func (s *Tier1Service) writeLastUsed(ctx context.Context, execGraph *exec.Graph, cacheStore dstore.Store) error {
+	for _, module := range execGraph.UsedModules() {
+		moduleStore, err := cacheStore.SubStore(execGraph.ModuleHashes().Get(module.Name))
+		if err != nil {
+			return fmt.Errorf("getting substore: %w", err)
+		}
+		moduleStore.SetOverwrite(true)
+		if err := moduleStore.WriteObject(ctx, "last_used", strings.NewReader(time.Now().Format("2006-01-02"))); err != nil {
+			return fmt.Errorf("writing last_used file")
+		}
+	}
+	return nil
+}
+
 var IsValidCacheTag = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`).MatchString
 
 func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Request, execGraph *exec.Graph, respFunc substreams.ResponseFunc) error {
@@ -553,6 +567,10 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		logger.Warn("cannot write package", zap.Error(err))
 	}
 
+	if err := s.writeLastUsed(ctx, execGraph, cacheStore); err != nil {
+		logger.Warn("cannot write 'last_used' file", zap.Error(err))
+	}
+
 	segmentSize := s.runtimeConfig.SegmentSize
 
 	execOutputConfigs, err := execout.NewConfigs(cacheStore, execGraph.UsedModules(), execGraph.ModuleHashes(), segmentSize, chainFirstStreamableBlock, logger)
@@ -595,7 +613,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		wasmRuntime,
 		execOutputCacheEngine,
 		segmentSize,
-		s.runtimeConfig.WorkerFactory,
+		s.runtimeConfig.WorkerPoolFactory,
 		respFunc,
 		s.blockExecutionTimeout,
 		opts...,

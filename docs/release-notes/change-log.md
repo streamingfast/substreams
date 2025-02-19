@@ -10,11 +10,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+Introduces Global Worker Pool management, updating dependencies, and improving the orchestration logic. The key change is the integration of a new worker pool protocol.
 
 ### Server
 
 * Added 'shared cache' on tier1: execution of modules near the HEAD of the chain will be done once for a given module hash and the result shared between requests.
   This will reduce CPU usage and increase performance when many requests are using the same modules (ex: foundational modules)
+
+* Improved "time to first block" when a lot of cached files exist on dependency substreams modules by skipping reads segments that won't be used and assuming stores "full KVs" are always filled sequentially (since they are!)
 
 * Limit parallel execution of a stage's layer.
 
@@ -34,8 +37,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v1.12.3
 
-### Server
-
+### Server Side:
+* Added `WorkerPoolFactory` to `Tier1Modules` and `RemoteWorkerClient` to `Tier2Modules` to support enhanced worker pool management.
+* Introduced `WorkerKeepAliveDelay` in `Tier1Config` to manage worker pool keep-alive settings.
+* Updated `Tier1App` and `Tier2App` to utilize the new worker pool components in their `Run` methods.
+* Refactored the orchestrator `loop` package to introduce a new `Msg` interface and associated message types, enhancing the message handling mechanism.
+* Modified the `Scheduler` and `ParallelProcessor` to integrate with the new worker pool interface and handle job scheduling more effectively.
+* Introduce `loop.IsMsg` interface  to ensure proper message handling.
 * Improve noop-mode: will now only send one signal per bundle, without any data.
 
 * Improve logging.

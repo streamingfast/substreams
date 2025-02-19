@@ -9,18 +9,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"google.golang.org/grpc/metadata"
-
 	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dgrpc"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	otelCodes "go.opentelemetry.io/otel/codes"
-	ttrace "go.opentelemetry.io/otel/trace"
-	"go.uber.org/zap"
-	"google.golang.org/grpc/codes"
-
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/orchestrator/loop"
@@ -29,6 +20,13 @@ import (
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	otelCodes "go.opentelemetry.io/otel/codes"
+	ttrace "go.opentelemetry.io/otel/trace"
+	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 )
 
 var lastWorkerID uint64
@@ -63,27 +61,27 @@ func (f SimpleWorkerFactory) ID() string {
 	return fmt.Sprintf("%d", f.id)
 }
 
-// The tracer will be provided by the worker pool, on worker creation
-type WorkerFactory = func(logger *zap.Logger) Worker
-
 type RemoteWorker struct {
-	clientFactory client.InternalClientFactory
-	tracer        ttrace.Tracer
-	logger        *zap.Logger
-	id            uint64
+	clientFactory  client.InternalClientFactory
+	tracer         ttrace.Tracer
+	logger         *zap.Logger
+	id             string
+	keepAliveDelay time.Duration
 }
 
-func NewRemoteWorker(clientFactory client.InternalClientFactory, logger *zap.Logger) *RemoteWorker {
+func NewRemoteWorker(clientFactory client.InternalClientFactory, id string, keepAliveDelay time.Duration, logger *zap.Logger) *RemoteWorker {
+	logger = logger.Named("remote-worker")
 	return &RemoteWorker{
-		clientFactory: clientFactory,
-		tracer:        otel.GetTracerProvider().Tracer("worker"),
-		logger:        logger,
-		id:            atomic.AddUint64(&lastWorkerID, 1),
+		clientFactory:  clientFactory,
+		tracer:         otel.GetTracerProvider().Tracer("worker"),
+		logger:         logger,
+		id:             id,
+		keepAliveDelay: keepAliveDelay,
 	}
 }
 
 func (w *RemoteWorker) ID() string {
-	return fmt.Sprintf("%d", w.id)
+	return w.id
 }
 
 func NewRequest(ctx context.Context, req *reqctx.RequestDetails, stageIndex int, startBlock uint64) *pbssinternal.ProcessRangeRequest {
@@ -174,12 +172,12 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 				zap.Float64("num_of_blocks_per_sec", float64(request.SegmentSize)/timeTook.Seconds()),
 				zap.Error(err),
 			)
-			return MsgJobFailed{Unit: unit, Error: err}
+			return MsgJobFailed{Unit: unit, Worker: w, Error: err}
 		}
 
 		if err := ctx.Err(); err != nil {
 			logger.Warn("job not completed", zap.Object("unit", unit), zap.Error(err))
-			return MsgJobFailed{Unit: unit, Error: err}
+			return MsgJobFailed{Unit: unit, Worker: w, Error: err}
 		}
 
 		timeTook := time.Since(startTime)
@@ -212,7 +210,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 	span.SetAttributes(
 		attribute.String("substreams.output_module", request.OutputModule),
 		attribute.Int64("substreams.segment_number", int64(request.SegmentNumber)),
-		attribute.Int64("substreams.worker_id", int64(w.id)),
+		attribute.String("substreams.worker_id", w.id),
 	)
 	logger := w.logger
 
@@ -227,6 +225,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 	defer stats.RecordEndSubrequest(jobIdx)
 
 	ctx = dauth.FromContext(ctx).ToOutgoingGRPCContext(ctx)
+	ctx = w.SetOutgoingHeaders(ctx)
 	if headers.IsSet() {
 		ctx = metadata.AppendToOutgoingContext(ctx, headers.ToArray()...)
 	}
@@ -313,6 +312,47 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 			}
 		}
 	}
+}
+
+const HeaderWorkerID = "x-sf-worker-id"
+const HeaderWorkerKeepAliveDelay = "x-sf-worker-keep-alive-delay"
+
+func (w *RemoteWorker) SetOutgoingHeaders(ctx context.Context) context.Context {
+	w.logger.Debug("setting outgoing headers", zap.String("worker_id", w.id), zap.Duration("keep_alive_delay", w.keepAliveDelay))
+	ctxWithHeaders := metadata.AppendToOutgoingContext(ctx,
+		HeaderWorkerID, w.id,
+		HeaderWorkerKeepAliveDelay, w.keepAliveDelay.String(),
+	)
+	return ctxWithHeaders
+}
+
+func IncomingParameters(ctx context.Context) (workerId string, keepAliveDelay time.Duration, err error) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return "", time.Duration(0), fmt.Errorf("getting metadata from context")
+	}
+
+	stringDurations := md.Get(HeaderWorkerKeepAliveDelay)
+	if len(stringDurations) != 1 || stringDurations[0] == "" {
+		return "", time.Duration(0), fmt.Errorf("missing keep alive delay header")
+	}
+
+	keepAliveDelay, err = time.ParseDuration(stringDurations[0])
+	if err != nil {
+		return "", time.Duration(0), fmt.Errorf("parsing keep alive delay: %w", err)
+	}
+
+	if keepAliveDelay == 0 {
+		return "", time.Duration(0), fmt.Errorf("keep alive delay must be greater than 0. header set to: %s", keepAliveDelay)
+	}
+
+	workerIds := md.Get(HeaderWorkerID)
+	if len(workerIds) != 1 || workerIds[0] == "" {
+		return "", time.Duration(0), fmt.Errorf("missing worker id header")
+	}
+	workerId = workerIds[0]
+
+	return
 }
 
 func toRPCPartialFiles(completed *pbssinternal.Completed) (out store.FileInfos) {

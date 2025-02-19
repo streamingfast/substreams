@@ -2,11 +2,20 @@ package loop
 
 import "time"
 
-type Msg any
-
 type Cmd func() Msg
 
-type BatchMsg []Cmd
+type Msg interface {
+	isMsg() bool
+}
+
+type IsMsg struct{}
+
+func (m IsMsg) isMsg() bool { return true }
+
+type BatchMsg struct {
+	IsMsg
+	cmds []Cmd
+}
 
 func Batch(cmds ...Cmd) Cmd {
 	var validCmds []Cmd
@@ -20,35 +29,48 @@ func Batch(cmds ...Cmd) Cmd {
 		return nil
 	}
 	return func() Msg {
-		return BatchMsg(validCmds)
+		return BatchMsg{
+			cmds: validCmds,
+		}
 	}
 }
 
-type SequenceMsg []Cmd
+type SequenceMsg struct {
+	IsMsg
+	cmds []Cmd
+}
 
 func Sequence(cmds ...Cmd) Cmd {
 	return func() Msg {
-		return SequenceMsg(cmds)
+		return SequenceMsg{
+			cmds: cmds,
+		}
 	}
 }
 
-func NewQuitMsg(err error) Msg {
-	return QuitMsg{err}
+type QuitMsg struct {
+	IsMsg
+	err error
 }
 
-type QuitMsg struct {
-	err error
+func NewQuitMsg(err error) Msg {
+	return &QuitMsg{err: err}
 }
 
 func Quit(err error) Cmd {
 	return func() Msg {
-		return QuitMsg{err}
+		return QuitMsg{err: err}
 	}
 }
 
-func Tick(delay time.Duration, fn func() Msg) Cmd {
+type TickMsg struct {
+	IsMsg
+	msg Msg
+}
+
+func Tick(delay time.Duration, msg Msg) Cmd {
 	return func() Msg {
 		time.Sleep(delay)
-		return fn()
+		return msg
 	}
 }

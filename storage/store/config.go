@@ -130,9 +130,11 @@ func (c *Config) FileSize(ctx context.Context, fileInfo *FileInfo) (int64, error
 	return size, nil
 }
 
-func (c *Config) ListSnapshotFiles(ctx context.Context, below uint64) (files []*FileInfo, err error) {
-	if below == 0 {
-		return nil, nil
+func (c *Config) ListSnapshotFiles(ctx context.Context, from uint64, inclusiveTo *uint64) (files []*FileInfo, err error) {
+	fromPrefix := FilenamePrefix(from)
+	toPrefix := ""
+	if inclusiveTo != nil {
+		toPrefix = FilenamePrefix(*inclusiveTo + 1)
 	}
 
 	logger := logging.Logger(ctx, zlog)
@@ -141,7 +143,7 @@ func (c *Config) ListSnapshotFiles(ctx context.Context, below uint64) (files []*
 		files = nil
 
 		deletedOldFiles := 0
-		return c.objStore.Walk(ctx, "", func(filename string) (err error) {
+		return c.objStore.WalkFromTo(ctx, "", fromPrefix, toPrefix, func(filename string) (err error) {
 			fileInfo, ok := parseFileName(c.Name(), filename)
 			if !ok {
 				logger.Warn("seen snapshot file that we don't know how to parse", zap.String("filename", filename))
@@ -160,14 +162,13 @@ func (c *Config) ListSnapshotFiles(ctx context.Context, below uint64) (files []*
 				return nil
 			}
 
-			if fileInfo.Range.StartBlock >= below {
-				return dstore.StopIteration
-			}
-
 			files = append(files, fileInfo)
 			return nil
 		})
 	})
+	if err == dstore.StopIteration {
+		return files, nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("walking files: %s", err)
 	}

@@ -16,6 +16,7 @@ import (
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"
 )
 
@@ -37,9 +38,10 @@ type Stages struct {
 	ctx    context.Context
 	logger *zap.Logger
 
-	globalSegmenter *block.Segmenter // This segmenter covers both the stores and the mapper
-	storeSegmenter  *block.Segmenter // This segmenter covers only jobs needed to build up stores according to the RequestPlan.
-	mapSegmenter    *block.Segmenter // This segmenter covers only what is needed to produce the mapper output for the FileWalker.
+	globalSegmenter   *block.Segmenter // This segmenter covers both the stores and the mapper
+	storeSegmenter    *block.Segmenter // This segmenter covers only jobs needed to build up stores according to the RequestPlan.
+	mapSegmenter      *block.Segmenter // This segmenter covers only what is needed to produce the mapper output for the FileWalker.
+	hasLinearPipeline bool
 
 	stages []*Stage
 
@@ -53,6 +55,9 @@ type Stages struct {
 	// are assumed to have been either fully loaded, or merged up until this offset.
 	segmentOffset int
 
+	storeConfigs   store.ConfigMap
+	execoutConfigs *execout.Configs
+
 	// first segment where we can run directly the higher stages (shadowing the lower stages)
 	shadowableSegment int
 }
@@ -62,30 +67,30 @@ func NewStages(
 	ctx context.Context,
 	execGraph *exec.Graph,
 	reqPlan *plan.RequestPlan,
+	execoutConfigs *execout.Configs,
 	storeConfigs store.ConfigMap,
 ) (out *Stages) {
 
-	if !reqPlan.RequiresParallelProcessing() {
-		panic("internal error: new_stages should never be called outside of parallel processing")
-	}
-
 	logger := reqctx.Logger(ctx)
-
-	stagedModules := execGraph.StagedUsedModules()
-	modulesInitBlocks := execGraph.ModulesInitBlocks()
 	out = &Stages{
 		ctx:                 ctx,
 		logger:              reqctx.Logger(ctx),
 		globalSegmenter:     reqPlan.BackprocessSegmenter(),
 		outputModuleIsIndex: execGraph.OutputModule().GetKindBlockIndex() != nil,
+		execoutConfigs:      execoutConfigs,
+		storeConfigs:        storeConfigs,
+
+		hasLinearPipeline: reqPlan.LinearPipeline != nil,
+		storeSegmenter:    reqPlan.StoresSegmenter(),
+		mapSegmenter:      reqPlan.WriteOutSegmenter(),
 	}
-	if reqPlan.BuildStores != nil {
-		out.storeSegmenter = reqPlan.StoresSegmenter()
+
+	if out.storeSegmenter == nil && out.mapSegmenter == nil {
+		panic("internal error: new_stages called without writeExecOut or buildStores")
 	}
-	if reqPlan.WriteExecOut != nil {
-		out.mapSegmenter = reqPlan.WriteOutSegmenter()
-	}
-	for idx, stageLayers := range stagedModules {
+
+	modulesInitBlocks := execGraph.ModulesInitBlocks()
+	for idx, stageLayers := range execGraph.StagedUsedModules() {
 		var allModules []string
 		for _, layer := range stageLayers {
 			for _, mod := range layer {

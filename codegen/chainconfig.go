@@ -136,7 +136,7 @@ var ChainConfigByID = map[string]*ChainConfig{
 	},
 	"sei-mainnet": {
 		DisplayName:      "Sei Mainnet",
-		ExplorerLink:     "",
+		ExplorerLink:     "https://seitrace.com/",
 		FirehoseEndpoint: "evm-mainnet.sei.streamingfast.io:443",
 		Network:          "sei-mainnet",
 	},

@@ -73,8 +73,11 @@ func New(c common.Common, config *request.Config) (*Output, error) {
 	// }
 
 	getBytesEncodingPerNetwork := func(endpoint string) dynamic.BytesRepresentation {
-		if manifest.HardcodedEndpoints["solana-mainnet-beta"] == endpoint {
-			return dynamic.BytesAsBase58
+		bytesAsBase58Chains := []string{"solana-mainnet-beta", "solana-mainnet", "solana-devnet"}
+		for _, chain := range bytesAsBase58Chains {
+			if manifest.HardcodedEndpoints[chain] == endpoint {
+				return dynamic.BytesAsBase58
+			}
 		}
 
 		return dynamic.BytesAsHex

@@ -18,6 +18,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+* Introduces Global Worker Pool management, updating dependencies, and improving the orchestration logic. The key change is the integration of a new worker pool protocol.
+
+* Introduced Global Request Pool to handle user request borrowing and quotas, preventing resource abuse. Integrated it into Tier1Service for enhanced request lifecycle management, ensuring concurrency limits and request lifetimes are respected. Updated dependencies to include required worker-pool protocol changes.
+
 * Added 'shared cache' on tier1: execution of modules near the HEAD of the chain will be done once for a given module hash and the result shared between requests.
   This will reduce CPU usage and increase performance when many requests are using the same modules (ex: foundational modules)
 

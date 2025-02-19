@@ -10,7 +10,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
-Introduces Global Worker Pool management, updating dependencies, and improving the orchestration logic. The key change is the integration of a new worker pool protocol.
+* Introduces Global Worker Pool management, updating dependencies, and improving the orchestration logic. The key change is the integration of a new worker pool protocol.
+
+* Add Sei Mainnet to the `ChainConfigByID` map.
+
+* When running Solana package, set base58 encoding by default in the GUI.
 
 ### Server
 

@@ -56,9 +56,7 @@ func (r *BorrowedRequest) startKeepAlive(ctx context.Context, delay time.Duratio
 		for {
 			select {
 			case <-ctx.Done():
-				return
 			case <-r.done:
-				return
 			case <-time.After(delay):
 				_, err := remoteWorkerPoolClient.KeepAlive(
 					ctx,
@@ -152,11 +150,14 @@ func (p *GlobalRequestPool) BorrowRequest(ctx context.Context, userID string, ap
 	p.borrowedRequestMutex.Unlock()
 
 	r.startKeepAlive(ctx, p.requestKeepAliveDelay, p.remoteWorkerPoolClient)
+
 	p.logger.Info("borrowed request worker", zap.String("worker_key", key))
+
 	return r
 }
 
-func (p *GlobalRequestPool) ReturnRequest(ctx context.Context, r *BorrowedRequest) {
+func (p *GlobalRequestPool) ReturnRequest(r *BorrowedRequest) {
+
 	r.StopKeepAlive()
 
 	p.borrowedRequestMutex.Lock()
@@ -168,10 +169,11 @@ func (p *GlobalRequestPool) ReturnRequest(ctx context.Context, r *BorrowedReques
 	p.borrowedRequestMutex.Unlock()
 
 	if strings.HasPrefix(r.key, work.FreeWorkerKeyPrefix) {
+		p.logger.Info("returning free request worker", zap.String("worker_key", r.key), zap.Bool("keep", false))
 		return
 	}
 
-	_, err := p.remoteWorkerPoolClient.ReturnWorker(ctx,
+	resp, err := p.remoteWorkerPoolClient.ReturnWorker(context.Background(),
 		&pbworker.ReturnWorkerRequest{
 			WorkerKey:                 r.key,
 			MinimalWorkerLifeDuration: durationpb.New(r.minimalWorkerLifeDuration),
@@ -181,6 +183,7 @@ func (p *GlobalRequestPool) ReturnRequest(ctx context.Context, r *BorrowedReques
 
 	if err != nil {
 		p.logger.Error("returning request worker", zap.Error(err))
-		//why do not propagate that err...
+		//do not propagate that err...
 	}
+	p.logger.Info("returned request worker", zap.String("key", r.key), zap.Stringer("status", resp.Status))
 }

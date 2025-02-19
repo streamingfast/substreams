@@ -656,12 +656,18 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		if r.status == pbworker.BorrowWorkerResponse_resource_exhausted {
 			msg := strings.Builder{}
 			msg.WriteString("Request quota exceeded.\n")
-			msg.WriteString(fmt.Sprintf("Your allowed %q concurrent requests.\n", r.state.MaxWorkers))
-			msg.WriteString(fmt.Sprintf("Each request has a minimal life time of %q\n", r.minimalWorkerLifeDuration))
+			msg.WriteString(fmt.Sprintf("Your allowed %d concurrent requests.\n", r.state.MaxWorkers))
+			msg.WriteString(fmt.Sprintf("Each request has a minimal life time of %d\n", r.minimalWorkerLifeDuration))
 			return status.Errorf(codes.ResourceExhausted, msg.String())
 		}
-
-		defer s.globalRequestPool.ReturnRequest(ctx, r)
+		defer func() {
+			zlog.Info("returning request", zap.Bool("keep", false), zap.String("key", r.key))
+			if s.IsTerminating() {
+				s.logger.Info("returning request without minimal life time. Server is shutting down", zap.String("key", r.key))
+				r.minimalWorkerLifeDuration = 0
+			}
+			s.globalRequestPool.ReturnRequest(r)
+		}()
 	}
 
 	logger.Debug("initializing tier1 pipeline",
@@ -823,6 +829,8 @@ func toConnectError(ctx context.Context, err error) error {
 			return connect.NewError(connect.CodeUnavailable, grpcError.Err())
 		case codes.InvalidArgument:
 			return connect.NewError(connect.CodeInvalidArgument, grpcError.Err())
+		case codes.ResourceExhausted:
+			return connect.NewError(connect.CodeResourceExhausted, grpcError.Err())
 		case codes.Unknown:
 			return connect.NewError(connect.CodeUnknown, grpcError.Err())
 		}

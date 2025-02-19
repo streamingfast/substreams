@@ -14,7 +14,6 @@ import (
 	"github.com/streamingfast/substreams/service"
 	"github.com/streamingfast/substreams/wasm"
 	"github.com/streamingfast/substreams/wasm/wazero"
-	pbworker "github.com/streamingfast/worker-pool-protocol/pb/sf/worker/v1"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
 )
@@ -43,7 +42,6 @@ type Tier2App struct {
 
 type Tier2Modules struct {
 	CheckPendingShutDown func() bool
-	RemoteWorkerClient   pbworker.WorkerPoolClient
 }
 
 func NewTier2(logger *zap.Logger, config *Tier2Config, modules *Tier2Modules) *Tier2App {
@@ -92,7 +90,6 @@ func (a *Tier2App) Run() error {
 	}
 
 	svc, err := service.NewTier2(
-		a.modules.RemoteWorkerClient,
 		a.logger,
 		opts...,
 	)

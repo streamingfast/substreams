@@ -30,10 +30,12 @@ func generateSubgraphEnv(cmd *cobra.Command, args []string) error {
 	input := fmt.Sprintf(
 		"Your Subgraph Powered Subtreams is now generated!\n\n" +
 			"**Now follow the next steps:**\n\n" +
-			"`cd subgraph`\n" +
+			"`cd subgraph` # Edit **mappings.ts** and **schema.graphql** files.\n" +
 			"`npm install`\n" +
 			"`npm run generate` # generate AssemblyScript and Protobuf bindings\n" +
-			"`npm run deploy-local` # build and deploy to a local graph-node\n",
+			"`npm run deploy-local` # build and deploy to a local graph-node\n" +
+			"`npm run deploy-local` # build and deploy to The Graph Studio **(*)**\n\n" +
+			"**(*)** If the network is supported in The Graph Studio. Take a look at https://thegraph.com/docs/en/supported-networks/\n",
 	)
 	fmt.Println(ToMarkdown(input))
 	return nil

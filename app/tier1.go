@@ -37,7 +37,7 @@ type Tier1Modules struct {
 	CheckPendingShutDown  func() bool
 	InfoServer            InfoServer
 	WorkerPoolFactory     work.WorkerPoolFactory
-	globalRequestPool     *service.GlobalRequestPool
+	GlobalRequestPool     *service.GlobalRequestPool
 }
 
 type InfoServer interface {
@@ -223,7 +223,7 @@ func (a *Tier1App) Run() error {
 		a.config.ActiveRequestsSoftLimit,
 		a.config.ActiveRequestsHardLimit,
 		a.config.SharedCacheSize,
-		a.modules.globalRequestPool,
+		a.modules.GlobalRequestPool,
 		opts...,
 	)
 	if err != nil {

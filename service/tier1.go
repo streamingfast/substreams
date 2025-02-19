@@ -43,10 +43,12 @@ import (
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
+	pbworker "github.com/streamingfast/worker-pool-protocol/pb/sf/worker/v1"
 	"go.opentelemetry.io/otel/attribute"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -78,6 +80,7 @@ type Tier1Service struct {
 	activeRequestsSoftLimit int
 	activeRequestsHardLimit int
 	tier2RequestParameters  reqctx.Tier2RequestParameters
+	globalRequestPool       *GlobalRequestPool
 }
 
 func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
@@ -141,6 +144,7 @@ func NewTier1(
 	activeRequestsSoftLimit int,
 	activeRequestsHardLimit int,
 	sharedCacheSize uint64,
+	globalRequestPool *GlobalRequestPool,
 	opts ...Option,
 ) (*Tier1Service, error) {
 
@@ -188,6 +192,7 @@ func NewTier1(
 		enforceCompression:      enforceCompression,
 		activeRequestsSoftLimit: activeRequestsSoftLimit,
 		activeRequestsHardLimit: activeRequestsHardLimit,
+		globalRequestPool:       globalRequestPool,
 	}
 
 	go func() {
@@ -642,6 +647,21 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	)
 	if err != nil {
 		return fmt.Errorf("error building request plan: %w", err)
+	}
+
+	if s.globalRequestPool != nil {
+		userID := dauth.FromContext(ctx).UserID()
+		apiKeyID := dauth.FromContext(ctx).APIKeyID()
+		r := s.globalRequestPool.BorrowRequest(ctx, userID, apiKeyID, traceId)
+		if r.status == pbworker.BorrowWorkerResponse_resource_exhausted {
+			msg := strings.Builder{}
+			msg.WriteString("Request quota exceeded.\n")
+			msg.WriteString(fmt.Sprintf("Your allowed %q concurrent requests.\n", r.state.MaxWorkers))
+			msg.WriteString(fmt.Sprintf("Each request has a minimal life time of %q\n", r.minimalWorkerLifeDuration))
+			return status.Errorf(codes.ResourceExhausted, msg.String())
+		}
+
+		defer s.globalRequestPool.ReturnRequest(ctx, r)
 	}
 
 	logger.Debug("initializing tier1 pipeline",

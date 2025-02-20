@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Added `globalRequestPool` to the `Tier1Modules` struct in `app/tier1.go` and integrated it into the `Run` method to enhance request lifecycle management.
 * Introduced `GlobalRequestPool` in `service/requestpool.go` to handle user request borrowing, quotas, and keep-alive mechanisms.
 * Updated `Tier1Service` to include `globalRequestPool` and integrated it into the request handling logic to enforce concurrency limits and request lifetimes.
+* Updated `Tier1Service` to manage worker keep alive instead of relying on `Tier2Service`.
 
 #### Other change
 * Added 'shared cache' on tier1: execution of modules near the HEAD of the chain will be done once for a given module hash and the result shared between requests.

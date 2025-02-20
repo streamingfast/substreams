@@ -9,41 +9,36 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
-* Introduces Global Worker Pool management, updating dependencies, and improving the orchestration logic. The key change is the integration of a new worker pool protocol.
-
-* Add Sei Mainnet to the `ChainConfigByID` map.
-
-* When running Solana package, set base58 encoding by default in the GUI.
+## v1.13.0
 
 ### Server
 
-#### Global Request Pool Integration:
-* Added `globalRequestPool` to the `Tier1Modules` struct in `app/tier1.go` and integrated it into the `Run` method to enhance request lifecycle management.
-* Introduced `GlobalRequestPool` in `service/requestpool.go` to handle user request borrowing, quotas, and keep-alive mechanisms.
-* Updated `Tier1Service` to include `globalRequestPool` and integrated it into the request handling logic to enforce concurrency limits and request lifetimes.
-* Updated `Tier1Service` to manage worker keep alive instead of relying on `Tier2Service`.
+#### Request Pool and Worker Pool
 
-#### Other change
+* Added `GlobalRequestPool` to the `Tier1Modules` struct in `app/tier1.go` and integrated it into the `Run` method to enhance request lifecycle management.
+  When set, the `GlobalRequestPool` will manage the borrowing, quotas, and keep-alive mechanisms for user requests via requests to a GRPC remote server.
+
+* Added `WorkerPoolFactory` to the `Tier1Modules` struct in `app/tier1.go` and integrated it into the `Run` method to enhance worker lifecycle management.
+  When set, the `WorkerPool` will manage the borrowing, quotas, and keep-alive mechanisms for worker subrequests on tier2, via requests to a GRPC remote server.
+
+#### Performance
+
 * Added 'shared cache' on tier1: execution of modules near the HEAD of the chain will be done once for a given module hash and the result shared between requests.
   This will reduce CPU usage and increase performance when many requests are using the same modules (ex: foundational modules)
 
 * Improved "time to first block" when a lot of cached files exist on dependency substreams modules by skipping reads segments that won't be used and assuming stores "full KVs" are always filled sequentially (since they are!)
 
 * Limit parallel execution of a stage's layer.
-
   Previously, the engine was executing modules in a stage's layer all in parallel. We now change that behavior, development mode will from now on execute every sequentially and when in production mode will limit parallelism to 2 (hard-coded) for now.
-
   The auth plugin can control that value dynamically by providing a trusted header `X-Sf-Substreams-Stage-Layer-Parallel-Executor-Max-Count`.
+
+* Fixed a regression since "v1.12.2" where the SkipEmptyOutput instruction was ignored in substreams mappers
 
 ### CLI
 
 * Removed enforcement of `BUFBUILD_AUTH_TOKEN` environment variable when using descriptor sets. It appears there is now a public free tier to query those which should work in most cases.
-
-### Dependency Updates:
-
-* Updated the `worker-pool-protocol` dependency in `go.mod` to the latest version to support the new worker pool protocol changes.
-
+* When running Solana package, set base58 encoding by default in the GUI.
+* Add Sei Mainnet to the `ChainConfigByID` map.
 
 ## v1.12.4
 

@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"reflect"
-	"strings"
 	"sync"
 	"time"
 
@@ -25,7 +23,6 @@ import (
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/metrics"
-	"github.com/streamingfast/substreams/orchestrator/work"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline"
@@ -36,7 +33,6 @@ import (
 	"github.com/streamingfast/substreams/storage/index"
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
-	pbworker "github.com/streamingfast/worker-pool-protocol/pb/sf/worker/v1"
 	"go.opentelemetry.io/otel/attribute"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
@@ -81,19 +77,17 @@ type Tier2Service struct {
 	blockExecutionTimeout     time.Duration
 
 	tier2RequestParameters *reqctx.Tier2RequestParameters
-	remoteWorkerClient     pbworker.WorkerPoolClient
 }
 
 const protoPkfPrefix = "type.googleapis.com/"
 
 func NewTier2(
-	remoteWorkerClient pbworker.WorkerPoolClient,
 	logger *zap.Logger,
 	opts ...Option,
 ) (*Tier2Service, error) {
 
 	s := &Tier2Service{
-		remoteWorkerClient:    remoteWorkerClient,
+
 		tracer:                tracing.GetTracer(),
 		logger:                logger,
 		blockExecutionTimeout: 3 * time.Minute,
@@ -464,42 +458,8 @@ excludable:
 		return fmt.Errorf("error getting stream: %w", err)
 	}
 
-	done := make(chan struct{})
-	if s.remoteWorkerClient != nil && !reflect.ValueOf(s.remoteWorkerClient).IsNil() {
-		workerID, keepAliveDelay, err := work.IncomingParameters(ctx)
-		if err != nil {
-			s.logger.Warn("getting incoming parameters, must be from a legacy tier 1", zap.Error(err))
-		} else {
-
-			if strings.HasPrefix(workerID, work.FreeWorkerKeyPrefix) {
-				s.logger.Info("got remote worker client, setting up keep alive", zap.String("worker_id", workerID), zap.Duration("keep_alive_delay", keepAliveDelay))
-
-				go func() {
-					for {
-						select {
-						case <-ctx.Done():
-							return
-						case <-done:
-							return
-						case <-time.After(keepAliveDelay):
-							s.logger.Info("keep alive timer expired, calling keep alive", zap.String("worker_id", workerID), zap.Bool("keep", false))
-							_, err := s.remoteWorkerClient.KeepAlive(ctx,
-								&pbworker.KeepAliveRequest{
-									WorkerKey: workerID,
-								})
-							if err != nil {
-								s.logger.Error("failed to call keep alive", zap.String("worker_id", workerID), zap.Error(err))
-							}
-						}
-					}
-				}()
-			}
-		}
-	}
-
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/pipeline/blocks_stream")
 	streamErr = blockStream.Run(ctx)
-	close(done)
 	span.EndWithErr(&streamErr)
 
 	return pipe.OnStreamTerminated(ctx, streamErr)

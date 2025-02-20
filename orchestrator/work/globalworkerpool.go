@@ -25,7 +25,7 @@ type GlobalWorkerPool struct {
 	startedAt          time.Time
 	rampUpWorkerServed bool
 
-	borrowedWorker         map[string]interface{}
+	borrowedWorker         map[string]Worker
 	borrowedWorkerMutex    sync.Mutex
 	remoteWorkerPoolClient pbworker.WorkerPoolClient
 	logger                 *zap.Logger
@@ -52,17 +52,15 @@ func NewGlobalWorkerPool(ctx context.Context, userID string, apiKeyID string, tr
 		workerKeepAliveDelay:   workerKeepAliveDelay,
 		logger:                 logger,
 		rampingUp:              true,
-		borrowedWorker:         make(map[string]interface{}),
+		borrowedWorker:         make(map[string]Worker),
 	}
 
 	go func() {
 		<-ctx.Done()
-		wp.borrowedWorkerMutex.Lock()
-		for s := range wp.borrowedWorker {
-			logger.Info("returning worker on context cancel", zap.String("worker_key", s))
-			wp.Return(context.Background(), NewRemoteWorker(wp.clientFactory, s, 0, wp.logger))
+		for s, w := range wp.borrowedWorker {
+			logger.Info("returning workers on context cancel", zap.String("worker_key", s))
+			wp.Return(context.Background(), w)
 		}
-		wp.borrowedWorkerMutex.Unlock()
 	}()
 
 	go func() {
@@ -117,16 +115,20 @@ func (p *GlobalWorkerPool) Borrow(ctx context.Context) (Worker, error) {
 	}
 
 	p.rampUpWorkerServed = true
-	worker := NewRemoteWorker(p.clientFactory, key, p.workerKeepAliveDelay, p.logger)
+	worker := NewRemoteWorker(p.clientFactory, key, p.logger)
 	p.logger.Info("worker borrowed", zap.String("worker_key", key))
 	p.borrowedWorkerMutex.Lock()
-	p.borrowedWorker[key] = struct{}{}
+	p.borrowedWorker[key] = worker
 	p.borrowedWorkerMutex.Unlock()
+
+	worker.StartKeepAlive(ctx, p.workerKeepAliveDelay, p.remoteWorkerPoolClient)
 
 	return worker, nil
 }
 
 func (p *GlobalWorkerPool) Return(ctx context.Context, worker Worker) {
+	worker.StopKeepAlive()
+
 	p.borrowedWorkerMutex.Lock()
 	delete(p.borrowedWorker, worker.ID())
 	p.borrowedWorkerMutex.Unlock()
@@ -145,7 +147,7 @@ func (p *GlobalWorkerPool) Return(ctx context.Context, worker Worker) {
 
 	if err != nil {
 		p.logger.Error("returning worker", zap.Error(err))
-		//why do not propagate that err...
+		//do not propagate that err...
 	}
 
 	p.rampUpWorkerServed = false

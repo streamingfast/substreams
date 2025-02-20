@@ -37,6 +37,7 @@ type Tier1Modules struct {
 	CheckPendingShutDown  func() bool
 	InfoServer            InfoServer
 	WorkerPoolFactory     work.WorkerPoolFactory
+	GlobalRequestPool     *service.GlobalRequestPool
 }
 
 type InfoServer interface {
@@ -65,26 +66,25 @@ type Tier1Config struct {
 	GRPCShutdownGracePeriod time.Duration // The duration we allow for gRPC connections to terminate gracefully prior forcing shutdown
 	ServiceDiscoveryURL     *url.URL
 	BlockExecutionTimeout   time.Duration
-	WorkerKeepAliveDelay    time.Duration
-	TmpDir                  string
 
+	TmpDir                  string
 	StateStoreURL           string
 	StateStoreDefaultTag    string
 	BlockType               string
 	StateBundleSize         uint64
 	EnforceCompression      bool // refuse incoming requests that do not accept gzip compression (ConnectRPC or GRPC)
 	ActiveRequestsSoftLimit int  // maximum number of active requests a tier1 app can have with external clients before starting to advertise itself as unready in the health check
-	ActiveRequestsHardLimit int  // maximum number of active requests a tier1 app can have with external clients, refuse with CodeUnavailable if reached
 
-	MaxSubrequests       uint64
-	SubrequestsEndpoint  string
-	SubrequestsInsecure  bool
-	SubrequestsPlaintext bool
-	SharedCacheSize      uint64
+	ActiveRequestsHardLimit int // maximum number of active requests a tier1 app can have with external clients, refuse with CodeUnavailable if reached
+	MaxSubrequests          uint64
+	SubrequestsEndpoint     string
+	SubrequestsInsecure     bool
+	SubrequestsPlaintext    bool
+
+	SharedCacheSize uint64
 
 	WASMExtensions wasm.WASMExtensioner
-
-	Tracing bool
+	Tracing        bool
 }
 
 type Tier1App struct {
@@ -222,6 +222,7 @@ func (a *Tier1App) Run() error {
 		a.config.ActiveRequestsSoftLimit,
 		a.config.ActiveRequestsHardLimit,
 		a.config.SharedCacheSize,
+		a.modules.GlobalRequestPool,
 		opts...,
 	)
 	if err != nil {

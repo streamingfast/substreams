@@ -18,6 +18,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+#### Global Request Pool Integration:
+* Added `globalRequestPool` to the `Tier1Modules` struct in `app/tier1.go` and integrated it into the `Run` method to enhance request lifecycle management.
+* Introduced `GlobalRequestPool` in `service/requestpool.go` to handle user request borrowing, quotas, and keep-alive mechanisms.
+* Updated `Tier1Service` to include `globalRequestPool` and integrated it into the request handling logic to enforce concurrency limits and request lifetimes.
+* Updated `Tier1Service` to manage worker keep alive instead of relying on `Tier2Service`.
+
+#### Other change
 * Added 'shared cache' on tier1: execution of modules near the HEAD of the chain will be done once for a given module hash and the result shared between requests.
   This will reduce CPU usage and increase performance when many requests are using the same modules (ex: foundational modules)
 
@@ -32,6 +39,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### CLI
 
 * Removed enforcement of `BUFBUILD_AUTH_TOKEN` environment variable when using descriptor sets. It appears there is now a public free tier to query those which should work in most cases.
+
+### Dependency Updates:
+
+* Updated the `worker-pool-protocol` dependency in `go.mod` to the latest version to support the new worker pool protocol changes.
+
 
 ## v1.12.4
 

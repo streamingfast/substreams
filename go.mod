@@ -18,7 +18,7 @@ require (
 	github.com/streamingfast/dstore v0.1.1-0.20250217165048-d508dcc6b33e
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
 	github.com/streamingfast/pbgo v0.0.6-0.20240823134334-812f6a16c5cb
-	github.com/streamingfast/worker-pool-protocol v0.0.0-20250211140743-fb8ffbc05fbc
+	github.com/streamingfast/worker-pool-protocol v0.0.0-20250218145136-4ad271e36e39
 	github.com/stretchr/testify v1.10.0
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869
 	go.uber.org/zap v1.26.0

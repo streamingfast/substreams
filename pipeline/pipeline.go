@@ -6,12 +6,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/streamingfast/substreams/metering"
-
 	"github.com/RoaringBitmap/roaring/roaring64"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/substreams"
+	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/orchestrator"
 	"github.com/streamingfast/substreams/orchestrator/plan"
 	"github.com/streamingfast/substreams/orchestrator/response"

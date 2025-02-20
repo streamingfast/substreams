@@ -53,7 +53,7 @@ func (p *SimpleWorkerPool) Borrow(_ context.Context) (Worker, error) {
 
 	p.freeWorker--
 	p.firstWorkerServed = true
-	worker := NewRemoteWorker(p.clientFactory, "", 0, p.logger)
+	worker := NewRemoteWorker(p.clientFactory, "", p.logger)
 	return worker, nil
 
 }

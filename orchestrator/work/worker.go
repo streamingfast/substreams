@@ -20,11 +20,13 @@ import (
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
+	pbworker "github.com/streamingfast/worker-pool-protocol/pb/sf/worker/v1"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	otelCodes "go.opentelemetry.io/otel/codes"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 )
@@ -39,6 +41,8 @@ type Result struct {
 type Worker interface {
 	ID() string
 	Work(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream) loop.Cmd // *Result
+	StartKeepAlive(ctx context.Context, delay time.Duration, remoteWorkerPoolClient pbworker.WorkerPoolClient)
+	StopKeepAlive()
 }
 
 func NewWorkerFactoryFromFunc(f func(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream) loop.Cmd) *SimpleWorkerFactory {
@@ -53,6 +57,14 @@ type SimpleWorkerFactory struct {
 	id uint64
 }
 
+func (f SimpleWorkerFactory) StartKeepAlive(ctx context.Context, delay time.Duration, remoteWorkerPoolClient pbworker.WorkerPoolClient) {
+	//noop
+}
+
+func (f SimpleWorkerFactory) StopKeepAlive() {
+	//noop
+}
+
 func (f SimpleWorkerFactory) Work(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream) loop.Cmd {
 	return f.f(ctx, unit, startBlock, moduleNames, upstream)
 }
@@ -62,21 +74,21 @@ func (f SimpleWorkerFactory) ID() string {
 }
 
 type RemoteWorker struct {
-	clientFactory  client.InternalClientFactory
-	tracer         ttrace.Tracer
-	logger         *zap.Logger
-	id             string
-	keepAliveDelay time.Duration
+	clientFactory client.InternalClientFactory
+	tracer        ttrace.Tracer
+	logger        *zap.Logger
+	id            string
+	done          chan struct{}
 }
 
-func NewRemoteWorker(clientFactory client.InternalClientFactory, id string, keepAliveDelay time.Duration, logger *zap.Logger) *RemoteWorker {
+func NewRemoteWorker(clientFactory client.InternalClientFactory, id string, logger *zap.Logger) *RemoteWorker {
 	logger = logger.Named("remote-worker")
 	return &RemoteWorker{
-		clientFactory:  clientFactory,
-		tracer:         otel.GetTracerProvider().Tracer("worker"),
-		logger:         logger,
-		id:             id,
-		keepAliveDelay: keepAliveDelay,
+		clientFactory: clientFactory,
+		tracer:        otel.GetTracerProvider().Tracer("worker"),
+		logger:        logger,
+		id:            id,
+		done:          make(chan struct{}),
 	}
 }
 
@@ -225,7 +237,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 	defer stats.RecordEndSubrequest(jobIdx)
 
 	ctx = dauth.FromContext(ctx).ToOutgoingGRPCContext(ctx)
-	ctx = w.SetOutgoingHeaders(ctx)
+
 	if headers.IsSet() {
 		ctx = metadata.AppendToOutgoingContext(ctx, headers.ToArray()...)
 	}
@@ -314,45 +326,37 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 	}
 }
 
-const HeaderWorkerID = "x-sf-worker-id"
-const HeaderWorkerKeepAliveDelay = "x-sf-worker-keep-alive-delay"
+func (r *RemoteWorker) StartKeepAlive(ctx context.Context, delay time.Duration, remoteWorkerPoolClient pbworker.WorkerPoolClient) {
+	if strings.HasPrefix(r.id, FreeWorkerKeyPrefix) {
+		r.logger.Info("keep alive is not needed for free worker")
+		return
+	}
 
-func (w *RemoteWorker) SetOutgoingHeaders(ctx context.Context) context.Context {
-	w.logger.Debug("setting outgoing headers", zap.String("worker_id", w.id), zap.Duration("keep_alive_delay", w.keepAliveDelay))
-	ctxWithHeaders := metadata.AppendToOutgoingContext(ctx,
-		HeaderWorkerID, w.id,
-		HeaderWorkerKeepAliveDelay, w.keepAliveDelay.String(),
-	)
-	return ctxWithHeaders
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-r.done:
+				return
+			case <-time.After(delay):
+				_, err := remoteWorkerPoolClient.KeepAlive(
+					ctx,
+					&pbworker.KeepAliveRequest{
+						WorkerKey: r.id,
+					},
+					grpc.WaitForReady(false),
+				)
+				if err != nil {
+					r.logger.Error("failed to call keep request worker alive", zap.String("worker_id", r.id), zap.Error(err))
+				}
+
+			}
+		}
+	}()
 }
-
-func IncomingParameters(ctx context.Context) (workerId string, keepAliveDelay time.Duration, err error) {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return "", time.Duration(0), fmt.Errorf("getting metadata from context")
-	}
-
-	stringDurations := md.Get(HeaderWorkerKeepAliveDelay)
-	if len(stringDurations) != 1 || stringDurations[0] == "" {
-		return "", time.Duration(0), fmt.Errorf("missing keep alive delay header")
-	}
-
-	keepAliveDelay, err = time.ParseDuration(stringDurations[0])
-	if err != nil {
-		return "", time.Duration(0), fmt.Errorf("parsing keep alive delay: %w", err)
-	}
-
-	if keepAliveDelay == 0 {
-		return "", time.Duration(0), fmt.Errorf("keep alive delay must be greater than 0. header set to: %s", keepAliveDelay)
-	}
-
-	workerIds := md.Get(HeaderWorkerID)
-	if len(workerIds) != 1 || workerIds[0] == "" {
-		return "", time.Duration(0), fmt.Errorf("missing worker id header")
-	}
-	workerId = workerIds[0]
-
-	return
+func (r *RemoteWorker) StopKeepAlive() {
+	close(r.done)
 }
 
 func toRPCPartialFiles(completed *pbssinternal.Completed) (out store.FileInfos) {

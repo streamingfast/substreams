@@ -56,7 +56,9 @@ func (r *BorrowedRequest) startKeepAlive(ctx context.Context, delay time.Duratio
 		for {
 			select {
 			case <-ctx.Done():
+				return
 			case <-r.done:
+				return
 			case <-time.After(delay):
 				_, err := remoteWorkerPoolClient.KeepAlive(
 					ctx,
@@ -68,7 +70,6 @@ func (r *BorrowedRequest) startKeepAlive(ctx context.Context, delay time.Duratio
 				if err != nil {
 					r.logger.Error("failed to call keep request worker alive", zap.String("worker_id", r.key), zap.Error(err))
 				}
-
 			}
 		}
 	}()

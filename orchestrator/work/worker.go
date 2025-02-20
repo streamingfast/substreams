@@ -336,7 +336,9 @@ func (r *RemoteWorker) startKeepAlive(ctx context.Context, delay time.Duration, 
 		for {
 			select {
 			case <-ctx.Done():
+				return
 			case <-r.done:
+				return
 			case <-time.After(delay):
 				_, err := remoteWorkerPoolClient.KeepAlive(
 					ctx,

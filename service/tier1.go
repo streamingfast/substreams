@@ -657,9 +657,10 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 			msg := strings.Builder{}
 			msg.WriteString("Request quota exceeded.\n")
 			msg.WriteString(fmt.Sprintf("Your allowed %d concurrent requests.\n", r.state.MaxWorkers))
-			msg.WriteString(fmt.Sprintf("Each request has a minimal life time of %d\n", r.minimalWorkerLifeDuration))
+			msg.WriteString(fmt.Sprintf("Each request has a minimal life time of %s\n", r.minimalWorkerLifeDuration.String()))
 			return status.Errorf(codes.ResourceExhausted, msg.String())
 		}
+
 		defer func() {
 			zlog.Info("returning request", zap.Bool("keep", false), zap.String("key", r.key))
 			if s.IsTerminating() {

@@ -121,7 +121,7 @@ func (p *GlobalWorkerPool) Borrow(ctx context.Context) (Worker, error) {
 	p.borrowedWorker[key] = worker
 	p.borrowedWorkerMutex.Unlock()
 
-	worker.startKeepAlive(ctx, p.workerKeepAliveDelay, p.remoteWorkerPoolClient)
+	worker.StartKeepAlive(ctx, p.workerKeepAliveDelay, p.remoteWorkerPoolClient)
 
 	return worker, nil
 }

@@ -41,7 +41,7 @@ type Result struct {
 type Worker interface {
 	ID() string
 	Work(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream) loop.Cmd // *Result
-	startKeepAlive(ctx context.Context, delay time.Duration, remoteWorkerPoolClient pbworker.WorkerPoolClient)
+	StartKeepAlive(ctx context.Context, delay time.Duration, remoteWorkerPoolClient pbworker.WorkerPoolClient)
 	StopKeepAlive()
 }
 
@@ -57,7 +57,7 @@ type SimpleWorkerFactory struct {
 	id uint64
 }
 
-func (f SimpleWorkerFactory) startKeepAlive(ctx context.Context, delay time.Duration, remoteWorkerPoolClient pbworker.WorkerPoolClient) {
+func (f SimpleWorkerFactory) StartKeepAlive(ctx context.Context, delay time.Duration, remoteWorkerPoolClient pbworker.WorkerPoolClient) {
 	//noop
 }
 
@@ -326,7 +326,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 	}
 }
 
-func (r *RemoteWorker) startKeepAlive(ctx context.Context, delay time.Duration, remoteWorkerPoolClient pbworker.WorkerPoolClient) {
+func (r *RemoteWorker) StartKeepAlive(ctx context.Context, delay time.Duration, remoteWorkerPoolClient pbworker.WorkerPoolClient) {
 	if strings.HasPrefix(r.id, FreeWorkerKeyPrefix) {
 		r.logger.Info("keep alive is not needed for free worker")
 		return

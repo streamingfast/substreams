@@ -9,6 +9,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Server
+
+* Implement "QuickSave" feature to save the state of "live running" substreams stores when shutting down, and then resume processing from that point if the cursor matches.
+
 ## v1.13.0
 
 ### Server

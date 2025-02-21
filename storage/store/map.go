@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"errors"
 
 	"go.uber.org/zap/zapcore"
@@ -18,6 +19,38 @@ type Setter interface {
 }
 
 type Map map[string]Store
+
+func (m Map) Names() []string {
+	out := make([]string, len(m))
+	i := 0
+	for _, s := range m {
+		out[i] = s.Name()
+		i++
+	}
+	return out
+}
+
+func (m *Map) QuickSave(ctx context.Context, atBlockHash string) error {
+	for _, s := range m.All() {
+		if writable, ok := s.(QuickSave); ok {
+			if err := writable.QuickSave(ctx, atBlockHash); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (m *Map) QuickLoad(ctx context.Context, atBlockHash string) error {
+	for _, s := range m.All() {
+		if writable, ok := s.(QuickLoad); ok {
+			if err := writable.QuickLoad(ctx, atBlockHash); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
 
 func NewMap() Map {
 	return map[string]Store{}

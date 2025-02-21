@@ -91,6 +91,7 @@ func (a *Tier2App) Run() error {
 
 	svc, err := service.NewTier2(
 		a.logger,
+		a.modules.CheckPendingShutDown,
 		opts...,
 	)
 	if err != nil {

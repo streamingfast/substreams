@@ -105,6 +105,7 @@ func Test_resolveStartBlockNum(t *testing.T) {
 			},
 			expectedBlockNum: 11,
 			wantErr:          false,
+			wantCursor:       "c1:16:10:10a:10:10a", // we keep cursor in here now, useful for quick loading stores
 		},
 		{
 			name: "step new irreversible",

@@ -37,6 +37,7 @@ type processingModule struct {
 
 type Pipeline struct {
 	ctx              context.Context
+	isTier1          bool
 	stateBundleSize  uint64
 	workerFactory    work.WorkerPoolFactory
 	executionTimeout time.Duration
@@ -80,14 +81,18 @@ type Pipeline struct {
 
 	// lastFinalClock should always be either THE `stopBlock` or a block beyond that point
 	// (for chains with potential block skips)
-	lastFinalClock *pbsubstreams.Clock
+	lastFinalClock        *pbsubstreams.Clock
+	lastProcessedBlockRef bstream.BlockRef
+	sentBlocks            uint64
 
-	blockStepMap      map[bstream.StepType]uint64
-	workerPoolFactory work.WorkerPoolFactory
+	blockStepMap         map[bstream.StepType]uint64
+	workerPoolFactory    work.WorkerPoolFactory
+	checkPendingShutdown func() bool
 }
 
 func New(
 	ctx context.Context,
+	isTier1 bool,
 	execGraph *exec.Graph,
 	stores *Stores,
 	indices map[string]map[string]*roaring64.Bitmap,
@@ -98,10 +103,12 @@ func New(
 	workerPoolFactory work.WorkerPoolFactory,
 	respFunc substreams.ResponseFunc,
 	executionTimeout time.Duration,
+	checkPendingShutdown func() bool,
 	opts ...Option,
 ) *Pipeline {
 	pipe := &Pipeline{
 		ctx:                     ctx,
+		isTier1:                 isTier1,
 		gate:                    newGate(ctx),
 		execOutputCache:         execOutputCache,
 		stateBundleSize:         stateBundleSize,
@@ -116,6 +123,7 @@ func New(
 		startTime:               time.Now(),
 		executionTimeout:        executionTimeout,
 		workerPoolFactory:       workerPoolFactory,
+		checkPendingShutdown:    checkPendingShutdown,
 	}
 	for _, opt := range opts {
 		opt(pipe)
@@ -163,7 +171,55 @@ func (p *Pipeline) InitTier2Stores(ctx context.Context) (err error) {
 	return nil
 }
 
+func (p *Pipeline) initStoresFromQuickload(ctx context.Context, reqPlan *plan.RequestPlan) (success bool) {
+
+	// no stores to init
+	if len(p.stores.configs) == 0 {
+		return false
+	}
+
+	if reqPlan.LinearPipeline == nil {
+		return false
+	}
+
+	if reqPlan.WriteExecOut != nil || reqPlan.ReadExecOut != nil {
+		return false
+	}
+
+	details := reqctx.Details(ctx)
+	if details.ResolvedCursor == "" {
+		return false
+	}
+
+	cursor, err := bstream.CursorFromOpaque(details.ResolvedCursor)
+	if err != nil {
+		reqctx.Logger(ctx).Warn("invalid cursor", zap.Error(err))
+		return false
+	}
+
+	if !reqPlan.LinearPipeline.Contains(cursor.Block.Num() + 1) {
+		return false
+	}
+
+	storeMap := store.NewMap()
+	for _, storeConfig := range p.stores.configs {
+		storeMap[storeConfig.Name()] = storeConfig.NewFullKV(p.stores.logger)
+	}
+
+	if err := storeMap.QuickLoad(ctx, cursor.Block.ID()); err != nil {
+		p.stores.logger.Info("no temporary store files found", zap.Error(err))
+		return false
+	}
+	reqctx.Logger(ctx).Info("skipping backprocessing, reading from temporary files", zap.Strings("stores", storeMap.Names()), zap.String("block", cursor.Block.String()))
+	p.stores.StoreMap = storeMap
+	return true
+}
+
 func (p *Pipeline) InitTier1StoresAndBackprocess(ctx context.Context, reqPlan *plan.RequestPlan, noopMode bool) (err error) {
+	if p.initStoresFromQuickload(ctx, reqPlan) {
+		return nil
+	}
+
 	if reqPlan.RequiresParallelProcessing() {
 		storeMap, err := p.runParallelProcess(ctx, reqPlan, noopMode)
 		if err != nil {

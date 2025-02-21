@@ -25,6 +25,9 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+var ErrShuttingDown = errors.New("endpoint is shutting down, please reconnect")
+var minBlocksProcessedToSave = uint64(25)
+
 func (p *Pipeline) ProcessFromExecOutput(
 	ctx context.Context,
 	clock *pbsubstreams.Clock,
@@ -200,6 +203,7 @@ func (p *Pipeline) handleStepUndo(clock *pbsubstreams.Clock, cursor *bstream.Cur
 
 	targetClock := blockRefToPB(reorgJunctionBlock)
 
+	p.lastProcessedBlockRef = reorgJunctionBlock
 	return p.respFunc(
 		&pbsubstreamsrpc.Response{
 			Message: &pbsubstreamsrpc.Response_BlockUndoSignal{
@@ -222,6 +226,12 @@ func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
 }
 
 func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput) (err error) {
+	if p.isTier1 && p.checkPendingShutdown() && p.stores.StoreMap != nil && p.sentBlocks > minBlocksProcessedToSave {
+		p.stores.logger.Info("shutting down, quick saving stores")
+		p.stores.StoreMap.QuickSave(ctx, p.lastFinalClock.Id)
+		return ErrShuttingDown
+	}
+
 	p.insideReorgUpTo = nil
 	reqDetails := reqctx.Details(ctx)
 
@@ -264,6 +274,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 	}
 
 	if p.gate.shouldSendOutputs() {
+		p.sentBlocks++
 		logger.Debug("will return module outputs")
 		if p.pendingUndoMessage != nil {
 			if err := p.respFunc(p.pendingUndoMessage); err != nil {
@@ -288,6 +299,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 
 	p.stores.resetStores()
 	logger.Debug("block processed", zap.Uint64("block_num", clock.Number))
+	p.lastProcessedBlockRef = bstream.NewBlockRef(clock.Id, clock.Number)
 	return nil
 }
 

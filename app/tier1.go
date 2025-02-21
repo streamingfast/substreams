@@ -223,6 +223,7 @@ func (a *Tier1App) Run() error {
 		a.config.ActiveRequestsHardLimit,
 		a.config.SharedCacheSize,
 		a.modules.GlobalRequestPool,
+		a.modules.CheckPendingShutDown,
 		opts...,
 	)
 	if err != nil {

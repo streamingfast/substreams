@@ -88,12 +88,6 @@ func BuildRequestDetails(
 		req.LinearGateBlockNum = req.ResolvedStartBlockNum
 	}
 
-	// if we start under the linearHandoff, it means we are in an irreversible section of the chain,
-	// the cursor has been resolved to 'resolvedStartBlockNum' and 'undoSignal', so it is not needed anymore
-	if req.ResolvedStartBlockNum < linearHandoff {
-		req.ResolvedCursor = ""
-	}
-
 	return
 }
 
@@ -173,7 +167,6 @@ func computeLinearHandoffBlockNum(productionMode bool, startBlock, stopBlock uin
 	return lib - (lib % segmentSize), nil
 }
 
-// resolveStartBlockNum will occasionally modify or remove the cursor inside the request
 func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, resolveCursor CursorResolver, getHeadBlock getBlockFunc) (uint64, string, *pbsubstreamsrpc.BlockUndoSignal, error) {
 	// TODO(abourget): a caller will need to verify that, if there's a cursor.Step that is New or Undo,
 	// then we need to validate that we are returning not only a number, but an ID,
@@ -208,7 +201,7 @@ func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, res
 
 	if cursor.IsOnFinalBlock() {
 		nextBlock := cursor.Block.Num() + 1
-		return nextBlock, "", nil, nil
+		return nextBlock, cursor.ToOpaque(), nil, nil
 	}
 
 	if cursor.LIB.Num() > cursor.Block.Num() {

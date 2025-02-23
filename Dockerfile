@@ -9,7 +9,7 @@ RUN --mount=target=. \
       --mount=type=cache,target=/go/pkg \
       GOOS=$TARGETOS GOARCH=$TARGETARCH go build -ldflags "-X \"main.version=$VERSION\"" -o /app/substreams ./cmd/substreams
 
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
       apt-get -y install -y ca-certificates libssl3

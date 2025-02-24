@@ -34,7 +34,7 @@ func generateSubgraphEnv(cmd *cobra.Command, args []string) error {
 			"`npm install`\n" +
 			"`npm run generate` # generate AssemblyScript and Protobuf bindings\n" +
 			"`npm run deploy-local` # build and deploy to a local graph-node\n" +
-			"`npm run deploy-local` # build and deploy to The Graph Studio **(*)**\n\n" +
+			"`npm run deploy-studio` # build and deploy to The Graph Studio **(*)**\n\n" +
 			"**(*)** If the network is supported in The Graph Studio. Take a look at https://thegraph.com/docs/en/supported-networks/\n",
 	)
 	fmt.Println(ToMarkdown(input))

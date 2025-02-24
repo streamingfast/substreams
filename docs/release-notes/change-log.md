@@ -15,6 +15,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * Implement "QuickSave" feature to save the state of "live running" substreams stores when shutting down, and then resume processing from that point if the cursor matches.
 
+### CLI
+
+* Trim down packages when using 'imports': only the modules explicitly defined in the YAML manifest and their dependencies will end up in the final spkg.
+
 ## v1.13.0
 
 ### Server

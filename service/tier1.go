@@ -130,6 +130,7 @@ func NewTier1(
 	hub *hub.ForkableHub,
 
 	stateStore dstore.Store,
+	quickSaveStore dstore.Store,
 	defaultCacheTag string,
 
 	parallelSubRequests uint64,
@@ -157,6 +158,7 @@ func NewTier1(
 		parallelSubRequests,
 		10,
 		stateStore,
+		quickSaveStore,
 		defaultCacheTag,
 		clientFactory,
 		workerPoolFactory,
@@ -565,6 +567,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	if err != nil {
 		return fmt.Errorf("internal error setting store: %w", err)
 	}
+	quickSaveStore := s.runtimeConfig.QuickSaveStore
 
 	if clonableStore, ok := cacheStore.(dstore.Clonable); ok {
 		cloned, err := clonableStore.Clone(ctx, metering.WithBytesMeteringOptions(dmetering.GetBytesMeter(ctx), logger)...)
@@ -591,7 +594,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		return fmt.Errorf("new config map: %w", err)
 	}
 
-	storeConfigs, err := store.NewConfigMap(cacheStore, execGraph.Stores(), execGraph.ModuleHashes(), chainFirstStreamableBlock)
+	storeConfigs, err := store.NewConfigMap(cacheStore, quickSaveStore, execGraph.Stores(), execGraph.ModuleHashes(), chainFirstStreamableBlock)
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}

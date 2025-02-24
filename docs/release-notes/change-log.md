@@ -14,6 +14,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Server
 
 * Implement "QuickSave" feature to save the state of "live running" substreams stores when shutting down, and then resume processing from that point if the cursor matches.
+  - enabled if the "QuickSaveStoreURL" attribute is not empty in the tier1 config
+  - requires the "CheckPendingShutdown" module to be passed to the app via NewTier1()
 
 ### CLI
 

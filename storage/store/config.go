@@ -38,6 +38,7 @@ func NewConfig(
 	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy,
 	valueType string,
 	store dstore.Store,
+	quickSaveStore dstore.Store,
 ) (*Config, error) {
 	subStore, err := store.SubStore(fmt.Sprintf("%s/states", moduleHash))
 	if err != nil {
@@ -47,9 +48,12 @@ func NewConfig(
 	if err != nil {
 		return nil, fmt.Errorf("creating sub store: %w", err)
 	}
-	quickSaveStore, err := store.SubStore(fmt.Sprintf("%s/quicksaves", moduleHash))
-	if err != nil {
-		return nil, fmt.Errorf("creating sub store: %w", err)
+	var qss dstore.Store
+	if quickSaveStore != nil {
+		qss, err = quickSaveStore.SubStore(moduleHash)
+		if err != nil {
+			return nil, fmt.Errorf("creating sub store: %w", err)
+		}
 	}
 
 	return &Config{
@@ -58,7 +62,7 @@ func NewConfig(
 		valueType:          valueType,
 		objStore:           subStore,
 		outputsStore:       outputsStore,
-		quickSaveStore:     quickSaveStore,
+		quickSaveStore:     qss,
 		moduleInitialBlock: moduleInitialBlock,
 		moduleHash:         moduleHash,
 		appendLimit:        8_388_608,     // 8MiB = 8 * 1024 * 1024,

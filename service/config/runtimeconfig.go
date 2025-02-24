@@ -16,6 +16,7 @@ type RuntimeConfig struct {
 	// derives substores `states/`, for `store` modules snapshots (full and partial)
 	// and `outputs/` for execution output of both `map` and `store` module kinds
 	BaseObjectStore        dstore.Store
+	QuickSaveStore         dstore.Store
 	DefaultCacheTag        string // appended to BaseObjectStore unless overriden by auth layer
 	ClientFactory          client.InternalClientFactory
 	WorkerPoolFactory      work.WorkerPoolFactory
@@ -27,6 +28,7 @@ func NewTier1RuntimeConfig(
 	parallelSubrequests uint64,
 	maxJobsAhead uint64,
 	baseObjectStore dstore.Store,
+	quickSaveStore dstore.Store,
 	defaultCacheTag string,
 	clientFactory client.InternalClientFactory,
 	WorkerPoolFactory work.WorkerPoolFactory,
@@ -36,6 +38,7 @@ func NewTier1RuntimeConfig(
 		DefaultParallelSubrequests: parallelSubrequests,
 		MaxJobsAhead:               maxJobsAhead,
 		BaseObjectStore:            baseObjectStore,
+		QuickSaveStore:             quickSaveStore,
 		DefaultCacheTag:            defaultCacheTag,
 		ClientFactory:              clientFactory,
 		WorkerPoolFactory:          WorkerPoolFactory,

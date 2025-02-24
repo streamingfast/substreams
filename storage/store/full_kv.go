@@ -37,7 +37,13 @@ func (s *FullKV) DerivePartialStore(initialBlock uint64) *PartialKV {
 	}
 }
 
+var ErrNoQuickSaveStore = fmt.Errorf("no quick save store")
+
 func (s *FullKV) QuickLoad(ctx context.Context, atBlockHash string) error {
+	if s.quickSaveStore == nil {
+		return ErrNoQuickSaveStore
+	}
+
 	filename := atBlockHash + ".quicksave"
 	s.logger.Debug("loading full store state from temporary file", zap.String("fileName", filename), zap.String("module_hash", s.moduleHash))
 
@@ -68,6 +74,9 @@ func (s *FullKV) QuickLoad(ctx context.Context, atBlockHash string) error {
 }
 
 func (s *FullKV) QuickSave(ctx context.Context, atBlockHash string) error {
+	if s.quickSaveStore == nil {
+		return ErrNoQuickSaveStore
+	}
 	s.logger.Debug("writing temporary store state", zap.Object("store", s))
 
 	stateData := &marshaller.StoreData{

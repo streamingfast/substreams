@@ -294,7 +294,62 @@ func (r *manifestConverter) manifestToPkg(manif *Manifest) (*pbsubstreams.Packag
 	//Set all empty blockFilter to nil (enables to  override blockFilter by nil for used modules)
 	handleEmptyBlockFilter(pkg, manif)
 
+	// Only keep modules that are declared in the manifest, and their dependencies.
+	// This dramatically reduce the number of modules in the package when a cascading imports...
+	removeUnusedImportedModules(pkg, manif)
+
 	return pkg, protoFiles, r.sinkConfigDynamicMessage, nil
+}
+
+func removeUnusedImportedModules(pkg *pbsubstreams.Package, manif *Manifest) {
+	moduleSet := make(map[string]bool)
+	var neededModules func(modName string)
+	neededModules = func(modName string) {
+		if moduleSet[modName] {
+			return
+		}
+		moduleSet[modName] = true
+
+		for _, mod := range pkg.Modules.Modules {
+			if mod.Name != modName {
+				continue
+			}
+
+			for _, input := range mod.Inputs {
+				if input.GetMap() != nil {
+					neededModules(input.GetMap().ModuleName)
+				} else if input.GetStore() != nil {
+					neededModules(input.GetStore().ModuleName)
+				}
+			}
+
+			if mod.BlockFilter != nil && mod.BlockFilter.Module != "" {
+				neededModules(mod.BlockFilter.Module)
+			}
+
+			return
+		}
+	}
+
+	for _, manifModule := range manif.Modules {
+		neededModules(manifModule.Name)
+
+		if manifModule.BlockFilter != nil && manifModule.BlockFilter.Module != "" {
+			neededModules(manifModule.BlockFilter.Module)
+		}
+	}
+
+	var newModules []*pbsubstreams.Module
+	var newModuleMeta []*pbsubstreams.ModuleMetadata
+	for i, mod := range pkg.Modules.Modules {
+		if moduleSet[mod.Name] {
+			newModules = append(newModules, mod)
+			newModuleMeta = append(newModuleMeta, pkg.ModuleMeta[i])
+		}
+	}
+
+	pkg.Modules.Modules = newModules
+	pkg.ModuleMeta = newModuleMeta
 }
 
 func handleEmptyBlockFilter(pkg *pbsubstreams.Package, manif *Manifest) {

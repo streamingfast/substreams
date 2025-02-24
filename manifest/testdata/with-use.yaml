@@ -1,0 +1,18 @@
+specVersion: v0.1.0
+package:
+  name: hackedgraphout
+  version: v0.1.0
+  url: https://github.com/streamingfast/substreams-uniswap-v3-info
+
+imports:
+  uniswapv3: ./univ3-first.yaml
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: binaries/dummy02.wasm
+
+modules:
+  - name: new_map_pools_created
+    initialBlock: 100000000
+    use: uniswapv3:map_pools_created

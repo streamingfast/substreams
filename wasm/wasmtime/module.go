@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	wasmtime "github.com/bytecodealliance/wasmtime-go/v4"
+	wasmtime "github.com/bytecodealliance/wasmtime-go/v30"
 
 	"github.com/streamingfast/substreams/wasm"
 )
@@ -21,6 +21,10 @@ func init() {
 
 func newModule(ctx context.Context, wasmCode []byte, wasmCodeType string, registry *wasm.Registry) (wasm.Module, error) {
 	cfg := wasmtime.NewConfig()
+
+	// disabled because 50% performance hit in some cases
+	// cfg.SetConsumeFuel(true)
+
 	engine := wasmtime.NewEngineWithConfig(cfg)
 
 	module, err := wasmtime.NewModule(engine, wasmCode)
@@ -39,7 +43,7 @@ func newModule(ctx context.Context, wasmCode []byte, wasmCodeType string, regist
 }
 
 func (m *Module) Close(ctx context.Context) error {
-	m.engine.FreeMem()
+	m.engine.Close()
 	return nil
 }
 
@@ -117,6 +121,8 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 func (m *Module) newInstance(ctx context.Context) (*instance, error) {
 	linker := wasmtime.NewLinker(m.engine)
 	store := wasmtime.NewStore(m.engine)
+	// disabled because 50% performance hit in some cases
+	// err := store.SetFuel(5_000_000_000_000)
 
 	i := &instance{
 		wasmEngine: m.engine,

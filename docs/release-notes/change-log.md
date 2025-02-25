@@ -11,8 +11,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
-* Fixed `--skip-package-validation` to also skip sub packages being imported.
+### Server engine
 
+* Rust modules will now be executed with `wasmtime` by default instead of `wazero`.
+  - Prevents the whole server from stalling in certain memory-intensive operations in wazero.
+  - Speed improvement: cuts the execution time in half in some circumstances.
+  - Wazero is still used for modules with `wbindgen` and modules compiled with `tinygo`.
+  - Set env var `SUBSTREAMS_WASM_RUNTIME=wazero` to revert to previous behavior.
+
+### CLI
+
+* Fixed `--skip-package-validation` to also skip sub packages being imported.
 * Trim down packages when using 'imports': only the modules explicitly defined in the YAML manifest and their dependencies will end up in the final spkg.
 
 ## v1.13.0

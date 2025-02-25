@@ -73,7 +73,8 @@ func BenchmarkExecution(b *testing.B) {
 			b.Run(fmt.Sprintf("vm=%s,instance=%s,tag=%s", config.name, instanceKey, testCase.tag), func(b *testing.B) {
 				ctx := context.Background()
 
-				wasmRuntime := wasm.NewRegistryWithRuntime(config.name, nil)
+				os.Setenv("SUBSTREAMS_WASM_RUNTIME", config.name)
+				wasmRuntime := wasm.NewRegistry(nil)
 
 				module, err := wasmRuntime.NewModule(ctx, config.code, config.wasmCodeType)
 				require.NoError(b, err)

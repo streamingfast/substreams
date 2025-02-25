@@ -20,7 +20,9 @@ import (
 
 func main() {
 	ctx := context.Background()
-	wasmRuntime := wasm.NewRegistryWithRuntime("wasi", nil)
+
+	os.Setenv("SUBSTREAMS_WASM_RUNTIME", "wasi")
+	wasmRuntime := wasm.NewRegistry(nil)
 	code, err := os.ReadFile("/Users/colindickson/code/dfuse/substreams/wasm/bench/substreams_wasi_go/main.wasm")
 	blockReader, err := os.Open("/Users/colindickson/code/dfuse/substreams/wasm/bench/cmd/wasigo/testdata/block.binpb")
 	if err != nil {

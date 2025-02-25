@@ -234,7 +234,7 @@ func TestValidateManifest(t *testing.T) {
 		},
 	}
 
-	manifestConv := newManifestConverter("test", true)
+	manifestConv := newManifestConverter("test", ReaderValidation{SkipSourceCodeImportValidation: true})
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			fmt.Println("Modules", c.manifest.Modules)

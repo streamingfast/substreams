@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	wasmtime "github.com/bytecodealliance/wasmtime-go/v4"
+	wasmtime "github.com/bytecodealliance/wasmtime-go/v30"
 
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/wasm"
@@ -23,9 +23,9 @@ type instance struct {
 }
 
 func (i *instance) Close(ctx context.Context) error {
-	i.wasmStore.FreeMem()
-	i.wasmLinker.FreeMem()
-	i.wasmStore.FreeMem()
+	i.wasmStore.Close()
+	i.wasmLinker.Close()
+	i.wasmStore.Close()
 	i.isClosed = true
 	return nil
 }

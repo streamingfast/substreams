@@ -25,7 +25,7 @@ import (
 	store2 "github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
 
-	//_ "github.com/streamingfast/substreams/wasm/wasmtime"
+	_ "github.com/streamingfast/substreams/wasm/wasmtime"
 	_ "github.com/streamingfast/substreams/wasm/wazero"
 )
 

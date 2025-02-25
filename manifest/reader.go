@@ -47,6 +47,12 @@ func hasRemotePrefix(in string) bool {
 	return false
 }
 
+type ReaderValidation struct {
+	SkipSourceCodeImportValidation bool
+	SkipModuleOutputTypeValidation bool
+	SkipPackageValidation          bool
+}
+
 type Reader struct {
 	currentData []byte
 
@@ -64,13 +70,11 @@ type Reader struct {
 	collectProtoDefinitionsFunc func(protoDefinitions []*desc.FileDescriptor)
 
 	//options
-	skipSourceCodeImportValidation bool
-	skipModuleOutputTypeValidation bool
-	skipPackageValidation          bool
-	overrideNetwork                string
-	overrideOutputModule           string
-	params                         map[string]string
-	registryURL                    string
+	validation           ReaderValidation
+	overrideNetwork      string
+	overrideOutputModule string
+	params               map[string]string
+	registryURL          string
 }
 
 func NewReader(input string, opts ...Option) (*Reader, error) {
@@ -122,8 +126,8 @@ func (r *Reader) Read() (*PackageBundle, error) {
 		return nil, err
 	}
 
-	if !r.skipPackageValidation {
-		if err := validatePackage(pkg, r.skipModuleOutputTypeValidation); err != nil {
+	if !r.validation.SkipPackageValidation {
+		if err := validatePackage(pkg, r.validation); err != nil {
 			return nil, fmt.Errorf("package validation failed: %w", err)
 		}
 	}
@@ -165,7 +169,7 @@ func (r *Reader) Read() (*PackageBundle, error) {
 		return nil, err
 	}
 
-	if !r.skipPackageValidation { // we validate here because the 'unset' module initial blocks are computed above
+	if !r.validation.SkipPackageValidation { // we validate here because the 'unset' module initial blocks are computed above
 		if err := ValidateModules(pkg.Modules); err != nil {
 			return nil, fmt.Errorf("module validation failed: %w", err)
 		}
@@ -493,7 +497,7 @@ func dependentImportedModules(graph *ModuleGraph, outputModule string) (map[stri
 	return out, nil
 }
 
-func validatePackage(pkg *pbsubstreams.Package, skipModuleOutputTypeValidation bool) error {
+func validatePackage(pkg *pbsubstreams.Package, validation ReaderValidation) error {
 	if len(pkg.ModuleMeta) != len(pkg.Modules.Modules) {
 		return fmt.Errorf("inconsistent package, metadata for modules not same length as modules list")
 	}
@@ -517,14 +521,14 @@ func validatePackage(pkg *pbsubstreams.Package, skipModuleOutputTypeValidation b
 		switch i := mod.Kind.(type) {
 		case *pbsubstreams.Module_KindMap_:
 			outputType := i.KindMap.OutputType
-			if !skipModuleOutputTypeValidation {
+			if !validation.SkipModuleOutputTypeValidation {
 				if !strings.HasPrefix(outputType, "proto:") {
 					return fmt.Errorf("module %q incorrect outputType %q valueType must be a proto Message", mod.Name, outputType)
 				}
 			}
 		case *pbsubstreams.Module_KindStore_:
 			valueType := i.KindStore.ValueType
-			if !skipModuleOutputTypeValidation {
+			if !validation.SkipModuleOutputTypeValidation {
 				if strings.HasPrefix(valueType, "proto:") {
 					// any store with a prototype is considered valid
 				} else if !storeValidTypes[valueType] {
@@ -563,7 +567,7 @@ func validatePackage(pkg *pbsubstreams.Package, skipModuleOutputTypeValidation b
 }
 
 func (r *Reader) newPkgFromManifest(manif *Manifest) (*pbsubstreams.Package, error) {
-	converter := newManifestConverter(r.currentInput, r.skipSourceCodeImportValidation)
+	converter := newManifestConverter(r.currentInput, r.validation)
 	pkg, descriptors, dynMessage, err := converter.Convert(manif)
 	if err != nil {
 		return nil, err
@@ -886,12 +890,14 @@ func LoadManifestFile(inputPath, workingDir string) (*Manifest, error) {
 
 // loop through the Manifest, and get the `imports` statements,
 // pull the Package files from Disk, and merge them into this one
-func loadImports(pkg *pbsubstreams.Package, manif *Manifest) error {
+func loadImports(pkg *pbsubstreams.Package, manif *Manifest, validation ReaderValidation) error {
 	for _, kv := range manif.Imports {
 		importName := kv[0]
 		importPath := manif.resolvePath(kv[1])
 
 		subpkgReader, err := NewReader(importPath)
+		subpkgReader.validation = validation
+
 		if err != nil {
 			return fmt.Errorf("importing %q: %w", importPath, err)
 		}

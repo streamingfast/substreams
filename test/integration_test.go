@@ -19,6 +19,7 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/stage"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	"github.com/streamingfast/substreams/reqctx"
+	_ "github.com/streamingfast/substreams/wasm/wasmtime"
 	_ "github.com/streamingfast/substreams/wasm/wazero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

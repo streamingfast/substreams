@@ -15,16 +15,18 @@ import (
 )
 
 type manifestConverter struct {
-	inputPath string
+	inputPath  string
+	validation ReaderValidation
 
-	sinkConfigDynamicMessage       *dynamic.Message
-	skipSourceCodeImportValidation bool
+	// Runtime assigned while manifest is being converted, this feels weird
+	// but I haven't the "flemme" to refactor this right now.
+	sinkConfigDynamicMessage *dynamic.Message
 }
 
-func newManifestConverter(inputPath string, skipSourceCodeImportValidation bool) *manifestConverter {
+func newManifestConverter(inputPath string, validation ReaderValidation) *manifestConverter {
 	return &manifestConverter{
-		inputPath:                      inputPath,
-		skipSourceCodeImportValidation: skipSourceCodeImportValidation,
+		inputPath:  inputPath,
+		validation: validation,
 	}
 }
 
@@ -254,7 +256,7 @@ func (r *manifestConverter) manifestToPkg(manif *Manifest) (*pbsubstreams.Packag
 		return nil, nil, nil, fmt.Errorf("failed to convert manifest to pkg: %w", err)
 	}
 
-	if err := loadImports(pkg, manif); err != nil {
+	if err := loadImports(pkg, manif, r.validation); err != nil {
 		return nil, nil, nil, fmt.Errorf("error loading imports: %w", err)
 	}
 
@@ -499,7 +501,7 @@ func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package
 			if !found {
 				codePath := m.resolvePath(binaryDef.File)
 				var byteCode []byte
-				if !r.skipSourceCodeImportValidation {
+				if !r.validation.SkipSourceCodeImportValidation {
 					byteCode, err = os.ReadFile(codePath)
 					if err != nil {
 						return nil, fmt.Errorf("failed to read source code %q: %w", codePath, err)

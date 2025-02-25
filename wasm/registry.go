@@ -83,7 +83,7 @@ func NewRegistry(extensions map[string]map[string]WASMExtension) *Registry {
 		"default":                         runtimes[defaultRuntime],
 		"wasip1/tinygo-v1":                runtimes["wazero"], // only wazero supports tinygo at the moment
 		"wasm/rust-v1":                    runtimes[defaultRuntime],
-		"wasm/rust-v1+wasm-bindgen-shims": runtimes["wazero"], // only wazero supports tinygo at the moment
+		"wasm/rust-v1+wasm-bindgen-shims": runtimes["wazero"], // only wazero supports wasm-bindgen at the moment
 	}
 
 	return r

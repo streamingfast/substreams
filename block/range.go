@@ -73,20 +73,8 @@ func (r *Range) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	return nil
 }
 
-func (r *Range) IsEmpty() bool {
-	return r.StartBlock == r.ExclusiveEndBlock
-}
-
 func (r *Range) Contains(blockNum uint64) bool {
-	return blockNum >= r.StartBlock && blockNum < r.ExclusiveEndBlock
-}
-
-func (r *Range) IsAbove(blockNum uint64) bool {
-	return blockNum > r.ExclusiveEndBlock
-}
-
-func (r *Range) IsBelow(blockNum uint64) bool {
-	return blockNum < r.StartBlock
+	return r != nil && blockNum >= r.StartBlock && (blockNum < r.ExclusiveEndBlock || r.ExclusiveEndBlock == 0)
 }
 
 func (r *Range) IsOutOfBounds(blockNum uint64) bool {

@@ -75,6 +75,7 @@ type Tier2Service struct {
 	moduleExecutionTracing    bool
 	connectionCountMutex      sync.RWMutex
 	blockExecutionTimeout     time.Duration
+	checkPendingShutdown      func() bool
 
 	tier2RequestParameters *reqctx.Tier2RequestParameters
 }
@@ -83,11 +84,13 @@ const protoPkfPrefix = "type.googleapis.com/"
 
 func NewTier2(
 	logger *zap.Logger,
+	checkPendingShutdown func() bool,
 	opts ...Option,
 ) (*Tier2Service, error) {
 
 	s := &Tier2Service{
 
+		checkPendingShutdown:  checkPendingShutdown,
 		tracer:                tracing.GetTracer(),
 		logger:                logger,
 		blockExecutionTimeout: 3 * time.Minute,
@@ -309,7 +312,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("new config map: %w", err)
 	}
 
-	storeConfigs, err := store.NewConfigMap(cacheStore, execGraph.Stores(), execGraph.ModuleHashes(), request.FirstStreamableBlock)
+	storeConfigs, err := store.NewConfigMap(cacheStore, nil, execGraph.Stores(), execGraph.ModuleHashes(), request.FirstStreamableBlock)
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
@@ -344,6 +347,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 
 	pipe := pipeline.New(
 		ctx,
+		false,
 		execGraph,
 		stores,
 		executionPlan.ExistingIndices,
@@ -354,6 +358,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		nil,
 		respFunc,
 		s.blockExecutionTimeout,
+		s.checkPendingShutdown,
 		opts...,
 	)
 

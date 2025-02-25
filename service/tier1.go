@@ -81,6 +81,7 @@ type Tier1Service struct {
 	activeRequestsHardLimit int
 	tier2RequestParameters  reqctx.Tier2RequestParameters
 	globalRequestPool       *GlobalRequestPool
+	checkPendingShutdown    func() bool
 }
 
 func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
@@ -129,6 +130,7 @@ func NewTier1(
 	hub *hub.ForkableHub,
 
 	stateStore dstore.Store,
+	quickSaveStore dstore.Store,
 	defaultCacheTag string,
 
 	parallelSubRequests uint64,
@@ -145,6 +147,7 @@ func NewTier1(
 	activeRequestsHardLimit int,
 	sharedCacheSize uint64,
 	globalRequestPool *GlobalRequestPool,
+	checkPendingShutdown func() bool,
 	opts ...Option,
 ) (*Tier1Service, error) {
 
@@ -155,6 +158,7 @@ func NewTier1(
 		parallelSubRequests,
 		10,
 		stateStore,
+		quickSaveStore,
 		defaultCacheTag,
 		clientFactory,
 		workerPoolFactory,
@@ -193,6 +197,7 @@ func NewTier1(
 		activeRequestsSoftLimit: activeRequestsSoftLimit,
 		activeRequestsHardLimit: activeRequestsHardLimit,
 		globalRequestPool:       globalRequestPool,
+		checkPendingShutdown:    checkPendingShutdown,
 	}
 
 	go func() {
@@ -243,6 +248,11 @@ func (s *Tier1Service) Blocks(
 			metrics.Tier1RejectedRequestCounter.Inc(reason)
 		}
 	}()
+	if s.checkPendingShutdown() {
+		time.Sleep(1 * time.Second) // prevent burst reconnections to this instance since we're shutting down
+		serverErr = connect.NewError(connect.CodeUnavailable, errShuttingDown)
+		return
+	}
 
 	// We keep `err` here as the unaltered error from `blocks` call, this is used in the EndSpan to record the full error
 	// and not only the `grpcError` one which is a subset view of the full `err`.
@@ -557,6 +567,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	if err != nil {
 		return fmt.Errorf("internal error setting store: %w", err)
 	}
+	quickSaveStore := s.runtimeConfig.QuickSaveStore
 
 	if clonableStore, ok := cacheStore.(dstore.Clonable); ok {
 		cloned, err := clonableStore.Clone(ctx, metering.WithBytesMeteringOptions(dmetering.GetBytesMeter(ctx), logger)...)
@@ -583,7 +594,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		return fmt.Errorf("new config map: %w", err)
 	}
 
-	storeConfigs, err := store.NewConfigMap(cacheStore, execGraph.Stores(), execGraph.ModuleHashes(), chainFirstStreamableBlock)
+	storeConfigs, err := store.NewConfigMap(cacheStore, quickSaveStore, execGraph.Stores(), execGraph.ModuleHashes(), chainFirstStreamableBlock)
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
@@ -611,6 +622,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 
 	pipe := pipeline.New(
 		ctx,
+		true,
 		execGraph,
 		stores,
 		nil,
@@ -621,6 +633,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		s.runtimeConfig.WorkerPoolFactory,
 		respFunc,
 		s.blockExecutionTimeout,
+		s.checkPendingShutdown,
 		opts...,
 	)
 
@@ -847,6 +860,11 @@ func toConnectError(ctx context.Context, err error) error {
 			}
 		}
 		return connect.NewError(connect.CodeCanceled, err)
+	}
+
+	// special case for "QuickSave" on shutdown
+	if err == pipeline.ErrShuttingDown {
+		return connect.NewError(connect.CodeUnavailable, err)
 	}
 
 	// context deadline exceeded

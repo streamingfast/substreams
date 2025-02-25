@@ -83,7 +83,7 @@ func createStore(_ context.Context, name string) *store.FullKV {
 	if err != nil {
 		panic(err)
 	}
-	storeConfig, err := store.NewConfig(name, 0, "hash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "string", ds)
+	storeConfig, err := store.NewConfig(name, 0, "hash.1", pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET, "string", ds, nil)
 	if err != nil {
 		panic(err)
 	}

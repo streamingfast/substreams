@@ -16,10 +16,11 @@ import (
 )
 
 type Config struct {
-	name         string
-	moduleHash   string
-	objStore     dstore.Store
-	outputsStore dstore.Store
+	name           string
+	moduleHash     string
+	objStore       dstore.Store
+	outputsStore   dstore.Store
+	quickSaveStore dstore.Store
 
 	moduleInitialBlock uint64
 	updatePolicy       pbsubstreams.Module_KindStore_UpdatePolicy
@@ -37,6 +38,7 @@ func NewConfig(
 	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy,
 	valueType string,
 	store dstore.Store,
+	quickSaveStore dstore.Store,
 ) (*Config, error) {
 	subStore, err := store.SubStore(fmt.Sprintf("%s/states", moduleHash))
 	if err != nil {
@@ -46,6 +48,13 @@ func NewConfig(
 	if err != nil {
 		return nil, fmt.Errorf("creating sub store: %w", err)
 	}
+	var qss dstore.Store
+	if quickSaveStore != nil {
+		qss, err = quickSaveStore.SubStore(moduleHash)
+		if err != nil {
+			return nil, fmt.Errorf("creating sub store: %w", err)
+		}
+	}
 
 	return &Config{
 		name:               name,
@@ -53,6 +62,7 @@ func NewConfig(
 		valueType:          valueType,
 		objStore:           subStore,
 		outputsStore:       outputsStore,
+		quickSaveStore:     qss,
 		moduleInitialBlock: moduleInitialBlock,
 		moduleHash:         moduleHash,
 		appendLimit:        8_388_608,     // 8MiB = 8 * 1024 * 1024,

@@ -54,6 +54,14 @@ type Store interface {
 	SetSumBigDecimalSetter
 }
 
+type QuickLoad interface {
+	QuickLoad(ctx context.Context, atBlockHash string) error
+}
+
+type QuickSave interface {
+	QuickSave(ctx context.Context, atBlockHash string) error
+}
+
 type PartialStore interface {
 	Roll(lastBlock uint64)
 }

@@ -70,6 +70,7 @@ type Tier1Config struct {
 
 	TmpDir                  string
 	StateStoreURL           string
+	QuickSaveStoreURL       string
 	StateStoreDefaultTag    string
 	BlockType               string
 	StateBundleSize         uint64
@@ -97,6 +98,10 @@ type Tier1App struct {
 }
 
 func NewTier1(logger *zap.Logger, config *Tier1Config, modules *Tier1Modules) *Tier1App {
+	if modules.CheckPendingShutDown == nil {
+		modules.CheckPendingShutDown = func() bool { return false }
+	}
+
 	return &Tier1App{
 		Shutter: shutter.New(),
 		config:  config,
@@ -129,6 +134,14 @@ func (a *Tier1App) Run() error {
 	stateStore, err := dstore.NewStore(a.config.StateStoreURL, "zst", "zstd", true)
 	if err != nil {
 		return fmt.Errorf("failed setting up state store from url %q: %w", a.config.StateStoreURL, err)
+	}
+
+	var quickSaveStore dstore.Store
+	if a.config.QuickSaveStoreURL != "" {
+		quickSaveStore, err = dstore.NewStore(a.config.QuickSaveStoreURL, "zst", "zstd", true)
+		if err != nil {
+			return fmt.Errorf("failed setting up quickSave store from url %q: %w", a.config.QuickSaveStoreURL, err)
+		}
 	}
 
 	// set to empty store interface if URL is ""
@@ -211,6 +224,7 @@ func (a *Tier1App) Run() error {
 		forkedBlocksStore,
 		forkableHub,
 		stateStore,
+		quickSaveStore,
 		a.config.StateStoreDefaultTag,
 		a.config.MaxSubrequests,
 		a.config.StateBundleSize,
@@ -224,6 +238,7 @@ func (a *Tier1App) Run() error {
 		a.config.ActiveRequestsHardLimit,
 		a.config.SharedCacheSize,
 		a.modules.GlobalRequestPool,
+		a.modules.CheckPendingShutDown,
 		opts...,
 	)
 	if err != nil {

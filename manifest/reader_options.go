@@ -6,21 +6,21 @@ type Option func(r *Reader) *Reader
 
 func SkipSourceCodeReader() Option {
 	return func(r *Reader) *Reader {
-		r.skipSourceCodeImportValidation = true
+		r.validation.SkipSourceCodeImportValidation = true
 		return r
 	}
 }
 
 func SkipModuleOutputTypeValidationReader() Option {
 	return func(r *Reader) *Reader {
-		r.skipModuleOutputTypeValidation = true
+		r.validation.SkipModuleOutputTypeValidation = true
 		return r
 	}
 }
 
 func SkipPackageValidationReader() Option {
 	return func(r *Reader) *Reader {
-		r.skipPackageValidation = true
+		r.validation.SkipPackageValidation = true
 		return r
 	}
 }

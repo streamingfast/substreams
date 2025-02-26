@@ -215,22 +215,23 @@ func (p *Pipeline) initStoresFromQuickload(ctx context.Context, reqPlan *plan.Re
 	return true
 }
 
-func (p *Pipeline) InitTier1StoresAndBackprocess(ctx context.Context, reqPlan *plan.RequestPlan, noopMode bool) (err error) {
-	if p.initStoresFromQuickload(ctx, reqPlan) {
-		return nil
+func (p *Pipeline) InitTier1StoresAndBackprocess(ctx context.Context, reqPlan *plan.RequestPlan, noopMode bool) (bool, error) {
+	success := p.initStoresFromQuickload(ctx, reqPlan)
+	if success {
+		return true, nil
 	}
 
 	if reqPlan.RequiresParallelProcessing() {
 		storeMap, err := p.runParallelProcess(ctx, reqPlan, noopMode)
 		if err != nil {
-			return fmt.Errorf("run_parallel_process failed: %w", err)
+			return false, fmt.Errorf("run_parallel_process failed: %w", err)
 		}
 		p.stores.SetStoreMap(storeMap) // this is valid even if we don't have stores in the parallelProcessing but only a mapper
-		return nil
+		return false, nil
 	}
 
 	p.stores.SetStoreMap(p.setupEmptyStores(ctx))
-	return nil
+	return false, nil
 }
 
 func (p *Pipeline) GetStoreMap() store.Map {

@@ -698,7 +698,8 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	if err := pipe.Init(ctx); err != nil {
 		return fmt.Errorf("error during pipeline init: %w", err)
 	}
-	if err := pipe.InitTier1StoresAndBackprocess(ctx, reqPlan, request.NoopMode); err != nil {
+	loadedFromQuicksave, err := pipe.InitTier1StoresAndBackprocess(ctx, reqPlan, request.NoopMode)
+	if err != nil {
 		return fmt.Errorf("error during init_stores_and_backprocess: %w", err)
 	}
 	if reqPlan.LinearPipeline == nil {
@@ -707,13 +708,14 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 
 	var streamErr error
 	cursor := requestDetails.ResolvedCursor
-	var cursorIsTarget bool
-	if requestDetails.ResolvedStartBlockNum != requestDetails.LinearHandoffBlockNum {
-		// FIXME(abourget): how is that different from reqPlan.LinearPipeline being set?
-		// and what does the cursor have to do here?
-		// This will also be true when we've done backprocessing.. is the cursor affected
-		// in that case?!
-		cursorIsTarget = true
+	var processBlocksBeforeCursor bool
+	if !loadedFromQuicksave &&
+		request.StartCursor != "" &&
+		requestDetails.ResolvedStartBlockNum != requestDetails.LinearHandoffBlockNum {
+		// if we have a cursor and our linearHandoff is NOT specifically set to our resolved startBlock,
+		// we ask the pipeline to process blocks before the cursor (between the linearHandoffBlockNum and the cursor)
+		// so that the stores are correctly populated from the last boundary to our cursor
+		processBlocksBeforeCursor = true
 	}
 	logger.Info("creating firehose stream",
 		zap.Uint64("handoff_block", requestDetails.LinearHandoffBlockNum),
@@ -744,7 +746,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		request.StopBlockNum,
 		cursor,
 		request.FinalBlocksOnly,
-		cursorIsTarget,
+		processBlocksBeforeCursor,
 		logger.Named("stream"),
 		bsstream.WithLiveSourceHandlerMiddleware(metering.LiveSourceMiddlewareHandlerFactory(ctx)),
 		bsstream.WithFileSourceHandlerMiddleware(metering.FileSourceMiddlewareHandlerFactory(ctx)),

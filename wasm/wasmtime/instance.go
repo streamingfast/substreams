@@ -96,6 +96,14 @@ func (i *instance) newImports() error {
 		return fmt.Errorf("registering output import: %w", err)
 	}
 
+	if err = linker.FuncWrap("env", "skip_empty_output",
+		func() {
+			i.CurrentCall.SkipEmptyOutput()
+		},
+	); err != nil {
+		return fmt.Errorf("registering output import: %w", err)
+	}
+
 	return nil
 }
 

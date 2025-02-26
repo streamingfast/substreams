@@ -22,8 +22,9 @@ type WorkerState int
 
 func NewSimpleWorkerPool(ctx context.Context, workerCount int, clientFactory client.InternalClientFactory) *SimpleWorkerPool {
 	logger := reqctx.Logger(ctx)
+	logger = logger.Named("simple-worker-pool").With(zap.Bool("keep", false))
 
-	logger.Debug("initializing worker pool", zap.Int("worker_count", workerCount))
+	logger.Info("initializing worker pool", zap.Int("worker_count", workerCount))
 	wp := &SimpleWorkerPool{
 		freeWorker:    workerCount,
 		startedAt:     time.Now(),
@@ -54,6 +55,9 @@ func (p *SimpleWorkerPool) Borrow(_ context.Context) (Worker, error) {
 	p.freeWorker--
 	p.firstWorkerServed = true
 	worker := NewRemoteWorker(p.clientFactory, "", p.logger)
+
+	p.logger.Info("worker borrowed", zap.String("worker_key", worker.ID()), zap.Int("remaining_worker", p.freeWorker))
+
 	return worker, nil
 
 }
@@ -62,6 +66,7 @@ func (p *SimpleWorkerPool) RampingUp() bool {
 	return p.rampingUp
 }
 
-func (p *SimpleWorkerPool) Return(_ context.Context, _ Worker) {
+func (p *SimpleWorkerPool) Return(_ context.Context, worker Worker) {
 	p.freeWorker++
+	p.logger.Info("worker returned", zap.String("worker_key", worker.ID()), zap.Int("remaining_worker", p.freeWorker))
 }

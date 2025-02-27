@@ -24,8 +24,12 @@ message UserInput {
     Upload file = 16;
     // Deprecated: we don't use this.
     DownloadedFiles downloaded_files = 20;
+    LocalFile local_file = 21;
   }
   message TextInput {
+    string value = 1;
+  }
+  message LocalFile {
     string value = 1;
   }
   message Start {
@@ -79,6 +83,7 @@ message SystemOutput {
     Confirm confirm = 21;
     Loading loading = 19;
     DownloadFiles download_files = 20;
+    LocalFile local_file = 22;
   }
 
   message Message {
@@ -113,6 +118,15 @@ message SystemOutput {
     int32 multi_line = 3; // Number of lines if multiline box.
     string validation_regexp = 4;
     string validation_error_message = 5;
+
+    string submit_button_label = 6;
+    string submit_button_icon = 7; // icon name or image_url
+  }
+  message LocalFile {
+    string prompt = 8;
+    string description = 1; // Markdown
+    string placeholder = 2;
+    string default_value = 9; // Pre-filled the textbox
 
     string submit_button_label = 6;
     string submit_button_icon = 7; // icon name or image_url

@@ -419,6 +419,39 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("error sending message: %w", err)
 			}
 
+		case *pbconvo.SystemOutput_LocalFile_:
+			input := msg.LocalFile
+
+			returnValue := input.DefaultValue
+
+			inputField := huh.NewInput().
+				Title(input.Prompt).
+				Description(input.Description).
+				Placeholder(input.Placeholder).
+				Value(&returnValue)
+
+			err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huhTheme).WithAccessible(WITH_ACCESSIBLE).Run()
+			if err != nil {
+				return fmt.Errorf("failed taking input: %w", err)
+			}
+
+			fmt.Println(gray("┃"), input.Prompt+":", bold(returnValue))
+			fmt.Println("")
+
+			content, err := os.ReadFile(returnValue)
+			if err != nil {
+				return errors.New("could not read the file provided")
+			}
+
+			if err := sendFunc(&pbconvo.UserInput{
+				FromActionId: resp.ActionId,
+				Entry: &pbconvo.UserInput_LocalFile_{
+					LocalFile: &pbconvo.UserInput_LocalFile{Value: strings.TrimRight(string(content), " ")},
+				},
+			}); err != nil {
+				return fmt.Errorf("error sending message: %w", err)
+			}
+
 		case *pbconvo.SystemOutput_Confirm_:
 			input := msg.Confirm
 

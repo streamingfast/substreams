@@ -71,6 +71,7 @@ The data missing in the Base Block makes the corresponding Protobuf field empty.
 - **Injective Testnet**: `testnet.injective.streamingfast.io:443`
 - **Sei Mainnet (EVM)**: `evm-mainnet.sei.streamingfast.io:443`
 - **Starknet Mainnet**: `mainnet.starknet.streamingfast.io:443`
+- **Starknet Testnet**: `testnet.starknet.streamingfast.io:443`
 - **Base Mainnet**: `base-mainnet.streamingfast.io:443`
 - **Mantra Mainnet**: `mainnet.mantra.streamingfast.io:443`
 - **Mantra Testnet**: `testnet.mantra.streamingfast.io:443`

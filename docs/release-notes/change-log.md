@@ -9,6 +9,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.14.1
+
+* Fix another `cannot resolve 'old cursor' from files in passthrough mode -- not implemented` bug when receiving a request in production-mode with a cursor that is below the "linear handoff" block
+
 ## v1.14.0
 
 This release brings performance improvements to the substreams engine, through the introduction of a new "QuickSave" feature, and a switch to `wasmtime` as the default runtime for Rust modules.

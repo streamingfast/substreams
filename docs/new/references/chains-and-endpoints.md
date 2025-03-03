@@ -27,14 +27,15 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 <figure><img src="../../.gitbook/assets/chains-endpoints.png" alt="" width="100%"><figcaption><p>Protobuf for the different supported chains</p></figcaption></figure>
 
 | Protocol | Proto model                                                                                                                               | Latest package                                                                                                        |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | --- |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | Ethereum | [`sf.ethereum.type.v2.Block`](https://github.com/streamingfast/firehose-ethereum/blob/develop/proto/sf/ethereum/type/v2/type.proto)       | [ethereum-v0.10.4.spkg](https://github.com/streamingfast/sf-ethereum/releases/download/v0.10.2/ethereum-v0.10.4.spkg) |
 | NEAR     | [`sf.near.type.v1.Block`](https://github.com/streamingfast/firehose-near/blob/develop/proto/sf/near/type/v1/type.proto)                   |                                                                                                                       |
 | Solana   | [`sf.solana.type.v1.Block`](https://github.com/streamingfast/firehose-solana/blob/develop/proto/sf/solana/type/v1/type.proto)             | [solana-v0.1.0.spkg](https://github.com/streamingfast/sf-solana/releases/download/v0.1.0/solana-v0.1.0.spkg)          |
-| Cosmos   | [`sf.cosmos.type.v2.Block`](https://github.com/streamingfast/firehose-cosmos/blob/develop/cosmos/proto/sf/cosmos/type/v2/block.proto#L10) |                                                                                                                       |     |
+| Cosmos   | [`sf.cosmos.type.v2.Block`](https://github.com/streamingfast/firehose-cosmos/blob/develop/cosmos/proto/sf/cosmos/type/v2/block.proto#L10) |                                                                                                                       |
 | Bitcoin  | [`sf.bitcoin.type.v1.Block`](https://github.com/streamingfast/firehose-bitcoin/blob/develop/proto/sf/bitcoin/type/v1/type.proto)          |                                                                                                                       |
 | Antelope | [`sf.antelope.type.v1.Block`](https://buf.build/pinax/firehose-antelope/docs/main:sf.antelope.type.v1#sf.antelope.type.v1.Block)          |                                                                                                                       |
 | Starknet | [`sf.starknet.type.v1.Block`](https://github.com/streamingfast/firehose-starknet/blob/main/proto/sf/starknet/type/v1/block.proto#L8)      |                                                                                                                       |
+
 
 ### EVM Extended vs Base Block Model
 

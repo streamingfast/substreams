@@ -376,7 +376,8 @@ func (s *Stages) WaitAsyncWork() error {
 	return nil
 }
 
-func (s *Stages) NextJob() (Unit, *block.Range) {
+// Returns the unit, its block range and a boolean indicating if we are backing off because of 'notAbove'
+func (s *Stages) NextJob(notAboveSegment int) (Unit, *block.Range, bool) {
 	// OPTIMIZATION: before calling NextJob, keep a small reserve (10% ?) of workers
 	//  so that when a job finishes, it can start immediately a potentially
 	//  higher priority one (we'll go do all those first-level jobs
@@ -422,16 +423,20 @@ func (s *Stages) NextJob() (Unit, *block.Range) {
 					u := Unit{Segment: segmentIdx, Stage: i}
 					if st := s.getState(u); st == UnitPending {
 						s.markSegmentScheduled(u)
-						return u, r
+						return u, r, false
 					}
 				}
 			}
 
+			if segmentIdx > notAboveSegment {
+				return Unit{}, nil, true
+			}
+
 			s.markSegmentScheduled(unit)
-			return unit, r
+			return unit, r, false
 		}
 	}
-	return Unit{}, nil
+	return Unit{}, nil, false
 }
 
 // setShadowableSegment sets the value to the first segment between

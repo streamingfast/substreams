@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"time"
 
@@ -17,6 +18,8 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
 )
+
+var errShuttingDown = errors.New("endpoint is shutting down, please reconnect")
 
 type Scheduler struct {
 	ctx context.Context
@@ -81,6 +84,9 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 	var cmds []loop.Cmd
 
 	switch msg := msg.(type) {
+	case work.MsgPendingShutdown:
+		cmds = append(cmds, loop.Quit(errShuttingDown))
+
 	case work.MsgJobSucceeded:
 		shadowedUnits := s.Stages.MarkJobSuccess(msg.Unit)
 		s.WorkerPool.Return(s.ctx, msg.Worker)
@@ -143,10 +149,37 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 				return nil //todo: wrap in a retry loop or just let it go through
 			}
 		}
-		workUnit, workRange := s.Stages.NextJob()
-		if workRange == nil { // End of job
+
+		notAboveSegment := math.MaxInt
+		if s.ExecOutWalker != nil {
+			first, current, _ := s.ExecOutWalker.Progress()
+			if current < first {
+				current = first // cover for execoutwalker initialisation
+			}
+			// if we have 10 maxParallelJobs, we don't schedule jobs more than 10 segments ahead of the execout walker
+			// This way, a client reading blocks very slowly will not cause the parallel processing of millions of blocks
+			notAboveSegment = current + int(reqctx.Details(s.ctx).MaxParallelJobs)
+		}
+
+		workUnit, workRange, skippedAboveSegment := s.Stages.NextJob(notAboveSegment)
+		if workRange == nil { // no job ready
 			s.WorkerPool.Return(s.ctx, worker)
-			return nil
+			if !skippedAboveSegment {
+				return nil
+			}
+
+			// this 'skippedAboveSegment' condition depends on the progress of the ExecOutWalker, which will not trigger a MsgScheduleNextJob,
+			// so we need to put it back in the loop ourselves.
+			// other conditions that would make new jobs available, like segment completion, will call 'MsgScheduleNextJob' themselves
+			if s.delayedScheduleNextJob {
+				s.logger.Debug("skipping ramp up delayed schedule next job")
+				return nil
+			}
+			s.delayedScheduleNextJob = true
+			return loop.Tick(10*time.Second, work.DelayedMsgScheduleNextJob{
+				TriggerBy: "linear reader backoff",
+			})
+
 		}
 
 		s.logger.Info("worker borrowed, scheduling work", zap.String("worker_id", worker.ID()), zap.Object("unit", workUnit))

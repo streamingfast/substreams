@@ -30,11 +30,11 @@ The modules within Solana Common exclude voting transactions, to benefit from a 
 
 ## Step 2.5: (Optionally) Transform the Data 
 
-Within the generated directories, modify your Substreams modules to include additional filters, aggregations, and transformations, then update the manifest accordingly. To learn more about this, visit the [How-to-Guides](../how-to-guides/develop-your-own-substreams/solana/solana.md)
+Within the generated directories, modify your Substreams modules to include additional filters, aggregations, and transformations, then update the manifest accordingly. To learn more about this, visit the [How-to-Guides](../../how-to-guides/develop-your-own-substreams/solana/solana.md)
 
 ## Step 3: Load the Data
 
-To make your Substreams queryable (as opposed to [direct streaming](../how-to-guides/sinks/stream/stream.md)), you can automatically generate a Subgraph (known as a [Substreams-powered subgraph](https://thegraph.com/docs/en/substreams/sps/introduction/) or SQL-DB sink.
+To make your Substreams queryable (as opposed to [direct streaming](../../how-to-guides/sinks/stream/stream.md)), you can automatically generate a Subgraph (known as a [Substreams-powered subgraph](https://thegraph.com/docs/en/sps/introduction/) or SQL-DB sink.
 
 ### Subgraph
 

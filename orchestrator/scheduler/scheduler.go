@@ -145,6 +145,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		}
 		workUnit, workRange := s.Stages.NextJob()
 		if workRange == nil { // End of job
+			s.WorkerPool.Return(s.ctx, worker)
 			return nil
 		}
 

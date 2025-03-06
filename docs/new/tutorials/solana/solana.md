@@ -31,15 +31,16 @@ The modules within Solana Common exclude voting transactions, to benefit from a 
 ## Step 2.5: (Optionally) Transform the Data 
 
 Within the generated directories, modify your Substreams modules to include additional filters, aggregations, and transformations, then update the manifest accordingly. To learn more about this, visit the [How-to-Guides](../../how-to-guides/develop-your-own-substreams/solana/solana.md)
+Within the generated directories, modify your Substreams modules to include additional filters, aggregations, and transformations, then update the manifest accordingly. To learn more about this, visit the [How-to-Guides](../../how-to-guides/develop-your-own-substreams/solana/solana.md)
 
 ## Step 3: Load the Data
 
-To make your Substreams queryable (as opposed to [direct streaming](../../how-to-guides/sinks/stream/stream.md)), you can automatically generate a Subgraph (known as a [Substreams-powered subgraph](https://thegraph.com/docs/en/sps/introduction/) or SQL-DB sink.
+To make your Substreams queryable (as opposed to [direct streaming](../../how-to-guides/sinks/stream/stream.md)), you can automatically generate a Subgraph (known as a [Substreams-powered subgraph](https://thegraph.com/docs/en/substreams/sps/introduction/) or SQL-DB sink.
 
 ### Subgraph
 
 1. Run `substreams codegen subgraph` to initialize the sink, producing the necessary files and function definitions. 
-2. Create your [subgraph mappings](../how-to-guides/sinks/subgraph/triggers.md) within the `mappings.ts` and associated entities within the `schema.graphql`.
+2. Create your [subgraph mappings](../../how-to-guides/sinks/subgraph/triggers.md) within the `mappings.ts` and associated entities within the `schema.graphql`.
 3. Build and deploy locally or to [Subgraph Studio](https://thegraph.com/studio-pricing/) by running `deploy-studio`.
 
 ### SQL
@@ -58,12 +59,12 @@ You may find these additional resources helpful for developing your first Solana
 
 ### Dev Container Reference
 
-The [Dev Container Reference](../references/devcontainer-ref.md) helps you navigate the container and its common errors. 
+The [Dev Container Reference](../../references/devcontainer-ref.md) helps you navigate the container and its common errors. 
 
 ### CLI Reference
 
-The [CLI reference](../references/cli/command-line-interface.md) lets you explore all the tools available in the Substreams CLI.
+The [CLI reference](../../references/cli/command-line-interface.md) lets you explore all the tools available in the Substreams CLI.
 
 ### Substreams Components Reference
 
-The [Components Reference](../references/substreams-components/packages.md) dives deeper into navigating the `substreams.yaml`.
+The [Components Reference](../../references/substreams-components/packages.md) dives deeper into navigating the `substreams.yaml`.

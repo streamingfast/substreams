@@ -11,6 +11,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### CLI
+
+* The `substreams gui` flag `--debug-modules-output` has been removed, it had zero effect.
+
+* The `substreams run` flag `--debug-modules-output` now accepts regular expressions like `substreams run --debug-modules-output=".*"`.
+
+* Fixed `--skip-package-validation` to also skip sub packages being imported.
+
 ### Server
 
 * Added a mechanism for 'production-mode' requests where the tier1 will not schedule tier2 jobs over { max_parallel_subrequests } segments above the current block being streamed to the user.

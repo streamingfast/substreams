@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
+	"github.com/bobg/go-generics/v3/slices"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/tools/test"
@@ -24,12 +26,34 @@ import (
 // ENUM(TUI, JSON, JSONL, CLOCK, CURSOR)
 type OutputMode uint
 
+type OutputStreamPattern struct {
+	pattern string
+	regex   *regexp.Regexp
+}
+
+func NewOutputStreamPattern(pattern string) OutputStreamPattern {
+	regex, err := regexp.Compile(pattern)
+	if err != nil {
+		return OutputStreamPattern{pattern: pattern, regex: nil}
+	}
+
+	return OutputStreamPattern{pattern: pattern, regex: regex}
+}
+
+func (o *OutputStreamPattern) Matches(input string) bool {
+	if o.regex == nil {
+		return o.pattern == input
+	}
+
+	return o.regex.MatchString(input)
+}
+
 type TUI struct {
 	shutter *shutter.Shutter
 
 	req               *pbsubstreamsrpc.Request
 	pkg               *pbsubstreams.Package
-	outputStreamNames []string
+	outputStreamNames []OutputStreamPattern
 
 	// Output mode flags
 	isTerminal        bool
@@ -51,7 +75,7 @@ func New(req *pbsubstreamsrpc.Request, pkg *pbsubstreams.Package, outputStreamNa
 		shutter:           shutter.New(),
 		req:               req,
 		pkg:               pkg,
-		outputStreamNames: outputStreamNames,
+		outputStreamNames: slices.Map(outputStreamNames, func(s string) OutputStreamPattern { return NewOutputStreamPattern(s) }),
 		decodeMsgTypes:    map[string]func(in []byte) string{},
 		msgTypes:          map[string]string{},
 		msgDescs:          map[string]*desc.MessageDescriptor{},
@@ -76,7 +100,7 @@ func (ui *TUI) Init(outputMode string) error {
 
 	for _, mod := range ui.pkg.Modules.Modules {
 		for _, outputStreamName := range ui.outputStreamNames {
-			if mod.Name == outputStreamName {
+			if outputStreamName.Matches(mod.Name) {
 				var msgType string
 				switch modKind := mod.Kind.(type) {
 				case *pbsubstreams.Module_KindStore_:

@@ -32,7 +32,6 @@ func init() {
 	guiCmd.Flags().Uint64("limit-processed-blocks", 10000, "Limit the number of blocks to be processed by the server, including preparing the stores, as a safeguard to prevent unexpected expensive reprocessing (0 disables the limit)")
 	guiCmd.Flags().Bool("final-blocks-only", false, "Only process blocks that have pass finality, to prevent any reorg and undo signal by staying further away from the chain HEAD")
 	guiCmd.Flags().StringSlice("debug-modules-initial-snapshot", nil, "List of 'store' modules from which to print the initial data snapshot (Unavailable in Production Mode")
-	guiCmd.Flags().StringSlice("debug-modules-output", nil, "List of extra modules from which to print outputs, deltas and logs (Unavailable in Production Mode)")
 	guiCmd.Flags().Bool("production-mode", false, "Enable Production Mode, with high-speed parallel processing")
 	guiCmd.Flags().StringArrayP("params", "p", nil, "Set a params for parameterizable modules. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
 	guiCmd.Flags().Bool("replay", false, "Replay saved session into GUI from replay.bin")
@@ -123,13 +122,7 @@ func runGui(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	productionMode := sflags.MustGetBool(cmd, "production-mode")
-	debugModulesOutput := sflags.MustGetStringSlice(cmd, "debug-modules-output")
-	if len(debugModulesOutput) == 0 {
-		debugModulesOutput = nil
-	}
-	if debugModulesOutput != nil && productionMode {
-		return fmt.Errorf("cannot set 'debug-modules-output' in 'production-mode'")
-	}
+
 	debugModulesInitialSnapshot := sflags.MustGetStringSlice(cmd, "debug-modules-initial-snapshot")
 	if len(debugModulesInitialSnapshot) == 0 {
 		debugModulesInitialSnapshot = nil
@@ -193,7 +186,6 @@ func runGui(cmd *cobra.Command, args []string) (err error) {
 		SkipPackageValidation:       sflags.MustGetBool(cmd, "skip-package-validation"),
 		Graph:                       packageBundle.Graph,
 		ProdMode:                    productionMode,
-		DebugModulesOutput:          debugModulesOutput,
 		DebugModulesInitialSnapshot: debugModulesInitialSnapshot,
 		Endpoint:                    endpoint,
 		OutputModule:                outputModule,

@@ -446,7 +446,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			if err := sendFunc(&pbconvo.UserInput{
 				FromActionId: resp.ActionId,
 				Entry: &pbconvo.UserInput_LocalFile_{
-					LocalFile: &pbconvo.UserInput_LocalFile{Value: strings.TrimRight(string(content), " ")},
+					LocalFile: &pbconvo.UserInput_LocalFile{Value: content},
 				},
 			}); err != nil {
 				return fmt.Errorf("error sending message: %w", err)

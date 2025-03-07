@@ -30,7 +30,7 @@ message UserInput {
     string value = 1;
   }
   message LocalFile {
-    string value = 1;
+    bytes value = 1;
   }
   message Start {
     // generator_id routes the conversation to the right generator backend

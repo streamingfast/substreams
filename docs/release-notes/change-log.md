@@ -11,7 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+## v1.14.2
+
 * Fix a bug where a 'worker pool' could incorrectly get exhausted
+* `substreams init` command: new Protobuf conversation object, `LocalFile`, which allows to read the content of a file provided by the user.
 
 ## v1.14.1
 

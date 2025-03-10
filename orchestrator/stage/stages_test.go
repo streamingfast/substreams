@@ -3,6 +3,7 @@ package stage
 import (
 	"context"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"testing"
@@ -58,12 +59,12 @@ func TestNewStageNextJobs(t *testing.T) {
 	)
 
 	noNextJob := func() {
-		_, r := stages.NextJob()
+		_, r, _ := stages.NextJob(math.MaxInt)
 		assert.Nil(t, r)
 	}
 
 	nextJob := func() Unit {
-		j, r := stages.NextJob()
+		j, r, _ := stages.NextJob(math.MaxInt)
 		if r == nil {
 			t.Error("no next job")
 		}
@@ -204,12 +205,12 @@ func TestNewStageNextJobs(t *testing.T) {
 }
 
 func assertNoNextJob(t *testing.T, stages *Stages) {
-	_, r := stages.NextJob()
+	_, r, _ := stages.NextJob(math.MaxInt)
 	assert.Nil(t, r)
 }
 
 func nextJob(t *testing.T, stages *Stages) Unit {
-	j, r := stages.NextJob()
+	j, r, _ := stages.NextJob(math.MaxInt)
 	if r == nil {
 		t.Error("no next job")
 	}

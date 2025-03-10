@@ -20,6 +20,10 @@ type MsgJobSucceeded struct {
 	Worker Worker
 }
 
+type MsgPendingShutdown struct {
+	loop.IsMsg
+}
+
 type MsgScheduleNextJob struct {
 	loop.IsMsg
 	TriggerBy string

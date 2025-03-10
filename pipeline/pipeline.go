@@ -364,7 +364,7 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 
 	logger.Debug("starting parallel processing")
 
-	storeMap, err = parallelProcessor.Run(ctx)
+	storeMap, err = parallelProcessor.Run(ctx, p.checkPendingShutdown)
 	if err != nil {
 		return nil, fmt.Errorf("parallel processing run: %w", err)
 	}

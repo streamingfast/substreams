@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/streamingfast/substreams"
 	orchestratorExecout "github.com/streamingfast/substreams/orchestrator/execout"
@@ -87,9 +88,23 @@ func (b *ParallelProcessor) Stages() *stage.Stages {
 	return b.scheduler.Stages
 }
 
-func (b *ParallelProcessor) Run(ctx context.Context) (storeMap store.Map, err error) {
+func (b *ParallelProcessor) Run(ctx context.Context, checkPendingShutdown func() bool) (storeMap store.Map, err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+
+	go func() {
+		for {
+			select {
+			case <-time.Tick(time.Second):
+				if checkPendingShutdown() {
+					b.scheduler.Send(work.MsgPendingShutdown{})
+					return
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 
 	initCmd := b.scheduler.Init()
 	if err := b.scheduler.Run(ctx, initCmd); err != nil {

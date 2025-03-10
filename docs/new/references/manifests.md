@@ -410,6 +410,27 @@ The value for `type` is always prefixed using `proto:` followed by a definition 
 
 This field should contain Markdown documentation of the module. Use it to describe how to use the params, or what to expect from the module.
 
+#### Module `use`
+
+If you want to directly _use_ an existing module.
+
+For example, consider that you have a package, `my_package.spkg`, with a module called `module1`. In the following snippet, you import the package, and you declare a local module, `local_module`, which directly uses the `module1` from the imported package.
+
+```yaml
+...
+
+imports:
+  evm_package: ../my_package.spkg
+
+modules:
+  - name: local_module
+    use: evm_package:module1
+
+...
+```
+
+**NOTE:** the `initialBlock` declared in the upstream module (i.e. the module being used) is not inherited.
+
 ### `params`
 
 The `params` mapping changes the default values for modules' parameterizable inputs.

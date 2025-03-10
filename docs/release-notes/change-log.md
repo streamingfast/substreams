@@ -11,9 +11,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
-* Fix a bug where a 'worker pool' could incorrectly get exhausted
 * Added a mechanism for 'production-mode' requests where the tier1 will not schedule tier2 jobs over { max_parallel_subrequests } segments above the current block being streamed to the user.
   This will ensure that a user slowly reading blocks 1, 2, 3... will not trigger a flood of tier2 jobs for higher blocks, let's say 300_000_000, that might never get read.
+
+* Added a validation for module 'triggering' inputs: it will now fail with a clear error message when the only available inputs are stores used with mode 'get' (not 'deltas'),
+  instead of silenlty skipping the module on every block.
+
+## v1.14.2
+
+* Fix a bug where a 'worker pool' could incorrectly get exhausted
 
 ## v1.14.1
 

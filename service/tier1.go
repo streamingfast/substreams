@@ -337,7 +337,7 @@ func (s *Tier1Service) Blocks(
 
 	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules, bstream.GetProtocolFirstStreamableBlock)
 	if err != nil {
-		err := bsstream.NewErrInvalidArg(err.Error())
+		err := connect.NewError(connect.CodeInvalidArgument, err)
 		fields = append(fields, zap.Error(err))
 		logger.Info("refusing Substreams Blocks request", fields...)
 		return err

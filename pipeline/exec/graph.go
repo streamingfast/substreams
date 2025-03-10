@@ -1,8 +1,10 @@
 package exec
 
 import (
+	"errors"
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -242,6 +244,9 @@ func computeStages(mods []*pbsubstreams.Module, initBlocks map[string]uint64) (s
 			}
 
 			var validInputsAtInitialBlock bool
+			var invalidBecauseOfInitialBlock []string
+			var invalidStoresInGetMode []string
+
 			for _, dep := range mod.Inputs {
 				var depModName string
 				switch input := dep.Input.(type) {
@@ -257,11 +262,19 @@ func computeStages(mods []*pbsubstreams.Module, initBlocks map[string]uint64) (s
 					depModName = input.Map.ModuleName
 					if initBlocks[mod.Name] >= initBlocks[depModName] {
 						validInputsAtInitialBlock = true
+					} else {
+						invalidBecauseOfInitialBlock = append(invalidBecauseOfInitialBlock, depModName)
 					}
 				case *pbsubstreams.Module_Input_Store_:
 					depModName = input.Store.ModuleName
-					if initBlocks[mod.Name] >= initBlocks[depModName] {
-						validInputsAtInitialBlock = true
+					if dep.GetStore().Mode == pbsubstreams.Module_Input_Store_DELTAS {
+						if initBlocks[mod.Name] >= initBlocks[depModName] {
+							validInputsAtInitialBlock = true
+						} else {
+							invalidBecauseOfInitialBlock = append(invalidBecauseOfInitialBlock, depModName)
+						}
+					} else {
+						invalidStoresInGetMode = append(invalidStoresInGetMode, depModName)
 					}
 				default:
 					panic(fmt.Errorf("unsupported input type %T", dep.Input))
@@ -276,7 +289,17 @@ func computeStages(mods []*pbsubstreams.Module, initBlocks map[string]uint64) (s
 			}
 
 			if !validInputsAtInitialBlock {
-				return nil, fmt.Errorf("module %q has no input available at its initial block %d", mod.Name, initBlocks[mod.Name])
+				errMessage := fmt.Sprintf("module %q is invalid because it contains no 'triggering input' (source, map or store in delta mode)", mod.Name)
+
+				if invalidBecauseOfInitialBlock != nil {
+					errMessage += fmt.Sprintf(" - inputs [%s] do not exist yet at the initial block %d", strings.Join(invalidBecauseOfInitialBlock, ", "), initBlocks[mod.Name])
+				}
+
+				if invalidStoresInGetMode != nil {
+					errMessage += fmt.Sprintf(" - store inputs [%s] do not trigger module execution because they are in 'get' mode. Use 'delta' mode or declare the store twice (in each mode) to trigger this module execution", strings.Join(invalidStoresInGetMode, ", "))
+				}
+
+				return nil, errors.New(errMessage)
 			}
 
 			//Check block index dependence

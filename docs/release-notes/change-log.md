@@ -17,6 +17,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Added a validation for module 'triggering' inputs: it will now fail with a clear error message when the only available inputs are stores used with mode 'get' (not 'deltas'),
   instead of silenlty skipping the module on every block.
 
+* Fixed `runtime error: slice bounds out of range` error on heavy memory usage with wasmtime engin
+
 ## v1.14.2
 
 * Fix a bug where a 'worker pool' could incorrectly get exhausted

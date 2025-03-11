@@ -16,3 +16,7 @@ message MapResult {
 message Boolean {
   bool result = 1;
 }
+
+message Array {
+  repeated string result = 1;
+}

@@ -68,7 +68,7 @@ func (h *Heap) WriteAndTrack(bytes []byte, track bool, from string) (int32, erro
 
 func (h *Heap) WriteAtPtr(bytes []byte, ptr int32, from string) (int32, error) {
 	data := h.memory.UnsafeData(h.store)
-	copy(data[ptr:], bytes)
+	copy(data[uint32(ptr):], bytes)
 	return ptr, nil
 }
 
@@ -90,5 +90,5 @@ func (h *Heap) ReadString(ptr int32, length int32) string {
 
 func (h *Heap) ReadBytes(ptr int32, length int32) []byte {
 	data := h.memory.UnsafeData(h.store)
-	return data[ptr : ptr+length]
+	return data[uint32(ptr) : uint32(ptr)+uint32(length)]
 }

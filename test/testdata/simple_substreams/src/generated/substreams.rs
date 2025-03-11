@@ -503,8 +503,6 @@ pub trait SubstreamsTrait {
         assert_all_test_bigint: substreams::store::StoreGetInt64,
         assert_all_test_bigdecimal: substreams::store::StoreGetInt64,
         assert_all_test_index: substreams::store::StoreGetInt64,
+        _block: pb::test::Block,
     ) -> Result<pb::test::Boolean, Error>;
 }
-
-
-

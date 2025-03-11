@@ -1477,6 +1477,7 @@ impl generated::substreams::SubstreamsTrait for generated::substreams::Substream
         assert_all_test_bigint: StoreGetInt64,
         assert_all_test_bigdecimal: StoreGetInt64,
         assert_all_test_index : StoreGetInt64,
+        _block: Block,
     ) -> Result<test::Boolean, Error> {
         return Ok(test::Boolean { result: true });
     }

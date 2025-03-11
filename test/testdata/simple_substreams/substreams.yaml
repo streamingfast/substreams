@@ -843,7 +843,7 @@ modules:
     inputs:
       - map: assert_test_store_delete_prefix
 
-  - name : assert_all_test_index 
+  - name: assert_all_test_index
     kind: store
     initialBlock: 10
     updatePolicy: set
@@ -862,6 +862,7 @@ modules:
       - store: assert_all_test_bigint
       - store: assert_all_test_bigdecimal
       - store: assert_all_test_index
+      - source: sf.substreams.v1.test.Block
     output:
       type: proto:sf.substreams.v1.test.Boolean
 

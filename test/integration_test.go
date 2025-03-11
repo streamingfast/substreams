@@ -510,6 +510,22 @@ func Test_SimpleMapModule(t *testing.T) {
 	require.NoError(t, run.Run(t, "test_map"))
 }
 
+// Test_BigMapModule tests the memory allocation: a bit under 117500000 strings of 10 characters, which is 1.1GB of memory, we get negative pointers.
+// This test ensures that the wasm memory management can handle this.
+func Test_BigMapModule(t *testing.T) {
+	run := newTestRun(t, 10000, 10001, 10001, 0, "write_big_output", "./testdata/big_substreams/big-substreams-v0.1.0.spkg")
+	run.NewBlockGenerator = func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
+		return &LinearBlockGenerator{
+			startBlock:         startBlock,
+			inclusiveStopBlock: inclusiveStopBlock + 10,
+		}
+	}
+	run.ProductionMode = false
+	run.Context = cancelledContext(10 * time.Second)
+
+	require.NoError(t, run.Run(t, "write_big_output"))
+}
+
 func Test_WASMBindgenShims(t *testing.T) {
 	run := newTestRun(t, 12, 14, 14, 0, "map_block", "./testdata/wasmbindgen_substreams/wasmbindgen-substreams-v0.1.0.spkg")
 	run.NewBlockGenerator = func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {

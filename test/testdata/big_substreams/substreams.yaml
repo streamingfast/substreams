@@ -1,0 +1,24 @@
+specVersion: v0.1.0
+package:
+  name: big_substreams
+  version: v0.1.0
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: ./target/wasm32-unknown-unknown/release/big_substreams.wasm
+
+protobuf:
+  files:
+    - "sf/substreams/v1/test/test.proto"
+  importPaths:
+    - ../../../proto
+
+modules:
+  - name: write_big_output
+    initialBlock: 10000
+    kind: map
+    inputs:
+      - source: sf.substreams.v1.test.Block
+    output:
+      type: proto:sf.substreams.v1.test.Array

@@ -28,6 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### CLI
 
 * Added `--limit-processed-blocks` flag to `substreams run` and `substreams gui` to set the `limit_processed_blocks` field in the request
+* The information messages in 'substreams run' now print to STDERR instead of STDOUT.
 
 ## v1.14.2
 

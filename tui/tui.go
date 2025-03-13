@@ -239,7 +239,9 @@ func (ui *TUI) IncomingMessage(ctx context.Context, resp *pbsubstreamsrpc.Respon
 			}
 
 			fmt.Fprintf(os.Stderr, "TraceID: %s\n", m.Session.TraceId)
-			fmt.Fprintf(os.Stderr, "Server HEAD block: %d\n", m.Session.ChainHead)
+			if m.Session.ChainHead != 0 {
+				fmt.Fprintf(os.Stderr, "Server HEAD block: %d\n", m.Session.ChainHead)
+			}
 			stages := len(execGraph.StagedUsedModules())
 			if stages == 1 || !ui.req.ProductionMode {
 				fmt.Fprintln(os.Stderr, "This request will be processed in a single stage")
@@ -255,8 +257,10 @@ func (ui *TUI) IncomingMessage(ctx context.Context, resp *pbsubstreamsrpc.Respon
 				fmt.Fprintf(os.Stderr, "Blocks to process to prepare the stores in %s: %d (%d already cached)\n", stageCount, m.Session.EffectiveBlocksToProcessBeforeStartBlock, m.Session.BlocksToProcessBeforeStartBlock-m.Session.EffectiveBlocksToProcessBeforeStartBlock)
 			}
 
-			fmt.Fprintf(os.Stderr, "Blocks to process in requested range: %d (%d already cached)\n", m.Session.EffectiveBlocksToProcessAfterStartBlock, m.Session.BlocksToProcessAfterStartBlock-m.Session.EffectiveBlocksToProcessAfterStartBlock)
-			ui.RequiredProcessedBlocks = m.Session.EffectiveBlocksToProcessBeforeStartBlock + m.Session.EffectiveBlocksToProcessAfterStartBlock
+			if m.Session.BlocksToProcessAfterStartBlock != 0 {
+				fmt.Fprintf(os.Stderr, "Blocks to process in requested range: %d (%d already cached)\n", m.Session.EffectiveBlocksToProcessAfterStartBlock, m.Session.BlocksToProcessAfterStartBlock-m.Session.EffectiveBlocksToProcessAfterStartBlock)
+				ui.RequiredProcessedBlocks = m.Session.EffectiveBlocksToProcessBeforeStartBlock + m.Session.EffectiveBlocksToProcessAfterStartBlock
+			}
 		}
 
 	default:

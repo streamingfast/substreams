@@ -119,8 +119,40 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 
 	case work.MsgScheduleNextJob:
 		s.logger.Info("scheduling next job", zap.String("trigger_by", msg.TriggerBy))
+
+		notAboveSegment := math.MaxInt
+		if s.ExecOutWalker != nil {
+			first, current, _ := s.ExecOutWalker.Progress()
+			if current < first {
+				current = first // cover for execoutwalker initialisation
+			}
+			// if we have 10 maxParallelJobs, we don't schedule jobs more than 15 segments ahead of the execout walker (1.5x)
+			// This way, a client reading blocks very slowly will not cause the parallel processing of millions of blocks
+			notAboveSegment = current + int(reqctx.Details(s.ctx).MaxParallelJobs)*3/2
+		}
+
+		workUnit, workRange, skippedAboveSegment := s.Stages.NextJob(notAboveSegment)
+		if workRange == nil { // no job ready
+			if !skippedAboveSegment {
+				return nil
+			}
+
+			// this 'skippedAboveSegment' condition depends on the progress of the ExecOutWalker, which will not trigger a MsgScheduleNextJob,
+			// so we need to put it back in the loop ourselves.
+			// other conditions that would make new jobs available, like segment completion, will call 'MsgScheduleNextJob' themselves
+			if s.delayedScheduleNextJob {
+				s.logger.Debug("skipping ramp up delayed schedule next job")
+				return nil
+			}
+			s.delayedScheduleNextJob = true
+			return loop.Tick(1*time.Second, work.DelayedMsgScheduleNextJob{
+				TriggerBy: "linear reader backoff",
+			})
+		}
+
 		worker, err := s.WorkerPool.Borrow(s.ctx)
 		if err != nil {
+			s.Stages.ReleaseJob(workUnit)
 			if errors.Is(err, work.ErrorResourceExhausted) {
 				s.logger.Info("resource exhausted", zap.Error(err))
 				if s.delayedScheduleNextJob {
@@ -129,7 +161,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 				}
 				s.logger.Debug("scheduling delayed schedule next job")
 				s.delayedScheduleNextJob = true
-				return loop.Tick(10*time.Second, work.DelayedMsgScheduleNextJob{
+				return loop.Tick(5*time.Second, work.DelayedMsgScheduleNextJob{
 					TriggerBy: "resource exhausted",
 				})
 			} else if errors.Is(err, work.ErrorResourceExhaustedRampUp) {
@@ -148,38 +180,6 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 				s.logger.Error("scheduler: failed to borrow worker", zap.Error(err))
 				return nil //todo: wrap in a retry loop or just let it go through
 			}
-		}
-
-		notAboveSegment := math.MaxInt
-		if s.ExecOutWalker != nil {
-			first, current, _ := s.ExecOutWalker.Progress()
-			if current < first {
-				current = first // cover for execoutwalker initialisation
-			}
-			// if we have 10 maxParallelJobs, we don't schedule jobs more than 10 segments ahead of the execout walker
-			// This way, a client reading blocks very slowly will not cause the parallel processing of millions of blocks
-			notAboveSegment = current + int(reqctx.Details(s.ctx).MaxParallelJobs)
-		}
-
-		workUnit, workRange, skippedAboveSegment := s.Stages.NextJob(notAboveSegment)
-		if workRange == nil { // no job ready
-			s.WorkerPool.Return(s.ctx, worker)
-			if !skippedAboveSegment {
-				return nil
-			}
-
-			// this 'skippedAboveSegment' condition depends on the progress of the ExecOutWalker, which will not trigger a MsgScheduleNextJob,
-			// so we need to put it back in the loop ourselves.
-			// other conditions that would make new jobs available, like segment completion, will call 'MsgScheduleNextJob' themselves
-			if s.delayedScheduleNextJob {
-				s.logger.Debug("skipping ramp up delayed schedule next job")
-				return nil
-			}
-			s.delayedScheduleNextJob = true
-			return loop.Tick(10*time.Second, work.DelayedMsgScheduleNextJob{
-				TriggerBy: "linear reader backoff",
-			})
-
 		}
 
 		s.logger.Info("worker borrowed, scheduling work", zap.String("worker_id", worker.ID()), zap.Object("unit", workUnit))

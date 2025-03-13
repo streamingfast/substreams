@@ -540,18 +540,6 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		requestDetails.SetStageLayerParallelExecutorCountFromContext(ctx)
 	}
 
-	traceId := tracing.GetTraceID(ctx).String()
-	respFunc(&pbsubstreamsrpc.Response{
-		Message: &pbsubstreamsrpc.Response_Session{
-			Session: &pbsubstreamsrpc.SessionInit{
-				TraceId:            traceId,
-				ResolvedStartBlock: requestDetails.ResolvedStartBlockNum,
-				LinearHandoffBlock: requestDetails.LinearHandoffBlockNum,
-				MaxParallelWorkers: requestDetails.MaxParallelJobs,
-			},
-		},
-	})
-
 	ctx = reqctx.WithRequest(ctx, requestDetails)
 	if s.runtimeConfig.ModuleExecutionTracing {
 		ctx = reqctx.WithModuleExecutionTracing(ctx)
@@ -620,6 +608,10 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		opts = append(opts, pipeline.WithFinalBlocksOnly())
 	}
 
+	if s.getHeadBlock != nil {
+		opts = append(opts, pipeline.WithHeadBlockGetter(s.getHeadBlock))
+	}
+
 	pipe := pipeline.New(
 		ctx,
 		true,
@@ -665,7 +657,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	if s.globalRequestPool != nil {
 		userID := dauth.FromContext(ctx).UserID()
 		apiKeyID := dauth.FromContext(ctx).APIKeyID()
-		r := s.globalRequestPool.BorrowRequest(ctx, userID, apiKeyID, traceId)
+		r := s.globalRequestPool.BorrowRequest(ctx, userID, apiKeyID, tracing.GetTraceID(ctx).String())
 		if r.status == pbworker.BorrowWorkerResponse_resource_exhausted {
 			msg := strings.Builder{}
 			msg.WriteString("Request quota exceeded.\n")
@@ -885,6 +877,11 @@ func toConnectError(ctx context.Context, err error) error {
 	var errInvalidArg *bsstream.ErrInvalidArg
 	if errors.As(err, &errInvalidArg) {
 		return connect.NewError(connect.CodeInvalidArgument, errInvalidArg)
+	}
+
+	connectError := new(connect.Error)
+	if errors.As(err, &connectError) {
+		return connectError
 	}
 
 	// Do we want to print the full cause as coming from Golang? Would we like to maybe trim off "operational"

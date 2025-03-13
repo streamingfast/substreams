@@ -2,6 +2,7 @@ package reqctx
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	"github.com/streamingfast/dauth"
@@ -24,11 +25,22 @@ type RequestDetails struct {
 	StopBlockNum                  uint64
 	MaxParallelJobs               uint64
 	MaxStageLayerParallelExecutor uint64
+	LimitProcessedBlocks          uint64
 	UniqueID                      uint64
 
 	ProductionMode bool
 	IsTier2Request bool
 	Tier2Stage     int
+}
+
+func (d *RequestDetails) AssertProcessedBlocksLimit(requiredBlocksStore, requiredBlocksRange uint64) error {
+	if d.LimitProcessedBlocks == 0 {
+		return nil
+	}
+	if requiredBlocksStore+requiredBlocksRange > d.LimitProcessedBlocks {
+		return fmt.Errorf("request needs to process a total of %d blocks (including %d to prepare the stores) but only %d blocks are allowed according to the 'limit-processed-block' request argument", requiredBlocksStore+requiredBlocksRange, requiredBlocksStore, d.LimitProcessedBlocks)
+	}
+	return nil
 }
 
 func (d *RequestDetails) UniqueIDString() string {

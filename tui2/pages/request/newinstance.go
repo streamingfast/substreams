@@ -45,6 +45,7 @@ type Config struct {
 	Headers                     map[string]string
 	OutputModule                string
 	OverrideNetwork             string
+	LimitProcessedBlocks        uint64
 	SubstreamsClientConfig      *client.SubstreamsClientConfig
 	HomeDir                     string
 	Vcr                         bool
@@ -185,6 +186,7 @@ func (c *Config) NewInstance() (out *Instance, err error) {
 		OutputModule:                        c.OutputModule,
 		ProductionMode:                      c.ProdMode,
 		DebugInitialStoreSnapshotForModules: c.DebugModulesInitialSnapshot,
+		LimitProcessedBlocks:                c.LimitProcessedBlocks,
 	}
 
 	c.Headers = headers.Append(c.Headers)

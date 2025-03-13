@@ -29,6 +29,7 @@ func init() {
 	guiCmd.Flags().StringP("start-block", "s", "", "Start block to stream from. If empty, will be replaced by initialBlock of the first module you are streaming. If negative, will be resolved by the server relative to the chain head")
 	guiCmd.Flags().StringP("cursor", "c", "", "Cursor to stream from. Leave blank for no cursor")
 	guiCmd.Flags().StringP("stop-block", "t", "+1000", "Stop block to end stream at, inclusively. Set to 0 to run indefinitely.")
+	guiCmd.Flags().Uint64("limit-processed-blocks", 10000, "Limit the number of blocks to be processed by the server, including preparing the stores, as a safeguard to prevent unexpected expensive reprocessing (0 disables the limit)")
 	guiCmd.Flags().Bool("final-blocks-only", false, "Only process blocks that have pass finality, to prevent any reorg and undo signal by staying further away from the chain HEAD")
 	guiCmd.Flags().StringSlice("debug-modules-initial-snapshot", nil, "List of 'store' modules from which to print the initial data snapshot (Unavailable in Production Mode")
 	guiCmd.Flags().StringSlice("debug-modules-output", nil, "List of extra modules from which to print outputs, deltas and logs (Unavailable in Production Mode)")
@@ -205,6 +206,7 @@ func runGui(cmd *cobra.Command, args []string) (err error) {
 		StartBlock:                  startBlock,
 		StopBlock:                   stopBlock,
 		FinalBlocksOnly:             sflags.MustGetBool(cmd, "final-blocks-only"),
+		LimitProcessedBlocks:        sflags.MustGetUint64(cmd, "limit-processed-blocks"),
 		Params:                      strings.Join(requestParams, "\n"),
 		DefaultParams:               strings.Join(defaultParams, "\n"),
 		// ReaderOptions:               readerOptions,

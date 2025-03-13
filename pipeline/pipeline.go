@@ -6,9 +6,11 @@ import (
 	"strings"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/RoaringBitmap/roaring/roaring64"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dmetering"
+	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/orchestrator"
@@ -72,6 +74,7 @@ type Pipeline struct {
 
 	gate            *gate
 	finalBlocksOnly bool
+	getHeadBlockNum func() (uint64, error)
 	highestStage    *int
 
 	forkHandler     *ForkHandler
@@ -222,12 +225,49 @@ func (p *Pipeline) InitTier1StoresAndBackprocess(ctx context.Context, reqPlan *p
 	}
 
 	if reqPlan.RequiresParallelProcessing() {
-		storeMap, err := p.runParallelProcess(ctx, reqPlan, noopMode)
+		storeMap, err := p.runParallelProcess(ctx, reqPlan, noopMode, p.getHeadBlockNum)
 		if err != nil {
 			return false, fmt.Errorf("run_parallel_process failed: %w", err)
 		}
 		p.stores.SetStoreMap(storeMap) // this is valid even if we don't have stores in the parallelProcessing but only a mapper
 		return false, nil
+	} else {
+
+		reqDetails := reqctx.Details(ctx)
+		var toProcessAfter uint64
+		stopBlockNum := reqDetails.StopBlockNum
+		if stopBlockNum == 0 && p.getHeadBlockNum != nil {
+			headBlock, err := p.getHeadBlockNum()
+			if err != nil {
+				reqctx.Logger(ctx).Warn("cannot get head block for sessionInit", zap.Error(err))
+			} else {
+				stopBlockNum = headBlock
+			}
+		}
+
+		if stopBlockNum != 0 {
+			toProcessAfter = stopBlockNum - reqDetails.ResolvedStartBlockNum
+		}
+
+		p.respFunc(&pbsubstreamsrpc.Response{
+			Message: &pbsubstreamsrpc.Response_Session{
+				Session: &pbsubstreamsrpc.SessionInit{
+					TraceId:                                  tracing.GetTraceID(ctx).String(),
+					ResolvedStartBlock:                       reqDetails.ResolvedStartBlockNum,
+					LinearHandoffBlock:                       reqDetails.LinearHandoffBlockNum,
+					MaxParallelWorkers:                       reqDetails.MaxParallelJobs,
+					BlocksToProcessBeforeStartBlock:          0,
+					EffectiveBlocksToProcessBeforeStartBlock: 0,
+					BlocksToProcessAfterStartBlock:           toProcessAfter, // only linear processing
+					EffectiveBlocksToProcessAfterStartBlock:  toProcessAfter, // only linear processing
+				},
+			},
+		})
+
+		if err := reqDetails.AssertProcessedBlocksLimit(0, toProcessAfter); err != nil {
+			return false, connect.NewError(connect.CodeFailedPrecondition, err)
+		}
+
 	}
 
 	p.stores.SetStoreMap(p.setupEmptyStores(ctx))
@@ -312,7 +352,7 @@ func (p *Pipeline) setupEmptyStores(ctx context.Context) store.Map {
 }
 
 // runParallelProcess
-func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.RequestPlan, noopMode bool) (storeMap store.Map, err error) {
+func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.RequestPlan, noopMode bool, getHeadBlockNum func() (uint64, error)) (storeMap store.Map, err error) {
 	ctx, span := reqctx.WithSpan(ctx, "substreams/pipeline/tier1/parallel_process")
 	defer span.EndWithErr(&err)
 
@@ -337,6 +377,35 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 	)
 	if err != nil {
 		return nil, fmt.Errorf("building parallel processor: %w", err)
+	}
+
+	var headBlockNum uint64
+	if getHeadBlockNum != nil {
+		headBlockNum, err = getHeadBlockNum()
+		if err != nil {
+			logger.Warn("cannot get head block when checking at parallel processor", zap.Error(err))
+		}
+	}
+
+	blocksBefore, effectiveBlocksBefore, blocksAfter, effectiveBlocksAfter := parallelProcessor.Stages().BlocksToProcess(headBlockNum)
+	traceId := tracing.GetTraceID(ctx).String()
+	p.respFunc(&pbsubstreamsrpc.Response{
+		Message: &pbsubstreamsrpc.Response_Session{
+			Session: &pbsubstreamsrpc.SessionInit{
+				TraceId:                                  traceId,
+				ResolvedStartBlock:                       reqDetails.ResolvedStartBlockNum,
+				LinearHandoffBlock:                       reqDetails.LinearHandoffBlockNum,
+				MaxParallelWorkers:                       reqDetails.MaxParallelJobs,
+				BlocksToProcessBeforeStartBlock:          blocksBefore,
+				BlocksToProcessAfterStartBlock:           blocksAfter,
+				EffectiveBlocksToProcessBeforeStartBlock: effectiveBlocksBefore,
+				EffectiveBlocksToProcessAfterStartBlock:  effectiveBlocksAfter,
+			},
+		},
+	})
+
+	if err := reqDetails.AssertProcessedBlocksLimit(effectiveBlocksBefore, effectiveBlocksAfter); err != nil {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, err)
 	}
 
 	stats := reqctx.ReqStats(ctx)

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/tools/test"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -35,9 +36,10 @@ type TUI struct {
 	outputMode        OutputMode
 	prettyPrintOutput bool
 
-	prog           *tea.Program
-	seenFirstData  bool
-	TotalReadBytes uint64
+	prog                    *tea.Program
+	seenFirstData           bool
+	TotalReadBytes          uint64
+	RequiredProcessedBlocks uint64
 
 	msgDescs       map[string]*desc.MessageDescriptor
 	decodeMsgTypes map[string]func(in []byte) string
@@ -230,7 +232,31 @@ func (ui *TUI) IncomingMessage(ctx context.Context, resp *pbsubstreamsrpc.Respon
 			ui.ensureTerminalLocked()
 			ui.prog.Send(m)
 		} else {
-			fmt.Printf("TraceID: %s\n", m.Session.TraceId)
+
+			execGraph, err := exec.NewOutputModuleGraph(ui.req.OutputModule, ui.req.ProductionMode, ui.req.Modules, bstream.GetProtocolFirstStreamableBlock)
+			if err != nil {
+				return fmt.Errorf("cannot handle module graph: %w", err)
+			}
+
+			fmt.Fprintf(os.Stderr, "TraceID: %s\n", m.Session.TraceId)
+			fmt.Fprintf(os.Stderr, "Server HEAD block: %d\n", m.Session.ChainHead)
+			stages := len(execGraph.StagedUsedModules())
+			if stages == 1 || !ui.req.ProductionMode {
+				fmt.Fprintln(os.Stderr, "This request will be processed in a single stage")
+			} else {
+				fmt.Fprintf(os.Stderr, "This request will be processed in %d stages\n", stages)
+			}
+
+			if m.Session.BlocksToProcessBeforeStartBlock != 0 {
+				stageCount := fmt.Sprintf("%d stage", stages-1)
+				if stages > 2 {
+					stageCount += "s"
+				}
+				fmt.Fprintf(os.Stderr, "Blocks to process to prepare the stores in %s: %d (%d already cached)\n", stageCount, m.Session.EffectiveBlocksToProcessBeforeStartBlock, m.Session.BlocksToProcessBeforeStartBlock-m.Session.EffectiveBlocksToProcessBeforeStartBlock)
+			}
+
+			fmt.Fprintf(os.Stderr, "Blocks to process in requested range: %d (%d already cached)\n", m.Session.EffectiveBlocksToProcessAfterStartBlock, m.Session.BlocksToProcessAfterStartBlock-m.Session.EffectiveBlocksToProcessAfterStartBlock)
+			ui.RequiredProcessedBlocks = m.Session.EffectiveBlocksToProcessBeforeStartBlock + m.Session.EffectiveBlocksToProcessAfterStartBlock
 		}
 
 	default:

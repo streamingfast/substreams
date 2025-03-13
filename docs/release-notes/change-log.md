@@ -11,13 +11,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Server
+
 * Added a mechanism for 'production-mode' requests where the tier1 will not schedule tier2 jobs over { max_parallel_subrequests } segments above the current block being streamed to the user.
   This will ensure that a user slowly reading blocks 1, 2, 3... will not trigger a flood of tier2 jobs for higher blocks, let's say 300_000_000, that might never get read.
 
-* Added a validation for module 'triggering' inputs: it will now fail with a clear error message when the only available inputs are stores used with mode 'get' (not 'deltas'),
-  instead of silenlty skipping the module on every block.
+* Added a validation on a module for the existence of 'triggering' inputs: the server will now fail with a clear error message
+  when the only available inputs are stores used with mode 'get' (not 'deltas'), instead of silenlty skipping the module on every block.
 
 * Fixed `runtime error: slice bounds out of range` error on heavy memory usage with wasmtime engin
+
+* Added information about the number of blocks that need to be processed for a given request in the `sf.substreams.rpc.v2.SessionInit` message
+
+* Added an optional field `limit_processed_blocks` to the `sf.substreams.rpc.v2.Request`. When set to a non-zero value, the server will reject a request that would process more blocks than the given value with the `FailedPrecondition` GRPC error code.
+
+### CLI
+
+* Added `--limit-processed-blocks` flag to `substreams run` and `substreams gui` to set the `limit_processed_blocks` field in the request
 
 ## v1.14.2
 

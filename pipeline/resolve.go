@@ -58,6 +58,7 @@ func BuildRequestDetails(
 		ProductionMode:                      request.ProductionMode,
 		StopBlockNum:                        request.StopBlockNum,
 		UniqueID:                            nextUniqueID(),
+		LimitProcessedBlocks:                request.LimitProcessedBlocks,
 	}
 
 	req.ResolvedStartBlockNum, req.ResolvedCursor, undoSignal, err = resolveStartBlockNum(ctx, request, resolveCursor, getHeadBlock)

@@ -1,12 +1,13 @@
 syntax = "proto3";
 
 package sf.substreams.rpc.v2;
-option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2;pbsubstreamsrpc";
 
 import "google/protobuf/any.proto";
-import "sf/substreams/v1/modules.proto";
-import "sf/substreams/v1/clock.proto";
 import "sf/firehose/v2/firehose.proto";
+import "sf/substreams/v1/clock.proto";
+import "sf/substreams/v1/modules.proto";
+
+option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2;pbsubstreamsrpc";
 
 service Stream {
   rpc Blocks(Request) returns (stream Response);
@@ -54,8 +55,11 @@ message Request {
   repeated string debug_initial_store_snapshot_for_modules = 10;
 
   bool noop_mode = 11;
-}
 
+  // If set, the engine will reject a request if the number of blocks to process (including preparing the stores) is above this limit.
+  // Useful as a safeguard for managing costs
+  uint64 limit_processed_blocks = 12;
+}
 
 message Response {
   oneof message {
@@ -71,7 +75,6 @@ message Response {
     InitialSnapshotComplete debug_snapshot_complete = 11;
   }
 }
-
 
 // BlockUndoSignal informs you that every bit of data
 // with a block number above 'last_valid_block' has been reverted
@@ -92,12 +95,12 @@ message BlockScopedData {
   repeated MapModuleOutput debug_map_outputs = 10;
   repeated StoreModuleOutput debug_store_outputs = 11;
 
-  // Signed attestation, enabling economic security as per GIP-0083. Signatures are 
+  // Signed attestation, enabling economic security as per GIP-0083. Signatures are
   // done using the key specified by SessionInit::attestation_public_key.
   string attestation = 12;
 }
 
-message SessionInit  {
+message SessionInit {
   string trace_id = 1;
   uint64 resolved_start_block = 2;
   uint64 linear_handoff_block = 3;
@@ -105,6 +108,23 @@ message SessionInit  {
 
   // Operator's attestation public_key or address, enabling economic security as per GIP-0083.
   string attestation_public_key = 5;
+
+  uint64 chain_head = 6;
+
+  // theoretical number of blocks that need to be processed __before any data is sent__, without consideration for current cached states
+  // Because of parallel work, 1000 blocks with 2 "store stages" will result in 2000 blocks to process
+  uint64 blocks_to_process_before_start_block = 7;
+
+  // same as `blocks_to_process_before_start_block`, but excluding the current cached states
+  uint64 effective_blocks_to_process_before_start_block = 8;
+
+  // theoretical number of blocks that will be processed inside the requested range, without consideration for current cached outputs
+  // if the range is open-ended, it is calculated up to the current chain head
+  // in production-mode, 1000 blocks with 3 "stages" will result in 3000 blocks to process
+  uint64 blocks_to_process_after_start_block = 9;
+
+  // same as `blocks_to_process_after_start_block`, but excluding the current cached outputs
+  uint64 effective_blocks_to_process_after_start_block = 10;
 }
 
 message InitialSnapshotComplete {
@@ -163,7 +183,6 @@ message ProcessedBytes {
   uint64 total_bytes_written = 2;
 }
 
-
 message Error {
   string module = 1;
   string reason = 2;
@@ -173,63 +192,62 @@ message Error {
   bool logs_truncated = 4;
 }
 
-
 message Job {
-    uint32 stage = 1;
-    uint64 start_block = 2;
-    uint64 stop_block = 3;
-    uint64 processed_blocks = 4;
-    uint64 duration_ms = 5;
+  uint32 stage = 1;
+  uint64 start_block = 2;
+  uint64 stop_block = 3;
+  uint64 processed_blocks = 4;
+  uint64 duration_ms = 5;
 }
 
 message Stage {
-    repeated string modules = 1;
-    repeated BlockRange completed_ranges = 2;
+  repeated string modules = 1;
+  repeated BlockRange completed_ranges = 2;
 }
 
 // ModuleStats gathers metrics and statistics from each module, running on tier1 or tier2
 // All the 'count' and 'time_ms' values may include duplicate for each stage going over that module
 message ModuleStats {
-    // name of the module
-    string name = 1;
+  // name of the module
+  string name = 1;
 
-    // total_processed_blocks is the sum of blocks sent to that module code
-    uint64 total_processed_block_count = 2;
-    // total_processing_time_ms is the sum of all time spent running that module code
-    uint64 total_processing_time_ms = 3;
+  // total_processed_blocks is the sum of blocks sent to that module code
+  uint64 total_processed_block_count = 2;
+  // total_processing_time_ms is the sum of all time spent running that module code
+  uint64 total_processing_time_ms = 3;
 
-    //// external_calls are chain-specific intrinsics, like "Ethereum RPC calls".
-    repeated ExternalCallMetric external_call_metrics = 4;
+  //// external_calls are chain-specific intrinsics, like "Ethereum RPC calls".
+  repeated ExternalCallMetric external_call_metrics = 4;
 
-    // total_store_operation_time_ms is the sum of all time spent running that module code waiting for a store operation (ex: read, write, delete...)
-    uint64 total_store_operation_time_ms = 5;
-    // total_store_read_count is the sum of all the store Read operations called from that module code
-    uint64 total_store_read_count = 6;
+  // total_store_operation_time_ms is the sum of all time spent running that module code waiting for a store operation (ex: read, write, delete...)
+  uint64 total_store_operation_time_ms = 5;
+  // total_store_read_count is the sum of all the store Read operations called from that module code
+  uint64 total_store_read_count = 6;
 
-    // total_store_write_count is the sum of all store Write operations called from that module code (store-only)
-    uint64 total_store_write_count = 10;
+  // total_store_write_count is the sum of all store Write operations called from that module code (store-only)
+  uint64 total_store_write_count = 10;
 
-    // total_store_deleteprefix_count is the sum of all store DeletePrefix operations called from that module code (store-only)
-    // note that DeletePrefix can be a costly operation on large stores
-    uint64 total_store_deleteprefix_count = 11;
+  // total_store_deleteprefix_count is the sum of all store DeletePrefix operations called from that module code (store-only)
+  // note that DeletePrefix can be a costly operation on large stores
+  uint64 total_store_deleteprefix_count = 11;
 
-    // store_size_bytes is the uncompressed size of the full KV store for that module, from the last 'merge' operation (store-only)
-    uint64 store_size_bytes = 12;
+  // store_size_bytes is the uncompressed size of the full KV store for that module, from the last 'merge' operation (store-only)
+  uint64 store_size_bytes = 12;
 
-    // total_store_merging_time_ms is the time spent merging partial stores into a full KV store for that module (store-only)
-    uint64 total_store_merging_time_ms = 13;
+  // total_store_merging_time_ms is the time spent merging partial stores into a full KV store for that module (store-only)
+  uint64 total_store_merging_time_ms = 13;
 
-    // store_currently_merging is true if there is a merging operation (partial store to full KV store) on the way.
-    bool store_currently_merging = 14;
+  // store_currently_merging is true if there is a merging operation (partial store to full KV store) on the way.
+  bool store_currently_merging = 14;
 
-    // highest_contiguous_block is the highest block in the highest merged full KV store of that module (store-only)
-    uint64 highest_contiguous_block = 15;
+  // highest_contiguous_block is the highest block in the highest merged full KV store of that module (store-only)
+  uint64 highest_contiguous_block = 15;
 }
 
 message ExternalCallMetric {
-    string name = 1;
-    uint64 count = 2;
-    uint64 time_ms = 3;
+  string name = 1;
+  uint64 count = 2;
+  uint64 time_ms = 3;
 }
 
 message StoreDelta {

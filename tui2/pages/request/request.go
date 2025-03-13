@@ -2,6 +2,7 @@ package request
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -75,6 +76,11 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "stop-block":
 			r.Config.StopBlock = msg.Value
+
+		case "limit-processed-blocks":
+			if value, err := strconv.ParseUint(msg.Value, 10, 64); err == nil {
+				r.Config.LimitProcessedBlocks = value
+			}
 		case "endpoint":
 			r.Config.Endpoint = msg.Value
 		case "params":
@@ -95,6 +101,12 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			comp.Input.Prompt("Enter the stop block number: ").
 				Description("Enter numbers only, with an optional - or + prefix.\n\nYou can specify relative block numbers with - (to head) or + (to start block) prefixes.\n")
 			comp.SetValue(r.Config.StopBlock)
+			cmds = append(cmds, common.SetModalComponentCmd(comp))
+		case "l":
+			comp := dataentry.New(r.Common, "limit-processed-blocks", validateNumberOrRelativeValue)
+			comp.Input.Prompt("Enter the number to limit processed blocks: ").
+				Description("Enter numbers only, with an optional - or + prefix.\n")
+			comp.SetValue(fmt.Sprintf("%d", r.Config.LimitProcessedBlocks))
 			cmds = append(cmds, common.SetModalComponentCmd(comp))
 		case "m":
 			comp := modsearch.New(r.Common, "request")
@@ -177,6 +189,7 @@ func (r *Request) renderRequestSummary() string {
 		{fmt.Sprintf("Module %s:", styles.HelpKey.Render("<m>")), r.Config.OutputModule},
 		{fmt.Sprintf("Start block %s:", styles.HelpKey.Render("<s>")), startBlock},
 		{fmt.Sprintf("Stop block %s:", styles.HelpKey.Render("<t>")), r.Config.StopBlock},
+		{fmt.Sprintf("Limit processed blocks %s:", styles.HelpKey.Render("<l>")), fmt.Sprintf("%d", r.Config.LimitProcessedBlocks)},
 	}
 	if len(r.Config.DebugModulesInitialSnapshot) > 0 {
 		rows = append(rows,

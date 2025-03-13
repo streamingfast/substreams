@@ -38,6 +38,12 @@ func WithFinalBlocksOnly() Option {
 	}
 }
 
+func WithHeadBlockGetter(getter func() (uint64, error)) Option {
+	return func(p *Pipeline) {
+		p.getHeadBlockNum = getter
+	}
+}
+
 func WithHighestStage(stage uint32) Option {
 	return func(p *Pipeline) {
 		s := int(stage)

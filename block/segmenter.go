@@ -51,6 +51,10 @@ func (s *Segmenter) LastIndex() int {
 	return int(lastSegment)
 }
 
+func (s *Segmenter) Interval() uint64 {
+	return s.interval
+}
+
 func (s *Segmenter) Range(idx int) *Range {
 	first := s.FirstIndex()
 	if idx < first {

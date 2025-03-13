@@ -582,9 +582,71 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 	return out, nil
 }
 
+func (s *Stages) BlocksToProcess(headBlockNum uint64) (beforeStartBlock, effectiveBeforeStartBlock, afterEndBlock, effectiveEndBlock uint64) {
+	details := reqctx.Details(s.ctx)
+	startSegment := s.globalSegmenter.IndexForStartBlock(details.ResolvedStartBlockNum)
+	var segmentsBefore int
+	var segmentsAfter int
+	var effectiveSegmentsBefore int
+	var effectiveSegmentsAfter int
+
+	for i := range s.stages {
+
+		cur := s.segmentOffset
+		for _, segment := range s.segmentStates {
+			cached := segment[i] != UnitPending && segment[i] != UnitScheduled
+
+			if cur < startSegment {
+				if s.stages[i].kind == KindStore {
+					segmentsBefore++
+					if !cached {
+						effectiveSegmentsBefore++
+					}
+				}
+			} else {
+				segmentsAfter++
+				if !cached {
+					effectiveSegmentsAfter++
+				}
+			}
+			cur++
+		}
+
+		for cur < startSegment {
+			if s.stages[i].kind == KindStore {
+				segmentsBefore++
+				effectiveSegmentsBefore++
+			}
+			cur++
+		}
+
+		for cur <= s.stages[i].segmenter.LastIndex() {
+			segmentsAfter++
+			effectiveSegmentsAfter++
+			cur++
+		}
+
+	}
+	stopBlock := details.StopBlockNum
+	if stopBlock == 0 {
+		stopBlock = headBlockNum
+	}
+
+	var extraBlocks uint64
+	rangeEndBlock := (s.globalSegmenter.Range(s.globalSegmenter.LastIndex()).ExclusiveEndBlock)
+	if stopBlock > rangeEndBlock {
+		extraBlocks = stopBlock - rangeEndBlock // blocks processed in linear mode...
+	}
+
+	return uint64(segmentsBefore) * s.globalSegmenter.Interval(),
+		uint64(effectiveSegmentsBefore) * s.globalSegmenter.Interval(),
+		uint64(segmentsAfter)*s.globalSegmenter.Interval() + extraBlocks,
+		uint64(effectiveSegmentsAfter)*s.globalSegmenter.Interval() + extraBlocks
+}
+
 func (s *Stages) StatesString() string {
 	out := strings.Builder{}
-	for i := 0; i < len(s.stages); i++ {
+	for i := range s.stages {
 		if s.stages[i].kind == KindMap {
 			out.WriteString("M:")
 		} else {
@@ -604,6 +666,16 @@ func (s *Stages) StatesString() string {
 		out.WriteString("\n")
 	}
 	return out.String()
+}
+
+var stringRepr = map[UnitState]string{
+	UnitPending:        ".",
+	UnitPartialPresent: "P",
+	UnitScheduled:      "S",
+	UnitMerging:        "M",
+	UnitCompleted:      "C",
+	UnitNoOp:           "N",
+	UnitShadowed:       "Z",
 }
 
 func (s *Stages) StageModules(stage int) (out []string) {

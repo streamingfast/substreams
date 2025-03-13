@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli/sflags"
@@ -14,7 +15,9 @@ import (
 	"github.com/streamingfast/substreams/tools/test"
 	"github.com/streamingfast/substreams/tui"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 func init() {
@@ -25,6 +28,7 @@ func init() {
 	runCmd.Flags().StringP("start-block", "s", "", "Start block to stream from. If empty, will be replaced by initialBlock of the first module you are streaming. If negative, will be resolved by the server relative to the chain head")
 	runCmd.Flags().StringP("cursor", "c", "", "Cursor to stream from. Leave blank for no cursor")
 	runCmd.Flags().StringP("stop-block", "t", "0", "Stop block to end stream at, exclusively. If the start-block is positive, a '+' prefix can indicate 'relative to start-block'")
+	runCmd.Flags().Uint64("limit-processed-blocks", 10000, "Limit the number of blocks to be processed by the server, including preparing the stores, as a safeguard to prevent unexpected expensive reprocessing (0 disables the limit)")
 	runCmd.Flags().Bool("final-blocks-only", false, "Only process blocks that have pass finality, to prevent any reorg and undo signal by staying further away from the chain HEAD")
 	runCmd.Flags().Bool("insecure", false, "Skip certificate validation on GRPC connection")
 	runCmd.Flags().Bool("plaintext", false, "Establish GRPC connection in plaintext")
@@ -187,6 +191,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		OutputModule:                        outputModule,
 		ProductionMode:                      productionMode,
 		DebugInitialStoreSnapshotForModules: debugModulesInitialSnapshot,
+		LimitProcessedBlocks:                sflags.MustGetUint64(cmd, "limit-processed-blocks"),
 		NoopMode:                            noopMode,
 	}
 
@@ -247,13 +252,18 @@ func runRun(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			if err == io.EOF {
 				ui.Cancel()
-				fmt.Println("Total Read Bytes (server-side consumption):", ui.TotalReadBytes)
-				fmt.Println("all done")
+				fmt.Fprintln(os.Stderr, "Total Read Bytes (server-side consumption):", ui.TotalReadBytes)
+				fmt.Fprintln(os.Stderr, "all done")
 				if testRunner != nil {
 					testRunner.LogResults()
 				}
 
 				return nil
+			}
+			if e, ok := status.FromError(err); ok {
+				if e.Code() == codes.FailedPrecondition {
+					return fmt.Errorf("%w\nHint: try setting the `--limit-processed-block` flag above %d, or 0 to disable the limit", err, ui.RequiredProcessedBlocks)
+				}
 			}
 
 			// Special handling if interrupted the context ourselves, no error

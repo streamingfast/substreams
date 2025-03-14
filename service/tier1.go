@@ -837,6 +837,8 @@ func toConnectError(ctx context.Context, err error) error {
 			return connect.NewError(connect.CodeUnavailable, grpcError.Err())
 		case codes.InvalidArgument:
 			return connect.NewError(connect.CodeInvalidArgument, grpcError.Err())
+		case codes.DeadlineExceeded:
+			return connect.NewError(connect.CodeDeadlineExceeded, err)
 		case codes.ResourceExhausted:
 			return connect.NewError(connect.CodeResourceExhausted, grpcError.Err())
 		case codes.Unknown:

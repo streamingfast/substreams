@@ -7,6 +7,7 @@ import (
 	"io"
 	"runtime/debug"
 
+	"connectrpc.com/connect"
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dmetering"
@@ -57,9 +58,14 @@ func (p *Pipeline) ProcessBlock(block *pbbstream.Block, obj interface{}) (err er
 					return
 				}
 			}
+
 			truncatedBlock := block.AsRef().String()
-			err = fmt.Errorf("panic at block %d: %s [%s]", block.Number, r, truncatedBlock)
-			logger.Warn("panic while process block", zap.Uint64("block_num", block.Number), zap.Error(err))
+			if p.executionTimedOut {
+				err = connect.NewError(connect.CodeDeadlineExceeded, fmt.Errorf("execution timed out at block %d: [%s] %s", block.Number, truncatedBlock, r))
+			} else {
+				err = fmt.Errorf("panic at block %d: %s [%s]", block.Number, r, truncatedBlock)
+			}
+			logger.Warn("recovered panic", zap.Uint64("block_num", block.Number), zap.Error(err))
 			logger.Debug(string(debug.Stack())) // there are known panic cases, we don't want them in error logs
 		}
 	}()
@@ -319,7 +325,12 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 
 	// the ctx is cached in the built moduleExecutors so we only activate timeout here
 	ctx, cancel := context.WithTimeout(ctx, p.executionTimeout)
-	defer cancel()
+	defer func() {
+		if ctx.Err() == context.DeadlineExceeded {
+			p.executionTimedOut = true
+		}
+		cancel()
+	}()
 
 	maxParallelExecutor := reqctx.MaxStageLayerParallelExecutor(ctx)
 	logging.Logger(ctx, p.stores.logger).Debug("executing stage's layers", zap.Int("layer_count", len(p.StagedModuleExecutors)), zap.Uint64("max_parallel_executor", maxParallelExecutor))

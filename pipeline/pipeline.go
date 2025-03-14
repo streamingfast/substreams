@@ -38,11 +38,12 @@ type processingModule struct {
 }
 
 type Pipeline struct {
-	ctx              context.Context
-	isTier1          bool
-	stateBundleSize  uint64
-	workerFactory    work.WorkerPoolFactory
-	executionTimeout time.Duration
+	ctx               context.Context
+	isTier1           bool
+	stateBundleSize   uint64
+	workerFactory     work.WorkerPoolFactory
+	executionTimeout  time.Duration
+	executionTimedOut bool
 
 	pendingUndoMessage *pbsubstreamsrpc.Response
 	preBlockHooks      []substreams.BlockHook

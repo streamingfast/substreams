@@ -148,15 +148,18 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 			switch err.(type) {
 			case *RetryableErr:
 				metrics.Tier1WorkerRetryCounter.Inc()
-				if err != nil && strings.Contains(err.Error(), "service currently overloaded") {
+				if strings.Contains(err.Error(), "service currently overloaded") {
 					metrics.Tier1WorkerRejectedOverloadedCounter.Inc()
-				} else if strings.Contains(err.Error(), "DeadlineExceeded") {
+				} else if grpcError := dgrpc.AsGRPCError(err); grpcError != nil && grpcError.Code() == codes.DeadlineExceeded {
+					executionTimeouts++
+				} else if strings.Contains(err.Error(), "DeadlineExceeded") { // catch old mechanism
 					executionTimeouts++
 				}
 				previousError = err
 				retryIdx++
 				if executionTimeouts >= maxExecutionTimeouts {
-					return derr.NewFatalError(fmt.Errorf("segment starting at block %d timed out %d times, giving up. Last error: %w", request.SegmentNumber*request.SegmentSize, executionTimeouts, err))
+					segmentStart := request.SegmentNumber * request.SegmentSize
+					return derr.NewFatalError(fmt.Errorf("segment [%d-%d] timed out %d times, giving up. Last error from worker: %w", segmentStart, segmentStart+request.SegmentSize, executionTimeouts, err))
 				}
 				return err
 			default:
@@ -318,6 +321,12 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 			}
 			if grpcErr := dgrpc.AsGRPCError(err); grpcErr.Code() == codes.InvalidArgument {
 				return &Result{Error: err}
+			}
+
+			if grpcErr := dgrpc.AsGRPCError(err); grpcErr.Code() == codes.DeadlineExceeded {
+				return &Result{
+					Error: NewRetryableErr(err),
+				}
 			}
 			return &Result{
 				Error: NewRetryableErr(fmt.Errorf("receiving stream resp: %w", err)),

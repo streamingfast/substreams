@@ -612,6 +612,8 @@ func toGRPCError(ctx context.Context, err error) error {
 			return status.Error(codes.InvalidArgument, err.Error())
 		case connect.CodeUnknown:
 			return status.Error(codes.Unknown, err.Error())
+		case connect.CodeDeadlineExceeded:
+			return status.Error(codes.DeadlineExceeded, err.Error())
 		}
 	}
 

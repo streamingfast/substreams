@@ -142,7 +142,12 @@ func (ui *TUI) configureOutputMode(outputMode string) error {
 		var err error
 		ui.outputMode, err = ParseOutputMode(outputMode)
 		if err != nil {
-			return fmt.Errorf("parse output mode: %w", err)
+			// Also accepts `ui` as an alias for `TUI`
+			if outputMode == "UI" || outputMode == "ui" {
+				ui.outputMode = OutputModeTUI
+			} else {
+				return fmt.Errorf("parse output mode: %w", err)
+			}
 		}
 	}
 

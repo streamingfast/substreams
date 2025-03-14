@@ -65,7 +65,7 @@ func NewGlobalWorkerPool(ctx context.Context, userID string, apiKeyID string, tr
 
 	go func() {
 		time.Sleep(time.Second * 4)
-		logger.Info("worker pool ramping up completed")
+		logger.Debug("worker pool ramping up completed")
 		wp.rampingUp = false
 	}()
 

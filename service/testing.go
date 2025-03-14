@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/wasm"
 
 	"github.com/streamingfast/substreams/reqctx"
@@ -20,6 +21,7 @@ import (
 
 func TestNewService(runtimeConfig config.RuntimeConfig, linearHandoffBlockNum uint64, streamFactoryFunc StreamFactoryFunc) *Tier1Service {
 	return &Tier1Service{
+		Shutter:           shutter.New(),
 		blockType:         "sf.substreams.v1.test.Block",
 		streamFactoryFunc: streamFactoryFunc,
 		runtimeConfig:     runtimeConfig,

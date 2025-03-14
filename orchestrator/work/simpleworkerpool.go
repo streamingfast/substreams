@@ -35,7 +35,7 @@ func NewSimpleWorkerPool(ctx context.Context, workerCount int, clientFactory cli
 
 	go func() {
 		time.Sleep(time.Second * 4)
-		logger.Info("worker pool ramping up completed")
+		logger.Debug("worker pool ramping up completed")
 		wp.rampingUp = false
 
 	}()

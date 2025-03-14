@@ -82,7 +82,6 @@ func (p *Pipeline) ProcessBlock(block *pbbstream.Block, obj interface{}) (err er
 
 	reorgJunctionBlock := obj.(bstream.Stepable).ReorgJunctionBlock()
 
-	reqctx.ReqStats(ctx).RecordBlock(block.AsRef())
 	p.gate.processBlock(block.Number, step)
 	execOutput, err := p.execOutputCache.NewBuffer(block, clock, cursor)
 	if err != nil {
@@ -92,6 +91,8 @@ func (p *Pipeline) ProcessBlock(block *pbbstream.Block, obj interface{}) (err er
 	if err = p.processBlock(ctx, execOutput, clock, cursor, step, reorgJunctionBlock); err != nil {
 		return err // watch out, io.EOF needs to go through undecorated
 	}
+
+	reqctx.ReqStats(ctx).RecordBlock(block.AsRef())
 	return
 }
 

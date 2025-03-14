@@ -1,11 +1,13 @@
 package metrics
 
 import (
+	"context"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dmetrics"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -32,8 +34,10 @@ type Stats struct {
 	completedJobsStats map[string]*pbssinternal.ModuleStats
 
 	localProcessedBlockCount  uint64
+	remoteProcessedBlockCount uint64
 	completedJobsBytesRead    uint64
 	completedJobsBytesWritten uint64
+	completedJobs             uint64
 
 	// counter is used to get the next jobIdx
 	counter uint64
@@ -297,6 +301,9 @@ func (s *Stats) RecordEndSubrequest(jobIdx uint64) {
 	s.completedJobsBytesRead += job.bytesRead
 	s.completedJobsBytesWritten += job.bytesWritten
 
+	s.completedJobs++
+	s.remoteProcessedBlockCount += job.ProcessedBlocks
+
 	delete(s.runningJobs, jobIdx)
 }
 
@@ -552,6 +559,10 @@ func (s *Stats) stage(module string) (uint32, *pbsubstreamsrpc.Stage) {
 func (s *Stats) RemoteBytesConsumption() (read uint64, written uint64) {
 	s.Lock()
 	defer s.Unlock()
+	return s.remoteBytesConsumption()
+}
+
+func (s *Stats) remoteBytesConsumption() (read uint64, written uint64) {
 	read = s.completedJobsBytesRead
 	written = s.completedJobsBytesWritten
 	for _, j := range s.runningJobs {
@@ -598,16 +609,19 @@ func (s *Stats) AggregatedModulesStats() []*pbsubstreamsrpc.ModuleStats {
 	return out
 }
 
-func (s *Stats) LogAndClose() {
+func (s *Stats) LogAndClose(ctx context.Context) {
 	s.Lock()
 	defer s.Unlock()
 	s.blockRate.SyncNow()
 	s.blockRate.Stop()
-	s.logger.Info("substreams request stats", s.getZapFields()...)
+	meter := dmetering.GetBytesMeter(ctx)
+	zapFields := s.getZapFields(meter)
+	s.logger.Info("substreams request stats", zapFields...)
+
 }
 
 // getZapFields should be called while Stats is locked
-func (s *Stats) getZapFields() []zap.Field {
+func (s *Stats) getZapFields(meter dmetering.Meter) []zap.Field {
 	// Logging fields order is important as it affects the final rendering, we carefully ordered
 	// them so the development logs looks nicer.
 	tier := "tier1"
@@ -632,7 +646,14 @@ func (s *Stats) getZapFields() []zap.Field {
 		zap.Duration("module_exec_duration", s.moduleExecDuration()),
 		zap.Duration("module_wasm_ext_duration", s.moduleWasmExtDuration()),
 		zap.Duration("time_to_first_data", s.timeToFirstData),
+		zap.Uint64("remote_jobs_completed", s.completedJobs),
+		zap.Uint64("remote_blocks_processed", s.remoteProcessedBlockCount),
 		zap.String("error", errorText),
+	}
+
+	if meter != nil {
+		remoteBytesRead, _ := s.remoteBytesConsumption()
+		out = append(out, zap.Uint64("total_uncompressed_read_bytes", remoteBytesRead+uint64(meter.GetCount("total_read_bytes"))))
 	}
 
 	return out

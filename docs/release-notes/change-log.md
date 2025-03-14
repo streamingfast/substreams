@@ -14,10 +14,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Server
 
 * Properly reject requests with a stop-block below the "resolved" StartBlock (caused by module initialBlocks or a chain's firstStreamableBlock)
+* Added the `resolved-start-block` to the `substreams request stats` log
 
 ### CLI
 
-* fix the 'Hint' when --limit-processed-block is too low, sometimes suggesting "0 or 0"
+* fix the 'Hint' when --limit-processed-blocks is too low, sometimes suggesting "0 or 0" and some typos
 
 ## v1.14.3
 
@@ -51,7 +52,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * Improved connection draining on shutdown: Now waits for the end of the 'shutdown-delay' before draining and refusing new connections, then waits for 'quicksaves' and successful signaling of clients, up to a max of 30 sec.
 
-* In 'substreams request stats' log, add fields: `remote_jobs_completed`, `remote_blocks_processed` and `total_uncompressed_read_bytes`
+* In `substreams request stats` log, add fields: `remote_jobs_completed`, `remote_blocks_processed` and `total_uncompressed_read_bytes`
 
 ## v1.14.2
 

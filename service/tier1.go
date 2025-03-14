@@ -412,7 +412,7 @@ func (s *Tier1Service) Blocks(
 
 	var reqStats *metrics.Stats
 	ctx, reqStats = setupRequestStats(ctx, request.OutputModule, outputModuleHash, request.ProductionMode, false)
-	defer reqStats.LogAndClose(ctx)
+	defer reqStats.LogAndClose(ctx, reqctx.Details(ctx).ResolvedStartBlockNum)
 
 	metrics.SubstreamsCounter.Inc()
 	metrics.ActiveRequests.Inc()

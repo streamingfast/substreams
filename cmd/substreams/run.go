@@ -262,7 +262,10 @@ func runRun(cmd *cobra.Command, args []string) error {
 			}
 			if e, ok := status.FromError(err); ok {
 				if e.Code() == codes.FailedPrecondition {
-					return fmt.Errorf("%w\nHint: try setting the `--limit-processed-block` flag above %d, or 0 to disable the limit", err, ui.RequiredProcessedBlocks)
+					if req.StopBlockNum == 0 {
+						return fmt.Errorf("%w\nHint: try setting a stop-block, ex: `substreams -s %d -t +1000 ...` or set the `--limit-processed-blocks` flag above %d, or 0 to disable the limit. ", err, ui.ResolvedStartBlock, ui.RequiredProcessedBlocks)
+					}
+					return fmt.Errorf("%w\nHint: try lowering your stop-block or setting the `--limit-processed-blocks` flag above %d, or 0 to disable the limit", err, ui.RequiredProcessedBlocks)
 				}
 			}
 

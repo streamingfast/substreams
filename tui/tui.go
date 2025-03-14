@@ -51,7 +51,7 @@ func (o *OutputStreamPattern) Matches(input string) bool {
 type TUI struct {
 	shutter *shutter.Shutter
 
-	req               *pbsubstreamsrpc.Request
+	Req               *pbsubstreamsrpc.Request
 	pkg               *pbsubstreams.Package
 	outputStreamNames []OutputStreamPattern
 
@@ -64,6 +64,7 @@ type TUI struct {
 	seenFirstData           bool
 	TotalReadBytes          uint64
 	RequiredProcessedBlocks uint64
+	ResolvedStartBlock      uint64
 
 	msgDescs       map[string]*desc.MessageDescriptor
 	decodeMsgTypes map[string]func(in []byte) string
@@ -73,7 +74,7 @@ type TUI struct {
 func New(req *pbsubstreamsrpc.Request, pkg *pbsubstreams.Package, outputStreamNames []string) *TUI {
 	ui := &TUI{
 		shutter:           shutter.New(),
-		req:               req,
+		Req:               req,
 		pkg:               pkg,
 		outputStreamNames: slices.Map(outputStreamNames, func(s string) OutputStreamPattern { return NewOutputStreamPattern(s) }),
 		decodeMsgTypes:    map[string]func(in []byte) string{},
@@ -260,13 +261,14 @@ func (ui *TUI) IncomingMessage(ctx context.Context, resp *pbsubstreamsrpc.Respon
 		if m.Session.BlocksToProcessAfterStartBlock != 0 {
 			ui.RequiredProcessedBlocks = m.Session.EffectiveBlocksToProcessBeforeStartBlock + m.Session.EffectiveBlocksToProcessAfterStartBlock
 		}
+		ui.ResolvedStartBlock = m.Session.ResolvedStartBlock
 
 		if ui.outputMode == OutputModeTUI {
 			ui.ensureTerminalLocked()
 			ui.prog.Send(m)
 		} else {
 
-			execGraph, err := exec.NewOutputModuleGraph(ui.req.OutputModule, ui.req.ProductionMode, ui.req.Modules, bstream.GetProtocolFirstStreamableBlock)
+			execGraph, err := exec.NewOutputModuleGraph(ui.Req.OutputModule, ui.Req.ProductionMode, ui.Req.Modules, bstream.GetProtocolFirstStreamableBlock)
 			if err != nil {
 				return fmt.Errorf("cannot handle module graph: %w", err)
 			}
@@ -276,7 +278,7 @@ func (ui *TUI) IncomingMessage(ctx context.Context, resp *pbsubstreamsrpc.Respon
 				fmt.Fprintf(os.Stderr, "Server HEAD block: %d\n", m.Session.ChainHead)
 			}
 			stages := len(execGraph.StagedUsedModules())
-			if stages == 1 || !ui.req.ProductionMode {
+			if stages == 1 || !ui.Req.ProductionMode {
 				fmt.Fprintln(os.Stderr, "This request will be processed in a single stage")
 			} else {
 				fmt.Fprintf(os.Stderr, "This request will be processed in %d stages\n", stages)

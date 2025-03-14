@@ -609,13 +609,15 @@ func (s *Stats) AggregatedModulesStats() []*pbsubstreamsrpc.ModuleStats {
 	return out
 }
 
-func (s *Stats) LogAndClose(ctx context.Context) {
+func (s *Stats) LogAndClose(ctx context.Context, resolvedStartBlockNum uint64) {
 	s.Lock()
 	defer s.Unlock()
 	s.blockRate.SyncNow()
 	s.blockRate.Stop()
 	meter := dmetering.GetBytesMeter(ctx)
 	zapFields := s.getZapFields(meter)
+	zapFields = append(zapFields, zap.Uint64("resolved_start_block", resolvedStartBlockNum))
+
 	s.logger.Info("substreams request stats", zapFields...)
 
 }

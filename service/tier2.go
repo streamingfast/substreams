@@ -235,7 +235,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 
 	var reqStats *metrics.Stats
 	ctx, reqStats = setupRequestStats(ctx, request.OutputModule, outputModuleHash, true, true)
-	defer reqStats.LogAndClose(ctx)
+	defer reqStats.LogAndClose(ctx, request.StartBlock())
 
 	ctx = reqctx.WithOutputModuleHash(ctx, outputModuleHash)
 

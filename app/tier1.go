@@ -24,8 +24,8 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service"
 	"github.com/streamingfast/substreams/wasm"
+	_ "github.com/streamingfast/substreams/wasm/wasmtime"
 	"github.com/streamingfast/substreams/wasm/wazero"
-	_ 	"github.com/streamingfast/substreams/wasm/wasmtime"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
 )
@@ -238,7 +238,6 @@ func (a *Tier1App) Run() error {
 		a.config.ActiveRequestsHardLimit,
 		a.config.SharedCacheSize,
 		a.modules.GlobalRequestPool,
-		a.modules.CheckPendingShutDown,
 		opts...,
 	)
 	if err != nil {
@@ -249,7 +248,6 @@ func (a *Tier1App) Run() error {
 		metrics.AppReadinessTier1.SetNotReady()
 
 		svc.Shutdown(err)
-		time.Sleep(2 * time.Second) // enough time to send termination grpc responses
 	})
 
 	go func() {

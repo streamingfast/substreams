@@ -35,6 +35,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * Improved error messages when a module execution is timing out on a block (ex: due to a slow external call) and now return a `DeadlineExceeded` Connect/GRPC error code instead of a Internal. Removed 'panic' from wording.
 
+* Improved connection draining on shutdown: Now waits for the end of the 'shutdown-delay' before draining and refusing new connections, then waits for 'quicksaves' and successful signaling of clients, up to a max of 30 sec.
+
 ### CLI
 
 * Added `--limit-processed-blocks` flag to `substreams run` and `substreams gui` to set the `limit_processed_blocks` field in the request

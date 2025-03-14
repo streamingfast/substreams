@@ -232,9 +232,13 @@ func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
 }
 
 func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput) (err error) {
-	if p.isTier1 && p.checkPendingShutdown() && p.stores.StoreMap != nil && p.sentBlocks > minBlocksProcessedToSave {
-		p.stores.logger.Info("shutting down, quick saving stores")
-		p.stores.StoreMap.QuickSave(ctx, p.lastFinalClock.Id)
+	if p.isTier1 && p.checkPendingShutdown() {
+		if p.stores.StoreMap != nil && p.sentBlocks > minBlocksProcessedToSave {
+			p.stores.logger.Info("shutting down, quick saving stores")
+			p.stores.StoreMap.QuickSave(ctx, p.lastFinalClock.Id)
+		} else {
+			p.stores.logger.Info("shutting down")
+		}
 		return ErrShuttingDown
 	}
 

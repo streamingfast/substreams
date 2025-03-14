@@ -57,6 +57,7 @@ var errShuttingDown = errors.New("endpoint is shutting down, please reconnect")
 type Tier1Service struct {
 	*shutter.Shutter
 	ssconnect.UnimplementedStreamHandler
+	activeRequests sync.WaitGroup
 
 	blockType             string
 	wasmExtensions        map[string]map[string]wasm.WASMExtension
@@ -81,7 +82,6 @@ type Tier1Service struct {
 	activeRequestsHardLimit int
 	tier2RequestParameters  reqctx.Tier2RequestParameters
 	globalRequestPool       *GlobalRequestPool
-	checkPendingShutdown    func() bool
 }
 
 func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
@@ -147,7 +147,6 @@ func NewTier1(
 	activeRequestsHardLimit int,
 	sharedCacheSize uint64,
 	globalRequestPool *GlobalRequestPool,
-	checkPendingShutdown func() bool,
 	opts ...Option,
 ) (*Tier1Service, error) {
 
@@ -197,8 +196,10 @@ func NewTier1(
 		activeRequestsSoftLimit: activeRequestsSoftLimit,
 		activeRequestsHardLimit: activeRequestsHardLimit,
 		globalRequestPool:       globalRequestPool,
-		checkPendingShutdown:    checkPendingShutdown,
 	}
+	s.OnTerminating(func(_ error) {
+		s.activeRequests.Wait()
+	})
 
 	go func() {
 		if sharedCacheSize == 0 {
@@ -243,16 +244,18 @@ func (s *Tier1Service) Blocks(
 	req *connect.Request[pbsubstreamsrpc.Request],
 	stream *connect.ServerStream[pbsubstreamsrpc.Response],
 ) (serverErr error) {
+
+	if s.IsTerminating() {
+		serverErr = connect.NewError(connect.CodeUnavailable, errShuttingDown)
+		return
+	}
+	s.activeRequests.Add(1)
 	defer func() {
 		if reason, countAsRejected := metrics.IsRejectedRequestError(serverErr); countAsRejected {
 			metrics.Tier1RejectedRequestCounter.Inc(reason)
 		}
+		s.activeRequests.Done()
 	}()
-	if s.checkPendingShutdown() {
-		time.Sleep(1 * time.Second) // prevent burst reconnections to this instance since we're shutting down
-		serverErr = connect.NewError(connect.CodeUnavailable, errShuttingDown)
-		return
-	}
 
 	// We keep `err` here as the unaltered error from `blocks` call, this is used in the EndSpan to record the full error
 	// and not only the `grpcError` one which is a subset view of the full `err`.
@@ -429,6 +432,7 @@ func (s *Tier1Service) Blocks(
 		case <-ctx.Done():
 			return
 		case <-s.Terminating():
+			<-time.After(30 * time.Second) // max delay to wait for stuck connections
 			cancelRunning(errShuttingDown)
 		}
 	}()
@@ -625,7 +629,9 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		s.runtimeConfig.WorkerPoolFactory,
 		respFunc,
 		s.blockExecutionTimeout,
-		s.checkPendingShutdown,
+		func() bool {
+			return s.IsTerminating() // pipeline starts draining when the service is actually terminating, (after the global shutdown-signal-delay)
+		},
 		opts...,
 	)
 

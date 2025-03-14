@@ -39,9 +39,6 @@ func (s *Tier1Service) TestBlocks(ctx context.Context, isSubRequest bool, reques
 	if err != nil {
 		return stream.NewErrInvalidArg(err.Error())
 	}
-	s.checkPendingShutdown = func() bool {
-		return false
-	}
 
 	return s.blocks(ctx, request, execGraph, respFunc)
 }

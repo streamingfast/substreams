@@ -9,7 +9,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v1.14.3
 
 ### CLI
 
@@ -18,6 +18,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * The `substreams run` flag `--debug-modules-output` now accepts regular expressions like `substreams run --debug-modules-output=".*"`.
 
 * Fixed `--skip-package-validation` to also skip sub packages being imported.
+
+* Added `--limit-processed-blocks` flag to `substreams run` and `substreams gui` to set the `limit_processed_blocks` field in the request
+
+* The information messages in 'substreams run' now print to STDERR instead of STDOUT.
 
 ### Server
 
@@ -38,11 +42,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Improved connection draining on shutdown: Now waits for the end of the 'shutdown-delay' before draining and refusing new connections, then waits for 'quicksaves' and successful signaling of clients, up to a max of 30 sec.
 
 * In 'substreams request stats' log, add fields: `remote_jobs_completed`, `remote_blocks_processed` and `total_uncompressed_read_bytes`
-
-### CLI
-
-* Added `--limit-processed-blocks` flag to `substreams run` and `substreams gui` to set the `limit_processed_blocks` field in the request
-* The information messages in 'substreams run' now print to STDERR instead of STDOUT.
 
 ## v1.14.2
 

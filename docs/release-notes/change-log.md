@@ -9,6 +9,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.14.4
+
+### Server
+
+* Properly reject requests with a stop-block below the "resolved" StartBlock (caused by module initialBlocks or a chain's firstStreamableBlock)
+
+### CLI
+
+* fix the 'Hint' when --limit-processed-block is too low, sometimes suggesting "0 or 0"
+
 ## v1.14.3
 
 ### CLI

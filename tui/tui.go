@@ -257,6 +257,10 @@ func (ui *TUI) IncomingMessage(ctx context.Context, resp *pbsubstreamsrpc.Respon
 		}
 
 	case *pbsubstreamsrpc.Response_Session:
+		if m.Session.BlocksToProcessAfterStartBlock != 0 {
+			ui.RequiredProcessedBlocks = m.Session.EffectiveBlocksToProcessBeforeStartBlock + m.Session.EffectiveBlocksToProcessAfterStartBlock
+		}
+
 		if ui.outputMode == OutputModeTUI {
 			ui.ensureTerminalLocked()
 			ui.prog.Send(m)
@@ -288,7 +292,6 @@ func (ui *TUI) IncomingMessage(ctx context.Context, resp *pbsubstreamsrpc.Respon
 
 			if m.Session.BlocksToProcessAfterStartBlock != 0 {
 				fmt.Fprintf(os.Stderr, "Blocks to process in requested range: %d (%d already cached)\n", m.Session.EffectiveBlocksToProcessAfterStartBlock, m.Session.BlocksToProcessAfterStartBlock-m.Session.EffectiveBlocksToProcessAfterStartBlock)
-				ui.RequiredProcessedBlocks = m.Session.EffectiveBlocksToProcessBeforeStartBlock + m.Session.EffectiveBlocksToProcessAfterStartBlock
 			}
 		}
 

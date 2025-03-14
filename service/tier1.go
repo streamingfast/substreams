@@ -521,8 +521,14 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		return fmt.Errorf("build request details: %w", err)
 	}
 
-	if requestDetails.ResolvedStartBlockNum == request.StopBlockNum && request.StopBlockNum != 0 {
-		return bsstream.NewErrInvalidArg("start block and stop block are the same")
+	if request.StopBlockNum != 0 {
+		if requestDetails.ResolvedStartBlockNum == request.StopBlockNum {
+			return bsstream.NewErrInvalidArg("start block and stop block are the same")
+		}
+
+		if requestDetails.ResolvedStartBlockNum > request.StopBlockNum {
+			return bsstream.NewErrInvalidArg(fmt.Sprintf("resolved start block %d is below stop block %d", requestDetails.ResolvedStartBlockNum, request.StopBlockNum))
+		}
 	}
 
 	requestDetails.MaxParallelJobs = s.runtimeConfig.DefaultParallelSubrequests

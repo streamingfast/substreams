@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -121,6 +123,23 @@ func NewRequest(ctx context.Context, req *reqctx.RequestDetails, stageIndex int,
 	}
 }
 
+var workerMaxRetries = 10
+var workerMaxTimeoutRetries = 2
+
+func init() {
+	if val := os.Getenv("SUBSTREAMS_WORKER_MAX_RETRIES"); val != "" {
+		if parsed, err := strconv.Atoi(val); err == nil {
+			workerMaxRetries = parsed
+		}
+	}
+
+	if val := os.Getenv("SUBSTREAMS_WORKER_MAX_TIMEOUT_RETRIES"); val != "" {
+		if parsed, err := strconv.Atoi(val); err == nil {
+			workerMaxTimeoutRetries = parsed
+		}
+	}
+}
+
 func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream) loop.Cmd {
 	request := NewRequest(ctx, reqctx.Details(ctx), unit.Stage, startBlock)
 	logger := reqctx.Logger(ctx)
@@ -129,8 +148,8 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 		var res *Result
 		retryIdx := 0
 		startTime := time.Now()
-		maxRetries := 720         //TODO: make this configurable
-		maxExecutionTimeouts := 3 //TODO: make this configurable
+		maxRetries := workerMaxRetries
+		maxExecutionTimeouts := workerMaxTimeoutRetries
 		executionTimeouts := 0
 		var previousError error
 		err := derr.RetryContext(ctx, uint64(maxRetries), func(ctx context.Context) error {

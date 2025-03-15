@@ -34,6 +34,25 @@ func (p *Pipeline) ProcessFromExecOutput(
 	clock *pbsubstreams.Clock,
 	cursor *bstream.Cursor,
 ) (err error) {
+
+	defer func() {
+		logger := reqctx.Logger(ctx)
+		if r := recover(); r != nil {
+			if err, ok := r.(error); ok {
+				if errors.Is(err, context.Canceled) {
+					return
+				}
+			}
+
+			if p.executionTimedOut {
+				err = connect.NewError(connect.CodeDeadlineExceeded, fmt.Errorf("execution timed out at block %d: [%s] %s", clock.Number, clock.Id, r))
+			} else {
+				err = fmt.Errorf("panic at block %d: %s [%s]", clock.Number, r, clock.Id)
+			}
+			logger.Warn("recovered panic", zap.Uint64("block_num", clock.Number), zap.Error(err))
+			logger.Debug(string(debug.Stack())) // there are known panic cases, we don't want them in error logs
+		}
+	}()
 	p.gate.processBlock(clock.Number, bstream.StepNewIrreversible)
 	execOutput, err := p.execOutputCache.NewBuffer(nil, clock, cursor)
 	if err != nil {
@@ -59,11 +78,10 @@ func (p *Pipeline) ProcessBlock(block *pbbstream.Block, obj interface{}) (err er
 				}
 			}
 
-			truncatedBlock := block.AsRef().String()
 			if p.executionTimedOut {
-				err = connect.NewError(connect.CodeDeadlineExceeded, fmt.Errorf("execution timed out at block %d: [%s] %s", block.Number, truncatedBlock, r))
+				err = connect.NewError(connect.CodeDeadlineExceeded, fmt.Errorf("execution timed out at block %d: [%s] %s", block.Number, block.Id, r))
 			} else {
-				err = fmt.Errorf("panic at block %d: %s [%s]", block.Number, r, truncatedBlock)
+				err = fmt.Errorf("panic at block %d: %s [%s]", block.Number, r, block.Id)
 			}
 			logger.Warn("recovered panic", zap.Uint64("block_num", block.Number), zap.Error(err))
 			logger.Debug(string(debug.Stack())) // there are known panic cases, we don't want them in error logs

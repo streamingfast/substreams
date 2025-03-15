@@ -9,6 +9,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Server
+
+* Fix panic on tier2 when hitting a timeout for requests running from pre-cached module outputs
+* Add environment variables to control retry behavior, "SUBSTREAMS_WORKER_MAX_RETRIES" (default 10) and "SUBSTREAMS_WORKER_MAX_TIMEOUT_RETRIES" (default 2), changing from previous defaults (720 and 3)
+  The worker_max_timeout_retries is the number of retries specifically applied to block execution timing out (ex: because of external calls)
+
 ## v1.14.5
 
 * Bugfix on server: fix panic on requests disconnecting before the resolvedStartBlock is set.

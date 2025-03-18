@@ -412,13 +412,6 @@ func (s *Tier1Service) Blocks(
 
 	var reqStats *metrics.Stats
 	ctx, reqStats = setupRequestStats(ctx, request.OutputModule, outputModuleHash, request.ProductionMode, false)
-	defer func() {
-		var resolvedStartBlock uint64
-		if reqDetails := reqctx.Details(ctx); reqDetails != nil {
-			resolvedStartBlock = reqDetails.ResolvedStartBlockNum
-		}
-		reqStats.LogAndClose(ctx, resolvedStartBlock)
-	}()
 
 	metrics.SubstreamsCounter.Inc()
 	metrics.ActiveRequests.Inc()
@@ -444,7 +437,7 @@ func (s *Tier1Service) Blocks(
 	}()
 
 	respFunc := tier1ResponseHandler(respContext, &mut, logger, stream, request.NoopMode, reqStats)
-	err = s.blocks(runningContext, request, execGraph, respFunc)
+	err = s.blocks(runningContext, request, execGraph, respFunc, reqStats)
 	reqStats.SetError(err)
 
 	if connectError := toConnectError(runningContext, err); connectError != nil {
@@ -508,7 +501,7 @@ func (s *Tier1Service) writeLastUsed(ctx context.Context, execGraph *exec.Graph,
 
 var IsValidCacheTag = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`).MatchString
 
-func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Request, execGraph *exec.Graph, respFunc substreams.ResponseFunc) error {
+func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Request, execGraph *exec.Graph, respFunc substreams.ResponseFunc, reqStats *metrics.Stats) error {
 	chainFirstStreamableBlock := bstream.GetProtocolFirstStreamableBlock
 	if request.StartBlockNum > 0 && request.StartBlockNum < int64(chainFirstStreamableBlock) {
 		return bsstream.NewErrInvalidArg("invalid start block %d, must be >= %d (the first streamable block of the chain)", request.StartBlockNum, chainFirstStreamableBlock)
@@ -526,6 +519,10 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	if err != nil {
 		return fmt.Errorf("build request details: %w", err)
 	}
+
+	defer func() {
+		reqStats.LogAndClose(ctx, requestDetails.ResolvedStartBlockNum)
+	}()
 
 	if request.StopBlockNum != 0 {
 		if requestDetails.ResolvedStartBlockNum == request.StopBlockNum {

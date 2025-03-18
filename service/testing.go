@@ -6,7 +6,9 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/shutter"
+	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/wasm"
+	"go.uber.org/zap"
 
 	"github.com/streamingfast/substreams/reqctx"
 
@@ -42,7 +44,7 @@ func (s *Tier1Service) TestBlocks(ctx context.Context, isSubRequest bool, reques
 		return stream.NewErrInvalidArg(err.Error())
 	}
 
-	return s.blocks(ctx, request, execGraph, respFunc)
+	return s.blocks(ctx, request, execGraph, respFunc, metrics.NewReqStats(&metrics.Config{}, zap.NewNop()))
 }
 
 func TestNewServiceTier2(moduleExecutionTracing bool, streamFactoryFunc StreamFactoryFunc) *Tier2Service {

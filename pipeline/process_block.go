@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"runtime/debug"
 
 	"connectrpc.com/connect"
 	"github.com/streamingfast/bstream"
@@ -35,24 +34,6 @@ func (p *Pipeline) ProcessFromExecOutput(
 	cursor *bstream.Cursor,
 ) (err error) {
 
-	defer func() {
-		logger := reqctx.Logger(ctx)
-		if r := recover(); r != nil {
-			if err, ok := r.(error); ok {
-				if errors.Is(err, context.Canceled) {
-					return
-				}
-			}
-
-			if p.executionTimedOut {
-				err = connect.NewError(connect.CodeDeadlineExceeded, fmt.Errorf("execution timed out at block %d: [%s] %s", clock.Number, clock.Id, r))
-			} else {
-				err = fmt.Errorf("panic at block %d: %s [%s]", clock.Number, r, clock.Id)
-			}
-			logger.Warn("recovered panic", zap.Uint64("block_num", clock.Number), zap.Error(err))
-			logger.Debug(string(debug.Stack())) // there are known panic cases, we don't want them in error logs
-		}
-	}()
 	p.gate.processBlock(clock.Number, bstream.StepNewIrreversible)
 	execOutput, err := p.execOutputCache.NewBuffer(nil, clock, cursor)
 	if err != nil {
@@ -68,25 +49,6 @@ func (p *Pipeline) ProcessFromExecOutput(
 
 func (p *Pipeline) ProcessBlock(block *pbbstream.Block, obj interface{}) (err error) {
 	ctx := p.ctx
-
-	logger := reqctx.Logger(ctx)
-	defer func() {
-		if r := recover(); r != nil {
-			if err, ok := r.(error); ok {
-				if errors.Is(err, context.Canceled) {
-					return
-				}
-			}
-
-			if p.executionTimedOut {
-				err = connect.NewError(connect.CodeDeadlineExceeded, fmt.Errorf("execution timed out at block %d: [%s] %s", block.Number, block.Id, r))
-			} else {
-				err = fmt.Errorf("panic at block %d: %s [%s]", block.Number, r, block.Id)
-			}
-			logger.Warn("recovered panic", zap.Uint64("block_num", block.Number), zap.Error(err))
-			logger.Debug(string(debug.Stack())) // there are known panic cases, we don't want them in error logs
-		}
-	}()
 
 	metrics.BlockBeginProcess.Inc()
 	defer metrics.BlockEndProcess.Inc()
@@ -349,8 +311,17 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 	// the ctx is cached in the built moduleExecutors so we only activate timeout here
 	ctx, cancel := context.WithTimeout(ctx, p.executionTimeout)
 	defer func() {
-		if ctx.Err() == context.DeadlineExceeded {
-			p.executionTimedOut = true
+		if r := recover(); r != nil {
+			if e, ok := r.(error); ok {
+				if errors.Is(e, context.Canceled) {
+					return
+				}
+				if ctx.Err() == context.DeadlineExceeded {
+					err = connect.NewError(connect.CodeDeadlineExceeded, fmt.Errorf("execution timed out at block %d: [%s] %s", blockNum, execOutput.Clock().Id, r))
+				} else {
+					err = fmt.Errorf("panic at block %d: %s [%s]", blockNum, r, execOutput.Clock().Id)
+				}
+			}
 		}
 		cancel()
 	}()
@@ -380,11 +351,27 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 					continue
 				}
 
-				wg.Go(func() error {
+				wg.Go(func() (err error) {
+					defer func() {
+						// each go thread needs its own recover(), as the WASM execution can panic
+						if r := recover(); r != nil {
+							if e, ok := r.(error); ok {
+								if errors.Is(e, context.Canceled) {
+									return
+								}
+								if ctx.Err() == context.DeadlineExceeded {
+									err = connect.NewError(connect.CodeDeadlineExceeded, fmt.Errorf("execution timed out at block %d: [%s] %s", blockNum, execOutput.Clock().Id, r))
+								} else {
+									err = fmt.Errorf("panic at block %d: %s [%s]", blockNum, r, execOutput.Clock().Id)
+								}
+							}
+						}
+					}()
+
 					res := p.execute(ctx, executor, execOutput)
 					results[i] = res
 
-					return nil
+					return
 				})
 			}
 

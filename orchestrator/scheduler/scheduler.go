@@ -118,7 +118,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		return work.CmdScheduleNextJob("delayed:" + msg.TriggerBy)
 
 	case work.MsgScheduleNextJob:
-		s.logger.Info("scheduling next job", zap.String("trigger_by", msg.TriggerBy))
+		s.logger.Debug("scheduling next job", zap.String("trigger_by", msg.TriggerBy))
 
 		notAboveSegment := math.MaxInt
 		if s.ExecOutWalker != nil && !s.ExecOutWalker.IsNoopMode() { // noop mode is used by operators to prepare cached output, we don't want to slow down anything
@@ -154,7 +154,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		if err != nil {
 			s.Stages.ReleaseJob(workUnit)
 			if errors.Is(err, work.ErrorResourceExhausted) {
-				s.logger.Info("resource exhausted", zap.Error(err))
+				s.logger.Debug("resource exhausted", zap.Error(err))
 				if s.delayedScheduleNextJob {
 					s.logger.Debug("skipping delayed schedule next job")
 					return nil
@@ -165,7 +165,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 					TriggerBy: "resource exhausted",
 				})
 			} else if errors.Is(err, work.ErrorResourceExhaustedRampUp) {
-				s.logger.Info("resource exhausted ramp up", zap.Error(err))
+				s.logger.Debug("resource exhausted ramp up", zap.Error(err))
 
 				if s.delayedScheduleNextJob {
 					s.logger.Debug("skipping ramp up delayed schedule next job")
@@ -182,7 +182,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 			}
 		}
 
-		s.logger.Info("worker borrowed, scheduling work", zap.String("worker_id", worker.ID()), zap.Object("unit", workUnit))
+		s.logger.Debug("worker borrowed, scheduling work", zap.String("worker_id", worker.ID()), zap.Object("unit", workUnit))
 		modules := s.Stages.StageModules(workUnit.Stage)
 
 		return loop.Batch(

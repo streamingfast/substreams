@@ -61,6 +61,10 @@ func NewWalker(
 	}
 }
 
+func (r *Walker) IsNoopMode() bool {
+	return r.noopMode
+}
+
 func (r *Walker) MarkNotWorking() {
 	r.working = false
 }

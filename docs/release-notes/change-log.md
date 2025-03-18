@@ -16,6 +16,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Fix panic on tier2 when hitting a timeout for requests running from pre-cached module outputs
 * Add environment variables to control retry behavior, "SUBSTREAMS_WORKER_MAX_RETRIES" (default 10) and "SUBSTREAMS_WORKER_MAX_TIMEOUT_RETRIES" (default 2), changing from previous defaults (720 and 3)
   The worker_max_timeout_retries is the number of retries specifically applied to block execution timing out (ex: because of external calls)
+* The mechanism to slow down processing segments "ahead of blocks being sent to user" has been disabled on "noop-mode" requests, since these requests are used to pre-cache data and should not be slowed down.
+* The "number of segments ahead" in this mechanism has been increased from `>number of parallel workers>` to `<number of parallel workers> * 1.5`
 
 ## v1.14.5
 
@@ -48,7 +50,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
-* Added a mechanism for 'production-mode' requests where the tier1 will not schedule tier2 jobs over { max_parallel_subrequests } segments above the current block being streamed to the user.
+* Added a mechanism to slow down processing "ahead of blocks being sent to user" for 'production-mode' requests. The tier1 will not schedule tier2 jobs over { max_parallel_subrequests } segments above the current block being streamed to the user.
   This will ensure that a user slowly reading blocks 1, 2, 3... will not trigger a flood of tier2 jobs for higher blocks, let's say 300_000_000, that might never get read.
 
 * Added a validation on a module for the existence of 'triggering' inputs: the server will now fail with a clear error message

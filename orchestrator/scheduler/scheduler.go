@@ -121,7 +121,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		s.logger.Info("scheduling next job", zap.String("trigger_by", msg.TriggerBy))
 
 		notAboveSegment := math.MaxInt
-		if s.ExecOutWalker != nil {
+		if s.ExecOutWalker != nil && !s.ExecOutWalker.IsNoopMode() { // noop mode is used by operators to prepare cached output, we don't want to slow down anything
 			first, current, _ := s.ExecOutWalker.Progress()
 			if current < first {
 				current = first // cover for execoutwalker initialisation

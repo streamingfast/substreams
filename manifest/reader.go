@@ -979,7 +979,7 @@ func prefixModules(mods []*pbsubstreams.Module, prefix string) {
 	}
 }
 
-// mergeAndReindexPackages consumes the `src` Package into `dest`, and
+// reindexAndMergePackage consumes the `src` Package into `dest`, and
 // modifies `src`.
 func reindexAndMergePackage(src, dest *pbsubstreams.Package) {
 	newBasePackageIndex := len(dest.PackageMeta)

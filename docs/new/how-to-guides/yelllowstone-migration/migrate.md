@@ -21,26 +21,123 @@ In Substreams, you are charged depending on the amount of data (TBs) that you co
 
 To reduce the cost even more, we have caches of data that will help you consume less data (blocks without voting transactions cache or transactions filtered by program ID cache, for example).
 
-## Example: Migrating
+## Examples
 
-Substreams offers two different endpoints to track Solana data:
-- Solana Block data (transactions, instructions, logs...): ``
-- Solana Account Changes (historical account data): ``
+In Substreams, you can build your own Substreams modules to filter and output the data that you need.
 
-There are three main parts in the Substreams development:
-1. Initialize your Substreams project (using the Substreams CLI).
-2. Use Rust to filter the data that you need (or choose an existing Substreams that outputs the data that you need).
-3. Consume the data in a variety of _sinks_ (SQL, Subgraphs, streaming...).
+By default, you can consume the most basic information in Solana (full Blocks, transactions and account changes). In the following examples, you will see different example in differents formats: using the Substreams CLI, consuming the data in JavaScript, or consuming the data in Go.
 
-Developing Substreams involves three main dependencies: the Rust programming language, the Buf CLI (Protobuf), and the Substreams CLI (a command-line utility tool to manage your Substreams). Follow [this guide](../../references/cli/installing-the-cli.md) to install all the necessary dependencies in your local computer OR use the [DevContainer](https://github.com/streamingfast/substreams-starter), which contains all the necessary dependencies ready to use.
+### Installation
 
-### 1. Initialize your Substreams project.
+{% tabs %}
+{% tab title="CLI" %}
+1. Install the Substreams CLI in your computer.
+2. Verify that the installation is correct by running:
 
-The `substreams init` command allows you to boostrap your Substreams project for a variety of chains, including Solana.
+```bash
+substreams --version
+```
+{% endtab %}
 
-### 2. Filter the Data
+{% tab title="JavaScript (Node)" %}
+1. Clone the [Yellostone Examples GitHub repository]().
+2. In the repository, move to the `javascript` folder.
+3. Run `npm install` to install all the necessary dependencies.
+{% endtab %}
+{% endtabs %}
 
-Once you have your project created, you can modify the `src/lib.rs` file to narrow the data that you want to 
+### Get the Full Solana Block
 
-### 3. Consume the Data
+The [https://spkg.io/streamingfast/solana_common-v0.3.3.spkg](https://substreams.dev/packages/solana-common/v0.3.3) Substreams package contains several modules to get the most basic Solana data, such as blocks or transactions. The `blocks_without_votes` module retrieves Solana blocks, removing all the _voting_ transactions.
+
+{% tabs %}
+{% tab title="CLI" %}
+Run the following command in your terminal:
+
+```bash
+substreams gui https://spkg.io/streamingfast/solana_common-v0.3.3.spkg blocks_without_votes --start-block=320100000
+```
+- `substreams gui` allows you to run a Substreams module and debug its content (move across the content, search, etc).
+- `https://spkg.io/streamingfast/solana_common-v0.3.3.spkg` is the Substreams package that extracts the most basic information on Solana.
+- `blocks_without_votes` is the module that extracts full Blocks (removing voting transactions).
+- `--start-block=320100000` specifies where you want to start consuming data.
+
+You will enter the Substreams GUI view, which will allow you to start the stream and move across blocks.
+
+**IMPORTANT:**
+- To start the streaming of data, press the `Enter` key.
+- To move across tabs (`Request`, `Output`...), press the `Tab` key.
+- To move across blocks, press the `o` and `p` keys.
+- To exist the GUI screen, press the `q` key.
+{% endtab %}
+
+{% tab title="JavaScript (Node)" %}
+```bash
+node index.js https://mainnet.sol.streamingfast.io:443 https://spkg.io/streamingfast/solana_common-v0.3.3.spkg blocks_without_votes 320876956
+```
+- `https://mainnet.sol.streamingfast.io:443 https://spkg.io/streamingfast/`: StreamingFast endpoint for Solana mainnet.
+- `https://spkg.io/streamingfast/solana_common-v0.3.3.spkg`: URL of the `solana-common` package in the Substreams Registry.
+- `blocks_without_votes`: name of the module you want to execute. This will retrieve Blocks without voting transactions.
+- `320876956`: start block of the application.
+{% endtab %}
+{% endtabs %}
+
+### Get Transactions Filtered by Program ID (Pump.Fun)
+
+The `solana-common` package also allows you to filter transaction by program ID and/or accounts by using the `transactions_by_programid_without_votes` module.
+
+{% tabs %}
+{% tab title="CLI" %}
+Run the following command in your terminal:
+
+```bash
+substreams gui https://spkg.io/streamingfast/solana_common-v0.3.3.spkg transactions_by_programid_without_votes -p "transactions_by_programid_without_votes=program:6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P" --start-block=320100000
+```
+- `https://spkg.io/streamingfast/solana_common-v0.3.3.spkg` package contains several modules that extract the most basic Solana data.
+- `transactions_by_programid_without_votes` is the module that extracts filtered transactions.
+- `-p "transactions_by_programid_without_votes=program:6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"` specifies the parameters passed to the Substreams module. The `transactions_by_programid_without_votes` expects one or several filters to be provided.
+In this example, you filter transactions that contain data from the `6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P` program (Pump Fun program).
+{% endtab %}
+
+{% tab title="JavaScript (Node)" %}
+```bash
+node index.js https://mainnet.sol.streamingfast.io:443 https://spkg.io/streamingfast/solana_common-v0.3.3.spkg blocks_without_votes 320876956
+```
+- `https://mainnet.sol.streamingfast.io:443 https://spkg.io/streamingfast/`: StreamingFast endpoint for Solana mainnet.
+- `https://spkg.io/streamingfast/solana_common-v0.3.3.spkg`: URL of the `solana-common` package in the Substreams Registry.
+- `blocks_without_votes`: name of the module you want to execute. This will retrieve Blocks without voting transactions.
+- `320876956`: start block of the application.
+{% endtab %}
+{% endtabs %}
+
+### Get Account Changes History
+
+You can also get the history of an account (with some limitations) using the [solana-accounts-foundational module](https://substreams.dev/packages/solana-accounts-foundational/v0.1.1).
+
+{% tabs %}
+{% tab title="CLI" %}
+Run the following command in your terminal:
+
+```bash
+substreams gui https://spkg.io/streamingfast/solana_accounts_foundational-v0.1.1.spkg filtered_accounts -p "filtered_accounts=account:5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1" --start-block=327404502
+```
+- `https://spkg.io/streamingfast/solana_accounts_foundational-v0.1.1.spkg` package contains module to filter Solana account changes data.
+- `filtered_accounts` is the module that extracts filtered accounts.
+- `-p "filtered_accounts=account:5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1"` specifies the parameters passed to the Substreams module. The `filtered_accounts` module expects one or several filters to be provided.
+In this example, you filter to only get data from the `5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1` account.
+{% endtab %}
+
+{% tab title="JavaScript (Node)" %}
+```bash
+node index.js https://accounts.mainnet.sol.streamingfast.io:443 https://spkg.io/streamingfast/solana_accounts_foundational-v0.1.1.spkg filtered_accounts 327404502 filtered_accounts=account:5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1
+```
+- `https://accounts.mainnet.sol.streamingfast.io:443`: StreamingFast endpoint for Account Changes
+- `https://spkg.io/streamingfast/solana_accounts_foundational-v0.1.1.spkg`: URL of the `solana-accounts-foundational` module in the Substreams Registry.
+- `filtered_accounts`: module of the package that allows you to filter one or several accounts.
+- `327404502`: start block of the stream.
+- `filtered_accounts=account:5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1`: parameters passed to the module. In this example, you filter on the `5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1` account.
+{% endtab %}
+{% endtabs %}
+
+<!--Developing Substreams involves three main dependencies: the Rust programming language, the Buf CLI (Protobuf), and the Substreams CLI (a command-line utility tool to manage your Substreams). Follow [this guide](../../references/cli/installing-the-cli.md) to install all the necessary dependencies in your local computer OR use the [DevContainer](https://github.com/streamingfast/substreams-starter), which contains all the necessary dependencies ready to use. -->
 

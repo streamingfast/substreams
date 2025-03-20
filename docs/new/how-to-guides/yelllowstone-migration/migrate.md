@@ -40,7 +40,7 @@ substreams --version
 {% endtab %}
 
 {% tab title="JavaScript (Node)" %}
-1. Clone the [Yellostone Examples GitHub repository]().
+1. Clone the [Yellostone Examples GitHub repository](https://github.com/enoldev/yellowstone-to-substreams-examples).
 2. In the repository, move to the `javascript` folder.
 3. Run `npm install` to install all the necessary dependencies.
 {% endtab %}

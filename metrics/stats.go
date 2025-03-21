@@ -689,7 +689,7 @@ func (s *Stats) getZapFields(meter dmetering.Meter) []zap.Field {
 		zap.Bool("production_mode", s.config.ProductionMode),
 		zap.String("tier", tier),
 		zap.String("block_rate_per_sec", s.blockRate.RateString()),
-		zap.Uint64("block_count", s.blockRate.Total()),
+		zap.Uint64("local_blocks_processed", s.blockRate.Total()),
 		zap.Duration("parallel_duration", s.initDuration),
 		zap.Duration("module_exec_duration", s.moduleExecDuration()),
 		zap.Duration("module_wasm_ext_duration", s.moduleWasmExtDuration()),

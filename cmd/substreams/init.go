@@ -695,6 +695,8 @@ func generatorGroupToProtocolTitle(group string) string {
 		return "Cosmos"
 	case "starknet":
 		return "Starknet"
+	case "stellar":
+		return "Stellar"
 	}
 
 	return ""

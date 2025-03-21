@@ -13,6 +13,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+* Tier2 now returns GRPC error codes for `DeadlineExceeded` when it times out, and `ResourceExhausted` when a request is rejected due to overload
+* Tier1 now correctly reports tier2 job outcomes in the `substreams request stats`
+* Added jitter in "retry" logic to prevent all workers from retrying at the same time when tier2 are overloaded
 * Fix panic on tier2 when hitting a timeout for requests running from pre-cached module outputs
 * Add environment variables to control retry behavior, "SUBSTREAMS_WORKER_MAX_RETRIES" (default 10) and "SUBSTREAMS_WORKER_MAX_TIMEOUT_RETRIES" (default 2), changing from previous defaults (720 and 3)
   The worker_max_timeout_retries is the number of retries specifically applied to block execution timing out (ex: because of external calls)

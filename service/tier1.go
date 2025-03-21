@@ -438,7 +438,6 @@ func (s *Tier1Service) Blocks(
 
 	respFunc := tier1ResponseHandler(respContext, &mut, logger, stream, request.NoopMode, reqStats)
 	err = s.blocks(runningContext, request, execGraph, respFunc, reqStats)
-	reqStats.SetError(err)
 
 	if connectError := toConnectError(runningContext, err); connectError != nil {
 		switch connect.CodeOf(connectError) {
@@ -501,7 +500,7 @@ func (s *Tier1Service) writeLastUsed(ctx context.Context, execGraph *exec.Graph,
 
 var IsValidCacheTag = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`).MatchString
 
-func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Request, execGraph *exec.Graph, respFunc substreams.ResponseFunc, reqStats *metrics.Stats) error {
+func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Request, execGraph *exec.Graph, respFunc substreams.ResponseFunc, reqStats *metrics.Stats) (err error) {
 	chainFirstStreamableBlock := bstream.GetProtocolFirstStreamableBlock
 	if request.StartBlockNum > 0 && request.StartBlockNum < int64(chainFirstStreamableBlock) {
 		return bsstream.NewErrInvalidArg("invalid start block %d, must be >= %d (the first streamable block of the chain)", request.StartBlockNum, chainFirstStreamableBlock)
@@ -521,6 +520,12 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	}
 
 	defer func() {
+		switch {
+		case errors.Is(err, context.Canceled):
+			reqStats.SetError(context.Canceled)
+		default:
+			reqStats.SetError(err)
+		}
 		reqStats.LogAndClose(ctx, requestDetails.ResolvedStartBlockNum)
 	}()
 

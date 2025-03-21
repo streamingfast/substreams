@@ -181,7 +181,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	}
 
 	if s.isOverloaded() {
-		err := connect.NewError(connect.CodeUnavailable, fmt.Errorf("service currently overloaded"))
+		err := status.Error(codes.ResourceExhausted, "service currently overloaded")
 		fields = append(fields, zap.Error(err))
 		logger.Info("refusing Substreams ProcessRange request", fields...)
 		return err
@@ -205,7 +205,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	span.SetAttributes(attribute.String("hostname", hostname))
 
 	if request.Modules == nil {
-		err := connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("missing modules in request"))
+		err := status.Error(codes.InvalidArgument, "missing modules in request")
 		fields = append(fields, zap.Error(err))
 		logger.Info("refusing Substreams ProcessRange request", fields...)
 	}
@@ -216,7 +216,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	fields = append(fields, zap.Strings("modules", moduleNames))
 
 	if err := ValidateTier2Request(request); err != nil {
-		err = connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("validate request: %w", err))
+		err = status.Errorf(codes.InvalidArgument, "validate request: %s", err)
 		fields = append(fields, zap.Error(err))
 		logger.Info("refusing Substreams ProcessRange request", fields...)
 		return err
@@ -242,7 +242,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	emitter, err := dmetering.New(request.MeteringConfig, logger)
 	if err != nil {
 		reqStats.SetError(err)
-		return connect.NewError(connect.CodeInternal, fmt.Errorf("unable to initialize dmetering: %w", err))
+		return status.Errorf(codes.Internal, "unable to initialize dmetering: %s", err)
 	}
 	defer func() {
 		emitter.Shutdown(nil)
@@ -546,7 +546,7 @@ func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbs
 		resp := respAny.(*pbssinternal.ProcessRangeResponse)
 		if err := streamSrv.Send(resp); err != nil {
 			logger.Info("unable to send block probably due to client disconnecting", zap.Error(err), zap.String("user_id", userID), zap.String("key_id", apiKeyID))
-			return connect.NewError(connect.CodeUnavailable, err)
+			return status.Error(codes.Unavailable, err.Error())
 		}
 
 		logger.Debug("sending metering event",

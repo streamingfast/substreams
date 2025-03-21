@@ -37,7 +37,19 @@ type Stats struct {
 	remoteProcessedBlockCount uint64
 	completedJobsBytesRead    uint64
 	completedJobsBytesWritten uint64
-	completedJobs             uint64
+	// successfully completed tier2 job (could be a noop if the tier2 finds out that all its required files are there upon startup)
+	completedJobs uint64
+	// jobs that failed (either with a fatal error or repeatdly on retryable errors, above a threshold)
+	failedJobs uint64
+
+	// retries that happened (does not affect the total number of jobs, a single startedJob can be retried multiple times)
+	retriedJobs uint64
+
+	// jobs that were delayed (waiting for overloaded tier2, does not affect the total number of jobs, a single startedJob can be delayed multiple times)
+	delayedJobs uint64
+
+	// tier2 jobs that were started
+	startedJobs uint64
 
 	// counter is used to get the next jobIdx
 	counter uint64
@@ -243,6 +255,7 @@ func (s *Stats) RecordNewSubrequest(stage uint32, startBlock, stopBlock uint64) 
 	id = s.counter
 	s.counter++
 
+	s.startedJobs++
 	s.runningJobs[id] = &extendedJob{
 		start: time.Now(),
 		Job: &pbsubstreamsrpc.Job{
@@ -276,7 +289,30 @@ func (s *Stats) RecordModuleMergeComplete(module string) {
 	stat.mergingTime += time.Since(stat.mergeBegin)
 }
 
-func (s *Stats) RecordEndSubrequest(jobIdx uint64) {
+// JobStatus represents the final state of a job
+type JobStatus int
+
+const (
+	JobComplete JobStatus = iota
+	JobCancelled
+	JobFailed
+)
+
+// RecordJobRetried should be called when a job is retried without any work done (ex: rejected upon connection to tier2)
+func (s *Stats) RecordJobDelayed(jobIdx uint64) {
+	s.Lock()
+	defer s.Unlock()
+	s.delayedJobs++
+}
+
+// RecordJobRetried should be called when a job is retried after having possibly done some work
+func (s *Stats) RecordJobRetried(jobIdx uint64) {
+	s.Lock()
+	defer s.Unlock()
+	s.retriedJobs++
+}
+
+func (s *Stats) RecordEndSubrequest(jobIdx uint64, status JobStatus) {
 	s.Lock()
 	defer s.Unlock()
 	job := s.runningJobs[jobIdx]
@@ -301,7 +337,14 @@ func (s *Stats) RecordEndSubrequest(jobIdx uint64) {
 	s.completedJobsBytesRead += job.bytesRead
 	s.completedJobsBytesWritten += job.bytesWritten
 
-	s.completedJobs++
+	switch status {
+	case JobComplete:
+		s.completedJobs++
+	case JobCancelled:
+	// no-op
+	case JobFailed:
+		s.failedJobs++
+	}
 	s.remoteProcessedBlockCount += job.ProcessedBlocks
 
 	delete(s.runningJobs, jobIdx)
@@ -618,7 +661,9 @@ func (s *Stats) LogAndClose(ctx context.Context, resolvedStartBlockNum uint64) {
 	zapFields := s.getZapFields(meter)
 	zapFields = append(zapFields, zap.Uint64("resolved_start_block", resolvedStartBlockNum))
 
+	// WARNING: DO NOT MODIFY THIS LOG ENTRY, IT IS USED IN REPORTING SYSTEMS ##################
 	s.logger.Info("substreams request stats", zapFields...)
+	// ####################################################################################
 
 }
 
@@ -635,6 +680,7 @@ func (s *Stats) getZapFields(meter dmetering.Meter) []zap.Field {
 		errorText = s.error.Error()
 	}
 
+	// WARNING: DO NOT MODIFY THESE FIELDS, THEY ARE USED IN REPORTING SYSTEMS ##################
 	out := []zap.Field{
 		zap.String("user_id", s.config.UserID),
 		zap.String("api_key_id", s.config.ApiKeyID),
@@ -649,6 +695,10 @@ func (s *Stats) getZapFields(meter dmetering.Meter) []zap.Field {
 		zap.Duration("module_wasm_ext_duration", s.moduleWasmExtDuration()),
 		zap.Duration("time_to_first_data", s.timeToFirstData),
 		zap.Uint64("remote_jobs_completed", s.completedJobs),
+		zap.Uint64("remote_jobs_failed", s.failedJobs),
+		zap.Uint64("remote_jobs_incomplete", s.startedJobs-s.completedJobs-s.failedJobs), // either canceled or not returned yet (will be definitely be canceled soon!)
+		zap.Uint64("remote_jobs_retried", s.retriedJobs),
+		zap.Uint64("remote_jobs_delayed", s.delayedJobs),
 		zap.Uint64("remote_blocks_processed", s.remoteProcessedBlockCount),
 		zap.String("error", errorText),
 	}
@@ -657,6 +707,7 @@ func (s *Stats) getZapFields(meter dmetering.Meter) []zap.Field {
 		remoteBytesRead, _ := s.remoteBytesConsumption()
 		out = append(out, zap.Uint64("total_uncompressed_read_bytes", remoteBytesRead+uint64(meter.GetCount("total_read_bytes"))))
 	}
+	// ##########################################################################################
 
 	return out
 }

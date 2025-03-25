@@ -119,7 +119,7 @@ func (p *Pipeline) processBlock(
 		//todo: (deprecated)
 		dmetering.GetBytesMeter(ctx).AddBytesRead(execOutput.Len())
 
-		err = p.handleStepNew(ctx, clock, cursor, execOutput)
+		err = p.handleStepNew(ctx, clock, cursor, execOutput, false)
 		if err != nil && err != io.EOF {
 			return err
 		}
@@ -128,7 +128,7 @@ func (p *Pipeline) processBlock(
 		}
 	case bstream.StepNewIrreversible:
 		p.blockStepMap[bstream.StepNewIrreversible]++
-		err = p.handleStepNew(ctx, clock, cursor, execOutput)
+		err = p.handleStepNew(ctx, clock, cursor, execOutput, true)
 		if err != nil && err != io.EOF {
 			return err
 		}
@@ -212,7 +212,7 @@ func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
 	return nil
 }
 
-func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput) (err error) {
+func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput, isFinalBlock bool) (err error) {
 	if p.isTier1 && p.checkPendingShutdown() {
 		if p.stores.StoreMap != nil && p.sentBlocks > minBlocksProcessedToSave {
 			p.stores.logger.Info("shutting down, quick saving stores")
@@ -260,7 +260,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 
 	metering.AddWasmInputBytes(ctx, execOutput.Len())
 
-	if err := p.executeModules(ctx, execOutput); err != nil {
+	if err := p.executeModules(ctx, execOutput, isFinalBlock); err != nil {
 		return fmt.Errorf("execute modules: %w", err)
 	}
 
@@ -294,7 +294,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 	return nil
 }
 
-func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.ExecutionOutput) (err error) {
+func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.ExecutionOutput, isFinalBlock bool) (err error) {
 	ctx, span := reqctx.WithModuleExecutionSpan(ctx, "modules_executions")
 	defer span.EndWithErr(&err)
 
@@ -335,7 +335,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 				if !executor.RunsOnBlock(blockNum) {
 					continue
 				}
-				res := p.execute(ctx, executor, execOutput)
+				res := p.execute(ctx, executor, execOutput, isFinalBlock)
 				if err := p.applyExecutionResult(ctx, executor, res, execOutput); err != nil {
 					return fmt.Errorf("applying executor results %q on block %d (%s): %w", executor.Name(), blockNum, execOutput.Clock().Id, res.err)
 				}
@@ -368,7 +368,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 						}
 					}()
 
-					res := p.execute(ctx, executor, execOutput)
+					res := p.execute(ctx, executor, execOutput, isFinalBlock)
 					results[i] = res
 
 					return
@@ -407,13 +407,17 @@ type resultObj struct {
 	skipped_output bool
 }
 
-func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, execOutput execout.ExecutionOutput) resultObj {
+func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, execOutput execout.ExecutionOutput, isFinalBlock bool) resultObj {
 	logger := reqctx.Logger(ctx)
 
 	executorName := executor.Name()
 	logger.Debug("executing", zap.Uint64("block", execOutput.Clock().Number), zap.String("module_name", executorName))
 
 	moduleOutput, outputBytes, outputBytesFiles, skipped, runError := exec.RunModule(ctx, executor, execOutput)
+
+	if isFinalBlock && errors.Is(runError, exec.ErrWasmDeterministicExec) {
+		p.execoutStorage.ConfigMap[executorName].WriteDeterministicError(ctx, execOutput.Clock().Number, runError)
+	}
 
 	return resultObj{
 		output:         moduleOutput,

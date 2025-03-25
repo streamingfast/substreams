@@ -549,7 +549,16 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		return err
 	}
 
-	if err := s.containsDeterministicError(ctx, requestDetails.ResolvedStartBlockNum, requestDetails.StopBlockNum, execGraph, cacheStore); err != nil {
+	segmentSize := s.runtimeConfig.SegmentSize
+
+	// determine if we should refuse the request because of a previously found deterministic error
+	startBlockErrorCheck := requestDetails.ResolvedStartBlockNum
+	stopBlockErrorCheck := request.StopBlockNum
+	if requestDetails.LinearHandoffBlockNum > startBlockErrorCheck {
+		startBlockErrorCheck = startBlockErrorCheck / segmentSize * segmentSize                     // round down to the nearest segment
+		stopBlockErrorCheck = ((stopBlockErrorCheck - 1) / segmentSize * segmentSize) + segmentSize // round up to the nearest segment
+	}
+	if err := s.containsDeterministicError(ctx, startBlockErrorCheck, stopBlockErrorCheck, execGraph, cacheStore); err != nil {
 		logger.Info("refusing Substreams Blocks request", append(logFields, zap.Error(err))...)
 		return err
 	}
@@ -575,8 +584,6 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	if err := s.writeLastUsed(ctx, execGraph, cacheStore); err != nil {
 		logger.Warn("cannot write 'last_used' file", zap.Error(err))
 	}
-
-	segmentSize := s.runtimeConfig.SegmentSize
 
 	execOutputConfigs, err := execout.NewConfigs(cacheStore, execGraph.UsedModules(), execGraph.ModuleHashes(), segmentSize, chainFirstStreamableBlock, logger)
 	if err != nil {

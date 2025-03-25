@@ -167,7 +167,8 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	generatorID := lastState.GeneratorID
 	if generatorID == "" {
 		fmt.Printf("Getting available code generators from %s...\n\n", initConvoURL)
-		resp, err := client.Discover(context.Background(), connect.NewRequest(&pbconvo.DiscoveryRequest{}))
+		// TEMPORARY FIX: Using the "searchTerms" field as version to enforce breaking changes in the CLI (even before we send the generators)
+		resp, err := client.Discover(context.Background(), connect.NewRequest(&pbconvo.DiscoveryRequest{SearchTerms: "version1"}))
 		if err != nil {
 			return fmt.Errorf("failed to call discovery endpoint: %w", err)
 		}
@@ -184,10 +185,13 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			if groupExists {
 				selector.Generators = append(selector.Generators, gen)
 			} else {
-				filteredProtocols[gen.Group] = &BlockchainProtocolSelector{
-					Id:         gen.Group,
-					Title:      generatorGroupToProtocolTitle(gen.Group),
-					Generators: []*pbconvo.DiscoveryResponse_Generator{gen},
+				protocolTitle := generatorGroupToProtocolTitle(gen.Group)
+				if protocolTitle != "" {
+					filteredProtocols[gen.Group] = &BlockchainProtocolSelector{
+						Id:         gen.Group,
+						Title:      generatorGroupToProtocolTitle(gen.Group),
+						Generators: []*pbconvo.DiscoveryResponse_Generator{gen},
+					}
 				}
 			}
 		}
@@ -259,7 +263,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	}
 	startMsg := &pbconvo.UserInput_Start{
 		GeneratorId: generatorID,
-		Version:     2,
+		Version:     3,
 	}
 	if lastState.State != nil {
 		startMsg.Hydrate = &pbconvo.UserInput_Hydrate{SavedState: string(lastState.State)}

@@ -70,8 +70,7 @@ func (fw *FileWalker) preload(ctx context.Context, seg int) {
 
 	f := fw.config.NewFile(rng)
 	go func() {
-		if err := f.Load(ctx); err == nil {
-		}
+		_ = f.Load(ctx)
 	}()
 	fw.buffer[seg] = f
 }

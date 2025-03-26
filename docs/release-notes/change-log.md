@@ -9,11 +9,51 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v1.14.6
 
 ### Server
 
-* Added a mechanism for 'production-mode' requests where the tier1 will not schedule tier2 jobs over { max_parallel_subrequests } segments above the current block being streamed to the user.
+* Tier2 now returns GRPC error codes for `DeadlineExceeded` when it times out, and `ResourceExhausted` when a request is rejected due to overload
+* Tier1 now correctly reports tier2 job outcomes in the `substreams request stats`
+* Added jitter in "retry" logic to prevent all workers from retrying at the same time when tier2 are overloaded
+* Fix panic on tier2 when hitting a timeout for requests running from pre-cached module outputs
+* Add environment variables to control retry behavior, "SUBSTREAMS_WORKER_MAX_RETRIES" (default 10) and "SUBSTREAMS_WORKER_MAX_TIMEOUT_RETRIES" (default 2), changing from previous defaults (720 and 3)
+  The worker_max_timeout_retries is the number of retries specifically applied to block execution timing out (ex: because of external calls)
+* The mechanism to slow down processing segments "ahead of blocks being sent to user" has been disabled on "noop-mode" requests, since these requests are used to pre-cache data and should not be slowed down.
+* The "number of segments ahead" in this mechanism has been increased from `>number of parallel workers>` to `<number of parallel workers> * 1.5`
+
+## v1.14.5
+
+* Bugfix on server: fix panic on requests disconnecting before the resolvedStartBlock is set.
+
+## v1.14.4
+
+### Server
+
+* Properly reject requests with a stop-block below the "resolved" StartBlock (caused by module initialBlocks or a chain's firstStreamableBlock)
+* Added the `resolved-start-block` to the `substreams request stats` log
+
+### CLI
+
+* fix the 'Hint' when --limit-processed-blocks is too low, sometimes suggesting "0 or 0" and some typos
+
+## v1.14.3
+
+### CLI
+
+* The `substreams gui` flag `--debug-modules-output` has been removed, it had zero effect.
+
+* The `substreams run` flag `--debug-modules-output` now accepts regular expressions like `substreams run --debug-modules-output=".*"`.
+
+* Fixed `--skip-package-validation` to also skip sub packages being imported.
+
+* Added `--limit-processed-blocks` flag to `substreams run` and `substreams gui` to set the `limit_processed_blocks` field in the request
+
+* The information messages in 'substreams run' now print to STDERR instead of STDOUT.
+
+### Server
+
+* Added a mechanism to slow down processing "ahead of blocks being sent to user" for 'production-mode' requests. The tier1 will not schedule tier2 jobs over { max_parallel_subrequests } segments above the current block being streamed to the user.
   This will ensure that a user slowly reading blocks 1, 2, 3... will not trigger a flood of tier2 jobs for higher blocks, let's say 300_000_000, that might never get read.
 
 * Added a validation on a module for the existence of 'triggering' inputs: the server will now fail with a clear error message
@@ -25,9 +65,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * Added an optional field `limit_processed_blocks` to the `sf.substreams.rpc.v2.Request`. When set to a non-zero value, the server will reject a request that would process more blocks than the given value with the `FailedPrecondition` GRPC error code.
 
-### CLI
+* Improved error messages when a module execution is timing out on a block (ex: due to a slow external call) and now return a `DeadlineExceeded` Connect/GRPC error code instead of a Internal. Removed 'panic' from wording.
 
-* Added `--limit-processed-blocks` flag to `substreams run` and `substreams gui` to set the `limit_processed_blocks` field in the request
+* Improved connection draining on shutdown: Now waits for the end of the 'shutdown-delay' before draining and refusing new connections, then waits for 'quicksaves' and successful signaling of clients, up to a max of 30 sec.
+
+* In `substreams request stats` log, add fields: `remote_jobs_completed`, `remote_blocks_processed` and `total_uncompressed_read_bytes`
 
 ## v1.14.2
 

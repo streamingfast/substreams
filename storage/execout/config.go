@@ -3,6 +3,7 @@ package execout
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
@@ -17,6 +18,7 @@ type Config struct {
 	name       string
 	moduleHash string
 	objStore   dstore.Store
+	errStore   dstore.Store
 
 	modKind            pbsubstreams.ModuleKind
 	moduleInitialBlock uint64
@@ -35,14 +37,25 @@ func NewConfig(name string, moduleInitialBlock uint64, modKind pbsubstreams.Modu
 		return nil, fmt.Errorf("creating sub store: %w", err)
 	}
 
+	errStore, err := baseStore.SubStore(moduleHash)
+	if err != nil {
+		return nil, fmt.Errorf("creating err store: %w", err)
+	}
+
 	return &Config{
 		name:               name,
 		objStore:           subStore,
+		errStore:           errStore,
 		modKind:            modKind,
 		moduleInitialBlock: moduleInitialBlock,
 		moduleHash:         moduleHash,
 		logger:             logger.With(zap.String("module", name)),
 	}, nil
+}
+
+func (c *Config) WriteDeterministicError(ctx context.Context, atBlock uint64, err error) error {
+	r := strings.NewReader(err.Error())
+	return c.errStore.WriteObject(ctx, fmt.Sprintf("errors.%010d", atBlock), r)
 }
 
 func (c *Config) NewFile(targetRange *block.Range) *File {

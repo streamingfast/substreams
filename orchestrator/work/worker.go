@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -121,6 +123,23 @@ func NewRequest(ctx context.Context, req *reqctx.RequestDetails, stageIndex int,
 	}
 }
 
+var workerMaxRetries = 10
+var workerMaxTimeoutRetries = 2
+
+func init() {
+	if val := os.Getenv("SUBSTREAMS_WORKER_MAX_RETRIES"); val != "" {
+		if parsed, err := strconv.Atoi(val); err == nil {
+			workerMaxRetries = parsed
+		}
+	}
+
+	if val := os.Getenv("SUBSTREAMS_WORKER_MAX_TIMEOUT_RETRIES"); val != "" {
+		if parsed, err := strconv.Atoi(val); err == nil {
+			workerMaxTimeoutRetries = parsed
+		}
+	}
+}
+
 func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream) loop.Cmd {
 	request := NewRequest(ctx, reqctx.Details(ctx), unit.Stage, startBlock)
 	logger := reqctx.Logger(ctx)
@@ -129,9 +148,14 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 		var res *Result
 		retryIdx := 0
 		startTime := time.Now()
-		maxRetries := 720         //TODO: make this configurable
-		maxExecutionTimeouts := 3 //TODO: make this configurable
+		maxRetries := workerMaxRetries
+		maxExecutionTimeouts := workerMaxTimeoutRetries
 		executionTimeouts := 0
+
+		stats := reqctx.ReqStats(ctx)
+		startBlock := request.SegmentNumber * request.SegmentSize
+		jobIdx := stats.RecordNewSubrequest(request.Stage, startBlock, startBlock+request.SegmentSize)
+
 		var previousError error
 		err := derr.RetryContext(ctx, uint64(maxRetries), func(ctx context.Context) error {
 			w.logger.Info("launching remote worker",
@@ -143,20 +167,33 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 				zap.NamedError("previous_error", previousError),
 			)
 
-			res = w.work(ctx, request, moduleNames, upstream)
+			res = w.work(ctx, request, moduleNames, upstream, jobIdx)
 			err := res.Error
 			switch err.(type) {
 			case *RetryableErr:
 				metrics.Tier1WorkerRetryCounter.Inc()
-				if err != nil && strings.Contains(err.Error(), "service currently overloaded") {
+				if strings.Contains(err.Error(), "service currently overloaded") || // previous tier2 behavior, for backward compatibility, replaced by codes.ResourceExhausted
+					errors.Is(err, ErrConnectionRefused) { // tier2 unavailable
+					stats.RecordJobDelayed(jobIdx)
 					metrics.Tier1WorkerRejectedOverloadedCounter.Inc()
-				} else if strings.Contains(err.Error(), "DeadlineExceeded") {
-					executionTimeouts++
+
+				} else if grpcError := dgrpc.AsGRPCError(err); grpcError != nil && grpcError.Code() == codes.ResourceExhausted { // tier2 overloaded
+					stats.RecordJobDelayed(jobIdx)
+					metrics.Tier1WorkerRejectedOverloadedCounter.Inc()
+
+				} else {
+					stats.RecordJobRetried(jobIdx)
+					if grpcError := dgrpc.AsGRPCError(err); grpcError != nil && grpcError.Code() == codes.DeadlineExceeded {
+						executionTimeouts++
+					} else if strings.Contains(err.Error(), "DeadlineExceeded") { // previous tier2 behavior, for backward compatibility
+						executionTimeouts++
+					}
 				}
 				previousError = err
 				retryIdx++
 				if executionTimeouts >= maxExecutionTimeouts {
-					return derr.NewFatalError(fmt.Errorf("segment starting at block %d timed out %d times, giving up. Last error: %w", request.SegmentNumber*request.SegmentSize, executionTimeouts, err))
+					segmentStart := request.SegmentNumber * request.SegmentSize
+					return derr.NewFatalError(fmt.Errorf("segment [%d-%d] timed out %d times, giving up. Last error from worker: %w", segmentStart, segmentStart+request.SegmentSize, executionTimeouts, err))
 				}
 				return err
 			default:
@@ -167,50 +204,58 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 			}
 		})
 
+		timeTook := time.Since(startTime)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
-				logger.Debug("job canceled", zap.Object("unit", unit), zap.Error(err))
+				err = context.Canceled // remove wrapping on this error
+				stats.RecordEndSubrequest(jobIdx, metrics.JobCancelled)
 			} else {
-				logger.Warn("job failed", zap.Object("unit", unit), zap.Error(err))
+				stats.RecordEndSubrequest(jobIdx, metrics.JobFailed)
 			}
 
-			timeTook := time.Since(startTime)
 			logger.Warn(
 				"incomplete job",
 				zap.Object("unit", unit),
 				zap.Int("number_of_tries", retryIdx),
 				zap.Strings("module_name", moduleNames),
 				zap.Duration("duration", timeTook),
-				zap.Float64("num_of_blocks_per_sec", float64(request.SegmentSize)/timeTook.Seconds()),
 				zap.Error(err),
 			)
 			return MsgJobFailed{Unit: unit, Worker: w, Error: err}
 		}
 
 		if err := ctx.Err(); err != nil {
-			logger.Warn("job not completed", zap.Object("unit", unit), zap.Error(err))
+			logger.Warn(
+				"incomplete job",
+				zap.Object("unit", unit),
+				zap.Int("number_of_tries", retryIdx),
+				zap.Strings("module_name", moduleNames),
+				zap.Duration("duration", timeTook),
+				zap.Error(err),
+			)
+			stats.RecordEndSubrequest(jobIdx, metrics.JobCancelled)
 			return MsgJobFailed{Unit: unit, Worker: w, Error: err}
 		}
 
-		timeTook := time.Since(startTime)
+		stats.RecordEndSubrequest(jobIdx, metrics.JobComplete)
 		logger.Info(
 			"job completed",
 			zap.Object("unit", unit),
 			zap.Int("number_of_tries", retryIdx),
 			zap.Strings("module_name", moduleNames),
-			zap.Float64("duration", timeTook.Seconds()),
+			zap.Duration("duration", timeTook),
 			zap.Float64("processing_time_per_block", timeTook.Seconds()/float64(request.SegmentSize)),
 		)
 		return MsgJobSucceeded{
 			Unit:   unit,
 			Worker: w,
-			// TODO: Clean the PartialFilesWritten from the res because it's not needed anymore.
-			//Files:  res.PartialFilesWritten,
 		}
 	}
 }
 
-func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, _ []string, upstream *response.Stream) *Result {
+var ErrConnectionRefused = errors.New("connection refused")
+
+func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRangeRequest, _ []string, upstream *response.Stream, jobIdx uint64) (res *Result) {
 	metrics.Tier1ActiveWorkerRequest.Inc()
 	metrics.Tier1WorkerRequestCounter.Inc()
 	defer metrics.Tier1ActiveWorkerRequest.Dec()
@@ -231,11 +276,6 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 		return &Result{Error: fmt.Errorf("unable to create grpc client: %w", err)}
 	}
 
-	stats := reqctx.ReqStats(ctx)
-	startBlock := request.SegmentNumber * request.SegmentSize
-	jobIdx := stats.RecordNewSubrequest(request.Stage, startBlock, startBlock+request.SegmentSize)
-	defer stats.RecordEndSubrequest(jobIdx)
-
 	ctx = dauth.FromContext(ctx).ToOutgoingGRPCContext(ctx)
 
 	if headers.IsSet() {
@@ -247,7 +287,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 			return &Result{Error: ctx.Err()}
 		}
 		return &Result{
-			Error: NewRetryableErr(fmt.Errorf("getting block stream: %w", err)),
+			Error: NewRetryableErr(ErrConnectionRefused),
 		}
 	}
 
@@ -275,6 +315,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 
 	span.SetAttributes(attribute.String("substreams.remote_hostname", remoteHostname))
 
+	stats := reqctx.ReqStats(ctx)
 	for {
 		resp, err := stream.Recv()
 
@@ -316,9 +357,17 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 			if ctx.Err() != nil {
 				return &Result{Error: ctx.Err()}
 			}
-			if grpcErr := dgrpc.AsGRPCError(err); grpcErr.Code() == codes.InvalidArgument {
-				return &Result{Error: err}
+			if grpcErr := dgrpc.AsGRPCError(err); grpcErr != nil {
+				switch grpcErr.Code() {
+				case codes.InvalidArgument:
+					return &Result{Error: err}
+				case codes.DeadlineExceeded, codes.ResourceExhausted, codes.Unavailable:
+					return &Result{
+						Error: NewRetryableErr(err),
+					}
+				}
 			}
+
 			return &Result{
 				Error: NewRetryableErr(fmt.Errorf("receiving stream resp: %w", err)),
 			}

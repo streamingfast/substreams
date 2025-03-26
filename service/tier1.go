@@ -57,12 +57,12 @@ var errShuttingDown = errors.New("endpoint is shutting down, please reconnect")
 type Tier1Service struct {
 	*shutter.Shutter
 	ssconnect.UnimplementedStreamHandler
+	activeRequests sync.WaitGroup
 
 	blockType             string
 	wasmExtensions        map[string]map[string]wasm.WASMExtension
 	wasmParams            map[string]string
 	failedRequestsLock    sync.RWMutex
-	failedRequests        map[string]*recordedFailure
 	streamFactoryFunc     StreamFactoryFunc
 	blockExecutionTimeout time.Duration
 	runtimeConfig         config.RuntimeConfig
@@ -81,7 +81,6 @@ type Tier1Service struct {
 	activeRequestsHardLimit int
 	tier2RequestParameters  reqctx.Tier2RequestParameters
 	globalRequestPool       *GlobalRequestPool
-	checkPendingShutdown    func() bool
 }
 
 func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
@@ -147,7 +146,6 @@ func NewTier1(
 	activeRequestsHardLimit int,
 	sharedCacheSize uint64,
 	globalRequestPool *GlobalRequestPool,
-	checkPendingShutdown func() bool,
 	opts ...Option,
 ) (*Tier1Service, error) {
 
@@ -187,7 +185,6 @@ func NewTier1(
 		runtimeConfig:           runtimeConfig,
 		blockType:               blockType,
 		tracer:                  tracing.GetTracer(),
-		failedRequests:          make(map[string]*recordedFailure),
 		resolveCursor:           pipeline.NewCursorResolver(hub, mergedBlocksStore, forkedBlocksStore),
 		logger:                  logger,
 		appSetIsReadyState:      appSetIsReadyState,
@@ -197,8 +194,10 @@ func NewTier1(
 		activeRequestsSoftLimit: activeRequestsSoftLimit,
 		activeRequestsHardLimit: activeRequestsHardLimit,
 		globalRequestPool:       globalRequestPool,
-		checkPendingShutdown:    checkPendingShutdown,
 	}
+	s.OnTerminating(func(_ error) {
+		s.activeRequests.Wait()
+	})
 
 	go func() {
 		if sharedCacheSize == 0 {
@@ -243,16 +242,18 @@ func (s *Tier1Service) Blocks(
 	req *connect.Request[pbsubstreamsrpc.Request],
 	stream *connect.ServerStream[pbsubstreamsrpc.Response],
 ) (serverErr error) {
+
+	if s.IsTerminating() {
+		serverErr = connect.NewError(connect.CodeUnavailable, errShuttingDown)
+		return
+	}
+	s.activeRequests.Add(1)
 	defer func() {
 		if reason, countAsRejected := metrics.IsRejectedRequestError(serverErr); countAsRejected {
 			metrics.Tier1RejectedRequestCounter.Inc(reason)
 		}
+		s.activeRequests.Done()
 	}()
-	if s.checkPendingShutdown() {
-		time.Sleep(1 * time.Second) // prevent burst reconnections to this instance since we're shutting down
-		serverErr = connect.NewError(connect.CodeUnavailable, errShuttingDown)
-		return
-	}
 
 	// We keep `err` here as the unaltered error from `blocks` call, this is used in the EndSpan to record the full error
 	// and not only the `grpcError` one which is a subset view of the full `err`.
@@ -345,23 +346,6 @@ func (s *Tier1Service) Blocks(
 
 	outputModuleHash := execGraph.ModuleHashes().Get(request.OutputModule)
 
-	requestID := fmt.Sprintf("%s:%d:%d:%s:%t:%t:%s",
-		outputModuleHash,
-		request.StartBlockNum,
-		request.StopBlockNum,
-		request.StartCursor,
-		request.ProductionMode,
-		request.FinalBlocksOnly,
-		strings.Join(request.DebugInitialStoreSnapshotForModules, ","),
-	)
-
-	//	s.resolveCursor
-	if err := s.errorFromRecordedFailure(requestID, request.ProductionMode, request.StartBlockNum, request.StartCursor); err != nil {
-		fields = append(fields, zap.Error(err), zap.Bool("cached_error", true))
-		logger.Info("refusing Substreams Blocks request", fields...)
-		return err
-	}
-
 	ctx = reqctx.WithOutputModuleHash(ctx, outputModuleHash)
 	fields = append(fields, zap.String("output_module_hash", outputModuleHash))
 
@@ -400,16 +384,12 @@ func (s *Tier1Service) Blocks(
 
 	if err := ValidateTier1Request(request, s.blockType); err != nil {
 		err := connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("validate request: %w", err))
-		fields = append(fields, zap.Error(err))
-		logger.Info("refusing Substreams Blocks request", fields...)
+		logger.Info("refusing Substreams Blocks request", append(fields, zap.Error(err))...)
 		return err
 	}
 
-	logger.Info("incoming Substreams Blocks request", fields...)
-
 	var reqStats *metrics.Stats
 	ctx, reqStats = setupRequestStats(ctx, request.OutputModule, outputModuleHash, request.ProductionMode, false)
-	defer reqStats.LogAndClose()
 
 	metrics.SubstreamsCounter.Inc()
 	metrics.ActiveRequests.Inc()
@@ -429,21 +409,20 @@ func (s *Tier1Service) Blocks(
 		case <-ctx.Done():
 			return
 		case <-s.Terminating():
+			<-time.After(30 * time.Second) // max delay to wait for stuck connections
 			cancelRunning(errShuttingDown)
 		}
 	}()
 
 	respFunc := tier1ResponseHandler(respContext, &mut, logger, stream, request.NoopMode, reqStats)
-	err = s.blocks(runningContext, request, execGraph, respFunc)
-	reqStats.SetError(err)
+	err = s.blocks(runningContext, request, execGraph, respFunc, reqStats, fields)
 
 	if connectError := toConnectError(runningContext, err); connectError != nil {
 		switch connect.CodeOf(connectError) {
 		case connect.CodeInternal:
 			logger.Warn("unexpected termination of stream of blocks", zap.String("stream_processor", "tier1"), zap.Error(err))
 		case connect.CodeInvalidArgument:
-			logger.Debug("recording failure on request", zap.String("request_id", requestID))
-			s.recordFailure(requestID, connectError)
+			logger.Debug("invalid argument on request", zap.Error(connectError))
 		case connect.CodeCanceled:
 			logger.Debug("Blocks request canceled by user", zap.Error(connectError))
 		default:
@@ -498,7 +477,7 @@ func (s *Tier1Service) writeLastUsed(ctx context.Context, execGraph *exec.Graph,
 
 var IsValidCacheTag = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`).MatchString
 
-func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Request, execGraph *exec.Graph, respFunc substreams.ResponseFunc) error {
+func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Request, execGraph *exec.Graph, respFunc substreams.ResponseFunc, reqStats *metrics.Stats, logFields []zap.Field) (err error) {
 	chainFirstStreamableBlock := bstream.GetProtocolFirstStreamableBlock
 	if request.StartBlockNum > 0 && request.StartBlockNum < int64(chainFirstStreamableBlock) {
 		return bsstream.NewErrInvalidArg("invalid start block %d, must be >= %d (the first streamable block of the chain)", request.StartBlockNum, chainFirstStreamableBlock)
@@ -514,11 +493,23 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 
 	requestDetails, undoSignal, err := pipeline.BuildRequestDetails(ctx, request, s.getRecentFinalBlock, s.resolveCursor, s.getHeadBlock, s.runtimeConfig.SegmentSize)
 	if err != nil {
-		return fmt.Errorf("build request details: %w", err)
+		err = fmt.Errorf("build request details: %w", err)
+		logger.Info("refusing Substreams Blocks request", append(logFields, zap.Error(err))...)
+		return err
 	}
 
-	if requestDetails.ResolvedStartBlockNum == request.StopBlockNum && request.StopBlockNum != 0 {
-		return bsstream.NewErrInvalidArg("start block and stop block are the same")
+	if request.StopBlockNum != 0 {
+		if requestDetails.ResolvedStartBlockNum == request.StopBlockNum {
+			err := bsstream.NewErrInvalidArg("start block and stop block are the same")
+			logger.Info("refusing Substreams Blocks request", append(logFields, zap.Error(err))...)
+			return err
+		}
+
+		if requestDetails.ResolvedStartBlockNum > request.StopBlockNum {
+			err := bsstream.NewErrInvalidArg(fmt.Sprintf("resolved start block %d is below stop block %d", requestDetails.ResolvedStartBlockNum, request.StopBlockNum))
+			logger.Info("refusing Substreams Blocks request", append(logFields, zap.Error(err))...)
+			return err
+		}
 	}
 
 	requestDetails.MaxParallelJobs = s.runtimeConfig.DefaultParallelSubrequests
@@ -546,15 +537,34 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	}
 
 	if err := execGraph.ValidateRequestStartBlock(requestDetails.ResolvedStartBlockNum); err != nil {
-		return bsstream.NewErrInvalidArg(err.Error())
+		err = bsstream.NewErrInvalidArg(err.Error())
+		logger.Info("refusing Substreams Blocks request", append(logFields, zap.Error(err))...)
+		return err
+	}
+
+	cacheStore, err := s.runtimeConfig.BaseObjectStore.SubStore(cacheTag)
+	if err != nil {
+		err = fmt.Errorf("internal error setting store: %w", err)
+		logger.Info("refusing Substreams Blocks request", append(logFields, zap.Error(err))...)
+		return err
+	}
+
+	segmentSize := s.runtimeConfig.SegmentSize
+
+	// determine if we should refuse the request because of a previously found deterministic error
+	startBlockErrorCheck := requestDetails.ResolvedStartBlockNum
+	stopBlockErrorCheck := request.StopBlockNum
+	if requestDetails.LinearHandoffBlockNum > startBlockErrorCheck {
+		startBlockErrorCheck = startBlockErrorCheck / segmentSize * segmentSize                     // round down to the nearest segment
+		stopBlockErrorCheck = ((stopBlockErrorCheck - 1) / segmentSize * segmentSize) + segmentSize // round up to the nearest segment
+	}
+	if err := s.containsDeterministicError(ctx, startBlockErrorCheck, stopBlockErrorCheck, execGraph, cacheStore); err != nil {
+		logger.Info("refusing Substreams Blocks request", append(logFields, zap.Error(err))...)
+		return err
 	}
 
 	wasmRuntime := wasm.NewRegistry(s.wasmExtensions)
 
-	cacheStore, err := s.runtimeConfig.BaseObjectStore.SubStore(cacheTag)
-	if err != nil {
-		return fmt.Errorf("internal error setting store: %w", err)
-	}
 	quickSaveStore := s.runtimeConfig.QuickSaveStore
 
 	if clonableStore, ok := cacheStore.(dstore.Clonable); ok {
@@ -574,8 +584,6 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	if err := s.writeLastUsed(ctx, execGraph, cacheStore); err != nil {
 		logger.Warn("cannot write 'last_used' file", zap.Error(err))
 	}
-
-	segmentSize := s.runtimeConfig.SegmentSize
 
 	execOutputConfigs, err := execout.NewConfigs(cacheStore, execGraph.UsedModules(), execGraph.ModuleHashes(), segmentSize, chainFirstStreamableBlock, logger)
 	if err != nil {
@@ -625,7 +633,9 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		s.runtimeConfig.WorkerPoolFactory,
 		respFunc,
 		s.blockExecutionTimeout,
-		s.checkPendingShutdown,
+		func() bool {
+			return s.IsTerminating() // pipeline starts draining when the service is actually terminating, (after the global shutdown-signal-delay)
+		},
 		opts...,
 	)
 
@@ -675,6 +685,18 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 			s.globalRequestPool.ReturnRequest(r)
 		}()
 	}
+
+	logger.Info("incoming Substreams Blocks request", logFields...)
+
+	defer func() {
+		switch {
+		case errors.Is(err, context.Canceled):
+			reqStats.SetError(context.Canceled)
+		default:
+			reqStats.SetError(err)
+		}
+		reqStats.LogAndClose(ctx, requestDetails.ResolvedStartBlockNum)
+	}()
 
 	logger.Debug("initializing tier1 pipeline",
 		zap.Stringer("plan", reqPlan),
@@ -786,13 +808,68 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 		}
 
 		if err := streamSrv.Send(resp); err != nil {
-			logger.Info("unable to send block probably due to client disconnecting", zap.Error(err))
+			logger.Info("unable to send block probably due to client disconnecting", zap.String("user_id", userID), zap.String("api_key_id", apiKeyID))
 			return connect.NewError(connect.CodeUnavailable, err)
 		}
 
 		metericsSender.Send(ctx, userID, apiKeyID, ip, userMeta, outputModuleHash, "sf.substreams.rpc.v2/Blocks", resp)
 		return nil
 	}
+}
+
+func (s *Tier1Service) containsDeterministicError(ctx context.Context, startBlock, endBlock uint64, execGraph *exec.Graph, cacheStore dstore.Store) error {
+	for _, module := range execGraph.UsedModules() {
+		moduleStore, err := cacheStore.SubStore(execGraph.ModuleHashes().Get(module.Name))
+		if err != nil {
+			return fmt.Errorf("getting substore: %w", err)
+		}
+
+		if err := containsDeterministicError(ctx, moduleStore, module.Name, startBlock, endBlock, module.GetKindStore() != nil, s.logger); err != nil {
+			return connect.NewError(connect.CodeInvalidArgument, err)
+		}
+	}
+	return nil
+}
+
+func containsDeterministicError(ctx context.Context, moduleStore dstore.Store, moduleName string, startBlock, endBlock uint64, isStore bool, logger *zap.Logger) error {
+	var lastError error
+
+	startFile := fmt.Sprintf("errors.%010d", startBlock)
+	if isStore {
+		startFile = "" // for stores, any error preceding the startBlock will prevent execution
+	}
+
+	moduleStore.WalkFrom(ctx, "errors.", startFile, func(filename string) (err error) {
+		num, err := strconv.ParseUint(strings.TrimPrefix(filename, "errors."), 10, 64)
+		if err != nil {
+			logger.Warn("checking for errors: cannot parse filename", zap.String("filename", filename), zap.Error(err))
+			return nil
+		}
+
+		if endBlock != 0 && num > endBlock {
+			return io.EOF
+		}
+
+		obj, err := moduleStore.OpenObject(ctx, filename)
+		if err != nil {
+			logger.Warn("checking for errors: cannot open file", zap.String("filename", filename), zap.Error(err))
+			return nil
+		}
+
+		cnt, err := io.ReadAll(obj)
+		if err != nil {
+			logger.Warn("checking for errors: cannot read file", zap.String("filename", filename), zap.Error(err))
+			return nil
+		}
+
+		lastError = fmt.Errorf("error from block %d in module %s: %s", num, moduleName, string(cnt))
+		return nil
+	})
+
+	if lastError != nil && lastError != io.EOF {
+		return lastError
+	}
+	return lastError
 }
 
 func setupRequestStats(ctx context.Context, outputModuleName, outputModuleHash string, productionMode, tier2 bool) (context.Context, *metrics.Stats) {
@@ -837,6 +914,8 @@ func toConnectError(ctx context.Context, err error) error {
 			return connect.NewError(connect.CodeUnavailable, grpcError.Err())
 		case codes.InvalidArgument:
 			return connect.NewError(connect.CodeInvalidArgument, grpcError.Err())
+		case codes.DeadlineExceeded:
+			return connect.NewError(connect.CodeDeadlineExceeded, err)
 		case codes.ResourceExhausted:
 			return connect.NewError(connect.CodeResourceExhausted, grpcError.Err())
 		case codes.Unknown:

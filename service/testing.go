@@ -5,7 +5,10 @@ import (
 	"fmt"
 
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/shutter"
+	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/wasm"
+	"go.uber.org/zap"
 
 	"github.com/streamingfast/substreams/reqctx"
 
@@ -20,6 +23,7 @@ import (
 
 func TestNewService(runtimeConfig config.RuntimeConfig, linearHandoffBlockNum uint64, streamFactoryFunc StreamFactoryFunc) *Tier1Service {
 	return &Tier1Service{
+		Shutter:           shutter.New(),
 		blockType:         "sf.substreams.v1.test.Block",
 		streamFactoryFunc: streamFactoryFunc,
 		runtimeConfig:     runtimeConfig,
@@ -39,11 +43,8 @@ func (s *Tier1Service) TestBlocks(ctx context.Context, isSubRequest bool, reques
 	if err != nil {
 		return stream.NewErrInvalidArg(err.Error())
 	}
-	s.checkPendingShutdown = func() bool {
-		return false
-	}
 
-	return s.blocks(ctx, request, execGraph, respFunc)
+	return s.blocks(ctx, request, execGraph, respFunc, metrics.NewReqStats(&metrics.Config{}, zap.NewNop()), nil)
 }
 
 func TestNewServiceTier2(moduleExecutionTracing bool, streamFactoryFunc StreamFactoryFunc) *Tier2Service {

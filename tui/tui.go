@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
+	"github.com/bobg/go-generics/v3/slices"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/tools/test"
@@ -24,12 +26,34 @@ import (
 // ENUM(TUI, JSON, JSONL, CLOCK, CURSOR)
 type OutputMode uint
 
+type OutputStreamPattern struct {
+	pattern string
+	regex   *regexp.Regexp
+}
+
+func NewOutputStreamPattern(pattern string) OutputStreamPattern {
+	regex, err := regexp.Compile(pattern)
+	if err != nil {
+		return OutputStreamPattern{pattern: pattern, regex: nil}
+	}
+
+	return OutputStreamPattern{pattern: pattern, regex: regex}
+}
+
+func (o *OutputStreamPattern) Matches(input string) bool {
+	if o.regex == nil {
+		return o.pattern == input
+	}
+
+	return o.regex.MatchString(input)
+}
+
 type TUI struct {
 	shutter *shutter.Shutter
 
-	req               *pbsubstreamsrpc.Request
+	Req               *pbsubstreamsrpc.Request
 	pkg               *pbsubstreams.Package
-	outputStreamNames []string
+	outputStreamNames []OutputStreamPattern
 
 	// Output mode flags
 	isTerminal        bool
@@ -40,6 +64,7 @@ type TUI struct {
 	seenFirstData           bool
 	TotalReadBytes          uint64
 	RequiredProcessedBlocks uint64
+	ResolvedStartBlock      uint64
 
 	msgDescs       map[string]*desc.MessageDescriptor
 	decodeMsgTypes map[string]func(in []byte) string
@@ -49,9 +74,9 @@ type TUI struct {
 func New(req *pbsubstreamsrpc.Request, pkg *pbsubstreams.Package, outputStreamNames []string) *TUI {
 	ui := &TUI{
 		shutter:           shutter.New(),
-		req:               req,
+		Req:               req,
 		pkg:               pkg,
-		outputStreamNames: outputStreamNames,
+		outputStreamNames: slices.Map(outputStreamNames, func(s string) OutputStreamPattern { return NewOutputStreamPattern(s) }),
 		decodeMsgTypes:    map[string]func(in []byte) string{},
 		msgTypes:          map[string]string{},
 		msgDescs:          map[string]*desc.MessageDescriptor{},
@@ -76,7 +101,7 @@ func (ui *TUI) Init(outputMode string) error {
 
 	for _, mod := range ui.pkg.Modules.Modules {
 		for _, outputStreamName := range ui.outputStreamNames {
-			if mod.Name == outputStreamName {
+			if outputStreamName.Matches(mod.Name) {
 				var msgType string
 				switch modKind := mod.Kind.(type) {
 				case *pbsubstreams.Module_KindStore_:
@@ -118,7 +143,12 @@ func (ui *TUI) configureOutputMode(outputMode string) error {
 		var err error
 		ui.outputMode, err = ParseOutputMode(outputMode)
 		if err != nil {
-			return fmt.Errorf("parse output mode: %w", err)
+			// Also accepts `ui` as an alias for `TUI`
+			if outputMode == "UI" || outputMode == "ui" {
+				ui.outputMode = OutputModeTUI
+			} else {
+				return fmt.Errorf("parse output mode: %w", err)
+			}
 		}
 	}
 
@@ -228,20 +258,27 @@ func (ui *TUI) IncomingMessage(ctx context.Context, resp *pbsubstreamsrpc.Respon
 		}
 
 	case *pbsubstreamsrpc.Response_Session:
+		if m.Session.BlocksToProcessAfterStartBlock != 0 {
+			ui.RequiredProcessedBlocks = m.Session.EffectiveBlocksToProcessBeforeStartBlock + m.Session.EffectiveBlocksToProcessAfterStartBlock
+		}
+		ui.ResolvedStartBlock = m.Session.ResolvedStartBlock
+
 		if ui.outputMode == OutputModeTUI {
 			ui.ensureTerminalLocked()
 			ui.prog.Send(m)
 		} else {
 
-			execGraph, err := exec.NewOutputModuleGraph(ui.req.OutputModule, ui.req.ProductionMode, ui.req.Modules, bstream.GetProtocolFirstStreamableBlock)
+			execGraph, err := exec.NewOutputModuleGraph(ui.Req.OutputModule, ui.Req.ProductionMode, ui.Req.Modules, bstream.GetProtocolFirstStreamableBlock)
 			if err != nil {
 				return fmt.Errorf("cannot handle module graph: %w", err)
 			}
 
 			fmt.Fprintf(os.Stderr, "TraceID: %s\n", m.Session.TraceId)
-			fmt.Fprintf(os.Stderr, "Server HEAD block: %d\n", m.Session.ChainHead)
+			if m.Session.ChainHead != 0 {
+				fmt.Fprintf(os.Stderr, "Server HEAD block: %d\n", m.Session.ChainHead)
+			}
 			stages := len(execGraph.StagedUsedModules())
-			if stages == 1 || !ui.req.ProductionMode {
+			if stages == 1 || !ui.Req.ProductionMode {
 				fmt.Fprintln(os.Stderr, "This request will be processed in a single stage")
 			} else {
 				fmt.Fprintf(os.Stderr, "This request will be processed in %d stages\n", stages)
@@ -255,8 +292,9 @@ func (ui *TUI) IncomingMessage(ctx context.Context, resp *pbsubstreamsrpc.Respon
 				fmt.Fprintf(os.Stderr, "Blocks to process to prepare the stores in %s: %d (%d already cached)\n", stageCount, m.Session.EffectiveBlocksToProcessBeforeStartBlock, m.Session.BlocksToProcessBeforeStartBlock-m.Session.EffectiveBlocksToProcessBeforeStartBlock)
 			}
 
-			fmt.Fprintf(os.Stderr, "Blocks to process in requested range: %d (%d already cached)\n", m.Session.EffectiveBlocksToProcessAfterStartBlock, m.Session.BlocksToProcessAfterStartBlock-m.Session.EffectiveBlocksToProcessAfterStartBlock)
-			ui.RequiredProcessedBlocks = m.Session.EffectiveBlocksToProcessBeforeStartBlock + m.Session.EffectiveBlocksToProcessAfterStartBlock
+			if m.Session.BlocksToProcessAfterStartBlock != 0 {
+				fmt.Fprintf(os.Stderr, "Blocks to process in requested range: %d (%d already cached)\n", m.Session.EffectiveBlocksToProcessAfterStartBlock, m.Session.BlocksToProcessAfterStartBlock-m.Session.EffectiveBlocksToProcessAfterStartBlock)
+			}
 		}
 
 	default:

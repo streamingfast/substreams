@@ -131,6 +131,12 @@ func (s *Stages) MarkSegmentPartialPresent(u Unit) {
 	)
 }
 
+func (s *Stages) ReleaseJob(u Unit) {
+	s.transition(u, UnitPending,
+		UnitScheduled,
+	)
+}
+
 func (s *Stages) markSegmentScheduled(u Unit) {
 	s.transition(u, UnitScheduled,
 		UnitPending, // after scheduling some work (NextJob())

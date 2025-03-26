@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"runtime/debug"
 
+	"connectrpc.com/connect"
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dmetering"
@@ -33,6 +33,7 @@ func (p *Pipeline) ProcessFromExecOutput(
 	clock *pbsubstreams.Clock,
 	cursor *bstream.Cursor,
 ) (err error) {
+
 	p.gate.processBlock(clock.Number, bstream.StepNewIrreversible)
 	execOutput, err := p.execOutputCache.NewBuffer(nil, clock, cursor)
 	if err != nil {
@@ -49,21 +50,6 @@ func (p *Pipeline) ProcessFromExecOutput(
 func (p *Pipeline) ProcessBlock(block *pbbstream.Block, obj interface{}) (err error) {
 	ctx := p.ctx
 
-	logger := reqctx.Logger(ctx)
-	defer func() {
-		if r := recover(); r != nil {
-			if err, ok := r.(error); ok {
-				if errors.Is(err, context.Canceled) {
-					return
-				}
-			}
-			truncatedBlock := block.AsRef().String()
-			err = fmt.Errorf("panic at block %d: %s [%s]", block.Number, r, truncatedBlock)
-			logger.Warn("panic while process block", zap.Uint64("block_num", block.Number), zap.Error(err))
-			logger.Debug(string(debug.Stack())) // there are known panic cases, we don't want them in error logs
-		}
-	}()
-
 	metrics.BlockBeginProcess.Inc()
 	defer metrics.BlockEndProcess.Inc()
 
@@ -76,7 +62,6 @@ func (p *Pipeline) ProcessBlock(block *pbbstream.Block, obj interface{}) (err er
 
 	reorgJunctionBlock := obj.(bstream.Stepable).ReorgJunctionBlock()
 
-	reqctx.ReqStats(ctx).RecordBlock(block.AsRef())
 	p.gate.processBlock(block.Number, step)
 	execOutput, err := p.execOutputCache.NewBuffer(block, clock, cursor)
 	if err != nil {
@@ -86,6 +71,8 @@ func (p *Pipeline) ProcessBlock(block *pbbstream.Block, obj interface{}) (err er
 	if err = p.processBlock(ctx, execOutput, clock, cursor, step, reorgJunctionBlock); err != nil {
 		return err // watch out, io.EOF needs to go through undecorated
 	}
+
+	reqctx.ReqStats(ctx).RecordBlock(block.AsRef())
 	return
 }
 
@@ -132,7 +119,7 @@ func (p *Pipeline) processBlock(
 		//todo: (deprecated)
 		dmetering.GetBytesMeter(ctx).AddBytesRead(execOutput.Len())
 
-		err = p.handleStepNew(ctx, clock, cursor, execOutput)
+		err = p.handleStepNew(ctx, clock, cursor, execOutput, false)
 		if err != nil && err != io.EOF {
 			return err
 		}
@@ -141,7 +128,7 @@ func (p *Pipeline) processBlock(
 		}
 	case bstream.StepNewIrreversible:
 		p.blockStepMap[bstream.StepNewIrreversible]++
-		err = p.handleStepNew(ctx, clock, cursor, execOutput)
+		err = p.handleStepNew(ctx, clock, cursor, execOutput, true)
 		if err != nil && err != io.EOF {
 			return err
 		}
@@ -225,10 +212,14 @@ func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
 	return nil
 }
 
-func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput) (err error) {
-	if p.isTier1 && p.checkPendingShutdown() && p.stores.StoreMap != nil && p.sentBlocks > minBlocksProcessedToSave {
-		p.stores.logger.Info("shutting down, quick saving stores")
-		p.stores.StoreMap.QuickSave(ctx, p.lastFinalClock.Id)
+func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput, isFinalBlock bool) (err error) {
+	if p.isTier1 && p.checkPendingShutdown() {
+		if p.stores.StoreMap != nil && p.sentBlocks > minBlocksProcessedToSave {
+			p.stores.logger.Info("shutting down, quick saving stores")
+			p.stores.StoreMap.QuickSave(ctx, p.lastFinalClock.Id)
+		} else {
+			p.stores.logger.Info("shutting down")
+		}
 		return ErrShuttingDown
 	}
 
@@ -269,7 +260,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 
 	metering.AddWasmInputBytes(ctx, execOutput.Len())
 
-	if err := p.executeModules(ctx, execOutput); err != nil {
+	if err := p.executeModules(ctx, execOutput, isFinalBlock); err != nil {
 		return fmt.Errorf("execute modules: %w", err)
 	}
 
@@ -303,7 +294,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 	return nil
 }
 
-func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.ExecutionOutput) (err error) {
+func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.ExecutionOutput, isFinalBlock bool) (err error) {
 	ctx, span := reqctx.WithModuleExecutionSpan(ctx, "modules_executions")
 	defer span.EndWithErr(&err)
 
@@ -319,7 +310,21 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 
 	// the ctx is cached in the built moduleExecutors so we only activate timeout here
 	ctx, cancel := context.WithTimeout(ctx, p.executionTimeout)
-	defer cancel()
+	defer func() {
+		if r := recover(); r != nil {
+			if e, ok := r.(error); ok {
+				if errors.Is(e, context.Canceled) {
+					return
+				}
+				if ctx.Err() == context.DeadlineExceeded {
+					err = connect.NewError(connect.CodeDeadlineExceeded, fmt.Errorf("execution timed out at block %d: [%s] %s", blockNum, execOutput.Clock().Id, r))
+				} else {
+					err = fmt.Errorf("panic at block %d: %s [%s]", blockNum, r, execOutput.Clock().Id)
+				}
+			}
+		}
+		cancel()
+	}()
 
 	maxParallelExecutor := reqctx.MaxStageLayerParallelExecutor(ctx)
 	logging.Logger(ctx, p.stores.logger).Debug("executing stage's layers", zap.Int("layer_count", len(p.StagedModuleExecutors)), zap.Uint64("max_parallel_executor", maxParallelExecutor))
@@ -330,7 +335,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 				if !executor.RunsOnBlock(blockNum) {
 					continue
 				}
-				res := p.execute(ctx, executor, execOutput)
+				res := p.execute(ctx, executor, execOutput, isFinalBlock)
 				if err := p.applyExecutionResult(ctx, executor, res, execOutput); err != nil {
 					return fmt.Errorf("applying executor results %q on block %d (%s): %w", executor.Name(), blockNum, execOutput.Clock().Id, res.err)
 				}
@@ -346,11 +351,27 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 					continue
 				}
 
-				wg.Go(func() error {
-					res := p.execute(ctx, executor, execOutput)
+				wg.Go(func() (err error) {
+					defer func() {
+						// each go thread needs its own recover(), as the WASM execution can panic
+						if r := recover(); r != nil {
+							if e, ok := r.(error); ok {
+								if errors.Is(e, context.Canceled) {
+									return
+								}
+								if ctx.Err() == context.DeadlineExceeded {
+									err = connect.NewError(connect.CodeDeadlineExceeded, fmt.Errorf("execution timed out at block %d: [%s] %s", blockNum, execOutput.Clock().Id, r))
+								} else {
+									err = fmt.Errorf("panic at block %d: %s [%s]", blockNum, r, execOutput.Clock().Id)
+								}
+							}
+						}
+					}()
+
+					res := p.execute(ctx, executor, execOutput, isFinalBlock)
 					results[i] = res
 
-					return nil
+					return
 				})
 			}
 
@@ -386,13 +407,17 @@ type resultObj struct {
 	skipped_output bool
 }
 
-func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, execOutput execout.ExecutionOutput) resultObj {
+func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, execOutput execout.ExecutionOutput, isFinalBlock bool) resultObj {
 	logger := reqctx.Logger(ctx)
 
 	executorName := executor.Name()
 	logger.Debug("executing", zap.Uint64("block", execOutput.Clock().Number), zap.String("module_name", executorName))
 
 	moduleOutput, outputBytes, outputBytesFiles, skipped, runError := exec.RunModule(ctx, executor, execOutput)
+
+	if isFinalBlock && errors.Is(runError, exec.ErrWasmDeterministicExec) {
+		p.execoutStorage.ConfigMap[executorName].WriteDeterministicError(ctx, execOutput.Clock().Number, runError)
+	}
 
 	return resultObj{
 		output:         moduleOutput,

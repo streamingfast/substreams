@@ -12,7 +12,7 @@ import (
 type SimpleWorkerPool struct {
 	freeWorker        int
 	startedAt         time.Time
-	firstWorkerServed bool
+	firstWorkerActive bool
 	clientFactory     client.InternalClientFactory
 	rampingUp         bool
 	logger            *zap.Logger
@@ -35,7 +35,7 @@ func NewSimpleWorkerPool(ctx context.Context, workerCount int, clientFactory cli
 
 	go func() {
 		time.Sleep(time.Second * 4)
-		logger.Info("worker pool ramping up completed")
+		logger.Debug("worker pool ramping up completed")
 		wp.rampingUp = false
 
 	}()
@@ -44,7 +44,7 @@ func NewSimpleWorkerPool(ctx context.Context, workerCount int, clientFactory cli
 }
 
 func (p *SimpleWorkerPool) Borrow(_ context.Context) (Worker, error) {
-	if p.rampingUp && p.firstWorkerServed {
+	if p.rampingUp && p.firstWorkerActive {
 		return nil, ErrorResourceExhaustedRampUp
 	}
 
@@ -53,7 +53,7 @@ func (p *SimpleWorkerPool) Borrow(_ context.Context) (Worker, error) {
 	}
 
 	p.freeWorker--
-	p.firstWorkerServed = true
+	p.firstWorkerActive = true
 	worker := NewRemoteWorker(p.clientFactory, "", p.logger)
 
 	p.logger.Info("worker borrowed", zap.String("worker_key", worker.ID()), zap.Int("remaining_worker", p.freeWorker))
@@ -67,6 +67,9 @@ func (p *SimpleWorkerPool) RampingUp() bool {
 }
 
 func (p *SimpleWorkerPool) Return(_ context.Context, worker Worker) {
+	if p.rampingUp {
+		p.firstWorkerActive = false // in case ramp up is still ongoing, we free that 'first worker'
+	}
 	p.freeWorker++
 	p.logger.Info("worker returned", zap.String("worker_key", worker.ID()), zap.Int("remaining_worker", p.freeWorker))
 }

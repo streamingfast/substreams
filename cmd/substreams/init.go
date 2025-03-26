@@ -29,6 +29,7 @@ import (
 	"github.com/streamingfast/cli/sflags"
 	pbconvo "github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1"
 	"github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1/pbconvoconnect"
+	"github.com/tidwall/gjson"
 	"golang.org/x/net/http2"
 )
 
@@ -66,6 +67,14 @@ var WITH_ACCESSIBLE = false
 type initStateFormat struct {
 	GeneratorID string          `json:"generator"`
 	State       json.RawMessage `json:"state"`
+}
+
+type UserState struct {
+	downloadedFilesfolderPath string
+}
+
+func newUserState() *UserState {
+	return &UserState{}
 }
 
 func readGeneratorState(stateFile string) (*initStateFormat, error) {
@@ -167,7 +176,8 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	generatorID := lastState.GeneratorID
 	if generatorID == "" {
 		fmt.Printf("Getting available code generators from %s...\n\n", initConvoURL)
-		resp, err := client.Discover(context.Background(), connect.NewRequest(&pbconvo.DiscoveryRequest{}))
+		// TEMPORARY FIX: Using the "searchTerms" field as version to enforce breaking changes in the CLI (even before we send the generators)
+		resp, err := client.Discover(context.Background(), connect.NewRequest(&pbconvo.DiscoveryRequest{SearchTerms: "version1"}))
 		if err != nil {
 			return fmt.Errorf("failed to call discovery endpoint: %w", err)
 		}
@@ -184,10 +194,13 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			if groupExists {
 				selector.Generators = append(selector.Generators, gen)
 			} else {
-				filteredProtocols[gen.Group] = &BlockchainProtocolSelector{
-					Id:         gen.Group,
-					Title:      generatorGroupToProtocolTitle(gen.Group),
-					Generators: []*pbconvo.DiscoveryResponse_Generator{gen},
+				protocolTitle := generatorGroupToProtocolTitle(gen.Group)
+				if protocolTitle != "" {
+					filteredProtocols[gen.Group] = &BlockchainProtocolSelector{
+						Id:         gen.Group,
+						Title:      generatorGroupToProtocolTitle(gen.Group),
+						Generators: []*pbconvo.DiscoveryResponse_Generator{gen},
+					}
 				}
 			}
 		}
@@ -259,7 +272,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	}
 	startMsg := &pbconvo.UserInput_Start{
 		GeneratorId: generatorID,
-		Version:     2,
+		Version:     3,
 	}
 	if lastState.State != nil {
 		startMsg.Hydrate = &pbconvo.UserInput_Hydrate{SavedState: string(lastState.State)}
@@ -273,6 +286,8 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed sending start message: %w", err)
 	}
+
+	userState := newUserState()
 
 	var loadingCh chan bool
 	for {
@@ -515,23 +530,61 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			}
 
 		case *pbconvo.SystemOutput_DownloadFiles_:
-			savingDest, _ := os.Getwd()
+			if userState.downloadedFilesfolderPath == "" {
+				savingDest := "output"
+				if projectName := gjson.GetBytes(lastState.State, "name").String(); projectName != "" {
+					savingDest = projectName
+				}
+
+				if cwd, err := os.Getwd(); err == nil {
+					savingDest = filepath.Join(cwd, savingDest)
+				}
+
+				inputField := huh.NewInput().Title("In which directory do you want to download the project?").Value(&savingDest)
+				inputField.Validate(func(userInput string) error {
+					fmt.Println("Checking directory", userInput)
+					fileInfo, err := os.Stat(userInput)
+					if err != nil {
+						if os.IsNotExist(err) {
+							return nil
+						}
+						return fmt.Errorf("error checking directory: %w", err)
+					}
+
+					if !fileInfo.IsDir() {
+						return errors.New("the path is not a directory")
+					}
+
+					return nil
+				})
+
+				err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run()
+				if err != nil {
+					return fmt.Errorf("failed taking input: %w", err)
+				}
+
+				// the multiple \n are not a mistake, it's to have a blank line before the next message
+				fmt.Printf("\nProject will be saved in %s\n\n", savingDest)
+				userState.downloadedFilesfolderPath = savingDest
+			}
+
+			savingDest := userState.downloadedFilesfolderPath
 			input := msg.DownloadFiles
 
 			if len(input.Files) == 0 {
 				return fmt.Errorf("no files to download")
 			}
 
+			fmt.Printf("Creating directory: %s\n\n", savingDest)
+			err = os.MkdirAll(savingDest, os.ModePerm)
+			if err != nil {
+				return fmt.Errorf("creating directory %q: %w", savingDest, err)
+			}
+
 			forceDownloadProvided, _ := sflags.MustGetBoolProvided(cmd, "force-download-cwd")
 			if forceDownloadProvided {
 				for _, inputFile := range input.Files {
 					fullpath := path.Join(savingDest, inputFile.Filename)
-					fileDir := path.Dir(fullpath)
-
-					err = os.MkdirAll(fileDir, os.ModePerm)
-					if err != nil {
-						return fmt.Errorf("creating directory %q: %w", fileDir, err)
-					}
 
 					err = os.WriteFile(fullpath, inputFile.Content, 0777)
 					if err != nil {
@@ -695,6 +748,8 @@ func generatorGroupToProtocolTitle(group string) string {
 		return "Cosmos"
 	case "starknet":
 		return "Starknet"
+	case "stellar":
+		return "Stellar"
 	}
 
 	return ""

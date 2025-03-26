@@ -9,6 +9,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+- `substreams init`: add Stellar to the list of supported grouped chains (this will require everyone to upgrade the CLI version to use codegen)
+- `substreams init`: create project in a new directory, not in the current directory of the user.
+
 ## v1.14.6
 
 ### Server

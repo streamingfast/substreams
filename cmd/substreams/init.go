@@ -532,11 +532,10 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					savingDest = projectName
 				}
 
-				absolutePath , err := filepath.Abs(savingDest)
+				savingDest, err := filepath.Abs(savingDest)
 				if err != nil {
 					return fmt.Errorf("error building directory path: %w", err)
 				}
-				savingDest = absolutePath
 
 				inputField := huh.NewInput().Title("In which directory do you want to download the project?").Value(&savingDest)
 				inputField.Validate(func(userInput string) error {

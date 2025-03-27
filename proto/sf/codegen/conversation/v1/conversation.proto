@@ -161,6 +161,10 @@ message SystemOutput {
 
 message DiscoveryRequest {
   string search_terms = 1;
+
+  // Version sent to the codegen service, which is incremental (0,1,2...). 
+  // It is used to force users to upgrade after breaking changes between the CLI and the codegen server.
+  uint64 client_version = 2;
 }
 
 message DiscoveryResponse {

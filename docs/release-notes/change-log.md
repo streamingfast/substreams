@@ -11,6 +11,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Server
+
+* Save deterministic failures in WASM in the module cache (under a file named `errors.0123456789.zst` at the failed block number), so further requests depending on this module at the same block can return the error immediately without re-executing the module.
+
+### CLI
+
 - `substreams init`: add Stellar to the list of supported grouped chains (this will require everyone to upgrade the CLI version to use codegen)
 - `substreams init`: create project in a new directory, not in the current directory of the user.
 

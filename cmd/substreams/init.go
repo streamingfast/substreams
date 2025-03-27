@@ -176,8 +176,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	generatorID := lastState.GeneratorID
 	if generatorID == "" {
 		fmt.Printf("Getting available code generators from %s...\n\n", initConvoURL)
-		// TEMPORARY FIX: Using the "searchTerms" field as version to enforce breaking changes in the CLI (even before we send the generators)
-		resp, err := client.Discover(context.Background(), connect.NewRequest(&pbconvo.DiscoveryRequest{SearchTerms: "version1"}))
+		resp, err := client.Discover(context.Background(), connect.NewRequest(&pbconvo.DiscoveryRequest{ClientVersion: 1}))
 		if err != nil {
 			return fmt.Errorf("failed to call discovery endpoint: %w", err)
 		}
@@ -194,13 +193,10 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			if groupExists {
 				selector.Generators = append(selector.Generators, gen)
 			} else {
-				protocolTitle := generatorGroupToProtocolTitle(gen.Group)
-				if protocolTitle != "" {
-					filteredProtocols[gen.Group] = &BlockchainProtocolSelector{
-						Id:         gen.Group,
-						Title:      generatorGroupToProtocolTitle(gen.Group),
-						Generators: []*pbconvo.DiscoveryResponse_Generator{gen},
-					}
+				filteredProtocols[gen.Group] = &BlockchainProtocolSelector{
+					Id:         gen.Group,
+					Title:      gen.Group,
+					Generators: []*pbconvo.DiscoveryResponse_Generator{gen},
 				}
 			}
 		}
@@ -536,8 +532,9 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					savingDest = projectName
 				}
 
-				if cwd, err := os.Getwd(); err == nil {
-					savingDest = filepath.Join(cwd, savingDest)
+				savingDest, err := filepath.Abs(savingDest)
+				if err != nil {
+					return fmt.Errorf("error building directory path: %w", err)
 				}
 
 				inputField := huh.NewInput().Title("In which directory do you want to download the project?").Value(&savingDest)
@@ -558,7 +555,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					return nil
 				})
 
-				err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run()
+				err = huh.NewForm(huh.NewGroup(inputField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run()
 				if err != nil {
 					return fmt.Errorf("failed taking input: %w", err)
 				}
@@ -736,23 +733,6 @@ func saveDownloadFile(path string, overwriteForm *OverwriteForm, inputFile *pbco
 		return fmt.Errorf("saving zip file %q: %w", inputFile.Filename, err)
 	}
 	return nil
-}
-
-func generatorGroupToProtocolTitle(group string) string {
-	switch group {
-	case "evm":
-		return "EVM"
-	case "solana":
-		return "Solana"
-	case "cosmos":
-		return "Cosmos"
-	case "starknet":
-		return "Starknet"
-	case "stellar":
-		return "Stellar"
-	}
-
-	return ""
 }
 
 func ToMarkdown(input string) string {

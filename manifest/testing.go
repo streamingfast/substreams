@@ -12,7 +12,7 @@ var ten = uint64(10)
 var twenty = uint64(20)
 var thirty = uint64(30)
 
-// NewTestModules can be used in foreign packages for their test suite
+// NewSimpleTestModules can be used in foreign packages for their test suite
 func NewSimpleTestModules() []*pbsubstreams.Module {
 	return []*pbsubstreams.Module{
 		{

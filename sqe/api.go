@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// FindAllFieldNames returns all used field names in the AST. There
+// ExtractAllKeys returns all used field names in the AST. There
 // is **NO** ordering on the elements, i.e. they might not come in the
 // same order specified in the AST.
 func ExtractAllKeys(expression Expression) (out []string) {

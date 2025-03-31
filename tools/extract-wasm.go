@@ -32,7 +32,7 @@ func extractWASME(cmd *cobra.Command, args []string) error {
 
 	module := sflags.MustGetString(cmd, "module")
 
-	manifestReader, err := manifest.NewReader(src)
+	manifestReader, err := manifest.NewReader(src, manifest.SkipPackageValidationReader())
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
 	}

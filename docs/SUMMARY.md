@@ -63,6 +63,7 @@
     * [Option struct](new/how-to-guides/using-rust-proto/rust/option.md)
     * [Result struct](new/how-to-guides/using-rust-proto/rust/result.md)
   * [Protobuf Schemas](new/how-to-guides/using-rust-proto/creating-protobuf-schemas.md)
+* [From Yellowstone to Substreams](new/how-to-guides/yelllowstone-migration/migrate.md)
 
 ## Reference Material
 

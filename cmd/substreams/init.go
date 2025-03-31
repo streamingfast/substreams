@@ -565,6 +565,12 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				// the multiple \n are not a mistake, it's to have a blank line before the next message
 				fmt.Printf("\nProject will be saved in %s\n\n", savingDest)
 				userState.downloadedFilesfolderPath = savingDest
+
+				fmt.Printf("Creating directory: %s\n\n", savingDest)
+				err = os.MkdirAll(savingDest, os.ModePerm)
+				if err != nil {
+					return fmt.Errorf("creating directory %q: %w", savingDest, err)
+				}
 			}
 
 			savingDest := userState.downloadedFilesfolderPath
@@ -572,12 +578,6 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 
 			if len(input.Files) == 0 {
 				return fmt.Errorf("no files to download")
-			}
-
-			fmt.Printf("Creating directory: %s\n\n", savingDest)
-			err = os.MkdirAll(savingDest, os.ModePerm)
-			if err != nil {
-				return fmt.Errorf("creating directory %q: %w", savingDest, err)
 			}
 
 			if forceDownloadProvided {

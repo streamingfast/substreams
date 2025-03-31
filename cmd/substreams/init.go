@@ -526,7 +526,9 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			}
 
 		case *pbconvo.SystemOutput_DownloadFiles_:
-			if userState.downloadedFilesfolderPath == "" {
+			forceDownloadProvided, _ := sflags.MustGetBoolProvided(cmd, "force-download-cwd")
+
+			if !forceDownloadProvided && userState.downloadedFilesfolderPath == "" {
 				savingDest := "output"
 				if projectName := gjson.GetBytes(lastState.State, "name").String(); projectName != "" {
 					savingDest = projectName
@@ -578,7 +580,6 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("creating directory %q: %w", savingDest, err)
 			}
 
-			forceDownloadProvided, _ := sflags.MustGetBoolProvided(cmd, "force-download-cwd")
 			if forceDownloadProvided {
 				for _, inputFile := range input.Files {
 					fullpath := path.Join(savingDest, inputFile.Filename)

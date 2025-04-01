@@ -41,7 +41,7 @@ func (w *Writer) Close(ctx context.Context) error {
 // startblock=500
 // look for 0->1000
 
-// GenrateBlockIndexWriters will only generate writers for modules that have no preexisting index file and that are aligned with the bundle size
+// GenerateBlockIndexWriters will only generate writers for modules that have no preexisting index file and that are aligned with the bundle size
 func GenerateBlockIndexWriters(ctx context.Context, baseStore dstore.Store, indexModules []*pbsubstreams.Module, ModuleHashes *manifest.ModuleHashes, logger *zap.Logger, blockRange *block.Range, bundleSize uint64) (writers map[string]*Writer, existingIndices map[string]map[string]*roaring64.Bitmap, err error) {
 	writers = make(map[string]*Writer)
 	existingIndices = make(map[string]map[string]*roaring64.Bitmap)

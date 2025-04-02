@@ -35,6 +35,7 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 | Bitcoin  | [`sf.bitcoin.type.v1.Block`](https://github.com/streamingfast/firehose-bitcoin/blob/develop/proto/sf/bitcoin/type/v1/type.proto)          |                                                                                                                       |
 | Antelope | [`sf.antelope.type.v1.Block`](https://buf.build/pinax/firehose-antelope/docs/main:sf.antelope.type.v1#sf.antelope.type.v1.Block)          |                                                                                                                       |
 | Starknet | [`sf.starknet.type.v1.Block`](https://github.com/streamingfast/firehose-starknet/blob/main/proto/sf/starknet/type/v1/block.proto#L8)      |                                                                                                                       |
+| Stellar | [`sf.stellar.type.v1.Block`](https://github.com/streamingfast/firehose-stellar/blob/main/proto/sf/stellar/type/v1/block.proto#L7)      |                                                                                                                       |
 
 
 ### EVM Extended vs Base Block Model

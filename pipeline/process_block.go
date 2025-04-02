@@ -216,9 +216,9 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 	if p.isTier1 && p.checkPendingShutdown() {
 		if p.stores.StoreMap != nil && p.sentBlocks > minBlocksProcessedToSave {
 			p.stores.logger.Info("shutting down, quick saving stores")
-			p.stores.StoreMap.QuickSave(ctx, p.lastFinalClock.Id)
+			p.stores.StoreMap.QuickSave(ctx, p.lastProcessedBlockRef.ID())
 		} else {
-			p.stores.logger.Info("shutting down")
+			p.stores.logger.Info("shutting down (no quick save)", zap.Bool("has_stores", p.stores.StoreMap != nil), zap.Uint64("sent_blocks", p.sentBlocks))
 		}
 		return ErrShuttingDown
 	}

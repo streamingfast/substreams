@@ -68,6 +68,7 @@
 ## Reference Material
 
 * [Chains and endpoints](new/references/chains-and-endpoints.md)
+  * [Ethereum Data Model](new/references/ethereum-data-model.md)
 * [Never Miss Data](new/references/reliability-guarantees.md)
 * [Development Container Reference](new/references/devcontainer-ref.md)
 * [Substreams CLI](new/references/cli/)

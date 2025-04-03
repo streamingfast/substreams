@@ -54,7 +54,6 @@ The data missing in the Base Block makes the corresponding Protobuf field empty.
 ## Official Endpoints
 
 - **Ethereum Mainnet**: `mainnet.eth.streamingfast.io:443`
-- **Ethereum Görli**: `goerli.eth.streamingfast.io:443`
 - **Ethereum Sepolia**: `sepolia.eth.streamingfast.io:443`
 - **Ethereum Holesky**: `holesky.eth.streamingfast.io:443`
 - **Polygon** **Mainnet**: `polygon.streamingfast.io:443`

@@ -61,7 +61,7 @@ The data missing in the Base Block makes the corresponding Protobuf field empty.
 - **Mumbai Testnet**: `mumbai.streamingfast.io:443`
 - **Arbitrum One**: `arb-one.streamingfast.io:443`
 - **BNB**: `bnb.streamingfast.io:443`
-- **Optimism**: `opt-mainnet.streamingfast.io:443`
+- **Optimism**: `mainnet.optimism.streamingfast.io:443`
 - **Avalanche C-Chain Mainnet**: `avalanche-mainnet.streamingfast.io:443`
 - **NEAR Mainnet**: `mainnet.near.streamingfast.io:443`
 - **NEAR Testnet**: `testnet.near.streamingfast.io:443`

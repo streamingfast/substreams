@@ -63,9 +63,9 @@ var ChainConfigByID = map[string]*ChainConfig{
 	"optimism": {
 		DisplayName:      "Optimism Mainnet",
 		ExplorerLink:     "https://optimistic.etherscan.io",
-		FirehoseEndpoint: "opt-mainnet.streamingfast.io:443",
+		FirehoseEndpoint: "mainnet.optimism.streamingfast.io:443",
 		Network:          "optimism",
-		SupportsCalls:    false,
+		SupportsCalls:    true,
 	},
 	"avalanche": {
 		DisplayName:      "Avalanche C-chain",

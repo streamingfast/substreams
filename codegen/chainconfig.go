@@ -128,11 +128,11 @@ var ChainConfigByID = map[string]*ChainConfig{
 		FirehoseEndpoint: "testnet.stellar.streamingfast.io:443",
 		Network:          "stellar-testnet",
 	},
-	"stellar-mainnet": {
+	"stellar": {
 		DisplayName:      "Stellar Mainnet",
 		ExplorerLink:     "",
 		FirehoseEndpoint: "mainnet.stellar.streamingfast.io:443",
-		Network:          "stellar-mainnet",
+		Network:          "stellar",
 	},
 	"sei-mainnet": {
 		DisplayName:      "Sei Mainnet",

@@ -16,6 +16,10 @@ In this guide, you'll learn how to initialize a Stellar-based Substreams project
     - **stellar-transactions-operations**: Creates a Substreams that extracts and decodes Stellar trasactions or operations using the cached [Stellar Foundational Module](https://substreams.dev/packages/stellar-foundational/v0.3.0). If you choose the index transactions, you will be able to filter by **source account(s)**. If you choose to index operations, you will be able to filter by **operation name**.
 
 {% hint style="info" %} 
+ The first streamable block for Stellar on Substreams is currently 55,411,000.
+{% endhint %}
+
+{% hint style="info" %} 
  The `stellar-transactions-operations` foundational module **only decodes and indexes SOME operations**. However, you can [modify the code](https://github.com/streamingfast/substreams-foundational-modules/blob/develop/stellar-common/src/operations.rs#L16) to include the decoding of other operations if needed.
  
  Please, find below the operations supported:

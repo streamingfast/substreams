@@ -18,11 +18,21 @@ This version refers to the `Block` emitted by the Firehose trace.
 
 ### Version 3
 
-- This version is current in place for **all EVM chains, with the exepction of Optimism** from block 0 to the last pre-Pague hard fork block.
-- This version contains several known issues, which are described in the Protobuf definition itself (next to the corresponding field affected). You can also check out this GitHub issue.
+- This version is current in place for **all EVM chains, with the exception of Optimism** from block 0 to the last pre-Prague (blockchains currently in Prague version are listed in a section later in this document) hard fork block.
+- This version contains several known issues, which are described in the Protobuf definition itself (next to the corresponding field affected). You can also check out [this GitHub issue](https://github.com/streamingfast/firehose-ethereum/issues/71).
 
 ### Version 4
 
 - This version is currently in place for the following chains:
     - Optimism
+    - Ethereum Hoodi
+    - Sei EVM
 - This version fixes the known issue of version 3.
+
+## Prague-enabled blockchains
+
+The following chains have already upgraded to Ethereum's Prague version:
+- Ethereum Sepolia
+- Ethereum Holesky
+- BSC Mainnet
+- BSC Testnet

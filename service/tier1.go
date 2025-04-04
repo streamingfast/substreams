@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -560,6 +561,13 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	}
 	if err := s.containsDeterministicError(ctx, startBlockErrorCheck, stopBlockErrorCheck, execGraph, cacheStore); err != nil {
 		logger.Info("refusing Substreams Blocks request", append(logFields, zap.Error(err))...)
+
+		// Calculate random sleep duration to prevent heavy reconnections on failed requests
+		randomMillis := 1000 + rand.Intn(4000) // between 1 and 5 seconds
+		sleepDuration := time.Duration(randomMillis) * time.Millisecond
+		logger.Debug("sleeping before returning deterministic error", zap.Duration("duration", sleepDuration))
+		time.Sleep(sleepDuration)
+
 		return err
 	}
 

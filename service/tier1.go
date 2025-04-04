@@ -555,6 +555,9 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	// determine if we should refuse the request because of a previously found deterministic error
 	startBlockErrorCheck := requestDetails.ResolvedStartBlockNum
 	stopBlockErrorCheck := request.StopBlockNum
+	if request.StopBlockNum == 0 {
+		stopBlockErrorCheck = requestDetails.LinearHandoffBlockNum
+	}
 	if requestDetails.LinearHandoffBlockNum > startBlockErrorCheck {
 		startBlockErrorCheck = startBlockErrorCheck / segmentSize * segmentSize                     // round down to the nearest segment
 		stopBlockErrorCheck = ((stopBlockErrorCheck - 1) / segmentSize * segmentSize) + segmentSize // round up to the nearest segment

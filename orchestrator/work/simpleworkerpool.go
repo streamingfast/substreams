@@ -24,7 +24,7 @@ func NewSimpleWorkerPool(ctx context.Context, workerCount int, clientFactory cli
 	logger := reqctx.Logger(ctx)
 	logger = logger.Named("simple-worker-pool").With(zap.Bool("keep", false))
 
-	logger.Info("initializing worker pool", zap.Int("worker_count", workerCount))
+	logger.Info("initializing worker pool", zap.Int("worker_count", workerCount), zap.Duration("rampup_time", rampupTime))
 	wp := &SimpleWorkerPool{
 		freeWorker:    workerCount,
 		startedAt:     time.Now(),
@@ -34,7 +34,7 @@ func NewSimpleWorkerPool(ctx context.Context, workerCount int, clientFactory cli
 	}
 
 	go func() {
-		time.Sleep(time.Second * 4)
+		time.Sleep(rampupTime)
 		logger.Debug("worker pool ramping up completed")
 		wp.rampingUp = false
 

@@ -3,6 +3,7 @@ package work
 import (
 	"context"
 	"errors"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -17,6 +18,16 @@ import (
 const Tier2WorkerServiceName = "t2w"
 const Tier1RequestServiceName = "t1r"
 const FreeWorkerKeyPrefix = "FREE.WORKER.KEY:"
+
+var rampupTime = time.Second * 4
+
+func init() {
+	if envRampupTime := os.Getenv("SUBSTREAMS_WORKERS_RAMPUP_TIME"); envRampupTime != "" {
+		if d, err := time.ParseDuration(envRampupTime); err == nil {
+			rampupTime = d
+		}
+	}
+}
 
 type GlobalWorkerPool struct {
 	userID             string
@@ -37,7 +48,8 @@ type GlobalWorkerPool struct {
 
 func NewGlobalWorkerPool(ctx context.Context, userID string, apiKeyID string, traceID string, maxWorkerForTraceID uint64, remoteWorkerPoolClient pbworker.WorkerPoolClient, clientFactory client.InternalClientFactory, workerKeepAliveDelay time.Duration) *GlobalWorkerPool {
 	logger := reqctx.Logger(ctx)
-	logger.Info("initializing worker pool", zap.String("user_id", userID), zap.String("api_key_id", apiKeyID), zap.String("trace_id", traceID), zap.Uint64("max_worker_for_trace_id", maxWorkerForTraceID), zap.Duration("worker_keep_alive_delay", workerKeepAliveDelay))
+	logger.Info("initializing worker pool", zap.String("user_id", userID), zap.String("api_key_id", apiKeyID), zap.String("trace_id", traceID), zap.Uint64("max_worker_for_trace_id", maxWorkerForTraceID), zap.Duration("worker_keep_alive_delay", workerKeepAliveDelay),
+		zap.Duration("ramp_up_time", rampupTime))
 
 	logger = logger.Named("global-worker-pool").With(zap.Bool("keep", false))
 
@@ -64,7 +76,7 @@ func NewGlobalWorkerPool(ctx context.Context, userID string, apiKeyID string, tr
 	}()
 
 	go func() {
-		time.Sleep(time.Second * 4)
+		time.Sleep(rampupTime)
 		logger.Debug("worker pool ramping up completed")
 		wp.rampingUp = false
 	}()

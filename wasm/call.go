@@ -1,6 +1,7 @@
 package wasm
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -12,6 +13,8 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage/store"
 )
+
+var ErrWasmDeterministicExec = errors.New("wasm execution failed deterministically")
 
 type Call struct {
 	Clock      *pbsubstreams.Clock // Used by WASM extensions
@@ -325,11 +328,11 @@ func (c *Call) validateWithTwoValueTypes(stateFunc string, updatePolicy pbsubstr
 }
 
 func (c *Call) returnInvalidPolicy(stateFunc, policy string) {
-	panic(fmt.Errorf("module %q: invalid store operation %q, only valid for stores with %s", c.ModuleName, stateFunc, policy))
+	panic(fmt.Errorf("module %q: invalid store operation %q, only valid for stores with %s, %w", c.ModuleName, stateFunc, policy, ErrWasmDeterministicExec))
 }
 
 func (c *Call) ReturnError(err error) {
-	panic(fmt.Errorf("module %q: %w", c.ModuleName, err))
+	panic(fmt.Errorf("module %q: %w, %w", c.ModuleName, err, ErrWasmDeterministicExec))
 }
 
 var policyMap = map[pbsubstreams.Module_KindStore_UpdatePolicy]string{

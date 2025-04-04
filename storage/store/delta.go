@@ -1,8 +1,8 @@
 package store
 
 import (
+	"errors"
 	"fmt"
-	"regexp"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
@@ -46,10 +46,10 @@ func (b *baseStore) ApplyDelta(delta *pbsubstreams.StoreDelta) {
 	}
 }
 
-var StoreAboveMaxSizeRegexp = regexp.MustCompile("store .* became too big at [0-9]*, maximum size: [0-9]*")
+var ErrStoreAboveMaxSize = errors.New("store above max size")
 
 func storeTooBigError(storeName string, size, limit uint64) error {
-	return fmt.Errorf("store %q became too big at %d, maximum size: %d", storeName, size, limit)
+	return fmt.Errorf("store %q became too big at %d, maximum size: %d, %w", storeName, size, limit, ErrStoreAboveMaxSize)
 }
 
 func (b *baseStore) ApplyDeltasReverse(deltas []*pbsubstreams.StoreDelta) {

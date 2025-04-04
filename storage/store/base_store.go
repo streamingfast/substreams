@@ -1,7 +1,6 @@
 package store
 
 import (
-	"errors"
 	"fmt"
 
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
@@ -80,20 +79,6 @@ func (b *baseStore) ApplyOps(in []byte) error {
 }
 
 func (b *baseStore) Flush() (err error) {
-	// the low-level store operations are supposed to panic because they are called directly from WASM
-	// we catch that panic and return the error if it happens in Flush()
-	defer func() {
-		if r := recover(); r != nil {
-			switch x := r.(type) {
-			case string:
-				err = errors.New(x)
-			case error:
-				err = x
-			default:
-				err = errors.New("unknown panic")
-			}
-		}
-	}()
 
 	b.kvOps.Sort()
 	for _, op := range b.kvOps.Operations {

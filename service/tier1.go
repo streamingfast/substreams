@@ -945,11 +945,7 @@ func toConnectError(ctx context.Context, err error) error {
 		return connect.NewError(connect.CodeDeadlineExceeded, err)
 	}
 
-	if store.StoreAboveMaxSizeRegexp.MatchString(err.Error()) {
-		return connect.NewError(connect.CodeInvalidArgument, err)
-	}
-
-	if errors.Is(err, exec.ErrWasmDeterministicExec) {
+	if errors.Is(err, wasm.ErrWasmDeterministicExec) || errors.Is(err, store.ErrStoreAboveMaxSize) {
 		return connect.NewError(connect.CodeInvalidArgument, err)
 	}
 

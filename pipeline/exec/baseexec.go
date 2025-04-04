@@ -13,8 +13,6 @@ import (
 	ttrace "go.opentelemetry.io/otel/trace"
 )
 
-var ErrWasmDeterministicExec = errors.New("wasm execution failed deterministically")
-
 type BaseExecutor struct {
 	ctx context.Context
 
@@ -136,13 +134,13 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canS
 			message:    panicErr.Error(),
 			stackTrace: call.Logs,
 		}
-		return nil, fmt.Errorf("block %d: module %q: general wasm execution panicked: %w: %s", clock.Number, e.moduleName, ErrWasmDeterministicExec, errExecutor.Error())
+		return nil, fmt.Errorf("block %d: module %q: general wasm execution panicked: %w: %s", clock.Number, e.moduleName, wasm.ErrWasmDeterministicExec, errExecutor.Error())
 	}
 	if err != nil {
 		if ctxErr := e.ctx.Err(); ctxErr != nil {
 			return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %w, %w", clock.Number, e.moduleName, err, ctxErr)
 		}
-		return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %w: %s", clock.Number, e.moduleName, ErrWasmDeterministicExec, err)
+		return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %w: %s", clock.Number, e.moduleName, wasm.ErrWasmDeterministicExec, err)
 	}
 	if inst != nil {
 		if e.instanceCacheEnabled {

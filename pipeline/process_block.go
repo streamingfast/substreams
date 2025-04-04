@@ -19,6 +19,8 @@ import (
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
+	"github.com/streamingfast/substreams/storage/store"
+	"github.com/streamingfast/substreams/wasm"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -407,15 +409,28 @@ type resultObj struct {
 	skipped_output bool
 }
 
-func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, execOutput execout.ExecutionOutput, isFinalBlock bool) resultObj {
+func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, execOutput execout.ExecutionOutput, isFinalBlock bool) (out resultObj) {
 	logger := reqctx.Logger(ctx)
 
 	executorName := executor.Name()
 	logger.Debug("executing", zap.Uint64("block", execOutput.Clock().Number), zap.String("module_name", executorName))
 
+	defer func() {
+		if r := recover(); r != nil {
+			if err, ok := r.(error); ok {
+				if errors.Is(err, wasm.ErrWasmDeterministicExec) || errors.Is(err, store.ErrStoreAboveMaxSize) {
+					p.execoutStorage.ConfigMap[executorName].WriteDeterministicError(ctx, execOutput.Clock().Number, err)
+					out.err = err
+					return
+				}
+			}
+			panic(r) // send other panics up one level
+		}
+	}()
+
 	moduleOutput, outputBytes, outputBytesFiles, skipped, runError := exec.RunModule(ctx, executor, execOutput)
 
-	if isFinalBlock && errors.Is(runError, exec.ErrWasmDeterministicExec) {
+	if isFinalBlock && errors.Is(runError, wasm.ErrWasmDeterministicExec) {
 		p.execoutStorage.ConfigMap[executorName].WriteDeterministicError(ctx, execOutput.Clock().Number, runError)
 	}
 

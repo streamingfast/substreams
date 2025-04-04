@@ -629,10 +629,7 @@ func toGRPCError(ctx context.Context, err error) error {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return status.Error(codes.DeadlineExceeded, err.Error())
 	}
-	if store.StoreAboveMaxSizeRegexp.MatchString(err.Error()) {
-		return status.Error(codes.InvalidArgument, err.Error())
-	}
-	if errors.Is(err, exec.ErrWasmDeterministicExec) {
+	if errors.Is(err, wasm.ErrWasmDeterministicExec) || errors.Is(err, store.ErrStoreAboveMaxSize) {
 		return status.Error(codes.InvalidArgument, err.Error())
 	}
 

@@ -9,6 +9,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+* Catch "store errors" as deterministic (ex: invalid operation, store too big...), writing them to the module cache as well as errors that happen directly in the WASM code.
+
 ## v1.15.2
 
 * Fix quicksave feature (incorrect block hash on quicksave)

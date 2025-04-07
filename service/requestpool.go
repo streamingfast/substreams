@@ -185,6 +185,7 @@ func (p *GlobalRequestPool) ReturnRequest(r *BorrowedRequest) {
 	if err != nil {
 		p.logger.Error("returning request worker", zap.Error(err))
 		//do not propagate that err...
+	} else {
+		p.logger.Info("returned request worker", zap.String("key", r.key), zap.Stringer("status", resp.Status))
 	}
-	p.logger.Info("returned request worker", zap.String("key", r.key), zap.Stringer("status", resp.Status))
 }

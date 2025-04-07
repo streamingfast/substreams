@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -81,6 +82,8 @@ type RemoteWorker struct {
 	logger        *zap.Logger
 	id            string
 	done          chan struct{}
+	mutex         sync.Mutex
+	stopped       bool
 }
 
 func NewRemoteWorker(clientFactory client.InternalClientFactory, id string, logger *zap.Logger) *RemoteWorker {
@@ -405,6 +408,14 @@ func (r *RemoteWorker) StartKeepAlive(ctx context.Context, delay time.Duration, 
 	}()
 }
 func (r *RemoteWorker) StopKeepAlive() {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	if r.stopped {
+		return
+	}
+
+	r.stopped = true
 	close(r.done)
 }
 

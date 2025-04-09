@@ -11,9 +11,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Server
+
 * Catch "store errors" as deterministic (ex: invalid operation, store too big...), writing them to the module cache as well as errors that happen directly in the WASM code.
 * Ensure the 'error cache' is effective even when the "stop block" is unset (0)
 * Fix 'SUBSTREAMS_WORKERS_RAMPUP_TIME' environment variable that was not being honored
+
+### CLI
+
+* `substreams init`: fix project creation when using the `--force-download-cwd` flag.
 
 ## v1.15.2
 

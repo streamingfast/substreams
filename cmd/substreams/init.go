@@ -12,7 +12,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -578,20 +577,6 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 
 			if len(input.Files) == 0 {
 				return fmt.Errorf("no files to download")
-			}
-
-			if forceDownloadProvided {
-				for _, inputFile := range input.Files {
-					fullpath := path.Join(savingDest, inputFile.Filename)
-
-					err = os.WriteFile(fullpath, inputFile.Content, 0777)
-					if err != nil {
-						if !os.IsNotExist(err) {
-							return fmt.Errorf("writing file %q: %w", fullpath, err)
-						}
-					}
-				}
-				return nil
 			}
 
 			fmt.Println("Writing local files:")

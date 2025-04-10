@@ -90,6 +90,7 @@
   * [Publish to The Graph Network](new/references/graph-node/publish-decentralized-network.md)
 * [Indexer Reference](new/references/indexer-reference/indexer-reference.md)
   * [Test Substreams Locally](new/references/indexer-reference/test-locally.md)
+* [Logging, Debugging & Testing](new/references/log-and-debug.md)
 * [Change log](release-notes/change-log.md)
 * [FAQ](new/references/faq.md)
 

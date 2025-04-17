@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/streamingfast/cli"
-	"github.com/streamingfast/cli/utils"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -15,21 +13,26 @@ import (
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
+	"github.com/streamingfast/cli"
+	"github.com/streamingfast/cli/utils"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
 
-func init() {
-	registryCmd.AddCommand(registryPublish)
-}
-
 var registryPublish = &cobra.Command{
 	Use:   "publish [github_release_url | https_spkg_path | local_spkg_path | local_substreams_path]",
 	Short: "Publish a package to the Substreams.dev registry",
 	Args:  cobra.MaximumNArgs(1),
 	RunE:  runRegistryPublish,
+}
+
+var teamSlug string
+
+func init() {
+	registryPublish.Flags().StringVarP(&teamSlug, "team", "t", "", "Team slug to publish the package under (e.g. 'my-team' instead of 'My Team')")
+	registryCmd.AddCommand(registryPublish)
 }
 
 func runRegistryPublish(cmd *cobra.Command, args []string) (err error) {
@@ -87,7 +90,6 @@ func runRegistryPublish(cmd *cobra.Command, args []string) (err error) {
 	writer := multipart.NewWriter(&requestBody)
 
 	// Create form file to get it read from the `substreams.dev`  server
-
 	formFile, err := writer.CreateFormFile("file", "substreams_package")
 	if err != nil {
 		return fmt.Errorf("failed to create form file: %w", err)
@@ -101,6 +103,14 @@ func runRegistryPublish(cmd *cobra.Command, args []string) (err error) {
 	_, err = formFile.Write(data)
 	if err != nil {
 		return fmt.Errorf("failed to write file content: %w", err)
+	}
+
+	// Add team slug to form data if provided
+	if teamSlug != "" {
+		err = writer.WriteField("teamSlug", teamSlug)
+		if err != nil {
+			return fmt.Errorf("failed to write team slug field: %w", err)
+		}
 	}
 
 	err = writer.Close()

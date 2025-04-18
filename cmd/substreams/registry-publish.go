@@ -31,7 +31,7 @@ var registryPublish = &cobra.Command{
 var teamSlug string
 
 func init() {
-	registryPublish.Flags().StringVarP(&teamSlug, "team", "t", "", "Team slug to publish the package under (e.g. 'my-team' instead of 'My Team')")
+	registryPublish.Flags().StringVarP(&teamSlug, "teamSlug", "t", "", "Team slug to publish the package under (e.g. 'myteam' instead of 'My Team')")
 	registryCmd.AddCommand(registryPublish)
 }
 

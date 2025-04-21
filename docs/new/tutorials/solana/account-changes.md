@@ -29,7 +29,7 @@ Using the [Solana Accounts Foundational Module](https://substreams.dev/packages/
 ```bash
  substreams gui  solana-accounts-foundational filtered_accounts -t +10 -p filtered_accounts="owner:TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA || account:4vMsoUT2BWatFweudnQM1xedRLfJgJ7hswhcpz4xgBTy"
 ```
-This command will stream account changes directly to your terminal.
+This command will benchmark the account change stream within your terminal.
 
 ```bash
 substreams run solana-accounts-foundational filtered_accounts -s -1 -o clock

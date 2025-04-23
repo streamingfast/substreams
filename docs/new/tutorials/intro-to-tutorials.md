@@ -9,3 +9,4 @@ If your blockchain is not supported, please ask in Discord. Then, consult the re
 - [Starknet](./starknet.md)
 - [Injective](./cosmos-compatible/injective.md)
 - [Mantra](./cosmos-compatible/mantra.md)
+- [Stellar](./stellar.md)

@@ -19,7 +19,7 @@ func TestExtractClocks(t *testing.T) {
 		{
 			name: "sunny path",
 			file: &File{
-				ModuleName: "sunny_path",
+				ModuleHash: "sunny_path",
 				Kv:         map[string]*pboutput.Item{"id1": {BlockNum: 1, BlockId: "1"}, "id2": {BlockNum: 2, BlockId: "3"}},
 			},
 			clocksDistributor: map[uint64]*pbsubstreams.Clock{},

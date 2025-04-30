@@ -51,7 +51,8 @@ func BuildParallelProcessor(
 		if requestedModule.GetKindMap() != nil {
 			initialBlock := execGraph.ModulesInitBlocks()[requestedModule.Name]
 			execOutSegmenter := reqPlan.ReadOutSegmenter(initialBlock)
-			walker := execoutStorage.NewFileWalker(requestedModule.Name, execOutSegmenter)
+			hash := execGraph.ModuleHashes().Get(requestedModule.Name)
+			walker := execoutStorage.NewFileWalker(hash, execOutSegmenter)
 
 			sched.ExecOutWalker = orchestratorExecout.NewWalker(
 				ctx,

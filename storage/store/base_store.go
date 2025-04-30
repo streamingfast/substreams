@@ -27,6 +27,7 @@ type baseStore struct {
 }
 
 func (b *baseStore) Name() string { return b.name }
+func (b *baseStore) Hash() string { return b.moduleHash }
 
 func (b *baseStore) InitialBlock() uint64 { return b.moduleInitialBlock }
 

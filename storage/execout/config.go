@@ -61,7 +61,7 @@ func (c *Config) WriteDeterministicError(ctx context.Context, atBlock uint64, er
 func (c *Config) NewFile(targetRange *block.Range) *File {
 	return &File{
 		Kv:         make(map[string]*pboutput.Item),
-		ModuleName: c.name,
+		ModuleHash: c.moduleHash,
 		store:      c.objStore,
 		Range:      targetRange,
 		logger:     c.logger,
@@ -69,6 +69,7 @@ func (c *Config) NewFile(targetRange *block.Range) *File {
 }
 
 func (c *Config) Name() string                        { return c.name }
+func (c *Config) Hash() string                        { return c.moduleHash }
 func (c *Config) ModuleKind() pbsubstreams.ModuleKind { return c.modKind }
 func (c *Config) ModuleInitialBlock() uint64          { return c.moduleInitialBlock }
 

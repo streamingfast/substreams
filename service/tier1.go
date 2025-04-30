@@ -608,7 +608,12 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 
 	stores := pipeline.NewStores(ctx, storeConfigs, segmentSize, requestDetails.LinearHandoffBlockNum, request.StopBlockNum, false, nil)
 
-	execOutputCacheEngine, err := cache.NewEngine(ctx, nil, s.blockType, nil, nil) // we don't read or write ExecOuts on tier1
+	hashes := make(map[string]string)
+	for _, module := range execGraph.UsedModules() {
+		hashes[module.Name] = execGraph.ModuleHashes().Get(module.Name)
+	}
+
+	execOutputCacheEngine, err := cache.NewEngine(ctx, nil, s.blockType, nil, nil, hashes) // we don't read or write ExecOuts on tier1
 	if err != nil {
 		return fmt.Errorf("error building caching engine: %w", err)
 	}

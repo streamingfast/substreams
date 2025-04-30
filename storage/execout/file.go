@@ -28,7 +28,7 @@ type File struct {
 	sync.RWMutex
 	*block.Range
 
-	ModuleName string
+	ModuleHash string
 	Kv         map[string]*pboutput.Item
 	store      dstore.Store
 	logger     *zap.Logger
@@ -179,7 +179,7 @@ func (c *File) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	if c == nil {
 		return nil
 	}
-	enc.AddString("module", c.ModuleName)
+	enc.AddString("module", c.ModuleHash)
 	enc.AddUint64("start_block", c.Range.StartBlock)
 	enc.AddUint64("end_block", c.Range.ExclusiveEndBlock)
 	enc.AddInt("kv_count", len(c.Kv))

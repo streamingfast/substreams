@@ -21,17 +21,18 @@ func NewConfigs(baseObjectStore dstore.Store, allRequestedModules []*pbsubstream
 		if initialBlock < firstStreamableBlock {
 			initialBlock = firstStreamableBlock
 		}
+		hash := moduleHashes.Get(mod.Name)
 		conf, err := NewConfig(
 			mod.Name,
 			initialBlock,
-			moduleHashes.Get(mod.Name),
+			hash,
 			baseObjectStore,
 			logger,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("new index config for %q: %w", mod.Name, err)
 		}
-		out[mod.Name] = conf
+		out[hash] = conf
 	}
 
 	return &Configs{

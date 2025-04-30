@@ -18,7 +18,7 @@ var ErrWasmDeterministicExec = errors.New("wasm execution failed deterministical
 
 type Call struct {
 	Clock      *pbsubstreams.Clock // Used by WASM extensions
-	ModuleName string
+	ModuleHash string
 	Entrypoint string
 
 	inputStores  []store.Reader
@@ -38,10 +38,10 @@ type Call struct {
 	stats          *metrics.Stats
 }
 
-func NewCall(clock *pbsubstreams.Clock, moduleName string, entrypoint string, stats *metrics.Stats, arguments []Argument, canSkipEmptyOutput bool) *Call {
+func NewCall(clock *pbsubstreams.Clock, moduleHash string, entrypoint string, stats *metrics.Stats, arguments []Argument, canSkipEmptyOutput bool) *Call {
 	call := &Call{
 		Clock:              clock,
-		ModuleName:         moduleName,
+		ModuleHash:         moduleHash,
 		Entrypoint:         entrypoint,
 		stats:              stats,
 		canSkipEmptyOutput: canSkipEmptyOutput,
@@ -118,24 +118,24 @@ func (c *Call) DoSet(ord uint64, key string, value []byte) {
 	now := time.Now()
 	c.validateSimple("set", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET, key)
 	c.outputStore.SetBytes(ord, key, value)
-	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+	c.stats.RecordModuleWasmStoreWrite(c.ModuleHash, c.outputStore.SizeBytes(), time.Since(now))
 }
 func (c *Call) DoSetIfNotExists(ord uint64, key string, value []byte) {
 	now := time.Now()
 	c.validateSimple("set_if_not_exists", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS, key)
 	c.outputStore.SetBytesIfNotExists(ord, key, value)
-	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+	c.stats.RecordModuleWasmStoreWrite(c.ModuleHash, c.outputStore.SizeBytes(), time.Since(now))
 }
 func (c *Call) DoAppend(ord uint64, key string, value []byte) {
 	now := time.Now()
 	c.validateSimple("append", pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND, key)
 	c.outputStore.Append(ord, key, value)
-	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+	c.stats.RecordModuleWasmStoreWrite(c.ModuleHash, c.outputStore.SizeBytes(), time.Since(now))
 }
 func (c *Call) DoDeletePrefix(ord uint64, prefix string) {
 	now := time.Now()
 	c.outputStore.DeletePrefix(ord, prefix)
-	c.stats.RecordModuleWasmStoreDeletePrefix(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+	c.stats.RecordModuleWasmStoreDeletePrefix(c.ModuleHash, c.outputStore.SizeBytes(), time.Since(now))
 }
 func (c *Call) DoAddBigInt(ord uint64, key string, value string) {
 	now := time.Now()
@@ -143,7 +143,7 @@ func (c *Call) DoAddBigInt(ord uint64, key string, value string) {
 
 	toAdd, _ := new(big.Int).SetString(value, 10)
 	c.outputStore.SumBigInt(ord, key, toAdd)
-	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+	c.stats.RecordModuleWasmStoreWrite(c.ModuleHash, c.outputStore.SizeBytes(), time.Since(now))
 }
 func (c *Call) DoAddBigDecimal(ord uint64, key string, value string) {
 	now := time.Now()
@@ -154,66 +154,66 @@ func (c *Call) DoAddBigDecimal(ord uint64, key string, value string) {
 		c.ReturnError(fmt.Errorf("parsing bigdecimal: %w", err))
 	}
 	c.outputStore.SumBigDecimal(ord, key, toAdd.Truncate(34))
-	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+	c.stats.RecordModuleWasmStoreWrite(c.ModuleHash, c.outputStore.SizeBytes(), time.Since(now))
 }
 func (c *Call) DoAddInt64(ord uint64, key string, value int64) {
 	now := time.Now()
 	c.validateWithValueType("add_int64", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, "int64", key)
 	c.outputStore.SumInt64(ord, key, value)
-	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+	c.stats.RecordModuleWasmStoreWrite(c.ModuleHash, c.outputStore.SizeBytes(), time.Since(now))
 }
 func (c *Call) DoAddFloat64(ord uint64, key string, value float64) {
 	now := time.Now()
 	c.validateWithValueType("add_float64", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, "float64", key)
 	c.outputStore.SumFloat64(ord, key, value)
-	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+	c.stats.RecordModuleWasmStoreWrite(c.ModuleHash, c.outputStore.SizeBytes(), time.Since(now))
 }
 func (c *Call) DoSetSumBigInt(ord uint64, key string, value string) {
 	now := time.Now()
 	c.validateSimple("set_sum_bigint", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, key)
 
 	c.outputStore.SetSumBigInt(ord, key, []byte(value))
-	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+	c.stats.RecordModuleWasmStoreWrite(c.ModuleHash, c.outputStore.SizeBytes(), time.Since(now))
 }
 func (c *Call) DoSetSumBigDecimal(ord uint64, key string, value string) {
 	now := time.Now()
 	c.validateSimple("set_sum_bigdecimal", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, key)
 
 	c.outputStore.SetSumBigDecimal(ord, key, []byte(value))
-	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+	c.stats.RecordModuleWasmStoreWrite(c.ModuleHash, c.outputStore.SizeBytes(), time.Since(now))
 }
 func (c *Call) DoSetSumInt64(ord uint64, key string, value string) {
 	now := time.Now()
 	c.validateSimple("set_sum_int64", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, key)
 
 	c.outputStore.SetSumInt64(ord, key, []byte(value))
-	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+	c.stats.RecordModuleWasmStoreWrite(c.ModuleHash, c.outputStore.SizeBytes(), time.Since(now))
 }
 func (c *Call) DoSetSumFloat64(ord uint64, key string, value string) {
 	now := time.Now()
 	c.validateSimple("set_sum_float64", pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, key)
 
 	c.outputStore.SetSumFloat64(ord, key, []byte(value))
-	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+	c.stats.RecordModuleWasmStoreWrite(c.ModuleHash, c.outputStore.SizeBytes(), time.Since(now))
 }
 func (c *Call) DoSetMinInt64(ord uint64, key string, value int64) {
 	now := time.Now()
 	c.validateWithValueType("set_min_int64", pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, "int64", key)
 	c.outputStore.SetMinInt64(ord, key, value)
-	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+	c.stats.RecordModuleWasmStoreWrite(c.ModuleHash, c.outputStore.SizeBytes(), time.Since(now))
 }
 func (c *Call) DoSetMinBigInt(ord uint64, key string, value string) {
 	now := time.Now()
 	c.validateWithValueType("set_min_bigint", pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, "bigint", key)
 	toSet, _ := new(big.Int).SetString(value, 10)
 	c.outputStore.SetMinBigInt(ord, key, toSet)
-	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+	c.stats.RecordModuleWasmStoreWrite(c.ModuleHash, c.outputStore.SizeBytes(), time.Since(now))
 }
 func (c *Call) DoSetMinFloat64(ord uint64, key string, value float64) {
 	now := time.Now()
 	c.validateWithValueType("set_min_float64", pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, "float64", key)
 	c.outputStore.SetMinFloat64(ord, key, value)
-	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+	c.stats.RecordModuleWasmStoreWrite(c.ModuleHash, c.outputStore.SizeBytes(), time.Since(now))
 }
 func (c *Call) DoSetMinBigDecimal(ord uint64, key string, value string) {
 	now := time.Now()
@@ -223,26 +223,26 @@ func (c *Call) DoSetMinBigDecimal(ord uint64, key string, value string) {
 		c.ReturnError(fmt.Errorf("parsing bigdecimal: %w", err))
 	}
 	c.outputStore.SetMinBigDecimal(ord, key, toAdd.Truncate(34))
-	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+	c.stats.RecordModuleWasmStoreWrite(c.ModuleHash, c.outputStore.SizeBytes(), time.Since(now))
 }
 func (c *Call) DoSetMaxInt64(ord uint64, key string, value int64) {
 	now := time.Now()
 	c.validateWithValueType("set_max_int64", pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, "int64", key)
 	c.outputStore.SetMaxInt64(ord, key, value)
-	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+	c.stats.RecordModuleWasmStoreWrite(c.ModuleHash, c.outputStore.SizeBytes(), time.Since(now))
 }
 func (c *Call) DoSetMaxBigInt(ord uint64, key string, value string) {
 	now := time.Now()
 	c.validateWithValueType("set_max_bigint", pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, "bigint", key)
 	toSet, _ := new(big.Int).SetString(value, 10)
 	c.outputStore.SetMaxBigInt(ord, key, toSet)
-	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+	c.stats.RecordModuleWasmStoreWrite(c.ModuleHash, c.outputStore.SizeBytes(), time.Since(now))
 }
 func (c *Call) DoSetMaxFloat64(ord uint64, key string, value float64) {
 	now := time.Now()
 	c.validateWithValueType("set_max_float64", pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, "float64", key)
 	c.outputStore.SetMaxFloat64(ord, key, value)
-	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+	c.stats.RecordModuleWasmStoreWrite(c.ModuleHash, c.outputStore.SizeBytes(), time.Since(now))
 }
 func (c *Call) DoSetMaxBigDecimal(ord uint64, key string, value string) {
 	now := time.Now()
@@ -252,12 +252,12 @@ func (c *Call) DoSetMaxBigDecimal(ord uint64, key string, value string) {
 		c.ReturnError(fmt.Errorf("parsing bigdecimal: %w", err))
 	}
 	c.outputStore.SetMaxBigDecimal(ord, key, toAdd.Truncate(34))
-	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
+	c.stats.RecordModuleWasmStoreWrite(c.ModuleHash, c.outputStore.SizeBytes(), time.Since(now))
 }
 
 func (c *Call) DoGetAt(storeIndex int, ord uint64, key string) (value []byte, found bool) {
 	now := time.Now()
-	defer func() { c.stats.RecordModuleWasmStoreRead(c.ModuleName, time.Since(now)) }()
+	defer func() { c.stats.RecordModuleWasmStoreRead(c.ModuleHash, time.Since(now)) }()
 	c.validateStoreIndex(storeIndex, "get_at")
 	readStore := c.inputStores[storeIndex]
 	return readStore.GetAt(ord, key)
@@ -265,7 +265,7 @@ func (c *Call) DoGetAt(storeIndex int, ord uint64, key string) (value []byte, fo
 
 func (c *Call) DoHasAt(storeIndex int, ord uint64, key string) (found bool) {
 	now := time.Now()
-	defer func() { c.stats.RecordModuleWasmStoreRead(c.ModuleName, time.Since(now)) }()
+	defer func() { c.stats.RecordModuleWasmStoreRead(c.ModuleHash, time.Since(now)) }()
 	c.validateStoreIndex(storeIndex, "has_at")
 	readStore := c.inputStores[storeIndex]
 	return readStore.HasAt(ord, key)
@@ -273,7 +273,7 @@ func (c *Call) DoHasAt(storeIndex int, ord uint64, key string) (found bool) {
 
 func (c *Call) DoGetFirst(storeIndex int, key string) (value []byte, found bool) {
 	now := time.Now()
-	defer func() { c.stats.RecordModuleWasmStoreRead(c.ModuleName, time.Since(now)) }()
+	defer func() { c.stats.RecordModuleWasmStoreRead(c.ModuleHash, time.Since(now)) }()
 	c.validateStoreIndex(storeIndex, "get_first")
 	readStore := c.inputStores[storeIndex]
 	return readStore.GetFirst(key)
@@ -281,7 +281,7 @@ func (c *Call) DoGetFirst(storeIndex int, key string) (value []byte, found bool)
 
 func (c *Call) DoHasFirst(storeIndex int, key string) (found bool) {
 	now := time.Now()
-	defer func() { c.stats.RecordModuleWasmStoreRead(c.ModuleName, time.Since(now)) }()
+	defer func() { c.stats.RecordModuleWasmStoreRead(c.ModuleHash, time.Since(now)) }()
 	c.validateStoreIndex(storeIndex, "has_first")
 	readStore := c.inputStores[storeIndex]
 	return readStore.HasFirst(key)
@@ -289,7 +289,7 @@ func (c *Call) DoHasFirst(storeIndex int, key string) (found bool) {
 
 func (c *Call) DoGetLast(storeIndex int, key string) (value []byte, found bool) {
 	now := time.Now()
-	defer func() { c.stats.RecordModuleWasmStoreRead(c.ModuleName, time.Since(now)) }()
+	defer func() { c.stats.RecordModuleWasmStoreRead(c.ModuleHash, time.Since(now)) }()
 	c.validateStoreIndex(storeIndex, "get_last")
 	readStore := c.inputStores[storeIndex]
 	return readStore.GetLast(key)
@@ -297,7 +297,7 @@ func (c *Call) DoGetLast(storeIndex int, key string) (value []byte, found bool) 
 
 func (c *Call) DoHasLast(storeIndex int, key string) (found bool) {
 	now := time.Now()
-	defer func() { c.stats.RecordModuleWasmStoreRead(c.ModuleName, time.Since(now)) }()
+	defer func() { c.stats.RecordModuleWasmStoreRead(c.ModuleHash, time.Since(now)) }()
 	c.validateStoreIndex(storeIndex, "has_last")
 	readStore := c.inputStores[storeIndex]
 	return readStore.HasLast(key)
@@ -328,11 +328,11 @@ func (c *Call) validateWithTwoValueTypes(stateFunc string, updatePolicy pbsubstr
 }
 
 func (c *Call) returnInvalidPolicy(stateFunc, policy string) {
-	panic(fmt.Errorf("module %q: invalid store operation %q, only valid for stores with %s, %w", c.ModuleName, stateFunc, policy, ErrWasmDeterministicExec))
+	panic(fmt.Errorf("module %q: invalid store operation %q, only valid for stores with %s, %w", c.ModuleHash, stateFunc, policy, ErrWasmDeterministicExec))
 }
 
 func (c *Call) ReturnError(err error) {
-	panic(fmt.Errorf("module %q: %w, %w", c.ModuleName, err, ErrWasmDeterministicExec))
+	panic(fmt.Errorf("module %q: %w, %w", c.ModuleHash, err, ErrWasmDeterministicExec))
 }
 
 var policyMap = map[pbsubstreams.Module_KindStore_UpdatePolicy]string{

@@ -74,17 +74,26 @@ func (s *Stores) flushStores(ctx context.Context, executionStages exec.Execution
 }
 
 func (s *Stores) saveStoresSnapshots(ctx context.Context, stage int, boundaryBlock uint64) (err error) {
-	for mod := range s.storesToWrite {
-		store := s.StoreMap[mod]
-		s.logger.Info("flushing store at boundary", zap.Uint64("boundary", boundaryBlock), zap.String("store", mod), zap.Int("stage", stage))
-		// TODO when partials are generic again, we can also check if PartialKV exists and skip if it does.
-		existsFullKv, _ := s.configs[mod].ExistsFullKV(ctx, boundaryBlock)
+
+	doneStores := make(map[string]struct{})
+
+	for hash, store := range s.StoreMap {
+		if _, ok := doneStores[hash]; ok {
+			continue
+		}
+		if _, ok := s.storesToWrite[hash]; !ok {
+			continue
+		}
+		doneStores[hash] = struct{}{}
+
+		s.logger.Info("flushing store at boundary", zap.Uint64("boundary", boundaryBlock), zap.String("store", store.Hash()), zap.Int("stage", stage))
+		existsFullKv, _ := s.configs[hash].ExistsFullKV(ctx, boundaryBlock)
 		if existsFullKv {
 			continue
 		}
 
 		if err := s.saveStoreSnapshot(ctx, store, boundaryBlock); err != nil {
-			return fmt.Errorf("save store snapshot %q: %w", mod, err)
+			return fmt.Errorf("save store snapshot %q: %w", store.Hash(), err)
 		}
 	}
 	return nil

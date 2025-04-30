@@ -28,14 +28,16 @@ type Engine struct {
 	ctx               context.Context
 	blockType         string
 	reversibleBuffers map[uint64]*execout.Buffer // block num to modules' outputs for that given block
-	execOutputWriters map[string]*execout.Writer // moduleName => writer (single file)
+
+	execOutputWriters map[string]*execout.Writer // moduleHash => writer (single file)
 	existingExecOuts  map[string]*execout.File
 	indexWriters      map[string]*index.Writer
+	moduleNameToHash  map[string]string
 
 	logger *zap.Logger
 }
 
-func NewEngine(ctx context.Context, execOutWriters map[string]*execout.Writer, blockType string, existingExecOuts map[string]*execout.File, indexWriters map[string]*index.Writer) (*Engine, error) {
+func NewEngine(ctx context.Context, execOutWriters map[string]*execout.Writer, blockType string, existingExecOuts map[string]*execout.File, indexWriters map[string]*index.Writer, moduleNameToHash map[string]string) (*Engine, error) {
 	e := &Engine{
 		ctx:               ctx,
 		reversibleBuffers: map[uint64]*execout.Buffer{},
@@ -44,26 +46,27 @@ func NewEngine(ctx context.Context, execOutWriters map[string]*execout.Writer, b
 		blockType:         blockType,
 		indexWriters:      indexWriters,
 		existingExecOuts:  existingExecOuts,
+		moduleNameToHash:  moduleNameToHash,
 	}
 	return e, nil
 }
 
 func (e *Engine) NewBuffer(optionalBlock *pbbstream.Block, clock *pbsubstreams.Clock, cursor *bstream.Cursor) (execout.ExecutionOutput, error) {
-	out, err := execout.NewBuffer(e.blockType, optionalBlock, clock)
+	out, err := execout.NewBuffer(e.blockType, optionalBlock, clock, e.moduleNameToHash)
 	if err != nil {
 		return nil, fmt.Errorf("setting up map: %w", err)
 	}
 
 	e.reversibleBuffers[clock.Number] = out
-	for moduleName, existingExecOut := range e.existingExecOuts {
+	for moduleHash, existingExecOut := range e.existingExecOuts {
 		val, ok := existingExecOut.Get(clock)
 		if !ok {
 			continue
 		}
 
-		err = out.Set(moduleName, val)
+		err = out.Set(moduleHash, val)
 		if err != nil {
-			return nil, fmt.Errorf("setting existing exec output for %s: %w", moduleName, err)
+			return nil, fmt.Errorf("setting existing exec output for %s: %w", moduleHash, err)
 		}
 
 	}
@@ -108,14 +111,14 @@ func (e *Engine) EndOfStream(lastFinalClock *pbsubstreams.Clock) error {
 		currentFile := writer.CurrentFile
 
 		if e.indexWriters != nil {
-			if indexWriter, ok := e.indexWriters[currentFile.ModuleName]; ok {
+			if indexWriter, ok := e.indexWriters[currentFile.ModuleHash]; ok {
 				indexes := make(map[string]*roaring64.Bitmap)
 				for _, item := range currentFile.Kv {
 					blockIndexOutput := item.Payload
 					extractedKeys := &pbindex.Keys{}
 					err := proto.Unmarshal(blockIndexOutput, extractedKeys)
 					if err != nil {
-						return fmt.Errorf("unmarshalling index keys from %s outputs: %w", currentFile.ModuleName, err)
+						return fmt.Errorf("unmarshalling index keys from %s outputs: %w", currentFile.ModuleHash, err)
 					}
 
 					for _, key := range extractedKeys.Keys {

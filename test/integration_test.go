@@ -25,6 +25,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func init() {
+	// Initialize any necessary setup here
+	manifest.TestUseSimpleHash = true
+}
+
 func TestForkHandling(t *testing.T) {
 	type response struct {
 		id                string
@@ -88,19 +93,19 @@ func TestForkHandling(t *testing.T) {
 			},
 			inProcessValidation: func(ctx *execContext) {
 				if ctx.block.Number == 6 {
-					s, found := ctx.stores.Get("setup_test_store_add_bigint")
+					s, found := ctx.stores.Get(hex.EncodeToString([]byte("setup_test_store_add_bigint")))
 					require.True(t, found)
 					bytes, found := s.GetLast("a.key.pos")
 					require.True(t, found)
 					bi := &big.Int{}
 					_, success := bi.SetString(string(bytes), 10)
 					require.True(t, success)
-					require.Equal(t, "6", bi.String())
+					assert.Equal(t, "6", bi.String())
 					bytes, found = s.GetLast("a.key.neg")
 					require.True(t, found)
 					_, success = bi.SetString(string(bytes), 10)
 					require.True(t, success)
-					require.Equal(t, "-6", bi.String())
+					assert.Equal(t, "-6", bi.String())
 				}
 			},
 		},
@@ -472,10 +477,11 @@ func TestMultipleStoresUnalignedStartBlocksProdMode(t *testing.T) {
 }
 
 func TestStoreDeletePrefix(t *testing.T) {
+	manifest.TestUseSimpleHash = true
 	run := newTestRun(t, 30, 40, 42, 0, "assert_test_store_delete_prefix", "./testdata/simple_substreams/substreams-test-v0.1.0.spkg")
 	run.BlockProcessedCallback = func(ctx *execContext) {
 		if ctx.block.Number == 40 {
-			s, storeFound := ctx.stores.Get("test_store_delete_prefix")
+			s, storeFound := ctx.stores.Get(hex.EncodeToString([]byte("test_store_delete_prefix")))
 			require.True(t, storeFound)
 			require.Equal(t, uint64(1), s.Length())
 		}

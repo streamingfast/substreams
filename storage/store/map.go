@@ -57,7 +57,7 @@ func NewMap() Map {
 }
 
 func (m Map) Set(s Store) {
-	m[s.Name()] = s
+	m[s.Hash()] = s
 }
 
 func (m Map) Get(name string) (Store, bool) {

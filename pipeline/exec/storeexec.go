@@ -26,7 +26,8 @@ func NewStoreModuleExecutor(baseExecutor *BaseExecutor, outputStore store.DeltaA
 }
 
 func (e *StoreModuleExecutor) Name() string   { return e.moduleName }
-func (e *StoreModuleExecutor) String() string { return e.Name() }
+func (e *StoreModuleExecutor) Hash() string   { return e.moduleHash }
+func (e *StoreModuleExecutor) String() string { return e.Hash() }
 
 func (e *StoreModuleExecutor) applyCachedOutput(value []byte) error {
 	return e.outputStore.ApplyOps(value)

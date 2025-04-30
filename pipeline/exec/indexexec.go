@@ -23,7 +23,8 @@ func NewIndexModuleExecutor(baseExecutor *BaseExecutor) *IndexModuleExecutor {
 }
 
 func (i *IndexModuleExecutor) Name() string   { return i.moduleName }
-func (i *IndexModuleExecutor) String() string { return i.Name() }
+func (i *IndexModuleExecutor) Hash() string   { return i.moduleHash }
+func (i *IndexModuleExecutor) String() string { return i.Hash() }
 
 func (i *IndexModuleExecutor) applyCachedOutput([]byte) error {
 	return nil

@@ -222,7 +222,14 @@ func (s *Stages) fetchOutputMapperState(ctx context.Context) (mapperName string,
 	}
 
 	mapperName = s.stages[len(s.stages)-1].storeModuleStates[0].name
-	conf := s.execoutConfigs.ConfigMap[mapperName]
+
+	var conf *execout.Config
+	for _, c := range s.execoutConfigs.ConfigMap {
+		if c.Name() == mapperName {
+			conf = c
+			break
+		}
+	}
 
 	execOutFirst := s.mapSegmenter.InitialBlock()
 	execOutLast := s.mapSegmenter.ExclusiveEndBlock()

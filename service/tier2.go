@@ -335,7 +335,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	stores := pipeline.NewStores(ctx, storeConfigs, request.SegmentSize, requestDetails.ResolvedStartBlockNum, stopBlock, true, executionPlan.StoresToWrite)
 
 	// this engine will keep the ExistingExecOuts to optimize the execution (for inputs from modules that skip execution)
-	execOutputCacheEngine, err := cache.NewEngine(ctx, executionPlan.ExecoutWriters, request.BlockType, executionPlan.ExistingExecOuts, executionPlan.IndexWriters)
+	execOutputCacheEngine, err := cache.NewEngine(ctx, executionPlan.ExecoutWriters, request.BlockType, executionPlan.ExistingExecOuts, executionPlan.IndexWriters, executionPlan.ModuleNameToHash)
 	if err != nil {
 		return fmt.Errorf("error building caching engine: %w", err)
 	}
@@ -386,16 +386,16 @@ excludable:
 		for _, executor := range stage {
 			switch executor := executor.(type) {
 			case *exec.MapperModuleExecutor:
-				if executionPlan.ExistingExecOuts[executor.Name()] != nil {
+				if executionPlan.ExistingExecOuts[executor.Hash()] != nil {
 					continue
 				}
 			case *exec.IndexModuleExecutor:
-				if executionPlan.ExistingIndices[executor.Name()] != nil {
+				if executionPlan.ExistingIndices[executor.Hash()] != nil {
 					continue
 				}
 			case *exec.StoreModuleExecutor:
-				if executionPlan.ExistingExecOuts[executor.Name()] != nil {
-					if _, ok := executionPlan.StoresToWrite[executor.Name()]; !ok {
+				if executionPlan.ExistingExecOuts[executor.Hash()] != nil {
+					if _, ok := executionPlan.StoresToWrite[executor.Hash()]; !ok {
 						continue
 					}
 				}
@@ -514,8 +514,8 @@ func canSkipBlockSource(existingExecOuts map[string]*execout.File, requiredModul
 	if len(existingExecOuts) == 0 {
 		return false
 	}
-	for name, module := range requiredModules {
-		if existingExecOuts[name] != nil {
+	for hash, module := range requiredModules {
+		if existingExecOuts[hash] != nil {
 			continue
 		}
 		for _, input := range module.Inputs {
@@ -641,12 +641,15 @@ func toGRPCError(ctx context.Context, err error) error {
 }
 
 type ExecutionPlan struct {
+	// key is always the module hash
 	ExistingExecOuts map[string]*execout.File
 	ExecoutWriters   map[string]*execout.Writer
 	ExistingIndices  map[string]map[string]*roaring64.Bitmap
 	IndexWriters     map[string]*index.Writer
-	RequiredModules  map[string]*pbsubstreams.Module
 	StoresToWrite    map[string]struct{}
+	RequiredModules  map[string]*pbsubstreams.Module
+
+	ModuleNameToHash map[string]string
 }
 
 func GetExecutionPlan(
@@ -667,10 +670,16 @@ func GetExecutionPlan(
 	requiredModules := make(map[string]*pbsubstreams.Module)
 	execoutWriters := make(map[string]*execout.Writer) // this affects stores and mappers, per-block data
 	indexWriters := make(map[string]*index.Writer)     // write the full index file
+	hashes := make(map[string]string)
+
 	// storeWriters := .... // write the snapshots
 	usedModules := make(map[string]*pbsubstreams.Module)
 	for _, module := range execGraph.UsedModulesUpToStage(int(stage)) {
-		usedModules[module.Name] = module
+		hash := execGraph.ModuleHashes().Get(module.Name)
+		hashes[module.Name] = hash
+		if _, ok := usedModules[hash]; !ok {
+			usedModules[hash] = module // we keep the first instance of each module if they are duplicated with different names and same hash
+		}
 	}
 
 	stageUsedModules := execGraph.StagedUsedModules()[stage]
@@ -678,17 +687,16 @@ func GetExecutionPlan(
 	stageUsedModulesName := make(map[string]bool)
 	for _, layer := range stageUsedModules {
 		for _, mod := range layer {
-			stageUsedModulesName[mod.Name] = true
+			stageUsedModulesName[hashes[mod.Name]] = true
 		}
 	}
-	for _, mod := range usedModules {
+
+	for hash, mod := range usedModules {
 		if mod.InitialBlock >= stopBlock {
 			continue
 		}
 
-		name := mod.Name
-
-		c := execoutConfigs.ConfigMap[name]
+		c := execoutConfigs.ConfigMap[hash]
 
 		moduleStartBlock := startBlock
 		if mod.InitialBlock > startBlock {
@@ -697,48 +705,48 @@ func GetExecutionPlan(
 
 		switch mod.ModuleKind() {
 		case pbsubstreams.ModuleKindBlockIndex:
-			indexFile := indexConfigs.ConfigMap[name].NewFile(&block.Range{StartBlock: moduleStartBlock, ExclusiveEndBlock: stopBlock})
+			indexFile := indexConfigs.ConfigMap[hash].NewFile(&block.Range{StartBlock: moduleStartBlock, ExclusiveEndBlock: stopBlock})
 			err := indexFile.Load(ctx)
 			if err != nil {
-				requiredModules[name] = usedModules[name]
-				indexWriters[name] = index.NewWriter(indexFile)
+				requiredModules[hash] = usedModules[hash]
+				indexWriters[hash] = index.NewWriter(indexFile)
 				break
 			}
 
-			existingIndices[name] = indexFile.Indices
+			existingIndices[hash] = indexFile.Indices
 
 		case pbsubstreams.ModuleKindMap:
 			file, readErr := c.ReadFile(ctx, &block.Range{StartBlock: moduleStartBlock, ExclusiveEndBlock: stopBlock})
 			if readErr != nil {
-				requiredModules[name] = usedModules[name]
+				requiredModules[hash] = usedModules[hash]
 				break
 			}
-			existingExecOuts[name] = file
+			existingExecOuts[hash] = file
 
 		case pbsubstreams.ModuleKindStore:
 			file, readErr := c.ReadFile(ctx, &block.Range{StartBlock: moduleStartBlock, ExclusiveEndBlock: stopBlock})
 			if readErr != nil {
-				requiredModules[name] = usedModules[name]
+				requiredModules[hash] = usedModules[hash]
 			} else {
-				existingExecOuts[name] = file
+				existingExecOuts[hash] = file
 			}
 
 			// if either full or partial kv exists, we can skip the module
 			// some stores may already exist completely on this stage, but others do not, so we keep going but ignore those
-			storeExists, err := storeConfigs[name].ExistsFullKV(ctx, stopBlock)
+			storeExists, err := storeConfigs[hash].ExistsFullKV(ctx, stopBlock)
 			if err != nil {
 				return nil, fmt.Errorf("checking fullkv file existence: %w", err)
 			}
 			if !storeExists {
-				partialStoreExists, err := storeConfigs[name].ExistsPartialKV(ctx, moduleStartBlock, stopBlock)
+				partialStoreExists, err := storeConfigs[hash].ExistsPartialKV(ctx, moduleStartBlock, stopBlock)
 				if err != nil {
 					return nil, fmt.Errorf("checking partial file existence: %w", err)
 				}
 				// when running last stage, we want to make sure that we write all the fullKV stores.
 				// in other scenarios, a partial store is enough so we won't produce it again if it's not needed.
 				if !partialStoreExists || runningLastStage {
-					storesToWrite[name] = struct{}{}
-					requiredModules[name] = usedModules[name]
+					storesToWrite[hash] = struct{}{}
+					requiredModules[hash] = usedModules[hash]
 				}
 			}
 
@@ -746,13 +754,13 @@ func GetExecutionPlan(
 
 	}
 
-	if runningLastStage && len(storesToWrite) == 0 && existingExecOuts[outputModule] != nil {
+	if runningLastStage && len(storesToWrite) == 0 && existingExecOuts[hashes[outputModule]] != nil {
 		logger.Info("found existing exec output for output_module and no stores to produce, skipping run", zap.String("output_module", outputModule))
 		return nil, nil
 	}
 
-	for name, module := range requiredModules {
-		if _, exists := existingExecOuts[name]; exists {
+	for hash, module := range requiredModules {
+		if _, exists := existingExecOuts[hash]; exists {
 			continue // for stores that need to be run for the partials, but already have cached execution outputs
 		}
 
@@ -766,10 +774,10 @@ func GetExecutionPlan(
 			isIndexWriter = true
 		}
 
-		execoutWriters[name] = execout.NewWriter(
+		execoutWriters[hash] = execout.NewWriter(
 			writerStartBlock,
 			stopBlock,
-			name,
+			hash,
 			execoutConfigs,
 			isIndexWriter,
 		)
@@ -781,7 +789,9 @@ func GetExecutionPlan(
 		ExecoutWriters:   execoutWriters,
 		ExistingIndices:  existingIndices,
 		IndexWriters:     indexWriters,
-		RequiredModules:  requiredModules,
 		StoresToWrite:    storesToWrite,
+
+		RequiredModules:  requiredModules,
+		ModuleNameToHash: hashes,
 	}, nil
 }

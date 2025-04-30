@@ -3,6 +3,8 @@ package execout
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
+	"strings"
 	"sync"
 
 	"github.com/streamingfast/substreams/block"
@@ -15,26 +17,29 @@ type Writer struct {
 	wg *sync.WaitGroup
 
 	CurrentFile      *File
-	outputModule     string
+	moduleHash       string
 	isWriterForIndex bool
 }
 
-func NewWriter(initialBlockBoundary, exclusiveEndBlock uint64, outputModule string, configs *Configs, isWriterForIndex bool) *Writer {
+func NewWriter(initialBlockBoundary, exclusiveEndBlock uint64, moduleHash string, configs *Configs, isWriterForIndex bool) *Writer {
+	if strings.HasPrefix(moduleHash, "orca") {
+		debug.PrintStack()
+	}
 	w := &Writer{
 		wg:               &sync.WaitGroup{},
-		outputModule:     outputModule,
+		moduleHash:       moduleHash,
 		isWriterForIndex: isWriterForIndex,
 	}
 
 	segmenter := block.NewSegmenter(configs.execOutputSaveInterval, initialBlockBoundary, exclusiveEndBlock)
-	walker := configs.NewFileWalker(outputModule, segmenter)
+	walker := configs.NewFileWalker(moduleHash, segmenter)
 	w.CurrentFile = walker.File()
 
 	return w
 }
 
 func (w *Writer) Write(clock *pbsubstreams.Clock, buffer *Buffer) {
-	if val, found := buffer.valuesForFileOutput[w.outputModule]; found {
+	if val, found := buffer.valuesForFileOutput[w.moduleHash]; found {
 		w.CurrentFile.SetItem(clock, val)
 	}
 }

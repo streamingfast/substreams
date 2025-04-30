@@ -24,18 +24,19 @@ func NewConfigs(baseObjectStore dstore.Store, allRequestedModules []*pbsubstream
 		if initialBlock < firstStreamableBlock {
 			initialBlock = firstStreamableBlock
 		}
+		hash := moduleHashes.Get(mod.Name)
 		conf, err := NewConfig(
 			mod.Name,
 			initialBlock,
 			mod.ModuleKind(),
-			moduleHashes.Get(mod.Name),
+			hash,
 			baseObjectStore,
 			logger,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("new exec output config for %q: %w", mod.Name, err)
 		}
-		out[mod.Name] = conf
+		out[hash] = conf
 	}
 
 	return &Configs{
@@ -57,10 +58,10 @@ func WrapConfigs(execOutputSaveInterval uint64, logger *zap.Logger, confs ...*Co
 	return out
 }
 
-func (c *Configs) NewFile(moduleName string, targetRange *block.Range) *File {
-	return c.ConfigMap[moduleName].NewFile(targetRange)
+func (c *Configs) NewFile(moduleHash string, targetRange *block.Range) *File {
+	return c.ConfigMap[moduleHash].NewFile(targetRange)
 }
 
-func (c *Configs) NewFileWalker(moduleName string, segmenter *block.Segmenter) *FileWalker {
-	return NewFileWalker(c.ConfigMap[moduleName], segmenter, c.logger)
+func (c *Configs) NewFileWalker(moduleHash string, segmenter *block.Segmenter) *FileWalker {
+	return NewFileWalker(c.ConfigMap[moduleHash], segmenter, c.logger)
 }

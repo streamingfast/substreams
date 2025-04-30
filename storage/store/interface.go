@@ -11,6 +11,7 @@ import (
 
 type Store interface {
 	Name() string
+	Hash() string
 	InitialBlock() uint64
 	SizeBytes() uint64
 

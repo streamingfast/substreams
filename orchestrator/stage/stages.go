@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/orchestrator/plan"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -55,6 +56,7 @@ type Stages struct {
 	// are assumed to have been either fully loaded, or merged up until this offset.
 	segmentOffset int
 
+	moduleHashes   *manifest.ModuleHashes
 	storeConfigs   store.ConfigMap
 	execoutConfigs *execout.Configs
 
@@ -79,6 +81,7 @@ func NewStages(
 		outputModuleIsIndex: execGraph.OutputModule().GetKindBlockIndex() != nil,
 		execoutConfigs:      execoutConfigs,
 		storeConfigs:        storeConfigs,
+		moduleHashes:        execGraph.ModuleHashes(),
 
 		hasLinearPipeline: reqPlan.LinearPipeline != nil,
 		storeSegmenter:    reqPlan.StoresSegmenter(),
@@ -118,8 +121,9 @@ func NewStages(
 		var moduleStates []*StoreModuleState
 		stageLowestInitBlock := modulesInitBlocks[layer[0].Name]
 		for _, mod := range layer {
+			hash := execGraph.ModuleHashes().Get(mod.Name)
 			modSegmenter := segmenter.WithInitialBlock(modulesInitBlocks[mod.Name])
-			modState := NewModuleState(logger, mod.Name, modSegmenter, storeConfigs[mod.Name])
+			modState := NewModuleState(logger, mod.Name, modSegmenter, storeConfigs[hash])
 			moduleStates = append(moduleStates, modState)
 
 			stageLowestInitBlock = min(stageLowestInitBlock, modulesInitBlocks[mod.Name])
@@ -530,6 +534,7 @@ func (s *Stages) previousUnitComplete(u Unit) bool {
 
 type loadedStore struct {
 	name string
+	hash string
 	kv   *store.FullKV
 	err  error
 }
@@ -558,6 +563,7 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 			fullKV, err := modState.getStore(s.ctx, exclusiveEndBlock)
 			loadingChan <- loadedStore{
 				name: modState.name,
+				hash: s.moduleHashes.Get(modState.name),
 				kv:   fullKV,
 				err:  err,
 			}
@@ -570,7 +576,7 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 			errs = errors.Join(errs, fmt.Errorf("while loading %s: %w", loaded.name, loaded.err))
 			continue
 		}
-		out[loaded.name] = loaded.kv
+		out[loaded.hash] = loaded.kv
 		if len(out) == len(storeModuleStates) {
 			close(loadingChan)
 		}

@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"encoding/hex"
 	"testing"
 
 	"github.com/streamingfast/bstream"
@@ -93,7 +94,7 @@ func mapTestExecutor(t *testing.T, ctx context.Context, name string) *exec.Mappe
 		exec.NewBaseExecutor(
 			ctx,
 			name,
-			"fakehash",
+			name,
 			0,
 			module,
 			false, // could exercice with cache enabled too
@@ -128,13 +129,17 @@ func bstreamBlk(t *testing.T, blk *pbsubstreamstest.Block) *pbbstream.Block {
 	return bb
 }
 
+func simpleHash(in string) string {
+	return hex.EncodeToString([]byte(in))
+}
+
 func TestSetupSubrequestStores(t *testing.T) {
 	t.Run("test store types depending on input", func(t *testing.T) {
 
 		confMap := testConfigMap(t, []testStoreConfig{
-			{name: "mod1", initBlock: 10, writtenUpTo: 0},
-			{name: "mod2", initBlock: 1, writtenUpTo: 10},
-			{name: "mod3", initBlock: 5, writtenUpTo: 0},
+			{name: simpleHash("mod1"), initBlock: 10, writtenUpTo: 0},
+			{name: simpleHash("mod2"), initBlock: 1, writtenUpTo: 10},
+			{name: simpleHash("mod3"), initBlock: 5, writtenUpTo: 0},
 		})
 		storeModuleKind := &pbsubstreams.Module_KindStore_{KindStore: &pbsubstreams.Module_KindStore{}}
 		p := Pipeline{
@@ -156,6 +161,7 @@ func TestSetupSubrequestStores(t *testing.T) {
 					},
 				},
 			},
+			execGraph: exec.TestSimpleHashes([]string{"mod1", "mod2", "mod3"}),
 		}
 		ctx := withTestRequest(t, "mod3", 10)
 
@@ -164,11 +170,11 @@ func TestSetupSubrequestStores(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, storeMap, 3)
 
-		fullKV := storeMap["mod1"].(*store2.FullKV)
+		fullKV := storeMap[simpleHash("mod1")].(*store2.FullKV)
 		assert.Equal(t, 10, int(fullKV.ModuleInitialBlock()))
-		val, _ := storeMap["mod2"].(*store2.FullKV).GetLast("k")
+		val, _ := storeMap[simpleHash("mod2")].(*store2.FullKV).GetLast("k")
 		assert.Equal(t, []byte("v"), val)
-		partialKV := storeMap["mod3"].(*store2.PartialKV)
+		partialKV := storeMap[simpleHash("mod3")].(*store2.PartialKV)
 		assert.Equal(t, 10, int(partialKV.InitialBlock()))
 	})
 

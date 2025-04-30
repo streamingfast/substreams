@@ -17,10 +17,11 @@ func NewConfigMap(baseObjectStore, quickSaveStore dstore.Store, storeModules []*
 		if initialBlock < firstStreamableBlock {
 			initialBlock = firstStreamableBlock
 		}
+		hash := moduleHashes.Get(storeModule.Name)
 		c, err := NewConfig(
 			storeModule.Name,
 			initialBlock,
-			moduleHashes.Get(storeModule.Name),
+			hash,
 			storeModule.GetKindStore().UpdatePolicy,
 			storeModule.GetKindStore().ValueType,
 			baseObjectStore,
@@ -29,7 +30,7 @@ func NewConfigMap(baseObjectStore, quickSaveStore dstore.Store, storeModules []*
 		if err != nil {
 			return nil, fmt.Errorf("new store config for %q: %w", storeModule.Name, err)
 		}
-		out[storeModule.Name] = c
+		out[hash] = c
 	}
 	return out, nil
 }

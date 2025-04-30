@@ -333,25 +333,38 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 
 	for _, layer := range p.StagedModuleExecutors {
 		if maxParallelExecutor <= 1 || len(layer) <= 1 {
+			dedupeByHash := make(map[string]struct{})
 			for _, executor := range layer {
 				if !executor.RunsOnBlock(blockNum) {
 					continue
 				}
+
+				hash := executor.Hash()
+				if _, ok := dedupeByHash[hash]; ok {
+					continue
+				}
+				dedupeByHash[hash] = struct{}{}
 				res := p.execute(ctx, executor, execOutput, isFinalBlock)
 				if err := p.applyExecutionResult(ctx, executor, res, execOutput); err != nil {
-					return fmt.Errorf("applying executor results %q on block %d (%s): %w", executor.Name(), blockNum, execOutput.Clock().Id, res.err)
+					return fmt.Errorf("applying executor results %q on block %d (%s): %w", executor.String(), blockNum, execOutput.Clock().Id, res.err)
 				}
 			}
 		} else {
-			results := make([]resultObj, len(layer))
+			results := make([]*resultObj, len(layer))
 			wg := errgroup.Group{}
 			wg.SetLimit(int(maxParallelExecutor))
 
+			dedupeByHash := make(map[string]struct{})
 			for i, executor := range layer {
 				if !executor.RunsOnBlock(execOutput.Clock().Number) {
-					results[i] = resultObj{not_runnable: true}
+					results[i] = &resultObj{not_runnable: true}
 					continue
 				}
+				hash := executor.Hash()
+				if _, ok := dedupeByHash[hash]; ok {
+					continue
+				}
+				dedupeByHash[hash] = struct{}{}
 
 				wg.Go(func() (err error) {
 					defer func() {
@@ -371,7 +384,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 					}()
 
 					res := p.execute(ctx, executor, execOutput, isFinalBlock)
-					results[i] = res
+					results[i] = &res
 
 					return
 				})
@@ -382,16 +395,19 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 			}
 
 			for i, result := range results {
+				if result == nil {
+					continue
+				}
 				if result.not_runnable {
 					continue
 				}
 				executor := layer[i]
 				if result.err != nil {
-					return fmt.Errorf("running executor %q: %w", executor.Name(), result.err)
+					return fmt.Errorf("running executor %q: %w", executor.String(), result.err)
 				}
 
-				if err := p.applyExecutionResult(ctx, executor, result, execOutput); err != nil {
-					return fmt.Errorf("applying executor results %q on block %d (%s): %w", executor.Name(), blockNum, execOutput.Clock(), result.err)
+				if err := p.applyExecutionResult(ctx, executor, *result, execOutput); err != nil {
+					return fmt.Errorf("applying executor results %q on block %d (%s): %w", executor.String(), blockNum, execOutput.Clock(), result.err)
 				}
 			}
 		}
@@ -412,14 +428,13 @@ type resultObj struct {
 func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, execOutput execout.ExecutionOutput, isFinalBlock bool) (out resultObj) {
 	logger := reqctx.Logger(ctx)
 
-	executorName := executor.Name()
-	logger.Debug("executing", zap.Uint64("block", execOutput.Clock().Number), zap.String("module_name", executorName))
+	logger.Debug("executing", zap.Uint64("block", execOutput.Clock().Number), zap.String("module_name", executor.String()))
 
 	defer func() {
 		if r := recover(); r != nil {
 			if err, ok := r.(error); ok {
 				if errors.Is(err, wasm.ErrWasmDeterministicExec) || errors.Is(err, store.ErrStoreAboveMaxSize) {
-					p.execoutStorage.ConfigMap[executorName].WriteDeterministicError(ctx, execOutput.Clock().Number, err)
+					p.execoutStorage.ConfigMap[executor.Hash()].WriteDeterministicError(ctx, execOutput.Clock().Number, err)
 					out.err = err
 					return
 				}
@@ -431,7 +446,7 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 	moduleOutput, outputBytes, outputBytesFiles, skipped, runError := exec.RunModule(ctx, executor, execOutput)
 
 	if isFinalBlock && errors.Is(runError, wasm.ErrWasmDeterministicExec) {
-		p.execoutStorage.ConfigMap[executorName].WriteDeterministicError(ctx, execOutput.Clock().Number, runError)
+		p.execoutStorage.ConfigMap[executor.Hash()].WriteDeterministicError(ctx, execOutput.Clock().Number, runError)
 	}
 
 	return resultObj{
@@ -445,7 +460,6 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 }
 
 func (p *Pipeline) applyExecutionResult(ctx context.Context, executor exec.ModuleExecutor, res resultObj, execOutput execout.ExecutionOutput) (err error) {
-	executorName := executor.Name()
 
 	moduleOutput, outputBytes, runError := res.output, res.bytes, res.err
 	if runError != nil {
@@ -453,13 +467,13 @@ func (p *Pipeline) applyExecutionResult(ctx context.Context, executor exec.Modul
 	}
 
 	if executor.HasValidOutput() {
-		p.saveModuleOutput(moduleOutput, executor.Name(), reqctx.Details(ctx).ProductionMode)
+		p.saveModuleOutput(moduleOutput, executor.Hash(), reqctx.Details(ctx).ProductionMode)
 	}
 
 	skip_output := res.skipped_output
 
 	if !skip_output && executor.HasValidOutput() {
-		if err := execOutput.Set(executorName, outputBytes); err != nil {
+		if err := execOutput.Set(executor.Hash(), outputBytes); err != nil {
 			return fmt.Errorf("set output cache: %w", err)
 		}
 		if moduleOutput != nil {
@@ -468,7 +482,7 @@ func (p *Pipeline) applyExecutionResult(ctx context.Context, executor exec.Modul
 	}
 
 	if !skip_output && executor.HasOutputForFiles() {
-		if err := execOutput.SetFileOutput(executorName, res.bytesForFiles); err != nil {
+		if err := execOutput.SetFileOutput(executor.Hash(), res.bytesForFiles); err != nil {
 			return fmt.Errorf("set output cache: %w", err)
 		}
 	}
@@ -477,8 +491,8 @@ func (p *Pipeline) applyExecutionResult(ctx context.Context, executor exec.Modul
 }
 
 // this will be sent to the requestor
-func (p *Pipeline) saveModuleOutput(output *pbssinternal.ModuleOutput, moduleName string, isProduction bool) {
-	if p.isOutputModule(moduleName) {
+func (p *Pipeline) saveModuleOutput(output *pbssinternal.ModuleOutput, moduleHash string, isProduction bool) {
+	if p.isOutputModule(moduleHash) {
 		p.mapModuleOutput = toRPCMapModuleOutputs(output)
 		return
 	}

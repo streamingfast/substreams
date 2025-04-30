@@ -91,7 +91,7 @@ func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
 			return MsgFileNotPresent{NextWait: computeNewWait(waitBefore, r.fileWalker.IsLocal)}
 		}
 		if err != nil {
-			return loop.NewQuitMsg(fmt.Errorf("loading %s cache %q: %w", file.ModuleName, file.Filename(), err))
+			return loop.NewQuitMsg(fmt.Errorf("loading %s cache %q: %w", file.ModuleHash, file.Filename(), err))
 		}
 
 		if err := r.sendItems(file.SortedItems()); err != nil {

@@ -351,21 +351,21 @@ func (s *Stats) RecordEndSubrequest(jobIdx uint64, status JobStatus) {
 }
 
 // RecordModuleWasmBlockBegin should be called once per module per block
-func (s *Stats) RecordModuleWasmBlockBegin(moduleName string) uint64 {
+func (s *Stats) RecordModuleWasmBlockBegin(moduleHash string) uint64 {
 	s.Lock()
 	defer s.Unlock()
 	uniqueID := uniqueIDCounter.Inc()
-	mod := s.moduleStats(moduleName)
+	mod := s.moduleStats(moduleHash)
 	mod.inprocessSince[uniqueID] = time.Now()
 
 	return uniqueID
 }
 
 // RecordModuleWasmBlockEnd should be called once per module per block. `elapsed` is the time spent in executing the WASM code, including store and extension calls
-func (s *Stats) RecordModuleWasmBlockEnd(moduleName string, uniqueID uint64) {
+func (s *Stats) RecordModuleWasmBlockEnd(moduleHash string, uniqueID uint64) {
 	s.Lock()
 	defer s.Unlock()
-	mod := s.moduleStats(moduleName)
+	mod := s.moduleStats(moduleHash)
 	mod.processingTime += time.Since(mod.inprocessSince[uniqueID])
 	delete(mod.inprocessSince, uniqueID)
 }
@@ -373,11 +373,11 @@ func (s *Stats) RecordModuleWasmBlockEnd(moduleName string, uniqueID uint64) {
 var uniqueIDCounter = atomic.NewUint64(0)
 
 // RecordModuleWasmExternalCallBegin can be called multiple times per module per block, for each external module call (ex: eth_call).
-func (s *Stats) RecordModuleWasmExternalCallBegin(moduleName string, extension string) uint64 {
+func (s *Stats) RecordModuleWasmExternalCallBegin(moduleHash string, extension string) uint64 {
 	s.Lock()
 	defer s.Unlock()
 
-	mod := s.moduleStats(moduleName)
+	mod := s.moduleStats(moduleHash)
 	uniqueID := uniqueIDCounter.Inc()
 
 	// initialize map
@@ -390,11 +390,11 @@ func (s *Stats) RecordModuleWasmExternalCallBegin(moduleName string, extension s
 }
 
 // RecordModuleWasmExternalCallEnd can be called multiple times per module per block, for each external module call (ex: eth_call). `elapsed` is the time spent in executing that call.
-func (s *Stats) RecordModuleWasmExternalCallEnd(moduleName string, extension string, uniqueID uint64) {
+func (s *Stats) RecordModuleWasmExternalCallEnd(moduleHash string, extension string, uniqueID uint64) {
 	s.Lock()
 	defer s.Unlock()
 
-	mod := s.moduleStats(moduleName)
+	mod := s.moduleStats(moduleHash)
 	met, ok := mod.externalCallMetrics[extension]
 	if !ok {
 		met = &extendedCallMetric{}
@@ -408,29 +408,29 @@ func (s *Stats) RecordModuleWasmExternalCallEnd(moduleName string, extension str
 }
 
 // RecordModuleWasmStoreRead can be called multiple times per module per block `elapsed` is the time spent in executing that operation.
-func (s *Stats) RecordModuleWasmStoreRead(moduleName string, elapsed time.Duration) {
+func (s *Stats) RecordModuleWasmStoreRead(moduleHash string, elapsed time.Duration) {
 	s.Lock()
 	defer s.Unlock()
-	mod := s.moduleStats(moduleName)
+	mod := s.moduleStats(moduleHash)
 	mod.StoreReadCount++
 	mod.storeOperationTime += elapsed
 }
 
 // RecordModuleWasmStoreWrite can be called multiple times per module per block `elapsed` is the time spent in executing that operation.
-func (s *Stats) RecordModuleWasmStoreWrite(moduleName string, sizeBytes uint64, elapsed time.Duration) {
+func (s *Stats) RecordModuleWasmStoreWrite(moduleHash string, sizeBytes uint64, elapsed time.Duration) {
 	s.Lock()
 	defer s.Unlock()
-	mod := s.moduleStats(moduleName)
+	mod := s.moduleStats(moduleHash)
 	mod.StoreSizeBytes = sizeBytes
 	mod.StoreWriteCount++
 	mod.storeOperationTime += elapsed
 }
 
 // RecordModuleWasmStoreDeletePrefix can be called multiple times per module per block `elapsed` is the time spent in executing that operation.
-func (s *Stats) RecordModuleWasmStoreDeletePrefix(moduleName string, sizeBytes uint64, elapsed time.Duration) {
+func (s *Stats) RecordModuleWasmStoreDeletePrefix(moduleHash string, sizeBytes uint64, elapsed time.Duration) {
 	s.Lock()
 	defer s.Unlock()
-	mod := s.moduleStats(moduleName)
+	mod := s.moduleStats(moduleHash)
 	mod.StoreSizeBytes = sizeBytes
 	mod.StoreDeleteprefixCount++
 	mod.storeOperationTime += elapsed
@@ -443,10 +443,10 @@ func (s *Stats) RecordBlock(ref bstream.BlockRef) {
 	s.localProcessedBlockCount += 1
 }
 
-func newExtendedStats(moduleName string) *extendedStats {
+func newExtendedStats(moduleHash string) *extendedStats {
 	return &extendedStats{
 		ModuleStats: &pbssinternal.ModuleStats{
-			Name: moduleName,
+			Name: moduleHash,
 		},
 		externalCallMetrics:  make(map[string]*extendedCallMetric),
 		inprocessCallMetrics: make(map[uint64]inprocessCall),
@@ -455,11 +455,11 @@ func newExtendedStats(moduleName string) *extendedStats {
 }
 
 // moduleStats should be called while locked
-func (s *Stats) moduleStats(moduleName string) *extendedStats {
-	mod, ok := s.modulesStats[moduleName]
+func (s *Stats) moduleStats(moduleHash string) *extendedStats {
+	mod, ok := s.modulesStats[moduleHash]
 	if !ok {
-		mod = newExtendedStats(moduleName)
-		s.modulesStats[moduleName] = mod
+		mod = newExtendedStats(moduleHash)
+		s.modulesStats[moduleHash] = mod
 	}
 	return mod
 }

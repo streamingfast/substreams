@@ -23,6 +23,7 @@ import (
 type Buffer struct {
 	values              map[string][]byte
 	valuesForFileOutput map[string][]byte
+	moduleNameToHash    map[string]string
 
 	clock *pbsubstreams.Clock
 }
@@ -35,7 +36,7 @@ func (i *Buffer) Len() (out int) {
 	return
 }
 
-func NewBuffer(blockType string, block *pbbstream.Block, clock *pbsubstreams.Clock) (*Buffer, error) {
+func NewBuffer(blockType string, block *pbbstream.Block, clock *pbsubstreams.Clock, moduleNameToHash map[string]string) (*Buffer, error) {
 	values := make(map[string][]byte)
 
 	clockBytes, err := proto.Marshal(clock)
@@ -52,6 +53,7 @@ func NewBuffer(blockType string, block *pbbstream.Block, clock *pbsubstreams.Clo
 		clock:               clock,
 		values:              values,
 		valuesForFileOutput: make(map[string][]byte),
+		moduleNameToHash:    moduleNameToHash,
 	}, nil
 }
 
@@ -59,21 +61,25 @@ func (i *Buffer) Clock() *pbsubstreams.Clock {
 	return i.clock
 }
 
-func (i *Buffer) Get(moduleName string) (value []byte, cached bool, err error) {
-	val, found := i.values[moduleName]
+func (i *Buffer) Get(moduleHash string) (value []byte, cached bool, err error) {
+	if hash, ok := i.moduleNameToHash[moduleHash]; ok {
+		moduleHash = hash
+	}
+
+	val, found := i.values[moduleHash]
 	if !found {
 		return nil, false, ErrNotFound
 	}
 	return val, true, nil
 }
 
-func (i *Buffer) Set(moduleName string, value []byte) (err error) {
-	i.values[moduleName] = value
+func (i *Buffer) Set(moduleHash string, value []byte) (err error) {
+	i.values[moduleHash] = value
 	return nil
 }
 
-func (i *Buffer) SetFileOutput(moduleName string, value []byte) (err error) {
-	i.valuesForFileOutput[moduleName] = value
+func (i *Buffer) SetFileOutput(moduleHash string, value []byte) (err error) {
+	i.valuesForFileOutput[moduleHash] = value
 
 	return nil
 }

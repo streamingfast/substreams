@@ -310,7 +310,8 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 			continue
 		}
 		for _, mod := range layer {
-			storeConfig := p.stores.configs[mod.Name]
+			hash := p.execGraph.ModuleHashes().Get(mod.Name)
+			storeConfig := p.stores.configs[hash]
 
 			if isLastStage {
 				initialBlock := reqDetails.ResolvedStartBlockNum
@@ -442,8 +443,8 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 	return storeMap, nil
 }
 
-func (p *Pipeline) isOutputModule(name string) bool {
-	return p.execGraph.IsOutputModule(name)
+func (p *Pipeline) isOutputModule(hash string) bool {
+	return p.execGraph.IsOutputModule(hash)
 }
 
 func (p *Pipeline) runPostJobHooks(ctx context.Context, clock *pbsubstreams.Clock) {
@@ -634,10 +635,11 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 					}
 					var precomputedBitmap *roaring64.Bitmap
 
-					if indices := p.preexistingBlockIndices[module.BlockFilter.Module]; indices != nil {
+					if indices := p.preexistingBlockIndices[p.execGraph.ModuleHashes().Get(module.BlockFilter.Module)]; indices != nil {
 						precomputedBitmap = sqe.RoaringBitmapsApply(expr, indices)
 					}
-					moduleBlockIndex = index.NewBlockIndex(expr, module.BlockFilter.Module, precomputedBitmap)
+					indexModuleHash := p.execGraph.ModuleHashes().Get(module.BlockFilter.Module)
+					moduleBlockIndex = index.NewBlockIndex(expr, indexModuleHash, precomputedBitmap)
 				}
 
 				entrypoint := module.BinaryEntrypoint
@@ -666,7 +668,7 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 					updatePolicy := kind.KindStore.UpdatePolicy
 					valueType := kind.KindStore.ValueType
 
-					outputStore, found := p.stores.StoreMap.Get(module.Name)
+					outputStore, found := p.stores.StoreMap.Get(p.execGraph.ModuleHashes().Get(module.Name))
 					if !found {
 						return fmt.Errorf("store %q not found", module.Name)
 					}
@@ -723,7 +725,7 @@ func (p *Pipeline) cleanUpModuleExecutors(ctx context.Context) error {
 	for _, layer := range p.StagedModuleExecutors {
 		for _, executor := range layer {
 			if err := executor.Close(ctx); err != nil {
-				return fmt.Errorf("closing module executor %q: %w", executor.Name(), err)
+				return fmt.Errorf("closing module executor %q: %w", executor.String(), err)
 			}
 		}
 	}
@@ -775,13 +777,13 @@ func (p *Pipeline) renderWasmInputs(module *pbsubstreams.Module) (out []wasm.Arg
 		case *pbsubstreams.Module_Input_Map_:
 			out = append(out, wasm.NewMapInput(in.Map.ModuleName, p.execGraph.ModulesInitBlocks()[in.Map.ModuleName]))
 		case *pbsubstreams.Module_Input_Store_:
-			inputName := input.GetStore().ModuleName
+			inputName := p.execGraph.ModuleHashes().Get(input.GetStore().ModuleName)
 			if input.GetStore().Mode == pbsubstreams.Module_Input_Store_DELTAS {
 				out = append(out, wasm.NewMapInput(inputName, p.execGraph.ModulesInitBlocks()[inputName]))
 			} else {
 				inputStore, found := storeAccessor.Get(inputName)
 				if !found {
-					return nil, fmt.Errorf("store %q npt found", inputName)
+					return nil, fmt.Errorf("store %q not found", inputName)
 				}
 				out = append(out, wasm.NewStoreReaderInput(inputName, inputStore, p.execGraph.ModulesInitBlocks()[inputName]))
 			}

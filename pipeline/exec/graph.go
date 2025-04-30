@@ -61,8 +61,10 @@ func (g *Graph) UsedIndexesModulesUpToStage(stage int) (out []*pbsubstreams.Modu
 	}
 	return
 }
-func (g *Graph) StagedUsedModules() ExecutionStages   { return g.stagedUsedModules }
-func (g *Graph) IsOutputModule(name string) bool      { return g.outputModule.Name == name }
+func (g *Graph) StagedUsedModules() ExecutionStages { return g.stagedUsedModules }
+func (g *Graph) IsOutputModule(hash string) bool {
+	return g.ModuleHashes().Get(g.outputModule.Name) == hash
+}
 func (g *Graph) ModuleHashes() *manifest.ModuleHashes { return g.moduleHashes }
 func (g *Graph) LowestInitBlock() uint64              { return g.lowestInitBlock }
 func (g *Graph) LowestStoresInitBlock() *uint64       { return g.lowestStoresInitBlock }

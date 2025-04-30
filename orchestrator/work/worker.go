@@ -43,12 +43,12 @@ type Result struct {
 
 type Worker interface {
 	ID() string
-	Work(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream) loop.Cmd // *Result
+	Work(ctx context.Context, unit stage.Unit, startBlock uint64, moduleHashes []string, upstream *response.Stream) loop.Cmd // *Result
 	StartKeepAlive(ctx context.Context, delay time.Duration, remoteWorkerPoolClient pbworker.WorkerPoolClient)
 	StopKeepAlive()
 }
 
-func NewWorkerFactoryFromFunc(f func(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream) loop.Cmd) *SimpleWorkerFactory {
+func NewWorkerFactoryFromFunc(f func(ctx context.Context, unit stage.Unit, startBlock uint64, moduleHashes []string, upstream *response.Stream) loop.Cmd) *SimpleWorkerFactory {
 	return &SimpleWorkerFactory{
 		f:  f,
 		id: atomic.AddUint64(&lastWorkerID, 1),
@@ -56,7 +56,7 @@ func NewWorkerFactoryFromFunc(f func(ctx context.Context, unit stage.Unit, start
 }
 
 type SimpleWorkerFactory struct {
-	f  func(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream) loop.Cmd
+	f  func(ctx context.Context, unit stage.Unit, startBlock uint64, moduleHashes []string, upstream *response.Stream) loop.Cmd
 	id uint64
 }
 
@@ -68,8 +68,8 @@ func (f SimpleWorkerFactory) StopKeepAlive() {
 	//noop
 }
 
-func (f SimpleWorkerFactory) Work(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream) loop.Cmd {
-	return f.f(ctx, unit, startBlock, moduleNames, upstream)
+func (f SimpleWorkerFactory) Work(ctx context.Context, unit stage.Unit, startBlock uint64, moduleHashes []string, upstream *response.Stream) loop.Cmd {
+	return f.f(ctx, unit, startBlock, moduleHashes, upstream)
 }
 
 func (f SimpleWorkerFactory) ID() string {
@@ -143,7 +143,7 @@ func init() {
 	}
 }
 
-func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream) loop.Cmd {
+func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uint64, moduleHashes []string, upstream *response.Stream) loop.Cmd {
 	request := NewRequest(ctx, reqctx.Details(ctx), unit.Stage, startBlock)
 	logger := reqctx.Logger(ctx)
 
@@ -170,7 +170,7 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 				zap.NamedError("previous_error", previousError),
 			)
 
-			res = w.work(ctx, request, moduleNames, upstream, jobIdx)
+			res = w.work(ctx, request, moduleHashes, upstream, jobIdx)
 			err := res.Error
 			switch err.(type) {
 			case *RetryableErr:
@@ -220,7 +220,7 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 				"incomplete job",
 				zap.Object("unit", unit),
 				zap.Int("number_of_tries", retryIdx),
-				zap.Strings("module_name", moduleNames),
+				zap.Strings("module_hashes", moduleHashes),
 				zap.Duration("duration", timeTook),
 				zap.Error(err),
 			)
@@ -232,7 +232,7 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 				"incomplete job",
 				zap.Object("unit", unit),
 				zap.Int("number_of_tries", retryIdx),
-				zap.Strings("module_name", moduleNames),
+				zap.Strings("module_hashes", moduleHashes),
 				zap.Duration("duration", timeTook),
 				zap.Error(err),
 			)
@@ -245,7 +245,7 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 			"job completed",
 			zap.Object("unit", unit),
 			zap.Int("number_of_tries", retryIdx),
-			zap.Strings("module_name", moduleNames),
+			zap.Strings("module_hashes", moduleHashes),
 			zap.Duration("duration", timeTook),
 			zap.Float64("processing_time_per_block", timeTook.Seconds()/float64(request.SegmentSize)),
 		)

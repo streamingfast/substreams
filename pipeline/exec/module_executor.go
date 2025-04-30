@@ -37,15 +37,14 @@ func skipFromIndex(index *index.BlockIndex, execOutput execout.ExecutionOutputGe
 
 func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.ExecutionOutputGetter) (*pbssinternal.ModuleOutput, []byte, []byte, bool, error) {
 	logger := reqctx.Logger(ctx)
-	modName := executor.Name()
 
 	var err error
 
 	ctx, span := reqctx.WithModuleExecutionSpan(ctx, "module_execution")
 	defer span.EndWithErr(&err)
 
-	logger = logger.With(zap.String("module_name", modName))
-	span.SetAttributes(attribute.String("substreams.module.name", modName))
+	logger = logger.With(zap.String("module_name", executor.String()))
+	span.SetAttributes(attribute.String("substreams.module.name", executor.String()))
 
 	logger.Debug("running module")
 
@@ -87,7 +86,8 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 		return moduleOutput, outputBytes, nil, false, nil
 	}
 
-	uid := reqctx.ReqStats(ctx).RecordModuleWasmBlockBegin(modName)
+	reqstats := reqctx.ReqStats(ctx)
+	uid := reqstats.RecordModuleWasmBlockBegin(executor.String())
 	var skippedOutput bool
 
 	outputBytes, outputForFiles, moduleOutput, err := executor.run(ctx, execOutput)
@@ -100,7 +100,7 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 		return nil, nil, nil, false, fmt.Errorf("execute: %w", err)
 	}
 
-	reqctx.ReqStats(ctx).RecordModuleWasmBlockEnd(modName, uid)
+	reqctx.ReqStats(ctx).RecordModuleWasmBlockEnd(executor.String(), uid)
 
 	fillModuleOutputMetadata(executor, moduleOutput)
 
@@ -108,7 +108,7 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 }
 
 func getCachedOutput(execOutput execout.ExecutionOutputGetter, executor ModuleExecutor) (bool, []byte, error) {
-	output, cached, err := execOutput.Get(executor.Name())
+	output, cached, err := execOutput.Get(executor.Hash())
 	if err != nil && err != execout.ErrNotFound {
 		return false, nil, fmt.Errorf("get cached output: %w", err)
 	}

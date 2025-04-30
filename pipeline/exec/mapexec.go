@@ -24,8 +24,9 @@ func NewMapperModuleExecutor(baseExecutor *BaseExecutor, outputType string) *Map
 
 // Name implements ModuleExecutor
 func (e *MapperModuleExecutor) Name() string { return e.moduleName }
+func (e *MapperModuleExecutor) Hash() string { return e.moduleHash }
 
-func (e *MapperModuleExecutor) String() string { return e.Name() }
+func (e *MapperModuleExecutor) String() string { return e.moduleHash }
 
 // todo: this is strange because it has to be done on both the store and the mapper
 // and in this case, we don't do anything

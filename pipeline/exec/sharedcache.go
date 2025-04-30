@@ -70,7 +70,7 @@ func (s *SharedCache) cleanup(head uint64) {
 type callEntry struct {
 	sync.RWMutex
 	clock           *pbsubstreams.Clock
-	moduleName      string
+	moduleHash      string
 	entrypoint      string
 	logs            []string
 	logsByteCount   uint64
@@ -98,7 +98,7 @@ func applyResult(res *callEntry, call *wasm.Call) error {
 
 func (res *callEntry) updateFromCall(call *wasm.Call, err error) {
 	res.clock = call.Clock
-	res.moduleName = call.ModuleName
+	res.moduleHash = call.ModuleHash
 	res.entrypoint = call.Entrypoint
 	res.err = err
 	res.panicErr = call.PanicError

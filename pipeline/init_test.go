@@ -73,21 +73,21 @@ func (i *ExecOutputTesting) Len() (out int) {
 	return
 }
 
-func (i *ExecOutputTesting) Get(moduleName string) (value []byte, cached bool, err error) {
-	val, found := i.Values[moduleName]
+func (i *ExecOutputTesting) Get(moduleHash string) (value []byte, cached bool, err error) {
+	val, found := i.Values[moduleHash]
 	if !found {
 		return nil, false, execout.ErrNotFound
 	}
 	return val, false, nil
 }
 
-func (i *ExecOutputTesting) Set(moduleName string, value []byte) (err error) {
-	i.Values[moduleName] = value
+func (i *ExecOutputTesting) Set(moduleHash string, value []byte) (err error) {
+	i.Values[moduleHash] = value
 	return nil
 }
 
-func (i *ExecOutputTesting) SetFileOutput(moduleName string, value []byte) (err error) {
-	i.ValuesForFiles[moduleName] = value
+func (i *ExecOutputTesting) SetFileOutput(moduleHash string, value []byte) (err error) {
+	i.ValuesForFiles[moduleHash] = value
 	return nil
 }
 

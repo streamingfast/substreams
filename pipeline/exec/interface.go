@@ -9,8 +9,9 @@ import (
 )
 
 type ModuleExecutor interface {
-	// Name returns the name of the module as defined in the manifest.
 	Name() string
+
+	Hash() string
 	String() string
 	Close(ctx context.Context) error
 	run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, outForFiles []byte, moduleOutputData *pbssinternal.ModuleOutput, err error)

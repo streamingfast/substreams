@@ -1,6 +1,7 @@
 package exec
 
 import (
+	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
@@ -9,6 +10,31 @@ func TestNew() *Graph {
 		outputModule: &pbsubstreams.Module{
 			Name: "",
 		},
+		moduleHashes: manifest.NewModuleHashes(),
+	}
+}
+
+func TestSimpleHashes(moduleNames []string) *Graph {
+	manifest.TestUseSimpleHash = true
+	hashes := manifest.NewModuleHashes()
+
+	var modules []*pbsubstreams.Module
+
+	for _, modName := range moduleNames {
+		modules = append(modules, &pbsubstreams.Module{
+			Name: modName,
+		})
+	}
+
+	for _, mod := range modules {
+		hashes.HashModule(&pbsubstreams.Modules{Modules: modules}, mod, &manifest.ModuleGraph{})
+	}
+
+	return &Graph{
+		outputModule: &pbsubstreams.Module{
+			Name: "",
+		},
+		moduleHashes: hashes,
 	}
 }
 

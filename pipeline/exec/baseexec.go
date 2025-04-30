@@ -33,7 +33,7 @@ type BaseExecutor struct {
 	logsTruncated bool
 }
 
-func NewBaseExecutor(ctx context.Context, moduleName, moduleHash string, initialBlock uint64, wasmModule wasm.Module, cacheEnabled bool, wasmArguments []wasm.Argument, blockIndex *index.BlockIndex, entrypoint string, tracer ttrace.Tracer) *BaseExecutor {
+func NewBaseExecutor(ctx context.Context, moduleName string, moduleHash string, initialBlock uint64, wasmModule wasm.Module, cacheEnabled bool, wasmArguments []wasm.Argument, blockIndex *index.BlockIndex, entrypoint string, tracer ttrace.Tracer) *BaseExecutor {
 	return &BaseExecutor{
 		ctx:                  ctx,
 		initialBlock:         initialBlock,
@@ -119,7 +119,7 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canS
 
 	stats := reqctx.ReqStats(e.ctx)
 	//t0 := time.Now()
-	call = wasm.NewCall(clock, e.moduleName, e.entrypoint, stats, e.wasmArguments, canSkipEmptyOutput)
+	call = wasm.NewCall(clock, e.moduleHash, e.entrypoint, stats, e.wasmArguments, canSkipEmptyOutput)
 
 	if sharedCache.Cachable(clock.Number) {
 		err = sharedCache.Execute(e.ctx, e.wasmModule, e.moduleHash, call, e.wasmArguments, argValues)
@@ -134,23 +134,23 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canS
 			message:    panicErr.Error(),
 			stackTrace: call.Logs,
 		}
-		return nil, fmt.Errorf("block %d: module %q: general wasm execution panicked: %w: %s", clock.Number, e.moduleName, wasm.ErrWasmDeterministicExec, errExecutor.Error())
+		return nil, fmt.Errorf("block %d: module %q: general wasm execution panicked: %w: %s", clock.Number, e.moduleHash, wasm.ErrWasmDeterministicExec, errExecutor.Error())
 	}
 	if err != nil {
 		if ctxErr := e.ctx.Err(); ctxErr != nil {
-			return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %w, %w", clock.Number, e.moduleName, err, ctxErr)
+			return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %w, %w", clock.Number, e.moduleHash, err, ctxErr)
 		}
-		return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %w: %s", clock.Number, e.moduleName, wasm.ErrWasmDeterministicExec, err)
+		return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %w: %s", clock.Number, e.moduleHash, wasm.ErrWasmDeterministicExec, err)
 	}
 	if inst != nil {
 		if e.instanceCacheEnabled {
 			if err := inst.Cleanup(e.ctx); err != nil {
-				return nil, fmt.Errorf("block %d: module %q: failed to cleanup module: %w", clock.Number, e.moduleName, err)
+				return nil, fmt.Errorf("block %d: module %q: failed to cleanup module: %w", clock.Number, e.moduleHash, err)
 			}
 			e.cachedInstance = inst
 		} else {
 			if err := inst.Close(e.ctx); err != nil {
-				return nil, fmt.Errorf("block %d: module %q: failed to close module: %w", clock.Number, e.moduleName, err)
+				return nil, fmt.Errorf("block %d: module %q: failed to close module: %w", clock.Number, e.moduleHash, err)
 			}
 		}
 	}

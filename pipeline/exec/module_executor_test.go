@@ -45,6 +45,7 @@ func (t *MockExecOutput) Set(name string, value []byte) (err error) {
 
 type MockModuleExecutor struct {
 	name string
+	hash string
 
 	RunFunc      func(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, outForFiles []byte, moduleOutputData *pbssinternal.ModuleOutput, err error)
 	ApplyFunc    func(value []byte) error
@@ -65,6 +66,7 @@ func (t *MockModuleExecutor) run(ctx context.Context, reader execout.ExecutionOu
 func (t *MockModuleExecutor) BlockIndex() *index.BlockIndex   { return nil }
 func (t *MockModuleExecutor) RunsOnBlock(_ uint64) bool       { return true }
 func (t *MockModuleExecutor) Name() string                    { return t.name }
+func (t *MockModuleExecutor) Hash() string                    { return t.hash }
 func (t *MockModuleExecutor) String() string                  { return fmt.Sprintf("TestModuleExecutor(%s)", t.name) }
 func (t *MockModuleExecutor) Close(ctx context.Context) error { return nil }
 func (t *MockModuleExecutor) HasValidOutput() bool            { return t.cacheable }
@@ -123,11 +125,13 @@ func TestModuleExecutorRunner_Run_HappyPath(t *testing.T) {
 
 func TestModuleExecutorRunner_Run_CachedOutput(t *testing.T) {
 	ctx := context.Background()
+	ctx = reqctx.WithReqStats(ctx, metrics.NewReqStats(&metrics.Config{}, zap.NewNop()))
 
 	applied := false
 
 	executor := &MockModuleExecutor{
 		name: "test",
+		hash: "testhash",
 		RunFunc: func(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, outForFiles []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
 			return []byte("test"), nil, &pbssinternal.ModuleOutput{
 				Data: &pbssinternal.ModuleOutput_MapOutput{
@@ -152,7 +156,7 @@ func TestModuleExecutorRunner_Run_CachedOutput(t *testing.T) {
 	}
 	output := &MockExecOutput{
 		cacheMap: map[string][]byte{
-			"test": []byte("cached"),
+			"testhash": []byte("cached"),
 		},
 	}
 

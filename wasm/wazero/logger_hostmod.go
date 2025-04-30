@@ -31,7 +31,7 @@ var LoggerFuncs = []funcs{
 			}
 
 			if tracer.Enabled() {
-				zlog.Debug(message, zap.String("module_name", call.ModuleName), zap.String("log_source", "wasm"))
+				zlog.Debug(message, zap.String("module_name", call.ModuleHash), zap.String("log_source", "wasm"))
 			}
 			call.AppendLog(message)
 		}),

@@ -43,12 +43,12 @@ func (i *instance) newExtensionFunction(ctx context.Context, namespace, name str
 	return func(ptr, length, outputPtr int32) {
 		data := i.Heap.ReadBytes(ptr, length)
 
-		metricID := reqctx.WasmExtensionReqStats(ctx).RecordModuleWasmExternalCallBegin(i.CurrentCall.ModuleName, fmt.Sprintf("%s:%s", namespace, name))
+		metricID := reqctx.WasmExtensionReqStats(ctx).RecordModuleWasmExternalCallBegin(i.CurrentCall.ModuleHash, fmt.Sprintf("%s:%s", namespace, name))
 		out, err := f(ctx, reqctx.Details(ctx).UniqueIDString(), i.CurrentCall.Clock, data)
 		if err != nil {
 			panic(fmt.Errorf(`running wasm extension "%s::%s": %w`, namespace, name, err))
 		}
-		reqctx.WasmExtensionReqStats(ctx).RecordModuleWasmExternalCallEnd(i.CurrentCall.ModuleName, fmt.Sprintf("%s:%s", namespace, name), metricID)
+		reqctx.WasmExtensionReqStats(ctx).RecordModuleWasmExternalCallEnd(i.CurrentCall.ModuleHash, fmt.Sprintf("%s:%s", namespace, name), metricID)
 
 		// It's unclear if WASMExtension implementor will correctly handle the context canceled case, as a safety
 		// measure, we check if the context was canceled without being handled correctly and stop here.

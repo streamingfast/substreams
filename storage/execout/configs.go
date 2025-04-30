@@ -5,7 +5,6 @@ import (
 
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
-	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 )
@@ -16,7 +15,7 @@ type Configs struct {
 	logger                 *zap.Logger
 }
 
-func NewConfigs(baseObjectStore dstore.Store, allRequestedModules []*pbsubstreams.Module, moduleHashes *manifest.ModuleHashes, execOutputSaveInterval uint64, firstStreamableBlock uint64, logger *zap.Logger) (*Configs, error) {
+func NewConfigs(baseObjectStore dstore.Store, allRequestedModules []*pbsubstreams.Module, moduleHashes map[string]string, execOutputSaveInterval uint64, firstStreamableBlock uint64, logger *zap.Logger) (*Configs, error) {
 	out := make(map[string]*Config)
 	for _, mod := range allRequestedModules {
 
@@ -28,7 +27,7 @@ func NewConfigs(baseObjectStore dstore.Store, allRequestedModules []*pbsubstream
 			mod.Name,
 			initialBlock,
 			mod.ModuleKind(),
-			moduleHashes.Get(mod.Name),
+			moduleHashes[mod.Name],
 			baseObjectStore,
 			logger,
 		)

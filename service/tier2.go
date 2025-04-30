@@ -229,7 +229,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 		logger.Info("refusing Substreams ProcessRange request", fields...)
 		return err
 	}
-	outputModuleHash := execGraph.ModuleHashes().Get(request.OutputModule)
+	outputModuleHash := execGraph.ModuleHashes()[request.OutputModule]
 
 	logger.Info("incoming substreams ProcessRange request", fields...)
 

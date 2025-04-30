@@ -12,7 +12,7 @@ on:
 
 jobs:
   buf:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     if: "${{ !startsWith(github.event.head_commit.message, 'GitBook: [#') }}"
     permissions:
       contents: read
@@ -34,7 +34,7 @@ jobs:
         uses: bufbuild/buf-breaking-action@v1
         with:
           input: proto
-          against: 'https://github.com/${{ github.repository }}.git#branch=${{ github.base_ref }}'
+          against: "https://github.com/${{ github.repository }}.git#branch=${{ github.base_ref }}"
 
       - uses: bufbuild/buf-push-action@v1
         if: github.event_name != 'pull_request'

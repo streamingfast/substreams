@@ -44,17 +44,26 @@ func TestGraphStagedModules(initialBlock1, ib2, ib3, ib4, ib5 uint64) *Graph {
 	lowest = min(lowest, ib3)
 	lowest = min(lowest, ib4)
 	lowest = min(lowest, ib5)
+	hashes := manifest.NewModuleHashes()
+	hashes.HashModule(nil, &pbsubstreams.Module{Name: "mod1"}, nil)
+	hashes.HashModule(nil, &pbsubstreams.Module{Name: "mod2"}, nil)
+	hashes.HashModule(nil, &pbsubstreams.Module{Name: "mod3"}, nil)
+	hashes.HashModule(nil, &pbsubstreams.Module{Name: "mod4"}, nil)
+	hashes.HashModule(nil, &pbsubstreams.Module{Name: "mod5"}, nil)
 	return &Graph{
 		lowestInitBlock: lowest,
+		moduleHashes:    hashes,
 		stagedUsedModules: ExecutionStages{
 			{
 				{
 					&pbsubstreams.Module{
+						Name:         "mod1",
 						Kind:         &pbsubstreams.Module_KindMap_{KindMap: &pbsubstreams.Module_KindMap{}},
 						InitialBlock: initialBlock1,
 					},
 				}, {
 					&pbsubstreams.Module{
+						Name:         "mod2",
 						Kind:         &pbsubstreams.Module_KindStore_{KindStore: &pbsubstreams.Module_KindStore{}},
 						InitialBlock: ib2,
 					},
@@ -64,11 +73,13 @@ func TestGraphStagedModules(initialBlock1, ib2, ib3, ib4, ib5 uint64) *Graph {
 
 				{
 					&pbsubstreams.Module{
+						Name:         "mod3",
 						Kind:         &pbsubstreams.Module_KindMap_{KindMap: &pbsubstreams.Module_KindMap{}},
 						InitialBlock: ib3,
 					},
 				}, {
 					&pbsubstreams.Module{
+						Name:         "mod4",
 						Kind:         &pbsubstreams.Module_KindStore_{KindStore: &pbsubstreams.Module_KindStore{}},
 						InitialBlock: ib4,
 					},
@@ -77,6 +88,7 @@ func TestGraphStagedModules(initialBlock1, ib2, ib3, ib4, ib5 uint64) *Graph {
 			{
 				{
 					&pbsubstreams.Module{
+						Name:         "mod5",
 						Kind:         &pbsubstreams.Module_KindMap_{KindMap: &pbsubstreams.Module_KindMap{}},
 						InitialBlock: ib5,
 					},

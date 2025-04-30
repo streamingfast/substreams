@@ -94,6 +94,9 @@ func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *
 		return fmt.Errorf("building execution moduleGraph: %w", err)
 	}
 	g.usedModules = processModules
+	if err := g.hashModules(graph); err != nil {
+		return fmt.Errorf("cannot hash module: %w", err)
+	}
 	g.modulesInitBlocks = map[string]uint64{}
 	for _, mod := range g.usedModules {
 		initialBlock := mod.InitialBlock
@@ -102,7 +105,7 @@ func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *
 		} else if initialBlock < firstStreamableBlock {
 			return fmt.Errorf("module %q has initial block %d smaller than first streamable block %d", mod.Name, initialBlock, firstStreamableBlock)
 		}
-		g.modulesInitBlocks[mod.Name] = initialBlock
+		g.modulesInitBlocks[g.ModuleHashes().Get(mod.Name)] = initialBlock
 	}
 
 	g.stagedUsedModules, err = computeStages(g.usedModules, g.modulesInitBlocks)
@@ -112,9 +115,6 @@ func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *
 
 	g.lowestInitBlock = computeLowestInitBlock(processModules, firstStreamableBlock)
 	g.lowestStoresInitBlock = computeLowestStoresInitBlock(processModules, firstStreamableBlock)
-	if err := g.hashModules(graph); err != nil {
-		return fmt.Errorf("cannot hash module: %w", err)
-	}
 
 	g.outputModule = computeOutputModule(g.usedModules, outputModuleName)
 

@@ -121,8 +121,11 @@ func NewStages(
 		var moduleStates []*StoreModuleState
 		stageLowestInitBlock := modulesInitBlocks[layer[0].Name]
 		for _, mod := range layer {
+			if execGraph.ModuleHashes() == nil {
+				panic("empty moduleHashes")
+			}
 			hash := execGraph.ModuleHashes().Get(mod.Name)
-			modSegmenter := segmenter.WithInitialBlock(modulesInitBlocks[mod.Name])
+			modSegmenter := segmenter.WithInitialBlock(modulesInitBlocks[hash])
 			modState := NewModuleState(logger, mod.Name, modSegmenter, storeConfigs[hash])
 			moduleStates = append(moduleStates, modState)
 

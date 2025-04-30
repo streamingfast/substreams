@@ -137,7 +137,6 @@ func (g *Graph) dedupeModules(mods *pbsubstreams.Modules) (*pbsubstreams.Modules
 	for _, names := range hashToNames {
 		canonicalName := names[0]
 		for _, name := range names {
-			fmt.Println("comparing name", name, "with", canonicalName)
 			if name < canonicalName {
 				canonicalName = name
 			}

@@ -9,6 +9,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+* dedupe modules with same hash when computing graph. (#619)
+* prevent memory usage burst when writing mapper by streaming protobuf items to writer
+
 ## v1.15.3
 
 ### Server

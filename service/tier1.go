@@ -345,7 +345,7 @@ func (s *Tier1Service) Blocks(
 		return err
 	}
 
-	outputModuleHash := execGraph.ModuleHashes().Get(request.OutputModule)
+	outputModuleHash := execGraph.ModuleHashes()[request.OutputModule]
 
 	ctx = reqctx.WithOutputModuleHash(ctx, outputModuleHash)
 	fields = append(fields, zap.String("output_module_hash", outputModuleHash))
@@ -446,7 +446,7 @@ func (s *Tier1Service) writePackage(ctx context.Context, request *pbsubstreamsrp
 		return fmt.Errorf("marshalling package: %w", err)
 	}
 
-	moduleStore, err := cacheStore.SubStore(execGraph.ModuleHashes().Get(request.OutputModule))
+	moduleStore, err := cacheStore.SubStore(execGraph.ModuleHashes()[request.OutputModule])
 	if err != nil {
 		return fmt.Errorf("getting substore: %w", err)
 	}
@@ -464,7 +464,7 @@ func (s *Tier1Service) writePackage(ctx context.Context, request *pbsubstreamsrp
 
 func (s *Tier1Service) writeLastUsed(ctx context.Context, execGraph *exec.Graph, cacheStore dstore.Store) error {
 	for _, module := range execGraph.UsedModules() {
-		moduleStore, err := cacheStore.SubStore(execGraph.ModuleHashes().Get(module.Name))
+		moduleStore, err := cacheStore.SubStore(execGraph.ModuleHashes()[module.Name])
 		if err != nil {
 			return fmt.Errorf("getting substore: %w", err)
 		}
@@ -830,7 +830,7 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 
 func (s *Tier1Service) containsDeterministicError(ctx context.Context, startBlock, endBlock uint64, execGraph *exec.Graph, cacheStore dstore.Store) error {
 	for _, module := range execGraph.UsedModules() {
-		moduleStore, err := cacheStore.SubStore(execGraph.ModuleHashes().Get(module.Name))
+		moduleStore, err := cacheStore.SubStore(execGraph.ModuleHashes()[module.Name])
 		if err != nil {
 			return fmt.Errorf("getting substore: %w", err)
 		}

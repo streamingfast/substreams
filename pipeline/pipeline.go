@@ -650,7 +650,7 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 					baseExecutor := exec.NewBaseExecutor(
 						ctx,
 						module.Name,
-						p.execGraph.ModuleHashes().Get(module.Name),
+						p.execGraph.ModuleHashes()[module.Name],
 						modulesInitBlocks[module.Name],
 						mod,
 						p.wasmRuntime.InstanceCacheEnabled(),
@@ -675,7 +675,7 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 					baseExecutor := exec.NewBaseExecutor(
 						ctx,
 						module.Name,
-						p.execGraph.ModuleHashes().Get(module.Name),
+						p.execGraph.ModuleHashes()[module.Name],
 						modulesInitBlocks[module.Name],
 						mod,
 						p.wasmRuntime.InstanceCacheEnabled(),
@@ -694,7 +694,7 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 					baseExecutor := exec.NewBaseExecutor(
 						ctx,
 						module.Name,
-						p.execGraph.ModuleHashes().Get(module.Name),
+						p.execGraph.ModuleHashes()[module.Name],
 						modulesInitBlocks[module.Name],
 						mod,
 						p.wasmRuntime.InstanceCacheEnabled(),

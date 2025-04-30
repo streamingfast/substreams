@@ -14,7 +14,7 @@ type Graph struct {
 	requestModules        *pbsubstreams.Modules
 	usedModules           []*pbsubstreams.Module // all modules that need to be processed (requested directly or a required module ancestor)
 	stagedUsedModules     ExecutionStages        // all modules that need to be processed (requested directly or a required module ancestor)
-	moduleHashes          *manifest.ModuleHashes
+	moduleHashes          map[string]string
 	stores                []*pbsubstreams.Module // subset of allModules: only the stores
 	modulesInitBlocks     map[string]uint64
 	lowestInitBlock       uint64
@@ -23,6 +23,8 @@ type Graph struct {
 
 	schedulableModules      []*pbsubstreams.Module // stores and output mappers needed to execute to produce output for all `output_modules`.
 	schedulableAncestorsMap map[string][]string    // modules that are ancestors (therefore dependencies) of a given module
+
+	deduped bool
 }
 
 func (g *Graph) OutputModule() *pbsubstreams.Module  { return g.outputModule }
@@ -63,7 +65,7 @@ func (g *Graph) UsedIndexesModulesUpToStage(stage int) (out []*pbsubstreams.Modu
 }
 func (g *Graph) StagedUsedModules() ExecutionStages   { return g.stagedUsedModules }
 func (g *Graph) IsOutputModule(name string) bool      { return g.outputModule.Name == name }
-func (g *Graph) ModuleHashes() *manifest.ModuleHashes { return g.moduleHashes }
+func (g *Graph) ModuleHashes() map[string]string      { return g.moduleHashes }
 func (g *Graph) LowestInitBlock() uint64              { return g.lowestInitBlock }
 func (g *Graph) LowestStoresInitBlock() *uint64       { return g.lowestStoresInitBlock }
 func (g *Graph) ModulesInitBlocks() map[string]uint64 { return g.modulesInitBlocks }
@@ -80,6 +82,85 @@ func NewOutputModuleGraph(outputModule string, productionMode bool, modules *pbs
 	return out, nil
 }
 
+// copyMod will copy the module and replace all its dependencies with their canonical names.
+func copyMod(inMod *pbsubstreams.Module, nameToCanonical map[string]string) *pbsubstreams.Module {
+	outMod := &pbsubstreams.Module{
+		Name:             inMod.Name,
+		Kind:             inMod.Kind,
+		BinaryIndex:      inMod.BinaryIndex,
+		BinaryEntrypoint: inMod.BinaryEntrypoint,
+		InitialBlock:     inMod.InitialBlock,
+		Output:           inMod.Output,
+	}
+
+	for _, input := range inMod.Inputs {
+		switch {
+		case input.GetParams() != nil,
+			input.GetSource() != nil:
+			outMod.Inputs = append(outMod.Inputs, input)
+		case input.GetMap() != nil:
+			outMod.Inputs = append(outMod.Inputs, &pbsubstreams.Module_Input{
+				Input: &pbsubstreams.Module_Input_Map_{
+					Map: &pbsubstreams.Module_Input_Map{
+						ModuleName: nameToCanonical[input.GetMap().ModuleName],
+					},
+				},
+			})
+		case input.GetStore() != nil:
+			outMod.Inputs = append(outMod.Inputs, &pbsubstreams.Module_Input{
+				Input: &pbsubstreams.Module_Input_Store_{
+					Store: &pbsubstreams.Module_Input_Store{
+						ModuleName: nameToCanonical[input.GetStore().ModuleName],
+						Mode:       input.GetStore().Mode,
+					},
+				},
+			})
+		}
+	}
+
+	if inMod.BlockFilter != nil {
+		outMod.BlockFilter = &pbsubstreams.Module_BlockFilter{
+			Module: nameToCanonical[inMod.BlockFilter.Module],
+			Query:  inMod.BlockFilter.Query,
+		}
+	}
+	return outMod
+}
+
+func (g *Graph) dedupeModules(mods *pbsubstreams.Modules) (*pbsubstreams.Modules, bool) {
+	hashToNames := make(map[string][]string)
+	for name, hash := range g.moduleHashes {
+		hashToNames[hash] = append(hashToNames[hash], name)
+	}
+
+	nameToCanonical := make(map[string]string)
+	for _, names := range hashToNames {
+		canonicalName := names[0]
+		for _, name := range names {
+			fmt.Println("comparing name", name, "with", canonicalName)
+			if name < canonicalName {
+				canonicalName = name
+			}
+		}
+		for _, name := range names {
+			nameToCanonical[name] = canonicalName
+		}
+	}
+
+	var deduped bool
+	var filteredModules []*pbsubstreams.Module
+
+	for _, mod := range mods.Modules {
+		if mod.Name == nameToCanonical[mod.Name] {
+			filteredModules = append(filteredModules, copyMod(mod, nameToCanonical))
+			continue
+		}
+		deduped = true
+	}
+
+	return &pbsubstreams.Modules{Modules: filteredModules}, deduped
+}
+
 func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *pbsubstreams.Modules, firstStreamableBlock uint64) error {
 	graph, err := manifest.NewModuleGraph(modules.Modules)
 	if err != nil {
@@ -92,17 +173,6 @@ func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *
 		return fmt.Errorf("building execution moduleGraph: %w", err)
 	}
 	g.usedModules = processModules
-	g.modulesInitBlocks = map[string]uint64{}
-	for _, mod := range g.usedModules {
-		initialBlock := mod.InitialBlock
-		if initialBlock == 0 {
-			initialBlock = firstStreamableBlock
-		} else if initialBlock < firstStreamableBlock {
-			return fmt.Errorf("module %q has initial block %d smaller than first streamable block %d", mod.Name, initialBlock, firstStreamableBlock)
-		}
-		g.modulesInitBlocks[mod.Name] = initialBlock
-	}
-
 	g.stagedUsedModules, err = computeStages(g.usedModules, g.modulesInitBlocks)
 	if err != nil {
 		return err
@@ -112,6 +182,34 @@ func (g *Graph) computeGraph(outputModule string, productionMode bool, modules *
 	g.lowestStoresInitBlock = computeLowestStoresInitBlock(processModules, firstStreamableBlock)
 	if err := g.hashModules(graph); err != nil {
 		return fmt.Errorf("cannot hash module: %w", err)
+	}
+
+	if newModules, deduped := g.dedupeModules(modules); deduped {
+		graph, err = manifest.NewModuleGraph(newModules.Modules)
+		if err != nil {
+			return fmt.Errorf("compute graph: %w", err)
+		}
+		g.deduped = true
+		processModules, err = graph.ModulesDownTo(outputModuleName)
+		if err != nil {
+			return fmt.Errorf("building execution moduleGraph: %w", err)
+		}
+		g.usedModules = processModules
+		g.stagedUsedModules, err = computeStages(g.usedModules, g.modulesInitBlocks)
+		if err != nil {
+			return err
+		}
+	}
+
+	g.modulesInitBlocks = map[string]uint64{}
+	for _, mod := range g.usedModules {
+		initialBlock := mod.InitialBlock
+		if initialBlock == 0 {
+			initialBlock = firstStreamableBlock
+		} else if initialBlock < firstStreamableBlock {
+			return fmt.Errorf("module %q has initial block %d smaller than first streamable block %d", mod.Name, initialBlock, firstStreamableBlock)
+		}
+		g.modulesInitBlocks[mod.Name] = initialBlock
 	}
 
 	g.outputModule = computeOutputModule(g.usedModules, outputModuleName)
@@ -385,12 +483,21 @@ func moduleNames(modules []*pbsubstreams.Module) (out []string) {
 }
 
 func (g *Graph) hashModules(graph *manifest.ModuleGraph) error {
-	g.moduleHashes = manifest.NewModuleHashes()
+	if g.deduped {
+		return fmt.Errorf("cannot hash modules after deduping")
+	}
+	hashes := manifest.NewModuleHashes()
 	for _, module := range g.usedModules {
-		if _, err := g.moduleHashes.HashModule(g.requestModules, module, graph); err != nil {
+		if _, err := hashes.HashModule(g.requestModules, module, graph); err != nil {
 			return err
 		}
 	}
+	g.moduleHashes = make(map[string]string)
+	hashes.Iter(func(hash, name string) error {
+		g.moduleHashes[name] = hash
+		return nil
+	})
+
 	return nil
 }
 

@@ -1,7 +1,6 @@
 package execout
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -11,6 +10,7 @@ import (
 	"sync"
 
 	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
+	"github.com/streamingfast/substreams/storage/execout/streamproto"
 
 	"go.uber.org/zap/zapcore"
 
@@ -157,16 +157,20 @@ func (c *File) Load(ctx context.Context) error {
 
 func (c *File) Save(ctx context.Context) error {
 	filename := c.Filename()
-	outputData := &pboutput.Map{Kv: c.Kv}
-	cnt, err := outputData.MarshalFast()
-	if err != nil {
-		return fmt.Errorf("unmarshalling file %s: %w", filename, err)
-	}
 
 	c.logger.Info("writing execution output file", zap.String("filename", filename))
 	return derr.RetryContext(ctx, 10, func(ctx context.Context) error { // more than the usual 5 retries here because if we fail, we have to reprocess the whole segment
-		reader := bytes.NewReader(cnt)
-		err := c.store.WriteObject(ctx, filename, reader)
+		r, w := io.Pipe()
+		go func() {
+			for _, item := range c.Kv {
+				if err := streamproto.WriteItem(w, item); err != nil {
+					w.CloseWithError(err)
+					return
+				}
+			}
+			w.Close()
+		}()
+		err := c.store.WriteObject(ctx, filename, r)
 		return err
 	})
 }

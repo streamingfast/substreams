@@ -13,6 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * dedupe modules with same hash when computing graph. (#619)
 * prevent memory usage burst when writing mapper by streaming protobuf items to writer
+* ignore "service currently overloaded" worker errors in the "maxRetries" count. Tier1 requests should not error out because tier2 servers are ramping up, only when they fail multiple times.
+* Default SUBSTREAMS_WORKER_MAX_RETRIES now set to 5.
 
 ## v1.15.3
 

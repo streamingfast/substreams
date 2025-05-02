@@ -5,6 +5,7 @@ import (
 
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 )
@@ -23,11 +24,14 @@ func NewConfigs(baseObjectStore dstore.Store, allRequestedModules []*pbsubstream
 		if initialBlock < firstStreamableBlock {
 			initialBlock = firstStreamableBlock
 		}
+		hash := moduleHashes[mod.Name]
+		extendedHash := manifest.ExtendedModuleHash(mod, hash)
 		conf, err := NewConfig(
 			mod.Name,
 			initialBlock,
 			mod.ModuleKind(),
-			moduleHashes[mod.Name],
+			hash,
+			extendedHash,
 			baseObjectStore,
 			logger,
 		)

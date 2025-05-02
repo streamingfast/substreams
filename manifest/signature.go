@@ -177,3 +177,32 @@ func inputValue(input *pbsubstreams.Module_Input) (string, error) {
 		return "", fmt.Errorf("invalid input %T", input.Input)
 	}
 }
+
+// ExtendedModuleHash adds the missing input store 'mode' and store 'valueType' and 'updatePolicy'
+// they are not required for the cached data to be consistent, but they can make it fail, we don't want those failures to persist after the user fixes his substreams.yaml
+func ExtendedModuleHash(module *pbsubstreams.Module, hash string) string {
+
+	// Create a hash combining the module hash with store properties to prevent the use
+	// of outdated error files when a store's config has changed
+	hashBytes, err := hex.DecodeString(hash)
+	if err != nil {
+		panic(fmt.Errorf("decoding module hash: %w", err))
+	}
+
+	h := sha1.New()
+	h.Write(hashBytes)
+
+	for _, input := range module.Inputs {
+		if store := input.GetStore(); store != nil {
+			h.Write([]byte(store.Mode.String()))
+		}
+	}
+
+	if store := module.GetKindStore(); store != nil {
+		h.Write([]byte(store.UpdatePolicy.String()))
+		h.Write([]byte(store.ValueType))
+	}
+
+	return hex.EncodeToString(h.Sum(nil))
+
+}

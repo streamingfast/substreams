@@ -69,7 +69,6 @@ func (c *responseCollector) Collect(respAny substreams.ResponseFromAnyTier) erro
 		c.sender.Send(c.ctx, "test_user", "test_api_key", "10.0.0.1", "test_meta", "testOutputHash", "tier1")
 	case *pbssinternal.ProcessRangeResponse:
 		c.internalResponses = append(c.internalResponses, resp)
-		metering.AddEgressBytes(c.ctx, proto.Size(resp))
 		c.sender.Send(c.ctx, "test_user", "test_api_key", "10.0.0.1", "test_meta", "testOutputHash", "tier2")
 	}
 	return nil

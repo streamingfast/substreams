@@ -16,6 +16,7 @@ import (
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/manifest"
+	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/orchestrator/stage"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	"github.com/streamingfast/substreams/reqctx"
@@ -653,6 +654,7 @@ func partialPreWork(t *testing.T, start uint64, stageIdx int, run *testRun, work
 	segmenter := block.NewSegmenter(10, 0, 0)
 	unit := stage.Unit{Segment: segmenter.IndexForStartBlock(start), Stage: stageIdx}
 	ctx = reqctx.WithRequest(run.Context, &reqctx.RequestDetails{Modules: run.Package.Modules, OutputModule: run.ModuleName})
+	ctx = metering.WithMetricsSender(ctx)
 	cmd := worker.Work(ctx, unit, start, []string{run.ModuleName}, nil)
 	result := cmd()
 	msg, ok := result.(work.MsgJobSucceeded)

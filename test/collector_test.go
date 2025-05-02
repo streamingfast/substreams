@@ -9,6 +9,7 @@ import (
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/reqctx"
+	"google.golang.org/protobuf/proto"
 )
 
 type eventsCollector struct {
@@ -64,10 +65,12 @@ func (c *responseCollector) Collect(respAny substreams.ResponseFromAnyTier) erro
 	switch resp := respAny.(type) {
 	case *pbsubstreamsrpc.Response:
 		c.responses = append(c.responses, resp)
-		c.sender.Send(c.ctx, "test_user", "test_api_key", "10.0.0.1", "test_meta", "testOutputHash", "tier1", resp)
+		metering.AddEgressBytes(c.ctx, proto.Size(resp))
+		c.sender.Send(c.ctx, "test_user", "test_api_key", "10.0.0.1", "test_meta", "testOutputHash", "tier1")
 	case *pbssinternal.ProcessRangeResponse:
 		c.internalResponses = append(c.internalResponses, resp)
-		c.sender.Send(c.ctx, "test_user", "test_api_key", "10.0.0.1", "test_meta", "testOutputHash", "tier2", resp)
+		metering.AddEgressBytes(c.ctx, proto.Size(resp))
+		c.sender.Send(c.ctx, "test_user", "test_api_key", "10.0.0.1", "test_meta", "testOutputHash", "tier2")
 	}
 	return nil
 }

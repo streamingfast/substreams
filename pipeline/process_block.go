@@ -331,6 +331,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 	maxParallelExecutor := reqctx.MaxStageLayerParallelExecutor(ctx)
 	logging.Logger(ctx, p.stores.logger).Debug("executing stage's layers", zap.Int("layer_count", len(p.StagedModuleExecutors)), zap.Uint64("max_parallel_executor", maxParallelExecutor))
 
+	executedStages := make(map[int]bool)
 	for _, layer := range p.StagedModuleExecutors {
 		if maxParallelExecutor <= 1 || len(layer) <= 1 {
 			for _, executor := range layer {
@@ -338,6 +339,9 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 					continue
 				}
 				res := p.execute(ctx, executor, execOutput, isFinalBlock)
+				if !res.skipped_output && !res.output.Cached {
+					executedStages[p.moduleNameToStage[res.output.ModuleName]] = true
+				}
 				if err := p.applyExecutionResult(ctx, executor, res, execOutput); err != nil {
 					return fmt.Errorf("applying executor results %q on block %d (%s): %w", executor.Name(), blockNum, execOutput.Clock().Id, res.err)
 				}
@@ -385,6 +389,9 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 				if result.not_runnable {
 					continue
 				}
+				if !result.skipped_output && !result.output.Cached {
+					executedStages[p.moduleNameToStage[result.output.ModuleName]] = true
+				}
 				executor := layer[i]
 				if result.err != nil {
 					return fmt.Errorf("running executor %q: %w", executor.Name(), result.err)
@@ -396,6 +403,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 			}
 		}
 	}
+	metering.AddProcessedBlocks(ctx, len(executedStages)) // blocks are counted on every stage for which they were executed (not skipped for indexes, not loaded from existing cache)
 
 	return nil
 }

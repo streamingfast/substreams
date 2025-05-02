@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## Unreleased
 
 * Prevent a deterministic failure on a module definition (mode, valueType, updatePolicy) from persisting when the issue is fixed in the substreams.yaml https://github.com/streamingfast/substreams/issues/621
+* Metering events on tier2 now bundled at the end of the job (prevents sending metering events for failing jobs)
+* Added metering for: "processed_blocks" (block * number of stages where execution happened) and "egress_bytes"
 
 ## v1.15.4
 

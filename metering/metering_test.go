@@ -388,8 +388,8 @@ func TestSend(t *testing.T) {
 
 	outputModuleHash := "outputModuleHash"
 
-	// Call the Send function
-	metericsSender.Send(ctx, "user1", "apiKey1", "127.0.0.1", "meta", outputModuleHash, "endpoint", resp)
+	AddEgressBytes(ctx, proto.Size(resp))
+	metericsSender.Send(ctx, "user1", "apiKey1", "127.0.0.1", "meta", outputModuleHash, "endpoint")
 
 	// Verify the emitted event
 	assert.Len(t, emitter.events, 1)
@@ -451,7 +451,8 @@ func TestSendParallel(t *testing.T) {
 			meter.CountInc(MeterFileCompressedWriteBytes, 600)
 
 			time.Sleep(time.Duration(randomInt()) * time.Nanosecond)
-			metricsSender.Send(ctx, "user1", "apiKey1", "127.0.0.1", "meta", "outputModuleHash", "endpoint", resp)
+			AddEgressBytes(ctx, proto.Size(resp))
+			metricsSender.Send(ctx, "user1", "apiKey1", "127.0.0.1", "meta", "outputModuleHash", "endpoint")
 		}()
 	}
 

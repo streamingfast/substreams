@@ -824,7 +824,8 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 			return connect.NewError(connect.CodeUnavailable, err)
 		}
 
-		metericsSender.Send(ctx, userID, apiKeyID, ip, userMeta, outputModuleHash, "sf.substreams.rpc.v2/Blocks", resp)
+		metering.AddEgressBytes(ctx, proto.Size(resp))
+		metericsSender.Send(ctx, userID, apiKeyID, ip, userMeta, outputModuleHash, "sf.substreams.rpc.v2/Blocks")
 		return nil
 	}
 }

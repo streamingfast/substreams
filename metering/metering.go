@@ -23,7 +23,7 @@ const (
 	MeterFileUncompressedWriteBytes = "file_uncompressed_write_bytes"
 	MeterFileCompressedWriteBytes   = "file_compressed_write_bytes"
 
-	MeterUncompressedEgressBytes = "uncompressed_egress_bytes"
+	MeterUncompressedEgressBytes = "egress_bytes" // named like this to be backwards compatible with the previous metrics
 	MeterProcessedBlocks         = "processed_blocks"
 
 	MeterWasmInputBytes = "wasm_input_bytes"
@@ -161,7 +161,7 @@ func (ms *MetricsSender) Send(ctx context.Context, userID, apiKeyID, ip, userMet
 
 		Endpoint: endpoint,
 		Metrics: map[string]float64{
-			"egress_bytes":                  float64(egressBytes),
+			MeterUncompressedEgressBytes:    float64(egressBytes),
 			"written_bytes":                 float64(bytesWritten),
 			"read_bytes":                    float64(bytesRead),
 			MeterWasmInputBytes:             float64(inputBytes),

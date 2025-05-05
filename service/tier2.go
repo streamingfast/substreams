@@ -340,6 +340,26 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("error building caching engine: %w", err)
 	}
 
+	now := time.Now()
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(10 * time.Second): // 10 sec
+				if time.Since(now) > 300*time.Second { // 300 secs
+					size := 0
+					for _, file := range executionPlan.ExistingExecOuts {
+						for _, v := range file.Kv {
+							size += len(v.Payload)
+						}
+					}
+					logger.Info("request active for for a long time", zap.Duration("duration", time.Since(now)), zap.Int("execout_size_mib", size/1024/1024))
+				}
+			}
+		}
+	}()
+
 	//opts := s.buildPipelineOptions(ctx, request)
 	var opts []pipeline.Option
 	opts = append(opts, pipeline.WithFinalBlocksOnly())

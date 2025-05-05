@@ -861,7 +861,9 @@ func parseFilename(in string) (blockNum uint64, moduleExtendedHash string, err e
 		return 0, "", err
 	}
 
-	moduleExtendedHash = in[11:] // ignore the '.' between blocknum and moduleExtendedHash
+	if len(in) > 10 {
+		moduleExtendedHash = in[11:] // ignore the '.' between blocknum and moduleExtendedHash
+	}
 	return blockNum, moduleExtendedHash, nil
 }
 

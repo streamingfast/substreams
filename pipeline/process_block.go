@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"runtime/debug"
 
 	"connectrpc.com/connect"
 	"github.com/streamingfast/bstream"
@@ -26,6 +28,8 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+var PrintStack = os.Getenv("SUBSTREAMS_PRINT_STACK") == "true" || os.Getenv("SUBSTREAMS_PRINT_STACK") == "1"
 
 var ErrShuttingDown = errors.New("endpoint is shutting down, please reconnect")
 var minBlocksProcessedToSave = uint64(25)
@@ -322,6 +326,9 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 					err = connect.NewError(connect.CodeDeadlineExceeded, fmt.Errorf("execution timed out at block %d: [%s] %s", blockNum, execOutput.Clock().Id, r))
 				} else {
 					err = fmt.Errorf("panic at block %d: %s [%s]", blockNum, r, execOutput.Clock().Id)
+					if PrintStack {
+						debug.PrintStack()
+					}
 				}
 			}
 		}
@@ -369,6 +376,9 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 									err = connect.NewError(connect.CodeDeadlineExceeded, fmt.Errorf("execution timed out at block %d: [%s] %s", blockNum, execOutput.Clock().Id, r))
 								} else {
 									err = fmt.Errorf("panic at block %d: %s [%s]", blockNum, r, execOutput.Clock().Id)
+									if PrintStack {
+										debug.PrintStack()
+									}
 								}
 							}
 						}

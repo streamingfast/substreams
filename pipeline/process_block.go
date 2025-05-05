@@ -339,7 +339,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 					continue
 				}
 				res := p.execute(ctx, executor, execOutput, isFinalBlock)
-				if !res.skipped_output && !res.output.Cached {
+				if res.output != nil && !res.skipped_output && !res.output.Cached {
 					executedStages[p.moduleNameToStage[res.output.ModuleName]] = true
 				}
 				if err := p.applyExecutionResult(ctx, executor, res, execOutput); err != nil {
@@ -389,7 +389,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 				if result.not_runnable {
 					continue
 				}
-				if !result.skipped_output && !result.output.Cached {
+				if result.output != nil && !result.skipped_output && !result.output.Cached {
 					executedStages[p.moduleNameToStage[result.output.ModuleName]] = true
 				}
 				executor := layer[i]

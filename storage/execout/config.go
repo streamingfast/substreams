@@ -15,10 +15,11 @@ import (
 )
 
 type Config struct {
-	name       string
-	moduleHash string
-	objStore   dstore.Store
-	errStore   dstore.Store
+	name               string
+	moduleHash         string
+	extendedModuleHash string // used for storing errors
+	objStore           dstore.Store
+	errStore           dstore.Store
 
 	modKind            pbsubstreams.ModuleKind
 	moduleInitialBlock uint64
@@ -26,7 +27,7 @@ type Config struct {
 	logger *zap.Logger
 }
 
-func NewConfig(name string, moduleInitialBlock uint64, modKind pbsubstreams.ModuleKind, moduleHash string, baseStore dstore.Store, logger *zap.Logger) (*Config, error) {
+func NewConfig(name string, moduleInitialBlock uint64, modKind pbsubstreams.ModuleKind, moduleHash string, extendedModuleHash string, baseStore dstore.Store, logger *zap.Logger) (*Config, error) {
 	subName := fmt.Sprintf("%s/outputs", moduleHash)
 	if modKind == pbsubstreams.ModuleKindBlockIndex {
 		subName = fmt.Sprintf("%s/index", moduleHash)
@@ -49,13 +50,14 @@ func NewConfig(name string, moduleInitialBlock uint64, modKind pbsubstreams.Modu
 		modKind:            modKind,
 		moduleInitialBlock: moduleInitialBlock,
 		moduleHash:         moduleHash,
+		extendedModuleHash: extendedModuleHash,
 		logger:             logger.With(zap.String("module", name)),
 	}, nil
 }
 
 func (c *Config) WriteDeterministicError(ctx context.Context, atBlock uint64, err error) error {
 	r := strings.NewReader(err.Error())
-	return c.errStore.WriteObject(ctx, fmt.Sprintf("errors.%010d", atBlock), r)
+	return c.errStore.WriteObject(ctx, fmt.Sprintf("errors.%010d.%s", atBlock, c.extendedModuleHash), r)
 }
 
 func (c *Config) NewFile(targetRange *block.Range) *File {

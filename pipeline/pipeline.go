@@ -66,9 +66,10 @@ type Pipeline struct {
 	respFunc         substreams.ResponseFunc
 	lastProgressSent time.Time
 
-	startTime      time.Time
-	stores         *Stores
-	execoutStorage *execout.Configs
+	startTime         time.Time
+	stores            *Stores
+	execoutStorage    *execout.Configs
+	moduleNameToStage map[string]int
 
 	processingModule *processingModule
 
@@ -127,10 +128,21 @@ func New(
 		executionTimeout:        executionTimeout,
 		workerPoolFactory:       workerPoolFactory,
 		checkPendingShutdown:    checkPendingShutdown,
+		moduleNameToStage:       make(map[string]int),
 	}
 	for _, opt := range opts {
 		opt(pipe)
 	}
+
+	slm := pipe.execGraph.StagedUsedModules()
+	for stage, layers := range slm {
+		for _, layer := range layers {
+			for _, mod := range layer {
+				pipe.moduleNameToStage[mod.Name] = stage
+			}
+		}
+	}
+
 	return pipe
 }
 
@@ -650,7 +662,7 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 					baseExecutor := exec.NewBaseExecutor(
 						ctx,
 						module.Name,
-						p.execGraph.ModuleHashes().Get(module.Name),
+						p.execGraph.ModuleHashes()[module.Name],
 						modulesInitBlocks[module.Name],
 						mod,
 						p.wasmRuntime.InstanceCacheEnabled(),
@@ -675,7 +687,7 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 					baseExecutor := exec.NewBaseExecutor(
 						ctx,
 						module.Name,
-						p.execGraph.ModuleHashes().Get(module.Name),
+						p.execGraph.ModuleHashes()[module.Name],
 						modulesInitBlocks[module.Name],
 						mod,
 						p.wasmRuntime.InstanceCacheEnabled(),
@@ -694,7 +706,7 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 					baseExecutor := exec.NewBaseExecutor(
 						ctx,
 						module.Name,
-						p.execGraph.ModuleHashes().Get(module.Name),
+						p.execGraph.ModuleHashes()[module.Name],
 						modulesInitBlocks[module.Name],
 						mod,
 						p.wasmRuntime.InstanceCacheEnabled(),

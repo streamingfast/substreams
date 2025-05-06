@@ -4,13 +4,12 @@ import (
 	"fmt"
 
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 type ConfigMap map[string]*Config
 
-func NewConfigMap(baseObjectStore, quickSaveStore dstore.Store, storeModules []*pbsubstreams.Module, moduleHashes *manifest.ModuleHashes, firstStreamableBlock uint64) (out ConfigMap, err error) {
+func NewConfigMap(baseObjectStore, quickSaveStore dstore.Store, storeModules []*pbsubstreams.Module, moduleHashes map[string]string, firstStreamableBlock uint64) (out ConfigMap, err error) {
 	out = make(ConfigMap)
 	for _, storeModule := range storeModules {
 		initialBlock := storeModule.InitialBlock
@@ -20,7 +19,7 @@ func NewConfigMap(baseObjectStore, quickSaveStore dstore.Store, storeModules []*
 		c, err := NewConfig(
 			storeModule.Name,
 			initialBlock,
-			moduleHashes.Get(storeModule.Name),
+			moduleHashes[storeModule.Name],
 			storeModule.GetKindStore().UpdatePolicy,
 			storeModule.GetKindStore().ValueType,
 			baseObjectStore,

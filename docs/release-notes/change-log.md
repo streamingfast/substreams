@@ -11,9 +11,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 # Unreleased
 
+### Server
+
+* Add env var SUBSTREAMS_PRINT_STACK to enable printing full stack traces when caught panic occurs
+* Prevent a deterministic failure on a module definition (mode, valueType, updatePolicy) from persisting when the issue is fixed in the substreams.yaml https://github.com/streamingfast/substreams/issues/621
+* Metering events on tier2 now bundled at the end of the job (prevents sending metering events for failing jobs)
+* Added metering for: "processed_blocks" (block * number of stages where execution happened) and "egress_bytes"
+
 ### CLI
 
 * Add `unichain` to the list of supported chains.
+
+## v1.15.4
+
+* dedupe modules with same hash when computing graph. (#619)
+* prevent memory usage burst when writing mapper by streaming protobuf items to writer
+* ignore "service currently overloaded" worker errors in the "maxRetries" count. Tier1 requests should not error out because tier2 servers are ramping up, only when they fail multiple times.
+* Default SUBSTREAMS_WORKER_MAX_RETRIES now set to 5.
 
 ## v1.15.3
 

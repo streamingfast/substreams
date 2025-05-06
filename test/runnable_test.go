@@ -19,6 +19,7 @@ import (
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/manifest"
+	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/orchestrator/stage"
 	"github.com/streamingfast/substreams/orchestrator/work"
@@ -86,6 +87,7 @@ func (f *testRun) run(t *testing.T, testName string) error {
 	}
 
 	ctx = reqctx.WithLogger(ctx, zlog)
+	ctx = metering.WithMetricsSender(ctx)
 	ctx = dmetering.WithBytesMeter(ctx)
 	ctx = reqctx.WithReqStats(ctx, metrics.NewReqStats(&metrics.Config{}, zlog))
 

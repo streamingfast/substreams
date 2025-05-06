@@ -28,6 +28,9 @@ func skipFromIndex(index *index.BlockIndex, execOutput execout.ExecutionOutputGe
 
 	indexedKeys, _, err := execOutput.Get(index.IndexModule)
 	if err != nil {
+		if err == execout.ErrNotFound {
+			return true // an empty index means we should skip
+		}
 		panic(fmt.Errorf("getting index module output for keys: %w", err))
 	}
 

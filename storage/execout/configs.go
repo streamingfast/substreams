@@ -16,7 +16,7 @@ type Configs struct {
 	logger                 *zap.Logger
 }
 
-func NewConfigs(baseObjectStore dstore.Store, allRequestedModules []*pbsubstreams.Module, moduleHashes *manifest.ModuleHashes, execOutputSaveInterval uint64, firstStreamableBlock uint64, logger *zap.Logger) (*Configs, error) {
+func NewConfigs(baseObjectStore dstore.Store, allRequestedModules []*pbsubstreams.Module, moduleHashes map[string]string, execOutputSaveInterval uint64, firstStreamableBlock uint64, logger *zap.Logger) (*Configs, error) {
 	out := make(map[string]*Config)
 	for _, mod := range allRequestedModules {
 
@@ -24,11 +24,14 @@ func NewConfigs(baseObjectStore dstore.Store, allRequestedModules []*pbsubstream
 		if initialBlock < firstStreamableBlock {
 			initialBlock = firstStreamableBlock
 		}
+		hash := moduleHashes[mod.Name]
+		extendedHash := manifest.ExtendedModuleHash(mod, hash)
 		conf, err := NewConfig(
 			mod.Name,
 			initialBlock,
 			mod.ModuleKind(),
-			moduleHashes.Get(mod.Name),
+			hash,
+			extendedHash,
 			baseObjectStore,
 			logger,
 		)

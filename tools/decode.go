@@ -357,7 +357,8 @@ func searchOutputsModule(
 	stateStore dstore.Store,
 	protoFiles []*descriptorpb.FileDescriptorProto,
 ) error {
-	modStore, err := execout.NewConfig(module.Name, module.InitialBlock, pbsubstreams.ModuleKindMap, moduleHash, stateStore, zlog)
+	extendedHash := manifest.ExtendedModuleHash(module, moduleHash)
+	modStore, err := execout.NewConfig(module.Name, module.InitialBlock, pbsubstreams.ModuleKindMap, moduleHash, extendedHash, stateStore, zlog)
 	if err != nil {
 		return fmt.Errorf("execout new config: %w", err)
 	}
@@ -406,7 +407,9 @@ func searchOutputsModuleKvOps(
 	module *pbsubstreams.Module,
 	stateStore dstore.Store,
 ) error {
-	modStore, err := execout.NewConfig(module.Name, module.InitialBlock, pbsubstreams.ModuleKindMap, moduleHash, stateStore, zlog)
+
+	extendedHash := manifest.ExtendedModuleHash(module, moduleHash)
+	modStore, err := execout.NewConfig(module.Name, module.InitialBlock, pbsubstreams.ModuleKindMap, moduleHash, extendedHash, stateStore, zlog)
 	if err != nil {
 		return fmt.Errorf("execout new config: %w", err)
 	}

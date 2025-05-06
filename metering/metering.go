@@ -12,7 +12,6 @@ import (
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/reqctx"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -23,6 +22,9 @@ const (
 
 	MeterFileUncompressedWriteBytes = "file_uncompressed_write_bytes"
 	MeterFileCompressedWriteBytes   = "file_compressed_write_bytes"
+
+	MeterUncompressedEgressBytes = "egress_bytes" // named like this to be backwards compatible with the previous metrics
+	MeterProcessedBlocks         = "processed_blocks"
 
 	MeterWasmInputBytes = "wasm_input_bytes"
 
@@ -59,6 +61,13 @@ func WithBytesMeteringOptions(meter dmetering.Meter, logger *zap.Logger) []dstor
 	}))
 
 	return opts
+}
+
+func AddEgressBytes(ctx context.Context, n int) {
+	dmetering.GetBytesMeter(ctx).CountInc(MeterUncompressedEgressBytes, n)
+}
+func AddProcessedBlocks(ctx context.Context, n int) {
+	dmetering.GetBytesMeter(ctx).CountInc(MeterProcessedBlocks, n)
 }
 
 func AddWasmInputBytes(ctx context.Context, n int) {
@@ -113,7 +122,7 @@ func NewMetricsSender() *MetricsSender {
 	}
 }
 
-func (ms *MetricsSender) Send(ctx context.Context, userID, apiKeyID, ip, userMeta, outputModuleHash, endpoint string, resp proto.Message) {
+func (ms *MetricsSender) Send(ctx context.Context, userID, apiKeyID, ip, userMeta, outputModuleHash, endpoint string) {
 	ms.Lock()
 	defer ms.Unlock()
 
@@ -125,7 +134,8 @@ func (ms *MetricsSender) Send(ctx context.Context, userID, apiKeyID, ip, userMet
 
 	bytesRead := meter.BytesReadDelta()
 	bytesWritten := meter.BytesWrittenDelta()
-	egressBytes := proto.Size(resp)
+	egressBytes := meter.GetCountAndReset(MeterUncompressedEgressBytes)
+	processedBlocks := meter.GetCountAndReset(MeterProcessedBlocks)
 
 	inputBytes := meter.GetCountAndReset(MeterWasmInputBytes)
 
@@ -151,7 +161,7 @@ func (ms *MetricsSender) Send(ctx context.Context, userID, apiKeyID, ip, userMet
 
 		Endpoint: endpoint,
 		Metrics: map[string]float64{
-			"egress_bytes":                  float64(egressBytes),
+			MeterUncompressedEgressBytes:    float64(egressBytes),
 			"written_bytes":                 float64(bytesWritten),
 			"read_bytes":                    float64(bytesRead),
 			MeterWasmInputBytes:             float64(inputBytes),
@@ -160,6 +170,7 @@ func (ms *MetricsSender) Send(ctx context.Context, userID, apiKeyID, ip, userMet
 			MeterFileCompressedReadBytes:    float64(fileCompressedReadBytes),
 			MeterFileUncompressedWriteBytes: float64(fileUncompressedWriteBytes),
 			MeterFileCompressedWriteBytes:   float64(fileCompressedWriteBytes),
+			MeterProcessedBlocks:            float64(processedBlocks),
 			"message_count":                 1,
 		},
 		Timestamp: time.Now(),

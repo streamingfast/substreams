@@ -41,7 +41,7 @@ func testStore() dstore.Store {
 
 func NewTestFileWalker() *FileWalker {
 	store := testStore()
-	config, _ := NewConfig("test", 0, pbsubstreams.ModuleKindMap, "abc", store, zap.NewNop())
+	config, _ := NewConfig("test", 0, pbsubstreams.ModuleKindMap, "abc", "ext_abc", store, zap.NewNop())
 	segmenter := block.NewSegmenter(10, 0, 100)
 	return NewFileWalker(config, segmenter, zap.NewNop())
 }

@@ -229,7 +229,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 		logger.Info("refusing Substreams ProcessRange request", fields...)
 		return err
 	}
-	outputModuleHash := execGraph.ModuleHashes().Get(request.OutputModule)
+	outputModuleHash := execGraph.ModuleHashes()[request.OutputModule]
 
 	logger.Info("incoming substreams ProcessRange request", fields...)
 
@@ -339,6 +339,26 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	if err != nil {
 		return fmt.Errorf("error building caching engine: %w", err)
 	}
+
+	now := time.Now()
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(10 * time.Second): // 10 sec
+				if time.Since(now) > 300*time.Second { // 300 secs
+					size := 0
+					for _, file := range executionPlan.ExistingExecOuts {
+						for _, v := range file.Kv {
+							size += len(v.Payload)
+						}
+					}
+					logger.Info("request active for for a long time", zap.Duration("duration", time.Since(now)), zap.Int("execout_size_mib", size/1024/1024))
+				}
+			}
+		}
+	}()
 
 	//opts := s.buildPipelineOptions(ctx, request)
 	var opts []pipeline.Option
@@ -528,19 +548,15 @@ func canSkipBlockSource(existingExecOuts map[string]*execout.File, requiredModul
 }
 
 func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbssinternal.Substreams_ProcessRangeServer) substreams.ResponseFunc {
-	var userID, apiKeyID, userMeta, ip string
+	var userID, apiKeyID, ip string
 	if auth := dauth.FromContext(ctx); auth != nil {
 		userID = auth.UserID()
 		apiKeyID = auth.APIKeyID()
-		userMeta = auth.Meta()
 		ip = auth.RealIP()
 		logger.Info("auth information available in tier2 response handler", zap.String("user_id", userID), zap.String("key_id", apiKeyID), zap.String("ip_address", ip))
 	} else {
 		logger.Warn("no auth information available in tier2 response handler")
 	}
-
-	outputModuleHash := reqctx.OutputModuleHash(ctx)
-	metricsSender := metering.GetMetricsSender(ctx)
 
 	return func(respAny substreams.ResponseFromAnyTier) error {
 		resp := respAny.(*pbssinternal.ProcessRangeResponse)
@@ -549,14 +565,7 @@ func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbs
 			return status.Error(codes.Unavailable, err.Error())
 		}
 
-		logger.Debug("sending metering event",
-			zap.String("user_id", userID),
-			zap.String("key_id", apiKeyID),
-			zap.String("ip_address", ip),
-			zap.String("user_meta", userMeta),
-			zap.String("endpoint", "sf.substreams.internal.v2/ProcessRange"),
-		)
-		metricsSender.Send(ctx, userID, apiKeyID, ip, userMeta, outputModuleHash, "sf.substreams.internal.v2/ProcessRange", resp)
+		// note: we don't increase EgressBytes on tier2 responses, these bytes are only sent to tier1
 		return nil
 	}
 }

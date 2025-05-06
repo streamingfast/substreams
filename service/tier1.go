@@ -29,6 +29,7 @@ import (
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/client"
+	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/orchestrator/plan"
@@ -345,7 +346,7 @@ func (s *Tier1Service) Blocks(
 		return err
 	}
 
-	outputModuleHash := execGraph.ModuleHashes().Get(request.OutputModule)
+	outputModuleHash := execGraph.ModuleHashes()[request.OutputModule]
 
 	ctx = reqctx.WithOutputModuleHash(ctx, outputModuleHash)
 	fields = append(fields, zap.String("output_module_hash", outputModuleHash))
@@ -446,7 +447,7 @@ func (s *Tier1Service) writePackage(ctx context.Context, request *pbsubstreamsrp
 		return fmt.Errorf("marshalling package: %w", err)
 	}
 
-	moduleStore, err := cacheStore.SubStore(execGraph.ModuleHashes().Get(request.OutputModule))
+	moduleStore, err := cacheStore.SubStore(execGraph.ModuleHashes()[request.OutputModule])
 	if err != nil {
 		return fmt.Errorf("getting substore: %w", err)
 	}
@@ -464,7 +465,7 @@ func (s *Tier1Service) writePackage(ctx context.Context, request *pbsubstreamsrp
 
 func (s *Tier1Service) writeLastUsed(ctx context.Context, execGraph *exec.Graph, cacheStore dstore.Store) error {
 	for _, module := range execGraph.UsedModules() {
-		moduleStore, err := cacheStore.SubStore(execGraph.ModuleHashes().Get(module.Name))
+		moduleStore, err := cacheStore.SubStore(execGraph.ModuleHashes()[module.Name])
 		if err != nil {
 			return fmt.Errorf("getting substore: %w", err)
 		}
@@ -823,26 +824,50 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 			return connect.NewError(connect.CodeUnavailable, err)
 		}
 
-		metericsSender.Send(ctx, userID, apiKeyID, ip, userMeta, outputModuleHash, "sf.substreams.rpc.v2/Blocks", resp)
+		metering.AddEgressBytes(ctx, proto.Size(resp))
+		metericsSender.Send(ctx, userID, apiKeyID, ip, userMeta, outputModuleHash, "sf.substreams.rpc.v2/Blocks")
 		return nil
 	}
 }
 
 func (s *Tier1Service) containsDeterministicError(ctx context.Context, startBlock, endBlock uint64, execGraph *exec.Graph, cacheStore dstore.Store) error {
 	for _, module := range execGraph.UsedModules() {
-		moduleStore, err := cacheStore.SubStore(execGraph.ModuleHashes().Get(module.Name))
+
+		hash := execGraph.ModuleHashes()[module.Name]
+		moduleStore, err := cacheStore.SubStore(hash)
 		if err != nil {
 			return fmt.Errorf("getting substore: %w", err)
 		}
 
-		if err := containsDeterministicError(ctx, moduleStore, module.Name, startBlock, endBlock, module.GetKindStore() != nil, s.logger); err != nil {
+		extendedHash := manifest.ExtendedModuleHash(module, hash)
+
+		if err := containsDeterministicError(ctx, moduleStore, module.Name, extendedHash, startBlock, endBlock, module.GetKindStore() != nil, s.logger); err != nil {
 			return connect.NewError(connect.CodeInvalidArgument, err)
 		}
 	}
 	return nil
 }
 
-func containsDeterministicError(ctx context.Context, moduleStore dstore.Store, moduleName string, startBlock, endBlock uint64, isStore bool, logger *zap.Logger) error {
+func parseFilename(in string) (blockNum uint64, moduleExtendedHash string, err error) {
+	in = strings.TrimPrefix(in, "errors.")
+
+	if len(in) < 10 {
+		return 0, "", err
+	}
+
+	blockNumStr := in[:10]
+	blockNum, err = strconv.ParseUint(blockNumStr, 10, 64)
+	if err != nil {
+		return 0, "", err
+	}
+
+	if len(in) > 10 {
+		moduleExtendedHash = in[11:] // ignore the '.' between blocknum and moduleExtendedHash
+	}
+	return blockNum, moduleExtendedHash, nil
+}
+
+func containsDeterministicError(ctx context.Context, moduleStore dstore.Store, moduleName, extendedHash string, startBlock, endBlock uint64, isStore bool, logger *zap.Logger) error {
 	var lastError error
 
 	startFile := fmt.Sprintf("errors.%010d", startBlock)
@@ -851,13 +876,25 @@ func containsDeterministicError(ctx context.Context, moduleStore dstore.Store, m
 	}
 
 	moduleStore.WalkFrom(ctx, "errors.", startFile, func(filename string) (err error) {
-		num, err := strconv.ParseUint(strings.TrimPrefix(filename, "errors."), 10, 64)
+
+		blockNum, parsedExtendedHash, err := parseFilename(filename)
 		if err != nil {
-			logger.Warn("checking for errors: cannot parse filename", zap.String("filename", filename), zap.Error(err))
+			logger.Warn("checking for errors: invalid filename", zap.String("filename", filename), zap.Error(err))
 			return nil
 		}
 
-		if endBlock != 0 && num > endBlock {
+		if parsedExtendedHash == "" {
+			logger.Info("deleting old deterministic error without extended hash", zap.String("filename", filename))
+			moduleStore.DeleteObject(ctx, filename)
+			return nil
+		}
+
+		if parsedExtendedHash != extendedHash {
+			logger.Info("ignoring error on another version of the same module", zap.String("filename", filename), zap.String("parsedExtendedHash", parsedExtendedHash), zap.String("extendedHash", extendedHash))
+			return nil
+		}
+
+		if endBlock != 0 && blockNum > endBlock {
 			return io.EOF
 		}
 
@@ -873,7 +910,7 @@ func containsDeterministicError(ctx context.Context, moduleStore dstore.Store, m
 			return nil
 		}
 
-		lastError = fmt.Errorf("error from block %d in module %s: %s", num, moduleName, string(cnt))
+		lastError = fmt.Errorf("error from block %d in module %s: %s", blockNum, moduleName, string(cnt))
 		return nil
 	})
 

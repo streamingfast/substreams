@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -126,7 +127,7 @@ func NewRequest(ctx context.Context, req *reqctx.RequestDetails, stageIndex int,
 	}
 }
 
-var workerMaxRetries = 10
+var workerMaxRetries = 5
 var workerMaxTimeoutRetries = 2
 
 func init() {
@@ -160,7 +161,7 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 		jobIdx := stats.RecordNewSubrequest(request.Stage, startBlock, startBlock+request.SegmentSize)
 
 		var previousError error
-		err := derr.RetryContext(ctx, uint64(maxRetries), func(ctx context.Context) error {
+		err := derr.RetryContext(ctx, math.MaxUint64, func(ctx context.Context) error {
 			w.logger.Info("launching remote worker",
 				zap.Uint64("segment", request.SegmentNumber),
 				zap.Uint32("stage", request.Stage),
@@ -174,30 +175,41 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 			err := res.Error
 			switch err.(type) {
 			case *RetryableErr:
-				metrics.Tier1WorkerRetryCounter.Inc()
+				previousError = err
 				if strings.Contains(err.Error(), "service currently overloaded") || // previous tier2 behavior, for backward compatibility, replaced by codes.ResourceExhausted
 					errors.Is(err, ErrConnectionRefused) { // tier2 unavailable
 					stats.RecordJobDelayed(jobIdx)
 					metrics.Tier1WorkerRejectedOverloadedCounter.Inc()
+					// don't count towards maxRetries, retry immediately
+					return err
 
-				} else if grpcError := dgrpc.AsGRPCError(err); grpcError != nil && grpcError.Code() == codes.ResourceExhausted { // tier2 overloaded
+				}
+				if grpcError := dgrpc.AsGRPCError(err); grpcError != nil && grpcError.Code() == codes.ResourceExhausted { // tier2 overloaded
 					stats.RecordJobDelayed(jobIdx)
 					metrics.Tier1WorkerRejectedOverloadedCounter.Inc()
+					// don't count towards maxRetries, retry immediately
+					return err
+				}
 
-				} else {
-					stats.RecordJobRetried(jobIdx)
-					if grpcError := dgrpc.AsGRPCError(err); grpcError != nil && grpcError.Code() == codes.DeadlineExceeded {
-						executionTimeouts++
-					} else if strings.Contains(err.Error(), "DeadlineExceeded") { // previous tier2 behavior, for backward compatibility
-						executionTimeouts++
+				metrics.Tier1WorkerRetryCounter.Inc()
+				stats.RecordJobRetried(jobIdx)
+
+				grpcError := dgrpc.AsGRPCError(err)
+				if (grpcError != nil && grpcError.Code() == codes.DeadlineExceeded) || strings.Contains(err.Error(), "DeadlineExceeded") {
+					executionTimeouts++
+					if executionTimeouts >= maxExecutionTimeouts {
+						segmentStart := request.SegmentNumber * request.SegmentSize
+						return derr.NewFatalError(fmt.Errorf("segment [%d-%d] timed out %d times, giving up. Last error from worker: %w", segmentStart, segmentStart+request.SegmentSize, executionTimeouts, err))
 					}
+					return err
 				}
-				previousError = err
+
 				retryIdx++
-				if executionTimeouts >= maxExecutionTimeouts {
+				if retryIdx >= maxRetries {
 					segmentStart := request.SegmentNumber * request.SegmentSize
-					return derr.NewFatalError(fmt.Errorf("segment [%d-%d] timed out %d times, giving up. Last error from worker: %w", segmentStart, segmentStart+request.SegmentSize, executionTimeouts, err))
+					return derr.NewFatalError(fmt.Errorf("segment [%d-%d] failed %d times, giving up. Last error from worker: %w", segmentStart, segmentStart+request.SegmentSize, retryIdx, err))
 				}
+
 				return err
 			default:
 				if err != nil {

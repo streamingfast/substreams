@@ -553,7 +553,7 @@ func execoutConfigs(t *testing.T, mappers map[string][]string) *execout.Configs 
 			Files: filesMap,
 		}
 
-		conf, err := execout.NewConfig(splitName[0], initialBlock, pbsubstreams.ModuleKindMap, "hash", store, testLogger)
+		conf, err := execout.NewConfig(splitName[0], initialBlock, pbsubstreams.ModuleKindMap, "hash", "ext_hash", store, testLogger)
 		require.NoError(t, err)
 		configs = append(configs, conf)
 	}
@@ -575,7 +575,7 @@ func testStoreConfig(
 }
 
 func testExecoutConfig(t *testing.T, name string, moduleInitialBlock uint64, moduleHash string, store dstore.Store) *execout.Config {
-	conf, err := execout.NewConfig(name, moduleInitialBlock, pbsubstreams.ModuleKindMap, moduleHash, store, testLogger)
+	conf, err := execout.NewConfig(name, moduleInitialBlock, pbsubstreams.ModuleKindMap, moduleHash, "ext_"+moduleHash, store, testLogger)
 	require.NoError(t, err)
 	return conf
 }

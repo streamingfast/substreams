@@ -206,6 +206,7 @@ require (
 	google.golang.org/api v0.230.0 // indirect
 	google.golang.org/genproto v0.0.0-20250122153221-138b5a5a4fd4 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
+	rogchap.com/v8go v0.9.0
 )
 
 retract v1.0.2 // Published at wrong tag.

@@ -6,9 +6,11 @@ import (
 	"fmt"
 
 	"github.com/streamingfast/substreams/wasm"
+	"rogchap.com/v8go"
 )
 
 type V8Module struct {
+	iso      *v8go.Isolate
 	code     []byte
 	registry *wasm.Registry
 }
@@ -20,7 +22,7 @@ var polyfillCode string
 var preludeCode string
 
 func (mod *V8Module) NewInstance(ctx context.Context) (wasm.Instance, error) {
-	return NewV8Instance()
+	return NewV8Instance(mod.iso)
 }
 
 func (mod *V8Module) ExecuteNewCall(
@@ -36,21 +38,24 @@ func (mod *V8Module) ExecuteNewCall(
 	if cachedInstance != nil {
 		inst = cachedInstance.(*V8Instance)
 	} else {
-		inst, err = NewV8Instance()
+		inst, err = NewV8Instance(mod.iso)
 		if err != nil {
 			return nil, fmt.Errorf("creating new V8 instance: %w", err)
 		}
 	}
 
 	if _, err = inst.ctx.RunScript(polyfillCode, "polyfill.js"); err != nil {
+		inst.Close(ctx)
 		return nil, fmt.Errorf("executing polyfill: %w", err)
 	}
 
 	if _, err = inst.ctx.RunScript(preludeCode, "prelude.js"); err != nil {
+		inst.Close(ctx)
 		return nil, fmt.Errorf("executing prelude: %w", err)
 	}
 
 	if _, err = inst.ctx.RunScript(string(mod.code), "bundle.js"); err != nil {
+		inst.Close(ctx)
 		return nil, fmt.Errorf("executing JS bundle: %w", err)
 	}
 
@@ -58,5 +63,6 @@ func (mod *V8Module) ExecuteNewCall(
 }
 
 func (mod *V8Module) Close(ctx context.Context) error {
+	mod.iso.Dispose()
 	return nil
 }

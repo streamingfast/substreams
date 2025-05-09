@@ -4,14 +4,16 @@ import (
 	"context"
 
 	"github.com/streamingfast/substreams/wasm"
+	"rogchap.com/v8go"
 )
 
 type V8ModuleFactory struct{}
 
 func NewModule(ctx context.Context, wasmCode []byte, wasmCodeType string, registry *wasm.Registry) (wasm.Module, error) {
-	mod := &V8Module{
+	iso := v8go.NewIsolate()
+	return &V8Module{
 		code:     wasmCode,
 		registry: registry,
-	}
-	return mod, nil
+		iso:      iso,
+	}, nil
 }

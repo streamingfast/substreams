@@ -65,7 +65,7 @@ func BenchmarkExecution(b *testing.B) {
 			//{"wazero", wasmCode, reuseInstance},
 			//{"wazero", wasmCode, freshInstanceEachRun},
 			{"wazero", "wasm/rust-v1", wasmCode, freshInstanceEachRun},
-			{"javascript-v8", "js-v8", jsCode, freshInstanceEachRun},
+			{"javascript-v8", "javascript-v8", jsCode, freshInstanceEachRun},
 
 			//{name: "wasi", wasmCodeType: "go/wasi", code: wasmTinyGo, shouldReUseInstance: reuseInstance},
 			//{"wasip1", wasmCodep1, freshInstanceEachRun},

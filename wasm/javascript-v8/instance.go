@@ -11,13 +11,9 @@ type V8Instance struct {
 	ctx *v8go.Context
 }
 
-func NewV8Instance() (*V8Instance, error) {
-	iso := v8go.NewIsolate()
+func NewV8Instance(iso *v8go.Isolate) (*V8Instance, error) {
 	ctx := v8go.NewContext(iso)
-	return &V8Instance{
-		iso: iso,
-		ctx: ctx,
-	}, nil
+	return &V8Instance{iso, ctx}, nil
 }
 
 func (inst *V8Instance) Cleanup(ctx context.Context) error {
@@ -25,6 +21,7 @@ func (inst *V8Instance) Cleanup(ctx context.Context) error {
 }
 
 func (inst *V8Instance) Close(ctx context.Context) error {
+	inst.ctx.Close()
 	inst.ctx = nil
 	inst.iso = nil
 	return nil

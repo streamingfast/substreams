@@ -11,7 +11,7 @@ factory.go: Creates a V8 module from JavaScript code (precompiled).
 integration.go: Registers the engine as javascript-v8 in the Substreams runtime.
 
 # What's working
-Functional JS processing for up to ~6000 Ethereum blocks without crashing.
+Functional JS processing for up to 10k Ethereum blocks without crashing (needs more testing).
 
 Use of a single reused isolate for each block, with fresh JS context.
 

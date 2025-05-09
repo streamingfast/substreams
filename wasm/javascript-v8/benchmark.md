@@ -3,8 +3,11 @@ This project aims to integrate the V8 JavaScript engine into Substreams in order
 
 # V8 engine main files
 module.go: Loads and executes JS scripts (polyfill, prelude, bundle).
+
 instance.go: Manages V8 execution contexts (V8Instance).
+
 factory.go: Creates a V8 module from JavaScript code (precompiled).
+
 integration.go: Registers the engine as javascript-v8 in the Substreams runtime.
 
 # What's working

@@ -88,6 +88,9 @@ func (e *Engine) HandleFinal(clock *pbsubstreams.Clock) error {
 	}
 
 	delete(e.reversibleBuffers, clock.Number)
+	for _, existingExecOut := range e.existingExecOuts { // delete mapper outputs from previous blocks to free up memory ASAP. The existingExecOuts are only used on tier2
+		delete(existingExecOut.Kv, clock.Id)
+	}
 
 	return nil
 }

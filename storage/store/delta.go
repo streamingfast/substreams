@@ -3,6 +3,7 @@ package store
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
@@ -21,6 +22,12 @@ func (b *baseStore) ApplyDelta(delta *pbsubstreams.StoreDelta) {
 	keySize := uint64(len(delta.Key))
 	switch delta.Operation {
 	case pbsubstreams.StoreDelta_UPDATE:
+		for k := range b.recentlyDeletedPrefixes {
+			if strings.HasPrefix(delta.Key, k) {
+				delete(b.recentlyDeletedPrefixes, k) // we added a key matching this prefix, it is not considered deleted anymore
+			}
+		}
+
 		b.kv[delta.Key] = delta.NewValue
 		switch {
 		case newSize > oldSize:
@@ -30,6 +37,12 @@ func (b *baseStore) ApplyDelta(delta *pbsubstreams.StoreDelta) {
 		}
 
 	case pbsubstreams.StoreDelta_CREATE:
+		for k := range b.recentlyDeletedPrefixes {
+			if strings.HasPrefix(delta.Key, k) {
+				delete(b.recentlyDeletedPrefixes, k) // we added a key matching this prefix, it is not considered deleted anymore
+			}
+		}
+
 		b.kv[delta.Key] = delta.NewValue
 		b.totalSizeBytes += newSize
 		b.totalSizeBytes += keySize
@@ -53,6 +66,8 @@ func storeTooBigError(storeName string, size, limit uint64) error {
 }
 
 func (b *baseStore) ApplyDeltasReverse(deltas []*pbsubstreams.StoreDelta) {
+	b.recentlyDeletedPrefixes = make(map[string]struct{}) // whenever we have an undo block, we delete this cache to avoid any bug
+
 	for i := len(deltas) - 1; i >= 0; i-- {
 		delta := deltas[i]
 

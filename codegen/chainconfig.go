@@ -33,6 +33,15 @@ func GetRegistryNetworks() map[string]*registry.Network {
 			}
 		}
 		registryNetworks = m
+		// Optionally add custom networks for testing
+		addCustomNetwork()
 	})
 	return registryNetworks
+}
+
+// addCustomNetwork can be used to add a custom network to the registry map for testing or development.
+// For now, this is a stub. To use, implement logic to add a *registry.Network to registryNetworks.
+func addCustomNetwork() {
+	// Example usage:
+	// registryNetworks["customnet"] = &registry.Network{ID: "customnet", ...}
 }

@@ -176,7 +176,7 @@ func buildGenerateCommandFromArgs(manifestPath string, outputType OutputType, wi
 	currentNetwork := pkg.Network
 	if currentNetwork == "" {
 		labels := []string{}
-		for label := range ChainConfigByID {
+		for label := range GetRegistryNetworks() {
 			labels = append(labels, label)
 		}
 

@@ -1,143 +1,38 @@
 package codegen
 
-type ChainConfig struct {
-	ID               string // Public
-	DisplayName      string // Public
-	ExplorerLink     string
-	ApiEndpoint      string
-	FirehoseEndpoint string
-	Network          string
-	SupportsCalls    bool
-}
+import (
+	"log"
+	"sync"
 
-var ChainConfigByID = map[string]*ChainConfig{
-	"mainnet": {
-		DisplayName:      "Ethereum Mainnet",
-		ExplorerLink:     "https://etherscan.io",
-		FirehoseEndpoint: "mainnet.eth.streamingfast.io:443",
-		Network:          "mainnet",
-		SupportsCalls:    true,
-	},
-	"bnb": {
-		DisplayName:      "BNB",
-		ExplorerLink:     "https://bscscan.com",
-		FirehoseEndpoint: "bnb.streamingfast.io:443",
-		Network:          "bsc",
-		SupportsCalls:    true,
-	},
-	"polygon": {
-		DisplayName:      "Polygon",
-		ExplorerLink:     "https://polygonscan.com",
-		FirehoseEndpoint: "polygon.streamingfast.io:443",
-		Network:          "polygon",
-		SupportsCalls:    true,
-	},
-	"amoy": {
-		DisplayName:      "Polygon Amoy Testnet",
-		ExplorerLink:     "https://www.okx.com/web3/explorer/amoy",
-		FirehoseEndpoint: "amoy.substreams.pinax.network:443",
-		Network:          "amoy",
-		SupportsCalls:    true,
-	},
-	"arbitrum": {
-		DisplayName:      "Arbitrum",
-		ExplorerLink:     "https://arbiscan.io",
-		FirehoseEndpoint: "arb-one.streamingfast.io:443",
-		Network:          "arbitrum",
-		SupportsCalls:    true,
-	},
-	"holesky": {
-		DisplayName:      "Holesky",
-		ExplorerLink:     "https://holesky.etherscan.io/",
-		FirehoseEndpoint: "holesky.eth.streamingfast.io:443",
-		Network:          "holesky",
-		SupportsCalls:    true,
-	},
-	"sepolia": {
-		DisplayName:      "Sepolia Testnet",
-		ExplorerLink:     "https://sepolia.etherscan.io",
-		FirehoseEndpoint: "sepolia.streamingfast.io:443",
-		Network:          "sepolia",
-		SupportsCalls:    true,
-	},
-	"optimism": {
-		DisplayName:      "Optimism Mainnet",
-		ExplorerLink:     "https://optimistic.etherscan.io",
-		FirehoseEndpoint: "mainnet.optimism.streamingfast.io:443",
-		Network:          "optimism",
-		SupportsCalls:    true,
-	},
-	"avalanche": {
-		DisplayName:      "Avalanche C-chain",
-		ExplorerLink:     "https://subnets.avax.network/c-chain",
-		FirehoseEndpoint: "avalanche-mainnet.streamingfast.io:443",
-		Network:          "avalanche",
-		SupportsCalls:    false,
-	},
-	"chapel": {
-		DisplayName:      "BNB Chapel Testnet",
-		ExplorerLink:     "https://testnet.bscscan.com/",
-		FirehoseEndpoint: "chapel.substreams.pinax.network:443",
-		Network:          "chapel",
-		SupportsCalls:    true,
-	},
-	"injective-mainnet": {
-		DisplayName:      "Injective Mainnet",
-		ExplorerLink:     "https://explorer.injective.network/",
-		FirehoseEndpoint: "mainnet.injective.streamingfast.io:443",
-		Network:          "injective-mainnet",
-	},
-	"injective-testnet": {
-		DisplayName:      "Injective Testnet",
-		ExplorerLink:     "https://testnet.explorer.injective.network/",
-		FirehoseEndpoint: "testnet.injective.streamingfast.io:443",
-		Network:          "injective-testnet",
-	},
-	"starknet-mainnet": {
-		DisplayName:      "Starknet Mainnet Transactions",
-		ExplorerLink:     "https://starkscan.co/",
-		FirehoseEndpoint: "mainnet.starknet.streamingfast.io:443",
-		Network:          "starknet-mainnet",
-	},
-	"starknet-testnet": {
-		DisplayName:      "Starknet Testnet Transactions",
-		ExplorerLink:     "",
-		FirehoseEndpoint: "testnet.starknet.streamingfast.io:443",
-		Network:          "starknet-testnet",
-	},
-	"solana-mainnet-beta": {
-		DisplayName:      "Solana Mainnet",
-		Network:          "solana-mainnet-beta",
-		FirehoseEndpoint: "mainnet.solana.streamingfast.io:443",
-	},
-	"mantra-testnet": {
-		DisplayName:      "Mantra Testnet",
-		ExplorerLink:     "",
-		FirehoseEndpoint: "testnet.mantra.streamingfast.io:443",
-		Network:          "mantra-testnet",
-	},
-	"mantra-mainnet": {
-		DisplayName:      "Mantra Mainnet",
-		ExplorerLink:     "",
-		FirehoseEndpoint: "mainnet.mantra.streamingfast.io:443",
-		Network:          "mantra-mainnet",
-	},
-	"stellar-testnet": {
-		DisplayName:      "Stellar Testnet",
-		ExplorerLink:     "",
-		FirehoseEndpoint: "testnet.stellar.streamingfast.io:443",
-		Network:          "stellar-testnet",
-	},
-	"stellar": {
-		DisplayName:      "Stellar Mainnet",
-		ExplorerLink:     "",
-		FirehoseEndpoint: "mainnet.stellar.streamingfast.io:443",
-		Network:          "stellar",
-	},
-	"sei-mainnet": {
-		DisplayName:      "Sei Mainnet",
-		ExplorerLink:     "https://seitrace.com/",
-		FirehoseEndpoint: "evm-mainnet.sei.streamingfast.io:443",
-		Network:          "sei-mainnet",
-	},
+	registry "github.com/pinax-network/graph-networks-libs/packages/golang/lib"
+)
+
+var (
+	registryNetworks     map[string]*registry.Network
+	registryNetworksOnce sync.Once
+)
+
+// GetRegistryNetworks returns a map of network ID to *registry.Network, using Pinax's registry as primary source.
+// Only networks with a Firehose endpoint are included.
+// If fetching fails, it falls back to loading from a local JSON file ("TheGraphNetworksRegistry.json").
+func GetRegistryNetworks() map[string]*registry.Network {
+	registryNetworksOnce.Do(func() {
+		reg, err := registry.FromLatestVersion()
+		if err != nil {
+			// Fallback: try to load from local file
+			// TODO: Validate where to put the registry file
+			reg, err = registry.FromFile("TheGraphNetworksRegistry.json")
+			if err != nil {
+				log.Fatalf("Failed to load registry from both network and file: %v", err)
+			}
+		}
+		m := make(map[string]*registry.Network)
+		for i, net := range reg.Networks {
+			if len(net.Services.Firehose) > 0 {
+				m[net.ID] = &reg.Networks[i]
+			}
+		}
+		registryNetworks = m
+	})
+	return registryNetworks
 }

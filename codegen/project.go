@@ -336,10 +336,12 @@ func (p *Project) GetRustOutputProtobufPath() string {
 }
 
 func (p *Project) ChainEndpoint() (string, error) {
-	if ChainConfigByID[p.Network] == nil {
+	networks := GetRegistryNetworks()
+	net := networks[p.Network]
+	if net == nil {
 		return "", fmt.Errorf("network %q not found", p.Network)
 	}
-	return ChainConfigByID[p.Network].FirehoseEndpoint, nil
+	return net.Services.Firehose[0], nil
 }
 
 func (p *Project) Render(withDevEnv bool) (projectFiles map[string][]byte, err error) {

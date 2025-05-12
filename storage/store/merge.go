@@ -16,11 +16,7 @@ import (
 )
 
 func (b *baseStore) setKV(k string, v []byte) {
-	for pref := range b.recentlyDeletedPrefixes {
-		if strings.HasPrefix(k, pref) {
-			delete(b.recentlyDeletedPrefixes, pref) // we added a key matching this prefix, it is not considered deleted anymore
-		}
-	}
+	b.recentlyDeletedPrefixes.RemoveMatching(k)
 
 	if prev, ok := b.kv[k]; ok {
 		b.totalSizeBytes -= uint64(len(prev))
@@ -32,11 +28,7 @@ func (b *baseStore) setKV(k string, v []byte) {
 }
 
 func (b *baseStore) setNewKV(k string, v []byte) {
-	for pref := range b.recentlyDeletedPrefixes {
-		if strings.HasPrefix(k, pref) {
-			delete(b.recentlyDeletedPrefixes, pref) // we added a key matching this prefix, it is not considered deleted anymore
-		}
-	}
+	b.recentlyDeletedPrefixes.RemoveMatching(k)
 
 	b.totalSizeBytes += uint64(len(k) + len(v))
 	b.kv[k] = v

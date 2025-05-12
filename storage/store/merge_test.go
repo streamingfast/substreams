@@ -497,7 +497,7 @@ func newStore(kv map[string][]byte, updatePolicy pbsubstreams.Module_KindStore_U
 			valueType:    valueType,
 		},
 		logger:                  zap.NewNop(),
-		recentlyDeletedPrefixes: make(map[string]struct{}),
+		recentlyDeletedPrefixes: make(DeletedPrefixes),
 	}
 	return &FullKV{baseStore: b}
 }

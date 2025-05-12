@@ -8,6 +8,38 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
+// DeletedPrefixes is a specialized map to track deleted prefixes
+type DeletedPrefixes map[string]struct{}
+
+// Clear removes all entries in the DeletedPrefixes map
+func (dp DeletedPrefixes) Clear() {
+	for k := range dp {
+		delete(dp, k)
+	}
+}
+
+// RemoveMatching removes all prefixes of the given string
+func (dp DeletedPrefixes) RemoveMatching(key string) {
+	for prefix := range dp {
+		if strings.HasPrefix(key, prefix) {
+			delete(dp, prefix)
+		}
+	}
+}
+
+// Add adds a key to the DeletedPrefixes map
+func (dp DeletedPrefixes) Add(prefix string) {
+	if len(dp) > 100 {
+		dp.Clear() // keep this under reasonable size
+	}
+	dp[prefix] = struct{}{}
+}
+
+func (dp DeletedPrefixes) Exists(prefix string) bool {
+	_, ok := dp[prefix]
+	return ok
+}
+
 func (b *baseStore) ApplyDelta(delta *pbsubstreams.StoreDelta) {
 	// Keys need to have at least one character, and mustn't start with 0xFF is reserved for internal use.
 	if len(delta.Key) == 0 {
@@ -22,11 +54,7 @@ func (b *baseStore) ApplyDelta(delta *pbsubstreams.StoreDelta) {
 	keySize := uint64(len(delta.Key))
 	switch delta.Operation {
 	case pbsubstreams.StoreDelta_UPDATE:
-		for k := range b.recentlyDeletedPrefixes {
-			if strings.HasPrefix(delta.Key, k) {
-				delete(b.recentlyDeletedPrefixes, k) // we added a key matching this prefix, it is not considered deleted anymore
-			}
-		}
+		b.recentlyDeletedPrefixes.RemoveMatching(delta.Key)
 
 		b.kv[delta.Key] = delta.NewValue
 		switch {
@@ -37,11 +65,7 @@ func (b *baseStore) ApplyDelta(delta *pbsubstreams.StoreDelta) {
 		}
 
 	case pbsubstreams.StoreDelta_CREATE:
-		for k := range b.recentlyDeletedPrefixes {
-			if strings.HasPrefix(delta.Key, k) {
-				delete(b.recentlyDeletedPrefixes, k) // we added a key matching this prefix, it is not considered deleted anymore
-			}
-		}
+		b.recentlyDeletedPrefixes.RemoveMatching(delta.Key)
 
 		b.kv[delta.Key] = delta.NewValue
 		b.totalSizeBytes += newSize
@@ -66,7 +90,7 @@ func storeTooBigError(storeName string, size, limit uint64) error {
 }
 
 func (b *baseStore) ApplyDeltasReverse(deltas []*pbsubstreams.StoreDelta) {
-	b.recentlyDeletedPrefixes = make(map[string]struct{}) // whenever we have an undo block, we delete this cache to avoid any bug
+	b.recentlyDeletedPrefixes.Clear() // whenever we have an undo block, we clear this cache to avoid any bug
 
 	for i := len(deltas) - 1; i >= 0; i-- {
 		delta := deltas[i]

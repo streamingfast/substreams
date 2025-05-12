@@ -36,6 +36,6 @@ func newTestBaseStore(
 		kv:                      make(map[string][]byte),
 		logger:                  zap.NewNop(),
 		marshaller:              &marshaller.Binary{},
-		recentlyDeletedPrefixes: make(map[string]struct{}),
+		recentlyDeletedPrefixes: make(DeletedPrefixes),
 	}
 }

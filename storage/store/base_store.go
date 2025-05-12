@@ -22,7 +22,7 @@ type baseStore struct {
 	lastOrdinal             uint64
 	marshaller              marshaller.Marshaller
 	totalSizeBytes          uint64
-	recentlyDeletedPrefixes map[string]struct{} // we cache them here to speed up future deletePrefix()
+	recentlyDeletedPrefixes DeletedPrefixes // we cache them here to speed up future deletePrefix()
 
 	logger *zap.Logger
 }

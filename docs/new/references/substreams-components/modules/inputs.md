@@ -15,7 +15,7 @@ Modules receive `inputs` of three types:
 
 ## Input type `source`
 
-An `inputs` of type `source` represents a chain-specific, Firehose-provisioned protobuf object. Learn more about the supported protocols and their corresponding message types in [chains and endpoints](../chains-and-endpoints.md).
+An `inputs` of type `source` represents a chain-specific, Firehose-provisioned protobuf object. Learn more about the supported protocols and their corresponding message types in [chains and endpoints](../../chains-and-endpoints.md).
 
 {% hint style="info" %}
 **Note**: The different blockchains reference different `Block` objects. For example, Solana references its `Block` object as `sf.solana.type.v1.Block`. Ethereum-based Substreams modules specify `sf.ethereum.type.v2.Block.`
@@ -48,13 +48,13 @@ An `inputs` of type `params` represents a parameterizable module input. Those pa
 * on the command-line (using `substreams run -p` for instance),
 * by tweaking the protobuf objects directly when consuming from your favorite language
 
-See the [Manifest's `params` manifest section of the Reference & specs](../../reference-and-specs/manifests.md#params) for more details.
+See the [Manifest's `params` manifest section of the Reference & specs](../manifests.md#params) for more details.
 
 ## Input type `map`
 
 An input of type `map` represents the output of another `map` module. It defines a parent-child relationship between modules.
 
-The object's type is defined in the [`output.type`](../../reference-and-specs/manifests.md#modules-.output) attribute of the `map` module.
+The object's type is defined in the [`output.type`](../manifests.md#modules-.output) attribute of the `map` module.
 
 {% hint style="warning" %}
 **Important**: The graph built by input dependencies is a Directed Acyclic Graph, which means there can be no circular dependencies.
@@ -69,7 +69,7 @@ Define the `map` input type in the manifest and choose a name for the `map` refl
 ```
 {% endcode %}
 
-Learn more about `maps` in the [Modules](./) section.
+Learn more about `maps` in the [Modules](./modules.md) section.
 
 ## Input type `store`
 
@@ -118,7 +118,7 @@ Substreams uses two types of `mode` for modules:
 
 ### `delta` mode
 
-`delta` `mode` modules are [protobuf objects](../../../pb/sf/substreams/v1/substreams.proto#L124) containing all the changes occurring in the `store` module available in the same block.
+`delta` `mode` modules are [protobuf objects](../../../../../pb/sf/substreams/v1/substreams.proto#L124) containing all the changes occurring in the `store` module available in the same block.
 
 `delta` mode enables you to loop through keys and decode values mutated in the module.
 

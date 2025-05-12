@@ -29,7 +29,7 @@ type Engine struct {
 	blockType         string
 	reversibleBuffers map[uint64]*execout.Buffer // block num to modules' outputs for that given block
 	execOutputWriters map[string]*execout.Writer // moduleName => writer (single file)
-	existingExecOuts  map[string]*execout.File
+	existingExecOuts  map[string]*execout.File   // on Tier2 requests, this contains any existing outputs that we could load from disk, skipping module execution
 	indexWriters      map[string]*index.Writer
 
 	logger *zap.Logger
@@ -87,8 +87,13 @@ func (e *Engine) HandleFinal(clock *pbsubstreams.Clock) error {
 		writer.Write(clock, execOutBuf)
 	}
 
+	// once a block is final, no need to keep it in reversible buffer
 	delete(e.reversibleBuffers, clock.Number)
-	for _, existingExecOut := range e.existingExecOuts { // delete mapper outputs from previous blocks to free up memory ASAP. The existingExecOuts are only used on tier2
+
+	// delete mapper outputs that were loaded from disk cache to free up memory ASAP and that have already been used.
+	// since `HandleFinal` is always called AFTER `HandleNew` on any given block, we know that the block is behind us.
+	// Note: the existingExecOuts only exist on tier2 requests, which does not process live blocks either.
+	for _, existingExecOut := range e.existingExecOuts {
 		delete(existingExecOut.Kv, clock.Id)
 	}
 

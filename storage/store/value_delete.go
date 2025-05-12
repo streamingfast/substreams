@@ -17,6 +17,10 @@ func (b *baseStore) DeletePrefix(ord uint64, prefix string) {
 }
 
 func (b *baseStore) deletePrefix(ord uint64, prefix string) {
+	if b.recentlyDeletedPrefixes.Exists(prefix) {
+		return
+	}
+	b.recentlyDeletedPrefixes.Add(prefix)
 
 	var deltas []*pbsubstreams.StoreDelta
 	for key, val := range b.kv {

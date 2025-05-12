@@ -73,11 +73,12 @@ func NewConfig(
 
 func (c *Config) newBaseStore(logger *zap.Logger) *baseStore {
 	return &baseStore{
-		Config:     c,
-		kvOps:      &pbssinternal.Operations{},
-		kv:         make(map[string][]byte),
-		logger:     logger.Named("store").With(zap.String("store_name", c.name), zap.String("module_hash", c.moduleHash)),
-		marshaller: marshaller.Default(),
+		Config:                  c,
+		kvOps:                   &pbssinternal.Operations{},
+		kv:                      make(map[string][]byte),
+		logger:                  logger.Named("store").With(zap.String("store_name", c.name), zap.String("module_hash", c.moduleHash)),
+		marshaller:              marshaller.Default(),
+		recentlyDeletedPrefixes: make(DeletedPrefixes),
 	}
 }
 

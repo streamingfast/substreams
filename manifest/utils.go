@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/streamingfast/substreams/networks"
 	"go.uber.org/zap"
 
 	"gopkg.in/yaml.v3"
@@ -56,8 +57,10 @@ func ExtractNetworkEndpoint(networkFromManifest, fromFlag string, logger *zap.Lo
 		return endpoint, nil
 	}
 
-	if ep, ok := HardcodedEndpoints[networkFromManifest]; ok {
-		logger.Info("using endpoint from hardcoded list", zap.String("manifest_network", networkFromManifest), zap.String("endpoint", ep))
+	net := networks.GetRegistryNetworksWithSubstreams().Find(networkFromManifest)
+	if net != nil && len(net.Services.Substreams) > 0 {
+		ep := net.Services.Substreams[0]
+		logger.Info("using endpoint from registry", zap.String("manifest_network", networkFromManifest), zap.String("endpoint", ep))
 		return ep, nil
 	}
 
@@ -81,61 +84,4 @@ func searchExistingCaseInsensitiveFileName(dir, filename string) (string, error)
 		}
 	}
 	return "", os.ErrNotExist
-}
-
-// TODO: replace by the blockchain-based discovery when available
-var HardcodedEndpoints = map[string]string{
-	"mainnet":                 "mainnet.eth.streamingfast.io:443",
-	"matic":                   "polygon.streamingfast.io:443",
-	"polygon":                 "polygon.streamingfast.io:443",
-	"amoy":                    "amoy.substreams.pinax.network:443",
-	"polygon-amoy":            "amoy.substreams.pinax.network:443",
-	"goerli":                  "goerli.eth.streamingfast.io:443",
-	"mumbai":                  "mumbai.streamingfast.io:443",
-	"bnb":                     "bnb.streamingfast.io:443",
-	"bsc":                     "bnb.streamingfast.io:443",
-	"base":                    "base-mainnet.streamingfast.io:443",
-	"sepolia":                 "sepolia.eth.streamingfast.io:443",
-	"holesky":                 "holesky.eth.streamingfast.io:443",
-	"near":                    "mainnet.near.streamingfast.io:443",
-	"near-mainnet":            "mainnet.near.streamingfast.io:443",
-	"arbitrum":                "arb-one.streamingfast.io:443",
-	"arb":                     "arb-one.streamingfast.io:443",
-	"arb-one":                 "arb-one.streamingfast.io:443",
-	"arbitrum-one":            "arb-one.streamingfast.io:443",
-	"solana":                  "mainnet.sol.streamingfast.io:443",
-	"sol":                     "mainnet.sol.streamingfast.io:443",
-	"solana-accounts-mainnet": "accounts.mainnet.sol.streamingfast.io:443",
-	"solana-mainnet":          "mainnet.sol.streamingfast.io:443",
-	"solana-mainnet-beta":     "mainnet.sol.streamingfast.io:443",
-	"solana-devnet":           "devnet.sol.streamingfast.io:443",
-	"optimism":                "optimism.streamingfast.io:443",
-	"bitcoin":                 "btc-mainnet.streamingfast.io:443",
-	"chapel":                  "chapel.substreams.pinax.network:443",
-	"injective-mainnet":       "mainnet.injective.streamingfast.io:443",
-	"injective-testnet":       "testnet.injective.streamingfast.io:443",
-	"sei":                     "evm-mainnet.sei.streamingfast.io:443",
-	"sei-mainnet":             "evm-mainnet.sei.streamingfast.io:443",
-	"sei-evm-mainnet":         "evm-mainnet.sei.streamingfast.io:443",
-	"starknet-mainnet":        "mainnet.starknet.streamingfast.io:443",
-	"starknet":                "mainnet.starknet.streamingfast.io:443",
-	"starknet-testnet":        "testnet.starknet.streamingfast.io:443",
-	"mantra-mainnet":          "mainnet.mantra.streamingfast.io:443",
-	"mantra-testnet":          "testnet.mantra.streamingfast.io:443",
-	"avalanche-mainnet":       "avalanche-mainnet.streamingfast.io:443",
-	"stellar-testnet":         "testnet.stellar.streamingfast.io:443",
-	"stellar":                 "mainnet.stellar.streamingfast.io:443",
-	"unichain":                "mainnet.unichain.streamingfast.io:443",
-
-	// antelope chains
-	"eos":       "eos.substreams.pinax.network:443",
-	"jungle4":   "jungle4.substreams.pinax.network:443",
-	"kylin":     "kylin.substreams.pinax.network:443",
-	"wax":       "wax.substreams.pinax.network:443",
-	"waxtest":   "waxtest.substreams.pinax.network:443",
-	"telos":     "telos.substreams.pinax.network:443",
-	"telostest": "telostest.substreams.pinax.network:443",
-	"ore":       "ore.substreams.pinax.network:443",
-	"orestage":  "orestage.substreams.pinax.network:443",
-	"ux":        "ux.substreams.pinax.network:443",
 }

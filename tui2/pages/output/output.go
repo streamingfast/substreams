@@ -9,6 +9,7 @@ import (
 	"github.com/jhump/protoreflect/dynamic"
 
 	"github.com/streamingfast/substreams/manifest"
+	"github.com/streamingfast/substreams/networks"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/tui2/common"
 	"github.com/streamingfast/substreams/tui2/components/blocksearch"
@@ -75,7 +76,7 @@ func New(c common.Common, config *request.Config) (*Output, error) {
 	getBytesEncodingPerNetwork := func(endpoint string) dynamic.BytesRepresentation {
 		bytesAsBase58Chains := []string{"solana-mainnet-beta", "solana-mainnet", "solana-devnet"}
 		for _, chain := range bytesAsBase58Chains {
-			if manifest.HardcodedEndpoints[chain] == endpoint {
+			if networks.GetRegistryNetworksWithSubstreams().Find(chain).Services.Substreams[0] == endpoint {
 				return dynamic.BytesAsBase58
 			}
 		}

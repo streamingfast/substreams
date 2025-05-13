@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/streamingfast/substreams/manifest"
+	"github.com/streamingfast/substreams/networks"
 )
 
 var defaultEndpointCmd = &cobra.Command{
@@ -19,8 +19,9 @@ func init() {
 }
 
 func defaultEndpointE(cmd *cobra.Command, args []string) error {
-	if endpoint := manifest.HardcodedEndpoints[args[0]]; endpoint != "" {
-		fmt.Println(endpoint)
+	net := networks.GetRegistryNetworksWithSubstreams().Find(args[0])
+	if net != nil && len(net.Services.Substreams) > 0 {
+		fmt.Println(net.Services.Substreams[0])
 		return nil
 	}
 	return fmt.Errorf("no endpoint found for network %s", args[0])

@@ -22,7 +22,7 @@ To authenticate with The Graph Market, you need to generate a JWT token. Follow 
 2. **Access the Dashboard**: 
    - Click on `Dashboard` in the navigation menu or go directly to [https://thegraph.market/dashboard](https://thegraph.market/dashboard).
 
-   ![Dashboard](../../.gitbook/assets/intro/thegraphmarket.png)
+   ![Dashboard](../../../.gitbook/assets/intro/thegraphmarket.png)
 
 3. **Create a New API Key**:
    - In the dashboard, click on `Create New Key`.
@@ -30,8 +30,7 @@ To authenticate with The Graph Market, you need to generate a JWT token. Follow 
    - This is not the _authentication token_, but a key to generate tokens.
 
 4. **Generate an API Token**:
-   - Click the **...** beside your new key.
-   - Click **Generate token**
+   - For security reasons, the API token is hidden. In the `API TOKEN` section, click the button besides the hidden token.
    - The system will generate a JWT token. **Copy** and **save** this token securely, as it will be required for authentication.
 
 ## Step 2: Set the JWT Token as an Environment Variable
@@ -54,16 +53,10 @@ To authenticate Substreams on your local machine, you need to set the JWT token 
 
 To ensure that your authentication is set up correctly, you can run a test Substreams. Here's how:
 
-1. Run the following command in your terminal to execute the ERC20 Balance Changes Substreams on the Ethereum Mainnet:
+1. Run the following command in your terminal to get all the events on Ethereum Mainnet:
 
    ```bash
-   substreams gui \
-     erc20-balance-changes@latest \
-     map_valid_balance_changes \
-     -e mainnet.eth.streamingfast.io:443 \
-     --start-block 10397553 \
-     --stop-block +10 \
-     --network eth
+   substreams gui ethereum-common@v0.3.1 all_events --start-block=15000000
    ```
 
 2. Verify that the Substreams runs without errors, confirming that your authentication is successful.

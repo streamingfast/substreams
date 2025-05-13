@@ -12,6 +12,7 @@ import (
 
 	"github.com/charmbracelet/huh"
 	"github.com/streamingfast/substreams/manifest"
+	"github.com/streamingfast/substreams/networks"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"google.golang.org/protobuf/types/descriptorpb"
 )
@@ -176,7 +177,7 @@ func buildGenerateCommandFromArgs(manifestPath string, outputType OutputType, wi
 	currentNetwork := pkg.Network
 	if currentNetwork == "" {
 		labels := []string{}
-		for label := range GetRegistryNetworks() {
+		for label := range networks.GetRegistryNetworks() {
 			labels = append(labels, label)
 		}
 

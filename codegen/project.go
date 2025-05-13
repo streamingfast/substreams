@@ -10,6 +10,7 @@ import (
 
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/golang-cz/textcase"
+	"github.com/streamingfast/substreams/networks"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"google.golang.org/protobuf/types/descriptorpb"
 )
@@ -336,12 +337,12 @@ func (p *Project) GetRustOutputProtobufPath() string {
 }
 
 func (p *Project) ChainEndpoint() (string, error) {
-	networks := GetRegistryNetworks()
+	networks := networks.GetRegistryNetworks()
 	net := networks[p.Network]
 	if net == nil {
 		return "", fmt.Errorf("network %q not found", p.Network)
 	}
-	return net.Services.Firehose[0], nil
+	return net.Services.Substreams[0], nil
 }
 
 func (p *Project) Render(withDevEnv bool) (projectFiles map[string][]byte, err error) {

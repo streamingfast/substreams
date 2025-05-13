@@ -113,12 +113,11 @@ func (r NetworkRegistry) addCustomNetwork(network *registry.Network) {
 	r[network.ID] = network
 }
 
-// Find returns the network by ID or, if not found, by alias (sorted by network ID).
+// Find returns the network by ID or, if not found, by alias (sorted by network ID), FullName, and ShortName.
 func (r NetworkRegistry) Find(key string) *registry.Network {
 	if n, ok := r[key]; ok {
 		return n
 	}
-	// If not found by ID, search aliases in sorted order
 	ids := make([]string, 0, len(r))
 	for id := range r {
 		ids = append(ids, id)
@@ -126,8 +125,20 @@ func (r NetworkRegistry) Find(key string) *registry.Network {
 	sort.Strings(ids)
 	for _, id := range ids {
 		net := r[id]
-		if slices.Contains(net.Aliases, key) {
+		if slices.Contains(net.Aliases, key) || net.FullName == key || net.ShortName == key || net.ID == key {
 			return net
+		}
+	}
+	return nil
+}
+
+// FindByGenesisBlock returns the *registry.Network whose genesis block matches the given blockNum and blockID (hash).
+func (r NetworkRegistry) FindByGenesisBlock(blockNum uint64, blockID string) *registry.Network {
+	for _, network := range r {
+		if network.Genesis != nil &&
+			uint64(network.Genesis.Height) == blockNum &&
+			network.Genesis.Hash == blockID {
+			return network
 		}
 	}
 	return nil

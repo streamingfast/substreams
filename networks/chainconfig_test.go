@@ -41,9 +41,40 @@ func TestAllLegacyChainConfigKeysPresent(t *testing.T) {
 		"mantra-testnet", "mantra-mainnet", "stellar-testnet", "stellar", "sei-mainnet",
 	}
 
-	networks := GetRegistryNetworks()
 	for _, key := range legacyKeys {
-		net := networks.Find(key)
-		assert.NotNilf(t, net, "Network with key %q should be present in GetRegistryNetworks()", key)
+		net := Find(key)
+		assert.NotNilf(t, net, "Network with key %q should be present in GetRegistryNetworksWithSubstreams()", key)
+	}
+}
+
+func TestGetRegistryNetworksWithSubstreams(t *testing.T) {
+	networks := GetRegistryNetworksWithSubstreams()
+	assert.NotEmpty(t, networks, "Should return at least one network with Substreams endpoint")
+	for id, net := range networks {
+		assert.Greater(t, len(net.Services.Substreams), 0, "Network %q should have at least one Substreams endpoint", id)
+	}
+	// Known networks with Substreams endpoints (should be present)
+	for _, key := range []string{"mainnet", "optimism", "arbitrum", "polygon", "bnb", "avalanche"} {
+		assert.NotNilf(t, networks.Find(key), "Network %q should be present in Substreams registry", key)
+	}
+	// Known networks without Substreams endpoints (should NOT be present)
+	for _, key := range []string{"cronos", "clover", "aurora", "celo"} {
+		assert.Nilf(t, networks.Find(key), "Network %q should NOT be present in Substreams registry", key)
+	}
+}
+
+func TestGetRegistryNetworksWithFirehose(t *testing.T) {
+	networks := GetRegistryNetworksWithFirehose()
+	assert.NotEmpty(t, networks, "Should return at least one network with Firehose endpoint")
+	for id, net := range networks {
+		assert.Greater(t, len(net.Services.Firehose), 0, "Network %q should have at least one Firehose endpoint", id)
+	}
+	// Known networks with Firehose endpoints (should be present)
+	for _, key := range []string{"mainnet", "optimism", "arbitrum", "polygon", "bnb", "avalanche"} {
+		assert.NotNilf(t, networks.Find(key), "Network %q should be present in Firehose registry", key)
+	}
+	// Known networks without Firehose endpoints (should NOT be present)
+	for _, key := range []string{"cronos", "clover", "aurora", "celo"} {
+		assert.Nilf(t, networks.Find(key), "Network %q should NOT be present in Firehose registry", key)
 	}
 }

@@ -23,9 +23,8 @@ var (
 	registryNetworksOnce sync.Once
 )
 
-// GetRegistryNetworks returns a map of network ID to *registry.Network, using The Graph's registry as primary source.
-// If fetching fails, it falls back to loading from a local JSON file ("TheGraphNetworksRegistry.json").
-func GetRegistryNetworks() NetworkRegistry {
+// getRegistryNetworks fetches and caches all networks from the registry (no filtering).
+func getRegistryNetworks() NetworkRegistry {
 	registryNetworksOnce.Do(func() {
 		reg, err := registry.FromLatestVersion()
 		if err != nil {
@@ -37,9 +36,7 @@ func GetRegistryNetworks() NetworkRegistry {
 		}
 		m := make(map[string]*registry.Network)
 		for i, net := range reg.Networks {
-			if len(net.Services.Substreams) > 0 {
-				m[net.ID] = &reg.Networks[i]
-			}
+			m[net.ID] = &reg.Networks[i]
 		}
 		registryNetworks = m
 
@@ -62,7 +59,7 @@ func GetRegistryNetworks() NetworkRegistry {
 				},
 			},
 			Services: registry.Services{
-				Subgraphs:  []string{"mainnet.tron.streamingfast.io:443"},
+				Firehose:   []string{"mainnet.tron.streamingfast.io:443"},
 				Substreams: []string{"mainnet.tron.streamingfast.io:443"},
 			},
 			NetworkType:     "mainnet",
@@ -82,6 +79,30 @@ func GetRegistryNetworks() NetworkRegistry {
 		})
 	})
 	return registryNetworks
+}
+
+// GetRegistryNetworksWithSubstreams returns only networks with Substreams endpoints.
+func GetRegistryNetworksWithSubstreams() NetworkRegistry {
+	all := getRegistryNetworks()
+	filtered := make(NetworkRegistry)
+	for id, net := range all {
+		if len(net.Services.Substreams) > 0 {
+			filtered[id] = net
+		}
+	}
+	return filtered
+}
+
+// GetRegistryNetworksWithFirehose returns only networks with Firehose endpoints.
+func GetRegistryNetworksWithFirehose() NetworkRegistry {
+	all := getRegistryNetworks()
+	filtered := make(NetworkRegistry)
+	for id, net := range all {
+		if len(net.Services.Firehose) > 0 {
+			filtered[id] = net
+		}
+	}
+	return filtered
 }
 
 // addCustomNetwork can be used to add a custom network to the registry map for testing or development.
@@ -112,9 +133,9 @@ func (r NetworkRegistry) Find(key string) *registry.Network {
 	return nil
 }
 
-// Find is a shortcut for GetRegistry().Find(key).
+// Find is a shortcut for getRegistryNetworks().Find(key).
 func Find(key string) *registry.Network {
-	return GetRegistryNetworks().Find(key)
+	return getRegistryNetworks().Find(key)
 }
 
 func ptr[T any](v T) *T { return &v }

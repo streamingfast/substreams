@@ -16,6 +16,8 @@ func NewV8Instance(iso *v8go.Isolate) (*V8Instance, error) {
 	return &V8Instance{iso, ctx}, nil
 }
 
+// Unused right now and simply comes from the wasm interface but might
+// be useful when cleaning between requests
 func (inst *V8Instance) Cleanup(ctx context.Context) error {
 	return nil
 }

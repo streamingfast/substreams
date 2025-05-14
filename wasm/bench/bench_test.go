@@ -11,7 +11,7 @@ import (
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/wasm"
 
-	_ "github.com/streamingfast/substreams/wasm/javascript-v8"
+	_ "github.com/streamingfast/substreams/wasm/v8"
 	// _ "github.com/streamingfast/substreams/wasm/wasi"
 	_ "github.com/streamingfast/substreams/wasm/wasmtime"
 	_ "github.com/streamingfast/substreams/wasm/wazero"
@@ -51,7 +51,7 @@ func BenchmarkExecution(b *testing.B) {
 		// var reuseInstance = true
 		var freshInstanceEachRun = false
 
-		jsCode := readCode(b, "../javascript-v8/runtime/prelude.bundle.js")
+		jsCode := readCode(b, "../v8/runtime/prelude.bundle.js")
 		wasmCode := readCode(b, "substreams_wasm/substreams.wasm")
 		// wasmCodep1 := readCode(b, "substreams_ts/index.wasm")
 		// wasmTinyGo := readCode(b, "substreams_tiny_go/main.wasm")
@@ -65,7 +65,7 @@ func BenchmarkExecution(b *testing.B) {
 			//{"wazero", wasmCode, reuseInstance},
 			//{"wazero", wasmCode, freshInstanceEachRun},
 			{"wazero", "wasm/rust-v1", wasmCode, freshInstanceEachRun},
-			{"javascript-v8", "javascript-v8", jsCode, freshInstanceEachRun},
+			{"v8", "javascript/v8", jsCode, freshInstanceEachRun},
 
 			//{name: "wasi", wasmCodeType: "go/wasi", code: wasmTinyGo, shouldReUseInstance: reuseInstance},
 			//{"wasip1", wasmCodep1, freshInstanceEachRun},

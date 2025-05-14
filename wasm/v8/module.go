@@ -42,6 +42,11 @@ func (mod *V8Module) ExecuteNewCall(
 		if err != nil {
 			return nil, fmt.Errorf("creating new V8 instance: %w", err)
 		}
+		defer func() {
+			if err := inst.Close(ctx); err != nil {
+				fmt.Printf("error closing V8 instance: %s\n", err)
+			}
+		}()
 	}
 
 	if _, err = inst.ctx.RunScript(polyfillCode, "polyfill.js"); err != nil {
@@ -58,6 +63,8 @@ func (mod *V8Module) ExecuteNewCall(
 		inst.Close(ctx)
 		return nil, fmt.Errorf("executing JS bundle: %w", err)
 	}
+
+	defer func() { inst = nil }()
 
 	return inst, nil
 }

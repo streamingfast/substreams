@@ -5,5 +5,5 @@ import (
 )
 
 func init() {
-	wasm.RegisterModuleFactory("javascript-v8", wasm.ModuleFactoryFunc(NewModule))
+	wasm.RegisterModuleFactory("v8", wasm.ModuleFactoryFunc(NewModule))
 }

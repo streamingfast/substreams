@@ -9,6 +9,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### CLI
+
+* The `substreams run` will now better render bytes depending on the network.
+
+* The `substreams run/gui` JSON rendered is now able to render known `anypb.Any` type correctly.
+
 ## v1.15.5
 
 ### Server

@@ -126,6 +126,8 @@ var HardcodedEndpoints = map[string]string{
 	"stellar-testnet":         "testnet.stellar.streamingfast.io:443",
 	"stellar":                 "mainnet.stellar.streamingfast.io:443",
 	"unichain":                "mainnet.unichain.streamingfast.io:443",
+	"tron":                    "mainnet.tron.streamingfast.io:443",
+	"tron-mainnet":            "mainnet.tron.streamingfast.io:443",
 
 	// antelope chains
 	"eos":       "eos.substreams.pinax.network:443",

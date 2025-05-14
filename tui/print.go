@@ -9,11 +9,16 @@ import (
 	"time"
 
 	"github.com/dustin/go-humanize"
+	"github.com/golang/protobuf/jsonpb"
+	protoV1 "github.com/golang/protobuf/proto"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/tidwall/pretty"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
+	"google.golang.org/protobuf/types/dynamicpb"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -231,7 +236,7 @@ func (ui *TUI) decodeDynamicMessage(msgType string, msgDesc *desc.MessageDescrip
 		return cnt
 	}
 
-	cnt, err := msgDescToJSON(msgType, blockNum, modName, dynMsg, true)
+	cnt, err := msgDescToJSON(msgType, blockNum, modName, ui.anyResolver, dynMsg, true)
 	if err != nil {
 		cnt, _ := json.Marshal(&ErrorWrap{
 			Module: modName,
@@ -260,7 +265,7 @@ func (ui *TUI) decodeDynamicStoreDeltas(msgType string, msgDesc *desc.MessageDes
 			})
 			return cnt
 		}
-		cnt, err := msgDescToJSON(msgType, blockNum, modName, dynMsg, false)
+		cnt, err := msgDescToJSON(msgType, blockNum, modName, ui.anyResolver, dynMsg, false)
 		if err != nil {
 			cnt, _ := json.Marshal(&ErrorWrap{
 				Error:  fmt.Sprintf("error encoding protobuf %s into json: %s\n", msgDesc.GetFullyQualifiedName(), err),
@@ -290,26 +295,69 @@ func (ui *TUI) prettyFormat(cnt []byte, isMapOutput bool) []byte {
 	return cnt
 }
 
-func msgDescToJSON(msgType string, blockNum uint64, mod string, dynMsg *dynamic.Message, wrap bool) (cnt []byte, err error) {
-	cnt, err = dynMsg.MarshalJSON()
+var _ jsonpb.AnyResolver = (*wellKnowAnyResolver)(nil)
+
+type wellKnowAnyResolver struct {
+	registry *protoregistry.Files
+}
+
+func (w *wellKnowAnyResolver) Resolve(typeURL string) (protoV1.Message, error) {
+	sanitizedTypeURL := strings.TrimPrefix(typeURL, "type.googleapis.com/")
+
+	desc, err := w.registry.FindDescriptorByName(protoreflect.FullName(sanitizedTypeURL))
 	if err != nil {
-		return
+		return nil, fmt.Errorf("find descriptor by name: %w", err)
+	}
+
+	msgDesc, ok := desc.(protoreflect.MessageDescriptor)
+	if !ok {
+		return nil, fmt.Errorf("descriptor is not found or not of message type for typeURL %s", typeURL)
+	}
+
+	return protoV1.MessageV1(dynamicpb.NewMessage(msgDesc)), nil
+}
+
+func newWellKnowAnyResolver(pkg *pbsubstreams.Package) (*wellKnowAnyResolver, error) {
+	files, err := pkg.GetProtoFilesRegistry()
+	if err != nil {
+		return nil, fmt.Errorf("get proto files registry: %w", err)
+	}
+
+	return &wellKnowAnyResolver{
+		registry: files,
+	}, nil
+}
+
+func msgDescToJSON(
+	msgType string,
+	blockNum uint64,
+	mod string,
+	anyResolver *pbsubstreams.PackageAnyResolver,
+	dynMsg *dynamic.Message,
+	wrap bool,
+) ([]byte, error) {
+	cnt, err := dynMsg.MarshalJSONPB(&jsonpb.Marshaler{
+		AnyResolver: anyResolver,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("protojson marshal: %w", err)
 	}
 
 	if wrap {
-		// FIXME: don't module wrap when we're in terminal mode and decorated output?
-		cnt, err = json.Marshal(ModuleWrap{
+		wrappedCnt, err := json.Marshal(ModuleWrap{
 			Module:   mod,
 			BlockNum: blockNum,
 			Type:     msgType,
 			Data:     cnt,
 		})
 		if err != nil {
-			return
+			return nil, err
 		}
+
+		return wrappedCnt, nil
 	}
 
-	return
+	return cnt, nil
 }
 
 type DeltasWrap struct {

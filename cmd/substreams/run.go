@@ -203,7 +203,11 @@ func runRun(cmd *cobra.Command, args []string) error {
 		toPrint = []string{outputModule}
 	}
 
-	ui := tui.New(req, pkgBundle.Package, toPrint)
+	ui, err := tui.New(substreamsClientConfig.Endpoint(), req, pkgBundle.Package, toPrint)
+	if err != nil {
+		return fmt.Errorf("creating ui: %w", err)
+	}
+
 	if err := ui.Init(outputMode); err != nil {
 		return fmt.Errorf("TUI initialization: %w", err)
 	}

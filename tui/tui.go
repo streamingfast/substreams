@@ -10,11 +10,13 @@ import (
 
 	"github.com/bobg/go-generics/v3/slices"
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/tools/test"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/dynamic"
 	"github.com/mattn/go-isatty"
 	"github.com/streamingfast/shutter"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -51,6 +53,7 @@ func (o *OutputStreamPattern) Matches(input string) bool {
 type TUI struct {
 	shutter *shutter.Shutter
 
+	endpoint          string
 	Req               *pbsubstreamsrpc.Request
 	pkg               *pbsubstreams.Package
 	outputStreamNames []OutputStreamPattern
@@ -69,20 +72,28 @@ type TUI struct {
 	msgDescs       map[string]*desc.MessageDescriptor
 	decodeMsgTypes map[string]func(in []byte) string
 	msgTypes       map[string]string // Replace by calls to GetFullyQualifiedName() on the `msgDescs`
+	anyResolver    *pbsubstreams.PackageAnyResolver
 }
 
-func New(req *pbsubstreamsrpc.Request, pkg *pbsubstreams.Package, outputStreamNames []string) *TUI {
+func New(endpoint string, req *pbsubstreamsrpc.Request, pkg *pbsubstreams.Package, outputStreamNames []string) (*TUI, error) {
+	anyResolver, err := pkg.NewAnyResolver()
+	if err != nil {
+		return nil, fmt.Errorf("new any resolver: %w", err)
+	}
+
 	ui := &TUI{
 		shutter:           shutter.New(),
+		endpoint:          endpoint,
 		Req:               req,
 		pkg:               pkg,
 		outputStreamNames: slices.Map(outputStreamNames, func(s string) OutputStreamPattern { return NewOutputStreamPattern(s) }),
 		decodeMsgTypes:    map[string]func(in []byte) string{},
 		msgTypes:          map[string]string{},
 		msgDescs:          map[string]*desc.MessageDescriptor{},
+		anyResolver:       anyResolver,
 	}
 
-	return ui
+	return ui, nil
 }
 
 func (ui *TUI) Init(outputMode string) error {
@@ -165,6 +176,19 @@ func (ui *TUI) configureOutputMode(outputMode string) error {
 	default:
 		panic(fmt.Errorf("unhandled output mode %q", ui.outputMode))
 	}
+
+	getBytesEncodingPerNetwork := func(endpoint string) dynamic.BytesRepresentation {
+		bytesAsBase58Chains := []string{"solana-mainnet-beta", "solana-mainnet", "solana-devnet"}
+		for _, chain := range bytesAsBase58Chains {
+			if manifest.HardcodedEndpoints[chain] == endpoint {
+				return dynamic.BytesAsBase58
+			}
+		}
+
+		return dynamic.BytesAsHex
+	}
+
+	dynamic.SetDefaultBytesRepresentation(getBytesEncodingPerNetwork(ui.endpoint))
 
 	return nil
 }

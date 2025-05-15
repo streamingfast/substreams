@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -21,6 +22,7 @@ import (
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/debugapi"
 	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/metrics"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
@@ -35,6 +37,7 @@ import (
 	"github.com/streamingfast/substreams/wasm"
 	"go.opentelemetry.io/otel/attribute"
 	ttrace "go.opentelemetry.io/otel/trace"
+	"go.uber.org/atomic"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -78,6 +81,9 @@ type Tier2Service struct {
 	checkPendingShutdown      func() bool
 
 	tier2RequestParameters *reqctx.Tier2RequestParameters
+
+	simulateOverloaded *atomic.Bool          // when true, the service will pretent that it is overloaded and refuse incoming requests
+	activeRequests     *activeRequestRecords // we keep a list of current requests for the debugAPI
 }
 
 const protoPkfPrefix = "type.googleapis.com/"
@@ -94,7 +100,26 @@ func NewTier2(
 		tracer:                tracing.GetTracer(),
 		logger:                logger,
 		blockExecutionTimeout: 3 * time.Minute,
+		simulateOverloaded:    atomic.NewBool(false),
+		activeRequests: &activeRequestRecords{
+			reqs: make(map[string]*ActiveRequestRecord),
+		},
 	}
+
+	debugAPI := debugapi.New(
+		"localhost:8081",
+		logger,
+		func(v bool) {
+			s.simulateOverloaded.Store(v)
+			s.appSetIsReadyState(!v)
+		},
+		func() bool {
+			return s.simulateOverloaded.Load()
+		},
+		s.listActiveRecords,
+		s.cancelRequest,
+	)
+	debugAPI.Start()
 
 	metrics.RegisterMetricSet(logger)
 
@@ -108,9 +133,30 @@ func NewTier2(
 func (s *Tier2Service) isOverloaded() bool {
 	s.connectionCountMutex.RLock()
 	defer s.connectionCountMutex.RUnlock()
+	if s.simulateOverloaded.Load() {
+		return true
+	}
 
 	isOverloaded := s.maxConcurrentRequests > 0 && uint64(s.currentConcurrentRequests) >= s.maxConcurrentRequests
 	return isOverloaded
+}
+
+func (s *Tier2Service) listActiveRecords() string {
+	b, err := json.Marshal(s.activeRequests.List())
+	if err != nil {
+		return err.Error()
+	}
+	return string(b)
+}
+
+func (s *Tier2Service) cancelRequest(traceID string, outputModuleHash string, segmentNumber, segmentSize *uint64, stage *uint32) []string {
+	return s.activeRequests.cancelRequest(
+		traceID,
+		outputModuleHash,
+		segmentNumber,
+		segmentSize,
+		stage,
+	)
 }
 
 func (s *Tier2Service) incrementConcurrentRequests() {
@@ -244,8 +290,22 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 		reqStats.SetError(err)
 		return status.Errorf(codes.Internal, "unable to initialize dmetering: %s", err)
 	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	traceID := tracing.GetTraceID(ctx).String()
+	s.activeRequests.Add(
+		cancel,
+		traceID,
+		outputModuleHash,
+		request.SegmentNumber,
+		request.SegmentSize,
+		request.Stage,
+	)
+
 	defer func() {
 		emitter.Shutdown(nil)
+		s.activeRequests.Remove(traceID, request.SegmentNumber, request.SegmentSize, request.Stage)
+		cancel()
 	}()
 
 	ctx = reqctx.WithEmitter(ctx, emitter)

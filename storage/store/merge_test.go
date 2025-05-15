@@ -482,6 +482,7 @@ func newPartialStore(kv map[string][]byte, updatePolicy pbsubstreams.Module_Kind
 			updatePolicy: updatePolicy,
 			valueType:    valueType,
 		},
+		recentlyDeletedPrefixes: make(map[string]struct{}),
 	}
 
 	return &PartialKV{baseStore: b, DeletedPrefixes: deletedPrefixes, seen: make(map[string]bool)}
@@ -495,7 +496,8 @@ func newStore(kv map[string][]byte, updatePolicy pbsubstreams.Module_KindStore_U
 			updatePolicy: updatePolicy,
 			valueType:    valueType,
 		},
-		logger: zap.NewNop(),
+		logger:                  zap.NewNop(),
+		recentlyDeletedPrefixes: make(DeletedPrefixes),
 	}
 	return &FullKV{baseStore: b}
 }

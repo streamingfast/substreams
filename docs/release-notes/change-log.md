@@ -11,12 +11,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### CLI
+
+* The `substreams run` will now better render bytes depending on the network.
+
+* The `substreams run/gui` JSON rendered is now able to render known `anypb.Any` type correctly.
+
+## v1.15.5
+
 ### Server
 
 * Add env var SUBSTREAMS_PRINT_STACK to enable printing full stack traces when caught panic occurs
 * Prevent a deterministic failure on a module definition (mode, valueType, updatePolicy) from persisting when the issue is fixed in the substreams.yaml https://github.com/streamingfast/substreams/issues/621
 * Metering events on tier2 now bundled at the end of the job (prevents sending metering events for failing jobs)
 * Added metering for: "processed_blocks" (block * number of stages where execution happened) and "egress_bytes"
+* Added a 'debug API' that listens on localhost:8081 and allows blocking connections, running GC, listing or canceling active requests.
 
 ### CLI
 

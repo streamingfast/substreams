@@ -16,6 +16,8 @@ import (
 )
 
 func (b *baseStore) setKV(k string, v []byte) {
+	b.recentlyDeletedPrefixes.RemoveMatching(k)
+
 	if prev, ok := b.kv[k]; ok {
 		b.totalSizeBytes -= uint64(len(prev))
 	} else {
@@ -26,6 +28,8 @@ func (b *baseStore) setKV(k string, v []byte) {
 }
 
 func (b *baseStore) setNewKV(k string, v []byte) {
+	b.recentlyDeletedPrefixes.RemoveMatching(k)
+
 	b.totalSizeBytes += uint64(len(k) + len(v))
 	b.kv[k] = v
 }

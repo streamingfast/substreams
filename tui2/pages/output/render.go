@@ -153,7 +153,7 @@ func (o *Output) decodeDynamicMessage(msgDesc *manifest.ModuleDescriptor, anyin 
 		//)
 	}
 
-	cnt, err := dynMsg.MarshalJSONPB(&jsonpb.Marshaler{Indent: "  ", EmitDefaults: true})
+	cnt, err := dynMsg.MarshalJSONPB(&jsonpb.Marshaler{Indent: "  ", EmitDefaults: true, AnyResolver: o.anyResolver})
 	if err != nil {
 		return "", fmt.Errorf("failed marshalling into JSON: %s\nString representation: %s", err.Error(), decodeAsString(in))
 		//return Styles.ErrorLine.Render(

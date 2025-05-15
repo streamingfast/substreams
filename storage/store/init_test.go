@@ -31,10 +31,11 @@ func newTestBaseStore(
 	config.itemSizeLimit = 10_485_760
 	require.NoError(t, err)
 	return &baseStore{
-		Config:     config,
-		kvOps:      &pbssinternal.Operations{},
-		kv:         make(map[string][]byte),
-		logger:     zap.NewNop(),
-		marshaller: &marshaller.Binary{},
+		Config:                  config,
+		kvOps:                   &pbssinternal.Operations{},
+		kv:                      make(map[string][]byte),
+		logger:                  zap.NewNop(),
+		marshaller:              &marshaller.Binary{},
+		recentlyDeletedPrefixes: make(DeletedPrefixes),
 	}
 }

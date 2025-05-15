@@ -1,6 +1,7 @@
 package output
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/charmbracelet/bubbles/viewport"
@@ -11,6 +12,7 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/networks"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/tui2/common"
 	"github.com/streamingfast/substreams/tui2/components/blocksearch"
 	"github.com/streamingfast/substreams/tui2/components/blockselect"
@@ -25,6 +27,7 @@ type Output struct {
 	common.Common
 	*request.Config
 
+	anyResolver    *pbsubstreams.PackageAnyResolver
 	msgDescs       map[string]*manifest.ModuleDescriptor
 	messageFactory *dynamic.MessageFactory
 
@@ -73,6 +76,11 @@ func New(c common.Common, config *request.Config) (*Output, error) {
 	// 	return nil, err
 	// }
 
+	anyResolver, err := config.Pkg.NewAnyResolver()
+	if err != nil {
+		return nil, fmt.Errorf("new any resolver: %w", err)
+	}
+
 	getBytesEncodingPerNetwork := func(endpoint string) dynamic.BytesRepresentation {
 		bytesAsBase58Chains := []string{"solana-mainnet-beta", "solana-mainnet", "solana-devnet"}
 		for _, chain := range bytesAsBase58Chains {
@@ -89,6 +97,7 @@ func New(c common.Common, config *request.Config) (*Output, error) {
 	output := &Output{
 		Common:              c,
 		Config:              config,
+		anyResolver:         anyResolver,
 		blocksPerModule:     make(map[string][]uint64),
 		payloads:            make(map[request.BlockContext]*pbsubstreamsrpc.AnyModuleOutput),
 		blockIDs:            make(map[uint64]string),

@@ -18,10 +18,11 @@ type baseStore struct {
 	kvOps *pbssinternal.Operations // operations to the curent block called from the WASM module
 	// deltas are always deltas for the given block. they are produced when store is flushed
 	// 	and used to read back in the store at different ordinals
-	deltas         []*pbsubstreams.StoreDelta
-	lastOrdinal    uint64
-	marshaller     marshaller.Marshaller
-	totalSizeBytes uint64
+	deltas                  []*pbsubstreams.StoreDelta
+	lastOrdinal             uint64
+	marshaller              marshaller.Marshaller
+	totalSizeBytes          uint64
+	recentlyDeletedPrefixes DeletedPrefixes // we cache them here to speed up future deletePrefix()
 
 	logger *zap.Logger
 }

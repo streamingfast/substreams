@@ -17,6 +17,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * The `substreams run/gui` JSON rendered is now able to render known `anypb.Any` type correctly.
 
+### SERVER
+
+* Add SUBSTREAMS_STORE_SIZE_LIMIT env var to allow overwriting the default 1GiB value
+
 ## v1.15.5
 
 ### Server

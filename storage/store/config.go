@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
 
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
@@ -29,6 +31,19 @@ type Config struct {
 	appendLimit    uint64
 	totalSizeLimit uint64
 	itemSizeLimit  uint64
+}
+
+var StoreSizeLimit uint64 = 1_073_741_824 // 1GiB
+func init() {
+	if limit := os.Getenv("SUBSTREAMS_STORE_SIZE_LIMIT"); limit != "" {
+		if parsed, err := strconv.ParseUint(limit, 10, 64); err == nil {
+			fmt.Println("Using SUBSTREAMS_STORE_SIZE_LIMIT:", parsed)
+			StoreSizeLimit = parsed
+		} else {
+			fmt.Printf("Warning: invalid SUBSTREAMS_STORE_SIZE_LIMIT value %q: %s\n", limit, err)
+		}
+	}
+
 }
 
 func NewConfig(
@@ -65,9 +80,9 @@ func NewConfig(
 		quickSaveStore:     qss,
 		moduleInitialBlock: moduleInitialBlock,
 		moduleHash:         moduleHash,
-		appendLimit:        8_388_608,     // 8MiB = 8 * 1024 * 1024,
-		totalSizeLimit:     1_073_741_824, // 1GiB
-		itemSizeLimit:      10_485_760,    // 10MiB
+		appendLimit:        8_388_608, // 8MiB = 8 * 1024 * 1024,
+		totalSizeLimit:     StoreSizeLimit,
+		itemSizeLimit:      10_485_760, // 10MiB
 	}, nil
 }
 

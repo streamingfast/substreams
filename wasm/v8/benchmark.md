@@ -53,3 +53,5 @@ time substreams run -e localhost:10016 --plaintext --noop-mode substreams.yaml m
   0.59s user 0.33s system 0% cpu 2:17.91 total
 
 Ratio (ms) : 135600 / 29000 = 4.667 ~> 4x difference
+
+for 10k blocks this translates to (approximately) 4.73 minutes for the rust version and 21 minutes for the JS.

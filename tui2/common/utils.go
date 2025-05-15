@@ -3,6 +3,7 @@ package common
 import (
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/muesli/reflow/truncate"
+	"github.com/streamingfast/substreams/networks"
 )
 
 // TruncateString is a convenient wrapper around truncate.TruncateString.
@@ -25,4 +26,26 @@ func BytesEncodingToRepresentation(enc string) dynamic.BytesRepresentation {
 	default:
 		return dynamic.BytesAsHex
 	}
+}
+
+// InferBytesRepresentation infers the bytes representation based on the network or endpoint.
+// It first checks the network ID, and if not found, it checks the endpoint.
+// If neither is provided, it defaults to Hex encoding.
+// It returns a dynamic.BytesRepresentation based on the encoding.
+func InferBytesRepresentation(network string, endpoint string) dynamic.BytesRepresentation {
+	registry := networks.GetSubstreamsRegistry()
+
+	// First check by network and aliases
+	net := registry.Find(network)
+	if net == nil {
+		// Try with endpoint if no network was found
+		net = registry.FindBySubstreamsEndpoint(endpoint)
+	}
+
+	// If network is found, try to extract bytes representation from it
+	if net != nil {
+		return BytesEncodingToRepresentation(string(networks.GetBytesEncoding(net)))
+	}
+
+	return dynamic.BytesAsHex
 }

@@ -10,7 +10,6 @@ import (
 
 	"github.com/bobg/go-generics/v3/slices"
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/substreams/networks"
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/tools/test"
 	"github.com/streamingfast/substreams/tui2/common"
@@ -178,8 +177,7 @@ func (ui *TUI) configureOutputMode(outputMode string) error {
 		panic(fmt.Errorf("unhandled output mode %q", ui.outputMode))
 	}
 
-	net := networks.GetSubstreamsRegistry().FindBySubstreamsEndpoint(ui.endpoint)
-	dynamic.SetDefaultBytesRepresentation(common.BytesEncodingToRepresentation(string(networks.GetBytesEncoding(net))))
+	dynamic.SetDefaultBytesRepresentation(common.InferBytesRepresentation(ui.pkg.Network, ui.endpoint))
 
 	return nil
 }

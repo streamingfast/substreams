@@ -10,7 +10,6 @@ import (
 	"github.com/jhump/protoreflect/dynamic"
 
 	"github.com/streamingfast/substreams/manifest"
-	"github.com/streamingfast/substreams/networks"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/tui2/common"
@@ -71,26 +70,12 @@ type Output struct {
 }
 
 func New(c common.Common, config *request.Config) (*Output, error) {
-	// nav, err := modgraph.New(config.OutputModule, c, modgraph.WithModuleGraph(config.Graph))
-	// if err != nil {
-	// 	return nil, err
-	// }
 	anyResolver, err := config.Pkg.NewAnyResolver()
 	if err != nil {
 		return nil, fmt.Errorf("new any resolver: %w", err)
 	}
 
-	var encoding string
-	// Try finding the network by network ID, if not, try finding by endpoint.
-	// By default, we use Hex encoding.
-	if config.Pkg.Network != "" {
-		net := networks.GetSubstreamsRegistry().Find(config.Pkg.Network)
-		encoding = string(networks.GetBytesEncoding(net))
-	} else if config.Endpoint != "" {
-		net := networks.GetSubstreamsRegistry().FindBySubstreamsEndpoint(config.Endpoint)
-		encoding = string(networks.GetBytesEncoding(net))
-	}
-	bytesRepresentation := common.BytesEncodingToRepresentation(encoding)
+	bytesRepresentation := common.InferBytesRepresentation(config.Pkg.Network, config.Endpoint)
 
 	output := &Output{
 		Common:              c,

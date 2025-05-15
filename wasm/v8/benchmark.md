@@ -39,14 +39,14 @@ Segfault (SIGSEGV)
 Cause: NewContext(nil) or context used after Dispose() of an isolate.
 
 # Benchmarking
-Pure rust:
+rust:
 time substreams run -e localhost:10016 --plaintext --noop-mode substreams.yaml map_events -s 22463000 -t +10000
 
-  0.55s user 0.30s system 2% cpu 29.196 total
+  0.56s user 0.33s system 3% cpu 28.464 total
 
-Pure JS:
+JS:
 time substreams run -e localhost:10016 --plaintext --noop-mode substreams.yaml map_events -s 22463000 -t +1000
 
-  0.61s user 0.29s system 0% cpu 7:10.24 total
+  0.59s user 0.33s system 0% cpu 2:17.91 total
 
-Ratio (ms) : 426000/29000 = 14 -> 14x difference
+Ratio (ms) : 135600 / 29000 = 4.667 ~> 4x difference

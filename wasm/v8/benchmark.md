@@ -40,6 +40,8 @@ Cause: NewContext(nil) or context used after Dispose() of an isolate.
 
 # Benchmarking
 
+The vast majority of compute needed to execute javascript comes from loading and running the different needed libraries. The v8 runtime is pretty fast. The main optimization route I'm currently looking at is how we can scale and handle these files while keeping our overhead small.
+
 For 1000 blocks
 
 rust:

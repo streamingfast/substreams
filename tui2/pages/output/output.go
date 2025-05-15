@@ -75,24 +75,22 @@ func New(c common.Common, config *request.Config) (*Output, error) {
 	// if err != nil {
 	// 	return nil, err
 	// }
-
 	anyResolver, err := config.Pkg.NewAnyResolver()
 	if err != nil {
 		return nil, fmt.Errorf("new any resolver: %w", err)
 	}
 
-	getBytesEncodingPerNetwork := func(endpoint string) dynamic.BytesRepresentation {
-		bytesAsBase58Chains := []string{"solana-mainnet-beta", "solana-mainnet", "solana-devnet"}
-		for _, chain := range bytesAsBase58Chains {
-			if networks.GetRegistryNetworksWithSubstreams().Find(chain).Services.Substreams[0] == endpoint {
-				return dynamic.BytesAsBase58
-			}
-		}
-
-		return dynamic.BytesAsHex
+	var encoding string
+	// Try finding the network by network ID, if not, try finding by endpoint.
+	// By default, we use Hex encoding.
+	if config.Pkg.Network != "" {
+		net := networks.GetSubstreamsRegistry().Find(config.Pkg.Network)
+		encoding = string(networks.GetBytesEncoding(net))
+	} else if config.Endpoint != "" {
+		net := networks.GetSubstreamsRegistry().FindBySubstreamsEndpoint(config.Endpoint)
+		encoding = string(networks.GetBytesEncoding(net))
 	}
-
-	bytesRepresentation := getBytesEncodingPerNetwork(config.Endpoint)
+	bytesRepresentation := bytesEncodingToRepresentation(encoding)
 
 	output := &Output{
 		Common:              c,
@@ -564,4 +562,18 @@ func newStatusBarWithBytesRepresentation(c common.Common, bytesRepresentation dy
 	statusBar := statusbar.New(c)
 	statusBar.SetBytesRepresentation(bytesRepresentation)
 	return statusBar
+}
+
+// Helper to map string to dynamic.BytesRepresentation
+func bytesEncodingToRepresentation(enc string) dynamic.BytesRepresentation {
+	switch enc {
+	case "base58":
+		return dynamic.BytesAsBase58
+	case "base64":
+		return dynamic.BytesAsBase64
+	case "string":
+		return dynamic.BytesAsString
+	default:
+		return dynamic.BytesAsHex
+	}
 }

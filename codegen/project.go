@@ -337,8 +337,7 @@ func (p *Project) GetRustOutputProtobufPath() string {
 }
 
 func (p *Project) ChainEndpoint() (string, error) {
-	networks := networks.GetRegistryNetworksWithSubstreams()
-	net := networks[p.Network]
+	net := networks.GetSubstreamsRegistry().Find(p.Network)
 	if net == nil {
 		return "", fmt.Errorf("network %q not found", p.Network)
 	}

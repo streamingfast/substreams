@@ -177,7 +177,7 @@ func buildGenerateCommandFromArgs(manifestPath string, outputType OutputType, wi
 	currentNetwork := pkg.Network
 	if currentNetwork == "" {
 		labels := []string{}
-		for label := range networks.GetRegistryNetworksWithSubstreams() {
+		for label := range networks.GetSubstreamsRegistry() {
 			labels = append(labels, label)
 		}
 

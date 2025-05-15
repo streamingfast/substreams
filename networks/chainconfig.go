@@ -3,14 +3,14 @@ package networks
 import (
 	_ "embed"
 	"fmt"
+	"maps"
 	"slices"
-	"sort"
 	"sync"
 
 	registry "github.com/pinax-network/graph-networks-libs/packages/golang/lib"
 )
 
-//go:embed TheGraphNetworksRegistry.json
+//go:embed fallback_TheGraphNetworkRegistry_0.6.59.json
 var embeddedRegistryJSON []byte
 
 // Package networks provides access to The Graph's network registry and helpers.
@@ -81,8 +81,8 @@ func getRegistryNetworks() NetworkRegistry {
 	return registryNetworks
 }
 
-// GetRegistryNetworksWithSubstreams returns only networks with Substreams endpoints.
-func GetRegistryNetworksWithSubstreams() NetworkRegistry {
+// GetSubstreamsRegistry returns only networks with Substreams endpoints.
+func GetSubstreamsRegistry() NetworkRegistry {
 	all := getRegistryNetworks()
 	filtered := make(NetworkRegistry)
 	for id, net := range all {
@@ -93,8 +93,8 @@ func GetRegistryNetworksWithSubstreams() NetworkRegistry {
 	return filtered
 }
 
-// GetRegistryNetworksWithFirehose returns only networks with Firehose endpoints.
-func GetRegistryNetworksWithFirehose() NetworkRegistry {
+// GetFirehoseRegistry returns only networks with Firehose endpoints.
+func GetFirehoseRegistry() NetworkRegistry {
 	all := getRegistryNetworks()
 	filtered := make(NetworkRegistry)
 	for id, net := range all {
@@ -118,11 +118,8 @@ func (r NetworkRegistry) Find(key string) *registry.Network {
 	if n, ok := r[key]; ok {
 		return n
 	}
-	ids := make([]string, 0, len(r))
-	for id := range r {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
+	ids := slices.Collect(maps.Keys(r))
+	slices.Sort(ids)
 	for _, id := range ids {
 		net := r[id]
 		if slices.Contains(net.Aliases, key) || net.FullName == key || net.ShortName == key || net.ID == key {
@@ -147,6 +144,25 @@ func (r NetworkRegistry) FindByGenesisBlock(blockNum uint64, blockID string) *re
 // Find is a shortcut for getRegistryNetworks().Find(key).
 func Find(key string) *registry.Network {
 	return getRegistryNetworks().Find(key)
+}
+
+// Returns the bytes encoding for a given network
+// Returns the raw BytesEncoding type, Hex if not found.
+func GetBytesEncoding(network *registry.Network) registry.BytesEncoding {
+	if network != nil && network.Firehose != nil {
+		return network.Firehose.BytesEncoding
+	}
+	return registry.Hex
+}
+
+// FindBySubstreamsEndpoint returns the *registry.Network whose Substreams endpoint matches the given endpoint.
+func (r NetworkRegistry) FindBySubstreamsEndpoint(endpoint string) *registry.Network {
+	for _, net := range r {
+		if slices.Contains(net.Services.Substreams, endpoint) {
+			return net
+		}
+	}
+	return nil
 }
 
 func ptr[T any](v T) *T { return &v }

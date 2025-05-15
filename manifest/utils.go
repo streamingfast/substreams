@@ -57,7 +57,7 @@ func ExtractNetworkEndpoint(networkFromManifest, fromFlag string, logger *zap.Lo
 		return endpoint, nil
 	}
 
-	net := networks.GetRegistryNetworksWithSubstreams().Find(networkFromManifest)
+	net := networks.GetSubstreamsRegistry().Find(networkFromManifest)
 	if net != nil && len(net.Services.Substreams) > 0 {
 		ep := net.Services.Substreams[0]
 		logger.Info("using endpoint from registry", zap.String("manifest_network", networkFromManifest), zap.String("endpoint", ep))

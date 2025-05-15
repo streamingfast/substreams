@@ -53,12 +53,12 @@ func TestAllLegacyChainConfigKeysPresent(t *testing.T) {
 
 	for _, key := range legacyKeys {
 		net := Find(key)
-		assert.NotNilf(t, net, "Network with key %q should be present in GetRegistryNetworksWithSubstreams()", key)
+		assert.NotNilf(t, net, "Network with key %q should be present in GetSubstreamsRegistry()", key)
 	}
 }
 
-func TestGetRegistryNetworksWithSubstreams(t *testing.T) {
-	networks := GetRegistryNetworksWithSubstreams()
+func TestGetSubstreamsRegistry(t *testing.T) {
+	networks := GetSubstreamsRegistry()
 	assert.NotEmpty(t, networks, "Should return at least one network with Substreams endpoint")
 	for id, net := range networks {
 		assert.Greater(t, len(net.Services.Substreams), 0, "Network %q should have at least one Substreams endpoint", id)
@@ -73,8 +73,8 @@ func TestGetRegistryNetworksWithSubstreams(t *testing.T) {
 	}
 }
 
-func TestGetRegistryNetworksWithFirehose(t *testing.T) {
-	networks := GetRegistryNetworksWithFirehose()
+func TestGetFirehoseRegistry(t *testing.T) {
+	networks := GetFirehoseRegistry()
 	assert.NotEmpty(t, networks, "Should return at least one network with Firehose endpoint")
 	for id, net := range networks {
 		assert.Greater(t, len(net.Services.Firehose), 0, "Network %q should have at least one Firehose endpoint", id)
@@ -102,4 +102,74 @@ func TestNetworkRegistry_FindByGenesisBlock(t *testing.T) {
 	// Not found case
 	notFound := networks.FindByGenesisBlock(12345, "0xdeadbeef")
 	assert.Nil(t, notFound, "Should return nil for unknown genesis block")
+}
+
+func TestGetBytesEncoding(t *testing.T) {
+	networks := getRegistryNetworks()
+
+	t.Run("returns correct encoding for mainnet", func(t *testing.T) {
+		net := networks.Find("mainnet")
+		assert.NotNil(t, net)
+		assert.Equal(t, registry.Hex, GetBytesEncoding(net))
+	})
+
+	t.Run("returns correct encoding for optimism", func(t *testing.T) {
+		net := networks.Find("optimism")
+		assert.NotNil(t, net)
+		assert.Equal(t, registry.Hex, GetBytesEncoding(net))
+	})
+
+	t.Run("returns Hex for nil network", func(t *testing.T) {
+		assert.Equal(t, registry.Hex, GetBytesEncoding(nil))
+	})
+
+	t.Run("returns Hex for network without Firehose", func(t *testing.T) {
+		net := &registry.Network{ID: "no-firehose"}
+		assert.Equal(t, registry.Hex, GetBytesEncoding(net))
+	})
+}
+
+func TestFindBySubstreamsEndpoint(t *testing.T) {
+	substreamsRegistry := GetSubstreamsRegistry()
+
+	t.Run("finds mainnet by endpoint", func(t *testing.T) {
+		mainnetEndpoints := []string{
+			"eth.substreams.pinax.network:443",
+			"mainnet.eth.streamingfast.io:443",
+		}
+		for _, ep := range mainnetEndpoints {
+			net := substreamsRegistry.FindBySubstreamsEndpoint(ep)
+			assert.NotNilf(t, net, "Should find mainnet for endpoint %q", ep)
+			assert.Equal(t, "mainnet", net.ID)
+		}
+	})
+
+	t.Run("finds optimism by endpoint", func(t *testing.T) {
+		optimismEndpoints := []string{
+			"mainnet.optimism.streamingfast.io:443",
+			"optimism.substreams.pinax.network:443",
+		}
+		for _, ep := range optimismEndpoints {
+			net := substreamsRegistry.FindBySubstreamsEndpoint(ep)
+			assert.NotNilf(t, net, "Should find optimism for endpoint %q", ep)
+			assert.Equal(t, "optimism", net.ID)
+		}
+	})
+
+	t.Run("returns nil for unknown endpoint", func(t *testing.T) {
+		net := substreamsRegistry.FindBySubstreamsEndpoint("unknown.endpoint:1234")
+		assert.Nil(t, net)
+	})
+
+	t.Run("returns nil for empty endpoint", func(t *testing.T) {
+		net := substreamsRegistry.FindBySubstreamsEndpoint("")
+		assert.Nil(t, net)
+	})
+
+	t.Run("returns nil for network with no Substreams endpoints", func(t *testing.T) {
+		// Add a network with no Substreams endpoints
+		net := &registry.Network{ID: "no-substreams", Services: registry.Services{Substreams: []string{}}}
+		r := NetworkRegistry{"no-substreams": net}
+		assert.Nil(t, r.FindBySubstreamsEndpoint("any.endpoint:443"))
+	})
 }

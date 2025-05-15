@@ -19,7 +19,7 @@ func init() {
 }
 
 func defaultEndpointE(cmd *cobra.Command, args []string) error {
-	net := networks.GetRegistryNetworksWithSubstreams().Find(args[0])
+	net := networks.GetSubstreamsRegistry().Find(args[0])
 	if net != nil && len(net.Services.Substreams) > 0 {
 		fmt.Println(net.Services.Substreams[0])
 		return nil

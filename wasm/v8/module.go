@@ -52,18 +52,17 @@ func (mod *V8Module) ExecuteNewCall(
 	}
 
 	// Runs all scripts (will be changed depending on files needed), probably going to merge all that are needed
-	scripts := []struct{ code, name string }{
-		{
-			polyfillCode, "polyfill.js",
-		},
-		{
-			string(mod.code), "bundle.js",
-		},
-	}
-	for _, s := range scripts {
-		if err := runJS(inst, s.code, s.name); err != nil {
-			inst.Close(ctx)
-			return nil, err
+	// this if makes sure we load our needed scripts ONLY on the first call
+	if cachedInstance == nil {
+		scripts := []struct{ code, name string }{
+			{polyfillCode, "polyfill.js"},
+			{string(mod.code), "bundle.js"},
+		}
+		for _, s := range scripts {
+			if err := runJS(inst, s.code, s.name); err != nil {
+				inst.Close(ctx)
+				return nil, err
+			}
 		}
 	}
 
@@ -74,6 +73,7 @@ func (mod *V8Module) ExecuteNewCall(
 	}
 
 	outBytes, err := getOutput(inst)
+	_ = inst.ctx.Global().Set("output", v8go.Null(inst.ctx.Isolate()))
 
 	if err != nil {
 		inst.Close(ctx)

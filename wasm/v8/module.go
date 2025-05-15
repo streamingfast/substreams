@@ -12,9 +12,6 @@ import (
 //go:embed runtime/polyfill.bundle.js
 var polyfillCode string
 
-//go:embed runtime/prelude.bundle.js
-var preludeCode string
-
 type V8Module struct {
 	iso      *v8go.Isolate
 	code     []byte

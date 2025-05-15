@@ -106,6 +106,8 @@ func NewTier2(
 		},
 	}
 
+	setSubstreamsStoreSizeLimitFromEnv(logger)
+
 	debugAPI := debugapi.New(
 		"localhost:8081",
 		logger,

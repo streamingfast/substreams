@@ -170,6 +170,8 @@ func NewTier1(
 		hub:               hub,
 	}
 
+	setSubstreamsStoreSizeLimitFromEnv(logger)
+
 	var err error
 	if blockType == "" {
 		blockType, err = getBlockTypeFromStreamFactory(sf)

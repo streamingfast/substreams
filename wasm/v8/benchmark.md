@@ -8,7 +8,7 @@ instance.go: Manages V8 execution contexts (V8Instance).
 
 factory.go: Creates a V8 module from JavaScript code (precompiled).
 
-integration.go: Registers the engine as javascript-v8 in the Substreams runtime.
+integration.go: Registers the engine as javascript/v8 in the Substreams runtime.
 
 # What's working
 Functional JS processing for up to 10k Ethereum blocks without crashing (needs more testing).
@@ -37,3 +37,16 @@ Manage memory by flushing the JS heap manually at the end of a run
 Segfault (SIGSEGV)
 
 Cause: NewContext(nil) or context used after Dispose() of an isolate.
+
+# Benchmarking
+Pure rust:
+time substreams run -e localhost:10016 --plaintext --noop-mode substreams.yaml map_events -s 22463000 -t +10000
+
+  0.55s user 0.30s system 2% cpu 29.196 total
+
+Pure JS:
+time substreams run -e localhost:10016 --plaintext --noop-mode substreams.yaml map_events -s 22463000 -t +1000
+
+  0.61s user 0.29s system 0% cpu 7:10.24 total
+
+Ratio (ms) : 426000/29000 = 14 -> 14x difference

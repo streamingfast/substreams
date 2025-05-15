@@ -9,19 +9,19 @@ import (
 	"rogchap.com/v8go"
 )
 
-type V8Module struct {
-	iso      *v8go.Isolate
-	code     []byte
-	registry *wasm.Registry
-}
-
 //go:embed runtime/polyfill.bundle.js
 var polyfillCode string
 
 //go:embed runtime/prelude.bundle.js
 var preludeCode string
 
-func (mod *V8Module) NewInstance(ctx context.Context) (wasm.Instance, error) {
+type V8Module struct {
+	iso      *v8go.Isolate
+	code     []byte
+	registry *wasm.Registry
+}
+
+func (mod *V8Module) NewInstance(context.Context) (wasm.Instance, error) {
 	return NewV8Instance(mod.iso)
 }
 
@@ -29,47 +29,103 @@ func (mod *V8Module) ExecuteNewCall(
 	ctx context.Context,
 	call *wasm.Call,
 	cachedInstance wasm.Instance,
-	arguments []wasm.Argument,
+	_ []wasm.Argument,
 	argValues map[string][]byte,
 ) (wasm.Instance, error) {
-	var inst *V8Instance
-	var err error
 
-	if cachedInstance != nil {
-		inst = cachedInstance.(*V8Instance)
-	} else {
-		inst, err = NewV8Instance(mod.iso)
-		if err != nil {
-			return nil, fmt.Errorf("creating new V8 instance: %w", err)
+	// Used to inject input, entry buffer
+	var input []byte
+	for _, val := range argValues {
+		input = val
+		break
+	}
+	if input == nil {
+		input = []byte{}
+	}
+
+	inst := getInstance(mod.iso, cachedInstance)
+
+	// Inject input before running scripts (needed to run main)
+	if err := runJS(inst, InjectUint8Array("input", input), "inject_input.js"); err != nil {
+		inst.Close(ctx)
+		return nil, err
+	}
+
+	// Runs all scripts (will be changed depending on files needed), probably going to merge all that are needed
+	scripts := []struct{ code, name string }{
+		{
+			polyfillCode, "polyfill.js",
+		},
+		{
+			string(mod.code), "bundle.js",
+		},
+	}
+	for _, s := range scripts {
+		if err := runJS(inst, s.code, s.name); err != nil {
+			inst.Close(ctx)
+			return nil, err
 		}
-		defer func() {
-			if err := inst.Close(ctx); err != nil {
-				fmt.Printf("error closing V8 instance: %s\n", err)
-			}
-		}()
 	}
 
-	if _, err = inst.ctx.RunScript(polyfillCode, "polyfill.js"); err != nil {
+	// call the actual js function
+	if err := callMain(inst); err != nil {
 		inst.Close(ctx)
-		return nil, fmt.Errorf("executing polyfill: %w", err)
+		return nil, err
 	}
 
-	if _, err = inst.ctx.RunScript(preludeCode, "prelude.js"); err != nil {
+	outBytes, err := getOutput(inst)
+
+	if err != nil {
 		inst.Close(ctx)
-		return nil, fmt.Errorf("executing prelude: %w", err)
+		return nil, err
 	}
 
-	if _, err = inst.ctx.RunScript(string(mod.code), "bundle.js"); err != nil {
-		inst.Close(ctx)
-		return nil, fmt.Errorf("executing JS bundle: %w", err)
-	}
-
-	defer func() { inst = nil }()
-
+	call.SetReturnValue(outBytes)
 	return inst, nil
 }
 
-func (mod *V8Module) Close(ctx context.Context) error {
+func (mod *V8Module) Close(context.Context) error {
 	mod.iso.Dispose()
 	return nil
+}
+
+func getInstance(iso *v8go.Isolate, cachedInstance wasm.Instance) *V8Instance {
+	if cachedInstance != nil {
+		return cachedInstance.(*V8Instance)
+	}
+	v8, _ := NewV8Instance(iso)
+	return v8
+}
+
+func runJS(inst *V8Instance, code, filename string) error {
+	if _, err := inst.ctx.RunScript(code, filename); err != nil {
+		return fmt.Errorf("executing %s: %w", filename, err)
+	}
+	return nil
+}
+
+func callMain(inst *V8Instance) error {
+
+	// A value in v8go is a type from the lib used internally
+	v8val, _ := inst.ctx.Global().Get("main")
+	if !v8val.IsFunction() {
+		return fmt.Errorf("global.main is not a function")
+	}
+
+	// Converts js value -> v8go function
+	fn, _ := v8val.AsFunction()
+
+	// call(undefined) the main function without arguments so main() is executed
+	_, err := fn.Call(v8go.Undefined(inst.ctx.Isolate()))
+	return err
+}
+
+// Returns bytes from Uint8Array
+func getOutput(inst *V8Instance) ([]byte, error) {
+	v8val, _ := inst.ctx.Global().Get("output")
+	if !v8val.IsObject() {
+		return nil, fmt.Errorf("global.output is not an object")
+	}
+
+	return ExtractUint8Array(v8val.Object())
 }

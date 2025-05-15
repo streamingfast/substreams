@@ -10,9 +10,10 @@ import (
 
 	"github.com/bobg/go-generics/v3/slices"
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/substreams/manifest"
+	"github.com/streamingfast/substreams/networks"
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/tools/test"
+	"github.com/streamingfast/substreams/tui2/common"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jhump/protoreflect/desc"
@@ -177,18 +178,8 @@ func (ui *TUI) configureOutputMode(outputMode string) error {
 		panic(fmt.Errorf("unhandled output mode %q", ui.outputMode))
 	}
 
-	getBytesEncodingPerNetwork := func(endpoint string) dynamic.BytesRepresentation {
-		bytesAsBase58Chains := []string{"solana-mainnet-beta", "solana-mainnet", "solana-devnet"}
-		for _, chain := range bytesAsBase58Chains {
-			if manifest.HardcodedEndpoints[chain] == endpoint {
-				return dynamic.BytesAsBase58
-			}
-		}
-
-		return dynamic.BytesAsHex
-	}
-
-	dynamic.SetDefaultBytesRepresentation(getBytesEncodingPerNetwork(ui.endpoint))
+	net := networks.GetSubstreamsRegistry().FindBySubstreamsEndpoint(ui.endpoint)
+	dynamic.SetDefaultBytesRepresentation(common.BytesEncodingToRepresentation(string(networks.GetBytesEncoding(net))))
 
 	return nil
 }

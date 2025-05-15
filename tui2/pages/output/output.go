@@ -10,6 +10,7 @@ import (
 	"github.com/jhump/protoreflect/dynamic"
 
 	"github.com/streamingfast/substreams/manifest"
+	"github.com/streamingfast/substreams/networks"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/tui2/common"
@@ -74,24 +75,22 @@ func New(c common.Common, config *request.Config) (*Output, error) {
 	// if err != nil {
 	// 	return nil, err
 	// }
-
 	anyResolver, err := config.Pkg.NewAnyResolver()
 	if err != nil {
 		return nil, fmt.Errorf("new any resolver: %w", err)
 	}
 
-	getBytesEncodingPerNetwork := func(endpoint string) dynamic.BytesRepresentation {
-		bytesAsBase58Chains := []string{"solana-mainnet-beta", "solana-mainnet", "solana-devnet"}
-		for _, chain := range bytesAsBase58Chains {
-			if manifest.HardcodedEndpoints[chain] == endpoint {
-				return dynamic.BytesAsBase58
-			}
-		}
-
-		return dynamic.BytesAsHex
+	var encoding string
+	// Try finding the network by network ID, if not, try finding by endpoint.
+	// By default, we use Hex encoding.
+	if config.Pkg.Network != "" {
+		net := networks.GetSubstreamsRegistry().Find(config.Pkg.Network)
+		encoding = string(networks.GetBytesEncoding(net))
+	} else if config.Endpoint != "" {
+		net := networks.GetSubstreamsRegistry().FindBySubstreamsEndpoint(config.Endpoint)
+		encoding = string(networks.GetBytesEncoding(net))
 	}
-
-	bytesRepresentation := getBytesEncodingPerNetwork(config.Endpoint)
+	bytesRepresentation := common.BytesEncodingToRepresentation(encoding)
 
 	output := &Output{
 		Common:              c,

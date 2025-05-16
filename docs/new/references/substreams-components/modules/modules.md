@@ -61,7 +61,7 @@ modules:
       type: proto:sf.substreams.sink.database.v1.DatabaseChanges
 ```
 
-There are two modules defined: `map_events` and `graph_out`.
+There are two modules defined: `map_events` and `db_out`.
 - The `map_events` module receives a `sf.ethereum.type.v2.Block` object (a raw Ethereum block) as a parameter and outputs a custom `contract.v1.Events` object.
 - The `db_out` module receives `map_events`'s output as an input, and outputs another custom object, `sf.substreams.sink.database.v1.DatabaseChanges`.
 

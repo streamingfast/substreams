@@ -3,13 +3,15 @@
   "description": "A Schema to support in making Substreams manifest files",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
-  "properties" : {
-    "specVersion" : {
+  "properties": {
+    "specVersion": {
       "title": "manifest's specVersion",
       "description": "A specVersion\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#specversion",
-      "enum" : ["v0.1.0"]
+      "enum": [
+        "v0.1.0"
+      ]
     },
-    "package" : {
+    "package": {
       "title": "package",
       "description": "A package",
       "type": "object",
@@ -36,7 +38,10 @@
           "type": "string"
         }
       },
-      "required": ["name", "version"],
+      "required": [
+        "name",
+        "version"
+      ],
       "additionalProperties": false
     },
     "imports": {
@@ -73,21 +78,24 @@
             {
               "title": "protobuf prefixFile",
               "descriptions": "a prefixFile",
-              "type":  "string"
+              "type": "string"
             }
           ],
           "minItems": 1
         }
       },
-      "required": ["files", "importPaths"],
+      "required": [
+        "files",
+        "importPaths"
+      ],
       "unevaluatedProperties": false
     },
-    "binaries" : {
+    "binaries": {
       "title": "binaries",
       "description": "A binary\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#binaries",
       "type": "object",
       "properties": {
-        "default" : {
+        "default": {
           "title": "default binary",
           "description": "the default binary",
           "type": "object",
@@ -95,14 +103,16 @@
             "type": {
               "title": "binary type",
               "description": "A binary type\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#binaries-name-.type",
-              "enum": ["wasm/rust-v1"]
+              "enum": [
+                "wasm/rust-v1"
+              ]
             },
             "file": {
               "title": "binary file",
               "description": "A binary file\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#binaries-name-.file",
               "type": "string"
             },
-            "protoPackageMapping" : {
+            "protoPackageMapping": {
               "title": "binary protoPackageMapping",
               "description": "a protoPackageMapping",
               "type": "object",
@@ -115,11 +125,16 @@
               "minProperties": 1
             }
           },
-          "required": ["type", "file"],
+          "required": [
+            "type",
+            "file"
+          ],
           "additionalProperties": false
         }
       },
-      "required": ["default"],
+      "required": [
+        "default"
+      ],
       "unevaluatedProperties": false
     },
     "modules": {
@@ -169,13 +184,15 @@
               },
               "if": {
                 "properties": {
-                  "store" : {
+                  "store": {
                     "type": "string"
                   }
                 },
-                "required": ["store"]
+                "required": [
+                  "store"
+                ]
               },
-              "then" : {
+              "then": {
                 "maxProperties": 2,
                 "properties": {
                   "mode": {
@@ -199,7 +216,9 @@
               "const": "store"
             }
           },
-          "required": ["kind"]
+          "required": [
+            "kind"
+          ]
         },
         "then": {
           "properties": {
@@ -216,7 +235,10 @@
             },
             "valueType": {
               "description": "A module's valueType\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#module-valuetype",
-              "type": ["string", "number"]
+              "type": [
+                "string",
+                "number"
+              ]
             },
             "name": {
               "description": "A module name\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#module-name",
@@ -258,13 +280,15 @@
                 },
                 "if": {
                   "properties": {
-                    "store" : {
+                    "store": {
                       "type": "string"
                     }
                   },
-                  "required": ["store"]
+                  "required": [
+                    "store"
+                  ]
                 },
-                "then" : {
+                "then": {
                   "maxProperties": 2,
                   "properties": {
                     "store": {
@@ -289,7 +313,7 @@
           },
           "additionalProperties": false
         },
-        "else" : {
+        "else": {
           "properties": {
             "name": {
               "description": "A module name\nhttps://substreams.streamingfast.io/reference-and-specs/manifests#module-name",
@@ -331,13 +355,15 @@
                 },
                 "if": {
                   "properties": {
-                    "store" : {
+                    "store": {
                       "type": "string"
                     }
                   },
-                  "required": ["store"]
+                  "required": [
+                    "store"
+                  ]
                 },
-                "then" : {
+                "then": {
                   "maxProperties": 2,
                   "properties": {
                     "mode": {
@@ -363,13 +389,19 @@
                   "type": "string"
                 }
               },
-              "required": ["type"],
+              "required": [
+                "type"
+              ],
               "additionalProperties": false
             }
           },
           "additionalProperties": false
         },
-        "required": ["kind", "name", "inputs"],
+        "required": [
+          "kind",
+          "name",
+          "inputs"
+        ],
         "unevaluatedProperties": false
       },
       "additionalItems": false,
@@ -379,14 +411,14 @@
       "title": "network",
       "description": "Target blockchain where the Substreams package will execute. See supported chains at https://thegraph.com/docs/en/supported-networks/",
       "type": "string",
-      "pattern": "arbitrum-one|avalanche|base|bsc|celo|eos|mainnet|gnosis|near-mainnet|optimism|matic|polygon-zkevm|solana-mainnet-beta"
+      "pattern": "[a-zA-Z0-9_-]+"
     },
     "networks": {
       "title": "networks",
       "description": "Per-network overrides for initialBlock and params",
       "type": "object",
       "propertyNames": {
-        "pattern": "arbitrum-one|avalanche|base|bsc|celo|eos|mainnet|gnosis|near-mainnet|optimism|matic|polygon-zkevm|solana-mainnet-beta"
+        "pattern": "[a-zA-Z0-9_-]+"
       },
       "additionalProperties": {
         "type": "object",
@@ -420,6 +452,12 @@
       "minProperties": 1
     }
   },
-  "required": ["specVersion", "package", "protobuf", "binaries", "modules"],
+  "required": [
+    "specVersion",
+    "package",
+    "protobuf",
+    "binaries",
+    "modules"
+  ],
   "additionalProperties": false
 }

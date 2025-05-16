@@ -16,10 +16,7 @@ type Configs struct {
 func NewConfigs(baseObjectStore dstore.Store, allRequestedModules []*pbsubstreams.Module, moduleHashes map[string]string, firstStreamableBlock uint64, logger *zap.Logger) (*Configs, error) {
 	out := make(map[string]*Config)
 	for _, mod := range allRequestedModules {
-		initialBlock := mod.InitialBlock
-		if initialBlock < firstStreamableBlock {
-			initialBlock = firstStreamableBlock
-		}
+		initialBlock := max(mod.InitialBlock, firstStreamableBlock)
 		conf, err := NewConfig(
 			mod.Name,
 			initialBlock,

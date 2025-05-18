@@ -20,10 +20,7 @@ func NewConfigs(baseObjectStore dstore.Store, allRequestedModules []*pbsubstream
 	out := make(map[string]*Config)
 	for _, mod := range allRequestedModules {
 
-		initialBlock := mod.InitialBlock
-		if initialBlock < firstStreamableBlock {
-			initialBlock = firstStreamableBlock
-		}
+		initialBlock := max(firstStreamableBlock, mod.InitialBlock)
 		hash := moduleHashes[mod.Name]
 		extendedHash := manifest.ExtendedModuleHash(mod, hash)
 		conf, err := NewConfig(

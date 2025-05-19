@@ -38,7 +38,7 @@ Authentication tokens are required to use Substreams and connect to the public F
 
 ### **My Substreams authentication token isn’t working, what do I do?**
 
-The StreamingFast team is [available on Discord to resolve problems](https://discord.gg/Ugc7KtkA) related to obtaining or by using authentication tokens.
+The StreamingFast team is [available on Discord to resolve problems](https://discord.gg/jZwqxJAvRs) related to obtaining or by using authentication tokens.
 
 The Substreams documentation also [provides general instructions surrounding authentication](https://substreams.streamingfast.io/reference-and-specs/authentication) tokens.
 
@@ -66,7 +66,7 @@ Specifying a stop block value of zero (0), the default enables transparent hando
 
 ### **Does StreamingFast have a Discord?**
 
-Yes, [join the StreamingFast Discord](https://discord.gg/Ugc7KtkA).
+Yes, [join the StreamingFast Discord](https://discord.gg/jZwqxJAvRs).
 
 ### **Is StreamingFast on Twitter?**
 

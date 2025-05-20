@@ -2,7 +2,7 @@
 description: StreamingFast Substreams SQL sink
 ---
 
-# `substreams-sink-sql` introduction
+# M
 
 ### Purpose
 

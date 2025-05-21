@@ -1,5 +1,5 @@
 
-# Direct Mapping from Protobuf (Without Annotations)
+# Flat Mapping
 
 The easiest way to map your Substreams output to SQL tables is to let the SQL sink handle everything for you. With this method, the sink automatically creates a table for each Protobuf message type you emit from your Substreams.
 
@@ -15,13 +15,14 @@ message Pool {
 
 The SQL sink will **automatically** create a table called `pools` with the corresponding columns, `token0`, `token1` and `created_at`. For every new `Pool` message outputted from the Substreams, a new row will be inserted into the table.
 
-## Running the Sink
+## Run the Sink
 
 You can run the sink with the following syntax:
 
 ```bash
-substreams-sink-sql from-proto <DSN> <SUBSTREAMS_PACKAGE>
+substreams-sink-sql from-proto <DSN> <SUBSTREAMS_PACKAGE> --no-proto-option
 ```
+**IMPORTANT:** Don't forget the `--no-proto-option` flag.
 
 The `substreams.yaml` file of your package must contain the sink configuration:
 

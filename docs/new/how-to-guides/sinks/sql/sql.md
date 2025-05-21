@@ -18,7 +18,7 @@ The core function of the SQL sink is to translate your Substreams output (Protob
     * Simplest method.
     * Automatically maps your Protobuf output to SQL tables.
     * Insert-only — no relationships or constraints.
-- Direct Mapping from Protobuf (With Annotations)
+- [Direct Mapping from Protobuf (With Annotations)](./protobuf-with-annotations.md)
     * Enables foreign key relationships in your SQL schema.
     * Requires adding annotations to your Protobuf messages (e.g., primary and foreign keys).
     * Still insert-only, but supports relational integrity.
@@ -26,6 +26,7 @@ The core function of the SQL sink is to translate your Substreams output (Protob
     * Gives you full control over the output.
     * Supports insert, update, and upsert operations.
     * Ideal for advanced use cases with evolving or mutable data.
+    * **NOTE:** In ClickHouse, reorgs are currently supported with delay.
 
 |                               | Without annotations | With annotations | `db_out` module |
 |-------------------------------|---------------------|------------------|-----------------|

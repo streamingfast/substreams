@@ -14,11 +14,7 @@ Before you begin, make sure you have:
 
 The core function of the SQL sink is to translate your Substreams output (Protobuf data) into SQL tables. You can choose one of three methods depending on your needs:
 
-- [Direct Mapping from Protobuf (Without Annotations)](./protobuf-without-annotations.md)
-    * Simplest method.
-    * Automatically maps your Protobuf output to SQL tables.
-    * Insert-only — no relationships or constraints.
-- [Direct Mapping from Protobuf (With Annotations)](./protobuf-with-annotations.md)
+- [Relational Mappings](./relational-mappings.md)
     * Enables foreign key relationships in your SQL schema.
     * Requires adding annotations to your Protobuf messages (e.g., primary and foreign keys).
     * Still insert-only, but supports relational integrity.
@@ -28,13 +24,13 @@ The core function of the SQL sink is to translate your Substreams output (Protob
     * Ideal for advanced use cases with evolving or mutable data.
     * **NOTE:** In ClickHouse, reorgs are currently supported with delay.
 
-|                               | Without annotations | With annotations | `db_out` module |
-|-------------------------------|---------------------|------------------|-----------------|
-| SQL relationships             | No                  | Yes              | No              |
-| Direct Protobuf<>SQL mappings | Yes                 | No               | No              |
-| `INSERT` supported            | Yes                 | Yes              | Yes             |
-| `UPDATE` supported            | No                  | No               | Yes             |
-| `UPSERT` supported            | No                  | No               | Yes             |
+|                               | With annotations | `db_out` module |
+|-------------------------------|------------------|-----------------|
+| SQL relationships             | Yes              | No              |
+| Direct Protobuf<>SQL mappings | No               | No              |
+| `INSERT` supported            | Yes              | Yes             |
+| `UPDATE` supported            | No               | Yes             |
+| `UPSERT` supported            | No               | Yes             |
 
 
 ## Installation
@@ -44,17 +40,16 @@ Regardless of the ways you choose to map the data, you will have to install the 
 ### Installing the Binary
 
 1. Download the correct binary, depending on your operating system, from the [substreams-sink-sql GitHub releases](https://github.com/streamingfast/substreams-sink-sql/releases) page.
-2. Move the binary to your `$PATH`.
+1. Move the binary to your `$PATH`.
 
 ### Installing from Source
 
 1. Clone the [substreams-sink-sql GitHub repository](https://github.com/streamingfast/substreams-sink-sql).
-2. Move to the `cmd/substreams-sink-sql` folder.
-3. Install the binary using Go
+1. Install the binary using Go.
 
 ```bash
-go build
+go install ./cmd/substreams-sink-sql
 ```
 
-4. Move the binary to your `$PATH`.
+1. Ensure you have Go bin directory in your $PATH.
 

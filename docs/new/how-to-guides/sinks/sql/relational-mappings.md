@@ -49,7 +49,7 @@ Let’s walk through a real-world example of storing SPL Token instructions in a
 
 Clone the [SPL Token Substreams GitHub repository](https://github.com/streamingfast/substreams-spl-token).
 
-### Inpsect the Project
+### Inspect the Project
 
 - Observe the `substreams.yaml` file:
 
@@ -172,3 +172,10 @@ export DSN=postgres://myuser:mypassword@localhost:5432/mydatabase?sslmode=disabl
 substreams-sink-sql from-proto $DSN ./substreams.yaml
 ```
 
+### Run the Sink Without Relations
+
+If you want the sink to create the SQL tables **without relationships**, then you can use the `--no-proto-option` flag. With this flag, you don't need annotations, the sink will infer the name of the table using the name of the messages that you output.
+
+```bash
+substreams-sink-sql from-proto $DSN ./substreams.yaml --no-proto-option
+```

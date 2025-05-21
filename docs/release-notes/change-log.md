@@ -9,7 +9,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v1.15.6
 
 ### CLI
 
@@ -17,7 +17,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * The `substreams run/gui` JSON rendered is now able to render known `anypb.Any` type correctly.
 
-### SERVER
+* Integrated the [Network Registry](https://github.com/graphprotocol/networks-registry?tab=readme-ov-file#the-graph-networks-registry) to better track supported networks.
+
+### Server
 
 * Add SUBSTREAMS_STORE_SIZE_LIMIT env var to allow overwriting the default 1GiB value
 

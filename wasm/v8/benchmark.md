@@ -57,3 +57,7 @@ time substreams run -e localhost:10016 --plaintext --noop-mode substreams.yaml m
 Ratio (ms) : 135600 / 29000 = 4.667 ~> 4x difference
 
 for 10k blocks this translates to (approximately) 4.73 minutes for the rust version and 21 minutes for the JS.
+
+This time is different when running on docker since we're in production mode and have access to the cache. When using the cache the difference between the two is negligible but when un-cached the difference is very noticeable.
+
+On a clean instance you can see a 50-70% slower execution on the JS side than the rust-wasm execution, no cache, for a 1000 blocs. This trend is also true for a number of blocks n that converge to 10k blocks.

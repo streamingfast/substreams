@@ -37,10 +37,10 @@ var initCmd = &cobra.Command{
 	Short: "Initialize a new, working Substreams project from scratch",
 	Long: cli.Dedent(`
 
-		Initialize a new Substreams project using a remote code generator.		
+		Initialize a new Substreams project using a remote code generator.
 		State will be saved to 'generator.json' by default.
 
-		Example: 
+		Example:
 			substreams init
 	`),
 	RunE:         runSubstreamsInitE,
@@ -284,6 +284,8 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 
 	userState := newUserState()
 
+	forceDownloadProvided, _ := sflags.MustGetBoolProvided(cmd, "force-download-cwd")
+
 	var loadingCh chan bool
 	for {
 		resp, err := conn.Receive()
@@ -336,6 +338,21 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			}
 
 		case *pbconvo.SystemOutput_ListSelect_:
+			if forceDownloadProvided && msg.ListSelect.Id == "consumption" {
+				// ignore everything after download, suggest 'sql'
+				if err := sendFunc(&pbconvo.UserInput{
+					FromActionId: resp.ActionId,
+					Entry: &pbconvo.UserInput_Selection_{
+						Selection: &pbconvo.UserInput_Selection{
+							Value: "sql",
+						},
+					},
+				}); err != nil {
+					return fmt.Errorf("error sending confirmation: %w", err)
+				}
+				continue
+
+			}
 			input := msg.ListSelect
 
 			//fmt.Println(toMarkdown(input.Instructions))
@@ -525,8 +542,6 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			}
 
 		case *pbconvo.SystemOutput_DownloadFiles_:
-			forceDownloadProvided, _ := sflags.MustGetBoolProvided(cmd, "force-download-cwd")
-
 			if !forceDownloadProvided && userState.downloadedFilesfolderPath == "" {
 				savingDest := "output"
 				if projectName := gjson.GetBytes(lastState.State, "name").String(); projectName != "" {

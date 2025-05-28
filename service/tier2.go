@@ -838,6 +838,7 @@ func GetExecutionPlan(
 		}
 
 		execoutWriters[name] = execout.NewWriter(
+			ctx,
 			writerStartBlock,
 			stopBlock,
 			name,

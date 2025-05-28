@@ -19,7 +19,7 @@ type Writer struct {
 	isWriterForIndex bool
 }
 
-func NewWriter(initialBlockBoundary, exclusiveEndBlock uint64, outputModule string, configs *Configs, isWriterForIndex bool) *Writer {
+func NewWriter(ctx context.Context, initialBlockBoundary, exclusiveEndBlock uint64, outputModule string, configs *Configs, isWriterForIndex bool) *Writer {
 	w := &Writer{
 		wg:               &sync.WaitGroup{},
 		outputModule:     outputModule,
@@ -29,6 +29,9 @@ func NewWriter(initialBlockBoundary, exclusiveEndBlock uint64, outputModule stri
 	segmenter := block.NewSegmenter(configs.execOutputSaveInterval, initialBlockBoundary, exclusiveEndBlock)
 	walker := configs.NewFileWalker(outputModule, segmenter)
 	w.CurrentFile = walker.File()
+	if !isWriterForIndex {
+		w.CurrentFile.WriteAsYouGo(ctx)
+	}
 
 	return w
 }

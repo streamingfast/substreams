@@ -3,6 +3,7 @@ package execout
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/streamingfast/derr"
@@ -68,6 +69,19 @@ func (c *Config) NewFile(targetRange *block.Range) *File {
 		Range:      targetRange,
 		logger:     c.logger,
 	}
+}
+
+func (f *File) WriteAsYouGo(ctx context.Context) {
+	filename := f.Filename()
+	f.logger.Info("begin writing execution output file", zap.String("filename", filename))
+	r, w := io.Pipe()
+	f.writeAsYouGo = true
+	f.writingFile = w
+	f.writeError = make(chan error, 1)
+
+	go func() {
+		f.writeError <- f.store.WriteObject(ctx, filename, r)
+	}()
 }
 
 func (c *Config) Name() string                        { return c.name }

@@ -34,6 +34,11 @@ type File struct {
 	logger     *zap.Logger
 	loaded     bool
 	loadedSize uint64
+
+	writeAsYouGo  bool
+	writingFile   *io.PipeWriter
+	writeError    chan error
+	deletedBefore *uint64
 }
 
 func (c *File) FullFilename() string {
@@ -83,12 +88,30 @@ func (c *File) SetItem(clock *pbsubstreams.Clock, data []byte) {
 		Payload: cp,
 	}
 
+	if c.writeAsYouGo {
+		c.writePreviousKV()
+		c.Kv = make(map[string]*pboutput.Item)
+		c.deletedBefore = &clock.Number
+	}
 	c.Kv[clock.Id] = ci
+
+}
+
+func (c *File) writePreviousKV() {
+	for _, item := range c.Kv {
+		if err := streamproto.WriteItem(c.writingFile, item); err != nil {
+			c.writingFile.CloseWithError(err)
+			return
+		}
+	}
 }
 
 func (c *File) Get(clock *pbsubstreams.Clock) ([]byte, bool) {
 	c.Lock()
 	defer c.Unlock()
+	if c.deletedBefore != nil && clock.Number < *c.deletedBefore {
+		panic("trying to get deleted data, this should never happen")
+	}
 
 	cacheItem, found := c.Kv[clock.Id]
 
@@ -103,6 +126,9 @@ func (c *File) GetAtBlock(blockNumber uint64) ([]byte, bool) {
 	c.Lock()
 	defer c.Unlock()
 
+	if c.deletedBefore != nil && blockNumber < *c.deletedBefore {
+		panic("trying to get deleted data, this should never happen")
+	}
 	for _, value := range c.Kv {
 		if value.BlockNum == blockNumber {
 			return value.Payload, true
@@ -156,6 +182,12 @@ func (c *File) Load(ctx context.Context) error {
 }
 
 func (c *File) Save(ctx context.Context) error {
+	if c.writeAsYouGo {
+		c.writePreviousKV() // last block output must be written
+		c.writingFile.Close()
+		return <-c.writeError
+	}
+
 	filename := c.Filename()
 
 	c.logger.Info("writing execution output file", zap.String("filename", filename))

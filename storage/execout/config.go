@@ -2,6 +2,7 @@ package execout
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -75,12 +76,19 @@ func (f *File) WriteAsYouGo(ctx context.Context) {
 	filename := f.Filename()
 	f.logger.Info("begin writing execution output file", zap.String("filename", filename))
 	r, w := io.Pipe()
-	f.writeAsYouGo = true
 	f.writingFile = w
 	f.writeError = make(chan error, 1)
 
 	go func() {
-		f.writeError <- f.store.WriteObject(ctx, filename, r)
+		// writes the data from the pipe to the storage
+		// any error here closes the pipe (to fail on next write)
+		// and also gets written to the writeError channel for 'Save' operation to pick up
+		err := f.store.WriteObject(ctx, filename, r)
+		if err != nil && !errors.Is(err, context.Canceled) {
+			f.logger.Warn("error writing execution output file", zap.String("filename", filename), zap.Error(err))
+		}
+		f.writingFile.CloseWithError(err)
+		f.writeError <- err // so the "Save" operation can wait on write completion and determine if something failed
 	}()
 }
 

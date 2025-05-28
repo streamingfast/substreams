@@ -36,10 +36,13 @@ func NewWriter(ctx context.Context, initialBlockBoundary, exclusiveEndBlock uint
 	return w
 }
 
-func (w *Writer) Write(clock *pbsubstreams.Clock, buffer *Buffer) {
+func (w *Writer) Write(clock *pbsubstreams.Clock, buffer *Buffer) error {
 	if val, found := buffer.valuesForFileOutput[w.outputModule]; found {
-		w.CurrentFile.SetItem(clock, val)
+		if err := w.CurrentFile.SetItem(clock, val); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func (w *Writer) Close(ctx context.Context) error {

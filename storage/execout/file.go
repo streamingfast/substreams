@@ -35,7 +35,6 @@ type File struct {
 	loaded     bool
 	loadedSize uint64
 
-	writeAsYouGo  bool
 	writingFile   *io.PipeWriter
 	writeError    chan error
 	deletedBefore *uint64
@@ -72,7 +71,7 @@ func (c *File) ExtractClocks(clocksMap map[uint64]*pbsubstreams.Clock) {
 	}
 }
 
-func (c *File) SetItem(clock *pbsubstreams.Clock, data []byte) {
+func (c *File) SetItem(clock *pbsubstreams.Clock, data []byte) error {
 	c.Lock()
 	defer c.Unlock()
 
@@ -88,22 +87,26 @@ func (c *File) SetItem(clock *pbsubstreams.Clock, data []byte) {
 		Payload: cp,
 	}
 
-	if c.writeAsYouGo {
-		c.writePreviousKV()
-		c.Kv = make(map[string]*pboutput.Item)
-		c.deletedBefore = &clock.Number
-	}
-	c.Kv[clock.Id] = ci
-
-}
-
-func (c *File) writePreviousKV() {
-	for _, item := range c.Kv {
-		if err := streamproto.WriteItem(c.writingFile, item); err != nil {
-			c.writingFile.CloseWithError(err)
-			return
+	if c.writingFile != nil {
+		if err := c.writePreviousKV(); err != nil {
+			return err
 		}
 	}
+	c.Kv = make(map[string]*pboutput.Item) // in writable File, we delete previous items
+	c.deletedBefore = &clock.Number
+
+	c.Kv[clock.Id] = ci
+
+	return nil
+}
+
+func (c *File) writePreviousKV() error {
+	for _, item := range c.Kv {
+		if err := streamproto.WriteItem(c.writingFile, item); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (c *File) Get(clock *pbsubstreams.Clock) ([]byte, bool) {
@@ -182,29 +185,14 @@ func (c *File) Load(ctx context.Context) error {
 }
 
 func (c *File) Save(ctx context.Context) error {
-	if c.writeAsYouGo {
-		c.writePreviousKV() // last block output must be written
-		c.writingFile.Close()
-		return <-c.writeError
+	if c.writingFile == nil {
+		return fmt.Errorf("cannot save file %s: writingfile is nil", c.Filename())
 	}
-
-	filename := c.Filename()
-
-	c.logger.Info("writing execution output file", zap.String("filename", filename))
-	return derr.RetryContext(ctx, 10, func(ctx context.Context) error { // more than the usual 5 retries here because if we fail, we have to reprocess the whole segment
-		r, w := io.Pipe()
-		go func() {
-			for _, item := range c.Kv {
-				if err := streamproto.WriteItem(w, item); err != nil {
-					w.CloseWithError(err)
-					return
-				}
-			}
-			w.Close()
-		}()
-		err := c.store.WriteObject(ctx, filename, r)
-		return err
-	})
+	c.writePreviousKV() // last block output must be written
+	if err := c.writingFile.Close(); err != nil {
+		return fmt.Errorf("closing file %s: %w", c.Filename(), err)
+	}
+	return <-c.writeError
 }
 
 func (c *File) String() string {

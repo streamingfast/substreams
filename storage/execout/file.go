@@ -88,12 +88,14 @@ func (c *File) SetItem(clock *pbsubstreams.Clock, data []byte) error {
 	}
 
 	if c.writingFile != nil {
+		// if we are writing the file, we flush the data and delete what was there before.
+		// if we are not writing the file, we probably writing an index so we can't delete the data, it will be aggregated at the end of the segment
 		if err := c.writePreviousKV(); err != nil {
 			return err
 		}
+		c.Kv = make(map[string]*pboutput.Item) // in writable File, we delete previous items
+		c.deletedBefore = &clock.Number
 	}
-	c.Kv = make(map[string]*pboutput.Item) // in writable File, we delete previous items
-	c.deletedBefore = &clock.Number
 
 	c.Kv[clock.Id] = ci
 

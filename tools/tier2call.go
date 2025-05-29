@@ -39,6 +39,7 @@ func init() {
 	tier2CallCmd.Flags().String("state-store-url", "./firehose-data/localdata", "Substreams state data storage")
 	tier2CallCmd.Flags().String("state-store-default-tag", "", "Substreams state store default tag")
 	tier2CallCmd.Flags().String("extension-configs", "", "semicolon-separted list of k=v values. Ex: rpc_eth_call=50000000,http://localhost:8000;a=b;c=d")
+	tier2CallCmd.Flags().Bool("skip-package-validation", false, "Do not perform any validation when reading substreams package")
 
 	Cmd.AddCommand(tier2CallCmd)
 }
@@ -50,7 +51,14 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 	outputModule := args[1]
 	stage, _ := strconv.ParseUint(args[2], 10, 32)
 	segmentNumber, _ := strconv.ParseUint(args[3], 10, 32)
-	manifestReader, err := manifest.NewReader(manifestPath)
+
+	options := []manifest.Option{}
+
+	if sflags.MustGetBool(cmd, "skip-package-validation") {
+		options = append(options, manifest.SkipPackageValidationReader())
+	}
+
+	manifestReader, err := manifest.NewReader(manifestPath, options...)
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
 	}

@@ -80,6 +80,10 @@ func (f *File) WriteAsYouGo(ctx context.Context) {
 	f.writeError = make(chan error, 1)
 
 	go func() {
+		<-ctx.Done()
+		w.CloseWithError(ctx.Err()) // this will trigger an error in 'store.WriteObject' in next thread. NOOP if already closed
+	}()
+	go func() {
 		// writes the data from the pipe to the storage
 		// any error here closes the pipe (to fail on next write)
 		// and also gets written to the writeError channel for 'Save' operation to pick up
@@ -87,8 +91,10 @@ func (f *File) WriteAsYouGo(ctx context.Context) {
 		if err != nil && !errors.Is(err, context.Canceled) {
 			f.logger.Warn("error writing execution output file", zap.String("filename", filename), zap.Error(err))
 		}
-		f.writingFile.CloseWithError(err)
+		w.CloseWithError(err) // NOOP if already closed
+
 		f.writeError <- err // so the "Save" operation can wait on write completion and determine if something failed
+		close(f.writeError)
 	}()
 }
 

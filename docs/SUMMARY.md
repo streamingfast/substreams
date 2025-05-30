@@ -37,16 +37,9 @@
       * [Simple Substreams Example](new/how-to-guides/develop-your-own-substreams/cosmos/injective/block-stats.md)
       * [Foundational Modules](new/how-to-guides/develop-your-own-substreams/cosmos/injective/foundational.md)
 * [Using a Substreams Sink](new/how-to-guides/sinks/sinks.md)
-<<<<<<< Updated upstream
-  * [Substreams:SQL](new/how-to-guides/sinks/sql/sql-sink.md)
-  * [Substreams:Subgraph](new/how-to-guides/sinks/subgraph/subgraph.md)
-    * [Triggers](new/how-to-guides/sinks/subgraph/triggers.md)
-    * [Graph Out](new/how-to-guides/sinks/subgraph/graph-out.md)
-=======
   * [Substreams:SQL](new/how-to-guides/sinks/sql/sql.md)
     * [Relational Mappings](new/how-to-guides/sinks/sql/relational-mappings.md)
     * [`db_out` module](new/how-to-guides/sinks/sql/db_out.md)
->>>>>>> Stashed changes
   * [Substreams:Stream](new/how-to-guides/sinks/stream/stream.md)
     * [JavaScript](new/how-to-guides/sinks/stream/javascript.md)
     * [Go](new/how-to-guides/sinks/stream/go.md)

@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * Tier2 jobs now write mapper outputs "as they progress", preventing memory usage spikes when saving them to disk.
   This should considerably reduce the memory footprint of tier2 instances.
+* Tier2 jobs now limit writing and loading mapper output files to a maximum size of 8GiB by default. `SUBSTREAMS_OUTPUT_SIZE_LIMIT_PER_SEGMENT` environment variable can be used to override this limit.
 
 ## v1.15.6
 

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -127,6 +128,13 @@ func NewTier2(
 
 	for _, opt := range opts {
 		opt(s)
+	}
+
+	if envVar := os.Getenv("SUBSTREAMS_OUTPUT_SIZE_LIMIT_PER_SEGMENT"); envVar != "" {
+		if size, err := strconv.Atoi(envVar); err == nil && size > 0 {
+			execout.MaxExecoutSegmentSize = size
+			execout.ErrSegmentSizeExceeded = connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("execution output segment size exceeded %d bytes: substreams cannot process this segment", size))
+		}
 	}
 
 	return s, nil
@@ -771,6 +779,9 @@ func GetExecutionPlan(
 			indexFile := indexConfigs.ConfigMap[name].NewFile(&block.Range{StartBlock: moduleStartBlock, ExclusiveEndBlock: stopBlock})
 			err := indexFile.Load(ctx)
 			if err != nil {
+				if !errors.Is(err, dstore.ErrNotFound) {
+					return nil, fmt.Errorf("reading mapper output file: %w", err)
+				}
 				requiredModules[name] = usedModules[name]
 				indexWriters[name] = index.NewWriter(indexFile)
 				break
@@ -781,6 +792,9 @@ func GetExecutionPlan(
 		case pbsubstreams.ModuleKindMap:
 			file, readErr := c.ReadFile(ctx, &block.Range{StartBlock: moduleStartBlock, ExclusiveEndBlock: stopBlock})
 			if readErr != nil {
+				if !errors.Is(readErr, dstore.ErrNotFound) {
+					return nil, fmt.Errorf("reading mapper output file: %w", readErr)
+				}
 				requiredModules[name] = usedModules[name]
 				break
 			}
@@ -789,6 +803,9 @@ func GetExecutionPlan(
 		case pbsubstreams.ModuleKindStore:
 			file, readErr := c.ReadFile(ctx, &block.Range{StartBlock: moduleStartBlock, ExclusiveEndBlock: stopBlock})
 			if readErr != nil {
+				if !errors.Is(readErr, dstore.ErrNotFound) {
+					return nil, fmt.Errorf("reading mapper output file: %w", readErr)
+				}
 				requiredModules[name] = usedModules[name]
 			} else {
 				existingExecOuts[name] = file

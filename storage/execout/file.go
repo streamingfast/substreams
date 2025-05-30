@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"sync"
 
+	"connectrpc.com/connect"
 	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
 	"github.com/streamingfast/substreams/storage/execout/streamproto"
 
@@ -33,11 +34,12 @@ type File struct {
 	store      dstore.Store
 	logger     *zap.Logger
 	loaded     bool
-	loadedSize uint64
 
 	writingFile   *io.PipeWriter
 	writeError    chan error
 	deletedBefore *uint64
+
+	sizeInMemory int
 }
 
 func (c *File) FullFilename() string {
@@ -104,8 +106,13 @@ func (c *File) SetItem(clock *pbsubstreams.Clock, data []byte) error {
 
 func (c *File) writePreviousKV() error {
 	for _, item := range c.Kv {
-		if err := streamproto.WriteItem(c.writingFile, item); err != nil {
+		size, err := streamproto.WriteItem(c.writingFile, item)
+		if err != nil {
 			return err
+		}
+		c.sizeInMemory += size
+		if c.sizeInMemory > MaxExecoutSegmentSize {
+			return fmt.Errorf("%w: file %s on module %s", ErrSegmentSizeExceeded, c.Filename(), c.ModuleName)
 		}
 	}
 	return nil
@@ -143,6 +150,9 @@ func (c *File) GetAtBlock(blockNumber uint64) ([]byte, bool) {
 	return nil, false
 }
 
+var MaxExecoutSegmentSize = int(8589934592)
+var ErrSegmentSizeExceeded = connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("execution output segment size exceeded %d bytes: substreams cannot process this segment", MaxExecoutSegmentSize))
+
 func (c *File) Load(ctx context.Context) error {
 	c.Lock()
 	defer c.Unlock()
@@ -164,11 +174,15 @@ func (c *File) Load(ctx context.Context) error {
 		}
 		defer objectReader.Close()
 
-		bytes, err := io.ReadAll(objectReader)
+		// Limit reading to MaxExecoutSegmentSize to prevent excessive memory usage
+		limitedReader := io.LimitReader(objectReader, int64(MaxExecoutSegmentSize+1))
+		bytes, err := io.ReadAll(limitedReader)
 		if err != nil {
 			return fmt.Errorf("reading store file %s: %w", filename, err)
 		}
-		c.loadedSize = uint64(len(bytes))
+		if len(bytes) == MaxExecoutSegmentSize+1 {
+			return derr.NewFatalError(fmt.Errorf("%w: file %s on module %s", ErrSegmentSizeExceeded, filename, c.ModuleName))
+		}
 
 		outputData := &pboutput.Map{}
 		if err = outputData.UnmarshalFast(bytes); err != nil {

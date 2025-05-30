@@ -112,7 +112,7 @@ func TestEncode(t *testing.T) {
 	var encodedStream []byte
 
 	for _, item := range items {
-		err := WriteItem(writer, item)
+		_, err := WriteItem(writer, item)
 		if err != nil {
 			t.Fatalf("Failed to stream item: %v", err)
 		}

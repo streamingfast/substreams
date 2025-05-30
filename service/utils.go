@@ -1,12 +1,15 @@
 package service
 
 import (
+	"fmt"
 	"os"
 	"sort"
 	"strconv"
 
+	"connectrpc.com/connect"
 	"github.com/streamingfast/bstream"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"
 	"go.uber.org/zap"
 )
@@ -37,6 +40,16 @@ func setSubstreamsStoreSizeLimitFromEnv(logger *zap.Logger) {
 			store.StoreSizeLimit = parsed
 		} else {
 			logger.Warn("invalid SUBSTREAMS_STORE_SIZE_LIMIT env var", zap.String("string", limit))
+		}
+	}
+}
+
+func setSubstreamsOutputSizeLimitFromEnv(logger *zap.Logger) {
+	if envVar := os.Getenv("SUBSTREAMS_OUTPUT_SIZE_LIMIT_PER_SEGMENT"); envVar != "" {
+		if size, err := strconv.Atoi(envVar); err == nil && size > 0 {
+			logger.Info("using SUBSTREAMS_OUTPUT_SIZE_LIMIT_PER_SEGMENT from env var", zap.Int("limit", size))
+			execout.MaxExecoutSegmentSize = size
+			execout.ErrSegmentSizeExceeded = connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("execution output segment size exceeded %d bytes: substreams cannot process this segment", size))
 		}
 	}
 }

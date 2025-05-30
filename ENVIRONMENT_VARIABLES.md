@@ -43,27 +43,9 @@ This document lists all environment variables used by the Substreams project, or
 - **Default**: `https://codegen.substreams.dev`
 - **Location**: `cmd/substreams/registry.go`
 
-### `substreams service` Commands
-
-#### `SUBSTREAMS_API_TOKEN`
-**Required for service-serve command**
-- **Purpose**: API token for authenticating with Substreams services
-- **Usage**: Required for `substreams service serve` command to authenticate API requests
-- **Default**: None (must be set or command fails)
-- **Location**: `cmd/substreams/service-serve.go`
-
-Note: **Configurable via --substreams-api-token-envvar flag**
-
 ## Server Engine Variables
 
-### Core Server Configuration
-
-#### `SUBSTREAMS_SEND_HOSTNAME`
-**Include hostname in stream headers**
-- **Purpose**: Send hostname information in stream headers for debugging and monitoring
-- **Usage**: Set to "true" to include hostname in metadata sent to clients
-- **Default**: `false`
-- **Location**: `service/tier2.go`
+### Performance tuning
 
 #### `SUBSTREAMS_STORE_SIZE_LIMIT`
 **Store size limit**
@@ -78,25 +60,6 @@ Note: **Configurable via --substreams-api-token-envvar flag**
 - **Usage**: Set as unsigned integer (bytes) to limit memory usage. Substreams will FAIL if the limit is exceeded when writing or reading
 - **Default**: 8589934592 (8GiB)
 - **Location**: `service/utils.go`
-
-### WASM Runtime Engine
-
-#### `SUBSTREAMS_WASM_RUNTIME`
-**WASM runtime selection**
-- **Purpose**: Select the WASM runtime engine to use for executing Substreams modules
-- **Usage**: Chooses between available WASM runtimes (e.g., "wasmtime") -- this is currently the only one that works
-- **Default**: `wasmtime`
-- **Location**: `wasm/registry.go`
-
-#### `SUBSTREAMS_WASM_CACHE_ENABLED`
-**Development-only WASM caching**
-- **Purpose**: Enable WASM instance caching/reuse ⚠️ **WARNING: produces non-deterministic output**
-- **Usage**: Set to "true" to enable caching for development/testing only
-- **Default**: `false`
-- **Warning**: **Never use in production** as it produces non-deterministic output and will poison your cache
-- **Location**: `wasm/registry.go`
-
-### Worker Pool Configuration
 
 #### `SUBSTREAMS_WORKERS_RAMPUP_TIME`
 **Worker ramp-up timing**
@@ -119,8 +82,6 @@ Note: **Configurable via --substreams-api-token-envvar flag**
 - **Default**: Built-in default value
 - **Location**: `orchestrator/work/worker.go`
 
-### Execution and Pipeline Configuration
-
 #### `SUBSTREAMS_DISABLE_PRELOAD_EXEC_FILES`
 **Disable execution file preloading**
 - **Purpose**: Disable preloading of execution files for performance optimization on tier1 on the walker
@@ -128,12 +89,52 @@ Note: **Configurable via --substreams-api-token-envvar flag**
 - **Default**: `false` (preloading enabled)
 - **Location**: `orchestrator/execout/execout_walker.go`
 
+### WASM Runtime Engine
+
+#### `SUBSTREAMS_WASM_RUNTIME`
+**WASM runtime selection**
+- **Purpose**: Select the WASM runtime engine to use for executing Substreams modules
+- **Usage**: Chooses between available WASM runtimes (e.g., "wasmtime") -- this is currently the only one that works
+- **Default**: `wasmtime`
+- **Location**: `wasm/registry.go`
+
+#### `SUBSTREAMS_WASM_CACHE_ENABLED`
+**Development-only WASM caching**
+- **Purpose**: Enable WASM instance caching/reuse ⚠️ **WARNING: produces non-deterministic output**
+- **Usage**: Set to "true" to enable caching for development/testing only
+- **Default**: `false`
+- **Warning**: **Never use in production** as it produces non-deterministic output and will poison your cache
+- **Location**: `wasm/registry.go`
+
+### Debugging and Logging
+
 #### `SUBSTREAMS_PRINT_STACK`
 **Debug stack traces**
 - **Purpose**: Enable printing of stack traces for debugging execution issues
 - **Usage**: Set to "true" or "1" to enable stack trace printing
 - **Default**: `false`
 - **Location**: `pipeline/process_block.go`
+
+### `SUBSTREAMS_DEBUG_SCHEDULER_STATE`
+**Debug scheduler state**
+- **Purpose**: Enable verbose logging of scheduler state changes for debugging
+- **Usage**: Set to "true" to enable debug output showing scheduler transitions
+- **Default**: `false`
+- **Location**: `orchestrator/parallelprocessor.go`, `orchestrator/scheduler/scheduler.go`
+
+### `SUBSTREAMS_DEBUG_API_ADDR`
+**Debug API address**
+- **Purpose**: Listen on a specific address for debug API requests and responses
+- **Usage**: If non-empty, the API will listen on the specified address for debug requests and responses
+- **Default**: None
+- **Location**: `service/tier2.go`
+
+#### `SUBSTREAMS_SEND_HOSTNAME`
+**Include hostname in stream headers**
+- **Purpose**: Send hostname information in stream headers for debugging and monitoring
+- **Usage**: Set to "true" to include hostname in metadata sent to clients
+- **Default**: `false`
+- **Location**: `service/tier2.go`
 
 ## Client Library Variables
 
@@ -173,26 +174,3 @@ Note: **Configurable via --substreams-api-token-envvar flag**
 - **Usage**: Dynamically configures endpoints based on network name (e.g., `SUBSTREAMS_ENDPOINTS_CONFIG_ETHEREUM`)
 - **Default**: None
 - **Location**: `manifest/utils.go`
-
-## Debug and Development Variables
-
-### `SUBSTREAMS_DEBUG_SCHEDULER_STATE`
-**Debug scheduler state**
-- **Purpose**: Enable verbose logging of scheduler state changes for debugging
-- **Usage**: Set to "true" to enable debug output showing scheduler transitions
-- **Default**: `false`
-- **Location**: `orchestrator/parallelprocessor.go`, `orchestrator/scheduler/scheduler.go`
-
-#### `DEBUG`
-**Test debugging**
-- **Purpose**: Enable debug output in tests (parser tests specifically)
-- **Usage**: Set to any non-empty value to enable debug output in parser tests
-- **Default**: None
-- **Location**: `sqe/parser_test.go`
-
-#### `SF_TRACING`
-**Distributed tracing for tests**
-- **Purpose**: Enable OpenTelemetry distributed tracing for tests
-- **Usage**: Set to any non-empty value to enable tracing in test runs
-- **Default**: None
-- **Location**: `test/runnable_test.go`

@@ -43,7 +43,7 @@ func New(
 	cancelRequest func(string, string, *uint64, *uint64, *uint32) []string,
 ) *DebugAPI {
 	api := &DebugAPI{
-		listenAddr:            ":8081", // Default port
+		listenAddr:            listenAddr,
 		logger:                logger,
 		getSimulateOverloaded: getSimulateOverloaded,
 		simulateOverloaded:    simulateOverloaded,

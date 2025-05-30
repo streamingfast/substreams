@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 	"sync"
 	"time"
 
@@ -102,39 +101,36 @@ func NewTier2(
 		logger:                logger,
 		blockExecutionTimeout: 3 * time.Minute,
 		simulateOverloaded:    atomic.NewBool(false),
+
 		activeRequests: &activeRequestRecords{
 			reqs: make(map[string]*ActiveRequestRecord),
 		},
 	}
 
 	setSubstreamsStoreSizeLimitFromEnv(logger)
+	setSubstreamsOutputSizeLimitFromEnv(logger)
 
-	debugAPI := debugapi.New(
-		"localhost:8081",
-		logger,
-		func(v bool) {
-			s.simulateOverloaded.Store(v)
-			s.appSetIsReadyState(!v)
-		},
-		func() bool {
-			return s.simulateOverloaded.Load()
-		},
-		s.listActiveRecords,
-		s.cancelRequest,
-	)
-	debugAPI.Start()
+	if debugAPIAddress := os.Getenv("SUBSTREAMS_DEBUG_API_ADDR"); debugAPIAddress != "" {
+		debugAPI := debugapi.New(
+			debugAPIAddress,
+			logger,
+			func(v bool) {
+				s.simulateOverloaded.Store(v)
+				s.appSetIsReadyState(!v)
+			},
+			func() bool {
+				return s.simulateOverloaded.Load()
+			},
+			s.listActiveRecords,
+			s.cancelRequest,
+		)
+		debugAPI.Start()
+	}
 
 	metrics.RegisterMetricSet(logger)
 
 	for _, opt := range opts {
 		opt(s)
-	}
-
-	if envVar := os.Getenv("SUBSTREAMS_OUTPUT_SIZE_LIMIT_PER_SEGMENT"); envVar != "" {
-		if size, err := strconv.Atoi(envVar); err == nil && size > 0 {
-			execout.MaxExecoutSegmentSize = size
-			execout.ErrSegmentSizeExceeded = connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("execution output segment size exceeded %d bytes: substreams cannot process this segment", size))
-		}
 	}
 
 	return s, nil

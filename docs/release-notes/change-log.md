@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   This should considerably reduce the memory footprint of tier2 instances.
 * Tier2 jobs now limit writing and loading mapper output files to a maximum size of 8GiB by default.
 * Added`SUBSTREAMS_OUTPUT_SIZE_LIMIT_PER_SEGMENT` environment variable to control this new limit.
+* Gate the DebugAPI feature on tier2 with the `SUBSTREAMS_DEBUG_API_ADDR` environment variable (set it to `localhost:8081` to keep behavior from v1.15.5)
 
 ### CLI
 

@@ -57,6 +57,3 @@ This is done using `delete_prefix` method:
 ```rust
 output.delete_prefix(0, &format!("TokenHourData:{prev_hour_id}:"));
 ```
-
-## Links
-* [Uniswap-v3 Subgraph and Substreams](https://github.com/streamingfast/substreams-uniswap-v3)

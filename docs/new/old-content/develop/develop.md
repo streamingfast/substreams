@@ -29,6 +29,6 @@ Lastly, you send the Substreams package to the Substreams provider for execution
 
 5. **Consume the Data**
 
-Use one of the Substreams services to consume the extracted data (SQL, Webhooks, Stream, Subgraphs...)
+Use one of the Substreams services to consume the extracted data (SQL, Webhooks, Stream...)
 
 <figure><img src="../../.gitbook/assets/consume/consume-services-only.png" width="100%" /></figure>

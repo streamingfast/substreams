@@ -1,6 +1,6 @@
 The [Injective Foundational Substreams](https://github.com/streamingfast/substreams-foundational-modules/injective-common) contains Substreams modules, which retrieve fundamental data on the Injective blockchain.
 
-You can use the Injective Foundational Modules as the input for your Substreams or subgraph.
+You can use the Injective Foundational Modules as the input for your Substreams.
 
 The Foundational Modules are the base of the code generation tools provided by the Substreams CLI.
 
@@ -72,7 +72,7 @@ The string parameter passed as input is used to specify which events you want to
 
 ## Use The Foundational Modules
 
-All this module are pre-programmed and ready to use in your Substreams or your subgraphs.
+All this module are pre-programmed and ready to use in your Substreams.
 
 ### Use in a Substreams
 
@@ -97,47 +97,3 @@ fn my_test_module(transactions: TransactionList) -> Result<MyOutputObject, Error
     // Your code here
 }
 ```
-
-### Use in a Subgraph
-
-You can easily import a Substreams module into a subgraph by defining it in the subgraph manifest (`subgraph.yaml`):
-
-```yaml
-specVersion: 1.0.0
-indexerHints:
-  prune: auto
-schema:
-  file: ./schema.graphql
-dataSources:
-  - kind: substreams
-    name: Events
-    network: injective-mainnet
-    source:
-      package:
-        file: injective-foundational-v0.1.0.spkg # 1.
-        moduleName: all_events # 2.
-    mapping:
-      apiVersion: 0.0.7
-      kind: substreams/graph-entities
-      file: ./src/mapping.ts # 3.
-      handler: handleEvents # 4.
-```
-1. Define the Substreams package (`.spkg`) containing the module of your choice.
-2. Define the module that you want to use (which must be contained in the package).
-3. Define the file where you will create the handler.
-4. Define the handler name.
-
-Then, in the `mappings.ts` file you can create the `handleEvents` function.
-
-```ts
-export function handleEvents(bytes: Uint8Array): void { // 1.
-    const eventList: EventList = Protobuf.decode<EventList>(bytes, EventList.decode); // 2.
-    const events = eventList.events;
-
-    // Your code here
-}
-```
-1. Definition of the function, which receives the raw bytes of the Substreams.
-2. Decode the bytes into the `EventList` Protobuf object, which is the output of the Substreams.
-
-You can check out a full example in the [USDT Exchange Volume tutorial](../injective/usdt-exchanges.md)

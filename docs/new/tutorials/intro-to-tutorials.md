@@ -1,4 +1,4 @@
-These tutorials demonstrate how to quickly index on-chain data for your application across various blockchains using the Substreams Dev Container. These tutorials are beginner friendly and are intended for developing either a programmable stream (Substreams) or programmable API ([Substreams-powered Subgraphs](https://thegraph.com/docs/en/sps/introduction/)).
+These tutorials demonstrate how to quickly index on-chain data for your application across various blockchains using the Substreams Dev Container.
 
 Substreams data streams are available on the chains listed [here](../references/chains-and-endpoints.md). To support Substreams a [Firehose](https://thegraph.com/docs/en/new-chain-integration/) endpoint must be available. 
 

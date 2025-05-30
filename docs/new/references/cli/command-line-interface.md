@@ -264,15 +264,7 @@ modules {
 
 ### **`codegen`**
 
-The `codegen` command generates a code for a specific sink taking as a Substreams module as input. There are two code generators available: `subgraph` and `sql`.
-
-- Subgraph
-
-Generates a Substreams-powered Subgraph project from the Substreams package found in the current folder.
-
-```bash
-substreams codegen subgraph
-```
+The `codegen` command generates a code for a specific sink taking as a Substreams module as input. 
 
 - SQL
 

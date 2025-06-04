@@ -41,16 +41,12 @@ func (mod *V8Module) ExecuteNewCall(
 	}
 
 	inst := getInstance(mod.iso, cachedInstance)
+	inputVal, _ := v8go.NewValue(inst.ctx.Isolate(), input)
+	_ = inst.ctx.Global().Set("input", inputVal)
 
-	// Inject input before running scripts (needed to run main)
-	if err := runJS(inst, InjectUint8Array("input", input), "inject_input.js"); err != nil {
-		inst.Close(ctx)
-		return nil, err
-	}
-
-	// Runs all scripts (will be changed depending on files needed), probably going to merge all that are needed
-	// this if makes sure we load our needed scripts ONLY on the first call
+	// Runs all scripts (will be changed depending on files needed), probably going to merge all that are needed. This if makes sure we load our needed scripts ONLY on the first call
 	if cachedInstance == nil {
+		_ = injectStoreFunction(inst.ctx, call)
 		scripts := []struct{ code, name string }{
 			{polyfillCode, "polyfill.js"},
 			{string(mod.code), "bundle.js"},
@@ -63,8 +59,8 @@ func (mod *V8Module) ExecuteNewCall(
 		}
 	}
 
-	// call the actual js function
-	if err := callMain(inst); err != nil {
+	// call the handlers from JS side
+	if err := callHandlers(inst, call); err != nil {
 		inst.Close(ctx)
 		return nil, err
 	}
@@ -101,28 +97,95 @@ func runJS(inst *V8Instance, code, filename string) error {
 	return nil
 }
 
-func callMain(inst *V8Instance) error {
+func callHandlers(inst *V8Instance, call *wasm.Call) error {
+	handlerName := call.ModuleName
 
-	// A value in v8go is a type from the lib used internally
-	v8val, _ := inst.ctx.Global().Get("main")
-	if !v8val.IsFunction() {
-		return fmt.Errorf("global.main is not a function")
+	// Check what type of handler this is
+	checkTypeCode := fmt.Sprintf(`getHandlerType("%s")`, handlerName)
+	handlerTypeVal, err := inst.ctx.RunScript(checkTypeCode, "check_handler_type.js")
+	if err != nil {
+		return fmt.Errorf("failed to check handler type: %w", err)
 	}
 
-	// Converts js value -> v8go function
-	fn, _ := v8val.AsFunction()
+	if handlerTypeVal.IsNull() || handlerTypeVal.IsUndefined() {
+		return fmt.Errorf("handler '%s' not found", handlerName)
+	}
 
-	// call(undefined) the main function without arguments so main() is executed
-	_, err := fn.Call(v8go.Undefined(inst.ctx.Isolate()))
+	handlerType := handlerTypeVal.String()
+
+	switch handlerType {
+	case "map":
+		return callMapHandler(inst, handlerName)
+	case "store":
+		return callStoreHandler(inst, call, handlerName)
+	default:
+		return fmt.Errorf("unknown handler type: %s", handlerType)
+	}
+}
+
+func callMapHandler(inst *V8Instance, handlerName string) error {
+	// Call the map handler directly, input is already set as global
+	code := fmt.Sprintf(`executeMapHandler("%s", input)`, handlerName)
+	result, err := inst.ctx.RunScript(code, "execute_map_handler.js")
+	if err != nil {
+		return fmt.Errorf("failed to execute map handler '%s': %w", handlerName, err)
+	}
+
+	return inst.ctx.Global().Set("output", result)
+}
+
+func callStoreHandler(inst *V8Instance, call *wasm.Call, handlerName string) error {
+	// Call store handler with the injected store interface
+	storeInterfaceCode := fmt.Sprintf(`
+		executeStoreHandler("%s", {
+			set: function(ordinal, key, value) {
+				__store_set(ordinal, key, value);
+			}
+		}, output)
+	`, handlerName)
+
+	_, err := inst.ctx.RunScript(storeInterfaceCode, "execute_store_handler.js")
 	return err
 }
 
-// Returns bytes from Uint8Array
 func getOutput(inst *V8Instance) ([]byte, error) {
-	v8val, _ := inst.ctx.Global().Get("output")
-	if !v8val.IsObject() {
-		return nil, fmt.Errorf("global.output is not an object")
+	v8val, err := inst.ctx.Global().Get("output")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get output global: %w", err)
 	}
 
-	return ExtractUint8Array(v8val.Object())
+	if v8val.IsNull() || v8val.IsUndefined() {
+		return []byte{}, nil
+	}
+
+	if !v8val.IsUint8Array() {
+		return nil, fmt.Errorf("global.output is not a Uint8Array")
+	}
+
+	return v8val.Uint8Array(), nil
+}
+
+func injectStoreFunction(ctx *v8go.Context, call *wasm.Call) error {
+	iso := ctx.Isolate()
+
+	storeSetFunc := v8go.NewFunctionTemplate(iso, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+		if len(info.Args()) != 3 {
+			panic("__store_set expects 3 arguments")
+		}
+
+		ordinal := info.Args()[0].Integer()
+		key := info.Args()[1].String()
+		value := info.Args()[2]
+
+		if !value.IsUint8Array() {
+			panic("__store_set expects a Uint8Array as value")
+		}
+
+		data := value.Uint8Array()
+		call.DoSet(uint64(ordinal), key, data)
+		return nil
+	})
+
+	storeSetInstance := storeSetFunc.GetFunction(ctx)
+	return ctx.Global().Set("__store_set", storeSetInstance)
 }

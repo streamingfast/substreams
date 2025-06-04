@@ -93,6 +93,7 @@ func validateBinaryTypes(bins []*pbsubstreams.Binary) error {
 
 		switch wasmCodeTypeID {
 		case "wasm/rust-v1":
+		case "javascript/v8":
 		case "wasip1/tinygo-v1":
 		default:
 			return fmt.Errorf(`unsupported binary type: %q, please use "wasm/rust-v1" or "wasip1/tinygo-v1"`, wasmCodeTypeID)

@@ -494,7 +494,7 @@ func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package
 		wasmCodeTypeID, _ := SplitBinaryType(binaryDef.Type)
 
 		switch wasmCodeTypeID {
-		case "wasm/rust-v1", "wasip1/tinygo-v1":
+		case "wasm/rust-v1", "wasip1/tinygo-v1", "javascript/v8":
 			// OPTIM(abourget): also check if it's not already in
 			// `Binaries`, by comparing its, length + hash or value.
 			codeIndex, found := moduleCodeIndexes[binaryDef.File]

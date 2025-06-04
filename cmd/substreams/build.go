@@ -199,6 +199,9 @@ func (b *BinaryBuilder) getCmdArgs(ctx context.Context, binaryType string) ([][]
 	binaryTypeID, _ := manifest.SplitBinaryType(binaryType)
 
 	switch binaryTypeID {
+	case "javascript/v8":
+		fmt.Printf("`javascript/v8` binary type found... \n")
+		return [][]string{}, nil
 	case "wasip1/tinygo-v1":
 		fmt.Printf("`wasip1/tinygo-v1` binary type found...\n")
 		depValidator := &TinyGoDependencyValidator{}

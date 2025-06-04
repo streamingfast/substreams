@@ -20,3 +20,4 @@ replay.log
 /wasm/bench/substreams_tiny_go/main.wasm
 generator.json
 devel/codegen
+node_modules/

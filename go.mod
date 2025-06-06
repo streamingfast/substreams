@@ -1,8 +1,8 @@
 module github.com/streamingfast/substreams
 
-go 1.23.4
+go 1.24
 
-toolchain go1.23.6
+toolchain go1.24.2
 
 require (
 	github.com/golang/protobuf v1.5.4

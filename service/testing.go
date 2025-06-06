@@ -41,7 +41,7 @@ func TestNewService(runtimeConfig config.RuntimeConfig, linearHandoffBlockNum ui
 func (s *Tier1Service) TestBlocks(ctx context.Context, isSubRequest bool, request *pbsubstreamsrpc.Request, respFunc substreams.ResponseFunc) error {
 	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules, bstream.GetProtocolFirstStreamableBlock)
 	if err != nil {
-		return stream.NewErrInvalidArg(err.Error())
+		return stream.NewErrInvalidArg("%s", err.Error())
 	}
 
 	return s.blocks(ctx, request, execGraph, respFunc, metrics.NewReqStats(&metrics.Config{}, zap.NewNop()), nil)

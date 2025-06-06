@@ -510,7 +510,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		}
 
 		if requestDetails.ResolvedStartBlockNum > request.StopBlockNum {
-			err := bsstream.NewErrInvalidArg(fmt.Sprintf("resolved start block %d is below stop block %d", requestDetails.ResolvedStartBlockNum, request.StopBlockNum))
+			err := bsstream.NewErrInvalidArg("resolved start block %d is below stop block %d", requestDetails.ResolvedStartBlockNum, request.StopBlockNum)
 			logger.Info("refusing Substreams Blocks request", append(logFields, zap.Error(err))...)
 			return err
 		}
@@ -541,7 +541,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	}
 
 	if err := execGraph.ValidateRequestStartBlock(requestDetails.ResolvedStartBlockNum); err != nil {
-		err = bsstream.NewErrInvalidArg(err.Error())
+		err = bsstream.NewErrInvalidArg("%s", err.Error())
 		logger.Info("refusing Substreams Blocks request", append(logFields, zap.Error(err))...)
 		return err
 	}
@@ -687,7 +687,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 			msg.WriteString("Request quota exceeded.\n")
 			msg.WriteString(fmt.Sprintf("Your allowed %d concurrent requests.\n", r.state.MaxWorkers))
 			msg.WriteString(fmt.Sprintf("Each request has a minimal life time of %s\n", r.minimalWorkerLifeDuration.String()))
-			return status.Errorf(codes.ResourceExhausted, msg.String())
+			return status.Errorf(codes.ResourceExhausted, "%s", msg.String())
 		}
 
 		defer func() {

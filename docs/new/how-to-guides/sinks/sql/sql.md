@@ -12,25 +12,25 @@ Before you begin, make sure you have:
 
 ## Mapping Substreams to SQL
 
-The core function of the SQL sink is to translate your Substreams output (Protobuf data) into SQL tables. You can choose one of three methods depending on your needs:
+The core function of the SQL sink is to translate your Substreams output (Protobuf data) into SQL tables. Choose one of the following methods depending on your needs:
 
 - [Relational Mappings](./relational-mappings.md)
     * Enables foreign key relationships in your SQL schema.
     * Requires adding annotations to your Protobuf messages (e.g., primary and foreign keys).
-    * Still insert-only, but supports relational integrity.
+    * Currently insert-only.
 - [`db_out` module](./db_out.md)
     * Gives you full control over the output.
     * Supports insert, update, and upsert operations.
     * Ideal for advanced use cases with evolving or mutable data.
     * **NOTE:** In ClickHouse, reorgs are currently supported with delay.
 
-|                               | With annotations | `db_out` module |
-|-------------------------------|------------------|-----------------|
-| SQL relationships             | Yes              | No              |
-| Direct Protobuf<>SQL mappings | No               | No              |
-| `INSERT` supported            | Yes              | Yes             |
-| `UPDATE` supported            | No               | Yes             |
-| `UPSERT` supported            | No               | Yes             |
+|                               | Relational Mappings | `db_out` module |
+|-------------------------------|---------------------|-----------------|
+| SQL relationships             | Yes                 | No              |
+| Direct Protobuf<>SQL mappings | Yes                 | No              |
+| `INSERT` supported            | Yes                 | Yes             |
+| `UPDATE` supported            | No                  | Yes             |
+| `UPSERT` supported            | No                  | Yes             |
 
 
 ## Installation

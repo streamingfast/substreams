@@ -49,5 +49,5 @@ Enabling `substreams-sink-sql` in your [Substreams CLI](../../../../references/c
 go install ./cmd/substreams-sink-sql
 ```
 
-1. Make sure GO is installed and the Go bin directory is in your $PATH.
+1. Make sure GO is installed and the GO bin directory is in your $PATH.
 

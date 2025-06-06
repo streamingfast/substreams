@@ -166,7 +166,7 @@ To run the sink, you will need a Postgres database. You can use a Docker contain
 export DSN=postgres://myuser:mypassword@localhost:5432/mydatabase?sslmode=disable
 ```
 
-- Run the sink using `substreams-sink-sql from-proto`:
+- Run the sink:
 
 ```bash
 substreams-sink-sql from-proto $DSN ./substreams.yaml

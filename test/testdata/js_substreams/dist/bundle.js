@@ -11,10 +11,10 @@
     return result;
   };
 
-  // ../../../../substreams-js-sdk/node_modules/@bufbuild/protobuf/dist/esm/is-message.js
+  // node_modules/@bufbuild/protobuf/dist/esm/is-message.js
   function isMessage(arg, schema) {
-    const isMessage3 = arg !== null && typeof arg == "object" && "$typeName" in arg && typeof arg.$typeName == "string";
-    if (!isMessage3) {
+    const isMessage2 = arg !== null && typeof arg == "object" && "$typeName" in arg && typeof arg.$typeName == "string";
+    if (!isMessage2) {
       return false;
     }
     if (schema === void 0) {
@@ -23,27 +23,27 @@
     return schema.typeName === arg.$typeName;
   }
 
-  // ../../../../substreams-js-sdk/node_modules/@bufbuild/protobuf/dist/esm/descriptors.js
+  // node_modules/@bufbuild/protobuf/dist/esm/descriptors.js
   var ScalarType;
-  (function(ScalarType3) {
-    ScalarType3[ScalarType3["DOUBLE"] = 1] = "DOUBLE";
-    ScalarType3[ScalarType3["FLOAT"] = 2] = "FLOAT";
-    ScalarType3[ScalarType3["INT64"] = 3] = "INT64";
-    ScalarType3[ScalarType3["UINT64"] = 4] = "UINT64";
-    ScalarType3[ScalarType3["INT32"] = 5] = "INT32";
-    ScalarType3[ScalarType3["FIXED64"] = 6] = "FIXED64";
-    ScalarType3[ScalarType3["FIXED32"] = 7] = "FIXED32";
-    ScalarType3[ScalarType3["BOOL"] = 8] = "BOOL";
-    ScalarType3[ScalarType3["STRING"] = 9] = "STRING";
-    ScalarType3[ScalarType3["BYTES"] = 12] = "BYTES";
-    ScalarType3[ScalarType3["UINT32"] = 13] = "UINT32";
-    ScalarType3[ScalarType3["SFIXED32"] = 15] = "SFIXED32";
-    ScalarType3[ScalarType3["SFIXED64"] = 16] = "SFIXED64";
-    ScalarType3[ScalarType3["SINT32"] = 17] = "SINT32";
-    ScalarType3[ScalarType3["SINT64"] = 18] = "SINT64";
+  (function(ScalarType2) {
+    ScalarType2[ScalarType2["DOUBLE"] = 1] = "DOUBLE";
+    ScalarType2[ScalarType2["FLOAT"] = 2] = "FLOAT";
+    ScalarType2[ScalarType2["INT64"] = 3] = "INT64";
+    ScalarType2[ScalarType2["UINT64"] = 4] = "UINT64";
+    ScalarType2[ScalarType2["INT32"] = 5] = "INT32";
+    ScalarType2[ScalarType2["FIXED64"] = 6] = "FIXED64";
+    ScalarType2[ScalarType2["FIXED32"] = 7] = "FIXED32";
+    ScalarType2[ScalarType2["BOOL"] = 8] = "BOOL";
+    ScalarType2[ScalarType2["STRING"] = 9] = "STRING";
+    ScalarType2[ScalarType2["BYTES"] = 12] = "BYTES";
+    ScalarType2[ScalarType2["UINT32"] = 13] = "UINT32";
+    ScalarType2[ScalarType2["SFIXED32"] = 15] = "SFIXED32";
+    ScalarType2[ScalarType2["SFIXED64"] = 16] = "SFIXED64";
+    ScalarType2[ScalarType2["SINT32"] = 17] = "SINT32";
+    ScalarType2[ScalarType2["SINT64"] = 18] = "SINT64";
   })(ScalarType || (ScalarType = {}));
 
-  // ../../../../substreams-js-sdk/node_modules/@bufbuild/protobuf/dist/esm/wire/varint.js
+  // node_modules/@bufbuild/protobuf/dist/esm/wire/varint.js
   function varint64read() {
     let lowBits = 0;
     let highBits = 0;
@@ -223,7 +223,7 @@
     return result >>> 0;
   }
 
-  // ../../../../substreams-js-sdk/node_modules/@bufbuild/protobuf/dist/esm/proto-int64.js
+  // node_modules/@bufbuild/protobuf/dist/esm/proto-int64.js
   var protoInt64 = /* @__PURE__ */ makeInt64Support();
   function makeInt64Support() {
     const dv = new DataView(new ArrayBuffer(8));
@@ -326,7 +326,7 @@
     }
   }
 
-  // ../../../../substreams-js-sdk/node_modules/@bufbuild/protobuf/dist/esm/reflect/scalar.js
+  // node_modules/@bufbuild/protobuf/dist/esm/reflect/scalar.js
   function scalarZeroValue(type, longAsString) {
     switch (type) {
       case ScalarType.STRING:
@@ -361,7 +361,7 @@
     }
   }
 
-  // ../../../../substreams-js-sdk/node_modules/@bufbuild/protobuf/dist/esm/reflect/unsafe.js
+  // node_modules/@bufbuild/protobuf/dist/esm/reflect/unsafe.js
   var IMPLICIT = 2;
   var unsafeLocal = Symbol.for("reflect unsafe local");
   function unsafeOneofCase(target, oneof) {
@@ -390,6 +390,9 @@
         return target[name] !== field.enum.values[0].number;
     }
     throw new Error("message field with implicit presence");
+  }
+  function unsafeIsSetExplicit(target, localName) {
+    return Object.prototype.hasOwnProperty.call(target, localName) && target[localName] !== void 0;
   }
   function unsafeGet(target, field) {
     if (field.oneof) {
@@ -438,7 +441,7 @@
     }
   }
 
-  // ../../../../substreams-js-sdk/node_modules/@bufbuild/protobuf/dist/esm/reflect/guard.js
+  // node_modules/@bufbuild/protobuf/dist/esm/reflect/guard.js
   function isObject(arg) {
     return arg !== null && typeof arg == "object" && !Array.isArray(arg);
   }
@@ -469,7 +472,7 @@
     return isObject(arg) && unsafeLocal in arg && "desc" in arg && isObject(arg.desc) && arg.desc.kind === "message" && (messageDesc3 === void 0 || arg.desc.typeName == messageDesc3.typeName);
   }
 
-  // ../../../../substreams-js-sdk/node_modules/@bufbuild/protobuf/dist/esm/wkt/wrappers.js
+  // node_modules/@bufbuild/protobuf/dist/esm/wkt/wrappers.js
   function isWrapper(arg) {
     return isWrapperTypeName(arg.$typeName);
   }
@@ -491,7 +494,7 @@
     ].includes(name.substring(16));
   }
 
-  // ../../../../substreams-js-sdk/node_modules/@bufbuild/protobuf/dist/esm/create.js
+  // node_modules/@bufbuild/protobuf/dist/esm/create.js
   var EDITION_PROTO3 = 999;
   var EDITION_PROTO2 = 998;
   var IMPLICIT2 = 2;
@@ -680,7 +683,7 @@
     return field.fieldKind == "scalar" ? scalarZeroValue(field.scalar, field.longAsString) : field.enum.values[0].number;
   }
 
-  // ../../../../substreams-js-sdk/node_modules/@bufbuild/protobuf/dist/esm/reflect/error.js
+  // node_modules/@bufbuild/protobuf/dist/esm/reflect/error.js
   var FieldError = class extends Error {
     constructor(fieldOrOneof, message, name = "FieldValueInvalidError") {
       super(message);
@@ -689,7 +692,7 @@
     }
   };
 
-  // ../../../../substreams-js-sdk/node_modules/@bufbuild/protobuf/dist/esm/wire/text-encoding.js
+  // node_modules/@bufbuild/protobuf/dist/esm/wire/text-encoding.js
   var symbol = Symbol.for("@bufbuild/protobuf/text-encoding");
   function getTextEncoding() {
     if (globalThis[symbol] == void 0) {
@@ -715,15 +718,15 @@
     return globalThis[symbol];
   }
 
-  // ../../../../substreams-js-sdk/node_modules/@bufbuild/protobuf/dist/esm/wire/binary-encoding.js
+  // node_modules/@bufbuild/protobuf/dist/esm/wire/binary-encoding.js
   var WireType;
-  (function(WireType3) {
-    WireType3[WireType3["Varint"] = 0] = "Varint";
-    WireType3[WireType3["Bit64"] = 1] = "Bit64";
-    WireType3[WireType3["LengthDelimited"] = 2] = "LengthDelimited";
-    WireType3[WireType3["StartGroup"] = 3] = "StartGroup";
-    WireType3[WireType3["EndGroup"] = 4] = "EndGroup";
-    WireType3[WireType3["Bit32"] = 5] = "Bit32";
+  (function(WireType2) {
+    WireType2[WireType2["Varint"] = 0] = "Varint";
+    WireType2[WireType2["Bit64"] = 1] = "Bit64";
+    WireType2[WireType2["LengthDelimited"] = 2] = "LengthDelimited";
+    WireType2[WireType2["StartGroup"] = 3] = "StartGroup";
+    WireType2[WireType2["EndGroup"] = 4] = "EndGroup";
+    WireType2[WireType2["Bit32"] = 5] = "Bit32";
   })(WireType || (WireType = {}));
   var FLOAT32_MAX = 34028234663852886e22;
   var FLOAT32_MIN = -34028234663852886e22;
@@ -1125,7 +1128,7 @@
       throw new Error("invalid float32: " + arg);
   }
 
-  // ../../../../substreams-js-sdk/node_modules/@bufbuild/protobuf/dist/esm/reflect/reflect-check.js
+  // node_modules/@bufbuild/protobuf/dist/esm/reflect/reflect-check.js
   function checkField(field, value) {
     const check = field.fieldKind == "list" ? isReflectList(value, field) : field.fieldKind == "map" ? isReflectMap(value, field) : checkSingular(field, value);
     if (check === true) {
@@ -1342,7 +1345,7 @@
     }
   }
 
-  // ../../../../substreams-js-sdk/node_modules/@bufbuild/protobuf/dist/esm/reflect/reflect.js
+  // node_modules/@bufbuild/protobuf/dist/esm/reflect/reflect.js
   function reflect(messageDesc3, message, check = true) {
     return new ReflectMessageImpl(messageDesc3, message, check);
   }
@@ -1781,1917 +1784,6 @@
     return value;
   }
 
-  // ../../../../substreams-js-sdk/node_modules/@bufbuild/protobuf/dist/esm/from-binary.js
-  var readDefaults = {
-    readUnknownFields: true
-  };
-  function makeReadOptions(options) {
-    return options ? Object.assign(Object.assign({}, readDefaults), options) : readDefaults;
-  }
-  function fromBinary(schema, bytes, options) {
-    const msg = reflect(schema, void 0, false);
-    readMessage(msg, new BinaryReader(bytes), makeReadOptions(options), false, bytes.byteLength);
-    return msg.message;
-  }
-  function readMessage(message, reader, options, delimited, lengthOrDelimitedFieldNo) {
-    var _a;
-    const end = delimited ? reader.len : reader.pos + lengthOrDelimitedFieldNo;
-    let fieldNo;
-    let wireType;
-    const unknownFields = (_a = message.getUnknown()) !== null && _a !== void 0 ? _a : [];
-    while (reader.pos < end) {
-      [fieldNo, wireType] = reader.tag();
-      if (delimited && wireType == WireType.EndGroup) {
-        break;
-      }
-      const field = message.findNumber(fieldNo);
-      if (!field) {
-        const data = reader.skip(wireType, fieldNo);
-        if (options.readUnknownFields) {
-          unknownFields.push({ no: fieldNo, wireType, data });
-        }
-        continue;
-      }
-      readField(message, reader, field, wireType, options);
-    }
-    if (delimited) {
-      if (wireType != WireType.EndGroup || fieldNo !== lengthOrDelimitedFieldNo) {
-        throw new Error("invalid end group tag");
-      }
-    }
-    if (unknownFields.length > 0) {
-      message.setUnknown(unknownFields);
-    }
-  }
-  function readField(message, reader, field, wireType, options) {
-    switch (field.fieldKind) {
-      case "scalar":
-        message.set(field, readScalar(reader, field.scalar));
-        break;
-      case "enum":
-        message.set(field, readScalar(reader, ScalarType.INT32));
-        break;
-      case "message":
-        message.set(field, readMessageField(reader, options, field, message.get(field)));
-        break;
-      case "list":
-        readListField(reader, wireType, message.get(field), options);
-        break;
-      case "map":
-        readMapEntry(reader, message.get(field), options);
-        break;
-    }
-  }
-  function readMapEntry(reader, map, options) {
-    const field = map.field();
-    let key;
-    let val;
-    const end = reader.pos + reader.uint32();
-    while (reader.pos < end) {
-      const [fieldNo] = reader.tag();
-      switch (fieldNo) {
-        case 1:
-          key = readScalar(reader, field.mapKey);
-          break;
-        case 2:
-          switch (field.mapKind) {
-            case "scalar":
-              val = readScalar(reader, field.scalar);
-              break;
-            case "enum":
-              val = reader.int32();
-              break;
-            case "message":
-              val = readMessageField(reader, options, field);
-              break;
-          }
-          break;
-      }
-    }
-    if (key === void 0) {
-      key = scalarZeroValue(field.mapKey, false);
-    }
-    if (val === void 0) {
-      switch (field.mapKind) {
-        case "scalar":
-          val = scalarZeroValue(field.scalar, false);
-          break;
-        case "enum":
-          val = field.enum.values[0].number;
-          break;
-        case "message":
-          val = reflect(field.message, void 0, false);
-          break;
-      }
-    }
-    map.set(key, val);
-  }
-  function readListField(reader, wireType, list, options) {
-    var _a;
-    const field = list.field();
-    if (field.listKind === "message") {
-      list.add(readMessageField(reader, options, field));
-      return;
-    }
-    const scalarType = (_a = field.scalar) !== null && _a !== void 0 ? _a : ScalarType.INT32;
-    const packed = wireType == WireType.LengthDelimited && scalarType != ScalarType.STRING && scalarType != ScalarType.BYTES;
-    if (!packed) {
-      list.add(readScalar(reader, scalarType));
-      return;
-    }
-    const e = reader.uint32() + reader.pos;
-    while (reader.pos < e) {
-      list.add(readScalar(reader, scalarType));
-    }
-  }
-  function readMessageField(reader, options, field, mergeMessage) {
-    const delimited = field.delimitedEncoding;
-    const message = mergeMessage !== null && mergeMessage !== void 0 ? mergeMessage : reflect(field.message, void 0, false);
-    readMessage(message, reader, options, delimited, delimited ? field.number : reader.uint32());
-    return message;
-  }
-  function readScalar(reader, type) {
-    switch (type) {
-      case ScalarType.STRING:
-        return reader.string();
-      case ScalarType.BOOL:
-        return reader.bool();
-      case ScalarType.DOUBLE:
-        return reader.double();
-      case ScalarType.FLOAT:
-        return reader.float();
-      case ScalarType.INT32:
-        return reader.int32();
-      case ScalarType.INT64:
-        return reader.int64();
-      case ScalarType.UINT64:
-        return reader.uint64();
-      case ScalarType.FIXED64:
-        return reader.fixed64();
-      case ScalarType.BYTES:
-        return reader.bytes();
-      case ScalarType.FIXED32:
-        return reader.fixed32();
-      case ScalarType.SFIXED32:
-        return reader.sfixed32();
-      case ScalarType.SFIXED64:
-        return reader.sfixed64();
-      case ScalarType.SINT64:
-        return reader.sint64();
-      case ScalarType.UINT32:
-        return reader.uint32();
-      case ScalarType.SINT32:
-        return reader.sint32();
-    }
-  }
-
-  // ../../../../substreams-js-sdk/node_modules/@bufbuild/protobuf/dist/esm/to-binary.js
-  var LEGACY_REQUIRED = 3;
-  var writeDefaults = {
-    writeUnknownFields: true
-  };
-  function makeWriteOptions(options) {
-    return options ? Object.assign(Object.assign({}, writeDefaults), options) : writeDefaults;
-  }
-  function toBinary(schema, message, options) {
-    return writeFields(new BinaryWriter(), makeWriteOptions(options), reflect(schema, message)).finish();
-  }
-  function writeFields(writer, opts, msg) {
-    var _a;
-    for (const f of msg.sortedFields) {
-      if (!msg.isSet(f)) {
-        if (f.presence == LEGACY_REQUIRED) {
-          throw new Error(`cannot encode ${f} to binary: required field not set`);
-        }
-        continue;
-      }
-      writeField(writer, opts, msg, f);
-    }
-    if (opts.writeUnknownFields) {
-      for (const { no, wireType, data } of (_a = msg.getUnknown()) !== null && _a !== void 0 ? _a : []) {
-        writer.tag(no, wireType).raw(data);
-      }
-    }
-    return writer;
-  }
-  function writeField(writer, opts, msg, field) {
-    var _a;
-    switch (field.fieldKind) {
-      case "scalar":
-      case "enum":
-        writeScalar(writer, msg.desc.typeName, field.name, (_a = field.scalar) !== null && _a !== void 0 ? _a : ScalarType.INT32, field.number, msg.get(field));
-        break;
-      case "list":
-        writeListField(writer, opts, field, msg.get(field));
-        break;
-      case "message":
-        writeMessageField(writer, opts, field, msg.get(field));
-        break;
-      case "map":
-        for (const [key, val] of msg.get(field)) {
-          writeMapEntry(writer, opts, field, key, val);
-        }
-        break;
-    }
-  }
-  function writeScalar(writer, msgName, fieldName, scalarType, fieldNo, value) {
-    writeScalarValue(writer.tag(fieldNo, writeTypeOfScalar(scalarType)), msgName, fieldName, scalarType, value);
-  }
-  function writeMessageField(writer, opts, field, message) {
-    if (field.delimitedEncoding) {
-      writeFields(writer.tag(field.number, WireType.StartGroup), opts, message).tag(field.number, WireType.EndGroup);
-    } else {
-      writeFields(writer.tag(field.number, WireType.LengthDelimited).fork(), opts, message).join();
-    }
-  }
-  function writeListField(writer, opts, field, list) {
-    var _a;
-    if (field.listKind == "message") {
-      for (const item of list) {
-        writeMessageField(writer, opts, field, item);
-      }
-      return;
-    }
-    const scalarType = (_a = field.scalar) !== null && _a !== void 0 ? _a : ScalarType.INT32;
-    if (field.packed) {
-      if (!list.size) {
-        return;
-      }
-      writer.tag(field.number, WireType.LengthDelimited).fork();
-      for (const item of list) {
-        writeScalarValue(writer, field.parent.typeName, field.name, scalarType, item);
-      }
-      writer.join();
-      return;
-    }
-    for (const item of list) {
-      writeScalar(writer, field.parent.typeName, field.name, scalarType, field.number, item);
-    }
-  }
-  function writeMapEntry(writer, opts, field, key, value) {
-    var _a;
-    writer.tag(field.number, WireType.LengthDelimited).fork();
-    writeScalar(writer, field.parent.typeName, field.name, field.mapKey, 1, key);
-    switch (field.mapKind) {
-      case "scalar":
-      case "enum":
-        writeScalar(writer, field.parent.typeName, field.name, (_a = field.scalar) !== null && _a !== void 0 ? _a : ScalarType.INT32, 2, value);
-        break;
-      case "message":
-        writeFields(writer.tag(2, WireType.LengthDelimited).fork(), opts, value).join();
-        break;
-    }
-    writer.join();
-  }
-  function writeScalarValue(writer, msgName, fieldName, type, value) {
-    try {
-      switch (type) {
-        case ScalarType.STRING:
-          writer.string(value);
-          break;
-        case ScalarType.BOOL:
-          writer.bool(value);
-          break;
-        case ScalarType.DOUBLE:
-          writer.double(value);
-          break;
-        case ScalarType.FLOAT:
-          writer.float(value);
-          break;
-        case ScalarType.INT32:
-          writer.int32(value);
-          break;
-        case ScalarType.INT64:
-          writer.int64(value);
-          break;
-        case ScalarType.UINT64:
-          writer.uint64(value);
-          break;
-        case ScalarType.FIXED64:
-          writer.fixed64(value);
-          break;
-        case ScalarType.BYTES:
-          writer.bytes(value);
-          break;
-        case ScalarType.FIXED32:
-          writer.fixed32(value);
-          break;
-        case ScalarType.SFIXED32:
-          writer.sfixed32(value);
-          break;
-        case ScalarType.SFIXED64:
-          writer.sfixed64(value);
-          break;
-        case ScalarType.SINT64:
-          writer.sint64(value);
-          break;
-        case ScalarType.UINT32:
-          writer.uint32(value);
-          break;
-        case ScalarType.SINT32:
-          writer.sint32(value);
-          break;
-      }
-    } catch (e) {
-      if (e instanceof Error) {
-        throw new Error(`cannot encode field ${msgName}.${fieldName} to binary: ${e.message}`);
-      }
-      throw e;
-    }
-  }
-  function writeTypeOfScalar(type) {
-    switch (type) {
-      case ScalarType.BYTES:
-      case ScalarType.STRING:
-        return WireType.LengthDelimited;
-      case ScalarType.DOUBLE:
-      case ScalarType.FIXED64:
-      case ScalarType.SFIXED64:
-        return WireType.Bit64;
-      case ScalarType.FIXED32:
-      case ScalarType.SFIXED32:
-      case ScalarType.FLOAT:
-        return WireType.Bit32;
-      default:
-        return WireType.Varint;
-    }
-  }
-
-  // ../../../../substreams-js-sdk/dist/index.mjs
-  var Store = class {
-    constructor(storeInterface, schema) {
-      this.storeInterface = storeInterface;
-      this.schema = schema;
-    }
-    set(ordinal, key, value) {
-      const out = toBinary(this.schema, value);
-      this.storeInterface.set(ordinal, key, out);
-    }
-  };
-  var handlerRegistry = /* @__PURE__ */ new Map();
-  var substreams;
-  ((substreams2) => {
-    let handlers;
-    ((handlers2) => {
-      function map(inputTypes, outputType) {
-        return function(target, propertyKey, descriptor) {
-          const fn = descriptor?.value ?? target[propertyKey];
-          handlerRegistry.set(propertyKey, {
-            type: "map",
-            inputTypes,
-            outputType,
-            handler: fn,
-            instance: new target.constructor()
-          });
-        };
-      }
-      handlers2.map = map;
-      function store(storeType) {
-        return function(target, propertyKey, descriptor) {
-          const fn = descriptor?.value ?? target[propertyKey];
-          handlerRegistry.set(propertyKey, {
-            type: "store",
-            storeType,
-            handler: fn,
-            instance: new target.constructor()
-          });
-        };
-      }
-      handlers2.store = store;
-    })(handlers = substreams2.handlers || (substreams2.handlers = {}));
-  })(substreams || (substreams = {}));
-  function executeMapHandler(handlerName, inputBytes) {
-    const registered = handlerRegistry.get(handlerName);
-    if (!registered || registered.type !== "map") {
-      throw new Error(`Map handler '${handlerName}' not found`);
-    }
-    const inputs = registered.inputTypes.map((type) => fromBinary(type, inputBytes));
-    const result = registered.handler.call(registered.instance, ...inputs);
-    return toBinary(registered.outputType, result);
-  }
-  function executeStoreHandler(handlerName, storeInterface, inputBytes) {
-    const registered = handlerRegistry.get(handlerName);
-    if (!registered || registered.type !== "store") {
-      throw new Error(`Store handler '${handlerName}' not found`);
-    }
-    const store = new Store(storeInterface, registered.storeType);
-    const input = fromBinary(registered.storeType, inputBytes);
-    registered.handler.call(registered.instance, store, input);
-  }
-  function getHandlerType(handlerName) {
-    return handlerRegistry.get(handlerName)?.type;
-  }
-  globalThis.getHandlerType = getHandlerType;
-  globalThis.executeMapHandler = executeMapHandler;
-  globalThis.executeStoreHandler = executeStoreHandler;
-  Object.defineProperty(globalThis, "Promise", {
-    configurable: false,
-    enumerable: false,
-    get() {
-      throw new Error("Promises are disabled in this runtime");
-    },
-    set(_) {
-      throw new Error("Cannot redefine Promise");
-    }
-  });
-
-  // node_modules/@bufbuild/protobuf/dist/esm/is-message.js
-  function isMessage2(arg, schema) {
-    const isMessage3 = arg !== null && typeof arg == "object" && "$typeName" in arg && typeof arg.$typeName == "string";
-    if (!isMessage3) {
-      return false;
-    }
-    if (schema === void 0) {
-      return true;
-    }
-    return schema.typeName === arg.$typeName;
-  }
-
-  // node_modules/@bufbuild/protobuf/dist/esm/descriptors.js
-  var ScalarType2;
-  (function(ScalarType3) {
-    ScalarType3[ScalarType3["DOUBLE"] = 1] = "DOUBLE";
-    ScalarType3[ScalarType3["FLOAT"] = 2] = "FLOAT";
-    ScalarType3[ScalarType3["INT64"] = 3] = "INT64";
-    ScalarType3[ScalarType3["UINT64"] = 4] = "UINT64";
-    ScalarType3[ScalarType3["INT32"] = 5] = "INT32";
-    ScalarType3[ScalarType3["FIXED64"] = 6] = "FIXED64";
-    ScalarType3[ScalarType3["FIXED32"] = 7] = "FIXED32";
-    ScalarType3[ScalarType3["BOOL"] = 8] = "BOOL";
-    ScalarType3[ScalarType3["STRING"] = 9] = "STRING";
-    ScalarType3[ScalarType3["BYTES"] = 12] = "BYTES";
-    ScalarType3[ScalarType3["UINT32"] = 13] = "UINT32";
-    ScalarType3[ScalarType3["SFIXED32"] = 15] = "SFIXED32";
-    ScalarType3[ScalarType3["SFIXED64"] = 16] = "SFIXED64";
-    ScalarType3[ScalarType3["SINT32"] = 17] = "SINT32";
-    ScalarType3[ScalarType3["SINT64"] = 18] = "SINT64";
-  })(ScalarType2 || (ScalarType2 = {}));
-
-  // node_modules/@bufbuild/protobuf/dist/esm/wire/varint.js
-  function varint64read2() {
-    let lowBits = 0;
-    let highBits = 0;
-    for (let shift = 0; shift < 28; shift += 7) {
-      let b = this.buf[this.pos++];
-      lowBits |= (b & 127) << shift;
-      if ((b & 128) == 0) {
-        this.assertBounds();
-        return [lowBits, highBits];
-      }
-    }
-    let middleByte = this.buf[this.pos++];
-    lowBits |= (middleByte & 15) << 28;
-    highBits = (middleByte & 112) >> 4;
-    if ((middleByte & 128) == 0) {
-      this.assertBounds();
-      return [lowBits, highBits];
-    }
-    for (let shift = 3; shift <= 31; shift += 7) {
-      let b = this.buf[this.pos++];
-      highBits |= (b & 127) << shift;
-      if ((b & 128) == 0) {
-        this.assertBounds();
-        return [lowBits, highBits];
-      }
-    }
-    throw new Error("invalid varint");
-  }
-  var TWO_PWR_32_DBL2 = 4294967296;
-  function int64FromString2(dec) {
-    const minus = dec[0] === "-";
-    if (minus) {
-      dec = dec.slice(1);
-    }
-    const base = 1e6;
-    let lowBits = 0;
-    let highBits = 0;
-    function add1e6digit(begin, end) {
-      const digit1e6 = Number(dec.slice(begin, end));
-      highBits *= base;
-      lowBits = lowBits * base + digit1e6;
-      if (lowBits >= TWO_PWR_32_DBL2) {
-        highBits = highBits + (lowBits / TWO_PWR_32_DBL2 | 0);
-        lowBits = lowBits % TWO_PWR_32_DBL2;
-      }
-    }
-    add1e6digit(-24, -18);
-    add1e6digit(-18, -12);
-    add1e6digit(-12, -6);
-    add1e6digit(-6);
-    return minus ? negate2(lowBits, highBits) : newBits2(lowBits, highBits);
-  }
-  function int64ToString2(lo, hi) {
-    let bits = newBits2(lo, hi);
-    const negative = bits.hi & 2147483648;
-    if (negative) {
-      bits = negate2(bits.lo, bits.hi);
-    }
-    const result = uInt64ToString2(bits.lo, bits.hi);
-    return negative ? "-" + result : result;
-  }
-  function uInt64ToString2(lo, hi) {
-    ({ lo, hi } = toUnsigned2(lo, hi));
-    if (hi <= 2097151) {
-      return String(TWO_PWR_32_DBL2 * hi + lo);
-    }
-    const low = lo & 16777215;
-    const mid = (lo >>> 24 | hi << 8) & 16777215;
-    const high = hi >> 16 & 65535;
-    let digitA = low + mid * 6777216 + high * 6710656;
-    let digitB = mid + high * 8147497;
-    let digitC = high * 2;
-    const base = 1e7;
-    if (digitA >= base) {
-      digitB += Math.floor(digitA / base);
-      digitA %= base;
-    }
-    if (digitB >= base) {
-      digitC += Math.floor(digitB / base);
-      digitB %= base;
-    }
-    return digitC.toString() + decimalFrom1e7WithLeadingZeros2(digitB) + decimalFrom1e7WithLeadingZeros2(digitA);
-  }
-  function toUnsigned2(lo, hi) {
-    return { lo: lo >>> 0, hi: hi >>> 0 };
-  }
-  function newBits2(lo, hi) {
-    return { lo: lo | 0, hi: hi | 0 };
-  }
-  function negate2(lowBits, highBits) {
-    highBits = ~highBits;
-    if (lowBits) {
-      lowBits = ~lowBits + 1;
-    } else {
-      highBits += 1;
-    }
-    return newBits2(lowBits, highBits);
-  }
-  var decimalFrom1e7WithLeadingZeros2 = (digit1e7) => {
-    const partial = String(digit1e7);
-    return "0000000".slice(partial.length) + partial;
-  };
-  function varint32read2() {
-    let b = this.buf[this.pos++];
-    let result = b & 127;
-    if ((b & 128) == 0) {
-      this.assertBounds();
-      return result;
-    }
-    b = this.buf[this.pos++];
-    result |= (b & 127) << 7;
-    if ((b & 128) == 0) {
-      this.assertBounds();
-      return result;
-    }
-    b = this.buf[this.pos++];
-    result |= (b & 127) << 14;
-    if ((b & 128) == 0) {
-      this.assertBounds();
-      return result;
-    }
-    b = this.buf[this.pos++];
-    result |= (b & 127) << 21;
-    if ((b & 128) == 0) {
-      this.assertBounds();
-      return result;
-    }
-    b = this.buf[this.pos++];
-    result |= (b & 15) << 28;
-    for (let readBytes = 5; (b & 128) !== 0 && readBytes < 10; readBytes++)
-      b = this.buf[this.pos++];
-    if ((b & 128) != 0)
-      throw new Error("invalid varint");
-    this.assertBounds();
-    return result >>> 0;
-  }
-
-  // node_modules/@bufbuild/protobuf/dist/esm/proto-int64.js
-  var protoInt642 = /* @__PURE__ */ makeInt64Support2();
-  function makeInt64Support2() {
-    const dv = new DataView(new ArrayBuffer(8));
-    const ok = typeof BigInt === "function" && typeof dv.getBigInt64 === "function" && typeof dv.getBigUint64 === "function" && typeof dv.setBigInt64 === "function" && typeof dv.setBigUint64 === "function" && (typeof process != "object" || typeof process.env != "object" || process.env.BUF_BIGINT_DISABLE !== "1");
-    if (ok) {
-      const MIN = BigInt("-9223372036854775808");
-      const MAX = BigInt("9223372036854775807");
-      const UMIN = BigInt("0");
-      const UMAX = BigInt("18446744073709551615");
-      return {
-        zero: BigInt(0),
-        supported: true,
-        parse(value) {
-          const bi = typeof value == "bigint" ? value : BigInt(value);
-          if (bi > MAX || bi < MIN) {
-            throw new Error(`invalid int64: ${value}`);
-          }
-          return bi;
-        },
-        uParse(value) {
-          const bi = typeof value == "bigint" ? value : BigInt(value);
-          if (bi > UMAX || bi < UMIN) {
-            throw new Error(`invalid uint64: ${value}`);
-          }
-          return bi;
-        },
-        enc(value) {
-          dv.setBigInt64(0, this.parse(value), true);
-          return {
-            lo: dv.getInt32(0, true),
-            hi: dv.getInt32(4, true)
-          };
-        },
-        uEnc(value) {
-          dv.setBigInt64(0, this.uParse(value), true);
-          return {
-            lo: dv.getInt32(0, true),
-            hi: dv.getInt32(4, true)
-          };
-        },
-        dec(lo, hi) {
-          dv.setInt32(0, lo, true);
-          dv.setInt32(4, hi, true);
-          return dv.getBigInt64(0, true);
-        },
-        uDec(lo, hi) {
-          dv.setInt32(0, lo, true);
-          dv.setInt32(4, hi, true);
-          return dv.getBigUint64(0, true);
-        }
-      };
-    }
-    return {
-      zero: "0",
-      supported: false,
-      parse(value) {
-        if (typeof value != "string") {
-          value = value.toString();
-        }
-        assertInt64String2(value);
-        return value;
-      },
-      uParse(value) {
-        if (typeof value != "string") {
-          value = value.toString();
-        }
-        assertUInt64String2(value);
-        return value;
-      },
-      enc(value) {
-        if (typeof value != "string") {
-          value = value.toString();
-        }
-        assertInt64String2(value);
-        return int64FromString2(value);
-      },
-      uEnc(value) {
-        if (typeof value != "string") {
-          value = value.toString();
-        }
-        assertUInt64String2(value);
-        return int64FromString2(value);
-      },
-      dec(lo, hi) {
-        return int64ToString2(lo, hi);
-      },
-      uDec(lo, hi) {
-        return uInt64ToString2(lo, hi);
-      }
-    };
-  }
-  function assertInt64String2(value) {
-    if (!/^-?[0-9]+$/.test(value)) {
-      throw new Error("invalid int64: " + value);
-    }
-  }
-  function assertUInt64String2(value) {
-    if (!/^[0-9]+$/.test(value)) {
-      throw new Error("invalid uint64: " + value);
-    }
-  }
-
-  // node_modules/@bufbuild/protobuf/dist/esm/reflect/scalar.js
-  function scalarZeroValue2(type, longAsString) {
-    switch (type) {
-      case ScalarType2.STRING:
-        return "";
-      case ScalarType2.BOOL:
-        return false;
-      case ScalarType2.DOUBLE:
-      case ScalarType2.FLOAT:
-        return 0;
-      case ScalarType2.INT64:
-      case ScalarType2.UINT64:
-      case ScalarType2.SFIXED64:
-      case ScalarType2.FIXED64:
-      case ScalarType2.SINT64:
-        return longAsString ? "0" : protoInt642.zero;
-      case ScalarType2.BYTES:
-        return new Uint8Array(0);
-      default:
-        return 0;
-    }
-  }
-  function isScalarZeroValue2(type, value) {
-    switch (type) {
-      case ScalarType2.BOOL:
-        return value === false;
-      case ScalarType2.STRING:
-        return value === "";
-      case ScalarType2.BYTES:
-        return value instanceof Uint8Array && !value.byteLength;
-      default:
-        return value == 0;
-    }
-  }
-
-  // node_modules/@bufbuild/protobuf/dist/esm/reflect/unsafe.js
-  var IMPLICIT3 = 2;
-  var unsafeLocal2 = Symbol.for("reflect unsafe local");
-  function unsafeOneofCase2(target, oneof) {
-    const c = target[oneof.localName].case;
-    if (c === void 0) {
-      return c;
-    }
-    return oneof.fields.find((f) => f.localName === c);
-  }
-  function unsafeIsSet2(target, field) {
-    const name = field.localName;
-    if (field.oneof) {
-      return target[field.oneof.localName].case === name;
-    }
-    if (field.presence != IMPLICIT3) {
-      return target[name] !== void 0 && Object.prototype.hasOwnProperty.call(target, name);
-    }
-    switch (field.fieldKind) {
-      case "list":
-        return target[name].length > 0;
-      case "map":
-        return Object.keys(target[name]).length > 0;
-      case "scalar":
-        return !isScalarZeroValue2(field.scalar, target[name]);
-      case "enum":
-        return target[name] !== field.enum.values[0].number;
-    }
-    throw new Error("message field with implicit presence");
-  }
-  function unsafeIsSetExplicit(target, localName) {
-    return Object.prototype.hasOwnProperty.call(target, localName) && target[localName] !== void 0;
-  }
-  function unsafeGet2(target, field) {
-    if (field.oneof) {
-      const oneof = target[field.oneof.localName];
-      if (oneof.case === field.localName) {
-        return oneof.value;
-      }
-      return void 0;
-    }
-    return target[field.localName];
-  }
-  function unsafeSet2(target, field, value) {
-    if (field.oneof) {
-      target[field.oneof.localName] = {
-        case: field.localName,
-        value
-      };
-    } else {
-      target[field.localName] = value;
-    }
-  }
-  function unsafeClear2(target, field) {
-    const name = field.localName;
-    if (field.oneof) {
-      const oneofLocalName = field.oneof.localName;
-      if (target[oneofLocalName].case === name) {
-        target[oneofLocalName] = { case: void 0 };
-      }
-    } else if (field.presence != IMPLICIT3) {
-      delete target[name];
-    } else {
-      switch (field.fieldKind) {
-        case "map":
-          target[name] = {};
-          break;
-        case "list":
-          target[name] = [];
-          break;
-        case "enum":
-          target[name] = field.enum.values[0].number;
-          break;
-        case "scalar":
-          target[name] = scalarZeroValue2(field.scalar, field.longAsString);
-          break;
-      }
-    }
-  }
-
-  // node_modules/@bufbuild/protobuf/dist/esm/reflect/guard.js
-  function isObject2(arg) {
-    return arg !== null && typeof arg == "object" && !Array.isArray(arg);
-  }
-  function isReflectList2(arg, field) {
-    var _a, _b, _c, _d;
-    if (isObject2(arg) && unsafeLocal2 in arg && "add" in arg && "field" in arg && typeof arg.field == "function") {
-      if (field !== void 0) {
-        const a = field;
-        const b = arg.field();
-        return a.listKind == b.listKind && a.scalar === b.scalar && ((_a = a.message) === null || _a === void 0 ? void 0 : _a.typeName) === ((_b = b.message) === null || _b === void 0 ? void 0 : _b.typeName) && ((_c = a.enum) === null || _c === void 0 ? void 0 : _c.typeName) === ((_d = b.enum) === null || _d === void 0 ? void 0 : _d.typeName);
-      }
-      return true;
-    }
-    return false;
-  }
-  function isReflectMap2(arg, field) {
-    var _a, _b, _c, _d;
-    if (isObject2(arg) && unsafeLocal2 in arg && "has" in arg && "field" in arg && typeof arg.field == "function") {
-      if (field !== void 0) {
-        const a = field, b = arg.field();
-        return a.mapKey === b.mapKey && a.mapKind == b.mapKind && a.scalar === b.scalar && ((_a = a.message) === null || _a === void 0 ? void 0 : _a.typeName) === ((_b = b.message) === null || _b === void 0 ? void 0 : _b.typeName) && ((_c = a.enum) === null || _c === void 0 ? void 0 : _c.typeName) === ((_d = b.enum) === null || _d === void 0 ? void 0 : _d.typeName);
-      }
-      return true;
-    }
-    return false;
-  }
-  function isReflectMessage2(arg, messageDesc3) {
-    return isObject2(arg) && unsafeLocal2 in arg && "desc" in arg && isObject2(arg.desc) && arg.desc.kind === "message" && (messageDesc3 === void 0 || arg.desc.typeName == messageDesc3.typeName);
-  }
-
-  // node_modules/@bufbuild/protobuf/dist/esm/wkt/wrappers.js
-  function isWrapper2(arg) {
-    return isWrapperTypeName2(arg.$typeName);
-  }
-  function isWrapperDesc2(messageDesc3) {
-    const f = messageDesc3.fields[0];
-    return isWrapperTypeName2(messageDesc3.typeName) && f !== void 0 && f.fieldKind == "scalar" && f.name == "value" && f.number == 1;
-  }
-  function isWrapperTypeName2(name) {
-    return name.startsWith("google.protobuf.") && [
-      "DoubleValue",
-      "FloatValue",
-      "Int64Value",
-      "UInt64Value",
-      "Int32Value",
-      "UInt32Value",
-      "BoolValue",
-      "StringValue",
-      "BytesValue"
-    ].includes(name.substring(16));
-  }
-
-  // node_modules/@bufbuild/protobuf/dist/esm/create.js
-  var EDITION_PROTO32 = 999;
-  var EDITION_PROTO22 = 998;
-  var IMPLICIT4 = 2;
-  function create2(schema, init) {
-    if (isMessage2(init, schema)) {
-      return init;
-    }
-    const message = createZeroMessage2(schema);
-    if (init !== void 0) {
-      initMessage2(schema, message, init);
-    }
-    return message;
-  }
-  function initMessage2(messageDesc3, message, init) {
-    for (const member of messageDesc3.members) {
-      let value = init[member.localName];
-      if (value == null) {
-        continue;
-      }
-      let field;
-      if (member.kind == "oneof") {
-        const oneofField = unsafeOneofCase2(init, member);
-        if (!oneofField) {
-          continue;
-        }
-        field = oneofField;
-        value = unsafeGet2(init, oneofField);
-      } else {
-        field = member;
-      }
-      switch (field.fieldKind) {
-        case "message":
-          value = toMessage2(field, value);
-          break;
-        case "scalar":
-          value = initScalar2(field, value);
-          break;
-        case "list":
-          value = initList2(field, value);
-          break;
-        case "map":
-          value = initMap2(field, value);
-          break;
-      }
-      unsafeSet2(message, field, value);
-    }
-    return message;
-  }
-  function initScalar2(field, value) {
-    if (field.scalar == ScalarType2.BYTES) {
-      return toU8Arr2(value);
-    }
-    return value;
-  }
-  function initMap2(field, value) {
-    if (isObject2(value)) {
-      if (field.scalar == ScalarType2.BYTES) {
-        return convertObjectValues2(value, toU8Arr2);
-      }
-      if (field.mapKind == "message") {
-        return convertObjectValues2(value, (val) => toMessage2(field, val));
-      }
-    }
-    return value;
-  }
-  function initList2(field, value) {
-    if (Array.isArray(value)) {
-      if (field.scalar == ScalarType2.BYTES) {
-        return value.map(toU8Arr2);
-      }
-      if (field.listKind == "message") {
-        return value.map((item) => toMessage2(field, item));
-      }
-    }
-    return value;
-  }
-  function toMessage2(field, value) {
-    if (field.fieldKind == "message" && !field.oneof && isWrapperDesc2(field.message)) {
-      return initScalar2(field.message.fields[0], value);
-    }
-    if (isObject2(value)) {
-      if (field.message.typeName == "google.protobuf.Struct" && field.parent.typeName !== "google.protobuf.Value") {
-        return value;
-      }
-      if (!isMessage2(value, field.message)) {
-        return create2(field.message, value);
-      }
-    }
-    return value;
-  }
-  function toU8Arr2(value) {
-    return Array.isArray(value) ? new Uint8Array(value) : value;
-  }
-  function convertObjectValues2(obj, fn) {
-    const ret = {};
-    for (const entry of Object.entries(obj)) {
-      ret[entry[0]] = fn(entry[1]);
-    }
-    return ret;
-  }
-  var tokenZeroMessageField2 = Symbol();
-  var messagePrototypes2 = /* @__PURE__ */ new WeakMap();
-  function createZeroMessage2(desc) {
-    let msg;
-    if (!needsPrototypeChain2(desc)) {
-      msg = {
-        $typeName: desc.typeName
-      };
-      for (const member of desc.members) {
-        if (member.kind == "oneof" || member.presence == IMPLICIT4) {
-          msg[member.localName] = createZeroField2(member);
-        }
-      }
-    } else {
-      const cached = messagePrototypes2.get(desc);
-      let prototype;
-      let members;
-      if (cached) {
-        ({ prototype, members } = cached);
-      } else {
-        prototype = {};
-        members = /* @__PURE__ */ new Set();
-        for (const member of desc.members) {
-          if (member.kind == "oneof") {
-            continue;
-          }
-          if (member.fieldKind != "scalar" && member.fieldKind != "enum") {
-            continue;
-          }
-          if (member.presence == IMPLICIT4) {
-            continue;
-          }
-          members.add(member);
-          prototype[member.localName] = createZeroField2(member);
-        }
-        messagePrototypes2.set(desc, { prototype, members });
-      }
-      msg = Object.create(prototype);
-      msg.$typeName = desc.typeName;
-      for (const member of desc.members) {
-        if (members.has(member)) {
-          continue;
-        }
-        if (member.kind == "field") {
-          if (member.fieldKind == "message") {
-            continue;
-          }
-          if (member.fieldKind == "scalar" || member.fieldKind == "enum") {
-            if (member.presence != IMPLICIT4) {
-              continue;
-            }
-          }
-        }
-        msg[member.localName] = createZeroField2(member);
-      }
-    }
-    return msg;
-  }
-  function needsPrototypeChain2(desc) {
-    switch (desc.file.edition) {
-      case EDITION_PROTO32:
-        return false;
-      case EDITION_PROTO22:
-        return true;
-      default:
-        return desc.fields.some((f) => f.presence != IMPLICIT4 && f.fieldKind != "message" && !f.oneof);
-    }
-  }
-  function createZeroField2(field) {
-    if (field.kind == "oneof") {
-      return { case: void 0 };
-    }
-    if (field.fieldKind == "list") {
-      return [];
-    }
-    if (field.fieldKind == "map") {
-      return {};
-    }
-    if (field.fieldKind == "message") {
-      return tokenZeroMessageField2;
-    }
-    const defaultValue = field.getDefaultValue();
-    if (defaultValue !== void 0) {
-      return field.fieldKind == "scalar" && field.longAsString ? defaultValue.toString() : defaultValue;
-    }
-    return field.fieldKind == "scalar" ? scalarZeroValue2(field.scalar, field.longAsString) : field.enum.values[0].number;
-  }
-
-  // node_modules/@bufbuild/protobuf/dist/esm/reflect/error.js
-  var FieldError2 = class extends Error {
-    constructor(fieldOrOneof, message, name = "FieldValueInvalidError") {
-      super(message);
-      this.name = name;
-      this.field = () => fieldOrOneof;
-    }
-  };
-
-  // node_modules/@bufbuild/protobuf/dist/esm/wire/text-encoding.js
-  var symbol2 = Symbol.for("@bufbuild/protobuf/text-encoding");
-  function getTextEncoding2() {
-    if (globalThis[symbol2] == void 0) {
-      const te = new globalThis.TextEncoder();
-      const td = new globalThis.TextDecoder();
-      globalThis[symbol2] = {
-        encodeUtf8(text) {
-          return te.encode(text);
-        },
-        decodeUtf8(bytes) {
-          return td.decode(bytes);
-        },
-        checkUtf8(text) {
-          try {
-            encodeURIComponent(text);
-            return true;
-          } catch (_) {
-            return false;
-          }
-        }
-      };
-    }
-    return globalThis[symbol2];
-  }
-
-  // node_modules/@bufbuild/protobuf/dist/esm/wire/binary-encoding.js
-  var WireType2;
-  (function(WireType3) {
-    WireType3[WireType3["Varint"] = 0] = "Varint";
-    WireType3[WireType3["Bit64"] = 1] = "Bit64";
-    WireType3[WireType3["LengthDelimited"] = 2] = "LengthDelimited";
-    WireType3[WireType3["StartGroup"] = 3] = "StartGroup";
-    WireType3[WireType3["EndGroup"] = 4] = "EndGroup";
-    WireType3[WireType3["Bit32"] = 5] = "Bit32";
-  })(WireType2 || (WireType2 = {}));
-  var FLOAT32_MAX2 = 34028234663852886e22;
-  var FLOAT32_MIN2 = -34028234663852886e22;
-  var UINT32_MAX2 = 4294967295;
-  var INT32_MAX2 = 2147483647;
-  var INT32_MIN2 = -2147483648;
-  var BinaryReader2 = class {
-    constructor(buf, decodeUtf8 = getTextEncoding2().decodeUtf8) {
-      this.decodeUtf8 = decodeUtf8;
-      this.varint64 = varint64read2;
-      this.uint32 = varint32read2;
-      this.buf = buf;
-      this.len = buf.length;
-      this.pos = 0;
-      this.view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
-    }
-    /**
-     * Reads a tag - field number and wire type.
-     */
-    tag() {
-      let tag = this.uint32(), fieldNo = tag >>> 3, wireType = tag & 7;
-      if (fieldNo <= 0 || wireType < 0 || wireType > 5)
-        throw new Error("illegal tag: field no " + fieldNo + " wire type " + wireType);
-      return [fieldNo, wireType];
-    }
-    /**
-     * Skip one element and return the skipped data.
-     *
-     * When skipping StartGroup, provide the tags field number to check for
-     * matching field number in the EndGroup tag.
-     */
-    skip(wireType, fieldNo) {
-      let start = this.pos;
-      switch (wireType) {
-        case WireType2.Varint:
-          while (this.buf[this.pos++] & 128) {
-          }
-          break;
-        case WireType2.Bit64:
-          this.pos += 4;
-        case WireType2.Bit32:
-          this.pos += 4;
-          break;
-        case WireType2.LengthDelimited:
-          let len = this.uint32();
-          this.pos += len;
-          break;
-        case WireType2.StartGroup:
-          for (; ; ) {
-            const [fn, wt] = this.tag();
-            if (wt === WireType2.EndGroup) {
-              if (fieldNo !== void 0 && fn !== fieldNo) {
-                throw new Error("invalid end group tag");
-              }
-              break;
-            }
-            this.skip(wt, fn);
-          }
-          break;
-        default:
-          throw new Error("cant skip wire type " + wireType);
-      }
-      this.assertBounds();
-      return this.buf.subarray(start, this.pos);
-    }
-    /**
-     * Throws error if position in byte array is out of range.
-     */
-    assertBounds() {
-      if (this.pos > this.len)
-        throw new RangeError("premature EOF");
-    }
-    /**
-     * Read a `int32` field, a signed 32 bit varint.
-     */
-    int32() {
-      return this.uint32() | 0;
-    }
-    /**
-     * Read a `sint32` field, a signed, zigzag-encoded 32-bit varint.
-     */
-    sint32() {
-      let zze = this.uint32();
-      return zze >>> 1 ^ -(zze & 1);
-    }
-    /**
-     * Read a `int64` field, a signed 64-bit varint.
-     */
-    int64() {
-      return protoInt642.dec(...this.varint64());
-    }
-    /**
-     * Read a `uint64` field, an unsigned 64-bit varint.
-     */
-    uint64() {
-      return protoInt642.uDec(...this.varint64());
-    }
-    /**
-     * Read a `sint64` field, a signed, zig-zag-encoded 64-bit varint.
-     */
-    sint64() {
-      let [lo, hi] = this.varint64();
-      let s = -(lo & 1);
-      lo = (lo >>> 1 | (hi & 1) << 31) ^ s;
-      hi = hi >>> 1 ^ s;
-      return protoInt642.dec(lo, hi);
-    }
-    /**
-     * Read a `bool` field, a variant.
-     */
-    bool() {
-      let [lo, hi] = this.varint64();
-      return lo !== 0 || hi !== 0;
-    }
-    /**
-     * Read a `fixed32` field, an unsigned, fixed-length 32-bit integer.
-     */
-    fixed32() {
-      return this.view.getUint32((this.pos += 4) - 4, true);
-    }
-    /**
-     * Read a `sfixed32` field, a signed, fixed-length 32-bit integer.
-     */
-    sfixed32() {
-      return this.view.getInt32((this.pos += 4) - 4, true);
-    }
-    /**
-     * Read a `fixed64` field, an unsigned, fixed-length 64 bit integer.
-     */
-    fixed64() {
-      return protoInt642.uDec(this.sfixed32(), this.sfixed32());
-    }
-    /**
-     * Read a `fixed64` field, a signed, fixed-length 64-bit integer.
-     */
-    sfixed64() {
-      return protoInt642.dec(this.sfixed32(), this.sfixed32());
-    }
-    /**
-     * Read a `float` field, 32-bit floating point number.
-     */
-    float() {
-      return this.view.getFloat32((this.pos += 4) - 4, true);
-    }
-    /**
-     * Read a `double` field, a 64-bit floating point number.
-     */
-    double() {
-      return this.view.getFloat64((this.pos += 8) - 8, true);
-    }
-    /**
-     * Read a `bytes` field, length-delimited arbitrary data.
-     */
-    bytes() {
-      let len = this.uint32(), start = this.pos;
-      this.pos += len;
-      this.assertBounds();
-      return this.buf.subarray(start, start + len);
-    }
-    /**
-     * Read a `string` field, length-delimited data converted to UTF-8 text.
-     */
-    string() {
-      return this.decodeUtf8(this.bytes());
-    }
-  };
-
-  // node_modules/@bufbuild/protobuf/dist/esm/reflect/reflect-check.js
-  function checkField2(field, value) {
-    const check = field.fieldKind == "list" ? isReflectList2(value, field) : field.fieldKind == "map" ? isReflectMap2(value, field) : checkSingular2(field, value);
-    if (check === true) {
-      return void 0;
-    }
-    let reason;
-    switch (field.fieldKind) {
-      case "list":
-        reason = `expected ${formatReflectList2(field)}, got ${formatVal2(value)}`;
-        break;
-      case "map":
-        reason = `expected ${formatReflectMap2(field)}, got ${formatVal2(value)}`;
-        break;
-      default: {
-        reason = reasonSingular2(field, value, check);
-      }
-    }
-    return new FieldError2(field, reason);
-  }
-  function checkListItem2(field, index, value) {
-    const check = checkSingular2(field, value);
-    if (check !== true) {
-      return new FieldError2(field, `list item #${index + 1}: ${reasonSingular2(field, value, check)}`);
-    }
-    return void 0;
-  }
-  function checkMapEntry2(field, key, value) {
-    const checkKey = checkScalarValue2(key, field.mapKey);
-    if (checkKey !== true) {
-      return new FieldError2(field, `invalid map key: ${reasonSingular2({ scalar: field.mapKey }, key, checkKey)}`);
-    }
-    const checkVal = checkSingular2(field, value);
-    if (checkVal !== true) {
-      return new FieldError2(field, `map entry ${formatVal2(key)}: ${reasonSingular2(field, value, checkVal)}`);
-    }
-    return void 0;
-  }
-  function checkSingular2(field, value) {
-    if (field.scalar !== void 0) {
-      return checkScalarValue2(value, field.scalar);
-    }
-    if (field.enum !== void 0) {
-      if (field.enum.open) {
-        return Number.isInteger(value);
-      }
-      return field.enum.values.some((v) => v.number === value);
-    }
-    return isReflectMessage2(value, field.message);
-  }
-  function checkScalarValue2(value, scalar) {
-    switch (scalar) {
-      case ScalarType2.DOUBLE:
-        return typeof value == "number";
-      case ScalarType2.FLOAT:
-        if (typeof value != "number") {
-          return false;
-        }
-        if (Number.isNaN(value) || !Number.isFinite(value)) {
-          return true;
-        }
-        if (value > FLOAT32_MAX2 || value < FLOAT32_MIN2) {
-          return `${value.toFixed()} out of range`;
-        }
-        return true;
-      case ScalarType2.INT32:
-      case ScalarType2.SFIXED32:
-      case ScalarType2.SINT32:
-        if (typeof value !== "number" || !Number.isInteger(value)) {
-          return false;
-        }
-        if (value > INT32_MAX2 || value < INT32_MIN2) {
-          return `${value.toFixed()} out of range`;
-        }
-        return true;
-      case ScalarType2.FIXED32:
-      case ScalarType2.UINT32:
-        if (typeof value !== "number" || !Number.isInteger(value)) {
-          return false;
-        }
-        if (value > UINT32_MAX2 || value < 0) {
-          return `${value.toFixed()} out of range`;
-        }
-        return true;
-      case ScalarType2.BOOL:
-        return typeof value == "boolean";
-      case ScalarType2.STRING:
-        if (typeof value != "string") {
-          return false;
-        }
-        return getTextEncoding2().checkUtf8(value) || "invalid UTF8";
-      case ScalarType2.BYTES:
-        return value instanceof Uint8Array;
-      case ScalarType2.INT64:
-      case ScalarType2.SFIXED64:
-      case ScalarType2.SINT64:
-        if (typeof value == "bigint" || typeof value == "number" || typeof value == "string" && value.length > 0) {
-          try {
-            protoInt642.parse(value);
-            return true;
-          } catch (_) {
-            return `${value} out of range`;
-          }
-        }
-        return false;
-      case ScalarType2.FIXED64:
-      case ScalarType2.UINT64:
-        if (typeof value == "bigint" || typeof value == "number" || typeof value == "string" && value.length > 0) {
-          try {
-            protoInt642.uParse(value);
-            return true;
-          } catch (_) {
-            return `${value} out of range`;
-          }
-        }
-        return false;
-    }
-  }
-  function reasonSingular2(field, val, details) {
-    details = typeof details == "string" ? `: ${details}` : `, got ${formatVal2(val)}`;
-    if (field.scalar !== void 0) {
-      return `expected ${scalarTypeDescription2(field.scalar)}` + details;
-    }
-    if (field.enum !== void 0) {
-      return `expected ${field.enum.toString()}` + details;
-    }
-    return `expected ${formatReflectMessage2(field.message)}` + details;
-  }
-  function formatVal2(val) {
-    switch (typeof val) {
-      case "object":
-        if (val === null) {
-          return "null";
-        }
-        if (val instanceof Uint8Array) {
-          return `Uint8Array(${val.length})`;
-        }
-        if (Array.isArray(val)) {
-          return `Array(${val.length})`;
-        }
-        if (isReflectList2(val)) {
-          return formatReflectList2(val.field());
-        }
-        if (isReflectMap2(val)) {
-          return formatReflectMap2(val.field());
-        }
-        if (isReflectMessage2(val)) {
-          return formatReflectMessage2(val.desc);
-        }
-        if (isMessage2(val)) {
-          return `message ${val.$typeName}`;
-        }
-        return "object";
-      case "string":
-        return val.length > 30 ? "string" : `"${val.split('"').join('\\"')}"`;
-      case "boolean":
-        return String(val);
-      case "number":
-        return String(val);
-      case "bigint":
-        return String(val) + "n";
-      default:
-        return typeof val;
-    }
-  }
-  function formatReflectMessage2(desc) {
-    return `ReflectMessage (${desc.typeName})`;
-  }
-  function formatReflectList2(field) {
-    switch (field.listKind) {
-      case "message":
-        return `ReflectList (${field.message.toString()})`;
-      case "enum":
-        return `ReflectList (${field.enum.toString()})`;
-      case "scalar":
-        return `ReflectList (${ScalarType2[field.scalar]})`;
-    }
-  }
-  function formatReflectMap2(field) {
-    switch (field.mapKind) {
-      case "message":
-        return `ReflectMap (${ScalarType2[field.mapKey]}, ${field.message.toString()})`;
-      case "enum":
-        return `ReflectMap (${ScalarType2[field.mapKey]}, ${field.enum.toString()})`;
-      case "scalar":
-        return `ReflectMap (${ScalarType2[field.mapKey]}, ${ScalarType2[field.scalar]})`;
-    }
-  }
-  function scalarTypeDescription2(scalar) {
-    switch (scalar) {
-      case ScalarType2.STRING:
-        return "string";
-      case ScalarType2.BOOL:
-        return "boolean";
-      case ScalarType2.INT64:
-      case ScalarType2.SINT64:
-      case ScalarType2.SFIXED64:
-        return "bigint (int64)";
-      case ScalarType2.UINT64:
-      case ScalarType2.FIXED64:
-        return "bigint (uint64)";
-      case ScalarType2.BYTES:
-        return "Uint8Array";
-      case ScalarType2.DOUBLE:
-        return "number (float64)";
-      case ScalarType2.FLOAT:
-        return "number (float32)";
-      case ScalarType2.FIXED32:
-      case ScalarType2.UINT32:
-        return "number (uint32)";
-      case ScalarType2.INT32:
-      case ScalarType2.SFIXED32:
-      case ScalarType2.SINT32:
-        return "number (int32)";
-    }
-  }
-
-  // node_modules/@bufbuild/protobuf/dist/esm/reflect/reflect.js
-  function reflect2(messageDesc3, message, check = true) {
-    return new ReflectMessageImpl2(messageDesc3, message, check);
-  }
-  var ReflectMessageImpl2 = class {
-    get sortedFields() {
-      var _a;
-      return (_a = this._sortedFields) !== null && _a !== void 0 ? _a : (
-        // biome-ignore lint/suspicious/noAssignInExpressions: no
-        this._sortedFields = this.desc.fields.concat().sort((a, b) => a.number - b.number)
-      );
-    }
-    constructor(messageDesc3, message, check = true) {
-      this.lists = /* @__PURE__ */ new Map();
-      this.maps = /* @__PURE__ */ new Map();
-      this.check = check;
-      this.desc = messageDesc3;
-      this.message = this[unsafeLocal2] = message !== null && message !== void 0 ? message : create2(messageDesc3);
-      this.fields = messageDesc3.fields;
-      this.oneofs = messageDesc3.oneofs;
-      this.members = messageDesc3.members;
-    }
-    findNumber(number) {
-      if (!this._fieldsByNumber) {
-        this._fieldsByNumber = new Map(this.desc.fields.map((f) => [f.number, f]));
-      }
-      return this._fieldsByNumber.get(number);
-    }
-    oneofCase(oneof) {
-      assertOwn2(this.message, oneof);
-      return unsafeOneofCase2(this.message, oneof);
-    }
-    isSet(field) {
-      assertOwn2(this.message, field);
-      return unsafeIsSet2(this.message, field);
-    }
-    clear(field) {
-      assertOwn2(this.message, field);
-      unsafeClear2(this.message, field);
-    }
-    get(field) {
-      assertOwn2(this.message, field);
-      const value = unsafeGet2(this.message, field);
-      switch (field.fieldKind) {
-        case "list":
-          let list = this.lists.get(field);
-          if (!list || list[unsafeLocal2] !== value) {
-            this.lists.set(
-              field,
-              // biome-ignore lint/suspicious/noAssignInExpressions: no
-              list = new ReflectListImpl2(field, value, this.check)
-            );
-          }
-          return list;
-        case "map":
-          let map = this.maps.get(field);
-          if (!map || map[unsafeLocal2] !== value) {
-            this.maps.set(
-              field,
-              // biome-ignore lint/suspicious/noAssignInExpressions: no
-              map = new ReflectMapImpl2(field, value, this.check)
-            );
-          }
-          return map;
-        case "message":
-          return messageToReflect2(field, value, this.check);
-        case "scalar":
-          return value === void 0 ? scalarZeroValue2(field.scalar, false) : longToReflect2(field, value);
-        case "enum":
-          return value !== null && value !== void 0 ? value : field.enum.values[0].number;
-      }
-    }
-    set(field, value) {
-      assertOwn2(this.message, field);
-      if (this.check) {
-        const err = checkField2(field, value);
-        if (err) {
-          throw err;
-        }
-      }
-      let local;
-      if (field.fieldKind == "message") {
-        local = messageToLocal2(field, value);
-      } else if (isReflectMap2(value) || isReflectList2(value)) {
-        local = value[unsafeLocal2];
-      } else {
-        local = longToLocal2(field, value);
-      }
-      unsafeSet2(this.message, field, local);
-    }
-    getUnknown() {
-      return this.message.$unknown;
-    }
-    setUnknown(value) {
-      this.message.$unknown = value;
-    }
-  };
-  function assertOwn2(owner, member) {
-    if (member.parent.typeName !== owner.$typeName) {
-      throw new FieldError2(member, `cannot use ${member.toString()} with message ${owner.$typeName}`, "ForeignFieldError");
-    }
-  }
-  var ReflectListImpl2 = class {
-    field() {
-      return this._field;
-    }
-    get size() {
-      return this._arr.length;
-    }
-    constructor(field, unsafeInput, check) {
-      this._field = field;
-      this._arr = this[unsafeLocal2] = unsafeInput;
-      this.check = check;
-    }
-    get(index) {
-      const item = this._arr[index];
-      return item === void 0 ? void 0 : listItemToReflect2(this._field, item, this.check);
-    }
-    set(index, item) {
-      if (index < 0 || index >= this._arr.length) {
-        throw new FieldError2(this._field, `list item #${index + 1}: out of range`);
-      }
-      if (this.check) {
-        const err = checkListItem2(this._field, index, item);
-        if (err) {
-          throw err;
-        }
-      }
-      this._arr[index] = listItemToLocal2(this._field, item);
-    }
-    add(item) {
-      if (this.check) {
-        const err = checkListItem2(this._field, this._arr.length, item);
-        if (err) {
-          throw err;
-        }
-      }
-      this._arr.push(listItemToLocal2(this._field, item));
-      return void 0;
-    }
-    clear() {
-      this._arr.splice(0, this._arr.length);
-    }
-    [Symbol.iterator]() {
-      return this.values();
-    }
-    keys() {
-      return this._arr.keys();
-    }
-    *values() {
-      for (const item of this._arr) {
-        yield listItemToReflect2(this._field, item, this.check);
-      }
-    }
-    *entries() {
-      for (let i = 0; i < this._arr.length; i++) {
-        yield [i, listItemToReflect2(this._field, this._arr[i], this.check)];
-      }
-    }
-  };
-  var ReflectMapImpl2 = class {
-    constructor(field, unsafeInput, check = true) {
-      this.obj = this[unsafeLocal2] = unsafeInput !== null && unsafeInput !== void 0 ? unsafeInput : {};
-      this.check = check;
-      this._field = field;
-    }
-    field() {
-      return this._field;
-    }
-    set(key, value) {
-      if (this.check) {
-        const err = checkMapEntry2(this._field, key, value);
-        if (err) {
-          throw err;
-        }
-      }
-      this.obj[mapKeyToLocal2(key)] = mapValueToLocal2(this._field, value);
-      return this;
-    }
-    delete(key) {
-      const k = mapKeyToLocal2(key);
-      const has = Object.prototype.hasOwnProperty.call(this.obj, k);
-      if (has) {
-        delete this.obj[k];
-      }
-      return has;
-    }
-    clear() {
-      for (const key of Object.keys(this.obj)) {
-        delete this.obj[key];
-      }
-    }
-    get(key) {
-      let val = this.obj[mapKeyToLocal2(key)];
-      if (val !== void 0) {
-        val = mapValueToReflect2(this._field, val, this.check);
-      }
-      return val;
-    }
-    has(key) {
-      return Object.prototype.hasOwnProperty.call(this.obj, mapKeyToLocal2(key));
-    }
-    *keys() {
-      for (const objKey of Object.keys(this.obj)) {
-        yield mapKeyToReflect2(objKey, this._field.mapKey);
-      }
-    }
-    *entries() {
-      for (const objEntry of Object.entries(this.obj)) {
-        yield [
-          mapKeyToReflect2(objEntry[0], this._field.mapKey),
-          mapValueToReflect2(this._field, objEntry[1], this.check)
-        ];
-      }
-    }
-    [Symbol.iterator]() {
-      return this.entries();
-    }
-    get size() {
-      return Object.keys(this.obj).length;
-    }
-    *values() {
-      for (const val of Object.values(this.obj)) {
-        yield mapValueToReflect2(this._field, val, this.check);
-      }
-    }
-    forEach(callbackfn, thisArg) {
-      for (const mapEntry of this.entries()) {
-        callbackfn.call(thisArg, mapEntry[1], mapEntry[0], this);
-      }
-    }
-  };
-  function messageToLocal2(field, value) {
-    if (!isReflectMessage2(value)) {
-      return value;
-    }
-    if (isWrapper2(value.message) && !field.oneof && field.fieldKind == "message") {
-      return value.message.value;
-    }
-    if (value.desc.typeName == "google.protobuf.Struct" && field.parent.typeName != "google.protobuf.Value") {
-      return wktStructToLocal2(value.message);
-    }
-    return value.message;
-  }
-  function messageToReflect2(field, value, check) {
-    if (value !== void 0) {
-      if (isWrapperDesc2(field.message) && !field.oneof && field.fieldKind == "message") {
-        value = {
-          $typeName: field.message.typeName,
-          value: longToReflect2(field.message.fields[0], value)
-        };
-      } else if (field.message.typeName == "google.protobuf.Struct" && field.parent.typeName != "google.protobuf.Value" && isObject2(value)) {
-        value = wktStructToReflect2(value);
-      }
-    }
-    return new ReflectMessageImpl2(field.message, value, check);
-  }
-  function listItemToLocal2(field, value) {
-    if (field.listKind == "message") {
-      return messageToLocal2(field, value);
-    }
-    return longToLocal2(field, value);
-  }
-  function listItemToReflect2(field, value, check) {
-    if (field.listKind == "message") {
-      return messageToReflect2(field, value, check);
-    }
-    return longToReflect2(field, value);
-  }
-  function mapValueToLocal2(field, value) {
-    if (field.mapKind == "message") {
-      return messageToLocal2(field, value);
-    }
-    return longToLocal2(field, value);
-  }
-  function mapValueToReflect2(field, value, check) {
-    if (field.mapKind == "message") {
-      return messageToReflect2(field, value, check);
-    }
-    return value;
-  }
-  function mapKeyToLocal2(key) {
-    return typeof key == "string" || typeof key == "number" ? key : String(key);
-  }
-  function mapKeyToReflect2(key, type) {
-    switch (type) {
-      case ScalarType2.STRING:
-        return key;
-      case ScalarType2.INT32:
-      case ScalarType2.FIXED32:
-      case ScalarType2.UINT32:
-      case ScalarType2.SFIXED32:
-      case ScalarType2.SINT32: {
-        const n = Number.parseInt(key);
-        if (Number.isFinite(n)) {
-          return n;
-        }
-        break;
-      }
-      case ScalarType2.BOOL:
-        switch (key) {
-          case "true":
-            return true;
-          case "false":
-            return false;
-        }
-        break;
-      case ScalarType2.UINT64:
-      case ScalarType2.FIXED64:
-        try {
-          return protoInt642.uParse(key);
-        } catch (_a) {
-        }
-        break;
-      default:
-        try {
-          return protoInt642.parse(key);
-        } catch (_b) {
-        }
-        break;
-    }
-    return key;
-  }
-  function longToReflect2(field, value) {
-    switch (field.scalar) {
-      case ScalarType2.INT64:
-      case ScalarType2.SFIXED64:
-      case ScalarType2.SINT64:
-        if ("longAsString" in field && field.longAsString && typeof value == "string") {
-          value = protoInt642.parse(value);
-        }
-        break;
-      case ScalarType2.FIXED64:
-      case ScalarType2.UINT64:
-        if ("longAsString" in field && field.longAsString && typeof value == "string") {
-          value = protoInt642.uParse(value);
-        }
-        break;
-    }
-    return value;
-  }
-  function longToLocal2(field, value) {
-    switch (field.scalar) {
-      case ScalarType2.INT64:
-      case ScalarType2.SFIXED64:
-      case ScalarType2.SINT64:
-        if ("longAsString" in field && field.longAsString) {
-          value = String(value);
-        } else if (typeof value == "string" || typeof value == "number") {
-          value = protoInt642.parse(value);
-        }
-        break;
-      case ScalarType2.FIXED64:
-      case ScalarType2.UINT64:
-        if ("longAsString" in field && field.longAsString) {
-          value = String(value);
-        } else if (typeof value == "string" || typeof value == "number") {
-          value = protoInt642.uParse(value);
-        }
-        break;
-    }
-    return value;
-  }
-  function wktStructToReflect2(json) {
-    const struct = {
-      $typeName: "google.protobuf.Struct",
-      fields: {}
-    };
-    if (isObject2(json)) {
-      for (const [k, v] of Object.entries(json)) {
-        struct.fields[k] = wktValueToReflect2(v);
-      }
-    }
-    return struct;
-  }
-  function wktStructToLocal2(val) {
-    const json = {};
-    for (const [k, v] of Object.entries(val.fields)) {
-      json[k] = wktValueToLocal2(v);
-    }
-    return json;
-  }
-  function wktValueToLocal2(val) {
-    switch (val.kind.case) {
-      case "structValue":
-        return wktStructToLocal2(val.kind.value);
-      case "listValue":
-        return val.kind.value.values.map(wktValueToLocal2);
-      case "nullValue":
-      case void 0:
-        return null;
-      default:
-        return val.kind.value;
-    }
-  }
-  function wktValueToReflect2(json) {
-    const value = {
-      $typeName: "google.protobuf.Value",
-      kind: { case: void 0 }
-    };
-    switch (typeof json) {
-      case "number":
-        value.kind = { case: "numberValue", value: json };
-        break;
-      case "string":
-        value.kind = { case: "stringValue", value: json };
-        break;
-      case "boolean":
-        value.kind = { case: "boolValue", value: json };
-        break;
-      case "object":
-        if (json === null) {
-          const nullValue = 0;
-          value.kind = { case: "nullValue", value: nullValue };
-        } else if (Array.isArray(json)) {
-          const listValue = {
-            $typeName: "google.protobuf.ListValue",
-            values: []
-          };
-          if (Array.isArray(json)) {
-            for (const e of json) {
-              listValue.values.push(wktValueToReflect2(e));
-            }
-          }
-          value.kind = {
-            case: "listValue",
-            value: listValue
-          };
-        } else {
-          value.kind = {
-            case: "structValue",
-            value: wktStructToReflect2(json)
-          };
-        }
-        break;
-    }
-    return value;
-  }
-
   // node_modules/@bufbuild/protobuf/dist/esm/wire/base64-encoding.js
   function base64Decode(base64Str) {
     const table = getDecodeTable();
@@ -3831,24 +1923,24 @@
   }
   function parseTextFormatScalarValue(type, value) {
     switch (type) {
-      case ScalarType2.STRING:
+      case ScalarType.STRING:
         return value;
-      case ScalarType2.BYTES: {
+      case ScalarType.BYTES: {
         const u = unescapeBytesDefaultValue(value);
         if (u === false) {
-          throw new Error(`cannot parse ${ScalarType2[type]} default value: ${value}`);
+          throw new Error(`cannot parse ${ScalarType[type]} default value: ${value}`);
         }
         return u;
       }
-      case ScalarType2.INT64:
-      case ScalarType2.SFIXED64:
-      case ScalarType2.SINT64:
-        return protoInt642.parse(value);
-      case ScalarType2.UINT64:
-      case ScalarType2.FIXED64:
-        return protoInt642.uParse(value);
-      case ScalarType2.DOUBLE:
-      case ScalarType2.FLOAT:
+      case ScalarType.INT64:
+      case ScalarType.SFIXED64:
+      case ScalarType.SINT64:
+        return protoInt64.parse(value);
+      case ScalarType.UINT64:
+      case ScalarType.FIXED64:
+        return protoInt64.uParse(value);
+      case ScalarType.DOUBLE:
+      case ScalarType.FLOAT:
         switch (value) {
           case "inf":
             return Number.POSITIVE_INFINITY;
@@ -3859,13 +1951,13 @@
           default:
             return parseFloat(value);
         }
-      case ScalarType2.BOOL:
+      case ScalarType.BOOL:
         return value === "true";
-      case ScalarType2.INT32:
-      case ScalarType2.UINT32:
-      case ScalarType2.SINT32:
-      case ScalarType2.FIXED32:
-      case ScalarType2.SFIXED32:
+      case ScalarType.INT32:
+      case ScalarType.UINT32:
+      case ScalarType.SINT32:
+      case ScalarType.FIXED32:
+      case ScalarType.SFIXED32:
         return parseInt(value, 10);
     }
   }
@@ -3972,7 +2064,7 @@
                 if (t === false) {
                   return false;
                 }
-                const tc = protoInt642.uEnc(s + t);
+                const tc = protoInt64.uEnc(s + t);
                 const chunk = new Uint8Array(8);
                 const view = new DataView(chunk.buffer);
                 view.setInt32(0, tc.lo, true);
@@ -4026,7 +2118,7 @@
       return registry;
     }
     if ("$typeName" in args[0]) {
-      let recurseDeps = function(file) {
+      let recurseDeps2 = function(file) {
         const deps = [];
         for (const protoFileName of file.dependency) {
           if (registry.getFile(protoFileName) != void 0) {
@@ -4046,12 +2138,13 @@
             deps.push(dep);
           }
         }
-        return deps.concat(...deps.map(recurseDeps));
+        return deps.concat(...deps.map(recurseDeps2));
       };
+      var recurseDeps = recurseDeps2;
       const input = args[0];
       const resolve = args[1];
       const seen = /* @__PURE__ */ new Set();
-      for (const file of [input, ...recurseDeps(input)].reverse()) {
+      for (const file of [input, ...recurseDeps2(input)].reverse()) {
         addFile(file, registry);
       }
     } else {
@@ -4132,8 +2225,8 @@
       }
     };
   }
-  var EDITION_PROTO23 = 998;
-  var EDITION_PROTO33 = 999;
+  var EDITION_PROTO22 = 998;
+  var EDITION_PROTO32 = 999;
   var TYPE_STRING = 9;
   var TYPE_GROUP = 10;
   var TYPE_MESSAGE = 11;
@@ -4144,8 +2237,8 @@
   var JS_STRING = 1;
   var IDEMPOTENCY_UNKNOWN = 0;
   var EXPLICIT = 1;
-  var IMPLICIT5 = 2;
-  var LEGACY_REQUIRED2 = 3;
+  var IMPLICIT3 = 2;
+  var LEGACY_REQUIRED = 3;
   var PACKED = 1;
   var DELIMITED = 2;
   var OPEN = 1;
@@ -4558,9 +2651,9 @@
     switch (proto.syntax) {
       case "":
       case "proto2":
-        return EDITION_PROTO23;
+        return EDITION_PROTO22;
       case "proto3":
-        return EDITION_PROTO33;
+        return EDITION_PROTO32;
       case "editions":
         if (proto.edition in featureDefaults) {
           return proto.edition;
@@ -4625,10 +2718,10 @@
   }
   function getFieldPresence(proto, oneof, isExtension, parent) {
     if (proto.label == LABEL_REQUIRED) {
-      return LEGACY_REQUIRED2;
+      return LEGACY_REQUIRED;
     }
     if (proto.label == LABEL_REPEATED) {
-      return IMPLICIT5;
+      return IMPLICIT3;
     }
     if (!!oneof || proto.proto3Optional) {
       return EXPLICIT;
@@ -4637,7 +2730,7 @@
       return EXPLICIT;
     }
     const resolved = resolveFeature("fieldPresence", { proto, parent });
-    if (resolved == IMPLICIT5 && (proto.type == TYPE_MESSAGE || proto.type == TYPE_GROUP)) {
+    if (resolved == IMPLICIT3 && (proto.type == TYPE_MESSAGE || proto.type == TYPE_GROUP)) {
       return EXPLICIT;
     }
     return resolved;
@@ -4665,7 +2758,7 @@
   function findMapEntryFields(mapEntry) {
     const key = mapEntry.fields.find((f) => f.number === 1);
     const value = mapEntry.fields.find((f) => f.number === 2);
-    assert(key && key.fieldKind == "scalar" && key.scalar != ScalarType2.BYTES && key.scalar != ScalarType2.FLOAT && key.scalar != ScalarType2.DOUBLE && value && value.fieldKind != "list" && value.fieldKind != "map");
+    assert(key && key.fieldKind == "scalar" && key.scalar != ScalarType.BYTES && key.scalar != ScalarType.FLOAT && key.scalar != ScalarType.DOUBLE && value && value.fieldKind != "list" && value.fieldKind != "map");
     return { key, value };
   }
   function isEnumOpen(desc) {
@@ -4926,18 +3019,18 @@
   })(Edition || (Edition = {}));
 
   // node_modules/@bufbuild/protobuf/dist/esm/from-binary.js
-  var readDefaults2 = {
+  var readDefaults = {
     readUnknownFields: true
   };
-  function makeReadOptions2(options) {
-    return options ? Object.assign(Object.assign({}, readDefaults2), options) : readDefaults2;
+  function makeReadOptions(options) {
+    return options ? Object.assign(Object.assign({}, readDefaults), options) : readDefaults;
   }
-  function fromBinary2(schema, bytes, options) {
-    const msg = reflect2(schema, void 0, false);
-    readMessage2(msg, new BinaryReader2(bytes), makeReadOptions2(options), false, bytes.byteLength);
+  function fromBinary(schema, bytes, options) {
+    const msg = reflect(schema, void 0, false);
+    readMessage(msg, new BinaryReader(bytes), makeReadOptions(options), false, bytes.byteLength);
     return msg.message;
   }
-  function readMessage2(message, reader, options, delimited, lengthOrDelimitedFieldNo) {
+  function readMessage(message, reader, options, delimited, lengthOrDelimitedFieldNo) {
     var _a;
     const end = delimited ? reader.len : reader.pos + lengthOrDelimitedFieldNo;
     let fieldNo;
@@ -4945,7 +3038,7 @@
     const unknownFields = (_a = message.getUnknown()) !== null && _a !== void 0 ? _a : [];
     while (reader.pos < end) {
       [fieldNo, wireType] = reader.tag();
-      if (delimited && wireType == WireType2.EndGroup) {
+      if (delimited && wireType == WireType.EndGroup) {
         break;
       }
       const field = message.findNumber(fieldNo);
@@ -4956,10 +3049,10 @@
         }
         continue;
       }
-      readField2(message, reader, field, wireType, options);
+      readField(message, reader, field, wireType, options);
     }
     if (delimited) {
-      if (wireType != WireType2.EndGroup || fieldNo !== lengthOrDelimitedFieldNo) {
+      if (wireType != WireType.EndGroup || fieldNo !== lengthOrDelimitedFieldNo) {
         throw new Error("invalid end group tag");
       }
     }
@@ -4967,26 +3060,26 @@
       message.setUnknown(unknownFields);
     }
   }
-  function readField2(message, reader, field, wireType, options) {
+  function readField(message, reader, field, wireType, options) {
     switch (field.fieldKind) {
       case "scalar":
-        message.set(field, readScalar2(reader, field.scalar));
+        message.set(field, readScalar(reader, field.scalar));
         break;
       case "enum":
-        message.set(field, readScalar2(reader, ScalarType2.INT32));
+        message.set(field, readScalar(reader, ScalarType.INT32));
         break;
       case "message":
-        message.set(field, readMessageField2(reader, options, field, message.get(field)));
+        message.set(field, readMessageField(reader, options, field, message.get(field)));
         break;
       case "list":
-        readListField2(reader, wireType, message.get(field), options);
+        readListField(reader, wireType, message.get(field), options);
         break;
       case "map":
-        readMapEntry2(reader, message.get(field), options);
+        readMapEntry(reader, message.get(field), options);
         break;
     }
   }
-  function readMapEntry2(reader, map, options) {
+  function readMapEntry(reader, map, options) {
     const field = map.field();
     let key;
     let val;
@@ -4995,96 +3088,96 @@
       const [fieldNo] = reader.tag();
       switch (fieldNo) {
         case 1:
-          key = readScalar2(reader, field.mapKey);
+          key = readScalar(reader, field.mapKey);
           break;
         case 2:
           switch (field.mapKind) {
             case "scalar":
-              val = readScalar2(reader, field.scalar);
+              val = readScalar(reader, field.scalar);
               break;
             case "enum":
               val = reader.int32();
               break;
             case "message":
-              val = readMessageField2(reader, options, field);
+              val = readMessageField(reader, options, field);
               break;
           }
           break;
       }
     }
     if (key === void 0) {
-      key = scalarZeroValue2(field.mapKey, false);
+      key = scalarZeroValue(field.mapKey, false);
     }
     if (val === void 0) {
       switch (field.mapKind) {
         case "scalar":
-          val = scalarZeroValue2(field.scalar, false);
+          val = scalarZeroValue(field.scalar, false);
           break;
         case "enum":
           val = field.enum.values[0].number;
           break;
         case "message":
-          val = reflect2(field.message, void 0, false);
+          val = reflect(field.message, void 0, false);
           break;
       }
     }
     map.set(key, val);
   }
-  function readListField2(reader, wireType, list, options) {
+  function readListField(reader, wireType, list, options) {
     var _a;
     const field = list.field();
     if (field.listKind === "message") {
-      list.add(readMessageField2(reader, options, field));
+      list.add(readMessageField(reader, options, field));
       return;
     }
-    const scalarType = (_a = field.scalar) !== null && _a !== void 0 ? _a : ScalarType2.INT32;
-    const packed = wireType == WireType2.LengthDelimited && scalarType != ScalarType2.STRING && scalarType != ScalarType2.BYTES;
+    const scalarType = (_a = field.scalar) !== null && _a !== void 0 ? _a : ScalarType.INT32;
+    const packed = wireType == WireType.LengthDelimited && scalarType != ScalarType.STRING && scalarType != ScalarType.BYTES;
     if (!packed) {
-      list.add(readScalar2(reader, scalarType));
+      list.add(readScalar(reader, scalarType));
       return;
     }
     const e = reader.uint32() + reader.pos;
     while (reader.pos < e) {
-      list.add(readScalar2(reader, scalarType));
+      list.add(readScalar(reader, scalarType));
     }
   }
-  function readMessageField2(reader, options, field, mergeMessage) {
+  function readMessageField(reader, options, field, mergeMessage) {
     const delimited = field.delimitedEncoding;
-    const message = mergeMessage !== null && mergeMessage !== void 0 ? mergeMessage : reflect2(field.message, void 0, false);
-    readMessage2(message, reader, options, delimited, delimited ? field.number : reader.uint32());
+    const message = mergeMessage !== null && mergeMessage !== void 0 ? mergeMessage : reflect(field.message, void 0, false);
+    readMessage(message, reader, options, delimited, delimited ? field.number : reader.uint32());
     return message;
   }
-  function readScalar2(reader, type) {
+  function readScalar(reader, type) {
     switch (type) {
-      case ScalarType2.STRING:
+      case ScalarType.STRING:
         return reader.string();
-      case ScalarType2.BOOL:
+      case ScalarType.BOOL:
         return reader.bool();
-      case ScalarType2.DOUBLE:
+      case ScalarType.DOUBLE:
         return reader.double();
-      case ScalarType2.FLOAT:
+      case ScalarType.FLOAT:
         return reader.float();
-      case ScalarType2.INT32:
+      case ScalarType.INT32:
         return reader.int32();
-      case ScalarType2.INT64:
+      case ScalarType.INT64:
         return reader.int64();
-      case ScalarType2.UINT64:
+      case ScalarType.UINT64:
         return reader.uint64();
-      case ScalarType2.FIXED64:
+      case ScalarType.FIXED64:
         return reader.fixed64();
-      case ScalarType2.BYTES:
+      case ScalarType.BYTES:
         return reader.bytes();
-      case ScalarType2.FIXED32:
+      case ScalarType.FIXED32:
         return reader.fixed32();
-      case ScalarType2.SFIXED32:
+      case ScalarType.SFIXED32:
         return reader.sfixed32();
-      case ScalarType2.SFIXED64:
+      case ScalarType.SFIXED64:
         return reader.sfixed64();
-      case ScalarType2.SINT64:
+      case ScalarType.SINT64:
         return reader.sint64();
-      case ScalarType2.UINT32:
+      case ScalarType.UINT32:
         return reader.uint32();
-      case ScalarType2.SINT32:
+      case ScalarType.SINT32:
         return reader.sint32();
     }
   }
@@ -5092,19 +3185,271 @@
   // node_modules/@bufbuild/protobuf/dist/esm/codegenv2/file.js
   function fileDesc(b64, imports) {
     var _a;
-    const root = fromBinary2(FileDescriptorProtoSchema, base64Decode(b64));
+    const root = fromBinary(FileDescriptorProtoSchema, base64Decode(b64));
     root.messageType.forEach(restoreJsonNames);
     root.dependency = (_a = imports === null || imports === void 0 ? void 0 : imports.map((f) => f.proto.name)) !== null && _a !== void 0 ? _a : [];
     const reg = createFileRegistry(root, (protoFileName) => imports === null || imports === void 0 ? void 0 : imports.find((f) => f.proto.name === protoFileName));
     return reg.getFile(root.name);
   }
 
+  // node_modules/@bufbuild/protobuf/dist/esm/to-binary.js
+  var LEGACY_REQUIRED2 = 3;
+  var writeDefaults = {
+    writeUnknownFields: true
+  };
+  function makeWriteOptions(options) {
+    return options ? Object.assign(Object.assign({}, writeDefaults), options) : writeDefaults;
+  }
+  function toBinary(schema, message, options) {
+    return writeFields(new BinaryWriter(), makeWriteOptions(options), reflect(schema, message)).finish();
+  }
+  function writeFields(writer, opts, msg) {
+    var _a;
+    for (const f of msg.sortedFields) {
+      if (!msg.isSet(f)) {
+        if (f.presence == LEGACY_REQUIRED2) {
+          throw new Error(`cannot encode ${f} to binary: required field not set`);
+        }
+        continue;
+      }
+      writeField(writer, opts, msg, f);
+    }
+    if (opts.writeUnknownFields) {
+      for (const { no, wireType, data } of (_a = msg.getUnknown()) !== null && _a !== void 0 ? _a : []) {
+        writer.tag(no, wireType).raw(data);
+      }
+    }
+    return writer;
+  }
+  function writeField(writer, opts, msg, field) {
+    var _a;
+    switch (field.fieldKind) {
+      case "scalar":
+      case "enum":
+        writeScalar(writer, msg.desc.typeName, field.name, (_a = field.scalar) !== null && _a !== void 0 ? _a : ScalarType.INT32, field.number, msg.get(field));
+        break;
+      case "list":
+        writeListField(writer, opts, field, msg.get(field));
+        break;
+      case "message":
+        writeMessageField(writer, opts, field, msg.get(field));
+        break;
+      case "map":
+        for (const [key, val] of msg.get(field)) {
+          writeMapEntry(writer, opts, field, key, val);
+        }
+        break;
+    }
+  }
+  function writeScalar(writer, msgName, fieldName, scalarType, fieldNo, value) {
+    writeScalarValue(writer.tag(fieldNo, writeTypeOfScalar(scalarType)), msgName, fieldName, scalarType, value);
+  }
+  function writeMessageField(writer, opts, field, message) {
+    if (field.delimitedEncoding) {
+      writeFields(writer.tag(field.number, WireType.StartGroup), opts, message).tag(field.number, WireType.EndGroup);
+    } else {
+      writeFields(writer.tag(field.number, WireType.LengthDelimited).fork(), opts, message).join();
+    }
+  }
+  function writeListField(writer, opts, field, list) {
+    var _a;
+    if (field.listKind == "message") {
+      for (const item of list) {
+        writeMessageField(writer, opts, field, item);
+      }
+      return;
+    }
+    const scalarType = (_a = field.scalar) !== null && _a !== void 0 ? _a : ScalarType.INT32;
+    if (field.packed) {
+      if (!list.size) {
+        return;
+      }
+      writer.tag(field.number, WireType.LengthDelimited).fork();
+      for (const item of list) {
+        writeScalarValue(writer, field.parent.typeName, field.name, scalarType, item);
+      }
+      writer.join();
+      return;
+    }
+    for (const item of list) {
+      writeScalar(writer, field.parent.typeName, field.name, scalarType, field.number, item);
+    }
+  }
+  function writeMapEntry(writer, opts, field, key, value) {
+    var _a;
+    writer.tag(field.number, WireType.LengthDelimited).fork();
+    writeScalar(writer, field.parent.typeName, field.name, field.mapKey, 1, key);
+    switch (field.mapKind) {
+      case "scalar":
+      case "enum":
+        writeScalar(writer, field.parent.typeName, field.name, (_a = field.scalar) !== null && _a !== void 0 ? _a : ScalarType.INT32, 2, value);
+        break;
+      case "message":
+        writeFields(writer.tag(2, WireType.LengthDelimited).fork(), opts, value).join();
+        break;
+    }
+    writer.join();
+  }
+  function writeScalarValue(writer, msgName, fieldName, type, value) {
+    try {
+      switch (type) {
+        case ScalarType.STRING:
+          writer.string(value);
+          break;
+        case ScalarType.BOOL:
+          writer.bool(value);
+          break;
+        case ScalarType.DOUBLE:
+          writer.double(value);
+          break;
+        case ScalarType.FLOAT:
+          writer.float(value);
+          break;
+        case ScalarType.INT32:
+          writer.int32(value);
+          break;
+        case ScalarType.INT64:
+          writer.int64(value);
+          break;
+        case ScalarType.UINT64:
+          writer.uint64(value);
+          break;
+        case ScalarType.FIXED64:
+          writer.fixed64(value);
+          break;
+        case ScalarType.BYTES:
+          writer.bytes(value);
+          break;
+        case ScalarType.FIXED32:
+          writer.fixed32(value);
+          break;
+        case ScalarType.SFIXED32:
+          writer.sfixed32(value);
+          break;
+        case ScalarType.SFIXED64:
+          writer.sfixed64(value);
+          break;
+        case ScalarType.SINT64:
+          writer.sint64(value);
+          break;
+        case ScalarType.UINT32:
+          writer.uint32(value);
+          break;
+        case ScalarType.SINT32:
+          writer.sint32(value);
+          break;
+      }
+    } catch (e) {
+      if (e instanceof Error) {
+        throw new Error(`cannot encode field ${msgName}.${fieldName} to binary: ${e.message}`);
+      }
+      throw e;
+    }
+  }
+  function writeTypeOfScalar(type) {
+    switch (type) {
+      case ScalarType.BYTES:
+      case ScalarType.STRING:
+        return WireType.LengthDelimited;
+      case ScalarType.DOUBLE:
+      case ScalarType.FIXED64:
+      case ScalarType.SFIXED64:
+        return WireType.Bit64;
+      case ScalarType.FIXED32:
+      case ScalarType.SFIXED32:
+      case ScalarType.FLOAT:
+        return WireType.Bit32;
+      default:
+        return WireType.Varint;
+    }
+  }
+
+  // node_modules/@substreams/sdk/dist/index.mjs
+  var Store = class {
+    constructor(storeInterface, schema) {
+      this.storeInterface = storeInterface;
+      this.schema = schema;
+    }
+    set(ordinal, key, value) {
+      const out = toBinary(this.schema, value);
+      this.storeInterface.set(ordinal, key, out);
+    }
+  };
+  var handlerRegistry = /* @__PURE__ */ new Map();
+  var substreams;
+  ((substreams2) => {
+    let handlers;
+    ((handlers2) => {
+      function map(inputTypes, outputType) {
+        return function(target, propertyKey, descriptor) {
+          const handler = descriptor.value;
+          const instance = new target.constructor();
+          handlerRegistry.set(propertyKey, {
+            type: "map",
+            inputTypes,
+            outputType,
+            handler,
+            instance
+          });
+        };
+      }
+      handlers2.map = map;
+      function store(storeType) {
+        return function(target, propertyKey, descriptor) {
+          const handler = descriptor.value;
+          const instance = new target.constructor();
+          handlerRegistry.set(propertyKey, {
+            type: "store",
+            handler,
+            instance,
+            storeType
+          });
+        };
+      }
+      handlers2.store = store;
+    })(handlers = substreams2.handlers || (substreams2.handlers = {}));
+  })(substreams || (substreams = {}));
+  function executeMapHandler(handlerName, inputBytes) {
+    const registered = handlerRegistry.get(handlerName);
+    if (!registered || registered.type !== "map") {
+      throw new Error(`Map handler '${handlerName}' not found`);
+    }
+    const inputs = registered.inputTypes.map((type) => fromBinary(type, inputBytes));
+    const result = registered.handler.call(registered.instance, ...inputs);
+    return toBinary(registered.outputType, result);
+  }
+  function executeStoreHandler(handlerName, storeInterface, inputBytes) {
+    const registered = handlerRegistry.get(handlerName);
+    if (!registered || registered.type !== "store") {
+      throw new Error(`Store handler '${handlerName}' not found`);
+    }
+    const store = new Store(storeInterface, registered.storeType);
+    const input = fromBinary(registered.storeType, inputBytes);
+    registered.handler.call(registered.instance, store, input);
+  }
+  function getHandlerType(handlerName) {
+    return handlerRegistry.get(handlerName)?.type;
+  }
+  globalThis.getHandlerType = getHandlerType;
+  globalThis.executeMapHandler = executeMapHandler;
+  globalThis.executeStoreHandler = executeStoreHandler;
+  Object.defineProperty(globalThis, "Promise", {
+    configurable: false,
+    enumerable: false,
+    get() {
+      throw new Error("Promises are disabled in this runtime");
+    },
+    set(_) {
+      throw new Error("Cannot redefine Promise");
+    }
+  });
+
   // node_modules/@bufbuild/protobuf/dist/esm/codegenv1/message.js
   function messageDesc2(file, path, ...paths) {
     return paths.reduce((acc, cur) => acc.nestedMessages[cur], file.messages[path]);
   }
 
-  // src/pb/pb/sf/substreams/v1/test/test_pb.ts
+  // src/pb/sf/substreams/v1/test/test_pb.ts
   var file_sf_substreams_v1_test_test = /* @__PURE__ */ fileDesc("CiBzZi9zdWJzdHJlYW1zL3YxL3Rlc3QvdGVzdC5wcm90bxIVc2Yuc3Vic3RyZWFtcy52MS50ZXN0IiMKBUJsb2NrEgoKAmlkGAEgASgJEg4KBm51bWJlchgCIAEoBCI1CglNYXBSZXN1bHQSFAoMYmxvY2tfbnVtYmVyGAEgASgEEhIKCmJsb2NrX2hhc2gYAiABKAkiGQoHQm9vbGVhbhIOCgZyZXN1bHQYASABKAgiFwoFQXJyYXkSDgoGcmVzdWx0GAEgAygJQlBaTmdpdGh1Yi5jb20vc3RyZWFtaW5nZmFzdC9zdWJzdHJlYW1zL3BiL3NmL3N1YnN0cmVhbXMvdjEvdGVzdC87cGJzdWJzdHJlYW1zdGVzdGIGcHJvdG8z");
   var BlockSchema = /* @__PURE__ */ messageDesc2(file_sf_substreams_v1_test_test, 0);
   var MapResultSchema = /* @__PURE__ */ messageDesc2(file_sf_substreams_v1_test_test, 1);
@@ -5112,7 +3457,7 @@
   // src/lib.ts
   var Substreams = class {
     test_map(blk) {
-      return create2(MapResultSchema, {
+      return create(MapResultSchema, {
         blockNumber: blk.number,
         blockHash: blk.id
       });

@@ -5,7 +5,7 @@
 	"dependencies": {
 		"@bufbuild/protobuf": "^2.3.0",
 		"@ethersproject/abi": "^5.8.0",
-		"@substreams/sdk": "github:streamingfast/substreams-js-sdk#2dfb296"
+		"@substreams/sdk": "github:streamingfast/substreams-js-sdk"
 	},
 	"devDependencies": {
 		"esbuild": "^0.21.0"

@@ -413,7 +413,7 @@ func printUndo(lastGoodClock *pbsubstreams.BlockRef, cursor string) {
 	fmt.Printf("\nNext cursor: %s\n", cursor)
 }
 func printUndoJSON(lastGoodClock *pbsubstreams.BlockRef, cursor string) {
-	fmt.Printf(formatUndoJSON(lastGoodClock, cursor) + "\n")
+	fmt.Print(formatUndoJSON(lastGoodClock, cursor) + "\n")
 }
 
 func formatUndoJSON(lastGoodClock *pbsubstreams.BlockRef, cursor string) string {

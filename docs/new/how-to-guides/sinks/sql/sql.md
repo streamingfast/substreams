@@ -35,11 +35,9 @@ The core function of the SQL sink is to translate your Substreams output (Protob
 
 ## Installation
 
-Regardless of the ways you choose to map the data, you will have to install the `substreams-sink-sql` CLI in your computer.
+Enabling `substreams-sink-sql` in your [Substreams CLI](../../../../references/cli/installing-the-cli.md).
 
-### Installing the Binary
-
-1. Download the correct binary, depending on your operating system, from the [substreams-sink-sql GitHub releases](https://github.com/streamingfast/substreams-sink-sql/releases) page.
+1. Download the current binary, optionally depending on your operating system, from the [substreams-sink-sql GitHub releases](https://github.com/streamingfast/substreams-sink-sql/releases) page.
 1. Move the binary to your `$PATH`.
 
 ### Installing from Source
@@ -51,5 +49,5 @@ Regardless of the ways you choose to map the data, you will have to install the 
 go install ./cmd/substreams-sink-sql
 ```
 
-1. Ensure you have Go bin directory in your $PATH.
+1. Ensure you have the Go bin directory in your $PATH.
 

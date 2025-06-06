@@ -812,8 +812,10 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 			return ctx.Err()
 		}
 
+		var isData bool
+		egressBytes := proto.Size(resp)
 		if data := resp.GetBlockScopedData(); data != nil {
-			stats.RecordDataSent()
+			isData = true
 			if noop {
 				data.DebugMapOutputs = nil
 				data.DebugStoreOutputs = nil
@@ -826,7 +828,8 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 			return connect.NewError(connect.CodeUnavailable, err)
 		}
 
-		metering.AddEgressBytes(ctx, proto.Size(resp))
+		stats.RecordMessageSent(isData, egressBytes)
+		metering.AddEgressBytes(ctx, egressBytes)
 		metericsSender.Send(ctx, userID, apiKeyID, ip, userMeta, outputModuleHash, "sf.substreams.rpc.v2/Blocks")
 		return nil
 	}

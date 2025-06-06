@@ -2,6 +2,7 @@ package execout
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"path"
@@ -35,9 +36,13 @@ type File struct {
 	logger     *zap.Logger
 	loaded     bool
 
-	writingFile   *io.PipeWriter
-	writeError    chan error
-	deletedBefore *uint64
+	readingFile        io.ReadCloser
+	highestLoadedBlock uint64
+
+	writingFile        *io.PipeWriter
+	orderedFlagWritten bool
+	writeError         chan error
+	deletedBefore      *uint64
 
 	sizeInMemory int
 }
@@ -105,6 +110,11 @@ func (c *File) SetItem(clock *pbsubstreams.Clock, data []byte) error {
 }
 
 func (c *File) writePreviousKV() error {
+	if !c.orderedFlagWritten {
+		if _, err := streamproto.WriteOrderedBool(c.writingFile); err != nil {
+			return fmt.Errorf("writing ordered bool: %w", err)
+		}
+	}
 	for _, item := range c.Kv {
 		size, err := streamproto.WriteItem(c.writingFile, item)
 		if err != nil {
@@ -153,6 +163,92 @@ func (c *File) GetAtBlock(blockNumber uint64) ([]byte, bool) {
 var MaxExecoutSegmentSize = int(8589934592)
 var ErrSegmentSizeExceeded = connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("execution output segment size exceeded %d bytes: substreams cannot process this segment", MaxExecoutSegmentSize))
 
+// LoadNext will load a single item from the file, unless upTo is set, then it is bound to that block number
+func (c *File) LoadNext(ctx context.Context, upTo *uint64) (lastLoaded uint64, err error) {
+	c.Lock()
+	defer c.Unlock()
+	if upTo != nil && c.highestLoadedBlock >= *upTo {
+		return c.highestLoadedBlock, nil
+	}
+	if c.readingFile == nil {
+		r, err := c.store.OpenObject(ctx, c.Filename())
+		if err != nil {
+			return 0, err
+		}
+		ordered, readBytes, err := streamproto.ReadOrderedBool(r)
+		if err != nil {
+			return 0, err
+		}
+		if !ordered {
+			if err := rewriteAsOrdered(ctx, r, readBytes, c.store, c.Filename(), c.Range, c.logger); err != nil {
+				return 0, err
+			}
+			if err := r.Close(); err != nil {
+				return 0, err
+			}
+
+			r, err := c.store.OpenObject(ctx, c.Filename())
+			if err != nil {
+				return 0, err
+			}
+			ordered, readBytes, err = streamproto.ReadOrderedBool(r)
+			if err != nil {
+				return 0, err
+			}
+			if !ordered {
+				return 0, fmt.Errorf("internal error: could not rewrite outputs as ordered")
+			}
+		}
+
+		c.readingFile = r
+	}
+
+	item, err := streamproto.ReadNextItem(c.readingFile)
+	if err != nil {
+		return 0, err
+	}
+	c.Kv[item.BlockId] = item
+	c.highestLoadedBlock = item.BlockNum
+
+	return c.highestLoadedBlock, nil
+}
+
+func rewriteAsOrdered(ctx context.Context, r io.Reader, readBytes []byte, store dstore.Store, filename string, rng *block.Range, logger *zap.Logger) error {
+	bytes, err := io.ReadAll(r)
+	if err != nil {
+		return fmt.Errorf("reading store file %s: %w", filename, err)
+	}
+	bytes = append(readBytes, bytes...)
+
+	o := &pboutput.Array{}
+	if err := o.UnmarshalVTUnsafe(bytes); err != nil {
+		return fmt.Errorf("unmarshalling data: %w", err)
+	}
+	items := o.Items
+
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].BlockNum < items[j].BlockNum
+	})
+
+	newFile := &File{
+		store:  store,
+		logger: logger,
+		Range:  rng,
+	}
+	newFile.WriteAsYouGo(ctx)
+
+	for _, item := range items {
+		if err := newFile.SetItem(&pbsubstreams.Clock{
+			Id:        item.BlockId,
+			Number:    uint64(item.BlockNum),
+			Timestamp: item.Timestamp,
+		}, item.Payload); err != nil {
+			return err
+		}
+	}
+	return newFile.Save(ctx)
+}
+
 func (c *File) Load(ctx context.Context) error {
 	c.Lock()
 	defer c.Unlock()
@@ -198,6 +294,32 @@ func (c *File) Load(ctx context.Context) error {
 		c.loaded = true
 	}
 	return err
+}
+
+func (f *File) WriteAsYouGo(ctx context.Context) {
+	filename := f.Filename()
+	f.logger.Info("begin writing execution output file", zap.String("filename", filename))
+	r, w := io.Pipe()
+	f.writingFile = w
+	f.writeError = make(chan error, 1)
+
+	go func() {
+		<-ctx.Done()
+		w.CloseWithError(ctx.Err()) // this will trigger an error in 'store.WriteObject' in next thread. NOOP if already closed
+	}()
+	go func() {
+		// writes the data from the pipe to the storage
+		// any error here closes the pipe (to fail on next write)
+		// and also gets written to the writeError channel for 'Save' operation to pick up
+		err := f.store.WriteObject(ctx, filename, r)
+		if err != nil && !errors.Is(err, context.Canceled) {
+			f.logger.Warn("error writing execution output file", zap.String("filename", filename), zap.Error(err))
+		}
+		w.CloseWithError(err) // NOOP if already closed
+
+		f.writeError <- err // so the "Save" operation can wait on write completion and determine if something failed
+		close(f.writeError)
+	}()
 }
 
 func (c *File) Save(ctx context.Context) error {

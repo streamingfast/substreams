@@ -217,5 +217,3 @@ replace (
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869 => github.com/streamingfast/graph v0.0.0-20220329181048-a5710712d873
 	rogchap.com/v8go => github.com/streamingfast/v8go v0.0.0-20250530143322-fe2ca23f76b3
 )
-
-// replace rogchap.com/v8go => /home/ulysse/Documents/SF/v8go

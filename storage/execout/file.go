@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"path"
 	"sort"
 	"strconv"
@@ -36,8 +37,8 @@ type File struct {
 	logger     *zap.Logger
 	loaded     bool
 
-	readingFile        io.ReadCloser
-	highestLoadedBlock uint64
+	readingFile io.ReadCloser
+	loadedUpTo  uint64
 
 	writingFile        *io.PipeWriter
 	orderedFlagWritten bool
@@ -128,11 +129,15 @@ func (c *File) writePreviousKV() error {
 	return nil
 }
 
-func (c *File) Get(clock *pbsubstreams.Clock) ([]byte, bool) {
+func (c *File) Get(ctx context.Context, clock *pbsubstreams.Clock) ([]byte, bool) {
 	c.Lock()
 	defer c.Unlock()
 	if c.deletedBefore != nil && clock.Number < *c.deletedBefore {
 		panic("trying to get deleted data, this should never happen")
+	}
+
+	if c.readingFile != nil && clock.Number > c.loadedUpTo {
+		c.LoadUpTo(ctx, clock.Number)
 	}
 
 	cacheItem, found := c.Kv[clock.Id]
@@ -144,73 +149,95 @@ func (c *File) Get(clock *pbsubstreams.Clock) ([]byte, bool) {
 	return cacheItem.Payload, found
 }
 
-func (c *File) GetAtBlock(blockNumber uint64) ([]byte, bool) {
+func (c *File) GetAtBlock(ctx context.Context, blockNumber uint64) (payload []byte, found bool, err error) {
 	c.Lock()
 	defer c.Unlock()
 
 	if c.deletedBefore != nil && blockNumber < *c.deletedBefore {
 		panic("trying to get deleted data, this should never happen")
 	}
+
+	if err := c.LoadUpTo(ctx, blockNumber); err != nil {
+		return nil, false, err
+	}
+
 	for _, value := range c.Kv {
 		if value.BlockNum == blockNumber {
-			return value.Payload, true
+			return value.Payload, true, nil
 		}
 	}
 
-	return nil, false
+	return nil, false, nil
 }
 
 var MaxExecoutSegmentSize = int(8589934592)
 var ErrSegmentSizeExceeded = connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("execution output segment size exceeded %d bytes: substreams cannot process this segment", MaxExecoutSegmentSize))
 
-// LoadNext will load a single item from the file, unless upTo is set, then it is bound to that block number
-func (c *File) LoadNext(ctx context.Context, upTo *uint64) (lastLoaded uint64, err error) {
-	c.Lock()
-	defer c.Unlock()
-	if upTo != nil && c.highestLoadedBlock >= *upTo {
-		return c.highestLoadedBlock, nil
+func (c *File) LoadUpTo(ctx context.Context, upTo uint64) error {
+	for upTo < c.loadedUpTo {
+		_, err := c.LoadNext(ctx)
+		if err != nil {
+			return err
+		}
 	}
-	if c.readingFile == nil {
+	return nil
+}
+
+func (c *File) openFileToRead(ctx context.Context) error {
+	r, err := c.store.OpenObject(ctx, c.Filename())
+	if err != nil {
+		return err
+	}
+	ordered, readBytes, err := streamproto.ReadOrderedBool(r)
+	if err != nil {
+		return err
+	}
+	if !ordered {
+		if err := rewriteAsOrdered(ctx, r, readBytes, c.store, c.Filename(), c.Range, c.logger); err != nil {
+			return err
+		}
+		if err := r.Close(); err != nil {
+			return err
+		}
+
 		r, err := c.store.OpenObject(ctx, c.Filename())
 		if err != nil {
-			return 0, err
+			return err
 		}
-		ordered, readBytes, err := streamproto.ReadOrderedBool(r)
+		ordered, readBytes, err = streamproto.ReadOrderedBool(r)
 		if err != nil {
-			return 0, err
+			return err
 		}
 		if !ordered {
-			if err := rewriteAsOrdered(ctx, r, readBytes, c.store, c.Filename(), c.Range, c.logger); err != nil {
-				return 0, err
-			}
-			if err := r.Close(); err != nil {
-				return 0, err
-			}
-
-			r, err := c.store.OpenObject(ctx, c.Filename())
-			if err != nil {
-				return 0, err
-			}
-			ordered, readBytes, err = streamproto.ReadOrderedBool(r)
-			if err != nil {
-				return 0, err
-			}
-			if !ordered {
-				return 0, fmt.Errorf("internal error: could not rewrite outputs as ordered")
-			}
+			return fmt.Errorf("internal error: could not rewrite outputs as ordered")
 		}
+	}
 
-		c.readingFile = r
+	c.readingFile = r
+	return nil
+}
+
+func (c *File) LoadNext(ctx context.Context) (*pboutput.Item, error) {
+	c.Lock()
+	defer c.Unlock()
+	if c.loadedUpTo == math.MaxUint64 {
+		return nil, nil
+	}
+
+	if c.readingFile == nil {
+		if err := c.openFileToRead(ctx); err != nil {
+			return nil, err
+		}
 	}
 
 	item, err := streamproto.ReadNextItem(c.readingFile)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	c.Kv[item.BlockId] = item
-	c.highestLoadedBlock = item.BlockNum
+	c.loadedUpTo = item.BlockNum
 
-	return c.highestLoadedBlock, nil
+	return item, nil
 }
 
 func rewriteAsOrdered(ctx context.Context, r io.Reader, readBytes []byte, store dstore.Store, filename string, rng *block.Range, logger *zap.Logger) error {
@@ -310,7 +337,7 @@ func (f *File) WriteAsYouGo(ctx context.Context) {
 	go func() {
 		// writes the data from the pipe to the storage
 		// any error here closes the pipe (to fail on next write)
-		// and also gets written to the writeError channel for 'Save' operation to pick up
+		// and also lgets written to the writeError channel for 'Save' operation to pick up
 		err := f.store.WriteObject(ctx, filename, r)
 		if err != nil && !errors.Is(err, context.Canceled) {
 			f.logger.Warn("error writing execution output file", zap.String("filename", filename), zap.Error(err))

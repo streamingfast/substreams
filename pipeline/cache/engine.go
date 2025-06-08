@@ -56,7 +56,7 @@ func (e *Engine) NewBuffer(optionalBlock *pbbstream.Block, clock *pbsubstreams.C
 
 	e.reversibleBuffers[clock.Number] = out
 	for moduleName, existingExecOut := range e.existingExecOuts {
-		val, ok := existingExecOut.Get(clock)
+		val, ok := existingExecOut.Get(e.ctx, clock)
 		if !ok {
 			continue
 		}

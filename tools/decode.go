@@ -382,7 +382,10 @@ func searchOutputsModule(
 	}
 
 	for i := requestedBlocks.StartBlock; i < requestedBlocks.ExclusiveEndBlock; i++ {
-		payloadBytes, found := outputCache.GetAtBlock(i)
+		payloadBytes, found, err := outputCache.GetAtBlock(ctx, i)
+		if err != nil {
+			return fmt.Errorf("getting block %d from cache %s file %s : %w", i, moduleStore.BaseURL(), outputCache.String(), err)
+		}
 		if !found {
 			continue
 		}
@@ -433,7 +436,10 @@ func searchOutputsModuleKvOps(
 	}
 
 	for i := requestedBlocks.StartBlock; i < requestedBlocks.ExclusiveEndBlock; i++ {
-		payloadBytes, found := outputCache.GetAtBlock(i)
+		payloadBytes, found, err := outputCache.GetAtBlock(ctx, i)
+		if err != nil {
+			return fmt.Errorf("getting block %d from cache %s file %s : %w", i, moduleStore.BaseURL(), outputCache.String(), err)
+		}
 		if !found {
 			continue
 		}

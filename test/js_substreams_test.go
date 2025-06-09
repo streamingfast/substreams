@@ -57,7 +57,6 @@ func Test_JSRuntime_SimpleMap(t *testing.T) {
 
 	request := work.NewRequest(ctx, reqctx.Details(ctx), stage, startBlock)
 	require.NoError(t, request.Validate())
-
 	require.NoError(
 		t,
 		processInternalRequest(t, ctx, request, nil, newBlockGenerator, responseCollector, nil, testTempDir),

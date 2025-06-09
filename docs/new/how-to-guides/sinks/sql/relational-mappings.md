@@ -1,5 +1,7 @@
 # Relational Mapping
 
+If you want to use a relational model (e.g., creating one-to-many), you can annotate your Protobuf to indicate the primary and foreings keys in your database.
+
 To map your Protobuf definitions directly to database tables and establish relationships between objects, you need to annotate your Protobuf messages with table names, primary keys, and relationship metadata.
 
 ```
@@ -72,7 +74,7 @@ params:
   map_spl_instructions: "spl_token_address=4vMsoUT2BWatFweudnQM1xedRLfJgJ7hswhcpz4xgBTy|spl_token_decimal=9" # 2.
   solana_common:transactions_by_programid_and_account_without_votes: "program:TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA && account:4vMsoUT2BWatFweudnQM1xedRLfJgJ7hswhcpz4xgBTy"
 
-sink:
+sink: 
   module: map_spl_instructions # 3.
   type: sf.substreams.sink.sql.v1.Service
   config:
@@ -81,12 +83,13 @@ sink:
       run_interval_seconds: 300
       enabled: false
 ```
-
 1. The `map_spl_instructions` module maps Solana transactions to the output Protobuf, `SplInstructions`.
 1. Configuration of the `map_spl_instructions` module. Here, you define the specific token you want to track and number of decimals to perform operations.
 1. The `sink` section defines the SQL sink configuration. In this example, the sink will directly map `map_spl_instructions` to the tables of the database.
 **The sink is able to infer the table names, so it is not necessary to provide a `schema.sql` file.**
 1. DBT configuration to create materialized views on top of the inserted data.
+
+**NOTE:** The `sink` block in the manifest is not necessary if you provide the module name when executing the SQL CLI command. For example: `substreams-sink-sql from-proto psql://.. substreams.yaml map_my_data`
 
 - Observe the annotations in Protobuf:
 
@@ -175,6 +178,8 @@ substreams-sink-sql from-proto $DSN ./substreams.yaml
 ### Run the Sink Without Relations
 
 If you want the sink to create the SQL tables **without relationships**, then you can use the `--no-proto-option` flag. With this flag, you don't need annotations, the sink will infer the name of the table using the name of the messages that you output.
+
+**NOTE:** This method will do its best to create the table, but it might NOT automatically work for complex and nested Protubuf messages.
 
 ```bash
 substreams-sink-sql from-proto $DSN ./substreams.yaml --no-proto-option

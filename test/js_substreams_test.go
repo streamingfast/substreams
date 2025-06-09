@@ -21,9 +21,12 @@ func Test_JSRuntime_SimpleMap(t *testing.T) {
 
 	testTempDir := t.TempDir()
 
-	ctx := context.Background()
-	ctx = metering.WithMetricsSender(ctx)
-	ctx = reqctx.WithReqStats(ctx, metrics.NewReqStats(&metrics.Config{}, zlog))
+	baseCtx := context.Background()
+	baseCtx = metering.WithMetricsSender(baseCtx)
+	baseCtx = reqctx.WithReqStats(baseCtx, metrics.NewReqStats(&metrics.Config{}, zlog))
+
+	ctx, cancel := context.WithCancel(baseCtx)
+	defer cancel()
 
 	manifestPath := "./testdata/js_substreams/substreams_eth_usdt_js.spkg"
 	pkg := manifest.TestReadManifest(t, manifestPath)

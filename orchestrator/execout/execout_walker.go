@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -22,13 +21,6 @@ import (
 	"github.com/streamingfast/substreams/storage/execout"
 	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
 )
-
-var disablePreloadExecFiles bool
-
-func init() {
-	e := os.Getenv("SUBSTREAMS_DISABLE_PRELOAD_EXEC_FILES")
-	disablePreloadExecFiles = e == "" || e == "0" || e == "false"
-}
 
 type Walker struct {
 	ctx context.Context
@@ -79,14 +71,11 @@ func (r *Walker) IsWorking() bool {
 
 func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
 	file := r.fileWalker.File()
-	if !disablePreloadExecFiles {
-		r.fileWalker.PreloadNext(r.ctx)
-	}
 
 	return func() loop.Msg {
 		time.Sleep(waitBefore)
 
-		err := file.Load(r.ctx)
+		err := file.Open(r.ctx)
 		if errors.Is(err, dstore.ErrNotFound) {
 			return MsgFileNotPresent{NextWait: computeNewWait(waitBefore, r.fileWalker.IsLocal)}
 		}
@@ -94,7 +83,7 @@ func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
 			return loop.NewQuitMsg(fmt.Errorf("loading %s cache %q: %w", file.ModuleName, file.Filename(), err))
 		}
 
-		if err := r.sendItems(file.SortedItems()); err != nil {
+		if err := r.sendItems(file.ReadNext); err != nil {
 			return loop.NewQuitMsg(err)
 		}
 		return MsgFileDownloaded{}
@@ -115,10 +104,14 @@ func computeNewWait(previousWait time.Duration, storeIsLocal bool) time.Duration
 	return newWait
 }
 
-func (r *Walker) sendItems(sortedItems []*pboutput.Item) error {
-	for _, item := range sortedItems {
+func (r *Walker) sendItems(get func() (*pboutput.Item, error)) error {
+	for {
+		item, err := get()
+		if err != nil {
+			return err
+		}
 		if item == nil {
-			continue // why would that happen?!
+			return nil // why would that happen?!
 		}
 		if item.BlockNum < r.StartBlock {
 			continue
@@ -148,7 +141,6 @@ func (r *Walker) sendItems(sortedItems []*pboutput.Item) error {
 			return nil
 		}
 	}
-	return nil
 }
 
 func (r *Walker) Progress() (first, current, last int) {

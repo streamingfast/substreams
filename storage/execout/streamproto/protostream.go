@@ -74,7 +74,7 @@ func ReadNextItem(reader io.Reader) (item *pb.Item, err error) {
 	}
 
 	itemData := make([]byte, size)
-	if _, err := reader.Read(itemData); err != nil {
+	if _, err := io.ReadFull(reader, itemData); err != nil {
 		return nil, fmt.Errorf("failed to read item data: %w", err)
 	}
 
@@ -89,23 +89,39 @@ func ReadNextItem(reader io.Reader) (item *pb.Item, err error) {
 func readVarint(reader io.Reader) (uint64, error) {
 	var value uint64
 	var shift uint
+	var bytesRead int
 
 	for {
 		buf := make([]byte, 1)
-		if _, err := reader.Read(buf); err != nil {
-			return 0, err
+		n, err := reader.Read(buf)
+		if err != nil {
+			return 0, fmt.Errorf("varint read error after %d bytes: %w", bytesRead, err)
+		}
+		if n != 1 {
+			return 0, fmt.Errorf("varint incomplete read: expected 1 byte, got %d after %d bytes", n, bytesRead)
 		}
 
+		bytesRead++
 		b := buf[0]
+
+		// Check for potential overflow before applying the shift
+		if shift >= 64 {
+			return 0, fmt.Errorf("varint overflow: too many bytes (%d)", bytesRead)
+		}
+
+		// Add the 7 bits from this byte to our value
 		value |= uint64(b&0x7F) << shift
 
+		// If MSB is 0, this is the last byte
 		if b&0x80 == 0 {
 			break
 		}
 
 		shift += 7
-		if shift >= 64 {
-			return 0, fmt.Errorf("varint overflow")
+
+		// Protect against infinite loops with malformed data
+		if bytesRead > 10 {
+			return 0, fmt.Errorf("varint too long: read %d bytes without termination", bytesRead)
 		}
 	}
 

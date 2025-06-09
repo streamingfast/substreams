@@ -25,6 +25,13 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
+type FileReader struct {
+	*File
+	reader        *io.ReadCloser
+	lastReadItem  *pboutput.Item
+	lastReadBlock uint64
+}
+
 // A File in `execout` stores, for a given module (with a given hash), the outputs of module execution
 // for _multiple blocks_, based on their block ID.
 type File struct {
@@ -115,6 +122,7 @@ func (c *File) writePreviousKV() error {
 		if _, err := streamproto.WriteOrderedBool(c.writingFile); err != nil {
 			return fmt.Errorf("writing ordered bool: %w", err)
 		}
+		c.orderedFlagWritten = true
 	}
 	for _, item := range c.Kv {
 		size, err := streamproto.WriteItem(c.writingFile, item)
@@ -183,7 +191,7 @@ func (c *File) LoadUpTo(ctx context.Context, upTo uint64) error {
 	return nil
 }
 
-func (c *File) openFileToRead(ctx context.Context) error {
+func (c *File) Open(ctx context.Context) error {
 	r, err := c.store.OpenObject(ctx, c.Filename())
 	if err != nil {
 		return err
@@ -193,46 +201,67 @@ func (c *File) openFileToRead(ctx context.Context) error {
 		return err
 	}
 	if !ordered {
+		fmt.Println("rewriting as ordered")
 		if err := rewriteAsOrdered(ctx, r, readBytes, c.store, c.Filename(), c.Range, c.logger); err != nil {
+			fmt.Println("rewriting as ordered error", err)
 			return err
 		}
+		fmt.Println("closing")
 		if err := r.Close(); err != nil {
+			fmt.Println("closing err", err)
 			return err
 		}
 
+		fmt.Println("opening object")
 		r, err := c.store.OpenObject(ctx, c.Filename())
 		if err != nil {
+			fmt.Println("opening object error", err)
 			return err
 		}
+		fmt.Println("reading ordered bool")
 		ordered, readBytes, err = streamproto.ReadOrderedBool(r)
 		if err != nil {
+			fmt.Println("reading ordered bool error", err)
 			return err
 		}
 		if !ordered {
+			fmt.Println("could not rewrite outputs as ordered")
 			return fmt.Errorf("internal error: could not rewrite outputs as ordered")
 		}
+		c.readingFile = r
+	} else {
+		c.readingFile = r
 	}
 
-	c.readingFile = r
 	return nil
+}
+
+func (c *File) ReadNext() (*pboutput.Item, error) {
+	item, err := streamproto.ReadNextItem(c.readingFile)
+	if err == io.EOF {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return item, nil
 }
 
 func (c *File) LoadNext(ctx context.Context) (*pboutput.Item, error) {
 	c.Lock()
 	defer c.Unlock()
+
 	if c.loadedUpTo == math.MaxUint64 {
 		return nil, nil
-	}
-
-	if c.readingFile == nil {
-		if err := c.openFileToRead(ctx); err != nil {
-			return nil, err
-		}
 	}
 
 	item, err := streamproto.ReadNextItem(c.readingFile)
 	if err != nil {
 		return nil, err
+	}
+	if item == nil { // fixme
+		c.loadedUpTo = math.MaxUint64
+		return nil, nil
 	}
 	c.Kv[item.BlockId] = item
 	c.loadedUpTo = item.BlockNum
@@ -262,6 +291,8 @@ func rewriteAsOrdered(ctx context.Context, r io.Reader, readBytes []byte, store 
 		logger: logger,
 		Range:  rng,
 	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel() // closes the WriteAsYouGo
 	newFile.WriteAsYouGo(ctx)
 
 	for _, item := range items {

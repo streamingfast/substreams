@@ -4,13 +4,11 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"testing"
 
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
-	"github.com/test-go/testify/require"
 	"go.uber.org/zap"
 )
 
@@ -46,21 +44,21 @@ func NewTestFileWalker() *FileWalker {
 	return NewFileWalker(config, segmenter, zap.NewNop())
 }
 
-func TestName(t *testing.T) {
-	w := NewTestFileWalker()
-	ctx := context.Background()
-
-	w.File()
-	require.Len(t, w.buffer, 0)
-	w.PreloadNext(ctx)
-	require.Len(t, w.buffer, 1)
-
-	w.Next()
-	require.Len(t, w.buffer, 1)
-
-	w.File()
-	require.Len(t, w.buffer, 0)
-
-	w.PreloadNext(ctx)
-	require.Len(t, w.buffer, 1)
-}
+//func TestName(t *testing.T) {
+//	w := NewTestFileWalker()
+//	ctx := context.Background()
+//
+//	w.File()
+//	require.Len(t, w.buffer, 0)
+//	w.PreloadNext(ctx)
+//	require.Len(t, w.buffer, 1)
+//
+//	w.Next()
+//	require.Len(t, w.buffer, 1)
+//
+//	w.File()
+//	require.Len(t, w.buffer, 0)
+//
+//	w.PreloadNext(ctx)
+//	require.Len(t, w.buffer, 1)
+//}

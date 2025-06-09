@@ -1,7 +1,6 @@
 package execout
 
 import (
-	"context"
 	"sync"
 
 	"go.uber.org/zap"
@@ -49,30 +48,6 @@ func (fw *FileWalker) File() *File {
 	}
 
 	return fw.config.NewFile(rng)
-}
-
-// PreloadNext loads the next file in the background so the consumer doesn't wait between each file.
-// This affects maximum throughput
-func (fw *FileWalker) PreloadNext(ctx context.Context) {
-	fw.bufferLock.Lock()
-	defer fw.bufferLock.Unlock()
-	fw.preload(ctx, fw.segment+1)
-}
-
-func (fw *FileWalker) preload(ctx context.Context, seg int) {
-	if _, found := fw.buffer[seg]; found {
-		return
-	}
-	rng := fw.segmenter.Range(seg)
-	if rng == nil {
-		return
-	}
-
-	f := fw.config.NewFile(rng)
-	go func() {
-		_ = f.Load(ctx)
-	}()
-	fw.buffer[seg] = f
 }
 
 // Move to the next

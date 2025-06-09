@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"sync"
 
+	"connectrpc.com/connect"
 	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
 	"github.com/streamingfast/substreams/storage/execout/streamproto"
 
@@ -33,7 +34,12 @@ type File struct {
 	store      dstore.Store
 	logger     *zap.Logger
 	loaded     bool
-	loadedSize uint64
+
+	writingFile   *io.PipeWriter
+	writeError    chan error
+	deletedBefore *uint64
+
+	sizeInMemory int
 }
 
 func (c *File) FullFilename() string {
@@ -67,7 +73,7 @@ func (c *File) ExtractClocks(clocksMap map[uint64]*pbsubstreams.Clock) {
 	}
 }
 
-func (c *File) SetItem(clock *pbsubstreams.Clock, data []byte) {
+func (c *File) SetItem(clock *pbsubstreams.Clock, data []byte) error {
 	c.Lock()
 	defer c.Unlock()
 
@@ -83,12 +89,41 @@ func (c *File) SetItem(clock *pbsubstreams.Clock, data []byte) {
 		Payload: cp,
 	}
 
+	if c.writingFile != nil {
+		// if we are writing the file, we flush the data and delete what was there before.
+		// if we are not writing the file, we probably writing an index so we can't delete the data, it will be aggregated at the end of the segment
+		if err := c.writePreviousKV(); err != nil {
+			return err
+		}
+		c.Kv = make(map[string]*pboutput.Item) // in writable File, we delete previous items
+		c.deletedBefore = &clock.Number
+	}
+
 	c.Kv[clock.Id] = ci
+
+	return nil
+}
+
+func (c *File) writePreviousKV() error {
+	for _, item := range c.Kv {
+		size, err := streamproto.WriteItem(c.writingFile, item)
+		if err != nil {
+			return err
+		}
+		c.sizeInMemory += size
+		if c.sizeInMemory > MaxExecoutSegmentSize {
+			return fmt.Errorf("%w: file %s on module %s", ErrSegmentSizeExceeded, c.Filename(), c.ModuleName)
+		}
+	}
+	return nil
 }
 
 func (c *File) Get(clock *pbsubstreams.Clock) ([]byte, bool) {
 	c.Lock()
 	defer c.Unlock()
+	if c.deletedBefore != nil && clock.Number < *c.deletedBefore {
+		panic("trying to get deleted data, this should never happen")
+	}
 
 	cacheItem, found := c.Kv[clock.Id]
 
@@ -103,6 +138,9 @@ func (c *File) GetAtBlock(blockNumber uint64) ([]byte, bool) {
 	c.Lock()
 	defer c.Unlock()
 
+	if c.deletedBefore != nil && blockNumber < *c.deletedBefore {
+		panic("trying to get deleted data, this should never happen")
+	}
 	for _, value := range c.Kv {
 		if value.BlockNum == blockNumber {
 			return value.Payload, true
@@ -111,6 +149,9 @@ func (c *File) GetAtBlock(blockNumber uint64) ([]byte, bool) {
 
 	return nil, false
 }
+
+var MaxExecoutSegmentSize = int(8589934592)
+var ErrSegmentSizeExceeded = connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("execution output segment size exceeded %d bytes: substreams cannot process this segment", MaxExecoutSegmentSize))
 
 func (c *File) Load(ctx context.Context) error {
 	c.Lock()
@@ -133,11 +174,15 @@ func (c *File) Load(ctx context.Context) error {
 		}
 		defer objectReader.Close()
 
-		bytes, err := io.ReadAll(objectReader)
+		// Limit reading to MaxExecoutSegmentSize to prevent excessive memory usage
+		limitedReader := io.LimitReader(objectReader, int64(MaxExecoutSegmentSize+1))
+		bytes, err := io.ReadAll(limitedReader)
 		if err != nil {
 			return fmt.Errorf("reading store file %s: %w", filename, err)
 		}
-		c.loadedSize = uint64(len(bytes))
+		if len(bytes) == MaxExecoutSegmentSize+1 {
+			return derr.NewFatalError(fmt.Errorf("%w: file %s on module %s", ErrSegmentSizeExceeded, filename, c.ModuleName))
+		}
 
 		outputData := &pboutput.Map{}
 		if err = outputData.UnmarshalFast(bytes); err != nil {
@@ -156,23 +201,14 @@ func (c *File) Load(ctx context.Context) error {
 }
 
 func (c *File) Save(ctx context.Context) error {
-	filename := c.Filename()
-
-	c.logger.Info("writing execution output file", zap.String("filename", filename))
-	return derr.RetryContext(ctx, 10, func(ctx context.Context) error { // more than the usual 5 retries here because if we fail, we have to reprocess the whole segment
-		r, w := io.Pipe()
-		go func() {
-			for _, item := range c.Kv {
-				if err := streamproto.WriteItem(w, item); err != nil {
-					w.CloseWithError(err)
-					return
-				}
-			}
-			w.Close()
-		}()
-		err := c.store.WriteObject(ctx, filename, r)
-		return err
-	})
+	if c.writingFile == nil {
+		return fmt.Errorf("cannot save file %s: writingfile is nil", c.Filename())
+	}
+	c.writePreviousKV() // last block output must be written
+	if err := c.writingFile.Close(); err != nil {
+		return fmt.Errorf("closing file %s: %w", c.Filename(), err)
+	}
+	return <-c.writeError
 }
 
 func (c *File) String() string {

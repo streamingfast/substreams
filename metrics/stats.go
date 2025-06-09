@@ -30,8 +30,9 @@ type Stats struct {
 	// moduleStats only contain stats from local execution
 	modulesStats map[string]*extendedStats
 
-	runningJobs        runningJobs
-	completedJobsStats map[string]*pbssinternal.ModuleStats
+	runningJobs             runningJobs
+	completedJobsStats      map[string]*pbssinternal.ModuleStats
+	uncompressedEgressBytes uint64
 
 	localProcessedBlockCount  uint64
 	remoteProcessedBlockCount uint64
@@ -231,11 +232,12 @@ func (s *Stats) RecordInitializationComplete() {
 	s.initDuration = time.Since(s.startTime)
 }
 
-func (s *Stats) RecordDataSent() {
+func (s *Stats) RecordMessageSent(isData bool, egressBytes int) {
 	// this is always sent linearly, no need to lock
-	if s.timeToFirstData == 0 {
+	if isData && s.timeToFirstData == 0 {
 		s.timeToFirstData = time.Since(s.startTime)
 	}
+	s.uncompressedEgressBytes += uint64(egressBytes)
 }
 
 func (s *Stats) RecordStages(stages []*pbsubstreamsrpc.Stage) {
@@ -700,6 +702,7 @@ func (s *Stats) getZapFields(meter dmetering.Meter) []zap.Field {
 		zap.Uint64("remote_jobs_retried", s.retriedJobs),
 		zap.Uint64("remote_jobs_delayed", s.delayedJobs),
 		zap.Uint64("remote_blocks_processed", s.remoteProcessedBlockCount),
+		zap.Uint64("uncompressed_egress_bytes", s.uncompressedEgressBytes),
 		zap.String("error", errorText),
 	}
 

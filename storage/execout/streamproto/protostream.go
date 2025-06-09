@@ -8,18 +8,18 @@ import (
 	pb "github.com/streamingfast/substreams/storage/execout/pb"
 )
 
-func WriteItem(writer io.Writer, item *pb.Item) error {
+func WriteItem(writer io.Writer, item *pb.Item) (size int, err error) {
 	data, err := item.MarshalVT()
 	if err != nil {
-		return fmt.Errorf("failed to marshal item: %w", err)
+		return 0, fmt.Errorf("failed to marshal item: %w", err)
 	}
 
 	prefixedSizeEncoding := varintEncodeWithArrayPrefix(uint64(len(data)))
 
 	if _, err := writer.Write(append(prefixedSizeEncoding, data...)); err != nil {
-		return fmt.Errorf("failed to write array item: %w", err)
+		return 0, fmt.Errorf("failed to write array item: %w", err)
 	}
-	return nil
+	return len(prefixedSizeEncoding) + len(data), nil
 }
 
 // When you marshal an Array object, the first bytes will encode field 1 (items) with wire type 2:

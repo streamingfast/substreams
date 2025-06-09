@@ -18,7 +18,7 @@ Developers do not need a dedicated installation of Firehose to use Substreams. S
 
 ### **Is it possible to use Substreams in my subgraph?**
 
-Yes, Substreams compliments and extend the capabilities and functionalities of subgraphs. Additional information is available in the [Substreams documentation for graph-node and subgraphs](https://substreams.streamingfast.io/reference-and-specs/graph-node-setup).
+Not anymore.
 
 ### **Is it possible to use Substreams for production deployments?**
 
@@ -38,7 +38,7 @@ Authentication tokens are required to use Substreams and connect to the public F
 
 ### **My Substreams authentication token isn’t working, what do I do?**
 
-The StreamingFast team is [available on Discord to resolve problems](https://discord.gg/Ugc7KtkA) related to obtaining or by using authentication tokens.
+The StreamingFast team is [available on Discord to resolve problems](https://discord.gg/jZwqxJAvRs) related to obtaining or by using authentication tokens.
 
 The Substreams documentation also [provides general instructions surrounding authentication](https://substreams.streamingfast.io/reference-and-specs/authentication) tokens.
 
@@ -58,7 +58,7 @@ Yes, Substreams is an open-source project and there are free (albeit rate-limite
 
 ### **How does a developer reach the information returned from a call to Substreams from a web-based UI?**
 
-Substreams is not meant to be piped to a web UI, it’s a data transformation layer. Substreams reaches Subgraphs, as a data source, and makes GraphQL available for web consumption. Other sinks might expose APIs for web browsers, however, it's not the responsibility of Substreams.
+Substreams is not meant to be piped to a web UI, it’s a data transformation layer. Some sinks might expose APIs for web browsers, however, it's not the responsibility of Substreams.
 
 ### Is it possible to listen for new blocks?
 
@@ -66,7 +66,7 @@ Specifying a stop block value of zero (0), the default enables transparent hando
 
 ### **Does StreamingFast have a Discord?**
 
-Yes, [join the StreamingFast Discord](https://discord.gg/Ugc7KtkA).
+Yes, [join the StreamingFast Discord](https://discord.gg/jZwqxJAvRs).
 
 ### **Is StreamingFast on Twitter?**
 

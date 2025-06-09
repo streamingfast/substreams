@@ -104,5 +104,4 @@ For a real-life application of this pattern see [Uniswap V3 Substreams](https://
 
 
 ## Links
-* [Uniswap-v3 Subgraph and Substreams](https://github.com/streamingfast/substreams-uniswap-v3)
 * [Substreams Sink Entity Changes](https://github.com/streamingfast/substreams-sink-entity-changes)

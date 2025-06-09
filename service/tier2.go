@@ -101,27 +101,31 @@ func NewTier2(
 		logger:                logger,
 		blockExecutionTimeout: 3 * time.Minute,
 		simulateOverloaded:    atomic.NewBool(false),
+
 		activeRequests: &activeRequestRecords{
 			reqs: make(map[string]*ActiveRequestRecord),
 		},
 	}
 
 	setSubstreamsStoreSizeLimitFromEnv(logger)
+	setSubstreamsOutputSizeLimitFromEnv(logger)
 
-	debugAPI := debugapi.New(
-		"localhost:8081",
-		logger,
-		func(v bool) {
-			s.simulateOverloaded.Store(v)
-			s.appSetIsReadyState(!v)
-		},
-		func() bool {
-			return s.simulateOverloaded.Load()
-		},
-		s.listActiveRecords,
-		s.cancelRequest,
-	)
-	debugAPI.Start()
+	if debugAPIAddress := os.Getenv("SUBSTREAMS_DEBUG_API_ADDR"); debugAPIAddress != "" {
+		debugAPI := debugapi.New(
+			debugAPIAddress,
+			logger,
+			func(v bool) {
+				s.simulateOverloaded.Store(v)
+				s.appSetIsReadyState(!v)
+			},
+			func() bool {
+				return s.simulateOverloaded.Load()
+			},
+			s.listActiveRecords,
+			s.cancelRequest,
+		)
+		debugAPI.Start()
+	}
 
 	metrics.RegisterMetricSet(logger)
 
@@ -272,7 +276,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 
 	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, true, request.Modules, request.FirstStreamableBlock) //production-mode flag is irrelevant here because it isn't used to calculate the hashes
 	if err != nil {
-		err = bsstream.NewErrInvalidArg(err.Error())
+		err = bsstream.NewErrInvalidArg("%s", err.Error())
 		fields = append(fields, zap.Error(err))
 		logger.Info("refusing Substreams ProcessRange request", fields...)
 		return err
@@ -346,7 +350,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 
 	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, true, request.Modules, request.FirstStreamableBlock)
 	if err != nil {
-		return stream.NewErrInvalidArg(err.Error())
+		return stream.NewErrInvalidArg("%s", err.Error())
 	}
 
 	requestDetails := pipeline.BuildRequestDetailsFromSubrequest(ctx, request)
@@ -771,6 +775,9 @@ func GetExecutionPlan(
 			indexFile := indexConfigs.ConfigMap[name].NewFile(&block.Range{StartBlock: moduleStartBlock, ExclusiveEndBlock: stopBlock})
 			err := indexFile.Load(ctx)
 			if err != nil {
+				if !errors.Is(err, dstore.ErrNotFound) {
+					return nil, fmt.Errorf("reading mapper output file: %w", err)
+				}
 				requiredModules[name] = usedModules[name]
 				indexWriters[name] = index.NewWriter(indexFile)
 				break
@@ -781,6 +788,9 @@ func GetExecutionPlan(
 		case pbsubstreams.ModuleKindMap:
 			file, readErr := c.ReadFile(ctx, &block.Range{StartBlock: moduleStartBlock, ExclusiveEndBlock: stopBlock})
 			if readErr != nil {
+				if !errors.Is(readErr, dstore.ErrNotFound) {
+					return nil, fmt.Errorf("reading mapper output file: %w", readErr)
+				}
 				requiredModules[name] = usedModules[name]
 				break
 			}
@@ -789,6 +799,9 @@ func GetExecutionPlan(
 		case pbsubstreams.ModuleKindStore:
 			file, readErr := c.ReadFile(ctx, &block.Range{StartBlock: moduleStartBlock, ExclusiveEndBlock: stopBlock})
 			if readErr != nil {
+				if !errors.Is(readErr, dstore.ErrNotFound) {
+					return nil, fmt.Errorf("reading mapper output file: %w", readErr)
+				}
 				requiredModules[name] = usedModules[name]
 			} else {
 				existingExecOuts[name] = file
@@ -838,6 +851,7 @@ func GetExecutionPlan(
 		}
 
 		execoutWriters[name] = execout.NewWriter(
+			ctx,
 			writerStartBlock,
 			stopBlock,
 			name,

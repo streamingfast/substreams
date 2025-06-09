@@ -20,6 +20,9 @@ func init() {
 	infoCmd.Flags().Bool("skip-package-validation", false, "Do not perform any validation when reading substreams package")
 	infoCmd.Flags().Bool("used-modules-only", false, "When set, only modules that are used by the output module will be displayed (requires the output_module arg to be set)")
 	infoCmd.Flags().Bool("summarize-hash-types", false, "When set, will also print the hash of the modules, grouped by type and their dependencies on stores")
+
+	infoCmd.Flags().StringArrayP("params", "p", nil, "Set a params for parameterizable modules. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
+
 }
 
 var infoCmd = &cobra.Command{
@@ -67,6 +70,22 @@ func runInfo(cmd *cobra.Command, args []string) error {
 	if skipPackageValidation {
 		opts = append(opts, manifest.SkipPackageValidationReader())
 	}
+
+	requestParams := sflags.MustGetStringArray(cmd, "params")
+	paramsStringMap := make(map[string]struct{})
+	for _, parameter := range requestParams {
+		moduleName := strings.Split(parameter, "=")[0]
+		paramsStringMap[moduleName] = struct{}{}
+	}
+
+	if len(requestParams) != 0 {
+		params, err := manifest.ParseParams(requestParams)
+		if err != nil {
+			return fmt.Errorf("parsing params: %w", err)
+		}
+		opts = append(opts, manifest.WithParams(params))
+	}
+
 	pkgInfo, err := info.Extended(manifestPath, outputModule, opts...)
 	if err != nil {
 		return err

@@ -11,13 +11,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+* Add `uncompressed_egress_bytes` field to `substreams request stats` log message. Only tier1 will produce a non-zero value there.
+
+## v1.15.7
+
+### Server
+
+* Tier2 jobs now write mapper outputs "as they progress", preventing memory usage spikes when saving them to disk.
+  This should considerably reduce the memory footprint of tier2 instances.
+* Tier2 jobs now limit writing and loading mapper output files to a maximum size of 8GiB by default.
+* Added`SUBSTREAMS_OUTPUT_SIZE_LIMIT_PER_SEGMENT` environment variable to control this new limit.
+* Gate the DebugAPI feature on tier2 with the `SUBSTREAMS_DEBUG_API_ADDR` environment variable (set it to `localhost:8081` to keep behavior from v1.15.5)
+
+### CLI
+
+* Removed the 'codegen subgraph' command from the CLI as SpS are being deprecated.
+* Added `--skip-package-validation` and `--extension-configs` flags to `tools tier2call` dev command
+
+## v1.15.6
+
 ### CLI
 
 * The `substreams run` will now better render bytes depending on the network.
 
 * The `substreams run/gui` JSON rendered is now able to render known `anypb.Any` type correctly.
 
-### SERVER
+* Integrated the [Network Registry](https://github.com/graphprotocol/networks-registry?tab=readme-ov-file#the-graph-networks-registry) to better track supported networks.
+
+### Server
 
 * Add SUBSTREAMS_STORE_SIZE_LIMIT env var to allow overwriting the default 1GiB value
 

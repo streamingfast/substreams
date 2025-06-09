@@ -80,11 +80,6 @@ A deployable unit is a Substreams manifest or package (spkg) that contains all t
 See [Working with deployable units](https://substreams.streamingfast.io/developers-guide/sink-deployable-units)
 
 
-## Substreams-powered Subgraph
-When a Subgraph acts as a sink for your Substreams, you call it a [Substreams-powered Subgraph](https://thegraph.com/docs/en/cookbook/substreams-powered-subgraphs/).
-
-The Subgraph Sink is one of the _official sinks_ supported by Substreams, and can help you index your Subgraph way faster!
-
 ## Parallel execution
 [Parallel execution](https://substreams.streamingfast.io/developers-guide/parallel-execution) is the process of a Substreams module's code executing multiple segments of blockchain data simultaneously in a forward or backward direction.
 

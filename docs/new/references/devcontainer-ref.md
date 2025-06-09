@@ -2,7 +2,7 @@
 description: Substreams Dev Container Reference
 ---
 
-The Substreams Dev Container is a tool to help you build your first project. You can either run it remotely through Github codespaces or locally by cloning the [substreams-starter repository](https://github.com/streamingfast/substreams-starter?tab=readme-ov-file). Inside the Dev Container, the `substreams init` command sets up a code-generated Substreams project, allowing you to easily build a subgraph or an SQL-based solution for data handling.
+The Substreams Dev Container is a tool to help you build your first project. You can either run it remotely through Github codespaces or locally by cloning the [substreams-starter repository](https://github.com/streamingfast/substreams-starter?tab=readme-ov-file). Inside the Dev Container, the `substreams init` command sets up a code-generated Substreams project, allowing you to easily build a SQL-based solution for data handling.
 
 ## Prerequisites
 
@@ -26,14 +26,9 @@ To publish your work with the broader community, publish your `.spkg` to [Substr
 
 ## Building a Sink for Your Project
 
-You can configure your Substreams project to query data either through a Subgraph or directly from an SQL database:
+You can configure your Substreams project to query data from a SQL database:
 
-- **Subgraph**: Run `substreams codegen subgraph`. This generates a project with a basic `schema.graphql` and `mappings.ts` file. You can customize these to define entities based on the data extracted by Substreams. For more information on configuring a Subgraph sink, see the [Subgraph documentation](https://thegraph.com/docs/en/sps/triggers).
-- **SQL**: Run `substreams codegen sql` for SQL-based queries. For more information on configuring a SQL sink, refer to the [SQL documentation](../how-to-guides/sinks/sql/sql-sink.md).
-
-## Deployment Options
-
-To deploy a Subgraph, you can either run the `graph-node` locally using the `deploy-local` command or deploy to Subgraph Studio by using the `deploy` command found in the `package.json` file.
+Run `substreams codegen sql` for SQL-based queries. For more information on configuring a SQL sink, refer to the [SQL documentation](../how-to-guides/sinks/sql/sql-sink.md).
 
 ## Common Errors
 

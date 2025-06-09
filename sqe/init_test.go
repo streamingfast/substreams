@@ -31,7 +31,7 @@ func (v *TestVisitor) Visit_Or(ctx context.Context, e *OrExpression) error {
 }
 
 func (v *TestVisitor) visit_binary(ctx context.Context, opStart, op, opEnd string, children []Expression) error {
-	v.print(opStart)
+	v.print("%s", opStart)
 
 	for i, child := range children {
 		if i != 0 {
@@ -40,7 +40,7 @@ func (v *TestVisitor) visit_binary(ctx context.Context, opStart, op, opEnd strin
 
 		child.Visit(ctx, v)
 	}
-	v.print(opEnd)
+	v.print("%s", opEnd)
 
 	return nil
 }
@@ -70,7 +70,7 @@ func (v *TestVisitor) printStringLiteral(literal *StringLiteral) error {
 		return v.print("%s%s%s", literal.QuotingChar, literal.Value, literal.QuotingChar)
 	}
 
-	return v.print(literal.Value)
+	return v.print("%s", literal.Value)
 }
 
 func (v *TestVisitor) print(message string, args ...interface{}) error {

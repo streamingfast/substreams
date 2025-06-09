@@ -203,7 +203,7 @@ image: ./ethereum-icon.png
 
 ### sink
 
-The `sink` field specifies the sink you want to use to consume your data (for example, a database or a subgraph).
+The `sink` field specifies the sink you want to use to consume your data (for example, a database).
 
 #### Sink `module`
 
@@ -211,7 +211,7 @@ Specifies the name of the module that emits the data to the sink. For example, `
 
 #### Sink `type`
 
-Specifies the service used to consume the data. For example, `sf.substreams.sink.subgraph.v1.Service` for subgraphs, or `sf.substreams.sink.sql.v1.Service` for databases.
+Specifies the service used to consume the data. For example, `sf.substreams.sink.sql.v1.Service` for databases.
 
 #### Sink `config`
 
@@ -244,20 +244,6 @@ sink:
   * `enabled`: enables or disabled the dbt engine.
   * `files`: path to the dbt models.
   * `run_interval_seconds`: execution intervals in seconds.
-
-**Subgraph Config**
-
-```
-sink:
-  module: graph_out
-  type: sf.substreams.sink.subgraph.v1.Service
-  config:
-    schema: "./schema.graphql"
-    subgraph_yaml: "./subgraph.yaml"
-```
-
-* `schema`: path to the GraphQL schema.
-* `subgraph_yaml`: path to the Subgraph manifest.
 
 ### `modules`
 

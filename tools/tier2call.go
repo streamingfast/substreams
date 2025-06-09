@@ -38,6 +38,8 @@ func init() {
 	tier2CallCmd.Flags().Uint64("first-streamable-block", 0, "First Streamable block on the chain (usually 0 or 1, some networks start at arbitrary block numbers)")
 	tier2CallCmd.Flags().String("state-store-url", "./firehose-data/localdata", "Substreams state data storage")
 	tier2CallCmd.Flags().String("state-store-default-tag", "", "Substreams state store default tag")
+	tier2CallCmd.Flags().String("extension-configs", "", "semicolon-separted list of k=v values. Ex: rpc_eth_call=50000000,http://localhost:8000;a=b;c=d")
+	tier2CallCmd.Flags().Bool("skip-package-validation", false, "Do not perform any validation when reading substreams package")
 
 	Cmd.AddCommand(tier2CallCmd)
 }
@@ -49,7 +51,14 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 	outputModule := args[1]
 	stage, _ := strconv.ParseUint(args[2], 10, 32)
 	segmentNumber, _ := strconv.ParseUint(args[3], 10, 32)
-	manifestReader, err := manifest.NewReader(manifestPath)
+
+	options := []manifest.Option{}
+
+	if sflags.MustGetBool(cmd, "skip-package-validation") {
+		options = append(options, manifest.SkipPackageValidationReader())
+	}
+
+	manifestReader, err := manifest.NewReader(manifestPath, options...)
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
@@ -111,6 +120,22 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 	stateBundleSize := sflags.MustGetUint64(cmd, "state-bundle-size")
 	firstStreamableBlock := sflags.MustGetUint64(cmd, "first-streamable-block")
 
+	var wasmExtensionConfigs map[string]string
+	extensionConfigs := sflags.MustGetString(cmd, "extension-configs")
+	if extensionConfigs != "" {
+		wasmExtensionConfigs = make(map[string]string)
+		for _, config := range strings.Split(extensionConfigs, ";") {
+			if config == "" {
+				continue
+			}
+			parts := strings.SplitN(config, "=", 2)
+			if len(parts) != 2 {
+				return fmt.Errorf("invalid extension config: %s", config)
+			}
+			wasmExtensionConfigs[parts[0]] = parts[1]
+		}
+	}
+
 	req, err := ssClient.ProcessRange(ctx, &pbssinternal.ProcessRangeRequest{
 		SegmentSize:          stateBundleSize,
 		SegmentNumber:        segmentNumber,
@@ -123,6 +148,7 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 		MergedBlocksStore:    mergedBlocksStore,
 		StateStore:           stateStore,
 		StateStoreDefaultTag: stateStoreDefaultTag,
+		WasmExtensionConfigs: wasmExtensionConfigs,
 	}, callOpts...)
 	if err != nil {
 		return fmt.Errorf("process range request: %w", err)

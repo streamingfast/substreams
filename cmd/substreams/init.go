@@ -37,10 +37,10 @@ var initCmd = &cobra.Command{
 	Short: "Initialize a new, working Substreams project from scratch",
 	Long: cli.Dedent(`
 
-		Initialize a new Substreams project using a remote code generator.		
+		Initialize a new Substreams project using a remote code generator.
 		State will be saved to 'generator.json' by default.
 
-		Example: 
+		Example:
 			substreams init
 	`),
 	RunE:         runSubstreamsInitE,
@@ -267,7 +267,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	}
 	startMsg := &pbconvo.UserInput_Start{
 		GeneratorId: generatorID,
-		Version:     3,
+		Version:     4,
 	}
 	if lastState.State != nil {
 		startMsg.Hydrate = &pbconvo.UserInput_Hydrate{SavedState: string(lastState.State)}
@@ -283,6 +283,11 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 	}
 
 	userState := newUserState()
+	if len(args) > 0 {
+		userState.downloadedFilesfolderPath = args[0]
+	}
+
+	forceDownloadProvided, _ := sflags.MustGetBoolProvided(cmd, "force-download-cwd")
 
 	var loadingCh chan bool
 	for {
@@ -336,6 +341,21 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			}
 
 		case *pbconvo.SystemOutput_ListSelect_:
+			if forceDownloadProvided && msg.ListSelect.Id == "consumption" {
+				// ignore everything after download, suggest 'sql'
+				if err := sendFunc(&pbconvo.UserInput{
+					FromActionId: resp.ActionId,
+					Entry: &pbconvo.UserInput_Selection_{
+						Selection: &pbconvo.UserInput_Selection{
+							Value: "sql",
+						},
+					},
+				}); err != nil {
+					return fmt.Errorf("error sending confirmation: %w", err)
+				}
+				continue
+
+			}
 			input := msg.ListSelect
 
 			//fmt.Println(toMarkdown(input.Instructions))
@@ -525,50 +545,53 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			}
 
 		case *pbconvo.SystemOutput_DownloadFiles_:
-			forceDownloadProvided, _ := sflags.MustGetBoolProvided(cmd, "force-download-cwd")
+			if !forceDownloadProvided {
+				if userState.downloadedFilesfolderPath == "" {
+					savingDest := "output"
+					if projectName := gjson.GetBytes(lastState.State, "name").String(); projectName != "" {
+						savingDest = projectName
+					}
 
-			if !forceDownloadProvided && userState.downloadedFilesfolderPath == "" {
-				savingDest := "output"
-				if projectName := gjson.GetBytes(lastState.State, "name").String(); projectName != "" {
-					savingDest = projectName
-				}
-
-				savingDest, err := filepath.Abs(savingDest)
-				if err != nil {
-					return fmt.Errorf("error building directory path: %w", err)
-				}
-
-				inputField := huh.NewInput().Title("In which directory do you want to download the project?").Value(&savingDest)
-				inputField.Validate(func(userInput string) error {
-					fmt.Println("Checking directory", userInput)
-					fileInfo, err := os.Stat(userInput)
+					savingDest, err := filepath.Abs(savingDest)
 					if err != nil {
-						if os.IsNotExist(err) {
-							return nil
+						return fmt.Errorf("error building directory path: %w", err)
+					}
+
+					inputField := huh.NewInput().Title("In which directory do you want to download the project?").Value(&savingDest)
+					inputField.Validate(func(userInput string) error {
+						fmt.Println("Checking directory", userInput)
+						fileInfo, err := os.Stat(userInput)
+						if err != nil {
+							if os.IsNotExist(err) {
+								return nil
+							}
+							return fmt.Errorf("error checking directory: %w", err)
 						}
-						return fmt.Errorf("error checking directory: %w", err)
+
+						if !fileInfo.IsDir() {
+							return errors.New("the path is not a directory")
+						}
+
+						return nil
+					})
+
+					err = huh.NewForm(huh.NewGroup(inputField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run()
+					if err != nil {
+						return fmt.Errorf("failed taking input: %w", err)
 					}
 
-					if !fileInfo.IsDir() {
-						return errors.New("the path is not a directory")
-					}
-
-					return nil
-				})
-
-				err = huh.NewForm(huh.NewGroup(inputField)).WithTheme(huh.ThemeCharm()).WithAccessible(WITH_ACCESSIBLE).Run()
-				if err != nil {
-					return fmt.Errorf("failed taking input: %w", err)
+					userState.downloadedFilesfolderPath = savingDest
 				}
 
 				// the multiple \n are not a mistake, it's to have a blank line before the next message
-				fmt.Printf("\nProject will be saved in %s\n\n", savingDest)
-				userState.downloadedFilesfolderPath = savingDest
+				fmt.Printf("\nProject will be saved in %s\n\n", userState.downloadedFilesfolderPath)
 
-				fmt.Printf("Creating directory: %s\n\n", savingDest)
-				err = os.MkdirAll(savingDest, os.ModePerm)
-				if err != nil {
-					return fmt.Errorf("creating directory %q: %w", savingDest, err)
+				if _, err := os.Stat(userState.downloadedFilesfolderPath); os.IsNotExist(err) {
+					fmt.Printf("Creating directory: %s\n\n", userState.downloadedFilesfolderPath)
+					err = os.MkdirAll(userState.downloadedFilesfolderPath, os.ModePerm)
+					if err != nil {
+						return fmt.Errorf("creating directory %q: %w", userState.downloadedFilesfolderPath, err)
+					}
 				}
 			}
 
@@ -624,6 +647,16 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					}
 				}
 			}
+
+			if err := sendFunc(&pbconvo.UserInput{
+				FromActionId: resp.ActionId,
+				Entry: &pbconvo.UserInput_TextInput_{
+					TextInput: &pbconvo.UserInput_TextInput{Value: savingDest},
+				},
+			}); err != nil {
+				return fmt.Errorf("error sending message: %w", err)
+			}
+
 		default:
 			fmt.Printf("Received unknown message type: %T\n", resp.Entry)
 		}

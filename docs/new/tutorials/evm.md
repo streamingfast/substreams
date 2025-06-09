@@ -28,13 +28,7 @@ Within the generated directories, modify your Substreams modules to include addi
 
 ## Step 3: Load the Data
 
-To make your Substreams queryable (as opposed to [direct streaming](../how-to-guides/sinks/stream/stream.md)), you can automatically generate a Subgraph (known as a [Substreams-powered subgraph](https://thegraph.com/docs/en/sps/introduction/) or SQL-DB sink.
-
-### Subgraph
-
-1. Run `substreams codegen subgraph` to initialize the sink, producing the necessary files and function definitions. 
-2. Create your [subgraph mappings](../how-to-guides/sinks/subgraph/triggers.md) within the `mappings.ts` and associated entities within the `schema.graphql`.
-3. Build and deploy locally or to [Subgraph Studio](https://thegraph.com/studio-pricing/) by running `deploy-studio`.
+To make your Substreams queryable (as opposed to [direct streaming](../how-to-guides/sinks/stream/stream.md)), you can automatically generate a SQL sink.
 
 ### SQL
 

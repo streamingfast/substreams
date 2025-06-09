@@ -84,7 +84,9 @@ func (e *Engine) HandleFinal(clock *pbsubstreams.Clock) error {
 	}
 
 	for _, writer := range e.execOutputWriters {
-		writer.Write(clock, execOutBuf)
+		if err := writer.Write(clock, execOutBuf); err != nil {
+			return err
+		}
 	}
 
 	// once a block is final, no need to keep it in reversible buffer

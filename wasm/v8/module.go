@@ -41,15 +41,8 @@ func (mod *V8Module) ExecuteNewCall(
 	}
 
 	inst := getInstance(mod.iso, cachedInstance)
-	dataVal, err := v8go.NewUint8Array(inst.ctx, input)
-	if err != nil {
-		inst.Close(ctx)
-		return nil, fmt.Errorf("creating Uint8Array for input: %w", err)
-	}
-	if err := inst.ctx.Global().Set("input", dataVal); err != nil {
-		inst.Close(ctx)
-		return nil, fmt.Errorf("setting global input: %w", err)
-	}
+	inputVal, _ := v8go.NewValue(inst.ctx.Isolate(), input)
+	_ = inst.ctx.Global().Set("input", inputVal)
 
 	// Runs all scripts (will be changed depending on files needed), probably going to merge all that are needed. This if makes sure we load our needed scripts ONLY on the first call
 	if cachedInstance == nil {

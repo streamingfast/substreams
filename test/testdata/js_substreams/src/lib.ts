@@ -6,8 +6,8 @@ export default class Substreams {
 	@substreams.handlers.map([BlockSchema], MapResultSchema)
 	test_map(blk: Block) {
 		return create(MapResultSchema, {
-			blockNumber: 14n,
-			blockHash: "testdata",
+			blockNumber: blk.number,
+			blockHash: blk.id,
 		});
 	}
 }

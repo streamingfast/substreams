@@ -491,34 +491,31 @@ excludable:
 	}
 
 	var streamErr error
-	// FIXME skipBlockSource disabled for now
-	//if canSkipBlockSource(executionPlan.ExistingExecOuts, executionPlan.RequiredModules, request.BlockType) {
-	//	maxDistributorLength := int(stopBlock - requestDetails.ResolvedStartBlockNum)
-	//	clocksDistributor := make(map[uint64]*pbsubstreams.Clock)
-	//	for _, execOutput := range executionPlan.ExistingExecOuts {
-	//		execOutput.ExtractClocks(clocksDistributor)
-	//		if len(clocksDistributor) >= maxDistributorLength {
-	//			break
-	//		}
-	//	}
+	if canSkipBlockSource(executionPlan.ExistingExecOuts, executionPlan.RequiredModules, request.BlockType) {
 
-	//	sortedClocksDistributor := sortClocksDistributor(clocksDistributor)
-	//	ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/pipeline/mapper_stream")
-	//	for _, clock := range sortedClocksDistributor {
-	//		if clock.Number < startBlock || clock.Number >= stopBlock {
-	//			panic("reading from mapper, block was out of range") // we don't want to have this case undetected
-	//		}
-	//		cursor := irreversibleCursorFromClock(clock)
+		ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/pipeline/mapper_stream")
 
-	//		if err := pipe.ProcessFromExecOutput(ctx, clock, cursor); err != nil {
-	//			span.EndWithErr(&err)
-	//			return err
-	//		}
-	//	}
-	//	streamErr = io.EOF
-	//	span.EndWithErr(&streamErr)
-	//	return pipe.OnStreamTerminated(ctx, streamErr)
-	//}
+		distributor := execout.NewClockDistributor(executionPlan.ExistingExecOuts, startBlock, stopBlock)
+
+		for {
+			clock, err := distributor.Next(ctx)
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				return err
+			}
+			cursor := irreversibleCursorFromClock(clock)
+
+			if err := pipe.ProcessFromExecOutput(ctx, clock, cursor); err != nil {
+				span.EndWithErr(&err)
+				return err
+			}
+		}
+		streamErr = io.EOF
+		span.EndWithErr(&streamErr)
+		return pipe.OnStreamTerminated(ctx, streamErr)
+	}
 	sf := &StreamFactory{
 		mergedBlocksStore: mergedBlocksStore,
 	}
@@ -590,7 +587,7 @@ func (s *Tier2Service) getStores(ctx context.Context, request *pbssinternal.Proc
 	return
 }
 
-func canSkipBlockSource(existingExecOuts map[string]*execout.File, requiredModules map[string]*pbsubstreams.Module, blockType string) bool {
+func canSkipBlockSource(existingExecOuts map[string]execout.FileReader, requiredModules map[string]*pbsubstreams.Module, blockType string) bool {
 	if len(existingExecOuts) == 0 {
 		return false
 	}

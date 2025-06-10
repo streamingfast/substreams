@@ -69,6 +69,60 @@ func (fw *fileWriter) Range() *block.Range {
 	return fw.File.Range
 }
 
+type ClockDistributor struct {
+	execOuts          map[string]FileReader
+	execOutsLastclock map[string]uint64
+	seenClocks        map[uint64]*pbsubstreams.Clock
+	startBlock        uint64
+	stopBlock         uint64
+	nextClockNumber   uint64
+}
+
+func NewClockDistributor(execOuts map[string]FileReader, startBlock uint64, stopBlock uint64) *ClockDistributor {
+	return &ClockDistributor{
+		execOuts:          execOuts,
+		execOutsLastclock: make(map[string]uint64),
+		seenClocks:        make(map[uint64]*pbsubstreams.Clock),
+		startBlock:        startBlock,
+		stopBlock:         stopBlock,
+		nextClockNumber:   startBlock,
+	}
+}
+
+func (cd *ClockDistributor) Next(ctx context.Context) (*pbsubstreams.Clock, error) {
+	for i := cd.nextClockNumber; i < cd.stopBlock; i++ {
+		for name, execOut := range cd.execOuts {
+			for {
+				lastRead, ok := cd.execOutsLastclock[name]
+				if ok && lastRead >= i {
+					break
+				}
+				item, err := execOut.ReadNext()
+				if err == io.EOF {
+					cd.execOutsLastclock[name] = cd.stopBlock
+					break
+				}
+				if err != nil {
+					return nil, err
+				}
+				cd.seenClocks[i] = &pbsubstreams.Clock{
+					Number:    item.BlockNum,
+					Id:        item.BlockId,
+					Timestamp: item.Timestamp,
+				}
+				cd.execOutsLastclock[name] = item.BlockNum
+			}
+		}
+
+		if cd.seenClocks[i] != nil {
+			cd.nextClockNumber = i + 1
+			return cd.seenClocks[i], nil
+		}
+
+	}
+	return nil, io.EOF
+}
+
 func NewFileWriter(ctx context.Context, store dstore.Store, logger *zap.Logger, rng *block.Range, moduleName string) FileWriter {
 	fw := &fileWriter{
 		File: &File{
@@ -131,18 +185,6 @@ func (c *File) ModuleName() string {
 	return c.moduleName
 }
 
-//func (c *File) ExtractClocks(clocksMap map[uint64]*pbsubstreams.Clock) {
-//	for _, item := range c.Kv {
-//		if _, found := clocksMap[item.BlockNum]; !found {
-//			clocksMap[item.BlockNum] = &pbsubstreams.Clock{
-//				Number:    item.BlockNum,
-//				Id:        item.BlockId,
-//				Timestamp: item.Timestamp,
-//			}
-//		}
-//	}
-//}
-
 func (fw *fileWriter) SetItem(clock *pbsubstreams.Clock, data []byte) error {
 	cp := make([]byte, len(data))
 	copy(cp, data)
@@ -172,12 +214,18 @@ func (fw *fileWriter) SetItem(clock *pbsubstreams.Clock, data []byte) error {
 func (fr *fileReader) Get(ctx context.Context, blockNumber uint64) (payload []byte, found bool, err error) {
 	next := fr.lastReadItem
 
+	if next == nil && fr.complete { // file has no data
+		return nil, false, nil
+	}
 	for {
-
-		if next == nil && fr.complete { // file has no data
-			return nil, false, nil
+		if next != nil {
+			switch {
+			case next.BlockNum == blockNumber:
+				return next.Payload, true, nil
+			case next.BlockNum > blockNumber:
+				return nil, false, nil
+			}
 		}
-
 		next, err = fr.ReadNext()
 		if err == io.EOF {
 			return nil, false, nil
@@ -186,14 +234,6 @@ func (fr *fileReader) Get(ctx context.Context, blockNumber uint64) (payload []by
 			return nil, false, err
 		}
 
-		switch {
-		case next.BlockNum == blockNumber:
-			return next.Payload, true, nil
-		case next.BlockNum > blockNumber:
-			return nil, false, nil
-		default:
-			continue
-		}
 	}
 }
 

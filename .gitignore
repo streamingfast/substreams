@@ -21,3 +21,4 @@ replay.log
 generator.json
 devel/codegen
 node_modules/
+package-lock.json

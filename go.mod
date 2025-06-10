@@ -1,8 +1,8 @@
 module github.com/streamingfast/substreams
 
-go 1.23.4
+go 1.24
 
-toolchain go1.23.6
+toolchain go1.24.2
 
 require (
 	github.com/golang/protobuf v1.5.4
@@ -15,7 +15,7 @@ require (
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
 	github.com/streamingfast/derr v0.0.0-20250321151415-6b4fbbcb1bb5
 	github.com/streamingfast/dgrpc v0.0.0-20250423172640-223250ed2391
-	github.com/streamingfast/dstore v0.1.1-0.20250217165048-d508dcc6b33e
+	github.com/streamingfast/dstore v0.1.1-0.20250609173504-95368d3441ee
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
 	github.com/streamingfast/pbgo v0.0.6-0.20240823134334-812f6a16c5cb
 	github.com/streamingfast/worker-pool-protocol v0.0.0-20250218145136-4ad271e36e39
@@ -215,5 +215,5 @@ retract v1.0.2 // Published at wrong tag.
 replace (
 	github.com/jhump/protoreflect => github.com/streamingfast/protoreflect v0.0.0-20231205191344-4b629d20ce8d
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869 => github.com/streamingfast/graph v0.0.0-20220329181048-a5710712d873
-	rogchap.com/v8go => github.com/streamingfast/v8go v0.0.0-20250604153749-c36ab3bbf86d
+	rogchap.com/v8go => github.com/streamingfast/v8go v0.0.0-20250609192103-f9b5beca42f2
 )

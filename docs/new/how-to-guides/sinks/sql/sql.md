@@ -2,31 +2,52 @@ The **Substreams:SQL service** allows you to consume the data extracted from the
 
 <figure><img src="../../../.gitbook/assets/consume/service-sql.png" width="100%" /></figure>
 
-## Different Ways of Setting Up the SQL Consumption
+## Requirements
 
-Substreams offers two different ways of consuming data as SQL:
-- Using the Deployable Services (beta)
-- Using the SQL sink, which currently supports PostgresSQL and Clickhouse (recommended)
+Before you begin, make sure you have:
 
-### - Substreams:SQL Deployable Service (beta)
-Use the Substreams CLI to easily send the data of your Substreams to a database. It also has support for **dbt transformations**, so it's great for data analysts!
+- A Substreams package (for example, a package that indexes ERC20 tokens).
+- A SQL database: Postgres or ClickHouse.
+- The [substreams-sink-sql](https://github.com/streamingfast/substreams-sink-sql) CLI installed in your computer.
 
-You can deploy a new service by using the `substreams alpha service` command.
+## Mapping Substreams to SQL
 
-#### Hosted Service
-The StreamingFast Hosted Service deploys a remote database in the StreamingFast servers, so you don't have to take of the infrastructure.
+The core function of the SQL sink is to translate your Substreams output (Protobuf data) into SQL tables. Choose one of the following methods depending on your needs:
 
-#### Local Service
-If you want to manage your own infrastructure, you can set up a services environment locally using Docker.
+- [Relational Mappings](./relational-mappings.md)
+    * Enables foreign key relationships in your SQL schema.
+    * Requires adding annotations to your Protobuf messages (e.g., primary and foreign keys).
+    * Currently insert-only.
+- [`db_out` module](./db_out.md)
+    * Gives you full control over the output.
+    * Supports insert, update, and upsert operations.
+    * Ideal for advanced use cases with evolving or mutable data.
+    * **NOTE:** In ClickHouse, reorgs are currently supported with delay.
 
-### - SQL sink (recommended)
+|                               | Relational Mappings | `db_out` module |
+|-------------------------------|---------------------|-----------------|
+| SQL relationships             | Yes                 | No              |
+| Direct Protobuf<>SQL mappings | Yes                 | No              |
+| `INSERT` supported            | Yes                 | Yes             |
+| `UPDATE` supported            | No                  | Yes             |
+| `UPSERT` supported            | No                  | Yes             |
 
-Previous to the implementation of the Deployable Services, the Postgres Sink was used to send data to a database. This is still available and there are a lot developers using it.
 
+## Installation
 
+Enabling `substreams-sink-sql` in your [Substreams CLI](../../../../references/cli/installing-the-cli.md).
 
-## Module Requirements
+1. Download the current binary, optionally depending on your operating system, from the [substreams-sink-sql GitHub releases](https://github.com/streamingfast/substreams-sink-sql/releases) page.
+1. Move the binary to your `$PATH`.
 
-In order to the send the data to a SQL database, your Substreams must have a `db_out` module that emits [`DatabaseChanges`](https://docs.rs/substreams-database-change/latest/substreams_database_change/pb/database/struct.DatabaseChanges.html) objects.
+### Installing from Source
 
-The `DatabaseChanges` object is something that the Postgres sink can understand, thus acting as a conversion layer between the data model of your Substreams and the table structure of the database.
+1. Clone the [substreams-sink-sql GitHub repository](https://github.com/streamingfast/substreams-sink-sql).
+1. Install the binary using Go.
+
+```bash
+go install ./cmd/substreams-sink-sql
+```
+
+1. Make sure GO is installed and the GO bin directory is in your $PATH.
+

@@ -276,7 +276,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 
 	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, true, request.Modules, request.FirstStreamableBlock) //production-mode flag is irrelevant here because it isn't used to calculate the hashes
 	if err != nil {
-		err = bsstream.NewErrInvalidArg(err.Error())
+		err = bsstream.NewErrInvalidArg("%s", err.Error())
 		fields = append(fields, zap.Error(err))
 		logger.Info("refusing Substreams ProcessRange request", fields...)
 		return err
@@ -350,7 +350,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 
 	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, true, request.Modules, request.FirstStreamableBlock)
 	if err != nil {
-		return stream.NewErrInvalidArg(err.Error())
+		return stream.NewErrInvalidArg("%s", err.Error())
 	}
 
 	requestDetails := pipeline.BuildRequestDetailsFromSubrequest(ctx, request)

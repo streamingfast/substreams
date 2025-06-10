@@ -1,0 +1,16 @@
+{
+	"name": "js_substreams",
+	"version": "1.0.0",
+	"private": true,
+	"dependencies": {
+		"@bufbuild/protobuf": "^2.5.2",
+		"@ethersproject/abi": "^5.8.0",
+		"@substreams/sdk": "github:streamingfast/substreams-js-sdk"
+	},
+	"devDependencies": {
+		"esbuild": "^0.21.0"
+	},
+	"scripts": {
+		"build": "esbuild src/lib.ts --bundle --platform=browser --format=iife --target=ES2022 --outfile=dist/bundle.js --tsconfig=tsconfig.json"
+	}
+}

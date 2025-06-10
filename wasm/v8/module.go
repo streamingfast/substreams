@@ -113,13 +113,14 @@ func callHandlers(inst *V8Instance, call *wasm.Call, input []byte) error {
 	}
 
 	// Dispatch to the appropriate handler
-	switch handlerTypeVal.String() {
+	handlerType := handlerTypeVal.String()
+	switch handlerType {
 	case "map":
 		return callMapHandler(inst, handlerName, input)
 	case "store":
 		return callStoreHandler(inst, handlerName, input)
 	default:
-		return fmt.Errorf("unknown handler type: %s", handlerTypeVal.String())
+		return fmt.Errorf("unknown handler type: %s", handlerType)
 	}
 }
 

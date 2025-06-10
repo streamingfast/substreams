@@ -5,19 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"path"
 	"sort"
 	"strconv"
-	"sync"
 
-	"connectrpc.com/connect"
 	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
 	"github.com/streamingfast/substreams/storage/execout/streamproto"
 
 	"go.uber.org/zap/zapcore"
 
-	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
 
@@ -25,34 +21,103 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-type FileReader struct {
+type FileReader interface {
+	ReadNext() (*pboutput.Item, error)
+	Get(ctx context.Context, blockNumber uint64) (payload []byte, found bool, err error)
+	ModuleName() string
+	Filename() string
+}
+
+type fileReader struct {
 	*File
-	reader        *io.ReadCloser
-	lastReadItem  *pboutput.Item
-	lastReadBlock uint64
+	reader       io.ReadCloser
+	lastReadItem *pboutput.Item
+	complete     bool
+}
+
+func NewFileReader(ctx context.Context, store dstore.Store, logger *zap.Logger, rng *block.Range, moduleName string) (FileReader, error) {
+	fr := &fileReader{
+		File: &File{
+			Range:      rng,
+			moduleName: moduleName,
+			store:      store,
+			logger:     logger,
+		},
+	}
+	err := fr.open(ctx)
+	return fr, err
+}
+
+type FileWriter interface {
+	SetItem(clock *pbsubstreams.Clock, data []byte) error
+	Close() error
+	ModuleName() string
+	Filename() string
+	Range() *block.Range
+}
+
+type fileWriter struct {
+	*File
+	writer             *io.PipeWriter
+	lastWrittenItem    *pboutput.Item
+	orderedFlagWritten bool
+	writeError         chan error
+	done               chan struct{}
+}
+
+func (fw *fileWriter) Range() *block.Range {
+	return fw.File.Range
+}
+
+func NewFileWriter(ctx context.Context, store dstore.Store, logger *zap.Logger, rng *block.Range, moduleName string) FileWriter {
+	fw := &fileWriter{
+		File: &File{
+			Range:      rng,
+			moduleName: moduleName,
+			store:      store,
+			logger:     logger,
+		},
+		orderedFlagWritten: false,
+		writeError:         make(chan error, 1),
+		done:               make(chan struct{}),
+	}
+
+	filename := fw.Filename()
+	fw.logger.Info("begin writing execution output file", zap.String("filename", filename))
+	r, w := io.Pipe()
+	fw.writer = w
+	fw.writeError = make(chan error, 1)
+
+	go func() {
+		select {
+		case <-ctx.Done():
+			w.CloseWithError(ctx.Err()) // this will trigger an error in 'store.WriteObject' in next thread. NOOP if already closed
+		case <-fw.done:
+		}
+	}()
+	go func() {
+		// writes the data from the pipe to the storage
+		// any error here closes the pipe (to fail on next write)
+		// and also lgets written to the writeError channel for 'Save' operation to pick up
+		err := fw.store.WriteObject(ctx, filename, r)
+		if err != nil && !errors.Is(err, context.Canceled) {
+			fw.logger.Warn("error writing execution output file", zap.String("filename", filename), zap.Error(err))
+		}
+		w.CloseWithError(err) // NOOP if already closed
+
+		fw.writeError <- err // so the "Save" operation can wait on write completion and determine if something failed
+		close(fw.writeError)
+	}()
+	return fw
 }
 
 // A File in `execout` stores, for a given module (with a given hash), the outputs of module execution
 // for _multiple blocks_, based on their block ID.
 type File struct {
-	sync.RWMutex
 	*block.Range
-
-	ModuleName string
-	Kv         map[string]*pboutput.Item
+	moduleName string
 	store      dstore.Store
 	logger     *zap.Logger
-	loaded     bool
-
-	readingFile io.ReadCloser
-	loadedUpTo  uint64
-
-	writingFile        *io.PipeWriter
-	orderedFlagWritten bool
-	writeError         chan error
-	deletedBefore      *uint64
-
-	sizeInMemory int
 }
 
 func (c *File) FullFilename() string {
@@ -62,137 +127,78 @@ func (c *File) Filename() string {
 	return computeDBinFilename(c.Range.StartBlock, c.Range.ExclusiveEndBlock)
 }
 
-func (c *File) SortedItems() (out []*pboutput.Item) {
-	// TODO(abourget): eventually, what is saved should be sorted before saving,
-	// or we import a list and Load() automatically sorts what needs to be sorted.
-	for _, item := range c.Kv {
-		out = append(out, item)
-	}
-	sort.Slice(out, func(i, j int) bool {
-		return out[i].BlockNum < out[j].BlockNum
-	})
-	return
+func (c *File) ModuleName() string {
+	return c.moduleName
 }
 
-func (c *File) ExtractClocks(clocksMap map[uint64]*pbsubstreams.Clock) {
-	for _, item := range c.Kv {
-		if _, found := clocksMap[item.BlockNum]; !found {
-			clocksMap[item.BlockNum] = &pbsubstreams.Clock{
-				Number:    item.BlockNum,
-				Id:        item.BlockId,
-				Timestamp: item.Timestamp,
-			}
-		}
-	}
-}
+//func (c *File) ExtractClocks(clocksMap map[uint64]*pbsubstreams.Clock) {
+//	for _, item := range c.Kv {
+//		if _, found := clocksMap[item.BlockNum]; !found {
+//			clocksMap[item.BlockNum] = &pbsubstreams.Clock{
+//				Number:    item.BlockNum,
+//				Id:        item.BlockId,
+//				Timestamp: item.Timestamp,
+//			}
+//		}
+//	}
+//}
 
-func (c *File) SetItem(clock *pbsubstreams.Clock, data []byte) error {
-	c.Lock()
-	defer c.Unlock()
-
+func (fw *fileWriter) SetItem(clock *pbsubstreams.Clock, data []byte) error {
 	cp := make([]byte, len(data))
 	copy(cp, data)
 
-	ci := &pboutput.Item{
+	item := &pboutput.Item{
 		BlockNum:  clock.Number,
 		BlockId:   clock.Id,
 		Timestamp: clock.Timestamp,
-		// TODO(abourget): remove the `Cursor` from this `pboutput.Item` struct,
-		//  as we're only going to store irreversible stuff now.
-		Payload: cp,
+		Payload:   cp,
 	}
 
-	if c.writingFile != nil {
-		// if we are writing the file, we flush the data and delete what was there before.
-		// if we are not writing the file, we probably writing an index so we can't delete the data, it will be aggregated at the end of the segment
-		if err := c.writePreviousKV(); err != nil {
-			return err
-		}
-		c.Kv = make(map[string]*pboutput.Item) // in writable File, we delete previous items
-		c.deletedBefore = &clock.Number
-	}
-
-	c.Kv[clock.Id] = ci
-
-	return nil
-}
-
-func (c *File) writePreviousKV() error {
-	if !c.orderedFlagWritten {
-		if _, err := streamproto.WriteOrderedBool(c.writingFile); err != nil {
+	if !fw.orderedFlagWritten {
+		if _, err := streamproto.WriteOrderedBool(fw.writer); err != nil {
 			return fmt.Errorf("writing ordered bool: %w", err)
 		}
-		c.orderedFlagWritten = true
+		fw.orderedFlagWritten = true
 	}
-	for _, item := range c.Kv {
-		size, err := streamproto.WriteItem(c.writingFile, item)
-		if err != nil {
-			return err
-		}
-		c.sizeInMemory += size
-		if c.sizeInMemory > MaxExecoutSegmentSize {
-			return fmt.Errorf("%w: file %s on module %s", ErrSegmentSizeExceeded, c.Filename(), c.ModuleName)
-		}
+
+	if _, err := streamproto.WriteItem(fw.writer, item); err != nil {
+		return err
 	}
+
+	fw.lastWrittenItem = item
 	return nil
 }
 
-func (c *File) Get(ctx context.Context, clock *pbsubstreams.Clock) ([]byte, bool) {
-	c.Lock()
-	defer c.Unlock()
-	if c.deletedBefore != nil && clock.Number < *c.deletedBefore {
-		panic("trying to get deleted data, this should never happen")
-	}
+func (fr *fileReader) Get(ctx context.Context, blockNumber uint64) (payload []byte, found bool, err error) {
+	next := fr.lastReadItem
 
-	if c.readingFile != nil && clock.Number > c.loadedUpTo {
-		c.LoadUpTo(ctx, clock.Number)
-	}
+	for {
 
-	cacheItem, found := c.Kv[clock.Id]
-
-	if !found {
-		return nil, false
-	}
-
-	return cacheItem.Payload, found
-}
-
-func (c *File) GetAtBlock(ctx context.Context, blockNumber uint64) (payload []byte, found bool, err error) {
-	c.Lock()
-	defer c.Unlock()
-
-	if c.deletedBefore != nil && blockNumber < *c.deletedBefore {
-		panic("trying to get deleted data, this should never happen")
-	}
-
-	if err := c.LoadUpTo(ctx, blockNumber); err != nil {
-		return nil, false, err
-	}
-
-	for _, value := range c.Kv {
-		if value.BlockNum == blockNumber {
-			return value.Payload, true, nil
+		if next == nil && fr.complete { // file has no data
+			return nil, false, nil
 		}
-	}
 
-	return nil, false, nil
-}
-
-var MaxExecoutSegmentSize = int(8589934592)
-var ErrSegmentSizeExceeded = connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("execution output segment size exceeded %d bytes: substreams cannot process this segment", MaxExecoutSegmentSize))
-
-func (c *File) LoadUpTo(ctx context.Context, upTo uint64) error {
-	for upTo < c.loadedUpTo {
-		_, err := c.LoadNext(ctx)
+		next, err = fr.ReadNext()
+		if err == io.EOF {
+			return nil, false, nil
+		}
 		if err != nil {
-			return err
+			return nil, false, err
+		}
+
+		switch {
+		case next.BlockNum == blockNumber:
+			return next.Payload, true, nil
+		case next.BlockNum > blockNumber:
+			return nil, false, nil
+		default:
+			continue
 		}
 	}
-	return nil
 }
 
-func (c *File) Open(ctx context.Context) error {
-	r, err := c.store.OpenObject(ctx, c.Filename())
+func (fr *fileReader) open(ctx context.Context) error {
+	r, err := fr.store.OpenObject(ctx, fr.Filename())
 	if err != nil {
 		return err
 	}
@@ -201,75 +207,51 @@ func (c *File) Open(ctx context.Context) error {
 		return err
 	}
 	if !ordered {
-		fmt.Println("rewriting as ordered")
-		if err := rewriteAsOrdered(ctx, r, readBytes, c.store, c.Filename(), c.Range, c.logger); err != nil {
+		if err := rewriteAsOrdered(ctx, r, readBytes, fr.store, fr.ModuleName(), fr.Filename(), fr.Range, fr.logger); err != nil {
 			fmt.Println("rewriting as ordered error", err)
 			return err
 		}
-		fmt.Println("closing")
 		if err := r.Close(); err != nil {
 			fmt.Println("closing err", err)
 			return err
 		}
 
-		fmt.Println("opening object")
-		r, err := c.store.OpenObject(ctx, c.Filename())
+		r, err := fr.store.OpenObject(ctx, fr.Filename())
 		if err != nil {
 			fmt.Println("opening object error", err)
 			return err
 		}
-		fmt.Println("reading ordered bool")
 		ordered, readBytes, err = streamproto.ReadOrderedBool(r)
 		if err != nil {
-			fmt.Println("reading ordered bool error", err)
 			return err
 		}
 		if !ordered {
-			fmt.Println("could not rewrite outputs as ordered")
 			return fmt.Errorf("internal error: could not rewrite outputs as ordered")
 		}
-		c.readingFile = r
+		fr.reader = r
 	} else {
-		c.readingFile = r
+		fr.reader = r
 	}
 
 	return nil
 }
 
-func (c *File) ReadNext() (*pboutput.Item, error) {
-	item, err := streamproto.ReadNextItem(c.readingFile)
-	if err == io.EOF {
-		return nil, nil
+func (fr *fileReader) ReadNext() (*pboutput.Item, error) {
+	if fr.complete {
+		return nil, io.EOF
 	}
+	item, err := streamproto.ReadNextItem(fr.reader)
 	if err != nil {
+		if err == io.EOF {
+			fr.complete = true
+			return nil, io.EOF
+		}
 		return nil, err
 	}
 	return item, nil
 }
 
-func (c *File) LoadNext(ctx context.Context) (*pboutput.Item, error) {
-	c.Lock()
-	defer c.Unlock()
-
-	if c.loadedUpTo == math.MaxUint64 {
-		return nil, nil
-	}
-
-	item, err := streamproto.ReadNextItem(c.readingFile)
-	if err != nil {
-		return nil, err
-	}
-	if item == nil { // fixme
-		c.loadedUpTo = math.MaxUint64
-		return nil, nil
-	}
-	c.Kv[item.BlockId] = item
-	c.loadedUpTo = item.BlockNum
-
-	return item, nil
-}
-
-func rewriteAsOrdered(ctx context.Context, r io.Reader, readBytes []byte, store dstore.Store, filename string, rng *block.Range, logger *zap.Logger) error {
+func rewriteAsOrdered(ctx context.Context, r io.Reader, readBytes []byte, store dstore.Store, moduleName, filename string, rng *block.Range, logger *zap.Logger) error {
 	bytes, err := io.ReadAll(r)
 	if err != nil {
 		return fmt.Errorf("reading store file %s: %w", filename, err)
@@ -286,14 +268,9 @@ func rewriteAsOrdered(ctx context.Context, r io.Reader, readBytes []byte, store 
 		return items[i].BlockNum < items[j].BlockNum
 	})
 
-	newFile := &File{
-		store:  store,
-		logger: logger,
-		Range:  rng,
-	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel() // closes the WriteAsYouGo
-	newFile.WriteAsYouGo(ctx)
+	newFile := NewFileWriter(ctx, store, logger, rng, moduleName)
 
 	for _, item := range items {
 		if err := newFile.SetItem(&pbsubstreams.Clock{
@@ -304,91 +281,15 @@ func rewriteAsOrdered(ctx context.Context, r io.Reader, readBytes []byte, store 
 			return err
 		}
 	}
-	return newFile.Save(ctx)
+	return newFile.Close()
 }
 
-func (c *File) Load(ctx context.Context) error {
-	c.Lock()
-	defer c.Unlock()
-	if c.loaded {
-		return nil
+func (fw *fileWriter) Close() error {
+	if err := fw.writer.Close(); err != nil {
+		return fmt.Errorf("closing file %s: %w", fw.Filename(), err)
 	}
-
-	filename := computeDBinFilename(c.Range.StartBlock, c.Range.ExclusiveEndBlock)
-	c.logger.Debug("loading execout file", zap.String("file_name", filename), zap.Object("block_range", c.Range))
-
-	err := derr.RetryContext(ctx, 5, func(ctx context.Context) error {
-		objectReader, err := c.store.OpenObject(ctx, filename)
-		if err == dstore.ErrNotFound {
-			return derr.NewFatalError(err)
-		}
-
-		if err != nil {
-			return fmt.Errorf("loading block reader %s: %w", filename, err)
-		}
-		defer objectReader.Close()
-
-		// Limit reading to MaxExecoutSegmentSize to prevent excessive memory usage
-		limitedReader := io.LimitReader(objectReader, int64(MaxExecoutSegmentSize+1))
-		bytes, err := io.ReadAll(limitedReader)
-		if err != nil {
-			return fmt.Errorf("reading store file %s: %w", filename, err)
-		}
-		if len(bytes) == MaxExecoutSegmentSize+1 {
-			return derr.NewFatalError(fmt.Errorf("%w: file %s on module %s", ErrSegmentSizeExceeded, filename, c.ModuleName))
-		}
-
-		outputData := &pboutput.Map{}
-		if err = outputData.UnmarshalFast(bytes); err != nil {
-			return fmt.Errorf("unmarshalling file %s: %w", filename, err)
-		}
-
-		c.Kv = outputData.Kv
-
-		c.logger.Debug("outputs data loaded", zap.Int("output_count", len(c.Kv)), zap.Stringer("block_range", c.Range))
-		return nil
-	})
-	if err == nil {
-		c.loaded = true
-	}
-	return err
-}
-
-func (f *File) WriteAsYouGo(ctx context.Context) {
-	filename := f.Filename()
-	f.logger.Info("begin writing execution output file", zap.String("filename", filename))
-	r, w := io.Pipe()
-	f.writingFile = w
-	f.writeError = make(chan error, 1)
-
-	go func() {
-		<-ctx.Done()
-		w.CloseWithError(ctx.Err()) // this will trigger an error in 'store.WriteObject' in next thread. NOOP if already closed
-	}()
-	go func() {
-		// writes the data from the pipe to the storage
-		// any error here closes the pipe (to fail on next write)
-		// and also lgets written to the writeError channel for 'Save' operation to pick up
-		err := f.store.WriteObject(ctx, filename, r)
-		if err != nil && !errors.Is(err, context.Canceled) {
-			f.logger.Warn("error writing execution output file", zap.String("filename", filename), zap.Error(err))
-		}
-		w.CloseWithError(err) // NOOP if already closed
-
-		f.writeError <- err // so the "Save" operation can wait on write completion and determine if something failed
-		close(f.writeError)
-	}()
-}
-
-func (c *File) Save(ctx context.Context) error {
-	if c.writingFile == nil {
-		return fmt.Errorf("cannot save file %s: writingfile is nil", c.Filename())
-	}
-	c.writePreviousKV() // last block output must be written
-	if err := c.writingFile.Close(); err != nil {
-		return fmt.Errorf("closing file %s: %w", c.Filename(), err)
-	}
-	return <-c.writeError
+	close(fw.done)
+	return <-fw.writeError // error at the other end of the pipe
 }
 
 func (c *File) String() string {
@@ -399,10 +300,9 @@ func (c *File) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	if c == nil {
 		return nil
 	}
-	enc.AddString("module", c.ModuleName)
+	enc.AddString("module", c.ModuleName())
 	enc.AddUint64("start_block", c.Range.StartBlock)
 	enc.AddUint64("end_block", c.Range.ExclusiveEndBlock)
-	enc.AddInt("kv_count", len(c.Kv))
 	return nil
 }
 

@@ -3,6 +3,7 @@ package index
 import (
 	"fmt"
 
+	"github.com/RoaringBitmap/roaring/roaring64"
 	"github.com/streamingfast/substreams/block"
 
 	"github.com/streamingfast/dstore"
@@ -39,5 +40,6 @@ func (c *Config) NewFile(targetRange *block.Range) *File {
 		moduleName:         c.name,
 		logger:             c.logger,
 		blockRange:         targetRange,
+		Indices:            make(map[string]*roaring64.Bitmap),
 	}
 }

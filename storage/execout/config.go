@@ -11,7 +11,6 @@ import (
 
 	"github.com/streamingfast/substreams/block"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
 )
 
 type Config struct {
@@ -62,12 +61,19 @@ func (c *Config) WriteDeterministicError(ctx context.Context, atBlock uint64, er
 
 func (c *Config) NewFile(targetRange *block.Range) *File {
 	return &File{
-		Kv:         make(map[string]*pboutput.Item),
-		ModuleName: c.name,
+		moduleName: c.name,
 		store:      c.objStore,
 		Range:      targetRange,
 		logger:     c.logger,
 	}
+}
+
+func (c *Config) NewFileReader(ctx context.Context, targetRange *block.Range) (FileReader, error) {
+	return NewFileReader(ctx, c.objStore, c.logger, targetRange, c.name)
+}
+
+func (c *Config) NewFileWriter(ctx context.Context, targetRange *block.Range) FileWriter {
+	return NewFileWriter(ctx, c.objStore, c.logger, targetRange, c.name)
 }
 
 func (c *Config) Name() string                        { return c.name }
@@ -110,12 +116,4 @@ func (c *Config) ListSnapshotFiles(ctx context.Context, from uint64, to uint64) 
 	}
 
 	return files, nil
-}
-
-func (c *Config) ReadFile(ctx context.Context, inrange *block.Range) (*File, error) {
-	file := c.NewFile(inrange)
-	if err := file.Load(ctx); err != nil {
-		return nil, err
-	}
-	return file, nil
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -70,21 +71,21 @@ func (r *Walker) IsWorking() bool {
 }
 
 func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
-	file := r.fileWalker.File()
-
 	return func() loop.Msg {
 		time.Sleep(waitBefore)
+		file, err := r.fileWalker.FileReader(r.ctx)
 
-		err := file.Open(r.ctx)
 		if errors.Is(err, dstore.ErrNotFound) {
 			return MsgFileNotPresent{NextWait: computeNewWait(waitBefore, r.fileWalker.IsLocal)}
 		}
 		if err != nil {
-			return loop.NewQuitMsg(fmt.Errorf("loading %s cache %q: %w", file.ModuleName, file.Filename(), err))
+			return loop.NewQuitMsg(fmt.Errorf("loading %s cache %q: %w", file.ModuleName(), file.Filename(), err))
 		}
 
 		if err := r.sendItems(file.ReadNext); err != nil {
-			return loop.NewQuitMsg(err)
+			if err != io.EOF {
+				return loop.NewQuitMsg(err)
+			}
 		}
 		return MsgFileDownloaded{}
 	}

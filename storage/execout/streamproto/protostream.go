@@ -59,7 +59,7 @@ func ReadNextItem(reader io.Reader) (item *pb.Item, err error) {
 	prefixBuf := make([]byte, 1)
 	if _, err := reader.Read(prefixBuf); err != nil {
 		if err == io.EOF {
-			return nil, nil
+			return nil, io.EOF
 		}
 		return nil, fmt.Errorf("failed to read array prefix: %w", err)
 	}

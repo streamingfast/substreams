@@ -4,9 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	pbindex "github.com/streamingfast/substreams/pb/sf/substreams/index/v1"
-
-	"github.com/RoaringBitmap/roaring/roaring64"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
@@ -15,7 +12,6 @@ import (
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/index"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
 )
 
 // Engine manages the reversible segments and keeps track of
@@ -27,15 +23,15 @@ type Engine struct {
 	//  so that `ForkHandler` disappears in the end?
 	ctx               context.Context
 	blockType         string
-	reversibleBuffers map[uint64]*execout.Buffer // block num to modules' outputs for that given block
-	execOutputWriters map[string]*execout.Writer // moduleName => writer (single file)
-	existingExecOuts  map[string]*execout.File   // on Tier2 requests, this contains any existing outputs that we could load from disk, skipping module execution
+	reversibleBuffers map[uint64]*execout.Buffer    // block num to modules' outputs for that given block
+	execOutputWriters map[string]*execout.Writer    // moduleName => writer (single file)
+	existingExecOuts  map[string]execout.FileReader // on Tier2 requests, this contains any existing outputs that we could load from disk, skipping module execution
 	indexWriters      map[string]*index.Writer
 
 	logger *zap.Logger
 }
 
-func NewEngine(ctx context.Context, execOutWriters map[string]*execout.Writer, blockType string, existingExecOuts map[string]*execout.File, indexWriters map[string]*index.Writer) (*Engine, error) {
+func NewEngine(ctx context.Context, execOutWriters map[string]*execout.Writer, blockType string, existingExecOuts map[string]execout.FileReader, indexWriters map[string]*index.Writer) (*Engine, error) {
 	e := &Engine{
 		ctx:               ctx,
 		reversibleBuffers: map[uint64]*execout.Buffer{},
@@ -56,9 +52,12 @@ func (e *Engine) NewBuffer(optionalBlock *pbbstream.Block, clock *pbsubstreams.C
 
 	e.reversibleBuffers[clock.Number] = out
 	for moduleName, existingExecOut := range e.existingExecOuts {
-		val, ok := existingExecOut.Get(e.ctx, clock)
+		val, ok, err := existingExecOut.Get(e.ctx, clock.Number)
 		if !ok {
 			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("getting existing exec output for %s: %w", moduleName, err)
 		}
 
 		err = out.Set(moduleName, val)
@@ -89,15 +88,16 @@ func (e *Engine) HandleFinal(clock *pbsubstreams.Clock) error {
 		}
 	}
 
+	for _, writer := range e.indexWriters {
+		if val, _, err := execOutBuf.Get(writer.ModuleName()); err == nil {
+			if err := writer.Add(clock, val); err != nil {
+				return err
+			}
+		}
+	}
+
 	// once a block is final, no need to keep it in reversible buffer
 	delete(e.reversibleBuffers, clock.Number)
-
-	// delete mapper outputs that were loaded from disk cache to free up memory ASAP and that have already been used.
-	// since `HandleFinal` is always called AFTER `HandleNew` on any given block, we know that the block is behind us.
-	// Note: the existingExecOuts only exist on tier2 requests, which does not process live blocks either.
-	for _, existingExecOut := range e.existingExecOuts {
-		delete(existingExecOut.Kv, clock.Id)
-	}
 
 	return nil
 }
@@ -111,38 +111,13 @@ func (e *Engine) EndOfStream(lastFinalClock *pbsubstreams.Clock) error {
 	var errs error
 
 	for _, writer := range e.execOutputWriters {
-		if err := writer.Close(context.Background()); err != nil {
+		if err := writer.Close(); err != nil {
 			errs = multierror.Append(errs, err)
 		}
-
-		currentFile := writer.CurrentFile
-
-		if e.indexWriters != nil {
-			if indexWriter, ok := e.indexWriters[currentFile.ModuleName]; ok {
-				indexes := make(map[string]*roaring64.Bitmap)
-				for _, item := range currentFile.Kv {
-					blockIndexOutput := item.Payload
-					extractedKeys := &pbindex.Keys{}
-					err := proto.Unmarshal(blockIndexOutput, extractedKeys)
-					if err != nil {
-						return fmt.Errorf("unmarshalling index keys from %s outputs: %w", currentFile.ModuleName, err)
-					}
-
-					for _, key := range extractedKeys.Keys {
-						if _, ok = indexes[key]; !ok {
-							indexes[key] = roaring64.New()
-						}
-						indexes[key].Add(item.BlockNum)
-					}
-				}
-
-				indexWriter.Write(indexes)
-
-				err := indexWriter.Close(context.Background())
-				if err != nil {
-					errs = multierror.Append(errs, err)
-				}
-			}
+	}
+	for _, writer := range e.indexWriters {
+		if err := writer.Close(e.ctx); err != nil {
+			errs = multierror.Append(errs, err)
 		}
 	}
 

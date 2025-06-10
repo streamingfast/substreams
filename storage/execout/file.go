@@ -288,6 +288,7 @@ func (fr *fileReader) ReadNext() (*pboutput.Item, error) {
 		}
 		return nil, err
 	}
+	fr.lastReadItem = item
 	return item, nil
 }
 

@@ -18,6 +18,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 )
 
 func init() {
@@ -246,9 +247,11 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 	ui.Connected()
 
+	var totalEgress int
 	for {
 		resp, err := cli.Recv()
 		if resp != nil {
+			totalEgress += proto.Size(resp)
 			if err := ui.IncomingMessage(ctx, resp, testRunner); err != nil {
 				fmt.Printf("RETURN HANDLER ERROR: %s\n", err)
 			}
@@ -256,7 +259,8 @@ func runRun(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			if err == io.EOF {
 				ui.Cancel()
-				fmt.Fprintln(os.Stderr, "Total Read Bytes (server-side consumption):", ui.TotalReadBytes)
+				fmt.Fprintln(os.Stderr, "Total Processed Bytes:", ui.TotalReadBytes)
+				fmt.Fprintln(os.Stderr, "Total Received Bytes (uncompressed egress):", totalEgress)
 				fmt.Fprintln(os.Stderr, "all done")
 				if testRunner != nil {
 					testRunner.LogResults()

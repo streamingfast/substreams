@@ -105,7 +105,7 @@ func (cd *ClockDistributor) Next(ctx context.Context) (*pbsubstreams.Clock, erro
 				if err != nil {
 					return nil, err
 				}
-				cd.seenClocks[i] = &pbsubstreams.Clock{
+				cd.seenClocks[item.BlockNum] = &pbsubstreams.Clock{
 					Number:    item.BlockNum,
 					Id:        item.BlockId,
 					Timestamp: item.Timestamp,

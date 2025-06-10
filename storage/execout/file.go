@@ -7,7 +7,6 @@ import (
 	"io"
 	"path"
 	"sort"
-	"strconv"
 
 	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
 	"github.com/streamingfast/substreams/storage/execout/streamproto"
@@ -349,12 +348,4 @@ func (c *File) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 
 func computeDBinFilename(startBlock, stopBlock uint64) string {
 	return fmt.Sprintf("%010d-%010d.output", startBlock, stopBlock)
-}
-
-func mustAtoi(s string) int {
-	i, err := strconv.Atoi(s)
-	if err != nil {
-		panic(err)
-	}
-	return i
 }

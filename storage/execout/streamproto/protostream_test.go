@@ -202,7 +202,7 @@ func TestDetailedItemAnalysis(t *testing.T) {
 
 	// Examine the first few bytes of the buffer
 	bufBytes := buf.Bytes()
-	headerBytes := bufBytes[:minInt(20, len(bufBytes))]
+	headerBytes := bufBytes[:min(20, len(bufBytes))]
 	t.Logf("First 20 bytes of written data: %v (hex: %x)", headerBytes, headerBytes)
 
 	// Now try to read it back step by step
@@ -284,7 +284,7 @@ func TestEncode(t *testing.T) {
 	if !bytes.Equal(encodedFull, encodedStream) {
 		t.Logf("Encoding methods produced different results")
 		// You might want to examine the first few bytes to see where they differ
-		compareLength := minInt(len(encodedFull), len(encodedStream))
+		compareLength := min(len(encodedFull), len(encodedStream))
 		if compareLength > 20 {
 			compareLength = 20 // Limit to first 20 bytes for readability
 		}
@@ -295,13 +295,6 @@ func TestEncode(t *testing.T) {
 		t.Logf("Both encoding methods produced identical results")
 	}
 
-}
-
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 func TestVarintReaderDiagnostics(t *testing.T) {

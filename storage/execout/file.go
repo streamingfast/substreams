@@ -247,17 +247,14 @@ func (fr *fileReader) open(ctx context.Context) error {
 	}
 	if !ordered {
 		if err := rewriteAsOrdered(ctx, r, readBytes, fr.store, fr.ModuleName(), fr.Filename(), fr.Range, fr.logger); err != nil {
-			fmt.Println("rewriting as ordered error", err)
 			return err
 		}
 		if err := r.Close(); err != nil {
-			fmt.Println("closing err", err)
 			return err
 		}
 
 		r, err := fr.store.OpenObject(ctx, fr.Filename())
 		if err != nil {
-			fmt.Println("opening object error", err)
 			return err
 		}
 		ordered, readBytes, err = streamproto.ReadOrderedBool(r)
@@ -308,6 +305,7 @@ func rewriteAsOrdered(ctx context.Context, r io.Reader, readBytes []byte, store 
 		return items[i].BlockNum < items[j].BlockNum
 	})
 
+	store.SetOverwrite(true)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel() // closes the WriteAsYouGo
 	newFile := NewFileWriter(ctx, store, logger, rng, moduleName)

@@ -15,6 +15,7 @@
 
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
 
+GOPATH=$(go env GOPATH)
 GOBIN=${1:-"$GOPATH/bin"}
 vtproto="$GOBIN/protoc-gen-go-vtproto"
 
@@ -25,7 +26,7 @@ function main() {
   pushd "$ROOT" >/dev/null
     pushd "$ROOT/pb" > /dev/null
       generate "output.proto"
-      mv  "github.com/streamingfast/substreams/pipeline/execout/cachev1/pb/output_vtproto.pb.go" .
+      mv  "github.com/streamingfast/substreams/storage/execout/pb/output_vtproto.pb.go" .
       rm -rf "github.com"
     popd >/dev/null
   popd >/dev/null
@@ -51,7 +52,7 @@ function generate() {
         --go-grpc_opt=paths=source_relative,require_unimplemented_servers=false \
         --go-vtproto_out=. \
         --plugin protoc-gen-go-vtproto="$vtproto" \
-        --go-vtproto_opt=features=marshal+unmarshal+size \
+        --go-vtproto_opt=features=marshal+unmarshal+size+unmarshal_unsafe \
           $base$file
     done
 }
@@ -95,7 +96,7 @@ function checks() {
   # version waits forever. So we pipe some wrong input to make it exit fast. In the new version
   # which supports `--version` correctly, it prints the version anyway and discard the standard input
   # so it's good with both version.
-  result=`printf "" | protoc-gen-prost --version 2>&1 | grep -Eo 0.1.[0-9]+`
+  result=`printf "" | protoc-gen-prost --version 2>&1 | grep -Eo 0.[12].[0-9]+`
   if [[ "$result" == "" ]]; then
     echo "Your version of 'protoc-gen-prost' (at `which protoc-gen-prost || echo N/A`) is not recent enough or not installed."
     echo ""
@@ -130,4 +131,3 @@ main "$@"
 
 echo "Success"
 echo ""
-echo "Make sure you update 'noalloc_version.go' file with content of 'output_vtproto.pb.go', keeping the noalloc fix"

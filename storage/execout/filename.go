@@ -3,6 +3,7 @@ package execout
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 
 	"github.com/streamingfast/substreams/block"
 )
@@ -59,4 +60,12 @@ func fileNameToRange(filename string, regex *regexp.Regexp) (*block.Range, error
 		StartBlock:        start,
 		ExclusiveEndBlock: end,
 	}, nil
+}
+
+func mustAtoi(s string) int {
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		panic(err)
+	}
+	return i
 }

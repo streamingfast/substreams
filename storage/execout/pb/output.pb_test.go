@@ -111,7 +111,7 @@ func Benchmark_Unmarshall_Array(b *testing.B) {
 			for n := 0; n < bb.N; n++ {
 
 				o := &Array{}
-				err := o.UnmarshalVTNoAlloc(data)
+				err := o.UnmarshalVTUnsafe(data)
 				require.NoError(bb, err)
 
 				itemsMap := make(map[string]*Item)
@@ -145,7 +145,7 @@ func Test_Unmarshall_Array(t *testing.T) {
 	require.NoError(t, err)
 
 	o := &Array{}
-	err = o.UnmarshalVTNoAlloc(data)
+	err = o.UnmarshalVTUnsafe(data)
 	require.NoError(t, err)
 
 	itemsMap := make(map[string]*Item)

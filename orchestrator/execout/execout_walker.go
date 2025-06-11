@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
+	"io"
 	"strings"
 	"time"
 
@@ -22,13 +22,6 @@ import (
 	"github.com/streamingfast/substreams/storage/execout"
 	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
 )
-
-var disablePreloadExecFiles bool
-
-func init() {
-	e := os.Getenv("SUBSTREAMS_DISABLE_PRELOAD_EXEC_FILES")
-	disablePreloadExecFiles = e == "" || e == "0" || e == "false"
-}
 
 type Walker struct {
 	ctx context.Context
@@ -78,24 +71,21 @@ func (r *Walker) IsWorking() bool {
 }
 
 func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
-	file := r.fileWalker.File()
-	if !disablePreloadExecFiles {
-		r.fileWalker.PreloadNext(r.ctx)
-	}
-
 	return func() loop.Msg {
 		time.Sleep(waitBefore)
+		file, err := r.fileWalker.FileReader(r.ctx)
 
-		err := file.Load(r.ctx)
 		if errors.Is(err, dstore.ErrNotFound) {
 			return MsgFileNotPresent{NextWait: computeNewWait(waitBefore, r.fileWalker.IsLocal)}
 		}
 		if err != nil {
-			return loop.NewQuitMsg(fmt.Errorf("loading %s cache %q: %w", file.ModuleName, file.Filename(), err))
+			return loop.NewQuitMsg(fmt.Errorf("loading %s cache %q: %w", file.ModuleName(), file.Filename(), err))
 		}
 
-		if err := r.sendItems(file.SortedItems()); err != nil {
-			return loop.NewQuitMsg(err)
+		if err := r.sendItems(file); err != nil {
+			if err != io.EOF {
+				return loop.NewQuitMsg(err)
+			}
 		}
 		return MsgFileDownloaded{}
 	}
@@ -115,10 +105,10 @@ func computeNewWait(previousWait time.Duration, storeIsLocal bool) time.Duration
 	return newWait
 }
 
-func (r *Walker) sendItems(sortedItems []*pboutput.Item) error {
-	for _, item := range sortedItems {
-		if item == nil {
-			continue // why would that happen?!
+func (r *Walker) sendItems(reader execout.FileReader) error {
+	for item, err := range reader.Iter() {
+		if err != nil {
+			return err
 		}
 		if item.BlockNum < r.StartBlock {
 			continue

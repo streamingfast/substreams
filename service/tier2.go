@@ -108,7 +108,6 @@ func NewTier2(
 	}
 
 	setSubstreamsStoreSizeLimitFromEnv(logger)
-	setSubstreamsOutputSizeLimitFromEnv(logger)
 
 	if debugAPIAddress := os.Getenv("SUBSTREAMS_DEBUG_API_ADDR"); debugAPIAddress != "" {
 		debugAPI := debugapi.New(
@@ -414,13 +413,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 				return
 			case <-time.After(10 * time.Second): // 10 sec
 				if time.Since(now) > 300*time.Second { // 300 secs
-					size := 0
-					for _, file := range executionPlan.ExistingExecOuts {
-						for _, v := range file.Kv {
-							size += len(v.Payload)
-						}
-					}
-					logger.Info("request active for for a long time", zap.Duration("duration", time.Since(now)), zap.Int("execout_size_mib", size/1024/1024))
+					logger.Info("request active for a long time", zap.Duration("duration", time.Since(now)))
 				}
 			}
 		}
@@ -499,20 +492,15 @@ excludable:
 
 	var streamErr error
 	if canSkipBlockSource(executionPlan.ExistingExecOuts, executionPlan.RequiredModules, request.BlockType) {
-		maxDistributorLength := int(stopBlock - requestDetails.ResolvedStartBlockNum)
-		clocksDistributor := make(map[uint64]*pbsubstreams.Clock)
-		for _, execOutput := range executionPlan.ExistingExecOuts {
-			execOutput.ExtractClocks(clocksDistributor)
-			if len(clocksDistributor) >= maxDistributorLength {
-				break
-			}
-		}
 
-		sortedClocksDistributor := sortClocksDistributor(clocksDistributor)
 		ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/pipeline/mapper_stream")
-		for _, clock := range sortedClocksDistributor {
-			if clock.Number < startBlock || clock.Number >= stopBlock {
-				panic("reading from mapper, block was out of range") // we don't want to have this case undetected
+
+		distributor := execout.NewClockDistributor(executionPlan.ExistingExecOuts, startBlock, stopBlock)
+
+		for clock, err := range distributor.Iter(ctx) {
+			if err != nil {
+				span.EndWithErr(&err)
+				return err
 			}
 			cursor := irreversibleCursorFromClock(clock)
 
@@ -596,7 +584,7 @@ func (s *Tier2Service) getStores(ctx context.Context, request *pbssinternal.Proc
 	return
 }
 
-func canSkipBlockSource(existingExecOuts map[string]*execout.File, requiredModules map[string]*pbsubstreams.Module, blockType string) bool {
+func canSkipBlockSource(existingExecOuts map[string]execout.FileReader, requiredModules map[string]*pbsubstreams.Module, blockType string) bool {
 	if len(existingExecOuts) == 0 {
 		return false
 	}
@@ -716,7 +704,7 @@ func toGRPCError(ctx context.Context, err error) error {
 }
 
 type ExecutionPlan struct {
-	ExistingExecOuts map[string]*execout.File
+	ExistingExecOuts map[string]execout.FileReader
 	ExecoutWriters   map[string]*execout.Writer
 	ExistingIndices  map[string]map[string]*roaring64.Bitmap
 	IndexWriters     map[string]*index.Writer
@@ -737,7 +725,7 @@ func GetExecutionPlan(
 	storeConfigs store.ConfigMap,
 ) (*ExecutionPlan, error) {
 	storesToWrite := make(map[string]struct{})
-	existingExecOuts := make(map[string]*execout.File)
+	existingExecOuts := make(map[string]execout.FileReader)
 	existingIndices := make(map[string]map[string]*roaring64.Bitmap)
 	requiredModules := make(map[string]*pbsubstreams.Module)
 	execoutWriters := make(map[string]*execout.Writer) // this affects stores and mappers, per-block data
@@ -786,7 +774,7 @@ func GetExecutionPlan(
 			existingIndices[name] = indexFile.Indices
 
 		case pbsubstreams.ModuleKindMap:
-			file, readErr := c.ReadFile(ctx, &block.Range{StartBlock: moduleStartBlock, ExclusiveEndBlock: stopBlock})
+			file, readErr := c.OpenFileReader(ctx, &block.Range{StartBlock: moduleStartBlock, ExclusiveEndBlock: stopBlock})
 			if readErr != nil {
 				if !errors.Is(readErr, dstore.ErrNotFound) {
 					return nil, fmt.Errorf("reading mapper output file: %w", readErr)
@@ -797,7 +785,7 @@ func GetExecutionPlan(
 			existingExecOuts[name] = file
 
 		case pbsubstreams.ModuleKindStore:
-			file, readErr := c.ReadFile(ctx, &block.Range{StartBlock: moduleStartBlock, ExclusiveEndBlock: stopBlock})
+			file, readErr := c.OpenFileReader(ctx, &block.Range{StartBlock: moduleStartBlock, ExclusiveEndBlock: stopBlock})
 			if readErr != nil {
 				if !errors.Is(readErr, dstore.ErrNotFound) {
 					return nil, fmt.Errorf("reading mapper output file: %w", readErr)
@@ -845,19 +833,19 @@ func GetExecutionPlan(
 			writerStartBlock = module.InitialBlock
 		}
 
-		var isIndexWriter bool
 		if module.ModuleKind() == pbsubstreams.ModuleKindBlockIndex {
-			isIndexWriter = true
+			file := indexConfigs.ConfigMap[name].NewFile(&block.Range{StartBlock: writerStartBlock, ExclusiveEndBlock: stopBlock})
+			indexWriters[name] = index.NewWriter(file)
+		} else {
+			// stores and execouts
+			execoutWriters[name] = execout.NewWriter(
+				ctx,
+				writerStartBlock,
+				stopBlock,
+				name,
+				execoutConfigs,
+			)
 		}
-
-		execoutWriters[name] = execout.NewWriter(
-			ctx,
-			writerStartBlock,
-			stopBlock,
-			name,
-			execoutConfigs,
-			isIndexWriter,
-		)
 
 	}
 

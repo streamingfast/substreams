@@ -8,6 +8,9 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
+	pbindex "github.com/streamingfast/substreams/pb/sf/substreams/index/v1"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
 	pbindexes "github.com/streamingfast/substreams/storage/index/pb"
 
 	"github.com/RoaringBitmap/roaring/roaring64"
@@ -23,7 +26,9 @@ type File struct {
 	moduleName         string
 	moduleInitialBlock uint64
 	Indices            map[string]*roaring64.Bitmap
-	logger             *zap.Logger
+	Kv                 map[string]*pboutput.Item
+
+	logger *zap.Logger
 }
 
 func NewFile(baseStore dstore.Store, moduleHash string, moduleName string, logger *zap.Logger, blockRange *block.Range) (*File, error) {
@@ -36,11 +41,28 @@ func NewFile(baseStore dstore.Store, moduleHash string, moduleName string, logge
 		store:      subStore,
 		moduleName: moduleName,
 		logger:     logger,
+		Indices:    make(map[string]*roaring64.Bitmap),
 	}, nil
 }
 
 func (f *File) Set(indices map[string]*roaring64.Bitmap) {
 	f.Indices = indices
+}
+
+func (f *File) Add(clock *pbsubstreams.Clock, data []byte) error {
+	extractedKeys := &pbindex.Keys{}
+	err := proto.Unmarshal(data, extractedKeys)
+	if err != nil {
+		return fmt.Errorf("unmarshalling index keys from %s outputs: %w", f.moduleName, err)
+	}
+
+	for _, key := range extractedKeys.Keys {
+		if _, ok := f.Indices[key]; !ok {
+			f.Indices[key] = roaring64.New()
+		}
+		f.Indices[key].Add(clock.Number)
+	}
+	return nil
 }
 
 func ConvertIndexesMapToBytes(indices map[string]*roaring64.Bitmap) (map[string][]byte, error) {
@@ -57,6 +79,7 @@ func ConvertIndexesMapToBytes(indices map[string]*roaring64.Bitmap) (map[string]
 
 func (f *File) Save(ctx context.Context) error {
 	filename := f.Filename()
+
 	convertedIndexes, err := ConvertIndexesMapToBytes(f.Indices)
 	if err != nil {
 		return fmt.Errorf("converting Indices to bytes: %w", err)

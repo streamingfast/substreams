@@ -1,6 +1,6 @@
 # Relational Mapping
 
-If you want to use a relational model (e.g., creating one-to-many), you can annotate your Protobuf to indicate the primary and foreings keys in your database.
+If you want to use a relational model (e.g., creating one-to-many), you can annotate your Protobuf to indicate the primary and foreign keys in your database.
 
 To map your Protobuf definitions directly to database tables and establish relationships between objects, you need to annotate your Protobuf messages with table names, primary keys, and relationship metadata.
 
@@ -161,7 +161,7 @@ message Transfer {
 
 ### Run the Sink
 
-To run the sink, you will need a Postgres database. You can use a Docker container to spin up one in your computer.
+To run the sink, you will need a Postgres database. You can use a Docker container to spin one up on your computer.
 
 - Define the `DSN` string, which will contain the credentials of the database.
 

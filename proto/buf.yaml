@@ -4,14 +4,14 @@ name: buf.build/streamingfast/substreams
 deps: ["buf.build/streamingfast/firehose"]
 
 build:
-  excludes:
-  - google
-  - sf/substreams/v1/test
+    excludes:
+        - google
+        - sf/substreams/v1/test
 
 lint:
-  use:
-    - DEFAULT
+    use:
+        - DEFAULT
 
 breaking:
-  use:
-    - FILE
+    use:
+        - FILE

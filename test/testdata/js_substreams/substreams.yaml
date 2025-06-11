@@ -1,0 +1,24 @@
+specVersion: v0.1.0
+package:
+    name: js_substreams
+    version: v0.0.1
+
+protobuf:
+    files:
+        - "sf/substreams/v1/test/test.proto"
+    importPaths:
+        - ../../../proto
+
+binaries:
+    default:
+        type: javascript/v8
+        file: ./dist/bundle.js
+
+modules:
+    - name: test_map
+      kind: map
+      initialBlock: 10
+      inputs:
+          - source: sf.substreams.v1.test.Block
+      output:
+          type: proto:sf.substreams.v1.test.MapResult

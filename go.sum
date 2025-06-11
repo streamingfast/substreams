@@ -522,8 +522,8 @@ github.com/streamingfast/substreams-sdk-go v0.0.0-20240110154316-5fb21a7a330b h1
 github.com/streamingfast/substreams-sdk-go v0.0.0-20240110154316-5fb21a7a330b/go.mod h1:TJXOmIAPY+FJvosBoMAiQeZzi32QiBXzCTSgVsss9Oo=
 github.com/streamingfast/substreams-sink-sql v1.0.1-0.20231127153906-acf5f3e34330 h1:svW/I3N8vW2JqJwE/cWXiULOEZi6eslxA60xHVqDaXk=
 github.com/streamingfast/substreams-sink-sql v1.0.1-0.20231127153906-acf5f3e34330/go.mod h1:4Zd5Re1SrhXDnO3VJh/FJcn64SyZPqAv6gFPjbyqMYI=
-github.com/streamingfast/v8go v0.0.0-20250606155404-8a2116409567 h1:9dCRqmEv2OqG0xHDNeLYf33csvGfRqGyRkGfSqEdS44=
-github.com/streamingfast/v8go v0.0.0-20250606155404-8a2116409567/go.mod h1:UhUDormMsmXqcSRlEbfZTtDtMgv3G+DPDDtb5khas34=
+github.com/streamingfast/v8go v0.0.0-20250609192103-f9b5beca42f2 h1:NUBaOrKL/8t3OdbyN2izsy8AWJkdLteXj5qZuNEwoe0=
+github.com/streamingfast/v8go v0.0.0-20250609192103-f9b5beca42f2/go.mod h1:UhUDormMsmXqcSRlEbfZTtDtMgv3G+DPDDtb5khas34=
 github.com/streamingfast/worker-pool-protocol v0.0.0-20250218145136-4ad271e36e39 h1:NBBLx99rrGz/hxwHjHi+QyN07DfqcDC4zzuBEsH0/vE=
 github.com/streamingfast/worker-pool-protocol v0.0.0-20250218145136-4ad271e36e39/go.mod h1:fq44dFx8K9S3/9QOoIVk0s+ptEscfpQmftLog/9WYU4=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=

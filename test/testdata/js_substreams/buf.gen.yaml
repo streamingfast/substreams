@@ -1,0 +1,5 @@
+version: v1
+plugins:
+    - plugin: buf.build/bufbuild/es:v2.3.0
+      opt: target=ts
+      out: pb

@@ -3472,13 +3472,13 @@
 
   // src/lib.ts
   var Substreams = class {
-    test_map(blk) {
+    js_test_map(blk) {
       return create(MapResultSchema, {
         blockNumber: blk.number,
         blockHash: blk.id
       });
     }
-    test_map_clock() {
+    js_test_map_clock() {
       const clock = getClock();
       return create(MapResultSchema, {
         blockNumber: clock.number,
@@ -3488,8 +3488,8 @@
   };
   __decorateClass([
     substreams.handlers.map([BlockSchema], MapResultSchema)
-  ], Substreams.prototype, "test_map", 1);
+  ], Substreams.prototype, "js_test_map", 1);
   __decorateClass([
     substreams.handlers.map([BlockSchema], MapResultSchema)
-  ], Substreams.prototype, "test_map_clock", 1);
+  ], Substreams.prototype, "js_test_map_clock", 1);
 })();

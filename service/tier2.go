@@ -497,12 +497,9 @@ excludable:
 
 		distributor := execout.NewClockDistributor(executionPlan.ExistingExecOuts, startBlock, stopBlock)
 
-		for {
-			clock, err := distributor.Next(ctx)
+		for clock, err := range distributor.Iter(ctx) {
 			if err != nil {
-				if err == io.EOF {
-					break
-				}
+				span.EndWithErr(&err)
 				return err
 			}
 			cursor := irreversibleCursorFromClock(clock)

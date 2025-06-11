@@ -23,7 +23,7 @@ import (
 
 type FileReader interface {
 	ReadNext() (*pboutput.Item, error)
-	All() iter.Seq2[*pboutput.Item, error]
+	Iter() iter.Seq2[*pboutput.Item, error]
 	Get(ctx context.Context, blockNumber uint64) (payload []byte, found bool, err error)
 	ModuleName() string
 	Filename() string
@@ -122,6 +122,25 @@ func (cd *ClockDistributor) Next(ctx context.Context) (*pbsubstreams.Clock, erro
 
 	}
 	return nil, io.EOF
+}
+
+// Iter returns an iterator that yields clocks from the distributor.
+// This allows using range loops: for clock, err := range distributor.Iter(ctx) { ... }
+func (cd *ClockDistributor) Iter(ctx context.Context) iter.Seq2[*pbsubstreams.Clock, error] {
+	return func(yield func(*pbsubstreams.Clock, error) bool) {
+		for {
+			clock, err := cd.Next(ctx)
+			if err == io.EOF {
+				return
+			}
+			if !yield(clock, err) {
+				return
+			}
+			if err != nil {
+				return
+			}
+		}
+	}
 }
 
 func NewFileWriter(ctx context.Context, store dstore.Store, logger *zap.Logger, rng *block.Range, moduleName string) FileWriter {
@@ -289,9 +308,9 @@ func (fr *fileReader) ReadNext() (*pboutput.Item, error) {
 	return item, nil
 }
 
-// All returns an iterator that yields all items from the reader.
-// Usage: for item, err := range fileReader.All() { ... }
-func (fr *fileReader) All() iter.Seq2[*pboutput.Item, error] {
+// Iter returns an iterator that yields all items from the reader.
+// Usage: for item, err := range fileReader.Iter() { ... }
+func (fr *fileReader) Iter() iter.Seq2[*pboutput.Item, error] {
 	return func(yield func(*pboutput.Item, error) bool) {
 		for {
 			item, err := fr.ReadNext()

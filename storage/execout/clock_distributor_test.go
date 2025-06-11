@@ -36,7 +36,7 @@ func (m *MockFileReader) ReadNext() (*pboutput.Item, error) {
 	return item, nil
 }
 
-func (m *MockFileReader) All() iter.Seq2[*pboutput.Item, error] {
+func (m *MockFileReader) Iter() iter.Seq2[*pboutput.Item, error] {
 	return func(yield func(*pboutput.Item, error) bool) {
 		for {
 			item, err := m.ReadNext()

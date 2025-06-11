@@ -106,7 +106,7 @@ func computeNewWait(previousWait time.Duration, storeIsLocal bool) time.Duration
 }
 
 func (r *Walker) sendItems(reader execout.FileReader) error {
-	for item, err := range reader.All() {
+	for item, err := range reader.Iter() {
 		if err != nil {
 			return err
 		}

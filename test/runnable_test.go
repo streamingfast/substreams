@@ -420,7 +420,6 @@ type Obj struct {
 	cursor             *bstream.Cursor
 	step               bstream.StepType
 	reorgJunctionBlock bstream.BlockRef
-	clock              *pbsubstreams.Clock
 }
 
 func (o *Obj) Cursor() *bstream.Cursor {

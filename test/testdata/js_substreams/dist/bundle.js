@@ -3192,6 +3192,9 @@
     return reg.getFile(root.name);
   }
 
+  // node_modules/@bufbuild/protobuf/dist/esm/wkt/gen/google/protobuf/timestamp_pb.js
+  var file_google_protobuf_timestamp = /* @__PURE__ */ fileDesc("Ch9nb29nbGUvcHJvdG9idWYvdGltZXN0YW1wLnByb3RvEg9nb29nbGUucHJvdG9idWYiKwoJVGltZXN0YW1wEg8KB3NlY29uZHMYASABKAMSDQoFbmFub3MYAiABKAVChQEKE2NvbS5nb29nbGUucHJvdG9idWZCDlRpbWVzdGFtcFByb3RvUAFaMmdvb2dsZS5nb2xhbmcub3JnL3Byb3RvYnVmL3R5cGVzL2tub3duL3RpbWVzdGFtcHBi+AEBogIDR1BCqgIeR29vZ2xlLlByb3RvYnVmLldlbGxLbm93blR5cGVzYgZwcm90bzM");
+
   // node_modules/@bufbuild/protobuf/dist/esm/to-binary.js
   var LEGACY_REQUIRED2 = 3;
   var writeDefaults = {
@@ -3364,6 +3367,11 @@
     }
   }
 
+  // node_modules/@bufbuild/protobuf/dist/esm/codegenv1/message.js
+  function messageDesc2(file, path, ...paths) {
+    return paths.reduce((acc, cur) => acc.nestedMessages[cur], file.messages[path]);
+  }
+
   // node_modules/@substreams/sdk/dist/index.mjs
   var Store = class {
     constructor(storeInterface, schema) {
@@ -3443,16 +3451,28 @@
       throw new Error("Cannot redefine Promise");
     }
   });
-
-  // node_modules/@bufbuild/protobuf/dist/esm/codegenv1/message.js
-  function messageDesc2(file, path, ...paths) {
-    return paths.reduce((acc, cur) => acc.nestedMessages[cur], file.messages[path]);
+  var file_sf_substreams_v1_clock = /* @__PURE__ */ fileDesc("ChxzZi9zdWJzdHJlYW1zL3YxL2Nsb2NrLnByb3RvEhBzZi5zdWJzdHJlYW1zLnYxIlIKBUNsb2NrEgoKAmlkGAEgASgJEg4KBm51bWJlchgCIAEoBBItCgl0aW1lc3RhbXAYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIiYKCEJsb2NrUmVmEgoKAmlkGAEgASgJEg4KBm51bWJlchgCIAEoBEJGWkRnaXRodWIuY29tL3N0cmVhbWluZ2Zhc3Qvc3Vic3RyZWFtcy9wYi9zZi9zdWJzdHJlYW1zL3YxO3Bic3Vic3RyZWFtc2IGcHJvdG8z", [file_google_protobuf_timestamp]);
+  var ClockSchema = /* @__PURE__ */ messageDesc2(file_sf_substreams_v1_clock, 0);
+  function getClock() {
+    let buf = globalThis.__clock();
+    if (!(buf instanceof Uint8Array)) {
+      if (buf?.length !== void 0 && typeof buf[0] === "number") {
+        buf = Uint8Array.from(buf);
+      } else {
+        throw new Error("__clock did not return a valid byte array");
+      }
+    }
+    return fromBinary(ClockSchema, buf);
   }
 
   // src/pb/sf/substreams/v1/test/test_pb.ts
   var file_sf_substreams_v1_test_test = /* @__PURE__ */ fileDesc("CiBzZi9zdWJzdHJlYW1zL3YxL3Rlc3QvdGVzdC5wcm90bxIVc2Yuc3Vic3RyZWFtcy52MS50ZXN0IiMKBUJsb2NrEgoKAmlkGAEgASgJEg4KBm51bWJlchgCIAEoBCI1CglNYXBSZXN1bHQSFAoMYmxvY2tfbnVtYmVyGAEgASgEEhIKCmJsb2NrX2hhc2gYAiABKAkiGQoHQm9vbGVhbhIOCgZyZXN1bHQYASABKAgiFwoFQXJyYXkSDgoGcmVzdWx0GAEgAygJQlBaTmdpdGh1Yi5jb20vc3RyZWFtaW5nZmFzdC9zdWJzdHJlYW1zL3BiL3NmL3N1YnN0cmVhbXMvdjEvdGVzdC87cGJzdWJzdHJlYW1zdGVzdGIGcHJvdG8z");
   var BlockSchema = /* @__PURE__ */ messageDesc2(file_sf_substreams_v1_test_test, 0);
   var MapResultSchema = /* @__PURE__ */ messageDesc2(file_sf_substreams_v1_test_test, 1);
+
+  // src/pb/sf/substreams/v1/clock_pb.ts
+  var file_sf_substreams_v1_clock2 = /* @__PURE__ */ fileDesc("ChxzZi9zdWJzdHJlYW1zL3YxL2Nsb2NrLnByb3RvEhBzZi5zdWJzdHJlYW1zLnYxIlIKBUNsb2NrEgoKAmlkGAEgASgJEg4KBm51bWJlchgCIAEoBBItCgl0aW1lc3RhbXAYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIiYKCEJsb2NrUmVmEgoKAmlkGAEgASgJEg4KBm51bWJlchgCIAEoBEJGWkRnaXRodWIuY29tL3N0cmVhbWluZ2Zhc3Qvc3Vic3RyZWFtcy9wYi9zZi9zdWJzdHJlYW1zL3YxO3Bic3Vic3RyZWFtc2IGcHJvdG8z", [file_google_protobuf_timestamp]);
+  var ClockSchema2 = /* @__PURE__ */ messageDesc2(file_sf_substreams_v1_clock2, 0);
 
   // src/lib.ts
   var Substreams = class {
@@ -3462,8 +3482,18 @@
         blockHash: blk.id
       });
     }
+    test_map_clock() {
+      const clock = getClock();
+      return create(MapResultSchema, {
+        blockNumber: clock.number,
+        blockHash: clock.id
+      });
+    }
   };
   __decorateClass([
     substreams.handlers.map([BlockSchema], MapResultSchema)
   ], Substreams.prototype, "test_map", 1);
+  __decorateClass([
+    substreams.handlers.map([ClockSchema2], MapResultSchema)
+  ], Substreams.prototype, "test_map_clock", 1);
 })();

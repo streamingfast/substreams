@@ -26,6 +26,6 @@ modules:
       kind: map
       initialBlock: 10
       inputs:
-          - source: sf.substreams.v1.Clock
+          - source: sf.substreams.v1.test.Block
       output:
           type: proto:sf.substreams.v1.test.MapResult

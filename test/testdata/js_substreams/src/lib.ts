@@ -1,7 +1,6 @@
 import { substreams, getClock } from "@substreams/sdk";
 import { fromBinary, create } from "@bufbuild/protobuf";
 import { Block, BlockSchema, MapResultSchema } from "./pb/sf/substreams/v1/test/test_pb";
-import { ClockSchema } from "./pb/sf/substreams/v1/clock_pb";
 
 export default class Substreams {
 	@substreams.handlers.map([BlockSchema], MapResultSchema)
@@ -11,7 +10,7 @@ export default class Substreams {
 			blockHash: blk.id,
 		});
 	}
-	@substreams.handlers.map([ClockSchema], MapResultSchema)
+	@substreams.handlers.map([BlockSchema], MapResultSchema)
 	test_map_clock() {
 		const clock = getClock();
 		return create(MapResultSchema, {

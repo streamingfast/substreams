@@ -3470,10 +3470,6 @@
   var BlockSchema = /* @__PURE__ */ messageDesc2(file_sf_substreams_v1_test_test, 0);
   var MapResultSchema = /* @__PURE__ */ messageDesc2(file_sf_substreams_v1_test_test, 1);
 
-  // src/pb/sf/substreams/v1/clock_pb.ts
-  var file_sf_substreams_v1_clock2 = /* @__PURE__ */ fileDesc("ChxzZi9zdWJzdHJlYW1zL3YxL2Nsb2NrLnByb3RvEhBzZi5zdWJzdHJlYW1zLnYxIlIKBUNsb2NrEgoKAmlkGAEgASgJEg4KBm51bWJlchgCIAEoBBItCgl0aW1lc3RhbXAYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIiYKCEJsb2NrUmVmEgoKAmlkGAEgASgJEg4KBm51bWJlchgCIAEoBEJGWkRnaXRodWIuY29tL3N0cmVhbWluZ2Zhc3Qvc3Vic3RyZWFtcy9wYi9zZi9zdWJzdHJlYW1zL3YxO3Bic3Vic3RyZWFtc2IGcHJvdG8z", [file_google_protobuf_timestamp]);
-  var ClockSchema2 = /* @__PURE__ */ messageDesc2(file_sf_substreams_v1_clock2, 0);
-
   // src/lib.ts
   var Substreams = class {
     test_map(blk) {
@@ -3494,6 +3490,6 @@
     substreams.handlers.map([BlockSchema], MapResultSchema)
   ], Substreams.prototype, "test_map", 1);
   __decorateClass([
-    substreams.handlers.map([ClockSchema2], MapResultSchema)
+    substreams.handlers.map([BlockSchema], MapResultSchema)
   ], Substreams.prototype, "test_map_clock", 1);
 })();

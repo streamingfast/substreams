@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"fmt"
 
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/wasm"
 	"google.golang.org/protobuf/proto"
 	"rogchap.com/v8go"
@@ -49,8 +48,10 @@ func (mod *V8Module) ExecuteNewCall(
 	// Runs all scripts (will be changed depending on files needed), probably going to merge all that are needed. This if makes sure we load our needed scripts ONLY on the first call
 	if cachedInstance == nil {
 
-		_ = injectStoreFunction(inst.ctx, call)
-		_ = injectClockFunction(inst.ctx, call.Clock)
+		if err := injectAllGlobals(inst.ctx, call); err != nil {
+			inst.Close(ctx)
+			return nil, err
+		}
 
 		scripts := []struct{ code, name string }{
 			{polyfillCode, "polyfill.js"},
@@ -80,6 +81,19 @@ func (mod *V8Module) ExecuteNewCall(
 
 	call.SetReturnValue(outBytes)
 	return inst, nil
+}
+
+func injectAllGlobals(ctx *v8go.Context, call *wasm.Call) error {
+
+	if err := injectStoreFunction(ctx, call); err != nil {
+		return fmt.Errorf("injectStoreFunction: %w", err)
+	}
+
+	if err := injectClockFunction(ctx, call); err != nil {
+		return fmt.Errorf("injectClockFunction: %w", err)
+	}
+
+	return nil
 }
 
 func (mod *V8Module) Close(context.Context) error {
@@ -171,20 +185,22 @@ func getOutput(inst *V8Instance) ([]byte, error) {
 }
 
 // Injects __clock into runtime
-func injectClockFunction(ctx *v8go.Context, clock *pbsubstreams.Clock) error {
+func injectClockFunction(ctx *v8go.Context, call *wasm.Call) error {
 	iso := ctx.Isolate()
 
-	data, err := proto.Marshal(clock)
-	if err != nil {
-		return fmt.Errorf("marshal clock: %w", err)
-	}
-
-	clockVal, err := v8go.NewUint8Array(ctx, data)
-	if err != nil {
-		return fmt.Errorf("clock Uint8array : %w", err)
-	}
-
 	clockFunc := v8go.NewFunctionTemplate(iso, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+		clock := call.Clock
+
+		data, err := proto.Marshal(clock)
+		if err != nil {
+			panic(fmt.Errorf("marshal clock: %w", err))
+		}
+
+		clockVal, err := v8go.NewUint8Array(ctx, data)
+		if err != nil {
+			panic(fmt.Errorf("clock Uint8Array: %w", err))
+		}
+
 		return clockVal
 	})
 

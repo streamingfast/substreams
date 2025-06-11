@@ -130,13 +130,15 @@ func Test_JSRuntime_ClockIntrinsic(t *testing.T) {
 	out, err := readOutputFile(ctx, filepath.Join(testTempDir, "test.store", "tag"), outputFile)
 	require.NoError(t, err)
 
-	var result pbsubstreamstest.MapResult
+	for blk := startBlock; blk <= 19; blk++ {
+		key := fmt.Sprintf("block-%d", blk)
+		item, found := out.Kv[key]
+		require.True(t, found, "missing expected key %s", key)
 
-	item, found := out.Kv["block-10"]
-	require.True(t, found, "missing expected key block-10")
-
-	require.NoError(t, proto.Unmarshal(item.Payload, &result))
-	assert.Equal(t, uint64(10), result.BlockNumber)
-	assert.Equal(t, "block-10", result.BlockHash)
+		var result pbsubstreamstest.MapResult
+		require.NoError(t, proto.Unmarshal(item.Payload, &result))
+		assert.Equal(t, blk, result.BlockNumber)
+		assert.Equal(t, key, result.BlockHash)
+	}
 
 }

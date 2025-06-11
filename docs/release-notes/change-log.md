@@ -11,7 +11,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### CLI
+
 * Add `uncompressed_egress_bytes` field to `substreams request stats` log message. Only tier1 will produce a non-zero value there.
+
+### Server
+
+Rework the execout File read/write:
+
+* This reduces the RAM usage necessary to read and stream data to the user on tier1,
+  as well as to read the existing execouts on tier2 jobs (in multi-stage scenario)
+
+* The cached execouts need to be rewritten to take advantage of this, since their data is currently not ordered:
+  the system will automatically load and rewrite existing execout when they are used.
+
+* Code changes include:
+  - new FileReader / FileWriter that "read as you go" or "write as you go"
+  - No more 'KV' map attached to the File
+  - Split the IndexWriter away from its dependencies on execoutMappers.
+  - Clock distributor now also reads "as you go", using a small "one-block-cache"
+
+* Removed env var and behaviors:
+  - SUBSTREAMS_DISABLE_PRELOAD_EXEC_FILES (no more preloading, it was mostly useful because reading full file+unmarshal was necessary when streaming...)
+  - SUBSTREAMS_OUTPUT_SIZE_LIMIT_PER_SEGMENT (not a RAM issue anymore)
 
 ## v1.15.7
 

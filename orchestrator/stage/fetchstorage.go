@@ -13,7 +13,7 @@ import (
 
 var firstPassStoresWalkMaxSegments = 50 // arbitrary "small" number of segments to scan for the first pass. Scan time is slow when listing thousands of files in object storage
 
-// fetchCachesState will look at the cache for:
+// FetchCachesState will look at the cache for:
 // 1. the output mapper (if we are in production mode and producing ExecOuts)
 // 2. each store (either:
 //   - if we need to prepare the stores after reading the execouts (for the LIVE segment) or

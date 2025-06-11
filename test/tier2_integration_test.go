@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/streamingfast/substreams/metering"
@@ -73,6 +74,7 @@ func TestTier2Call(t *testing.T) {
 		preCreatedFiles       []string
 		preCreatedIndices     *preCreatedIndices
 		expectRemainingFiles  []string
+		expectEmptyFiles      []string
 		mapOutputFileToCheck  string
 		expectedSkippedBlocks map[uint64]struct{}
 
@@ -102,13 +104,15 @@ func TestTier2Call(t *testing.T) {
 				secondStoreInit30 + "/states/0000000060-0000000030.kv",
 				thirdStoreInit40 + "/states/0000000060-0000000040.kv",
 
-				firstStoreInit20 + "/states/0000000050-0000000020.kv",
 				firstStoreInit20 + "/outputs/0000000050-0000000060.output",
-				secondStoreInit30 + "/states/0000000050-0000000030.kv",
 				secondStoreInit30 + "/outputs/0000000050-0000000060.output",
-				thirdStoreInit40 + "/states/0000000050-0000000040.kv",
 				thirdStoreInit40 + "/outputs/0000000050-0000000060.output",
 				mapInit50 + "/outputs/0000000050-0000000060.output",
+			},
+			expectEmptyFiles: []string{
+				firstStoreInit20 + "/states/0000000050-0000000020.kv",
+				secondStoreInit30 + "/states/0000000050-0000000030.kv",
+				thirdStoreInit40 + "/states/0000000050-0000000040.kv",
 			},
 			mapOutputFilesToDeepInspectForKeys: map[string]map[uint64]any{
 				mapInit50 + "/outputs/0000000050-0000000060.output": {
@@ -203,11 +207,12 @@ func TestTier2Call(t *testing.T) {
 			},
 
 			expectRemainingFiles: []string{
-				"73657475705f746573745f73746f72655f6164645f693634/outputs/0000000018-0000000020.output",
-				"73657475705f746573745f73746f72655f6164645f693634/states/0000000020-0000000018.partial",
-
 				"73657475705f746573745f73746f72655f6164645f693634/outputs/0000000020-0000000030.output",
 				"73657475705f746573745f73746f72655f6164645f693634/states/0000000030-0000000020.partial",
+			},
+			expectEmptyFiles: []string{
+				"73657475705f746573745f73746f72655f6164645f693634/outputs/0000000018-0000000020.output",
+				"73657475705f746573745f73746f72655f6164645f693634/states/0000000020-0000000018.partial",
 			},
 		},
 
@@ -229,13 +234,14 @@ func TestTier2Call(t *testing.T) {
 			},
 
 			expectRemainingFiles: []string{
-				"73657475705f746573745f73746f72655f6164645f693634/outputs/0000000018-0000000020.output",
-				"73657475705f746573745f73746f72655f6164645f693634/states/0000000020-0000000018.kv",
-
 				"73657475705f746573745f73746f72655f6164645f693634/outputs/0000000020-0000000030.output",
 				"73657475705f746573745f73746f72655f6164645f693634/states/0000000030-0000000018.kv",
 
 				"6173736572745f746573745f73746f72655f6164645f693634/outputs/0000000020-0000000030.output",
+			},
+			expectEmptyFiles: []string{
+				"73657475705f746573745f73746f72655f6164645f693634/outputs/0000000018-0000000020.output",
+				"73657475705f746573745f73746f72655f6164645f693634/states/0000000020-0000000018.kv",
 			},
 		},
 
@@ -263,16 +269,18 @@ func TestTier2Call(t *testing.T) {
 				secondStoreInit30 + "/states/0000000060-0000000030.kv",
 				thirdStoreInit40 + "/states/0000000060-0000000040.kv",
 
-				firstStoreInit20 + "/states/0000000050-0000000020.kv",
 				firstStoreInit20 + "/outputs/0000000050-0000000060.output",
-				secondStoreInit30 + "/states/0000000050-0000000030.kv",
 				secondStoreInit30 + "/outputs/0000000050-0000000060.output",
-				thirdStoreInit40 + "/states/0000000050-0000000040.kv",
 				thirdStoreInit40 + "/outputs/0000000050-0000000060.output",
 				secondMapInit50 + "/outputs/0000000050-0000000060.output",
 
 				fourthStoreInit52 + "/states/0000000060-0000000052.kv",
 				fourthStoreInit52 + "/outputs/0000000052-0000000060.output",
+			},
+			expectEmptyFiles: []string{
+				firstStoreInit20 + "/states/0000000050-0000000020.kv",
+				secondStoreInit30 + "/states/0000000050-0000000030.kv",
+				thirdStoreInit40 + "/states/0000000050-0000000040.kv",
 			},
 		},
 		// This test is checking the index file loading when file already existing
@@ -411,7 +419,7 @@ func TestTier2Call(t *testing.T) {
 
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
-			testTempDir := t.TempDir()
+			testTempDir, _ := os.MkdirTemp("/tmp", "test")
 
 			extendedTempDir := filepath.Join(testTempDir, "test.store", "tag")
 			err := createFiles(extendedTempDir, test.preCreatedFiles)
@@ -460,8 +468,9 @@ func TestTier2Call(t *testing.T) {
 				}
 				return res
 			}
+			fmt.Println("testTempDir", testTempDir)
 
-			assertFiles(t, testTempDir, false, withZST(test.expectRemainingFiles)...)
+			assertFilesWithEmpty(t, testTempDir, false, true, withZST(test.expectRemainingFiles), withZST(test.expectEmptyFiles))
 
 			outputFileToCheck := test.mapOutputFileToCheck
 			if outputFileToCheck != "" {
@@ -475,6 +484,49 @@ func TestTier2Call(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func assertFilesWithEmpty(t *testing.T, tempDir string, expectPartialSpkg bool, expectNonEmpty bool, wantedFiles []string, expectedEmptyFiles []string) {
+	producedFiles, emptyFiles := listFiles(t, tempDir)
+
+	if !expectNonEmpty {
+		producedFiles = append(producedFiles, emptyFiles...)
+	}
+
+	actualFiles := make([]string, 0, len(producedFiles))
+	actualEmptyFiles := make([]string, 0, len(emptyFiles))
+	var seenPartialSpkg bool
+	for _, f := range producedFiles {
+		parts := strings.Split(f, string(os.PathSeparator))
+		if parts[len(parts)-1] == "substreams.partial.spkg.zst" {
+			seenPartialSpkg = true
+			continue
+		}
+
+		if parts[len(parts)-1] == "last_used.zst" {
+			continue
+		}
+		actualFiles = append(actualFiles, filepath.Join(parts[3:]...))
+	}
+
+	for _, f := range emptyFiles {
+		parts := strings.Split(f, string(os.PathSeparator))
+		if parts[len(parts)-1] == "substreams.partial.spkg.zst" {
+			continue
+		}
+
+		if parts[len(parts)-1] == "last_used.zst" {
+			continue
+		}
+		actualEmptyFiles = append(actualEmptyFiles, filepath.Join(parts[3:]...))
+	}
+
+	if expectPartialSpkg {
+		assert.True(t, seenPartialSpkg, "substreams.partial.spkg should be produced")
+	}
+
+	assert.ElementsMatch(t, wantedFiles, actualFiles, "empty files: %s", emptyFiles)
+	assert.ElementsMatch(t, expectedEmptyFiles, actualEmptyFiles, "expected empty files don't match actual empty files")
 }
 
 func createFiles(extendedTempDir string, files []string) error {

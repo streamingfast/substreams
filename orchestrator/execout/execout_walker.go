@@ -82,7 +82,7 @@ func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
 			return loop.NewQuitMsg(fmt.Errorf("loading %s cache %q: %w", file.ModuleName(), file.Filename(), err))
 		}
 
-		if err := r.sendItems(file.ReadNext); err != nil {
+		if err := r.sendItems(file); err != nil {
 			if err != io.EOF {
 				return loop.NewQuitMsg(err)
 			}
@@ -105,14 +105,10 @@ func computeNewWait(previousWait time.Duration, storeIsLocal bool) time.Duration
 	return newWait
 }
 
-func (r *Walker) sendItems(get func() (*pboutput.Item, error)) error {
-	for {
-		item, err := get()
+func (r *Walker) sendItems(reader execout.FileReader) error {
+	for item, err := range reader.All() {
 		if err != nil {
 			return err
-		}
-		if item == nil {
-			return nil // why would that happen?!
 		}
 		if item.BlockNum < r.StartBlock {
 			continue
@@ -142,6 +138,7 @@ func (r *Walker) sendItems(get func() (*pboutput.Item, error)) error {
 			return nil
 		}
 	}
+	return nil
 }
 
 func (r *Walker) Progress() (first, current, last int) {

@@ -413,7 +413,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 				return
 			case <-time.After(10 * time.Second): // 10 sec
 				if time.Since(now) > 300*time.Second { // 300 secs
-					logger.Info("request active for for a long time", zap.Duration("duration", time.Since(now)))
+					logger.Info("request active for a long time", zap.Duration("duration", time.Since(now)))
 				}
 			}
 		}
@@ -777,7 +777,7 @@ func GetExecutionPlan(
 			existingIndices[name] = indexFile.Indices
 
 		case pbsubstreams.ModuleKindMap:
-			file, readErr := c.NewFileReader(ctx, &block.Range{StartBlock: moduleStartBlock, ExclusiveEndBlock: stopBlock})
+			file, readErr := c.OpenFileReader(ctx, &block.Range{StartBlock: moduleStartBlock, ExclusiveEndBlock: stopBlock})
 			if readErr != nil {
 				if !errors.Is(readErr, dstore.ErrNotFound) {
 					return nil, fmt.Errorf("reading mapper output file: %w", readErr)
@@ -788,7 +788,7 @@ func GetExecutionPlan(
 			existingExecOuts[name] = file
 
 		case pbsubstreams.ModuleKindStore:
-			file, readErr := c.NewFileReader(ctx, &block.Range{StartBlock: moduleStartBlock, ExclusiveEndBlock: stopBlock})
+			file, readErr := c.OpenFileReader(ctx, &block.Range{StartBlock: moduleStartBlock, ExclusiveEndBlock: stopBlock})
 			if readErr != nil {
 				if !errors.Is(readErr, dstore.ErrNotFound) {
 					return nil, fmt.Errorf("reading mapper output file: %w", readErr)

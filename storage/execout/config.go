@@ -68,8 +68,8 @@ func (c *Config) NewFile(targetRange *block.Range) *File {
 	}
 }
 
-func (c *Config) NewFileReader(ctx context.Context, targetRange *block.Range) (FileReader, error) {
-	return NewFileReader(ctx, c.objStore, c.logger, targetRange, c.name)
+func (c *Config) OpenFileReader(ctx context.Context, targetRange *block.Range) (FileReader, error) {
+	return OpenFileReader(ctx, c.objStore, c.logger, targetRange, c.name)
 }
 
 func (c *Config) NewFileWriter(ctx context.Context, targetRange *block.Range) FileWriter {

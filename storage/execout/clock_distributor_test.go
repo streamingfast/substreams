@@ -3,6 +3,7 @@ package execout
 import (
 	"context"
 	"io"
+	"iter"
 	"testing"
 
 	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
@@ -33,6 +34,23 @@ func (m *MockFileReader) ReadNext() (*pboutput.Item, error) {
 	item := m.items[m.currentIdx]
 	m.currentIdx++
 	return item, nil
+}
+
+func (m *MockFileReader) All() iter.Seq2[*pboutput.Item, error] {
+	return func(yield func(*pboutput.Item, error) bool) {
+		for {
+			item, err := m.ReadNext()
+			if err == io.EOF {
+				return
+			}
+			if !yield(item, err) {
+				return
+			}
+			if err != nil {
+				return
+			}
+		}
+	}
 }
 
 func (m *MockFileReader) Get(ctx context.Context, blockNumber uint64) (payload []byte, found bool, err error) {

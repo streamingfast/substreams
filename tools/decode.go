@@ -370,11 +370,10 @@ func searchOutputsModule(
 
 	rng := block.NewRange(startBlock, startBlock-startBlock%saveInterval+saveInterval)
 
-	outputCache, err := modStore.NewFileReader(ctx, rng)
+	outputCache, err := modStore.OpenFileReader(ctx, rng)
 	if err != nil {
 		return fmt.Errorf("can't create file reader for module %q: %w", module.Name, err)
 	}
-	fmt.Println("filename:", outputCache.Filename())
 	zlog.Info("loading block from store", zap.Uint64("start_block", startBlock), zap.Stringer("requested_block_range", requestedBlocks))
 
 	for i := requestedBlocks.StartBlock; i < requestedBlocks.ExclusiveEndBlock; i++ {
@@ -420,11 +419,10 @@ func searchOutputsModuleKvOps(
 
 	rng := block.NewRange(startBlock, startBlock-startBlock%saveInterval+saveInterval)
 
-	outputCache, err := modStore.NewFileReader(ctx, rng)
+	outputCache, err := modStore.OpenFileReader(ctx, rng)
 	if err != nil {
 		return fmt.Errorf("can't create file reader for module %q: %w", module.Name, err)
 	}
-	fmt.Println("filename:", outputCache.Filename())
 	zlog.Info("loading block from store", zap.Uint64("start_block", startBlock), zap.Stringer("requested_block_range", requestedBlocks))
 
 	for i := requestedBlocks.StartBlock; i < requestedBlocks.ExclusiveEndBlock; i++ {

@@ -34,7 +34,7 @@ func (fw *FileWalker) FileReader(ctx context.Context) (FileReader, error) {
 	if rng == nil {
 		return nil, nil
 	}
-	return fw.config.NewFileReader(ctx, rng)
+	return fw.config.OpenFileReader(ctx, rng)
 }
 
 // If the current segment is out of ranges, returns nil.

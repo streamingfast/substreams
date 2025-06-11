@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"path"
 	"sort"
 
@@ -22,6 +23,7 @@ import (
 
 type FileReader interface {
 	ReadNext() (*pboutput.Item, error)
+	All() iter.Seq2[*pboutput.Item, error]
 	Get(ctx context.Context, blockNumber uint64) (payload []byte, found bool, err error)
 	ModuleName() string
 	Filename() string
@@ -34,7 +36,7 @@ type fileReader struct {
 	complete     bool
 }
 
-func NewFileReader(ctx context.Context, store dstore.Store, logger *zap.Logger, rng *block.Range, moduleName string) (FileReader, error) {
+func OpenFileReader(ctx context.Context, store dstore.Store, logger *zap.Logger, rng *block.Range, moduleName string) (FileReader, error) {
 	fr := &fileReader{
 		File: &File{
 			Range:      rng,
@@ -249,9 +251,6 @@ func (fr *fileReader) open(ctx context.Context) error {
 		if err := rewriteAsOrdered(ctx, r, readBytes, fr.store, fr.ModuleName(), fr.Filename(), fr.Range, fr.logger); err != nil {
 			return err
 		}
-		if err := r.Close(); err != nil {
-			return err
-		}
 
 		r, err := fr.store.OpenObject(ctx, fr.Filename())
 		if err != nil {
@@ -261,6 +260,8 @@ func (fr *fileReader) open(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+
+		// We check again here because we have to read that boolean anyway, might as well check it. If a race condition or a store bad config with 'Overwriting' gives us the old file again, we have to stop here.
 		if !ordered {
 			return fmt.Errorf("internal error: could not rewrite outputs as ordered")
 		}
@@ -288,11 +289,35 @@ func (fr *fileReader) ReadNext() (*pboutput.Item, error) {
 	return item, nil
 }
 
-func rewriteAsOrdered(ctx context.Context, r io.Reader, readBytes []byte, store dstore.Store, moduleName, filename string, rng *block.Range, logger *zap.Logger) error {
+// All returns an iterator that yields all items from the reader.
+// Usage: for item, err := range fileReader.All() { ... }
+func (fr *fileReader) All() iter.Seq2[*pboutput.Item, error] {
+	return func(yield func(*pboutput.Item, error) bool) {
+		for {
+			item, err := fr.ReadNext()
+			if err == io.EOF {
+				return
+			}
+			if !yield(item, err) {
+				return
+			}
+			if err != nil {
+				return
+			}
+		}
+	}
+}
+
+// rewriteAsOrdered reads the file (prepending the already-read-bytes), closes it, then overwrites it with the ordered data.
+func rewriteAsOrdered(ctx context.Context, r io.ReadCloser, readBytes []byte, store dstore.Store, moduleName, filename string, rng *block.Range, logger *zap.Logger) (err error) {
 	bytes, err := io.ReadAll(r)
 	if err != nil {
 		return fmt.Errorf("reading store file %s: %w", filename, err)
 	}
+	if err := r.Close(); err != nil {
+		return err
+	}
+
 	bytes = append(readBytes, bytes...)
 
 	o := &pboutput.Array{}
@@ -309,6 +334,7 @@ func rewriteAsOrdered(ctx context.Context, r io.Reader, readBytes []byte, store 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel() // closes the WriteAsYouGo
 	newFile := NewFileWriter(ctx, store, logger, rng, moduleName)
+	defer func() { err = errors.Join(err, newFile.Close()) }()
 
 	for _, item := range items {
 		if err := newFile.SetItem(&pbsubstreams.Clock{
@@ -319,7 +345,8 @@ func rewriteAsOrdered(ctx context.Context, r io.Reader, readBytes []byte, store 
 			return err
 		}
 	}
-	return newFile.Close()
+
+	return nil
 }
 
 func (fw *fileWriter) Close() error {

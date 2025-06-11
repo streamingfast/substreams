@@ -396,7 +396,7 @@ func TestOneStoreOneMap(t *testing.T) {
 				return res
 			}
 
-			assertFiles(t, run.TempDir, true, withZST(test.expectFiles)...)
+			assertFiles(t, run.TempDir, true, true, withZST(test.expectFiles)...)
 		})
 	}
 }
@@ -603,8 +603,7 @@ func cancelledContext(delay time.Duration) context.Context {
 	return ctx
 }
 
-func listFiles(t *testing.T, tempDir string) []string {
-	var storedFiles []string
+func listFiles(t *testing.T, tempDir string) (storedFiles []string, emptyFiles []string) {
 	require.NoError(t, filepath.Walk(tempDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -612,14 +611,22 @@ func listFiles(t *testing.T, tempDir string) []string {
 		if info.IsDir() {
 			return nil
 		}
+		if info.Size() == 0 {
+			emptyFiles = append(emptyFiles, strings.TrimPrefix(path, tempDir))
+			return nil
+		}
 		storedFiles = append(storedFiles, strings.TrimPrefix(path, tempDir))
 		return nil
 	}))
-	return storedFiles
+	return
 }
 
-func assertFiles(t *testing.T, tempDir string, expectPartialSpkg bool, wantedFiles ...string) {
-	producedFiles := listFiles(t, tempDir)
+func assertFiles(t *testing.T, tempDir string, expectPartialSpkg bool, expectNonEmpty bool, wantedFiles ...string) {
+	producedFiles, emptyFiles := listFiles(t, tempDir)
+
+	if !expectNonEmpty {
+		producedFiles = append(producedFiles, emptyFiles...)
+	}
 
 	actualFiles := make([]string, 0, len(producedFiles))
 	var seenPartialSpkg bool
@@ -640,7 +647,7 @@ func assertFiles(t *testing.T, tempDir string, expectPartialSpkg bool, wantedFil
 		assert.True(t, seenPartialSpkg, "substreams.partial.spkg should be produced")
 	}
 
-	assert.ElementsMatch(t, wantedFiles, actualFiles)
+	assert.ElementsMatch(t, wantedFiles, actualFiles, "empty files: %s", emptyFiles)
 }
 
 func partialPreWork(t *testing.T, start uint64, stageIdx int, run *testRun, workerPoolFactory work.WorkerPoolFactory) {

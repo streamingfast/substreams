@@ -73,5 +73,5 @@ func Test_JSRuntime_SimpleMap(t *testing.T) {
 		return res
 	}
 
-	assertFiles(t, testTempDir, false, withZST([]string{outputRel})...)
+	assertFiles(t, testTempDir, false, true, withZST([]string{outputRel})...)
 }

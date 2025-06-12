@@ -25,6 +25,14 @@ func NewWriter(indexFile *File) *Writer {
 	}
 }
 
+func (w *Writer) ModuleName() string {
+	return w.indexFile.moduleName
+}
+
+func (w *Writer) Add(clock *pbsubstreams.Clock, data []byte) error {
+	return w.indexFile.Add(clock, data)
+}
+
 func (w *Writer) Write(indexes map[string]*roaring64.Bitmap) {
 	w.indexFile.Set(indexes)
 }

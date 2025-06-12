@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/streamingfast/substreams/wasm"
+	"google.golang.org/protobuf/proto"
 	"rogchap.com/v8go"
 )
 
@@ -44,7 +45,12 @@ func (mod *V8Module) ExecuteNewCall(
 
 	// Runs all scripts (will be changed depending on files needed), probably going to merge all that are needed. This if makes sure we load our needed scripts ONLY on the first call
 	if cachedInstance == nil {
-		_ = injectStoreFunction(inst.ctx, call)
+
+		if err := injectAllGlobals(inst.ctx, call); err != nil {
+			inst.Close(ctx)
+			return nil, err
+		}
+
 		scripts := []struct{ code, name string }{
 			{polyfillCode, "polyfill.js"},
 			{string(mod.code), "bundle.js"},
@@ -71,6 +77,19 @@ func (mod *V8Module) ExecuteNewCall(
 
 	call.SetReturnValue(outBytes)
 	return inst, nil
+}
+
+func injectAllGlobals(ctx *v8go.Context, call *wasm.Call) error {
+
+	if err := injectStoreFunction(ctx, call); err != nil {
+		return fmt.Errorf("injectStoreFunction: %w", err)
+	}
+
+	if err := injectClockFunction(ctx, call); err != nil {
+		return fmt.Errorf("injectClockFunction: %w", err)
+	}
+
+	return nil
 }
 
 func (mod *V8Module) Close(context.Context) error {
@@ -187,6 +206,30 @@ func getOutput(inst *V8Instance) ([]byte, error) {
 	}
 
 	return v8val.Uint8Array(), nil
+}
+
+// Injects __clock into runtime
+func injectClockFunction(ctx *v8go.Context, call *wasm.Call) error {
+	iso := ctx.Isolate()
+
+	clockFunc := v8go.NewFunctionTemplate(iso, func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+		clock := call.Clock
+
+		data, err := proto.Marshal(clock)
+		if err != nil {
+			panic(fmt.Errorf("marshal clock: %w", err))
+		}
+
+		clockVal, err := v8go.NewUint8Array(ctx, data)
+		if err != nil {
+			panic(fmt.Errorf("clock Uint8Array: %w", err))
+		}
+
+		return clockVal
+	})
+
+	clockInstance := clockFunc.GetFunction(ctx)
+	return ctx.Global().Set("__clock", clockInstance)
 }
 
 func injectStoreFunction(ctx *v8go.Context, call *wasm.Call) error {

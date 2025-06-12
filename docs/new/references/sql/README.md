@@ -1,0 +1,1 @@
+This section contains all the reference material related to the Substreams:SQL sink.

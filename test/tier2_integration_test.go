@@ -25,8 +25,9 @@ import (
 
 	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
 
-	"github.com/streamingfast/substreams/manifest"
+	_ "github.com/streamingfast/substreams/wasm/v8"
 
+	"github.com/streamingfast/substreams/manifest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -41,6 +42,10 @@ type preCreatedIndices struct {
 
 func TestTier2Call(t *testing.T) {
 	manifest.TestUseSimpleHash = true
+
+	jsMapInit := hex.EncodeToString([]byte("js_test_map"))
+	jsMapClockInit := hex.EncodeToString([]byte("js_test_map_clock"))
+
 	mapInit50 := hex.EncodeToString([]byte("map_output_init_50"))
 	secondMapInit50 := hex.EncodeToString([]byte("second_map_output_init_50"))
 
@@ -80,6 +85,52 @@ func TestTier2Call(t *testing.T) {
 
 		mapOutputFilesToDeepInspectForKeys map[string]map[uint64]any
 	}{
+
+		{
+			name:            "js_test_map",
+			startBlock:      10,
+			stage:           0,
+			moduleName:      "js_test_map",
+			stateBundleSize: 10,
+			manifestPath:    "./testdata/js_substreams/substreams_eth_usdt_js.spkg",
+
+			expectRemainingFiles: []string{
+				jsMapInit + "/outputs/0000000010-0000000020.output",
+			},
+
+			mapOutputFileToCheck: jsMapInit + "/outputs/0000000010-0000000020.output",
+		},
+
+		{
+			name:            "js_test_map_clock",
+			startBlock:      10,
+			stage:           0,
+			moduleName:      "js_test_map_clock",
+			stateBundleSize: 10,
+			manifestPath:    "./testdata/js_substreams/substreams_eth_usdt_js.spkg",
+
+			expectRemainingFiles: []string{
+				jsMapClockInit + "/outputs/0000000010-0000000020.output",
+			},
+
+			mapOutputFileToCheck: jsMapClockInit + "/outputs/0000000010-0000000020.output",
+
+			mapOutputFilesToDeepInspectForKeys: map[string]map[uint64]any{
+				jsMapClockInit + "/outputs/0000000010-0000000020.output": {
+					10: &pbsubstreamstest.MapResult{BlockNumber: 10, BlockHash: "block-10"},
+					11: &pbsubstreamstest.MapResult{BlockNumber: 11, BlockHash: "block-11"},
+					12: &pbsubstreamstest.MapResult{BlockNumber: 12, BlockHash: "block-12"},
+					13: &pbsubstreamstest.MapResult{BlockNumber: 13, BlockHash: "block-13"},
+					14: &pbsubstreamstest.MapResult{BlockNumber: 14, BlockHash: "block-14"},
+					15: &pbsubstreamstest.MapResult{BlockNumber: 15, BlockHash: "block-15"},
+					16: &pbsubstreamstest.MapResult{BlockNumber: 16, BlockHash: "block-16"},
+					17: &pbsubstreamstest.MapResult{BlockNumber: 17, BlockHash: "block-17"},
+					18: &pbsubstreamstest.MapResult{BlockNumber: 18, BlockHash: "block-18"},
+					19: &pbsubstreamstest.MapResult{BlockNumber: 19, BlockHash: "block-19"},
+				},
+			},
+		},
+
 		// Complex substreams package : "./testdata/complex_substreams/complex-substreams-v0.1.0.spkg"
 		// Output module : map_output_init_50
 		//Stage 0: [["first_store_init_20"]]

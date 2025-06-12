@@ -30,11 +30,10 @@ func BenchmarkV8_RunJS_Separate(b *testing.B) {
 	ctx := newV8Instance(b)
 	defer ctx.Isolate().Dispose()
 
-	if _, err := ctx.RunScript(string(poly), "polyfill.js"); err != nil {
-		b.Fatalf("polyfill init error: %v", err)
-	}
-
 	for b.Loop() {
+		if _, err := ctx.RunScript(string(poly), "polyfill.js"); err != nil {
+			b.Fatalf("polyfill init error: %v", err)
+		}
 		if _, err := ctx.RunScript(string(bund), "bundle.js"); err != nil {
 			b.Fatalf("bundle error: %v", err)
 		}

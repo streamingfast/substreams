@@ -11,8 +11,7 @@ import (
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/wasm"
 
-	// _ "github.com/streamingfast/substreams/wasm/v8"
-	// _ "github.com/streamingfast/substreams/wasm/wasi"
+	_ "github.com/streamingfast/substreams/wasm/wasi"
 	_ "github.com/streamingfast/substreams/wasm/wasmtime"
 	_ "github.com/streamingfast/substreams/wasm/wazero"
 
@@ -41,34 +40,24 @@ func BenchmarkExecution(b *testing.B) {
 	}
 
 	for _, testCase := range []*testCase{
-		// {"bare", "map_noop", args(wasm.NewParamsInput("")), []int{0}},
 
 		// Decode proto only decode and returns the block.number as the output (to ensure the block is not elided at compile time)
-		// {"decode_proto_only", "map_decode_proto_only", blockInputFile(b, "testdata/ethereum_mainnet_block_16021772.binpb"), []int{0}},
+		{"decode_proto_only", "map_decode_proto_only", blockInputFile(b, "testdata/ethereum_mainnet_block_16021772.binpb"), []int{0}},
 
-		// {"map_block", "map_block", blockInputFile(b, "testdata/ethereum_mainnet_block_16021772.binpb"), []int{53}},
+		{"map_block", "map_block", blockInputFile(b, "testdata/ethereum_mainnet_block_16021772.binpb"), []int{53}},
 	} {
-		// var reuseInstance = true
-		// var freshInstanceEachRun = false
+		var reuseInstance = true
+		var freshInstanceEachRun = false
 
-		// jsCode := readCode(b, "../v8/runtime/prelude.bundle.js")
-		// wasmCode := readCode(b, "substreams_wasm/substreams.wasm")
-		// wasmCodep1 := readCode(b, "substreams_ts/index.wasm")
-		// wasmTinyGo := readCode(b, "substreams_tiny_go/main.wasm")
-		// wasmCodep1 := readCode(b, "substreams_wasi/wasi_hello_world/hello.wasm")
+		wasmCode := readCode(b, "substreams_wasm/substreams.wasm")
 
 		stats := metrics.NewReqStats(&metrics.Config{}, zap.NewNop())
 		for _, config := range []*runtime{
-			//{"wasmtime", wasmCode, reuseInstance},
-			// {"wasmtime", "wasm/rust-v1", wasmCode, freshInstanceEachRun},
-			//
-			//{"wazero", wasmCode, reuseInstance},
-			// {"wazero", wasmCode, freshInstanceEachRun},
-			// {"wazero", "wasm/rust-v1", wasmCode, freshInstanceEachRun},
-			// {"v8", "javascript/v8", jsCode, freshInstanceEachRun},
-
-			//{name: "wasi", wasmCodeType: "go/wasi", code: wasmTinyGo, shouldReUseInstance: reuseInstance},
-			//{"wasip1", wasmCodep1, freshInstanceEachRun},
+			{"wasmtime", "wasm/rust-v1", wasmCode, reuseInstance},
+			{"wasmtime", "wasm/rust-v1", wasmCode, freshInstanceEachRun},
+			{"wazero", "wasm/rust-v1", wasmCode, reuseInstance},
+			{"wazero", "wasm/rust-v1", wasmCode, freshInstanceEachRun},
+			{"wazero", "wasm/rust-v1", wasmCode, freshInstanceEachRun},
 		} {
 			instanceKey := "reused"
 			if !config.shouldReUseInstance {

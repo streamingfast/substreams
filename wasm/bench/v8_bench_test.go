@@ -23,7 +23,8 @@ func newV8Instance(b *testing.B) *v8go.Context {
 }
 
 func BenchmarkV8_RunJS_Separate(b *testing.B) {
-	poly := mustRead(b, "testdata/polyfill.bundle.js")
+
+	poly := mustRead(b, "../v8/runtime/polyfill.bundle.js")
 	bund := mustRead(b, "testdata/bundle.js")
 
 	ctx := newV8Instance(b)
@@ -33,17 +34,14 @@ func BenchmarkV8_RunJS_Separate(b *testing.B) {
 		b.Fatalf("polyfill init error: %v", err)
 	}
 
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := ctx.RunScript(string(bund), "bundle.js"); err != nil {
 			b.Fatalf("bundle error: %v", err)
 		}
 	}
 }
 func BenchmarkV8_RunJS_Concat(b *testing.B) {
-	poly := mustRead(b, "testdata/polyfill.bundle.js")
+	poly := mustRead(b, "../v8/runtime/polyfill.bundle.js")
 	bund := mustRead(b, "testdata/bundle.js")
 
 	combined := append(poly, bund...)
@@ -51,12 +49,7 @@ func BenchmarkV8_RunJS_Concat(b *testing.B) {
 	ctx := newV8Instance(b)
 	defer ctx.Isolate().Dispose()
 
-	_, _ = ctx.RunScript(string(combined), "polyfill_and_bundle.js")
-
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := ctx.RunScript(string(combined), "polyfill_and_bundle.js"); err != nil {
 			b.Fatalf("concat error: %v", err)
 		}

@@ -301,7 +301,7 @@ func (p *Pipeline) setupProcessingModule(reqDetails *reqctx.RequestDetails) {
 	}
 }
 
-// setupSubrequestsStores will prepare stores for all required modules up to the current stage.
+// setupSubrequestStores will prepare stores for all required modules up to the current stage.
 func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Map, err error) {
 	ctx, span := reqctx.WithSpan(ctx, "substreams/pipeline/tier2/store_setup")
 	defer span.EndWithErr(&err)

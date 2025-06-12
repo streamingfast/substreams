@@ -15,7 +15,14 @@ binaries:
         file: ./dist/bundle.js
 
 modules:
-    - name: test_map
+    - name: js_test_map
+      kind: map
+      initialBlock: 10
+      inputs:
+          - source: sf.substreams.v1.test.Block
+      output:
+          type: proto:sf.substreams.v1.test.MapResult
+    - name: js_test_map_clock
       kind: map
       initialBlock: 10
       inputs:

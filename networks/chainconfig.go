@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 	"sync"
 
 	registry "github.com/pinax-network/graph-networks-libs/packages/golang/lib"
@@ -134,7 +135,7 @@ func (r NetworkRegistry) FindByGenesisBlock(blockNum uint64, blockID string) *re
 	for _, network := range r {
 		if network.Genesis != nil &&
 			uint64(network.Genesis.Height) == blockNum &&
-			network.Genesis.Hash == blockID {
+			nox(network.Genesis.Hash) == nox(blockID) {
 			return network
 		}
 	}
@@ -166,3 +167,8 @@ func (r NetworkRegistry) FindBySubstreamsEndpoint(endpoint string) *registry.Net
 }
 
 func ptr[T any](v T) *T { return &v }
+
+// some chains have noisy '0x' prefixes, some don't, normalize it without 0x
+func nox(s string) string {
+	return strings.TrimPrefix(s, "0x")
+}

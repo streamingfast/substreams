@@ -9,6 +9,7 @@ import (
 	"github.com/streamingfast/bstream/forkable"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	pbsubstreamstest "github.com/streamingfast/substreams/pb/sf/substreams/v1/test"
+
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -171,6 +172,7 @@ func (g LinearBlockGenerator) Generate() []*GeneratedBlock {
 		}
 		blockLIBRef := bstream.NewBlockRef("block-"+strconv.FormatUint(libNum, 10), libNum)
 		blockRef := bstream.NewBlockRef("block-"+strconv.FormatUint(i, 10), i)
+
 		block := &pbsubstreamstest.Block{
 			Id:     blockRef.ID(),
 			Number: blockRef.Num(),

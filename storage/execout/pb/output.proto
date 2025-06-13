@@ -11,6 +11,7 @@ message Map {
 
 message Array {
     repeated Item items = 1;
+    bool ordered = 2; // this will forcibly be written at the beginning if we are ordered, so the items can be unmarshalled sequentially
 }
 
 message Item {

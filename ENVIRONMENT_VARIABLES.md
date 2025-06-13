@@ -54,13 +54,6 @@ This document lists all environment variables used by the Substreams project, or
 - **Default**: 1073741824 (1GiB)
 - **Location**: `service/utils.go`
 
-#### `SUBSTREAMS_OUTPUT_SIZE_LIMIT_PER_SEGMENT`
-**Limit of the size of cached execution outputs for the segment**
-- **Purpose**: Prevent excessive memory usage by limiting the size of cached execution outputs on a segment grow above this
-- **Usage**: Set as unsigned integer (bytes) to limit memory usage. Substreams will FAIL if the limit is exceeded when writing or reading
-- **Default**: 8589934592 (8GiB)
-- **Location**: `service/utils.go`
-
 #### `SUBSTREAMS_WORKERS_RAMPUP_TIME`
 **Worker ramp-up timing**
 - **Purpose**: Configure the time for workers to ramp up during startup
@@ -81,13 +74,6 @@ This document lists all environment variables used by the Substreams project, or
 - **Usage**: Set as integer value
 - **Default**: Built-in default value
 - **Location**: `orchestrator/work/worker.go`
-
-#### `SUBSTREAMS_DISABLE_PRELOAD_EXEC_FILES`
-**Disable execution file preloading**
-- **Purpose**: Disable preloading of execution files for performance optimization on tier1 on the walker
-- **Usage**: Set to any non-empty value other than "0" or "false" to disable preloading
-- **Default**: `false` (preloading enabled)
-- **Location**: `orchestrator/execout/execout_walker.go`
 
 ### WASM Runtime Engine
 

@@ -370,19 +370,17 @@ func searchOutputsModule(
 
 	rng := block.NewRange(startBlock, startBlock-startBlock%saveInterval+saveInterval)
 
-	outputCache := modStore.NewFile(rng)
-	fmt.Println("filename:", outputCache.FullFilename())
-	zlog.Info("loading block from store", zap.Uint64("start_block", startBlock), zap.Stringer("requested_block_range", requestedBlocks))
-	if err := outputCache.Load(ctx); err != nil {
-		if err == dstore.ErrNotFound {
-			return fmt.Errorf("can't find cache at block %d storeURL %q", startBlock, moduleStore.BaseURL().String())
-		}
-
-		return fmt.Errorf("loading cache %s file %s : %w", moduleStore.BaseURL(), outputCache.String(), err)
+	outputCache, err := modStore.OpenFileReader(ctx, rng)
+	if err != nil {
+		return fmt.Errorf("can't create file reader for module %q: %w", module.Name, err)
 	}
+	zlog.Info("loading block from store", zap.Uint64("start_block", startBlock), zap.Stringer("requested_block_range", requestedBlocks))
 
 	for i := requestedBlocks.StartBlock; i < requestedBlocks.ExclusiveEndBlock; i++ {
-		payloadBytes, found := outputCache.GetAtBlock(i)
+		payloadBytes, found, err := outputCache.Get(ctx, i)
+		if err != nil {
+			return fmt.Errorf("getting block %d from cache %s file %s : %w", i, moduleStore.BaseURL(), outputCache.Filename(), err)
+		}
 		if !found {
 			continue
 		}
@@ -421,19 +419,17 @@ func searchOutputsModuleKvOps(
 
 	rng := block.NewRange(startBlock, startBlock-startBlock%saveInterval+saveInterval)
 
-	outputCache := modStore.NewFile(rng)
-	fmt.Println("filename:", outputCache.FullFilename())
-	zlog.Info("loading block from store", zap.Uint64("start_block", startBlock), zap.Stringer("requested_block_range", requestedBlocks))
-	if err := outputCache.Load(ctx); err != nil {
-		if err == dstore.ErrNotFound {
-			return fmt.Errorf("can't find cache at block %d storeURL %q", startBlock, moduleStore.BaseURL().String())
-		}
-
-		return fmt.Errorf("loading cache %s file %s : %w", moduleStore.BaseURL(), outputCache.String(), err)
+	outputCache, err := modStore.OpenFileReader(ctx, rng)
+	if err != nil {
+		return fmt.Errorf("can't create file reader for module %q: %w", module.Name, err)
 	}
+	zlog.Info("loading block from store", zap.Uint64("start_block", startBlock), zap.Stringer("requested_block_range", requestedBlocks))
 
 	for i := requestedBlocks.StartBlock; i < requestedBlocks.ExclusiveEndBlock; i++ {
-		payloadBytes, found := outputCache.GetAtBlock(i)
+		payloadBytes, found, err := outputCache.Get(ctx, i)
+		if err != nil {
+			return fmt.Errorf("getting block %d from cache %s file %s : %w", i, moduleStore.BaseURL(), outputCache.Filename(), err)
+		}
 		if !found {
 			continue
 		}

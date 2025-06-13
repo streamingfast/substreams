@@ -3192,6 +3192,9 @@
     return reg.getFile(root.name);
   }
 
+  // node_modules/@bufbuild/protobuf/dist/esm/wkt/gen/google/protobuf/timestamp_pb.js
+  var file_google_protobuf_timestamp = /* @__PURE__ */ fileDesc("Ch9nb29nbGUvcHJvdG9idWYvdGltZXN0YW1wLnByb3RvEg9nb29nbGUucHJvdG9idWYiKwoJVGltZXN0YW1wEg8KB3NlY29uZHMYASABKAMSDQoFbmFub3MYAiABKAVChQEKE2NvbS5nb29nbGUucHJvdG9idWZCDlRpbWVzdGFtcFByb3RvUAFaMmdvb2dsZS5nb2xhbmcub3JnL3Byb3RvYnVmL3R5cGVzL2tub3duL3RpbWVzdGFtcHBi+AEBogIDR1BCqgIeR29vZ2xlLlByb3RvYnVmLldlbGxLbm93blR5cGVzYgZwcm90bzM");
+
   // node_modules/@bufbuild/protobuf/dist/esm/to-binary.js
   var LEGACY_REQUIRED2 = 3;
   var writeDefaults = {
@@ -3364,6 +3367,11 @@
     }
   }
 
+  // node_modules/@bufbuild/protobuf/dist/esm/codegenv1/message.js
+  function messageDesc2(file, path, ...paths) {
+    return paths.reduce((acc, cur) => acc.nestedMessages[cur], file.messages[path]);
+  }
+
   // node_modules/@substreams/sdk/dist/index.mjs
   var Store = class {
     constructor(storeInterface, schema) {
@@ -3443,10 +3451,18 @@
       throw new Error("Cannot redefine Promise");
     }
   });
-
-  // node_modules/@bufbuild/protobuf/dist/esm/codegenv1/message.js
-  function messageDesc2(file, path, ...paths) {
-    return paths.reduce((acc, cur) => acc.nestedMessages[cur], file.messages[path]);
+  var file_sf_substreams_v1_clock = /* @__PURE__ */ fileDesc("ChxzZi9zdWJzdHJlYW1zL3YxL2Nsb2NrLnByb3RvEhBzZi5zdWJzdHJlYW1zLnYxIlIKBUNsb2NrEgoKAmlkGAEgASgJEg4KBm51bWJlchgCIAEoBBItCgl0aW1lc3RhbXAYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIiYKCEJsb2NrUmVmEgoKAmlkGAEgASgJEg4KBm51bWJlchgCIAEoBEJGWkRnaXRodWIuY29tL3N0cmVhbWluZ2Zhc3Qvc3Vic3RyZWFtcy9wYi9zZi9zdWJzdHJlYW1zL3YxO3Bic3Vic3RyZWFtc2IGcHJvdG8z", [file_google_protobuf_timestamp]);
+  var ClockSchema = /* @__PURE__ */ messageDesc2(file_sf_substreams_v1_clock, 0);
+  function getClock() {
+    let buf = globalThis.__clock();
+    if (!(buf instanceof Uint8Array)) {
+      if (buf?.length !== void 0 && typeof buf[0] === "number") {
+        buf = Uint8Array.from(buf);
+      } else {
+        throw new Error("__clock did not return a valid byte array");
+      }
+    }
+    return fromBinary(ClockSchema, buf);
   }
 
   // src/pb/sf/substreams/v1/test/test_pb.ts
@@ -3456,14 +3472,24 @@
 
   // src/lib.ts
   var Substreams = class {
-    test_map(blk) {
+    js_test_map(blk) {
       return create(MapResultSchema, {
         blockNumber: blk.number,
         blockHash: blk.id
       });
     }
+    js_test_map_clock() {
+      const clock = getClock();
+      return create(MapResultSchema, {
+        blockNumber: clock.number,
+        blockHash: clock.id
+      });
+    }
   };
   __decorateClass([
     substreams.handlers.map([BlockSchema], MapResultSchema)
-  ], Substreams.prototype, "test_map", 1);
+  ], Substreams.prototype, "js_test_map", 1);
+  __decorateClass([
+    substreams.handlers.map([BlockSchema], MapResultSchema)
+  ], Substreams.prototype, "js_test_map_clock", 1);
 })();

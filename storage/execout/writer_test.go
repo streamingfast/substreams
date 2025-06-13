@@ -33,7 +33,7 @@ var testConfigs = &Configs{
 }
 
 func TestNewExecOutputWriterIsSubRequest(t *testing.T) {
-	res := NewWriter(context.Background(), 11, 15, "A", testConfigs, false)
+	res := NewWriter(context.Background(), 11, 15, "A", testConfigs)
 	require.NotNil(t, res)
-	assert.Equal(t, 15, int(res.CurrentFile.ExclusiveEndBlock))
+	assert.Equal(t, 15, int(res.CurrentFile.Range().ExclusiveEndBlock))
 }

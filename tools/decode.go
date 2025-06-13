@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -51,7 +52,7 @@ var decodeOutputsModuleCmd = &cobra.Command{
 }
 
 var decodeStatesModuleCmd = &cobra.Command{
-	Use:   "states [<manifest_file>] <module_name> <output_url> <block_number> <key>",
+	Use:   "states <manifest_file> <module_name> <output_url> <block_number> [<key>]",
 	Short: "Decode states base 64 encoded bytes to protobuf data structure",
 	Long: cli.Dedent(`
 		Running the states command only works if the module is a store. If it is a map an error message will be returned
@@ -60,9 +61,9 @@ var decodeStatesModuleCmd = &cobra.Command{
 		file in place of '<manifest_file>, or a link to a remote .spkg file, using urls gs://, http(s)://, ipfs://, etc.'.
 	`),
 	Example: string(cli.ExamplePrefixed("substreams tools decode states", `
-		store_eth_prices [bucket-url-path] 12487090 token:051cf5178f60e9def5d5a39b2a988a9f914107cb:dprice:eth
+		uniswap-v3 store_eth_prices [bucket-url-path] 12487090 token:051cf5178f60e9def5d5a39b2a988a9f914107cb:dprice:eth
 		dir-with-manifest store_pools [bucket-url-path] 12487090 pool:c772a65917d5da983b7fc3c9cfbfb53ef01aef7e
-		uniswap-v3.spkg store_pools [bucket-url-path] 12487090 pool:c772a65917d5da983b7fc3c9cfbfb53ef01aef7e
+		uniswap-v3.spkg store_pools [bucket-url-path] 12487090
 	`)),
 	RunE:         runDecodeStatesModuleRunE,
 	Args:         cobra.RangeArgs(4, 5),
@@ -83,6 +84,8 @@ var decodeIndexModuleCmd = &cobra.Command{
 func init() {
 	decodeCmd.PersistentFlags().Uint64("save-interval", 1000, "Save interval (segment size)")
 	decodeCmd.PersistentFlags().Bool("use-test-simple-hash", false, "Use the 'simple hashing' function to get module hashes instead of regular hashes, for testing purposes")
+	decodeCmd.PersistentFlags().Bool("match-regexp", false, "Use regular expressions to match keys")
+	decodeCmd.PersistentFlags().Int("max-keys", 10, "Maximum keys to print when using match-regexp")
 
 	decodeCmd.AddCommand(decodeOutputsModuleCmd)
 	decodeCmd.AddCommand(decodeStatesModuleCmd)
@@ -95,21 +98,21 @@ func runDecodeStatesModuleRunE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	saveInterval := sflags.MustGetUint64(cmd, "save-interval")
 	manifest.TestUseSimpleHash = sflags.MustGetBool(cmd, "use-test-simple-hash")
+	matchRegexp := sflags.MustGetBool(cmd, "match-regexp")
+	maxKeys := sflags.MustGetInt(cmd, "max-keys")
 
-	manifestPath := ""
-	if len(args) == 5 {
-		manifestPath = args[0]
-		args = args[1:]
-	}
-
-	moduleName := args[0]
-	storeURL := args[1]
-	blockNumber, err := strconv.ParseUint(args[2], 10, 64)
+	manifestPath := args[0]
+	moduleName := args[1]
+	storeURL := args[2]
+	blockNumber, err := strconv.ParseUint(args[3], 10, 64)
 	if err != nil {
 		return fmt.Errorf("converting blockNumber to uint: %w", err)
 	}
 
-	key := args[3]
+	var key string
+	if len(args) == 5 {
+		key = args[4]
+	}
 
 	zlog.Info("decoding module",
 		zap.String("manifest_path", manifestPath),
@@ -118,6 +121,7 @@ func runDecodeStatesModuleRunE(cmd *cobra.Command, args []string) error {
 		zap.Uint64("block_number", blockNumber),
 		zap.Uint64("save_internal", saveInterval),
 		zap.String("key", key),
+		zap.Bool("regexp", matchRegexp),
 	)
 
 	objStore, err := dstore.NewStore(storeURL, "zst", "zstd", false)
@@ -164,11 +168,29 @@ func runDecodeStatesModuleRunE(cmd *cobra.Command, args []string) error {
 	zlog.Info("found module hash", zap.String("hash", moduleHash), zap.String("module", matchingModule.Name))
 
 	startBlock := blockNumber - blockNumber%saveInterval
+	fmt.Printf(`
+* Name: %s
+* Hash: %s
+* Value Type: %s
+* Update Policy: %s
+* Initial Block: %d
+* Loading at block: %d
+`,
+		matchingModule.Name,
+		moduleHash,
+		matchingModule.GetKindStore().ValueType,
+		matchingModule.GetKindStore().UpdatePolicy.Pretty(),
+		matchingModule.InitialBlock,
+		startBlock,
+	)
 
 	switch matchingModule.Kind.(type) {
 	case *pbsubstreams.Module_KindMap_:
 		return fmt.Errorf("no states are available for a mapper")
 	case *pbsubstreams.Module_KindStore_:
+		if matchRegexp {
+			return printStateModule(ctx, startBlock, moduleHash, key, maxKeys, matchingModule, objStore, protoFiles)
+		}
 		return searchStateModule(ctx, startBlock, moduleHash, key, matchingModule, objStore, protoFiles)
 	}
 	return fmt.Errorf("module has an unknown")
@@ -389,7 +411,7 @@ func searchOutputsModule(
 		if len(payloadBytes) == 0 {
 			continue
 		}
-		if err := printObject(module, protoFiles, payloadBytes); err != nil {
+		if err := printObject("", module, protoFiles, payloadBytes); err != nil {
 			return fmt.Errorf("printing object: %w", err)
 		}
 	}
@@ -445,6 +467,60 @@ func searchOutputsModuleKvOps(
 	return nil
 }
 
+func printStateModule(
+	ctx context.Context,
+	startBlock uint64,
+	moduleHash string,
+	fuzzyMatch string,
+	max int,
+	module *pbsubstreams.Module,
+	stateStore dstore.Store,
+	protoFiles []*descriptorpb.FileDescriptorProto,
+) error {
+	config, err := store.NewConfig(module.Name, module.InitialBlock, moduleHash, module.GetKindStore().GetUpdatePolicy(), module.GetKindStore().GetValueType(), stateStore, nil)
+	if err != nil {
+		return fmt.Errorf("initializing store config module %q: %w", module.Name, err)
+	}
+	moduleStore := config.NewFullKV(zlog)
+
+	file := store.NewCompleteFileInfo(module.Name, module.InitialBlock, startBlock)
+	if err = moduleStore.Load(ctx, file); err != nil {
+		return fmt.Errorf("unable to load file: %w", err)
+	}
+
+	fmt.Println("* Filename:", stateStore.BaseURL().JoinPath(moduleHash, "states", file.Filename+".zst").String())
+	fmt.Println("* Results:")
+
+	var re *regexp.Regexp
+	if fuzzyMatch != "" {
+		re, err = regexp.Compile(fuzzyMatch)
+		if err != nil {
+			return fmt.Errorf("invalid regex pattern %q: %w", fuzzyMatch, err)
+		}
+	}
+
+	count := 0
+	matchCount := 0
+	moduleStore.Iter(func(key string, value []byte) error {
+		count++
+		if re == nil || re.MatchString(key) {
+			matchCount++
+			if matchCount > max {
+				return nil
+			}
+			return printObject("  - "+key, module, protoFiles, value)
+		}
+		return nil
+	})
+	if matchCount > max {
+		fmt.Println("    ...")
+	}
+	fmt.Println("Total:", count)
+	fmt.Printf("Matching %q: %d\n", fuzzyMatch, matchCount)
+
+	return nil
+}
+
 func searchStateModule(
 	ctx context.Context,
 	startBlock uint64,
@@ -471,7 +547,7 @@ func searchStateModule(
 	if !found {
 		return fmt.Errorf("no data found for %q", key)
 	}
-	return printObject(module, protoFiles, bytes)
+	return printObject("", module, protoFiles, bytes)
 }
 
 func printKVOps(data []byte) error {
@@ -488,7 +564,7 @@ func printKVOps(data []byte) error {
 	return nil
 }
 
-func printObject(module *pbsubstreams.Module, protoFiles []*descriptorpb.FileDescriptorProto, data []byte) error {
+func printObject(key string, module *pbsubstreams.Module, protoFiles []*descriptorpb.FileDescriptorProto, data []byte) error {
 	protoDefinition := ""
 	valuePrinted := false
 
@@ -516,7 +592,11 @@ func printObject(module *pbsubstreams.Module, protoFiles []*descriptorpb.FileDes
 				if err != nil {
 					return fmt.Errorf("unmarshalling data: %w", err)
 				}
-				fmt.Println(val)
+				if key != "" {
+					fmt.Printf("%s: %v\n", key, val)
+				} else {
+					fmt.Printf("%v\n", val)
+				}
 				valuePrinted = true
 			default:
 				return fmt.Errorf("invalid module kind: %q", module.Kind)
@@ -528,7 +608,11 @@ func printObject(module *pbsubstreams.Module, protoFiles []*descriptorpb.FileDes
 		return nil
 	}
 
-	fmt.Println(string(data))
+	if key != "" {
+		fmt.Printf("%s: %v\n", key, string(data))
+	} else {
+		fmt.Printf("%v\n", string(data))
+	}
 	return nil
 }
 

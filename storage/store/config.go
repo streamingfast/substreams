@@ -146,7 +146,11 @@ func (c *Config) ListSnapshotFiles(ctx context.Context, from uint64, inclusiveTo
 	fromPrefix := FilenamePrefix(from)
 	toPrefix := ""
 	if inclusiveTo != nil {
-		toPrefix = FilenamePrefix(*inclusiveTo + 1)
+		if *inclusiveTo >= 9999999999 {
+			toPrefix = FilenamePrefix(9999999999)
+		} else {
+			toPrefix = FilenamePrefix(*inclusiveTo + 1)
+		}
 	}
 
 	logger := logging.Logger(ctx, zlog)

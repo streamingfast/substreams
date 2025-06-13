@@ -9,11 +9,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v1.15.8
 
 ### CLI
 
-* Add `uncompressed_egress_bytes` field to `substreams request stats` log message. Only tier1 will produce a non-zero value there.
+* `substreams run` now prints "Total Egress Bytes" as well as "Total Processed Bytes"
 
 ### Server
 
@@ -32,8 +32,10 @@ Rework the execout File read/write:
   - Clock distributor now also reads "as you go", using a small "one-block-cache"
 
 * Removed env var and behaviors:
-  - SUBSTREAMS_DISABLE_PRELOAD_EXEC_FILES (no more preloading, it was mostly useful because reading full file+unmarshal was necessary when streaming...)
-  - SUBSTREAMS_OUTPUT_SIZE_LIMIT_PER_SEGMENT (not a RAM issue anymore)
+  - removed SUBSTREAMS_DISABLE_PRELOAD_EXEC_FILES (no more preloading, it was mostly useful because reading full file+unmarshal was necessary when streaming...)
+  - removed SUBSTREAMS_OUTPUT_SIZE_LIMIT_PER_SEGMENT (this is not a RAM issue anymore)
+
+* Add `uncompressed_egress_bytes` field to `substreams request stats` log message. Only tier1 will produce a non-zero value there.
 
 ## v1.15.7
 

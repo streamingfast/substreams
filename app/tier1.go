@@ -25,7 +25,6 @@ import (
 	"github.com/streamingfast/substreams/service"
 	"github.com/streamingfast/substreams/wasm"
 
-	_ "github.com/streamingfast/substreams/wasm/v8"
 	_ "github.com/streamingfast/substreams/wasm/wasmtime"
 	"github.com/streamingfast/substreams/wasm/wazero"
 	"go.uber.org/atomic"

@@ -42,8 +42,6 @@ func (mod *V8Module) ExecuteNewCall(
 	}
 
 	inst := getInstance(mod.iso, cachedInstance)
-	inputVal, _ := v8go.NewValue(inst.ctx.Isolate(), input)
-	_ = inst.ctx.Global().Set("input", inputVal)
 
 	// Runs all scripts (will be changed depending on files needed), probably going to merge all that are needed. This if makes sure we load our needed scripts ONLY on the first call
 	if cachedInstance == nil {
@@ -66,14 +64,12 @@ func (mod *V8Module) ExecuteNewCall(
 	}
 
 	// call the handlers from JS side
-	if err := callHandlers(inst, call); err != nil {
+	if err := callHandlers(inst, call, input); err != nil {
 		inst.Close(ctx)
 		return nil, err
 	}
 
 	outBytes, err := getOutput(inst)
-	_ = inst.ctx.Global().Set("output", v8go.Null(inst.ctx.Isolate()))
-
 	if err != nil {
 		inst.Close(ctx)
 		return nil, err
@@ -116,54 +112,82 @@ func runJS(inst *V8Instance, code, filename string) error {
 	return nil
 }
 
-func callHandlers(inst *V8Instance, call *wasm.Call) error {
+// callHandlers determines the type of handler (map, store) for a given module name and dispatches the execution to the appropriate handler function.
+func callHandlers(inst *V8Instance, call *wasm.Call, input []byte) error {
 	handlerName := call.ModuleName
 
-	// Check what type of handler this is
-	checkTypeCode := fmt.Sprintf(`getHandlerType("%s")`, handlerName)
-	handlerTypeVal, err := inst.ctx.RunScript(checkTypeCode, "check_handler_type.js")
+	// Check the type of handler (map, store)
+	typeCheckVal, err := inst.ctx.Global().Get("getHandlerType")
 	if err != nil {
-		return fmt.Errorf("failed to check handler type: %w", err)
+		return fmt.Errorf("missing getHandlerType: %w", err)
+	}
+	getHandlerType, err := typeCheckVal.AsFunction()
+	if err != nil {
+		return fmt.Errorf("getHandlerType not a function: %w", err)
+	}
+	nameVal, _ := v8go.NewValue(inst.ctx.Isolate(), handlerName)
+	handlerTypeVal, err := getHandlerType.Call(v8go.Undefined(inst.ctx.Isolate()), nameVal)
+	if err != nil {
+		return fmt.Errorf("getHandlerType call failed: %w", err)
 	}
 
-	if handlerTypeVal.IsNull() || handlerTypeVal.IsUndefined() {
-		return fmt.Errorf("handler '%s' not found", handlerName)
-	}
-
+	// Dispatch to the appropriate handler
 	handlerType := handlerTypeVal.String()
-
 	switch handlerType {
 	case "map":
-		return callMapHandler(inst, handlerName)
+		return callMapHandler(inst, handlerName, input)
 	case "store":
-		return callStoreHandler(inst, call, handlerName)
+		return callStoreHandler(inst, handlerName, input)
 	default:
 		return fmt.Errorf("unknown handler type: %s", handlerType)
 	}
 }
 
-func callMapHandler(inst *V8Instance, handlerName string) error {
-	// Call the map handler directly, input is already set as global
-	code := fmt.Sprintf(`executeMapHandler("%s", input)`, handlerName)
-	result, err := inst.ctx.RunScript(code, "execute_map_handler.js")
+// Executes a map handler registered in the JS context.
+func callMapHandler(inst *V8Instance, handlerName string, input []byte) error {
+	handlerVal, err := inst.ctx.Global().Get("executeMapHandler")
 	if err != nil {
-		return fmt.Errorf("failed to execute map handler '%s': %w", handlerName, err)
+		return fmt.Errorf("could not get executeMapHandler: %w", err)
+	}
+	handler, err := handlerVal.AsFunction()
+	if err != nil {
+		return fmt.Errorf("executeMapHandler is not a function: %w", err)
+	}
+
+	nameVal, _ := v8go.NewValue(inst.ctx.Isolate(), handlerName)
+	inputVal, _ := v8go.NewUint8Array(inst.ctx, input)
+	result, err := handler.Call(v8go.Undefined(inst.ctx.Isolate()), nameVal, inputVal)
+	if err != nil {
+		return fmt.Errorf("failed to execute map handler: %w", err)
 	}
 
 	return inst.ctx.Global().Set("output", result)
 }
 
-func callStoreHandler(inst *V8Instance, call *wasm.Call, handlerName string) error {
-	// Call store handler with the injected store interface
-	storeInterfaceCode := fmt.Sprintf(`
-		executeStoreHandler("%s", {
-			set: function(ordinal, key, value) {
-				__store_set(ordinal, key, value);
-			}
-		}, output)
-	`, handlerName)
+// Executes a store handler registered in the JS context.
+func callStoreHandler(inst *V8Instance, handlerName string, input []byte) error {
+	storeFuncVal, err := inst.ctx.Global().Get("executeStoreHandler")
+	if err != nil {
+		return fmt.Errorf("could not get executeStoreHandler: %w", err)
+	}
+	storeFunc, err := storeFuncVal.AsFunction()
+	if err != nil {
+		return fmt.Errorf("executeStoreHandler is not a function: %w", err)
+	}
 
-	_, err := inst.ctx.RunScript(storeInterfaceCode, "execute_store_handler.js")
+	nameVal, _ := v8go.NewValue(inst.ctx.Isolate(), handlerName)
+	outputVal, _ := v8go.NewUint8Array(inst.ctx, input)
+
+	// Define the store interface (JS object) that maps to the Go __store_set
+	storeInterfaceCode := `({ set: function(ordinal, key, value) {
+								__store_set(ordinal, key, value);
+							}})`
+	storeIface, err := inst.ctx.RunScript(storeInterfaceCode, "store_iface.js")
+	if err != nil {
+		return fmt.Errorf("could not create store interface: %w", err)
+	}
+
+	_, err = storeFunc.Call(v8go.Undefined(inst.ctx.Isolate()), nameVal, storeIface, outputVal)
 	return err
 }
 
@@ -178,7 +202,7 @@ func getOutput(inst *V8Instance) ([]byte, error) {
 	}
 
 	if !v8val.IsUint8Array() {
-		return nil, fmt.Errorf("global.output is not a Uint8Array")
+		return nil, fmt.Errorf("output is not a Uint8Array")
 	}
 
 	return v8val.Uint8Array(), nil

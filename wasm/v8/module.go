@@ -132,14 +132,13 @@ func callHandlers(inst *V8Instance, call *wasm.Call, input []byte) error {
 	}
 
 	// Dispatch to the appropriate handler
-	handlerType := handlerTypeVal.String()
-	switch handlerType {
+	switch handlerTypeVal.String() {
 	case "map":
 		return callMapHandler(inst, handlerName, input)
 	case "store":
 		return callStoreHandler(inst, handlerName, input)
 	default:
-		return fmt.Errorf("unknown handler type: %s", handlerType)
+		return fmt.Errorf("unknown handler type: %s", handlerTypeVal.String())
 	}
 }
 
@@ -157,11 +156,23 @@ func callMapHandler(inst *V8Instance, handlerName string, input []byte) error {
 	nameVal, _ := v8go.NewValue(inst.ctx.Isolate(), handlerName)
 	inputVal, _ := v8go.NewUint8Array(inst.ctx, input)
 	result, err := handler.Call(v8go.Undefined(inst.ctx.Isolate()), nameVal, inputVal)
+
 	if err != nil {
 		return fmt.Errorf("failed to execute map handler: %w", err)
 	}
 
-	return inst.ctx.Global().Set("output", result)
+	// If no result was returned, skip
+	if result.IsNull() || result.IsUndefined() {
+		return nil
+	}
+
+	if !result.IsUint8Array() {
+		return fmt.Errorf("map handler did not return a Uint8Array")
+	}
+
+	// Save to instance so it can be retrieved
+	inst.output = result.Uint8Array()
+	return nil
 }
 
 // Executes a store handler registered in the JS context.
@@ -192,20 +203,11 @@ func callStoreHandler(inst *V8Instance, handlerName string, input []byte) error 
 }
 
 func getOutput(inst *V8Instance) ([]byte, error) {
-	v8val, err := inst.ctx.Global().Get("output")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get output global: %w", err)
+	// No output
+	if inst.output == nil {
+		return nil, nil
 	}
-
-	if v8val.IsNull() || v8val.IsUndefined() {
-		return []byte{}, nil
-	}
-
-	if !v8val.IsUint8Array() {
-		return nil, fmt.Errorf("output is not a Uint8Array")
-	}
-
-	return v8val.Uint8Array(), nil
+	return inst.output, nil
 }
 
 // Injects __clock into runtime

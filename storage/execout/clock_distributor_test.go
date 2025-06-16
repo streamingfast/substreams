@@ -66,6 +66,10 @@ func (m *MockFileReader) Filename() string {
 	return m.filename
 }
 
+func (m *MockFileReader) Close() error {
+	return nil
+}
+
 func (m *MockFileReader) SetItems(items []*pboutput.Item) {
 	m.items = items
 	m.currentIdx = 0

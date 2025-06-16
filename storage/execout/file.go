@@ -27,6 +27,7 @@ type FileReader interface {
 	Get(ctx context.Context, blockNumber uint64) (payload []byte, found bool, err error)
 	ModuleName() string
 	Filename() string
+	Close() error
 }
 
 type fileReader struct {
@@ -34,6 +35,10 @@ type fileReader struct {
 	reader       io.ReadCloser
 	lastReadItem *pboutput.Item
 	complete     bool
+}
+
+func (fr *fileReader) Close() error {
+	return fr.reader.Close()
 }
 
 func OpenFileReader(ctx context.Context, store dstore.Store, logger *zap.Logger, rng *block.Range, moduleName string) (FileReader, error) {
@@ -331,6 +336,7 @@ func (fr *fileReader) Iter() iter.Seq2[*pboutput.Item, error] {
 func rewriteAsOrdered(ctx context.Context, r io.ReadCloser, readBytes []byte, store dstore.Store, moduleName, filename string, rng *block.Range, logger *zap.Logger) (err error) {
 	bytes, err := io.ReadAll(r)
 	if err != nil {
+		r.Close() // always close that reader to prevent leaking unzstd threads
 		return fmt.Errorf("reading store file %s: %w", filename, err)
 	}
 	if err := r.Close(); err != nil {

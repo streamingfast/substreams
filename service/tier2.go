@@ -723,7 +723,7 @@ func GetExecutionPlan(
 	execoutConfigs *execout.Configs,
 	indexConfigs *index.Configs,
 	storeConfigs store.ConfigMap,
-) (*ExecutionPlan, error) {
+) (plan *ExecutionPlan, err error) {
 	storesToWrite := make(map[string]struct{})
 	existingExecOuts := make(map[string]execout.FileReader)
 	existingIndices := make(map[string]map[string]*roaring64.Bitmap)
@@ -744,6 +744,17 @@ func GetExecutionPlan(
 			stageUsedModulesName[mod.Name] = true
 		}
 	}
+
+	go func() {
+		<-ctx.Done()
+		for _, eo := range existingExecOuts {
+			if err := eo.Close(); err != nil {
+				logger.Info("error closing reader", zap.String("filename", eo.Filename()), zap.Error(err))
+			}
+		}
+		// Writers don't need to be closed, canceling the context is enough
+	}()
+
 	for _, mod := range usedModules {
 		if mod.InitialBlock >= stopBlock {
 			continue

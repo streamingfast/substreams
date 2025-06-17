@@ -10,7 +10,7 @@ import (
 
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/golang-cz/textcase"
-	"github.com/streamingfast/substreams/networks"
+	networks "github.com/streamingfast/firehose-networks"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"google.golang.org/protobuf/types/descriptorpb"
 )

@@ -3,7 +3,7 @@ package common
 import (
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/muesli/reflow/truncate"
-	"github.com/streamingfast/substreams/networks"
+	networks "github.com/streamingfast/firehose-networks"
 )
 
 // TruncateString is a convenient wrapper around truncate.TruncateString.

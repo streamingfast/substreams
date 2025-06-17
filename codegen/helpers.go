@@ -8,11 +8,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/golang-cz/textcase"
-
 	"github.com/charmbracelet/huh"
+	"github.com/golang-cz/textcase"
+	networks "github.com/streamingfast/firehose-networks"
 	"github.com/streamingfast/substreams/manifest"
-	"github.com/streamingfast/substreams/networks"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"google.golang.org/protobuf/types/descriptorpb"
 )

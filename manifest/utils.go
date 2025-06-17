@@ -5,9 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/streamingfast/substreams/networks"
+	networks "github.com/streamingfast/firehose-networks"
 	"go.uber.org/zap"
-
 	"gopkg.in/yaml.v3"
 )
 

@@ -166,7 +166,7 @@ This cleanup happens automatically during normal operation to prevent unbounded 
 ## Limitations
 
 - **Primary keys required**: All tables must have primary keys for re-org handling to work
-- **PostgreSQL only**: ClickHouse does not support re-org handling due to its architecture
+- **Clickhouse delay**: The ClickHouse sink supports re-org handling but with a slight delay compared to PostgreSQL
 - **Performance impact**: History tracking adds overhead to write operations
 - **Storage growth**: History table grows with write volume until cleanup occurs
 

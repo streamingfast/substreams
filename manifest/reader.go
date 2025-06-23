@@ -75,6 +75,8 @@ type Reader struct {
 	overrideOutputModule string
 	params               map[string]string
 	registryURL          string
+	protoPath            string
+	protoDescriptorSet   string
 }
 
 func NewReader(input string, opts ...Option) (*Reader, error) {
@@ -567,7 +569,7 @@ func validatePackage(pkg *pbsubstreams.Package, validation ReaderValidation) err
 }
 
 func (r *Reader) newPkgFromManifest(manif *Manifest) (*pbsubstreams.Package, error) {
-	converter := newManifestConverter(r.currentInput, r.validation)
+	converter := newManifestConverter(r.currentInput, r.validation, r)
 	pkg, descriptors, dynMessage, err := converter.Convert(manif)
 	if err != nil {
 		return nil, err
@@ -596,6 +598,12 @@ func (r *Reader) resolvePkg() (*pbsubstreams.Package, *Manifest, error) {
 		return nil, nil, fmt.Errorf("unable to get package: %w", err)
 	}
 
+	// Load additional protobuf definitions from command line flags
+	err = r.loadAdditionalProtobufs(pkg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("loading additional protobuf definitions: %w", err)
+	}
+
 	pkg.ProtoFiles, err = orderProtobufFilesByDependencies(pkg.ProtoFiles)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to order protobuf files: %w", err)
@@ -603,6 +611,25 @@ func (r *Reader) resolvePkg() (*pbsubstreams.Package, *Manifest, error) {
 
 	r.pkg = pkg
 	return pkg, manif, nil
+}
+
+func (r *Reader) loadAdditionalProtobufs(pkg *pbsubstreams.Package) error {
+	// Load additional protobuf definitions from command line flags
+	if r.protoPath != "" {
+		_, err := loadProtobufFromDirectory(pkg, r.protoPath)
+		if err != nil {
+			return fmt.Errorf("loading protobuf from directory %q: %w", r.protoPath, err)
+		}
+	}
+
+	if r.protoDescriptorSet != "" {
+		_, err := loadProtobufFromDescriptorSet(pkg, r.protoDescriptorSet)
+		if err != nil {
+			return fmt.Errorf("loading protobuf from descriptor set %q: %w", r.protoDescriptorSet, err)
+		}
+	}
+
+	return nil
 }
 
 func orderProtobufFilesByDependencies(in []*descriptorpb.FileDescriptorProto) ([]*descriptorpb.FileDescriptorProto, error) {

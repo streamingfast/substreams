@@ -36,6 +36,8 @@ func init() {
 	guiCmd.Flags().StringArrayP("params", "p", nil, "Set a params for parameterizable modules. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
 	guiCmd.Flags().Bool("replay", false, "Replay saved session into GUI from replay.bin")
 	guiCmd.Flags().Bool("skip-package-validation", false, "Do not perform any validation when reading substreams package")
+	guiCmd.Flags().String("proto-path", "", "Directory path containing .proto files to load on top of the substreams package protobuf definitions")
+	guiCmd.Flags().String("proto-descriptor-set", "", "Path to a protobuf descriptor set file to load on top of the substreams package protobuf definitions")
 	rootCmd.AddCommand(guiCmd)
 }
 
@@ -101,6 +103,16 @@ func runGui(cmd *cobra.Command, args []string) (err error) {
 			return fmt.Errorf("parsing params: %w", err)
 		}
 		readerOptions = append(readerOptions, manifest.WithParams(params))
+	}
+
+	protoPath := sflags.MustGetString(cmd, "proto-path")
+	if protoPath != "" {
+		readerOptions = append(readerOptions, manifest.WithProtoPath(protoPath))
+	}
+
+	protoDescriptorSet := sflags.MustGetString(cmd, "proto-descriptor-set")
+	if protoDescriptorSet != "" {
+		readerOptions = append(readerOptions, manifest.WithProtoDescriptorSet(protoDescriptorSet))
 	}
 
 	if sflags.MustGetBool(cmd, "skip-package-validation") {

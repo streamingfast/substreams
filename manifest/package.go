@@ -17,16 +17,18 @@ import (
 type manifestConverter struct {
 	inputPath  string
 	validation ReaderValidation
+	reader     *Reader
 
 	// Runtime assigned while manifest is being converted, this feels weird
 	// but I haven't the "flemme" to refactor this right now.
 	sinkConfigDynamicMessage *dynamic.Message
 }
 
-func newManifestConverter(inputPath string, validation ReaderValidation) *manifestConverter {
+func newManifestConverter(inputPath string, validation ReaderValidation, reader *Reader) *manifestConverter {
 	return &manifestConverter{
 		inputPath:  inputPath,
 		validation: validation,
+		reader:     reader,
 	}
 }
 

@@ -263,7 +263,10 @@ func runRun(cmd *cobra.Command, args []string) error {
 	for {
 		resp, err := cli.Recv()
 		if resp != nil {
-			totalEgress += proto.Size(resp)
+			// only blockScopedData is billed as egress
+			if _, ok := resp.Message.(*pbsubstreamsrpc.Response_BlockScopedData); ok {
+				totalEgress += proto.Size(resp)
+			}
 			if err := ui.IncomingMessage(ctx, resp, testRunner); err != nil {
 				fmt.Printf("RETURN HANDLER ERROR: %s\n", err)
 			}

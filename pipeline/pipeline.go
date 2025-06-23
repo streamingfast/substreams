@@ -427,10 +427,21 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 		stream := response.New(p.respFunc)
 
 		meter := dmetering.GetBytesMeter(ctx)
+		notifyInterval := time.Duration(500)
 
+		count := int64(0)
 		for {
+			count++
+			switch count { // reduce "probably useless" bandwidth consumption after a few minutes.
+			case 120: // after 60 seconds, notify every second
+				notifyInterval = time.Second
+			case 240: // after 3 minutes, notify every 3 seconds
+				notifyInterval = time.Second * 3
+			case 300: // after 6 minutes, notify every 5 seconds
+				notifyInterval = time.Second * 5
+			}
 			select {
-			case <-time.After(time.Millisecond * 500):
+			case <-time.After(notifyInterval):
 				stagesProgress := stats.Stages()
 				jobs := stats.JobsStats()
 				modStats := stats.AggregatedModulesStats()

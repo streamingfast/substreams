@@ -232,9 +232,9 @@ func (s *Stats) RecordInitializationComplete() {
 	s.initDuration = time.Since(s.startTime)
 }
 
-func (s *Stats) RecordMessageSent(isData bool, egressBytes int) {
+func (s *Stats) RecordDataSent(egressBytes int) {
 	// this is always sent linearly, no need to lock
-	if isData && s.timeToFirstData == 0 {
+	if s.timeToFirstData == 0 {
 		s.timeToFirstData = time.Since(s.startTime)
 	}
 	s.uncompressedEgressBytes += uint64(egressBytes)

@@ -11,6 +11,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Server
+
+* "Uncompressed egress bytes" metrics now only include actual substreams data, not progress notifications
+* Progress notifications will only be sent every 500ms for the first minute, then reduce rate up to every 5 seconds
+
 ### CLI
 
 * **Added** `--proto-path` flag to `substreams run` and `substreams gui` commands: Allows loading protobuf definitions from a directory containing `.proto` files on top of the substreams package protobuf definitions

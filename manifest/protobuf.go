@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"buf.build/gen/go/bufbuild/reflect/connectrpc/go/buf/reflect/v1beta1/reflectv1beta1connect"
@@ -181,4 +182,135 @@ func readSystemProtobufs() (*descriptorpb.FileDescriptorSet, error) {
 	}
 
 	return fds, nil
+}
+
+func loadProtobufFromDirectory(pkg *pbsubstreams.Package, protoPath string) ([]*desc.FileDescriptor, error) {
+	seen := map[string]bool{}
+	for _, file := range pkg.ProtoFiles {
+		seen[*file.Name] = true
+	}
+
+	parser := &protoparse.Parser{
+		ImportPaths:           []string{protoPath},
+		IncludeSourceCodeInfo: true,
+		Accessor: func(filename string) (io.ReadCloser, error) {
+			// This is a workaround for protoparse's parser that does not honor extensions (google.protobuf.FieldOptions) without access to the full source:
+			// the source 'sf/substreams/options.proto' file is provided through go_embed, simulating that the file exists on disk.
+			if strings.HasSuffix(filename, sfproto.OptionsPath) {
+				return io.NopCloser(bytes.NewReader(sfproto.OptionsSource)), nil
+			}
+			return os.Open(filename)
+		},
+		LookupImportProto: func(file string) (*descriptorpb.FileDescriptorProto, error) {
+			for _, protoFile := range pkg.ProtoFiles {
+				if protoFile.GetName() == file {
+					return protoFile, nil
+				}
+			}
+			return nil, fmt.Errorf("proto file %q not found in package", file)
+		},
+	}
+
+	// Find all .proto files in the directory
+	var protoFiles []string
+	err := filepath.Walk(protoPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() && strings.HasSuffix(path, ".proto") {
+			// Get relative path from protoPath
+			relPath, err := filepath.Rel(protoPath, path)
+			if err != nil {
+				return err
+			}
+			protoFiles = append(protoFiles, relPath)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error walking proto directory %q: %w", protoPath, err)
+	}
+
+	if len(protoFiles) == 0 {
+		return nil, nil // No proto files found, return empty
+	}
+
+	// Filter out files that already exist
+	var filesToParse []string
+	for _, file := range protoFiles {
+		if !seen[file] {
+			filesToParse = append(filesToParse, file)
+		}
+	}
+
+	if len(filesToParse) == 0 {
+		return nil, nil // All files already exist
+	}
+
+	customFiles, err := parser.ParseFiles(filesToParse...)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing proto files from directory %q: %w", protoPath, err)
+	}
+
+	for _, fd := range customFiles {
+		pkg.ProtoFiles = append(pkg.ProtoFiles, fd.AsFileDescriptorProto())
+	}
+
+	return customFiles, nil
+}
+
+func loadProtobufFromDescriptorSet(pkg *pbsubstreams.Package, descriptorSetPath string) ([]*desc.FileDescriptor, error) {
+	seen := map[string]bool{}
+	for _, file := range pkg.ProtoFiles {
+		seen[*file.Name] = true
+	}
+
+	f, err := os.Open(descriptorSetPath)
+	if err != nil {
+		return nil, fmt.Errorf("error opening protobuf descriptor set file %q: %w", descriptorSetPath, err)
+	}
+	defer f.Close()
+
+	b, err := io.ReadAll(f)
+	if err != nil {
+		return nil, fmt.Errorf("error reading protobuf descriptor set file %q: %w", descriptorSetPath, err)
+	}
+
+	// Try to unmarshal as FileDescriptorSet first
+	fds := &descriptorpb.FileDescriptorSet{}
+	err = proto.Unmarshal(b, fds)
+	if err != nil {
+		// If that fails, try to unmarshal as Package (which contains FileDescriptorProto slice)
+		protoDescContainer := &pbsubstreams.Package{}
+		err = proto.Unmarshal(b, protoDescContainer)
+		if err != nil {
+			return nil, fmt.Errorf("error unmarshaling protobuf descriptor set file %q: not a valid FileDescriptorSet or Package: %w", descriptorSetPath, err)
+		}
+
+		// Add FileDescriptorProtos from Package
+		for _, fdProto := range protoDescContainer.ProtoFiles {
+			if _, found := seen[fdProto.GetName()]; !found {
+				seen[fdProto.GetName()] = true
+				pkg.ProtoFiles = append(pkg.ProtoFiles, fdProto)
+			}
+		}
+		return nil, nil // No FileDescriptors to return, just added to pkg.ProtoFiles
+	}
+
+	// Create FileDescriptors from FileDescriptorSet
+	fdMap, err := desc.CreateFileDescriptorsFromSet(fds)
+	if err != nil {
+		return nil, fmt.Errorf("creating file descriptors from set %q: %w", descriptorSetPath, err)
+	}
+
+	var out []*desc.FileDescriptor
+	for _, fd := range fdMap {
+		if _, found := seen[fd.GetName()]; !found {
+			seen[fd.GetName()] = true
+			out = append(out, fd)
+			pkg.ProtoFiles = append(pkg.ProtoFiles, fd.AsFileDescriptorProto())
+		}
+	}
+
+	return out, nil
 }

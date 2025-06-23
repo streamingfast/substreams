@@ -43,6 +43,8 @@ func init() {
 	runCmd.Flags().StringArrayP("params", "p", nil, "Set a params for parameterizable modules. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
 	runCmd.Flags().String("test-file", "", "runs a test file")
 	runCmd.Flags().Bool("test-verbose", false, "print out all the results")
+	runCmd.Flags().String("proto-path", "", "Directory path containing .proto files to load on top of the substreams package protobuf definitions")
+	runCmd.Flags().String("proto-descriptor-set", "", "Path to a protobuf descriptor set file (ex: another .spkg) to load on top of the substreams package protobuf definitions")
 	rootCmd.AddCommand(runCmd)
 }
 
@@ -77,6 +79,16 @@ func runRun(cmd *cobra.Command, args []string) error {
 		manifest.WithOverrideNetwork(network),
 		manifest.WithParams(params),
 		manifest.WithRegistryURL(getSubstreamsRegistryEndpoint()),
+	}
+
+	protoPath := sflags.MustGetString(cmd, "proto-path")
+	if protoPath != "" {
+		readerOptions = append(readerOptions, manifest.WithProtoPath(protoPath))
+	}
+
+	protoDescriptorSet := sflags.MustGetString(cmd, "proto-descriptor-set")
+	if protoDescriptorSet != "" {
+		readerOptions = append(readerOptions, manifest.WithProtoDescriptorSet(protoDescriptorSet))
 	}
 
 	if outputModule != "" {

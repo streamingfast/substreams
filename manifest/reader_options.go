@@ -59,3 +59,17 @@ func WithRegistryURL(url string) Option {
 		return r
 	}
 }
+
+func WithProtoPath(protoPath string) Option {
+	return func(r *Reader) *Reader {
+		r.protoPath = protoPath
+		return r
+	}
+}
+
+func WithProtoDescriptorSet(protoDescriptorSet string) Option {
+	return func(r *Reader) *Reader {
+		r.protoDescriptorSet = protoDescriptorSet
+		return r
+	}
+}

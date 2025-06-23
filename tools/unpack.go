@@ -18,7 +18,8 @@ var unpackCmd = &cobra.Command{
 	Short: "extract substreams.yaml and binary files from a substreams package into a folder",
 	Long: `Unpack extracts a substreams package into a folder named '{packagename}-unpacked' containing:
 - substreams.yaml: The manifest file
-- Binary files: All WASM and other binary files referenced in the manifest`,
+- Binary files: All WASM and other binary files referenced in the manifest
+Useful for tweaking an existing package`,
 	Args: cobra.ExactArgs(1),
 	RunE: unpackE,
 }
@@ -58,8 +59,8 @@ func unpackE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("create output directory %q: %w", outputDir, err)
 	}
 
-	// Create spkg file from package object
-	spkgFilename, err := createSpkgFromPackage(outputDir, packageName, pkgBundle)
+	// Write a copy of the spkg as protodesc reference
+	spkgFilename, err := writeSpkgFromPackage(outputDir, packageName, pkgBundle)
 	if err != nil {
 		return fmt.Errorf("create spkg file: %w", err)
 	}
@@ -89,14 +90,13 @@ func unpackE(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  - Inspect the manifest structure\n")
 	fmt.Printf("  - Extract binary files for other uses\n")
 	fmt.Printf("  - Run substreams commands directly: substreams run %s <module_name>\n", outputDir)
-	fmt.Printf("  - Use as a protobuf descriptor set for other tools\n")
 	fmt.Printf("\nNote: The .spkg file is recreated from the loaded package data.\n")
 	fmt.Printf("To rebuild from source, you would need the original Rust source code and Cargo.toml.\n")
 
 	return nil
 }
 
-func createSpkgFromPackage(outputDir, packageName string, pkgBundle *manifest.PackageBundle) (string, error) {
+func writeSpkgFromPackage(outputDir, packageName string, pkgBundle *manifest.PackageBundle) (string, error) {
 	// Determine the spkg filename
 	version := "unknown"
 	if len(pkgBundle.Package.PackageMeta) > 0 && pkgBundle.Package.PackageMeta[0].Version != "" {

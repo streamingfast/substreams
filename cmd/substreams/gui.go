@@ -37,7 +37,7 @@ func init() {
 	guiCmd.Flags().Bool("replay", false, "Replay saved session into GUI from replay.bin")
 	guiCmd.Flags().Bool("skip-package-validation", false, "Do not perform any validation when reading substreams package")
 	guiCmd.Flags().String("proto-path", "", "Directory path containing .proto files to load on top of the substreams package protobuf definitions")
-	guiCmd.Flags().String("proto-descriptor-set", "", "Path to a protobuf descriptor set file to load on top of the substreams package protobuf definitions")
+	guiCmd.Flags().String("proto-descriptor-set", "", "Path to a protobuf descriptor set file (ex: another .spkg) to load on top of the substreams package protobuf definitions")
 	rootCmd.AddCommand(guiCmd)
 }
 

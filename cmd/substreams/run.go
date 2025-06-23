@@ -44,7 +44,7 @@ func init() {
 	runCmd.Flags().String("test-file", "", "runs a test file")
 	runCmd.Flags().Bool("test-verbose", false, "print out all the results")
 	runCmd.Flags().String("proto-path", "", "Directory path containing .proto files to load on top of the substreams package protobuf definitions")
-	runCmd.Flags().String("proto-descriptor-set", "", "Path to a protobuf descriptor set file to load on top of the substreams package protobuf definitions")
+	runCmd.Flags().String("proto-descriptor-set", "", "Path to a protobuf descriptor set file (ex: another .spkg) to load on top of the substreams package protobuf definitions")
 	rootCmd.AddCommand(runCmd)
 }
 

@@ -11,13 +11,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
-* Added `substreams unpack` command to extract the contents of a .spkg file to a tweakable YAML manifest.
-
 ### CLI
 
 * **Added** `--proto-path` flag to `substreams run` and `substreams gui` commands: Allows loading protobuf definitions from a directory containing `.proto` files on top of the substreams package protobuf definitions
 * **Added** `--proto-descriptor-set` flag to `substreams run` and `substreams gui` commands: Allows loading protobuf definitions from a single protobuf descriptor set file on top of the substreams package protobuf definitions
 * Both flags work with both manifest files (`.yaml`) and pre-compiled packages (`.spkg`), enabling additional protobuf types to be available during execution
+* Added `substreams unpack` command to extract the contents of a .spkg file to a tweakable YAML manifest.
 
 ## v1.15.8
 

@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v3"
 )
 
@@ -57,8 +58,14 @@ func unpackE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("create output directory %q: %w", outputDir, err)
 	}
 
+	// Create spkg file from package object
+	spkgFilename, err := createSpkgFromPackage(outputDir, packageName, pkgBundle)
+	if err != nil {
+		return fmt.Errorf("create spkg file: %w", err)
+	}
+
 	// Extract substreams.yaml
-	if err := extractManifest(pkgBundle, outputDir); err != nil {
+	if err := extractManifest(pkgBundle, outputDir, spkgFilename); err != nil {
 		return fmt.Errorf("extract manifest: %w", err)
 	}
 
@@ -70,23 +77,49 @@ func unpackE(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Package unpacked to directory: %s\n", outputDir)
 	fmt.Printf("Contents:\n")
 	fmt.Printf("  - substreams.yaml: manifest file\n")
+	fmt.Printf("  - %s: original package file (protobuf descriptor set)\n", spkgFilename)
 
 	binariesCount := len(pkgBundle.Package.Modules.Binaries)
 	if binariesCount > 0 {
 		fmt.Printf("  - %d binary file(s) extracted\n", binariesCount)
 	}
 
-	fmt.Printf("\nNote: This package contains compiled binaries only.\n")
+	fmt.Printf("\nNote: This package contains compiled binaries and protobuf definitions.\n")
 	fmt.Printf("The extracted files can be used to:\n")
 	fmt.Printf("  - Inspect the manifest structure\n")
 	fmt.Printf("  - Extract binary files for other uses\n")
-	fmt.Printf("  - Run substreams commands directly: substreams run -p %s <module_name>\n", outputDir)
-	fmt.Printf("\nTo rebuild from source, you would need the original Rust source code and Cargo.toml.\n")
+	fmt.Printf("  - Run substreams commands directly: substreams run %s <module_name>\n", outputDir)
+	fmt.Printf("  - Use as a protobuf descriptor set for other tools\n")
+	fmt.Printf("\nNote: The .spkg file is recreated from the loaded package data.\n")
+	fmt.Printf("To rebuild from source, you would need the original Rust source code and Cargo.toml.\n")
 
 	return nil
 }
 
-func extractManifest(pkgBundle *manifest.PackageBundle, outputDir string) error {
+func createSpkgFromPackage(outputDir, packageName string, pkgBundle *manifest.PackageBundle) (string, error) {
+	// Determine the spkg filename
+	version := "unknown"
+	if len(pkgBundle.Package.PackageMeta) > 0 && pkgBundle.Package.PackageMeta[0].Version != "" {
+		version = pkgBundle.Package.PackageMeta[0].Version
+	}
+	spkgFilename := fmt.Sprintf("%s@%s.spkg", packageName, version)
+
+	// Serialize the package object to protobuf
+	data, err := proto.Marshal(pkgBundle.Package)
+	if err != nil {
+		return spkgFilename, fmt.Errorf("marshal package to protobuf: %w", err)
+	}
+
+	// Write the spkg file
+	destPath := filepath.Join(outputDir, spkgFilename)
+	if err := os.WriteFile(destPath, data, 0644); err != nil {
+		return spkgFilename, fmt.Errorf("write spkg file %q: %w", destPath, err)
+	}
+
+	return spkgFilename, nil
+}
+
+func extractManifest(pkgBundle *manifest.PackageBundle, outputDir, spkgFilename string) error {
 	var manifestData []byte
 	var err error
 
@@ -95,6 +128,19 @@ func extractManifest(pkgBundle *manifest.PackageBundle, outputDir string) error 
 
 		// Create a copy of the manifest to modify
 		manifestCopy := *pkgBundle.Manifest
+
+		// Add protobuf descriptor set reference if not already present
+		if manifestCopy.Protobuf.DescriptorSets == nil {
+			manifestCopy.Protobuf = manifest.Protobuf{
+				DescriptorSets: []*manifest.BufImport{
+					{
+						LocalPath: spkgFilename,
+						Module:    "local",  // Placeholder for local files
+						Version:   "v1.0.0", // Placeholder for local files
+					},
+				},
+			}
+		}
 
 		// Update binary file paths to point to extracted files
 		if manifestCopy.Binaries != nil {
@@ -122,7 +168,7 @@ func extractManifest(pkgBundle *manifest.PackageBundle, outputDir string) error 
 	} else {
 
 		// Fallback: create a minimal manifest from package data
-		manifestData, err = createManifestFromPackage(pkgBundle.Package)
+		manifestData, err = createManifestFromPackage(pkgBundle.Package, spkgFilename)
 		if err != nil {
 			return fmt.Errorf("create manifest from package: %w", err)
 		}
@@ -183,7 +229,7 @@ func getFileExtensionFromBinaryType(binaryType string) string {
 	}
 }
 
-func createManifestFromPackage(pkg *pbsubstreams.Package) ([]byte, error) {
+func createManifestFromPackage(pkg *pbsubstreams.Package, spkgFilename string) ([]byte, error) {
 	// This is a fallback function to create a basic manifest from package data
 	// when the original manifest is not available
 
@@ -191,9 +237,16 @@ func createManifestFromPackage(pkg *pbsubstreams.Package) ([]byte, error) {
 		SpecVersion: "v0.1.0",
 	}
 
-	// Add comment about parameter names
-	// Note: Parameter names are reconstructed as 'param_N' since original names
-	// are not preserved in the compiled package format
+	// Add protobuf descriptor set reference
+	manif.Protobuf = manifest.Protobuf{
+		DescriptorSets: []*manifest.BufImport{
+			{
+				LocalPath: spkgFilename,
+				Module:    "local",  // Placeholder for local files
+				Version:   "v1.0.0", // Placeholder for local files
+			},
+		},
+	}
 
 	// Set package metadata
 	if len(pkg.PackageMeta) > 0 {

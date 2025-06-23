@@ -63,6 +63,11 @@ func runPack(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no package found")
 	}
 
+	// Validate proto output types
+	if err := manifest.ValidateProtoOutputTypes(pkgBundle.Package); err != nil {
+		return fmt.Errorf("validation failed: %w", err)
+	}
+
 	originalOutputFile, _ := sflags.GetString(cmd, "output-file")
 
 	manifestDir := filepath.Dir(manifestPath)

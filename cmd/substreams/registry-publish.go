@@ -74,6 +74,11 @@ func runRegistryPublish(cmd *cobra.Command, args []string) (err error) {
 
 	spkg := pkgBundle.Package
 
+	// Validate proto output types
+	if err := manifest.ValidateProtoOutputTypes(spkg); err != nil {
+		return fmt.Errorf("validation failed: %w", err)
+	}
+
 	warnIncompletePackage(spkg)
 	printPackageDetails(spkg)
 

@@ -300,7 +300,7 @@ const (
 	JobFailed
 )
 
-// RecordJobRetried should be called when a job is retried without any work done (ex: rejected upon connection to tier2)
+// RecordJobDelayed should be called when a job is retried without any work done (ex: rejected upon connection to tier2)
 func (s *Stats) RecordJobDelayed(jobIdx uint64) {
 	s.Lock()
 	defer s.Unlock()

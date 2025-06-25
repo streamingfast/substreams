@@ -10,12 +10,12 @@
   * [on Solana](tutorials/intro-to-tutorials/on-solana/README.md)
     * [Transactions & Instructions](new/tutorials/solana/solana.md)
     * [Account Changes](new/tutorials/solana/account-changes.md)
+  * [on TRON](new/tutorials/tron.md)
   * [on Cosmos](tutorials/intro-to-tutorials/on-cosmos/README.md)
     * [Injective](new/tutorials/cosmos-compatible/injective.md)
     * [MANTRA](new/tutorials/cosmos-compatible/mantra.md)
   * [on Starknet](new/tutorials/starknet.md)
   * [on Stellar](new/tutorials/stellar.md)
-  * [on TRON](new/tutorials/tron.md)
 * [Publishing a Substreams Package](new/tutorials/publish-package.md)
 
 ## How-To Guides

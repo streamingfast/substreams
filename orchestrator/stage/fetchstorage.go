@@ -21,7 +21,7 @@ var firstPassStoresWalkMaxSegments = 50 // arbitrary "small" number of segments 
 //   - if we are in development mode and need to prepare the stores at the beginning of the range
 //
 // )
-// Then, the the internal "s.segmentStates" will be updated.
+// Then, the internal "s.segmentStates" will be updated.
 // It tries to fetch the minimal number of files, because with object-storage (gcs, s3, ...), listing files can be slow and costly
 func (s *Stages) FetchCachesState(
 	ctx context.Context,

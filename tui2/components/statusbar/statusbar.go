@@ -13,6 +13,7 @@ import (
 	"github.com/streamingfast/substreams/tui2/common"
 	"github.com/streamingfast/substreams/tui2/stream"
 	"github.com/streamingfast/substreams/tui2/styles"
+	"google.golang.org/protobuf/proto"
 )
 
 type StatusBar struct {
@@ -27,9 +28,11 @@ type StatusBar struct {
 	bytesRepresentation dynamic.BytesRepresentation
 	showLogs            bool
 
-	dataPayloads             uint64
-	totalBytesRead           uint64
-	totalBytesWritten        uint64
+	dataPayloads   uint64
+	totalBytesRead uint64
+
+	totalBlocksProcessed     uint64
+	totalEgressBytes         uint64
 	initCheckpointBlockCount uint64
 	lastCheckpointTime       time.Time
 	lastCheckpointBlocks     uint64
@@ -56,24 +59,30 @@ func (s *StatusBar) Init() tea.Cmd {
 }
 
 func (s *StatusBar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+
 	switch msg := msg.(type) {
 	case stream.StreamErrorMsg:
 		s.state = "Error"
 		s.error = msg.(error)
 	case *pbsubstreamsrpc.SessionInit:
+
+		s.totalEgressBytes += uint64(proto.Size(msg))
+
 		s.maxParallelWorkers = msg.MaxParallelWorkers
 		s.traceId = msg.TraceId
 		s.linearHandoffBlock = msg.LinearHandoffBlock
 		s.resolveStartBlock = msg.ResolvedStartBlock
 		s.dataPayloads = 0
 	case *pbsubstreamsrpc.BlockScopedData:
+		s.totalEgressBytes += uint64(proto.Size(msg))
 		s.dataPayloads += 1
 
 	case *pbsubstreamsrpc.ModulesProgress:
+		s.totalEgressBytes += uint64(proto.Size(msg))
 		if msg.ProcessedBytes != nil {
 			s.totalBytesRead = msg.ProcessedBytes.TotalBytesRead
-			s.totalBytesWritten = msg.ProcessedBytes.TotalBytesWritten
 		}
+		s.totalBlocksProcessed = msg.ProcessedBlocks
 
 		var totalBackprocessedBlocks uint64
 		for _, j := range msg.RunningJobs {
@@ -146,8 +155,7 @@ func (s *StatusBar) View() string {
 	line1 = append(line1, styles.StatusBarKey.Render(state))
 
 	line1 = append(line1, styles.StatusBarBranch.Render(
-		fmt.Sprintf("%s read / %s written", humanize.Bytes(s.totalBytesRead), humanize.Bytes(s.totalBytesWritten)),
-	))
+		fmt.Sprintf("%s processed bytes / %s processed blocks / %s egress bytes", humanize.Bytes(s.totalBytesRead), humanize.Comma(int64(s.totalBlocksProcessed)), humanize.Bytes(s.totalEgressBytes))))
 	line1 = append(line1, styles.StatusBarHelp.Render("logs: "+showHide(s.showLogs)))
 
 	if s.maxParallelWorkers != 0 {

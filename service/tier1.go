@@ -418,7 +418,7 @@ func (s *Tier1Service) Blocks(
 		}
 	}()
 
-	respFunc := tier1ResponseHandler(respContext, &mut, logger, stream, request.NoopMode, reqStats)
+	respFunc := tier1ResponseHandler(respContext, &mut, logger, stream, request.NoopMode, reqStats, req.Msg.DevOutputModules)
 	err = s.blocks(runningContext, request, execGraph, respFunc, reqStats, fields)
 
 	if connectError := toConnectError(runningContext, err); connectError != nil {
@@ -515,6 +515,12 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 			return err
 		}
 	}
+	if request.ProgressMessagesIntervalMs != 0 && request.ProgressMessagesIntervalMs < 500 {
+		err := bsstream.NewErrInvalidArg("Invalid progress_messages_interval_ms %q (minimum 500)", request.ProgressMessagesIntervalMs)
+		logger.Info("refusing Substreams Blocks request", append(logFields, zap.Error(err))...)
+		return err
+	}
+	requestDetails.UpdateInterval = time.Duration(request.ProgressMessagesIntervalMs) * time.Millisecond
 
 	requestDetails.MaxParallelJobs = s.runtimeConfig.DefaultParallelSubrequests
 	cacheTag := s.runtimeConfig.DefaultCacheTag
@@ -790,7 +796,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	return pipe.OnStreamTerminated(ctx, streamErr)
 }
 
-func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logger, streamSrv *connect.ServerStream[pbsubstreamsrpc.Response], noop bool, stats *metrics.Stats) substreams.ResponseFunc {
+func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logger, streamSrv *connect.ServerStream[pbsubstreamsrpc.Response], noop bool, stats *metrics.Stats, debugOutputForModules []string) substreams.ResponseFunc {
 	auth := dauth.FromContext(ctx)
 	userID := auth.UserID()
 	apiKeyID := auth.APIKeyID()
@@ -801,6 +807,13 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 
 	ctx = reqctx.WithEmitter(ctx, dmetering.GetDefaultEmitter())
 	metericsSender := metering.GetMetricsSender(ctx)
+	var debugOutputs map[string]struct{}
+	if len(debugOutputForModules) != 0 {
+		debugOutputs = make(map[string]struct{})
+		for _, module := range debugOutputForModules {
+			debugOutputs[module] = struct{}{}
+		}
+	}
 
 	return func(respAny substreams.ResponseFromAnyTier) error {
 		resp := respAny.(*pbsubstreamsrpc.Response)
@@ -821,6 +834,25 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 				data.DebugStoreOutputs = nil
 				data.Output = &pbsubstreamsrpc.MapModuleOutput{}
 			}
+			if debugOutputs != nil {
+				// Filter DebugMapOutputs
+				var filteredMapOutputs []*pbsubstreamsrpc.MapModuleOutput
+				for _, output := range data.DebugMapOutputs {
+					if _, exists := debugOutputs[output.Name]; exists {
+						filteredMapOutputs = append(filteredMapOutputs, output)
+					}
+				}
+				data.DebugMapOutputs = filteredMapOutputs
+
+				// Filter DebugStoreOutputs
+				var filteredStoreOutputs []*pbsubstreamsrpc.StoreModuleOutput
+				for _, output := range data.DebugStoreOutputs {
+					if _, exists := debugOutputs[output.Name]; exists {
+						filteredStoreOutputs = append(filteredStoreOutputs, output)
+					}
+				}
+				data.DebugStoreOutputs = filteredStoreOutputs
+			}
 		}
 
 		if err := streamSrv.Send(resp); err != nil {
@@ -829,9 +861,10 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 		}
 
 		if isData {
-			stats.RecordDataSent(egressBytes)
-			metering.AddEgressBytes(ctx, egressBytes)
+			stats.RecordDataSent()
 		}
+		stats.RecordEgress(egressBytes)
+		metering.AddEgressBytes(ctx, egressBytes)
 		metericsSender.Send(ctx, userID, apiKeyID, ip, userMeta, outputModuleHash, "sf.substreams.rpc.v2/Blocks")
 		return nil
 	}

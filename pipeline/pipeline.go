@@ -427,7 +427,7 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 		stream := response.New(p.respFunc)
 
 		meter := dmetering.GetBytesMeter(ctx)
-		notifyInterval := time.Duration(500)
+		notifyInterval := time.Duration(500 * time.Millisecond)
 
 		count := int64(0)
 		for {
@@ -446,8 +446,7 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 				jobs := stats.JobsStats()
 				modStats := stats.AggregatedModulesStats()
 				remoteBytesRead, remoteBytesWritten := stats.RemoteBytesConsumption()
-
-				stream.SendModulesStats(modStats, stagesProgress, jobs, metering.GetTotalBytesRead(meter)+remoteBytesRead, metering.GetTotalBytesWritten(meter)+remoteBytesWritten)
+				stream.SendModulesStats(modStats, stagesProgress, jobs, metering.GetTotalBytesRead(meter)+remoteBytesRead, metering.GetTotalBytesWritten(meter)+remoteBytesWritten, stats.GetBlocksProcessed())
 			case <-progressCtx.Done():
 				return
 			}
@@ -565,7 +564,7 @@ func (p *Pipeline) returnRPCModuleProgressOutputs(forceOutput bool) error {
 
 	meter := dmetering.GetBytesMeter(p.ctx)
 	remoteBytesRead, remoteBytesWritten := stats.RemoteBytesConsumption()
-	return stream.SendModulesStats(modStats, stagesProgress, jobs, metering.GetTotalBytesRead(meter)+remoteBytesRead, metering.GetTotalBytesWritten(meter)+remoteBytesWritten)
+	return stream.SendModulesStats(modStats, stagesProgress, jobs, metering.GetTotalBytesRead(meter)+remoteBytesRead, metering.GetTotalBytesWritten(meter)+remoteBytesWritten, stats.GetBlocksProcessed())
 
 }
 
@@ -580,9 +579,24 @@ func (p *Pipeline) toInternalUpdate(clock *pbsubstreams.Clock) *pbssinternal.Upd
 	}
 
 	if clock != nil {
-		out.ProcessedBlocks = clock.Number - p.processingModule.initialBlockNum
+		out.ProgressBlocks = clock.Number - p.processingModule.initialBlockNum
 	}
 	return out
+}
+
+func (p *Pipeline) returnInternalModuleComplete() error {
+	out := &pbssinternal.ProcessRangeResponse{
+		Type: &pbssinternal.ProcessRangeResponse_Completed{
+			Completed: &pbssinternal.Completed{
+				ProcessedBlocks: reqctx.ReqStats(p.ctx).GetBlocksProcessed(),
+			},
+		},
+	}
+
+	if err := p.respFunc(out); err != nil {
+		return fmt.Errorf("calling return func: %w", err)
+	}
+	return nil
 }
 
 func (p *Pipeline) returnInternalModuleProgressOutputs(clock *pbsubstreams.Clock, forceOutput bool) error {

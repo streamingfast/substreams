@@ -206,6 +206,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		DebugInitialStoreSnapshotForModules: debugModulesInitialSnapshot,
 		LimitProcessedBlocks:                sflags.MustGetUint64(cmd, "limit-processed-blocks"),
 		NoopMode:                            noopMode,
+		DevOutputModules:                    []string{outputModule},
 	}
 
 	if err := req.Validate(); err != nil {
@@ -263,10 +264,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 	for {
 		resp, err := cli.Recv()
 		if resp != nil {
-			// only blockScopedData is billed as egress
-			if _, ok := resp.Message.(*pbsubstreamsrpc.Response_BlockScopedData); ok {
-				totalEgress += proto.Size(resp)
-			}
+			totalEgress += proto.Size(resp)
 			if err := ui.IncomingMessage(ctx, resp, testRunner); err != nil {
 				fmt.Printf("RETURN HANDLER ERROR: %s\n", err)
 			}
@@ -275,6 +273,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 			if err == io.EOF {
 				ui.Cancel()
 				fmt.Fprintln(os.Stderr, "Total Processed Bytes:", ui.TotalReadBytes)
+				fmt.Fprintln(os.Stderr, "Total Processed Blocks:", ui.TotalProcessedBlocks)
 				fmt.Fprintln(os.Stderr, "Total Received Bytes (uncompressed egress):", totalEgress)
 				fmt.Fprintln(os.Stderr, "all done")
 				if testRunner != nil {

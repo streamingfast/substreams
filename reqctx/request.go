@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/streamingfast/dauth"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -26,6 +27,7 @@ type RequestDetails struct {
 	MaxParallelJobs               uint64
 	MaxStageLayerParallelExecutor uint64
 	LimitProcessedBlocks          uint64
+	UpdateInterval                time.Duration
 	UniqueID                      uint64
 
 	ProductionMode bool

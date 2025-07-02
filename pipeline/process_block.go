@@ -414,6 +414,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 		}
 	}
 	metering.AddProcessedBlocks(ctx, len(executedStages)) // blocks are counted on every stage for which they were executed (not skipped for indexes, not loaded from existing cache)
+	reqctx.ReqStats(ctx).RecordBlocksProcessed(uint64(len(executedStages)))
 
 	return nil
 }

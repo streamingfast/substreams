@@ -112,8 +112,15 @@ type Request struct {
 	// If set, the engine will reject a request if the number of blocks to process (including preparing the stores) is above this limit.
 	// Useful as a safeguard for managing costs
 	LimitProcessedBlocks uint64 `protobuf:"varint,12,opt,name=limit_processed_blocks,json=limitProcessedBlocks,proto3" json:"limit_processed_blocks,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// Available only in developer mode
+	// If set, the server will only send the output of these modules.
+	// If unset, all the outputs are sent.
+	// This allows the user to reduce the payload in dev mode, while still getting some extra debugging information
+	DevOutputModules []string `protobuf:"bytes,13,rep,name=dev_output_modules,json=devOutputModules,proto3" json:"dev_output_modules,omitempty"`
+	// Progress_messages_interval_ms is the interval between progress messages, in milliseconds (minimum: 500, default: start at 500ms and ramp up to 5000ms within 1min)
+	ProgressMessagesIntervalMs uint64 `protobuf:"varint,14,opt,name=progress_messages_interval_ms,json=progressMessagesIntervalMs,proto3" json:"progress_messages_interval_ms,omitempty"`
+	unknownFields              protoimpl.UnknownFields
+	sizeCache                  protoimpl.SizeCache
 }
 
 func (x *Request) Reset() {
@@ -212,6 +219,20 @@ func (x *Request) GetNoopMode() bool {
 func (x *Request) GetLimitProcessedBlocks() uint64 {
 	if x != nil {
 		return x.LimitProcessedBlocks
+	}
+	return 0
+}
+
+func (x *Request) GetDevOutputModules() []string {
+	if x != nil {
+		return x.DevOutputModules
+	}
+	return nil
+}
+
+func (x *Request) GetProgressMessagesIntervalMs() uint64 {
+	if x != nil {
+		return x.ProgressMessagesIntervalMs
 	}
 	return 0
 }
@@ -961,10 +982,11 @@ type ModulesProgress struct {
 	// Execution statistics for each module
 	ModulesStats []*ModuleStats `protobuf:"bytes,3,rep,name=modules_stats,json=modulesStats,proto3" json:"modules_stats,omitempty"`
 	// Stages definition and completed block ranges
-	Stages         []*Stage        `protobuf:"bytes,4,rep,name=stages,proto3" json:"stages,omitempty"`
-	ProcessedBytes *ProcessedBytes `protobuf:"bytes,5,opt,name=processed_bytes,json=processedBytes,proto3" json:"processed_bytes,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	Stages          []*Stage        `protobuf:"bytes,4,rep,name=stages,proto3" json:"stages,omitempty"`
+	ProcessedBytes  *ProcessedBytes `protobuf:"bytes,5,opt,name=processed_bytes,json=processedBytes,proto3" json:"processed_bytes,omitempty"`
+	ProcessedBlocks uint64          `protobuf:"varint,6,opt,name=processed_blocks,json=processedBlocks,proto3" json:"processed_blocks,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *ModulesProgress) Reset() {
@@ -1023,6 +1045,13 @@ func (x *ModulesProgress) GetProcessedBytes() *ProcessedBytes {
 		return x.ProcessedBytes
 	}
 	return nil
+}
+
+func (x *ModulesProgress) GetProcessedBlocks() uint64 {
+	if x != nil {
+		return x.ProcessedBlocks
+	}
+	return 0
 }
 
 type ProcessedBytes struct {
@@ -1148,14 +1177,14 @@ func (x *Error) GetLogsTruncated() bool {
 }
 
 type Job struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	Stage           uint32                 `protobuf:"varint,1,opt,name=stage,proto3" json:"stage,omitempty"`
-	StartBlock      uint64                 `protobuf:"varint,2,opt,name=start_block,json=startBlock,proto3" json:"start_block,omitempty"`
-	StopBlock       uint64                 `protobuf:"varint,3,opt,name=stop_block,json=stopBlock,proto3" json:"stop_block,omitempty"`
-	ProcessedBlocks uint64                 `protobuf:"varint,4,opt,name=processed_blocks,json=processedBlocks,proto3" json:"processed_blocks,omitempty"`
-	DurationMs      uint64                 `protobuf:"varint,5,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Stage          uint32                 `protobuf:"varint,1,opt,name=stage,proto3" json:"stage,omitempty"`
+	StartBlock     uint64                 `protobuf:"varint,2,opt,name=start_block,json=startBlock,proto3" json:"start_block,omitempty"`
+	StopBlock      uint64                 `protobuf:"varint,3,opt,name=stop_block,json=stopBlock,proto3" json:"stop_block,omitempty"`
+	ProgressBlocks uint64                 `protobuf:"varint,4,opt,name=progress_blocks,json=progressBlocks,proto3" json:"progress_blocks,omitempty"`
+	DurationMs     uint64                 `protobuf:"varint,5,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Job) Reset() {
@@ -1209,9 +1238,9 @@ func (x *Job) GetStopBlock() uint64 {
 	return 0
 }
 
-func (x *Job) GetProcessedBlocks() uint64 {
+func (x *Job) GetProgressBlocks() uint64 {
 	if x != nil {
-		return x.ProcessedBlocks
+		return x.ProgressBlocks
 	}
 	return 0
 }
@@ -1614,7 +1643,7 @@ var File_sf_substreams_rpc_v2_service_proto protoreflect.FileDescriptor
 
 const file_sf_substreams_rpc_v2_service_proto_rawDesc = "" +
 	"\n" +
-	"\"sf/substreams/rpc/v2/service.proto\x12\x14sf.substreams.rpc.v2\x1a\x19google/protobuf/any.proto\x1a\x1dsf/firehose/v2/firehose.proto\x1a\x1csf/substreams/v1/clock.proto\x1a\x1esf/substreams/v1/modules.proto\"\xd3\x03\n" +
+	"\"sf/substreams/rpc/v2/service.proto\x12\x14sf.substreams.rpc.v2\x1a\x19google/protobuf/any.proto\x1a\x1dsf/firehose/v2/firehose.proto\x1a\x1csf/substreams/v1/clock.proto\x1a\x1esf/substreams/v1/modules.proto\"\xc4\x04\n" +
 	"\aRequest\x12&\n" +
 	"\x0fstart_block_num\x18\x01 \x01(\x03R\rstartBlockNum\x12!\n" +
 	"\fstart_cursor\x18\x02 \x01(\tR\vstartCursor\x12$\n" +
@@ -1626,7 +1655,9 @@ const file_sf_substreams_rpc_v2_service_proto_rawDesc = "" +
 	"(debug_initial_store_snapshot_for_modules\x18\n" +
 	" \x03(\tR#debugInitialStoreSnapshotForModules\x12\x1b\n" +
 	"\tnoop_mode\x18\v \x01(\bR\bnoopMode\x124\n" +
-	"\x16limit_processed_blocks\x18\f \x01(\x04R\x14limitProcessedBlocks\"\xc9\x04\n" +
+	"\x16limit_processed_blocks\x18\f \x01(\x04R\x14limitProcessedBlocks\x12,\n" +
+	"\x12dev_output_modules\x18\r \x03(\tR\x10devOutputModules\x12A\n" +
+	"\x1dprogress_messages_interval_ms\x18\x0e \x01(\x04R\x1aprogressMessagesIntervalMs\"\xc9\x04\n" +
 	"\bResponse\x12=\n" +
 	"\asession\x18\x01 \x01(\v2!.sf.substreams.rpc.v2.SessionInitH\x00R\asession\x12C\n" +
 	"\bprogress\x18\x02 \x01(\v2%.sf.substreams.rpc.v2.ModulesProgressH\x00R\bprogress\x12S\n" +
@@ -1688,12 +1719,13 @@ const file_sf_substreams_rpc_v2_service_proto_rawDesc = "" +
 	"\x0fOutputDebugInfo\x12\x12\n" +
 	"\x04logs\x18\x01 \x03(\tR\x04logs\x12%\n" +
 	"\x0elogs_truncated\x18\x02 \x01(\bR\rlogsTruncated\x12\x16\n" +
-	"\x06cached\x18\x03 \x01(\bR\x06cached\"\xa1\x02\n" +
+	"\x06cached\x18\x03 \x01(\bR\x06cached\"\xcc\x02\n" +
 	"\x0fModulesProgress\x12<\n" +
 	"\frunning_jobs\x18\x02 \x03(\v2\x19.sf.substreams.rpc.v2.JobR\vrunningJobs\x12F\n" +
 	"\rmodules_stats\x18\x03 \x03(\v2!.sf.substreams.rpc.v2.ModuleStatsR\fmodulesStats\x123\n" +
 	"\x06stages\x18\x04 \x03(\v2\x1b.sf.substreams.rpc.v2.StageR\x06stages\x12M\n" +
-	"\x0fprocessed_bytes\x18\x05 \x01(\v2$.sf.substreams.rpc.v2.ProcessedBytesR\x0eprocessedBytesJ\x04\b\x01\x10\x02\"j\n" +
+	"\x0fprocessed_bytes\x18\x05 \x01(\v2$.sf.substreams.rpc.v2.ProcessedBytesR\x0eprocessedBytes\x12)\n" +
+	"\x10processed_blocks\x18\x06 \x01(\x04R\x0fprocessedBlocksJ\x04\b\x01\x10\x02\"j\n" +
 	"\x0eProcessedBytes\x12(\n" +
 	"\x10total_bytes_read\x18\x01 \x01(\x04R\x0etotalBytesRead\x12.\n" +
 	"\x13total_bytes_written\x18\x02 \x01(\x04R\x11totalBytesWritten\"r\n" +
@@ -1701,14 +1733,14 @@ const file_sf_substreams_rpc_v2_service_proto_rawDesc = "" +
 	"\x06module\x18\x01 \x01(\tR\x06module\x12\x16\n" +
 	"\x06reason\x18\x02 \x01(\tR\x06reason\x12\x12\n" +
 	"\x04logs\x18\x03 \x03(\tR\x04logs\x12%\n" +
-	"\x0elogs_truncated\x18\x04 \x01(\bR\rlogsTruncated\"\xa7\x01\n" +
+	"\x0elogs_truncated\x18\x04 \x01(\bR\rlogsTruncated\"\xa5\x01\n" +
 	"\x03Job\x12\x14\n" +
 	"\x05stage\x18\x01 \x01(\rR\x05stage\x12\x1f\n" +
 	"\vstart_block\x18\x02 \x01(\x04R\n" +
 	"startBlock\x12\x1d\n" +
 	"\n" +
-	"stop_block\x18\x03 \x01(\x04R\tstopBlock\x12)\n" +
-	"\x10processed_blocks\x18\x04 \x01(\x04R\x0fprocessedBlocks\x12\x1f\n" +
+	"stop_block\x18\x03 \x01(\x04R\tstopBlock\x12'\n" +
+	"\x0fprogress_blocks\x18\x04 \x01(\x04R\x0eprogressBlocks\x12\x1f\n" +
 	"\vduration_ms\x18\x05 \x01(\x04R\n" +
 	"durationMs\"n\n" +
 	"\x05Stage\x12\x18\n" +

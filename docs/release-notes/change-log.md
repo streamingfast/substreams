@@ -13,8 +13,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
-* "Uncompressed egress bytes" metrics now only include actual substreams data, not progress notifications
-* Progress notifications will only be sent every 500ms for the first minute, then reduce rate up to every 5 seconds
+* Return 'processed blocks' counter to client at the end of the request
+* Progress notifications will only be sent every 500ms for the first minute, then reduce rate up to every 5 seconds (can be overridden per request)
+* Added `dev_output_modules` to protobuf request (if present, in dev mode, only send the output of the modules listed)
+* Added `progress_messages_interval_ms` to protobuf request (if present, overrides the rate of progress messages to that many milliseconds)
 
 ### CLI
 
@@ -23,6 +25,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Both flags work with both manifest files (`.yaml`) and pre-compiled packages (`.spkg`), enabling additional protobuf types to be available during execution
 * Added `substreams unpack` command to extract the contents of a .spkg file to a tweakable YAML manifest.
 * Added validation of protobuf outputs when doing 'pack' and 'publish' (they must have protobuf definitions attached to the manifest)
+* Set `dev_output_modules` to only show the output_module when using `substreams run`, and all non-imported modules when using `substreams gui`
+* Print the `processed blocks` counter to client at the end of the request
 
 ## v1.15.8
 

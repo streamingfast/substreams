@@ -200,6 +200,15 @@ func (r *Request) renderRequestSummary() string {
 		rows = append(rows,
 			[]string{"Production mode:", fmt.Sprintf("%v", r.Config.ProdMode)},
 		)
+	} else {
+		printedModules := "[all non-imported modules]"
+		if r.Config.DebugModulesOutput != nil {
+			printedModules = strings.Join(r.Config.DebugModulesOutput, ",")
+		}
+		rows = append(rows,
+			[]string{"Printed modules:", printedModules},
+		)
+
 	}
 	rows = append(rows,
 		[]string{"", ""},

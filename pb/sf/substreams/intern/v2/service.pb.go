@@ -324,7 +324,7 @@ func (*ProcessRangeResponse_Update) isProcessRangeResponse_Type() {}
 type Update struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	DurationMs        uint64                 `protobuf:"varint,1,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
-	ProcessedBlocks   uint64                 `protobuf:"varint,2,opt,name=processed_blocks,json=processedBlocks,proto3" json:"processed_blocks,omitempty"`
+	ProgressBlocks    uint64                 `protobuf:"varint,2,opt,name=progress_blocks,json=progressBlocks,proto3" json:"progress_blocks,omitempty"`
 	TotalBytesRead    uint64                 `protobuf:"varint,3,opt,name=total_bytes_read,json=totalBytesRead,proto3" json:"total_bytes_read,omitempty"`
 	TotalBytesWritten uint64                 `protobuf:"varint,4,opt,name=total_bytes_written,json=totalBytesWritten,proto3" json:"total_bytes_written,omitempty"`
 	ModulesStats      []*ModuleStats         `protobuf:"bytes,5,rep,name=modules_stats,json=modulesStats,proto3" json:"modules_stats,omitempty"`
@@ -369,9 +369,9 @@ func (x *Update) GetDurationMs() uint64 {
 	return 0
 }
 
-func (x *Update) GetProcessedBlocks() uint64 {
+func (x *Update) GetProgressBlocks() uint64 {
 	if x != nil {
-		return x.ProcessedBlocks
+		return x.ProgressBlocks
 	}
 	return 0
 }
@@ -561,17 +561,10 @@ func (x *ExternalCallMetric) GetTimeMs() uint64 {
 type Completed struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
 	AllProcessedRanges []*BlockRange          `protobuf:"bytes,1,rep,name=all_processed_ranges,json=allProcessedRanges,proto3" json:"all_processed_ranges,omitempty"`
-	// TraceId represents the producer's trace id that produced the partial files.
-	// This is present here so that the consumer can use it to identify the
-	// right partial files that needs to be squashed together.
-	//
-	// The TraceId can be empty in which case it should be assumed by the tier1
-	// consuming this message that the tier2 that produced those partial files
-	// is not yet updated to produce a trace id and a such, the tier1 should
-	// generate a legacy partial file name.
-	TraceId       string `protobuf:"bytes,2,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// actual processed blocks (excluding blocks skipped by indexes)
+	ProcessedBlocks uint64 `protobuf:"varint,3,opt,name=processed_blocks,json=processedBlocks,proto3" json:"processed_blocks,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *Completed) Reset() {
@@ -611,11 +604,11 @@ func (x *Completed) GetAllProcessedRanges() []*BlockRange {
 	return nil
 }
 
-func (x *Completed) GetTraceId() string {
+func (x *Completed) GetProcessedBlocks() uint64 {
 	if x != nil {
-		return x.TraceId
+		return x.ProcessedBlocks
 	}
-	return ""
+	return 0
 }
 
 type Failed struct {
@@ -762,11 +755,11 @@ const file_sf_substreams_intern_v2_service_proto_rawDesc = "" +
 	"\x06failed\x18\x04 \x01(\v2!.sf.substreams.internal.v2.FailedH\x00R\x06failed\x12D\n" +
 	"\tcompleted\x18\x05 \x01(\v2$.sf.substreams.internal.v2.CompletedH\x00R\tcompleted\x12;\n" +
 	"\x06update\x18\x06 \x01(\v2!.sf.substreams.internal.v2.UpdateH\x00R\x06updateB\x06\n" +
-	"\x04typeJ\x04\b\x01\x10\x02J\x04\b\x02\x10\x03J\x04\b\x03\x10\x04\"\xfb\x01\n" +
+	"\x04typeJ\x04\b\x01\x10\x02J\x04\b\x02\x10\x03J\x04\b\x03\x10\x04\"\xf9\x01\n" +
 	"\x06Update\x12\x1f\n" +
 	"\vduration_ms\x18\x01 \x01(\x04R\n" +
-	"durationMs\x12)\n" +
-	"\x10processed_blocks\x18\x02 \x01(\x04R\x0fprocessedBlocks\x12(\n" +
+	"durationMs\x12'\n" +
+	"\x0fprogress_blocks\x18\x02 \x01(\x04R\x0eprogressBlocks\x12(\n" +
 	"\x10total_bytes_read\x18\x03 \x01(\x04R\x0etotalBytesRead\x12.\n" +
 	"\x13total_bytes_written\x18\x04 \x01(\x04R\x11totalBytesWritten\x12K\n" +
 	"\rmodules_stats\x18\x05 \x03(\v2&.sf.substreams.internal.v2.ModuleStatsR\fmodulesStats\"\xa3\x03\n" +
@@ -783,10 +776,10 @@ const file_sf_substreams_intern_v2_service_proto_rawDesc = "" +
 	"\x12ExternalCallMetric\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05count\x18\x02 \x01(\x04R\x05count\x12\x17\n" +
-	"\atime_ms\x18\x03 \x01(\x04R\x06timeMs\"\x7f\n" +
+	"\atime_ms\x18\x03 \x01(\x04R\x06timeMs\"\x95\x01\n" +
 	"\tCompleted\x12W\n" +
-	"\x14all_processed_ranges\x18\x01 \x03(\v2%.sf.substreams.internal.v2.BlockRangeR\x12allProcessedRanges\x12\x19\n" +
-	"\btrace_id\x18\x02 \x01(\tR\atraceId\"[\n" +
+	"\x14all_processed_ranges\x18\x01 \x03(\v2%.sf.substreams.internal.v2.BlockRangeR\x12allProcessedRanges\x12)\n" +
+	"\x10processed_blocks\x18\x03 \x01(\x04R\x0fprocessedBlocksJ\x04\b\x02\x10\x03\"[\n" +
 	"\x06Failed\x12\x16\n" +
 	"\x06reason\x18\x01 \x01(\tR\x06reason\x12\x12\n" +
 	"\x04logs\x18\x02 \x03(\tR\x04logs\x12%\n" +

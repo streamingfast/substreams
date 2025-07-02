@@ -177,6 +177,20 @@ func (c *Config) NewInstance() (out *Instance, err error) {
 		headers = make(map[string]string)
 	}
 
+	outputModules := c.DebugModulesOutput
+	if outputModules == nil {
+		usedModules, err := c.Graph.ModulesDownTo(c.OutputModule)
+		if err != nil {
+			return nil, fmt.Errorf("get used modules: %w", err)
+		}
+		for _, mod := range usedModules {
+			if strings.Contains(mod.Name, ":") {
+				continue
+			}
+			outputModules = append(outputModules, mod.Name)
+		}
+	}
+
 	req := &pbsubstreamsrpc.Request{
 		StartBlockNum:                       startBlock,
 		StartCursor:                         c.Cursor,
@@ -187,6 +201,7 @@ func (c *Config) NewInstance() (out *Instance, err error) {
 		ProductionMode:                      c.ProdMode,
 		DebugInitialStoreSnapshotForModules: c.DebugModulesInitialSnapshot,
 		LimitProcessedBlocks:                c.LimitProcessedBlocks,
+		DevOutputModules:                    outputModules,
 	}
 
 	c.Headers = headers.Append(c.Headers)

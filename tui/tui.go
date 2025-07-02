@@ -66,6 +66,7 @@ type TUI struct {
 	prog                    *tea.Program
 	seenFirstData           bool
 	TotalReadBytes          uint64
+	TotalProcessedBlocks    uint64
 	RequiredProcessedBlocks uint64
 	ResolvedStartBlock      uint64
 
@@ -247,9 +248,11 @@ func (ui *TUI) IncomingMessage(ctx context.Context, resp *pbsubstreamsrpc.Respon
 			return ui.jsonBlockScopedData(m.BlockScopedData.Output, m.BlockScopedData.DebugMapOutputs, m.BlockScopedData.DebugStoreOutputs, m.BlockScopedData.Clock)
 		}
 	case *pbsubstreamsrpc.Response_Progress:
+
 		if m.Progress.ProcessedBytes != nil {
 			ui.TotalReadBytes = m.Progress.ProcessedBytes.TotalBytesRead
 		}
+		ui.TotalProcessedBlocks = m.Progress.ProcessedBlocks
 
 		if !ui.seenFirstData {
 			if ui.outputMode == OutputModeTUI {

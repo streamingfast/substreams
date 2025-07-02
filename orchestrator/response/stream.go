@@ -19,13 +19,14 @@ func (s *Stream) BlockScopedData(in *pbsubstreamsrpc.BlockScopedData) error {
 	return s.respFunc(substreams.NewBlockScopedDataResponse(in))
 }
 
-func (s *Stream) SendModulesStats(stats []*pbsubstreamsrpc.ModuleStats, stages []*pbsubstreamsrpc.Stage, jobs []*pbsubstreamsrpc.Job, bytesRead, bytesWritten uint64) error {
+func (s *Stream) SendModulesStats(stats []*pbsubstreamsrpc.ModuleStats, stages []*pbsubstreamsrpc.Stage, jobs []*pbsubstreamsrpc.Job, bytesRead, bytesWritten, blocksProcessed uint64) error {
 	return s.respFunc(&pbsubstreamsrpc.Response{
 		Message: &pbsubstreamsrpc.Response_Progress{
 			Progress: &pbsubstreamsrpc.ModulesProgress{
-				ModulesStats: stats,
-				Stages:       stages,
-				RunningJobs:  jobs,
+				ModulesStats:    stats,
+				Stages:          stages,
+				RunningJobs:     jobs,
+				ProcessedBlocks: blocksProcessed,
 				ProcessedBytes: &pbsubstreamsrpc.ProcessedBytes{
 					TotalBytesRead:    bytesRead,
 					TotalBytesWritten: bytesWritten,

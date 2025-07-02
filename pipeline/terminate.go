@@ -60,6 +60,11 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, err error) error {
 		if err != nil {
 			logger.Error("returning internal module progress outputs", zap.Error(err))
 		}
+
+		err = p.returnInternalModuleComplete()
+		if err != nil {
+			logger.Error("returning internal module complete", zap.Error(err))
+		}
 	} else {
 		err := p.returnRPCModuleProgressOutputs(true)
 		if err != nil {

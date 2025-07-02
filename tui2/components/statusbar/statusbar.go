@@ -77,7 +77,7 @@ func (s *StatusBar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		var totalBackprocessedBlocks uint64
 		for _, j := range msg.RunningJobs {
-			totalBackprocessedBlocks += j.ProcessedBlocks
+			totalBackprocessedBlocks += j.ProgressBlocks
 		}
 		for _, stage := range msg.Stages {
 			for _, r := range stage.CompletedRanges {

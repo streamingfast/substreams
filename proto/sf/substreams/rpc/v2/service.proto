@@ -59,6 +59,16 @@ message Request {
   // If set, the engine will reject a request if the number of blocks to process (including preparing the stores) is above this limit.
   // Useful as a safeguard for managing costs
   uint64 limit_processed_blocks = 12;
+
+  // Available only in developer mode
+  // If set, the server will only send the output of these modules.
+  // If unset, all the outputs are sent.
+  // This allows the user to reduce the payload in dev mode, while still getting some extra debugging information
+  repeated string dev_output_modules = 13;
+
+  // Progress_messages_interval_ms is the interval between progress messages, in milliseconds (minimum: 500, default: start at 500ms and ramp up to 5000ms within 1min)
+  uint64 progress_messages_interval_ms = 14;
+
 }
 
 message Response {
@@ -176,6 +186,7 @@ message ModulesProgress {
   repeated Stage stages = 4;
 
   ProcessedBytes processed_bytes = 5;
+  uint64 processed_blocks = 6;
 }
 
 message ProcessedBytes {
@@ -196,7 +207,7 @@ message Job {
   uint32 stage = 1;
   uint64 start_block = 2;
   uint64 stop_block = 3;
-  uint64 processed_blocks = 4;
+  uint64 progress_blocks = 4;
   uint64 duration_ms = 5;
 }
 

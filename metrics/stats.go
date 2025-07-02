@@ -33,6 +33,7 @@ type Stats struct {
 	runningJobs             runningJobs
 	completedJobsStats      map[string]*pbssinternal.ModuleStats
 	uncompressedEgressBytes uint64
+	processedBlocks         uint64
 
 	localProcessedBlockCount  uint64
 	remoteProcessedBlockCount uint64
@@ -76,7 +77,7 @@ func cloneStats(in *pbssinternal.ModuleStats) *pbssinternal.ModuleStats {
 
 func (j runningJobs) blocksProcessed() (count uint64) {
 	for _, job := range j {
-		count += job.ProcessedBlocks
+		count += job.ProgressBlocks
 	}
 	return
 }
@@ -145,7 +146,7 @@ func (s *Stats) RecordJobUpdate(jobIdx uint64, upd *pbssinternal.Update) {
 	for _, modStatUpdate := range upd.ModulesStats {
 		job.modulesStats[modStatUpdate.Name] = modStatUpdate
 	}
-	job.ProcessedBlocks = upd.ProcessedBlocks
+	job.ProgressBlocks = upd.ProgressBlocks
 	job.DurationMs = upd.DurationMs
 	job.bytesRead = upd.TotalBytesRead
 	job.bytesWritten = upd.TotalBytesWritten
@@ -232,12 +233,24 @@ func (s *Stats) RecordInitializationComplete() {
 	s.initDuration = time.Since(s.startTime)
 }
 
-func (s *Stats) RecordDataSent(egressBytes int) {
+func (s *Stats) RecordEgress(egressBytes int) {
+	// this is always sent linearly, no need to lock
+	s.uncompressedEgressBytes += uint64(egressBytes)
+}
+
+func (s *Stats) RecordDataSent() {
 	// this is always sent linearly, no need to lock
 	if s.timeToFirstData == 0 {
 		s.timeToFirstData = time.Since(s.startTime)
 	}
-	s.uncompressedEgressBytes += uint64(egressBytes)
+}
+
+func (s *Stats) RecordBlocksProcessed(count uint64) {
+	s.processedBlocks += count
+}
+
+func (s *Stats) GetBlocksProcessed() uint64 {
+	return s.processedBlocks
 }
 
 func (s *Stats) RecordStages(stages []*pbsubstreamsrpc.Stage) {
@@ -261,11 +274,11 @@ func (s *Stats) RecordNewSubrequest(stage uint32, startBlock, stopBlock uint64) 
 	s.runningJobs[id] = &extendedJob{
 		start: time.Now(),
 		Job: &pbsubstreamsrpc.Job{
-			Stage:           stage,
-			StartBlock:      startBlock,
-			StopBlock:       stopBlock,
-			ProcessedBlocks: 0,
-			DurationMs:      0,
+			Stage:          stage,
+			StartBlock:     startBlock,
+			StopBlock:      stopBlock,
+			ProgressBlocks: 0,
+			DurationMs:     0,
 		},
 		modulesStats: make(map[string]*pbssinternal.ModuleStats),
 	}
@@ -324,7 +337,7 @@ func (s *Stats) RecordEndSubrequest(jobIdx uint64, status JobStatus) {
 			if _, ok := s.modulesStats[mod]; !ok {
 				s.modulesStats[mod] = newExtendedStats(mod)
 			}
-			s.modulesStats[mod].processedBlocksInCompleteJobs += job.ProcessedBlocks
+			s.modulesStats[mod].processedBlocksInCompleteJobs += job.ProgressBlocks
 		}
 	}
 
@@ -347,7 +360,7 @@ func (s *Stats) RecordEndSubrequest(jobIdx uint64, status JobStatus) {
 	case JobFailed:
 		s.failedJobs++
 	}
-	s.remoteProcessedBlockCount += job.ProcessedBlocks
+	s.remoteProcessedBlockCount += job.ProgressBlocks
 
 	delete(s.runningJobs, jobIdx)
 }
@@ -483,11 +496,11 @@ func (s *Stats) JobsStats() []*pbsubstreamsrpc.Job {
 	i := 0
 	for _, v := range s.runningJobs {
 		out[i] = &pbsubstreamsrpc.Job{
-			Stage:           v.Stage,
-			StartBlock:      v.StartBlock,
-			StopBlock:       v.StopBlock,
-			ProcessedBlocks: v.ProcessedBlocks,
-			DurationMs:      uint64(time.Since(v.start).Milliseconds()),
+			Stage:          v.Stage,
+			StartBlock:     v.StartBlock,
+			StopBlock:      v.StopBlock,
+			ProgressBlocks: v.ProgressBlocks,
+			DurationMs:     uint64(time.Since(v.start).Milliseconds()),
 		}
 		i++
 	}
@@ -701,7 +714,8 @@ func (s *Stats) getZapFields(meter dmetering.Meter) []zap.Field {
 		zap.Uint64("remote_jobs_incomplete", s.startedJobs-s.completedJobs-s.failedJobs), // either canceled or not returned yet (will be definitely be canceled soon!)
 		zap.Uint64("remote_jobs_retried", s.retriedJobs),
 		zap.Uint64("remote_jobs_delayed", s.delayedJobs),
-		zap.Uint64("remote_blocks_processed", s.remoteProcessedBlockCount),
+		zap.Uint64("remote_blocks_processed", s.remoteProcessedBlockCount), // "estimated" from remote ranges
+		zap.Uint64("total_blocks_processed", s.processedBlocks),            // includes remote and local blocks processed in this request, multiplied by execution stages, excludes blocks that were skipped from indexes
 		zap.Uint64("uncompressed_egress_bytes", s.uncompressedEgressBytes),
 		zap.String("error", errorText),
 	}

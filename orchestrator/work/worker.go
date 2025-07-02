@@ -359,6 +359,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 
 			case *pbssinternal.ProcessRangeResponse_Completed:
 				logger.Debug("worker done")
+				stats.RecordBlocksProcessed(r.Completed.ProcessedBlocks) // add workers' processed blocks count to our own stats
 				return &Result{
 					PartialFilesWritten: toRPCPartialFiles(r.Completed),
 				}

@@ -1,6 +1,7 @@
 package wasm
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/big"
@@ -9,6 +10,7 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/shopspring/decimal"
 
+	"github.com/streamingfast/substreams/client/fstore"
 	"github.com/streamingfast/substreams/metrics"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage/store"
@@ -25,6 +27,8 @@ type Call struct {
 	outputStore  store.Store
 	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy
 
+	fstoreReader fstore.FoundationalReader
+
 	valueType string
 
 	returnValue        []byte
@@ -38,13 +42,14 @@ type Call struct {
 	stats          *metrics.Stats
 }
 
-func NewCall(clock *pbsubstreams.Clock, moduleName string, entrypoint string, stats *metrics.Stats, arguments []Argument, canSkipEmptyOutput bool) *Call {
+func NewCall(clock *pbsubstreams.Clock, moduleName string, entrypoint string, stats *metrics.Stats, arguments []Argument, canSkipEmptyOutput bool, foundationalStoreReader fstore.FoundationalReader) *Call {
 	call := &Call{
 		Clock:              clock,
 		ModuleName:         moduleName,
 		Entrypoint:         entrypoint,
 		stats:              stats,
 		canSkipEmptyOutput: canSkipEmptyOutput,
+		fstoreReader:       foundationalStoreReader,
 	}
 
 	for _, input := range arguments {
@@ -301,6 +306,22 @@ func (c *Call) DoHasLast(storeIndex int, key string) (found bool) {
 	c.validateStoreIndex(storeIndex, "has_last")
 	readStore := c.inputStores[storeIndex]
 	return readStore.HasLast(key)
+}
+
+func (c *Call) DoFStoreGet(block uint64, key []byte) (val []byte, found bool) {
+	if c.fstoreReader == nil {
+		return nil, false
+	}
+	val, ok, _ := c.fstoreReader.Get(context.Background(), key, block)
+	return val, ok
+}
+
+func (c *Call) DoFStoreGetAll(block uint64, keys [][]byte) map[string][]byte {
+	if c.fstoreReader == nil {
+		return nil
+	}
+	vals, _ := c.fstoreReader.GetAll(context.Background(), keys, block)
+	return vals
 }
 
 func (c *Call) validateStoreIndex(storeIndex int, stateFunc string) {

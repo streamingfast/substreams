@@ -158,6 +158,8 @@ func inputName(input *pbsubstreams.Module_Input) (string, error) {
 		return "map", nil
 	case *pbsubstreams.Module_Input_Params_:
 		return "params", nil
+	case *pbsubstreams.Module_Input_FoundationalStore:
+		return "foundational-store", nil
 	default:
 		return "", fmt.Errorf("invalid input %T", input.Input)
 	}
@@ -173,6 +175,8 @@ func inputValue(input *pbsubstreams.Module_Input) (string, error) {
 		return "", nil // this is accounted for in the `AncestorOf()` tree
 	case *pbsubstreams.Module_Input_Map_:
 		return "", nil // this is accounted for in the `AncestorOf()` tree
+	case *pbsubstreams.Module_Input_FoundationalStore:
+		return input.GetFoundationalStore().GetEndpoint(), nil
 	default:
 		return "", fmt.Errorf("invalid input %T", input.Input)
 	}

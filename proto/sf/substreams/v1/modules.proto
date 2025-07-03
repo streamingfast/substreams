@@ -83,12 +83,17 @@ message Module {
     string output_type = 1;
   }
 
+  message FoundationalStore {
+    string endpoint = 1;
+  }
+
   message Input {
     oneof input {
       Source source = 1;
       Map map = 2;
       Store store = 3;
       Params params = 4;
+      FoundationalStore foundational_store = 5;
     }
 
     message Source {

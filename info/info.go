@@ -177,6 +177,9 @@ func Basic(pkg *pbsubstreams.Package, graph *manifest.ModuleGraph) (*BasicInfo, 
 			case *pbsubstreams.Module_Input_Params_:
 				inputInfo.Type = "params"
 				inputInfo.Name = input.GetParams().Value
+			case *pbsubstreams.Module_Input_FoundationalStore:
+				inputInfo.Type = "foundational-store"
+				inputInfo.Name = v.FoundationalStore.Endpoint
 			default:
 				inputInfo.Type = "unknown"
 				inputInfo.Name = "unknown"

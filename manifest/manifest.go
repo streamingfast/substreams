@@ -124,10 +124,11 @@ type BlockFilterQuery struct {
 }
 
 type Input struct {
-	Source string `yaml:"source,omitempty"`
-	Store  string `yaml:"store,omitempty"`
-	Map    string `yaml:"map,omitempty"`
-	Params string `yaml:"params,omitempty"`
+	Source            string `yaml:"source,omitempty"`
+	Store             string `yaml:"store,omitempty"`
+	Map               string `yaml:"map,omitempty"`
+	Params            string `yaml:"params,omitempty"`
+	FoundationalStore string `yaml:"foundational-store,omitempty"`
 
 	Mode string `yaml:"mode,omitempty"`
 }
@@ -183,6 +184,10 @@ func (i *Input) IsParams() bool {
 	return i.Params != "" && i.Source == "" && i.Map == "" && i.Store == ""
 }
 
+func (i *Input) IsFoundationalStore() bool {
+	return i.FoundationalStore != "" && i.Source == "" && i.Map == "" && i.Store == "" && i.Params == ""
+}
+
 func (i *Input) parse() error {
 	if i.IsMap() {
 		//i.Name = fmt.Sprintf("map:%s", i.Map)
@@ -204,6 +209,9 @@ func (i *Input) parse() error {
 		if i.Params != "string" {
 			return fmt.Errorf("input 'params': 'string' is the only acceptable value here; specify the parameter's value under the top-level 'params' mapping")
 		}
+		return nil
+	}
+	if i.IsFoundationalStore() {
 		return nil
 	}
 	return fmt.Errorf("input has an unknown or mixed types; expect one, and only one of: 'params', 'map', 'store' or 'source'")
@@ -402,6 +410,18 @@ func (m *Module) setInputsToProto(pbModule *pbsubstreams.Module) error {
 				Input: &pbsubstreams.Module_Input_Params_{
 					Params: &pbsubstreams.Module_Input_Params{
 						Value: "",
+					},
+				},
+			}
+			pbModule.Inputs = append(pbModule.Inputs, pbInput)
+			continue
+		}
+
+		if input.FoundationalStore != "" {
+			pbInput := &pbsubstreams.Module_Input{
+				Input: &pbsubstreams.Module_Input_FoundationalStore{
+					FoundationalStore: &pbsubstreams.Module_FoundationalStore{
+						Endpoint: input.FoundationalStore,
 					},
 				},
 			}

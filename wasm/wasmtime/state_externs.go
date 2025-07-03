@@ -153,6 +153,19 @@ func (i *instance) hasLast(storeIndex int32, keyPtr, keyLength int32) int32 {
 	return returnIfFound(found)
 }
 
+func (i *instance) fstoreGet(fsIndex int32, blockNum int64, keyPtr, keyLen, outputPtr int32) int32 {
+	key := i.Heap.ReadBytes(keyPtr, keyLen)
+	val, found := i.CurrentCall.DoFStoreGet(uint64(blockNum), key)
+	return writeToHeapIfFound(i, outputPtr, val, found)
+}
+
+// TODO: Implement real function
+func (i *instance) fstoreGetAll(fsIndex int32, blockNum int64, keyPtr, keyLen, outputPtr int32) int32 {
+	key := i.Heap.ReadBytes(keyPtr, keyLen)
+	val, found := i.CurrentCall.DoFStoreGet(uint64(blockNum), key)
+	return writeToHeapIfFound(i, outputPtr, val, found)
+}
+
 func writeToHeapIfFound(i *instance, outputPtr int32, value []byte, found bool) int32 {
 	if !found {
 		return 0

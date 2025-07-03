@@ -352,7 +352,7 @@ func computeStages(mods []*pbsubstreams.Module, initBlocks map[string]uint64) (s
 						validInputsAtInitialBlock = true // special case where a module has only params as input, to extract the clock
 					}
 					continue
-				case *pbsubstreams.Module_Input_Source_:
+				case *pbsubstreams.Module_Input_Source_, *pbsubstreams.Module_Input_FoundationalStore:
 					validInputsAtInitialBlock = true
 					continue
 				case *pbsubstreams.Module_Input_Map_:

@@ -774,6 +774,9 @@ func duplicateStringInput(in *pbsubstreams.Module_Input) string {
 		return fmt.Sprintf("store: %s, mode: %s", put.Store.ModuleName, strings.ToLower(put.Store.Mode.String()))
 	case *pbsubstreams.Module_Input_Params_:
 		return "params"
+	case *pbsubstreams.Module_Input_FoundationalStore:
+		return fmt.Sprintf("foundational-store: %s", put.FoundationalStore.Endpoint)
+
 	default:
 		return ""
 	}
@@ -1032,6 +1035,7 @@ func prefixModules(mods []*pbsubstreams.Module, prefix string) {
 			case *pbsubstreams.Module_Input_Map_:
 				input.Map.ModuleName = withPrefix(input.Map.ModuleName, prefix)
 			case *pbsubstreams.Module_Input_Params_:
+			case *pbsubstreams.Module_Input_FoundationalStore:
 			default:
 				panic(fmt.Sprintf("module %q: input index %d: unsupported module input type %s", mod.Name, idx, inputIface.Input))
 			}

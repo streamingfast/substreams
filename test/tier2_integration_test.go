@@ -57,6 +57,9 @@ func TestTier2Call(t *testing.T) {
 	mapHybridInputBlock70 := hex.EncodeToString([]byte("map_hybrid_input_block_70"))
 	setSumStoreInit0 := hex.EncodeToString([]byte("set_sum_store_init_0"))
 
+	// foundationMapHash := hex.EncodeToString([]byte("foundation_map"))
+	// foundationStoreHash := hex.EncodeToString([]byte("foundational_store"))
+
 	randomIndicesRange := roaring64.New()
 	randomIndicesRange.AddInt(70)
 	randomIndicesRange.AddInt(71)

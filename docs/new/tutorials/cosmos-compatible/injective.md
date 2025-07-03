@@ -19,7 +19,7 @@ In this guide, you'll learn how to initialize a Injective-based Substreams proje
 2. Running `substreams init` will give you the option to choose between two Injective project options. Select the one that best fits your requirements:
     - **Injective-minimal**: Creates a simple Substreams that extracts raw Injective block data and generates corresponding Rust code. This path will start you with the full raw block, you can navigate to the `substreams.yaml` (the manifest) to modify the input.
     - **Injective-events**: Creates a Substreams that extracts Injective events using the cached [Injective Foundational Module](https://substreams.dev/packages/injective-common/v0.2.4), filtered by one or more smart contract addresses. This includes type `wasm` events.
-
+    - **Injective EVM**: Navigate to the `substreams init` [EVM path](../evm.md) to access Injective EVM specific data. Supports [Extended Blocks](../../references/chains-and-endpoints.md).
 {% hint style="info" %} 
 Tip: Have the start block of your transaction or specific events ready. 
 {% endhint %}

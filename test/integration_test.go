@@ -662,7 +662,7 @@ func partialPreWork(t *testing.T, start uint64, stageIdx int, run *testRun, work
 	unit := stage.Unit{Segment: segmenter.IndexForStartBlock(start), Stage: stageIdx}
 	ctx = reqctx.WithRequest(run.Context, &reqctx.RequestDetails{Modules: run.Package.Modules, OutputModule: run.ModuleName})
 	ctx = metering.WithMetricsSender(ctx)
-	cmd := worker.Work(ctx, unit, start, []string{run.ModuleName}, nil)
+	cmd := worker.Work(ctx, unit, start, []string{run.ModuleName}, nil, false)
 	result := cmd()
 	msg, ok := result.(work.MsgJobSucceeded)
 	require.True(t, ok)

@@ -280,17 +280,28 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 		}
 		p.pendingUndoMessage = nil
 
-		// LIVE and DEV mode always receive module data outputs, even when they are empty
-		// so they can follow progress (and dev also gets debug output...)
-		mapModuleOutput := p.mapModuleOutput
-		if mapModuleOutput == nil && !reqDetails.IsTier2Request {
-			mapModuleOutput = &pbsubstreamsrpc.MapModuleOutput{
-				Name:      reqDetails.OutputModule,
-				MapOutput: &anypb.Any{},
+		if reqDetails.IsTier2Request {
+			if out := p.mapModuleOutput.GetMapOutput(); out != nil {
+				skippable := p.mapModuleOutputSkippable && len(out.Value) == 0
+				if !skippable {
+					if err = returnTier2DataOutputs(clock, out, p.respFunc); err != nil {
+						return fmt.Errorf("failed to return module data output: %w", err)
+					}
+				}
 			}
-		}
-		if err = returnModuleDataOutputs(clock, cursor, mapModuleOutput, p.extraMapModuleOutputs, p.extraStoreModuleOutputs, p.respFunc, logger); err != nil {
-			return fmt.Errorf("failed to return module data output: %w", err)
+		} else {
+			// LIVE and DEV mode always receive module data outputs, even when they are empty
+			// so they can follow progress (and dev also gets debug output...)
+			mapModuleOutput := p.mapModuleOutput
+			if mapModuleOutput == nil {
+				mapModuleOutput = &pbsubstreamsrpc.MapModuleOutput{
+					Name:      reqDetails.OutputModule,
+					MapOutput: &anypb.Any{},
+				}
+			}
+			if err = returnModuleDataOutputs(clock, cursor, mapModuleOutput, p.extraMapModuleOutputs, p.extraStoreModuleOutputs, p.respFunc, logger); err != nil {
+				return fmt.Errorf("failed to return module data output: %w", err)
+			}
 		}
 	}
 
@@ -472,7 +483,7 @@ func (p *Pipeline) applyExecutionResult(ctx context.Context, executor exec.Modul
 	}
 
 	if executor.HasValidOutput() {
-		p.saveModuleOutput(moduleOutput, executor.Name(), reqctx.Details(ctx).ProductionMode)
+		p.saveModuleOutput(moduleOutput, executor.Name(), reqctx.Details(ctx).ProductionMode, res.skipped_output)
 	}
 
 	skip_output := res.skipped_output
@@ -496,9 +507,10 @@ func (p *Pipeline) applyExecutionResult(ctx context.Context, executor exec.Modul
 }
 
 // this will be sent to the requestor
-func (p *Pipeline) saveModuleOutput(output *pbssinternal.ModuleOutput, moduleName string, isProduction bool) {
+func (p *Pipeline) saveModuleOutput(output *pbssinternal.ModuleOutput, moduleName string, isProduction bool, skippable bool) {
 	if p.isOutputModule(moduleName) {
 		p.mapModuleOutput = toRPCMapModuleOutputs(output)
+		p.mapModuleOutputSkippable = skippable
 		return
 	}
 	if isProduction {

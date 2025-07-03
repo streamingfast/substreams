@@ -30,6 +30,7 @@ import (
 	"github.com/streamingfast/substreams/wasm"
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type processingModule struct {
@@ -58,7 +59,9 @@ type Pipeline struct {
 	StagedModuleExecutors [][]exec.ModuleExecutor
 	executionStages       exec.ExecutionStages
 
-	mapModuleOutput         *pbsubstreamsrpc.MapModuleOutput
+	mapModuleOutput          *pbsubstreamsrpc.MapModuleOutput
+	mapModuleOutputSkippable bool
+
 	extraMapModuleOutputs   []*pbsubstreamsrpc.MapModuleOutput
 	extraStoreModuleOutputs []*pbsubstreamsrpc.StoreModuleOutput
 	preexistingBlockIndices map[string]map[string]*roaring64.Bitmap
@@ -797,6 +800,24 @@ func returnModuleDataOutputs(
 	}
 
 	if err := respFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {
+		return fmt.Errorf("calling return func: %w", err)
+	}
+
+	return nil
+}
+
+func returnTier2DataOutputs(
+	clock *pbsubstreams.Clock,
+	data *anypb.Any,
+	respFunc substreams.ResponseFunc,
+) error {
+
+	out := &pbssinternal.BlockScopedData{
+		Clock:  clock,
+		Output: data,
+	}
+
+	if err := respFunc(substreams.NewBlockScopedDataInternResponse(out)); err != nil {
 		return fmt.Errorf("calling return func: %w", err)
 	}
 

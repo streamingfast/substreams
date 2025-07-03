@@ -65,7 +65,7 @@ func (l *LiveBackFiller) ProcessBlock(blk *pbbstream.Block, obj interface{}) (er
 }
 
 func RequestBackProcessing(ctx context.Context, logger *zap.Logger, startBlock uint64, stageToProcess int, clientFactory client.InternalClientFactory, jobResult chan error) {
-	liveBackFillerRequest := work.NewRequest(ctx, reqctx.Details(ctx), stageToProcess, startBlock)
+	liveBackFillerRequest := work.NewRequest(ctx, reqctx.Details(ctx), stageToProcess, startBlock, false)
 
 	err := derr.RetryContext(ctx, backfillRetries, func(ctx context.Context) error {
 		err := requestBackProcessing(ctx, logger, liveBackFillerRequest, clientFactory)

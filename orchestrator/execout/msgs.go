@@ -11,6 +11,10 @@ type MsgDownloadSegment struct {
 	Wait time.Duration
 }
 
+type MsgWaitFirstSegmentStreamed struct {
+	loop.IsMsg
+}
+
 type MsgFileDownloaded struct{ loop.IsMsg }
 type MsgFileNotPresent struct {
 	loop.IsMsg
@@ -29,4 +33,8 @@ func CmdDownloadSegment(wait time.Duration) loop.Cmd {
 	return func() loop.Msg {
 		return MsgDownloadSegment{Wait: wait}
 	}
+}
+
+func CmdWaitFirstSegmentStreamed(wait time.Duration) loop.Cmd {
+	return loop.Tick(wait, MsgWaitFirstSegmentStreamed{})
 }

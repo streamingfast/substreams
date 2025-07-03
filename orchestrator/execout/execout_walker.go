@@ -96,9 +96,9 @@ func computeNewWait(previousWait time.Duration, storeIsLocal bool) time.Duration
 		return 50 * time.Millisecond
 	}
 	if previousWait == 0 {
-		return 500 * time.Millisecond
+		return 250 * time.Millisecond
 	}
-	newWait := previousWait + 250*time.Millisecond
+	newWait := previousWait + 50*time.Millisecond
 	if newWait > 2*time.Second {
 		return 2 * time.Second
 	}

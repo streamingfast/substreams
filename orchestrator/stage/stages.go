@@ -146,6 +146,20 @@ func (s *Stages) OutputModuleIsIndex() bool {
 	return s.outputModuleIsIndex
 }
 
+func (s *Stages) IsFirstMapperJob(segment, stage int) bool {
+	if s.mapSegmenter == nil || stage != len(s.stages)-1 {
+		return false
+	}
+	return s.mapSegmenter.FirstIndex() == segment
+}
+
+func (s *Stages) FirstMapperSegmentRequiresProcessing() bool {
+	return s.getState(Unit{
+		Segment: s.mapSegmenter.FirstIndex(),
+		Stage:   len(s.stages) - 1,
+	}) == UnitPending
+}
+
 func (s *Stages) LastStageCompleted() bool {
 	lastSegment := s.mapSegmenter.LastIndex()
 

@@ -30,9 +30,10 @@ type RequestDetails struct {
 	UpdateInterval                time.Duration
 	UniqueID                      uint64
 
-	ProductionMode bool
-	IsTier2Request bool
-	Tier2Stage     int
+	ProductionMode   bool
+	IsTier2Request   bool
+	IsStreamingTier2 bool // special mode where tier2 will stream the data back to tier1, for the first segment
+	Tier2Stage       int
 }
 
 func (d *RequestDetails) AssertProcessedBlocksLimit(requiredBlocksStore, requiredBlocksRange uint64) error {

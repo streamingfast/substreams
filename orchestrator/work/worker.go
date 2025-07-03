@@ -10,9 +10,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
+	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dgrpc"
@@ -22,6 +22,7 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/response"
 	"github.com/streamingfast/substreams/orchestrator/stage"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
 	pbworker "github.com/streamingfast/worker-pool-protocol/pb/sf/worker/v1"
@@ -44,37 +45,9 @@ type Result struct {
 
 type Worker interface {
 	ID() string
-	Work(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream) loop.Cmd // *Result
+	Work(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream, streamOutput bool) loop.Cmd // *Result
 	StartKeepAlive(ctx context.Context, delay time.Duration, remoteWorkerPoolClient pbworker.WorkerPoolClient)
 	StopKeepAlive()
-}
-
-func NewWorkerFactoryFromFunc(f func(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream) loop.Cmd) *SimpleWorkerFactory {
-	return &SimpleWorkerFactory{
-		f:  f,
-		id: atomic.AddUint64(&lastWorkerID, 1),
-	}
-}
-
-type SimpleWorkerFactory struct {
-	f  func(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream) loop.Cmd
-	id uint64
-}
-
-func (f SimpleWorkerFactory) StartKeepAlive(ctx context.Context, delay time.Duration, remoteWorkerPoolClient pbworker.WorkerPoolClient) {
-	//noop
-}
-
-func (f SimpleWorkerFactory) StopKeepAlive() {
-	//noop
-}
-
-func (f SimpleWorkerFactory) Work(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream) loop.Cmd {
-	return f.f(ctx, unit, startBlock, moduleNames, upstream)
-}
-
-func (f SimpleWorkerFactory) ID() string {
-	return fmt.Sprintf("%d", f.id)
 }
 
 type RemoteWorker struct {
@@ -102,7 +75,7 @@ func (w *RemoteWorker) ID() string {
 	return w.id
 }
 
-func NewRequest(ctx context.Context, req *reqctx.RequestDetails, stageIndex int, startBlock uint64) *pbssinternal.ProcessRangeRequest {
+func NewRequest(ctx context.Context, req *reqctx.RequestDetails, stageIndex int, startBlock uint64, streamOutput bool) *pbssinternal.ProcessRangeRequest {
 	tier2ReqParams, ok := reqctx.GetTier2RequestParameters(ctx)
 	if !ok {
 		panic("unable to get tier2 request parameters")
@@ -124,6 +97,7 @@ func NewRequest(ctx context.Context, req *reqctx.RequestDetails, stageIndex int,
 		WasmExtensionConfigs: tier2ReqParams.WASMModules,
 		BlockType:            tier2ReqParams.BlockType,
 		ProductionMode:       req.ProductionMode,
+		StreamOutput:         streamOutput,
 	}
 }
 
@@ -144,8 +118,8 @@ func init() {
 	}
 }
 
-func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream) loop.Cmd {
-	request := NewRequest(ctx, reqctx.Details(ctx), unit.Stage, startBlock)
+func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream, streamOutput bool) loop.Cmd {
+	request := NewRequest(ctx, reqctx.Details(ctx), unit.Stage, startBlock, streamOutput)
 	logger := reqctx.Logger(ctx)
 
 	return func() loop.Msg {
@@ -262,8 +236,9 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 			zap.Float64("processing_time_per_block", timeTook.Seconds()/float64(request.SegmentSize)),
 		)
 		return MsgJobSucceeded{
-			Unit:   unit,
-			Worker: w,
+			Unit:     unit,
+			Worker:   w,
+			Streamed: streamOutput,
 		}
 	}
 }
@@ -362,6 +337,30 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 				stats.RecordBlocksProcessed(r.Completed.ProcessedBlocks) // add workers' processed blocks count to our own stats
 				return &Result{
 					PartialFilesWritten: toRPCPartialFiles(r.Completed),
+				}
+
+			case *pbssinternal.ProcessRangeResponse_BlockScopedData:
+				clock := r.BlockScopedData.Clock
+				details := reqctx.Details(ctx)
+				if clock.Number >= details.ResolvedStartBlockNum && clock.Number < details.StopBlockNum {
+
+					blockRef := bstream.NewBlockRef(clock.Id, clock.Number)
+					cursor := bstream.Cursor{
+						Step:      bstream.StepNewIrreversible,
+						Block:     blockRef,
+						LIB:       blockRef,
+						HeadBlock: blockRef,
+					}
+
+					upstream.BlockScopedData(&pbsubstreamsrpc.BlockScopedData{
+						Output: &pbsubstreamsrpc.MapModuleOutput{
+							Name:      details.OutputModule,
+							MapOutput: r.BlockScopedData.Output,
+						},
+						Clock:            clock,
+						FinalBlockHeight: r.BlockScopedData.Clock.Number,
+						Cursor:           cursor.ToOpaque(),
+					})
 				}
 			}
 		}

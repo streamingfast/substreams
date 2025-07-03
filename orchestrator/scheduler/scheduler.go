@@ -27,9 +27,11 @@ type Scheduler struct {
 
 	stream *response.Stream
 
-	Stages        *stage.Stages
-	WorkerPool    work.WorkerPool
-	ExecOutWalker *execout.Walker
+	Stages                      *stage.Stages
+	WorkerPool                  work.WorkerPool
+	ExecOutWalker               *execout.Walker
+	StreamFirstSegmentFromTier2 bool
+	firstSegmentStreamed        bool
 
 	logger *zap.Logger
 
@@ -55,7 +57,9 @@ func New(ctx context.Context, stream *response.Stream) *Scheduler {
 func (s *Scheduler) Init() loop.Cmd {
 	var cmds []loop.Cmd
 
-	if s.ExecOutWalker != nil {
+	if s.StreamFirstSegmentFromTier2 {
+		cmds = append(cmds, execout.CmdWaitFirstSegmentStreamed(250*time.Millisecond))
+	} else if s.ExecOutWalker != nil {
 		cmds = append(cmds, execout.CmdDownloadSegment(0))
 	} else {
 		// This hides the fact that there _was no_ Walker. Could cause
@@ -90,6 +94,9 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 	case work.MsgJobSucceeded:
 		shadowedUnits := s.Stages.MarkJobSuccess(msg.Unit)
 		s.WorkerPool.Return(s.ctx, msg.Worker)
+		if msg.Streamed {
+			s.firstSegmentStreamed = true
+		}
 
 		tryMerge := s.Stages.CmdTryMerge(msg.Unit.Stage)
 		if shadowedUnits == nil {
@@ -108,7 +115,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		cmds = append(cmds,
 			work.CmdScheduleNextJob("job succeeded"),
 		)
-		if s.ExecOutWalker != nil {
+		if s.ExecOutWalker != nil && (s.firstSegmentStreamed || !s.StreamFirstSegmentFromTier2) {
 			cmds = append(cmds, execout.CmdDownloadSegment(0))
 		}
 
@@ -185,8 +192,10 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		s.logger.Debug("worker borrowed, scheduling work", zap.String("worker_id", worker.ID()), zap.Object("unit", workUnit))
 		modules := s.Stages.StageModules(workUnit.Stage)
 
+		streamOutput := s.Stages.IsFirstMapperJob(workUnit.Segment, workUnit.Stage)
+
 		return loop.Batch(
-			worker.Work(s.ctx, workUnit, workRange.StartBlock, modules, s.stream),
+			worker.Work(s.ctx, workUnit, workRange.StartBlock, modules, s.stream, streamOutput),
 			work.CmdScheduleNextJob("scheduler next job"),
 		)
 
@@ -223,6 +232,13 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		s.ExecOutWalker.NextSegment()
 		s.ExecOutWalker.MarkNotWorking()
 		cmds = append(cmds, execout.CmdDownloadSegment(0))
+
+	case execout.MsgWaitFirstSegmentStreamed:
+		if s.firstSegmentStreamed {
+			return execout.CmdDownloadSegment(0)
+		}
+
+		return execout.CmdWaitFirstSegmentStreamed(250 * time.Millisecond)
 
 	case execout.MsgDownloadSegment:
 		if s.ExecOutWalker == nil {

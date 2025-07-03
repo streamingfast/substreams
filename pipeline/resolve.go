@@ -109,6 +109,7 @@ func BuildRequestDetailsFromSubrequest(ctx context.Context, request *pbssinterna
 		LinearHandoffBlockNum: request.StopBlock(),
 		ResolvedStartBlockNum: request.StartBlock(),
 		UniqueID:              nextUniqueID(),
+		IsStreamingTier2:      request.StreamOutput,
 	}
 
 	req.SetStageLayerParallelExecutorCountFromContext(ctx)

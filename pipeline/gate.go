@@ -18,7 +18,7 @@ type gate struct {
 func newGate(ctx context.Context) *gate {
 	reqDetails := reqctx.Details(ctx)
 	return &gate{
-		disabled:      reqDetails.IsTier2Request,
+		disabled:      reqDetails.IsTier2Request && !reqDetails.IsStreamingTier2, // streamingTier2 needs the gate to say 'shouldSendOutputs'
 		startBlockNum: reqDetails.LinearGateBlockNum,
 	}
 }

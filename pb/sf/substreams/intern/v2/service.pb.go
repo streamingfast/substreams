@@ -10,7 +10,7 @@ import (
 	v1 "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	_ "google.golang.org/protobuf/types/known/anypb"
+	anypb "google.golang.org/protobuf/types/known/anypb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -90,6 +90,7 @@ type ProcessRangeRequest struct {
 	// It's possible to have tier2 requests in development mode, for example if the Substreams
 	// needs to back process stores while in development mode.
 	ProductionMode bool `protobuf:"varint,16,opt,name=production_mode,json=productionMode,proto3" json:"production_mode,omitempty"`
+	StreamOutput   bool `protobuf:"varint,17,opt,name=stream_output,json=streamOutput,proto3" json:"stream_output,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -223,6 +224,13 @@ func (x *ProcessRangeRequest) GetProductionMode() bool {
 	return false
 }
 
+func (x *ProcessRangeRequest) GetStreamOutput() bool {
+	if x != nil {
+		return x.StreamOutput
+	}
+	return false
+}
+
 type ProcessRangeResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Type:
@@ -230,6 +238,7 @@ type ProcessRangeResponse struct {
 	//	*ProcessRangeResponse_Failed
 	//	*ProcessRangeResponse_Completed
 	//	*ProcessRangeResponse_Update
+	//	*ProcessRangeResponse_BlockScopedData
 	Type          isProcessRangeResponse_Type `protobuf_oneof:"type"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -299,6 +308,15 @@ func (x *ProcessRangeResponse) GetUpdate() *Update {
 	return nil
 }
 
+func (x *ProcessRangeResponse) GetBlockScopedData() *BlockScopedData {
+	if x != nil {
+		if x, ok := x.Type.(*ProcessRangeResponse_BlockScopedData); ok {
+			return x.BlockScopedData
+		}
+	}
+	return nil
+}
+
 type isProcessRangeResponse_Type interface {
 	isProcessRangeResponse_Type()
 }
@@ -315,11 +333,69 @@ type ProcessRangeResponse_Update struct {
 	Update *Update `protobuf:"bytes,6,opt,name=update,proto3,oneof"`
 }
 
+type ProcessRangeResponse_BlockScopedData struct {
+	BlockScopedData *BlockScopedData `protobuf:"bytes,7,opt,name=block_scoped_data,json=blockScopedData,proto3,oneof"`
+}
+
 func (*ProcessRangeResponse_Failed) isProcessRangeResponse_Type() {}
 
 func (*ProcessRangeResponse_Completed) isProcessRangeResponse_Type() {}
 
 func (*ProcessRangeResponse_Update) isProcessRangeResponse_Type() {}
+
+func (*ProcessRangeResponse_BlockScopedData) isProcessRangeResponse_Type() {}
+
+type BlockScopedData struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Output        *anypb.Any             `protobuf:"bytes,1,opt,name=output,proto3" json:"output,omitempty"`
+	Clock         *v1.Clock              `protobuf:"bytes,2,opt,name=clock,proto3" json:"clock,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BlockScopedData) Reset() {
+	*x = BlockScopedData{}
+	mi := &file_sf_substreams_intern_v2_service_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BlockScopedData) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BlockScopedData) ProtoMessage() {}
+
+func (x *BlockScopedData) ProtoReflect() protoreflect.Message {
+	mi := &file_sf_substreams_intern_v2_service_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BlockScopedData.ProtoReflect.Descriptor instead.
+func (*BlockScopedData) Descriptor() ([]byte, []int) {
+	return file_sf_substreams_intern_v2_service_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *BlockScopedData) GetOutput() *anypb.Any {
+	if x != nil {
+		return x.Output
+	}
+	return nil
+}
+
+func (x *BlockScopedData) GetClock() *v1.Clock {
+	if x != nil {
+		return x.Clock
+	}
+	return nil
+}
 
 type Update struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
@@ -334,7 +410,7 @@ type Update struct {
 
 func (x *Update) Reset() {
 	*x = Update{}
-	mi := &file_sf_substreams_intern_v2_service_proto_msgTypes[2]
+	mi := &file_sf_substreams_intern_v2_service_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -346,7 +422,7 @@ func (x *Update) String() string {
 func (*Update) ProtoMessage() {}
 
 func (x *Update) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_substreams_intern_v2_service_proto_msgTypes[2]
+	mi := &file_sf_substreams_intern_v2_service_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -359,7 +435,7 @@ func (x *Update) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Update.ProtoReflect.Descriptor instead.
 func (*Update) Descriptor() ([]byte, []int) {
-	return file_sf_substreams_intern_v2_service_proto_rawDescGZIP(), []int{2}
+	return file_sf_substreams_intern_v2_service_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Update) GetDurationMs() uint64 {
@@ -414,7 +490,7 @@ type ModuleStats struct {
 
 func (x *ModuleStats) Reset() {
 	*x = ModuleStats{}
-	mi := &file_sf_substreams_intern_v2_service_proto_msgTypes[3]
+	mi := &file_sf_substreams_intern_v2_service_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -426,7 +502,7 @@ func (x *ModuleStats) String() string {
 func (*ModuleStats) ProtoMessage() {}
 
 func (x *ModuleStats) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_substreams_intern_v2_service_proto_msgTypes[3]
+	mi := &file_sf_substreams_intern_v2_service_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -439,7 +515,7 @@ func (x *ModuleStats) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ModuleStats.ProtoReflect.Descriptor instead.
 func (*ModuleStats) Descriptor() ([]byte, []int) {
-	return file_sf_substreams_intern_v2_service_proto_rawDescGZIP(), []int{3}
+	return file_sf_substreams_intern_v2_service_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ModuleStats) GetName() string {
@@ -509,7 +585,7 @@ type ExternalCallMetric struct {
 
 func (x *ExternalCallMetric) Reset() {
 	*x = ExternalCallMetric{}
-	mi := &file_sf_substreams_intern_v2_service_proto_msgTypes[4]
+	mi := &file_sf_substreams_intern_v2_service_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -521,7 +597,7 @@ func (x *ExternalCallMetric) String() string {
 func (*ExternalCallMetric) ProtoMessage() {}
 
 func (x *ExternalCallMetric) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_substreams_intern_v2_service_proto_msgTypes[4]
+	mi := &file_sf_substreams_intern_v2_service_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -534,7 +610,7 @@ func (x *ExternalCallMetric) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExternalCallMetric.ProtoReflect.Descriptor instead.
 func (*ExternalCallMetric) Descriptor() ([]byte, []int) {
-	return file_sf_substreams_intern_v2_service_proto_rawDescGZIP(), []int{4}
+	return file_sf_substreams_intern_v2_service_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ExternalCallMetric) GetName() string {
@@ -569,7 +645,7 @@ type Completed struct {
 
 func (x *Completed) Reset() {
 	*x = Completed{}
-	mi := &file_sf_substreams_intern_v2_service_proto_msgTypes[5]
+	mi := &file_sf_substreams_intern_v2_service_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -581,7 +657,7 @@ func (x *Completed) String() string {
 func (*Completed) ProtoMessage() {}
 
 func (x *Completed) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_substreams_intern_v2_service_proto_msgTypes[5]
+	mi := &file_sf_substreams_intern_v2_service_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -594,7 +670,7 @@ func (x *Completed) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Completed.ProtoReflect.Descriptor instead.
 func (*Completed) Descriptor() ([]byte, []int) {
-	return file_sf_substreams_intern_v2_service_proto_rawDescGZIP(), []int{5}
+	return file_sf_substreams_intern_v2_service_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Completed) GetAllProcessedRanges() []*BlockRange {
@@ -624,7 +700,7 @@ type Failed struct {
 
 func (x *Failed) Reset() {
 	*x = Failed{}
-	mi := &file_sf_substreams_intern_v2_service_proto_msgTypes[6]
+	mi := &file_sf_substreams_intern_v2_service_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -636,7 +712,7 @@ func (x *Failed) String() string {
 func (*Failed) ProtoMessage() {}
 
 func (x *Failed) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_substreams_intern_v2_service_proto_msgTypes[6]
+	mi := &file_sf_substreams_intern_v2_service_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -649,7 +725,7 @@ func (x *Failed) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Failed.ProtoReflect.Descriptor instead.
 func (*Failed) Descriptor() ([]byte, []int) {
-	return file_sf_substreams_intern_v2_service_proto_rawDescGZIP(), []int{6}
+	return file_sf_substreams_intern_v2_service_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Failed) GetReason() string {
@@ -683,7 +759,7 @@ type BlockRange struct {
 
 func (x *BlockRange) Reset() {
 	*x = BlockRange{}
-	mi := &file_sf_substreams_intern_v2_service_proto_msgTypes[7]
+	mi := &file_sf_substreams_intern_v2_service_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -695,7 +771,7 @@ func (x *BlockRange) String() string {
 func (*BlockRange) ProtoMessage() {}
 
 func (x *BlockRange) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_substreams_intern_v2_service_proto_msgTypes[7]
+	mi := &file_sf_substreams_intern_v2_service_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -708,7 +784,7 @@ func (x *BlockRange) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockRange.ProtoReflect.Descriptor instead.
 func (*BlockRange) Descriptor() ([]byte, []int) {
-	return file_sf_substreams_intern_v2_service_proto_rawDescGZIP(), []int{7}
+	return file_sf_substreams_intern_v2_service_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *BlockRange) GetStartBlock() uint64 {
@@ -729,7 +805,7 @@ var File_sf_substreams_intern_v2_service_proto protoreflect.FileDescriptor
 
 const file_sf_substreams_intern_v2_service_proto_rawDesc = "" +
 	"\n" +
-	"%sf/substreams/intern/v2/service.proto\x12\x19sf.substreams.internal.v2\x1a\x19google/protobuf/any.proto\x1a\x1esf/substreams/v1/modules.proto\"\xfd\x05\n" +
+	"%sf/substreams/intern/v2/service.proto\x12\x19sf.substreams.internal.v2\x1a\x19google/protobuf/any.proto\x1a\x1csf/substreams/v1/clock.proto\x1a\x1esf/substreams/v1/modules.proto\"\xa2\x06\n" +
 	"\x13ProcessRangeRequest\x12(\n" +
 	"\x0estop_block_num\x18\x02 \x01(\x04B\x02\x18\x01R\fstopBlockNum\x12#\n" +
 	"\routput_module\x18\x03 \x01(\tR\foutputModule\x123\n" +
@@ -747,15 +823,20 @@ const file_sf_substreams_intern_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"block_type\x18\x0e \x01(\tR\tblockType\x12%\n" +
 	"\x0esegment_number\x18\x0f \x01(\x04R\rsegmentNumber\x12'\n" +
-	"\x0fproduction_mode\x18\x10 \x01(\bR\x0eproductionMode\x1aG\n" +
+	"\x0fproduction_mode\x18\x10 \x01(\bR\x0eproductionMode\x12#\n" +
+	"\rstream_output\x18\x11 \x01(\bR\fstreamOutput\x1aG\n" +
 	"\x19WasmExtensionConfigsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01J\x04\b\x01\x10\x02J\x04\b\b\x10\t\"\xf0\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01J\x04\b\x01\x10\x02J\x04\b\b\x10\t\"\xca\x02\n" +
 	"\x14ProcessRangeResponse\x12;\n" +
 	"\x06failed\x18\x04 \x01(\v2!.sf.substreams.internal.v2.FailedH\x00R\x06failed\x12D\n" +
 	"\tcompleted\x18\x05 \x01(\v2$.sf.substreams.internal.v2.CompletedH\x00R\tcompleted\x12;\n" +
-	"\x06update\x18\x06 \x01(\v2!.sf.substreams.internal.v2.UpdateH\x00R\x06updateB\x06\n" +
-	"\x04typeJ\x04\b\x01\x10\x02J\x04\b\x02\x10\x03J\x04\b\x03\x10\x04\"\xf9\x01\n" +
+	"\x06update\x18\x06 \x01(\v2!.sf.substreams.internal.v2.UpdateH\x00R\x06update\x12X\n" +
+	"\x11block_scoped_data\x18\a \x01(\v2*.sf.substreams.internal.v2.BlockScopedDataH\x00R\x0fblockScopedDataB\x06\n" +
+	"\x04typeJ\x04\b\x01\x10\x02J\x04\b\x02\x10\x03J\x04\b\x03\x10\x04\"n\n" +
+	"\x0fBlockScopedData\x12,\n" +
+	"\x06output\x18\x01 \x01(\v2\x14.google.protobuf.AnyR\x06output\x12-\n" +
+	"\x05clock\x18\x02 \x01(\v2\x17.sf.substreams.v1.ClockR\x05clock\"\xf9\x01\n" +
 	"\x06Update\x12\x1f\n" +
 	"\vduration_ms\x18\x01 \x01(\x04R\n" +
 	"durationMs\x12'\n" +
@@ -809,36 +890,42 @@ func file_sf_substreams_intern_v2_service_proto_rawDescGZIP() []byte {
 }
 
 var file_sf_substreams_intern_v2_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_sf_substreams_intern_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_sf_substreams_intern_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_sf_substreams_intern_v2_service_proto_goTypes = []any{
 	(WASMModuleType)(0),          // 0: sf.substreams.internal.v2.WASMModuleType
 	(*ProcessRangeRequest)(nil),  // 1: sf.substreams.internal.v2.ProcessRangeRequest
 	(*ProcessRangeResponse)(nil), // 2: sf.substreams.internal.v2.ProcessRangeResponse
-	(*Update)(nil),               // 3: sf.substreams.internal.v2.Update
-	(*ModuleStats)(nil),          // 4: sf.substreams.internal.v2.ModuleStats
-	(*ExternalCallMetric)(nil),   // 5: sf.substreams.internal.v2.ExternalCallMetric
-	(*Completed)(nil),            // 6: sf.substreams.internal.v2.Completed
-	(*Failed)(nil),               // 7: sf.substreams.internal.v2.Failed
-	(*BlockRange)(nil),           // 8: sf.substreams.internal.v2.BlockRange
-	nil,                          // 9: sf.substreams.internal.v2.ProcessRangeRequest.WasmExtensionConfigsEntry
-	(*v1.Modules)(nil),           // 10: sf.substreams.v1.Modules
+	(*BlockScopedData)(nil),      // 3: sf.substreams.internal.v2.BlockScopedData
+	(*Update)(nil),               // 4: sf.substreams.internal.v2.Update
+	(*ModuleStats)(nil),          // 5: sf.substreams.internal.v2.ModuleStats
+	(*ExternalCallMetric)(nil),   // 6: sf.substreams.internal.v2.ExternalCallMetric
+	(*Completed)(nil),            // 7: sf.substreams.internal.v2.Completed
+	(*Failed)(nil),               // 8: sf.substreams.internal.v2.Failed
+	(*BlockRange)(nil),           // 9: sf.substreams.internal.v2.BlockRange
+	nil,                          // 10: sf.substreams.internal.v2.ProcessRangeRequest.WasmExtensionConfigsEntry
+	(*v1.Modules)(nil),           // 11: sf.substreams.v1.Modules
+	(*anypb.Any)(nil),            // 12: google.protobuf.Any
+	(*v1.Clock)(nil),             // 13: sf.substreams.v1.Clock
 }
 var file_sf_substreams_intern_v2_service_proto_depIdxs = []int32{
-	10, // 0: sf.substreams.internal.v2.ProcessRangeRequest.modules:type_name -> sf.substreams.v1.Modules
-	9,  // 1: sf.substreams.internal.v2.ProcessRangeRequest.wasm_extension_configs:type_name -> sf.substreams.internal.v2.ProcessRangeRequest.WasmExtensionConfigsEntry
-	7,  // 2: sf.substreams.internal.v2.ProcessRangeResponse.failed:type_name -> sf.substreams.internal.v2.Failed
-	6,  // 3: sf.substreams.internal.v2.ProcessRangeResponse.completed:type_name -> sf.substreams.internal.v2.Completed
-	3,  // 4: sf.substreams.internal.v2.ProcessRangeResponse.update:type_name -> sf.substreams.internal.v2.Update
-	4,  // 5: sf.substreams.internal.v2.Update.modules_stats:type_name -> sf.substreams.internal.v2.ModuleStats
-	5,  // 6: sf.substreams.internal.v2.ModuleStats.external_call_metrics:type_name -> sf.substreams.internal.v2.ExternalCallMetric
-	8,  // 7: sf.substreams.internal.v2.Completed.all_processed_ranges:type_name -> sf.substreams.internal.v2.BlockRange
-	1,  // 8: sf.substreams.internal.v2.Substreams.ProcessRange:input_type -> sf.substreams.internal.v2.ProcessRangeRequest
-	2,  // 9: sf.substreams.internal.v2.Substreams.ProcessRange:output_type -> sf.substreams.internal.v2.ProcessRangeResponse
-	9,  // [9:10] is the sub-list for method output_type
-	8,  // [8:9] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	11, // 0: sf.substreams.internal.v2.ProcessRangeRequest.modules:type_name -> sf.substreams.v1.Modules
+	10, // 1: sf.substreams.internal.v2.ProcessRangeRequest.wasm_extension_configs:type_name -> sf.substreams.internal.v2.ProcessRangeRequest.WasmExtensionConfigsEntry
+	8,  // 2: sf.substreams.internal.v2.ProcessRangeResponse.failed:type_name -> sf.substreams.internal.v2.Failed
+	7,  // 3: sf.substreams.internal.v2.ProcessRangeResponse.completed:type_name -> sf.substreams.internal.v2.Completed
+	4,  // 4: sf.substreams.internal.v2.ProcessRangeResponse.update:type_name -> sf.substreams.internal.v2.Update
+	3,  // 5: sf.substreams.internal.v2.ProcessRangeResponse.block_scoped_data:type_name -> sf.substreams.internal.v2.BlockScopedData
+	12, // 6: sf.substreams.internal.v2.BlockScopedData.output:type_name -> google.protobuf.Any
+	13, // 7: sf.substreams.internal.v2.BlockScopedData.clock:type_name -> sf.substreams.v1.Clock
+	5,  // 8: sf.substreams.internal.v2.Update.modules_stats:type_name -> sf.substreams.internal.v2.ModuleStats
+	6,  // 9: sf.substreams.internal.v2.ModuleStats.external_call_metrics:type_name -> sf.substreams.internal.v2.ExternalCallMetric
+	9,  // 10: sf.substreams.internal.v2.Completed.all_processed_ranges:type_name -> sf.substreams.internal.v2.BlockRange
+	1,  // 11: sf.substreams.internal.v2.Substreams.ProcessRange:input_type -> sf.substreams.internal.v2.ProcessRangeRequest
+	2,  // 12: sf.substreams.internal.v2.Substreams.ProcessRange:output_type -> sf.substreams.internal.v2.ProcessRangeResponse
+	12, // [12:13] is the sub-list for method output_type
+	11, // [11:12] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_sf_substreams_intern_v2_service_proto_init() }
@@ -850,6 +937,7 @@ func file_sf_substreams_intern_v2_service_proto_init() {
 		(*ProcessRangeResponse_Failed)(nil),
 		(*ProcessRangeResponse_Completed)(nil),
 		(*ProcessRangeResponse_Update)(nil),
+		(*ProcessRangeResponse_BlockScopedData)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -857,7 +945,7 @@ func file_sf_substreams_intern_v2_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_sf_substreams_intern_v2_service_proto_rawDesc), len(file_sf_substreams_intern_v2_service_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   9,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

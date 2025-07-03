@@ -133,7 +133,12 @@ func (f *testRun) run(t *testing.T, testName string) error {
 	}
 
 	ctx = withEventsCollector(ctx, &eventsCollector{})
-	responseCollector := newResponseCollector(ctx)
+
+	startBlock := uint64(f.StartBlock)
+	if f.FirstStreamableBlock > startBlock {
+		startBlock = f.FirstStreamableBlock
+	}
+	responseCollector := newResponseCollector(ctx, f.ModuleName, startBlock, f.ExclusiveEndBlock)
 
 	newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
 		return &LinearBlockGenerator{
@@ -150,7 +155,7 @@ func (f *testRun) run(t *testing.T, testName string) error {
 		count++
 		return &TestWorker{
 			t:                      t,
-			responseCollector:      newResponseCollector(ctx),
+			responseCollector:      responseCollector,
 			newBlockGenerator:      newBlockGenerator,
 			blockProcessedCallBack: f.BlockProcessedCallback,
 			jobCallBack:            f.JobCallback,

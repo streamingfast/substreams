@@ -43,7 +43,7 @@ func (w *TestWorker) ID() string {
 	return fmt.Sprintf("%d", w.id)
 }
 
-func (w *TestWorker) Work(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream) loop.Cmd {
+func (w *TestWorker) Work(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream, streamOutput bool) loop.Cmd {
 	w.t.Helper()
 
 	if w.jobCallBack != nil {
@@ -56,7 +56,7 @@ func (w *TestWorker) Work(ctx context.Context, unit stage.Unit, startBlock uint6
 		StateStoreDefaultTag: "tag",
 		FirstStreamableBlock: w.firstStreamableBlock,
 	})
-	request := work.NewRequest(ctx, reqctx.Details(ctx), unit.Stage, startBlock)
+	request := work.NewRequest(ctx, reqctx.Details(ctx), unit.Stage, startBlock, streamOutput)
 
 	logger := reqctx.Logger(ctx)
 	logger = logger.With(zap.Uint64("workerId", w.id))
@@ -80,6 +80,6 @@ func (w *TestWorker) Work(ctx context.Context, unit stage.Unit, startBlock uint6
 			zap.Int("stage", unit.Stage),
 		)
 
-		return work.MsgJobSucceeded{Unit: unit, Worker: w}
+		return work.MsgJobSucceeded{Unit: unit, Worker: w, Streamed: streamOutput}
 	}
 }

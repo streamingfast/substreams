@@ -24,7 +24,6 @@ import (
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/reqctx"
-	"github.com/streamingfast/substreams/storage/store"
 	pbworker "github.com/streamingfast/worker-pool-protocol/pb/sf/worker/v1"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -39,8 +38,7 @@ import (
 var lastWorkerID uint64
 
 type Result struct {
-	PartialFilesWritten store.FileInfos
-	Error               error
+	Error error
 }
 
 type Worker interface {
@@ -310,6 +308,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 
 	span.SetAttributes(attribute.String("substreams.remote_hostname", remoteHostname))
 
+	var tier2SupportsStreamingMode bool
 	stats := reqctx.ReqStats(ctx)
 	for {
 		resp, err := stream.Recv()
@@ -339,10 +338,8 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 
 			case *pbssinternal.ProcessRangeResponse_Completed:
 				logger.Debug("worker done")
+				tier2SupportsStreamingMode = r.Completed.StreamingMode
 				stats.RecordBlocksProcessed(r.Completed.ProcessedBlocks) // add workers' processed blocks count to our own stats
-				return &Result{
-					PartialFilesWritten: toRPCPartialFiles(r.Completed),
-				}
 
 			case *pbssinternal.ProcessRangeResponse_BlockScopedData:
 				clock := r.BlockScopedData.Clock
@@ -372,6 +369,10 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 
 		if err != nil {
 			if err == io.EOF {
+				if request.StreamOutput && !tier2SupportsStreamingMode {
+					return &Result{Error: fmt.Errorf("tier2 incompatible: it does not support streaming mode, operator should upgrade tier2 server")}
+				}
+
 				return &Result{}
 			}
 			if ctx.Err() != nil {
@@ -434,18 +435,4 @@ func (r *RemoteWorker) StopKeepAlive() {
 
 	r.stopped = true
 	close(r.done)
-}
-
-func toRPCPartialFiles(completed *pbssinternal.Completed) (out store.FileInfos) {
-	// TODO(abourget): Add the MODULE Name in there, so we know to which modules each of those things
-	// are attached in the tier1.
-	// TODO(abourget): actually, here generate all the partial file infos
-	// based on the request, segment and stage, and disregard what was
-	// sent over the Complete message.. we will simply wait for the
-	// stores to all having been processed.
-	out = make(store.FileInfos, len(completed.AllProcessedRanges))
-	for i, b := range completed.AllProcessedRanges {
-		out[i] = store.NewPartialFileInfo("TODO:CHANGE-ME", b.StartBlock, b.EndBlock)
-	}
-	return
 }

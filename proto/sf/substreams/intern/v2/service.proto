@@ -103,6 +103,7 @@ message Completed {
 
   // actual processed blocks (excluding blocks skipped by indexes)
   uint64 processed_blocks = 3;
+  bool streaming_mode = 4; // confirms that streaming mode was used (compatibility check)
 }
 
 message Failed {

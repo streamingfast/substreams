@@ -639,6 +639,7 @@ type Completed struct {
 	AllProcessedRanges []*BlockRange          `protobuf:"bytes,1,rep,name=all_processed_ranges,json=allProcessedRanges,proto3" json:"all_processed_ranges,omitempty"`
 	// actual processed blocks (excluding blocks skipped by indexes)
 	ProcessedBlocks uint64 `protobuf:"varint,3,opt,name=processed_blocks,json=processedBlocks,proto3" json:"processed_blocks,omitempty"`
+	StreamingMode   bool   `protobuf:"varint,4,opt,name=streaming_mode,json=streamingMode,proto3" json:"streaming_mode,omitempty"` // confirms that streaming mode was used (compatibility check)
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -685,6 +686,13 @@ func (x *Completed) GetProcessedBlocks() uint64 {
 		return x.ProcessedBlocks
 	}
 	return 0
+}
+
+func (x *Completed) GetStreamingMode() bool {
+	if x != nil {
+		return x.StreamingMode
+	}
+	return false
 }
 
 type Failed struct {
@@ -857,10 +865,11 @@ const file_sf_substreams_intern_v2_service_proto_rawDesc = "" +
 	"\x12ExternalCallMetric\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05count\x18\x02 \x01(\x04R\x05count\x12\x17\n" +
-	"\atime_ms\x18\x03 \x01(\x04R\x06timeMs\"\x95\x01\n" +
+	"\atime_ms\x18\x03 \x01(\x04R\x06timeMs\"\xbc\x01\n" +
 	"\tCompleted\x12W\n" +
 	"\x14all_processed_ranges\x18\x01 \x03(\v2%.sf.substreams.internal.v2.BlockRangeR\x12allProcessedRanges\x12)\n" +
-	"\x10processed_blocks\x18\x03 \x01(\x04R\x0fprocessedBlocksJ\x04\b\x02\x10\x03\"[\n" +
+	"\x10processed_blocks\x18\x03 \x01(\x04R\x0fprocessedBlocks\x12%\n" +
+	"\x0estreaming_mode\x18\x04 \x01(\bR\rstreamingModeJ\x04\b\x02\x10\x03\"[\n" +
 	"\x06Failed\x12\x16\n" +
 	"\x06reason\x18\x01 \x01(\tR\x06reason\x12\x12\n" +
 	"\x04logs\x18\x02 \x03(\tR\x04logs\x12%\n" +

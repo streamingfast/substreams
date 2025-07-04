@@ -132,12 +132,22 @@ func (p *RequestPlan) WriteOutSegmenter() *block.Segmenter {
 	return block.NewSegmenter(p.segmentInterval, p.WriteExecOut.StartBlock, p.WriteExecOut.ExclusiveEndBlock)
 }
 
-func (p *RequestPlan) ReadOutSegmenter(outputModuleInitialBlock uint64) *block.Segmenter {
+func (p *RequestPlan) ReadOutSegmenter(outputModuleInitialBlock uint64, skipFirstSegment bool) *block.Segmenter {
 	startBlock := p.WriteExecOut.StartBlock
 	if outputModuleInitialBlock > startBlock {
 		startBlock = outputModuleInitialBlock
 	}
-	return block.NewSegmenter(p.segmentInterval, startBlock, p.WriteExecOut.ExclusiveEndBlock)
+
+	if !skipFirstSegment {
+		return block.NewSegmenter(p.segmentInterval, startBlock, p.WriteExecOut.ExclusiveEndBlock)
+	}
+
+	nextSegment := startBlock/p.segmentInterval + 1
+	if nextSegment*p.segmentInterval > p.WriteExecOut.ExclusiveEndBlock {
+		return nil
+	}
+
+	return block.NewSegmenter(p.segmentInterval, nextSegment*p.segmentInterval, p.WriteExecOut.ExclusiveEndBlock)
 }
 
 func (p *RequestPlan) String() string {

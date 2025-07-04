@@ -495,7 +495,7 @@ func TestTier2Call(t *testing.T) {
 				StateStoreDefaultTag: "tag",
 			})
 
-			responseCollector := newResponseCollector(ctx)
+			responseCollector := newResponseCollector(ctx, test.moduleName, 0, 0)
 
 			newBlockGenerator := func(startBlock uint64, inclusiveStopBlock uint64) TestBlockGenerator {
 				return &LinearBlockGenerator{
@@ -504,7 +504,7 @@ func TestTier2Call(t *testing.T) {
 				}
 			}
 
-			request := work.NewRequest(ctx, reqctx.Details(ctx), test.stage, test.startBlock)
+			request := work.NewRequest(ctx, reqctx.Details(ctx), test.stage, test.startBlock, false)
 			require.NoError(t, request.Validate())
 
 			err = processInternalRequest(t, ctx, request, nil, newBlockGenerator, responseCollector, nil, testTempDir)

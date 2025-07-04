@@ -114,7 +114,6 @@ func TestBackFiller(t *testing.T) {
 
 			//Start from fromBlocks, to toBlocks
 			for currentBlockNum := c.startRange; currentBlockNum <= c.endRange; currentBlockNum++ {
-				fmt.Println("pushing block", currentBlockNum)
 				block := &pbbstream.Block{
 					Number: currentBlockNum}
 				obj := &testObject{step: bstream.StepIrreversible}

@@ -40,6 +40,12 @@ func BuildParallelProcessor(
 
 	stream := response.New(respFunc)
 	sched := scheduler.New(ctx, stream)
+
+	stages := stage.NewStages(ctx, execGraph, reqPlan, execoutStorage, storeConfigs)
+	if err := stages.FetchCachesState(ctx); err != nil {
+		return nil, fmt.Errorf("fetch caches storage state: %w", err)
+	}
+
 	if reqPlan.ReadExecOut != nil {
 		// note: since we are *NOT* in a sub-request and are setting up output module is a map
 		requestedModule := execGraph.OutputModule()
@@ -49,24 +55,22 @@ func BuildParallelProcessor(
 
 		// no ReadExecOut if output type is an index
 		if requestedModule.GetKindMap() != nil {
+			sched.StreamFirstTier2MapSegment = stages.FirstMapperSegmentRequiresProcessing()
+
 			initialBlock := execGraph.ModulesInitBlocks()[requestedModule.Name]
-			execOutSegmenter := reqPlan.ReadOutSegmenter(initialBlock)
-			walker := execoutStorage.NewFileWalker(requestedModule.Name, execOutSegmenter)
+			if execOutSegmenter := reqPlan.ReadOutSegmenter(initialBlock, sched.StreamFirstTier2MapSegment); execOutSegmenter != nil {
+				walker := execoutStorage.NewFileWalker(requestedModule.Name, execOutSegmenter)
 
-			sched.ExecOutWalker = orchestratorExecout.NewWalker(
-				ctx,
-				requestedModule,
-				walker,
-				reqPlan.ReadExecOut,
-				stream,
-				noopMode,
-			)
+				sched.ExecOutWalker = orchestratorExecout.NewWalker(
+					ctx,
+					requestedModule,
+					walker,
+					reqPlan.ReadExecOut,
+					stream,
+					noopMode,
+				)
+			}
 		}
-	}
-
-	stages := stage.NewStages(ctx, execGraph, reqPlan, execoutStorage, storeConfigs)
-	if err := stages.FetchCachesState(ctx); err != nil {
-		return nil, fmt.Errorf("fetch caches storage state: %w", err)
 	}
 
 	sched.Stages = stages

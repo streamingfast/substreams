@@ -3,6 +3,7 @@ package substreams
 import (
 	"context"
 
+	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
@@ -15,6 +16,12 @@ type ResponseFunc func(ResponseFromAnyTier) error
 func NewBlockScopedDataResponse(in *pbsubstreamsrpc.BlockScopedData) *pbsubstreamsrpc.Response {
 	return &pbsubstreamsrpc.Response{
 		Message: &pbsubstreamsrpc.Response_BlockScopedData{BlockScopedData: in},
+	}
+}
+
+func NewBlockScopedDataInternResponse(in *pbssinternal.BlockScopedData) *pbssinternal.ProcessRangeResponse {
+	return &pbssinternal.ProcessRangeResponse{
+		Type: &pbssinternal.ProcessRangeResponse_BlockScopedData{BlockScopedData: in},
 	}
 }
 

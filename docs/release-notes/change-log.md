@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
+* [BREAKING CHANGE] Tier2 servers must be upgraded BEFORE tier1 servers, tier2 servers will stream outputs for the 'first segment', to speed up time to first block
 * Return 'processed blocks' counter to client at the end of the request
 * Progress notifications will only be sent every 500ms for the first minute, then reduce rate up to every 5 seconds (can be overridden per request)
 * Added `dev_output_modules` to protobuf request (if present, in dev mode, only send the output of the modules listed)

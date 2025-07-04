@@ -9,17 +9,19 @@ import (
 )
 
 type gate struct {
-	startBlockNum uint64
-	disabled      bool
-	passed        bool
-	snapshotSent  bool
+	startBlockNum    uint64
+	disabled         bool
+	passed           bool
+	snapshotSent     bool
+	alwaysSendOutput bool
 }
 
 func newGate(ctx context.Context) *gate {
 	reqDetails := reqctx.Details(ctx)
 	return &gate{
-		disabled:      reqDetails.IsTier2Request,
-		startBlockNum: reqDetails.LinearGateBlockNum,
+		disabled:         reqDetails.IsTier2Request,
+		startBlockNum:    reqDetails.LinearGateBlockNum,
+		alwaysSendOutput: reqDetails.IsStreamingTier2,
 	}
 }
 
@@ -46,7 +48,7 @@ func (g *gate) shouldSendSnapshot() bool {
 }
 
 func (g *gate) shouldSendOutputs() bool {
-	return g.passed
+	return g.passed || g.alwaysSendOutput
 }
 
 func blockTriggersGate(blockNum, requestStartBlockNum uint64, step bstream.StepType) bool {

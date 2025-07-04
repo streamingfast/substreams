@@ -1,10 +1,12 @@
 syntax = "proto3";
 
 package sf.substreams.internal.v2;
-option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2;pbssinternal";
 
 import "google/protobuf/any.proto";
+import "sf/substreams/v1/clock.proto";
 import "sf/substreams/v1/modules.proto";
+
+option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2;pbssinternal";
 
 service Substreams {
   rpc ProcessRange(ProcessRangeRequest) returns (stream ProcessRangeResponse);
@@ -42,10 +44,12 @@ message ProcessRangeRequest {
   // It's possible to have tier2 requests in development mode, for example if the Substreams
   // needs to back process stores while in development mode.
   bool production_mode = 16;
+
+  bool stream_output = 17;
 }
 
 message ProcessRangeResponse {
-  reserved 1;// previously string module_name = 1;
+  reserved 1; // previously string module_name = 1;
 
   reserved 2; // previously in oneof(type): BlockRange processed_range
   reserved 3; // previously in oneof(type): ProcessedBytes processed_bytes
@@ -54,37 +58,42 @@ message ProcessRangeResponse {
     Failed failed = 4;
     Completed completed = 5;
     Update update = 6;
+    BlockScopedData block_scoped_data = 7;
   }
+}
 
+message BlockScopedData {
+  google.protobuf.Any output = 1;
+  sf.substreams.v1.Clock clock = 2;
 }
 
 message Update {
-    uint64 duration_ms = 1;
-    uint64 progress_blocks = 2;
-    uint64 total_bytes_read = 3;
-    uint64 total_bytes_written = 4;
+  uint64 duration_ms = 1;
+  uint64 progress_blocks = 2;
+  uint64 total_bytes_read = 3;
+  uint64 total_bytes_written = 4;
 
-    repeated ModuleStats modules_stats = 5;
+  repeated ModuleStats modules_stats = 5;
 }
 
 message ModuleStats {
-    string name = 1;
-    uint64 processing_time_ms = 2;
-    uint64 store_operation_time_ms = 3;
-    uint64 store_read_count = 4;
+  string name = 1;
+  uint64 processing_time_ms = 2;
+  uint64 store_operation_time_ms = 3;
+  uint64 store_read_count = 4;
 
-    repeated ExternalCallMetric external_call_metrics = 5;
+  repeated ExternalCallMetric external_call_metrics = 5;
 
-    // store-specific (will be 0 on mappers)
-    uint64 store_write_count = 10;
-    uint64 store_deleteprefix_count = 11;
-    uint64 store_size_bytes = 12;
+  // store-specific (will be 0 on mappers)
+  uint64 store_write_count = 10;
+  uint64 store_deleteprefix_count = 11;
+  uint64 store_size_bytes = 12;
 }
 
 message ExternalCallMetric {
-    string name = 1;
-    uint64 count = 2;
-    uint64 time_ms = 3;
+  string name = 1;
+  uint64 count = 2;
+  uint64 time_ms = 3;
 }
 
 message Completed {
@@ -94,8 +103,6 @@ message Completed {
 
   // actual processed blocks (excluding blocks skipped by indexes)
   uint64 processed_blocks = 3;
-
-
 }
 
 message Failed {

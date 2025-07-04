@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -42,6 +43,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type ModuleExecutionConfig struct {
@@ -393,6 +395,33 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("creating execution plan: %w", err)
 	}
 
+	if executionPlan.Skippable && request.StreamOutput {
+		logger.Info("no modules required to run, skipping, but sending outputs anyway because StreamOutput is set")
+		module := execGraph.OutputModule()
+		execOuts := executionPlan.ExistingExecOuts[request.OutputModule]
+		for cacheItem, err := range execOuts.Iter() {
+			if err != nil {
+				return fmt.Errorf("error iterating existing execouts: %w", err)
+			}
+
+			clock := &pbsubstreams.Clock{
+				Id:        cacheItem.BlockId,
+				Number:    cacheItem.BlockNum,
+				Timestamp: cacheItem.Timestamp,
+			}
+			outputType := strings.TrimPrefix(module.Output.Type, "proto:")
+			out := &anypb.Any{TypeUrl: "type.googleapis.com/" + outputType, Value: cacheItem.Payload}
+
+			if err := respFunc(substreams.NewBlockScopedDataInternResponse(&pbssinternal.BlockScopedData{
+				Output: out,
+				Clock:  clock,
+			})); err != nil {
+				return fmt.Errorf("error sending response: %w", err)
+			}
+		}
+		return nil
+	}
+
 	if executionPlan == nil || len(executionPlan.RequiredModules) == 0 {
 		logger.Info("no modules required to run, skipping")
 		return nil
@@ -710,6 +739,7 @@ type ExecutionPlan struct {
 	IndexWriters     map[string]*index.Writer
 	RequiredModules  map[string]*pbsubstreams.Module
 	StoresToWrite    map[string]struct{}
+	Skippable        bool
 }
 
 func GetExecutionPlan(
@@ -831,7 +861,16 @@ func GetExecutionPlan(
 
 	if runningLastStage && len(storesToWrite) == 0 && existingExecOuts[outputModule] != nil {
 		logger.Info("found existing exec output for output_module and no stores to produce, skipping run", zap.String("output_module", outputModule))
-		return nil, nil
+
+		return &ExecutionPlan{
+			ExistingExecOuts: existingExecOuts,
+			ExecoutWriters:   nil,
+			ExistingIndices:  nil,
+			IndexWriters:     nil,
+			RequiredModules:  nil,
+			StoresToWrite:    nil,
+			Skippable:        true,
+		}, nil
 	}
 
 	for name, module := range requiredModules {

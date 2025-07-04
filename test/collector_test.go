@@ -20,9 +20,7 @@ func (c *eventsCollector) Emit(_ context.Context, ev dmetering.Event) {
 	c.events = append(c.events, ev)
 }
 
-func (c *eventsCollector) Shutdown(_ error) {
-	return
-}
+func (c *eventsCollector) Shutdown(_ error) {}
 
 func (c *eventsCollector) Events() []dmetering.Event {
 	return c.events
@@ -49,11 +47,18 @@ type responseCollector struct {
 
 	sender *metering.MetricsSender
 
-	ctx context.Context
+	outputModuleName string
+	ctx              context.Context
+	startBlock       uint64
+	endBlock         uint64
 }
 
-func newResponseCollector(ctx context.Context) *responseCollector {
-	rc := &responseCollector{}
+func newResponseCollector(ctx context.Context, outputModuleName string, startBlock, endBlock uint64) *responseCollector {
+	rc := &responseCollector{
+		outputModuleName: outputModuleName,
+		startBlock:       startBlock,
+		endBlock:         endBlock,
+	}
 	rc.ctx = reqctx.WithEmitter(ctx, rc)
 	rc.eventsCollector = eventsCollectorFromContext(ctx)
 	rc.sender = metering.NewMetricsSender()
@@ -68,6 +73,23 @@ func (c *responseCollector) Collect(respAny substreams.ResponseFromAnyTier) erro
 		metering.AddEgressBytes(c.ctx, proto.Size(resp))
 		c.sender.Send(c.ctx, "test_user", "test_api_key", "10.0.0.1", "test_meta", "testOutputHash", "tier1")
 	case *pbssinternal.ProcessRangeResponse:
+		// in non-test code, this is 'passed through' from tier2 to tier1 to the user as a pbsubstreamsrpc.response
+		if blockScopedData := resp.GetBlockScopedData(); blockScopedData != nil {
+			if blockScopedData.Clock.Number < c.endBlock && blockScopedData.Clock.Number >= c.startBlock {
+				c.responses = append(c.responses, &pbsubstreamsrpc.Response{
+					Message: &pbsubstreamsrpc.Response_BlockScopedData{
+						BlockScopedData: &pbsubstreamsrpc.BlockScopedData{
+							Clock: blockScopedData.Clock,
+							Output: &pbsubstreamsrpc.MapModuleOutput{
+								Name:      c.outputModuleName,
+								MapOutput: blockScopedData.Output,
+							},
+						},
+					},
+				})
+			}
+		}
+
 		c.internalResponses = append(c.internalResponses, resp)
 		c.sender.Send(c.ctx, "test_user", "test_api_key", "10.0.0.1", "test_meta", "testOutputHash", "tier2")
 	}

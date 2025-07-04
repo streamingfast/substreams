@@ -16,8 +16,9 @@ type MsgJobFailed struct {
 
 type MsgJobSucceeded struct {
 	loop.IsMsg
-	Unit   stage.Unit
-	Worker Worker
+	Unit     stage.Unit
+	Worker   Worker
+	Streamed bool
 }
 
 type MsgPendingShutdown struct {

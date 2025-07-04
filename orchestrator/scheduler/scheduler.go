@@ -27,11 +27,11 @@ type Scheduler struct {
 
 	stream *response.Stream
 
-	Stages                      *stage.Stages
-	WorkerPool                  work.WorkerPool
-	ExecOutWalker               *execout.Walker
-	StreamFirstSegmentFromTier2 bool
-	firstSegmentStreamed        bool
+	Stages                       *stage.Stages
+	WorkerPool                   work.WorkerPool
+	ExecOutWalker                *execout.Walker
+	StreamFirstTier2MapSegment   bool
+	firstTier2MapSegmentStreamed bool
 
 	logger *zap.Logger
 
@@ -57,8 +57,8 @@ func New(ctx context.Context, stream *response.Stream) *Scheduler {
 func (s *Scheduler) Init() loop.Cmd {
 	var cmds []loop.Cmd
 
-	if s.StreamFirstSegmentFromTier2 {
-		cmds = append(cmds, execout.CmdWaitFirstSegmentStreamed(250*time.Millisecond))
+	if s.StreamFirstTier2MapSegment {
+		cmds = append(cmds, execout.CmdWaitFirstTier2MapSegmentStreamed(250*time.Millisecond))
 	} else if s.ExecOutWalker != nil {
 		cmds = append(cmds, execout.CmdDownloadSegment(0))
 	} else {
@@ -95,7 +95,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		shadowedUnits := s.Stages.MarkJobSuccess(msg.Unit)
 		s.WorkerPool.Return(s.ctx, msg.Worker)
 		if msg.Streamed {
-			s.firstSegmentStreamed = true
+			s.firstTier2MapSegmentStreamed = true
 		}
 
 		tryMerge := s.Stages.CmdTryMerge(msg.Unit.Stage)
@@ -115,7 +115,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		cmds = append(cmds,
 			work.CmdScheduleNextJob("job succeeded"),
 		)
-		if s.ExecOutWalker != nil && (s.firstSegmentStreamed || !s.StreamFirstSegmentFromTier2) {
+		if s.ExecOutWalker != nil && (s.firstTier2MapSegmentStreamed || !s.StreamFirstTier2MapSegment) {
 			cmds = append(cmds, execout.CmdDownloadSegment(0))
 		}
 
@@ -233,12 +233,12 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		s.ExecOutWalker.MarkNotWorking()
 		cmds = append(cmds, execout.CmdDownloadSegment(0))
 
-	case execout.MsgWaitFirstSegmentStreamed:
-		if s.firstSegmentStreamed {
+	case execout.MsgWaitFirstTier2MapSegmentStreamed:
+		if s.firstTier2MapSegmentStreamed {
 			return execout.CmdDownloadSegment(0)
 		}
 
-		return execout.CmdWaitFirstSegmentStreamed(250 * time.Millisecond)
+		return execout.CmdWaitFirstTier2MapSegmentStreamed(250 * time.Millisecond)
 
 	case execout.MsgDownloadSegment:
 		if s.ExecOutWalker == nil {

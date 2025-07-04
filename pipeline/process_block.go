@@ -280,7 +280,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 		}
 		p.pendingUndoMessage = nil
 
-		if reqDetails.IsTier2Request {
+		if reqDetails.IsTier2Request { // the gate.shouldSendOutputs() assures us that we are a streaming tier2 in this case
 			if out := p.mapModuleOutput.GetMapOutput(); out != nil {
 				skippable := p.mapModuleOutputSkippable && len(out.Value) == 0
 				if !skippable {

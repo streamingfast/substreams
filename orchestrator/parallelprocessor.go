@@ -55,11 +55,10 @@ func BuildParallelProcessor(
 
 		// no ReadExecOut if output type is an index
 		if requestedModule.GetKindMap() != nil {
-			firstSegmentRequiresProcessing := stages.FirstMapperSegmentRequiresProcessing()
-			sched.StreamFirstSegmentFromTier2 = firstSegmentRequiresProcessing
+			sched.StreamFirstTier2MapSegment = stages.FirstMapperSegmentRequiresProcessing()
 
 			initialBlock := execGraph.ModulesInitBlocks()[requestedModule.Name]
-			if execOutSegmenter := reqPlan.ReadOutSegmenter(initialBlock, firstSegmentRequiresProcessing); execOutSegmenter != nil {
+			if execOutSegmenter := reqPlan.ReadOutSegmenter(initialBlock, sched.StreamFirstTier2MapSegment); execOutSegmenter != nil {
 				walker := execoutStorage.NewFileWalker(requestedModule.Name, execOutSegmenter)
 
 				sched.ExecOutWalker = orchestratorExecout.NewWalker(

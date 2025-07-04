@@ -51,7 +51,6 @@ func (p *RequestPlan) RequiresParallelProcessing() bool {
 }
 
 func BuildTier1RequestPlan(productionMode bool, segmentInterval, lowestInitialBlock, lowestStoreInitialBlock, resolvedStartBlock, linearHandoffBlock, exclusiveEndBlock uint64, scheduleStores bool) (*RequestPlan, error) {
-
 	if resolvedStartBlock < lowestInitialBlock {
 		return nil, fmt.Errorf("start block cannot be prior to the lowest init block in the requested module graph (%d)", lowestInitialBlock)
 	}
@@ -143,9 +142,8 @@ func (p *RequestPlan) ReadOutSegmenter(outputModuleInitialBlock uint64, skipFirs
 		return block.NewSegmenter(p.segmentInterval, startBlock, p.WriteExecOut.ExclusiveEndBlock)
 	}
 
-	exclusiveEndBlock := p.WriteExecOut.ExclusiveEndBlock
 	nextSegment := startBlock/p.segmentInterval + 1
-	if nextSegment*p.segmentInterval > exclusiveEndBlock {
+	if nextSegment*p.segmentInterval > p.WriteExecOut.ExclusiveEndBlock {
 		return nil
 	}
 

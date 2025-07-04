@@ -588,10 +588,12 @@ func (p *Pipeline) toInternalUpdate(clock *pbsubstreams.Clock) *pbssinternal.Upd
 }
 
 func (p *Pipeline) returnInternalModuleComplete() error {
+
 	out := &pbssinternal.ProcessRangeResponse{
 		Type: &pbssinternal.ProcessRangeResponse_Completed{
 			Completed: &pbssinternal.Completed{
 				ProcessedBlocks: reqctx.ReqStats(p.ctx).GetBlocksProcessed(),
+				StreamingMode:   reqctx.Details(p.ctx).IsStreamingTier2,
 			},
 		},
 	}

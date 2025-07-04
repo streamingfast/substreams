@@ -344,7 +344,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 			case *pbssinternal.ProcessRangeResponse_BlockScopedData:
 				clock := r.BlockScopedData.Clock
 				details := reqctx.Details(ctx)
-				if clock.Number >= details.ResolvedStartBlockNum && clock.Number < details.StopBlockNum {
+				if clock.Number >= details.ResolvedStartBlockNum && (details.StopBlockNum == 0 || clock.Number < details.StopBlockNum) {
 
 					blockRef := bstream.NewBlockRef(clock.Id, clock.Number)
 					cursor := bstream.Cursor{

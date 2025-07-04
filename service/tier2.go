@@ -211,6 +211,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 		zap.String("output_module", request.OutputModule),
 		zap.Uint64("first_streamable_block", request.FirstStreamableBlock),
 		zap.String("metering_config", request.MeteringConfig),
+		zap.Bool("stream_output", request.StreamOutput),
 	}
 
 	if auth := dauth.FromContext(ctx); auth != nil {

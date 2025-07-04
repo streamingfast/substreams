@@ -14,7 +14,7 @@ In this tutorial, you'll learn how to initialize a TRON-based Substreams project
 2. Running `substreams init` will give you the option to choose between three TRON project options. Select the one that best fits your requirements:
     - **tron-hello-world**: Creates a simple Substreams example, the example outputs results with type `TransferContract` that have an `amount` above 100M. Use this example to learn how to write a custom Substreams starting from the [TRON Full block](https://github.com/streamingfast/firehose-tron/blob/main/proto/sf/tron/type/v1/block.proto) as input.
     - **tron-transactions**: Generates a Substreams that outputs filtered transactions (full transactions). Filtering is supported on `contract_type`, `to`, `from` and `contract_address`.
-    - **Tron EVM mainnet**: Navigate to the `substreams init` EVM path to access TRON EVM specific data. While the TRON full blocks do contain everything, TRON EVM mainnet contains only the EVM associated transactions, receipts, and logs. 
+    - **Tron EVM (mainnet)**: Navigate to the `substreams init` [EVM path](./evm.md) to access TRON-specific EVM data. While the TRON full blocks do contain everything, TRON EVM mainnet contains only the EVM associated transactions, receipts, and logs. 
     
 ## Step 2: Visualize the Data
 

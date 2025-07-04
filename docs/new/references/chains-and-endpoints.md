@@ -68,9 +68,10 @@ The data missing in the Base Block makes the corresponding Protobuf field empty.
 - **Solana Devnet**: `devnet.sol.streamingfast.io:443`
 - **Solana Accounts**: `accounts.mainnet.sol.streamingfast.io:443`
 - **Bitcoin Mainnet**: `mainnet.btc.streamingfast.io:443`
+- **Injective EVM Testnet**: `testnet.injective-evm.streamingfast.io:443`
 - **Injective Mainnet**: `mainnet.injective.streamingfast.io:443`
 - **Injective Testnet**: `testnet.injective.streamingfast.io:443`
-- **Sei Mainnet (EVM)**: `evm-mainnet.sei.streamingfast.io:443`
+- **Sei EVM Mainnet**: `evm-mainnet.sei.streamingfast.io:443`
 - **Starknet Mainnet**: `mainnet.starknet.streamingfast.io:443`
 - **Starknet Testnet**: `testnet.starknet.streamingfast.io:443`
 - **Base Mainnet**: `base-mainnet.streamingfast.io:443`

@@ -205,7 +205,7 @@ grpcurl --plaintext   -d '{"prefix": "day:first:201511", "limit":31}' localhost:
 
 ## Consume the key-value data from a web-page using Connect-Web
 
-The [Connect-Web](https://connect.build/docs/web/getting-started) library allows you to quickly bootstrap a web-based client for your key-value store.
+The [Connect-Web](https://connectrpc.com/docs/web/getting-started/) library allows you to quickly bootstrap a web-based client for your key-value store.
 
 ### Requirements
 

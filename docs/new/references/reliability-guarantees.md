@@ -36,7 +36,7 @@ message BlockScopedData {
 ```
 
 In a connection, errors might occur; any of the two parties involved may get disconnected because of a network issue.
-In theses cases, it is essential to have a mechanism that allows you to consume the data exactly where you left it before the disconnection. This mechanism is usually called a **cursor**. Essentially, a cursor points to the latest piece of data consumed by the user.
+In these cases, it is essential to have a mechanism that allows you to consume the data exactly where you left it before the disconnection. This mechanism is usually called a **cursor**. Essentially, a cursor points to the latest piece of data consumed by the user.
 
 In Substreams, the `cursor` field of the response indicates the latest block consumed by the user. The user **must** persist the cursor, so that in the case of a disconnection, the Substreams provider can start streaming data from the latest consumed block.
 

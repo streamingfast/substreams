@@ -805,7 +805,7 @@
     });
   });
 
-  // Registry of of encoder/decoder factories, by encoding name.
+  // Registry of encoder/decoder factories, by encoding name.
   /** @type {Object.<string, function({fatal:boolean}): Encoder>} */
   var encoders = {};
   /** @type {Object.<string, function({fatal:boolean}): Decoder>} */

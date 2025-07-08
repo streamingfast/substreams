@@ -126,7 +126,7 @@ func nextUniqueID() uint64 {
 func computeLinearHandoffBlockNum(productionMode bool, startBlock, stopBlock uint64, getRecentFinalBlockFunc func() (uint64, error), stateRequiredAt *uint64, segmentSize uint64) (uint64, error) {
 	stateRequired := stateRequiredAt != nil && *stateRequiredAt <= startBlock
 
-	//get value of of next boundary after stopBlock
+	// get value of next boundary after stopBlock
 	if productionMode {
 		nextBoundary := stopBlock
 		if remainder := (stopBlock % segmentSize); remainder != 0 {

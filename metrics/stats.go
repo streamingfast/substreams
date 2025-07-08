@@ -27,7 +27,7 @@ type Stats struct {
 	initDuration    time.Duration
 	timeToFirstData time.Duration
 
-	// moduleStats only contain stats from local execution
+	// modulesStats only contain stats from local execution
 	modulesStats map[string]*extendedStats
 
 	runningJobs             runningJobs

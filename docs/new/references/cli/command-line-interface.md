@@ -68,7 +68,7 @@ The details of the run command are:
 
 #### Headers
 
-The `-H` option in of the `run` or `gui` command allows you to dynamically pass headers with the gRPC request. This is useful when overriding default parameters in the Substreams execution.
+The `-H` option of the `run` or `gui` command allows you to dynamically pass headers with the gRPC request. This is useful when overriding default parameters in the Substreams execution.
 
 ##### X-Sf-Substreams-Parallel-Jobs Header
 

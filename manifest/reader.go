@@ -444,11 +444,6 @@ func (r *Reader) registryBaseURL() string {
 	return "https://spkg.io"
 }
 
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
-}
-
 func (r *Reader) getPkg() (*pbsubstreams.Package, *Manifest, error) {
 	if r.currentData == nil {
 		return nil, nil, fmt.Errorf("no result available")

@@ -43,7 +43,7 @@ substreams pack ./substreams.yaml
 Developers can use modules and protobuf definitions from other Substreams packages when `imports` is defined in the manifest.
 
 {% hint style="warning" %}
-**Important**: To avoid potential naming collisions select unique `.proto` filenames and namespaces specifying fully qualified paths.
+**Important**: To avoid potential naming collisions, select unique `.proto` filenames and namespaces specifying fully qualified paths.
 {% endhint %}
 
 Local Protobuf filenames take precedence over the imported package's proto files.

@@ -124,7 +124,7 @@ The available output display options are:
 
 The `gui` command pops up a terminal-based graphical user interface.
 
-Its parameters are very similar to those of `run`, but provides a UI to navigate the results instead of a stream of data.
+Its parameters are very similar to those of `run`, but the `gui` command provides a UI to navigate the results instead of a stream of data.
 
 #### Replay mode
 

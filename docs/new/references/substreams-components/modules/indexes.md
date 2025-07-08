@@ -34,7 +34,7 @@ A possible flow to use an index module to index all the events in a block:
 
 1. You create a module, `all_events`, which receives a `Block` object as an input and outputs an `Events` object, with all the events of the block.
 2. You create the actual index module, `index_events`, which receives the `Events` object of the block as an input and outputs a `Keys` object, containing the `address` and `signature` fields of every event you want to track. For every block, this `Keys` object is cached, and then used to verify if a given event is present in the block before decoding the actual data of the block.
-3. You create a module that uses the index module a module that uses the index module (i.e. filters the blocks based on a query before processing them), `filtered_events`, which receives the `index_events` module as an input plus a string with the event addresses that the Substreams must filter.
+3. You create a module that uses the index module (i.e. filters the blocks based on a query before processing them), `filtered_events`, which receives the `index_events` module as an input plus a string with the event addresses that the Substreams must filter.
 Given this string of addresses, Substreams checks if the event address is contained on a given block before actually decoding the data of the block.
 You can use logical operators (`and` and `or`) to select what events to search.
 

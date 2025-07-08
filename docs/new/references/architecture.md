@@ -8,7 +8,7 @@ Parallel execution is the process of a Substreams module's code executing multip
 
 Parallel execution occurs when a requested module's start block is further back in the blockchain's history than the requested stop block. For example, if a module starts at block 12,000,000 and a user requests data at block 15,000,000, parallel execution is used. This applies to both the development and production modes of Substreams operation.
 
-Parallel execution addresses the problem of the slow single linear execution of a module. Instead of running a module in a linear fashion, one block after the other without leveraging full computing power, N number of workers are executed over a different segment of the chain. It means data can be pushed back to the user N times faster than cases using a single worker.
+Parallel execution addresses the problem of the slow, single, linear execution of a module. Instead of running a module in a linear fashion, one block after the other without leveraging full computing power, N number of workers are executed over a different segment of the chain. It means data can be pushed back to the user N times faster than cases using a single worker.
 
 The server will define an execution schedule and take the module's dependencies into consideration. The server's execution schedule is a list of pairs of (`module, range`), where range contains `N` blocks. This is a configurable value set to 25K blocks, on the server.
 

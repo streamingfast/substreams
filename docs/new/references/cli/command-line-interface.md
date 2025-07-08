@@ -136,7 +136,7 @@ You can reload the data without hitting the server again using `--replay`. The d
 
 ## Cheatsheet
 
-There are the shortcuts that you can use to navigate the GUI. You can always get more information by pressing the `?` key.
+These are the shortcuts that you can use to navigate the GUI. You can always get more information by pressing the `?` key.
 
 | Function | Keys  | 
 |---|---|

@@ -264,7 +264,7 @@ modules {
 
 ### **`codegen`**
 
-The `codegen` command generates a code for a specific sink taking as a Substreams module as input. 
+The `codegen` command generates a code for a specific sink taking a Substreams module as input. 
 
 - SQL
 

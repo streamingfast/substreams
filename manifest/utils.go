@@ -56,11 +56,10 @@ func ExtractNetworkEndpoint(networkFromManifest, fromFlag string, logger *zap.Lo
 		return endpoint, nil
 	}
 
-	net := networks.GetSubstreamsRegistry().Find(networkFromManifest)
-	if net != nil && len(net.Services.Substreams) > 0 {
-		ep := net.Services.Substreams[0]
-		logger.Info("using endpoint from registry", zap.String("manifest_network", networkFromManifest), zap.String("endpoint", ep))
-		return ep, nil
+	endpoint := networks.GetSubstreamsEndpoint(networkFromManifest)
+	if endpoint != "" {
+		logger.Info("using endpoint from registry", zap.String("manifest_network", networkFromManifest), zap.String("endpoint", endpoint))
+		return endpoint, nil
 	}
 
 	return "", fmt.Errorf("cannot determine endpoint for network %q: make sure that you set SUBSTREAMS_ENDPOINTS_CONFIG_%s environment variable to a valid endpoint, or use the endpoint flag", networkFromManifest, strings.ToUpper(networkFromManifest))

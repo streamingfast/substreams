@@ -9,18 +9,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v1.15.9
 
 ### Server
 
-* [BREAKING CHANGE] Tier2 servers must be upgraded BEFORE tier1 servers, tier2 servers will stream outputs for the 'first segment', to speed up time to first block
-* Return 'processed blocks' counter to client at the end of the request
-* Progress notifications will only be sent every 500ms for the first minute, then reduce rate up to every 5 seconds (can be overridden per request)
-* Added `dev_output_modules` to protobuf request (if present, in dev mode, only send the output of the modules listed)
-* Added `progress_messages_interval_ms` to protobuf request (if present, overrides the rate of progress messages to that many milliseconds)
+* [**BREAKING CHANGE**] `substreams-tier2` servers must be upgraded **before** tier1 servers, tier2 servers will stream outputs for the 'first segment', to speed up time to first block.
+* Return `processed_blocks` counter to client at the end of the request.
+* Progress notifications will only be sent every 500ms for the first minute, then reduce rate up to every 5 seconds (can be overridden per request).
+* Added `dev_output_modules` to protobuf request (if present, in dev mode, only send the output of the modules listed).
+* Added `progress_messages_interval_ms` to protobuf request (if present, overrides the rate of progress messages to that many milliseconds).
 
 ### CLI
 
+* Updated to latest networks registry version.
 * **Added** `--proto-path` flag to `substreams run` and `substreams gui` commands: Allows loading protobuf definitions from a directory containing `.proto` files on top of the substreams package protobuf definitions
 * **Added** `--proto-descriptor-set` flag to `substreams run` and `substreams gui` commands: Allows loading protobuf definitions from a single protobuf descriptor set file on top of the substreams package protobuf definitions
 * Both flags work with both manifest files (`.yaml`) and pre-compiled packages (`.spkg`), enabling additional protobuf types to be available during execution

@@ -2,6 +2,7 @@ package sink
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/streamingfast/bstream"
@@ -14,6 +15,17 @@ type sinkerHandlers struct {
 	handleBlockUndoSignal func(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *Cursor) error
 }
 
+type fullSinkerHandlers struct {
+	sinkerHandlers
+	handleSessionInit             func(ctx context.Context, session *pbsubstreamsrpc.SessionInit) error
+	handleProgress                func(ctx context.Context, progress *pbsubstreamsrpc.ModulesProgress)
+	handleInitialSnapshotData     func(ctx context.Context, debug *pbsubstreamsrpc.InitialSnapshotData) error
+	handleInitialSnapshotComplete func(ctx context.Context, debug *pbsubstreamsrpc.InitialSnapshotComplete) error
+	handleError                   func(ctx context.Context, error *pbsubstreamsrpc.Error)
+}
+
+var ErrHandlerNotImplemented = errors.New("handler not implemented")
+
 func (h sinkerHandlers) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.BlockScopedData, isLive *bool, cursor *Cursor) error {
 	return h.handleBlockScopedData(ctx, data, isLive, cursor)
 }
@@ -22,11 +34,71 @@ func (h sinkerHandlers) HandleBlockUndoSignal(ctx context.Context, undoSignal *p
 	return h.handleBlockUndoSignal(ctx, undoSignal, cursor)
 }
 
+func (h fullSinkerHandlers) HandleProgress(ctx context.Context, progress *pbsubstreamsrpc.ModulesProgress) {
+	if h.handleProgress != nil {
+		h.handleProgress(ctx, progress)
+	}
+}
+
+func (h fullSinkerHandlers) HandleError(ctx context.Context, error *pbsubstreamsrpc.Error) {
+	if h.handleError != nil {
+		h.handleError(ctx, error)
+	}
+}
+
+func (h fullSinkerHandlers) HandleSessionInit(ctx context.Context, sessionInit *pbsubstreamsrpc.SessionInit) error {
+	if h.handleSessionInit != nil {
+		return h.handleSessionInit(ctx, sessionInit)
+	}
+	return nil
+}
+
+func (h fullSinkerHandlers) HandleInitialSnapshotData(ctx context.Context, snapshotData *pbsubstreamsrpc.InitialSnapshotData) error {
+	if h.handleInitialSnapshotData != nil {
+		return h.handleInitialSnapshotData(ctx, snapshotData)
+	}
+	return nil
+}
+
+func (h fullSinkerHandlers) HandleInitialSnapshotComplete(ctx context.Context, snapshotComplete *pbsubstreamsrpc.InitialSnapshotComplete) error {
+	if h.handleInitialSnapshotComplete != nil {
+		return h.handleInitialSnapshotComplete(ctx, snapshotComplete)
+	}
+	return nil
+}
+
+// NewSinkerHandlers creates a new SinkerHandler with only the required handlers and optional handlers
 func NewSinkerHandlers(
 	handleBlockScopedData func(ctx context.Context, data *pbsubstreamsrpc.BlockScopedData, isLive *bool, cursor *Cursor) error,
 	handleBlockUndoSignal func(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *Cursor) error,
 ) SinkerHandler {
-	return sinkerHandlers{handleBlockScopedData, handleBlockUndoSignal}
+	return &sinkerHandlers{
+		handleBlockScopedData: handleBlockScopedData,
+		handleBlockUndoSignal: handleBlockUndoSignal,
+	}
+}
+
+// NewSinkerFullHandlers creates a SinkerHandler with extra interfaces for handling session initialization, progress and debug data
+func NewSinkerFullHandlers(
+	handleBlockScopedData func(ctx context.Context, data *pbsubstreamsrpc.BlockScopedData, isLive *bool, cursor *Cursor) error,
+	handleBlockUndoSignal func(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *Cursor) error,
+	handleSessionInit func(ctx context.Context, session *pbsubstreamsrpc.SessionInit) error,
+	handleProgress func(ctx context.Context, progress *pbsubstreamsrpc.ModulesProgress),
+	handleInitialSnapshotData func(ctx context.Context, debug *pbsubstreamsrpc.InitialSnapshotData) error,
+	handleInitialSnapshotComplete func(ctx context.Context, complete *pbsubstreamsrpc.InitialSnapshotComplete) error,
+	handleError func(ctx context.Context, error *pbsubstreamsrpc.Error),
+) SinkerHandler {
+	return &fullSinkerHandlers{
+		sinkerHandlers: sinkerHandlers{
+			handleBlockScopedData: handleBlockScopedData,
+			handleBlockUndoSignal: handleBlockUndoSignal,
+		},
+		handleSessionInit:             handleSessionInit,
+		handleProgress:                handleProgress,
+		handleInitialSnapshotData:     handleInitialSnapshotData,
+		handleInitialSnapshotComplete: handleInitialSnapshotComplete,
+		handleError:                   handleError,
+	}
 }
 
 type SinkerHandler interface {
@@ -44,7 +116,7 @@ type SinkerHandler interface {
 	// error and the [Sinker] will not retry it. If the error is retryable, wrap it in `derr.NewRetryableError(err)` to notify
 	// the [Sinker] that it should retry from last valid cursor. It's your responsibility to ensure no data was persisted prior the
 	// the error.
-	/**/ HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.BlockScopedData, isLive *bool, cursor *Cursor) error
+	HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.BlockScopedData, isLive *bool, cursor *Cursor) error
 
 	// HandleBlockUndoSignal defines the callback that will handle Substreams `BlockUndoSignal` messages.
 	//
@@ -61,6 +133,72 @@ type SinkerHandler interface {
 	// the [Sinker] that it should retry from last valid cursor. It's your responsibility to ensure no data was persisted prior the
 	// the error.
 	HandleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *Cursor) error
+}
+
+// SinkerProgressHandler defines an extra interface that handles the Progress message.
+type SinkerProgressHandler interface {
+	// HandleProgress defines the callback that will handle Substreams `ModulesProgress` messages.
+	//
+	// The handler receives the following arguments:
+	// - `ctx` is the context runtime, your handler should be minimal, so normally you shouldn't use this.
+	// - `progress` contains the progress information that was received from the Substreams API.
+	//
+	// The [HandleProgress] is optional and can be nil.
+	HandleProgress(ctx context.Context, progress *pbsubstreamsrpc.ModulesProgress)
+}
+
+type SinkerSessionInitHandler interface {
+	// HandleSessionInit defines the callback that will handle Substreams `SessionInit` messages.
+	//
+	// The handler receives the following arguments:
+	// - `ctx` is the context runtime, your handler should be minimal, so normally you shouldn't use this.
+	// - `sessionInit` contains the session initialization data that was received from the Substreams API.
+	//
+	// The [HandleSessionInit] is optional and can be nil.
+	//
+	// Your handler must return an error value that can be nil or non-nil. If non-nil, the error is assumed to be a fatal
+	// error and the [Sinker] will shutdown
+	HandleSessionInit(ctx context.Context, sessionInit *pbsubstreamsrpc.SessionInit) error
+}
+
+type SinkerErrorHandler interface {
+
+	// HandleError defines the callback that will handle Substreams errors.
+	//
+	// The handler receives the following arguments:
+	// - `ctx` is the context runtime, your handler should be minimal, so normally you shouldn't use this.
+	// - `error` is simply the error received from the Substreams API.
+	//
+	// The [HandleError] is optional and can be nil.
+	HandleError(ctx context.Context, err error)
+}
+
+type SinkerSnapshotHandler interface {
+	// HandleInitialSnapshotData defines the callback that will handle Substreams `InitialSnapshotData` messages.
+	//
+	// The handler receives the following arguments:
+	// - `ctx` is the context runtime, your handler should be minimal, so normally you shouldn't use this.
+	// - `snapshotData` contains the initial snapshot data that was received from the Substreams API.
+	//
+	// The [HandleInitialSnapshotData] is optional and can be nil.
+	//
+	// Your handler must return an error value that can be nil or non-nil. If non-nil, the error is assumed to be a fatal
+	// error and the [Sinker] will not retry it. If the error is retryable, wrap it in `derr.NewRetryableError(err)` to notify
+	// the [Sinker] that it should retry from last valid cursor.
+	HandleInitialSnapshotData(ctx context.Context, snapshotData *pbsubstreamsrpc.InitialSnapshotData) error
+
+	// HandleInitialSnapshotComplete defines the callback that will handle Substreams `InitialSnapshotComplete` messages.
+	//
+	// The handler receives the following arguments:
+	// - `ctx` is the context runtime, your handler should be minimal, so normally you shouldn't use this.
+	// - `snapshotComplete` contains the initial snapshot completion information that was received from the Substreams API.
+	//
+	// The [HandleInitialSnapshotComplete] is optional and can be nil.
+	//
+	// Your handler must return an error value that can be nil or non-nil. If non-nil, the error is assumed to be a fatal
+	// error and the [Sinker] will not retry it. If the error is retryable, wrap it in `derr.NewRetryableError(err)` to notify
+	// the [Sinker] that it should retry from last valid cursor.
+	HandleInitialSnapshotComplete(ctx context.Context, snapshotComplete *pbsubstreamsrpc.InitialSnapshotComplete) error
 }
 
 // SinkerCompletionHandler defines an extra interface that can be implemented on top of `SinkerHandler` where the

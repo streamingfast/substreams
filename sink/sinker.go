@@ -393,6 +393,10 @@ func (s *Sinker) doRequest(
 				}
 			}
 
+			if eh, ok := handler.(SinkerErrorHandler); ok {
+				eh.HandleError(ctx, err)
+			}
+
 			return activeCursor, receivedMessage, retryable(err)
 		}
 
@@ -401,6 +405,11 @@ func (s *Sinker) doRequest(
 
 		switch r := resp.Message.(type) {
 		case *pbsubstreamsrpc.Response_Progress:
+			if ph, ok := handler.(SinkerProgressHandler); ok {
+				ph.HandleProgress(ctx, r.Progress)
+				break
+			}
+
 			msg := r.Progress
 			var totalProcessedBlocks uint64
 
@@ -538,10 +547,30 @@ func (s *Sinker) doRequest(
 				}
 			}
 
-		case *pbsubstreamsrpc.Response_DebugSnapshotData, *pbsubstreamsrpc.Response_DebugSnapshotComplete:
-			s.logger.Warn("received debug snapshot message, there is no reason to receive those here", zap.Reflect("message", r))
+		case *pbsubstreamsrpc.Response_DebugSnapshotData:
+			if ss, ok := handler.(SinkerSnapshotHandler); ok {
+				if err := ss.HandleInitialSnapshotData(ctx, r.DebugSnapshotData); err != nil {
+					return activeCursor, receivedMessage, fmt.Errorf("handle initial snapshot data: %w", err)
+				}
+			} else {
+				s.logger.Warn("received debug snapshot message, there is no reason to receive those here", zap.Reflect("message", r))
+			}
+		case *pbsubstreamsrpc.Response_DebugSnapshotComplete:
+			if ss, ok := handler.(SinkerSnapshotHandler); ok {
+				if err := ss.HandleInitialSnapshotComplete(ctx, r.DebugSnapshotComplete); err != nil {
+					return activeCursor, receivedMessage, fmt.Errorf("handle initial snapshot complete: %w", err)
+				}
+			} else {
+				s.logger.Warn("received debug snapshot message, there is no reason to receive those here", zap.Reflect("message", r))
+			}
 
 		case *pbsubstreamsrpc.Response_Session:
+			if sh, ok := handler.(SinkerSessionInitHandler); ok {
+				if err := sh.HandleSessionInit(ctx, r.Session); err != nil {
+					return activeCursor, receivedMessage, fmt.Errorf("handle session init: %w", err)
+				}
+				break
+			}
 			s.logger.Info("session initialized with remote endpoint",
 				zap.Uint64("max_parallel_workers", r.Session.MaxParallelWorkers),
 				zap.Uint64("linear_handoff_block", r.Session.LinearHandoffBlock),

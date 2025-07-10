@@ -1,4 +1,3 @@
-
 Getting started with Substreams is very easy! Depending on the blockchain that you want to use, the best way to get started might change:
 
 {% tabs %}
@@ -65,7 +64,7 @@ Writing project files
 Generating Protobuf Rust code
 Project "uniswapv3_factory" initialized at "/Users/enolalvarezdeprado/Documents/projects/substreams/dsds/test"
 
-Run 'make build' to build the wasm code.
+Run 'substreams build' to build the wasm code.
 
 The following substreams.yaml files have been created with different sink targets:
  * substreams.yaml: no sink target

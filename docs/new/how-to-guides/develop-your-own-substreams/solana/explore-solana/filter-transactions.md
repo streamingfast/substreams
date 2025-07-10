@@ -7,7 +7,7 @@ The `map_filter_transactions` module of the Solana Substreams Explorer filters t
 In the `substreams-explorer` project, move to the `solana-explorer` folder, which contains the source of the Solana Substreams. Then, build the Rust code:
 
 ```bash
-make build
+substreams build
 ```
 
 Now, you can run the Substreams by using the `substreams gui` command. To avoid iterating over the whole blockchain, the following command extracts transactions including `21ED2HBGuLUwgbaBb77cGwFR8MkVQfjR9KszzCb7jZkeSysJkHAVew6RaaBh3r1zTefpdq9Kf5geFp19P3nUXB3t` signatures.

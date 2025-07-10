@@ -5,14 +5,10 @@ For example, if you want to retrieve all the transactions initiated by the addre
 
 ### Running the Substreams
 
-First, generate the Protobuf modules and build the Rust code:
+First, build the Rust code (this will also generate the Protobuf modules):
 
 ```bash
-make protogen
-```
-
-```bash
-make build
+substreams build
 ```
 
 Now, you can run the Substreams:

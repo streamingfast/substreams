@@ -18,21 +18,34 @@ import (
 )
 
 const (
-	FlagNetwork               = "network"
-	FlagParams                = "params"
-	FlagInsecure              = "insecure"
-	FlagPlaintext             = "plaintext"
-	FlagUndoBufferSize        = "undo-buffer-size"
-	FlagLiveBlockTimeDelta    = "live-block-time-delta"
-	FlagDevelopmentMode       = "development-mode"
-	FlagFinalBlocksOnly       = "final-blocks-only"
-	FlagInfiniteRetry         = "infinite-retry"
-	FlagIrreversibleOnly      = "irreversible-only"
+	FlagEndpoint        = "endpoint"
+	ShortFlagEndoint    = "e"
+	FlagStartBlock      = "start-block"
+	ShortFlagStartBlock = "s"
+	FlagStopBlock       = "stop-block"
+	ShortFlagStopBlock  = "t"
+	FlagCursor          = "cursor"
+	ShortFlagCursor     = "c"
+
+	FlagFinalBlocksOnly = "final-blocks-only"
+	FlagAPIKeyEnvvar    = "api-key-envvar"
+	FlagAPITokenEnvvar  = "api-token-envvar"
+
+	FlagNetwork   = "network"
+	FlagParams    = "params"
+	FlagInsecure  = "insecure"
+	FlagPlaintext = "plaintext"
+
+	FlagUndoBufferSize     = "undo-buffer-size"
+	FlagLiveBlockTimeDelta = "live-block-time-delta"
+	FlagDevelopmentMode    = "development-mode"
+	FlagInfiniteRetry      = "infinite-retry"
+
 	FlagSkipPackageValidation = "skip-package-validation"
 	FlagExtraHeaders          = "header"
-	FlagAPIKeyEnvvar          = "api-key-envvar"
-	FlagAPITokenEnvvar        = "api-token-envvar"
 	FlagNoopMode              = "noop-mode"
+	FlagProtoPath             = "proto-path"
+	FlagProtoDescriptorSet    = "proto-descriptor-set"
 )
 
 func FlagIgnore(in ...string) FlagIgnored {
@@ -55,16 +68,22 @@ func (i flagIgnoredList) IsIgnored(flag string) bool {
 //
 // Defines
 //
+//	Flag `--endpoint` (-e) (defaults `""`)
+//	Flag `--start-block` (-s) (defaults `""`)
+//	Flag `--stop-block` (-t) (defaults `""`)
+//	Flag `--cursor` (-c) (defaults `""`)
+//	Flag `--network` (defaults `""`)
 //	Flag `--params` (-p) (defaults `[]`)
-//	Flag `--insecure` (-k) (defaults `false`)
+//	Flag `--insecure` (defaults `false`)
 //	Flag `--plaintext` (defaults `false`)
 //	Flag `--undo-buffer-size` (defaults `12`)
 //	Flag `--live-block-time-delta` (defaults `300*time.Second`)
 //	Flag `--development-mode` (defaults `false`)
+//	Flag `--noop-mode` (defaults `false`)
 //	Flag `--final-blocks-only` (defaults `false`)
 //	Flag `--infinite-retry` (defaults `false`)
 //	Flag `--skip-package-validation` (defaults `false`)
-//	Flag `--header (-H)` (defaults `[]`)
+//	Flag `--header` (-H) (defaults `[]`)
 //	Flag `--api-key-envvar` (default `SUBSTREAMS_API_KEY`)
 //	Flag `--api-token-envvar` (default `SUBSTREAMS_API_TOKEN`)
 //
@@ -76,20 +95,36 @@ func (i flagIgnoredList) IsIgnored(flag string) bool {
 func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagIgnored) {
 	flagIncluded := func(x string) bool { return every(ignore, func(e FlagIgnored) bool { return !e.IsIgnored(x) }) }
 
-	if flagIncluded(FlagParams) {
-		flags.StringArrayP(FlagParams, "p", nil, "Set a params for parameterizable modules of the from `-p <module>=<value>`, can be specified multiple times (e.g. -p module1=valA -p module2=valX&valY)")
+	if flagIncluded(FlagEndpoint) {
+		flags.StringP(FlagEndpoint, ShortFlagEndoint, "", "Substreams gRPC endpoint. If empty, will be replaced by the SUBSTREAMS_ENDPOINT_{network_name} environment variable, where `network_name` is determined from the substreams manifest. Some network names have default endpoints.")
+	}
+
+	if flagIncluded(FlagStartBlock) {
+		flags.StringP(FlagStartBlock, ShortFlagStartBlock, "", "Start block to stream from. If empty, will be replaced by initialBlock of the first module you are streaming. If negative, will be resolved by the server relative to the chain head")
+	}
+
+	if flagIncluded(FlagStopBlock) {
+		flags.StringP(FlagStopBlock, ShortFlagStopBlock, "0", "Stop block to end stream at, exclusively. If the start-block is positive, a '+' prefix can indicate 'relative to start-block'")
+	}
+
+	if flagIncluded(FlagCursor) {
+		flags.StringP(FlagCursor, ShortFlagCursor, "", "Cursor to stream from. Leave blank for no cursor")
 	}
 
 	if flagIncluded(FlagNetwork) {
-		flags.StringP(FlagNetwork, "n", "", "Specify network, overriding the default one in the manifest or .spkg")
+		flags.String(FlagNetwork, "", "Specify the network to use for params and initialBlocks, overriding the 'network' field in the substreams package")
+	}
+
+	if flagIncluded(FlagParams) {
+		flags.StringArrayP(FlagParams, "p", nil, "Set a params for parameterizable modules. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
 	}
 
 	if flagIncluded(FlagInsecure) {
-		flags.BoolP(FlagInsecure, "k", false, "Skip certificate validation on gRPC connection")
+		flags.Bool(FlagInsecure, false, "Skip certificate validation on GRPC connection")
 	}
 
 	if flagIncluded(FlagPlaintext) {
-		flags.Bool(FlagPlaintext, false, "Establish gRPC connection in plaintext")
+		flags.Bool(FlagPlaintext, false, "Establish GRPC connection in plaintext")
 	}
 
 	if flagIncluded(FlagUndoBufferSize) {
@@ -105,17 +140,11 @@ func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagIgnored) {
 	}
 
 	if flagIncluded(FlagNoopMode) {
-		flags.Bool(FlagNoopMode, false, "Noop mode, to cache data without producing output when being live")
+		flags.Bool(FlagNoopMode, false, "Sends the request to the server with 'noop-mode', which will not send actual data, only populate the cache")
 	}
 
 	if flagIncluded(FlagFinalBlocksOnly) {
-		flags.Bool(FlagFinalBlocksOnly, false, "Get only final blocks")
-
-		if flagIncluded(FlagIrreversibleOnly) {
-			// Deprecated flags
-			flags.Bool(FlagIrreversibleOnly, false, "Get only irreversible blocks")
-			flags.Lookup(FlagIrreversibleOnly).Deprecated = "Renamed to --final-blocks-only"
-		}
+		flags.Bool(FlagFinalBlocksOnly, false, "Only process blocks that have pass finality, to prevent any reorg and undo signal by staying further away from the chain HEAD")
 	}
 
 	if flagIncluded(FlagInfiniteRetry) {
@@ -123,7 +152,7 @@ func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagIgnored) {
 	}
 
 	if flagIncluded(FlagSkipPackageValidation) {
-		flags.Bool(FlagSkipPackageValidation, false, "Skip .spkg file validation, allowing the use of a partial spkg (without metadata and protobuf definiitons)")
+		flags.Bool(FlagSkipPackageValidation, false, "Do not perform any validation when reading substreams package")
 	}
 
 	if flagIncluded(FlagExtraHeaders) {
@@ -131,11 +160,11 @@ func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagIgnored) {
 	}
 
 	if flagIncluded(FlagAPIKeyEnvvar) {
-		flags.StringP(FlagAPIKeyEnvvar, "", "SUBSTREAMS_API_KEY", "Name of environment variable containing substreams API Key")
+		flags.String(FlagAPIKeyEnvvar, "SUBSTREAMS_API_KEY", "Name of variable containing Substreams Api Key")
 	}
 
 	if flagIncluded(FlagAPITokenEnvvar) {
-		flags.StringP(FlagAPITokenEnvvar, "", "SUBSTREAMS_API_TOKEN", "Name of environment variable containing substreams Authentication token (JWT)")
+		flags.String(FlagAPITokenEnvvar, "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token")
 	}
 
 }
@@ -297,15 +326,8 @@ func getViperFlags(cmd *cobra.Command) (
 		infiniteRetry = sflags.MustGetBool(cmd, FlagInfiniteRetry)
 	}
 
-	var isSet bool
 	if sflags.FlagDefined(cmd, FlagFinalBlocksOnly) {
-		finalBlocksOnly, isSet = sflags.MustGetBoolProvided(cmd, FlagFinalBlocksOnly)
-	}
-
-	if !isSet {
-		if sflags.FlagDefined(cmd, FlagIrreversibleOnly) {
-			finalBlocksOnly = sflags.MustGetBool(cmd, FlagIrreversibleOnly)
-		}
+		finalBlocksOnly = sflags.MustGetBool(cmd, FlagFinalBlocksOnly)
 	}
 
 	if sflags.FlagDefined(cmd, FlagSkipPackageValidation) {
@@ -317,6 +339,19 @@ func getViperFlags(cmd *cobra.Command) (
 	}
 
 	return
+}
+
+type SyncConfig struct {
+	Params                []string
+	Network               string
+	UndoBufferSize        int
+	LiveBlockTimeDelta    time.Duration
+	IsDevelopmentMode     bool
+	InfiniteRetry         bool
+	FinalBlocksOnly       bool
+	SkipPackageValidation bool
+	IsNoopMode            bool
+	ExtraHeaders          []string
 }
 
 // parseNumber parses a number and indicates whether the number is relative, meaning it starts with a +

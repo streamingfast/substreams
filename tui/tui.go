@@ -9,9 +9,7 @@ import (
 	"time"
 
 	"github.com/bobg/go-generics/v3/slices"
-	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/substreams/pipeline/exec"
-	"github.com/streamingfast/substreams/tools/test"
+	"github.com/streamingfast/substreams/sink"
 	"github.com/streamingfast/substreams/tui2/common"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -195,127 +193,117 @@ func (ui *TUI) Cancel() {
 	ui.shutter.Shutdown(err)
 }
 
-func (ui *TUI) IncomingMessage(ctx context.Context, resp *pbsubstreamsrpc.Response, testRunner *test.Runner) error {
-	switch m := resp.Message.(type) {
-	case *pbsubstreamsrpc.Response_BlockUndoSignal:
-		switch ui.outputMode {
-		case OutputModeTUI:
-			printUndo(m.BlockUndoSignal.LastValidBlock, m.BlockUndoSignal.LastValidCursor)
-			ui.ensureTerminalUnlocked()
-		case OutputModeJSON, OutputModeJSONL:
-			printUndoJSON(m.BlockUndoSignal.LastValidBlock, m.BlockUndoSignal.LastValidCursor)
-		case OutputModeCLOCK:
-			fmt.Println("UNDO:", m.BlockUndoSignal.LastValidBlock)
-		case OutputModeCURSOR:
-			cur, err := bstream.CursorFromOpaque(m.BlockUndoSignal.LastValidCursor)
-			if err != nil {
-				return err
-			}
-			fmt.Println(cur.String())
-		}
+func (ui *TUI) HandleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *sink.Cursor) error {
+	switch ui.outputMode {
+	case OutputModeTUI:
+		printUndo(undoSignal.LastValidBlock, undoSignal.LastValidCursor)
+		ui.ensureTerminalUnlocked()
+	case OutputModeJSON, OutputModeJSONL:
+		printUndoJSON(undoSignal.LastValidBlock, undoSignal.LastValidCursor)
+	case OutputModeCLOCK:
+		fmt.Println("UNDO:", undoSignal.LastValidBlock)
+	case OutputModeCURSOR:
+		fmt.Println(cursor.String())
+	}
+	return nil
+}
 
-	case *pbsubstreamsrpc.Response_BlockScopedData:
-		if testRunner != nil {
-			if err := testRunner.Test(ctx, m.BlockScopedData.Output, m.BlockScopedData.DebugMapOutputs, m.BlockScopedData.DebugStoreOutputs, m.BlockScopedData.Clock); err != nil {
-				return fmt.Errorf("test runner failed: %w", err)
-			}
-		}
+func (ui *TUI) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.BlockScopedData, isLive *bool, cursor *sink.Cursor) error {
+	_ = isLive
 
-		if m.BlockScopedData == nil {
-			return nil
-		}
-		switch ui.outputMode {
-		case OutputModeTUI:
-			printClock(m.BlockScopedData)
-		case OutputModeCLOCK:
-			printClock(m.BlockScopedData)
-			return nil
-		case OutputModeCURSOR:
+	if data == nil {
+		return nil
+	}
+	switch ui.outputMode {
+	case OutputModeTUI:
+		printClock(data)
+	case OutputModeCLOCK:
+		printClock(data)
+		return nil
+	case OutputModeCURSOR:
+		fmt.Println(cursor.String())
+		return nil
+	}
 
-			cur, err := bstream.CursorFromOpaque(resp.GetBlockScopedData().Cursor)
-			if err != nil {
-				return err
-			}
-			fmt.Println(cur.String())
-			return nil
-		}
+	ui.seenFirstData = true
+	if ui.outputMode == OutputModeTUI {
+		ui.ensureTerminalUnlocked()
+		return ui.decoratedBlockScopedData(data.Output, data.DebugMapOutputs, data.DebugStoreOutputs, data.Clock)
+	} else {
+		return ui.jsonBlockScopedData(data.Output, data.DebugMapOutputs, data.DebugStoreOutputs, data.Clock)
+	}
+}
 
-		ui.seenFirstData = true
-		if ui.outputMode == OutputModeTUI {
-			ui.ensureTerminalUnlocked()
-			return ui.decoratedBlockScopedData(m.BlockScopedData.Output, m.BlockScopedData.DebugMapOutputs, m.BlockScopedData.DebugStoreOutputs, m.BlockScopedData.Clock)
-		} else {
-			return ui.jsonBlockScopedData(m.BlockScopedData.Output, m.BlockScopedData.DebugMapOutputs, m.BlockScopedData.DebugStoreOutputs, m.BlockScopedData.Clock)
-		}
-	case *pbsubstreamsrpc.Response_Progress:
+func (ui *TUI) HandleProgress(ctx context.Context, progress *pbsubstreamsrpc.ModulesProgress) {
+	if progress.ProcessedBytes != nil {
+		ui.TotalReadBytes = progress.ProcessedBytes.TotalBytesRead
+	}
+	ui.TotalProcessedBlocks = progress.ProcessedBlocks
 
-		if m.Progress.ProcessedBytes != nil {
-			ui.TotalReadBytes = m.Progress.ProcessedBytes.TotalBytesRead
-		}
-		ui.TotalProcessedBlocks = m.Progress.ProcessedBlocks
-
-		if !ui.seenFirstData {
-			if ui.outputMode == OutputModeTUI {
-				ui.ensureTerminalLocked()
-				ui.prog.Send(m.Progress)
-			}
-		}
-	case *pbsubstreamsrpc.Response_DebugSnapshotData:
-		if ui.outputMode == OutputModeTUI {
-			ui.ensureTerminalUnlocked()
-			return ui.decoratedSnapshotData(m.DebugSnapshotData)
-		} else {
-			return ui.jsonSnapshotData(m.DebugSnapshotData)
-		}
-
-	case *pbsubstreamsrpc.Response_DebugSnapshotComplete:
-		if ui.outputMode == OutputModeTUI {
-			fmt.Println("Snapshot data dump complete")
-		}
-
-	case *pbsubstreamsrpc.Response_Session:
-		if m.Session.BlocksToProcessAfterStartBlock != 0 {
-			ui.RequiredProcessedBlocks = m.Session.EffectiveBlocksToProcessBeforeStartBlock + m.Session.EffectiveBlocksToProcessAfterStartBlock
-		}
-		ui.ResolvedStartBlock = m.Session.ResolvedStartBlock
-
+	if !ui.seenFirstData {
 		if ui.outputMode == OutputModeTUI {
 			ui.ensureTerminalLocked()
-			ui.prog.Send(m)
-		} else {
-
-			execGraph, err := exec.NewOutputModuleGraph(ui.Req.OutputModule, ui.Req.ProductionMode, ui.Req.Modules, bstream.GetProtocolFirstStreamableBlock)
-			if err != nil {
-				return fmt.Errorf("cannot handle module graph: %w", err)
-			}
-
-			fmt.Fprintf(os.Stderr, "TraceID: %s\n", m.Session.TraceId)
-			if m.Session.ChainHead != 0 {
-				fmt.Fprintf(os.Stderr, "Server HEAD block: %d\n", m.Session.ChainHead)
-			}
-			stages := len(execGraph.StagedUsedModules())
-			if stages == 1 || !ui.Req.ProductionMode {
-				fmt.Fprintln(os.Stderr, "This request will be processed in a single stage")
-			} else {
-				fmt.Fprintf(os.Stderr, "This request will be processed in %d stages\n", stages)
-			}
-
-			if m.Session.BlocksToProcessBeforeStartBlock != 0 {
-				stageCount := fmt.Sprintf("%d stage", stages-1)
-				if stages > 2 {
-					stageCount += "s"
-				}
-				fmt.Fprintf(os.Stderr, "Blocks to process to prepare the stores in %s: %d (%d already cached)\n", stageCount, m.Session.EffectiveBlocksToProcessBeforeStartBlock, m.Session.BlocksToProcessBeforeStartBlock-m.Session.EffectiveBlocksToProcessBeforeStartBlock)
-			}
-
-			if m.Session.BlocksToProcessAfterStartBlock != 0 {
-				fmt.Fprintf(os.Stderr, "Blocks to process in requested range: %d (%d already cached)\n", m.Session.EffectiveBlocksToProcessAfterStartBlock, m.Session.BlocksToProcessAfterStartBlock-m.Session.EffectiveBlocksToProcessAfterStartBlock)
-			}
+			ui.prog.Send(progress)
 		}
-
-	default:
-		fmt.Println("Unsupported response", m)
 	}
+}
+
+func (ui *TUI) HandleDebugSnapshotData(ctx context.Context, debug *pbsubstreamsrpc.InitialSnapshotData) error {
+	if ui.outputMode == OutputModeTUI {
+		ui.ensureTerminalUnlocked()
+		return ui.decoratedSnapshotData(debug)
+	} else {
+		return ui.jsonSnapshotData(debug)
+	}
+}
+
+func (ui *TUI) HandleDebugSnapshotComplete(ctx context.Context, complete *pbsubstreamsrpc.InitialSnapshotComplete) error {
+	_ = complete
+	if ui.outputMode == OutputModeTUI {
+		fmt.Println("Snapshot data dump complete")
+	}
+	return nil
+}
+
+func (ui *TUI) HandleSession(ctx context.Context, session *pbsubstreamsrpc.SessionInit) error {
+	if session.BlocksToProcessAfterStartBlock != 0 {
+		ui.RequiredProcessedBlocks = session.EffectiveBlocksToProcessBeforeStartBlock + session.EffectiveBlocksToProcessAfterStartBlock
+	}
+	ui.ResolvedStartBlock = session.ResolvedStartBlock
+
+	if ui.outputMode == OutputModeTUI {
+		ui.ensureTerminalLocked()
+		ui.prog.Send(session)
+	}
+	//	} else {
+	//		execGraph, err := exec.NewOutputModuleGraph(ui.Req.OutputModule, ui.Req.ProductionMode, ui.Req.Modules, bstream.GetProtocolFirstStreamableBlock//)
+	//		if err != nil {
+	//			return fmt.Errorf("cannot handle module graph: %w", err)
+	//		}
+	//
+	//		fmt.Fprintf(os.Stderr, "TraceID: %s\n", session.TraceId)
+	//		if session.ChainHead != 0 {
+	//			fmt.Fprintf(os.Stderr, "Server HEAD block: %d\n", session.ChainHead)
+	//		}
+	//		stages := len(execGraph.StagedUsedModules())
+	//		if stages == 1 || !ui.Req.ProductionMode {
+	//			fmt.Fprintln(os.Stderr, "This request will be processed in a single stage")
+	//		} else {
+	//			fmt.Fprintf(os.Stderr, "This request will be processed in %d stages\n", stages)
+	//		}
+	//
+	//		if session.BlocksToProcessBeforeStartBlock != 0 {
+	//			stageCount := fmt.Sprintf("%d stage", stages-1)
+	//			if stages > 2 {
+	//				stageCount += "s"
+	//			}
+	//			fmt.Fprintf(os.Stderr, "Blocks to process to prepare the stores in %s: %d (%d already cached)\n", stageCount, //session.EffectiveBlocksToProcessBeforeStartBlock, session.BlocksToProcessBeforeStartBlock-session.EffectiveBlocksToProcessBeforeStartBlock)
+	//		}
+	//
+	//		if session.BlocksToProcessAfterStartBlock != 0 {
+	//			fmt.Fprintf(os.Stderr, "Blocks to process in requested range: %d (%d already cached)\n", session.EffectiveBlocksToProcessAfterStartBlock, //session.BlocksToProcessAfterStartBlock-session.EffectiveBlocksToProcessAfterStartBlock)
+	//		}
+	//	}
 	return nil
 }
 

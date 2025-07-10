@@ -4,14 +4,10 @@ Given a smart contract address passed as a parameter, this module returns the lo
 
 ### Running the Substreams
 
-First, generate the Protobuf modules and build the Rust code:
+First, build the Rust code (this will also generate the Protobuf modules):
 
 ```bash
-make protogen
-```
-
-```bash
-make build
+substreams build
 ```
 
 Now, you can run the Substreams. The logs retrieved correspond to the `0xbc4ca0eda7647a8ab7c2061c2e118a18a936f13d` (BoredApeYachtClub smart contract).

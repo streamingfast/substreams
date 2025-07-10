@@ -68,7 +68,7 @@ The details of the run command are:
 
 #### Headers
 
-The `-H` option in of the `run` or `gui` command allows you to dynamically pass headers with the gRPC request. This is useful when overriding default parameters in the Substreams execution.
+The `-H` option of the `run` or `gui` command allows you to dynamically pass headers with the gRPC request. This is useful when overriding default parameters in the Substreams execution.
 
 ##### X-Sf-Substreams-Parallel-Jobs Header
 
@@ -124,7 +124,7 @@ The available output display options are:
 
 The `gui` command pops up a terminal-based graphical user interface.
 
-Its parameters are very similar to those of `run`, but provides a UI to navigate the results instead of a stream of data.
+Its parameters are very similar to those of `run`, but the `gui` command provides a UI to navigate the results instead of a stream of data.
 
 #### Replay mode
 
@@ -136,7 +136,7 @@ You can reload the data without hitting the server again using `--replay`. The d
 
 ## Cheatsheet
 
-There are the shortcuts that you can use to navigate the GUI. You can always get more information by pressing the `?` key.
+These are the shortcuts that you can use to navigate the GUI. You can always get more information by pressing the `?` key.
 
 | Function | Keys  | 
 |---|---|
@@ -264,7 +264,7 @@ modules {
 
 ### **`codegen`**
 
-The `codegen` command generates a code for a specific sink taking as a Substreams module as input. 
+The `codegen` command generates a code for a specific sink taking a Substreams module as input. 
 
 - SQL
 

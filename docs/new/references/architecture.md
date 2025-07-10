@@ -6,9 +6,9 @@ description: Learn about the Substreams architecture
 
 Parallel execution is the process of a Substreams module's code executing multiple segments of blockchain data simultaneously in a forward or backward direction. Substreams modules can be executed in parallel, rapidly producing data for consumption in end-user applications. Parallel execution enables Substreams' highly efficient blockchain data processing capabilities.
 
-Parallel execution occurs when a requested module's start block is further back in the blockchain's history than the requested start block. For example, if a module starts at block 12,000,000 and a user requests data at block 15,000,000, parallel execution is used. This applies to both the development and production modes of Substreams operation.
+Parallel execution occurs when a module's start block is further back in the blockchain's history than the requested start block. For example, if a module starts at block 12,000,000 and a user requests data at block 15,000,000, parallel execution is used. This applies to both the development and production modes of Substreams operation.
 
-Parallel execution addresses the problem of the slow single linear execution of a module. Instead of running a module in a linear fashion, one block after the other without leveraging full computing power, N number of workers are executed over a different segment of the chain. It means data can be pushed back to the user N times faster than cases using a single worker.
+Parallel execution addresses the problem of the slow, single, linear execution of a module. Instead of running a module in a linear fashion, one block after the other without leveraging full computing power, N number of workers are executed over a different segment of the chain. It means data can be pushed back to the user N times faster than cases using a single worker.
 
 The server will define an execution schedule and take the module's dependencies into consideration. The server's execution schedule is a list of pairs of (`module, range`), where range contains `N` blocks. This is a configurable value set to 25K blocks, on the server.
 

@@ -13,7 +13,6 @@ import (
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 )
 
@@ -181,7 +180,7 @@ func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagIgnored) {
 
 // NewFromViper constructs a new Sinker instance from a fixed set of "known" flags.
 // This function creates a SinkerConfig from the Viper configuration and then uses
-// it to create a new Sinker instance, replacing the previous Options pattern.
+// it to create a new Sinker instance.
 //
 // If you want to extract the sink output module's name directly from the Substreams
 // package, if supported by your sink, instead of an actual name for paramater
@@ -197,27 +196,31 @@ func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagIgnored) {
 func NewFromViper(
 	cmd *cobra.Command,
 	expectedOutputModuleType string,
-	manifestPath, outputModuleName string,
+	manifestPath string,
+	outputModuleName string,
+	userAgent string,
 	zlog *zap.Logger,
 	tracer logging.Tracer,
 ) (*Sinker, error) {
-	config, err := NewSinkerConfigFromViper(cmd, expectedOutputModuleType, manifestPath, outputModuleName, zlog, tracer)
+	config, err := ConfigFromViper(cmd, expectedOutputModuleType, manifestPath, outputModuleName, userAgent, zlog, tracer)
 	if err != nil {
 		return nil, fmt.Errorf("creating sinker config from viper: %w", err)
 	}
 
-	return New(config, config.ZLog, config.Tracer), nil
+	return New(config), nil
 }
 
-// NewSinkerConfigFromViper creates a SinkerConfig from the provided Viper configuration.
+// ConfigFromViper creates a SinkerConfig from the provided Viper configuration.
 // This function extracts all necessary configuration from the command flags and
 // creates a complete SinkerConfig that can be used to create a Sinker instance.
 // The endpoint is read from the FlagEndpoint flag, and the block range is computed
 // from the FlagStartBlock and FlagStopBlock flags.
-func NewSinkerConfigFromViper(
+func ConfigFromViper(
 	cmd *cobra.Command,
 	expectedOutputModuleType string,
-	manifestPath, outputModuleName string,
+	manifestPath string,
+	outputModuleName string,
+	userAgent string,
 	zlog *zap.Logger,
 	tracer logging.Tracer,
 ) (*SinkerConfig, error) {
@@ -312,7 +315,7 @@ func NewSinkerConfigFromViper(
 		authType,
 		sflags.MustGetBool(cmd, FlagInsecure),
 		sflags.MustGetBool(cmd, FlagPlaintext),
-		"sink",
+		userAgent,
 	)
 
 	mode := SubstreamsModeProduction
@@ -349,7 +352,7 @@ func NewSinkerConfigFromViper(
 		Params:                params,
 		Network:               network,
 		SkipPackageValidation: skipPackageValidation,
-		ZLog:                  zlog,
+		Logger:                zlog,
 		Tracer:                tracer,
 	}
 
@@ -409,49 +412,6 @@ func getViperFlags(cmd *cobra.Command) (
 	}
 
 	return
-}
-
-// SinkerConfig contains all configuration needed to create and run a Sinker.
-// This struct replaces the previous Options pattern and provides a more
-// structured approach to configuring the Sinker instance.
-type SinkerConfig struct {
-	// Substreams package configuration
-	Pkg              *pbsubstreams.Package
-	OutputModule     *pbsubstreams.Module
-	OutputModuleHash manifest.ModuleHash
-
-	// Client configuration
-	ClientConfig *client.SubstreamsClientConfig
-
-	// Operational configuration
-	Mode     SubstreamsMode
-	NoopMode bool
-
-	// Block processing configuration
-	StartBlock      int64
-	StopBlock       uint64
-	UndoBufferSize  int
-	FinalBlocksOnly bool
-
-	// Retry and reliability configuration
-	InfiniteRetry bool
-	BackOff       backoff.BackOff
-
-	// Liveness configuration
-	LiveBlockTimeDelta time.Duration
-	LivenessChecker    LivenessChecker
-
-	// Additional configuration
-	ExtraHeaders []string
-
-	// Logging and tracing
-	ZLog   *zap.Logger
-	Tracer logging.Tracer
-
-	// Legacy fields for backward compatibility
-	Params                []string
-	Network               string
-	SkipPackageValidation bool
 }
 
 func every[E any](s []E, test func(e E) bool) bool {

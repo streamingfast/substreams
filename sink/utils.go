@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jhump/protoreflect/dynamic"
 	"github.com/spf13/cobra"
 	networks "github.com/streamingfast/firehose-networks"
 )
@@ -59,17 +58,26 @@ func readStopBlockFlag(cmd *cobra.Command, startBlock int64, flagName string) (u
 	return endBlock, nil
 }
 
-// Helper to map string to dynamic.BytesRepresentation
-func BytesEncodingToRepresentation(enc string) dynamic.BytesRepresentation {
+type BytesRepresentation int
+
+const (
+	BytesAsBase64 BytesRepresentation = iota
+	BytesAsHex
+	BytesAsString
+	BytesAsBase58
+)
+
+// Helper to map string to BytesRepresentation
+func BytesEncodingToRepresentation(enc string) BytesRepresentation {
 	switch enc {
 	case "base58":
-		return dynamic.BytesAsBase58
+		return BytesAsBase58
 	case "base64":
-		return dynamic.BytesAsBase64
+		return BytesAsBase64
 	case "string":
-		return dynamic.BytesAsString
+		return BytesAsString
 	default:
-		return dynamic.BytesAsHex
+		return BytesAsHex
 	}
 }
 
@@ -77,14 +85,14 @@ func BytesEncodingToRepresentation(enc string) dynamic.BytesRepresentation {
 // It first checks the network ID, and if not found, it checks the endpoint.
 // If neither is provided, it defaults to Hex encoding.
 // It returns a dynamic.BytesRepresentation based on the encoding.
-func InferBytesRepresentation(network string, endpoint string) dynamic.BytesRepresentation {
+func InferBytesRepresentation(network string, endpoint string) BytesRepresentation {
 	registry := networks.GetSubstreamsRegistry()
 
 	// First check by network and aliases
 	net := registry.Find(network)
 	if net == nil {
 		if endpoint == "" {
-			return dynamic.BytesAsHex
+			return BytesAsHex
 		}
 		// Try with endpoint if no network was found
 		net = registry.FindBySubstreamsEndpoint(endpoint)
@@ -95,5 +103,5 @@ func InferBytesRepresentation(network string, endpoint string) dynamic.BytesRepr
 		return BytesEncodingToRepresentation(string(networks.GetBytesEncoding(net)))
 	}
 
-	return dynamic.BytesAsHex
+	return BytesAsHex
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/streamingfast/substreams/sink"
 	"github.com/streamingfast/substreams/tools/test"
 	"github.com/streamingfast/substreams/tui"
+	"github.com/streamingfast/substreams/tui2/common"
 	"go.uber.org/zap"
 )
 
@@ -23,9 +24,10 @@ func init() {
 
 	runCmd.Flags().Bool("production-mode", false, "Enable Production Mode, with high-speed parallel processing")
 	runCmd.Flags().Uint64("limit-processed-blocks", 10000, "Limit the number of blocks to be processed by the server, including preparing the stores, as a safeguard to prevent unexpected expensive reprocessing (0 disables the limit)")
-	runCmd.Flags().StringP("output", "o", "", "Output mode, one of: [tui (and ui), json, jsonl, clock] Defaults to 'tui' when in a TTY is present, and 'json' otherwise")
 	runCmd.Flags().StringSlice("debug-modules-initial-snapshot", nil, "List of 'store' modules from which to print the initial data snapshot (Unavailable in Production Mode)")
 	runCmd.Flags().StringSlice("debug-modules-output", nil, "List of modules from which to print outputs, deltas and logs, accepts regexes (Unavailable in Production Mode)")
+
+	runCmd.Flags().StringP("output", "o", "", "Output mode, one of: [tui (and ui), json, jsonl, clock] Defaults to 'tui' when in a TTY is present, and 'json' otherwise")
 
 	runCmd.Flags().String("test-file", "", "runs a test file")
 	runCmd.Flags().Bool("test-verbose", false, "print out all the results")
@@ -52,7 +54,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 
 	// parses flags
-	sinkerConfig, err := sink.NewSinkerConfigFromViper(cmd, "", manifestPath, outputModule, zlog, tracer)
+	sinkerConfig, err := sink.ConfigFromViper(cmd, sink.IgnoreOutputModuleType, manifestPath, outputModule, "substreams_run", zlog, tracer)
 	if err != nil {
 		return fmt.Errorf("creating sink config: %w", err)
 	}
@@ -61,10 +63,25 @@ func runRun(cmd *cobra.Command, args []string) error {
 	if sflags.MustGetBool(cmd, "production-mode") {
 		sinkerConfig.Mode = sink.SubstreamsModeProduction
 	} else {
+		if sinkerConfig.NoopMode {
+			zlog.Warn("noop-mode used without production-mode: server will execute in development mode without sending the data, this is probably not what you want")
+		}
 		sinkerConfig.Mode = sink.SubstreamsModeDevelopment
 	}
 
-	sinker := sink.New(sinkerConfig, zlog, tracer)
+	sinkerConfig.DevOutputModules = sflags.MustGetStringSlice(cmd, "debug-modules-output")
+	if sinkerConfig.DevOutputModules != nil && sinkerConfig.Mode == sink.SubstreamsModeProduction {
+		return fmt.Errorf("cannot set 'debug-modules-output' in 'production-mode'")
+	}
+
+	outputModulesSnapshot := sflags.MustGetStringSlice(cmd, "debug-modules-initial-snapshot")
+	if len(outputModulesSnapshot) != 0 {
+		sinkerConfig.DevOutputSnapshots = outputModulesSnapshot
+	}
+
+	sinkerConfig.LimitProcessedBlocks = sflags.MustGetUint64(cmd, "limit-processed-blocks")
+
+	sinker := sink.New(sinkerConfig)
 
 	cursorStr := sflags.MustGetString(cmd, "cursor")
 	cursor, err := sink.NewCursor(cursorStr)
@@ -95,7 +112,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		ui.SetTestRunner(testRunner)
 	}
 
-	if err := ui.Init(outputMode, sinker.BytesRepresentation()); err != nil {
+	if err := ui.Init(outputMode, common.ToDynamicBytesRepresentation(sinker.BytesRepresentation())); err != nil {
 		return fmt.Errorf("TUI initialization: %w", err)
 	}
 	defer ui.CleanUpTerminal()
@@ -122,33 +139,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	return err
 
-	// FIXME: size isn't same for egress bytes, also test others with prod mode reproc.
-	// FIXME Maybe expose those 'Get()' things on the sinker object, maybe not... or at least rename them
-	// FIXME
-	//	debugModulesOutput := sflags.MustGetStringSlice(cmd, "debug-modules-output")
-	//	if len(debugModulesOutput) == 0 {
-	//		debugModulesOutput = nil
-	//	}
-	//	if debugModulesOutput != nil && productionMode {
-	//		return fmt.Errorf("cannot set 'debug-modules-output' in 'production-mode'")
-	//	}
-	//
-	//	debugModulesInitialSnapshot := sflags.MustGetStringSlice(cmd, "debug-modules-initial-snapshot")
-	//	if len(debugModulesInitialSnapshot) == 0 {
-	//		debugModulesInitialSnapshot = nil
-	//	}
-	//
-	// FIXME find the outputModule automatically like in GUI, move this to sink
-	//
-	//	if outputModule == "" {
-	//		mods, ok := pkgBundle.Graph.TopologicalSort()
-	//		if ok {
-	//			outputModule = mods[0].Name
-	//			fmt.Printf("Selected output module: %s\n", outputModule)
-	//		}
-	//	}
-	//
-	// FIXME
 	//	if readFromModule {
 	//		sb, err := pkgBundle.Graph.ModuleInitialBlock(outputModule)
 	//		if err != nil {
@@ -160,8 +150,5 @@ func runRun(cmd *cobra.Command, args []string) error {
 	// FIXME: provide the user_agent for the client...
 	//
 	// FIXME
-	//	if noopMode && !productionMode {
-	//		zlog.Warn("noop-mode used without production-mode: server will execute in development mode without sending the data, this is probably not what //you want")
-	//	}
 
 }

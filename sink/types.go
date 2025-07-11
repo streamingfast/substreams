@@ -152,13 +152,14 @@ type SinkerSessionInitHandler interface {
 	//
 	// The handler receives the following arguments:
 	// - `ctx` is the context runtime, your handler should be minimal, so normally you shouldn't use this.
+	// - `req` is the request that was sent to the Substreams API.
 	// - `sessionInit` contains the session initialization data that was received from the Substreams API.
 	//
 	// The [HandleSessionInit] is optional and can be nil.
 	//
 	// Your handler must return an error value that can be nil or non-nil. If non-nil, the error is assumed to be a fatal
 	// error and the [Sinker] will shutdown
-	HandleSessionInit(ctx context.Context, sessionInit *pbsubstreamsrpc.SessionInit) error
+	HandleSessionInit(ctx context.Context, req *pbsubstreamsrpc.Request, sessionInit *pbsubstreamsrpc.SessionInit) error
 }
 
 type SinkerErrorHandler interface {

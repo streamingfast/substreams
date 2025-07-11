@@ -59,8 +59,9 @@ func ReadManifestAndModule(
 
 	pkg = pkgBundle.Package
 
-	resolvedOutputModuleName := outputModuleName
-	if resolvedOutputModuleName == InferOutputModuleFromPackage {
+	var resolvedOutputModuleName string
+	switch outputModuleName {
+	case InferOutputModuleFromPackage:
 		zlog.Debug("inferring module output name from package directly")
 
 		if pkg.SinkModule == "" {
@@ -68,6 +69,15 @@ func ReadManifestAndModule(
 		}
 
 		resolvedOutputModuleName = pkg.SinkModule
+	case "":
+		mods, ok := pkgBundle.Graph.TopologicalSort()
+		if ok {
+			resolvedOutputModuleName = mods[0].Name
+		} else {
+			return nil, nil, nil, fmt.Errorf("failed to sort modules")
+		}
+	default:
+		resolvedOutputModuleName = outputModuleName
 	}
 
 	zlog.Info("finding output module", zap.String("module_name", resolvedOutputModuleName))

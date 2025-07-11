@@ -76,8 +76,7 @@ func New(c common.Common, config *request.Config) (*Output, error) {
 		return nil, fmt.Errorf("new any resolver: %w", err)
 	}
 
-	bytesRepresentation := sink.InferBytesRepresentation(config.Pkg.Network, config.Endpoint)
-
+	bytesRepresentation := common.ToDynamicBytesRepresentation(sink.InferBytesRepresentation(config.Pkg.Network, config.Endpoint))
 	output := &Output{
 		Common:              c,
 		Config:              config,

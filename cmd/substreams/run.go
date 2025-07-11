@@ -70,6 +70,9 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 
 	sinkerConfig.DevOutputModules = sflags.MustGetStringSlice(cmd, "debug-modules-output")
+	if len(sinkerConfig.DevOutputModules) == 0 {
+		sinkerConfig.DevOutputModules = nil
+	}
 	if sinkerConfig.DevOutputModules != nil && sinkerConfig.Mode == sink.SubstreamsModeProduction {
 		return fmt.Errorf("cannot set 'debug-modules-output' in 'production-mode'")
 	}

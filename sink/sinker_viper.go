@@ -157,7 +157,7 @@ func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagIgnored) {
 	}
 
 	if flagIncluded(FlagExtraHeaders) {
-		flags.StringArrayP(FlagExtraHeaders, "H", nil, "Additional headers to be sent in the substreams request")
+		flags.StringSliceP(FlagExtraHeaders, "H", nil, "Additional headers to be sent in the substreams request")
 	}
 
 	if flagIncluded(FlagAPIKeyEnvvar) {
@@ -408,7 +408,7 @@ func getViperFlags(cmd *cobra.Command) (
 	}
 
 	if sflags.FlagDefined(cmd, FlagExtraHeaders) {
-		extraHeaders = sflags.MustGetStringArray(cmd, FlagExtraHeaders)
+		extraHeaders = sflags.MustGetStringSlice(cmd, FlagExtraHeaders)
 	}
 
 	return

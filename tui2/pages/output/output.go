@@ -11,7 +11,7 @@ import (
 
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/protodecode"
 	"github.com/streamingfast/substreams/sink"
 	"github.com/streamingfast/substreams/tui2/common"
 	"github.com/streamingfast/substreams/tui2/components/blocksearch"
@@ -27,7 +27,7 @@ type Output struct {
 	common.Common
 	*request.Config
 
-	anyResolver    *pbsubstreams.PackageAnyResolver
+	decoder        *protodecode.Decoder
 	msgDescs       map[string]*manifest.ModuleDescriptor
 	messageFactory *dynamic.MessageFactory
 
@@ -71,16 +71,10 @@ type Output struct {
 }
 
 func New(c common.Common, config *request.Config) (*Output, error) {
-	anyResolver, err := config.Pkg.NewAnyResolver()
-	if err != nil {
-		return nil, fmt.Errorf("new any resolver: %w", err)
-	}
-
 	bytesRepresentation := common.ToDynamicBytesRepresentation(sink.InferBytesRepresentation(config.Pkg.Network, config.Endpoint))
 	output := &Output{
 		Common:              c,
 		Config:              config,
-		anyResolver:         anyResolver,
 		blocksPerModule:     make(map[string][]uint64),
 		payloads:            make(map[request.BlockContext]*pbsubstreamsrpc.AnyModuleOutput),
 		blockIDs:            make(map[uint64]string),
@@ -145,6 +139,15 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case request.NewRequestInstance:
 		o.errReceived = nil
 		o.msgDescs = msg.MsgDescs
+
+		// Initialize decoder with the manifest descriptors
+		decoder, err := protodecode.NewDecoderFromManifest(o.Pkg, msg.MsgDescs)
+		if err != nil {
+			o.errReceived = fmt.Errorf("failed to create decoder: %w", err)
+		} else {
+			o.decoder = decoder
+		}
+
 		o.blocksPerModule = make(map[string][]uint64)
 		o.payloads = make(map[request.BlockContext]*pbsubstreamsrpc.AnyModuleOutput)
 		o.blockIDs = make(map[uint64]string)

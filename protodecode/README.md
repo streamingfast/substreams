@@ -21,6 +21,8 @@ Supports pattern matching for output stream names using regular expressions or e
 
 ## Usage
 
+### Pattern-based Decoder (for TUI package)
+
 ```go
 package main
 
@@ -30,7 +32,7 @@ import (
 )
 
 func main() {
-    // Create a decoder for a package
+    // Create a decoder for a package with pattern matching
     decoder, err := protodecode.NewDecoder(pkg, outputStreamNames)
     if err != nil {
         panic(err)
@@ -50,13 +52,68 @@ func main() {
 }
 ```
 
+### Manifest-based Decoder (for TUI2 package)
+
+```go
+package main
+
+import (
+    "github.com/streamingfast/substreams/protodecode"
+    "github.com/streamingfast/substreams/manifest"
+    pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+)
+
+func main() {
+    // Build message descriptors from the package
+    msgDescs, err := manifest.BuildMessageDescriptors(pkg)
+    if err != nil {
+        panic(err)
+    }
+    
+    // Create a decoder from manifest descriptors
+    decoder, err := protodecode.NewDecoderFromManifest(pkg, msgDescs)
+    if err != nil {
+        panic(err)
+    }
+    
+    // Set formatting options for pretty printing
+    decoder.SetFormatting("  ", true)
+    
+    // Use the decoder as before
+    if decoder.HasMessageType("my_module") {
+        msgType := decoder.GetMessageType("my_module")
+        msgDesc := decoder.GetMessageDescriptor("my_module")
+        
+        result := decoder.DecodeDynamicMessage(msgType, msgDesc, blockNum, modName, anyMessage)
+    }
+}
+```
+
 ## Features
 
 - **Dynamic Message Decoding**: Decode protobuf messages without compile-time knowledge of their structure
 - **Store Delta Decoding**: Handle store delta decoding with proper type handling
 - **Pattern Matching**: Support for regex and exact string matching for output stream names
+- **Manifest Integration**: Direct integration with manifest.ModuleDescriptor for TUI2 compatibility
+- **Flexible Formatting**: Configurable JSON output formatting with indentation and default values
 - **Error Handling**: Graceful handling of unknown types and decoding errors
 - **JSON Output**: Structured JSON output with module metadata
+
+## API Reference
+
+### Constructors
+
+- `NewDecoder(pkg, outputStreamNames)` - Creates a decoder with pattern matching (used by TUI)
+- `NewDecoderFromManifest(pkg, msgDescs)` - Creates a decoder from manifest descriptors (used by TUI2)
+
+### Methods
+
+- `HasMessageType(moduleName)` - Check if a module has a message type
+- `GetMessageType(moduleName)` - Get the message type for a module
+- `GetMessageDescriptor(moduleName)` - Get the message descriptor for a module
+- `DecodeDynamicMessage(msgType, msgDesc, blockNum, modName, anyMessage)` - Decode a map output message
+- `DecodeDynamicStoreDeltas(msgType, msgDesc, blockNum, modName, deltaBytes)` - Decode store delta bytes
+- `SetFormatting(indent, emitDefaults)` - Configure JSON formatting options
 
 ## Error Handling
 

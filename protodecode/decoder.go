@@ -10,6 +10,7 @@ import (
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
+	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -40,6 +41,9 @@ type Decoder struct {
 	msgDescs    map[string]*desc.MessageDescriptor
 	msgTypes    map[string]string
 	anyResolver *pbsubstreams.PackageAnyResolver
+	// Formatting options
+	indent       string
+	emitDefaults bool
 }
 
 func NewDecoder(pkg *pbsubstreams.Package, outputStreamNames []string) (*Decoder, error) {
@@ -49,9 +53,11 @@ func NewDecoder(pkg *pbsubstreams.Package, outputStreamNames []string) (*Decoder
 	}
 
 	decoder := &Decoder{
-		msgDescs:    map[string]*desc.MessageDescriptor{},
-		msgTypes:    map[string]string{},
-		anyResolver: anyResolver,
+		msgDescs:     map[string]*desc.MessageDescriptor{},
+		msgTypes:     map[string]string{},
+		anyResolver:  anyResolver,
+		indent:       "",
+		emitDefaults: false,
 	}
 
 	fileDescs, err := desc.CreateFileDescriptors(pkg.ProtoFiles)
@@ -89,6 +95,34 @@ func NewDecoder(pkg *pbsubstreams.Package, outputStreamNames []string) (*Decoder
 				}
 				decoder.msgDescs[mod.Name] = msgDesc
 			}
+		}
+	}
+
+	return decoder, nil
+}
+
+func NewDecoderFromManifest(pkg *pbsubstreams.Package, msgDescs map[string]*manifest.ModuleDescriptor) (*Decoder, error) {
+	anyResolver, err := pkg.NewAnyResolver()
+	if err != nil {
+		return nil, fmt.Errorf("new any resolver: %w", err)
+	}
+
+	decoder := &Decoder{
+		msgDescs:     map[string]*desc.MessageDescriptor{},
+		msgTypes:     map[string]string{},
+		anyResolver:  anyResolver,
+		indent:       "  ",
+		emitDefaults: true,
+	}
+
+	for modName, modDesc := range msgDescs {
+		decoder.msgDescs[modName] = modDesc.MessageDescriptor
+		if modDesc.ProtoMessageType != "" {
+			decoder.msgTypes[modName] = modDesc.ProtoMessageType
+		} else if modDesc.StoreValueType != "" {
+			decoder.msgTypes[modName] = modDesc.StoreValueType
+		} else if modDesc.MapOutputType != "" {
+			decoder.msgTypes[modName] = modDesc.MapOutputType
 		}
 	}
 
@@ -175,6 +209,11 @@ func (d *Decoder) HasMessageType(modName string) bool {
 	return ok
 }
 
+func (d *Decoder) SetFormatting(indent string, emitDefaults bool) {
+	d.indent = indent
+	d.emitDefaults = emitDefaults
+}
+
 func (d *Decoder) msgDescToJSON(
 	msgType string,
 	blockNum uint64,
@@ -183,7 +222,9 @@ func (d *Decoder) msgDescToJSON(
 	wrap bool,
 ) ([]byte, error) {
 	cnt, err := dynMsg.MarshalJSONPB(&jsonpb.Marshaler{
-		AnyResolver: d.anyResolver,
+		AnyResolver:  d.anyResolver,
+		Indent:       d.indent,
+		EmitDefaults: d.emitDefaults,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("protojson marshal: %w", err)

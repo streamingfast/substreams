@@ -4,18 +4,16 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"regexp"
 	"strings"
 	"time"
 
-	"github.com/bobg/go-generics/v3/slices"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/pipeline/exec"
+	"github.com/streamingfast/substreams/protodecode"
 	"github.com/streamingfast/substreams/sink"
 	"github.com/streamingfast/substreams/tools/test"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/mattn/go-isatty"
 	"github.com/streamingfast/shutter"
@@ -28,33 +26,11 @@ import (
 // ENUM(TUI, JSON, JSONL, CLOCK, CURSOR)
 type OutputMode uint
 
-type OutputStreamPattern struct {
-	pattern string
-	regex   *regexp.Regexp
-}
-
-func NewOutputStreamPattern(pattern string) OutputStreamPattern {
-	regex, err := regexp.Compile(pattern)
-	if err != nil {
-		return OutputStreamPattern{pattern: pattern, regex: nil}
-	}
-
-	return OutputStreamPattern{pattern: pattern, regex: regex}
-}
-
-func (o *OutputStreamPattern) Matches(input string) bool {
-	if o.regex == nil {
-		return o.pattern == input
-	}
-
-	return o.regex.MatchString(input)
-}
-
 type TUI struct {
 	shutter *shutter.Shutter
 
-	pkg               *pbsubstreams.Package
-	outputStreamNames []OutputStreamPattern
+	pkg     *pbsubstreams.Package
+	decoder *protodecode.Decoder
 
 	// Output mode flags
 	isTerminal        bool
@@ -66,28 +42,19 @@ type TUI struct {
 	RequiredProcessedBlocks uint64
 	ResolvedStartBlock      uint64
 
-	msgDescs       map[string]*desc.MessageDescriptor
-	decodeMsgTypes map[string]func(in []byte) string
-	msgTypes       map[string]string // Replace by calls to GetFullyQualifiedName() on the `msgDescs`
-	anyResolver    *pbsubstreams.PackageAnyResolver
-
 	testRunner *test.Runner
 }
 
 func New(pkg *pbsubstreams.Package, outputStreamNames []string) (*TUI, error) {
-	anyResolver, err := pkg.NewAnyResolver()
+	decoder, err := protodecode.NewDecoder(pkg, outputStreamNames)
 	if err != nil {
-		return nil, fmt.Errorf("new any resolver: %w", err)
+		return nil, fmt.Errorf("new decoder: %w", err)
 	}
 
 	ui := &TUI{
-		shutter:           shutter.New(),
-		pkg:               pkg,
-		outputStreamNames: slices.Map(outputStreamNames, func(s string) OutputStreamPattern { return NewOutputStreamPattern(s) }),
-		decodeMsgTypes:    map[string]func(in []byte) string{},
-		msgTypes:          map[string]string{},
-		msgDescs:          map[string]*desc.MessageDescriptor{},
-		anyResolver:       anyResolver,
+		shutter: shutter.New(),
+		pkg:     pkg,
+		decoder: decoder,
 	}
 
 	return ui, nil
@@ -108,39 +75,6 @@ func (ui *TUI) Init(outputMode string, bytesRepresentation dynamic.BytesRepresen
 		ui.ensureTerminalLocked()
 	}
 
-	fileDescs, err := desc.CreateFileDescriptors(ui.pkg.ProtoFiles)
-	if err != nil {
-		return fmt.Errorf("couldn't convert, should do this check much earlier: %w", err)
-	}
-
-	for _, mod := range ui.pkg.Modules.Modules {
-		for _, outputStreamName := range ui.outputStreamNames {
-			if outputStreamName.Matches(mod.Name) {
-				var msgType string
-				switch modKind := mod.Kind.(type) {
-				case *pbsubstreams.Module_KindStore_:
-					msgType = modKind.KindStore.ValueType
-				case *pbsubstreams.Module_KindMap_:
-					msgType = modKind.KindMap.OutputType
-				case *pbsubstreams.Module_KindBlockIndex_:
-					msgType = modKind.KindBlockIndex.OutputType
-				}
-
-				msgType = strings.TrimPrefix(msgType, "proto:")
-
-				ui.msgTypes[mod.Name] = msgType
-
-				var msgDesc *desc.MessageDescriptor
-				for _, file := range fileDescs {
-					msgDesc = file.FindMessage(msgType)
-					if msgDesc != nil {
-						break
-					}
-				}
-				ui.msgDescs[mod.Name] = msgDesc
-			}
-		}
-	}
 	return nil
 }
 

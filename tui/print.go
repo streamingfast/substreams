@@ -2,7 +2,6 @@ package tui
 
 import (
 	"bytes"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -11,15 +10,12 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/golang/protobuf/jsonpb"
 	protoV1 "github.com/golang/protobuf/proto"
-	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/dynamic"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/tidwall/pretty"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/dynamicpb"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 func (ui *TUI) decoratedBlockScopedData(
@@ -30,7 +26,7 @@ func (ui *TUI) decoratedBlockScopedData(
 ) error {
 	var s []string
 	for _, out := range append([]*pbsubstreamsrpc.MapModuleOutput{output}, debugMapOutputs...) {
-		if _, ok := ui.msgTypes[out.Name]; !ok {
+		if !ui.decoder.HasMessageType(out.Name) {
 			continue
 		}
 		if out.DebugInfo != nil {
@@ -40,9 +36,9 @@ func (ui *TUI) decoratedBlockScopedData(
 		}
 
 		if len(out.MapOutput.Value) != 0 {
-			msgDesc := ui.msgDescs[out.Name]
-			msgType := ui.msgTypes[out.Name]
-			cnt := ui.decodeDynamicMessage(msgType, msgDesc, clock.Number, out.Name, out.MapOutput)
+			msgDesc := ui.decoder.GetMessageDescriptor(out.Name)
+			msgType := ui.decoder.GetMessageType(out.Name)
+			cnt := ui.decoder.DecodeDynamicMessage(msgType, msgDesc, clock.Number, out.Name, out.MapOutput)
 			cnt = ui.prettyFormat(cnt, true)
 			if out.DebugInfo != nil && out.DebugInfo.Cached {
 				s = append(s, cachedValues(out.Name))
@@ -52,7 +48,7 @@ func (ui *TUI) decoratedBlockScopedData(
 	}
 
 	for _, out := range debugStoreOutputs {
-		if _, ok := ui.msgTypes[out.Name]; !ok {
+		if !ui.decoder.HasMessageType(out.Name) {
 			continue
 		}
 		for _, log := range out.DebugInfo.Logs {
@@ -78,8 +74,8 @@ func cachedValues(name string) string {
 }
 
 func (ui *TUI) renderDecoratedDeltas(modName string, blockNum uint64, deltas []*pbsubstreamsrpc.StoreDelta, initialSnapshot bool) (s []string) {
-	msgDesc := ui.msgDescs[modName]
-	msgType := ui.msgTypes[modName]
+	msgDesc := ui.decoder.GetMessageDescriptor(modName)
+	msgType := ui.decoder.GetMessageType(modName)
 	if initialSnapshot {
 		s = append(s, fmt.Sprintf("%s: initial store snapshot:\n", modName))
 	} else {
@@ -92,7 +88,7 @@ func (ui *TUI) renderDecoratedDeltas(modName string, blockNum uint64, deltas []*
 		if len(delta.NewValue) == 0 {
 			s = append(s, "    NEW: (none)\n")
 		} else {
-			new := ui.decodeDynamicStoreDeltas(msgType, msgDesc, blockNum, modName, delta.NewValue)
+			new := ui.decoder.DecodeDynamicStoreDeltas(msgType, msgDesc, blockNum, modName, delta.NewValue)
 			s = append(s, fmt.Sprintf("    NEW: %s\n", indent(ui.prettyFormat(new, false))))
 		}
 	}
@@ -104,8 +100,8 @@ func (ui *TUI) printJSONBlockDeltas(modName string, blockNum uint64, deltas []*p
 		Module:   modName,
 		BlockNum: blockNum,
 	}
-	msgDesc := ui.msgDescs[modName]
-	msgType := ui.msgTypes[modName]
+	msgDesc := ui.decoder.GetMessageDescriptor(modName)
+	msgType := ui.decoder.GetMessageType(modName)
 	for _, delta := range deltas {
 		subwrap := DeltaWrap{
 			Operation: delta.Operation.String(),
@@ -113,7 +109,7 @@ func (ui *TUI) printJSONBlockDeltas(modName string, blockNum uint64, deltas []*p
 			Key:       delta.Key,
 		}
 		if len(delta.NewValue) != 0 {
-			new := ui.decodeDynamicStoreDeltas(msgType, msgDesc, 0, modName, delta.NewValue)
+			new := ui.decoder.DecodeDynamicStoreDeltas(msgType, msgDesc, 0, modName, delta.NewValue)
 			subwrap.NewValue = json.RawMessage(new)
 		}
 		wrap.Deltas = append(wrap.Deltas, subwrap)
@@ -138,14 +134,14 @@ func (ui *TUI) jsonBlockScopedData(
 ) error {
 
 	for _, out := range append([]*pbsubstreamsrpc.MapModuleOutput{output}, debugMapOutputs...) {
-		if _, ok := ui.msgTypes[out.Name]; !ok {
+		if !ui.decoder.HasMessageType(out.Name) {
 			continue
 		}
 
 		if len(out.MapOutput.Value) != 0 {
-			msgDesc := ui.msgDescs[out.Name]
-			msgType := ui.msgTypes[out.Name]
-			cnt := ui.decodeDynamicMessage(msgType, msgDesc, clock.Number, out.Name, out.MapOutput)
+			msgDesc := ui.decoder.GetMessageDescriptor(out.Name)
+			msgType := ui.decoder.GetMessageType(out.Name)
+			cnt := ui.decoder.DecodeDynamicMessage(msgType, msgDesc, clock.Number, out.Name, out.MapOutput)
 			cnt = ui.prettyFormat(cnt, true)
 			if out.DebugInfo != nil && out.DebugInfo.Cached {
 				fmt.Println(cachedValues(out.Name))
@@ -155,7 +151,7 @@ func (ui *TUI) jsonBlockScopedData(
 	}
 
 	for _, out := range debugStoreOutputs {
-		if _, ok := ui.msgTypes[out.Name]; !ok {
+		if !ui.decoder.HasMessageType(out.Name) {
 			continue
 		}
 		if len(out.DebugStoreDeltas) != 0 {
@@ -187,8 +183,8 @@ func (ui *TUI) jsonSnapshotData(output *pbsubstreamsrpc.InitialSnapshotData) err
 	}
 
 	modName := output.ModuleName
-	msgDesc := ui.msgDescs[modName]
-	msgType := ui.msgTypes[modName]
+	msgDesc := ui.decoder.GetMessageDescriptor(modName)
+	msgType := ui.decoder.GetMessageType(modName)
 	length := len(output.Deltas)
 	for idx, delta := range output.Deltas {
 		wrap := SnapshotDeltaWrap{
@@ -201,7 +197,7 @@ func (ui *TUI) jsonSnapshotData(output *pbsubstreamsrpc.InitialSnapshotData) err
 			Key:       delta.Key,
 		}
 		if len(delta.NewValue) != 0 {
-			new := ui.decodeDynamicStoreDeltas(msgType, msgDesc, 0, modName, delta.NewValue)
+			new := ui.decoder.DecodeDynamicStoreDeltas(msgType, msgDesc, 0, modName, delta.NewValue)
 			subwrap.NewValue = json.RawMessage(new)
 		}
 		wrap.Delta = subwrap
@@ -212,73 +208,6 @@ func (ui *TUI) jsonSnapshotData(output *pbsubstreamsrpc.InitialSnapshotData) err
 		fmt.Println(string(ui.prettyFormat(cnt, false)))
 	}
 	return nil
-}
-
-func (ui *TUI) decodeDynamicMessage(msgType string, msgDesc *desc.MessageDescriptor, blockNum uint64, modName string, anyin *anypb.Any) []byte {
-	in := anyin.GetValue()
-	if msgDesc == nil {
-		cnt, _ := json.Marshal(&UnknownWrap{
-			Module:      modName,
-			UnknownType: string(anyin.MessageName()),
-			String:      string(decodeAsString(in)),
-			Bytes:       in,
-		})
-		return cnt
-	}
-	dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
-	if err := dynMsg.Unmarshal(in); err != nil {
-		cnt, _ := json.Marshal(&ErrorWrap{
-			Module: modName,
-			Error:  fmt.Sprintf("error unmarshalling message into %s: %s\n", msgType, err.Error()),
-			String: string(decodeAsString(in)),
-			Bytes:  in,
-		})
-		return cnt
-	}
-
-	cnt, err := msgDescToJSON(msgType, blockNum, modName, ui.anyResolver, dynMsg, true)
-	if err != nil {
-		cnt, _ := json.Marshal(&ErrorWrap{
-			Module: modName,
-			Error:  fmt.Sprintf("error encoding protobuf %s into json: %s\n", msgType, err),
-			String: string(decodeAsString(in)),
-			Bytes:  in,
-		})
-		return decodeAsString(cnt)
-	}
-
-	return cnt
-}
-
-func (ui *TUI) decodeDynamicStoreDeltas(msgType string, msgDesc *desc.MessageDescriptor, blockNum uint64, modName string, in []byte) []byte {
-	if msgType == "bytes" {
-		return []byte(decodeAsHex(in))
-	}
-
-	if msgDesc != nil {
-		dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
-		if err := dynMsg.Unmarshal(in); err != nil {
-			cnt, _ := json.Marshal(&ErrorWrap{
-				Error:  fmt.Sprintf("error unmarshalling message into %s: %s\n", msgDesc.GetFullyQualifiedName(), err.Error()),
-				String: string(decodeAsString(in)),
-				Bytes:  in,
-			})
-			return cnt
-		}
-		cnt, err := msgDescToJSON(msgType, blockNum, modName, ui.anyResolver, dynMsg, false)
-		if err != nil {
-			cnt, _ := json.Marshal(&ErrorWrap{
-				Error:  fmt.Sprintf("error encoding protobuf %s into json: %s\n", msgDesc.GetFullyQualifiedName(), err),
-				String: string(decodeAsString(in)),
-				Bytes:  in,
-			})
-			return decodeAsString(cnt)
-		}
-		return cnt
-	}
-
-	// default, other msgType: "bigint", "bigfloat", "int64", "float64", "string":
-	return decodeAsString(in)
 }
 
 func (ui *TUI) prettyFormat(cnt []byte, isMapOutput bool) []byte {
@@ -328,38 +257,6 @@ func newWellKnowAnyResolver(pkg *pbsubstreams.Package) (*wellKnowAnyResolver, er
 	}, nil
 }
 
-func msgDescToJSON(
-	msgType string,
-	blockNum uint64,
-	mod string,
-	anyResolver *pbsubstreams.PackageAnyResolver,
-	dynMsg *dynamic.Message,
-	wrap bool,
-) ([]byte, error) {
-	cnt, err := dynMsg.MarshalJSONPB(&jsonpb.Marshaler{
-		AnyResolver: anyResolver,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("protojson marshal: %w", err)
-	}
-
-	if wrap {
-		wrappedCnt, err := json.Marshal(ModuleWrap{
-			Module:   mod,
-			BlockNum: blockNum,
-			Type:     msgType,
-			Data:     cnt,
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		return wrappedCnt, nil
-	}
-
-	return cnt, nil
-}
-
 type DeltasWrap struct {
 	Module   string      `json:"@module"`
 	BlockNum uint64      `json:"@block,omitempty"`
@@ -380,29 +277,7 @@ type DeltaWrap struct {
 	NewValue  json.RawMessage `json:"new"`
 }
 
-type UnknownWrap struct {
-	Module      string `json:"@module"`
-	UnknownType string `json:"@unknown"`
-	String      string `json:"@str"`
-	Bytes       []byte `json:"@bytes"`
-}
-
-type ErrorWrap struct {
-	Module string `json:"@module,omitempty"`
-	Error  string `json:"@error"`
-	String string `json:"@str"`
-	Bytes  []byte `json:"@bytes"`
-}
-
-type ModuleWrap struct {
-	Module   string          `json:"@module"`
-	BlockNum uint64          `json:"@block"`
-	Type     string          `json:"@type"`
-	Data     json.RawMessage `json:"@data"`
-}
-
 func decodeAsString(in []byte) []byte { return []byte(fmt.Sprintf("%q", string(in))) }
-func decodeAsHex(in []byte) string    { return "(hex) " + hex.EncodeToString(in) }
 
 func printClock(block *pbsubstreamsrpc.BlockScopedData) {
 	fmt.Printf("----------- BLOCK #%s (%s) age=%s ---------------\n", humanize.Comma(int64(block.Clock.Number)), block.Clock.Id, time.Since(block.Clock.Timestamp.AsTime()))

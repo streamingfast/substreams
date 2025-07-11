@@ -219,14 +219,20 @@ func (s *extendedStats) updateDurations() {
 		}
 
 		s.ModuleStats.ExternalCallMetrics[i] = callMetric
-		sort.Slice(s.ModuleStats.ExternalCallMetrics, func(i, j int) bool {
-			return s.ModuleStats.ExternalCallMetrics[i].Name < s.ModuleStats.ExternalCallMetrics[j].Name
-		})
 		i++
 	}
+
+	if len(s.ModuleStats.ExternalCallMetrics) > 0 {
+		sort.Slice(s.ModuleStats.ExternalCallMetrics, func(i, j int) bool {
+			if s.ModuleStats.ExternalCallMetrics[i] == nil || s.ModuleStats.ExternalCallMetrics[j] == nil {
+				return false
+			}
+			return s.ModuleStats.ExternalCallMetrics[i].Name < s.ModuleStats.ExternalCallMetrics[j].Name
+		})
+	}
+
 	s.ModuleStats.StoreOperationTimeMs = uint64(s.storeOperationTime.Milliseconds())
 }
-
 func (s *Stats) RecordInitializationComplete() {
 	s.Lock()
 	defer s.Unlock()

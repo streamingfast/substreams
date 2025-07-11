@@ -2,11 +2,15 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli/sflags"
+	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/sink"
+	"github.com/streamingfast/substreams/tools/test"
 	"github.com/streamingfast/substreams/tui"
+	"go.uber.org/zap"
 )
 
 func init() {
@@ -47,20 +51,20 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	endpoint := sflags.MustGetString(cmd, sink.FlagEndpoint)
-
-	sinker, err := sink.NewFromViper(cmd,
-		"",
-		endpoint,
-		manifestPath,
-		outputModule,
-		"1000000:1000010",
-		zlog,
-		tracer,
-	)
+	// parses flags
+	sinkerConfig, err := sink.NewSinkerConfigFromViper(cmd, "", manifestPath, outputModule, zlog, tracer)
 	if err != nil {
-		return fmt.Errorf("creating sink: %w", err)
+		return fmt.Errorf("creating sink config: %w", err)
 	}
+
+	// override from our own production-mode flag
+	if sflags.MustGetBool(cmd, "production-mode") {
+		sinkerConfig.Mode = sink.SubstreamsModeProduction
+	} else {
+		sinkerConfig.Mode = sink.SubstreamsModeDevelopment
+	}
+
+	sinker := sink.New(sinkerConfig, zlog, tracer)
 
 	cursorStr := sflags.MustGetString(cmd, "cursor")
 	cursor, err := sink.NewCursor(cursorStr)
@@ -69,12 +73,29 @@ func runRun(cmd *cobra.Command, args []string) error {
 	}
 
 	outputMode := sflags.MustGetString(cmd, "output")
-	ui, err := tui.New(endpoint, nil, sinker.Package(), []string{outputModule})
+	ui, err := tui.New(
+		sinker.Package(),
+		[]string{outputModule},
+	)
 	if err != nil {
 		return fmt.Errorf("creating ui: %w", err)
 	}
 
-	if err := ui.Init(outputMode); err != nil {
+	testFile := sflags.MustGetString(cmd, "test-file")
+	if testFile != "" {
+		msgDescs, err := manifest.BuildMessageDescriptors(sinker.Package())
+		if err != nil {
+			return fmt.Errorf("building message descriptors: %w", err)
+		}
+		zlog.Info("running test runner", zap.String(testFile, testFile))
+		testRunner, err := test.NewRunner(testFile, msgDescs, sflags.MustGetBool(cmd, "test-verbose"), zlog)
+		if err != nil {
+			return fmt.Errorf("failed to setup test runner: %w", err)
+		}
+		ui.SetTestRunner(testRunner)
+	}
+
+	if err := ui.Init(outputMode, sinker.BytesRepresentation()); err != nil {
 		return fmt.Errorf("TUI initialization: %w", err)
 	}
 	defer ui.CleanUpTerminal()
@@ -89,70 +110,21 @@ func runRun(cmd *cobra.Command, args []string) error {
 		nil,
 	)
 
+	ui.Connecting()
 	sinker.Run(ctx, cursor, h)
-	return sinker.Err()
+	err = sinker.Err()
 
-	//	network := sflags.MustGetString(cmd, "network")
-	//	paramsString := sflags.MustGetStringArray(cmd, "params")
-	//	params, err := manifest.ParseParams(paramsString)
-	//	if err != nil {
-	//		return fmt.Errorf("parsing params: %w", err)
-	//	}
-	//
-	//	readerOptions := []manifest.Option{
-	//		manifest.WithOverrideNetwork(network),
-	//		manifest.WithParams(params),
-	//		manifest.WithRegistryURL(getSubstreamsRegistryEndpoint()),
-	//	}
-	//
-	//	protoPath := sflags.MustGetString(cmd, "proto-path")
-	//	if protoPath != "" {
-	//		readerOptions = append(readerOptions, manifest.WithProtoPath(protoPath))
-	//	}
-	//
-	//	protoDescriptorSet := sflags.MustGetString(cmd, "proto-descriptor-set")
-	//	if protoDescriptorSet != "" {
-	//		readerOptions = append(readerOptions, manifest.WithProtoDescriptorSet(protoDescriptorSet))
-	//	}
-	//
-	//	if outputModule != "" {
-	//		readerOptions = append(readerOptions, manifest.WithOverrideOutputModule(outputModule))
-	//	}
-	//
-	//	if sflags.MustGetBool(cmd, "skip-package-validation") {
-	//		readerOptions = append(readerOptions, manifest.SkipPackageValidationReader())
-	//	}
-	//
-	//	manifestReader, err := manifest.NewReader(manifestPath, readerOptions...)
-	//	if err != nil {
-	//		return fmt.Errorf("manifest reader: %w", err)
-	//	}
-	//
-	//	pkgBundle, err := manifestReader.Read()
-	//	if err != nil {
-	//		return fmt.Errorf("read manifest %q: %w", manifestPath, err)
-	//	}
-	//
-	//	if pkgBundle == nil {
-	//		return fmt.Errorf("no package found")
-	//	}
-	//
-	//	msgDescs, err := manifest.BuildMessageDescriptors(pkgBundle.Package)
-	//	if err != nil {
-	//		return fmt.Errorf("building message descriptors: %w", err)
-	//	}
-	//
-	//	var testRunner *test.Runner
-	//	testFile := sflags.MustGetString(cmd, "test-file")
-	//	if testFile != "" {
-	//		zlog.Info("running test runner", zap.String(testFile, testFile))
-	//		testRunner, err = test.NewRunner(testFile, msgDescs, sflags.MustGetBool(cmd, "test-verbose"), zlog)
-	//		if err != nil {
-	//			return fmt.Errorf("failed to setup test runner: %w", err)
-	//		}
-	//	}
-	//
-	//	productionMode := sflags.MustGetBool(cmd, "production-mode")
+	ui.Cancel()
+	fmt.Fprintf(os.Stderr, "Total Processed Bytes: %d\n", uint64(sink.ProgressMessageProcessedBytes.Get()))
+	fmt.Fprintf(os.Stderr, "Total Processed Blocks: %d\n", uint64(sink.ProgressMessageTotalProcessedBlocks.Get()))
+	fmt.Fprintf(os.Stderr, "Total Received Bytes (uncompressed gress): %d\n", uint64(sink.DataMessageSizeBytes.Get()))
+	fmt.Fprintln(os.Stderr, "all done")
+
+	return err
+
+	// FIXME: size isn't same for egress bytes, also test others with prod mode reproc.
+	// FIXME Maybe expose those 'Get()' things on the sinker object, maybe not... or at least rename them
+	// FIXME
 	//	debugModulesOutput := sflags.MustGetStringSlice(cmd, "debug-modules-output")
 	//	if len(debugModulesOutput) == 0 {
 	//		debugModulesOutput = nil
@@ -166,10 +138,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 	//		debugModulesInitialSnapshot = nil
 	//	}
 	//
-	//	startBlock, readFromModule, err := readStartBlockFlag(cmd, "start-block")
-	//	if err != nil {
-	//		return fmt.Errorf("stop block: %w", err)
-	//	}
+	// FIXME find the outputModule automatically like in GUI, move this to sink
 	//
 	//	if outputModule == "" {
 	//		mods, ok := pkgBundle.Graph.TopologicalSort()
@@ -179,6 +148,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 	//		}
 	//	}
 	//
+	// FIXME
 	//	if readFromModule {
 	//		sb, err := pkgBundle.Graph.ModuleInitialBlock(outputModule)
 	//		if err != nil {
@@ -187,85 +157,11 @@ func runRun(cmd *cobra.Command, args []string) error {
 	//		startBlock = int64(sb)
 	//	}
 	//
-	//	authToken, authType := tools.GetAuth(cmd, "substreams-api-key-envvar", "substreams-api-token-envvar")
-	//	substreamsClientConfig := client.NewSubstreamsClientConfig(
-	//		endpoint,
-	//		authToken,
-	//		authType,
-	//		sflags.MustGetBool(cmd, "insecure"),
-	//		sflags.MustGetBool(cmd, "plaintext"),
-	//		"substreams_run",
-	//	)
+	// FIXME: provide the user_agent for the client...
 	//
-	//	ssClient, connClose, callOpts, headers, err := client.NewSubstreamsClient(substreamsClientConfig)
-	//	if err != nil {
-	//		return fmt.Errorf("substreams client setup: %w", err)
-	//	}
-	//	defer connClose()
-	//
-
-	//	stopBlock, err := readStopBlockFlag(cmd, startBlock, "stop-block", cursorStr != "")
-	//	if err != nil {
-	//		return fmt.Errorf("stop block: %w", err)
-	//	}
-	//
-	//	noopMode := sflags.MustGetBool(cmd, "noop-mode")
+	// FIXME
 	//	if noopMode && !productionMode {
 	//		zlog.Warn("noop-mode used without production-mode: server will execute in development mode without sending the data, this is probably not what //you want")
 	//	}
-	//	req := &pbsubstreamsrpc.Request{
-	//		StartBlockNum:                       startBlock,
-	//		StartCursor:                         cursorStr,
-	//		StopBlockNum:                        stopBlock,
-	//		FinalBlocksOnly:                     sflags.MustGetBool(cmd, "final-blocks-only"),
-	//		Modules:                             pkgBundle.Package.Modules,
-	//		OutputModule:                        outputModule,
-	//		ProductionMode:                      productionMode,
-	//		DebugInitialStoreSnapshotForModules: debugModulesInitialSnapshot,
-	//		LimitProcessedBlocks:                sflags.MustGetUint64(cmd, "limit-processed-blocks"),
-	//		NoopMode:                            noopMode,
-	//		DevOutputModules:                    []string{outputModule},
-	//	}
-	//
-	//	if err := req.Validate(); err != nil {
-	//		return fmt.Errorf("validate request: %w", err)
-	//	}
-	//toPrint := debugModulesOutput
-	//if toPrint == nil {
-	//	toPrint = []string{outputModule}
-	//}
-
-	//streamCtx, cancel := context.WithCancel(ctx)
-	//ui.OnTerminated(func(err error) {
-	//	if err != nil {
-	//		fmt.Printf("UI terminated with error %q\n", err)
-	//	}
-
-	//	cancel()
-	//})
-	//defer cancel()
-
-	//// add additional authorization headers
-	//if headers.IsSet() {
-	//	streamCtx = metadata.AppendToOutgoingContext(streamCtx, headers.ToArray()...)
-	//}
-	////parse additional-headers flag
-	//additionalHeaders := sflags.MustGetStringSlice(cmd, "header")
-	//if additionalHeaders != nil {
-	//	res := parseHeaders(additionalHeaders)
-	//	headerArray := make([]string, 0, len(res)*2)
-	//	for k, v := range res {
-	//		headerArray = append(headerArray, k, v)
-	//	}
-	//	streamCtx = metadata.AppendToOutgoingContext(streamCtx, headerArray...)
-	//}
-
-	//ui.SetRequest(req)
-	//ui.Connecting()
-	//cli, err := ssClient.Blocks(streamCtx, req, callOpts...)
-	//if err != nil && streamCtx.Err() != context.Canceled {
-	//	return fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err)
-	//}
-	//ui.Connected()
 
 }

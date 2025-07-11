@@ -11,13 +11,13 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
+	"github.com/jhump/protoreflect/dynamic"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dgrpc"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/client"
-	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
@@ -51,9 +51,12 @@ type Sinker struct {
 	tracer           logging.Tracer
 
 	// Options
-	backOff         backoff.BackOff
-	buffer          *blockDataBuffer
-	blockRange      *bstream.Range
+	backOff    backoff.BackOff
+	buffer     *blockDataBuffer
+	startBlock int64
+	stopBlock  uint64
+	request    *pbsubstreamsrpc.Request
+
 	infiniteRetry   bool
 	finalBlocksOnly bool
 	livenessChecker LivenessChecker
@@ -64,37 +67,38 @@ type Sinker struct {
 	requestActiveStartBlock uint64
 }
 
+// New creates a new Sinker instance from the provided SinkerConfig.
+// This function replaces the previous Options pattern with a more structured
+// configuration approach. All configuration is now contained within the
+// SinkerConfig struct, making it easier to manage and test.
 func New(
-	mode SubstreamsMode,
-	NoopMode bool,
-	pkg *pbsubstreams.Package,
-	outputModule *pbsubstreams.Module,
-	hash manifest.ModuleHash,
-	clientConfig *client.SubstreamsClientConfig,
+	config *SinkerConfig,
 	logger *zap.Logger,
 	tracer logging.Tracer,
-	opts ...Option,
-) (*Sinker, error) {
-
-	bo := backoff.NewExponentialBackOff()
-	bo.MaxElapsedTime = 0
-
+) *Sinker {
 	s := &Sinker{
 		Shutter:          shutter.New(),
-		clientConfig:     clientConfig,
-		pkg:              pkg,
-		outputModule:     outputModule,
-		outputModuleHash: hex.EncodeToString(hash),
-		mode:             mode,
-		NoopMode:         NoopMode,
-		backOff:          bo,
+		clientConfig:     config.ClientConfig,
+		pkg:              config.Pkg,
+		outputModule:     config.OutputModule,
+		outputModuleHash: hex.EncodeToString(config.OutputModuleHash),
+		mode:             config.Mode,
+		NoopMode:         config.NoopMode,
+		backOff:          config.BackOff,
+		startBlock:       config.StartBlock,
+		stopBlock:        config.StopBlock,
+		infiniteRetry:    config.InfiniteRetry,
+		finalBlocksOnly:  config.FinalBlocksOnly,
+		livenessChecker:  config.LivenessChecker,
+		extraHeaders:     config.ExtraHeaders,
 		stats:            newStats(logger),
 		logger:           logger,
 		tracer:           tracer,
 	}
 
-	for _, opt := range opts {
-		opt(s)
+	// Set up buffer unless final blocks only is configured
+	if config.UndoBufferSize > 0 && !config.FinalBlocksOnly {
+		s.buffer = newBlockDataBuffer(config.UndoBufferSize)
 	}
 
 	if s.finalBlocksOnly && s.buffer != nil {
@@ -110,13 +114,14 @@ func New(
 		zap.String("output_module_hash", s.outputModuleHash),
 		zap.Stringer("client_config", (*substramsClientStringer)(s.clientConfig)),
 		zap.Stringer("buffer", s.buffer),
-		zap.Stringer("block_range", s.blockRange),
+		zap.Int64("start_block", s.startBlock),
+		zap.Uint64("stop_block", s.stopBlock),
 		zap.Bool("infinite_retry", s.infiniteRetry),
 		zap.Bool("final_blocks_only", s.finalBlocksOnly),
 		zap.Bool("liveness_checker", s.livenessChecker != nil),
 	)
 
-	return s, nil
+	return s
 }
 
 type substramsClientStringer client.SubstreamsClientConfig
@@ -127,12 +132,31 @@ func (s *substramsClientStringer) String() string {
 	return fmt.Sprintf("%s (insecure: %t, plaintext: %t, JWT present: %t)", config.Endpoint(), config.Insecure(), config.PlainText(), config.AuthToken() != "")
 }
 
-func (s *Sinker) BlockRange() *bstream.Range {
-	return s.blockRange
+func (s *Sinker) StartBlock() int64 {
+	return s.startBlock
+}
+
+func (s *Sinker) StopBlock() uint64 {
+	return s.stopBlock
 }
 
 func (s *Sinker) Package() *pbsubstreams.Package {
 	return s.pkg
+}
+
+func (s *Sinker) BytesRepresentation() dynamic.BytesRepresentation {
+	var network, endpoint string
+	if s.pkg != nil {
+		network = s.pkg.Network
+	}
+	if s.clientConfig != nil {
+		endpoint = s.clientConfig.Endpoint()
+	}
+	return InferBytesRepresentation(network, endpoint)
+}
+
+func (s *Sinker) Request() *pbsubstreamsrpc.Request {
+	return s.request
 }
 
 func (s *Sinker) OutputModule() *pbsubstreams.Module {
@@ -269,12 +293,12 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 
 	backOff = backoff.WithContext(backOff, ctx)
 
-	startBlock := s.BlockRange().StartBlock()
+	startBlock := s.startBlock
 	stopBlock := s.adjustedEndBlock()
 
 	for {
-		req := &pbsubstreamsrpc.Request{
-			StartBlockNum:   int64(startBlock),
+		s.request = &pbsubstreamsrpc.Request{
+			StartBlockNum:   startBlock,
 			StopBlockNum:    stopBlock,
 			StartCursor:     activeCursor.String(),
 			FinalBlocksOnly: s.finalBlocksOnly,
@@ -284,6 +308,8 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 			NoopMode:        s.NoopMode,
 		}
 
+		s.logger.Info("sending request", zap.String("start_block", fmt.Sprintf("%d", startBlock)), zap.String("stop_block", fmt.Sprintf("%d", stopBlock)))
+
 		// Add extra headers if set
 		streamCtx := ctx
 		if len(headersArray) > 0 {
@@ -291,7 +317,7 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 		}
 
 		var receivedMessage bool
-		activeCursor, receivedMessage, err = s.doRequest(streamCtx, activeCursor, req, ssClient, callOpts, handler)
+		activeCursor, receivedMessage, err = s.doRequest(streamCtx, activeCursor, s.request, ssClient, callOpts, handler)
 
 		// If we received at least one message, we must reset the backoff
 		if receivedMessage {
@@ -338,11 +364,11 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 // When an undo buffer is used, we most finished +N block later than real
 // stop block to ensure we accumulate enough blocks to assert "finality".
 func (s *Sinker) adjustedEndBlock() (endBlock uint64) {
-	if s.blockRange == nil || s.blockRange.EndBlock() == nil {
+	if s.stopBlock == 0 {
 		return 0
 	}
 
-	endBlock = *s.blockRange.EndBlock()
+	endBlock = s.stopBlock
 	if s.buffer != nil {
 		adjusted := endBlock + uint64(s.buffer.Capacity())
 		s.logger.Debug("adjusted request end block for buffer", zap.Uint64("initial", endBlock), zap.Uint64("adjusted", adjusted))
@@ -407,17 +433,14 @@ func (s *Sinker) doRequest(
 		case *pbsubstreamsrpc.Response_Progress:
 			if ph, ok := handler.(SinkerProgressHandler); ok {
 				ph.HandleProgress(ctx, r.Progress)
-				break
 			}
 
 			msg := r.Progress
-			var totalProcessedBlocks uint64
 
 			latestEndBlockPerStage := make(map[uint32]uint64)
 			jobsPerStage := make(map[uint32]uint64)
 
 			for _, j := range msg.RunningJobs {
-				totalProcessedBlocks += j.ProgressBlocks
 				jobEndBlock := j.StartBlock + j.ProgressBlocks
 				if prevEndBlock, ok := latestEndBlockPerStage[j.Stage]; !ok || jobEndBlock > prevEndBlock {
 					latestEndBlockPerStage[j.Stage] = jobEndBlock
@@ -444,14 +467,14 @@ func (s *Sinker) doRequest(
 							ProgressMessageLastContiguousBlock.SetUint64(r.EndBlock, stageString(uint32(i)))
 						}
 					}
-					totalProcessedBlocks += (r.EndBlock - r.StartBlock)
 				}
 			}
 
 			ProgressMessageCount.Inc()
 			// The returned value from the server gives an overview of the current progress and not the delta
 			// since the last message. Since the server is the source of truth, we just set the value directly.
-			ProgressMessageTotalProcessedBlocks.SetUint64(totalProcessedBlocks)
+			ProgressMessageTotalProcessedBlocks.SetUint64(r.Progress.ProcessedBlocks)
+			ProgressMessageProcessedBytes.SetUint64(r.Progress.ProcessedBytes.TotalBytesRead)
 
 			if s.tracer.Enabled() {
 				s.logger.Debug("received response Progress", zap.Reflect("progress", r))

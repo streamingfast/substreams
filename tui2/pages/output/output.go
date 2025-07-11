@@ -12,6 +12,7 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/sink"
 	"github.com/streamingfast/substreams/tui2/common"
 	"github.com/streamingfast/substreams/tui2/components/blocksearch"
 	"github.com/streamingfast/substreams/tui2/components/blockselect"
@@ -75,7 +76,7 @@ func New(c common.Common, config *request.Config) (*Output, error) {
 		return nil, fmt.Errorf("new any resolver: %w", err)
 	}
 
-	bytesRepresentation := common.InferBytesRepresentation(config.Pkg.Network, config.Endpoint)
+	bytesRepresentation := sink.InferBytesRepresentation(config.Pkg.Network, config.Endpoint)
 
 	output := &Output{
 		Common:              c,

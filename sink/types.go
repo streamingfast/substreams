@@ -17,7 +17,7 @@ type sinkerHandlers struct {
 
 type fullSinkerHandlers struct {
 	sinkerHandlers
-	handleSessionInit             func(ctx context.Context, session *pbsubstreamsrpc.SessionInit) error
+	handleSessionInit             func(ctx context.Context, req *pbsubstreamsrpc.Request, session *pbsubstreamsrpc.SessionInit) error
 	handleProgress                func(ctx context.Context, progress *pbsubstreamsrpc.ModulesProgress)
 	handleInitialSnapshotData     func(ctx context.Context, debug *pbsubstreamsrpc.InitialSnapshotData) error
 	handleInitialSnapshotComplete func(ctx context.Context, debug *pbsubstreamsrpc.InitialSnapshotComplete) error
@@ -46,9 +46,9 @@ func (h fullSinkerHandlers) HandleError(ctx context.Context, error *pbsubstreams
 	}
 }
 
-func (h fullSinkerHandlers) HandleSessionInit(ctx context.Context, sessionInit *pbsubstreamsrpc.SessionInit) error {
+func (h fullSinkerHandlers) HandleSessionInit(ctx context.Context, req *pbsubstreamsrpc.Request, sessionInit *pbsubstreamsrpc.SessionInit) error {
 	if h.handleSessionInit != nil {
-		return h.handleSessionInit(ctx, sessionInit)
+		return h.handleSessionInit(ctx, req, sessionInit)
 	}
 	return nil
 }
@@ -82,7 +82,7 @@ func NewSinkerHandlers(
 func NewSinkerFullHandlers(
 	handleBlockScopedData func(ctx context.Context, data *pbsubstreamsrpc.BlockScopedData, isLive *bool, cursor *Cursor) error,
 	handleBlockUndoSignal func(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *Cursor) error,
-	handleSessionInit func(ctx context.Context, session *pbsubstreamsrpc.SessionInit) error,
+	handleSessionInit func(ctx context.Context, req *pbsubstreamsrpc.Request, session *pbsubstreamsrpc.SessionInit) error,
 	handleProgress func(ctx context.Context, progress *pbsubstreamsrpc.ModulesProgress),
 	handleInitialSnapshotData func(ctx context.Context, debug *pbsubstreamsrpc.InitialSnapshotData) error,
 	handleInitialSnapshotComplete func(ctx context.Context, complete *pbsubstreamsrpc.InitialSnapshotComplete) error,

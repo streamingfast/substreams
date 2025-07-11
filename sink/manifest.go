@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/bobg/go-generics/v2/slices"
-	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
@@ -26,6 +25,7 @@ func ReadManifestAndModule(
 	outputModuleName string,
 	expectedOutputModuleType string,
 	skipPackageValidation bool,
+	additionalOptions []manifest.Option,
 	zlog *zap.Logger,
 ) (
 	pkg *pbsubstreams.Package,
@@ -45,6 +45,7 @@ func ReadManifestAndModule(
 		return nil, nil, nil, err
 	}
 	opts = append(opts, manifest.WithParams(params))
+	opts = append(opts, additionalOptions...)
 
 	reader, err := manifest.NewReader(manifestPath, opts...)
 	if err != nil {
@@ -96,38 +97,6 @@ func ReadManifestAndModule(
 	}
 
 	return pkg, module, outputModuleHash, nil
-}
-
-// ReadManifestAndModuleAndBlockRange acts exactly like ReadManifestAndModule but also reads the block range.
-func ReadManifestAndModuleAndBlockRange(
-	manifestPath string,
-	network string,
-	params []string,
-	outputModuleName string,
-	expectedOutputModuleType string,
-	skipPackageValidation bool,
-	blockRange string,
-	zlog *zap.Logger,
-) (
-	pkg *pbsubstreams.Package,
-	module *pbsubstreams.Module,
-	outputModuleHash manifest.ModuleHash,
-	resolvedBlockRange *bstream.Range,
-	err error,
-) {
-	pkg, module, outputModuleHash, err = ReadManifestAndModule(manifestPath, network, params, outputModuleName, expectedOutputModuleType, skipPackageValidation, zlog)
-	if err != nil {
-		err = fmt.Errorf("read manifest and module: %w", err)
-		return
-	}
-
-	resolvedBlockRange, err = ReadBlockRange(module, blockRange)
-	if err != nil {
-		err = fmt.Errorf("resolve block range: %w", err)
-		return
-	}
-
-	return
 }
 
 // sanitizeModuleTypes has the same behavior as sanitizeModuleType but explodes

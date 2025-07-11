@@ -2,17 +2,17 @@ package sink
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/bobg/go-generics/v2/slices"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/streamingfast/bstream"
+
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/client"
+	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 )
@@ -86,6 +86,8 @@ func (i flagIgnoredList) IsIgnored(flag string) bool {
 //	Flag `--header` (-H) (defaults `[]`)
 //	Flag `--api-key-envvar` (default `SUBSTREAMS_API_KEY`)
 //	Flag `--api-token-envvar` (default `SUBSTREAMS_API_TOKEN`)
+//	Flag `--proto-path` (defaults `""`)
+//	Flag `--proto-descriptor-set` (defaults `""`)
 //
 // The `ignore` field can be used to multiple times to avoid adding the specified
 // `flags` to the the set. This can be used for example to avoid adding `--final-blocks-only`
@@ -128,7 +130,7 @@ func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagIgnored) {
 	}
 
 	if flagIncluded(FlagUndoBufferSize) {
-		flags.Int(FlagUndoBufferSize, 12, "Number of blocks to keep buffered to handle fork reorganizations")
+		flags.Int(FlagUndoBufferSize, 0, "Number of blocks to keep buffered to handle fork reorganizations")
 	}
 
 	if flagIncluded(FlagLiveBlockTimeDelta) {
@@ -167,9 +169,19 @@ func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagIgnored) {
 		flags.String(FlagAPITokenEnvvar, "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token")
 	}
 
+	if flagIncluded(FlagProtoPath) {
+		flags.String(FlagProtoPath, "", "Path to proto files")
+	}
+
+	if flagIncluded(FlagProtoDescriptorSet) {
+		flags.String(FlagProtoDescriptorSet, "", "Path to proto descriptor set file")
+	}
+
 }
 
 // NewFromViper constructs a new Sinker instance from a fixed set of "known" flags.
+// This function creates a SinkerConfig from the Viper configuration and then uses
+// it to create a new Sinker instance, replacing the previous Options pattern.
 //
 // If you want to extract the sink output module's name directly from the Substreams
 // package, if supported by your sink, instead of an actual name for paramater
@@ -185,12 +197,46 @@ func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagIgnored) {
 func NewFromViper(
 	cmd *cobra.Command,
 	expectedOutputModuleType string,
-	endpoint, manifestPath, outputModuleName, blockRange string,
+	manifestPath, outputModuleName string,
 	zlog *zap.Logger,
 	tracer logging.Tracer,
-	opts ...Option,
 ) (*Sinker, error) {
+	config, err := NewSinkerConfigFromViper(cmd, expectedOutputModuleType, manifestPath, outputModuleName, zlog, tracer)
+	if err != nil {
+		return nil, fmt.Errorf("creating sinker config from viper: %w", err)
+	}
+
+	return New(config, config.ZLog, config.Tracer), nil
+}
+
+// NewSinkerConfigFromViper creates a SinkerConfig from the provided Viper configuration.
+// This function extracts all necessary configuration from the command flags and
+// creates a complete SinkerConfig that can be used to create a Sinker instance.
+// The endpoint is read from the FlagEndpoint flag, and the block range is computed
+// from the FlagStartBlock and FlagStopBlock flags.
+func NewSinkerConfigFromViper(
+	cmd *cobra.Command,
+	expectedOutputModuleType string,
+	manifestPath, outputModuleName string,
+	zlog *zap.Logger,
+	tracer logging.Tracer,
+) (*SinkerConfig, error) {
 	params, network, undoBufferSize, liveBlockTimeDelta, isDevelopmentMode, infiniteRetry, finalBlocksOnly, skipPackageValidation, isNoopMode, extraHeaders := getViperFlags(cmd)
+
+	// Get endpoint from flags
+	endpoint := sflags.MustGetString(cmd, FlagEndpoint)
+
+	// Parse start and stop blocks using utility functions
+	startBlock, startBlockIsEmpty, err := readStartBlockFlag(cmd, FlagStartBlock)
+	if err != nil {
+		return nil, fmt.Errorf("reading start block flag: %w", err)
+	}
+
+	var stopBlock uint64
+	stopBlock, err = readStopBlockFlag(cmd, startBlock, FlagStopBlock)
+	if err != nil {
+		return nil, fmt.Errorf("reading stop block flag: %w", err)
+	}
 
 	zlog.Info("sinker from CLI",
 		zap.String("endpoint", endpoint),
@@ -199,7 +245,9 @@ func NewFromViper(
 		zap.String("network", network),
 		zap.String("output_module_name", outputModuleName),
 		zap.Stringer("expected_module_type", expectedModuleType(expectedOutputModuleType)),
-		zap.String("block_range", blockRange),
+		zap.Int64("start_block", startBlock),
+		zap.Uint64("stop_block", stopBlock),
+		zap.Bool("start_block_empty", startBlockIsEmpty),
 		zap.Bool("development_mode", isDevelopmentMode),
 		zap.Bool("noop_mode", isNoopMode),
 		zap.Bool("infinite_retry", infiniteRetry),
@@ -210,21 +258,45 @@ func NewFromViper(
 		zap.Strings("extra_headers", extraHeaders),
 	)
 
-	pkg, module, outputModuleHash, resolvedBlockRange, err := ReadManifestAndModuleAndBlockRange(
+	var readerOptions []manifest.Option
+	protoPath := sflags.MustGetString(cmd, FlagProtoPath)
+	if protoPath != "" {
+		readerOptions = append(readerOptions, manifest.WithProtoPath(protoPath))
+	}
+
+	protoDescriptorSet := sflags.MustGetString(cmd, FlagProtoDescriptorSet)
+	if protoDescriptorSet != "" {
+		readerOptions = append(readerOptions, manifest.WithProtoDescriptorSet(protoDescriptorSet))
+	}
+
+	if outputModuleName != "" {
+		readerOptions = append(readerOptions, manifest.WithOverrideOutputModule(outputModuleName))
+	}
+
+	pkg, module, outputModuleHash, err := ReadManifestAndModule(
 		manifestPath,
 		network,
 		params,
 		outputModuleName,
 		expectedOutputModuleType,
 		skipPackageValidation,
-		blockRange,
+		readerOptions,
 		zlog,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("reading manifest: %w", err)
 	}
 
-	zlog.Debug("resolved block range", zap.Stringer("range", resolvedBlockRange))
+	// Resolve start block if empty (use module's initial block)
+	if startBlockIsEmpty {
+		startBlock = int64(module.InitialBlock)
+	}
+
+	zlog.Debug("resolved block range",
+		zap.Int64("start_block", startBlock),
+		zap.Uint64("stop_block", stopBlock),
+		zap.Bool("start_block_was_empty", startBlockIsEmpty),
+	)
 
 	if finalBlocksOnly {
 		zlog.Debug("override undo buffer size to 0 since final blocks only is requested")
@@ -248,42 +320,40 @@ func NewFromViper(
 		mode = SubstreamsModeDevelopment
 	}
 
-	var defaultSinkOptions []Option
-	if undoBufferSize > 0 {
-		defaultSinkOptions = append(defaultSinkOptions, WithBlockDataBuffer(undoBufferSize))
-	}
+	// Create backoff configuration
+	bo := backoff.NewExponentialBackOff()
+	bo.MaxElapsedTime = 0
 
-	if infiniteRetry {
-		defaultSinkOptions = append(defaultSinkOptions, WithInfiniteRetry())
-	}
-
+	// Create liveness checker if configured
+	var livenessChecker LivenessChecker
 	if liveBlockTimeDelta > 0 {
-		defaultSinkOptions = append(defaultSinkOptions, WithLivenessChecker(NewDeltaLivenessChecker(liveBlockTimeDelta)))
+		livenessChecker = NewDeltaLivenessChecker(liveBlockTimeDelta)
 	}
 
-	if finalBlocksOnly {
-		defaultSinkOptions = append(defaultSinkOptions, WithFinalBlocksOnly())
+	config := &SinkerConfig{
+		Pkg:                   pkg,
+		OutputModule:          module,
+		OutputModuleHash:      outputModuleHash,
+		ClientConfig:          clientConfig,
+		Mode:                  mode,
+		NoopMode:              isNoopMode,
+		StartBlock:            startBlock,
+		StopBlock:             stopBlock,
+		UndoBufferSize:        undoBufferSize,
+		FinalBlocksOnly:       finalBlocksOnly,
+		InfiniteRetry:         infiniteRetry,
+		BackOff:               bo,
+		LiveBlockTimeDelta:    liveBlockTimeDelta,
+		LivenessChecker:       livenessChecker,
+		ExtraHeaders:          extraHeaders,
+		Params:                params,
+		Network:               network,
+		SkipPackageValidation: skipPackageValidation,
+		ZLog:                  zlog,
+		Tracer:                tracer,
 	}
 
-	if resolvedBlockRange != nil {
-		defaultSinkOptions = append(defaultSinkOptions, WithBlockRange(resolvedBlockRange))
-	}
-
-	if len(extraHeaders) > 0 {
-		defaultSinkOptions = append(defaultSinkOptions, WithExtraHeaders(extraHeaders))
-	}
-
-	return New(
-		mode,
-		isNoopMode,
-		pkg,
-		module,
-		outputModuleHash,
-		clientConfig,
-		zlog,
-		tracer,
-		append(defaultSinkOptions, opts...)...,
-	)
+	return config, nil
 }
 
 func getViperFlags(cmd *cobra.Command) (
@@ -341,116 +411,47 @@ func getViperFlags(cmd *cobra.Command) (
 	return
 }
 
-type SyncConfig struct {
+// SinkerConfig contains all configuration needed to create and run a Sinker.
+// This struct replaces the previous Options pattern and provides a more
+// structured approach to configuring the Sinker instance.
+type SinkerConfig struct {
+	// Substreams package configuration
+	Pkg              *pbsubstreams.Package
+	OutputModule     *pbsubstreams.Module
+	OutputModuleHash manifest.ModuleHash
+
+	// Client configuration
+	ClientConfig *client.SubstreamsClientConfig
+
+	// Operational configuration
+	Mode     SubstreamsMode
+	NoopMode bool
+
+	// Block processing configuration
+	StartBlock      int64
+	StopBlock       uint64
+	UndoBufferSize  int
+	FinalBlocksOnly bool
+
+	// Retry and reliability configuration
+	InfiniteRetry bool
+	BackOff       backoff.BackOff
+
+	// Liveness configuration
+	LiveBlockTimeDelta time.Duration
+	LivenessChecker    LivenessChecker
+
+	// Additional configuration
+	ExtraHeaders []string
+
+	// Logging and tracing
+	ZLog   *zap.Logger
+	Tracer logging.Tracer
+
+	// Legacy fields for backward compatibility
 	Params                []string
 	Network               string
-	UndoBufferSize        int
-	LiveBlockTimeDelta    time.Duration
-	IsDevelopmentMode     bool
-	InfiniteRetry         bool
-	FinalBlocksOnly       bool
 	SkipPackageValidation bool
-	IsNoopMode            bool
-	ExtraHeaders          []string
-}
-
-// parseNumber parses a number and indicates whether the number is relative, meaning it starts with a +
-func parseNumber(number string) (numberInt64 int64, numberIsEmpty bool, numberIsRelative bool, err error) {
-	if number == "" {
-		numberIsEmpty = true
-		return
-	}
-
-	numberIsRelative = strings.HasPrefix(number, "+")
-	numberInt64, err = strconv.ParseInt(strings.TrimPrefix(number, "+"), 0, 64)
-	if err != nil {
-		return 0, false, false, fmt.Errorf("invalid block number value: %w", err)
-	}
-
-	return
-}
-
-// ReadBlockRange parses a block range string and returns a bstream.Range out of it
-// using the model to resolve relative block numbers to absolute block numbers.
-//
-// The block range string is of the form:
-//
-//	[<before>]:[<after>]
-//
-// Where before and after are block numbers. If before is empty, it is resolve to the module's start block.
-// If after is empty it means stream forever. If after is empty and before is empty, the
-// range is the entire chain.
-//
-// If before or after is prefixed with a +, it is relative to the module's start block.
-func ReadBlockRange(module *pbsubstreams.Module, input string) (*bstream.Range, error) {
-	if input == "" {
-		input = ":"
-	}
-
-	before, after, rangeHasStartAndStop := strings.Cut(input, ":")
-
-	beforeAsInt64, beforeIsEmpty, beforeIsRelative, err := parseNumber(before)
-	if err != nil {
-		return nil, fmt.Errorf("parse number %q: %w", before, err)
-	}
-
-	if beforeIsEmpty {
-		// We become automatically relative to module start block with +0, so we get back module's start block
-		beforeIsRelative = true
-	}
-
-	afterAsInt64, afterIsEmpty, afterIsRelative := int64(0), false, false
-	if rangeHasStartAndStop {
-		afterAsInt64, afterIsEmpty, afterIsRelative, err = parseNumber(after)
-		if err != nil {
-			return nil, fmt.Errorf("parse number %q: %w", after, err)
-		}
-	}
-
-	if !rangeHasStartAndStop {
-		// If there is no `:` we assume it's a stop block value right away
-		if beforeAsInt64 < 1 {
-			return bstream.NewOpenRange(module.InitialBlock), nil
-		}
-
-		start := module.InitialBlock
-		stop := resolveBlockNumber(beforeAsInt64, 0, beforeIsRelative, int64(start))
-
-		if int64(start) >= stop {
-			return nil, fmt.Errorf("invalid range: start block %d is equal or above stop block %d (exclusive)", start, stop)
-		}
-
-		return bstream.NewRangeExcludingEnd(start, uint64(stop)), nil
-	} else {
-		// Otherwise, we have a `:` sign so we assume it's a start/stop range
-		start := resolveBlockNumber(beforeAsInt64, int64(module.InitialBlock), beforeIsRelative, int64(module.InitialBlock))
-		if afterAsInt64 == -1 {
-			return bstream.NewOpenRange(uint64(start)), nil
-		}
-
-		startBlock := uint64(start)
-		if afterIsEmpty {
-			return bstream.NewOpenRange(startBlock), nil
-		}
-
-		exclusiveEndBlock := uint64(resolveBlockNumber(afterAsInt64, 0, afterIsRelative, start))
-
-		if startBlock >= exclusiveEndBlock {
-			return nil, fmt.Errorf("invalid range: start block %d is equal or above stop block %d (exclusive)", startBlock, exclusiveEndBlock)
-		}
-
-		return bstream.NewRangeExcludingEnd(startBlock, exclusiveEndBlock), nil
-	}
-}
-
-func resolveBlockNumber(value int64, defaultIfNegative int64, relative bool, against int64) int64 {
-	if !relative {
-		if value < 0 {
-			return defaultIfNegative
-		}
-		return value
-	}
-	return int64(against) + value
 }
 
 func every[E any](s []E, test func(e E) bool) bool {

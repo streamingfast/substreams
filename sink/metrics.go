@@ -20,6 +20,8 @@ var ProgressMessageCount = metrics.NewGauge("substreams_sink_progress_message", 
 var ProgressMessageLastBlock = metrics.NewGaugeVec("substreams_sink_progress_message_last_block", []string{"stage"}, "Latest progress reported processed range end block for each stage (not necessarily contiguous)")
 var ProgressMessageRunningJobs = metrics.NewGaugeVec("substreams_sink_progress_message_running_jobs", []string{"stage"}, "Latest reported number of active jobs for each stage")
 var ProgressMessageTotalProcessedBlocks = metrics.NewGauge("substreams_sink_progress_message_total_processed_blocks", "Latest progress reported total processed blocks (including cached blocks from previous runs)")
+
+var ProgressMessageProcessedBytes = metrics.NewGauge("substreams_sink_progress_message_processed_bytes", "number of bytes processed on server side")
 var ProgressMessageLastContiguousBlock = metrics.NewGaugeVec("substreams_sink_progress_message_last_contiguous_block", []string{"stage"}, "Latest progress reported processed end block for the first completed (contiguous) range")
 var UndoMessageCount = metrics.NewCounter("substreams_sink_undo_message", "The number of block undo message received")
 var UnknownMessageCount = metrics.NewCounter("substreams_sink_unknown_message", "The number of unknown message received")

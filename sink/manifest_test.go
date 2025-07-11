@@ -66,7 +66,7 @@ func TestReadManifestAndModule(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotPkg, gotModule, gotOutputModuleHash, err := ReadManifestAndModule(tt.args.manifestPath, "", tt.args.params, tt.args.outputModuleName, tt.args.expectedOutputModuleType, tt.args.skipPackageValudation, zlog)
+			gotPkg, gotModule, gotOutputModuleHash, err := ReadManifestAndModule(tt.args.manifestPath, "", tt.args.params, tt.args.outputModuleName, tt.args.expectedOutputModuleType, tt.args.skipPackageValudation, nil, zlog)
 			tt.assertion(t, err)
 
 			if tt.wantPackagePresent {

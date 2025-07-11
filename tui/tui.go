@@ -9,8 +9,10 @@ import (
 	"time"
 
 	"github.com/bobg/go-generics/v3/slices"
+	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/sink"
-	"github.com/streamingfast/substreams/tui2/common"
+	"github.com/streamingfast/substreams/tools/test"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jhump/protoreflect/desc"
@@ -51,8 +53,6 @@ func (o *OutputStreamPattern) Matches(input string) bool {
 type TUI struct {
 	shutter *shutter.Shutter
 
-	endpoint          string
-	Req               *pbsubstreamsrpc.Request
 	pkg               *pbsubstreams.Package
 	outputStreamNames []OutputStreamPattern
 
@@ -63,8 +63,6 @@ type TUI struct {
 
 	prog                    *tea.Program
 	seenFirstData           bool
-	TotalReadBytes          uint64
-	TotalProcessedBlocks    uint64
 	RequiredProcessedBlocks uint64
 	ResolvedStartBlock      uint64
 
@@ -72,9 +70,11 @@ type TUI struct {
 	decodeMsgTypes map[string]func(in []byte) string
 	msgTypes       map[string]string // Replace by calls to GetFullyQualifiedName() on the `msgDescs`
 	anyResolver    *pbsubstreams.PackageAnyResolver
+
+	testRunner *test.Runner
 }
 
-func New(endpoint string, req *pbsubstreamsrpc.Request, pkg *pbsubstreams.Package, outputStreamNames []string) (*TUI, error) {
+func New(pkg *pbsubstreams.Package, outputStreamNames []string) (*TUI, error) {
 	anyResolver, err := pkg.NewAnyResolver()
 	if err != nil {
 		return nil, fmt.Errorf("new any resolver: %w", err)
@@ -82,8 +82,6 @@ func New(endpoint string, req *pbsubstreamsrpc.Request, pkg *pbsubstreams.Packag
 
 	ui := &TUI{
 		shutter:           shutter.New(),
-		endpoint:          endpoint,
-		Req:               req,
 		pkg:               pkg,
 		outputStreamNames: slices.Map(outputStreamNames, func(s string) OutputStreamPattern { return NewOutputStreamPattern(s) }),
 		decodeMsgTypes:    map[string]func(in []byte) string{},
@@ -95,10 +93,16 @@ func New(endpoint string, req *pbsubstreamsrpc.Request, pkg *pbsubstreams.Packag
 	return ui, nil
 }
 
-func (ui *TUI) Init(outputMode string) error {
+func (ui *TUI) SetTestRunner(testRunner *test.Runner) {
+	ui.testRunner = testRunner
+}
+
+func (ui *TUI) Init(outputMode string, bytesRepresentation dynamic.BytesRepresentation) error {
 	if err := ui.configureOutputMode(outputMode); err != nil {
 		return err
 	}
+
+	dynamic.SetDefaultBytesRepresentation(bytesRepresentation)
 
 	if ui.outputMode == OutputModeTUI {
 		ui.ensureTerminalLocked()
@@ -176,8 +180,6 @@ func (ui *TUI) configureOutputMode(outputMode string) error {
 		panic(fmt.Errorf("unhandled output mode %q", ui.outputMode))
 	}
 
-	dynamic.SetDefaultBytesRepresentation(common.InferBytesRepresentation(ui.pkg.Network, ui.endpoint))
-
 	return nil
 }
 
@@ -188,6 +190,10 @@ func (ui *TUI) Cancel() {
 	err := ui.prog.ReleaseTerminal()
 	if err != nil {
 		err = fmt.Errorf("releasing terminal: %w", err)
+	}
+
+	if ui.testRunner != nil {
+		ui.testRunner.LogResults()
 	}
 
 	ui.shutter.Shutdown(err)
@@ -210,6 +216,11 @@ func (ui *TUI) HandleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstrea
 
 func (ui *TUI) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.BlockScopedData, isLive *bool, cursor *sink.Cursor) error {
 	_ = isLive
+	if ui.testRunner != nil {
+		if err := ui.testRunner.Test(ctx, data.Output, data.DebugMapOutputs, data.DebugStoreOutputs, data.Clock); err != nil {
+			return fmt.Errorf("test runner failed: %w", err)
+		}
+	}
 
 	if data == nil {
 		return nil
@@ -235,11 +246,6 @@ func (ui *TUI) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.
 }
 
 func (ui *TUI) HandleProgress(ctx context.Context, progress *pbsubstreamsrpc.ModulesProgress) {
-	if progress.ProcessedBytes != nil {
-		ui.TotalReadBytes = progress.ProcessedBytes.TotalBytesRead
-	}
-	ui.TotalProcessedBlocks = progress.ProcessedBlocks
-
 	if !ui.seenFirstData {
 		if ui.outputMode == OutputModeTUI {
 			ui.ensureTerminalLocked()
@@ -265,7 +271,7 @@ func (ui *TUI) HandleDebugSnapshotComplete(ctx context.Context, complete *pbsubs
 	return nil
 }
 
-func (ui *TUI) HandleSession(ctx context.Context, session *pbsubstreamsrpc.SessionInit) error {
+func (ui *TUI) HandleSession(ctx context.Context, req *pbsubstreamsrpc.Request, session *pbsubstreamsrpc.SessionInit) error {
 	if session.BlocksToProcessAfterStartBlock != 0 {
 		ui.RequiredProcessedBlocks = session.EffectiveBlocksToProcessBeforeStartBlock + session.EffectiveBlocksToProcessAfterStartBlock
 	}
@@ -274,36 +280,35 @@ func (ui *TUI) HandleSession(ctx context.Context, session *pbsubstreamsrpc.Sessi
 	if ui.outputMode == OutputModeTUI {
 		ui.ensureTerminalLocked()
 		ui.prog.Send(session)
+	} else {
+		execGraph, err := exec.NewOutputModuleGraph(req.OutputModule, req.ProductionMode, req.Modules, bstream.GetProtocolFirstStreamableBlock)
+		if err != nil {
+			return fmt.Errorf("cannot handle module graph: %w", err)
+		}
+
+		fmt.Fprintf(os.Stderr, "TraceID: %s\n", session.TraceId)
+		if session.ChainHead != 0 {
+			fmt.Fprintf(os.Stderr, "Server HEAD block: %d\n", session.ChainHead)
+		}
+		stages := len(execGraph.StagedUsedModules())
+		if stages == 1 || !req.ProductionMode {
+			fmt.Fprintln(os.Stderr, "This request will be processed in a single stage")
+		} else {
+			fmt.Fprintf(os.Stderr, "This request will be processed in %d stages\n", stages)
+		}
+
+		if session.BlocksToProcessBeforeStartBlock != 0 {
+			stageCount := fmt.Sprintf("%d stage", stages-1)
+			if stages > 2 {
+				stageCount += "s"
+			}
+			fmt.Fprintf(os.Stderr, "Blocks to process to prepare the stores in %s: %d (%d already cached)\n", stageCount, session.EffectiveBlocksToProcessBeforeStartBlock, session.BlocksToProcessBeforeStartBlock-session.EffectiveBlocksToProcessBeforeStartBlock)
+		}
+
+		if session.BlocksToProcessAfterStartBlock != 0 {
+			fmt.Fprintf(os.Stderr, "Blocks to process in requested range: %d (%d already cached)\n", session.EffectiveBlocksToProcessAfterStartBlock, session.BlocksToProcessAfterStartBlock-session.EffectiveBlocksToProcessAfterStartBlock)
+		}
 	}
-	//	} else {
-	//		execGraph, err := exec.NewOutputModuleGraph(ui.Req.OutputModule, ui.Req.ProductionMode, ui.Req.Modules, bstream.GetProtocolFirstStreamableBlock//)
-	//		if err != nil {
-	//			return fmt.Errorf("cannot handle module graph: %w", err)
-	//		}
-	//
-	//		fmt.Fprintf(os.Stderr, "TraceID: %s\n", session.TraceId)
-	//		if session.ChainHead != 0 {
-	//			fmt.Fprintf(os.Stderr, "Server HEAD block: %d\n", session.ChainHead)
-	//		}
-	//		stages := len(execGraph.StagedUsedModules())
-	//		if stages == 1 || !ui.Req.ProductionMode {
-	//			fmt.Fprintln(os.Stderr, "This request will be processed in a single stage")
-	//		} else {
-	//			fmt.Fprintf(os.Stderr, "This request will be processed in %d stages\n", stages)
-	//		}
-	//
-	//		if session.BlocksToProcessBeforeStartBlock != 0 {
-	//			stageCount := fmt.Sprintf("%d stage", stages-1)
-	//			if stages > 2 {
-	//				stageCount += "s"
-	//			}
-	//			fmt.Fprintf(os.Stderr, "Blocks to process to prepare the stores in %s: %d (%d already cached)\n", stageCount, //session.EffectiveBlocksToProcessBeforeStartBlock, session.BlocksToProcessBeforeStartBlock-session.EffectiveBlocksToProcessBeforeStartBlock)
-	//		}
-	//
-	//		if session.BlocksToProcessAfterStartBlock != 0 {
-	//			fmt.Fprintf(os.Stderr, "Blocks to process in requested range: %d (%d already cached)\n", session.EffectiveBlocksToProcessAfterStartBlock, //session.BlocksToProcessAfterStartBlock-session.EffectiveBlocksToProcessAfterStartBlock)
-	//		}
-	//	}
 	return nil
 }
 

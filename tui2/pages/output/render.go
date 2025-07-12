@@ -92,8 +92,7 @@ func (o *Output) renderedOutput(in *pbsubstreamsrpc.AnyModuleOutput, withStyle b
 	if in.IsMap() && !in.IsEmpty() {
 		if o.decoder != nil && o.decoder.HasMessageType(in.Name()) {
 			msgDesc := o.decoder.GetMessageDescriptor(in.Name())
-			msgType := o.decoder.GetMessageType(in.Name())
-			plainBytes := o.decoder.DecodeDynamicMessage(msgType, msgDesc, 0, in.Name(), in.MapOutput.MapOutput)
+			plainBytes := o.decoder.DecodeDynamicMessage(msgDesc, in.MapOutput.MapOutput)
 			out.plainJSON = string(plainBytes)
 			if withStyle {
 				out.styledJSON = highlightJSON(out.plainJSON)
@@ -171,7 +170,7 @@ func (o *Output) decodeDelta(in []byte, msgDesc *desc.MessageDescriptor, msgType
 		out.WriteString(fmt.Sprintf("%q\n", decodeAsType(in, msgType)))
 	} else {
 		if o.decoder != nil {
-			deltaBytes := o.decoder.DecodeDynamicStoreDeltas(msgType, msgDesc, 0, "", in)
+			deltaBytes := o.decoder.DecodeDynamicStoreDeltas(msgType, msgDesc, in)
 			jsonStr := strings.Replace(string(deltaBytes), "\n", "\n  ", -1)
 			jsonStr = highlightJSON(jsonStr)
 			out.WriteString(jsonStr)

@@ -43,11 +43,14 @@ func main() {
         msgType := decoder.GetMessageType("my_module")
         msgDesc := decoder.GetMessageDescriptor("my_module")
         
-        // Decode a dynamic message
-        result := decoder.DecodeDynamicMessage(msgType, msgDesc, blockNum, modName, anyMessage)
+        // Decode a dynamic message (returns only data content)
+        dataContent := decoder.DecodeDynamicMessage(msgDesc, anyMessage)
+        
+        // Wrap with metadata if needed
+        wrappedResult, err := decoder.WrapMessage(msgType, blockNum, modName, dataContent)
         
         // Or decode store deltas
-        deltaResult := decoder.DecodeDynamicStoreDeltas(msgType, msgDesc, blockNum, modName, deltaBytes)
+        deltaResult := decoder.DecodeDynamicStoreDeltas(msgType, msgDesc, deltaBytes)
     }
 }
 ```
@@ -84,7 +87,11 @@ func main() {
         msgType := decoder.GetMessageType("my_module")
         msgDesc := decoder.GetMessageDescriptor("my_module")
         
-        result := decoder.DecodeDynamicMessage(msgType, msgDesc, blockNum, modName, anyMessage)
+        // Returns only the data content
+        dataContent := decoder.DecodeDynamicMessage(msgDesc, anyMessage)
+        
+        // Wrap with metadata if full format is needed
+        result, err := decoder.WrapMessage(msgType, blockNum, modName, dataContent)
     }
 }
 ```
@@ -97,7 +104,7 @@ func main() {
 - **Manifest Integration**: Direct integration with manifest.ModuleDescriptor for TUI2 compatibility
 - **Flexible Formatting**: Configurable JSON output formatting with indentation and default values
 - **Error Handling**: Graceful handling of unknown types and decoding errors
-- **JSON Output**: Structured JSON output with module metadata
+- **JSON Output**: Clean data content output with optional metadata wrapping
 
 ## API Reference
 
@@ -111,8 +118,9 @@ func main() {
 - `HasMessageType(moduleName)` - Check if a module has a message type
 - `GetMessageType(moduleName)` - Get the message type for a module
 - `GetMessageDescriptor(moduleName)` - Get the message descriptor for a module
-- `DecodeDynamicMessage(msgType, msgDesc, blockNum, modName, anyMessage)` - Decode a map output message
-- `DecodeDynamicStoreDeltas(msgType, msgDesc, blockNum, modName, deltaBytes)` - Decode store delta bytes
+- `DecodeDynamicMessage(msgDesc, anyMessage)` - Decode a map output message (returns json.RawMessage with data content only)
+- `DecodeDynamicStoreDeltas(msgType, msgDesc, deltaBytes)` - Decode store delta bytes (returns json.RawMessage)
+- `WrapMessage(msgType, blockNum, modName, data)` - Wrap json.RawMessage data with metadata (@module, @block, @type, @data)
 - `SetFormatting(indent, emitDefaults)` - Configure JSON formatting options
 
 ## Error Handling

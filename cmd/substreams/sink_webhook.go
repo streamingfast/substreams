@@ -68,11 +68,16 @@ func sinkWebhookE(cmd *cobra.Command, args []string) error {
 				return nil
 			}
 
-			msgType := decoder.GetMessageType(data.Output.Name)
+			//msgType := decoder.GetMessageType(data.Output.Name)
 			msgDesc := decoder.GetMessageDescriptor(data.Output.Name)
-			out := decoder.DecodeDynamicMessage(msgType, msgDesc, data.Clock.Number, data.Output.Name, data.Output.MapOutput)
+			dataContent := decoder.DecodeDynamicMessage(msgDesc, data.Output.MapOutput)
 
-			fmt.Println("would call webhook", url, "with data", string(out))
+			//wrappedOut, err := decoder.WrapMessage(msgType, data.Clock.Number, data.Output.Name, dataContent)
+			//if err != nil {
+			//	return fmt.Errorf("failed to wrap message: %w", err)
+			//}
+
+			fmt.Println("would call webhook for block", url, data.Clock.Number, "with data", string(dataContent))
 			return nil
 		},
 		func(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *sink.Cursor) error {

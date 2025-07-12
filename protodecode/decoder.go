@@ -129,45 +129,46 @@ func NewDecoderFromManifest(pkg *pbsubstreams.Package, msgDescs map[string]*mani
 	return decoder, nil
 }
 
-func (d *Decoder) DecodeDynamicMessage(msgType string, msgDesc *desc.MessageDescriptor, blockNum uint64, modName string, anyin *anypb.Any) []byte {
+func (d *Decoder) DecodeDynamicMessage(msgDesc *desc.MessageDescriptor, anyin *anypb.Any) json.RawMessage {
 	in := anyin.GetValue()
 	if msgDesc == nil {
 		cnt, _ := json.Marshal(&UnknownWrap{
-			Module:      modName,
 			UnknownType: string(anyin.MessageName()),
 			String:      string(decodeAsString(in)),
 			Bytes:       in,
 		})
-		return cnt
+		return json.RawMessage(cnt)
 	}
 	dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
 	if err := dynMsg.Unmarshal(in); err != nil {
 		cnt, _ := json.Marshal(&ErrorWrap{
-			Module: modName,
-			Error:  fmt.Sprintf("error unmarshalling message into %s: %s\n", msgType, err.Error()),
+			Error:  fmt.Sprintf("error unmarshalling message into %s: %s\n", msgDesc.GetFullyQualifiedName(), err.Error()),
 			String: string(decodeAsString(in)),
 			Bytes:  in,
 		})
-		return cnt
+		return json.RawMessage(cnt)
 	}
 
-	cnt, err := d.msgDescToJSON(msgType, blockNum, modName, dynMsg, true)
+	cnt, err := dynMsg.MarshalJSONPB(&jsonpb.Marshaler{
+		AnyResolver:  d.anyResolver,
+		Indent:       d.indent,
+		EmitDefaults: d.emitDefaults,
+	})
 	if err != nil {
 		cnt, _ := json.Marshal(&ErrorWrap{
-			Module: modName,
-			Error:  fmt.Sprintf("error encoding protobuf %s into json: %s\n", msgType, err),
+			Error:  fmt.Sprintf("error encoding protobuf %s into json: %s\n", msgDesc.GetFullyQualifiedName(), err),
 			String: string(decodeAsString(in)),
 			Bytes:  in,
 		})
-		return decodeAsString(cnt)
+		return json.RawMessage(cnt)
 	}
 
-	return cnt
+	return json.RawMessage(cnt)
 }
 
-func (d *Decoder) DecodeDynamicStoreDeltas(msgType string, msgDesc *desc.MessageDescriptor, blockNum uint64, modName string, in []byte) []byte {
+func (d *Decoder) DecodeDynamicStoreDeltas(msgType string, msgDesc *desc.MessageDescriptor, in []byte) json.RawMessage {
 	if msgType == "bytes" {
-		return []byte(decodeAsHex(in))
+		return json.RawMessage(fmt.Sprintf(`"%s"`, decodeAsHex(in)))
 	}
 
 	if msgDesc != nil {
@@ -178,22 +179,26 @@ func (d *Decoder) DecodeDynamicStoreDeltas(msgType string, msgDesc *desc.Message
 				String: string(decodeAsString(in)),
 				Bytes:  in,
 			})
-			return cnt
+			return json.RawMessage(cnt)
 		}
-		cnt, err := d.msgDescToJSON(msgType, blockNum, modName, dynMsg, false)
+		cnt, err := dynMsg.MarshalJSONPB(&jsonpb.Marshaler{
+			AnyResolver:  d.anyResolver,
+			Indent:       d.indent,
+			EmitDefaults: d.emitDefaults,
+		})
 		if err != nil {
 			cnt, _ := json.Marshal(&ErrorWrap{
 				Error:  fmt.Sprintf("error encoding protobuf %s into json: %s\n", msgDesc.GetFullyQualifiedName(), err),
 				String: string(decodeAsString(in)),
 				Bytes:  in,
 			})
-			return decodeAsString(cnt)
+			return json.RawMessage(cnt)
 		}
-		return cnt
+		return json.RawMessage(cnt)
 	}
 
 	// default, other msgType: "bigint", "bigfloat", "int64", "float64", "string":
-	return decodeAsString(in)
+	return json.RawMessage(decodeAsString(in))
 }
 
 func (d *Decoder) GetMessageDescriptor(modName string) *desc.MessageDescriptor {
@@ -214,49 +219,28 @@ func (d *Decoder) SetFormatting(indent string, emitDefaults bool) {
 	d.emitDefaults = emitDefaults
 }
 
-func (d *Decoder) msgDescToJSON(
-	msgType string,
-	blockNum uint64,
-	mod string,
-	dynMsg *dynamic.Message,
-	wrap bool,
-) ([]byte, error) {
-	cnt, err := dynMsg.MarshalJSONPB(&jsonpb.Marshaler{
-		AnyResolver:  d.anyResolver,
-		Indent:       d.indent,
-		EmitDefaults: d.emitDefaults,
+// WrapMessage wraps data content with module metadata (@module, @block, @type, @data)
+func (d *Decoder) WrapMessage(msgType string, blockNum uint64, modName string, data json.RawMessage) ([]byte, error) {
+	wrappedCnt, err := json.Marshal(ModuleWrap{
+		Module:   modName,
+		BlockNum: blockNum,
+		Type:     msgType,
+		Data:     data,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("protojson marshal: %w", err)
+		return nil, err
 	}
-
-	if wrap {
-		wrappedCnt, err := json.Marshal(ModuleWrap{
-			Module:   mod,
-			BlockNum: blockNum,
-			Type:     msgType,
-			Data:     cnt,
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		return wrappedCnt, nil
-	}
-
-	return cnt, nil
+	return wrappedCnt, nil
 }
 
 // Helper types
 type UnknownWrap struct {
-	Module      string `json:"@module"`
 	UnknownType string `json:"@unknown"`
 	String      string `json:"@str"`
 	Bytes       []byte `json:"@bytes"`
 }
 
 type ErrorWrap struct {
-	Module string `json:"@module,omitempty"`
 	Error  string `json:"@error"`
 	String string `json:"@str"`
 	Bytes  []byte `json:"@bytes"`

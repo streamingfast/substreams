@@ -38,12 +38,18 @@ func (ui *TUI) decoratedBlockScopedData(
 		if len(out.MapOutput.Value) != 0 {
 			msgDesc := ui.decoder.GetMessageDescriptor(out.Name)
 			msgType := ui.decoder.GetMessageType(out.Name)
-			cnt := ui.decoder.DecodeDynamicMessage(msgType, msgDesc, clock.Number, out.Name, out.MapOutput)
-			cnt = ui.prettyFormat(cnt, true)
-			if out.DebugInfo != nil && out.DebugInfo.Cached {
-				s = append(s, cachedValues(out.Name))
+			dataContent := ui.decoder.DecodeDynamicMessage(msgDesc, out.MapOutput)
+
+			wrappedCnt, err := ui.decoder.WrapMessage(msgType, clock.Number, out.Name, dataContent)
+			if err != nil {
+				s = append(s, fmt.Sprintf("Error wrapping message: %v", err))
+			} else {
+				cnt := ui.prettyFormat(wrappedCnt, true)
+				if out.DebugInfo != nil && out.DebugInfo.Cached {
+					s = append(s, cachedValues(out.Name))
+				}
+				s = append(s, string(cnt))
 			}
-			s = append(s, string(cnt))
 		}
 	}
 
@@ -88,7 +94,7 @@ func (ui *TUI) renderDecoratedDeltas(modName string, blockNum uint64, deltas []*
 		if len(delta.NewValue) == 0 {
 			s = append(s, "    NEW: (none)\n")
 		} else {
-			new := ui.decoder.DecodeDynamicStoreDeltas(msgType, msgDesc, blockNum, modName, delta.NewValue)
+			new := ui.decoder.DecodeDynamicStoreDeltas(msgType, msgDesc, delta.NewValue)
 			s = append(s, fmt.Sprintf("    NEW: %s\n", indent(ui.prettyFormat(new, false))))
 		}
 	}
@@ -109,7 +115,7 @@ func (ui *TUI) printJSONBlockDeltas(modName string, blockNum uint64, deltas []*p
 			Key:       delta.Key,
 		}
 		if len(delta.NewValue) != 0 {
-			new := ui.decoder.DecodeDynamicStoreDeltas(msgType, msgDesc, 0, modName, delta.NewValue)
+			new := ui.decoder.DecodeDynamicStoreDeltas(msgType, msgDesc, delta.NewValue)
 			subwrap.NewValue = json.RawMessage(new)
 		}
 		wrap.Deltas = append(wrap.Deltas, subwrap)
@@ -141,12 +147,18 @@ func (ui *TUI) jsonBlockScopedData(
 		if len(out.MapOutput.Value) != 0 {
 			msgDesc := ui.decoder.GetMessageDescriptor(out.Name)
 			msgType := ui.decoder.GetMessageType(out.Name)
-			cnt := ui.decoder.DecodeDynamicMessage(msgType, msgDesc, clock.Number, out.Name, out.MapOutput)
-			cnt = ui.prettyFormat(cnt, true)
-			if out.DebugInfo != nil && out.DebugInfo.Cached {
-				fmt.Println(cachedValues(out.Name))
+			dataContent := ui.decoder.DecodeDynamicMessage(msgDesc, out.MapOutput)
+
+			wrappedCnt, err := ui.decoder.WrapMessage(msgType, clock.Number, out.Name, dataContent)
+			if err != nil {
+				fmt.Printf("Error wrapping message: %v\n", err)
+			} else {
+				cnt := ui.prettyFormat(wrappedCnt, true)
+				if out.DebugInfo != nil && out.DebugInfo.Cached {
+					fmt.Println(cachedValues(out.Name))
+				}
+				fmt.Println(string(cnt))
 			}
-			fmt.Println(string(cnt))
 		}
 	}
 
@@ -197,7 +209,7 @@ func (ui *TUI) jsonSnapshotData(output *pbsubstreamsrpc.InitialSnapshotData) err
 			Key:       delta.Key,
 		}
 		if len(delta.NewValue) != 0 {
-			new := ui.decoder.DecodeDynamicStoreDeltas(msgType, msgDesc, 0, modName, delta.NewValue)
+			new := ui.decoder.DecodeDynamicStoreDeltas(msgType, msgDesc, delta.NewValue)
 			subwrap.NewValue = json.RawMessage(new)
 		}
 		wrap.Delta = subwrap

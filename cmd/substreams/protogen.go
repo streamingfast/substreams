@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
@@ -19,6 +20,7 @@ var protogenCmd = &cobra.Command{
 		Generate Rust bindings from a package. The manifest is optional as it will try to find a file named
 		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml'
 		file in place of '<manifest_file>', or a link to a remote .spkg file, using urls gs://, http(s)://, ipfs://, etc.'.
+		You can also use "-" to read the manifest from standard input.
 		
 		Note: if you have a data structure with an attribute that starts with an underscore, buf generate will remove the underscore.
 	`),
@@ -63,9 +65,22 @@ func runProtogen(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("manifest reader: %w", err)
 	}
 
+	// For relative output paths with local manifests, make the path relative to the manifest directory
+	// For stdin ("-"), use current working directory
 	if manifestReader.IsLocalManifest() && !filepath.IsAbs(outputPath) {
-		newOutputPath := filepath.Join(filepath.Dir(manifestPath), outputPath)
-
+		var manifestDir string
+		if manifestPath == "-" {
+			// For stdin, use current working directory
+			if wd, err := os.Getwd(); err == nil {
+				manifestDir = wd
+			} else {
+				manifestDir = "."
+			}
+		} else {
+			manifestDir = filepath.Dir(manifestPath)
+		}
+		
+		newOutputPath := filepath.Join(manifestDir, outputPath)
 		zlog.Debug("manifest path is a local manifest, making output path relative to it", zap.String("old", outputPath), zap.String("new", newOutputPath))
 		outputPath = newOutputPath
 	}

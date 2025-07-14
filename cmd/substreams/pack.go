@@ -21,6 +21,7 @@ var packCmd = &cobra.Command{
 		Build an .spkg out of a .yaml manifest. The manifest is optional as it will try to find a file named
 		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a
 		'substreams.yaml' file in place of '<manifest_file>', or a link to a remote .spkg file, using urls gs://, http(s)://, ipfs://, etc.'.
+		You can also use "-" to read the manifest from standard input.
 	`),
 	RunE:         runPack,
 	Args:         cobra.RangeArgs(0, 1),
@@ -70,12 +71,22 @@ func runPack(cmd *cobra.Command, args []string) error {
 
 	originalOutputFile, _ := sflags.GetString(cmd, "output-file")
 
-	manifestDir := filepath.Dir(manifestPath)
-	if manifestReader.IsRemotePackage(manifestPath) {
-		manifestDir = "."
+	var manifestDir string
+	if manifestPath == "-" {
+		// For stdin, use current working directory
+		if wd, err := os.Getwd(); err == nil {
+			manifestDir = wd
+		} else {
+			manifestDir = "."
+		}
+	} else {
+		manifestDir = filepath.Dir(manifestPath)
+		if manifestReader.IsRemotePackage(manifestPath) {
+			manifestDir = "."
 
-		if !manifestReader.IsLocalManifest() {
-			fmt.Printf("Re-packaging existing .spkg file...")
+			if !manifestReader.IsLocalManifest() {
+				fmt.Printf("Re-packaging existing .spkg file...")
+			}
 		}
 	}
 

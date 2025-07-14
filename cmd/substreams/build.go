@@ -32,7 +32,7 @@ var buildCmd = &cobra.Command{
 
 func init() {
 	buildCmd.Flags().Bool("no-pack", false, "Do not pack the build output (default false)")
-	buildCmd.Flags().String("manifest", "", "Path to the manifest file")
+	buildCmd.Flags().String("manifest", "", "Path to the manifest file (use \"-\" to read from stdin)")
 	buildCmd.Flags().String("binary", "default", "binary label to build from manifest")
 	rootCmd.AddCommand(buildCmd)
 }
@@ -49,16 +49,39 @@ func runBuildE(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("error finding manifest: %w", err)
 		}
 	}
-	fmt.Printf("Building manifest file: %s\n", manifestPath)
 
-	manif, err := readManifestYaml(manifestPath)
+	if manifestPath == "-" {
+		fmt.Printf("Reading manifest from stdin\n")
+	} else if manifestPath != "" {
+		fmt.Printf("Building manifest file: %s\n", manifestPath)
+	}
+
+	manifestReader, err := manifest.NewReader(manifestPath)
 	if err != nil {
-		return fmt.Errorf("error reading manifest: %w", err)
+		return fmt.Errorf("manifest reader: %w", err)
+	}
+
+	pkgBundle, err := manifestReader.Read()
+	if err != nil {
+		return fmt.Errorf("reading manifest: %w", err)
+	}
+
+	// For stdin, we need to create a temporary file for subcommands since stdin can only be read once
+	actualPath := manifestPath
+	var cleanupFunc func()
+	if manifestPath == "-" {
+		tempFile, err := createTempManifestFile(pkgBundle.Manifest)
+		if err != nil {
+			return fmt.Errorf("creating temporary manifest file: %w", err)
+		}
+		actualPath = tempFile
+		cleanupFunc = func() { os.Remove(tempFile) }
+		defer cleanupFunc()
 	}
 
 	info := &manifestInfo{
-		Path:     manifestPath,
-		Manifest: manif,
+		Path:     actualPath,
+		Manifest: *pkgBundle.Manifest,
 	}
 
 	binaryLabel := sflags.MustGetString(cmd, "binary")
@@ -118,6 +141,34 @@ func readManifestYaml(manifestPath string) (manifest.Manifest, error) {
 	}
 
 	return *out, nil
+}
+
+func createTempManifestFile(manif *manifest.Manifest) (string, error) {
+	// Create a temporary file in the current directory
+	tmpFile, err := os.CreateTemp(".", "substreams-*.yaml")
+	if err != nil {
+		return "", fmt.Errorf("creating temporary manifest file: %w", err)
+	}
+
+	defer func() {
+		tmpFile.Close()
+		if err != nil {
+			os.Remove(tmpFile.Name())
+		}
+	}()
+
+	// Convert manifest back to YAML
+	yamlData, err := yaml.Marshal(manif)
+	if err != nil {
+		return "", fmt.Errorf("marshaling manifest to YAML: %w", err)
+	}
+
+	// Write YAML to temporary file
+	if _, err := tmpFile.Write(yamlData); err != nil {
+		return "", fmt.Errorf("writing manifest to temporary file: %w", err)
+	}
+
+	return tmpFile.Name(), nil
 }
 
 type manifestInfo struct {

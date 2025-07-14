@@ -17,6 +17,7 @@ var graphCmd = &cobra.Command{
 		Generate mermaid-js graph document. The manifest is optional as it will try to find a file named
 		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a
 		'substreams.yaml' file in place of '<manifest_file>', or a link to a remote .spkg file, using urls gs://, http(s)://, ipfs://, etc.'.
+		You can also use "-" to read the manifest from standard input.
 	`),
 	Args:         cobra.RangeArgs(0, 1),
 	SilenceUsage: true,

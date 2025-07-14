@@ -45,11 +45,24 @@ func (r *manifestConverter) Convert(manif *Manifest) (*pbsubstreams.Package, []*
 }
 
 func (r *manifestConverter) expandManifestVariables(manif *Manifest) error {
-	abs, err := filepath.Abs(r.inputPath)
+	// FIXME: This is super clumsy, so down in the "reading" pipeline and we set working
+	// directory on the manifest, in such an unrelated places. But this broke a bunch of tests
+	// so some refactor would be needed to move that to a more appropriate place.
+	//
+	// All manifestConvert and related upstreams calls are private, so we just need to do the job.
+	// -----------------------
+	pathToExpand := r.inputPath
+	if r.inputPath == "-" {
+		pathToExpand = "."
+	}
+
+	abs, err := filepath.Abs(pathToExpand)
 	if err != nil {
 		return fmt.Errorf("unable to get working dir: %w", err)
 	}
 	manif.Workdir = path.Dir(abs)
+	// -----------------------
+
 	// Allow environment variables in `imports` element
 	for i, moduleImport := range manif.Imports {
 		manif.Imports[i][1] = os.ExpandEnv(moduleImport[1])

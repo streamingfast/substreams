@@ -17,8 +17,11 @@ The `substreams` CLI exposes many commands to developers enabling a range of fea
 * Local `.spkg` package files
 * Remote `.spkg` package URLs
 * Local directory containing a `substreams.yaml` file
+* Standard input by using `"-"` as the manifest path
 
 If you choose to not use it, make sure that you are in a directory that contains a substreams.yaml file. Otherwise, you will get a usage error back.
+
+**Stdin Support**: Commands that accept manifest files (`build`, `run`, `gui`, `info`, `graph`, `pack`, `protogen`, `inspect`, `registry publish`, `service deploy`, `service update`) all support reading the manifest from standard input by specifying `"-"` as the manifest path. This enables dynamic manifest generation and preprocessing workflows.
 {% endhint %}
 
 ### **`init`**
@@ -42,9 +45,32 @@ The `build` command:
 substreams build
 ```
 
+#### Reading manifest from stdin
+
+The `build` command supports reading the manifest from stdin by using `--manifest "-"`. This allows for dynamic manifest generation and processing pipelines.
+
+```bash
+cat substreams.yaml | substreams build --manifest "-"
+```
+
+**Example with `envsubst`**:
+```bash
+# Generate manifest dynamically with environment variable substitution
+envsubst < substreams.yaml.template | substreams build --manifest "-"
+```
+
+{% hint style="info" %}
+When using standard input mode (`"-"`), file path resolution within the Substreams manifest is done relative to the current working directory where the command is executed, not relative to the original manifest file location.
+{% endhint %}
+
+This approach is useful for:
+- Dynamic configuration using environment variables
+- Pre-processing manifest files with template tools
+- CI/CD pipelines with dynamic manifest generation
+
 ### **`run`**
 
-The `run` command connects to a Substreams endpoint and begins processing data.
+The `run` command connects to a Substreams endpoint and begins processing data. It supports reading manifest from stdin using `"-"`.
 
 {% code title="run command" overflow="wrap" %}
 ```bash
@@ -52,6 +78,9 @@ substreams run -e mainnet.eth.streamingfast.io:443 \
    -t +1 \
    ./substreams.yaml \
    module_name
+
+# Or read from stdin:
+cat substreams.yaml | substreams run -e mainnet.eth.streamingfast.io:443 -t +1 "-" module_name
 ```
 {% endcode %}
 
@@ -122,7 +151,7 @@ The available output display options are:
 
 ### `gui`
 
-The `gui` command pops up a terminal-based graphical user interface.
+The `gui` command pops up a terminal-based graphical user interface. It supports reading manifest from stdin using `"-"`.
 
 Its parameters are very similar to those of `run`, but the `gui` command provides a UI to navigate the results instead of a stream of data.
 
@@ -138,7 +167,7 @@ You can reload the data without hitting the server again using `--replay`. The d
 
 These are the shortcuts that you can use to navigate the GUI. You can always get more information by pressing the `?` key.
 
-| Function | Keys  | 
+| Function | Keys  |
 |---|---|
 | Switch screen (`Request`, `Progress`, `Output`) | `tab` |
 | Restart                                         | `r`  |
@@ -155,7 +184,7 @@ These are the shortcuts that you can use to navigate the GUI. You can always get
 
 **(DEPRECATED: use `build` instead)**
 
-The `pack` command builds a shippable, importable package from a `substreams.yaml` manifest file.
+The `pack` command builds a shippable, importable package from a `substreams.yaml` manifest file. It supports reading manifest from stdin using `"-"`.
 
 {% code title="pack command" overflow="wrap" %}
 ```bash
@@ -174,7 +203,7 @@ Successfully wrote "your-package-v0.1.0.spkg".
 
 ### `info`
 
-The `info` command prints out the contents of a package for inspection. It works on both local and remote `yaml` or `spkg` configuration files.
+The `info` command prints out the contents of a package for inspection. It works on both local and remote `yaml` or `spkg` configuration files, and supports reading manifest from stdin using `"-"`.
 
 {% code title="info command" overflow="wrap" %}
 ```bash
@@ -211,7 +240,7 @@ Hash: 11fd70768029bebce3741b051c15191d099d2436
 
 ### `graph`
 
-The `graph` command prints out a visual graph of the package in the [mermaid-js format](https://mermaid.js.org/intro/n00b-syntaxReference.html).
+The `graph` command prints out a visual graph of the package in the [mermaid-js format](https://mermaid.js.org/intro/n00b-syntaxReference.html). It supports reading manifest from stdin using `"-"`.
 
 {% hint style="success" %}
 **Tip**: [Mermaid Live Editor](https://mermaid.live/) is the visual editor used by Substreams.
@@ -241,7 +270,7 @@ Mermaid generated graph diagram
 
 ### `inspect`
 
-The `inspect` command reaches deep into the file structure of a `yaml` configuration file or `spkg` package and is used mostly for debugging, or if you're curious\_.\_
+The `inspect` command reaches deep into the file structure of a `yaml` configuration file or `spkg` package and is used mostly for debugging, or if you're curious. It supports reading manifest from stdin using `"-"`.
 
 {% code title="inspect command" overflow="wrap" %}
 ```bash
@@ -262,9 +291,19 @@ modules {
 ```
 {% endcode %}
 
+### **`protogen`**
+
+The `protogen` command generates Rust bindings from a package. It supports reading manifest from stdin using `"-"`.
+
+```bash
+substreams protogen ./substreams.yaml
+# Or from stdin:
+cat substreams.yaml | substreams protogen "-"
+```
+
 ### **`codegen`**
 
-The `codegen` command generates a code for a specific sink taking a Substreams module as input. 
+The `codegen` command generates a code for a specific sink taking a Substreams module as input.
 
 - SQL
 

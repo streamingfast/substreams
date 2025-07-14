@@ -138,16 +138,9 @@ func newProtoBuilder(manifInfo *manifestInfo, binaryLabel string) (*ProtoBuilder
 }
 
 func (p *ProtoBuilder) Build(ctx context.Context) error {
-
 	if len(p.manifInfo.Manifest.Binaries) == 0 || !strings.HasPrefix(p.manifInfo.Manifest.Binaries[p.binaryLabel].Type, "wasm/rust-v1") {
 		fmt.Println("Notice: No binaries found of type `wasm/rust-v1`, not generating rust bindings...")
 		return nil
-	}
-
-	excludePaths := p.manifInfo.Manifest.Protobuf.ExcludePaths
-	if len(excludePaths) == 0 {
-		fmt.Printf("Notice: No exclude paths found:\n")
-		fmt.Printf("* Typically, `google` and `sf/substreams` are excluded. If build fails, consider adding these exclude paths.\n")
 	}
 
 	// Read the manifest to get the package
@@ -172,15 +165,12 @@ func (p *ProtoBuilder) Build(ctx context.Context) error {
 		return fmt.Errorf("reading manifest %q: %w", p.manifInfo.Path, err)
 	}
 
-	// Use exclude paths from manifest if available
-	if len(excludePaths) == 0 {
-		if pkgBundle != nil && pkgBundle.Manifest != nil {
-			excludePaths = pkgBundle.Manifest.Protobuf.ExcludePaths
-		}
+	if len(pkgBundle.Manifest.Protobuf.ExcludePaths) == 0 {
+		fmt.Printf("Notice: No exclude paths found:\n")
+		fmt.Printf("* Typically, `google` and `sf/substreams` are excluded. If build fails, consider adding these exclude paths.\n")
 	}
 
-	// Create proto generator and call GenerateProto directly
-	generator := codegen.NewProtoGenerator(outputPath, excludePaths, true) // generateMod = true by default
+	generator := codegen.NewProtoGenerator(outputPath, pkgBundle.Manifest.Protobuf.ExcludePaths, true)
 	err = generator.GenerateProto(pkgBundle.Package)
 	if err != nil {
 		return fmt.Errorf("error generating proto: %w", err)

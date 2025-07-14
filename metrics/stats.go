@@ -2,7 +2,7 @@ package metrics
 
 import (
 	"context"
-	"sort"
+	"slices"
 	"sync"
 	"time"
 
@@ -223,16 +223,23 @@ func (s *extendedStats) updateDurations() {
 	}
 
 	if len(s.ModuleStats.ExternalCallMetrics) > 0 {
-		sort.Slice(s.ModuleStats.ExternalCallMetrics, func(i, j int) bool {
-			if s.ModuleStats.ExternalCallMetrics[i] == nil || s.ModuleStats.ExternalCallMetrics[j] == nil {
-				return false
+		slices.SortFunc(s.ModuleStats.ExternalCallMetrics, func(a, b *pbssinternal.ExternalCallMetric) int {
+			if a == nil || b == nil {
+				return 0
 			}
-			return s.ModuleStats.ExternalCallMetrics[i].Name < s.ModuleStats.ExternalCallMetrics[j].Name
+			if a.Name < b.Name {
+				return -1
+			}
+			if a.Name > b.Name {
+				return 1
+			}
+			return 0
 		})
 	}
 
 	s.ModuleStats.StoreOperationTimeMs = uint64(s.storeOperationTime.Milliseconds())
 }
+
 func (s *Stats) RecordInitializationComplete() {
 	s.Lock()
 	defer s.Unlock()

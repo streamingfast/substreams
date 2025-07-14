@@ -3,6 +3,7 @@ package metrics
 import (
 	"context"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -233,7 +234,7 @@ func (s *extendedStats) updateDurations() {
 			if a.Name > b.Name {
 				return 1
 			}
-			return 0
+			return strings.Compare(a.Name, b.Name)
 		})
 	}
 

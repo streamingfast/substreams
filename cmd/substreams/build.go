@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
+	"github.com/streamingfast/substreams/codegen"
 	"github.com/streamingfast/substreams/manifest"
 	"gopkg.in/yaml.v3"
 )
@@ -137,26 +138,42 @@ func newProtoBuilder(manifInfo *manifestInfo, binaryLabel string) (*ProtoBuilder
 }
 
 func (p *ProtoBuilder) Build(ctx context.Context) error {
-
 	if len(p.manifInfo.Manifest.Binaries) == 0 || !strings.HasPrefix(p.manifInfo.Manifest.Binaries[p.binaryLabel].Type, "wasm/rust-v1") {
 		fmt.Println("Notice: No binaries found of type `wasm/rust-v1`, not generating rust bindings...")
 		return nil
 	}
 
-	excludes := strings.Join(p.manifInfo.Manifest.Protobuf.ExcludePaths, ",")
-	if excludes == "" {
+	// Read the manifest to get the package
+	readerOptions := []manifest.Option{
+		manifest.SkipSourceCodeReader(),
+		manifest.SkipModuleOutputTypeValidationReader(),
+	}
+
+	manifestReader, err := manifest.NewReader(p.manifInfo.Path, readerOptions...)
+	if err != nil {
+		return fmt.Errorf("manifest reader: %w", err)
+	}
+
+	// Determine output path relative to manifest
+	outputPath := "src/pb"
+	if manifestReader.IsLocalManifest() && !filepath.IsAbs(outputPath) {
+		outputPath = filepath.Join(filepath.Dir(p.manifInfo.Path), outputPath)
+	}
+
+	pkgBundle, err := manifestReader.Read()
+	if err != nil {
+		return fmt.Errorf("reading manifest %q: %w", p.manifInfo.Path, err)
+	}
+
+	if len(pkgBundle.Manifest.Protobuf.ExcludePaths) == 0 {
 		fmt.Printf("Notice: No exclude paths found:\n")
 		fmt.Printf("* Typically, `google` and `sf/substreams` are excluded. If build fails, consider adding these exclude paths.\n")
 	}
 
-	defaultCmd := []string{"substreams", "protogen", p.manifInfo.Path}
-	if excludes != "" {
-		defaultCmd = append(defaultCmd, []string{"--exclude-paths", excludes}...)
-	}
-
-	err := runCommandInDir(ctx, filepath.Dir(p.manifInfo.Path), defaultCmd)
+	generator := codegen.NewProtoGenerator(outputPath, pkgBundle.Manifest.Protobuf.ExcludePaths, true)
+	err = generator.GenerateProto(pkgBundle.Package)
 	if err != nil {
-		return fmt.Errorf("error running protogen: %w", err)
+		return fmt.Errorf("error generating proto: %w", err)
 	}
 
 	fmt.Printf("Protogen complete.\n")

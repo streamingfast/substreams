@@ -225,15 +225,6 @@ func (s *extendedStats) updateDurations() {
 
 	if len(s.ModuleStats.ExternalCallMetrics) > 0 {
 		slices.SortFunc(s.ModuleStats.ExternalCallMetrics, func(a, b *pbssinternal.ExternalCallMetric) int {
-			if a == nil || b == nil {
-				return 0
-			}
-			if a.Name < b.Name {
-				return -1
-			}
-			if a.Name > b.Name {
-				return 1
-			}
 			return strings.Compare(a.Name, b.Name)
 		})
 	}

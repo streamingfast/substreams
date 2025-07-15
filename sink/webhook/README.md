@@ -17,7 +17,7 @@ substreams sink webhook https://api.example.com/webhook manifest.yaml module_nam
 The webhook sink now supports configurable retry behavior for handling transient failures:
 
 ### Default Settings
-- **Max Retries**: 3 attempts
+- **Max Retries**: 3 attempts (use -1 for infinite retries)
 - **Timeout**: 30 seconds per request
 - **Max Retry Interval**: 30 seconds (exponential backoff cap)
 
@@ -39,6 +39,10 @@ substreams sink webhook https://api.example.com/webhook manifest.yaml module_nam
 # Disable retries completely
 substreams sink webhook https://api.example.com/webhook manifest.yaml module_name \
   --webhook-max-retries 0
+
+# Enable infinite retries (retry until success or context cancellation)
+substreams sink webhook https://api.example.com/webhook manifest.yaml module_name \
+  --webhook-max-retries -1
 ```
 
 ### Combined Configuration
@@ -49,6 +53,13 @@ substreams sink webhook https://api.example.com/webhook manifest.yaml module_nam
   --webhook-max-retries 5 \
   --webhook-timeout 15s \
   --webhook-max-retry-interval 45s \
+  --state-file ./production.cursor
+
+# Production configuration with infinite retries for critical webhooks
+substreams sink webhook https://api.example.com/webhook manifest.yaml module_name \
+  --webhook-max-retries -1 \
+  --webhook-timeout 30s \
+  --webhook-max-retry-interval 15s \
   --state-file ./production.cursor
 ```
 
@@ -64,12 +75,25 @@ substreams sink webhook https://api.example.com/webhook manifest.yaml module_nam
 - **Request creation failures** (invalid URLs)
 - **Context cancellation**
 
+### Retry Modes
+- **Limited retries** (default): Retry up to `--webhook-max-retries` times
+- **No retries** (`--webhook-max-retries 0`): Fail immediately on first error
+- **Infinite retries** (`--webhook-max-retries -1`): Retry indefinitely until success or context cancellation
+
 ### Exponential Backoff
 The retry mechanism uses exponential backoff with jitter:
 - First retry: ~1 second
-- Second retry: ~2 seconds  
+- Second retry: ~2 seconds
 - Third retry: ~4 seconds
 - Maximum interval is capped by `--webhook-max-retry-interval`
+
+### Infinite Retry Behavior
+When `--webhook-max-retries` is set to `-1`:
+- Webhook calls will retry indefinitely for transient failures
+- Only context cancellation or permanent errors (4xx) will stop retries
+- Useful for critical webhooks that must eventually succeed
+- Consider setting appropriate `--webhook-timeout` and `--webhook-max-retry-interval` values
+- Monitor logs for excessive retry patterns that might indicate service issues
 
 ## State Management
 
@@ -105,9 +129,33 @@ INFO webhook call successful block=12345 url=https://api.example.com/webhook
 
 1. **Set appropriate timeouts**: Use shorter timeouts (5-15s) for real-time processing
 2. **Configure retries based on endpoint reliability**: More retries for less reliable services
-3. **Monitor webhook endpoint performance**: Adjust settings based on observed behavior
-4. **Use state files**: Always specify a state file for production deployments
-5. **Handle failures gracefully**: Implement idempotent webhook handlers that can handle duplicate calls
+3. **Use infinite retries sparingly**: Only for critical webhooks where eventual delivery is essential
+4. **Monitor webhook endpoint performance**: Adjust settings based on observed behavior
+5. **Use state files**: Always specify a state file for production deployments
+6. **Handle failures gracefully**: Implement idempotent webhook handlers that can handle duplicate calls
+7. **Context management**: When using infinite retries, ensure proper context cancellation for shutdown
+
+### Retry Strategy Guidelines
+
+**For real-time applications:**
+```bash
+--webhook-max-retries 2
+--webhook-timeout 5s
+--webhook-max-retry-interval 10s
+```
+
+**For critical data delivery:**
+```bash
+--webhook-max-retries -1
+--webhook-timeout 30s
+--webhook-max-retry-interval 60s
+```
+
+**For testing/development:**
+```bash
+--webhook-max-retries 0
+--webhook-timeout 10s
+```
 
 ## Webhook Payload Format
 

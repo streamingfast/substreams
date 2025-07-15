@@ -17,7 +17,7 @@ func init() {
 			sink.FlagInfiniteRetry))
 
 	sinkWebhookCmd.Flags().String("state-file", "./state.cursor", "File where the sink will store its cursor. If empty, no cursor will be saved or used, only the start-block.")
-	sinkWebhookCmd.Flags().Int("webhook-max-retries", 3, "Maximum number of retries for webhook calls (0 disables retries)")
+	sinkWebhookCmd.Flags().Int("webhook-max-retries", 3, "Maximum number of retries for webhook calls (0 disables retries, -1 for infinite retries)")
 	sinkWebhookCmd.Flags().Duration("webhook-timeout", 30*time.Second, "Timeout for individual webhook calls")
 	sinkWebhookCmd.Flags().Duration("webhook-max-retry-interval", 30*time.Second, "Maximum interval between webhook retries (exponential backoff cap)")
 

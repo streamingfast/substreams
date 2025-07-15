@@ -24,7 +24,7 @@ type Client struct {
 // Config holds configuration for the webhook client
 type Config struct {
 	Timeout     time.Duration // HTTP request timeout for individual calls
-	MaxRetries  int           // Maximum number of retry attempts for transient failures
+	MaxRetries  int           // Maximum number of retry attempts for transient failures (-1 for infinite retries)
 	MaxInterval time.Duration // Maximum interval between retries (exponential backoff cap)
 }
 
@@ -76,7 +76,14 @@ func (c *Client) Call(ctx context.Context, url string, payload []byte, blockNumb
 	b.MaxInterval = c.maxInterval
 	b.MaxElapsedTime = 0 // No overall timeout, let context handle it
 
-	retryBackoff := backoff.WithMaxRetries(b, uint64(c.maxRetries))
+	var retryBackoff backoff.BackOff
+	if c.maxRetries == -1 {
+		// Infinite retries - no max retry limit
+		retryBackoff = b
+	} else {
+		// Limited retries
+		retryBackoff = backoff.WithMaxRetries(b, uint64(c.maxRetries))
+	}
 	retryBackoff = backoff.WithContext(retryBackoff, ctx)
 
 	err := backoff.Retry(operation, retryBackoff)

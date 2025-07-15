@@ -611,3 +611,116 @@ func BenchmarkClient_Call_LargePayload(b *testing.B) {
 		}
 	}
 }
+
+func TestClient_Call_InfiniteRetries(t *testing.T) {
+	// Test infinite retries (-1) with eventual success
+	var requestCount int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		if requestCount < 5 {
+			// Fail first 4 requests
+			w.WriteHeader(http.StatusInternalServerError)
+		} else {
+			// Succeed on 5th request
+			w.WriteHeader(http.StatusOK)
+		}
+	}))
+	defer server.Close()
+
+	config := Config{
+		Timeout:     5 * time.Second,
+		MaxRetries:  -1,                     // Infinite retries
+		MaxInterval: 100 * time.Millisecond, // Short interval for faster test
+	}
+	client := NewClient(config, zap.NewNop())
+	payload := []byte(`{"test": "infinite retries"}`)
+
+	err := client.Call(context.Background(), server.URL, payload, 123)
+	assert.NoError(t, err)
+	assert.Equal(t, 5, requestCount, "Should have made 5 requests (4 failures + 1 success)")
+}
+
+func TestClient_Call_InfiniteRetriesWithContextCancellation(t *testing.T) {
+	// Test that infinite retries respect context cancellation
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Always return server error to force retries
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	config := Config{
+		Timeout:     1 * time.Second,
+		MaxRetries:  -1, // Infinite retries
+		MaxInterval: 50 * time.Millisecond,
+	}
+	client := NewClient(config, zap.NewNop())
+	payload := []byte(`{"test": "context cancel"}`)
+
+	// Create context with short timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+
+	err := client.Call(ctx, server.URL, payload, 123)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "context deadline exceeded")
+}
+
+func TestClient_Call_InfiniteRetriesClientError(t *testing.T) {
+	// Test that infinite retries still respect permanent errors (4xx)
+	var requestCount int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		w.WriteHeader(http.StatusBadRequest) // 400 - permanent error
+	}))
+	defer server.Close()
+
+	config := Config{
+		Timeout:     1 * time.Second,
+		MaxRetries:  -1, // Infinite retries
+		MaxInterval: 10 * time.Millisecond,
+	}
+	client := NewClient(config, zap.NewNop())
+	payload := []byte(`{"test": "client error"}`)
+
+	err := client.Call(context.Background(), server.URL, payload, 123)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "client error status 400")
+	assert.Equal(t, 1, requestCount, "Should only make one request for permanent error")
+}
+
+func TestClient_Call_ConfigValidation(t *testing.T) {
+	// Test that different MaxRetries values work correctly
+	testCases := []struct {
+		name       string
+		maxRetries int
+		expected   string
+	}{
+		{
+			name:       "zero retries",
+			maxRetries: 0,
+			expected:   "no retries",
+		},
+		{
+			name:       "limited retries",
+			maxRetries: 3,
+			expected:   "limited retries",
+		},
+		{
+			name:       "infinite retries",
+			maxRetries: -1,
+			expected:   "infinite retries",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			config := Config{
+				Timeout:     30 * time.Second,
+				MaxRetries:  tc.maxRetries,
+				MaxInterval: 30 * time.Second,
+			}
+			client := NewClient(config, zap.NewNop())
+			assert.Equal(t, tc.maxRetries, client.maxRetries)
+		})
+	}
+}

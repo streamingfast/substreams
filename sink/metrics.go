@@ -1,6 +1,10 @@
 package sink
 
-import "github.com/streamingfast/dmetrics"
+import (
+	"time"
+
+	"github.com/streamingfast/dmetrics"
+)
 
 func RegisterMetrics() {
 	metrics.Register()
@@ -10,6 +14,15 @@ var metrics = dmetrics.NewSet()
 
 var HeadBlockNumber = metrics.NewHeadBlockNumber("substreams_sink")
 var HeadBlockTimeDrift = metrics.NewHeadTimeDrift("substreams_sink")
+
+var AvgBlockWaitTime = dmetrics.NewAvgDurationCounter(30*time.Second, time.Second, "Average duration for BlockWaitTime")
+var BlockWaitTime = metrics.NewGauge("substreams_sink_block_wait_time", "The time that the sinks spends waiting for the next block from substreams -- should converge to the block production time of the chain")
+
+var AvgBlockTimeDelta = dmetrics.NewAvgDurationCounter(30*time.Second, time.Second, "Average duration for BlockTimeDelta")
+var BlockTimeDelta = metrics.NewGauge("substreams_sink_block_time_delta", "The difference between the last received block's BlockTime and the previous block's BlockTime -- can be skewed very high when processing older segments with a BlockFilter or skipped outputs")
+
+var AvgLocalProcessingTime = dmetrics.NewAvgDurationCounter(30*time.Second, time.Second, "Average duration for LocalProcessingTime")
+var LocalProcessingTime = metrics.NewGauge("substreams_sink_local_processing_time", "The time that the sinks spends processing the received block")
 
 var MessageSizeBytes = metrics.NewCounter("substreams_sink_message_size_bytes", "The number of total bytes of message received from the Substreams backend")
 

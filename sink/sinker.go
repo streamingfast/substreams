@@ -271,7 +271,7 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 			ProductionMode:       s.Mode == SubstreamsModeProduction,
 			NoopMode:             s.NoopMode,
 			DevOutputModules:     devOutputModules,
-			LimitProcessedBlocks: 10000, //FIXME
+			LimitProcessedBlocks: s.LimitProcessedBlocks,
 		}
 
 		s.Logger.Info("sending request", zap.String("start_block", fmt.Sprintf("%d", startBlock)), zap.String("stop_block", fmt.Sprintf("%d", stopBlock)))
@@ -362,12 +362,22 @@ func (s *Sinker) doRequest(
 	if err != nil {
 		return activeCursor, receivedMessage, retryable(fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err))
 	}
+	var prevBlockTime time.Time
+	var afterReceive time.Time
+	var lastMessageWasData bool
 
 	for {
 		if s.Tracer.Enabled() {
 			s.Logger.Debug("substreams waiting to receive message", zap.Stringer("cursor", activeCursor))
 		}
 
+		if lastMessageWasData {
+			AvgLocalProcessingTime.AddElapsedTime(afterReceive)
+			LocalProcessingTime.SetFloat64(AvgLocalProcessingTime.Average().Seconds())
+		}
+		lastMessageWasData = false // reset
+
+		beforeReceive := time.Now()
 		resp, err := stream.Recv()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
@@ -447,6 +457,18 @@ func (s *Sinker) doRequest(
 			}
 
 		case *pbsubstreamsrpc.Response_BlockScopedData:
+			afterReceive = time.Now()
+			lastMessageWasData = true
+			AvgBlockWaitTime.AddElapsedTime(beforeReceive)
+			BlockWaitTime.SetFloat64(AvgBlockWaitTime.Average().Seconds())
+
+			blockTime := r.BlockScopedData.Clock.Timestamp.AsTime()
+			if !prevBlockTime.IsZero() {
+				AvgBlockTimeDelta.AddDuration(blockTime.Sub(prevBlockTime))
+				BlockTimeDelta.SetFloat64(AvgBlockTimeDelta.Average().Seconds())
+			}
+			prevBlockTime = blockTime
+
 			block := bstream.NewBlockRef(r.BlockScopedData.Clock.Id, r.BlockScopedData.Clock.Number)
 			moduleOutput := r.BlockScopedData.Output
 
@@ -492,6 +514,7 @@ func (s *Sinker) doRequest(
 					if s.LivenessChecker.IsLive(blockScopedData.Clock) {
 						isLive = &liveBlock
 					}
+					s.stats.SetLiveness(isLive)
 				}
 
 				if err := handler.HandleBlockScopedData(ctx, blockScopedData, isLive, currentCursor); err != nil {

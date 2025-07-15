@@ -35,7 +35,6 @@ require (
 	github.com/alecthomas/participle v0.7.1
 	github.com/bmatcuk/doublestar/v4 v4.6.1
 	github.com/bobg/go-generics/v2 v2.1.1
-	github.com/bobg/go-generics/v3 v3.5.0
 	github.com/bytecodealliance/wasmtime-go/v30 v30.0.0
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/charmbracelet/bubbles v0.20.0
@@ -94,6 +93,7 @@ require (
 	github.com/alecthomas/chroma/v2 v2.8.0 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.12.0 // indirect
+	github.com/bobg/go-generics/v3 v3.5.0 // indirect
 	github.com/catppuccin/go v0.2.0 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.2 // indirect
 	github.com/charmbracelet/x/exp/strings v0.0.0-20240722160745-212f7b056ed0 // indirect

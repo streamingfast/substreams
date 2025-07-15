@@ -21,7 +21,7 @@ var protogenCmd = &cobra.Command{
 		'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml'
 		file in place of '<manifest_file>', or a link to a remote .spkg file, using urls gs://, http(s)://, ipfs://, etc.'.
 		You can also use "-" to read the manifest from standard input.
-		
+
 		Note: if you have a data structure with an attribute that starts with an underscore, buf generate will remove the underscore.
 	`),
 	RunE:         runProtogen,
@@ -55,6 +55,19 @@ func runProtogen(cmd *cobra.Command, args []string) error {
 		manifestPath = args[0]
 	}
 
+	// Check if called from build command
+	calledFromBuild := os.Getenv("__SUBSTREAMS_INTERNAL_BUILD_INVOCATION__") == "true"
+
+	if !calledFromBuild {
+		if manifestPath == "-" {
+			fmt.Printf("🔧 Generating protobuf bindings from 'stdin'\n")
+		} else if manifestPath != "" {
+			fmt.Printf("🔧 Generating protobuf bindings from %s\n", manifestPath)
+		} else {
+			fmt.Printf("🔧 Generating protobuf bindings from substreams.yaml\n")
+		}
+	}
+
 	readerOptions := []manifest.Option{
 		manifest.SkipSourceCodeReader(),
 		manifest.SkipModuleOutputTypeValidationReader(),
@@ -79,7 +92,7 @@ func runProtogen(cmd *cobra.Command, args []string) error {
 		} else {
 			manifestDir = filepath.Dir(manifestPath)
 		}
-		
+
 		newOutputPath := filepath.Join(manifestDir, outputPath)
 		zlog.Debug("manifest path is a local manifest, making output path relative to it", zap.String("old", outputPath), zap.String("new", newOutputPath))
 		outputPath = newOutputPath
@@ -97,5 +110,14 @@ func runProtogen(cmd *cobra.Command, args []string) error {
 	}
 
 	generator := codegen.NewProtoGenerator(outputPath, excludePaths, generateMod)
-	return generator.GenerateProto(pkgBundle.Package)
+	err = generator.GenerateProto(pkgBundle.Package)
+	if err != nil {
+		return err
+	}
+
+	if !calledFromBuild {
+		fmt.Printf("✅ Protobuf bindings generated successfully\n")
+	}
+
+	return nil
 }

@@ -1,10 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -46,24 +44,24 @@ func runBuildE(cmd *cobra.Command, args []string) error {
 		var err error
 		manifestPath, err = findManifest()
 		if err != nil {
-			return fmt.Errorf("error finding manifest: %w", err)
+			return fmt.Errorf("❌ Error finding manifest: %w", err)
 		}
 	}
 
 	if manifestPath == "-" {
-		fmt.Printf("Reading manifest from stdin\n")
+		fmt.Printf("📄 Reading manifest from stdin\n")
 	} else if manifestPath != "" {
-		fmt.Printf("Building manifest file: %s\n", manifestPath)
+		fmt.Printf("🏗️  Building Substreams package from %s\n", manifestPath)
 	}
 
 	manifestReader, err := manifest.NewReader(manifestPath)
 	if err != nil {
-		return fmt.Errorf("manifest reader: %w", err)
+		return fmt.Errorf("❌ Manifest reader: %w", err)
 	}
 
 	pkgBundle, err := manifestReader.Read()
 	if err != nil {
-		return fmt.Errorf("reading manifest: %w", err)
+		return fmt.Errorf("❌ Reading manifest: %w", err)
 	}
 
 	// For stdin, we need to create a temporary file for subcommands since stdin can only be read once
@@ -72,7 +70,7 @@ func runBuildE(cmd *cobra.Command, args []string) error {
 	if manifestPath == "-" {
 		tempFile, err := createTempManifestFile(pkgBundle.Manifest)
 		if err != nil {
-			return fmt.Errorf("creating temporary manifest file: %w", err)
+			return fmt.Errorf("❌ Creating temporary manifest file: %w", err)
 		}
 		actualPath = tempFile
 		cleanupFunc = func() { os.Remove(tempFile) }
@@ -88,66 +86,50 @@ func runBuildE(cmd *cobra.Command, args []string) error {
 
 	protoBuilder, err := newProtoBuilder(info, binaryLabel)
 	if err != nil {
-		return fmt.Errorf("error creating proto builder: %w", err)
+		return fmt.Errorf("❌ Error creating proto builder: %w", err)
 	}
 	err = protoBuilder.Build(ctx)
 	if err != nil {
-		return fmt.Errorf("error running protogen: %w", err)
+		return fmt.Errorf("❌ Error running protogen: %w", err)
 	}
 
 	binaryBuilder, err := newBinaryBuilder(info, binaryLabel)
 	if err != nil {
-		return fmt.Errorf("error creating binary builder: %w", err)
+		return fmt.Errorf("❌ Error creating binary builder: %w", err)
 	}
 
 	err = binaryBuilder.Build(ctx)
 	if err != nil {
-		return fmt.Errorf("error building binary: %w", err)
+		return fmt.Errorf("❌ Error building binary: %w", err)
 	}
+
+	fmt.Println()
 
 	noPack := sflags.MustGetBool(cmd, "no-pack")
 	if noPack {
-		fmt.Printf("--no-pack flag detected, skipping creation of .spkg file.\n")
-		fmt.Printf("Build complete.\n")
+		fmt.Printf("✅ Build complete! Binaries ready for use.\n")
 		return nil
 	}
 
 	spkgBuilder, err := newSPKGPacker(info)
 	if err != nil {
-		return fmt.Errorf("error creating spkg builder: %w", err)
+		return fmt.Errorf("❌ Error creating spkg builder: %w", err)
 	}
 
 	err = spkgBuilder.Build(ctx)
 	if err != nil {
-		return fmt.Errorf("error building spkg: %w", err)
+		return fmt.Errorf("❌ Error building spkg: %w", err)
 	}
 
-	fmt.Printf("Build complete.\n")
+	fmt.Printf("✅ Build complete!\n")
 	return nil
-}
-
-func readManifestYaml(manifestPath string) (manifest.Manifest, error) {
-	var out *manifest.Manifest
-
-	cnt, err := os.ReadFile(manifestPath)
-	if err != nil {
-		return manifest.Manifest{}, fmt.Errorf("error reading substreams manifest %q: %w", manifestPath, err)
-	}
-
-	decoder := yaml.NewDecoder(bytes.NewReader(cnt))
-	decoder.KnownFields(true)
-	if err := decoder.Decode(&out); err != nil {
-		return manifest.Manifest{}, fmt.Errorf("error decoding manifest content: %w", err)
-	}
-
-	return *out, nil
 }
 
 func createTempManifestFile(manif *manifest.Manifest) (string, error) {
 	// Create a temporary file in the current directory
 	tmpFile, err := os.CreateTemp(".", "substreams-*.yaml")
 	if err != nil {
-		return "", fmt.Errorf("creating temporary manifest file: %w", err)
+		return "", err
 	}
 
 	defer func() {
@@ -190,7 +172,7 @@ func newProtoBuilder(manifInfo *manifestInfo, binaryLabel string) (*ProtoBuilder
 
 func (p *ProtoBuilder) Build(ctx context.Context) error {
 	if len(p.manifInfo.Manifest.Binaries) == 0 || !strings.HasPrefix(p.manifInfo.Manifest.Binaries[p.binaryLabel].Type, "wasm/rust-v1") {
-		fmt.Println("Notice: No binaries found of type `wasm/rust-v1`, not generating rust bindings...")
+		fmt.Println("⚠️  No Rust binaries found, skipping protobuf generation")
 		return nil
 	}
 
@@ -217,8 +199,8 @@ func (p *ProtoBuilder) Build(ctx context.Context) error {
 	}
 
 	if len(pkgBundle.Manifest.Protobuf.ExcludePaths) == 0 {
-		fmt.Printf("Notice: No exclude paths found:\n")
-		fmt.Printf("* Typically, `google` and `sf/substreams` are excluded. If build fails, consider adding these exclude paths.\n")
+		fmt.Printf("⚠️  No protobuf exclude paths configured\n")
+		fmt.Printf("   Consider adding 'google' and 'sf/substreams' to exclude paths if build fails\n")
 	}
 
 	generator := codegen.NewProtoGenerator(outputPath, pkgBundle.Manifest.Protobuf.ExcludePaths, true)
@@ -227,7 +209,7 @@ func (p *ProtoBuilder) Build(ctx context.Context) error {
 		return fmt.Errorf("error generating proto: %w", err)
 	}
 
-	fmt.Printf("Protogen complete.\n")
+	fmt.Printf("📦 Protobuf generation complete\n")
 	return nil
 }
 
@@ -254,7 +236,6 @@ func (b *BinaryBuilder) isBuildRequired() bool {
 		}
 	}
 	if allUse {
-		fmt.Printf("All modules have a 'use' field\n")
 		buildRequired = false
 	} else {
 		buildRequired = true
@@ -268,10 +249,10 @@ func (b *BinaryBuilder) getCmdArgs(ctx context.Context, binaryType string) ([][]
 
 	switch binaryTypeID {
 	case "javascript/v8":
-		fmt.Printf("`javascript/v8` binary type found... \n")
+		fmt.Printf("🟨 JavaScript/V8 binary detected\n")
 		return [][]string{}, nil
 	case "wasip1/tinygo-v1":
-		fmt.Printf("`wasip1/tinygo-v1` binary type found...\n")
+		fmt.Printf("🟦 TinyGo binary detected\n")
 		depValidator := &TinyGoDependencyValidator{}
 		err := depValidator.ValidateDependency(ctx)
 		if err != nil {
@@ -280,7 +261,7 @@ func (b *BinaryBuilder) getCmdArgs(ctx context.Context, binaryType string) ([][]
 
 		return [][]string{{"tinygo", "build", "-o", "main.wasm", "-target", "wasi", "-gc", "leaking", "-scheduler", "none", "."}}, nil
 	case "wasm/rust-v1":
-		fmt.Printf("`wasm/rust-v1` binary type found...\n")
+		fmt.Printf("🦀 Rust binary detected\n")
 		depValidator := &CargoDependencyValidator{}
 		err := depValidator.ValidateDependency(ctx)
 		if err != nil {
@@ -295,12 +276,12 @@ func (b *BinaryBuilder) getCmdArgs(ctx context.Context, binaryType string) ([][]
 
 func (b *BinaryBuilder) Build(ctx context.Context) error {
 	if b.manifInfo.Manifest.Binaries == nil || len(b.manifInfo.Manifest.Binaries) == 0 {
-		fmt.Printf("No binaries to build\n")
+		fmt.Printf("⚠️  No binaries configured for build\n")
 		return nil
 	}
 
 	if !b.isBuildRequired() {
-		fmt.Printf("No build required.\n")
+		fmt.Printf("⚠️  All modules use external binaries, skipping build\n")
 		return nil
 	}
 
@@ -335,7 +316,7 @@ func (b *BinaryBuilder) Build(ctx context.Context) error {
 		return fmt.Errorf("binary label %q not found in manifest", b.binaryLabel)
 	}
 
-	fmt.Printf("Binary build complete.\n")
+	fmt.Printf("🔧 Binary compilation complete\n")
 	return nil
 }
 
@@ -347,35 +328,32 @@ type TinyGoDependencyValidator struct{}
 
 func (t *TinyGoDependencyValidator) ValidateDependency(ctx context.Context) error {
 	//run tinygo version on the machine.  error if exit code not 0
-	fmt.Printf("Checking for tinygo on the system...\n")
+	fmt.Printf("🔍 Checking for TinyGo...\n")
 	cmd := exec.CommandContext(ctx, "tinygo", "version")
 	cmd.Env = os.Environ()
 	err := cmd.Run()
 	if err != nil {
-		return fmt.Errorf(`error validating presence of tinygo on machine: %w\n
-Consider installing tinygo from https://tinygo.org/getting-started/install\n`, err)
+		return fmt.Errorf(`TinyGo not found: %w\n
+Install TinyGo from https://tinygo.org/getting-started/install`, err)
 	}
 
-	fmt.Printf("tinygo found on the system\n")
+	fmt.Printf("✅ TinyGo found\n")
 	return nil
 }
 
 type CargoDependencyValidator struct{}
 
 func (c *CargoDependencyValidator) ValidateDependency(ctx context.Context) error {
-	//run cargo version on the machine.  error if exit code not 0
-	fmt.Printf("Checking for cargo on the system...\n")
 	cmd := exec.CommandContext(ctx, "cargo", "--version")
 	cmd.Env = os.Environ()
 	err := cmd.Run()
 	if err != nil {
-		return fmt.Errorf(`error validating presence of rust cargo on machine: %w\n
-Consider installing rustup from https://rustup.rs/
-On Linux and macOS systems, this is done as follows:
-"curl https://sh.rustup.rs -sSf | sh"`, err)
+		return fmt.Errorf(`Rust/Cargo not found: %w\n
+Install Rust from https://rustup.rs/
+On Linux and macOS: curl https://sh.rustup.rs -sSf | sh`, err)
 	}
 
-	fmt.Printf("cargo found on the system\n")
+	fmt.Printf("✅ Rust/Cargo found\n")
 	return nil
 }
 
@@ -396,7 +374,6 @@ func (s *SPKGPacker) Build(ctx context.Context) error {
 		return fmt.Errorf("error running pack: %w", err)
 	}
 
-	fmt.Printf("Pack complete.\n")
 	return nil
 }
 
@@ -439,26 +416,15 @@ func runCommandInDir(ctx context.Context, dir string, cmdArgs []string) error {
 	cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
 	cmd.Env = append(os.Environ(), "CARGO_TERM_COLOR=always")
 	cmd.Env = append(cmd.Env, "CLICOLOR_FORCE=true")
+	cmd.Env = append(cmd.Env, "__SUBSTREAMS_INTERNAL_BUILD_INVOCATION__=true")
 	cmd.Dir = dir
 
-	stdoutPipe, err := cmd.StdoutPipe()
-	if err != nil {
-		return fmt.Errorf("error creating stdout pipe: %w", err)
-	}
-	stderrPipe, err := cmd.StderrPipe()
-	if err != nil {
-		return fmt.Errorf("error creating stderr pipe: %w", err)
-	}
+	// For better output synchronization, redirect directly to stdout/stderr
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 
-	go func() {
-		_, _ = io.Copy(os.Stdout, stdoutPipe)
-	}()
-	go func() {
-		_, _ = io.Copy(os.Stderr, stderrPipe)
-	}()
-
-	fmt.Printf("Running command in %s: `%s`...\n", dir, strings.Join(cmdArgs, " "))
-	err = cmd.Start()
+	// Remove verbose command logging for cleaner output
+	err := cmd.Start()
 	if err != nil {
 		return fmt.Errorf("error starting `%s`: %w", strings.Join(cmdArgs, " "), err)
 	}

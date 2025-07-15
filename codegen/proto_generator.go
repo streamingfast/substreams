@@ -136,11 +136,8 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
 	
 	// Check if we can skip generation
 	if lastHash != "" && lastHash == currentHash && g.hasGeneratedFiles() {
-		fmt.Printf("Proto definitions unchanged, skipping buf generate (hash: %s)\n", currentHash[:12])
 		return nil
 	}
-	
-	fmt.Printf("Proto definitions changed or no previous generation found, running buf generate (hash: %s)\n", currentHash[:12])
 
 	tmpDir, err := os.MkdirTemp("", "substreams_protogen")
 	if err != nil {

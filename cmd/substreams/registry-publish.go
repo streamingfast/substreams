@@ -29,8 +29,8 @@ var registryPublish = &cobra.Command{
 		local spkg path, or local substreams path. If no argument is provided, it will look for a substreams.yaml
 		file in the current directory. You can use "-" to read the manifest from standard input.
 	`),
-	Args:  cobra.MaximumNArgs(1),
-	RunE:  runRegistryPublish,
+	Args: cobra.MaximumNArgs(1),
+	RunE: runRegistryPublish,
 }
 
 var teamSlug string
@@ -84,7 +84,7 @@ func runRegistryPublish(cmd *cobra.Command, args []string) (err error) {
 		return fmt.Errorf("validation failed: %w", err)
 	}
 
-	warnIncompletePackage(spkg)
+	warnIncompletePackage(spkg, warningsConfig{})
 	printPackageDetails(spkg)
 
 	confirm, err := utils.RunConfirmForm("Would you like to publish this package?")

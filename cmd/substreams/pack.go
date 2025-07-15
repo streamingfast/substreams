@@ -47,6 +47,19 @@ func runPack(cmd *cobra.Command, args []string) error {
 		manifestPath = args[0]
 	}
 
+	// Check if called from build command
+	calledFromBuild := os.Getenv("__SUBSTREAMS_INTERNAL_BUILD_INVOCATION__") == "true"
+
+	if !calledFromBuild {
+		if manifestPath == "-" {
+			fmt.Printf("🔧 Creating package from 'stdin'\n")
+		} else if manifestPath != "" {
+			fmt.Printf("🔧 Creating package from %s\n", manifestPath)
+		} else {
+			fmt.Printf("🔧 Creating package from substreams.yaml\n")
+		}
+	}
+
 	manifestReader, err := manifest.NewReader(manifestPath)
 	if err != nil {
 		return fmt.Errorf("manifest reader: %w", err)
@@ -56,9 +69,6 @@ func runPack(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("reading manifest %q: %w", manifestPath, err)
 	}
-
-	warnIncompletePackage(pkgBundle.Package)
-	printPackageDetails(pkgBundle.Package)
 
 	if pkgBundle == nil {
 		return fmt.Errorf("no package found")
@@ -84,7 +94,7 @@ func runPack(cmd *cobra.Command, args []string) error {
 		if manifestReader.IsRemotePackage(manifestPath) {
 			manifestDir = "."
 
-			if !manifestReader.IsLocalManifest() {
+			if !manifestReader.IsLocalManifest() && !calledFromBuild {
 				fmt.Printf("Re-packaging existing .spkg file...")
 			}
 		}
@@ -114,7 +124,30 @@ func runPack(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("writing file: %w", err)
 	}
 
-	fmt.Printf("Successfully wrote %q.\n", resolvedOutputFile)
+	if !calledFromBuild {
+		printPackageDetails(pkgBundle.Package)
+	}
+
+	icon := "✅"
+	if calledFromBuild {
+		icon = "📦"
+	}
+
+	finalOutputFile := resolvedOutputFile
+	workingDirectory, err := os.Getwd()
+	if err == nil {
+		finalOutputFile, err = filepath.Rel(workingDirectory, resolvedOutputFile)
+		if err != nil {
+			finalOutputFile = resolvedOutputFile
+		}
+	}
+
+	fmt.Printf("%s Package created successfully at %s", icon, finalOutputFile)
+
+	warned := warnIncompletePackage(pkgBundle.Package, warningsConfig{Indent: "  ", DisableImageWarning: true})
+	if warned && calledFromBuild {
+		fmt.Println()
+	}
 
 	return nil
 }

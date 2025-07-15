@@ -2,6 +2,7 @@ package output
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 
 	"github.com/charmbracelet/bubbles/viewport"
@@ -535,12 +536,7 @@ func (o *Output) jumpToNextMatchingBlock() tea.Cmd {
 }
 
 func (o *Output) hasDataForBlock(num uint64) bool {
-	for _, b := range o.blockSelector.BlocksWithData {
-		if b == num {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(o.blockSelector.BlocksWithData, num)
 }
 
 func newStatusBarWithBytesRepresentation(c common.Common, bytesRepresentation dynamic.BytesRepresentation) *statusbar.StatusBar {

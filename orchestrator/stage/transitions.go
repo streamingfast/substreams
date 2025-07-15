@@ -1,6 +1,9 @@
 package stage
 
-import "fmt"
+import (
+	"fmt"
+	"slices"
+)
 
 /*
 Transitions:
@@ -157,11 +160,9 @@ func (s *Stages) markSegmentCompleted(u Unit) {
 func (s *Stages) transition(u Unit, to UnitState, allowedPreviousStates ...UnitState) {
 	s.allocSegments(u.Segment)
 	prev := s.getState(u)
-	for _, from := range allowedPreviousStates {
-		if prev == from {
-			s.setState(u, to)
-			return
-		}
+	if slices.Contains(allowedPreviousStates, prev) {
+		s.setState(u, to)
+		return
 	}
 	invalidTransition(prev, to, u)
 }

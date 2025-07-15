@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"context"
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -604,10 +605,8 @@ func cloneCallMetrics(in []*pbssinternal.ExternalCallMetric) []*pbssinternal.Ext
 
 func (s *Stats) stage(module string) (uint32, *pbsubstreamsrpc.Stage) {
 	for i, ss := range s.stages {
-		for _, mod := range ss.Modules {
-			if mod == module {
-				return uint32(i), ss
-			}
+		if slices.Contains(ss.Modules, module) {
+			return uint32(i), ss
 		}
 	}
 	// could happen on initial lookup, minor race condition

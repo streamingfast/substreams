@@ -94,7 +94,7 @@ func (s *Sink) handleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.
 	msgDesc := s.decoder.GetMessageDescriptor(data.Output.Name)
 	dataContent := s.decoder.DecodeDynamicMessage(msgDesc, data.Output.MapOutput)
 
-	payload, err := NewWebhookPayload(data.Output.Name, data.Clock.Number, data.Clock.Timestamp, data.Output.MapOutput.TypeUrl, dataContent)
+	payload, err := NewWebhookPayload(data.Output.Name, data.Clock, data.Output.MapOutput.TypeUrl, dataContent)
 	if err != nil {
 		return fmt.Errorf("failed to create webhook payload: %w", err)
 	}

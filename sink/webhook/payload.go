@@ -2,33 +2,65 @@ package webhook
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
-	"google.golang.org/protobuf/types/known/timestamppb"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
+
+// Clock represents the clock information in the webhook payload
+type Clock struct {
+	Timestamp string `json:"timestamp"`
+	Number    uint64 `json:"number"`
+	ID        string `json:"id"`
+}
+
+// Manifest represents the manifest information in the webhook payload
+type Manifest struct {
+	ModuleName string `json:"moduleName"`
+	Type       string `json:"type"`
+}
 
 // WebhookPayload represents the payload structure sent to webhook endpoints
 type WebhookPayload struct {
-	Module    string          `json:"module"`
-	Block     uint64          `json:"block"`
-	Timestamp string          `json:"timestamp"`
-	Type      string          `json:"type"`
-	Payload   json.RawMessage `json:"payload"`
+	Clock    Clock           `json:"clock"`
+	Manifest Manifest        `json:"manifest"`
+	Data     json.RawMessage `json:"data"`
 }
 
 // NewWebhookPayload creates a new webhook payload with the desired format
-func NewWebhookPayload(moduleName string, blockNum uint64, timestamp *timestamppb.Timestamp, msgType string, data json.RawMessage) (*WebhookPayload, error) {
+func NewWebhookPayload(moduleName string, clock *pbsubstreams.Clock, msgType string, data json.RawMessage) (*WebhookPayload, error) {
 	var timestampStr string
-	if timestamp != nil {
-		timestampStr = timestamp.AsTime().Format(time.RFC3339)
+	if clock != nil && clock.Timestamp != nil {
+		timestampStr = clock.Timestamp.AsTime().Format(time.RFC3339)
+	}
+
+	// Strip the "type.googleapis.com/" prefix from the type
+	cleanType := msgType
+	if strings.HasPrefix(msgType, "type.googleapis.com/") {
+		cleanType = strings.TrimPrefix(msgType, "type.googleapis.com/")
+	}
+
+	clockInfo := Clock{
+		Timestamp: timestampStr,
+		Number:    0,
+		ID:        "",
+	}
+
+	if clock != nil {
+		clockInfo.Number = clock.Number
+		clockInfo.ID = clock.Id
+	}
+
+	manifest := Manifest{
+		ModuleName: moduleName,
+		Type:       cleanType,
 	}
 
 	return &WebhookPayload{
-		Module:    moduleName,
-		Block:     blockNum,
-		Timestamp: timestampStr,
-		Type:      msgType,
-		Payload:   data,
+		Clock:    clockInfo,
+		Manifest: manifest,
+		Data:     data,
 	}, nil
 }
 

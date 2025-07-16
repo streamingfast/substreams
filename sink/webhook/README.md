@@ -163,6 +163,59 @@ The webhook receives JSON payloads in the following format:
 
 ```json
 {
+  "clock": {
+    "timestamp": "2024-02-12T22:23:51.000Z",
+    "number": 53448530,
+    "id": "f843bc26cea0cbd50b09699546a8a97de6a1727646c17a857c5d8d868fc26142"
+  },
+  "manifest": {
+    "moduleName": "module_name",
+    "type": "sf.substreams.ethereum.v1.Events"
+  },
+  "data": {
+    // Your module's output data
+  }
+}
+```
+
+It is loosely based on the format from https://github.com/pinax-network/substreams-sink-webhook
+
+### Payload Structure
+
+- **`clock`**: Contains blockchain timing and identification information
+  - `timestamp`: Block timestamp in RFC3339 format
+  - `number`: Block number
+  - `id`: Block hash/ID
+- **`manifest`**: Contains module metadata
+  - `moduleName`: Name of the substreams module that generated this data
+  - `type`: Module output type (automatically strips `type.googleapis.com/` prefix)
+- **`data`**: Contains the actual output from your substreams module
+
+### Example with Real Data
+
+```json
+{
+  "clock": {
+    "timestamp": "2024-02-12T22:23:51.000Z",
+    "number": 53448530,
+    "id": "f843bc26cea0cbd50b09699546a8a97de6a1727646c17a857c5d8d868fc26142"
+  },
+  "manifest": {
+    "moduleName": "filtered_events",
+    "type": "sf.substreams.ethereum.v1.Events"
+  },
+  "data": {
+    "events": [
+      {
+        "address": "0x1234567890abcdef",
+        "topics": ["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"],
+        "data": "0x000000000000000000000000000000000000000000000001158e460913d00000"
+      }
+    ]
+  }
+}
+```
+
   "module": "module_name",
   "block": 12345,
   "timestamp": "2023-01-01T00:00:00Z",

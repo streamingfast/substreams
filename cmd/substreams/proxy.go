@@ -112,7 +112,7 @@ func init() {
 	proxyCmd.Flags().String("listen-addr", "localhost:8080", "listen on this address (unencrypted)")
 	proxyCmd.Flags().BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
 	proxyCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
-	proxyCmd.Flags().String("force-manifest", "", "if non-empty, the requests' modules will be replaced by the modules loaded from this location. Can be a local spkg or yaml file, or a remote (HTTP) spkg file.")
+	proxyCmd.Flags().String("force-manifest", "", "if non-empty, the requests' modules will be replaced by the modules loaded from this location. Can be a local spkg or yaml file, a remote (HTTP) spkg file, or \"-\" to read from stdin.")
 	proxyCmd.Flags().Uint64("force-start-block", 0, "if non-zero, the requests' start-block will be replaced by this value")
 
 	tools.Cmd.AddCommand(proxyCmd)

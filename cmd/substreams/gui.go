@@ -46,6 +46,7 @@ var guiOrRunLongUsage = cli.Dedent(`
 Stream module output from a given package on a remote endpoint. The manifest is optional as it will try to find a file named
 'substreams.yaml' in current working directory if nothing entered. You may enter a directory that contains a 'substreams.yaml'
 file in place of '<manifest_file>, or a link to a remote .spkg file, using urls gs://, http(s)://, ipfs://, etc.'.
+You can also use "-" to read the manifest from standard input.
 
 You can also use substreams gui my-package@v0.1.0 to specify a specific version of the package. This will fetch it from
 the Substreams registry at https://substreams.dev
@@ -85,6 +86,7 @@ func runGui(cmd *cobra.Command, args []string) (err error) {
 	if err != nil {
 		return err
 	}
+
 
 	requestParams := sflags.MustGetStringArray(cmd, "params")
 
@@ -239,7 +241,17 @@ func runGui(cmd *cobra.Command, args []string) (err error) {
 }
 
 func loadSubstreamsAuthEnvFile(manifestPath string) {
-	projectPath := filepath.Dir(manifestPath)
+	var projectPath string
+	if manifestPath == "-" {
+		// For stdin, use current working directory
+		if wd, err := os.Getwd(); err == nil {
+			projectPath = wd
+		} else {
+			projectPath = "."
+		}
+	} else {
+		projectPath = filepath.Dir(manifestPath)
+	}
 	authFile := filepath.Join(projectPath, ".substreams.env")
 	_, err := os.Stat(authFile)
 	if err != nil {

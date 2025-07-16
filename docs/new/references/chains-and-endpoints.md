@@ -40,7 +40,7 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 
 ### EVM Extended vs Base Block Model
 
-For EVM chains, the are two different types of `Block` models: _Extended_ and _Base_:
+For EVM chains, there are two different types of `Block` models: _Extended_ and _Base_:
 
 - An **Extended Block** is produced by a full node instrumentation integration, thus containing a rich data model (balance changes, internal calls, storage changes...).
 - A **Base Block** is produced by a _RPC Poller_ integration, which essentially means that only the data exposed by an RPC endpoint can be included in the data model.

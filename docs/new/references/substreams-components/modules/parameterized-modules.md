@@ -157,7 +157,7 @@ substreams gui map_whale_transfers -p map_whale_transfers="address[]=aaa..aaa&ad
 
 ## Parameters Per Network
 
-It also possible to specify parameters per network. For example, consider that you want to specify a specific parameter for Ethereum and a different one for Solana.
+It is also possible to specify parameters per network. For example, consider that you want to specify a specific parameter for Ethereum and a different one for Solana.
 
 The syntax to specify the parameters per network in your manifest uses the top-level `networks` block.
 

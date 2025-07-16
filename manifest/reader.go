@@ -187,6 +187,12 @@ func (r *Reader) Read() (*PackageBundle, error) {
 
 func (r *Reader) read() error {
 	input := r.currentInput
+
+	// Handle stdin input
+	if input == "-" {
+		return r.readStdin()
+	}
+
 	if r.IsRemotePackage(input) {
 		return r.readRemote(input)
 	}
@@ -398,8 +404,25 @@ func (r *Reader) readLocal(input string) error {
 	return nil
 }
 
+func (r *Reader) readStdin() error {
+	data, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		return fmt.Errorf("unable to read from stdin: %w", err)
+	}
+
+	r.currentData = data
+	return nil
+}
+
 func (r *Reader) resolveInputPath() error {
 	input := r.originalInput
+
+	// Handle stdin input
+	if input == "-" {
+		r.currentInput = "-"
+		return nil
+	}
+
 	if r.IsRemotePackage(input) {
 		r.currentInput = input
 		return nil
@@ -442,8 +465,10 @@ func (r *Reader) getPkg() (*pbsubstreams.Package, *Manifest, error) {
 		return nil, nil, fmt.Errorf("no result available")
 	}
 
-	if strings.HasSuffix(r.currentInput, ".yaml") || strings.HasSuffix(r.currentInput, ".yml") {
+	if r.currentInput == "-" || strings.HasSuffix(r.currentInput, ".yaml") || strings.HasSuffix(r.currentInput, ".yml") {
 		manif := &Manifest{}
+		manif.Workdir = r.workingDir
+
 		decoder := yaml3.NewDecoder(bytes.NewReader(r.currentData))
 		decoder.KnownFields(true)
 
@@ -570,6 +595,7 @@ func validatePackage(pkg *pbsubstreams.Package, validation ReaderValidation) err
 
 func (r *Reader) newPkgFromManifest(manif *Manifest) (*pbsubstreams.Package, error) {
 	converter := newManifestConverter(r.currentInput, r.validation, r)
+
 	pkg, descriptors, dynMessage, err := converter.Convert(manif)
 	if err != nil {
 		return nil, err
@@ -700,16 +726,27 @@ func (r *Reader) IsLocalManifest() bool {
 		return false
 	}
 
+	// Reading from standard input is also considered a local manifest input
+	if r.currentInput == "-" {
+		return true
+	}
+
 	return strings.HasSuffix(r.currentInput, ".yaml") || strings.HasSuffix(r.currentInput, ".yml")
 }
 
 // IsLikelyManifestInput determines if the input is likely a manifest input, which is determined
 // by checking:
 //   - If the input starts with remote prefix ("https://", "http://", "ipfs://", "gs://", "s3://", "az://")
+//   - If the input is reading from standard input (i.e., `-`)
 //   - If the input ends with `.yaml`
 //   - If the input is a directory (we check for path separator)
 func IsLikelyManifestInput(in string) bool {
 	if hasRemotePrefix(in) {
+		return true
+	}
+
+	// Reading from standard input is also considered a valid manifest input
+	if in == "-" {
 		return true
 	}
 

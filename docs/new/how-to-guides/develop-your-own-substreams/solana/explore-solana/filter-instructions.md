@@ -7,7 +7,7 @@ The `map_filter_instructions` module of the Solana Substreams Explorer extracts 
 In the `substreams-explorer` project, move to the `solana-explorer` folder, which contains the source of the Solana Substreams. Then, build the Rust code:
 
 ```bash
-make build
+substreams build
 ```
 
 Now, you can run the Substreams by using the `substreams gui` command. To avoid iterating over the whole blockchain, the following command extracts instructions from the Stake Program only at block `243830383`:

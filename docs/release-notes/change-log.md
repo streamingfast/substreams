@@ -9,6 +9,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### CLI
+
+* **Improved** Improved `substreams build`, `substreams protogen` and `substreams pack` command outputs to be streamlined and condensed.
+
+* **Added** support for reading manifest from stdin across all manifest-accepting commands using `"-"` as the manifest path. Affected commands: `build`, `run`, `gui`, `info`, `graph`, `pack`, `protogen`. This enables dynamic manifest generation and preprocessing workflows, including integration with tools like `envsubst` for environment variable substitution and CI/CD pipeline automation.
+
 ## v1.15.10
 
 * Re-release of v1.15.9 with missing dependency update.

@@ -1,6 +1,7 @@
 package sink
 
 import (
+	"strings"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
@@ -55,4 +56,38 @@ type SinkerConfig struct {
 	Params                []string
 	Network               string
 	SkipPackageValidation bool
+}
+
+// ExtractDefaultParams extracts default parameter values from the package modules
+// that are not already specified in the existing parameters. This is useful for
+// GUI applications that want to show default values from the package.
+func (c *SinkerConfig) ExtractDefaultParams() []string {
+	// Create a map of existing parameters to avoid duplicates
+	existingParamsMap := make(map[string]struct{})
+	for _, param := range c.Params {
+		if len(param) > 0 {
+			moduleName := param
+			if idx := strings.Index(param, "="); idx != -1 {
+				moduleName = param[:idx]
+			}
+			existingParamsMap[moduleName] = struct{}{}
+		}
+	}
+
+	var defaultParams []string
+	if c.Pkg != nil && c.Pkg.Modules != nil {
+		for _, module := range c.Pkg.Modules.Modules {
+			moduleName := module.Name
+			for _, input := range module.Inputs {
+				param := input.GetParams()
+				if param != nil {
+					if _, found := existingParamsMap[moduleName]; !found {
+						defaultParams = append(defaultParams, moduleName+"="+param.Value)
+					}
+				}
+			}
+		}
+	}
+
+	return defaultParams
 }

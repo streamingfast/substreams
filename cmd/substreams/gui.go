@@ -11,7 +11,7 @@ import (
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/substreams/sink"
 	"github.com/streamingfast/substreams/tui2"
-	"github.com/streamingfast/substreams/tui2/pages/request"
+	"github.com/streamingfast/substreams/tui2/common"
 )
 
 func init() {
@@ -128,43 +128,26 @@ func runGui(cmd *cobra.Command, args []string) (err error) {
 	// Extract default parameters from package
 	defaultParams := sinkerConfig.ExtractDefaultParams()
 
-	// Build GUI request configuration
-	requestConfig := &request.Config{
-		ManifestPath:                manifestPath,
-		Pkg:                         sinkerConfig.Pkg,
-		SkipPackageValidation:       sinkerConfig.SkipPackageValidation,
-		Graph:                       nil, // Will be built from package
-		ProdMode:                    sinkerConfig.Mode == sink.SubstreamsModeProduction,
-		DebugModulesInitialSnapshot: sinkerConfig.DevOutputSnapshots,
-		DebugModulesOutput:          sinkerConfig.DevOutputModules,
-		Endpoint:                    sinkerConfig.ClientConfig.Endpoint(),
-		OutputModule:                outputModule,
-		OverrideNetwork:             sinkerConfig.Network,
-		SubstreamsClientConfig:      sinkerConfig.ClientConfig,
-		HomeDir:                     homeDir,
-		Vcr:                         sflags.MustGetBool(cmd, "replay"),
-		Headers:                     parseHeaders(sinkerConfig.ExtraHeaders),
-		Cursor:                      "", // Will be set from flags
-		StartBlock:                  fmt.Sprintf("%d", sinkerConfig.StartBlock),
-		StopBlock:                   fmt.Sprintf("%d", sinkerConfig.StopBlock),
-		FinalBlocksOnly:             sinkerConfig.FinalBlocksOnly,
-		LimitProcessedBlocks:        sinkerConfig.LimitProcessedBlocks,
-		Params:                      strings.Join(sinkerConfig.Params, "\n"),
-		DefaultParams:               strings.Join(defaultParams, "\n"),
+	// Build TUI-specific configuration
+	var outputModuleName string
+	if sinkerConfig.OutputModule != nil {
+		outputModuleName = sinkerConfig.OutputModule.Name
 	}
 
-	// Set cursor from flags if provided
-	if cursorFlag := sflags.MustGetString(cmd, sink.FlagCursor); cursorFlag != "" {
-		requestConfig.Cursor = cursorFlag
-	}
-
-	if err := requestConfig.Normalize(); err != nil {
-		return err
+	tuiConfig := &common.TUIConfig{
+		ManifestPath:  manifestPath,
+		HomeDir:       homeDir,
+		Vcr:           sflags.MustGetBool(cmd, "replay"),
+		Headers:       parseHeaders(sinkerConfig.ExtraHeaders),
+		Cursor:        sflags.MustGetString(cmd, sink.FlagCursor),
+		Params:        strings.Join(sinkerConfig.Params, "\n"),
+		DefaultParams: strings.Join(defaultParams, "\n"),
+		OutputModule:  outputModuleName,
 	}
 
 	fmt.Println("Launching Substreams GUI...")
 
-	ui, err := tui2.New(requestConfig)
+	ui, err := tui2.New(sinkerConfig, tuiConfig)
 	if err != nil {
 		return err
 	}

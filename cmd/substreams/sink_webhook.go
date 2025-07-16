@@ -43,6 +43,9 @@ func sinkWebhookE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Load auth environment file if it exists
+	sink.LoadSubstreamsAuthEnvFile(manifestPath)
+
 	// parses flags
 	sinkerConfig, err := sink.ConfigFromViper(cmd, sink.IgnoreOutputModuleType, manifestPath, outputModule, "sink_webhook", zlog, tracer)
 	if err != nil {

@@ -75,7 +75,7 @@ func runGui(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	// Load auth environment file if it exists
-	loadSubstreamsAuthEnvFile(manifestPath)
+	sink.LoadSubstreamsAuthEnvFile(manifestPath)
 
 	// Use sink pattern to create configuration
 	sinkerConfig, err := sink.ConfigFromViper(cmd, sink.IgnoreOutputModuleType, manifestPath, outputModule, "substreams_gui", zlog, tracer)
@@ -157,61 +157,6 @@ func runGui(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	return nil
-}
-
-func loadSubstreamsAuthEnvFile(manifestPath string) {
-	var projectPath string
-	if manifestPath == "-" {
-		// For stdin, use current working directory
-		if wd, err := os.Getwd(); err == nil {
-			projectPath = wd
-		} else {
-			projectPath = "."
-		}
-	} else {
-		projectPath = filepath.Dir(manifestPath)
-	}
-	authFile := filepath.Join(projectPath, ".substreams.env")
-	_, err := os.Stat(authFile)
-	if err != nil {
-		if os.IsNotExist(err) {
-			authFile = ".substreams.env"
-			_, err := os.Stat(authFile)
-			if err != nil {
-				if os.IsNotExist(err) {
-					return
-				} else {
-					fmt.Printf("Error reading stats on auth file: %v: %s\n", authFile, err.Error())
-					return
-				}
-			}
-		} else {
-			fmt.Printf("Error reading stats on auth file: %v: %s\n", authFile, err.Error())
-			return
-		}
-	}
-
-	cnt, err := os.ReadFile(authFile)
-	if err != nil {
-		fmt.Printf("Error reading auth file: %v: %s\n", authFile, err.Error())
-		return
-	}
-
-	lines := strings.Split(string(cnt), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "export") {
-			continue
-		}
-		line = strings.TrimPrefix(line, "export ")
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) == 2 {
-			key := strings.TrimSpace(parts[0])
-			value := strings.TrimSpace(parts[1])
-			fmt.Printf("Reading %s from %s\n", key, authFile)
-			os.Setenv(key, value)
-		}
-	}
 }
 
 func resolveManifestFile(input string) (manifestName string, err error) {

@@ -53,6 +53,9 @@ func runRun(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Load auth environment file if it exists
+	sink.LoadSubstreamsAuthEnvFile(manifestPath)
+
 	// parses flags
 	sinkerConfig, err := sink.ConfigFromViper(cmd, sink.IgnoreOutputModuleType, manifestPath, outputModule, "substreams_run", zlog, tracer)
 	if err != nil {

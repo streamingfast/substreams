@@ -141,17 +141,4 @@ func runRun(cmd *cobra.Command, args []string) error {
 	fmt.Fprintln(os.Stderr, "all done")
 
 	return err
-
-	//	if readFromModule {
-	//		sb, err := pkgBundle.Graph.ModuleInitialBlock(outputModule)
-	//		if err != nil {
-	//			return fmt.Errorf("getting module start block: %w", err)
-	//		}
-	//		startBlock = int64(sb)
-	//	}
-	//
-	// FIXME: provide the user_agent for the client...
-	//
-	// FIXME
-
 }

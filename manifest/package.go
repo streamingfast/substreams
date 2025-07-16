@@ -60,7 +60,13 @@ func (r *manifestConverter) expandManifestVariables(manif *Manifest) error {
 	if err != nil {
 		return fmt.Errorf("unable to get working dir: %w", err)
 	}
-	manif.Workdir = path.Dir(abs)
+
+	if r.inputPath == "-" {
+		// For stdin input, use the current working directory directly
+		manif.Workdir = abs
+	} else {
+		manif.Workdir = path.Dir(abs)
+	}
 	// -----------------------
 
 	// Allow environment variables in `imports` element

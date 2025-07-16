@@ -114,7 +114,7 @@ func TestAddFlagsToSet(t *testing.T) {
 		},
 		{
 			"ignore mixed",
-			[]FlagIgnored{FlagIgnore(FlagInsecure), FlagIgnore(FlagPlaintext, FlagLiveBlockTimeDelta)},
+			[]FlagIgnored{FlagIgnore(FlagInsecure), FlagIgnore(FlagPlaintext, FlagLiveBlockTimeDelta), FlagIgnore(FlagProtoPath, FlagProtoDescriptorSet)},
 			[]string{
 				FlagEndpoint,
 				FlagStartBlock,
@@ -135,7 +135,7 @@ func TestAddFlagsToSet(t *testing.T) {
 		},
 		{
 			"ignore final block",
-			[]FlagIgnored{FlagIgnore(FlagFinalBlocksOnly)},
+			[]FlagIgnored{FlagIgnore(FlagFinalBlocksOnly), FlagIgnore(FlagProtoPath, FlagProtoDescriptorSet)},
 			[]string{
 				FlagEndpoint,
 				FlagStartBlock,

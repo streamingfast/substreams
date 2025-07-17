@@ -226,9 +226,6 @@ func ConfigFromViper(
 ) (*SinkerConfig, error) {
 	params, network, undoBufferSize, liveBlockTimeDelta, isDevelopmentMode, infiniteRetry, finalBlocksOnly, skipPackageValidation, isNoopMode, extraHeaders := getViperFlags(cmd)
 
-	// Get endpoint from flags
-	endpoint := sflags.MustGetString(cmd, FlagEndpoint)
-
 	// Parse start and stop blocks using utility functions
 	startBlock, startBlockIsEmpty, err := readStartBlockFlag(cmd, FlagStartBlock)
 	if err != nil {
@@ -240,26 +237,6 @@ func ConfigFromViper(
 	if err != nil {
 		return nil, fmt.Errorf("reading stop block flag: %w", err)
 	}
-
-	zlog.Info("sinker from CLI",
-		zap.String("endpoint", endpoint),
-		zap.String("manifest_path", manifestPath),
-		zap.Strings("params", params),
-		zap.String("network", network),
-		zap.String("output_module_name", outputModuleName),
-		zap.Stringer("expected_module_type", expectedModuleType(expectedOutputModuleType)),
-		zap.Int64("start_block", startBlock),
-		zap.Uint64("stop_block", stopBlock),
-		zap.Bool("start_block_empty", startBlockIsEmpty),
-		zap.Bool("development_mode", isDevelopmentMode),
-		zap.Bool("noop_mode", isNoopMode),
-		zap.Bool("infinite_retry", infiniteRetry),
-		zap.Bool("final_blocks_only", finalBlocksOnly),
-		zap.Bool("skip_package_validation", skipPackageValidation),
-		zap.Duration("live_block_time_delta", liveBlockTimeDelta),
-		zap.Int("undo_buffer_size", undoBufferSize),
-		zap.Strings("extra_headers", extraHeaders),
-	)
 
 	var readerOptions []manifest.Option
 	protoPath := sflags.MustGetString(cmd, FlagProtoPath)
@@ -290,15 +267,35 @@ func ConfigFromViper(
 		return nil, fmt.Errorf("reading manifest: %w", err)
 	}
 
+	// Get endpoint from flags
+	endpoint, err := manifest.ExtractNetworkEndpoint(pkg.Network, sflags.MustGetString(cmd, FlagEndpoint), zlog)
+	if err != nil {
+		return nil, fmt.Errorf("extracting endpoint: %w", err)
+	}
+
 	// Resolve start block if empty (use module's initial block)
 	if startBlockIsEmpty {
 		startBlock = int64(module.InitialBlock)
 	}
 
-	zlog.Debug("resolved block range",
+	zlog.Info("sinker from CLI",
+		zap.String("endpoint", endpoint),
+		zap.String("manifest_path", manifestPath),
+		zap.Strings("params", params),
+		zap.String("network", network),
+		zap.String("output_module_name", outputModuleName),
+		zap.Stringer("expected_module_type", expectedModuleType(expectedOutputModuleType)),
 		zap.Int64("start_block", startBlock),
 		zap.Uint64("stop_block", stopBlock),
-		zap.Bool("start_block_was_empty", startBlockIsEmpty),
+		zap.Bool("start_block_empty", startBlockIsEmpty),
+		zap.Bool("development_mode", isDevelopmentMode),
+		zap.Bool("noop_mode", isNoopMode),
+		zap.Bool("infinite_retry", infiniteRetry),
+		zap.Bool("final_blocks_only", finalBlocksOnly),
+		zap.Bool("skip_package_validation", skipPackageValidation),
+		zap.Duration("live_block_time_delta", liveBlockTimeDelta),
+		zap.Int("undo_buffer_size", undoBufferSize),
+		zap.Strings("extra_headers", extraHeaders),
 	)
 
 	if finalBlocksOnly {

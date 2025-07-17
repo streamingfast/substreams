@@ -46,6 +46,7 @@ var runCmd = &cobra.Command{
 }
 
 func runRun(cmd *cobra.Command, args []string) error {
+	// note:  zlog in CLI only prints Warn/Err, not Info by default
 	ctx := cmd.Context()
 
 	manifestPath, outputModule, err := ruiOrGuiManifestModulePositionalParams(args)

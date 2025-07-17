@@ -45,6 +45,28 @@ The `build` command:
 substreams build
 ```
 
+#### Performance optimization
+
+The `build` command uses hash-based caching to avoid regenerating proto files when they haven't changed. This significantly improves build performance by:
+
+- Computing a hash of proto files, exclude paths, and generation settings
+- Storing the hash in a `.last_generated_hash` file in the output directory
+- Skipping proto generation when the hash matches and generated files exist
+- Displaying status messages indicating whether proto generation was skipped or run
+
+```bash
+# Example output when proto definitions haven't changed:
+Proto definitions unchanged, skipping buf generate (hash: a1b2c3d4e5f6)
+
+# Example output when proto definitions have changed:
+Proto definitions changed or no previous generation found, running buf generate (hash: f6e5d4c3b2a1)
+```
+
+This optimization is particularly beneficial for:
+- Iterative development workflows
+- CI/CD pipelines with unchanged proto definitions
+- Large projects with extensive proto files
+
 #### Reading manifest from stdin
 
 The `build` command supports reading the manifest from stdin by using `--manifest "-"`. This allows for dynamic manifest generation and processing pipelines.

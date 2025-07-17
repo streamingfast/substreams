@@ -90,7 +90,7 @@ func warnIncompletePackage(spkg *pbsubstreams.Package, config warningsConfig) (w
 
 	if len(warnings) > 0 {
 		fmt.Println()
-		fmt.Print(config.Indent + "⚠️ Detected Substreams Package warnings:\n")
+		fmt.Println(config.Indent + "⚠️ Detected Substreams Package warnings:")
 		for _, warning := range warnings {
 			fmt.Print(config.Indent + "   • " + warning + "\n")
 		}

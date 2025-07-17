@@ -1,11 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli/sflags"
+	"github.com/streamingfast/derr"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/sink"
 	"github.com/streamingfast/substreams/tools/test"
@@ -133,16 +134,18 @@ func runRun(cmd *cobra.Command, args []string) error {
 		ui.HandleDebugSnapshotComplete,
 		nil,
 	)
+	ctx, cancel := context.WithCancel(ctx)
+	go func() {
+		<-derr.SetupSignalHandler(0)
+		cancel()
+	}()
 
 	ui.Connecting()
 	sinker.Run(ctx, cursor, h)
 	err = sinker.Err()
 
 	ui.Cancel()
-	fmt.Fprintf(os.Stderr, "Total Processed Bytes: %d\n", uint64(sink.ProgressMessageProcessedBytes.Get()))
-	fmt.Fprintf(os.Stderr, "Total Processed Blocks: %d\n", uint64(sink.ProgressMessageTotalProcessedBlocks.Get()))
-	fmt.Fprintf(os.Stderr, "Total Received Bytes (uncompressed gress): %d\n", uint64(sink.DataMessageSizeBytes.Get()))
-	fmt.Fprintln(os.Stderr, "all done")
+	sinker.PrintStats()
 
 	return err
 }

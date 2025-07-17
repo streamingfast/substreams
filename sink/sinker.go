@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -164,10 +165,19 @@ func (s *Sinker) ApiToken() string {
 	return s.SinkerConfig.ClientConfig.AuthToken()
 }
 
+func (s *Sinker) PrintStats() {
+	fmt.Fprintf(os.Stderr, "\nTotal Processed Bytes: %d\n", uint64(ProgressMessageProcessedBytes.Get()))
+	fmt.Fprintf(os.Stderr, "Total Processed Blocks: %d\n", uint64(ProgressMessageTotalProcessedBlocks.Get()))
+	fmt.Fprintf(os.Stderr, "Total Received Bytes (uncompressed gress): %d\n", uint64(DataMessageSizeBytes.Get()))
+	fmt.Fprintln(os.Stderr, "all done")
+}
+
 func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler) {
+	ctx, cancel := context.WithCancel(ctx)
 	s.OnTerminating(func(_ error) {
 		s.Logger.Info("sinker terminating")
 		s.stats.Close()
+		cancel()
 	})
 	s.stats.OnTerminated(func(err error) { s.Shutdown(err) })
 

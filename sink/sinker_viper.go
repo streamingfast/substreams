@@ -239,14 +239,16 @@ func ConfigFromViper(
 	}
 
 	var readerOptions []manifest.Option
-	protoPath := sflags.MustGetString(cmd, FlagProtoPath)
-	if protoPath != "" {
-		readerOptions = append(readerOptions, manifest.WithProtoPath(protoPath))
+	if protoPath, err := sflags.GetString(cmd, FlagProtoPath); err == nil {
+		if protoPath != "" {
+			readerOptions = append(readerOptions, manifest.WithProtoPath(protoPath))
+		}
 	}
 
-	protoDescriptorSet := sflags.MustGetString(cmd, FlagProtoDescriptorSet)
-	if protoDescriptorSet != "" {
-		readerOptions = append(readerOptions, manifest.WithProtoDescriptorSet(protoDescriptorSet))
+	if protoDescriptorSet, err := sflags.GetString(cmd, FlagProtoDescriptorSet); err == nil {
+		if protoDescriptorSet != "" {
+			readerOptions = append(readerOptions, manifest.WithProtoDescriptorSet(protoDescriptorSet))
+		}
 	}
 
 	if outputModuleName != "" {

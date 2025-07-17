@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli/sflags"
+	"github.com/streamingfast/derr"
 	"github.com/streamingfast/substreams/sink"
 	"github.com/streamingfast/substreams/sink/webhook"
 )
@@ -76,6 +78,12 @@ func sinkWebhookE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	go func() {
+		<-derr.SetupSignalHandler(0)
+		cancel()
+	}()
 
 	err = webhookSink.Run(ctx)
 

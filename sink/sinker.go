@@ -392,6 +392,8 @@ func (s *Sinker) doRequest(
 				case codes.InvalidArgument:
 					return activeCursor, receivedMessage, fmt.Errorf("stream invalid: %w", err)
 
+				case codes.FailedPrecondition: // ex: related to limit-processed-blocks
+					return activeCursor, receivedMessage, err
 				}
 			}
 

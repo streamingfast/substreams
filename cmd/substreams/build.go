@@ -209,7 +209,6 @@ func (p *ProtoBuilder) Build(ctx context.Context) error {
 		return fmt.Errorf("error generating proto: %w", err)
 	}
 
-	fmt.Printf("📦 Protobuf generation complete\n")
 	return nil
 }
 

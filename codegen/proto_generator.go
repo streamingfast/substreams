@@ -121,6 +121,33 @@ func (g *ProtoGenerator) hasGeneratedFiles() bool {
 	return false
 }
 
+func formatBufCommand(cmdArgs []string) string {
+	// Make the command more readable by breaking long paths and formatting nicely
+	result := make([]string, 0, len(cmdArgs))
+	for i, arg := range cmdArgs {
+		if i == 0 {
+			// First argument is the command (generate)
+			result = append(result, arg)
+		} else if strings.HasPrefix(arg, "/") && strings.Contains(arg, "tmp") {
+			// Format long temporary file paths
+			if strings.Contains(arg, "#format=bin") {
+				parts := strings.Split(arg, "/")
+				if len(parts) > 0 {
+					fileName := parts[len(parts)-1]
+					result = append(result, fmt.Sprintf("<%s>", fileName))
+				} else {
+					result = append(result, arg)
+				}
+			} else {
+				result = append(result, arg)
+			}
+		} else {
+			result = append(result, arg)
+		}
+	}
+	return strings.Join(result, " ")
+}
+
 func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
 	// Calculate current hash of inputs
 	currentHash, err := g.calculateHash(pkg)
@@ -136,6 +163,7 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
 	
 	// Check if we can skip generation
 	if lastHash != "" && lastHash == currentHash && g.hasGeneratedFiles() {
+		fmt.Printf("⚡ Protobuf generation skipped (no changes detected)\n")
 		return nil
 	}
 
@@ -181,8 +209,6 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
 			`)
 		}
 
-		fmt.Printf("Generating 'buf.gen.yaml' for protobuf generation using neoeinstein-prost %q and neoeinstein-prost-crate %q\n", prostVersion, prostCrateVersion)
-
 		if err := os.WriteFile("buf.gen.yaml", []byte(content), 0644); err != nil {
 			return fmt.Errorf("error writing buf.gen.yaml: %w", err)
 		}
@@ -198,7 +224,13 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
 
 	cmdArgs = append(cmdArgs, "--include-imports")
 
-	fmt.Printf("Running: buf %s\n", strings.Join(cmdArgs, " "))
+	if bufFileNotFound {
+		fmt.Printf("📋 Generated buf.gen.yaml using neoeinstein-prost %s and neoeinstein-prost-crate %s\n", prostVersion, prostCrateVersion)
+	} else {
+		fmt.Printf("📋 Using existing buf.gen.yaml configuration\n")
+	}
+	
+	fmt.Printf("📦 Generating protobuf code \033[90m(buf %s)\033[0m\n", formatBufCommand(cmdArgs))
 	c := exec.Command("buf", cmdArgs...)
 	c.Stdin = os.Stdin
 	c.Stdout = os.Stdout
@@ -219,5 +251,6 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
 		return fmt.Errorf("writing hash file: %w", err)
 	}
 
+	fmt.Printf("🎯 Protobuf generation complete\n")
 	return nil
 }

@@ -227,13 +227,14 @@ func ConfigFromViper(
 	params, network, undoBufferSize, liveBlockTimeDelta, isDevelopmentMode, infiniteRetry, finalBlocksOnly, skipPackageValidation, isNoopMode, extraHeaders := getViperFlags(cmd)
 
 	// Parse start and stop blocks using utility functions
-	startBlock, startBlockIsEmpty, err := readStartBlockFlag(cmd, FlagStartBlock)
+	startBlockFlag := sflags.MustGetString(cmd, FlagStartBlock)
+	startBlock, startBlockIsEmpty, err := parseStartBlockFlag(startBlockFlag)
 	if err != nil {
 		return nil, fmt.Errorf("reading start block flag: %w", err)
 	}
 
-	var stopBlock uint64
-	stopBlock, err = readStopBlockFlag(cmd, startBlock, FlagStopBlock)
+	stopBlockFlag := sflags.MustGetString(cmd, FlagStopBlock)
+	stopBlock, err := parseStopBlockFlag(stopBlockFlag, startBlock)
 	if err != nil {
 		return nil, fmt.Errorf("reading stop block flag: %w", err)
 	}

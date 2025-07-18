@@ -19,9 +19,11 @@ func init() {
 
 	// default sinker flags
 	sink.AddFlagsToSet(runCmd.Flags(),
-		sink.FlagIgnore(sink.FlagDevelopmentMode,
+		sink.FlagIgnore(
+			sink.FlagDevelopmentMode,
 			sink.FlagLiveBlockTimeDelta,
-			sink.FlagInfiniteRetry))
+			sink.FlagInfiniteRetry,
+		))
 
 	runCmd.Flags().Bool("production-mode", false, "Enable Production Mode, with high-speed parallel processing")
 	runCmd.Flags().Uint64("limit-processed-blocks", 10000, "Limit the number of blocks to be processed by the server, including preparing the stores, as a safeguard to prevent unexpected expensive reprocessing (0 disables the limit)")

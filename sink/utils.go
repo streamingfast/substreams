@@ -7,15 +7,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/spf13/cobra"
 	networks "github.com/streamingfast/firehose-networks"
 )
 
-func readStartBlockFlag(cmd *cobra.Command, flagName string) (int64, bool, error) {
-	val, err := cmd.Flags().GetString(flagName)
-	if err != nil {
-		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
-	}
+func parseStartBlockFlag(val string) (int64, bool, error) {
 	if val == "" {
 		return 0, true, nil
 	}
@@ -28,12 +23,7 @@ func readStartBlockFlag(cmd *cobra.Command, flagName string) (int64, bool, error
 	return startBlock, false, nil
 }
 
-func readStopBlockFlag(cmd *cobra.Command, startBlock int64, flagName string) (uint64, error) {
-	val, err := cmd.Flags().GetString(flagName)
-	if err != nil {
-		panic(fmt.Sprintf("flags: couldn't find flag %q", flagName))
-	}
-
+func parseStopBlockFlag(val string, startBlock int64) (uint64, error) {
 	// If empty, return 0 to indicate no stop block (infinite streaming)
 	if val == "" {
 		return 0, nil

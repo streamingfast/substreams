@@ -13,11 +13,13 @@ import (
 func init() {
 	// default sinker flags - ignore specific flags for noop sink
 	sink.AddFlagsToSet(sinkNoopCmd.Flags(),
-		sink.FlagIgnore(sink.FlagUndoBufferSize,
+		sink.FlagIgnore(
+			sink.FlagUndoBufferSize,
 			sink.FlagDevelopmentMode,
 			sink.FlagNoopMode,
 			sink.FlagProtoPath,
-			sink.FlagProtoDescriptorSet))
+			sink.FlagProtoDescriptorSet,
+		))
 
 	sinkNoopCmd.Flags().String("state-file", "./state.cursor", "File where the sink will store its cursor. If empty, no cursor will be saved or used, only the start-block.")
 

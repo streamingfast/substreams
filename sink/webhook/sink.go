@@ -3,8 +3,6 @@ package webhook
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
-	"strings"
 
 	"github.com/streamingfast/substreams/protodecode"
 	"github.com/streamingfast/substreams/sink"
@@ -57,21 +55,11 @@ func NewSink(config SinkConfig) (*Sink, error) {
 func (s *Sink) Run(ctx context.Context) error {
 	// Load existing cursor if state file exists
 	var startCursor *sink.Cursor
+	var err error
 	if s.stateFile != "" {
-		if data, err := ioutil.ReadFile(s.stateFile); err == nil {
-			cursorStr := strings.TrimSpace(string(data))
-			if cursorStr != "" {
-				if cursor, err := sink.NewCursor(cursorStr); err == nil {
-					startCursor = cursor
-					s.logger.Info("loaded cursor from state file",
-						zap.String("cursor", cursorStr),
-						zap.String("file", s.stateFile))
-				} else {
-					s.logger.Warn("failed to parse cursor from state file",
-						zap.Error(err),
-						zap.String("file", s.stateFile))
-				}
-			}
+		startCursor, err = sink.ReadCursor(s.stateFile)
+		if err != nil {
+			return fmt.Errorf("reading cursor: %w", err)
 		}
 	}
 
@@ -116,7 +104,7 @@ func (s *Sink) handleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.
 
 	// Save cursor to state file
 	if s.stateFile != "" && cursor != nil {
-		if err := s.saveCursor(cursor); err != nil {
+		if err := sink.WriteCursor(s.stateFile, cursor); err != nil {
 			s.logger.Warn("failed to save cursor to state file",
 				zap.Error(err),
 				zap.String("file", s.stateFile))
@@ -130,19 +118,13 @@ func (s *Sink) handleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.
 func (s *Sink) handleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *sink.Cursor) error {
 	// Save cursor to state file on undo
 	if s.stateFile != "" && cursor != nil {
-		if err := s.saveCursor(cursor); err != nil {
+		if err := sink.WriteCursor(s.stateFile, cursor); err != nil {
 			s.logger.Warn("failed to save cursor to state file on undo",
 				zap.Error(err),
 				zap.String("file", s.stateFile))
 		}
 	}
 	return nil
-}
-
-// saveCursor saves the cursor to the state file
-func (s *Sink) saveCursor(cursor *sink.Cursor) error {
-	cursorStr := cursor.String()
-	return ioutil.WriteFile(s.stateFile, []byte(cursorStr), 0644)
 }
 
 // PrintStats prints final statistics

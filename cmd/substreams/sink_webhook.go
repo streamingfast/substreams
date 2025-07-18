@@ -14,9 +14,11 @@ import (
 func init() {
 	// default sinker flags
 	sink.AddFlagsToSet(sinkWebhookCmd.Flags(),
-		sink.FlagIgnore(sink.FlagDevelopmentMode,
+		sink.FlagIgnore(
+			sink.FlagDevelopmentMode,
 			sink.FlagLiveBlockTimeDelta,
-			sink.FlagInfiniteRetry))
+			sink.FlagInfiniteRetry,
+		))
 
 	sinkWebhookCmd.Flags().String("state-file", "./state.cursor", "File where the sink will store its cursor. If empty, no cursor will be saved or used, only the start-block.")
 	sinkWebhookCmd.Flags().Int("webhook-max-retries", 3, "Maximum number of retries for webhook calls (0 disables retries, -1 for infinite retries)")

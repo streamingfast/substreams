@@ -17,9 +17,11 @@ import (
 func init() {
 	// Use sink's standard flags, but ignore some that don't apply to GUI
 	sink.AddFlagsToSet(guiCmd.Flags(),
-		sink.FlagIgnore(sink.FlagDevelopmentMode,
+		sink.FlagIgnore(
+			sink.FlagDevelopmentMode,
 			sink.FlagLiveBlockTimeDelta,
-			sink.FlagInfiniteRetry))
+			sink.FlagInfiniteRetry,
+		))
 
 	// GUI-specific flags
 	guiCmd.Flags().Bool("production-mode", false, "Enable Production Mode, with high-speed parallel processing")

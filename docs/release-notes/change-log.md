@@ -13,7 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### CLI
 
-* Fixed `substreams build` command when there is WASM file present yet.
+* Fixed `substreams build` command when there is no WASM file already present on disk.
 
 ## v1.16.0
 

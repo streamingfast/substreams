@@ -54,7 +54,7 @@ func runBuildE(cmd *cobra.Command, args []string) error {
 		fmt.Printf("🏗️  Building Substreams package from %s\n", manifestPath)
 	}
 
-	manifestReader, err := manifest.NewReader(manifestPath)
+	manifestReader, err := manifest.NewReader(manifestPath, manifest.SkipSourceCodeReader())
 	if err != nil {
 		return fmt.Errorf("❌ Manifest reader: %w", err)
 	}

@@ -12,7 +12,7 @@ In this tutorial, you'll learn how to initialize a Solana-based Substreams proje
 1. [Install the Substreams CLI](../../references/cli/installing-the-cli.md).
 
 2. Running `substreams init` will give you the option to choose between two Solana project options. Select the one that best fits your requirements:
-    - **sol-minimal**: Creates a simple Substreams that extracts raw Solana block data and generates corresponding Rust code. This path will start you with the full raw block, you can navigate to the `substreams.yaml` (the manifest) to modify the input.
+    - **sol-hello-world**: Creates a simple Substreams that outputs the accounts used in the Pump.Fun smart contract. It demonstrates how to access to full Solana Block, iterate over instructions and filter on a specific program ID.
     - **sol-transactions**: Creates a Substreams that filters Solana transactions based on one or more Program IDs and/or Account IDs, using the cached [Solana Foundational Module](https://substreams.dev/streamingfast/solana-common/v0.3.0).
     - **sol-anchor-beta**: Given an Anchor IDL, create a Substreams that decodes instructions and events. If an IDL isn’t available using the `idl` subcommand within the [Anchor CLI](https://www.anchor-lang.com/docs/cli), you’ll need to provide it yourself.
 

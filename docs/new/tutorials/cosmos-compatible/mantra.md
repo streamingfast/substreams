@@ -12,7 +12,7 @@ In this tutorial, you'll learn how to initialize a Mantra-based Substreams proje
 1. [Install the Substreams CLI](../../references/cli/installing-the-cli.md).
     
 2. Running `substreams init` will give you the option to choose between two MANTRA project options. Select the one that best fits your requirements:
-    - **MANTRA-minimal**: Creates a simple Substreams that extracts raw MANTRA block data and generates corresponding Rust code. This path will start you with the full raw block, you can navigate to the `substreams.yaml` (the manifest) to modify the input.
+    - **MANTRA-hello-world**: Creates a simple Substreams module that outputs all `transfer` events. It demonstrates how to access the full Mantra block, iterate over events, and filter by a specific event `type`.
     - **MANTRA-events**: Creates a Substreams that extracts MANTRA events using the cached [MANTRA Foundational Module](https://substreams.dev/packages/mantra-common/v0.1.0), filtered by one or more smart contract addresses. This includes type `wasm` events.
 
 {% hint style="info" %} 

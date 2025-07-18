@@ -13,7 +13,7 @@ In this tutorial, you'll learn how to initialize a EVM-based Substreams project 
 1. [Install the Substreams CLI](../references/cli/installing-the-cli.md)
     
 2. Running `substreams init` will give you the option to choose between two EVM project options. Select the one that best fits your requirements:
-    - **evm-minimal**: Creates a simple Substreams that extracts raw EVM block data and generates corresponding Rust code. This path will start you with the full raw block, you can navigate to the `substreams.yaml` (the manifest) to modify the input.
+    - **evm-hello-world**: Creates a simple Substreams that outputs the events of a smart contract. Depending on the blockchain that you choose (Mainnet, Arbitrum, Polygon), the smart contract address will be different (usually, it's the USDC token, if it's available on the chain).
     - **evm-events-calls**: Creates a Substreams that extracts and decodes EVM events and calls using the cached [EVM Foundational Module](https://substreams.dev/streamingfast/ethereum-common/v0.3.0), filtered by one or more smart contract addresses. Contract ABIs are retrieved from Etherscan. If an ABI isn’t available, you’ll need to provide it yourself.
 
 ## Step 2: Visualize the Data

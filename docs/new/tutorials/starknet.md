@@ -12,7 +12,7 @@ In this tutorial, you'll learn how to initialize a Starknet-based Substreams pro
 1. [Install the Substreams CLI](../references/cli/installing-the-cli.md).
 
 2. Running `substreams init` will give you the option to choose between two Starknet project options. Select the one that best fits your requirements:
-    - **starknet-minimal**: Creates a simple Substreams that extracts raw Starknet block data and generates corresponding Rust code. This path will start you with the full raw block, you can navigate to the `substreams.yaml` (the manifest) to modify the input.
+    - **stellar-hello-world**: Creates a Substreams that outputs all the events of the Starknet token. It teaches how to access the full Starknet Block, how to iterate over transactions and how to filter on specific event addresses.
     - **starknet-events**: Creates a Substreams that extracts and decodes Starknet events and calls using the cached [Starknet Foundational Module](https://substreams.dev/packages/starknet-foundational/v0.1.4), filtered by one or more smart contract addresses. Contract ABIs are retrieved from Starkscan. If an ABI isn’t available, you’ll need to provide it yourself.
 
 {% hint style="info" %} 

@@ -211,80 +211,7 @@ The sink library provides robust error handling:
 
 ### Practical Example
 
-Here's a complete example of implementing a basic sink:
-
-```go
-package main
-
-import (
-    "context"
-    "fmt"
-    "log"
-
-    "github.com/streamingfast/substreams/sink"
-    pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
-)
-
-type MyDataSink struct {
-    // Your storage client, database connection, etc.
-}
-
-func (s *MyDataSink) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.BlockScopedData, isLive *bool, cursor *sink.Cursor) error {
-    // Process the output data from your substreams module
-    for _, output := range data.Outputs {
-        // Decode and process your module's output
-        fmt.Printf("Processing block %d, module: %s\n", data.Clock.Number, output.Name)
-
-        // Save to your storage system
-        // err := s.saveToDatabase(output.MapOutput)
-        // if err != nil {
-        //     return fmt.Errorf("failed to save data: %w", err)
-        // }
-    }
-
-    // Save cursor for checkpoint recovery
-    // err := s.saveCursor(cursor)
-    // return err
-    return nil
-}
-
-func (s *MyDataSink) HandleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *sink.Cursor) error {
-    lastValidBlock := undoSignal.LastValidBlock.Number
-    fmt.Printf("Handling fork: removing data after block %d\n", lastValidBlock)
-
-    // Remove invalidated data from your storage
-    // err := s.removeDataAfterBlock(lastValidBlock)
-    // if err != nil {
-    //     return fmt.Errorf("failed to handle undo: %w", err)
-    // }
-
-    // Update cursor
-    // err = s.saveCursor(cursor)
-    // return err
-    return nil
-}
-
-func main() {
-    // Create your sink configuration
-    config := &sink.SinkerConfig{
-        // ... configure your sinker
-    }
-
-    // Create sinker
-    sinker := sink.New(config)
-
-    // Create your data sink
-    dataSink := &MyDataSink{}
-
-    // Run the sinker
-    ctx := context.Background()
-    cursor, _ := sink.NewCursor("")
-    err := sinker.Run(ctx, cursor, dataSink)
-    if err != nil {
-        log.Fatalf("Sinker failed: %v", err)
-    }
-}
-```
+See examples from the 'examples' folder
 
 #### From Viper
 
@@ -329,21 +256,6 @@ config := &sink.SinkerConfig{
     Tracer: tracer,                       // *otellib.Tracer
 }
 ```
-
-##### Accepted Block Range
-
-Block range specification (assuming a module's start block of 5):
-
-- `<empty>` => `[5, ∞+` (from module start to live)
-- `-1` => `[5, ∞+` (from module start to live)
-- `:` => `[5, ∞+` (from module start to live)
-- `10` => `[5, 10(` (from module start to block 10, exclusive)
-- `+10` => `[5, 15(` (from module start, process 10 blocks)
-- `:+10` => `[5, 15(` (from module start, process 10 blocks)
-- `+10:` => `[15, ∞+` (skip 10 blocks from start, then to live)
-- `10:15` => `[10, 15(` (from block 10 to 15, exclusive)
-- `10:+10` => `[10, 20(` (from block 10, process 10 blocks)
-- `+10:+10` => `[15, 25(` (skip 10 from start, then process 10 blocks)
 
 ### Launching
 

@@ -2,15 +2,15 @@
 title: Getting Started on EVM
 ---
 
-In this guide, you'll learn how to initialize an EVM-based Substreams project within the Dev Container.
+In this tutorial, you'll learn how to initialize a EVM-based Substreams project using the Substreams CLI (`substreams init` command).
 
 {% hint style="info" %} 
- If you prefer to begin locally within your terminal rather than through the Dev Container (VS Code required), refer to the [Substreams CLI installation guide](../../references/cli/installing-the-cli.md).
+ The CLI installation is supported only on Linux and macOS. If you're using Windows, consider using the [DevContainer environment](../references/devcontainer-ref.md), which launches a Linux-based virtual environment.
 {% endhint %}
 
 ## Step 1: Initialize Your EVM Substreams Project
 
-1. Open the [Dev Container](https://github.com/streamingfast/substreams-starter) and follow the on-screen steps to initialize your project.
+1. [Install the Substreams CLI](../references/cli/installing-the-cli.md)
     
 2. Running `substreams init` will give you the option to choose between two EVM project options. Select the one that best fits your requirements:
     - **evm-minimal**: Creates a simple Substreams that extracts raw EVM block data and generates corresponding Rust code. This path will start you with the full raw block, you can navigate to the `substreams.yaml` (the manifest) to modify the input.
@@ -18,27 +18,22 @@ In this guide, you'll learn how to initialize an EVM-based Substreams project wi
 
 ## Step 2: Visualize the Data
 
+
 1. Run `substreams auth` to create your [account](https://thegraph.market/) and generate an authentication token (JWT), then pass this token back as input.
 
-2. Now you can freely use the `substreams gui` to visualize and iterate on your extracted data.
+2. Run `substreams build` to compile the project.
+
+3. Run `substreams gui` to visualize and iterate on your extracted data.
 
 ## Step 2.5: (Optionally) Transform the Data 
 
-Within the generated directories, modify your Substreams modules to include additional filters, aggregations, and transformations, then update the manifest accordingly. To learn more about this, visit the [How-to-Guides](../how-to-guides/develop-your-own-substreams/evm/exploring-ethereum/exploring-ethereum.md)
+1. Open the `src/lib.rs` file that has been generated.
+
+2. Modify the transformations made to the data as needed. Every time you modify the code, you will have to recompile the project with `substreams build`.
 
 ## Step 3: Load the Data
 
-To make your Substreams queryable (as opposed to [direct streaming](../how-to-guides/sinks/stream/stream.md)), you can automatically generate a SQL sink.
-
-### SQL
-
-1. Run `substreams codegen sql` and choose from either ClickHouse or Postgres to initialize the sink, producing the necessary files. 
-2. Run `substreams build` build the [Substreams:SQL](../how-to-guides/sinks/sql/sql-sink.md) sink. 
-3. Run `substreams-sink-sql` to sink the data into your selected SQL DB.
-
-{% hint style="info" %}
-**Note**: Run `help` to better navigate the development environment and check the health of containers. 
-{% endhint %}
+To make your Substreams queryable (as opposed to [direct streaming](../how-to-guides/sinks/stream/stream.md)), you can automatically send the data to a SQL data by using the [SQL sink](../how-to-guides/sinks/sql/sql.md) or through [PubSub](../how-to-guides/sinks/pubsub.md).
 
 ## Additional Resources
 

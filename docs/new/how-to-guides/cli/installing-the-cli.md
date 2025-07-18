@@ -6,13 +6,13 @@ description: StreamingFast Substreams CLI installation documentation
 
 Used for connecting to endpoints, streaming data in real time, and packaging custom modules.
 
-### Homebrew installation
+### Homebrew installation (macOS)
 
 ```
 brew install streamingfast/tap/substreams
 ```
 
-### Docker Alias
+### Docker Alias (macOS or Linux)
 
 You can use our published Substreams CLI Docker image an assign an alias to Docker. We mount the API token as `SF_API_TOKEN` in the alias so that credentials are known to the CLI running inside Docker.
 
@@ -24,7 +24,7 @@ alias substreams='docker run --rm -it -e="SF_API_TOKEN=$SF_API_TOKEN" ghcr.io/st
 **Note**: Expansion of `$SF_API_TOKEN` above happens at command runtime, so you must ensure that it is set correctly in your own host environment.
 {% endhint %}
 
-### Pre-compiled binary installation
+### Pre-compiled binary installation (macOS or Linux)
 
 There are several CLI binaries available for different operating systems. Choose the correct platform in the [CLI releases page](https://github.com/streamingfast/substreams/releases).
 
@@ -43,7 +43,7 @@ LINK=$(curl -s https://api.github.com/repos/streamingfast/substreams/releases/la
 curl -L  $LINK  | tar zxf -
 ```
 
-### Installation from source
+### Installation from source (Linux)
 
 ```bash
 git clone https://github.com/streamingfast/substreams

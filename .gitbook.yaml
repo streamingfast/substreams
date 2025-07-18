@@ -74,3 +74,9 @@ redirects:
   documentation/how-to-guides/evm: ./new/tutorials/evm.md
   documentation/how-to-guides/injective: ./new/tutorials/cosmos-compatible/injective.md
   how-to-guides/sinks/sql-sink: ./new/how-to-guides/sinks/sql/sql.md
+  how-to-guides/sinks/sql-sink: ./new/how-to-guides/sinks/sql/sql.md
+  how-to-guides/sinks/community-sinks/files: ./new/how-to-guides/sinks/files.md
+  how-to-guides/overview/eth-calls: ./new/how-to-guides/develop-your-own-substreams/evm/eth-calls.md
+  how-to-guides/migrate: ./new/how-to-guides/develop-your-own-substreams/solana/migrate-from-yellowstone.md
+  reference-material/substreams-cli/installing-the-cli: ./new/how-to-guides/cli/installing-the-cli.md
+  tutorials/publish-package: ./new/how-to-guides/publish-package.md

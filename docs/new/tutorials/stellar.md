@@ -58,15 +58,6 @@ Within the generated directories, modify your Substreams modules to include addi
 
 To make your Substreams queryable (as opposed to [direct streaming](../how-to-guides/sinks/stream/stream.md)), you can automatically generate a SQL sink.
 
-### SQL
-
-1. Run `substreams codegen sql` and choose from either ClickHouse or Postgres to initialize the sink, producing the necessary files. 
-2. Run `substreams build` build the [Substreams:SQL](../how-to-guides/sinks/sql/sql-sink.md) sink. 
-3. Run `substreams-sink-sql` to sink the data into your selected SQL DB.
-
-{% hint style="info" %}
-**Note**: Run `help` to better navigate the development environment and check the health of containers. 
-{% endhint %}
 
 ## Additional Resources
 

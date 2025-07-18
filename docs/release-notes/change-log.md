@@ -26,8 +26,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### CLI
 
 * **Improved** Improved `substreams build`, `substreams protogen` and `substreams pack` command outputs to be streamlined and condensed.
-
 * **Added** support for reading manifest from stdin across all manifest-accepting commands using `"-"` as the manifest path. Affected commands: `build`, `run`, `gui`, `info`, `graph`, `pack`, `protogen`. This enables dynamic manifest generation and preprocessing workflows, including integration with tools like `envsubst` for environment variable substitution and CI/CD pipeline automation.
+* **Added** `substreams sink webhook` command to send Substreams output to a webhook endpoint. See [the documentation](./sink/webhook/README.md) for more information.
+* Changed `substreams-api-token-envvar` flag to `api-token-envvar`
+* Changed `substreams-api-key-envvar` flag to `api-key-envvar`
+
+## Lib
+
+* **Moved** github.com/streamingfast/substreams-sink library in this repo, under github.com/streamingfast/substreams/sink
 
 ## v1.15.10
 

@@ -454,7 +454,13 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 					return
 				}
 			}
-			panic(r) // send other panics up one level
+			if s, ok := r.(string); ok {
+				e := fmt.Errorf("wasmtime error: %s", s)
+				p.execoutStorage.ConfigMap[executorName].WriteDeterministicError(ctx, execOutput.Clock().Number, e)
+				out.err = e
+				return
+			}
+			panic(fmt.Errorf("unknown error: %s", r))
 		}
 	}()
 

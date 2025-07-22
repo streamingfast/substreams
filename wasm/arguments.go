@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/protocolbuffers/protoscope"
-	"github.com/streamingfast/substreams/client/fstore"
+	"github.com/streamingfast/substreams/client/foundational"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage/store"
 )
@@ -143,13 +143,13 @@ func (i *ParamsInput) ProtoScopeValue(value []byte) string {
 
 type FoundationalStoreInput struct {
 	BaseArgument
-	Client fstore.FoundationalReader
+	Clients []*foundational.Store
 }
 
-func NewFoundationalStoreInput(name string, client fstore.FoundationalReader) *FoundationalStoreInput {
+func NewFoundationalStoreInput(name string, clients []*foundational.Store) *FoundationalStoreInput {
 	return &FoundationalStoreInput{
 		BaseArgument: BaseArgument{name: name},
-		Client:       client,
+		Clients:      clients,
 	}
 }
 

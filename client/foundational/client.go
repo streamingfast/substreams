@@ -1,4 +1,4 @@
-package fstore
+package foundational
 
 import (
 	"context"
@@ -7,22 +7,18 @@ import (
 
 	"github.com/streamingfast/dgrpc"
 	pbstore "github.com/streamingfast/substreams-foundational-store/pb/sf/substreams/foundational-store/v1"
-
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-type FoundationalReader interface {
-	Get(ctx context.Context, key []byte, block uint64) ([]byte, bool, error)
-	GetAll(ctx context.Context, keys [][]byte, block uint64) (map[string][]byte, error)
-}
-
-type foundationalClient struct {
+type Store struct {
 	rpc pbstore.StoreKVClient
 }
 
-func NewFoundationalClient(rawEndpoint string) (FoundationalReader, func() error, error) {
+type Stores []*Store
+
+func New(rawEndpoint string) (*Store, func() error, error) {
 	if u, err := url.Parse(rawEndpoint); err == nil && (u.Scheme == "grpc" || u.Scheme == "grpcs") {
 		rawEndpoint = u.Host
 	}
@@ -40,11 +36,11 @@ func NewFoundationalClient(rawEndpoint string) (FoundationalReader, func() error
 		return nil, nil, err
 	}
 
-	return &foundationalClient{rpc: pbstore.NewStoreKVClient(conn)}, conn.Close, nil
+	return &Store{rpc: pbstore.NewStoreKVClient(conn)}, conn.Close, nil
 }
 
-func (c *foundationalClient) Get(ctx context.Context, key []byte, block uint64) ([]byte, bool, error) {
-	resp, err := c.rpc.Get(ctx, &pbstore.GetRequest{
+func (s *Store) Get(ctx context.Context, key []byte, block uint64) ([]byte, bool, error) {
+	resp, err := s.rpc.Get(ctx, &pbstore.GetRequest{
 		Key:         key,
 		BlockNumber: block,
 	})
@@ -57,8 +53,8 @@ func (c *foundationalClient) Get(ctx context.Context, key []byte, block uint64) 
 	return resp.Value.Value, true, nil
 }
 
-func (c *foundationalClient) GetAll(ctx context.Context, keys [][]byte, block uint64) (map[string][]byte, error) {
-	resp, err := c.rpc.GetAll(ctx, &pbstore.GetAllRequest{
+func (s *Store) GetAll(ctx context.Context, keys [][]byte, block uint64) (map[string][]byte, error) {
+	resp, err := s.rpc.GetAll(ctx, &pbstore.GetAllRequest{
 		Keys:        keys,
 		BlockNumber: block,
 		OmitDeleted: true,

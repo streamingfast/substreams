@@ -10,7 +10,7 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/shopspring/decimal"
 
-	"github.com/streamingfast/substreams/client/fstore"
+	"github.com/streamingfast/substreams/client/foundational"
 	"github.com/streamingfast/substreams/metrics"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage/store"
@@ -27,7 +27,7 @@ type Call struct {
 	outputStore  store.Store
 	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy
 
-	fstoreReader fstore.FoundationalReader
+	foundationalStores []*foundational.Store
 
 	valueType string
 
@@ -42,14 +42,14 @@ type Call struct {
 	stats          *metrics.Stats
 }
 
-func NewCall(clock *pbsubstreams.Clock, moduleName string, entrypoint string, stats *metrics.Stats, arguments []Argument, canSkipEmptyOutput bool, foundationalStoreReader fstore.FoundationalReader) *Call {
+func NewCall(clock *pbsubstreams.Clock, moduleName string, entrypoint string, stats *metrics.Stats, arguments []Argument, canSkipEmptyOutput bool, foundationalStores []*foundational.Store) *Call {
 	call := &Call{
 		Clock:              clock,
 		ModuleName:         moduleName,
 		Entrypoint:         entrypoint,
 		stats:              stats,
 		canSkipEmptyOutput: canSkipEmptyOutput,
-		fstoreReader:       foundationalStoreReader,
+		foundationalStores: foundationalStores,
 	}
 
 	for _, input := range arguments {
@@ -62,7 +62,8 @@ func NewCall(clock *pbsubstreams.Clock, moduleName string, entrypoint string, st
 		case *StoreReaderInput:
 			call.inputStores = append(call.inputStores, v.Store)
 		case *MapInput, *StoreDeltaInput, *ParamsInput, *SourceInput:
-			// Handled in ÈxecuteNewCall()
+			// Handled in ExecuteNewCall()
+		case *FoundationalStoreInput:
 		default:
 			panic(fmt.Sprintf("unknown wasm argument type %T", v))
 		}
@@ -308,19 +309,19 @@ func (c *Call) DoHasLast(storeIndex int, key string) (found bool) {
 	return readStore.HasLast(key)
 }
 
-func (c *Call) DoFStoreGet(block uint64, key []byte) (val []byte, found bool) {
-	if c.fstoreReader == nil {
+func (c *Call) DoFStoreGet(index uint32, block uint64, key []byte) (val []byte, found bool) {
+	if len(c.foundationalStores) == 0 {
 		return nil, false
 	}
-	val, ok, _ := c.fstoreReader.Get(context.Background(), key, block)
+	val, ok, _ := c.foundationalStores[index].Get(context.Background(), key, block)
 	return val, ok
 }
 
-func (c *Call) DoFStoreGetAll(block uint64, keys [][]byte) map[string][]byte {
-	if c.fstoreReader == nil {
+func (c *Call) DoFStoreGetAll(index uint32, block uint64, keys [][]byte) map[string][]byte {
+	if len(c.foundationalStores) == 0 {
 		return nil
 	}
-	vals, _ := c.fstoreReader.GetAll(context.Background(), keys, block)
+	vals, _ := c.foundationalStores[index].GetAll(context.Background(), keys, block)
 	return vals
 }
 

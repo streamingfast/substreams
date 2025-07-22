@@ -2,6 +2,10 @@ package wasmtime
 
 import (
 	"fmt"
+
+	pbstore "github.com/streamingfast/substreams-foundational-store/pb/sf/substreams/foundational-store/v1"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 func (i *instance) set(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
@@ -153,17 +157,97 @@ func (i *instance) hasLast(storeIndex int32, keyPtr, keyLength int32) int32 {
 	return returnIfFound(found)
 }
 
-func (i *instance) fstoreGet(fsIndex int32, blockNum int64, keyPtr, keyLen, outputPtr int32) int32 {
-	key := i.Heap.ReadBytes(keyPtr, keyLen)
-	val, found := i.CurrentCall.DoFStoreGet(uint64(blockNum), key)
-	return writeToHeapIfFound(i, outputPtr, val, found)
+func (i *instance) fstoreGet(storeIndex int32, reqPtr int32, reqLen int32) int64 {
+	reqData := i.Heap.ReadBytes(reqPtr, reqLen)
+
+	// Deserialize GetRequest
+	var req pbstore.GetRequest
+	if err := proto.Unmarshal(reqData, &req); err != nil {
+		i.CurrentCall.ReturnError(fmt.Errorf("failed to unmarshal GetRequest: %w", err))
+		return 0
+	}
+
+	val, found := i.CurrentCall.DoFStoreGet(uint32(storeIndex), req.BlockNumber, req.Key)
+
+	// Create GetResponse
+	resp := &pbstore.GetResponse{
+		Response: pbstore.ResponseCode_NOT_FOUND,
+	}
+
+	if found {
+		resp.Response = pbstore.ResponseCode_FOUND
+		resp.Value = &anypb.Any{Value: val}
+	}
+
+	// Serialize response
+	respData, err := proto.Marshal(resp)
+	if err != nil {
+		i.CurrentCall.ReturnError(fmt.Errorf("failed to marshal GetResponse: %w", err))
+		return 0
+	}
+
+	// Write to heap and return packed pointer/length
+	respPtr, err := i.Heap.Write(respData, "fstoreGet")
+	if err != nil {
+		i.CurrentCall.ReturnError(fmt.Errorf("writing response to heap: %w", err))
+		return 0
+	}
+
+	// Pack pointer and length into int64
+	return packPtrLen(respPtr, int32(len(respData)))
 }
 
-// TODO: Implement real function
-func (i *instance) fstoreGetAll(fsIndex int32, blockNum int64, keyPtr, keyLen, outputPtr int32) int32 {
-	key := i.Heap.ReadBytes(keyPtr, keyLen)
-	val, found := i.CurrentCall.DoFStoreGet(uint64(blockNum), key)
-	return writeToHeapIfFound(i, outputPtr, val, found)
+func (i *instance) fstoreGetAll(storeIndex int32, reqPtr int32, reqLen int32) int64 {
+	reqData := i.Heap.ReadBytes(reqPtr, reqLen)
+
+	// Deserialize GetAllRequest
+	var req pbstore.GetAllRequest
+	if err := proto.Unmarshal(reqData, &req); err != nil {
+		i.CurrentCall.ReturnError(fmt.Errorf("failed to unmarshal GetAllRequest: %w", err))
+		return 0
+	}
+
+	vals := i.CurrentCall.DoFStoreGetAll(uint32(storeIndex), req.BlockNumber, req.Keys)
+
+	// Create GetAllResponse
+	resp := &pbstore.GetAllResponse{}
+
+	for _, key := range req.Keys {
+		entry := &pbstore.ResponseEntry{
+			Key: key,
+		}
+		if val, exists := vals[string(key)]; exists {
+			entry.Response = &pbstore.GetResponse{
+				Response: pbstore.ResponseCode_FOUND,
+				Value:    &anypb.Any{Value: val},
+			}
+		} else {
+			entry.Response = &pbstore.GetResponse{Response: pbstore.ResponseCode_NOT_FOUND}
+		}
+		resp.Entries = append(resp.Entries, entry)
+	}
+
+	// Serialize response
+	respData, err := proto.Marshal(resp)
+	if err != nil {
+		i.CurrentCall.ReturnError(fmt.Errorf("failed to marshal GetAllResponse: %w", err))
+		return 0
+	}
+
+	// Write to heap and return packed pointer/length
+	respPtr, err := i.Heap.Write(respData, "fstoreGetAll")
+	if err != nil {
+		i.CurrentCall.ReturnError(fmt.Errorf("writing response to heap: %w", err))
+		return 0
+	}
+
+	// Pack pointer and length into int64
+	return packPtrLen(respPtr, int32(len(respData)))
+}
+
+// Helper function to pack pointer and length into int64
+func packPtrLen(ptr, length int32) int64 {
+	return int64(ptr)<<32 | int64(length)
 }
 
 func writeToHeapIfFound(i *instance, outputPtr int32, value []byte, found bool) int32 {

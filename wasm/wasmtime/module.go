@@ -81,6 +81,7 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 
 	var args []interface{}
 	var inputStoreCount int
+	var foundationalStoreCount int
 
 	for _, input := range arguments {
 		switch v := input.(type) {
@@ -104,6 +105,9 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 			}
 			length := int32(len(cnt))
 			args = append(args, ptr, length)
+		case *wasm.FoundationalStoreInput:
+			args = append(args, int32(foundationalStoreCount))
+			foundationalStoreCount++
 		default:
 			panic("unknown wasm argument type")
 		}
@@ -112,7 +116,7 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 	inst.CurrentCall = call
 	_, err = entrypoint.Call(inst.wasmStore, args...)
 	if err != nil {
-		return inst, fmt.Errorf("call: %w", err)
+		return inst, fmt.Errorf("calling entrypoint: %w", err)
 	}
 
 	return inst, nil

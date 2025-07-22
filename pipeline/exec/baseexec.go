@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/streamingfast/substreams/client/fstore"
+	"github.com/streamingfast/substreams/client/foundational"
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
@@ -26,28 +26,28 @@ type BaseExecutor struct {
 	blockIndex    *index.BlockIndex
 	tracer        ttrace.Tracer
 
-	instanceCacheEnabled    bool
-	cachedInstance          wasm.Instance
-	foundationalStoreReader fstore.FoundationalReader
+	instanceCacheEnabled bool
+	cachedInstance       wasm.Instance
+	foundationalStores   []*foundational.Store
 
 	// Results
 	logs          []string
 	logsTruncated bool
 }
 
-func NewBaseExecutor(ctx context.Context, moduleName, moduleHash string, initialBlock uint64, wasmModule wasm.Module, cacheEnabled bool, wasmArguments []wasm.Argument, blockIndex *index.BlockIndex, entrypoint string, tracer ttrace.Tracer, foundationalStoreReader fstore.FoundationalReader) *BaseExecutor {
+func NewBaseExecutor(ctx context.Context, moduleName, moduleHash string, initialBlock uint64, wasmModule wasm.Module, cacheEnabled bool, wasmArguments []wasm.Argument, blockIndex *index.BlockIndex, entrypoint string, tracer ttrace.Tracer, foundationalStores []*foundational.Store) *BaseExecutor {
 	return &BaseExecutor{
-		ctx:                     ctx,
-		initialBlock:            initialBlock,
-		blockIndex:              blockIndex,
-		moduleName:              moduleName,
-		moduleHash:              moduleHash,
-		wasmModule:              wasmModule,
-		instanceCacheEnabled:    cacheEnabled,
-		wasmArguments:           wasmArguments,
-		entrypoint:              entrypoint,
-		tracer:                  tracer,
-		foundationalStoreReader: foundationalStoreReader,
+		ctx:                  ctx,
+		initialBlock:         initialBlock,
+		blockIndex:           blockIndex,
+		moduleName:           moduleName,
+		moduleHash:           moduleHash,
+		wasmModule:           wasmModule,
+		instanceCacheEnabled: cacheEnabled,
+		wasmArguments:        wasmArguments,
+		entrypoint:           entrypoint,
+		tracer:               tracer,
+		foundationalStores:   foundationalStores,
 	}
 }
 
@@ -122,7 +122,7 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canS
 
 	stats := reqctx.ReqStats(e.ctx)
 	//t0 := time.Now()
-	call = wasm.NewCall(clock, e.moduleName, e.entrypoint, stats, e.wasmArguments, canSkipEmptyOutput, e.foundationalStoreReader)
+	call = wasm.NewCall(clock, e.moduleName, e.entrypoint, stats, e.wasmArguments, canSkipEmptyOutput, e.foundationalStores)
 
 	if sharedCache.Cachable(clock.Number) {
 		err = sharedCache.Execute(e.ctx, e.wasmModule, e.moduleHash, call, e.wasmArguments, argValues)
@@ -141,9 +141,9 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canS
 	}
 	if err != nil {
 		if ctxErr := e.ctx.Err(); ctxErr != nil {
-			return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %w, %w", clock.Number, e.moduleName, err, ctxErr)
+			return nil, fmt.Errorf("block %d: module %q: general wasm execution failed 2: %w, %w", clock.Number, e.moduleName, err, ctxErr)
 		}
-		return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %w: %s", clock.Number, e.moduleName, wasm.ErrWasmDeterministicExec, err)
+		return nil, fmt.Errorf("block %d: module %q: general wasm execution failed 3: %w: %s", clock.Number, e.moduleName, wasm.ErrWasmDeterministicExec, err)
 	}
 	if inst != nil {
 		if e.instanceCacheEnabled {

@@ -7,7 +7,7 @@ In this tutorial, you will learn how to consume Solana account change data using
 By the end of this tutorial, you will have a working Substreams feed that allows you to track real-time account changes on the Solana blockchain, as well as historical account change data.
 
 {% hint style="info" %} 
-Data for Solana account changes is available on a rolling three-month window, the current first streamable slot is 335,410,714.
+Data for Solana account changes is available on a rolling three-month window.
 {% endhint %}
 
 For each Solana Account block, only the latest update per account is recorded, see the [Protobuf Referece](https://buf.build/streamingfast/firehose-solana/file/main:sf/solana/type/v1/account.proto). If an account is deleted, a payload with `deleted == True` is provided. Additionally, events of low importance we're omitted, such as those with the special owner “Vote11111111…” account or changes that do not affect the account data (ex: lamport changes).

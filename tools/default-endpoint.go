@@ -19,10 +19,11 @@ func init() {
 }
 
 func defaultEndpointE(cmd *cobra.Command, args []string) error {
-	net := networks.GetSubstreamsRegistry().Find(args[0])
-	if net != nil && len(net.Services.Substreams) > 0 {
-		fmt.Println(net.Services.Substreams[0])
+	endpoint := networks.GetSubstreamsEndpoint(args[0])
+	if endpoint != "" {
+		fmt.Println(endpoint)
 		return nil
 	}
+
 	return fmt.Errorf("no endpoint found for network %s", args[0])
 }

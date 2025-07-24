@@ -34,21 +34,15 @@ Extract `substreams-sink-files` into a folder and ensure this folder is referenc
 
 The accompanying code example for this tutorial is available in the `substreams-sink-files` repository. The Substreams project for the tutorial is located in the [docs/tutorial](https://github.com/streamingfast/substreams-sink-files/tree/master/docs/tutorial) directory.
 
-Run the included `make protogen` command to create the required Protobuf files.
+Build the Substreams module (this will also create the required Protobuf files).
 
 ```bash
-make protogen
+substreams build
 ```
 
 It's a good idea to run the example code using your installation of the `substreams` CLI to make sure everything is set up and working properly.
 
-Verify the setup for the example project by using the `make build` and `substreams run` commands.
-
-Build the Substreams module by using the included `make` command.
-
-```bash
-make
-```
+Verify the setup for the example project by using the `substreams build` and `substreams run` commands.
 
 Run the project by using the `substreams run` command.
 

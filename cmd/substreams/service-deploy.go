@@ -28,6 +28,7 @@ var deployCmd = &cobra.Command{
 	Long: cli.Dedent(`
         Sends a "deploy" request to a server. By default, it will talk to a local "substreams alpha service serve" instance.
         The substreams must contain a "SinkConfig" section to be deployable.
+        You can use "-" as the package argument to read the manifest from standard input.
 	`),
 	RunE:         deployE,
 	Args:         cobra.ExactArgs(1),

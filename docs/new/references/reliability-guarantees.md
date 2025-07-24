@@ -36,7 +36,7 @@ message BlockScopedData {
 ```
 
 In a connection, errors might occur; any of the two parties involved may get disconnected because of a network issue.
-In theses cases, it is essential to have a mechanism that allows you to consume the data exactly where you left it before the disconnection. This mechanism is usually called a **cursor**. Essentially, a cursor points to the latest piece of data consumed by the user.
+In these cases, it is essential to have a mechanism that allows you to consume the data exactly where you left it before the disconnection. This mechanism is usually called a **cursor**. Essentially, a cursor points to the latest piece of data consumed by the user.
 
 In Substreams, the `cursor` field of the response indicates the latest block consumed by the user. The user **must** persist the cursor, so that in the case of a disconnection, the Substreams provider can start streaming data from the latest consumed block.
 
@@ -44,7 +44,7 @@ For example, the SQL sink establishes a gRPC connection with the Substreams prov
 
 ### Forks
 
-Forks are really common in blockchain. Essentially, a fork occurs when the path of the blockchain diverges (i.e. there are two or more different paths available because different the nodes involved do not agree on the correct path).
+Forks are really common in blockchain. Essentially, a fork occurs when the path of the blockchain diverges (i.e. there are two or more different paths available because different nodes involved do not agree on the correct path).
 
 The `BlockUndoSignal` object of the response is used to keep track of forks. In Substreams, you are reading real-time data, so if a fork occurs, you may read blocks from the incorrect path. When the blockchain resolves the fork and eventually chooses a path, you will have to _unread_ all the incorrect blocks (i.e. discard all the blocks belonging to the incorrect path of the fork). The `BlockUndoSignal` contains the latest valid block of the blockchain and a cursor:
 

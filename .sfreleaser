@@ -4,3 +4,4 @@ global:
   variant: application
 release:
   changelog-path: "./docs/release-notes/change-log.md"
+  goreleaser-docker-image: "goreleaser/goreleaser-cross:v1.24"

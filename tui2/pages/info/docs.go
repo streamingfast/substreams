@@ -13,16 +13,26 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/tui2/common"
-	"github.com/streamingfast/substreams/tui2/pages/request"
+
 	"github.com/streamingfast/substreams/tui2/styles"
 )
+
+type Summary struct {
+	Manifest        string
+	Endpoint        string
+	ProductionMode  bool
+	InitialSnapshot []string
+	Docs            []*pbsubstreams.PackageMetadata
+	ModuleDocs      []*pbsubstreams.ModuleMetadata
+	Params          map[string]string
+}
 
 type Info struct {
 	common.Common
 
 	docsView viewport.Model
 
-	reqSummary *request.Summary
+	reqSummary *Summary
 	modules    *pbsubstreams.Modules
 	graph      *manifest.ModuleGraph
 	hashes     *manifest.ModuleHashes
@@ -38,7 +48,7 @@ func New(c common.Common) *Info {
 	return page
 }
 
-func (d *Info) setNewRequest(reqSummary *request.Summary, modules *pbsubstreams.Modules, graph *manifest.ModuleGraph) {
+func (d *Info) setNewRequest(reqSummary *Summary, modules *pbsubstreams.Modules, graph *manifest.ModuleGraph) {
 	d.reqSummary = reqSummary
 	d.modules = modules
 	d.graph = graph
@@ -86,8 +96,6 @@ func (d *Info) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case string:
 		log.Println(msg)
-	case request.NewRequestInstance:
-		d.setNewRequest(msg.RequestSummary, msg.Modules, msg.Graph)
 	}
 	var cmd tea.Cmd
 	d.docsView, cmd = d.docsView.Update(msg)

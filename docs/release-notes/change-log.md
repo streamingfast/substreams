@@ -11,16 +11,47 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
-### Server
+### CLI
 
-* [BREAKING CHANGE] Tier2 servers must be upgraded BEFORE tier1 servers, tier2 servers will stream outputs for the 'first segment', to speed up time to first block
-* Return 'processed blocks' counter to client at the end of the request
-* Progress notifications will only be sent every 500ms for the first minute, then reduce rate up to every 5 seconds (can be overridden per request)
-* Added `dev_output_modules` to protobuf request (if present, in dev mode, only send the output of the modules listed)
-* Added `progress_messages_interval_ms` to protobuf request (if present, overrides the rate of progress messages to that many milliseconds)
+* More tweaks to `substreams build` and `substreams protogen` commands output.
+
+## v1.16.1
 
 ### CLI
 
+* Fixed `substreams build` command when there is no WASM file already present on disk.
+
+## v1.16.0
+
+### CLI
+
+* **Improved** Improved `substreams build`, `substreams protogen` and `substreams pack` command outputs to be streamlined and condensed.
+* **Added** support for reading manifest from stdin across all manifest-accepting commands using `"-"` as the manifest path. Affected commands: `build`, `run`, `gui`, `info`, `graph`, `pack`, `protogen`. This enables dynamic manifest generation and preprocessing workflows, including integration with tools like `envsubst` for environment variable substitution and CI/CD pipeline automation.
+* **Added** `substreams sink webhook` command to send Substreams output to a webhook endpoint. See [the documentation](./sink/webhook/README.md) for more information.
+* Changed `substreams-api-token-envvar` flag to `api-token-envvar`
+* Changed `substreams-api-key-envvar` flag to `api-key-envvar`
+
+## Lib
+
+* **Moved** github.com/streamingfast/substreams-sink library in this repo, under github.com/streamingfast/substreams/sink
+
+## v1.15.10
+
+* Re-release of v1.15.9 with missing dependency update.
+
+## v1.15.9
+
+### Server
+
+* [**BREAKING CHANGE**] `substreams-tier2` servers must be upgraded **before** tier1 servers, tier2 servers will stream outputs for the 'first segment', to speed up time to first block.
+* Return `processed_blocks` counter to client at the end of the request.
+* Progress notifications will only be sent every 500ms for the first minute, then reduce rate up to every 5 seconds (can be overridden per request).
+* Added `dev_output_modules` to protobuf request (if present, in dev mode, only send the output of the modules listed).
+* Added `progress_messages_interval_ms` to protobuf request (if present, overrides the rate of progress messages to that many milliseconds).
+
+### CLI
+
+* Updated to latest networks registry version.
 * **Added** `--proto-path` flag to `substreams run` and `substreams gui` commands: Allows loading protobuf definitions from a directory containing `.proto` files on top of the substreams package protobuf definitions
 * **Added** `--proto-descriptor-set` flag to `substreams run` and `substreams gui` commands: Allows loading protobuf definitions from a single protobuf descriptor set file on top of the substreams package protobuf definitions
 * Both flags work with both manifest files (`.yaml`) and pre-compiled packages (`.spkg`), enabling additional protobuf types to be available during execution

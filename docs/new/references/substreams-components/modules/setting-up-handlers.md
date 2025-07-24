@@ -6,7 +6,7 @@ description: StreamingFast Substreams module handlers
 
 ## Module handlers overview
 
-To begin creating the custom module handlers initialize a new Rust project by using the `cargo` `init` command.
+To begin creating the custom module handlers, initialize a new Rust project by using the `cargo` `init` command.
 
 ```bash
 # Creates a empty Rust project suitable for WASM compilation

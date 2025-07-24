@@ -4,7 +4,7 @@ description: Learn the basics about modules
 
 ## Modules
 
-In Substreams, manifests and modules are concepts tightly related because they are fundamental to understand how Substreams works.
+In Substreams, manifests and modules are concepts tightly related because they are fundamental to understanding how Substreams works.
 
 In simple terms, a Substreams module is a Rust function that receives an input and returns an output. For example, the following Rust function receives an Ethereum block and returns a custom object containing fields such as block number, hash or parent hash.
 
@@ -71,7 +71,7 @@ Technically, modules have one or more inputs, which can be in the form of a `map
 
 There are two types of modules: `map` and `store`. `map` modules are used for stateless transformations and `store` modules are used for stateful transformations.
 
-Substreams executes the Rust function associated with module for every block on the blockchain, but there will be times when you will have to save data between blocks. `store` modules allow you to save in-memory data.
+Substreams executes the Rust function associated with the module for every block on the blockchain, but there will be times when you will have to save data between blocks. `store` modules allow you to save in-memory data.
 
 ### `map` modules
 
@@ -95,7 +95,7 @@ Functional `map` modules have several important use cases and facts to consider,
 
 Unbounded `store` modules are discouraged. `store` modules shouldn't be used as an infinite bucket to dump data into.
 
-Notable facts and use cases for working `store` modules include:
+Notable facts and use cases for working with `store` modules include:
 
 * `store` modules should only be used when reading data from another downstream Substreams module.
 * `store` modules cannot be output as a stream, except in development mode.

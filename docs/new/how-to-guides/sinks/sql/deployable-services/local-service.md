@@ -44,7 +44,7 @@ Generating ABI Event models for
 Writing project files
 Generating Protobuf Rust code
 Project "cryptopunks" initialized at "/Users/stepd/repos"
-Run 'make build' to build the wasm code.
+Run 'substreams build' to build the wasm code.
 The following substreams.yaml files have been created with different sink targets:
  * substreams.yaml: no sink target
  * substreams.sql.yaml: PostgreSQL sink
@@ -57,7 +57,7 @@ The following substreams.yaml files have been created with different sink target
 * Build the rust code:
 
 ```bash
-make build
+substreams build
 ```
 
 You should see:

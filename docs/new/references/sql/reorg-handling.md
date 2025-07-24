@@ -18,7 +18,7 @@ This document currently focuses on the **DatabaseChanges model** implementation.
 
 The DatabaseChanges model (used by `db_out` modules) handles re-orgs through a four-phase process:
 
-1. **Tracking changes** - Storing a record of all database operations in a history table, only in the reversible segment of the chain, this means there is no operations happening when backfilling historical segments.
+1. **Tracking changes** - Storing a record of all database operations in a history table, only in the reversible segment of the chain, this means there are no operations happening when backfilling historical segments.
 2. **Detecting re-orgs** - Receiving undo signals when reorganizations occur
 3. **Reverting changes** - Rolling back operations from forked blocks
 4. **Cleaning up** - Removing history records for finalized blocks

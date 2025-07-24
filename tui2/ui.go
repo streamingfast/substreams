@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/streamingfast/substreams/manifest"
+	"github.com/streamingfast/substreams/sink"
 	"github.com/streamingfast/substreams/tui2/buildoutput"
 	"github.com/streamingfast/substreams/tui2/common"
 	"github.com/streamingfast/substreams/tui2/components/errorbox"
@@ -37,11 +38,13 @@ const (
 type UI struct {
 	lastView time.Time
 
-	msgDescs      map[string]*manifest.ModuleDescriptor
-	stream        *streamui.Stream
-	replayLog     *replaylog.File
-	requestConfig *request.Config // all boilerplate to pass down to refresh
-	buildOut      *buildoutput.BuildOutput
+	msgDescs     map[string]*manifest.ModuleDescriptor
+	stream       *streamui.Stream
+	replayLog    *replaylog.File
+	sinkerConfig *sink.SinkerConfig
+	tuiConfig    *common.TUIConfig
+	buildOut     *buildoutput.BuildOutput
+	sinker       *sink.Sinker
 
 	common.Common
 	modalComponent common.Component
@@ -51,26 +54,31 @@ type UI struct {
 	tabs           *tabs.Tabs
 }
 
-func New(reqConfig *request.Config) (*UI, error) {
+func New(sinkerConfig *sink.SinkerConfig, tuiConfig *common.TUIConfig) (*UI, error) {
 	c := common.Common{}
 
-	outputTab, err := output.New(c, reqConfig)
+	// Create a sinker from the config
+	sinker := sink.New(sinkerConfig)
+
+	outputTab, err := output.New(c, sinkerConfig, tuiConfig)
 	if err != nil {
 		return nil, err
 	}
 	ui := &UI{
 		Common: c,
 		pages: []common.Component{
-			request.New(c, reqConfig),
+			request.New(c, sinkerConfig, tuiConfig),
 			progress.New(c),
 			outputTab,
 			info.New(c),
-			build.New(c, reqConfig.ManifestPath),
+			build.New(c, tuiConfig.ManifestPath),
 		},
-		activePage:    requestPage,
-		tabs:          tabs.New(c, []string{"Request", "Backprocessing", "Output", "Info", "Build"}),
-		requestConfig: reqConfig,
-		replayLog:     replaylog.New(),
+		activePage:   requestPage,
+		tabs:         tabs.New(c, []string{"Request", "Backprocessing", "Output", "Info", "Build"}),
+		sinkerConfig: sinkerConfig,
+		tuiConfig:    tuiConfig,
+		sinker:       sinker,
+		replayLog:    replaylog.New(),
 	}
 	ui.footer = footer.New(c, ui.pages[ui.activePage])
 
@@ -297,7 +305,7 @@ func (ui *UI) View() string {
 func (ui *UI) setupNewInstance(startStream bool) tea.Cmd {
 	var cmds []tea.Cmd
 	ui.stream = nil
-	reqInstance, err := ui.requestConfig.NewInstance()
+	reqInstance, err := request.NewInstance(ui.sinkerConfig, ui.tuiConfig)
 	if err != nil {
 		return func() tea.Msg { return streamui.StreamErrorMsg(err) }
 	}
@@ -327,7 +335,7 @@ func (ui *UI) setupNewInstance(startStream bool) tea.Cmd {
 }
 
 func (ui *UI) setupNewBuild() tea.Cmd {
-	buildInstance, err := build.NewBuild(ui.requestConfig.ManifestPath)
+	buildInstance, err := build.NewBuild(ui.tuiConfig.ManifestPath)
 	if err != nil {
 		return func() tea.Msg { return err }
 	}

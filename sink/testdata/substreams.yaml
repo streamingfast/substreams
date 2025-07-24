@@ -1,0 +1,34 @@
+specVersion: v0.1.0
+package:
+  name: test
+  version: v0.0.0
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: binaries/dummy.wasm
+
+modules:
+  - name: params_out
+    kind: map
+    initialBlock: 0
+    inputs:
+      - params: string
+    output:
+      type: proto:string
+
+  - name: kv_out
+    kind: map
+    initialBlock: 0
+    inputs:
+      - source: sf.test.Block
+    output:
+      type: proto:kv-out
+
+  - name: graph_out
+    kind: map
+    initialBlock: 0
+    inputs:
+      - source: sf.test.Block
+    output:
+      type: proto:graph-out

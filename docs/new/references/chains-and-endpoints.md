@@ -40,7 +40,7 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 
 ### EVM Extended vs Base Block Model
 
-For EVM chains, the are two different types of `Block` models: _Extended_ and _Base_:
+For EVM chains, there are two different types of `Block` models: _Extended_ and _Base_:
 
 - An **Extended Block** is produced by a full node instrumentation integration, thus containing a rich data model (balance changes, internal calls, storage changes...).
 - A **Base Block** is produced by a _RPC Poller_ integration, which essentially means that only the data exposed by an RPC endpoint can be included in the data model.
@@ -67,6 +67,8 @@ The data missing in the Base Block makes the corresponding Protobuf field empty.
 - **Solana Mainnet-Beta**: `mainnet.sol.streamingfast.io:443`
 - **Solana Devnet**: `devnet.sol.streamingfast.io:443`
 - **Solana Accounts**: `accounts.mainnet.sol.streamingfast.io:443`
+- **TRON Native**: `mainnet.tron.streamingfast.io:443`
+- **TRON EVM**: `mainnet-evm.tron.streamingfast.io:443`
 - **Bitcoin Mainnet**: `mainnet.btc.streamingfast.io:443`
 - **Injective EVM Testnet**: `testnet.injective-evm.streamingfast.io:443`
 - **Injective Mainnet**: `mainnet.injective.streamingfast.io:443`
@@ -80,6 +82,7 @@ The data missing in the Base Block makes the corresponding Protobuf field empty.
 - **Stellar Mainnet**: `mainnet.stellar.streamingfast.io:443`
 - **Stellar Testnet**: `testnet.stellar.streamingfast.io:443`
 - **Unichain Mainnet**: `mainnet.unichain.streamingfast.io:443`
+- **Katana Mainnet**: `katana.streamingfast.io:443`
 
 ## Community Endpoints
 

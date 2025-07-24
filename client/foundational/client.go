@@ -39,18 +39,16 @@ func New(rawEndpoint string) (*Store, func() error, error) {
 	return &Store{rpc: pbstore.NewStoreKVClient(conn)}, conn.Close, nil
 }
 
-func (s *Store) Get(ctx context.Context, key []byte, block uint64) ([]byte, bool, error) {
+func (s *Store) Get(ctx context.Context, key []byte, block uint64) (*pbstore.GetResponse, error) {
 	resp, err := s.rpc.Get(ctx, &pbstore.GetRequest{
 		Key:         key,
 		BlockNumber: block,
 	})
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
-	if resp.Response != pbstore.ResponseCode_FOUND || resp.Value == nil {
-		return nil, false, nil
-	}
-	return resp.Value.Value, true, nil
+
+	return resp, nil
 }
 
 func (s *Store) GetAll(ctx context.Context, keys [][]byte, block uint64) (map[string][]byte, error) {

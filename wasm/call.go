@@ -10,6 +10,7 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/shopspring/decimal"
 
+	pbstore "github.com/streamingfast/substreams-foundational-store/pb/sf/substreams/foundational-store/v1"
 	"github.com/streamingfast/substreams/client/foundational"
 	"github.com/streamingfast/substreams/metrics"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -309,12 +310,11 @@ func (c *Call) DoHasLast(storeIndex int, key string) (found bool) {
 	return readStore.HasLast(key)
 }
 
-func (c *Call) DoFStoreGet(index uint32, block uint64, key []byte) (val []byte, found bool) {
+func (c *Call) DoFStoreGet(index uint32, block uint64, key []byte) (*pbstore.GetResponse, error) {
 	if len(c.foundationalStores) == 0 {
-		return nil, false
+		return nil, fmt.Errorf("store not found for index: %d", index)
 	}
-	val, ok, _ := c.foundationalStores[index].Get(context.Background(), key, block)
-	return val, ok
+	return c.foundationalStores[index].Get(context.Background(), key, block)
 }
 
 func (c *Call) DoFStoreGetAll(index uint32, block uint64, keys [][]byte) map[string][]byte {

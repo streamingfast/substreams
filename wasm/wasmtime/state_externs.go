@@ -167,18 +167,11 @@ func (i *instance) fstoreGet(storeIndex int32, reqPtr int32, reqLen int32) int64
 		return 0
 	}
 
-	val, found := i.CurrentCall.DoFStoreGet(uint32(storeIndex), req.BlockNumber, req.Key)
-
-	// Create GetResponse
-	resp := &pbstore.GetResponse{
-		Response: pbstore.ResponseCode_NOT_FOUND,
+	resp, err := i.CurrentCall.DoFStoreGet(uint32(storeIndex), req.BlockNumber, req.Key)
+	if err != nil {
+		i.CurrentCall.ReturnError(fmt.Errorf("foundational store error: %w", err))
+		return 0
 	}
-
-	if found {
-		resp.Response = pbstore.ResponseCode_FOUND
-		resp.Value = &anypb.Any{Value: val}
-	}
-
 	// Serialize response
 	respData, err := proto.Marshal(resp)
 	if err != nil {

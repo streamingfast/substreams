@@ -393,7 +393,7 @@ var StateFuncs = []funcs{
 				return
 			}
 
-			resp, err := call.DoFStoreGet(storeIndex, req.BlockNumber, req.Key)
+			resp, err := call.DoFoundationalStoreGet(storeIndex, req.BlockNumber, req.Key)
 			if err != nil {
 				call.ReturnError(fmt.Errorf("foundational store error: %w", err))
 				stack[0] = 0

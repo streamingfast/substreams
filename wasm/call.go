@@ -310,7 +310,7 @@ func (c *Call) DoHasLast(storeIndex int, key string) (found bool) {
 	return readStore.HasLast(key)
 }
 
-func (c *Call) DoFStoreGet(index uint32, block uint64, key []byte) (*pbstore.GetResponse, error) {
+func (c *Call) DoFoundationalStoreGet(index uint32, block uint64, key []byte) (*pbstore.GetResponse, error) {
 	if len(c.foundationalStores) == 0 {
 		return nil, fmt.Errorf("store not found for index: %d", index)
 	}

@@ -167,7 +167,7 @@ func (i *instance) foundationalStoreGet(storeIndex int32, reqPtr int32, reqLen i
 		return 0
 	}
 
-	resp, err := i.CurrentCall.DoFStoreGet(uint32(storeIndex), req.BlockNumber, req.Key)
+	resp, err := i.CurrentCall.DoFoundationalStoreGet(uint32(storeIndex), req.BlockNumber, req.Key)
 	if err != nil {
 		i.CurrentCall.ReturnError(fmt.Errorf("foundational store error: %w", err))
 		return 0

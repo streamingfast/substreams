@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	pbstore "github.com/streamingfast/substreams-foundational-store/pb/sf/substreams/foundational-store/v1"
 	"github.com/streamingfast/substreams/wasm"
 	"github.com/tetratelabs/wazero/api"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type parm = api.ValueType
@@ -372,6 +375,104 @@ var StateFuncs = []funcs{
 			setStack0Bool(stack, found)
 		}),
 	},
+	{
+		"foundational_store_get",
+		[]parm{i32, i32, i32},
+		[]parm{i64},
+		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
+			storeIndex := uint32(stack[0])
+			reqData := readBytesFromStack(mod, stack[1:])
+			call := wasm.FromContext(ctx)
+			inst := instanceFromContext(ctx)
+
+			// Deserialize
+			var req pbstore.GetRequest
+			if err := proto.Unmarshal(reqData, &req); err != nil {
+				call.ReturnError(fmt.Errorf("failed to unmarshal GetRequest: %w", err))
+				stack[0] = 0
+				return
+			}
+
+			resp, err := call.DoFStoreGet(storeIndex, req.BlockNumber, req.Key)
+			if err != nil {
+				call.ReturnError(fmt.Errorf("foundational store error: %w", err))
+				stack[0] = 0
+				return
+			}
+
+			// Serialize response
+			respData, err := proto.Marshal(resp)
+			if err != nil {
+				call.ReturnError(fmt.Errorf("failed to marshal GetResponse: %w", err))
+				stack[0] = 0
+				return
+			}
+
+			respPtr, err := writeToHeap(ctx, inst, true, respData)
+			if err != nil {
+				call.ReturnError(fmt.Errorf("writing response to heap: %w", err))
+				stack[0] = 0
+				return
+			}
+
+			stack[0] = packPtrLen(respPtr, uint32(len(respData)))
+		}),
+	},
+	{
+		"foundational_store_get_all",
+		[]parm{i32, i32, i32},
+		[]parm{i64},
+		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
+			storeIndex := uint32(stack[0])
+			reqData := readBytesFromStack(mod, stack[1:])
+			call := wasm.FromContext(ctx)
+			inst := instanceFromContext(ctx)
+
+			// Deserialize
+			var req pbstore.GetAllRequest
+			if err := proto.Unmarshal(reqData, &req); err != nil {
+				call.ReturnError(fmt.Errorf("failed to unmarshal GetAllRequest: %w", err))
+				stack[0] = 0
+				return
+			}
+
+			vals := call.DoFoundationalStoreGetAll(storeIndex, req.BlockNumber, req.Keys)
+
+			resp := &pbstore.GetAllResponse{}
+
+			for _, key := range req.Keys {
+				entry := &pbstore.ResponseEntry{
+					Key: key,
+				}
+				if val, exists := vals[string(key)]; exists {
+					entry.Response = &pbstore.GetResponse{
+						Response: pbstore.ResponseCode_FOUND,
+						Value:    &anypb.Any{Value: val},
+					}
+				} else {
+					entry.Response = &pbstore.GetResponse{Response: pbstore.ResponseCode_NOT_FOUND}
+				}
+				resp.Entries = append(resp.Entries, entry)
+			}
+
+			// Serialize response
+			respData, err := proto.Marshal(resp)
+			if err != nil {
+				call.ReturnError(fmt.Errorf("failed to marshal GetAllResponse: %w", err))
+				stack[0] = 0
+				return
+			}
+
+			respPtr, err := writeToHeap(ctx, inst, true, respData)
+			if err != nil {
+				call.ReturnError(fmt.Errorf("writing response to heap: %w", err))
+				stack[0] = 0
+				return
+			}
+
+			stack[0] = packPtrLen(respPtr, uint32(len(respData)))
+		}),
+	},
 }
 
 func setStackAndOutput(ctx context.Context, stack []uint64, call *wasm.Call, found bool, inst *Instance, outputPtr uint32, value []byte) {
@@ -391,4 +492,9 @@ func setStack0Bool(stack []uint64, value bool) {
 	} else {
 		stack[0] = 0
 	}
+}
+
+// Helper function to pack pointer and length into uint64
+func packPtrLen(ptr, length uint32) uint64 {
+	return uint64(ptr)<<32 | uint64(length)
 }

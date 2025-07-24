@@ -314,15 +314,14 @@ func (c *Call) DoFoundationalStoreGet(index uint32, block uint64, key []byte) (*
 	if len(c.foundationalStores) == 0 {
 		return nil, fmt.Errorf("store not found for index: %d", index)
 	}
-	return c.foundationalStores[index].Get(context.Background(), key, block)
+	return c.foundationalStores[index].Get(context.Background(), block, key)
 }
 
-func (c *Call) DoFoundationalStoreGetAll(index uint32, block uint64, keys [][]byte) map[string][]byte {
+func (c *Call) DoFoundationalStoreGetAll(index uint32, block uint64, keys [][]byte) (*pbstore.GetAllResponse, error) {
 	if len(c.foundationalStores) == 0 {
-		return nil
+		return nil, fmt.Errorf("store not found for index: %d", index)
 	}
-	vals, _ := c.foundationalStores[index].GetAll(context.Background(), keys, block)
-	return vals
+	return c.foundationalStores[index].GetAll(context.Background(), block, keys)
 }
 
 func (c *Call) validateStoreIndex(storeIndex int, stateFunc string) {

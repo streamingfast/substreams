@@ -39,7 +39,7 @@ func New(rawEndpoint string) (*Store, func() error, error) {
 	return &Store{rpc: pbstore.NewStoreKVClient(conn)}, conn.Close, nil
 }
 
-func (s *Store) Get(ctx context.Context, key []byte, block uint64) (*pbstore.GetResponse, error) {
+func (s *Store) Get(ctx context.Context, block uint64, key []byte) (*pbstore.GetResponse, error) {
 	resp, err := s.rpc.Get(ctx, &pbstore.GetRequest{
 		Key:         key,
 		BlockNumber: block,
@@ -51,7 +51,7 @@ func (s *Store) Get(ctx context.Context, key []byte, block uint64) (*pbstore.Get
 	return resp, nil
 }
 
-func (s *Store) GetAll(ctx context.Context, keys [][]byte, block uint64) (map[string][]byte, error) {
+func (s *Store) GetAll(ctx context.Context, block uint64, keys [][]byte) (*pbstore.GetAllResponse, error) {
 	resp, err := s.rpc.GetAll(ctx, &pbstore.GetAllRequest{
 		Keys:        keys,
 		BlockNumber: block,
@@ -60,11 +60,5 @@ func (s *Store) GetAll(ctx context.Context, keys [][]byte, block uint64) (map[st
 	if err != nil {
 		return nil, err
 	}
-	out := make(map[string][]byte, len(resp.Entries))
-	for _, e := range resp.Entries {
-		if e.Response.Response == pbstore.ResponseCode_FOUND && e.Response.Value != nil {
-			out[string(e.Key)] = e.Response.Value.Value
-		}
-	}
-	return out, nil
+	return resp, nil
 }

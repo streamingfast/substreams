@@ -8,7 +8,6 @@ import (
 	"github.com/streamingfast/substreams/wasm"
 	"github.com/tetratelabs/wazero/api"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type parm = api.ValueType
@@ -436,23 +435,11 @@ var StateFuncs = []funcs{
 				return
 			}
 
-			vals := call.DoFoundationalStoreGetAll(storeIndex, req.BlockNumber, req.Keys)
-
-			resp := &pbstore.GetAllResponse{}
-
-			for _, key := range req.Keys {
-				entry := &pbstore.ResponseEntry{
-					Key: key,
-				}
-				if val, exists := vals[string(key)]; exists {
-					entry.Response = &pbstore.GetResponse{
-						Response: pbstore.ResponseCode_FOUND,
-						Value:    &anypb.Any{Value: val},
-					}
-				} else {
-					entry.Response = &pbstore.GetResponse{Response: pbstore.ResponseCode_NOT_FOUND}
-				}
-				resp.Entries = append(resp.Entries, entry)
+			resp, err := call.DoFoundationalStoreGetAll(storeIndex, req.BlockNumber, req.Keys)
+			if err != nil {
+				call.ReturnError(fmt.Errorf("foundational store error: %w", err))
+				stack[0] = 0
+				return
 			}
 
 			// Serialize response

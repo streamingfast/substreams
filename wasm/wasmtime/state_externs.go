@@ -5,7 +5,6 @@ import (
 
 	pbstore "github.com/streamingfast/substreams-foundational-store/pb/sf/substreams/foundational-store/v1"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 func (i *instance) set(ord int64, keyPtr, keyLength, valPtr, valLength int32) {
@@ -200,24 +199,10 @@ func (i *instance) foundationalStoreGetAll(storeIndex int32, reqPtr int32, reqLe
 		return 0
 	}
 
-	vals := i.CurrentCall.DoFoundationalStoreGetAll(uint32(storeIndex), req.BlockNumber, req.Keys)
-
-	// Create GetAllResponse
-	resp := &pbstore.GetAllResponse{}
-
-	for _, key := range req.Keys {
-		entry := &pbstore.ResponseEntry{
-			Key: key,
-		}
-		if val, exists := vals[string(key)]; exists {
-			entry.Response = &pbstore.GetResponse{
-				Response: pbstore.ResponseCode_FOUND,
-				Value:    &anypb.Any{Value: val},
-			}
-		} else {
-			entry.Response = &pbstore.GetResponse{Response: pbstore.ResponseCode_NOT_FOUND}
-		}
-		resp.Entries = append(resp.Entries, entry)
+	resp, err := i.CurrentCall.DoFoundationalStoreGetAll(uint32(storeIndex), req.BlockNumber, req.Keys)
+	if err != nil {
+		i.CurrentCall.ReturnError(fmt.Errorf("foundational store error: %w", err))
+		return 0
 	}
 
 	// Serialize response

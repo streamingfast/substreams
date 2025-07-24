@@ -317,7 +317,7 @@ func (c *Call) DoFStoreGet(index uint32, block uint64, key []byte) (*pbstore.Get
 	return c.foundationalStores[index].Get(context.Background(), key, block)
 }
 
-func (c *Call) DoFStoreGetAll(index uint32, block uint64, keys [][]byte) map[string][]byte {
+func (c *Call) DoFoundationalStoreGetAll(index uint32, block uint64, keys [][]byte) map[string][]byte {
 	if len(c.foundationalStores) == 0 {
 		return nil
 	}

@@ -157,7 +157,7 @@ func (i *instance) hasLast(storeIndex int32, keyPtr, keyLength int32) int32 {
 	return returnIfFound(found)
 }
 
-func (i *instance) fstoreGet(storeIndex int32, reqPtr int32, reqLen int32) int64 {
+func (i *instance) foundationalStoreGet(storeIndex int32, reqPtr int32, reqLen int32) int64 {
 	reqData := i.Heap.ReadBytes(reqPtr, reqLen)
 
 	// Deserialize GetRequest
@@ -180,7 +180,7 @@ func (i *instance) fstoreGet(storeIndex int32, reqPtr int32, reqLen int32) int64
 	}
 
 	// Write to heap and return packed pointer/length
-	respPtr, err := i.Heap.Write(respData, "fstoreGet")
+	respPtr, err := i.Heap.Write(respData, "foundationalStoreGet")
 	if err != nil {
 		i.CurrentCall.ReturnError(fmt.Errorf("writing response to heap: %w", err))
 		return 0
@@ -190,7 +190,7 @@ func (i *instance) fstoreGet(storeIndex int32, reqPtr int32, reqLen int32) int64
 	return packPtrLen(respPtr, int32(len(respData)))
 }
 
-func (i *instance) fstoreGetAll(storeIndex int32, reqPtr int32, reqLen int32) int64 {
+func (i *instance) foundationalStoreGetAll(storeIndex int32, reqPtr int32, reqLen int32) int64 {
 	reqData := i.Heap.ReadBytes(reqPtr, reqLen)
 
 	// Deserialize GetAllRequest
@@ -200,7 +200,7 @@ func (i *instance) fstoreGetAll(storeIndex int32, reqPtr int32, reqLen int32) in
 		return 0
 	}
 
-	vals := i.CurrentCall.DoFStoreGetAll(uint32(storeIndex), req.BlockNumber, req.Keys)
+	vals := i.CurrentCall.DoFoundationalStoreGetAll(uint32(storeIndex), req.BlockNumber, req.Keys)
 
 	// Create GetAllResponse
 	resp := &pbstore.GetAllResponse{}
@@ -228,7 +228,7 @@ func (i *instance) fstoreGetAll(storeIndex int32, reqPtr int32, reqLen int32) in
 	}
 
 	// Write to heap and return packed pointer/length
-	respPtr, err := i.Heap.Write(respData, "fstoreGetAll")
+	respPtr, err := i.Heap.Write(respData, "foundationalStoreGetAll")
 	if err != nil {
 		i.CurrentCall.ReturnError(fmt.Errorf("writing response to heap: %w", err))
 		return 0

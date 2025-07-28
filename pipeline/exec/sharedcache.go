@@ -119,6 +119,7 @@ func (s *SharedCache) Execute(
 	call *wasm.Call,
 	wasmArguments []wasm.Argument,
 	argValues map[string][]byte,
+	undoManager *UndoManager,
 ) error {
 	clock := cacheClock{
 		id:  call.Clock.Id,
@@ -154,6 +155,12 @@ func (s *SharedCache) Execute(
 		ctx = reqctx.WithRequest(ctx, &reqctx.RequestDetails{
 			UniqueID: reqctx.Details(originalContext).UniqueID,
 		})
+
+		if undoManager != nil {
+			var cancel func()
+			ctx, cancel = undoManager.Subscribe(ctx, clock.id)
+			defer cancel()
+		}
 
 		inst, err := wasmModule.ExecuteNewCall(ctx, call, nil, wasmArguments, argValues)
 		inst.Close(ctx)

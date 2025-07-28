@@ -37,7 +37,7 @@ func (e *MapperModuleExecutor) run(ctx context.Context, reader execout.Execution
 
 	e.ctx = ctx
 	var call *wasm.Call
-	if call, err = e.wasmCall(reader, true, GlobalSharedCache); err != nil {
+	if call, err = e.wasmCall(reader, true, GlobalSharedCache, GlobalUndoManager); err != nil {
 		return nil, nil, nil, fmt.Errorf("maps wasm call: %w", err)
 	}
 

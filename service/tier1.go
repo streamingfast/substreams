@@ -218,13 +218,33 @@ func NewTier1(
 		sharedCache := exec.NewSharedCache(sharedCacheSize)
 		hubSrc := hub.SourceFromBlockNum(hub.HeadNum(), sharedCache)
 		if hubSrc == nil {
-			zlog.Error("cannot get blocks source from hub")
+			zlog.Error("shared cache: cannot get blocks source from hub")
 			return
 		}
 		exec.GlobalSharedCache = sharedCache
 		hubSrc.Run()
 		if err := hubSrc.Err(); err != nil {
 			zlog.Info("shared cache source stopped", zap.Error(err))
+		}
+	}()
+
+	go func() {
+		if hub == nil {
+			zlog.Info("undo manager disabled, no live source configured")
+			return
+		}
+
+		<-hub.Ready
+		undoManager := exec.NewUndoManager(time.Second * 5)
+		hubSrc := hub.SourceFromBlockNum(hub.HeadNum(), undoManager)
+		if hubSrc == nil {
+			zlog.Error("undoManager: cannot get blocks source from hub")
+			return
+		}
+		exec.GlobalUndoManager = undoManager
+		hubSrc.Run()
+		if err := hubSrc.Err(); err != nil {
+			zlog.Info("undo managersource stopped", zap.Error(err))
 		}
 	}()
 

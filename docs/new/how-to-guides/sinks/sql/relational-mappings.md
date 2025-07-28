@@ -4,6 +4,10 @@ If you want to use a relational model (e.g., creating one-to-many), you can anno
 
 To map your Protobuf definitions directly to database tables and establish relationships between objects, you need to annotate your Protobuf messages with table names, primary keys, and relationship metadata.
 
+{% hint style="warning" %} 
+Relational mappings from Protobuf are currently in beta. Postgres support is stable, but ClickHouse support is still under development.
+{% endhint %}
+
 ```
 message Swap {
     option (sf.substreams.sink.sql.schema.v1.table) = {
@@ -175,9 +179,9 @@ export DSN=postgres://myuser:mypassword@localhost:5432/mydatabase?sslmode=disabl
 substreams-sink-sql from-proto $DSN ./substreams.yaml
 ```
 
-### Run the Sink Without Relations
+### Run the Sink Without Relations (PostgreSQL only)
 
-If you want the sink to create the SQL tables **without relationships**, then you can use the `--no-proto-option` flag. With this flag, you don't need annotations, the sink will infer the name of the table using the name of the messages that you output.
+If you want the sink to create the SQL tables in Postgres **without relationships**, then you can use the `--no-proto-option` flag. With this flag, you don't need annotations, the sink will infer the name of the table using the name of the messages that you output.
 
 **NOTE:** This method will do its best to create the table, but it might NOT automatically work for complex and nested Protubuf messages.
 

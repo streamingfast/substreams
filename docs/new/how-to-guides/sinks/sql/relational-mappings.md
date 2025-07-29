@@ -50,6 +50,30 @@ export DSN="postgres://postgres:password@localhost:5432/substreams?sslmode=disab
 substreams-sink-sql from-proto $DSN https://github.com/streamingfast/substreams-spl-token/releases/download/v0.1.0/solana-spl-token-v0.1.0.spkg
 ```
 
+### Database Connection (DSN)
+
+The DSN (Data Source Name) defines how to connect to your database. The format varies by database type:
+
+**PostgreSQL:**
+```bash
+postgres://<user>:<password>@<host>:<port>/<database>?<options>
+```
+
+**ClickHouse:**
+```bash
+# Not encrypted
+clickhouse://<user>:<password>@<host>:9000/<database>?<options>
+
+# Encrypted (ClickHouse Cloud)
+clickhouse://<user>:<password>@<host>:9440/<database>?secure=true&skip_verify=true&<options>
+```
+
+{% hint style="info" %}
+For ClickHouse Cloud, use port `9440` with `secure=true` option. The standard port `9000` is for unencrypted connections.
+{% endhint %}
+
+For complete DSN format details and additional database options, see the [DSN Reference](../../../references/sql/dsn-reference.md).
+
 ## Example: SPL Token
 
 Let’s walk through a real-world example of storing SPL Token instructions in a Postgres database.

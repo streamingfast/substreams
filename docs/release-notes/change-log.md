@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Server
+
+* Fix handling of invalid module kind: prevent heavy logging from recovered panic
+
 ### CLI
 
 * More tweaks to `substreams build` and `substreams protogen` commands output.

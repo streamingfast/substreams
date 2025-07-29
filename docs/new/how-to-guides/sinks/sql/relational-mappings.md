@@ -5,7 +5,7 @@ If you want to use a relational model (e.g., creating one-to-many), you can anno
 To map your Protobuf definitions directly to database tables and establish relationships between objects, you need to annotate your Protobuf messages with table names, primary keys, and relationship metadata.
 
 {% hint style="warning" %} 
-Relational mappings from Protobuf are currently in beta. Postgres support is stable, but ClickHouse support is still under development. [Reference releases](https://github.com/streamingfast/substreams-sink-sql/releases). 
+Relational mappings from Protobuf are currently in beta. Postgres support is stable, but ClickHouse support is still under development. [Reference releases](https://github.com/streamingfast/substreams-sink-sql/releases)
 {% endhint %}
 
 ```

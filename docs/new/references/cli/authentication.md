@@ -4,7 +4,7 @@ This guide explains how to authenticate when running a Substreams package (`.spk
 
 ## Overview
 
-Substreams require authentication to ensure secure and controlled access to providers. This guide focuses on obtaining and using a JWT token from The Graph Market to authenticate your Substreams execution.
+Substreams requires authentication to ensure secure and controlled access to providers. This guide focuses on obtaining and using a JWT token from The Graph Market to authenticate your Substreams execution.
 
 ## Prerequisites
 

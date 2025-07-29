@@ -187,6 +187,12 @@ func (r *Reader) Read() (*PackageBundle, error) {
 
 func (r *Reader) read() error {
 	input := r.currentInput
+
+	// Handle stdin input
+	if input == "-" {
+		return r.readStdin()
+	}
+
 	if r.IsRemotePackage(input) {
 		return r.readRemote(input)
 	}
@@ -398,22 +404,33 @@ func (r *Reader) readLocal(input string) error {
 	return nil
 }
 
+func (r *Reader) readStdin() error {
+	data, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		return fmt.Errorf("unable to read from stdin: %w", err)
+	}
+
+	r.currentData = data
+	return nil
+}
+
 func (r *Reader) resolveInputPath() error {
+
 	input := r.originalInput
+
+	// Handle stdin input
+	if input == "-" {
+		r.currentInput = "-"
+		return nil
+	}
+
 	if r.IsRemotePackage(input) {
 		r.currentInput = input
 		return nil
 	}
 
-	pkgName, version, err := r.ParseStandardPackageAndVersion(input)
-	if err == nil {
-		registryURL := r.registryURL
-		if registryURL == "" {
-			// This is an extreme fallback, because this should be
-			// set by the WithRegistryURL option.
-			registryURL = "https://spkg.io"
-		}
-		r.currentInput = fmt.Sprintf("%s/v1/packages/%s/%s", registryURL, pkgName, version)
+	if pkgName, version, err := r.ParseStandardPackageAndVersion(input); err == nil {
+		r.currentInput = fmt.Sprintf("%s/v1/packages/%s/%s", r.registryBaseURL(), pkgName, version)
 		return nil
 	}
 
@@ -437,13 +454,27 @@ func (r *Reader) resolveInputPath() error {
 	return nil
 }
 
+func (r *Reader) registryBaseURL() string {
+	if r.registryURL != "" {
+		return r.registryURL
+	}
+	if env := os.Getenv("SUBSTREAMS_REGISTRY"); env != "" {
+		return env
+	}
+	// This is an extreme fallback, because this should be
+	// set by the WithRegistryURL option.
+	return "https://spkg.io"
+}
+
 func (r *Reader) getPkg() (*pbsubstreams.Package, *Manifest, error) {
 	if r.currentData == nil {
 		return nil, nil, fmt.Errorf("no result available")
 	}
 
-	if strings.HasSuffix(r.currentInput, ".yaml") || strings.HasSuffix(r.currentInput, ".yml") {
+	if r.currentInput == "-" || strings.HasSuffix(r.currentInput, ".yaml") || strings.HasSuffix(r.currentInput, ".yml") {
 		manif := &Manifest{}
+		manif.Workdir = r.workingDir
+
 		decoder := yaml3.NewDecoder(bytes.NewReader(r.currentData))
 		decoder.KnownFields(true)
 
@@ -570,6 +601,7 @@ func validatePackage(pkg *pbsubstreams.Package, validation ReaderValidation) err
 
 func (r *Reader) newPkgFromManifest(manif *Manifest) (*pbsubstreams.Package, error) {
 	converter := newManifestConverter(r.currentInput, r.validation, r)
+
 	pkg, descriptors, dynMessage, err := converter.Convert(manif)
 	if err != nil {
 		return nil, err
@@ -700,16 +732,27 @@ func (r *Reader) IsLocalManifest() bool {
 		return false
 	}
 
+	// Reading from standard input is also considered a local manifest input
+	if r.currentInput == "-" {
+		return true
+	}
+
 	return strings.HasSuffix(r.currentInput, ".yaml") || strings.HasSuffix(r.currentInput, ".yml")
 }
 
 // IsLikelyManifestInput determines if the input is likely a manifest input, which is determined
 // by checking:
 //   - If the input starts with remote prefix ("https://", "http://", "ipfs://", "gs://", "s3://", "az://")
+//   - If the input is reading from standard input (i.e., `-`)
 //   - If the input ends with `.yaml`
 //   - If the input is a directory (we check for path separator)
 func IsLikelyManifestInput(in string) bool {
 	if hasRemotePrefix(in) {
+		return true
+	}
+
+	// Reading from standard input is also considered a valid manifest input
+	if in == "-" {
 		return true
 	}
 
@@ -831,7 +874,11 @@ func ValidateModules(mods *pbsubstreams.Modules) error {
 			return fmt.Errorf("module %q: duplicate module name", mod.Name)
 		}
 		mapModules[mod.Name] = mod
-		mapModuleKind[mod.Name] = mod.ModuleKind()
+		modKind := mod.ModuleKind()
+		if modKind == pbsubstreams.ModuleKindInvalid {
+			return fmt.Errorf("module %q: invalid module kind", mod.Name)
+		}
+		mapModuleKind[mod.Name] = modKind
 	}
 
 	for _, mod := range mods.Modules {
@@ -923,11 +970,10 @@ func loadImports(pkg *pbsubstreams.Package, manif *Manifest, validation ReaderVa
 		importPath := manif.resolvePath(kv[1])
 
 		subpkgReader, err := NewReader(importPath)
-		subpkgReader.validation = validation
-
 		if err != nil {
 			return fmt.Errorf("importing %q: %w", importPath, err)
 		}
+		subpkgReader.validation = validation
 
 		pkgBundle, err := subpkgReader.Read()
 		if err != nil {

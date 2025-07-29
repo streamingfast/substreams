@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/streamingfast/substreams/tui2/components/search"
-	"github.com/streamingfast/substreams/tui2/pages/request"
+
 	"github.com/streamingfast/substreams/tui2/styles"
 
 	"github.com/dustin/go-humanize"
@@ -19,6 +19,7 @@ import (
 
 type BlockChangedMsg uint64
 type JumpToBlockMsg uint64
+type NewRequestInstanceMsg struct{}
 
 type BlockSelect struct {
 	common.Common
@@ -64,7 +65,7 @@ func (b *BlockSelect) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			b.blocksColored = make(map[uint64]bool)
 		}
 		b.blocksColored[uint64(msg)] = true
-	case request.NewRequestInstance:
+	case NewRequestInstanceMsg:
 		b.BlocksWithData = nil
 	}
 	return b, tea.Batch(cmds...)

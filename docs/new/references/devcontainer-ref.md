@@ -33,4 +33,4 @@ Run `substreams codegen sql` for SQL-based queries. For more information on conf
 ## Common Errors
 
 - When running locally, make sure to verify that all Docker containers are healthy by running the `dev-status` command. 
-- If you put the wrong start-block while generating your project, navigate to the `substreams.yaml` to change the block number, then re-run `substreams build`. 
+- If you input the wrong start-block while generating your project, navigate to the `substreams.yaml` to change the block number, then re-run `substreams build`. 

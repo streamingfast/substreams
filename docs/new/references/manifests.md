@@ -92,7 +92,7 @@ This field should be written in Markdown format.
 
 ### `imports`
 
-The `imports` section allow you to import third-party Substreams packages. It adds local references to modules in those packages, and pull in the WASM code, Protobuf and modules into the current Package.
+The `imports` section allows you to import third-party Substreams packages. It adds local references to modules in those packages, and pulls WASM code, Protobuf and modules into the current Package.
 
 Relying on imports rather than copying source code from third-party packages allows you to leverage server-side caches, and lower your costs.
 

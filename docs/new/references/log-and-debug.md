@@ -1,6 +1,6 @@
 # Logging, Debugging and Testing Reference
 
-In this reference, you will learn how to log arbitry inputs in your Substreams execution, and how to create unit tests for your modules.
+In this reference, you will learn how to log arbitrary inputs in your Substreams execution, and how to create unit tests for your modules.
 
 ## Using logs in Substreams
 
@@ -69,7 +69,7 @@ fn _filtered_events(query: String, mut events: Events) -> Result<Events, Error> 
 3. The `filtered_events` test is split into three parts:
     * **Given:** create the inputs of the function. In this case, we are reading a full Ethereum Block from a base-64-encoded file. Later in this doc, you will learn how to generate this file.
     * **When:** the actual execution of the function. The tests will filter all the events with `address=0x5acc84a3e955bdd76467d3348077d003f00ffb97` because we know this event is contained in the input Block.
-    * **Expect:** there are you assertions: the number of events returned must be greater than 0; all the events returned must have the `0x5acc84a3e955bdd76467d3348077d003f00ffb97` address.
+    * **Expect:** there are your assertions: the number of events returned must be greater than 0; all the events returned must have the `0x5acc84a3e955bdd76467d3348077d003f00ffb97` address.
 
 
 ```rust

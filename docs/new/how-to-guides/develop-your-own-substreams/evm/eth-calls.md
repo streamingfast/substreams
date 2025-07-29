@@ -59,7 +59,7 @@ Generating Protobuf Rust code
 2. Move to the project folder and build the Substreams.
 
 ```bash
-make build
+substreams build
 ```
 
 3. Then, verify that the Substreams runs correctly. By default, it will output all the events of the smart contract.
@@ -161,7 +161,7 @@ fn map_events(blk: eth::Block) -> Result<contract::Events, substreams::errors::E
 6. To see it in action, just re-build and re-run the Substreams:
 
 ```bash
-make build
+substreams build
 ```
 
 ```bash
@@ -345,7 +345,7 @@ fn get_calls() {
 5. Build and run the Substreams.
 
 ```bash
-make build
+substreams build
 ```
 
 ```bash

@@ -26,7 +26,7 @@ Stores declaring their own data types expose methods capable of mutating keys wi
 * Do not save keys in stores **unless they are going to be read by a downstream module**. Substreams stores are a way to aggregate data, but they are **not meant to be a storage layer**.
 * Do not save all transfers of a chain in a `store` module, rather, output them in a `map` and have a downstream system store them for querying.
 
-There are limitations impose on store usage. Specifically, each key/value entry must be smaller than 10MiB while a store cannot exceed 1GiB total. Keys being string, each character in the key account for 1 byte of storage space.
+There are limitations imposed on store usage. Specifically, each key/value entry must be smaller than 10MiB while a store cannot exceed 1GiB total. Keys being strings, each character in the key accounts for 1 byte of storage space.
 
 ### Important store properties
 

@@ -6,21 +6,15 @@ Let's run the Substreams first, and then go through the code.
 
 ### Running the Substreams
 
-Running a Substreams usually requires three steps: generating the Rust Protobufs, building the WASM container, and using the Substreams CLI to start the streaming. Make sure to run the following commands in the `substreams-explorer/ethereum-explorer` folder:
+Running a Substreams usually requires two steps: building the WASM container (which includes generating the Rust Protobufs), and using the Substreams CLI to start the streaming. Make sure to run the following commands in the `substreams-explorer/ethereum-explorer` folder:
 
-1. **Generate the Protobuf objects:** The `.proto` files define a data model regardless of any programming language. However, in order to use this model in your Rust application, you must generate the corresponding Rust data structures. Note that running `make protogen` is only necessary when making updates to any file in the proto folder.
-
-```bash
-make protogen
-```
-
-2. **Build the WASM module:** The following command generates a WASM container from the Rust application, which you can find at `/target/wasm32-unknown-unknown/release/substreams.wasm`. Note that this is the same path provided in the Substreams manifest (`substreams.yml`).
+1. **Build the WASM module:** The following command generates the Protobuf objects and builds a WASM container from the Rust application, which you can find at `/target/wasm32-unknown-unknown/release/substreams.wasm`. Note that this is the same path provided in the Substreams manifest (`substreams.yml`).
 
 ```bash
-make build
+substreams build
 ```
 
-3. **Streaming data through the CLI:** The following command streams the Ethereum blockchain data, and applies the transformations contained in the `map_block_meta` module to every block.
+2. **Streaming data through the CLI:** The following command streams the Ethereum blockchain data, and applies the transformations contained in the `map_block_meta` module to every block.
 
 ```bash
 $ substreams run -e mainnet.eth.streamingfast.io:443 substreams.yaml map_block_meta --start-block 17712040 --stop-block +1

@@ -38,6 +38,13 @@ func skipFromIndex(index *index.BlockIndex, execOutput execout.ExecutionOutputGe
 
 }
 
+// RunModule returns:
+//   - moduleOutput:     the structured data
+//   - outputBytes:      the marshalled version of moduleOutput
+//   - outputBytesFiles: the marshalled bytes to be sent to a file,
+//   - skipped:          an indication that execution was not performed (skipped from index or skipped because it has no input)
+//     (cached data does not count as skipped, but marks the moduleOuput as 'Cached')
+//   - error:            an error
 func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.ExecutionOutputGetter) (*pbssinternal.ModuleOutput, []byte, []byte, bool, error) {
 	logger := reqctx.Logger(ctx)
 	modName := executor.Name()
@@ -91,12 +98,10 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 	}
 
 	uid := reqctx.ReqStats(ctx).RecordModuleWasmBlockBegin(modName)
-	var skippedOutput bool
 
 	outputBytes, outputForFiles, moduleOutput, err := executor.run(ctx, execOutput)
 	switch {
 	case errors.Is(err, ErrSkippedOutput):
-		skippedOutput = true
 	case errors.Is(err, ErrNoInput):
 		return nil, nil, nil, true, nil
 	case err != nil:
@@ -107,7 +112,7 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 
 	fillModuleOutputMetadata(executor, moduleOutput)
 
-	return moduleOutput, outputBytes, outputForFiles, skippedOutput, nil
+	return moduleOutput, outputBytes, outputForFiles, false, nil
 }
 
 func getCachedOutput(execOutput execout.ExecutionOutputGetter, executor ModuleExecutor) (bool, []byte, error) {

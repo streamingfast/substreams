@@ -6,7 +6,7 @@ description: StreamingFast Substreams frequently asked questions
 
 ## **Substreams FAQ overview**
 
-You can find answers to common Substreams questions in the FAQ documentation. If the answer you're looking for is not included [contact the StreamingFast team](https://discord.gg/mYPcRAzeVN) through Discord to get help.
+You can find answers to common Substreams questions in the FAQ documentation. If the answer you're looking for is not included, [contact the StreamingFast team](https://discord.gg/mYPcRAzeVN) through Discord to get help.
 
 ### **What is Substreams?**
 
@@ -38,7 +38,7 @@ Authentication tokens are required to use Substreams and connect to the public F
 
 ### **My Substreams authentication token isn’t working, what do I do?**
 
-The StreamingFast team is [available on Discord to resolve problems](https://discord.gg/jZwqxJAvRs) related to obtaining or by using authentication tokens.
+The StreamingFast team is [available on Discord to resolve problems](https://discord.gg/jZwqxJAvRs) related to obtaining or using authentication tokens.
 
 The Substreams documentation also [provides general instructions surrounding authentication](https://substreams.streamingfast.io/reference-and-specs/authentication) tokens.
 

@@ -69,7 +69,7 @@ modules:
 1. Build the Rust code:
 
 ```bash
-make build
+substreams build
 ```
 
 1. Run the Substreams using the `substreams run` command of the CLI: 

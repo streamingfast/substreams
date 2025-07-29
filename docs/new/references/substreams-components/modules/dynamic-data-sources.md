@@ -4,13 +4,13 @@ description: Dynamic data sources and Substreams
 
 # Dynamic data sources and Substreams
 
-Using Factory contract is a quite common pattern used by dApps when the main smart contract deploys and manages multiple identical associated contracts, i.e. one smart contract for each Uniswap or Curve swap pool.
+Using Factory contract is a quite common pattern used by dApps, when the main smart contract deploys and manages multiple identical associated contracts, i.e. one smart contract for each Uniswap or Curve swap pool.
 
 When developing traditional subgraphs, you could use [data source templates](https://thegraph.com/docs/en/developing/creating-a-subgraph/#data-source-templates) approach to keep track of such dynamically deployed smart contracts.
 
 Here's how you can achieve that with Substreams.
 
-We'll be using Uniswap V3 example where the Factory creates and deploys its smart contract for each pool.
+We'll be using a Uniswap V3 example where the Factory creates and deploys its smart contract for each pool.
 
 You start with a simple map module that emits all pool creation events:
 ```yaml
@@ -98,7 +98,7 @@ pub fn map_events(block: Block, pools_store: StoreGetProto<Pool>) -> Result<Even
 
 Here we use `pools_store.get_last()` method to get the pool from the store by its smart contract address. Once we have it, we can use that information to analyze the swap transaction and emit the events.
 
-Alternatively, we could make RPC calls to get the pool details from an RPC node but that would be extremely inefficient considering that we would need to make RPC calls for millions of such events. Using a store will be much faster.
+Alternatively, we could make RPC calls to get the pool details from an RPC node, but that would be extremely inefficient considering that we would need to make RPC calls for millions of such events. Using a store will be much faster.
 
 For a real-life application of this pattern see [Uniswap V3 Substreams](https://github.com/streamingfast/substreams-uniswap-v3)
 

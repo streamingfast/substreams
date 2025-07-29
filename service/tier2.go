@@ -723,7 +723,7 @@ func toGRPCError(ctx context.Context, err error) error {
 		return status.Error(codes.DeadlineExceeded, err.Error())
 	}
 	if errors.Is(err, wasm.ErrWasmDeterministicExec) || errors.Is(err, store.ErrStoreAboveMaxSize) {
-		return status.Error(codes.InvalidArgument, err.Error())
+		return status.Error(codes.InvalidArgument, fmt.Sprintf("%s (deterministic error)", err.Error()))
 	}
 
 	var errInvalidArg *stream.ErrInvalidArg
@@ -856,6 +856,8 @@ func GetExecutionPlan(
 				}
 			}
 
+		default:
+			return nil, fmt.Errorf("invalid module type: %s", name)
 		}
 
 	}
@@ -884,11 +886,11 @@ func GetExecutionPlan(
 			writerStartBlock = module.InitialBlock
 		}
 
-		if module.ModuleKind() == pbsubstreams.ModuleKindBlockIndex {
+		switch module.ModuleKind() {
+		case pbsubstreams.ModuleKindBlockIndex:
 			file := indexConfigs.ConfigMap[name].NewFile(&block.Range{StartBlock: writerStartBlock, ExclusiveEndBlock: stopBlock})
 			indexWriters[name] = index.NewWriter(file)
-		} else {
-			// stores and execouts
+		case pbsubstreams.ModuleKindStore, pbsubstreams.ModuleKindMap:
 			execoutWriters[name] = execout.NewWriter(
 				ctx,
 				writerStartBlock,
@@ -896,6 +898,8 @@ func GetExecutionPlan(
 				name,
 				execoutConfigs,
 			)
+		default:
+			return nil, fmt.Errorf("invalid module type: %s", name)
 		}
 
 	}

@@ -1034,7 +1034,7 @@ func toConnectError(ctx context.Context, err error) error {
 	}
 
 	if errors.Is(err, wasm.ErrWasmDeterministicExec) || errors.Is(err, store.ErrStoreAboveMaxSize) {
-		return connect.NewError(connect.CodeInvalidArgument, err)
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("%w (deterministic error)", err))
 	}
 
 	var errInvalidArg *bsstream.ErrInvalidArg

@@ -82,6 +82,7 @@
   * [Manifests Reference](new/references/substreams-components/manifests.md)
 * [Substreams Architecture](new/references/architecture.md)
 * [Substreams:SQL](new/references/sql/README.md)
+  * [Sink Config](new/references/sql/sink-config.md)
   * [Reorg Handling](new/references/sql/reorg-handling.md)
 * [Indexer Reference](new/references/indexer-reference/indexer-reference.md)
   * [Test Substreams Locally](new/references/indexer-reference/test-locally.md)

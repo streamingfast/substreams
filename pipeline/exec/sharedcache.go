@@ -157,9 +157,9 @@ func (s *SharedCache) Execute(
 		})
 
 		if undoManager != nil {
-			var cancel func()
-			ctx, cancel = undoManager.Subscribe(ctx, clock.id)
-			defer cancel()
+			var unsubscribe func()
+			ctx, unsubscribe = undoManager.Subscribe(ctx, clock.id)
+			defer unsubscribe()
 		}
 
 		inst, err := wasmModule.ExecuteNewCall(ctx, call, nil, wasmArguments, argValues)

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"math"
 	"sync"
-	"time"
 
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
@@ -17,12 +16,6 @@ var GlobalUndoManager *UndoManager
 var ErrBlockUndo = errors.New("block undone")
 var MaxUndoneBlocksSize = 100
 
-var globalIDCounter atomic.Uint64
-
-func nextUniqueID() uint64 {
-	return globalIDCounter.Add(1)
-}
-
 type watcher struct {
 	cancel context.CancelCauseFunc
 	id     uint64
@@ -33,12 +26,14 @@ type UndoManager struct {
 	sync.Mutex
 	activeSubscriptions  map[string][]watcher
 	previousUndoneBlocks map[string]uint64
+	idCounter            atomic.Uint64
 }
 
-func NewUndoManager(cancelDelay time.Duration) *UndoManager {
+func NewUndoManager() *UndoManager {
 	return &UndoManager{
 		activeSubscriptions:  make(map[string][]watcher),
 		previousUndoneBlocks: make(map[string]uint64),
+		idCounter:            atomic.Uint64{},
 	}
 }
 
@@ -99,7 +94,7 @@ func (u *UndoManager) Subscribe(ctx context.Context, blockID string) (context.Co
 	ctx, cancel := context.WithCancelCause(ctx)
 	watcher := watcher{
 		cancel: cancel,
-		id:     nextUniqueID(),
+		id:     u.idCounter.Add(1),
 	}
 	if tracer.Enabled() {
 		zlog.Debug("undo manager subscribed block", zap.String("block_id", blockID), zap.Uint64("watcher_id", watcher.id))
@@ -130,6 +125,9 @@ func (u *UndoManager) unsubscribe(blockID string, watcherID uint64) {
 			u.activeSubscriptions[blockID] = append(u.activeSubscriptions[blockID][:i], u.activeSubscriptions[blockID][i+1:]...)
 			break
 		}
+	}
+	if len(u.activeSubscriptions[blockID]) == 0 {
+		delete(u.activeSubscriptions, blockID)
 	}
 	u.Unlock()
 }

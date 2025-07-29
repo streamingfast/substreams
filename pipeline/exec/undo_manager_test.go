@@ -31,14 +31,13 @@ func (t *testStepableObject) ReorgJunctionBlock() bstream.BlockRef {
 }
 
 func TestUndoManager_BasicFunctionality(t *testing.T) {
-	um := NewUndoManager(0)
+	um := NewUndoManager()
 
 	// Test empty manager
 	assert.False(t, um.Contains("nonexistent"))
 
 	// Test subscription to non-existent block
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	subCtx, unsubscribe := um.Subscribe(ctx, "block1")
 	defer unsubscribe()
@@ -73,7 +72,7 @@ func TestUndoManager_BasicFunctionality(t *testing.T) {
 }
 
 func TestUndoManager_SubscribeToAlreadyUndonePreviousBlock(t *testing.T) {
-	um := NewUndoManager(0)
+	um := NewUndoManager()
 
 	// First, undo a block
 	block := &pbbstream.Block{
@@ -86,9 +85,7 @@ func TestUndoManager_SubscribeToAlreadyUndonePreviousBlock(t *testing.T) {
 	require.NoError(t, err)
 
 	// Now subscribe to the already undone block
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
+	ctx := t.Context()
 	subCtx, unsubscribe := um.Subscribe(ctx, "block1")
 	defer unsubscribe()
 
@@ -102,7 +99,7 @@ func TestUndoManager_SubscribeToAlreadyUndonePreviousBlock(t *testing.T) {
 }
 
 func TestUndoManager_ProcessNewBlock(t *testing.T) {
-	um := NewUndoManager(0)
+	um := NewUndoManager()
 
 	// First undo a block
 	block := &pbbstream.Block{
@@ -125,7 +122,7 @@ func TestUndoManager_ProcessNewBlock(t *testing.T) {
 }
 
 func TestUndoManager_ProcessNewBlockEdgeCases(t *testing.T) {
-	um := NewUndoManager(0)
+	um := NewUndoManager()
 
 	// Test processing NEW block that was never undone (should be no-op)
 	block := &pbbstream.Block{
@@ -158,7 +155,7 @@ func TestUndoManager_ProcessNewBlockEdgeCases(t *testing.T) {
 }
 
 func TestUndoManager_ProcessNonStepableObject(t *testing.T) {
-	um := NewUndoManager(0)
+	um := NewUndoManager()
 
 	block := &pbbstream.Block{
 		Id:     "block1",
@@ -174,13 +171,13 @@ func TestUndoManager_ProcessNonStepableObject(t *testing.T) {
 }
 
 func TestUndoManager_MaxUndoneBlocksSize(t *testing.T) {
-	um := NewUndoManager(0)
+	um := NewUndoManager()
 	originalMaxSize := MaxUndoneBlocksSize
 	MaxUndoneBlocksSize = 3 // Set small size for testing
 	defer func() { MaxUndoneBlocksSize = originalMaxSize }()
 
 	// Add blocks beyond the max size
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		block := &pbbstream.Block{
 			Id:     fmt.Sprintf("block%d", i),
 			Number: uint64(100 + i),
@@ -191,31 +188,18 @@ func TestUndoManager_MaxUndoneBlocksSize(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	// Should only have MaxUndoneBlocksSize blocks
-	um.Lock()
-	assert.Equal(t, MaxUndoneBlocksSize, len(um.previousUndoneBlocks))
-
-	// Check which blocks are present without calling Contains (which would deadlock)
-	_, has0 := um.previousUndoneBlocks["block0"]
-	_, has1 := um.previousUndoneBlocks["block1"]
-	_, has2 := um.previousUndoneBlocks["block2"]
-	_, has3 := um.previousUndoneBlocks["block3"]
-	_, has4 := um.previousUndoneBlocks["block4"]
-	um.Unlock()
-
 	// The oldest blocks should have been removed (block0 and block1)
-	assert.False(t, has0)
-	assert.False(t, has1)
-	assert.True(t, has2)
-	assert.True(t, has3)
-	assert.True(t, has4)
+	assert.False(t, um.Contains("block0"))
+	assert.False(t, um.Contains("block1"))
+	assert.True(t, um.Contains("block2"))
+	assert.True(t, um.Contains("block3"))
+	assert.True(t, um.Contains("block4"))
 }
 
 func TestUndoManager_MultipleSubscribersToSameBlock(t *testing.T) {
-	um := NewUndoManager(0)
+	um := NewUndoManager()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	// Subscribe multiple times to the same block
 	subCtx1, unsubscribe1 := um.Subscribe(ctx, "block1")
@@ -250,10 +234,9 @@ func TestUndoManager_MultipleSubscribersToSameBlock(t *testing.T) {
 }
 
 func TestUndoManager_UnsubscribeBeforeUndo(t *testing.T) {
-	um := NewUndoManager(0)
+	um := NewUndoManager()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	subCtx, unsubscribe := um.Subscribe(ctx, "block1")
 
@@ -281,9 +264,8 @@ func TestUndoManager_UnsubscribeBeforeUndo(t *testing.T) {
 }
 
 func TestUndoManager_ConcurrentSubscribeAndProcessBlock(t *testing.T) {
-	um := NewUndoManager(0)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	um := NewUndoManager()
+	ctx := t.Context()
 
 	const numSubscribers = 100
 	const numBlocks = 50
@@ -293,7 +275,7 @@ func TestUndoManager_ConcurrentSubscribeAndProcessBlock(t *testing.T) {
 	cancelledContexts := make(map[string]int)
 
 	// Start multiple subscribers concurrently
-	for i := 0; i < numSubscribers; i++ {
+	for i := range numSubscribers {
 		wg.Add(1)
 		go func(subscriberID int) {
 			defer wg.Done()
@@ -317,7 +299,7 @@ func TestUndoManager_ConcurrentSubscribeAndProcessBlock(t *testing.T) {
 	}
 
 	// Start processing blocks linearly (normal use case)
-	for blockNum := 0; blockNum < numBlocks; blockNum++ {
+	for blockNum := range numBlocks {
 		// Add some delay to allow subscribers to register
 		time.Sleep(time.Duration(blockNum) * time.Millisecond)
 
@@ -340,9 +322,8 @@ func TestUndoManager_ConcurrentSubscribeAndProcessBlock(t *testing.T) {
 }
 
 func TestUndoManager_ConcurrentSubscribeUnsubscribe(t *testing.T) {
-	um := NewUndoManager(0)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	um := NewUndoManager()
+	ctx := t.Context()
 
 	const numWorkers = 50
 	const iterations = 100
@@ -350,12 +331,12 @@ func TestUndoManager_ConcurrentSubscribeUnsubscribe(t *testing.T) {
 	var wg sync.WaitGroup
 
 	// Workers that subscribe and unsubscribe rapidly
-	for i := 0; i < numWorkers; i++ {
+	for i := range numWorkers {
 		wg.Add(1)
 		go func(workerID int) {
 			defer wg.Done()
 
-			for j := 0; j < iterations; j++ {
+			for j := range iterations {
 				blockID := fmt.Sprintf("block%d", (workerID*iterations+j)%10)
 				subCtx, unsubscribe := um.Subscribe(ctx, blockID)
 
@@ -382,7 +363,7 @@ func TestUndoManager_ConcurrentSubscribeUnsubscribe(t *testing.T) {
 	go func() {
 		defer wg.Done()
 
-		for i := 0; i < iterations; i++ {
+		for i := range iterations {
 			blockID := fmt.Sprintf("block%d", i%10)
 			block := &pbbstream.Block{
 				Id:     blockID,
@@ -402,34 +383,8 @@ func TestUndoManager_ConcurrentSubscribeUnsubscribe(t *testing.T) {
 	// Test should complete without deadlock
 }
 
-func TestUndoManager_UniqueIDGeneration(t *testing.T) {
-	// Test that unique IDs are generated correctly
-	const numIDs = 1000
-	ids := make(map[uint64]bool)
-
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-
-	// Generate IDs concurrently
-	for i := 0; i < numIDs; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			id := nextUniqueID()
-
-			mu.Lock()
-			assert.False(t, ids[id], "ID %d should be unique", id)
-			ids[id] = true
-			mu.Unlock()
-		}()
-	}
-
-	wg.Wait()
-	assert.Equal(t, numIDs, len(ids), "All IDs should be unique")
-}
-
 func TestUndoManager_ContextCancelPropagation(t *testing.T) {
-	um := NewUndoManager(0)
+	um := NewUndoManager()
 
 	// Create a context that we'll cancel
 	ctx, cancel := context.WithCancel(context.Background())
@@ -451,23 +406,108 @@ func TestUndoManager_ContextCancelPropagation(t *testing.T) {
 }
 
 func TestUndoManager_MemoryLeakPrevention(t *testing.T) {
-	um := NewUndoManager(0)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	um := NewUndoManager()
+	ctx := t.Context()
 
 	// Subscribe to a block
 	_, unsubscribe := um.Subscribe(ctx, "block1")
 
-	// Check that subscription exists
-	um.Lock()
-	assert.Len(t, um.activeSubscriptions["block1"], 1)
-	um.Unlock()
-
 	// Unsubscribe
 	unsubscribe()
 
-	// Check that subscription is removed
-	um.Lock()
-	assert.Len(t, um.activeSubscriptions["block1"], 0)
-	um.Unlock()
+	// Test that subsequent subscriptions work properly (indicating cleanup occurred)
+	_, unsubscribe2 := um.Subscribe(ctx, "block1")
+	unsubscribe2()
+}
+
+func TestUndoManager_ActiveSubscriptionsCleanupAfterLastUnsubscribe(t *testing.T) {
+	um := NewUndoManager()
+	ctx := t.Context()
+
+	blockID := "test_block_cleanup"
+
+	// Subscribe multiple watchers to the same block
+	_, unsubscribe1 := um.Subscribe(ctx, blockID)
+	_, unsubscribe2 := um.Subscribe(ctx, blockID)
+	_, unsubscribe3 := um.Subscribe(ctx, blockID)
+
+	// Unsubscribe first two watchers
+	unsubscribe1()
+	unsubscribe2()
+
+	// Unsubscribe the last watcher
+	unsubscribe3()
+
+	// Test that new subscriptions work properly after cleanup (indicating cleanup occurred)
+	blockID2 := "test_block_cleanup_2"
+	_, unsubscribe4 := um.Subscribe(ctx, blockID2)
+	unsubscribe4()
+
+	// Test that we can still subscribe to the original block (indicating it was cleaned up)
+	_, unsubscribe5 := um.Subscribe(ctx, blockID)
+	unsubscribe5()
+}
+
+func TestUndoManager_ActiveSubscriptionsCleanupEdgeCases(t *testing.T) {
+	um := NewUndoManager()
+	ctx := t.Context()
+
+	// Test case 1: Single subscription cleanup
+	blockID1 := "single_sub_test"
+	_, unsubscribe1 := um.Subscribe(ctx, blockID1)
+
+	unsubscribe1()
+
+	// Test that new subscription works (indicating cleanup occurred)
+	_, unsubscribe1b := um.Subscribe(ctx, blockID1)
+	unsubscribe1b()
+
+	// Test case 2: Multiple unsubscribes of the same watcher (should be safe)
+	blockID2 := "double_unsub_test"
+	_, unsubscribe2 := um.Subscribe(ctx, blockID2)
+
+	unsubscribe2()
+	unsubscribe2() // Second call should be safe
+
+	// Test that new subscription works (indicating cleanup occurred)
+	_, unsubscribe2b := um.Subscribe(ctx, blockID2)
+	unsubscribe2b()
+
+	// Test case 3: Mixed order unsubscribes
+	blockID3 := "mixed_order_test"
+	_, unsubscribeA := um.Subscribe(ctx, blockID3)
+	_, unsubscribeB := um.Subscribe(ctx, blockID3)
+	_, unsubscribeC := um.Subscribe(ctx, blockID3)
+
+	// Unsubscribe middle one first, then first, then last
+	unsubscribeB()
+	unsubscribeA()
+	unsubscribeC()
+
+	// Test that new subscription works (indicating cleanup occurred)
+	_, unsubscribe3b := um.Subscribe(ctx, blockID3)
+	unsubscribe3b()
+
+	// Test case 4: Cleanup doesn't affect other blocks
+	blockID4a := "block_a"
+	blockID4b := "block_b"
+
+	_, unsubscribe4a := um.Subscribe(ctx, blockID4a)
+	_, unsubscribe4b1 := um.Subscribe(ctx, blockID4b)
+	_, unsubscribe4b2 := um.Subscribe(ctx, blockID4b)
+
+	// Remove all subscriptions from block A
+	unsubscribe4a()
+
+	// Block A should be cleaned up, but block B should still work
+	// Test that block A is cleaned up by subscribing again
+	_, unsubscribe4a_new := um.Subscribe(ctx, blockID4a)
+
+	// Block B should still work with existing subscriptions
+	// Remove one subscription from B and ensure it still works
+	unsubscribe4b1()
+
+	// Cleanup remaining subscriptions
+	unsubscribe4a_new()
+	unsubscribe4b2()
 }

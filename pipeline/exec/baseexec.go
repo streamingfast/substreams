@@ -126,10 +126,10 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canS
 		err = sharedCache.Execute(ctx, e.wasmModule, e.moduleHash, call, e.wasmArguments, argValues, undoManager)
 	} else {
 		if undoManager != nil {
-			var cancel func()
+			var unsubscribe func()
 			// note: a canceled context only has an effect inside 'external calls', not within the wasm module executor itself, so the cancelation does not affect all connected streams
-			ctx, cancel = undoManager.Subscribe(ctx, clock.Id)
-			defer cancel()
+			ctx, unsubscribe = undoManager.Subscribe(ctx, clock.Id)
+			defer unsubscribe()
 		}
 		inst, err = e.wasmModule.ExecuteNewCall(ctx, call, e.cachedInstance, e.wasmArguments, argValues)
 		metrics.ExecutedWasmModules.Inc()

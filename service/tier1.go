@@ -90,7 +90,7 @@ func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
 	ctx := context.Background()
 	stream, err := sf.New(
 		ctx,
-		bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
+		bstream.HandlerFunc(func(blk *pbbstream.Block, obj any) error {
 			out = blk.Payload.TypeUrl
 			return io.EOF
 		}),
@@ -235,7 +235,7 @@ func NewTier1(
 		}
 
 		<-hub.Ready
-		undoManager := exec.NewUndoManager(time.Second * 5)
+		undoManager := exec.NewUndoManager()
 		hubSrc := hub.SourceFromBlockNum(hub.HeadNum(), undoManager)
 		if hubSrc == nil {
 			zlog.Error("undoManager: cannot get blocks source from hub")

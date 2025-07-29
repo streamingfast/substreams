@@ -167,9 +167,9 @@ func (s *Sinker) ApiToken() string {
 }
 
 func (s *Sinker) PrintStats() {
-	fmt.Fprintf(os.Stderr, "📊 Total Processed Bytes: %s\n", humanize.Bytes(uint64(ProgressMessageProcessedBytes.Get())))
+	fmt.Fprintf(os.Stderr, "📊 Total Processed Bytes: %s\n", humanize.IBytes(uint64(ProgressMessageProcessedBytes.Get())))
 	fmt.Fprintf(os.Stderr, "🧮 Total Processed Blocks: %s\n", humanize.Comma(int64(ProgressMessageTotalProcessedBlocks.Get())))
-	fmt.Fprintf(os.Stderr, "📤 Total Egress Bytes (uncompressed ): %s\n", humanize.Bytes(uint64(uint64(DataMessageSizeBytes.Get()))))
+	fmt.Fprintf(os.Stderr, "📤 Total Egress Bytes (uncompressed): %s\n", humanize.IBytes(uint64(uint64(DataMessageSizeBytes.Get()))))
 	fmt.Fprintln(os.Stderr, "")
 }
 

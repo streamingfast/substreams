@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
+	"github.com/dustin/go-humanize"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dgrpc"
@@ -166,10 +167,10 @@ func (s *Sinker) ApiToken() string {
 }
 
 func (s *Sinker) PrintStats() {
-	fmt.Fprintf(os.Stderr, "\nTotal Processed Bytes: %d\n", uint64(ProgressMessageProcessedBytes.Get()))
-	fmt.Fprintf(os.Stderr, "Total Processed Blocks: %d\n", uint64(ProgressMessageTotalProcessedBlocks.Get()))
-	fmt.Fprintf(os.Stderr, "Total Received Bytes (uncompressed gress): %d\n", uint64(DataMessageSizeBytes.Get()))
-	fmt.Fprintln(os.Stderr, "all done")
+	fmt.Fprintf(os.Stderr, "📊 Total Processed Bytes: %s\n", humanize.Bytes(uint64(ProgressMessageProcessedBytes.Get())))
+	fmt.Fprintf(os.Stderr, "🧮 Total Processed Blocks: %s\n", humanize.Comma(int64(ProgressMessageTotalProcessedBlocks.Get())))
+	fmt.Fprintf(os.Stderr, "📤 Total Egress Bytes (uncompressed ): %s\n", humanize.Bytes(uint64(uint64(DataMessageSizeBytes.Get()))))
+	fmt.Fprintln(os.Stderr, "")
 }
 
 func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler) {

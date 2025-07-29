@@ -155,31 +155,32 @@ func TestReader_Read(t *testing.T) {
 			require.NoError,
 			false,
 		},
-		//{
-		//	"imports_http_url.yaml",
-		//	args{
-		//		env: map[string]string{
-		//			"SERVER_HOST": strings.Replace(remoteServer.URL, "http://", "", 1),
-		//		},
-		//	},
-		//	&pbsubstreams.Package{
-		//		Version:    1,
-		//		ProtoFiles: readSystemProtoDescriptors(t),
-		//		Modules:    &pbsubstreams.Modules{},
-		//		PackageMeta: []*pbsubstreams.PackageMetadata{
-		//			{
-		//				Name:    "test",
-		//				Version: "v0.0.0",
-		//			},
-		//			{
-		//				Name:    "spkg1",
-		//				Version: "v0.0.0",
-		//			},
-		//		},
-		//	},
-		//	require.NoError,
-		//	require.NoError,
-		//},
+		{
+			"imports_http_url.yaml",
+			args{
+				env: map[string]string{
+					"SERVER_HOST": strings.Replace(remoteServer.URL, "http://", "", 1),
+				},
+			},
+			&pbsubstreams.Package{
+				Version:    1,
+				ProtoFiles: readSystemProtoDescriptors(t),
+				Modules:    &pbsubstreams.Modules{},
+				PackageMeta: []*pbsubstreams.PackageMetadata{
+					{
+						Name:    "test",
+						Version: "v0.0.0",
+					},
+					{
+						Name:    "spkg1",
+						Version: "v0.0.0",
+					},
+				},
+			},
+			require.NoError,
+			require.NoError,
+			true,
+		},
 		{
 			"imports_expand_env_variables.yaml",
 			args{
@@ -210,6 +211,64 @@ func TestReader_Read(t *testing.T) {
 			require.NoError,
 			require.NoError,
 			false,
+		},
+		{
+			"imports_registry_notation.yaml",
+			args{
+				env: map[string]string{
+					"SUBSTREAMS_REGISTRY": remoteServer.URL,
+				},
+			},
+			&pbsubstreams.Package{
+				Version:    1,
+				ProtoFiles: readSystemProtoDescriptors(t),
+				Modules:    &pbsubstreams.Modules{},
+				PackageMeta: []*pbsubstreams.PackageMetadata{
+					{Name: "test", Version: "v0.0.0"},
+					{Name: "spkg1", Version: "v0.0.0"},
+				},
+			},
+			require.NoError,
+			require.NoError,
+			true,
+		},
+		{
+			"imports_too_many_at.yaml",
+			args{
+				env: map[string]string{"SUBSTREAMS_REGISTRY": remoteServer.URL},
+			},
+			nil,
+			require.NoError,
+			require.Error,
+			false,
+		},
+		{
+			"imports_invalid_semver.yaml",
+			args{
+				env: map[string]string{"SUBSTREAMS_REGISTRY": remoteServer.URL},
+			},
+			nil,
+			require.NoError,
+			require.Error,
+			false,
+		},
+		{
+			"imports_latest.yaml",
+			args{
+				env: map[string]string{"SUBSTREAMS_REGISTRY": remoteServer.URL},
+			},
+			&pbsubstreams.Package{
+				Version:    1,
+				ProtoFiles: readSystemProtoDescriptors(t),
+				Modules:    &pbsubstreams.Modules{},
+				PackageMeta: []*pbsubstreams.PackageMetadata{
+					{Name: "test", Version: "v0.0.0"},
+					{Name: "spkg1", Version: "v0.0.0"},
+				},
+			},
+			require.NoError,
+			require.NoError,
+			true,
 		},
 		{
 			"protobuf_files_relative_path.yaml",

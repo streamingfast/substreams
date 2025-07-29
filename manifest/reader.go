@@ -415,6 +415,7 @@ func (r *Reader) readStdin() error {
 }
 
 func (r *Reader) resolveInputPath() error {
+
 	input := r.originalInput
 
 	// Handle stdin input
@@ -428,15 +429,8 @@ func (r *Reader) resolveInputPath() error {
 		return nil
 	}
 
-	pkgName, version, err := r.ParseStandardPackageAndVersion(input)
-	if err == nil {
-		registryURL := r.registryURL
-		if registryURL == "" {
-			// This is an extreme fallback, because this should be
-			// set by the WithRegistryURL option.
-			registryURL = "https://spkg.io"
-		}
-		r.currentInput = fmt.Sprintf("%s/v1/packages/%s/%s", registryURL, pkgName, version)
+	if pkgName, version, err := r.ParseStandardPackageAndVersion(input); err == nil {
+		r.currentInput = fmt.Sprintf("%s/v1/packages/%s/%s", r.registryBaseURL(), pkgName, version)
 		return nil
 	}
 
@@ -458,6 +452,18 @@ func (r *Reader) resolveInputPath() error {
 	r.currentInput = input
 
 	return nil
+}
+
+func (r *Reader) registryBaseURL() string {
+	if r.registryURL != "" {
+		return r.registryURL
+	}
+	if env := os.Getenv("SUBSTREAMS_REGISTRY"); env != "" {
+		return env
+	}
+	// This is an extreme fallback, because this should be
+	// set by the WithRegistryURL option.
+	return "https://spkg.io"
 }
 
 func (r *Reader) getPkg() (*pbsubstreams.Package, *Manifest, error) {
@@ -964,11 +970,10 @@ func loadImports(pkg *pbsubstreams.Package, manif *Manifest, validation ReaderVa
 		importPath := manif.resolvePath(kv[1])
 
 		subpkgReader, err := NewReader(importPath)
-		subpkgReader.validation = validation
-
 		if err != nil {
 			return fmt.Errorf("importing %q: %w", importPath, err)
 		}
+		subpkgReader.validation = validation
 
 		pkgBundle, err := subpkgReader.Read()
 		if err != nil {

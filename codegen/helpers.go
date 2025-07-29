@@ -103,7 +103,7 @@ func buildGenerateCommandFromArgs(manifestPath string, outputType OutputType, wi
 			continue
 		}
 
-		if module.ModuleKind() == pbsubstreams.ModuleKindBlockIndex || module.ModuleKind() == pbsubstreams.ModuleKindStore || module.Output == nil {
+		if module.ModuleKind() != pbsubstreams.ModuleKindMap || module.Output == nil {
 			continue
 		}
 

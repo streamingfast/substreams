@@ -868,7 +868,11 @@ func ValidateModules(mods *pbsubstreams.Modules) error {
 			return fmt.Errorf("module %q: duplicate module name", mod.Name)
 		}
 		mapModules[mod.Name] = mod
-		mapModuleKind[mod.Name] = mod.ModuleKind()
+		modKind := mod.ModuleKind()
+		if modKind == pbsubstreams.ModuleKindInvalid {
+			return fmt.Errorf("module %q: invalid module kind", mod.Name)
+		}
+		mapModuleKind[mod.Name] = modKind
 	}
 
 	for _, mod := range mods.Modules {

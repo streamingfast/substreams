@@ -52,6 +52,7 @@ func (u *UndoManager) ProcessBlock(blk *pbbstream.Block, obj any) error {
 	case step.Matches(bstream.StepNew):
 		if u.Contains(blk.Id) {
 			zlog.Warn("received 'NEW' block on a block that was previously state 'UNDO'. This may have disconnected some users for no good reason", zap.String("block_id", blk.Id), zap.Uint64("block_number", blk.Number))
+			delete(u.previousUndoneBlocks, blk.Id)
 		}
 	case step.Matches(bstream.StepUndo):
 		if tracer.Enabled() {

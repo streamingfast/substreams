@@ -120,8 +120,41 @@ func TestUndoManager_ProcessNewBlock(t *testing.T) {
 	err = um.ProcessBlock(block, stepableObj)
 	require.NoError(t, err)
 
-	// Block should still be in undone blocks
+	// Block should be removed from previousUndoneBlocks (line 55 functionality)
+	assert.False(t, um.Contains("block1"))
+}
+
+func TestUndoManager_ProcessNewBlockEdgeCases(t *testing.T) {
+	um := NewUndoManager(0)
+
+	// Test processing NEW block that was never undone (should be no-op)
+	block := &pbbstream.Block{
+		Id:     "block1",
+		Number: 100,
+	}
+	stepableObj := &testStepableObject{step: bstream.StepNew}
+
+	err := um.ProcessBlock(block, stepableObj)
+	require.NoError(t, err)
+	assert.False(t, um.Contains("block1"))
+
+	// Test multiple NEW blocks for the same previously undone block
+	// First undo the block
+	stepableObj = &testStepableObject{step: bstream.StepUndo}
+	err = um.ProcessBlock(block, stepableObj)
+	require.NoError(t, err)
 	assert.True(t, um.Contains("block1"))
+
+	// Process NEW twice - first should remove, second should be no-op
+	stepableObj = &testStepableObject{step: bstream.StepNew}
+	err = um.ProcessBlock(block, stepableObj)
+	require.NoError(t, err)
+	assert.False(t, um.Contains("block1"))
+
+	// Second NEW should be no-op (no panic/error)
+	err = um.ProcessBlock(block, stepableObj)
+	require.NoError(t, err)
+	assert.False(t, um.Contains("block1"))
 }
 
 func TestUndoManager_ProcessNonStepableObject(t *testing.T) {

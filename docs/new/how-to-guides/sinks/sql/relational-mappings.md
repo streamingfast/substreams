@@ -65,7 +65,7 @@ postgres://<user>:<password>@<host>:<port>/<database>?<options>
 clickhouse://<user>:<password>@<host>:9000/<database>?<options>
 
 # Encrypted (ClickHouse Cloud)
-clickhouse://<user>:<password>@<host>:9440/<database>?secure=true&skip_verify=true&<options>
+clickhouse://<user>:<password>@<host>:9440/<database>?secure=true&<options>
 ```
 
 {% hint style="info" %}
@@ -209,12 +209,6 @@ export DSN="postgres://postgres:password@localhost:5432/substreams?sslmode=disab
 
 ```bash
 substreams-sink-sql from-proto $DSN https://github.com/streamingfast/substreams-spl-token/releases/download/v0.1.0/solana-spl-token-v0.1.0.spkg
-```
-
-Alternatively, if you have cloned the repository locally, you can run:
-
-```bash
-substreams-sink-sql from-proto $DSN ./substreams.yaml
 ```
 
 ## Run the Sink Without Relations

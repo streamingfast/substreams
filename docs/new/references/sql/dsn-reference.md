@@ -69,7 +69,7 @@ clickhouse://default:@localhost:9000/default
 clickhouse://myuser:mypassword@localhost:9000/mydatabase
 
 # ClickHouse Cloud (encrypted)
-clickhouse://default:mypassword@abc123.clickhouse.cloud:9440/default?secure=true&skip_verify=true
+clickhouse://default:mypassword@abc123.clickhouse.cloud:9440/default?secure=true
 
 # With additional options
 clickhouse://myuser:mypassword@localhost:9000/mydatabase?compress=true&debug=true
@@ -99,7 +99,7 @@ For ClickHouse Cloud, you **must** use:
 - `secure=true` option
 - Often `skip_verify=true` for certificate issues
 
-Example: `clickhouse://default:password@instance-id.clickhouse.cloud:9440/default?secure=true&skip_verify=true`
+Example: `clickhouse://default:password@instance-id.clickhouse.cloud:9440/default?secure=true`
 {% endhint %}
 
 ## Environment Variable Substitution
@@ -142,11 +142,3 @@ postgres://myuser:my%40password@localhost:5432/mydatabase
 # Special characters in username  
 postgres://my%2Buser:mypassword@localhost:5432/mydatabase
 ```
-
-Common URL encodings:
-- `@` → `%40`
-- `+` → `%2B`
-- `/` → `%2F`
-- `?` → `%3F`
-- `#` → `%23`
-- `&` → `%26`

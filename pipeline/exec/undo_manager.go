@@ -95,37 +95,35 @@ func (u *UndoManager) Contains(id string) bool {
 
 // Subscribe returns a context that will get canceled if the block with the given ID gets previousUndoneBlocks
 // returns an unsubscribe function that must be called to prevent leaks
-func (u *UndoManager) Subscribe(ctx context.Context, id string) (context.Context, func()) {
-
-	if tracer.Enabled() {
-		zlog.Debug("undo manager subscribed block", zap.String("id", id))
-	}
+func (u *UndoManager) Subscribe(ctx context.Context, blockID string) (context.Context, func()) {
 	ctx, cancel := context.WithCancelCause(ctx)
-
 	watcher := watcher{
 		cancel: cancel,
 		id:     nextUniqueID(),
+	}
+	if tracer.Enabled() {
+		zlog.Debug("undo manager subscribed block", zap.String("block_id", blockID), zap.Uint64("watcher_id", watcher.id))
 	}
 
 	u.Lock()
 	defer u.Unlock()
 
-	_, alreadyUndone := u.previousUndoneBlocks[id]
+	_, alreadyUndone := u.previousUndoneBlocks[blockID]
 	if alreadyUndone {
 		cancel(ErrBlockUndo)
 		return ctx, func() {}
 	}
-	u.activeSubscriptions[id] = append(u.activeSubscriptions[id], watcher)
+	u.activeSubscriptions[blockID] = append(u.activeSubscriptions[blockID], watcher)
 
 	return ctx, func() {
-		u.unsubscribe(id, watcher.id)
+		u.unsubscribe(blockID, watcher.id)
 	}
 }
 
 func (u *UndoManager) unsubscribe(blockID string, watcherID uint64) {
 	u.Lock()
 	if tracer.Enabled() {
-		zlog.Debug("undo manager unsubscribed block", zap.String("id", blockID))
+		zlog.Debug("undo manager unsubscribed block", zap.String("block_id", blockID), zap.Uint64("watcher_id", watcherID))
 	}
 	for i, w := range u.activeSubscriptions[blockID] {
 		if w.id == watcherID {
@@ -138,6 +136,9 @@ func (u *UndoManager) unsubscribe(blockID string, watcherID uint64) {
 
 func (u *UndoManager) notifyUndo(blockID string) {
 	for _, w := range u.activeSubscriptions[blockID] {
+		if tracer.Enabled() {
+			zlog.Debug("UNDO triggering cancel", zap.String("block_id", blockID), zap.Uint64("watcher_id", w.id))
+		}
 		w.cancel(ErrBlockUndo)
 	}
 }

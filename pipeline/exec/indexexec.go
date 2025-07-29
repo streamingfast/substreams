@@ -35,7 +35,7 @@ func (i *IndexModuleExecutor) run(ctx context.Context, reader execout.ExecutionO
 	i.ctx = ctx
 
 	var call *wasm.Call
-	if call, err = i.wasmCall(reader, false, GlobalSharedCache); err != nil {
+	if call, err = i.wasmCall(reader, false, GlobalSharedCache, GlobalUndoManager); err != nil {
 		return nil, nil, nil, fmt.Errorf("maps wasm call: %w", err)
 	}
 

@@ -5,7 +5,7 @@
 
 ## Tutorials
 
-* [Develop Your First Substreams](new/tutorials/intro-to-tutorials.md)
+* [Generate Your First Substreams](new/tutorials/intro-to-tutorials.md)
   * [on EVM](new/tutorials/evm.md)
   * [on Solana](tutorials/intro-to-tutorials/on-solana/README.md)
     * [Transactions & Instructions](new/tutorials/solana/solana.md)
@@ -19,7 +19,7 @@
 
 ## How-To Guides
 
-* [Developing Substreams](new/how-to-guides/develop-your-own-substreams/develop-your-own-substreams.md)
+* [Developing Substreams (Deep Dive)](new/how-to-guides/develop-your-own-substreams/develop-your-own-substreams.md)
   * [on EVM](how-to-guides/develop-your-own-substreams/on-evm/README.md)
     * [Exploring Ethereum](new/how-to-guides/develop-your-own-substreams/evm/exploring-ethereum/exploring-ethereum.md)
       * [Mapping Blocks](how-to-guides/develop-your-own-substreams/on-evm/exploring-ethereum/mapping-blocks.md)

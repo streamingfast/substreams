@@ -45,6 +45,7 @@ const (
 	FlagNoopMode              = "noop-mode"
 	FlagProtoPath             = "proto-path"
 	FlagProtoDescriptorSet    = "proto-descriptor-set"
+	FlagPrometheusAddr        = "prometheus-addr"
 )
 
 func FlagIgnore(in ...string) FlagIgnored {
@@ -87,6 +88,7 @@ func (i flagIgnoredList) IsIgnored(flag string) bool {
 //	Flag `--api-token-envvar` (default `SUBSTREAMS_API_TOKEN`)
 //	Flag `--proto-path` (defaults `""`)
 //	Flag `--proto-descriptor-set` (defaults `""`)
+//	Flag `--prometheus-addr` (defaults `""`)
 //
 // The `ignore` field can be used to multiple times to avoid adding the specified
 // `flags` to the the set. This can be used for example to avoid adding `--final-blocks-only`
@@ -176,6 +178,10 @@ func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagIgnored) {
 		flags.String(FlagProtoDescriptorSet, "", "Path to proto descriptor set file")
 	}
 
+	if flagIncluded(FlagPrometheusAddr) {
+		flags.String(FlagPrometheusAddr, "localhost:9102", "Address to bind prometheus metrics server")
+	}
+
 }
 
 // NewFromViper constructs a new Sinker instance from a fixed set of "known" flags.
@@ -224,7 +230,7 @@ func ConfigFromViper(
 	zlog *zap.Logger,
 	tracer logging.Tracer,
 ) (*SinkerConfig, error) {
-	params, network, undoBufferSize, liveBlockTimeDelta, isDevelopmentMode, infiniteRetry, finalBlocksOnly, skipPackageValidation, isNoopMode, extraHeaders := getViperFlags(cmd)
+	params, network, undoBufferSize, liveBlockTimeDelta, isDevelopmentMode, infiniteRetry, finalBlocksOnly, skipPackageValidation, isNoopMode, extraHeaders, prometheusAddr := getViperFlags(cmd)
 
 	// Parse start and stop blocks using utility functions
 	startBlockFlag := sflags.MustGetString(cmd, FlagStartBlock)
@@ -349,6 +355,7 @@ func ConfigFromViper(
 		LiveBlockTimeDelta:    liveBlockTimeDelta,
 		LivenessChecker:       livenessChecker,
 		ExtraHeaders:          extraHeaders,
+		PrometheusAddr:        prometheusAddr,
 		Params:                params,
 		Network:               network,
 		SkipPackageValidation: skipPackageValidation,
@@ -370,6 +377,7 @@ func getViperFlags(cmd *cobra.Command) (
 	skipPackageValidation bool,
 	isNoopMode bool,
 	extraHeaders []string,
+	prometheusAddr string,
 ) {
 	if sflags.FlagDefined(cmd, FlagParams) {
 		params = sflags.MustGetStringArray(cmd, FlagParams)
@@ -409,6 +417,10 @@ func getViperFlags(cmd *cobra.Command) (
 
 	if sflags.FlagDefined(cmd, FlagExtraHeaders) {
 		extraHeaders = sflags.MustGetStringSlice(cmd, FlagExtraHeaders)
+	}
+
+	if sflags.FlagDefined(cmd, FlagPrometheusAddr) {
+		prometheusAddr = sflags.MustGetString(cmd, FlagPrometheusAddr)
 	}
 
 	return

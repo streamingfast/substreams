@@ -26,7 +26,7 @@ func newStats(logger *zap.Logger) *Stats {
 		Shutter: shutter.New(),
 
 		dataMsgRate:       dmetrics.MustNewAvgRateFromPromCounter(DataMessageCount, 1*time.Second, 30*time.Second, "msg"),
-		progressBlockRate: dmetrics.MustNewAvgRateFromPromGauge(ProgressMessageTotalProcessedBlocks, 1*time.Second, 30*time.Second, "block"),
+		progressBlockRate: dmetrics.MustNewAvgRateFromPromGauge(ProcessedBlocks, 1*time.Second, 30*time.Second, "block"),
 		undoMsgRate:       dmetrics.MustNewAvgRateFromPromCounter(UndoMessageCount, 1*time.Second, 30*time.Second, "msg"),
 
 		lastBlock: unsetBlockRef{},
@@ -77,7 +77,7 @@ func (s *Stats) LogNow() {
 
 		zap.Any("progress_last_block", dmetrics.NewValuesFromMetric(ProgressMessageLastBlock).Uints("stage")),
 		zap.Any("progress_running_jobs", dmetrics.NewValuesFromMetric(ProgressMessageRunningJobs).Uints("stage")),
-		zap.Uint64("progress_total_processed_blocks", dmetrics.NewValueFromMetric(ProgressMessageTotalProcessedBlocks, "blocks").ValueUint()),
+		zap.Uint64("progress_total_processed_blocks", dmetrics.NewValueFromMetric(ProcessedBlocks, "blocks").ValueUint()),
 		zap.Any("progress_last_contiguous_block", dmetrics.NewValuesFromMetric(ProgressMessageLastContiguousBlock).Uints("stage")),
 
 		zap.Stringer("last_block", s.lastBlock),

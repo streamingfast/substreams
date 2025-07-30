@@ -230,3 +230,7 @@ Make sure your webhook endpoint can handle:
 - POST requests with `Content-Type: application/json`
 - Potential duplicate calls (implement idempotency)
 - Proper HTTP status code responses (2xx for success, 4xx for permanent errors, 5xx for retryable errors)
+
+### Monitoring via Prometheus
+
+* Prometheus metrics are available at `http://localhost:9102` by default. See the --prometheus-addr flag for more details.

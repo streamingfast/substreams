@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * More tweaks to `substreams build` and `substreams protogen` commands output.
 * **Added** support for package version notation using `@` syntax (e.g., `package@v1.2.3` or `package@latest`) in manifest imports and package references.
+* **Added** `--prometheus-addr` flag to sink commands for binding Prometheus metrics server to a specified address.
 
 ### Server
 

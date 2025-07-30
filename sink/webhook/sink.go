@@ -3,7 +3,9 @@ package webhook
 import (
 	"context"
 	"fmt"
+	"os"
 
+	"github.com/dustin/go-humanize"
 	"github.com/streamingfast/substreams/protodecode"
 	"github.com/streamingfast/substreams/sink"
 	"go.uber.org/zap"
@@ -29,6 +31,9 @@ type SinkConfig struct {
 	ClientConfig Config
 	Logger       *zap.Logger
 }
+
+var WebhookCallsCounter = sink.Metrics.NewCounter("webhook_calls", "Number of calls made to the webhook")
+var WebhookSizeBytes = sink.Metrics.NewCounter("webhook_bytes_sent", "Number of bytes sent via webhook")
 
 // NewSink creates a new webhook sink
 func NewSink(config SinkConfig) (*Sink, error) {
@@ -91,6 +96,9 @@ func (s *Sink) handleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.
 		return fmt.Errorf("failed to serialize webhook payload: %w", err)
 	}
 
+	WebhookCallsCounter.Inc()
+	WebhookSizeBytes.AddInt(len(wrappedOut))
+
 	s.logger.Info("calling webhook",
 		zap.Uint64("block", data.Clock.Number),
 	)
@@ -130,4 +138,6 @@ func (s *Sink) handleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstrea
 // PrintStats prints final statistics
 func (s *Sink) PrintStats() {
 	s.sinker.PrintStats()
+	fmt.Fprintf(os.Stderr, " • Total Webhook calls: %s\n", humanize.Comma(int64(WebhookCallsCounter.Get())))
+	fmt.Fprintf(os.Stderr, " • Total Webhook bytes sent: %s\n", humanize.IBytes(uint64(WebhookSizeBytes.Get())))
 }

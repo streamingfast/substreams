@@ -202,8 +202,12 @@ func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 	if s.adjustedEndBlock() != 0 {
 		fields = append(fields, zap.String("end_at", fmt.Sprintf("#%d", s.adjustedEndBlock()-1)))
 	}
+	if cursor != nil {
+		fields = append(fields, zap.String("cursor", cursor.String()))
+	}
 
 	s.Logger.Info("starting sinker", fields...)
+
 	lastCursor, err := s.run(ctx, cursor, handler)
 	if err == nil {
 		s.Logger.Info("substreams ended correctly, reached your stop block", zap.Stringer("last_block_seen", lastCursor.Block()))
@@ -291,7 +295,7 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 			LimitProcessedBlocks: s.LimitProcessedBlocks,
 		}
 
-		s.Logger.Info("sending request", zap.String("start_block", fmt.Sprintf("%d", startBlock)), zap.String("stop_block", fmt.Sprintf("%d", stopBlock)))
+		s.Logger.Info("sending request", zap.String("start_block", fmt.Sprintf("%d", startBlock)), zap.String("stop_block", fmt.Sprintf("%d", stopBlock)), zap.String("cursor", activeCursor.String()))
 
 		// Add extra headers if set
 		streamCtx := ctx

@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * **Added** mechanism to immediately cancel pending requests that are doing an 'external call' (ex: eth_call) on a given block when it gets forked out (UNDO because of a reorg).
 * **Fixed** handling of invalid module kind: prevent heavy logging from recovered panic
+* Error considered deterministic which will cache the error forever are now suffixed with `<original message> (deterministic error)`.
 
 ### CLI
 
@@ -23,10 +24,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * More tweaks to `substreams build` and `substreams protogen` commands output.
 * **Added** support for package version notation using `@` syntax (e.g., `package@v1.2.3` or `package@latest`) in manifest imports and package references.
 * **Added** `--prometheus-addr` flag to sink commands for binding Prometheus metrics server to a specified address.
-
-### Server
-
-* Error considered deterministic which will cache the error forever are now suffixed with `<original message> (deterministic error)`.
 
 ## v1.16.1
 

@@ -12,9 +12,11 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
+	"github.com/dustin/go-humanize"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dgrpc"
+	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/client"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -166,10 +168,11 @@ func (s *Sinker) ApiToken() string {
 }
 
 func (s *Sinker) PrintStats() {
-	fmt.Fprintf(os.Stderr, "\nTotal Processed Bytes: %d\n", uint64(ProgressMessageProcessedBytes.Get()))
-	fmt.Fprintf(os.Stderr, "Total Processed Blocks: %d\n", uint64(ProgressMessageTotalProcessedBlocks.Get()))
-	fmt.Fprintf(os.Stderr, "Total Received Bytes (uncompressed gress): %d\n", uint64(DataMessageSizeBytes.Get()))
-	fmt.Fprintln(os.Stderr, "all done")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "📊 Usage Report")
+	fmt.Fprintf(os.Stderr, " • Egress Bytes (uncompressed): %s\n", humanize.IBytes(uint64(uint64(ServerEgressBytes.Get()))))
+	fmt.Fprintf(os.Stderr, " • Processed Blocks: %s blocks\n", humanize.Comma(int64(ProcessedBlocks.Get())))
+	fmt.Fprintf(os.Stderr, " • Processed Bytes: %s\n", humanize.IBytes(uint64(ProcessedBytes.Get())))
 }
 
 func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler) {
@@ -180,6 +183,10 @@ func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 		cancel()
 	})
 	s.stats.OnTerminated(func(err error) { s.Shutdown(err) })
+	if s.SinkerConfig.PrometheusAddr != "" {
+		Metrics.Register()
+		go dmetrics.Serve(s.SinkerConfig.PrometheusAddr)
+	}
 
 	logEach := 15 * time.Second
 	if s.Logger.Core().Enabled(zap.DebugLevel) {
@@ -195,8 +202,12 @@ func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 	if s.adjustedEndBlock() != 0 {
 		fields = append(fields, zap.String("end_at", fmt.Sprintf("#%d", s.adjustedEndBlock()-1)))
 	}
+	if cursor != nil {
+		fields = append(fields, zap.String("cursor", cursor.String()))
+	}
 
 	s.Logger.Info("starting sinker", fields...)
+
 	lastCursor, err := s.run(ctx, cursor, handler)
 	if err == nil {
 		s.Logger.Info("substreams ended correctly, reached your stop block", zap.Stringer("last_block_seen", lastCursor.Block()))
@@ -284,7 +295,7 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 			LimitProcessedBlocks: s.LimitProcessedBlocks,
 		}
 
-		s.Logger.Info("sending request", zap.String("start_block", fmt.Sprintf("%d", startBlock)), zap.String("stop_block", fmt.Sprintf("%d", stopBlock)))
+		s.Logger.Info("sending request", zap.String("start_block", fmt.Sprintf("%d", startBlock)), zap.String("stop_block", fmt.Sprintf("%d", stopBlock)), zap.String("cursor", activeCursor.String()))
 
 		// Add extra headers if set
 		streamCtx := ctx
@@ -461,8 +472,8 @@ func (s *Sinker) doRequest(
 			ProgressMessageCount.Inc()
 			// The returned value from the server gives an overview of the current progress and not the delta
 			// since the last message. Since the server is the source of truth, we just set the value directly.
-			ProgressMessageTotalProcessedBlocks.SetUint64(r.Progress.ProcessedBlocks)
-			ProgressMessageProcessedBytes.SetUint64(r.Progress.ProcessedBytes.TotalBytesRead)
+			ProcessedBlocks.SetUint64(r.Progress.ProcessedBlocks)
+			ProcessedBytes.SetUint64(r.Progress.ProcessedBytes.TotalBytesRead)
 
 			if s.Tracer.Enabled() {
 				s.Logger.Debug("received response Progress", zap.Reflect("progress", r))
@@ -493,7 +504,7 @@ func (s *Sinker) doRequest(
 			HeadBlockNumber.SetUint64(block.Num())
 			HeadBlockTimeDrift.SetBlockTime(r.BlockScopedData.Clock.Timestamp.AsTime())
 			DataMessageCount.Inc()
-			DataMessageSizeBytes.AddInt(proto.Size(r.BlockScopedData))
+			ServerEgressBytes.AddInt(proto.Size(r.BlockScopedData))
 			BackprocessingCompletion.SetUint64(1)
 
 			cursor, err := NewCursor(r.BlockScopedData.Cursor)

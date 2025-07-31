@@ -121,6 +121,7 @@ func runBuildE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("❌ Error building spkg: %w", err)
 	}
 
+	fmt.Println()
 	fmt.Printf("✅ Build complete!\n")
 	return nil
 }

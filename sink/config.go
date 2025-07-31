@@ -52,6 +52,9 @@ type SinkerConfig struct {
 	Logger *zap.Logger
 	Tracer logging.Tracer
 
+	// Expose metrics
+	PrometheusAddr string // if non-null, will listen to this address
+
 	// Legacy fields for backward compatibility
 	Params                []string
 	Network               string

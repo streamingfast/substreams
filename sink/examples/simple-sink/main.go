@@ -44,6 +44,9 @@ var cmd = &cobra.Command{
 // Initialize logging and tracing for the sink followwing Streamingfast's logging pattern
 var zlog, tracer = logging.RootLogger("simple-sink", "github.com/streamingfast/substreams/sink/example/simple-sink")
 
+// Add our own metrics to the ones exposed in the sink
+var EventCounter = sink.Metrics.NewCounter("simple_sink_events", "Number of events processed by the simple sink")
+
 func runE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 
@@ -116,6 +119,8 @@ func (s *SimpleSink) HandleBlockScopedData(ctx context.Context, data *pbsubstrea
 	if data.Output.MapOutput.Value == nil {
 		return nil
 	}
+
+	EventCounter.AddInt(1)
 
 	msgDesc := s.decoder.GetMessageDescriptor(data.Output.Name)
 	dataContent := s.decoder.DecodeDynamicMessage(msgDesc, data.Output.MapOutput)

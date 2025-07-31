@@ -37,7 +37,7 @@ func (e *StoreModuleExecutor) run(ctx context.Context, reader execout.ExecutionO
 	defer span.EndWithErr(&err)
 	e.ctx = ctx
 
-	if _, err := e.wasmCall(reader, true, nil); err != nil {
+	if _, err := e.wasmCall(reader, true, nil, GlobalUndoManager); err != nil {
 		return nil, nil, nil, fmt.Errorf("store wasm call: %w", err)
 	}
 

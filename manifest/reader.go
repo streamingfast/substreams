@@ -220,14 +220,6 @@ func (r *Reader) readRemote(input string) error {
 func (r *Reader) readFromHttp(input string) error {
 	resp, err := httpClient.Get(input)
 	if err != nil {
-		// Check if this is a registry URL and provide a better error message
-		if r.isRegistryURL(input) {
-			packageName, version := r.parseRegistryURL(input)
-			if packageName != "" && version != "" {
-				return fmt.Errorf("unable to connect to package registry to fetch %q@%q: %w", packageName, version, err)
-			}
-			return fmt.Errorf("unable to connect to package registry: %w", err)
-		}
 		return fmt.Errorf("error downloading %q: %w", input, err)
 	}
 	defer resp.Body.Close()
@@ -248,30 +240,8 @@ func (r *Reader) readFromHttp(input string) error {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		// Check if this is a registry URL and provide a better error message
 		if r.isRegistryURL(input) {
-			packageName, version := r.parseRegistryURL(input)
-			if packageName != "" && version != "" {
-				switch resp.StatusCode {
-				case http.StatusNotFound:
-					return fmt.Errorf("package %q@%q does not exist on the registry", packageName, version)
-				case http.StatusForbidden:
-					return fmt.Errorf("access denied to package %q@%q on the registry", packageName, version)
-				case http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
-					return fmt.Errorf("package registry is temporarily unavailable (status %s)", resp.Status)
-				default:
-					return fmt.Errorf("failed to fetch package %q@%q from registry (status %s)", packageName, version, resp.Status)
-				}
-			}
-			// Fallback if we can't parse the package info
-			switch resp.StatusCode {
-			case http.StatusNotFound:
-				return fmt.Errorf("package does not exist on the registry")
-			case http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
-				return fmt.Errorf("package registry is temporarily unavailable (status %s)", resp.Status)
-			default:
-				return fmt.Errorf("failed to fetch package from registry (status %s)", resp.Status)
-			}
+			return r.mapRegistryErrors(resp.StatusCode, resp.Status)
 		}
 		return fmt.Errorf("error downloading %q, status %s: %s", input, resp.Status, string(r.currentData))
 	}
@@ -502,29 +472,21 @@ func (r *Reader) registryBaseURL() string {
 // isRegistryURL checks if the given URL is targeting the package registry
 func (r *Reader) isRegistryURL(url string) bool {
 	registryBase := r.registryBaseURL()
-	return strings.HasPrefix(url, registryBase+"/v1/packages/")
+	return strings.HasPrefix(url, registryBase)
 }
 
-// parseRegistryURL extracts package name and version from a registry URL
-// Returns empty strings if the URL is not a valid registry URL
-func (r *Reader) parseRegistryURL(url string) (packageName, version string) {
-	registryBase := r.registryBaseURL()
-	prefix := registryBase + "/v1/packages/"
-	
-	if !strings.HasPrefix(url, prefix) {
-		return "", ""
+// mapRegistryErrors transforms HTTP status codes into user-friendly registry error messages
+func (r *Reader) mapRegistryErrors(statusCode int, status string) error {
+	switch statusCode {
+	case http.StatusNotFound:
+		return fmt.Errorf("package does not exist on the registry")
+	case http.StatusForbidden:
+		return fmt.Errorf("access denied to package on the registry")
+	case http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return fmt.Errorf("package registry is temporarily unavailable (status %s)", status)
+	default:
+		return fmt.Errorf("failed to fetch package from registry (status %s)", status)
 	}
-	
-	// Remove the prefix to get the package path
-	packagePath := strings.TrimPrefix(url, prefix)
-	
-	// Split by "/" to get package name and version
-	parts := strings.Split(packagePath, "/")
-	if len(parts) != 2 {
-		return "", ""
-	}
-	
-	return parts[0], parts[1]
 }
 
 func (r *Reader) getPkg() (*pbsubstreams.Package, *Manifest, error) {

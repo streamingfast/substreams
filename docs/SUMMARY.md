@@ -15,7 +15,6 @@
   * [on MANTRA](new/tutorials/cosmos-compatible/mantra.md)
   * [on Starknet](new/tutorials/starknet.md)
   * [on Stellar](new/tutorials/stellar.md)
-* [Publishing a Substreams Package](new/tutorials/publish-package.md)
 
 ## How-To Guides
 

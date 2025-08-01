@@ -309,6 +309,7 @@ func (s *Tier1Service) Blocks(
 		zap.Bool("final_blocks_only", request.FinalBlocksOnly),
 		zap.Bool("production_mode", request.ProductionMode),
 		zap.Bool("noop_mode", request.NoopMode),
+		zap.Strings("dev_output_modules", request.DevOutputModules),
 	}
 
 	if s.enforceCompression && !compressed {

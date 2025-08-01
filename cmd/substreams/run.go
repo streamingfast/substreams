@@ -28,7 +28,6 @@ func init() {
 	runCmd.Flags().Bool("production-mode", false, "Enable Production Mode, with high-speed parallel processing")
 	runCmd.Flags().Uint64("limit-processed-blocks", 10000, "Limit the number of blocks to be processed by the server, including preparing the stores, as a safeguard to prevent unexpected expensive reprocessing (0 disables the limit)")
 	runCmd.Flags().StringSlice("debug-modules-initial-snapshot", nil, "List of 'store' modules from which to print the initial data snapshot (Unavailable in Production Mode)")
-	runCmd.Flags().StringSlice("debug-modules-output", nil, "List of modules from which to print outputs, deltas and logs, accepts regexes (Unavailable in Production Mode)")
 
 	runCmd.Flags().StringP("output", "o", "", "Output mode, one of: [tui (and ui), json, jsonl, clock] Defaults to 'tui' when in a TTY is present, and 'json' otherwise")
 
@@ -74,14 +73,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 			zlog.Warn("noop-mode used without production-mode: server will execute in development mode without sending the data, this is probably not what you want")
 		}
 		sinkerConfig.Mode = sink.SubstreamsModeDevelopment
-	}
-
-	sinkerConfig.DevOutputModules = sflags.MustGetStringSlice(cmd, "debug-modules-output")
-	if len(sinkerConfig.DevOutputModules) == 0 {
-		sinkerConfig.DevOutputModules = nil
-	}
-	if sinkerConfig.DevOutputModules != nil && sinkerConfig.Mode == sink.SubstreamsModeProduction {
-		return fmt.Errorf("cannot set 'debug-modules-output' in 'production-mode'")
 	}
 
 	outputModulesSnapshot := sflags.MustGetStringSlice(cmd, "debug-modules-initial-snapshot")

@@ -279,6 +279,8 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 	devOutputModules := s.DevOutputModules
 	if devOutputModules == nil && s.Mode == SubstreamsModeDevelopment {
 		devOutputModules = []string{s.SinkerConfig.OutputModule.Name} // default behavior is to ask only for the output module
+	} else if len(devOutputModules) == 1 && devOutputModules[0] == ".*" && s.Mode == SubstreamsModeDevelopment {
+		devOutputModules = nil // ask the server to send everything
 	}
 
 	for {

@@ -112,7 +112,7 @@ func TestModuleExecutorRunner_Run_HappyPath(t *testing.T) {
 		cacheMap: make(map[string][]byte),
 	}
 
-	moduleOutput, _, _, _, err := RunModule(ctx, executor, output)
+	moduleOutput, _, _, _, _, err := RunModule(ctx, executor, output)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +156,7 @@ func TestModuleExecutorRunner_Run_CachedOutput(t *testing.T) {
 		},
 	}
 
-	moduleOutput, _, _, _, err := RunModule(ctx, executor, output)
+	moduleOutput, _, _, _, _, err := RunModule(ctx, executor, output)
 	if err != nil {
 		t.Fatal(err)
 	}

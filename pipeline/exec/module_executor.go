@@ -42,14 +42,15 @@ func skipFromIndex(index *index.BlockIndex, execOutput execout.ExecutionOutputGe
 //   - moduleOutput:     the structured data
 //   - outputBytes:      the marshalled version of moduleOutput
 //   - outputBytesFiles: the marshalled bytes to be sent to a file,
-//   - skipped:          an indication that execution was not performed (skipped from index or skipped because it has no input)
-//     (cached data does not count as skipped, but marks the moduleOuput as 'Cached')
+//   - skippedExecution: an indication that execution was not performed (skipped from index or skipped because it has no input -- cached data does not count as skipped, but marks the moduleOuput as 'Cached')
+//   - skippableOutput:  an indication that the output can be skipped
 //   - error:            an error
-func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.ExecutionOutputGetter) (*pbssinternal.ModuleOutput, []byte, []byte, bool, error) {
+func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.ExecutionOutputGetter) (*pbssinternal.ModuleOutput, []byte, []byte, bool, bool, error) {
 	logger := reqctx.Logger(ctx)
 	modName := executor.Name()
 
 	var err error
+	var skippableOutput bool
 
 	ctx, span := reqctx.WithModuleExecutionSpan(ctx, "module_execution")
 	defer span.EndWithErr(&err)
@@ -61,58 +62,59 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 
 	if skipFromIndex(executor.BlockIndex(), execOutput) {
 		emptyOutput, _ := executor.toModuleOutput(nil)
-		return emptyOutput, nil, nil, true, nil
+		return emptyOutput, nil, nil, true, true, nil
 	}
 
 	cached, outputBytes, err := getCachedOutput(execOutput, executor)
 	if err != nil {
-		return nil, nil, nil, false, fmt.Errorf("check cache output exists: %w", err)
+		return nil, nil, nil, false, skippableOutput, fmt.Errorf("check cache output exists: %w", err)
 	}
 	span.SetAttributes(attribute.Bool("substreams.module.cached", cached))
 
 	if cached {
 		if err = executor.applyCachedOutput(outputBytes); err != nil {
-			return nil, nil, nil, false, fmt.Errorf("apply cached output: %w", err)
+			return nil, nil, nil, false, skippableOutput, fmt.Errorf("apply cached output: %w", err)
 		}
 
 		moduleOutput, err := executor.toModuleOutput(outputBytes)
 		if err != nil {
-			return moduleOutput, outputBytes, nil, false, fmt.Errorf("converting output to module output: %w", err)
+			return moduleOutput, outputBytes, nil, false, skippableOutput, fmt.Errorf("converting output to module output: %w", err)
 		}
 
 		if moduleOutput == nil {
-			return nil, nil, nil, false, nil // output from PartialKV is always nil, we cannot use it
+			return nil, nil, nil, false, skippableOutput, nil // output from PartialKV is always nil, we cannot use it
 		}
 
 		// For store modules, the output in cache is in "operations", but we get the proper store deltas in "toModuleOutput", so we need to transform back those deltas into outputBytes
 		if storeDeltas := moduleOutput.GetStoreDeltas(); storeDeltas != nil {
 			outputBytes, err = proto.Marshal(moduleOutput.GetStoreDeltas())
 			if err != nil {
-				return nil, nil, nil, false, err
+				return nil, nil, nil, false, skippableOutput, err
 			}
 		}
 
 		fillModuleOutputMetadata(executor, moduleOutput)
 		moduleOutput.Cached = true
-		return moduleOutput, outputBytes, nil, false, nil
+		return moduleOutput, outputBytes, nil, false, skippableOutput, nil
 	}
 
 	uid := reqctx.ReqStats(ctx).RecordModuleWasmBlockBegin(modName)
 
 	outputBytes, outputForFiles, moduleOutput, err := executor.run(ctx, execOutput)
 	switch {
-	case errors.Is(err, ErrSkippedOutput):
+	case errors.Is(err, ErrSkippableOutput):
+		skippableOutput = true
 	case errors.Is(err, ErrNoInput):
-		return nil, nil, nil, true, nil
+		return nil, nil, nil, true, true, nil
 	case err != nil:
-		return nil, nil, nil, false, fmt.Errorf("execute: %w", err)
+		return nil, nil, nil, false, skippableOutput, fmt.Errorf("execute: %w", err)
 	}
 
 	reqctx.ReqStats(ctx).RecordModuleWasmBlockEnd(modName, uid)
 
 	fillModuleOutputMetadata(executor, moduleOutput)
 
-	return moduleOutput, outputBytes, outputForFiles, false, nil
+	return moduleOutput, outputBytes, outputForFiles, false, skippableOutput, nil
 }
 
 func getCachedOutput(execOutput execout.ExecutionOutputGetter, executor ModuleExecutor) (bool, []byte, error) {

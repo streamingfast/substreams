@@ -51,7 +51,7 @@ func (e *MapperModuleExecutor) run(ctx context.Context, reader execout.Execution
 	}
 
 	if call.CanSkipOutput() {
-		err = ErrSkippedOutput
+		err = ErrSkippableOutput
 	}
 	return out, out, modOut, err // same output for files or for the module
 }

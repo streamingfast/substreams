@@ -168,11 +168,20 @@ func (s *Sinker) ApiToken() string {
 }
 
 func (s *Sinker) PrintStats() {
+	egressBytes := ServerEgressBytes.Get()
+	processedBlocks := ProcessedBlocks.Get()
+	processedBytes := ProcessedBytes.Get()
+
+	// Don't show usage report if all metrics are zero (e.g., when there's an error and no data was processed)
+	if egressBytes == 0 && processedBlocks == 0 && processedBytes == 0 {
+		return
+	}
+
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "📊 Usage Report")
-	fmt.Fprintf(os.Stderr, " • Egress Bytes (uncompressed): %s\n", humanize.IBytes(uint64(uint64(ServerEgressBytes.Get()))))
-	fmt.Fprintf(os.Stderr, " • Processed Blocks: %s blocks\n", humanize.Comma(int64(ProcessedBlocks.Get())))
-	fmt.Fprintf(os.Stderr, " • Processed Bytes: %s\n", humanize.IBytes(uint64(ProcessedBytes.Get())))
+	fmt.Fprintf(os.Stderr, " • Egress Bytes (uncompressed): %s\n", humanize.IBytes(uint64(egressBytes)))
+	fmt.Fprintf(os.Stderr, " • Processed Blocks: %s blocks\n", humanize.Comma(int64(processedBlocks)))
+	fmt.Fprintf(os.Stderr, " • Processed Bytes: %s\n", humanize.IBytes(uint64(processedBytes)))
 }
 
 func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler) {

@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/schollz/closestmatch"
 	"github.com/streamingfast/bstream"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/yourbasic/graph"
@@ -583,70 +584,29 @@ func (g *ModuleGraph) createModuleNotFoundError(moduleName string) error {
 		return fmt.Errorf("could not find module %q: no modules available in manifest", moduleName)
 	}
 	
-	// Find similar module names using fuzzy matching
-	suggestions := g.findSimilarModules(moduleName, allModules)
-	
-	if len(suggestions) > 0 {
-		// Found similar modules, suggest them
-		if len(suggestions) == 1 {
-			return fmt.Errorf("could not find module %q, did you mean %q?", moduleName, suggestions[0])
-		} else {
-			return fmt.Errorf("could not find module %q, did you mean one of: %s?", moduleName, strings.Join(suggestions, ", "))
-		}
+	// Get all module names for fuzzy matching
+	moduleNames := make([]string, len(allModules))
+	for i, mod := range allModules {
+		moduleNames[i] = mod.Name
 	}
 	
-	// No similar modules found, list all available output modules
+	// Try fuzzy matching using closestmatch (same as used elsewhere in the project)
+	closeEnough := closestmatch.New(moduleNames, []int{2}).Closest(moduleName)
+	if closeEnough != "" && closeEnough != moduleName {
+		return fmt.Errorf("could not find module %q, did you mean %q?", moduleName, closeEnough)
+	}
+	
+	// No close match found, list all available output modules
 	outputModules := g.getOutputModules(allModules)
 	if len(outputModules) == 0 {
 		// Fallback to all modules if no output modules found
-		moduleNames := make([]string, len(allModules))
-		for i, mod := range allModules {
-			moduleNames[i] = mod.Name
-		}
 		return fmt.Errorf("could not find module %q, available modules: %s", moduleName, strings.Join(moduleNames, ", "))
 	}
 	
 	return fmt.Errorf("could not find module %q, available output modules: %s", moduleName, strings.Join(outputModules, ", "))
 }
 
-// findSimilarModules finds modules with names similar to the input using fuzzy matching
-func (g *ModuleGraph) findSimilarModules(input string, modules []*pbsubstreams.Module) []string {
-	const maxSuggestions = 3
-	const similarityThreshold = 0.6 // Require at least 60% similarity
-	
-	type suggestion struct {
-		name       string
-		similarity float64
-	}
-	
-	var suggestions []suggestion
-	
-	for _, module := range modules {
-		similarity := calculateStringSimilarity(input, module.Name)
-		if similarity >= similarityThreshold {
-			suggestions = append(suggestions, suggestion{
-				name:       module.Name,
-				similarity: similarity,
-			})
-		}
-	}
-	
-	// Sort by similarity (highest first)
-	sort.Slice(suggestions, func(i, j int) bool {
-		return suggestions[i].similarity > suggestions[j].similarity
-	})
-	
-	// Return top suggestions
-	result := make([]string, 0, maxSuggestions)
-	for i, s := range suggestions {
-		if i >= maxSuggestions {
-			break
-		}
-		result = append(result, s.name)
-	}
-	
-	return result
-}
+
 
 // getOutputModules returns names of modules that can be used as output modules (non-store modules)
 func (g *ModuleGraph) getOutputModules(modules []*pbsubstreams.Module) []string {
@@ -666,86 +626,7 @@ func (g *ModuleGraph) getOutputModules(modules []*pbsubstreams.Module) []string 
 	return outputModules
 }
 
-// calculateStringSimilarity calculates similarity between two strings using Levenshtein distance
-// Returns a value between 0.0 (no similarity) and 1.0 (identical)
-func calculateStringSimilarity(s1, s2 string) float64 {
-	// Convert to lowercase for case-insensitive comparison
-	s1 = strings.ToLower(s1)
-	s2 = strings.ToLower(s2)
-	
-	if s1 == s2 {
-		return 1.0
-	}
-	
-	// Calculate Levenshtein distance
-	distance := levenshteinDistance(s1, s2)
-	maxLen := max(len(s1), len(s2))
-	
-	if maxLen == 0 {
-		return 1.0
-	}
-	
-	// Convert distance to similarity (0.0 to 1.0)
-	similarity := 1.0 - float64(distance)/float64(maxLen)
-	return similarity
-}
 
-// levenshteinDistance calculates the Levenshtein distance between two strings
-func levenshteinDistance(s1, s2 string) int {
-	if len(s1) == 0 {
-		return len(s2)
-	}
-	if len(s2) == 0 {
-		return len(s1)
-	}
-	
-	// Create a matrix to store distances
-	matrix := make([][]int, len(s1)+1)
-	for i := range matrix {
-		matrix[i] = make([]int, len(s2)+1)
-	}
-	
-	// Initialize first row and column
-	for i := 0; i <= len(s1); i++ {
-		matrix[i][0] = i
-	}
-	for j := 0; j <= len(s2); j++ {
-		matrix[0][j] = j
-	}
-	
-	// Fill the matrix
-	for i := 1; i <= len(s1); i++ {
-		for j := 1; j <= len(s2); j++ {
-			cost := 0
-			if s1[i-1] != s2[j-1] {
-				cost = 1
-			}
-			
-			matrix[i][j] = min(
-				min(matrix[i-1][j]+1, matrix[i][j-1]+1), // deletion, insertion
-				matrix[i-1][j-1]+cost,                    // substitution
-			)
-		}
-	}
-	
-	return matrix[len(s1)][len(s2)]
-}
-
-// min returns the minimum of two integers
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-// max returns the maximum of two integers
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
 
 type ModuleMarshaler []*pbsubstreams.Module
 

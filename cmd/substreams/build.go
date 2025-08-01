@@ -275,7 +275,7 @@ func (b *BinaryBuilder) getCmdArgs(ctx context.Context, binaryType string) ([][]
 }
 
 func (b *BinaryBuilder) Build(ctx context.Context) error {
-	if b.manifInfo.Manifest.Binaries == nil || len(b.manifInfo.Manifest.Binaries) == 0 {
+	if b.manifInfo.Manifest.Binaries == nil {
 		fmt.Printf("⚠️  No binaries configured for build\n")
 		return nil
 	}

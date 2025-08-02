@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 
+	"github.com/schollz/closestmatch"
 	"github.com/streamingfast/bstream"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/yourbasic/graph"
@@ -569,8 +571,62 @@ func (g *ModuleGraph) Module(moduleName string) (*pbsubstreams.Module, error) {
 	if moduleIndex, found := g.moduleIndex[moduleName]; found {
 		return g.modules[moduleIndex], nil
 	}
-	return nil, fmt.Errorf("could not find module %s in graph", moduleName)
+	
+	// Module not found, provide helpful suggestions
+	return nil, g.createModuleNotFoundError(moduleName)
 }
+
+// createModuleNotFoundError creates an enhanced error message with suggestions
+func (g *ModuleGraph) createModuleNotFoundError(moduleName string) error {
+	// Get all available modules
+	allModules := g.modules
+	if len(allModules) == 0 {
+		return fmt.Errorf("could not find module %q: no modules available in manifest", moduleName)
+	}
+	
+	// Get all module names for fuzzy matching
+	moduleNames := make([]string, len(allModules))
+	for i, mod := range allModules {
+		moduleNames[i] = mod.Name
+	}
+	
+	// Try fuzzy matching using closestmatch (same as used elsewhere in the project)
+	closeEnough := closestmatch.New(moduleNames, []int{2}).Closest(moduleName)
+	if closeEnough != "" && closeEnough != moduleName {
+		return fmt.Errorf("could not find module %q, did you mean %q?", moduleName, closeEnough)
+	}
+	
+	// No close match found, list all available output modules
+	outputModules := g.getOutputModules(allModules)
+	if len(outputModules) == 0 {
+		// Fallback to all modules if no output modules found
+		return fmt.Errorf("could not find module %q, available modules: %s", moduleName, strings.Join(moduleNames, ", "))
+	}
+	
+	return fmt.Errorf("could not find module %q, available output modules: %s", moduleName, strings.Join(outputModules, ", "))
+}
+
+
+
+// getOutputModules returns names of modules that can be used as output modules (non-store modules)
+func (g *ModuleGraph) getOutputModules(modules []*pbsubstreams.Module) []string {
+	var outputModules []string
+	
+	for _, module := range modules {
+		// Skip store modules as they cannot be used as output modules
+		if module.GetKindStore() != nil {
+			continue
+		}
+		outputModules = append(outputModules, module.Name)
+	}
+	
+	// Sort alphabetically for consistent output
+	sort.Strings(outputModules)
+	
+	return outputModules
+}
+
+
 
 type ModuleMarshaler []*pbsubstreams.Module
 

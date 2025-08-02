@@ -9,6 +9,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### CLI
+
+* Add close match suggestions when module name cannot be found on `substreams run/sink` command(s).
+
+* Do not print usage report when there was no usage at all, usually when there is an error on `substreams run/sink` command(s).
+
 ## v1.16.2
 
 ### Server

@@ -257,17 +257,9 @@ func TestReader_Read(t *testing.T) {
 			args{
 				env: map[string]string{"SUBSTREAMS_REGISTRY": remoteServer.URL},
 			},
-			&pbsubstreams.Package{
-				Version:    1,
-				ProtoFiles: readSystemProtoDescriptors(t),
-				Modules:    &pbsubstreams.Modules{},
-				PackageMeta: []*pbsubstreams.PackageMetadata{
-					{Name: "test", Version: "v0.0.0"},
-					{Name: "spkg1", Version: "v0.0.0"},
-				},
-			},
+			nil,
 			require.NoError,
-			require.NoError,
+			require.Error,
 			true,
 		},
 		{
@@ -734,34 +726,34 @@ func mustNewModuleGraph(modules []*pbsubstreams.Module) *ModuleGraph {
 
 func TestReader_RegistryErrorHandling(t *testing.T) {
 	tests := []struct {
-		name           string
-		statusCode     int
-		registryURL    string
-		expectedError  string
+		name          string
+		statusCode    int
+		registryURL   string
+		expectedError string
 	}{
 		{
 			name:          "package not found",
 			statusCode:    http.StatusNotFound,
 			registryURL:   "https://spkg.io",
-			expectedError: "package does not exist on the registry",
+			expectedError: "package does not exist on the Substreams registry",
 		},
 		{
 			name:          "access denied",
 			statusCode:    http.StatusForbidden,
 			registryURL:   "https://spkg.io",
-			expectedError: "access denied to package on the registry",
+			expectedError: "access denied to package on the Substreams registry",
 		},
 		{
 			name:          "server error",
 			statusCode:    http.StatusInternalServerError,
 			registryURL:   "https://spkg.io",
-			expectedError: "package registry is temporarily unavailable (status 500 Internal Server Error)",
+			expectedError: "Substreams package registry is temporarily unavailable (status 500 Internal Server Error)",
 		},
 		{
 			name:          "bad gateway",
 			statusCode:    http.StatusBadGateway,
 			registryURL:   "https://spkg.io",
-			expectedError: "package registry is temporarily unavailable (status 502 Bad Gateway)",
+			expectedError: "Substreams package registry is temporarily unavailable (status 502 Bad Gateway)",
 		},
 	}
 
@@ -835,5 +827,3 @@ func TestReader_IsRegistryURL(t *testing.T) {
 		})
 	}
 }
-
-

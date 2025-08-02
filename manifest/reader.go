@@ -3,6 +3,7 @@ package manifest
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -432,9 +433,16 @@ func (r *Reader) resolveInputPath() error {
 		return nil
 	}
 
-	if pkgName, version, err := r.ParseStandardPackageAndVersion(input); err == nil {
-		r.currentInput = fmt.Sprintf("%s/v1/packages/%s/%s", r.registryBaseURL(), pkgName, version)
-		return nil
+	if pkgName, version, likelyShortcut, validationErr := ParseShortPackageIdentifier(input); likelyShortcut || validationErr == nil {
+		if likelyShortcut && validationErr != nil {
+			return fmt.Errorf("invalid Substreams Registry short package identifier %q: %w", input, validationErr)
+		}
+
+		// If there is no error
+		if validationErr == nil {
+			r.currentInput = r.registryPackageURL(pkgName, version)
+			return nil
+		}
 	}
 
 	if input == "" {
@@ -455,6 +463,10 @@ func (r *Reader) resolveInputPath() error {
 	r.currentInput = input
 
 	return nil
+}
+
+func (r *Reader) registryPackageURL(packageName string, version string) string {
+	return fmt.Sprintf("%s/v1/packages/%s/%s", r.registryBaseURL(), url.PathEscape(packageName), url.PathEscape(version))
 }
 
 func (r *Reader) registryBaseURL() string {
@@ -479,13 +491,13 @@ func (r *Reader) isRegistryURL(url string) bool {
 func (r *Reader) mapRegistryErrors(statusCode int, status string) error {
 	switch statusCode {
 	case http.StatusNotFound:
-		return fmt.Errorf("package does not exist on the registry")
+		return fmt.Errorf("package does not exist on the Substreams registry")
 	case http.StatusForbidden:
-		return fmt.Errorf("access denied to package on the registry")
+		return fmt.Errorf("access denied to package on the Substreams registry")
 	case http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
-		return fmt.Errorf("package registry is temporarily unavailable (status %s)", status)
+		return fmt.Errorf("Substreams package registry is temporarily unavailable (status %s)", status)
 	default:
-		return fmt.Errorf("failed to fetch package from registry (status %s)", status)
+		return fmt.Errorf("failed to fetch package from Substreams registry (status %s)", status)
 	}
 }
 
@@ -724,28 +736,42 @@ func (r *Reader) IsRemotePackage(input string) bool {
 	return hasRemotePrefix(input)
 }
 
-func (r *Reader) ParseStandardPackageAndVersion(input string) (packageName, version string, err error) {
-	parts := strings.Split(input, "@")
-	if len(parts) > 2 {
-		return "", "", fmt.Errorf("too many '@' in package name: %s", input)
-	}
-
-	packageName = parts[0]
+// ParseShortPackageIdentifier parses a package identifier in the format "package@version"
+// and returns the package name and version. If the version is not specified, it defaults to "latest".
+// Once deemed valid, we return validation errors as a multierror.
+//
+// The `likelyShortcut` boolean indicates if the input is likely a shortcut package identifier
+// which is when a @ is found in the input.
+//
+// The parser accepts "latest" as a valid version, and it will be returned as such even if
+// it's not a semver version.
+func ParseShortPackageIdentifier(input string) (packageName, version string, likelyShortcut bool, validationError error) {
+	packageName, version, likelyShortcut = strings.Cut(input, "@")
 	if !moduleNameRegexp.MatchString(packageName) {
-		return "", "", fmt.Errorf("package name %s does not match regexp %s", packageName, moduleNameRegexp.String())
+		validationError = errors.Join(validationError, fmt.Errorf("package name %s does not match regexp %s", packageName, moduleNameRegexp))
 	}
 
-	if len(parts) == 1 || parts[1] == "" || parts[1] == "latest" {
-		version = "latest"
-		return
+	if version == "" || version == "latest" {
+		return packageName, "latest", likelyShortcut, validationError
 	}
 
-	if !semver.IsValid(parts[1]) {
-		return "", "", fmt.Errorf("version %q is not valid Semver format", parts[1])
+	if strings.Contains(version, "@") {
+		validationError = errors.Join(validationError, fmt.Errorf("version %q should not contain '@'", version))
+	} else if version != "latest" && !semver.IsValid(version) {
+		validationError = errors.Join(validationError, fmt.Errorf("version %q is not valid Semver format", version))
 	}
-	version = parts[1]
 
 	return
+}
+
+// Deprecated: ParseStandardPackageAndVersion is deprecated, use [manifest.ParseShortPackageIdentifier] instead.
+func (r *Reader) ParseStandardPackageAndVersion(input string) (packageName, version string, err error) {
+	packageName, version, _, validationErr := ParseShortPackageIdentifier(input)
+	if validationErr != nil {
+		return "", "", validationErr
+	}
+
+	return packageName, version, nil
 }
 
 // IsLocalManifest determines if reader's input to read the manifest is a local manifest file, which is determined
@@ -987,12 +1013,36 @@ func LoadManifestFile(inputPath, workingDir string) (*Manifest, error) {
 
 // loop through the Manifest, and get the `imports` statements,
 // pull the Package files from Disk, and merge them into this one
-func loadImports(pkg *pbsubstreams.Package, manif *Manifest, validation ReaderValidation) error {
+func loadImports(pkg *pbsubstreams.Package, manif *Manifest, parentReader *Reader, validation ReaderValidation) error {
 	for _, kv := range manif.Imports {
 		importName := kv[0]
-		importPath := manif.resolvePath(kv[1])
+		importLocation := kv[1]
+		var importPath string
 
-		subpkgReader, err := NewReader(importPath)
+		packageName, version, likelyShortcut, validationErr := ParseShortPackageIdentifier(importLocation)
+		if likelyShortcut {
+			if validationErr != nil {
+				return fmt.Errorf("invalid import %q: %w", importLocation, validationErr)
+			}
+
+			if version == "latest" {
+				return fmt.Errorf("import %q: version 'latest' is not allowed in imports, please specify a specific version", importLocation)
+			}
+
+			importPath = parentReader.registryPackageURL(packageName, version)
+		} else {
+			importPath = manif.resolvePath(importLocation)
+		}
+
+		subpkgReader, err := NewReader(importPath,
+			WithRegistryURL(parentReader.registryURL),
+			WithOverrideNetwork(parentReader.overrideNetwork),
+			WithCollectProtoDefinitions(parentReader.collectProtoDefinitionsFunc),
+
+			// Do we need to add proto descriptor set to child reader?
+			// WithProtoPath(parentReader.protoPath),
+			// WithProtoDescriptorSet(parentReader.protoDescriptorSet),
+		)
 		if err != nil {
 			return fmt.Errorf("importing %q: %w", importPath, err)
 		}

@@ -10,7 +10,6 @@ import (
 	"regexp"
 	"strings"
 
-	"golang.org/x/mod/semver"
 	"gopkg.in/yaml.v3"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -64,11 +63,6 @@ var httpSchemePrefixRegex = regexp.MustCompile("^https?://")
 
 func (m *Manifest) resolvePath(path string) string {
 	if m.Workdir == "" || filepath.IsAbs(path) || httpSchemePrefixRegex.MatchString(path) {
-		return path
-	}
-
-	parts := strings.Split(path, "@")
-	if len(parts) == 2 && (semver.IsValid(parts[1]) || parts[1] == "latest") {
 		return path
 	}
 

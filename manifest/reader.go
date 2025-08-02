@@ -240,6 +240,9 @@ func (r *Reader) readFromHttp(input string) error {
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		if r.isRegistryURL(input) {
+			return r.mapRegistryErrors(resp.StatusCode, resp.Status)
+		}
 		return fmt.Errorf("error downloading %q, status %s: %s", input, resp.Status, string(r.currentData))
 	}
 
@@ -464,6 +467,26 @@ func (r *Reader) registryBaseURL() string {
 	// This is an extreme fallback, because this should be
 	// set by the WithRegistryURL option.
 	return "https://spkg.io"
+}
+
+// isRegistryURL checks if the given URL is targeting the package registry
+func (r *Reader) isRegistryURL(url string) bool {
+	registryBase := r.registryBaseURL()
+	return strings.HasPrefix(url, registryBase)
+}
+
+// mapRegistryErrors transforms HTTP status codes into user-friendly registry error messages
+func (r *Reader) mapRegistryErrors(statusCode int, status string) error {
+	switch statusCode {
+	case http.StatusNotFound:
+		return fmt.Errorf("package does not exist on the registry")
+	case http.StatusForbidden:
+		return fmt.Errorf("access denied to package on the registry")
+	case http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return fmt.Errorf("package registry is temporarily unavailable (status %s)", status)
+	default:
+		return fmt.Errorf("failed to fetch package from registry (status %s)", status)
+	}
 }
 
 func (r *Reader) getPkg() (*pbsubstreams.Package, *Manifest, error) {

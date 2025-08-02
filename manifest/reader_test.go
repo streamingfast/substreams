@@ -731,3 +731,109 @@ func mustNewModuleGraph(modules []*pbsubstreams.Module) *ModuleGraph {
 	}
 	return g
 }
+
+func TestReader_RegistryErrorHandling(t *testing.T) {
+	tests := []struct {
+		name           string
+		statusCode     int
+		registryURL    string
+		expectedError  string
+	}{
+		{
+			name:          "package not found",
+			statusCode:    http.StatusNotFound,
+			registryURL:   "https://spkg.io",
+			expectedError: "package does not exist on the registry",
+		},
+		{
+			name:          "access denied",
+			statusCode:    http.StatusForbidden,
+			registryURL:   "https://spkg.io",
+			expectedError: "access denied to package on the registry",
+		},
+		{
+			name:          "server error",
+			statusCode:    http.StatusInternalServerError,
+			registryURL:   "https://spkg.io",
+			expectedError: "package registry is temporarily unavailable (status 500 Internal Server Error)",
+		},
+		{
+			name:          "bad gateway",
+			statusCode:    http.StatusBadGateway,
+			registryURL:   "https://spkg.io",
+			expectedError: "package registry is temporarily unavailable (status 502 Bad Gateway)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a test server that returns the specified status code
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tt.statusCode)
+			}))
+			defer server.Close()
+
+			// Create a reader with the test server as the registry URL
+			reader := &Reader{
+				registryURL: server.URL,
+			}
+
+			// Construct the registry URL for the package
+			packageURL := server.URL + "/v1/packages/common/0.1.0"
+
+			// Test the readFromHttp method
+			err := reader.readFromHttp(packageURL)
+
+			// Verify the error message
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.expectedError)
+		})
+	}
+}
+
+func TestReader_IsRegistryURL(t *testing.T) {
+	tests := []struct {
+		name        string
+		registryURL string
+		testURL     string
+		expected    bool
+	}{
+		{
+			name:        "valid registry URL",
+			registryURL: "https://spkg.io",
+			testURL:     "https://spkg.io/v1/packages/common/0.1.0",
+			expected:    true,
+		},
+		{
+			name:        "non-registry URL",
+			registryURL: "https://spkg.io",
+			testURL:     "https://github.com/streamingfast/substreams/releases/download/v1.0.0/package.spkg",
+			expected:    false,
+		},
+		{
+			name:        "custom registry URL",
+			registryURL: "https://custom-registry.com",
+			testURL:     "https://custom-registry.com/v1/packages/test/1.0.0",
+			expected:    true,
+		},
+		{
+			name:        "registry base URL match",
+			registryURL: "https://spkg.io",
+			testURL:     "https://spkg.io/some/other/path",
+			expected:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reader := &Reader{
+				registryURL: tt.registryURL,
+			}
+
+			result := reader.isRegistryURL(tt.testURL)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+

@@ -5,12 +5,12 @@ title: Getting Started on EVM
 In this tutorial, you'll learn how to initialize a EVM-based Substreams project using the Substreams CLI (`substreams init` command).
 
 {% hint style="info" %} 
- The CLI installation is supported only on Linux and macOS. If you're using Windows, consider using the [DevContainer environment](../how-to-guides/cli/installing-the-cli.md), which launches a Linux-based virtual environment.
+ The CLI installation is supported only on Linux and macOS. If you're using Windows, consider using the [DevContainer environment](../references/devcontainer-ref.md), which launches a Linux-based virtual environment.
 {% endhint %}
 
 ## Step 1: Initialize Your EVM Substreams Project
 
-1. [Install the Substreams CLI](../references/cli/installing-the-cli.md)
+1. [Install the Substreams CLI](../how-to-guides/cli/installing-the-cli.md)
     
 2. Running `substreams init` will give you the option to choose between two EVM project options. Select the one that best fits your requirements:
     - **evm-hello-world**: Creates a simple Substreams that outputs the events of a smart contract. Depending on the blockchain that you choose (Mainnet, Arbitrum, Polygon), the smart contract address will be different (usually, it's the USDC token, if it's available on the chain).

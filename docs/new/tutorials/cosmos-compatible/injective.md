@@ -14,7 +14,7 @@ In this tutorial, you'll learn how to initialize a Injective-based Substreams pr
 
 ## Step 1: Initialize Your Injective Substreams Project
 
-1. [Install the Substreams CLI](../../references/cli/installing-the-cli.md).
+1. [Install the Substreams CLI](../../how-to-guides/cli/installing-the-cli.md).
     
 2. Running `substreams init` will give you the option to choose between three Injective project options. Select the one that best fits your requirements:
     - **Injective EVM**: Navigate to the `substreams init` [EVM path](../evm.md) to access Injective-specific EVM data. Supports [Extended Blocks](../../references/chains-and-endpoints.md).

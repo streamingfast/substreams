@@ -6,8 +6,8 @@ If your blockchain is not supported, please ask in Discord. Then, consult the re
 
 - [EVM](./evm.md)
 - [Solana](./solana/solana.md)
+- [Tron](./tron.md)
 - [Starknet](./starknet.md)
 - [Injective](./cosmos-compatible/injective.md)
 - [Mantra](./cosmos-compatible/mantra.md)
 - [Stellar](./stellar.md)
-- [Stellar](./tron.md)

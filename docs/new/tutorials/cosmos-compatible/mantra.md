@@ -9,7 +9,7 @@ In this tutorial, you'll learn how to initialize a Mantra-based Substreams proje
 
 ## Step 1: Initialize Your MANTRA Substreams Project
 
-1. [Install the Substreams CLI](../../references/cli/installing-the-cli.md).
+1. [Install the Substreams CLI](../../how-to-guides/cli/installing-the-cli.md).
     
 2. Running `substreams init` will give you the option to choose between two MANTRA project options. Select the one that best fits your requirements:
     - **MANTRA-hello-world**: Creates a simple Substreams module that outputs all `transfer` events. It demonstrates how to access the full Mantra block, iterate over events, and filter by a specific event `type`.

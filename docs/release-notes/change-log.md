@@ -11,16 +11,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### CLI
+
+* Refuse `<name>@latest` in imports, this resolves to a different version at different busting the Substreams cache, use a specific version instead `<name>@<version>` which `version` must respect semantic versioning (SemVer).
+
+* Add close match suggestions when module name cannot be found on `substreams run/sink` command(s).
+
+* Do not print usage report when there was no usage at all, usually when there is an error on `substreams run/sink` command(s).
+
+* Improved error message when Substreams short package notation (`<name>@<version>`) is used but malformed.
+
+## v1.16.2
+
 ### Server
 
 * **Added** mechanism to immediately cancel pending requests that are doing an 'external call' (ex: eth_call) on a given block when it gets forked out (UNDO because of a reorg).
+
 * **Fixed** handling of invalid module kind: prevent heavy logging from recovered panic
 * Error considered deterministic which will cache the error forever are now suffixed with `<original message> (deterministic error)`.
 
 ### CLI
 
 * Improved `substreams run` command output to have humanize bytes/values and harmonized output with `substreams build`.
-
+* Fixed GUI which didn't show the 'dev outputs' from other modules anymore in development mode.
 * More tweaks to `substreams build` and `substreams protogen` commands output.
 * **Added** support for package version notation using `@` syntax (e.g., `package@v1.2.3` or `package@latest`) in manifest imports and package references.
 * **Added** `--prometheus-addr` flag to sink commands for binding Prometheus metrics server to a specified address.

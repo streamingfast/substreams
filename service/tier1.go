@@ -309,6 +309,7 @@ func (s *Tier1Service) Blocks(
 		zap.Bool("final_blocks_only", request.FinalBlocksOnly),
 		zap.Bool("production_mode", request.ProductionMode),
 		zap.Bool("noop_mode", request.NoopMode),
+		zap.Strings("dev_output_modules", request.DevOutputModules),
 	}
 
 	if s.enforceCompression && !compressed {
@@ -876,7 +877,7 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 		}
 
 		if err := streamSrv.Send(resp); err != nil {
-			logger.Info("unable to send block probably due to client disconnecting", zap.String("user_id", userID), zap.String("api_key_id", apiKeyID))
+			logger.Info("unable to send block probably due to client disconnecting", zap.String("user_id", userID), zap.String("api_key_id", apiKeyID), zap.Error(err))
 			return connect.NewError(connect.CodeUnavailable, err)
 		}
 

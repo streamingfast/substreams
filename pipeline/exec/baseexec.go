@@ -53,7 +53,7 @@ func NewBaseExecutor(ctx context.Context, moduleName, moduleHash string, initial
 
 // var Timer time.Duration
 var ErrNoInput = errors.New("no input")
-var ErrSkippedOutput = errors.New("skipped output") // willfully skipped output (through intrinsic)
+var ErrSkippableOutput = errors.New("skippable output") // willfully skippable output (through intrinsic)
 
 // getWasmArgumentValues return the values for each argument of type wasm.ValueArgument.
 // An empty value is returned as an empty byte slice, while a missing (skipped) value is returned as nil.

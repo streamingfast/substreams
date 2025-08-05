@@ -63,25 +63,24 @@ func NewInstance(sinkerConfig *sink.SinkerConfig, tuiConfig *common.TUIConfig) (
 		readerOptions = append(readerOptions, manifest.WithOverrideNetwork(sinkerConfig.Network))
 	}
 
-	var graph *manifest.ModuleGraph
-	if sinkerConfig.Pkg == nil {
-		manifestReader, err := manifest.NewReader(tuiConfig.ManifestPath, readerOptions...)
-		if err != nil {
-			return nil, fmt.Errorf("reading package: %w", err)
-		}
-
-		pkgBundle, err := manifestReader.Read()
-		if err != nil {
-			return nil, fmt.Errorf("parsing package at %q: %w", tuiConfig.ManifestPath, err)
-		}
-
-		if pkgBundle == nil {
-			return nil, fmt.Errorf("no package found")
-		}
-
-		sinkerConfig.Pkg = pkgBundle.Package
-		graph = pkgBundle.Graph
+	manifestReader, err := manifest.NewReader(tuiConfig.ManifestPath, readerOptions...)
+	if err != nil {
+		return nil, fmt.Errorf("reading package: %w", err)
 	}
+
+	pkgBundle, err := manifestReader.Read()
+	if err != nil {
+		return nil, fmt.Errorf("parsing package at %q: %w", tuiConfig.ManifestPath, err)
+	}
+
+	if pkgBundle == nil {
+		return nil, fmt.Errorf("no package found")
+	}
+
+	if sinkerConfig.Pkg == nil {
+		sinkerConfig.Pkg = pkgBundle.Package
+	}
+	graph := pkgBundle.Graph
 
 	if tuiConfig.OutputModule == "" && graph != nil {
 		mods, ok := graph.TopologicalSort()
@@ -143,7 +142,8 @@ func NewInstance(sinkerConfig *sink.SinkerConfig, tuiConfig *common.TUIConfig) (
 	}
 
 	outputModules := sinkerConfig.DevOutputModules
-	if outputModules == nil && graph != nil && tuiConfig.OutputModule != "" {
+	if len(outputModules) == 0 && graph != nil && tuiConfig.OutputModule != "" {
+		// with no special value, request all 'local' module outputs
 		usedModules, err := graph.ModulesDownTo(tuiConfig.OutputModule)
 		if err != nil {
 			return nil, fmt.Errorf("get used modules: %w", err)
@@ -154,6 +154,8 @@ func NewInstance(sinkerConfig *sink.SinkerConfig, tuiConfig *common.TUIConfig) (
 			}
 			outputModules = append(outputModules, mod.Name)
 		}
+	} else if len(outputModules) == 1 && outputModules[0] == ".*" {
+		outputModules = nil // with special value '.*', request everything, no filtering
 	}
 
 	req := &pbsubstreamsrpc.Request{

@@ -277,7 +277,7 @@ func (r *manifestConverter) manifestToPkg(manif *Manifest) (*pbsubstreams.Packag
 		return nil, nil, nil, fmt.Errorf("failed to convert manifest to pkg: %w", err)
 	}
 
-	if err := loadImports(pkg, manif, r.validation); err != nil {
+	if err := loadImports(pkg, manif, r.reader, r.validation); err != nil {
 		return nil, nil, nil, fmt.Errorf("error loading imports: %w", err)
 	}
 

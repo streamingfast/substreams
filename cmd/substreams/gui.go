@@ -27,7 +27,7 @@ func init() {
 	guiCmd.Flags().Bool("production-mode", false, "Enable Production Mode, with high-speed parallel processing")
 	guiCmd.Flags().Uint64("limit-processed-blocks", 10000, "Limit the number of blocks to be processed by the server, including preparing the stores, as a safeguard to prevent unexpected expensive reprocessing (0 disables the limit)")
 	guiCmd.Flags().StringSlice("debug-modules-initial-snapshot", nil, "List of 'store' modules from which to print the initial data snapshot (Unavailable in Production Mode)")
-	guiCmd.Flags().StringSlice("debug-modules-output", nil, "List of modules from which to fetch the outputs, useful when debugging (unavailable in Production Mode). Defaults to the non-imported modules.")
+	guiCmd.Flags().StringSlice("debug-modules-output", nil, "List of modules from which to fetch the outputs, useful when debugging (unavailable in Production Mode). Defaults to the non-imported modules. Set to '.*' to to request all module outputs.")
 	guiCmd.Flags().Bool("replay", false, "Replay saved session into GUI from replay.bin")
 
 	rootCmd.AddCommand(guiCmd)

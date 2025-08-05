@@ -645,7 +645,7 @@ func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbs
 	return func(respAny substreams.ResponseFromAnyTier) error {
 		resp := respAny.(*pbssinternal.ProcessRangeResponse)
 		if err := streamSrv.Send(resp); err != nil {
-			logger.Info("unable to send block probably due to client disconnecting", zap.Error(err), zap.String("user_id", userID), zap.String("key_id", apiKeyID))
+			logger.Info("unable to send block probably due to client disconnecting", zap.Error(err), zap.String("user_id", userID), zap.String("key_id", apiKeyID), zap.Error(err))
 			return status.Error(codes.Unavailable, err.Error())
 		}
 

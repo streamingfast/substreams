@@ -18,7 +18,7 @@ For each Solana Account block, only the latest update per account is recorded, s
 
 Before you begin, ensure that you have the following:
 
-1. [Substreams CLI](../../references/cli/installing-the-cli.md) installed.
+1. [Substreams CLI](../../how-to-guides/cli/installing-the-cli.md) installed.
 2. A [Substreams key](../../references/cli/authentication.md) for access to the Solana Account Change data.
 3. Basic knowledge of [how to use](../../references/cli/command-line-interface.md) the command line interface (CLI).
 

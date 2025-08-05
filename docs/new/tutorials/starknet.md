@@ -9,7 +9,7 @@ In this tutorial, you'll learn how to initialize a Starknet-based Substreams pro
 
 ## Step 1: Initialize Your Starknet Substreams Project
 
-1. [Install the Substreams CLI](../references/cli/installing-the-cli.md).
+1. [Install the Substreams CLI](../how-to-guides/cli/installing-the-cli.md).
 
 2. Running `substreams init` will give you the option to choose between two Starknet project options. Select the one that best fits your requirements:
     - **stellar-hello-world**: Creates a Substreams that outputs all the events of the Starknet token. It teaches how to access the full Starknet Block, how to iterate over transactions and how to filter on specific event addresses.

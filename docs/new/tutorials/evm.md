@@ -5,7 +5,7 @@ title: Getting Started on EVM
 In this tutorial, you'll learn how to initialize a EVM-based Substreams project using the Substreams CLI (`substreams init` command).
 
 {% hint style="info" %} 
- The CLI installation is supported only on Linux and macOS. If you're using Windows, consider using the [DevContainer environment](../references/devcontainer-ref.md), which launches a Linux-based virtual environment.
+ The CLI installation is supported only on Linux and macOS. If you're using Windows, consider using the [DevContainer environment](../how-to-guides/cli/installing-the-cli.md), which launches a Linux-based virtual environment.
 {% endhint %}
 
 ## Step 1: Initialize Your EVM Substreams Project

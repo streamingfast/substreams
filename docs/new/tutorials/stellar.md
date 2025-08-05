@@ -4,13 +4,12 @@ Tutorial on Stellar
 In this guide, you'll learn how to initialize a Stellar-based Substreams project within the Dev Container.
 
 {% hint style="info" %} 
- If you prefer to begin locally within your terminal rather than through the Dev Container (VS Code required), refer to the [Substreams CLI installation guide](../how-to-guides/cli/installing-the-cli.md).
+ The CLI installation is supported only on Linux and macOS. If you're using Windows, consider using the [DevContainer environment](../references/devcontainer-ref.md), which launches a Linux-based virtual environment.
 {% endhint %}
 
-## Step 1: Initialize Your Stellar Substreams Project
+## Step 1: Initialize Your Starknet Substreams Project
 
-1. Open the [Dev Container](https://github.com/streamingfast/substreams-starter) and follow the on-screen steps to initialize your project.
-
+1. [Install the Substreams CLI](../how-to-guides/cli/installing-the-cli.md).
 2. Running `substreams init` will give you the option to choose between two Stellar project options. Select the one that best fits your requirements:
     - **stellar-minimal**: Creates a simple Substreams that extracts raw Stellar block data and generates corresponding Rust code. This path will start you with the full raw block, you can navigate to the `substreams.yaml` (the manifest) to modify the input.
     - **stellar-transactions-operations**: Creates a Substreams that extracts and decodes Stellar trasactions or operations using the cached [Stellar Foundational Module](https://substreams.dev/packages/stellar-foundational/v0.3.0). If you choose the index transactions, you will be able to filter by **source account(s)**. If you choose to index operations, you will be able to filter by **operation name**.

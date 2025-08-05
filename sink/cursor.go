@@ -2,6 +2,7 @@ package sink
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -21,10 +22,31 @@ func ReadCursor(filename string) (*Cursor, error) {
 	return nil, nil
 }
 
-// WriteCursor is a NOOP if filename is empty or cursor is nil
+// WriteCursor writes cursor to file using temp file and rename. Returns nil if filename is empty or cursor is nil.
 func WriteCursor(filename string, cursor *Cursor) error {
 	if filename == "" || cursor == nil {
 		return nil
 	}
-	return os.WriteFile(filename, []byte(cursor.String()), 0644)
+
+	dir := filepath.Dir(filename)
+	tempFile, err := os.CreateTemp(dir, ".cursor_*")
+	if err != nil {
+		return err
+	}
+
+	tempPath := tempFile.Name()
+
+	_, err = tempFile.Write([]byte(cursor.String()))
+	if err != nil {
+		tempFile.Close()
+		os.Remove(tempPath)
+		return err
+	}
+
+	if err = tempFile.Close(); err != nil {
+		os.Remove(tempPath)
+		return err
+	}
+
+	return os.Rename(tempPath, filename)
 }

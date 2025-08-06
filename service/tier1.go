@@ -90,7 +90,7 @@ func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
 	ctx := context.Background()
 	stream, err := sf.New(
 		ctx,
-		bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
+		bstream.HandlerFunc(func(blk *pbbstream.Block, obj any) error {
 			out = blk.Payload.TypeUrl
 			return io.EOF
 		}),
@@ -218,13 +218,33 @@ func NewTier1(
 		sharedCache := exec.NewSharedCache(sharedCacheSize)
 		hubSrc := hub.SourceFromBlockNum(hub.HeadNum(), sharedCache)
 		if hubSrc == nil {
-			zlog.Error("cannot get blocks source from hub")
+			zlog.Error("shared cache: cannot get blocks source from hub")
 			return
 		}
 		exec.GlobalSharedCache = sharedCache
 		hubSrc.Run()
 		if err := hubSrc.Err(); err != nil {
 			zlog.Info("shared cache source stopped", zap.Error(err))
+		}
+	}()
+
+	go func() {
+		if hub == nil {
+			zlog.Info("undo manager disabled, no live source configured")
+			return
+		}
+
+		<-hub.Ready
+		undoManager := exec.NewUndoManager()
+		hubSrc := hub.SourceFromBlockNum(hub.HeadNum(), undoManager)
+		if hubSrc == nil {
+			zlog.Error("undoManager: cannot get blocks source from hub")
+			return
+		}
+		exec.GlobalUndoManager = undoManager
+		hubSrc.Run()
+		if err := hubSrc.Err(); err != nil {
+			zlog.Info("undo managersource stopped", zap.Error(err))
 		}
 	}()
 
@@ -289,6 +309,7 @@ func (s *Tier1Service) Blocks(
 		zap.Bool("final_blocks_only", request.FinalBlocksOnly),
 		zap.Bool("production_mode", request.ProductionMode),
 		zap.Bool("noop_mode", request.NoopMode),
+		zap.Strings("dev_output_modules", request.DevOutputModules),
 	}
 
 	if s.enforceCompression && !compressed {
@@ -856,7 +877,7 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 		}
 
 		if err := streamSrv.Send(resp); err != nil {
-			logger.Info("unable to send block probably due to client disconnecting", zap.String("user_id", userID), zap.String("api_key_id", apiKeyID))
+			logger.Info("unable to send block probably due to client disconnecting", zap.String("user_id", userID), zap.String("api_key_id", apiKeyID), zap.Error(err))
 			return connect.NewError(connect.CodeUnavailable, err)
 		}
 
@@ -1034,7 +1055,7 @@ func toConnectError(ctx context.Context, err error) error {
 	}
 
 	if errors.Is(err, wasm.ErrWasmDeterministicExec) || errors.Is(err, store.ErrStoreAboveMaxSize) {
-		return connect.NewError(connect.CodeInvalidArgument, err)
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("%w (deterministic error)", err))
 	}
 
 	var errInvalidArg *bsstream.ErrInvalidArg

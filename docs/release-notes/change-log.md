@@ -9,6 +9,55 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### CLI
+
+* Refuse `<name>@latest` in imports, this resolves to a different version at different busting the Substreams cache, use a specific version instead `<name>@<version>` which `version` must respect semantic versioning (SemVer).
+
+* Add close match suggestions when module name cannot be found on `substreams run/sink` command(s).
+
+* Do not print usage report when there was no usage at all, usually when there is an error on `substreams run/sink` command(s).
+
+* Improved error message when Substreams short package notation (`<name>@<version>`) is used but malformed.
+
+## v1.16.2
+
+### Server
+
+* **Added** mechanism to immediately cancel pending requests that are doing an 'external call' (ex: eth_call) on a given block when it gets forked out (UNDO because of a reorg).
+
+* **Fixed** handling of invalid module kind: prevent heavy logging from recovered panic
+* Error considered deterministic which will cache the error forever are now suffixed with `<original message> (deterministic error)`.
+
+### CLI
+
+* Improved `substreams run` command output to have humanize bytes/values and harmonized output with `substreams build`.
+* Fixed GUI which didn't show the 'dev outputs' from other modules anymore in development mode.
+* More tweaks to `substreams build` and `substreams protogen` commands output.
+* **Added** support for package version notation using `@` syntax (e.g., `package@v1.2.3` or `package@latest`) in manifest imports and package references.
+* **Added** `--prometheus-addr` flag to sink commands for binding Prometheus metrics server to a specified address.
+
+## v1.16.1
+
+### CLI
+
+* Fixed `substreams build` command when there is no WASM file already present on disk.
+
+## v1.16.0
+
+### CLI
+
+* **Improved** Improved `substreams build`, `substreams protogen` and `substreams pack` command outputs to be streamlined and condensed.
+* **Added** support for reading manifest from stdin across all manifest-accepting commands using `"-"` as the manifest path. Affected commands: `build`, `run`, `gui`, `info`, `graph`, `pack`, `protogen`. This enables dynamic manifest generation and preprocessing workflows, including integration with tools like `envsubst` for environment variable substitution and CI/CD pipeline automation.
+* **Added** `substreams sink webhook` command to send Substreams output to a webhook endpoint. See [the documentation](./sink/webhook/README.md) for more information.
+* Changed `substreams-api-token-envvar` flag to `api-token-envvar`
+* Changed `substreams-api-key-envvar` flag to `api-key-envvar`
+
+## Lib
+
+* **Moved** github.com/streamingfast/substreams-sink library in this repo, under github.com/streamingfast/substreams/sink
+
 ## v1.15.10
 
 * Re-release of v1.15.9 with missing dependency update.

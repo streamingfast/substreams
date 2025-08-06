@@ -3,6 +3,7 @@ package manifest
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -187,6 +188,12 @@ func (r *Reader) Read() (*PackageBundle, error) {
 
 func (r *Reader) read() error {
 	input := r.currentInput
+
+	// Handle stdin input
+	if input == "-" {
+		return r.readStdin()
+	}
+
 	if r.IsRemotePackage(input) {
 		return r.readRemote(input)
 	}
@@ -234,6 +241,9 @@ func (r *Reader) readFromHttp(input string) error {
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		if r.isRegistryURL(input) {
+			return r.mapRegistryErrors(resp.StatusCode, resp.Status)
+		}
 		return fmt.Errorf("error downloading %q, status %s: %s", input, resp.Status, string(r.currentData))
 	}
 
@@ -398,23 +408,41 @@ func (r *Reader) readLocal(input string) error {
 	return nil
 }
 
+func (r *Reader) readStdin() error {
+	data, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		return fmt.Errorf("unable to read from stdin: %w", err)
+	}
+
+	r.currentData = data
+	return nil
+}
+
 func (r *Reader) resolveInputPath() error {
+
 	input := r.originalInput
+
+	// Handle stdin input
+	if input == "-" {
+		r.currentInput = "-"
+		return nil
+	}
+
 	if r.IsRemotePackage(input) {
 		r.currentInput = input
 		return nil
 	}
 
-	pkgName, version, err := r.ParseStandardPackageAndVersion(input)
-	if err == nil {
-		registryURL := r.registryURL
-		if registryURL == "" {
-			// This is an extreme fallback, because this should be
-			// set by the WithRegistryURL option.
-			registryURL = "https://spkg.io"
+	if pkgName, version, likelyShortcut, validationErr := ParseShortPackageIdentifier(input); likelyShortcut || validationErr == nil {
+		if likelyShortcut && validationErr != nil {
+			return fmt.Errorf("invalid Substreams Registry short package identifier %q: %w", input, validationErr)
 		}
-		r.currentInput = fmt.Sprintf("%s/v1/packages/%s/%s", registryURL, pkgName, version)
-		return nil
+
+		// If there is no error
+		if validationErr == nil {
+			r.currentInput = r.registryPackageURL(pkgName, version)
+			return nil
+		}
 	}
 
 	if input == "" {
@@ -437,13 +465,51 @@ func (r *Reader) resolveInputPath() error {
 	return nil
 }
 
+func (r *Reader) registryPackageURL(packageName string, version string) string {
+	return fmt.Sprintf("%s/v1/packages/%s/%s", r.registryBaseURL(), url.PathEscape(packageName), url.PathEscape(version))
+}
+
+func (r *Reader) registryBaseURL() string {
+	if r.registryURL != "" {
+		return r.registryURL
+	}
+	if env := os.Getenv("SUBSTREAMS_REGISTRY"); env != "" {
+		return env
+	}
+	// This is an extreme fallback, because this should be
+	// set by the WithRegistryURL option.
+	return "https://spkg.io"
+}
+
+// isRegistryURL checks if the given URL is targeting the package registry
+func (r *Reader) isRegistryURL(url string) bool {
+	registryBase := r.registryBaseURL()
+	return strings.HasPrefix(url, registryBase)
+}
+
+// mapRegistryErrors transforms HTTP status codes into user-friendly registry error messages
+func (r *Reader) mapRegistryErrors(statusCode int, status string) error {
+	switch statusCode {
+	case http.StatusNotFound:
+		return fmt.Errorf("package does not exist on the Substreams registry")
+	case http.StatusForbidden:
+		return fmt.Errorf("access denied to package on the Substreams registry")
+	case http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return fmt.Errorf("Substreams package registry is temporarily unavailable (status %s)", status)
+	default:
+		return fmt.Errorf("failed to fetch package from Substreams registry (status %s)", status)
+	}
+}
+
 func (r *Reader) getPkg() (*pbsubstreams.Package, *Manifest, error) {
 	if r.currentData == nil {
 		return nil, nil, fmt.Errorf("no result available")
 	}
 
-	if strings.HasSuffix(r.currentInput, ".yaml") || strings.HasSuffix(r.currentInput, ".yml") {
+	if r.currentInput == "-" || strings.HasSuffix(r.currentInput, ".yaml") || strings.HasSuffix(r.currentInput, ".yml") {
 		manif := &Manifest{}
+		manif.Workdir = r.workingDir
+
 		decoder := yaml3.NewDecoder(bytes.NewReader(r.currentData))
 		decoder.KnownFields(true)
 
@@ -570,6 +636,7 @@ func validatePackage(pkg *pbsubstreams.Package, validation ReaderValidation) err
 
 func (r *Reader) newPkgFromManifest(manif *Manifest) (*pbsubstreams.Package, error) {
 	converter := newManifestConverter(r.currentInput, r.validation, r)
+
 	pkg, descriptors, dynMessage, err := converter.Convert(manif)
 	if err != nil {
 		return nil, err
@@ -669,28 +736,42 @@ func (r *Reader) IsRemotePackage(input string) bool {
 	return hasRemotePrefix(input)
 }
 
-func (r *Reader) ParseStandardPackageAndVersion(input string) (packageName, version string, err error) {
-	parts := strings.Split(input, "@")
-	if len(parts) > 2 {
-		return "", "", fmt.Errorf("too many '@' in package name: %s", input)
-	}
-
-	packageName = parts[0]
+// ParseShortPackageIdentifier parses a package identifier in the format "package@version"
+// and returns the package name and version. If the version is not specified, it defaults to "latest".
+// Once deemed valid, we return validation errors as a multierror.
+//
+// The `likelyShortcut` boolean indicates if the input is likely a shortcut package identifier
+// which is when a @ is found in the input.
+//
+// The parser accepts "latest" as a valid version, and it will be returned as such even if
+// it's not a semver version.
+func ParseShortPackageIdentifier(input string) (packageName, version string, likelyShortcut bool, validationError error) {
+	packageName, version, likelyShortcut = strings.Cut(input, "@")
 	if !moduleNameRegexp.MatchString(packageName) {
-		return "", "", fmt.Errorf("package name %s does not match regexp %s", packageName, moduleNameRegexp.String())
+		validationError = errors.Join(validationError, fmt.Errorf("package name %s does not match regexp %s", packageName, moduleNameRegexp))
 	}
 
-	if len(parts) == 1 || parts[1] == "" || parts[1] == "latest" {
-		version = "latest"
-		return
+	if version == "" || version == "latest" {
+		return packageName, "latest", likelyShortcut, validationError
 	}
 
-	if !semver.IsValid(parts[1]) {
-		return "", "", fmt.Errorf("version %q is not valid Semver format", parts[1])
+	if strings.Contains(version, "@") {
+		validationError = errors.Join(validationError, fmt.Errorf("version %q should not contain '@'", version))
+	} else if version != "latest" && !semver.IsValid(version) {
+		validationError = errors.Join(validationError, fmt.Errorf("version %q is not valid Semver format", version))
 	}
-	version = parts[1]
 
 	return
+}
+
+// Deprecated: ParseStandardPackageAndVersion is deprecated, use [manifest.ParseShortPackageIdentifier] instead.
+func (r *Reader) ParseStandardPackageAndVersion(input string) (packageName, version string, err error) {
+	packageName, version, _, validationErr := ParseShortPackageIdentifier(input)
+	if validationErr != nil {
+		return "", "", validationErr
+	}
+
+	return packageName, version, nil
 }
 
 // IsLocalManifest determines if reader's input to read the manifest is a local manifest file, which is determined
@@ -700,16 +781,27 @@ func (r *Reader) IsLocalManifest() bool {
 		return false
 	}
 
+	// Reading from standard input is also considered a local manifest input
+	if r.currentInput == "-" {
+		return true
+	}
+
 	return strings.HasSuffix(r.currentInput, ".yaml") || strings.HasSuffix(r.currentInput, ".yml")
 }
 
 // IsLikelyManifestInput determines if the input is likely a manifest input, which is determined
 // by checking:
 //   - If the input starts with remote prefix ("https://", "http://", "ipfs://", "gs://", "s3://", "az://")
+//   - If the input is reading from standard input (i.e., `-`)
 //   - If the input ends with `.yaml`
 //   - If the input is a directory (we check for path separator)
 func IsLikelyManifestInput(in string) bool {
 	if hasRemotePrefix(in) {
+		return true
+	}
+
+	// Reading from standard input is also considered a valid manifest input
+	if in == "-" {
 		return true
 	}
 
@@ -831,7 +923,11 @@ func ValidateModules(mods *pbsubstreams.Modules) error {
 			return fmt.Errorf("module %q: duplicate module name", mod.Name)
 		}
 		mapModules[mod.Name] = mod
-		mapModuleKind[mod.Name] = mod.ModuleKind()
+		modKind := mod.ModuleKind()
+		if modKind == pbsubstreams.ModuleKindInvalid {
+			return fmt.Errorf("module %q: invalid module kind", mod.Name)
+		}
+		mapModuleKind[mod.Name] = modKind
 	}
 
 	for _, mod := range mods.Modules {
@@ -917,17 +1013,40 @@ func LoadManifestFile(inputPath, workingDir string) (*Manifest, error) {
 
 // loop through the Manifest, and get the `imports` statements,
 // pull the Package files from Disk, and merge them into this one
-func loadImports(pkg *pbsubstreams.Package, manif *Manifest, validation ReaderValidation) error {
+func loadImports(pkg *pbsubstreams.Package, manif *Manifest, parentReader *Reader, validation ReaderValidation) error {
 	for _, kv := range manif.Imports {
 		importName := kv[0]
-		importPath := manif.resolvePath(kv[1])
+		importLocation := kv[1]
+		var importPath string
 
-		subpkgReader, err := NewReader(importPath)
-		subpkgReader.validation = validation
+		packageName, version, likelyShortcut, validationErr := ParseShortPackageIdentifier(importLocation)
+		if likelyShortcut {
+			if validationErr != nil {
+				return fmt.Errorf("invalid import %q: %w", importLocation, validationErr)
+			}
 
+			if version == "latest" {
+				return fmt.Errorf("import %q: version 'latest' is not allowed in imports, please specify a specific version", importLocation)
+			}
+
+			importPath = parentReader.registryPackageURL(packageName, version)
+		} else {
+			importPath = manif.resolvePath(importLocation)
+		}
+
+		subpkgReader, err := NewReader(importPath,
+			WithRegistryURL(parentReader.registryURL),
+			WithOverrideNetwork(parentReader.overrideNetwork),
+			WithCollectProtoDefinitions(parentReader.collectProtoDefinitionsFunc),
+
+			// Do we need to add proto descriptor set to child reader?
+			// WithProtoPath(parentReader.protoPath),
+			// WithProtoDescriptorSet(parentReader.protoDescriptorSet),
+		)
 		if err != nil {
 			return fmt.Errorf("importing %q: %w", importPath, err)
 		}
+		subpkgReader.validation = validation
 
 		pkgBundle, err := subpkgReader.Read()
 		if err != nil {

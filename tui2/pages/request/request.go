@@ -5,7 +5,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	"github.com/streamingfast/substreams/sink"
 	"github.com/streamingfast/substreams/tui2/components/dataentry"
 	"github.com/streamingfast/substreams/tui2/components/modsearch"
 	"github.com/streamingfast/substreams/tui2/stream"
@@ -30,14 +32,11 @@ const LogoASCII = `
          ▀▀
 `
 
-type BlockContext struct {
-	Module   string
-	BlockNum uint64
-}
-
 type Request struct {
 	common.Common
-	*Config
+	sinkerConfig *sink.SinkerConfig
+	tuiConfig    *common.TUIConfig
+	graph        *manifest.ModuleGraph
 
 	isStreaming        bool
 	RequestSummary     *Summary
@@ -47,10 +46,11 @@ type Request struct {
 	linearHandoffBlock uint64
 }
 
-func New(c common.Common, conf *Config) *Request {
+func New(c common.Common, sinkerConfig *sink.SinkerConfig, tuiConfig *common.TUIConfig) *Request {
 	return &Request{
-		Common: c,
-		Config: conf,
+		Common:       c,
+		sinkerConfig: sinkerConfig,
+		tuiConfig:    tuiConfig,
 	}
 }
 
@@ -64,28 +64,29 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case NewRequestInstance:
 		r.RequestSummary = msg.RequestSummary
+		r.graph = msg.Graph
 
 	case common.SetRequestValue:
 		switch msg.Field {
 		case "module":
-			r.Config.OutputModule = msg.Value
+			r.tuiConfig.OutputModule = msg.Value
 		case "start-block":
-			r.Config.StartBlock = msg.Value
-			if strings.HasPrefix(msg.Value, "-") {
-				r.Config.StopBlock = ""
+			if value, err := strconv.ParseInt(msg.Value, 10, 64); err == nil {
+				r.sinkerConfig.StartBlock = value
 			}
 		case "stop-block":
-			r.Config.StopBlock = msg.Value
-
+			if value, err := strconv.ParseUint(msg.Value, 10, 64); err == nil {
+				r.sinkerConfig.StopBlock = value
+			}
 		case "limit-processed-blocks":
 			if value, err := strconv.ParseUint(msg.Value, 10, 64); err == nil {
-				r.Config.LimitProcessedBlocks = value
+				r.sinkerConfig.LimitProcessedBlocks = value
 			}
 		case "endpoint":
-			r.Config.Endpoint = msg.Value
+			r.sinkerConfig.ClientConfig.SetEndpoint(msg.Value)
 		case "params":
 			// TODO: there's no interface to modify this for now, dataentry doesn't support it yet.
-			r.Config.Params = msg.Value
+			r.tuiConfig.Params = msg.Value
 		}
 
 	case tea.KeyMsg:
@@ -94,31 +95,33 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			comp := dataentry.New(r.Common, "start-block", validateNumbersOnly)
 			comp.Input.Prompt("Enter the start block number: ").
 				Description("Block from which to start streaming. Numbers only. Negative means relative to chain head.\n\n")
-			comp.SetValue(r.Config.StartBlock)
+			comp.SetValue(fmt.Sprintf("%d", r.sinkerConfig.StartBlock))
 			cmds = append(cmds, common.SetModalComponentCmd(comp))
 		case "t":
 			comp := dataentry.New(r.Common, "stop-block", validateNumberOrRelativeValue)
 			comp.Input.Prompt("Enter the stop block number: ").
 				Description("Enter numbers only, with an optional - or + prefix.\n\nYou can specify relative block numbers with - (to head) or + (to start block) prefixes.\n")
-			comp.SetValue(r.Config.StopBlock)
+			comp.SetValue(fmt.Sprintf("%d", r.sinkerConfig.StopBlock))
 			cmds = append(cmds, common.SetModalComponentCmd(comp))
 		case "l":
 			comp := dataentry.New(r.Common, "limit-processed-blocks", validateNumberOrRelativeValue)
 			comp.Input.Prompt("Enter the number to limit processed blocks: ").
 				Description("Enter numbers only, with an optional - or + prefix.\n")
-			comp.SetValue(fmt.Sprintf("%d", r.Config.LimitProcessedBlocks))
+			comp.SetValue(fmt.Sprintf("%d", r.sinkerConfig.LimitProcessedBlocks))
 			cmds = append(cmds, common.SetModalComponentCmd(comp))
 		case "m":
 			comp := modsearch.New(r.Common, "request")
 			comp.Title = "Select top-level map module (/ to filter)"
-			comp.SetListItems(r.Config.Graph.MapModules())
-			comp.SetSelected(r.Config.OutputModule)
+			if r.graph != nil {
+				comp.SetListItems(r.graph.MapModules())
+			}
+			comp.SetSelected(r.tuiConfig.OutputModule)
 			cmds = append(cmds, common.SetModalComponentCmd(comp))
 		case "e":
 			comp := dataentry.New(r.Common, "endpoint", nil)
 			comp.Input.Prompt("Enter endpoint: ").
 				Description("Without https://. Include port (:443). Find endpoints on https://thegraph.market\nExample: mainnet.eth.streamingfast.io:443\n")
-			comp.SetValue(r.Config.Endpoint)
+			comp.SetValue(r.sinkerConfig.ClientConfig.Endpoint())
 			cmds = append(cmds, common.SetModalComponentCmd(comp))
 		case "a":
 		case "p":
@@ -132,7 +135,7 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case common.ModuleSelectedMsg:
 		if msg.Target == "request" {
-			r.Config.OutputModule = msg.ModuleName
+			r.tuiConfig.OutputModule = msg.ModuleName
 		}
 
 	case *pbsubstreamsrpc.SessionInit:
@@ -161,49 +164,50 @@ func (r *Request) View() string {
 }
 
 func (r *Request) renderRequestSummary() string {
-	startBlock := r.Config.StartBlock
-	if startBlock == "" && r.Config.Graph != nil {
-		startBlockInt, _ := r.Config.Graph.ModuleInitialBlock(r.Config.OutputModule)
-		startBlock = fmt.Sprintf("%d (module's initial block)", startBlockInt)
+	startBlock := fmt.Sprintf("%d", r.sinkerConfig.StartBlock)
+	if r.graph != nil && r.tuiConfig.OutputModule != "" {
+		if startBlockInt, err := r.graph.ModuleInitialBlock(r.tuiConfig.OutputModule); err == nil {
+			startBlock = fmt.Sprintf("%d (module's initial block)", startBlockInt)
+		}
 	}
-	packageName := r.Config.ManifestPath
+	packageName := r.tuiConfig.ManifestPath
 	packageMetaName := "unknown"
 	packageMetaVersion := "unknown"
-	if r.Config.Pkg != nil && len(r.Config.Pkg.PackageMeta) > 0 {
-		packageMetaName = r.Config.Pkg.PackageMeta[0].Name
-		packageMetaVersion = r.Config.Pkg.PackageMeta[0].Version
+	if r.sinkerConfig.Pkg != nil && len(r.sinkerConfig.Pkg.PackageMeta) > 0 {
+		packageMetaName = r.sinkerConfig.Pkg.PackageMeta[0].Name
+		packageMetaVersion = r.sinkerConfig.Pkg.PackageMeta[0].Version
 	}
 	packageName = fmt.Sprintf("%s (%s-%s)", packageName, packageMetaName, packageMetaVersion)
 	authToken := "No, run `substreams auth` to set it"
-	if r.Config.SubstreamsClientConfig.AuthToken() != "" {
+	if r.sinkerConfig.ClientConfig.AuthToken() != "" {
 		authToken = "Yes"
 	}
 	rows := [][]string{
 		{"Package:", packageName},
-		{fmt.Sprintf("Endpoint %s:", styles.HelpKey.Render("<e>")), r.Config.Endpoint},
+		{fmt.Sprintf("Endpoint %s:", styles.HelpKey.Render("<e>")), r.sinkerConfig.ClientConfig.Endpoint()},
 		{"Auth Token loaded:", authToken},
-		{"Network:", r.Config.OverrideNetwork},
-		{"Custom params:", r.Config.Params},
-		{"Default params:", r.Config.DefaultParams},
+		{"Network:", r.sinkerConfig.Network},
+		{"Custom params:", r.tuiConfig.Params},
+		{"Default params:", r.tuiConfig.DefaultParams},
 		{"", ""},
-		{fmt.Sprintf("Module %s:", styles.HelpKey.Render("<m>")), r.Config.OutputModule},
+		{fmt.Sprintf("Module %s:", styles.HelpKey.Render("<m>")), r.tuiConfig.OutputModule},
 		{fmt.Sprintf("Start block %s:", styles.HelpKey.Render("<s>")), startBlock},
-		{fmt.Sprintf("Stop block %s:", styles.HelpKey.Render("<t>")), r.Config.StopBlock},
-		{fmt.Sprintf("Limit processed blocks %s:", styles.HelpKey.Render("<l>")), fmt.Sprintf("%d", r.Config.LimitProcessedBlocks)},
+		{fmt.Sprintf("Stop block %s:", styles.HelpKey.Render("<t>")), fmt.Sprintf("%d", r.sinkerConfig.StopBlock)},
+		{fmt.Sprintf("Limit processed blocks %s:", styles.HelpKey.Render("<l>")), fmt.Sprintf("%d", r.sinkerConfig.LimitProcessedBlocks)},
 	}
-	if len(r.Config.DebugModulesInitialSnapshot) > 0 {
+	if len(r.sinkerConfig.DevOutputSnapshots) > 0 {
 		rows = append(rows,
-			[]string{"Initial snapshots:", strings.Join(r.Config.DebugModulesInitialSnapshot, ", ")},
+			[]string{"Initial snapshots:", strings.Join(r.sinkerConfig.DevOutputSnapshots, ", ")},
 		)
 	}
-	if r.Config.ProdMode {
+	if r.sinkerConfig.Mode == sink.SubstreamsModeProduction {
 		rows = append(rows,
-			[]string{"Production mode:", fmt.Sprintf("%v", r.Config.ProdMode)},
+			[]string{"Production mode:", "true"},
 		)
 	} else {
 		printedModules := "[all non-imported modules]"
-		if r.Config.DebugModulesOutput != nil {
-			printedModules = strings.Join(r.Config.DebugModulesOutput, ",")
+		if r.sinkerConfig.DevOutputModules != nil {
+			printedModules = strings.Join(r.sinkerConfig.DevOutputModules, ",")
 		}
 		rows = append(rows,
 			[]string{"Printed modules:", printedModules},

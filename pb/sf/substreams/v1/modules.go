@@ -8,7 +8,8 @@ import (
 type ModuleKind int
 
 const (
-	ModuleKindStore = ModuleKind(iota)
+	ModuleKindInvalid = ModuleKind(iota)
+	ModuleKindStore
 	ModuleKindMap
 	ModuleKindBlockIndex
 )
@@ -41,7 +42,7 @@ func (x *Module) ModuleKind() ModuleKind {
 	case *Module_KindBlockIndex_:
 		return ModuleKindBlockIndex
 	}
-	panic("unsupported kind")
+	return ModuleKindInvalid
 }
 
 func (x *Module_Input) Pretty() string {

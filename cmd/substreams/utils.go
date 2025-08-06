@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"strconv"
-	"strings"
 )
 
 func readStartBlockFlag(cmd *cobra.Command, flagName string) (int64, bool, error) {
@@ -57,37 +58,70 @@ func readStopBlockFlag(cmd *cobra.Command, startBlock int64, flagName string, wi
 	return endBlock, nil
 }
 
-func warnIncompletePackage(spkg *pbsubstreams.Package) {
+type warningsConfig struct {
+	Indent              string
+	DisableImageWarning bool
+}
+
+func warnIncompletePackage(spkg *pbsubstreams.Package, config warningsConfig) (warned bool) {
+	var warnings []string
+
 	if len(spkg.PackageMeta) > 0 {
 		if spkg.PackageMeta[0].Doc == "" {
-			fmt.Println(cli.WarningStyle.Render("Warning: README not found for this package."))
+			warnings = append(warnings, "README (package.doc) not found")
 		}
 
 		if spkg.PackageMeta[0].Url == "" {
-			fmt.Println(cli.WarningStyle.Render("Warning: URL is not set for this package."))
+			warnings = append(warnings, "URL (package.url) is not set")
 		}
 
 		if spkg.PackageMeta[0].Description == "" {
-			fmt.Println(cli.WarningStyle.Render("Warning: Description is not set for this package."))
+			warnings = append(warnings, "Description (package.description) is not set")
 		}
 	}
 
+	if spkg.Image == nil && !config.DisableImageWarning {
+		warnings = append(warnings, "Image (package.image) is not set")
+	}
+
 	if spkg.Network == "" {
-		fmt.Println(cli.WarningStyle.Render("Warning: Network is not set for this package."))
+		warnings = append(warnings, "Network (network) is not set")
 	}
 
-	if spkg.Image == nil {
-		fmt.Println(cli.WarningStyle.Render("Warning: Image is not set for this package."))
+	if len(warnings) > 0 {
+		fmt.Println()
+		fmt.Println(config.Indent + "⚠️ Detected Substreams Package warnings:")
+		for _, warning := range warnings {
+			fmt.Print(config.Indent + "   • " + warning + "\n")
+		}
 	}
 
-	fmt.Println()
+	return len(warnings) > 0
 }
 
 func printPackageDetails(spkg *pbsubstreams.Package) {
-	fmt.Println()
-	fmt.Println(cli.HeaderStyle.Render("Package Details"))
-	fmt.Printf("%s: %s\n", cli.PurpleStyle.Render("Name"), spkg.PackageMeta[0].Name)
-	fmt.Printf("%s: %s\n", cli.PurpleStyle.Render("Version"), spkg.PackageMeta[0].Version)
-	fmt.Printf("%s: %s\n", cli.PurpleStyle.Render("URL"), spkg.PackageMeta[0].Url)
+	if len(spkg.PackageMeta) <= 0 {
+		return
+	}
+
+	fmt.Println("📦 Package Details")
+
+	meta := spkg.PackageMeta[0]
+
+	fmt.Printf("  %s %s\n", cli.PurpleStyle.Render("Name:"), meta.Name)
+	fmt.Printf("  %s %s\n", cli.PurpleStyle.Render("Version:"), meta.Version)
+
+	if meta.Description != "" {
+		fmt.Printf("  %s %s\n", cli.PurpleStyle.Render("Description:"), meta.Description)
+	}
+
+	if meta.Url != "" {
+		fmt.Printf("  %s %s\n", cli.PurpleStyle.Render("URL:"), meta.Url)
+	}
+
+	if spkg.Network != "" {
+		fmt.Printf("  %s %s\n", cli.PurpleStyle.Render("Network:"), spkg.Network)
+	}
+
 	fmt.Println()
 }

@@ -24,8 +24,13 @@ import (
 var registryPublish = &cobra.Command{
 	Use:   "publish [github_release_url | https_spkg_path | local_spkg_path | local_substreams_path]",
 	Short: "Publish a package to the Substreams.dev registry",
-	Args:  cobra.MaximumNArgs(1),
-	RunE:  runRegistryPublish,
+	Long: cli.Dedent(`
+		Publish a package to the Substreams.dev registry. You can specify a GitHub release URL, HTTPS spkg path,
+		local spkg path, or local substreams path. If no argument is provided, it will look for a substreams.yaml
+		file in the current directory. You can use "-" to read the manifest from standard input.
+	`),
+	Args: cobra.MaximumNArgs(1),
+	RunE: runRegistryPublish,
 }
 
 var teamSlug string
@@ -79,7 +84,7 @@ func runRegistryPublish(cmd *cobra.Command, args []string) (err error) {
 		return fmt.Errorf("validation failed: %w", err)
 	}
 
-	warnIncompletePackage(spkg)
+	warnIncompletePackage(spkg, warningsConfig{})
 	printPackageDetails(spkg)
 
 	confirm, err := utils.RunConfirmForm("Would you like to publish this package?")

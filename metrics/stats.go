@@ -3,7 +3,7 @@ package metrics
 import (
 	"context"
 	"slices"
-	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -220,11 +220,15 @@ func (s *extendedStats) updateDurations() {
 		}
 
 		s.ModuleStats.ExternalCallMetrics[i] = callMetric
-		sort.Slice(s.ModuleStats.ExternalCallMetrics, func(i, j int) bool {
-			return s.ModuleStats.ExternalCallMetrics[i].Name < s.ModuleStats.ExternalCallMetrics[j].Name
-		})
 		i++
 	}
+
+	if len(s.ModuleStats.ExternalCallMetrics) > 0 {
+		slices.SortFunc(s.ModuleStats.ExternalCallMetrics, func(a, b *pbssinternal.ExternalCallMetric) int {
+			return strings.Compare(a.Name, b.Name)
+		})
+	}
+
 	s.ModuleStats.StoreOperationTimeMs = uint64(s.storeOperationTime.Milliseconds())
 }
 

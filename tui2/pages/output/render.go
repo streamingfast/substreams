@@ -4,22 +4,18 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/alecthomas/chroma/quick"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/itchyny/gojq"
+	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 
-	"github.com/golang/protobuf/jsonpb"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/tui2/styles"
 
 	"github.com/muesli/termenv"
-	"google.golang.org/protobuf/types/known/anypb"
-
-	"github.com/streamingfast/substreams/manifest"
 )
 
 func (o *Output) wrapLogs(log string) string {
@@ -94,21 +90,26 @@ func (o *Output) renderedOutput(in *pbsubstreamsrpc.AnyModuleOutput, withStyle b
 	}
 
 	if in.IsMap() && !in.IsEmpty() {
-		msgDesc := o.msgDescs[in.Name()]
-		plain, err := o.decodeDynamicMessage(msgDesc, in.MapOutput.MapOutput)
-		if err != nil {
-			out.error = err
-		}
-		out.plainJSON = plain
-		if withStyle {
-			out.styledJSON = highlightJSON(plain)
+		if o.decoder != nil && o.decoder.HasMessageType(in.Name()) {
+			msgDesc := o.decoder.GetMessageDescriptor(in.Name())
+			plainBytes := o.decoder.DecodeDynamicMessage(msgDesc, in.MapOutput.MapOutput)
+			out.plainJSON = string(plainBytes)
+			if withStyle {
+				out.styledJSON = highlightJSON(out.plainJSON)
+			}
+		} else {
+			out.error = fmt.Errorf("no decoder available for module %s", in.Name())
 		}
 	}
 	if in.IsStore() {
 		if !in.IsEmpty() {
-			msgDesc := o.msgDescs[in.Name()]
-			// TODO: implement a store deltas decoder separate from JSON and styled one.
-			out.plainOutput = o.decodeDynamicStoreDeltas(in.StoreOutput.DebugStoreDeltas, msgDesc)
+			if o.decoder != nil && o.decoder.HasMessageType(in.Name()) {
+				msgDesc := o.decoder.GetMessageDescriptor(in.Name())
+				msgType := o.decoder.GetMessageType(in.Name())
+				out.plainOutput = o.decodeDynamicStoreDeltas(in.StoreOutput.DebugStoreDeltas, msgDesc, msgType)
+			} else {
+				out.plainOutput = fmt.Sprintf("No decoder available for module %s", in.Name())
+			}
 		} else {
 			out.plainOutput = "No deltas"
 		}
@@ -132,41 +133,6 @@ func (o *Output) renderPayload(in *renderedOutput) string {
 	return out.String()
 }
 
-func (o *Output) decodeDynamicMessage(msgDesc *manifest.ModuleDescriptor, anyin *anypb.Any) (string, error) {
-	if msgDesc.MessageDescriptor == nil {
-		return "", fmt.Errorf("no message descriptor for %s", anyin.MessageName())
-		//return Styles.ErrorLine.Render(fmt.Sprintf("Unknown type: %s\n", anyin.MessageName()))
-	}
-	in := anyin.GetValue()
-	dynMsg := o.messageFactory.NewDynamicMessage(msgDesc.MessageDescriptor)
-	if err := dynMsg.Unmarshal(in); err != nil {
-		return "", fmt.Errorf("failed unmarshalling message into %s: %s\n%s", msgDesc.ProtoMessageType,
-			err.Error(),
-			decodeAsString(in),
-		)
-		//return Styles.ErrorLine.Render(
-		//	fmt.Sprintf("Failed unmarshalling message into %s: %s\n%s",
-		//		msgDesc.ProtoMessageType,
-		//		err.Error(),
-		//		decodeAsString(in),
-		//	),
-		//)
-	}
-
-	cnt, err := dynMsg.MarshalJSONPB(&jsonpb.Marshaler{Indent: "  ", EmitDefaults: true, AnyResolver: o.anyResolver})
-	if err != nil {
-		return "", fmt.Errorf("failed marshalling into JSON: %s\nString representation: %s", err.Error(), decodeAsString(in))
-		//return Styles.ErrorLine.Render(
-		//	fmt.Sprintf("Failed marshalling into JSON: %s\nString representation: %s",
-		//		err.Error(),
-		//		decodeAsString(in),
-		//	),
-		//)
-	}
-
-	return string(cnt), nil
-}
-
 func highlightJSON(in string) string {
 	if len(in) > 1_000_000 {
 		return in
@@ -182,49 +148,41 @@ func highlightJSON(in string) string {
 	return out.String()
 }
 
-func (o *Output) decodeDynamicStoreDeltas(deltas []*pbsubstreamsrpc.StoreDelta, msgDesc *manifest.ModuleDescriptor) string {
+func (o *Output) decodeDynamicStoreDeltas(deltas []*pbsubstreamsrpc.StoreDelta, msgDesc *desc.MessageDescriptor, msgType string) string {
 	out := &strings.Builder{}
 	for _, delta := range deltas {
 		out.WriteString(fmt.Sprintf("%s (%d) KEY: %q\n", delta.Operation, delta.Ordinal, delta.Key))
-		out.WriteString(o.decodeDelta(delta.OldValue, msgDesc, "OLD"))
-		out.WriteString(o.decodeDelta(delta.NewValue, msgDesc, "NEW"))
+		out.WriteString(o.decodeDelta(delta.OldValue, msgDesc, msgType, "OLD"))
+		out.WriteString(o.decodeDelta(delta.NewValue, msgDesc, msgType, "NEW"))
 
 		out.WriteString("\n")
 	}
 	return out.String()
 }
 
-func (o *Output) decodeDelta(in []byte, msgDesc *manifest.ModuleDescriptor, oldNew string) string {
+func (o *Output) decodeDelta(in []byte, msgDesc *desc.MessageDescriptor, msgType string, oldNew string) string {
 	out := &strings.Builder{}
 	out.WriteString(fmt.Sprintf("  %s: ", oldNew))
 
 	if len(in) == 0 {
 		out.WriteString("(none)\n")
-	} else if msgDesc.MessageDescriptor == nil {
-		out.WriteString(fmt.Sprintf("%q\n", decodeAsType(in, msgDesc.StoreValueType)))
+	} else if msgDesc == nil {
+		out.WriteString(fmt.Sprintf("%q\n", decodeAsType(in, msgType)))
 	} else {
-
-		msg := o.messageFactory.NewDynamicMessage(msgDesc.MessageDescriptor)
-		if err := msg.Unmarshal(in); err != nil {
-			log.Println("error unmarshalling message:", err)
+		if o.decoder != nil {
+			deltaBytes := o.decoder.DecodeDynamicStoreDeltas(msgType, msgDesc, in)
+			jsonStr := strings.Replace(string(deltaBytes), "\n", "\n  ", -1)
+			jsonStr = highlightJSON(jsonStr)
+			out.WriteString(jsonStr)
 		} else {
-			jsonBytes, err := msg.MarshalJSONIndent()
-			if err != nil {
-				out.WriteString("failed to marshal json: " + err.Error() + ", hex:")
-				out.WriteString(decodeAsHex(in))
-			} else {
-				jsonStr := strings.Replace(string(jsonBytes), "\n", "\n  ", -1)
-				jsonStr = highlightJSON(jsonStr)
-				out.WriteString(jsonStr)
-			}
-			out.WriteString("\n")
+			out.WriteString(fmt.Sprintf("%q\n", decodeAsType(in, msgType)))
 		}
+		out.WriteString("\n")
 	}
 	return out.String()
 }
 
-func decodeAsString(in []byte) []byte { return []byte(fmt.Sprintf("%q", string(in))) }
-func decodeAsHex(in []byte) string    { return "(hex) " + hex.EncodeToString(in) }
+func decodeAsHex(in []byte) string { return "(hex) " + hex.EncodeToString(in) }
 
 func decodeAsType(in []byte, typ string) string {
 	switch typ {

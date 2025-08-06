@@ -20,13 +20,18 @@ func NewConfigs(baseObjectStore dstore.Store, allRequestedModules []*pbsubstream
 	out := make(map[string]*Config)
 	for _, mod := range allRequestedModules {
 
+		modKind := mod.ModuleKind()
+		if modKind == pbsubstreams.ModuleKindInvalid {
+			return nil, fmt.Errorf("invalid module kind for %q", mod.Name)
+		}
+
 		initialBlock := max(firstStreamableBlock, mod.InitialBlock)
 		hash := moduleHashes[mod.Name]
 		extendedHash := manifest.ExtendedModuleHash(mod, hash)
 		conf, err := NewConfig(
 			mod.Name,
 			initialBlock,
-			mod.ModuleKind(),
+			modKind,
 			hash,
 			extendedHash,
 			baseObjectStore,

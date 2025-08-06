@@ -357,7 +357,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 					continue
 				}
 				res := p.execute(ctx, executor, execOutput, isFinalBlock)
-				if res.output != nil && !res.skipped_output && !res.output.Cached {
+				if res.output != nil && !res.skippedExecution && !res.output.Cached {
 					executedStages[p.moduleNameToStage[res.output.ModuleName]] = true
 				}
 				if err := p.applyExecutionResult(ctx, executor, res, execOutput); err != nil {
@@ -371,7 +371,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 
 			for i, executor := range layer {
 				if !executor.RunsOnBlock(execOutput.Clock().Number) {
-					results[i] = resultObj{not_runnable: true}
+					results[i] = resultObj{notRunnable: true}
 					continue
 				}
 
@@ -407,10 +407,10 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 			}
 
 			for i, result := range results {
-				if result.not_runnable {
+				if result.notRunnable {
 					continue
 				}
-				if result.output != nil && !result.skipped_output && !result.output.Cached {
+				if result.output != nil && !result.skippedExecution && !result.output.Cached {
 					executedStages[p.moduleNameToStage[result.output.ModuleName]] = true
 				}
 				executor := layer[i]
@@ -431,12 +431,13 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 }
 
 type resultObj struct {
-	output         *pbssinternal.ModuleOutput
-	bytes          []byte
-	bytesForFiles  []byte
-	err            error
-	not_runnable   bool
-	skipped_output bool
+	output           *pbssinternal.ModuleOutput
+	bytes            []byte
+	bytesForFiles    []byte
+	err              error
+	notRunnable      bool
+	skippedExecution bool
+	skippableOutput  bool
 }
 
 func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, execOutput execout.ExecutionOutput, isFinalBlock bool) (out resultObj) {
@@ -449,7 +450,7 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 		if r := recover(); r != nil {
 			if err, ok := r.(error); ok {
 				if errors.Is(err, wasm.ErrWasmDeterministicExec) || errors.Is(err, store.ErrStoreAboveMaxSize) {
-					p.execoutStorage.ConfigMap[executorName].WriteDeterministicError(ctx, execOutput.Clock().Number, err)
+					p.execoutStorage.ConfigMap[executorName].WriteDeterministicError(ctx, execOutput.Clock().Number, fmt.Errorf("%w (deterministic error)", err))
 					out.err = err
 					return
 				}
@@ -458,19 +459,20 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 		}
 	}()
 
-	moduleOutput, outputBytes, outputBytesFiles, skipped, runError := exec.RunModule(ctx, executor, execOutput)
+	moduleOutput, outputBytes, outputBytesFiles, skippedExecution, skippableOutput, runError := exec.RunModule(ctx, executor, execOutput)
 
 	if isFinalBlock && errors.Is(runError, wasm.ErrWasmDeterministicExec) {
 		p.execoutStorage.ConfigMap[executorName].WriteDeterministicError(ctx, execOutput.Clock().Number, runError)
 	}
 
 	return resultObj{
-		output:         moduleOutput,
-		bytes:          outputBytes,
-		bytesForFiles:  outputBytesFiles,
-		err:            runError,
-		not_runnable:   false,
-		skipped_output: skipped,
+		output:           moduleOutput,
+		bytes:            outputBytes,
+		bytesForFiles:    outputBytesFiles,
+		err:              runError,
+		notRunnable:      false,
+		skippedExecution: skippedExecution,
+		skippableOutput:  skippableOutput,
 	}
 }
 
@@ -483,10 +485,10 @@ func (p *Pipeline) applyExecutionResult(ctx context.Context, executor exec.Modul
 	}
 
 	if executor.HasValidOutput() {
-		p.saveModuleOutput(moduleOutput, executor.Name(), reqctx.Details(ctx).ProductionMode, res.skipped_output)
+		p.saveModuleOutput(moduleOutput, executor.Name(), reqctx.Details(ctx).ProductionMode, res.skippableOutput)
 	}
 
-	skip_output := res.skipped_output
+	skip_output := res.skippableOutput
 
 	if !skip_output && executor.HasValidOutput() {
 		if err := execOutput.Set(executorName, outputBytes); err != nil {

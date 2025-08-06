@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/substreams/manifest"
 	"google.golang.org/protobuf/proto"
@@ -16,6 +17,10 @@ import (
 var inspectCmd = &cobra.Command{
 	Use:          "inspect <package>",
 	Short:        "Display low-level package structure",
+	Long: cli.Dedent(`
+		Display low-level package structure for debugging purposes. You can specify a local yaml configuration file,
+		local .spkg package file, or remote .spkg package URL. You can use "-" to read the manifest from standard input.
+	`),
 	RunE:         runInspect,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,

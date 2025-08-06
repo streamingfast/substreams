@@ -50,7 +50,7 @@ func NewBaseExecutor(ctx context.Context, moduleName, moduleHash string, initial
 
 // var Timer time.Duration
 var ErrNoInput = errors.New("no input")
-var ErrSkippedOutput = errors.New("skipped output") // willfully skipped output (through intrinsic)
+var ErrSkippableOutput = errors.New("skippable output") // willfully skippable output (through intrinsic)
 
 // getWasmArgumentValues return the values for each argument of type wasm.ValueArgument.
 // An empty value is returned as an empty byte slice, while a missing (skipped) value is returned as nil.
@@ -101,7 +101,7 @@ func canSkipExecution(wasmArgumentValues map[string][]byte, hasSingleParams bool
 	return true
 }
 
-func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canSkipEmptyOutput bool, sharedCache *SharedCache) (call *wasm.Call, err error) {
+func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canSkipEmptyOutput bool, sharedCache *SharedCache, undoManager *UndoManager) (call *wasm.Call, err error) {
 	e.logs = nil
 	e.logsTruncated = false
 
@@ -121,10 +121,17 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canS
 	//t0 := time.Now()
 	call = wasm.NewCall(clock, e.moduleName, e.entrypoint, stats, e.wasmArguments, canSkipEmptyOutput)
 
+	ctx := e.ctx
 	if sharedCache.Cachable(clock.Number) {
-		err = sharedCache.Execute(e.ctx, e.wasmModule, e.moduleHash, call, e.wasmArguments, argValues)
+		err = sharedCache.Execute(ctx, e.wasmModule, e.moduleHash, call, e.wasmArguments, argValues, undoManager)
 	} else {
-		inst, err = e.wasmModule.ExecuteNewCall(e.ctx, call, e.cachedInstance, e.wasmArguments, argValues)
+		if undoManager != nil {
+			var unsubscribe func()
+			// note: a canceled context only has an effect inside 'external calls', not within the wasm module executor itself, so the cancelation does not affect all connected streams
+			ctx, unsubscribe = undoManager.Subscribe(ctx, clock.Id)
+			defer unsubscribe()
+		}
+		inst, err = e.wasmModule.ExecuteNewCall(ctx, call, e.cachedInstance, e.wasmArguments, argValues)
 		metrics.ExecutedWasmModules.Inc()
 	}
 
@@ -137,7 +144,10 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canS
 		return nil, fmt.Errorf("block %d: module %q: general wasm execution panicked: %w: %s", clock.Number, e.moduleName, wasm.ErrWasmDeterministicExec, errExecutor.Error())
 	}
 	if err != nil {
-		if ctxErr := e.ctx.Err(); ctxErr != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			if context.Cause(ctx) == ErrBlockUndo {
+				return nil, fmt.Errorf("%w: block %d was reverted duing a reorg (UNDO) during an external call, please reconnect", ErrBlockUndo, clock.Number)
+			}
 			return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %w, %w", clock.Number, e.moduleName, err, ctxErr)
 		}
 		return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %w: %s", clock.Number, e.moduleName, wasm.ErrWasmDeterministicExec, err)

@@ -13,6 +13,8 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/sink"
+	"github.com/streamingfast/substreams/tui2/common"
 	"github.com/streamingfast/substreams/tui2/replaylog"
 	streamui "github.com/streamingfast/substreams/tui2/stream"
 	"go.uber.org/zap"
@@ -29,31 +31,6 @@ func SetupNewInstanceCmd(startStream bool) tea.Cmd {
 
 type NewRequestInstance *Instance
 
-type Config struct {
-	ManifestPath                string
-	Pkg                         *pbsubstreams.Package
-	SkipPackageValidation       bool
-	Graph                       *manifest.ModuleGraph
-	ReadFromModule              bool
-	ProdMode                    bool
-	DebugModulesOutput          []string
-	DebugModulesInitialSnapshot []string
-	Endpoint                    string
-	StartBlock                  string
-	StopBlock                   string
-	FinalBlocksOnly             bool
-	Headers                     map[string]string
-	OutputModule                string
-	OverrideNetwork             string
-	LimitProcessedBlocks        uint64
-	SubstreamsClientConfig      *client.SubstreamsClientConfig
-	HomeDir                     string
-	Vcr                         bool
-	Cursor                      string
-	Params                      string
-	DefaultParams               string
-}
-
 type Instance struct {
 	StartStream    bool
 	Stream         *streamui.Stream
@@ -64,60 +41,51 @@ type Instance struct {
 	Graph          *manifest.ModuleGraph
 }
 
-func (c *Config) Normalize() error {
-	_, err := c.NewInstance()
-	return err
-}
-
-func (c *Config) NewInstance() (out *Instance, err error) {
+func NewInstance(sinkerConfig *sink.SinkerConfig, tuiConfig *common.TUIConfig) (out *Instance, err error) {
 	// WARN: this is run in a goroutine, so there are risks of races when we mutate
 	// this *Config pointer, although it should be fairly low risk.
-	// A solution is to clone the Config, and return it inside the Instance, and apply it back
+	// A solution is to clone the Config, and return it back inside the Instance, and apply it back
 	// in the Update() cycle.
 	readerOptions := []manifest.Option{
-		manifest.WithOverrideOutputModule(c.OutputModule),
+		manifest.WithOverrideOutputModule(tuiConfig.OutputModule),
 	}
 
 	var params map[string]string
-	if c.Params != "" {
-		params, err = manifest.ParseParams(strings.Split(c.Params, "\n"))
+	if tuiConfig.Params != "" {
+		params, err = manifest.ParseParams(strings.Split(tuiConfig.Params, "\n"))
 		if err != nil {
 			return nil, fmt.Errorf("parsing params: %w", err)
 		}
 		readerOptions = append(readerOptions, manifest.WithParams(params))
 	}
 
-	if c.OverrideNetwork != "" {
-		readerOptions = append(readerOptions, manifest.WithOverrideNetwork(c.OverrideNetwork))
+	if sinkerConfig.Network != "" {
+		readerOptions = append(readerOptions, manifest.WithOverrideNetwork(sinkerConfig.Network))
 	}
 
-	if c.SkipPackageValidation {
-		readerOptions = append(readerOptions, manifest.SkipPackageValidationReader())
+	manifestReader, err := manifest.NewReader(tuiConfig.ManifestPath, readerOptions...)
+	if err != nil {
+		return nil, fmt.Errorf("reading package: %w", err)
 	}
 
-	if c.Pkg == nil || c.Graph == nil {
-		manifestReader, err := manifest.NewReader(c.ManifestPath, readerOptions...)
-		if err != nil {
-			return nil, fmt.Errorf("reading package: %w", err)
-		}
-
-		pkgBundle, err := manifestReader.Read()
-		if err != nil {
-			return nil, fmt.Errorf("parsing package at %q: %w", c.ManifestPath, err)
-		}
-
-		if pkgBundle == nil {
-			return nil, fmt.Errorf("no package found")
-		}
-
-		c.Pkg = pkgBundle.Package
-		c.Graph = pkgBundle.Graph
+	pkgBundle, err := manifestReader.Read()
+	if err != nil {
+		return nil, fmt.Errorf("parsing package at %q: %w", tuiConfig.ManifestPath, err)
 	}
 
-	if c.OutputModule == "" {
-		mods, ok := c.Graph.TopologicalSort()
+	if pkgBundle == nil {
+		return nil, fmt.Errorf("no package found")
+	}
+
+	if sinkerConfig.Pkg == nil {
+		sinkerConfig.Pkg = pkgBundle.Package
+	}
+	graph := pkgBundle.Graph
+
+	if tuiConfig.OutputModule == "" && graph != nil {
+		mods, ok := graph.TopologicalSort()
 		if ok {
-			c.OutputModule = mods[0].Name
+			tuiConfig.OutputModule = mods[0].Name
 		}
 	}
 
@@ -130,46 +98,42 @@ func (c *Config) NewInstance() (out *Instance, err error) {
 	core := zapcore.NewCore(encoder, writer, zap.InfoLevel)
 	logger := zap.New(core)
 
-	endpoint, err := manifest.ExtractNetworkEndpoint(c.Pkg.Network, c.Endpoint, logger)
+	endpoint, err := manifest.ExtractNetworkEndpoint(sinkerConfig.Pkg.Network, sinkerConfig.ClientConfig.Endpoint(), logger)
 	if err != nil {
 		return nil, fmt.Errorf("extracting network endpoint: %w", err)
 	}
-	c.Endpoint = endpoint
 
 	logger.Sync()
 	if logBuffer.String() != "" {
 		log.Println("Accumulated these logs:", logBuffer.String())
 	}
-	c.SubstreamsClientConfig.SetEndpoint(endpoint)
+	sinkerConfig.ClientConfig.SetEndpoint(endpoint)
 
-	var startBlock int64
-	if c.StartBlock != "" {
-		// TODO: use the methods for parsing those start blocks..
-		startBlock, err = strconv.ParseInt(c.StartBlock, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid start block: %w", err)
+	var startBlock int64 = sinkerConfig.StartBlock
+	if graph != nil && tuiConfig.OutputModule != "" {
+		if startBlock == 0 {
+			sb, err := graph.ModuleInitialBlock(tuiConfig.OutputModule)
+			if err != nil {
+				return nil, fmt.Errorf("start block: %w", err)
+			}
+			startBlock = int64(sb)
 		}
-	} else {
-		sb, err := c.Graph.ModuleInitialBlock(c.OutputModule)
-		if err != nil {
-			return nil, fmt.Errorf("start block: %w", err)
-		}
-		startBlock = int64(sb)
 	}
 
-	var stopBlock uint64
-	if c.StopBlock != "" {
-		stopBlock, err = parseStopBlock(startBlock, c.StopBlock, c.Cursor != "")
-		if err != nil {
-			return nil, fmt.Errorf("invalid stop block: %w", err)
-		}
+	var stopBlock uint64 = sinkerConfig.StopBlock
+	if stopBlock == 0 {
+		// Parse stop block if it was set as string (this might not be needed in new design)
+		// stopBlock, err = parseStopBlock(startBlock, stopBlockString, tuiConfig.Cursor != "")
+		// if err != nil {
+		// 	return nil, fmt.Errorf("invalid stop block: %w", err)
+		// }
 	}
 
 	// TODO: use the latest `endpoint`, create a new `SubstreamsClientConfig`
 	// TODO: if there's an error, we should have a modal dialog box showing the error, instead of
 	// showing in the StatusBar, with a "Confirm" or `esc` to close dialog.
 	// in big red font, and with the appropriate size.
-	ssClient, _, callOpts, headers, err := client.NewSubstreamsClient(c.SubstreamsClientConfig)
+	ssClient, _, callOpts, headers, err := client.NewSubstreamsClient(sinkerConfig.ClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("substreams client setup: %w", err)
 	}
@@ -177,9 +141,10 @@ func (c *Config) NewInstance() (out *Instance, err error) {
 		headers = make(map[string]string)
 	}
 
-	outputModules := c.DebugModulesOutput
-	if outputModules == nil {
-		usedModules, err := c.Graph.ModulesDownTo(c.OutputModule)
+	outputModules := sinkerConfig.DevOutputModules
+	if len(outputModules) == 0 && graph != nil && tuiConfig.OutputModule != "" {
+		// with no special value, request all 'local' module outputs
+		usedModules, err := graph.ModulesDownTo(tuiConfig.OutputModule)
 		if err != nil {
 			return nil, fmt.Errorf("get used modules: %w", err)
 		}
@@ -189,31 +154,33 @@ func (c *Config) NewInstance() (out *Instance, err error) {
 			}
 			outputModules = append(outputModules, mod.Name)
 		}
+	} else if len(outputModules) == 1 && outputModules[0] == ".*" {
+		outputModules = nil // with special value '.*', request everything, no filtering
 	}
 
 	req := &pbsubstreamsrpc.Request{
 		StartBlockNum:                       startBlock,
-		StartCursor:                         c.Cursor,
-		FinalBlocksOnly:                     c.FinalBlocksOnly,
+		StartCursor:                         tuiConfig.Cursor,
+		FinalBlocksOnly:                     sinkerConfig.FinalBlocksOnly,
 		StopBlockNum:                        stopBlock,
-		Modules:                             c.Pkg.Modules,
-		OutputModule:                        c.OutputModule,
-		ProductionMode:                      c.ProdMode,
-		DebugInitialStoreSnapshotForModules: c.DebugModulesInitialSnapshot,
-		LimitProcessedBlocks:                c.LimitProcessedBlocks,
+		Modules:                             sinkerConfig.Pkg.Modules,
+		OutputModule:                        tuiConfig.OutputModule,
+		ProductionMode:                      sinkerConfig.Mode == sink.SubstreamsModeProduction,
+		DebugInitialStoreSnapshotForModules: sinkerConfig.DevOutputSnapshots,
+		LimitProcessedBlocks:                sinkerConfig.LimitProcessedBlocks,
 		DevOutputModules:                    outputModules,
 	}
 
-	c.Headers = headers.Append(c.Headers)
-	stream := streamui.New(req, ssClient, c.Headers, callOpts)
+	combinedHeaders := headers.Append(tuiConfig.Headers)
+	stream := streamui.New(req, ssClient, combinedHeaders, callOpts)
 
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validate request: %w", err)
 	}
 
-	replayLogFilePath := filepath.Join(c.HomeDir, "replay.log")
+	replayLogFilePath := filepath.Join(tuiConfig.HomeDir, "replay.log")
 	replayLog := replaylog.New(replaylog.WithPath(replayLogFilePath))
-	if c.Vcr {
+	if tuiConfig.Vcr {
 		stream.ReplayBundle, err = replayLog.ReadReplay()
 		if err != nil {
 			return nil, err
@@ -225,21 +192,21 @@ func (c *Config) NewInstance() (out *Instance, err error) {
 		//defer replayLog.Close()
 	}
 
-	debugLogPath := filepath.Join(c.HomeDir, "debug.log")
+	debugLogPath := filepath.Join(tuiConfig.HomeDir, "debug.log")
 	tea.LogToFile(debugLogPath, "gui:")
 
-	msgDescs, err := manifest.BuildMessageDescriptors(c.Pkg)
+	msgDescs, err := manifest.BuildMessageDescriptors(sinkerConfig.Pkg)
 	if err != nil {
 		return nil, fmt.Errorf("building message descriptors: %w", err)
 	}
 
 	requestSummary := &Summary{
-		Manifest:        c.ManifestPath,
-		Endpoint:        c.SubstreamsClientConfig.Endpoint(),
-		ProductionMode:  c.ProdMode,
+		Manifest:        tuiConfig.ManifestPath,
+		Endpoint:        sinkerConfig.ClientConfig.Endpoint(),
+		ProductionMode:  sinkerConfig.Mode == sink.SubstreamsModeProduction,
 		InitialSnapshot: req.DebugInitialStoreSnapshotForModules,
-		Docs:            c.Pkg.PackageMeta,
-		ModuleDocs:      c.Pkg.ModuleMeta,
+		Docs:            sinkerConfig.Pkg.PackageMeta,
+		ModuleDocs:      sinkerConfig.Pkg.ModuleMeta,
 		Params:          params,
 	}
 
@@ -248,8 +215,8 @@ func (c *Config) NewInstance() (out *Instance, err error) {
 		MsgDescs:       msgDescs,
 		ReplayLog:      replayLog,
 		RequestSummary: requestSummary,
-		Modules:        c.Pkg.Modules,
-		Graph:          c.Graph,
+		Modules:        sinkerConfig.Pkg.Modules,
+		Graph:          graph,
 	}
 
 	return substreamRequirements, nil

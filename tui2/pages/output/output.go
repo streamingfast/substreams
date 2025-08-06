@@ -12,7 +12,8 @@ import (
 
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/protodecode"
+	"github.com/streamingfast/substreams/sink"
 	"github.com/streamingfast/substreams/tui2/common"
 	"github.com/streamingfast/substreams/tui2/components/blocksearch"
 	"github.com/streamingfast/substreams/tui2/components/blockselect"
@@ -25,9 +26,11 @@ import (
 
 type Output struct {
 	common.Common
-	*request.Config
+	sinkerConfig *sink.SinkerConfig
+	tuiConfig    *common.TUIConfig
+	graph        *manifest.ModuleGraph
 
-	anyResolver    *pbsubstreams.PackageAnyResolver
+	decoder        *protodecode.Decoder
 	msgDescs       map[string]*manifest.ModuleDescriptor
 	messageFactory *dynamic.MessageFactory
 
@@ -42,13 +45,13 @@ type Output struct {
 	highBlock uint64
 
 	blocksPerModule     map[string][]uint64
-	payloads            map[request.BlockContext]*pbsubstreamsrpc.AnyModuleOutput
+	payloads            map[common.BlockContext]*pbsubstreamsrpc.AnyModuleOutput
 	bytesRepresentation dynamic.BytesRepresentation
 
 	blockIDs map[uint64]string
 
-	active            request.BlockContext // module + block
-	outputViewYoffset map[request.BlockContext]int
+	active            common.BlockContext // module + block
+	outputViewYoffset map[common.BlockContext]int
 
 	moduleSearchView *modsearch.ModuleSearch
 
@@ -70,32 +73,25 @@ type Output struct {
 	// moduleNavigator     *modgraph.Navigator
 }
 
-func New(c common.Common, config *request.Config) (*Output, error) {
-	anyResolver, err := config.Pkg.NewAnyResolver()
-	if err != nil {
-		return nil, fmt.Errorf("new any resolver: %w", err)
-	}
-
-	bytesRepresentation := common.InferBytesRepresentation(config.Pkg.Network, config.Endpoint)
-
+func New(c common.Common, sinkerConfig *sink.SinkerConfig, tuiConfig *common.TUIConfig) (*Output, error) {
+	bytesRepresentation := common.ToDynamicBytesRepresentation(sink.InferBytesRepresentation(sinkerConfig.Pkg.Network, sinkerConfig.ClientConfig.Endpoint()))
 	output := &Output{
 		Common:              c,
-		Config:              config,
-		anyResolver:         anyResolver,
+		sinkerConfig:        sinkerConfig,
+		tuiConfig:           tuiConfig,
 		blocksPerModule:     make(map[string][]uint64),
-		payloads:            make(map[request.BlockContext]*pbsubstreamsrpc.AnyModuleOutput),
+		payloads:            make(map[common.BlockContext]*pbsubstreamsrpc.AnyModuleOutput),
 		blockIDs:            make(map[uint64]string),
-		moduleSelector:      modselect.New(c, config.Graph),
 		blockSelector:       blockselect.New(c),
 		outputView:          viewport.New(24, 80),
 		messageFactory:      dynamic.NewMessageFactoryWithDefaults(),
-		outputViewYoffset:   map[request.BlockContext]int{},
+		outputViewYoffset:   map[common.BlockContext]int{},
 		statusBar:           newStatusBarWithBytesRepresentation(c, bytesRepresentation),
 		searchCtx:           search.New(c),
 		blockSearchCtx:      blocksearch.New(c),
 		bytesRepresentation: bytesRepresentation,
 		moduleSearchView:    modsearch.New(c, "output"),
-		outputModule:        config.OutputModule,
+		outputModule:        tuiConfig.OutputModule,
 		logsEnabled:         true,
 		//moduleNavigator:     nav,
 	}
@@ -105,15 +101,19 @@ func New(c common.Common, config *request.Config) (*Output, error) {
 
 func (o *Output) Init() tea.Cmd {
 	//o.outputView.HighPerformanceRendering = true
-	return tea.Batch(
-		o.moduleSelector.Init(),
-		o.blockSelector.Init(),
-	)
+	var cmds []tea.Cmd
+	if o.moduleSelector != nil {
+		cmds = append(cmds, o.moduleSelector.Init())
+	}
+	cmds = append(cmds, o.blockSelector.Init())
+	return tea.Batch(cmds...)
 }
 
 func (o *Output) SetSize(w, h int) {
 	o.Common.SetSize(w, h)
-	o.moduleSelector.SetSize(w, 2)
+	if o.moduleSelector != nil {
+		o.moduleSelector.SetSize(w, 2)
+	}
 	o.blockSelector.SetSize(w, 5)
 	o.statusBar.SetSize(w, h)
 	o.moduleSearchView.SetSize(w, h)
@@ -122,7 +122,11 @@ func (o *Output) SetSize(w, h int) {
 	//o.moduleNavigator.FrameHeight = h - 11
 	outputViewTopBorder := 1
 	o.outputView.Width = w
-	o.outputView.Height = h - o.moduleSelector.Height - o.blockSelector.Height - outputViewTopBorder - o.statusBar.Height
+	moduleSelectorHeight := 0
+	if o.moduleSelector != nil {
+		moduleSelectorHeight = o.moduleSelector.Height
+	}
+	o.outputView.Height = h - moduleSelectorHeight - o.blockSelector.Height - outputViewTopBorder - o.statusBar.Height
 }
 
 func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -146,10 +150,26 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case request.NewRequestInstance:
 		o.errReceived = nil
 		o.msgDescs = msg.MsgDescs
+		o.graph = msg.Graph
+
+		// Initialize module selector now that we have the graph
+		if o.graph != nil {
+			o.moduleSelector = modselect.New(o.Common, o.graph)
+			o.moduleSelector.SetSize(o.Width, 2)
+		}
+
+		// Initialize decoder with the manifest descriptors
+		decoder, err := protodecode.NewDecoderFromManifest(o.sinkerConfig.Pkg, msg.MsgDescs)
+		if err != nil {
+			o.errReceived = fmt.Errorf("failed to create decoder: %w", err)
+		} else {
+			o.decoder = decoder
+		}
+
 		o.blocksPerModule = make(map[string][]uint64)
-		o.payloads = make(map[request.BlockContext]*pbsubstreamsrpc.AnyModuleOutput)
+		o.payloads = make(map[common.BlockContext]*pbsubstreamsrpc.AnyModuleOutput)
 		o.blockIDs = make(map[uint64]string)
-		o.blockSelector.Update(msg)
+		o.blockSelector.Update(blockselect.NewRequestInstanceMsg{})
 
 		// weird issue when the user rebuilds their substreams and runs a new request
 		// the old logs would keep showing
@@ -170,7 +190,7 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// this will run on first received data (whatever module)
 		// we always add the "output module" as soon as we get data
-		if o.moduleSelector.AddModule(o.outputModule) {
+		if o.moduleSelector != nil && o.moduleSelector.AddModule(o.outputModule) {
 			cmds = append(cmds, func() tea.Msg { return common.UpdateSeenModulesMsg(o.moduleSelector.Modules) })
 			o.active.Module = o.outputModule
 			o.active.BlockNum = blockNum
@@ -183,14 +203,14 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			modName := output.Name()
-			blockCtx := request.BlockContext{
+			blockCtx := common.BlockContext{
 				Module:   modName,
 				BlockNum: blockNum,
 			}
 
 			forceRedraw := false
 			if _, found := o.payloads[blockCtx]; !found {
-				if o.moduleSelector.AddModule(modName) {
+				if o.moduleSelector != nil && modName != "" && o.moduleSelector.AddModule(modName) {
 					cmds = append(cmds, func() tea.Msg { return common.UpdateSeenModulesMsg(o.moduleSelector.Modules) })
 				}
 				if o.active.Module == "" {
@@ -307,14 +327,16 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	o.outputView, cmd = o.outputView.Update(msg)
 	cmds = append(cmds, cmd)
 
-	_, cmd = o.moduleSelector.Update(msg)
-	cmds = append(cmds, cmd)
+	if o.moduleSelector != nil {
+		_, cmd = o.moduleSelector.Update(msg)
+		cmds = append(cmds, cmd)
+	}
 
 	return o, tea.Batch(cmds...)
 }
 
 type displayContext struct {
-	blockCtx          request.BlockContext
+	blockCtx          common.BlockContext
 	logsEnabled       bool
 	searchViewEnabled bool
 	searchQuery       string
@@ -370,8 +392,12 @@ func (o *Output) View() string {
 	middleSection := o.outputView.View()
 	// TODO: reimplement the `navigator` module.
 
+	var moduleSelectorView string
+	if o.moduleSelector != nil {
+		moduleSelectorView = o.moduleSelector.View()
+	}
 	out := lipgloss.JoinVertical(0,
-		o.moduleSelector.View(),
+		moduleSelectorView,
 		o.blockSelector.View(),
 		"",
 		middleSection,
@@ -395,7 +421,7 @@ func (o *Output) searchAllBlocksForModule(moduleName string) map[uint64]bool {
 	out := make(map[uint64]bool)
 
 	for _, block := range o.blocksPerModule[moduleName] {
-		blockCtx := request.BlockContext{
+		blockCtx := common.BlockContext{
 			Module:   moduleName,
 			BlockNum: block,
 		}
@@ -419,7 +445,7 @@ func (o *Output) searchAllBlocksForModule(moduleName string) map[uint64]bool {
 func (o *Output) searchIncomingBlockInModule(moduleName string, block uint64) bool {
 	var hasSearch bool
 
-	blockCtx := request.BlockContext{
+	blockCtx := common.BlockContext{
 		Module:   moduleName,
 		BlockNum: block,
 	}

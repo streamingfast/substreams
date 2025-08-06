@@ -14,3 +14,21 @@ func (c *Common) SetSize(width, height int) {
 
 func (c *Common) GetWidth() int  { return c.Width }
 func (c *Common) GetHeight() int { return c.Height }
+
+// BlockContext represents a module and block number combination
+type BlockContext struct {
+	Module   string
+	BlockNum uint64
+}
+
+// TUIConfig contains TUI-specific configuration that doesn't belong in SinkerConfig
+type TUIConfig struct {
+	ManifestPath  string
+	HomeDir       string
+	Vcr           bool
+	Headers       map[string]string
+	Cursor        string
+	Params        string
+	DefaultParams string
+	OutputModule  string
+}

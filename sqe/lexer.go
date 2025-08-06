@@ -3,6 +3,7 @@ package sqe
 import (
 	"fmt"
 	"io"
+	"slices"
 
 	lex "github.com/alecthomas/participle/lexer"
 )
@@ -98,12 +99,7 @@ func (l *lexer) isBinaryOperator(t lex.Token) bool {
 }
 
 func (l *lexer) isAnyTokenType(token lex.Token, expectedTypes ...string) bool {
-	for _, expectedType := range expectedTypes {
-		if l.symbols[token.Type] == expectedType {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(expectedTypes, l.symbols[token.Type])
 }
 
 func (l *lexer) getTokenType(token lex.Token) string {

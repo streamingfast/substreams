@@ -13,6 +13,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### CLI
 
+* **Added** `--yes` flag to `substreams registry publish` command to auto-confirm package publishing without prompting.
+* **Added** `--team-slug` flag to `substreams registry publish` command and deprecated `--teamSlug` (use `--team-slug` instead).
+
 * Refuse `<name>@latest` in imports, this resolves to a different version at different busting the Substreams cache, use a specific version instead `<name>@<version>` which `version` must respect semantic versioning (SemVer).
 
 * Add close match suggestions when module name cannot be found on `substreams run/sink` command(s).

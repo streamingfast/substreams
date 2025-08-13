@@ -64,7 +64,6 @@ require (
 	github.com/shopspring/decimal v1.3.1
 	github.com/streamingfast/dmetering v0.0.0-20241101155221-489f5a9d9139
 	github.com/streamingfast/dmetrics v0.0.0-20250711072030-f023e918a175
-	github.com/streamingfast/firehose-networks v0.1.0
 	github.com/streamingfast/sf-tracing v0.0.0-20240430173521-888827872b90
 	github.com/streamingfast/shutter v1.5.0
 	github.com/streamingfast/substreams-sdk-go v0.0.0-20240110154316-5fb21a7a330b
@@ -95,7 +94,6 @@ require (
 	github.com/bits-and-blooms/bitset v1.12.0 // indirect
 	github.com/bobg/go-generics/v3 v3.5.0 // indirect
 	github.com/catppuccin/go v0.2.0 // indirect
-	github.com/cenkalti/backoff/v5 v5.0.2 // indirect
 	github.com/charmbracelet/x/exp/strings v0.0.0-20240722160745-212f7b056ed0 // indirect
 	github.com/charmbracelet/x/term v0.2.0 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.32.4 // indirect
@@ -108,7 +106,6 @@ require (
 	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.6 // indirect
-	github.com/pinax-network/graph-networks-libs/packages/golang v0.7.0 // indirect
 	github.com/sahilm/fuzzy v0.1.1 // indirect
 	github.com/sercand/kuberesolver/v5 v5.1.1 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect

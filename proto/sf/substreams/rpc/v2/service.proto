@@ -3,6 +3,7 @@ syntax = "proto3";
 package sf.substreams.rpc.v2;
 
 import "google/protobuf/any.proto";
+import "google/protobuf/descriptor.proto";
 import "sf/firehose/v2/firehose.proto";
 import "sf/substreams/v1/clock.proto";
 import "sf/substreams/v1/modules.proto";
@@ -50,6 +51,10 @@ message Request {
   string output_module = 6;
 
   sf.substreams.v1.Modules modules = 7;
+
+  // Protobuf descriptors for the modules
+  // These are used by the server to decode the module outputs and to store them in the partial .spkg files
+  repeated google.protobuf.FileDescriptorProto proto_files = 8;
 
   // Available only in developer mode
   repeated string debug_initial_store_snapshot_for_modules = 10;

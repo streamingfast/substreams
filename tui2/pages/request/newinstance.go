@@ -169,6 +169,7 @@ func NewInstance(sinkerConfig *sink.SinkerConfig, tuiConfig *common.TUIConfig) (
 		DebugInitialStoreSnapshotForModules: sinkerConfig.DevOutputSnapshots,
 		LimitProcessedBlocks:                sinkerConfig.LimitProcessedBlocks,
 		DevOutputModules:                    outputModules,
+		ProtoFiles:                          sinkerConfig.Pkg.ProtoFiles,
 	}
 
 	combinedHeaders := headers.Append(tuiConfig.Headers)

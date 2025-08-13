@@ -304,6 +304,7 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 			NoopMode:             s.NoopMode,
 			DevOutputModules:     devOutputModules,
 			LimitProcessedBlocks: s.LimitProcessedBlocks,
+			ProtoFiles:           s.Pkg.ProtoFiles,
 		}
 
 		s.Logger.Info("sending request", zap.String("start_block", fmt.Sprintf("%d", startBlock)), zap.String("stop_block", fmt.Sprintf("%d", stopBlock)), zap.String("cursor", activeCursor.String()))

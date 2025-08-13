@@ -174,10 +174,12 @@ func (p *GlobalRequestPool) ReturnRequest(r *BorrowedRequest) {
 		return
 	}
 
+	// Use zero duration to signal immediate return (pure active streams)
+	// This ensures the request is immediately returned when the connection closes
 	resp, err := p.remoteWorkerPoolClient.ReturnWorker(context.Background(),
 		&pbworker.ReturnWorkerRequest{
 			WorkerKey:                 r.key,
-			MinimalWorkerLifeDuration: durationpb.New(r.minimalWorkerLifeDuration),
+			MinimalWorkerLifeDuration: durationpb.New(0), // Zero duration for immediate return
 		},
 		grpc.WaitForReady(false),
 	)
@@ -186,6 +188,6 @@ func (p *GlobalRequestPool) ReturnRequest(r *BorrowedRequest) {
 		p.logger.Error("returning request worker", zap.Error(err))
 		//do not propagate that err...
 	} else {
-		p.logger.Info("returned request worker", zap.String("key", r.key), zap.Stringer("status", resp.Status))
+		p.logger.Info("returned request worker (pure mode)", zap.String("key", r.key), zap.Stringer("status", resp.Status))
 	}
 }

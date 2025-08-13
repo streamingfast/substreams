@@ -13,6 +13,7 @@ import (
 	pbworker "github.com/streamingfast/worker-pool-protocol/pb/sf/worker/v1"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 const Tier2WorkerServiceName = "t2w"
@@ -150,9 +151,12 @@ func (p *GlobalWorkerPool) Return(ctx context.Context, worker Worker) {
 	}
 
 	key := worker.ID()
+	// Use zero duration to signal immediate return (pure active streams)
+	// This ensures the worker is immediately returned when the connection closes
 	_, err := p.remoteWorkerPoolClient.ReturnWorker(ctx,
 		&pbworker.ReturnWorkerRequest{
-			WorkerKey: key,
+			WorkerKey:                 key,
+			MinimalWorkerLifeDuration: durationpb.New(0), // Zero duration for immediate return
 		},
 		grpc.WaitForReady(false),
 	)
@@ -163,7 +167,7 @@ func (p *GlobalWorkerPool) Return(ctx context.Context, worker Worker) {
 	}
 
 	p.rampUpWorkerServed = false
-	p.logger.Info("returning worker", zap.String("worker_key", key))
+	p.logger.Info("returning worker (pure mode)", zap.String("worker_key", key))
 }
 
 func (p *GlobalWorkerPool) RampingUp() bool {

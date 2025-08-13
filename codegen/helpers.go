@@ -10,7 +10,7 @@ import (
 
 	"github.com/charmbracelet/huh"
 	"github.com/golang-cz/textcase"
-	networks "github.com/streamingfast/firehose-networks"
+	"github.com/streamingfast/substreams/internal/networks"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"google.golang.org/protobuf/types/descriptorpb"
@@ -346,3 +346,4 @@ func toProtoPascalCase(input string) string {
 func printMarkdown(input string) {
 	fmt.Println(ToMarkdown(input))
 }
+

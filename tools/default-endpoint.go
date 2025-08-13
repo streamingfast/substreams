@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	networks "github.com/streamingfast/firehose-networks"
+	"github.com/streamingfast/substreams/internal/networks"
 )
 
 var defaultEndpointCmd = &cobra.Command{
@@ -27,3 +27,4 @@ func defaultEndpointE(cmd *cobra.Command, args []string) error {
 
 	return fmt.Errorf("no endpoint found for network %s", args[0])
 }
+

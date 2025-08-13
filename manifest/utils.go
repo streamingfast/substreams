@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	networks "github.com/streamingfast/firehose-networks"
+	"github.com/streamingfast/substreams/internal/networks"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 )
@@ -83,3 +83,4 @@ func searchExistingCaseInsensitiveFileName(dir, filename string) (string, error)
 	}
 	return "", os.ErrNotExist
 }
+

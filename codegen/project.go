@@ -10,7 +10,7 @@ import (
 
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/golang-cz/textcase"
-	networks "github.com/streamingfast/firehose-networks"
+	"github.com/streamingfast/substreams/internal/networks"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"google.golang.org/protobuf/types/descriptorpb"
 )
@@ -460,3 +460,4 @@ func ParseFS(myFuncs template.FuncMap, fsys fs.FS, pattern string) (*template.Te
 	}
 	return t, nil
 }
+

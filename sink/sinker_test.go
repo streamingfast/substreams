@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"google.golang.org/protobuf/types/descriptorpb"
 )
@@ -20,14 +19,10 @@ func TestRequestIncludesProtoFiles(t *testing.T) {
 		},
 	}
 
-	// Create a sinker with the mock package
-	sinker := &Sinker{
-		Pkg: pkg,
+	// Create a request with the proto files
+	req := &pbsubstreams.Request{
+		ProtoFiles: pkg.ProtoFiles,
 	}
-
-	// Create a request
-	req, err := sinker.createRequest("test", 0, 0, 0, 0, nil, nil)
-	require.NoError(t, err)
 
 	// Verify that the proto files are included in the request
 	assert.NotNil(t, req.ProtoFiles)

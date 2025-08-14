@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -51,6 +52,14 @@ func init() {
 	registryPublish.Flags().MarkDeprecated("teamSlug", "use --team-slug instead")
 
 	registryCmd.AddCommand(registryPublish)
+}
+
+// ErrorResponse represents the structured error response from the server
+type ErrorResponse struct {
+	Code    string         `json:"code"`
+	TraceID string         `json:"trace_id"`
+	Message string         `json:"message"`
+	Details map[string]any `json:"details,omitempty"`
 }
 
 func runRegistryPublish(cmd *cobra.Command, args []string) (err error) {
@@ -184,19 +193,43 @@ func runRegistryPublish(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		if resp.StatusCode == http.StatusUnauthorized {
-			fmt.Println("")
-			fmt.Println(cli.ErrorStyle.Render("Failed to publish package"))
-			fmt.Println(cli.ErrorStyle.Render("Reason: " + string(b)))
-			fmt.Println("Make sure you are properly authenticated with:")
-			fmt.Println("")
-			fmt.Println(cli.PurpleStyle.Render("substreams registry login"))
-			return nil
-		}
-
 		fmt.Println("")
 		fmt.Println(cli.ErrorStyle.Render("Failed to publish package"))
-		fmt.Println(cli.ErrorStyle.Render("Reason: " + string(b)))
+
+		// Try to parse the error response as a structured error
+		var errorResp ErrorResponse
+		if err := json.Unmarshal(b, &errorResp); err == nil && errorResp.Code != "" {
+			// Successfully parsed structured error
+			fmt.Println(cli.ErrorStyle.Render(fmt.Sprintf("Error code: %s", errorResp.Code)))
+			fmt.Println(cli.ErrorStyle.Render(fmt.Sprintf("Error message: %s", errorResp.Message)))
+			
+			// Print details if available
+			if len(errorResp.Details) > 0 {
+				fmt.Println(cli.ErrorStyle.Render("Details:"))
+				for k, v := range errorResp.Details {
+					fmt.Printf("  - %s: %v\n", k, v)
+				}
+			}
+			
+			// Special handling for authentication errors
+			if resp.StatusCode == http.StatusUnauthorized {
+				fmt.Println("")
+				fmt.Println("Make sure you are properly authenticated with:")
+				fmt.Println("")
+				fmt.Println(cli.PurpleStyle.Render("substreams registry login"))
+			}
+		} else {
+			// Fallback to raw error message
+			fmt.Println(cli.ErrorStyle.Render("Reason: " + string(b)))
+			
+			if resp.StatusCode == http.StatusUnauthorized {
+				fmt.Println("")
+				fmt.Println("Make sure you are properly authenticated with:")
+				fmt.Println("")
+				fmt.Println(cli.PurpleStyle.Render("substreams registry login"))
+			}
+		}
+		
 		return nil
 	}
 
@@ -280,3 +313,4 @@ func slugifyPackageName(s string) (slug string) {
 	slug = strings.Replace(s, "_", "-", -1)
 	return
 }
+

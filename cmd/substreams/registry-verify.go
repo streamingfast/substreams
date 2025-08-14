@@ -6,7 +6,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/substreams/manifest"
-	"go.uber.org/zap"
 )
 
 var registryVerify = &cobra.Command{
@@ -82,7 +81,6 @@ func runRegistryVerify(cmd *cobra.Command, args []string) (err error) {
 	fmt.Println(cli.PurpleStyle.Render("    substreams registry publish"))
 	fmt.Println()
 
-	zlog.Debug("package verification completed successfully")
+	// Successfully verified package
 	return nil
 }
-

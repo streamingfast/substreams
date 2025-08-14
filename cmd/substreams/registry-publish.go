@@ -30,6 +30,14 @@ var registryPublish = &cobra.Command{
 		file in the current directory. You can use "-" to read the manifest from standard input.
 
 		You can publish a package by specifying under a team initially by providing the '--team-slug'.
+
+		Here the rules under which ownership a package is published based on the actual
+		published state and the '--team-slug' flag:
+
+		- Under the user's personal namespace if package was never published before and no team slug is provided.
+		- Under the team namespace if package was never published before and a team slug is provided.
+		- Under the package's existing team if it has been published initially using a team slug.
+		- Under the package's existing owner if it has been published initially without a team slug.
 	`),
 	Args: cobra.MaximumNArgs(1),
 	RunE: runRegistryPublish,

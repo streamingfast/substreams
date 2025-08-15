@@ -29,7 +29,7 @@ require (
 	github.com/streamingfast/derr v0.0.0-20250321151415-6b4fbbcb1bb5
 	github.com/streamingfast/dgrpc v0.0.0-20230919022358-3ed4eb22dce0
 	github.com/streamingfast/dhttp v0.1.2
-	github.com/streamingfast/dstore v0.1.1-0.20250609173504-95368d3441ee
+	github.com/streamingfast/dstore v0.1.1-0.20230620124109-3f08f18d6567
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
 	github.com/streamingfast/opaque v0.0.0-20210811180740-0c01d37ea308
 	github.com/streamingfast/pbgo v0.0.6-0.20240823134334-812f6a16c5cb
@@ -152,6 +152,7 @@ exclude (
 	github.com/streamingfast/firehose-networks v0.2.0
 	github.com/streamingfast/worker-pool-protocol v0.0.0-20250218145136-4ad271e36e39
 	github.com/streamingfast/dgrpc v0.0.0-20250423172640-223250ed2391
+	github.com/streamingfast/dstore v0.1.1-0.20250609173504-95368d3441ee
 	google.golang.org/grpc v1.72.0
 )
 

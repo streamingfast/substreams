@@ -13,7 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### CLI
 
-* **Added** `substreams registry verify` command to validate a package is ready for publishing without actually publishing it.
+* **Added** `substreams registry verify` command to validate a package is ready for publishing without actually publishing it. Only available as `registry verify` (no alias).
 * **Added** `--yes` flag to `substreams registry publish` command to auto-confirm package publishing without prompting.
 * **Added** `--team-slug` flag to `substreams registry publish` command and deprecated `--teamSlug` (use `--team-slug` instead).
 

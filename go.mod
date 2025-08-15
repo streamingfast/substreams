@@ -47,7 +47,7 @@ require (
 	golang.org/x/mod v0.16.0
 	golang.org/x/oauth2 v0.18.0
 	google.golang.org/grpc v1.59.0
-	google.golang.org/protobuf v1.36.6
+	google.golang.org/protobuf v1.31.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -155,5 +155,6 @@ exclude (
 	github.com/streamingfast/dstore v0.1.1-0.20250609173504-95368d3441ee
 	github.com/streamingfast/cli v0.0.4-0.20241119021815-815afa473375
 	google.golang.org/grpc v1.72.0
+	google.golang.org/protobuf v1.36.6
 )
 

@@ -1,6 +1,6 @@
 module github.com/streamingfast/substreams
 
-go 1.24.2
+go 1.21.13
 
 require (
 	github.com/abourget/llerrgroup v0.2.0
@@ -31,6 +31,7 @@ require (
 	github.com/streamingfast/dhttp v0.1.2
 	github.com/streamingfast/dstore v0.1.1-0.20250609173504-95368d3441ee
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
+	github.com/streamingfast/opaque v0.0.0-20210811180740-0c01d37ea308
 	github.com/streamingfast/pbgo v0.0.6-0.20240823134334-812f6a16c5cb
 	github.com/streamingfast/shutter v1.5.0
 	github.com/streamingfast/sf-tracing v0.0.0-20240430173521-888827872b90
@@ -116,7 +117,6 @@ require (
 	github.com/streamingfast/dmetering v0.0.0-20241101155221-489f5a9d9139 // indirect
 	github.com/streamingfast/dmetrics v0.0.0-20250711072030-f023e918a175 // indirect
 	github.com/streamingfast/firehose-networks v0.2.0 // indirect
-	github.com/streamingfast/opaque v1.0.0 // indirect
 	github.com/streamingfast/substreams-sdk-go v0.0.0-20240110154316-5fb21a7a330b // indirect
 	github.com/streamingfast/worker-pool-protocol v0.0.0-20250218145136-4ad271e36e39 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect

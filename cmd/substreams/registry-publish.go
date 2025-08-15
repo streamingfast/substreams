@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/utils"
+	"github.com/streamingfast/dhttp"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
@@ -52,14 +53,6 @@ func init() {
 	registryPublish.Flags().MarkDeprecated("teamSlug", "use --team-slug instead")
 
 	registryCmd.AddCommand(registryPublish)
-}
-
-// ErrorResponse represents the structured error response from the server
-type ErrorResponse struct {
-	Code    string         `json:"code"`
-	TraceID string         `json:"trace_id"`
-	Message string         `json:"message"`
-	Details map[string]any `json:"details,omitempty"`
 }
 
 func runRegistryPublish(cmd *cobra.Command, args []string) (err error) {
@@ -197,7 +190,7 @@ func runRegistryPublish(cmd *cobra.Command, args []string) (err error) {
 		fmt.Println(cli.ErrorStyle.Render("Failed to publish package"))
 
 		// Try to parse the error response as a structured error
-		var errorResp ErrorResponse
+		var errorResp dhttp.ErrorResponse
 		if err := json.Unmarshal(b, &errorResp); err == nil && errorResp.Code != "" {
 			// Successfully parsed structured error
 			fmt.Println(cli.ErrorStyle.Render(fmt.Sprintf("Error code: %s", errorResp.Code)))

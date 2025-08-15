@@ -1,6 +1,6 @@
 module github.com/streamingfast/substreams
 
-go 1.21.13
+go 1.19
 
 require (
 	github.com/abourget/llerrgroup v0.2.0
@@ -24,12 +24,12 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.18.2
 	github.com/streamingfast/bstream v0.0.2-0.20250221181559-fb0809660f91
-	github.com/streamingfast/cli v0.0.4-0.20230307220041-a3a5c7e5f921
+	github.com/streamingfast/cli v0.0.3
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
 	github.com/streamingfast/derr v0.0.0-20250321151415-6b4fbbcb1bb5
 	github.com/streamingfast/dgrpc v0.0.0-20230919022358-3ed4eb22dce0
 	github.com/streamingfast/dhttp v0.1.2
-	github.com/streamingfast/dstore v0.1.1-0.20230620124109-3f08f18d6567
+	github.com/streamingfast/dstore v0.1.0
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
 	github.com/streamingfast/opaque v0.0.0-20210811180740-0c01d37ea308
 	github.com/streamingfast/pbgo v0.0.6-0.20240823134334-812f6a16c5cb
@@ -147,6 +147,8 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240123012728-ef4313101c80 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 )
+
+replace github.com/streamingfast/dstore => github.com/dfuse-io/dstore v0.1.0
 
 exclude (
 	github.com/streamingfast/firehose-networks v0.2.0

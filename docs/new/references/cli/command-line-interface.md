@@ -21,7 +21,7 @@ The `substreams` CLI exposes many commands to developers enabling a range of fea
 
 If you choose to not use it, make sure that you are in a directory that contains a substreams.yaml file. Otherwise, you will get a usage error back.
 
-**Stdin Support**: Commands that accept manifest files (`build`, `run`, `gui`, `info`, `graph`, `pack`, `protogen`, `inspect`, `registry publish`, `service deploy`, `service update`) all support reading the manifest from standard input by specifying `"-"` as the manifest path. This enables dynamic manifest generation and preprocessing workflows.
+**Stdin Support**: Commands that accept manifest files (`build`, `run`, `gui`, `info`, `graph`, `pack`, `protogen`, `inspect`, `registry publish`, `registry verify`, `service deploy`, `service update`) all support reading the manifest from standard input by specifying `"-"` as the manifest path. This enables dynamic manifest generation and preprocessing workflows.
 {% endhint %}
 
 ### **`init`**

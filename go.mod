@@ -1,6 +1,6 @@
 module github.com/streamingfast/substreams
 
-go 1.24.2
+go 1.19
 
 toolchain go1.24.7
 

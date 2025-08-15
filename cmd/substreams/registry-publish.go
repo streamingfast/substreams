@@ -15,7 +15,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
-	"github.com/streamingfast/cli/utils"
 	"github.com/streamingfast/dhttp"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/tidwall/gjson"
@@ -121,7 +120,7 @@ func runRegistryPublish(cmd *cobra.Command, args []string) (err error) {
 	printPackageDetails(spkg)
 
 	if !autoConfirm {
-		confirm, err := utils.RunConfirmForm("Would you like to publish this package?")
+		confirm, err := runConfirmForm("Would you like to publish this package?")
 		if err != nil {
 			return fmt.Errorf("running confirm form %w", err)
 		}
@@ -305,5 +304,23 @@ func copyPasteTokenForm(endpoint string, linkStyle lipgloss.Style) (string, erro
 func slugifyPackageName(s string) (slug string) {
 	slug = strings.Replace(s, "_", "-", -1)
 	return
+}
+
+// runConfirmForm is a helper function to run a confirmation form
+func runConfirmForm(message string) (bool, error) {
+	var confirm bool
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title(message).
+				Value(&confirm),
+		),
+	)
+
+	if err := form.Run(); err != nil {
+		return false, fmt.Errorf("error running form: %w", err)
+	}
+
+	return confirm, nil
 }
 

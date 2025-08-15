@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/streamingfast/cli/utils"
 	"os"
 	"path/filepath"
 
@@ -35,7 +34,7 @@ func runRegistryLoginE(cmd *cobra.Command, args []string) error {
 
 	isFileExists := checkFileExists(registryTokenFilename)
 	if isFileExists {
-		confirmOverwrite, err := utils.RunConfirmForm("Token already saved to ~/.config/substreams/registry-token, do you want to overwrite it?")
+		confirmOverwrite, err := runConfirmForm("Token already saved to ~/.config/substreams/registry-token, do you want to overwrite it?")
 		if err != nil {
 			return fmt.Errorf("running confirm form: %w", err)
 		}

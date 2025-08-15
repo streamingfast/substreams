@@ -46,7 +46,7 @@ require (
 	golang.org/x/exp v0.0.0-20240222234643-814bf88cf225
 	golang.org/x/mod v0.16.0
 	golang.org/x/oauth2 v0.18.0
-	google.golang.org/grpc v1.72.0
+	google.golang.org/grpc v1.59.0
 	google.golang.org/protobuf v1.36.6
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -152,5 +152,6 @@ exclude (
 	github.com/streamingfast/firehose-networks v0.2.0
 	github.com/streamingfast/worker-pool-protocol v0.0.0-20250218145136-4ad271e36e39
 	github.com/streamingfast/dgrpc v0.0.0-20250423172640-223250ed2391
+	google.golang.org/grpc v1.72.0
 )
 

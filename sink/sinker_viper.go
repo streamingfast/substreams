@@ -135,7 +135,7 @@ func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagIgnored) {
 	}
 
 	if flagIncluded(FlagLiveBlockTimeDelta) {
-		flags.Duration(FlagLiveBlockTimeDelta, 300*time.Second, "Consider chain live if block time is within this number of seconds of current time")
+		flags.Duration(FlagLiveBlockTimeDelta, 0, "Consider chain live if block time is within this number of seconds of current time. If disabled, liveness is based on the cursor being 'finalized' or not")
 	}
 
 	if flagIncluded(FlagDevelopmentMode) {
@@ -337,6 +337,8 @@ func ConfigFromViper(
 	var livenessChecker LivenessChecker
 	if liveBlockTimeDelta > 0 {
 		livenessChecker = NewDeltaLivenessChecker(liveBlockTimeDelta)
+	} else {
+		livenessChecker = NewCursorBasedLivenessChecker()
 	}
 
 	config := &SinkerConfig{

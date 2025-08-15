@@ -491,6 +491,10 @@ func (s *Sinker) doRequest(
 			}
 
 		case *pbsubstreamsrpc.Response_BlockScopedData:
+			if cursorLivenessChecker, ok := s.LivenessChecker.(*CursorBasedLivenessChecker); ok {
+				cursorLivenessChecker.CheckCursor(r.BlockScopedData.Cursor)
+			}
+
 			afterReceive = time.Now()
 			lastMessageWasData = true
 			AvgBlockWaitTime.AddElapsedTime(beforeReceive)

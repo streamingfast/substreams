@@ -24,7 +24,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.18.2
 	github.com/streamingfast/bstream v0.0.2-0.20250221181559-fb0809660f91
-	github.com/streamingfast/cli v0.0.4-0.20241119021815-815afa473375
+	github.com/streamingfast/cli v0.0.4-0.20230307220041-a3a5c7e5f921
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
 	github.com/streamingfast/derr v0.0.0-20250321151415-6b4fbbcb1bb5
 	github.com/streamingfast/dgrpc v0.0.0-20230919022358-3ed4eb22dce0
@@ -153,6 +153,7 @@ exclude (
 	github.com/streamingfast/worker-pool-protocol v0.0.0-20250218145136-4ad271e36e39
 	github.com/streamingfast/dgrpc v0.0.0-20250423172640-223250ed2391
 	github.com/streamingfast/dstore v0.1.1-0.20250609173504-95368d3441ee
+	github.com/streamingfast/cli v0.0.4-0.20241119021815-815afa473375
 	google.golang.org/grpc v1.72.0
 )
 

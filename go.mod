@@ -117,7 +117,6 @@ require (
 	github.com/streamingfast/dmetering v0.0.0-20241101155221-489f5a9d9139 // indirect
 	github.com/streamingfast/dmetrics v0.0.0-20250711072030-f023e918a175 // indirect
 	github.com/streamingfast/substreams-sdk-go v0.0.0-20240110154316-5fb21a7a330b // indirect
-	github.com/streamingfast/worker-pool-protocol v0.0.0-20250218145136-4ad271e36e39 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
@@ -149,5 +148,8 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect
 )
 
-exclude github.com/streamingfast/firehose-networks v0.2.0
+exclude (
+	github.com/streamingfast/firehose-networks v0.2.0
+	github.com/streamingfast/worker-pool-protocol v0.0.0-20250218145136-4ad271e36e39
+)
 

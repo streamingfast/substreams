@@ -37,7 +37,7 @@ fn map_program_data(blk: Block) -> Data {
 
 ## Unit Testing
 
-Testing a Substreams does not differ much from testing a standard Rust application. As an example, you can can refer to the tests in the [Ethereum Foundational Modules Substreams](https://github.com/streamingfast/substreams-foundational-modules/tree/develop/ethereum-common). Let's take a look at the [filtered_events test](https://github.com/streamingfast/substreams-foundational-modules/blob/develop/ethereum-common/src/events.rs#L95).
+Testing a Substreams does not differ much from testing a standard Rust application. As an example, you can refer to the tests in the [Ethereum Foundational Modules Substreams](https://github.com/streamingfast/substreams-foundational-modules/tree/develop/ethereum-common). Let's take a look at the [filtered_events test](https://github.com/streamingfast/substreams-foundational-modules/blob/develop/ethereum-common/src/events.rs#L95).
 
 1. The definition of the function is a standard Substreams module, which needs the `#[substreams::handlers::map]` macro. Because of the macro, the _real_ signature of the function is more complex than just a couple of input parameters. Therefore, to facilitate the testing, all the logic is contained inside the `_filtered_events` function.
 

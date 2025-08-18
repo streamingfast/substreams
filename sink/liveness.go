@@ -58,9 +58,7 @@ func NewCursorBasedLivenessChecker() *CursorBasedLivenessChecker {
 }
 
 func (t *CursorBasedLivenessChecker) IsLive(clock *pbsubstreams.Clock) bool {
-	if t.isLive {
-		return true
-	}
+	return t.isLive
 }
 
 func (t *CursorBasedLivenessChecker) CheckCursor(cursor string) {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
@@ -25,6 +26,14 @@ type TestWorker struct {
 	testTempDir            string
 	id                     uint64
 	firstStreamableBlock   uint64
+}
+
+func (w *TestWorker) StartKeepAlive(ctx context.Context, delay time.Duration, remoteWorkerPoolClient work.WorkerBroker) {
+	//noop
+}
+
+func (w *TestWorker) StopKeepAlive() {
+	//noop
 }
 
 var workerID atomic.Uint64

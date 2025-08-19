@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/streamingfast/bstream"
@@ -23,11 +24,14 @@ import (
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/reqctx"
+	pbworker "github.com/streamingfast/worker-pool-protocol/pb/sf/worker/v1"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	otelCodes "go.opentelemetry.io/otel/codes"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
+
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 )
@@ -41,6 +45,8 @@ type Result struct {
 type Worker interface {
 	ID() string
 	Work(ctx context.Context, unit stage.Unit, startBlock uint64, moduleNames []string, upstream *response.Stream, streamOutput bool) loop.Cmd // *Result
+	StartKeepAlive(ctx context.Context, delay time.Duration, remoteWorkerPoolClient WorkerBroker)
+	StopKeepAlive()
 }
 
 type RemoteWorker struct {
@@ -48,6 +54,9 @@ type RemoteWorker struct {
 	tracer        ttrace.Tracer
 	logger        *zap.Logger
 	id            string
+	done          chan struct{}
+	mutex         sync.Mutex
+	stopped       bool
 }
 
 func NewRemoteWorker(clientFactory client.InternalClientFactory, id string, logger *zap.Logger) *RemoteWorker {
@@ -57,6 +66,7 @@ func NewRemoteWorker(clientFactory client.InternalClientFactory, id string, logg
 		tracer:        otel.GetTracerProvider().Tracer("worker"),
 		logger:        logger,
 		id:            id,
+		done:          make(chan struct{}),
 	}
 }
 
@@ -73,21 +83,20 @@ func NewRequest(ctx context.Context, req *reqctx.RequestDetails, stageIndex int,
 	segment := startBlock / tier2ReqParams.StateBundleSize
 
 	return &pbssinternal.ProcessRangeRequest{
-		Modules:                    req.Modules,
-		OutputModule:               req.OutputModule,
-		Stage:                      uint32(stageIndex),
-		MeteringConfig:             tier2ReqParams.MeteringConfig,
-		FirstStreamableBlock:       tier2ReqParams.FirstStreamableBlock,
-		MergedBlocksStore:          tier2ReqParams.MergedBlockStoreURL,
-		StateStore:                 tier2ReqParams.StateStoreURL,
-		SegmentSize:                tier2ReqParams.StateBundleSize,
-		SegmentNumber:              segment,
-		StateStoreDefaultTag:       tier2ReqParams.StateStoreDefaultTag,
-		WasmExtensionConfigs:       tier2ReqParams.WASMModules,
-		BlockType:                  tier2ReqParams.BlockType,
-		ProductionMode:             req.ProductionMode,
-		StreamOutput:               streamOutput,
-		FoundationalStoreEndpoints: tier2ReqParams.FoundationalStoreEndpoints,
+		Modules:              req.Modules,
+		OutputModule:         req.OutputModule,
+		Stage:                uint32(stageIndex),
+		MeteringConfig:       tier2ReqParams.MeteringConfig,
+		FirstStreamableBlock: tier2ReqParams.FirstStreamableBlock,
+		MergedBlocksStore:    tier2ReqParams.MergedBlockStoreURL,
+		StateStore:           tier2ReqParams.StateStoreURL,
+		SegmentSize:          tier2ReqParams.StateBundleSize,
+		SegmentNumber:        segment,
+		StateStoreDefaultTag: tier2ReqParams.StateStoreDefaultTag,
+		WasmExtensionConfigs: tier2ReqParams.WASMModules,
+		BlockType:            tier2ReqParams.BlockType,
+		ProductionMode:       req.ProductionMode,
+		StreamOutput:         streamOutput,
 	}
 }
 
@@ -158,7 +167,7 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 				if streamOutput {
 					// never retry for jobs that stream blocks, we don't know how much data they already sent
 					segmentStart := request.SegmentNumber * request.SegmentSize
-					return derr.NewFatalError(fmt.Errorf("segment [%d-%d] failed while streaming data: %w", segmentStart, segmentStart+request.SegmentSize, err))
+					return derr.NewFatalError(fmt.Errorf("segment [%d-%d] failed while streaming data: %s", segmentStart, segmentStart+request.SegmentSize, err))
 				}
 				metrics.Tier1WorkerRetryCounter.Inc()
 				stats.RecordJobRetried(jobIdx)
@@ -386,4 +395,45 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 			}
 		}
 	}
+}
+
+func (r *RemoteWorker) StartKeepAlive(ctx context.Context, delay time.Duration, remoteWorkerPoolClient WorkerBroker) {
+	if strings.HasPrefix(r.id, FreeWorkerKeyPrefix) {
+		r.logger.Info("keep alive is not needed for free worker")
+		return
+	}
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-r.done:
+				return
+			case <-time.After(delay):
+				_, err := remoteWorkerPoolClient.KeepAlive(
+					ctx,
+					&pbworker.KeepAliveRequest{
+						WorkerKey: r.id,
+					},
+					grpc.WaitForReady(false),
+				)
+				if err != nil {
+					r.logger.Error("failed to call keep request worker alive", zap.String("worker_id", r.id), zap.Error(err))
+				}
+
+			}
+		}
+	}()
+}
+func (r *RemoteWorker) StopKeepAlive() {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	if r.stopped {
+		return
+	}
+
+	r.stopped = true
+	close(r.done)
 }

@@ -212,9 +212,107 @@ func (i *Input) parse() error {
 		return nil
 	}
 	if i.IsFoundationalStore() {
-		return nil
+		// return nil
+		return i.parseFoundationalStore()
 	}
 	return fmt.Errorf("input has an unknown or mixed types; expect one, and only one of: 'params', 'map', 'store' or 'source'")
+}
+
+func (i *Input) parseFoundationalStore() error {
+	// Handle package notation
+	if strings.Contains(i.FoundationalStore, "@") {
+		_, _, _, err := parseFoundationalStoreIdentifier(i.FoundationalStore)
+		return err
+	}
+
+	if strings.HasPrefix(i.FoundationalStore, "grpc://") {
+		return nil
+	}
+
+	return fmt.Errorf("foundational-store input %q: unsupported format. Use either package notation (package@version) or gRPC endpoint (grpc://host:port)", i.FoundationalStore)
+}
+
+var foundationalStorePackageNameRegexp = regexp.MustCompile(`^[a-z]+(-[a-z]+)*$`)
+
+func parseFoundationalStoreIdentifier(input string) (packageName, version string, isShortcut bool, err error) {
+	packageName, version, found := strings.Cut(input, "@")
+
+	if !found {
+		return packageName, "", false, nil
+	}
+
+	isShortcut = true
+	var errors []error
+
+	// Validate package name
+	if packageName == "" {
+		errors = append(errors, fmt.Errorf("package name cannot be empty"))
+	} else if !foundationalStorePackageNameRegexp.MatchString(packageName) {
+		errors = append(errors, fmt.Errorf("package name %q is invalid, must match pattern %s", packageName, foundationalStorePackageNameRegexp.String()))
+	}
+
+	// Validate version
+	if version == "" {
+		errors = append(errors, fmt.Errorf("version cannot be empty"))
+	} else if !strings.HasPrefix(version, "v") {
+		errors = append(errors, fmt.Errorf("version %q must start with 'v' (e.g., v1.0.0)", version))
+	} else if version == "vlatest" {
+		errors = append(errors, fmt.Errorf("version %q is not supported for foundational-store inputs, use specific version", version))
+	}
+
+	if len(errors) > 0 {
+		return packageName, version, isShortcut, fmt.Errorf("invalid foundational-store identifier %q: %w", input, joinErrors(errors))
+	}
+
+	return packageName, version, isShortcut, nil
+}
+
+func joinErrors(errors []error) error {
+	if len(errors) == 0 {
+		return nil
+	}
+	if len(errors) == 1 {
+		return errors[0]
+	}
+
+	var messages []string
+	for _, err := range errors {
+		messages = append(messages, err.Error())
+	}
+	return fmt.Errorf("%s", strings.Join(messages, "; "))
+}
+
+func (i *Input) resolveFoundationalStoreEndpoint() string {
+	if strings.HasPrefix(i.FoundationalStore, "grpc://") {
+		return i.FoundationalStore
+	}
+
+	if strings.Contains(i.FoundationalStore, "@") {
+		packageName, version, isShortcut, err := parseFoundationalStoreIdentifier(i.FoundationalStore)
+		if err == nil && isShortcut {
+			return resolveFoundationalStoreEndpoint(packageName, version)
+		}
+	}
+
+	return i.FoundationalStore
+}
+
+func resolveFoundationalStoreEndpoint(packageName, version string) string {
+	if endpoint := os.Getenv("FOUNDATIONAL_STORE_ENDPOINT"); endpoint != "" {
+		return endpoint
+	}
+
+	environment := os.Getenv("DEPLOYMENT_ENVIRONMENT")
+	switch environment {
+	case "local", "dev", "development":
+		return "grpc://localhost:50051"
+	case "staging", "stage":
+		return "grpc://foundational-store-staging:10016"
+	case "production", "prod":
+		return "grpc://foundational-store:10016"
+	}
+
+	return "grpc://foundational-store:10016"
 }
 
 func validateModuleWithUse(module *Module) error {
@@ -418,10 +516,12 @@ func (m *Module) setInputsToProto(pbModule *pbsubstreams.Module) error {
 		}
 
 		if input.FoundationalStore != "" {
+			resolvedEndpoint := input.resolveFoundationalStoreEndpoint()
 			pbInput := &pbsubstreams.Module_Input{
 				Input: &pbsubstreams.Module_Input_FoundationalStore{
 					FoundationalStore: &pbsubstreams.Module_FoundationalStore{
-						Endpoint: input.FoundationalStore,
+						// Endpoint: input.FoundationalStore,
+						Endpoint: resolvedEndpoint,
 					},
 				},
 			}

@@ -1,6 +1,7 @@
 package manifest
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -240,3 +241,402 @@ func TestManifest_ToProto(t *testing.T) {
 //func (x *testSinkConfig) String() string                     { return "testSinkConfig" }
 //func (*testSinkConfig) ProtoMessage()                        {}
 //func (x *testSinkConfig) ProtoReflect() protoreflect.Message { panic("unimplemented") }
+
+func TestParseFoundationalStoreIdentifier(t *testing.T) {
+	type test struct {
+		name           string
+		input          string
+		expectedOutput struct {
+			packageName string
+			version     string
+			isShortcut  bool
+		}
+		expectError string
+	}
+
+	tests := []test{
+		{
+			name:  "valid package notation",
+			input: "account-owners@v1.0.0",
+			expectedOutput: struct {
+				packageName string
+				version     string
+				isShortcut  bool
+			}{
+				packageName: "account-owners",
+				version:     "v1.0.0",
+				isShortcut:  true,
+			},
+		},
+		{
+			name:  "valid single word package",
+			input: "tokens@v2.1.3",
+			expectedOutput: struct {
+				packageName string
+				version     string
+				isShortcut  bool
+			}{
+				packageName: "tokens",
+				version:     "v2.1.3",
+				isShortcut:  true,
+			},
+		},
+		{
+			name:  "grpc endpoint without @",
+			input: "grpc://localhost:50051",
+			expectedOutput: struct {
+				packageName string
+				version     string
+				isShortcut  bool
+			}{
+				packageName: "grpc://localhost:50051",
+				version:     "",
+				isShortcut:  false,
+			},
+		},
+		{
+			name:        "empty package name",
+			input:       "@v1.0.0",
+			expectError: "package name cannot be empty",
+		},
+		{
+			name:        "empty version",
+			input:       "account-owners@",
+			expectError: "version cannot be empty",
+		},
+		{
+			name:        "invalid package name with uppercase",
+			input:       "Account-Owners@v1.0.0",
+			expectError: "package name \"Account-Owners\" is invalid",
+		},
+		{
+			name:        "invalid package name with underscore",
+			input:       "account_owners@v1.0.0",
+			expectError: "package name \"account_owners\" is invalid",
+		},
+		{
+			name:        "version without v prefix",
+			input:       "account-owners@1.0.0",
+			expectError: "version \"1.0.0\" must start with 'v'",
+		},
+		{
+			name:        "invalid version vlatest",
+			input:       "account-owners@vlatest",
+			expectError: "version \"vlatest\" is not supported",
+		},
+		{
+			name:        "multiple validation errors",
+			input:       "Invalid_Package@1.0.0",
+			expectError: "package name \"Invalid_Package\" is invalid",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			packageName, version, isShortcut, err := parseFoundationalStoreIdentifier(tt.input)
+
+			if tt.expectError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectError)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedOutput.packageName, packageName)
+				assert.Equal(t, tt.expectedOutput.version, version)
+				assert.Equal(t, tt.expectedOutput.isShortcut, isShortcut)
+			}
+		})
+	}
+}
+
+func TestResolveFoundationalStoreEndpoint(t *testing.T) {
+	// Save original environment
+	originalEndpoint := os.Getenv("FOUNDATIONAL_STORE_ENDPOINT")
+	originalEnvironment := os.Getenv("DEPLOYMENT_ENVIRONMENT")
+
+	// Cleanup function
+	cleanup := func() {
+		if originalEndpoint != "" {
+			os.Setenv("FOUNDATIONAL_STORE_ENDPOINT", originalEndpoint)
+		} else {
+			os.Unsetenv("FOUNDATIONAL_STORE_ENDPOINT")
+		}
+		if originalEnvironment != "" {
+			os.Setenv("DEPLOYMENT_ENVIRONMENT", originalEnvironment)
+		} else {
+			os.Unsetenv("DEPLOYMENT_ENVIRONMENT")
+		}
+	}
+	defer cleanup()
+
+	type test struct {
+		name           string
+		envEndpoint    string
+		envEnvironment string
+		expectedOutput string
+	}
+
+	tests := []test{
+		{
+			name:           "custom endpoint via env var",
+			envEndpoint:    "grpc://custom-host:9999",
+			envEnvironment: "production",
+			expectedOutput: "grpc://custom-host:9999",
+		},
+		{
+			name:           "local environment",
+			envEndpoint:    "",
+			envEnvironment: "local",
+			expectedOutput: "grpc://localhost:50051",
+		},
+		{
+			name:           "dev environment",
+			envEndpoint:    "",
+			envEnvironment: "dev",
+			expectedOutput: "grpc://localhost:50051",
+		},
+		{
+			name:           "development environment",
+			envEndpoint:    "",
+			envEnvironment: "development",
+			expectedOutput: "grpc://localhost:50051",
+		},
+		{
+			name:           "staging environment",
+			envEndpoint:    "",
+			envEnvironment: "staging",
+			expectedOutput: "grpc://foundational-store-staging:10016",
+		},
+		{
+			name:           "stage environment",
+			envEndpoint:    "",
+			envEnvironment: "stage",
+			expectedOutput: "grpc://foundational-store-staging:10016",
+		},
+		{
+			name:           "production environment",
+			envEndpoint:    "",
+			envEnvironment: "production",
+			expectedOutput: "grpc://foundational-store:10016",
+		},
+		{
+			name:           "prod environment",
+			envEndpoint:    "",
+			envEnvironment: "prod",
+			expectedOutput: "grpc://foundational-store:10016",
+		},
+		{
+			name:           "unknown environment defaults to production",
+			envEndpoint:    "",
+			envEnvironment: "unknown",
+			expectedOutput: "grpc://foundational-store:10016",
+		},
+		{
+			name:           "empty environment defaults to production",
+			envEndpoint:    "",
+			envEnvironment: "",
+			expectedOutput: "grpc://foundational-store:10016",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Set environment variables
+			if tt.envEndpoint != "" {
+				os.Setenv("FOUNDATIONAL_STORE_ENDPOINT", tt.envEndpoint)
+			} else {
+				os.Unsetenv("FOUNDATIONAL_STORE_ENDPOINT")
+			}
+			os.Setenv("DEPLOYMENT_ENVIRONMENT", tt.envEnvironment)
+
+			result := resolveFoundationalStoreEndpoint("account-owners", "v1.0.0")
+			assert.Equal(t, tt.expectedOutput, result)
+		})
+	}
+}
+
+func TestInputResolveFoundationalStoreEndpoint(t *testing.T) {
+	tests := []struct {
+		name           string
+		inputStore     string
+		expectEndpoint string
+	}{
+		{
+			name:           "grpc endpoint passthrough",
+			inputStore:     "grpc://localhost:50051",
+			expectEndpoint: "grpc://localhost:50051",
+		},
+		{
+			name:           "grpc endpoint with custom port",
+			inputStore:     "grpc://foundational-store:9999",
+			expectEndpoint: "grpc://foundational-store:9999",
+		},
+		{
+			name:           "package notation resolves to default",
+			inputStore:     "account-owners@v1.0.0",
+			expectEndpoint: "grpc://foundational-store:10016", // default when no env vars set
+		},
+		{
+			name:           "invalid format returns as-is",
+			inputStore:     "invalid-format-no-grpc-or-at",
+			expectEndpoint: "invalid-format-no-grpc-or-at",
+		},
+	}
+
+	// Clear environment variables for consistent test results
+	os.Unsetenv("FOUNDATIONAL_STORE_ENDPOINT")
+	os.Unsetenv("DEPLOYMENT_ENVIRONMENT")
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := &Input{
+				FoundationalStore: tt.inputStore,
+			}
+			result := input.resolveFoundationalStoreEndpoint()
+			assert.Equal(t, tt.expectEndpoint, result)
+		})
+	}
+}
+
+func TestInputParseFoundationalStore(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       Input
+		expectError string
+	}{
+		{
+			name: "valid grpc endpoint",
+			input: Input{
+				FoundationalStore: "grpc://localhost:50051",
+			},
+			expectError: "",
+		},
+		{
+			name: "valid package notation",
+			input: Input{
+				FoundationalStore: "account-owners@v1.0.0",
+			},
+			expectError: "",
+		},
+		{
+			name: "invalid package notation - empty package",
+			input: Input{
+				FoundationalStore: "@v1.0.0",
+			},
+			expectError: "package name cannot be empty",
+		},
+		{
+			name: "invalid package notation - empty version",
+			input: Input{
+				FoundationalStore: "account-owners@",
+			},
+			expectError: "version cannot be empty",
+		},
+		{
+			name: "invalid package notation - bad package name",
+			input: Input{
+				FoundationalStore: "Account_Owners@v1.0.0",
+			},
+			expectError: "package name \"Account_Owners\" is invalid",
+		},
+		{
+			name: "invalid package notation - bad version",
+			input: Input{
+				FoundationalStore: "account-owners@1.0.0",
+			},
+			expectError: "version \"1.0.0\" must start with 'v'",
+		},
+		{
+			name: "unsupported format",
+			input: Input{
+				FoundationalStore: "http://not-supported",
+			},
+			expectError: "unsupported format. Use either package notation (package@version) or gRPC endpoint (grpc://host:port)",
+		},
+		{
+			name: "completely invalid format",
+			input: Input{
+				FoundationalStore: "totally-random-string",
+			},
+			expectError: "unsupported format. Use either package notation (package@version) or gRPC endpoint (grpc://host:port)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.input.parseFoundationalStore()
+
+			if tt.expectError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectError)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestFoundationalStorePackageNameRegexp(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		isValid bool
+	}{
+		{
+			name:    "valid single word",
+			input:   "accounts",
+			isValid: true,
+		},
+		{
+			name:    "valid hyphenated",
+			input:   "account-owners",
+			isValid: true,
+		},
+		{
+			name:    "valid multiple hyphens",
+			input:   "token-account-owners",
+			isValid: true,
+		},
+		{
+			name:    "invalid with uppercase",
+			input:   "Account-owners",
+			isValid: false,
+		},
+		{
+			name:    "invalid with underscore",
+			input:   "account_owners",
+			isValid: false,
+		},
+		{
+			name:    "invalid with numbers",
+			input:   "account2owners",
+			isValid: false,
+		},
+		{
+			name:    "invalid starting with hyphen",
+			input:   "-account-owners",
+			isValid: false,
+		},
+		{
+			name:    "invalid ending with hyphen",
+			input:   "account-owners-",
+			isValid: false,
+		},
+		{
+			name:    "invalid empty",
+			input:   "",
+			isValid: false,
+		},
+		{
+			name:    "invalid consecutive hyphens",
+			input:   "account--owners",
+			isValid: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := foundationalStorePackageNameRegexp.MatchString(tt.input)
+			assert.Equal(t, tt.isValid, result, "Expected %s to be valid=%v", tt.input, tt.isValid)
+		})
+	}
+}

@@ -123,7 +123,7 @@ The `-H` option of the `run` or `gui` command allows you to dynamically pass hea
 
 ##### X-Sf-Substreams-Parallel-Jobs Header
 
-The `X-Sf-Substreams-Parallel-Jobs` header sets the number of parallel jobs to use in the Substreams execution. By default, 10 jobs are used.
+The `X-Sf-Substreams-Parallel-Jobs` header sets the number of parallel jobs to use in the Substreams execution. By default, 10 jobs are used. Most authentication backends will prevent setting this header to a higher value than the what the auth provides.
 
 ```bash
 substreams run -e mainnet.eth.streamingfast.io:443 \

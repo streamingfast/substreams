@@ -220,7 +220,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 			zap.String("key_id", auth.APIKeyID()),
 			zap.String("ip_address", auth.RealIP()),
 		)
-		if cacheTag := auth.Get("X-Sf-Substreams-Cache-Tag"); cacheTag != "" {
+		if cacheTag := auth.Get(reqctx.HeaderCacheTag); cacheTag != "" {
 			fields = append(fields,
 				zap.String("cache_tag", cacheTag),
 			)
@@ -587,11 +587,11 @@ func (s *Tier2Service) getStores(ctx context.Context, request *pbssinternal.Proc
 
 	cacheTag := request.StateStoreDefaultTag
 	if auth := dauth.FromContext(ctx); auth != nil {
-		if ct := auth.Get("X-Sf-Substreams-Cache-Tag"); ct != "" {
+		if ct := auth.Get(reqctx.HeaderCacheTag); ct != "" {
 			if IsValidCacheTag(ct) {
 				cacheTag = ct
 			} else {
-				return nil, nil, nil, fmt.Errorf("invalid value for X-Sf-Substreams-Cache-Tag %s, should only contain letters, numbers, hyphens and undescores", ct)
+				return nil, nil, nil, fmt.Errorf("invalid value for %s: %q, should only contain letters, numbers, hyphens and underscores", reqctx.HeaderCacheTag, ct)
 			}
 		}
 	}

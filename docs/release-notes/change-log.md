@@ -14,6 +14,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Server
 
 * Fix zstd thread/mem leak on filereader
+* Allow decreasing 'X-Sf-Substreams-Parallel-Jobs' and "X-Sf-Substreams-Stage-Layer-Parallel-Executor-Max-Count" through HTTP headers (auth layer determines higher bound)
+
 
 ## v1.16.3
 

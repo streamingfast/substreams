@@ -8,9 +8,9 @@ import (
 	"github.com/streamingfast/dauth"
 )
 
-const HeaderParallelJobs = "X-Sf-Substreams-Parallel-Jobs"
-const HeaderCacheTag = "X-Sf-Substreams-Cache-Tag"
-const HeaderParallelExecutor = "X-Sf-Substreams-Stage-Layer-Parallel-Executor-Max-Count"
+const HeaderParallelJobs = "x-sf-substreams-parallel-jobs"
+const HeaderCacheTag = "x-sf-substreams-cache-tag"
+const HeaderParallelExecutor = "x-sf-substreams-stage-layer-parallel-executor-max-count"
 
 // GetEffectiveHeaderValues compares the request headers to the 'trusted headers' sent by the authentication layer.
 // It contains some business logic:
@@ -29,7 +29,7 @@ func GetEffectiveHeaderValues(ctx context.Context, headers http.Header, defaultP
 		}
 		if parallelExecutorsStr := trustedHeaders.Get(HeaderParallelExecutor); parallelExecutorsStr != "" {
 			if count, err := strconv.ParseUint(parallelExecutorsStr, 10, 64); err == nil {
-				parallelJobs = count
+				parallelExecutors = count
 			}
 		}
 	}
@@ -38,17 +38,15 @@ func GetEffectiveHeaderValues(ctx context.Context, headers http.Header, defaultP
 	if parallelJobsStr := headers.Get(HeaderParallelJobs); parallelJobsStr != "" {
 		if count, err := strconv.ParseUint(parallelJobsStr, 10, 64); err == nil {
 			if count < parallelJobs {
-				count = parallelJobs
+				parallelJobs = count
 			}
-			parallelJobs = count
 		}
 	}
 	if parallelExecutorsStr := headers.Get(HeaderParallelExecutor); parallelExecutorsStr != "" {
 		if count, err := strconv.ParseUint(parallelExecutorsStr, 10, 64); err == nil {
 			if count < parallelExecutors {
-				count = parallelExecutors
+				parallelExecutors = count
 			}
-			parallelExecutors = count
 		}
 	}
 

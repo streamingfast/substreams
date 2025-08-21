@@ -4,7 +4,7 @@ If you want to use a relational model (e.g., creating one-to-many), you can anno
 
 To map your Protobuf definitions directly to database tables and establish relationships between objects, you need to annotate your Protobuf messages with table names, primary keys, and relationship metadata.
 
-{% hint style="warning" %} 
+{% hint style="warning" %}
 Relational mappings from Protobuf are currently in beta. Postgres support is stable, but ClickHouse support is still under development. [Reference releases](https://github.com/streamingfast/substreams-sink-sql/releases)
 {% endhint %}
 
@@ -46,8 +46,12 @@ docker run --name postgres-db -e POSTGRES_PASSWORD=password -e POSTGRES_DB=subst
 You can run the sink with the following syntax:
 
 ```bash
+# Ensure you are authenticated properly https://docs.substreams.dev/how-to-guides/installing-the-cli/authentication
+
 export DSN="postgres://postgres:password@localhost:5432/substreams?sslmode=disable"
-substreams-sink-sql from-proto $DSN https://github.com/streamingfast/substreams-spl-token/releases/download/v0.1.0/solana-spl-token-v0.1.0.spkg
+substreams-sink-sql from-proto "$DSN" solana-spl-token@latest
+
+# Run 'docker rm postgres-db --force' to delete running database or start from scratch
 ```
 
 ### Database Connection (DSN)
@@ -213,7 +217,7 @@ substreams-sink-sql from-proto $DSN https://github.com/streamingfast/substreams-
 
 ## Run the Sink Without Relations
 
-{% hint style="note" %} 
+{% hint style="note" %}
 For PostgreSQL users, you can run the sink without relations, no annotations required. The sink will infer the name of the table using the name of the messages that you output.
 {% endhint %}
 

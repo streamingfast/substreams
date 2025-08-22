@@ -8,9 +8,9 @@ import (
 	"github.com/streamingfast/dauth"
 )
 
-const HeaderParallelJobs = "x-sf-substreams-parallel-jobs"
-const HeaderCacheTag = "x-sf-substreams-cache-tag"
-const HeaderParallelExecutor = "x-sf-substreams-stage-layer-parallel-executor-max-count"
+const HeaderParallelWorkers = "x-substreams-parallel-workers"
+const legacyHeaderParallelWorkers = "x-sf-substreams-parallel-jobs"
+const HeaderCacheTag = "x-substreams-cache-tag"
 
 // GetEffectiveHeaderValues compares the request headers to the 'trusted headers' sent by the authentication layer.
 // It contains some business logic:
@@ -22,33 +22,35 @@ func GetEffectiveHeaderValues(ctx context.Context, headers http.Header, defaultP
 
 	// TrustedHeaders can always override these values
 	if trustedHeaders := dauth.FromContext(ctx); trustedHeaders != nil {
-		if parallelJobsStr := trustedHeaders.Get(HeaderParallelJobs); parallelJobsStr != "" {
+		if parallelJobsStr := trustedHeaders.Get(HeaderParallelWorkers); parallelJobsStr != "" {
 			if count, err := strconv.ParseUint(parallelJobsStr, 10, 64); err == nil {
 				parallelJobs = count
 			}
 		}
-		if parallelExecutorsStr := trustedHeaders.Get(HeaderParallelExecutor); parallelExecutorsStr != "" {
-			if count, err := strconv.ParseUint(parallelExecutorsStr, 10, 64); err == nil {
-				parallelExecutors = count
-			}
+
+		switch trustedHeaders.SubstreamsPlanTier() {
+		case "ENTERPRISE":
+			parallelExecutors = 10
+		case "PRO":
+			parallelExecutors = 8
+		case "SCALING":
+			parallelExecutors = 5
+		default:
+			parallelExecutors = 2
 		}
 	}
 
-	// Normal headers can only lower those values
-	if parallelJobsStr := headers.Get(HeaderParallelJobs); parallelJobsStr != "" {
-		if count, err := strconv.ParseUint(parallelJobsStr, 10, 64); err == nil {
+	// untrusted headers (from the request) can only reduce the number of parallel workers
+	untrustedParallelWorkers := headers.Get(HeaderParallelWorkers)
+	if untrustedParallelWorkers == "" {
+		untrustedParallelWorkers = headers.Get(legacyHeaderParallelWorkers)
+	}
+	if untrustedParallelWorkers != "" {
+		if count, err := strconv.ParseUint(untrustedParallelWorkers, 10, 64); err == nil {
 			if count < parallelJobs {
 				parallelJobs = count
 			}
 		}
 	}
-	if parallelExecutorsStr := headers.Get(HeaderParallelExecutor); parallelExecutorsStr != "" {
-		if count, err := strconv.ParseUint(parallelExecutorsStr, 10, 64); err == nil {
-			if count < parallelExecutors {
-				parallelExecutors = count
-			}
-		}
-	}
-
 	return
 }

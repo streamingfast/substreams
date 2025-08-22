@@ -11,61 +11,58 @@ import (
 
 func TestGetEffectiveHeaderValues(t *testing.T) {
 	tests := []struct {
-		name                      string
-		trustedHeaders            dauth.TrustedHeaders
-		normalHeaders             http.Header
-		defaultParallelJobs       uint64
-		defaultParallelExecutors  uint64
-		expectedParallelJobs      uint64
-		expectedParallelExecutors uint64
+		name                    string
+		trustedHeaders          dauth.TrustedHeaders
+		normalHeaders           http.Header
+		defaultParallelWorkers  uint64
+		defaultStageExecutors   uint64
+		expectedParallelWorkers uint64
+		expectedStageExecutors  uint64
 	}{
 		{
-			name:                      "uses defaults when no headers provided",
-			trustedHeaders:            nil,
-			normalHeaders:             http.Header{},
-			defaultParallelJobs:       10,
-			defaultParallelExecutors:  5,
-			expectedParallelJobs:      10,
-			expectedParallelExecutors: 5,
+			name:                    "uses defaults when no headers provided",
+			trustedHeaders:          nil,
+			normalHeaders:           http.Header{},
+			defaultParallelWorkers:  10,
+			defaultStageExecutors:   5,
+			expectedParallelWorkers: 10,
+			expectedStageExecutors:  5,
 		},
 		{
 			name: "trusted headers override defaults",
 			trustedHeaders: dauth.TrustedHeaders{
-				HeaderParallelJobs:     "20",
-				HeaderParallelExecutor: "8",
+				HeaderParallelWorkers: "20",
 			},
-			normalHeaders:             http.Header{},
-			defaultParallelJobs:       10,
-			defaultParallelExecutors:  5,
-			expectedParallelJobs:      20,
-			expectedParallelExecutors: 8,
+			normalHeaders:           http.Header{},
+			defaultParallelWorkers:  10,
+			defaultStageExecutors:   5,
+			expectedParallelWorkers: 20,
+			expectedStageExecutors:  2, // default for free
 		},
 		{
 			name:           "normal headers can only lower values",
 			trustedHeaders: nil,
 			normalHeaders: http.Header{
-				http.CanonicalHeaderKey(HeaderParallelJobs):     []string{"5"},  // lower than default 10
-				http.CanonicalHeaderKey(HeaderParallelExecutor): []string{"16"}, // higher than default 5, should be ignored
+				http.CanonicalHeaderKey(HeaderParallelWorkers): []string{"5"}, // lower than default 10
 			},
-			defaultParallelJobs:       10,
-			defaultParallelExecutors:  5,
-			expectedParallelJobs:      5, // lowered
-			expectedParallelExecutors: 5, // unchanged (cannot increase)
+			defaultParallelWorkers:  10,
+			defaultStageExecutors:   5,
+			expectedParallelWorkers: 5, // lowered
+			expectedStageExecutors:  5, // unchanged (cannot increase)
 		},
 		{
 			name: "normal headers cannot override trusted headers upward",
 			trustedHeaders: dauth.TrustedHeaders{
-				HeaderParallelJobs:     "20",
-				HeaderParallelExecutor: "8",
+				HeaderParallelWorkers:          "20",
+				dauth.HeaderSubstreamsPlanTier: "PRO",
 			},
 			normalHeaders: http.Header{
-				http.CanonicalHeaderKey(HeaderParallelJobs):     []string{"15"}, // lower than trusted 20
-				http.CanonicalHeaderKey(HeaderParallelExecutor): []string{"10"}, // higher than trusted 8, should be ignored
+				http.CanonicalHeaderKey(HeaderParallelWorkers): []string{"15"}, // lower than trusted 20
 			},
-			defaultParallelJobs:       10,
-			defaultParallelExecutors:  5,
-			expectedParallelJobs:      15, // lowered from trusted value
-			expectedParallelExecutors: 8,  // unchanged (cannot increase from trusted)
+			defaultParallelWorkers:  10,
+			defaultStageExecutors:   5,
+			expectedParallelWorkers: 15, // lowered from trusted value
+			expectedStageExecutors:  8,  // increased from the "PRO" plan
 		},
 	}
 
@@ -79,12 +76,12 @@ func TestGetEffectiveHeaderValues(t *testing.T) {
 			parallelJobs, parallelExecutors := GetEffectiveHeaderValues(
 				ctx,
 				tt.normalHeaders,
-				tt.defaultParallelJobs,
-				tt.defaultParallelExecutors,
+				tt.defaultParallelWorkers,
+				tt.defaultStageExecutors,
 			)
 
-			assert.Equal(t, tt.expectedParallelJobs, parallelJobs, "parallel jobs mismatch")
-			assert.Equal(t, tt.expectedParallelExecutors, parallelExecutors, "parallel executors mismatch")
+			assert.Equal(t, tt.expectedParallelWorkers, parallelJobs, "parallel jobs mismatch")
+			assert.Equal(t, tt.expectedStageExecutors, parallelExecutors, "parallel executors mismatch")
 		})
 	}
 }

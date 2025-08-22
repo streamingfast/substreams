@@ -104,7 +104,7 @@ func WithEmitter(ctx context.Context, emitter dmetering.EventEmitter) context.Co
 	return context.WithValue(ctx, emitterKey, emitter)
 }
 
-const defaultMaxStageLayerParallelExecutorCount = 2
+const DefaultMaxStageLayerParallelExecutorCount = 2
 
 const safeguardMaxStageLayerParallelExecutorCount = 16
 
@@ -128,7 +128,7 @@ func MaxStageLayerParallelExecutor(ctx context.Context) uint64 {
 
 	// If unset, provide default value which is 2 for now
 	if details.MaxStageLayerParallelExecutor == 0 {
-		return defaultMaxStageLayerParallelExecutorCount
+		return DefaultMaxStageLayerParallelExecutorCount
 	}
 
 	// Protect in case of misconfiguration to cap at a sane system max value

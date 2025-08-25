@@ -96,13 +96,15 @@ package:
   url: https://github.com/streamingfast/substreams-spl-token
 
 imports:
-  solana_common: https://github.com/streamingfast/substreams-foundational-modules/releases/download/solana-common-v0.3.0/solana-common-v0.3.0.spkg
+  solana_common: solana-common@v0.3.0
 
 protobuf:
   files:
     - sf/solana/v1/spl/type/spl.proto
   descriptorSets:
     - module: buf.build/streamingfast/substreams-sink-sql
+  excludePaths:
+    - google
   importPaths:
     - ./proto
 
@@ -215,10 +217,10 @@ export DSN="postgres://postgres:password@localhost:5432/substreams?sslmode=disab
 substreams-sink-sql from-proto $DSN https://github.com/streamingfast/substreams-spl-token/releases/download/v0.1.0/solana-spl-token-v0.1.0.spkg
 ```
 
-## Run the Sink Without Relations
+## Run the Sink Without Annotations
 
 {% hint style="note" %}
-For PostgreSQL users, you can run the sink without relations, no annotations required. The sink will infer the name of the table using the name of the messages that you output.
+For PostgreSQL users, you can run the sink without annotations. The sink will infer the name of the table using the name of the messages that you output.
 {% endhint %}
 
 When you run the sink without explicit table annotations, it automatically infers table structures using the following rules:

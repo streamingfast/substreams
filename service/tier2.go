@@ -795,10 +795,7 @@ func GetExecutionPlan(
 
 		c := execoutConfigs.ConfigMap[name]
 
-		moduleStartBlock := startBlock
-		if mod.InitialBlock > startBlock {
-			moduleStartBlock = mod.InitialBlock
-		}
+		moduleStartBlock := max(mod.InitialBlock, startBlock)
 
 		switch mod.ModuleKind() {
 		case pbsubstreams.ModuleKindBlockIndex:
@@ -881,10 +878,7 @@ func GetExecutionPlan(
 			continue // for stores that need to be run for the partials, but already have cached execution outputs
 		}
 
-		writerStartBlock := startBlock
-		if module.InitialBlock > startBlock {
-			writerStartBlock = module.InitialBlock
-		}
+		writerStartBlock := max(module.InitialBlock, startBlock)
 
 		switch module.ModuleKind() {
 		case pbsubstreams.ModuleKindBlockIndex:

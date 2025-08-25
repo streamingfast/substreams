@@ -84,10 +84,7 @@ func BuildRequestDetails(
 
 	req.LinearHandoffBlockNum = linearHandoff
 
-	req.LinearGateBlockNum = req.LinearHandoffBlockNum
-	if req.ResolvedStartBlockNum > req.LinearHandoffBlockNum {
-		req.LinearGateBlockNum = req.ResolvedStartBlockNum
-	}
+	req.LinearGateBlockNum = max(req.ResolvedStartBlockNum, req.LinearHandoffBlockNum)
 
 	// if we start under the linearHandoff, it means we are in an irreversible section of the chain,
 	// the cursor has been resolved to 'resolvedStartBlockNum' and 'undoSignal', so it is not needed anymore
@@ -189,10 +186,7 @@ func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, res
 		if err != nil {
 			return 0, "", nil, fmt.Errorf("resolving negative start block: %w", err)
 		}
-		req.StartBlockNum = int64(headBlock) + req.StartBlockNum
-		if req.StartBlockNum < 0 {
-			req.StartBlockNum = 0
-		}
+		req.StartBlockNum = max(int64(headBlock)+req.StartBlockNum, 0)
 	}
 
 	if req.StartCursor == "" {

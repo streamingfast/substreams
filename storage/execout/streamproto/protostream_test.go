@@ -284,10 +284,8 @@ func TestEncode(t *testing.T) {
 	if !bytes.Equal(encodedFull, encodedStream) {
 		t.Logf("Encoding methods produced different results")
 		// You might want to examine the first few bytes to see where they differ
-		compareLength := min(len(encodedFull), len(encodedStream))
-		if compareLength > 20 {
-			compareLength = 20 // Limit to first 20 bytes for readability
-		}
+		// Limit to first 20 bytes for readability
+		compareLength := min(min(len(encodedFull), len(encodedStream)), 20)
 
 		t.Logf("First %d bytes of full encoding: %v", compareLength, encodedFull[:compareLength])
 		t.Logf("First %d bytes of streamed encoding: %v", compareLength, encodedStream[:compareLength])
@@ -417,10 +415,7 @@ func (r *slowReader) Read(p []byte) (n int, err error) {
 	}
 
 	remaining := len(r.data) - r.pos
-	toRead := len(p)
-	if toRead > r.maxBytesPerRead {
-		toRead = r.maxBytesPerRead
-	}
+	toRead := min(len(p), r.maxBytesPerRead)
 	if toRead > remaining {
 		toRead = remaining
 	}

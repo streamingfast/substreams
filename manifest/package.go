@@ -285,13 +285,13 @@ func (r *manifestConverter) manifestToPkg(manif *Manifest) (*pbsubstreams.Packag
 
 	fromBufBuild, err := loadDescriptorSets(pkg, manif)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("loading protobuf: %w", err)
+		return nil, nil, nil, fmt.Errorf("loading protobuf from buf: %w", err)
 	}
 	protoFiles = append(protoFiles, fromBufBuild...)
 
 	fromLocalFiles, err := loadLocalProtobufs(pkg, manif)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("loading protobuf: %w", err)
+		return nil, nil, nil, fmt.Errorf("loading protobuf from file: %w", err)
 	}
 
 	protoFiles = append(protoFiles, fromLocalFiles...)

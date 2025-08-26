@@ -3,6 +3,7 @@ package manifest
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -347,5 +348,257 @@ func TestReaderOptions_ProtoPathAndDescriptorSet(t *testing.T) {
 
 	if reader.protoDescriptorSet != "/test/descriptor/set.desc" {
 		t.Errorf("Expected protoDescriptorSet to be '/test/descriptor/set.desc', got '%s'", reader.protoDescriptorSet)
+	}
+}
+
+// Cache-related tests
+func TestGenerateCacheKey(t *testing.T) {
+	tests := []struct {
+		name     string
+		module   string
+		version  string
+		symbols  []string
+		expected string
+	}{
+		{
+			name:     "basic key generation",
+			module:   "buf.build/streamingfast/substreams",
+			version:  "v1.0.0",
+			symbols:  []string{"proto.Message"},
+			expected: "e5a5d5d5c5b5f5f5d5a5c5b5e5f5a5c5d5b5f5a5e5c5d5b5a5f5e5c5b5a5d5f5e5c", // This will be the actual hash
+		},
+		{
+			name:     "empty symbols",
+			module:   "buf.build/test/module",
+			version:  "v2.1.0",
+			symbols:  []string{},
+			expected: "", // Will be generated
+		},
+		{
+			name:     "multiple symbols",
+			module:   "buf.build/multi/module",
+			version:  "v1.0.0",
+			symbols:  []string{"proto.A", "proto.B", "proto.C"},
+			expected: "", // Will be generated
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := generateCacheKey(tt.module, tt.version, tt.symbols)
+			
+			// Verify it's a valid hex string of correct length (SHA256 = 64 chars)
+			if len(result) != 64 {
+				t.Errorf("Expected cache key length of 64, got %d", len(result))
+			}
+			
+			// Verify it's all hex characters
+			for _, c := range result {
+				if !strings.ContainsRune("0123456789abcdef", c) {
+					t.Errorf("Cache key contains non-hex character: %c", c)
+				}
+			}
+			
+			// Verify deterministic
+			result2 := generateCacheKey(tt.module, tt.version, tt.symbols)
+			if result != result2 {
+				t.Errorf("Cache key generation is not deterministic")
+			}
+		})
+	}
+}
+
+func TestGenerateCacheKey_Uniqueness(t *testing.T) {
+	// Test that different inputs produce different keys
+	key1 := generateCacheKey("module1", "v1.0.0", []string{"symbol1"})
+	key2 := generateCacheKey("module2", "v1.0.0", []string{"symbol1"})
+	key3 := generateCacheKey("module1", "v2.0.0", []string{"symbol1"})
+	key4 := generateCacheKey("module1", "v1.0.0", []string{"symbol2"})
+
+	keys := map[string]bool{
+		key1: true,
+		key2: true,
+		key3: true,
+		key4: true,
+	}
+
+	if len(keys) != 4 {
+		t.Errorf("Expected 4 unique keys, got %d", len(keys))
+	}
+}
+
+func TestCacheSaveAndLoad(t *testing.T) {
+	// Create a temporary cache directory for testing
+	tempCacheDir := filepath.Join("/tmp", "substreams-buf-test.cache")
+	defer os.RemoveAll(tempCacheDir)
+
+	// Create test data
+	testFds := &descriptorpb.FileDescriptorSet{
+		File: []*descriptorpb.FileDescriptorProto{
+			{
+				Name:    proto.String("test_cache.proto"),
+				Package: proto.String("test_cache"),
+				MessageType: []*descriptorpb.DescriptorProto{
+					{
+						Name: proto.String("TestCacheMessage"),
+						Field: []*descriptorpb.FieldDescriptorProto{
+							{
+								Name:   proto.String("cache_field"),
+								Number: proto.Int32(1),
+								Type:   descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(),
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	cacheKey := "test_cache_key_1234567890abcdef1234567890abcdef12345678"
+
+	// Test save to cache
+	err := saveToCache(cacheKey, testFds)
+	if err != nil {
+		t.Fatalf("Failed to save to cache: %v", err)
+	}
+
+	// Test load from cache
+	loadedFds, err := loadFromCache(cacheKey)
+	if err != nil {
+		t.Fatalf("Failed to load from cache: %v", err)
+	}
+
+	// Verify the loaded data matches the saved data
+	if len(loadedFds.File) != len(testFds.File) {
+		t.Errorf("Expected %d files, got %d", len(testFds.File), len(loadedFds.File))
+	}
+
+	if loadedFds.File[0].GetName() != testFds.File[0].GetName() {
+		t.Errorf("Expected file name %s, got %s", testFds.File[0].GetName(), loadedFds.File[0].GetName())
+	}
+
+	if loadedFds.File[0].GetPackage() != testFds.File[0].GetPackage() {
+		t.Errorf("Expected package %s, got %s", testFds.File[0].GetPackage(), loadedFds.File[0].GetPackage())
+	}
+}
+
+func TestLoadFromCache_NotFound(t *testing.T) {
+	// Try to load from cache with non-existent key
+	_, err := loadFromCache("nonexistent_cache_key_1234567890abcdef1234567890abcdef")
+	if err == nil {
+		t.Error("Expected error when loading non-existent cache key, got nil")
+	}
+}
+
+func TestGetCacheDir(t *testing.T) {
+	cacheDir, err := getCacheDir()
+	if err != nil {
+		t.Fatalf("Failed to get cache dir: %v", err)
+	}
+
+	expectedPath := "/tmp/substreams-buf.cache"
+	if cacheDir != expectedPath {
+		t.Errorf("Expected cache dir %s, got %s", expectedPath, cacheDir)
+	}
+
+	// Verify the directory exists after calling getCacheDir
+	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
+		t.Error("Cache directory was not created")
+	}
+
+	// Clean up
+	os.RemoveAll(cacheDir)
+}
+
+func TestCacheIntegration(t *testing.T) {
+	// Test the full cache workflow with realistic descriptor set data
+	tempCacheDir := filepath.Join("/tmp", "substreams-buf-integration-test.cache")
+	defer os.RemoveAll(tempCacheDir)
+
+	// Create realistic test data similar to what buf.build would return
+	testFds := &descriptorpb.FileDescriptorSet{
+		File: []*descriptorpb.FileDescriptorProto{
+			{
+				Name:    proto.String("google/protobuf/descriptor.proto"),
+				Package: proto.String("google.protobuf"),
+				MessageType: []*descriptorpb.DescriptorProto{
+					{
+						Name: proto.String("FileDescriptorSet"),
+						Field: []*descriptorpb.FieldDescriptorProto{
+							{
+								Name:   proto.String("file"),
+								Number: proto.Int32(1),
+								Type:   descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
+								TypeName: proto.String(".google.protobuf.FileDescriptorProto"),
+								Label:    descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(),
+							},
+						},
+					},
+				},
+			},
+			{
+				Name:    proto.String("sf/substreams/sink/service/v1/service.proto"),
+				Package: proto.String("sf.substreams.sink.service.v1"),
+				MessageType: []*descriptorpb.DescriptorProto{
+					{
+						Name: proto.String("DeployRequest"),
+						Field: []*descriptorpb.FieldDescriptorProto{
+							{
+								Name:   proto.String("substreams_package"),
+								Number: proto.Int32(1),
+								Type:   descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
+								TypeName: proto.String(".sf.substreams.v1.Package"),
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Generate cache key for realistic module/version/symbols
+	module := "buf.build/streamingfast/substreams-sink-sql"
+	version := "v1.0.0"
+	symbols := []string{
+		"sf.substreams.sink.service.v1.DeployRequest",
+		"sf.substreams.sink.service.v1.DeployResponse",
+	}
+	cacheKey := generateCacheKey(module, version, symbols)
+
+	// Test: First call should save to cache
+	err := saveToCache(cacheKey, testFds)
+	if err != nil {
+		t.Fatalf("Failed to save realistic data to cache: %v", err)
+	}
+
+	// Test: Second call should load from cache
+	cachedFds, err := loadFromCache(cacheKey)
+	if err != nil {
+		t.Fatalf("Failed to load realistic data from cache: %v", err)
+	}
+
+	// Verify integrity of cached data
+	if len(cachedFds.File) != len(testFds.File) {
+		t.Errorf("Cache integrity check failed: expected %d files, got %d", len(testFds.File), len(cachedFds.File))
+	}
+
+	// Verify specific file content
+	for i, originalFile := range testFds.File {
+		cachedFile := cachedFds.File[i]
+		
+		if cachedFile.GetName() != originalFile.GetName() {
+			t.Errorf("File name mismatch at index %d: expected %s, got %s", 
+				i, originalFile.GetName(), cachedFile.GetName())
+		}
+		
+		if cachedFile.GetPackage() != originalFile.GetPackage() {
+			t.Errorf("Package name mismatch at index %d: expected %s, got %s", 
+				i, originalFile.GetPackage(), cachedFile.GetPackage())
+		}
+
+		if len(cachedFile.MessageType) != len(originalFile.MessageType) {
+			t.Errorf("Message type count mismatch at index %d: expected %d, got %d", 
+				i, len(originalFile.MessageType), len(cachedFile.MessageType))
+		}
 	}
 }

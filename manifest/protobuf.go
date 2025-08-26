@@ -3,6 +3,8 @@ package manifest
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
@@ -21,6 +23,53 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/descriptorpb"
 )
+
+func getCacheDir() (string, error) {
+	cacheDir := filepath.Join("/tmp", "substreams-buf.cache")
+	return cacheDir, os.MkdirAll(cacheDir, 0755)
+}
+
+func generateCacheKey(module, version string, symbols []string) string {
+	h := sha256.New()
+	h.Write([]byte(module))
+	h.Write([]byte(version))
+	for _, symbol := range symbols {
+		h.Write([]byte(symbol))
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func loadFromCache(cacheKey string) (*descriptorpb.FileDescriptorSet, error) {
+	cacheDir, err := getCacheDir()
+	if err != nil {
+		return nil, err
+	}
+
+	cacheFile := filepath.Join(cacheDir, cacheKey+".pb")
+	data, err := os.ReadFile(cacheFile)
+	if err != nil {
+		return nil, err
+	}
+
+	fds := &descriptorpb.FileDescriptorSet{}
+	err = proto.Unmarshal(data, fds)
+	return fds, err
+}
+
+func saveToCache(cacheKey string, fds *descriptorpb.FileDescriptorSet) error {
+	cacheDir, err := getCacheDir()
+	if err != nil {
+		return err
+	}
+
+	data, err := proto.Marshal(fds)
+	if err != nil {
+		return err
+	}
+
+	cacheFile := filepath.Join(cacheDir, cacheKey+".pb")
+	return os.WriteFile(cacheFile, data, 0644)
+}
 
 func loadLocalProtobufs(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.FileDescriptor, error) {
 
@@ -136,23 +185,39 @@ func loadDescriptorSets(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.Fil
 			"https://buf.build",
 		)
 
-		request := connect.NewRequest(&reflectv1beta1.GetFileDescriptorSetRequest{
-			Module:  descriptor.Module,
-			Symbols: descriptor.Symbols,
-			Version: descriptor.Version,
-		})
+		// Try to load from cache first
+		cacheKey := generateCacheKey(descriptor.Module, descriptor.Version, descriptor.Symbols)
+		cachedFds, err := loadFromCache(cacheKey)
 
-		authToken := os.Getenv("BUFBUILD_AUTH_TOKEN")
-		if authToken != "" {
-			request.Header().Set("Authorization", "Bearer "+authToken)
+		var fileDescriptorSetResponse *descriptorpb.FileDescriptorSet
+		if err == nil {
+			// Cache hit
+			fileDescriptorSetResponse = cachedFds
+		} else {
+			// Cache miss, fetch from buf.build
+			request := connect.NewRequest(&reflectv1beta1.GetFileDescriptorSetRequest{
+				Module:  descriptor.Module,
+				Symbols: descriptor.Symbols,
+				Version: descriptor.Version,
+			})
+
+			authToken := os.Getenv("BUFBUILD_AUTH_TOKEN")
+			if authToken != "" {
+				request.Header().Set("Authorization", "Bearer "+authToken)
+			}
+
+			fileDescriptorSet, err := client.GetFileDescriptorSet(context.Background(), request)
+			if err != nil {
+				return nil, fmt.Errorf("getting file descriptor set for %s: %w", descriptor.Module, err)
+			}
+
+			fileDescriptorSetResponse = fileDescriptorSet.Msg.FileDescriptorSet
+
+			// Save to cache (ignore errors to not break the build)
+			_ = saveToCache(cacheKey, fileDescriptorSetResponse)
 		}
 
-		fileDescriptorSet, err := client.GetFileDescriptorSet(context.Background(), request)
-		if err != nil {
-			return nil, fmt.Errorf("getting file descriptor set for %s: %w", descriptor.Module, err)
-		}
-
-		fdMap, err := desc.CreateFileDescriptorsFromSet(fileDescriptorSet.Msg.FileDescriptorSet)
+		fdMap, err := desc.CreateFileDescriptorsFromSet(fileDescriptorSetResponse)
 		if err != nil {
 			return nil, fmt.Errorf("creating file descriptors from set: %w", err)
 		}

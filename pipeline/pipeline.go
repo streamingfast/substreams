@@ -10,6 +10,7 @@ import (
 	"github.com/RoaringBitmap/roaring/roaring64"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dmetering"
+	"github.com/streamingfast/logging"
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/client/foundational"
@@ -885,7 +886,7 @@ func (p *Pipeline) renderWasmInputs(module *pbsubstreams.Module) (out []wasm.Arg
 			endpoint := in.FoundationalStore.GetEndpoint()
 			clients, ok := p.foundationalClients[endpoint]
 			if !ok {
-				client, closeFn, err := foundational.New(endpoint)
+				client, closeFn, err := foundational.New(endpoint, logging.Logger(p.ctx, zap.NewNop()))
 				if err != nil {
 					return nil, fmt.Errorf("failed to create foundational store client for endpoint %s: %w", endpoint, err)
 				}

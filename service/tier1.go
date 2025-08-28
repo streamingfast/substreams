@@ -23,6 +23,7 @@ import (
 	"github.com/streamingfast/dgrpc"
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dmetrics"
+	"github.com/streamingfast/dsession"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
 	tracing "github.com/streamingfast/sf-tracing"
@@ -45,7 +46,6 @@ import (
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
-	pbworker "github.com/streamingfast/worker-pool-protocol/pb/sf/worker/v1"
 	"go.opentelemetry.io/otel/attribute"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
@@ -82,7 +82,7 @@ type Tier1Service struct {
 	activeRequestsSoftLimit int
 	activeRequestsHardLimit int
 	tier2RequestParameters  reqctx.Tier2RequestParameters
-	globalRequestPool       *GlobalRequestPool
+	sessionPool             dsession.SessionPool
 }
 
 func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
@@ -147,7 +147,7 @@ func NewTier1(
 	activeRequestsSoftLimit int,
 	activeRequestsHardLimit int,
 	sharedCacheSize uint64,
-	globalRequestPool *GlobalRequestPool,
+	sessionPool dsession.SessionPool,
 	opts ...Option,
 ) (*Tier1Service, error) {
 
@@ -197,7 +197,7 @@ func NewTier1(
 		enforceCompression:      enforceCompression,
 		activeRequestsSoftLimit: activeRequestsSoftLimit,
 		activeRequestsHardLimit: activeRequestsHardLimit,
-		globalRequestPool:       globalRequestPool,
+		sessionPool:             sessionPool,
 	}
 	s.OnTerminating(func(_ error) {
 		s.activeRequests.Wait()
@@ -699,28 +699,29 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		return fmt.Errorf("error building request plan: %w", err)
 	}
 
-	if s.globalRequestPool != nil {
-		userID := dauth.FromContext(ctx).UserID()
-		apiKeyID := dauth.FromContext(ctx).APIKeyID()
-		r, err := s.globalRequestPool.BorrowRequest(ctx, userID, apiKeyID, tracing.GetTraceID(ctx).String())
+	if s.sessionPool != nil {
+		auth := dauth.FromContext(ctx)
+		userID := auth.UserID()
+		apiKeyID := auth.APIKeyID()
+		traceID := "default" // Can be extracted from tracing context if needed
+		service := "tier1"
+
+		sessionID, err := s.sessionPool.Get(ctx, service, userID, apiKeyID, traceID, func(err error) {
+			if err != nil {
+				s.logger.Error("session error callback", zap.Error(err))
+			}
+		})
+
 		if err != nil {
-			return err
-		}
-		if r.status == pbworker.BorrowWorkerResponse_resource_exhausted {
-			msg := strings.Builder{}
-			msg.WriteString("Request quota exceeded.\n")
-			msg.WriteString(fmt.Sprintf("You are allowed %d concurrent requests.\n", r.state.MaxWorkers))
-			msg.WriteString(fmt.Sprintf("Each request has a minimal life time of %s\n", r.minimalWorkerLifeDuration.String()))
-			return status.Errorf(codes.ResourceExhausted, "%s", msg.String())
+			s.logger.Error("failed to acquire session", zap.Error(err))
+			return status.Errorf(codes.ResourceExhausted, "Request quota exceeded: %v", err)
 		}
 
+		s.logger.Debug("acquired session", zap.String("session_id", sessionID))
+
 		defer func() {
-			zlog.Info("returning request", zap.Bool("keep", false), zap.String("key", r.key))
-			if s.IsTerminating() {
-				s.logger.Info("returning request without minimal life time. Server is shutting down", zap.String("key", r.key))
-				r.minimalWorkerLifeDuration = 0
-			}
-			s.globalRequestPool.ReturnRequest(r)
+			s.logger.Debug("releasing session", zap.String("session_id", sessionID))
+			s.sessionPool.Release(sessionID)
 		}()
 	}
 

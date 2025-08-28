@@ -16,8 +16,8 @@ require (
 	github.com/streamingfast/dstore v0.1.1-0.20250609173504-95368d3441ee
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
 	github.com/streamingfast/pbgo v0.0.6-0.20240823134334-812f6a16c5cb
-	github.com/streamingfast/worker-pool-protocol v0.0.0-20250218145136-4ad271e36e39
-	github.com/stretchr/testify v1.10.0
+	github.com/streamingfast/worker-pool-protocol v0.0.0-20250826200931-136a043ecece
+	github.com/stretchr/testify v1.11.1
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869
 	go.uber.org/zap v1.27.0
 	google.golang.org/protobuf v1.36.6
@@ -112,6 +112,7 @@ require (
 	github.com/sahilm/fuzzy v0.1.1 // indirect
 	github.com/sercand/kuberesolver/v5 v5.1.1 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
+	github.com/streamingfast/dsession v0.0.0-20250828135210-0b74c3e1ed99 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/zeebo/errs v1.4.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect

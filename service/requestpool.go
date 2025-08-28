@@ -6,12 +6,19 @@ import (
 	"sync"
 	"time"
 
+	"github.com/streamingfast/dauth"
+	"github.com/streamingfast/dgrpc"
 	"github.com/streamingfast/substreams/orchestrator/work"
+	"github.com/streamingfast/substreams/reqctx"
 	pbworker "github.com/streamingfast/worker-pool-protocol/pb/sf/worker/v1"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
+
+// from paymentgateway/session
+// NewSessionGetter(url string)
 
 type GlobalRequestPool struct {
 	userBorrowedRequest              map[string]uint64
@@ -51,6 +58,8 @@ func (r *BorrowedRequest) startKeepAlive(ctx context.Context, delay time.Duratio
 		r.logger.Info("keep alive is not needed for free worker")
 		return
 	}
+	apiKeyID := dauth.FromContext(ctx).APIKeyID()
+	delay = time.Second // FIXME
 
 	go func() {
 		for {
@@ -64,11 +73,15 @@ func (r *BorrowedRequest) startKeepAlive(ctx context.Context, delay time.Duratio
 					ctx,
 					&pbworker.KeepAliveRequest{
 						WorkerKey: r.key,
+						ApiKeyId:  apiKeyID,
 					},
 					grpc.WaitForReady(false),
 				)
 				if err != nil {
+					// FIXME: add some retry with smaller delay, handle specific errors here
 					r.logger.Error("failed to call keep request worker alive", zap.String("worker_id", r.key), zap.Error(err))
+					reqctx.CancelFunc(ctx)(err)
+					return
 				}
 			}
 		}
@@ -95,34 +108,41 @@ func NewGlobalRequestPool(remoteWorkerPoolClient pbworker.WorkerPoolClient, requ
 	return rp
 }
 
-func (p *GlobalRequestPool) BorrowRequest(ctx context.Context, userID string, apiKeyID string, traceID string) *BorrowedRequest {
+func (p *GlobalRequestPool) BorrowRequest(ctx context.Context, userID string, apiKeyID string, traceID string) (*BorrowedRequest, error) {
 	resp, err := p.remoteWorkerPoolClient.BorrowWorker(ctx,
 		&pbworker.BorrowWorkerRequest{
 			Service:  work.Tier1RequestServiceName,
 			UserId:   userID,
 			ApiKeyId: apiKeyID,
 			TraceId:  traceID,
+			//			MaxWorkerForTraceId: 1, // single trace ID, single session.
 		},
 		grpc.WaitForReady(false),
 	)
 
 	key := ""
-	status := pbworker.BorrowWorkerResponse_unset
+	workerStatus := pbworker.BorrowWorkerResponse_unset
 	var state *pbworker.WorkersState
 	var minimalWorkerLifeDuration = p.defaultMinimalWorkerLifeDuration
 
 	if err != nil {
+		// this ResourceExhausted error is returned when the user has a hard limit quota on his resource consumption,
+		// it is not the same as the pool resources returned in resp.Status
+		if statusErr := dgrpc.AsGRPCError(err); statusErr != nil && statusErr.Code() == codes.ResourceExhausted {
+			return nil, err
+		}
+
 		resp = &pbworker.BorrowWorkerResponse{}
 		p.logger.Error("error borrowing request worker, will return free worker", zap.Error(err))
 		key = work.FreeWorkerKeyPrefix + time.Now().String()
-		status = pbworker.BorrowWorkerResponse_borrowed
+		workerStatus = pbworker.BorrowWorkerResponse_borrowed
 
 		p.borrowedRequestMutex.Lock()
 		borrowedUserRequestCount := p.userBorrowedRequest[userID]
 		p.borrowedRequestMutex.Unlock()
 
 		if borrowedUserRequestCount >= p.defaultMaxRequestPerUser {
-			status = pbworker.BorrowWorkerResponse_resource_exhausted
+			workerStatus = pbworker.BorrowWorkerResponse_resource_exhausted
 		}
 
 		state = &pbworker.WorkersState{
@@ -134,16 +154,16 @@ func (p *GlobalRequestPool) BorrowRequest(ctx context.Context, userID string, ap
 
 	} else {
 		key = resp.WorkerKey
-		status = resp.Status
+		workerStatus = resp.Status
 		state = resp.WorkerState
 		minimalWorkerLifeDuration = resp.MinimalWorkerLifeDuration.AsDuration()
 	}
 
-	r := NewBorrowedRequest(key, userID, status, state, minimalWorkerLifeDuration, p.logger)
+	r := NewBorrowedRequest(key, userID, workerStatus, state, minimalWorkerLifeDuration, p.logger)
 
-	if status == pbworker.BorrowWorkerResponse_resource_exhausted {
-		p.logger.Info("worker pool is exhausted", zap.String("worker_key", key), zap.String("status", status.String()))
-		return r
+	if workerStatus == pbworker.BorrowWorkerResponse_resource_exhausted {
+		p.logger.Info("worker pool is exhausted", zap.String("worker_key", key), zap.String("status", workerStatus.String()))
+		return r, nil
 	}
 
 	p.borrowedRequestMutex.Lock()
@@ -154,7 +174,7 @@ func (p *GlobalRequestPool) BorrowRequest(ctx context.Context, userID string, ap
 
 	p.logger.Info("borrowed request worker", zap.String("worker_key", key))
 
-	return r
+	return r, nil
 }
 
 func (p *GlobalRequestPool) ReturnRequest(r *BorrowedRequest) {

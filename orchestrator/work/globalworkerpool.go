@@ -95,7 +95,7 @@ func (p *GlobalWorkerPool) Borrow(ctx context.Context) (Worker, error) {
 
 	borrowWorkerResp, err := p.remoteWorkerPoolClient.BorrowWorker(ctx,
 		&pbworker.BorrowWorkerRequest{
-			Service:             Tier2WorkerServiceName,
+			Service:             Tier2WorkerServiceName, // t2w
 			UserId:              p.userID,
 			ApiKeyId:            p.apiKeyID,
 			TraceId:             p.traceID,

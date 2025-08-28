@@ -343,20 +343,20 @@ func (s *Tier1Service) Blocks(
 		}
 	}
 
-	status := s.getOverloadedStatus()
+	stat := s.getOverloadedStatus()
 
 	// Set us as unready if the soft limit would be reached by this request
-	if status.softLimitWouldBeReached() {
+	if stat.softLimitWouldBeReached() {
 		s.logger.Debug("soft limit would be reached by this request, setting app as unready",
-			append(fields, zap.Int("active_request_count", status.activeRequestCount), zap.Int("soft_limit", status.softLimit))...,
+			append(fields, zap.Int("active_request_count", stat.activeRequestCount), zap.Int("soft_limit", stat.softLimit))...,
 		)
 		s.appSetIsReadyState(false)
 	}
 
 	// Refuse the request if the hard limit is currently reached by this instance
-	if status.hardLimitReached() {
+	if stat.hardLimitReached() {
 		err := connect.NewError(connect.CodeUnavailable, fmt.Errorf("service under heavy load, please try connecting again"))
-		fields = append(fields, zap.Error(err), zap.Int("active_request_count", status.activeRequestCount), zap.Int("hard_limit", status.hardLimit))
+		fields = append(fields, zap.Error(err), zap.Int("active_request_count", stat.activeRequestCount), zap.Int("hard_limit", stat.hardLimit))
 		logger.Info("refusing Substreams Blocks request", fields...)
 		return err
 	}
@@ -438,6 +438,8 @@ func (s *Tier1Service) Blocks(
 			cancelRunning(errShuttingDown)
 		}
 	}()
+
+	runningContext = reqctx.WithCancelFunc(runningContext, cancelRunning) // we pass this down so that the 'workerPool/requestPool' can cancel the running context
 
 	respFunc := tier1ResponseHandler(respContext, &mut, logger, stream, request.NoopMode, reqStats, req.Msg.DevOutputModules)
 	err = s.blocks(runningContext, request, req.Header(), execGraph, respFunc, reqStats, fields)
@@ -700,11 +702,14 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	if s.globalRequestPool != nil {
 		userID := dauth.FromContext(ctx).UserID()
 		apiKeyID := dauth.FromContext(ctx).APIKeyID()
-		r := s.globalRequestPool.BorrowRequest(ctx, userID, apiKeyID, tracing.GetTraceID(ctx).String())
+		r, err := s.globalRequestPool.BorrowRequest(ctx, userID, apiKeyID, tracing.GetTraceID(ctx).String())
+		if err != nil {
+			return err
+		}
 		if r.status == pbworker.BorrowWorkerResponse_resource_exhausted {
 			msg := strings.Builder{}
 			msg.WriteString("Request quota exceeded.\n")
-			msg.WriteString(fmt.Sprintf("Your allowed %d concurrent requests.\n", r.state.MaxWorkers))
+			msg.WriteString(fmt.Sprintf("You are allowed %d concurrent requests.\n", r.state.MaxWorkers))
 			msg.WriteString(fmt.Sprintf("Each request has a minimal life time of %s\n", r.minimalWorkerLifeDuration.String()))
 			return status.Errorf(codes.ResourceExhausted, "%s", msg.String())
 		}
@@ -1006,34 +1011,36 @@ func toConnectError(ctx context.Context, err error) error {
 		return nil
 	}
 
+	if errors.Is(err, context.Canceled) {
+		if contextCause := context.Cause(ctx); contextCause != nil {
+			err = contextCause // unwrap errors in canceled contexts
+		} else {
+			return connect.NewError(connect.CodeCanceled, err)
+		}
+	}
+
+	// special case for context canceled when shutting down
+	if err == errShuttingDown {
+		return connect.NewError(connect.CodeUnavailable, err)
+	}
+
 	// GRPC to connect error
 	if grpcError := dgrpc.AsGRPCError(err); grpcError != nil {
 		switch grpcError.Code() {
 		case codes.Canceled:
-			return connect.NewError(connect.CodeCanceled, grpcError.Err())
+			return connect.NewError(connect.CodeCanceled, errors.New(grpcError.Message()))
 		case codes.Unavailable:
-			return connect.NewError(connect.CodeUnavailable, grpcError.Err())
+			return connect.NewError(connect.CodeUnavailable, errors.New(grpcError.Message()))
 		case codes.InvalidArgument:
-			return connect.NewError(connect.CodeInvalidArgument, grpcError.Err())
+			return connect.NewError(connect.CodeInvalidArgument, errors.New(grpcError.Message()))
 		case codes.DeadlineExceeded:
 			return connect.NewError(connect.CodeDeadlineExceeded, err)
 		case codes.ResourceExhausted:
-			return connect.NewError(connect.CodeResourceExhausted, grpcError.Err())
+			return connect.NewError(connect.CodeResourceExhausted, errors.New(grpcError.Message()))
 		case codes.Unknown:
-			return connect.NewError(connect.CodeUnknown, grpcError.Err())
+			return connect.NewError(connect.CodeUnknown, errors.New(grpcError.Message()))
 		}
 		return grpcError.Err()
-	}
-
-	// special case for context canceled when shutting down
-	if errors.Is(err, context.Canceled) {
-		if context.Cause(ctx) != nil {
-			err = context.Cause(ctx)
-			if err == errShuttingDown {
-				return connect.NewError(connect.CodeUnavailable, err)
-			}
-		}
-		return connect.NewError(connect.CodeCanceled, err)
 	}
 
 	// special case for "QuickSave" on shutdown

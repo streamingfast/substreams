@@ -13,6 +13,7 @@ import (
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	dauth "github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetrics"
+	"github.com/streamingfast/dsession"
 	"github.com/streamingfast/dstore"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"github.com/streamingfast/shutter"
@@ -34,6 +35,7 @@ import (
 type Tier1Modules struct {
 	// Required dependencies
 	Authenticator         dauth.Authenticator
+	SessionPool           dsession.SessionPool
 	HeadTimeDriftMetric   *dmetrics.HeadTimeDrift
 	HeadBlockNumberMetric *dmetrics.HeadBlockNum
 	CheckPendingShutDown  func() bool

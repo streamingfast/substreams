@@ -402,6 +402,8 @@ func (r *RemoteWorker) StartKeepAlive(ctx context.Context, delay time.Duration, 
 		return
 	}
 
+	apiKeyID := dauth.FromContext(ctx).APIKeyID()
+
 	go func() {
 		for {
 			select {
@@ -414,6 +416,7 @@ func (r *RemoteWorker) StartKeepAlive(ctx context.Context, delay time.Duration, 
 					ctx,
 					&pbworker.KeepAliveRequest{
 						WorkerKey: r.id,
+						ApiKeyId:  apiKeyID,
 					},
 					grpc.WaitForReady(false),
 				)

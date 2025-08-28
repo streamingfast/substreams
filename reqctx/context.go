@@ -26,6 +26,15 @@ var moduleExecutionTracingConfigKey = contextKeyType(5)
 var outputModuleHashKey = contextKeyType(6)
 var tier2RequestParametersKeyKey = contextKeyType(7)
 var wasmExtensionReqStats = contextKeyType(8)
+var cancelFunc = contextKeyType(9)
+
+func WithCancelFunc(ctx context.Context, f context.CancelCauseFunc) context.Context {
+	return context.WithValue(ctx, cancelFunc, f)
+}
+
+func CancelFunc(ctx context.Context) context.CancelCauseFunc {
+	return ctx.Value(cancelFunc).(context.CancelCauseFunc)
+}
 
 func Logger(ctx context.Context) *zap.Logger {
 	return logging.Logger(ctx, zap.NewNop())

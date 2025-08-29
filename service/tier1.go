@@ -50,7 +50,6 @@ import (
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -442,7 +441,7 @@ func (s *Tier1Service) Blocks(
 	runningContext = reqctx.WithCancelFunc(runningContext, cancelRunning) // we pass this down so that the 'workerPool/requestPool' can cancel the running context
 
 	respFunc := tier1ResponseHandler(respContext, &mut, logger, stream, request.NoopMode, reqStats, req.Msg.DevOutputModules)
-	err = s.blocks(runningContext, request, req.Header(), execGraph, respFunc, reqStats, fields)
+	err = s.blocks(runningContext, cancelRunning, request, req.Header(), execGraph, respFunc, reqStats, fields)
 
 	if connectError := toConnectError(runningContext, err); connectError != nil {
 		switch connect.CodeOf(connectError) {
@@ -504,7 +503,7 @@ func (s *Tier1Service) writeLastUsed(ctx context.Context, execGraph *exec.Graph,
 
 var IsValidCacheTag = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`).MatchString
 
-func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Request, header http.Header, execGraph *exec.Graph, respFunc substreams.ResponseFunc, reqStats *metrics.Stats, logFields []zap.Field) (err error) {
+func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelCauseFunc, request *pbsubstreamsrpc.Request, header http.Header, execGraph *exec.Graph, respFunc substreams.ResponseFunc, reqStats *metrics.Stats, logFields []zap.Field) (err error) {
 	chainFirstStreamableBlock := bstream.GetProtocolFirstStreamableBlock
 	if request.StartBlockNum > 0 && request.StartBlockNum < int64(chainFirstStreamableBlock) {
 		return bsstream.NewErrInvalidArg("invalid start block %d, must be >= %d (the first streamable block of the chain)", request.StartBlockNum, chainFirstStreamableBlock)
@@ -704,17 +703,17 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		userID := auth.UserID()
 		apiKeyID := auth.APIKeyID()
 		traceID := "default" // Can be extracted from tracing context if needed
-		service := "tier1"
+		service := "t1r"
 
 		sessionID, err := s.sessionPool.Get(ctx, service, userID, apiKeyID, traceID, func(err error) {
-			if err != nil {
-				s.logger.Error("session error callback", zap.Error(err))
+			if cancelRunning != nil { // in tests, this might be nil
+				cancelRunning(err)
 			}
 		})
 
 		if err != nil {
 			s.logger.Error("failed to acquire session", zap.Error(err))
-			return status.Errorf(codes.ResourceExhausted, "Request quota exceeded: %v", err)
+			return err
 		}
 
 		s.logger.Debug("acquired session", zap.String("session_id", sessionID))
@@ -1020,6 +1019,9 @@ func toConnectError(ctx context.Context, err error) error {
 		}
 	}
 
+	if err, ok := dsession.ToConnectError(err); ok {
+		return err
+	}
 	// special case for context canceled when shutting down
 	if err == errShuttingDown {
 		return connect.NewError(connect.CodeUnavailable, err)

@@ -406,6 +406,13 @@ func (s *Stats) RecordModuleWasmExternalCallBegin(moduleName string, extension s
 		extension: extension,
 	}
 
+	met, ok := mod.externalCallMetrics[extension]
+	if !ok {
+		met = &extendedCallMetric{}
+		mod.externalCallMetrics[extension] = met
+	}
+	met.count++
+
 	return uniqueID
 }
 
@@ -420,7 +427,6 @@ func (s *Stats) RecordModuleWasmExternalCallEnd(moduleName string, extension str
 		met = &extendedCallMetric{}
 		mod.externalCallMetrics[extension] = met
 	}
-	met.count++
 	inproc := mod.inprocessCallMetrics[uniqueID]
 	met.time += time.Since(inproc.startTime)
 

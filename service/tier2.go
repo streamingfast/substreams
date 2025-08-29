@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -46,6 +47,10 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
+var slowQueryNotificationFrequency = 30 * time.Second
+var slowQueryNotificationThreshold = 300 * time.Second
+var ErrRequestActiveForTooLong = errors.New("request active for too long")
+
 type ModuleExecutionConfig struct {
 	name       string
 	moduleHash string
@@ -80,7 +85,9 @@ type Tier2Service struct {
 	moduleExecutionTracing    bool
 	connectionCountMutex      sync.RWMutex
 	blockExecutionTimeout     time.Duration
-	checkPendingShutdown      func() bool
+	segmentExecutionTimeout   time.Duration
+
+	checkPendingShutdown func() bool
 
 	tier2RequestParameters *reqctx.Tier2RequestParameters
 
@@ -98,11 +105,13 @@ func NewTier2(
 
 	s := &Tier2Service{
 
-		checkPendingShutdown:  checkPendingShutdown,
-		tracer:                tracing.GetTracer(),
-		logger:                logger,
-		blockExecutionTimeout: 3 * time.Minute,
-		simulateOverloaded:    atomic.NewBool(false),
+		checkPendingShutdown:    checkPendingShutdown,
+		tracer:                  tracing.GetTracer(),
+		logger:                  logger,
+		blockExecutionTimeout:   3 * time.Minute,
+		segmentExecutionTimeout: 60 * time.Minute,
+
+		simulateOverloaded: atomic.NewBool(false),
 
 		activeRequests: &activeRequestRecords{
 			reqs: make(map[string]*ActiveRequestRecord),
@@ -435,15 +444,45 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("error building caching engine: %w", err)
 	}
 
+	ctx, cancelCause := context.WithCancelCause(ctx)
+	defer cancelCause(nil)
+
 	now := time.Now()
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.After(10 * time.Second): // 10 sec
-				if time.Since(now) > 300*time.Second { // 300 secs
-					logger.Info("request active for a long time", zap.Duration("duration", time.Since(now)))
+			case <-time.After(slowQueryNotificationFrequency):
+				if s.segmentExecutionTimeout != 0 && time.Since(now) > s.segmentExecutionTimeout {
+					cancelCause(connect.NewError(connect.CodeDeadlineExceeded, ErrRequestActiveForTooLong))
+				}
+				if time.Since(now) > slowQueryNotificationThreshold {
+
+					modStats := reqctx.ReqStats(ctx).AggregatedModulesStats()
+					modStrings := make([]string, len(modStats))
+					for i, mod := range modStats {
+						var storeSizeStr string
+						if mod.StoreSizeBytes != 0 {
+							storeSizeStr = fmt.Sprintf(" store_size_bytes:%d,", mod.StoreSizeBytes)
+						}
+						var externalCallMetricsStr string
+						if mod.ExternalCallMetrics != nil {
+							externalCallMetricsStr = "{"
+							for _, metric := range mod.ExternalCallMetrics {
+								externalCallMetricsStr = fmt.Sprintf("%s: {count: %d, duration_ms: %d}", metric.Name, metric.Count, metric.TimeMs)
+							}
+						}
+
+						modStrings[i] = fmt.Sprintf("%s: processing_time_ms:%d,%s %s", mod.Name, mod.TotalProcessingTimeMs, storeSizeStr, externalCallMetricsStr)
+					}
+
+					userID := "UNKNOWN"
+					if auth := dauth.FromContext(ctx); auth != nil {
+						userID = fmt.Sprintf("user_id:%s,", auth.UserID())
+					}
+					sort.Strings(modStrings)
+					logger.Info("request active for a long time", zap.Duration("duration", time.Since(now)), zap.Strings("modules", modStrings), zap.Uint64("processed_blocks", reqctx.ReqStats(ctx).GetBlocksProcessed()), zap.String("user_id", userID))
 				}
 			}
 		}
@@ -570,6 +609,10 @@ excludable:
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/pipeline/blocks_stream")
 	streamErr = blockStream.Run(ctx)
 	span.EndWithErr(&streamErr)
+
+	if errors.Is(context.Canceled, streamErr) {
+		streamErr = context.Cause(ctx)
+	}
 
 	return pipe.OnStreamTerminated(ctx, streamErr)
 }

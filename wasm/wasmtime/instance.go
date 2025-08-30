@@ -22,15 +22,15 @@ type instance struct {
 	isClosed     bool
 }
 
-func (i *instance) Close(ctx context.Context) error {
+func (i *instance) Close(_ context.Context) (_ error) {
 	i.wasmStore.Close()
 	i.wasmLinker.Close()
 	i.wasmStore.Close()
 	i.isClosed = true
-	return nil
+	return
 }
 
-func (i *instance) Cleanup(ctx context.Context) error {
+func (i *instance) Cleanup(_ context.Context) error {
 	err := i.Heap.Clear()
 	if err != nil {
 		return fmt.Errorf("clearing heap: %w", err)

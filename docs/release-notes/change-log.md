@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Add a maximum execution time for a full tier2 segment. By default, this is 60 minutes. It will fail with `rpc error: code = DeadlineExceeded desc = request active for too long`.
   It can be configured from the `SegmentExecutionTimeout` configuration option on Tier2Config or disabled by setting it to 0.
 * Improve log message for 'request active for a long time', adding stats.
+* Fixed a small context memory leak when using wasmtime (especially with grpc-based metering plugin)
 
 ## v1.16.4
 

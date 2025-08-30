@@ -325,8 +325,10 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 		cancel()
 	}()
 
+	ctx = reqctx.WithEmitter(ctx, emitter)
+
 	respFunc := tier2ResponseHandler(ctx, logger, streamSrv)
-	err = s.processRange(ctx, request, respFunc, emitter)
+	err = s.processRange(ctx, request, respFunc)
 	grpcError := toGRPCError(ctx, err)
 
 	switch status.Code(grpcError) {
@@ -349,7 +351,7 @@ func (s *Tier2Service) getWASMRegistry(wasmExtensionConfigs map[string]string) (
 	return wasm.NewRegistry(exts), nil
 }
 
-func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc, emitter dmetering.EventEmitter) error {
+func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) error {
 	logger := reqctx.Logger(ctx)
 
 	mergedBlocksStore, cacheStore, unmeteredCacheStore, err := s.getStores(ctx, request)
@@ -507,11 +509,6 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		s.checkPendingShutdown,
 		opts...,
 	)
-
-	// we don't put the emitter in the pipeline context itself, because we've seen that it causes a memory leak
-	// more investigation needed around this, because there is probably other small things leaking from the context,
-	// but setting the emitter here fixes the bulk of it
-	ctx = reqctx.WithEmitter(ctx, emitter)
 
 	logger.Debug("initializing tier2 pipeline",
 		zap.Uint64("request_start_block", requestDetails.ResolvedStartBlockNum),

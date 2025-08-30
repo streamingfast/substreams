@@ -67,5 +67,5 @@ func (s *Tier2Service) TestProcessRange(ctx context.Context, request *pbssintern
 		return make(map[string]map[string]wasm.WASMExtension), nil
 	}
 
-	return s.processRange(ctx, request, respFunc, nil)
+	return s.processRange(ctx, request, respFunc)
 }

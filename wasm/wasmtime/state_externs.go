@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	pbstore "github.com/streamingfast/substreams-foundational-store/pb/sf/substreams/foundational-store/v1"
+	"github.com/streamingfast/substreams/wasm"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -172,7 +173,9 @@ func (i *instance) foundationalStoreGet(storeIndex int32, reqPtr int32, reqLen i
 	if blockNumber == 0 && len(blockHash) == 0 {
 		if i.CurrentCall.Clock != nil {
 			blockNumber = i.CurrentCall.Clock.Number
-			blockHash = []byte(i.CurrentCall.Clock.Id)
+			if decoded := wasm.DecodeHashString(i.CurrentCall.Clock.Id); decoded != nil {
+				blockHash = decoded
+			}
 		}
 	}
 
@@ -215,7 +218,9 @@ func (i *instance) foundationalStoreGetAll(storeIndex int32, reqPtr int32, reqLe
 	if blockNumber == 0 && len(blockHash) == 0 {
 		if i.CurrentCall.Clock != nil {
 			blockNumber = i.CurrentCall.Clock.Number
-			blockHash = []byte(i.CurrentCall.Clock.Id)
+			if decoded := wasm.DecodeHashString(i.CurrentCall.Clock.Id); decoded != nil {
+				blockHash = decoded
+			}
 		}
 	}
 

@@ -398,7 +398,9 @@ var StateFuncs = []funcs{
 			if blockNumber == 0 && len(blockHash) == 0 {
 				if call.Clock != nil {
 					blockNumber = call.Clock.Number
-					blockHash = []byte(call.Clock.Id)
+					if decoded := wasm.DecodeHashString(call.Clock.Id); decoded != nil {
+						blockHash = decoded
+					}
 				}
 			}
 
@@ -451,7 +453,9 @@ var StateFuncs = []funcs{
 			if blockNumber == 0 && len(blockHash) == 0 {
 				if call.Clock != nil {
 					blockNumber = call.Clock.Number
-					blockHash = []byte(call.Clock.Id)
+					if decoded := wasm.DecodeHashString(call.Clock.Id); decoded != nil {
+						blockHash = decoded
+					}
 				}
 			}
 

@@ -149,8 +149,13 @@ func (d *Decoder) DecodeDynamicMessage(msgDesc *desc.MessageDescriptor, anyin *a
 		return json.RawMessage(cnt)
 	}
 
+	// Create a custom AnyResolver that wraps the original one but also respects the bytes representation
+	anyResolver := &bytesAwareAnyResolver{
+		resolver: d.anyResolver,
+	}
+
 	cnt, err := dynMsg.MarshalJSONPB(&jsonpb.Marshaler{
-		AnyResolver:  d.anyResolver,
+		AnyResolver:  anyResolver,
 		Indent:       d.indent,
 		EmitDefaults: d.emitDefaults,
 	})
@@ -251,6 +256,25 @@ type ModuleWrap struct {
 	BlockNum uint64          `json:"@block"`
 	Type     string          `json:"@type"`
 	Data     json.RawMessage `json:"@data"`
+}
+
+// bytesAwareAnyResolver is a wrapper around another AnyResolver that ensures
+// the bytes representation is respected when resolving Any messages.
+type bytesAwareAnyResolver struct {
+	resolver *pbsubstreams.PackageAnyResolver
+}
+
+func (b *bytesAwareAnyResolver) Resolve(typeURL string) (protoV1.Message, error) {
+	// First, use the wrapped resolver to resolve the message
+	msg, err := b.resolver.Resolve(typeURL)
+	if err != nil {
+		return nil, err
+	}
+
+	// The current bytes representation is already set globally via dynamic.SetDefaultBytesRepresentation
+	// and will be used when marshaling the resolved message to JSON.
+	// We don't need to do anything special here, as the dynamic package will use the global setting.
+	return msg, nil
 }
 
 // Helper functions

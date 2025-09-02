@@ -392,7 +392,17 @@ var StateFuncs = []funcs{
 				return
 			}
 
-			resp, err := call.DoFoundationalStoreGet(storeIndex, req.BlockNumber, req.Key)
+			// Inject current Clock if found
+			blockNumber := req.BlockNumber
+			blockHash := req.BlockHash
+			if blockNumber == 0 && len(blockHash) == 0 {
+				if call.Clock != nil {
+					blockNumber = call.Clock.Number
+					blockHash = []byte(call.Clock.Id)
+				}
+			}
+
+			resp, err := call.DoFoundationalStoreGet(storeIndex, blockNumber, blockHash, req.Key)
 			if err != nil {
 				call.ReturnError(fmt.Errorf("foundational store error: %w", err))
 				stack[0] = 0
@@ -435,7 +445,17 @@ var StateFuncs = []funcs{
 				return
 			}
 
-			resp, err := call.DoFoundationalStoreGetAll(storeIndex, req.BlockNumber, req.Keys)
+			// Inject current Clock if found
+			blockNumber := req.BlockNumber
+			blockHash := req.BlockHash
+			if blockNumber == 0 && len(blockHash) == 0 {
+				if call.Clock != nil {
+					blockNumber = call.Clock.Number
+					blockHash = []byte(call.Clock.Id)
+				}
+			}
+
+			resp, err := call.DoFoundationalStoreGetAll(storeIndex, blockNumber, blockHash, req.Keys)
 			if err != nil {
 				call.ReturnError(fmt.Errorf("foundational store error: %w", err))
 				stack[0] = 0

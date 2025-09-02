@@ -310,18 +310,18 @@ func (c *Call) DoHasLast(storeIndex int, key string) (found bool) {
 	return readStore.HasLast(key)
 }
 
-func (c *Call) DoFoundationalStoreGet(index uint32, block uint64, key []byte) (*pbstore.GetResponse, error) {
+func (c *Call) DoFoundationalStoreGet(index uint32, block uint64, blockHash []byte, key []byte) (*pbstore.GetResponse, error) {
 	if len(c.foundationalStores) == 0 {
 		return nil, fmt.Errorf("store not found for index: %d", index)
 	}
-	return c.foundationalStores[index].Get(context.Background(), block, key)
+	return c.foundationalStores[index].Get(context.Background(), block, blockHash, key)
 }
 
-func (c *Call) DoFoundationalStoreGetAll(index uint32, block uint64, keys [][]byte) (*pbstore.GetAllResponse, error) {
+func (c *Call) DoFoundationalStoreGetAll(index uint32, block uint64, blockHash []byte, keys [][]byte) (*pbstore.GetAllResponse, error) {
 	if len(c.foundationalStores) == 0 {
 		return nil, fmt.Errorf("store not found for index: %d", index)
 	}
-	return c.foundationalStores[index].GetAll(context.Background(), block, keys)
+	return c.foundationalStores[index].GetAll(context.Background(), block, blockHash, keys)
 }
 
 func (c *Call) validateStoreIndex(storeIndex int, stateFunc string) {

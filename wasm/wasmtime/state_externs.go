@@ -166,7 +166,17 @@ func (i *instance) foundationalStoreGet(storeIndex int32, reqPtr int32, reqLen i
 		return 0
 	}
 
-	resp, err := i.CurrentCall.DoFoundationalStoreGet(uint32(storeIndex), req.BlockNumber, req.Key)
+	// Inject current Clock if found
+	blockNumber := req.BlockNumber
+	blockHash := req.BlockHash
+	if blockNumber == 0 && len(blockHash) == 0 {
+		if i.CurrentCall.Clock != nil {
+			blockNumber = i.CurrentCall.Clock.Number
+			blockHash = []byte(i.CurrentCall.Clock.Id)
+		}
+	}
+
+	resp, err := i.CurrentCall.DoFoundationalStoreGet(uint32(storeIndex), blockNumber, blockHash, req.Key)
 	if err != nil {
 		i.CurrentCall.ReturnError(fmt.Errorf("foundational store error: %w", err))
 		return 0
@@ -199,7 +209,17 @@ func (i *instance) foundationalStoreGetAll(storeIndex int32, reqPtr int32, reqLe
 		return 0
 	}
 
-	resp, err := i.CurrentCall.DoFoundationalStoreGetAll(uint32(storeIndex), req.BlockNumber, req.Keys)
+	// Inject current Clock if found
+	blockNumber := req.BlockNumber
+	blockHash := req.BlockHash
+	if blockNumber == 0 && len(blockHash) == 0 {
+		if i.CurrentCall.Clock != nil {
+			blockNumber = i.CurrentCall.Clock.Number
+			blockHash = []byte(i.CurrentCall.Clock.Id)
+		}
+	}
+
+	resp, err := i.CurrentCall.DoFoundationalStoreGetAll(uint32(storeIndex), blockNumber, blockHash, req.Keys)
 	if err != nil {
 		i.CurrentCall.ReturnError(fmt.Errorf("foundational store error: %w", err))
 		return 0

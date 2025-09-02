@@ -36,7 +36,7 @@ func New(rawEndpoint string, logger *zap.Logger) (*Store, func() error, error) {
 		grpc.WithTimeout(5 * time.Second),
 	}
 
-	conn, err := dgrpc.NewExternalClientConn(rawEndpoint, opts...)
+	conn, err := dgrpc.NewInternalClientConn(rawEndpoint, opts...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -44,13 +44,15 @@ func New(rawEndpoint string, logger *zap.Logger) (*Store, func() error, error) {
 	return &Store{rpc: pbstore.NewStoreKVClient(conn), logger: logger}, conn.Close, nil
 }
 
-func (s *Store) Get(ctx context.Context, block uint64, key []byte) (*pbstore.GetResponse, error) {
+func (s *Store) Get(ctx context.Context, block uint64, blockHash []byte, key []byte) (*pbstore.GetResponse, error) {
 	s.logger.Info("getting value from key")
 
 	resp, err := s.rpc.Get(ctx, &pbstore.GetRequest{
 		Key:         key,
 		BlockNumber: block,
+		BlockHash:   blockHash,
 	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -58,14 +60,16 @@ func (s *Store) Get(ctx context.Context, block uint64, key []byte) (*pbstore.Get
 	return resp, nil
 }
 
-func (s *Store) GetAll(ctx context.Context, block uint64, keys [][]byte) (*pbstore.GetAllResponse, error) {
+func (s *Store) GetAll(ctx context.Context, block uint64, blockHash []byte, keys [][]byte) (*pbstore.GetAllResponse, error) {
 	s.logger.Info("getting values from keys")
 
 	resp, err := s.rpc.GetAll(ctx, &pbstore.GetAllRequest{
 		Keys:        keys,
 		BlockNumber: block,
+		BlockHash:   blockHash,
 		OmitDeleted: true,
 	})
+
 	if err != nil {
 		return nil, err
 	}

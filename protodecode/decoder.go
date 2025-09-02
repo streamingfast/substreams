@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/golang/protobuf/jsonpb"
+	protoV1 "github.com/golang/protobuf/proto"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/streamingfast/substreams/manifest"

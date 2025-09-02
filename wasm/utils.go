@@ -23,7 +23,7 @@ func NewPanicError(message, filename string, lineNumber, columnNumber int) *Pani
 	return &PanicError{message, filename, lineNumber, columnNumber}
 }
 
-// DecodeHashString attempts to decode a hash string into bytes using multiple formats.
+// Attempts to decode a hash string into bytes using multiple formats
 func DecodeHashString(hashStr string) []byte {
 	if hashStr == "" {
 		return nil

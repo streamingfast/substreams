@@ -569,13 +569,13 @@ excludable:
 		for clock, err := range distributor.Iter(ctx) {
 			if err != nil {
 				span.EndWithErr(&err)
-				return err
+				return pipe.OnStreamTerminated(ctx, err)
 			}
 			cursor := irreversibleCursorFromClock(clock)
 
 			if err := pipe.ProcessFromExecOutput(ctx, clock, cursor); err != nil {
 				span.EndWithErr(&err)
-				return err
+				return pipe.OnStreamTerminated(ctx, err)
 			}
 		}
 		streamErr = io.EOF
@@ -603,7 +603,7 @@ excludable:
 		bsstream.WithFileSourceHandlerMiddleware(metering.FileSourceMiddlewareHandlerFactory(ctx)),
 	)
 	if err != nil {
-		return fmt.Errorf("error getting stream: %w", err)
+		return pipe.OnStreamTerminated(ctx, fmt.Errorf("error getting stream: %w", err))
 	}
 
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/pipeline/blocks_stream")

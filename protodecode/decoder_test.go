@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	protoV1 "github.com/golang/protobuf/proto"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/known/anypb"
 )

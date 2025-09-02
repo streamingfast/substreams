@@ -261,8 +261,8 @@ func TestDecoder_WrapMessage(t *testing.T) {
 }
 
 func TestBytesAwareAnyResolver(t *testing.T) {
-	// Create a mock PackageAnyResolver
-	mockResolver := &pbsubstreams.PackageAnyResolver{}
+	// Create a mock resolver that implements jsonpb.AnyResolver
+	mockResolver := &mockAnyResolver{}
 
 	// Create the bytesAwareAnyResolver
 	resolver := &bytesAwareAnyResolver{
@@ -279,4 +279,11 @@ func TestBytesAwareAnyResolver(t *testing.T) {
 	
 	// The real test of this functionality would be an integration test that verifies
 	// the bytes encoding is properly respected in anypb.Any fields when rendered to JSON.
+}
+
+// mockAnyResolver is a simple mock that implements jsonpb.AnyResolver
+type mockAnyResolver struct{}
+
+func (m *mockAnyResolver) Resolve(typeURL string) (protoV1.Message, error) {
+	return nil, nil
 }

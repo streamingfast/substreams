@@ -261,7 +261,7 @@ type ModuleWrap struct {
 // bytesAwareAnyResolver is a wrapper around another AnyResolver that ensures
 // the bytes representation is respected when resolving Any messages.
 type bytesAwareAnyResolver struct {
-	resolver *pbsubstreams.PackageAnyResolver
+	resolver jsonpb.AnyResolver
 }
 
 func (b *bytesAwareAnyResolver) Resolve(typeURL string) (protoV1.Message, error) {

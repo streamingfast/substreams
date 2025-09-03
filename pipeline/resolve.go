@@ -112,7 +112,8 @@ func BuildRequestDetailsFromSubrequest(ctx context.Context, request *pbssinterna
 		IsStreamingTier2:      request.StreamOutput,
 	}
 
-	req.SetStageLayerParallelExecutorCountFromContext(ctx)
+	// note: we don't touch the maxParallelJobs here
+	_, req.MaxStageLayerParallelExecutor = reqctx.GetEffectiveHeaderValues(ctx, nil, 0, reqctx.DefaultMaxStageLayerParallelExecutorCount)
 
 	return req
 }

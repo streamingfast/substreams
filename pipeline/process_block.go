@@ -197,6 +197,7 @@ func (p *Pipeline) handleStepUndo(clock *pbsubstreams.Clock, cursor *bstream.Cur
 	targetClock := blockRefToPB(reorgJunctionBlock)
 
 	p.lastProcessedBlockRef = reorgJunctionBlock
+	p.lastCursor = targetCursor
 	return p.respFunc(
 		&pbsubstreamsrpc.Response{
 			Message: &pbsubstreamsrpc.Response_BlockUndoSignal{
@@ -308,6 +309,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 	p.stores.resetStores()
 	logger.Debug("block processed", zap.Uint64("block_num", clock.Number))
 	p.lastProcessedBlockRef = bstream.NewBlockRef(clock.Id, clock.Number)
+	p.lastCursor = cursor
 	return nil
 }
 

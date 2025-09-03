@@ -21,7 +21,7 @@ The `substreams` CLI exposes many commands to developers enabling a range of fea
 
 If you choose to not use it, make sure that you are in a directory that contains a substreams.yaml file. Otherwise, you will get a usage error back.
 
-**Stdin Support**: Commands that accept manifest files (`build`, `run`, `gui`, `info`, `graph`, `pack`, `protogen`, `inspect`, `registry publish`, `service deploy`, `service update`) all support reading the manifest from standard input by specifying `"-"` as the manifest path. This enables dynamic manifest generation and preprocessing workflows.
+**Stdin Support**: Commands that accept manifest files (`build`, `run`, `gui`, `info`, `graph`, `pack`, `protogen`, `inspect`, `registry publish`, `registry verify`, `service deploy`, `service update`) all support reading the manifest from standard input by specifying `"-"` as the manifest path. This enables dynamic manifest generation and preprocessing workflows.
 {% endhint %}
 
 ### **`init`**
@@ -121,14 +121,14 @@ The details of the run command are:
 
 The `-H` option of the `run` or `gui` command allows you to dynamically pass headers with the gRPC request. This is useful when overriding default parameters in the Substreams execution.
 
-##### X-Sf-Substreams-Parallel-Jobs Header
+##### X-Substreams-Parallel-Workers Header
 
-The `X-Sf-Substreams-Parallel-Jobs` header sets the number of parallel jobs to use in the Substreams execution. By default, 10 jobs are used.
+The `X-Substreams-Parallel-Workers` header sets the number of parallel jobs to use in the Substreams execution. By default, 10 jobs are used. Most authentication backends will prevent setting this header to a higher value than the what the auth provides.
 
 ```bash
 substreams run -e mainnet.eth.streamingfast.io:443 \
    -t +1 \
-   -H "X-Sf-Substreams-Parallel-Jobs: 20" \
+   -H "X-Substreams-Parallel-Workers: 20" \
    ./substreams.yaml \
    module_name
 ```

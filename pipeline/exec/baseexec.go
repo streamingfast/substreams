@@ -134,7 +134,7 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canS
 			ctx, unsubscribe = undoManager.Subscribe(ctx, clock.Id)
 			defer unsubscribe()
 		}
-		inst, err = e.wasmModule.ExecuteNewCall(ctx, call, e.cachedInstance, e.wasmArguments, argValues)
+		_, err = e.wasmModule.ExecuteNewCall(ctx, call, e.cachedInstance, e.wasmArguments, argValues)
 		metrics.ExecutedWasmModules.Inc()
 	}
 
@@ -155,17 +155,11 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canS
 		}
 		return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %w: %s", clock.Number, e.moduleName, wasm.ErrWasmDeterministicExec, err)
 	}
-	if inst != nil {
-		if e.instanceCacheEnabled {
-			if err := inst.Cleanup(e.ctx); err != nil {
-				return nil, fmt.Errorf("block %d: module %q: failed to cleanup module: %w", clock.Number, e.moduleName, err)
-			}
-			e.cachedInstance = inst
-		} else {
-			if err := inst.Close(e.ctx); err != nil {
-				return nil, fmt.Errorf("block %d: module %q: failed to close module: %w", clock.Number, e.moduleName, err)
-			}
+	if inst != nil && e.instanceCacheEnabled {
+		if err := inst.Cleanup(e.ctx); err != nil {
+			return nil, fmt.Errorf("block %d: module %q: failed to cleanup module: %w", clock.Number, e.moduleName, err)
 		}
+		e.cachedInstance = inst
 	}
 	e.logs = call.Logs
 	e.logsTruncated = call.ReachedLogsMaxByteCount()

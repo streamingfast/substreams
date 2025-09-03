@@ -166,7 +166,7 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 				if streamOutput {
 					// never retry for jobs that stream blocks, we don't know how much data they already sent
 					segmentStart := request.SegmentNumber * request.SegmentSize
-					return derr.NewFatalError(fmt.Errorf("segment [%d-%d] failed while streaming data: %s", segmentStart, segmentStart+request.SegmentSize, err))
+					return derr.NewFatalError(fmt.Errorf("segment [%d-%d] failed while streaming data: %w", segmentStart, segmentStart+request.SegmentSize, err))
 				}
 				metrics.Tier1WorkerRetryCounter.Inc()
 				stats.RecordJobRetried(jobIdx)

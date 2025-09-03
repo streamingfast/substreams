@@ -28,19 +28,58 @@ var registryPublish = &cobra.Command{
 		Publish a package to the Substreams.dev registry. You can specify a GitHub release URL, HTTPS spkg path,
 		local spkg path, or local substreams path. If no argument is provided, it will look for a substreams.yaml
 		file in the current directory. You can use "-" to read the manifest from standard input.
+
+		You can publish a package by specifying under a team initially by providing the '--team-slug'.
+
+		Here the rules under which ownership a package is published based on the actual
+		published state and the '--team-slug' flag:
+
+		- Under the user's personal namespace if package was never published before and no team slug is provided.
+		- Under the team namespace if package was never published before and a team slug is provided.
+		- Under the package's existing team if it has been published initially using a team slug.
+		- Under the package's existing owner if it has been published initially without a team slug.
 	`),
 	Args: cobra.MaximumNArgs(1),
 	RunE: runRegistryPublish,
 }
 
-var teamSlug string
-
 func init() {
-	registryPublish.Flags().StringVarP(&teamSlug, "teamSlug", "t", "", "Team slug to publish the package under (e.g. 'myteam' instead of 'My Team')")
+	teamSlugDescription := cli.Dedent(`
+		Team slug to publish the package under, by default the package will be published:
+		- Under the user's personal namespace if package was never published before and no team slug is provided.
+		- Under the team namespace if package was never published before and a team slug is provided.
+		- Under the package's existing team if it has been published initially using a team slug.
+		- Under the package's existing owner if it has been published initially without a team slug.
+	`)
+
+	registryPublish.Flags().String("teamSlug", "", teamSlugDescription)
+	registryPublish.Flags().String("team-slug", "", teamSlugDescription)
+	registryPublish.Flags().Bool("yes", false, "Auto-confirm the publish operation without prompting")
+
+	registryPublish.Flags().MarkDeprecated("teamSlug", "use --team-slug instead")
+
 	registryCmd.AddCommand(registryPublish)
 }
 
 func runRegistryPublish(cmd *cobra.Command, args []string) (err error) {
+	autoConfirm, err := cmd.Flags().GetBool("yes")
+	if err != nil {
+		return fmt.Errorf("getting yes flag: %w", err)
+	}
+
+	teamSlug, err := cmd.Flags().GetString("team-slug")
+	if err != nil {
+		return fmt.Errorf("getting team-slug flag: %w", err)
+	}
+
+	// Check deprecated flag if new flag is empty
+	if teamSlug == "" {
+		teamSlug, err = cmd.Flags().GetString("teamSlug")
+		if err != nil {
+			return fmt.Errorf("getting teamSlug flag: %w", err)
+		}
+	}
+
 	apiEndpoint := getSubstreamsRegistryEndpoint()
 
 	token, err := getRegistryToken(apiEndpoint)
@@ -87,13 +126,15 @@ func runRegistryPublish(cmd *cobra.Command, args []string) (err error) {
 	warnIncompletePackage(spkg, warningsConfig{})
 	printPackageDetails(spkg)
 
-	confirm, err := utils.RunConfirmForm("Would you like to publish this package?")
-	if err != nil {
-		return fmt.Errorf("running confirm form %w", err)
-	}
+	if !autoConfirm {
+		confirm, err := utils.RunConfirmForm("Would you like to publish this package?")
+		if err != nil {
+			return fmt.Errorf("running confirm form %w", err)
+		}
 
-	if !confirm {
-		return nil
+		if !confirm {
+			return nil
+		}
 	}
 
 	var requestBody bytes.Buffer

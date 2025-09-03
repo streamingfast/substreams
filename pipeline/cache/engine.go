@@ -120,6 +120,9 @@ func (e *Engine) EndOfStream(lastFinalClock *pbsubstreams.Clock) error {
 			errs = multierror.Append(errs, err)
 		}
 	}
+	for _, file := range e.existingExecOuts {
+		file.Close()
+	}
 
 	return errs
 }

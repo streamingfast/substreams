@@ -106,6 +106,7 @@ func (f *File) Load(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 	content, err := io.ReadAll(file)
 	if err != nil {
 		return err

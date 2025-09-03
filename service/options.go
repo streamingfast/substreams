@@ -32,6 +32,18 @@ func WithBlockExecutionTimeout(timeout time.Duration) Option {
 	}
 }
 
+// Tier2 will completely bail out if a segment execution takes longer than the this.
+func WithSegmentExecutionTimeout(timeout time.Duration) Option {
+	return func(a anyTierService) {
+		switch s := a.(type) {
+		case *Tier1Service:
+			// not used
+		case *Tier2Service:
+			s.segmentExecutionTimeout = timeout
+		}
+	}
+}
+
 func WithWASMExtensioner(ext wasm.WASMExtensioner) Option {
 	return func(a anyTierService) {
 		switch s := a.(type) {

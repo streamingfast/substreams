@@ -70,7 +70,7 @@ func TestWithBytesReadMeteringOptionsZstd(t *testing.T) {
 	}
 
 	uncompressedSize := 1024
-	compressedSize := 24
+	compressedSize := 16
 
 	err = store.WriteObject(nil, "test", bytes.NewReader(bytes.Repeat([]byte("1"), uncompressedSize)))
 	if err != nil {

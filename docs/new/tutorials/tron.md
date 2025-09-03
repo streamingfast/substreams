@@ -9,7 +9,7 @@ In this tutorial, you'll learn how to initialize a TRON-based Substreams project
 
 ## Step 1: Initialize Your TRON Substreams Project
 
-1. [Install the Substreams CLI](../references/cli/installing-the-cli.md).
+1. [Install the Substreams CLI](../how-to-guides/cli/installing-the-cli.md).
 
 2. Running `substreams init` will give you the option to choose between three TRON project options. Select the one that best fits your requirements:
     - **tron-hello-world**: Creates a simple Substreams example, the example outputs results with type `TransferContract` that have an `amount` above 100M. Use this example to learn how to write a custom Substreams starting from the [TRON Full block](https://github.com/streamingfast/firehose-tron/blob/main/proto/sf/tron/type/v1/block.proto) as input.

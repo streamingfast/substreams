@@ -10,7 +10,7 @@ In this tutorial, you'll learn how to initialize a EVM-based Substreams project 
 
 ## Step 1: Initialize Your EVM Substreams Project
 
-1. [Install the Substreams CLI](../references/cli/installing-the-cli.md)
+1. [Install the Substreams CLI](../how-to-guides/cli/installing-the-cli.md)
     
 2. Running `substreams init` will give you the option to choose between two EVM project options. Select the one that best fits your requirements:
     - **evm-hello-world**: Creates a simple Substreams that outputs the events of a smart contract. Depending on the blockchain that you choose (Mainnet, Arbitrum, Polygon), the smart contract address will be different (usually, it's the USDC token, if it's available on the chain).

@@ -7,14 +7,9 @@ In this tutorial, you'll learn how to initialize a Injective-based Substreams pr
  The CLI installation is supported only on Linux and macOS. If you're using Windows, consider using the [DevContainer environment](../../references/devcontainer-ref.md), which launches a Linux-based virtual environment.
 {% endhint %}
 
-## Prerequisites
-
-- Docker and VS Code installed and up-to-date.
-- Visit the [Getting Started Guide](https://github.com/streamingfast/substreams-starter) to initialize your Dev Container.
-
 ## Step 1: Initialize Your Injective Substreams Project
 
-1. [Install the Substreams CLI](../../references/cli/installing-the-cli.md).
+1. [Install the Substreams CLI](../../how-to-guides/cli/installing-the-cli.md).
     
 2. Running `substreams init` will give you the option to choose between three Injective project options. Select the one that best fits your requirements:
     - **Injective EVM**: Navigate to the `substreams init` [EVM path](../evm.md) to access Injective-specific EVM data. Supports [Extended Blocks](../../references/chains-and-endpoints.md).

@@ -9,7 +9,7 @@ In this tutorial, you'll learn how to initialize a Solana-based Substreams proje
 
 ## Step 1: Initialize Your Solana Substreams Project
 
-1. [Install the Substreams CLI](../../references/cli/installing-the-cli.md).
+1. [Install the Substreams CLI](../../how-to-guides/cli/installing-the-cli.md).
 
 2. Running `substreams init` will give you the option to choose between two Solana project options. Select the one that best fits your requirements:
     - **sol-hello-world**: Creates a simple Substreams that outputs the accounts used in the Pump.Fun smart contract. It demonstrates how to access to full Solana Block, iterate over instructions and filter on a specific program ID.

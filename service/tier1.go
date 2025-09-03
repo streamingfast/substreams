@@ -336,7 +336,7 @@ func (s *Tier1Service) Blocks(
 			fields = append(fields, zap.String("deployment_id", auth["x-deployment-id"]))
 		}
 
-		if cacheTag := auth.Get("X-Sf-Substreams-Cache-Tag"); cacheTag != "" {
+		if cacheTag := auth.Get(reqctx.HeaderCacheTag); cacheTag != "" {
 			fields = append(fields,
 				zap.String("cache_tag", cacheTag),
 			)
@@ -440,7 +440,7 @@ func (s *Tier1Service) Blocks(
 	}()
 
 	respFunc := tier1ResponseHandler(respContext, &mut, logger, stream, request.NoopMode, reqStats, req.Msg.DevOutputModules)
-	err = s.blocks(runningContext, request, execGraph, respFunc, reqStats, fields)
+	err = s.blocks(runningContext, request, req.Header(), execGraph, respFunc, reqStats, fields)
 
 	if connectError := toConnectError(runningContext, err); connectError != nil {
 		switch connect.CodeOf(connectError) {
@@ -502,7 +502,7 @@ func (s *Tier1Service) writeLastUsed(ctx context.Context, execGraph *exec.Graph,
 
 var IsValidCacheTag = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`).MatchString
 
-func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Request, execGraph *exec.Graph, respFunc substreams.ResponseFunc, reqStats *metrics.Stats, logFields []zap.Field) (err error) {
+func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Request, header http.Header, execGraph *exec.Graph, respFunc substreams.ResponseFunc, reqStats *metrics.Stats, logFields []zap.Field) (err error) {
 	chainFirstStreamableBlock := bstream.GetProtocolFirstStreamableBlock
 	if request.StartBlockNum > 0 && request.StartBlockNum < int64(chainFirstStreamableBlock) {
 		return bsstream.NewErrInvalidArg("invalid start block %d, must be >= %d (the first streamable block of the chain)", request.StartBlockNum, chainFirstStreamableBlock)
@@ -525,7 +525,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 
 	if request.StopBlockNum != 0 {
 		if requestDetails.ResolvedStartBlockNum == request.StopBlockNum {
-			err := bsstream.NewErrInvalidArg("start block and stop block are the same")
+			err := bsstream.NewErrInvalidArg("start block and stop block are the same: %d and %d", requestDetails.ResolvedStartBlockNum, request.StopBlockNum)
 			logger.Info("refusing Substreams Blocks request", append(logFields, zap.Error(err))...)
 			return err
 		}
@@ -543,24 +543,16 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	}
 	requestDetails.UpdateInterval = time.Duration(request.ProgressMessagesIntervalMs) * time.Millisecond
 
-	requestDetails.MaxParallelJobs = s.runtimeConfig.DefaultParallelSubrequests
 	cacheTag := s.runtimeConfig.DefaultCacheTag
-	if auth := dauth.FromContext(ctx); auth != nil {
-		if parallelJobs := auth.Get("X-Sf-Substreams-Parallel-Jobs"); parallelJobs != "" {
-			if count, err := strconv.ParseUint(parallelJobs, 10, 64); err == nil {
-				requestDetails.MaxParallelJobs = count
-			}
+	if ct := dauth.FromContext(ctx).Get(reqctx.HeaderCacheTag); ct != "" {
+		if IsValidCacheTag(ct) {
+			cacheTag = ct
 		}
-		if tag := auth.Get("X-Sf-Substreams-Cache-Tag"); tag != "" {
-			if IsValidCacheTag(tag) {
-				cacheTag = tag
-			} else {
-				return fmt.Errorf("invalid value for X-Sf-Substreams-Cache-Tag %s, should only contain letters, numbers, hyphens and underscores", tag)
-			}
-		}
-
-		requestDetails.SetStageLayerParallelExecutorCountFromContext(ctx)
 	}
+
+	parallelJobs, parallelExecutors := reqctx.GetEffectiveHeaderValues(ctx, header, s.runtimeConfig.DefaultParallelSubrequests, reqctx.DefaultMaxStageLayerParallelExecutorCount)
+	requestDetails.MaxParallelJobs = parallelJobs
+	requestDetails.MaxStageLayerParallelExecutor = parallelExecutors
 
 	ctx = reqctx.WithRequest(ctx, requestDetails)
 	if s.runtimeConfig.ModuleExecutionTracing {
@@ -778,7 +770,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		zap.String("cursor", cursor),
 	)
 
-	var streamHandler bstream.Handler
+	var wrappedPipe bstream.Handler
 	if requestDetails.ProductionMode {
 		liveBackFiller := NewLiveBackFiller(ctx, pipe, logger, execGraph.OutputModuleStageIndex(), segmentSize, requestDetails.LinearHandoffBlockNum, s.runtimeConfig.ClientFactory, RequestBackProcessing)
 
@@ -789,14 +781,14 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		}
 
 		go liveBackFiller.Start(ctx)
-		streamHandler = liveBackFiller
+		wrappedPipe = liveBackFiller
 	} else {
-		streamHandler = pipe
+		wrappedPipe = pipe
 	}
 
 	blockStream, err := s.streamFactoryFunc(
 		ctx,
-		streamHandler,
+		wrappedPipe,
 		int64(requestDetails.LinearHandoffBlockNum),
 		request.StopBlockNum,
 		cursor,
@@ -811,7 +803,37 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	}
 
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier1/pipeline/blocks_stream")
-	streamErr = blockStream.Run(ctx)
+	for {
+		streamErr = blockStream.Run(ctx)
+		if errors.Is(streamErr, hub.ErrSubscriptionChannelFull) {
+			cur := pipe.LastCursor()
+			if cur == nil {
+				logger.Warn("subscription channel at max capacity, but no cursor was found to reconnect")
+				break
+			}
+
+			logger.Warn("subscription channel at max capacity, creating new stream", zap.String("last_block", cur.Block.String()))
+			blockStream, err = s.streamFactoryFunc(
+				ctx,
+				wrappedPipe,
+				int64(requestDetails.LinearHandoffBlockNum),
+				request.StopBlockNum,
+				cur.ToOpaque(),
+				request.FinalBlocksOnly,
+				false,
+				logger.Named("stream"),
+				bsstream.WithLiveSourceHandlerMiddleware(metering.LiveSourceMiddlewareHandlerFactory(ctx)),
+				bsstream.WithFileSourceHandlerMiddleware(metering.FileSourceMiddlewareHandlerFactory(ctx)),
+			)
+			if err != nil {
+				streamErr = fmt.Errorf("error getting stream: %w", err)
+				break
+			}
+			continue
+		}
+		break
+	}
+
 	span.EndWithErr(&streamErr)
 
 	return pipe.OnStreamTerminated(ctx, streamErr)
@@ -876,10 +898,12 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 			}
 		}
 
+		begin := time.Now()
 		if err := streamSrv.Send(resp); err != nil {
 			logger.Info("unable to send block probably due to client disconnecting", zap.String("user_id", userID), zap.String("api_key_id", apiKeyID), zap.Error(err))
 			return connect.NewError(connect.CodeUnavailable, err)
 		}
+		stats.RecordReadTime(begin)
 
 		if isData {
 			stats.RecordDataSent()

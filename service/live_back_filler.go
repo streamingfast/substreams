@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -71,6 +72,9 @@ func RequestBackProcessing(ctx context.Context, logger *zap.Logger, startBlock u
 		err := requestBackProcessing(ctx, logger, liveBackFillerRequest, clientFactory)
 		if err != nil {
 			logger.Debug("retryable error while live backprocessing", zap.Error(err))
+			if errors.Is(err, context.Canceled) {
+				return derr.NewFatalError(err)
+			}
 			return err
 		}
 

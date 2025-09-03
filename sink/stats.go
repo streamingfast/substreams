@@ -65,25 +65,23 @@ func (s *Stats) Start(each time.Duration) {
 
 func (s *Stats) LogNow() {
 
-	// Logging fields order is important as it affects the final rendering, we carefully ordered
-	// them so the development logs looks nicer.
 	fields := []zap.Field{
 		zap.Stringer("data_msg_rate", s.dataMsgRate),
-		zap.Any("progress_block_rate", s.progressBlockRate),
 		zap.Stringer("undo_msg_rate", s.undoMsgRate),
 		zap.Float64("avg_block_wait_time_sec", BlockWaitTime.Get()),
 		zap.Float64("avg_block_time_delta_sec", BlockTimeDelta.Get()),
 		zap.Float64("avg_local_block_processing_time_sec", LocalProcessingTime.Get()),
-
-		zap.Any("progress_last_block", dmetrics.NewValuesFromMetric(ProgressMessageLastBlock).Uints("stage")),
-		zap.Any("progress_running_jobs", dmetrics.NewValuesFromMetric(ProgressMessageRunningJobs).Uints("stage")),
-		zap.Uint64("progress_total_processed_blocks", dmetrics.NewValueFromMetric(ProcessedBlocks, "blocks").ValueUint()),
-		zap.Any("progress_last_contiguous_block", dmetrics.NewValuesFromMetric(ProgressMessageLastContiguousBlock).Uints("stage")),
-
 		zap.Stringer("last_block", s.lastBlock),
 	}
 	if s.isLive != nil {
-		fields = append(fields, zap.Bool("is_live", *s.isLive))
+		fields = append(fields,
+			zap.Any("progress_block_rate", s.progressBlockRate),
+			zap.Any("progress_last_block", dmetrics.NewValuesFromMetric(ProgressMessageLastBlock).Uints("stage")),
+			zap.Any("progress_running_jobs", dmetrics.NewValuesFromMetric(ProgressMessageRunningJobs).Uints("stage")),
+			zap.Uint64("progress_total_processed_blocks", dmetrics.NewValueFromMetric(ProcessedBlocks, "blocks").ValueUint()),
+			zap.Any("progress_last_contiguous_block", dmetrics.NewValuesFromMetric(ProgressMessageLastContiguousBlock).Uints("stage")),
+			zap.Bool("is_live", *s.isLive),
+		)
 	}
 
 	s.logger.Info("substreams stream stats", fields...)

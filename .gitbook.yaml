@@ -30,7 +30,7 @@ redirects:
   /developers-guide/sink-targets/substreams-sink-kv: /new/consume/other-sinks/kv
   /developers-guide/sink-targets/substreams-sink-mongodb: /new/consume/other-sinks/mongodb
   /developers-guide/sink-targets/substreams-sink-prometheus: /new/consume/other-sinks/prometheus
-  /getting-started/installing-the-cli: /new/common/installing-the-cli
+  /getting-started/installing-the-cli: /new/how-to-guides/cli/installing-the-cli
   /getting-started/quickstart: /new/develop/init-project
   /references-and-specs/chains-and-endpoints: /new/references/chains-and-endpoints
   /references-and-specs/command-line-interface: /new/references/command-line-interface
@@ -72,7 +72,7 @@ redirects:
   /documentation/intro-getting-started/intro-injective/injective-first-sps: /new/tutorials/cosmos-compatible/injective
   /documentation/how-to-guides/solana: /new/tutorials/solana
   /documentation/how-to-guides/evm: /new/tutorials/evm
-  /documentation/how-to-guides/injective: /new/tutorials/cosmos-compatible/injective
+  /documentation/how-to-guides/injective: /new/tutorials/injective
   /how-to-guides/sinks/sql-sink: /new/how-to-guides/sinks/sql/sql
   /how-to-guides/sinks/community-sinks/files: /new/how-to-guides/sinks/files
   /how-to-guides/overview/eth-calls: /new/how-to-guides/develop-your-own-substreams/evm/eth-calls

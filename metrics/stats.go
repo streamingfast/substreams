@@ -57,8 +57,9 @@ type Stats struct {
 	// counter is used to get the next jobIdx
 	counter uint64
 
-	error  error
-	logger *zap.Logger
+	clientReadTime *dmetrics.AvgDurationCounter
+	error          error
+	logger         *zap.Logger
 }
 
 type runningJobs map[uint64]*extendedJob
@@ -157,6 +158,7 @@ func NewReqStats(config *Config, logger *zap.Logger) *Stats {
 	return &Stats{
 		config:             config,
 		blockRate:          dmetrics.MustNewAvgRateCounter(1*time.Second, 30*time.Second, "blocks"),
+		clientReadTime:     dmetrics.NewAvgDurationCounter(5*time.Minute, time.Second, "client_read_time"),
 		startTime:          time.Now(),
 		logger:             logger,
 		modulesStats:       make(map[string]*extendedStats),
@@ -406,6 +408,13 @@ func (s *Stats) RecordModuleWasmExternalCallBegin(moduleName string, extension s
 		extension: extension,
 	}
 
+	met, ok := mod.externalCallMetrics[extension]
+	if !ok {
+		met = &extendedCallMetric{}
+		mod.externalCallMetrics[extension] = met
+	}
+	met.count++
+
 	return uniqueID
 }
 
@@ -420,7 +429,6 @@ func (s *Stats) RecordModuleWasmExternalCallEnd(moduleName string, extension str
 		met = &extendedCallMetric{}
 		mod.externalCallMetrics[extension] = met
 	}
-	met.count++
 	inproc := mod.inprocessCallMetrics[uniqueID]
 	met.time += time.Since(inproc.startTime)
 
@@ -454,6 +462,12 @@ func (s *Stats) RecordModuleWasmStoreDeletePrefix(moduleName string, sizeBytes u
 	mod.StoreSizeBytes = sizeBytes
 	mod.StoreDeleteprefixCount++
 	mod.storeOperationTime += elapsed
+}
+
+func (s *Stats) RecordReadTime(since time.Time) {
+	s.Lock()
+	defer s.Unlock()
+	s.clientReadTime.AddElapsedTime(since)
 }
 
 func (s *Stats) RecordBlock(ref bstream.BlockRef) {
@@ -609,10 +623,8 @@ func cloneCallMetrics(in []*pbssinternal.ExternalCallMetric) []*pbssinternal.Ext
 
 func (s *Stats) stage(module string) (uint32, *pbsubstreamsrpc.Stage) {
 	for i, ss := range s.stages {
-		for _, mod := range ss.Modules {
-			if mod == module {
-				return uint32(i), ss
-			}
+		if slices.Contains(ss.Modules, module) {
+			return uint32(i), ss
 		}
 	}
 	// could happen on initial lookup, minor race condition
@@ -722,6 +734,7 @@ func (s *Stats) getZapFields(meter dmetering.Meter) []zap.Field {
 		zap.Uint64("remote_blocks_processed", s.remoteProcessedBlockCount), // "estimated" from remote ranges
 		zap.Uint64("total_blocks_processed", s.processedBlocks),            // includes remote and local blocks processed in this request, multiplied by execution stages, excludes blocks that were skipped from indexes
 		zap.Uint64("uncompressed_egress_bytes", s.uncompressedEgressBytes),
+		zap.Duration("client_read_average_time_last_5_minutes", s.clientReadTime.Average()),
 		zap.String("error", errorText),
 	}
 

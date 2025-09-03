@@ -3,6 +3,7 @@ package sink
 import (
 	"time"
 
+	"github.com/streamingfast/bstream"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
@@ -46,4 +47,28 @@ func (t *DeltaLivenessChecker) IsLive(clock *pbsubstreams.Clock) bool {
 	}
 
 	return t.isLive
+}
+
+type CursorBasedLivenessChecker struct {
+	isLive bool
+}
+
+func NewCursorBasedLivenessChecker() *CursorBasedLivenessChecker {
+	return &CursorBasedLivenessChecker{}
+}
+
+func (t *CursorBasedLivenessChecker) IsLive(clock *pbsubstreams.Clock) bool {
+	return t.isLive
+}
+
+func (t *CursorBasedLivenessChecker) CheckCursor(cursor string) {
+	if t.isLive {
+		return
+	}
+
+	if cur, err := NewCursor(cursor); err == nil {
+		if cur.Step == bstream.StepNew {
+			t.isLive = true
+		}
+	}
 }

@@ -38,7 +38,7 @@ const (
 	FlagUndoBufferSize     = "undo-buffer-size"
 	FlagLiveBlockTimeDelta = "live-block-time-delta"
 	FlagDevelopmentMode    = "development-mode"
-	FlagInfiniteRetry      = "infinite-retry"
+	FlagMaxRetries         = "max-retries"
 
 	FlagSkipPackageValidation = "skip-package-validation"
 	FlagExtraHeaders          = "header"
@@ -81,7 +81,7 @@ func (i flagIgnoredList) IsIgnored(flag string) bool {
 //	Flag `--development-mode` (defaults `false`)
 //	Flag `--noop-mode` (defaults `false`)
 //	Flag `--final-blocks-only` (defaults `false`)
-//	Flag `--infinite-retry` (defaults `false`)
+//	Flag `--max-retries` (defaults `3`)
 //	Flag `--skip-package-validation` (defaults `false`)
 //	Flag `--header` (-H) (defaults `[]`)
 //	Flag `--api-key-envvar` (default `SUBSTREAMS_API_KEY`)
@@ -135,7 +135,7 @@ func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagIgnored) {
 	}
 
 	if flagIncluded(FlagLiveBlockTimeDelta) {
-		flags.Duration(FlagLiveBlockTimeDelta, 300*time.Second, "Consider chain live if block time is within this number of seconds of current time")
+		flags.Duration(FlagLiveBlockTimeDelta, 0, "Consider chain live if block time is within this number of seconds of current time. If disabled, liveness is based on the cursor being 'finalized' or not")
 	}
 
 	if flagIncluded(FlagDevelopmentMode) {
@@ -150,8 +150,8 @@ func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagIgnored) {
 		flags.Bool(FlagFinalBlocksOnly, false, "Only process blocks that have pass finality, to prevent any reorg and undo signal by staying further away from the chain HEAD")
 	}
 
-	if flagIncluded(FlagInfiniteRetry) {
-		flags.Bool(FlagInfiniteRetry, false, "Default behavior is to retry 15 times spanning approximatively 5m before exiting with an error, activating this flag will retry forever")
+	if flagIncluded(FlagMaxRetries) {
+		flags.Int(FlagMaxRetries, 3, "Maximum number of retries for substreams calls (0 disables retries, -1 for infinite retries)")
 	}
 
 	if flagIncluded(FlagSkipPackageValidation) {
@@ -230,7 +230,7 @@ func ConfigFromViper(
 	zlog *zap.Logger,
 	tracer logging.Tracer,
 ) (*SinkerConfig, error) {
-	params, network, undoBufferSize, liveBlockTimeDelta, isDevelopmentMode, infiniteRetry, finalBlocksOnly, skipPackageValidation, isNoopMode, extraHeaders, prometheusAddr := getViperFlags(cmd)
+	params, network, undoBufferSize, liveBlockTimeDelta, isDevelopmentMode, maxRetries, finalBlocksOnly, skipPackageValidation, isNoopMode, extraHeaders, prometheusAddr := getViperFlags(cmd)
 
 	// Parse start and stop blocks using utility functions
 	startBlockFlag := sflags.MustGetString(cmd, FlagStartBlock)
@@ -299,7 +299,7 @@ func ConfigFromViper(
 		zap.Bool("start_block_empty", startBlockIsEmpty),
 		zap.Bool("development_mode", isDevelopmentMode),
 		zap.Bool("noop_mode", isNoopMode),
-		zap.Bool("infinite_retry", infiniteRetry),
+		zap.Int("max_retries", maxRetries),
 		zap.Bool("final_blocks_only", finalBlocksOnly),
 		zap.Bool("skip_package_validation", skipPackageValidation),
 		zap.Duration("live_block_time_delta", liveBlockTimeDelta),
@@ -337,6 +337,8 @@ func ConfigFromViper(
 	var livenessChecker LivenessChecker
 	if liveBlockTimeDelta > 0 {
 		livenessChecker = NewDeltaLivenessChecker(liveBlockTimeDelta)
+	} else {
+		livenessChecker = NewCursorBasedLivenessChecker()
 	}
 
 	config := &SinkerConfig{
@@ -350,7 +352,7 @@ func ConfigFromViper(
 		StopBlock:             stopBlock,
 		UndoBufferSize:        undoBufferSize,
 		FinalBlocksOnly:       finalBlocksOnly,
-		InfiniteRetry:         infiniteRetry,
+		MaxRetries:            maxRetries,
 		BackOff:               bo,
 		LiveBlockTimeDelta:    liveBlockTimeDelta,
 		LivenessChecker:       livenessChecker,
@@ -372,7 +374,7 @@ func getViperFlags(cmd *cobra.Command) (
 	undoBufferSize int,
 	liveBlockTimeDelta time.Duration,
 	isDevelopmentMode bool,
-	infiniteRetry bool,
+	maxRetries int,
 	finalBlocksOnly bool,
 	skipPackageValidation bool,
 	isNoopMode bool,
@@ -403,8 +405,8 @@ func getViperFlags(cmd *cobra.Command) (
 		isNoopMode = sflags.MustGetBool(cmd, FlagNoopMode)
 	}
 
-	if sflags.FlagDefined(cmd, FlagInfiniteRetry) {
-		infiniteRetry = sflags.MustGetBool(cmd, FlagInfiniteRetry)
+	if sflags.FlagDefined(cmd, FlagMaxRetries) {
+		maxRetries = sflags.MustGetInt(cmd, FlagMaxRetries)
 	}
 
 	if sflags.FlagDefined(cmd, FlagFinalBlocksOnly) {

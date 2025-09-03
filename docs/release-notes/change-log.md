@@ -11,7 +11,54 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Server
+
+* **BREAKING** Add a maximum execution time for a full tier2 segment. By default, this is 60 minutes. It will fail with `rpc error: code = DeadlineExceeded desc = request active for too long`.
+  It can be configured from the `SegmentExecutionTimeout` configuration option on Tier2Config or disabled by setting it to 0.
+* Improve log message for 'request active for a long time', adding stats.
+* Fix `subscription channel at max capacity` error: when the LIVE channel is full (ex: slow module execution or slow client reader), the request will be continued from merged files instead of failing, and gracefully recover if performance is restored.
+* Fixed a small context memory leak when using wasmtime (especially with grpc-based metering plugin)
+
 ### CLI
+
+* **BREAKING**: Replaced `--infinite-retry` boolean flag with `--max-retries` integer flag in sink package for more flexible retry control:
+  - `--max-retries 0`: No retries (fail immediately on first error)
+  - `--max-retries 3`: Default behavior (retry up to 3 times)
+  - `--max-retries N`: Retry up to N times (where N > 0)
+  - `--max-retries -1`: Infinite retries (equivalent to old `--infinite-retry` flag)
+
+## v1.16.4
+
+### Server
+
+#### Memory leak
+
+* Fix zstd thread/mem leak on filereader
+
+#### Authentication changes
+
+People using their own authentication layer will need to consider these changes before upgrading!
+
+* Renamed config headers that come from authentication layer:
+  - `x-sf-user-id` renamed to `x-user-id` (from dauth module)
+  - `x-sf-api-key-id` renamed to `x-api-key-id` (from dauth module)
+  - `x-sf-meta` renamed to `x-meta` (from dauth module)
+  - `x-sf-substreams-parallel-jobs` renamed to `x-substreams-parallel-workers`
+* Allow decreasing `x-substreams-parallel-workers` through an HTTP headers (auth layer determines higher bound)
+* Detect value for the 'stage layer parallel executor max count' based on the `x-plan-tier` header (removed `x-sf-substreams-stage-layer-parallel-executor-max-count` handling)
+
+#### New authentication plugin
+
+* Added `tgm://auth.thegraph.market?indexer-api-key=<API_KEY>&reissue-jwt-max-age-secs=600` plugin that allows an indexer to use The Graph Market as the authentication source.
+  An API key with special "indexer" feature is needed to allow repeated calls to the API without rate limiting (for Key-based authentication and reissuance of "untrusted long-lived JWTs").
+
+## v1.16.3
+
+### CLI
+
+* **Added** `substreams registry verify` command to validate a package is ready for publishing without actually publishing it. Only available as `registry verify` (no alias).
+* **Added** `--yes` flag to `substreams registry publish` command to auto-confirm package publishing without prompting.
+* **Added** `--team-slug` flag to `substreams registry publish` command and deprecated `--teamSlug` (use `--team-slug` instead).
 
 * Refuse `<name>@latest` in imports, this resolves to a different version at different busting the Substreams cache, use a specific version instead `<name>@<version>` which `version` must respect semantic versioning (SemVer).
 

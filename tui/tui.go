@@ -155,6 +155,9 @@ func (ui *TUI) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.
 	if debugSubstreamsRun {
 		time.Sleep(debugSubstreamsRunDelay)
 		debugSubstreamsRunDelay += time.Millisecond * 100
+		if debugSubstreamsRunDelay > 500*time.Millisecond {
+			debugSubstreamsRunDelay = 500 * time.Millisecond
+		}
 	}
 	_ = isLive
 	if ui.testRunner != nil {

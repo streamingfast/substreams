@@ -20,7 +20,7 @@ func init() {
 		sink.FlagIgnore(
 			sink.FlagDevelopmentMode,
 			sink.FlagLiveBlockTimeDelta,
-			sink.FlagInfiniteRetry,
+			sink.FlagMaxRetries,
 		))
 
 	// GUI-specific flags

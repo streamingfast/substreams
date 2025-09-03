@@ -83,7 +83,7 @@ func New(
 		zap.Stringer("buffer", s.buffer),
 		zap.Int64("start_block", s.SinkerConfig.StartBlock),
 		zap.Uint64("stop_block", s.SinkerConfig.StopBlock),
-		zap.Bool("infinite_retry", s.InfiniteRetry),
+		zap.Int("max_retries", s.MaxRetries),
 		zap.Bool("final_blocks_only", s.FinalBlocksOnly),
 		zap.Bool("liveness_checker", s.LivenessChecker != nil),
 	)
@@ -283,9 +283,15 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 	backOff := s.BackOff
 	s.Logger.Debug("configured default backoff", zap.String("back_off", fmt.Sprintf("%#v", backOff)))
 
-	if !s.InfiniteRetry {
-		s.Logger.Debug("configured backoff to stop after 15 retries")
-		backOff = backoff.WithMaxRetries(backOff, 15)
+	if s.MaxRetries == 0 {
+		s.Logger.Debug("configured backoff to stop after 0 retries (no retries)")
+		backOff = backoff.WithMaxRetries(backOff, 0)
+	} else if s.MaxRetries > 0 {
+		s.Logger.Debug("configured backoff to stop after specified retries", zap.Int("max_retries", s.MaxRetries))
+		backOff = backoff.WithMaxRetries(backOff, uint64(s.MaxRetries))
+	} else {
+		s.Logger.Debug("configured backoff for infinite retries")
+		// For infinite retries (MaxRetries == -1), don't set MaxRetries on backoff
 	}
 
 	backOff = backoff.WithContext(backOff, ctx)

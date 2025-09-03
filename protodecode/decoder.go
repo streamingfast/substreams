@@ -262,9 +262,12 @@ type ModuleWrap struct {
 // bytesAwareAnyResolver is a wrapper around another AnyResolver that ensures
 // the bytes representation is respected when resolving Any messages.
 type bytesAwareAnyResolver struct {
-	resolver jsonpb.AnyResolver
+	resolver *pbsubstreams.PackageAnyResolver
 }
 
+// Resolve implements the jsonpb.AnyResolver interface.
+// It delegates to the underlying resolver but ensures that the bytes representation
+// setting is respected when marshaling the resolved message to JSON.
 func (b *bytesAwareAnyResolver) Resolve(typeURL string) (protoV1.Message, error) {
 	// First, use the wrapped resolver to resolve the message
 	msg, err := b.resolver.Resolve(typeURL)
@@ -272,9 +275,41 @@ func (b *bytesAwareAnyResolver) Resolve(typeURL string) (protoV1.Message, error)
 		return nil, err
 	}
 
-	// The current bytes representation is already set globally via dynamic.SetDefaultBytesRepresentation
-	// and will be used when marshaling the resolved message to JSON.
-	// We don't need to do anything special here, as the dynamic package will use the global setting.
+	// For dynamic messages, we need to ensure they use the current bytes representation
+	if dynMsg, ok := msg.(*dynamic.Message); ok {
+		// The dynamic message will use the global bytes representation setting
+		// which is set via dynamic.SetDefaultBytesRepresentation()
+		// We don't need to do anything special here
+		return dynMsg, nil
+	}
+
+	// For non-dynamic messages, we need to wrap them in a dynamic message
+	// to ensure they use the current bytes representation
+	if protoMsg, ok := msg.(protoV1.Message); ok {
+		// Get the descriptor for the message
+		msgDesc, err := desc.LoadMessageDescriptorForMessage(protoMsg)
+		if err != nil {
+			return nil, err
+		}
+
+		// Create a new dynamic message with the same descriptor
+		dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
+		
+		// Copy the data from the original message to the dynamic message
+		data, err := protoV1.Marshal(protoMsg)
+		if err != nil {
+			return nil, err
+		}
+		
+		if err := dynMsg.Unmarshal(data); err != nil {
+			return nil, err
+		}
+		
+		// Return the dynamic message which will use the current bytes representation
+		return dynMsg, nil
+	}
+
+	// If we can't convert to a dynamic message, just return the original message
 	return msg, nil
 }
 

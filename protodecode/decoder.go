@@ -140,6 +140,8 @@ func (d *Decoder) DecodeDynamicMessage(msgDesc *desc.MessageDescriptor, anyin *a
 		})
 		return json.RawMessage(cnt)
 	}
+	
+	// Create a dynamic message with the current bytes representation setting
 	dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
 	if err := dynMsg.Unmarshal(in); err != nil {
 		cnt, _ := json.Marshal(&ErrorWrap{
@@ -155,11 +157,14 @@ func (d *Decoder) DecodeDynamicMessage(msgDesc *desc.MessageDescriptor, anyin *a
 		resolver: d.anyResolver,
 	}
 
-	cnt, err := dynMsg.MarshalJSONPB(&jsonpb.Marshaler{
+	// Ensure we use the current bytes representation for JSON marshaling
+	marshaler := &jsonpb.Marshaler{
 		AnyResolver:  anyResolver,
 		Indent:       d.indent,
 		EmitDefaults: d.emitDefaults,
-	})
+	}
+	
+	cnt, err := dynMsg.MarshalJSONPB(marshaler)
 	if err != nil {
 		cnt, _ := json.Marshal(&ErrorWrap{
 			Error:  fmt.Sprintf("error encoding protobuf %s into json: %s\n", msgDesc.GetFullyQualifiedName(), err),
@@ -290,7 +295,9 @@ func (b *bytesAwareAnyResolver) Resolve(typeURL string) (protoV1.Message, error)
 	}
 
 	// Create a new dynamic message with the same descriptor
-	dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
+	// Use the current global bytes representation setting
+	factory := dynamic.NewMessageFactoryWithDefaults()
+	dynMsg := factory.NewDynamicMessage(msgDesc)
 	
 	// Copy the data from the original message to the dynamic message
 	data, err := protoV1.Marshal(msg)

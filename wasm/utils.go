@@ -64,12 +64,10 @@ func ValidateAndInjectFoundationalStoreClock(clock *pbsubstreams.Clock, blockNum
 	}
 
 	// Inject current Clock if found
-	if blockNumber == 0 && len(blockHash) == 0 {
-		if clock != nil {
-			blockNumber = clock.Number
-			if decoded := DecodeHashString(clock.Id); decoded != nil {
-				blockHash = decoded
-			}
+	if clock != nil {
+		blockNumber = clock.Number
+		if decoded := DecodeHashString(clock.Id); decoded != nil {
+			blockHash = decoded
 		}
 	}
 

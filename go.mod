@@ -8,7 +8,7 @@ require (
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/streamingfast/bstream v0.0.2-0.20250903174843-9c884c3356fd
-	github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b
+	github.com/streamingfast/cli v0.0.4-0.20241119021815-815afa473375
 	github.com/streamingfast/dauth v0.0.0-20250821195214-8e2a3c300f97
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
 	github.com/streamingfast/derr v0.0.0-20250321151415-6b4fbbcb1bb5

@@ -1,0 +1,18 @@
+# Bytes Encoding Fix for anypb.Any Type
+
+This PR fixes an issue where bytes encoding settings were not being respected in nested `anypb.Any` fields in the Substreams CLI.
+
+## Problem
+
+In Substreams CLI, we render Protobuf to JSON using the upcoming Golang JSON V2 module. We define how we want bytes to be encoded correctly, which works well for top-level messages. However, when a message has a field of type `anypb.Any`, the inner JSON object rendered does not respect our bytes encoding settings.
+
+## Solution
+
+The fix is implemented in our fork of the `jhump/protoreflect` library. We modified the `anyResolver.Resolve` method in `dynamic/json.go` to ensure that when a message contains an `anypb.Any` field, the inner JSON object rendered will respect the same bytes encoding configuration that is set for the top-level message.
+
+This ensures consistent bytes encoding throughout the entire JSON output, providing a better user experience.
+
+## Testing
+
+The fix has been verified with a test case that confirms bytes encoding settings are properly propagated to nested `anypb.Any` fields.
+

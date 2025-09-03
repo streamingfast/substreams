@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/mr-tron/base58"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 type PanicError struct {
@@ -50,4 +51,27 @@ func DecodeHashString(hashStr string) []byte {
 
 	// Fallback: return nil if no format worked
 	return nil
+}
+
+// ValidateAndInjectFoundationalStoreClock validates that block_number is 0 and block_hash is empty,
+// then injects the current clock values. Returns the final block number and hash to use.
+func ValidateAndInjectFoundationalStoreClock(clock *pbsubstreams.Clock, blockNumber uint64, blockHash []byte, operation string) (uint64, []byte) {
+	if blockNumber != 0 {
+		panic(fmt.Sprintf("foundational_store_%s: block_number cannot be modified, must be 0, got %d", operation, blockNumber))
+	}
+	if len(blockHash) != 0 {
+		panic(fmt.Sprintf("foundational_store_%s: block_hash cannot be modified, must be empty, got %d bytes", operation, len(blockHash)))
+	}
+
+	// Inject current Clock if found
+	if blockNumber == 0 && len(blockHash) == 0 {
+		if clock != nil {
+			blockNumber = clock.Number
+			if decoded := DecodeHashString(clock.Id); decoded != nil {
+				blockHash = decoded
+			}
+		}
+	}
+
+	return blockNumber, blockHash
 }

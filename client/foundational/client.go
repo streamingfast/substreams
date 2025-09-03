@@ -14,7 +14,7 @@ import (
 )
 
 type Store struct {
-	rpc    pbstore.StoreKVClient
+	rpc    pbstore.StoreClient
 	logger *zap.Logger
 }
 
@@ -41,7 +41,7 @@ func New(rawEndpoint string, logger *zap.Logger) (*Store, func() error, error) {
 		return nil, nil, err
 	}
 
-	return &Store{rpc: pbstore.NewStoreKVClient(conn), logger: logger}, conn.Close, nil
+	return &Store{rpc: pbstore.NewStoreClient(conn), logger: logger}, conn.Close, nil
 }
 
 func (s *Store) Get(ctx context.Context, block uint64, blockHash []byte, key []byte) (*pbstore.GetResponse, error) {

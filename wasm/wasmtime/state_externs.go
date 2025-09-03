@@ -160,6 +160,8 @@ func (i *instance) hasLast(storeIndex int32, keyPtr, keyLength int32) int32 {
 func (i *instance) foundationalStoreGet(storeIndex int32, reqPtr int32, reqLen int32) int64 {
 	reqData := i.Heap.ReadBytes(reqPtr, reqLen)
 
+	// TODO: backend should return already-serialized bytes to avoid marshal here
+
 	// Deserialize GetRequest
 	var req pbstore.GetRequest
 	if err := proto.Unmarshal(reqData, &req); err != nil {
@@ -167,17 +169,8 @@ func (i *instance) foundationalStoreGet(storeIndex int32, reqPtr int32, reqLen i
 		return 0
 	}
 
-	// Inject current Clock if found
-	blockNumber := req.BlockNumber
-	blockHash := req.BlockHash
-	if blockNumber == 0 && len(blockHash) == 0 {
-		if i.CurrentCall.Clock != nil {
-			blockNumber = i.CurrentCall.Clock.Number
-			if decoded := wasm.DecodeHashString(i.CurrentCall.Clock.Id); decoded != nil {
-				blockHash = decoded
-			}
-		}
-	}
+	// Validate and inject clock
+	blockNumber, blockHash := wasm.ValidateAndInjectFoundationalStoreClock(i.CurrentCall.Clock, req.BlockNumber, req.BlockHash, "get")
 
 	resp, err := i.CurrentCall.DoFoundationalStoreGet(uint32(storeIndex), blockNumber, blockHash, req.Key)
 	if err != nil {
@@ -205,6 +198,8 @@ func (i *instance) foundationalStoreGet(storeIndex int32, reqPtr int32, reqLen i
 func (i *instance) foundationalStoreGetAll(storeIndex int32, reqPtr int32, reqLen int32) int64 {
 	reqData := i.Heap.ReadBytes(reqPtr, reqLen)
 
+	// TODO: backend should return already-serialized bytes to avoid marshal here
+
 	// Deserialize GetAllRequest
 	var req pbstore.GetAllRequest
 	if err := proto.Unmarshal(reqData, &req); err != nil {
@@ -212,17 +207,8 @@ func (i *instance) foundationalStoreGetAll(storeIndex int32, reqPtr int32, reqLe
 		return 0
 	}
 
-	// Inject current Clock if found
-	blockNumber := req.BlockNumber
-	blockHash := req.BlockHash
-	if blockNumber == 0 && len(blockHash) == 0 {
-		if i.CurrentCall.Clock != nil {
-			blockNumber = i.CurrentCall.Clock.Number
-			if decoded := wasm.DecodeHashString(i.CurrentCall.Clock.Id); decoded != nil {
-				blockHash = decoded
-			}
-		}
-	}
+	// Validate and inject clock
+	blockNumber, blockHash := wasm.ValidateAndInjectFoundationalStoreClock(i.CurrentCall.Clock, req.BlockNumber, req.BlockHash, "get_all")
 
 	resp, err := i.CurrentCall.DoFoundationalStoreGetAll(uint32(storeIndex), blockNumber, blockHash, req.Keys)
 	if err != nil {

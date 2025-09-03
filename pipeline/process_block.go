@@ -456,7 +456,7 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 				}
 			}
 			if s, ok := r.(string); ok {
-				e := fmt.Errorf("wasmtime error: %s", s)
+				e := fmt.Errorf("wasm error: %s", s)
 				p.execoutStorage.ConfigMap[executorName].WriteDeterministicError(ctx, execOutput.Clock().Number, e)
 				out.err = e
 				return

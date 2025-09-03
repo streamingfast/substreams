@@ -8,7 +8,7 @@ require (
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/streamingfast/bstream v0.0.2-0.20250221181559-fb0809660f91
-	github.com/streamingfast/cli v0.0.4-0.20241119021815-815afa473375
+	github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b
 	github.com/streamingfast/dauth v0.0.0-20250129222106-6e8709b44acf
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
 	github.com/streamingfast/derr v0.0.0-20250321151415-6b4fbbcb1bb5
@@ -67,7 +67,7 @@ require (
 	github.com/streamingfast/firehose-networks v0.2.0
 	github.com/streamingfast/sf-tracing v0.0.0-20240430173521-888827872b90
 	github.com/streamingfast/shutter v1.5.0
-	github.com/streamingfast/substreams-foundational-store v0.0.0-20250826200255-be68544ccc6c
+	github.com/streamingfast/substreams-foundational-store v0.1.0
 	github.com/streamingfast/substreams-sdk-go v0.0.0-20240110154316-5fb21a7a330b
 	github.com/streamingfast/substreams-sink-sql v1.0.1-0.20231127153906-acf5f3e34330
 	github.com/test-go/testify v1.1.4
@@ -174,7 +174,7 @@ require (
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.25 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
-	github.com/mr-tron/base58 v1.2.0 // indirect
+	github.com/mr-tron/base58 v1.2.0
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect

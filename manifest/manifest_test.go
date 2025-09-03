@@ -1,13 +1,15 @@
 package manifest
 
 import (
-	"os"
+	"crypto/sha256"
+	"encoding/hex"
 	"strings"
 	"testing"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v3"
 )
 
@@ -229,28 +231,16 @@ func TestManifest_ToProto(t *testing.T) {
 
 }
 
-//type testSinkConfig struct {
-//	state         protoimpl.MessageState
-//	sizeCache     protoimpl.SizeCache
-//	unknownFields protoimpl.UnknownFields
-//
-//	AddSomePancakes bool `protobuf:"varint,1,opt,name=add_some_pancakes,json=addSomePancakes,proto3" json:"add_some_pancakes,omitempty"`
-//}
-//
-//func (x *testSinkConfig) Reset()                             { *x = testSinkConfig{} }
-//func (x *testSinkConfig) String() string                     { return "testSinkConfig" }
-//func (*testSinkConfig) ProtoMessage()                        {}
-//func (x *testSinkConfig) ProtoReflect() protoreflect.Message { panic("unimplemented") }
-
 func TestParseFoundationalStoreIdentifier(t *testing.T) {
+	type out struct {
+		packageName string
+		version     string
+		isShortcut  bool
+	}
 	type test struct {
-		name           string
-		input          string
-		expectedOutput struct {
-			packageName string
-			version     string
-			isShortcut  bool
-		}
+		name        string
+		input       string
+		expected    out
 		expectError string
 	}
 
@@ -258,11 +248,7 @@ func TestParseFoundationalStoreIdentifier(t *testing.T) {
 		{
 			name:  "valid package notation",
 			input: "account-owners@v1.0.0",
-			expectedOutput: struct {
-				packageName string
-				version     string
-				isShortcut  bool
-			}{
+			expected: out{
 				packageName: "account-owners",
 				version:     "v1.0.0",
 				isShortcut:  true,
@@ -271,228 +257,49 @@ func TestParseFoundationalStoreIdentifier(t *testing.T) {
 		{
 			name:  "valid single word package",
 			input: "tokens@v2.1.3",
-			expectedOutput: struct {
-				packageName string
-				version     string
-				isShortcut  bool
-			}{
+			expected: out{
 				packageName: "tokens",
 				version:     "v2.1.3",
 				isShortcut:  true,
 			},
 		},
 		{
-			name:  "grpc endpoint without @",
-			input: "grpc://localhost:50051",
-			expectedOutput: struct {
-				packageName string
-				version     string
-				isShortcut  bool
-			}{
-				packageName: "grpc://localhost:50051",
-				version:     "",
-				isShortcut:  false,
-			},
-		},
-		{
 			name:        "empty package name",
 			input:       "@v1.0.0",
-			expectError: "package name cannot be empty",
+			expectError: "does not match regexp",
 		},
 		{
-			name:        "empty version",
+			name:        "empty version becomes latest (then rejected at parseFoundationalStore time)",
 			input:       "account-owners@",
-			expectError: "version cannot be empty",
+			expected:    out{packageName: "account-owners", version: "latest", isShortcut: true},
+			expectError: "",
 		},
 		{
-			name:        "invalid package name with uppercase",
-			input:       "Account-Owners@v1.0.0",
-			expectError: "package name \"Account-Owners\" is invalid",
-		},
-		{
-			name:        "invalid package name with underscore",
-			input:       "account_owners@v1.0.0",
-			expectError: "package name \"account_owners\" is invalid",
-		},
-		{
-			name:        "version without v prefix",
+			name:        "invalid version (not semver)",
 			input:       "account-owners@1.0.0",
-			expectError: "version \"1.0.0\" must start with 'v'",
+			expectError: "not valid Semver",
 		},
 		{
-			name:        "invalid version vlatest",
-			input:       "account-owners@vlatest",
-			expectError: "version \"vlatest\" is not supported",
-		},
-		{
-			name:        "multiple validation errors",
-			input:       "Invalid_Package@1.0.0",
-			expectError: "package name \"Invalid_Package\" is invalid",
+			name:        "multiple validation issues",
+			input:       "Invalid Package@1.0.0",
+			expectError: "does not match regexp",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			packageName, version, isShortcut, err := parseFoundationalStoreIdentifier(tt.input)
+			pkg, ver, shortcut, validationErr := ParseShortPackageIdentifier(tt.input)
 
 			if tt.expectError != "" {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.expectError)
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tt.expectedOutput.packageName, packageName)
-				assert.Equal(t, tt.expectedOutput.version, version)
-				assert.Equal(t, tt.expectedOutput.isShortcut, isShortcut)
+				require.Error(t, validationErr)
+				assert.Contains(t, validationErr.Error(), tt.expectError)
+				return
 			}
-		})
-	}
-}
 
-func TestResolveFoundationalStoreEndpoint(t *testing.T) {
-	// Save original environment
-	originalEndpoint := os.Getenv("FOUNDATIONAL_STORE_ENDPOINT")
-	originalEnvironment := os.Getenv("DEPLOYMENT_ENVIRONMENT")
-
-	// Cleanup function
-	cleanup := func() {
-		if originalEndpoint != "" {
-			os.Setenv("FOUNDATIONAL_STORE_ENDPOINT", originalEndpoint)
-		} else {
-			os.Unsetenv("FOUNDATIONAL_STORE_ENDPOINT")
-		}
-		if originalEnvironment != "" {
-			os.Setenv("DEPLOYMENT_ENVIRONMENT", originalEnvironment)
-		} else {
-			os.Unsetenv("DEPLOYMENT_ENVIRONMENT")
-		}
-	}
-	defer cleanup()
-
-	type test struct {
-		name           string
-		envEndpoint    string
-		envEnvironment string
-		expectedOutput string
-	}
-
-	tests := []test{
-		{
-			name:           "custom endpoint via env var",
-			envEndpoint:    "grpc://custom-host:9999",
-			envEnvironment: "production",
-			expectedOutput: "grpc://custom-host:9999",
-		},
-		{
-			name:           "local environment",
-			envEndpoint:    "",
-			envEnvironment: "local",
-			expectedOutput: "grpc://localhost:50051",
-		},
-		{
-			name:           "dev environment",
-			envEndpoint:    "",
-			envEnvironment: "dev",
-			expectedOutput: "grpc://localhost:50051",
-		},
-		{
-			name:           "development environment",
-			envEndpoint:    "",
-			envEnvironment: "development",
-			expectedOutput: "grpc://localhost:50051",
-		},
-		{
-			name:           "staging environment",
-			envEndpoint:    "",
-			envEnvironment: "staging",
-			expectedOutput: "grpc://foundational-store-staging:10016",
-		},
-		{
-			name:           "stage environment",
-			envEndpoint:    "",
-			envEnvironment: "stage",
-			expectedOutput: "grpc://foundational-store-staging:10016",
-		},
-		{
-			name:           "production environment",
-			envEndpoint:    "",
-			envEnvironment: "production",
-			expectedOutput: "grpc://foundational-store:10016",
-		},
-		{
-			name:           "prod environment",
-			envEndpoint:    "",
-			envEnvironment: "prod",
-			expectedOutput: "grpc://foundational-store:10016",
-		},
-		{
-			name:           "unknown environment defaults to production",
-			envEndpoint:    "",
-			envEnvironment: "unknown",
-			expectedOutput: "grpc://foundational-store:10016",
-		},
-		{
-			name:           "empty environment defaults to production",
-			envEndpoint:    "",
-			envEnvironment: "",
-			expectedOutput: "grpc://foundational-store:10016",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Set environment variables
-			if tt.envEndpoint != "" {
-				os.Setenv("FOUNDATIONAL_STORE_ENDPOINT", tt.envEndpoint)
-			} else {
-				os.Unsetenv("FOUNDATIONAL_STORE_ENDPOINT")
-			}
-			os.Setenv("DEPLOYMENT_ENVIRONMENT", tt.envEnvironment)
-
-			result := resolveFoundationalStoreEndpoint("account-owners", "v1.0.0")
-			assert.Equal(t, tt.expectedOutput, result)
-		})
-	}
-}
-
-func TestInputResolveFoundationalStoreEndpoint(t *testing.T) {
-	tests := []struct {
-		name           string
-		inputStore     string
-		expectEndpoint string
-	}{
-		{
-			name:           "grpc endpoint passthrough",
-			inputStore:     "grpc://localhost:50051",
-			expectEndpoint: "grpc://localhost:50051",
-		},
-		{
-			name:           "grpc endpoint with custom port",
-			inputStore:     "grpc://foundational-store:9999",
-			expectEndpoint: "grpc://foundational-store:9999",
-		},
-		{
-			name:           "package notation resolves to default",
-			inputStore:     "account-owners@v1.0.0",
-			expectEndpoint: "grpc://foundational-store:10016", // default when no env vars set
-		},
-		{
-			name:           "invalid format returns as-is",
-			inputStore:     "invalid-format-no-grpc-or-at",
-			expectEndpoint: "invalid-format-no-grpc-or-at",
-		},
-	}
-
-	// Clear environment variables for consistent test results
-	os.Unsetenv("FOUNDATIONAL_STORE_ENDPOINT")
-	os.Unsetenv("DEPLOYMENT_ENVIRONMENT")
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			input := &Input{
-				FoundationalStore: tt.inputStore,
-			}
-			result := input.resolveFoundationalStoreEndpoint()
-			assert.Equal(t, tt.expectEndpoint, result)
+			require.NoError(t, validationErr)
+			assert.Equal(t, tt.expected.packageName, pkg)
+			assert.Equal(t, tt.expected.version, ver)
+			assert.Equal(t, tt.expected.isShortcut, shortcut)
 		})
 	}
 }
@@ -504,11 +311,11 @@ func TestInputParseFoundationalStore(t *testing.T) {
 		expectError string
 	}{
 		{
-			name: "valid grpc endpoint",
+			name: "grpc_no_longer_supported_here",
 			input: Input{
 				FoundationalStore: "grpc://localhost:50051",
 			},
-			expectError: "",
+			expectError: "invalid foundational-store identifier",
 		},
 		{
 			name: "valid package notation",
@@ -522,42 +329,35 @@ func TestInputParseFoundationalStore(t *testing.T) {
 			input: Input{
 				FoundationalStore: "@v1.0.0",
 			},
-			expectError: "package name cannot be empty",
+			expectError: "invalid foundational-store identifier",
 		},
 		{
-			name: "invalid package notation - empty version",
+			name: "invalid package notation - empty version (interpreted as latest, which is forbidden)",
 			input: Input{
 				FoundationalStore: "account-owners@",
 			},
-			expectError: "version cannot be empty",
-		},
-		{
-			name: "invalid package notation - bad package name",
-			input: Input{
-				FoundationalStore: "Account_Owners@v1.0.0",
-			},
-			expectError: "package name \"Account_Owners\" is invalid",
+			expectError: `version "latest" is not supported`,
 		},
 		{
 			name: "invalid package notation - bad version",
 			input: Input{
 				FoundationalStore: "account-owners@1.0.0",
 			},
-			expectError: "version \"1.0.0\" must start with 'v'",
+			expectError: "not valid Semver",
 		},
 		{
-			name: "unsupported format",
+			name: "unsupported_format_http",
 			input: Input{
 				FoundationalStore: "http://not-supported",
 			},
-			expectError: "unsupported format. Use either package notation (package@version) or gRPC endpoint (grpc://host:port)",
+			expectError: "invalid foundational-store identifier",
 		},
 		{
 			name: "completely invalid format",
 			input: Input{
 				FoundationalStore: "totally-random-string",
 			},
-			expectError: "unsupported format. Use either package notation (package@version) or gRPC endpoint (grpc://host:port)",
+			expectError: "expected package@version",
 		},
 	}
 
@@ -575,68 +375,103 @@ func TestInputParseFoundationalStore(t *testing.T) {
 	}
 }
 
-func TestFoundationalStorePackageNameRegexp(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   string
-		isValid bool
-	}{
+func TestFoundationalStore_HashBehavior(t *testing.T) {
+	mkModule := func(identifier string) *pbsubstreams.Module {
+		return &pbsubstreams.Module{
+			Name: "m",
+			Kind: &pbsubstreams.Module_KindMap_{
+				KindMap: &pbsubstreams.Module_KindMap{
+					OutputType: "proto:sf.substreams.test.v1.Dummy",
+				},
+			},
+			Inputs: []*pbsubstreams.Module_Input{
+				{
+					Input: &pbsubstreams.Module_Input_FoundationalStore{
+						FoundationalStore: &pbsubstreams.Module_FoundationalStore{
+							Identifier: identifier,
+						},
+					},
+				},
+			},
+		}
+	}
+	mkPackage := func(identifier string) *pbsubstreams.Package {
+		return &pbsubstreams.Package{
+			Version: 1,
+			Modules: &pbsubstreams.Modules{
+				Modules: []*pbsubstreams.Module{mkModule(identifier)},
+			},
+			Network: "testnet",
+		}
+	}
+	hash := func(m proto.Message) string {
+		b, err := proto.MarshalOptions{Deterministic: true}.Marshal(m)
+		require.NoError(t, err)
+		sum := sha256.Sum256(b)
+		return hex.EncodeToString(sum[:])
+	}
+
+	type tc struct {
+		name        string
+		scope       string
+		idA         string
+		idB         string
+		expectEqual bool
+	}
+	tests := []tc{
+		// different hash
 		{
-			name:    "valid single word",
-			input:   "accounts",
-			isValid: true,
+			name:        "module: version change",
+			scope:       "module",
+			idA:         "account-owners@v1.0.0",
+			idB:         "account-owners@v1.0.1",
+			expectEqual: false,
 		},
+		// different hash
 		{
-			name:    "valid hyphenated",
-			input:   "account-owners",
-			isValid: true,
+			name:        "package: version change",
+			scope:       "package",
+			idA:         "account-owners@v1.0.0",
+			idB:         "account-owners@v1.0.1",
+			expectEqual: false,
 		},
+		// same hash
 		{
-			name:    "valid multiple hyphens",
-			input:   "token-account-owners",
-			isValid: true,
+			name:        "module: same identifier",
+			scope:       "module",
+			idA:         "account-owners@v1.2.3",
+			idB:         "account-owners@v1.2.3",
+			expectEqual: true,
 		},
+		// same hash
 		{
-			name:    "invalid with uppercase",
-			input:   "Account-owners",
-			isValid: false,
-		},
-		{
-			name:    "invalid with underscore",
-			input:   "account_owners",
-			isValid: false,
-		},
-		{
-			name:    "invalid with numbers",
-			input:   "account2owners",
-			isValid: false,
-		},
-		{
-			name:    "invalid starting with hyphen",
-			input:   "-account-owners",
-			isValid: false,
-		},
-		{
-			name:    "invalid ending with hyphen",
-			input:   "account-owners-",
-			isValid: false,
-		},
-		{
-			name:    "invalid empty",
-			input:   "",
-			isValid: false,
-		},
-		{
-			name:    "invalid consecutive hyphens",
-			input:   "account--owners",
-			isValid: false,
+			name:        "package: same identifier",
+			scope:       "package",
+			idA:         "account-owners@v1.2.3",
+			idB:         "account-owners@v1.2.3",
+			expectEqual: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := foundationalStorePackageNameRegexp.MatchString(tt.input)
-			assert.Equal(t, tt.isValid, result, "Expected %s to be valid=%v", tt.input, tt.isValid)
+			var hA, hB string
+			switch tt.scope {
+			case "module":
+				hA = hash(mkModule(tt.idA))
+				hB = hash(mkModule(tt.idB))
+			case "package":
+				hA = hash(mkPackage(tt.idA))
+				hB = hash(mkPackage(tt.idB))
+			default:
+				t.Fatalf("unknown scope %q", tt.scope)
+			}
+
+			if tt.expectEqual {
+				require.Equal(t, hA, hB)
+			} else {
+				require.NotEqual(t, hA, hB)
+			}
 		})
 	}
 }

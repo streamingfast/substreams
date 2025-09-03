@@ -384,6 +384,8 @@ var StateFuncs = []funcs{
 			call := wasm.FromContext(ctx)
 			inst := instanceFromContext(ctx)
 
+			// TODO: backend should return already-serialized bytes to avoid marshal here
+
 			// Deserialize
 			var req pbstore.GetRequest
 			if err := proto.Unmarshal(reqData, &req); err != nil {
@@ -392,17 +394,8 @@ var StateFuncs = []funcs{
 				return
 			}
 
-			// Inject current Clock if found
-			blockNumber := req.BlockNumber
-			blockHash := req.BlockHash
-			if blockNumber == 0 && len(blockHash) == 0 {
-				if call.Clock != nil {
-					blockNumber = call.Clock.Number
-					if decoded := wasm.DecodeHashString(call.Clock.Id); decoded != nil {
-						blockHash = decoded
-					}
-				}
-			}
+			// Validate and inject clock
+			blockNumber, blockHash := wasm.ValidateAndInjectFoundationalStoreClock(call.Clock, req.BlockNumber, req.BlockHash, "get")
 
 			resp, err := call.DoFoundationalStoreGet(storeIndex, blockNumber, blockHash, req.Key)
 			if err != nil {
@@ -439,6 +432,8 @@ var StateFuncs = []funcs{
 			call := wasm.FromContext(ctx)
 			inst := instanceFromContext(ctx)
 
+			// TODO: backend should return already-serialized bytes to avoid marshal here
+
 			// Deserialize
 			var req pbstore.GetAllRequest
 			if err := proto.Unmarshal(reqData, &req); err != nil {
@@ -447,17 +442,8 @@ var StateFuncs = []funcs{
 				return
 			}
 
-			// Inject current Clock if found
-			blockNumber := req.BlockNumber
-			blockHash := req.BlockHash
-			if blockNumber == 0 && len(blockHash) == 0 {
-				if call.Clock != nil {
-					blockNumber = call.Clock.Number
-					if decoded := wasm.DecodeHashString(call.Clock.Id); decoded != nil {
-						blockHash = decoded
-					}
-				}
-			}
+			// Validate and inject clock
+			blockNumber, blockHash := wasm.ValidateAndInjectFoundationalStoreClock(call.Clock, req.BlockNumber, req.BlockHash, "get_all")
 
 			resp, err := call.DoFoundationalStoreGetAll(storeIndex, blockNumber, blockHash, req.Keys)
 			if err != nil {

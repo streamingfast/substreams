@@ -674,9 +674,13 @@ func (x *Module_KindBlockIndex) GetOutputType() string {
 	return ""
 }
 
+// FoundationalStore represents a reference to an external foundational store
+// that provides pre-computed data for substreams modules. The foundational store
+// is resolved at runtime based on the identifier provided.
 type Module_FoundationalStore struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Endpoint      string                 `protobuf:"bytes,1,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Package notation: "package-name@version"
+	Identifier    string `protobuf:"bytes,1,opt,name=identifier,proto3" json:"identifier,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -711,9 +715,9 @@ func (*Module_FoundationalStore) Descriptor() ([]byte, []int) {
 	return file_sf_substreams_v1_modules_proto_rawDescGZIP(), []int{2, 5}
 }
 
-func (x *Module_FoundationalStore) GetEndpoint() string {
+func (x *Module_FoundationalStore) GetIdentifier() string {
 	if x != nil {
-		return x.Endpoint
+		return x.Identifier
 	}
 	return ""
 }
@@ -1086,7 +1090,7 @@ const file_sf_substreams_v1_modules_proto_rawDesc = "" +
 	"\bbinaries\x18\x02 \x03(\v2\x18.sf.substreams.v1.BinaryR\bbinaries\"6\n" +
 	"\x06Binary\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x18\n" +
-	"\acontent\x18\x02 \x01(\fR\acontent\"\xde\x0e\n" +
+	"\acontent\x18\x02 \x01(\fR\acontent\"\xe2\x0e\n" +
 	"\x06Module\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12=\n" +
 	"\bkind_map\x18\x02 \x01(\v2 .sf.substreams.v1.Module.KindMapH\x00R\akindMap\x12C\n" +
@@ -1124,9 +1128,11 @@ const file_sf_substreams_v1_modules_proto_rawDesc = "" +
 	"\x15UPDATE_POLICY_SET_SUM\x10\a\x1a1\n" +
 	"\x0eKindBlockIndex\x12\x1f\n" +
 	"\voutput_type\x18\x01 \x01(\tR\n" +
-	"outputType\x1a/\n" +
-	"\x11FoundationalStore\x12\x1a\n" +
-	"\bendpoint\x18\x01 \x01(\tR\bendpoint\x1a\xdd\x04\n" +
+	"outputType\x1a3\n" +
+	"\x11FoundationalStore\x12\x1e\n" +
+	"\n" +
+	"identifier\x18\x01 \x01(\tR\n" +
+	"identifier\x1a\xdd\x04\n" +
 	"\x05Input\x12?\n" +
 	"\x06source\x18\x01 \x01(\v2%.sf.substreams.v1.Module.Input.SourceH\x00R\x06source\x126\n" +
 	"\x03map\x18\x02 \x01(\v2\".sf.substreams.v1.Module.Input.MapH\x00R\x03map\x12<\n" +

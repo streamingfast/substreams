@@ -176,7 +176,7 @@ func inputValue(input *pbsubstreams.Module_Input) (string, error) {
 	case *pbsubstreams.Module_Input_Map_:
 		return "", nil // this is accounted for in the `AncestorOf()` tree
 	case *pbsubstreams.Module_Input_FoundationalStore:
-		return input.GetFoundationalStore().GetEndpoint(), nil
+		return input.GetFoundationalStore().GetIdentifier(), nil
 	default:
 		return "", fmt.Errorf("invalid input %T", input.Input)
 	}

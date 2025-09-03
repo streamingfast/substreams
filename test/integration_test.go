@@ -58,7 +58,7 @@ func TestForkHandling(t *testing.T) {
 			exclusiveEnd: 7,
 			production:   true,
 			forkBlockRefs: []*ForkBlockRef{
-				{blockRef: bstream.NewBlockRef("1a", 1), previousID: "34a", libBlockRef: bstream.NewBlockRef("0a", 0)},
+				{blockRef: bstream.NewBlockRef("1a", 1), previousID: "0a", libBlockRef: bstream.NewBlockRef("0a", 0)},
 				{blockRef: bstream.NewBlockRef("2a", 2), previousID: "1a", libBlockRef: bstream.NewBlockRef("0a", 0)},
 				{blockRef: bstream.NewBlockRef("3a", 3), previousID: "2a", libBlockRef: bstream.NewBlockRef("0a", 0)},
 				{blockRef: bstream.NewBlockRef("2b", 2), previousID: "1a", libBlockRef: bstream.NewBlockRef("0a", 0)},

@@ -883,19 +883,19 @@ func (p *Pipeline) renderWasmInputs(module *pbsubstreams.Module) (out []wasm.Arg
 			out = append(out, wasm.NewSourceInput(in.Source.Type, 0))
 
 		case *pbsubstreams.Module_Input_FoundationalStore:
-			endpoint := in.FoundationalStore.GetEndpoint()
-			clients, ok := p.foundationalClients[endpoint]
+			identifier := in.FoundationalStore.GetIdentifier()
+			clients, ok := p.foundationalClients[identifier]
 			if !ok {
-				client, closeFn, err := foundational.New(endpoint, logging.Logger(p.ctx, zap.NewNop()))
+				client, closeFn, err := foundational.New(identifier, logging.Logger(p.ctx, zap.NewNop()))
 				if err != nil {
-					return nil, fmt.Errorf("failed to create foundational store client for endpoint %s: %w", endpoint, err)
+					return nil, fmt.Errorf("failed to create foundational store client for identifier %s: %w", identifier, err)
 				}
 
 				clients = []*foundational.Store{client}
-				p.foundationalClients[endpoint] = clients
-				p.foundationalClosers[endpoint] = []func() error{closeFn}
+				p.foundationalClients[identifier] = clients
+				p.foundationalClosers[identifier] = []func() error{closeFn}
 			}
-			out = append(out, wasm.NewFoundationalStoreInput(endpoint, clients))
+			out = append(out, wasm.NewFoundationalStoreInput(identifier, clients))
 
 		default:
 			return nil, fmt.Errorf("invalid input struct for module %q", module.Name)

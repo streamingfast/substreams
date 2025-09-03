@@ -492,8 +492,8 @@ github.com/spiffe/go-spiffe/v2 v2.5.0 h1:N2I01KCUkv1FAjZXJMwh95KK1ZIQLYbPfhaxw8W
 github.com/spiffe/go-spiffe/v2 v2.5.0/go.mod h1:P+NxobPc6wXhVtINNtFjNWGBTreew1GBUCwT2wPmb7g=
 github.com/streamingfast/bstream v0.0.2-0.20250221181559-fb0809660f91 h1:n4Ws5vS8dF4J6WYP7mE0C9DsE1Inju7BKd6XWI4T18c=
 github.com/streamingfast/bstream v0.0.2-0.20250221181559-fb0809660f91/go.mod h1:n5wy+Vmwp4xbjXO7B81MAkAgjnf1vJ/lI2y6hWWyFbg=
-github.com/streamingfast/cli v0.0.4-0.20241119021815-815afa473375 h1:nwuFSEJtQfqTuN62WvysfAtDT4qqwQ6ghFX0i2VY1fY=
-github.com/streamingfast/cli v0.0.4-0.20241119021815-815afa473375/go.mod h1:qOksW3DPhHVYBo8dcYxS7K3Q09wlcOChSdopeOjLWng=
+github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b h1:ztYeX3/5rg2tV2EU7edcrcHzMz6wUbdJB+LqCrP5W8s=
+github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b/go.mod h1:o9R/tjNON01X2mgWL5qirl2MV6xQ4EZI5D504ST3K/M=
 github.com/streamingfast/dauth v0.0.0-20250129222106-6e8709b44acf h1:RFkRnIRUk51fcPn6eWuuecUSYFqmCP5affIMKywPIDU=
 github.com/streamingfast/dauth v0.0.0-20250129222106-6e8709b44acf/go.mod h1:d8NTrjIoiqplrZEYOUXwwFaeB2C8fVeHYLvaJFfa9Xo=
 github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c h1:6WjE2yInE+5jnI7cmCcxOiGZiEs2FQm9Zsg2a9Ivp0Q=
@@ -526,8 +526,8 @@ github.com/streamingfast/sf-tracing v0.0.0-20240430173521-888827872b90 h1:94Hllk
 github.com/streamingfast/sf-tracing v0.0.0-20240430173521-888827872b90/go.mod h1:e6tKS/udlfXFUTQBYfDDdISfjULvQXet1kBrOeRfgI4=
 github.com/streamingfast/shutter v1.5.0 h1:NpzDYzj0HVpSiDJVO/FFSL6QIK/YKOxY0gJAtyaTOgs=
 github.com/streamingfast/shutter v1.5.0/go.mod h1:B/T6efqdeMGbGwjzPS1ToXzYZI4kDzI5/u4I+7qbjY8=
-github.com/streamingfast/substreams-foundational-store v0.0.0-20250826200255-be68544ccc6c h1:OQ/DgZh83YHNNmOqlXT/SmO/2NUrq3zoxJ2IoSwuYo0=
-github.com/streamingfast/substreams-foundational-store v0.0.0-20250826200255-be68544ccc6c/go.mod h1:hjroz2u2NCNkfZSUrn2GQAfbRxIcc6WRCH8XG00OqS4=
+github.com/streamingfast/substreams-foundational-store v0.1.0 h1:E7yFhv62lGl24gyZL7rAjW2LOiDR4jvxrSUnE7q5OXc=
+github.com/streamingfast/substreams-foundational-store v0.1.0/go.mod h1:PjBeJPBPxcNV3JGKy/Yp7SvTC+itfTrro4I+qEDSv4Q=
 github.com/streamingfast/substreams-sdk-go v0.0.0-20240110154316-5fb21a7a330b h1:O00ZKnNHVHrIEzS/dr+w07H3c0qP2JZwE6XS9scJZSY=
 github.com/streamingfast/substreams-sdk-go v0.0.0-20240110154316-5fb21a7a330b/go.mod h1:TJXOmIAPY+FJvosBoMAiQeZzi32QiBXzCTSgVsss9Oo=
 github.com/streamingfast/substreams-sink-sql v1.0.1-0.20231127153906-acf5f3e34330 h1:svW/I3N8vW2JqJwE/cWXiULOEZi6eslxA60xHVqDaXk=

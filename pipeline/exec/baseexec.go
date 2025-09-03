@@ -153,7 +153,7 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canS
 			}
 			return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %w, %w", clock.Number, e.moduleName, err, ctxErr)
 		}
-		return nil, fmt.Errorf("block %d: module %q: general wasm execution failed 3: %w: %s", clock.Number, e.moduleName, wasm.ErrWasmDeterministicExec, err)
+		return nil, fmt.Errorf("block %d: module %q: general wasm execution failed: %w: %s", clock.Number, e.moduleName, wasm.ErrWasmDeterministicExec, err)
 	}
 	if inst != nil {
 		if e.instanceCacheEnabled {

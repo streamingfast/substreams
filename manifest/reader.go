@@ -830,7 +830,7 @@ func duplicateStringInput(in *pbsubstreams.Module_Input) string {
 	case *pbsubstreams.Module_Input_Params_:
 		return "params"
 	case *pbsubstreams.Module_Input_FoundationalStore:
-		return fmt.Sprintf("foundational-store: %s", put.FoundationalStore.Endpoint)
+		return fmt.Sprintf("foundational-store: %s", put.FoundationalStore.Identifier)
 
 	default:
 		return ""

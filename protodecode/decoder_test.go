@@ -291,6 +291,9 @@ func TestBytesAwareAnyResolver(t *testing.T) {
 	dynamic.SetDefaultBytesRepresentation(dynamic.BytesAsHex)
 	out := decoder.DecodeDynamicMessage(msgDesc, mustAnyNew(t, topLevel))
 
+	// Print the actual output for debugging
+	t.Logf("Actual output: %s", string(out))
+
 	require.JSONEq(t, `{
 		"data":"0xf1f2",
 		"content": {

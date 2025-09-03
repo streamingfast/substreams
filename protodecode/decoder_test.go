@@ -4,8 +4,12 @@ import (
 	"encoding/json"
 	"testing"
 
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	protoV1 "github.com/golang/protobuf/proto"
+	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/dynamic"
+	pbtest "github.com/streamingfast/substreams/internal/pb/test"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -262,24 +266,39 @@ func TestDecoder_WrapMessage(t *testing.T) {
 }
 
 func TestBytesAwareAnyResolver(t *testing.T) {
-	// Create a mock resolver that implements jsonpb.AnyResolver
-	mockResolver := &mockAnyResolver{}
+	decoder, err := NewDecoder(&pbsubstreams.Package{
+		Modules: &pbsubstreams.Modules{
+			Modules: []*pbsubstreams.Module{
+				{
+					Name: "out",
+				},
+			},
+		},
+	}, []string{"out"})
+	require.NoError(t, err)
 
-	// Create the bytesAwareAnyResolver
-	resolver := &bytesAwareAnyResolver{
-		resolver: mockResolver,
+	topLevel := &pbtest.TopLevel{
+		Data: []byte{0xF1, 0xF2},
+		Content: mustAnyNew(t, &pbtest.Child{
+			Name:  "child_name",
+			Value: []byte{0xD1, 0xD2, 0xD3},
+		}),
 	}
 
-	// Test that the resolver implements the jsonpb.AnyResolver interface
-	// We can't directly test this with a type assertion since we don't have access to the jsonpb.AnyResolver type
-	// But we can verify that the Resolve method exists with the correct signature
-	
-	// Note: We can't fully test the resolver's functionality here without mocking
-	// the dynamic.SetDefaultBytesRepresentation behavior, but we can at least
-	// verify that the struct is properly defined.
-	
-	// The real test of this functionality would be an integration test that verifies
-	// the bytes encoding is properly respected in anypb.Any fields when rendered to JSON.
+	msgDesc, err := desc.LoadMessageDescriptorForMessage(topLevel)
+	require.NoError(t, err)
+
+	dynamic.SetDefaultBytesRepresentation(dynamic.BytesAsHex)
+	out := decoder.DecodeDynamicMessage(msgDesc, mustAnyNew(t, topLevel))
+
+	require.JSONEq(t, `{
+		"data":"0xf1f2",
+		"content": {
+			"@type": "type.googleapis.com/test.Child",
+			"name": "child_name",
+			"value": "0xd1d2d3"
+		}
+	}`, string(out))
 }
 
 // mockAnyResolver is a simple mock that implements jsonpb.AnyResolver
@@ -287,4 +306,13 @@ type mockAnyResolver struct{}
 
 func (m *mockAnyResolver) Resolve(typeURL string) (protoV1.Message, error) {
 	return nil, nil
+}
+
+func mustAnyNew(t *testing.T, msg protoV1.Message) *anypb.Any {
+	t.Helper()
+
+	out, err := anypb.New(protoV1.MessageV2(msg))
+	require.NoError(t, err)
+
+	return out
 }

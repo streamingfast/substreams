@@ -211,6 +211,13 @@ func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 	if s.adjustedEndBlock() != 0 {
 		fields = append(fields, zap.String("end_at", fmt.Sprintf("#%d", s.adjustedEndBlock()-1)))
 	}
+
+	if cursor != nil && cursor.Block().Num() >= s.adjustedEndBlock()-1 {
+		s.Logger.Info("No more blocks to process: cursor reached your stop block", zap.Stringer("last_block_seen", cursor.Block()))
+		s.Shutdown(nil)
+		return
+	}
+
 	if cursor != nil {
 		fields = append(fields, zap.String("cursor", cursor.String()))
 	}

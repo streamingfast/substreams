@@ -280,22 +280,14 @@ func (b *bytesAwareAnyResolver) Resolve(typeURL string) (protoV1.Message, error)
 		return nil, err
 	}
 
-	// For dynamic messages, we need to ensure they use the current bytes representation
-	if dynMsg, ok := msg.(*dynamic.Message); ok {
-		// The dynamic message will use the global bytes representation setting
-		// which is set via dynamic.SetDefaultBytesRepresentation()
-		return dynMsg, nil
-	}
-
-	// For non-dynamic messages, we need to convert them to dynamic messages
-	// to ensure they use the current bytes representation
+	// Always convert to a dynamic message to ensure consistent bytes representation
 	msgDesc, err := desc.LoadMessageDescriptorForMessage(msg)
 	if err != nil {
 		return nil, err
 	}
 
 	// Create a new dynamic message with the same descriptor
-	// Use the current global bytes representation setting
+	// This will use the current global bytes representation setting
 	factory := dynamic.NewMessageFactoryWithDefaults()
 	dynMsg := factory.NewDynamicMessage(msgDesc)
 	

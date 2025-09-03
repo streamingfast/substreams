@@ -770,7 +770,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		zap.String("cursor", cursor),
 	)
 
-	var streamHandler bstream.Handler
+	var wrappedPipe bstream.Handler
 	if requestDetails.ProductionMode {
 		liveBackFiller := NewLiveBackFiller(ctx, pipe, logger, execGraph.OutputModuleStageIndex(), segmentSize, requestDetails.LinearHandoffBlockNum, s.runtimeConfig.ClientFactory, RequestBackProcessing)
 
@@ -781,14 +781,14 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		}
 
 		go liveBackFiller.Start(ctx)
-		streamHandler = liveBackFiller
+		wrappedPipe = liveBackFiller
 	} else {
-		streamHandler = pipe
+		wrappedPipe = pipe
 	}
 
 	blockStream, err := s.streamFactoryFunc(
 		ctx,
-		streamHandler,
+		wrappedPipe,
 		int64(requestDetails.LinearHandoffBlockNum),
 		request.StopBlockNum,
 		cursor,
@@ -803,7 +803,37 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 	}
 
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier1/pipeline/blocks_stream")
-	streamErr = blockStream.Run(ctx)
+	for {
+		streamErr = blockStream.Run(ctx)
+		if errors.Is(streamErr, hub.ErrSubscriptionChannelFull) {
+			cur := pipe.LastCursor()
+			if cur == nil {
+				logger.Warn("subscription channel at max capacity, but no cursor was found to reconnect")
+				break
+			}
+
+			logger.Warn("subscription channel at max capacity, creating new stream", zap.String("last_block", cur.Block.String()))
+			blockStream, err = s.streamFactoryFunc(
+				ctx,
+				wrappedPipe,
+				int64(requestDetails.LinearHandoffBlockNum),
+				request.StopBlockNum,
+				cur.ToOpaque(),
+				request.FinalBlocksOnly,
+				false,
+				logger.Named("stream"),
+				bsstream.WithLiveSourceHandlerMiddleware(metering.LiveSourceMiddlewareHandlerFactory(ctx)),
+				bsstream.WithFileSourceHandlerMiddleware(metering.FileSourceMiddlewareHandlerFactory(ctx)),
+			)
+			if err != nil {
+				streamErr = fmt.Errorf("error getting stream: %w", err)
+				break
+			}
+			continue
+		}
+		break
+	}
+
 	span.EndWithErr(&streamErr)
 
 	return pipe.OnStreamTerminated(ctx, streamErr)

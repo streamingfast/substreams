@@ -90,6 +90,7 @@ type Pipeline struct {
 	// (for chains with potential block skips)
 	lastFinalClock        *pbsubstreams.Clock
 	lastProcessedBlockRef bstream.BlockRef
+	lastCursor            *bstream.Cursor
 	sentBlocks            uint64
 
 	blockStepMap         map[bstream.StepType]uint64
@@ -291,6 +292,10 @@ func (p *Pipeline) InitTier1StoresAndBackprocess(ctx context.Context, reqPlan *p
 
 func (p *Pipeline) GetStoreMap() store.Map {
 	return p.stores.StoreMap
+}
+
+func (p *Pipeline) LastCursor() *bstream.Cursor {
+	return p.lastCursor
 }
 
 func (p *Pipeline) setupProcessingModule(reqDetails *reqctx.RequestDetails) {

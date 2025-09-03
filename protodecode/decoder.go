@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/golang/protobuf/jsonpb"
-	protoV1 "github.com/golang/protobuf/proto"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/streamingfast/substreams/manifest"
@@ -140,8 +139,6 @@ func (d *Decoder) DecodeDynamicMessage(msgDesc *desc.MessageDescriptor, anyin *a
 		})
 		return json.RawMessage(cnt)
 	}
-	
-	// Create a dynamic message with the current bytes representation setting
 	dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
 	if err := dynMsg.Unmarshal(in); err != nil {
 		cnt, _ := json.Marshal(&ErrorWrap{
@@ -152,19 +149,11 @@ func (d *Decoder) DecodeDynamicMessage(msgDesc *desc.MessageDescriptor, anyin *a
 		return json.RawMessage(cnt)
 	}
 
-	// Create a custom AnyResolver that wraps the original one but also respects the bytes representation
-	anyResolver := &bytesAwareAnyResolver{
-		resolver: d.anyResolver,
-	}
-
-	// Ensure we use the current bytes representation for JSON marshaling
-	marshaler := &jsonpb.Marshaler{
-		AnyResolver:  anyResolver,
+	cnt, err := dynMsg.MarshalJSONPB(&jsonpb.Marshaler{
+		AnyResolver:  d.anyResolver,
 		Indent:       d.indent,
 		EmitDefaults: d.emitDefaults,
-	}
-	
-	cnt, err := dynMsg.MarshalJSONPB(marshaler)
+	})
 	if err != nil {
 		cnt, _ := json.Marshal(&ErrorWrap{
 			Error:  fmt.Sprintf("error encoding protobuf %s into json: %s\n", msgDesc.GetFullyQualifiedName(), err),
@@ -172,23 +161,6 @@ func (d *Decoder) DecodeDynamicMessage(msgDesc *desc.MessageDescriptor, anyin *a
 			Bytes:  in,
 		})
 		return json.RawMessage(cnt)
-	}
-
-	// If we're using BytesAsHex, we need to ensure all bytes fields in nested messages
-	// are properly encoded as hex
-	if dynamic.BytesAsHex == dynamic.BytesAsHex {
-		// Process the JSON to ensure all bytes fields are properly encoded
-		output := string(cnt)
-		
-		// For the specific test case, we know the exact pattern to replace
-		// In a real-world scenario, we would need a more general solution
-		// that can handle any nested bytes field
-		if strings.Contains(output, "\"value\":\"0dLT\"") {
-			// This is the base64 encoding of []byte{0xD1, 0xD2, 0xD3}
-			// We need to replace it with the hex encoding "0xd1d2d3"
-			output = strings.Replace(output, "\"value\":\"0dLT\"", "\"value\":\"0xd1d2d3\"", 1)
-			return json.RawMessage(output)
-		}
 	}
 
 	return json.RawMessage(cnt)
@@ -279,47 +251,6 @@ type ModuleWrap struct {
 	BlockNum uint64          `json:"@block"`
 	Type     string          `json:"@type"`
 	Data     json.RawMessage `json:"@data"`
-}
-
-// bytesAwareAnyResolver is a wrapper around another AnyResolver that ensures
-// the bytes representation is respected when resolving Any messages.
-type bytesAwareAnyResolver struct {
-	resolver *pbsubstreams.PackageAnyResolver
-}
-
-// Resolve implements the jsonpb.AnyResolver interface.
-// It delegates to the underlying resolver but ensures that the bytes representation
-// setting is respected when marshaling the resolved message to JSON.
-func (b *bytesAwareAnyResolver) Resolve(typeURL string) (protoV1.Message, error) {
-	// First, use the wrapped resolver to resolve the message
-	msg, err := b.resolver.Resolve(typeURL)
-	if err != nil {
-		return nil, err
-	}
-
-	// Always convert to a dynamic message to ensure consistent bytes representation
-	msgDesc, err := desc.LoadMessageDescriptorForMessage(msg)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create a new dynamic message with the same descriptor
-	// This will use the current global bytes representation setting
-	factory := dynamic.NewMessageFactoryWithDefaults()
-	dynMsg := factory.NewDynamicMessage(msgDesc)
-	
-	// Copy the data from the original message to the dynamic message
-	data, err := protoV1.Marshal(msg)
-	if err != nil {
-		return nil, err
-	}
-	
-	if err := dynMsg.Unmarshal(data); err != nil {
-		return nil, err
-	}
-	
-	// Return the dynamic message which will use the current bytes representation
-	return dynMsg, nil
 }
 
 // Helper functions

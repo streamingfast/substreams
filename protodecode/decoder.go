@@ -279,38 +279,31 @@ func (b *bytesAwareAnyResolver) Resolve(typeURL string) (protoV1.Message, error)
 	if dynMsg, ok := msg.(*dynamic.Message); ok {
 		// The dynamic message will use the global bytes representation setting
 		// which is set via dynamic.SetDefaultBytesRepresentation()
-		// We don't need to do anything special here
 		return dynMsg, nil
 	}
 
-	// For non-dynamic messages, we need to wrap them in a dynamic message
+	// For non-dynamic messages, we need to convert them to dynamic messages
 	// to ensure they use the current bytes representation
-	if protoMsg, ok := msg.(protoV1.Message); ok {
-		// Get the descriptor for the message
-		msgDesc, err := desc.LoadMessageDescriptorForMessage(protoMsg)
-		if err != nil {
-			return nil, err
-		}
-
-		// Create a new dynamic message with the same descriptor
-		dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
-		
-		// Copy the data from the original message to the dynamic message
-		data, err := protoV1.Marshal(protoMsg)
-		if err != nil {
-			return nil, err
-		}
-		
-		if err := dynMsg.Unmarshal(data); err != nil {
-			return nil, err
-		}
-		
-		// Return the dynamic message which will use the current bytes representation
-		return dynMsg, nil
+	msgDesc, err := desc.LoadMessageDescriptorForMessage(msg)
+	if err != nil {
+		return nil, err
 	}
 
-	// If we can't convert to a dynamic message, just return the original message
-	return msg, nil
+	// Create a new dynamic message with the same descriptor
+	dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(msgDesc)
+	
+	// Copy the data from the original message to the dynamic message
+	data, err := protoV1.Marshal(msg)
+	if err != nil {
+		return nil, err
+	}
+	
+	if err := dynMsg.Unmarshal(data); err != nil {
+		return nil, err
+	}
+	
+	// Return the dynamic message which will use the current bytes representation
+	return dynMsg, nil
 }
 
 // Helper functions

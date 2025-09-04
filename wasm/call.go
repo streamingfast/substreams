@@ -19,6 +19,14 @@ import (
 
 var ErrWasmDeterministicExec = errors.New("wasm execution failed deterministically")
 
+// Foundational store retry configuration constants
+const (
+	foundationalStoreMaxRetries = 10
+	foundationalStoreRetryDelay = 1 * time.Second
+	// Kill switch timeout
+	foundationalStoreMaxWaitTime = 60 * time.Second
+)
+
 type Call struct {
 	Clock      *pbsubstreams.Clock // Used by WASM extensions
 	ModuleName string
@@ -314,14 +322,92 @@ func (c *Call) DoFoundationalStoreGet(index uint32, block uint64, blockHash []by
 	if len(c.foundationalStores) == 0 {
 		return nil, fmt.Errorf("store not found for index: %d", index)
 	}
-	return c.foundationalStores[index].Get(context.Background(), block, blockHash, key)
+
+	ctx, cancel := context.WithTimeout(context.Background(), foundationalStoreMaxWaitTime)
+	defer cancel()
+
+	start := time.Now()
+	for attempt := 0; attempt <= foundationalStoreMaxRetries; attempt++ {
+		// Check if we've exceeded the kill switch timeout
+		if time.Since(start) > foundationalStoreMaxWaitTime {
+			return nil, fmt.Errorf("foundational store sync timeout: waited %v for block %d to be available", time.Since(start), block)
+		}
+
+		resp, err := c.foundationalStores[index].Get(ctx, block, blockHash, key)
+		if err != nil {
+			return nil, fmt.Errorf("foundational store request failed: %w", err)
+		}
+
+		// If block is not reached yet, retry after a delay
+		if resp.Response == pbstore.ResponseCode_RESPONSE_CODE_NOT_FOUND_BLOCK_NOT_REACHED {
+			if attempt < foundationalStoreMaxRetries {
+				select {
+				case <-ctx.Done():
+					return nil, fmt.Errorf("foundational store sync timeout: context cancelled while waiting for block %d", block)
+				case <-time.After(foundationalStoreRetryDelay):
+					continue
+				}
+			}
+			// Max retries reached
+			return nil, fmt.Errorf("foundational store block %d not available after %d retries in %v", block, foundationalStoreMaxRetries, time.Since(start))
+		}
+
+		// Return successful response or other response codes immediately
+		return resp, nil
+	}
+
+	// This should never be reached due to the logic above, but kept for safety
+	return nil, fmt.Errorf("foundational store get failed unexpectedly")
 }
 
 func (c *Call) DoFoundationalStoreGetAll(index uint32, block uint64, blockHash []byte, keys [][]byte) (*pbstore.GetAllResponse, error) {
 	if len(c.foundationalStores) == 0 {
 		return nil, fmt.Errorf("store not found for index: %d", index)
 	}
-	return c.foundationalStores[index].GetAll(context.Background(), block, blockHash, keys)
+
+	ctx, cancel := context.WithTimeout(context.Background(), foundationalStoreMaxWaitTime)
+	defer cancel()
+
+	start := time.Now()
+	for attempt := 0; attempt <= foundationalStoreMaxRetries; attempt++ {
+		// Check if we've exceeded the kill switch timeout
+		if time.Since(start) > foundationalStoreMaxWaitTime {
+			return nil, fmt.Errorf("foundational store sync timeout: waited %v for block %d to be available", time.Since(start), block)
+		}
+
+		resp, err := c.foundationalStores[index].GetAll(ctx, block, blockHash, keys)
+		if err != nil {
+			return nil, fmt.Errorf("foundational store request failed: %w", err)
+		}
+
+		// Check if any entries need retry (block not reached)
+		needsRetry := false
+		for _, entry := range resp.Entries {
+			if entry.Response.Response == pbstore.ResponseCode_RESPONSE_CODE_NOT_FOUND_BLOCK_NOT_REACHED {
+				needsRetry = true
+				break
+			}
+		}
+
+		if needsRetry {
+			if attempt < foundationalStoreMaxRetries {
+				select {
+				case <-ctx.Done():
+					return nil, fmt.Errorf("foundational store sync timeout: context cancelled while waiting for block %d", block)
+				case <-time.After(foundationalStoreRetryDelay):
+					continue
+				}
+			}
+			// Max retries reached
+			return nil, fmt.Errorf("foundational store block %d not available after %d retries in %v", block, foundationalStoreMaxRetries, time.Since(start))
+		}
+
+		// Return successful response when no entries need retry
+		return resp, nil
+	}
+
+	// This should never be reached due to the logic above, but kept for safety
+	return nil, fmt.Errorf("foundational store get_all failed unexpectedly")
 }
 
 func (c *Call) validateStoreIndex(storeIndex int, stateFunc string) {

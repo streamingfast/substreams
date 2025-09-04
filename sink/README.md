@@ -207,7 +207,7 @@ The sink library provides robust error handling:
 - **Retryable Errors**: Wrap errors in `derr.NewRetryableError(err)` to indicate they should be retried
 - **Fatal Errors**: Return unwrapped errors to indicate fatal conditions that should stop processing
 - **Backoff Strategy**: The library uses exponential backoff for retryable errors
-- **Infinite Retry**: Can be configured for production deployments that should never stop
+- **Max Retries**: Can be configured for production deployments (0=no retries, -1=infinite, >0=specific count)
 
 ### Practical Example
 
@@ -238,7 +238,7 @@ config := &sink.SinkerConfig{
     Mode:         sink.SubstreamsModeDevelopment, // or SubstreamsModeProduction
 
     // Error handling
-    InfiniteRetry: true,                  // bool - retry forever on errors
+    MaxRetries: -1,                       // int - maximum retries (0=no retries, -1=infinite, >0=specific count)
 
     // Performance tuning
     FinalBlocksOnly: false,               // bool - disable undo handling for faster processing

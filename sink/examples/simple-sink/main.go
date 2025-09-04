@@ -20,7 +20,7 @@ func init() {
 		sink.FlagIgnore(
 			sink.FlagDevelopmentMode,
 			sink.FlagLiveBlockTimeDelta,
-			sink.FlagInfiniteRetry,
+			sink.FlagMaxRetries,
 		))
 
 	// add your own flags, like this one for state management

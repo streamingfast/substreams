@@ -136,15 +136,18 @@ func (m *Module) NewInstance(ctx context.Context) (out wasm.Instance, err error)
 
 func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInstance wasm.Instance, arguments []wasm.Argument, argValues map[string][]byte) (out wasm.Instance, err error) {
 	var mod api.Module
+	var inst *Instance
 	if cachedInstance != nil {
 		mod = cachedInstance.(api.Module)
+		inst = NewInstance(mod, m.runtimeSauce)
 	} else {
 		mod, err = m.instantiateModule(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("could not instantiate wasm module: %w", err)
 		}
+		inst = NewInstance(mod, m.runtimeSauce)
+		defer inst.Close(ctx)
 	}
-	inst := NewInstance(mod, m.runtimeSauce)
 
 	f := mod.ExportedFunction(call.Entrypoint)
 	if f == nil {

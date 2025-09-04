@@ -60,6 +60,8 @@ func NewDefaultTier1Config() *Tier1Config {
 type Tier1Config struct {
 	MeteringConfig string
 
+	FoundationalStores map[string]string
+
 	MergedBlocksStoreURL    string
 	OneBlocksStoreURL       string
 	ForkedBlocksStoreURL    string
@@ -239,6 +241,7 @@ func (a *Tier1App) Run() error {
 		a.config.ActiveRequestsHardLimit,
 		a.config.SharedCacheSize,
 		a.modules.GlobalRequestPool,
+		a.config.FoundationalStores,
 		opts...,
 	)
 	if err != nil {

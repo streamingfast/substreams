@@ -22,6 +22,8 @@ type Tier2Config struct {
 	GRPCListenAddr      string // gRPC address where this app will listen to
 	ServiceDiscoveryURL *url.URL
 
+	FoundationalStores map[string]string
+
 	PipelineOptions []pipeline.Option
 
 	MaximumConcurrentRequests uint64
@@ -92,6 +94,10 @@ func (a *Tier2App) Run() error {
 	}
 	if a.config.WASMExtensions != nil {
 		opts = append(opts, service.WithWASMExtensioner(a.config.WASMExtensions))
+	}
+	
+	if a.config.FoundationalStores != nil {
+		opts = append(opts, service.WithFoundationalStoreEndpoints(a.config.FoundationalStores))
 	}
 
 	svc, err := service.NewTier2(

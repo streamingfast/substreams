@@ -82,6 +82,7 @@ type Tier1Service struct {
 	activeRequestsSoftLimit int
 	activeRequestsHardLimit int
 	tier2RequestParameters  reqctx.Tier2RequestParameters
+	foundationalEndpoints   map[string]string
 	globalRequestPool       *GlobalRequestPool
 }
 
@@ -148,6 +149,7 @@ func NewTier1(
 	activeRequestsHardLimit int,
 	sharedCacheSize uint64,
 	globalRequestPool *GlobalRequestPool,
+	foundationalEndpoints map[string]string,
 	opts ...Option,
 ) (*Tier1Service, error) {
 
@@ -198,6 +200,7 @@ func NewTier1(
 		activeRequestsSoftLimit: activeRequestsSoftLimit,
 		activeRequestsHardLimit: activeRequestsHardLimit,
 		globalRequestPool:       globalRequestPool,
+		foundationalEndpoints:   foundationalEndpoints,
 	}
 	s.OnTerminating(func(_ error) {
 		s.activeRequests.Wait()
@@ -669,6 +672,7 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		func() bool {
 			return s.IsTerminating() // pipeline starts draining when the service is actually terminating, (after the global shutdown-signal-delay)
 		},
+		s.foundationalEndpoints,
 		opts...,
 	)
 

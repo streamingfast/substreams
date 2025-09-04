@@ -76,8 +76,9 @@ type Pipeline struct {
 	execoutStorage    *execout.Configs
 	moduleNameToStage map[string]int
 
-	foundationalClients map[string][]*foundational.Store // Changed from single store to array
-	foundationalClosers map[string][]func() error        // Changed to array of closers
+	foundationalClients   map[string][]*foundational.Store
+	foundationalClosers   map[string][]func() error
+	foundationalEndpoints map[string]string
 
 	processingModule *processingModule
 
@@ -117,6 +118,7 @@ func New(
 	respFunc substreams.ResponseFunc,
 	executionTimeout time.Duration,
 	checkPendingShutdown func() bool,
+	foundationalEndpoints map[string]string,
 	opts ...Option,
 ) *Pipeline {
 	pipe := &Pipeline{
@@ -132,6 +134,7 @@ func New(
 		stores:                  stores,
 		foundationalClients:     make(map[string][]*foundational.Store),
 		foundationalClosers:     make(map[string][]func() error),
+		foundationalEndpoints:   foundationalEndpoints,
 		execoutStorage:          execoutStorage,
 		forkHandler:             NewForkHandler(),
 		blockStepMap:            make(map[bstream.StepType]uint64),
@@ -891,9 +894,16 @@ func (p *Pipeline) renderWasmInputs(module *pbsubstreams.Module) (out []wasm.Arg
 			identifier := in.FoundationalStore.GetIdentifier()
 			clients, ok := p.foundationalClients[identifier]
 			if !ok {
-				client, closeFn, err := foundational.New(identifier, logging.Logger(p.ctx, zap.NewNop()))
+				// Look up the endpoint for this foundational store identifier
+				endpoint, hasEndpoint := p.foundationalEndpoints[identifier]
+				if !hasEndpoint {
+					// Fall back to using identifier as endpoint
+					endpoint = identifier
+				}
+
+				client, closeFn, err := foundational.New(endpoint, logging.Logger(p.ctx, zap.NewNop()))
 				if err != nil {
-					return nil, fmt.Errorf("failed to create foundational store client for identifier %s: %w", identifier, err)
+					return nil, fmt.Errorf("failed to create foundational store client for identifier %s (endpoint: %s): %w", identifier, endpoint, err)
 				}
 
 				clients = []*foundational.Store{client}

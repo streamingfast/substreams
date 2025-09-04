@@ -86,6 +86,7 @@ type Tier2Service struct {
 	connectionCountMutex      sync.RWMutex
 	blockExecutionTimeout     time.Duration
 	segmentExecutionTimeout   time.Duration
+	foundationalEndpoints     map[string]string
 
 	checkPendingShutdown func() bool
 
@@ -507,6 +508,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		respFunc,
 		s.blockExecutionTimeout,
 		s.checkPendingShutdown,
+		s.foundationalEndpoints,
 		opts...,
 	)
 

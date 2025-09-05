@@ -1,0 +1,123 @@
+package work
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"sync"
+
+	"github.com/streamingfast/dsession"
+	"github.com/streamingfast/substreams/client"
+	"github.com/streamingfast/substreams/reqctx"
+	"go.uber.org/zap"
+)
+
+const Tier2WorkerServiceName = "t2w"
+
+type SessionWorkerPool struct {
+	sessionPool   dsession.SessionPool
+	clientFactory client.InternalClientFactory
+	logger        *zap.Logger
+
+	serviceName          string
+	sessionKey           string // This is the sessionID from sessionPool.Get(), used as requestKey in GetWorker
+	maxWorkersPerSession int
+
+	borrowedWorkers      map[string]Worker
+	borrowedWorkersMutex sync.Mutex
+}
+
+func NewSessionWorkerPool(
+	ctx context.Context,
+	sessionKey string,
+	sessionPool dsession.SessionPool,
+	clientFactory client.InternalClientFactory,
+) *SessionWorkerPool {
+	logger := reqctx.Logger(ctx)
+	logger = logger.Named("session-worker-pool").With(zap.Bool("keep", false))
+
+	reqDetails := reqctx.Details(ctx)
+	maxWorkers := int(reqDetails.MaxParallelJobs)
+
+	logger.Debug("initializing session worker pool",
+		zap.String("session_key", sessionKey),
+		zap.Int("max_workers", maxWorkers),
+	)
+
+	wp := &SessionWorkerPool{
+		sessionPool:          sessionPool,
+		clientFactory:        clientFactory,
+		logger:               logger,
+		serviceName:          Tier2WorkerServiceName,
+		sessionKey:           sessionKey,
+		maxWorkersPerSession: maxWorkers,
+		borrowedWorkers:      make(map[string]Worker),
+	}
+
+	// Clean up workers on context cancellation
+	go func() {
+		<-ctx.Done()
+		wp.borrowedWorkersMutex.Lock()
+		defer wp.borrowedWorkersMutex.Unlock()
+
+		for key := range wp.borrowedWorkers {
+			logger.Debug("returning worker on context cancel", zap.String("worker_key", key))
+			wp.sessionPool.ReleaseWorker(key)
+			delete(wp.borrowedWorkers, key)
+		}
+	}()
+
+	return wp
+}
+
+func (p *SessionWorkerPool) Borrow(ctx context.Context) (Worker, error) {
+	// Use sessionKey as the requestKey parameter for GetWorker
+	workerKey, err := p.sessionPool.GetWorker(
+		ctx,
+		p.serviceName,
+		p.sessionKey, // sessionKey is passed as requestKey to GetWorker
+		p.maxWorkersPerSession,
+	)
+
+	if err != nil {
+		if errors.Is(err, dsession.ErrWorkersLimitExceeded) {
+			p.logger.Debug("worker pool is exhausted", zap.Error(err))
+			return nil, ErrorResourceExhausted
+		}
+		if errors.Is(err, dsession.ErrSessionNotFound) {
+			p.logger.Error("session not found in pool", zap.Error(err))
+			return nil, fmt.Errorf("session not found: %w", err)
+		}
+		p.logger.Error("failed to get worker from session pool", zap.Error(err))
+		return nil, fmt.Errorf("failed to get worker: %w", err)
+	}
+
+	worker := NewRemoteWorker(p.clientFactory, workerKey, p.logger)
+
+	p.borrowedWorkersMutex.Lock()
+	p.borrowedWorkers[workerKey] = worker
+	p.borrowedWorkersMutex.Unlock()
+
+	p.logger.Debug("worker borrowed",
+		zap.String("worker_key", workerKey),
+		zap.Int("active_workers", len(p.borrowedWorkers)),
+	)
+
+	return worker, nil
+}
+
+func (p *SessionWorkerPool) Return(ctx context.Context, worker Worker) {
+	workerKey := worker.ID()
+
+	p.borrowedWorkersMutex.Lock()
+	delete(p.borrowedWorkers, workerKey)
+	activeWorkers := len(p.borrowedWorkers)
+	p.borrowedWorkersMutex.Unlock()
+
+	p.sessionPool.ReleaseWorker(workerKey)
+
+	p.logger.Debug("worker returned",
+		zap.String("worker_key", workerKey),
+		zap.Int("remaining_workers", activeWorkers),
+	)
+}

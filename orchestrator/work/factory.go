@@ -3,51 +3,30 @@ package work
 import (
 	"context"
 
-	"github.com/streamingfast/dauth"
-	tracing "github.com/streamingfast/sf-tracing"
+	"github.com/streamingfast/dsession"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/reqctx"
-	pbworker "github.com/streamingfast/worker-pool-protocol/pb/sf/worker/v1"
 )
 
 type WorkerPoolFactory func(ctx context.Context) WorkerPool
 
-type GlobalWorkerPoolFactory struct {
-	clientFactory    client.InternalClientFactory
-	remoteWorkerPool pbworker.WorkerPoolClient
-}
-
-func NewGlobalWorkerPoolFactory(remoteWorkerPool pbworker.WorkerPoolClient, clientFactory client.InternalClientFactory) *GlobalWorkerPoolFactory {
-
-	return &GlobalWorkerPoolFactory{
-		remoteWorkerPool: remoteWorkerPool,
-		clientFactory:    clientFactory,
-	}
-}
-
-func (f *GlobalWorkerPoolFactory) WorkerPool(ctx context.Context) WorkerPool {
-	userID := dauth.FromContext(ctx).UserID()
-	apiKeyID := dauth.FromContext(ctx).APIKeyID()
-	traceID := tracing.GetTraceID(ctx)
-	reqDetails := reqctx.Details(ctx)
-	workerPool := NewGlobalWorkerPool(ctx, userID, apiKeyID, traceID.String(), reqDetails.MaxParallelJobs, f.remoteWorkerPool, f.clientFactory)
-
-	return workerPool
-}
-
-type SimpleWorkerPoolFactory struct {
+type SessionWorkerPoolFactory struct {
+	sessionPool   dsession.SessionPool
 	clientFactory client.InternalClientFactory
 }
 
-func NewSimpleWorkerPoolFactory(clientFactory client.InternalClientFactory) *SimpleWorkerPoolFactory {
-	return &SimpleWorkerPoolFactory{
+func NewSessionWorkerPoolFactory(sessionPool dsession.SessionPool, clientFactory client.InternalClientFactory) *SessionWorkerPoolFactory {
+	return &SessionWorkerPoolFactory{
+		sessionPool:   sessionPool,
 		clientFactory: clientFactory,
 	}
 }
 
-func (f *SimpleWorkerPoolFactory) WorkerPool(ctx context.Context) WorkerPool {
-	reqDetails := reqctx.Details(ctx)
-	workerPool := NewSimpleWorkerPool(ctx, int(reqDetails.MaxParallelJobs), f.clientFactory)
-
-	return workerPool
+func (f *SessionWorkerPoolFactory) WorkerPool(ctx context.Context) WorkerPool {
+	sessionKey, ok := reqctx.GetSessionKey(ctx)
+	if !ok {
+		// For backward compatibility with tests that don't set sessionKey
+		sessionKey = "test-session"
+	}
+	return NewSessionWorkerPool(ctx, sessionKey, f.sessionPool, f.clientFactory)
 }

@@ -19,7 +19,6 @@ import (
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metrics"
-	"github.com/streamingfast/substreams/orchestrator/work"
 	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcconnect"
 	ssconnect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcconnect"
 	"github.com/streamingfast/substreams/reqctx"
@@ -40,7 +39,6 @@ type Tier1Modules struct {
 	HeadBlockNumberMetric *dmetrics.HeadBlockNum
 	CheckPendingShutDown  func() bool
 	InfoServer            InfoServer
-	WorkerPoolFactory     work.WorkerPoolFactory
 }
 
 type InfoServer interface {
@@ -234,7 +232,6 @@ func (a *Tier1App) Run() error {
 		a.setIsReady,
 		subRequestsClientConfig,
 		tier2RequestParameters,
-		a.modules.WorkerPoolFactory,
 		a.config.EnforceCompression,
 		a.config.ActiveRequestsSoftLimit,
 		a.config.ActiveRequestsHardLimit,

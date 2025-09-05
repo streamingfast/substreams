@@ -140,8 +140,6 @@ func NewTier1(
 	appSetIsReadyState func(isReady bool),
 	substreamsClientConfig *client.SubstreamsClientConfig,
 	tier2RequestParameters reqctx.Tier2RequestParameters,
-	workerPoolFactory work.WorkerPoolFactory,
-
 	enforceCompression bool,
 	activeRequestsSoftLimit int,
 	activeRequestsHardLimit int,
@@ -152,6 +150,9 @@ func NewTier1(
 
 	clientFactory := client.NewInternalClientFactory(substreamsClientConfig)
 
+	// Create WorkerPoolFactory using the sessionPool
+	workerPoolFactory := work.NewSessionWorkerPoolFactory(sessionPool, clientFactory)
+
 	runtimeConfig := config.NewTier1RuntimeConfig(
 		stateBundleSize,
 		parallelSubRequests,
@@ -160,7 +161,7 @@ func NewTier1(
 		quickSaveStore,
 		defaultCacheTag,
 		clientFactory,
-		workerPoolFactory,
+		workerPoolFactory.WorkerPool,
 	)
 
 	sf := &StreamFactory{
@@ -702,7 +703,7 @@ func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelC
 		auth := dauth.FromContext(ctx)
 		userID := auth.UserID()
 		apiKeyID := auth.APIKeyID()
-		traceID := "default" // Can be extracted from tracing context if needed
+		traceID := tracing.GetTraceID(ctx).String()
 		service := "t1r"
 
 		sessionID, err := s.sessionPool.Get(ctx, service, userID, apiKeyID, traceID, func(err error) {
@@ -717,6 +718,9 @@ func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelC
 		}
 
 		s.logger.Debug("acquired session", zap.String("session_id", sessionID))
+
+		// Pass sessionKey through context for WorkerPool
+		ctx = reqctx.WithSessionKey(ctx, sessionID)
 
 		defer func() {
 			s.logger.Debug("releasing session", zap.String("session_id", sessionID))

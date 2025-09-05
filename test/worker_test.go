@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"testing"
-	"time"
 
-	pbworker "github.com/streamingfast/worker-pool-protocol/pb/sf/worker/v1"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
 
@@ -27,14 +25,6 @@ type TestWorker struct {
 	testTempDir            string
 	id                     uint64
 	firstStreamableBlock   uint64
-}
-
-func (w *TestWorker) StartKeepAlive(ctx context.Context, delay time.Duration, remoteWorkerPoolClient pbworker.WorkerPoolClient) {
-	//noop
-}
-
-func (w *TestWorker) StopKeepAlive() {
-	//noop
 }
 
 var workerID atomic.Uint64

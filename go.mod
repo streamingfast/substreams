@@ -64,7 +64,7 @@ require (
 	github.com/shopspring/decimal v1.3.1
 	github.com/streamingfast/dmetering v0.0.0-20241101155221-489f5a9d9139
 	github.com/streamingfast/dmetrics v0.0.0-20250711072030-f023e918a175
-	github.com/streamingfast/dsession v0.0.0-20250828190456-5201082654e0
+	github.com/streamingfast/dsession v0.0.0-20250904235523-ffe9952a12d3
 	github.com/streamingfast/firehose-networks v0.2.0
 	github.com/streamingfast/sf-tracing v0.0.0-20240430173521-888827872b90
 	github.com/streamingfast/shutter v1.5.0

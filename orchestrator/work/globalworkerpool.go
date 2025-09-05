@@ -41,14 +41,13 @@ type GlobalWorkerPool struct {
 	remoteWorkerPoolClient pbworker.WorkerPoolClient
 	logger                 *zap.Logger
 	clientFactory          client.InternalClientFactory
-	workerKeepAliveDelay   time.Duration
 	maxWorkerForTraceID    uint64
 	rampingUp              bool
 }
 
-func NewGlobalWorkerPool(ctx context.Context, userID string, apiKeyID string, traceID string, maxWorkerForTraceID uint64, remoteWorkerPoolClient pbworker.WorkerPoolClient, clientFactory client.InternalClientFactory, workerKeepAliveDelay time.Duration) *GlobalWorkerPool {
+func NewGlobalWorkerPool(ctx context.Context, userID string, apiKeyID string, traceID string, maxWorkerForTraceID uint64, remoteWorkerPoolClient pbworker.WorkerPoolClient, clientFactory client.InternalClientFactory) *GlobalWorkerPool {
 	logger := reqctx.Logger(ctx)
-	logger.Info("initializing worker pool", zap.String("user_id", userID), zap.String("api_key_id", apiKeyID), zap.String("trace_id", traceID), zap.Uint64("max_worker_for_trace_id", maxWorkerForTraceID), zap.Duration("worker_keep_alive_delay", workerKeepAliveDelay),
+	logger.Info("initializing worker pool", zap.String("user_id", userID), zap.String("api_key_id", apiKeyID), zap.String("trace_id", traceID), zap.Uint64("max_worker_for_trace_id", maxWorkerForTraceID),
 		zap.Duration("ramp_up_time", rampupTime))
 
 	logger = logger.Named("global-worker-pool").With(zap.Bool("keep", false))
@@ -61,7 +60,6 @@ func NewGlobalWorkerPool(ctx context.Context, userID string, apiKeyID string, tr
 		remoteWorkerPoolClient: remoteWorkerPoolClient,
 		startedAt:              time.Now(),
 		clientFactory:          clientFactory,
-		workerKeepAliveDelay:   workerKeepAliveDelay,
 		logger:                 logger,
 		rampingUp:              true,
 		borrowedWorker:         make(map[string]Worker),
@@ -133,14 +131,10 @@ func (p *GlobalWorkerPool) Borrow(ctx context.Context) (Worker, error) {
 	p.borrowedWorker[key] = worker
 	p.borrowedWorkerMutex.Unlock()
 
-	worker.StartKeepAlive(ctx, p.workerKeepAliveDelay, p.remoteWorkerPoolClient)
-
 	return worker, nil
 }
 
 func (p *GlobalWorkerPool) Return(ctx context.Context, worker Worker) {
-	worker.StopKeepAlive()
-
 	p.borrowedWorkerMutex.Lock()
 	delete(p.borrowedWorker, worker.ID())
 	p.borrowedWorkerMutex.Unlock()

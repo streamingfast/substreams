@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/streamingfast/dsession"
 	"github.com/streamingfast/substreams/client"
@@ -13,6 +15,8 @@ import (
 )
 
 const Tier2WorkerServiceName = "t2w"
+
+var rampupTime = time.Second * 4
 
 type SessionWorkerPool struct {
 	sessionPool   dsession.SessionPool
@@ -25,6 +29,9 @@ type SessionWorkerPool struct {
 
 	borrowedWorkers      map[string]Worker
 	borrowedWorkersMutex sync.Mutex
+
+	rampingUp         *atomic.Bool
+	rampupWorkerGiven *atomic.Bool
 }
 
 func NewSessionWorkerPool(
@@ -52,7 +59,13 @@ func NewSessionWorkerPool(
 		sessionKey:           sessionKey,
 		maxWorkersPerSession: maxWorkers,
 		borrowedWorkers:      make(map[string]Worker),
+		rampingUp:            &atomic.Bool{},
+		rampupWorkerGiven:    &atomic.Bool{},
 	}
+	wp.rampingUp.Store(true)
+	time.AfterFunc(rampupTime, func() {
+		wp.rampingUp.Store(false)
+	})
 
 	// Clean up workers on context cancellation
 	go func() {
@@ -71,6 +84,13 @@ func NewSessionWorkerPool(
 }
 
 func (p *SessionWorkerPool) Borrow(ctx context.Context) (Worker, error) {
+	rampingUp := p.rampingUp.Load()
+	if rampingUp {
+		if p.rampupWorkerGiven.Load() {
+			return nil, ErrorResourceExhaustedRampUp
+		}
+	}
+
 	// Use sessionKey as the requestKey parameter for GetWorker
 	workerKey, err := p.sessionPool.GetWorker(
 		ctx,
@@ -102,6 +122,10 @@ func (p *SessionWorkerPool) Borrow(ctx context.Context) (Worker, error) {
 		zap.String("worker_key", workerKey),
 		zap.Int("active_workers", len(p.borrowedWorkers)),
 	)
+
+	if rampingUp {
+		p.rampupWorkerGiven.Store(true)
+	}
 
 	return worker, nil
 }

@@ -2,8 +2,10 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
+	"os"
 	"time"
 
 	dauth "github.com/streamingfast/dauth"
@@ -22,7 +24,7 @@ type Tier2Config struct {
 	GRPCListenAddr      string // gRPC address where this app will listen to
 	ServiceDiscoveryURL *url.URL
 
-	FoundationalStores map[string]string
+	FoundationalStoresConfigPath string
 
 	PipelineOptions []pipeline.Option
 
@@ -56,6 +58,24 @@ func NewTier2(logger *zap.Logger, config *Tier2Config, modules *Tier2Modules) *T
 
 		isReady: atomic.NewBool(false),
 	}
+}
+
+func loadTier2FoundationalStoreEndpoints(configPath string) (map[string]string, error) {
+	if configPath == "" {
+		return nil, nil
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read foundational stores config file %s: %w", configPath, err)
+	}
+
+	var endpoints map[string]string
+	if err := json.Unmarshal(data, &endpoints); err != nil {
+		return nil, fmt.Errorf("failed to parse foundational stores config file %s: %w", configPath, err)
+	}
+
+	return endpoints, nil
 }
 
 func (a *Tier2App) Run() error {
@@ -96,8 +116,13 @@ func (a *Tier2App) Run() error {
 		opts = append(opts, service.WithWASMExtensioner(a.config.WASMExtensions))
 	}
 	
-	if a.config.FoundationalStores != nil {
-		opts = append(opts, service.WithFoundationalStoreEndpoints(a.config.FoundationalStores))
+	if a.config.FoundationalStoresConfigPath != "" {
+		endpoints, err := loadTier2FoundationalStoreEndpoints(a.config.FoundationalStoresConfigPath)
+		if err != nil {
+			a.logger.Error("failed to load foundational store endpoints", zap.Error(err))
+		} else if endpoints != nil {
+			opts = append(opts, service.WithFoundationalStoreEndpoints(endpoints))
+		}
 	}
 
 	svc, err := service.NewTier2(

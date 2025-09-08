@@ -226,19 +226,26 @@ func (a *Tier1App) Run() error {
 		wazero.SetTempDir(a.config.TmpDir)
 	}
 
+	foundationalStoreEndpoints, err := loadTier1FoundationalStoreEndpoints(a.config.FoundationalStoresConfigPath)
+	if err != nil {
+		a.logger.Error("failed to load foundational store endpoints", zap.Error(err))
+		return nil
+	}
+
 	var wasmModules map[string]string
 	if a.config.WASMExtensions != nil {
 		wasmModules = a.config.WASMExtensions.Params()
 	}
 
 	tier2RequestParameters := reqctx.Tier2RequestParameters{
-		MeteringConfig:       a.config.MeteringConfig,
-		FirstStreamableBlock: bstream.GetProtocolFirstStreamableBlock,
-		MergedBlockStoreURL:  a.config.MergedBlocksStoreURL,
-		StateStoreURL:        a.config.StateStoreURL,
-		StateBundleSize:      a.config.StateBundleSize,
-		StateStoreDefaultTag: a.config.StateStoreDefaultTag,
-		WASMModules:          wasmModules,
+		MeteringConfig:             a.config.MeteringConfig,
+		FirstStreamableBlock:       bstream.GetProtocolFirstStreamableBlock,
+		MergedBlockStoreURL:        a.config.MergedBlocksStoreURL,
+		StateStoreURL:              a.config.StateStoreURL,
+		StateBundleSize:            a.config.StateBundleSize,
+		StateStoreDefaultTag:       a.config.StateStoreDefaultTag,
+		WASMModules:                wasmModules,
+		FoundationalStoreEndpoints: foundationalStoreEndpoints,
 	}
 
 	svc, err := service.NewTier1(
@@ -261,14 +268,7 @@ func (a *Tier1App) Run() error {
 		a.config.ActiveRequestsHardLimit,
 		a.config.SharedCacheSize,
 		a.modules.GlobalRequestPool,
-		func() map[string]string {
-			endpoints, err := loadTier1FoundationalStoreEndpoints(a.config.FoundationalStoresConfigPath)
-			if err != nil {
-				a.logger.Error("failed to load foundational store endpoints", zap.Error(err))
-				return nil
-			}
-			return endpoints
-		}(),
+		foundationalStoreEndpoints,
 		opts...,
 	)
 	if err != nil {

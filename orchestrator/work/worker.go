@@ -96,6 +96,7 @@ func NewRequest(ctx context.Context, req *reqctx.RequestDetails, stageIndex int,
 		BlockType:            tier2ReqParams.BlockType,
 		ProductionMode:       req.ProductionMode,
 		StreamOutput:         streamOutput,
+		FoundationalStoreEndpoints: tier2ReqParams.FoundationalStoreEndpoints,
 	}
 }
 

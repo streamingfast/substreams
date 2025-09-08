@@ -46,6 +46,8 @@ message ProcessRangeRequest {
   bool production_mode = 16;
 
   bool stream_output = 17;
+
+  map<string, string> foundational_store_endpoints = 18;
 }
 
 message ProcessRangeResponse {

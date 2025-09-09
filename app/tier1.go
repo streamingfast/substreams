@@ -15,12 +15,12 @@ import (
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	dauth "github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetrics"
+	"github.com/streamingfast/dsession"
 	"github.com/streamingfast/dstore"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metrics"
-	"github.com/streamingfast/substreams/orchestrator/work"
 	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcconnect"
 	ssconnect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcconnect"
 	"github.com/streamingfast/substreams/reqctx"
@@ -36,12 +36,11 @@ import (
 type Tier1Modules struct {
 	// Required dependencies
 	Authenticator         dauth.Authenticator
+	SessionPool           dsession.SessionPool
 	HeadTimeDriftMetric   *dmetrics.HeadTimeDrift
 	HeadBlockNumberMetric *dmetrics.HeadBlockNum
 	CheckPendingShutDown  func() bool
 	InfoServer            InfoServer
-	WorkerPoolFactory     work.WorkerPoolFactory
-	GlobalRequestPool     *service.GlobalRequestPool
 }
 
 type InfoServer interface {
@@ -261,12 +260,11 @@ func (a *Tier1App) Run() error {
 		a.setIsReady,
 		subRequestsClientConfig,
 		tier2RequestParameters,
-		a.modules.WorkerPoolFactory,
 		a.config.EnforceCompression,
 		a.config.ActiveRequestsSoftLimit,
 		a.config.ActiveRequestsHardLimit,
 		a.config.SharedCacheSize,
-		a.modules.GlobalRequestPool,
+		a.modules.SessionPool,
 		foundationalStoreEndpoints,
 		opts...,
 	)

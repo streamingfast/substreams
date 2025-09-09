@@ -431,14 +431,20 @@ func (s *Sinker) doRequest(
 
 			if dgrpcError := dgrpc.AsGRPCError(err); dgrpcError != nil {
 				switch dgrpcError.Code() {
-				case codes.Unauthenticated:
-					return activeCursor, receivedMessage, fmt.Errorf("stream failure: %w", err)
+				case codes.Unauthenticated, codes.PermissionDenied:
+					return activeCursor, receivedMessage, fmt.Errorf("stream auth failure: %w", err)
 
 				case codes.InvalidArgument:
 					return activeCursor, receivedMessage, fmt.Errorf("stream invalid: %w", err)
 
 				case codes.FailedPrecondition: // ex: related to limit-processed-blocks
 					return activeCursor, receivedMessage, err
+
+				case codes.ResourceExhausted:
+					if strings.Contains(dgrpcError.Message(), "quota exceeded") { // no more bytes/blocks
+						return activeCursor, receivedMessage, err
+					}
+					return activeCursor, receivedMessage, retryable(err) // no concurrent stream available
 				}
 			}
 

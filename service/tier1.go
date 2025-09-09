@@ -23,6 +23,7 @@ import (
 	"github.com/streamingfast/dgrpc"
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dmetrics"
+	"github.com/streamingfast/dsession"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
 	tracing "github.com/streamingfast/sf-tracing"
@@ -45,12 +46,10 @@ import (
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
-	pbworker "github.com/streamingfast/worker-pool-protocol/pb/sf/worker/v1"
 	"go.opentelemetry.io/otel/attribute"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -83,7 +82,7 @@ type Tier1Service struct {
 	activeRequestsHardLimit int
 	tier2RequestParameters  reqctx.Tier2RequestParameters
 	foundationalEndpoints   map[string]string
-	globalRequestPool       *GlobalRequestPool
+	sessionPool             dsession.SessionPool
 }
 
 func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
@@ -142,18 +141,19 @@ func NewTier1(
 	appSetIsReadyState func(isReady bool),
 	substreamsClientConfig *client.SubstreamsClientConfig,
 	tier2RequestParameters reqctx.Tier2RequestParameters,
-	workerPoolFactory work.WorkerPoolFactory,
-
 	enforceCompression bool,
 	activeRequestsSoftLimit int,
 	activeRequestsHardLimit int,
 	sharedCacheSize uint64,
-	globalRequestPool *GlobalRequestPool,
+	sessionPool dsession.SessionPool,
 	foundationalEndpoints map[string]string,
 	opts ...Option,
 ) (*Tier1Service, error) {
 
 	clientFactory := client.NewInternalClientFactory(substreamsClientConfig)
+
+	// Create WorkerPoolFactory using the sessionPool
+	workerPoolFactory := work.NewSessionWorkerPoolFactory(sessionPool, clientFactory)
 
 	runtimeConfig := config.NewTier1RuntimeConfig(
 		stateBundleSize,
@@ -163,7 +163,7 @@ func NewTier1(
 		quickSaveStore,
 		defaultCacheTag,
 		clientFactory,
-		workerPoolFactory,
+		workerPoolFactory.WorkerPool,
 	)
 
 	sf := &StreamFactory{
@@ -199,8 +199,8 @@ func NewTier1(
 		enforceCompression:      enforceCompression,
 		activeRequestsSoftLimit: activeRequestsSoftLimit,
 		activeRequestsHardLimit: activeRequestsHardLimit,
-		globalRequestPool:       globalRequestPool,
 		foundationalEndpoints:   foundationalEndpoints,
+		sessionPool:             sessionPool,
 	}
 	s.OnTerminating(func(_ error) {
 		s.activeRequests.Wait()
@@ -346,20 +346,20 @@ func (s *Tier1Service) Blocks(
 		}
 	}
 
-	status := s.getOverloadedStatus()
+	stat := s.getOverloadedStatus()
 
 	// Set us as unready if the soft limit would be reached by this request
-	if status.softLimitWouldBeReached() {
+	if stat.softLimitWouldBeReached() {
 		s.logger.Debug("soft limit would be reached by this request, setting app as unready",
-			append(fields, zap.Int("active_request_count", status.activeRequestCount), zap.Int("soft_limit", status.softLimit))...,
+			append(fields, zap.Int("active_request_count", stat.activeRequestCount), zap.Int("soft_limit", stat.softLimit))...,
 		)
 		s.appSetIsReadyState(false)
 	}
 
 	// Refuse the request if the hard limit is currently reached by this instance
-	if status.hardLimitReached() {
+	if stat.hardLimitReached() {
 		err := connect.NewError(connect.CodeUnavailable, fmt.Errorf("service under heavy load, please try connecting again"))
-		fields = append(fields, zap.Error(err), zap.Int("active_request_count", status.activeRequestCount), zap.Int("hard_limit", status.hardLimit))
+		fields = append(fields, zap.Error(err), zap.Int("active_request_count", stat.activeRequestCount), zap.Int("hard_limit", stat.hardLimit))
 		logger.Info("refusing Substreams Blocks request", fields...)
 		return err
 	}
@@ -442,8 +442,10 @@ func (s *Tier1Service) Blocks(
 		}
 	}()
 
+	runningContext = reqctx.WithCancelFunc(runningContext, cancelRunning) // we pass this down so that the 'workerPool/requestPool' can cancel the running context
+
 	respFunc := tier1ResponseHandler(respContext, &mut, logger, stream, request.NoopMode, reqStats, req.Msg.DevOutputModules)
-	err = s.blocks(runningContext, request, req.Header(), execGraph, respFunc, reqStats, fields)
+	err = s.blocks(runningContext, cancelRunning, request, req.Header(), execGraph, respFunc, reqStats, fields)
 
 	if connectError := toConnectError(runningContext, err); connectError != nil {
 		switch connect.CodeOf(connectError) {
@@ -505,7 +507,7 @@ func (s *Tier1Service) writeLastUsed(ctx context.Context, execGraph *exec.Graph,
 
 var IsValidCacheTag = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`).MatchString
 
-func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Request, header http.Header, execGraph *exec.Graph, respFunc substreams.ResponseFunc, reqStats *metrics.Stats, logFields []zap.Field) (err error) {
+func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelCauseFunc, request *pbsubstreamsrpc.Request, header http.Header, execGraph *exec.Graph, respFunc substreams.ResponseFunc, reqStats *metrics.Stats, logFields []zap.Field) (err error) {
 	chainFirstStreamableBlock := bstream.GetProtocolFirstStreamableBlock
 	if request.StartBlockNum > 0 && request.StartBlockNum < int64(chainFirstStreamableBlock) {
 		return bsstream.NewErrInvalidArg("invalid start block %d, must be >= %d (the first streamable block of the chain)", request.StartBlockNum, chainFirstStreamableBlock)
@@ -701,25 +703,32 @@ func (s *Tier1Service) blocks(ctx context.Context, request *pbsubstreamsrpc.Requ
 		return fmt.Errorf("error building request plan: %w", err)
 	}
 
-	if s.globalRequestPool != nil {
-		userID := dauth.FromContext(ctx).UserID()
-		apiKeyID := dauth.FromContext(ctx).APIKeyID()
-		r := s.globalRequestPool.BorrowRequest(ctx, userID, apiKeyID, tracing.GetTraceID(ctx).String())
-		if r.status == pbworker.BorrowWorkerResponse_resource_exhausted {
-			msg := strings.Builder{}
-			msg.WriteString("Request quota exceeded.\n")
-			msg.WriteString(fmt.Sprintf("Your allowed %d concurrent requests.\n", r.state.MaxWorkers))
-			msg.WriteString(fmt.Sprintf("Each request has a minimal life time of %s\n", r.minimalWorkerLifeDuration.String()))
-			return status.Errorf(codes.ResourceExhausted, "%s", msg.String())
+	if s.sessionPool != nil {
+		auth := dauth.FromContext(ctx)
+		userID := auth.UserID()
+		apiKeyID := auth.APIKeyID()
+		traceID := tracing.GetTraceID(ctx).String()
+		service := "t1r"
+
+		sessionID, err := s.sessionPool.Get(ctx, service, userID, apiKeyID, traceID, func(err error) {
+			if cancelRunning != nil { // in tests, this might be nil
+				cancelRunning(err)
+			}
+		})
+
+		if err != nil {
+			s.logger.Error("failed to acquire session", zap.Error(err))
+			return err
 		}
 
+		s.logger.Debug("acquired session", zap.String("session_id", sessionID))
+
+		// Pass sessionKey through context for WorkerPool
+		ctx = reqctx.WithSessionKey(ctx, sessionID)
+
 		defer func() {
-			zlog.Info("returning request", zap.Bool("keep", false), zap.String("key", r.key))
-			if s.IsTerminating() {
-				s.logger.Info("returning request without minimal life time. Server is shutting down", zap.String("key", r.key))
-				r.minimalWorkerLifeDuration = 0
-			}
-			s.globalRequestPool.ReturnRequest(r)
+			s.logger.Debug("releasing session", zap.String("session_id", sessionID))
+			s.sessionPool.Release(sessionID)
 		}()
 	}
 
@@ -1042,34 +1051,39 @@ func toConnectError(ctx context.Context, err error) error {
 		return nil
 	}
 
+	if errors.Is(err, context.Canceled) {
+		if contextCause := context.Cause(ctx); contextCause != nil {
+			err = contextCause // unwrap errors in canceled contexts
+		} else {
+			return connect.NewError(connect.CodeCanceled, err)
+		}
+	}
+
+	if err, ok := dsession.ToConnectError(err); ok {
+		return err
+	}
+	// special case for context canceled when shutting down
+	if err == errShuttingDown {
+		return connect.NewError(connect.CodeUnavailable, err)
+	}
+
 	// GRPC to connect error
 	if grpcError := dgrpc.AsGRPCError(err); grpcError != nil {
 		switch grpcError.Code() {
 		case codes.Canceled:
-			return connect.NewError(connect.CodeCanceled, grpcError.Err())
+			return connect.NewError(connect.CodeCanceled, errors.New(grpcError.Message()))
 		case codes.Unavailable:
-			return connect.NewError(connect.CodeUnavailable, grpcError.Err())
+			return connect.NewError(connect.CodeUnavailable, errors.New(grpcError.Message()))
 		case codes.InvalidArgument:
-			return connect.NewError(connect.CodeInvalidArgument, grpcError.Err())
+			return connect.NewError(connect.CodeInvalidArgument, errors.New(grpcError.Message()))
 		case codes.DeadlineExceeded:
 			return connect.NewError(connect.CodeDeadlineExceeded, err)
 		case codes.ResourceExhausted:
-			return connect.NewError(connect.CodeResourceExhausted, grpcError.Err())
+			return connect.NewError(connect.CodeResourceExhausted, errors.New(grpcError.Message()))
 		case codes.Unknown:
-			return connect.NewError(connect.CodeUnknown, grpcError.Err())
+			return connect.NewError(connect.CodeUnknown, errors.New(grpcError.Message()))
 		}
 		return grpcError.Err()
-	}
-
-	// special case for context canceled when shutting down
-	if errors.Is(err, context.Canceled) {
-		if context.Cause(ctx) != nil {
-			err = context.Cause(ctx)
-			if err == errShuttingDown {
-				return connect.NewError(connect.CodeUnavailable, err)
-			}
-		}
-		return connect.NewError(connect.CodeCanceled, err)
 	}
 
 	// special case for "QuickSave" on shutdown

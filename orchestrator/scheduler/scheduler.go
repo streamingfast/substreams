@@ -168,7 +168,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 				}
 				s.logger.Debug("scheduling delayed schedule next job")
 				s.delayedScheduleNextJob = true
-				return loop.Tick(5*time.Second, work.DelayedMsgScheduleNextJob{
+				return loop.Tick(3*time.Second, work.DelayedMsgScheduleNextJob{
 					TriggerBy: "resource exhausted",
 				})
 			} else if errors.Is(err, work.ErrorResourceExhaustedRampUp) {

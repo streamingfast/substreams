@@ -22,8 +22,6 @@ type Tier2Config struct {
 	GRPCListenAddr      string // gRPC address where this app will listen to
 	ServiceDiscoveryURL *url.URL
 
-	FoundationalStoresConfigPath string
-
 	PipelineOptions []pipeline.Option
 
 	MaximumConcurrentRequests uint64

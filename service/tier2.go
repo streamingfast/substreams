@@ -508,7 +508,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		respFunc,
 		s.blockExecutionTimeout,
 		s.checkPendingShutdown,
-		s.foundationalEndpoints,
+		request.FoundationalStoreEndpoints,
 		opts...,
 	)
 

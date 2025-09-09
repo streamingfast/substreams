@@ -228,8 +228,7 @@ func (a *Tier1App) Run() error {
 
 	foundationalStoreEndpoints, err := loadTier1FoundationalStoreEndpoints(a.config.FoundationalStoresConfigPath)
 	if err != nil {
-		a.logger.Error("failed to load foundational store endpoints", zap.Error(err))
-		return nil
+		return fmt.Errorf("failed to load foundational store endpoints %q: %w", a.config.FoundationalStoresConfigPath, err)
 	}
 
 	var wasmModules map[string]string

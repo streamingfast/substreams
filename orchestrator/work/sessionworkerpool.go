@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -17,6 +18,14 @@ import (
 const Tier2WorkerServiceName = "t2w"
 
 var rampupTime = time.Second * 4
+
+func init() {
+	if envDuration := os.Getenv("SUBSTREAMS_WORKERS_RAMPUP_TIME"); envDuration != "" {
+		if parsed, err := time.ParseDuration(envDuration); err == nil {
+			rampupTime = parsed
+		}
+	}
+}
 
 type SessionWorkerPool struct {
 	sessionPool   dsession.SessionPool

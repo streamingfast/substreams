@@ -452,6 +452,8 @@ func (s *Tier1Service) Blocks(
 			logger.Debug("invalid argument on request", zap.Error(connectError))
 		case connect.CodeCanceled:
 			logger.Debug("Blocks request canceled by user", zap.Error(connectError))
+		case connect.CodeResourceExhausted:
+			logger.Debug("Blocks request failed with ResourceExhausted", zap.Error(connectError))
 		default:
 			logger.Warn("Blocks request completed with error", zap.Error(connectError))
 		}
@@ -713,7 +715,14 @@ func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelC
 		})
 
 		if err != nil {
-			s.logger.Error("failed to acquire session", zap.Error(err))
+			switch {
+			case errors.Is(err, dsession.ErrConcurrentStreamLimitExceeded),
+				errors.Is(err, dsession.ErrPermissionDenied),
+				errors.Is(err, dsession.ErrQuotaExceeded):
+				s.logger.Info("session denied to user", zap.String("user_id", userID), zap.String("api_key_id", apiKeyID), zap.String("trace_id", traceID), zap.Error(err))
+			default:
+				s.logger.Error("failed to acquire session", zap.Error(err), zap.String("service", service), zap.String("user_id", userID), zap.String("api_key_id", apiKeyID), zap.String("trace_id", traceID))
+			}
 			return err
 		}
 

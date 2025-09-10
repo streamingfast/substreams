@@ -115,6 +115,14 @@ func copyMod(inMod *pbsubstreams.Module, nameToCanonical map[string]string) *pbs
 					},
 				},
 			})
+		case input.GetFoundationalStore() != nil:
+			outMod.Inputs = append(outMod.Inputs, &pbsubstreams.Module_Input{
+				Input: &pbsubstreams.Module_Input_FoundationalStore{
+					FoundationalStore: &pbsubstreams.Module_FoundationalStore{
+						Identifier: input.GetFoundationalStore().Identifier,
+					},
+				},
+			})
 		}
 	}
 

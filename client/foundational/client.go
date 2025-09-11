@@ -45,7 +45,7 @@ func New(rawEndpoint string, logger *zap.Logger) (*Store, func() error, error) {
 }
 
 func (s *Store) Get(ctx context.Context, block uint64, blockHash []byte, key []byte) (*pbstore.GetResponse, error) {
-	s.logger.Info("getting value from key")
+	s.logger.Debug("getting value from key")
 
 	resp, err := s.rpc.Get(ctx, &pbstore.GetRequest{
 		Key:         key,
@@ -61,7 +61,7 @@ func (s *Store) Get(ctx context.Context, block uint64, blockHash []byte, key []b
 }
 
 func (s *Store) GetAll(ctx context.Context, block uint64, blockHash []byte, keys [][]byte) (*pbstore.GetAllResponse, error) {
-	s.logger.Info("getting values from keys")
+	s.logger.Debug("getting values from keys")
 
 	resp, err := s.rpc.GetAll(ctx, &pbstore.GetAllRequest{
 		Keys:        keys,

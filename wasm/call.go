@@ -2,6 +2,7 @@ package wasm
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -334,12 +335,9 @@ func (c *Call) DoFoundationalStoreGet(index uint32, block uint64, blockHash []by
 		}
 
 		resp, err := c.foundationalStores[index].Get(ctx, block, blockHash, key)
-		if err != nil {
-			return nil, fmt.Errorf("foundational store request failed: %w", err)
-		}
 
-		// If block is not reached yet, retry after a delay
-		if resp.Response == pbstore.ResponseCode_RESPONSE_CODE_NOT_FOUND_BLOCK_NOT_REACHED {
+		// If there's an error or block is not reached yet, retry after a delay
+		if err != nil || (resp != nil && !resp.GetBlockReached()) {
 			if attempt < foundationalStoreMaxRetries {
 				select {
 				case <-ctx.Done():
@@ -349,10 +347,13 @@ func (c *Call) DoFoundationalStoreGet(index uint32, block uint64, blockHash []by
 				}
 			}
 			// Max retries reached
+			if err != nil {
+				return nil, fmt.Errorf("foundational store request failed after %d retries in %v: %w", foundationalStoreMaxRetries, time.Since(start), err)
+			}
 			return nil, fmt.Errorf("foundational store block %d not available after %d retries in %v", block, foundationalStoreMaxRetries, time.Since(start))
 		}
 
-		// Return successful response or other response codes immediately
+		// Return successful response when no retry is needed
 		return resp, nil
 	}
 
@@ -376,16 +377,17 @@ func (c *Call) DoFoundationalStoreGetAll(index uint32, block uint64, blockHash [
 		}
 
 		resp, err := c.foundationalStores[index].GetAll(ctx, block, blockHash, keys)
-		if err != nil {
-			return nil, fmt.Errorf("foundational store request failed: %w", err)
-		}
 
-		// Check if any entries need retry (block not reached)
+		// Check if we need to retry due to error or any entries with block not reached
 		needsRetry := false
-		for _, entry := range resp.Entries {
-			if entry.Response.Response == pbstore.ResponseCode_RESPONSE_CODE_NOT_FOUND_BLOCK_NOT_REACHED {
-				needsRetry = true
-				break
+		if err != nil {
+			needsRetry = true
+		} else if resp != nil {
+			for _, entry := range resp.Entries {
+				if !entry.Response.GetBlockReached() {
+					needsRetry = true
+					break
+				}
 			}
 		}
 
@@ -398,11 +400,15 @@ func (c *Call) DoFoundationalStoreGetAll(index uint32, block uint64, blockHash [
 					continue
 				}
 			}
+
 			// Max retries reached
-			return nil, fmt.Errorf("foundational store block %d not available after %d retries in %v", block, foundationalStoreMaxRetries, time.Since(start))
+			if err != nil {
+				return nil, fmt.Errorf("foundational store request failed after %d retries in %v: %w", foundationalStoreMaxRetries, time.Since(start), err)
+			}
+			return nil, fmt.Errorf("foundational store block %d not available after %d retries in %v for key 1: %s", block, foundationalStoreMaxRetries, time.Since(start), hex.EncodeToString(keys[0]))
 		}
 
-		// Return successful response when no entries need retry
+		// Return successful response when no retry is needed
 		return resp, nil
 	}
 

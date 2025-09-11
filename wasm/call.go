@@ -2,7 +2,6 @@ package wasm
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/shopspring/decimal"
+	"go.uber.org/zap"
 
 	pbstore "github.com/streamingfast/substreams-foundational-store/pb/sf/substreams/foundational-store/v1"
 	"github.com/streamingfast/substreams/client/foundational"
@@ -23,7 +23,7 @@ var ErrWasmDeterministicExec = errors.New("wasm execution failed deterministical
 // Foundational store retry configuration constants
 const (
 	foundationalStoreMaxRetries = 10
-	foundationalStoreRetryDelay = 1 * time.Second
+	foundationalStoreRetryDelay = 100 * time.Millisecond
 	// Kill switch timeout
 	foundationalStoreMaxWaitTime = 60 * time.Second
 )
@@ -327,41 +327,27 @@ func (c *Call) DoFoundationalStoreGet(index uint32, block uint64, blockHash []by
 	ctx, cancel := context.WithTimeout(context.Background(), foundationalStoreMaxWaitTime)
 	defer cancel()
 
-	start := time.Now()
-	for attempt := 0; attempt <= foundationalStoreMaxRetries; attempt++ {
-		// Check if we've exceeded the kill switch timeout
-		if time.Since(start) > foundationalStoreMaxWaitTime {
-			return nil, fmt.Errorf("foundational store sync timeout: waited %v for block %d to be available", time.Since(start), block)
-		}
-
+	for {
 		resp, err := c.foundationalStores[index].Get(ctx, block, blockHash, key)
+		if err == nil {
+			if resp.BlockReached {
+				return resp, nil
+			}
 
-		// If there's an error or block is not reached yet, retry after a delay
-		if err != nil || (resp != nil && !resp.GetBlockReached()) {
-			if attempt < foundationalStoreMaxRetries {
-				select {
-				case <-ctx.Done():
-					return nil, fmt.Errorf("foundational store sync timeout: context cancelled while waiting for block %d", block)
-				case <-time.After(foundationalStoreRetryDelay):
-					continue
-				}
-			}
-			// Max retries reached
-			if err != nil {
-				return nil, fmt.Errorf("foundational store request failed after %d retries in %v: %w", foundationalStoreMaxRetries, time.Since(start), err)
-			}
-			return nil, fmt.Errorf("foundational store block %d not available after %d retries in %v", block, foundationalStoreMaxRetries, time.Since(start))
 		}
-
-		// Return successful response when no retry is needed
-		return resp, nil
+		if !resp.BlockReached {
+			zlog.Debug("block not reached, retrying", zap.Uint64("block_number", block))
+		}
+		if err != nil {
+			zlog.Warn("failed to call foundational store", zap.Error(err))
+		}
+		time.Sleep(foundationalStoreRetryDelay)
 	}
-
-	// This should never be reached due to the logic above, but kept for safety
-	return nil, fmt.Errorf("foundational store get failed unexpectedly")
 }
 
 func (c *Call) DoFoundationalStoreGetAll(index uint32, block uint64, blockHash []byte, keys [][]byte) (*pbstore.GetAllResponse, error) {
+	zlog.Info("entering call DoFoundationalStoreGetAll")
+
 	if len(c.foundationalStores) == 0 {
 		return nil, fmt.Errorf("store not found for index: %d", index)
 	}
@@ -369,51 +355,24 @@ func (c *Call) DoFoundationalStoreGetAll(index uint32, block uint64, blockHash [
 	ctx, cancel := context.WithTimeout(context.Background(), foundationalStoreMaxWaitTime)
 	defer cancel()
 
-	start := time.Now()
-	for attempt := 0; attempt <= foundationalStoreMaxRetries; attempt++ {
-		// Check if we've exceeded the kill switch timeout
-		if time.Since(start) > foundationalStoreMaxWaitTime {
-			return nil, fmt.Errorf("foundational store sync timeout: waited %v for block %d to be available", time.Since(start), block)
-		}
-
+	for {
 		resp, err := c.foundationalStores[index].GetAll(ctx, block, blockHash, keys)
+		zlog.Info("foundational store GetAll result", zap.Bool("block_reached", resp.BlockReached), zap.Error(err))
+		if err == nil {
+			if resp.BlockReached {
+				return resp, nil
+			}
 
-		// Check if we need to retry due to error or any entries with block not reached
-		needsRetry := false
+		}
+		if !resp.BlockReached {
+			zlog.Debug("block not reached, retrying", zap.Uint64("block_number", block))
+		}
 		if err != nil {
-			needsRetry = true
-		} else if resp != nil {
-			for _, entry := range resp.Entries {
-				if !entry.Response.GetBlockReached() {
-					needsRetry = true
-					break
-				}
-			}
+			zlog.Warn("failed to call foundational store", zap.Error(err))
 		}
-
-		if needsRetry {
-			if attempt < foundationalStoreMaxRetries {
-				select {
-				case <-ctx.Done():
-					return nil, fmt.Errorf("foundational store sync timeout: context cancelled while waiting for block %d", block)
-				case <-time.After(foundationalStoreRetryDelay):
-					continue
-				}
-			}
-
-			// Max retries reached
-			if err != nil {
-				return nil, fmt.Errorf("foundational store request failed after %d retries in %v: %w", foundationalStoreMaxRetries, time.Since(start), err)
-			}
-			return nil, fmt.Errorf("foundational store block %d not available after %d retries in %v for key 1: %s", block, foundationalStoreMaxRetries, time.Since(start), hex.EncodeToString(keys[0]))
-		}
-
-		// Return successful response when no retry is needed
-		return resp, nil
+		time.Sleep(foundationalStoreRetryDelay)
 	}
 
-	// This should never be reached due to the logic above, but kept for safety
-	return nil, fmt.Errorf("foundational store get_all failed unexpectedly")
 }
 
 func (c *Call) validateStoreIndex(storeIndex int, stateFunc string) {

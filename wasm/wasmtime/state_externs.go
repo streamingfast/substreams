@@ -198,6 +198,7 @@ func (i *instance) foundationalStoreGet(storeIndex int32, reqPtr int32, reqLen i
 func (i *instance) foundationalStoreGetAll(storeIndex int32, reqPtr int32, reqLen int32) int64 {
 	reqData := i.Heap.ReadBytes(reqPtr, reqLen)
 
+	zlog.Info("entering instance of foundationalStoreGetAll")
 	// TODO: backend should return already-serialized bytes to avoid marshal here
 
 	// Deserialize GetAllRequest
@@ -212,6 +213,7 @@ func (i *instance) foundationalStoreGetAll(storeIndex int32, reqPtr int32, reqLe
 
 	resp, err := i.CurrentCall.DoFoundationalStoreGetAll(uint32(storeIndex), blockNumber, blockHash, req.Keys)
 	if err != nil {
+		
 		i.CurrentCall.ReturnError(fmt.Errorf("foundational store error: %w", err))
 		return 0
 	}

@@ -530,10 +530,6 @@ github.com/streamingfast/sf-tracing v0.0.0-20240430173521-888827872b90 h1:94Hllk
 github.com/streamingfast/sf-tracing v0.0.0-20240430173521-888827872b90/go.mod h1:e6tKS/udlfXFUTQBYfDDdISfjULvQXet1kBrOeRfgI4=
 github.com/streamingfast/shutter v1.5.0 h1:NpzDYzj0HVpSiDJVO/FFSL6QIK/YKOxY0gJAtyaTOgs=
 github.com/streamingfast/shutter v1.5.0/go.mod h1:B/T6efqdeMGbGwjzPS1ToXzYZI4kDzI5/u4I+7qbjY8=
-github.com/streamingfast/substreams-foundational-store v0.1.0 h1:E7yFhv62lGl24gyZL7rAjW2LOiDR4jvxrSUnE7q5OXc=
-github.com/streamingfast/substreams-foundational-store v0.1.0/go.mod h1:PjBeJPBPxcNV3JGKy/Yp7SvTC+itfTrro4I+qEDSv4Q=
-github.com/streamingfast/substreams-foundational-store v0.1.1-0.20250911140508-5c260f615ebc h1:wkFjGZm6Pep1YYQG5SgohrNdDo8Foh9dQmUBKcMQE/c=
-github.com/streamingfast/substreams-foundational-store v0.1.1-0.20250911140508-5c260f615ebc/go.mod h1:J1CzU6dbj7VgGIc2L/nJKCQsjys3nhF+aTNWbyXw7OA=
 github.com/streamingfast/substreams-foundational-store v0.1.1-0.20250912144020-b075d35bf78a h1:eSj5ghyD247ekt3QooQmIeBiXBkFuRYWkVNa1/303v4=
 github.com/streamingfast/substreams-foundational-store v0.1.1-0.20250912144020-b075d35bf78a/go.mod h1:J1CzU6dbj7VgGIc2L/nJKCQsjys3nhF+aTNWbyXw7OA=
 github.com/streamingfast/substreams-sdk-go v0.0.0-20240110154316-5fb21a7a330b h1:O00ZKnNHVHrIEzS/dr+w07H3c0qP2JZwE6XS9scJZSY=

@@ -148,7 +148,17 @@ func (ui *TUI) HandleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstrea
 	return nil
 }
 
+var debugSubstreamsRun = os.Getenv("SUBSTREAMS_DEBUG_RUN_SLOWDOWN") == "true"
+var debugSubstreamsRunDelay = time.Millisecond * 100
+
 func (ui *TUI) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.BlockScopedData, isLive *bool, cursor *sink.Cursor) error {
+	if debugSubstreamsRun {
+		time.Sleep(debugSubstreamsRunDelay)
+		debugSubstreamsRunDelay += time.Millisecond * 100
+		if debugSubstreamsRunDelay > 500*time.Millisecond {
+			debugSubstreamsRunDelay = 500 * time.Millisecond
+		}
+	}
 	_ = isLive
 	if ui.testRunner != nil {
 		if err := ui.testRunner.Test(ctx, data.Output, data.DebugMapOutputs, data.DebugStoreOutputs, data.Clock); err != nil {

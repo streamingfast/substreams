@@ -27,6 +27,7 @@ type Tier2Config struct {
 	MaximumConcurrentRequests uint64
 	WASMExtensions            wasm.WASMExtensioner
 	BlockExecutionTimeout     time.Duration
+	SegmentExecutionTimeout   time.Duration
 	TmpDir                    string
 
 	Tracing bool
@@ -78,6 +79,10 @@ func (a *Tier2App) Run() error {
 
 	if a.config.BlockExecutionTimeout != 0 {
 		opts = append(opts, service.WithBlockExecutionTimeout(a.config.BlockExecutionTimeout))
+	}
+
+	if a.config.SegmentExecutionTimeout != 0 {
+		opts = append(opts, service.WithSegmentExecutionTimeout(a.config.SegmentExecutionTimeout))
 	}
 
 	opts = append(opts, service.WithReadinessFunc(a.setIsReady))

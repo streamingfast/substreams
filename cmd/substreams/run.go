@@ -22,7 +22,6 @@ func init() {
 		sink.FlagIgnore(
 			sink.FlagDevelopmentMode,
 			sink.FlagLiveBlockTimeDelta,
-			sink.FlagInfiniteRetry,
 		))
 
 	runCmd.Flags().Bool("production-mode", false, "Enable Production Mode, with high-speed parallel processing")

@@ -26,6 +26,16 @@ var moduleExecutionTracingConfigKey = contextKeyType(5)
 var outputModuleHashKey = contextKeyType(6)
 var tier2RequestParametersKeyKey = contextKeyType(7)
 var wasmExtensionReqStats = contextKeyType(8)
+var cancelFunc = contextKeyType(9)
+var sessionKey = contextKeyType(10)
+
+func WithCancelFunc(ctx context.Context, f context.CancelCauseFunc) context.Context {
+	return context.WithValue(ctx, cancelFunc, f)
+}
+
+func CancelFunc(ctx context.Context) context.CancelCauseFunc {
+	return ctx.Value(cancelFunc).(context.CancelCauseFunc)
+}
 
 func Logger(ctx context.Context) *zap.Logger {
 	return logging.Logger(ctx, zap.NewNop())
@@ -216,6 +226,15 @@ func Details(ctx context.Context) *RequestDetails {
 
 func WithRequest(ctx context.Context, req *RequestDetails) context.Context {
 	return context.WithValue(ctx, detailsKey, req)
+}
+
+func WithSessionKey(ctx context.Context, key string) context.Context {
+	return context.WithValue(ctx, sessionKey, key)
+}
+
+func GetSessionKey(ctx context.Context) (string, bool) {
+	key, ok := ctx.Value(sessionKey).(string)
+	return key, ok
 }
 
 func ModuleExecutionTracing(ctx context.Context) bool {

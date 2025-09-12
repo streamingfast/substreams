@@ -45,6 +45,7 @@ func (mod *V8Module) ExecuteNewCall(
 
 	// Runs all scripts (will be changed depending on files needed), probably going to merge all that are needed. This if makes sure we load our needed scripts ONLY on the first call
 	if cachedInstance == nil {
+		defer inst.Close(ctx)
 
 		if err := injectAllGlobals(inst.ctx, call); err != nil {
 			inst.Close(ctx)

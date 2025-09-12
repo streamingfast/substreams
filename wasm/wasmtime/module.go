@@ -5,7 +5,9 @@ import (
 	"fmt"
 
 	wasmtime "github.com/bytecodealliance/wasmtime-go/v30"
+	"go.uber.org/zap"
 
+	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/wasm"
 )
 
@@ -42,7 +44,7 @@ func newModule(ctx context.Context, wasmCode []byte, wasmCodeType string, regist
 	}, nil
 }
 
-func (m *Module) Close(ctx context.Context) error {
+func (m *Module) Close(_ context.Context) error {
 	m.engine.Close()
 	return nil
 }
@@ -68,6 +70,14 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 		if err != nil {
 			return nil, fmt.Errorf("could not instantiate wasm module: %w", err)
 		}
+		defer func() {
+			if e := inst.Close(ctx); e != nil {
+				reqctx.Logger(ctx).Warn("cannot close instance", zap.Error(e))
+				if err == nil {
+					err = e
+				}
+			}
+		}()
 	}
 
 	export := inst.wasmInstance.GetExport(inst.wasmStore, call.Entrypoint)

@@ -83,7 +83,7 @@ func New(
 		zap.Stringer("buffer", s.buffer),
 		zap.Int64("start_block", s.SinkerConfig.StartBlock),
 		zap.Uint64("stop_block", s.SinkerConfig.StopBlock),
-		zap.Bool("infinite_retry", s.InfiniteRetry),
+		zap.Int("max_retries", s.MaxRetries),
 		zap.Bool("final_blocks_only", s.FinalBlocksOnly),
 		zap.Bool("liveness_checker", s.LivenessChecker != nil),
 	)
@@ -211,6 +211,13 @@ func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 	if s.adjustedEndBlock() != 0 {
 		fields = append(fields, zap.String("end_at", fmt.Sprintf("#%d", s.adjustedEndBlock()-1)))
 	}
+
+	if cursor != nil && cursor.Block().Num() >= s.adjustedEndBlock()-1 {
+		s.Logger.Info("No more blocks to process: cursor reached your stop block", zap.Stringer("last_block_seen", cursor.Block()))
+		s.Shutdown(nil)
+		return
+	}
+
 	if cursor != nil {
 		fields = append(fields, zap.String("cursor", cursor.String()))
 	}
@@ -276,9 +283,15 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 	backOff := s.BackOff
 	s.Logger.Debug("configured default backoff", zap.String("back_off", fmt.Sprintf("%#v", backOff)))
 
-	if !s.InfiniteRetry {
-		s.Logger.Debug("configured backoff to stop after 15 retries")
-		backOff = backoff.WithMaxRetries(backOff, 15)
+	if s.MaxRetries == 0 {
+		s.Logger.Debug("configured backoff to stop after 0 retries (no retries)")
+		backOff = backoff.WithMaxRetries(backOff, 0)
+	} else if s.MaxRetries > 0 {
+		s.Logger.Debug("configured backoff to stop after specified retries", zap.Int("max_retries", s.MaxRetries))
+		backOff = backoff.WithMaxRetries(backOff, uint64(s.MaxRetries))
+	} else {
+		s.Logger.Debug("configured backoff for infinite retries")
+		// For infinite retries (MaxRetries == -1), don't set MaxRetries on backoff
 	}
 
 	backOff = backoff.WithContext(backOff, ctx)
@@ -418,14 +431,20 @@ func (s *Sinker) doRequest(
 
 			if dgrpcError := dgrpc.AsGRPCError(err); dgrpcError != nil {
 				switch dgrpcError.Code() {
-				case codes.Unauthenticated:
-					return activeCursor, receivedMessage, fmt.Errorf("stream failure: %w", err)
+				case codes.Unauthenticated, codes.PermissionDenied:
+					return activeCursor, receivedMessage, fmt.Errorf("stream auth failure: %w", err)
 
 				case codes.InvalidArgument:
 					return activeCursor, receivedMessage, fmt.Errorf("stream invalid: %w", err)
 
 				case codes.FailedPrecondition: // ex: related to limit-processed-blocks
 					return activeCursor, receivedMessage, err
+
+				case codes.ResourceExhausted:
+					if strings.Contains(dgrpcError.Message(), "quota exceeded") { // no more bytes/blocks
+						return activeCursor, receivedMessage, err
+					}
+					return activeCursor, receivedMessage, retryable(err) // no concurrent stream available
 				}
 			}
 

@@ -38,8 +38,8 @@ type SinkerConfig struct {
 	DevOutputModules   []string // if this is empty, the request will contain the output module in here
 
 	// Retry and reliability configuration
-	InfiniteRetry bool
-	BackOff       backoff.BackOff
+	MaxRetries int // 0 = no retries, -1 = infinite retries, >0 = specific number of retries
+	BackOff    backoff.BackOff
 
 	// Liveness configuration
 	LiveBlockTimeDelta time.Duration

@@ -9,6 +9,32 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.16.5
+
+### Server
+
+#### Session (stream + workers management)
+
+* **BREAKING** Concurrent streams and workers limits are now handled under the new session plugin (see CHANGELOG in github.com/streamingfast/firehose-core for details and usage)
+  - removed 'WorkerPoolFactory' from Tier1Modules
+  - removed 'GlobalRequestPool' from Tier1Modules
+  - added 'SessionPool' (dsession.SessionPool) to Tier1Modules
+
+#### Stability
+
+* **BREAKING** Add a maximum execution time for a full tier2 segment. By default, this is 60 minutes. It will fail with `rpc error: code = DeadlineExceeded desc = request active for too long`.
+  It can be configured from the `SegmentExecutionTimeout` configuration option on Tier2Config or disabled by setting it to 0.
+* Improve log message for 'request active for a long time', adding stats.
+* Fix `subscription channel at max capacity` error: when the LIVE channel is full (ex: slow module execution or slow client reader), the request will be continued from merged files instead of failing, and gracefully recover if performance is restored.
+* Fixed a small context memory leak when using wasmtime (especially with grpc-based metering plugin)
+
+### CLI
+
+* **BREAKING**: Replaced `--infinite-retry` boolean flag with `--max-retries` integer flag in sink package for more flexible retry control:
+  - `--max-retries 0`: No retries (fail immediately on first error)
+  - `--max-retries 3`: Default behavior (retry up to 3 times)
+  - `--max-retries -1`: Infinite retries (equivalent to old `--infinite-retry` flag)
+
 ## v1.16.4
 
 ### Server

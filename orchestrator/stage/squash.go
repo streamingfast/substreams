@@ -129,7 +129,7 @@ func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUni
 	if newFullKV != nil {
 		modState.cachedStore = newFullKV
 		modState.lastBlockInStore = rng.ExclusiveEndBlock
-		s.logger.Info("squashing time metrics (skipped, loaded from full kv)", metrics.logFields()...)
+		s.logger.Debug("squashing time metrics (skipped, loaded from full kv)", metrics.logFields()...)
 		return nil
 	}
 

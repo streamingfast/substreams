@@ -25,7 +25,7 @@ func (inst *V8Instance) Cleanup(ctx context.Context) error {
 	return nil
 }
 
-func (inst *V8Instance) Close(ctx context.Context) error {
+func (inst *V8Instance) Close(_ context.Context) (_ error) {
 	inst.ctx.Close()
-	return nil
+	return
 }

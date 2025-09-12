@@ -17,7 +17,7 @@ func init() {
 		sink.FlagIgnore(
 			sink.FlagDevelopmentMode,
 			sink.FlagLiveBlockTimeDelta,
-			sink.FlagInfiniteRetry,
+			sink.FlagMaxRetries,
 		))
 
 	sinkWebhookCmd.Flags().String("state-file", "./state.cursor", "File where the sink will store its cursor. If empty, no cursor will be saved or used, only the start-block.")

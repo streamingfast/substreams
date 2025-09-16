@@ -2,8 +2,10 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
+	"os"
 	"time"
 
 	"connectrpc.com/connect"
@@ -59,6 +61,8 @@ func NewDefaultTier1Config() *Tier1Config {
 type Tier1Config struct {
 	MeteringConfig string
 
+	FoundationalStoresConfigPath string
+
 	MergedBlocksStoreURL    string
 	OneBlocksStoreURL       string
 	ForkedBlocksStoreURL    string
@@ -110,6 +114,24 @@ func NewTier1(logger *zap.Logger, config *Tier1Config, modules *Tier1Modules) *T
 
 		isReady: atomic.NewBool(false),
 	}
+}
+
+func loadTier1FoundationalStoreEndpoints(configPath string) (map[string]string, error) {
+	if configPath == "" {
+		return nil, nil
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read foundational stores config file %s: %w", configPath, err)
+	}
+
+	var endpoints map[string]string
+	if err := json.Unmarshal(data, &endpoints); err != nil {
+		return nil, fmt.Errorf("failed to parse foundational stores config file %s: %w", configPath, err)
+	}
+
+	return endpoints, nil
 }
 
 func (a *Tier1App) Run() error {
@@ -203,19 +225,25 @@ func (a *Tier1App) Run() error {
 		wazero.SetTempDir(a.config.TmpDir)
 	}
 
+	foundationalStoreEndpoints, err := loadTier1FoundationalStoreEndpoints(a.config.FoundationalStoresConfigPath)
+	if err != nil {
+		return fmt.Errorf("failed to load foundational store endpoints %q: %w", a.config.FoundationalStoresConfigPath, err)
+	}
+
 	var wasmModules map[string]string
 	if a.config.WASMExtensions != nil {
 		wasmModules = a.config.WASMExtensions.Params()
 	}
 
 	tier2RequestParameters := reqctx.Tier2RequestParameters{
-		MeteringConfig:       a.config.MeteringConfig,
-		FirstStreamableBlock: bstream.GetProtocolFirstStreamableBlock,
-		MergedBlockStoreURL:  a.config.MergedBlocksStoreURL,
-		StateStoreURL:        a.config.StateStoreURL,
-		StateBundleSize:      a.config.StateBundleSize,
-		StateStoreDefaultTag: a.config.StateStoreDefaultTag,
-		WASMModules:          wasmModules,
+		MeteringConfig:             a.config.MeteringConfig,
+		FirstStreamableBlock:       bstream.GetProtocolFirstStreamableBlock,
+		MergedBlockStoreURL:        a.config.MergedBlocksStoreURL,
+		StateStoreURL:              a.config.StateStoreURL,
+		StateBundleSize:            a.config.StateBundleSize,
+		StateStoreDefaultTag:       a.config.StateStoreDefaultTag,
+		WASMModules:                wasmModules,
+		FoundationalStoreEndpoints: foundationalStoreEndpoints,
 	}
 
 	svc, err := service.NewTier1(
@@ -237,6 +265,7 @@ func (a *Tier1App) Run() error {
 		a.config.ActiveRequestsHardLimit,
 		a.config.SharedCacheSize,
 		a.modules.SessionPool,
+		foundationalStoreEndpoints,
 		opts...,
 	)
 	if err != nil {

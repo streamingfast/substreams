@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 
@@ -120,6 +121,12 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 	stateBundleSize := sflags.MustGetUint64(cmd, "state-bundle-size")
 	firstStreamableBlock := sflags.MustGetUint64(cmd, "first-streamable-block")
 
+	foundationalStoreConfigPath := sflags.MustGetString(cmd, "foundational-stores-config-path")
+	foundationStoreConfigs, err := loadTier1FoundationalStoreEndpoints(foundationalStoreConfigPath)
+	if err != nil {
+		fmt.Println("foundational store config path error: ", err)
+	}
+
 	var wasmExtensionConfigs map[string]string
 	extensionConfigs := sflags.MustGetString(cmd, "extension-configs")
 	if extensionConfigs != "" {
@@ -137,18 +144,19 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 	}
 
 	req, err := ssClient.ProcessRange(ctx, &pbssinternal.ProcessRangeRequest{
-		SegmentSize:          stateBundleSize,
-		SegmentNumber:        segmentNumber,
-		OutputModule:         outputModule,
-		Modules:              pkg.Modules,
-		Stage:                uint32(stage),
-		MeteringConfig:       meteringConfig,
-		BlockType:            blockType,
-		FirstStreamableBlock: firstStreamableBlock,
-		MergedBlocksStore:    mergedBlocksStore,
-		StateStore:           stateStore,
-		StateStoreDefaultTag: stateStoreDefaultTag,
-		WasmExtensionConfigs: wasmExtensionConfigs,
+		SegmentSize:                stateBundleSize,
+		SegmentNumber:              segmentNumber,
+		OutputModule:               outputModule,
+		Modules:                    pkg.Modules,
+		Stage:                      uint32(stage),
+		MeteringConfig:             meteringConfig,
+		BlockType:                  blockType,
+		FirstStreamableBlock:       firstStreamableBlock,
+		MergedBlocksStore:          mergedBlocksStore,
+		StateStore:                 stateStore,
+		StateStoreDefaultTag:       stateStoreDefaultTag,
+		WasmExtensionConfigs:       wasmExtensionConfigs,
+		FoundationalStoreEndpoints: foundationStoreConfigs,
 	}, callOpts...)
 	if err != nil {
 		return fmt.Errorf("process range request: %w", err)
@@ -181,4 +189,22 @@ func parseHeaders(headers []string) map[string]string {
 		result[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
 	}
 	return result
+}
+
+func loadTier1FoundationalStoreEndpoints(configPath string) (map[string]string, error) {
+	if configPath == "" {
+		return nil, nil
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read foundational stores config file %s: %w", configPath, err)
+	}
+
+	var endpoints map[string]string
+	if err := json.Unmarshal(data, &endpoints); err != nil {
+		return nil, fmt.Errorf("failed to parse foundational stores config file %s: %w", configPath, err)
+	}
+
+	return endpoints, nil
 }

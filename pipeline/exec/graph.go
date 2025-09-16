@@ -115,6 +115,14 @@ func copyMod(inMod *pbsubstreams.Module, nameToCanonical map[string]string) *pbs
 					},
 				},
 			})
+		case input.GetFoundationalStore() != nil:
+			outMod.Inputs = append(outMod.Inputs, &pbsubstreams.Module_Input{
+				Input: &pbsubstreams.Module_Input_FoundationalStore{
+					FoundationalStore: &pbsubstreams.Module_FoundationalStore{
+						Identifier: input.GetFoundationalStore().Identifier,
+					},
+				},
+			})
 		}
 	}
 
@@ -352,7 +360,7 @@ func computeStages(mods []*pbsubstreams.Module, initBlocks map[string]uint64) (s
 						validInputsAtInitialBlock = true // special case where a module has only params as input, to extract the clock
 					}
 					continue
-				case *pbsubstreams.Module_Input_Source_:
+				case *pbsubstreams.Module_Input_Source_, *pbsubstreams.Module_Input_FoundationalStore:
 					validInputsAtInitialBlock = true
 					continue
 				case *pbsubstreams.Module_Input_Map_:

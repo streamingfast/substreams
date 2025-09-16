@@ -10,8 +10,10 @@ import (
 	"github.com/RoaringBitmap/roaring/roaring64"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dmetering"
+	"github.com/streamingfast/logging"
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/substreams"
+	"github.com/streamingfast/substreams/client/foundational"
 	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/orchestrator"
 	"github.com/streamingfast/substreams/orchestrator/plan"
@@ -74,6 +76,10 @@ type Pipeline struct {
 	execoutStorage    *execout.Configs
 	moduleNameToStage map[string]int
 
+	foundationalClients   map[string][]*foundational.Store
+	foundationalClosers   map[string][]func() error
+	foundationalEndpoints map[string]string
+
 	processingModule *processingModule
 
 	gate            *gate
@@ -112,6 +118,7 @@ func New(
 	respFunc substreams.ResponseFunc,
 	executionTimeout time.Duration,
 	checkPendingShutdown func() bool,
+	foundationalEndpoints map[string]string,
 	opts ...Option,
 ) *Pipeline {
 	pipe := &Pipeline{
@@ -125,6 +132,9 @@ func New(
 		wasmRuntime:             wasmRuntime,
 		respFunc:                respFunc,
 		stores:                  stores,
+		foundationalClients:     make(map[string][]*foundational.Store),
+		foundationalClosers:     make(map[string][]func() error),
+		foundationalEndpoints:   foundationalEndpoints,
 		execoutStorage:          execoutStorage,
 		forkHandler:             NewForkHandler(),
 		blockStepMap:            make(map[bstream.StepType]uint64),
@@ -629,6 +639,15 @@ func (p *Pipeline) returnInternalModuleProgressOutputs(clock *pbsubstreams.Clock
 	return nil
 }
 
+func getFoundationalStores(inputs []wasm.Argument) []*foundational.Store {
+	for _, arg := range inputs {
+		if fStore, ok := arg.(*wasm.FoundationalStoreInput); ok {
+			return fStore.Clients
+		}
+	}
+	return nil
+}
+
 // BuildModuleExecutors builds the ModuleExecutors, and the loadedModules.
 func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 	if p.StagedModuleExecutors != nil {
@@ -690,6 +709,7 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 				entrypoint := module.BinaryEntrypoint
 				mod := loadedModules[module.BinaryIndex]
 
+				foundationalStores := getFoundationalStores(inputs)
 				switch kind := module.Kind.(type) {
 				case *pbsubstreams.Module_KindMap_:
 					outType := strings.TrimPrefix(module.Output.Type, "proto:")
@@ -705,6 +725,7 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 						moduleBlockIndex,
 						entrypoint,
 						tracer,
+						foundationalStores,
 					)
 					executor := exec.NewMapperModuleExecutor(baseExecutor, outType)
 					moduleExecutors = append(moduleExecutors, executor)
@@ -730,6 +751,7 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 						moduleBlockIndex,
 						entrypoint,
 						tracer,
+						foundationalStores,
 					)
 					executor := exec.NewStoreModuleExecutor(baseExecutor, outputStore)
 					moduleExecutors = append(moduleExecutors, executor)
@@ -749,6 +771,7 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 						moduleBlockIndex,
 						entrypoint,
 						tracer,
+						foundationalStores,
 					)
 
 					executor := exec.NewIndexModuleExecutor(baseExecutor)
@@ -766,7 +789,7 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 	return nil
 }
 
-func (p *Pipeline) cleanUpModuleExecutors(ctx context.Context) error {
+func (p *Pipeline) cleanUpModuleExecutors(ctx context.Context, logger *zap.Logger) error {
 	for _, layer := range p.StagedModuleExecutors {
 		for _, executor := range layer {
 			if err := executor.Close(ctx); err != nil {
@@ -777,6 +800,14 @@ func (p *Pipeline) cleanUpModuleExecutors(ctx context.Context) error {
 	for idx, mod := range p.loadedModules {
 		if err := mod.Close(ctx); err != nil {
 			return fmt.Errorf("closing wasm module %d: %w", idx, err)
+		}
+	}
+	// tear down any foundational store gRPC clients
+	for endpoint, closers := range p.foundationalClosers {
+		for _, closeFn := range closers {
+			if err := closeFn(); err != nil {
+				logger.Warn("closing foundational store client", zap.String("endpoint", endpoint), zap.Error(err))
+			}
 		}
 	}
 	return nil
@@ -835,10 +866,13 @@ func (p *Pipeline) renderWasmInputs(module *pbsubstreams.Module) (out []wasm.Arg
 	storeAccessor := p.stores.StoreMap
 	for _, input := range module.Inputs {
 		switch in := input.Input.(type) {
+
 		case *pbsubstreams.Module_Input_Params_:
 			out = append(out, wasm.NewParamsInput(input.GetParams().GetValue()))
+
 		case *pbsubstreams.Module_Input_Map_:
 			out = append(out, wasm.NewMapInput(in.Map.ModuleName, p.execGraph.ModulesInitBlocks()[in.Map.ModuleName]))
+
 		case *pbsubstreams.Module_Input_Store_:
 			inputName := input.GetStore().ModuleName
 			if input.GetStore().Mode == pbsubstreams.Module_Input_Store_DELTAS {
@@ -846,14 +880,38 @@ func (p *Pipeline) renderWasmInputs(module *pbsubstreams.Module) (out []wasm.Arg
 			} else {
 				inputStore, found := storeAccessor.Get(inputName)
 				if !found {
-					return nil, fmt.Errorf("store %q npt found", inputName)
+					return nil, fmt.Errorf("store %q not found", inputName)
 				}
 				out = append(out, wasm.NewStoreReaderInput(inputName, inputStore, p.execGraph.ModulesInitBlocks()[inputName]))
 			}
+
 		case *pbsubstreams.Module_Input_Source_:
 			// in.Source.Type checking against `blockType` is already done
 			// upfront in `validateGraph`.
 			out = append(out, wasm.NewSourceInput(in.Source.Type, 0))
+
+		case *pbsubstreams.Module_Input_FoundationalStore:
+			identifier := in.FoundationalStore.GetIdentifier()
+			clients, ok := p.foundationalClients[identifier]
+			if !ok {
+				// Look up the endpoint for this foundational store identifier
+				endpoint, hasEndpoint := p.foundationalEndpoints[identifier]
+				if !hasEndpoint {
+					// Fall back to using identifier as endpoint
+					endpoint = identifier
+				}
+
+				client, closeFn, err := foundational.New(endpoint, logging.Logger(p.ctx, zap.NewNop()))
+				if err != nil {
+					return nil, fmt.Errorf("failed to create foundational store client for identifier %s (endpoint: %s): %w", identifier, endpoint, err)
+				}
+
+				clients = []*foundational.Store{client}
+				p.foundationalClients[identifier] = clients
+				p.foundationalClosers[identifier] = []func() error{closeFn}
+			}
+			out = append(out, wasm.NewFoundationalStoreInput(identifier, clients))
+
 		default:
 			return nil, fmt.Errorf("invalid input struct for module %q", module.Name)
 		}

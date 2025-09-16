@@ -89,10 +89,11 @@ type ProcessRangeRequest struct {
 	// Whether the tier1 initial request was in production mode or in development mode.
 	// It's possible to have tier2 requests in development mode, for example if the Substreams
 	// needs to back process stores while in development mode.
-	ProductionMode bool `protobuf:"varint,16,opt,name=production_mode,json=productionMode,proto3" json:"production_mode,omitempty"`
-	StreamOutput   bool `protobuf:"varint,17,opt,name=stream_output,json=streamOutput,proto3" json:"stream_output,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	ProductionMode             bool              `protobuf:"varint,16,opt,name=production_mode,json=productionMode,proto3" json:"production_mode,omitempty"`
+	StreamOutput               bool              `protobuf:"varint,17,opt,name=stream_output,json=streamOutput,proto3" json:"stream_output,omitempty"`
+	FoundationalStoreEndpoints map[string]string `protobuf:"bytes,18,rep,name=foundational_store_endpoints,json=foundationalStoreEndpoints,proto3" json:"foundational_store_endpoints,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields              protoimpl.UnknownFields
+	sizeCache                  protoimpl.SizeCache
 }
 
 func (x *ProcessRangeRequest) Reset() {
@@ -229,6 +230,13 @@ func (x *ProcessRangeRequest) GetStreamOutput() bool {
 		return x.StreamOutput
 	}
 	return false
+}
+
+func (x *ProcessRangeRequest) GetFoundationalStoreEndpoints() map[string]string {
+	if x != nil {
+		return x.FoundationalStoreEndpoints
+	}
+	return nil
 }
 
 type ProcessRangeResponse struct {
@@ -813,7 +821,7 @@ var File_sf_substreams_intern_v2_service_proto protoreflect.FileDescriptor
 
 const file_sf_substreams_intern_v2_service_proto_rawDesc = "" +
 	"\n" +
-	"%sf/substreams/intern/v2/service.proto\x12\x19sf.substreams.internal.v2\x1a\x19google/protobuf/any.proto\x1a\x1csf/substreams/v1/clock.proto\x1a\x1esf/substreams/v1/modules.proto\"\xa2\x06\n" +
+	"%sf/substreams/intern/v2/service.proto\x12\x19sf.substreams.internal.v2\x1a\x19google/protobuf/any.proto\x1a\x1csf/substreams/v1/clock.proto\x1a\x1esf/substreams/v1/modules.proto\"\x84\b\n" +
 	"\x13ProcessRangeRequest\x12(\n" +
 	"\x0estop_block_num\x18\x02 \x01(\x04B\x02\x18\x01R\fstopBlockNum\x12#\n" +
 	"\routput_module\x18\x03 \x01(\tR\foutputModule\x123\n" +
@@ -832,8 +840,12 @@ const file_sf_substreams_intern_v2_service_proto_rawDesc = "" +
 	"block_type\x18\x0e \x01(\tR\tblockType\x12%\n" +
 	"\x0esegment_number\x18\x0f \x01(\x04R\rsegmentNumber\x12'\n" +
 	"\x0fproduction_mode\x18\x10 \x01(\bR\x0eproductionMode\x12#\n" +
-	"\rstream_output\x18\x11 \x01(\bR\fstreamOutput\x1aG\n" +
+	"\rstream_output\x18\x11 \x01(\bR\fstreamOutput\x12\x90\x01\n" +
+	"\x1cfoundational_store_endpoints\x18\x12 \x03(\v2N.sf.substreams.internal.v2.ProcessRangeRequest.FoundationalStoreEndpointsEntryR\x1afoundationalStoreEndpoints\x1aG\n" +
 	"\x19WasmExtensionConfigsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1aM\n" +
+	"\x1fFoundationalStoreEndpointsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01J\x04\b\x01\x10\x02J\x04\b\b\x10\t\"\xca\x02\n" +
 	"\x14ProcessRangeResponse\x12;\n" +
@@ -899,7 +911,7 @@ func file_sf_substreams_intern_v2_service_proto_rawDescGZIP() []byte {
 }
 
 var file_sf_substreams_intern_v2_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_sf_substreams_intern_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_sf_substreams_intern_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_sf_substreams_intern_v2_service_proto_goTypes = []any{
 	(WASMModuleType)(0),          // 0: sf.substreams.internal.v2.WASMModuleType
 	(*ProcessRangeRequest)(nil),  // 1: sf.substreams.internal.v2.ProcessRangeRequest
@@ -912,29 +924,31 @@ var file_sf_substreams_intern_v2_service_proto_goTypes = []any{
 	(*Failed)(nil),               // 8: sf.substreams.internal.v2.Failed
 	(*BlockRange)(nil),           // 9: sf.substreams.internal.v2.BlockRange
 	nil,                          // 10: sf.substreams.internal.v2.ProcessRangeRequest.WasmExtensionConfigsEntry
-	(*v1.Modules)(nil),           // 11: sf.substreams.v1.Modules
-	(*anypb.Any)(nil),            // 12: google.protobuf.Any
-	(*v1.Clock)(nil),             // 13: sf.substreams.v1.Clock
+	nil,                          // 11: sf.substreams.internal.v2.ProcessRangeRequest.FoundationalStoreEndpointsEntry
+	(*v1.Modules)(nil),           // 12: sf.substreams.v1.Modules
+	(*anypb.Any)(nil),            // 13: google.protobuf.Any
+	(*v1.Clock)(nil),             // 14: sf.substreams.v1.Clock
 }
 var file_sf_substreams_intern_v2_service_proto_depIdxs = []int32{
-	11, // 0: sf.substreams.internal.v2.ProcessRangeRequest.modules:type_name -> sf.substreams.v1.Modules
+	12, // 0: sf.substreams.internal.v2.ProcessRangeRequest.modules:type_name -> sf.substreams.v1.Modules
 	10, // 1: sf.substreams.internal.v2.ProcessRangeRequest.wasm_extension_configs:type_name -> sf.substreams.internal.v2.ProcessRangeRequest.WasmExtensionConfigsEntry
-	8,  // 2: sf.substreams.internal.v2.ProcessRangeResponse.failed:type_name -> sf.substreams.internal.v2.Failed
-	7,  // 3: sf.substreams.internal.v2.ProcessRangeResponse.completed:type_name -> sf.substreams.internal.v2.Completed
-	4,  // 4: sf.substreams.internal.v2.ProcessRangeResponse.update:type_name -> sf.substreams.internal.v2.Update
-	3,  // 5: sf.substreams.internal.v2.ProcessRangeResponse.block_scoped_data:type_name -> sf.substreams.internal.v2.BlockScopedData
-	12, // 6: sf.substreams.internal.v2.BlockScopedData.output:type_name -> google.protobuf.Any
-	13, // 7: sf.substreams.internal.v2.BlockScopedData.clock:type_name -> sf.substreams.v1.Clock
-	5,  // 8: sf.substreams.internal.v2.Update.modules_stats:type_name -> sf.substreams.internal.v2.ModuleStats
-	6,  // 9: sf.substreams.internal.v2.ModuleStats.external_call_metrics:type_name -> sf.substreams.internal.v2.ExternalCallMetric
-	9,  // 10: sf.substreams.internal.v2.Completed.all_processed_ranges:type_name -> sf.substreams.internal.v2.BlockRange
-	1,  // 11: sf.substreams.internal.v2.Substreams.ProcessRange:input_type -> sf.substreams.internal.v2.ProcessRangeRequest
-	2,  // 12: sf.substreams.internal.v2.Substreams.ProcessRange:output_type -> sf.substreams.internal.v2.ProcessRangeResponse
-	12, // [12:13] is the sub-list for method output_type
-	11, // [11:12] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	11, // 2: sf.substreams.internal.v2.ProcessRangeRequest.foundational_store_endpoints:type_name -> sf.substreams.internal.v2.ProcessRangeRequest.FoundationalStoreEndpointsEntry
+	8,  // 3: sf.substreams.internal.v2.ProcessRangeResponse.failed:type_name -> sf.substreams.internal.v2.Failed
+	7,  // 4: sf.substreams.internal.v2.ProcessRangeResponse.completed:type_name -> sf.substreams.internal.v2.Completed
+	4,  // 5: sf.substreams.internal.v2.ProcessRangeResponse.update:type_name -> sf.substreams.internal.v2.Update
+	3,  // 6: sf.substreams.internal.v2.ProcessRangeResponse.block_scoped_data:type_name -> sf.substreams.internal.v2.BlockScopedData
+	13, // 7: sf.substreams.internal.v2.BlockScopedData.output:type_name -> google.protobuf.Any
+	14, // 8: sf.substreams.internal.v2.BlockScopedData.clock:type_name -> sf.substreams.v1.Clock
+	5,  // 9: sf.substreams.internal.v2.Update.modules_stats:type_name -> sf.substreams.internal.v2.ModuleStats
+	6,  // 10: sf.substreams.internal.v2.ModuleStats.external_call_metrics:type_name -> sf.substreams.internal.v2.ExternalCallMetric
+	9,  // 11: sf.substreams.internal.v2.Completed.all_processed_ranges:type_name -> sf.substreams.internal.v2.BlockRange
+	1,  // 12: sf.substreams.internal.v2.Substreams.ProcessRange:input_type -> sf.substreams.internal.v2.ProcessRangeRequest
+	2,  // 13: sf.substreams.internal.v2.Substreams.ProcessRange:output_type -> sf.substreams.internal.v2.ProcessRangeResponse
+	13, // [13:14] is the sub-list for method output_type
+	12, // [12:13] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_sf_substreams_intern_v2_service_proto_init() }
@@ -954,7 +968,7 @@ func file_sf_substreams_intern_v2_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_sf_substreams_intern_v2_service_proto_rawDesc), len(file_sf_substreams_intern_v2_service_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   10,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

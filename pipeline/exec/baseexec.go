@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/streamingfast/substreams/client/foundational"
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
@@ -27,13 +28,14 @@ type BaseExecutor struct {
 
 	instanceCacheEnabled bool
 	cachedInstance       wasm.Instance
+	foundationalStores   []*foundational.Store
 
 	// Results
 	logs          []string
 	logsTruncated bool
 }
 
-func NewBaseExecutor(ctx context.Context, moduleName, moduleHash string, initialBlock uint64, wasmModule wasm.Module, cacheEnabled bool, wasmArguments []wasm.Argument, blockIndex *index.BlockIndex, entrypoint string, tracer ttrace.Tracer) *BaseExecutor {
+func NewBaseExecutor(ctx context.Context, moduleName, moduleHash string, initialBlock uint64, wasmModule wasm.Module, cacheEnabled bool, wasmArguments []wasm.Argument, blockIndex *index.BlockIndex, entrypoint string, tracer ttrace.Tracer, foundationalStores []*foundational.Store) *BaseExecutor {
 	return &BaseExecutor{
 		ctx:                  ctx,
 		initialBlock:         initialBlock,
@@ -45,6 +47,7 @@ func NewBaseExecutor(ctx context.Context, moduleName, moduleHash string, initial
 		wasmArguments:        wasmArguments,
 		entrypoint:           entrypoint,
 		tracer:               tracer,
+		foundationalStores:   foundationalStores,
 	}
 }
 
@@ -119,7 +122,7 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canS
 
 	stats := reqctx.ReqStats(e.ctx)
 	//t0 := time.Now()
-	call = wasm.NewCall(clock, e.moduleName, e.entrypoint, stats, e.wasmArguments, canSkipEmptyOutput)
+	call = wasm.NewCall(clock, e.moduleName, e.entrypoint, stats, e.wasmArguments, canSkipEmptyOutput, e.foundationalStores)
 
 	ctx := e.ctx
 	if sharedCache.Cachable(clock.Number) {

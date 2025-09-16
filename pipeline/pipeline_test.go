@@ -104,6 +104,7 @@ func mapTestExecutor(t *testing.T, ctx context.Context, name string) *exec.Mappe
 			nil,
 			name,
 			otel.GetTracerProvider().Tracer("test"),
+			nil,
 		),
 		"",
 	)

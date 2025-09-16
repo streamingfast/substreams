@@ -81,6 +81,7 @@ type Tier1Service struct {
 	activeRequestsSoftLimit int
 	activeRequestsHardLimit int
 	tier2RequestParameters  reqctx.Tier2RequestParameters
+	foundationalEndpoints   map[string]string
 	sessionPool             dsession.SessionPool
 }
 
@@ -145,6 +146,7 @@ func NewTier1(
 	activeRequestsHardLimit int,
 	sharedCacheSize uint64,
 	sessionPool dsession.SessionPool,
+	foundationalEndpoints map[string]string,
 	opts ...Option,
 ) (*Tier1Service, error) {
 
@@ -197,6 +199,7 @@ func NewTier1(
 		enforceCompression:      enforceCompression,
 		activeRequestsSoftLimit: activeRequestsSoftLimit,
 		activeRequestsHardLimit: activeRequestsHardLimit,
+		foundationalEndpoints:   foundationalEndpoints,
 		sessionPool:             sessionPool,
 	}
 	s.OnTerminating(func(_ error) {
@@ -673,6 +676,7 @@ func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelC
 		func() bool {
 			return s.IsTerminating() // pipeline starts draining when the service is actually terminating, (after the global shutdown-signal-delay)
 		},
+		s.foundationalEndpoints,
 		opts...,
 	)
 

@@ -213,7 +213,7 @@ func NewFromViper(
 		return nil, fmt.Errorf("creating sinker config from viper: %w", err)
 	}
 
-	return New(config), nil
+	return New(config)
 }
 
 // ConfigFromViper creates a SinkerConfig from the provided Viper configuration.

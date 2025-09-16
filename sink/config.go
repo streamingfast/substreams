@@ -15,9 +15,10 @@ import (
 // SinkerConfig contains all configuration needed to create and run a Sinker.
 type SinkerConfig struct {
 	// Substreams package configuration
-	Pkg              *pbsubstreams.Package
-	OutputModule     *pbsubstreams.Module
-	OutputModuleHash manifest.ModuleHash
+	Pkg                              *pbsubstreams.Package
+	OutputModule                     *pbsubstreams.Module
+	OutputModuleHash                 manifest.ModuleHash
+	SupportIndexOutputProductionMode bool
 
 	// Client configuration
 	ClientConfig *client.SubstreamsClientConfig

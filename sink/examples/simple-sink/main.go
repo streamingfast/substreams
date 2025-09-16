@@ -101,7 +101,10 @@ func (s *SimpleSink) Run(ctx context.Context, initialCursor *sink.Cursor) error 
 	s.decoder = decoder
 
 	// run the actual sinker that will call our Handle methods
-	sinker := sink.New(s.sinkerConfig)
+	sinker, err := sink.New(s.sinkerConfig)
+	if err != nil {
+		return fmt.Errorf("creating sink: %w", err)
+	}
 	sinker.Run(
 		ctx,
 		initialCursor,

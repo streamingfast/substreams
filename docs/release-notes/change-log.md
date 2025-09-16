@@ -11,8 +11,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Server and Client
+
 * Added support to foundational-store for wasmtime and wazero.
 * Added foundational-store grpc client to substreams engine.
+
+### CLI
+
+* Fixed the progress logs and prometheus metrics from `substreams sink noop` when running with an output_module of type "index" in production mode (other sinks will now refuse to run in this mode)
+* Removed 'progress_last_contiguous_block' from sink logs, as it was often misleading. Getting a correct value in all cases would require doing a slow lookup on all cached files, which is not desirable.
 
 ## v1.16.5
 

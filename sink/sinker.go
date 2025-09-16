@@ -55,7 +55,7 @@ type Sinker struct {
 // SinkerConfig struct, making it easier to manage and test.
 func New(
 	config *SinkerConfig,
-) *Sinker {
+) (*Sinker, error) {
 
 	s := &Sinker{
 		Shutter:      shutter.New(),
@@ -88,7 +88,19 @@ func New(
 		zap.Bool("liveness_checker", s.LivenessChecker != nil),
 	)
 
-	return s
+	if s.Mode == SubstreamsModeProduction {
+		switch s.OutputModule.Kind.(type) {
+		case *pbsubstreams.Module_KindBlockIndex_:
+			if config.SupportIndexOutputProductionMode {
+				config.Logger.Warn("running sink on an *index module* in *production mode*: until it catches up to LIVE, this sink will display `last_block`'s correct ID in the logs and prometheus metrics for `head_block_drift` will be incorrect")
+				s.stats.SetIndexOutputProductionMode()
+			} else {
+				return nil, errors.New("this sink cannot run in production mode with 'index' module as an output")
+			}
+		}
+	}
+
+	return s, nil
 }
 
 type substramsClientStringer client.SubstreamsClientConfig

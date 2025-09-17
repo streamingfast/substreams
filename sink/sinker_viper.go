@@ -99,7 +99,7 @@ func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagIgnored) {
 	flagIncluded := func(x string) bool { return every(ignore, func(e FlagIgnored) bool { return !e.IsIgnored(x) }) }
 
 	if flagIncluded(FlagEndpoint) {
-		flags.StringP(FlagEndpoint, ShortFlagEndoint, "", "Substreams gRPC endpoint. If empty, will be replaced by the SUBSTREAMS_ENDPOINT_{network_name} environment variable, where `network_name` is determined from the substreams manifest. Some network names have default endpoints.")
+		flags.StringP(FlagEndpoint, ShortFlagEndoint, "", "Substreams gRPC endpoint (supports http:// or https:// prefix). If empty, will be replaced by the SUBSTREAMS_ENDPOINT_{network_name} environment variable, where `network_name` is determined from the substreams manifest. Defaults to SSL unless prefixed with `http://` or if `--plaintext` flag is used.")
 	}
 
 	if flagIncluded(FlagStartBlock) {
@@ -127,7 +127,7 @@ func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagIgnored) {
 	}
 
 	if flagIncluded(FlagPlaintext) {
-		flags.Bool(FlagPlaintext, false, "Establish GRPC connection in plaintext")
+		flags.Bool(FlagPlaintext, false, "Use plaintext connection as default for endpoints without an http:// or https:// prefix")
 	}
 
 	if flagIncluded(FlagUndoBufferSize) {

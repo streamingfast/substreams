@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### CLI
 
+* Added support for `http://` and `https://` prefixes in the `--endpoint` flag. Setting the protocol (http/https) in the URL will ignore the `--plaintext` flag setting. The default (no prefix) is still SSL. The enforcing of `--plaintext` and `--insecure` has been relaxed: plaintext+insecure is simply plaintext.
 * Fixed the progress logs and prometheus metrics from `substreams sink noop` when running with an output_module of type "index" in production mode (other sinks will now refuse to run in this mode)
 * Removed 'progress_last_contiguous_block' from sink logs, as it was often misleading. Getting a correct value in all cases would require doing a slow lookup on all cached files, which is not desirable.
 

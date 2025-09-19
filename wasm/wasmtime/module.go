@@ -12,9 +12,10 @@ import (
 )
 
 type Module struct {
-	module   *wasmtime.Module
-	engine   *wasmtime.Engine
-	registry *wasm.Registry
+	module            *wasmtime.Module
+	engine            *wasmtime.Engine
+	registry          *wasm.Registry
+	runtimeExtensions wasm.RuntimeExtensions
 }
 
 func init() {
@@ -29,6 +30,15 @@ func newModule(ctx context.Context, wasmCode []byte, wasmCodeType string, regist
 
 	engine := wasmtime.NewEngineWithConfig(cfg)
 
+	wasmCodeTypeID, runtimeExtensions, err := wasm.ParseWASMCodeType(wasmCodeType)
+	if err != nil {
+		return nil, fmt.Errorf("invalid wasm code type %q: %w", wasmCodeType, err)
+	}
+
+	// For now, we only support the basic wasmCodeTypeID without specific handling
+	// TODO: Add support for different wasmCodeTypeID variants if needed
+	_ = wasmCodeTypeID
+
 	module, err := wasmtime.NewModule(engine, wasmCode)
 	if err != nil {
 		return nil, fmt.Errorf("creating new module: %w", err)
@@ -38,9 +48,10 @@ func newModule(ctx context.Context, wasmCode []byte, wasmCodeType string, regist
 	// instantiation time.
 
 	return &Module{
-		module:   module,
-		engine:   engine,
-		registry: registry,
+		module:            module,
+		engine:            engine,
+		registry:          registry,
+		runtimeExtensions: runtimeExtensions,
 	}, nil
 }
 
@@ -155,6 +166,14 @@ func (m *Module) newInstance(ctx context.Context) (*instance, error) {
 			}
 		}
 	}
+
+	// Handle wasm-bindgen-shims if enabled
+	if m.runtimeExtensions.Has(wasm.RuntimeExtensionIDWASMBindgenShims) {
+		if err := m.addWASMBindgenShims(ctx, linker); err != nil {
+			return nil, fmt.Errorf("adding wasm-bindgen shims: %w", err)
+		}
+	}
+
 	instance, err := i.wasmLinker.Instantiate(i.wasmStore, i.wasmModule)
 	if err != nil {
 		return nil, fmt.Errorf("creating new instance: %w", err)
@@ -170,4 +189,56 @@ func (m *Module) newInstance(ctx context.Context) (*instance, error) {
 	i.Heap = heap
 	i.wasmInstance = instance
 	return i, nil
+}
+
+// addWASMBindgenShims adds shim functions for wasm-bindgen modules
+func (m *Module) addWASMBindgenShims(ctx context.Context, linker *wasmtime.Linker) error {
+	// Register shim functions for known wasm-bindgen modules
+	for moduleName := range wasm.WASMBindgenModules {
+		if err := m.addShimModule(linker, moduleName); err != nil {
+			return fmt.Errorf("adding shim module %q: %w", moduleName, err)
+		}
+	}
+	return nil
+}
+
+// addShimModule adds a shim module with dummy functions that panic when called
+func (m *Module) addShimModule(linker *wasmtime.Linker, moduleName string) error {
+	// For now, we'll add some common wasm-bindgen functions that are typically imported
+	// This is a simplified approach - in a more complete implementation, we would
+	// inspect the module's imports to determine exactly what functions are needed
+	
+	commonBindgenFunctions := []string{
+		"__wbindgen_object_drop_ref",
+		"__wbindgen_string_new",
+		"__wbindgen_throw",
+		"__wbg_new_abda76e883ba8a5f",
+		"__wbg_stack_658279fe44541cf6",
+		"__wbg_error_f851667af71bcfc6",
+		"__wbindgen_object_clone_ref",
+		"__wbindgen_cb_drop",
+		"__wbindgen_add_to_stack_pointer",
+		"__wbindgen_free",
+		"__wbindgen_malloc",
+		"__wbindgen_realloc",
+	}
+
+	for _, funcName := range commonBindgenFunctions {
+		// Create a shim function that panics with an appropriate error message
+		shimFunc := func(funcName, moduleName string) interface{} {
+			return func() {
+				panic(fmt.Errorf("you are trying to call %q from module %q for which Substreams provided a dummy"+
+					" implementation, you are allowed to have it referenced but it's forbidden to call it since"+
+					" we cannot provide a real implementation for it", funcName, moduleName))
+			}
+		}(funcName, moduleName)
+
+		if err := linker.FuncWrap(moduleName, funcName, shimFunc); err != nil {
+			// Ignore errors for functions that don't match the expected signature
+			// This is expected since we're registering common functions that may not all be needed
+			continue
+		}
+	}
+
+	return nil
 }

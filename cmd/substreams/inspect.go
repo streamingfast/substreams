@@ -15,8 +15,8 @@ import (
 )
 
 var inspectCmd = &cobra.Command{
-	Use:          "inspect <package>",
-	Short:        "Display low-level package structure",
+	Use:   "inspect <package>",
+	Short: "Display low-level package structure",
 	Long: cli.Dedent(`
 		Display low-level package structure for debugging purposes. You can specify a local yaml configuration file,
 		local .spkg package file, or remote .spkg package URL. You can use "-" to read the manifest from standard input.

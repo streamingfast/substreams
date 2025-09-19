@@ -56,7 +56,6 @@ func runInfo(cmd *cobra.Command, args []string) error {
 		outputModule = args[1]
 	}
 
-
 	outputSinkconfigFilesPath := sflags.MustGetString(cmd, "output-sinkconfig-files-path")
 	skipPackageValidation := sflags.MustGetBool(cmd, "skip-package-validation")
 	onlyShowUsedModules := sflags.MustGetBool(cmd, "used-modules-only")

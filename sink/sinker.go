@@ -371,7 +371,13 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 		devOutputModules = nil // ask the server to send everything
 	}
 
+	params, err := pbsubstreamsrpcv3.ParamsToMap(s.Params)
+	if err != nil {
+		return nil, err
+	}
+
 	for {
+
 		s.request = &pbsubstreamsrpcv3.Request{
 			StartBlockNum:        startBlock,
 			StopBlockNum:         stopBlock,
@@ -383,6 +389,8 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 			NoopMode:             s.NoopMode,
 			DevOutputModules:     devOutputModules,
 			LimitProcessedBlocks: s.LimitProcessedBlocks,
+			Params:               params,
+			Network:              s.Network,
 		}
 
 		s.Logger.Info("sending request", zap.String("start_block", fmt.Sprintf("%d", startBlock)), zap.String("stop_block", fmt.Sprintf("%d", stopBlock)), zap.String("cursor", activeCursor.String()))
@@ -474,8 +482,13 @@ func (s *Sinker) doRequest(
 	var stream grpc.ServerStreamingClient[pbsubstreamsrpc.Response]
 	var err error
 
+	reqV2, err := req.ToV2()
+	if err != nil {
+		return activeCursor, receivedMessage, fmt.Errorf("failed to convert request to v2: %w", err)
+	}
+
 	if runV2 {
-		stream, err = ssClientV2.Blocks(ctx, req.ToV2(), callOpts...)
+		stream, err = ssClientV2.Blocks(ctx, reqV2, callOpts...)
 		if err != nil {
 			return activeCursor, receivedMessage, retryable(fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err))
 		}
@@ -514,7 +527,11 @@ func (s *Sinker) doRequest(
 						// fallback to use v2 if the server does not support v3
 						s.Logger.Info("server does not implement sf.substreams.rpc.v3.Stream/Blocks, trying v2")
 						runV2 = true
-						stream, err = ssClientV2.Blocks(ctx, req.ToV2(), callOpts...)
+						reqV2, err := req.ToV2()
+						if err != nil {
+							return activeCursor, receivedMessage, fmt.Errorf("failed to convert request to v2: %w", err)
+						}
+						stream, err = ssClientV2.Blocks(ctx, reqV2, callOpts...)
 						if err != nil {
 							return activeCursor, receivedMessage, retryable(fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err))
 						}

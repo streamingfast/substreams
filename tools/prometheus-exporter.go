@@ -308,7 +308,15 @@ func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.Subs
 
 		var cli grpc.ServerStreamingClient[pbsubstreamsrpc.Response]
 		if substreamsClientConfig.ForceV2() {
-			cli, err = ssClientV2.Blocks(ctx, subReq.ToV2(), callOpts...)
+			reqV2, err := subReq.ToV2()
+			if err != nil {
+				zlog.Error("call sf.substreams.rpc.v2.Stream/Blocks", zap.String("endpoint", endpoint), zap.Error(err))
+				markFailure(endpoint, begin, err)
+				connClose()
+				cancel()
+				continue
+			}
+			cli, err = ssClientV2.Blocks(ctx, reqV2, callOpts...)
 			if err != nil {
 				zlog.Error("call sf.substreams.rpc.v2.Stream/Blocks", zap.String("endpoint", endpoint), zap.Error(err))
 				markFailure(endpoint, begin, err)

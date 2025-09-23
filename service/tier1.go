@@ -278,8 +278,12 @@ func (s *Tier1Service) BlocksV3(
 	}
 
 	ctx = reqctx.WithSpkg(ctx, r.Package) // passing by context is simpler for now, this could be cleaned up
+	reqV2, err := r.ToV2()
+	if err != nil {
+		return fmt.Errorf("failed to convert request to v2: %w", err)
+	}
 
-	return s.BlocksAny(ctx, r.ToV2(), req.Header(), pbsubstreamsrpcv3.Stream_Blocks_FullMethodName, r.Package, stream)
+	return s.BlocksAny(ctx, reqV2, req.Header(), pbsubstreamsrpcv3.Stream_Blocks_FullMethodName, r.Package, stream)
 }
 
 func (s *Tier1Service) Blocks(

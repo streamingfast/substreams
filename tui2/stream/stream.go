@@ -165,7 +165,11 @@ func (s *Stream) StartStream() tea.Msg {
 	s.cancelContext = cancel
 
 	if s.forceV2 {
-		cli, err := s.clientV2.Blocks(streamCtx, s.req.ToV2(), s.callOpts...)
+		v2Req, err := s.req.ToV2()
+		if err != nil {
+			return StreamErrorMsg(fmt.Errorf("failed to convert request to v2: %w", err))
+		}
+		cli, err := s.clientV2.Blocks(streamCtx, v2Req, s.callOpts...)
 		if err != nil && streamCtx.Err() != context.Canceled {
 			return StreamErrorMsg(fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err))
 		}
@@ -174,7 +178,7 @@ func (s *Stream) StartStream() tea.Msg {
 	} else {
 		cli, err := s.clientV3.Blocks(streamCtx, s.req, s.callOpts...)
 		if err != nil && streamCtx.Err() != context.Canceled {
-			return StreamErrorMsg(fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err))
+			return StreamErrorMsg(fmt.Errorf("call sf.substreams.rpc.v3.Stream/Blocks: %w", err))
 		}
 		s.conn = cli
 	}

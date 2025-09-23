@@ -21,8 +21,7 @@ import (
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metrics"
-	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcconnect"
-	ssconnect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcconnect"
+	ssconnect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcv2connect"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service"
 	"github.com/streamingfast/substreams/wasm"
@@ -347,7 +346,7 @@ func (config *Tier1Config) Validate() error {
 	return nil
 }
 
-var _ pbsubstreamsrpcconnect.EndpointInfoHandler = (*InfoServerWrapper)(nil)
+var _ ssconnect.EndpointInfoHandler = (*InfoServerWrapper)(nil)
 
 type InfoServerWrapper struct {
 	rpcInfoServer InfoServer

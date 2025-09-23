@@ -9,7 +9,7 @@ import "sf/substreams/v1/clock.proto";
 import "sf/substreams/v1/modules.proto";
 import "sf/substreams/v1/package.proto";
 
-option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3;pbsubstreamsrpc";
+option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3;pbsubstreamsrpcv3";
 
 service Stream {
   rpc Blocks(Request) returns (stream sf.substreams.rpc.v2.Response); // v3 request still sends v2 response

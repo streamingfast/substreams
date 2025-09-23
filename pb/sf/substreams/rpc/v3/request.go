@@ -1,4 +1,4 @@
-package pbsubstreamsrpc
+package pbsubstreamsrpcv3
 
 import (
 	"fmt"

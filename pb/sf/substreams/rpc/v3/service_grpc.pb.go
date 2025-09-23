@@ -4,7 +4,7 @@
 // - protoc             (unknown)
 // source: sf/substreams/rpc/v3/service.proto
 
-package pbsubstreamsrpc
+package pbsubstreamsrpcv3
 
 import (
 	context "context"

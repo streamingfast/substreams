@@ -903,7 +903,7 @@ func (p *Pipeline) renderWasmInputs(module *pbsubstreams.Module) (out []wasm.Arg
 
 				client, closeFn, err := foundational.New(endpoint, logging.Logger(p.ctx, zap.NewNop()))
 				if err != nil {
-					return nil, fmt.Errorf("failed to connect remotely to foundational store (unkown identifier %q): %w", identifier, err)
+					return nil, fmt.Errorf("failed to connect remotely to foundational store with identifier %q, it's either not supported by this specific operator or you have a typo in your identifier: %w", identifier, err)
 				}
 
 				clients = []*foundational.Store{client}

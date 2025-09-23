@@ -2,6 +2,8 @@ module github.com/streamingfast/substreams
 
 go 1.24.2
 
+toolchain go1.24.7
+
 require (
 	github.com/golang/protobuf v1.5.4
 	github.com/jhump/protoreflect v1.14.0
@@ -34,7 +36,7 @@ require (
 	github.com/alecthomas/participle v0.7.1
 	github.com/bmatcuk/doublestar/v4 v4.6.1
 	github.com/bobg/go-generics/v2 v2.1.1
-	github.com/bytecodealliance/wasmtime-go/v30 v30.0.0
+	github.com/bytecodealliance/wasmtime-go/v36 v36.0.0
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/charmbracelet/bubbles v0.20.0
 	github.com/charmbracelet/bubbletea v1.1.0

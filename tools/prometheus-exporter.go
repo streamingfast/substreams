@@ -23,6 +23,7 @@ import (
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
@@ -50,6 +51,7 @@ func init() {
 	prometheusCmd.Flags().String("substreams-api-key-envvar", "SUBSTREAMS_API_KEY", "Name of variable containing Substreams Api Key")
 	prometheusCmd.Flags().BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
 	prometheusCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
+	prometheusCmd.Flags().Bool("force-v2", false, "Force using V2 API")
 	prometheusCmd.Flags().Int64("block-height", -1, "Block number to request (defaults to -1, which means the HEAD)")
 	prometheusCmd.Flags().Duration("max-freshness", time.Minute*2, "(only used if block-height is relative, i.e. below 0) check the age of the received blocks, fail an endpoint if it is older than this duration")
 	prometheusCmd.Flags().Duration("interval", time.Second*20, "endpoints will be polled at this interval")
@@ -170,6 +172,7 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 	plaintext := sflags.MustGetBool(cmd, "plaintext")
 	interval := sflags.MustGetDuration(cmd, "interval")
 	timeout := sflags.MustGetDuration(cmd, "timeout")
+	forceV2 := sflags.MustGetBool(cmd, "force-v2")
 	maxFreshness := sflags.MustGetDuration(cmd, "max-freshness")
 
 	allLabels := map[string]bool{"endpoint": true}
@@ -210,13 +213,14 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 			insecure,
 			plaintext,
 			"substreams_prometheus",
+			forceV2,
 		)
 		var fresh *time.Duration
 		if startBlock < 0 {
 			fresh = &maxFreshness
 		}
 
-		go launchSubstreamsPoller(endpoint, substreamsClientConfig, pkgBundle.Package.Modules, outputStreamName, startBlock, interval, timeout, fresh)
+		go launchSubstreamsPoller(endpoint, substreamsClientConfig, pkgBundle.Package, outputStreamName, startBlock, interval, timeout, fresh)
 	}
 
 	promReg := prometheus.NewRegistry()
@@ -260,7 +264,7 @@ func markFailure(endpoint string, begin time.Time, err error) {
 	requestDurationMs.With(endpointMap[endpoint].labels).Set(float64(time.Since(begin).Milliseconds()))
 }
 
-func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.SubstreamsClientConfig, modules *pbsubstreams.Modules, outputStreamName string, blockNum int64, pollingInterval, pollingTimeout time.Duration, maxFreshness *time.Duration) {
+func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.SubstreamsClientConfig, pkg *pbsubstreams.Package, outputStreamName string, blockNum int64, pollingInterval, pollingTimeout time.Duration, maxFreshness *time.Duration) {
 
 	sleep := time.Duration(0)
 	for {
@@ -269,7 +273,7 @@ func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.Subs
 
 		ctx, cancel := context.WithTimeout(context.Background(), pollingTimeout)
 		begin := time.Now()
-		ssClient, connClose, callOpts, headers, err := client.NewSubstreamsClient(substreamsClientConfig)
+		ssClientV2, ssClientV3, connClose, callOpts, headers, err := client.NewSubstreamsClients(substreamsClientConfig)
 		if err != nil {
 			zlog.Error("substreams client setup", zap.Error(err))
 			markFailure(endpoint, begin, err)
@@ -285,10 +289,10 @@ func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.Subs
 		if blockNum > 0 {
 			stopBlockNum = uint64(blockNum + 1)
 		}
-		subReq := &pbsubstreamsrpc.Request{
+		subReq := &pbsubstreamsrpcv3.Request{
 			StartBlockNum: blockNum,
 			StopBlockNum:  stopBlockNum,
-			Modules:       modules,
+			Package:       pkg,
 			OutputModule:  outputStreamName,
 		}
 
@@ -301,7 +305,19 @@ func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.Subs
 		}
 		callOpts = append(callOpts, grpc.WaitForReady(false))
 		zlog.Debug("calling sf.substreams.rpc.v2.Stream/Blocks", zap.String("endpoint", endpoint), zap.String("output_module", outputStreamName), zap.Int64("start_block", blockNum), zap.Uint64("stop_block", stopBlockNum))
-		cli, err := ssClient.Blocks(ctx, subReq, callOpts...)
+
+		var cli grpc.ServerStreamingClient[pbsubstreamsrpc.Response]
+		if substreamsClientConfig.ForceV2() {
+			cli, err = ssClientV2.Blocks(ctx, subReq.ToV2(), callOpts...)
+			if err != nil {
+				zlog.Error("call sf.substreams.rpc.v2.Stream/Blocks", zap.String("endpoint", endpoint), zap.Error(err))
+				markFailure(endpoint, begin, err)
+				connClose()
+				cancel()
+				continue
+			}
+		}
+		cli, err = ssClientV3.Blocks(ctx, subReq, callOpts...)
 		if err != nil {
 			zlog.Error("call sf.substreams.rpc.v2.Stream/Blocks", zap.String("endpoint", endpoint), zap.Error(err))
 			markFailure(endpoint, begin, err)

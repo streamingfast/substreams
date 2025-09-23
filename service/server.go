@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"strings"
@@ -13,7 +14,10 @@ import (
 	connectweb "github.com/streamingfast/dgrpc/server/connectrpc"
 	"github.com/streamingfast/dgrpc/server/factory"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	ssconnect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcconnect"
+	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
+	ssconnectv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3/pbsubstreamsrpcconnect"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
@@ -37,6 +41,12 @@ func GetCommonServerOptions(listenAddr string, logger *zap.Logger, healthcheck d
 	return options
 }
 
+type streamHandlerV3 func(ctx context.Context, req *connect_go.Request[pbsubstreamsrpcv3.Request], stream *connect_go.ServerStream[pbsubstreamsrpc.Response]) error
+
+func (h streamHandlerV3) Blocks(ctx context.Context, req *connect_go.Request[pbsubstreamsrpcv3.Request], stream *connect_go.ServerStream[pbsubstreamsrpc.Response]) error {
+	return h(ctx, req, stream)
+}
+
 func ListenTier1(
 	listenAddr string,
 	svc *Tier1Service,
@@ -55,11 +65,18 @@ func ListenTier1(
 		options = append(options, dgrpcserver.WithConnectInterceptor(dauthconnect.NewAuthInterceptor(auth, logger)))
 		options = append(options, dgrpcserver.WithConnectStrictContentType(false))
 		options = append(options, dgrpcserver.WithConnectReflection(ssconnect.StreamName))
+		options = append(options, dgrpcserver.WithConnectReflection(ssconnectv3.StreamName))
 
 		streamHandlerGetter := func(opts ...connect_go.HandlerOption) (string, http.Handler) {
 			return ssconnect.NewStreamHandler(svc, opts...)
 		}
-		handlerGetters := []connectweb.HandlerGetter{streamHandlerGetter}
+
+		streamHandlerGetterV3 := func(opts ...connect_go.HandlerOption) (string, http.Handler) {
+			handler := streamHandlerV3(svc.BlocksV3)
+			return ssconnectv3.NewStreamHandler(handler, opts...)
+		}
+
+		handlerGetters := []connectweb.HandlerGetter{streamHandlerGetter, streamHandlerGetterV3}
 
 		if infoService != nil {
 			infoHandlerGetter := func(opts ...connect_go.HandlerOption) (string, http.Handler) {

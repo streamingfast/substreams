@@ -207,6 +207,7 @@ func (a *Tier1App) Run() error {
 		a.config.SubrequestsInsecure,
 		a.config.SubrequestsPlaintext,
 		"substreams_tier1",
+		false, // unused for tier2 requests
 	)
 	var opts []service.Option
 	if a.config.WASMExtensions != nil {

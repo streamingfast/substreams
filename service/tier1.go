@@ -37,6 +37,7 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	ssconnect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcconnect"
+	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/pipeline/cache"
@@ -264,9 +265,37 @@ func NewTier1(
 	return s, nil
 }
 
+func (s *Tier1Service) BlocksV3(
+	ctx context.Context,
+	req *connect.Request[pbsubstreamsrpcv3.Request],
+	stream *connect.ServerStream[pbsubstreamsrpc.Response],
+) error {
+	r := req.Msg
+
+	_, err := manifest.ApplyPackageTransformations(r.Package, false, r.Network, r.OutputModule, r.Params)
+	if err != nil {
+		return err
+	}
+
+	ctx = reqctx.WithSpkg(ctx, r.Package) // passing by context is simpler for now, this could be cleaned up
+
+	return s.BlocksAny(ctx, r.ToV2(), req.Header(), pbsubstreamsrpcv3.Stream_Blocks_FullMethodName, r.Package, stream)
+}
+
 func (s *Tier1Service) Blocks(
 	ctx context.Context,
 	req *connect.Request[pbsubstreamsrpc.Request],
+	stream *connect.ServerStream[pbsubstreamsrpc.Response],
+) (serverErr error) {
+	return s.BlocksAny(ctx, req.Msg, req.Header(), pbsubstreamsrpc.Stream_Blocks_FullMethodName, nil, stream)
+}
+
+func (s *Tier1Service) BlocksAny(
+	ctx context.Context,
+	request *pbsubstreamsrpc.Request,
+	header http.Header,
+	protocol string,
+	pkg *pbsubstreams.Package,
 	stream *connect.ServerStream[pbsubstreamsrpc.Response],
 ) (serverErr error) {
 
@@ -297,13 +326,13 @@ func (s *Tier1Service) Blocks(
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier1/request")
 	defer span.EndWithErr(&err)
 
-	request := req.Msg
 	var compressed bool
-	if matchHeader(req.Header()) {
+	if matchHeader(header) {
 		compressed = true
 	}
 
 	fields := []zap.Field{
+		zap.String("protocol", protocol),
 		zap.Int64("start_block", request.StartBlockNum),
 		zap.Uint64("stop_block", request.StopBlockNum),
 		zap.String("cursor", request.StartCursor),
@@ -397,7 +426,6 @@ func (s *Tier1Service) Blocks(
 		zap.Bool("with_blockfilter", hasFilter),
 		zap.Int("module_count", len(usedModules)),
 	)
-
 	// We need to ensure that the response function is NEVER used after this Blocks handler has returned.
 	// We use a context that will be canceled on defer, and a lock to prevent races. The respFunc is used in various threads
 	mut := sync.Mutex{}
@@ -444,8 +472,8 @@ func (s *Tier1Service) Blocks(
 
 	runningContext = reqctx.WithCancelFunc(runningContext, cancelRunning) // we pass this down so that the 'workerPool/requestPool' can cancel the running context
 
-	respFunc := tier1ResponseHandler(respContext, &mut, logger, stream, request.NoopMode, reqStats, req.Msg.DevOutputModules)
-	err = s.blocks(runningContext, cancelRunning, request, req.Header(), execGraph, respFunc, reqStats, fields)
+	respFunc := tier1ResponseHandler(respContext, &mut, logger, stream, request.NoopMode, reqStats, request.DevOutputModules)
+	err = s.blocks(runningContext, cancelRunning, request, header, execGraph, respFunc, reqStats, fields)
 
 	if connectError := toConnectError(runningContext, err); connectError != nil {
 		switch connect.CodeOf(connectError) {
@@ -472,6 +500,10 @@ func (s *Tier1Service) writePackage(ctx context.Context, request *pbsubstreamsrp
 		ModuleMeta: []*pbsubstreams.ModuleMetadata{},
 	}
 
+	if pkg := reqctx.Spkg(ctx); pkg != nil {
+		asPackage = pkg
+	}
+
 	cnt, err := proto.Marshal(asPackage)
 	if err != nil {
 		return fmt.Errorf("marshalling package: %w", err)
@@ -481,6 +513,7 @@ func (s *Tier1Service) writePackage(ctx context.Context, request *pbsubstreamsrp
 	if err != nil {
 		return fmt.Errorf("getting substore: %w", err)
 	}
+
 	exists, err := moduleStore.FileExists(ctx, "substreams.partial.spkg")
 	if err != nil {
 		return fmt.Errorf("error checking fileExists: %w", err)

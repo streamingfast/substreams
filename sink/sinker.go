@@ -22,6 +22,7 @@ import (
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -46,7 +47,7 @@ type Sinker struct {
 
 	// State fields that are modified during operation
 	buffer                  *blockDataBuffer
-	request                 *pbsubstreamsrpc.Request
+	request                 *pbsubstreamsrpcv3.Request
 	stats                   *Stats
 	requestActiveStartBlock uint64
 }
@@ -188,7 +189,7 @@ func (s *Sinker) BytesRepresentation() BytesRepresentation {
 	return InferBytesRepresentation(network, endpoint)
 }
 
-func (s *Sinker) Request() *pbsubstreamsrpc.Request {
+func (s *Sinker) Request() *pbsubstreamsrpcv3.Request {
 	return s.request
 }
 
@@ -316,7 +317,7 @@ func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler) (activeCursor *Cursor, err error) {
 	activeCursor = cursor
 
-	ssClient, connClose, callOpts, headers, err := client.NewSubstreamsClient(s.SinkerConfig.ClientConfig)
+	ssClientV2, ssClientV3, connClose, callOpts, headers, err := client.NewSubstreamsClients(s.SinkerConfig.ClientConfig)
 
 	if err != nil {
 		return activeCursor, fmt.Errorf("new substreams client: %w", err)
@@ -371,12 +372,12 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 	}
 
 	for {
-		s.request = &pbsubstreamsrpc.Request{
+		s.request = &pbsubstreamsrpcv3.Request{
 			StartBlockNum:        startBlock,
 			StopBlockNum:         stopBlock,
 			StartCursor:          activeCursor.String(),
 			FinalBlocksOnly:      s.FinalBlocksOnly,
-			Modules:              s.Pkg.Modules,
+			Package:              s.Pkg,
 			OutputModule:         s.SinkerConfig.OutputModule.Name,
 			ProductionMode:       s.Mode == SubstreamsModeProduction,
 			NoopMode:             s.NoopMode,
@@ -393,7 +394,7 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 		}
 
 		var receivedMessage bool
-		activeCursor, receivedMessage, err = s.doRequest(streamCtx, activeCursor, s.request, ssClient, callOpts, handler)
+		activeCursor, receivedMessage, err = s.doRequest(streamCtx, activeCursor, s.request, s.ClientConfig().ForceV2(), ssClientV2, ssClientV3, callOpts, handler)
 
 		// If we received at least one message, we must reset the backoff
 		if receivedMessage {
@@ -456,8 +457,10 @@ func (s *Sinker) adjustedEndBlock() (endBlock uint64) {
 func (s *Sinker) doRequest(
 	ctx context.Context,
 	activeCursor *Cursor,
-	req *pbsubstreamsrpc.Request,
-	ssClient pbsubstreamsrpc.StreamClient,
+	req *pbsubstreamsrpcv3.Request,
+	runV2 bool,
+	ssClientV2 pbsubstreamsrpc.StreamClient,
+	ssClientV3 pbsubstreamsrpcv3.StreamClient,
 	callOpts []grpc.CallOption,
 	handler SinkerHandler,
 ) (
@@ -468,9 +471,19 @@ func (s *Sinker) doRequest(
 	s.Logger.Debug("launching substreams request", zap.Int64("start_block", req.StartBlockNum), zap.Stringer("cursor", activeCursor))
 	receivedMessage := false
 
-	stream, err := ssClient.Blocks(ctx, req, callOpts...)
-	if err != nil {
-		return activeCursor, receivedMessage, retryable(fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err))
+	var stream grpc.ServerStreamingClient[pbsubstreamsrpc.Response]
+	var err error
+
+	if runV2 {
+		stream, err = ssClientV2.Blocks(ctx, req.ToV2(), callOpts...)
+		if err != nil {
+			return activeCursor, receivedMessage, retryable(fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err))
+		}
+	} else {
+		stream, err = ssClientV3.Blocks(ctx, req, callOpts...)
+		if err != nil {
+			return activeCursor, receivedMessage, retryable(fmt.Errorf("call sf.substreams.rpc.v3.Stream/Blocks: %w", err))
+		}
 	}
 	var prevBlockTime time.Time
 	var afterReceive time.Time
@@ -496,6 +509,18 @@ func (s *Sinker) doRequest(
 
 			if dgrpcError := dgrpc.AsGRPCError(err); dgrpcError != nil {
 				switch dgrpcError.Code() {
+				case codes.Unimplemented, codes.NotFound:
+					if !runV2 {
+						// fallback to use v2 if the server does not support v3
+						s.Logger.Info("server does not implement sf.substreams.rpc.v3.Stream/Blocks, trying v2")
+						runV2 = true
+						stream, err = ssClientV2.Blocks(ctx, req.ToV2(), callOpts...)
+						if err != nil {
+							return activeCursor, receivedMessage, retryable(fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err))
+						}
+						continue
+					}
+
 				case codes.Unauthenticated, codes.PermissionDenied:
 					return activeCursor, receivedMessage, fmt.Errorf("stream auth failure: %w", err)
 

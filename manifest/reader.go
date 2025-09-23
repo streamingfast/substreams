@@ -129,8 +129,24 @@ func (r *Reader) Read() (*PackageBundle, error) {
 		return nil, err
 	}
 
-	if !r.validation.SkipPackageValidation {
-		if err := validatePackage(pkg, r.validation); err != nil {
+	graph, err := ApplyPackageTransformations(pkg, r.validation.SkipPackageValidation, r.overrideNetwork, r.overrideOutputModule, r.params)
+	if err != nil {
+		return nil, err
+	}
+
+	mb.Package = pkg
+	mb.Graph = graph
+	mb.Manifest = manif
+	mb.ManifestPath = r.currentInput
+
+	return mb, nil
+}
+
+// ApplyPackageTransformations applies validation, network overrides, params, and computes initial blocks on a package.
+// It returns the module graph for the package.
+func ApplyPackageTransformations(pkg *pbsubstreams.Package, skipPackageValidation bool, overrideNetwork string, overrideOutputModule string, overrideParams map[string]string) (*ModuleGraph, error) {
+	if !skipPackageValidation {
+		if err := validatePackage(pkg, ReaderValidation{SkipPackageValidation: skipPackageValidation}); err != nil {
 			return nil, fmt.Errorf("package validation failed: %w", err)
 		}
 	}
@@ -140,12 +156,12 @@ func (r *Reader) Read() (*PackageBundle, error) {
 		return nil, err
 	}
 
-	if r.overrideNetwork != "" {
-		pkg.Network = r.overrideNetwork
+	if overrideNetwork != "" {
+		pkg.Network = overrideNetwork
 	}
 
 	if pkg.Networks != nil {
-		importIncludedModules, err := dependentImportedModules(graph, r.overrideOutputModule)
+		importIncludedModules, err := dependentImportedModules(graph, overrideOutputModule)
 		if err != nil {
 			return nil, err
 		}
@@ -162,8 +178,8 @@ func (r *Reader) Read() (*PackageBundle, error) {
 	}
 
 	// applied on top of network-specific params
-	if r.params != nil {
-		if err := ApplyParams(r.params, pkg); err != nil {
+	if overrideParams != nil {
+		if err := ApplyParams(overrideParams, pkg); err != nil {
 			return nil, err
 		}
 	}
@@ -172,18 +188,13 @@ func (r *Reader) Read() (*PackageBundle, error) {
 		return nil, err
 	}
 
-	if !r.validation.SkipPackageValidation { // we validate here because the 'unset' module initial blocks are computed above
+	if !skipPackageValidation { // we validate here because the 'unset' module initial blocks are computed above
 		if err := ValidateModules(pkg.Modules); err != nil {
 			return nil, fmt.Errorf("module validation failed: %w", err)
 		}
 	}
 
-	mb.Package = pkg
-	mb.Graph = graph
-	mb.Manifest = manif
-	mb.ManifestPath = r.currentInput
-
-	return mb, nil
+	return graph, nil
 }
 
 func (r *Reader) read() error {

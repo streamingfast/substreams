@@ -10,7 +10,8 @@ import (
 
 	"github.com/streamingfast/dgrpc"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -39,6 +40,7 @@ type SubstreamsClientConfig struct {
 	insecure  bool
 	plaintext bool
 	agent     string
+	forceV2   bool
 }
 
 func (c *SubstreamsClientConfig) Agent() string {
@@ -54,6 +56,10 @@ func (c *SubstreamsClientConfig) SetAgent(agent string) {
 
 func (c *SubstreamsClientConfig) Endpoint() string {
 	return c.endpoint
+}
+
+func (c *SubstreamsClientConfig) ForceV2() bool {
+	return c.forceV2
 }
 
 func (c *SubstreamsClientConfig) SetEndpoint(endpoint string) {
@@ -88,7 +94,7 @@ func (c *SubstreamsClientConfig) MarshalLogObject(encoder zapcore.ObjectEncoder)
 
 type InternalClientFactory = func() (cli pbssinternal.SubstreamsClient, closeFunc func() error, callOpts []grpc.CallOption, headers Headers, err error)
 
-func NewSubstreamsClientConfig(endpoint string, authToken string, authType AuthType, insecure bool, plaintext bool, agent string) *SubstreamsClientConfig {
+func NewSubstreamsClientConfig(endpoint string, authToken string, authType AuthType, insecure bool, plaintext bool, agent string, forceV2 bool) *SubstreamsClientConfig {
 	// Check for http:// or https:// prefix and adjust settings accordingly
 	if len(endpoint) > 7 && endpoint[:7] == "http://" {
 		plaintext = true
@@ -125,6 +131,7 @@ func NewSubstreamsClientConfig(endpoint string, authToken string, authType AuthT
 		insecure:  insecure,
 		plaintext: plaintext,
 		agent:     agent,
+		forceV2:   forceV2,
 	}
 }
 
@@ -214,7 +221,7 @@ func NewSubstreamsInternalClient(config *SubstreamsClientConfig) (cli pbssintern
 	return
 }
 
-func NewSubstreamsClient(config *SubstreamsClientConfig) (cli pbsubstreamsrpc.StreamClient, closeFunc func() error, callOpts []grpc.CallOption, headers Headers, err error) {
+func newConnection(config *SubstreamsClientConfig) (conn *grpc.ClientConn, closeFunc func() error, callOpts []grpc.CallOption, headers Headers, err error) {
 	if config == nil {
 		return nil, nil, nil, nil, fmt.Errorf("substreams client config not set")
 	}
@@ -223,6 +230,8 @@ func NewSubstreamsClient(config *SubstreamsClientConfig) (cli pbsubstreamsrpc.St
 	authType := config.authType
 	usePlainTextConnection := config.plaintext
 	useInsecureTLSConnection := config.insecure
+
+	zlog.Debug("creating new client", zap.String("endpoint", endpoint))
 
 	if !portSuffixRegex.MatchString(endpoint) {
 		return nil, nil, nil, nil, fmt.Errorf("invalid endpoint %q: endpoint's suffix must be a valid port in the form ':<port>', port 443 is usually the right one to use", endpoint)
@@ -261,7 +270,7 @@ func NewSubstreamsClient(config *SubstreamsClientConfig) (cli pbsubstreamsrpc.St
 	dialOptions = append(dialOptions, grpc.WithUserAgent(config.agent))
 
 	zlog.Debug("getting connection", zap.String("endpoint", endpoint))
-	conn, err := dgrpc.NewExternalClient(endpoint, dialOptions...)
+	conn, err = dgrpc.NewExternalClient(endpoint, dialOptions...)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("unable to create external gRPC client: %w", err)
 	}
@@ -278,8 +287,18 @@ func NewSubstreamsClient(config *SubstreamsClientConfig) (cli pbsubstreamsrpc.St
 		}
 	}
 
-	zlog.Debug("creating new client", zap.String("endpoint", endpoint))
-	cli = pbsubstreamsrpc.NewStreamClient(conn)
+	return
+}
+
+func NewSubstreamsClients(config *SubstreamsClientConfig) (cliV2 pbsubstreamsrpcv2.StreamClient, cliV3 pbsubstreamsrpcv3.StreamClient, closeFunc func() error, callOpts []grpc.CallOption, headers Headers, err error) {
+	var conn *grpc.ClientConn
+	conn, closeFunc, callOpts, headers, err = newConnection(config)
+	if err != nil {
+		return nil, nil, nil, nil, nil, fmt.Errorf("unable to create external gRPC client: %w", err)
+	}
+
+	cliV2 = pbsubstreamsrpcv2.NewStreamClient(conn)
+	cliV3 = pbsubstreamsrpcv3.NewStreamClient(conn)
 	zlog.Debug("client created")
 	return
 }

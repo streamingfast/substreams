@@ -34,6 +34,7 @@ const (
 	FlagParams    = "params"
 	FlagInsecure  = "insecure"
 	FlagPlaintext = "plaintext"
+	FlagForceV2   = "force-v2"
 
 	FlagUndoBufferSize     = "undo-buffer-size"
 	FlagLiveBlockTimeDelta = "live-block-time-delta"
@@ -175,6 +176,10 @@ func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagInclusionExclusion) {
 
 	if defaultFlagIncluded(FlagPlaintext) {
 		flags.Bool(FlagPlaintext, false, "Use plaintext connection as default for endpoints without an http:// or https:// prefix")
+	}
+
+	if defaultFlagIncluded(FlagForceV2) {
+		flags.Bool(FlagForceV2, false, "Force the use of the v2 API instead of default v3")
 	}
 
 	if defaultFlagIncluded(FlagUndoBufferSize) {
@@ -369,6 +374,7 @@ func ConfigFromViper(
 		sflags.MustGetBool(cmd, FlagInsecure),
 		sflags.MustGetBool(cmd, FlagPlaintext),
 		userAgent,
+		sflags.MustGetBool(cmd, FlagForceV2),
 	)
 
 	mode := SubstreamsModeProduction

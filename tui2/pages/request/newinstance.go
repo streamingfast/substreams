@@ -11,7 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/sink"
 	"github.com/streamingfast/substreams/tui2/common"
@@ -133,7 +133,7 @@ func NewInstance(sinkerConfig *sink.SinkerConfig, tuiConfig *common.TUIConfig) (
 	// TODO: if there's an error, we should have a modal dialog box showing the error, instead of
 	// showing in the StatusBar, with a "Confirm" or `esc` to close dialog.
 	// in big red font, and with the appropriate size.
-	ssClient, _, callOpts, headers, err := client.NewSubstreamsClient(sinkerConfig.ClientConfig)
+	ssClientV2, ssClientV3, _, callOpts, headers, err := client.NewSubstreamsClients(sinkerConfig.ClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("substreams client setup: %w", err)
 	}
@@ -158,12 +158,12 @@ func NewInstance(sinkerConfig *sink.SinkerConfig, tuiConfig *common.TUIConfig) (
 		outputModules = nil // with special value '.*', request everything, no filtering
 	}
 
-	req := &pbsubstreamsrpc.Request{
+	req := &pbsubstreamsrpcv3.Request{
 		StartBlockNum:                       startBlock,
 		StartCursor:                         tuiConfig.Cursor,
 		FinalBlocksOnly:                     sinkerConfig.FinalBlocksOnly,
 		StopBlockNum:                        stopBlock,
-		Modules:                             sinkerConfig.Pkg.Modules,
+		Package:                             sinkerConfig.Pkg,
 		OutputModule:                        tuiConfig.OutputModule,
 		ProductionMode:                      sinkerConfig.Mode == sink.SubstreamsModeProduction,
 		DebugInitialStoreSnapshotForModules: sinkerConfig.DevOutputSnapshots,
@@ -172,7 +172,7 @@ func NewInstance(sinkerConfig *sink.SinkerConfig, tuiConfig *common.TUIConfig) (
 	}
 
 	combinedHeaders := headers.Append(tuiConfig.Headers)
-	stream := streamui.New(req, ssClient, combinedHeaders, callOpts)
+	stream := streamui.New(req, ssClientV2, ssClientV3, combinedHeaders, callOpts, sinkerConfig.ClientConfig.ForceV2())
 
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validate request: %w", err)

@@ -45,7 +45,6 @@ func init() {
 	Cmd.AddCommand(tier2CallCmd)
 }
 
-// delete all partial files which are already merged into the kv store
 func tier2CallE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	manifestPath := args[0]
@@ -91,6 +90,7 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 		sflags.MustGetBool(cmd, "insecure"),
 		sflags.MustGetBool(cmd, "plaintext"),
 		"substreams_tools",
+		false, // irrelevant for tier2 calls
 	)
 	ssClient, _, callOpts, headers, err := client.NewSubstreamsInternalClient(clientConfig)
 	if err != nil {

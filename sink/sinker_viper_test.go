@@ -37,6 +37,7 @@ func TestAddFlagsToSet(t *testing.T) {
 				FlagProtoPath,
 				FlagProtoDescriptorSet,
 				FlagPrometheusAddr,
+				FlagForceV2,
 			},
 		},
 		{
@@ -62,6 +63,7 @@ func TestAddFlagsToSet(t *testing.T) {
 				FlagProtoPath,
 				FlagProtoDescriptorSet,
 				FlagPrometheusAddr,
+				FlagForceV2,
 			},
 		},
 		{
@@ -86,6 +88,7 @@ func TestAddFlagsToSet(t *testing.T) {
 				FlagProtoPath,
 				FlagProtoDescriptorSet,
 				FlagPrometheusAddr,
+				FlagForceV2,
 			},
 		},
 		{
@@ -110,6 +113,7 @@ func TestAddFlagsToSet(t *testing.T) {
 				FlagProtoPath,
 				FlagProtoDescriptorSet,
 				FlagPrometheusAddr,
+				FlagForceV2,
 			},
 		},
 		{
@@ -131,6 +135,7 @@ func TestAddFlagsToSet(t *testing.T) {
 				FlagAPITokenEnvvar,
 				FlagNoopMode,
 				FlagPrometheusAddr,
+				FlagForceV2,
 			},
 		},
 		{
@@ -154,6 +159,7 @@ func TestAddFlagsToSet(t *testing.T) {
 				FlagAPITokenEnvvar,
 				FlagNoopMode,
 				FlagPrometheusAddr,
+				FlagForceV2,
 			},
 		},
 		{

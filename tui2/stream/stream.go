@@ -8,9 +8,12 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 
+	"github.com/streamingfast/dgrpc"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
 )
 
 type Msg int
@@ -35,8 +38,10 @@ type Stream struct {
 
 	seenBlockData         bool
 	sentBackprocessingMsg bool
-	req                   *pbsubstreamsrpc.Request
-	client                pbsubstreamsrpc.StreamClient
+	req                   *pbsubstreamsrpcv3.Request
+	clientV2              pbsubstreamsrpc.StreamClient
+	clientV3              pbsubstreamsrpcv3.StreamClient
+	forceV2               bool
 	callOpts              []grpc.CallOption
 	targetEndBlock        uint64
 
@@ -48,13 +53,15 @@ type Stream struct {
 	err error
 }
 
-func New(req *pbsubstreamsrpc.Request, client pbsubstreamsrpc.StreamClient, headers map[string]string, callOpts []grpc.CallOption) *Stream {
+func New(req *pbsubstreamsrpcv3.Request, clientV2 pbsubstreamsrpc.StreamClient, clientV3 pbsubstreamsrpcv3.StreamClient, headers map[string]string, callOpts []grpc.CallOption, forceV2 bool) *Stream {
 	return &Stream{
 		req:            req,
 		targetEndBlock: req.StopBlockNum,
-		client:         client,
+		clientV2:       clientV2,
+		clientV3:       clientV3,
 		callOpts:       callOpts,
 		headers:        headers,
+		forceV2:        forceV2,
 	}
 }
 
@@ -157,12 +164,20 @@ func (s *Stream) StartStream() tea.Msg {
 	s.ctx = streamCtx
 	s.cancelContext = cancel
 
-	cli, err := s.client.Blocks(streamCtx, s.req, s.callOpts...)
-	if err != nil && streamCtx.Err() != context.Canceled {
-		return StreamErrorMsg(fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err))
-	}
+	if s.forceV2 {
+		cli, err := s.clientV2.Blocks(streamCtx, s.req.ToV2(), s.callOpts...)
+		if err != nil && streamCtx.Err() != context.Canceled {
+			return StreamErrorMsg(fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err))
+		}
 
-	s.conn = cli
+		s.conn = cli
+	} else {
+		cli, err := s.clientV3.Blocks(streamCtx, s.req, s.callOpts...)
+		if err != nil && streamCtx.Err() != context.Canceled {
+			return StreamErrorMsg(fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err))
+		}
+		s.conn = cli
+	}
 
 	return ConnectedMsg
 }
@@ -175,6 +190,20 @@ func (s *Stream) readNextMessage() tea.Msg {
 	if s.conn != nil {
 		resp, err := s.conn.Recv()
 		if err != nil {
+
+			if dgrpcError := dgrpc.AsGRPCError(err); dgrpcError != nil {
+				switch dgrpcError.Code() {
+				case codes.Unimplemented, codes.NotFound:
+					if !s.forceV2 {
+						// fallback to use v2 if the server does not support v3
+						s.forceV2 = true
+						s.cancelContext()
+						_ = s.StartStream() // updates s.conn, s.ctx and s.cancelContext
+						return s.readNextMessage()
+					}
+				}
+			}
+
 			if err == io.EOF {
 				s.err = io.EOF
 				return EndOfStreamMsg

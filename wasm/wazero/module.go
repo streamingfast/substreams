@@ -156,6 +156,7 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 
 	var args []uint64
 	var inputStoreCount int
+	var foundationalStoreCount int
 	for _, input := range arguments {
 		switch v := input.(type) {
 		case *wasm.StoreWriterOutput:
@@ -178,6 +179,9 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 			}
 			length := uint64(len(cnt))
 			args = append(args, uint64(ptr), length)
+		case *wasm.FoundationalStoreInput:
+			args = append(args, uint64(foundationalStoreCount))
+			foundationalStoreCount++
 		default:
 			panic("unknown wasm argument type")
 		}

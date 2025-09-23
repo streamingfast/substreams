@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/protocolbuffers/protoscope"
+	"github.com/streamingfast/substreams/client/foundational"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage/store"
 )
@@ -138,4 +139,24 @@ func (i *ParamsInput) Value() []byte {
 func (i *ParamsInput) ProtoScopeValue(value []byte) string {
 	//todo: need to encode the value
 	return fmt.Sprintf("{\"%s\"}", string(value))
+}
+
+type FoundationalStoreInput struct {
+	BaseArgument
+	Clients []*foundational.Store
+}
+
+func NewFoundationalStoreInput(name string, clients []*foundational.Store) *FoundationalStoreInput {
+	return &FoundationalStoreInput{
+		BaseArgument: BaseArgument{name: name},
+		Clients:      clients,
+	}
+}
+
+func (f *FoundationalStoreInput) Name() string {
+	return f.name
+}
+
+func (f *FoundationalStoreInput) ProtoScopeValue(value []byte) string {
+	return fmt.Sprintf("<foundational %s>", string(value))
 }

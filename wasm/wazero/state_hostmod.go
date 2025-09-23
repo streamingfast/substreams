@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	pbstore "github.com/streamingfast/substreams-foundational-store/pb/sf/substreams/foundational-store/v1"
 	"github.com/streamingfast/substreams/wasm"
 	"github.com/tetratelabs/wazero/api"
+	"google.golang.org/protobuf/proto"
 )
 
 type parm = api.ValueType
@@ -372,6 +374,102 @@ var StateFuncs = []funcs{
 			setStack0Bool(stack, found)
 		}),
 	},
+	{
+		"foundational_store_get",
+		[]parm{i32, i32, i32},
+		[]parm{i64},
+		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
+			storeIndex := uint32(stack[0])
+			reqData := readBytesFromStack(mod, stack[1:])
+			call := wasm.FromContext(ctx)
+			inst := instanceFromContext(ctx)
+
+			// TODO: backend should return already-serialized bytes to avoid marshal here
+
+			// Deserialize
+			var req pbstore.GetRequest
+			if err := proto.Unmarshal(reqData, &req); err != nil {
+				call.ReturnError(fmt.Errorf("failed to unmarshal GetRequest: %w", err))
+				stack[0] = 0
+				return
+			}
+
+			// Validate and inject clock
+			blockNumber, blockHash := wasm.ValidateAndInjectFoundationalStoreClock(call.Clock, req.BlockNumber, req.BlockHash, "get")
+
+			resp, err := call.DoFoundationalStoreGet(storeIndex, blockNumber, blockHash, req.Key)
+			if err != nil {
+				call.ReturnError(fmt.Errorf("foundational store error: %w", err))
+				stack[0] = 0
+				return
+			}
+
+			// Serialize response
+			respData, err := proto.Marshal(resp)
+			if err != nil {
+				call.ReturnError(fmt.Errorf("failed to marshal GetResponse: %w", err))
+				stack[0] = 0
+				return
+			}
+
+			respPtr, err := writeToHeap(ctx, inst, true, respData)
+			if err != nil {
+				call.ReturnError(fmt.Errorf("writing response to heap: %w", err))
+				stack[0] = 0
+				return
+			}
+
+			stack[0] = packPtrLen(respPtr, uint32(len(respData)))
+		}),
+	},
+	{
+		"foundational_store_get_all",
+		[]parm{i32, i32, i32},
+		[]parm{i64},
+		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
+			storeIndex := uint32(stack[0])
+			reqData := readBytesFromStack(mod, stack[1:])
+			call := wasm.FromContext(ctx)
+			inst := instanceFromContext(ctx)
+
+			// TODO: backend should return already-serialized bytes to avoid marshal here
+
+			// Deserialize
+			var req pbstore.GetAllRequest
+			if err := proto.Unmarshal(reqData, &req); err != nil {
+				call.ReturnError(fmt.Errorf("failed to unmarshal GetAllRequest: %w", err))
+				stack[0] = 0
+				return
+			}
+
+			// Validate and inject clock
+			blockNumber, blockHash := wasm.ValidateAndInjectFoundationalStoreClock(call.Clock, req.BlockNumber, req.BlockHash, "get_all")
+
+			resp, err := call.DoFoundationalStoreGetAll(storeIndex, blockNumber, blockHash, req.Keys)
+			if err != nil {
+				call.ReturnError(fmt.Errorf("foundational store error: %w", err))
+				stack[0] = 0
+				return
+			}
+
+			// Serialize response
+			respData, err := proto.Marshal(resp)
+			if err != nil {
+				call.ReturnError(fmt.Errorf("failed to marshal GetAllResponse: %w", err))
+				stack[0] = 0
+				return
+			}
+
+			respPtr, err := writeToHeap(ctx, inst, true, respData)
+			if err != nil {
+				call.ReturnError(fmt.Errorf("writing response to heap: %w", err))
+				stack[0] = 0
+				return
+			}
+
+			stack[0] = packPtrLen(respPtr, uint32(len(respData)))
+		}),
+	},
 }
 
 func setStackAndOutput(ctx context.Context, stack []uint64, call *wasm.Call, found bool, inst *Instance, outputPtr uint32, value []byte) {
@@ -391,4 +489,9 @@ func setStack0Bool(stack []uint64, value bool) {
 	} else {
 		stack[0] = 0
 	}
+}
+
+// Helper function to pack pointer and length into uint64
+func packPtrLen(ptr, length uint32) uint64 {
+	return uint64(ptr)<<32 | uint64(length)
 }

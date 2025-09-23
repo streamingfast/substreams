@@ -2,6 +2,7 @@ package noop
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"strings"
 
@@ -27,7 +28,14 @@ type SinkConfig struct {
 
 // NewSink creates a new noop sink
 func NewSink(config SinkConfig) (*Sink, error) {
-	sinker := sink.New(config.SinkerConfig)
+
+	// This is usually a configuration rejected by the sinker, only useful in a noop situation
+	config.SinkerConfig.SupportIndexOutputProductionMode = true
+
+	sinker, err := sink.New(config.SinkerConfig)
+	if err != nil {
+		return nil, fmt.Errorf("creating sink: %w", err)
+	}
 
 	return &Sink{
 		stateFile: config.StateFile,

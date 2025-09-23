@@ -41,7 +41,7 @@ func NewProtoGenerator(outputPath string, excludedPaths []string, generateMod bo
 // calculateHash computes a deterministic hash of the proto generation inputs
 func (g *ProtoGenerator) calculateHash(pkg *pbsubstreams.Package) (string, error) {
 	hasher := sha256.New()
-	
+
 	// Hash proto files in a deterministic order
 	protoHashes := make([]string, 0, len(pkg.ProtoFiles))
 	for _, protoFile := range pkg.ProtoFiles {
@@ -54,12 +54,12 @@ func (g *ProtoGenerator) calculateHash(pkg *pbsubstreams.Package) (string, error
 		protoHashes = append(protoHashes, hex.EncodeToString(protoHasher.Sum(nil)))
 	}
 	sort.Strings(protoHashes)
-	
+
 	// Write proto file hashes
 	for _, hash := range protoHashes {
 		hasher.Write([]byte(hash))
 	}
-	
+
 	// Hash excluded paths in deterministic order
 	excludedPaths := make([]string, len(g.excludedPaths))
 	copy(excludedPaths, g.excludedPaths)
@@ -67,14 +67,14 @@ func (g *ProtoGenerator) calculateHash(pkg *pbsubstreams.Package) (string, error
 	for _, path := range excludedPaths {
 		hasher.Write([]byte(path))
 	}
-	
+
 	// Hash generateMod flag
 	if g.generateMod {
 		hasher.Write([]byte("generateMod:true"))
 	} else {
 		hasher.Write([]byte("generateMod:false"))
 	}
-	
+
 	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
@@ -97,7 +97,7 @@ func (g *ProtoGenerator) writeLastGeneratedHash(hash string) error {
 	if err := os.MkdirAll(g.outputPath, 0755); err != nil {
 		return fmt.Errorf("creating output directory: %w", err)
 	}
-	
+
 	hashFilePath := filepath.Join(g.outputPath, ".last_generated_hash")
 	if err := os.WriteFile(hashFilePath, []byte(hash), 0644); err != nil {
 		return fmt.Errorf("writing hash file: %w", err)
@@ -111,7 +111,7 @@ func (g *ProtoGenerator) hasGeneratedFiles() bool {
 	if err != nil {
 		return false
 	}
-	
+
 	// Look for .rs files (generated Rust files)
 	for _, entry := range entries {
 		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".rs") {
@@ -154,13 +154,13 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
 	if err != nil {
 		return fmt.Errorf("calculating hash: %w", err)
 	}
-	
+
 	// Read last generated hash
 	lastHash, err := g.readLastGeneratedHash()
 	if err != nil {
 		return fmt.Errorf("reading last generated hash: %w", err)
 	}
-	
+
 	// Check if we can skip generation
 	if lastHash != "" && lastHash == currentHash && g.hasGeneratedFiles() {
 		fmt.Printf("⚡ Protobuf generation skipped (no changes detected)\n")
@@ -229,7 +229,7 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
 	} else {
 		fmt.Printf("📋 Using existing buf.gen.yaml configuration\n")
 	}
-	
+
 	fmt.Printf("📦 Generating protobuf code \033[90m(buf %s)\033[0m\n", formatBufCommand(cmdArgs))
 	c := exec.Command("buf", cmdArgs...)
 	c.Stdin = os.Stdin

@@ -2,13 +2,15 @@ module github.com/streamingfast/substreams
 
 go 1.24.2
 
+toolchain go1.24.7
+
 require (
 	github.com/golang/protobuf v1.5.4
 	github.com/jhump/protoreflect v1.14.0
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/streamingfast/bstream v0.0.2-0.20250903174843-9c884c3356fd
-	github.com/streamingfast/cli v0.0.4-0.20241119021815-815afa473375
+	github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b
 	github.com/streamingfast/dauth v0.0.0-20250821195214-8e2a3c300f97
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
 	github.com/streamingfast/derr v0.0.0-20250321151415-6b4fbbcb1bb5
@@ -34,7 +36,7 @@ require (
 	github.com/alecthomas/participle v0.7.1
 	github.com/bmatcuk/doublestar/v4 v4.6.1
 	github.com/bobg/go-generics/v2 v2.1.1
-	github.com/bytecodealliance/wasmtime-go/v30 v30.0.0
+	github.com/bytecodealliance/wasmtime-go/v36 v36.0.0
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/charmbracelet/bubbles v0.20.0
 	github.com/charmbracelet/bubbletea v1.1.0
@@ -67,6 +69,7 @@ require (
 	github.com/streamingfast/firehose-networks v0.2.0
 	github.com/streamingfast/sf-tracing v0.0.0-20240430173521-888827872b90
 	github.com/streamingfast/shutter v1.5.0
+	github.com/streamingfast/substreams-foundational-store v0.1.1-0.20250912144020-b075d35bf78a
 	github.com/streamingfast/substreams-sdk-go v0.0.0-20240110154316-5fb21a7a330b
 	github.com/streamingfast/substreams-sink-sql v1.0.1-0.20231127153906-acf5f3e34330
 	github.com/test-go/testify v1.1.4
@@ -173,7 +176,7 @@ require (
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.25 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
-	github.com/mr-tron/base58 v1.2.0 // indirect
+	github.com/mr-tron/base58 v1.2.0
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect

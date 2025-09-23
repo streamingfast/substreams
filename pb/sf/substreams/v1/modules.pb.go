@@ -138,7 +138,7 @@ func (x Module_Input_Store_Mode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Module_Input_Store_Mode.Descriptor instead.
 func (Module_Input_Store_Mode) EnumDescriptor() ([]byte, []int) {
-	return file_sf_substreams_v1_modules_proto_rawDescGZIP(), []int{2, 5, 2, 0}
+	return file_sf_substreams_v1_modules_proto_rawDescGZIP(), []int{2, 6, 2, 0}
 }
 
 type Modules struct {
@@ -674,6 +674,54 @@ func (x *Module_KindBlockIndex) GetOutputType() string {
 	return ""
 }
 
+// FoundationalStore represents a reference to an external foundational store
+// that provides pre-computed data for substreams modules. The foundational store
+// is resolved at runtime based on the identifier provided.
+type Module_FoundationalStore struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Package notation: "package-name@version"
+	Identifier    string `protobuf:"bytes,1,opt,name=identifier,proto3" json:"identifier,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Module_FoundationalStore) Reset() {
+	*x = Module_FoundationalStore{}
+	mi := &file_sf_substreams_v1_modules_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Module_FoundationalStore) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Module_FoundationalStore) ProtoMessage() {}
+
+func (x *Module_FoundationalStore) ProtoReflect() protoreflect.Message {
+	mi := &file_sf_substreams_v1_modules_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Module_FoundationalStore.ProtoReflect.Descriptor instead.
+func (*Module_FoundationalStore) Descriptor() ([]byte, []int) {
+	return file_sf_substreams_v1_modules_proto_rawDescGZIP(), []int{2, 5}
+}
+
+func (x *Module_FoundationalStore) GetIdentifier() string {
+	if x != nil {
+		return x.Identifier
+	}
+	return ""
+}
+
 type Module_Input struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Input:
@@ -682,6 +730,7 @@ type Module_Input struct {
 	//	*Module_Input_Map_
 	//	*Module_Input_Store_
 	//	*Module_Input_Params_
+	//	*Module_Input_FoundationalStore
 	Input         isModule_Input_Input `protobuf_oneof:"input"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -689,7 +738,7 @@ type Module_Input struct {
 
 func (x *Module_Input) Reset() {
 	*x = Module_Input{}
-	mi := &file_sf_substreams_v1_modules_proto_msgTypes[8]
+	mi := &file_sf_substreams_v1_modules_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -701,7 +750,7 @@ func (x *Module_Input) String() string {
 func (*Module_Input) ProtoMessage() {}
 
 func (x *Module_Input) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_substreams_v1_modules_proto_msgTypes[8]
+	mi := &file_sf_substreams_v1_modules_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -714,7 +763,7 @@ func (x *Module_Input) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Module_Input.ProtoReflect.Descriptor instead.
 func (*Module_Input) Descriptor() ([]byte, []int) {
-	return file_sf_substreams_v1_modules_proto_rawDescGZIP(), []int{2, 5}
+	return file_sf_substreams_v1_modules_proto_rawDescGZIP(), []int{2, 6}
 }
 
 func (x *Module_Input) GetInput() isModule_Input_Input {
@@ -760,6 +809,15 @@ func (x *Module_Input) GetParams() *Module_Input_Params {
 	return nil
 }
 
+func (x *Module_Input) GetFoundationalStore() *Module_FoundationalStore {
+	if x != nil {
+		if x, ok := x.Input.(*Module_Input_FoundationalStore); ok {
+			return x.FoundationalStore
+		}
+	}
+	return nil
+}
+
 type isModule_Input_Input interface {
 	isModule_Input_Input()
 }
@@ -780,6 +838,10 @@ type Module_Input_Params_ struct {
 	Params *Module_Input_Params `protobuf:"bytes,4,opt,name=params,proto3,oneof"`
 }
 
+type Module_Input_FoundationalStore struct {
+	FoundationalStore *Module_FoundationalStore `protobuf:"bytes,5,opt,name=foundational_store,json=foundationalStore,proto3,oneof"`
+}
+
 func (*Module_Input_Source_) isModule_Input_Input() {}
 
 func (*Module_Input_Map_) isModule_Input_Input() {}
@@ -787,6 +849,8 @@ func (*Module_Input_Map_) isModule_Input_Input() {}
 func (*Module_Input_Store_) isModule_Input_Input() {}
 
 func (*Module_Input_Params_) isModule_Input_Input() {}
+
+func (*Module_Input_FoundationalStore) isModule_Input_Input() {}
 
 type Module_Output struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -797,7 +861,7 @@ type Module_Output struct {
 
 func (x *Module_Output) Reset() {
 	*x = Module_Output{}
-	mi := &file_sf_substreams_v1_modules_proto_msgTypes[9]
+	mi := &file_sf_substreams_v1_modules_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -809,7 +873,7 @@ func (x *Module_Output) String() string {
 func (*Module_Output) ProtoMessage() {}
 
 func (x *Module_Output) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_substreams_v1_modules_proto_msgTypes[9]
+	mi := &file_sf_substreams_v1_modules_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -822,7 +886,7 @@ func (x *Module_Output) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Module_Output.ProtoReflect.Descriptor instead.
 func (*Module_Output) Descriptor() ([]byte, []int) {
-	return file_sf_substreams_v1_modules_proto_rawDescGZIP(), []int{2, 6}
+	return file_sf_substreams_v1_modules_proto_rawDescGZIP(), []int{2, 7}
 }
 
 func (x *Module_Output) GetType() string {
@@ -841,7 +905,7 @@ type Module_Input_Source struct {
 
 func (x *Module_Input_Source) Reset() {
 	*x = Module_Input_Source{}
-	mi := &file_sf_substreams_v1_modules_proto_msgTypes[10]
+	mi := &file_sf_substreams_v1_modules_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -853,7 +917,7 @@ func (x *Module_Input_Source) String() string {
 func (*Module_Input_Source) ProtoMessage() {}
 
 func (x *Module_Input_Source) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_substreams_v1_modules_proto_msgTypes[10]
+	mi := &file_sf_substreams_v1_modules_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -866,7 +930,7 @@ func (x *Module_Input_Source) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Module_Input_Source.ProtoReflect.Descriptor instead.
 func (*Module_Input_Source) Descriptor() ([]byte, []int) {
-	return file_sf_substreams_v1_modules_proto_rawDescGZIP(), []int{2, 5, 0}
+	return file_sf_substreams_v1_modules_proto_rawDescGZIP(), []int{2, 6, 0}
 }
 
 func (x *Module_Input_Source) GetType() string {
@@ -885,7 +949,7 @@ type Module_Input_Map struct {
 
 func (x *Module_Input_Map) Reset() {
 	*x = Module_Input_Map{}
-	mi := &file_sf_substreams_v1_modules_proto_msgTypes[11]
+	mi := &file_sf_substreams_v1_modules_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -897,7 +961,7 @@ func (x *Module_Input_Map) String() string {
 func (*Module_Input_Map) ProtoMessage() {}
 
 func (x *Module_Input_Map) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_substreams_v1_modules_proto_msgTypes[11]
+	mi := &file_sf_substreams_v1_modules_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -910,7 +974,7 @@ func (x *Module_Input_Map) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Module_Input_Map.ProtoReflect.Descriptor instead.
 func (*Module_Input_Map) Descriptor() ([]byte, []int) {
-	return file_sf_substreams_v1_modules_proto_rawDescGZIP(), []int{2, 5, 1}
+	return file_sf_substreams_v1_modules_proto_rawDescGZIP(), []int{2, 6, 1}
 }
 
 func (x *Module_Input_Map) GetModuleName() string {
@@ -930,7 +994,7 @@ type Module_Input_Store struct {
 
 func (x *Module_Input_Store) Reset() {
 	*x = Module_Input_Store{}
-	mi := &file_sf_substreams_v1_modules_proto_msgTypes[12]
+	mi := &file_sf_substreams_v1_modules_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -942,7 +1006,7 @@ func (x *Module_Input_Store) String() string {
 func (*Module_Input_Store) ProtoMessage() {}
 
 func (x *Module_Input_Store) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_substreams_v1_modules_proto_msgTypes[12]
+	mi := &file_sf_substreams_v1_modules_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -955,7 +1019,7 @@ func (x *Module_Input_Store) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Module_Input_Store.ProtoReflect.Descriptor instead.
 func (*Module_Input_Store) Descriptor() ([]byte, []int) {
-	return file_sf_substreams_v1_modules_proto_rawDescGZIP(), []int{2, 5, 2}
+	return file_sf_substreams_v1_modules_proto_rawDescGZIP(), []int{2, 6, 2}
 }
 
 func (x *Module_Input_Store) GetModuleName() string {
@@ -981,7 +1045,7 @@ type Module_Input_Params struct {
 
 func (x *Module_Input_Params) Reset() {
 	*x = Module_Input_Params{}
-	mi := &file_sf_substreams_v1_modules_proto_msgTypes[13]
+	mi := &file_sf_substreams_v1_modules_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -993,7 +1057,7 @@ func (x *Module_Input_Params) String() string {
 func (*Module_Input_Params) ProtoMessage() {}
 
 func (x *Module_Input_Params) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_substreams_v1_modules_proto_msgTypes[13]
+	mi := &file_sf_substreams_v1_modules_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1006,7 +1070,7 @@ func (x *Module_Input_Params) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Module_Input_Params.ProtoReflect.Descriptor instead.
 func (*Module_Input_Params) Descriptor() ([]byte, []int) {
-	return file_sf_substreams_v1_modules_proto_rawDescGZIP(), []int{2, 5, 3}
+	return file_sf_substreams_v1_modules_proto_rawDescGZIP(), []int{2, 6, 3}
 }
 
 func (x *Module_Input_Params) GetValue() string {
@@ -1026,7 +1090,7 @@ const file_sf_substreams_v1_modules_proto_rawDesc = "" +
 	"\bbinaries\x18\x02 \x03(\v2\x18.sf.substreams.v1.BinaryR\bbinaries\"6\n" +
 	"\x06Binary\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x18\n" +
-	"\acontent\x18\x02 \x01(\fR\acontent\"\xd0\r\n" +
+	"\acontent\x18\x02 \x01(\fR\acontent\"\xe2\x0e\n" +
 	"\x06Module\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12=\n" +
 	"\bkind_map\x18\x02 \x01(\v2 .sf.substreams.v1.Module.KindMapH\x00R\akindMap\x12C\n" +
@@ -1064,12 +1128,17 @@ const file_sf_substreams_v1_modules_proto_rawDesc = "" +
 	"\x15UPDATE_POLICY_SET_SUM\x10\a\x1a1\n" +
 	"\x0eKindBlockIndex\x12\x1f\n" +
 	"\voutput_type\x18\x01 \x01(\tR\n" +
-	"outputType\x1a\x80\x04\n" +
+	"outputType\x1a3\n" +
+	"\x11FoundationalStore\x12\x1e\n" +
+	"\n" +
+	"identifier\x18\x01 \x01(\tR\n" +
+	"identifier\x1a\xdd\x04\n" +
 	"\x05Input\x12?\n" +
 	"\x06source\x18\x01 \x01(\v2%.sf.substreams.v1.Module.Input.SourceH\x00R\x06source\x126\n" +
 	"\x03map\x18\x02 \x01(\v2\".sf.substreams.v1.Module.Input.MapH\x00R\x03map\x12<\n" +
 	"\x05store\x18\x03 \x01(\v2$.sf.substreams.v1.Module.Input.StoreH\x00R\x05store\x12?\n" +
-	"\x06params\x18\x04 \x01(\v2%.sf.substreams.v1.Module.Input.ParamsH\x00R\x06params\x1a\x1c\n" +
+	"\x06params\x18\x04 \x01(\v2%.sf.substreams.v1.Module.Input.ParamsH\x00R\x06params\x12[\n" +
+	"\x12foundational_store\x18\x05 \x01(\v2*.sf.substreams.v1.Module.FoundationalStoreH\x00R\x11foundationalStore\x1a\x1c\n" +
 	"\x06Source\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x1a&\n" +
 	"\x03Map\x12\x1f\n" +
@@ -1104,7 +1173,7 @@ func file_sf_substreams_v1_modules_proto_rawDescGZIP() []byte {
 }
 
 var file_sf_substreams_v1_modules_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_sf_substreams_v1_modules_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_sf_substreams_v1_modules_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_sf_substreams_v1_modules_proto_goTypes = []any{
 	(Module_KindStore_UpdatePolicy)(0), // 0: sf.substreams.v1.Module.KindStore.UpdatePolicy
 	(Module_Input_Store_Mode)(0),       // 1: sf.substreams.v1.Module.Input.Store.Mode
@@ -1116,12 +1185,13 @@ var file_sf_substreams_v1_modules_proto_goTypes = []any{
 	(*Module_KindMap)(nil),             // 7: sf.substreams.v1.Module.KindMap
 	(*Module_KindStore)(nil),           // 8: sf.substreams.v1.Module.KindStore
 	(*Module_KindBlockIndex)(nil),      // 9: sf.substreams.v1.Module.KindBlockIndex
-	(*Module_Input)(nil),               // 10: sf.substreams.v1.Module.Input
-	(*Module_Output)(nil),              // 11: sf.substreams.v1.Module.Output
-	(*Module_Input_Source)(nil),        // 12: sf.substreams.v1.Module.Input.Source
-	(*Module_Input_Map)(nil),           // 13: sf.substreams.v1.Module.Input.Map
-	(*Module_Input_Store)(nil),         // 14: sf.substreams.v1.Module.Input.Store
-	(*Module_Input_Params)(nil),        // 15: sf.substreams.v1.Module.Input.Params
+	(*Module_FoundationalStore)(nil),   // 10: sf.substreams.v1.Module.FoundationalStore
+	(*Module_Input)(nil),               // 11: sf.substreams.v1.Module.Input
+	(*Module_Output)(nil),              // 12: sf.substreams.v1.Module.Output
+	(*Module_Input_Source)(nil),        // 13: sf.substreams.v1.Module.Input.Source
+	(*Module_Input_Map)(nil),           // 14: sf.substreams.v1.Module.Input.Map
+	(*Module_Input_Store)(nil),         // 15: sf.substreams.v1.Module.Input.Store
+	(*Module_Input_Params)(nil),        // 16: sf.substreams.v1.Module.Input.Params
 }
 var file_sf_substreams_v1_modules_proto_depIdxs = []int32{
 	4,  // 0: sf.substreams.v1.Modules.modules:type_name -> sf.substreams.v1.Module
@@ -1129,21 +1199,22 @@ var file_sf_substreams_v1_modules_proto_depIdxs = []int32{
 	7,  // 2: sf.substreams.v1.Module.kind_map:type_name -> sf.substreams.v1.Module.KindMap
 	8,  // 3: sf.substreams.v1.Module.kind_store:type_name -> sf.substreams.v1.Module.KindStore
 	9,  // 4: sf.substreams.v1.Module.kind_block_index:type_name -> sf.substreams.v1.Module.KindBlockIndex
-	10, // 5: sf.substreams.v1.Module.inputs:type_name -> sf.substreams.v1.Module.Input
-	11, // 6: sf.substreams.v1.Module.output:type_name -> sf.substreams.v1.Module.Output
+	11, // 5: sf.substreams.v1.Module.inputs:type_name -> sf.substreams.v1.Module.Input
+	12, // 6: sf.substreams.v1.Module.output:type_name -> sf.substreams.v1.Module.Output
 	5,  // 7: sf.substreams.v1.Module.block_filter:type_name -> sf.substreams.v1.Module.BlockFilter
 	6,  // 8: sf.substreams.v1.Module.BlockFilter.query_from_params:type_name -> sf.substreams.v1.Module.QueryFromParams
 	0,  // 9: sf.substreams.v1.Module.KindStore.update_policy:type_name -> sf.substreams.v1.Module.KindStore.UpdatePolicy
-	12, // 10: sf.substreams.v1.Module.Input.source:type_name -> sf.substreams.v1.Module.Input.Source
-	13, // 11: sf.substreams.v1.Module.Input.map:type_name -> sf.substreams.v1.Module.Input.Map
-	14, // 12: sf.substreams.v1.Module.Input.store:type_name -> sf.substreams.v1.Module.Input.Store
-	15, // 13: sf.substreams.v1.Module.Input.params:type_name -> sf.substreams.v1.Module.Input.Params
-	1,  // 14: sf.substreams.v1.Module.Input.Store.mode:type_name -> sf.substreams.v1.Module.Input.Store.Mode
-	15, // [15:15] is the sub-list for method output_type
-	15, // [15:15] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	13, // 10: sf.substreams.v1.Module.Input.source:type_name -> sf.substreams.v1.Module.Input.Source
+	14, // 11: sf.substreams.v1.Module.Input.map:type_name -> sf.substreams.v1.Module.Input.Map
+	15, // 12: sf.substreams.v1.Module.Input.store:type_name -> sf.substreams.v1.Module.Input.Store
+	16, // 13: sf.substreams.v1.Module.Input.params:type_name -> sf.substreams.v1.Module.Input.Params
+	10, // 14: sf.substreams.v1.Module.Input.foundational_store:type_name -> sf.substreams.v1.Module.FoundationalStore
+	1,  // 15: sf.substreams.v1.Module.Input.Store.mode:type_name -> sf.substreams.v1.Module.Input.Store.Mode
+	16, // [16:16] is the sub-list for method output_type
+	16, // [16:16] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_sf_substreams_v1_modules_proto_init() }
@@ -1160,11 +1231,12 @@ func file_sf_substreams_v1_modules_proto_init() {
 		(*Module_BlockFilter_QueryString)(nil),
 		(*Module_BlockFilter_QueryFromParams)(nil),
 	}
-	file_sf_substreams_v1_modules_proto_msgTypes[8].OneofWrappers = []any{
+	file_sf_substreams_v1_modules_proto_msgTypes[9].OneofWrappers = []any{
 		(*Module_Input_Source_)(nil),
 		(*Module_Input_Map_)(nil),
 		(*Module_Input_Store_)(nil),
 		(*Module_Input_Params_)(nil),
+		(*Module_Input_FoundationalStore)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -1172,7 +1244,7 @@ func file_sf_substreams_v1_modules_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_sf_substreams_v1_modules_proto_rawDesc), len(file_sf_substreams_v1_modules_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   14,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

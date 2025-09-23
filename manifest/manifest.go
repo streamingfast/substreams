@@ -124,10 +124,11 @@ type BlockFilterQuery struct {
 }
 
 type Input struct {
-	Source string `yaml:"source,omitempty"`
-	Store  string `yaml:"store,omitempty"`
-	Map    string `yaml:"map,omitempty"`
-	Params string `yaml:"params,omitempty"`
+	Source            string `yaml:"source,omitempty"`
+	Store             string `yaml:"store,omitempty"`
+	Map               string `yaml:"map,omitempty"`
+	Params            string `yaml:"params,omitempty"`
+	FoundationalStore string `yaml:"foundational-store,omitempty"`
 
 	Mode string `yaml:"mode,omitempty"`
 }
@@ -183,6 +184,10 @@ func (i *Input) IsParams() bool {
 	return i.Params != "" && i.Source == "" && i.Map == "" && i.Store == ""
 }
 
+func (i *Input) IsFoundationalStore() bool {
+	return i.FoundationalStore != "" && i.Source == "" && i.Map == "" && i.Store == "" && i.Params == ""
+}
+
 func (i *Input) parse() error {
 	if i.IsMap() {
 		//i.Name = fmt.Sprintf("map:%s", i.Map)
@@ -206,7 +211,34 @@ func (i *Input) parse() error {
 		}
 		return nil
 	}
+	if i.IsFoundationalStore() {
+		// Validate foundational-store package-notation format
+		return i.parseFoundationalStore()
+	}
 	return fmt.Errorf("input has an unknown or mixed types; expect one, and only one of: 'params', 'map', 'store' or 'source'")
+}
+
+func (i *Input) parseFoundationalStore() error {
+	id := strings.TrimSpace(i.FoundationalStore)
+	if id == "" {
+		return fmt.Errorf("foundational-store: identifier cannot be empty")
+	}
+
+	pkg, version, hasAt, validationErr := ParseShortPackageIdentifier(id)
+	if validationErr != nil {
+		return fmt.Errorf("invalid foundational-store identifier %q: %w", id, validationErr)
+	}
+	if !hasAt {
+		return fmt.Errorf("foundational-store input %q: expected package@version", id)
+	}
+	if version == "latest" {
+		return fmt.Errorf("version %q is not supported for foundational-store inputs, use a specific semver (e.g., v1.2.3)", version)
+	}
+
+	// parsed & validated
+	_ = pkg
+
+	return nil
 }
 
 func validateModuleWithUse(module *Module) error {
@@ -402,6 +434,18 @@ func (m *Module) setInputsToProto(pbModule *pbsubstreams.Module) error {
 				Input: &pbsubstreams.Module_Input_Params_{
 					Params: &pbsubstreams.Module_Input_Params{
 						Value: "",
+					},
+				},
+			}
+			pbModule.Inputs = append(pbModule.Inputs, pbInput)
+			continue
+		}
+
+		if input.FoundationalStore != "" {
+			pbInput := &pbsubstreams.Module_Input{
+				Input: &pbsubstreams.Module_Input_FoundationalStore{
+					FoundationalStore: &pbsubstreams.Module_FoundationalStore{
+						Identifier: input.FoundationalStore,
 					},
 				},
 			}

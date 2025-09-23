@@ -9,6 +9,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Server
+* Updated Wasmtime runtime from v30.0.0 to v36.0.0, bringing performance improvements, inlining support, Component Model async implementation, and enhanced security features.
+
+* Added WASM bindgen shims support for WASMTime runtime to handle WASM modules with WASM bindgen imports (when Substreams Module binary is defined as type `wasm/rust-v1+wasm-bindgen-shims`).
+
+### Server and Client
+
+* Added support to foundational-store for wasmtime and wazero.
+* Added foundational-store grpc client to substreams engine.
+* Fixed module caching to properly handle modules with different runtime extensions.
+
+### CLI
+
+* Added support for `http://` and `https://` prefixes in the `--endpoint` flag. Setting the protocol (http/https) in the URL will ignore the `--plaintext` flag setting. The default (no prefix) is still SSL. The enforcing of `--plaintext` and `--insecure` has been relaxed: plaintext+insecure is simply plaintext.
+* Fixed the progress logs and prometheus metrics from `substreams sink noop` when running with an output_module of type "index" in production mode (other sinks will now refuse to run in this mode)
+* Removed 'progress_last_contiguous_block' from sink logs, as it was often misleading. Getting a correct value in all cases would require doing a slow lookup on all cached files, which is not desirable.
+
 ## v1.16.5
 
 ### Server

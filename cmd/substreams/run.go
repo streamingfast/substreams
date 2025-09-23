@@ -81,7 +81,10 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	sinkerConfig.LimitProcessedBlocks = sflags.MustGetUint64(cmd, "limit-processed-blocks")
 
-	sinker := sink.New(sinkerConfig)
+	sinker, err := sink.New(sinkerConfig)
+	if err != nil {
+		return fmt.Errorf("creating sink: %w", err)
+	}
 
 	cursorStr := sflags.MustGetString(cmd, "cursor")
 	cursor, err := sink.NewCursor(cursorStr)

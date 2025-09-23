@@ -23,7 +23,7 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, err error) error {
 	logger := reqctx.Logger(ctx)
 	reqDetails := reqctx.Details(ctx)
 
-	if err := p.cleanUpModuleExecutors(ctx); err != nil {
+	if err := p.cleanUpModuleExecutors(ctx, logger); err != nil {
 		return err
 	}
 

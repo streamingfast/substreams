@@ -1,6 +1,7 @@
 package wasm
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/big"
@@ -8,13 +9,24 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/shopspring/decimal"
+	"go.uber.org/zap"
 
+	pbstore "github.com/streamingfast/substreams-foundational-store/pb/sf/substreams/foundational-store/v1"
+	"github.com/streamingfast/substreams/client/foundational"
 	"github.com/streamingfast/substreams/metrics"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage/store"
 )
 
 var ErrWasmDeterministicExec = errors.New("wasm execution failed deterministically")
+
+// Foundational store retry configuration constants
+const (
+	foundationalStoreMaxRetries = 10
+	foundationalStoreRetryDelay = 100 * time.Millisecond
+	// Kill switch timeout
+	foundationalStoreMaxWaitTime = 60 * time.Second
+)
 
 type Call struct {
 	Clock      *pbsubstreams.Clock // Used by WASM extensions
@@ -24,6 +36,8 @@ type Call struct {
 	inputStores  []store.Reader
 	outputStore  store.Store
 	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy
+
+	foundationalStores []*foundational.Store
 
 	valueType string
 
@@ -38,13 +52,14 @@ type Call struct {
 	stats          *metrics.Stats
 }
 
-func NewCall(clock *pbsubstreams.Clock, moduleName string, entrypoint string, stats *metrics.Stats, arguments []Argument, canSkipEmptyOutput bool) *Call {
+func NewCall(clock *pbsubstreams.Clock, moduleName string, entrypoint string, stats *metrics.Stats, arguments []Argument, canSkipEmptyOutput bool, foundationalStores []*foundational.Store) *Call {
 	call := &Call{
 		Clock:              clock,
 		ModuleName:         moduleName,
 		Entrypoint:         entrypoint,
 		stats:              stats,
 		canSkipEmptyOutput: canSkipEmptyOutput,
+		foundationalStores: foundationalStores,
 	}
 
 	for _, input := range arguments {
@@ -57,7 +72,8 @@ func NewCall(clock *pbsubstreams.Clock, moduleName string, entrypoint string, st
 		case *StoreReaderInput:
 			call.inputStores = append(call.inputStores, v.Store)
 		case *MapInput, *StoreDeltaInput, *ParamsInput, *SourceInput:
-			// Handled in ÈxecuteNewCall()
+			// Handled in ExecuteNewCall()
+		case *FoundationalStoreInput:
 		default:
 			panic(fmt.Sprintf("unknown wasm argument type %T", v))
 		}
@@ -301,6 +317,62 @@ func (c *Call) DoHasLast(storeIndex int, key string) (found bool) {
 	c.validateStoreIndex(storeIndex, "has_last")
 	readStore := c.inputStores[storeIndex]
 	return readStore.HasLast(key)
+}
+
+func (c *Call) DoFoundationalStoreGet(index uint32, block uint64, blockHash []byte, key []byte) (*pbstore.GetResponse, error) {
+	if len(c.foundationalStores) == 0 {
+		return nil, fmt.Errorf("store not found for index: %d", index)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), foundationalStoreMaxWaitTime)
+	defer cancel()
+
+	for {
+		resp, err := c.foundationalStores[index].Get(ctx, block, blockHash, key)
+		if err == nil {
+			if resp.BlockReached {
+				return resp, nil
+			}
+
+		}
+		if !resp.BlockReached {
+			zlog.Debug("block not reached, retrying", zap.Uint64("block_number", block))
+		}
+		if err != nil {
+			zlog.Warn("failed to call foundational store", zap.Error(err))
+		}
+		time.Sleep(foundationalStoreRetryDelay)
+	}
+}
+
+func (c *Call) DoFoundationalStoreGetAll(index uint32, block uint64, blockHash []byte, keys [][]byte) (*pbstore.GetAllResponse, error) {
+	zlog.Info("entering call DoFoundationalStoreGetAll")
+
+	if len(c.foundationalStores) == 0 {
+		return nil, fmt.Errorf("store not found for index: %d", index)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), foundationalStoreMaxWaitTime)
+	defer cancel()
+
+	for {
+		resp, err := c.foundationalStores[index].GetAll(ctx, block, blockHash, keys)
+		zlog.Info("foundational store GetAll result", zap.Bool("block_reached", resp.BlockReached), zap.Error(err))
+		if err == nil {
+			if resp.BlockReached {
+				return resp, nil
+			}
+
+		}
+		if !resp.BlockReached {
+			zlog.Debug("block not reached, retrying", zap.Uint64("block_number", block))
+		}
+		if err != nil {
+			zlog.Warn("failed to call foundational store", zap.Error(err))
+		}
+		time.Sleep(foundationalStoreRetryDelay)
+	}
+
 }
 
 func (c *Call) validateStoreIndex(storeIndex int, stateFunc string) {

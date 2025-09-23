@@ -83,12 +83,21 @@ message Module {
     string output_type = 1;
   }
 
+  // FoundationalStore represents a reference to an external foundational store
+  // that provides pre-computed data for substreams modules. The foundational store
+  // is resolved at runtime based on the identifier provided.
+  message FoundationalStore {
+    // Package notation: "package-name@version"
+    string identifier = 1;
+  }
+
   message Input {
     oneof input {
       Source source = 1;
       Map map = 2;
       Store store = 3;
       Params params = 4;
+      FoundationalStore foundational_store = 5;
     }
 
     message Source {

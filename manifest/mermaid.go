@@ -72,6 +72,10 @@ func generateMermaidGraph(mods *pbsubstreams.Modules) string {
 			case *pbsubstreams.Module_Input_Params_:
 				name := s.Name + ":params"
 				str.WriteString(fmt.Sprintf("  %s[params] --> %s;\n", name, s.Name))
+			case *pbsubstreams.Module_Input_FoundationalStore:
+				id := input.FoundationalStore.Identifier
+				str.WriteString(fmt.Sprintf("  %s[foundational-store: %s] --> %s;\n", id, id, s.Name))
+
 			}
 		}
 	}

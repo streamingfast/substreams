@@ -65,7 +65,7 @@ func runRegistryVerify(cmd *cobra.Command, args []string) (err error) {
 
 	// Check for warnings about incomplete package
 	warned := warnIncompletePackage(spkg, warningsConfig{})
-	
+
 	// Print package details
 	printPackageDetails(spkg)
 
@@ -74,7 +74,7 @@ func runRegistryVerify(cmd *cobra.Command, args []string) (err error) {
 	} else {
 		fmt.Println("✅ Package is valid and ready for publishing")
 	}
-	
+
 	fmt.Println()
 	fmt.Println("To publish this package, run:")
 	fmt.Println()

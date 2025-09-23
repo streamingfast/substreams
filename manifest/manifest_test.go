@@ -1,12 +1,15 @@
 package manifest
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"strings"
 	"testing"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v3"
 )
 
@@ -228,15 +231,247 @@ func TestManifest_ToProto(t *testing.T) {
 
 }
 
-//type testSinkConfig struct {
-//	state         protoimpl.MessageState
-//	sizeCache     protoimpl.SizeCache
-//	unknownFields protoimpl.UnknownFields
-//
-//	AddSomePancakes bool `protobuf:"varint,1,opt,name=add_some_pancakes,json=addSomePancakes,proto3" json:"add_some_pancakes,omitempty"`
-//}
-//
-//func (x *testSinkConfig) Reset()                             { *x = testSinkConfig{} }
-//func (x *testSinkConfig) String() string                     { return "testSinkConfig" }
-//func (*testSinkConfig) ProtoMessage()                        {}
-//func (x *testSinkConfig) ProtoReflect() protoreflect.Message { panic("unimplemented") }
+func TestParseFoundationalStoreIdentifier(t *testing.T) {
+	type out struct {
+		packageName string
+		version     string
+		isShortcut  bool
+	}
+	type test struct {
+		name        string
+		input       string
+		expected    out
+		expectError string
+	}
+
+	tests := []test{
+		{
+			name:  "valid package notation",
+			input: "account-owners@v1.0.0",
+			expected: out{
+				packageName: "account-owners",
+				version:     "v1.0.0",
+				isShortcut:  true,
+			},
+		},
+		{
+			name:  "valid single word package",
+			input: "tokens@v2.1.3",
+			expected: out{
+				packageName: "tokens",
+				version:     "v2.1.3",
+				isShortcut:  true,
+			},
+		},
+		{
+			name:        "empty package name",
+			input:       "@v1.0.0",
+			expectError: "does not match regexp",
+		},
+		{
+			name:        "empty version becomes latest (then rejected at parseFoundationalStore time)",
+			input:       "account-owners@",
+			expected:    out{packageName: "account-owners", version: "latest", isShortcut: true},
+			expectError: "",
+		},
+		{
+			name:        "invalid version (not semver)",
+			input:       "account-owners@1.0.0",
+			expectError: "not valid Semver",
+		},
+		{
+			name:        "multiple validation issues",
+			input:       "Invalid Package@1.0.0",
+			expectError: "does not match regexp",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pkg, ver, shortcut, validationErr := ParseShortPackageIdentifier(tt.input)
+
+			if tt.expectError != "" {
+				require.Error(t, validationErr)
+				assert.Contains(t, validationErr.Error(), tt.expectError)
+				return
+			}
+
+			require.NoError(t, validationErr)
+			assert.Equal(t, tt.expected.packageName, pkg)
+			assert.Equal(t, tt.expected.version, ver)
+			assert.Equal(t, tt.expected.isShortcut, shortcut)
+		})
+	}
+}
+
+func TestInputParseFoundationalStore(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       Input
+		expectError string
+	}{
+		{
+			name: "grpc_no_longer_supported_here",
+			input: Input{
+				FoundationalStore: "grpc://localhost:50051",
+			},
+			expectError: "invalid foundational-store identifier",
+		},
+		{
+			name: "valid package notation",
+			input: Input{
+				FoundationalStore: "account-owners@v1.0.0",
+			},
+			expectError: "",
+		},
+		{
+			name: "invalid package notation - empty package",
+			input: Input{
+				FoundationalStore: "@v1.0.0",
+			},
+			expectError: "invalid foundational-store identifier",
+		},
+		{
+			name: "invalid package notation - empty version (interpreted as latest, which is forbidden)",
+			input: Input{
+				FoundationalStore: "account-owners@",
+			},
+			expectError: `version "latest" is not supported`,
+		},
+		{
+			name: "invalid package notation - bad version",
+			input: Input{
+				FoundationalStore: "account-owners@1.0.0",
+			},
+			expectError: "not valid Semver",
+		},
+		{
+			name: "unsupported_format_http",
+			input: Input{
+				FoundationalStore: "http://not-supported",
+			},
+			expectError: "invalid foundational-store identifier",
+		},
+		{
+			name: "completely invalid format",
+			input: Input{
+				FoundationalStore: "totally-random-string",
+			},
+			expectError: "expected package@version",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.input.parseFoundationalStore()
+
+			if tt.expectError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectError)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestFoundationalStore_HashBehavior(t *testing.T) {
+	mkModule := func(identifier string) *pbsubstreams.Module {
+		return &pbsubstreams.Module{
+			Name: "m",
+			Kind: &pbsubstreams.Module_KindMap_{
+				KindMap: &pbsubstreams.Module_KindMap{
+					OutputType: "proto:sf.substreams.test.v1.Dummy",
+				},
+			},
+			Inputs: []*pbsubstreams.Module_Input{
+				{
+					Input: &pbsubstreams.Module_Input_FoundationalStore{
+						FoundationalStore: &pbsubstreams.Module_FoundationalStore{
+							Identifier: identifier,
+						},
+					},
+				},
+			},
+		}
+	}
+	mkPackage := func(identifier string) *pbsubstreams.Package {
+		return &pbsubstreams.Package{
+			Version: 1,
+			Modules: &pbsubstreams.Modules{
+				Modules: []*pbsubstreams.Module{mkModule(identifier)},
+			},
+			Network: "testnet",
+		}
+	}
+	hash := func(m proto.Message) string {
+		b, err := proto.MarshalOptions{Deterministic: true}.Marshal(m)
+		require.NoError(t, err)
+		sum := sha256.Sum256(b)
+		return hex.EncodeToString(sum[:])
+	}
+
+	type tc struct {
+		name        string
+		scope       string
+		idA         string
+		idB         string
+		expectEqual bool
+	}
+	tests := []tc{
+		// different hash
+		{
+			name:        "module: version change",
+			scope:       "module",
+			idA:         "account-owners@v1.0.0",
+			idB:         "account-owners@v1.0.1",
+			expectEqual: false,
+		},
+		// different hash
+		{
+			name:        "package: version change",
+			scope:       "package",
+			idA:         "account-owners@v1.0.0",
+			idB:         "account-owners@v1.0.1",
+			expectEqual: false,
+		},
+		// same hash
+		{
+			name:        "module: same identifier",
+			scope:       "module",
+			idA:         "account-owners@v1.2.3",
+			idB:         "account-owners@v1.2.3",
+			expectEqual: true,
+		},
+		// same hash
+		{
+			name:        "package: same identifier",
+			scope:       "package",
+			idA:         "account-owners@v1.2.3",
+			idB:         "account-owners@v1.2.3",
+			expectEqual: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var hA, hB string
+			switch tt.scope {
+			case "module":
+				hA = hash(mkModule(tt.idA))
+				hB = hash(mkModule(tt.idB))
+			case "package":
+				hA = hash(mkPackage(tt.idA))
+				hB = hash(mkPackage(tt.idB))
+			default:
+				t.Fatalf("unknown scope %q", tt.scope)
+			}
+
+			if tt.expectEqual {
+				require.Equal(t, hA, hB)
+			} else {
+				require.NotEqual(t, hA, hB)
+			}
+		})
+	}
+}

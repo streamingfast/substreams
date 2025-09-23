@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	wasmtime "github.com/bytecodealliance/wasmtime-go/v30"
+	wasmtime "github.com/bytecodealliance/wasmtime-go/v36"
 	"go.uber.org/zap"
 
 	"github.com/streamingfast/substreams/reqctx"
@@ -12,9 +12,10 @@ import (
 )
 
 type Module struct {
-	module   *wasmtime.Module
-	engine   *wasmtime.Engine
-	registry *wasm.Registry
+	module            *wasmtime.Module
+	engine            *wasmtime.Engine
+	registry          *wasm.Registry
+	runtimeExtensions wasm.RuntimeExtensions
 }
 
 func init() {
@@ -29,6 +30,15 @@ func newModule(ctx context.Context, wasmCode []byte, wasmCodeType string, regist
 
 	engine := wasmtime.NewEngineWithConfig(cfg)
 
+	wasmCodeTypeID, runtimeExtensions, err := wasm.ParseWASMCodeType(wasmCodeType)
+	if err != nil {
+		return nil, fmt.Errorf("invalid wasm code type %q: %w", wasmCodeType, err)
+	}
+
+	// For now, we only support the basic wasmCodeTypeID without specific handling
+	// TODO: Add support for different wasmCodeTypeID variants if needed
+	_ = wasmCodeTypeID
+
 	module, err := wasmtime.NewModule(engine, wasmCode)
 	if err != nil {
 		return nil, fmt.Errorf("creating new module: %w", err)
@@ -38,9 +48,10 @@ func newModule(ctx context.Context, wasmCode []byte, wasmCodeType string, regist
 	// instantiation time.
 
 	return &Module{
-		module:   module,
-		engine:   engine,
-		registry: registry,
+		module:            module,
+		engine:            engine,
+		registry:          registry,
+		runtimeExtensions: runtimeExtensions,
 	}, nil
 }
 
@@ -91,6 +102,7 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 
 	var args []interface{}
 	var inputStoreCount int
+	var foundationalStoreCount int
 
 	for _, input := range arguments {
 		switch v := input.(type) {
@@ -114,6 +126,9 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 			}
 			length := int32(len(cnt))
 			args = append(args, ptr, length)
+		case *wasm.FoundationalStoreInput:
+			args = append(args, int32(foundationalStoreCount))
+			foundationalStoreCount++
 		default:
 			panic("unknown wasm argument type")
 		}
@@ -122,7 +137,7 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 	inst.CurrentCall = call
 	_, err = entrypoint.Call(inst.wasmStore, args...)
 	if err != nil {
-		return inst, fmt.Errorf("call: %w", err)
+		return inst, fmt.Errorf("calling entrypoint: %w", err)
 	}
 
 	return inst, nil
@@ -151,6 +166,14 @@ func (m *Module) newInstance(ctx context.Context) (*instance, error) {
 			}
 		}
 	}
+
+	// Handle wasm-bindgen-shims if enabled
+	if m.runtimeExtensions.Has(wasm.RuntimeExtensionIDWASMBindgenShims) {
+		if err := m.addWASMBindgenShims(ctx, linker, store); err != nil {
+			return nil, fmt.Errorf("adding wasm-bindgen shims: %w", err)
+		}
+	}
+
 	instance, err := i.wasmLinker.Instantiate(i.wasmStore, i.wasmModule)
 	if err != nil {
 		return nil, fmt.Errorf("creating new instance: %w", err)
@@ -166,4 +189,76 @@ func (m *Module) newInstance(ctx context.Context) (*instance, error) {
 	i.Heap = heap
 	i.wasmInstance = instance
 	return i, nil
+}
+
+// addWASMBindgenShims adds shim functions for wasm-bindgen modules
+func (m *Module) addWASMBindgenShims(_ context.Context, linker *wasmtime.Linker, store *wasmtime.Store) error {
+	// Gather unbound imports to see what we actually need to shim
+	unboundedImports := m.gatherUnboundedModuleImports(linker, store)
+
+	for moduleName, imports := range unboundedImports {
+		_, found := wasm.WASMBindgenModules[moduleName]
+		if !found {
+			// We only shim bindgen modules, it will fail later since this module we skip is unbound
+			continue
+		}
+
+		if err := m.addShimModule(linker, store, moduleName, imports); err != nil {
+			return fmt.Errorf("adding shim module %q: %w", moduleName, err)
+		}
+	}
+	return nil
+}
+
+// addShimModule adds a shim module with dummy functions that panic when called
+func (m *Module) addShimModule(linker *wasmtime.Linker, store *wasmtime.Store, moduleName string, imports []*wasmtime.ImportType) error {
+	for _, imp := range imports {
+		funcName := imp.Name()
+		if funcName == nil {
+			continue
+		}
+
+		funcType := imp.Type().FuncType()
+		if funcType == nil {
+			continue
+		}
+
+		// Create a generic shim function that matches any signature and panics when called
+		shimFunc := wasmtime.NewFunc(store, funcType, func(*wasmtime.Caller, []wasmtime.Val) ([]wasmtime.Val, *wasmtime.Trap) {
+			panic(fmt.Errorf("you are trying to call %q from module %q for which Substreams provided a dummy"+
+				" implementation, you are allowed to have it referenced but it's forbidden to call it since"+
+				" we cannot provide a real implementation for it", *funcName, moduleName))
+		})
+
+		if err := linker.Define(store, moduleName, *funcName, shimFunc); err != nil {
+			return fmt.Errorf("defining shim function %q in module %q: %w", *funcName, moduleName, err)
+		}
+	}
+
+	return nil
+}
+
+// gatherUnboundedModuleImports returns a map of module names to their unbound imports
+func (m *Module) gatherUnboundedModuleImports(linker *wasmtime.Linker, store *wasmtime.Store) map[string][]*wasmtime.ImportType {
+	importsByModule := make(map[string][]*wasmtime.ImportType)
+
+	for _, imp := range m.module.Imports() {
+		moduleName := imp.Module()
+
+		// Only process function imports since we're creating function shims
+		if imp.Type().FuncType() == nil {
+			continue
+		}
+
+		// Check if this import is already bound in the linker
+		if imp.Name() != nil {
+			if existing := linker.Get(store, imp.Module(), *imp.Name()); existing != nil {
+				continue
+			}
+		}
+
+		importsByModule[moduleName] = append(importsByModule[moduleName], imp)
+	}
+
+	return importsByModule
 }

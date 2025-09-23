@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"buf.build/gen/go/bufbuild/reflect/connectrpc/go/buf/reflect/v1beta1/reflectv1beta1connect"
 	reflectv1beta1 "buf.build/gen/go/bufbuild/reflect/protocolbuffers/go/buf/reflect/v1beta1"
@@ -229,6 +230,8 @@ func loadDescriptorSets(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.Fil
 			seen[fd.GetName()] = true
 			out = append(out, fd)
 		}
+		// TEMP FIX FOR TEST DEPLOYMENT
+		time.Sleep(1020 * time.Millisecond)
 	}
 
 	for _, fd := range out {

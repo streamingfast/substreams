@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"regexp"
 
@@ -77,6 +78,35 @@ func (c *SubstreamsClientConfig) MarshalLogObject(encoder zapcore.ObjectEncoder)
 type InternalClientFactory = func() (cli pbssinternal.SubstreamsClient, closeFunc func() error, callOpts []grpc.CallOption, headers Headers, err error)
 
 func NewSubstreamsClientConfig(endpoint string, authToken string, authType AuthType, insecure bool, plaintext bool, agent string) *SubstreamsClientConfig {
+	// Check for http:// or https:// prefix and adjust settings accordingly
+	if len(endpoint) > 7 && endpoint[:7] == "http://" {
+		plaintext = true
+		parsedURL, err := url.Parse(endpoint)
+		if err == nil && parsedURL.Port() == "" {
+			// No port specified, append default port for HTTP
+			endpoint = parsedURL.Host + ":80"
+		} else if err == nil {
+			// Port is already specified or there was an error, just strip the scheme
+			endpoint = parsedURL.Host
+		} else {
+			// Fallback to simple stripping if parsing fails
+			endpoint = endpoint[7:]
+		}
+	} else if len(endpoint) > 8 && endpoint[:8] == "https://" {
+		plaintext = false
+		parsedURL, err := url.Parse(endpoint)
+		if err == nil && parsedURL.Port() == "" {
+			// No port specified, append default port for HTTPS
+			endpoint = parsedURL.Host + ":443"
+		} else if err == nil {
+			// Port is already specified or there was an error, just strip the scheme
+			endpoint = parsedURL.Host
+		} else {
+			// Fallback to simple stripping if parsing fails
+			endpoint = endpoint[8:]
+		}
+	}
+
 	return &SubstreamsClientConfig{
 		endpoint:  endpoint,
 		authToken: authToken,
@@ -135,13 +165,9 @@ func NewSubstreamsInternalClient(config *SubstreamsClientConfig) (cli pbssintern
 		}
 		dialOptions = append(dialOptions, grpc.WithTransportCredentials(creds))
 	} else {
-		if useInsecureTLSConnection && usePlainTextConnection {
-			return nil, nil, nil, nil, fmt.Errorf("option --insecure and --plaintext are mutually exclusive, they cannot be both specified at the same time")
-		}
 		switch {
 		case usePlainTextConnection:
 			zlog.Debug("setting plain text option")
-
 			dialOptions = []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
 
 		case useInsecureTLSConnection:

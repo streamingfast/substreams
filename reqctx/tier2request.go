@@ -13,7 +13,8 @@ type Tier2RequestParameters struct {
 
 	BlockType string
 
-	WASMModules map[string]string
+	WASMModules                map[string]string
+	FoundationalStoreEndpoints map[string]string
 }
 
 func WithTier2RequestParameters(ctx context.Context, parameters Tier2RequestParameters) context.Context {

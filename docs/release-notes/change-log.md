@@ -11,11 +11,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Server
+
+* Added wasm-bindgen-shims support for WASMTime runtime to handle WASM modules with wasm-bindgen imports (when Substreams Module binary is defined as type `wasm/rust-v1+wasm-bindgen-shims`).
+
 ### Server and Client
 
 * Added support to foundational-store for wasmtime and wazero.
 * Added foundational-store grpc client to substreams engine.
-* Added wasm-bindgen-shims support for wasmtime runtime to handle WASM modules with wasm-bindgen imports.
 * Fixed module caching to properly handle modules with different runtime extensions.
 
 ### CLI

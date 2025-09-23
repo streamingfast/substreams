@@ -194,7 +194,7 @@ func (m *Module) newInstance(ctx context.Context) (*instance, error) {
 // addWASMBindgenShims adds shim functions for wasm-bindgen modules
 func (m *Module) addWASMBindgenShims(_ context.Context, linker *wasmtime.Linker, store *wasmtime.Store) error {
 	// Gather unbound imports to see what we actually need to shim
-	unboundedImports := m.gatherUnboundedModuleImports()
+	unboundedImports := m.gatherUnboundedModuleImports(linker, store)
 
 	for moduleName, imports := range unboundedImports {
 		_, found := wasm.WASMBindgenModules[moduleName]
@@ -231,8 +231,7 @@ func (m *Module) addShimModule(linker *wasmtime.Linker, store *wasmtime.Store, m
 		})
 
 		if err := linker.Define(store, moduleName, *funcName, shimFunc); err != nil {
-			// This is expected since we're registering functions that may not all be needed
-			continue
+			return fmt.Errorf("defining shim function %q in module %q: %w", *funcName, moduleName, err)
 		}
 	}
 
@@ -240,12 +239,24 @@ func (m *Module) addShimModule(linker *wasmtime.Linker, store *wasmtime.Store, m
 }
 
 // gatherUnboundedModuleImports returns a map of module names to their unbound imports
-func (m *Module) gatherUnboundedModuleImports() map[string][]*wasmtime.ImportType {
+func (m *Module) gatherUnboundedModuleImports(linker *wasmtime.Linker, store *wasmtime.Store) map[string][]*wasmtime.ImportType {
 	importsByModule := make(map[string][]*wasmtime.ImportType)
 
 	for _, imp := range m.module.Imports() {
 		moduleName := imp.Module()
-		// Check if this module is already bound in the linker
+
+		// Only process function imports since we're creating function shims
+		if imp.Type().FuncType() == nil {
+			continue
+		}
+
+		// Check if this import is already bound in the linker
+		if imp.Name() != nil {
+			if existing := linker.Get(store, imp.Module(), *imp.Name()); existing != nil {
+				continue
+			}
+		}
+
 		importsByModule[moduleName] = append(importsByModule[moduleName], imp)
 	}
 

@@ -35,6 +35,12 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
+// moduleKey combines binary index and type to handle cases where the same binary is used with different runtime extensions (wasm-bindgen-shims)
+type moduleKey struct {
+	binaryIndex uint32
+	binaryType  string
+}
+
 type processingModule struct {
 	name            string
 	initialBlockNum uint64
@@ -54,7 +60,7 @@ type Pipeline struct {
 
 	wasmRuntime   *wasm.Registry
 	execGraph     *exec.Graph
-	loadedModules map[uint32]wasm.Module
+	loadedModules map[moduleKey]wasm.Module
 	// StagedModuleExecutors represents all the modules within a stage that should be executed. The
 	// first level of the 2D list represents layer within a stage to execute sequentially.
 	// The second level contains modules to execute within a layer, those can be executed concurrently.
@@ -659,19 +665,20 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 	reqModules := reqctx.Details(ctx).Modules
 	tracer := otel.GetTracerProvider().Tracer("executor")
 
-	loadedModules := make(map[uint32]wasm.Module)
+	loadedModules := make(map[moduleKey]wasm.Module)
 	for _, stage := range p.executionStages {
 		for _, layer := range stage {
 			for _, module := range layer {
-				if _, exists := loadedModules[module.BinaryIndex]; exists {
+				code := reqModules.Binaries[module.BinaryIndex]
+				key := moduleKey{binaryIndex: module.BinaryIndex, binaryType: code.Type}
+				if _, exists := loadedModules[key]; exists {
 					continue
 				}
-				code := reqModules.Binaries[module.BinaryIndex]
 				m, err := p.wasmRuntime.NewModule(ctx, code.Content, code.Type)
 				if err != nil {
 					return fmt.Errorf("new wasm module: %w", err)
 				}
-				loadedModules[module.BinaryIndex] = m
+				loadedModules[key] = m
 			}
 		}
 	}
@@ -707,7 +714,9 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 				}
 
 				entrypoint := module.BinaryEntrypoint
-				mod := loadedModules[module.BinaryIndex]
+				code := reqModules.Binaries[module.BinaryIndex]
+				key := moduleKey{binaryIndex: module.BinaryIndex, binaryType: code.Type}
+				mod := loadedModules[key]
 
 				foundationalStores := getFoundationalStores(inputs)
 				switch kind := module.Kind.(type) {
@@ -797,9 +806,9 @@ func (p *Pipeline) cleanUpModuleExecutors(ctx context.Context, logger *zap.Logge
 			}
 		}
 	}
-	for idx, mod := range p.loadedModules {
+	for key, mod := range p.loadedModules {
 		if err := mod.Close(ctx); err != nil {
-			return fmt.Errorf("closing wasm module %d: %w", idx, err)
+			return fmt.Errorf("closing wasm module %+v: %w", key, err)
 		}
 	}
 	// tear down any foundational store gRPC clients

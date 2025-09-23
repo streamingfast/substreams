@@ -22,7 +22,7 @@ In the `Output` screen of the Substreams GUI you can see there is a transaction 
 
 <figure><img src="../../../../.gitbook/assets/tutorials/solana-filter-transactions-output.png" width="100%" /></figure>
 
-You can change the signature hash in `params` section of the the Substreams Manifest (`substreams.yaml`):
+You can change the signature hash in `params` section of the Substreams Manifest (`substreams.yaml`):
 
 ```yaml
 params:

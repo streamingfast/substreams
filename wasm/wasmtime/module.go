@@ -169,7 +169,7 @@ func (m *Module) newInstance(ctx context.Context) (*instance, error) {
 
 	// Handle wasm-bindgen-shims if enabled
 	if m.runtimeExtensions.Has(wasm.RuntimeExtensionIDWASMBindgenShims) {
-		if err := m.addWASMBindgenShims(ctx, linker); err != nil {
+		if err := m.addWASMBindgenShims(ctx, linker, store); err != nil {
 			return nil, fmt.Errorf("adding wasm-bindgen shims: %w", err)
 		}
 	}
@@ -192,10 +192,18 @@ func (m *Module) newInstance(ctx context.Context) (*instance, error) {
 }
 
 // addWASMBindgenShims adds shim functions for wasm-bindgen modules
-func (m *Module) addWASMBindgenShims(ctx context.Context, linker *wasmtime.Linker) error {
-	// Register shim functions for known wasm-bindgen modules
-	for moduleName := range wasm.WASMBindgenModules {
-		if err := m.addShimModule(linker, moduleName); err != nil {
+func (m *Module) addWASMBindgenShims(_ context.Context, linker *wasmtime.Linker, store *wasmtime.Store) error {
+	// Gather unbound imports to see what we actually need to shim
+	unboundedImports := m.gatherUnboundedModuleImports()
+
+	for moduleName, imports := range unboundedImports {
+		_, found := wasm.WASMBindgenModules[moduleName]
+		if !found {
+			// We only shim bindgen modules, it will fail later since this module we skip is unbound
+			continue
+		}
+
+		if err := m.addShimModule(linker, store, moduleName, imports); err != nil {
 			return fmt.Errorf("adding shim module %q: %w", moduleName, err)
 		}
 	}
@@ -203,42 +211,43 @@ func (m *Module) addWASMBindgenShims(ctx context.Context, linker *wasmtime.Linke
 }
 
 // addShimModule adds a shim module with dummy functions that panic when called
-func (m *Module) addShimModule(linker *wasmtime.Linker, moduleName string) error {
-	// For now, we'll add some common wasm-bindgen functions that are typically imported
-	// This is a simplified approach - in a more complete implementation, we would
-	// inspect the module's imports to determine exactly what functions are needed
-	
-	commonBindgenFunctions := []string{
-		"__wbindgen_object_drop_ref",
-		"__wbindgen_string_new",
-		"__wbindgen_throw",
-		"__wbg_new_abda76e883ba8a5f",
-		"__wbg_stack_658279fe44541cf6",
-		"__wbg_error_f851667af71bcfc6",
-		"__wbindgen_object_clone_ref",
-		"__wbindgen_cb_drop",
-		"__wbindgen_add_to_stack_pointer",
-		"__wbindgen_free",
-		"__wbindgen_malloc",
-		"__wbindgen_realloc",
-	}
+func (m *Module) addShimModule(linker *wasmtime.Linker, store *wasmtime.Store, moduleName string, imports []*wasmtime.ImportType) error {
+	for _, imp := range imports {
+		funcName := imp.Name()
+		if funcName == nil {
+			continue
+		}
 
-	for _, funcName := range commonBindgenFunctions {
-		// Create a shim function that panics with an appropriate error message
-		shimFunc := func(funcName, moduleName string) interface{} {
-			return func() {
-				panic(fmt.Errorf("you are trying to call %q from module %q for which Substreams provided a dummy"+
-					" implementation, you are allowed to have it referenced but it's forbidden to call it since"+
-					" we cannot provide a real implementation for it", funcName, moduleName))
-			}
-		}(funcName, moduleName)
+		funcType := imp.Type().FuncType()
+		if funcType == nil {
+			continue
+		}
 
-		if err := linker.FuncWrap(moduleName, funcName, shimFunc); err != nil {
-			// Ignore errors for functions that don't match the expected signature
-			// This is expected since we're registering common functions that may not all be needed
+		// Create a generic shim function that matches any signature and panics when called
+		shimFunc := wasmtime.NewFunc(store, funcType, func(*wasmtime.Caller, []wasmtime.Val) ([]wasmtime.Val, *wasmtime.Trap) {
+			panic(fmt.Errorf("you are trying to call %q from module %q for which Substreams provided a dummy"+
+				" implementation, you are allowed to have it referenced but it's forbidden to call it since"+
+				" we cannot provide a real implementation for it", *funcName, moduleName))
+		})
+
+		if err := linker.Define(store, moduleName, *funcName, shimFunc); err != nil {
+			// This is expected since we're registering functions that may not all be needed
 			continue
 		}
 	}
 
 	return nil
+}
+
+// gatherUnboundedModuleImports returns a map of module names to their unbound imports
+func (m *Module) gatherUnboundedModuleImports() map[string][]*wasmtime.ImportType {
+	importsByModule := make(map[string][]*wasmtime.ImportType)
+
+	for _, imp := range m.module.Imports() {
+		moduleName := imp.Module()
+		// Check if this module is already bound in the linker
+		importsByModule[moduleName] = append(importsByModule[moduleName], imp)
+	}
+
+	return importsByModule
 }

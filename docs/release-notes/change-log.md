@@ -9,16 +9,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v1.16.6
 
 ### Server
-* Updated Wasmtime runtime from v30.0.0 to v36.0.0, bringing performance improvements, inlining support, Component Model async implementation, and enhanced security features.
 
-* Added WASM bindgen shims support for WASMTime runtime to handle WASM modules with WASM bindgen imports (when Substreams Module binary is defined as type `wasm/rust-v1+wasm-bindgen-shims`).
+* Updated Wasmtime runtime from v30.0.0 to v36.0.0, bringing performance improvements, inlining support, Component Model async implementation, and enhanced security features.
+* Added WASM bindgen shims support for Wasmtime runtime to handle WASM modules with WASM bindgen imports (when Substreams Module binary is defined as type `wasm/rust-v1+wasm-bindgen-shims`).
 
 ### Server and Client
 
-* Added support to foundational-store for wasmtime and wazero.
+* Added support for foundational-store (in wasmtime and wazero).
 * Added foundational-store grpc client to substreams engine.
 * Fixed module caching to properly handle modules with different runtime extensions.
 

@@ -199,13 +199,13 @@ func runRegistryPublish(cmd *cobra.Command, args []string) (err error) {
 			fmt.Println("Make sure you are properly authenticated with:")
 			fmt.Println("")
 			fmt.Println(cli.PurpleStyle.Render("substreams registry login"))
-			return nil
+			return fmt.Errorf("authentication failed: %s", string(b))
 		}
 
 		fmt.Println("")
 		fmt.Println(cli.ErrorStyle.Render("Failed to publish package"))
 		fmt.Println(cli.ErrorStyle.Render("Reason: " + string(b)))
-		return nil
+		return fmt.Errorf("publishing failed: %s", string(b))
 	}
 
 	registryURL := gjson.Get(string(b), "registry_url").String()

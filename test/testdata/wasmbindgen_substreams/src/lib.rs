@@ -2,7 +2,7 @@ mod pb;
 
 use std::str::FromStr;
 
-use crate::pb::test;
+use crate::pb::sf::substreams::v1::test;
 use solana_program::pubkey::Pubkey;
 use substreams;
 

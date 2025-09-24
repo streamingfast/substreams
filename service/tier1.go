@@ -885,7 +885,7 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 		mut.Lock()
 		defer mut.Unlock()
 
-		// this reponse handler is used in goroutines, sending to streamSrv on closed ctx would panic
+		// this response handler is used in goroutines, sending to streamSrv on closed ctx would panic
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}

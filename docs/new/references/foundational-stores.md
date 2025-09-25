@@ -50,7 +50,7 @@ The **Server** exposes a high-performance gRPC API:
 Foundational stores are available for various blockchain ecosystems, each optimized for specific data patterns and use cases:
 
 ### Ethereum
-- [ERC20 Token Metadata](foundational-stores/ethereum/erc20-token-metadata.md) - Store and serve ERC20 token metadata and balances
+- [ERC20 Token Metadata](../how-to-guides/foundational-stores/ethereum/erc20-token-metadata.md) - Store and serve ERC20 token metadata and balances
 
 ### Solana
-- [SPL Initialized Account](foundational-stores/solana/spl-initialized-account.md) - Track SPL token account initialization and ownership
+- [SPL Initialized Account](../how-to-guides/foundational-stores/solana/spl-initialized-account.md) - Track SPL token account initialization and ownership

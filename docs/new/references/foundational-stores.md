@@ -45,12 +45,3 @@ The **Server** exposes a high-performance gRPC API:
 - **Block Validation**: Ensures requested blocks have been processed
 - **Response Codes**: Clear status indicators (FOUND, NOT_FOUND, NOT_FOUND_BLOCK_NOT_REACHED)
 
-## Chain-Specific Foundational Stores
-
-Foundational stores are available for various blockchain ecosystems, each optimized for specific data patterns and use cases:
-
-### Ethereum
-- [ERC20 Token Metadata](../how-to-guides/foundational-stores/ethereum/erc20-token-metadata.md) - Store and serve ERC20 token metadata and balances
-
-### Solana
-- [SPL Initialized Account](../how-to-guides/foundational-stores/solana/spl-initialized-account.md) - Track SPL token account initialization and ownership

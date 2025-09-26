@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
+	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
@@ -29,7 +30,14 @@ type SinkerConfig struct {
 	LimitProcessedBlocks uint64
 
 	// Block processing configuration
-	StartBlock      int64
+	// StartBlock is always defined, defaults to module initial block if not set by the user, 0 if module initial block is not set
+	// which means start from chain's first streamable block.
+	StartBlock int64
+	// StopBlock is optional, 0 means run until the chain's head and should be treated as infinite/open-ended
+	// stream of blocks.
+	//
+	// The stop block is considered exclusive, meaning if you set StopBlock to 100, the last block processed
+	// will be 99.
 	StopBlock       uint64
 	UndoBufferSize  int
 	FinalBlocksOnly bool
@@ -60,6 +68,16 @@ type SinkerConfig struct {
 	Params                []string
 	Network               string
 	SkipPackageValidation bool
+}
+
+// BlockRange returns a bstream.Range representing the start and stop blocks configured
+// in the SinkerConfig. If StopBlock is 0, it returns an open-ended range starting from StartBlock.
+func (c *SinkerConfig) BlockRange() *bstream.Range {
+	if c.StopBlock == 0 {
+		return bstream.NewOpenRange(uint64(c.StartBlock))
+	}
+
+	return bstream.NewRangeExcludingEnd(uint64(c.StartBlock), uint64(c.StopBlock))
 }
 
 // ExtractDefaultParams extracts default parameter values from the package modules

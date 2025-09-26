@@ -6,6 +6,13 @@ import (
 	"github.com/streamingfast/dmetrics"
 )
 
+// RegisterMetrics registers all sink-related metrics.
+//
+// Deprecated: the metrics are now auto-registered on Sinker.Run call, remove this call.
+func RegisterMetrics() {
+	Metrics.Register()
+}
+
 var Metrics = dmetrics.NewSet()
 
 var HeadBlockNumber = Metrics.NewHeadBlockNumber("substreams_sink")

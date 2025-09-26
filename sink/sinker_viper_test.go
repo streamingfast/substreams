@@ -10,7 +10,7 @@ import (
 func TestAddFlagsToSet(t *testing.T) {
 	tests := []struct {
 		name          string
-		ignore        []FlagIgnored
+		ignore        []FlagInclusionExclusion
 		expectedFlags []string
 	}{
 		{
@@ -42,7 +42,7 @@ func TestAddFlagsToSet(t *testing.T) {
 		},
 		{
 			"ignore one",
-			[]FlagIgnored{FlagIgnore(FlagInsecure)},
+			[]FlagInclusionExclusion{FlagExcludeDefault(FlagInsecure)},
 			[]string{
 				FlagEndpoint,
 				FlagStartBlock,
@@ -68,7 +68,7 @@ func TestAddFlagsToSet(t *testing.T) {
 		},
 		{
 			"ignore one multiple",
-			[]FlagIgnored{FlagIgnore(FlagInsecure, FlagPlaintext)},
+			[]FlagInclusionExclusion{FlagExcludeDefault(FlagInsecure, FlagPlaintext)},
 			[]string{
 				FlagEndpoint,
 				FlagStartBlock,
@@ -93,7 +93,7 @@ func TestAddFlagsToSet(t *testing.T) {
 		},
 		{
 			"ignore multiple",
-			[]FlagIgnored{FlagIgnore(FlagInsecure), FlagIgnore(FlagPlaintext)},
+			[]FlagExcludeDefaultd{FlagExcludeDefault(FlagInsecure), FlagExcludeDefault(FlagPlaintext)},
 			[]string{
 				FlagEndpoint,
 				FlagStartBlock,
@@ -118,7 +118,7 @@ func TestAddFlagsToSet(t *testing.T) {
 		},
 		{
 			"ignore mixed",
-			[]FlagIgnored{FlagIgnore(FlagInsecure), FlagIgnore(FlagPlaintext, FlagLiveBlockTimeDelta), FlagIgnore(FlagProtoPath, FlagProtoDescriptorSet)},
+			[]FlagExcludeDefaultd{FlagExcludeDefault(FlagInsecure), FlagExcludeDefault(FlagPlaintext, FlagLiveBlockTimeDelta), FlagExcludeDefault(FlagProtoPath, FlagProtoDescriptorSet)},
 			[]string{
 				FlagEndpoint,
 				FlagStartBlock,
@@ -140,7 +140,7 @@ func TestAddFlagsToSet(t *testing.T) {
 		},
 		{
 			"ignore final block",
-			[]FlagIgnored{FlagIgnore(FlagFinalBlocksOnly), FlagIgnore(FlagProtoPath, FlagProtoDescriptorSet)},
+			[]FlagExcludeDefaultd{FlagExcludeDefault(FlagFinalBlocksOnly), FlagExcludeDefault(FlagProtoPath, FlagProtoDescriptorSet)},
 			[]string{
 				FlagEndpoint,
 				FlagStartBlock,

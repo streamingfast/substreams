@@ -16,13 +16,15 @@ import (
 )
 
 func init() {
-
-	// default sinker flags
 	sink.AddFlagsToSet(runCmd.Flags(),
-		sink.FlagIgnore(
+		sink.FlagIncludeOptional(
+			sink.FlagCursor,
+		),
+		sink.FlagExcludeDefault(
 			sink.FlagDevelopmentMode,
 			sink.FlagLiveBlockTimeDelta,
-		))
+		),
+	)
 
 	runCmd.Flags().Bool("production-mode", false, "Enable Production Mode, with high-speed parallel processing")
 	runCmd.Flags().Uint64("limit-processed-blocks", 10000, "Limit the number of blocks to be processed by the server, including preparing the stores, as a safeguard to prevent unexpected expensive reprocessing (0 disables the limit)")
@@ -30,8 +32,8 @@ func init() {
 
 	runCmd.Flags().StringP("output", "o", "", "Output mode, one of: [tui (and ui), json, jsonl, clock] Defaults to 'tui' when in a TTY is present, and 'json' otherwise")
 
-	runCmd.Flags().String("test-file", "", "runs a test file")
-	runCmd.Flags().Bool("test-verbose", false, "print out all the results")
+	runCmd.Flags().String("test-file", "", "Runs a test file")
+	runCmd.Flags().Bool("test-verbose", false, "Print out all the results")
 
 	rootCmd.AddCommand(runCmd)
 }
@@ -81,7 +83,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	sinkerConfig.LimitProcessedBlocks = sflags.MustGetUint64(cmd, "limit-processed-blocks")
 
-	sinker, err := sink.New(sinkerConfig)
+	sinker, err := sink.NewFromConfig(sinkerConfig)
 	if err != nil {
 		return fmt.Errorf("creating sink: %w", err)
 	}

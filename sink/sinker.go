@@ -17,8 +17,10 @@ import (
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dgrpc"
 	"github.com/streamingfast/dmetrics"
+	"github.com/streamingfast/logging"
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/client"
+	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
@@ -49,11 +51,47 @@ type Sinker struct {
 	requestActiveStartBlock uint64
 }
 
+// New creates a new Sinker instance with the provided parameters.
+//
+// Deprecated: use NewFromConfig instead which takes a SinkerConfig struct, most options can
+// simply be applied to the SinkerConfig struct directly.
+func New(
+	mode SubstreamsMode,
+	noopMode bool,
+	pkg *pbsubstreams.Package,
+	outputModule *pbsubstreams.Module,
+	hash manifest.ModuleHash,
+	clientConfig *client.SubstreamsClientConfig,
+	logger *zap.Logger,
+	tracer logging.Tracer,
+	opts ...Option,
+) (*Sinker, error) {
+	sinker, err := NewFromConfig(&SinkerConfig{
+		Mode:             mode,
+		NoopMode:         noopMode,
+		Pkg:              pkg,
+		OutputModule:     outputModule,
+		OutputModuleHash: hash,
+		ClientConfig:     clientConfig,
+		Logger:           logger,
+		Tracer:           tracer,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, o := range opts {
+		o(sinker)
+	}
+
+	return sinker, nil
+}
+
 // New creates a new Sinker instance from the provided SinkerConfig.
 // This function replaces the previous Options pattern with a more structured
 // configuration approach. All configuration is now contained within the
 // SinkerConfig struct, making it easier to manage and test.
-func New(
+func NewFromConfig(
 	config *SinkerConfig,
 ) (*Sinker, error) {
 
@@ -111,12 +149,25 @@ func (s *substramsClientStringer) String() string {
 	return fmt.Sprintf("%s (insecure: %t, plaintext: %t, JWT present: %t)", config.Endpoint(), config.Insecure(), config.PlainText(), config.AuthToken() != "")
 }
 
+// StartBlock is always defined, defaults to module initial block if not set by the user, 0 if module initial block is not set
+// which means start from chain's first streamable block.
 func (s *Sinker) StartBlock() int64 {
 	return s.SinkerConfig.StartBlock
 }
 
+// StopBlock is optional, 0 means run until the chain's head and should be treated as infinite/open-ended
+// stream of blocks.
+//
+// The stop block is considered exclusive, meaning if you set StopBlock to 100, the last block processed
+// will be 99.
 func (s *Sinker) StopBlock() uint64 {
 	return s.SinkerConfig.StopBlock
+}
+
+// BlockRange returns a bstream.Range representing the start and stop blocks configured
+// in the SinkerConfig. If StopBlock is 0, it returns an open-ended range starting from StartBlock.
+func (s *Sinker) BlockRange() *bstream.Range {
+	return s.SinkerConfig.BlockRange()
 }
 
 func (s *Sinker) Package() *pbsubstreams.Package {

@@ -14,7 +14,10 @@ import (
 func init() {
 	// default sinker flags
 	sink.AddFlagsToSet(sinkWebhookCmd.Flags(),
-		sink.FlagIgnore(
+		sink.FlagIncludeOptional(
+			sink.FlagCursor,
+		),
+		sink.FlagExcludeDefault(
 			sink.FlagDevelopmentMode,
 			sink.FlagLiveBlockTimeDelta,
 			sink.FlagMaxRetries,

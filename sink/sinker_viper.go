@@ -48,137 +48,184 @@ const (
 	FlagPrometheusAddr        = "prometheus-addr"
 )
 
-func FlagIgnore(in ...string) FlagIgnored {
-	return flagIgnoredList(in)
+type FlagInclusionExclusion interface {
+	IsExplicitlyIncluded(flag string) bool
+	IsExplicitlyExcluded(flag string) bool
 }
 
-type FlagIgnored interface {
-	IsIgnored(flag string) bool
+// Deprecated: Use FlagInclusionExclusion instead
+type FlagIgnored = FlagInclusionExclusion
+
+// FlagExcludeDefault can be used to exclude one or more of the default flags from being added to a flag set
+// when using [AddFlagsToSet].
+func FlagExcludeDefault(in ...string) FlagInclusionExclusion {
+	return flagsExclusion(in)
 }
 
-type flagIgnoredList []string
+// FlagIncludeOptional can be used to include one or more optional flags to be added to a flag set
+// when using [AddFlagsToSet].
+func FlagIncludeOptional(in ...string) FlagInclusionExclusion {
+	return flagsInclusion(in)
+}
 
-func (i flagIgnoredList) IsIgnored(flag string) bool {
+// Deprecated: use FlagExclude instead
+var FlagIgnore = FlagExcludeDefault
+
+type flagsExclusion []string
+
+func (i flagsExclusion) IsExplicitlyIncluded(flag string) bool {
+	return false
+}
+
+func (i flagsExclusion) IsExplicitlyExcluded(flag string) bool {
 	return slices.Contains(i, flag)
 }
 
-// AddFlagsToSet can be used to import standard flags needed for sink to configure itself. By using
+type flagsInclusion []string
+
+func (i flagsInclusion) IsExplicitlyIncluded(flag string) bool {
+	return slices.Contains(i, flag)
+}
+
+func (i flagsInclusion) IsExplicitlyExcluded(flag string) bool {
+	return false
+}
+
+// AddFlagsToSet can be used to import standard flags a controls which flags to ignore (if default
+// is to include it) or include (if default is to ignore it).
+//
+//	needed for sink to configure itself. By using
+//
 // this method to define your flag and using `cli.ConfigureViper` (import "github.com/streamingfast/cli")
 // in your main application command, `NewFromViper` is usable to easily create a `sink.Sinker` instance.
 //
-// Defines
+// # Default Inclusion
 //
-//	Flag `--endpoint` (-e) (defaults `""`)
-//	Flag `--start-block` (-s) (defaults `""`)
-//	Flag `--stop-block` (-t) (defaults `""`)
-//	Flag `--cursor` (-c) (defaults `""`)
-//	Flag `--network` (defaults `""`)
-//	Flag `--params` (-p) (defaults `[]`)
-//	Flag `--insecure` (defaults `false`)
-//	Flag `--plaintext` (defaults `false`)
-//	Flag `--undo-buffer-size` (defaults `12`)
-//	Flag `--live-block-time-delta` (defaults `300*time.Second`)
-//	Flag `--development-mode` (defaults `false`)
-//	Flag `--noop-mode` (defaults `false`)
-//	Flag `--final-blocks-only` (defaults `false`)
-//	Flag `--max-retries` (defaults `3`)
-//	Flag `--skip-package-validation` (defaults `false`)
-//	Flag `--header` (-H) (defaults `[]`)
-//	Flag `--api-key-envvar` (default `SUBSTREAMS_API_KEY`)
-//	Flag `--api-token-envvar` (default `SUBSTREAMS_API_TOKEN`)
-//	Flag `--proto-path` (defaults `""`)
-//	Flag `--proto-descriptor-set` (defaults `""`)
-//	Flag `--prometheus-addr` (defaults `""`)
+// Added by default: [FlagEndpoint], [FlagStartBlock], [FlagStopBlock], [FlagNetwork], [FlagParams],
+// [FlagInsecure], [FlagPlaintext], [FlagUndoBufferSize], [FlagLiveBlockTimeDelta], [FlagDevelopmentMode],
+// [FlagFinalBlocksOnly], [FlagMaxRetries], [FlagSkipPackageValidation], [FlagExtraHeaders],
+// [FlagAPIKeyEnvvar], [FlagAPITokenEnvvar], [FlagProtoPath], [FlagProtoDescriptorSet], [FlagPrometheusAddr]
 //
-// The `ignore` field can be used to multiple times to avoid adding the specified
-// `flags` to the the set. This can be used for example to avoid adding `--final-blocks-only`
-// when the sink is always final only.
+// To avoid adding a default included flag, use [FlagExcludeDefault(<flag>, ...)].
 //
-//	AddFlagsToSet(flags, sink.FlagIgnore(sink.FlagFinalBlocksOnly))
-func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagIgnored) {
-	flagIncluded := func(x string) bool { return every(ignore, func(e FlagIgnored) bool { return !e.IsIgnored(x) }) }
+// # Possible Inclusion
+//
+// Not added by default but can be explicitly included: [FlagCursor].
+//
+// You add those flags by using [FlagIncludeOptional(<flag>, ...)].
+//
+// # Reference Table
+//
+//	[FlagEndpoint]: `--endpoint` (-e) (defaults `""`)
+//	[FlagStartBlock]: `--start-block` (-s) (defaults `""`)
+//	[FlagStopBlock]: `--stop-block` (-t) (defaults `""`)
+//	[FlagCursor]: `--cursor` (-c) (defaults `""`)
+//	[FlagNetwork]: `--network` (defaults `""`)
+//	[FlagParams]: `--params` (-p) (defaults `[]`)
+//	[FlagInsecure]: `--insecure` (defaults `false`)
+//	[FlagPlaintext]: `--plaintext` (defaults `false`)
+//	[FlagUndoBufferSize]: `--undo-buffer-size` (defaults `12`)
+//	[FlagLiveBlockTimeDelta]: `--live-block-time-delta` (defaults `300*time.Second`)
+//	[FlagDevelopmentMode]: `--development-mode` (defaults `false`)
+//	[FlagNoopMode]: `--noop-mode` (defaults `false`)
+//	[FlagFinalBlocksOnly]: `--final-blocks-only` (defaults `false`)
+//	[FlagMaxRetries]: `--max-retries` (defaults `3`)
+//	[FlagSkipPackageValidation]: `--skip-package-validation` (defaults `false`)
+//	[FlagExtraHeaders]: `--header` (-H) (defaults `[]`)
+//	[FlagAPIKeyEnvvar]: `--api-key-envvar` (default `SUBSTREAMS_API_KEY`)
+//	[FlagAPITokenEnvvar]: `--api-token-envvar` (default `SUBSTREAMS_API_TOKEN`)
+//	[FlagProtoPath]: `--proto-path` (defaults `""`)
+//	[FlagProtoDescriptorSet]: `--proto-descriptor-set` (defaults `""`)
+//	[FlagPrometheusAddr]: `--prometheus-addr` (defaults `""`)
+func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagInclusionExclusion) {
+	defaultFlagIncluded := func(x string) bool {
+		return every(ignore, func(e FlagInclusionExclusion) bool { return !e.IsExplicitlyExcluded(x) })
+	}
+	optionalFlagIncluded := func(x string) bool {
+		return some(ignore, func(e FlagInclusionExclusion) bool { return e.IsExplicitlyIncluded(x) })
+	}
 
-	if flagIncluded(FlagEndpoint) {
+	if defaultFlagIncluded(FlagEndpoint) {
 		flags.StringP(FlagEndpoint, ShortFlagEndoint, "", "Substreams gRPC endpoint (supports http:// or https:// prefix). If empty, will be replaced by the SUBSTREAMS_ENDPOINT_{network_name} environment variable, where `network_name` is determined from the substreams manifest. Defaults to SSL unless prefixed with `http://` or if `--plaintext` flag is used.")
 	}
 
-	if flagIncluded(FlagStartBlock) {
+	if defaultFlagIncluded(FlagStartBlock) {
 		flags.StringP(FlagStartBlock, ShortFlagStartBlock, "", "Start block to stream from. If empty, will be replaced by initialBlock of the first module you are streaming. If negative, will be resolved by the server relative to the chain head")
 	}
 
-	if flagIncluded(FlagStopBlock) {
+	if defaultFlagIncluded(FlagStopBlock) {
 		flags.StringP(FlagStopBlock, ShortFlagStopBlock, "0", "Stop block to end stream at, exclusively. If the start-block is positive, a '+' prefix can indicate 'relative to start-block'")
 	}
 
-	if flagIncluded(FlagCursor) {
+	if optionalFlagIncluded(FlagCursor) {
 		flags.StringP(FlagCursor, ShortFlagCursor, "", "Cursor to stream from. Leave blank for no cursor")
 	}
 
-	if flagIncluded(FlagNetwork) {
+	if defaultFlagIncluded(FlagNetwork) {
 		flags.String(FlagNetwork, "", "Specify the network to use for params and initialBlocks, overriding the 'network' field in the substreams package")
 	}
 
-	if flagIncluded(FlagParams) {
+	if defaultFlagIncluded(FlagParams) {
 		flags.StringArrayP(FlagParams, "p", nil, "Set a params for parameterizable modules. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
 	}
 
-	if flagIncluded(FlagInsecure) {
+	if defaultFlagIncluded(FlagInsecure) {
 		flags.Bool(FlagInsecure, false, "Skip certificate validation on GRPC connection")
 	}
 
-	if flagIncluded(FlagPlaintext) {
+	if defaultFlagIncluded(FlagPlaintext) {
 		flags.Bool(FlagPlaintext, false, "Use plaintext connection as default for endpoints without an http:// or https:// prefix")
 	}
 
-	if flagIncluded(FlagUndoBufferSize) {
+	if defaultFlagIncluded(FlagUndoBufferSize) {
 		flags.Int(FlagUndoBufferSize, 0, "Number of blocks to keep buffered to handle fork reorganizations")
 	}
 
-	if flagIncluded(FlagLiveBlockTimeDelta) {
+	if defaultFlagIncluded(FlagLiveBlockTimeDelta) {
 		flags.Duration(FlagLiveBlockTimeDelta, 0, "Consider chain live if block time is within this number of seconds of current time. If disabled, liveness is based on the cursor being 'finalized' or not")
 	}
 
-	if flagIncluded(FlagDevelopmentMode) {
+	if defaultFlagIncluded(FlagDevelopmentMode) {
 		flags.Bool(FlagDevelopmentMode, false, "Enable development mode, use it for testing purpose only, should not be used for production workload")
 	}
 
-	if flagIncluded(FlagNoopMode) {
+	if defaultFlagIncluded(FlagNoopMode) {
 		flags.Bool(FlagNoopMode, false, "Sends the request to the server with 'noop-mode', which will not send actual data, only populate the cache")
 	}
 
-	if flagIncluded(FlagFinalBlocksOnly) {
+	if defaultFlagIncluded(FlagFinalBlocksOnly) {
 		flags.Bool(FlagFinalBlocksOnly, false, "Only process blocks that have pass finality, to prevent any reorg and undo signal by staying further away from the chain HEAD")
 	}
 
-	if flagIncluded(FlagMaxRetries) {
+	if defaultFlagIncluded(FlagMaxRetries) {
 		flags.Int(FlagMaxRetries, 3, "Maximum number of retries for substreams calls (0 disables retries, -1 for infinite retries)")
 	}
 
-	if flagIncluded(FlagSkipPackageValidation) {
+	if defaultFlagIncluded(FlagSkipPackageValidation) {
 		flags.Bool(FlagSkipPackageValidation, false, "Do not perform any validation when reading substreams package")
 	}
 
-	if flagIncluded(FlagExtraHeaders) {
+	if defaultFlagIncluded(FlagExtraHeaders) {
 		flags.StringSliceP(FlagExtraHeaders, "H", nil, "Additional headers to be sent in the substreams request")
 	}
 
-	if flagIncluded(FlagAPIKeyEnvvar) {
+	if defaultFlagIncluded(FlagAPIKeyEnvvar) {
 		flags.String(FlagAPIKeyEnvvar, "SUBSTREAMS_API_KEY", "Name of variable containing Substreams Api Key")
 	}
 
-	if flagIncluded(FlagAPITokenEnvvar) {
+	if defaultFlagIncluded(FlagAPITokenEnvvar) {
 		flags.String(FlagAPITokenEnvvar, "SUBSTREAMS_API_TOKEN", "name of variable containing Substreams Authentication token")
 	}
 
-	if flagIncluded(FlagProtoPath) {
+	if defaultFlagIncluded(FlagProtoPath) {
 		flags.String(FlagProtoPath, "", "Path to proto files")
 	}
 
-	if flagIncluded(FlagProtoDescriptorSet) {
+	if defaultFlagIncluded(FlagProtoDescriptorSet) {
 		flags.String(FlagProtoDescriptorSet, "", "Path to proto descriptor set file")
 	}
 
-	if flagIncluded(FlagPrometheusAddr) {
+	if defaultFlagIncluded(FlagPrometheusAddr) {
 		flags.String(FlagPrometheusAddr, "localhost:9102", "Address to bind prometheus metrics server")
 	}
 
@@ -213,7 +260,7 @@ func NewFromViper(
 		return nil, fmt.Errorf("creating sinker config from viper: %w", err)
 	}
 
-	return New(config)
+	return NewFromConfig(config)
 }
 
 // ConfigFromViper creates a SinkerConfig from the provided Viper configuration.
@@ -436,4 +483,14 @@ func every[E any](s []E, test func(e E) bool) bool {
 	}
 
 	return true
+}
+
+func some[E any](s []E, test func(e E) bool) bool {
+	for _, element := range s {
+		if test(element) {
+			return true
+		}
+	}
+
+	return false
 }

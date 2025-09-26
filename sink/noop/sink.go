@@ -32,7 +32,7 @@ func NewSink(config SinkConfig) (*Sink, error) {
 	// This is usually a configuration rejected by the sinker, only useful in a noop situation
 	config.SinkerConfig.SupportIndexOutputProductionMode = true
 
-	sinker, err := sink.New(config.SinkerConfig)
+	sinker, err := sink.NewFromConfig(config.SinkerConfig)
 	if err != nil {
 		return nil, fmt.Errorf("creating sink: %w", err)
 	}

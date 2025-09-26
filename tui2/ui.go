@@ -58,7 +58,7 @@ func New(sinkerConfig *sink.SinkerConfig, tuiConfig *common.TUIConfig) (*UI, err
 	c := common.Common{}
 
 	// Create a sinker from the config
-	sinker, err := sink.New(sinkerConfig)
+	sinker, err := sink.NewFromConfig(sinkerConfig)
 	if err != nil {
 		return nil, err
 	}

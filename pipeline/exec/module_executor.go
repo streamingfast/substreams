@@ -62,6 +62,7 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 
 	if skipFromIndex(executor.BlockIndex(), execOutput) {
 		emptyOutput, _ := executor.toModuleOutput(nil)
+		emptyOutput.ModuleName = executor.Name() // always set the module name here to play well with sinks
 		return emptyOutput, nil, nil, true, true, nil
 	}
 

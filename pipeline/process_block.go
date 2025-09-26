@@ -299,6 +299,9 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 					Name:      reqDetails.OutputModule,
 					MapOutput: &anypb.Any{},
 				}
+			} else if mapModuleOutput.Name == "" {
+				//failsafe: normalize any output to at least include the module name
+				mapModuleOutput.Name = reqDetails.OutputModule
 			}
 			if err = returnModuleDataOutputs(clock, cursor, mapModuleOutput, p.extraMapModuleOutputs, p.extraStoreModuleOutputs, p.respFunc, logger); err != nil {
 				return fmt.Errorf("failed to return module data output: %w", err)

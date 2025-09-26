@@ -182,18 +182,17 @@ func (s *Sinker) ApiToken() string {
 func (s *Sinker) PrintStats() {
 	egressBytes := ServerEgressBytes.Get()
 	processedBlocks := ProcessedBlocks.Get()
-	processedBytes := ProcessedBytes.Get()
+	receivedBlockData := DataMessageCount.Get()
 
-	// Don't show usage report if all metrics are zero (e.g., when there's an error and no data was processed)
-	if egressBytes == 0 && processedBlocks == 0 && processedBytes == 0 {
-		return
+	var noDataReceived string
+	if egressBytes == 0 && processedBlocks == 0 {
+		noDataReceived = " (no data received)"
 	}
 
-	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, "📊 Usage Report")
+	fmt.Fprintf(os.Stderr, "📊 Usage Report%s\n", noDataReceived)
 	fmt.Fprintf(os.Stderr, " • Egress Bytes (uncompressed): %s\n", humanize.IBytes(uint64(egressBytes)))
 	fmt.Fprintf(os.Stderr, " • Processed Blocks: %s blocks\n", humanize.Comma(int64(processedBlocks)))
-	fmt.Fprintf(os.Stderr, " • Processed Bytes: %s\n", humanize.IBytes(uint64(processedBytes)))
+	fmt.Fprintf(os.Stderr, " • Received Blocks: %s blocks\n", humanize.Comma(int64(receivedBlockData)))
 }
 
 func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler) {

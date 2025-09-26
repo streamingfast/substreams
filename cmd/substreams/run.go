@@ -129,10 +129,11 @@ func runRun(cmd *cobra.Command, args []string) error {
 		ui.HandleDebugSnapshotComplete,
 		nil,
 	)
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancelCause := context.WithCancelCause(ctx)
 	go func() {
-		<-derr.SetupSignalHandler(0)
-		cancel()
+		s := <-derr.SetupSignalHandler(0)
+		fmt.Println("received", s.String())
+		cancelCause(fmt.Errorf("received signal %q", s.String()))
 	}()
 
 	ui.Connecting()
@@ -141,6 +142,16 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	ui.Cancel()
 	sinker.PrintStats()
+	if err == nil {
+		if cause := context.Cause(ctx); cause != nil {
+			return cause
+		}
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
+		fmt.Println("Completed successfully")
+		return nil
+	}
 
 	return err
 }

@@ -44,7 +44,7 @@ message AccountOwner {
 }
 ```
 
-## How It Works
+## Implementation details
 
 The foundational store processes SPL token account initialization instructions to extract account-to-owner mappings. It tracks three instruction types:
 
@@ -53,6 +53,88 @@ The foundational store processes SPL token account initialization instructions t
 3. **`InitializeAccount3`** - Newer variant of account initialization with embedded owner
 
 Each SPL token account address becomes a key, with the corresponding `AccountOwner` protobuf message containing mint and owner information as the value.
+
+## Rust Implementation
+
+### Creating Foundational Store Entries
+
+```rust
+#[substreams::handlers::map]
+fn map_spl_initialized_account(
+    transactions: SolanaTransactions,
+) -> Result<Entries, Error> {
+    let mut entries: Vec<Entry> = Vec::new();
+
+    for confirmed_trx in successful_transactions(transactions) {
+        for instruction in confirmed_trx.walk_instructions() {
+            if let Ok(token_instruction) = TokenInstruction::unpack(&instruction.data()) {
+                match token_instruction {
+                    TokenInstruction::InitializeAccount {} => {
+                        let account_owner = AccountOwner {
+                            mint_address: instruction.accounts()[1].clone(),
+                            owner: instruction.accounts()[2].clone(),
+                        };
+
+                        let mut buf = Vec::new();
+                        account_owner.encode(&mut buf)?;
+
+                        let entry = Entry {
+                            key: instruction.accounts()[0].clone(),
+                            value: Some(Any {
+                                type_url: "type.googleapis.com/sf.substreams.solana.spl.v1.AccountOwner".to_string(),
+                                value: buf,
+                            }),
+                        };
+                        entries.push(entry);
+                    }
+                    TokenInstruction::InitializeAccount2 { owner } => {
+                        // Handle embedded owner in instruction data
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    Ok(Entries { entries })
+}
+```
+
+> **Complete Example**: See the [map_spl_initialized_account](https://github.com/streamingfast/substreams-foundational-modules/blob/develop/solana/spl-initialized-account/src/lib.rs#L23) implementation.
+
+### Consuming Account Owner Data
+
+```rust
+#[substreams::handlers::map]
+fn map_spl_instructions(
+    transactions: SolanaTransactions,
+    account_owner_store: FoundationalStore,
+) -> Result<SplInstructions, Error> {
+    // ... extract transfer instructions from transactions
+
+    // Collect account addresses that need owner lookup
+    let account_keys: Vec<Vec<u8>> = transfer_accounts.iter()
+        .map(|addr| bs58::decode(addr).into_vec().unwrap())
+        .collect();
+
+    // Batch query foundational store for account owners
+    let response = account_owner_store.get_all(&account_keys);
+
+    // Process responses and decode account owner data
+    for entry in response.entries {
+        if entry.response.unwrap().response == ResponseCode::Found as i32 {
+            let account_owner = AccountOwner::decode(
+                entry.response.unwrap().value.unwrap().value.as_slice()
+            )?;
+            let owner_address = bs58::encode(&account_owner.owner).into_string();
+            // Use owner_address to enrich transfer data
+        }
+    }
+    // ...
+}
+```
+
+> **Complete Example**: See the [map_spl_instructions](https://github.com/streamingfast/substreams-spl-token/blob/main/src/lib.rs#L49) implementation.
 
 ### Substreams Manifest Configuration
 
@@ -67,12 +149,6 @@ network: solana
 
 imports:
   solana_common: solana-common@v0.3.0
-
-protobuf:
-  files:
-    - sf/substreams/solana/spl/v1/initialized_account.proto
-  descriptorSets:
-    - module: buf.build/streamingfast/substreams-foundational-store
 
 modules:
   - name: map_spl_initialized_account
@@ -96,8 +172,8 @@ package:
   version: v0.1.0
 
 imports:
-  solana_common: solana-common@v0.3.0
-  spl_owner_foundational: ../substreams-foundational-modules/solana/spl-initialized-account/spl-initialized-account-v0.1.2.spkg
+    solana_common: solana-common@v0.3.0
+    spl_initialized_account: spl-initialized-account@v0.1.2
 
 modules:
   - name: map_spl_instructions
@@ -112,13 +188,6 @@ modules:
 params:
   solana_common:transactions_by_programid_without_votes: "program:TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA || program:TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 ```
-
-
-
-## Integration with Transfer Tracking
-
-The account ownership store is essential for SPL token transfer modules. See the [substreams-spl-all-tokens](https://github.com/streamingfast/substreams-spl-all-tokens) example that enriches SPL token transfers with wallet owner information by querying this foundational store.
-
 
 ## Related Resources
 

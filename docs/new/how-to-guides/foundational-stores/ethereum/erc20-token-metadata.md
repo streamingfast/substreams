@@ -40,7 +40,7 @@ message TokenMetadata {
 }
 ```
 
-## How It Works
+## Implementation details
 
 The foundational store processes ERC20 metadata through two mechanisms:
 
@@ -48,6 +48,70 @@ The foundational store processes ERC20 metadata through two mechanisms:
 2. **MetadataChanges Events**: Batch RPC calls to ensure accuracy
 
 Each token address becomes a key, with the corresponding `TokenMetadata` protobuf message as the value.
+
+## Rust Implementation
+
+### Creating Foundational Store Entries
+
+```rust
+#[substreams::handlers::map]
+fn metadata_to_foundational_store(
+    metadata_events: erc20_metadata::Events,
+) -> Result<Entries, Error> {
+    let mut entries: Vec<Entry> = Vec::new();
+
+    for event in metadata_events.events {
+        let token_metadata = TokenMetadata {
+            address: event.token_address.clone(),
+            name: event.name.clone(),
+            symbol: event.symbol.clone(),
+            decimals: event.decimals,
+        };
+
+        let mut buf = Vec::new();
+        Message::encode(&token_metadata, &mut buf).unwrap();
+
+        let any = Any {
+            type_url: "type.googleapis.com/evm.token.metadata.v1.TokenMetadata".to_string(),
+            value: buf,
+        };
+
+        let entry = Entry {
+            key: init.address,
+            value: Some(any),
+        };
+
+        entries.push(entry);
+
+    Ok(Entries { entries })
+}
+```
+
+> **Complete Example**: See the [map_tokens_transfers](https://github.com/streamingfast/substreams-erc20-token-transfers-with-metadata/blob/main/src/lib.rs#L23) implementation.
+
+### Consuming Foundational Store Data
+
+```rust
+#[substreams::handlers::map]
+fn map_tokens_transfers(
+    block: eth::Block,
+    token_metadata_store: FoundationalStore,
+) -> Result<TokenTransfers, Error> {
+    // ... extract transfers from block
+
+    let response = token_metadata_store.get(&token_address);
+    if response.response == ResponseCode::Found as i32 {
+        let metadata = TokenMetadata::decode(response.value.unwrap().value.as_slice())?;
+        // Use metadata.name, metadata.symbol, metadata.decimals to enrich transfer
+    }
+
+    // For multiple tokens: 
+    let response = token_metadata_store.get_all(&token_addresses)
+    // ...
+}
+```
+
+> **Complete Example**: See the [metadata_to_foundational_store](https://github.com/Data-Nexus-Web3/token-metadata-foundational-store/blob/main/src/lib.rs) implementation.
 
 ### Substreams Manifest Configuration
 
@@ -61,18 +125,13 @@ package:
 imports:
   erc20_metadata: https://github.com/pinax-network/substreams-evm-tokens/releases/download/erc20-metadata-v0.2.1/evm-erc20-metadata-v0.2.1.spkg
 
-protobuf:
-  files:
-    - foundational-store.proto
-    - token-metadata.proto
-
 modules:
   - name: metadata_to_foundational_store
     kind: map
     inputs:
       - map: erc20_metadata:map_events
     output:
-      type: proto:foundational_store.v1.Entries
+      type: proto:sf.substreams.foundational_store.v1.Entries
 ```
 
 **Consumer Module** (uses foundational store as input):
@@ -95,9 +154,6 @@ modules:
       type: proto:erc20.metadata.v1.TokenTransfers
 ```
 
-## Integration with Transfer Tracking
-
-The metadata store is designed to work with transfer tracking modules. See the [substreams-erc20-token-metadata](https://github.com/streamingfast/substreams-erc20-token-transfers-with-metadata) example that enriches ERC20 transfers with token metadata by querying this foundational store.
 ## Related Resources
 
 - [Foundational Stores Overview](../foundational-stores.md)

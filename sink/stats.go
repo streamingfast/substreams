@@ -17,6 +17,7 @@ type Stats struct {
 	undoMsgRate                 *dmetrics.AvgRatePromCounter
 	isLive                      *bool
 	isIndexOutputProductionMode bool
+	isNoop                      bool
 
 	lastBlock bstream.BlockRef
 	logger    *zap.Logger
@@ -48,6 +49,10 @@ func (s *Stats) SetIndexOutputProductionMode() {
 	s.isIndexOutputProductionMode = true
 }
 
+func (s *Stats) SetNoop() {
+	s.isNoop = true
+}
+
 func (s *Stats) Start(each time.Duration) {
 	if s.IsTerminating() || s.IsTerminated() {
 		panic("already shutdown, refusing to start again")
@@ -77,7 +82,7 @@ func (s *Stats) Start(each time.Duration) {
 func (s *Stats) LogNow() {
 
 	progressLastBlock := dmetrics.NewValuesFromMetric(ProgressMessageLastBlock).Uints("stage")
-	if s.isIndexOutputProductionMode {
+	if s.isIndexOutputProductionMode || s.isNoop {
 		//  'index' modules do not send any output from cached segments (in production mode), so we approximate prometheus's `HeadBlockNumber` and the logs' `last_block` from the previous `LastBlock` seen in a ProgressMessage
 		var lowestStageBlock uint64
 		for _, block := range progressLastBlock {

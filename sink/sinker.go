@@ -137,6 +137,9 @@ func NewFromConfig(
 			}
 		}
 	}
+	if s.NoopMode {
+		s.stats.SetNoop()
+	}
 
 	return s, nil
 }

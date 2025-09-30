@@ -188,6 +188,7 @@ func TestAddFlagsToSet(t *testing.T) {
 				FlagAPITokenEnvvar,
 				FlagNoopMode,
 				FlagPrometheusAddr,
+				FlagForceV2,
 			},
 		},
 	}

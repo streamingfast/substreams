@@ -17,11 +17,12 @@ import (
 func init() {
 	// Add the list of common sink flags from the sink package, skipping the ones you don't want or want to define yourself
 	sink.AddFlagsToSet(cmd.Flags(),
-		sink.FlagIgnore(
+		sink.FlagExcludeDefault(
 			sink.FlagDevelopmentMode,
 			sink.FlagLiveBlockTimeDelta,
 			sink.FlagMaxRetries,
-		))
+		),
+	)
 
 	// add your own flags, like this one for state management
 	cmd.Flags().String("state-file", "./state.cursor", "File where the sink will store its cursor. If empty, no cursor will be saved or used, only the start-block.")
@@ -101,7 +102,7 @@ func (s *SimpleSink) Run(ctx context.Context, initialCursor *sink.Cursor) error 
 	s.decoder = decoder
 
 	// run the actual sinker that will call our Handle methods
-	sinker, err := sink.New(s.sinkerConfig)
+	sinker, err := sink.NewFromConfig(s.sinkerConfig)
 	if err != nil {
 		return fmt.Errorf("creating sink: %w", err)
 	}

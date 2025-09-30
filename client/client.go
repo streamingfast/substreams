@@ -41,6 +41,17 @@ type SubstreamsClientConfig struct {
 	agent     string
 }
 
+func (c *SubstreamsClientConfig) Agent() string {
+	return c.agent
+}
+
+// SetAgent sets the User-Agent header for gRPC requests made by this client, this can be
+// set at any time but will be effective only before the `NewSubstreamsClient` is called, after
+// that the changes to agent will **not** affect already created clients.
+func (c *SubstreamsClientConfig) SetAgent(agent string) {
+	c.agent = agent
+}
+
 func (c *SubstreamsClientConfig) Endpoint() string {
 	return c.endpoint
 }

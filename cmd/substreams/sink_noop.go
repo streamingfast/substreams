@@ -13,7 +13,7 @@ import (
 func init() {
 	// default sinker flags - ignore specific flags for noop sink
 	sink.AddFlagsToSet(sinkNoopCmd.Flags(),
-		sink.FlagIgnore(
+		sink.FlagExcludeDefault(
 			sink.FlagUndoBufferSize,
 			sink.FlagDevelopmentMode,
 			sink.FlagNoopMode,

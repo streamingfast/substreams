@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/utils"
+	"github.com/streamingfast/dhttp"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
@@ -192,20 +194,48 @@ func runRegistryPublish(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		if resp.StatusCode == http.StatusUnauthorized {
-			fmt.Println("")
-			fmt.Println(cli.ErrorStyle.Render("Failed to publish package"))
-			fmt.Println(cli.ErrorStyle.Render("Reason: " + string(b)))
-			fmt.Println("Make sure you are properly authenticated with:")
-			fmt.Println("")
-			fmt.Println(cli.PurpleStyle.Render("substreams registry login"))
-			return nil
-		}
-
 		fmt.Println("")
 		fmt.Println(cli.ErrorStyle.Render("Failed to publish package"))
-		fmt.Println(cli.ErrorStyle.Render("Reason: " + string(b)))
-		return nil
+
+		// Try to parse the error response as a structured error
+		var errorResp dhttp.ErrorResponse
+		if err := json.Unmarshal(b, &errorResp); err == nil && errorResp.Code != "" {
+			// Successfully parsed structured error
+			fmt.Println(cli.ErrorStyle.Render(fmt.Sprintf("Error code: %s", errorResp.Code)))
+			fmt.Println(cli.ErrorStyle.Render(fmt.Sprintf("Error message: %s", errorResp.Message)))
+			
+			// Print details if available
+			if len(errorResp.Details) > 0 {
+				fmt.Println(cli.ErrorStyle.Render("Details:"))
+				for k, v := range errorResp.Details {
+					fmt.Printf("  - %s: %v\n", k, v)
+				}
+			}
+			
+			// Special handling for authentication errors
+			if resp.StatusCode == http.StatusUnauthorized {
+				fmt.Println("")
+				fmt.Println("Make sure you are properly authenticated with:")
+				fmt.Println("")
+				fmt.Println(cli.PurpleStyle.Render("substreams registry login"))
+				return fmt.Errorf("authentication failed: %s", errorResp.Message)
+			}
+			
+			return fmt.Errorf("publishing failed: %s", errorResp.Message)
+		} else {
+			// Fallback to raw error message
+			fmt.Println(cli.ErrorStyle.Render("Reason: " + string(b)))
+			
+			if resp.StatusCode == http.StatusUnauthorized {
+				fmt.Println("")
+				fmt.Println("Make sure you are properly authenticated with:")
+				fmt.Println("")
+				fmt.Println(cli.PurpleStyle.Render("substreams registry login"))
+				return fmt.Errorf("authentication failed: %s", string(b))
+			}
+			
+			return fmt.Errorf("publishing failed: %s", string(b))
+		}
 	}
 
 	registryURL := gjson.Get(string(b), "registry_url").String()

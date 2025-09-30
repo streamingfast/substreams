@@ -8,6 +8,12 @@ binaries:
     type: wasm/rust-v1+wasm-bindgen-shims
     file: ./target/wasm32-unknown-unknown/release/substreams.wasm
 
+protobuf:
+  files:
+    - "sf/substreams/v1/test/test.proto"
+  importPaths:
+    - ../../../proto
+
 modules:
   - name: map_block
     kind: map
@@ -15,5 +21,5 @@ modules:
     inputs:
       - source: sf.substreams.v1.test.Block
     output:
-      type: proto:google.protobuf.Any
+      type: proto:sf.substreams.v1.test.MapResult
 

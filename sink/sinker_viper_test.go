@@ -10,7 +10,7 @@ import (
 func TestAddFlagsToSet(t *testing.T) {
 	tests := []struct {
 		name          string
-		ignore        []FlagIgnored
+		ignore        []FlagInclusionExclusion
 		expectedFlags []string
 	}{
 		{
@@ -20,7 +20,6 @@ func TestAddFlagsToSet(t *testing.T) {
 				FlagEndpoint,
 				FlagStartBlock,
 				FlagStopBlock,
-				FlagCursor,
 				FlagParams,
 				FlagNetwork,
 				FlagInsecure,
@@ -42,12 +41,11 @@ func TestAddFlagsToSet(t *testing.T) {
 		},
 		{
 			"ignore one",
-			[]FlagIgnored{FlagIgnore(FlagInsecure)},
+			[]FlagInclusionExclusion{FlagExcludeDefault(FlagInsecure)},
 			[]string{
 				FlagEndpoint,
 				FlagStartBlock,
 				FlagStopBlock,
-				FlagCursor,
 				FlagParams,
 				FlagNetwork,
 				FlagPlaintext,
@@ -68,12 +66,11 @@ func TestAddFlagsToSet(t *testing.T) {
 		},
 		{
 			"ignore one multiple",
-			[]FlagIgnored{FlagIgnore(FlagInsecure, FlagPlaintext)},
+			[]FlagInclusionExclusion{FlagExcludeDefault(FlagInsecure, FlagPlaintext)},
 			[]string{
 				FlagEndpoint,
 				FlagStartBlock,
 				FlagStopBlock,
-				FlagCursor,
 				FlagParams,
 				FlagNetwork,
 				FlagUndoBufferSize,
@@ -93,12 +90,11 @@ func TestAddFlagsToSet(t *testing.T) {
 		},
 		{
 			"ignore multiple",
-			[]FlagIgnored{FlagIgnore(FlagInsecure), FlagIgnore(FlagPlaintext)},
+			[]FlagInclusionExclusion{FlagExcludeDefault(FlagInsecure), FlagExcludeDefault(FlagPlaintext)},
 			[]string{
 				FlagEndpoint,
 				FlagStartBlock,
 				FlagStopBlock,
-				FlagCursor,
 				FlagParams,
 				FlagNetwork,
 				FlagUndoBufferSize,
@@ -118,12 +114,11 @@ func TestAddFlagsToSet(t *testing.T) {
 		},
 		{
 			"ignore mixed",
-			[]FlagIgnored{FlagIgnore(FlagInsecure), FlagIgnore(FlagPlaintext, FlagLiveBlockTimeDelta), FlagIgnore(FlagProtoPath, FlagProtoDescriptorSet)},
+			[]FlagInclusionExclusion{FlagExcludeDefault(FlagInsecure), FlagExcludeDefault(FlagPlaintext, FlagLiveBlockTimeDelta), FlagExcludeDefault(FlagProtoPath, FlagProtoDescriptorSet)},
 			[]string{
 				FlagEndpoint,
 				FlagStartBlock,
 				FlagStopBlock,
-				FlagCursor,
 				FlagParams,
 				FlagNetwork,
 				FlagUndoBufferSize,
@@ -140,14 +135,41 @@ func TestAddFlagsToSet(t *testing.T) {
 		},
 		{
 			"ignore final block",
-			[]FlagIgnored{FlagIgnore(FlagFinalBlocksOnly), FlagIgnore(FlagProtoPath, FlagProtoDescriptorSet)},
+			[]FlagInclusionExclusion{FlagExcludeDefault(FlagFinalBlocksOnly), FlagExcludeDefault(FlagProtoPath, FlagProtoDescriptorSet)},
 			[]string{
 				FlagEndpoint,
 				FlagStartBlock,
 				FlagStopBlock,
-				FlagCursor,
 				FlagParams,
 				FlagNetwork,
+				FlagInsecure,
+				FlagPlaintext,
+				FlagUndoBufferSize,
+				FlagLiveBlockTimeDelta,
+				FlagDevelopmentMode,
+				FlagMaxRetries,
+				FlagSkipPackageValidation,
+				FlagExtraHeaders,
+				FlagAPIKeyEnvvar,
+				FlagAPITokenEnvvar,
+				FlagNoopMode,
+				FlagPrometheusAddr,
+			},
+		},
+		{
+			"ignore final block but include cursor",
+			[]FlagInclusionExclusion{
+				FlagIncludeOptional(FlagCursor),
+				FlagExcludeDefault(FlagFinalBlocksOnly),
+				FlagExcludeDefault(FlagProtoPath, FlagProtoDescriptorSet),
+			},
+			[]string{
+				FlagEndpoint,
+				FlagStartBlock,
+				FlagStopBlock,
+				FlagParams,
+				FlagNetwork,
+				FlagCursor,
 				FlagInsecure,
 				FlagPlaintext,
 				FlagUndoBufferSize,

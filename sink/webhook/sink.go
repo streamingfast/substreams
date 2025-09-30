@@ -37,7 +37,7 @@ var WebhookSizeBytes = sink.Metrics.NewCounter("webhook_bytes_sent", "Number of 
 
 // NewSink creates a new webhook sink
 func NewSink(config SinkConfig) (*Sink, error) {
-	sinker, err := sink.New(config.SinkerConfig)
+	sinker, err := sink.NewFromConfig(config.SinkerConfig)
 	if err != nil {
 		return nil, err
 	}

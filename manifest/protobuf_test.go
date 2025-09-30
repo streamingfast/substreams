@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/descriptorpb"
 )
@@ -352,68 +354,62 @@ func TestReaderOptions_ProtoPathAndDescriptorSet(t *testing.T) {
 }
 
 // Cache-related tests
-func TestGenerateCacheKey(t *testing.T) {
+func TestDescriptorCache_GenerateCacheKey(t *testing.T) {
+	cache := &DescriptorCache{cacheDir: t.TempDir()}
+
 	tests := []struct {
-		name     string
-		module   string
-		version  string
-		symbols  []string
-		expected string
+		name    string
+		module  string
+		version string
+		symbols []string
 	}{
 		{
-			name:     "basic key generation",
-			module:   "buf.build/streamingfast/substreams",
-			version:  "v1.0.0",
-			symbols:  []string{"proto.Message"},
-			expected: "e5a5d5d5c5b5f5f5d5a5c5b5e5f5a5c5d5b5f5a5e5c5d5b5a5f5e5c5b5a5d5f5e5c", // This will be the actual hash
+			name:    "basic key generation",
+			module:  "buf.build/streamingfast/substreams",
+			version: "v1.0.0",
+			symbols: []string{"proto.Message"},
 		},
 		{
-			name:     "empty symbols",
-			module:   "buf.build/test/module",
-			version:  "v2.1.0",
-			symbols:  []string{},
-			expected: "", // Will be generated
+			name:    "empty symbols",
+			module:  "buf.build/test/module",
+			version: "v2.1.0",
+			symbols: []string{},
 		},
 		{
-			name:     "multiple symbols",
-			module:   "buf.build/multi/module",
-			version:  "v1.0.0",
-			symbols:  []string{"proto.A", "proto.B", "proto.C"},
-			expected: "", // Will be generated
+			name:    "multiple symbols",
+			module:  "buf.build/multi/module",
+			version: "v1.0.0",
+			symbols: []string{"proto.A", "proto.B", "proto.C"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := generateCacheKey(tt.module, tt.version, tt.symbols)
-			
+			result := cache.generateCacheKey(tt.module, tt.version, tt.symbols)
+
 			// Verify it's a valid hex string of correct length (SHA256 = 64 chars)
-			if len(result) != 64 {
-				t.Errorf("Expected cache key length of 64, got %d", len(result))
-			}
-			
+			assert.Equal(t, 64, len(result), "Cache key should be 64 characters (SHA256 hex)")
+
 			// Verify it's all hex characters
 			for _, c := range result {
-				if !strings.ContainsRune("0123456789abcdef", c) {
-					t.Errorf("Cache key contains non-hex character: %c", c)
-				}
+				assert.True(t, strings.ContainsRune("0123456789abcdef", c), "Cache key should only contain hex characters")
 			}
-			
+
 			// Verify deterministic
-			result2 := generateCacheKey(tt.module, tt.version, tt.symbols)
-			if result != result2 {
-				t.Errorf("Cache key generation is not deterministic")
-			}
+			result2 := cache.generateCacheKey(tt.module, tt.version, tt.symbols)
+			assert.Equal(t, result, result2, "Cache key generation should be deterministic")
 		})
 	}
 }
 
-func TestGenerateCacheKey_Uniqueness(t *testing.T) {
+func TestDescriptorCache_GenerateCacheKey_Uniqueness(t *testing.T) {
+	cache := &DescriptorCache{cacheDir: t.TempDir()}
+
 	// Test that different inputs produce different keys
-	key1 := generateCacheKey("module1", "v1.0.0", []string{"symbol1"})
-	key2 := generateCacheKey("module2", "v1.0.0", []string{"symbol1"})
-	key3 := generateCacheKey("module1", "v2.0.0", []string{"symbol1"})
-	key4 := generateCacheKey("module1", "v1.0.0", []string{"symbol2"})
+	key1 := cache.generateCacheKey("module1", "v1.0.0", []string{"symbol1"})
+	key2 := cache.generateCacheKey("module2", "v1.0.0", []string{"symbol1"})
+	key3 := cache.generateCacheKey("module1", "v2.0.0", []string{"symbol1"})
+	key4 := cache.generateCacheKey("module1", "v1.0.0", []string{"symbol2"})
 
 	keys := map[string]bool{
 		key1: true,
@@ -422,15 +418,35 @@ func TestGenerateCacheKey_Uniqueness(t *testing.T) {
 		key4: true,
 	}
 
-	if len(keys) != 4 {
-		t.Errorf("Expected 4 unique keys, got %d", len(keys))
+	assert.Equal(t, 4, len(keys), "All cache keys should be unique")
+}
+
+func TestDescriptorCache_ShouldCache(t *testing.T) {
+	cache := &DescriptorCache{cacheDir: t.TempDir()}
+
+	tests := []struct {
+		version     string
+		shouldCache bool
+		description string
+	}{
+		{"v1.0.0", true, "semantic version should be cached"},
+		{"v2.1.3", true, "semantic version should be cached"},
+		{"", false, "empty version should not be cached"},
+		{"main", false, "main branch should not be cached"},
+		{"develop", false, "develop branch should not be cached"},
+		{"master", false, "master branch should not be cached"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.description, func(t *testing.T) {
+			result := cache.shouldCache(tt.version)
+			assert.Equal(t, tt.shouldCache, result, tt.description)
+		})
 	}
 }
 
-func TestCacheSaveAndLoad(t *testing.T) {
-	// Create a temporary cache directory for testing
-	tempCacheDir := filepath.Join("/tmp", "substreams-buf-test.cache")
-	defer os.RemoveAll(tempCacheDir)
+func TestDescriptorCache_SaveAndLoad(t *testing.T) {
+	cache := &DescriptorCache{cacheDir: t.TempDir()}
 
 	// Create test data
 	testFds := &descriptorpb.FileDescriptorSet{
@@ -457,63 +473,48 @@ func TestCacheSaveAndLoad(t *testing.T) {
 	cacheKey := "test_cache_key_1234567890abcdef1234567890abcdef12345678"
 
 	// Test save to cache
-	err := saveToCache(cacheKey, testFds)
-	if err != nil {
-		t.Fatalf("Failed to save to cache: %v", err)
-	}
+	err := cache.save(cacheKey, testFds)
+	require.NoError(t, err, "Failed to save to cache")
 
 	// Test load from cache
-	loadedFds, err := loadFromCache(cacheKey)
-	if err != nil {
-		t.Fatalf("Failed to load from cache: %v", err)
+	loadedFds, err := cache.load(cacheKey)
+	require.NoError(t, err, "Failed to load from cache")
+
+	// Verify the loaded data matches the saved data using proto.Equal
+	if !proto.Equal(testFds, loadedFds) {
+		require.Equal(t, testFds, loadedFds, "Loaded descriptor should match saved descriptor")
 	}
 
-	// Verify the loaded data matches the saved data
-	if len(loadedFds.File) != len(testFds.File) {
-		t.Errorf("Expected %d files, got %d", len(testFds.File), len(loadedFds.File))
-	}
-
-	if loadedFds.File[0].GetName() != testFds.File[0].GetName() {
-		t.Errorf("Expected file name %s, got %s", testFds.File[0].GetName(), loadedFds.File[0].GetName())
-	}
-
-	if loadedFds.File[0].GetPackage() != testFds.File[0].GetPackage() {
-		t.Errorf("Expected package %s, got %s", testFds.File[0].GetPackage(), loadedFds.File[0].GetPackage())
-	}
+	// Additional checks
+	assert.Equal(t, len(testFds.File), len(loadedFds.File), "File count should match")
+	assert.Equal(t, testFds.File[0].GetName(), loadedFds.File[0].GetName(), "File name should match")
+	assert.Equal(t, testFds.File[0].GetPackage(), loadedFds.File[0].GetPackage(), "Package name should match")
 }
 
-func TestLoadFromCache_NotFound(t *testing.T) {
+func TestDescriptorCache_Load_NotFound(t *testing.T) {
+	cache := &DescriptorCache{cacheDir: t.TempDir()}
+
 	// Try to load from cache with non-existent key
-	_, err := loadFromCache("nonexistent_cache_key_1234567890abcdef1234567890abcdef")
-	if err == nil {
-		t.Error("Expected error when loading non-existent cache key, got nil")
-	}
+	_, err := cache.load("nonexistent_cache_key_1234567890abcdef1234567890abcdef")
+	assert.Error(t, err, "Expected error when loading non-existent cache key")
 }
 
-func TestGetCacheDir(t *testing.T) {
-	cacheDir, err := getCacheDir()
-	if err != nil {
-		t.Fatalf("Failed to get cache dir: %v", err)
-	}
+func TestNewDescriptorCache(t *testing.T) {
+	cache, err := newDescriptorCache()
+	require.NoError(t, err, "Failed to create descriptor cache")
+	require.NotNil(t, cache, "Cache should not be nil")
 
-	expectedPath := "/tmp/substreams-buf.cache"
-	if cacheDir != expectedPath {
-		t.Errorf("Expected cache dir %s, got %s", expectedPath, cacheDir)
-	}
+	// Verify the directory exists
+	_, err = os.Stat(cache.cacheDir)
+	require.NoError(t, err, "Cache directory should exist")
 
-	// Verify the directory exists after calling getCacheDir
-	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
-		t.Error("Cache directory was not created")
-	}
-
-	// Clean up
-	os.RemoveAll(cacheDir)
+	// Verify the path contains expected components
+	assert.Contains(t, cache.cacheDir, "substreams", "Cache dir should contain 'substreams'")
+	assert.Contains(t, cache.cacheDir, "buf-cache", "Cache dir should contain 'buf-cache'")
 }
 
 func TestCacheIntegration(t *testing.T) {
-	// Test the full cache workflow with realistic descriptor set data
-	tempCacheDir := filepath.Join("/tmp", "substreams-buf-integration-test.cache")
-	defer os.RemoveAll(tempCacheDir)
+	cache := &DescriptorCache{cacheDir: t.TempDir()}
 
 	// Create realistic test data similar to what buf.build would return
 	testFds := &descriptorpb.FileDescriptorSet{
@@ -526,9 +527,9 @@ func TestCacheIntegration(t *testing.T) {
 						Name: proto.String("FileDescriptorSet"),
 						Field: []*descriptorpb.FieldDescriptorProto{
 							{
-								Name:   proto.String("file"),
-								Number: proto.Int32(1),
-								Type:   descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
+								Name:     proto.String("file"),
+								Number:   proto.Int32(1),
+								Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
 								TypeName: proto.String(".google.protobuf.FileDescriptorProto"),
 								Label:    descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(),
 							},
@@ -544,9 +545,9 @@ func TestCacheIntegration(t *testing.T) {
 						Name: proto.String("DeployRequest"),
 						Field: []*descriptorpb.FieldDescriptorProto{
 							{
-								Name:   proto.String("substreams_package"),
-								Number: proto.Int32(1),
-								Type:   descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
+								Name:     proto.String("substreams_package"),
+								Number:   proto.Int32(1),
+								Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
 								TypeName: proto.String(".sf.substreams.v1.Package"),
 							},
 						},
@@ -563,42 +564,18 @@ func TestCacheIntegration(t *testing.T) {
 		"sf.substreams.sink.service.v1.DeployRequest",
 		"sf.substreams.sink.service.v1.DeployResponse",
 	}
-	cacheKey := generateCacheKey(module, version, symbols)
+	cacheKey := cache.generateCacheKey(module, version, symbols)
 
 	// Test: First call should save to cache
-	err := saveToCache(cacheKey, testFds)
-	if err != nil {
-		t.Fatalf("Failed to save realistic data to cache: %v", err)
-	}
+	err := cache.save(cacheKey, testFds)
+	require.NoError(t, err, "Failed to save realistic data to cache")
 
 	// Test: Second call should load from cache
-	cachedFds, err := loadFromCache(cacheKey)
-	if err != nil {
-		t.Fatalf("Failed to load realistic data from cache: %v", err)
-	}
+	cachedFds, err := cache.load(cacheKey)
+	require.NoError(t, err, "Failed to load realistic data from cache")
 
-	// Verify integrity of cached data
-	if len(cachedFds.File) != len(testFds.File) {
-		t.Errorf("Cache integrity check failed: expected %d files, got %d", len(testFds.File), len(cachedFds.File))
-	}
-
-	// Verify specific file content
-	for i, originalFile := range testFds.File {
-		cachedFile := cachedFds.File[i]
-		
-		if cachedFile.GetName() != originalFile.GetName() {
-			t.Errorf("File name mismatch at index %d: expected %s, got %s", 
-				i, originalFile.GetName(), cachedFile.GetName())
-		}
-		
-		if cachedFile.GetPackage() != originalFile.GetPackage() {
-			t.Errorf("Package name mismatch at index %d: expected %s, got %s", 
-				i, originalFile.GetPackage(), cachedFile.GetPackage())
-		}
-
-		if len(cachedFile.MessageType) != len(originalFile.MessageType) {
-			t.Errorf("Message type count mismatch at index %d: expected %d, got %d", 
-				i, len(originalFile.MessageType), len(cachedFile.MessageType))
-		}
+	// Verify integrity of cached data using proto.Equal
+	if !proto.Equal(testFds, cachedFds) {
+		require.Equal(t, testFds, cachedFds, "Cached descriptor should match original")
 	}
 }

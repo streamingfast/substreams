@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"buf.build/gen/go/bufbuild/reflect/connectrpc/go/buf/reflect/v1beta1/reflectv1beta1connect"
 	reflectv1beta1 "buf.build/gen/go/bufbuild/reflect/protocolbuffers/go/buf/reflect/v1beta1"
@@ -21,16 +20,35 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pb/system"
 	sfproto "github.com/streamingfast/substreams/proto"
+	"golang.org/x/mod/semver"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/descriptorpb"
 )
 
-func getCacheDir() (string, error) {
-	cacheDir := filepath.Join("/tmp", "substreams-buf.cache")
-	return cacheDir, os.MkdirAll(cacheDir, 0755)
+type DescriptorCache struct {
+	cacheDir string
 }
 
-func generateCacheKey(module, version string, symbols []string) string {
+func newDescriptorCache() (*DescriptorCache, error) {
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		return nil, fmt.Errorf("getting user config directory: %w", err)
+	}
+
+	cacheDir := filepath.Join(configDir, "substreams", "buf-cache")
+	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+		return nil, fmt.Errorf("creating cache directory: %w", err)
+	}
+
+	return &DescriptorCache{cacheDir: cacheDir}, nil
+}
+
+func (c *DescriptorCache) shouldCache(version string) bool {
+	// Only cache valid semver versions
+	return semver.IsValid(version)
+}
+
+func (c *DescriptorCache) generateCacheKey(module, version string, symbols []string) string {
 	h := sha256.New()
 	h.Write([]byte(module))
 	h.Write([]byte(version))
@@ -40,13 +58,8 @@ func generateCacheKey(module, version string, symbols []string) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func loadFromCache(cacheKey string) (*descriptorpb.FileDescriptorSet, error) {
-	cacheDir, err := getCacheDir()
-	if err != nil {
-		return nil, err
-	}
-
-	cacheFile := filepath.Join(cacheDir, cacheKey+".pb")
+func (c *DescriptorCache) load(cacheKey string) (*descriptorpb.FileDescriptorSet, error) {
+	cacheFile := filepath.Join(c.cacheDir, cacheKey+".file_descriptor.binpb")
 	data, err := os.ReadFile(cacheFile)
 	if err != nil {
 		return nil, err
@@ -57,18 +70,13 @@ func loadFromCache(cacheKey string) (*descriptorpb.FileDescriptorSet, error) {
 	return fds, err
 }
 
-func saveToCache(cacheKey string, fds *descriptorpb.FileDescriptorSet) error {
-	cacheDir, err := getCacheDir()
-	if err != nil {
-		return err
-	}
-
+func (c *DescriptorCache) save(cacheKey string, fds *descriptorpb.FileDescriptorSet) error {
 	data, err := proto.Marshal(fds)
 	if err != nil {
 		return err
 	}
 
-	cacheFile := filepath.Join(cacheDir, cacheKey+".pb")
+	cacheFile := filepath.Join(c.cacheDir, cacheKey+".file_descriptor.binpb")
 	return os.WriteFile(cacheFile, data, 0644)
 }
 
@@ -152,6 +160,12 @@ func loadDescriptorSets(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.Fil
 		seen[*file.Name] = true
 	}
 
+	// Initialize cache once for all descriptor sets
+	cache, err := newDescriptorCache()
+	if err != nil {
+		return nil, fmt.Errorf("initializing descriptor cache: %w", err)
+	}
+
 	var out []*desc.FileDescriptor
 	var outProto []*descriptorpb.FileDescriptorProto
 	for _, descriptor := range manif.Protobuf.DescriptorSets {
@@ -186,16 +200,10 @@ func loadDescriptorSets(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.Fil
 			"https://buf.build",
 		)
 
-		// Try to load from cache first
-		cacheKey := generateCacheKey(descriptor.Module, descriptor.Version, descriptor.Symbols)
-		cachedFds, err := loadFromCache(cacheKey)
-
 		var fileDescriptorSetResponse *descriptorpb.FileDescriptorSet
-		if err == nil {
-			// Cache hit
-			fileDescriptorSetResponse = cachedFds
-		} else {
-			// Cache miss, fetch from buf.build
+
+		// Don't use cache for mutable versions or empty versions
+		if !cache.shouldCache(descriptor.Version) {
 			request := connect.NewRequest(&reflectv1beta1.GetFileDescriptorSetRequest{
 				Module:  descriptor.Module,
 				Symbols: descriptor.Symbols,
@@ -213,9 +221,37 @@ func loadDescriptorSets(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.Fil
 			}
 
 			fileDescriptorSetResponse = fileDescriptorSet.Msg.FileDescriptorSet
+		} else {
+			// Try to load from cache first for valid semver versions
+			cacheKey := cache.generateCacheKey(descriptor.Module, descriptor.Version, descriptor.Symbols)
+			cachedFds, err := cache.load(cacheKey)
 
-			// Save to cache (ignore errors to not break the build)
-			_ = saveToCache(cacheKey, fileDescriptorSetResponse)
+			if err == nil {
+				// Cache hit
+				fileDescriptorSetResponse = cachedFds
+			} else {
+				// Cache miss, fetch from buf.build
+				request := connect.NewRequest(&reflectv1beta1.GetFileDescriptorSetRequest{
+					Module:  descriptor.Module,
+					Symbols: descriptor.Symbols,
+					Version: descriptor.Version,
+				})
+
+				authToken := os.Getenv("BUFBUILD_AUTH_TOKEN")
+				if authToken != "" {
+					request.Header().Set("Authorization", "Bearer "+authToken)
+				}
+
+				fileDescriptorSet, err := client.GetFileDescriptorSet(context.Background(), request)
+				if err != nil {
+					return nil, fmt.Errorf("getting file descriptor set for %s: %w", descriptor.Module, err)
+				}
+
+				fileDescriptorSetResponse = fileDescriptorSet.Msg.FileDescriptorSet
+
+				// Save to cache (ignore errors to not break the build)
+				_ = cache.save(cacheKey, fileDescriptorSetResponse)
+			}
 		}
 
 		fdMap, err := desc.CreateFileDescriptorsFromSet(fileDescriptorSetResponse)
@@ -230,8 +266,8 @@ func loadDescriptorSets(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.Fil
 			seen[fd.GetName()] = true
 			out = append(out, fd)
 		}
-		// TEMP FIX FOR TEST DEPLOYMENT
-		time.Sleep(1020 * time.Millisecond)
+		// TEMP FIX FOR TEST DEPLOYMENT (keeping this here still until we've decided)
+		// time.Sleep(1020 * time.Millisecond)
 	}
 
 	for _, fd := range out {

@@ -475,3 +475,114 @@ func TestFoundationalStore_HashBehavior(t *testing.T) {
 		})
 	}
 }
+
+func TestBufImport_UnmarshalYAML(t *testing.T) {
+	tests := []struct {
+		name        string
+		yaml        string
+		expected    BufImport
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "old format with full module path and version",
+			yaml: `module: buf.build/streamingfast/substreams-sink-sql
+version: v0.1.0`,
+			expected: BufImport{
+				Module:  "buf.build/streamingfast/substreams-sink-sql",
+				Version: "v0.1.0",
+			},
+			expectError: false,
+		},
+		{
+			name: "new format with package@version notation",
+			yaml: `module: substreams-sink-sql@v0.1.0`,
+			expected: BufImport{
+				Module:  "buf.build/streamingfast/substreams-sink-sql",
+				Version: "v0.1.0",
+			},
+			expectError: false,
+		},
+		{
+			name: "new format with different package",
+			yaml: `module: substreams-foundational-store@v1.2.3`,
+			expected: BufImport{
+				Module:  "buf.build/streamingfast/substreams-foundational-store",
+				Version: "v1.2.3",
+			},
+			expectError: false,
+		},
+		{
+			name: "old format without version",
+			yaml: `module: buf.build/streamingfast/substreams-sink-sql`,
+			expected: BufImport{
+				Module:  "buf.build/streamingfast/substreams-sink-sql",
+				Version: "",
+			},
+			expectError: false,
+		},
+		{
+			name: "error: version specified in both places",
+			yaml: `module: substreams-sink-sql@v0.1.0
+version: v0.2.0`,
+			expectError: true,
+			errorMsg:    "cannot specify version both in module field and version field",
+		},
+		{
+			name: "error: latest version not allowed",
+			yaml: `module: substreams-sink-sql@latest`,
+			expectError: true,
+			errorMsg:    "version 'latest' is not allowed",
+		},
+		{
+			name: "error: invalid package name",
+			yaml: `module: invalid-name!@v0.1.0`,
+			expectError: true,
+			errorMsg:    "invalid descriptor set module notation",
+		},
+		{
+			name: "with symbols in old format",
+			yaml: `module: buf.build/streamingfast/substreams-sink-sql
+version: v0.1.0
+symbols:
+  - sf.substreams.sink.sql.v1.Table`,
+			expected: BufImport{
+				Module:  "buf.build/streamingfast/substreams-sink-sql",
+				Version: "v0.1.0",
+				Symbols: []string{"sf.substreams.sink.sql.v1.Table"},
+			},
+			expectError: false,
+		},
+		{
+			name: "with symbols in new format",
+			yaml: `module: substreams-sink-sql@v0.1.0
+symbols:
+  - sf.substreams.sink.sql.v1.Table`,
+			expected: BufImport{
+				Module:  "buf.build/streamingfast/substreams-sink-sql",
+				Version: "v0.1.0",
+				Symbols: []string{"sf.substreams.sink.sql.v1.Table"},
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var bufImport BufImport
+			err := yaml.Unmarshal([]byte(tt.yaml), &bufImport)
+
+			if tt.expectError {
+				require.Error(t, err)
+				if tt.errorMsg != "" {
+					assert.Contains(t, err.Error(), tt.errorMsg)
+				}
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected.Module, bufImport.Module)
+				assert.Equal(t, tt.expected.Version, bufImport.Version)
+				assert.Equal(t, tt.expected.Symbols, bufImport.Symbols)
+			}
+		})
+	}
+}

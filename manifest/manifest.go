@@ -88,8 +88,8 @@ type Protobuf struct {
 type BufImport struct {
 	LocalPath string   `yaml:"localPath,omitempty"`
 	Module    string   `yaml:"module"`
-	Version   string   `yaml:"version"`
-	Symbols   []string `yaml:"symbols"`
+	Version   string   `yaml:"version,omitempty"`
+	Symbols   []string `yaml:"symbols,omitempty"`
 }
 
 type Module struct {
@@ -529,4 +529,57 @@ func (m *Module) setOutputToProto(pbModule *pbsubstreams.Module) {
 			Type: m.Output.Type,
 		}
 	}
+}
+
+// UnmarshalYAML implements custom YAML unmarshaling for BufImport
+// Supports multiple formats:
+// 1. Full path: buf.build/org/pkg
+// 2. With version: pkg@v1.0.0
+// 3. Without version: pkg
+func (b *BufImport) UnmarshalYAML(n *yaml.Node) error {
+	// Type alias to avoid recursion
+	type rawBufImport BufImport
+
+	var raw rawBufImport
+	if err := n.Decode(&raw); err != nil {
+		return err
+	}
+
+	// Copy all fields first
+	*b = BufImport(raw)
+
+	module := strings.TrimSpace(b.Module)
+	version := strings.TrimSpace(b.Version)
+
+	// Try parsing as package@version notation
+	packageName, parsedVersion, likelyShortcut, validationErr := ParseShortPackageIdentifier(module)
+
+	if likelyShortcut {
+		// User used @ notation
+		if validationErr != nil {
+			return fmt.Errorf("invalid descriptor set module notation %q: %w", module, validationErr)
+		}
+
+		if parsedVersion == "latest" {
+			return fmt.Errorf("descriptor set module %q: version 'latest' is not allowed, please specify a specific version or omit version entirely", module)
+		}
+
+		if version != "" {
+			return fmt.Errorf("descriptor set module %q: cannot specify version both in module field and version field", module)
+		}
+
+		// Expand to full buf.build path
+		b.Module = fmt.Sprintf("buf.build/streamingfast/%s", packageName)
+		b.Version = parsedVersion
+	} else if !strings.Contains(module, "/") {
+		// Short package name
+		b.Module = fmt.Sprintf("buf.build/streamingfast/%s", module)
+		b.Version = version
+	} else {
+		// Full path format
+		b.Module = module
+		b.Version = version
+	}
+
+	return nil
 }

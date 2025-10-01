@@ -581,7 +581,7 @@ This release brings performance improvements to the substreams engine, through t
 ### Server
 
 - Add `sf.substreams.rpc.v2.EndpointInfo/Info` endpoint (if the infoserver is given as a module, i.e. from firehose-core)
-- Add an execution timeout of 3 minutes per block by default (can be overriden in tier1/tier2 Configs) -- this is useful when an external (eth_call) is stuck on a forked block hash.
+- Add an execution timeout of 3 minutes per block by default (can be overridden in tier1/tier2 Configs) -- this is useful when an external (eth_call) is stuck on a forked block hash.
 - Revert 'initialBlocks' changes from v1.9.1 because a 'changing module hash' causes more trouble.
 - Wazero: bump v1.8.0 and activate caching of precompiled wasm modules in `/tmp/wazero` to decrease compilation time
 - Metering update: more detailed metering with addition of new metrics (`live_uncompressed_read_bytes`, `live_uncompressed_read_forked_bytes`, `file_uncompressed_read_bytes`, `file_uncompressed_read_forked_bytes`, `file_compressed_read_forked_bytes`, `file_compressed_read_bytes`, `file_uncompressed_write_bytes`, `file_compressed_write_bytes`). _DEPRECATION WARNING_: `bytes_read` and `bytes_written` metrics will be removed in the future, please use the new metrics for metering instead.

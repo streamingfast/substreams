@@ -489,7 +489,7 @@ func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package
 		})
 
 		if mod.Use != "" {
-			pbmod, err := mod.ToProtoWASM(0) // the binary index and module will be overriden by th 'use'
+			pbmod, err := mod.ToProtoWASM(0) // the binary index and module will be overridden by th 'use'
 			if err != nil {
 				return nil, fmt.Errorf("handling used module %q for module %q: %w", mod.Use, mod.Name, err)
 			}

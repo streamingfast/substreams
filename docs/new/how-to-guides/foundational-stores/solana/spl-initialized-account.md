@@ -14,9 +14,70 @@ The SPL Initialized Account foundational store provides efficient storage and re
 - **Mint Associations**: Which token mint each account is associated with
 - **Initialization Events**: Tracking of newly created SPL token accounts
 
-## Problem Solved
-
 SPL token transfer instructions on Solana only contain account addresses, not the wallet owners. To determine who actually sent/received tokens, you need to resolve account ownership. This foundational store provides that critical mapping.
+
+## Consuming Account Owner Data
+
+```rust
+use substreams::store::FoundationalStore;
+...
+use pb::sf::substreams::solana::v1::Transactions as SolanaTransactions;
+
+#[substreams::handlers::map]
+fn map_spl_instructions(
+    transactions: SolanaTransactions,
+    account_owner_store: FoundationalStore,
+) -> Result<SplInstructions, Error> {
+    // ... extract transfer instructions from transactions
+
+    // Collect account addresses that need owner lookup
+    let account_keys: Vec<Vec<u8>> = transfer_accounts.iter()
+        .map(|addr| bs58::decode(addr).into_vec().unwrap())
+        .collect();
+
+    // Batch query foundational store for account owners
+    let response = account_owner_store.get_all(&account_keys);
+
+    // Process responses and decode account owner data
+    for entry in response.entries {
+        if entry.response.unwrap().response == ResponseCode::Found as i32 {
+            let account_owner = AccountOwner::decode(
+                entry.response.unwrap().value.unwrap().value.as_slice()
+            )?;
+            let owner_address = bs58::encode(&account_owner.owner).into_string();
+            // Use owner_address to enrich transfer data
+        }
+    }
+    // ...
+}
+```
+
+**Consumer Module** (uses foundational store as input):
+```yaml
+specVersion: v0.1.0
+package:
+  name: solana-spl-all-tokens
+  version: v0.1.0
+
+imports:
+    solana_common: solana-common@v0.3.0
+    spl_initialized_account: spl-initialized-account@v0.1.2
+
+modules:
+  - name: map_spl_instructions
+    kind: map
+    initialBlock: 31310775
+    inputs:
+      - map: solana_common:transactions_by_programid_without_votes
+      - foundational-store: spl-initialized-account@v0.1.2
+    output:
+      type: proto:sf.solana.spl.v1.type.SplInstructions
+
+params:
+  solana_common:transactions_by_programid_without_votes: "program:TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA || program:TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+```
+
+> **Complete Example**: See the [map_spl_instructions](https://github.com/streamingfast/substreams-spl-token/blob/main/src/lib.rs#L49) implementation.
 
 ## Data Model
 
@@ -54,7 +115,7 @@ The foundational store processes SPL token account initialization instructions t
 
 Each SPL token account address becomes a key, with the corresponding `AccountOwner` protobuf message containing mint and owner information as the value.
 
-## Rust Implementation
+## Implementation
 
 ### Creating Foundational Store Entries
 
@@ -100,42 +161,6 @@ fn map_spl_initialized_account(
 }
 ```
 
-> **Complete Example**: See the [map_spl_initialized_account](https://github.com/streamingfast/substreams-foundational-modules/blob/develop/solana/spl-initialized-account/src/lib.rs#L23) implementation.
-
-### Consuming Account Owner Data
-
-```rust
-#[substreams::handlers::map]
-fn map_spl_instructions(
-    transactions: SolanaTransactions,
-    account_owner_store: FoundationalStore,
-) -> Result<SplInstructions, Error> {
-    // ... extract transfer instructions from transactions
-
-    // Collect account addresses that need owner lookup
-    let account_keys: Vec<Vec<u8>> = transfer_accounts.iter()
-        .map(|addr| bs58::decode(addr).into_vec().unwrap())
-        .collect();
-
-    // Batch query foundational store for account owners
-    let response = account_owner_store.get_all(&account_keys);
-
-    // Process responses and decode account owner data
-    for entry in response.entries {
-        if entry.response.unwrap().response == ResponseCode::Found as i32 {
-            let account_owner = AccountOwner::decode(
-                entry.response.unwrap().value.unwrap().value.as_slice()
-            )?;
-            let owner_address = bs58::encode(&account_owner.owner).into_string();
-            // Use owner_address to enrich transfer data
-        }
-    }
-    // ...
-}
-```
-
-> **Complete Example**: See the [map_spl_instructions](https://github.com/streamingfast/substreams-spl-token/blob/main/src/lib.rs#L49) implementation.
-
 ### Substreams Manifest Configuration
 
 **Producer Module** (creates foundational store entries):
@@ -164,33 +189,11 @@ params:
   solana_common:transactions_by_programid_without_votes: "program:TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA || program:TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 ```
 
-**Consumer Module** (uses foundational store as input):
-```yaml
-specVersion: v0.1.0
-package:
-  name: solana-spl-all-tokens
-  version: v0.1.0
-
-imports:
-    solana_common: solana-common@v0.3.0
-    spl_initialized_account: spl-initialized-account@v0.1.2
-
-modules:
-  - name: map_spl_instructions
-    kind: map
-    initialBlock: 31310775
-    inputs:
-      - map: solana_common:transactions_by_programid_without_votes
-      - foundational-store: spl-initialized-account@v0.1.2
-    output:
-      type: proto:sf.solana.spl.v1.type.SplInstructions
-
-params:
-  solana_common:transactions_by_programid_without_votes: "program:TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA || program:TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
-```
+> **Complete Example**: See the [map_spl_initialized_account](https://github.com/streamingfast/substreams-foundational-modules/blob/develop/solana/spl-initialized-account/src/lib.rs#L23) implementation.
 
 ## Related Resources
 
 - [Foundational Stores Overview](../foundational-stores.md)
+- [Introduction to Foundational Stores](../../../tutorials/intro-to-foundational-stores.md)
 - [SPL Initialized Account (GitHub)](https://github.com/streamingfast/substreams-foundational-modules/tree/develop/solana/spl-initialized-account)
 - [Substreams SPL All Tokens](https://github.com/streamingfast/substreams-spl-all-tokens) - Consumer example

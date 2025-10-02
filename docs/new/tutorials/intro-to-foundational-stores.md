@@ -54,5 +54,5 @@ Foundational stores return detailed status information for each query:
 
 ## Next steps
 
-- [Chain-specific foundational stores](../how-to-guides/foundational-stores/) for your blockchain
+- [Chain-specific foundational stores](../how-to-guides/foundational-stores/foundational-stores.md) for your blockchain
 - [Foundational store architecture](../references/foundational-stores.md) for technical details

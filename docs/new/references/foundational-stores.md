@@ -88,23 +88,10 @@ fn my_module(
     foundational_store: FoundationalStore,
 ) -> Result<Output, Error> {
     // Query foundational store for block-scoped data
-    let response = foundational_store.get(&key);
-    let batch_responses = foundational_store.get_all(&keys);
+    let response = foundational_store.get_all(&keys);
     // ...
 }
 ```
-
-### Query Patterns
-
-**Single Key Queries** - Use `get()` when:
-- You need one specific piece of data
-- The lookup depends on previous results
-- Making conditional lookups
-
-**Batch Queries** - Use `get_all()` when:
-- You need multiple related pieces of data
-- You know all keys upfront
-- Performance is critical (reduces overhead significantly)
 
 ### Response Codes
 

@@ -6,7 +6,6 @@
 ## Tutorials
 
 * [Generate Your First Substreams](new/tutorials/intro-to-tutorials.md)
-* [Intro to Foundational Stores](new/tutorials/intro-to-foundational-stores.md)
   * [on EVM](new/tutorials/evm.md)
   * [on Solana](tutorials/intro-to-tutorials/on-solana/README.md)
     * [Transactions & Instructions](new/tutorials/solana/solana.md)
@@ -16,6 +15,7 @@
   * [on MANTRA](new/tutorials/cosmos-compatible/mantra.md)
   * [on Starknet](new/tutorials/starknet.md)
   * [on Stellar](new/tutorials/stellar.md)
+* [Intro to Foundational Stores](new/tutorials/intro-to-foundational-stores.md)
 
 ## How-To Guides
 

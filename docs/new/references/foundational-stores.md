@@ -103,3 +103,6 @@ Foundational stores return detailed status information for each query:
 - **NOT_FOUND_BLOCK_NOT_REACHED**: Requested block has not been processed yet
 
 > See the complete [ResponseCode definition](https://github.com/streamingfast/substreams-foundational-store/blob/develop/proto/sf/substreams/foundational-store/v1/service.proto#L73) for additional details.
+
+## See Also
+- [Intro to Foundational Stores](../tutorials/intro-to-foundational-stores.md) - Step-by-step tutorial on consuming foundational stores

@@ -4,8 +4,6 @@ description: Chain-specific foundational stores
 
 # Foundational Stores
 
-## Chain-Specific Foundational Stores
-
 Foundational stores are available for various blockchain ecosystems, each optimized for specific data patterns and use cases:
 
 ### Ethereum

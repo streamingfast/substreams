@@ -195,5 +195,3 @@ params:
 
 - [Foundational Stores Overview](../foundational-stores.md)
 - [Introduction to Foundational Stores](../../../tutorials/intro-to-foundational-stores.md)
-- [SPL Initialized Account (GitHub)](https://github.com/streamingfast/substreams-foundational-modules/tree/develop/solana/spl-initialized-account)
-- [Substreams SPL All Tokens](https://github.com/streamingfast/substreams-spl-all-tokens) - Consumer example

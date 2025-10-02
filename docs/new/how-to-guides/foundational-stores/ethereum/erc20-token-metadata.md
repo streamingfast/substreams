@@ -163,5 +163,3 @@ modules:
 
 - [Foundational Stores Overview](../foundational-stores.md)
 - [Introduction to Foundational Stores](../../../tutorials/intro-to-foundational-stores.md)
-- [Token Metadata Foundational Store (GitHub)](https://github.com/streamingfast/token-metadata-foundational-store)
-- [Pinax EVM Tokens](https://github.com/pinax-network/substreams-evm-tokens) - Base metadata extraction

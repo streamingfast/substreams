@@ -50,7 +50,7 @@ package:
   version: v0.1.0
 
 imports:
-  token_metadata_store: https://github.com/Data-Nexus-Web3/token-metadata-foundational-store/releases/download/v0.1.0/evm-token-metadata-foundational-store-v0.1.0.spkg
+  token_metadata_store: erc20-token-metadata@v0.1.0
 
 modules:
   - name: map_tokens_transfers

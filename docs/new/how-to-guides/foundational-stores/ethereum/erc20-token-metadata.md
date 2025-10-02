@@ -157,7 +157,7 @@ modules:
       type: proto:sf.substreams.foundational_store.v1.Entries
 ```
 
-> **Complete Example**: See the [metadata_to_foundational_store](https://github.com/Data-Nexus-Web3/token-metadata-foundational-store/blob/main/src/lib.rs) implementation.
+> **Complete Example**: See the [metadata_to_foundational_store](https://github.com/streamingfast/substreams-foundational-modules/blob/develop/ethereum/erc20-token-metadata/src/lib.rs#L11) implementation.
 
 ## Related Resources
 

@@ -25,7 +25,7 @@ function main() {
   pushd "$ROOT" >/dev/null
     pushd "$ROOT/pb" > /dev/null
       generate "store.proto"
-      mv  "github.com/streamingfast/substreams/store/marshaller/pb/store_vtproto.pb.go" .
+      mv  "github.com/streamingfast/substreams/storage/store/marshaller/pb/store_vtproto.pb.go" .
       rm -rf "github.com"
     popd >/dev/null
   popd >/dev/null

@@ -25,7 +25,7 @@ use substreams_ethereum::pb::eth::v2::Block;
 
 #[substreams::handlers::map]
 fn map_tokens_transfers(
-    block: eth::Block,
+    block: Block,
     token_metadata_store: FoundationalStore,
 ) -> Result<TokenTransfers, Error> {
     // ... extract transfers from block

@@ -47,33 +47,27 @@ The **Server** exposes a high-performance gRPC API:
 
 ## Data Flow Architecture
 
-{% mermaid %}
-graph TD
-    A[Blockchain Network] --> B[Firehose]
-    B --> C[Substreams Engine]
-
-    C --> D[Producer Substream Module]
-    D --> E[Entries]
-    E --> F[Sink]
-    F --> G[Store]
-
-    G --> H[Badger Database]
-    G --> I[PostgreSQL]
-
-    J[Consumer Substream Module] --> K[FoundationalStore API]
-    K --> L{Query Type?}
-    L -->|Single Key| M[get]
-    L -->|Multiple Keys| N[get_all]
-
-    M --> O[gRPC Server]
-    N --> O
-    O --> G
-
-    G --> P[Response]
-    P --> Q{Response Code}
-
-    Q --> U[Enriched Output]
-{% endmermaid %}
+```mermaid
+graph TD;
+  A[Blockchain Network] --> B[Firehose]
+  B --> C[Substreams Engine]
+  C --> D[Producer Substream Module]
+  D --> E[Entries]
+  E --> F[Sink]
+  F --> G[Store]
+  G --> H[Badger Database]
+  G --> I[PostgreSQL]
+  J[Consumer Substream Module] --> K[FoundationalStore API]
+  K --> L{Query Type?}
+  L -->|Single Key| M[get]
+  L -->|Multiple Keys| N[get_all]
+  M --> O[gRPC Server]
+  N --> O
+  O --> G
+  G --> P[Response]
+  P --> Q{Response Code}
+  Q --> U[Enriched Output]
+```
 
 ## User Consumption Patterns
 

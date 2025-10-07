@@ -495,8 +495,8 @@ version: v0.1.0`,
 			expectError: false,
 		},
 		{
-			name: "new format with package@version notation",
-			yaml: `module: substreams-sink-sql@v0.1.0`,
+			name: "full path with @version notation",
+			yaml: `module: buf.build/streamingfast/substreams-sink-sql@v0.1.0`,
 			expected: BufImport{
 				Module:  "buf.build/streamingfast/substreams-sink-sql",
 				Version: "v0.1.0",
@@ -504,8 +504,8 @@ version: v0.1.0`,
 			expectError: false,
 		},
 		{
-			name: "new format with different package",
-			yaml: `module: substreams-foundational-store@v1.2.3`,
+			name: "full path with @version notation - different package",
+			yaml: `module: buf.build/streamingfast/substreams-foundational-store@v1.2.3`,
 			expected: BufImport{
 				Module:  "buf.build/streamingfast/substreams-foundational-store",
 				Version: "v1.2.3",
@@ -523,22 +523,34 @@ version: v0.1.0`,
 		},
 		{
 			name: "error: version specified in both places",
-			yaml: `module: substreams-sink-sql@v0.1.0
+			yaml: `module: buf.build/streamingfast/substreams-sink-sql@v0.1.0
 version: v0.2.0`,
 			expectError: true,
 			errorMsg:    "cannot specify version both in module field and version field",
 		},
 		{
 			name: "error: latest version not allowed",
-			yaml: `module: substreams-sink-sql@latest`,
+			yaml: `module: buf.build/streamingfast/substreams-sink-sql@latest`,
 			expectError: true,
 			errorMsg:    "version 'latest' is not allowed",
 		},
 		{
-			name: "error: invalid package name",
-			yaml: `module: invalid-name!@v0.1.0`,
+			name: "error: empty version after @",
+			yaml: `module: buf.build/streamingfast/substreams-sink-sql@`,
 			expectError: true,
-			errorMsg:    "invalid descriptor set module notation",
+			errorMsg:    "version 'latest' is not allowed",
+		},
+		{
+			name: "error: invalid semver version",
+			yaml: `module: buf.build/streamingfast/substreams-sink-sql@invalid-version`,
+			expectError: true,
+			errorMsg:    "is not valid Semver format",
+		},
+		{
+			name: "error: version with multiple @",
+			yaml: `module: buf.build/streamingfast/substreams-sink-sql@v0.1.0@extra`,
+			expectError: true,
+			errorMsg:    "should not contain '@'",
 		},
 		{
 			name: "with symbols in old format",
@@ -554,8 +566,8 @@ symbols:
 			expectError: false,
 		},
 		{
-			name: "with symbols in new format",
-			yaml: `module: substreams-sink-sql@v0.1.0
+			name: "with symbols and @version notation",
+			yaml: `module: buf.build/streamingfast/substreams-sink-sql@v0.1.0
 symbols:
   - sf.substreams.sink.sql.v1.Table`,
 			expected: BufImport{

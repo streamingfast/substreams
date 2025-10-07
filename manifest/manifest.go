@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 
+	"golang.org/x/mod/semver"
 	"gopkg.in/yaml.v3"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -534,8 +535,7 @@ func (m *Module) setOutputToProto(pbModule *pbsubstreams.Module) {
 // UnmarshalYAML implements custom YAML unmarshaling for BufImport
 // Supports multiple formats:
 // 1. Full path: buf.build/org/pkg
-// 2. With version: pkg@v1.0.0
-// 3. Without version: pkg
+// 2. With version: buf.build/org/pkg@version
 func (b *BufImport) UnmarshalYAML(n *yaml.Node) error {
 	// Type alias to avoid recursion
 	type rawBufImport BufImport
@@ -545,40 +545,29 @@ func (b *BufImport) UnmarshalYAML(n *yaml.Node) error {
 		return err
 	}
 
-	// Copy all fields first
+	// Copy all fields
 	*b = BufImport(raw)
 
 	module := strings.TrimSpace(b.Module)
 	version := strings.TrimSpace(b.Version)
 
-	// Try parsing as package@version notation
-	packageName, parsedVersion, likelyShortcut, validationErr := ParseShortPackageIdentifier(module)
-
-	if likelyShortcut {
-		// User used @ notation
-		if validationErr != nil {
-			return fmt.Errorf("invalid descriptor set module notation %q: %w", module, validationErr)
-		}
-
-		if parsedVersion == "latest" {
-			return fmt.Errorf("descriptor set module %q: version 'latest' is not allowed, please specify a specific version or omit version entirely", module)
-		}
-
+	modulePart, versionPart, hasAt := strings.Cut(module, "@")
+	if hasAt {
 		if version != "" {
 			return fmt.Errorf("descriptor set module %q: cannot specify version both in module field and version field", module)
 		}
+		if versionPart == "" || versionPart == "latest" {
+			return fmt.Errorf("descriptor set module %q: version 'latest' is not allowed, please specify a specific version or omit version entirely", module)
+		}
+		if strings.Contains(versionPart, "@") {
+			return fmt.Errorf("descriptor set module %q: version %q should not contain '@'", module, versionPart)
+		}
+		if versionPart != "latest" && !semver.IsValid(versionPart) {
+			return fmt.Errorf("descriptor set module %q: version %q is not valid Semver format", module, versionPart)
+		}
 
-		// Expand to full buf.build path
-		b.Module = fmt.Sprintf("buf.build/streamingfast/%s", packageName)
-		b.Version = parsedVersion
-	} else if !strings.Contains(module, "/") {
-		// Short package name
-		b.Module = fmt.Sprintf("buf.build/streamingfast/%s", module)
-		b.Version = version
-	} else {
-		// Full path format
-		b.Module = module
-		b.Version = version
+		b.Module = modulePart
+		b.Version = versionPart
 	}
 
 	return nil

@@ -1,6 +1,4 @@
-The **Substreams:SQL service** allows you to consume the data extracted from the blockchain through a SQL database.
-
-<figure><img src="../../../.gitbook/assets/consume/service-sql.png" width="100%" /></figure>
+The **Substreams:SQL Sink** allows you to consume the data extracted from the blockchain through a SQL database.
 
 ## Requirements
 

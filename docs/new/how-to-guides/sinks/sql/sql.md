@@ -14,7 +14,7 @@ Before you begin, make sure you have:
 
 The core function of the SQL sink is to translate your Substreams output (Protobuf data) into SQL tables. Choose one of the following methods depending on your needs:
 
-- [Using Relational Mappings](./relational-mappings.md)
+- [Using Relational Mappings "from-proto"](https://github.com/streamingfast/substreams-sink-sql/blob/develop/FROM_PROTO.md)
     * Enables foreign key relationships in your SQL schema.
     * Requires adding annotations to your Protobuf messages (e.g., primary and foreign keys).
     * Currently insert-only.

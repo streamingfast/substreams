@@ -20,30 +20,41 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pb/system"
 	sfproto "github.com/streamingfast/substreams/proto"
+	"go.uber.org/zap"
 	"golang.org/x/mod/semver"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/descriptorpb"
 )
 
 type DescriptorCache struct {
-	cacheDir string
+	cacheDir       string
+	memoryCache    map[string]*descriptorpb.FileDescriptorSet
+	useMemoryCache bool
 }
 
-func newDescriptorCache() (*DescriptorCache, error) {
+func newDescriptorCache() *DescriptorCache {
 	configDir, err := os.UserConfigDir()
 	if err != nil {
-		return nil, fmt.Errorf("getting user config directory: %w", err)
+		zlog.Debug("failed to get user config directory, falling back to in-memory cache", zap.Error(err))
+		return &DescriptorCache{
+			memoryCache:    make(map[string]*descriptorpb.FileDescriptorSet),
+			useMemoryCache: true,
+		}
 	}
 
 	cacheDir := filepath.Join(configDir, "substreams", "buf-cache")
 	if err := os.MkdirAll(cacheDir, 0755); err != nil {
-		return nil, fmt.Errorf("creating cache directory: %w", err)
+		zlog.Debug("failed to create cache directory, falling back to in-memory cache", zap.Error(err))
+		return &DescriptorCache{
+			memoryCache:    make(map[string]*descriptorpb.FileDescriptorSet),
+			useMemoryCache: true,
+		}
 	}
 
-	return &DescriptorCache{cacheDir: cacheDir}, nil
+	return &DescriptorCache{cacheDir: cacheDir}
 }
 
-func (c *DescriptorCache) shouldCache(version string) bool {
+func (c *DescriptorCache) isDeterministicVersion(version string) bool {
 	// Only cache valid semver versions
 	return semver.IsValid(version)
 }
@@ -52,15 +63,26 @@ func (c *DescriptorCache) generateCacheKey(module, version string, symbols []str
 	h := sha256.New()
 	h.Write([]byte(module))
 	h.Write([]byte(version))
+	// symbols contains fully-qualified protobuf type names (eg, sf.substreams.v1.Package)
 	for _, symbol := range symbols {
 		h.Write([]byte(symbol))
 	}
 	return hex.EncodeToString(h.Sum(nil))
 }
 
+func (c *DescriptorCache) cacheFilePath(cacheKey string) string {
+	return filepath.Join(c.cacheDir, cacheKey+".file_descriptor.binpb")
+}
+
 func (c *DescriptorCache) load(cacheKey string) (*descriptorpb.FileDescriptorSet, error) {
-	cacheFile := filepath.Join(c.cacheDir, cacheKey+".file_descriptor.binpb")
-	data, err := os.ReadFile(cacheFile)
+	if c.useMemoryCache {
+		if fds, ok := c.memoryCache[cacheKey]; ok {
+			return fds, nil
+		}
+		return nil, fmt.Errorf("cache miss")
+	}
+
+	data, err := os.ReadFile(c.cacheFilePath(cacheKey))
 	if err != nil {
 		return nil, err
 	}
@@ -71,13 +93,17 @@ func (c *DescriptorCache) load(cacheKey string) (*descriptorpb.FileDescriptorSet
 }
 
 func (c *DescriptorCache) save(cacheKey string, fds *descriptorpb.FileDescriptorSet) error {
+	if c.useMemoryCache {
+		c.memoryCache[cacheKey] = fds
+		return nil
+	}
+
 	data, err := proto.Marshal(fds)
 	if err != nil {
 		return err
 	}
 
-	cacheFile := filepath.Join(c.cacheDir, cacheKey+".file_descriptor.binpb")
-	return os.WriteFile(cacheFile, data, 0644)
+	return os.WriteFile(c.cacheFilePath(cacheKey), data, 0644)
 }
 
 func loadLocalProtobufs(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.FileDescriptor, error) {
@@ -154,17 +180,14 @@ func loadLocalProtobufs(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.Fil
 	return customFiles, nil
 }
 
-func loadDescriptorSets(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.FileDescriptor, error) {
+func loadDescriptorSets(ctx context.Context, pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.FileDescriptor, error) {
 	seen := map[string]bool{}
 	for _, file := range pkg.ProtoFiles {
 		seen[*file.Name] = true
 	}
 
 	// Initialize cache once for all descriptor sets
-	cache, err := newDescriptorCache()
-	if err != nil {
-		return nil, fmt.Errorf("initializing descriptor cache: %w", err)
-	}
+	cache := newDescriptorCache()
 
 	var out []*desc.FileDescriptor
 	var outProto []*descriptorpb.FileDescriptorProto
@@ -202,8 +225,19 @@ func loadDescriptorSets(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.Fil
 
 		var fileDescriptorSetResponse *descriptorpb.FileDescriptorSet
 
-		// Don't use cache for mutable versions or empty versions
-		if !cache.shouldCache(descriptor.Version) {
+		// Try to load from cache first for deterministic versions
+		if cache.isDeterministicVersion(descriptor.Version) {
+			cacheKey := cache.generateCacheKey(descriptor.Module, descriptor.Version, descriptor.Symbols)
+			cachedFds, err := cache.load(cacheKey)
+			if err == nil {
+				fileDescriptorSetResponse = cachedFds
+			} else {
+				zlog.Debug("cache miss for descriptor set", zap.String("module", descriptor.Module), zap.String("version", descriptor.Version))
+			}
+		}
+
+		// Fetch from buf.build if not cached or cache disabled
+		if fileDescriptorSetResponse == nil {
 			request := connect.NewRequest(&reflectv1beta1.GetFileDescriptorSetRequest{
 				Module:  descriptor.Module,
 				Symbols: descriptor.Symbols,
@@ -215,42 +249,19 @@ func loadDescriptorSets(pkg *pbsubstreams.Package, manif *Manifest) ([]*desc.Fil
 				request.Header().Set("Authorization", "Bearer "+authToken)
 			}
 
-			fileDescriptorSet, err := client.GetFileDescriptorSet(context.Background(), request)
+			fileDescriptorSet, err := client.GetFileDescriptorSet(ctx, request)
 			if err != nil {
 				return nil, fmt.Errorf("getting file descriptor set for %s: %w", descriptor.Module, err)
 			}
 
 			fileDescriptorSetResponse = fileDescriptorSet.Msg.FileDescriptorSet
-		} else {
-			// Try to load from cache first for valid semver versions
-			cacheKey := cache.generateCacheKey(descriptor.Module, descriptor.Version, descriptor.Symbols)
-			cachedFds, err := cache.load(cacheKey)
 
-			if err == nil {
-				// Cache hit
-				fileDescriptorSetResponse = cachedFds
-			} else {
-				// Cache miss, fetch from buf.build
-				request := connect.NewRequest(&reflectv1beta1.GetFileDescriptorSetRequest{
-					Module:  descriptor.Module,
-					Symbols: descriptor.Symbols,
-					Version: descriptor.Version,
-				})
-
-				authToken := os.Getenv("BUFBUILD_AUTH_TOKEN")
-				if authToken != "" {
-					request.Header().Set("Authorization", "Bearer "+authToken)
+			// Save to cache for deterministic versions
+			if cache.isDeterministicVersion(descriptor.Version) {
+				cacheKey := cache.generateCacheKey(descriptor.Module, descriptor.Version, descriptor.Symbols)
+				if err := cache.save(cacheKey, fileDescriptorSetResponse); err != nil {
+					zlog.Debug("failed to save descriptor set to cache", zap.Error(err))
 				}
-
-				fileDescriptorSet, err := client.GetFileDescriptorSet(context.Background(), request)
-				if err != nil {
-					return nil, fmt.Errorf("getting file descriptor set for %s: %w", descriptor.Module, err)
-				}
-
-				fileDescriptorSetResponse = fileDescriptorSet.Msg.FileDescriptorSet
-
-				// Save to cache (ignore errors to not break the build)
-				_ = cache.save(cacheKey, fileDescriptorSetResponse)
 			}
 		}
 

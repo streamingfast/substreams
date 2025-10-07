@@ -421,13 +421,13 @@ func TestDescriptorCache_GenerateCacheKey_Uniqueness(t *testing.T) {
 	assert.Equal(t, 4, len(keys), "All cache keys should be unique")
 }
 
-func TestDescriptorCache_ShouldCache(t *testing.T) {
+func TestDescriptorCache_IsDeterministicVersion(t *testing.T) {
 	cache := &DescriptorCache{cacheDir: t.TempDir()}
 
 	tests := []struct {
-		version     string
-		shouldCache bool
-		description string
+		version              string
+		isDeterministicVersion bool
+		description          string
 	}{
 		{"v1.0.0", true, "semantic version should be cached"},
 		{"v2.1.3", true, "semantic version should be cached"},
@@ -439,8 +439,8 @@ func TestDescriptorCache_ShouldCache(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
-			result := cache.shouldCache(tt.version)
-			assert.Equal(t, tt.shouldCache, result, tt.description)
+			result := cache.isDeterministicVersion(tt.version)
+			assert.Equal(t, tt.isDeterministicVersion, result, tt.description)
 		})
 	}
 }
@@ -500,12 +500,11 @@ func TestDescriptorCache_Load_NotFound(t *testing.T) {
 }
 
 func TestNewDescriptorCache(t *testing.T) {
-	cache, err := newDescriptorCache()
-	require.NoError(t, err, "Failed to create descriptor cache")
+	cache := newDescriptorCache()
 	require.NotNil(t, cache, "Cache should not be nil")
 
 	// Verify the directory exists
-	_, err = os.Stat(cache.cacheDir)
+	_, err := os.Stat(cache.cacheDir)
 	require.NoError(t, err, "Cache directory should exist")
 
 	// Verify the path contains expected components

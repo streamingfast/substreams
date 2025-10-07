@@ -32,7 +32,7 @@ func newManifestConverter(inputPath string, validation ReaderValidation, reader 
 	}
 }
 
-func (r *manifestConverter) Convert(manif *Manifest) (*pbsubstreams.Package, []*desc.FileDescriptor, *dynamic.Message, error) {
+func (r *manifestConverter) Convert(ctx context.Context, manif *Manifest) (*pbsubstreams.Package, []*desc.FileDescriptor, *dynamic.Message, error) {
 	if err := r.expandManifestVariables(manif); err != nil {
 		return nil, nil, nil, err
 	}
@@ -41,7 +41,7 @@ func (r *manifestConverter) Convert(manif *Manifest) (*pbsubstreams.Package, []*
 		return nil, nil, nil, fmt.Errorf("unable to load manifest: %w", err)
 	}
 
-	return r.manifestToPkg(manif)
+	return r.manifestToPkg(ctx, manif)
 }
 
 func (r *manifestConverter) expandManifestVariables(manif *Manifest) error {
@@ -271,7 +271,7 @@ func checkUseInputs(moduleWithUse, usedModule *pbsubstreams.Module, manifestModu
 	return nil
 }
 
-func (r *manifestConverter) manifestToPkg(manif *Manifest) (*pbsubstreams.Package, []*desc.FileDescriptor, *dynamic.Message, error) {
+func (r *manifestConverter) manifestToPkg(ctx context.Context, manif *Manifest) (*pbsubstreams.Package, []*desc.FileDescriptor, *dynamic.Message, error) {
 	pkg, err := r.convertToPkg(manif)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to convert manifest to pkg: %w", err)
@@ -283,7 +283,7 @@ func (r *manifestConverter) manifestToPkg(manif *Manifest) (*pbsubstreams.Packag
 
 	var protoFiles []*desc.FileDescriptor
 
-	fromBufBuild, err := loadDescriptorSets(pkg, manif)
+	fromBufBuild, err := loadDescriptorSets(ctx, pkg, manif)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("loading protobuf from buf: %w", err)
 	}

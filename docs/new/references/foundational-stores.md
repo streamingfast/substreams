@@ -47,27 +47,9 @@ The **Server** exposes a high-performance gRPC API:
 
 ## Data Flow Architecture
 
-```mermaid
-graph TD
-  A[Blockchain Network] --> B[Firehose]
-  B --> C[Substreams Engine]
-  C --> D[Producer Substream Module]
-  D --> E[Entries]
-  E --> F[Sink]
-  F --> G[Store]
-  G --> H[Badger Database]
-  G --> I[PostgreSQL]
-  J[Consumer Substream Module] --> K[FoundationalStore API]
-  K --> L{Query Type?}
-  L -->|Single Key| M[get]
-  L -->|Multiple Keys| N[get_all]
-  M --> O[gRPC Server]
-  N --> O
-  O --> G
-  G --> P[Response]
-  P --> Q{Response Code}
-  Q --> U[Enriched Output]
-```
+{% embed url="https://mermaid.ink/img/pako:eNptUluTmjAU_iuZPLsOVEHkoZ0Vdbv1hmv70uh0snAKjJAwIWlrkf_eEMRtZ8oT57ucc_IlNY54DNjHiaBlemRIf49klvPoHKU0Y2gL8icX5xN6eHiPZmSZCUh5BadOOjNwQA7qtZICaFGhBUsy1vKdIjCKOQkFj1UEAt2laKORvO80N7oFWTApMqhu6MKgS3LI2PkGLQ30RA6Si7cxTwb9SGY0TvSQOZX0ld7X7NhnEvJKJgIO-_Xd-IkEnFWq-N9mxrUiS65YTGXGGc3NVPQYPt86r4xmXe8ViAv6fCnhQ9Mx65a56sWTHNAKLle0IQnI09_sRuUyKzu-uqJtK_hG8_y-3ca035HkJQzQAcQPELcG247pil2Xyb9hhOQFqlIfrk8hNPC-7mEU6KtvetPesF_0BYgsSiFGOyVLJU94oN9GFmNfCgUDrIMqaFviuvUdsUyhgCP29W9MxfmIj6zRnpKyr5wXvU1wlaTY_07zSleq1HnCPKP61b1JgMUgAh22xL5jOmC_xr-wP5paQ9uyHcseu2NvPJpo9oJ927aGlj11Xc-ZTFvebQb4txlqDT3Ldd45I3vqTSaO63nNH6VD4xk?type=png" %}
+Foundational Store Data Flow
+{% endembed %}
 
 ## User Consumption Patterns
 

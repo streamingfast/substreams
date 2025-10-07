@@ -47,8 +47,8 @@ The **Server** exposes a high-performance gRPC API:
 
 ## Data Flow Architecture
 
-```mermaid
-graph TD;
+{% mermaid %}
+graph TD
     A[Blockchain Network] --> B[Firehose]
     B --> C[Substreams Engine]
 
@@ -73,7 +73,7 @@ graph TD;
     P --> Q{Response Code}
 
     Q --> U[Enriched Output]
-```
+{% endmermaid %}
 
 ## User Consumption Patterns
 

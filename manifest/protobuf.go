@@ -277,8 +277,6 @@ func loadDescriptorSets(ctx context.Context, pkg *pbsubstreams.Package, manif *M
 			seen[fd.GetName()] = true
 			out = append(out, fd)
 		}
-		// TEMP FIX FOR TEST DEPLOYMENT (keeping this here still until we've decided)
-		// time.Sleep(1020 * time.Millisecond)
 	}
 
 	for _, fd := range out {

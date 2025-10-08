@@ -485,7 +485,7 @@ func TestDescriptorSetEntry_UnmarshalYAML(t *testing.T) {
 		errorMsg    string
 	}{
 		{
-			name: "old format with full module path and version",
+			name: "old format with full module path and semver version",
 			yaml: `module: buf.build/streamingfast/substreams-sink-sql
 version: v0.1.0`,
 			expected: DescriptorSetEntry{
@@ -495,7 +495,7 @@ version: v0.1.0`,
 			expectError: false,
 		},
 		{
-			name: "full path with @version notation",
+			name: "full path with @version notation (semver inline)",
 			yaml: `module: buf.build/streamingfast/substreams-sink-sql@v0.1.0`,
 			expected: DescriptorSetEntry{
 				Module:  "buf.build/streamingfast/substreams-sink-sql",
@@ -504,7 +504,7 @@ version: v0.1.0`,
 			expectError: false,
 		},
 		{
-			name: "full path with @version notation - different package",
+			name: "full path with @version notation (different package)",
 			yaml: `module: buf.build/streamingfast/substreams-foundational-store@v1.2.3`,
 			expected: DescriptorSetEntry{
 				Module:  "buf.build/streamingfast/substreams-foundational-store",
@@ -513,7 +513,7 @@ version: v0.1.0`,
 			expectError: false,
 		},
 		{
-			name: "without version (uses latest from BSR)",
+			name: "without version (resolves to latest implicitly)",
 			yaml: `module: buf.build/streamingfast/substreams-sink-sql`,
 			expected: DescriptorSetEntry{
 				Module:  "buf.build/streamingfast/substreams-sink-sql",
@@ -522,15 +522,9 @@ version: v0.1.0`,
 			expectError: false,
 		},
 		{
-			name: "error: version specified in both places",
-			yaml: `module: buf.build/streamingfast/substreams-sink-sql@v0.1.0
-version: v0.2.0`,
-			expectError: true,
-			errorMsg:    "cannot specify version both in module field and version field",
-		},
-		{
-			name: "@latest treated as no version (uses latest from BSR)",
-			yaml: `module: buf.build/streamingfast/substreams-sink-sql@latest`,
+			name: "separate version with latest (allowed)",
+			yaml: `module: buf.build/streamingfast/substreams-sink-sql
+version: latest`,
 			expected: DescriptorSetEntry{
 				Module:  "buf.build/streamingfast/substreams-sink-sql",
 				Version: "",
@@ -538,25 +532,38 @@ version: v0.2.0`,
 			expectError: false,
 		},
 		{
-			name: "error: empty version after @",
-			yaml: `module: buf.build/streamingfast/substreams-sink-sql@`,
+			name: "error: version specified both inline and separate",
+			yaml: `module: buf.build/streamingfast/substreams-sink-sql@v0.1.0
+version: v0.2.0`,
+			expectError: true,
+			errorMsg:    "cannot specify version both inline (with '@') and in the separate 'version' field",
+		},
+		{
+			name:        "error: @latest is NOT allowed inline",
+			yaml:        `module: buf.build/streamingfast/substreams-sink-sql@latest`,
+			expectError: true,
+			errorMsg:    "'@latest' is not allowed in inline notation; use 'version: latest' or omit the version",
+		},
+		{
+			name:        "error: empty version after @",
+			yaml:        `module: buf.build/streamingfast/substreams-sink-sql@`,
 			expectError: true,
 			errorMsg:    "empty version after '@'",
 		},
 		{
-			name: "error: invalid semver version",
-			yaml: `module: buf.build/streamingfast/substreams-sink-sql@invalid-version`,
+			name:        "error: invalid semver version inline",
+			yaml:        `module: buf.build/streamingfast/substreams-sink-sql@invalid-version`,
 			expectError: true,
-			errorMsg:    "is not valid Semver format",
+			errorMsg:    "is not valid semantic version",
 		},
 		{
-			name: "error: version with multiple @",
-			yaml: `module: buf.build/streamingfast/substreams-sink-sql@v0.1.0@extra`,
+			name:        "error: version with multiple @ characters",
+			yaml:        `module: buf.build/streamingfast/substreams-sink-sql@v0.1.0@extra`,
 			expectError: true,
 			errorMsg:    "should not contain '@'",
 		},
 		{
-			name: "with symbols in old format",
+			name: "with symbols in separate version format",
 			yaml: `module: buf.build/streamingfast/substreams-sink-sql
 version: v0.1.0
 symbols:
@@ -569,7 +576,7 @@ symbols:
 			expectError: false,
 		},
 		{
-			name: "with symbols and @version notation",
+			name: "with symbols and inline semver",
 			yaml: `module: buf.build/streamingfast/substreams-sink-sql@v0.1.0
 symbols:
   - sf.substreams.sink.sql.v1.Table`,
@@ -579,6 +586,13 @@ symbols:
 				Symbols: []string{"sf.substreams.sink.sql.v1.Table"},
 			},
 			expectError: false,
+		},
+		{
+			name: "error: separate non-semver version (not latest)",
+			yaml: `module: buf.build/streamingfast/substreams-sink-sql
+version: 1.2`,
+			expectError: true,
+			errorMsg:    "is not valid semantic version (or 'latest')",
 		},
 	}
 
@@ -592,12 +606,13 @@ symbols:
 				if tt.errorMsg != "" {
 					assert.Contains(t, err.Error(), tt.errorMsg)
 				}
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tt.expected.Module, descriptorSetEntry.Module)
-				assert.Equal(t, tt.expected.Version, descriptorSetEntry.Version)
-				assert.Equal(t, tt.expected.Symbols, descriptorSetEntry.Symbols)
+				return
 			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected.Module, descriptorSetEntry.Module)
+			assert.Equal(t, tt.expected.Version, descriptorSetEntry.Version)
+			assert.Equal(t, tt.expected.Symbols, descriptorSetEntry.Symbols)
 		})
 	}
 }

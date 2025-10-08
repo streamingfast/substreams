@@ -547,7 +547,7 @@ func (d *DescriptorSetEntry) UnmarshalYAML(n *yaml.Node) error {
 		return err
 	}
 
-	// Copy all fields
+	// Copy all fields decoded so far
 	*d = DescriptorSetEntry(raw)
 
 	module := strings.TrimSpace(d.Module)
@@ -556,27 +556,40 @@ func (d *DescriptorSetEntry) UnmarshalYAML(n *yaml.Node) error {
 	modulePart, versionPart, hasAt := strings.Cut(module, "@")
 	if hasAt {
 		if version != "" {
-			return fmt.Errorf("descriptor set module %q: cannot specify version both in module field and version field", module)
+			return fmt.Errorf("descriptor set module %q: cannot specify version both inline (with '@') and in the separate 'version' field", module)
 		}
 		// Reject empty version after @
 		if versionPart == "" {
-			return fmt.Errorf("descriptor set module %q: empty version after '@' either specify a version (e.g., @v1.0.0) or remove the '@' entirely", module)
+			return fmt.Errorf("descriptor set module %q: empty version after '@'; specify a semver (e.g., @v1.0.0) or remove the '@'", module)
 		}
 		if versionPart == "latest" {
-			d.Module = modulePart
-			d.Version = ""
-			return nil
+			return fmt.Errorf("descriptor set module %q: '@latest' is not allowed in inline notation; use 'version: latest' or omit the version", module)
 		}
 		// Validate explicit version is valid semver
 		if strings.Contains(versionPart, "@") {
 			return fmt.Errorf("descriptor set module %q: version %q should not contain '@'", module, versionPart)
 		}
 		if !semver.IsValid(versionPart) {
-			return fmt.Errorf("descriptor set module %q: version %q is not valid Semver format", module, versionPart)
+			return fmt.Errorf("descriptor set module %q: version %q is not valid semantic version (expected like v1.2.3)", module, versionPart)
 		}
 		d.Module = modulePart
 		d.Version = versionPart
+		return nil
+	}
+	d.Module = module
+	if version == "" {
+		d.Version = ""
+		return nil
 	}
 
+	if version == "latest" {
+		d.Version = ""
+		return nil
+	}
+
+	if !semver.IsValid(version) {
+		return fmt.Errorf("descriptor set module %q: version %q is not valid semantic version (or 'latest')", module, version)
+	}
+	d.Version = version
 	return nil
 }

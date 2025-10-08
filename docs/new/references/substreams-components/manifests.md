@@ -179,7 +179,7 @@ protobuf:
 **Available Fields:**
 
 * `module` (required): The full path to the Buf module in the format `buf.build/organization/repository`. Can optionally include the version using `@version` notation.
-* `version` (optional): The semantic version of the module to import (e.g., `v0.1.0`, `v1.2.3`). Must be a valid [semver](https://semver.org/) format.
+* `version` (optional): Either a valid semantic version (e.g., `v0.1.0`, `v1.2.3`) or `latest`.
 * `symbols` (optional): An array of specific protobuf symbols to import from the descriptor set. If omitted, all types from the descriptor set are available.
 * `localPath` (optional): Local filesystem path where the descriptor set should be cached or stored.
 
@@ -204,11 +204,14 @@ protobuf:
 **Version Validation Rules:**
 
 {% hint style="warning" %}
-**Important**: When specifying a version, the following rules are enforced:
+**Important**: When using inline `@version` notation:
 
-* The version **must** be a valid semantic version (e.g., `v1.0.0`, `v0.2.5`) when explicitly specified
-* Using `@latest` or omitting the version entirely will both resolve to the latest available version from Buf Schema Registry
-* You **cannot** specify the version both inline (with `@`) and as a separate field, chose one format
+* Explicit versions **must** be valid semantic versions (e.g., `v1.0.0`, `v0.2.5`)
+* Inline `@version` notation must use a valid semantic version (e.g., `v1.0.0`, `v0.2.5`)
+* Inline `@latest` is **not allowed**. Use `version: latest` or omit the version instead
+* You **cannot** specify the version both inline (with `@`) and as a separate field, choose one format
+* Omitting the version entirely will use the latest available version
+* Using `version: latest` (separate field) will also use the latest available version
 {% endhint %}
 ### `binaries`
 

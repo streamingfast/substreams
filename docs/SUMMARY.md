@@ -15,6 +15,7 @@
   * [on MANTRA](new/tutorials/cosmos-compatible/mantra.md)
   * [on Starknet](new/tutorials/starknet.md)
   * [on Stellar](new/tutorials/stellar.md)
+* [Intro to Foundational Stores](new/tutorials/intro-to-foundational-stores.md)
 
 ## How-To Guides
 
@@ -58,6 +59,9 @@
     * [Option struct](new/how-to-guides/using-rust-proto/rust/option.md)
     * [Result struct](new/how-to-guides/using-rust-proto/rust/result.md)
   * [Protobuf Schemas](new/how-to-guides/using-rust-proto/creating-protobuf-schemas.md)
+* [Foundational Stores](new/how-to-guides/foundational-stores/foundational-stores.md)
+  * [Ethereum - ERC20 Token Metadata](new/how-to-guides/foundational-stores/ethereum/erc20-token-metadata.md)
+  * [Solana - SPL Initialized Account](new/how-to-guides/foundational-stores/solana/spl-initialized-account.md)
 
 ## Reference Material
 
@@ -81,6 +85,7 @@
     * [Parameterized Modules](new/references/substreams-components/modules/parameterized-modules.md)
   * [Manifests Reference](new/references/substreams-components/manifests.md)
 * [Substreams Architecture](new/references/architecture.md)
+* [Substreams Foundational Stores](new/references/foundational-stores.md)
 * [Substreams:SQL](new/references/sql/README.md)
   * [Sink Config](new/references/sql/sink-config.md)
   * [DSN Reference](new/references/sql/dsn-reference.md)

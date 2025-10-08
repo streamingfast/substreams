@@ -36,15 +36,16 @@ func WriteCursor(filename string, cursor *Cursor) error {
 
 	tempPath := tempFile.Name()
 
+	// cleanupt, prevents leaving temp file on disk if rename fails
+	defer os.Remove(tempPath)
+
 	_, err = tempFile.Write([]byte(cursor.String()))
 	if err != nil {
 		tempFile.Close()
-		os.Remove(tempPath)
 		return err
 	}
 
 	if err = tempFile.Close(); err != nil {
-		os.Remove(tempPath)
 		return err
 	}
 

@@ -17,7 +17,7 @@ func (s BackOffStringer) String() string {
 	case *backoff.ConstantBackOff:
 		return fmt.Sprintf("Wait Constantly %s", v.Interval)
 	case *backoff.ExponentialBackOff:
-		return fmt.Sprintf("Wait Exponentialy (interval: %s, max interval: %s, max elapsed time: %s)", v.InitialInterval, v.MaxInterval, v.MaxElapsedTime)
+		return fmt.Sprintf("Wait Exponentially (interval: %s, max interval: %s, max elapsed time: %s)", v.InitialInterval, v.MaxInterval, v.MaxElapsedTime)
 	default:
 		return fmt.Sprintf("%T", v)
 	}

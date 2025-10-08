@@ -68,7 +68,7 @@ func deployE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("cannot deploy package %q: it does not specify a sink_module", file)
 	}
 
-	pkgBundle.Package.Networks = nil // we don't want to send this to the server, so it does not apply network values again, possibly losing the overriden params
+	pkgBundle.Package.Networks = nil // we don't want to send this to the server, so it does not apply network values again, possibly losing the overridden params
 
 	paramsMap := make(map[string]string)
 	for _, param := range sflags.MustGetStringArray(cmd, "deployment-params") {

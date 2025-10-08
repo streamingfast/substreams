@@ -204,10 +204,11 @@ protobuf:
 **Version Validation Rules:**
 
 {% hint style="warning" %}
-**Important**: The following version rules are enforced:
+**Important**: When specifying a version, the following rules are enforced:
 
-* The version **must** be a valid semantic version (e.g., `v1.0.0`, `v0.2.5`)
-* The version **cannot** be `latest` - you must specify an explicit version for reproducibility
+* The version **must** be a valid semantic version (e.g., `v1.0.0`, `v0.2.5`) when explicitly specified
+* Using `@latest` or omitting the version entirely will both resolve to the latest available version from Buf Schema Registry
+* You **cannot** specify the version both inline (with `@`) and as a separate field, chose one format
 {% endhint %}
 ### `binaries`
 

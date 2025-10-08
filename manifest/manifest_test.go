@@ -476,11 +476,11 @@ func TestFoundationalStore_HashBehavior(t *testing.T) {
 	}
 }
 
-func TestBufImport_UnmarshalYAML(t *testing.T) {
+func TestDescriptorSetEntry_UnmarshalYAML(t *testing.T) {
 	tests := []struct {
 		name        string
 		yaml        string
-		expected    BufImport
+		expected    DescriptorSetEntry
 		expectError bool
 		errorMsg    string
 	}{
@@ -488,7 +488,7 @@ func TestBufImport_UnmarshalYAML(t *testing.T) {
 			name: "old format with full module path and version",
 			yaml: `module: buf.build/streamingfast/substreams-sink-sql
 version: v0.1.0`,
-			expected: BufImport{
+			expected: DescriptorSetEntry{
 				Module:  "buf.build/streamingfast/substreams-sink-sql",
 				Version: "v0.1.0",
 			},
@@ -497,7 +497,7 @@ version: v0.1.0`,
 		{
 			name: "full path with @version notation",
 			yaml: `module: buf.build/streamingfast/substreams-sink-sql@v0.1.0`,
-			expected: BufImport{
+			expected: DescriptorSetEntry{
 				Module:  "buf.build/streamingfast/substreams-sink-sql",
 				Version: "v0.1.0",
 			},
@@ -506,16 +506,16 @@ version: v0.1.0`,
 		{
 			name: "full path with @version notation - different package",
 			yaml: `module: buf.build/streamingfast/substreams-foundational-store@v1.2.3`,
-			expected: BufImport{
+			expected: DescriptorSetEntry{
 				Module:  "buf.build/streamingfast/substreams-foundational-store",
 				Version: "v1.2.3",
 			},
 			expectError: false,
 		},
 		{
-			name: "old format without version",
+			name: "without version (uses latest from BSR)",
 			yaml: `module: buf.build/streamingfast/substreams-sink-sql`,
-			expected: BufImport{
+			expected: DescriptorSetEntry{
 				Module:  "buf.build/streamingfast/substreams-sink-sql",
 				Version: "",
 			},
@@ -529,16 +529,19 @@ version: v0.2.0`,
 			errorMsg:    "cannot specify version both in module field and version field",
 		},
 		{
-			name: "error: latest version not allowed",
+			name: "@latest treated as no version (uses latest from BSR)",
 			yaml: `module: buf.build/streamingfast/substreams-sink-sql@latest`,
-			expectError: true,
-			errorMsg:    "version 'latest' is not allowed",
+			expected: DescriptorSetEntry{
+				Module:  "buf.build/streamingfast/substreams-sink-sql",
+				Version: "",
+			},
+			expectError: false,
 		},
 		{
 			name: "error: empty version after @",
 			yaml: `module: buf.build/streamingfast/substreams-sink-sql@`,
 			expectError: true,
-			errorMsg:    "version 'latest' is not allowed",
+			errorMsg:    "empty version after '@'",
 		},
 		{
 			name: "error: invalid semver version",
@@ -558,7 +561,7 @@ version: v0.2.0`,
 version: v0.1.0
 symbols:
   - sf.substreams.sink.sql.v1.Table`,
-			expected: BufImport{
+			expected: DescriptorSetEntry{
 				Module:  "buf.build/streamingfast/substreams-sink-sql",
 				Version: "v0.1.0",
 				Symbols: []string{"sf.substreams.sink.sql.v1.Table"},
@@ -570,7 +573,7 @@ symbols:
 			yaml: `module: buf.build/streamingfast/substreams-sink-sql@v0.1.0
 symbols:
   - sf.substreams.sink.sql.v1.Table`,
-			expected: BufImport{
+			expected: DescriptorSetEntry{
 				Module:  "buf.build/streamingfast/substreams-sink-sql",
 				Version: "v0.1.0",
 				Symbols: []string{"sf.substreams.sink.sql.v1.Table"},
@@ -581,8 +584,8 @@ symbols:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var bufImport BufImport
-			err := yaml.Unmarshal([]byte(tt.yaml), &bufImport)
+			var descriptorSetEntry DescriptorSetEntry
+			err := yaml.Unmarshal([]byte(tt.yaml), &descriptorSetEntry)
 
 			if tt.expectError {
 				require.Error(t, err)
@@ -591,9 +594,9 @@ symbols:
 				}
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tt.expected.Module, bufImport.Module)
-				assert.Equal(t, tt.expected.Version, bufImport.Version)
-				assert.Equal(t, tt.expected.Symbols, bufImport.Symbols)
+				assert.Equal(t, tt.expected.Module, descriptorSetEntry.Module)
+				assert.Equal(t, tt.expected.Version, descriptorSetEntry.Version)
+				assert.Equal(t, tt.expected.Symbols, descriptorSetEntry.Symbols)
 			}
 		})
 	}

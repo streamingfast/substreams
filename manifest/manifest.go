@@ -80,18 +80,20 @@ type PackageMeta struct {
 }
 
 type Protobuf struct {
-	DescriptorSets []*BufImport `yaml:"descriptorSets,omitempty"`
-	Files          []string     `yaml:"files,omitempty"`
-	ImportPaths    []string     `yaml:"importPaths,omitempty"`
-	ExcludePaths   []string     `yaml:"excludePaths,omitempty"`
+	DescriptorSets []*DescriptorSetEntry `yaml:"descriptorSets,omitempty"`
+	Files          []string              `yaml:"files,omitempty"`
+	ImportPaths    []string              `yaml:"importPaths,omitempty"`
+	ExcludePaths   []string              `yaml:"excludePaths,omitempty"`
 }
 
-type BufImport struct {
+type DescriptorSetEntry struct {
 	LocalPath string   `yaml:"localPath,omitempty"`
 	Module    string   `yaml:"module"`
 	Version   string   `yaml:"version,omitempty"`
 	Symbols   []string `yaml:"symbols,omitempty"`
 }
+
+type BufImport = DescriptorSetEntry
 
 type Module struct {
 	Name         string       `yaml:"name,omitempty"`
@@ -532,42 +534,48 @@ func (m *Module) setOutputToProto(pbModule *pbsubstreams.Module) {
 	}
 }
 
-// UnmarshalYAML implements custom YAML unmarshaling for BufImport
-// Supports multiple formats:
+// UnmarshalYAML implements custom YAML unmarshaling for DescriptorSetEntry
+// Supports two formats:
 // 1. Full path: buf.build/org/pkg
 // 2. With version: buf.build/org/pkg@version
-func (b *BufImport) UnmarshalYAML(n *yaml.Node) error {
+func (d *DescriptorSetEntry) UnmarshalYAML(n *yaml.Node) error {
 	// Type alias to avoid recursion
-	type rawBufImport BufImport
+	type rawDescriptorSetEntry DescriptorSetEntry
 
-	var raw rawBufImport
+	var raw rawDescriptorSetEntry
 	if err := n.Decode(&raw); err != nil {
 		return err
 	}
 
 	// Copy all fields
-	*b = BufImport(raw)
+	*d = DescriptorSetEntry(raw)
 
-	module := strings.TrimSpace(b.Module)
-	version := strings.TrimSpace(b.Version)
+	module := strings.TrimSpace(d.Module)
+	version := strings.TrimSpace(d.Version)
 
 	modulePart, versionPart, hasAt := strings.Cut(module, "@")
 	if hasAt {
 		if version != "" {
 			return fmt.Errorf("descriptor set module %q: cannot specify version both in module field and version field", module)
 		}
-		if versionPart == "" || versionPart == "latest" {
-			return fmt.Errorf("descriptor set module %q: version 'latest' is not allowed, please specify a specific version or omit version entirely", module)
+		// Reject empty version after @
+		if versionPart == "" {
+			return fmt.Errorf("descriptor set module %q: empty version after '@' either specify a version (e.g., @v1.0.0) or remove the '@' entirely", module)
 		}
+		if versionPart == "latest" {
+			d.Module = modulePart
+			d.Version = ""
+			return nil
+		}
+		// Validate explicit version is valid semver
 		if strings.Contains(versionPart, "@") {
 			return fmt.Errorf("descriptor set module %q: version %q should not contain '@'", module, versionPart)
 		}
-		if versionPart != "latest" && !semver.IsValid(versionPart) {
+		if !semver.IsValid(versionPart) {
 			return fmt.Errorf("descriptor set module %q: version %q is not valid Semver format", module, versionPart)
 		}
-
-		b.Module = modulePart
-		b.Version = versionPart
+		d.Module = modulePart
+		d.Version = versionPart
 	}
 
 	return nil

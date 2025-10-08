@@ -517,7 +517,7 @@ func (r *Reader) getPkg() (*pbsubstreams.Package, *Manifest, error) {
 			return nil, nil, fmt.Errorf("unable to unmarshal manifest: %w", err)
 		}
 
-		pkg, err := r.newPkgFromManifest(manif)
+		pkg, err := r.newPkgFromManifest(context.Background(), manif)
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to convert manifest to package: %w", err)
 		}
@@ -634,10 +634,10 @@ func validatePackage(pkg *pbsubstreams.Package, validation ReaderValidation) err
 	return nil
 }
 
-func (r *Reader) newPkgFromManifest(manif *Manifest) (*pbsubstreams.Package, error) {
+func (r *Reader) newPkgFromManifest(ctx context.Context, manif *Manifest) (*pbsubstreams.Package, error) {
 	converter := newManifestConverter(r.currentInput, r.validation, r)
 
-	pkg, descriptors, dynMessage, err := converter.Convert(manif)
+	pkg, descriptors, dynMessage, err := converter.Convert(ctx, manif)
 	if err != nil {
 		return nil, err
 	}

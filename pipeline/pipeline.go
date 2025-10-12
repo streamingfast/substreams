@@ -657,7 +657,7 @@ func getFoundationalStores(inputs []wasm.Argument) []*foundational.Store {
 // BuildModuleExecutors builds the ModuleExecutors, and the loadedModules.
 func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 	if p.StagedModuleExecutors != nil {
-		// Eventually, we can invalidate our catch to accomodate the PATCH
+		// Eventually, we can invalidate our catch to accommodate the PATCH
 		// and rebuild all the modules, and tear down the previously loaded ones.
 		return nil
 	}

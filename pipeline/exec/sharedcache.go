@@ -83,9 +83,13 @@ type callEntry struct {
 }
 
 func applyResult(res *callEntry, call *wasm.Call) error {
-	if call.Clock.Id != res.clock.Id ||
-		call.Entrypoint != res.entrypoint {
-		panic(fmt.Sprintf("invalid shared cache data on block %s (%s)", call.Clock, res.clock))
+	if call.Clock.Id != res.clock.Id || call.Entrypoint != res.entrypoint {
+		panic(fmt.Sprintf(
+			"invalid shared cache data on block %d id=%s call{module=%s entrypoint=%s} cached{module=%s entrypoint=%s}",
+			call.Clock.Number, call.Clock.Id,
+			call.ModuleName, call.Entrypoint,
+			res.moduleName, res.entrypoint,
+		))
 	}
 
 	call.Logs = append([]string{}, res.logs...)
@@ -133,7 +137,11 @@ func (s *SharedCache) Execute(
 	}
 	result, found := s.callEntries[clock][moduleHash]
 	if !found {
-		result = &callEntry{clock: call.Clock}
+		result = &callEntry{
+			clock:      call.Clock,
+			moduleName: call.ModuleName,
+			entrypoint: call.Entrypoint,
+		}
 		s.callEntries[clock][moduleHash] = result
 
 		// this request will actually cause the WASM execution. It locks the 'result' object for writes until it populates it
@@ -145,7 +153,14 @@ func (s *SharedCache) Execute(
 
 	if !found {
 		if tracer.Enabled() {
-			zlog.Debug("executing wasm call", zap.String("module_hash", moduleHash), zap.Uint64("block_num", clock.num))
+			// zlog.Debug("executing wasm call", zap.String("module_hash", moduleHash), zap.Uint64("block_num", clock.num))
+			zlog.Debug("executing wasm call",
+				zap.Uint64("block_num", clock.num),
+				zap.String("block_id", clock.id),
+				zap.String("module_hash", moduleHash),
+				zap.String("module_name", call.ModuleName),
+				zap.String("entrypoint", call.Entrypoint),
+			)
 		}
 		metrics.ExecutedWasmModules.Inc()
 		result.metricsGatherer = &metrics.WasmMetricsGatherer{}
@@ -175,7 +190,16 @@ func (s *SharedCache) Execute(
 	defer result.RUnlock()
 
 	if tracer.Enabled() {
-		zlog.Debug("getting wasm call from cache", zap.String("module_hash", moduleHash), zap.Uint64("block_num", clock.num))
+		// zlog.Debug("getting wasm call from cache", zap.String("module_hash", moduleHash), zap.Uint64("block_num", clock.num))
+		zlog.Debug("getting wasm call from cache",
+			zap.Uint64("block_num", clock.num),
+			zap.String("block_id", clock.id),
+			zap.String("module_hash_wasm_binary", moduleHash),
+			zap.String("module_name", call.ModuleName),
+			zap.String("entrypoint", call.Entrypoint),
+			zap.String("cached_module_name", result.moduleName),
+			zap.String("cached_entrypoint", result.entrypoint),
+		)
 	}
 	metrics.SkippedCachedWasmModules.Inc()
 	result.metricsGatherer.ApplyToStats(reqctx.ReqStats(originalContext))

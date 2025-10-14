@@ -12,6 +12,7 @@ import (
 	"github.com/streamingfast/substreams/storage/index"
 	"github.com/streamingfast/substreams/wasm"
 	ttrace "go.opentelemetry.io/otel/trace"
+	"go.uber.org/zap"
 )
 
 type BaseExecutor struct {
@@ -126,6 +127,12 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canS
 
 	ctx := e.ctx
 	if sharedCache.Cachable(clock.Number) {
+		zlog.Debug("calling shared cache execute",
+			zap.String("module_name", e.moduleName),
+			zap.String("entrypoint", e.entrypoint),
+			zap.String("module_hash", e.moduleHash),
+			zap.Uint64("block_num", clock.Number),
+		)
 		err = sharedCache.Execute(ctx, e.wasmModule, e.moduleHash, call, e.wasmArguments, argValues, undoManager)
 	} else {
 		if undoManager != nil {

@@ -211,13 +211,13 @@ func (m *Module) instantiateModule(ctx context.Context) (api.Module, error) {
 
 	if m.runtimeExtensions.Has(wasm.RuntimeExtensionIDWASMBindgenShims) {
 		// This must happen after the host modules are instantiated and just before we actually instantiate the user module.
-		// This is to ensure that we do not bind moddules that would be provided by us.
+		// This is to ensure that we do not bind modules that would be provided by us.
 		unboundedImports := m.gatherUnboundedModuleImports()
 
 		for moduleName, imports := range unboundedImports {
 			_, found := wasm.WASMBindgenModules[moduleName]
 			if !found {
-				// We only shims bindgen module, it will fail later since this module we skip is unbounded
+				// We only shim bindgen modules, it will fail later since this module we skip is unbounded
 				continue
 			}
 

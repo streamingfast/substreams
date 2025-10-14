@@ -31,4 +31,4 @@ In this guide, you'll learn how to publish a Substreams package to the [Substrea
 
 <figure><img src="../../.gitbook/assets/tutorials/publish-package/4_confirm.png" alt="" width="100%"></figure>
 
-That's it! You have succesfully published a package in the Substreams registry.
+That's it! You have successfully published a package in the Substreams registry.

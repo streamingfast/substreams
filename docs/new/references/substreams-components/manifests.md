@@ -145,6 +145,76 @@ Protobufs and modules are packaged together to help Substreams clients decode th
 
 [Learn more about Google Protocol Buffers](https://protobuf.dev/) in the official documentation provided by Google.
 
+#### `protobuf.descriptorSets`
+
+The `descriptorSets` field allows you to import precompiled Protocol Buffer definitions from the [Buf Schema Registry (BSR)](https://buf.build). This is useful when you want to consume protobuf types from external packages without copying `.proto` files into your project.
+
+Descriptor sets are precompiled binary representations of protobuf schemas that can be directly loaded by Substreams, enabling efficient type resolution and validation.
+
+{% hint style="info" %}
+**Note**: Using `descriptorSets` is an alternative to specifying `.proto` files via the `files` and `importPaths` fields. You can use both approaches in the same manifest if needed.
+{% endhint %}
+
+**Format 1: Separate version field**
+
+{% code title="substreams.yaml" %}
+```yaml
+protobuf:
+  descriptorSets:
+    - module: buf.build/streamingfast/substreams-sink-sql
+      version: v0.1.0
+```
+{% endcode %}
+
+**Format 2: Inline version with @ notation**
+
+{% code title="substreams.yaml" %}
+```yaml
+protobuf:
+  descriptorSets:
+    - module: buf.build/streamingfast/substreams-sink-sql@v0.1.0
+```
+{% endcode %}
+
+**Available Fields:**
+
+* `module` (required): The full path to the Buf module in the format `buf.build/organization/repository`. Can optionally include the version using `@version` notation.
+* `version` (optional): Either a valid semantic version (e.g., `v0.1.0`, `v1.2.3`) or `latest`.
+* `symbols` (optional): An array of specific protobuf symbols to import from the descriptor set. If omitted, all types from the descriptor set are available.
+* `localPath` (optional): Local filesystem path where the descriptor set should be cached or stored.
+
+**Complete Example with All Fields:**
+
+{% code title="substreams.yaml" %}
+```yaml
+protobuf:
+  descriptorSets:
+    - module: buf.build/streamingfast/substreams-sink-sql
+      version: v1.0.0
+      symbols:
+        - sf.substreams.sink.sql.v1.Service
+        - sf.substreams.sink.sql.v1.Table
+      localPath: ./proto-cache/sink-sql.binpb
+    - module: buf.build/streamingfast/substreams-entity-change@v1.3.0
+      symbols:
+        - sf.substreams.entity.v1.EntityChanges
+```
+{% endcode %}
+
+**Version Validation Rules:**
+
+{% hint style="warning" %}
+**Important**: When using inline `@version` notation:
+
+* Versions **must** be valid semantic versions (e.g., `v1.0.0`, `v0.2.5`)
+* When using inline `@version` notation:
+  * Only semantic versions are allowed (e.g., `module@v1.0.0`)
+  * `@latest` is **not allowed**, use `version: latest` as a separate field or omit the version
+* You **cannot** specify the version both inline (with `@`) and as a separate field, choose one format
+* To use the latest version, either:
+  * Omit the version field entirely
+  * Use `version: latest` as a separate field
+{% endhint %}
 ### `binaries`
 
 The `binaries` field specifies the WASM binary code to use when executing modules.

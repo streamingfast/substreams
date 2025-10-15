@@ -475,3 +475,144 @@ func TestFoundationalStore_HashBehavior(t *testing.T) {
 		})
 	}
 }
+
+func TestDescriptorSetEntry_UnmarshalYAML(t *testing.T) {
+	tests := []struct {
+		name        string
+		yaml        string
+		expected    DescriptorSetEntry
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "old format with full module path and semver version",
+			yaml: `module: buf.build/streamingfast/substreams-sink-sql
+version: v0.1.0`,
+			expected: DescriptorSetEntry{
+				Module:  "buf.build/streamingfast/substreams-sink-sql",
+				Version: "v0.1.0",
+			},
+			expectError: false,
+		},
+		{
+			name: "full path with @version notation (semver inline)",
+			yaml: `module: buf.build/streamingfast/substreams-sink-sql@v0.1.0`,
+			expected: DescriptorSetEntry{
+				Module:  "buf.build/streamingfast/substreams-sink-sql",
+				Version: "v0.1.0",
+			},
+			expectError: false,
+		},
+		{
+			name: "full path with @version notation (different package)",
+			yaml: `module: buf.build/streamingfast/substreams-foundational-store@v1.2.3`,
+			expected: DescriptorSetEntry{
+				Module:  "buf.build/streamingfast/substreams-foundational-store",
+				Version: "v1.2.3",
+			},
+			expectError: false,
+		},
+		{
+			name: "without version (resolves to latest implicitly)",
+			yaml: `module: buf.build/streamingfast/substreams-sink-sql`,
+			expected: DescriptorSetEntry{
+				Module:  "buf.build/streamingfast/substreams-sink-sql",
+				Version: "",
+			},
+			expectError: false,
+		},
+		{
+			name: "separate version with latest (allowed)",
+			yaml: `module: buf.build/streamingfast/substreams-sink-sql
+version: latest`,
+			expected: DescriptorSetEntry{
+				Module:  "buf.build/streamingfast/substreams-sink-sql",
+				Version: "",
+			},
+			expectError: false,
+		},
+		{
+			name: "error: version specified both inline and separate",
+			yaml: `module: buf.build/streamingfast/substreams-sink-sql@v0.1.0
+version: v0.2.0`,
+			expectError: true,
+			errorMsg:    "cannot specify version both inline (with '@') and in the separate 'version' field",
+		},
+		{
+			name:        "error: @latest is NOT allowed inline",
+			yaml:        `module: buf.build/streamingfast/substreams-sink-sql@latest`,
+			expectError: true,
+			errorMsg:    "'@latest' is not allowed in inline notation; use 'version: latest' or omit the version",
+		},
+		{
+			name:        "error: empty version after @",
+			yaml:        `module: buf.build/streamingfast/substreams-sink-sql@`,
+			expectError: true,
+			errorMsg:    "empty version after '@'",
+		},
+		{
+			name:        "error: invalid semver version inline",
+			yaml:        `module: buf.build/streamingfast/substreams-sink-sql@invalid-version`,
+			expectError: true,
+			errorMsg:    "is not valid semantic version",
+		},
+		{
+			name:        "error: version with multiple @ characters",
+			yaml:        `module: buf.build/streamingfast/substreams-sink-sql@v0.1.0@extra`,
+			expectError: true,
+			errorMsg:    "should not contain '@'",
+		},
+		{
+			name: "with symbols in separate version format",
+			yaml: `module: buf.build/streamingfast/substreams-sink-sql
+version: v0.1.0
+symbols:
+  - sf.substreams.sink.sql.v1.Table`,
+			expected: DescriptorSetEntry{
+				Module:  "buf.build/streamingfast/substreams-sink-sql",
+				Version: "v0.1.0",
+				Symbols: []string{"sf.substreams.sink.sql.v1.Table"},
+			},
+			expectError: false,
+		},
+		{
+			name: "with symbols and inline semver",
+			yaml: `module: buf.build/streamingfast/substreams-sink-sql@v0.1.0
+symbols:
+  - sf.substreams.sink.sql.v1.Table`,
+			expected: DescriptorSetEntry{
+				Module:  "buf.build/streamingfast/substreams-sink-sql",
+				Version: "v0.1.0",
+				Symbols: []string{"sf.substreams.sink.sql.v1.Table"},
+			},
+			expectError: false,
+		},
+		{
+			name: "error: separate non-semver version (not latest)",
+			yaml: `module: buf.build/streamingfast/substreams-sink-sql
+version: 1.2`,
+			expectError: true,
+			errorMsg:    "is not valid semantic version (or 'latest')",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var descriptorSetEntry DescriptorSetEntry
+			err := yaml.Unmarshal([]byte(tt.yaml), &descriptorSetEntry)
+
+			if tt.expectError {
+				require.Error(t, err)
+				if tt.errorMsg != "" {
+					assert.Contains(t, err.Error(), tt.errorMsg)
+				}
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected.Module, descriptorSetEntry.Module)
+			assert.Equal(t, tt.expected.Version, descriptorSetEntry.Version)
+			assert.Equal(t, tt.expected.Symbols, descriptorSetEntry.Symbols)
+		})
+	}
+}

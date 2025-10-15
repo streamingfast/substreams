@@ -14,8 +14,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Fixed a bug with BlockFilter: a skipped module would send BlockScopedData (in dev or near HEAD, to follow progress) with an empty module name, breaking some sinks. Module name was present if requesting a module dependent on that skipped module. Now the module name is always included.
 * **Added** support for `@version` notation in `protobuf.descriptorSets` section of manifest. You can now specify versions in multiple ways:
   - Separate fields: `module: buf.build/streamingfast/substreams-sink-sql`
-  - Separate fields with latest: `module: buf.build/streamingfast/substreams-sink-sql` with `version: latest`
+  - Separate fields with explicit latest: `module: buf.build/streamingfast/substreams-sink-sql` with `version: latest`
   - Inline notation: `module: buf.build/streamingfast/substreams-sink-sql@v0.1.0`
+  - Note: `@latest` inline notation is **not allowed**; use `version: latest` or omit the version instead
 ## v1.16.6
 
 ### Server

@@ -93,6 +93,8 @@ type DescriptorSetEntry struct {
 	Symbols   []string `yaml:"symbols,omitempty"`
 }
 
+// BufImport is deprecated: Use DescriptorSetEntry instead
+// This type alias is maintained for backward compatibility
 type BufImport = DescriptorSetEntry
 
 type Module struct {

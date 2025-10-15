@@ -206,12 +206,14 @@ protobuf:
 {% hint style="warning" %}
 **Important**: When using inline `@version` notation:
 
-* Explicit versions **must** be valid semantic versions (e.g., `v1.0.0`, `v0.2.5`)
-* Inline `@version` notation must use a valid semantic version (e.g., `v1.0.0`, `v0.2.5`)
-* Inline `@latest` is **not allowed**. Use `version: latest` or omit the version instead
+* Versions **must** be valid semantic versions (e.g., `v1.0.0`, `v0.2.5`)
+* When using inline `@version` notation:
+  * Only semantic versions are allowed (e.g., `module@v1.0.0`)
+  * `@latest` is **not allowed**, use `version: latest` as a separate field or omit the version
 * You **cannot** specify the version both inline (with `@`) and as a separate field, choose one format
-* Omitting the version entirely will use the latest available version
-* Using `version: latest` (separate field) will also use the latest available version
+* To use the latest version, either:
+  * Omit the version field entirely
+  * Use `version: latest` as a separate field
 {% endhint %}
 ### `binaries`
 

@@ -138,9 +138,7 @@ func (s *SharedCache) Execute(
 	result, found := s.callEntries[clock][moduleHash]
 	if !found {
 		result = &callEntry{
-			clock:      call.Clock,
-			moduleName: call.ModuleName,
-			entrypoint: call.Entrypoint,
+			clock: call.Clock,
 		}
 		s.callEntries[clock][moduleHash] = result
 

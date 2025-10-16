@@ -152,16 +152,13 @@ func (s *SharedCache) Execute(
 	s.Unlock() // This lock is global, it should never wait for an execution!
 
 	if !found {
-		if tracer.Enabled() {
-			// zlog.Debug("executing wasm call", zap.String("module_hash", moduleHash), zap.Uint64("block_num", clock.num))
-			zlog.Info("executing wasm call",
-				zap.Uint64("block_num", clock.num),
-				zap.String("block_id", clock.id),
-				zap.String("module_hash", moduleHash),
-				zap.String("module_name", call.ModuleName),
-				zap.String("entrypoint", call.Entrypoint),
-			)
-		}
+		zlog.Info("executing wasm call",
+			zap.Uint64("block_num", clock.num),
+			zap.String("block_id", clock.id),
+			zap.String("module_hash", moduleHash),
+			zap.String("module_name", call.ModuleName),
+			zap.String("entrypoint", call.Entrypoint),
+		)
 		metrics.ExecutedWasmModules.Inc()
 		result.metricsGatherer = &metrics.WasmMetricsGatherer{}
 
@@ -189,18 +186,15 @@ func (s *SharedCache) Execute(
 	result.RLock()
 	defer result.RUnlock()
 
-	if tracer.Enabled() {
-		// zlog.Debug("getting wasm call from cache", zap.String("module_hash", moduleHash), zap.Uint64("block_num", clock.num))
-		zlog.Info("getting wasm call from cache",
-			zap.Uint64("block_num", clock.num),
-			zap.String("block_id", clock.id),
-			zap.String("module_hash_wasm_binary", moduleHash),
-			zap.String("module_name", call.ModuleName),
-			zap.String("entrypoint", call.Entrypoint),
-			zap.String("cached_module_name", result.moduleName),
-			zap.String("cached_entrypoint", result.entrypoint),
-		)
-	}
+	zlog.Info("getting wasm call from cache",
+		zap.Uint64("block_num", clock.num),
+		zap.String("block_id", clock.id),
+		zap.String("module_hash_wasm_binary", moduleHash),
+		zap.String("module_name", call.ModuleName),
+		zap.String("entrypoint", call.Entrypoint),
+		zap.String("cached_module_name", result.moduleName),
+		zap.String("cached_entrypoint", result.entrypoint),
+	)
 	metrics.SkippedCachedWasmModules.Inc()
 	result.metricsGatherer.ApplyToStats(reqctx.ReqStats(originalContext))
 	return applyResult(result, call)

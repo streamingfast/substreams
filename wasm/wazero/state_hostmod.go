@@ -2,6 +2,7 @@ package wazero
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	pbstore "github.com/streamingfast/substreams-foundational-store/pb/sf/substreams/foundational-store/v1"
@@ -399,6 +400,9 @@ var StateFuncs = []funcs{
 
 			resp, err := call.DoFoundationalStoreGet(storeIndex, blockNumber, blockHash, req.Key)
 			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					panic(wasm.ErrFoundationalStoreCanceled)
+				}
 				call.ReturnError(fmt.Errorf("foundational store error: %w", err))
 				stack[0] = 0
 				return
@@ -447,6 +451,9 @@ var StateFuncs = []funcs{
 
 			resp, err := call.DoFoundationalStoreGetAll(storeIndex, blockNumber, blockHash, req.Keys)
 			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					panic(wasm.ErrFoundationalStoreCanceled)
+				}
 				call.ReturnError(fmt.Errorf("foundational store error: %w", err))
 				stack[0] = 0
 				return

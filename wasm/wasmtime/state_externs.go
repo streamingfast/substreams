@@ -1,6 +1,8 @@
 package wasmtime
 
 import (
+	"context"
+	"errors"
 	"fmt"
 
 	pbstore "github.com/streamingfast/substreams-foundational-store/pb/sf/substreams/foundational-store/v1"
@@ -174,6 +176,9 @@ func (i *instance) foundationalStoreGet(storeIndex int32, reqPtr int32, reqLen i
 
 	resp, err := i.CurrentCall.DoFoundationalStoreGet(uint32(storeIndex), blockNumber, blockHash, req.Key)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			panic(wasm.ErrFoundationalStoreCanceled)
+		}
 		i.CurrentCall.ReturnError(fmt.Errorf("foundational store error: %w", err))
 		return 0
 	}
@@ -213,7 +218,9 @@ func (i *instance) foundationalStoreGetAll(storeIndex int32, reqPtr int32, reqLe
 
 	resp, err := i.CurrentCall.DoFoundationalStoreGetAll(uint32(storeIndex), blockNumber, blockHash, req.Keys)
 	if err != nil {
-
+		if errors.Is(err, context.Canceled) {
+			panic(wasm.ErrFoundationalStoreCanceled)
+		}
 		i.CurrentCall.ReturnError(fmt.Errorf("foundational store error: %w", err))
 		return 0
 	}

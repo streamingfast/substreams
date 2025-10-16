@@ -454,8 +454,8 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 	defer func() {
 		if r := recover(); r != nil {
 			if err, ok := r.(error); ok {
-				if errors.Is(err, context.Canceled) {
-					panic(context.Canceled)
+				if errors.Is(err, wasm.ErrFoundationalStoreCanceled) {
+					return
 				}
 				if errors.Is(err, wasm.ErrWasmDeterministicExec) || errors.Is(err, store.ErrStoreAboveMaxSize) {
 					p.execoutStorage.ConfigMap[executorName].WriteDeterministicError(ctx, execOutput.Clock().Number, fmt.Errorf("%w (deterministic error)", err))

@@ -19,10 +19,10 @@ import (
 )
 
 var ErrWasmDeterministicExec = errors.New("wasm execution failed deterministically")
+var ErrFoundationalStoreCanceled = errors.New("foundational store request canceled")
 
 // Foundational store retry configuration constants
 const (
-	foundationalStoreMaxRetries = 10
 	foundationalStoreRetryDelay = 100 * time.Millisecond
 	// Kill switch timeout
 	foundationalStoreMaxWaitTime = 60 * time.Second
@@ -326,71 +326,64 @@ func (c *Call) DoFoundationalStoreGet(index uint32, block uint64, blockHash []by
 		return nil, fmt.Errorf("store not found for index: %d", index)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), foundationalStoreMaxWaitTime)
+	ctx, cancel := context.WithTimeoutCause(c.ctx, foundationalStoreMaxWaitTime, fmt.Errorf("foundational store timeout after %s", foundationalStoreMaxWaitTime))
 	defer cancel()
 
 	for {
-		// Check if the call context was cancelled
-		select {
-		case <-c.ctx.Done():
-			zlog.Info("foundational store get cancelled due to upstream disconnect", zap.Uint64("block_number", block))
-			panic(context.Canceled)
-		default:
-		}
-
 		resp, err := c.foundationalStores[index].Get(ctx, block, blockHash, key)
-		if err == nil {
-			if resp.BlockReached {
-				return resp, nil
+		if err != nil {
+			// Check if call context was cancelled
+			if c.ctx.Err() != nil {
+				zlog.Debug("foundational store get cancelled due to upstream disconnect",
+					zap.Uint64("block_number", block),
+					zap.Error(context.Cause(c.ctx)))
+				return nil, context.Canceled
 			}
 
-		}
-		if !resp.BlockReached {
-			zlog.Debug("block not reached, retrying", zap.Uint64("block_number", block))
-		}
-		if err != nil {
 			zlog.Warn("failed to call foundational store", zap.Error(err))
+			time.Sleep(foundationalStoreRetryDelay)
+			continue
 		}
+
+		if resp.BlockReached {
+			return resp, nil
+		}
+
 		time.Sleep(foundationalStoreRetryDelay)
 	}
 }
 
 func (c *Call) DoFoundationalStoreGetAll(index uint32, block uint64, blockHash []byte, keys [][]byte) (*pbstore.GetAllResponse, error) {
-	zlog.Info("entering call DoFoundationalStoreGetAll")
-
 	if len(c.foundationalStores) == 0 {
 		return nil, fmt.Errorf("store not found for index: %d", index)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), foundationalStoreMaxWaitTime)
+	ctx, cancel := context.WithTimeoutCause(c.ctx, foundationalStoreMaxWaitTime, fmt.Errorf("foundational store get_all timeout after %s", foundationalStoreMaxWaitTime))
 	defer cancel()
 
 	for {
-		// Check if the call context was cancelled
-		select {
-		case <-c.ctx.Done():
-			zlog.Info("foundational store get_all cancelled due to upstream disconnect", zap.Uint64("block_number", block))
-			panic(context.Canceled)
-		default:
-		}
-
 		resp, err := c.foundationalStores[index].GetAll(ctx, block, blockHash, keys)
-		zlog.Info("foundational store GetAll result", zap.Bool("block_reached", resp.BlockReached), zap.Error(err))
-		if err == nil {
-			if resp.BlockReached {
-				return resp, nil
+		zlog.Info("foundational store GetAll result", zap.Bool("block_reached", resp != nil && resp.BlockReached), zap.Error(err))
+		if err != nil {
+			// Check if call context was cancelled
+			if c.ctx.Err() != nil {
+				zlog.Debug("foundational store get_all cancelled due to upstream disconnect",
+					zap.Uint64("block_number", block),
+					zap.Error(context.Cause(c.ctx)))
+				return nil, context.Canceled
 			}
 
-		}
-		if !resp.BlockReached {
-			zlog.Debug("block not reached, retrying", zap.Uint64("block_number", block))
-		}
-		if err != nil {
 			zlog.Warn("failed to call foundational store", zap.Error(err))
+			time.Sleep(foundationalStoreRetryDelay)
+			continue
 		}
+
+		if resp.BlockReached {
+			return resp, nil
+		}
+
 		time.Sleep(foundationalStoreRetryDelay)
 	}
-
 }
 
 func (c *Call) validateStoreIndex(storeIndex int, stateFunc string) {

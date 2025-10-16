@@ -29,6 +29,7 @@ const (
 )
 
 type Call struct {
+	ctx        context.Context
 	Clock      *pbsubstreams.Clock // Used by WASM extensions
 	ModuleName string
 	Entrypoint string
@@ -52,8 +53,9 @@ type Call struct {
 	stats          *metrics.Stats
 }
 
-func NewCall(clock *pbsubstreams.Clock, moduleName string, entrypoint string, stats *metrics.Stats, arguments []Argument, canSkipEmptyOutput bool, foundationalStores []*foundational.Store) *Call {
+func NewCall(ctx context.Context, clock *pbsubstreams.Clock, moduleName string, entrypoint string, stats *metrics.Stats, arguments []Argument, canSkipEmptyOutput bool, foundationalStores []*foundational.Store) *Call {
 	call := &Call{
+		ctx:                ctx,
 		Clock:              clock,
 		ModuleName:         moduleName,
 		Entrypoint:         entrypoint,
@@ -328,6 +330,14 @@ func (c *Call) DoFoundationalStoreGet(index uint32, block uint64, blockHash []by
 	defer cancel()
 
 	for {
+		// Check if the call context was cancelled
+		select {
+		case <-c.ctx.Done():
+			zlog.Info("foundational store get cancelled due to upstream disconnect", zap.Uint64("block_number", block))
+			panic(context.Canceled)
+		default:
+		}
+
 		resp, err := c.foundationalStores[index].Get(ctx, block, blockHash, key)
 		if err == nil {
 			if resp.BlockReached {
@@ -356,6 +366,14 @@ func (c *Call) DoFoundationalStoreGetAll(index uint32, block uint64, blockHash [
 	defer cancel()
 
 	for {
+		// Check if the call context was cancelled
+		select {
+		case <-c.ctx.Done():
+			zlog.Info("foundational store get_all cancelled due to upstream disconnect", zap.Uint64("block_number", block))
+			panic(context.Canceled)
+		default:
+		}
+
 		resp, err := c.foundationalStores[index].GetAll(ctx, block, blockHash, keys)
 		zlog.Info("foundational store GetAll result", zap.Bool("block_reached", resp.BlockReached), zap.Error(err))
 		if err == nil {

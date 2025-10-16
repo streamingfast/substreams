@@ -454,6 +454,7 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 	defer func() {
 		if r := recover(); r != nil {
 			if err, ok := r.(error); ok {
+				// Ensure silent return and prevents deterministic errors and stack traces
 				if errors.Is(err, wasm.ErrFoundationalStoreCanceled) {
 					return
 				}

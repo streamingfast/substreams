@@ -125,7 +125,6 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canS
 	//t0 := time.Now()
 	call = wasm.NewCall(clock, e.moduleName, e.entrypoint, stats, e.wasmArguments, canSkipEmptyOutput, e.foundationalStores)
 
-	zlog.Info("allo")
 	ctx := e.ctx
 	if sharedCache.Cachable(clock.Number) {
 		zlog.Info("calling shared cache execute",

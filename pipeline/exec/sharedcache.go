@@ -154,7 +154,7 @@ func (s *SharedCache) Execute(
 	if !found {
 		if tracer.Enabled() {
 			// zlog.Debug("executing wasm call", zap.String("module_hash", moduleHash), zap.Uint64("block_num", clock.num))
-			zlog.Debug("executing wasm call",
+			zlog.Info("executing wasm call",
 				zap.Uint64("block_num", clock.num),
 				zap.String("block_id", clock.id),
 				zap.String("module_hash", moduleHash),
@@ -191,7 +191,7 @@ func (s *SharedCache) Execute(
 
 	if tracer.Enabled() {
 		// zlog.Debug("getting wasm call from cache", zap.String("module_hash", moduleHash), zap.Uint64("block_num", clock.num))
-		zlog.Debug("getting wasm call from cache",
+		zlog.Info("getting wasm call from cache",
 			zap.Uint64("block_num", clock.num),
 			zap.String("block_id", clock.id),
 			zap.String("module_hash_wasm_binary", moduleHash),

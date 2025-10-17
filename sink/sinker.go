@@ -22,6 +22,7 @@ import (
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
@@ -317,11 +318,13 @@ func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler) (activeCursor *Cursor, err error) {
 	activeCursor = cursor
 
-	ssClientV2, ssClientV3, connClose, callOpts, headers, err := client.NewSubstreamsClients(s.SinkerConfig.ClientConfig)
-
+	conn, connClose, callOpts, headers, err := client.NewSubstreamsClientConn(s.SinkerConfig.ClientConfig)
 	if err != nil {
-		return activeCursor, fmt.Errorf("new substreams client: %w", err)
+		return activeCursor, fmt.Errorf("new substreams client connection: %w", err)
 	}
+	
+	ssClientV2 := pbsubstreamsrpcv2.NewStreamClient(conn)
+	ssClientV3 := pbsubstreamsrpcv3.NewStreamClient(conn)
 	s.OnTerminating(func(_ error) { connClose() })
 
 	var headersArray []string

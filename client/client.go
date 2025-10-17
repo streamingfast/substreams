@@ -290,15 +290,6 @@ func newConnection(config *SubstreamsClientConfig) (conn *grpc.ClientConn, close
 	return
 }
 
-func NewSubstreamsClients(config *SubstreamsClientConfig) (cliV2 pbsubstreamsrpcv2.StreamClient, cliV3 pbsubstreamsrpcv3.StreamClient, closeFunc func() error, callOpts []grpc.CallOption, headers Headers, err error) {
-	var conn *grpc.ClientConn
-	conn, closeFunc, callOpts, headers, err = newConnection(config)
-	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("unable to create external gRPC client: %w", err)
-	}
-
-	cliV2 = pbsubstreamsrpcv2.NewStreamClient(conn)
-	cliV3 = pbsubstreamsrpcv3.NewStreamClient(conn)
-	zlog.Debug("client created")
-	return
+func NewSubstreamsClientConn(config *SubstreamsClientConfig) (conn *grpc.ClientConn, closeFunc func() error, callOpts []grpc.CallOption, headers Headers, err error) {
+	return newConnection(config)
 }

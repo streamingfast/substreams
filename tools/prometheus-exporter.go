@@ -23,6 +23,7 @@ import (
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
@@ -273,13 +274,16 @@ func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.Subs
 
 		ctx, cancel := context.WithTimeout(context.Background(), pollingTimeout)
 		begin := time.Now()
-		ssClientV2, ssClientV3, connClose, callOpts, headers, err := client.NewSubstreamsClients(substreamsClientConfig)
+		conn, connClose, callOpts, headers, err := client.NewSubstreamsClientConn(substreamsClientConfig)
 		if err != nil {
-			zlog.Error("substreams client setup", zap.Error(err))
+			zlog.Error("substreams client connection setup", zap.Error(err))
 			markFailure(endpoint, begin, err)
 			cancel()
 			continue
 		}
+		
+		ssClientV2 := pbsubstreamsrpcv2.NewStreamClient(conn)
+		ssClientV3 := pbsubstreamsrpcv3.NewStreamClient(conn)
 
 		if headers.IsSet() {
 			ctx = metadata.AppendToOutgoingContext(ctx, headers.ToArray()...)

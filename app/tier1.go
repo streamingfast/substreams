@@ -21,7 +21,7 @@ import (
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metrics"
-	ssconnect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcv2connect"
+	pbsubstreamsrpcv2connect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcv2connect"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service"
 	"github.com/streamingfast/substreams/wasm"
@@ -279,7 +279,7 @@ func (a *Tier1App) Run() error {
 	})
 
 	go func() {
-		var infoServer ssconnect.EndpointInfoHandler
+		var infoServer pbsubstreamsrpcv2connect.EndpointInfoHandler
 		if a.modules.InfoServer != nil {
 			a.logger.Info("waiting until info server is ready")
 			infoServer = &InfoServerWrapper{a.modules.InfoServer}
@@ -346,7 +346,7 @@ func (config *Tier1Config) Validate() error {
 	return nil
 }
 
-var _ ssconnect.EndpointInfoHandler = (*InfoServerWrapper)(nil)
+var _ pbsubstreamsrpcv2connect.EndpointInfoHandler = (*InfoServerWrapper)(nil)
 
 type InfoServerWrapper struct {
 	rpcInfoServer InfoServer

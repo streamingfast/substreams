@@ -10,8 +10,6 @@ import (
 
 	"github.com/streamingfast/dgrpc"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
-	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
-	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"

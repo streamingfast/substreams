@@ -11,6 +11,7 @@ import (
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/metrics"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.opentelemetry.io/otel/codes"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
@@ -28,6 +29,19 @@ var tier2RequestParametersKeyKey = contextKeyType(7)
 var wasmExtensionReqStats = contextKeyType(8)
 var cancelFunc = contextKeyType(9)
 var sessionKey = contextKeyType(10)
+var spkgKey = contextKeyType(11)
+
+func WithSpkg(ctx context.Context, pkg *pbsubstreams.Package) context.Context {
+	return context.WithValue(ctx, spkgKey, pkg)
+}
+
+func Spkg(ctx context.Context) *pbsubstreams.Package {
+	spkg := ctx.Value(spkgKey)
+	if t, ok := spkg.(*pbsubstreams.Package); ok {
+		return t
+	}
+	return nil
+}
 
 func WithCancelFunc(ctx context.Context, f context.CancelCauseFunc) context.Context {
 	return context.WithValue(ctx, cancelFunc, f)

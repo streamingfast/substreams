@@ -70,7 +70,7 @@ require (
 	github.com/streamingfast/firehose-networks v0.2.0
 	github.com/streamingfast/sf-tracing v0.0.0-20240430173521-888827872b90
 	github.com/streamingfast/shutter v1.5.0
-	github.com/streamingfast/substreams-foundational-store v0.1.1-0.20250930145106-2f2a893cbf56
+	github.com/streamingfast/substreams-foundational-store v0.1.1-0.20251017155401-352038f44dd2
 	github.com/streamingfast/substreams-sdk-go v0.0.0-20240110154316-5fb21a7a330b
 	github.com/streamingfast/substreams-sink-sql v1.0.1-0.20231127153906-acf5f3e34330
 	github.com/test-go/testify v1.1.4
@@ -102,7 +102,6 @@ require (
 	github.com/cenkalti/backoff/v5 v5.0.2 // indirect
 	github.com/charmbracelet/x/exp/strings v0.0.0-20240722160745-212f7b056ed0 // indirect
 	github.com/charmbracelet/x/term v0.2.0 // indirect
-	github.com/drone/envsubst v1.0.3 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.32.4 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
@@ -111,8 +110,6 @@ require (
 	github.com/gorilla/schema v1.0.2 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/iancoleman/strcase v0.3.0 // indirect
-	github.com/jmoiron/sqlx v1.4.0 // indirect
-	github.com/lib/pq v1.10.9 // indirect
 	github.com/manifoldco/promptui v0.9.0 // indirect
 	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
 	github.com/mostynb/go-grpc-compression v1.2.3 // indirect

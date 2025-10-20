@@ -7,7 +7,7 @@ import "sf/firehose/v2/firehose.proto";
 import "sf/substreams/v1/clock.proto";
 import "sf/substreams/v1/modules.proto";
 
-option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2;pbsubstreamsrpc";
+option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2;pbsubstreamsrpcv2";
 
 service Stream {
   rpc Blocks(Request) returns (stream Response);

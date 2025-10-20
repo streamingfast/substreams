@@ -4,7 +4,7 @@
 // 	protoc        (unknown)
 // source: sf/substreams/rpc/v2/service.proto
 
-package pbsubstreamsrpc
+package pbsubstreamsrpcv2
 
 import (
 	v2 "github.com/streamingfast/pbgo/sf/firehose/v2"
@@ -1787,7 +1787,7 @@ const file_sf_substreams_rpc_v2_service_proto_rawDesc = "" +
 	"\x06Stream\x12I\n" +
 	"\x06Blocks\x12\x1d.sf.substreams.rpc.v2.Request\x1a\x1e.sf.substreams.rpc.v2.Response0\x012Q\n" +
 	"\fEndpointInfo\x12A\n" +
-	"\x04Info\x12\x1b.sf.firehose.v2.InfoRequest\x1a\x1c.sf.firehose.v2.InfoResponseBMZKgithub.com/streamingfast/substreams/pb/sf/substreams/rpc/v2;pbsubstreamsrpcb\x06proto3"
+	"\x04Info\x12\x1b.sf.firehose.v2.InfoRequest\x1a\x1c.sf.firehose.v2.InfoResponseBOZMgithub.com/streamingfast/substreams/pb/sf/substreams/rpc/v2;pbsubstreamsrpcv2b\x06proto3"
 
 var (
 	file_sf_substreams_rpc_v2_service_proto_rawDescOnce sync.Once

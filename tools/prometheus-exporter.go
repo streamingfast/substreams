@@ -9,10 +9,12 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
+	"github.com/streamingfast/dgrpc"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -23,6 +25,8 @@ import (
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
@@ -50,6 +54,7 @@ func init() {
 	prometheusCmd.Flags().String("substreams-api-key-envvar", "SUBSTREAMS_API_KEY", "Name of variable containing Substreams Api Key")
 	prometheusCmd.Flags().BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
 	prometheusCmd.Flags().BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
+	prometheusCmd.Flags().Int("force-protocol-version", 0, "Force the use of a specific protocol version (0=unset/auto, 2=v2, 3=v3)")
 	prometheusCmd.Flags().Int64("block-height", -1, "Block number to request (defaults to -1, which means the HEAD)")
 	prometheusCmd.Flags().Duration("max-freshness", time.Minute*2, "(only used if block-height is relative, i.e. below 0) check the age of the received blocks, fail an endpoint if it is older than this duration")
 	prometheusCmd.Flags().Duration("interval", time.Second*20, "endpoints will be polled at this interval")
@@ -170,6 +175,9 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 	plaintext := sflags.MustGetBool(cmd, "plaintext")
 	interval := sflags.MustGetDuration(cmd, "interval")
 	timeout := sflags.MustGetDuration(cmd, "timeout")
+	protocolVersionFlag := sflags.MustGetInt(cmd, "force-protocol-version")
+	forceProtocolVersion, err := client.ParseProtocolVersion(protocolVersionFlag)
+
 	maxFreshness := sflags.MustGetDuration(cmd, "max-freshness")
 
 	allLabels := map[string]bool{"endpoint": true}
@@ -203,20 +211,21 @@ func runPrometheus(cmd *cobra.Command, args []string) error {
 			startBlock = int64(*endpointMap[endpoint].startBlock)
 		}
 
-		substreamsClientConfig := client.NewSubstreamsClientConfig(
-			endpoint,
-			authToken,
-			authType,
-			insecure,
-			plaintext,
-			"substreams_prometheus",
-		)
+		substreamsClientConfig := client.NewSubstreamsClientConfig(client.SubstreamsClientConfigOptions{
+			Endpoint:             endpoint,
+			AuthToken:            authToken,
+			AuthType:             authType,
+			Insecure:             insecure,
+			PlainText:            plaintext,
+			Agent:                "substreams_prometheus",
+			ForceProtocolVersion: forceProtocolVersion,
+		})
 		var fresh *time.Duration
 		if startBlock < 0 {
 			fresh = &maxFreshness
 		}
 
-		go launchSubstreamsPoller(endpoint, substreamsClientConfig, pkgBundle.Package.Modules, outputStreamName, startBlock, interval, timeout, fresh)
+		go launchSubstreamsPoller(endpoint, substreamsClientConfig, pkgBundle.Package, outputStreamName, startBlock, interval, timeout, fresh)
 	}
 
 	promReg := prometheus.NewRegistry()
@@ -260,7 +269,7 @@ func markFailure(endpoint string, begin time.Time, err error) {
 	requestDurationMs.With(endpointMap[endpoint].labels).Set(float64(time.Since(begin).Milliseconds()))
 }
 
-func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.SubstreamsClientConfig, modules *pbsubstreams.Modules, outputStreamName string, blockNum int64, pollingInterval, pollingTimeout time.Duration, maxFreshness *time.Duration) {
+func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.SubstreamsClientConfig, pkg *pbsubstreams.Package, outputStreamName string, blockNum int64, pollingInterval, pollingTimeout time.Duration, maxFreshness *time.Duration) {
 
 	sleep := time.Duration(0)
 	for {
@@ -269,13 +278,16 @@ func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.Subs
 
 		ctx, cancel := context.WithTimeout(context.Background(), pollingTimeout)
 		begin := time.Now()
-		ssClient, connClose, callOpts, headers, err := client.NewSubstreamsClient(substreamsClientConfig)
+		conn, connClose, callOpts, headers, err := client.NewSubstreamsClientConn(substreamsClientConfig)
 		if err != nil {
-			zlog.Error("substreams client setup", zap.Error(err))
+			zlog.Error("substreams client connection setup", zap.Error(err))
 			markFailure(endpoint, begin, err)
 			cancel()
 			continue
 		}
+
+		ssClientV2 := pbsubstreamsrpcv2.NewStreamClient(conn)
+		ssClientV3 := pbsubstreamsrpcv3.NewStreamClient(conn)
 
 		if headers.IsSet() {
 			ctx = metadata.AppendToOutgoingContext(ctx, headers.ToArray()...)
@@ -285,10 +297,10 @@ func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.Subs
 		if blockNum > 0 {
 			stopBlockNum = uint64(blockNum + 1)
 		}
-		subReq := &pbsubstreamsrpc.Request{
+		subReq := &pbsubstreamsrpcv3.Request{
 			StartBlockNum: blockNum,
 			StopBlockNum:  stopBlockNum,
-			Modules:       modules,
+			Package:       pkg,
 			OutputModule:  outputStreamName,
 		}
 
@@ -301,13 +313,36 @@ func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.Subs
 		}
 		callOpts = append(callOpts, grpc.WaitForReady(false))
 		zlog.Debug("calling sf.substreams.rpc.v2.Stream/Blocks", zap.String("endpoint", endpoint), zap.String("output_module", outputStreamName), zap.Int64("start_block", blockNum), zap.Uint64("stop_block", stopBlockNum))
-		cli, err := ssClient.Blocks(ctx, subReq, callOpts...)
-		if err != nil {
-			zlog.Error("call sf.substreams.rpc.v2.Stream/Blocks", zap.String("endpoint", endpoint), zap.Error(err))
-			markFailure(endpoint, begin, err)
-			connClose()
-			cancel()
-			continue
+
+		var isRunningV2 bool
+		var cli grpc.ServerStreamingClient[pbsubstreamsrpc.Response]
+		if substreamsClientConfig.ForceProtocolVersion().IsV2() {
+			reqV2, err := subReq.ToV2()
+			if err != nil {
+				zlog.Error("call sf.substreams.rpc.v2.Stream/Blocks", zap.String("endpoint", endpoint), zap.Error(err))
+				markFailure(endpoint, begin, err)
+				connClose()
+				cancel()
+				continue
+			}
+			cli, err = ssClientV2.Blocks(ctx, reqV2, callOpts...)
+			if err != nil {
+				zlog.Error("call sf.substreams.rpc.v2.Stream/Blocks", zap.String("endpoint", endpoint), zap.Error(err))
+				markFailure(endpoint, begin, err)
+				connClose()
+				cancel()
+				continue
+			}
+			isRunningV2 = true
+		} else {
+			cli, err = ssClientV3.Blocks(ctx, subReq, callOpts...)
+			if err != nil {
+				zlog.Error("call sf.substreams.rpc.v2.Stream/Blocks", zap.String("endpoint", endpoint), zap.Error(err))
+				markFailure(endpoint, begin, err)
+				connClose()
+				cancel()
+				continue
+			}
 		}
 
 	forloop:
@@ -343,6 +378,33 @@ func launchSubstreamsPoller(endpoint string, substreamsClientConfig *client.Subs
 				}
 			}
 			if err != nil {
+				if substreamsClientConfig.ForceProtocolVersion().IsUnset() && !isRunningV2 {
+					if dgrpcError := dgrpc.AsGRPCError(err); dgrpcError != nil {
+						switch dgrpcError.Code() {
+						case codes.Unimplemented, codes.NotFound:
+
+							zlog.Debug("server does not implement sf.substreams.rpc.v3.Stream/Blocks, trying v2")
+							reqV2, err := subReq.ToV2()
+							if err != nil {
+								zlog.Error("call sf.substreams.rpc.v2.Stream/Blocks", zap.String("endpoint", endpoint), zap.Error(err))
+								markFailure(endpoint, begin, err)
+								connClose()
+								cancel()
+								break
+							}
+							cli, err = ssClientV2.Blocks(ctx, reqV2, callOpts...)
+							if err != nil {
+								zlog.Error("call sf.substreams.rpc.v2.Stream/Blocks", zap.String("endpoint", endpoint), zap.Error(err))
+								markFailure(endpoint, begin, err)
+								connClose()
+								cancel()
+								continue
+							}
+							isRunningV2 = true
+						}
+					}
+				}
+
 				markFailure(endpoint, begin, err)
 				break
 			}

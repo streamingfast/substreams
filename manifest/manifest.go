@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 
+	"golang.org/x/mod/semver"
 	"gopkg.in/yaml.v3"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -79,18 +80,22 @@ type PackageMeta struct {
 }
 
 type Protobuf struct {
-	DescriptorSets []*BufImport `yaml:"descriptorSets,omitempty"`
-	Files          []string     `yaml:"files,omitempty"`
-	ImportPaths    []string     `yaml:"importPaths,omitempty"`
-	ExcludePaths   []string     `yaml:"excludePaths,omitempty"`
+	DescriptorSets []*DescriptorSetEntry `yaml:"descriptorSets,omitempty"`
+	Files          []string              `yaml:"files,omitempty"`
+	ImportPaths    []string              `yaml:"importPaths,omitempty"`
+	ExcludePaths   []string              `yaml:"excludePaths,omitempty"`
 }
 
-type BufImport struct {
+type DescriptorSetEntry struct {
 	LocalPath string   `yaml:"localPath,omitempty"`
 	Module    string   `yaml:"module"`
-	Version   string   `yaml:"version"`
-	Symbols   []string `yaml:"symbols"`
+	Version   string   `yaml:"version,omitempty"`
+	Symbols   []string `yaml:"symbols,omitempty"`
 }
+
+// Deprecated: BufImport type replaced with DescriptorSetEntry
+// This type alias is maintained for backward compatibility
+type BufImport = DescriptorSetEntry
 
 type Module struct {
 	Name         string       `yaml:"name,omitempty"`
@@ -529,4 +534,64 @@ func (m *Module) setOutputToProto(pbModule *pbsubstreams.Module) {
 			Type: m.Output.Type,
 		}
 	}
+}
+
+// UnmarshalYAML implements custom YAML unmarshaling for DescriptorSetEntry
+// Supports two formats:
+// 1. Full path: buf.build/org/pkg
+// 2. With version: buf.build/org/pkg@version
+func (d *DescriptorSetEntry) UnmarshalYAML(n *yaml.Node) error {
+	// Type alias to avoid recursion
+	type rawDescriptorSetEntry DescriptorSetEntry
+
+	var raw rawDescriptorSetEntry
+	if err := n.Decode(&raw); err != nil {
+		return err
+	}
+
+	// Copy all fields decoded so far
+	*d = DescriptorSetEntry(raw)
+
+	module := strings.TrimSpace(d.Module)
+	version := strings.TrimSpace(d.Version)
+
+	modulePart, versionPart, hasAt := strings.Cut(module, "@")
+	if hasAt {
+		if version != "" {
+			return fmt.Errorf("descriptor set module %q: cannot specify version both inline (with '@') and in the separate 'version' field", module)
+		}
+		// Reject empty version after @
+		if versionPart == "" {
+			return fmt.Errorf("descriptor set module %q: empty version after '@'; specify a semver (e.g., @v1.0.0) or remove the '@'", module)
+		}
+		if versionPart == "latest" {
+			return fmt.Errorf("descriptor set module %q: '@latest' is not allowed in inline notation; use 'version: latest' or omit the version", module)
+		}
+		// Validate explicit version is valid semver
+		if strings.Contains(versionPart, "@") {
+			return fmt.Errorf("descriptor set module %q: version %q should not contain '@'", module, versionPart)
+		}
+		if !semver.IsValid(versionPart) {
+			return fmt.Errorf("descriptor set module %q: version %q is not valid semantic version (expected like v1.2.3)", module, versionPart)
+		}
+		d.Module = modulePart
+		d.Version = versionPart
+		return nil
+	}
+	d.Module = module
+	if version == "" {
+		d.Version = ""
+		return nil
+	}
+
+	if version == "latest" {
+		d.Version = ""
+		return nil
+	}
+
+	if !semver.IsValid(version) {
+		return fmt.Errorf("descriptor set module %q: version %q is not valid semantic version (or 'latest')", module, version)
+	}
+	d.Version = version
+	return nil
 }

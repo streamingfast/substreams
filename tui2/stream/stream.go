@@ -8,9 +8,14 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 
+	"github.com/streamingfast/dgrpc"
+	"github.com/streamingfast/substreams/client"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
 )
 
 type Msg int
@@ -35,10 +40,13 @@ type Stream struct {
 
 	seenBlockData         bool
 	sentBackprocessingMsg bool
-	req                   *pbsubstreamsrpc.Request
-	client                pbsubstreamsrpc.StreamClient
-	callOpts              []grpc.CallOption
-	targetEndBlock        uint64
+	req                   *pbsubstreamsrpcv3.Request
+
+	grpcConn             *grpc.ClientConn
+	forceProtocolVersion client.ProtocolVersion
+
+	callOpts       []grpc.CallOption
+	targetEndBlock uint64
 
 	headers       map[string]string
 	ctx           context.Context
@@ -48,13 +56,14 @@ type Stream struct {
 	err error
 }
 
-func New(req *pbsubstreamsrpc.Request, client pbsubstreamsrpc.StreamClient, headers map[string]string, callOpts []grpc.CallOption) *Stream {
+func New(req *pbsubstreamsrpcv3.Request, conn *grpc.ClientConn, forceProtocolVersion client.ProtocolVersion, headers map[string]string, callOpts []grpc.CallOption) *Stream {
 	return &Stream{
-		req:            req,
-		targetEndBlock: req.StopBlockNum,
-		client:         client,
-		callOpts:       callOpts,
-		headers:        headers,
+		req:                  req,
+		targetEndBlock:       req.StopBlockNum,
+		grpcConn:             conn,
+		forceProtocolVersion: forceProtocolVersion,
+		callOpts:             callOpts,
+		headers:              headers,
 	}
 }
 
@@ -157,12 +166,27 @@ func (s *Stream) StartStream() tea.Msg {
 	s.ctx = streamCtx
 	s.cancelContext = cancel
 
-	cli, err := s.client.Blocks(streamCtx, s.req, s.callOpts...)
-	if err != nil && streamCtx.Err() != context.Canceled {
-		return StreamErrorMsg(fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err))
-	}
+	if s.forceProtocolVersion.IsV2() {
+		v2Req, err := s.req.ToV2()
+		if err != nil {
+			return StreamErrorMsg(fmt.Errorf("failed to convert request to v2: %w", err))
+		}
 
-	s.conn = cli
+		client := pbsubstreamsrpcv2.NewStreamClient(s.grpcConn)
+		cli, err := client.Blocks(streamCtx, v2Req, s.callOpts...)
+		if err != nil && streamCtx.Err() != context.Canceled {
+			return StreamErrorMsg(fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err))
+		}
+
+		s.conn = cli
+	} else {
+		client := pbsubstreamsrpcv3.NewStreamClient(s.grpcConn)
+		cli, err := client.Blocks(streamCtx, s.req, s.callOpts...)
+		if err != nil && streamCtx.Err() != context.Canceled {
+			return StreamErrorMsg(fmt.Errorf("call sf.substreams.rpc.v3.Stream/Blocks: %w", err))
+		}
+		s.conn = cli
+	}
 
 	return ConnectedMsg
 }
@@ -175,6 +199,20 @@ func (s *Stream) readNextMessage() tea.Msg {
 	if s.conn != nil {
 		resp, err := s.conn.Recv()
 		if err != nil {
+
+			if dgrpcError := dgrpc.AsGRPCError(err); dgrpcError != nil {
+				switch dgrpcError.Code() {
+				case codes.Unimplemented, codes.NotFound:
+					if s.forceProtocolVersion.IsUnset() {
+						// fallback to use v2 if the server does not support v3
+						s.forceProtocolVersion = client.ProtocolVersionV2
+						s.cancelContext()
+						_ = s.StartStream() // updates s.conn, s.ctx and s.cancelContext
+						return s.readNextMessage()
+					}
+				}
+			}
+
 			if err == io.EOF {
 				s.err = io.EOF
 				return EndOfStreamMsg

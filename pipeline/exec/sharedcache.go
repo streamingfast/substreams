@@ -83,9 +83,6 @@ type callEntry struct {
 }
 
 func applyResult(res *callEntry, call *wasm.Call) error {
-	fmt.Printf("applyResult: call block_id=%s entrypoint=%s, cached block_id=%s entrypoint=%s\n",
-		call.Clock.Id, call.Entrypoint, res.clock.Id, res.entrypoint)
-
 	if call.Clock.Id != res.clock.Id || call.Entrypoint != res.entrypoint {
 		fmt.Printf("CACHE MISMATCH DETECTED!\n")
 		fmt.Printf("  call.Clock: num=%d id=%s module=%s entrypoint=%s\n",
@@ -160,13 +157,6 @@ func (s *SharedCache) Execute(
 		// this request will actually cause the WASM execution. It locks the 'result' object for writes until it populates it
 		result.Lock()
 		defer result.Unlock()
-	} else {
-		fmt.Printf("Execute: CACHE HIT waiting \n")
-		zlog.Info("CACHE HIT",
-			zap.Uint64("block_num", clock.num),
-			zap.String("block_id", clock.id),
-			zap.String("module_hash", moduleHash),
-		)
 	}
 
 	s.Unlock() // This lock is global, it should never wait for an execution!
@@ -206,18 +196,7 @@ func (s *SharedCache) Execute(
 	result.RLock()
 	defer result.RUnlock()
 
-	zlog.Info("getting wasm call from cache",
-		zap.Uint64("block_num", clock.num),
-		zap.String("block_id", clock.id),
-		zap.String("module_hash_wasm_binary", moduleHash),
-		zap.String("module_name", call.ModuleName),
-		zap.String("entrypoint", call.Entrypoint),
-		zap.String("cached_module_name", result.moduleName),
-		zap.String("cached_entrypoint", result.entrypoint),
-	)
 	metrics.SkippedCachedWasmModules.Inc()
 	result.metricsGatherer.ApplyToStats(reqctx.ReqStats(originalContext))
-	fmt.Printf("About to apply cached result: requested block_id=%s, cached block_id=%s\n",
-		clock.id, result.clock.Id)
 	return applyResult(result, call)
 }

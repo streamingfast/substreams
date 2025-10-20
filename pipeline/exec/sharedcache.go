@@ -113,7 +113,16 @@ func (res *callEntry) updateFromCall(call *wasm.Call, err error) {
 }
 
 func (s *SharedCache) Cachable(blockNum uint64) bool {
-	return s != nil && blockNum+s.sizeBlocks > s.headBlock.Load()
+	if s == nil {
+		fmt.Printf("Cachable: s=nil, returning false\n")
+		return false
+	}
+	headBlock := s.headBlock.Load()
+	sizeBlocks := s.sizeBlocks
+	result := blockNum+sizeBlocks > headBlock
+	fmt.Printf("Cachable: blockNum=%d, sizeBlocks=%d, headBlock=%d, blockNum+sizeBlocks=%d, result=%v\n",
+		blockNum, sizeBlocks, headBlock, blockNum+sizeBlocks, result)
+	return result
 }
 
 func (s *SharedCache) Execute(
@@ -135,8 +144,13 @@ func (s *SharedCache) Execute(
 	if s.callEntries[clock] == nil {
 		s.callEntries[clock] = make(map[string]*callEntry)
 	}
+
+	fmt.Printf("Execute: looking up cache block_num=%d, block_id=%s, module_hash=%s\n",
+		clock.num, clock.id, moduleHash)
+
 	result, found := s.callEntries[clock][moduleHash]
 	if !found {
+		fmt.Printf("Execute: CACHE MISS \n")
 		result = &callEntry{
 			clock: call.Clock,
 		}
@@ -145,6 +159,13 @@ func (s *SharedCache) Execute(
 		// this request will actually cause the WASM execution. It locks the 'result' object for writes until it populates it
 		result.Lock()
 		defer result.Unlock()
+	} else {
+		fmt.Printf("Execute: CACHE HIT waiting \n")
+		zlog.Info("CACHE HIT",
+			zap.Uint64("block_num", clock.num),
+			zap.String("block_id", clock.id),
+			zap.String("module_hash", moduleHash),
+		)
 	}
 
 	s.Unlock() // This lock is global, it should never wait for an execution!

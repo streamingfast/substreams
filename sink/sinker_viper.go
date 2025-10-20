@@ -30,11 +30,11 @@ const (
 	FlagAPIKeyEnvvar    = "api-key-envvar"
 	FlagAPITokenEnvvar  = "api-token-envvar"
 
-	FlagNetwork   = "network"
-	FlagParams    = "params"
-	FlagInsecure  = "insecure"
-	FlagPlaintext = "plaintext"
-	FlagForceV2   = "force-v2"
+	FlagNetwork              = "network"
+	FlagParams               = "params"
+	FlagInsecure             = "insecure"
+	FlagPlaintext            = "plaintext"
+	FlagForceProtocolVersion = "force-protocol-version"
 
 	FlagUndoBufferSize     = "undo-buffer-size"
 	FlagLiveBlockTimeDelta = "live-block-time-delta"
@@ -178,8 +178,8 @@ func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagInclusionExclusion) {
 		flags.Bool(FlagPlaintext, false, "Use plaintext connection as default for endpoints without an http:// or https:// prefix")
 	}
 
-	if defaultFlagIncluded(FlagForceV2) {
-		flags.Bool(FlagForceV2, false, "Force the use of the v2 API instead of default v3")
+	if defaultFlagIncluded(FlagForceProtocolVersion) {
+		flags.Int(FlagForceProtocolVersion, 0, "Force the use of a specific protocol version (0=unset: v3 with fallback, 2=v2, 3=v3)")
 	}
 
 	if defaultFlagIncluded(FlagUndoBufferSize) {
@@ -367,15 +367,21 @@ func ConfigFromViper(
 	auth := newAuthenticator(sflags.MustGetString(cmd, FlagAPIKeyEnvvar), sflags.MustGetString(cmd, FlagAPITokenEnvvar))
 	authToken, authType := auth.GetTokenAndType()
 
-	clientConfig := client.NewSubstreamsClientConfig(
-		endpoint,
-		authToken,
-		authType,
-		sflags.MustGetBool(cmd, FlagInsecure),
-		sflags.MustGetBool(cmd, FlagPlaintext),
-		userAgent,
-		sflags.MustGetBool(cmd, FlagForceV2),
-	)
+	protocolVersionFlag := sflags.MustGetInt(cmd, FlagForceProtocolVersion)
+	forceProtocolVersion, err := client.ParseProtocolVersion(protocolVersionFlag)
+	if err != nil {
+		return nil, fmt.Errorf("invalid protocol version: %w", err)
+	}
+
+	clientConfig := client.NewSubstreamsClientConfig(client.SubstreamsClientConfigOptions{
+		Endpoint:             endpoint,
+		AuthToken:            authToken,
+		AuthType:             authType,
+		Insecure:             sflags.MustGetBool(cmd, FlagInsecure),
+		PlainText:            sflags.MustGetBool(cmd, FlagPlaintext),
+		Agent:                userAgent,
+		ForceProtocolVersion: forceProtocolVersion,
+	})
 
 	mode := SubstreamsModeProduction
 	if isDevelopmentMode {

@@ -83,15 +83,15 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 	}
 
 	authToken, authType := GetAuth(cmd, "substreams-api-key-envvar", "substreams-api-token-envvar")
-	clientConfig := client.NewSubstreamsClientConfig(
-		sflags.MustGetString(cmd, "substreams-endpoint"),
-		authToken,
-		authType,
-		sflags.MustGetBool(cmd, "insecure"),
-		sflags.MustGetBool(cmd, "plaintext"),
-		"substreams_tools",
-		false, // irrelevant for tier2 calls
-	)
+	clientConfig := client.NewSubstreamsClientConfig(client.SubstreamsClientConfigOptions{
+		Endpoint:             sflags.MustGetString(cmd, "substreams-endpoint"),
+		AuthToken:            authToken,
+		AuthType:             authType,
+		Insecure:             sflags.MustGetBool(cmd, "insecure"),
+		PlainText:            sflags.MustGetBool(cmd, "plaintext"),
+		Agent:                "substreams_tools",
+		ForceProtocolVersion: client.ProtocolVersionUnset, // irrelevant for tier2 calls
+	})
 	ssClient, _, callOpts, headers, err := client.NewSubstreamsInternalClient(clientConfig)
 	if err != nil {
 		return fmt.Errorf("new internal client: %w", err)

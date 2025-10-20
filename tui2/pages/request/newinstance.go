@@ -11,7 +11,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
-	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/sink"
@@ -138,9 +137,7 @@ func NewInstance(sinkerConfig *sink.SinkerConfig, tuiConfig *common.TUIConfig) (
 	if err != nil {
 		return nil, fmt.Errorf("substreams client connection setup: %w", err)
 	}
-	
-	ssClientV2 := pbsubstreamsrpcv2.NewStreamClient(conn)
-	ssClientV3 := pbsubstreamsrpcv3.NewStreamClient(conn)
+
 	if headers == nil {
 		headers = make(map[string]string)
 	}
@@ -176,7 +173,7 @@ func NewInstance(sinkerConfig *sink.SinkerConfig, tuiConfig *common.TUIConfig) (
 	}
 
 	combinedHeaders := headers.Append(tuiConfig.Headers)
-	stream := streamui.New(req, ssClientV2, ssClientV3, combinedHeaders, callOpts, sinkerConfig.ClientConfig.ForceV2())
+	stream := streamui.New(req, conn, sinkerConfig.ClientConfig.ForceProtocolVersion(), combinedHeaders, callOpts)
 
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validate request: %w", err)

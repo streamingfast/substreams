@@ -199,15 +199,15 @@ func (a *Tier1App) Run() error {
 		go forkableHub.Run()
 	}
 
-	subRequestsClientConfig := client.NewSubstreamsClientConfig(
-		a.config.SubrequestsEndpoint,
-		"",
-		client.None,
-		a.config.SubrequestsInsecure,
-		a.config.SubrequestsPlaintext,
-		"substreams_tier1",
-		false, // unused for tier2 requests
-	)
+	subRequestsClientConfig := client.NewSubstreamsClientConfig(client.SubstreamsClientConfigOptions{
+		Endpoint:             a.config.SubrequestsEndpoint,
+		AuthToken:            "",
+		AuthType:             client.None,
+		Insecure:             a.config.SubrequestsInsecure,
+		PlainText:            a.config.SubrequestsPlaintext,
+		Agent:                "substreams_tier1",
+		ForceProtocolVersion: client.ProtocolVersionUnset, // unused for tier2 requests
+	})
 	var opts []service.Option
 	if a.config.WASMExtensions != nil {
 		opts = append(opts, service.WithWASMExtensioner(a.config.WASMExtensions))

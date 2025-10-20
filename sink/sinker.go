@@ -322,9 +322,7 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 	if err != nil {
 		return activeCursor, fmt.Errorf("new substreams client connection: %w", err)
 	}
-	
-	ssClientV2 := pbsubstreamsrpcv2.NewStreamClient(conn)
-	ssClientV3 := pbsubstreamsrpcv3.NewStreamClient(conn)
+
 	s.OnTerminating(func(_ error) { connClose() })
 
 	var headersArray []string
@@ -405,7 +403,7 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 		}
 
 		var receivedMessage bool
-		activeCursor, receivedMessage, err = s.doRequest(streamCtx, activeCursor, s.request, s.ClientConfig().ForceV2(), ssClientV2, ssClientV3, callOpts, handler)
+		activeCursor, receivedMessage, err = s.doRequest(streamCtx, activeCursor, s.request, conn, s.ClientConfig().ForceProtocolVersion(), callOpts, handler)
 
 		// If we received at least one message, we must reset the backoff
 		if receivedMessage {
@@ -469,9 +467,8 @@ func (s *Sinker) doRequest(
 	ctx context.Context,
 	activeCursor *Cursor,
 	req *pbsubstreamsrpcv3.Request,
-	runV2 bool,
-	ssClientV2 pbsubstreamsrpc.StreamClient,
-	ssClientV3 pbsubstreamsrpcv3.StreamClient,
+	conn *grpc.ClientConn,
+	forceProtocolVersion client.ProtocolVersion,
 	callOpts []grpc.CallOption,
 	handler SinkerHandler,
 ) (
@@ -485,16 +482,21 @@ func (s *Sinker) doRequest(
 	var stream grpc.ServerStreamingClient[pbsubstreamsrpc.Response]
 	var err error
 
-	reqV2, err := req.ToV2()
-	if err != nil {
-		return activeCursor, receivedMessage, fmt.Errorf("failed to convert request to v2: %w", err)
-	}
+	ssClientV2 := pbsubstreamsrpcv2.NewStreamClient(conn)
+	ssClientV3 := pbsubstreamsrpcv3.NewStreamClient(conn)
+	var isRunningV2 bool
 
-	if runV2 {
+	if forceProtocolVersion.IsV2() {
+		reqV2, err := req.ToV2()
+		if err != nil {
+			return activeCursor, receivedMessage, fmt.Errorf("failed to convert request to v2: %w", err)
+		}
+
 		stream, err = ssClientV2.Blocks(ctx, reqV2, callOpts...)
 		if err != nil {
 			return activeCursor, receivedMessage, retryable(fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err))
 		}
+		isRunningV2 = true
 	} else {
 		stream, err = ssClientV3.Blocks(ctx, req, callOpts...)
 		if err != nil {
@@ -526,10 +528,10 @@ func (s *Sinker) doRequest(
 			if dgrpcError := dgrpc.AsGRPCError(err); dgrpcError != nil {
 				switch dgrpcError.Code() {
 				case codes.Unimplemented, codes.NotFound:
-					if !runV2 {
+					if forceProtocolVersion.IsUnset() && !isRunningV2 {
 						// fallback to use v2 if the server does not support v3
 						s.Logger.Info("server does not implement sf.substreams.rpc.v3.Stream/Blocks, trying v2")
-						runV2 = true
+						isRunningV2 = true
 						reqV2, err := req.ToV2()
 						if err != nil {
 							return activeCursor, receivedMessage, fmt.Errorf("failed to convert request to v2: %w", err)
@@ -540,6 +542,7 @@ func (s *Sinker) doRequest(
 						}
 						continue
 					}
+					return activeCursor, receivedMessage, fmt.Errorf("stream auth failure: %w", err)
 
 				case codes.Unauthenticated, codes.PermissionDenied:
 					return activeCursor, receivedMessage, fmt.Errorf("stream auth failure: %w", err)

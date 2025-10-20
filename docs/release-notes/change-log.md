@@ -25,7 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Added support for foundational-store (in wasmtime and wazero).
 * Added support for new 'sf.substreams.rpc.v3.Stream/Blocks' endpoint that sends the full '.spkg' data with params and network value, so the client does not need to do any mangling.
   * This requires the substreams server to support it (under `/sf.substreams.rpc.v3.Stream/*` location).
-  * On the `run`, `gui` and `sink` commands, the `--force-v2` flag is available to keep the previous protocol; the `v2` endpoint will also be tried as fallback if the server responds with 404 or MethodNotAllowed.
+  * On the `run`, `gui` and `sink` commands, the `--force-protocol-version` flag is available to specify protocol version (2 or 3); the `v2` endpoint will also be tried as fallback if the server responds with 404 or MethodNotAllowed.
 * Added foundational-store grpc client to substreams engine.
 * Fixed module caching to properly handle modules with different runtime extensions.
 

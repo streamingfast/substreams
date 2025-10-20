@@ -31,14 +31,85 @@ const (
 	ApiKey
 )
 
+type ProtocolVersion int
+
+const (
+	ProtocolVersionUnset ProtocolVersion = 0
+	ProtocolVersionV2    ProtocolVersion = 2
+	ProtocolVersionV3    ProtocolVersion = 3
+)
+
+// String returns the string representation of the protocol version
+func (pv ProtocolVersion) String() string {
+	switch pv {
+	case ProtocolVersionUnset:
+		return "unset"
+	case ProtocolVersionV2:
+		return "v2"
+	case ProtocolVersionV3:
+		return "v3"
+	default:
+		return "unknown"
+	}
+}
+
+// IsValid returns true if the protocol version is valid
+func (pv ProtocolVersion) IsValid() bool {
+	return pv == ProtocolVersionUnset || pv == ProtocolVersionV2 || pv == ProtocolVersionV3
+}
+
+// ParseProtocolVersion parses an integer to a ProtocolVersion
+func ParseProtocolVersion(version int) (ProtocolVersion, error) {
+	switch version {
+	case 0:
+		return ProtocolVersionUnset, nil
+	case 2:
+		return ProtocolVersionV2, nil
+	case 3:
+		return ProtocolVersionV3, nil
+	default:
+		return ProtocolVersionUnset, fmt.Errorf("invalid protocol version %d, only 0, 2 and 3 are supported", version)
+	}
+}
+
+func (pv ProtocolVersion) IsV2() bool {
+	return pv == ProtocolVersionV2
+}
+
+func (pv ProtocolVersion) IsV3() bool {
+	return pv == ProtocolVersionV3
+}
+
+func (pv ProtocolVersion) IsUnset() bool {
+	return pv == ProtocolVersionUnset
+}
+
+// SubstreamsClientConfigOptions contains options for creating a new SubstreamsClientConfig
+type SubstreamsClientConfigOptions struct {
+	// Endpoint is the gRPC endpoint to connect to (e.g., "mainnet.eth.streamingfast.io:443")
+	Endpoint string
+	// AuthToken is the authentication token (JWT or API key)
+	AuthToken string
+	// AuthType specifies the type of authentication (None, JWT, or ApiKey)
+	AuthType AuthType
+	// Insecure allows insecure TLS connections (skips certificate verification)
+	Insecure bool
+	// PlainText uses unencrypted connections (no TLS)
+	PlainText bool
+	// Agent is the User-Agent string for gRPC requests
+	Agent string
+	// ForceProtocolVersion forces the use of a specific protocol version (2 or 3)
+	ForceProtocolVersion ProtocolVersion
+}
+
 type SubstreamsClientConfig struct {
-	endpoint  string
-	authToken string
-	authType  AuthType
-	insecure  bool
-	plaintext bool
-	agent     string
-	forceV2   bool
+	endpoint             string
+	authToken            string
+	authType             AuthType
+	insecure             bool
+	plaintext            bool
+	agent                string
+	forceProtocolVersion ProtocolVersion
 }
 
 func (c *SubstreamsClientConfig) Agent() string {
@@ -56,8 +127,8 @@ func (c *SubstreamsClientConfig) Endpoint() string {
 	return c.endpoint
 }
 
-func (c *SubstreamsClientConfig) ForceV2() bool {
-	return c.forceV2
+func (c *SubstreamsClientConfig) ForceProtocolVersion() ProtocolVersion {
+	return c.forceProtocolVersion
 }
 
 func (c *SubstreamsClientConfig) SetEndpoint(endpoint string) {
@@ -92,7 +163,22 @@ func (c *SubstreamsClientConfig) MarshalLogObject(encoder zapcore.ObjectEncoder)
 
 type InternalClientFactory = func() (cli pbssinternal.SubstreamsClient, closeFunc func() error, callOpts []grpc.CallOption, headers Headers, err error)
 
-func NewSubstreamsClientConfig(endpoint string, authToken string, authType AuthType, insecure bool, plaintext bool, agent string, forceV2 bool) *SubstreamsClientConfig {
+// NewSubstreamsClientConfig creates a new SubstreamsClientConfig using the provided options.
+// This function handles URL parsing for http:// and https:// schemes, automatically setting
+// appropriate plaintext and port defaults.
+//
+// Example usage:
+//
+//	config := client.NewSubstreamsClientConfig(client.NewSubstreamsClientConfigOptions{
+//	    Endpoint:  "mainnet.eth.streamingfast.io:443",
+//	    AuthToken: "your-auth-token",
+//	    AuthType:  client.JWT,
+//	    Agent:     "my-application",
+//	})
+func NewSubstreamsClientConfig(opts SubstreamsClientConfigOptions) *SubstreamsClientConfig {
+	endpoint := opts.Endpoint
+	plaintext := opts.PlainText
+
 	// Check for http:// or https:// prefix and adjust settings accordingly
 	if len(endpoint) > 7 && endpoint[:7] == "http://" {
 		plaintext = true
@@ -123,13 +209,13 @@ func NewSubstreamsClientConfig(endpoint string, authToken string, authType AuthT
 	}
 
 	return &SubstreamsClientConfig{
-		endpoint:  endpoint,
-		authToken: authToken,
-		authType:  authType,
-		insecure:  insecure,
-		plaintext: plaintext,
-		agent:     agent,
-		forceV2:   forceV2,
+		endpoint:             endpoint,
+		authToken:            opts.AuthToken,
+		authType:             opts.AuthType,
+		insecure:             opts.Insecure,
+		plaintext:            plaintext,
+		agent:                opts.Agent,
+		forceProtocolVersion: opts.ForceProtocolVersion,
 	}
 }
 

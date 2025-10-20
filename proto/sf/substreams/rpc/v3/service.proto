@@ -12,12 +12,25 @@ import "sf/substreams/v1/package.proto";
 option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3;pbsubstreamsrpcv3";
 
 service Stream {
-  rpc Blocks(Request) returns (stream sf.substreams.rpc.v2.Response); // v3 request still sends v2 response
+    // Request processing of blocks via substreams engine.
+    // Similar to `sf.substreams.rpc.v2.Stream/Blocks` request, but:
+    //   - the full spkg package is sent instead of just the modules
+    //   - 'params' and 'network' fields are sent to apply the user-defined params to the package server-side
+    // Responses are identical to those of the v2 request.
+  rpc Blocks(Request) returns (stream sf.substreams.rpc.v2.Response);
 }
 
 message Request {
+  // if positive, determines the absolute requested start block
+  // if 0, the start block is determined by the chain's first streamable block
+  // if negative, the start block is relative to the chain HEAD (determined server-side at the time of the request)
   int64 start_block_num = 1;
+
+  // start_cursor has precedence over start_block_num
   string start_cursor = 2;
+
+  // if non-zero, processing will stop *before* this block (exclusive)
+  // if zero, processing will continue and keep up with the chain HEAD
   uint64 stop_block_num = 3;
 
   // With final_block_only, you only receive blocks that are irreversible:
@@ -54,6 +67,7 @@ message Request {
   // Available only in developer mode
   repeated string debug_initial_store_snapshot_for_modules = 10;
 
+  // Prepares the stores and caches on the server, sending only progress messages and "minimal" clock data (and cursor)
   bool noop_mode = 11;
 
   // If set, the engine will reject a request if the number of blocks to process (including preparing the stores) is above this limit.
@@ -66,7 +80,7 @@ message Request {
   // This allows the user to reduce the payload in dev mode, while still getting some extra debugging information
   repeated string dev_output_modules = 13;
 
-  // Progress_messages_interval_ms is the interval between progress messages, in milliseconds (minimum: 500, default: start at 500ms and ramp up to 5000ms within 1min)
+  // Progress_messages_interval_ms is the interval between progress messages, in milliseconds (min 500ms)
+  // default: start at 500ms and ramp up to 5000ms within 1min
   uint64 progress_messages_interval_ms = 14;
-
 }

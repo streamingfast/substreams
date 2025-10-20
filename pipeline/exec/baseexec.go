@@ -133,12 +133,9 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canS
 			zap.String("module_hash", e.moduleHash),
 			zap.Uint64("block_num", clock.Number),
 		)
+
 		err = sharedCache.Execute(ctx, e.wasmModule, e.moduleHash, call, e.wasmArguments, argValues, undoManager)
 	} else {
-		zlog.Info("NOT using shared cache",
-			zap.String("module_name", e.moduleName),
-			zap.Uint64("block_num", clock.Number),
-		)
 		if undoManager != nil {
 			var unsubscribe func()
 			// note: a canceled context only has an effect inside 'external calls', not within the wasm module executor itself, so the cancelation does not affect all connected streams

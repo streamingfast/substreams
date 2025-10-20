@@ -122,14 +122,11 @@ func (res *callEntry) updateFromCall(call *wasm.Call, err error) {
 
 func (s *SharedCache) Cachable(blockNum uint64) bool {
 	if s == nil {
-		fmt.Printf("Cachable: s=nil, returning false\n")
 		return false
 	}
 	headBlock := s.headBlock.Load()
 	sizeBlocks := s.sizeBlocks
 	result := blockNum+sizeBlocks > headBlock
-	fmt.Printf("Cachable: blockNum=%d, sizeBlocks=%d, headBlock=%d, blockNum+sizeBlocks=%d, result=%v\n",
-		blockNum, sizeBlocks, headBlock, blockNum+sizeBlocks, result)
 	return result
 }
 
@@ -153,12 +150,8 @@ func (s *SharedCache) Execute(
 		s.callEntries[clock] = make(map[string]*callEntry)
 	}
 
-	fmt.Printf("Execute: looking up cache block_num=%d, block_id=%s, module_hash=%s\n",
-		clock.num, clock.id, moduleHash)
-
 	result, found := s.callEntries[clock][moduleHash]
 	if !found {
-		fmt.Printf("Execute: CACHE MISS \n")
 		result = &callEntry{
 			clock: call.Clock,
 		}

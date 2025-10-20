@@ -83,7 +83,15 @@ type callEntry struct {
 }
 
 func applyResult(res *callEntry, call *wasm.Call) error {
+	fmt.Printf("applyResult: call block_id=%s entrypoint=%s, cached block_id=%s entrypoint=%s\n",
+		call.Clock.Id, call.Entrypoint, res.clock.Id, res.entrypoint)
+
 	if call.Clock.Id != res.clock.Id || call.Entrypoint != res.entrypoint {
+		fmt.Printf("CACHE MISMATCH DETECTED!\n")
+		fmt.Printf("  call.Clock: num=%d id=%s module=%s entrypoint=%s\n",
+			call.Clock.Number, call.Clock.Id, call.ModuleName, call.Entrypoint)
+		fmt.Printf("  cached: num=%d id=%s module=%s entrypoint=%s\n",
+			res.clock.Number, res.clock.Id, res.moduleName, res.entrypoint)
 		panic(fmt.Sprintf(
 			"invalid shared cache data on block %d id=%s call{module=%s entrypoint=%s} cached{module=%s entrypoint=%s}",
 			call.Clock.Number, call.Clock.Id,
@@ -216,5 +224,7 @@ func (s *SharedCache) Execute(
 	)
 	metrics.SkippedCachedWasmModules.Inc()
 	result.metricsGatherer.ApplyToStats(reqctx.ReqStats(originalContext))
+	fmt.Printf("About to apply cached result: requested block_id=%s, cached block_id=%s\n",
+		clock.id, result.clock.Id)
 	return applyResult(result, call)
 }

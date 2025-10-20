@@ -21,8 +21,7 @@ import (
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metrics"
-	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcconnect"
-	ssconnect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcconnect"
+	pbsubstreamsrpcv2connect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcv2connect"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service"
 	"github.com/streamingfast/substreams/wasm"
@@ -200,14 +199,15 @@ func (a *Tier1App) Run() error {
 		go forkableHub.Run()
 	}
 
-	subRequestsClientConfig := client.NewSubstreamsClientConfig(
-		a.config.SubrequestsEndpoint,
-		"",
-		client.None,
-		a.config.SubrequestsInsecure,
-		a.config.SubrequestsPlaintext,
-		"substreams_tier1",
-	)
+	subRequestsClientConfig := client.NewSubstreamsClientConfig(client.SubstreamsClientConfigOptions{
+		Endpoint:             a.config.SubrequestsEndpoint,
+		AuthToken:            "",
+		AuthType:             client.None,
+		Insecure:             a.config.SubrequestsInsecure,
+		PlainText:            a.config.SubrequestsPlaintext,
+		Agent:                "substreams_tier1",
+		ForceProtocolVersion: client.ProtocolVersionUnset, // unused for tier2 requests
+	})
 	var opts []service.Option
 	if a.config.WASMExtensions != nil {
 		opts = append(opts, service.WithWASMExtensioner(a.config.WASMExtensions))
@@ -279,7 +279,7 @@ func (a *Tier1App) Run() error {
 	})
 
 	go func() {
-		var infoServer ssconnect.EndpointInfoHandler
+		var infoServer pbsubstreamsrpcv2connect.EndpointInfoHandler
 		if a.modules.InfoServer != nil {
 			a.logger.Info("waiting until info server is ready")
 			infoServer = &InfoServerWrapper{a.modules.InfoServer}
@@ -346,7 +346,7 @@ func (config *Tier1Config) Validate() error {
 	return nil
 }
 
-var _ pbsubstreamsrpcconnect.EndpointInfoHandler = (*InfoServerWrapper)(nil)
+var _ pbsubstreamsrpcv2connect.EndpointInfoHandler = (*InfoServerWrapper)(nil)
 
 type InfoServerWrapper struct {
 	rpcInfoServer InfoServer

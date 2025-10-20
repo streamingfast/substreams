@@ -22,6 +22,8 @@ import (
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -46,7 +48,7 @@ type Sinker struct {
 
 	// State fields that are modified during operation
 	buffer                  *blockDataBuffer
-	request                 *pbsubstreamsrpc.Request
+	request                 *pbsubstreamsrpcv3.Request
 	stats                   *Stats
 	requestActiveStartBlock uint64
 }
@@ -188,7 +190,7 @@ func (s *Sinker) BytesRepresentation() BytesRepresentation {
 	return InferBytesRepresentation(network, endpoint)
 }
 
-func (s *Sinker) Request() *pbsubstreamsrpc.Request {
+func (s *Sinker) Request() *pbsubstreamsrpcv3.Request {
 	return s.request
 }
 
@@ -316,11 +318,11 @@ func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler) (activeCursor *Cursor, err error) {
 	activeCursor = cursor
 
-	ssClient, connClose, callOpts, headers, err := client.NewSubstreamsClient(s.SinkerConfig.ClientConfig)
-
+	conn, connClose, callOpts, headers, err := client.NewSubstreamsClientConn(s.SinkerConfig.ClientConfig)
 	if err != nil {
-		return activeCursor, fmt.Errorf("new substreams client: %w", err)
+		return activeCursor, fmt.Errorf("new substreams client connection: %w", err)
 	}
+
 	s.OnTerminating(func(_ error) { connClose() })
 
 	var headersArray []string
@@ -370,18 +372,26 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 		devOutputModules = nil // ask the server to send everything
 	}
 
+	params, err := pbsubstreamsrpcv3.ParamsToMap(s.Params)
+	if err != nil {
+		return nil, err
+	}
+
 	for {
-		s.request = &pbsubstreamsrpc.Request{
+
+		s.request = &pbsubstreamsrpcv3.Request{
 			StartBlockNum:        startBlock,
 			StopBlockNum:         stopBlock,
 			StartCursor:          activeCursor.String(),
 			FinalBlocksOnly:      s.FinalBlocksOnly,
-			Modules:              s.Pkg.Modules,
+			Package:              s.Pkg,
 			OutputModule:         s.SinkerConfig.OutputModule.Name,
 			ProductionMode:       s.Mode == SubstreamsModeProduction,
 			NoopMode:             s.NoopMode,
 			DevOutputModules:     devOutputModules,
 			LimitProcessedBlocks: s.LimitProcessedBlocks,
+			Params:               params,
+			Network:              s.Network,
 		}
 
 		s.Logger.Info("sending request", zap.String("start_block", fmt.Sprintf("%d", startBlock)), zap.String("stop_block", fmt.Sprintf("%d", stopBlock)), zap.String("cursor", activeCursor.String()))
@@ -393,7 +403,7 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 		}
 
 		var receivedMessage bool
-		activeCursor, receivedMessage, err = s.doRequest(streamCtx, activeCursor, s.request, ssClient, callOpts, handler)
+		activeCursor, receivedMessage, err = s.doRequest(streamCtx, activeCursor, s.request, conn, s.ClientConfig().ForceProtocolVersion(), callOpts, handler)
 
 		// If we received at least one message, we must reset the backoff
 		if receivedMessage {
@@ -456,8 +466,9 @@ func (s *Sinker) adjustedEndBlock() (endBlock uint64) {
 func (s *Sinker) doRequest(
 	ctx context.Context,
 	activeCursor *Cursor,
-	req *pbsubstreamsrpc.Request,
-	ssClient pbsubstreamsrpc.StreamClient,
+	req *pbsubstreamsrpcv3.Request,
+	conn *grpc.ClientConn,
+	forceProtocolVersion client.ProtocolVersion,
 	callOpts []grpc.CallOption,
 	handler SinkerHandler,
 ) (
@@ -468,9 +479,29 @@ func (s *Sinker) doRequest(
 	s.Logger.Debug("launching substreams request", zap.Int64("start_block", req.StartBlockNum), zap.Stringer("cursor", activeCursor))
 	receivedMessage := false
 
-	stream, err := ssClient.Blocks(ctx, req, callOpts...)
-	if err != nil {
-		return activeCursor, receivedMessage, retryable(fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err))
+	var stream grpc.ServerStreamingClient[pbsubstreamsrpc.Response]
+	var err error
+
+	ssClientV2 := pbsubstreamsrpcv2.NewStreamClient(conn)
+	ssClientV3 := pbsubstreamsrpcv3.NewStreamClient(conn)
+	var isRunningV2 bool
+
+	if forceProtocolVersion.IsV2() {
+		reqV2, err := req.ToV2()
+		if err != nil {
+			return activeCursor, receivedMessage, fmt.Errorf("failed to convert request to v2: %w", err)
+		}
+
+		stream, err = ssClientV2.Blocks(ctx, reqV2, callOpts...)
+		if err != nil {
+			return activeCursor, receivedMessage, retryable(fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err))
+		}
+		isRunningV2 = true
+	} else {
+		stream, err = ssClientV3.Blocks(ctx, req, callOpts...)
+		if err != nil {
+			return activeCursor, receivedMessage, retryable(fmt.Errorf("call sf.substreams.rpc.v3.Stream/Blocks: %w", err))
+		}
 	}
 	var prevBlockTime time.Time
 	var afterReceive time.Time
@@ -496,6 +527,23 @@ func (s *Sinker) doRequest(
 
 			if dgrpcError := dgrpc.AsGRPCError(err); dgrpcError != nil {
 				switch dgrpcError.Code() {
+				case codes.Unimplemented, codes.NotFound:
+					if forceProtocolVersion.IsUnset() && !isRunningV2 {
+						// fallback to use v2 if the server does not support v3
+						s.Logger.Info("server does not implement sf.substreams.rpc.v3.Stream/Blocks, trying v2")
+						isRunningV2 = true
+						reqV2, err := req.ToV2()
+						if err != nil {
+							return activeCursor, receivedMessage, fmt.Errorf("failed to convert request to v2: %w", err)
+						}
+						stream, err = ssClientV2.Blocks(ctx, reqV2, callOpts...)
+						if err != nil {
+							return activeCursor, receivedMessage, retryable(fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err))
+						}
+						continue
+					}
+					return activeCursor, receivedMessage, fmt.Errorf("stream auth failure: %w", err)
+
 				case codes.Unauthenticated, codes.PermissionDenied:
 					return activeCursor, receivedMessage, fmt.Errorf("stream auth failure: %w", err)
 

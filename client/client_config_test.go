@@ -57,7 +57,15 @@ func TestNewSubstreamsClientConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			config := NewSubstreamsClientConfig(tt.endpoint, "", None, false, false, "test-agent")
+			config := NewSubstreamsClientConfig(SubstreamsClientConfigOptions{
+				Endpoint:             tt.endpoint,
+				AuthToken:            "",
+				AuthType:             None,
+				Insecure:             false,
+				PlainText:            false,
+				Agent:                "test-agent",
+				ForceProtocolVersion: ProtocolVersionUnset,
+			})
 
 			if config.endpoint != tt.expectedEndpoint {
 				t.Errorf("expected endpoint %q, got %q", tt.expectedEndpoint, config.endpoint)

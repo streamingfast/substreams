@@ -7,6 +7,7 @@ import (
 
 	"github.com/streamingfast/bstream"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
 	"go.uber.org/zap/zapcore"
 )
 
@@ -159,7 +160,7 @@ type SinkerSessionInitHandler interface {
 	//
 	// Your handler must return an error value that can be nil or non-nil. If non-nil, the error is assumed to be a fatal
 	// error and the [Sinker] will shutdown
-	HandleSessionInit(ctx context.Context, req *pbsubstreamsrpc.Request, sessionInit *pbsubstreamsrpc.SessionInit) error
+	HandleSessionInit(ctx context.Context, req *pbsubstreamsrpcv3.Request, sessionInit *pbsubstreamsrpc.SessionInit) error
 }
 
 type SinkerErrorHandler interface {

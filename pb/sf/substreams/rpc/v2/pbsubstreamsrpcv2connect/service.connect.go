@@ -2,7 +2,7 @@
 //
 // Source: sf/substreams/rpc/v2/service.proto
 
-package pbsubstreamsrpcconnect
+package pbsubstreamsrpcv2connect
 
 import (
 	connect "connectrpc.com/connect"

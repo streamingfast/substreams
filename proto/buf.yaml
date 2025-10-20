@@ -15,3 +15,5 @@ lint:
 breaking:
     use:
         - FILE
+    except:
+        - FILE_OPTION_GO_PACKAGE_CHANGE

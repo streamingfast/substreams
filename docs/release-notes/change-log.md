@@ -28,6 +28,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Server and Client
 
 * Added support for foundational-store (in wasmtime and wazero).
+* Added support for new 'sf.substreams.rpc.v3.Stream/Blocks' endpoint that sends the full '.spkg' data with params and network value, so the client does not need to do any mangling.
+  * This requires the substreams server to support it (under `/sf.substreams.rpc.v3.Stream/*` location).
+  * On the `run`, `gui` and `sink` commands, the `--force-protocol-version` flag is available to specify protocol version (2 or 3); the `v2` endpoint will also be tried as fallback if the server responds with 404 or MethodNotAllowed.
 * Added foundational-store grpc client to substreams engine.
 * Fixed module caching to properly handle modules with different runtime extensions.
 
@@ -37,6 +40,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Fixed the progress logs and prometheus metrics from `substreams sink noop` when running with an output_module of type "index" in production mode (other sinks will now refuse to run in this mode)
 * Removed 'progress_last_contiguous_block' from sink logs, as it was often misleading. Getting a correct value in all cases would require doing a slow lookup on all cached files, which is not desirable.
 * **Fixed** `substreams registry publish` command now properly returns non-zero exit codes when publishing fails (e.g., authentication errors), enabling scripts and CI/CD pipelines to correctly detect failures.
+* Removed `substreams proxy` command
 
 ## v1.16.5
 

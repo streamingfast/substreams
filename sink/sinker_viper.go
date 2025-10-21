@@ -203,7 +203,7 @@ func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagInclusionExclusion) {
 	}
 
 	if defaultFlagIncluded(FlagMaxRetries) {
-		flags.Int(FlagMaxRetries, 3, "Maximum number of retries for substreams calls (0 disables retries, -1 for infinite retries)")
+		flags.Int(FlagMaxRetries, 3, "Maximum number of retries for substreams calls (0 disables retries, -1 for infinite retries) -- Counter is reset when we receive actual data")
 	}
 
 	if defaultFlagIncluded(FlagSkipPackageValidation) {

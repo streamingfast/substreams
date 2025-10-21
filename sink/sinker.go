@@ -402,11 +402,11 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 			streamCtx = metadata.AppendToOutgoingContext(streamCtx, headersArray...)
 		}
 
-		var receivedMessage bool
-		activeCursor, receivedMessage, err = s.doRequest(streamCtx, activeCursor, s.request, conn, s.ClientConfig().ForceProtocolVersion(), callOpts, handler)
+		var receivedDataMessage bool
+		activeCursor, receivedDataMessage, err = s.doRequest(streamCtx, activeCursor, s.request, conn, s.ClientConfig().ForceProtocolVersion(), callOpts, handler)
 
 		// If we received at least one message, we must reset the backoff
-		if receivedMessage {
+		if receivedDataMessage {
 			backOff.Reset()
 		}
 
@@ -463,6 +463,7 @@ func (s *Sinker) adjustedEndBlock() (endBlock uint64) {
 	return
 }
 
+// returns cursor, receivedDataMessage, error
 func (s *Sinker) doRequest(
 	ctx context.Context,
 	activeCursor *Cursor,
@@ -477,7 +478,7 @@ func (s *Sinker) doRequest(
 	error,
 ) {
 	s.Logger.Debug("launching substreams request", zap.Int64("start_block", req.StartBlockNum), zap.Stringer("cursor", activeCursor))
-	receivedMessage := false
+	receivedDataMessage := false
 
 	var stream grpc.ServerStreamingClient[pbsubstreamsrpc.Response]
 	var err error
@@ -489,18 +490,18 @@ func (s *Sinker) doRequest(
 	if forceProtocolVersion.IsV2() {
 		reqV2, err := req.ToV2()
 		if err != nil {
-			return activeCursor, receivedMessage, fmt.Errorf("failed to convert request to v2: %w", err)
+			return activeCursor, receivedDataMessage, fmt.Errorf("failed to convert request to v2: %w", err)
 		}
 
 		stream, err = ssClientV2.Blocks(ctx, reqV2, callOpts...)
 		if err != nil {
-			return activeCursor, receivedMessage, retryable(fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err))
+			return activeCursor, receivedDataMessage, retryable(fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err))
 		}
 		isRunningV2 = true
 	} else {
 		stream, err = ssClientV3.Blocks(ctx, req, callOpts...)
 		if err != nil {
-			return activeCursor, receivedMessage, retryable(fmt.Errorf("call sf.substreams.rpc.v3.Stream/Blocks: %w", err))
+			return activeCursor, receivedDataMessage, retryable(fmt.Errorf("call sf.substreams.rpc.v3.Stream/Blocks: %w", err))
 		}
 	}
 	var prevBlockTime time.Time
@@ -522,7 +523,7 @@ func (s *Sinker) doRequest(
 		resp, err := stream.Recv()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				return activeCursor, receivedMessage, err
+				return activeCursor, receivedDataMessage, err
 			}
 
 			if dgrpcError := dgrpc.AsGRPCError(err); dgrpcError != nil {
@@ -534,30 +535,30 @@ func (s *Sinker) doRequest(
 						isRunningV2 = true
 						reqV2, err := req.ToV2()
 						if err != nil {
-							return activeCursor, receivedMessage, fmt.Errorf("failed to convert request to v2: %w", err)
+							return activeCursor, receivedDataMessage, fmt.Errorf("failed to convert request to v2: %w", err)
 						}
 						stream, err = ssClientV2.Blocks(ctx, reqV2, callOpts...)
 						if err != nil {
-							return activeCursor, receivedMessage, retryable(fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err))
+							return activeCursor, receivedDataMessage, retryable(fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err))
 						}
 						continue
 					}
-					return activeCursor, receivedMessage, fmt.Errorf("stream auth failure: %w", err)
+					return activeCursor, receivedDataMessage, fmt.Errorf("stream auth failure: %w", err)
 
 				case codes.Unauthenticated, codes.PermissionDenied:
-					return activeCursor, receivedMessage, fmt.Errorf("stream auth failure: %w", err)
+					return activeCursor, receivedDataMessage, fmt.Errorf("stream auth failure: %w", err)
 
 				case codes.InvalidArgument:
-					return activeCursor, receivedMessage, fmt.Errorf("stream invalid: %w", err)
+					return activeCursor, receivedDataMessage, fmt.Errorf("stream invalid: %w", err)
 
 				case codes.FailedPrecondition: // ex: related to limit-processed-blocks
-					return activeCursor, receivedMessage, err
+					return activeCursor, receivedDataMessage, err
 
 				case codes.ResourceExhausted:
 					if strings.Contains(dgrpcError.Message(), "quota exceeded") { // no more bytes/blocks
-						return activeCursor, receivedMessage, err
+						return activeCursor, receivedDataMessage, err
 					}
-					return activeCursor, receivedMessage, retryable(err) // no concurrent stream available
+					return activeCursor, receivedDataMessage, retryable(err) // no concurrent stream available
 				}
 			}
 
@@ -565,10 +566,9 @@ func (s *Sinker) doRequest(
 				eh.HandleError(ctx, err)
 			}
 
-			return activeCursor, receivedMessage, retryable(err)
+			return activeCursor, receivedDataMessage, retryable(err)
 		}
 
-		receivedMessage = true
 		MessageSizeBytes.AddInt(proto.Size(resp))
 
 		switch r := resp.Message.(type) {
@@ -623,6 +623,7 @@ func (s *Sinker) doRequest(
 			}
 
 		case *pbsubstreamsrpc.Response_BlockScopedData:
+			receivedDataMessage = true
 			if cursorLivenessChecker, ok := s.LivenessChecker.(*CursorBasedLivenessChecker); ok {
 				cursorLivenessChecker.CheckCursor(r.BlockScopedData.Cursor)
 			}
@@ -656,7 +657,7 @@ func (s *Sinker) doRequest(
 
 			cursor, err := NewCursor(r.BlockScopedData.Cursor)
 			if err != nil {
-				return activeCursor, receivedMessage, fmt.Errorf("invalid received cursor, 'bstream' library in here is probably not up to date: %w", err)
+				return activeCursor, receivedDataMessage, fmt.Errorf("invalid received cursor, 'bstream' library in here is probably not up to date: %w", err)
 			}
 
 			activeCursor = cursor
@@ -668,14 +669,14 @@ func (s *Sinker) doRequest(
 			} else {
 				dataToProcess, err = s.buffer.HandleBlockScopedData(r.BlockScopedData)
 				if err != nil {
-					return activeCursor, receivedMessage, fmt.Errorf("buffer add block data: %w", err)
+					return activeCursor, receivedDataMessage, fmt.Errorf("buffer add block data: %w", err)
 				}
 			}
 
 			for _, blockScopedData := range dataToProcess {
 				currentCursor, err := NewCursor(blockScopedData.Cursor)
 				if err != nil {
-					return activeCursor, receivedMessage, fmt.Errorf("invalid received cursor, 'bstream' library in here is probably not up to date: %w", err)
+					return activeCursor, receivedDataMessage, fmt.Errorf("invalid received cursor, 'bstream' library in here is probably not up to date: %w", err)
 				}
 
 				var isLive *bool
@@ -688,7 +689,7 @@ func (s *Sinker) doRequest(
 				}
 
 				if err := handler.HandleBlockScopedData(ctx, blockScopedData, isLive, currentCursor); err != nil {
-					return activeCursor, receivedMessage, fmt.Errorf("handle BlockScopedData message at block %s: %w", block, err)
+					return activeCursor, receivedDataMessage, fmt.Errorf("handle BlockScopedData message at block %s: %w", block, err)
 				}
 			}
 
@@ -702,7 +703,7 @@ func (s *Sinker) doRequest(
 
 			cursor, err := NewCursor(undoSignal.LastValidCursor)
 			if err != nil {
-				return activeCursor, receivedMessage, fmt.Errorf("invalid received cursor, 'bstream' library in here is probably not up to date: %w", err)
+				return activeCursor, receivedDataMessage, fmt.Errorf("invalid received cursor, 'bstream' library in here is probably not up to date: %w", err)
 			}
 
 			activeCursor = cursor
@@ -715,7 +716,7 @@ func (s *Sinker) doRequest(
 
 			if s.buffer == nil {
 				if err := handler.HandleBlockUndoSignal(ctx, r.BlockUndoSignal, activeCursor); err != nil {
-					return activeCursor, receivedMessage, fmt.Errorf("handle BlockUndoSignal: %w", err)
+					return activeCursor, receivedDataMessage, fmt.Errorf("handle BlockUndoSignal: %w", err)
 				}
 			} else {
 				// In the case of dealing with an undo buffer, it's expected that a fork will never
@@ -725,14 +726,14 @@ func (s *Sinker) doRequest(
 				// This means ultimately that we expect to never call the downstream `BlockUndoSignalHandler` function.
 				err = s.buffer.HandleBlockUndoSignal(r.BlockUndoSignal)
 				if err != nil {
-					return activeCursor, receivedMessage, fmt.Errorf("buffer undo block: %w", err)
+					return activeCursor, receivedDataMessage, fmt.Errorf("buffer undo block: %w", err)
 				}
 			}
 
 		case *pbsubstreamsrpc.Response_DebugSnapshotData:
 			if ss, ok := handler.(SinkerSnapshotHandler); ok {
 				if err := ss.HandleInitialSnapshotData(ctx, r.DebugSnapshotData); err != nil {
-					return activeCursor, receivedMessage, fmt.Errorf("handle initial snapshot data: %w", err)
+					return activeCursor, receivedDataMessage, fmt.Errorf("handle initial snapshot data: %w", err)
 				}
 			} else {
 				s.Logger.Warn("received debug snapshot message, there is no reason to receive those here", zap.Reflect("message", r))
@@ -740,7 +741,7 @@ func (s *Sinker) doRequest(
 		case *pbsubstreamsrpc.Response_DebugSnapshotComplete:
 			if ss, ok := handler.(SinkerSnapshotHandler); ok {
 				if err := ss.HandleInitialSnapshotComplete(ctx, r.DebugSnapshotComplete); err != nil {
-					return activeCursor, receivedMessage, fmt.Errorf("handle initial snapshot complete: %w", err)
+					return activeCursor, receivedDataMessage, fmt.Errorf("handle initial snapshot complete: %w", err)
 				}
 			} else {
 				s.Logger.Warn("received debug snapshot message, there is no reason to receive those here", zap.Reflect("message", r))
@@ -749,7 +750,7 @@ func (s *Sinker) doRequest(
 		case *pbsubstreamsrpc.Response_Session:
 			if sh, ok := handler.(SinkerSessionInitHandler); ok {
 				if err := sh.HandleSessionInit(ctx, s.request, r.Session); err != nil {
-					return activeCursor, receivedMessage, fmt.Errorf("handle session init: %w", err)
+					return activeCursor, receivedDataMessage, fmt.Errorf("handle session init: %w", err)
 				}
 				break
 			}

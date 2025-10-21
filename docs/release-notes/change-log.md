@@ -43,9 +43,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Inline notation: `module: buf.build/streamingfast/substreams-sink-sql@v0.1.0`
   - Note: `@latest` inline notation is **not allowed**; use `version: latest` or omit the version instead
 
-### Bugfixes
+### Bug fixes
 
 * Fixed a bug with BlockFilter: a skipped module would send BlockScopedData (in dev or near HEAD, to follow progress) with an empty module name, breaking some sinks. Module name was present if requesting a module dependent on that skipped module. Now the module name is always included.
+* Fix "max-retries" so that it only 'resets' the counter if it receives actual data.
 
 ## v1.16.6
 

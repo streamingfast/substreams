@@ -913,6 +913,11 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 
 	outputModuleHash := reqctx.OutputModuleHash(ctx)
 
+	endpoint := "sf.substreams.rpc.v2/Blocks"
+	if reqctx.Spkg(ctx) != nil { // if we got the full spkg, we are on the v3 endpoint
+		endpoint = "sf.substreams.rpc.v3/Blocks"
+	}
+
 	ctx = reqctx.WithEmitter(ctx, dmetering.GetDefaultEmitter())
 	metericsSender := metering.GetMetricsSender(ctx)
 	var debugOutputs map[string]struct{}
@@ -975,7 +980,8 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 		}
 		stats.RecordEgress(egressBytes)
 		metering.AddEgressBytes(ctx, egressBytes)
-		metericsSender.Send(ctx, userID, apiKeyID, ip, userMeta, outputModuleHash, "sf.substreams.rpc.v2/Blocks")
+
+		metericsSender.Send(ctx, userID, apiKeyID, ip, userMeta, outputModuleHash, endpoint)
 		return nil
 	}
 }

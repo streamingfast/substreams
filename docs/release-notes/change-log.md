@@ -26,7 +26,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Watch for releases for firehose-core, firehose-ethereum, etc. to include this new endpoint.
 * It is added on top of the existing 'v2' endpoint, both being active at the same time.
 * To enable it, operators will simply need to ensure that their routing allows the `/sf.substreams.rpc.v3.Stream/*` path.
-* Cached spkg on the server will now contain protobuf definitions, simplifying debugging of user requests
+* Cached spkg on the server will now contain protobuf definitions, simplifying debugging of user requests.
+* Emitted metrics for requests can now be `sf.substreams.rpc.v3/Blocks` instead of always `sf.substreams.rpc.v2/Blocks`, make sure that your metering endpoint can support it.
 
 #### Clients
 

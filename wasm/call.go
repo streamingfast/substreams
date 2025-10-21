@@ -331,6 +331,7 @@ func (c *Call) DoFoundationalStoreGet(index uint32, block uint64, blockHash []by
 
 	for {
 		resp, err := c.foundationalStores[index].Get(ctx, block, blockHash, key)
+		zlog.Debug("foundational store Get result", zap.Bool("block_reached", resp != nil && resp.BlockReached), zap.Error(err))
 		if err != nil {
 			// Check if call context was cancelled
 			if c.ctx.Err() != nil {
@@ -363,7 +364,7 @@ func (c *Call) DoFoundationalStoreGetAll(index uint32, block uint64, blockHash [
 
 	for {
 		resp, err := c.foundationalStores[index].GetAll(ctx, block, blockHash, keys)
-		zlog.Info("foundational store GetAll result", zap.Bool("block_reached", resp != nil && resp.BlockReached), zap.Error(err))
+		zlog.Debug("foundational store GetAll result", zap.Bool("block_reached", resp != nil && resp.BlockReached), zap.Error(err))
 		if err != nil {
 			// Check if call context was cancelled
 			if c.ctx.Err() != nil {

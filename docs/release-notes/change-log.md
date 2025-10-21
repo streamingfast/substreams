@@ -11,13 +11,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### New sf.substreams.rpc.v3.Stream/Blocks endpoint
+
+* This new endpoint removes the need for complex "mangling" of the package on the client side.
+* Instead of expecting `sf.substreams.v1.Modules` (with the client having to apply parameters, network, etc.), the `sf.substreams.rpc.v3.Request` now expects:
+  - a `sf.substreams.v1.Package`.
+  - a `map<string, string>` of `params`
+  - the `network` string
+  which will all be applied to the package server-side.
+* It returns the same object as the v2 endpoint, i.e. a stream of `sf.substreams.rpc.v2.Response`
+
+#### Server
+
+* Watch for releases for firehose-core, firehose-ethereum, etc. to include this new endpoint.
+* It is added on top of the existing 'v2' endpoint, both being active at the same time.
+* To enable it, operators will simply need to ensure that their routing allows the `/sf.substreams.rpc.v3.Stream/*` path.
+* Cached spkg on the server will now contain protobuf definitions, simplifying debugging of user requests
+
+#### Clients
+
+* The clients provided in this release (substreams run, gui and sinks that are linked to the 'client' library) will now support both endpoints.
+* Without any flag, they will use the v3 endpoint by default and automatically fallback to v2 if they hit a "404 Not Found" or "Not Implemented" error.
+* The `--force-protocol-version` has been added to all clients. Set it to 2 to force only v2, set it to 3 to force only v3, or leave it unset (0) to use the default "v3 with fallback to v2"
+
+### Build
 * Added filesystem-backed caching for Buf BSR API requests to improve build performance and prevent rate limit errors. Cache uses SHA256 keys based on module/version/symbols, stores to `~/.config/substreams/buf-cache/`, and only caches deterministic semver versions. Falls back to in-memory cache if filesystem unavailable. Warns when descriptor sets lack version specifications, as these cannot be cached and may cause rate limit issues.
-* Fixed a bug with BlockFilter: a skipped module would send BlockScopedData (in dev or near HEAD, to follow progress) with an empty module name, breaking some sinks. Module name was present if requesting a module dependent on that skipped module. Now the module name is always included.
 * **Added** support for `@version` notation in `protobuf.descriptorSets` section of manifest. You can now specify versions in multiple ways:
   - Separate fields: `module: buf.build/streamingfast/substreams-sink-sql`
   - Separate fields with explicit latest: `module: buf.build/streamingfast/substreams-sink-sql` with `version: latest`
   - Inline notation: `module: buf.build/streamingfast/substreams-sink-sql@v0.1.0`
   - Note: `@latest` inline notation is **not allowed**; use `version: latest` or omit the version instead
+
+### Bugfixes
+
+* Fixed a bug with BlockFilter: a skipped module would send BlockScopedData (in dev or near HEAD, to follow progress) with an empty module name, breaking some sinks. Module name was present if requesting a module dependent on that skipped module. Now the module name is always included.
+
 ## v1.16.6
 
 ### Server

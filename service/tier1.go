@@ -498,32 +498,38 @@ func (s *Tier1Service) BlocksAny(
 	return nil
 }
 
+// writePackage writes the spkg to the module cache if it doesn't exist:
+//   - `substreams.spkg.zst` if it comes from a substreams.rpc.v3 request (package is complete with metadata)
+//   - `substreams.partial.spkg.zst` if it comes from a substreams.rpc.v2 request (package is partial, missing protobuf definitions and other metadata)
 func (s *Tier1Service) writePackage(ctx context.Context, request *pbsubstreamsrpc.Request, execGraph *exec.Graph, cacheStore dstore.Store) error {
-	asPackage := &pbsubstreams.Package{
-		Modules:    request.Modules,
-		ModuleMeta: []*pbsubstreams.ModuleMetadata{},
-	}
+	var pkg *pbsubstreams.Package
+	var fileName string
 
-	if pkg := reqctx.Spkg(ctx); pkg != nil {
-		asPackage = pkg
+	if receivedSpkg := reqctx.Spkg(ctx); receivedSpkg != nil {
+		pkg = receivedSpkg
+		fileName = "substreams.spkg"
+	} else {
+		pkg = &pbsubstreams.Package{
+			Modules:    request.Modules,
+			ModuleMeta: []*pbsubstreams.ModuleMetadata{},
+		}
+		fileName = "substreams.partial.spkg"
 	}
-
-	cnt, err := proto.Marshal(asPackage)
-	if err != nil {
-		return fmt.Errorf("marshalling package: %w", err)
-	}
-
 	moduleStore, err := cacheStore.SubStore(execGraph.ModuleHashes()[request.OutputModule])
 	if err != nil {
 		return fmt.Errorf("getting substore: %w", err)
 	}
 
-	exists, err := moduleStore.FileExists(ctx, "substreams.partial.spkg")
+	exists, err := moduleStore.FileExists(ctx, fileName)
 	if err != nil {
 		return fmt.Errorf("error checking fileExists: %w", err)
 	}
 	if !exists {
-		if err := moduleStore.WriteObject(ctx, "substreams.partial.spkg", bytes.NewReader(cnt)); err != nil {
+		cnt, err := proto.Marshal(pkg)
+		if err != nil {
+			return fmt.Errorf("marshalling package: %w", err)
+		}
+		if err := moduleStore.WriteObject(ctx, fileName, bytes.NewReader(cnt)); err != nil {
 			return fmt.Errorf("writing substreams.partial object")
 		}
 	}

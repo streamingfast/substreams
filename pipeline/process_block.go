@@ -334,19 +334,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 	ctx, cancel := context.WithTimeout(ctx, p.executionTimeout)
 	defer func() {
 		if r := recover(); r != nil {
-			if e, ok := r.(error); ok {
-				if errors.Is(e, context.Canceled) {
-					return
-				}
-				if ctx.Err() == context.DeadlineExceeded {
-					err = connect.NewError(connect.CodeDeadlineExceeded, fmt.Errorf("execution timed out at block %d: [%s] %s", blockNum, execOutput.Clock().Id, r))
-				} else {
-					err = fmt.Errorf("panic at block %d: %s [%s]", blockNum, r, execOutput.Clock().Id)
-					if PrintStack {
-						debug.PrintStack()
-					}
-				}
-			}
+			err = recoverWasmPanic(ctx, err, r, execOutput.Clock().AsBlockRef())
 		}
 		cancel()
 	}()
@@ -384,19 +372,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 					defer func() {
 						// each go thread needs its own recover(), as the WASM execution can panic
 						if r := recover(); r != nil {
-							if e, ok := r.(error); ok {
-								if errors.Is(e, context.Canceled) {
-									return
-								}
-								if ctx.Err() == context.DeadlineExceeded {
-									err = connect.NewError(connect.CodeDeadlineExceeded, fmt.Errorf("execution timed out at block %d: [%s] %s", blockNum, execOutput.Clock().Id, r))
-								} else {
-									err = fmt.Errorf("panic at block %d: %s [%s]", blockNum, r, execOutput.Clock().Id)
-									if PrintStack {
-										debug.PrintStack()
-									}
-								}
-							}
+							err = recoverWasmPanic(ctx, err, r, execOutput.Clock().AsBlockRef())
 						}
 					}()
 
@@ -433,6 +409,40 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 	reqctx.ReqStats(ctx).RecordBlocksProcessed(uint64(len(executedStages)))
 
 	return nil
+}
+
+// recoverWasmPanic performs the recovery logic if a `recover() != nil` condition happened. The `recover()` must always
+// be called at the goroutine location, then the recovered value must be passed to this handler.
+//
+// The executionError is the "normal" non-recovered error that happened during execution of the WASM by the WASM
+// virtual machine.
+func recoverWasmPanic(ctx context.Context, executionError error, recovered any, blockRef bstream.BlockRef) error {
+	var recoveredErr error
+	if e, ok := recovered.(error); ok {
+		recoveredErr = e
+	} else {
+		recoveredErr = fmt.Errorf("%v", recovered)
+	}
+
+	// If recovering from context cancel, simply return the execution error
+	if errors.Is(recoveredErr, context.Canceled) {
+		return executionError
+	}
+
+	// If the context deadline was exceeded, return a deadline exceeded error RPC error
+	if ctx.Err() == context.DeadlineExceeded {
+		return connect.NewError(connect.CodeDeadlineExceeded, fmt.Errorf("execution timed out at block %s: %w", blockRef, recoveredErr))
+	}
+
+	// Otherwise, log the panic and return a generic error
+	if PrintStack {
+		debug.PrintStack()
+	}
+
+	// Also log error with stacktrace for easier debugging
+	reqctx.Logger(ctx).Error("panic at block", zap.Stringer("block", blockRef), zap.Error(recoveredErr), zap.Stack("stacktrace"))
+
+	return fmt.Errorf("panic at block %d: %w", blockRef, recoveredErr)
 }
 
 type resultObj struct {

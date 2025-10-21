@@ -334,7 +334,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 	ctx, cancel := context.WithTimeout(ctx, p.executionTimeout)
 	defer func() {
 		if r := recover(); r != nil {
-			err = recoverWasmPanic(ctx, err, r, execOutput.Clock().AsBlockRef())
+			err = recoverExecutionPanic(ctx, err, r, execOutput.Clock().AsBlockRef())
 		}
 		cancel()
 	}()
@@ -372,7 +372,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 					defer func() {
 						// each go thread needs its own recover(), as the WASM execution can panic
 						if r := recover(); r != nil {
-							err = recoverWasmPanic(ctx, err, r, execOutput.Clock().AsBlockRef())
+							err = recoverExecutionPanic(ctx, err, r, execOutput.Clock().AsBlockRef())
 						}
 					}()
 
@@ -411,12 +411,12 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 	return nil
 }
 
-// recoverWasmPanic performs the recovery logic if a `recover() != nil` condition happened. The `recover()` must always
+// recoverExecutionPanic performs the recovery logic if a `recover() != nil` condition happened. The `recover()` must always
 // be called at the goroutine location, then the recovered value must be passed to this handler.
 //
-// The executionError is the "normal" non-recovered error that happened during execution of the WASM by the WASM
-// virtual machine.
-func recoverWasmPanic(ctx context.Context, executionError error, recovered any, blockRef bstream.BlockRef) error {
+// The executionError is the "normal" non-recovered error that happened during execution of the execution engine, usually
+// a WASM virtual machine.
+func recoverExecutionPanic(ctx context.Context, executionError error, recovered any, blockRef bstream.BlockRef) error {
 	var recoveredErr error
 	if e, ok := recovered.(error); ok {
 		recoveredErr = e
@@ -424,8 +424,8 @@ func recoverWasmPanic(ctx context.Context, executionError error, recovered any, 
 		recoveredErr = fmt.Errorf("%v", recovered)
 	}
 
-	// If recovering from context cancel, simply return the execution error
-	if errors.Is(recoveredErr, context.Canceled) {
+	// If recovering from context cancel, simply return the execution error as-is
+	if ctx.Err() != nil || errors.Is(recoveredErr, context.Canceled) {
 		return executionError
 	}
 
@@ -463,23 +463,26 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 
 	defer func() {
 		if r := recover(); r != nil {
+			var recoveredErr error
 			if err, ok := r.(error); ok {
-				// Ensure silent return and prevents deterministic errors and stack traces
-				if errors.Is(err, wasm.ErrFoundationalStoreCanceled) {
-					return
-				}
-				if errors.Is(err, wasm.ErrWasmDeterministicExec) || errors.Is(err, store.ErrStoreAboveMaxSize) {
-					p.execoutStorage.ConfigMap[executorName].WriteDeterministicError(ctx, execOutput.Clock().Number, fmt.Errorf("%w (deterministic error)", err))
-					out.err = err
-					return
-				}
+				recoveredErr = err
+			} else {
+				recoveredErr = fmt.Errorf("%v", r)
 			}
-			if s, ok := r.(string); ok {
-				e := fmt.Errorf("wasm error: %s", s)
-				p.execoutStorage.ConfigMap[executorName].WriteDeterministicError(ctx, execOutput.Clock().Number, e)
-				out.err = e
+
+			if errors.Is(recoveredErr, wasm.ErrWasmDeterministicExec) || errors.Is(recoveredErr, store.ErrStoreAboveMaxSize) {
+				p.execoutStorage.ConfigMap[executorName].WriteDeterministicError(ctx, execOutput.Clock().Number, fmt.Errorf("%w (deterministic error)", recoveredErr))
+				out.err = recoveredErr
 				return
 			}
+
+			// Those are not deterministic errors, just propagate them up for now, but the context is probably cancelled at this point
+			if errors.Is(recoveredErr, wasm.ErrFoundationalStoreCanceled) {
+				out.err = recoveredErr
+				return
+			}
+
+			// Move the panic up so it's handled at a higher level by those who call execute()
 			panic(fmt.Errorf("unknown error: %s", r))
 		}
 	}()

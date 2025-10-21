@@ -9,6 +9,7 @@ import (
 
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/metrics"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/wasm"
 
 	// _ "github.com/streamingfast/substreams/wasm/wasi"
@@ -77,7 +78,7 @@ func BenchmarkExecution(b *testing.B) {
 				require.NoError(b, err)
 				defer cachedInstance.Close(ctx)
 
-				call := wasm.NewCall(ctx, nil, testCase.tag, testCase.entrypoint, stats, []wasm.Argument{testCase.argument.arg}, true, nil)
+				call := wasm.NewCall(ctx, &pbsubstreams.Clock{Id: "a", Number: 0}, testCase.tag, testCase.entrypoint, stats, []wasm.Argument{testCase.argument.arg}, true, nil)
 
 				b.ReportAllocs()
 				b.ResetTimer()

@@ -2,8 +2,6 @@ package wazero
 
 import (
 	"context"
-	"errors"
-	"fmt"
 
 	pbstore "github.com/streamingfast/substreams-foundational-store/pb/sf/substreams/foundational-store/v1"
 	"github.com/streamingfast/substreams/wasm"
@@ -385,40 +383,25 @@ var StateFuncs = []funcs{
 			call := wasm.FromContext(ctx)
 			inst := instanceFromContext(ctx)
 
-			// TODO: backend should return already-serialized bytes to avoid marshal here
-
-			// Deserialize
 			var req pbstore.GetRequest
 			if err := proto.Unmarshal(reqData, &req); err != nil {
-				call.ReturnError(fmt.Errorf("failed to unmarshal GetRequest: %w", err))
+				call.PanicDeterministicError("failed to unmarshal GetRequest: %w", err)
 				stack[0] = 0
 				return
 			}
 
-			// Validate and inject clock
-			blockNumber, blockHash := wasm.ValidateAndInjectFoundationalStoreClock(call.Clock, req.BlockNumber, req.BlockHash, "get")
+			resp := call.DoFoundationalStoreGet(storeIndex, &req)
 
-			resp, err := call.DoFoundationalStoreGet(storeIndex, blockNumber, blockHash, req.Key)
-			if err != nil {
-				if errors.Is(err, context.Canceled) {
-					panic(wasm.ErrFoundationalStoreCanceled)
-				}
-				call.ReturnError(fmt.Errorf("foundational store error: %w", err))
-				stack[0] = 0
-				return
-			}
-
-			// Serialize response
 			respData, err := proto.Marshal(resp)
 			if err != nil {
-				call.ReturnError(fmt.Errorf("failed to marshal GetResponse: %w", err))
+				call.PanicDeterministicError("failed to marshal GetResponse: %w", err)
 				stack[0] = 0
 				return
 			}
 
 			respPtr, err := writeToHeap(ctx, inst, true, respData)
 			if err != nil {
-				call.ReturnError(fmt.Errorf("writing response to heap: %w", err))
+				call.PanicDeterministicError("writing response to heap: %w", err)
 				stack[0] = 0
 				return
 			}
@@ -441,35 +424,24 @@ var StateFuncs = []funcs{
 			// Deserialize
 			var req pbstore.GetAllRequest
 			if err := proto.Unmarshal(reqData, &req); err != nil {
-				call.ReturnError(fmt.Errorf("failed to unmarshal GetAllRequest: %w", err))
+				call.PanicDeterministicError("failed to unmarshal GetAllRequest: %w", err)
 				stack[0] = 0
 				return
 			}
 
-			// Validate and inject clock
-			blockNumber, blockHash := wasm.ValidateAndInjectFoundationalStoreClock(call.Clock, req.BlockNumber, req.BlockHash, "get_all")
-
-			resp, err := call.DoFoundationalStoreGetAll(storeIndex, blockNumber, blockHash, req.Keys)
-			if err != nil {
-				if errors.Is(err, context.Canceled) {
-					panic(wasm.ErrFoundationalStoreCanceled)
-				}
-				call.ReturnError(fmt.Errorf("foundational store error: %w", err))
-				stack[0] = 0
-				return
-			}
+			resp := call.DoFoundationalStoreGetAll(storeIndex, &req)
 
 			// Serialize response
 			respData, err := proto.Marshal(resp)
 			if err != nil {
-				call.ReturnError(fmt.Errorf("failed to marshal GetAllResponse: %w", err))
+				call.PanicDeterministicError("failed to marshal GetAllResponse: %w", err)
 				stack[0] = 0
 				return
 			}
 
 			respPtr, err := writeToHeap(ctx, inst, true, respData)
 			if err != nil {
-				call.ReturnError(fmt.Errorf("writing response to heap: %w", err))
+				call.PanicDeterministicError("writing response to heap: %w", err)
 				stack[0] = 0
 				return
 			}
@@ -484,7 +456,7 @@ func setStackAndOutput(ctx context.Context, stack []uint64, call *wasm.Call, fou
 		stack[0] = 0
 	} else {
 		if err := writeOutputToHeap(ctx, inst, outputPtr, value); err != nil {
-			call.ReturnError(fmt.Errorf("writing output to heap: %w", err))
+			call.PanicDeterministicError("writing output to heap: %w", err)
 		}
 		stack[0] = 1
 	}

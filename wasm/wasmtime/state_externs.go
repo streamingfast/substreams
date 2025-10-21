@@ -1,12 +1,7 @@
 package wasmtime
 
 import (
-	"context"
-	"errors"
-	"fmt"
-
 	pbstore "github.com/streamingfast/substreams-foundational-store/pb/sf/substreams/foundational-store/v1"
-	"github.com/streamingfast/substreams/wasm"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -167,32 +162,23 @@ func (i *instance) foundationalStoreGet(storeIndex int32, reqPtr int32, reqLen i
 	// Deserialize GetRequest
 	var req pbstore.GetRequest
 	if err := proto.Unmarshal(reqData, &req); err != nil {
-		i.CurrentCall.ReturnError(fmt.Errorf("failed to unmarshal GetRequest: %w", err))
+		i.CurrentCall.PanicDeterministicError("failed to unmarshal GetRequest: %w", err)
 		return 0
 	}
 
-	// Validate and inject clock
-	blockNumber, blockHash := wasm.ValidateAndInjectFoundationalStoreClock(i.CurrentCall.Clock, req.BlockNumber, req.BlockHash, "get")
+	resp := i.CurrentCall.DoFoundationalStoreGet(uint32(storeIndex), &req)
 
-	resp, err := i.CurrentCall.DoFoundationalStoreGet(uint32(storeIndex), blockNumber, blockHash, req.Key)
-	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			panic(wasm.ErrFoundationalStoreCanceled)
-		}
-		i.CurrentCall.ReturnError(fmt.Errorf("foundational store error: %w", err))
-		return 0
-	}
 	// Serialize response
 	respData, err := proto.Marshal(resp)
 	if err != nil {
-		i.CurrentCall.ReturnError(fmt.Errorf("failed to marshal GetResponse: %w", err))
+		i.CurrentCall.PanicDeterministicError("failed to marshal GetResponse: %w", err)
 		return 0
 	}
 
 	// Write to heap and return packed pointer/length
 	respPtr, err := i.Heap.Write(respData, "foundationalStoreGet")
 	if err != nil {
-		i.CurrentCall.ReturnError(fmt.Errorf("writing response to heap: %w", err))
+		i.CurrentCall.PanicDeterministicError("writing response to heap: %w", err)
 		return 0
 	}
 
@@ -209,33 +195,23 @@ func (i *instance) foundationalStoreGetAll(storeIndex int32, reqPtr int32, reqLe
 	// Deserialize GetAllRequest
 	var req pbstore.GetAllRequest
 	if err := proto.Unmarshal(reqData, &req); err != nil {
-		i.CurrentCall.ReturnError(fmt.Errorf("failed to unmarshal GetAllRequest: %w", err))
+		i.CurrentCall.PanicDeterministicError("failed to unmarshal GetAllRequest: %w", err)
 		return 0
 	}
 
-	// Validate and inject clock
-	blockNumber, blockHash := wasm.ValidateAndInjectFoundationalStoreClock(i.CurrentCall.Clock, req.BlockNumber, req.BlockHash, "get_all")
-
-	resp, err := i.CurrentCall.DoFoundationalStoreGetAll(uint32(storeIndex), blockNumber, blockHash, req.Keys)
-	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			panic(wasm.ErrFoundationalStoreCanceled)
-		}
-		i.CurrentCall.ReturnError(fmt.Errorf("foundational store error: %w", err))
-		return 0
-	}
+	resp := i.CurrentCall.DoFoundationalStoreGetAll(uint32(storeIndex), &req)
 
 	// Serialize response
 	respData, err := proto.Marshal(resp)
 	if err != nil {
-		i.CurrentCall.ReturnError(fmt.Errorf("failed to marshal GetAllResponse: %w", err))
+		i.CurrentCall.PanicDeterministicError("failed to marshal GetAllResponse: %w", err)
 		return 0
 	}
 
 	// Write to heap and return packed pointer/length
 	respPtr, err := i.Heap.Write(respData, "foundationalStoreGetAll")
 	if err != nil {
-		i.CurrentCall.ReturnError(fmt.Errorf("writing response to heap: %w", err))
+		i.CurrentCall.PanicDeterministicError("writing response to heap: %w", err)
 		return 0
 	}
 
@@ -253,7 +229,7 @@ func writeToHeapIfFound(i *instance, outputPtr int32, value []byte, found bool) 
 		return 0
 	}
 	if err := writeOutputToHeap(i, outputPtr, value); err != nil {
-		i.CurrentCall.ReturnError(fmt.Errorf("writing output to heap: %w", err))
+		i.CurrentCall.PanicDeterministicError("writing output to heap: %w", err)
 	}
 	return 1
 }

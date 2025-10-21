@@ -55,6 +55,12 @@ func NewConfig(name string, moduleInitialBlock uint64, modKind pbsubstreams.Modu
 }
 
 func (c *Config) WriteDeterministicError(ctx context.Context, atBlock uint64, err error) error {
+	// Never write deterministic errors if context is cancelled, it cannot be deterministic in this case,
+	// safeguard against wrong error handling over time.
+	if ctx.Err() != nil {
+		return nil
+	}
+
 	r := strings.NewReader(err.Error())
 	return c.errStore.WriteObject(ctx, fmt.Sprintf("errors.%010d.%s", atBlock, c.extendedModuleHash), r)
 }

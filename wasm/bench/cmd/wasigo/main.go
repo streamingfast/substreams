@@ -49,7 +49,7 @@ func main() {
 			wasm.NewStoreWriterOutput("out", createStore(ctx, "out"), 1, "string"),
 		)
 
-		call := wasm.NewCall(ctx, nil, "mapBlock", "mapBlock", nil, args, false, nil)
+		call := wasm.NewCall(ctx, &pbsubstreams.Clock{Id: "a", Number: 0}, "mapBlock", "mapBlock", nil, args, false, nil)
 		_, err = module.ExecuteNewCall(ctx, call, instance, args, map[string][]byte{argsVals.arg.Name(): argsVals.val})
 		if err != nil {
 			panic(fmt.Errorf("executing call: %w", err))

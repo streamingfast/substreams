@@ -15,6 +15,7 @@ import (
 	"github.com/streamingfast/substreams/client/foundational"
 	"github.com/streamingfast/substreams/metrics"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
 )
 
@@ -23,9 +24,8 @@ var ErrFoundationalStoreCanceled = errors.New("foundational store request cancel
 
 // Foundational store retry configuration constants
 const (
-	foundationalStoreRetryDelay = 100 * time.Millisecond
-	// Kill switch timeout
-	foundationalStoreMaxWaitTime = 60 * time.Second
+	foundationalStoreRetryDelay  = 100 * time.Millisecond
+	foundationalStoreMaxWaitTime = 30 * time.Second
 )
 
 type Call struct {
@@ -169,7 +169,7 @@ func (c *Call) DoAddBigDecimal(ord uint64, key string, value string) {
 
 	toAdd, err := decimal.NewFromString(string(value))
 	if err != nil {
-		c.ReturnError(fmt.Errorf("parsing bigdecimal: %w", err))
+		c.PanicDeterministicError("parsing bigdecimal: %w", err)
 	}
 	c.outputStore.SumBigDecimal(ord, key, toAdd.Truncate(34))
 	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
@@ -238,7 +238,7 @@ func (c *Call) DoSetMinBigDecimal(ord uint64, key string, value string) {
 	c.validateWithTwoValueTypes("set_min_bigdecimal", pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN, "bigdecimal", "bigfloat", key)
 	toAdd, err := decimal.NewFromString(value)
 	if err != nil {
-		c.ReturnError(fmt.Errorf("parsing bigdecimal: %w", err))
+		c.PanicDeterministicError("parsing bigdecimal: %w", err)
 	}
 	c.outputStore.SetMinBigDecimal(ord, key, toAdd.Truncate(34))
 	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
@@ -267,7 +267,7 @@ func (c *Call) DoSetMaxBigDecimal(ord uint64, key string, value string) {
 	c.validateWithTwoValueTypes("set_max_bigdecimal", pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX, "bigdecimal", "bigfloat", key)
 	toAdd, err := decimal.NewFromString(value)
 	if err != nil {
-		c.ReturnError(fmt.Errorf("parsing bigdecimal: %w", err))
+		c.PanicDeterministicError("parsing bigdecimal: %w", err)
 	}
 	c.outputStore.SetMaxBigDecimal(ord, key, toAdd.Truncate(34))
 	c.stats.RecordModuleWasmStoreWrite(c.ModuleName, c.outputStore.SizeBytes(), time.Since(now))
@@ -321,66 +321,83 @@ func (c *Call) DoHasLast(storeIndex int, key string) (found bool) {
 	return readStore.HasLast(key)
 }
 
-func (c *Call) DoFoundationalStoreGet(index uint32, block uint64, blockHash []byte, key []byte) (*pbstore.GetResponse, error) {
-	if len(c.foundationalStores) == 0 {
-		return nil, fmt.Errorf("store not found for index: %d", index)
-	}
+// DoFoundationalStoreGet performs a Get request to the foundational store at the given index. The function
+// retries forever until either the context is cancelled or the foundational store indicates that the requested block
+// has been reached.
+//
+// If there is validation errors, this method panics with a deterministic error. If the context is cancelled while waiting
+// for the foundational store to reach the requested block, this method panics with a non-deterministic error.
+func (c *Call) DoFoundationalStoreGet(index uint32, request *pbstore.GetRequest) *pbstore.GetResponse {
+	c.validateFoundationStoreRequest(request, "foundational_store_get")
+	c.validateFoundationalStoreIndex(int(index), "foundational_store_get")
 
-	ctx, cancel := context.WithTimeoutCause(c.ctx, foundationalStoreMaxWaitTime, fmt.Errorf("foundational store timeout after %s", foundationalStoreMaxWaitTime))
-	defer cancel()
+	logger := reqctx.Logger(c.ctx).With(zap.Uint32("foundational_store_index", index))
 
 	for {
-		resp, err := c.foundationalStores[index].Get(ctx, block, blockHash, key)
-		zlog.Debug("foundational store Get result", zap.Bool("block_reached", resp != nil && resp.BlockReached), zap.Error(err))
+		ctx, cancel := context.WithTimeoutCause(c.ctx, foundationalStoreMaxWaitTime, fmt.Errorf("foundational store timeout after %s", foundationalStoreMaxWaitTime))
+		defer cancel()
+
+		resp, err := c.foundationalStores[index].Get(ctx, c.Clock, request.Key)
+		logger.Debug("foundational store Get result", zap.Bool("block_reached", resp != nil && resp.BlockReached), zap.Error(err))
 		if err != nil {
-			// Check if call context was cancelled
+			// Check if parent call context was cancelled (we do not check the local ctx as a timeout for this one means retry)
 			if c.ctx.Err() != nil {
-				zlog.Debug("foundational store get cancelled due to upstream disconnect",
-					zap.Uint64("block_number", block),
-					zap.Error(context.Cause(c.ctx)))
-				return nil, context.Canceled
+				logger.Debug("foundational store get cancelled due to upstream disconnect",
+					zap.Stringer("block", c.Clock.AsBlockRef()),
+					zap.Error(context.Cause(c.ctx)),
+				)
+				c.PanicNonDeterministicError(ErrFoundationalStoreCanceled)
 			}
 
-			zlog.Warn("failed to call foundational store", zap.Error(err))
+			logger.Warn("failed to call foundational store", zap.Error(err))
 			time.Sleep(foundationalStoreRetryDelay)
 			continue
 		}
 
 		if resp.BlockReached {
-			return resp, nil
+			return resp
 		}
 
 		time.Sleep(foundationalStoreRetryDelay)
 	}
 }
 
-func (c *Call) DoFoundationalStoreGetAll(index uint32, block uint64, blockHash []byte, keys [][]byte) (*pbstore.GetAllResponse, error) {
-	if len(c.foundationalStores) == 0 {
-		return nil, fmt.Errorf("store not found for index: %d", index)
-	}
+// DoFoundationalStoreGetAll performs a GetAll request to the foundational store at the given index. The function
+// retries forever until either the context is cancelled or the foundational store indicates that the requested block
+// has been reached.
+//
+// If there is validation errors, this method panics with a deterministic error. If the context is cancelled while waiting
+// for the foundational store to reach the requested block, this method panics with a non-deterministic error.
+func (c *Call) DoFoundationalStoreGetAll(index uint32, request *pbstore.GetAllRequest) *pbstore.GetAllResponse {
+	c.validateFoundationStoreRequest(request, "foundational_store_get_all")
+	c.validateFoundationalStoreIndex(int(index), "foundational_store_get_all")
 
-	ctx, cancel := context.WithTimeoutCause(c.ctx, foundationalStoreMaxWaitTime, fmt.Errorf("foundational store get_all timeout after %s", foundationalStoreMaxWaitTime))
-	defer cancel()
+	logger := reqctx.Logger(c.ctx).With(zap.Uint32("foundational_store_index", index))
 
 	for {
-		resp, err := c.foundationalStores[index].GetAll(ctx, block, blockHash, keys)
-		zlog.Debug("foundational store GetAll result", zap.Bool("block_reached", resp != nil && resp.BlockReached), zap.Error(err))
+		ctx, cancel := context.WithTimeoutCause(c.ctx, foundationalStoreMaxWaitTime, fmt.Errorf("foundational store get_all timeout after %s", foundationalStoreMaxWaitTime))
+		defer cancel()
+
+		resp, err := c.foundationalStores[index].GetAll(ctx, c.Clock, request.Keys)
+
+		logger.Debug("foundational store GetAll result", zap.Bool("block_reached", resp != nil && resp.BlockReached), zap.Error(err))
 		if err != nil {
-			// Check if call context was cancelled
+			// Check if parent call context was cancelled (we do not check the local ctx as a timeout for this one means retry)
 			if c.ctx.Err() != nil {
-				zlog.Debug("foundational store get_all cancelled due to upstream disconnect",
-					zap.Uint64("block_number", block),
-					zap.Error(context.Cause(c.ctx)))
-				return nil, context.Canceled
+				logger.Debug("foundational store get_all cancelled due to upstream disconnect",
+					zap.Stringer("block", c.Clock.AsBlockRef()),
+					zap.Error(context.Cause(c.ctx)),
+				)
+				c.PanicNonDeterministicError(ErrFoundationalStoreCanceled)
 			}
 
-			zlog.Warn("failed to call foundational store", zap.Error(err))
+			logger.Warn("failed to call foundational store", zap.Error(err))
 			time.Sleep(foundationalStoreRetryDelay)
 			continue
 		}
 
 		if resp.BlockReached {
-			return resp, nil
+			return resp
 		}
 
 		time.Sleep(foundationalStoreRetryDelay)
@@ -389,7 +406,30 @@ func (c *Call) DoFoundationalStoreGetAll(index uint32, block uint64, blockHash [
 
 func (c *Call) validateStoreIndex(storeIndex int, stateFunc string) {
 	if storeIndex+1 > len(c.inputStores) {
-		c.ReturnError(fmt.Errorf("%q failed: invalid store index %d, %d stores declared", stateFunc, storeIndex, len(c.inputStores)))
+		c.PanicDeterministicError("%q failed: invalid store index %d, %d stores declared", stateFunc, storeIndex, len(c.inputStores))
+	}
+}
+
+func (c *Call) validateFoundationalStoreIndex(storeIndex int, stateFunc string) {
+	if storeIndex+1 > len(c.foundationalStores) {
+		c.PanicDeterministicError("%q failed: invalid foundational store index %d, %d stores declared", stateFunc, storeIndex, len(c.foundationalStores))
+	}
+}
+
+type foundationalStoreRequest interface {
+	GetBlockNumber() uint64
+	GetBlockHash() []byte
+}
+
+// validateFoundationStoreRequest validates the received request to ensure the block_number and block_hash
+// are not modified by the WASM module. If they are, it panics with a deterministic error as it's invalid for the
+// users to try to query other blocks than the current one.
+func (c *Call) validateFoundationStoreRequest(request foundationalStoreRequest, operation string) {
+	if request.GetBlockNumber() != 0 {
+		c.PanicDeterministicError("%s: block_number cannot be modified, must be 0, got %d", operation, request.GetBlockNumber())
+	}
+	if len(request.GetBlockHash()) != 0 {
+		c.PanicDeterministicError("%s: block_hash cannot be modified, must be empty, got %d bytes", operation, len(request.GetBlockHash()))
 	}
 }
 
@@ -415,8 +455,25 @@ func (c *Call) returnInvalidPolicy(stateFunc, policy string) {
 	panic(fmt.Errorf("module %q: invalid store operation %q, only valid for stores with %s, %w", c.ModuleName, stateFunc, policy, ErrWasmDeterministicExec))
 }
 
-func (c *Call) ReturnError(err error) {
-	panic(fmt.Errorf("module %q: %w, %w", c.ModuleName, err, ErrWasmDeterministicExec))
+// deterministicError creates a wrapped error indicating a deterministic execution error
+// and include the module name and the actual error.
+func (c *Call) deterministicError(format string, args ...any) error {
+	return fmt.Errorf("module %q: %w, %w", c.ModuleName, fmt.Errorf(format, args...), ErrWasmDeterministicExec)
+}
+
+// PanicDeterministicError panics with a wrapped error indicating a deterministic execution error
+// and include the module name and the actual error.
+func (c *Call) PanicDeterministicError(format string, args ...any) {
+	panic(c.deterministicError(format, args...))
+}
+
+// PanicNonDeterministicError panics with a wrapped error indicating a non-deterministic execution error
+// and include the module name and the actual error. To determine if the error is deterministic,
+// one will need to inspect [err] itself.
+//
+// So it is the caller responsibility to decide if the error is deterministic or not.
+func (c *Call) PanicNonDeterministicError(err error) {
+	panic(fmt.Errorf("module %q: %w", c.ModuleName, err))
 }
 
 var policyMap = map[pbsubstreams.Module_KindStore_UpdatePolicy]string{

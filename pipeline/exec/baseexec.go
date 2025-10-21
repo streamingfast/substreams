@@ -122,7 +122,7 @@ func (e *BaseExecutor) wasmCall(outputGetter execout.ExecutionOutputGetter, canS
 
 	stats := reqctx.ReqStats(e.ctx)
 	//t0 := time.Now()
-	call = wasm.NewCall(clock, e.moduleName, e.entrypoint, stats, e.wasmArguments, canSkipEmptyOutput, e.foundationalStores)
+	call = wasm.NewCall(e.ctx, clock, e.moduleName, e.entrypoint, stats, e.wasmArguments, canSkipEmptyOutput, e.foundationalStores)
 
 	ctx := e.ctx
 	if sharedCache.Cachable(clock.Number) {

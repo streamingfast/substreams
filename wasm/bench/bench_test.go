@@ -77,7 +77,7 @@ func BenchmarkExecution(b *testing.B) {
 				require.NoError(b, err)
 				defer cachedInstance.Close(ctx)
 
-				call := wasm.NewCall(nil, testCase.tag, testCase.entrypoint, stats, []wasm.Argument{testCase.argument.arg}, true, nil)
+				call := wasm.NewCall(ctx, nil, testCase.tag, testCase.entrypoint, stats, []wasm.Argument{testCase.argument.arg}, true, nil)
 
 				b.ReportAllocs()
 				b.ResetTimer()

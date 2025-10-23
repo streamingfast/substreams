@@ -400,7 +400,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 				}
 
 				if err := p.applyExecutionResult(ctx, executor, result, execOutput); err != nil {
-					return fmt.Errorf("applying executor results %q on block %d (%s): %w", executor.Name(), blockNum, execOutput.Clock(), result.err)
+					return fmt.Errorf("applying executor results %q on block %s: %w", executor.Name(), execOutput.Clock().AsBlockRef(), result.err)
 				}
 			}
 		}
@@ -439,10 +439,10 @@ func recoverExecutionPanic(ctx context.Context, executionError error, recovered 
 		debug.PrintStack()
 	}
 
-	// Also log error with stacktrace for easier debugging
-	reqctx.Logger(ctx).Error("panic at block", zap.Stringer("block", blockRef), zap.Error(recoveredErr), zap.Stack("stacktrace"))
+	// Also log error with stacktrace for easier debugging, the message contains also the block, for easy logs viewing
+	reqctx.Logger(ctx).Error(fmt.Sprintf("panic at block %s", blockRef), zap.Stringer("block", blockRef), zap.Error(recoveredErr), zap.Stack("stacktrace"))
 
-	return fmt.Errorf("panic at block %d: %w", blockRef, recoveredErr)
+	return fmt.Errorf("panic at block %s: %w", blockRef, recoveredErr)
 }
 
 type resultObj struct {

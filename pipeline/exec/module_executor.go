@@ -62,7 +62,14 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 
 	if skipFromIndex(executor.BlockIndex(), execOutput) {
 		emptyOutput, _ := executor.toModuleOutput(nil)
-		emptyOutput.ModuleName = executor.Name() // always set the module name here to play well with sinks
+
+		if emptyOutput == nil {
+			// if the moduleOutput is nil here, we may be on a module type that never produces outputs, like a store on partialKV
+			return nil, nil, nil, true, true, nil
+		}
+
+		// always set the module name here to play well with sinks
+		emptyOutput.ModuleName = executor.Name()
 		return emptyOutput, nil, nil, true, true, nil
 	}
 

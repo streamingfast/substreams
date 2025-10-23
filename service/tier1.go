@@ -50,6 +50,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/protobuf/proto"
 )
@@ -286,6 +287,29 @@ func (s *Tier1Service) BlocksV3(
 	return s.BlocksAny(ctx, reqV2, req.Header(), pbsubstreamsrpcv3.Stream_Blocks_FullMethodName, r.Package, stream)
 }
 
+type usedStore struct {
+	Name string
+	Hash string
+}
+
+func (s *usedStore) MarshalLogObject(e zapcore.ObjectEncoder) error {
+	e.AddString("name", s.Name)
+	e.AddString("hash", s.Hash)
+	return nil
+}
+
+type UsedFoundationalStore struct {
+	Identifier string
+	ModuleHash string
+}
+
+func (s *UsedFoundationalStore) MarshalLogObject(e zapcore.ObjectEncoder) error {
+	e.AddString("identifier", s.Identifier)
+	e.AddString("module_hash", s.ModuleHash)
+
+	return nil
+}
+
 func (s *Tier1Service) Blocks(
 	ctx context.Context,
 	req *connect.Request[pbsubstreamsrpc.Request],
@@ -412,6 +436,9 @@ func (s *Tier1Service) BlocksAny(
 
 	usedModules := execGraph.UsedModules()
 
+	usedStoreMap := map[string]*usedStore{}
+	usedFstoreMap := map[string]*UsedFoundationalStore{}
+
 	var hasStores bool
 	var hasFilter bool
 	moduleNames := make([]string, len(usedModules))
@@ -419,17 +446,51 @@ func (s *Tier1Service) BlocksAny(
 		moduleNames[i] = module.Name
 		if module.GetKindStore() != nil {
 			hasStores = true
+			h := execGraph.ModuleHashes()[module.Name]
+			usedStoreMap[h] = &usedStore{
+				Name: module.Name,
+				Hash: h,
+			}
 		}
+		for _, i := range module.Inputs {
+			if fs := i.GetFoundationalStore(); fs != nil {
+				usedFstoreMap[fs.Identifier] = &UsedFoundationalStore{
+					Identifier: fs.Identifier,
+					ModuleHash: execGraph.ModuleHashes()[module.Name],
+				}
+			}
+		}
+
 		if module.BlockFilter != nil {
 			hasFilter = true
 		}
 	}
+
+	stores := func() []*usedStore {
+		var out []*usedStore
+		for _, s := range usedStoreMap {
+			out = append(out, s)
+		}
+		return out
+	}
+
+	fstores := func() []*UsedFoundationalStore {
+		var out []*UsedFoundationalStore
+		for _, s := range usedFstoreMap {
+			out = append(out, s)
+		}
+		return out
+	}
+
 	fields = append(fields,
 		zap.Strings("modules", moduleNames),
 		zap.Bool("with_stores", hasStores),
 		zap.Bool("with_blockfilter", hasFilter),
 		zap.Int("module_count", len(usedModules)),
+		zap.Objects("stores", stores()),
+		zap.Objects("foundational_stores", fstores()),
 	)
+
 	// We need to ensure that the response function is NEVER used after this Blocks handler has returned.
 	// We use a context that will be canceled on defer, and a lock to prevent races. The respFunc is used in various threads
 	mut := sync.Mutex{}

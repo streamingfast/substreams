@@ -11,18 +11,8 @@ In this tutorial, you'll learn how to initialize a NEAR-based Substreams project
 
 1. [Install the Substreams CLI](../how-to-guides/cli/installing-the-cli.md).
 
-2. Currently, NEAR project templates are being developed for the `substreams init` command. In the meantime, you can get started with NEAR Substreams by cloning the existing example:
-
-   ```bash
-   git clone https://github.com/streamingfast/substreams-near-hello-world.git
-   cd substreams-near-hello-world
-   ```
-
-   This example demonstrates how to extract and process NEAR blockchain data using the [NEAR Full block](https://github.com/streamingfast/firehose-near/blob/develop/proto/sf/near/type/v1/type.proto) as input.
-
-{% hint style="info" %}
-**Coming Soon**: NEAR project templates will be available through `substreams init` in a future release, similar to other supported blockchains.
-{% endhint %}
+2. Running `substreams init` will give you the option to choose between NEAR project options. Select the one that best fits your requirements:
+   - **near-hello-world**: Creates a simple Substreams example that demonstrates how to extract and process NEAR blockchain data using the [NEAR Full block](https://github.com/streamingfast/firehose-near/blob/develop/proto/sf/near/type/v1/type.proto) as input.
 
 ## Step 2: Visualize the Data
 

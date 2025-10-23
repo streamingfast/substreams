@@ -61,6 +61,9 @@ func init() {
 	registryPublish.Flags().MarkDeprecated("teamSlug", "use --team-slug instead")
 
 	registryCmd.AddCommand(registryPublish)
+
+	// Add `substreams publish` as an alias command of `substreams registry publish`
+	rootCmd.AddCommand(registryPublish)
 }
 
 func runRegistryPublish(cmd *cobra.Command, args []string) (err error) {
@@ -203,7 +206,7 @@ func runRegistryPublish(cmd *cobra.Command, args []string) (err error) {
 			// Successfully parsed structured error
 			fmt.Println(cli.ErrorStyle.Render(fmt.Sprintf("Error code: %s", errorResp.Code)))
 			fmt.Println(cli.ErrorStyle.Render(fmt.Sprintf("Error message: %s", errorResp.Message)))
-			
+
 			// Print details if available
 			if len(errorResp.Details) > 0 {
 				fmt.Println(cli.ErrorStyle.Render("Details:"))
@@ -211,7 +214,7 @@ func runRegistryPublish(cmd *cobra.Command, args []string) (err error) {
 					fmt.Printf("  - %s: %v\n", k, v)
 				}
 			}
-			
+
 			// Special handling for authentication errors
 			if resp.StatusCode == http.StatusUnauthorized {
 				fmt.Println("")
@@ -220,12 +223,12 @@ func runRegistryPublish(cmd *cobra.Command, args []string) (err error) {
 				fmt.Println(cli.PurpleStyle.Render("substreams registry login"))
 				return fmt.Errorf("authentication failed: %s", errorResp.Message)
 			}
-			
+
 			return fmt.Errorf("publishing failed: %s", errorResp.Message)
 		} else {
 			// Fallback to raw error message
 			fmt.Println(cli.ErrorStyle.Render("Reason: " + string(b)))
-			
+
 			if resp.StatusCode == http.StatusUnauthorized {
 				fmt.Println("")
 				fmt.Println("Make sure you are properly authenticated with:")
@@ -233,7 +236,7 @@ func runRegistryPublish(cmd *cobra.Command, args []string) (err error) {
 				fmt.Println(cli.PurpleStyle.Render("substreams registry login"))
 				return fmt.Errorf("authentication failed: %s", string(b))
 			}
-			
+
 			return fmt.Errorf("publishing failed: %s", string(b))
 		}
 	}

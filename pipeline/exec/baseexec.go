@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/streamingfast/substreams/client/foundational"
 	"github.com/streamingfast/substreams/metrics"
+	pbservice "github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/service/v1"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/index"
@@ -28,14 +28,25 @@ type BaseExecutor struct {
 
 	instanceCacheEnabled bool
 	cachedInstance       wasm.Instance
-	foundationalStores   []*foundational.Store
+	foundationalStores   []pbservice.StoreClient
 
 	// Results
 	logs          []string
 	logsTruncated bool
 }
 
-func NewBaseExecutor(ctx context.Context, moduleName, moduleHash string, initialBlock uint64, wasmModule wasm.Module, cacheEnabled bool, wasmArguments []wasm.Argument, blockIndex *index.BlockIndex, entrypoint string, tracer ttrace.Tracer, foundationalStores []*foundational.Store) *BaseExecutor {
+func NewBaseExecutor(
+	ctx context.Context,
+	moduleName, moduleHash string,
+	initialBlock uint64,
+	wasmModule wasm.Module,
+	cacheEnabled bool,
+	wasmArguments []wasm.Argument,
+	blockIndex *index.BlockIndex,
+	entrypoint string,
+	tracer ttrace.Tracer,
+	foundationalStores []pbservice.StoreClient,
+) *BaseExecutor {
 	return &BaseExecutor{
 		ctx:                  ctx,
 		initialBlock:         initialBlock,

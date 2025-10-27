@@ -13,12 +13,13 @@ import (
 	"github.com/streamingfast/logging"
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/substreams"
-	"github.com/streamingfast/substreams/client/foundational"
+	"github.com/streamingfast/substreams/foudational_store"
 	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/orchestrator"
 	"github.com/streamingfast/substreams/orchestrator/plan"
 	"github.com/streamingfast/substreams/orchestrator/response"
 	"github.com/streamingfast/substreams/orchestrator/work"
+	pbservice "github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/service/v1"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -82,9 +83,10 @@ type Pipeline struct {
 	execoutStorage    *execout.Configs
 	moduleNameToStage map[string]int
 
-	foundationalClients   map[string][]*foundational.Store
-	foundationalClosers   map[string][]func() error
+	foundationalClients   map[string][]pbservice.StoreClient
 	foundationalEndpoints map[string]string
+
+	foundationalClosers   map[string][]func() error
 
 	processingModule *processingModule
 
@@ -138,7 +140,7 @@ func New(
 		wasmRuntime:             wasmRuntime,
 		respFunc:                respFunc,
 		stores:                  stores,
-		foundationalClients:     make(map[string][]*foundational.Store),
+		foundationalClients:     make(map[string][]pbservice.StoreClient),
 		foundationalClosers:     make(map[string][]func() error),
 		foundationalEndpoints:   foundationalEndpoints,
 		execoutStorage:          execoutStorage,
@@ -645,7 +647,7 @@ func (p *Pipeline) returnInternalModuleProgressOutputs(clock *pbsubstreams.Clock
 	return nil
 }
 
-func getFoundationalStores(inputs []wasm.Argument) []*foundational.Store {
+func getFoundationalStores(inputs []wasm.Argument) []pbservice.StoreClient {
 	for _, arg := range inputs {
 		if fStore, ok := arg.(*wasm.FoundationalStoreInput); ok {
 			return fStore.Clients
@@ -812,10 +814,10 @@ func (p *Pipeline) cleanUpModuleExecutors(ctx context.Context, logger *zap.Logge
 		}
 	}
 	// tear down any foundational store gRPC clients
-	for endpoint, closers := range p.foundationalClosers {
-		for _, closeFn := range closers {
-			if err := closeFn(); err != nil {
-				logger.Warn("closing foundational store client", zap.String("endpoint", endpoint), zap.Error(err))
+	for identifier, stores := range p.foundationalClients {
+		for _, s := range stores {
+			if err := s.; err != nil {
+				logger.Warn("closing foundational store client", zap.String("endpoint", identifier), zap.Error(err))
 			}
 		}
 	}
@@ -910,12 +912,12 @@ func (p *Pipeline) renderWasmInputs(module *pbsubstreams.Module) (out []wasm.Arg
 					endpoint = identifier
 				}
 
-				client, closeFn, err := foundational.New(endpoint, logging.Logger(p.ctx, zap.NewNop()))
+				client, err := foudational_store.NewStoreClient(endpoint, logging.Logger(p.ctx, zap.NewNop()))
 				if err != nil {
 					return nil, fmt.Errorf("failed to connect remotely to foundational store with identifier %q, it's either not supported by this specific operator or you have a typo in your identifier: %w", identifier, err)
 				}
 
-				clients = []*foundational.Store{client}
+				clients = append(clients, client)
 				p.foundationalClients[identifier] = clients
 				p.foundationalClosers[identifier] = []func() error{closeFn}
 			}

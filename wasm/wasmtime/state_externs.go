@@ -2,6 +2,7 @@ package wasmtime
 
 import (
 	pbstore "github.com/streamingfast/substreams-foundational-store/pb/sf/substreams/foundational-store/v1"
+	pbmodel "github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/model/v1"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -160,13 +161,13 @@ func (i *instance) foundationalStoreGet(storeIndex int32, reqPtr int32, reqLen i
 	// TODO: backend should return already-serialized bytes to avoid marshal here
 
 	// Deserialize GetRequest
-	var req pbstore.GetRequest
-	if err := proto.Unmarshal(reqData, &req); err != nil {
+	var key pbmodel.Key
+	if err := proto.Unmarshal(reqData, &key); err != nil {
 		i.CurrentCall.PanicDeterministicError("failed to unmarshal GetRequest: %w", err)
 		return 0
 	}
 
-	resp := i.CurrentCall.DoFoundationalStoreGet(uint32(storeIndex), &req)
+	resp := i.CurrentCall.DoFoundationalStoreGet(uint32(storeIndex), &key)
 
 	// Serialize response
 	respData, err := proto.Marshal(resp)

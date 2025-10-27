@@ -12,8 +12,10 @@ import (
 	"github.com/streamingfast/dmetrics"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 type Stats struct {
@@ -60,6 +62,8 @@ type Stats struct {
 	clientReadTime *dmetrics.AvgDurationCounter
 	error          error
 	logger         *zap.Logger
+	stores         []*pbsubstreams.Module
+	moduleHashes   map[string]string
 }
 
 type runningJobs map[uint64]*extendedJob
@@ -154,7 +158,7 @@ func (s *Stats) RecordJobUpdate(jobIdx uint64, upd *pbssinternal.Update) {
 	job.bytesWritten = upd.TotalBytesWritten
 }
 
-func NewReqStats(config *Config, logger *zap.Logger) *Stats {
+func NewReqStats(config *Config, stores []*pbsubstreams.Module, moduleHashes map[string]string, logger *zap.Logger) *Stats {
 	return &Stats{
 		config:             config,
 		blockRate:          dmetrics.MustNewAvgRateCounter(1*time.Second, 30*time.Second, "blocks"),
@@ -164,6 +168,8 @@ func NewReqStats(config *Config, logger *zap.Logger) *Stats {
 		modulesStats:       make(map[string]*extendedStats),
 		runningJobs:        make(map[uint64]*extendedJob),
 		completedJobsStats: make(map[string]*pbssinternal.ModuleStats),
+		stores:             stores,
+		moduleHashes:       moduleHashes,
 	}
 }
 
@@ -699,6 +705,19 @@ func (s *Stats) LogAndClose(ctx context.Context, resolvedStartBlockNum uint64) {
 
 }
 
+type storeSize struct {
+	name string
+	hash string
+	size uint64
+}
+
+func (s *storeSize) MarshalLogObject(encoder zapcore.ObjectEncoder) error {
+	encoder.AddString("name", s.name)
+	encoder.AddString("hash", s.hash)
+	encoder.AddUint64("size", s.size)
+	return nil
+}
+
 // getZapFields should be called while Stats is locked
 func (s *Stats) getZapFields(meter dmetering.Meter) []zap.Field {
 	// Logging fields order is important as it affects the final rendering, we carefully ordered
@@ -737,6 +756,28 @@ func (s *Stats) getZapFields(meter dmetering.Meter) []zap.Field {
 		zap.Duration("client_read_average_time_last_5_minutes", s.clientReadTime.Average()),
 		zap.String("error", errorText),
 	}
+
+	var storeSizes []*storeSize
+	for _, stats := range s.modulesStats {
+		found := false
+		for _, module := range s.stores {
+			if module.Name == stats.Name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			continue
+		}
+		ss := &storeSize{
+			name: stats.Name,
+			hash: s.moduleHashes[stats.Name],
+			size: stats.StoreSizeBytes,
+		}
+		storeSizes = append(storeSizes, ss)
+	}
+
+	out = append(out, zap.Objects("store_sizes", storeSizes))
 
 	if meter != nil {
 		remoteBytesRead, _ := s.remoteBytesConsumption()

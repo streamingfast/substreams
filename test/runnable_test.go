@@ -89,7 +89,7 @@ func (f *testRun) run(t *testing.T, testName string) error {
 	ctx = reqctx.WithLogger(ctx, zlog)
 	ctx = metering.WithMetricsSender(ctx)
 	ctx = dmetering.WithBytesMeter(ctx)
-	ctx = reqctx.WithReqStats(ctx, metrics.NewReqStats(&metrics.Config{}, zlog))
+	ctx = reqctx.WithReqStats(ctx, metrics.NewReqStats(&metrics.Config{}, nil, nil, zlog))
 
 	os.Setenv("TEST_TEMP_DIR", f.TempDir)
 

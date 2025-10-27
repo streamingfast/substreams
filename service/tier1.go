@@ -510,7 +510,7 @@ func (s *Tier1Service) BlocksAny(
 	}
 
 	var reqStats *metrics.Stats
-	ctx, reqStats = setupRequestStats(ctx, request.OutputModule, outputModuleHash, request.ProductionMode, false)
+	ctx, reqStats = setupRequestStats(ctx, request.OutputModule, outputModuleHash, execGraph, request.ProductionMode, false)
 
 	metrics.SubstreamsCounter.Inc()
 	metrics.ActiveRequests.Inc()
@@ -1137,7 +1137,7 @@ func containsDeterministicError(ctx context.Context, moduleStore dstore.Store, m
 	return lastError
 }
 
-func setupRequestStats(ctx context.Context, outputModuleName, outputModuleHash string, productionMode, tier2 bool) (context.Context, *metrics.Stats) {
+func setupRequestStats(ctx context.Context, outputModuleName, outputModuleHash string, execGraph *exec.Graph, productionMode, tier2 bool) (context.Context, *metrics.Stats) {
 	logger := reqctx.Logger(ctx)
 	auth := dauth.FromContext(ctx)
 	stats := metrics.NewReqStats(&metrics.Config{
@@ -1147,7 +1147,7 @@ func setupRequestStats(ctx context.Context, outputModuleName, outputModuleHash s
 		OutputModule:     outputModuleName,
 		OutputModuleHash: outputModuleHash,
 		ProductionMode:   productionMode,
-	}, logger)
+	}, execGraph.Stores(), execGraph.ModuleHashes(), logger)
 	return reqctx.WithReqStats(ctx, stats), stats
 }
 

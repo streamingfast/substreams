@@ -487,7 +487,7 @@ func newTestCall(updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy, valueT
 		panic("failed")
 	}
 	outStore := storeConf.NewFullKV(zap.NewNop())
-	return &Call{updatePolicy: updatePolicy, valueType: valueType, outputStore: outStore, stats: metrics.NewReqStats(&metrics.Config{}, zap.NewNop())}
+	return &Call{updatePolicy: updatePolicy, valueType: valueType, outputStore: outStore, stats: metrics.NewReqStats(&metrics.Config{}, nil, nil, zap.NewNop())}
 }
 
 func expectPanic(t *testing.T, shouldPanic bool, c *Call, f func(c *Call)) {

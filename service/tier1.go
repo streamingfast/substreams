@@ -1000,7 +1000,6 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 		}
 
 		var isData bool
-		egressBytes := proto.Size(resp)
 		if data := resp.GetBlockScopedData(); data != nil {
 			isData = true
 			if noop {
@@ -1028,6 +1027,7 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 				data.DebugStoreOutputs = filteredStoreOutputs
 			}
 		}
+		egressBytes := proto.Size(resp)
 
 		begin := time.Now()
 		if err := streamSrv.Send(resp); err != nil {

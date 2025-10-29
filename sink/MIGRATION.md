@@ -186,12 +186,18 @@ var control sink.FlagInclusionExclusion = sink.FlagIncludeOptional(sink.FlagCurs
 sinker, err := sink.NewFromViper(cmd, moduleType, "https://eth.substreams.pinax.network:443", ...)
 
 // After: Endpoint from manifest or flag
-// Option 1: Let manifest determine endpoint
+// Option 1: Let manifest determine endpoint (recommended)
 sinker, err := sink.NewFromViper(cmd, moduleType, manifestPath, ...)
 
 // Option 2: Override with flag
 // Use --endpoint flag in your CLI: --endpoint https://eth.substreams.pinax.network:443
 ```
+
+**Manifest Path Formats:**
+The `manifestPath` parameter now supports multiple formats:
+- Local files: `./substreams.yaml` or `/path/to/substreams.yaml`
+- Remote .spkg files: `https://spkg.io/streamingfast/substreams-eth-block-meta-v0.4.3.spkg`
+- Short notation: `substreams_template@v0.1.0` (for packages in the registry)
 
 ### 5. Block Range Configuration
 
@@ -347,8 +353,19 @@ my-sink run https://eth.substreams.pinax.network:443 ./substreams.yaml map_trans
 
 ### After
 ```bash
+# Basic usage with local manifest
 my-sink run ./substreams.yaml map_transfers --start-block 1000 --stop-block 2000
-# Endpoint is inferred from manifest, or override with --endpoint
+
+# Using remote .spkg files
+my-sink run https://spkg.io/streamingfast/substreams-eth-block-meta-v0.4.3.spkg db_out
+
+# Using short notation for registry packages
+my-sink run substreams_template@v0.1.0
+
+# Override endpoint explicitly if needed
+my-sink run ./substreams.yaml map_transfers --endpoint https://eth.substreams.pinax.network:443 --start-block 1000 --stop-block 2000
+
+# Endpoint is inferred from manifest network field when not specified
 ```
 
 ## Troubleshooting

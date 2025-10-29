@@ -71,7 +71,7 @@ func (c *responseCollector) Collect(respAny substreams.ResponseFromAnyTier) erro
 	case *pbsubstreamsrpc.Response:
 		c.responses = append(c.responses, resp)
 		metering.AddEgressBytes(c.ctx, proto.Size(resp))
-		c.sender.Send(c.ctx, "test_user", "test_api_key", "10.0.0.1", "test_meta", "testOutputHash", "tier1")
+		c.sender.Send(c.ctx, "test_org", "test_api_key", "10.0.0.1", "test_meta", "testOutputHash", "tier1")
 	case *pbssinternal.ProcessRangeResponse:
 		// in non-test code, this is 'passed through' from tier2 to tier1 to the user as a pbsubstreamsrpc.response
 		if blockScopedData := resp.GetBlockScopedData(); blockScopedData != nil {
@@ -91,7 +91,7 @@ func (c *responseCollector) Collect(respAny substreams.ResponseFromAnyTier) erro
 		}
 
 		c.internalResponses = append(c.internalResponses, resp)
-		c.sender.Send(c.ctx, "test_user", "test_api_key", "10.0.0.1", "test_meta", "testOutputHash", "tier2")
+		c.sender.Send(c.ctx, "test_org", "test_api_key", "10.0.0.1", "test_meta", "testOutputHash", "tier2")
 	}
 	return nil
 }

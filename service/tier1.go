@@ -967,7 +967,7 @@ func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelC
 
 func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logger, streamSrv *connect.ServerStream[pbsubstreamsrpc.Response], noop bool, stats *metrics.Stats, debugOutputForModules []string) substreams.ResponseFunc {
 	auth := dauth.FromContext(ctx)
-	userID := auth.UserID()
+	organizationID := auth.OrganizationID()
 	apiKeyID := auth.APIKeyID()
 	userMeta := auth.Meta()
 	ip := auth.RealIP()
@@ -1031,7 +1031,7 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 
 		begin := time.Now()
 		if err := streamSrv.Send(resp); err != nil {
-			logger.Info("unable to send block probably due to client disconnecting", zap.String("user_id", userID), zap.String("api_key_id", apiKeyID), zap.Error(err))
+			logger.Info("unable to send block probably due to client disconnecting", zap.String("user_id", organizationID), zap.String("api_key_id", apiKeyID), zap.Error(err))
 			return connect.NewError(connect.CodeUnavailable, err)
 		}
 		stats.RecordReadTime(begin)
@@ -1042,7 +1042,7 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 		stats.RecordEgress(egressBytes)
 		metering.AddEgressBytes(ctx, egressBytes)
 
-		metericsSender.Send(ctx, userID, apiKeyID, ip, userMeta, outputModuleHash, endpoint)
+		metericsSender.Send(ctx, organizationID, apiKeyID, ip, userMeta, outputModuleHash, endpoint)
 		return nil
 	}
 }

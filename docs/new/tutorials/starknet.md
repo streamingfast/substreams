@@ -3,7 +3,7 @@ Tutorial on Starknet
 
 In this tutorial, you'll learn how to initialize a Starknet-based Substreams project using the Substreams CLI (`substreams init` command).
 
-{% hint style="info" %} 
+{% hint style="info" %}
  The CLI installation is supported only on Linux and macOS. If you're using Windows, consider using the [DevContainer environment](../references/devcontainer-ref.md), which launches a Linux-based virtual environment.
 {% endhint %}
 
@@ -12,13 +12,13 @@ In this tutorial, you'll learn how to initialize a Starknet-based Substreams pro
 1. [Install the Substreams CLI](../how-to-guides/cli/installing-the-cli.md).
 
 2. Running `substreams init` will give you the option to choose between two Starknet project options. Select the one that best fits your requirements:
-    - **stellar-hello-world**: Creates a Substreams that outputs all the events of the Starknet token. It teaches how to access the full Starknet Block, how to iterate over transactions and how to filter on specific event addresses.
+    - **starknet-hello-world**: Creates a Substreams that outputs all the events of the Starknet token. It teaches how to access the full Starknet Block, how to iterate over transactions and how to filter on specific event addresses.
     - **starknet-events**: Creates a Substreams that extracts and decodes Starknet events and calls using the cached [Starknet Foundational Module](https://substreams.dev/packages/starknet-foundational/v0.1.4), filtered by one or more smart contract addresses. Contract ABIs are retrieved from Starkscan. If an ABI isn’t available, you’ll need to provide it yourself.
 
-{% hint style="info" %} 
-Note: Starknet ABIs are mutable within blocks, therefore the current ABI of your smart-contract may change in a future block. 
+{% hint style="info" %}
+Note: Starknet ABIs are mutable within blocks, therefore the current ABI of your smart-contract may change in a future block.
 {% endhint %}
-    
+
 ## Step 2: Visualize the Data
 
 1. Run `substreams auth` to create your [account](https://thegraph.market/) and generate an authentication token (JWT), then pass this token back as input.
@@ -27,7 +27,7 @@ Note: Starknet ABIs are mutable within blocks, therefore the current ABI of your
 
 3. Run `substreams gui` to visualize and iterate on your extracted data.
 
-## Step 2.5: (Optionally) Transform the Data 
+## Step 2.5: (Optionally) Transform the Data
 
 1. Open the `src/lib.rs` file that has been generated.
 
@@ -43,7 +43,7 @@ You may find these additional resources helpful for developing your first Starkn
 
 ### Dev Container Reference
 
-The [Dev Container Reference](../references/devcontainer-ref.md) helps you navigate the container and its common errors. 
+The [Dev Container Reference](../references/devcontainer-ref.md) helps you navigate the container and its common errors.
 
 ### CLI Reference
 

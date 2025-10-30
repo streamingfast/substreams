@@ -284,7 +284,7 @@ func (s *Tier1Service) BlocksV3(
 		return fmt.Errorf("failed to convert request to v2: %w", err)
 	}
 
-	return s.BlocksAny(ctx, reqV2, req.Header(), pbsubstreamsrpcv3.Stream_Blocks_FullMethodName, r.Package, stream)
+	return s.BlocksAny(ctx, reqV2, req.Header(), "/sf.substreams.rpc.v3.Stream/Blocks", r.Package, stream)
 }
 
 type usedStore struct {
@@ -315,7 +315,7 @@ func (s *Tier1Service) Blocks(
 	req *connect.Request[pbsubstreamsrpc.Request],
 	stream *connect.ServerStream[pbsubstreamsrpc.Response],
 ) (serverErr error) {
-	return s.BlocksAny(ctx, req.Msg, req.Header(), pbsubstreamsrpc.Stream_Blocks_FullMethodName, nil, stream)
+	return s.BlocksAny(ctx, req.Msg, req.Header(), "/sf.substreams.rpc.v3.Stream/Blocks", nil, stream)
 }
 
 func (s *Tier1Service) BlocksAny(

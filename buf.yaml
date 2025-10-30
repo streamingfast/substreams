@@ -1,0 +1,23 @@
+version: v2
+modules:
+  - path: proto
+    name: buf.build/streamingfast/substreams
+    excludes:
+      - proto/google
+#      - proto/sf/substreams/v1/test
+    lint:
+      use:
+        - DEFAULT
+      except:
+        - FIELD_NOT_REQUIRED
+        - PACKAGE_NO_IMPORT_CYCLE
+      disallow_comment_ignores: true
+    breaking:
+      use:
+        - FILE
+      except:
+        - EXTENSION_NO_DELETE
+        - FIELD_SAME_DEFAULT
+
+deps:
+  - buf.build/streamingfast/firehose

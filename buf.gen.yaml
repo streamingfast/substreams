@@ -1,32 +1,26 @@
-version: v1
-managed:
-  # We are now using managed mode for now because I did not find how to support `;pbsubstreams` package
-  # which we use currently. It's not a big problem for now but I didn't want to change anything. We
-  # might revisit that later.
-  enabled: false
+version: v2
+inputs:
+  - directory: proto
 plugins:
-  - name: go
+  - local: protoc-gen-go
     out: pb
     opt:
-    - paths=source_relative
-    - Msf/codegen/conversation/v1/conversation.proto=github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1;pbconvo
-    - Msf/substreams/foundational-store/model/v1/model.proto=github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/model/v1;pbmodel
-    - Msf/substreams/foundational-store/service/v1/model.proto=github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/service/v1;pbservice
-  - plugin: go-grpc
+      - paths=source_relative
+      - Msf/codegen/conversation/v1/conversation.proto=github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1;pbconvo
+      - Msf/substreams/foundational-store/model/v2/model.proto=github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/model/v2;pbmodel
+      - Msf/substreams/foundational-store/service/v2/service.proto=github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/service/v2;pbservice
+  - local: protoc-gen-go-grpc
     out: pb
     opt:
-    - paths=source_relative
-    - require_unimplemented_servers=false
-    - Msf/codegen/conversation/v1/conversation.proto=github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1;pbconvo
-    - Msf/substreams/foundational-store/model/v1/model.proto=github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/model/v1;pbmodel
-    - Msf/substreams/foundational-store/service/v1/model.proto=github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/service/v1;pbservice
-
-  - plugin: buf.build/connectrpc/go:v1.15.0
-    exclude_types:
-      - sf.substreams.foundational_store.service.v1.Store
+      - paths=source_relative
+      - require_unimplemented_servers=false
+      - Msf/codegen/conversation/v1/conversation.proto=github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1;pbconvo
+      - Msf/substreams/foundational-store/model/v2/model.proto=github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/model/v2;pbmodel
+      - Msf/substreams/foundational-store/service/v2/service.proto=github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/service/v2;pbservice
+  - remote: buf.build/connectrpc/go:v1.15.0
     out: pb
     opt:
-    - paths=source_relative
-    - Msf/codegen/conversation/v1/conversation.proto=github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1;pbconvo
-    - Msf/substreams/foundational-store/model/v1/model.proto=github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/model/v1;pbmodel
-    - Msf/substreams/foundational-store/service/v1/model.proto=github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/service/v1;pbservice
+      - paths=source_relative
+      - Msf/codegen/conversation/v1/conversation.proto=github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1;pbconvo
+      - Msf/substreams/foundational-store/model/v2/model.proto=github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/model/v2;pbmodel
+      - Msf/substreams/foundational-store/service/v2/service.proto=github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/service/v2;pbservice

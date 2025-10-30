@@ -46,6 +46,12 @@ var (
 
 // StreamClient is a client for the sf.substreams.rpc.v3.Stream service.
 type StreamClient interface {
+	// Request processing of blocks via substreams engine.
+	// Similar to `sf.substreams.rpc.v2.Stream/Blocks` request, but:
+	//   - the full spkg package is sent instead of just the modules
+	//   - 'params' and 'network' fields are sent to apply the user-defined params to the package server-side
+	//
+	// Responses are identical to those of the v2 request.
 	Blocks(context.Context, *connect.Request[v3.Request]) (*connect.ServerStreamForClient[v2.Response], error)
 }
 
@@ -80,6 +86,12 @@ func (c *streamClient) Blocks(ctx context.Context, req *connect.Request[v3.Reque
 
 // StreamHandler is an implementation of the sf.substreams.rpc.v3.Stream service.
 type StreamHandler interface {
+	// Request processing of blocks via substreams engine.
+	// Similar to `sf.substreams.rpc.v2.Stream/Blocks` request, but:
+	//   - the full spkg package is sent instead of just the modules
+	//   - 'params' and 'network' fields are sent to apply the user-defined params to the package server-side
+	//
+	// Responses are identical to those of the v2 request.
 	Blocks(context.Context, *connect.Request[v3.Request], *connect.ServerStream[v2.Response]) error
 }
 

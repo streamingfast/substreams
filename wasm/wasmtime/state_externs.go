@@ -1,8 +1,8 @@
 package wasmtime
 
 import (
-	pbstore "github.com/streamingfast/substreams-foundational-store/pb/sf/substreams/foundational-store/v1"
-	pbmodel "github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/model/v1"
+	pbmodel "github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/model/v2"
+	depricated "github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/service/v1"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -155,7 +155,9 @@ func (i *instance) hasLast(storeIndex int32, keyPtr, keyLength int32) int32 {
 	return returnIfFound(found)
 }
 
-func (i *instance) foundationalStoreGet(storeIndex int32, reqPtr int32, reqLen int32) int64 {
+//todo: implements stuff for getFirst
+
+func (i *instance) foundationalStoreGetEntry(storeIndex int32, reqPtr int32, reqLen int32) int64 {
 	reqData := i.Heap.ReadBytes(reqPtr, reqLen)
 
 	// TODO: backend should return already-serialized bytes to avoid marshal here
@@ -167,12 +169,146 @@ func (i *instance) foundationalStoreGet(storeIndex int32, reqPtr int32, reqLen i
 		return 0
 	}
 
-	resp := i.CurrentCall.DoFoundationalStoreGet(uint32(storeIndex), &key)
+	entry := i.CurrentCall.DoFoundationalStoreGet(uint32(storeIndex), &key)
+
+	// Serialize response
+	respData, err := proto.Marshal(entry)
+	if err != nil {
+		i.CurrentCall.PanicDeterministicError("failed to marshal entry: %w", err)
+		return 0
+	}
+
+	// Write to heap and return packed pointer/length
+	respPtr, err := i.Heap.Write(respData, "foundationalStoreGet")
+	if err != nil {
+		i.CurrentCall.PanicDeterministicError("writing entry to heap: %w", err)
+		return 0
+	}
+
+	// Pack pointer and length into int64
+	return packPtrLen(respPtr, int32(len(respData)))
+}
+
+func (i *instance) foundationalStoreGetAllEntries(storeIndex int32, reqPtr int32, reqLen int32) int64 {
+	reqData := i.Heap.ReadBytes(reqPtr, reqLen)
+
+	zlog.Info("entering instance of foundationalStoreGetAll")
+	// TODO: backend should return already-serialized bytes to avoid marshal here
+
+	var keys pbmodel.Keys
+	if err := proto.Unmarshal(reqData, &keys); err != nil {
+		i.CurrentCall.PanicDeterministicError("failed to unmarshal GetAllRequest: %w", err)
+		return 0
+	}
+
+	entries := i.CurrentCall.DoFoundationalStoreGetAll(uint32(storeIndex), &keys)
+
+	// Serialize response
+	respData, err := proto.Marshal(entries)
+	if err != nil {
+		i.CurrentCall.PanicDeterministicError("failed to marshal entries: %w", err)
+		return 0
+	}
+
+	// Write to heap and return packed pointer/length
+	respPtr, err := i.Heap.Write(respData, "foundationalStoreGetAll")
+	if err != nil {
+		i.CurrentCall.PanicDeterministicError("writing entries to heap: %w", err)
+		return 0
+	}
+
+	// Pack pointer and length into int64
+	return packPtrLen(respPtr, int32(len(respData)))
+}
+
+func (i *instance) foundationalStoreGetFirstEntry(storeIndex int32, reqPtr int32, reqLen int32) int64 {
+	reqData := i.Heap.ReadBytes(reqPtr, reqLen)
+
+	// TODO: backend should return already-serialized bytes to avoid marshal here
+
+	// Deserialize GetRequest
+	var key pbmodel.Key
+	if err := proto.Unmarshal(reqData, &key); err != nil {
+		i.CurrentCall.PanicDeterministicError("failed to unmarshal GetRequest: %w", err)
+		return 0
+	}
+
+	entry := i.CurrentCall.DoFoundationalStoreGetFirst(uint32(storeIndex), &key)
+
+	// Serialize response
+	respData, err := proto.Marshal(entry)
+	if err != nil {
+		i.CurrentCall.PanicDeterministicError("failed to marshal entry: %w", err)
+		return 0
+	}
+
+	// Write to heap and return packed pointer/length
+	respPtr, err := i.Heap.Write(respData, "foundationalStoreGet")
+	if err != nil {
+		i.CurrentCall.PanicDeterministicError("writing entry to heap: %w", err)
+		return 0
+	}
+
+	// Pack pointer and length into int64
+	return packPtrLen(respPtr, int32(len(respData)))
+}
+
+func (i *instance) foundationalStoreGetAllFirstEntries(storeIndex int32, reqPtr int32, reqLen int32) int64 {
+	reqData := i.Heap.ReadBytes(reqPtr, reqLen)
+
+	zlog.Info("entering instance of foundationalStoreGetAll")
+	// TODO: backend should return already-serialized bytes to avoid marshal here
+
+	var keys pbmodel.Keys
+	if err := proto.Unmarshal(reqData, &keys); err != nil {
+		i.CurrentCall.PanicDeterministicError("failed to unmarshal GetAllRequest: %w", err)
+		return 0
+	}
+
+	entries := i.CurrentCall.DoFoundationalStoreGetAllFirst(uint32(storeIndex), &keys)
+
+	// Serialize response
+	respData, err := proto.Marshal(entries)
+	if err != nil {
+		i.CurrentCall.PanicDeterministicError("failed to marshal entries: %w", err)
+		return 0
+	}
+
+	// Write to heap and return packed pointer/length
+	respPtr, err := i.Heap.Write(respData, "foundationalStoreGetAll")
+	if err != nil {
+		i.CurrentCall.PanicDeterministicError("writing entries to heap: %w", err)
+		return 0
+	}
+
+	// Pack pointer and length into int64
+	return packPtrLen(respPtr, int32(len(respData)))
+}
+
+func (i *instance) foundationalStoreGet(storeIndex int32, reqPtr int32, reqLen int32) int64 {
+	reqData := i.Heap.ReadBytes(reqPtr, reqLen)
+
+	// TODO: backend should return already-serialized bytes to avoid marshal here
+
+	// Deserialize GetRequest
+	var req depricated.GetRequest
+	if err := proto.Unmarshal(reqData, &req); err != nil {
+		i.CurrentCall.PanicDeterministicError("failed to unmarshal GetRequest: %w", err)
+		return 0
+	}
+
+	entry := i.CurrentCall.DoFoundationalStoreGet(uint32(storeIndex), &pbmodel.Key{Bytes: req.Key})
+
+	resp := &depricated.GetResponse{
+		BlockReached: true,
+		Code:         depricated.ResponseCode(entry.Code),
+		Value:        entry.Entry.Value,
+	}
 
 	// Serialize response
 	respData, err := proto.Marshal(resp)
 	if err != nil {
-		i.CurrentCall.PanicDeterministicError("failed to marshal GetResponse: %w", err)
+		i.CurrentCall.PanicDeterministicError("failed to marshal response: %w", err)
 		return 0
 	}
 
@@ -193,19 +329,37 @@ func (i *instance) foundationalStoreGetAll(storeIndex int32, reqPtr int32, reqLe
 	zlog.Info("entering instance of foundationalStoreGetAll")
 	// TODO: backend should return already-serialized bytes to avoid marshal here
 
-	// Deserialize GetAllRequest
-	var req pbstore.GetAllRequest
+	var req depricated.GetAllRequest
 	if err := proto.Unmarshal(reqData, &req); err != nil {
 		i.CurrentCall.PanicDeterministicError("failed to unmarshal GetAllRequest: %w", err)
 		return 0
 	}
+	var keys []*pbmodel.Key
+	for _, key := range req.Keys {
+		keys = append(keys, &pbmodel.Key{Bytes: key})
+	}
+	entries := i.CurrentCall.DoFoundationalStoreGetAll(uint32(storeIndex), &pbmodel.Keys{Keys: keys})
 
-	resp := i.CurrentCall.DoFoundationalStoreGetAll(uint32(storeIndex), &req)
+	var respEntries []*depricated.ResponseEntry
+	for _, entry := range entries.Entries {
+		respEntries = append(respEntries, &depricated.ResponseEntry{
+			Key: entry.Entry.Key.Bytes,
+			Response: &depricated.GetResponse{
+				BlockReached: true,
+				Code:         depricated.ResponseCode(entry.Code),
+				Value:        entry.Entry.Value,
+			},
+		})
+	}
 
+	response := &depricated.GetAllResponse{
+		Entries:      respEntries,
+		BlockReached: true,
+	}
 	// Serialize response
-	respData, err := proto.Marshal(resp)
+	respData, err := proto.Marshal(response)
 	if err != nil {
-		i.CurrentCall.PanicDeterministicError("failed to marshal GetAllResponse: %w", err)
+		i.CurrentCall.PanicDeterministicError("failed to response entries: %w", err)
 		return 0
 	}
 

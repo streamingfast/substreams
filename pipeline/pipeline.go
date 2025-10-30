@@ -19,7 +19,7 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/plan"
 	"github.com/streamingfast/substreams/orchestrator/response"
 	"github.com/streamingfast/substreams/orchestrator/work"
-	pbservice "github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/service/v1"
+	pbservice "github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/service/v2"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -86,7 +86,7 @@ type Pipeline struct {
 	foundationalClients   map[string][]pbservice.StoreClient
 	foundationalEndpoints map[string]string
 
-	foundationalClosers   map[string][]func() error
+	foundationalClosers map[string][]func() error
 
 	processingModule *processingModule
 
@@ -813,14 +813,7 @@ func (p *Pipeline) cleanUpModuleExecutors(ctx context.Context, logger *zap.Logge
 			return fmt.Errorf("closing wasm module %+v: %w", key, err)
 		}
 	}
-	// tear down any foundational store gRPC clients
-	for identifier, stores := range p.foundationalClients {
-		for _, s := range stores {
-			if err := s.; err != nil {
-				logger.Warn("closing foundational store client", zap.String("endpoint", identifier), zap.Error(err))
-			}
-		}
-	}
+
 	return nil
 }
 
@@ -912,14 +905,14 @@ func (p *Pipeline) renderWasmInputs(module *pbsubstreams.Module) (out []wasm.Arg
 					endpoint = identifier
 				}
 
-				client, err := foudational_store.NewStoreClient(endpoint, logging.Logger(p.ctx, zap.NewNop()))
+				client, closer, err := foudational_store.NewStoreClient(endpoint, logging.Logger(p.ctx, zap.NewNop()))
 				if err != nil {
 					return nil, fmt.Errorf("failed to connect remotely to foundational store with identifier %q, it's either not supported by this specific operator or you have a typo in your identifier: %w", identifier, err)
 				}
 
 				clients = append(clients, client)
 				p.foundationalClients[identifier] = clients
-				p.foundationalClosers[identifier] = []func() error{closeFn}
+				p.foundationalClosers[identifier] = []func() error{closer}
 			}
 			out = append(out, wasm.NewFoundationalStoreInput(identifier, clients))
 

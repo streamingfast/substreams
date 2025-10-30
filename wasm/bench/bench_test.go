@@ -52,7 +52,7 @@ func BenchmarkExecution(b *testing.B) {
 
 		wasmCode := readCode(b, "substreams_wasm/substreams.wasm")
 
-		stats := metrics.NewReqStats(&metrics.Config{}, zap.NewNop())
+		stats := metrics.NewReqStats(&metrics.Config{}, nil, nil, zap.NewNop())
 		for _, config := range []*runtime{
 			{"wasmtime", "wasm/rust-v1", wasmCode, reuseInstance},
 			{"wasmtime", "wasm/rust-v1", wasmCode, freshInstanceEachRun},

@@ -510,7 +510,7 @@ func (s *Tier1Service) BlocksAny(
 	}
 
 	var reqStats *metrics.Stats
-	ctx, reqStats = setupRequestStats(ctx, request.OutputModule, outputModuleHash, request.ProductionMode, false)
+	ctx, reqStats = setupRequestStats(ctx, request.OutputModule, outputModuleHash, execGraph, request.ProductionMode, false)
 
 	metrics.SubstreamsCounter.Inc()
 	metrics.ActiveRequests.Inc()
@@ -967,7 +967,7 @@ func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelC
 
 func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logger, streamSrv *connect.ServerStream[pbsubstreamsrpc.Response], noop bool, stats *metrics.Stats, debugOutputForModules []string) substreams.ResponseFunc {
 	auth := dauth.FromContext(ctx)
-	userID := auth.UserID()
+	organizationID := auth.OrganizationID()
 	apiKeyID := auth.APIKeyID()
 	userMeta := auth.Meta()
 	ip := auth.RealIP()
@@ -1000,7 +1000,6 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 		}
 
 		var isData bool
-		egressBytes := proto.Size(resp)
 		if data := resp.GetBlockScopedData(); data != nil {
 			isData = true
 			if noop {
@@ -1028,10 +1027,11 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 				data.DebugStoreOutputs = filteredStoreOutputs
 			}
 		}
+		egressBytes := proto.Size(resp)
 
 		begin := time.Now()
 		if err := streamSrv.Send(resp); err != nil {
-			logger.Info("unable to send block probably due to client disconnecting", zap.String("user_id", userID), zap.String("api_key_id", apiKeyID), zap.Error(err))
+			logger.Info("unable to send block probably due to client disconnecting", zap.String("user_id", organizationID), zap.String("api_key_id", apiKeyID), zap.Error(err))
 			return connect.NewError(connect.CodeUnavailable, err)
 		}
 		stats.RecordReadTime(begin)
@@ -1042,7 +1042,7 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 		stats.RecordEgress(egressBytes)
 		metering.AddEgressBytes(ctx, egressBytes)
 
-		metericsSender.Send(ctx, userID, apiKeyID, ip, userMeta, outputModuleHash, endpoint)
+		metericsSender.Send(ctx, organizationID, apiKeyID, ip, userMeta, outputModuleHash, endpoint)
 		return nil
 	}
 }
@@ -1137,7 +1137,7 @@ func containsDeterministicError(ctx context.Context, moduleStore dstore.Store, m
 	return lastError
 }
 
-func setupRequestStats(ctx context.Context, outputModuleName, outputModuleHash string, productionMode, tier2 bool) (context.Context, *metrics.Stats) {
+func setupRequestStats(ctx context.Context, outputModuleName, outputModuleHash string, execGraph *exec.Graph, productionMode, tier2 bool) (context.Context, *metrics.Stats) {
 	logger := reqctx.Logger(ctx)
 	auth := dauth.FromContext(ctx)
 	stats := metrics.NewReqStats(&metrics.Config{
@@ -1147,7 +1147,7 @@ func setupRequestStats(ctx context.Context, outputModuleName, outputModuleHash s
 		OutputModule:     outputModuleName,
 		OutputModuleHash: outputModuleHash,
 		ProductionMode:   productionMode,
-	}, logger)
+	}, execGraph.Stores(), execGraph.ModuleHashes(), logger)
 	return reqctx.WithReqStats(ctx, stats), stats
 }
 

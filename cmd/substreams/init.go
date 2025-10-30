@@ -347,7 +347,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					FromActionId: resp.ActionId,
 					Entry: &pbconvo.UserInput_Selection_{
 						Selection: &pbconvo.UserInput_Selection{
-							Value: "sql",
+							Value: "postgres",
 						},
 					},
 				}); err != nil {
@@ -367,14 +367,17 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			}
 
 			var options []huh.Option[string]
-			optionsMap := make(map[string]string)
+			optionsValueToKey := make(map[string]string)
 			for i := 0; i < len(input.Labels); i++ {
+				// This is confusion here as above we have the logical mapping <value> => <label>
+				// but here <label> is the key and <value> is the value. This is to work
+				// with huh select which wants Key as the display string.
 				entry := huh.Option[string]{
 					Key:   input.Labels[i],
 					Value: input.Values[i],
 				}
 				options = append(options, entry)
-				optionsMap[entry.Value] = entry.Key
+				optionsValueToKey[entry.Value] = entry.Key
 			}
 			selection := msg.ListSelect.DefaultValue
 			selectField := huh.NewSelect[string]().
@@ -387,23 +390,19 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("failed taking input: %w", err)
 			}
 
-			var selectedValue string
-			for _, opt := range options {
-				selectedValue = opt.Key
-			}
-			fmt.Println(gray("┃"), input.Instructions+":", bold(selectedValue))
+			fmt.Println(gray("┃"), input.Instructions+":", bold(optionsValueToKey[selection]))
 			fmt.Println("")
 
 			if err := sendFunc(&pbconvo.UserInput{
 				FromActionId: resp.ActionId,
 				Entry: &pbconvo.UserInput_Selection_{
 					Selection: &pbconvo.UserInput_Selection{
-						Label: optionsMap[selection],
+						Label: optionsValueToKey[selection],
 						Value: selection,
 					},
 				},
 			}); err != nil {
-				return fmt.Errorf("error sending message: %w", err)
+				return fmt.Errorf("error sending selected value message: %w", err)
 			}
 
 		case *pbconvo.SystemOutput_TextInput_:
@@ -446,7 +445,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					TextInput: &pbconvo.UserInput_TextInput{Value: strings.TrimRight(returnValue, " ")},
 				},
 			}); err != nil {
-				return fmt.Errorf("error sending message: %w", err)
+				return fmt.Errorf("error sending text input message: %w", err)
 			}
 
 		case *pbconvo.SystemOutput_LocalFile_:
@@ -479,7 +478,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					LocalFile: &pbconvo.UserInput_LocalFile{Value: content},
 				},
 			}); err != nil {
-				return fmt.Errorf("error sending message: %w", err)
+				return fmt.Errorf("error sending local file message: %w", err)
 			}
 
 		case *pbconvo.SystemOutput_Confirm_:
@@ -654,7 +653,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					TextInput: &pbconvo.UserInput_TextInput{Value: savingDest},
 				},
 			}); err != nil {
-				return fmt.Errorf("error sending message: %w", err)
+				return fmt.Errorf("error sending saved destination message: %w", err)
 			}
 
 		default:

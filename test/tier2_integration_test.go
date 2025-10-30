@@ -483,7 +483,7 @@ func TestTier2Call(t *testing.T) {
 
 			ctx = metering.WithMetricsSender(ctx)
 			ctx = reqctx.WithRequest(ctx, &reqctx.RequestDetails{Modules: pkg.Modules, OutputModule: test.moduleName})
-			ctx = reqctx.WithReqStats(ctx, metrics.NewReqStats(&metrics.Config{}, zlog))
+			ctx = reqctx.WithReqStats(ctx, metrics.NewReqStats(&metrics.Config{}, nil, nil, zlog))
 
 			ctx = reqctx.WithTier2RequestParameters(ctx, reqctx.Tier2RequestParameters{
 				BlockType:            "sf.substreams.v1.test.Block",

@@ -49,13 +49,13 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, err error) error {
 	if reqctx.Details(ctx).IsTier2Request {
 		// metrics on tier2 are just sent at the end of the ProcessBlock
 		auth := dauth.FromContext(ctx)
-		userID := auth.UserID()
+		organizationID := auth.OrganizationID()
 		apiKeyID := auth.APIKeyID()
 		userMeta := auth.Meta()
 		ip := auth.RealIP()
 		outputModuleHash := reqctx.OutputModuleHash(ctx)
 		metricsSender := metering.GetMetricsSender(ctx)
-		metricsSender.Send(ctx, userID, apiKeyID, ip, userMeta, outputModuleHash, "sf.substreams.internal.v2/ProcessRange")
+		metricsSender.Send(ctx, organizationID, apiKeyID, ip, userMeta, outputModuleHash, "sf.substreams.internal.v2/ProcessRange")
 		err := p.returnInternalModuleProgressOutputs(p.lastFinalClock, true)
 		if err != nil {
 			logger.Error("returning internal module progress outputs", zap.Error(err))

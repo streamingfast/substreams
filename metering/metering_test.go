@@ -389,13 +389,13 @@ func TestSend(t *testing.T) {
 	outputModuleHash := "outputModuleHash"
 
 	AddEgressBytes(ctx, proto.Size(resp))
-	metericsSender.Send(ctx, "user1", "apiKey1", "127.0.0.1", "meta", outputModuleHash, "endpoint")
+	metericsSender.Send(ctx, "org1", "apiKey1", "127.0.0.1", "meta", outputModuleHash, "endpoint")
 
 	// Verify the emitted event
 	assert.Len(t, emitter.events, 1)
 	event := emitter.events[0]
 
-	assert.Equal(t, "user1", event.UserID)
+	assert.Equal(t, "org1", event.OrganizationID)
 	assert.Equal(t, "apiKey1", event.ApiKeyID)
 	assert.Equal(t, "127.0.0.1", event.IpAddress)
 	assert.Equal(t, "meta", event.Meta)
@@ -452,7 +452,7 @@ func TestSendParallel(t *testing.T) {
 
 			time.Sleep(time.Duration(randomInt()) * time.Nanosecond)
 			AddEgressBytes(ctx, proto.Size(resp))
-			metricsSender.Send(ctx, "user1", "apiKey1", "127.0.0.1", "meta", "outputModuleHash", "endpoint")
+			metricsSender.Send(ctx, "org1", "apiKey1", "127.0.0.1", "meta", "outputModuleHash", "endpoint")
 		}()
 	}
 

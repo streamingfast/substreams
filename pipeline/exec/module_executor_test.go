@@ -94,7 +94,7 @@ func (t *MockModuleExecutor) lastExecutionLogs() (logs []string, truncated bool)
 func TestModuleExecutorRunner_Run_HappyPath(t *testing.T) {
 	ctx := context.Background()
 
-	ctx = reqctx.WithReqStats(ctx, metrics.NewReqStats(&metrics.Config{}, zap.NewNop()))
+	ctx = reqctx.WithReqStats(ctx, metrics.NewReqStats(&metrics.Config{}, nil, nil, zap.NewNop()))
 	executor := &MockModuleExecutor{
 		name: "test",
 		RunFunc: func(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, outForFiles []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {

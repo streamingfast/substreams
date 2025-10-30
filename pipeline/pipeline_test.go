@@ -55,7 +55,7 @@ func TestPipeline_runExecutor(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := reqctx.WithRequest(context.Background(), &reqctx.RequestDetails{})
-			ctx = reqctx.WithReqStats(ctx, metrics.NewReqStats(&metrics.Config{}, zap.NewNop()))
+			ctx = reqctx.WithReqStats(ctx, metrics.NewReqStats(&metrics.Config{}, nil, nil, zap.NewNop()))
 			pipe := &Pipeline{
 				forkHandler: NewForkHandler(),
 				execGraph:   exec.TestNew(),

@@ -3,11 +3,11 @@ Tutorial on Stellar
 
 In this guide, you'll learn how to initialize a Stellar-based Substreams project within the Dev Container.
 
-{% hint style="info" %} 
+{% hint style="info" %}
  The CLI installation is supported only on Linux and macOS. If you're using Windows, consider using the [DevContainer environment](../references/devcontainer-ref.md), which launches a Linux-based virtual environment.
 {% endhint %}
 
-## Step 1: Initialize Your Starknet Substreams Project
+## Step 1: Initialize Your Stellar Substreams Project
 
 1. [Install the Substreams CLI](../how-to-guides/cli/installing-the-cli.md).
 
@@ -15,15 +15,15 @@ In this guide, you'll learn how to initialize a Stellar-based Substreams project
     - **stellar-minimal**: Creates a simple Substreams that extracts raw Stellar block data and generates corresponding Rust code. This path will start you with the full raw block, you can navigate to the `substreams.yaml` (the manifest) to modify the input.
     - **stellar-transactions-operations**: Creates a Substreams that extracts and decodes Stellar trasactions or operations using the cached [Stellar Foundational Module](https://substreams.dev/packages/stellar-foundational/v0.3.0). If you choose the index transactions, you will be able to filter by **source account(s)**. If you choose to index operations, you will be able to filter by **operation name**.
 
-{% hint style="info" %} 
+{% hint style="info" %}
  The first streamable block for Stellar on Substreams is currently 55,411,000.
 {% endhint %}
 
-{% hint style="info" %} 
+{% hint style="info" %}
  The `stellar-transactions-operations` foundational module **only decodes and indexes SOME operations**. However, you can [modify the code](https://github.com/streamingfast/substreams-foundational-modules/blob/develop/stellar-common/src/operations.rs#L16) to include the decoding of other operations if needed.
- 
+
  Please, find below the operations supported:
- 
+
 ```rust
 &Op::CreateAccount(_) => "create_account",
 &Op::AccountMerge(_) => "account_merge",
@@ -50,7 +50,7 @@ In this guide, you'll learn how to initialize a Stellar-based Substreams project
 
 2. Now you can freely use the `substreams gui` to visualize and iterate on your extracted data.
 
-## Step 2.5: (Optionally) Transform the Data 
+## Step 2.5: (Optionally) Transform the Data
 
 Within the generated directories, modify your Substreams modules to include additional filters, aggregations, and transformations, then update the manifest accordingly. To learn more about this, visit the [How-to-Guides](../how-to-guides/develop-your-own-substreams/develop-your-own-substreams.md)
 
@@ -65,7 +65,7 @@ You may find these additional resources helpful for developing your first Stella
 
 ### Dev Container Reference
 
-The [Dev Container Reference](../references/devcontainer-ref.md) helps you navigate the container and its common errors. 
+The [Dev Container Reference](../references/devcontainer-ref.md) helps you navigate the container and its common errors.
 
 ### CLI Reference
 

@@ -11,10 +11,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+## CLI
+
+* Fixed `substreams init` to correctly showing selected label when selecting from a list of items.
+
 ### Server
 
 * Fix a panic (nil pointer) when skipping blocks via indexes on stores on tier2
-
+* Fix egress bytes calculation when running in noop or dev mode with specified output debug modules
 
 ## v1.17.1
 

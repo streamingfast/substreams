@@ -2,14 +2,14 @@
 //
 // Source: sf/codegen/conversation/v1/conversation.proto
 
-package pbconvoconnect
+package conversationconnect
 
 import (
 	connect "connectrpc.com/connect"
 	context "context"
 	errors "errors"
-	v1 "github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1"
 	http "net/http"
+	conversation "sf/codegen/conversation"
 	strings "strings"
 )
 
@@ -43,7 +43,7 @@ const (
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
 var (
-	conversationServiceServiceDescriptor        = v1.File_sf_codegen_conversation_v1_conversation_proto.Services().ByName("ConversationService")
+	conversationServiceServiceDescriptor        = conversation.File_sf_codegen_conversation_v1_conversation_proto.Services().ByName("ConversationService")
 	conversationServiceConverseMethodDescriptor = conversationServiceServiceDescriptor.Methods().ByName("Converse")
 	conversationServiceDiscoverMethodDescriptor = conversationServiceServiceDescriptor.Methods().ByName("Discover")
 )
@@ -51,8 +51,8 @@ var (
 // ConversationServiceClient is a client for the sf.codegen.conversation.v1.ConversationService
 // service.
 type ConversationServiceClient interface {
-	Converse(context.Context) *connect.BidiStreamForClient[v1.UserInput, v1.SystemOutput]
-	Discover(context.Context, *connect.Request[v1.DiscoveryRequest]) (*connect.Response[v1.DiscoveryResponse], error)
+	Converse(context.Context) *connect.BidiStreamForClient[conversation.UserInput, conversation.SystemOutput]
+	Discover(context.Context, *connect.Request[conversation.DiscoveryRequest]) (*connect.Response[conversation.DiscoveryResponse], error)
 }
 
 // NewConversationServiceClient constructs a client for the
@@ -66,13 +66,13 @@ type ConversationServiceClient interface {
 func NewConversationServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) ConversationServiceClient {
 	baseURL = strings.TrimRight(baseURL, "/")
 	return &conversationServiceClient{
-		converse: connect.NewClient[v1.UserInput, v1.SystemOutput](
+		converse: connect.NewClient[conversation.UserInput, conversation.SystemOutput](
 			httpClient,
 			baseURL+ConversationServiceConverseProcedure,
 			connect.WithSchema(conversationServiceConverseMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
-		discover: connect.NewClient[v1.DiscoveryRequest, v1.DiscoveryResponse](
+		discover: connect.NewClient[conversation.DiscoveryRequest, conversation.DiscoveryResponse](
 			httpClient,
 			baseURL+ConversationServiceDiscoverProcedure,
 			connect.WithSchema(conversationServiceDiscoverMethodDescriptor),
@@ -83,25 +83,25 @@ func NewConversationServiceClient(httpClient connect.HTTPClient, baseURL string,
 
 // conversationServiceClient implements ConversationServiceClient.
 type conversationServiceClient struct {
-	converse *connect.Client[v1.UserInput, v1.SystemOutput]
-	discover *connect.Client[v1.DiscoveryRequest, v1.DiscoveryResponse]
+	converse *connect.Client[conversation.UserInput, conversation.SystemOutput]
+	discover *connect.Client[conversation.DiscoveryRequest, conversation.DiscoveryResponse]
 }
 
 // Converse calls sf.codegen.conversation.v1.ConversationService.Converse.
-func (c *conversationServiceClient) Converse(ctx context.Context) *connect.BidiStreamForClient[v1.UserInput, v1.SystemOutput] {
+func (c *conversationServiceClient) Converse(ctx context.Context) *connect.BidiStreamForClient[conversation.UserInput, conversation.SystemOutput] {
 	return c.converse.CallBidiStream(ctx)
 }
 
 // Discover calls sf.codegen.conversation.v1.ConversationService.Discover.
-func (c *conversationServiceClient) Discover(ctx context.Context, req *connect.Request[v1.DiscoveryRequest]) (*connect.Response[v1.DiscoveryResponse], error) {
+func (c *conversationServiceClient) Discover(ctx context.Context, req *connect.Request[conversation.DiscoveryRequest]) (*connect.Response[conversation.DiscoveryResponse], error) {
 	return c.discover.CallUnary(ctx, req)
 }
 
 // ConversationServiceHandler is an implementation of the
 // sf.codegen.conversation.v1.ConversationService service.
 type ConversationServiceHandler interface {
-	Converse(context.Context, *connect.BidiStream[v1.UserInput, v1.SystemOutput]) error
-	Discover(context.Context, *connect.Request[v1.DiscoveryRequest]) (*connect.Response[v1.DiscoveryResponse], error)
+	Converse(context.Context, *connect.BidiStream[conversation.UserInput, conversation.SystemOutput]) error
+	Discover(context.Context, *connect.Request[conversation.DiscoveryRequest]) (*connect.Response[conversation.DiscoveryResponse], error)
 }
 
 // NewConversationServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -137,10 +137,10 @@ func NewConversationServiceHandler(svc ConversationServiceHandler, opts ...conne
 // UnimplementedConversationServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedConversationServiceHandler struct{}
 
-func (UnimplementedConversationServiceHandler) Converse(context.Context, *connect.BidiStream[v1.UserInput, v1.SystemOutput]) error {
+func (UnimplementedConversationServiceHandler) Converse(context.Context, *connect.BidiStream[conversation.UserInput, conversation.SystemOutput]) error {
 	return connect.NewError(connect.CodeUnimplemented, errors.New("sf.codegen.conversation.v1.ConversationService.Converse is not implemented"))
 }
 
-func (UnimplementedConversationServiceHandler) Discover(context.Context, *connect.Request[v1.DiscoveryRequest]) (*connect.Response[v1.DiscoveryResponse], error) {
+func (UnimplementedConversationServiceHandler) Discover(context.Context, *connect.Request[conversation.DiscoveryRequest]) (*connect.Response[conversation.DiscoveryResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sf.codegen.conversation.v1.ConversationService.Discover is not implemented"))
 }

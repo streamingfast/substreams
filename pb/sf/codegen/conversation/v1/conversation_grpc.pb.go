@@ -4,7 +4,7 @@
 // - protoc             (unknown)
 // source: sf/codegen/conversation/v1/conversation.proto
 
-package conversation
+package pbconvo
 
 import (
 	context "context"

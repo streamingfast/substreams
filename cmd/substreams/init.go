@@ -27,7 +27,7 @@ import (
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
 	pbconvo "github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1"
-	pbconvoconnect "github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1/conversationconnect"
+	pbconvoconnect "github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1/pbconvoconnect"
 	"github.com/tidwall/gjson"
 	"golang.org/x/net/http2"
 )

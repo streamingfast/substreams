@@ -315,7 +315,7 @@ func (s *Tier1Service) Blocks(
 	req *connect.Request[pbsubstreamsrpc.Request],
 	stream *connect.ServerStream[pbsubstreamsrpc.Response],
 ) (serverErr error) {
-	return s.BlocksAny(ctx, req.Msg, req.Header(), "/sf.substreams.rpc.v3.Stream/Blocks", nil, stream)
+	return s.BlocksAny(ctx, req.Msg, req.Header(), "/sf.substreams.rpc.v2.Stream/Blocks", nil, stream)
 }
 
 func (s *Tier1Service) BlocksAny(

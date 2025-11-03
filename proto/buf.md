@@ -5,3 +5,8 @@ Protobuf definitions for Substreams package and Substreams RPC. A `.spkg` file c
 Useful links:
 - Documentation: [https://substreams.streamingfast.io/](https://substreams.streamingfast.io/)
 - Source: [https://github.com/streamingfast/substreams](https://github.com/streamingfast/substreams)
+
+### Substreams Foundational Store
+``` shell
+buf generate  buf.build/streamingfast/substreams-foundational-store
+```

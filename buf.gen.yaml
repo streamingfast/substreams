@@ -9,6 +9,7 @@ plugins:
       - Msf/codegen/conversation/v1/conversation.proto=github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1;pbconvo
       - Msf/substreams/foundational-store/model/v2/model.proto=github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/model/v2;pbmodel
       - Msf/substreams/foundational-store/service/v2/service.proto=github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/service/v2;pbservice
+      - Msf/substreams/foundational-store/service/v1/service.proto=github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/service/v1;pbstore
   - local: protoc-gen-go-grpc
     out: pb
     opt:
@@ -17,6 +18,7 @@ plugins:
       - Msf/codegen/conversation/v1/conversation.proto=github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1;pbconvo
       - Msf/substreams/foundational-store/model/v2/model.proto=github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/model/v2;pbmodel
       - Msf/substreams/foundational-store/service/v2/service.proto=github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/service/v2;pbservice
+      - Msf/substreams/foundational-store/service/v1/service.proto=github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/service/v1;pbstore
   - remote: buf.build/connectrpc/go:v1.15.0
     out: pb
     opt:
@@ -24,3 +26,4 @@ plugins:
       - Msf/codegen/conversation/v1/conversation.proto=github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1;pbconvo
       - Msf/substreams/foundational-store/model/v2/model.proto=github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/model/v2;pbmodel
       - Msf/substreams/foundational-store/service/v2/service.proto=github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/service/v2;pbservice
+      - Msf/substreams/foundational-store/service/v1/service.proto=github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/service/v1;pbstore

@@ -154,6 +154,10 @@ func (i *instance) registerStateImports(linker *wasmtime.Linker) error {
 	functions["has_last"] = i.hasLast
 	functions["foundational_store_get"] = i.foundationalStoreGet
 	functions["foundational_store_get_all"] = i.foundationalStoreGetAll
+	functions["foundational_store_get_entry"] = i.foundationalStoreGetEntry
+	functions["foundational_store_get_all_entries"] = i.foundationalStoreGetAllEntries
+	functions["foundational_store_get_first_entry"] = i.foundationalStoreGetFirstEntry
+	functions["foundational_store_get_all_first_entries"] = i.foundationalStoreGetAllFirstEntries
 
 	for n, f := range functions {
 		if err := linker.FuncWrap("state", n, f); err != nil {

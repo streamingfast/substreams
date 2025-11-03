@@ -2,21 +2,23 @@ package wasm
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/dustin/go-humanize"
+	"github.com/mr-tron/base58"
 	"github.com/shopspring/decimal"
-	"go.uber.org/zap"
-
-	pbstore "github.com/streamingfast/substreams-foundational-store/pb/sf/substreams/foundational-store/v1"
-	"github.com/streamingfast/substreams/client/foundational"
 	"github.com/streamingfast/substreams/metrics"
+	pbmodel "github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/model/v2"
+	pbservice "github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/service/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
+	"go.uber.org/zap"
 )
 
 var ErrWasmDeterministicExec = errors.New("wasm execution failed deterministically")
@@ -38,7 +40,7 @@ type Call struct {
 	outputStore  store.Store
 	updatePolicy pbsubstreams.Module_KindStore_UpdatePolicy
 
-	foundationalStores []*foundational.Store
+	foundationalStores []pbservice.StoreClient
 
 	valueType string
 
@@ -53,7 +55,7 @@ type Call struct {
 	stats          *metrics.Stats
 }
 
-func NewCall(ctx context.Context, clock *pbsubstreams.Clock, moduleName string, entrypoint string, stats *metrics.Stats, arguments []Argument, canSkipEmptyOutput bool, foundationalStores []*foundational.Store) *Call {
+func NewCall(ctx context.Context, clock *pbsubstreams.Clock, moduleName string, entrypoint string, stats *metrics.Stats, arguments []Argument, canSkipEmptyOutput bool, foundationalStores []pbservice.StoreClient) *Call {
 	call := &Call{
 		ctx:                ctx,
 		Clock:              clock,
@@ -321,14 +323,7 @@ func (c *Call) DoHasLast(storeIndex int, key string) (found bool) {
 	return readStore.HasLast(key)
 }
 
-// DoFoundationalStoreGet performs a Get request to the foundational store at the given index. The function
-// retries forever until either the context is cancelled or the foundational store indicates that the requested block
-// has been reached.
-//
-// If there is validation errors, this method panics with a deterministic error. If the context is cancelled while waiting
-// for the foundational store to reach the requested block, this method panics with a non-deterministic error.
-func (c *Call) DoFoundationalStoreGet(index uint32, request *pbstore.GetRequest) *pbstore.GetResponse {
-	c.validateFoundationStoreRequest(request, "foundational_store_get")
+func (c *Call) DoFoundationalStoreGetFirst(index uint32, key *pbmodel.Key) *pbmodel.QueriedEntry {
 	c.validateFoundationalStoreIndex(int(index), "foundational_store_get")
 
 	logger := reqctx.Logger(c.ctx).With(zap.Uint32("foundational_store_index", index))
@@ -337,7 +332,12 @@ func (c *Call) DoFoundationalStoreGet(index uint32, request *pbstore.GetRequest)
 		ctx, cancel := context.WithTimeoutCause(c.ctx, foundationalStoreMaxWaitTime, fmt.Errorf("foundational store timeout after %s", foundationalStoreMaxWaitTime))
 		defer cancel()
 
-		resp, err := c.foundationalStores[index].Get(ctx, c.Clock, request.Key)
+		req := &pbservice.GetFirstRequest{
+			BlockNumber: c.Clock.Number,
+			BlockHash:   decodeHashString(c.Clock.Id),
+			Key:         key,
+		}
+		resp, err := c.foundationalStores[index].GetFirst(ctx, req)
 		logger.Debug("foundational store Get result", zap.Bool("block_reached", resp != nil && resp.BlockReached), zap.Error(err))
 		if err != nil {
 			// Check if parent call context was cancelled (we do not check the local ctx as a timeout for this one means retry)
@@ -355,7 +355,45 @@ func (c *Call) DoFoundationalStoreGet(index uint32, request *pbstore.GetRequest)
 		}
 
 		if resp.BlockReached {
-			return resp
+			return resp.Entry
+		}
+
+		time.Sleep(foundationalStoreRetryDelay)
+	}
+}
+func (c *Call) DoFoundationalStoreGet(index uint32, key *pbmodel.Key) *pbmodel.QueriedEntry {
+	c.validateFoundationalStoreIndex(int(index), "foundational_store_get")
+
+	logger := reqctx.Logger(c.ctx).With(zap.Uint32("foundational_store_index", index))
+
+	for {
+		ctx, cancel := context.WithTimeoutCause(c.ctx, foundationalStoreMaxWaitTime, fmt.Errorf("foundational store timeout after %s", foundationalStoreMaxWaitTime))
+		defer cancel()
+
+		req := &pbservice.GetRequest{
+			BlockNumber: c.Clock.Number,
+			BlockHash:   decodeHashString(c.Clock.Id),
+			Key:         key,
+		}
+		resp, err := c.foundationalStores[index].Get(ctx, req)
+		logger.Debug("foundational store Get result", zap.Bool("block_reached", resp != nil && resp.BlockReached), zap.Error(err))
+		if err != nil {
+			// Check if parent call context was cancelled (we do not check the local ctx as a timeout for this one means retry)
+			if c.ctx.Err() != nil {
+				logger.Debug("foundational store get cancelled due to upstream disconnect",
+					zap.Stringer("block", c.Clock.AsBlockRef()),
+					zap.Error(context.Cause(c.ctx)),
+				)
+				c.PanicNonDeterministicError(ErrFoundationalStoreCanceled)
+			}
+
+			logger.Warn("failed to call foundational store", zap.Error(err))
+			time.Sleep(foundationalStoreRetryDelay)
+			continue
+		}
+
+		if resp.BlockReached {
+			return resp.Entry
 		}
 
 		time.Sleep(foundationalStoreRetryDelay)
@@ -368,8 +406,7 @@ func (c *Call) DoFoundationalStoreGet(index uint32, request *pbstore.GetRequest)
 //
 // If there is validation errors, this method panics with a deterministic error. If the context is cancelled while waiting
 // for the foundational store to reach the requested block, this method panics with a non-deterministic error.
-func (c *Call) DoFoundationalStoreGetAll(index uint32, request *pbstore.GetAllRequest) *pbstore.GetAllResponse {
-	c.validateFoundationStoreRequest(request, "foundational_store_get_all")
+func (c *Call) DoFoundationalStoreGetAll(index uint32, keys *pbmodel.Keys) *pbmodel.QueriedEntries {
 	c.validateFoundationalStoreIndex(int(index), "foundational_store_get_all")
 
 	logger := reqctx.Logger(c.ctx).With(zap.Uint32("foundational_store_index", index))
@@ -378,7 +415,13 @@ func (c *Call) DoFoundationalStoreGetAll(index uint32, request *pbstore.GetAllRe
 		ctx, cancel := context.WithTimeoutCause(c.ctx, foundationalStoreMaxWaitTime, fmt.Errorf("foundational store get_all timeout after %s", foundationalStoreMaxWaitTime))
 		defer cancel()
 
-		resp, err := c.foundationalStores[index].GetAll(ctx, c.Clock, request.Keys)
+		request := &pbservice.GetAllRequest{
+			BlockNumber: c.Clock.Number,
+			BlockHash:   decodeHashString(c.Clock.Id),
+			Keys:        keys.Keys,
+		}
+
+		resp, err := c.foundationalStores[index].GetAll(ctx, request)
 
 		logger.Debug("foundational store GetAll result", zap.Bool("block_reached", resp != nil && resp.BlockReached), zap.Error(err))
 		if err != nil {
@@ -397,7 +440,47 @@ func (c *Call) DoFoundationalStoreGetAll(index uint32, request *pbstore.GetAllRe
 		}
 
 		if resp.BlockReached {
-			return resp
+			return resp.Entries
+		}
+
+		time.Sleep(foundationalStoreRetryDelay)
+	}
+}
+func (c *Call) DoFoundationalStoreGetAllFirst(index uint32, keys *pbmodel.Keys) *pbmodel.QueriedEntries {
+	c.validateFoundationalStoreIndex(int(index), "foundational_store_get_all")
+
+	logger := reqctx.Logger(c.ctx).With(zap.Uint32("foundational_store_index", index))
+
+	for {
+		ctx, cancel := context.WithTimeoutCause(c.ctx, foundationalStoreMaxWaitTime, fmt.Errorf("foundational store get_all timeout after %s", foundationalStoreMaxWaitTime))
+		defer cancel()
+
+		request := &pbservice.GetAllRequest{
+			BlockNumber: c.Clock.Number,
+			BlockHash:   decodeHashString(c.Clock.Id),
+			Keys:        keys.Keys,
+		}
+
+		resp, err := c.foundationalStores[index].GetAllFirst(ctx, request)
+
+		logger.Debug("foundational store GetAllFirst result", zap.Bool("block_reached", resp != nil && resp.BlockReached), zap.Error(err))
+		if err != nil {
+			// Check if parent call context was cancelled (we do not check the local ctx as a timeout for this one means retry)
+			if c.ctx.Err() != nil {
+				logger.Debug("foundational store get_all cancelled due to upstream disconnect",
+					zap.Stringer("block", c.Clock.AsBlockRef()),
+					zap.Error(context.Cause(c.ctx)),
+				)
+				c.PanicNonDeterministicError(ErrFoundationalStoreCanceled)
+			}
+
+			logger.Warn("failed to call foundational store", zap.Error(err))
+			time.Sleep(foundationalStoreRetryDelay)
+			continue
+		}
+
+		if resp.BlockReached {
+			return resp.Entries
 		}
 
 		time.Sleep(foundationalStoreRetryDelay)
@@ -484,4 +567,33 @@ var policyMap = map[pbsubstreams.Module_KindStore_UpdatePolicy]string{
 	pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN:               "min",
 	pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX:               "max",
 	pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND:            "append",
+}
+
+// Attempts to decode a hash string into bytes using multiple formats
+func decodeHashString(hashStr string) []byte {
+	if hashStr == "" {
+		return nil
+	}
+
+	// hex with 0x prefix
+	if strings.HasPrefix(hashStr, "0x") && len(hashStr) == 66 {
+		if decoded, err := hex.DecodeString(hashStr[2:]); err == nil {
+			return decoded
+		}
+	}
+
+	//hex without prefix
+	if len(hashStr) == 64 {
+		if decoded, err := hex.DecodeString(strings.ToLower(hashStr)); err == nil {
+			return decoded
+		}
+	}
+
+	// base58
+	if decoded, err := base58.Decode(hashStr); err == nil && len(decoded) == 32 {
+		return decoded
+	}
+
+	// Fallback: return nil if no format worked
+	return nil
 }

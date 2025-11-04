@@ -57,7 +57,7 @@ func WithFinalBlocksOnly() Option {
 	}
 }
 
-// WithRetryBackoff configures the [Sinker] to which itself configurs the Substreams
+// WithRetryBackOff configures the [Sinker] to which itself configurs the Substreams
 // gRPC stream to only send [pbsubstreamsrpc.BlockScopedData] once the block is final, this
 // means that `WithBlockDataBuffer` if used has is discarded and [BlockUndoSignalHandler]
 // will never be called.

@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package test.output;
+
+message Events {
+  repeated Event event = 1;
+}
+message Event {
+  string evt_tx_hash = 1;
+  string evt_from = 2;
+  string evt_to = 3;
+  uint64 evt_block_number = 4;
+  uint64 fee = 5;
+}

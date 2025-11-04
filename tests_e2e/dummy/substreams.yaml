@@ -1,0 +1,47 @@
+specVersion: v0.1.0
+package:
+  name: e2e
+  version: v0.1.0
+
+protobuf:
+  descriptorSets:
+    - module: buf.build/streamingfast/firehose-acme
+  files:
+    - contract.proto
+  importPaths:
+    - ./proto
+  excludePaths:
+    - sf/substreams
+    - google
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: ./target/wasm32-unknown-unknown/release/substreams.wasm
+
+modules:
+  - name: store_stats
+    kind: store
+    initialBlock: 200
+    updatePolicy: add
+    valueType: bigint
+    inputs:
+      - source: sf.acme.type.v1.Block
+
+  - name: map_events
+    kind: map
+    initialBlock: 100
+    inputs:
+      - source: sf.acme.type.v1.Block
+    output:
+      type: proto:test.output.Events
+
+  - name: map_stats
+    kind: map
+    initialBlock: 150
+    inputs:
+      - source: sf.acme.type.v1.Block
+      - store: store_stats
+    output:
+      type: proto:test.output.Events
+network: dummy

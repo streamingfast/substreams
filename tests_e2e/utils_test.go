@@ -3,6 +3,7 @@ package tests_e2e
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -90,6 +91,8 @@ func RunRequest(t *testing.T, req *pbsubstreamsrpcv2.Request, endpoint string) (
 }
 
 func startTier1App(t *testing.T, ctx context.Context, tmpDir string, container testcontainers.Container, zlog *zap.Logger) (*app.Tier1App, string) {
+
+	os.Setenv("SUBSTREAMS_WORKERS_RAMPUP_TIME", "0")
 
 	port, err := container.MappedPort(ctx, "10014/tcp")
 	require.NoError(t, err)
@@ -214,11 +217,9 @@ func newDummyBlockchainContainer(ctx context.Context, tmpDir string) (testcontai
 			"relayer",
 			"-c",
 			"",
-			// --with-reorgs=false
-			// --with-skipped-blocks=false
 			"--advertise-chain-name=acme-dummy-blockchain",
 			"--reader-node-path=dummy-blockchain",
-			"--reader-node-arguments=start --log-level=error --tracer=firehose --store-dir=/data --genesis-block-burst=1000 --block-rate=600 --block-size=2560 --genesis-height=0 --server-addr=:9777",
+			"--reader-node-arguments=start --log-level=error --tracer=firehose --store-dir=/data --genesis-block-burst=1000 --block-rate=600 --block-size=2560 --genesis-height=0 --server-addr=:9777 --with-reorgs=false --with-skipped-blocks=false",
 			"--advertise-block-id-encoding=hex",
 		},
 		ExposedPorts: []string{"10014/tcp"},

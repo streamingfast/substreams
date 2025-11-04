@@ -20,14 +20,6 @@ binaries:
     file: ./target/wasm32-unknown-unknown/release/substreams.wasm
 
 modules:
-  - name: store_stats
-    kind: store
-    initialBlock: 200
-    updatePolicy: add
-    valueType: bigint
-    inputs:
-      - source: sf.acme.type.v1.Block
-
   - name: map_events
     kind: map
     initialBlock: 100
@@ -35,6 +27,23 @@ modules:
       - source: sf.acme.type.v1.Block
     output:
       type: proto:test.output.Events
+
+  - name: store_stats
+    kind: store
+    initialBlock: 400
+    updatePolicy: add
+    valueType: bigint
+    inputs:
+      - source: sf.acme.type.v1.Block
+
+  - name: store_stats2
+    kind: store
+    initialBlock: 150
+    updatePolicy: add
+    valueType: bigint
+    inputs:
+      - source: sf.acme.type.v1.Block
+      - store: store_stats
 
   - name: map_stats
     kind: map
@@ -44,4 +53,14 @@ modules:
       - store: store_stats
     output:
       type: proto:test.output.Events
+
+  - name: map_stats2
+    kind: map
+    initialBlock: 150
+    inputs:
+      - source: sf.acme.type.v1.Block
+      - store: store_stats2
+    output:
+      type: proto:test.output.Events
+
 network: dummy

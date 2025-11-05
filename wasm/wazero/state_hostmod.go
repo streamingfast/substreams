@@ -391,12 +391,15 @@ var StateFuncs = []funcs{
 				return
 			}
 
-			resp := call.DoFoundationalStoreGet(storeIndex, &pbmodel.Key{Bytes: req.Key})
+			keys := &pbmodel.Keys{
+				Keys: []*pbmodel.Key{{Bytes: req.Key}},
+			}
+			resp := call.DoFoundationalStoreGet(storeIndex, keys)
 
 			legacyResp := &pbstore.GetResponse{
 				BlockReached: true,
-				Code:         pbstore.ResponseCode(resp.Code),
-				Value:        resp.Entry.Value,
+				Code:         pbstore.ResponseCode(resp.Entries[0].Code),
+				Value:        resp.Entries[0].Entry.Value,
 			}
 
 			respData, err := proto.Marshal(legacyResp)
@@ -441,7 +444,7 @@ var StateFuncs = []funcs{
 				keys.Keys = append(keys.Keys, &pbmodel.Key{Bytes: key})
 			}
 
-			resp := call.DoFoundationalStoreGetAll(storeIndex, keys)
+			resp := call.DoFoundationalStoreGet(storeIndex, keys)
 
 			legacyResp := &pbstore.GetAllResponse{
 				BlockReached: true,
@@ -477,43 +480,7 @@ var StateFuncs = []funcs{
 		}),
 	},
 	{
-		"foundational_store_get_first_entry",
-		[]parm{i32, i32, i32},
-		[]parm{i64},
-		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
-			storeIndex := uint32(stack[0])
-			reqData := readBytesFromStack(mod, stack[1:])
-			call := wasm.FromContext(ctx)
-			inst := instanceFromContext(ctx)
-
-			var key *pbmodel.Key
-			if err := proto.Unmarshal(reqData, key); err != nil {
-				call.PanicDeterministicError("failed to unmarshal GetRequest: %w", err)
-				stack[0] = 0
-				return
-			}
-
-			resp := call.DoFoundationalStoreGetFirst(storeIndex, key)
-
-			respData, err := proto.Marshal(resp)
-			if err != nil {
-				call.PanicDeterministicError("failed to marshal GetResponse: %w", err)
-				stack[0] = 0
-				return
-			}
-
-			respPtr, err := writeToHeap(ctx, inst, true, respData)
-			if err != nil {
-				call.PanicDeterministicError("writing response to heap: %w", err)
-				stack[0] = 0
-				return
-			}
-
-			stack[0] = packPtrLen(respPtr, uint32(len(respData)))
-		}),
-	},
-	{
-		"foundational_store_get_all_first_entries",
+		"foundational_store_get_first_entries",
 		[]parm{i32, i32, i32},
 		[]parm{i64},
 		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
@@ -532,7 +499,7 @@ var StateFuncs = []funcs{
 				return
 			}
 
-			resp := call.DoFoundationalStoreGetAllFirst(storeIndex, keys)
+			resp := call.DoFoundationalStoreGetFirst(storeIndex, keys)
 
 			// Serialize response
 			respData, err := proto.Marshal(resp)
@@ -553,43 +520,7 @@ var StateFuncs = []funcs{
 		}),
 	},
 	{
-		"foundational_store_get_entry",
-		[]parm{i32, i32, i32},
-		[]parm{i64},
-		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
-			storeIndex := uint32(stack[0])
-			reqData := readBytesFromStack(mod, stack[1:])
-			call := wasm.FromContext(ctx)
-			inst := instanceFromContext(ctx)
-
-			var key *pbmodel.Key
-			if err := proto.Unmarshal(reqData, key); err != nil {
-				call.PanicDeterministicError("failed to unmarshal GetRequest: %w", err)
-				stack[0] = 0
-				return
-			}
-
-			resp := call.DoFoundationalStoreGet(storeIndex, key)
-
-			respData, err := proto.Marshal(resp)
-			if err != nil {
-				call.PanicDeterministicError("failed to marshal GetResponse: %w", err)
-				stack[0] = 0
-				return
-			}
-
-			respPtr, err := writeToHeap(ctx, inst, true, respData)
-			if err != nil {
-				call.PanicDeterministicError("writing response to heap: %w", err)
-				stack[0] = 0
-				return
-			}
-
-			stack[0] = packPtrLen(respPtr, uint32(len(respData)))
-		}),
-	},
-	{
-		"foundational_store_get_all_entries",
+		"foundational_store_get_entries",
 		[]parm{i32, i32, i32},
 		[]parm{i64},
 		api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
@@ -608,7 +539,7 @@ var StateFuncs = []funcs{
 				return
 			}
 
-			resp := call.DoFoundationalStoreGetAll(storeIndex, keys)
+			resp := call.DoFoundationalStoreGet(storeIndex, keys)
 
 			// Serialize response
 			respData, err := proto.Marshal(resp)

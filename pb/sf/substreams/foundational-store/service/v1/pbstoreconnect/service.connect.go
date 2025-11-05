@@ -48,9 +48,9 @@ var (
 
 // StoreClient is a client for the sf.substreams.foundational_store.v1.Store service.
 type StoreClient interface {
-	// Get retrieves a single value by key at a specific block number
+	// DEPRECATED: Use sf.substreams.foundational_store.service.v2.SinkEntries Instead.
 	Get(context.Context, *connect.Request[v1.GetRequest]) (*connect.Response[v1.GetResponse], error)
-	// GetAll retrieves multiple values by keys at a specific block number
+	// DEPRECATED: Use sf.substreams.foundational_store.service.v2.SinkEntries Instead.
 	GetAll(context.Context, *connect.Request[v1.GetAllRequest]) (*connect.Response[v1.GetAllResponse], error)
 }
 
@@ -97,9 +97,9 @@ func (c *storeClient) GetAll(ctx context.Context, req *connect.Request[v1.GetAll
 
 // StoreHandler is an implementation of the sf.substreams.foundational_store.v1.Store service.
 type StoreHandler interface {
-	// Get retrieves a single value by key at a specific block number
+	// DEPRECATED: Use sf.substreams.foundational_store.service.v2.SinkEntries Instead.
 	Get(context.Context, *connect.Request[v1.GetRequest]) (*connect.Response[v1.GetResponse], error)
-	// GetAll retrieves multiple values by keys at a specific block number
+	// DEPRECATED: Use sf.substreams.foundational_store.service.v2.SinkEntries Instead.
 	GetAll(context.Context, *connect.Request[v1.GetAllRequest]) (*connect.Response[v1.GetAllResponse], error)
 }
 

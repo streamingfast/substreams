@@ -155,44 +155,10 @@ func (i *instance) hasLast(storeIndex int32, keyPtr, keyLength int32) int32 {
 	return returnIfFound(found)
 }
 
-//todo: implements stuff for getFirst
-
-func (i *instance) foundationalStoreGetEntry(storeIndex int32, reqPtr int32, reqLen int32) int64 {
+func (i *instance) foundationalStoreGetEntries(storeIndex int32, reqPtr int32, reqLen int32) int64 {
 	reqData := i.Heap.ReadBytes(reqPtr, reqLen)
 
-	// TODO: backend should return already-serialized bytes to avoid marshal here
-
-	// Deserialize GetRequest
-	var key pbmodel.Key
-	if err := proto.Unmarshal(reqData, &key); err != nil {
-		i.CurrentCall.PanicDeterministicError("failed to unmarshal GetRequest: %w", err)
-		return 0
-	}
-
-	entry := i.CurrentCall.DoFoundationalStoreGet(uint32(storeIndex), &key)
-
-	// Serialize response
-	respData, err := proto.Marshal(entry)
-	if err != nil {
-		i.CurrentCall.PanicDeterministicError("failed to marshal entry: %w", err)
-		return 0
-	}
-
-	// Write to heap and return packed pointer/length
-	respPtr, err := i.Heap.Write(respData, "foundationalStoreGet")
-	if err != nil {
-		i.CurrentCall.PanicDeterministicError("writing entry to heap: %w", err)
-		return 0
-	}
-
-	// Pack pointer and length into int64
-	return packPtrLen(respPtr, int32(len(respData)))
-}
-
-func (i *instance) foundationalStoreGetAllEntries(storeIndex int32, reqPtr int32, reqLen int32) int64 {
-	reqData := i.Heap.ReadBytes(reqPtr, reqLen)
-
-	zlog.Info("entering instance of foundationalStoreGetAll")
+	zlog.Debug("entering instance of foundationalStoreGetAll")
 	// TODO: backend should return already-serialized bytes to avoid marshal here
 
 	var keys pbmodel.Keys
@@ -201,7 +167,7 @@ func (i *instance) foundationalStoreGetAllEntries(storeIndex int32, reqPtr int32
 		return 0
 	}
 
-	entries := i.CurrentCall.DoFoundationalStoreGetAll(uint32(storeIndex), &keys)
+	entries := i.CurrentCall.DoFoundationalStoreGet(uint32(storeIndex), &keys)
 
 	// Serialize response
 	respData, err := proto.Marshal(entries)
@@ -221,39 +187,7 @@ func (i *instance) foundationalStoreGetAllEntries(storeIndex int32, reqPtr int32
 	return packPtrLen(respPtr, int32(len(respData)))
 }
 
-func (i *instance) foundationalStoreGetFirstEntry(storeIndex int32, reqPtr int32, reqLen int32) int64 {
-	reqData := i.Heap.ReadBytes(reqPtr, reqLen)
-
-	// TODO: backend should return already-serialized bytes to avoid marshal here
-
-	// Deserialize GetRequest
-	var key pbmodel.Key
-	if err := proto.Unmarshal(reqData, &key); err != nil {
-		i.CurrentCall.PanicDeterministicError("failed to unmarshal GetRequest: %w", err)
-		return 0
-	}
-
-	entry := i.CurrentCall.DoFoundationalStoreGetFirst(uint32(storeIndex), &key)
-
-	// Serialize response
-	respData, err := proto.Marshal(entry)
-	if err != nil {
-		i.CurrentCall.PanicDeterministicError("failed to marshal entry: %w", err)
-		return 0
-	}
-
-	// Write to heap and return packed pointer/length
-	respPtr, err := i.Heap.Write(respData, "foundationalStoreGet")
-	if err != nil {
-		i.CurrentCall.PanicDeterministicError("writing entry to heap: %w", err)
-		return 0
-	}
-
-	// Pack pointer and length into int64
-	return packPtrLen(respPtr, int32(len(respData)))
-}
-
-func (i *instance) foundationalStoreGetAllFirstEntries(storeIndex int32, reqPtr int32, reqLen int32) int64 {
+func (i *instance) foundationalStoreGetFirstEntries(storeIndex int32, reqPtr int32, reqLen int32) int64 {
 	reqData := i.Heap.ReadBytes(reqPtr, reqLen)
 
 	zlog.Info("entering instance of foundationalStoreGetAll")
@@ -265,7 +199,7 @@ func (i *instance) foundationalStoreGetAllFirstEntries(storeIndex int32, reqPtr 
 		return 0
 	}
 
-	entries := i.CurrentCall.DoFoundationalStoreGetAllFirst(uint32(storeIndex), &keys)
+	entries := i.CurrentCall.DoFoundationalStoreGetFirst(uint32(storeIndex), &keys)
 
 	// Serialize response
 	respData, err := proto.Marshal(entries)
@@ -297,12 +231,15 @@ func (i *instance) foundationalStoreGet(storeIndex int32, reqPtr int32, reqLen i
 		return 0
 	}
 
-	entry := i.CurrentCall.DoFoundationalStoreGet(uint32(storeIndex), &pbmodel.Key{Bytes: req.Key})
+	keys := &pbmodel.Keys{
+		Keys: []*pbmodel.Key{{Bytes: req.Key}},
+	}
+	entryResponse := i.CurrentCall.DoFoundationalStoreGet(uint32(storeIndex), keys)
 
 	resp := &depricated.GetResponse{
 		BlockReached: true,
-		Code:         depricated.ResponseCode(entry.Code),
-		Value:        entry.Entry.Value,
+		Code:         depricated.ResponseCode(entryResponse.Entries[0].Code),
+		Value:        entryResponse.Entries[0].Entry.Value,
 	}
 
 	// Serialize response
@@ -338,7 +275,7 @@ func (i *instance) foundationalStoreGetAll(storeIndex int32, reqPtr int32, reqLe
 	for _, key := range req.Keys {
 		keys = append(keys, &pbmodel.Key{Bytes: key})
 	}
-	entries := i.CurrentCall.DoFoundationalStoreGetAll(uint32(storeIndex), &pbmodel.Keys{Keys: keys})
+	entries := i.CurrentCall.DoFoundationalStoreGet(uint32(storeIndex), &pbmodel.Keys{Keys: keys})
 
 	var respEntries []*depricated.ResponseEntry
 	for _, entry := range entries.Entries {

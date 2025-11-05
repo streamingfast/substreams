@@ -22,12 +22,8 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type StoreClient interface {
-	// Get retrieves a single value by key at a specific block number
 	Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetResponse, error)
-	// GetAll retrieves multiple values by keys at a specific block number
-	GetAll(ctx context.Context, in *GetAllRequest, opts ...grpc.CallOption) (*GetAllResponse, error)
-	GetFirst(ctx context.Context, in *GetFirstRequest, opts ...grpc.CallOption) (*GetResponse, error)
-	GetAllFirst(ctx context.Context, in *GetAllRequest, opts ...grpc.CallOption) (*GetAllResponse, error)
+	GetFirst(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetResponse, error)
 }
 
 type storeClient struct {
@@ -47,27 +43,9 @@ func (c *storeClient) Get(ctx context.Context, in *GetRequest, opts ...grpc.Call
 	return out, nil
 }
 
-func (c *storeClient) GetAll(ctx context.Context, in *GetAllRequest, opts ...grpc.CallOption) (*GetAllResponse, error) {
-	out := new(GetAllResponse)
-	err := c.cc.Invoke(ctx, "/sf.substreams.foundational_store.service.v2.Store/GetAll", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *storeClient) GetFirst(ctx context.Context, in *GetFirstRequest, opts ...grpc.CallOption) (*GetResponse, error) {
+func (c *storeClient) GetFirst(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetResponse, error) {
 	out := new(GetResponse)
 	err := c.cc.Invoke(ctx, "/sf.substreams.foundational_store.service.v2.Store/GetFirst", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *storeClient) GetAllFirst(ctx context.Context, in *GetAllRequest, opts ...grpc.CallOption) (*GetAllResponse, error) {
-	out := new(GetAllResponse)
-	err := c.cc.Invoke(ctx, "/sf.substreams.foundational_store.service.v2.Store/GetAllFirst", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -78,12 +56,8 @@ func (c *storeClient) GetAllFirst(ctx context.Context, in *GetAllRequest, opts .
 // All implementations should embed UnimplementedStoreServer
 // for forward compatibility
 type StoreServer interface {
-	// Get retrieves a single value by key at a specific block number
 	Get(context.Context, *GetRequest) (*GetResponse, error)
-	// GetAll retrieves multiple values by keys at a specific block number
-	GetAll(context.Context, *GetAllRequest) (*GetAllResponse, error)
-	GetFirst(context.Context, *GetFirstRequest) (*GetResponse, error)
-	GetAllFirst(context.Context, *GetAllRequest) (*GetAllResponse, error)
+	GetFirst(context.Context, *GetRequest) (*GetResponse, error)
 }
 
 // UnimplementedStoreServer should be embedded to have forward compatible implementations.
@@ -93,14 +67,8 @@ type UnimplementedStoreServer struct {
 func (UnimplementedStoreServer) Get(context.Context, *GetRequest) (*GetResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Get not implemented")
 }
-func (UnimplementedStoreServer) GetAll(context.Context, *GetAllRequest) (*GetAllResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetAll not implemented")
-}
-func (UnimplementedStoreServer) GetFirst(context.Context, *GetFirstRequest) (*GetResponse, error) {
+func (UnimplementedStoreServer) GetFirst(context.Context, *GetRequest) (*GetResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetFirst not implemented")
-}
-func (UnimplementedStoreServer) GetAllFirst(context.Context, *GetAllRequest) (*GetAllResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetAllFirst not implemented")
 }
 
 // UnsafeStoreServer may be embedded to opt out of forward compatibility for this service.
@@ -132,26 +100,8 @@ func _Store_Get_Handler(srv interface{}, ctx context.Context, dec func(interface
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Store_GetAll_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetAllRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(StoreServer).GetAll(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/sf.substreams.foundational_store.service.v2.Store/GetAll",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(StoreServer).GetAll(ctx, req.(*GetAllRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _Store_GetFirst_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetFirstRequest)
+	in := new(GetRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -163,25 +113,7 @@ func _Store_GetFirst_Handler(srv interface{}, ctx context.Context, dec func(inte
 		FullMethod: "/sf.substreams.foundational_store.service.v2.Store/GetFirst",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(StoreServer).GetFirst(ctx, req.(*GetFirstRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Store_GetAllFirst_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetAllRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(StoreServer).GetAllFirst(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/sf.substreams.foundational_store.service.v2.Store/GetAllFirst",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(StoreServer).GetAllFirst(ctx, req.(*GetAllRequest))
+		return srv.(StoreServer).GetFirst(ctx, req.(*GetRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -198,16 +130,8 @@ var Store_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Store_Get_Handler,
 		},
 		{
-			MethodName: "GetAll",
-			Handler:    _Store_GetAll_Handler,
-		},
-		{
 			MethodName: "GetFirst",
 			Handler:    _Store_GetFirst_Handler,
-		},
-		{
-			MethodName: "GetAllFirst",
-			Handler:    _Store_GetAllFirst_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

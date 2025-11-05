@@ -35,31 +35,21 @@ const (
 const (
 	// StoreGetProcedure is the fully-qualified name of the Store's Get RPC.
 	StoreGetProcedure = "/sf.substreams.foundational_store.service.v2.Store/Get"
-	// StoreGetAllProcedure is the fully-qualified name of the Store's GetAll RPC.
-	StoreGetAllProcedure = "/sf.substreams.foundational_store.service.v2.Store/GetAll"
 	// StoreGetFirstProcedure is the fully-qualified name of the Store's GetFirst RPC.
 	StoreGetFirstProcedure = "/sf.substreams.foundational_store.service.v2.Store/GetFirst"
-	// StoreGetAllFirstProcedure is the fully-qualified name of the Store's GetAllFirst RPC.
-	StoreGetAllFirstProcedure = "/sf.substreams.foundational_store.service.v2.Store/GetAllFirst"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
 var (
-	storeServiceDescriptor           = v2.File_sf_substreams_foundational_store_service_v2_service_proto.Services().ByName("Store")
-	storeGetMethodDescriptor         = storeServiceDescriptor.Methods().ByName("Get")
-	storeGetAllMethodDescriptor      = storeServiceDescriptor.Methods().ByName("GetAll")
-	storeGetFirstMethodDescriptor    = storeServiceDescriptor.Methods().ByName("GetFirst")
-	storeGetAllFirstMethodDescriptor = storeServiceDescriptor.Methods().ByName("GetAllFirst")
+	storeServiceDescriptor        = v2.File_sf_substreams_foundational_store_service_v2_service_proto.Services().ByName("Store")
+	storeGetMethodDescriptor      = storeServiceDescriptor.Methods().ByName("Get")
+	storeGetFirstMethodDescriptor = storeServiceDescriptor.Methods().ByName("GetFirst")
 )
 
 // StoreClient is a client for the sf.substreams.foundational_store.service.v2.Store service.
 type StoreClient interface {
-	// Get retrieves a single value by key at a specific block number
 	Get(context.Context, *connect.Request[v2.GetRequest]) (*connect.Response[v2.GetResponse], error)
-	// GetAll retrieves multiple values by keys at a specific block number
-	GetAll(context.Context, *connect.Request[v2.GetAllRequest]) (*connect.Response[v2.GetAllResponse], error)
-	GetFirst(context.Context, *connect.Request[v2.GetFirstRequest]) (*connect.Response[v2.GetResponse], error)
-	GetAllFirst(context.Context, *connect.Request[v2.GetAllRequest]) (*connect.Response[v2.GetAllResponse], error)
+	GetFirst(context.Context, *connect.Request[v2.GetRequest]) (*connect.Response[v2.GetResponse], error)
 }
 
 // NewStoreClient constructs a client for the sf.substreams.foundational_store.service.v2.Store
@@ -78,22 +68,10 @@ func NewStoreClient(httpClient connect.HTTPClient, baseURL string, opts ...conne
 			connect.WithSchema(storeGetMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
-		getAll: connect.NewClient[v2.GetAllRequest, v2.GetAllResponse](
-			httpClient,
-			baseURL+StoreGetAllProcedure,
-			connect.WithSchema(storeGetAllMethodDescriptor),
-			connect.WithClientOptions(opts...),
-		),
-		getFirst: connect.NewClient[v2.GetFirstRequest, v2.GetResponse](
+		getFirst: connect.NewClient[v2.GetRequest, v2.GetResponse](
 			httpClient,
 			baseURL+StoreGetFirstProcedure,
 			connect.WithSchema(storeGetFirstMethodDescriptor),
-			connect.WithClientOptions(opts...),
-		),
-		getAllFirst: connect.NewClient[v2.GetAllRequest, v2.GetAllResponse](
-			httpClient,
-			baseURL+StoreGetAllFirstProcedure,
-			connect.WithSchema(storeGetAllFirstMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -101,10 +79,8 @@ func NewStoreClient(httpClient connect.HTTPClient, baseURL string, opts ...conne
 
 // storeClient implements StoreClient.
 type storeClient struct {
-	get         *connect.Client[v2.GetRequest, v2.GetResponse]
-	getAll      *connect.Client[v2.GetAllRequest, v2.GetAllResponse]
-	getFirst    *connect.Client[v2.GetFirstRequest, v2.GetResponse]
-	getAllFirst *connect.Client[v2.GetAllRequest, v2.GetAllResponse]
+	get      *connect.Client[v2.GetRequest, v2.GetResponse]
+	getFirst *connect.Client[v2.GetRequest, v2.GetResponse]
 }
 
 // Get calls sf.substreams.foundational_store.service.v2.Store.Get.
@@ -112,30 +88,16 @@ func (c *storeClient) Get(ctx context.Context, req *connect.Request[v2.GetReques
 	return c.get.CallUnary(ctx, req)
 }
 
-// GetAll calls sf.substreams.foundational_store.service.v2.Store.GetAll.
-func (c *storeClient) GetAll(ctx context.Context, req *connect.Request[v2.GetAllRequest]) (*connect.Response[v2.GetAllResponse], error) {
-	return c.getAll.CallUnary(ctx, req)
-}
-
 // GetFirst calls sf.substreams.foundational_store.service.v2.Store.GetFirst.
-func (c *storeClient) GetFirst(ctx context.Context, req *connect.Request[v2.GetFirstRequest]) (*connect.Response[v2.GetResponse], error) {
+func (c *storeClient) GetFirst(ctx context.Context, req *connect.Request[v2.GetRequest]) (*connect.Response[v2.GetResponse], error) {
 	return c.getFirst.CallUnary(ctx, req)
-}
-
-// GetAllFirst calls sf.substreams.foundational_store.service.v2.Store.GetAllFirst.
-func (c *storeClient) GetAllFirst(ctx context.Context, req *connect.Request[v2.GetAllRequest]) (*connect.Response[v2.GetAllResponse], error) {
-	return c.getAllFirst.CallUnary(ctx, req)
 }
 
 // StoreHandler is an implementation of the sf.substreams.foundational_store.service.v2.Store
 // service.
 type StoreHandler interface {
-	// Get retrieves a single value by key at a specific block number
 	Get(context.Context, *connect.Request[v2.GetRequest]) (*connect.Response[v2.GetResponse], error)
-	// GetAll retrieves multiple values by keys at a specific block number
-	GetAll(context.Context, *connect.Request[v2.GetAllRequest]) (*connect.Response[v2.GetAllResponse], error)
-	GetFirst(context.Context, *connect.Request[v2.GetFirstRequest]) (*connect.Response[v2.GetResponse], error)
-	GetAllFirst(context.Context, *connect.Request[v2.GetAllRequest]) (*connect.Response[v2.GetAllResponse], error)
+	GetFirst(context.Context, *connect.Request[v2.GetRequest]) (*connect.Response[v2.GetResponse], error)
 }
 
 // NewStoreHandler builds an HTTP handler from the service implementation. It returns the path on
@@ -150,34 +112,18 @@ func NewStoreHandler(svc StoreHandler, opts ...connect.HandlerOption) (string, h
 		connect.WithSchema(storeGetMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
-	storeGetAllHandler := connect.NewUnaryHandler(
-		StoreGetAllProcedure,
-		svc.GetAll,
-		connect.WithSchema(storeGetAllMethodDescriptor),
-		connect.WithHandlerOptions(opts...),
-	)
 	storeGetFirstHandler := connect.NewUnaryHandler(
 		StoreGetFirstProcedure,
 		svc.GetFirst,
 		connect.WithSchema(storeGetFirstMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
-	storeGetAllFirstHandler := connect.NewUnaryHandler(
-		StoreGetAllFirstProcedure,
-		svc.GetAllFirst,
-		connect.WithSchema(storeGetAllFirstMethodDescriptor),
-		connect.WithHandlerOptions(opts...),
-	)
 	return "/sf.substreams.foundational_store.service.v2.Store/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case StoreGetProcedure:
 			storeGetHandler.ServeHTTP(w, r)
-		case StoreGetAllProcedure:
-			storeGetAllHandler.ServeHTTP(w, r)
 		case StoreGetFirstProcedure:
 			storeGetFirstHandler.ServeHTTP(w, r)
-		case StoreGetAllFirstProcedure:
-			storeGetAllFirstHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -191,14 +137,6 @@ func (UnimplementedStoreHandler) Get(context.Context, *connect.Request[v2.GetReq
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sf.substreams.foundational_store.service.v2.Store.Get is not implemented"))
 }
 
-func (UnimplementedStoreHandler) GetAll(context.Context, *connect.Request[v2.GetAllRequest]) (*connect.Response[v2.GetAllResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sf.substreams.foundational_store.service.v2.Store.GetAll is not implemented"))
-}
-
-func (UnimplementedStoreHandler) GetFirst(context.Context, *connect.Request[v2.GetFirstRequest]) (*connect.Response[v2.GetResponse], error) {
+func (UnimplementedStoreHandler) GetFirst(context.Context, *connect.Request[v2.GetRequest]) (*connect.Response[v2.GetResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sf.substreams.foundational_store.service.v2.Store.GetFirst is not implemented"))
-}
-
-func (UnimplementedStoreHandler) GetAllFirst(context.Context, *connect.Request[v2.GetAllRequest]) (*connect.Response[v2.GetAllResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sf.substreams.foundational_store.service.v2.Store.GetAllFirst is not implemented"))
 }

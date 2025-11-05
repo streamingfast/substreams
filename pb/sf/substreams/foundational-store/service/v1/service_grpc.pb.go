@@ -22,9 +22,9 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type StoreClient interface {
-	// Get retrieves a single value by key at a specific block number
+	// DEPRECATED: Use sf.substreams.foundational_store.service.v2.SinkEntries Instead.
 	Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetResponse, error)
-	// GetAll retrieves multiple values by keys at a specific block number
+	// DEPRECATED: Use sf.substreams.foundational_store.service.v2.SinkEntries Instead.
 	GetAll(ctx context.Context, in *GetAllRequest, opts ...grpc.CallOption) (*GetAllResponse, error)
 }
 
@@ -58,9 +58,9 @@ func (c *storeClient) GetAll(ctx context.Context, in *GetAllRequest, opts ...grp
 // All implementations should embed UnimplementedStoreServer
 // for forward compatibility
 type StoreServer interface {
-	// Get retrieves a single value by key at a specific block number
+	// DEPRECATED: Use sf.substreams.foundational_store.service.v2.SinkEntries Instead.
 	Get(context.Context, *GetRequest) (*GetResponse, error)
-	// GetAll retrieves multiple values by keys at a specific block number
+	// DEPRECATED: Use sf.substreams.foundational_store.service.v2.SinkEntries Instead.
 	GetAll(context.Context, *GetAllRequest) (*GetAllResponse, error)
 }
 

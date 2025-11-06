@@ -13,6 +13,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## CLI
 
+* Improved `substreams init` to expand `~` and environment variable when resolving local file path.
+
+* Improved `substreams init` reporting of error when local file cannot be uploaded/read correctly.
+
+* Improved `substreams init` rendering of list items and some other elements.
+
 * Fixed `substreams init` to correctly showing selected label when selecting from a list of items.
 
 ### Server

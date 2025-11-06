@@ -19,6 +19,7 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/glamour/ansi"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/huh/spinner"
 	"github.com/charmbracelet/lipgloss"
@@ -29,6 +30,7 @@ import (
 	pbconvo "github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1"
 	pbconvoconnect "github.com/streamingfast/substreams/pb/sf/codegen/conversation/v1/pbconvoconnect"
 	"github.com/tidwall/gjson"
+	"go.uber.org/zap"
 	"golang.org/x/net/http2"
 )
 
@@ -50,6 +52,11 @@ var initCmd = &cobra.Command{
 
 var huhTheme *huh.Theme
 
+var (
+	customLightStyle *ansi.StyleConfig
+	customDarkStyle  *ansi.StyleConfig
+)
+
 func init() {
 	initCmd.Flags().String("state-file", "./generator.json", "File to load/save the state of the code generator")
 	initCmd.Flags().Bool("force-download-cwd", false, "Force download at current dir")
@@ -58,6 +65,21 @@ func init() {
 	huhTheme = huh.ThemeCharm()
 	huhTheme.Focused.Base = huhTheme.Focused.Base.
 		BorderForeground(lipgloss.Color("15"))
+
+	adjustStyle := func(style ansi.StyleConfig) *ansi.StyleConfig {
+		style.Document.Margin = ptr(uint(0))
+		style.Code.Prefix = ""
+		style.Code.Suffix = ""
+		style.CodeBlock.Margin = ptr(uint(0))
+		style.CodeBlock.Indent = ptr(uint(2))
+		style.CodeBlock.Prefix = "\n"
+		style.CodeBlock.Suffix = "\n"
+		style.List.Indent = ptr(uint(2))
+		return &style
+	}
+
+	customLightStyle = adjustStyle(glamour.LightStyleConfig)
+	customDarkStyle = adjustStyle(glamour.DarkStyleConfig)
 }
 
 var INIT_TRACE = false
@@ -467,9 +489,20 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			fmt.Println(gray("┃"), input.Prompt+":", bold(returnValue))
 			fmt.Println("")
 
+			// Expand tilde if present and environment variable, if present
+			returnValue = expandTilde(returnValue)
+			returnValue = os.ExpandEnv(returnValue)
+
 			content, err := os.ReadFile(returnValue)
 			if err != nil {
-				return errors.New("could not read the file provided")
+				if err := sendFunc(&pbconvo.UserInput{
+					FromActionId: resp.ActionId,
+					Entry: &pbconvo.UserInput_LocalFile_{
+						LocalFile: &pbconvo.UserInput_LocalFile{Value: nil, Error: ptr(fmt.Sprintf("could not read file %q: %s", returnValue, err.Error()))},
+					},
+				}); err != nil {
+					return fmt.Errorf("error sending local file message: %w", err)
+				}
 			}
 
 			if err := sendFunc(&pbconvo.UserInput{
@@ -632,9 +665,6 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 					}
 
 				default:
-					// "application/x-protobuf; messageType=\"sf.substreams.v1.Package\""
-					// "application/zip", "application/x-zip"
-					// "text/plain":
 					if inputFile.Content == nil {
 						continue
 					}
@@ -754,12 +784,12 @@ func saveDownloadFile(path string, overwriteForm *OverwriteForm, inputFile *pbco
 }
 
 func ToMarkdown(input string) string {
-	style := "light"
+	style := customLightStyle
 	if lipgloss.HasDarkBackground() {
-		style = "dark"
+		style = customDarkStyle
 	}
 
-	renderer, err := glamour.NewTermRenderer(glamour.WithWordWrap(0), glamour.WithStandardStyle(style))
+	renderer, err := glamour.NewTermRenderer(glamour.WithWordWrap(0), glamour.WithStyles(*style))
 
 	if err != nil {
 		panic(fmt.Errorf("failed rendering markdown %q: %w", input, err))
@@ -888,4 +918,21 @@ func (f *OverwriteForm) createOverwriteForm(path string) error {
 	}
 
 	return nil
+}
+
+func expandTilde(path string) string {
+	if strings.HasPrefix(path, "~") {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			zlog.Debug("could not determine user home directory, not expanding tidle", zap.Error(err))
+			return path
+		}
+
+		return filepath.Join(homeDir, path[1:])
+	}
+	return path
+}
+
+func ptr[T any](v T) *T {
+	return &v
 }

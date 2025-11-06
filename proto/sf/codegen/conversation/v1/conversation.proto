@@ -31,6 +31,13 @@ message UserInput {
   }
   message LocalFile {
     bytes value = 1;
+    // Error can be set by the client to indicate an issue when trying to read the file,
+    // the error comes from the client side. The server can inspect that to decide what
+    // to do next if there is an error.
+    //
+    // If an error is set, the [value] field will be empty and not populated, so implementor
+    // should check for that first.
+    optional string error = 2;
   }
   message Start {
     // generator_id routes the conversation to the right generator backend
@@ -162,7 +169,7 @@ message SystemOutput {
 message DiscoveryRequest {
   string search_terms = 1;
 
-  // Version sent to the codegen service, which is incremental (0,1,2...). 
+  // Version sent to the codegen service, which is incremental (0,1,2...).
   // It is used to force users to upgrade after breaking changes between the CLI and the codegen server.
   uint64 client_version = 2;
 }

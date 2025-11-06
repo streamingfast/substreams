@@ -3,9 +3,12 @@ package stage
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"go.uber.org/zap"
 
+	"github.com/streamingfast/derr"
+	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/storage/store"
 )
@@ -35,6 +38,53 @@ func NewModuleState(logger *zap.Logger, name string, segmenter *block.Segmenter,
 func (s *StoreModuleState) Name() string {
 	return s.name
 }
+
+func (s *StoreModuleState) estimateStoreSizeBytes(ctx context.Context, exclusiveEndBlock uint64) (uncompressedSizeBytes uint64, metadata map[string]string, err error) {
+	if s.lastBlockInStore == exclusiveEndBlock && s.cachedStore != nil {
+		return s.cachedStore.SizeBytes(), nil, nil
+	}
+
+	objStore := s.storeConfig.NewFullKV(s.logger).Store()
+
+	moduleInitBlock := s.storeConfig.ModuleInitialBlock()
+	if moduleInitBlock < exclusiveEndBlock {
+		fullKVFile := store.NewCompleteFileInfo(s.name, moduleInitBlock, exclusiveEndBlock)
+		compressed, uncompressed, metadata, err := getSize(ctx, objStore, fullKVFile.Filename, s.logger)
+		if err != nil {
+			return 0, nil, fmt.Errorf("get size of store %q: %w", s.name, err)
+		}
+
+		if uncompressed == nil {
+			return compressed * 4, metadata, nil // gross estimation for cases where we don't have metadata
+		}
+		return *uncompressed, metadata, nil
+	}
+	return 0, metadata, nil
+}
+
+func getSize(ctx context.Context, store dstore.Store, filename string, logger *zap.Logger) (compressedSize uint64, uncompressedSize *uint64, metadata map[string]string, err error) {
+	err = derr.RetryContext(ctx, 5, func(ctx context.Context) error {
+		r, err := store.ObjectAttributes(ctx, filename)
+		if err != nil {
+			return fmt.Errorf("opening file: %w", err)
+		}
+		compressedSize = uint64(r.Size)
+		metadata = r.Metadata
+
+		if ds, ok := r.Metadata["datasize"]; ok {
+			s, err := strconv.ParseUint(ds, 10, 64)
+			if err != nil {
+				logger.Info("failed to parse datasize from metadata", zap.Error(err), zap.String("datasize", ds))
+				return nil
+			}
+			uncompressedSize = &s
+		}
+
+		return nil
+	})
+	return
+}
+
 func (s *StoreModuleState) getStore(ctx context.Context, exclusiveEndBlock uint64) (*store.FullKV, error) {
 	if s.lastBlockInStore == exclusiveEndBlock && s.cachedStore != nil {
 		return s.cachedStore, nil

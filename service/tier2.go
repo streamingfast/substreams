@@ -33,6 +33,7 @@ import (
 	"github.com/streamingfast/substreams/pipeline/cache"
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/substreams/service/active_requests"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/index"
 	"github.com/streamingfast/substreams/storage/store"
@@ -92,8 +93,8 @@ type Tier2Service struct {
 
 	tier2RequestParameters *reqctx.Tier2RequestParameters
 
-	simulateOverloaded *atomic.Bool          // when true, the service will pretent that it is overloaded and refuse incoming requests
-	activeRequests     *activeRequestRecords // we keep a list of current requests for the debugAPI
+	simulateOverloaded *atomic.Bool                           // when true, the service will pretent that it is overloaded and refuse incoming requests
+	activeRequests     *active_requests.ActiveRequestsManager // we keep a list of current requests for the debugAPI and to manage memory
 }
 
 const protoPkfPrefix = "type.googleapis.com/"
@@ -114,9 +115,7 @@ func NewTier2(
 
 		simulateOverloaded: atomic.NewBool(false),
 
-		activeRequests: &activeRequestRecords{
-			reqs: make(map[string]*ActiveRequestRecord),
-		},
+		activeRequests: active_requests.NewActiveRequestsManager(logger),
 	}
 
 	setSubstreamsStoreSizeLimitFromEnv(logger)
@@ -167,7 +166,7 @@ func (s *Tier2Service) listActiveRecords() string {
 }
 
 func (s *Tier2Service) cancelRequest(traceID string, outputModuleHash string, segmentNumber, segmentSize *uint64, stage *uint32) []string {
-	return s.activeRequests.cancelRequest(
+	return s.activeRequests.CancelRequest(
 		traceID,
 		outputModuleHash,
 		segmentNumber,
@@ -309,9 +308,9 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 		return status.Errorf(codes.Internal, "unable to initialize dmetering: %s", err)
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancelCause(ctx)
 	traceID := tracing.GetTraceID(ctx).String()
-	s.activeRequests.Add(
+	activeReqHandler := s.activeRequests.Add(
 		cancel,
 		traceID,
 		outputModuleHash,
@@ -322,11 +321,12 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 
 	defer func() {
 		emitter.Shutdown(nil)
-		s.activeRequests.Remove(traceID, request.SegmentNumber, request.SegmentSize, request.Stage)
-		cancel()
+		s.activeRequests.Remove(activeReqHandler)
+		cancel(nil)
 	}()
 
 	ctx = reqctx.WithEmitter(ctx, emitter)
+	ctx = reqctx.WithActiveRequestsHandler(ctx, activeReqHandler)
 
 	respFunc := tier2ResponseHandler(ctx, logger, streamSrv)
 	err = s.processRange(ctx, request, respFunc)

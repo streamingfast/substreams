@@ -566,6 +566,30 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 	}
 
 	loadingChan := make(chan loadedStore, len(storeModuleStates))
+
+	storesMetadata := make(map[string]map[string]string)
+	var approxStoreSize uint64
+	for _, modState := range storeModuleStates {
+		size, metadata, err := modState.estimateStoreSizeBytes(s.ctx, exclusiveEndBlock)
+		if err != nil {
+			return nil, err
+		}
+		approxStoreSize += size
+		storesMetadata[modState.name] = metadata
+	}
+
+	//var m runtime.MemStats
+	//runtime.ReadMemStats(&m)
+	//s.logger.Info("about to load stores", zap.Uint64("total_store_size", totalStoreSize/1024/1024), zap.Uint64("used_memory_mb", m.HeapInuse/1024/1024))
+	s.logger.Info("about to load stores", zap.Uint64("approx_store_size", approxStoreSize/1024/1024))
+
+	if reqHandler := reqctx.ActiveRequestsHandler(s.ctx); reqHandler != nil {
+		reqHandler.AllocateFullKVSize(approxStoreSize)
+		if s.ctx.Err() != nil {
+			return nil, s.ctx.Err()
+		}
+	}
+
 	for _, modState := range storeModuleStates {
 		modState := modState
 		go func() {
@@ -580,10 +604,30 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 			case <-s.ctx.Done():
 				return
 			}
+
+			if err == nil {
+				//  add loaded file size to metadata
+				met := storesMetadata[modState.name]
+				if met == nil {
+					met = make(map[string]string)
+				}
+				if met["datasize"] == "" {
+					met["datasize"] = fmt.Sprintf("%d", fullKV.SizeBytes())
+				}
+				go func() {
+					err := fullKV.Store().SetMetadata(s.ctx, fullKV.Filename(), met)
+					if err != nil {
+						s.logger.Warn("failed to set metadata on store", zap.String("store_name", modState.name), zap.String("filename", fullKV.Filename()), zap.Error(err))
+					}
+				}()
+			}
 		}()
 	}
 
+	//runtime.ReadMemStats(&m)
+	//s.logger.Info("after loading stores", zap.Uint64("total_store_size", totalStoreSize/1024/1024), zap.Uint64("used_memory_mb", m.HeapInuse/1024/1024))
 	var errs error
+	var actualStoreSize uint64
 	for len(out) < len(storeModuleStates) {
 		select {
 		case <-s.ctx.Done():
@@ -594,14 +638,16 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 			}
 			if loaded.err != nil {
 				errs = errors.Join(errs, fmt.Errorf("while loading %s: %w", loaded.name, loaded.err))
-				continue
+				break
 			}
 			out[loaded.name] = loaded.kv
+			actualStoreSize += loaded.kv.SizeBytes()
 		}
 	}
-	close(loadingChan)
-	if errs != nil {
-		return nil, errs
+
+	if reqHandler := reqctx.ActiveRequestsHandler(s.ctx); reqHandler != nil {
+		s.logger.Info("adjusting to stores size", zap.Uint64("actual_store_size", actualStoreSize/1024/1024))
+		reqHandler.AdjustFullKVSize(actualStoreSize)
 	}
 
 	return out, nil

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/streamingfast/dstore"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/storage/store/marshaller"
 	"go.uber.org/zap"
@@ -17,6 +18,10 @@ type FullKV struct {
 	*baseStore
 
 	loadedFrom string
+}
+
+func (s *FullKV) Store() dstore.Store {
+	return s.objStore
 }
 
 func (s *FullKV) Marshaller() marshaller.Marshaller {
@@ -152,7 +157,13 @@ func (s *FullKV) Load(ctx context.Context, file *FileInfo) error {
 			return fmt.Errorf("unmarshal store: %w", err)
 		}
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 
+	//if reqHandler := reqctx.ActiveRequestsHandler(ctx); reqHandler != nil {
+	//	reqHandler.AdjustFullKVSize(size)
+	//}
 	s.kv = storeData.Kv
 	s.totalSizeBytes = size
 	if s.kv == nil {
@@ -207,6 +218,10 @@ func (s *FullKV) Save(endBoundaryBlock uint64) (*FileInfo, *fileWriter, error) {
 	)
 
 	return file, fw, nil
+}
+
+func (s *FullKV) Filename() string {
+	return s.loadedFrom
 }
 
 func (s *FullKV) String() string {

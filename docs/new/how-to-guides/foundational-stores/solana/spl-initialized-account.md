@@ -193,5 +193,4 @@ params:
 
 ## Related Resources
 
-- [Foundational Stores Overview](../foundational-stores.md)
-- [Introduction to Foundational Stores](../../../tutorials/intro-to-foundational-stores.md)
+- [Foundational Stores Overview](https://github.com/streamingfast/substreams-foundational-store/blob/develop/README.md)

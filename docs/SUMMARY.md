@@ -10,6 +10,7 @@
   * [on Solana](tutorials/intro-to-tutorials/on-solana/README.md)
     * [Transactions & Instructions](new/tutorials/solana/solana.md)
     * [Account Changes](new/tutorials/solana/account-changes.md)
+  * [on NEAR](new/tutorials/near.md)
   * [on TRON](new/tutorials/tron.md)
   * [on Injective](new/tutorials/cosmos-compatible/injective.md)
   * [on MANTRA](new/tutorials/cosmos-compatible/mantra.md)

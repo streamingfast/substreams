@@ -117,7 +117,7 @@ func (s *SimpleSink) Run(ctx context.Context, initialCursor *sink.Cursor) error 
 	return nil
 }
 
-// handleBlockScopedData processes the data from a block
+// HandleBlockScopedData processes the data from a block
 func (s *SimpleSink) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.BlockScopedData, isLive *bool, cursor *sink.Cursor) error {
 	// skip empty data (when live, only clock is sent)
 	if data.Output.MapOutput.Value == nil {

@@ -182,14 +182,12 @@ func (s *Stages) AllStoresCompleted() bool {
 	}
 	lastSegment := s.storeSegmenter.LastIndex()
 
-	fmt.Println("----------------------------------")
 	for idx, stage := range s.stages {
 		if stage.kind != KindStore {
 			continue
 		}
 		for seg := s.storeSegmenter.FirstIndex(); seg <= lastSegment; seg++ {
 			state := s.getState(Unit{Segment: seg, Stage: idx})
-			fmt.Println("stage: ", idx, "segment: ", seg, "status:", state)
 			if state != UnitCompleted && state != UnitNoOp {
 				return false
 			}

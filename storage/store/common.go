@@ -33,6 +33,21 @@ func saveStore(ctx context.Context, store dstore.Store, filename string, content
 	})
 }
 
+func saveStoreStream(ctx context.Context, store dstore.Store, filename string, reader io.Reader) (err error) {
+	if cloned, ok := store.(dstore.Clonable); ok {
+		store, err = cloned.Clone(ctx, metering.WithBytesMeteringOptions(dmetering.GetBytesMeter(ctx), reqctx.Logger(ctx))...)
+		if err != nil {
+			return fmt.Errorf("cloning store: %w", err)
+		}
+		//todo: (deprecated)
+		store.SetMeter(dmetering.GetBytesMeter(ctx))
+	}
+
+	return derr.RetryContext(ctx, 10, func(ctx context.Context) error { // more than the usual 5 retries because if we fail, we have to reprocess the whole segment
+		return store.WriteObject(ctx, filename, reader)
+	})
+}
+
 func loadStore(ctx context.Context, store dstore.Store, filename string) (out []byte, err error) {
 	if cloned, ok := store.(dstore.Clonable); ok {
 		store, err = cloned.Clone(ctx, metering.WithBytesMeteringOptions(dmetering.GetBytesMeter(ctx), reqctx.Logger(ctx))...)
@@ -59,6 +74,28 @@ func loadStore(ctx context.Context, store dstore.Store, filename string) (out []
 		return nil
 	})
 	return out, err
+}
+
+func loadStoreStream(ctx context.Context, store dstore.Store, filename string) (reader io.ReadCloser, err error) {
+	if cloned, ok := store.(dstore.Clonable); ok {
+		store, err = cloned.Clone(ctx, metering.WithBytesMeteringOptions(dmetering.GetBytesMeter(ctx), reqctx.Logger(ctx))...)
+		if err != nil {
+			return nil, fmt.Errorf("cloning store: %w", err)
+		}
+		//todo: (deprecated)
+		store.SetMeter(dmetering.GetBytesMeter(ctx))
+	}
+
+	err = derr.RetryContext(ctx, 5, func(ctx context.Context) error {
+		r, err := store.OpenObject(ctx, filename)
+		if err != nil {
+			return fmt.Errorf("opening file for streaming: %w", err)
+		}
+		reader = r
+		return nil
+	})
+
+	return
 }
 
 // apparently this is faster than append() method

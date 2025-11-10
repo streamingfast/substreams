@@ -1,9 +1,11 @@
 package store
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"math"
 	"math/big"
 
@@ -36,14 +38,28 @@ func (p *PartialKV) Load(ctx context.Context, file *FileInfo) error {
 	p.loadedFrom = file.Filename
 	p.logger.Debug("loading partial store state from file", zap.String("filename", file.Filename))
 
-	data, err := loadStore(ctx, p.objStore, file.Filename)
-	if err != nil {
-		return fmt.Errorf("load partial store %s at %s: %w", p.name, file.Filename, err)
-	}
+	var storeData *marshaller.StoreData
+	var size uint64
 
-	storeData, size, err := p.marshaller.Unmarshal(data)
-	if err != nil {
-		return fmt.Errorf("unmarshal store: %w", err)
+	if unmarshaller, ok := p.marshaller.(marshaller.StreamMarshaller); ok {
+		reader, err := loadStoreStream(ctx, p.objStore, file.Filename)
+		if err != nil {
+			return fmt.Errorf("load store stream: %w", err)
+		}
+		defer reader.Close()
+		storeData, size, err = unmarshaller.UnmarshalStream(reader, 10*1024*1024) // TODO: bubble up approximation of store size here
+		if err != nil {
+			return fmt.Errorf("unmarshal store (streaming): %w", err)
+		}
+	} else {
+		data, err := loadStore(ctx, p.objStore, file.Filename)
+		if err != nil {
+			return fmt.Errorf("load full store %s at %s: %w", p.name, file.Filename, err)
+		}
+		storeData, size, err = p.marshaller.Unmarshal(data)
+		if err != nil {
+			return fmt.Errorf("unmarshal store: %w", err)
+		}
 	}
 
 	p.kv = storeData.Kv
@@ -65,18 +81,31 @@ func (p *PartialKV) Save(endBoundaryBlock uint64) (*FileInfo, *fileWriter, error
 		DeletePrefixes: p.DeletedPrefixes,
 	}
 
-	content, err := p.marshaller.Marshal(stateData)
-	if err != nil {
-		return nil, nil, fmt.Errorf("marshal partial data: %w", err)
-	}
-
 	file := NewPartialFileInfo(p.name, p.initialBlock, endBoundaryBlock)
 	p.logger.Debug("partial store save written", zap.String("file_name", file.Filename), zap.Stringer("block_range", file.Range))
 
-	fw := &fileWriter{
-		store:    p.objStore,
-		filename: file.Filename,
-		content:  content,
+	var fw *fileWriter
+
+	// New streaming marshaller support
+	if marshaller, ok := p.marshaller.(marshaller.StreamMarshaller); ok && p.totalSizeBytes > 524288 { // we don't use the streaming approach for payloads below 512kiB, it is slower
+		reader := marshaller.MarshalStream(stateData, int64(p.totalSizeBytes))
+
+		fw = &fileWriter{
+			store:    p.objStore,
+			filename: file.Filename,
+			reader:   reader,
+		}
+	} else {
+		content, err := p.marshaller.Marshal(stateData)
+		if err != nil {
+			return nil, nil, fmt.Errorf("marshal kv state: %w", err)
+		}
+
+		fw = &fileWriter{
+			store:    p.objStore,
+			filename: file.Filename,
+			reader:   io.NopCloser(bytes.NewReader(content)),
+		}
 	}
 
 	return file, fw, nil

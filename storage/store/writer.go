@@ -2,15 +2,18 @@ package store
 
 import (
 	"context"
+	"io"
+
 	"github.com/streamingfast/dstore"
 )
 
 type fileWriter struct {
 	store    dstore.Store
 	filename string
-	content  []byte
+	reader   io.ReadCloser
 }
 
 func (f *fileWriter) Write(ctx context.Context) error {
-	return saveStore(ctx, f.store, f.filename, f.content)
+	defer f.reader.Close()
+	return saveStoreStream(ctx, f.store, f.filename, f.reader)
 }

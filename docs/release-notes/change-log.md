@@ -25,6 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * Fix a panic (nil pointer) when skipping blocks via indexes on stores on tier2
 * Fix egress bytes calculation when running in noop or dev mode with specified output debug modules
+* Reduced memory usage while reading or writing large stores
 
 ## v1.17.1
 

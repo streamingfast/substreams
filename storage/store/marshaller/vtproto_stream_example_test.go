@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -152,6 +153,180 @@ func TestVTproto_UnmarshalStreamVsUnmarshal(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestVTproto_MarshalStreamResourceCleanup verifies that MarshalStream properly cleans up resources
+func TestVTproto_MarshalStreamResourceCleanup(t *testing.T) {
+	testData := &StoreData{
+		Kv: map[string][]byte{
+			"key1": []byte("value1"),
+			"key2": []byte("value2"),
+		},
+		DeletePrefixes: []string{"prefix1"},
+	}
+
+	marshaller := &VTproto{}
+
+	// Test that Close() can be called multiple times without issues
+	t.Run("multiple_close_calls", func(t *testing.T) {
+		reader := marshaller.MarshalStream(testData, 0)
+
+		// Read some data
+		buffer := make([]byte, 100)
+		_, err := reader.Read(buffer)
+		if err != nil && err != io.EOF {
+			t.Fatalf("failed to read from stream: %v", err)
+		}
+
+		// Close multiple times should not cause issues
+		err = reader.Close()
+		if err != nil {
+			t.Fatalf("first close failed: %v", err)
+		}
+
+		err = reader.Close()
+		if err != nil {
+			t.Fatalf("second close failed: %v", err)
+		}
+
+		// Reading after close should return EOF
+		_, err = reader.Read(buffer)
+		if err != io.EOF {
+			t.Fatalf("expected EOF after close, got: %v", err)
+		}
+	})
+
+	// Test that resources are cleaned up even if not fully consumed
+	t.Run("partial_read_with_close", func(t *testing.T) {
+		reader := marshaller.MarshalStream(testData, 0)
+
+		// Read only small amount of data
+		buffer := make([]byte, 10)
+		_, err := reader.Read(buffer)
+		if err != nil && err != io.EOF {
+			t.Fatalf("failed to read from stream: %v", err)
+		}
+
+		// Close without reading all data
+		err = reader.Close()
+		if err != nil {
+			t.Fatalf("close failed: %v", err)
+		}
+	})
+
+	// Test with defer pattern
+	t.Run("defer_pattern", func(t *testing.T) {
+		func() {
+			reader := marshaller.MarshalStream(testData, 0)
+			defer reader.Close() // Should always be called
+
+			// Simulate some processing that might fail
+			buffer := make([]byte, 100)
+			for {
+				n, err := reader.Read(buffer)
+				if err == io.EOF {
+					break
+				}
+				if err != nil {
+					t.Fatalf("read error: %v", err)
+				}
+				_ = buffer[:n] // Process data
+			}
+		}()
+		// reader.Close() should have been called by defer
+	})
+}
+
+// TestVTproto_ResourceLeakDetection runs stress tests to detect potential resource leaks
+func TestVTproto_ResourceLeakDetection(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping resource leak test in short mode")
+	}
+
+	testData := &StoreData{
+		Kv: map[string][]byte{
+			"key1": []byte(strings.Repeat("data", 1000)),
+			"key2": []byte(strings.Repeat("more", 1000)),
+			"key3": []byte(strings.Repeat("test", 1000)),
+		},
+		DeletePrefixes: []string{"prefix1", "prefix2"},
+	}
+
+	marshaller := &VTproto{}
+
+	t.Run("marshal_stream_leak_test", func(t *testing.T) {
+		var m1, m2 runtime.MemStats
+		runtime.GC()
+		runtime.ReadMemStats(&m1)
+
+		// Create and properly close many readers
+		for i := 0; i < 1000; i++ {
+			reader := marshaller.MarshalStream(testData, 0)
+			buffer := make([]byte, 1024)
+
+			// Read some data
+			for j := 0; j < 5; j++ {
+				_, err := reader.Read(buffer)
+				if err == io.EOF {
+					break
+				}
+				if err != nil {
+					t.Fatalf("read error: %v", err)
+				}
+			}
+
+			reader.Close()
+		}
+
+		runtime.GC()
+		runtime.ReadMemStats(&m2)
+
+		// Check that memory didn't grow excessively
+		var memGrowth uint64
+		if m2.Alloc > m1.Alloc {
+			memGrowth = m2.Alloc - m1.Alloc
+		} else {
+			memGrowth = 0 // Memory may have been collected, which is good
+		}
+		if memGrowth > 10*1024*1024 { // 10MB threshold
+			t.Errorf("excessive memory growth detected: %d bytes", memGrowth)
+		}
+	})
+
+	t.Run("unmarshal_stream_leak_test", func(t *testing.T) {
+		// First marshal the test data
+		serialized, err := marshaller.Marshal(testData)
+		if err != nil {
+			t.Fatalf("failed to marshal test data: %v", err)
+		}
+
+		var m1, m2 runtime.MemStats
+		runtime.GC()
+		runtime.ReadMemStats(&m1)
+
+		// Unmarshal many times to test for leaks
+		for i := 0; i < 1000; i++ {
+			reader := bytes.NewReader(serialized)
+			_, _, err := marshaller.UnmarshalStream(reader, int64(len(serialized)))
+			if err != nil {
+				t.Fatalf("unmarshal error: %v", err)
+			}
+		}
+
+		runtime.GC()
+		runtime.ReadMemStats(&m2)
+
+		// Check that memory didn't grow excessively
+		var memGrowth uint64
+		if m2.Alloc > m1.Alloc {
+			memGrowth = m2.Alloc - m1.Alloc
+		} else {
+			memGrowth = 0 // Memory may have been collected, which is good
+		}
+		if memGrowth > 10*1024*1024 { // 10MB threshold
+			t.Errorf("excessive memory growth detected: %d bytes", memGrowth)
+		}
+	})
 }
 
 func BenchmarkVTproto_UnmarshalStream(b *testing.B) {

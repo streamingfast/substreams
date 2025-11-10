@@ -38,7 +38,9 @@ func (p *VTproto) UnmarshalStreamFast(reader io.Reader, estimatedSize int64) (*S
 	}, dataSize, nil
 }
 
-// UnmarshalStream reads and unmarshals data from a stream
+// UnmarshalStream reads and unmarshals data from a stream.
+// The caller is responsible for closing the reader if it implements io.Closer.
+// All internal pooled resources are automatically cleaned up on error or success.
 func (p *VTproto) UnmarshalStream(reader io.Reader, estimatedSize int64) (*StoreData, uint64, error) {
 	stateData := &pbstore.StoreData{}
 	var dataSize uint64
@@ -72,6 +74,8 @@ func (p *VTproto) Marshal(data *StoreData) ([]byte, error) {
 // MarshalStream returns an io.ReadCloser that streams the marshaled data.
 // The data is assumed to not change until the returned ReadCloser is closed.
 // estimatedSize is used for buffer optimization; use 0 for auto-sizing.
+// MarshalStream returns an io.ReadCloser that streams the marshaled data.
+// IMPORTANT: The caller MUST call Close() on the returned ReadCloser to prevent resource leaks.
 func (p *VTproto) MarshalStream(data *StoreData, estimatedSize int64) io.ReadCloser {
 	return newFastStreamingMarshaler(data, estimatedSize)
 }
@@ -604,7 +608,10 @@ var largeBufPool = sync.Pool{
 func unmarshalVTStreamFast(m *pbstore.StoreData, reader io.Reader, estimatedSize int64) (dataSize uint64, err error) {
 	// Use larger buffer for better performance
 	bufPtr := largeBufPool.Get().(*[]byte)
-	defer largeBufPool.Put(bufPtr)
+	defer func() {
+		// Ensure buffer is always returned to pool, even on panic
+		largeBufPool.Put(bufPtr)
+	}()
 
 	// Create larger buffered reader based on estimated size
 	bufferSize := int64(32768) // Default 32KB
@@ -849,11 +856,17 @@ func unmarshalVTStreamFast(m *pbstore.StoreData, reader io.Reader, estimatedSize
 func unmarshalVTStream(m *pbstore.StoreData, reader io.Reader) (dataSize uint64, err error) {
 	// Get pooled buffer and buffered reader
 	bufPtr := bufferPool.Get().(*[]byte)
-	defer bufferPool.Put(bufPtr)
+	defer func() {
+		// Ensure buffer is always returned to pool, even on panic
+		bufferPool.Put(bufPtr)
+	}()
 
 	br := bufferedReaderPool.Get().(*bufio.Reader)
 	br.Reset(reader)
-	defer bufferedReaderPool.Put(br)
+	defer func() {
+		// Ensure buffered reader is always returned to pool, even on panic
+		bufferedReaderPool.Put(br)
+	}()
 
 	workBuf := *bufPtr
 

@@ -579,16 +579,22 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 	}
 
 	var errs error
-	for loaded := range loadingChan {
-		if loaded.err != nil {
-			errs = errors.Join(errs, fmt.Errorf("while loading %s: %w", loaded.name, loaded.err))
-			continue
-		}
-		out[loaded.name] = loaded.kv
-		if len(out) == len(storeModuleStates) {
-			close(loadingChan)
+	for len(out) < len(storeModuleStates) {
+		select {
+		case <-s.ctx.Done():
+			return nil, s.ctx.Err()
+		case loaded, ok := <-loadingChan:
+			if !ok {
+				break
+			}
+			if loaded.err != nil {
+				errs = errors.Join(errs, fmt.Errorf("while loading %s: %w", loaded.name, loaded.err))
+				continue
+			}
+			out[loaded.name] = loaded.kv
 		}
 	}
+	close(loadingChan)
 	if errs != nil {
 		return nil, errs
 	}

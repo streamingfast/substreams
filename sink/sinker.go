@@ -218,7 +218,7 @@ func (s *Sinker) OutputModuleTypeUnprefixed() (unprefixed string) {
 	return
 }
 
-// ClientConfig returns the the `SubstreamsClientConfig`used by this sinker instance.
+// ClientConfig returns the `SubstreamsClientConfig` used by this sinker instance.
 func (s *Sinker) ClientConfig() *client.SubstreamsClientConfig {
 	return s.SinkerConfig.ClientConfig
 }

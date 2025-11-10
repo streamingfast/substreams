@@ -8,7 +8,7 @@ Ensure you have [sfreleaser](https://github.com/streamingfast/sfreleaser) CLI, i
 
 ### Preparing for a release
 
-- Ensure tests past `go test ./...`
+- Ensure tests pass `go test ./...`
 - Ensure you are in a clean and pushed Git state
 - Update the [./docs/release-notes/change-log.md](./docs/release-notes/change-log.md) to update the `## Unreleased` header to become `## [${version}](https://github.com/streamingfast/substreams/releases/tag/v${version})`
 - Commit everything with message `Preparing release of ${version}`.

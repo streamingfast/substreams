@@ -84,11 +84,11 @@ export DSN=postgres://myuser:mypassword@localhost:5432/mydatabase?sslmode=disabl
 - Configure the sink to create the necessary tables.
 
 ```bash
-substreams-sink-sql setup $DNS ./substreams.yaml
+substreams-sink-sql setup $DSN ./substreams.yaml
 ```
 
 - Run the sink
 
 ```bash
-substreams-sink-sql run $DNS ./substreams.yaml
+substreams-sink-sql run $DSN ./substreams.yaml
 ```

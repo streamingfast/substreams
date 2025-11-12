@@ -11,22 +11,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v1.17.2
 
-## Server
+### Server
 
 * Reduced memory usage associated with reading and writing large stores by streaming the marshalling process. (~45% reduction peak usage)
 * New environment variable `SUBSTREAMS_TIER1_DEBUG_API_ADDR` now enables the debug API on the tier1 service.
 * Renamed environment variable `SUBSTREAMS_DEBUG_API_ADDR` to `SUBSTREAMS_TIER2_DEBUG_API_ADDR`, since it only affected tier2.
 
-## CLI
+### CLI
 
 * Improved `substreams init` to expand `~` and environment variable when resolving local file path.
-
 * Improved `substreams init` reporting of error when local file cannot be uploaded/read correctly.
-
 * Improved `substreams init` rendering of list items and some other elements.
-
 * Fixed `substreams init` to correctly showing selected label when selecting from a list of items.
-
 * Fixed `substreams protogen` when params are defined on networks for imported modules that are not dependencies to any local module
 
 ### Server

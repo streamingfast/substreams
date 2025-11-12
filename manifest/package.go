@@ -371,6 +371,20 @@ func removeUnusedImportedModules(pkg *pbsubstreams.Package, manif *Manifest) {
 		}
 	}
 
+	// also remove unused network parameters and initial blocks
+	for _, nets := range pkg.Networks {
+		for mod := range nets.Params {
+			if !moduleSet[mod] {
+				delete(nets.Params, mod)
+			}
+		}
+		for mod := range nets.InitialBlocks {
+			if !moduleSet[mod] {
+				delete(nets.InitialBlocks, mod)
+			}
+		}
+	}
+
 	pkg.Modules.Modules = newModules
 	pkg.ModuleMeta = newModuleMeta
 }

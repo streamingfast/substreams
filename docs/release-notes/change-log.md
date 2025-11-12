@@ -9,7 +9,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v1.17.2
 
 ## Server
 
@@ -26,6 +26,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Improved `substreams init` rendering of list items and some other elements.
 
 * Fixed `substreams init` to correctly showing selected label when selecting from a list of items.
+
+* Fixed `substreams protogen` when params are defined on networks for imported modules that are not dependencies to any local module
 
 ### Server
 

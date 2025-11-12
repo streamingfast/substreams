@@ -13,8 +13,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Server
 
-* `SUBSTREAMS_TIER1_DEBUG_API_ADDR` now enables the debug API on the tier1 service.
-* Previous env var `SUBSTREAMS_DEBUG_API_ADDR` for tier2 renamed to `SUBSTREAMS_TIER2_DEBUG_API_ADDR`.
+* Reduced memory usage associated with reading and writing large stores by streaming the marshalling process. (~45% reduction peak usage)
+* New environment variable `SUBSTREAMS_TIER1_DEBUG_API_ADDR` now enables the debug API on the tier1 service.
+* Renamed environment variable `SUBSTREAMS_DEBUG_API_ADDR` to `SUBSTREAMS_TIER2_DEBUG_API_ADDR`, since it only affected tier2.
 
 ## CLI
 

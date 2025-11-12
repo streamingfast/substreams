@@ -108,7 +108,7 @@ This document lists all environment variables used by the Substreams project, or
 - **Default**: `false`
 - **Location**: `orchestrator/parallelprocessor.go`, `orchestrator/scheduler/scheduler.go`
 
-### `SUBSTREAMS_DEBUG_API_ADDR`
+### `SUBSTREAMS_TIER1_DEBUG_API_ADDR` and `SUBSTREAMS_TIER2_DEBUG_API_ADDR`
 **Debug API address**
 - **Purpose**: Listen on a specific address for debug API requests and responses
 - **Usage**: If non-empty, the API will listen on the specified address for debug requests and responses

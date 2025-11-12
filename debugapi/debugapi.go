@@ -84,6 +84,9 @@ func (api *DebugAPI) handleSimulateOverloaded(w http.ResponseWriter, r *http.Req
 	switch r.Method {
 
 	case http.MethodGet:
+		if api.getSimulateOverloaded == nil {
+			http.Error(w, "overloaded cannot be get or set", http.StatusForbidden)
+		}
 		// Get current readiness status
 		overloaded := api.getSimulateOverloaded()
 		w.Header().Set("Content-Type", "application/json")

@@ -11,6 +11,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+## Server
+
+* `SUBSTREAMS_TIER1_DEBUG_API_ADDR` now enables the debug API on the tier1 service.
+* Previous env var `SUBSTREAMS_DEBUG_API_ADDR` for tier2 renamed to `SUBSTREAMS_TIER2_DEBUG_API_ADDR`.
+
 ## CLI
 
 * Improved `substreams init` to expand `~` and environment variable when resolving local file path.

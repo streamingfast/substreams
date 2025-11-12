@@ -3,11 +3,13 @@ package service
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -30,6 +32,7 @@ import (
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/client"
+	"github.com/streamingfast/substreams/debugapi"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/metrics"
@@ -60,7 +63,8 @@ var errShuttingDown = errors.New("endpoint is shutting down, please reconnect")
 type Tier1Service struct {
 	*shutter.Shutter
 	pbsubstreamsrpcv2connect.UnimplementedStreamHandler
-	activeRequests sync.WaitGroup
+	activeRequestsWG sync.WaitGroup
+	activeRequests   *activeRequestRecords // we keep a list of current requests for the debugAPI
 
 	blockType             string
 	wasmExtensions        map[string]map[string]wasm.WASMExtension
@@ -205,8 +209,20 @@ func NewTier1(
 		sessionPool:             sessionPool,
 	}
 	s.OnTerminating(func(_ error) {
-		s.activeRequests.Wait()
+		s.activeRequestsWG.Wait()
 	})
+
+	if debugAPIAddress := os.Getenv("SUBSTREAMS_TIER1_DEBUG_API_ADDR"); debugAPIAddress != "" {
+		debugAPI := debugapi.New(
+			debugAPIAddress,
+			logger,
+			nil, // not used on tier1
+			nil,
+			s.listActiveRecords,
+			s.cancelRequest,
+		)
+		debugAPI.Start()
+	}
 
 	go func() {
 		if sharedCacheSize == 0 {
@@ -331,12 +347,12 @@ func (s *Tier1Service) BlocksAny(
 		serverErr = connect.NewError(connect.CodeUnavailable, errShuttingDown)
 		return
 	}
-	s.activeRequests.Add(1)
+	s.activeRequestsWG.Add(1)
 	defer func() {
 		if reason, countAsRejected := metrics.IsRejectedRequestError(serverErr); countAsRejected {
 			metrics.Tier1RejectedRequestCounter.Inc(reason)
 		}
-		s.activeRequests.Done()
+		s.activeRequestsWG.Done()
 	}()
 
 	// We keep `err` here as the unaltered error from `blocks` call, this is used in the EndSpan to record the full error
@@ -1303,6 +1319,24 @@ func (s *Tier1Service) getOverloadedStatus() (status overloadingStatus) {
 		softLimit:          s.activeRequestsSoftLimit,
 		hardLimit:          s.activeRequestsHardLimit,
 	}
+}
+
+func (s *Tier1Service) listActiveRecords() string {
+	b, err := json.Marshal(s.activeRequests.List())
+	if err != nil {
+		return err.Error()
+	}
+	return string(b)
+}
+
+func (s *Tier1Service) cancelRequest(traceID string, outputModuleHash string, segmentNumber, segmentSize *uint64, stage *uint32) []string {
+	return s.activeRequests.cancelRequest(
+		traceID,
+		outputModuleHash,
+		segmentNumber,
+		segmentSize,
+		stage,
+	)
 }
 
 func (s *Tier1Service) getActiveRequestCount() int {

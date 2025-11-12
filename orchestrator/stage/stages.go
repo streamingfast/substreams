@@ -570,10 +570,15 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 		modState := modState
 		go func() {
 			fullKV, err := modState.getStore(s.ctx, exclusiveEndBlock)
-			loadingChan <- loadedStore{
+			loaded := loadedStore{
 				name: modState.name,
 				kv:   fullKV,
 				err:  err,
+			}
+			select {
+			case loadingChan <- loaded:
+			case <-s.ctx.Done():
+				return
 			}
 		}()
 	}

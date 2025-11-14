@@ -63,7 +63,7 @@ func (s *StoreModuleState) estimateStoreSizeBytes(ctx context.Context, exclusive
 }
 
 func getSize(ctx context.Context, store dstore.Store, filename string, logger *zap.Logger) (compressedSize uint64, uncompressedSize *uint64, metadata map[string]string, err error) {
-	err = derr.RetryContext(ctx, 5, func(ctx context.Context) error {
+	err = derr.RetryContext(ctx, 2, func(ctx context.Context) error {
 		r, err := store.ObjectAttributes(ctx, filename)
 		if err != nil {
 			return fmt.Errorf("opening file: %w", err)

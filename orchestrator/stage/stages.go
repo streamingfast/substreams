@@ -578,9 +578,6 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 		storesMetadata[modState.name] = metadata
 	}
 
-	//var m runtime.MemStats
-	//runtime.ReadMemStats(&m)
-	//s.logger.Info("about to load stores", zap.Uint64("total_store_size", totalStoreSize/1024/1024), zap.Uint64("used_memory_mb", m.HeapInuse/1024/1024))
 	s.logger.Info("about to load stores", zap.Uint64("approx_store_size", approxStoreSize/1024/1024))
 
 	if reqHandler := reqctx.ActiveRequestsHandler(s.ctx); reqHandler != nil {
@@ -624,10 +621,8 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 		}()
 	}
 
-	//runtime.ReadMemStats(&m)
-	//s.logger.Info("after loading stores", zap.Uint64("total_store_size", totalStoreSize/1024/1024), zap.Uint64("used_memory_mb", m.HeapInuse/1024/1024))
 	var errs error
-	var actualStoreSize uint64
+	var actualRequestStoresSize uint64
 	for len(out) < len(storeModuleStates) {
 		select {
 		case <-s.ctx.Done():
@@ -641,13 +636,13 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 				break
 			}
 			out[loaded.name] = loaded.kv
-			actualStoreSize += loaded.kv.SizeBytes()
+			actualRequestStoresSize += loaded.kv.SizeBytes()
 		}
 	}
 
 	if reqHandler := reqctx.ActiveRequestsHandler(s.ctx); reqHandler != nil {
-		s.logger.Info("adjusting to stores size", zap.Uint64("actual_store_size", actualStoreSize/1024/1024))
-		reqHandler.AdjustFullKVSize(actualStoreSize)
+		s.logger.Info("adjusting to stores size", zap.Uint64("actual_store_size", actualRequestStoresSize/1024/1024))
+		reqHandler.AdjustFullKVSize(actualRequestStoresSize)
 	}
 
 	return out, nil

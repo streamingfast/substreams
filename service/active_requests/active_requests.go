@@ -18,10 +18,10 @@ import (
 
 var GB uint64 = 1024 * 1024 * 1024
 var enforceStoreSizeLimitPerRequest = os.Getenv("SUBSTREAMS_ENFORCE_STORE_SIZE_LIMIT_PER_REQUEST") == "true"
-var storeSizeLimitPerRequest = parseUint64EnvVar("SUBSTREAMS_STORE_SIZE_LIMIT_PER_REQUEST", 5*GB)
+var storeSizeLimitPerRequest = parseUint64EnvVar("SUBSTREAMS_STORE_SIZE_LIMIT_PER_REQUEST", 5*GB) // limit size of all loaded stores for a single request, in bytes
 
 var enforceTotalStoreSizeLimit = os.Getenv("SUBSTREAMS_ENFORCE_TOTAL_STORE_SIZE_LIMIT") == "true"
-var totalStoreSizeLimitPercent = parseUint64EnvVar("SUBSTREAMS_TOTAL_STORE_SIZE_LIMIT_PERCENT", 50)
+var totalStoreSizeLimitPercent = parseUint64EnvVar("SUBSTREAMS_TOTAL_STORE_SIZE_LIMIT_PERCENT", 75) // limit size in-memory of all loaded stores concurrently, in percentage of usable memory (cgroup or system total -- regardless of free or available)
 
 func parseUint64EnvVar(envVar string, defaultValue uint64) uint64 {
 	if val := os.Getenv(envVar); val != "" {

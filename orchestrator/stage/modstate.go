@@ -35,6 +35,30 @@ func NewModuleState(logger *zap.Logger, name string, segmenter *block.Segmenter,
 func (s *StoreModuleState) Name() string {
 	return s.name
 }
+
+func (s *StoreModuleState) estimateStoreSizeBytes(ctx context.Context, exclusiveEndBlock uint64) (uncompressedSizeBytes uint64, metadata map[string]string, err error) {
+	if s.lastBlockInStore == exclusiveEndBlock && s.cachedStore != nil {
+		return s.cachedStore.SizeBytes(), nil, nil
+	}
+
+	fullKV := s.storeConfig.NewFullKV(s.logger)
+
+	moduleInitBlock := s.storeConfig.ModuleInitialBlock()
+	if moduleInitBlock < exclusiveEndBlock {
+		fullKVFile := store.NewCompleteFileInfo(s.name, moduleInitBlock, exclusiveEndBlock)
+		compressed, uncompressed, metadata, err := fullKV.GetSize(ctx, fullKVFile.Filename)
+		if err != nil {
+			return 0, nil, fmt.Errorf("get size of store %q: %w", s.name, err)
+		}
+
+		if uncompressed == nil {
+			return compressed * 4, metadata, nil // gross estimation for cases where we don't have metadata
+		}
+		return *uncompressed, metadata, nil
+	}
+	return 0, metadata, nil
+}
+
 func (s *StoreModuleState) getStore(ctx context.Context, exclusiveEndBlock uint64) (*store.FullKV, error) {
 	if s.lastBlockInStore == exclusiveEndBlock && s.cachedStore != nil {
 		return s.cachedStore, nil

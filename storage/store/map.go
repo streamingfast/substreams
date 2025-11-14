@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/streamingfast/substreams/reqctx"
 	"go.uber.org/zap/zapcore"
 )
 
@@ -42,10 +43,18 @@ func (m *Map) QuickSave(ctx context.Context, atBlockHash string) error {
 }
 
 func (m *Map) QuickLoad(ctx context.Context, atBlockHash string) error {
+
 	for _, s := range m.All() {
 		if writable, ok := s.(QuickLoad); ok {
 			if err := writable.QuickLoad(ctx, atBlockHash); err != nil {
 				return err
+			}
+		}
+
+		if reqHandler := reqctx.ActiveRequestsHandler(ctx); reqHandler != nil {
+			reqHandler.AllocateFullKVSizeOrForceCancelRequest(s.SizeBytes())
+			if ctx.Err() != nil {
+				return ctx.Err()
 			}
 		}
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/metrics"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"github.com/streamingfast/substreams/service/active_requests"
 	"go.opentelemetry.io/otel/codes"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
@@ -30,6 +31,7 @@ var wasmExtensionReqStats = contextKeyType(8)
 var cancelFunc = contextKeyType(9)
 var sessionKey = contextKeyType(10)
 var spkgKey = contextKeyType(11)
+var activeRequestsHandlerKey = contextKeyType(12)
 
 func WithSpkg(ctx context.Context, pkg *pbsubstreams.Package) context.Context {
 	return context.WithValue(ctx, spkgKey, pkg)
@@ -38,6 +40,18 @@ func WithSpkg(ctx context.Context, pkg *pbsubstreams.Package) context.Context {
 func Spkg(ctx context.Context) *pbsubstreams.Package {
 	spkg := ctx.Value(spkgKey)
 	if t, ok := spkg.(*pbsubstreams.Package); ok {
+		return t
+	}
+	return nil
+}
+
+func WithActiveRequestsHandler(ctx context.Context, reqMgr *active_requests.ActiveRequestsHandler) context.Context {
+	return context.WithValue(ctx, activeRequestsHandlerKey, reqMgr)
+}
+
+func ActiveRequestsHandler(ctx context.Context) *active_requests.ActiveRequestsHandler {
+	spkg := ctx.Value(activeRequestsHandlerKey)
+	if t, ok := spkg.(*active_requests.ActiveRequestsHandler); ok {
 		return t
 	}
 	return nil

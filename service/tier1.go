@@ -46,6 +46,7 @@ import (
 	"github.com/streamingfast/substreams/pipeline/cache"
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/substreams/service/active_requests"
 	"github.com/streamingfast/substreams/service/config"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/store"
@@ -64,7 +65,6 @@ type Tier1Service struct {
 	*shutter.Shutter
 	pbsubstreamsrpcv2connect.UnimplementedStreamHandler
 	activeRequestsWG sync.WaitGroup
-	activeRequests   *activeRequestRecords // we keep a list of current requests for the debugAPI
 
 	blockType             string
 	wasmExtensions        map[string]map[string]wasm.WASMExtension
@@ -89,6 +89,7 @@ type Tier1Service struct {
 	tier2RequestParameters  reqctx.Tier2RequestParameters
 	foundationalEndpoints   map[string]string
 	sessionPool             dsession.SessionPool
+	activeRequestsManager   *active_requests.ActiveRequestsManager // we keep a list of current requests for the debugAPI and to manage memory
 }
 
 func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
@@ -207,6 +208,7 @@ func NewTier1(
 		activeRequestsHardLimit: activeRequestsHardLimit,
 		foundationalEndpoints:   foundationalEndpoints,
 		sessionPool:             sessionPool,
+		activeRequestsManager:   active_requests.NewActiveRequestsManager(logger),
 	}
 	s.OnTerminating(func(_ error) {
 		s.activeRequestsWG.Wait()
@@ -861,6 +863,31 @@ func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelC
 		}()
 	}
 
+	traceID := tracing.GetTraceID(ctx).String()
+
+	if s.activeRequestsManager != nil {
+		activeReqHandler := s.activeRequestsManager.Add(
+			cancelRunning,
+			traceID,
+			reqctx.OutputModuleHash(ctx),
+			0, // not used on tier1
+			0,
+			0,
+		)
+		defer func() {
+			s.activeRequestsManager.Remove(activeReqHandler)
+			cancelRunning(context.Canceled) // in case nothing canceled it before
+		}()
+		ctx = reqctx.WithActiveRequestsHandler(ctx, activeReqHandler)
+	} else {
+		// we put this here, even if it is unrelated, to avoid setting more than one function to defer
+		defer func() {
+			if cancelRunning != nil { // in tests, this might be nil
+				cancelRunning(err)
+			}
+		}()
+	}
+
 	logger.Info("incoming Substreams Blocks request", logFields...)
 
 	defer func() {
@@ -1322,7 +1349,7 @@ func (s *Tier1Service) getOverloadedStatus() (status overloadingStatus) {
 }
 
 func (s *Tier1Service) listActiveRecords() string {
-	b, err := json.Marshal(s.activeRequests.List())
+	b, err := json.Marshal(s.activeRequestsManager.List())
 	if err != nil {
 		return err.Error()
 	}
@@ -1330,7 +1357,7 @@ func (s *Tier1Service) listActiveRecords() string {
 }
 
 func (s *Tier1Service) cancelRequest(traceID string, outputModuleHash string, segmentNumber, segmentSize *uint64, stage *uint32) []string {
-	return s.activeRequests.cancelRequest(
+	return s.activeRequestsManager.CancelRequest(
 		traceID,
 		outputModuleHash,
 		segmentNumber,

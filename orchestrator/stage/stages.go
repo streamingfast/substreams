@@ -10,6 +10,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/dustin/go-humanize"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/orchestrator/plan"
@@ -566,6 +567,27 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 	}
 
 	loadingChan := make(chan loadedStore, len(storeModuleStates))
+
+	storesMetadata := make(map[string]map[string]string)
+	var approxStoreSize uint64
+	for _, modState := range storeModuleStates {
+		size, metadata, err := modState.estimateStoreSizeBytes(s.ctx, exclusiveEndBlock)
+		if err != nil {
+			return nil, err
+		}
+		approxStoreSize += size
+		storesMetadata[modState.name] = metadata
+	}
+
+	s.logger.Info("about to load stores", zap.String("approx_store_size", humanize.IBytes(approxStoreSize)))
+
+	if reqHandler := reqctx.ActiveRequestsHandler(s.ctx); reqHandler != nil {
+		reqHandler.AllocateFullKVSizeOrForceCancelRequest(approxStoreSize)
+		if s.ctx.Err() != nil {
+			return nil, s.ctx.Err()
+		}
+	}
+
 	for _, modState := range storeModuleStates {
 		modState := modState
 		go func() {
@@ -580,10 +602,28 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 			case <-s.ctx.Done():
 				return
 			}
+
+			if err == nil {
+				//  add loaded file size to metadata
+				met := storesMetadata[modState.name]
+				if met == nil {
+					met = make(map[string]string)
+				}
+				if met["datasize"] == "" {
+					met["datasize"] = fmt.Sprintf("%d", fullKV.SizeBytes())
+				}
+				go func() {
+					err := fullKV.Store().SetMetadata(s.ctx, fullKV.Filename(), met)
+					if err != nil {
+						s.logger.Warn("failed to set metadata on store", zap.String("store_name", modState.name), zap.String("filename", fullKV.Filename()), zap.Error(err))
+					}
+				}()
+			}
 		}()
 	}
 
 	var errs error
+	var actualRequestStoresSize uint64
 	for len(out) < len(storeModuleStates) {
 		select {
 		case <-s.ctx.Done():
@@ -594,14 +634,16 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 			}
 			if loaded.err != nil {
 				errs = errors.Join(errs, fmt.Errorf("while loading %s: %w", loaded.name, loaded.err))
-				continue
+				break
 			}
 			out[loaded.name] = loaded.kv
+			actualRequestStoresSize += loaded.kv.SizeBytes()
 		}
 	}
-	close(loadingChan)
-	if errs != nil {
-		return nil, errs
+
+	if reqHandler := reqctx.ActiveRequestsHandler(s.ctx); reqHandler != nil {
+		s.logger.Info("adjusting to stores size", zap.Uint64("actual_store_size", actualRequestStoresSize/1024/1024))
+		reqHandler.AdjustFullKVSize(actualRequestStoresSize)
 	}
 
 	return out, nil

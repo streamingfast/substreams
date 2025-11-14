@@ -582,7 +582,7 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 	s.logger.Info("about to load stores", zap.String("approx_store_size", humanize.IBytes(approxStoreSize)))
 
 	if reqHandler := reqctx.ActiveRequestsHandler(s.ctx); reqHandler != nil {
-		reqHandler.AllocateFullKVSize(approxStoreSize)
+		reqHandler.AllocateFullKVSizeOrForceCancelRequest(approxStoreSize)
 		if s.ctx.Err() != nil {
 			return nil, s.ctx.Err()
 		}

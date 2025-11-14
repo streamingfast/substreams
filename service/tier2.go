@@ -761,6 +761,7 @@ func toGRPCError(ctx context.Context, err error) error {
 			if err == errShuttingDown {
 				return status.Error(codes.Unavailable, err.Error())
 			}
+			return toGRPCError(context.TODO(), err) // get error parsing from above for the error encapsulated in the cause
 		}
 		return status.Error(codes.Canceled, err.Error())
 	}

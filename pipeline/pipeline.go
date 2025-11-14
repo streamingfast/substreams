@@ -399,7 +399,7 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 	logger.Info("about to load stores", zap.String("approx_store_size", humanize.IBytes(neededSize)))
 
 	if reqHandler := reqctx.ActiveRequestsHandler(ctx); reqHandler != nil {
-		reqHandler.AllocateFullKVSize(neededSize)
+		reqHandler.AllocateFullKVSizeOrForceCancelRequest(neededSize)
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}

@@ -5,7 +5,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strconv"
 
+	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/storage/store/marshaller"
@@ -226,4 +228,27 @@ func (s *FullKV) Filename() string {
 
 func (s *FullKV) String() string {
 	return fmt.Sprintf("fullKV name %s moduleInitialBlock %d keyCount %d loadedFrom %s deltasCount %d", s.Name(), s.moduleInitialBlock, len(s.kv), s.loadedFrom, len(s.deltas))
+}
+
+func (s *FullKV) GetSize(ctx context.Context, filename string) (compressedSize uint64, uncompressedSize *uint64, metadata map[string]string, err error) {
+	err = derr.RetryContext(ctx, 2, func(ctx context.Context) error {
+		r, err := s.objStore.ObjectAttributes(ctx, filename)
+		if err != nil {
+			return fmt.Errorf("opening file: %w", err)
+		}
+		compressedSize = uint64(r.Size)
+		metadata = r.Metadata
+
+		if ds, ok := r.Metadata["datasize"]; ok {
+			size, err := strconv.ParseUint(ds, 10, 64)
+			if err != nil {
+				s.logger.Info("failed to parse datasize from metadata", zap.Error(err), zap.String("datasize", ds))
+				return nil
+			}
+			uncompressedSize = &size
+		}
+
+		return nil
+	})
+	return
 }

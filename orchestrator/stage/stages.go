@@ -10,6 +10,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/dustin/go-humanize"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/orchestrator/plan"
@@ -578,7 +579,7 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 		storesMetadata[modState.name] = metadata
 	}
 
-	s.logger.Info("about to load stores", zap.Uint64("approx_store_size", approxStoreSize/1024/1024))
+	s.logger.Info("about to load stores", zap.String("approx_store_size", humanize.IBytes(approxStoreSize)))
 
 	if reqHandler := reqctx.ActiveRequestsHandler(s.ctx); reqHandler != nil {
 		reqHandler.AllocateFullKVSize(approxStoreSize)

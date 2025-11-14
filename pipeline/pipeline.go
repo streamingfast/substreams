@@ -8,6 +8,7 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/RoaringBitmap/roaring/roaring64"
+	"github.com/dustin/go-humanize"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/logging"
@@ -337,6 +338,12 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 
 	storeMap = store.NewMap()
 
+	type loadable struct {
+		fullKVStore *store.FullKV
+		fileInfo    *store.FileInfo
+	}
+	var loadableStores []*loadable
+
 	lastStage := len(p.executionStages) - 1
 	for stageIdx, stage := range p.executionStages {
 		if p.highestStage != nil && stageIdx > *p.highestStage {
@@ -363,17 +370,70 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 
 				if fullStore.InitialBlock() < reqDetails.ResolvedStartBlockNum {
 					file := store.NewCompleteFileInfo(fullStore.Name(), fullStore.InitialBlock(), reqDetails.ResolvedStartBlockNum)
-					// FIXME: run debugging session with conditional breakpoint
-					// `request.Stage == 1 && request.StartBlockNum == 20`
-					// in tier2.go: on the call to InitTier2Stores.
-					// Things stall in this LOAD command:
-					if err := fullStore.Load(ctx, file); err != nil {
-						return nil, fmt.Errorf("load full store %s (%s): %w", storeConfig.Name(), storeConfig.ModuleHash(), err)
-					}
+					loadableStores = append(loadableStores, &loadable{
+						fullKVStore: fullStore,
+						fileInfo:    file,
+					})
+
 				}
 				storeMap.Set(fullStore)
 			}
 		}
+	}
+
+	storesMetadata := make(map[string]map[string]string)
+	var neededSize uint64
+	for _, loadable := range loadableStores {
+		compressed, uncompressed, metadata, err := loadable.fullKVStore.GetSize(ctx, loadable.fileInfo.Filename) // ignore error here
+		if err != nil {
+			logger.Warn("failed to get size of store", zap.String("store_name", loadable.fullKVStore.Name()), zap.Error(err))
+		}
+		if uncompressed == nil {
+			neededSize += compressed * 4
+		} else {
+			neededSize += *uncompressed
+		}
+		storesMetadata[loadable.fullKVStore.Name()] = metadata
+	}
+
+	logger.Info("about to load stores", zap.String("approx_store_size", humanize.IBytes(neededSize)))
+
+	if reqHandler := reqctx.ActiveRequestsHandler(ctx); reqHandler != nil {
+		reqHandler.AllocateFullKVSize(neededSize)
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+	}
+
+	var actualRequestStoresSize uint64
+	for _, loadable := range loadableStores {
+		if err := loadable.fullKVStore.Load(ctx, loadable.fileInfo); err != nil {
+			return nil, fmt.Errorf("load full store %s (%s): %w", loadable.fullKVStore.Name(), loadable.fullKVStore.ModuleHash(), err)
+		}
+		//  add loaded file size to metadata
+		met := storesMetadata[loadable.fullKVStore.Name()]
+		if met == nil {
+			met = make(map[string]string)
+		}
+		actualSize := loadable.fullKVStore.SizeBytes()
+		if met["datasize"] == "" {
+			met["datasize"] = fmt.Sprintf("%d", actualSize)
+		}
+		actualRequestStoresSize += actualSize
+		go func() {
+			err := loadable.fullKVStore.Store().SetMetadata(ctx, loadable.fullKVStore.Filename(), met)
+			if err != nil {
+				logger.Warn("failed to set metadata on store",
+					zap.String("store_name", loadable.fullKVStore.Name()),
+					zap.String("filename", loadable.fullKVStore.Filename()),
+					zap.Error(err))
+			}
+		}()
+	}
+
+	if reqHandler := reqctx.ActiveRequestsHandler(ctx); reqHandler != nil {
+		logger.Info("adjusting to stores size", zap.String("approx_store_size", humanize.IBytes(actualRequestStoresSize)))
+		reqHandler.AdjustFullKVSize(actualRequestStoresSize)
 	}
 
 	return storeMap, nil

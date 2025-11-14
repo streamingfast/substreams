@@ -86,7 +86,7 @@ func ReadManifestAndModule(
 		return nil, nil, nil, fmt.Errorf("get output module %q: %w", resolvedOutputModuleName, err)
 	}
 	if module.GetKindStore() != nil {
-		return nil, nil, nil, fmt.Errorf("ouput module %q is of type 'Store'", resolvedOutputModuleName)
+		return nil, nil, nil, fmt.Errorf("output module %q is of type 'Store'", resolvedOutputModuleName)
 	}
 
 	zlog.Info("validating output module type", zap.String("module_name", module.Name), zap.String("module_type", module.Output.Type))

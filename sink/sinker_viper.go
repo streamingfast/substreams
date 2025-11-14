@@ -241,7 +241,7 @@ func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagInclusionExclusion) {
 // it to create a new Sinker instance.
 //
 // If you want to extract the sink output module's name directly from the Substreams
-// package, if supported by your sink, instead of an actual name for paramater
+// package, if supported by your sink, instead of an actual name for parameter
 // `outputModuleNameArg`, use `sink.InferOutputModuleFromPackage`.
 //
 // The `expectedOutputModuleType` should be the fully qualified expected Protobuf

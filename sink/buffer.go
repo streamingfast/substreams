@@ -15,7 +15,7 @@ import (
 // about our internal "fake" finality which happens once enough block
 // has "passed" which is the size of the undo block size
 type blockDataBuffer struct {
-	// data is kept striclty ordered and its ordering must be respected
+	// data is kept strictly ordered and its ordering must be respected
 	// throughout the implementation.
 	//
 	// The array is always fully allocated, but the `dataEmptyAt` determines

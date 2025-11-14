@@ -7,7 +7,7 @@ import (
 	"go.opentelemetry.io/otel/trace/noop"
 )
 
-// NoopSpan is an implementation of span that preforms no operations.
+// NoopSpan is an implementation of span that performs no operations.
 type NoopSpan struct{}
 
 func (n *NoopSpan) EndWithErr(e *error) {}

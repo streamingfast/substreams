@@ -32,7 +32,7 @@ func TestReadManifestAndModule(t *testing.T) {
 			assert.NoError,
 		},
 		{
-			"multile expected type accepted",
+			"multiple expected type accepted",
 			args{"testdata/substreams.yaml", nil, "kv_out", "kv-out,graph-out", false},
 			true,
 			"kv_out",
@@ -40,7 +40,7 @@ func TestReadManifestAndModule(t *testing.T) {
 			assert.NoError,
 		},
 		{
-			"multile expected type accepted, inverted",
+			"multiple expected type accepted, inverted",
 			args{"testdata/substreams.yaml", nil, "graph_out", "kv-out,graph-out", false},
 			true,
 			"graph_out",

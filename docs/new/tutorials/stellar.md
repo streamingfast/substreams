@@ -13,7 +13,7 @@ In this guide, you'll learn how to initialize a Stellar-based Substreams project
 
 2. Running `substreams init` will give you the option to choose between two Stellar project options. Select the one that best fits your requirements:
     - **stellar-minimal**: Creates a simple Substreams that extracts raw Stellar block data and generates corresponding Rust code. This path will start you with the full raw block, you can navigate to the `substreams.yaml` (the manifest) to modify the input.
-    - **stellar-transactions-operations**: Creates a Substreams that extracts and decodes Stellar trasactions or operations using the cached [Stellar Foundational Module](https://substreams.dev/packages/stellar-foundational/v0.3.0). If you choose the index transactions, you will be able to filter by **source account(s)**. If you choose to index operations, you will be able to filter by **operation name**.
+    - **stellar-transactions-operations**: Creates a Substreams that extracts and decodes Stellar transactions or operations using the cached [Stellar Foundational Module](https://substreams.dev/packages/stellar-foundational/v0.3.0). If you choose the index transactions, you will be able to filter by **source account(s)**. If you choose to index operations, you will be able to filter by **operation name**.
 
 {% hint style="info" %}
  The first streamable block for Stellar on Substreams is currently 55,411,000.

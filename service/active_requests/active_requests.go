@@ -123,7 +123,7 @@ func (arh *ActiveRequestsHandler) AllocateFullKVSize(size uint64) {
 		if size > arh.manager.storeSizeLimitPerRequest {
 			arh.manager.logger.Warn("sum of all stores used in this request is above maximum", zap.String("uniqueID", arh.uniqueID), zap.Uint64("size", size), zap.Uint64("totalBytes", arh.manager.storeSizeLimitPerRequest))
 			if arh.manager.enforceStoreSizeLimitPerRequest {
-				req.cancelFunc(connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("sum of all stores used in this request have a size of %q, above maximum of: %q, (deterministic error)", humanize.Bytes(size), humanize.Bytes(arh.manager.storeSizeLimitPerRequest))))
+				req.cancelFunc(connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("sum of all stores used in this request have a size of %q, above maximum of: %q, (deterministic error)", humanize.IBytes(size), humanize.IBytes(arh.manager.storeSizeLimitPerRequest))))
 			}
 			return
 		}

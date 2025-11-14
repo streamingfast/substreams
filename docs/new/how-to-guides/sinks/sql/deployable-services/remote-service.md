@@ -69,7 +69,7 @@ Services:
 1. **Service ID:** the identifier of the deployed service, which you can use to manage the service.
 2. **URL of the service status:** use this URL to verify the status of the service.
 3. **URL of the PostgreSQL client:** use this client to run SQL queries, update the SQL schema, and manage the SQL database in general.
-4. **URL of the GraphQL clent:** use this client to run GraphQL queries.
+4. **URL of the GraphQL client:** use this client to run GraphQL queries.
 
 ### Inspecting the PostgreSQL client
 

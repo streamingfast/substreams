@@ -23,7 +23,7 @@ The Substreams GUI is a command-line utility, so you use the keys in your keyboa
 | Navigate Modules - Forward                      | `i`  |
 | Navigate Modules - Backwards                    | `u`  |
 | Search                                          | `/` + *text* + `enter`  |
-| Commnads information                            | `?`  |
+| Commands information                            | `?`  |
 
 ## Launching the GUI
 
@@ -77,7 +77,7 @@ You can see the output of a different module by using the `u` and `i` keys. In t
 
 ### Searching in the Output
 
-To search for a speciifc text in the output:
+To search for a specific text in the output:
 
 1. Press the `/` key.
 2. Introduce the text.

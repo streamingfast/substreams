@@ -29,7 +29,7 @@ Consider that you want to dump all the Pump.Fun data decoded with an IDL into yo
 
 Clone the [Pump Fun Substreams GitHub repository](https://github.com/enoldev/pump-fun-substreams).
 
-### Inpsect the Project
+### Inspect the Project
 
 - Observe the `substreams.yaml` file:
 

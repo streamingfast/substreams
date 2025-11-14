@@ -16,7 +16,7 @@ pub struct Block {
     /// and all other information the form a block.
     #[prost(message, optional, tag="5")]
     pub header: ::core::option::Option<BlockHeader>,
-    /// Uncles represents block produced with a valid solution but were not actually choosen
+    /// Uncles represents block produced with a valid solution but were not actually chosen
     /// as the canonical block for the given height so they are mostly "forked" blocks.
     ///
     /// If the Block has been produced using the Proof of Stake consensus algorithm, this
@@ -256,7 +256,7 @@ pub struct TransactionTrace {
     /// balance change for gas refunded to the transaction's emitter (e.g. `from`) and a balance change for the miner who
     /// received the transaction fees. There is also a nonce change for the transaction's emitter (e.g. `from`).
     ///
-    /// This means that to properly record the state changes for a transaction, you need to conditionally procees the
+    /// This means that to properly record the state changes for a transaction, you need to conditionally process the
     /// transaction's status.
     ///
     /// For a `SUCCEEDED` transaction, you iterate over the `calls` array and record the state changes for each call for
@@ -426,7 +426,7 @@ pub struct Call {
     #[prost(message, repeated, tag="28")]
     pub gas_changes: ::prost::alloc::vec::Vec<GasChange>,
     /// In Ethereum, a call can be either:
-    /// - Successfull, execution passes without any problem encountered
+    /// - Successful, execution passes without any problem encountered
     /// - Failed, execution failed, and remaining gas should be consumed
     /// - Reverted, execution failed, but only gas consumed so far is billed, remaining gas is refunded
     ///
@@ -441,7 +441,7 @@ pub struct Call {
     /// see above for details about those flags.
     #[prost(string, tag="11")]
     pub failure_reason: ::prost::alloc::string::String,
-    /// This field represents wheter or not the state changes performed
+    /// This field represents whether or not the state changes performed
     /// by this call were correctly recorded by the blockchain.
     ///
     /// On Ethereum, a transaction can record state changes even if some

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/streamingfast/dauth"
+	"github.com/streamingfast/dsession"
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/reqctx"
@@ -51,6 +52,28 @@ func NewSimpleWorkerPoolFactory(clientFactory client.InternalClientFactory) *Sim
 func (f *SimpleWorkerPoolFactory) WorkerPool(ctx context.Context) WorkerPool {
 	reqDetails := reqctx.Details(ctx)
 	workerPool := NewSimpleWorkerPool(ctx, int(reqDetails.MaxParallelJobs), f.clientFactory)
+
+	return workerPool
+}
+
+type SessionWorkerPoolFactory struct {
+	sessionPool   dsession.SessionPool
+	clientFactory client.InternalClientFactory
+}
+
+func NewSessionWorkerPoolFactory(sessionPool dsession.SessionPool, clientFactory client.InternalClientFactory) *SessionWorkerPoolFactory {
+	return &SessionWorkerPoolFactory{
+		sessionPool:   sessionPool,
+		clientFactory: clientFactory,
+	}
+}
+
+func (f *SessionWorkerPoolFactory) WorkerPool(ctx context.Context) WorkerPool {
+	// Use the trace ID as the session key for this request
+	traceID := tracing.GetTraceID(ctx)
+	sessionKey := traceID.String()
+
+	workerPool := NewSessionWorkerPool(ctx, sessionKey, f.sessionPool, f.clientFactory)
 
 	return workerPool
 }

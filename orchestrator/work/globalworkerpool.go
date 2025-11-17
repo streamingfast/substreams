@@ -2,7 +2,6 @@ package work
 
 import (
 	"context"
-	"errors"
 	"os"
 	"strings"
 	"sync"
@@ -110,9 +109,6 @@ func NewGlobalWorkerPool(ctx context.Context, userID string, apiKeyID string, tr
 	return wp
 }
 
-var ErrorResourceExhausted = errors.New("resource exhausted")
-var ErrorResourceExhaustedRampUp = errors.New("resource exhausted during ramp up")
-
 func (p *GlobalWorkerPool) Borrow(ctx context.Context) (Worker, error) {
 	if atomic.LoadInt32(&p.rampingUp) == 1 && atomic.LoadInt32(&p.rampUpWorkerServed) == 1 {
 		p.logger.Info("worker pool is exhausted because of ramp up", zap.Bool("first_worker_served", atomic.LoadInt32(&p.rampUpWorkerServed) == 1), zap.Bool("ramping_up", atomic.LoadInt32(&p.rampingUp) == 1), zap.Duration("time_since_start", time.Since(p.startedAt)))
@@ -122,7 +118,6 @@ func (p *GlobalWorkerPool) Borrow(ctx context.Context) (Worker, error) {
 	borrowWorkerResp, err := p.remoteWorkerPoolClient.BorrowWorker(ctx,
 		&pbworker.BorrowWorkerRequest{
 			Service:             Tier2WorkerServiceName,
-			UserId:              p.userID,
 			ApiKeyId:            p.apiKeyID,
 			TraceId:             p.traceID,
 			MaxWorkerForTraceId: int64(p.maxWorkerForTraceID),

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -14,18 +13,6 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 	"go.uber.org/zap"
 )
-
-const Tier2WorkerServiceName = "t2w"
-
-var rampupTime = time.Second * 4
-
-func init() {
-	if envDuration := os.Getenv("SUBSTREAMS_WORKERS_RAMPUP_TIME"); envDuration != "" {
-		if parsed, err := time.ParseDuration(envDuration); err == nil {
-			rampupTime = parsed
-		}
-	}
-}
 
 type SessionWorkerPool struct {
 	sessionPool   dsession.SessionPool
@@ -43,6 +30,8 @@ type SessionWorkerPool struct {
 	rampupWorkerGiven *atomic.Bool
 }
 
+// NewSessionWorkerPool creates a session-based worker pool that uses dsession.SessionPool
+// This is used when session-based worker management is available
 func NewSessionWorkerPool(
 	ctx context.Context,
 	sessionKey string,
@@ -153,4 +142,44 @@ func (p *SessionWorkerPool) Return(ctx context.Context, worker Worker) {
 		zap.String("worker_key", workerKey),
 		zap.Int("remaining_workers", activeWorkers),
 	)
+}
+
+// NewSimpleWorkerPool creates a simple in-process worker pool without session management
+// It maintains a local pool of remote workers
+func NewSimpleWorkerPool(ctx context.Context, maxWorkers int, clientFactory client.InternalClientFactory) WorkerPool {
+	logger := reqctx.Logger(ctx)
+	logger = logger.Named("simple-worker-pool").With(zap.Bool("keep", false))
+
+	logger.Debug("initializing simple worker pool", zap.Int("max_workers", maxWorkers))
+
+	wp := &SessionWorkerPool{
+		sessionPool:          nil, // Not used in simple mode
+		clientFactory:        clientFactory,
+		logger:               logger,
+		serviceName:          Tier2WorkerServiceName,
+		sessionKey:           "simple-pool", // Local pool, no session
+		maxWorkersPerSession: maxWorkers,
+		borrowedWorkers:      make(map[string]Worker),
+		rampingUp:            &atomic.Bool{},
+		rampupWorkerGiven:    &atomic.Bool{},
+	}
+
+	wp.rampingUp.Store(true)
+	time.AfterFunc(rampupTime, func() {
+		wp.rampingUp.Store(false)
+	})
+
+	// Clean up workers on context cancellation
+	go func() {
+		<-ctx.Done()
+		wp.borrowedWorkersMutex.Lock()
+		defer wp.borrowedWorkersMutex.Unlock()
+
+		for key := range wp.borrowedWorkers {
+			logger.Debug("returning worker on context cancel", zap.String("worker_key", key))
+			delete(wp.borrowedWorkers, key)
+		}
+	}()
+
+	return wp
 }

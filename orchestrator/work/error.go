@@ -1,5 +1,10 @@
 package work
 
+import "errors"
+
+var ErrorResourceExhausted = errors.New("resource exhausted")
+var ErrorResourceExhaustedRampUp = errors.New("resource exhausted during ramp up")
+
 type RetryableErr struct {
 	cause error
 }

@@ -73,6 +73,7 @@ require (
 	github.com/streamingfast/shutter v1.5.0
 	github.com/streamingfast/substreams-sdk-go v0.0.0-20240110154316-5fb21a7a330b
 	github.com/streamingfast/substreams-sink-sql v1.0.1-0.20231127153906-acf5f3e34330
+	github.com/streamingfast/worker-pool-protocol v0.0.0-20251029142144-b539534f3eb1
 	github.com/test-go/testify v1.1.4
 	github.com/tetratelabs/wazero v1.8.0
 	github.com/tidwall/pretty v1.2.1
@@ -127,6 +128,7 @@ require (
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.60.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.35.0 // indirect
+	go.uber.org/mock v0.5.0 // indirect
 	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1 // indirect
 	golang.org/x/time v0.11.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250218202821-56aae31c358a // indirect

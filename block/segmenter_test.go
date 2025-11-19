@@ -188,9 +188,9 @@ func TestSegmenter_WithInitialBlock(t *testing.T) {
 			exclusiveEndBlock:  25,
 			newInitialBlock:    30,
 			expectedInitial:    25,
-			expectedCount:      1,
+			expectedCount:      0, // no count, empty
 			expectedFirstIndex: 2,
-			expectedLastIndex:  2,
+			expectedLastIndex:  -1,
 		},
 		{
 			name:               "move to exclusive end block - should clamp",
@@ -199,9 +199,9 @@ func TestSegmenter_WithInitialBlock(t *testing.T) {
 			exclusiveEndBlock:  25,
 			newInitialBlock:    25,
 			expectedInitial:    25,
-			expectedCount:      1,
+			expectedCount:      0, // no count, empty
 			expectedFirstIndex: 2,
-			expectedLastIndex:  2,
+			expectedLastIndex:  -1,
 		},
 	}
 

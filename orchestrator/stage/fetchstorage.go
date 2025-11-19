@@ -236,6 +236,9 @@ func (s *Stages) fetchOutputMapperState(ctx context.Context) (mapperName string,
 }
 
 func (s *Stages) getUnits(firstIndex, lastIndex, stage int) []Unit {
+	if firstIndex >= lastIndex {
+		return nil
+	}
 	out := make([]Unit, lastIndex-firstIndex+1)
 	i := 0
 	for segIdx := firstIndex; segIdx <= lastIndex; segIdx++ {

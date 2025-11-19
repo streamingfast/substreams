@@ -42,6 +42,52 @@ func TestNewStages(t *testing.T) {
 	assert.Equal(t, block.MustParseRange("70-75"), stages.globalSegmenter.Range(7))
 }
 
+func TestNewStagesDepsInFuture(t *testing.T) {
+	//  productionMode bool, segmentInterval, lowestInitialBlock, lowestStoreInitialBlock, resolvedStartBlock, linearHandoffBlock, exclusiveEndBlock uint64, scheduleStores bool
+	reqPlan, err := plan.BuildTier1RequestPlan(true,
+		10,   // segmentInterval
+		0,    // lowestInitialBlock
+		1000, // lowestStoreInitialBlock
+		5,    // resolvedStartBlock
+		100,  // linearHandoffBlock
+		200,  // exclusiveEndBlock
+		true)
+	assert.NoError(t, err)
+
+	stages := NewStages(
+		context.Background(),
+		exec.TestGraphStagedModules(1000, 1000, 1000, 1000, 0),
+		reqPlan,
+		nil,
+		nil,
+	)
+
+	/*
+				// All stores are NOOP because they start in the future
+			    S:NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+		        S:NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+		        M:....................................................................................................
+	*/
+	assert.Equal(t, 10, stages.globalSegmenter.Count()) // 0 to 100 here we check that the linearHandoff block is the boundary for the global segmenter
+	assert.Equal(t, 0, stages.storeSegmenter.Count())
+
+	assert.Equal(t, 100, stages.storeSegmenter.FirstIndex())
+	assert.Equal(t, -1, stages.storeSegmenter.LastIndex()) // segmenter is empty, there is "no" last index
+
+	//	assert.Equal(t, 100, stages.storeSegmenter.Count()) // 0 to 100 here we check that the linearHandoff block is the boundary for the global segmenter
+
+	//assert.Equal(t, true, stages.storeSegmenter.EndsOnInterval(6))
+	//assert.Equal(t, false, stages.globalSegmenter.EndsOnInterval(7))
+	//assert.Equal(t, 6, stages.storeSegmenter.IndexForStartBlock(60), "index in range")
+	//assert.Equal(t, 8, stages.storeSegmenter.IndexForStartBlock(80), "index out of range still returned here")
+	//assert.Nil(t, stages.storeSegmenter.Range(8), "out of range")
+
+	//assert.Equal(t, block.MustParseRange("5-10"), stages.storeSegmenter.Range(0))
+	//assert.Equal(t, block.MustParseRange("10-20"), stages.storeSegmenter.Range(1))
+	//assert.Equal(t, block.MustParseRange("70-75"), stages.storeSegmenter.Range(7))
+	//assert.Equal(t, block.MustParseRange("70-75"), stages.globalSegmenter.Range(7))
+}
+
 func unit(seg, stage int) Unit {
 	return Unit{Segment: seg, Stage: stage}
 }

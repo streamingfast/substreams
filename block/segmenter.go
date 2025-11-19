@@ -3,7 +3,7 @@ package block
 // TODO(abourget): The Segmenter is a new SegmentedRange system, that takes an index so
 // the caller can always keep track of just one number, and we can obtain the corresponding
 // Range for the segment. We can obtain info on the Segment too (if it's Partial, Complete, etc..)
-
+// The segmenter can be 'empty' if initialBlock == exclusiveEndBlock, for example if we depend on a store that starts in the future, but still want the segmenter to exist.
 type Segmenter struct {
 	interval          uint64
 	initialBlock      uint64
@@ -11,6 +11,9 @@ type Segmenter struct {
 }
 
 func NewSegmenter(interval uint64, initialBlock uint64, exclusiveEndBlock uint64) *Segmenter {
+	if exclusiveEndBlock != 0 && exclusiveEndBlock < initialBlock {
+		exclusiveEndBlock = initialBlock // becomes an "empty" segment
+	}
 	s := &Segmenter{
 		interval:          interval,
 		initialBlock:      initialBlock,
@@ -27,8 +30,9 @@ func (s *Segmenter) ExclusiveEndBlock() uint64 {
 	return s.exclusiveEndBlock
 }
 
+// The given initialBlock will be clamped to exclusiveEndBlock
 func (s *Segmenter) WithInitialBlock(newInitialBlock uint64) *Segmenter {
-	if s.exclusiveEndBlock < newInitialBlock {
+	if s.exclusiveEndBlock != 0 && newInitialBlock > s.exclusiveEndBlock {
 		newInitialBlock = s.exclusiveEndBlock
 	}
 	return NewSegmenter(s.interval, newInitialBlock, s.exclusiveEndBlock)
@@ -41,6 +45,9 @@ func (s *Segmenter) WithExclusiveEndBlock(newExclusiveEndBlock uint64) *Segmente
 // Count returns the number of valid segments for the internal range.
 // Use LastIndex to know about the highest index.
 func (s *Segmenter) Count() int {
+	if s.exclusiveEndBlock != 0 && s.initialBlock == s.exclusiveEndBlock {
+		return 0
+	}
 	return int(s.LastIndex() - s.FirstIndex() + 1)
 }
 
@@ -49,8 +56,13 @@ func (s *Segmenter) FirstIndex() int {
 	return int(initSegment)
 }
 
+// if LastIndex returns -1, it means the segment is effectively empty
 func (s *Segmenter) LastIndex() int {
-	lastSegment := (s.exclusiveEndBlock - 1) / s.interval
+	if s.exclusiveEndBlock != 0 && s.initialBlock >= s.exclusiveEndBlock {
+		return -1
+	}
+	lastSegment := (s.exclusiveEndBlock - 1) / s.interval // at 0, this rolls over to maxInt / interval, so "infinite"
+
 	return int(lastSegment)
 }
 

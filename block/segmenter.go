@@ -28,6 +28,9 @@ func (s *Segmenter) ExclusiveEndBlock() uint64 {
 }
 
 func (s *Segmenter) WithInitialBlock(newInitialBlock uint64) *Segmenter {
+	if s.exclusiveEndBlock < newInitialBlock {
+		newInitialBlock = s.exclusiveEndBlock
+	}
 	return NewSegmenter(s.interval, newInitialBlock, s.exclusiveEndBlock)
 }
 

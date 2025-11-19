@@ -811,6 +811,9 @@ func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelC
 	var lowestStoresInitBlock uint64
 	if scheduleStores {
 		lowestStoresInitBlock = *execGraph.LowestStoresInitBlock()
+		if lowestStoresInitBlock > requestDetails.LinearHandoffBlockNum {
+			lowestStoresInitBlock = requestDetails.LinearHandoffBlockNum
+		}
 	}
 
 	reqPlan, err := plan.BuildTier1RequestPlan(

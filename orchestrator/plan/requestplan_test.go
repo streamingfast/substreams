@@ -237,7 +237,7 @@ func TestBuildConfig(t *testing.T) {
 			resolvedStartBlock:        738,
 			linearHandoffBlock:        800,
 			exclusiveEndBlock:         800,
-			expectStoresRange:         "nil",
+			expectStoresRange:         "810-800", // we still create it, even if noop, to avoid weird bugs
 			expectWriteExecOutRange:   "700-800",
 			expectReadExecOutRange:    "738-800",
 			expectLinearPipelineRange: "nil",

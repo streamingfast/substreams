@@ -2,6 +2,7 @@ package tests_e2e
 
 import (
 	"context"
+	"io"
 	"os"
 	"testing"
 
@@ -79,6 +80,16 @@ func TestDummyBlockchainContainer(t *testing.T) {
 			expectedLen:    350,
 			expectedClock:  499,
 		},
+		{
+			name:           "map that depend on store in future (prod)",
+			startBlock:     0,
+			stopBlock:      400,
+			productionMode: true,
+			spkgFile:       "./dummy/e2e-v0.1.0.spkg",
+			outputModule:   "map_stats",
+			expectedLen:    399,
+			expectedClock:  399,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -97,7 +108,7 @@ func TestDummyBlockchainContainer(t *testing.T) {
 
 			// Run the request
 			blockScopedDataSlice, session, err := RunRequest(t, request, substreamsEndpoint)
-			if err != nil {
+			if err != io.EOF {
 				// Let's try to get container logs to debug
 				logs, logErr := container.Logs(ctx)
 				if logErr == nil {
@@ -106,12 +117,12 @@ func TestDummyBlockchainContainer(t *testing.T) {
 					n, _ := logs.Read(buf)
 					t.Logf("Container logs: %s", string(buf[:n]))
 				}
-
-				t.Errorf("Error running request: %v", err)
+				t.Fatalf("Unexpected error: %s", err)
 			}
 
 			require.NotNil(t, session, "Should have received at least one session")
 			assert.Equal(t, tc.expectedLen, len(blockScopedDataSlice), "Should have received all expected blocks")
+			require.Greater(t, len(blockScopedDataSlice), 0)
 			assert.Equal(t, tc.expectedClock, uint64(blockScopedDataSlice[len(blockScopedDataSlice)-1].Clock.Number), "Should end on expected block")
 		})
 	}

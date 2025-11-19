@@ -72,7 +72,7 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval, lowestInitialBl
 
 	if productionMode {
 		storesEnd := linearHandoffBlock
-		if scheduleStores && storesEnd > lowestStoreInitialBlock {
+		if scheduleStores { // even if the stores have their initialBlock after our storesEnd, we still add buildStore.
 			plan.BuildStores = block.NewRange(lowestStoreInitialBlock, storesEnd)
 		}
 

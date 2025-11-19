@@ -356,7 +356,7 @@ func (s *Stages) initSegmentsOffset(reqPlan *plan.RequestPlan) {
 		for i := firstIndex; i < storesFirstIndex; i++ {
 			// take the last stages layer, and mark the NoOp
 			for idx := range s.stages {
-				if idx == lastStageIndex {
+				if idx >= lastStageIndex {
 					continue
 				}
 				s.allocSegments(i)
@@ -370,6 +370,10 @@ func (s *Stages) initSegmentsOffset(reqPlan *plan.RequestPlan) {
 func (s *Stages) getState(u Unit) UnitState {
 	index := u.Segment - s.segmentOffset
 	if index >= len(s.segmentStates) {
+		stg := s.stages[u.Stage]
+		if stg.kind == KindStore && stg.segmenter.FirstIndex() > index {
+			return UnitNoOp // stores that start in the future will not be blocking here
+		}
 		return UnitPending
 	} else if index < 0 || (len(s.stages) != 0 && u.Segment < s.stages[u.Stage].segmenter.FirstIndex()) {
 		return UnitNoOp

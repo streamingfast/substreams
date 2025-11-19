@@ -66,7 +66,8 @@ func RunRequest(t *testing.T, req *pbsubstreamsrpcv2.Request, endpoint string) (
 	var session *pbsubstreamsrpcv2.SessionInit
 
 	for {
-		response, err := stream.Recv()
+		var response *pbsubstreamsrpcv2.Response
+		response, err = stream.Recv()
 		if err != nil {
 			t.Logf("Stream ended or error: %v", err)
 			break
@@ -86,7 +87,7 @@ func RunRequest(t *testing.T, req *pbsubstreamsrpcv2.Request, endpoint string) (
 		}
 	}
 
-	return blockScopedDataSlice, session, nil
+	return blockScopedDataSlice, session, err
 
 }
 

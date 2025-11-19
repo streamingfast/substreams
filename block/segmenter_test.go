@@ -135,3 +135,91 @@ func TestSegmenter_Range(t *testing.T) {
 	assert.True(t, s.EndsOnInterval(1))
 
 }
+
+func TestSegmenter_WithInitialBlock(t *testing.T) {
+	tests := []struct {
+		name               string
+		interval           uint64
+		initialBlock       uint64
+		exclusiveEndBlock  uint64
+		newInitialBlock    uint64
+		expectedInitial    uint64
+		expectedCount      int
+		expectedFirstIndex int
+		expectedLastIndex  int
+	}{
+		{
+			name:               "normal case - move initial block forward",
+			interval:           10,
+			initialBlock:       5,
+			exclusiveEndBlock:  35,
+			newInitialBlock:    15,
+			expectedInitial:    15,
+			expectedCount:      3, // segments 15-20, 20-30, 30-35
+			expectedFirstIndex: 1,
+			expectedLastIndex:  3,
+		},
+		{
+			name:               "move initial block backward",
+			interval:           10,
+			initialBlock:       15,
+			exclusiveEndBlock:  35,
+			newInitialBlock:    5,
+			expectedInitial:    5,
+			expectedCount:      4, // segments 5-10, 10-20, 20-30, 30-35
+			expectedFirstIndex: 0,
+			expectedLastIndex:  3,
+		},
+		{
+			name:               "move to same interval boundary",
+			interval:           10,
+			initialBlock:       5,
+			exclusiveEndBlock:  25,
+			newInitialBlock:    10,
+			expectedInitial:    10,
+			expectedCount:      2, // segments 10-20, 20-25
+			expectedFirstIndex: 1,
+			expectedLastIndex:  2,
+		},
+		{
+			name:               "move beyond exclusive end block - should clamp",
+			interval:           10,
+			initialBlock:       5,
+			exclusiveEndBlock:  25,
+			newInitialBlock:    30,
+			expectedInitial:    25,
+			expectedCount:      1,
+			expectedFirstIndex: 2,
+			expectedLastIndex:  2,
+		},
+		{
+			name:               "move to exclusive end block - should clamp",
+			interval:           10,
+			initialBlock:       5,
+			exclusiveEndBlock:  25,
+			newInitialBlock:    25,
+			expectedInitial:    25,
+			expectedCount:      1,
+			expectedFirstIndex: 2,
+			expectedLastIndex:  2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			original := NewSegmenter(tt.interval, tt.initialBlock, tt.exclusiveEndBlock)
+			result := original.WithInitialBlock(tt.newInitialBlock)
+
+			// Verify the new segmenter has expected properties
+			assert.Equal(t, tt.expectedInitial, result.InitialBlock(), "InitialBlock()")
+			assert.Equal(t, tt.exclusiveEndBlock, result.ExclusiveEndBlock(), "ExclusiveEndBlock() should remain unchanged")
+			assert.Equal(t, tt.interval, result.Interval(), "Interval() should remain unchanged")
+			assert.Equal(t, tt.expectedCount, result.Count(), "Count()")
+			assert.Equal(t, tt.expectedFirstIndex, result.FirstIndex(), "FirstIndex()")
+			assert.Equal(t, tt.expectedLastIndex, result.LastIndex(), "LastIndex()")
+
+			// Verify original segmenter is unchanged
+			assert.Equal(t, tt.initialBlock, original.InitialBlock(), "Original segmenter should be unchanged")
+		})
+	}
+}

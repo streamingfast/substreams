@@ -47,7 +47,7 @@ modules:
 
   - name: map_stats
     kind: map
-    initialBlock: 150
+    initialBlock: 0
     inputs:
       - source: sf.acme.type.v1.Block
       - store: store_stats

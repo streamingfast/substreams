@@ -19,6 +19,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - "SUBSTREAMS_TOTAL_STORE_SIZE_LIMIT_PERCENT" (default: 75): limit the size in-memory of all loaded stores concurrently on the instance, in percentage of usable memory (cgroup or system total -- regardless of free or available)
   - "SUBSTREAMS_ENFORCE_TOTAL_STORE_SIZE_LIMIT" (default: false): if set to `true`, enforce the limit above instead of just logging a warning
 
+* Fixed an edge case where substreams with modules depending on stores that start on the future would fail and incorrectly report an error about "tier2 version being incompatible"
+
 ## v1.17.2
 
 ### Server

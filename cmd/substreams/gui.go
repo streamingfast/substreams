@@ -21,6 +21,7 @@ func init() {
 			sink.FlagCursor,
 		),
 		sink.FlagExcludeDefault(
+			sink.FlagStopBlock,
 			sink.FlagDevelopmentMode,
 			sink.FlagLiveBlockTimeDelta,
 			sink.FlagMaxRetries,
@@ -28,6 +29,7 @@ func init() {
 	)
 
 	// GUI-specific flags
+	guiCmd.Flags().StringP(sink.FlagStopBlock, sink.ShortFlagStopBlock, "+1000", "Stop block to end stream at, exclusively. If the start-block is positive, a '+' prefix can indicate 'relative to start-block'")
 	guiCmd.Flags().Bool("production-mode", false, "Enable Production Mode, with high-speed parallel processing")
 	guiCmd.Flags().Uint64("limit-processed-blocks", 10000, "Limit the number of blocks to be processed by the server, including preparing the stores, as a safeguard to prevent unexpected expensive reprocessing (0 disables the limit)")
 	guiCmd.Flags().StringSlice("debug-modules-initial-snapshot", nil, "List of 'store' modules from which to print the initial data snapshot (Unavailable in Production Mode)")
@@ -141,6 +143,8 @@ func runGui(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	tuiConfig := &common.TUIConfig{
+		StartBlock:    sinkerConfig.StartBlock,
+		StopBlock:     sflags.MustGetString(cmd, sink.FlagStopBlock), // we ignore stopBlock from sinkerConfig for now, the manifest will be (re)loaded later
 		ManifestPath:  manifestPath,
 		HomeDir:       homeDir,
 		Vcr:           sflags.MustGetBool(cmd, "replay"),

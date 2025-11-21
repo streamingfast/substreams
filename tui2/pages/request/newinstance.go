@@ -109,7 +109,7 @@ func NewInstance(sinkerConfig *sink.SinkerConfig, tuiConfig *common.TUIConfig) (
 	}
 	sinkerConfig.ClientConfig.SetEndpoint(endpoint)
 
-	var startBlock int64 = sinkerConfig.StartBlock
+	var startBlock int64 = tuiConfig.StartBlock
 	if graph != nil && tuiConfig.OutputModule != "" {
 		if startBlock == 0 {
 			sb, err := graph.ModuleInitialBlock(tuiConfig.OutputModule)
@@ -120,13 +120,13 @@ func NewInstance(sinkerConfig *sink.SinkerConfig, tuiConfig *common.TUIConfig) (
 		}
 	}
 
-	var stopBlock uint64 = sinkerConfig.StopBlock
+	var stopBlock uint64
 	if stopBlock == 0 {
 		// Parse stop block if it was set as string (this might not be needed in new design)
-		// stopBlock, err = parseStopBlock(startBlock, stopBlockString, tuiConfig.Cursor != "")
-		// if err != nil {
-		// 	return nil, fmt.Errorf("invalid stop block: %w", err)
-		// }
+		stopBlock, err = parseStopBlock(startBlock, tuiConfig.StopBlock, tuiConfig.Cursor != "")
+		if err != nil {
+			return nil, fmt.Errorf("invalid stop block: %w", err)
+		}
 	}
 
 	// TODO: use the latest `endpoint`, create a new `SubstreamsClientConfig`

@@ -75,9 +75,7 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				r.sinkerConfig.StartBlock = value
 			}
 		case "stop-block":
-			if value, err := strconv.ParseUint(msg.Value, 10, 64); err == nil {
-				r.sinkerConfig.StopBlock = value
-			}
+			r.tuiConfig.StopBlock = msg.Value
 		case "limit-processed-blocks":
 			if value, err := strconv.ParseUint(msg.Value, 10, 64); err == nil {
 				r.sinkerConfig.LimitProcessedBlocks = value
@@ -95,13 +93,13 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			comp := dataentry.New(r.Common, "start-block", validateNumbersOnly)
 			comp.Input.Prompt("Enter the start block number: ").
 				Description("Block from which to start streaming. Numbers only. Negative means relative to chain head.\n\n")
-			comp.SetValue(fmt.Sprintf("%d", r.sinkerConfig.StartBlock))
+			comp.SetValue(fmt.Sprintf("%d", r.tuiConfig.StartBlock))
 			cmds = append(cmds, common.SetModalComponentCmd(comp))
 		case "t":
 			comp := dataentry.New(r.Common, "stop-block", validateNumberOrRelativeValue)
 			comp.Input.Prompt("Enter the stop block number: ").
 				Description("Enter numbers only, with an optional - or + prefix.\n\nYou can specify relative block numbers with - (to head) or + (to start block) prefixes.\n")
-			comp.SetValue(fmt.Sprintf("%d", r.sinkerConfig.StopBlock))
+			comp.SetValue(r.tuiConfig.StopBlock)
 			cmds = append(cmds, common.SetModalComponentCmd(comp))
 		case "l":
 			comp := dataentry.New(r.Common, "limit-processed-blocks", validateNumberOrRelativeValue)
@@ -163,12 +161,17 @@ func (r *Request) View() string {
 	)
 }
 
-func (r *Request) renderRequestSummary() string {
-	startBlock := fmt.Sprintf("%d", r.sinkerConfig.StartBlock)
+func (r *Request) calculateTUIStartBlock() {
 	if r.graph != nil && r.tuiConfig.OutputModule != "" {
 		if startBlockInt, err := r.graph.ModuleInitialBlock(r.tuiConfig.OutputModule); err == nil {
-			startBlock = fmt.Sprintf("%d (module's initial block)", startBlockInt)
+			r.tuiConfig.StartBlock = int64(startBlockInt)
 		}
+	}
+}
+
+func (r *Request) renderRequestSummary() string {
+	if r.tuiConfig.StartBlock == 0 {
+		r.calculateTUIStartBlock()
 	}
 	packageName := r.tuiConfig.ManifestPath
 	packageMetaName := "unknown"
@@ -191,8 +194,8 @@ func (r *Request) renderRequestSummary() string {
 		{"Default params:", r.tuiConfig.DefaultParams},
 		{"", ""},
 		{fmt.Sprintf("Module %s:", styles.HelpKey.Render("<m>")), r.tuiConfig.OutputModule},
-		{fmt.Sprintf("Start block %s:", styles.HelpKey.Render("<s>")), startBlock},
-		{fmt.Sprintf("Stop block %s:", styles.HelpKey.Render("<t>")), fmt.Sprintf("%d", r.sinkerConfig.StopBlock)},
+		{fmt.Sprintf("Start block %s:", styles.HelpKey.Render("<s>")), fmt.Sprintf("%d", r.tuiConfig.StartBlock)},
+		{fmt.Sprintf("Stop block %s:", styles.HelpKey.Render("<t>")), r.tuiConfig.StopBlock},
 		{fmt.Sprintf("Limit processed blocks %s:", styles.HelpKey.Render("<l>")), fmt.Sprintf("%d", r.sinkerConfig.LimitProcessedBlocks)},
 	}
 	if len(r.sinkerConfig.DevOutputSnapshots) > 0 {

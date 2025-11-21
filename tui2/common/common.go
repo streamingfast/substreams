@@ -27,6 +27,8 @@ type TUIConfig struct {
 	HomeDir       string
 	Vcr           bool
 	Headers       map[string]string
+	StartBlock    int64
+	StopBlock     string
 	Cursor        string
 	Params        string
 	DefaultParams string

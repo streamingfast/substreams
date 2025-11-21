@@ -339,10 +339,15 @@ func (m *Module) String() string {
 }
 
 func (m *Module) ToProtoWASM(codeIndex uint32) (*pbsubstreams.Module, error) {
+	entrypoint := m.Name
+	if lastColon := strings.LastIndex(m.Name, ":"); lastColon != -1 {
+		entrypoint = m.Name[lastColon+1:]
+	}
+
 	out := &pbsubstreams.Module{
 		Name:             m.Name,
 		BinaryIndex:      codeIndex,
-		BinaryEntrypoint: m.Name,
+		BinaryEntrypoint: entrypoint,
 	}
 
 	out.InitialBlock = UNSET

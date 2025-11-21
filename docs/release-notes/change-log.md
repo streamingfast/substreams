@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### CLI
+
+* Fix running from manifests that were created with `tools unpack` and contain imported modules, preventing "failed to get entrypoint" error.
+
 ### Server
 
 * Added opt-in memory limits related to loading FullKV stores, gated by environment variables:

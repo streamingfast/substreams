@@ -158,7 +158,11 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			ui.footer.SetShowAll(!ui.footer.ShowAll())
 			ui.resize()
 		case "r":
-			return ui, request.SetupNewInstanceCmd(true)
+			cmds = append(cmds, common.SetupNewInstanceCmd(true))
+			if ui.activePage == buildPage {
+				cmds = append(cmds, tabs.SelectTabCmd(2))
+			}
+			return ui, tea.Batch(cmds...)
 		case "b":
 			return ui, build.SetupNewBuildCmd()
 		}
@@ -179,7 +183,7 @@ func (ui *UI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, tabs.SelectTabCmd(int(buildPage)))
 		}
 
-	case request.SetupNewInstanceMsg:
+	case common.SetupNewInstanceMsg:
 		return ui, ui.setupNewInstance(msg.StartStream)
 	case request.NewRequestInstance:
 		ui.stream = msg.Stream

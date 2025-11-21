@@ -1,5 +1,7 @@
 package common
 
+import tea "github.com/charmbracelet/bubbletea"
+
 // Common is a struct all components should embed.
 type Common struct {
 	Width  int
@@ -33,4 +35,13 @@ type TUIConfig struct {
 	Params        string
 	DefaultParams string
 	OutputModule  string
+	RequiresBuild bool
+}
+
+type SetupNewInstanceMsg struct {
+	StartStream bool
+}
+
+func SetupNewInstanceCmd(startStream bool) tea.Cmd {
+	return func() tea.Msg { return SetupNewInstanceMsg{StartStream: startStream} }
 }

@@ -41,12 +41,13 @@ const (
 	FlagDevelopmentMode    = "development-mode"
 	FlagMaxRetries         = "max-retries"
 
-	FlagSkipPackageValidation = "skip-package-validation"
-	FlagExtraHeaders          = "header"
-	FlagNoopMode              = "noop-mode"
-	FlagProtoPath             = "proto-path"
-	FlagProtoDescriptorSet    = "proto-descriptor-set"
-	FlagPrometheusAddr        = "prometheus-addr"
+	FlagSkipPackageValidation        = "skip-package-validation"
+	FlagExtraHeaders                 = "header"
+	FlagNoopMode                     = "noop-mode"
+	FlagProtoPath                    = "proto-path"
+	FlagProtoDescriptorSet           = "proto-descriptor-set"
+	FlagPrometheusAddr               = "prometheus-addr"
+	FlagSkipCheckModuleBinariesExist = "skip-check-module-binaries-exist"
 )
 
 type FlagInclusionExclusion interface {
@@ -160,6 +161,10 @@ func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagInclusionExclusion) {
 
 	if optionalFlagIncluded(FlagCursor) {
 		flags.StringP(FlagCursor, ShortFlagCursor, "", "Cursor to stream from. Leave blank for no cursor")
+	}
+
+	if optionalFlagIncluded(FlagSkipCheckModuleBinariesExist) {
+		flags.Bool(FlagSkipCheckModuleBinariesExist, true, "Skip validation that the module binaries exist when loading from YAML manifest (ex: WASM already built)")
 	}
 
 	if defaultFlagIncluded(FlagNetwork) {
@@ -282,19 +287,13 @@ func ConfigFromViper(
 	zlog *zap.Logger,
 	tracer logging.Tracer,
 ) (*SinkerConfig, error) {
-	params, network, undoBufferSize, liveBlockTimeDelta, isDevelopmentMode, maxRetries, finalBlocksOnly, skipPackageValidation, isNoopMode, extraHeaders, prometheusAddr := getViperFlags(cmd)
+	params, network, undoBufferSize, liveBlockTimeDelta, isDevelopmentMode, maxRetries, finalBlocksOnly, skipPackageValidation, isNoopMode, extraHeaders, prometheusAddr, skipCheckModuleBinariesExist := getViperFlags(cmd)
 
 	// Parse start and stop blocks using utility functions
 	startBlockFlag := sflags.MustGetString(cmd, FlagStartBlock)
 	startBlock, startBlockIsEmpty, err := parseStartBlockFlag(startBlockFlag)
 	if err != nil {
 		return nil, fmt.Errorf("reading start block flag: %w", err)
-	}
-
-	stopBlockFlag := sflags.MustGetString(cmd, FlagStopBlock)
-	stopBlock, err := parseStopBlockFlag(stopBlockFlag, startBlock)
-	if err != nil {
-		return nil, fmt.Errorf("reading stop block flag: %w", err)
 	}
 
 	var readerOptions []manifest.Option
@@ -312,6 +311,10 @@ func ConfigFromViper(
 
 	if outputModuleName != "" {
 		readerOptions = append(readerOptions, manifest.WithOverrideOutputModule(outputModuleName))
+	}
+
+	if skipCheckModuleBinariesExist {
+		readerOptions = append(readerOptions, manifest.SkipSourceCodeReader())
 	}
 
 	pkg, module, outputModuleHash, err := ReadManifestAndModule(
@@ -337,6 +340,12 @@ func ConfigFromViper(
 	// Resolve start block if empty (use module's initial block)
 	if startBlockIsEmpty {
 		startBlock = int64(module.InitialBlock)
+	}
+
+	stopBlockFlag := sflags.MustGetString(cmd, FlagStopBlock)
+	stopBlock, err := parseStopBlockFlag(stopBlockFlag, startBlock)
+	if err != nil {
+		return nil, fmt.Errorf("reading stop block flag: %w", err)
 	}
 
 	zlog.Info("sinker from CLI",
@@ -439,6 +448,7 @@ func getViperFlags(cmd *cobra.Command) (
 	isNoopMode bool,
 	extraHeaders []string,
 	prometheusAddr string,
+	skipCheckModuleBinariesExist bool,
 ) {
 	if sflags.FlagDefined(cmd, FlagParams) {
 		params = sflags.MustGetStringArray(cmd, FlagParams)
@@ -482,6 +492,10 @@ func getViperFlags(cmd *cobra.Command) (
 
 	if sflags.FlagDefined(cmd, FlagPrometheusAddr) {
 		prometheusAddr = sflags.MustGetString(cmd, FlagPrometheusAddr)
+	}
+
+	if sflags.FlagDefined(cmd, FlagSkipCheckModuleBinariesExist) {
+		skipCheckModuleBinariesExist = sflags.MustGetBool(cmd, FlagSkipCheckModuleBinariesExist)
 	}
 
 	return

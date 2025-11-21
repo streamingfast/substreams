@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os/exec"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -18,7 +19,8 @@ const (
 )
 
 type BuildOutputMsg struct {
-	Msg string
+	Msg      string
+	Finished bool
 }
 
 type BuildOutput struct {
@@ -75,23 +77,24 @@ func (b *BuildOutput) Init() tea.Cmd {
 }
 
 func (b *BuildOutput) Update(msg tea.Msg) tea.Cmd {
-	switch msg {
-	case BuildDoneSuccess:
-		return func() tea.Msg {
-			return nil
-		}
-	case BuildDoneFailure:
-		return func() tea.Msg {
-			return nil
-		}
-	}
 	return b.readNextLine
 }
 
 func (b *BuildOutput) readNextLine() tea.Msg {
 	msg := <-b.outputCh
 
+	var finished bool
+	if strings.Contains(msg, "✅ Build complete!") {
+		msg += " Press <r> to start your substreams request (or <tab> to navigate)"
+		finished = true
+
+	} else if strings.Contains(msg, "❌ Error building spkg:") {
+		msg += " Press <b> when ready to build again (or <tab> to navigate)"
+		finished = true
+	}
+
 	return BuildOutputMsg{
-		Msg: msg,
+		Msg:      msg,
+		Finished: finished,
 	}
 }

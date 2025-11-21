@@ -536,8 +536,8 @@ func (r *manifestConverter) convertToPkg(m *Manifest) (pkg *pbsubstreams.Package
 			if !found {
 				codePath := m.resolvePath(binaryDef.File)
 				var byteCode []byte
+				byteCode, err = os.ReadFile(codePath)
 				if !r.validation.SkipSourceCodeImportValidation {
-					byteCode, err = os.ReadFile(codePath)
 					if err != nil {
 						return nil, fmt.Errorf("failed to read source code %q: %w", codePath, err)
 					}

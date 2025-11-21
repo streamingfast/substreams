@@ -125,6 +125,9 @@ var (
 				Foreground(lipgloss.AdaptiveColor{Dark: "15", Light: "15"}).  // White color
 				Background(lipgloss.AdaptiveColor{Dark: "160", Light: "160"}) // Reddish color
 
+	BuildButton = StreamButton.
+			Foreground(lipgloss.AdaptiveColor{Dark: "8", Light: "8"}).           // Darkish color
+			Background(lipgloss.AdaptiveColor{Dark: "#ffd700", Light: "ffd700"}) // Bright green color
 	Spinner = lipgloss.NewStyle().
 		MarginTop(1).
 		MarginLeft(2).

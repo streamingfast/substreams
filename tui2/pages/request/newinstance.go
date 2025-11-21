@@ -21,14 +21,6 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-type SetupNewInstanceMsg struct {
-	StartStream bool
-}
-
-func SetupNewInstanceCmd(startStream bool) tea.Cmd {
-	return func() tea.Msg { return SetupNewInstanceMsg{StartStream: startStream} }
-}
-
 type NewRequestInstance *Instance
 
 type Instance struct {
@@ -69,6 +61,17 @@ func NewInstance(sinkerConfig *sink.SinkerConfig, tuiConfig *common.TUIConfig) (
 	}
 
 	pkgBundle, err := manifestReader.Read()
+	if err != nil && strings.Contains(err.Error(), "failed to read source code") {
+		tuiConfig.RequiresBuild = true
+		readerOptions = append(readerOptions, manifest.SkipSourceCodeReader()) // do not fail if package is not built yet
+		manifestReader, err2 := manifest.NewReader(tuiConfig.ManifestPath, readerOptions...)
+		if err2 != nil {
+			return nil, fmt.Errorf("reading package: %w", err)
+		}
+		pkgBundle, err = manifestReader.Read()
+	} else {
+		tuiConfig.RequiresBuild = false
+	}
 	if err != nil {
 		return nil, fmt.Errorf("parsing package at %q: %w", tuiConfig.ManifestPath, err)
 	}
@@ -77,9 +80,7 @@ func NewInstance(sinkerConfig *sink.SinkerConfig, tuiConfig *common.TUIConfig) (
 		return nil, fmt.Errorf("no package found")
 	}
 
-	if sinkerConfig.Pkg == nil {
-		sinkerConfig.Pkg = pkgBundle.Package
-	}
+	sinkerConfig.Pkg = pkgBundle.Package // reload package from disk
 	graph := pkgBundle.Graph
 
 	if tuiConfig.OutputModule == "" && graph != nil {

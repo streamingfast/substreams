@@ -44,6 +44,7 @@ func (d *Build) SetSize(w, h int) {
 }
 
 func (b *Build) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
 	switch msg := msg.(type) {
 	case string:
 		log.Println(msg)
@@ -52,10 +53,14 @@ func (b *Build) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		b.BuildOutputErrMsgs = []string{}
 	case buildoutput.BuildOutputMsg:
 		b.BuildOutputMsgs = append(b.BuildOutputMsgs, msg.Msg)
+		if msg.Finished {
+			cmds = append(cmds, common.SetupNewInstanceCmd(false)) // this will reload the 'request' page indirectly, by updating the TUIconfig based on the compiled package
+		}
 	}
 	var cmd tea.Cmd
 	b.buildView, cmd = b.buildView.Update(msg)
-	return b, cmd
+	cmds = append(cmds, cmd)
+	return b, tea.Batch(cmds...)
 }
 
 func (b *Build) View() string {

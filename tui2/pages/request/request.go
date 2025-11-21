@@ -10,6 +10,7 @@ import (
 	"github.com/streamingfast/substreams/sink"
 	"github.com/streamingfast/substreams/tui2/components/dataentry"
 	"github.com/streamingfast/substreams/tui2/components/modsearch"
+	"github.com/streamingfast/substreams/tui2/pages/build"
 	"github.com/streamingfast/substreams/tui2/stream"
 	"github.com/streamingfast/substreams/tui2/styles"
 
@@ -124,11 +125,15 @@ func (r *Request) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "a":
 		case "p":
 		case "enter":
-			if r.isStreaming {
-				cmds = append(cmds, func() tea.Msg { return stream.InterruptStreamMsg })
+			if r.tuiConfig.RequiresBuild {
+				cmds = append(cmds, build.SetupNewBuildCmd())
 			} else {
-				r.isStreaming = true
-				cmds = append(cmds, SetupNewInstanceCmd(true))
+				if r.isStreaming {
+					cmds = append(cmds, func() tea.Msg { return stream.InterruptStreamMsg })
+				} else {
+					r.isStreaming = true
+					cmds = append(cmds, common.SetupNewInstanceCmd(true))
+				}
 			}
 		}
 	case common.ModuleSelectedMsg:
@@ -221,10 +226,14 @@ func (r *Request) renderRequestSummary() string {
 		[]string{"", ""},
 	)
 
-	if r.isStreaming {
-		rows = append(rows, []string{"", styles.StreamButtonStop.Render("STOP <enter>")})
+	if r.tuiConfig.RequiresBuild {
+		rows = append(rows, []string{"You must first build your substreams package:", styles.BuildButton.Render("BUILD <enter>")})
 	} else {
-		rows = append(rows, []string{"", styles.StreamButtonStart.Render("STREAM <enter>")})
+		if r.isStreaming {
+			rows = append(rows, []string{"", styles.StreamButtonStop.Render("STOP <enter>")})
+		} else {
+			rows = append(rows, []string{"", styles.StreamButtonStart.Render("STREAM <enter>")})
+		}
 	}
 
 	rows = append(rows,

@@ -13,7 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### CLI
 
-* Fix GUI handling of relative stop block (regression)
+* Fix handling of relative stop block (regression) in GUI, RUN and other sinks.
+* Fix GUI handling of substreams that are not built yet.
 
 ## v1.17.3
 

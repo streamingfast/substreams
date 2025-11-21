@@ -19,6 +19,7 @@ func init() {
 	sink.AddFlagsToSet(guiCmd.Flags(),
 		sink.FlagIncludeOptional(
 			sink.FlagCursor,
+			sink.FlagSkipCheckModuleBinariesExist,
 		),
 		sink.FlagExcludeDefault(
 			sink.FlagStopBlock,

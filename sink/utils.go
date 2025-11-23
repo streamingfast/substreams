@@ -23,7 +23,7 @@ func parseStartBlockFlag(val string) (int64, bool, error) {
 	return startBlock, false, nil
 }
 
-func parseStopBlockFlag(val string, startBlock int64) (uint64, error) {
+func parseStopBlockFlag(val string, startBlock int64, flagChanged bool) (uint64, error) {
 	// If empty, return 0 to indicate no stop block (infinite streaming)
 	if val == "" {
 		return 0, nil
@@ -32,6 +32,12 @@ func parseStopBlockFlag(val string, startBlock int64) (uint64, error) {
 	isRelative := strings.HasPrefix(val, "+")
 	if isRelative {
 		if startBlock < 0 {
+			// if start block is relative and stop block flag was not explicitly provided, the default value is forced to be 0
+			// This allows a "sane" relative stop block while the user can still provide "just a relative start block".
+			if !flagChanged {
+				return 0, nil
+			}
+
 			return 0, fmt.Errorf("relative end block is supported only with an absolute start block")
 		}
 

@@ -30,7 +30,7 @@ func init() {
 	)
 
 	// GUI-specific flags
-	guiCmd.Flags().StringP(sink.FlagStopBlock, sink.ShortFlagStopBlock, "+1000", "Stop block to end stream at, exclusively. If the start-block is positive, a '+' prefix can indicate 'relative to start-block'")
+	guiCmd.Flags().StringP(sink.FlagStopBlock, sink.ShortFlagStopBlock, "+1000", "Stop block to end stream at, exclusively. If the start-block is positive, a '+' prefix can indicate 'relative to start-block'. If stop-block is positive, default value will be set to '0'")
 	guiCmd.Flags().Bool("production-mode", false, "Enable Production Mode, with high-speed parallel processing")
 	guiCmd.Flags().Uint64("limit-processed-blocks", 10000, "Limit the number of blocks to be processed by the server, including preparing the stores, as a safeguard to prevent unexpected expensive reprocessing (0 disables the limit)")
 	guiCmd.Flags().StringSlice("debug-modules-initial-snapshot", nil, "List of 'store' modules from which to print the initial data snapshot (Unavailable in Production Mode)")
@@ -143,9 +143,16 @@ func runGui(cmd *cobra.Command, args []string) (err error) {
 		outputModuleName = sinkerConfig.OutputModule.Name
 	}
 
+	// if start block is relative and stop block was not explicitly provided, the default value is forced to be "0"
+	// This allows a "sane" relative stop block while the user can still provide "just a relative start block".
+	stopBlockString := sflags.MustGetString(cmd, sink.FlagStopBlock)
+	if sinkerConfig.StartBlock < 0 && !cmd.Flags().Lookup(sink.FlagStopBlock).Changed {
+		stopBlockString = "0"
+	}
+
 	tuiConfig := &common.TUIConfig{
 		StartBlock:    sinkerConfig.StartBlock,
-		StopBlock:     sflags.MustGetString(cmd, sink.FlagStopBlock), // we ignore stopBlock from sinkerConfig for now, the manifest will be (re)loaded later
+		StopBlock:     stopBlockString, // we ignore stopBlock from sinkerConfig for now, the manifest will be (re)loaded later
 		ManifestPath:  manifestPath,
 		HomeDir:       homeDir,
 		Vcr:           sflags.MustGetBool(cmd, "replay"),

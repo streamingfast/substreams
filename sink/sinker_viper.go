@@ -343,7 +343,7 @@ func ConfigFromViper(
 	}
 
 	stopBlockFlag := sflags.MustGetString(cmd, FlagStopBlock)
-	stopBlock, err := parseStopBlockFlag(stopBlockFlag, startBlock)
+	stopBlock, err := parseStopBlockFlag(stopBlockFlag, startBlock, cmd.Flags().Lookup(FlagStopBlock).Changed)
 	if err != nil {
 		return nil, fmt.Errorf("reading stop block flag: %w", err)
 	}

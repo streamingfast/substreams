@@ -9,6 +9,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.17.5
+
+### CLI
+
+* substreams GUI: fix setting (only) the start block with a relative value: will now change the default stop block from +1000 to 0 
+                  instead of returning the error `relative end block is supported only with an absolute start block`
+
 ## v1.17.4
 
 ### CLI

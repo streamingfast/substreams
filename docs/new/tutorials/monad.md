@@ -47,7 +47,7 @@ The [Substreams Ethereum](https://github.com/streamingfast/substreams-ethereum) 
 ### Monad Endpoints
 
 Monad Substreams are available on the following endpoints:
-- **Monad Mainnet**: `mainnet.monad.streamingfast.io:443`
+- **Monad Mainnet**: `mainnet-base.monad.streamingfast.io:443`
 
 ### Dev Container Reference
 

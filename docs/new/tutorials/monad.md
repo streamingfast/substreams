@@ -18,7 +18,7 @@ The CLI installation is supported only on Linux and macOS. If you're using Windo
 2. Running `substreams init` will give you the option to choose the EVM protocol, then select one of three project options that best fits your requirements:
    - **evm-hello-world**: Creates a Substreams that extracts a popular ERC20 token's log data from blocks
    - **evm-events-calls-raw**: (without ABI) Get raw Ethereum events/calls and create a Substreams as source. You'll need to specify the contract address(es) that you want to follow.
-   - **evm-events-calls**: (with ABI) Decode Ethereum events/calls using an ABI and create a Substreams as source. You'll need to specify the contract address(es) that you want to follow. Contract ABIs are retrieved from Etherscan, or you can provide them yourself if not available.
+   - **evm-events-calls**: (with ABI) Decode Ethereum events/calls using an ABI and create a Substreams as source. You'll need to specify the contract address(es) that you want to follow. Contract ABIs are retrieved from [Monadscan](https://monadscan.com/), or you can provide them yourself if not available.
 
 ## Step 2: Visualize the Data
 

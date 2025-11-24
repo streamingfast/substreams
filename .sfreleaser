@@ -5,3 +5,6 @@ global:
 release:
   changelog-path: "./docs/release-notes/change-log.md"
   goreleaser-docker-image: "goreleaser/goreleaser-cross:v1.24"
+  pre-build-hooks:
+    - "go test ./..."
+    - "go test ./tests_e2e"

@@ -83,4 +83,7 @@ message Request {
   // Progress_messages_interval_ms is the interval between progress messages, in milliseconds (min 500ms)
   // default: start at 500ms and ramp up to 5000ms within 1min
   uint64 progress_messages_interval_ms = 14;
+
+  // If true, only partial blocks are sent, no 'block-scoped-data' or cursor.
+  bool partial_blocks_only = 15;
 }

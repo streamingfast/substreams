@@ -40,6 +40,7 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.26.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.50.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/propagator v0.39.0 // indirect
+	github.com/KimMachineGun/automemlimit v0.7.5 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/RoaringBitmap/roaring v1.9.1 // indirect
 	github.com/abourget/llerrgroup v0.2.0 // indirect
@@ -148,7 +149,7 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.15.0 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
-	github.com/streamingfast/bstream v0.0.2-0.20250903174843-9c884c3356fd // indirect
+	github.com/streamingfast/bstream v0.0.2-0.20251125191954-babf367aae68 // indirect
 	github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b // indirect
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c // indirect
 	github.com/streamingfast/derr v0.0.0-20250321151415-6b4fbbcb1bb5 // indirect
@@ -156,7 +157,7 @@ require (
 	github.com/streamingfast/dstore v0.1.1-0.20251105221635-c60b9e8af972 // indirect
 	github.com/streamingfast/firehose-networks v0.2.0 // indirect
 	github.com/streamingfast/opaque v0.0.0-20210811180740-0c01d37ea308 // indirect
-	github.com/streamingfast/pbgo v0.0.6-0.20240823134334-812f6a16c5cb // indirect
+	github.com/streamingfast/pbgo v0.0.6-0.20251125204657-0a9c67563b19 // indirect
 	github.com/streamingfast/sf-tracing v0.0.0-20240430173521-888827872b90 // indirect
 	github.com/streamingfast/shutter v1.5.0 // indirect
 	github.com/subosito/gotenv v1.4.2 // indirect

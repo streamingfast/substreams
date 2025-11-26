@@ -9,7 +9,7 @@ require (
 	github.com/jhump/protoreflect v1.14.0
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
-	github.com/streamingfast/bstream v0.0.2-0.20250903174843-9c884c3356fd
+	github.com/streamingfast/bstream v0.0.2-0.20251125191954-babf367aae68
 	github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b
 	github.com/streamingfast/dauth v0.0.0-20251029141649-15559a9f457b
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
@@ -18,7 +18,7 @@ require (
 	github.com/streamingfast/dhttp v0.1.2
 	github.com/streamingfast/dstore v0.1.1-0.20251105221635-c60b9e8af972
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
-	github.com/streamingfast/pbgo v0.0.6-0.20240823134334-812f6a16c5cb
+	github.com/streamingfast/pbgo v0.0.6-0.20251125204657-0a9c67563b19
 	github.com/stretchr/testify v1.11.1
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869
 	go.uber.org/zap v1.27.0
@@ -46,7 +46,7 @@ require (
 	github.com/charmbracelet/huh/spinner v0.0.0-20240806005253-b7436a76999a
 	github.com/charmbracelet/lipgloss v1.0.0
 	github.com/charmbracelet/x/ansi v0.4.2
-	github.com/docker/cli v24.0.6+incompatible
+	github.com/docker/cli v29.0.4+incompatible
 	github.com/dustin/go-humanize v1.0.1
 	github.com/golang-cz/textcase v1.2.1
 	github.com/google/uuid v1.6.0
@@ -113,6 +113,7 @@ require (
 	github.com/iancoleman/strcase v0.3.0 // indirect
 	github.com/manifoldco/promptui v0.9.0 // indirect
 	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
+	github.com/moby/moby/api v1.52.0 // indirect
 	github.com/mostynb/go-grpc-compression v1.2.3 // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.6 // indirect

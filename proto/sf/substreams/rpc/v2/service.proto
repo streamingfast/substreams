@@ -83,6 +83,8 @@ message Response {
     InitialSnapshotData debug_snapshot_data = 10;
     // Available only in developer mode, and only if `debug_initial_store_snapshot_for_modules` is set.
     InitialSnapshotComplete debug_snapshot_complete = 11;
+
+    PartialBlockData partial_block_data = 12;
   }
 }
 
@@ -108,6 +110,11 @@ message BlockScopedData {
   // Signed attestation, enabling economic security as per GIP-0083. Signatures are
   // done using the key specified by SessionInit::attestation_public_key.
   string attestation = 12;
+}
+
+message PartialBlockData {
+  MapModuleOutput output = 1;
+  sf.substreams.v1.Clock clock = 2;
 }
 
 message SessionInit {

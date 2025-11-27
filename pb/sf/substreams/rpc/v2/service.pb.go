@@ -119,8 +119,13 @@ type Request struct {
 	DevOutputModules []string `protobuf:"bytes,13,rep,name=dev_output_modules,json=devOutputModules,proto3" json:"dev_output_modules,omitempty"`
 	// Progress_messages_interval_ms is the interval between progress messages, in milliseconds (minimum: 500, default: start at 500ms and ramp up to 5000ms within 1min)
 	ProgressMessagesIntervalMs uint64 `protobuf:"varint,14,opt,name=progress_messages_interval_ms,json=progressMessagesIntervalMs,proto3" json:"progress_messages_interval_ms,omitempty"`
-	unknownFields              protoimpl.UnknownFields
-	sizeCache                  protoimpl.SizeCache
+	// If true, partial blocks are also sent on the stream
+	IncludePartialBlocks bool `protobuf:"varint,15,opt,name=include_partial_blocks,json=includePartialBlocks,proto3" json:"include_partial_blocks,omitempty"`
+	// If true, only partial blocks are sent, no 'block-scoped-data' or cursor.
+	// This value supersedes include_partial_blocks
+	PartialBlocksOnly bool `protobuf:"varint,16,opt,name=partial_blocks_only,json=partialBlocksOnly,proto3" json:"partial_blocks_only,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *Request) Reset() {
@@ -235,6 +240,20 @@ func (x *Request) GetProgressMessagesIntervalMs() uint64 {
 		return x.ProgressMessagesIntervalMs
 	}
 	return 0
+}
+
+func (x *Request) GetIncludePartialBlocks() bool {
+	if x != nil {
+		return x.IncludePartialBlocks
+	}
+	return false
+}
+
+func (x *Request) GetPartialBlocksOnly() bool {
+	if x != nil {
+		return x.PartialBlocksOnly
+	}
+	return false
 }
 
 type Response struct {
@@ -571,6 +590,7 @@ type PartialBlockData struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Output        *MapModuleOutput       `protobuf:"bytes,1,opt,name=output,proto3" json:"output,omitempty"`
 	Clock         *v1.Clock              `protobuf:"bytes,2,opt,name=clock,proto3" json:"clock,omitempty"`
+	PartialIndex  uint32                 `protobuf:"varint,3,opt,name=partial_index,json=partialIndex,proto3" json:"partial_index,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -617,6 +637,13 @@ func (x *PartialBlockData) GetClock() *v1.Clock {
 		return x.Clock
 	}
 	return nil
+}
+
+func (x *PartialBlockData) GetPartialIndex() uint32 {
+	if x != nil {
+		return x.PartialIndex
+	}
+	return 0
 }
 
 type SessionInit struct {
@@ -1711,7 +1738,7 @@ var File_sf_substreams_rpc_v2_service_proto protoreflect.FileDescriptor
 
 const file_sf_substreams_rpc_v2_service_proto_rawDesc = "" +
 	"\n" +
-	"\"sf/substreams/rpc/v2/service.proto\x12\x14sf.substreams.rpc.v2\x1a\x19google/protobuf/any.proto\x1a\x1dsf/firehose/v2/firehose.proto\x1a\x1csf/substreams/v1/clock.proto\x1a\x1esf/substreams/v1/modules.proto\"\xc4\x04\n" +
+	"\"sf/substreams/rpc/v2/service.proto\x12\x14sf.substreams.rpc.v2\x1a\x19google/protobuf/any.proto\x1a\x1dsf/firehose/v2/firehose.proto\x1a\x1csf/substreams/v1/clock.proto\x1a\x1esf/substreams/v1/modules.proto\"\xaa\x05\n" +
 	"\aRequest\x12&\n" +
 	"\x0fstart_block_num\x18\x01 \x01(\x03R\rstartBlockNum\x12!\n" +
 	"\fstart_cursor\x18\x02 \x01(\tR\vstartCursor\x12$\n" +
@@ -1725,7 +1752,9 @@ const file_sf_substreams_rpc_v2_service_proto_rawDesc = "" +
 	"\tnoop_mode\x18\v \x01(\bR\bnoopMode\x124\n" +
 	"\x16limit_processed_blocks\x18\f \x01(\x04R\x14limitProcessedBlocks\x12,\n" +
 	"\x12dev_output_modules\x18\r \x03(\tR\x10devOutputModules\x12A\n" +
-	"\x1dprogress_messages_interval_ms\x18\x0e \x01(\x04R\x1aprogressMessagesIntervalMs\"\xa1\x05\n" +
+	"\x1dprogress_messages_interval_ms\x18\x0e \x01(\x04R\x1aprogressMessagesIntervalMs\x124\n" +
+	"\x16include_partial_blocks\x18\x0f \x01(\bR\x14includePartialBlocks\x12.\n" +
+	"\x13partial_blocks_only\x18\x10 \x01(\bR\x11partialBlocksOnly\"\xa1\x05\n" +
 	"\bResponse\x12=\n" +
 	"\asession\x18\x01 \x01(\v2!.sf.substreams.rpc.v2.SessionInitH\x00R\asession\x12C\n" +
 	"\bprogress\x18\x02 \x01(\v2%.sf.substreams.rpc.v2.ModulesProgressH\x00R\bprogress\x12S\n" +
@@ -1749,10 +1778,11 @@ const file_sf_substreams_rpc_v2_service_proto_rawDesc = "" +
 	"\x11debug_map_outputs\x18\n" +
 	" \x03(\v2%.sf.substreams.rpc.v2.MapModuleOutputR\x0fdebugMapOutputs\x12W\n" +
 	"\x13debug_store_outputs\x18\v \x03(\v2'.sf.substreams.rpc.v2.StoreModuleOutputR\x11debugStoreOutputs\x12 \n" +
-	"\vattestation\x18\f \x01(\tR\vattestation\"\x80\x01\n" +
+	"\vattestation\x18\f \x01(\tR\vattestation\"\xa5\x01\n" +
 	"\x10PartialBlockData\x12=\n" +
 	"\x06output\x18\x01 \x01(\v2%.sf.substreams.rpc.v2.MapModuleOutputR\x06output\x12-\n" +
-	"\x05clock\x18\x02 \x01(\v2\x17.sf.substreams.v1.ClockR\x05clock\"\xf1\x04\n" +
+	"\x05clock\x18\x02 \x01(\v2\x17.sf.substreams.v1.ClockR\x05clock\x12#\n" +
+	"\rpartial_index\x18\x03 \x01(\rR\fpartialIndex\"\xf1\x04\n" +
 	"\vSessionInit\x12\x19\n" +
 	"\btrace_id\x18\x01 \x01(\tR\atraceId\x120\n" +
 	"\x14resolved_start_block\x18\x02 \x01(\x04R\x12resolvedStartBlock\x120\n" +

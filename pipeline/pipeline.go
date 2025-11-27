@@ -48,6 +48,13 @@ type processingModule struct {
 	initialBlockNum uint64
 }
 
+type partialProcessingState struct {
+	num                        uint64
+	lastBlockID                string
+	processedPartials          []*pbsubstreams.Clock
+	processedTransactionsCount uint64
+}
+
 type Pipeline struct {
 	ctx              context.Context
 	isTier1          bool
@@ -75,6 +82,8 @@ type Pipeline struct {
 	extraMapModuleOutputs   []*pbsubstreamsrpc.MapModuleOutput
 	extraStoreModuleOutputs []*pbsubstreamsrpc.StoreModuleOutput
 	preexistingBlockIndices map[string]map[string]*roaring64.Bitmap
+
+	partialProcessingState *partialProcessingState
 
 	respFunc         substreams.ResponseFunc
 	lastProgressSent time.Time

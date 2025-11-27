@@ -12,6 +12,8 @@ import (
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dmetering"
+	pbacme "github.com/streamingfast/dummy-blockchain/pb/sf/acme/type/v1"
+	pbeth "github.com/streamingfast/firehose-ethereum/types/pb/sf/ethereum/type/v2"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/metrics"
@@ -25,6 +27,7 @@ import (
 	"github.com/streamingfast/substreams/wasm"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -180,7 +183,24 @@ func (p *Pipeline) handleStepStalled(clock *pbsubstreams.Clock) error {
 	return nil
 }
 
+func (p *Pipeline) undoPartialStates() error {
+	if p.partialProcessingState == nil {
+		return nil
+	}
+	for i := len(p.partialProcessingState.processedPartials) - 1; i >= 0; i-- {
+		clk := p.partialProcessingState.processedPartials[i]
+		if err := p.forkHandler.handleUndo(clk); err != nil {
+			return fmt.Errorf("reverting outputs: %w", err)
+		}
+	}
+	p.partialProcessingState = nil
+	return nil
+}
+
 func (p *Pipeline) handleStepUndo(clock *pbsubstreams.Clock, cursor *bstream.Cursor, reorgJunctionBlock bstream.BlockRef) error {
+	if err := p.undoPartialStates(); err != nil {
+		return err
+	}
 
 	if err := p.forkHandler.handleUndo(clock); err != nil {
 		return fmt.Errorf("reverting outputs: %w", err)
@@ -224,6 +244,51 @@ func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
 }
 
 func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput, idx int32) (err error) {
+
+	if p.partialProcessingState != nil {
+		if clock.Id == p.partialProcessingState.lastBlockID {
+			return nil // same hash: nothing new to process
+		}
+		if clock.Number != p.partialProcessingState.num {
+			panic(fmt.Sprintf("cannot handle partials from different block numbers consecutively: received %d, expected %d", clock.Number, p.partialProcessingState.num))
+		}
+	} else {
+		p.partialProcessingState = &partialProcessingState{
+			lastBlockID:                clock.Id,
+			num:                        clock.Number,
+			processedTransactionsCount: 0,
+		}
+	}
+
+	// Unmarshal and repack the partial block with less transactions...
+	if blockData, _, err := execOutput.Get("sf.acme.type.v1.Block"); err == nil {
+		block := &pbacme.Block{}
+		if err := proto.Unmarshal(blockData, block); err != nil {
+			return fmt.Errorf("unmarshal block: %w", err)
+		}
+		block.Transactions = block.Transactions[p.partialProcessingState.processedTransactionsCount:]
+		p.partialProcessingState.processedTransactionsCount += uint64(len(block.Transactions))
+		blockData, _ = proto.Marshal(block)
+		if err := execOutput.Set("sf.acme.type.v1.Block", blockData); err != nil {
+			return fmt.Errorf("set block: %w", err)
+		}
+
+	} else if blockData, _, err := execOutput.Get("sf.ethereum.type.v2.Block"); err == nil {
+		block := &pbeth.Block{}
+		if err := proto.Unmarshal(blockData, block); err != nil {
+			return fmt.Errorf("unmarshal block: %w", err)
+		}
+		block.TransactionTraces = block.TransactionTraces[p.partialProcessingState.processedTransactionsCount:]
+		p.partialProcessingState.processedTransactionsCount += uint64(len(block.TransactionTraces))
+		blockData, _ = proto.Marshal(block)
+		if err := execOutput.Set("sf.ethereum.type.v2.Block", blockData); err != nil {
+			return fmt.Errorf("set block: %w", err)
+		}
+	} else {
+		return fmt.Errorf("unsupported block type for partial blocks")
+	}
+
+	p.partialProcessingState.processedPartials = append(p.partialProcessingState.processedPartials, clock)
 
 	reqDetails := reqctx.Details(ctx)
 	if isBlockOverStopBlock(clock.Number, reqDetails.StopBlockNum) {
@@ -275,6 +340,10 @@ func normalizeModuleOutput(in *pbsubstreamsrpc.MapModuleOutput, outputModule str
 }
 
 func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput, isFinalBlock bool) (err error) {
+	if err := p.undoPartialStates(); err != nil {
+		return err
+	}
+
 	if p.isTier1 && p.checkPendingShutdown() {
 		if p.stores.StoreMap != nil && p.sentBlocks > minBlocksProcessedToSave {
 			p.stores.logger.Info("shutting down, quick saving stores")

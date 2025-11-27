@@ -36,7 +36,7 @@ require (
 	github.com/alecthomas/chroma v0.10.0
 	github.com/alecthomas/participle v0.7.1
 	github.com/bmatcuk/doublestar/v4 v4.6.1
-	github.com/bobg/go-generics/v2 v2.1.1
+	github.com/bobg/go-generics/v2 v2.2.2
 	github.com/bytecodealliance/wasmtime-go/v36 v36.0.0
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/charmbracelet/bubbles v0.20.0
@@ -48,6 +48,7 @@ require (
 	github.com/charmbracelet/x/ansi v0.4.2
 	github.com/docker/cli v29.0.4+incompatible
 	github.com/dustin/go-humanize v1.0.1
+	github.com/gogo/protobuf v1.3.2
 	github.com/golang-cz/textcase v1.2.1
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-multierror v1.1.1
@@ -68,7 +69,9 @@ require (
 	github.com/streamingfast/dmetering v0.0.0-20251027175535-4fd530934b97
 	github.com/streamingfast/dmetrics v0.0.0-20250711072030-f023e918a175
 	github.com/streamingfast/dsession v0.0.0-20251029144057-b94d1030e142
-	github.com/streamingfast/firehose-networks v0.2.0
+	github.com/streamingfast/dummy-blockchain v1.7.3
+	github.com/streamingfast/firehose-ethereum/types v0.0.0-20251113151010-c9c94d64348a
+	github.com/streamingfast/firehose-networks v0.2.2
 	github.com/streamingfast/sf-tracing v0.0.0-20240430173521-888827872b90
 	github.com/streamingfast/shutter v1.5.0
 	github.com/streamingfast/substreams-sdk-go v0.0.0-20240110154316-5fb21a7a330b
@@ -128,7 +131,7 @@ require (
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.60.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.35.0 // indirect
-	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1 // indirect
+	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
 	golang.org/x/time v0.11.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250218202821-56aae31c358a // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250414145226-207652e42e2e // indirect
@@ -173,7 +176,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/itchyny/timefmt-go v0.1.5 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
-	github.com/klauspost/compress v1.17.8
+	github.com/klauspost/compress v1.17.11
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect

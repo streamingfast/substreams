@@ -384,6 +384,8 @@ func (s *Sinker) run(ctx context.Context, cursor *Cursor, handler SinkerHandler)
 			StopBlockNum:         stopBlock,
 			StartCursor:          activeCursor.String(),
 			FinalBlocksOnly:      s.FinalBlocksOnly,
+			PartialBlocksOnly:    s.PartialBlocksOnly,
+			IncludePartialBlocks: s.IncludePartialBlocks,
 			Package:              s.Pkg,
 			OutputModule:         s.SinkerConfig.OutputModule.Name,
 			ProductionMode:       s.Mode == SubstreamsModeProduction,
@@ -620,6 +622,20 @@ func (s *Sinker) doRequest(
 
 			if s.Tracer.Enabled() {
 				s.Logger.Debug("received response Progress", zap.Reflect("progress", r))
+			}
+
+		case *pbsubstreamsrpc.Response_PartialBlockData:
+			if s.Tracer.Enabled() {
+				s.Logger.Debug("received response PartialblockData", zap.Stringer("at", r.PartialBlockData.Clock), zap.String("module_name", r.PartialBlockData.Output.Name), zap.Int("payload_bytes", len(r.PartialBlockData.Output.MapOutput.Value)))
+			}
+			if pbdh, ok := handler.(SinkerPartialBlockHandler); ok {
+				if s.LivenessChecker != nil {
+					s.stats.SetLiveness(&liveBlock)
+				}
+
+				if err := pbdh.HandlePartialBlockData(ctx, r.PartialBlockData); err != nil {
+					return activeCursor, receivedDataMessage, fmt.Errorf("handle PartialBlockData message at block %s: %w", r.PartialBlockData.Clock.String(), err)
+				}
 			}
 
 		case *pbsubstreamsrpc.Response_BlockScopedData:

@@ -46,7 +46,7 @@ func (p *Pipeline) ProcessFromExecOutput(
 		return fmt.Errorf("setting up exec output: %w", err)
 	}
 
-	if err = p.processBlock(ctx, execOutput, clock, cursor, bstream.StepNewIrreversible, nil); err != nil {
+	if err = p.processBlock(ctx, execOutput, clock, cursor, bstream.StepNewIrreversible, nil, 0); err != nil {
 		return err
 	}
 
@@ -74,7 +74,7 @@ func (p *Pipeline) ProcessBlock(block *pbbstream.Block, obj interface{}) (err er
 		return fmt.Errorf("setting up exec output: %w", err)
 	}
 
-	if err = p.processBlock(ctx, execOutput, clock, cursor, step, reorgJunctionBlock); err != nil {
+	if err = p.processBlock(ctx, execOutput, clock, cursor, step, reorgJunctionBlock, block.PartialIndex); err != nil {
 		return err // watch out, io.EOF needs to go through undecorated
 	}
 
@@ -104,10 +104,14 @@ func (p *Pipeline) processBlock(
 	cursor *bstream.Cursor,
 	step bstream.StepType,
 	reorgJunctionBlock bstream.BlockRef,
+	partialIndex int32,
 ) (err error) {
 	var eof bool
 
 	switch step {
+	case bstream.StepPartial:
+		p.handleStepPartial(ctx, clock, cursor, execOutput, partialIndex)
+
 	case bstream.StepUndo:
 		p.blockStepMap[bstream.StepUndo]++
 		if err = p.handleStepUndo(clock, cursor, reorgJunctionBlock); err != nil {
@@ -219,6 +223,57 @@ func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
 	return nil
 }
 
+func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput, idx int32) (err error) {
+
+	reqDetails := reqctx.Details(ctx)
+	if isBlockOverStopBlock(clock.Number, reqDetails.StopBlockNum) {
+		return nil // skip but don't take actions on a partial block for this
+	}
+	if p.isTier1 && p.checkPendingShutdown() {
+		return nil // skip but don't take actions on a partial block for this
+	}
+	if p.pendingUndoMessage != nil {
+		return nil
+	}
+	if !p.gate.shouldSendOutputs() {
+		return nil
+	}
+	if reqDetails.IsTier2Request {
+		panic("tier2 requests should never receive partial block")
+	}
+
+	if err := p.executeModules(ctx, execOutput, false); err != nil {
+		return fmt.Errorf("execute modules: %w", err)
+	}
+
+	// we always undo the partial blocks immediately as to not keep anything in store
+	// TODO: keep list of all 'currently applied partials' that we can undo when we receive the next 'new' or 'undo'
+	if err := p.forkHandler.handleUndo(clock); err != nil {
+		return fmt.Errorf("reverting outputs: %w", err)
+	}
+
+	mapModuleOutput := normalizeModuleOutput(p.mapModuleOutput, reqDetails.OutputModule)
+
+	if err = returnPartialDataOutput(clock, mapModuleOutput, p.respFunc, idx); err != nil {
+		return fmt.Errorf("failed to return module data output: %w", err)
+	}
+
+	return nil
+}
+
+func normalizeModuleOutput(in *pbsubstreamsrpc.MapModuleOutput, outputModule string) *pbsubstreamsrpc.MapModuleOutput {
+	if in == nil {
+		return &pbsubstreamsrpc.MapModuleOutput{
+			Name:      outputModule,
+			MapOutput: &anypb.Any{},
+		}
+	}
+	if in.Name == "" {
+		in.Name = outputModule
+	}
+	return in
+}
+
 func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput, isFinalBlock bool) (err error) {
 	if p.isTier1 && p.checkPendingShutdown() {
 		if p.stores.StoreMap != nil && p.sentBlocks > minBlocksProcessedToSave {
@@ -271,7 +326,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 		return fmt.Errorf("execute modules: %w", err)
 	}
 
-	if p.gate.shouldSendOutputs() {
+	if p.gate.shouldSendOutputs() && !reqctx.PartialBlocksOnly(ctx) {
 		p.sentBlocks++
 		logger.Debug("will return module outputs")
 		if p.pendingUndoMessage != nil {
@@ -293,16 +348,8 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 		} else {
 			// LIVE and DEV mode always receive module data outputs, even when they are empty
 			// so they can follow progress (and dev also gets debug output...)
-			mapModuleOutput := p.mapModuleOutput
-			if mapModuleOutput == nil {
-				mapModuleOutput = &pbsubstreamsrpc.MapModuleOutput{
-					Name:      reqDetails.OutputModule,
-					MapOutput: &anypb.Any{},
-				}
-			} else if mapModuleOutput.Name == "" {
-				//failsafe: normalize any output to at least include the module name
-				mapModuleOutput.Name = reqDetails.OutputModule
-			}
+			//
+			mapModuleOutput := normalizeModuleOutput(p.mapModuleOutput, reqDetails.OutputModule)
 			if err = returnModuleDataOutputs(clock, cursor, mapModuleOutput, p.extraMapModuleOutputs, p.extraStoreModuleOutputs, p.respFunc, logger); err != nil {
 				return fmt.Errorf("failed to return module data output: %w", err)
 			}

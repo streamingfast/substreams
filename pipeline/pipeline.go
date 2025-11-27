@@ -877,6 +877,26 @@ func (p *Pipeline) cleanUpModuleExecutors(ctx context.Context, logger *zap.Logge
 	return nil
 }
 
+func returnPartialDataOutput(
+	clock *pbsubstreams.Clock,
+	mapModuleOutput *pbsubstreamsrpc.MapModuleOutput,
+	respFunc substreams.ResponseFunc,
+	partialIdx int32,
+) error {
+
+	out := &pbsubstreamsrpc.PartialBlockData{
+		Clock:        clock,
+		Output:       mapModuleOutput,
+		PartialIndex: uint32(partialIdx),
+	}
+
+	if err := respFunc(substreams.NewPartialBlockResponse(out)); err != nil {
+		return fmt.Errorf("calling return func: %w", err)
+	}
+
+	return nil
+}
+
 func returnModuleDataOutputs(
 	clock *pbsubstreams.Clock,
 	cursor *bstream.Cursor,

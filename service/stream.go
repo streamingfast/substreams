@@ -28,6 +28,7 @@ func (sf *StreamFactory) New(
 	stopBlockNum uint64,
 	cursor string,
 	finalBlocksOnly bool,
+	includePartialBlocks bool,
 	cursorIsTarget bool,
 	logger *zap.Logger,
 	extraOpts ...stream.Option,
@@ -39,6 +40,10 @@ func (sf *StreamFactory) New(
 	}
 	if finalBlocksOnly {
 		options = append(options, stream.WithFinalBlocksOnly())
+	}
+
+	if includePartialBlocks {
+		options = append(options, stream.WithCustomStepTypeFilter(bstream.StepsAllWithPartial))
 	}
 
 	if cursor != "" {

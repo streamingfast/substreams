@@ -103,7 +103,11 @@ func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
 		}),
 		int64(bstream.GetProtocolFirstStreamableBlock),
 		bstream.GetProtocolFirstStreamableBlock,
-		"", false, false, zlog,
+		"",
+		false,
+		false,
+		false,
+		zlog,
 	)
 	if err != nil {
 		return "", err
@@ -297,6 +301,8 @@ func (s *Tier1Service) BlocksV3(
 	}
 
 	ctx = reqctx.WithSpkg(ctx, r.Package) // passing by context is simpler for now, this could be cleaned up
+	ctx = reqctx.WithPartialBlocksOnly(ctx, r.PartialBlocksOnly)
+	ctx = reqctx.WithIncludePartialBlocks(ctx, r.IncludePartialBlocks || r.PartialBlocksOnly) // either flags will trigger 'include partial blocks'
 	reqV2, err := r.ToV2()
 	if err != nil {
 		return fmt.Errorf("failed to convert request to v2: %w", err)
@@ -965,6 +971,7 @@ func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelC
 		request.StopBlockNum,
 		cursor,
 		request.FinalBlocksOnly,
+		reqctx.IncludePartialBlocks(ctx),
 		processBlocksBeforeCursor,
 		logger.Named("stream"),
 		bsstream.WithLiveSourceHandlerMiddleware(metering.LiveSourceMiddlewareHandlerFactory(ctx)),
@@ -992,7 +999,8 @@ func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelC
 				request.StopBlockNum,
 				cur.ToOpaque(),
 				request.FinalBlocksOnly,
-				false,
+				reqctx.PartialBlocksOnly(ctx),
+				false, // processBlocksBeforeCursor always false here
 				logger.Named("stream"),
 				bsstream.WithLiveSourceHandlerMiddleware(metering.LiveSourceMiddlewareHandlerFactory(ctx)),
 				bsstream.WithFileSourceHandlerMiddleware(metering.FileSourceMiddlewareHandlerFactory(ctx)),

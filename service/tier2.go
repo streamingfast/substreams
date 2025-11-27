@@ -600,7 +600,8 @@ excludable:
 		stopBlock,
 		"",
 		true,
-		false,
+		false, // includePartialBlocks should be false in tier2
+		false, // cursorIsTarget
 		logger.Named("stream"),
 		bsstream.WithFileSourceHandlerMiddleware(metering.FileSourceMiddlewareHandlerFactory(ctx)),
 	)

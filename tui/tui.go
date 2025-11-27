@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dustin/go-humanize"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/protodecode"
@@ -186,6 +187,30 @@ func (ui *TUI) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.
 		return ui.decoratedBlockScopedData(data.Output, data.DebugMapOutputs, data.DebugStoreOutputs, data.Clock)
 	} else {
 		return ui.jsonBlockScopedData(data.Output, data.DebugMapOutputs, data.DebugStoreOutputs, data.Clock)
+	}
+}
+
+func (ui *TUI) HandlePartialBlockData(ctx context.Context, data *pbsubstreamsrpc.PartialBlockData) error {
+	if data == nil {
+		return nil
+	}
+	switch ui.outputMode {
+	case OutputModeTUI:
+		fmt.Printf("----------- PARTIAL BLOCK #%s (idx=%d) (%s) age=%s ---------------\n", humanize.Comma(int64(data.Clock.Number)), data.PartialIndex, data.Clock.Id, time.Since(data.Clock.Timestamp.AsTime()))
+	case OutputModeCLOCK:
+		fmt.Printf("----------- PARTIAL BLOCK #%s (idx=%d) (%s) age=%s ---------------\n", humanize.Comma(int64(data.Clock.Number)), data.PartialIndex, data.Clock.Id, time.Since(data.Clock.Timestamp.AsTime()))
+		return nil
+	case OutputModeCURSOR:
+		fmt.Printf("STEP_PARTIAL: %d (idx=%d) (%s)\n", data.Clock.Number, data.PartialIndex, data.Clock.Id)
+		return nil
+	}
+
+	ui.seenFirstData = true
+	if ui.outputMode == OutputModeTUI {
+		ui.ensureTerminalUnlocked()
+		return ui.decoratedBlockScopedData(data.Output, nil, nil, data.Clock)
+	} else {
+		return ui.jsonBlockScopedData(data.Output, nil, nil, data.Clock)
 	}
 }
 

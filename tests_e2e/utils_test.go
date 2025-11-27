@@ -207,10 +207,15 @@ waitReady:
 	return t2app
 }
 
-func newDummyBlockchainContainer(ctx context.Context, tmpDir string) (testcontainers.Container, error) {
+func newDummyBlockchainContainer(ctx context.Context, tmpDir string, image string, additionalReaderArgs string, burst int) (testcontainers.Container, error) {
+	baseReaderArgs := fmt.Sprintf("start --log-level=error --tracer=firehose --store-dir=/data --genesis-block-burst=%d --block-rate=120 --block-size=1230 --genesis-height=0 --server-addr=:9777 --with-reorgs=false --with-skipped-blocks=false", burst)
+	readerArgs := baseReaderArgs
+	if additionalReaderArgs != "" {
+		readerArgs = baseReaderArgs + " " + additionalReaderArgs
+	}
 
 	req := testcontainers.ContainerRequest{
-		Image: "ghcr.io/streamingfast/dummy-blockchain:v1.7.2",
+		Image: image,
 		Cmd: []string{
 			"start",
 			"reader-node",
@@ -220,7 +225,7 @@ func newDummyBlockchainContainer(ctx context.Context, tmpDir string) (testcontai
 			"",
 			"--advertise-chain-name=acme-dummy-blockchain",
 			"--reader-node-path=dummy-blockchain",
-			"--reader-node-arguments=start --log-level=error --tracer=firehose --store-dir=/data --genesis-block-burst=1000 --block-rate=600 --block-size=2560 --genesis-height=0 --server-addr=:9777 --with-reorgs=false --with-skipped-blocks=false",
+			"--reader-node-arguments=" + readerArgs,
 			"--advertise-block-id-encoding=hex",
 		},
 		ExposedPorts: []string{"10014/tcp"},

@@ -311,12 +311,6 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 		return fmt.Errorf("execute modules: %w", err)
 	}
 
-	// we always undo the partial blocks immediately as to not keep anything in store
-	// TODO: keep list of all 'currently applied partials' that we can undo when we receive the next 'new' or 'undo'
-	if err := p.forkHandler.handleUndo(clock); err != nil {
-		return fmt.Errorf("reverting outputs: %w", err)
-	}
-
 	mapModuleOutput := normalizeModuleOutput(p.mapModuleOutput, reqDetails.OutputModule)
 
 	if err = returnPartialDataOutput(clock, mapModuleOutput, p.respFunc, idx); err != nil {

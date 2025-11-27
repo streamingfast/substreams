@@ -301,8 +301,6 @@ func (s *Tier1Service) BlocksV3(
 	}
 
 	ctx = reqctx.WithSpkg(ctx, r.Package) // passing by context is simpler for now, this could be cleaned up
-	ctx = reqctx.WithPartialBlocksOnly(ctx, r.PartialBlocksOnly)
-	ctx = reqctx.WithIncludePartialBlocks(ctx, r.IncludePartialBlocks || r.PartialBlocksOnly) // either flags will trigger 'include partial blocks'
 	reqV2, err := r.ToV2()
 	if err != nil {
 		return fmt.Errorf("failed to convert request to v2: %w", err)
@@ -363,6 +361,9 @@ func (s *Tier1Service) BlocksAny(
 		s.activeRequestsWG.Done()
 	}()
 
+	ctx = reqctx.WithPartialBlocksOnly(ctx, request.PartialBlocksOnly)
+	ctx = reqctx.WithIncludePartialBlocks(ctx, request.IncludePartialBlocks || request.PartialBlocksOnly) // either flags will trigger 'include partial blocks'
+
 	// We keep `err` here as the unaltered error from `blocks` call, this is used in the EndSpan to record the full error
 	// and not only the `grpcError` one which is a subset view of the full `err`.
 	var err error
@@ -394,6 +395,8 @@ func (s *Tier1Service) BlocksAny(
 		zap.Bool("production_mode", request.ProductionMode),
 		zap.Bool("noop_mode", request.NoopMode),
 		zap.Strings("dev_output_modules", request.DevOutputModules),
+		zap.Bool("include_partial_blocks", request.IncludePartialBlocks),
+		zap.Bool("partial_blocks_only", request.PartialBlocksOnly),
 	}
 
 	if s.enforceCompression && !compressed {

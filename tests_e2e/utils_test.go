@@ -3,6 +3,7 @@ package tests_e2e
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -91,16 +92,18 @@ func RunRequest(t *testing.T, req *pbsubstreamsrpcv2.Request, endpoint string) (
 
 }
 
-func startTier1App(t *testing.T, ctx context.Context, tmpDir string, container testcontainers.Container, zlog *zap.Logger) (*app.Tier1App, string) {
+func startTier1App(t *testing.T, ctx context.Context, tmpDir string, container testcontainers.Container, t2Endpoint string, zlog *zap.Logger) (*app.Tier1App, string) {
 
 	os.Setenv("SUBSTREAMS_WORKERS_RAMPUP_TIME", "0")
 
-	port, err := container.MappedPort(ctx, "10014/tcp")
+	relayerPort, err := container.MappedPort(ctx, "10014/tcp")
 	require.NoError(t, err)
 
-	relayerEndpoint := fmt.Sprintf("localhost:%d", port.Int())
+	relayerEndpoint := fmt.Sprintf("localhost:%d", relayerPort.Int())
 	t.Logf("Tier1App relayer endpoint: %s", relayerEndpoint)
-	substreamsEndpoint := ":10016"
+
+	listenPort := findFreePort(t)
+	substreamsEndpoint := fmt.Sprintf("localhost:%d", listenPort)
 	t1conf := &app.Tier1Config{
 		GRPCListenAddr:               substreamsEndpoint,
 		OneBlocksStoreURL:            filepath.Join(tmpDir, "one-blocks"),
@@ -118,7 +121,7 @@ func startTier1App(t *testing.T, ctx context.Context, tmpDir string, container t
 		StateStoreDefaultTag:         "",
 		BlockType:                    "sf.acme.type.v1.Block",
 		StateBundleSize:              100,
-		SubrequestsEndpoint:          "localhost:10017",
+		SubrequestsEndpoint:          t2Endpoint,
 		SubrequestsPlaintext:         true,
 		MaxSubrequests:               10,
 	}
@@ -165,12 +168,14 @@ waitReady:
 	return t1app, substreamsEndpoint
 }
 
-func startTier2App(t *testing.T, ctx context.Context, tmpDir string, zlog *zap.Logger) *app.Tier2App {
+func startTier2App(t *testing.T, ctx context.Context, tmpDir string, zlog *zap.Logger) (out *app.Tier2App, endpoint string) {
 
+	port := findFreePort(t)
+	endpoint = fmt.Sprintf("localhost:%d", port)
 	dauthtrust.Register()
 
 	t2conf := &app.Tier2Config{
-		GRPCListenAddr:        ":10017",
+		GRPCListenAddr:        endpoint,
 		ServiceDiscoveryURL:   nil,
 		BlockExecutionTimeout: 5 * time.Second,
 		TmpDir:                filepath.Join(tmpDir, "tmp"),
@@ -204,7 +209,7 @@ waitReady:
 		}
 	}
 
-	return t2app
+	return t2app, endpoint
 }
 
 func newDummyBlockchainContainer(ctx context.Context, tmpDir string) (testcontainers.Container, error) {
@@ -244,4 +249,16 @@ func newDummyBlockchainContainer(ctx context.Context, tmpDir string) (testcontai
 	}
 
 	return container, nil
+}
+
+func findFreePort(t *testing.T) int {
+	// Listen on port 0, which tells the OS to pick any available port
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Error(err)
+	}
+	defer listener.Close()
+
+	addr := listener.Addr().(*net.TCPAddr)
+	return addr.Port
 }

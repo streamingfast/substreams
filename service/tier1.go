@@ -527,7 +527,7 @@ func (s *Tier1Service) BlocksAny(
 		return err
 	}
 
-	if os.Getenv("LATEST_FALL_BACK_DURATION") != "" && hasEthCall(request.Modules.Binaries) {
+	if os.Getenv("ETH_CALL_FALLBACK_TO_LATEST_DURATION") != "" && hasEthCall(request.Modules.Binaries) {
 		if header.Get("X-substreams-ack-non-deterministic-substreams") != "true" {
 			err := connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("header X-substreams-ack-non-deterministic-substreams must be set to true when using eth_call or eth_get_balance"))
 			logger.Info("refusing Substreams Blocks request", append(fields, zap.Error(err))...)

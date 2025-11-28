@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/streamingfast/substreams/manifest"
@@ -8,6 +9,7 @@ import (
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/wasm"
+	"github.com/tetratelabs/wazero"
 )
 
 // Deprecated: use ValidateTier1Request
@@ -100,4 +102,27 @@ func validateBinaryTypes(bins []*pbsubstreams.Binary) error {
 		}
 	}
 	return nil
+}
+
+func hasEthCall(bins []*pbsubstreams.Binary) bool {
+	ctx := context.Background()
+	runtime := wazero.NewRuntime(ctx)
+	defer runtime.Close(ctx)
+
+	for _, binary := range bins {
+		mod, err := runtime.CompileModule(ctx, binary.Content)
+		if err != nil {
+			// If can't compile, assume no eth_call
+			continue
+		}
+
+		imports := mod.ImportedFunctions()
+		for _, imp := range imports {
+			module, name, _ := imp.Import()
+			if module == "rpc" && (name == "eth_call" || name == "eth_get_balance") {
+				return true
+			}
+		}
+	}
+	return false
 }

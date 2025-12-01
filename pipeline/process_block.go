@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"runtime/debug"
+	"strconv"
 
 	"connectrpc.com/connect"
 	"github.com/streamingfast/bstream"
@@ -33,6 +34,17 @@ import (
 )
 
 var PrintStack = os.Getenv("SUBSTREAMS_PRINT_STACK") == "true" || os.Getenv("SUBSTREAMS_PRINT_STACK") == "1"
+
+var biggestPartialBlockIndex = getBiggestPartialBlockIndex()
+
+func getBiggestPartialBlockIndex() int32 {
+	if env := os.Getenv("SUBSTREAMS_BIGGEST_PARTIAL_BLOCK_INDEX"); env != "" {
+		if val, err := strconv.ParseInt(env, 10, 32); err == nil {
+			return int32(val)
+		}
+	}
+	return int32(10)
+}
 
 var ErrShuttingDown = errors.New("endpoint is shutting down, please reconnect")
 var minBlocksProcessedToSave = uint64(25)
@@ -113,7 +125,7 @@ func (p *Pipeline) processBlock(
 
 	switch step {
 	case bstream.StepPartial:
-		p.handleStepPartial(ctx, clock, cursor, execOutput, partialIndex)
+		p.handleStepPartial(ctx, clock, execOutput, partialIndex)
 
 	case bstream.StepUndo:
 		p.blockStepMap[bstream.StepUndo]++
@@ -243,7 +255,7 @@ func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
 	return nil
 }
 
-func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput, idx int32) (err error) {
+func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Clock, execOutput execout.ExecutionOutput, idx int32) (err error) {
 
 	if p.partialProcessingState != nil {
 		if clock.Id == p.partialProcessingState.lastBlockID {
@@ -334,6 +346,19 @@ func normalizeModuleOutput(in *pbsubstreamsrpc.MapModuleOutput, outputModule str
 }
 
 func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput, isFinalBlock bool) (err error) {
+
+	// if we get a 'new' block in partialBlocksOnly mode, we complete the missing partials based on its content.
+	// Ex: we got partials 3, 4, 7
+	//    -> partial 3 contains all transactions from partials 1+2+3
+	//    -> partial 4 only processes transactions from partial 4
+	//    -> when we get the full block (stepNEW), if it differs from the partial7's ID, we process it so that we send a 'partial 10' that contains transactions from partials 8,9,10
+	if reqctx.PartialBlocksOnly(ctx) {
+		if p.partialProcessingState == nil || p.partialProcessingState.lastBlockID != clock.Id {
+			if err := p.handleStepPartial(ctx, clock, execOutput, biggestPartialBlockIndex); err != nil {
+				return err
+			}
+		}
+	}
 	if err := p.undoPartialStates(); err != nil {
 		return err
 	}

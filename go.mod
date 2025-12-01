@@ -48,7 +48,6 @@ require (
 	github.com/charmbracelet/x/ansi v0.4.2
 	github.com/docker/cli v29.0.4+incompatible
 	github.com/dustin/go-humanize v1.0.1
-	github.com/gogo/protobuf v1.3.2
 	github.com/golang-cz/textcase v1.2.1
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-multierror v1.1.1

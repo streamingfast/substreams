@@ -27,8 +27,8 @@ func TestDummyBlockchainContainer(t *testing.T) {
 	require.NoError(t, err)
 	defer container.Terminate(ctx)
 
-	_, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, zlog)
-	_ = startTier2App(t, ctx, tmpDir, zlog)
+	_, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog)
+	_, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)
 
 	testCases := []struct {
 		name           string
@@ -51,7 +51,7 @@ func TestDummyBlockchainContainer(t *testing.T) {
 			expectedClock:  159,
 		},
 		{
-			name:           "stats that depend on store (dev)",
+			name:           "stats that depend on store in future (dev)",
 			startBlock:     150,
 			stopBlock:      210,
 			productionMode: false,
@@ -59,6 +59,16 @@ func TestDummyBlockchainContainer(t *testing.T) {
 			outputModule:   "map_stats",
 			expectedLen:    60,
 			expectedClock:  209,
+		},
+		{
+			name:           "stats further away that depend on store (dev)",
+			startBlock:     500,
+			stopBlock:      510,
+			productionMode: false,
+			spkgFile:       "./dummy/e2e-v0.1.0.spkg",
+			outputModule:   "map_stats",
+			expectedLen:    10,
+			expectedClock:  509,
 		},
 		{
 			name:           "stats that depend on store (prod)",

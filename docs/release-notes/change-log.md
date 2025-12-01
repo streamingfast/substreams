@@ -8,12 +8,16 @@ Keep track of [Firehose releases and Data model updates](https://firehose.stream
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
 ## UNRELEASED
 
-### Server
+### [Server]
 
 * Added validation in tier1 service for WASM modules that import `eth_call` or `eth_get_balance`. When the environment variable `X-substreams-ack-non-deterministic-substreams` is set, requests using such modules must include the header `X-substreams-ack-non-deterministic-substreams` set to `true` to acknowledge the non-deterministic nature of external calls.
+
+## v1.17.6
+
+* [Server] Fix regression from v1.17.3 where "store stages" would not always correctly get scheduled for backfilling, resulting in `get size of store "...": opening file: not found`
+
 
 ## v1.17.5
 

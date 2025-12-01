@@ -32,6 +32,7 @@ var cancelFunc = contextKeyType(9)
 var sessionKey = contextKeyType(10)
 var spkgKey = contextKeyType(11)
 var activeRequestsHandlerKey = contextKeyType(12)
+var ethCallFallbackToLatestDuration = contextKeyType(13)
 
 func WithSpkg(ctx context.Context, pkg *pbsubstreams.Package) context.Context {
 	return context.WithValue(ctx, spkgKey, pkg)

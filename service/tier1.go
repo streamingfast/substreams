@@ -363,11 +363,21 @@ func (s *Tier1Service) BlocksAny(
 
 	logger := reqctx.Logger(ctx).Named("tier1")
 
+	envEthCallFallbackToLatestDuration := os.Getenv(EnvEthCallFallbackToLatestDuration)
+	fallbackDuration := time.Duration(0)
+	if envEthCallFallbackToLatestDuration != "" {
+		fallbackDuration, err = time.ParseDuration(envEthCallFallbackToLatestDuration)
+		if err != nil {
+			return fmt.Errorf("invalid value for env var %s: %w", EnvEthCallFallbackToLatestDuration, err)
+		}
+	}
+
 	ctx = logging.WithLogger(ctx, logger)
 	ctx = reqctx.WithTracer(ctx, s.tracer)
 	ctx = dmetering.WithBytesMeter(ctx)
 	ctx = metering.WithMetricsSender(ctx)
 	ctx = reqctx.WithTier2RequestParameters(ctx, s.tier2RequestParameters)
+	ctx = reqctx.WithEthCallFallbackToLatestDuration(ctx, fallbackDuration)
 
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier1/request")
 	defer span.EndWithErr(&err)
@@ -527,7 +537,7 @@ func (s *Tier1Service) BlocksAny(
 		return err
 	}
 
-	if os.Getenv(EnvEthCallFallbackToLatestDuration) != "" && hasEthCall(request.Modules.Binaries) {
+	if envEthCallFallbackToLatestDuration != "" && hasEthCall(request.Modules.Binaries) {
 		if header.Get("X-substreams-ack-non-deterministic-substreams") != "true" {
 			err := connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("header X-substreams-ack-non-deterministic-substreams must be set to true when using eth_call or eth_get_balance"))
 			logger.Info("refusing Substreams Blocks request", append(fields, zap.Error(err))...)

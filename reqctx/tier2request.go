@@ -1,6 +1,9 @@
 package reqctx
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 type Tier2RequestParameters struct {
 	MeteringConfig       string
@@ -19,6 +22,18 @@ type Tier2RequestParameters struct {
 
 func WithTier2RequestParameters(ctx context.Context, parameters Tier2RequestParameters) context.Context {
 	return context.WithValue(ctx, tier2RequestParametersKeyKey, parameters)
+}
+
+func WithEthCallFallbackToLatestDuration(ctx context.Context, duration time.Duration) context.Context {
+	return context.WithValue(ctx, tier2RequestParametersKeyKey, duration)
+}
+
+func EthCallFallbackToLatestDuration(ctx context.Context) time.Duration {
+	duration, ok := ctx.Value(tier2RequestParametersKeyKey).(time.Duration)
+	if !ok {
+		return time.Duration(0)
+	}
+	return duration
 }
 
 func GetTier2RequestParameters(ctx context.Context) (Tier2RequestParameters, bool) {

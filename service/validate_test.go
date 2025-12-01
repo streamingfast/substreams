@@ -2,6 +2,8 @@ package service
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -156,4 +158,26 @@ func addOutputModule(req *pbsubstreamsrpc.Request, outputModule, kind string) {
 	req.Modules.Modules = append(req.Modules.Modules, module)
 	req.OutputModule = outputModule
 
+}
+
+func Test_hasEthCall(t *testing.T) {
+	ethCallWasm, err := os.ReadFile(filepath.Join("testdata", "eth_call_import.wasm"))
+	require.NoError(t, err)
+
+	tests := []struct {
+		name     string
+		binaries []*pbsubstreams.Binary
+		expected bool
+	}{
+		{"no binaries", []*pbsubstreams.Binary{}, false},
+		{"empty binary", []*pbsubstreams.Binary{{Content: []byte{}}}, false},
+		{"binary with eth_call import", []*pbsubstreams.Binary{{Content: ethCallWasm}}, true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := hasEthCall(test.binaries)
+			require.Equal(t, test.expected, result)
+		})
+	}
 }

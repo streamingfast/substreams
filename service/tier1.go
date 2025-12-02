@@ -538,8 +538,8 @@ func (s *Tier1Service) BlocksAny(
 	}
 
 	if envEthCallFallbackToLatestDuration != "" && hasEthCall(request.Modules.Binaries) {
-		if header.Get("X-substreams-ack-non-deterministic-substreams") != "true" {
-			err := connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("header X-substreams-ack-non-deterministic-substreams must be set to true when using eth_call or eth_get_balance on a non deterministic rpc provider"))
+		if header.Get("X-substreams-acknowledge-non-deterministic") != "true" {
+			err := connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("header X-substreams-acknowledge-non-deterministic must be set to true when using eth_call or eth_get_balance on a non deterministic rpc provider"))
 			logger.Info("refusing Substreams Blocks request", append(fields, zap.Error(err))...)
 			return err
 		}

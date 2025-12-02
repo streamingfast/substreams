@@ -7,6 +7,7 @@
 
 * [Generate Your First Substreams](new/tutorials/intro-to-tutorials.md)
   * [on EVM](new/tutorials/evm.md)
+  * [on World Chain](new/tutorials/world-chain.md)
   * [on Solana](tutorials/intro-to-tutorials/on-solana/README.md)
     * [Transactions & Instructions](new/tutorials/solana/solana.md)
     * [Account Changes](new/tutorials/solana/account-changes.md)

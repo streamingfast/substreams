@@ -2,6 +2,7 @@ package reqctx
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
 
@@ -21,15 +22,16 @@ type Tier2RequestParameters struct {
 }
 
 func WithTier2RequestParameters(ctx context.Context, parameters Tier2RequestParameters) context.Context {
-	return context.WithValue(ctx, tier2RequestParametersKeyKey, parameters)
+	fmt.Println("Setting tier2 request parameters", parameters)
+	return context.WithValue(ctx, tier2RequestParametersKey, parameters)
 }
 
 func WithEthCallFallbackToLatestDuration(ctx context.Context, duration time.Duration) context.Context {
-	return context.WithValue(ctx, tier2RequestParametersKeyKey, duration)
+	return context.WithValue(ctx, ethCallFallbackToLatestDuration, duration)
 }
 
 func EthCallFallbackToLatestDuration(ctx context.Context) time.Duration {
-	duration, ok := ctx.Value(tier2RequestParametersKeyKey).(time.Duration)
+	duration, ok := ctx.Value(tier2RequestParametersKey).(time.Duration)
 	if !ok {
 		return time.Duration(0)
 	}
@@ -37,6 +39,6 @@ func EthCallFallbackToLatestDuration(ctx context.Context) time.Duration {
 }
 
 func GetTier2RequestParameters(ctx context.Context) (Tier2RequestParameters, bool) {
-	parameters, ok := ctx.Value(tier2RequestParametersKeyKey).(Tier2RequestParameters)
+	parameters, ok := ctx.Value(tier2RequestParametersKey).(Tier2RequestParameters)
 	return parameters, ok
 }

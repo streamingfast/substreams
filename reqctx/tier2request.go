@@ -2,7 +2,6 @@ package reqctx
 
 import (
 	"context"
-	"fmt"
 	"time"
 )
 
@@ -22,7 +21,6 @@ type Tier2RequestParameters struct {
 }
 
 func WithTier2RequestParameters(ctx context.Context, parameters Tier2RequestParameters) context.Context {
-	fmt.Println("Setting tier2 request parameters", parameters)
 	return context.WithValue(ctx, tier2RequestParametersKey, parameters)
 }
 

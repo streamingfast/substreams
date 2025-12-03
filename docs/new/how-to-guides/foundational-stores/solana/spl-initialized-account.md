@@ -20,35 +20,47 @@ SPL token transfer instructions on Solana only contain account addresses, not th
 
 ```rust
 use substreams::store::FoundationalStore;
-...
-use pb::sf::substreams::solana::v1::Transactions as SolanaTransactions;
+use std::collections::HashSet;
 
 #[substreams::handlers::map]
 fn map_spl_instructions(
+    params: String,
     transactions: SolanaTransactions,
-    account_owner_store: FoundationalStore,
+    foundational_store: FoundationalStore,
 ) -> Result<SplInstructions, Error> {
     // ... extract transfer instructions from transactions
 
     // Collect account addresses that need owner lookup
-    let account_keys: Vec<Vec<u8>> = transfer_accounts.iter()
-        .map(|addr| bs58::decode(addr).into_vec().unwrap())
+    let mut accounts_to_lookup = HashSet::<String>::new();
+    accounts_to_lookup.insert(transfer.from.clone());
+    accounts_to_lookup.insert(transfer.to.clone());
+
+    // Convert addresses to bytes and query store
+    let account_bytes: Vec<Vec<u8>> = accounts_to_lookup
+        .iter()
+        .filter_map(|addr| bs58::decode(addr).into_vec().ok())
         .collect();
 
-    // Batch query foundational store for account owners
-    let response = account_owner_store.get_all(&account_keys);
+    let resp = foundational_store.get(&account_bytes);
 
-    // Process responses and decode account owner data
-    for entry in response.entries {
-        if entry.response.unwrap().response == ResponseCode::Found as i32 {
-            let account_owner = AccountOwner::decode(
-                entry.response.unwrap().value.unwrap().value.as_slice()
-            )?;
-            let owner_address = bs58::encode(&account_owner.owner).into_string();
-            // Use owner_address to enrich transfer data
+    // Process responses and decode owner data
+    for queried_entry in resp.entries {
+        if queried_entry.code != ResponseCode::Found as i32 {
+            continue;
         }
+        let Some(entry) = &queried_entry.entry else { continue; };
+        let Some(value) = &entry.value else { continue; };
+
+        let Ok(account_owner) = AccountOwner::decode(value.value.as_slice()) else {
+            continue;
+        };
+
+        // Use owner data to enrich transfers
+        let owner_b58 = bs58::encode(&account_owner.owner).into_string();
+        transfer.from_owner = owner_b58;
     }
-    // ...
+
+    Ok(SplInstructions { instructions })
 }
 ```
 
@@ -56,25 +68,27 @@ fn map_spl_instructions(
 ```yaml
 specVersion: v0.1.0
 package:
-  name: solana-spl-all-tokens
-  version: v0.1.0
+  name: solana-spl-token
+  version: v0.2.0
 
 imports:
-    solana_common: solana-common@v0.3.0
-    spl_initialized_account: spl-initialized-account@v0.1.2
+  solana_common: solana-common@v0.3.0
+  spl_initialized_account: spl-initialized-account@v0.2.0
 
 modules:
   - name: map_spl_instructions
     kind: map
-    initialBlock: 31310775
+    initialBlock: 158569587
     inputs:
-      - map: solana_common:transactions_by_programid_without_votes
+      - params: string
+      - map: solana_common:transactions_by_programid_and_account_without_votes
       - foundational-store: spl-initialized-account@v0.1.2
     output:
       type: proto:sf.solana.spl.v1.type.SplInstructions
 
 params:
-  solana_common:transactions_by_programid_without_votes: "program:TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA || program:TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+  map_spl_instructions: "spl_token_address=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v|spl_token_decimal=6"
+  solana_common:transactions_by_programid_and_account_without_votes: "program:TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA || program:TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 ```
 
 > **Complete Example**: See the [map_spl_instructions](https://github.com/streamingfast/substreams-spl-token/blob/main/src/lib.rs#L49) implementation.
@@ -120,44 +134,57 @@ Each SPL token account address becomes a key, with the corresponding `AccountOwn
 ### Creating Foundational Store Entries
 
 ```rust
+use prost::Message;
+
 #[substreams::handlers::map]
-fn map_spl_initialized_account(
-    transactions: SolanaTransactions,
-) -> Result<Entries, Error> {
-    let mut entries: Vec<Entry> = Vec::new();
+pub fn map_spl_initialized_account(
+    transactions: SolanaTransactions
+) -> Result<SinkEntries, Error> {
+    let mut entries: Vec<Entry> = vec![];
 
-    for confirmed_trx in successful_transactions(transactions) {
-        for instruction in confirmed_trx.walk_instructions() {
-            if let Ok(token_instruction) = TokenInstruction::unpack(&instruction.data()) {
-                match token_instruction {
-                    TokenInstruction::InitializeAccount {} => {
-                        let account_owner = AccountOwner {
-                            mint_address: instruction.accounts()[1].clone(),
-                            owner: instruction.accounts()[2].clone(),
-                        };
+    for transaction in transactions.transactions {
+        if !transaction.is_successful() {
+            continue;
+        }
 
-                        let mut buf = Vec::new();
-                        account_owner.encode(&mut buf)?;
+        for instruction in transaction.walk_instructions() {
+            // Decode SPL token instruction
+            let token_instruction = TokenInstruction::unpack(instruction.data().as_slice())?;
 
-                        let entry = Entry {
-                            key: instruction.accounts()[0].clone(),
-                            value: Some(Any {
-                                type_url: "type.googleapis.com/sf.substreams.solana.spl.v1.AccountOwner".to_string(),
-                                value: buf,
-                            }),
-                        };
-                        entries.push(entry);
-                    }
-                    TokenInstruction::InitializeAccount2 { owner } => {
-                        // Handle embedded owner in instruction data
-                    }
-                    _ => {}
+            match token_instruction {
+                TokenInstruction::InitializeAccount {} => {
+                    let account_owner = AccountOwner {
+                        mint_address: instruction.accounts()[1].clone(),
+                        owner: instruction.accounts()[2].clone(),
+                    };
+
+                    let mut buf = Vec::new();
+                    prost::Message::encode(&account_owner, &mut buf).unwrap();
+
+                    entries.push(Entry {
+                        key: Some(Key {
+                            bytes: instruction.accounts()[0].to_vec(),
+                        }),
+                        value: Some(Any {
+                            type_url: "type.googleapis.com/sf.substreams.solana.spl.v1.AccountOwner".to_string(),
+                            value: buf,
+                        }),
+                    });
                 }
+                TokenInstruction::InitializeAccount2 { owner } |
+                TokenInstruction::InitializeAccount3 { owner } => {
+                    // Handle embedded owner in instruction data
+                    // ... similar to InitializeAccount
+                }
+                _ => {}
             }
         }
     }
 
-    Ok(Entries { entries })
+    Ok(SinkEntries {
+        entries,
+        if_not_exist: true,
+    })
 }
 ```
 
@@ -168,7 +195,7 @@ fn map_spl_initialized_account(
 specVersion: v0.1.0
 package:
   name: spl-initialized-account
-  version: v0.1.2
+  version: v0.2.1
 
 network: solana
 
@@ -183,7 +210,7 @@ modules:
       - params: string
       - map: solana_common:transactions_by_programid_without_votes
     output:
-      type: proto:sf.substreams.foundational_store.v1.Entries
+      type: proto:sf.substreams.foundational_store.model.v2.SinkEntries
 
 params:
   solana_common:transactions_by_programid_without_votes: "program:TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA || program:TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
@@ -193,4 +220,6 @@ params:
 
 ## Related Resources
 
-- [Foundational Stores Overview](https://github.com/streamingfast/substreams-foundational-store/blob/develop/README.md)
+- [Hosting a Foundational Store](https://docs.substreams.dev/tutorials/hosting-foundational-stores)
+- [Consuming a Foundational Store](https://docs.substreams.dev/tutorials/consuming-foundational-store)
+- [Foundational Stores Architecture](https://github.com/streamingfast/substreams-foundational-store/blob/develop/README.md)

@@ -79,5 +79,3 @@ redirects:
   /how-to-guides/migrate: /new/how-to-guides/develop-your-own-substreams/solana/migrate-from-yellowstone
   /reference-material/substreams-cli/installing-the-cli: /new/how-to-guides/cli/installing-the-cli
   /tutorials/publish-package: /new/how-to-guides/publish-package
-  /how-to-guides/foundational-stores/erc20-token-metadata: /how-to-guides/foundational-stores/ethereum/erc20-token-metadata
-  /how-to-guides/foundational-stores/spl-initialized-account: /how-to-guides/foundational-stores/solana/spl-initialized-account

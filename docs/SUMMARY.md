@@ -88,7 +88,7 @@
     * [Parameterized Modules](new/references/substreams-components/modules/parameterized-modules.md)
   * [Manifests Reference](new/references/substreams-components/manifests.md)
 * [Substreams Architecture](new/references/architecture.md)
-* [Substreams Foundational Stores](https://github.com/streamingfast/substreams-foundational-store/blob/develop/README.md)
+* [Substreams Foundational Stores](new/references/foundational-store-reference.md)
 * [Substreams:SQL](new/references/sql/README.md)
   * [Sink Config](new/references/sql/sink-config.md)
   * [DSN Reference](new/references/sql/dsn-reference.md)

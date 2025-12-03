@@ -183,4 +183,4 @@ modules:
 
 - [Hosting a Foundational Store](https://docs.substreams.dev/tutorials/hosting-foundational-stores)
 - [Consuming a Foundational Store](https://docs.substreams.dev/tutorials/consuming-foundational-store)
-- [Foundational Stores Architecture](https://github.com/streamingfast/substreams-foundational-store/blob/develop/README.md)
+- [Foundational Stores Architecture](../../../references/foundational-store-reference.md)

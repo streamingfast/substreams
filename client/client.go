@@ -9,6 +9,7 @@ import (
 	"regexp"
 
 	"github.com/streamingfast/dgrpc"
+	networks "github.com/streamingfast/firehose-networks"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.uber.org/zap"
@@ -205,6 +206,12 @@ func NewSubstreamsClientConfig(opts SubstreamsClientConfigOptions) *SubstreamsCl
 		} else {
 			// Fallback to simple stripping if parsing fails
 			endpoint = endpoint[8:]
+		}
+	} else {
+		if resolvedEndpoint := networks.GetSubstreamsEndpoint(endpoint); resolvedEndpoint != "" {
+			// Resolved endpoint from alias is always non-plaintext
+			endpoint = resolvedEndpoint
+			plaintext = false
 		}
 	}
 

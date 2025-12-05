@@ -84,6 +84,7 @@ The data missing in the Base Block makes the corresponding Protobuf field empty.
 - **Stellar Mainnet**: `mainnet.stellar.streamingfast.io:443`
 - **Stellar Testnet**: `testnet.stellar.streamingfast.io:443`
 - **Unichain Mainnet**: `mainnet.unichain.streamingfast.io:443`
+- **World Chain Mainnet**: `mainnet.worldchain.streamingfast.io:443`
 - **Katana Mainnet**: `katana.streamingfast.io:443`
 
 ## Community Endpoints

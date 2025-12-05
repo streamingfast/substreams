@@ -1,0 +1,9 @@
+version: v1
+plugins:
+  - plugin: buf.build/protocolbuffers/rust:v23.3
+    out: src
+    opt:
+      - bytes=.
+      - btree_map=.
+      - type_attribute=.=derive(Clone,PartialEq,::prost::Message)
+      - field_attribute=.=derive(Clone,PartialEq)

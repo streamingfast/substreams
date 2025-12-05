@@ -27,8 +27,8 @@ func TestDummyBlockchainContainer(t *testing.T) {
 	require.NoError(t, err)
 	defer container.Terminate(ctx)
 
-	_, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, zlog)
-	_ = startTier2App(t, ctx, tmpDir, zlog)
+	app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, zlog)
+	app2 := startTier2App(t, ctx, tmpDir, zlog)
 
 	testCases := []struct {
 		name           string
@@ -127,4 +127,9 @@ func TestDummyBlockchainContainer(t *testing.T) {
 		})
 	}
 
+	// ensure we close this well for next tests
+	app.Shutdown(nil)
+	app2.Shutdown(nil)
+	<-app.Terminated()
+	<-app2.Terminated()
 }

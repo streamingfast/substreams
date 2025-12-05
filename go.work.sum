@@ -103,6 +103,7 @@ cloud.google.com/go/iot v1.8.3/go.mod h1:dYhrZh+vUxIQ9m3uajyKRSW7moF/n0rYmA2PhYA
 cloud.google.com/go/kms v1.20.5/go.mod h1:C5A8M1sv2YWYy1AE6iSrnddSG9lRGdJq5XEdBy28Lmw=
 cloud.google.com/go/language v1.14.3/go.mod h1:hjamj+KH//QzF561ZuU2J+82DdMlFUjmiGVWpovGGSA=
 cloud.google.com/go/lifesciences v0.10.3/go.mod h1:hnUUFht+KcZcliixAg+iOh88FUwAzDQQt5tWd7iIpNg=
+cloud.google.com/go/logging v1.8.1/go.mod h1:TJjR+SimHwuC8MZ9cjByQulAMgni+RkXeI3wwctHJEI=
 cloud.google.com/go/logging v1.12.0/go.mod h1:wwYBt5HlYP1InnrtYI0wtwttpVU1rifnMT7RejksUAM=
 cloud.google.com/go/longrunning v0.5.6/go.mod h1:vUaDrWYOMKRuhiv6JBnn49YxCPz2Ayn9GqyjaBT8/mA=
 cloud.google.com/go/longrunning v0.6.2/go.mod h1:k/vIs83RN4bE3YCswdXC5PFfWVILjm3hpEUlSko4PiI=
@@ -111,6 +112,7 @@ cloud.google.com/go/maps v1.17.1/go.mod h1:lGZCm2ILmN06GQyrRQwA1rScqQZuApQsCTX+0
 cloud.google.com/go/mediatranslation v0.9.3/go.mod h1:KTrFV0dh7duYKDjmuzjM++2Wn6yw/I5sjZQVV5k3BAA=
 cloud.google.com/go/memcache v1.11.3/go.mod h1:UeWI9cmY7hvjU1EU6dwJcQb6EFG4GaM3KNXOO2OFsbI=
 cloud.google.com/go/metastore v1.14.3/go.mod h1:HlbGVOvg0ubBLVFRk3Otj3gtuzInuzO/TImOBwsKlG4=
+cloud.google.com/go/monitoring v1.16.3/go.mod h1:KwSsX5+8PnXv5NJnICZzW2R8pWTis8ypC4zmdRD63Tw=
 cloud.google.com/go/monitoring v1.21.2/go.mod h1:hS3pXvaG8KgWTSz+dAdyzPrGUYmi2Q+WFX8g2hqVEZU=
 cloud.google.com/go/monitoring v1.22.1/go.mod h1:AuZZXAoN0WWWfsSvET1Cpc4/1D8LXq8KRDU87fMS6XY=
 cloud.google.com/go/networkconnectivity v1.16.1/go.mod h1:GBC1iOLkblcnhcnfRV92j4KzqGBrEI6tT7LP52nZCTk=

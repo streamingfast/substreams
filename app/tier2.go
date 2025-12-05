@@ -109,7 +109,11 @@ func (a *Tier2App) Run() error {
 		return fmt.Errorf("failed to setup trust authenticator: %w", err)
 	}
 
-	a.OnTerminating(func(_ error) { a.setIsReady(false) })
+	// app shuts down the service with its listener
+	a.OnTerminating(func(err error) {
+		a.setIsReady(false)
+		svc.Shutdown(err)
+	})
 
 	go func() {
 		a.logger.Info("launching gRPC server")

@@ -186,7 +186,7 @@ func startTier2App(t *testing.T, ctx context.Context, tmpDir string, zlog *zap.L
 		require.NoError(t, err)
 	}()
 
-	// Wait for t1app to be ready with polling
+	// Wait for t2app to be ready with polling
 	timeout := time.After(5 * time.Second)
 	ticker := time.NewTicker(20 * time.Millisecond)
 	defer ticker.Stop()
@@ -195,7 +195,7 @@ waitReady:
 	for {
 		select {
 		case <-timeout:
-			t.Fatal("timeout waiting for t1app to be ready")
+			t.Fatal("timeout waiting for t2app to be ready")
 		case <-ticker.C:
 			if t2app.IsReady(ctx) {
 				t.Logf("t1app is ready")

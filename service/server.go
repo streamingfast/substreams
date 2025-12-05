@@ -88,6 +88,10 @@ func ListenTier1(
 
 		options = append(options, dgrpcserver.WithConnectPermissiveCORS())
 		srv := connectweb.New(handlerGetters, options...)
+		svc.OnTerminating(func(err error) {
+			logger.Info("Tier1Service is terminating")
+			srv.Shutdown(err)
+		})
 		servers = append(servers, srv)
 		cleanAddr := strings.ReplaceAll(addr, "*", "")
 		go func() {
@@ -130,6 +134,11 @@ func ListenTier2(
 
 	grpcServer := factory.ServerFromOptions(options...)
 	pbssinternal.RegisterSubstreamsServer(grpcServer.ServiceRegistrar(), svc)
+
+	svc.OnTerminating(func(err error) {
+		logger.Info("Tier2Service is terminating")
+		grpcServer.Shutdown(0)
+	})
 
 	done := make(chan struct{})
 	grpcServer.OnTerminated(func(e error) {

@@ -47,8 +47,8 @@ func TestPartialBlocksContainer(t *testing.T) {
 		}
 	}
 
-	_, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, zlog)
-	_ = startTier2App(t, ctx, tmpDir, zlog)
+	app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, zlog)
+	app2 := startTier2App(t, ctx, tmpDir, zlog)
 
 	testCases := []struct {
 		name           string
@@ -102,6 +102,13 @@ func TestPartialBlocksContainer(t *testing.T) {
 			t.Logf("Received %d block scoped data items", len(blockScopedDataSlice))
 		})
 	}
+
+	// ensure we close this well, for next tests
+	app.Shutdown(nil)
+	app2.Shutdown(nil)
+	<-app.Terminated()
+	<-app2.Terminated()
+
 }
 
 // RunRequestWithPartialBlocks is similar to RunRequest but specifically looks for partial block data

@@ -1230,6 +1230,9 @@ func toConnectError(ctx context.Context, err error) error {
 	if errors.Is(err, context.Canceled) {
 		if contextCause := context.Cause(ctx); contextCause != nil {
 			err = contextCause // unwrap errors in canceled contexts
+			if errors.Is(err, context.Canceled) {
+				return connect.NewError(connect.CodeCanceled, err)
+			}
 		} else {
 			return connect.NewError(connect.CodeCanceled, err)
 		}

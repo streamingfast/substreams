@@ -19,7 +19,6 @@
   * [on Starknet](new/tutorials/starknet.md)
   * [on Stellar](new/tutorials/stellar.md)
 * [Consuming a Foundational Store](new/tutorials/consuming-foundational-store.md)
-* [Hosting a Foundational Store](new/tutorials/hosting-foundational-stores.md)
 
 ## How-To Guides
 
@@ -89,6 +88,7 @@
   * [Manifests Reference](new/references/substreams-components/manifests.md)
 * [Substreams Architecture](new/references/architecture.md)
 * [Substreams Foundational Stores](new/references/foundational-store-reference.md)
+  * [Hosting a Foundational Store](new/tutorials/hosting-foundational-stores.md)
 * [Substreams:SQL](new/references/sql/README.md)
   * [Sink Config](new/references/sql/sink-config.md)
   * [DSN Reference](new/references/sql/dsn-reference.md)

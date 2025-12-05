@@ -81,7 +81,6 @@
     * [Inputs](new/references/substreams-components/modules/inputs.md)
     * [Output](new/references/substreams-components/modules/outputs.md)
     * [Module handlers](new/references/substreams-components/modules/setting-up-handlers.md)
-    * [Module handler creation](new/references/substreams-components/modules/setting-up-handlers.md)
     * [Indexes](new/references/substreams-components/modules/indexes.md)
     * [Keys in stores](new/references/substreams-components/modules/keys-in-stores.md)
     * [Dynamic data sources](new/references/substreams-components/modules/dynamic-data-sources.md)

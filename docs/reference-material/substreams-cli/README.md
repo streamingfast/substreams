@@ -1,2 +1,0 @@
-# Substreams CLI
-

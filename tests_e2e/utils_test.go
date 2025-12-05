@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"testing"
 	"time"
 
@@ -27,6 +29,26 @@ import (
 
 func init() {
 	logger.Register()
+}
+
+// ParseTxCountLog parses a log entry like "Block 304: Current TX count: 4, Stored TX count: 4, Total: 1691"
+// and returns the 4 values: blockNumber, currentTxCount, storedTxCount, totalTxCount
+// Returns ok=false if the log entry doesn't match the expected format
+func ParseTxCountLog(logEntry string) (blockNumber, currentTxCount, storedTxCount, totalTxCount uint64, ok bool) {
+	// Regex to match: Block 304: Current TX count: 4, Stored TX count: 4, Total: 1691
+	re := regexp.MustCompile(`Block (\d+): Current TX count: (\d+), Stored TX count: (\d+), Total: (\d+)`)
+	matches := re.FindStringSubmatch(logEntry)
+
+	if len(matches) != 5 { // Full match + 4 capture groups
+		return 0, 0, 0, 0, false
+	}
+
+	blockNumber, _ = strconv.ParseUint(matches[1], 10, 64)
+	currentTxCount, _ = strconv.ParseUint(matches[2], 10, 64)
+	storedTxCount, _ = strconv.ParseUint(matches[3], 10, 64)
+	totalTxCount, _ = strconv.ParseUint(matches[4], 10, 64)
+
+	return blockNumber, currentTxCount, storedTxCount, totalTxCount, true
 }
 
 func RunRequest(t *testing.T, req *pbsubstreamsrpcv2.Request, endpoint string) ([]*pbsubstreamsrpcv2.BlockScopedData, *pbsubstreamsrpcv2.SessionInit, error) {
@@ -249,4 +271,79 @@ func newDummyBlockchainContainer(ctx context.Context, tmpDir string, image strin
 	}
 
 	return container, nil
+}
+
+// RunRequestWithPartialBlocks is similar to RunRequest but specifically looks for partial block data
+func RunRequestWithPartialBlocks(t *testing.T, req *pbsubstreamsrpcv2.Request, endpoint string, partialResponseCount int) ([]*pbsubstreamsrpcv2.BlockScopedData, *pbsubstreamsrpcv2.SessionInit, []*pbsubstreamsrpcv2.PartialBlockData, error) {
+
+	ctx := t.Context()
+	// substreams client
+	//
+	conn, closeFunc, callOpts, _, err := client.NewSubstreamsClientConn(client.NewSubstreamsClientConfig(
+		client.SubstreamsClientConfigOptions{
+			Endpoint:  endpoint,
+			AuthType:  client.None,
+			PlainText: true,
+			Agent:     "test-client",
+		},
+	))
+	require.NoError(t, err)
+	defer func() {
+		err := closeFunc()
+		require.NoError(t, err)
+	}()
+
+	// Debug: Log the endpoint we're connecting to
+	t.Logf("Connecting to endpoint: %s", endpoint)
+
+	// Create client
+	streamClient := pbsubstreamsrpcv2.NewStreamClient(conn)
+
+	// Make the streaming call
+	stream, err := streamClient.Blocks(ctx, req, callOpts...)
+	if err != nil {
+		t.Logf("Error making streaming call: %v", err)
+		require.NoError(t, err)
+	}
+
+	// Read all responses and accumulate BlockScopedData and PartialBlockData
+	var blockScopedDataSlice []*pbsubstreamsrpcv2.BlockScopedData
+	var partialBlockDataSlice []*pbsubstreamsrpcv2.PartialBlockData
+	var session *pbsubstreamsrpcv2.SessionInit
+
+	for {
+		var response *pbsubstreamsrpcv2.Response
+		response, err = stream.Recv()
+		if err != nil {
+			t.Logf("Stream ended or error: %v", err)
+			break
+		}
+		require.NotNil(t, response)
+
+		// Validate session if received
+		if sess := response.GetSession(); sess != nil {
+			session = sess
+			t.Logf("Received session: %+v", session)
+		}
+
+		// Check for partial block data and accumulate
+		if partialData := response.GetPartialBlockData(); partialData != nil {
+			partialBlockDataSlice = append(partialBlockDataSlice, partialData)
+			//t.Logf("Received partial block data %d/%d", len(partialBlockDataSlice), partialResponseCount)
+
+			// Break if we've received the desired number of partial responses
+			if len(partialBlockDataSlice) >= partialResponseCount {
+				t.Logf("Received %d partial responses - halting request", len(partialBlockDataSlice))
+				break
+			}
+		}
+
+		// Accumulate BlockScopedData
+		if blockData := response.GetBlockScopedData(); blockData != nil {
+			blockScopedDataSlice = append(blockScopedDataSlice, blockData)
+			//t.Logf("Accumulated BlockScopedData clock %d, total count: %d", blockData.Clock.Number, len(blockScopedDataSlice))
+		}
+	}
+
+	return blockScopedDataSlice, session, partialBlockDataSlice, err
 }

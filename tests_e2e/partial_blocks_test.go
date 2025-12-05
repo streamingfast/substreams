@@ -8,11 +8,11 @@ import (
 	"testing"
 
 	"github.com/streamingfast/logging"
-	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestPartialBlocksContainer(t *testing.T) {
@@ -84,7 +84,7 @@ func TestPartialBlocksContainer(t *testing.T) {
 			}
 
 			// Run the request with custom handling for partial blocks
-			blockScopedDataSlice, session, partialBlockReceived, err := RunRequestWithPartialBlocks(t, request, substreamsEndpoint)
+			blockScopedDataSlice, session, partialResponses, err := RunRequestWithPartialBlocks(t, request, substreamsEndpoint, 5)
 			if err != nil && err != io.EOF && !errors.Is(err, context.Canceled) {
 				// Let's try to get container logs to debug
 				logs, logErr := container.Logs(ctx)
@@ -98,8 +98,8 @@ func TestPartialBlocksContainer(t *testing.T) {
 			}
 
 			require.NotNil(t, session, "Should have received at least one session")
-			assert.True(t, partialBlockReceived, "Should have received partial block data")
-			t.Logf("Received %d block scoped data items", len(blockScopedDataSlice))
+			assert.True(t, len(partialResponses) > 0, "Should have received partial block data")
+			t.Logf("Received %d block scoped data items and %d partial responses", len(blockScopedDataSlice), len(partialResponses))
 		})
 	}
 
@@ -111,72 +111,166 @@ func TestPartialBlocksContainer(t *testing.T) {
 
 }
 
-// RunRequestWithPartialBlocks is similar to RunRequest but specifically looks for partial block data
-func RunRequestWithPartialBlocks(t *testing.T, req *pbsubstreamsrpcv2.Request, endpoint string) ([]*pbsubstreamsrpcv2.BlockScopedData, *pbsubstreamsrpcv2.SessionInit, bool, error) {
+func TestPartialBlocksWithStores(t *testing.T) {
+	ctx := context.Background()
+	zlog := zap.NewNop()
+	// zlog := MustCreateLoggerWithServiceName("partial-blocks-test") // use this to include verbose substreams service logs
 
-	ctx := t.Context()
-	// substreams client
-	//
-	conn, closeFunc, callOpts, _, err := client.NewSubstreamsClientConn(client.NewSubstreamsClientConfig(
-		client.SubstreamsClientConfigOptions{
-			Endpoint:  endpoint,
-			AuthType:  client.None,
-			PlainText: true,
-			Agent:     "test-client",
-		},
-	))
+	// Create temporary directory for volume mount
+	tmpDir, err := os.MkdirTemp("", "firehose-data-")
 	require.NoError(t, err)
-	defer func() {
-		err := closeFunc()
-		require.NoError(t, err)
-	}()
+	defer os.RemoveAll(tmpDir)
 
-	// Debug: Log the endpoint we're connecting to
-	t.Logf("Connecting to endpoint: %s", endpoint)
+	// launch dummy blockchain container with flash blocks enabled
+	image := "ghcr.io/streamingfast/dummy-blockchain:17b576d"
+	burst := 300
 
-	// Create client
-	streamClient := pbsubstreamsrpcv2.NewStreamClient(conn)
+	t.Logf("Starting container with image: %s and burst %d", image, burst)
+	container, err := newDummyBlockchainContainer(ctx, tmpDir, image, "--with-flash-blocks", burst)
+	require.NoError(t, err)
+	defer container.Terminate(ctx)
 
-	// Make the streaming call
-	stream, err := streamClient.Blocks(ctx, req, callOpts...)
-	if err != nil {
-		t.Logf("Error making streaming call: %v", err)
-		require.NoError(t, err)
-	}
-
-	// Read all responses and accumulate BlockScopedData
-	var blockScopedDataSlice []*pbsubstreamsrpcv2.BlockScopedData
-	var session *pbsubstreamsrpcv2.SessionInit
-	var partialBlockReceived bool
-
-	for {
-		var response *pbsubstreamsrpcv2.Response
-		response, err = stream.Recv()
-		if err != nil {
-			t.Logf("Stream ended or error: %v", err)
-			break
+	// Log container details for debugging
+	if container != nil {
+		if ports, portErr := container.Ports(ctx); portErr == nil {
+			t.Logf("Container exposed ports: %v", ports)
 		}
-		require.NotNil(t, response)
-
-		// Validate session if received
-		if sess := response.GetSession(); sess != nil {
-			session = sess
-			t.Logf("Received session: %+v", session)
-		}
-
-		// Check for partial block data and halt when received
-		if partialData := response.GetPartialBlockData(); partialData != nil {
-			partialBlockReceived = true
-			t.Logf("Received partial block data - halting request")
-			break
-		}
-
-		// Accumulate BlockScopedData
-		if blockData := response.GetBlockScopedData(); blockData != nil {
-			blockScopedDataSlice = append(blockScopedDataSlice, blockData)
-			t.Logf("Accumulated BlockScopedData clock %d, total count: %d", blockData.Clock.Number, len(blockScopedDataSlice))
+		if logs, logErr := container.Logs(ctx); logErr == nil {
+			defer logs.Close()
+			buf := make([]byte, 2048)
+			if n, _ := logs.Read(buf); n > 0 {
+				t.Logf("Container logs: %s", string(buf[:n]))
+			}
 		}
 	}
 
-	return blockScopedDataSlice, session, partialBlockReceived, err
+	app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, zlog)
+	app2 := startTier2App(t, ctx, tmpDir, zlog)
+
+	testCases := []struct {
+		name                   string
+		startBlock             int64
+		stopBlock              uint64
+		productionMode         bool
+		spkgFile               string
+		outputModule           string
+		expectPartialResponses int
+	}{
+		{
+			name:                   "simple events head",
+			startBlock:             100,
+			stopBlock:              0, // Will halt after the requested number of partial responses
+			productionMode:         false,
+			spkgFile:               "./partial_blocks_store/partial-blocks-store-v0.1.0.spkg",
+			outputModule:           "map_tx_counter_summary",
+			expectPartialResponses: 12,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pkg, err := manifest.MustNewReader(tc.spkgFile).Read()
+			require.NoError(t, err)
+
+			request := &pbsubstreamsrpcv2.Request{
+				StartBlockNum:        tc.startBlock,
+				StopBlockNum:         tc.stopBlock,
+				FinalBlocksOnly:      false,
+				ProductionMode:       tc.productionMode,
+				OutputModule:         tc.outputModule,
+				Modules:              pkg.Package.Modules,
+				IncludePartialBlocks: true,
+			}
+
+			// Run the request with custom handling for partial blocks
+			blockScopedDataSlice, session, partialResponses, err := RunRequestWithPartialBlocks(t, request, substreamsEndpoint, tc.expectPartialResponses)
+			if err != nil && err != io.EOF && !errors.Is(err, context.Canceled) {
+				// Let's try to get container logs to debug
+				logs, logErr := container.Logs(ctx)
+				if logErr == nil {
+					defer logs.Close()
+					buf := make([]byte, 4096)
+					n, _ := logs.Read(buf)
+					t.Logf("Container logs: %s", string(buf[:n]))
+				}
+				t.Fatalf("Unexpected error: %s", err)
+			}
+
+			require.NotNil(t, session, "Should have received at least one session")
+
+			type fullBlockResponse struct {
+				currentTxCount uint64
+				storedTxCount  uint64
+				totalTxCount   uint64
+			}
+
+			seenBlocks := make(map[uint64]fullBlockResponse)
+
+			for _, fullResponse := range blockScopedDataSlice {
+				require.Len(t, fullResponse.Output.DebugInfo.Logs, 1)
+				logEntry := fullResponse.Output.DebugInfo.Logs[0]
+				blockNumber, currentTxCount, storedTxCount, totalTxCount, ok := ParseTxCountLog(logEntry)
+				require.True(t, ok, "Failed to parse tx count log")
+				require.Equal(t, blockNumber, fullResponse.Clock.Number)
+
+				seenBlocks[fullResponse.Clock.Number] = fullBlockResponse{
+					currentTxCount: currentTxCount,
+					storedTxCount:  storedTxCount,
+					totalTxCount:   totalTxCount,
+				}
+			}
+
+			lastSeenPartialNumber := uint64(0)
+			lastSeenPartialIndex := uint32(0)
+			sumCurrentTxCount := uint64(0)
+			notSeen := uint64(0)
+
+			assert.Len(t, partialResponses, tc.expectPartialResponses, "Should have received %d partial block data", tc.expectPartialResponses)
+			for _, partialResponse := range partialResponses {
+
+				require.Len(t, partialResponse.Output.DebugInfo.Logs, 1)
+				logEntry := partialResponse.Output.DebugInfo.Logs[0]
+				blockNumber, currentTxCount, storedTxCount, totalTxCount, ok := ParseTxCountLog(logEntry)
+				require.True(t, ok, "Failed to parse tx count log")
+				require.Equal(t, blockNumber, partialResponse.Clock.Number)
+				t.Logf("Partial Block - Block: %d, idx: %d, Current TX count: %d, Stored TX count: %d, Total: %d",
+					blockNumber, partialResponse.PartialIndex, currentTxCount, storedTxCount, totalTxCount)
+
+				if blockNumber == lastSeenPartialNumber {
+					assert.Greater(t, partialResponse.PartialIndex, lastSeenPartialIndex)
+					sumCurrentTxCount += currentTxCount
+				} else {
+					assert.Greater(t, blockNumber, lastSeenPartialNumber)
+					lastSeenPartialNumber = blockNumber
+					sumCurrentTxCount = currentTxCount // reset counter
+				}
+
+				lastSeenPartialIndex = partialResponse.PartialIndex
+
+				if fullResp, ok := seenBlocks[blockNumber]; ok {
+					if partialResponse.PartialIndex == 4 {
+						assert.True(t, currentTxCount <= fullResp.currentTxCount, "Partial block %d has more transactions than full block", blockNumber)
+						assert.Equal(t, storedTxCount, fullResp.storedTxCount)
+						assert.Equal(t, totalTxCount, fullResp.totalTxCount)
+						assert.Equal(t, sumCurrentTxCount, fullResp.currentTxCount)
+					}
+				} else {
+					t.Logf("Partial block %d received that was not seen in full responses", blockNumber)
+					if notSeen != 0 && notSeen != blockNumber {
+						t.Errorf("More than one partial block received that was not seen in in full responses: %d and %d", blockNumber, notSeen)
+					}
+					notSeen = blockNumber
+				}
+
+			}
+
+		})
+	}
+
+	// ensure we close this well, for next tests
+	app.Shutdown(nil)
+	app2.Shutdown(nil)
+	<-app.Terminated()
+	<-app2.Terminated()
+
 }

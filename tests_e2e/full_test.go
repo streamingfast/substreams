@@ -6,16 +6,17 @@ import (
 	"os"
 	"testing"
 
-	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestDummyBlockchainContainer(t *testing.T) {
 	ctx := context.Background()
-	zlog := logging.MustCreateLoggerWithServiceName("dummy-blockchain-test")
+	//zlog := logging.MustCreateLoggerWithServiceName("dummy-blockchain-test")
+	zlog := zap.NewNop()
 
 	// Create temporary directory for volume mount
 	tmpDir, err := os.MkdirTemp("", "firehose-data-")

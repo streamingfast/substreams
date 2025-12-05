@@ -7,7 +7,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/stretchr/testify/assert"
@@ -15,9 +14,10 @@ import (
 	"go.uber.org/zap"
 )
 
-func TestPartialBlocksContainer(t *testing.T) {
+func TestPartialBlocksSimple(t *testing.T) {
 	ctx := context.Background()
-	zlog := logging.MustCreateLoggerWithServiceName("partial-blocks-test")
+	//zlog := logging.MustCreateLoggerWithServiceName("partial-blocks-test")
+	zlog := zap.NewNop()
 
 	// Create temporary directory for volume mount
 	tmpDir, err := os.MkdirTemp("", "firehose-data-")
@@ -63,6 +63,14 @@ func TestPartialBlocksContainer(t *testing.T) {
 			startBlock:     -1,
 			stopBlock:      0, // Will halt on first partial block
 			productionMode: false,
+			spkgFile:       "./dummy/e2e-v0.1.0.spkg",
+			outputModule:   "map_events",
+		},
+		{
+			name:           "simple events prod",
+			startBlock:     -1,
+			stopBlock:      0, // Will halt on first partial block
+			productionMode: true,
 			spkgFile:       "./dummy/e2e-v0.1.0.spkg",
 			outputModule:   "map_events",
 		},
@@ -157,8 +165,17 @@ func TestPartialBlocksWithStores(t *testing.T) {
 		expectPartialResponses int
 	}{
 		{
-			name:                   "simple events head",
+			name:                   "dev with stores",
 			startBlock:             100,
+			stopBlock:              0, // Will halt after the requested number of partial responses
+			productionMode:         false,
+			spkgFile:               "./partial_blocks_store/partial-blocks-store-v0.1.0.spkg",
+			outputModule:           "map_tx_counter_summary",
+			expectPartialResponses: 100,
+		},
+		{
+			name:                   "prod with stores",
+			startBlock:             200,
 			stopBlock:              0, // Will halt after the requested number of partial responses
 			productionMode:         false,
 			spkgFile:               "./partial_blocks_store/partial-blocks-store-v0.1.0.spkg",
@@ -207,10 +224,8 @@ func TestPartialBlocksWithStores(t *testing.T) {
 			seenBlocks := make(map[uint64]fullBlockResponse)
 
 			for _, fullResponse := range blockScopedDataSlice {
-				require.Len(t, fullResponse.Output.DebugInfo.Logs, 1)
-				logEntry := fullResponse.Output.DebugInfo.Logs[0]
-				blockNumber, currentTxCount, storedTxCount, totalTxCount, ok := ParseTxCountLog(logEntry)
-				require.True(t, ok, "Failed to parse tx count log")
+				blockNumber, currentTxCount, storedTxCount, totalTxCount, ok := ParseTxCounterSummary(fullResponse.Output)
+				require.True(t, ok, "Failed to parse TxCounterSummary from MapOutput")
 				require.Equal(t, blockNumber, fullResponse.Clock.Number)
 
 				seenBlocks[fullResponse.Clock.Number] = fullBlockResponse{
@@ -228,10 +243,8 @@ func TestPartialBlocksWithStores(t *testing.T) {
 			assert.Len(t, partialResponses, tc.expectPartialResponses, "Should have received %d partial block data", tc.expectPartialResponses)
 			for _, partialResponse := range partialResponses {
 
-				require.Len(t, partialResponse.Output.DebugInfo.Logs, 1)
-				logEntry := partialResponse.Output.DebugInfo.Logs[0]
-				blockNumber, currentTxCount, storedTxCount, totalTxCount, ok := ParseTxCountLog(logEntry)
-				require.True(t, ok, "Failed to parse tx count log")
+				blockNumber, currentTxCount, storedTxCount, totalTxCount, ok := ParseTxCounterSummary(partialResponse.Output)
+				require.True(t, ok, "Failed to parse TxCounterSummary from MapOutput")
 				require.Equal(t, blockNumber, partialResponse.Clock.Number)
 				t.Logf("Partial Block - Block: %d, idx: %d, Current TX count: %d, Stored TX count: %d, Total: %d",
 					blockNumber, partialResponse.PartialIndex, currentTxCount, storedTxCount, totalTxCount)

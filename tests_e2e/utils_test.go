@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strconv"
 	"testing"
 	"time"
 
@@ -21,6 +19,7 @@ import (
 	"github.com/streamingfast/substreams/app"
 	"github.com/streamingfast/substreams/client"
 	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbtest "github.com/streamingfast/substreams/tests_e2e/partial_blocks_store/pb"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -31,24 +30,30 @@ func init() {
 	logger.Register()
 }
 
-// ParseTxCountLog parses a log entry like "Block 304: Current TX count: 4, Stored TX count: 4, Total: 1691"
-// and returns the 4 values: blockNumber, currentTxCount, storedTxCount, totalTxCount
-// Returns ok=false if the log entry doesn't match the expected format
-func ParseTxCountLog(logEntry string) (blockNumber, currentTxCount, storedTxCount, totalTxCount uint64, ok bool) {
-	// Regex to match: Block 304: Current TX count: 4, Stored TX count: 4, Total: 1691
-	re := regexp.MustCompile(`Block (\d+): Current TX count: (\d+), Stored TX count: (\d+), Total: (\d+)`)
-	matches := re.FindStringSubmatch(logEntry)
-
-	if len(matches) != 5 { // Full match + 4 capture groups
+// ParseTxCounterSummary unmarshals the MapOutput protobuf Any field into a TxCounterSummary
+// and returns the key values: blockNumber, currentTxCount, storedTxCount, totalTxCount
+// Returns ok=false if the unmarshaling fails
+func ParseTxCounterSummary(output *pbsubstreamsrpcv2.MapModuleOutput) (blockNumber, currentTxCount, storedTxCount, totalTxCount uint64, ok bool) {
+	if output == nil || output.MapOutput == nil {
 		return 0, 0, 0, 0, false
 	}
 
-	blockNumber, _ = strconv.ParseUint(matches[1], 10, 64)
-	currentTxCount, _ = strconv.ParseUint(matches[2], 10, 64)
-	storedTxCount, _ = strconv.ParseUint(matches[3], 10, 64)
-	totalTxCount, _ = strconv.ParseUint(matches[4], 10, 64)
+	var summary pbtest.TxCounterSummary
+	if err := output.MapOutput.UnmarshalTo(&summary); err != nil {
+		return 0, 0, 0, 0, false
+	}
 
-	return blockNumber, currentTxCount, storedTxCount, totalTxCount, true
+	// Convert int64 to uint64 for the counts (they should be positive values)
+	currentTxCount = uint64(summary.CurrentBlockTxCount)
+	totalTxCount = uint64(summary.TotalTxCount)
+
+	// Calculate stored tx count from the block_counts slice
+	storedTxCount = 0
+	for _, blockCount := range summary.BlockCounts {
+		storedTxCount += uint64(blockCount.TxCount)
+	}
+
+	return summary.BlockNumber, currentTxCount, storedTxCount, totalTxCount, true
 }
 
 func RunRequest(t *testing.T, req *pbsubstreamsrpcv2.Request, endpoint string) ([]*pbsubstreamsrpcv2.BlockScopedData, *pbsubstreamsrpcv2.SessionInit, error) {
@@ -105,7 +110,7 @@ func RunRequest(t *testing.T, req *pbsubstreamsrpcv2.Request, endpoint string) (
 		// Accumulate BlockScopedData
 		if blockData := response.GetBlockScopedData(); blockData != nil {
 			blockScopedDataSlice = append(blockScopedDataSlice, blockData)
-			t.Logf("Accumulated BlockScopedData clock %d, total count: %d", blockData.Clock.Number, len(blockScopedDataSlice))
+			//t.Logf("Accumulated BlockScopedData clock %d, total count: %d", blockData.Clock.Number, len(blockScopedDataSlice))
 		}
 	}
 

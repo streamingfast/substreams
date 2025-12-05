@@ -47,8 +47,8 @@ func TestPartialBlocksSimple(t *testing.T) {
 		}
 	}
 
-	app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, zlog)
-	app2 := startTier2App(t, ctx, tmpDir, zlog)
+	app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog)
+	app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)
 
 	testCases := []struct {
 		name           string
@@ -152,8 +152,8 @@ func TestPartialBlocksWithStores(t *testing.T) {
 		}
 	}
 
-	app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, zlog)
-	app2 := startTier2App(t, ctx, tmpDir, zlog)
+	app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog)
+	app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)
 
 	testCases := []struct {
 		name                   string

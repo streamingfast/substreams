@@ -7,7 +7,6 @@
 
 * [Generate Your First Substreams](new/tutorials/intro-to-tutorials.md)
   * [on EVM](new/tutorials/evm.md)
-  * [on World Chain](new/tutorials/world-chain.md)
   * [on Solana](tutorials/intro-to-tutorials/on-solana/README.md)
     * [Transactions & Instructions](new/tutorials/solana/solana.md)
     * [Account Changes](new/tutorials/solana/account-changes.md)
@@ -18,6 +17,7 @@
   * [on MANTRA](new/tutorials/cosmos-compatible/mantra.md)
   * [on Starknet](new/tutorials/starknet.md)
   * [on Stellar](new/tutorials/stellar.md)
+  * [on World Chain](new/tutorials/world-chain.md)
 * [Consuming a Foundational Store](new/tutorials/consuming-foundational-store.md)
 
 ## How-To Guides
@@ -25,10 +25,6 @@
 * [Install Substreams CLI](new/how-to-guides/cli/installing-the-cli.md)
   * [Substreams CLI Authentication](new/how-to-guides/cli/authentication.md)
 * [Developing Substreams](new/how-to-guides/develop-your-own-substreams/develop-your-own-substreams.md)
-  * [Rust](new/how-to-guides/using-rust-proto/rust/rust.md)
-    * [Option struct](new/how-to-guides/using-rust-proto/rust/option.md)
-    * [Result struct](new/how-to-guides/using-rust-proto/rust/result.md)
-  * [Protobuf](new/how-to-guides/using-rust-proto/creating-protobuf-schemas.md)
   * [on EVM](how-to-guides/develop-your-own-substreams/on-evm/README.md)
     * [Exploring Ethereum](new/how-to-guides/develop-your-own-substreams/evm/exploring-ethereum/exploring-ethereum.md)
       * [Mapping Blocks](how-to-guides/develop-your-own-substreams/on-evm/exploring-ethereum/mapping-blocks.md)
@@ -47,6 +43,11 @@
     * [Injective](how-to-guides/develop-your-own-substreams/on-cosmos/injective/README.md)
       * [Simple Substreams Example](new/how-to-guides/develop-your-own-substreams/cosmos/injective/block-stats.md)
       * [Foundational Modules](new/how-to-guides/develop-your-own-substreams/cosmos/injective/foundational.md)
+  * Generic
+    * [Rust](new/how-to-guides/using-rust-proto/rust/rust.md)
+      * [Option struct](new/how-to-guides/using-rust-proto/rust/option.md)
+      * [Result struct](new/how-to-guides/using-rust-proto/rust/result.md)
+    * [Protobuf](new/how-to-guides/using-rust-proto/creating-protobuf-schemas.md)
 * [Composing Substreams](new/how-to-guides/composing-substreams/composing-substreams.md)
   * [Foundational Modules](new/how-to-guides/composing-substreams/foundational-modules.md)
   * [Foundational Stores](new/how-to-guides/composing-substreams/foundational-stores/foundational-stores.md)

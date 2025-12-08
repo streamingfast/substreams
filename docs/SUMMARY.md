@@ -22,12 +22,13 @@
 
 ## How-To Guides
 
-* [Understanding Rust & Protobuf](new/how-to-guides/using-rust-proto/using-rust-proto.md)
+* [Install Substreams CLI](new/how-to-guides/cli/installing-the-cli.md)
+  * [Substreams CLI Authentication](new/how-to-guides/cli/authentication.md)
+* [Developing Substreams](new/how-to-guides/develop-your-own-substreams/develop-your-own-substreams.md)
   * [Rust](new/how-to-guides/using-rust-proto/rust/rust.md)
     * [Option struct](new/how-to-guides/using-rust-proto/rust/option.md)
     * [Result struct](new/how-to-guides/using-rust-proto/rust/result.md)
-  * [Protobuf Schemas](new/how-to-guides/using-rust-proto/creating-protobuf-schemas.md)
-* [Developing Substreams](new/how-to-guides/develop-your-own-substreams/develop-your-own-substreams.md)
+  * [Protobuf](new/how-to-guides/using-rust-proto/creating-protobuf-schemas.md)
   * [on EVM](how-to-guides/develop-your-own-substreams/on-evm/README.md)
     * [Exploring Ethereum](new/how-to-guides/develop-your-own-substreams/evm/exploring-ethereum/exploring-ethereum.md)
       * [Mapping Blocks](how-to-guides/develop-your-own-substreams/on-evm/exploring-ethereum/mapping-blocks.md)
@@ -65,8 +66,6 @@
     * [MongoDB](new/how-to-guides/sinks/community/other-sinks/mongodb.md)
     * [Key-Value Store](new/how-to-guides/sinks/community/other-sinks/kv.md)
     * [Prometheus](new/how-to-guides/sinks/community/other-sinks/prometheus.md)
-* [Install Substreams CLI](new/how-to-guides/cli/installing-the-cli.md)
-  * [Substreams CLI Authentication](new/how-to-guides/cli/authentication.md)
 * [Publishing a Substreams Package](new/how-to-guides/publish-package.md)
 
 ## Reference Material

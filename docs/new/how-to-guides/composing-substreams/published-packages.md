@@ -84,7 +84,7 @@ To use a published package in your Substreams project:
 
 ```yaml
 imports:
-  uniswap_v3: https://github.com/streamingfast/substreams-uniswap-v3/releases/download/v0.2.8/substreams-uniswap-v3-v0.2.8.spkg
+  uniswap_v3: uniswap_v3@v0.2.10
 ```
 
 ### Integration Example
@@ -104,24 +104,26 @@ modules:
 
 ```rust
 use substreams::prelude::*;
-use uniswap_v3::pb::uniswap::v3::{PoolSwaps, PoolCreated};
+use uniswap_v3::pb::uniswap::v1::{Events, Pool};
 
 #[substreams::handlers::map]
 fn process_dex_data(
-    swaps: PoolSwaps,
-    pools: PoolCreated,
+    events: Events,
 ) -> Result<DexData, substreams::errors::Error> {
     let mut data = DexData::default();
     
-    // Process swap events
-    for swap in swaps.swaps {
-        data.volume_usd += swap.amount_usd;
-        data.transaction_count += 1;
-    }
-    
-    // Process new pool creations
-    for pool in pools.pools {
-        data.new_pools.push(pool.pool_address);
+    // Process Uniswap events
+    for event in events.pool_events {
+        match event.r#type.as_str() {
+            "SWAP" => {
+                data.volume_usd += event.amount_usd;
+                data.transaction_count += 1;
+            }
+            "POOL_CREATED" => {
+                data.new_pools.push(event.pool_address.clone());
+            }
+            _ => {}
+        }
     }
     
     Ok(data)
@@ -175,42 +177,19 @@ Combine multiple packages for complex analytics:
 
 ```yaml
 imports:
-  ethereum_common: https://github.com/streamingfast/substreams-foundational-modules/releases/download/ethereum-v0.1.0/ethereum-v0.1.0.spkg
-  uniswap_v3: https://github.com/streamingfast/substreams-uniswap-v3/releases/download/v0.2.8/substreams-uniswap-v3-v0.2.8.spkg
-  aave_v3: https://github.com/messari/substreams-aave-v3/releases/download/v1.0.0/aave-v3-v1.0.0.spkg
+  ethereum_common: ethereum_common@v0.3.3
+  uniswap_v3: uniswap_v3@v0.2.10
+  aave_v2: aave-v2@v0.1.0
 
 modules:
   - name: defi_analytics
     kind: map
     inputs:
       - map: ethereum_common:filtered_logs
-      - map: uniswap_v3:pool_swaps
-      - map: aave_v3:lending_events
+      - map: uniswap_v3:pool_events
+      - map: aave_v2:lending_events
     output:
       type: proto:defi.Analytics
-```
-
-### Custom Extensions
-
-Extend existing packages with your own logic:
-
-```rust
-use substreams::prelude::*;
-use uniswap_v3::pb::uniswap::v3::PoolSwaps;
-
-#[substreams::handlers::map]
-fn enhanced_swap_analytics(swaps: PoolSwaps) -> Result<EnhancedAnalytics, substreams::errors::Error> {
-    let mut analytics = EnhancedAnalytics::default();
-    
-    for swap in swaps.swaps {
-        // Add custom business logic
-        analytics.arbitrage_opportunities += detect_arbitrage(&swap);
-        analytics.whale_trades += classify_whale_trade(&swap);
-        analytics.mev_activity += detect_mev(&swap);
-    }
-    
-    Ok(analytics)
-}
 ```
 
 ## Next Steps

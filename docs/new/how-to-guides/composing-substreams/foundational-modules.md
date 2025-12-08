@@ -19,8 +19,6 @@ The Ethereum foundational modules provide comprehensive access to:
 - **Events and Logs**: Filtered and decoded smart contract events
 - **Transactions**: Detailed transaction data with receipt information
 - **Blocks**: Complete block data with metadata
-- **Token Transfers**: ERC-20, ERC-721, and ERC-1155 token movement tracking
-- **DeFi Protocols**: Pre-built modules for popular DeFi protocols like Uniswap, Aave, and Compound
 
 ### Solana
 Solana foundational modules offer:
@@ -28,7 +26,6 @@ Solana foundational modules offer:
 - **Instructions**: Parsed and filtered program instructions
 - **Account Changes**: Track state changes across Solana accounts
 - **Token Programs**: SPL token transfers and account modifications
-- **Program-Specific Data**: Modules for popular Solana programs like Serum, Raydium, and Jupiter
 
 ### Cosmos Ecosystem
 Cosmos-compatible chains include modules for:
@@ -38,13 +35,29 @@ Cosmos-compatible chains include modules for:
 - **IBC Transfers**: Inter-blockchain communication tracking
 - **Chain-Specific Features**: Modules tailored for Injective, Osmosis, and other Cosmos chains
 
-### Other Supported Chains
-Additional foundational modules are available for:
+### Starknet
+Starknet foundational modules provide:
 
-- **Starknet**: Cairo program interactions and state changes
-- **TRON**: TRC-20 tokens and smart contract events
-- **NEAR**: Function calls and account state modifications
-- **Antelope**: EOS and other Antelope-based chain data
+- **Cairo program interactions**: Parsed Cairo program calls and state changes
+- **Account operations**: Account deployment and upgrade tracking
+
+### TRON
+TRON foundational modules offer:
+
+- **TRC-20 tokens**: Token transfer and balance tracking
+- **Smart contract events**: Decoded contract event data
+
+### NEAR
+NEAR foundational modules include:
+
+- **Function calls**: Parsed function call data and results
+- **Account state modifications**: Track account state changes
+
+### Antelope
+Antelope foundational modules support:
+
+- **EOS and other Antelope-based chains**: Transaction and action data
+- **Resource management**: CPU, NET, and RAM usage tracking
 
 ## Using Foundational Modules
 
@@ -55,43 +68,37 @@ To use foundational modules in your Substreams project:
 1. **Add the dependency** to your `substreams.yaml`:
 ```yaml
 imports:
-  ethereum: https://github.com/streamingfast/substreams-foundational-modules/releases/download/ethereum-v0.1.0/ethereum-v0.1.0.spkg
+  ethereum_common: ethereum_common@v0.3.3
 ```
 
-2. **Reference the module** in your manifest:
+2. **Reference the module** in your manifest with query expressions:
 ```yaml
 modules:
   - name: my_custom_module
     kind: map
     inputs:
       - source: sf.ethereum.type.v2.Block
-      - map: ethereum:filtered_transactions
+      - map: ethereum_common:filtered_logs
+        params: "address=0xa0b86a33e6776e1b1c4b0b8b8b8b8b8b8b8b8b8b"
     output:
       type: proto:my.custom.Output
 ```
 
-### Example: Using Ethereum Event Filtering
+### Example: Using Ethereum Log Filtering
 
 ```rust
 use substreams::prelude::*;
 use substreams_ethereum::pb::eth::v2 as eth;
 
 #[substreams::handlers::map]
-fn process_events(events: eth::Events) -> Result<MyOutput, substreams::errors::Error> {
+fn process_logs(logs: eth::Logs) -> Result<MyOutput, substreams::errors::Error> {
     let mut output = MyOutput::default();
     
-    for event in events.events {
-        // Process pre-filtered and decoded events
-        match event.name.as_str() {
-            "Transfer" => {
-                // Handle ERC-20 transfers
-                output.transfers.push(process_transfer(event));
-            }
-            "Swap" => {
-                // Handle DEX swaps
-                output.swaps.push(process_swap(event));
-            }
-            _ => {}
+    for log in logs.logs {
+        // Check for ERC-20 Transfer topic
+        if log.topics.len() > 0 && log.topics[0] == "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef" {
+            // Handle ERC-20 transfers
+            output.transfers.push(process_transfer_log(&log));
         }
     }
     
@@ -107,17 +114,33 @@ fn process_events(events: eth::Events) -> Result<MyOutput, substreams::errors::E
 - **Event decoders**: Decode smart contract events with ABI information
 - **Log processors**: Parse and structure blockchain logs
 
-### Data Transformation Modules
-- **Price feeds**: Convert token amounts to USD values
-- **Address resolvers**: Map addresses to human-readable names
-- **Time converters**: Convert block numbers to timestamps
-- **Data aggregators**: Combine data from multiple sources
+## Performance Optimization with Indexes and Query Expressions
 
-### Protocol-Specific Modules
-- **DeFi protocols**: Uniswap, SushiSwap, Curve, Aave, Compound
-- **NFT marketplaces**: OpenSea, LooksRare, X2Y2
-- **Gaming protocols**: Axie Infinity, The Sandbox
-- **Infrastructure**: ENS, Chainlink, The Graph
+One of the biggest performance factors when consuming Substreams is the use of indexes and query expressions. These features allow the Substreams engine to skip processing entire blocks when they don't contain relevant data, dramatically improving performance.
+
+### Using Query Expressions
+
+Query expressions filter data at the source, ensuring that only relevant blocks are processed:
+
+```yaml
+modules:
+  - name: filtered_transfers
+    kind: map
+    inputs:
+      - map: ethereum_common:filtered_logs
+        params: "address=0xa0b86a33e6776e1b1c4b0b8b8b8b8b8b8b8b8b8b&topic0=0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+    output:
+      type: proto:my.transfers.Transfers
+```
+
+### Performance Benefits
+
+- **Block Skipping**: When no logs match the query expression, the entire block is skipped
+- **Reduced Processing**: Only relevant data flows through the pipeline
+- **Lower Resource Usage**: Significant reduction in CPU and memory consumption
+- **Faster Sync Times**: Historical data processing completes much faster
+
+A well-designed query expression can improve performance by orders of magnitude, especially when processing historical data where many blocks may not contain relevant events.
 
 ## Benefits of Using Foundational Modules
 

@@ -14,4 +14,4 @@ Foundational stores are available for various blockchain ecosystems, each optimi
 
 ## Additional Resources
 
-- [Foundational Stores Reference](../../references/foundational-store-reference.md) - Detailed architecture and technical specifications
+- [Foundational Stores Reference](../../../references/foundational-store-reference.md) - Detailed architecture and technical specifications

@@ -111,7 +111,7 @@ fn process_dex_data(
     events: Events,
 ) -> Result<DexData, substreams::errors::Error> {
     let mut data = DexData::default();
-    
+
     // Process Uniswap events
     for event in events.pool_events {
         match event.r#type.as_str() {
@@ -125,7 +125,7 @@ fn process_dex_data(
             _ => {}
         }
     }
-    
+
     Ok(data)
 }
 ```

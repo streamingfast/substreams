@@ -222,4 +222,4 @@ params:
 
 - [Hosting a Foundational Store](https://docs.substreams.dev/reference-material/foundational-store-reference/hosting-foundational-stores)
 - [Consuming a Foundational Store](https://docs.substreams.dev/tutorials/consuming-foundational-store)
-- [Foundational Stores Architecture](../../../references/foundational-store-reference.md)
+- [Foundational Stores Architecture](../../../../references/foundational-store-reference.md)

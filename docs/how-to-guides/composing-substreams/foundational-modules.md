@@ -93,7 +93,7 @@ use substreams_ethereum::pb::eth::v2 as eth;
 #[substreams::handlers::map]
 fn process_logs(logs: eth::Logs) -> Result<MyOutput, substreams::errors::Error> {
     let mut output = MyOutput::default();
-    
+
     for log in logs.logs {
         // Check for ERC-20 Transfer topic
         if log.topics.len() > 0 && log.topics[0] == "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef" {
@@ -101,7 +101,7 @@ fn process_logs(logs: eth::Logs) -> Result<MyOutput, substreams::errors::Error> 
             output.transfers.push(process_transfer_log(&log));
         }
     }
-    
+
     Ok(output)
 }
 ```

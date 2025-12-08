@@ -36,6 +36,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### [CLI]
 
+* Added `substreams estimate` command to estimate, by sampling
+
 * The `--endpoint` flag on various elements (`substreams run/gui/sink`) now accepts a short identifier to resolve, identifier which must match of the The Graph Network Registry, so for example, `--endpoint=solana` can be used directly now.
 
 ### [Server]

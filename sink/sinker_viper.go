@@ -283,11 +283,15 @@ func NewFromViper(
 	return NewFromConfig(config)
 }
 
-// ConfigFromViper creates a SinkerConfig from the provided Viper configuration.
+// ConfigFromViper creates a [SinkerConfig] from the provided Viper configuration.
 // This function extracts all necessary configuration from the command flags and
-// creates a complete SinkerConfig that can be used to create a Sinker instance.
-// The endpoint is read from the FlagEndpoint flag, and the block range is computed
-// from the FlagStartBlock and FlagStopBlock flags.
+// creates a complete [SinkerConfig] that can be used to create a Sinker instance.
+// The endpoint is read from the [FlagEndpoint] flag, and the block range is computed
+// from the [FlagStartBlock] and [FlagStopBlock] flags.
+//
+// If you want to dynamically validate the output module type yourself, for argument
+// `expectedOutputModuleType`, you can pass [IgnoreOutputModuleType] or the empty
+// string.
 func ConfigFromViper(
 	cmd *cobra.Command,
 	expectedOutputModuleType string,
@@ -446,6 +450,42 @@ func ConfigFromViper(
 	}
 
 	return config, nil
+}
+
+// CloneWithNewModule creates a new SinkerConfig based on the current one but
+// replacing the package, output module and output module hash with the ones
+// read from the manifest at `manifestPath`, using `outputModuleName` as the
+// output module to extract from the package.
+//
+// The rest of the configuration remains the same and you can modify it
+// further if needed on the returned SinkerConfig.
+func (config *SinkerConfig) CloneWithNewModule(
+	expectedOutputModuleType string,
+	manifestPath string,
+	outputModuleName string,
+) (*SinkerConfig, error) {
+	newPkg, newModule, newOutputModuleHash, err := ReadManifestAndModule(
+		manifestPath,
+		config.Network,
+		config.Params,
+		outputModuleName,
+		expectedOutputModuleType,
+		config.SkipPackageValidation,
+		[]manifest.Option{
+			manifest.WithOverrideOutputModule(outputModuleName),
+		},
+		config.Logger,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("reading manifest in CloneWithModule: %w", err)
+	}
+
+	newConfig := *config
+	newConfig.Pkg = newPkg
+	newConfig.OutputModule = newModule
+	newConfig.OutputModuleHash = newOutputModuleHash
+
+	return &newConfig, nil
 }
 
 func getViperFlags(cmd *cobra.Command) (

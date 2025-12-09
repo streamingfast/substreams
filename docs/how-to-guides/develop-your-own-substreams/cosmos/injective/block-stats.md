@@ -3,14 +3,14 @@ The [BlockStats Substreams](https://github.com/streamingfast/substreams-cosmos-b
 {% hint style="success" %}
 **Tip**: This tutorial teaches you how to build a Substreams from scratch.
 
-Remember that you can auto-generate your Substreams module by using the [code-generation tools](../../../getting-started/injective/injective-first-sql.md).
+Remember that you can auto-generate your Substreams module by using the [code-generation tools](../../../../tutorials/cosmos-compatible/injective.md).
 {% endhint %}
 
 ## Before You Begin
 
-- [Install the Substreams CLI](../../../common/installing-the-cli.md)
-- [Get an authentication token](../../../common/authentication.md)
-- [Learn about the basics of the Substreams](../../../common/manifest-modules.md)
+- [Install the Substreams CLI](../../../cli/installing-the-cli.md)
+- [Get an authentication token](../../../cli/authentication.md)
+- [Learn about the basics of the Substreams](../../../../references/substreams-components/manifests.md)
 
 Clone the [BlockStats Substreams GitHub repository](https://github.com/streamingfast/substreams-cosmos-block-stats) and open it in an IDE of your choice (for example, VSCode).
 
@@ -72,7 +72,7 @@ modules:
 substreams build
 ```
 
-1. Run the Substreams using the `substreams run` command of the CLI: 
+1. Run the Substreams using the `substreams run` command of the CLI:
 
 ```bash
 substreams run substreams.yaml block_to_stats \

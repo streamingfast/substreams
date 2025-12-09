@@ -147,7 +147,7 @@ The `?` symbol after a `Result` enum does two things:
 
 ## In Substreams
 
-The `Result` enum is used in Substreams to return the data (or the errors) of a module. For example, if you take the `map_filter_transactions` module from the [Ethereum Explorer tutorial](/tutorials/ethereum/exploring-ethereum/map_filter_transactions_module):
+The `Result` enum is used in Substreams to return the data (or the errors) of a module. For example, if you take the `map_filter_transactions` module from the [Ethereum Explorer tutorial](../../../../how-to-guides/develop-your-own-substreams/evm/exploring-ethereum/exploring-ethereum.md):
 
 ```rust
 [...]

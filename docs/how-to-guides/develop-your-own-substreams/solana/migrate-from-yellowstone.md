@@ -139,5 +139,5 @@ node index.js https://accounts.mainnet.sol.streamingfast.io:443 https://spkg.io/
 {% endtab %}
 {% endtabs %}
 
-<!--Developing Substreams involves three main dependencies: the Rust programming language, the Buf CLI (Protobuf), and the Substreams CLI (a command-line utility tool to manage your Substreams). Follow [this guide](../../references/cli/installing-the-cli.md) to install all the necessary dependencies in your local computer OR use the [DevContainer](https://github.com/streamingfast/substreams-starter), which contains all the necessary dependencies ready to use. -->
+<!--Developing Substreams involves three main dependencies: the Rust programming language, the Buf CLI (Protobuf), and the Substreams CLI (a command-line utility tool to manage your Substreams). Follow [this guide](../../cli/installing-the-cli.md) to install all the necessary dependencies in your local computer OR use the [DevContainer](https://github.com/streamingfast/substreams-starter), which contains all the necessary dependencies ready to use. -->
 

@@ -196,5 +196,5 @@ modules:
 
 - Explore the [Substreams Registry](https://substreams.dev) to discover available packages
 - Learn about [Foundational Modules](foundational-modules.md) for core blockchain data processing
-- Check out [Foundational Stores](foundational-stores.md) for pre-computed historical data
+- Check out [Foundational Stores](foundational-stores/foundational-stores.md) for pre-computed historical data
 - Read the guide on [Publishing a Substreams Package](../publish-package.md) to contribute your own modules

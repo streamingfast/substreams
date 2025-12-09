@@ -62,7 +62,7 @@ package:
 
 The `package.name` field is used to identify the package.
 
-The `package.name` field infers the filename when the [`pack`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#pack) command is run by using `substreams.yaml` as a flag for the Substreams package.
+The `package.name` field infers the filename when the [`pack`](../cli/command-line-interface.md#pack-deprecated) command is run by using `substreams.yaml` as a flag for the Substreams package.
 
 The content of the `name` field must match the regular expression: `^([a-zA-Z][a-zA-Z0-9_]{0,63})$`. For consistency, use the `snake_case` naming convention.
 
@@ -246,7 +246,7 @@ The type of code and implied virtual machine for execution. There is **only one 
 The `binaries[name].file` field references a locally compiled [WASM module](https://webassembly.github.io/spec/core/syntax/modules.html). Paths for the `binaries[name].file` field are absolute or relative to the manifest's directory. The **standard location** of the compiled WASM module is the **root directory** of the Substreams module.
 
 {% hint style="success" %}
-**Tip**: The WASM file referenced by the `binary` field is picked up and packaged into an `.spkg` when invoking the [`pack`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#pack) and [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) commands through the [`substreams` CLI](command-line-interface.md).
+**Tip**: The WASM file referenced by the `binary` field is picked up and packaged into an `.spkg` when invoking the [`pack`](../cli/command-line-interface.md#pack-deprecated) and [`run`](../cli/command-line-interface.md#run) commands through the [`substreams` CLI](../cli/command-line-interface.md).
 {% endhint %}
 
 ### network
@@ -332,7 +332,7 @@ This example shows one map module, named `events_extractor` and one store module
       type: proto:my.types.v1.Events
     doc:
       This module extracts events
-      
+
       Use in such and such situations
 
   - name: totals
@@ -349,7 +349,7 @@ This example shows one map module, named `events_extractor` and one store module
 
 The identifier for the module, prefixed by a letter, followed by a maximum of 64 characters of `[a-zA-Z0-9_]`. The [same rules applied to the `package.name`](manifests.md#package.name) field applies to the module `name`, including the convention to use `snake_case` names.
 
-The module `name` is the reference identifier used on the command line for the `substreams` [`run`](https://substreams.streamingfast.io/reference-and-specs/command-line-interface#run) command. The module `name` is also used in the [`inputs`](manifests.md#modules-.inputs) defined in the Substreams manifest.
+The module `name` is the reference identifier used on the command line for the `substreams` [`run`](../../references/cli/command-line-interface.md#run) command. The module `name` is also used in the [`inputs`](./modules/inputs.md) defined in the Substreams manifest.
 
 The module `name` also corresponds to the **name of the Rust function** invoked on the compiled WASM code upon execution. The module `name` is the same `#[substreams::handlers::map]` as defined in the Rust code. Maps and stores both work in the same fashion.
 
@@ -445,7 +445,7 @@ The key types for `inputs` include:
 * `map`
 * `params`
 
-You can find more details about inputs in the [Developer Guide's section about Modules](../developers-guide/modules/types.md).
+You can find more details about inputs in the [Developer Guide's section about Modules](../substreams-components/modules/modules.md).
 
 #### Module `output`
 

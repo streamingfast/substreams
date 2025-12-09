@@ -4,14 +4,14 @@ title: Getting Started on EVM
 
 In this tutorial, you'll learn how to initialize a EVM-based Substreams project using the Substreams CLI (`substreams init` command).
 
-{% hint style="info" %} 
+{% hint style="info" %}
  The CLI installation is supported only on Linux and macOS. If you're using Windows, consider using the [DevContainer environment](../references/devcontainer-ref.md), which launches a Linux-based virtual environment.
 {% endhint %}
 
 ## Step 1: Initialize Your EVM Substreams Project
 
 1. [Install the Substreams CLI](../how-to-guides/cli/installing-the-cli.md)
-    
+
 2. Running `substreams init` will give you the option to choose between two EVM project options. Select the one that best fits your requirements:
     - **evm-hello-world**: Creates a simple Substreams that outputs the events of a smart contract. Depending on the blockchain that you choose (Mainnet, Arbitrum, Polygon), the smart contract address will be different (usually, it's the USDC token, if it's available on the chain).
     - **evm-events-calls**: Creates a Substreams that extracts and decodes EVM events and calls using the cached [EVM Foundational Module](https://substreams.dev/streamingfast/ethereum-common/v0.3.0), filtered by one or more smart contract addresses. Contract ABIs are retrieved from Etherscan. If an ABI isn’t available, you’ll need to provide it yourself.
@@ -25,7 +25,7 @@ In this tutorial, you'll learn how to initialize a EVM-based Substreams project 
 
 3. Run `substreams gui` to visualize and iterate on your extracted data.
 
-## Step 2.5: (Optionally) Transform the Data 
+## Step 2.5: (Optionally) Transform the Data
 
 1. Open the `src/lib.rs` file that has been generated.
 
@@ -41,7 +41,7 @@ You may find these additional resources helpful for developing your first EVM ap
 
 ### Dev Container Reference
 
-The [Dev Container Reference](../references/devcontainer-ref.md) helps you navigate the container and its common errors. 
+The [Dev Container Reference](../references/devcontainer-ref.md) helps you navigate the container and its common errors.
 
 ### CLI Reference
 

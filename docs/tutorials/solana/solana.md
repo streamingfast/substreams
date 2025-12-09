@@ -3,8 +3,8 @@ Tutorial on Solana
 
 In this tutorial, you'll learn how to initialize a Solana-based Substreams project using the Substreams CLI (`substreams init` command).
 
-{% hint style="info" %} 
- The CLI installation is supported only on Linux and macOS. If you're using Windows, consider using the [DevContainer environment](../references/devcontainer-ref.md), which launches a Linux-based virtual environment.
+{% hint style="info" %}
+ The CLI installation is supported only on Linux and macOS. If you're using Windows, consider using the [DevContainer environment](../../references/devcontainer-ref.md), which launches a Linux-based virtual environment.
 {% endhint %}
 
 ## Step 1: Initialize Your Solana Substreams Project
@@ -18,10 +18,10 @@ In this tutorial, you'll learn how to initialize a Solana-based Substreams proje
 
 The modules within Solana Common exclude voting transactions, to benefit from a 75% reduction in data processing size and costs, delay your stream by over 1000 blocks from head. This can be done using the [`sleep`](https://doc.rust-lang.org/std/thread/fn.sleep.html) function in Rust.
 
-{% hint style="info" %} 
+{% hint style="info" %}
  To access voting transactions, use the full Solana block, `sf.solana.type.v1.Block`, as input.
 {% endhint %}
-    
+
 ## Step 2: Visualize the Data
 
 1. Run `substreams auth` to create your [account](https://thegraph.market/) and generate an authentication token (JWT), then pass this token back as input.
@@ -30,7 +30,7 @@ The modules within Solana Common exclude voting transactions, to benefit from a 
 
 3. Run `substreams gui` to visualize and iterate on your extracted data.
 
-## Step 2.5: (Optionally) Transform the Data 
+## Step 2.5: (Optionally) Transform the Data
 
 1. Open the `src/lib.rs` file that has been generated.
 
@@ -46,7 +46,7 @@ You may find these additional resources helpful for developing your first Solana
 
 ### Dev Container Reference
 
-The [Dev Container Reference](../../references/devcontainer-ref.md) helps you navigate the container and its common errors. 
+The [Dev Container Reference](../../references/devcontainer-ref.md) helps you navigate the container and its common errors.
 
 ### CLI Reference
 

@@ -12,8 +12,8 @@ The USDT smart contract exposes a read function called `decimals`.
 
 ## Pre-requisites
 
-- You have some knowledge about Substreams ([modules](https://substreams.streamingfast.io/concepts-and-fundamentals/modules) and [fundamentals](https://substreams.streamingfast.io/concepts-and-fundamentals/fundamentals)).
-- You have the latest version of the [CLI](https://substreams.streamingfast.io/getting-started/installing-the-cli) installed.
+- You have some knowledge about Substreams ([modules](../../../references/substreams-components/modules/modules.md) and [fundamentals](../../../references/architecture.md)).
+- You have the latest version of the [CLI](../../cli/installing-the-cli.md) installed.
 
 ## Querying on EthScan
 
@@ -38,11 +38,11 @@ Project name (lowercase, numbers, underscores): usdttracker
 Protocol: Ethereum
 Ethereum chain: Mainnet
 Contract address to track (leave empty to use "Bored Ape Yacht Club"): 0xdac17f958d2ee523a2206206994597c13d831ec7
-Would you like to track another contract? (Leave empty if not): 
+Would you like to track another contract? (Leave empty if not):
 Retrieving Ethereum Mainnet contract information (ABI & creation block)
 Fetched contract ABI for dac17f958d2ee523a2206206994597c13d831ec7
 Fetched initial block 4634748 for dac17f958d2ee523a2206206994597c13d831ec7 (lowest 4634748)
-Generating ABI Event models for 
+Generating ABI Event models for
   Generating ABI Events for AddedBlackList (_user)
   Generating ABI Events for Approval (owner,spender,value)
   Generating ABI Events for Deprecate (newAddress)
@@ -65,9 +65,9 @@ substreams build
 3. Then, verify that the Substreams runs correctly. By default, it will output all the events of the smart contract.
 
 ```bash
-substreams run -e mainnet.eth.streamingfast.io:443 \            
+substreams run -e mainnet.eth.streamingfast.io:443 \
    substreams.yaml \
-   map_events \ 
+   map_events \
    --start-block 12292922 \
    --stop-block +1
 ```
@@ -165,9 +165,9 @@ substreams build
 ```
 
 ```bash
-substreams run -e mainnet.eth.streamingfast.io:443 \            
+substreams run -e mainnet.eth.streamingfast.io:443 \
    substreams.yaml \
-   map_events \ 
+   map_events \
    --start-block 12292922 \
    --stop-block +1
 ```
@@ -215,7 +215,7 @@ In the previous USDT example, consider that you want to make three RPC calls: `D
 ```rust
 fn get_calls() {
     let batch = substreams_ethereum::rpc::RpcBatch::new();
-    
+
 }
 ```
 

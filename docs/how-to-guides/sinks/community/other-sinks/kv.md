@@ -16,13 +16,13 @@ A Connect-Web interface makes the data available directly from the `substreams-s
 
 * An existing substreams (including `substreams.yaml` and Rust code) that you want to instrument for `substreams-sink-kv`.
 * A key-value store where you want to send your data (a badger local file can be used for development)
-* Knowledge about Substreams development (start [here](https://substreams.streamingfast.io/getting-started/quickstart))
+* Knowledge about Substreams development (start [here](../../../../tutorials/intro-to-tutorials.md))
 * Rust installation and compiler
 
 ## Installation
 
 * Install [substreams-sink-kv CLI](https://github.com/streamingfast/substreams-sink-kv/releases)
-* Install [substreams CLI](https://substreams.streamingfast.io/getting-started/installing-the-cli)
+* Install [substreams CLI](../../../cli/installing-the-cli.md)
 * Install [grpcurl](https://github.com/fullstorydev/grpcurl/releases) to easily read the data back from the KV store
 
 ## Instrumenting your Substreams
@@ -153,7 +153,7 @@ cargo build --release --target=wasm32-unknown-unknown
 substreams run -e mainnet.eth.streamingfast.io:443 substreams.yaml kv_out --start-block 1000000 --stop-block +1
 ```
 
-> **Note** To connect to a public StreamingFast substreams endpoint, you will need an authentication token, follow this [guide](https://substreams.streamingfast.io/reference-and-specs/authentication) to obtain one.
+> **Note** To connect to a public StreamingFast substreams endpoint, you will need an authentication token, follow this [guide](../../../cli/authentication.md) to obtain one.
 
 1. Run with `substreams-sink-kv`:
 
@@ -284,4 +284,4 @@ See [kvdb](https://github.com/streamingfast/kvdb) for more details.
 
 ## Conclusion and review
 
-The ability to route data extracted from the blockchain by using Substreams is powerful and useful. Key-value stores aren't the only type of sink the data extracted by Substreams can be piped into. Review the core Substreams sinks documentation for [additional information on other types of sinks](https://substreams.streamingfast.io/developers-guide/substreams-sinks) and sinking strategies.
+The ability to route data extracted from the blockchain by using Substreams is powerful and useful. Key-value stores aren't the only type of sink the data extracted by Substreams can be piped into. Review the core Substreams sinks documentation for [additional information on other types of sinks](../../sinks.md) and sinking strategies.

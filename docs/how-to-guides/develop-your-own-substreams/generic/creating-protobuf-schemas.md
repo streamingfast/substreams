@@ -72,14 +72,14 @@ The Substreams Template example extracts `Transfer` events from the [Bored Ape Y
 Several specific data types exist in the Ethereum smart contract ecosystem, some extending the ERC20 and ERC721 base modules. Complex protobufs are created and refined based on the various data types used across the different blockchains.
 
 {% hint style="success" %}
-**Tip**_:_ The use of fully qualified protobuf file paths reduces the risk of naming conflicts when other community members build their [Substreams packages](../reference-and-specs/packages.md#dependencies).
+**Tip**_:_ The use of fully qualified protobuf file paths reduces the risk of naming conflicts when other community members build their [Substreams packages](../../../references/substreams-components/packages.md#dependencies).
 {% endhint %}
 
 ### Generating protobufs
 
-The [`substreams` CLI](../reference-and-specs/command-line-interface.md) is used to generate the associated Rust code for the protobuf.
+The [`substreams` CLI](../../../references/cli/command-line-interface.md) is used to generate the associated Rust code for the protobuf.
 
-Notice the `protogen` command and Substreams manifest passed into the [`substreams` CLI](../reference-and-specs/command-line-interface.md).
+Notice the `protogen` command and Substreams manifest passed into the [`substreams` CLI](../../../references/cli/command-line-interface.md).
 
 {% code overflow="wrap" %}
 

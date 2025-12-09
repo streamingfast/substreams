@@ -6,9 +6,9 @@ The Foundational Modules are the base of the code generation tools provided by t
 
 ## Before You Begin
 
-- [Install the Substreams CLI](../../../common/installing-the-cli.md)
-- [Get an authentication token](../../../common/authentication.md)
-- [Learn about the basics of the Substreams](../../../common/manifest-modules.md)
+- [Install the Substreams CLI](../../../cli/installing-the-cli.md)
+- [Get an authentication token](../../../cli/authentication.md)
+- [Learn about the basics of the Substreams](../../../../references/substreams-components/manifests.md)
 - [Go through the Block Stats Substreams tutorial](./block-stats.md)
 
 Clone the [Foundational Substreams GitHub repository](https://github.com/streamingfast/substreams-foundational-modules), move to the `injective-common` folder, and open it in an IDE of your choice (for example, VSCode).
@@ -44,7 +44,7 @@ modules:
     output:
       type: proto:sf.substreams.index.v1.Keys
     doc: |
-      `index_events` sets the keys corresponding to every event 'type' 
+      `index_events` sets the keys corresponding to every event 'type'
       ex: `coin_received`, `message` or `injective.peggy.v1.EventDepositClaim`
 
   - name: filtered_events # 4.
@@ -59,7 +59,7 @@ modules:
     output:
       type: proto:sf.substreams.cosmos.v1.EventList
     doc: |
-      `filtered_events` reads from `all_events` and applies a filter on the event types, only outputting the events that match the filter. 
+      `filtered_events` reads from `all_events` and applies a filter on the event types, only outputting the events that match the filter.
       The only operator that you should need to use this filter is the logical or `||`, because each event can only match one type.
 ```
 1. The `all_transactions` module provides access to all the transactions of the Injective blockchain.

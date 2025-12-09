@@ -15,14 +15,14 @@ Substreams requires authentication to ensure secure and controlled access to pro
 
 To authenticate with The Graph Market, you need to generate a JWT token. Follow these steps:
 
-1. **Log in to The Graph Market**: 
+1. **Log in to The Graph Market**:
    - Visit [https://thegraph.market](https://thegraph.market).
    - Log in to your existing account or create a new one if you don't have an account.
 
-2. **Access the Dashboard**: 
+2. **Access the Dashboard**:
    - Click on `Dashboard` in the navigation menu or go directly to [https://thegraph.market/dashboard](https://thegraph.market/dashboard).
 
-   ![Dashboard](../../../.gitbook/assets/intro/thegraphmarket.png)
+   ![Dashboard](../../.gitbook/assets/intro/thegraphmarket.png)
 
 3. **Create a New API Key**:
    - In the dashboard, click on `Create New Key`.

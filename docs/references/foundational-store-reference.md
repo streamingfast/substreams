@@ -176,7 +176,7 @@ Comprehensive API documentation is available in the proto files:
 
 - [Hosting a Foundational Store](../tutorials/hosting-foundational-stores.md) - Complete guide for setting up and running a Foundational Store server
 - [Consuming a Foundational Store](../tutorials/consuming-foundational-store.md) - Guide for querying Foundational Stores in Substreams modules
-- [Foundational Store Examples](../how-to-guides/foundational-stores/foundational-stores.md) - Chain-specific foundational store implementations
+- [Foundational Store Examples](../how-to-guides/composing-substreams/foundational-stores/foundational-stores.md) - Chain-specific foundational store implementations
 - [GitHub Repository](https://github.com/streamingfast/substreams-foundational-store) - Source code and issue tracker
 - [Substreams](https://github.com/streamingfast/substreams) - Real-time blockchain data processing
 - [Firehose](https://github.com/streamingfast/firehose) - Blockchain data extraction protocol

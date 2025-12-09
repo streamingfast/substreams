@@ -172,6 +172,6 @@ Visit the [Substreams Foundational Modules repository](https://github.com/stream
 
 ## Next Steps
 
-- Explore the [Foundational Stores](foundational-stores.md) for pre-computed historical data
+- Explore the [Foundational Stores](foundational-stores/foundational-stores.md) for pre-computed historical data
 - Discover [Published Packages](published-packages.md) from the community
 - Learn how to [publish your own modules](../publish-package.md) for others to use

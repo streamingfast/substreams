@@ -57,7 +57,7 @@ go install -v ./cmd/substreams
 
 ## Validation of installation
 
-Run the [`substreams` CLI](./command-line-interface.md) passing the `--version` flag to check the success of the installation.
+Run the [`substreams` CLI](../../references/cli/command-line-interface.md) passing the `--version` flag to check the success of the installation.
 
 ```bash
 substreams --version
@@ -103,5 +103,5 @@ Buf simplifies the generation of typed structures in any language. Buf uses a re
 Visit the [Buf website](https://buf.build/) for additional information and [installation instructions](https://docs.buf.build/installation).
 
 {% hint style="info" %}
-**Note**_:_ [Substreams packages](../substreams-components/packages.md) and [Buf images](https://docs.buf.build/reference/images) are compatible.
+**Note**_:_ [Substreams packages](../../references/substreams-components/packages.md) and [Buf images](https://docs.buf.build/reference/images) are compatible.
 {% endhint %}

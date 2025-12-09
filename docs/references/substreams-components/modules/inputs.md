@@ -118,7 +118,7 @@ Substreams uses two types of `mode` for modules:
 
 ### `delta` mode
 
-`delta` `mode` modules are [protobuf objects](../../../../../pb/sf/substreams/v1/substreams.proto#L124) containing all the changes occurring in the `store` module available in the same block.
+`delta` `mode` modules are [protobuf objects](https://buf.build/streamingfast/substreams/docs/main:sf.substreams.v1#sf.substreams.v1.StoreDeltas) containing all the changes occurring in the `store` module available in the same block.
 
 `delta` mode enables you to loop through keys and decode values mutated in the module.
 

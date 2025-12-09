@@ -176,4 +176,4 @@ pub mod erc721;
 
 View the [`mod.rs`](https://github.com/streamingfast/substreams-template/blob/develop/src/abi/mod.rs) file in the repository.
 
-You're now ready to [write the module handlers](writing-module-handlers.md).
+You're now ready to [write the module handlers](./modules.md).

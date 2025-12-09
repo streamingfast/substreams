@@ -106,28 +106,39 @@ func validateMarkdownLinks(sourceFile string, content string) []BrokenLink {
 				linkPath = linkPath[:spaceIdx]
 			}
 
-			// Remove anchor/fragment
-			if hashIdx := strings.Index(linkPath, "#"); hashIdx != -1 {
-				linkPath = linkPath[:hashIdx]
+			// Skip empty links
+			if linkPath == "" {
+				continue
 			}
 
-			// Skip empty links, external links (http/https), anchors, and mailto
-			if linkPath == "" ||
-			   strings.HasPrefix(linkPath, "http://") ||
+			// Skip URL-like links (absolute URLs and protocols)
+			if strings.HasPrefix(linkPath, "http://") ||
 			   strings.HasPrefix(linkPath, "https://") ||
-			   strings.HasPrefix(linkPath, "#") ||
+			   strings.HasPrefix(linkPath, "ftp://") ||
+			   strings.HasPrefix(linkPath, "//") ||
 			   strings.HasPrefix(linkPath, "mailto:") {
 				continue
 			}
 
-			// Only validate .md links (skip images, etc.)
-			if !strings.HasSuffix(linkPath, ".md") {
+			// Skip anchor-only links
+			if strings.HasPrefix(linkPath, "#") {
+				continue
+			}
+
+			// Remove anchor/fragment for file existence check
+			pathWithoutAnchor := linkPath
+			if hashIdx := strings.Index(linkPath, "#"); hashIdx != -1 {
+				pathWithoutAnchor = linkPath[:hashIdx]
+			}
+
+			// Skip if empty after removing anchor
+			if pathWithoutAnchor == "" {
 				continue
 			}
 
 			// Resolve relative path
 			sourceDir := filepath.Dir(sourceFile)
-			targetPath := filepath.Join(sourceDir, linkPath)
+			targetPath := filepath.Join(sourceDir, pathWithoutAnchor)
 			targetPath = filepath.Clean(targetPath)
 
 			// Check if target exists

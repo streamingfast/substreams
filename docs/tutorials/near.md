@@ -3,7 +3,7 @@ Tutorial on NEAR
 
 In this tutorial, you'll learn how to initialize a NEAR-based Substreams project using the Substreams CLI and the available NEAR development resources.
 
-{% hint style="info" %} 
+{% hint style="info" %}
  The CLI installation is supported only on Linux and macOS. If you're using Windows, consider using the [DevContainer environment](../references/devcontainer-ref.md), which launches a Linux-based virtual environment.
 {% endhint %}
 
@@ -22,7 +22,7 @@ In this tutorial, you'll learn how to initialize a NEAR-based Substreams project
 
 3. Run `substreams gui` to visualize and iterate on your extracted data.
 
-## Step 2.5: (Optionally) Transform the Data 
+## Step 2.5: (Optionally) Transform the Data
 
 1. Open the `src/lib.rs` file that has been generated.
 
@@ -48,8 +48,8 @@ NEAR Substreams are available on the following endpoints:
 
 ### Dev Container Reference
 
-The [Dev Container Reference](../../references/devcontainer-ref.md), in case you are developing on Windows and need a Linux virtual environment.
+The [Dev Container Reference](../references/devcontainer-ref.md), in case you are developing on Windows and need a Linux virtual environment.
 
 ### Substreams Components Reference
 
-The [Components Reference](../../references/substreams-components/packages.md) dives deeper into navigating the `substreams.yaml`.
+The [Components Reference](../references/substreams-components/packages.md) dives deeper into navigating the `substreams.yaml`.

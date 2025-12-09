@@ -15,7 +15,7 @@ There are different Substreams providers that you can use. StreamingFast and Pin
 Protobuf definitions and public endpoints are provided for the supported protocols and chains.
 
 {% hint style="success" %}
-**Tip**: All of the endpoints listed in the documentation require [authentication](../common/authentication.md) before use.
+**Tip**: All of the endpoints listed in the documentation require [authentication](../how-to-guides/cli/authentication.md) before use.
 {% endhint %}
 
 {% hint style="warning" %}

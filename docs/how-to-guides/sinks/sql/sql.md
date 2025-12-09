@@ -33,7 +33,7 @@ The core function of the SQL sink is to translate your Substreams output (Protob
 
 ## Installation
 
-Enabling `substreams-sink-sql` in your [Substreams CLI](../../../../references/cli/installing-the-cli.md).
+Enabling `substreams-sink-sql` in your [Substreams CLI](../../cli/installing-the-cli.md).
 
 1. Download the current binary, optionally depending on your operating system, from the [substreams-sink-sql GitHub releases](https://github.com/streamingfast/substreams-sink-sql/releases) page.
 1. Move the binary to your `$PATH`.

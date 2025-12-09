@@ -4,14 +4,14 @@ title: Getting Started on World Chain
 
 In this tutorial, you'll learn how to initialize a World Chain-based Substreams project using the Substreams CLI (`substreams init` command).
 
-{% hint style="info" %} 
+{% hint style="info" %}
  The CLI installation is supported only on Linux and macOS. If you're using Windows, consider using the [DevContainer environment](../references/devcontainer-ref.md), which launches a Linux-based virtual environment.
 {% endhint %}
 
 ## Step 1: Initialize Your World Chain Substreams Project
 
 1. [Install the Substreams CLI](../how-to-guides/cli/installing-the-cli.md)
-    
+
 2. Running `substreams init` will give you the option to choose between two EVM project options. Select the one that best fits your requirements:
     - **evm-hello-world**: Creates a simple Substreams that outputs the events of a smart contract. For World Chain, this will typically use a common smart contract address available on the network.
     - **evm-events-calls**: Creates a Substreams that extracts and decodes EVM events and calls using the cached [EVM Foundational Module](https://substreams.dev/streamingfast/ethereum-common/v0.3.0), filtered by one or more smart contract addresses. Contract ABIs are retrieved from Etherscan-compatible block explorers. If an ABI isn't available, you'll need to provide it yourself.
@@ -32,7 +32,7 @@ substreams run -e mainnet.worldchain.streamingfast.io:443 substreams.yaml [modul
 
 3. Run `substreams gui -e mainnet.worldchain.streamingfast.io:443` to visualize and iterate on your extracted data.
 
-## Step 3.5: (Optionally) Transform the Data 
+## Step 3.5: (Optionally) Transform the Data
 
 1. Open the `src/lib.rs` file that has been generated.
 
@@ -57,7 +57,7 @@ You may find these additional resources helpful for developing your first World 
 
 ### Dev Container Reference
 
-The [Dev Container Reference](../references/devcontainer-ref.md) helps you navigate the container and its common errors. 
+The [Dev Container Reference](../references/devcontainer-ref.md) helps you navigate the container and its common errors.
 
 ### CLI Reference
 
@@ -69,4 +69,4 @@ The [Components Reference](../references/substreams-components/packages.md) dive
 
 ### EVM Development Guide
 
-Since World Chain is EVM-compatible, you can also refer to the general [EVM development guide](../how-to-guides/develop-your-own-substreams/on-evm/README.md) for more advanced patterns and techniques.
+Since World Chain is EVM-compatible, you can also refer to the general [EVM development guide](../how-to-guides/develop-your-own-substreams/evm/exploring-ethereum/exploring-ethereum.md) for more advanced patterns and techniques.

@@ -30,23 +30,23 @@ Substreams is the name of the engine, and of the product. It is to be capitalize
 
 ### **What is the `substreams` CLI?**
 
-The [`substreams` command line interface (CLI)](command-line-interface.md) is the main tool developers use to use the Substreams engine. The [`substreams` CLI](command-line-interface.md) provides a range of features, commands, and flags. Additional information for the [`substreams` CLI](command-line-interface.md) is available in the Substreams documentation.
+The [`substreams` command line interface (CLI)](cli/command-line-interface.md) is the main tool developers use to use the Substreams engine. The [`substreams` CLI](cli/command-line-interface.md) provides a range of features, commands, and flags. Additional information for the [`substreams` CLI](cli/command-line-interface.md) is available in the Substreams documentation.
 
 ### **How do I get a Substreams authentication token?**
 
-Authentication tokens are required to use Substreams and connect to the public Firehose endpoint. Full [instructions for obtaining a StreamingFast authentication token](https://substreams.streamingfast.io/reference-and-specs/authentication) are available in the Substreams documentation.
+Authentication tokens are required to use Substreams and connect to the public Firehose endpoint. Full [instructions for obtaining a StreamingFast authentication token](../how-to-guides/cli/authentication.md) are available in the Substreams documentation.
 
 ### **My Substreams authentication token isn’t working, what do I do?**
 
 The StreamingFast team is [available on Discord to resolve problems](https://discord.gg/jZwqxJAvRs) related to obtaining or using authentication tokens.
 
-The Substreams documentation also [provides general instructions surrounding authentication](https://substreams.streamingfast.io/reference-and-specs/authentication) tokens.
+The Substreams documentation also [provides general instructions surrounding authentication](../how-to-guides/cli/authentication.md) tokens.
 
 ### **How do I create a Substreams module?**
 
-Developers create their own Substreams implementations in a variety of ways. Use these [examples](reference-and-specs/examples.md) as a reference and starting point.
+Developers create their own Substreams implementations in a variety of ways. Check out one of [tutorial](../tutorials/intro-to-tutorials.md) to start from some pre-made building blocks.
 
-The Substreams documentation [provides a Developer's guide](https://substreams.streamingfast.io/developer-guide/overview) to assist you to understand and use Substreams.
+The Substreams documentation [provides a Developer's guide](../how-to-guides/develop-your-own-substreams/develop-your-own-substreams.md) to assist you to understand and use Substreams.
 
 ### **What is Substreams used for?**
 

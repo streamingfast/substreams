@@ -29,7 +29,7 @@ To publish your work with the broader community, publish your `.spkg` to [Substr
 
 You can configure your Substreams project to query data from a SQL database:
 
-Run `substreams codegen sql` for SQL-based queries. For more information on configuring a SQL sink, refer to the [SQL documentation](../how-to-guides/sinks/sql/sql-sink.md).
+Run `substreams codegen sql` for SQL-based queries. For more information on configuring a SQL sink, refer to the [SQL documentation](../how-to-guides/sinks/sql/sql.md).
 
 ## Common Errors
 

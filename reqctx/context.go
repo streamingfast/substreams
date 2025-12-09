@@ -35,6 +35,7 @@ var activeRequestsHandlerKey = contextKeyType(12)
 var includePartialBlocksKey = contextKeyType(13)
 var partialBlocksOnlyKey = contextKeyType(14)
 var ethCallFallbackToLatestDuration = contextKeyType(15)
+var ethCallUseBlockNumberDuration = contextKeyType(16)
 
 func WithSpkg(ctx context.Context, pkg *pbsubstreams.Package) context.Context {
 	return context.WithValue(ctx, spkgKey, pkg)

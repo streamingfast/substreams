@@ -54,6 +54,24 @@ This document lists all environment variables used by the Substreams project, or
 - **Default**: 1073741824 (1GiB)
 - **Location**: `service/utils.go`
 
+### Ethereum RPC Call Configuration
+
+#### `ETH_CALL_FALLBACK_TO_LATEST_DURATION`
+**Ethereum call fallback duration**
+- **Purpose**: Enable fallback to "latest" block for Ethereum eth_call/eth_getBalance operations
+- **Usage**: Set as duration string (e.g., "30s", "5m") to enable fallback to "latest" when block age exceeds this threshold, and automatically retry "block not found" errors with "latest"
+- **Default**: None (disabled)
+- **Warning**: Enables non-deterministic behavior - requires `X-substreams-acknowledge-non-deterministic` header
+- **Location**: `service/tier1.go`, `service/utils.go`
+
+#### `ETH_CALL_USE_BLOCK_NUMBER_DURATION`
+**Ethereum call block number duration**
+- **Purpose**: Use block number instead of block hash for Ethereum eth_call/eth_getBalance operations
+- **Usage**: Set as duration string (e.g., "30s", "5m") to use block number instead of block hash when block age exceeds this threshold
+- **Default**: None (disabled)
+- **Warning**: Can lead to non-deterministic behavior due to chain reorganizations - ensure that you set a duration that is high enough with 100% certainty
+- **Location**: `service/tier1.go`, `service/utils.go`
+
 #### `SUBSTREAMS_WORKERS_RAMPUP_TIME`
 **Worker ramp-up timing**
 - **Purpose**: Configure the time for workers to ramp up during startup
@@ -63,7 +81,6 @@ This document lists all environment variables used by the Substreams project, or
 
 #### `SUBSTREAMS_WORKER_MAX_RETRIES`
 **Worker retry limit**
-- **Purpose**: Maximum number of retries for worker operations
 - **Usage**: Set as integer value
 - **Default**: Built-in default value
 - **Location**: `orchestrator/work/worker.go`

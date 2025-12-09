@@ -216,6 +216,9 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	if request.EthCallFallbackToLatestDuration > 0 {
 		ctx = reqctx.WithEthCallFallbackToLatestDuration(ctx, time.Duration(request.EthCallFallbackToLatestDuration))
 	}
+	if request.EthCallFallbackToNumberDuration > 0 {
+		ctx = reqctx.WithEthCallUseBlockNumberDuration(ctx, time.Duration(request.EthCallFallbackToNumberDuration))
+	}
 
 	stage := request.OutputModule
 	logger := reqctx.Logger(ctx).Named("tier2").With(zap.String("output_module", stage), zap.Uint64("segment_number", request.SegmentNumber))

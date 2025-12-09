@@ -17,6 +17,11 @@ import (
 // X-substreams-acknowledge-non-deterministic header.
 const EnvEthCallFallbackToLatestDuration = "ETH_CALL_FALLBACK_TO_LATEST_DURATION"
 
+// EnvEthCallUseBlockNumberDuration is the environment variable name that, when set,
+// enables using block number instead of block hash for Ethereum eth_call/eth_getBalance after a specified duration.
+// This is to be used on chains with deterministic behavior but with an archive node that needs the block number to route old queries.
+const EnvEthCallUseBlockNumberDuration = "ETH_CALL_USE_BLOCK_NUMBER_DURATION"
+
 func sortClocksDistributor(clockDistributor map[uint64]*pbsubstreams.Clock) (sortedClockDistributor []*pbsubstreams.Clock) {
 	sortedClockDistributor = make([]*pbsubstreams.Clock, 0, len(clockDistributor))
 	for _, clock := range clockDistributor {

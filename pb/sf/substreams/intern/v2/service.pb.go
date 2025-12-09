@@ -92,7 +92,8 @@ type ProcessRangeRequest struct {
 	ProductionMode                  bool              `protobuf:"varint,16,opt,name=production_mode,json=productionMode,proto3" json:"production_mode,omitempty"`
 	StreamOutput                    bool              `protobuf:"varint,17,opt,name=stream_output,json=streamOutput,proto3" json:"stream_output,omitempty"`
 	FoundationalStoreEndpoints      map[string]string `protobuf:"bytes,18,rep,name=foundational_store_endpoints,json=foundationalStoreEndpoints,proto3" json:"foundational_store_endpoints,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	EthCallFallbackToLatestDuration int64             `protobuf:"varint,19,opt,name=eth_call_fallback_to_latest_duration,json=ethCallFallbackToLatestDuration,proto3" json:"eth_call_fallback_to_latest_duration,omitempty"`
+	EthCallFallbackToLatestDuration int64             `protobuf:"varint,19,opt,name=eth_call_fallback_to_latest_duration,json=ethCallFallbackToLatestDuration,proto3" json:"eth_call_fallback_to_latest_duration,omitempty"` // if non-zero, above this duration in nanoseconds, the eth_calls will use "latest" instead of block ref. It will also automatically retry 'block not found' with 'latest'. It has precedence over eth_call_fallback_to_number_duration.
+	EthCallFallbackToNumberDuration int64             `protobuf:"varint,20,opt,name=eth_call_fallback_to_number_duration,json=ethCallFallbackToNumberDuration,proto3" json:"eth_call_fallback_to_number_duration,omitempty"` // if non-zero, above this duration in nanoseconds, the eth_calls will use block number instead of block hash
 	unknownFields                   protoimpl.UnknownFields
 	sizeCache                       protoimpl.SizeCache
 }
@@ -243,6 +244,13 @@ func (x *ProcessRangeRequest) GetFoundationalStoreEndpoints() map[string]string 
 func (x *ProcessRangeRequest) GetEthCallFallbackToLatestDuration() int64 {
 	if x != nil {
 		return x.EthCallFallbackToLatestDuration
+	}
+	return 0
+}
+
+func (x *ProcessRangeRequest) GetEthCallFallbackToNumberDuration() int64 {
+	if x != nil {
+		return x.EthCallFallbackToNumberDuration
 	}
 	return 0
 }
@@ -829,7 +837,7 @@ var File_sf_substreams_intern_v2_service_proto protoreflect.FileDescriptor
 
 const file_sf_substreams_intern_v2_service_proto_rawDesc = "" +
 	"\n" +
-	"%sf/substreams/intern/v2/service.proto\x12\x19sf.substreams.internal.v2\x1a\x19google/protobuf/any.proto\x1a\x1csf/substreams/v1/clock.proto\x1a\x1esf/substreams/v1/modules.proto\"\xd3\b\n" +
+	"%sf/substreams/intern/v2/service.proto\x12\x19sf.substreams.internal.v2\x1a\x19google/protobuf/any.proto\x1a\x1csf/substreams/v1/clock.proto\x1a\x1esf/substreams/v1/modules.proto\"\xa2\t\n" +
 	"\x13ProcessRangeRequest\x12(\n" +
 	"\x0estop_block_num\x18\x02 \x01(\x04B\x02\x18\x01R\fstopBlockNum\x12#\n" +
 	"\routput_module\x18\x03 \x01(\tR\foutputModule\x123\n" +
@@ -850,7 +858,8 @@ const file_sf_substreams_intern_v2_service_proto_rawDesc = "" +
 	"\x0fproduction_mode\x18\x10 \x01(\bR\x0eproductionMode\x12#\n" +
 	"\rstream_output\x18\x11 \x01(\bR\fstreamOutput\x12\x90\x01\n" +
 	"\x1cfoundational_store_endpoints\x18\x12 \x03(\v2N.sf.substreams.internal.v2.ProcessRangeRequest.FoundationalStoreEndpointsEntryR\x1afoundationalStoreEndpoints\x12M\n" +
-	"$eth_call_fallback_to_latest_duration\x18\x13 \x01(\x03R\x1fethCallFallbackToLatestDuration\x1aG\n" +
+	"$eth_call_fallback_to_latest_duration\x18\x13 \x01(\x03R\x1fethCallFallbackToLatestDuration\x12M\n" +
+	"$eth_call_fallback_to_number_duration\x18\x14 \x01(\x03R\x1fethCallFallbackToNumberDuration\x1aG\n" +
 	"\x19WasmExtensionConfigsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1aM\n" +

@@ -379,12 +379,22 @@ func (s *Tier1Service) BlocksAny(
 		}
 	}
 
+	envEthCallUseBlockNumberDuration := os.Getenv(EnvEthCallUseBlockNumberDuration)
+	useBlockNumberDuration := time.Duration(0)
+	if envEthCallUseBlockNumberDuration != "" {
+		useBlockNumberDuration, err = time.ParseDuration(envEthCallUseBlockNumberDuration)
+		if err != nil {
+			return fmt.Errorf("invalid value for env var %s: %w", EnvEthCallUseBlockNumberDuration, err)
+		}
+	}
+
 	ctx = logging.WithLogger(ctx, logger)
 	ctx = reqctx.WithTracer(ctx, s.tracer)
 	ctx = dmetering.WithBytesMeter(ctx)
 	ctx = metering.WithMetricsSender(ctx)
 	ctx = reqctx.WithTier2RequestParameters(ctx, s.tier2RequestParameters)
 	ctx = reqctx.WithEthCallFallbackToLatestDuration(ctx, fallbackDuration)
+	ctx = reqctx.WithEthCallUseBlockNumberDuration(ctx, useBlockNumberDuration)
 
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier1/request")
 	defer span.EndWithErr(&err)

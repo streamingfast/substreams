@@ -347,12 +347,12 @@ func normalizeModuleOutput(in *pbsubstreamsrpc.MapModuleOutput, outputModule str
 
 func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput, isFinalBlock bool) (err error) {
 
-	// if we get a 'new' block in partialBlocksOnly mode, we complete the missing partials based on its content.
+	// if we get a 'new' block while handling partial blocks, we complete the missing partials based on its content.
 	// Ex: we got partials 3, 4, 7
 	//    -> partial 3 contains all transactions from partials 1+2+3
 	//    -> partial 4 only processes transactions from partial 4
 	//    -> when we get the full block (stepNEW), if it differs from the partial7's ID, we process it so that we send a 'partial 10' that contains transactions from partials 8,9,10
-	if reqctx.PartialBlocksOnly(ctx) {
+	if reqctx.IncludePartialBlocks(ctx) { // this also covers 'partialBlocksOnly'
 		if p.partialProcessingState == nil || p.partialProcessingState.lastBlockID != clock.Id {
 			if err := p.handleStepPartial(ctx, clock, execOutput, biggestPartialBlockIndex); err != nil {
 				return err

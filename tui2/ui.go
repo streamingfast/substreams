@@ -110,7 +110,6 @@ func (ui *UI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if bundle, ok := msg.(streamui.ReplayBundle); ok {
 		var seq []tea.Cmd
 		for _, el := range bundle {
-			el := el
 			seq = append(seq, func() tea.Msg { return el })
 		}
 		return ui, tea.Sequence(seq...)

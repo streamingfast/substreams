@@ -13,7 +13,7 @@ type ModuleExecutor interface {
 	Name() string
 	String() string
 	Close(ctx context.Context) error
-	run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, outForFiles []byte, moduleOutputData *pbssinternal.ModuleOutput, err error)
+	run(ctx context.Context, reader execout.ExecutionOutputGetter, cachable bool) (out []byte, outForFiles []byte, moduleOutputData *pbssinternal.ModuleOutput, err error)
 	applyCachedOutput(value []byte) error
 	toModuleOutput(data []byte) (*pbssinternal.ModuleOutput, error)
 	HasValidOutput() bool

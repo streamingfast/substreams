@@ -45,7 +45,7 @@ func skipFromIndex(index *index.BlockIndex, execOutput execout.ExecutionOutputGe
 //   - skippedExecution: an indication that execution was not performed (skipped from index or skipped because it has no input -- cached data does not count as skipped, but marks the moduleOuput as 'Cached')
 //   - skippableOutput:  an indication that the output can be skipped
 //   - error:            an error
-func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.ExecutionOutputGetter) (*pbssinternal.ModuleOutput, []byte, []byte, bool, bool, error) {
+func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.ExecutionOutputGetter, cachable bool) (*pbssinternal.ModuleOutput, []byte, []byte, bool, bool, error) {
 	logger := reqctx.Logger(ctx)
 	modName := executor.Name()
 
@@ -108,7 +108,7 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 
 	uid := reqctx.ReqStats(ctx).RecordModuleWasmBlockBegin(modName)
 
-	outputBytes, outputForFiles, moduleOutput, err := executor.run(ctx, execOutput)
+	outputBytes, outputForFiles, moduleOutput, err := executor.run(ctx, execOutput, cachable)
 	switch {
 	case errors.Is(err, ErrSkippableOutput):
 		skippableOutput = true

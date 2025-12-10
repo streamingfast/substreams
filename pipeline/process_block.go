@@ -319,7 +319,7 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 		panic("tier2 requests should never receive partial block")
 	}
 
-	if err := p.executeModules(ctx, execOutput, false); err != nil {
+	if err := p.executeModules(ctx, execOutput, false, false); err != nil {
 		return fmt.Errorf("execute modules: %w", err)
 	}
 
@@ -410,7 +410,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 
 	metering.AddWasmInputBytes(ctx, execOutput.Len())
 
-	if err := p.executeModules(ctx, execOutput, isFinalBlock); err != nil {
+	if err := p.executeModules(ctx, execOutput, isFinalBlock, true); err != nil {
 		return fmt.Errorf("execute modules: %w", err)
 	}
 
@@ -451,7 +451,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 	return nil
 }
 
-func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.ExecutionOutput, isFinalBlock bool) (err error) {
+func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.ExecutionOutput, isFinalBlock bool, cachable bool) (err error) {
 	ctx, span := reqctx.WithModuleExecutionSpan(ctx, "modules_executions")
 	defer span.EndWithErr(&err)
 
@@ -484,7 +484,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 				if !executor.RunsOnBlock(blockNum) {
 					continue
 				}
-				res := p.execute(ctx, executor, execOutput, isFinalBlock)
+				res := p.execute(ctx, executor, execOutput, isFinalBlock, cachable)
 				if res.output != nil && !res.skippedExecution && !res.output.Cached {
 					executedStages[p.moduleNameToStage[res.output.ModuleName]] = true
 				}
@@ -511,7 +511,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 						}
 					}()
 
-					res := p.execute(ctx, executor, execOutput, isFinalBlock)
+					res := p.execute(ctx, executor, execOutput, isFinalBlock, cachable)
 					results[i] = res
 
 					return
@@ -590,7 +590,7 @@ type resultObj struct {
 	skippableOutput  bool
 }
 
-func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, execOutput execout.ExecutionOutput, isFinalBlock bool) (out resultObj) {
+func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, execOutput execout.ExecutionOutput, isFinalBlock bool, cachable bool) (out resultObj) {
 	logger := reqctx.Logger(ctx)
 
 	executorName := executor.Name()
@@ -622,7 +622,7 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 		}
 	}()
 
-	moduleOutput, outputBytes, outputBytesFiles, skippedExecution, skippableOutput, runError := exec.RunModule(ctx, executor, execOutput)
+	moduleOutput, outputBytes, outputBytesFiles, skippedExecution, skippableOutput, runError := exec.RunModule(ctx, executor, execOutput, cachable)
 
 	if isFinalBlock && errors.Is(runError, wasm.ErrWasmDeterministicExec) {
 		p.execoutStorage.ConfigMap[executorName].WriteDeterministicError(ctx, execOutput.Clock().Number, runError)

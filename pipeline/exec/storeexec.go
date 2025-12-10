@@ -32,7 +32,7 @@ func (e *StoreModuleExecutor) applyCachedOutput(value []byte) error {
 	return e.outputStore.ApplyOps(value)
 }
 
-func (e *StoreModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, outForFiles []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
+func (e *StoreModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter, cachable bool) (out []byte, outForFiles []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
 	_, span := reqctx.WithModuleExecutionSpan(ctx, "exec_store")
 	defer span.EndWithErr(&err)
 	e.ctx = ctx

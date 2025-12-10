@@ -9,6 +9,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.17.8-partialblocks
+
+* Added experimental support for partial blocks (ex: flash blocks) -- only supported on https://base-mainnet-flash.streamingfast.io endpoint
+
+### [CLI]
+
+* commands `run` and `sink webhook` now support these flags:
+  - `--include-partial-blocks`: sends every block as partial(s) but also as real block
+  - `--partial-blocks-only`: only sends partials (for every block, every bit of data should be there)
+
 ## v1.17.7
 
 ### [CLI]

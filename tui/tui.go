@@ -184,9 +184,9 @@ func (ui *TUI) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.
 	ui.seenFirstData = true
 	if ui.outputMode == OutputModeTUI {
 		ui.ensureTerminalUnlocked()
-		return ui.decoratedBlockScopedData(data.Output, data.DebugMapOutputs, data.DebugStoreOutputs, data.Clock)
+		return ui.decoratedBlockScopedData(data.Output, data.DebugMapOutputs, data.DebugStoreOutputs, data.Clock, 0)
 	} else {
-		return ui.jsonBlockScopedData(data.Output, data.DebugMapOutputs, data.DebugStoreOutputs, data.Clock)
+		return ui.jsonBlockScopedData(data.Output, data.DebugMapOutputs, data.DebugStoreOutputs, data.Clock, 0)
 	}
 }
 
@@ -208,9 +208,9 @@ func (ui *TUI) HandlePartialBlockData(ctx context.Context, data *pbsubstreamsrpc
 	ui.seenFirstData = true
 	if ui.outputMode == OutputModeTUI {
 		ui.ensureTerminalUnlocked()
-		return ui.decoratedBlockScopedData(data.Output, nil, nil, data.Clock)
+		return ui.decoratedBlockScopedData(data.Output, nil, nil, data.Clock, data.PartialIndex)
 	} else {
-		return ui.jsonBlockScopedData(data.Output, nil, nil, data.Clock)
+		return ui.jsonBlockScopedData(data.Output, nil, nil, data.Clock, data.PartialIndex)
 	}
 }
 

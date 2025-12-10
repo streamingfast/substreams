@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"encoding/json"
+	"maps"
 	"testing"
 
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
@@ -91,6 +92,13 @@ func (i *ExecOutputTesting) SetFileOutput(moduleName string, value []byte) (err 
 	return nil
 }
 
+func (i *ExecOutputTesting) Clone() execout.ExecutionOutput {
+	return &ExecOutputTesting{
+		clock:          i.clock,
+		Values:         maps.Clone(i.Values),
+		ValuesForFiles: maps.Clone(i.ValuesForFiles),
+	}
+}
 func (i *ExecOutputTesting) Clock() *pbsubstreams.Clock {
 	return i.clock
 }

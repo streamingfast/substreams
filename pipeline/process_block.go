@@ -354,7 +354,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 	//    -> when we get the full block (stepNEW), if it differs from the partial7's ID, we process it so that we send a 'partial 10' that contains transactions from partials 8,9,10
 	if reqctx.IncludePartialBlocks(ctx) { // this also covers 'partialBlocksOnly'
 		if p.partialProcessingState == nil || p.partialProcessingState.lastBlockID != clock.Id {
-			if err := p.handleStepPartial(ctx, clock, execOutput, biggestPartialBlockIndex); err != nil {
+			if err := p.handleStepPartial(ctx, clock, execOutput.Clone(), biggestPartialBlockIndex); err != nil { // we will reuse this execOutput so we clone it here
 				return err
 			}
 		}

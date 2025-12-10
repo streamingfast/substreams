@@ -16,6 +16,8 @@ func init() {
 	sink.AddFlagsToSet(sinkWebhookCmd.Flags(),
 		sink.FlagIncludeOptional(
 			sink.FlagCursor,
+			sink.FlagIncludePartialBlocks,
+			sink.FlagPartialBlocksOnly,
 		),
 		sink.FlagExcludeDefault(
 			sink.FlagDevelopmentMode,

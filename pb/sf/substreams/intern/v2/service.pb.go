@@ -89,11 +89,12 @@ type ProcessRangeRequest struct {
 	// Whether the tier1 initial request was in production mode or in development mode.
 	// It's possible to have tier2 requests in development mode, for example if the Substreams
 	// needs to back process stores while in development mode.
-	ProductionMode             bool              `protobuf:"varint,16,opt,name=production_mode,json=productionMode,proto3" json:"production_mode,omitempty"`
-	StreamOutput               bool              `protobuf:"varint,17,opt,name=stream_output,json=streamOutput,proto3" json:"stream_output,omitempty"`
-	FoundationalStoreEndpoints map[string]string `protobuf:"bytes,18,rep,name=foundational_store_endpoints,json=foundationalStoreEndpoints,proto3" json:"foundational_store_endpoints,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields              protoimpl.UnknownFields
-	sizeCache                  protoimpl.SizeCache
+	ProductionMode                  bool              `protobuf:"varint,16,opt,name=production_mode,json=productionMode,proto3" json:"production_mode,omitempty"`
+	StreamOutput                    bool              `protobuf:"varint,17,opt,name=stream_output,json=streamOutput,proto3" json:"stream_output,omitempty"`
+	FoundationalStoreEndpoints      map[string]string `protobuf:"bytes,18,rep,name=foundational_store_endpoints,json=foundationalStoreEndpoints,proto3" json:"foundational_store_endpoints,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	EthCallFallbackToLatestDuration int64             `protobuf:"varint,19,opt,name=eth_call_fallback_to_latest_duration,json=ethCallFallbackToLatestDuration,proto3" json:"eth_call_fallback_to_latest_duration,omitempty"`
+	unknownFields                   protoimpl.UnknownFields
+	sizeCache                       protoimpl.SizeCache
 }
 
 func (x *ProcessRangeRequest) Reset() {
@@ -237,6 +238,13 @@ func (x *ProcessRangeRequest) GetFoundationalStoreEndpoints() map[string]string 
 		return x.FoundationalStoreEndpoints
 	}
 	return nil
+}
+
+func (x *ProcessRangeRequest) GetEthCallFallbackToLatestDuration() int64 {
+	if x != nil {
+		return x.EthCallFallbackToLatestDuration
+	}
+	return 0
 }
 
 type ProcessRangeResponse struct {
@@ -821,7 +829,7 @@ var File_sf_substreams_intern_v2_service_proto protoreflect.FileDescriptor
 
 const file_sf_substreams_intern_v2_service_proto_rawDesc = "" +
 	"\n" +
-	"%sf/substreams/intern/v2/service.proto\x12\x19sf.substreams.internal.v2\x1a\x19google/protobuf/any.proto\x1a\x1csf/substreams/v1/clock.proto\x1a\x1esf/substreams/v1/modules.proto\"\x84\b\n" +
+	"%sf/substreams/intern/v2/service.proto\x12\x19sf.substreams.internal.v2\x1a\x19google/protobuf/any.proto\x1a\x1csf/substreams/v1/clock.proto\x1a\x1esf/substreams/v1/modules.proto\"\xd3\b\n" +
 	"\x13ProcessRangeRequest\x12(\n" +
 	"\x0estop_block_num\x18\x02 \x01(\x04B\x02\x18\x01R\fstopBlockNum\x12#\n" +
 	"\routput_module\x18\x03 \x01(\tR\foutputModule\x123\n" +
@@ -841,7 +849,8 @@ const file_sf_substreams_intern_v2_service_proto_rawDesc = "" +
 	"\x0esegment_number\x18\x0f \x01(\x04R\rsegmentNumber\x12'\n" +
 	"\x0fproduction_mode\x18\x10 \x01(\bR\x0eproductionMode\x12#\n" +
 	"\rstream_output\x18\x11 \x01(\bR\fstreamOutput\x12\x90\x01\n" +
-	"\x1cfoundational_store_endpoints\x18\x12 \x03(\v2N.sf.substreams.internal.v2.ProcessRangeRequest.FoundationalStoreEndpointsEntryR\x1afoundationalStoreEndpoints\x1aG\n" +
+	"\x1cfoundational_store_endpoints\x18\x12 \x03(\v2N.sf.substreams.internal.v2.ProcessRangeRequest.FoundationalStoreEndpointsEntryR\x1afoundationalStoreEndpoints\x12M\n" +
+	"$eth_call_fallback_to_latest_duration\x18\x13 \x01(\x03R\x1fethCallFallbackToLatestDuration\x1aG\n" +
 	"\x19WasmExtensionConfigsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1aM\n" +

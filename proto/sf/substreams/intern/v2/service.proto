@@ -48,6 +48,8 @@ message ProcessRangeRequest {
   bool stream_output = 17;
 
   map<string, string> foundational_store_endpoints = 18;
+
+  int64 eth_call_fallback_to_latest_duration = 19;
 }
 
 message ProcessRangeResponse {

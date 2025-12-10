@@ -14,7 +14,7 @@ import (
 // EnvEthCallFallbackToLatestDuration is the environment variable name that, when set,
 // enables a non-deterministic fallback to latest for Ethereum eth_call/eth_getBalance.
 // Its presence requires callers to acknowledge non-determinism via the
-// X-substreams-ack-non-deterministic-substreams header.
+// X-substreams-acknowledge-non-deterministic header.
 const EnvEthCallFallbackToLatestDuration = "ETH_CALL_FALLBACK_TO_LATEST_DURATION"
 
 func sortClocksDistributor(clockDistributor map[uint64]*pbsubstreams.Clock) (sortedClockDistributor []*pbsubstreams.Clock) {

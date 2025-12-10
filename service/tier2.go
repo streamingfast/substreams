@@ -213,6 +213,10 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	var err error
 	ctx := streamSrv.Context()
 
+	if request.EthCallFallbackToLatestDuration > 0 {
+		ctx = reqctx.WithEthCallFallbackToLatestDuration(ctx, time.Duration(request.EthCallFallbackToLatestDuration))
+	}
+
 	stage := request.OutputModule
 	logger := reqctx.Logger(ctx).Named("tier2").With(zap.String("output_module", stage), zap.Uint64("segment_number", request.SegmentNumber))
 

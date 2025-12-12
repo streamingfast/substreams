@@ -146,13 +146,14 @@ message PartialBlockData {
   MapModuleOutput output = 1;
 
   // Clock contains the block number and ID for this partial block.
-  // Note: The block ID changes with each partial block emission and matches the final block's ID
-  // only on the last partial block before the full block.
+  // Note: Each partial block has a different, temporary block ID. Only the last partial block's
+  // ID will match the final confirmed block's ID when the full block is produced.
   sf.substreams.v1.Clock clock = 2;
 
   // partial_index indicates which partial block this is (e.g., 1, 2, 3...).
   // Increases sequentially for each emission of the same block number.
-  // The engine may skip some indices to keep up with the chain.
+  // The engine may skip some indices to keep up with chain HEAD, but transactions
+  // are always sent in order without duplication.
   uint32 partial_index = 3;
 }
 

@@ -42,9 +42,34 @@ Here's how it works:
 * Partial blocks are not sent as `BlockScopedData`, but as `PartialBlockData`, which is new possible type for `Response.message`
 
 ```proto
+// PartialBlockData represents partial block data from "flashblocks".
+// Flashblocks are partial, unconfirmed blocks emitted every ~200ms containing a fraction
+// of the transactions that will be in the final block.
+//
+// Important characteristics:
+// * Partial blocks are NOT final and may become invalid if there's a reorg
+// * No cursor is sent with partial blocks - they cannot be used for resumption
+// * The same block number will have multiple partial blocks with increasing partial_index
+// * Eventually a full BlockScopedData will be sent for the same block (when include_partial_blocks is true)
+// * Only the full block data is used to update stores, ensuring consistency
+// * Transactions are sent incrementally and never out-of-order within a block
+// * Some partial block emissions may be skipped to keep up with chain head
+//
+// Enable by setting include_partial_blocks or partial_blocks_only in the Request.
+// See: https://docs.base.org/base-chain/flashblocks/apps
 message PartialBlockData {
+  // The output of your module execution on the partial block's transactions
   MapModuleOutput output = 1;
+
+  // Clock contains the block number and ID for this partial block.
+  // Note: Each partial block has a different, temporary block ID. Only the last partial block's
+  // ID will match the final confirmed block's ID when the full block is produced.
   sf.substreams.v1.Clock clock = 2;
+
+  // partial_index indicates which partial block this is (e.g., 1, 2, 3...).
+  // Increases sequentially for each emission of the same block number.
+  // The engine may skip some indices to keep up with chain HEAD, but transactions
+  // are always sent in order without duplication.
   uint32 partial_index = 3;
 }
 ```
@@ -52,11 +77,17 @@ message PartialBlockData {
 * The `sf.substreams.rpc.v2.Blocks/Request`  and `sf.substreams.rpc.v3.Blocks/Request` now contain these parameters:
 
 ``` proto
-// If true, partial blocks are also sent on the stream
+// If true, partial blocks (flashblocks) are sent in addition to full blocks.
+// Partial blocks are unconfirmed, incremental block data emitted every ~200ms.
+// When enabled, you'll receive multiple PartialBlockData messages for each block,
+// followed by the full BlockScopedData for that block.
+// Note: Partial blocks have no cursor and may become invalid on reorg.
 bool include_partial_blocks = 15;
 
-// If true, only partial blocks are sent, no 'block-scoped-data' or cursor.
-// This value supersedes include_partial_blocks
+// If true, only partial blocks (flashblocks) are sent - no BlockScopedData or cursor.
+// This is useful for real-time monitoring where you don't need confirmed data.
+// This value supersedes include_partial_blocks.
+// Note: Without cursors, you cannot resume from a specific point.
 bool partial_blocks_only = 16;
 ```
 

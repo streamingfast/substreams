@@ -7,11 +7,14 @@ import (
 	"io"
 	"os"
 	"runtime/debug"
+	"strconv"
 
 	"connectrpc.com/connect"
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dmetering"
+	pbacme "github.com/streamingfast/dummy-blockchain/pb/sf/acme/type/v1"
+	pbeth "github.com/streamingfast/firehose-ethereum/types/pb/sf/ethereum/type/v2"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/metrics"
@@ -25,11 +28,23 @@ import (
 	"github.com/streamingfast/substreams/wasm"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 var PrintStack = os.Getenv("SUBSTREAMS_PRINT_STACK") == "true" || os.Getenv("SUBSTREAMS_PRINT_STACK") == "1"
+
+var biggestPartialBlockIndex = getBiggestPartialBlockIndex()
+
+func getBiggestPartialBlockIndex() int32 {
+	if env := os.Getenv("SUBSTREAMS_BIGGEST_PARTIAL_BLOCK_INDEX"); env != "" {
+		if val, err := strconv.ParseInt(env, 10, 32); err == nil {
+			return int32(val)
+		}
+	}
+	return int32(10)
+}
 
 var ErrShuttingDown = errors.New("endpoint is shutting down, please reconnect")
 var minBlocksProcessedToSave = uint64(25)
@@ -46,7 +61,7 @@ func (p *Pipeline) ProcessFromExecOutput(
 		return fmt.Errorf("setting up exec output: %w", err)
 	}
 
-	if err = p.processBlock(ctx, execOutput, clock, cursor, bstream.StepNewIrreversible, nil); err != nil {
+	if err = p.processBlock(ctx, execOutput, clock, cursor, bstream.StepNewIrreversible, nil, 0); err != nil {
 		return err
 	}
 
@@ -74,7 +89,7 @@ func (p *Pipeline) ProcessBlock(block *pbbstream.Block, obj interface{}) (err er
 		return fmt.Errorf("setting up exec output: %w", err)
 	}
 
-	if err = p.processBlock(ctx, execOutput, clock, cursor, step, reorgJunctionBlock); err != nil {
+	if err = p.processBlock(ctx, execOutput, clock, cursor, step, reorgJunctionBlock, block.PartialIndex); err != nil {
 		return err // watch out, io.EOF needs to go through undecorated
 	}
 
@@ -104,10 +119,16 @@ func (p *Pipeline) processBlock(
 	cursor *bstream.Cursor,
 	step bstream.StepType,
 	reorgJunctionBlock bstream.BlockRef,
+	partialIndex int32,
 ) (err error) {
 	var eof bool
 
 	switch step {
+	case bstream.StepPartial:
+		if reqctx.IncludePartialBlocks(ctx) { // this also covers 'partialBlocksOnly'
+			p.handleStepPartial(ctx, clock, execOutput, partialIndex)
+		}
+
 	case bstream.StepUndo:
 		p.blockStepMap[bstream.StepUndo]++
 		if err = p.handleStepUndo(clock, cursor, reorgJunctionBlock); err != nil {
@@ -176,7 +197,24 @@ func (p *Pipeline) handleStepStalled(clock *pbsubstreams.Clock) error {
 	return nil
 }
 
+func (p *Pipeline) undoPartialStates() error {
+	if p.partialProcessingState == nil {
+		return nil
+	}
+	for i := len(p.partialProcessingState.processedPartials) - 1; i >= 0; i-- {
+		clk := p.partialProcessingState.processedPartials[i]
+		if err := p.forkHandler.handleUndo(clk); err != nil {
+			return fmt.Errorf("reverting outputs: %w", err)
+		}
+	}
+	p.partialProcessingState = nil
+	return nil
+}
+
 func (p *Pipeline) handleStepUndo(clock *pbsubstreams.Clock, cursor *bstream.Cursor, reorgJunctionBlock bstream.BlockRef) error {
+	if err := p.undoPartialStates(); err != nil {
+		return err
+	}
 
 	if err := p.forkHandler.handleUndo(clock); err != nil {
 		return fmt.Errorf("reverting outputs: %w", err)
@@ -219,7 +257,119 @@ func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
 	return nil
 }
 
+func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Clock, execOutput execout.ExecutionOutput, idx int32) (err error) {
+
+	if p.partialProcessingState != nil {
+		if clock.Id == p.partialProcessingState.lastBlockID {
+			return nil // same hash: nothing new to process
+		}
+		if clock.Number != p.partialProcessingState.num {
+			reqctx.Logger(ctx).Warn("cannot handle partials from different block numbers consecutively", zap.Uint64("received", clock.Number), zap.Uint64("expected", p.partialProcessingState.num))
+			return nil
+		}
+	} else {
+		p.partialProcessingState = &partialProcessingState{
+			lastBlockID:                clock.Id,
+			num:                        clock.Number,
+			processedTransactionsCount: 0,
+		}
+	}
+
+	// Unmarshal and repack the partial block with less transactions...
+	// TODO: this should be implemented in a "generic" fashion,
+	// using Protobuf annotations + Protobuf reflection
+	// (ex; the sf.ethereum.type.v2.Block could have an annotation on
+	// the transactionTraces field marking it as "the" partial field)
+	if blockData, _, err := execOutput.Get("sf.acme.type.v1.Block"); err == nil {
+		block := &pbacme.Block{}
+		if err := proto.Unmarshal(blockData, block); err != nil {
+			return fmt.Errorf("unmarshal block: %w", err)
+		}
+		block.Transactions = block.Transactions[p.partialProcessingState.processedTransactionsCount:]
+		p.partialProcessingState.processedTransactionsCount += uint64(len(block.Transactions))
+		blockData, _ = proto.Marshal(block)
+		if err := execOutput.Set("sf.acme.type.v1.Block", blockData); err != nil {
+			return fmt.Errorf("set block: %w", err)
+		}
+
+	} else if blockData, _, err := execOutput.Get("sf.ethereum.type.v2.Block"); err == nil {
+		block := &pbeth.Block{}
+		if err := proto.Unmarshal(blockData, block); err != nil {
+			return fmt.Errorf("unmarshal block: %w", err)
+		}
+		block.TransactionTraces = block.TransactionTraces[p.partialProcessingState.processedTransactionsCount:]
+		p.partialProcessingState.processedTransactionsCount += uint64(len(block.TransactionTraces))
+		blockData, _ = proto.Marshal(block)
+		if err := execOutput.Set("sf.ethereum.type.v2.Block", blockData); err != nil {
+			return fmt.Errorf("set block: %w", err)
+		}
+	} else {
+		return fmt.Errorf("unsupported block type for partial blocks")
+	}
+
+	p.partialProcessingState.processedPartials = append(p.partialProcessingState.processedPartials, clock)
+
+	reqDetails := reqctx.Details(ctx)
+	if isBlockOverStopBlock(clock.Number, reqDetails.StopBlockNum) {
+		return nil
+	}
+	if p.isTier1 && p.checkPendingShutdown() {
+		return nil
+	}
+	if p.pendingUndoMessage != nil {
+		return nil
+	}
+	if !p.gate.shouldSendOutputs() {
+		return nil
+	}
+	if reqDetails.IsTier2Request {
+		panic("tier2 requests should never receive partial block")
+	}
+
+	if err := p.executeModules(ctx, execOutput, false, false); err != nil {
+		return fmt.Errorf("execute modules: %w", err)
+	}
+
+	mapModuleOutput := normalizeModuleOutput(p.mapModuleOutput, reqDetails.OutputModule)
+
+	if err = returnPartialDataOutput(clock, mapModuleOutput, p.respFunc, idx); err != nil {
+		return fmt.Errorf("failed to return module data output: %w", err)
+	}
+
+	return nil
+}
+
+func normalizeModuleOutput(in *pbsubstreamsrpc.MapModuleOutput, outputModule string) *pbsubstreamsrpc.MapModuleOutput {
+	if in == nil {
+		return &pbsubstreamsrpc.MapModuleOutput{
+			Name:      outputModule,
+			MapOutput: &anypb.Any{},
+		}
+	}
+	if in.Name == "" {
+		in.Name = outputModule
+	}
+	return in
+}
+
 func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput, isFinalBlock bool) (err error) {
+
+	// if we get a 'new' block while handling partial blocks, we complete the missing partials based on its content.
+	// Ex: we got partials 3, 4, 7
+	//    -> partial 3 contains all transactions from partials 1+2+3
+	//    -> partial 4 only processes transactions from partial 4
+	//    -> when we get the full block (stepNEW), if it differs from the partial7's ID, we process it so that we send a 'partial 10' that contains transactions from partials 8,9,10
+	if reqctx.IncludePartialBlocks(ctx) { // this also covers 'partialBlocksOnly'
+		if p.partialProcessingState == nil || p.partialProcessingState.lastBlockID != clock.Id {
+			if err := p.handleStepPartial(ctx, clock, execOutput.Clone(), biggestPartialBlockIndex); err != nil { // we will reuse this execOutput so we clone it here
+				return err
+			}
+		}
+		if err := p.undoPartialStates(); err != nil {
+			return err
+		}
+	}
+
 	if p.isTier1 && p.checkPendingShutdown() {
 		if p.stores.StoreMap != nil && p.sentBlocks > minBlocksProcessedToSave {
 			p.stores.logger.Info("shutting down, quick saving stores")
@@ -267,11 +417,11 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 
 	metering.AddWasmInputBytes(ctx, execOutput.Len())
 
-	if err := p.executeModules(ctx, execOutput, isFinalBlock); err != nil {
+	if err := p.executeModules(ctx, execOutput, isFinalBlock, true); err != nil {
 		return fmt.Errorf("execute modules: %w", err)
 	}
 
-	if p.gate.shouldSendOutputs() {
+	if p.gate.shouldSendOutputs() && !reqctx.PartialBlocksOnly(ctx) {
 		p.sentBlocks++
 		logger.Debug("will return module outputs")
 		if p.pendingUndoMessage != nil {
@@ -293,16 +443,8 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 		} else {
 			// LIVE and DEV mode always receive module data outputs, even when they are empty
 			// so they can follow progress (and dev also gets debug output...)
-			mapModuleOutput := p.mapModuleOutput
-			if mapModuleOutput == nil {
-				mapModuleOutput = &pbsubstreamsrpc.MapModuleOutput{
-					Name:      reqDetails.OutputModule,
-					MapOutput: &anypb.Any{},
-				}
-			} else if mapModuleOutput.Name == "" {
-				//failsafe: normalize any output to at least include the module name
-				mapModuleOutput.Name = reqDetails.OutputModule
-			}
+			//
+			mapModuleOutput := normalizeModuleOutput(p.mapModuleOutput, reqDetails.OutputModule)
 			if err = returnModuleDataOutputs(clock, cursor, mapModuleOutput, p.extraMapModuleOutputs, p.extraStoreModuleOutputs, p.respFunc, logger); err != nil {
 				return fmt.Errorf("failed to return module data output: %w", err)
 			}
@@ -316,7 +458,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 	return nil
 }
 
-func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.ExecutionOutput, isFinalBlock bool) (err error) {
+func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.ExecutionOutput, isFinalBlock bool, cachable bool) (err error) {
 	ctx, span := reqctx.WithModuleExecutionSpan(ctx, "modules_executions")
 	defer span.EndWithErr(&err)
 
@@ -349,7 +491,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 				if !executor.RunsOnBlock(blockNum) {
 					continue
 				}
-				res := p.execute(ctx, executor, execOutput, isFinalBlock)
+				res := p.execute(ctx, executor, execOutput, isFinalBlock, cachable)
 				if res.output != nil && !res.skippedExecution && !res.output.Cached {
 					executedStages[p.moduleNameToStage[res.output.ModuleName]] = true
 				}
@@ -376,7 +518,7 @@ func (p *Pipeline) executeModules(ctx context.Context, execOutput execout.Execut
 						}
 					}()
 
-					res := p.execute(ctx, executor, execOutput, isFinalBlock)
+					res := p.execute(ctx, executor, execOutput, isFinalBlock, cachable)
 					results[i] = res
 
 					return
@@ -455,7 +597,7 @@ type resultObj struct {
 	skippableOutput  bool
 }
 
-func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, execOutput execout.ExecutionOutput, isFinalBlock bool) (out resultObj) {
+func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, execOutput execout.ExecutionOutput, isFinalBlock bool, cachable bool) (out resultObj) {
 	logger := reqctx.Logger(ctx)
 
 	executorName := executor.Name()
@@ -487,7 +629,7 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 		}
 	}()
 
-	moduleOutput, outputBytes, outputBytesFiles, skippedExecution, skippableOutput, runError := exec.RunModule(ctx, executor, execOutput)
+	moduleOutput, outputBytes, outputBytesFiles, skippedExecution, skippableOutput, runError := exec.RunModule(ctx, executor, execOutput, cachable)
 
 	if isFinalBlock && errors.Is(runError, wasm.ErrWasmDeterministicExec) {
 		p.execoutStorage.ConfigMap[executorName].WriteDeterministicError(ctx, execOutput.Clock().Number, runError)

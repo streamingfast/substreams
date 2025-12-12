@@ -101,6 +101,13 @@ This document lists all environment variables used by the Substreams project, or
 - **Default**: `false`
 - **Location**: `pipeline/process_block.go`
 
+#### `SUBSTREAMS_BIGGEST_PARTIAL_BLOCK_INDEX`
+**Partial block composition limit**
+- **Purpose**: Configure the maximum block index used to compose the last partial block of a sequence when a request fetches "partial-blocks-only"
+- **Usage**: Set as integer value to control partial block composition behavior
+- **Default**: `10`
+- **Location**: `pipeline/process_block.go`
+
 ### `SUBSTREAMS_DEBUG_SCHEDULER_STATE`
 **Debug scheduler state**
 - **Purpose**: Enable verbose logging of scheduler state changes for debugging

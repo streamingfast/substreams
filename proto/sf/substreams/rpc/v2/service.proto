@@ -69,6 +69,12 @@ message Request {
   // Progress_messages_interval_ms is the interval between progress messages, in milliseconds (minimum: 500, default: start at 500ms and ramp up to 5000ms within 1min)
   uint64 progress_messages_interval_ms = 14;
 
+  // If true, partial blocks are also sent on the stream
+  bool include_partial_blocks = 15;
+
+  // If true, only partial blocks are sent, no 'block-scoped-data' or cursor.
+  // This value supersedes include_partial_blocks
+  bool partial_blocks_only = 16;
 }
 
 message Response {
@@ -83,6 +89,8 @@ message Response {
     InitialSnapshotData debug_snapshot_data = 10;
     // Available only in developer mode, and only if `debug_initial_store_snapshot_for_modules` is set.
     InitialSnapshotComplete debug_snapshot_complete = 11;
+
+    PartialBlockData partial_block_data = 12;
   }
 }
 
@@ -108,6 +116,12 @@ message BlockScopedData {
   // Signed attestation, enabling economic security as per GIP-0083. Signatures are
   // done using the key specified by SessionInit::attestation_public_key.
   string attestation = 12;
+}
+
+message PartialBlockData {
+  MapModuleOutput output = 1;
+  sf.substreams.v1.Clock clock = 2;
+  uint32 partial_index = 3;
 }
 
 message SessionInit {

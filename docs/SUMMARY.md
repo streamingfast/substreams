@@ -91,6 +91,7 @@
 * [Chain Support](new/references/chains-and-endpoints.md)
   * [Chains & Endpoints](new/references/chains-and-endpoints.md)
   * [Ethereum Data Model](new/references/ethereum-data-model.md)
+  * [(alpha) Flashblocks support](new/references/flashblocks.md)
 * [Sinks Reference](new/references/sql/README.md)
   * [SQL Sink Config](new/references/sql/sink-config.md)
   * [DSN Reference](new/references/sql/dsn-reference.md)

@@ -103,7 +103,11 @@ func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
 		}),
 		int64(bstream.GetProtocolFirstStreamableBlock),
 		bstream.GetProtocolFirstStreamableBlock,
-		"", false, false, zlog,
+		"",
+		false,
+		false,
+		false,
+		zlog,
 	)
 	if err != nil {
 		return "", err
@@ -357,6 +361,9 @@ func (s *Tier1Service) BlocksAny(
 		s.activeRequestsWG.Done()
 	}()
 
+	ctx = reqctx.WithPartialBlocksOnly(ctx, request.PartialBlocksOnly)
+	ctx = reqctx.WithIncludePartialBlocks(ctx, request.IncludePartialBlocks || request.PartialBlocksOnly) // either flags will trigger 'include partial blocks'
+
 	// We keep `err` here as the unaltered error from `blocks` call, this is used in the EndSpan to record the full error
 	// and not only the `grpcError` one which is a subset view of the full `err`.
 	var err error
@@ -398,6 +405,8 @@ func (s *Tier1Service) BlocksAny(
 		zap.Bool("production_mode", request.ProductionMode),
 		zap.Bool("noop_mode", request.NoopMode),
 		zap.Strings("dev_output_modules", request.DevOutputModules),
+		zap.Bool("include_partial_blocks", request.IncludePartialBlocks),
+		zap.Bool("partial_blocks_only", request.PartialBlocksOnly),
 	}
 
 	if s.enforceCompression && !compressed {
@@ -983,6 +992,7 @@ func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelC
 		request.StopBlockNum,
 		cursor,
 		request.FinalBlocksOnly,
+		reqctx.IncludePartialBlocks(ctx),
 		processBlocksBeforeCursor,
 		logger.Named("stream"),
 		bsstream.WithLiveSourceHandlerMiddleware(metering.LiveSourceMiddlewareHandlerFactory(ctx)),
@@ -1010,7 +1020,8 @@ func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelC
 				request.StopBlockNum,
 				cur.ToOpaque(),
 				request.FinalBlocksOnly,
-				false,
+				reqctx.IncludePartialBlocks(ctx),
+				false, // processBlocksBeforeCursor always false here
 				logger.Named("stream"),
 				bsstream.WithLiveSourceHandlerMiddleware(metering.LiveSourceMiddlewareHandlerFactory(ctx)),
 				bsstream.WithFileSourceHandlerMiddleware(metering.FileSourceMiddlewareHandlerFactory(ctx)),
@@ -1237,6 +1248,9 @@ func toConnectError(ctx context.Context, err error) error {
 	if errors.Is(err, context.Canceled) {
 		if contextCause := context.Cause(ctx); contextCause != nil {
 			err = contextCause // unwrap errors in canceled contexts
+			if errors.Is(err, context.Canceled) {
+				return connect.NewError(connect.CodeCanceled, err)
+			}
 		} else {
 			return connect.NewError(connect.CodeCanceled, err)
 		}

@@ -42,6 +42,8 @@ const (
 	FlagMaxRetries         = "max-retries"
 
 	FlagSkipPackageValidation        = "skip-package-validation"
+	FlagIncludePartialBlocks         = "include-partial-blocks"
+	FlagPartialBlocksOnly            = "partial-blocks-only"
 	FlagExtraHeaders                 = "header"
 	FlagNoopMode                     = "noop-mode"
 	FlagProtoPath                    = "proto-path"
@@ -167,6 +169,14 @@ func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagInclusionExclusion) {
 		flags.Bool(FlagSkipCheckModuleBinariesExist, true, "Skip validation that the module binaries exist when loading from YAML manifest (ex: WASM already built)")
 	}
 
+	if optionalFlagIncluded(FlagIncludePartialBlocks) {
+		flags.Bool(FlagIncludePartialBlocks, false, "Include partial blocks in the stream")
+	}
+
+	if optionalFlagIncluded(FlagPartialBlocksOnly) {
+		flags.Bool(FlagPartialBlocksOnly, false, fmt.Sprintf("Only fetch partial blocks in the stream (supersedes --%s)", FlagIncludePartialBlocks))
+	}
+
 	if defaultFlagIncluded(FlagNetwork) {
 		flags.String(FlagNetwork, "", "Specify the network to use for params and initialBlocks, overriding the 'network' field in the substreams package")
 	}
@@ -287,7 +297,7 @@ func ConfigFromViper(
 	zlog *zap.Logger,
 	tracer logging.Tracer,
 ) (*SinkerConfig, error) {
-	params, network, undoBufferSize, liveBlockTimeDelta, isDevelopmentMode, maxRetries, finalBlocksOnly, skipPackageValidation, isNoopMode, extraHeaders, prometheusAddr, skipCheckModuleBinariesExist := getViperFlags(cmd)
+	params, network, undoBufferSize, liveBlockTimeDelta, isDevelopmentMode, maxRetries, finalBlocksOnly, includePartialBlocks, partialBlocksOnly, skipPackageValidation, isNoopMode, extraHeaders, prometheusAddr, skipCheckModuleBinariesExist := getViperFlags(cmd)
 
 	// Parse start and stop blocks using utility functions
 	startBlockFlag := sflags.MustGetString(cmd, FlagStartBlock)
@@ -420,6 +430,8 @@ func ConfigFromViper(
 		StopBlock:             stopBlock,
 		UndoBufferSize:        undoBufferSize,
 		FinalBlocksOnly:       finalBlocksOnly,
+		PartialBlocksOnly:     partialBlocksOnly,
+		IncludePartialBlocks:  includePartialBlocks,
 		MaxRetries:            maxRetries,
 		BackOff:               bo,
 		LiveBlockTimeDelta:    liveBlockTimeDelta,
@@ -444,6 +456,8 @@ func getViperFlags(cmd *cobra.Command) (
 	isDevelopmentMode bool,
 	maxRetries int,
 	finalBlocksOnly bool,
+	includePartialBlocks bool,
+	partialBlocksOnly bool,
 	skipPackageValidation bool,
 	isNoopMode bool,
 	extraHeaders []string,
@@ -484,6 +498,14 @@ func getViperFlags(cmd *cobra.Command) (
 
 	if sflags.FlagDefined(cmd, FlagSkipPackageValidation) {
 		skipPackageValidation = sflags.MustGetBool(cmd, FlagSkipPackageValidation)
+	}
+
+	if sflags.FlagDefined(cmd, FlagPartialBlocksOnly) {
+		partialBlocksOnly = sflags.MustGetBool(cmd, FlagPartialBlocksOnly)
+	}
+
+	if sflags.FlagDefined(cmd, FlagIncludePartialBlocks) {
+		includePartialBlocks = sflags.MustGetBool(cmd, FlagIncludePartialBlocks)
 	}
 
 	if sflags.FlagDefined(cmd, FlagExtraHeaders) {

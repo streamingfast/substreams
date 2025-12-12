@@ -56,7 +56,7 @@ type MockModuleExecutor struct {
 
 var _ ModuleExecutor = (*MockModuleExecutor)(nil)
 
-func (t *MockModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, outForFiles []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
+func (t *MockModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter, cachable bool) (out []byte, outForFiles []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
 	if t.RunFunc != nil {
 		return t.RunFunc(ctx, reader)
 	}
@@ -112,7 +112,7 @@ func TestModuleExecutorRunner_Run_HappyPath(t *testing.T) {
 		cacheMap: make(map[string][]byte),
 	}
 
-	moduleOutput, _, _, _, _, err := RunModule(ctx, executor, output)
+	moduleOutput, _, _, _, _, err := RunModule(ctx, executor, output, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +156,7 @@ func TestModuleExecutorRunner_Run_CachedOutput(t *testing.T) {
 		},
 	}
 
-	moduleOutput, _, _, _, _, err := RunModule(ctx, executor, output)
+	moduleOutput, _, _, _, _, err := RunModule(ctx, executor, output, true)
 	if err != nil {
 		t.Fatal(err)
 	}

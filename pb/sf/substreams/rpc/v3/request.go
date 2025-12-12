@@ -29,6 +29,8 @@ func (r *Request) ToV2() (*pbsubstreamsrpcv2.Request, error) {
 		LimitProcessedBlocks:                r.LimitProcessedBlocks,
 		DevOutputModules:                    r.DevOutputModules,
 		ProgressMessagesIntervalMs:          r.ProgressMessagesIntervalMs,
+		IncludePartialBlocks:                r.IncludePartialBlocks,
+		PartialBlocksOnly:                   r.PartialBlocksOnly,
 	}, nil
 }
 

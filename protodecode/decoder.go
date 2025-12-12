@@ -220,12 +220,13 @@ func (d *Decoder) SetFormatting(indent string, emitDefaults bool) {
 }
 
 // WrapMessage wraps data content with module metadata (@module, @block, @type, @data)
-func (d *Decoder) WrapMessage(msgType string, blockNum uint64, modName string, data json.RawMessage) ([]byte, error) {
+func (d *Decoder) WrapMessage(msgType string, blockNum uint64, modName string, data json.RawMessage, partialIndex uint32) ([]byte, error) {
 	wrappedCnt, err := json.Marshal(ModuleWrap{
-		Module:   modName,
-		BlockNum: blockNum,
-		Type:     msgType,
-		Data:     data,
+		Module:       modName,
+		PartialIndex: partialIndex,
+		BlockNum:     blockNum,
+		Type:         msgType,
+		Data:         data,
 	})
 	if err != nil {
 		return nil, err
@@ -247,10 +248,11 @@ type ErrorWrap struct {
 }
 
 type ModuleWrap struct {
-	Module   string          `json:"@module"`
-	BlockNum uint64          `json:"@block"`
-	Type     string          `json:"@type"`
-	Data     json.RawMessage `json:"@data"`
+	Module       string          `json:"@module"`
+	BlockNum     uint64          `json:"@block"`
+	PartialIndex uint32          `json:"@partial_index,omitempty"`
+	Type         string          `json:"@type"`
+	Data         json.RawMessage `json:"@data"`
 }
 
 // Helper functions

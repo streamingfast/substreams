@@ -23,6 +23,7 @@ func (ui *TUI) decoratedBlockScopedData(
 	debugMapOutputs []*pbsubstreamsrpc.MapModuleOutput,
 	debugStoreOutputs []*pbsubstreamsrpc.StoreModuleOutput,
 	clock *pbsubstreams.Clock,
+	partialIndex uint32,
 ) error {
 	var s []string
 	for _, out := range append([]*pbsubstreamsrpc.MapModuleOutput{output}, debugMapOutputs...) {
@@ -40,7 +41,7 @@ func (ui *TUI) decoratedBlockScopedData(
 			msgType := ui.decoder.GetMessageType(out.Name)
 			dataContent := ui.decoder.DecodeDynamicMessage(msgDesc, out.MapOutput)
 
-			wrappedCnt, err := ui.decoder.WrapMessage(msgType, clock.Number, out.Name, dataContent)
+			wrappedCnt, err := ui.decoder.WrapMessage(msgType, clock.Number, out.Name, dataContent, partialIndex)
 			if err != nil {
 				s = append(s, fmt.Sprintf("Error wrapping message: %v", err))
 			} else {
@@ -137,6 +138,7 @@ func (ui *TUI) jsonBlockScopedData(
 	debugMapOutputs []*pbsubstreamsrpc.MapModuleOutput,
 	debugStoreOutputs []*pbsubstreamsrpc.StoreModuleOutput,
 	clock *pbsubstreams.Clock,
+	partialIndex uint32,
 ) error {
 
 	for _, out := range append([]*pbsubstreamsrpc.MapModuleOutput{output}, debugMapOutputs...) {
@@ -149,14 +151,11 @@ func (ui *TUI) jsonBlockScopedData(
 			msgType := ui.decoder.GetMessageType(out.Name)
 			dataContent := ui.decoder.DecodeDynamicMessage(msgDesc, out.MapOutput)
 
-			wrappedCnt, err := ui.decoder.WrapMessage(msgType, clock.Number, out.Name, dataContent)
+			wrappedCnt, err := ui.decoder.WrapMessage(msgType, clock.Number, out.Name, dataContent, partialIndex)
 			if err != nil {
 				fmt.Printf("Error wrapping message: %v\n", err)
 			} else {
 				cnt := ui.prettyFormat(wrappedCnt, true)
-				if out.DebugInfo != nil && out.DebugInfo.Cached {
-					fmt.Println(cachedValues(out.Name))
-				}
 				fmt.Println(string(cnt))
 			}
 		}
@@ -167,9 +166,6 @@ func (ui *TUI) jsonBlockScopedData(
 			continue
 		}
 		if len(out.DebugStoreDeltas) != 0 {
-			if out.DebugInfo != nil && out.DebugInfo.Cached {
-				fmt.Println(cachedValues(out.Name))
-			}
 			if err := ui.printJSONBlockDeltas(out.Name, clock.Number, out.DebugStoreDeltas); err != nil {
 				return fmt.Errorf("print json deltas: %w", err)
 			}

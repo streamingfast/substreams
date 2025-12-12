@@ -29,13 +29,17 @@ func (i *IndexModuleExecutor) applyCachedOutput([]byte) error {
 	return nil
 }
 
-func (i *IndexModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, outForFiles []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
+func (i *IndexModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter, cachable bool) (out []byte, outForFiles []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
 	_, span := reqctx.WithModuleExecutionSpan(ctx, "exec_index")
 	defer span.EndWithErr(&err)
 	i.ctx = ctx
 
 	var call *wasm.Call
-	if call, err = i.wasmCall(reader, false, GlobalSharedCache, GlobalUndoManager); err != nil {
+	var cache *SharedCache
+	if cachable {
+		cache = GlobalSharedCache
+	}
+	if call, err = i.wasmCall(reader, false, cache, GlobalUndoManager); err != nil {
 		return nil, nil, nil, fmt.Errorf("maps wasm call: %w", err)
 	}
 

@@ -22,6 +22,7 @@ import (
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
 	tracing "github.com/streamingfast/sf-tracing"
+	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/debugapi"
@@ -72,6 +73,7 @@ type BlockFilter struct {
 }
 
 type Tier2Service struct {
+	*shutter.Shutter
 	wasmExtensions func(map[string]string) (map[string]map[string]wasm.WASMExtension, error) //todo: rename
 	tracer         ttrace.Tracer
 	logger         *zap.Logger
@@ -106,7 +108,7 @@ func NewTier2(
 ) (*Tier2Service, error) {
 
 	s := &Tier2Service{
-
+		Shutter:                 shutter.New(),
 		checkPendingShutdown:    checkPendingShutdown,
 		tracer:                  tracing.GetTracer(),
 		logger:                  logger,
@@ -604,7 +606,8 @@ excludable:
 		stopBlock,
 		"",
 		true,
-		false,
+		false, // includePartialBlocks should be false in tier2
+		false, // cursorIsTarget
 		logger.Named("stream"),
 		bsstream.WithFileSourceHandlerMiddleware(metering.FileSourceMiddlewareHandlerFactory(ctx)),
 	)

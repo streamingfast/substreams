@@ -374,7 +374,7 @@ type TestRunner struct {
 	generator TestBlockGenerator
 }
 
-func (r *TestRunner) StreamFactory(ctx context.Context, h bstream.Handler, startBlockNum int64, stopBlockNum uint64, _ string, _ bool, _ bool, _ *zap.Logger, extraOpts ...stream.Option) (service.Streamable, error) {
+func (r *TestRunner) StreamFactory(ctx context.Context, h bstream.Handler, startBlockNum int64, stopBlockNum uint64, _ string, _ bool, _ bool, _ bool, _ *zap.Logger, extraOpts ...stream.Option) (service.Streamable, error) {
 	var liveBackFiller *service.LiveBackFiller
 
 	if liveBackFillerHandler, ok := h.(*service.LiveBackFiller); ok {

@@ -29,10 +29,10 @@ ref: https://docs.base.org/base-chain/flashblocks/apps
 
 Here's how it works:
 
-1. The "sequencer* emits a flash block every 200ms (so a maximum of 10 per block height)
-2. The instrumented Base node reader sends the increasing versions of the block same block to the Substreams engine and eventually, the full block.
+1. The "sequencer" emits a flashblock every 200ms (so a maximum of 10 per block height)
+2. The instrumented Base node reader sends the increasing versions of the same block to the Substreams engine and eventually, the full block.
 3. To keep up with the chain, it may skip a few emissions of partial blocks, but will never send the transactions out-of-order.
-4. The Substreams engine will remember what was processed for each active substreams and only process the new transactions since the last execution.
+4. The Substreams engine will remember what was processed for each active Substreams and only process the new transactions since the last execution.
 5. It sends the PartialData for each part of the full block as it gets it from the flash blocks
 6. If there is a reorg, new and undo signals are sent for the full blocks, but there is no consideration for the sent partial blocks. The user must always consider that the partial blocks data may become invalid.
 7. For this reason, there is no "cursor" sent with the partial blocks data.
@@ -65,8 +65,8 @@ bool partial_blocks_only = 16;
 For the hypothetical scenario where 
 * a block #123 is being emitted as partial blocks
 * each partial block contains exactly 10 new transactions (to simplify the example)
-* the Substreams engine receives only the blocks with index 2, 4, 7 (to ensure that we keep up with the chain)
-* finally, it receives followed by the full block #123
+* the Substreams engine receives only the blocks with index 2, 4, 7 (some may be skipped to keep up with the chain HEAD)
+* finally, it receives the full block #123
 
 The module will be executed 4 times with partial data:
   1. with transactions 0-20
@@ -92,7 +92,7 @@ If the user requested `include_partial_blocks` (and NOT `partial_blocks_only`), 
 
 ### A simple test, from terminal, with `substreams run`
 
-1. Get the latest release of substreams: https://github.com/streamingfast/substreams/releases/tag/v1.17.8
+1. Get the latest release of Substreams: https://github.com/streamingfast/substreams/releases/tag/v1.17.8
 
 2. To test with a common module, using `jq` to quickly see what is going on (you need [jq](https://jqlang.org/)):
 
@@ -127,11 +127,11 @@ This will print lines like this:
 ----------- PARTIAL BLOCK #39,306,388 (idx=10) (c7871f81180ad6565ae6f9c4d244b2dcac05b2348aff54bd591a65d6c945107e) age=1.138322s ---------------
 ----------- BLOCK #39,306,388 (c7871f81180ad6565ae6f9c4d244b2dcac05b2348aff54bd591a65d6c945107e) age=1.138495s ---------------
 ```
-See the "negative age", that's because at partial block with idx=5, the proposed block timestamp is still 2seconds in the future.
+See the "negative age", that's because at partial block with idx=5, the proposed block timestamp is still 2 seconds in the future.
 
 ### A more useful example, with the Substreams Webhook Sink:
 
-1. Get the latest release of substreams: https://github.com/streamingfast/substreams/releases/tag/v1.17.8
+1. Get the latest release of Substreams: https://github.com/streamingfast/substreams/releases/tag/v1.17.8
 2. Run this command:
 
 `substreams sink webhook --partial-blocks-only -e https://base-mainnet-flash.streamingfast.io http://webhook.example.com path-to-your.spkg  -s -1`
@@ -140,7 +140,7 @@ Enjoy!
 
 ### More sinks
 
-The flash block support is not implemented in other sinks. For example, we believe that it would be a bad idea to implement in the SQL sink, because it would cause too many "undo" operations.
+Flashblock support is not implemented in other sinks. For example, we believe that it would be a bad idea to implement in the SQL sink, because it would cause too many "undo" operations.
 If you have your own sink implementation that uses github.com/streamingfast/substreams/sink, you can simply:
   - Bump to the latest version of substreams in your go.mod (1.17.8 and above)
   - Define your sink flags with `sink.FlagIncludePartialBlocks` and/or `sink.FlagPartialBlocksOnly` under `FlagIncludeOptional()`

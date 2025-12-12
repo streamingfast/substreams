@@ -126,7 +126,7 @@ message BlockScopedData {
   string attestation = 12;
 }
 
-// PartialBlockData represents partial block data from "flashblocks" (currently Base only).
+// PartialBlockData represents partial block data from "flashblocks".
 // Flashblocks are partial, unconfirmed blocks emitted every ~200ms containing a fraction
 // of the transactions that will be in the final block.
 //

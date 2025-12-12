@@ -276,6 +276,10 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 	}
 
 	// Unmarshal and repack the partial block with less transactions...
+	// TODO: this should be implemented in a "generic" fashion,
+	// using Protobuf annotations + Protobuf reflection
+	// (ex; the sf.ethereum.type.v2.Block could have an annotation on
+	// the transactionTraces field marking it as "the" partial field)
 	if blockData, _, err := execOutput.Get("sf.acme.type.v1.Block"); err == nil {
 		block := &pbacme.Block{}
 		if err := proto.Unmarshal(blockData, block); err != nil {
@@ -307,10 +311,10 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 
 	reqDetails := reqctx.Details(ctx)
 	if isBlockOverStopBlock(clock.Number, reqDetails.StopBlockNum) {
-		return nil // skip but don't take actions on a partial block for this
+		return nil
 	}
 	if p.isTier1 && p.checkPendingShutdown() {
-		return nil // skip but don't take actions on a partial block for this
+		return nil
 	}
 	if p.pendingUndoMessage != nil {
 		return nil

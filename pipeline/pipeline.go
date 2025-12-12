@@ -900,7 +900,7 @@ func returnPartialDataOutput(
 	}
 
 	if err := respFunc(substreams.NewPartialBlockResponse(out)); err != nil {
-		return fmt.Errorf("calling return func: %w", err)
+		return fmt.Errorf("calling response func: %w", err)
 	}
 
 	return nil

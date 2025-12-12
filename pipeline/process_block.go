@@ -267,11 +267,13 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 			reqctx.Logger(ctx).Warn("cannot handle partials from different block numbers consecutively", zap.Uint64("received", clock.Number), zap.Uint64("expected", p.partialProcessingState.num))
 			return nil
 		}
+		p.partialProcessingState.highestIndex = idx
 	} else {
 		p.partialProcessingState = &partialProcessingState{
 			lastBlockID:                clock.Id,
 			num:                        clock.Number,
 			processedTransactionsCount: 0,
+			highestIndex:               idx,
 		}
 	}
 
@@ -308,7 +310,6 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 	}
 
 	p.partialProcessingState.processedPartials = append(p.partialProcessingState.processedPartials, clock)
-
 	reqDetails := reqctx.Details(ctx)
 	if isBlockOverStopBlock(clock.Number, reqDetails.StopBlockNum) {
 		return nil
@@ -361,7 +362,11 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 	//    -> when we get the full block (stepNEW), if it differs from the partial7's ID, we process it so that we send a 'partial 10' that contains transactions from partials 8,9,10
 	if reqctx.IncludePartialBlocks(ctx) { // this also covers 'partialBlocksOnly'
 		if p.partialProcessingState == nil || p.partialProcessingState.lastBlockID != clock.Id {
-			if err := p.handleStepPartial(ctx, clock, execOutput.Clone(), biggestPartialBlockIndex); err != nil { // we will reuse this execOutput so we clone it here
+			partialBlockIndex := biggestPartialBlockIndex
+			if p.partialProcessingState != nil && p.partialProcessingState.highestIndex > partialBlockIndex {
+				partialBlockIndex = p.partialProcessingState.highestIndex + 1 // push back the 'biggest partial block index' so we don't send them out of order to the client
+			}
+			if err := p.handleStepPartial(ctx, clock, execOutput.Clone(), partialBlockIndex); err != nil { // we will reuse this execOutput so we clone it here
 				return err
 			}
 		}

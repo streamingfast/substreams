@@ -53,6 +53,7 @@ type partialProcessingState struct {
 	lastBlockID                string
 	processedPartials          []*pbsubstreams.Clock
 	processedTransactionsCount uint64
+	highestIndex               int32
 }
 
 type Pipeline struct {

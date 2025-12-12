@@ -37,7 +37,7 @@ func (h sinkerHandlers) HandleBlockUndoSignal(ctx context.Context, undoSignal *p
 }
 
 func (h fullSinkerHandlers) HandlePartialBlockData(ctx context.Context, data *pbsubstreamsrpc.PartialBlockData) error {
-	if h.handleBlockScopedData != nil {
+	if h.handlePartialBlockData != nil {
 		return h.handlePartialBlockData(ctx, data)
 	}
 	return nil

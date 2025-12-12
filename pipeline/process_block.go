@@ -125,7 +125,9 @@ func (p *Pipeline) processBlock(
 
 	switch step {
 	case bstream.StepPartial:
-		p.handleStepPartial(ctx, clock, execOutput, partialIndex)
+		if reqctx.IncludePartialBlocks(ctx) { // this also covers 'partialBlocksOnly'
+			p.handleStepPartial(ctx, clock, execOutput, partialIndex)
+		}
 
 	case bstream.StepUndo:
 		p.blockStepMap[bstream.StepUndo]++
@@ -262,7 +264,8 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 			return nil // same hash: nothing new to process
 		}
 		if clock.Number != p.partialProcessingState.num {
-			panic(fmt.Sprintf("cannot handle partials from different block numbers consecutively: received %d, expected %d", clock.Number, p.partialProcessingState.num))
+			reqctx.Logger(ctx).Warn("cannot handle partials from different block numbers consecutively", zap.Uint64("received", clock.Number), zap.Uint64("expected", p.partialProcessingState.num))
+			return nil
 		}
 	} else {
 		p.partialProcessingState = &partialProcessingState{
@@ -358,9 +361,9 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 				return err
 			}
 		}
-	}
-	if err := p.undoPartialStates(); err != nil {
-		return err
+		if err := p.undoPartialStates(); err != nil {
+			return err
+		}
 	}
 
 	if p.isTier1 && p.checkPendingShutdown() {

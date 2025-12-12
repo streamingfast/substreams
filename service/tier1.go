@@ -1020,7 +1020,7 @@ func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelC
 				request.StopBlockNum,
 				cur.ToOpaque(),
 				request.FinalBlocksOnly,
-				reqctx.PartialBlocksOnly(ctx),
+				reqctx.IncludePartialBlocks(ctx),
 				false, // processBlocksBeforeCursor always false here
 				logger.Named("stream"),
 				bsstream.WithLiveSourceHandlerMiddleware(metering.LiveSourceMiddlewareHandlerFactory(ctx)),

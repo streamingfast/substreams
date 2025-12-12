@@ -3,10 +3,11 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/streamingfast/cli/utils"
 	"os"
 	"path/filepath"
+
+	"github.com/charmbracelet/lipgloss"
+	"github.com/streamingfast/cli/utils"
 
 	"github.com/spf13/cobra"
 )

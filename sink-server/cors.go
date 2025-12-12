@@ -1,10 +1,11 @@
 package server
 
 import (
-	"go.uber.org/zap"
 	"net/http"
 	"net/url"
 	"time"
+
+	"go.uber.org/zap"
 
 	"github.com/rs/cors"
 )

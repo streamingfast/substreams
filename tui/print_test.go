@@ -1,9 +1,10 @@
 package tui
 
 import (
+	"testing"
+
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func Test_printUndoJSON(t *testing.T) {

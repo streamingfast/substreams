@@ -3,9 +3,10 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/streamingfast/cli"
 	"os"
 	"strings"
+
+	"github.com/streamingfast/cli"
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"

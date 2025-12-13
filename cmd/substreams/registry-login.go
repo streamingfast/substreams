@@ -7,9 +7,8 @@ import (
 	"path/filepath"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/streamingfast/cli/utils"
-
 	"github.com/spf13/cobra"
+	"github.com/streamingfast/cli/utils"
 )
 
 var registryLoginCmd = &cobra.Command{

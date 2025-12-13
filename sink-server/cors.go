@@ -5,9 +5,8 @@ import (
 	"net/url"
 	"time"
 
-	"go.uber.org/zap"
-
 	"github.com/rs/cors"
+	"go.uber.org/zap"
 )
 
 func (s *server) corsOption() *cors.Cors {

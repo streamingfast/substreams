@@ -5,13 +5,14 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
-	"github.com/itchyny/gojq"
-	"github.com/streamingfast/substreams/tools/test/comparator"
-	"gopkg.in/yaml.v3"
 	"io"
 	"os"
 	"path/filepath"
 	"strconv"
+
+	"github.com/itchyny/gojq"
+	"github.com/streamingfast/substreams/tools/test/comparator"
+	"gopkg.in/yaml.v3"
 )
 
 type Spec struct {

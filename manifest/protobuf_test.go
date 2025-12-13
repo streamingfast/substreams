@@ -425,9 +425,9 @@ func TestDescriptorCache_IsDeterministicVersion(t *testing.T) {
 	cache := &DescriptorCache{cacheDir: t.TempDir()}
 
 	tests := []struct {
-		version              string
+		version                string
 		isDeterministicVersion bool
-		description          string
+		description            string
 	}{
 		{"v1.0.0", true, "semantic version should be cached"},
 		{"v2.1.3", true, "semantic version should be cached"},

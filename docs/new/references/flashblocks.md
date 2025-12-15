@@ -66,7 +66,8 @@ Here's how it works:
 When writing a substreams that will run on partial blocks, remember that your modules will run multiple times on small increments of the same block.
 This means that any type of aggregation in a mapper will be incorrect. Only process data inside the block as if it were a stream of transactions.
 
-When a block gets completed, stores modules will be recomputed from the final data, but should provide the incremental data as the partial blocks get processed.
+While store modules should provide the incremental data as the partial blocks get processed, they may not represent exactly the same data as the full block would. 
+When a block gets completed, they get recomputed from the final data so that inconsistencies don't add up.
 
 ### Example
 

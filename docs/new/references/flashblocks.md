@@ -24,8 +24,8 @@ Transactions can be processed incrementally, making your applications more respo
 
 * In Substreams, Flashblocks are called **partial blocks**, as a generalization of the concept, even though Flashblocks are the only supported implementation yet.
 * To benefit from partial blocks:
-  1. you need the latest version of substreams CLI or library.
-  1. your substreams modules should avoid doing "block-level aggregations" and should only work on what is inside the "transactionTraces"
+  - You need the latest version of Substreams CLI or library.
+  - Your Substreams modules should avoid doing "block-level aggregations" and should only work on what is inside the "transactionTraces"
 
 Here's how it works:
 
@@ -60,7 +60,6 @@ Here's how it works:
   bool partial_blocks_only = 16;
   ```
 
-
 ## Developing for partial blocks
 
 When writing a substreams that will run on partial blocks, remember that your modules will run multiple times on small increments of the same block.
@@ -69,28 +68,28 @@ This means that any type of aggregation in a mapper will be incorrect. Only proc
 While store modules should provide the incremental data as the partial blocks get processed, they may not represent exactly the same data as the full block would. 
 When a block gets completed, they get recomputed from the final data so that inconsistencies don't add up.
 
-### Example
+### Example of workflow
 
-For the hypothetical scenario where 
+For the hypothetical scenario where:
 * a block #123 is being emitted as partial blocks
 * each partial block contains exactly 10 new transactions (to simplify the example)
 * the Substreams engine receives only the blocks with index 2, 4, 7 (some may be skipped to keep up with the chain HEAD)
 * finally, it receives the full block #123
 
 The module will be executed 4 times with partial data:
-1. with transactions 0-20
-1. with transactions 20-40
-1. with transactions 40-70
-1. with transaction 70-100 (when it gets the full block)
+  1. with transactions 0-20
+  1. with transactions 20-40
+  1. with transactions 40-70
+  1. with transaction 70-100 (when it gets the full block)
   
 Then, the module will be executed again with the full block data. This is the data that will be used to apply changes to the stores, to ensure consistency before we execute the next blocks.
       
 The user will receive:
-1. The result of execution of trx 0-20, within `PartialBlockData` with `Clock(num=123, ID=0xaaaaaaaaa)` and `PartialIndex=2`
-1. The result of execution of trx 20-40, within `PartialBlockData` with `Clock(num=123, ID=0xbbbbbbbbbb)` and `PartialIndex=4`
-1. The result of execution of trx 40-70, within `PartialBlockData` with `Clock(num=123, ID=0xcccccccccc)` and `PartialIndex=7`
-1. The result of execution of trx 70-100, within `PartialBlockData` with `Clock(num=123, ID=0xdddddddddd)` and `PartialIndex=10`
-1. The result of execution of trx 0-100, within `BlockData` with `Clock (num=123, ID=0xdddddddddd)` <- Note that the ID here is the same as the last partial block received.
+  1. The result of execution of trx 0-20, within `PartialBlockData` with `Clock(num=123, ID=0xaaaaaaaaa)` and `PartialIndex=2`
+  1. The result of execution of trx 20-40, within `PartialBlockData` with `Clock(num=123, ID=0xbbbbbbbbbb)` and `PartialIndex=4`
+  1. The result of execution of trx 40-70, within `PartialBlockData` with `Clock(num=123, ID=0xcccccccccc)` and `PartialIndex=7`
+  1. The result of execution of trx 70-100, within `PartialBlockData` with `Clock(num=123, ID=0xdddddddddd)` and `PartialIndex=10`
+  1. The result of execution of trx 0-100, within `BlockData` with `Clock (num=123, ID=0xdddddddddd)` <- Note that the ID here is the same as the last partial block received.
 
 Note that the last block above will only be received if the user requested `include_partial_blocks` (and NOT `partial_blocks_only`)
 

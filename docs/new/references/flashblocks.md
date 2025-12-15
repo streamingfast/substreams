@@ -40,14 +40,14 @@ Here's how it works:
 ### Changes to Protobuf models
 
 * Partial blocks are not sent as `BlockScopedData`, but as [`PartialBlockData`](https://buf.build/streamingfast/substreams/docs/main:sf.substreams.rpc.v2#sf.substreams.rpc.v2.PartialBlockData), which is a new possible type for `Response.message`
-
-```proto
-message PartialBlockData {
-  MapModuleOutput output = 1;
-  sf.substreams.v1.Clock clock = 2;
-  uint32 partial_index = 3;
-}
-```
+  
+  ```proto
+  message PartialBlockData {
+    MapModuleOutput output = 1;
+    sf.substreams.v1.Clock clock = 2;
+    uint32 partial_index = 3;
+  }
+  ```
 
 * The [`sf.substreams.rpc.v2.Request`](https://buf.build/streamingfast/substreams/docs/main:sf.substreams.rpc.v2#sf.substreams.rpc.v2.Request) and [`sf.substreams.rpc.v3.Request`](https://buf.build/streamingfast/substreams/docs/main:sf.substreams.rpc.v3#sf.substreams.rpc.v3.Request) now contain these parameters:
   

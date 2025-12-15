@@ -56,6 +56,13 @@ message Request {
 
   bool noop_mode = 11;
 
+  // Estimate mode enables development-like execution without output persistence.
+  // When enabled, the engine processes blocks without saving data to stores,
+  // collecting only billing metrics (egress bytes and processed blocks) for cost estimation.
+  // This mode is mutually exclusive with noop_mode and is limited to small block ranges
+  // for cost control purposes. Only billing metrics are recorded and reported.
+  bool estimate_mode = 17;
+
   // If set, the engine will reject a request if the number of blocks to process (including preparing the stores) is above this limit.
   // Useful as a safeguard for managing costs
   uint64 limit_processed_blocks = 12;

@@ -346,7 +346,6 @@ func (s *Tier1Service) BlocksAny(
 	pkg *pbsubstreams.Package,
 	stream *connect.ServerStream[pbsubstreamsrpc.Response],
 ) (serverErr error) {
-
 	if s.IsTerminating() {
 		serverErr = connect.NewError(connect.CodeUnavailable, errShuttingDown)
 		return
@@ -367,31 +366,13 @@ func (s *Tier1Service) BlocksAny(
 
 	logger := reqctx.Logger(ctx).Named("tier1")
 
-	envEthCallFallbackToLatestDuration := os.Getenv(EnvEthCallFallbackToLatestDuration)
-	fallbackDuration := time.Duration(0)
-	if envEthCallFallbackToLatestDuration != "" {
-		fallbackDuration, err = time.ParseDuration(envEthCallFallbackToLatestDuration)
-		if err != nil {
-			return fmt.Errorf("invalid value for env var %s: %w", EnvEthCallFallbackToLatestDuration, err)
-		}
-	}
-
-	envEthCallUseBlockNumberDuration := os.Getenv(EnvEthCallUseBlockNumberDuration)
-	useBlockNumberDuration := time.Duration(0)
-	if envEthCallUseBlockNumberDuration != "" {
-		useBlockNumberDuration, err = time.ParseDuration(envEthCallUseBlockNumberDuration)
-		if err != nil {
-			return fmt.Errorf("invalid value for env var %s: %w", EnvEthCallUseBlockNumberDuration, err)
-		}
-	}
-
 	ctx = logging.WithLogger(ctx, logger)
 	ctx = reqctx.WithTracer(ctx, s.tracer)
 	ctx = dmetering.WithBytesMeter(ctx)
 	ctx = metering.WithMetricsSender(ctx)
 	ctx = reqctx.WithTier2RequestParameters(ctx, s.tier2RequestParameters)
-	ctx = reqctx.WithEthCallFallbackToLatestDuration(ctx, fallbackDuration)
-	ctx = reqctx.WithEthCallUseBlockNumberDuration(ctx, useBlockNumberDuration)
+	ctx = reqctx.WithEnvEthCallFallbackToLatestDuration(ctx, logger, time.Duration(0))
+	ctx = reqctx.WithEnvEthCallUseBlockNumberDuration(ctx, logger, time.Duration(0))
 
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier1/request")
 	defer span.EndWithErr(&err)
@@ -411,6 +392,7 @@ func (s *Tier1Service) BlocksAny(
 		zap.Bool("final_blocks_only", request.FinalBlocksOnly),
 		zap.Bool("production_mode", request.ProductionMode),
 		zap.Bool("noop_mode", request.NoopMode),
+		zap.Bool("estimate_mode", request.EstimateMode),
 		zap.Strings("dev_output_modules", request.DevOutputModules),
 		zap.Bool("partial_blocks", request.PartialBlocks),
 	}
@@ -552,7 +534,7 @@ func (s *Tier1Service) BlocksAny(
 		return err
 	}
 
-	if envEthCallFallbackToLatestDuration != "" && hasEthCall(request.Modules.Binaries) {
+	if reqctx.HasEthCallFallbackToLatestDuration(ctx) && hasEthCall(request.Modules.Binaries) {
 		if header.Get("X-substreams-acknowledge-non-deterministic") != "true" {
 			err := connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("header X-substreams-acknowledge-non-deterministic must be set to true when using eth_call or eth_get_balance on a non deterministic rpc provider"))
 			logger.Info("refusing Substreams Blocks request", append(fields, zap.Error(err))...)
@@ -561,7 +543,7 @@ func (s *Tier1Service) BlocksAny(
 	}
 
 	var reqStats *metrics.Stats
-	ctx, reqStats = setupRequestStats(ctx, request.OutputModule, outputModuleHash, execGraph, request.ProductionMode, false)
+	ctx, reqStats = setupRequestStats(ctx, request.OutputModule, outputModuleHash, execGraph, request.ProductionMode, request.EstimateMode, request.NoopMode, false)
 
 	metrics.Tier1RequestsCounter.Inc()
 	metrics.Tier1ActiveRequests.Inc()
@@ -664,7 +646,16 @@ func (s *Tier1Service) writeLastUsed(ctx context.Context, execGraph *exec.Graph,
 
 var IsValidCacheTag = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`).MatchString
 
-func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelCauseFunc, request *pbsubstreamsrpc.Request, header http.Header, execGraph *exec.Graph, respFunc substreams.ResponseFunc, reqStats *metrics.Stats, logFields []zap.Field) (err error) {
+func (s *Tier1Service) blocks(
+	ctx context.Context,
+	cancelRunning context.CancelCauseFunc,
+	request *pbsubstreamsrpc.Request,
+	header http.Header,
+	execGraph *exec.Graph,
+	respFunc substreams.ResponseFunc,
+	reqStats *metrics.Stats,
+	logFields []zap.Field,
+) (err error) {
 	chainFirstStreamableBlock := bstream.GetProtocolFirstStreamableBlock
 	if request.StartBlockNum > 0 && request.StartBlockNum < int64(chainFirstStreamableBlock) {
 		return bsstream.NewErrInvalidArg("invalid start block %d, must be >= %d (the first streamable block of the chain)", request.StartBlockNum, chainFirstStreamableBlock)
@@ -977,7 +968,11 @@ func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelC
 	)
 
 	var wrappedPipe bstream.Handler
-	if requestDetails.ProductionMode {
+
+	if request.EstimateMode {
+		estimateHandler := NewEstimateHandler(ctx, respFunc)
+		wrappedPipe = estimateHandler
+	} else if requestDetails.ProductionMode {
 		liveBackFiller := NewLiveBackFiller(ctx, pipe, logger, execGraph.OutputModuleStageIndex(), segmentSize, requestDetails.LinearHandoffBlockNum, s.runtimeConfig.ClientFactory, RequestBackProcessing)
 
 		// In noop mode, the pipe handler is overwritten by a NoopHandler which produces no outputs.
@@ -1258,16 +1253,28 @@ func containsDeterministicError(ctx context.Context, moduleStore dstore.Store, m
 	return lastError
 }
 
-func setupRequestStats(ctx context.Context, outputModuleName, outputModuleHash string, execGraph *exec.Graph, productionMode, tier2 bool) (context.Context, *metrics.Stats) {
+func setupRequestStats(
+	ctx context.Context,
+	outputModuleName string,
+	outputModuleHash string,
+	execGraph *exec.Graph,
+	productionMode bool,
+	estimateMode bool,
+	noopMode bool,
+	tier2 bool,
+) (context.Context, *metrics.Stats) {
 	logger := reqctx.Logger(ctx)
 	auth := dauth.FromContext(ctx)
 	stats := metrics.NewReqStats(&metrics.Config{
-		UserID:           auth.UserID(),
+		//
+		UserID:           auth.OrganizationID(),
 		ApiKeyID:         auth.APIKeyID(),
 		Tier2:            tier2,
 		OutputModule:     outputModuleName,
 		OutputModuleHash: outputModuleHash,
 		ProductionMode:   productionMode,
+		EstimateMode:     estimateMode,
+		NoopMode:         noopMode,
 	}, execGraph.Stores(), execGraph.ModuleHashes(), logger)
 	return reqctx.WithReqStats(ctx, stats), stats
 }

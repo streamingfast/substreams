@@ -12,14 +12,10 @@ import (
 	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 )
 
 func TestPartialBlocksSimple(t *testing.T) {
 	ctx := context.Background()
-	//zlog := logging.MustCreateLoggerWithServiceName("partial-blocks-test")
-	zlog := zap.NewNop()
-
 	// Create temporary directory for volume mount
 	tmpDir, err := os.MkdirTemp("", "firehose-data-")
 	require.NoError(t, err)
@@ -135,13 +131,7 @@ func TestPartialBlocksSimple(t *testing.T) {
 
 func TestPartialBlocksWithStores(t *testing.T) {
 	ctx := context.Background()
-	zlog := zap.NewNop()
-	// zlog := MustCreateLoggerWithServiceName("partial-blocks-test") // use this to include verbose substreams service logs
-
-	// Create temporary directory for volume mount
-	tmpDir, err := os.MkdirTemp("", "firehose-data-")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	// launch dummy blockchain container with flash blocks enabled
 	image := "ghcr.io/streamingfast/dummy-blockchain:17b576d"

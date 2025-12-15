@@ -510,6 +510,8 @@ type Config struct {
 	OutputModule     string
 	OutputModuleHash string
 	ProductionMode   bool
+	NoopMode         bool
+	EstimateMode     bool
 	Tier2            bool
 }
 
@@ -738,6 +740,8 @@ func (s *Stats) getZapFields(meter dmetering.Meter) []zap.Field {
 		zap.String("output_module_name", s.config.OutputModule),
 		zap.String("output_module_hash", s.config.OutputModuleHash),
 		zap.Bool("production_mode", s.config.ProductionMode),
+		zap.Bool("noop_mode", s.config.NoopMode),
+		zap.Bool("estimate_mode", s.config.EstimateMode),
 		zap.String("tier", tier),
 		zap.String("block_rate_per_sec", s.blockRate.RateString()),
 		zap.Uint64("local_blocks_processed", s.blockRate.Total()),

@@ -13,10 +13,11 @@ import (
 	"github.com/streamingfast/dauth"
 	dauthnull "github.com/streamingfast/dauth/null"
 	dauthtrust "github.com/streamingfast/dauth/trust"
-	"github.com/streamingfast/dmetering/logger"
+	dmeteringlogger "github.com/streamingfast/dmetering/logger"
 	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/dsession"
 	_ "github.com/streamingfast/dsession/local"
+	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/app"
 	"github.com/streamingfast/substreams/client"
 	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -27,8 +28,18 @@ import (
 	"go.uber.org/zap"
 )
 
+var zlog, _ = logging.PackageLogger("e2e", "github.com/streamingfast/substreams/tests_e2e")
+
 func init() {
-	logger.Register()
+	// Registers some required plugins
+	dmeteringlogger.Register()
+	dauthnull.Register()
+	dauthtrust.Register()
+
+	// Some global configuration needed
+	os.Setenv("SUBSTREAMS_WORKERS_RAMPUP_TIME", "0")
+
+	logging.InstantiateLoggers()
 }
 
 // ParseTxCounterSummary unmarshals the MapOutput protobuf Any field into a TxCounterSummary
@@ -121,8 +132,6 @@ func RunRequest(t *testing.T, req *pbsubstreamsrpcv2.Request, endpoint string) (
 
 func startTier1App(t *testing.T, ctx context.Context, tmpDir string, container testcontainers.Container, t2Endpoint string, zlog *zap.Logger) (*app.Tier1App, string) {
 
-	os.Setenv("SUBSTREAMS_WORKERS_RAMPUP_TIME", "0")
-
 	relayerPort, err := container.MappedPort(ctx, "10014/tcp")
 	require.NoError(t, err)
 
@@ -154,7 +163,6 @@ func startTier1App(t *testing.T, ctx context.Context, tmpDir string, container t
 	}
 
 	// unused components, but required for the tier1 to start
-	dauthnull.Register()
 	auth, err := dauth.New("null://", zlog)
 	require.NoError(t, err)
 	metricset := dmetrics.NewSet()
@@ -196,10 +204,8 @@ waitReady:
 }
 
 func startTier2App(t *testing.T, ctx context.Context, tmpDir string, zlog *zap.Logger) (out *app.Tier2App, endpoint string) {
-
 	port := findFreePort(t)
 	endpoint = fmt.Sprintf("localhost:%d", port)
-	dauthtrust.Register()
 
 	t2conf := &app.Tier2Config{
 		GRPCListenAddr:        endpoint,
@@ -240,7 +246,20 @@ waitReady:
 }
 
 func newDummyBlockchainContainer(ctx context.Context, tmpDir string, image string, additionalReaderArgs string, burst int) (testcontainers.Container, error) {
-	baseReaderArgs := fmt.Sprintf("start --log-level=error --tracer=firehose --store-dir=/data --genesis-block-burst=%d --block-rate=120 --block-size=1500 --genesis-height=0 --server-addr=:9777 --with-reorgs=false --with-skipped-blocks=false", burst)
+	containerLogLevel := "error"
+	if zlog.Core().Enabled(zap.DebugLevel) {
+		containerLogLevel = "debug"
+	} else if zlog.Core().Enabled(zap.InfoLevel) {
+		containerLogLevel = "info"
+	}
+
+	zlog.Info("starting blockchain container for e2e tests",
+		zap.String("log_level", containerLogLevel),
+		zap.String("image", estimateModeBlockchainImage),
+		zap.Int("burst", estimateModeBurst),
+	)
+
+	baseReaderArgs := fmt.Sprintf("start --log-level=%s --tracer=firehose --store-dir=/data --genesis-block-burst=%d --block-rate=120 --block-size=1500 --genesis-height=0 --server-addr=:9777 --with-reorgs=false --with-skipped-blocks=false", containerLogLevel, burst)
 	readerArgs := baseReaderArgs
 	if additionalReaderArgs != "" {
 		readerArgs = baseReaderArgs + " " + additionalReaderArgs
@@ -264,13 +283,15 @@ func newDummyBlockchainContainer(ctx context.Context, tmpDir string, image strin
 		HostConfigModifier: func(hostConfig *container.HostConfig) {
 			hostConfig.Binds = []string{tmpDir + ":/app/firehose-data/storage/"}
 		},
+		Env: map[string]string{
+			"DLOG": os.Getenv("DLOG"),
+		},
 		WaitingFor: wait.ForAll(
 			wait.ForListeningPort("10014/tcp"),
 			wait.ForLog("serving gRPC").WithStartupTimeout(30*time.Second),
 		),
 	}
 
-	// Start container
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
 		Started:          true,

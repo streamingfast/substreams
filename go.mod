@@ -2,8 +2,6 @@ module github.com/streamingfast/substreams
 
 go 1.24.2
 
-toolchain go1.24.7
-
 require (
 	github.com/golang/protobuf v1.5.4
 	github.com/jhump/protoreflect v1.14.0

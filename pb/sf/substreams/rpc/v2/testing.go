@@ -29,6 +29,28 @@ func withDebugSnapshotsModule(mod string) testNewRequestOption {
 	}
 }
 
+func withEstimateMode() testNewRequestOption {
+	return func(req *Request) *Request {
+		req.EstimateMode = true
+		return req
+	}
+}
+
+func withNoopMode() testNewRequestOption {
+	return func(req *Request) *Request {
+		req.NoopMode = true
+		return req
+	}
+}
+
+func withBlockRange(start int64, stop uint64) testNewRequestOption {
+	return func(req *Request) *Request {
+		req.StartBlockNum = start
+		req.StopBlockNum = stop
+		return req
+	}
+}
+
 func withTestOutputModule(module string) testNewRequestOption {
 	return func(req *Request) *Request {
 		req.OutputModule = module

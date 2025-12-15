@@ -50,15 +50,15 @@ message PartialBlockData {
 ```
 
 * The [`sf.substreams.rpc.v2.Request`](https://buf.build/streamingfast/substreams/docs/main:sf.substreams.rpc.v2#sf.substreams.rpc.v2.Request) and [`sf.substreams.rpc.v3.Request`](https://buf.build/streamingfast/substreams/docs/main:sf.substreams.rpc.v3#sf.substreams.rpc.v3.Request) now contain these parameters:
-
-```proto
-// If true, partial blocks are also sent on the stream
-bool include_partial_blocks = 15;
-
-// If true, only partial blocks are sent, no 'block-scoped-data' or cursor.
-// This value supersedes include_partial_blocks
-bool partial_blocks_only = 16;
-```
+  
+  ```proto
+  // If true, partial blocks are also sent on the stream
+  bool include_partial_blocks = 15;
+  
+  // If true, only partial blocks are sent, no 'block-scoped-data' or cursor.
+  // This value supersedes include_partial_blocks
+  bool partial_blocks_only = 16;
+  ```
 
 
 ## Developing for partial blocks

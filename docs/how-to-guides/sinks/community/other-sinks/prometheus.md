@@ -1,4 +1,4 @@
-# [`Substreams`](https://docs.substreams.dev/) [Prometheus](https://prometheus.io/) sink module
+# [`Substreams`](../../../../getting-started.md) [Prometheus](https://prometheus.io/) sink module
 
 [<img alt="github" src="https://img.shields.io/badge/Github-substreams.prometheus-8da0cb?style=for-the-badge&logo=github" height="20">](https://github.com/pinax-network/substreams-sink-prometheus)
 [<img alt="crates.io" src="https://img.shields.io/crates/v/substreams-sink-prometheus.svg?style=for-the-badge&color=fc8d62&logo=rust" height="20">](https://crates.io/crates/substreams-sink-prometheus)
@@ -14,7 +14,7 @@
 
 ### Further resources
 
-- [Substreams documentation](https://docs.substreams.dev)
+- [Substreams documentation](../../../../getting-started.md)
 - [Prometheus documentation](https://prometheus.io)
 
 ## CLI

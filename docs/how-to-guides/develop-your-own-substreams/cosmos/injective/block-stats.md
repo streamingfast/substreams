@@ -92,7 +92,7 @@ substreams gui substreams.yaml block_to_stats \
  --start-block=64987400 --stop-block=+1000
 ```
 
-Review the [GUI Reference](https://docs.substreams.dev/reference-material/installing-the-cli/command-line-interface#gui) to get more information on how to use this utility.
+Review the [GUI Reference](../../../../references/cli/command-line-interface.md#gui) to get more information on how to use this utility.
 
 ## Inspect the Code
 

@@ -49,7 +49,7 @@ cd substreams-foundational-store
 go build -o foundational-store ./cmd/foundational-store
 ```
 
-See [Hosting a Foundational Store](../tutorials/hosting-foundational-stores.md) for complete setup and configuration instructions.
+See [Hosting a Foundational Store](./foundational-stores/hosting-foundational-stores.md) for complete setup and configuration instructions.
 
 ## Storage Backends
 
@@ -69,7 +69,7 @@ Enterprise-grade relational database for distributed deployments:
 --dsn "postgres://user:password@host:port/database?sslmode=require"
 ```
 
-See [Hosting a Foundational Store](../tutorials/hosting-foundational-stores.md) for backend-specific configuration and tuning.
+See [Hosting a Foundational Store](foundational-stores/hosting-foundational-stores.md) for backend-specific configuration and tuning.
 
 ## Configuration
 
@@ -85,7 +85,7 @@ Available Commands:
   server      Start the gRPC server
 ```
 
-See [Hosting a Foundational Store](../tutorials/hosting-foundational-stores.md) for detailed server configuration options and usage examples.
+See [Hosting a Foundational Store](foundational-stores/hosting-foundational-stores.md) for detailed server configuration options and usage examples.
 
 ## Data Model
 
@@ -130,7 +130,7 @@ See [Consuming a Foundational Store](../tutorials/consuming-foundational-store.m
 
 The store supports conditional insertion with the `if_not_exist` flag for data integrity during ingestion.
 
-See [Hosting a Foundational Store](../tutorials/hosting-foundational-stores.md) for details on using `SinkEntries` and conditional operations.
+See [Hosting a Foundational Store](foundational-stores/hosting-foundational-stores.md) for details on using `SinkEntries` and conditional operations.
 
 **Note**: v1 API is deprecated. Use v2 API for all new implementations.
 
@@ -174,7 +174,7 @@ Comprehensive API documentation is available in the proto files:
 
 ## Related Resources
 
-- [Hosting a Foundational Store](../tutorials/hosting-foundational-stores.md) - Complete guide for setting up and running a Foundational Store server
+- [Hosting a Foundational Store](foundational-stores/hosting-foundational-stores.md) - Complete guide for setting up and running a Foundational Store server
 - [Consuming a Foundational Store](../tutorials/consuming-foundational-store.md) - Guide for querying Foundational Stores in Substreams modules
 - [Foundational Store Examples](../how-to-guides/composing-substreams/foundational-stores/foundational-stores.md) - Chain-specific foundational store implementations
 - [GitHub Repository](https://github.com/streamingfast/substreams-foundational-store) - Source code and issue tracker

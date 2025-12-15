@@ -1,45 +1,45 @@
----
-description: Flashblocks support (alpha feature)
----
+# Flashblocks Support (alpha)
 
-New support for "Flashblocks" is now available for alpha testing on Base Mainnet.
+New support for "Flashblocks" is now available for alpha testing on Base Mainnet. For more details about Base Flashblocks, see the [Base documentation](https://docs.base.org/base-chain/flashblocks/apps).
 
-ref: https://docs.base.org/base-chain/flashblocks/apps
-
-## Disclaimers
+{% hint style="warning" %}
+**Disclaimers**
 
 * The only endpoint supporting Flashblocks is `https://base-mainnet-flash.streamingfast.io:443`.
 * That endpoint is not guaranteed to be stable or available at all times.
 * The protocol might still change in the next few weeks, as we gather feedback on usage.
 * Flashblocks coming from Firehose or Substreams endpoint should not be considered final data. Only write to database data coming from full blocks: there is no "undo" mechanism for Flashblocks.
+{% endhint %}
 
 ## Description
 
-* Flashblocks are partial blocks that are not fully confirmed yet. 
-* They are emitted every 200ms and contain a fraction of the transactions that will be in the final block.
+Flashblocks are partial blocks that are not fully confirmed yet. 
+They are emitted every 200ms and contain a fraction of the transactions that will be in the final block.
+Consuming them allows you to get access to transaction data as soon as it's sequenced, rather than waiting for full block confirmation.
+Transactions can be processed incrementally, making your applications more responsive or predictions more accurate.
 
-### Flashblocks in Substreams
+## Flashblocks in Substreams
 
-#### Partial Blocks
+### Partial Blocks
 
 * In Substreams, Flashblocks are called **partial blocks**, as a generalization of the concept, even though Flashblocks are the only supported implementation yet.
-* To benefit from partial blocks: 
+* To benefit from partial blocks:
   1. you need the latest version of substreams CLI or library.
-  2. your substreams modules should avoid doing "block-level aggregations" and should only work on what is inside the "transactionTraces"
+  1. your substreams modules should avoid doing "block-level aggregations" and should only work on what is inside the "transactionTraces"
 
 Here's how it works:
 
 1. The "sequencer" emits a flashblock every 200ms (so a maximum of 10 per block height)
-2. The instrumented Base node reader sends the increasing versions of the same block to the Substreams engine and eventually, the full block.
-3. To keep up with the chain, it may skip a few emissions of partial blocks, but will never send the transactions out-of-order.
-4. The Substreams engine will remember what was processed for each active Substreams and only process the new transactions since the last execution.
-5. It sends the PartialData for each part of the full block as it gets it from the flash blocks
-6. If there is a reorg, new and undo signals are sent for the full blocks, but there is no consideration for the sent partial blocks. The user must always consider that the partial blocks data may become invalid.
-7. For this reason, there is no "cursor" sent with the partial blocks data.
+1. The instrumented Base node reader sends the increasing versions of the same block to the Substreams engine and eventually, the full block.
+1. To keep up with the chain, it may skip a few emissions of partial blocks, but will never send the transactions out-of-order.
+1. The Substreams engine will remember what was processed for each active Substreams and only process the new transactions since the last execution.
+1. It sends the [PartialBlockData](https://buf.build/streamingfast/substreams/docs/main:sf.substreams.rpc.v2#sf.substreams.rpc.v2.PartialBlockData) for each part of the full block as it gets it from the partial blocks
+1. If there is a reorg, new and undo signals are sent for the full blocks, but there is no consideration for the sent partial blocks. The user must always consider that the partial blocks data may become invalid.
+1. For this reason, there is no "cursor" sent with the partial blocks data.
 
-#### Changes to Protobuf models
+### Changes to Protobuf models
 
-* Partial blocks are not sent as `BlockScopedData`, but as `PartialBlockData`, which is new possible type for `Response.message`
+* Partial blocks are not sent as `BlockScopedData`, but as [`PartialBlockData`](https://buf.build/streamingfast/substreams/docs/main:sf.substreams.rpc.v2#sf.substreams.rpc.v2.PartialBlockData), which is a new possible type for `Response.message`
 
 ```proto
 message PartialBlockData {
@@ -49,9 +49,9 @@ message PartialBlockData {
 }
 ```
 
-* The `sf.substreams.rpc.v2.Blocks/Request`  and `sf.substreams.rpc.v3.Blocks/Request` now contain these parameters:
+* The [`sf.substreams.rpc.v2.Request`](https://buf.build/streamingfast/substreams/docs/main:sf.substreams.rpc.v2#sf.substreams.rpc.v2.Request) and [`sf.substreams.rpc.v3.Request`](https://buf.build/streamingfast/substreams/docs/main:sf.substreams.rpc.v3#sf.substreams.rpc.v3.Request) now contain these parameters:
 
-``` proto
+```proto
 // If true, partial blocks are also sent on the stream
 bool include_partial_blocks = 15;
 
@@ -60,7 +60,15 @@ bool include_partial_blocks = 15;
 bool partial_blocks_only = 16;
 ```
 
-#### Example
+
+## Developing for partial blocks
+
+When writing a substreams that will run on partial blocks, remember that your modules will run multiple times on small increments of the same block.
+This means that any type of aggregation in a mapper will be incorrect. Only process data inside the block as if it were a stream of transactions.
+
+When a block gets completed, stores modules will be recomputed from the final data, but should provide the incremental data as the partial blocks get processed.
+
+### Example
 
 For the hypothetical scenario where 
 * a block #123 is being emitted as partial blocks
@@ -69,34 +77,35 @@ For the hypothetical scenario where
 * finally, it receives the full block #123
 
 The module will be executed 4 times with partial data:
-  1. with transactions 0-20
-  2. with transactions 20-40
-  3. with transactions 40-70
-  4. with transaction 70-100 (when it gets the full block)
+1. with transactions 0-20
+1. with transactions 20-40
+1. with transactions 40-70
+1. with transaction 70-100 (when it gets the full block)
   
 Then, the module will be executed again with the full block data. This is the data that will be used to apply changes to the stores, to ensure consistency before we execute the next blocks.
       
 The user will receive:
+1. The result of execution of trx 0-20, within `PartialBlockData` with `Clock(num=123, ID=0xaaaaaaaaa)` and `PartialIndex=2`
+1. The result of execution of trx 20-40, within `PartialBlockData` with `Clock(num=123, ID=0xbbbbbbbbbb)` and `PartialIndex=4`
+1. The result of execution of trx 40-70, within `PartialBlockData` with `Clock(num=123, ID=0xcccccccccc)` and `PartialIndex=7`
+1. The result of execution of trx 70-100, within `PartialBlockData` with `Clock(num=123, ID=0xdddddddddd)` and `PartialIndex=10`
+1. The result of execution of trx 0-100, within `BlockData` with `Clock (num=123, ID=0xdddddddddd)` <- Note that the ID here is the same as the last partial block received.
 
-1. The result of execution of trx 0-20, within PartialBlockData with Clock(num=123, ID=0xaaaaaaaaa) and PartialIndex=2
-2. The result of execution of trx 20-40, within PartialBlockData with Clock(num=123, ID=0xbbbbbbbbbb) and PartialIndex=4
-3. The result of execution of trx 40-70, within PartialBlockData with Clock(num=123, ID=0xcccccccccc) and PartialIndex=7
-4. The result of execution of trx 70-100, within PartialBlockData with Clock(num=123, ID=0xdddddddddd) and PartialIndex=10
+Note that the last block above will only be received if the user requested `include_partial_blocks` (and NOT `partial_blocks_only`)
 
-If the user requested `include_partial_blocks` (and NOT `partial_blocks_only`), they will also receive:
-
-5. The result of execution of trx 0-100, within BlockData with Clock (num=123, ID=0xdddddddddd) <- Note that the ID here is the same
-
-
-## Using Flashblocks
+## Consuming partial blocks
 
 ### A simple test, from terminal, with `substreams run`
 
 1. Get the latest release of Substreams: https://github.com/streamingfast/substreams/releases/tag/v1.17.8
 
-2. To test with a common module, using `jq` to quickly see what is going on (you need [jq](https://jqlang.org/)):
+1. To test with a common module, using `jq` to quickly see what is going on (you need [jq](https://jqlang.org/)):
 
 `substreams run -e https://base-mainnet-flash.streamingfast.io ethereum_common all_events -s -1 --include-partial-blocks -o jsonl | jq -r '"Block: #\(.["@block"]) Partial: \(.["@partial_index"]) Event count:\(.["@data"].events|length)"'`
+
+{% hint style="note" %}
+The `jq` part is optional, only used here to show a quick summary of the content. Without it, you would receive the full JSON objects with the ethereum events..
+{% endhint %}
 
 This will print lines like this:
 
@@ -116,7 +125,7 @@ Block: #39306108 Partial: null Event count:1401
 
 When you see "partial: null" it means that it is the actual full block.
 
-3. To see how it performs with a clock, you can use, as always, the -o clock with something like this:
+1. To see how it performs with a clock, you can use, as always, the -o clock with something like this:
 
 `substreams run -e https://base-mainnet-flash.streamingfast.io https://github.com/graphprotocol/graph-node/raw/refs/heads/master/substreams/substreams-head-tracker/substreams-head-tracker-v1.0.0.spkg -s -1 -o clock --include-partial-blocks`
 
@@ -127,12 +136,14 @@ This will print lines like this:
 ----------- PARTIAL BLOCK #39,306,388 (idx=10) (c7871f81180ad6565ae6f9c4d244b2dcac05b2348aff54bd591a65d6c945107e) age=1.138322s ---------------
 ----------- BLOCK #39,306,388 (c7871f81180ad6565ae6f9c4d244b2dcac05b2348aff54bd591a65d6c945107e) age=1.138495s ---------------
 ```
+{% hint style="note" %}
 See the "negative age", that's because at partial block with idx=5, the proposed block timestamp is still 2 seconds in the future.
+{% endhint %}
 
 ### A more useful example, with the Substreams Webhook Sink:
 
 1. Get the latest release of Substreams: https://github.com/streamingfast/substreams/releases/tag/v1.17.8
-2. Run this command:
+1. Run this command:
 
 `substreams sink webhook --partial-blocks-only -e https://base-mainnet-flash.streamingfast.io http://webhook.example.com path-to-your.spkg  -s -1`
 
@@ -141,8 +152,7 @@ Enjoy!
 ### More sinks
 
 Flashblock support is not implemented in other sinks. For example, we believe that it would be a bad idea to implement in the SQL sink, because it would cause too many "undo" operations.
-If you have your own sink implementation that uses github.com/streamingfast/substreams/sink, you can simply:
+If you are using our [Golang Substreams Sink SDK](https://github.com/streamingfast/substreams/blob/develop/sink/README.md#substreams-sink), you can simply:
   - Bump to the latest version of substreams in your go.mod (1.17.8 and above)
   - Define your sink flags with `sink.FlagIncludePartialBlocks` and/or `sink.FlagPartialBlocksOnly` under `FlagIncludeOptional()`
   - Implement the function `HandlePartialBlockData(...)` and pass it to `NewSinkerFullHandlersWithPartial(...)` when creating the sinker.
-  - Enjoy!

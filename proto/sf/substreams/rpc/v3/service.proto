@@ -17,6 +17,11 @@ service Stream {
     //   - the full spkg package is sent instead of just the modules
     //   - 'params' and 'network' fields are sent to apply the user-defined params to the package server-side
     // Responses are identical to those of the v2 request.
+    //
+    // The service supports an 'estimated_mode' for cost estimation purposes, which processes
+    // blocks without persisting output data, collecting only billing metrics for cost analysis.
+    // This mode impacts normal execution flow by skipping data persistence while maintaining
+    // accurate billing metric collection.
   rpc Blocks(Request) returns (stream sf.substreams.rpc.v2.Response);
 }
 
@@ -90,4 +95,11 @@ message Request {
   // If true, only partial blocks are sent, no 'block-scoped-data' or cursor.
   // This value supersedes include_partial_blocks
   bool partial_blocks_only = 16;
+
+  // Estimated mode enables development-like execution without output persistence.
+  // When enabled, the engine processes blocks without saving data to stores,
+  // collecting only billing metrics (egress bytes and processed blocks) for cost estimation.
+  // This mode is mutually exclusive with noop_mode and is limited to small block ranges
+  // for cost control purposes. Only billing metrics are recorded and reported.
+  bool estimated_mode = 17;
 }

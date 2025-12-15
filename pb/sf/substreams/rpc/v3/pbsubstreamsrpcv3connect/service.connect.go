@@ -52,6 +52,11 @@ type StreamClient interface {
 	//   - 'params' and 'network' fields are sent to apply the user-defined params to the package server-side
 	//
 	// Responses are identical to those of the v2 request.
+	//
+	// The service supports an 'estimated_mode' for cost estimation purposes, which processes
+	// blocks without persisting output data, collecting only billing metrics for cost analysis.
+	// This mode impacts normal execution flow by skipping data persistence while maintaining
+	// accurate billing metric collection.
 	Blocks(context.Context, *connect.Request[v3.Request]) (*connect.ServerStreamForClient[v2.Response], error)
 }
 
@@ -92,6 +97,11 @@ type StreamHandler interface {
 	//   - 'params' and 'network' fields are sent to apply the user-defined params to the package server-side
 	//
 	// Responses are identical to those of the v2 request.
+	//
+	// The service supports an 'estimated_mode' for cost estimation purposes, which processes
+	// blocks without persisting output data, collecting only billing metrics for cost analysis.
+	// This mode impacts normal execution flow by skipping data persistence while maintaining
+	// accurate billing metric collection.
 	Blocks(context.Context, *connect.Request[v3.Request], *connect.ServerStream[v2.Response]) error
 }
 

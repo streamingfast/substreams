@@ -186,7 +186,7 @@ func (c *Config) ListSnapshotFiles(ctx context.Context, from uint64, inclusiveTo
 		return files, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("walking files: %s", err)
+		return nil, fmt.Errorf("walking files: %w", err)
 	}
 
 	return files, nil

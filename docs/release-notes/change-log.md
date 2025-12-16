@@ -9,6 +9,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+## Server
+
+* Fix issue where "live backfiller" would not create segments after reconnecting with a cursor starting from a previous quicksave, causing delays in future reconnection
+
 ## v1.17.8
 
 * Added experimental support for partial blocks (ex: Base's Flash Blocks) -- only supported on https://base-mainnet-flash.streamingfast.io endpoint

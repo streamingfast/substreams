@@ -128,6 +128,10 @@ func (l *LiveBackFiller) Rewind(segment uint64) {
 	}
 }
 
+func (l *LiveBackFiller) CurrentSegment() uint64 {
+	return l.currentSegment
+}
+
 func (l *LiveBackFiller) Start(ctx context.Context) {
 	ctx = dauth.FromContext(ctx).ToOutgoingGRPCContext(ctx)
 	ctx = reqctx.WithBackfillerRequest(ctx)

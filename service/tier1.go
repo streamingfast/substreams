@@ -1062,13 +1062,16 @@ func configureLiveBackFillerFromQuickload(ctx context.Context, segmentSize uint6
 
 	for _, mod := range usedStores {
 		lowestIndex := mod.InitialBlock / segmentSize
-		for backfillFromIndex > lowestIndex {
+		for i := 0; backfillFromIndex > lowestIndex; i++ {
 
 			listUpTo := backfillFromIndex * segmentSize
 			for range 3 { // a bit faster to check for 3 files than to check for 1 file more often. usually, only a single file would be missed
 				if backfillFromIndex > lowestIndex {
 					backfillFromIndex--
 				}
+			}
+			if i > 4 {
+				backfillFromIndex = lowestIndex
 			}
 
 			files, err := storeConfigs[mod.Name].ListSnapshotFiles(ctx, backfillFromIndex*segmentSize, &listUpTo)

@@ -266,6 +266,7 @@ func (p *Pipeline) initStoresFromQuickload(ctx context.Context, reqPlan *plan.Re
 func (p *Pipeline) InitTier1StoresAndBackprocess(ctx context.Context, reqPlan *plan.RequestPlan, noopMode bool) (bool, error) {
 	success := p.initStoresFromQuickload(ctx, reqPlan)
 	if success {
+		reqctx.Details(ctx).FromQuickload = true
 		return true, nil
 	}
 

@@ -30,6 +30,15 @@ type Graph struct {
 func (g *Graph) OutputModule() *pbsubstreams.Module  { return g.outputModule }
 func (g *Graph) Stores() []*pbsubstreams.Module      { return g.stores }
 func (g *Graph) UsedModules() []*pbsubstreams.Module { return g.usedModules }
+func (g *Graph) UsedStoreModules() []*pbsubstreams.Module {
+	storeModules := make([]*pbsubstreams.Module, 0)
+	for _, mod := range g.usedModules {
+		if mod.GetKindStore() != nil {
+			storeModules = append(storeModules, mod)
+		}
+	}
+	return storeModules
+}
 func (g *Graph) UsedIndexModules() []*pbsubstreams.Module {
 	indexModules := make([]*pbsubstreams.Module, 0)
 	for _, mod := range g.usedModules {

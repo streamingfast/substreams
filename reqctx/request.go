@@ -28,6 +28,7 @@ type RequestDetails struct {
 	UpdateInterval                time.Duration
 	UniqueID                      uint64
 
+	FromQuickload    bool
 	ProductionMode   bool
 	IsTier2Request   bool
 	IsStreamingTier2 bool // special mode where tier2 will stream the data back to tier1, for the first segment

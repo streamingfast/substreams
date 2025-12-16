@@ -121,6 +121,13 @@ func requestBackProcessing(ctx context.Context, logger *zap.Logger, liveCachingR
 	return nil
 }
 
+func (l *LiveBackFiller) Rewind(segment uint64) {
+	if segment < l.currentSegment {
+		l.logger.Debug("rewinding liveBackFiller", zap.Uint64("current_segment", l.currentSegment), zap.Uint64("segment", segment))
+		l.currentSegment = segment
+	}
+}
+
 func (l *LiveBackFiller) Start(ctx context.Context) {
 	ctx = dauth.FromContext(ctx).ToOutgoingGRPCContext(ctx)
 	ctx = reqctx.WithBackfillerRequest(ctx)

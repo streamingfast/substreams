@@ -989,6 +989,12 @@ func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelC
 			liveBackFiller = NewLiveBackFiller(ctx, noopHandler, logger, execGraph.OutputModuleStageIndex(), segmentSize, requestDetails.LinearHandoffBlockNum, s.runtimeConfig.ClientFactory, RequestBackProcessing)
 		}
 
+		if requestDetails.FromQuickload {
+			if err := configureLiveBackFillerFromQuickload(ctx, segmentSize, requestDetails.LinearHandoffBlockNum, execGraph.UsedStoreModules(), storeConfigs, liveBackFiller); err != nil {
+				return err
+			}
+		}
+
 		go liveBackFiller.Start(ctx)
 		wrappedPipe = liveBackFiller
 	} else {
@@ -1048,6 +1054,36 @@ func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelC
 	span.EndWithErr(&streamErr)
 
 	return pipe.OnStreamTerminated(ctx, streamErr)
+}
+
+// configureLiveBackFillerFromQuickload will ensure that any used store
+func configureLiveBackFillerFromQuickload(ctx context.Context, segmentSize uint64, linearHandoffBlockNum uint64, usedStores []*pbsubstreams.Module, storeConfigs store.ConfigMap, liveBackFiller *LiveBackFiller) error {
+	backfillFromIndex := linearHandoffBlockNum / segmentSize
+
+	for _, mod := range usedStores {
+		lowestIndex := mod.InitialBlock / segmentSize
+		for backfillFromIndex > lowestIndex {
+
+			listUpTo := backfillFromIndex * segmentSize
+			for range 3 { // a bit faster to check for 3 files than to check for 1 file more often. usually, only a single file would be missed
+				if backfillFromIndex > lowestIndex {
+					backfillFromIndex--
+				}
+			}
+
+			files, err := storeConfigs[mod.Name].ListSnapshotFiles(ctx, backfillFromIndex*segmentSize, &listUpTo)
+			if err != nil {
+				return err
+			}
+			if files != nil {
+				backfillFromIndex = files[len(files)-1].Range.ExclusiveEndBlock / segmentSize
+				break
+			}
+		}
+		liveBackFiller.Rewind(backfillFromIndex)
+
+	}
+	return nil
 }
 
 func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logger, streamSrv *connect.ServerStream[pbsubstreamsrpc.Response], noop bool, stats *metrics.Stats, debugOutputForModules []string) substreams.ResponseFunc {

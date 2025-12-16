@@ -17,7 +17,7 @@ Substreams is a powerful indexing technology, which allows you to:
 
 ### How Does It Work?
 
-Watch the following video and visit the [Getting Started](new/explanation/getting-started.md) to learn more about how Substreams works.
+Watch the following video and visit the [Getting Started](./getting-started.md) to learn more about how Substreams works.
 
 {% embed url="https://www.youtube.com/watch?v=gVqGCqKVM08" %}
 Get an overview of Substreams

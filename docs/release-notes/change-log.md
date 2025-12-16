@@ -2056,7 +2056,7 @@ The state output format for `map` and `store` modules has changed internally to 
 
 ## [v0.0.7-beta](https://github.com/streamingfast/substreams/releases/tag/v0.0.7-beta)
 
-- Changed `startBlock` to `initialBlock` in substreams.yaml [manifests](docs/reference-and-specs/manifests.md#modules-.initialblock).
+- Changed `startBlock` to `initialBlock` in substreams.yaml [manifests](../references/substreams-components/manifests.md#module-initialblock).
 - `code:` is now defined in the `binaries` section of the manifest, instead of in each module. A module can select which binary with the `binary:` field on the Module definition.
 - Added `substreams inspect ./substreams.yaml` or `inspect some.spkg` to see what's inside. Requires `protoc` to be installed (which you should have anyway).
 - Added command `substreams protogen` that writes a temporary `buf.gen.yaml` and generates Rust structs based on the contents of the provided manifest or package.
@@ -2084,7 +2084,7 @@ The state output format for `map` and `store` modules has changed internally to 
 
 ## [v0.0.6-beta](https://github.com/streamingfast/substreams/releases/tag/v0.0.6-beta)
 
-- Implemented [packages (see docs)](docs/reference-and-specs/packages.md).
+- Implemented [packages (see docs)](../references/substreams-components/packages.md).
 - Added `substreams::Hex` wrapper type to more easily deal with printing and encoding bytes to hexadecimal string.
 - Added `substreams::log::info!(...)` and `substreams::log::debug!(...)` supporting formatting arguments (acts like `println!()` macro).
 - Added new field `logs_truncated` that can be used to determined if logs were truncated.

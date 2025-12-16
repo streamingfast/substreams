@@ -12,14 +12,13 @@ Substreams has all the benefits of StreamingFast Firehose, like low-cost caching
 
 ## Documentation
 
-Full documentation for installing, running and working with Substreams is available at: https://substreams.streamingfast.io.
+Full documentation for installing, running and working with Substreams is available at: https://docs.substreams.dev.
 
 ## Contributing
 
 **Please first refer to the general
 [StreamingFast contribution guide](https://github.com/streamingfast/streamingfast/blob/master/CONTRIBUTING.md)**,
 if you wish to contribute to this code base.
-
 
 ## License
 

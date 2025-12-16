@@ -1,0 +1,346 @@
+---
+description: StreamingFast Substreams command line interface (CLI)
+---
+
+# Substreams CLI reference
+
+## `substreams` CLI reference overview
+
+The `substreams` command line interface (CLI) is the primary user interface and the main tool for sending requests and receiving data.
+
+The `substreams` CLI exposes many commands to developers enabling a range of features.
+
+{% hint style="info" %}
+**Note**: When a package is specified, it is optional. If you do use it, you can use:
+
+* Local `substreams.yaml` configuration files
+* Local `.spkg` package files
+* Remote `.spkg` package URLs
+* Local directory containing a `substreams.yaml` file
+* Standard input by using `"-"` as the manifest path
+
+If you choose to not use it, make sure that you are in a directory that contains a substreams.yaml file. Otherwise, you will get a usage error back.
+
+**Stdin Support**: Commands that accept manifest files (`build`, `run`, `gui`, `info`, `graph`, `pack`, `protogen`, `inspect`, `registry publish`, `registry verify`, `service deploy`, `service update`) all support reading the manifest from standard input by specifying `"-"` as the manifest path. This enables dynamic manifest generation and preprocessing workflows.
+{% endhint %}
+
+### **`init`**
+
+The `init` command allows you to initialize a Substreams project for several blockchains. It is a conversational-like command: you will be asked several questions and a project with the specified features will be created for you.
+
+The options included in the `init` command will evolve over time, but every blockchain should, at least, contain one option.
+
+```bash
+substreams init
+```
+
+### **`build`**
+
+The `build` command:
+- Generates the necessary Protobufs specified in the `substreams.yaml` file.
+- Compiles the Rust code.
+- Creates a Substreams package file (`.spkg`).
+
+```bash
+substreams build
+```
+
+#### Performance optimization
+
+The `build` command uses hash-based caching to avoid regenerating proto files when they haven't changed. This significantly improves build performance by:
+
+- Computing a hash of proto files, exclude paths, and generation settings
+- Storing the hash in a `.last_generated_hash` file in the output directory
+- Skipping proto generation when the hash matches and generated files exist
+- Displaying status messages indicating whether proto generation was skipped or run
+
+```bash
+# Example output when proto definitions haven't changed:
+Proto definitions unchanged, skipping buf generate (hash: a1b2c3d4e5f6)
+
+# Example output when proto definitions have changed:
+Proto definitions changed or no previous generation found, running buf generate (hash: f6e5d4c3b2a1)
+```
+
+This optimization is particularly beneficial for:
+- Iterative development workflows
+- CI/CD pipelines with unchanged proto definitions
+- Large projects with extensive proto files
+
+#### Reading manifest from stdin
+
+The `build` command supports reading the manifest from stdin by using `--manifest "-"`. This allows for dynamic manifest generation and processing pipelines.
+
+```bash
+cat substreams.yaml | substreams build --manifest "-"
+```
+
+**Example with `envsubst`**:
+```bash
+# Generate manifest dynamically with environment variable substitution
+envsubst < substreams.yaml.template | substreams build --manifest "-"
+```
+
+{% hint style="info" %}
+When using standard input mode (`"-"`), file path resolution within the Substreams manifest is done relative to the current working directory where the command is executed, not relative to the original manifest file location.
+{% endhint %}
+
+This approach is useful for:
+- Dynamic configuration using environment variables
+- Pre-processing manifest files with template tools
+- CI/CD pipelines with dynamic manifest generation
+
+### **`run`**
+
+The `run` command connects to a Substreams endpoint and begins processing data. It supports reading manifest from stdin using `"-"`.
+
+{% code title="run command" overflow="wrap" %}
+```bash
+substreams run -e mainnet.eth.streamingfast.io:443 \
+   -t +1 \
+   ./substreams.yaml \
+   module_name
+
+# Or read from stdin:
+cat substreams.yaml | substreams run -e mainnet.eth.streamingfast.io:443 -t +1 "-" module_name
+```
+{% endcode %}
+
+The details of the run command are:
+
+* `-e mainnet.eth.streamingfast.io:443` is the endpoint of the provider running your Substreams.
+* `-t +1` or `--stop-block` only requests a single block; the stop block is the manifest's `initialBlock` + 1.
+* `substreams.yaml` is the path where you have defined your [Substreams manifest](../substreams-components/manifests.md). You can use a `.spkg` or `substreams.yaml` configuration file.
+* `module_name` is the module we want to `run`, referring to the module name [defined in the Substreams manifest](../substreams-components/manifests.md#modules-.name).
+
+{% hint style="success" %}
+**Tip**: Passing a different `-s` or `--start-block` runs prior modules at a higher speed. Output is provided at the requested start block, keeping snapshots along the way if you want to process it again.
+{% endhint %}
+
+#### Headers
+
+The `-H` option of the `run` or `gui` command allows you to dynamically pass headers with the gRPC request. This is useful when overriding default parameters in the Substreams execution.
+
+##### X-Substreams-Parallel-Workers Header
+
+The `X-Substreams-Parallel-Workers` header sets the number of parallel jobs to use in the Substreams execution. By default, 10 jobs are used. Most authentication backends will prevent setting this header to a higher value than the what the auth provides.
+
+```bash
+substreams run -e mainnet.eth.streamingfast.io:443 \
+   -t +1 \
+   -H "X-Substreams-Parallel-Workers: 20" \
+   ./substreams.yaml \
+   module_name
+```
+
+#### Run example with output
+
+{% code title="substreams run " overflow="wrap" %}
+```bash
+$ substreams run -e mainnet.eth.streamingfast.io:443 \
+    https://github.com/Jannis/gravity-substream/releases/download/v0.0.1/gravity-v0.1.0.spkg \
+    gravatar_updates -o json
+```
+{% endcode %}
+
+The output of the `gravatar_updates` module starting at block `6200807` will print a message resembling:
+
+{% code title="run output" %}
+```bash
+{
+  "updates": [
+    {
+      "id": "39",
+      "owner": "0xaadcc13071fdf9c73cfbb8d97639ea68aa6fd1d2",
+      "displayName": "alex | OpenSea",
+      "imageUrl": "https://ucarecdn.com/13a67247-cb89-417a-92d2-50a7d7aa481c/-/crop/382x382/0,0/-/preview/"
+    }
+  ]
+}
+...
+```
+{% endcode %}
+
+{% hint style="info" %}
+**Note**: The `-o` or `--output` flag alters the output format.
+{% endhint %}
+
+The available output display options are:
+
+* `ui`, a nicely formatted, UI-driven interface, displaying progress information and execution logs.
+* `json`, an indented stream of data, **not** displaying progress information or logs, only data output for blocks proceeding the start block.
+* `jsonl`, same as `json` showing every individual output on a single line.
+
+### `gui`
+
+The `gui` command pops up a terminal-based graphical user interface. It supports reading manifest from stdin using `"-"`.
+
+Its parameters are very similar to those of `run`, but the `gui` command provides a UI to navigate the results instead of a stream of data.
+
+#### Replay mode
+
+When you run a `gui` session, a file called `replay.log` gets written with the contents of the streamed data that persists after closing the GUI.
+
+You can reload the data without hitting the server again using `--replay`. The data is immediately reloaded in the GUI, ready for more inspection.
+
+#### GUI Cheatsheet
+
+## Cheatsheet
+
+These are the shortcuts that you can use to navigate the GUI. You can always get more information by pressing the `?` key.
+
+| Function | Keys  |
+|---|---|
+| Switch screen (`Request`, `Progress`, `Output`) | `tab` |
+| Restart                                         | `r`  |
+| Quit                                            | `q`  |
+| Navigate Blocks - Forward                       | `p`  |
+| Navigate Blocks - Backwards                     | `o`  |
+| Navigate Blocks - Go To                         | `=` + *block number* + `enter` |
+| Navigate Modules - Forward                      | `i`  |
+| Navigate Modules - Backwards                    | `u`  |
+| Search                                          | `/` + *text* + `enter`  |
+| Commands information                            | `?`  |
+
+### `pack` **(DEPRECATED)**
+
+**(DEPRECATED: use `build` instead)**
+
+The `pack` command builds a shippable, importable package from a `substreams.yaml` manifest file. It supports reading manifest from stdin using `"-"`.
+
+{% code title="pack command" overflow="wrap" %}
+```bash
+$ substreams pack ./substreams.yaml
+```
+{% endcode %}
+
+The output of the `pack` command will print a message resembling:
+
+{% code title="pack output" overflow="wrap" %}
+```bash
+...
+Successfully wrote "your-package-v0.1.0.spkg".
+```
+{% endcode %}
+
+### `info`
+
+The `info` command prints out the contents of a package for inspection. It works on both local and remote `yaml` or `spkg` configuration files, and supports reading manifest from stdin using `"-"`.
+
+{% code title="info command" overflow="wrap" %}
+```bash
+$ substreams info ./substreams.yaml
+```
+{% endcode %}
+
+The output of the `info` command will print a message resembling:
+
+{% code title="info output" overflow="wrap" %}
+```bash
+Package name: solana_spl_transfers
+Version: v0.5.2
+Doc: Solana SPL Token Transfers stream
+
+  Stream SPL token transfers to the nearest human being.
+
+Modules:
+----
+Name: spl_transfers
+Initial block: 130000000
+Kind: map
+Output Type: proto:solana.spl.v1.TokenTransfers
+Hash: 2b59e4e840f814f4154a688c2935da9c3b61dc61
+
+Name: transfer_store
+Initial block: 130000000
+Kind: store
+Value Type: proto:solana.spl.v1.TokenTransfers
+Update Policy: UPDATE_POLICY_SET
+Hash: 11fd70768029bebce3741b051c15191d099d2436
+```
+{% endcode %}
+
+### `graph`
+
+The `graph` command prints out a visual graph of the package in the [mermaid-js format](https://mermaid.js.org/intro/n00b-syntaxReference.html). It supports reading manifest from stdin using `"-"`.
+
+{% hint style="success" %}
+**Tip**: [Mermaid Live Editor](https://mermaid.live/) is the visual editor used by Substreams.
+{% endhint %}
+
+{% code title="graph command" overflow="wrap" %}
+````bash
+$ substreams graph ./substreams.yaml
+                    [±master ●●]
+Mermaid graph:
+
+```mermaid
+graph TD;
+  spl_transfers[map: spl_transfers]
+  sf.solana.type.v1.Block[source: sf.solana.type.v1.Block] --> spl_transfers
+  transfer_store[store: transfer_store]
+  spl_transfers --> transfer_store
+```
+````
+{% endcode %}
+
+The `graph` command will result in a graphic resembling:
+
+{% embed url="https://mermaid.ink/svg/pako:eNp1kMsKg0AMRX9Fsq5Ct1PootgvaHeOSHBilc6LeRRE_PeOUhe2dBOSm5NLkglaIwgYPBzaPruXJ66zzFvZBIfad-R8pdCyvVSvUFd4I1FjEUZLxetYXKRpn5U30bXE_vXrLM_Pe7vFbSsaH4yjao3sS61_dlu99tDCwAEUOYWDSJdNi8Ih9KSIA0upoA6jDBy4nhMarcBAVzGkcWAdSk8HwBjMbdQtsOAibVA5YHqU-lDzG43ick8" %}
+Mermaid generated graph diagram
+{% endembed %}
+
+### `inspect`
+
+The `inspect` command reaches deep into the file structure of a `yaml` configuration file or `spkg` package and is used mostly for debugging, or if you're curious. It supports reading manifest from stdin using `"-"`.
+
+{% code title="inspect command" overflow="wrap" %}
+```bash
+$ substreams inspect ./substreams.yaml | less
+```
+{% endcode %}
+
+The output of the `inspect` command will print a message resembling:
+
+{% code title="inspect output" overflow="wrap" %}
+```bash
+proto_files
+...
+modules {
+  modules {
+    name: "my_module_name"
+...
+```
+{% endcode %}
+
+### **`protogen`**
+
+The `protogen` command generates Rust bindings from a package. It supports reading manifest from stdin using `"-"`.
+
+```bash
+substreams protogen ./substreams.yaml
+# Or from stdin:
+cat substreams.yaml | substreams protogen "-"
+```
+
+### **`codegen`**
+
+The `codegen` command generates a code for a specific sink taking a Substreams module as input.
+
+- SQL
+
+Generates a SQL-based Substreams project from the Substreams package found in the current folder.
+
+```bash
+substreams codegen sql
+```
+
+### Help
+
+To view a list of available commands and brief explanations in the `substreams` CLI, run the `substreams` command in a terminal passing the `-h` flag. You can use this help reference at any time.
+
+{% code title="help option" overflow="wrap" %}
+```bash
+substreams -h
+```
+{% endcode %}

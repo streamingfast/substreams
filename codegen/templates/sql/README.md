@@ -12,7 +12,7 @@
 
 To try the Substreams directly, you need to install the `substreams CLI` (v1.7.2 or above).
 
-You have many options as explained in this [installation guide](https://substreams.streamingfast.io/documentation/consume/installing-the-cli).
+You have many options as explained in this [installation guide](https://docs.substreams.dev/how-to-guides/installing-the-cli).
 
 Check if `substreams` was installed successfully, you can run the following command:
 
@@ -26,7 +26,7 @@ substreams --version
 
 ```
 
-Get a development API token using the following command: 
+Get a development API token using the following command:
 
 ```bash
 substreams auth

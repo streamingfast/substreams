@@ -26,6 +26,7 @@ func (r *Request) ToV2() (*pbsubstreamsrpcv2.Request, error) {
 		Modules:                             r.Package.Modules,
 		DebugInitialStoreSnapshotForModules: r.DebugInitialStoreSnapshotForModules,
 		NoopMode:                            r.NoopMode,
+		EstimateMode:                        r.EstimateMode,
 		LimitProcessedBlocks:                r.LimitProcessedBlocks,
 		DevOutputModules:                    r.DevOutputModules,
 		ProgressMessagesIntervalMs:          r.ProgressMessagesIntervalMs,

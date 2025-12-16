@@ -989,6 +989,12 @@ func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelC
 			liveBackFiller = NewLiveBackFiller(ctx, noopHandler, logger, execGraph.OutputModuleStageIndex(), segmentSize, requestDetails.LinearHandoffBlockNum, s.runtimeConfig.ClientFactory, RequestBackProcessing)
 		}
 
+		// In estimate mode, the pipe handler is overwritten by an EstimateHandler which collects metrics without persisting data.
+		if request.EstimateMode {
+			estimateHandler := NewEstimateHandler(ctx, respFunc)
+			liveBackFiller = NewLiveBackFiller(ctx, estimateHandler, logger, execGraph.OutputModuleStageIndex(), segmentSize, requestDetails.LinearHandoffBlockNum, s.runtimeConfig.ClientFactory, RequestBackProcessing)
+		}
+
 		go liveBackFiller.Start(ctx)
 		wrappedPipe = liveBackFiller
 	} else {

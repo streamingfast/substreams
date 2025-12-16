@@ -109,6 +109,12 @@ type Request struct {
 	// Available only in developer mode
 	DebugInitialStoreSnapshotForModules []string `protobuf:"bytes,10,rep,name=debug_initial_store_snapshot_for_modules,json=debugInitialStoreSnapshotForModules,proto3" json:"debug_initial_store_snapshot_for_modules,omitempty"`
 	NoopMode                            bool     `protobuf:"varint,11,opt,name=noop_mode,json=noopMode,proto3" json:"noop_mode,omitempty"`
+	// Estimate mode enables development-like execution without output persistence.
+	// When enabled, the engine processes blocks without saving data to stores,
+	// collecting only billing metrics (egress bytes and processed blocks) for cost estimation.
+	// This mode is mutually exclusive with noop_mode and is limited to small block ranges
+	// for cost control purposes. Only billing metrics are recorded and reported.
+	EstimateMode bool `protobuf:"varint,17,opt,name=estimate_mode,json=estimateMode,proto3" json:"estimate_mode,omitempty"`
 	// If set, the engine will reject a request if the number of blocks to process (including preparing the stores) is above this limit.
 	// Useful as a safeguard for managing costs
 	LimitProcessedBlocks uint64 `protobuf:"varint,12,opt,name=limit_processed_blocks,json=limitProcessedBlocks,proto3" json:"limit_processed_blocks,omitempty"`
@@ -217,6 +223,13 @@ func (x *Request) GetDebugInitialStoreSnapshotForModules() []string {
 func (x *Request) GetNoopMode() bool {
 	if x != nil {
 		return x.NoopMode
+	}
+	return false
+}
+
+func (x *Request) GetEstimateMode() bool {
+	if x != nil {
+		return x.EstimateMode
 	}
 	return false
 }

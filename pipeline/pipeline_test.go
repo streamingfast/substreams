@@ -63,7 +63,7 @@ func TestPipeline_runExecutor(t *testing.T) {
 			clock := &pbsubstreams.Clock{Id: test.block.Id, Number: test.block.Number}
 			execOutput := NewExecOutputTesting(t, bstreamBlk(t, test.block), clock)
 			executor := mapTestExecutor(t, ctx, test.moduleName)
-			res := pipe.execute(ctx, executor, execOutput, false)
+			res := pipe.execute(ctx, executor, execOutput, false, true)
 			err := pipe.applyExecutionResult(ctx, executor, res, execOutput)
 			require.NoError(t, err)
 			output, found := execOutput.Values[test.moduleName]

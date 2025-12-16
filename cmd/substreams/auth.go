@@ -3,12 +3,12 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/streamingfast/cli"
 	"os"
 	"strings"
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
+	"github.com/streamingfast/cli"
 )
 
 var authCmd = &cobra.Command{

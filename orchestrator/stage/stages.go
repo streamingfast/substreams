@@ -589,7 +589,6 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 	}
 
 	for _, modState := range storeModuleStates {
-		modState := modState
 		go func() {
 			fullKV, err := modState.getStore(s.ctx, exclusiveEndBlock)
 			loaded := loadedStore{

@@ -3,12 +3,12 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/streamingfast/cli/utils"
 	"os"
 	"path/filepath"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
+	"github.com/streamingfast/cli/utils"
 )
 
 var registryLoginCmd = &cobra.Command{

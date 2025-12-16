@@ -48,6 +48,14 @@ type processingModule struct {
 	initialBlockNum uint64
 }
 
+type partialProcessingState struct {
+	num                        uint64
+	lastBlockID                string
+	processedPartials          []*pbsubstreams.Clock
+	processedTransactionsCount uint64
+	highestIndex               int32
+}
+
 type Pipeline struct {
 	ctx              context.Context
 	isTier1          bool
@@ -75,6 +83,8 @@ type Pipeline struct {
 	extraMapModuleOutputs   []*pbsubstreamsrpc.MapModuleOutput
 	extraStoreModuleOutputs []*pbsubstreamsrpc.StoreModuleOutput
 	preexistingBlockIndices map[string]map[string]*roaring64.Bitmap
+
+	partialProcessingState *partialProcessingState
 
 	respFunc         substreams.ResponseFunc
 	lastProgressSent time.Time
@@ -872,6 +882,26 @@ func (p *Pipeline) cleanUpModuleExecutors(ctx context.Context, logger *zap.Logge
 		if err := mod.Close(ctx); err != nil {
 			return fmt.Errorf("closing wasm module %+v: %w", key, err)
 		}
+	}
+
+	return nil
+}
+
+func returnPartialDataOutput(
+	clock *pbsubstreams.Clock,
+	mapModuleOutput *pbsubstreamsrpc.MapModuleOutput,
+	respFunc substreams.ResponseFunc,
+	partialIdx int32,
+) error {
+
+	out := &pbsubstreamsrpc.PartialBlockData{
+		Clock:        clock,
+		Output:       mapModuleOutput,
+		PartialIndex: uint32(partialIdx),
+	}
+
+	if err := respFunc(substreams.NewPartialBlockResponse(out)); err != nil {
+		return fmt.Errorf("calling response func: %w", err)
 	}
 
 	return nil

@@ -2,6 +2,7 @@ package execout
 
 import (
 	"fmt"
+	"maps"
 
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 
@@ -70,6 +71,15 @@ func (i *Buffer) Get(moduleName string) (value []byte, cached bool, err error) {
 func (i *Buffer) Set(moduleName string, value []byte) (err error) {
 	i.values[moduleName] = value
 	return nil
+}
+
+func (i *Buffer) Clone() ExecutionOutput {
+	out := &Buffer{
+		values:              maps.Clone(i.values),
+		clock:               i.clock,
+		valuesForFileOutput: maps.Clone(i.valuesForFileOutput),
+	}
+	return out
 }
 
 func (i *Buffer) SetFileOutput(moduleName string, value []byte) (err error) {

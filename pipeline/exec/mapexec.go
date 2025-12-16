@@ -31,13 +31,17 @@ func (e *MapperModuleExecutor) String() string { return e.Name() }
 // and in this case, we don't do anything
 func (e *MapperModuleExecutor) applyCachedOutput([]byte) error { return nil }
 
-func (e *MapperModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter) (out []byte, outForFiles []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
+func (e *MapperModuleExecutor) run(ctx context.Context, reader execout.ExecutionOutputGetter, cachable bool) (out []byte, outForFiles []byte, moduleOutputData *pbssinternal.ModuleOutput, err error) {
 	_, span := reqctx.WithModuleExecutionSpan(ctx, "exec_map")
 	defer span.EndWithErr(&err)
 
 	e.ctx = ctx
 	var call *wasm.Call
-	if call, err = e.wasmCall(reader, true, GlobalSharedCache, GlobalUndoManager); err != nil {
+	var cache *SharedCache
+	if cachable {
+		cache = GlobalSharedCache
+	}
+	if call, err = e.wasmCall(reader, true, cache, GlobalUndoManager); err != nil {
 		return nil, nil, nil, fmt.Errorf("maps wasm call: %w", err)
 	}
 

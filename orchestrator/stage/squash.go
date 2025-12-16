@@ -32,7 +32,6 @@ func (s *Stages) multiSquash(stage *Stage, mergeUnit Unit) error {
 			continue
 		}
 
-		modState := modState // capture in loop
 		stage.syncWork.Go(func() error {
 			stats := reqctx.ReqStats(s.ctx)
 			stats.RecordModuleMerging(modState.name)

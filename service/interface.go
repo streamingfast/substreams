@@ -14,6 +14,7 @@ type StreamFactoryFunc func(ctx context.Context,
 	stopBlockNum uint64,
 	cursor string,
 	finalBlocksOnly bool,
+	includePartialBlocks bool,
 	cursorIsTarget bool,
 	logger *zap.Logger,
 	extraOpts ...stream.Option) (Streamable, error)

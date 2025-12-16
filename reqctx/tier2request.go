@@ -40,3 +40,15 @@ func EthCallFallbackToLatestDuration(ctx context.Context) time.Duration {
 	}
 	return duration
 }
+
+func WithEthCallUseBlockNumberDuration(ctx context.Context, duration time.Duration) context.Context {
+	return context.WithValue(ctx, ethCallUseBlockNumberDuration, duration)
+}
+
+func EthCallUseBlockNumberDuration(ctx context.Context) time.Duration {
+	duration, ok := ctx.Value(ethCallUseBlockNumberDuration).(time.Duration)
+	if !ok {
+		return time.Duration(0)
+	}
+	return duration
+}

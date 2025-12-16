@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package test.output;
+
+option go_package = "github.com/streamingfast/substreams/tests_e2e/partial_blocks_store/pb;pbtest";
+
+message TxCounterSummary {
+  uint64 block_number = 1;
+  int64 current_block_tx_count = 2;
+  int64 total_tx_count = 3;
+  repeated BlockTxCount block_counts = 4;
+}
+
+message BlockTxCount {
+  uint64 block_number = 1;
+  int64 tx_count = 2;
+}

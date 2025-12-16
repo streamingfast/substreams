@@ -9,6 +9,29 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.17.8
+
+* Added experimental support for partial blocks (ex: Base's Flash Blocks) -- only supported on https://base-mainnet-flash.streamingfast.io endpoint
+* See [more details in the documentation](https://docs.substreams.dev/reference-material/flash-blocks)
+
+### CLI
+
+* commands `run` and `sink webhook` now support these flags:
+  - `--include-partial-blocks`: sends every block as partial(s) but also as real block
+  - `--partial-blocks-only`: only sends partials (for every block, every bit of data should be there)
+  
+### Sink library
+
+* To use the new partial blocks in a sink that uses github.com/streamingfast/substreams/sink, simply:
+  - Define your sink flags with `sink.FlagIncludePartialBlocks` and/or `sink.FlagPartialBlocksOnly` under `FlagIncludeOptional()`
+  - Implement the function `HandlePartialBlockData(...)` and pass it to `NewSinkerFullHandlersWithPartial(...)` when creating the sinker.
+
+### Server
+
+* Server accepts new `include_partial_blocks` and `partial_blocks_only` boolean params in the request body.
+* Response, when requested with above params, now include new message `PartialBlockData`, containing the usual "map module output", the clock and the index of that partial.
+* Server accepts environment variable `SUBSTREAMS_BIGGEST_PARTIAL_BLOCK_INDEX` (default 10) -- it will emit a partial with this index when it gets the final part of a block.
+
 ## v1.17.7
 
 ### [CLI]

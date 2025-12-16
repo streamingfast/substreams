@@ -981,22 +981,22 @@ func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelC
 
 	var wrappedPipe bstream.Handler
 	if requestDetails.ProductionMode {
-		liveBackFiller := NewLiveBackFiller(ctx, pipe, logger, execGraph.OutputModuleStageIndex(), segmentSize, requestDetails.LinearHandoffBlockNum, s.runtimeConfig.ClientFactory, RequestBackProcessing)
-
-		// In noop mode, the pipe handler is overwritten by a NoopHandler which produces no outputs.
-		if request.NoopMode {
-			noopHandler := NewNoopHandler(respFunc)
-			liveBackFiller = NewLiveBackFiller(ctx, noopHandler, logger, execGraph.OutputModuleStageIndex(), segmentSize, requestDetails.LinearHandoffBlockNum, s.runtimeConfig.ClientFactory, RequestBackProcessing)
-		}
-
-		// In estimate mode, the pipe handler is overwritten by an EstimateHandler which collects metrics without persisting data.
+		// In estimate mode, use EstimateHandler directly without LiveBackFiller
 		if request.EstimateMode {
 			estimateHandler := NewEstimateHandler(ctx, respFunc)
-			liveBackFiller = NewLiveBackFiller(ctx, estimateHandler, logger, execGraph.OutputModuleStageIndex(), segmentSize, requestDetails.LinearHandoffBlockNum, s.runtimeConfig.ClientFactory, RequestBackProcessing)
-		}
+			wrappedPipe = estimateHandler
+		} else {
+			liveBackFiller := NewLiveBackFiller(ctx, pipe, logger, execGraph.OutputModuleStageIndex(), segmentSize, requestDetails.LinearHandoffBlockNum, s.runtimeConfig.ClientFactory, RequestBackProcessing)
 
-		go liveBackFiller.Start(ctx)
-		wrappedPipe = liveBackFiller
+			// In noop mode, the pipe handler is overwritten by a NoopHandler which produces no outputs.
+			if request.NoopMode {
+				noopHandler := NewNoopHandler(respFunc)
+				liveBackFiller = NewLiveBackFiller(ctx, noopHandler, logger, execGraph.OutputModuleStageIndex(), segmentSize, requestDetails.LinearHandoffBlockNum, s.runtimeConfig.ClientFactory, RequestBackProcessing)
+			}
+
+			go liveBackFiller.Start(ctx)
+			wrappedPipe = liveBackFiller
+		}
 	} else {
 		wrappedPipe = pipe
 	}

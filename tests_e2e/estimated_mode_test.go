@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"os"
 	"testing"
 
 	"github.com/streamingfast/substreams/manifest"
@@ -19,15 +18,13 @@ func TestEstimatedMode(t *testing.T) {
 	zlog := zap.NewNop()
 
 	// Create temporary directory for volume mount
-	tmpDir, err := os.MkdirTemp("", "firehose-data-")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	// Launch dummy blockchain container
 	image := "ghcr.io/streamingfast/dummy-blockchain:17b576d"
 	burst := 120
 
-	t.Logf("Starting container with image: %s and burst %d", image, burst)
+	zlog.Info("starting container", zap.String("image", image), zap.Int("burst", burst))
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, image, "", burst)
 	require.NoError(t, err)
 	defer container.Terminate(ctx)
@@ -35,13 +32,13 @@ func TestEstimatedMode(t *testing.T) {
 	// Log container details for debugging
 	if container != nil {
 		if ports, portErr := container.Ports(ctx); portErr == nil {
-			t.Logf("Container exposed ports: %v", ports)
+			zlog.Info("container exposed ports", zap.Any("ports", ports))
 		}
 		if logs, logErr := container.Logs(ctx); logErr == nil {
 			defer logs.Close()
 			buf := make([]byte, 2048)
 			if n, _ := logs.Read(buf); n > 0 {
-				t.Logf("Container logs: %s", string(buf[:n]))
+				zlog.Info("container logs", zap.String("logs", string(buf[:n])))
 			}
 		}
 	}
@@ -154,7 +151,7 @@ func TestEstimatedMode(t *testing.T) {
 					defer logs.Close()
 					buf := make([]byte, 4096)
 					if n, _ := logs.Read(buf); n > 0 {
-						t.Logf("Container logs on error: %s", string(buf[:n]))
+						zlog.Error("container logs on error", zap.String("logs", string(buf[:n])))
 					}
 				}
 				require.NoError(t, err)
@@ -162,18 +159,18 @@ func TestEstimatedMode(t *testing.T) {
 
 			// Verify session was initialized
 			require.NotNil(t, session, "Session should be initialized")
-			t.Logf("Session initialized with trace_id: %s", session.TraceId)
+			zlog.Info("session initialized", zap.String("trace_id", session.TraceId))
 
 			// Verify we got some block scoped data
 			require.NotEmpty(t, blockScopedDataSlice, "Should have received block scoped data")
-			t.Logf("Received %d block scoped data responses", len(blockScopedDataSlice))
+			zlog.Info("received block scoped data responses", zap.Int("count", len(blockScopedDataSlice)))
 
 			// In estimate mode, verify that responses have empty MapModuleOutput
 			// but still contain clock and cursor information
 			for i, blockData := range blockScopedDataSlice {
 				require.NotNil(t, blockData.Clock, "Block %d should have clock", i)
 				require.NotNil(t, blockData.Cursor, "Block %d should have cursor", i)
-				
+
 				// In estimate mode, the output should be empty (no actual data)
 				if tc.estimateMode {
 					if blockData.Output != nil {
@@ -185,14 +182,14 @@ func TestEstimatedMode(t *testing.T) {
 					}
 				}
 
-				t.Logf("Block %d: number=%d, id=%s", i, blockData.Clock.Number, blockData.Clock.Id)
+				zlog.Debug("processed block", zap.Int("index", i), zap.Uint64("number", blockData.Clock.Number), zap.String("id", blockData.Clock.Id))
 			}
 
 			// Verify the block range matches what we requested
 			if len(blockScopedDataSlice) > 0 {
 				firstBlock := blockScopedDataSlice[0]
 				lastBlock := blockScopedDataSlice[len(blockScopedDataSlice)-1]
-				
+
 				assert.GreaterOrEqual(t, firstBlock.Clock.Number, uint64(tc.startBlock), "First block should be >= start block")
 				assert.Less(t, lastBlock.Clock.Number, tc.stopBlock, "Last block should be < stop block")
 			}
@@ -209,15 +206,13 @@ func TestEstimatedModeMetricsCollection(t *testing.T) {
 	zlog := zap.NewNop()
 
 	// Create temporary directory for volume mount
-	tmpDir, err := os.MkdirTemp("", "firehose-data-")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	// Launch dummy blockchain container
 	image := "ghcr.io/streamingfast/dummy-blockchain:17b576d"
 	burst := 120
 
-	t.Logf("Starting container with image: %s and burst %d", image, burst)
+	zlog.Info("starting container for metrics collection", zap.String("image", image), zap.Int("burst", burst))
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, image, "", burst)
 	require.NoError(t, err)
 	defer container.Terminate(ctx)
@@ -274,8 +269,8 @@ func TestEstimatedModeMetricsCollection(t *testing.T) {
 			require.GreaterOrEqual(t, len(blockScopedDataSlice), tc.minBlocks, "Should have received at least %d blocks", tc.minBlocks)
 
 			// Log metrics information for manual verification
-			t.Logf("Processed %d blocks in estimate mode", len(blockScopedDataSlice))
-			
+			zlog.Info("processed blocks in estimate mode", zap.Int("block_count", len(blockScopedDataSlice)))
+
 			// In a real implementation, we would verify that:
 			// 1. Egress bytes are calculated correctly
 			// 2. Processed block count matches the number of blocks
@@ -294,15 +289,13 @@ func TestEstimatedModeConcurrentRequests(t *testing.T) {
 	zlog := zap.NewNop()
 
 	// Create temporary directory for volume mount
-	tmpDir, err := os.MkdirTemp("", "firehose-data-")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	// Launch dummy blockchain container
 	image := "ghcr.io/streamingfast/dummy-blockchain:17b576d"
 	burst := 120
 
-	t.Logf("Starting container with image: %s and burst %d", image, burst)
+	zlog.Info("starting container for concurrent requests test", zap.String("image", image), zap.Int("burst", burst))
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, image, "", burst)
 	require.NoError(t, err)
 	defer container.Terminate(ctx)
@@ -347,7 +340,7 @@ func TestEstimatedModeConcurrentRequests(t *testing.T) {
 				return
 			}
 
-			t.Logf("Concurrent request %d completed successfully with %d blocks", requestID, len(blockScopedDataSlice))
+			zlog.Info("concurrent request completed successfully", zap.Int("request_id", requestID), zap.Int("block_count", len(blockScopedDataSlice)))
 			results <- nil
 		}(i)
 	}

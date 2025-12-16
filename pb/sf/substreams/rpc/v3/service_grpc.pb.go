@@ -30,7 +30,7 @@ type StreamClient interface {
 	//
 	// Responses are identical to those of the v2 request.
 	//
-	// The service supports an 'estimated_mode' for cost estimation purposes, which processes
+	// The service supports an 'estimate_mode' for cost estimation purposes, which processes
 	// blocks without persisting output data, collecting only billing metrics for cost analysis.
 	// This mode impacts normal execution flow by skipping data persistence while maintaining
 	// accurate billing metric collection.
@@ -88,7 +88,7 @@ type StreamServer interface {
 	//
 	// Responses are identical to those of the v2 request.
 	//
-	// The service supports an 'estimated_mode' for cost estimation purposes, which processes
+	// The service supports an 'estimate_mode' for cost estimation purposes, which processes
 	// blocks without persisting output data, collecting only billing metrics for cost analysis.
 	// This mode impacts normal execution flow by skipping data persistence while maintaining
 	// accurate billing metric collection.

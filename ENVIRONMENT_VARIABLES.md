@@ -55,9 +55,9 @@ This document lists all environment variables used by the Substreams project, or
 - **Location**: `service/utils.go`
 
 #### `SUBSTREAMS_ESTIMATE_MODE_MAX_BLOCK_RANGE`
-**Estimated mode maximum block range**
-- **Purpose**: Set maximum block range allowed when using estimated_mode for cost estimation
-- **Usage**: Set as unsigned integer to limit the number of blocks that can be processed in estimated_mode
+**Estimate mode maximum block range**
+- **Purpose**: Set maximum block range allowed when using estimate_mode for cost estimation
+- **Usage**: Set as unsigned integer to limit the number of blocks that can be processed in estimate_mode
 - **Default**: 1000
 - **Location**: `pb/sf/substreams/rpc/v3/request.go`
 

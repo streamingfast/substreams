@@ -93,19 +93,19 @@ func (req *Request) Validate() error {
 		}
 	}
 
-	// Validate estimated_mode constraints
-	if req.EstimatedMode {
+	// Validate estimate_mode constraints
+	if req.EstimateMode {
 		// Mutual exclusivity with noop_mode
 		if req.NoopMode {
-			return fmt.Errorf("estimated_mode and noop_mode are mutually exclusive")
+			return fmt.Errorf("estimate_mode and noop_mode are mutually exclusive")
 		}
 
-		// Block range validation when estimated_mode is enabled
+		// Block range validation when estimate_mode is enabled
 		if req.StopBlockNum > 0 {
 			blockRange := req.StopBlockNum - uint64(req.StartBlockNum)
 			maxBlockRange := getEstimateModeMaxBlockRange()
 			if blockRange > maxBlockRange {
-				return fmt.Errorf("estimated_mode block range (%d) exceeds maximum allowed range (%d)", blockRange, maxBlockRange)
+				return fmt.Errorf("estimate_mode block range (%d) exceeds maximum allowed range (%d)", blockRange, maxBlockRange)
 			}
 		}
 	}
@@ -113,7 +113,7 @@ func (req *Request) Validate() error {
 	return nil
 }
 
-// getEstimateModeMaxBlockRange returns the maximum block range allowed for estimated_mode
+// getEstimateModeMaxBlockRange returns the maximum block range allowed for estimate_mode
 // from the SUBSTREAMS_ESTIMATE_MODE_MAX_BLOCK_RANGE environment variable, defaulting to 1000
 func getEstimateModeMaxBlockRange() uint64 {
 	envVar := os.Getenv("SUBSTREAMS_ESTIMATE_MODE_MAX_BLOCK_RANGE")

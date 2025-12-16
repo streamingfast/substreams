@@ -7,7 +7,7 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
-func TestRequest_Validate_EstimatedMode(t *testing.T) {
+func TestRequest_Validate_EstimateMode(t *testing.T) {
 	tests := []struct {
 		name        string
 		request     *Request
@@ -16,7 +16,27 @@ func TestRequest_Validate_EstimatedMode(t *testing.T) {
 		errorMsg    string
 	}{
 		{
-			name: "estimated_mode with noop_mode should fail",
+			name: "estimate_mode with noop_mode should fail",
+			request: &Request{
+				Package: &pbsubstreams.Package{
+					Modules: &pbsubstreams.Modules{
+						Modules: []*pbsubstreams.Module{
+							{
+								Name: "test_module",
+								Kind: &pbsubstreams.Module_KindMap_{},
+							},
+						},
+					},
+				},
+				OutputModule: "test_module",
+				EstimateMode: true,
+				NoopMode:     true,
+			},
+			expectError: true,
+			errorMsg:    "estimate_mode and noop_mode are mutually exclusive",
+		},
+		{
+			name: "estimate_mode with valid block range should pass",
 			request: &Request{
 				Package: &pbsubstreams.Package{
 					Modules: &pbsubstreams.Modules{
@@ -29,34 +49,14 @@ func TestRequest_Validate_EstimatedMode(t *testing.T) {
 					},
 				},
 				OutputModule:  "test_module",
-				EstimatedMode: true,
-				NoopMode:      true,
-			},
-			expectError: true,
-			errorMsg:    "estimated_mode and noop_mode are mutually exclusive",
-		},
-		{
-			name: "estimated_mode with valid block range should pass",
-			request: &Request{
-				Package: &pbsubstreams.Package{
-					Modules: &pbsubstreams.Modules{
-						Modules: []*pbsubstreams.Module{
-							{
-								Name: "test_module",
-								Kind: &pbsubstreams.Module_KindMap_{},
-							},
-						},
-					},
-				},
-				OutputModule:   "test_module",
-				EstimatedMode:  true,
-				StartBlockNum:  100,
-				StopBlockNum:   500, // Range of 400 blocks
+				EstimateMode:  true,
+				StartBlockNum: 100,
+				StopBlockNum:  500, // Range of 400 blocks
 			},
 			expectError: false,
 		},
 		{
-			name: "estimated_mode with excessive block range should fail",
+			name: "estimate_mode with excessive block range should fail",
 			request: &Request{
 				Package: &pbsubstreams.Package{
 					Modules: &pbsubstreams.Modules{
@@ -68,16 +68,16 @@ func TestRequest_Validate_EstimatedMode(t *testing.T) {
 						},
 					},
 				},
-				OutputModule:   "test_module",
-				EstimatedMode:  true,
-				StartBlockNum:  100,
-				StopBlockNum:   2000, // Range of 1900 blocks (exceeds default 1000)
+				OutputModule:  "test_module",
+				EstimateMode:  true,
+				StartBlockNum: 100,
+				StopBlockNum:  2000, // Range of 1900 blocks (exceeds default 1000)
 			},
 			expectError: true,
-			errorMsg:    "estimated_mode block range (1900) exceeds maximum allowed range (1000)",
+			errorMsg:    "estimate_mode block range (1900) exceeds maximum allowed range (1000)",
 		},
 		{
-			name: "estimated_mode with custom env var limit should pass",
+			name: "estimate_mode with custom env var limit should pass",
 			request: &Request{
 				Package: &pbsubstreams.Package{
 					Modules: &pbsubstreams.Modules{
@@ -89,16 +89,16 @@ func TestRequest_Validate_EstimatedMode(t *testing.T) {
 						},
 					},
 				},
-				OutputModule:   "test_module",
-				EstimatedMode:  true,
-				StartBlockNum:  100,
-				StopBlockNum:   2500, // Range of 2400 blocks
+				OutputModule:  "test_module",
+				EstimateMode:  true,
+				StartBlockNum: 100,
+				StopBlockNum:  2500, // Range of 2400 blocks
 			},
 			envVar:      "3000", // Set limit to 3000
 			expectError: false,
 		},
 		{
-			name: "estimated_mode with custom env var limit should fail",
+			name: "estimate_mode with custom env var limit should fail",
 			request: &Request{
 				Package: &pbsubstreams.Package{
 					Modules: &pbsubstreams.Modules{
@@ -110,17 +110,17 @@ func TestRequest_Validate_EstimatedMode(t *testing.T) {
 						},
 					},
 				},
-				OutputModule:   "test_module",
-				EstimatedMode:  true,
-				StartBlockNum:  100,
-				StopBlockNum:   2600, // Range of 2500 blocks (exceeds custom 2000)
+				OutputModule:  "test_module",
+				EstimateMode:  true,
+				StartBlockNum: 100,
+				StopBlockNum:  2600, // Range of 2500 blocks (exceeds custom 2000)
 			},
 			envVar:      "2000", // Set limit to 2000
 			expectError: true,
-			errorMsg:    "estimated_mode block range (2500) exceeds maximum allowed range (2000)",
+			errorMsg:    "estimate_mode block range (2500) exceeds maximum allowed range (2000)",
 		},
 		{
-			name: "estimated_mode without stop_block_num should pass",
+			name: "estimate_mode without stop_block_num should pass",
 			request: &Request{
 				Package: &pbsubstreams.Package{
 					Modules: &pbsubstreams.Modules{
@@ -132,10 +132,10 @@ func TestRequest_Validate_EstimatedMode(t *testing.T) {
 						},
 					},
 				},
-				OutputModule:   "test_module",
-				EstimatedMode:  true,
-				StartBlockNum:  100,
-				StopBlockNum:   0, // No stop block specified
+				OutputModule:  "test_module",
+				EstimateMode:  true,
+				StartBlockNum: 100,
+				StopBlockNum:  0, // No stop block specified
 			},
 			expectError: false,
 		},

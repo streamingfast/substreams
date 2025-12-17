@@ -16,8 +16,8 @@ import (
 type ModuleGraph struct {
 	*graph.Mutable
 
-	currentHashesCache map[string][]byte // moduleName => hash
-
+	currentHashesCache map[string][]byte // moduleName -> moduleHash
+	
 	modules         []*pbsubstreams.Module
 	moduleIndex     map[string]int
 	indexIndex      map[int]*pbsubstreams.Module

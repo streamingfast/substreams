@@ -47,7 +47,7 @@ func (m *ModuleHashes) Iter(cb func(hash, name string) error) error {
 }
 
 func (m *ModuleHashes) HashModule(modules *pbsubstreams.Modules, module *pbsubstreams.Module, graph *ModuleGraph) (ModuleHash, error) {
-	//Simplified hash for testing purposes
+	// Simplified hash for testing purposes
 	if TestUseSimpleHash {
 		return m.hashModuleSimple(modules, module, graph)
 	}

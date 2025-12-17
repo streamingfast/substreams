@@ -489,6 +489,7 @@ func (r *Reader) registryBaseURL() string {
 	}
 	// This is an extreme fallback, because this should be
 	// set by the WithRegistryURL option.
+	// Default registry URL: https://spkg.io
 	return "https://spkg.io"
 }
 

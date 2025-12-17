@@ -209,7 +209,7 @@ func NewSubstreamsClientConfig(opts SubstreamsClientConfigOptions) *SubstreamsCl
 		}
 	} else {
 		if resolvedEndpoint := networks.GetSubstreamsEndpoint(endpoint); resolvedEndpoint != "" {
-			// Resolved endpoint from alias is always non-plaintext
+			// Resolved endpoint from alias is always using non-plaintext
 			endpoint = resolvedEndpoint
 			plaintext = false
 		}

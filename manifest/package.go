@@ -20,7 +20,7 @@ type manifestConverter struct {
 	reader     *Reader
 
 	// Runtime assigned while manifest is being converted, this feels weird
-	// but I haven't the "flemme" to refactor this right now.
+	// but I haven't had the time/motivation to refactor this right now.
 	sinkConfigDynamicMessage *dynamic.Message
 }
 

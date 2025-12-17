@@ -140,7 +140,7 @@ func (s *SimpleSink) HandleBlockScopedData(ctx context.Context, data *pbsubstrea
 	return nil
 }
 
-// handleBlockUndoSignal handles undo signals
+// HandleBlockUndoSignal handles undo signals
 func (s *SimpleSink) HandleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *sink.Cursor) error {
 
 	// Do something with the information about the UNDO event (chain reorg)

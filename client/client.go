@@ -285,8 +285,7 @@ func NewSubstreamsInternalClient(config *SubstreamsClientConfig) (cli pbssintern
 		}
 	}
 
-	dialOptions = append(dialOptions, grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()))
-	dialOptions = append(dialOptions, grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()))
+	dialOptions = append(dialOptions, grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 
 	zlog.Debug("getting connection", zap.String("endpoint", endpoint))
 	conn, err := dgrpc.NewExternalClientConn(endpoint, dialOptions...)
@@ -355,8 +354,7 @@ func newConnection(config *SubstreamsClientConfig) (conn *grpc.ClientConn, close
 		}
 	}
 
-	dialOptions = append(dialOptions, grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()))
-	dialOptions = append(dialOptions, grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()))
+	dialOptions = append(dialOptions, grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	dialOptions = append(dialOptions, grpc.WithDefaultCallOptions(grpc.UseCompressor(gzip.Name)))
 	dialOptions = append(dialOptions, grpc.WithUserAgent(config.agent))
 

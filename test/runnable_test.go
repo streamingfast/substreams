@@ -266,7 +266,8 @@ func withTestTracing(t *testing.T, ctx context.Context, testName string) (contex
 	endFunc := func() {}
 	if tracingEnabled {
 		fmt.Println("Running test with tracing enabled: ", os.Getenv("SF_TRACING"))
-		require.NoError(t, tracing.SetupOpenTelemetry(ctx, "substreams"))
+		_, err := tracing.SetupOpenTelemetry(ctx, "substreams")
+		require.NoError(t, err)
 		ctx = reqctx.WithTracer(ctx, otel.GetTracerProvider().Tracer("service.test"))
 		spanCtx, span := reqctx.WithSpan(ctx, testName)
 		endFunc = func() {

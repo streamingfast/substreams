@@ -126,7 +126,7 @@ func (p *Pipeline) processBlock(
 	switch step {
 	case bstream.StepPartial:
 		if reqctx.IncludePartialBlocks(ctx) { // this also covers 'partialBlocksOnly'
-			p.handleStepPartial(ctx, clock, execOutput, partialIndex)
+			p.handleStepPartial(ctx, clock, cursor, execOutput, partialIndex)
 		}
 
 	case bstream.StepUndo:
@@ -257,8 +257,7 @@ func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
 	return nil
 }
 
-func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Clock, execOutput execout.ExecutionOutput, idx int32) (err error) {
-
+func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput, idx int32) (err error) {
 	if p.partialProcessingState != nil {
 		if clock.Id == p.partialProcessingState.lastBlockID {
 			return nil // same hash: nothing new to process
@@ -333,7 +332,7 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 
 	mapModuleOutput := normalizeModuleOutput(p.mapModuleOutput, reqDetails.OutputModule)
 
-	if err = returnPartialDataOutput(clock, mapModuleOutput, p.respFunc, idx); err != nil {
+	if err = returnPartialDataOutput(clock, cursor, mapModuleOutput, p.respFunc, idx); err != nil {
 		return fmt.Errorf("failed to return module data output: %w", err)
 	}
 
@@ -366,7 +365,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 			if p.partialProcessingState != nil && p.partialProcessingState.highestIndex > partialBlockIndex {
 				partialBlockIndex = p.partialProcessingState.highestIndex + 1 // push back the 'biggest partial block index' so we don't send them out of order to the client
 			}
-			if err := p.handleStepPartial(ctx, clock, execOutput.Clone(), partialBlockIndex); err != nil { // we will reuse this execOutput so we clone it here
+			if err := p.handleStepPartial(ctx, clock, cursor, execOutput.Clone(), partialBlockIndex); err != nil { // we will reuse this execOutput so we clone it here
 				return err
 			}
 		}

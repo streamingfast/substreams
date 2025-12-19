@@ -122,6 +122,10 @@ message PartialBlockData {
   MapModuleOutput output = 1;
   sf.substreams.v1.Clock clock = 2;
   uint32 partial_index = 3;
+  string cursor = 4;
+
+  // Non-deterministic, allows substreams-sink to let go of their undo data.
+  uint64 final_block_height = 5;
 }
 
 message SessionInit {

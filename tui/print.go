@@ -288,7 +288,7 @@ type DeltaWrap struct {
 func decodeAsString(in []byte) []byte { return []byte(fmt.Sprintf("%q", string(in))) }
 
 func printClock(block *pbsubstreamsrpc.BlockScopedData) {
-	fmt.Printf("----------- BLOCK #%s (%s) age=%s ---------------\n", humanize.Comma(int64(block.Clock.Number)), block.Clock.Id, time.Since(block.Clock.Timestamp.AsTime()))
+	fmt.Printf("----------- BLOCK #%s (%s) age=%s --------------- %s\n", humanize.Comma(int64(block.Clock.Number)), block.Clock.Id, time.Since(block.Clock.Timestamp.AsTime()), block.Cursor)
 }
 
 func printUndo(lastGoodClock *pbsubstreams.BlockRef, cursor string) {

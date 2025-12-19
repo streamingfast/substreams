@@ -198,7 +198,7 @@ func (ui *TUI) HandlePartialBlockData(ctx context.Context, data *pbsubstreamsrpc
 	case OutputModeTUI:
 		fmt.Printf("----------- PARTIAL BLOCK #%s (idx=%d) (%s) age=%s ---------------\n", humanize.Comma(int64(data.Clock.Number)), data.PartialIndex, data.Clock.Id, time.Since(data.Clock.Timestamp.AsTime()))
 	case OutputModeCLOCK:
-		fmt.Printf("----------- PARTIAL BLOCK #%s (idx=%d) (%s) age=%s ---------------\n", humanize.Comma(int64(data.Clock.Number)), data.PartialIndex, data.Clock.Id, time.Since(data.Clock.Timestamp.AsTime()))
+		fmt.Printf("----------- PARTIAL BLOCK #%s (idx=%d) (%s) age=%s --------------- %s\n", humanize.Comma(int64(data.Clock.Number)), data.PartialIndex, data.Clock.Id, time.Since(data.Clock.Timestamp.AsTime()), data.Cursor)
 		return nil
 	case OutputModeCURSOR:
 		fmt.Printf("STEP_PARTIAL: %d (idx=%d) (%s)\n", data.Clock.Number, data.PartialIndex, data.Clock.Id)

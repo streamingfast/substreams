@@ -46,6 +46,7 @@ type Output struct {
 
 	blocksPerModule     map[string][]uint64
 	payloads            map[common.BlockContext]*pbsubstreamsrpc.AnyModuleOutput
+	partialBlockIndices map[common.BlockContext]uint32 // tracks partial block indices
 	bytesRepresentation dynamic.BytesRepresentation
 
 	blockIDs map[uint64]string
@@ -184,6 +185,7 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		o.blocksPerModule = make(map[string][]uint64)
 		o.payloads = make(map[common.BlockContext]*pbsubstreamsrpc.AnyModuleOutput)
+		o.partialBlockIndices = make(map[common.BlockContext]uint32)
 		o.blockIDs = make(map[uint64]string)
 		o.blockSelector.Update(blockselect.NewRequestInstanceMsg{})
 
@@ -251,6 +253,66 @@ func (o *Output) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			o.payloads[blockCtx] = output
+			o.setOutputViewContent(forceRedraw)
+		}
+
+	case *pbsubstreamsrpc.PartialBlockData:
+		blockNum := msg.Clock.Number
+
+		if o.lowBlock == nil {
+			o.lowBlock = &blockNum
+		}
+		if o.highBlock < blockNum {
+			o.highBlock = blockNum
+		}
+		o.blockSelector.StretchBounds(*o.lowBlock, o.highBlock)
+
+		// Handle partial block data similar to BlockScopedData
+		if o.moduleSelector != nil && o.moduleSelector.AddModule(o.outputModule) {
+			cmds = append(cmds, func() tea.Msg { return common.UpdateSeenModulesMsg(o.moduleSelector.Modules) })
+			o.active.Module = o.outputModule
+			o.active.BlockNum = blockNum
+		}
+
+		o.blockIDs[msg.Clock.Number] = msg.Clock.Id
+
+		// Handle the partial block output
+		if msg.Output != nil && !msg.Output.IsEmpty() {
+			modName := msg.Output.Name()
+			blockCtx := common.BlockContext{
+				Module:   modName,
+				BlockNum: blockNum,
+			}
+
+			forceRedraw := false
+			if _, found := o.payloads[blockCtx]; !found {
+				if o.moduleSelector != nil && modName != "" && o.moduleSelector.AddModule(modName) {
+					cmds = append(cmds, func() tea.Msg { return common.UpdateSeenModulesMsg(o.moduleSelector.Modules) })
+				}
+				if o.active.Module == "" {
+					o.active.Module = modName
+					o.active.BlockNum = blockNum
+				}
+				if o.active.Module == modName && len(o.blocksPerModule[modName]) == 0 {
+					forceRedraw = true
+					o.active.BlockNum = blockNum
+				}
+				o.blocksPerModule[modName] = append(o.blocksPerModule[modName], blockNum)
+				if modName == o.active.Module {
+					o.blockSelector.SetAvailableBlocks(o.blocksPerModule[modName])
+				}
+
+				if o.keywordToSearchFor != "" {
+					if hasKeyword := o.searchIncomingBlockInModule(o.active.Module, blockNum); hasKeyword {
+						cmds = append(cmds, func() tea.Msg {
+							return search.AddMatchingBlock(blockNum)
+						})
+					}
+				}
+			}
+			// Store partial block data with special handling
+			o.payloads[blockCtx] = msg.Output
+			o.partialBlockIndices[blockCtx] = msg.PartialIndex
 			o.setOutputViewContent(forceRedraw)
 		}
 

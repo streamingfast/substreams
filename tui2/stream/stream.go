@@ -123,6 +123,14 @@ func (s *Stream) Update(msg tea.Msg) tea.Cmd {
 		}
 		cmds = append(cmds, s.readNextMessage)
 		return tea.Batch(cmds...)
+	case *pbsubstreamsrpc.PartialBlockData:
+		var cmds []tea.Cmd
+		if !s.seenBlockData {
+			s.seenBlockData = true
+			cmds = append(cmds, func() tea.Msg { return StreamingMsg })
+		}
+		cmds = append(cmds, s.readNextMessage)
+		return tea.Batch(cmds...)
 	case *pbsubstreamsrpc.ModulesProgress:
 		var cmds []tea.Cmd
 		if !s.seenBlockData && !s.sentBackprocessingMsg {
@@ -232,6 +240,8 @@ func (s *Stream) routeNextMessage(resp *pbsubstreamsrpc.Response) tea.Msg {
 	switch m := resp.Message.(type) {
 	case *pbsubstreamsrpc.Response_BlockScopedData:
 		return m.BlockScopedData
+	case *pbsubstreamsrpc.Response_PartialBlockData:
+		return m.PartialBlockData
 	case *pbsubstreamsrpc.Response_Progress:
 		//log.Printf("Progress response: %T %v", resp, resp)
 		return m.Progress

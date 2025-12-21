@@ -20,6 +20,8 @@ func init() {
 		sink.FlagIncludeOptional(
 			sink.FlagCursor,
 			sink.FlagSkipCheckModuleBinariesExist,
+			sink.FlagIncludePartialBlocks,
+			sink.FlagPartialBlocksOnly,
 		),
 		sink.FlagExcludeDefault(
 			sink.FlagStopBlock,

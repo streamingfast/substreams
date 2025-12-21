@@ -8,6 +8,7 @@ import (
 
 	"github.com/alecthomas/chroma/quick"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/dustin/go-humanize"
 	"github.com/itchyny/gojq"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
@@ -119,6 +120,18 @@ func (o *Output) renderedOutput(in *pbsubstreamsrpc.AnyModuleOutput, withStyle b
 
 func (o *Output) renderPayload(in *renderedOutput) string {
 	out := &strings.Builder{}
+	
+	// Add block header with partial block indication
+	blockCtx := o.active
+	if partialIndex, isPartial := o.partialBlockIndices[blockCtx]; isPartial {
+		header := fmt.Sprintf("----------- PARTIAL BLOCK #%s (idx=%d) (%s) ---------------",
+			humanize.Comma(int64(blockCtx.BlockNum)),
+			partialIndex,
+			o.blockIDs[blockCtx.BlockNum])
+		out.WriteString(styles.Output.LogLabel.Render(header))
+		out.WriteString("\n\n")
+	}
+	
 	if in.error != nil {
 		out.WriteString(styles.Output.ErrorLine.Render(in.error.Error()))
 		out.WriteString("\n")

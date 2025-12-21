@@ -118,16 +118,15 @@ func (o *Output) renderedOutput(in *pbsubstreamsrpc.AnyModuleOutput, withStyle b
 	return
 }
 
-func (o *Output) renderPayload(in *renderedOutput) string {
+func (o *Output) renderPayload(in *renderedOutput, displayCtx *displayContext) string {
 	out := &strings.Builder{}
 	
 	// Add block header with partial block indication
-	blockCtx := o.active
-	if partialIndex, isPartial := o.partialBlockIndices[blockCtx]; isPartial {
+	if displayCtx.isPartialBlock {
 		header := fmt.Sprintf("----------- PARTIAL BLOCK #%s (idx=%d) (%s) ---------------",
-			humanize.Comma(int64(blockCtx.BlockNum)),
-			partialIndex,
-			o.blockIDs[blockCtx.BlockNum])
+			humanize.Comma(int64(displayCtx.blockCtx.BlockNum)),
+			displayCtx.partialIndex,
+			o.blockIDs[displayCtx.blockCtx.BlockNum])
 		out.WriteString(styles.Output.LogLabel.Render(header))
 		out.WriteString("\n\n")
 	}

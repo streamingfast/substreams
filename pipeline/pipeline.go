@@ -52,8 +52,17 @@ type partialProcessingState struct {
 	num                        uint64
 	lastBlockID                string
 	processedPartials          []*pbsubstreams.Clock
-	processedTransactionsCount uint64
+	processedTransactionsCount int
+	processedTransactionsHash  []byte
 	highestIndex               int32
+}
+
+func newPartialProcessingState(num uint64, id string, idx int32) *partialProcessingState {
+	return &partialProcessingState{
+		num:          num,
+		lastBlockID:  id,
+		highestIndex: idx,
+	}
 }
 
 type Pipeline struct {
@@ -110,6 +119,7 @@ type Pipeline struct {
 	insideReorgUpTo bstream.BlockRef
 
 	execOutputCache *cache.Engine
+	blockType       string
 
 	// lastFinalClock should always be either THE `stopBlock` or a block beyond that point
 	// (for chains with potential block skips)
@@ -127,6 +137,7 @@ func New(
 	ctx context.Context,
 	isTier1 bool,
 	execGraph *exec.Graph,
+	blockType string,
 	stores *Stores,
 	indices map[string]map[string]*roaring64.Bitmap,
 	execoutStorage *execout.Configs,
@@ -147,6 +158,7 @@ func New(
 		execOutputCache:         execOutputCache,
 		stateBundleSize:         stateBundleSize,
 		preexistingBlockIndices: indices,
+		blockType:               blockType,
 		execGraph:               execGraph,
 		wasmRuntime:             wasmRuntime,
 		respFunc:                respFunc,

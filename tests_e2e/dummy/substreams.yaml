@@ -28,6 +28,14 @@ modules:
     output:
       type: proto:test.output.Events
 
+  - name: map_events_0
+    kind: map
+    initialBlock: 0
+    inputs:
+      - source: sf.acme.type.v1.Block
+    output:
+      type: proto:test.output.Events
+
   - name: store_stats
     kind: store
     initialBlock: 400

@@ -177,13 +177,6 @@ func computeLinearHandoffBlockNum(productionMode bool, startBlock, stopBlock uin
 }
 
 func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, resolveCursor CursorResolver, getHeadBlock getBlockFunc) (uint64, string, *pbsubstreamsrpc.BlockUndoSignal, error) {
-	// TODO(abourget): a caller will need to verify that, if there's a cursor.Step that is New or Undo,
-	// then we need to validate that we are returning not only a number, but an ID,
-	// We then need to sync from a known finalized Snapshot's block, down to the potentially
-	// forked block in the Cursor, to then send the Substreams Undo payloads to the user,
-	// before continuing on to live (or parallel download, if the fork happened way in the past
-	// and everything is irreversible.
-
 	if req.StartBlockNum < 0 {
 		headBlock, err := getHeadBlock()
 		if err != nil {
@@ -208,9 +201,34 @@ func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, res
 		return 0, "", nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("StartCursor %q is after StopBlockNum %d", cursor, req.StopBlockNum))
 	}
 
+	var undoSignal *pbsubstreamsrpc.BlockUndoSignal
+
+	if cursor.Step == bstream.StepPartial && cursor.HeadBlock.Num() < cursor.Block.Num() {
+		// cursors with StepPartial hide the 'parent block' in the 'head block' field
+		// this allows an optimization where we either send an undo signal up to the parent of the partialblock and start from there,
+		// or we try to resolve a new cursor that we craft from the parent block
+		//
+		// The "headblock" < "block" is there as a safety net to catch exceptions with older cursors during alpha stage of the service.
+		// It would then fallback to the safer "undo up to LIB" behavior
+		cursor = &bstream.Cursor{
+			Step:      bstream.StepNew,
+			Block:     cursor.HeadBlock,
+			LIB:       cursor.LIB,
+			HeadBlock: cursor.HeadBlock,
+		}
+
+		undoSignal = &pbsubstreamsrpc.BlockUndoSignal{
+			LastValidBlock: &pbsubstreams.BlockRef{
+				Number: cursor.Block.Num(),
+				Id:     cursor.Block.ID(),
+			},
+			LastValidCursor: cursor.ToOpaque(),
+		}
+	}
+
 	if cursor.IsOnFinalBlock() {
 		nextBlock := cursor.Block.Num() + 1
-		return nextBlock, cursor.ToOpaque(), nil, nil
+		return nextBlock, cursor.ToOpaque(), undoSignal, nil
 	}
 
 	if cursor.LIB.Num() > cursor.Block.Num() {
@@ -225,7 +243,6 @@ func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, res
 	if err != nil {
 		return 0, "", nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("cannot resolve StartCursor %q: %s", cursor, err.Error()))
 	}
-	var undoSignal *pbsubstreamsrpc.BlockUndoSignal
 	resolvedCursor := cursor
 	if reorgJunctionBlock != nil && reorgJunctionBlock.Num() != cursor.Block.Num() {
 		validCursor := &bstream.Cursor{

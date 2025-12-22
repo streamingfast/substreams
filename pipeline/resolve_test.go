@@ -139,6 +139,57 @@ func Test_resolveStartBlockNum(t *testing.T) {
 			headBlockErr: fmt.Errorf("cannot find head block"),
 			wantErr:      true,
 		},
+		{
+			name: "step partial",
+			req: &pbsubstreamsrpc.Request{
+				StartBlockNum: 10,
+				StartCursor: (&bstream.Cursor{
+					Step:      bstream.StepPartial,
+					Block:     bstream.NewBlockRef("10d", 10),
+					LIB:       bstream.NewBlockRef("5a", 5),
+					HeadBlock: bstream.NewBlockRef("9a", 9), // "headblock" is actually the parentBlock on partial steps
+				}).ToOpaque(),
+			},
+			wantUndoLastBlock: bstream.NewBlockRef("9a", 9),
+			expectedBlockNum:  10, // undo up to 9, start at 10
+			wantErr:           false,
+			wantCursor:        "c1:1:9:9a:5:5a",
+		},
+		{
+			name: "step partial with chains that skips blocks",
+			req: &pbsubstreamsrpc.Request{
+				StartBlockNum: 10,
+				StartCursor: (&bstream.Cursor{
+					Step:      bstream.StepPartial,
+					Block:     bstream.NewBlockRef("10d", 10),
+					LIB:       bstream.NewBlockRef("5a", 5),
+					HeadBlock: bstream.NewBlockRef("8a", 8), // parent block 9 is skipped on this chain
+				}).ToOpaque(),
+			},
+			wantUndoLastBlock: bstream.NewBlockRef("8a", 8),
+			expectedBlockNum:  9, // undo up to 8, start at 9
+			wantErr:           false,
+			wantCursor:        "c1:1:8:8a:5:5a",
+		},
+		{
+			name: "step partial on forked parent cursor",
+			req: &pbsubstreamsrpc.Request{
+				StartBlockNum: 10,
+				StartCursor: (&bstream.Cursor{
+					Step:      bstream.StepPartial,
+					Block:     bstream.NewBlockRef("10d", 10), // partial block built on 9b
+					LIB:       bstream.NewBlockRef("6a", 6),
+					HeadBlock: bstream.NewBlockRef("9b", 9), // parent block 9, forked
+				}).ToOpaque(),
+			},
+			expectedBlockNum: 9,
+			wantErr:          false,
+			cursorResolverArgs: []interface{}{
+				"c1:1:9:9b:6:6a", bstream.NewBlockRef("8a", 8), bstream.NewBlockRef("11a", 11), nil, // cursor gets mangled by our code before calling cursorResolverArgs
+			},
+			wantUndoLastBlock: bstream.NewBlockRef("8a", 8),
+			wantCursor:        "c3:1:8:8a:11:11a:6:6a",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -13,8 +13,6 @@ import (
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dmetering"
-	pbacme "github.com/streamingfast/dummy-blockchain/pb/sf/acme/type/v1"
-	pbeth "github.com/streamingfast/firehose-ethereum/types/pb/sf/ethereum/type/v2"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/metrics"
@@ -28,7 +26,6 @@ import (
 	"github.com/streamingfast/substreams/wasm"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -126,7 +123,7 @@ func (p *Pipeline) processBlock(
 	switch step {
 	case bstream.StepPartial:
 		if reqctx.IncludePartialBlocks(ctx) { // this also covers 'partialBlocksOnly'
-			p.handleStepPartial(ctx, clock, execOutput, partialIndex)
+			p.handleStepPartial(ctx, clock, cursor, execOutput, partialIndex)
 		}
 
 	case bstream.StepUndo:
@@ -257,57 +254,48 @@ func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
 	return nil
 }
 
-func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Clock, execOutput execout.ExecutionOutput, idx int32) (err error) {
-
+func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput, idx int32) (err error) {
 	if p.partialProcessingState != nil {
 		if clock.Id == p.partialProcessingState.lastBlockID {
 			return nil // same hash: nothing new to process
 		}
-		if clock.Number != p.partialProcessingState.num {
-			reqctx.Logger(ctx).Warn("cannot handle partials from different block numbers consecutively", zap.Uint64("received", clock.Number), zap.Uint64("expected", p.partialProcessingState.num))
-			return nil
-		}
-		p.partialProcessingState.highestIndex = idx
-	} else {
-		p.partialProcessingState = &partialProcessingState{
-			lastBlockID:                clock.Id,
-			num:                        clock.Number,
-			processedTransactionsCount: 0,
-			highestIndex:               idx,
-		}
-	}
-
-	// Unmarshal and repack the partial block with less transactions...
-	// TODO: this should be implemented in a "generic" fashion,
-	// using Protobuf annotations + Protobuf reflection
-	// (ex; the sf.ethereum.type.v2.Block could have an annotation on
-	// the transactionTraces field marking it as "the" partial field)
-	if blockData, _, err := execOutput.Get("sf.acme.type.v1.Block"); err == nil {
-		block := &pbacme.Block{}
-		if err := proto.Unmarshal(blockData, block); err != nil {
-			return fmt.Errorf("unmarshal block: %w", err)
-		}
-		block.Transactions = block.Transactions[p.partialProcessingState.processedTransactionsCount:]
-		p.partialProcessingState.processedTransactionsCount += uint64(len(block.Transactions))
-		blockData, _ = proto.Marshal(block)
-		if err := execOutput.Set("sf.acme.type.v1.Block", blockData); err != nil {
-			return fmt.Errorf("set block: %w", err)
-		}
-
-	} else if blockData, _, err := execOutput.Get("sf.ethereum.type.v2.Block"); err == nil {
-		block := &pbeth.Block{}
-		if err := proto.Unmarshal(blockData, block); err != nil {
-			return fmt.Errorf("unmarshal block: %w", err)
-		}
-		block.TransactionTraces = block.TransactionTraces[p.partialProcessingState.processedTransactionsCount:]
-		p.partialProcessingState.processedTransactionsCount += uint64(len(block.TransactionTraces))
-		blockData, _ = proto.Marshal(block)
-		if err := execOutput.Set("sf.ethereum.type.v2.Block", blockData); err != nil {
-			return fmt.Errorf("set block: %w", err)
+		if clock.Number == p.partialProcessingState.num {
+			p.partialProcessingState.highestIndex = idx
+		} else {
+			reqctx.Logger(ctx).Warn("received partials from different block numbers consecutively (without step_New or step_Undo) -- this should not happen unless you are running a chain with partial blocks AND skipped blocks", zap.Uint64("received", clock.Number), zap.Uint64("expected", p.partialProcessingState.num))
+			p.partialProcessingState = newPartialProcessingState(clock.Number, clock.Id, idx)
 		}
 	} else {
-		return fmt.Errorf("unsupported block type for partial blocks")
+		p.partialProcessingState = newPartialProcessingState(clock.Number, clock.Id, idx)
 	}
+
+	txCount, txsHash, err := splitPartialblock(execOutput, p.blockType, p.partialProcessingState.processedTransactionsCount, p.partialProcessingState.processedTransactionsHash)
+	if err != nil {
+		// This is the case where you received partials for block 36, but then you receive a different real block 36: we will undo the previous 36 up to its parent (35), then send handle this new 36 partial.
+		if errors.Is(err, errHashMismatch) {
+			panic("hehe")
+			if err := p.handleStepUndo(&pbsubstreams.Clock{
+				Id:     p.partialProcessingState.lastBlockID,
+				Number: p.partialProcessingState.num,
+			}, &bstream.Cursor{
+				Step:      bstream.StepUndo,
+				Block:     bstream.NewBlockRef(p.partialProcessingState.lastBlockID, p.partialProcessingState.num),
+				HeadBlock: bstream.NewBlockRef(p.partialProcessingState.lastBlockID, p.partialProcessingState.num),
+				LIB:       cursor.LIB,
+			},
+				cursor.HeadBlock, // this is the parent block of the partial
+			); err != nil {
+				return err
+			}
+
+			p.partialProcessingState = nil
+			return p.handleStepPartial(ctx, clock, cursor, execOutput, idx) // call handleStepPartial again, now that undo was performed and we have the new version of the block
+		} else {
+			return err
+		}
+	}
+	p.partialProcessingState.processedTransactionsHash = txsHash
+	p.partialProcessingState.processedTransactionsCount = txCount
 
 	p.partialProcessingState.processedPartials = append(p.partialProcessingState.processedPartials, clock)
 	reqDetails := reqctx.Details(ctx)
@@ -333,7 +321,7 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 
 	mapModuleOutput := normalizeModuleOutput(p.mapModuleOutput, reqDetails.OutputModule)
 
-	if err = returnPartialDataOutput(clock, mapModuleOutput, p.respFunc, idx); err != nil {
+	if err = returnPartialDataOutput(clock, cursor, mapModuleOutput, p.respFunc, idx); err != nil {
 		return fmt.Errorf("failed to return module data output: %w", err)
 	}
 
@@ -355,29 +343,12 @@ func normalizeModuleOutput(in *pbsubstreamsrpc.MapModuleOutput, outputModule str
 
 func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput, isFinalBlock bool) (err error) {
 
-	// if we get a 'new' block while handling partial blocks, we complete the missing partials based on its content.
-	// Ex: we got partials 3, 4, 7
-	//    -> partial 3 contains all transactions from partials 1+2+3
-	//    -> partial 4 only processes transactions from partial 4
-	//    -> when we get the full block (stepNEW), if it differs from the partial7's ID, we process it so that we send a 'partial 10' that contains transactions from partials 8,9,10
-	if reqctx.IncludePartialBlocks(ctx) { // this also covers 'partialBlocksOnly'
-		if p.partialProcessingState == nil || p.partialProcessingState.lastBlockID != clock.Id {
-			partialBlockIndex := biggestPartialBlockIndex
-			if p.partialProcessingState != nil && p.partialProcessingState.highestIndex > partialBlockIndex {
-				partialBlockIndex = p.partialProcessingState.highestIndex + 1 // push back the 'biggest partial block index' so we don't send them out of order to the client
-			}
-			if err := p.handleStepPartial(ctx, clock, execOutput.Clone(), partialBlockIndex); err != nil { // we will reuse this execOutput so we clone it here
-				return err
-			}
-		}
-		if err := p.undoPartialStates(); err != nil {
-			return err
-		}
-	}
-
 	if p.isTier1 && p.checkPendingShutdown() {
 		if p.stores.StoreMap != nil && p.sentBlocks > minBlocksProcessedToSave {
 			p.stores.logger.Info("shutting down, quick saving stores")
+			if err := p.undoPartialStates(); err != nil {
+				return err
+			}
 			p.stores.StoreMap.QuickSave(ctx, p.lastProcessedBlockRef.ID())
 		} else {
 			p.stores.logger.Info("shutting down (no quick save)", zap.Bool("has_stores", p.stores.StoreMap != nil), zap.Uint64("sent_blocks", p.sentBlocks))
@@ -422,36 +393,59 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 
 	metering.AddWasmInputBytes(ctx, execOutput.Len())
 
+	if p.pendingUndoMessage != nil && p.gate.shouldSendOutputs() {
+		if err := p.respFunc(p.pendingUndoMessage); err != nil {
+			return fmt.Errorf("failed to run send pending undo message: %w", err)
+		}
+		p.pendingUndoMessage = nil
+	}
+
+	// if we get a 'new' block while handling partial blocks, we complete the missing partials based on its content.
+	// Ex: we got partials 3, 4, 7
+	//    -> partial 3 contains all transactions from partials 1+2+3
+	//    -> partial 4 only processes transactions from partial 4
+	//    -> when we get the full block (stepNEW), if it differs from the partial7's ID, we process it so that we send a 'partial 10' that contains transactions from partials 8,9,10
+	if reqctx.IncludePartialBlocks(ctx) { // this also covers 'partialBlocksOnly'
+		if p.partialProcessingState == nil || p.partialProcessingState.lastBlockID != clock.Id {
+			partialBlockIndex := biggestPartialBlockIndex
+			if p.partialProcessingState != nil && p.partialProcessingState.highestIndex > partialBlockIndex {
+				partialBlockIndex = p.partialProcessingState.highestIndex + 1 // push back the 'biggest partial block index' so we don't send them out of order to the client
+			}
+
+			// this handleStepPartial will gate the 'shouldSendOutputs' itself
+			if err := p.handleStepPartial(ctx, clock, cursor, execOutput.Clone(), partialBlockIndex); err != nil { // we will reuse this execOutput so we clone it here
+				return err
+			}
+		}
+		if err := p.undoPartialStates(); err != nil {
+			return err
+		}
+	}
+
 	if err := p.executeModules(ctx, execOutput, isFinalBlock, true); err != nil {
 		return fmt.Errorf("execute modules: %w", err)
 	}
 
-	if p.gate.shouldSendOutputs() && !reqctx.PartialBlocksOnly(ctx) {
+	if p.gate.shouldSendOutputs() {
 		p.sentBlocks++
-		logger.Debug("will return module outputs")
-		if p.pendingUndoMessage != nil {
-			if err := p.respFunc(p.pendingUndoMessage); err != nil {
-				return fmt.Errorf("failed to run send pending undo message: %w", err)
-			}
-		}
-		p.pendingUndoMessage = nil
-
-		if reqDetails.IsTier2Request { // the gate.shouldSendOutputs() assures us that we are a streaming tier2 in this case
-			if out := p.mapModuleOutput.GetMapOutput(); out != nil {
-				skippable := p.mapModuleOutputSkippable && len(out.Value) == 0
-				if !skippable {
-					if err = returnTier2DataOutputs(clock, out, p.respFunc); err != nil {
-						return fmt.Errorf("failed to return module data output: %w", err)
+		if !reqctx.PartialBlocksOnly(ctx) {
+			if reqDetails.IsTier2Request { // the gate.shouldSendOutputs() assures us that we are a streaming tier2 in this case
+				if out := p.mapModuleOutput.GetMapOutput(); out != nil {
+					skippable := p.mapModuleOutputSkippable && len(out.Value) == 0
+					if !skippable {
+						if err = returnTier2DataOutputs(clock, out, p.respFunc); err != nil {
+							return fmt.Errorf("failed to return module data output: %w", err)
+						}
 					}
 				}
-			}
-		} else {
-			// LIVE and DEV mode always receive module data outputs, even when they are empty
-			// so they can follow progress (and dev also gets debug output...)
-			//
-			mapModuleOutput := normalizeModuleOutput(p.mapModuleOutput, reqDetails.OutputModule)
-			if err = returnModuleDataOutputs(clock, cursor, mapModuleOutput, p.extraMapModuleOutputs, p.extraStoreModuleOutputs, p.respFunc, logger); err != nil {
-				return fmt.Errorf("failed to return module data output: %w", err)
+			} else {
+				// LIVE and DEV mode always receive module data outputs, even when they are empty
+				// so they can follow progress (and dev also gets debug output...)
+				//
+				mapModuleOutput := normalizeModuleOutput(p.mapModuleOutput, reqDetails.OutputModule)
+				if err = returnModuleDataOutputs(clock, cursor, mapModuleOutput, p.extraMapModuleOutputs, p.extraStoreModuleOutputs, p.respFunc, logger); err != nil {
+					return fmt.Errorf("failed to return module data output: %w", err)
+				}
 			}
 		}
 	}

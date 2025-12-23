@@ -240,7 +240,7 @@ waitReady:
 }
 
 func newDummyBlockchainContainer(ctx context.Context, tmpDir string, image string, additionalReaderArgs string, burst int) (testcontainers.Container, error) {
-	baseReaderArgs := fmt.Sprintf("start --log-level=error --tracer=firehose --store-dir=/data --genesis-block-burst=%d --block-rate=120 --block-size=1230 --genesis-height=0 --server-addr=:9777 --with-reorgs=false --with-skipped-blocks=false", burst)
+	baseReaderArgs := fmt.Sprintf("start --log-level=error --tracer=firehose --store-dir=/data --genesis-block-burst=%d --block-rate=120 --block-size=1500 --genesis-height=0 --server-addr=:9777 --with-reorgs=false --with-skipped-blocks=false", burst)
 	readerArgs := baseReaderArgs
 	if additionalReaderArgs != "" {
 		readerArgs = baseReaderArgs + " " + additionalReaderArgs
@@ -283,8 +283,76 @@ func newDummyBlockchainContainer(ctx context.Context, tmpDir string, image strin
 	return container, nil
 }
 
+type responses []interface{}
+
+func (r *responses) Strings() (out []string) {
+	for _, rr := range *r {
+		switch rr := rr.(type) {
+		case *pbsubstreamsrpcv2.BlockScopedData:
+			out = append(out, fmt.Sprintf("F:%d", rr.Clock.Number))
+		case *pbsubstreamsrpcv2.PartialBlockData:
+			out = append(out, fmt.Sprintf("P:%d:%d", rr.Clock.Number, rr.PartialIndex))
+		case *pbsubstreamsrpcv2.BlockUndoSignal:
+			out = append(out, fmt.Sprintf("U:%d", rr.LastValidBlock.Number))
+		}
+	}
+	return
+}
+
+func (r *responses) BlockScopedData() []*pbsubstreamsrpcv2.BlockScopedData {
+	if r == nil {
+		return nil
+	}
+	var blockScopedData []*pbsubstreamsrpcv2.BlockScopedData
+	for _, resp := range *r {
+		if blockScopedDataResp, ok := resp.(*pbsubstreamsrpcv2.BlockScopedData); ok {
+			blockScopedData = append(blockScopedData, blockScopedDataResp)
+		}
+	}
+	return blockScopedData
+}
+
+func (r *responses) PartialBlockData() []*pbsubstreamsrpcv2.PartialBlockData {
+	if r == nil {
+		return nil
+	}
+	var partialBlockData []*pbsubstreamsrpcv2.PartialBlockData
+	for _, resp := range *r {
+		if partialBlockDataResp, ok := resp.(*pbsubstreamsrpcv2.PartialBlockData); ok {
+			partialBlockData = append(partialBlockData, partialBlockDataResp)
+		}
+	}
+	return partialBlockData
+}
+
+func (r *responses) SessionInit() *pbsubstreamsrpcv2.SessionInit {
+	if r == nil {
+		return nil
+	}
+	for _, resp := range *r {
+		if sessionInitResp, ok := resp.(*pbsubstreamsrpcv2.SessionInit); ok {
+			return sessionInitResp
+		}
+	}
+	return nil
+}
+
+func (r *responses) Undo() []*pbsubstreamsrpcv2.BlockUndoSignal {
+	if r == nil {
+		return nil
+	}
+	var blockUndoSignals []*pbsubstreamsrpcv2.BlockUndoSignal
+	for _, resp := range *r {
+		if blockUndoSignalResp, ok := resp.(*pbsubstreamsrpcv2.BlockUndoSignal); ok {
+			blockUndoSignals = append(blockUndoSignals, blockUndoSignalResp)
+		}
+	}
+	return blockUndoSignals
+}
+
 // RunRequestWithPartialBlocks is similar to RunRequest but specifically looks for partial block data
-func RunRequestWithPartialBlocks(t *testing.T, req *pbsubstreamsrpcv2.Request, endpoint string, partialResponseCount int) ([]*pbsubstreamsrpcv2.BlockScopedData, *pbsubstreamsrpcv2.SessionInit, []*pbsubstreamsrpcv2.PartialBlockData, error) {
+func RunRequestWithPartialBlocks(t *testing.T, req *pbsubstreamsrpcv2.Request, endpoint string, maxPartialResponses int) (responses, error) {
+	var resps responses
 
 	ctx := t.Context()
 	// substreams client
@@ -315,11 +383,7 @@ func RunRequestWithPartialBlocks(t *testing.T, req *pbsubstreamsrpcv2.Request, e
 		t.Logf("Error making streaming call: %v", err)
 		require.NoError(t, err)
 	}
-
-	// Read all responses and accumulate BlockScopedData and PartialBlockData
-	var blockScopedDataSlice []*pbsubstreamsrpcv2.BlockScopedData
-	var partialBlockDataSlice []*pbsubstreamsrpcv2.PartialBlockData
-	var session *pbsubstreamsrpcv2.SessionInit
+	var partialBlockDataCount int
 
 	for {
 		var response *pbsubstreamsrpcv2.Response
@@ -332,30 +396,36 @@ func RunRequestWithPartialBlocks(t *testing.T, req *pbsubstreamsrpcv2.Request, e
 
 		// Validate session if received
 		if sess := response.GetSession(); sess != nil {
-			session = sess
-			t.Logf("Received session: %+v", session)
+			resps = append(resps, sess)
+			t.Logf("Received session: %+v", sess)
 		}
 
 		// Check for partial block data and accumulate
 		if partialData := response.GetPartialBlockData(); partialData != nil {
-			partialBlockDataSlice = append(partialBlockDataSlice, partialData)
+			resps = append(resps, partialData)
+			partialBlockDataCount++
 			//t.Logf("Received partial block data %d/%d", len(partialBlockDataSlice), partialResponseCount)
 
 			// Break if we've received the desired number of partial responses
-			if len(partialBlockDataSlice) >= partialResponseCount {
-				t.Logf("Received %d partial responses - halting request", len(partialBlockDataSlice))
+			if partialBlockDataCount >= maxPartialResponses {
+				t.Logf("Received %d partial responses - halting request", partialBlockDataCount)
 				break
 			}
 		}
 
 		// Accumulate BlockScopedData
 		if blockData := response.GetBlockScopedData(); blockData != nil {
-			blockScopedDataSlice = append(blockScopedDataSlice, blockData)
+			resps = append(resps, blockData)
 			//t.Logf("Accumulated BlockScopedData clock %d, total count: %d", blockData.Clock.Number, len(blockScopedDataSlice))
+		}
+
+		if undo := response.GetBlockUndoSignal(); undo != nil {
+			resps = append(resps, undo)
+			//t.Logf("Accumulated BlockUndoSignal clock %d, total count: %d", undo.Clock.Number, len(blockUndoSignalSlice))
 		}
 	}
 
-	return blockScopedDataSlice, session, partialBlockDataSlice, err
+	return resps, err
 }
 
 func findFreePort(t *testing.T) int {

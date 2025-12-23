@@ -823,6 +823,7 @@ func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelC
 		ctx,
 		true,
 		execGraph,
+		s.blockType,
 		stores,
 		nil,
 		execOutputConfigs,

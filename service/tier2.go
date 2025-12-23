@@ -507,6 +507,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		ctx,
 		false,
 		execGraph,
+		request.BlockType,
 		stores,
 		executionPlan.ExistingIndices,
 		execOutputConfigs,

@@ -25,7 +25,7 @@
 * [Install Substreams CLI](how-to-guides/cli/installing-the-cli.md)
   * [Substreams CLI Authentication](how-to-guides/cli/authentication.md)
 * [Developing Substreams](how-to-guides/develop-your-own-substreams/develop-your-own-substreams.md)
-  * [on EVM](how-to-guides/develop-your-own-substreams/evm/exploring-ethereum/exploring-ethereum.md)
+  * [on EVM](how-to-guides/develop-your-own-substreams/on-evm/README.md)
     * [Exploring Ethereum](how-to-guides/develop-your-own-substreams/evm/exploring-ethereum/exploring-ethereum.md)
       * [Filter Transactions](how-to-guides/develop-your-own-substreams/evm/exploring-ethereum/map_filter_transactions_module.md)
       * [Retrieve Events of a Smart Contract](how-to-guides/develop-your-own-substreams/evm/exploring-ethereum/map_contract_events_module.md)
@@ -38,7 +38,7 @@
     * [NFT Trades](how-to-guides/develop-your-own-substreams/solana/top-ledger/nft-trades.md)
     * [DEX Trades](how-to-guides/develop-your-own-substreams/solana/top-ledger/dex-trades.md)
     * [From Yellowstone to Substreams](how-to-guides/develop-your-own-substreams/solana/migrate-from-yellowstone.md)
-  * [on Cosmos](how-to-guides/develop-your-own-substreams/cosmos)
+  * on Cosmos
     * [Injective](how-to-guides/develop-your-own-substreams/cosmos/injective)
       * [Simple Substreams Example](how-to-guides/develop-your-own-substreams/cosmos/injective/block-stats.md)
       * [Foundational Modules](how-to-guides/develop-your-own-substreams/cosmos/injective/foundational.md)
@@ -62,7 +62,7 @@
     * [Go](how-to-guides/sinks/stream/go.md)
   * [Substreams:PubSub](how-to-guides/sinks/pubsub.md)
   * [Files](how-to-guides/sinks/files.md)
-  * [Community Sinks](how-to-guides/sinks/community/other-sinks)
+  * [Community Sinks]
     * [MongoDB](how-to-guides/sinks/community/other-sinks/mongodb.md)
     * [Key-Value Store](how-to-guides/sinks/community/other-sinks/kv.md)
     * [Prometheus](how-to-guides/sinks/community/other-sinks/prometheus.md)

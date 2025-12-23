@@ -6,9 +6,10 @@ New support for "Flashblocks" is now available for alpha testing on Base Mainnet
 **Disclaimers**
 
 * The only endpoint supporting Flashblocks is `https://base-mainnet-flash.streamingfast.io:443`.
-* That endpoint is not guaranteed to be stable or available at all times.
+* That endpoint is not guaranteed to be stable or available at all times (alpha testing).
 * The protocol might still change in the next few weeks, as we gather feedback on usage.
-* Flashblocks coming from Firehose or Substreams endpoint should not be considered final data. Only write to database data coming from full blocks: there is no "undo" mechanism for Flashblocks.
+* It is normal to receive only "some" partial blocks indexes. In Substreams, the data from missing ones will always be bundled in the next PartialBlockData.
+* Substreams does not send "undo signals" between partial blocks. It only sends an "undo signal" in case of a reorg, or if the sent partial blocks are being discarded and the new block does not correspond to the partial blocks sent. 
 {% endhint %}
 
 ## Description
@@ -34,8 +35,7 @@ Here's how it works:
 1. To keep up with the chain, it may skip a few emissions of partial blocks, but will never send the transactions out-of-order.
 1. The Substreams engine will remember what was processed for each active Substreams and only process the new transactions since the last execution.
 1. It sends the [PartialBlockData](https://buf.build/streamingfast/substreams/docs/main:sf.substreams.rpc.v2#sf.substreams.rpc.v2.PartialBlockData) for each part of the full block as it gets it from the partial blocks
-1. If there is a reorg, new and undo signals are sent for the full blocks, but there is no consideration for the sent partial blocks. The user must always consider that the partial blocks data may become invalid.
-1. For this reason, there is no "cursor" sent with the partial blocks data.
+1. If there is a reorg, the UNDO signals are sent, followed by the PartialBlockData with index=10 of the new blocks (containing effectively all the data for those blocks)
 
 ### Changes to Protobuf models
 
@@ -46,6 +46,9 @@ Here's how it works:
     MapModuleOutput output = 1;
     sf.substreams.v1.Clock clock = 2;
     uint32 partial_index = 3;
+    string cursor = 4;
+    // Non-deterministic, allows substreams-sink to let go of their undo data.
+    uint64 final_block_height = 5;
   }
   ```
 
@@ -64,9 +67,7 @@ Here's how it works:
 
 When writing a substreams that will run on partial blocks, remember that your modules will run multiple times on small increments of the same block.
 This means that any type of aggregation in a mapper will be incorrect. Only process data inside the block as if it were a stream of transactions.
-
-While store modules should provide the incremental data as the partial blocks get processed, they may not represent exactly the same data as the full block would. 
-When a block gets completed, they get recomputed from the final data so that inconsistencies don't add up.
+Also, never use the block hash in your modules, as it changes between the versions of a partial block.
 
 ### Example of workflow
 

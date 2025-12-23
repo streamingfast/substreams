@@ -144,7 +144,7 @@ func (ui *TUI) HandleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstrea
 	case OutputModeCLOCK:
 		fmt.Println("UNDO:", undoSignal.LastValidBlock)
 	case OutputModeCURSOR:
-		fmt.Println(cursor.String())
+		fmt.Printf("UNDO: last valid:%d, cursor:%s\n", undoSignal.LastValidBlock.Number, cursor.String())
 	}
 	return nil
 }
@@ -177,7 +177,7 @@ func (ui *TUI) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.
 		printClock(data)
 		return nil
 	case OutputModeCURSOR:
-		fmt.Println(cursor.String())
+		fmt.Printf("BLOCK #%s (%s) age: %s cursor: %s\n", humanize.Comma(int64(data.Clock.Number)), data.Clock.Id, time.Since(data.Clock.Timestamp.AsTime()), cursor.String())
 		return nil
 	}
 
@@ -198,10 +198,10 @@ func (ui *TUI) HandlePartialBlockData(ctx context.Context, data *pbsubstreamsrpc
 	case OutputModeTUI:
 		fmt.Printf("----------- PARTIAL BLOCK #%s (idx=%d) (%s) age=%s ---------------\n", humanize.Comma(int64(data.Clock.Number)), data.PartialIndex, data.Clock.Id, time.Since(data.Clock.Timestamp.AsTime()))
 	case OutputModeCLOCK:
-		fmt.Printf("----------- PARTIAL BLOCK #%s (idx=%d) (%s) age=%s --------------- %s\n", humanize.Comma(int64(data.Clock.Number)), data.PartialIndex, data.Clock.Id, time.Since(data.Clock.Timestamp.AsTime()), data.Cursor)
+		fmt.Printf("----------- PARTIAL BLOCK #%s (idx=%d) (%s) age=%s ---------------\n", humanize.Comma(int64(data.Clock.Number)), data.PartialIndex, data.Clock.Id, time.Since(data.Clock.Timestamp.AsTime()))
 		return nil
 	case OutputModeCURSOR:
-		fmt.Printf("STEP_PARTIAL: %d (idx=%d) (%s)\n", data.Clock.Number, data.PartialIndex, data.Clock.Id)
+		fmt.Printf("PARTIAL BLOCK #%s (idx=%d) (%s) age: %s cursor: %s\n", humanize.Comma(int64(data.Clock.Number)), data.PartialIndex, data.Clock.Id, time.Since(data.Clock.Timestamp.AsTime()), data.Cursor)
 		return nil
 	}
 

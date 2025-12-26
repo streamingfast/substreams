@@ -62,7 +62,7 @@
     * [Go](how-to-guides/sinks/stream/go.md)
   * [Substreams:PubSub](how-to-guides/sinks/pubsub.md)
   * [Files](how-to-guides/sinks/files.md)
-  * [Community Sinks](how-to-guides/sinks/community/other-sinks)
+  * Community Sinks
     * [MongoDB](how-to-guides/sinks/community/other-sinks/mongodb.md)
     * [Key-Value Store](how-to-guides/sinks/community/other-sinks/kv.md)
     * [Prometheus](how-to-guides/sinks/community/other-sinks/prometheus.md)

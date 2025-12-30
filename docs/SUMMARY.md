@@ -38,7 +38,7 @@
     * [NFT Trades](how-to-guides/develop-your-own-substreams/solana/top-ledger/nft-trades.md)
     * [DEX Trades](how-to-guides/develop-your-own-substreams/solana/top-ledger/dex-trades.md)
     * [From Yellowstone to Substreams](how-to-guides/develop-your-own-substreams/solana/migrate-from-yellowstone.md)
-  * on Cosmos
+  * [on Cosmos](how-to-guides/develop-your-own-substreams/cosmos)
     * [Injective](how-to-guides/develop-your-own-substreams/cosmos/injective)
       * [Simple Substreams Example](how-to-guides/develop-your-own-substreams/cosmos/injective/block-stats.md)
       * [Foundational Modules](how-to-guides/develop-your-own-substreams/cosmos/injective/foundational.md)
@@ -62,7 +62,7 @@
     * [Go](how-to-guides/sinks/stream/go.md)
   * [Substreams:PubSub](how-to-guides/sinks/pubsub.md)
   * [Files](how-to-guides/sinks/files.md)
-  * [Community Sinks]
+  * [Community Sinks](how-to-guides/sinks/community/other-sinks)
     * [MongoDB](how-to-guides/sinks/community/other-sinks/mongodb.md)
     * [Key-Value Store](how-to-guides/sinks/community/other-sinks/kv.md)
     * [Prometheus](how-to-guides/sinks/community/other-sinks/prometheus.md)

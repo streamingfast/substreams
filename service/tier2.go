@@ -477,9 +477,13 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 						var externalCallMetricsStr string
 						if mod.ExternalCallMetrics != nil {
 							externalCallMetricsStr = "{"
-							for _, metric := range mod.ExternalCallMetrics {
-								externalCallMetricsStr = fmt.Sprintf("%s: {count: %d, duration_ms: %d}", metric.Name, metric.Count, metric.TimeMs)
+							for i, metric := range mod.ExternalCallMetrics {
+								if i > 0 {
+									externalCallMetricsStr += ", "
+								}
+								externalCallMetricsStr += fmt.Sprintf(`"%s": {"count": %d, "duration_ms": %d}`, metric.Name, metric.Count, metric.TimeMs)
 							}
+							externalCallMetricsStr += "}"
 						}
 
 						modStrings[i] = fmt.Sprintf("%s: processing_time_ms:%d,%s %s", mod.Name, mod.TotalProcessingTimeMs, storeSizeStr, externalCallMetricsStr)

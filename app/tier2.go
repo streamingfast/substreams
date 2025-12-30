@@ -46,6 +46,9 @@ type Tier2Modules struct {
 }
 
 func NewTier2(logger *zap.Logger, config *Tier2Config, modules *Tier2Modules) *Tier2App {
+
+	metrics.DeclareTier2Metrics(logger)
+
 	return &Tier2App{
 		Shutter: shutter.New(),
 		config:  config,
@@ -57,6 +60,8 @@ func NewTier2(logger *zap.Logger, config *Tier2Config, modules *Tier2Modules) *T
 }
 
 func (a *Tier2App) Run() error {
+
+	// declared in NewTier2, registered here
 	dmetrics.Register(metrics.MetricSet)
 
 	a.logger.Info("running substreams-tier2", zap.Reflect("config", a.config))

@@ -279,8 +279,6 @@ func NewTier1(
 	s.getRecentFinalBlock = sf.GetRecentFinalBlock
 	s.getHeadBlock = sf.GetHeadBlock
 
-	metrics.RegisterMetricSet(logger)
-
 	for _, opt := range opts {
 		opt(s)
 	}
@@ -567,10 +565,10 @@ func (s *Tier1Service) BlocksAny(
 	var reqStats *metrics.Stats
 	ctx, reqStats = setupRequestStats(ctx, request.OutputModule, outputModuleHash, execGraph, request.ProductionMode, false)
 
-	metrics.SubstreamsCounter.Inc()
-	metrics.ActiveRequests.Inc()
+	metrics.Tier1RequestsCounter.Inc()
+	metrics.Tier1ActiveRequests.Inc()
 	defer func() {
-		metrics.ActiveRequests.Dec()
+		metrics.Tier1ActiveRequests.Dec()
 
 		if status := s.getOverloadedStatus(); status.canAcceptUpcomingRequests() {
 			s.appSetIsReadyState(true)
@@ -1452,5 +1450,5 @@ func (s *Tier1Service) cancelRequest(traceID string, outputModuleHash string, se
 }
 
 func (s *Tier1Service) getActiveRequestCount() int {
-	return int(dmetrics.NewValueFromMetric(metrics.ActiveRequests, "requests").ValueUint())
+	return int(dmetrics.NewValueFromMetric(metrics.Tier1ActiveRequests, "requests").ValueUint())
 }

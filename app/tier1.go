@@ -105,6 +105,8 @@ func NewTier1(logger *zap.Logger, config *Tier1Config, modules *Tier1Modules) *T
 		modules.CheckPendingShutDown = func() bool { return false }
 	}
 
+	metrics.DeclareTier1Metrics(logger)
+
 	return &Tier1App{
 		Shutter: shutter.New(),
 		config:  config,
@@ -134,7 +136,7 @@ func loadTier1FoundationalStoreEndpoints(configPath string) (map[string]string, 
 }
 
 func (a *Tier1App) Run() error {
-
+	// declared in NewTier1, registered here
 	dmetrics.Register(metrics.MetricSet)
 
 	a.logger.Info("running substreams-tier1", zap.Reflect("config", a.config))

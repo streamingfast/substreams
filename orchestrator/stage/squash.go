@@ -133,8 +133,8 @@ func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUni
 		return nil
 	}
 
-	metrics.SquashersStarted.Inc()
-	defer metrics.SquashersEnded.Inc()
+	metrics.Tier1SquashersStarted.Inc()
+	defer metrics.Tier1SquashersEnded.Inc()
 
 	// Merge
 	meter.mergeStart = time.Now()

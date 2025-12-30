@@ -65,6 +65,9 @@ type testRun struct {
 }
 
 func newTestRun(t *testing.T, startBlock int64, linearHandoffBlock, exclusiveEndBlock, firstStreamableBlock uint64, moduleName string, manifestPath string) *testRun {
+
+	metrics.DeclareTier1Metrics(zap.NewNop())
+	metrics.DeclareTier2Metrics(zap.NewNop())
 	pkg := manifest.TestReadManifest(t, manifestPath)
 
 	return &testRun{Package: pkg, StartBlock: startBlock, ExclusiveEndBlock: exclusiveEndBlock, FirstStreamableBlock: firstStreamableBlock, ModuleName: moduleName, LinearHandoffBlockNum: linearHandoffBlock}

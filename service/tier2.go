@@ -139,8 +139,6 @@ func NewTier2(
 		debugAPI.Start()
 	}
 
-	metrics.RegisterMetricSet(logger)
-
 	for _, opt := range opts {
 		opt(s)
 	}

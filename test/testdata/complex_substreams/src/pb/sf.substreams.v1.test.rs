@@ -21,4 +21,10 @@ pub struct Boolean {
     #[prost(bool, tag="1")]
     pub result: bool,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Array {
+    #[prost(string, repeated, tag="1")]
+    pub result: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
 // @@protoc_insertion_point(module)

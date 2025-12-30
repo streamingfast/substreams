@@ -47,6 +47,9 @@ func generateMermaidGraph(mods *pbsubstreams.Modules) string {
 	for _, s := range mods.Modules {
 		// fmt.Println("module", s.Filename)
 		switch s.Kind.(type) {
+
+		case *pbsubstreams.Module_KindBlockIndex_:
+			str.WriteString(fmt.Sprintf("  %s[index: %s];\n", s.Name, s.Name))
 		case *pbsubstreams.Module_KindMap_:
 			str.WriteString(fmt.Sprintf("  %s[map: %s];\n", s.Name, s.Name))
 		case *pbsubstreams.Module_KindStore_:
@@ -77,6 +80,10 @@ func generateMermaidGraph(mods *pbsubstreams.Modules) string {
 				str.WriteString(fmt.Sprintf("  %s[foundational-store: %s] --> %s;\n", id, id, s.Name))
 
 			}
+		}
+
+		if s.BlockFilter != nil {
+			str.WriteString(fmt.Sprintf("  %s -.-> |blockFilter| %s;\n", s.BlockFilter.Module, s.Name))
 		}
 	}
 

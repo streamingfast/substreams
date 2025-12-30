@@ -23,8 +23,7 @@ func (n NoopHandler) ProcessBlock(blk *pbbstream.Block, obj interface{}) (err er
 
 	step := obj.(bstream.Stepable).Step()
 	switch step {
-	case bstream.StepIrreversible,
-		bstream.StepNewIrreversible,
+	case bstream.StepNewIrreversible,
 		bstream.StepNew:
 	default:
 		return nil

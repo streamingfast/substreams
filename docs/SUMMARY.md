@@ -25,7 +25,7 @@
 * [Install Substreams CLI](how-to-guides/cli/installing-the-cli.md)
   * [Substreams CLI Authentication](how-to-guides/cli/authentication.md)
 * [Developing Substreams](how-to-guides/develop-your-own-substreams/develop-your-own-substreams.md)
-  * [on EVM](how-to-guides/develop-your-own-substreams/evm)
+  * [on EVM](how-to-guides/develop-your-own-substreams/evm/exploring-ethereum/exploring-ethereum.md)
     * [Exploring Ethereum](how-to-guides/develop-your-own-substreams/evm/exploring-ethereum/exploring-ethereum.md)
       * [Filter Transactions](how-to-guides/develop-your-own-substreams/evm/exploring-ethereum/map_filter_transactions_module.md)
       * [Retrieve Events of a Smart Contract](how-to-guides/develop-your-own-substreams/evm/exploring-ethereum/map_contract_events_module.md)

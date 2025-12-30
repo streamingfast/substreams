@@ -478,8 +478,8 @@ func (c *Call) PanicNonDeterministicError(err error) {
 
 var policyMap = map[pbsubstreams.Module_KindStore_UpdatePolicy]string{
 	pbsubstreams.Module_KindStore_UPDATE_POLICY_UNSET:             "unset",
-	pbsubstreams.Module_KindStore_UPDATE_POLICY_SET:               "replace",
-	pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS: "ignore",
+	pbsubstreams.Module_KindStore_UPDATE_POLICY_SET:               "set",
+	pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS: "set_if_not_exists",
 	pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD:               "add",
 	pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN:               "min",
 	pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX:               "max",

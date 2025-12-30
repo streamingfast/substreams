@@ -9,6 +9,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/streamingfast/substreams/block"
+	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
 )
@@ -97,14 +98,14 @@ func getPartialOrFullKV(ctx context.Context, modState *StoreModuleState, rng *bl
 // singleSquash gets the current fullKV and merges the next partialKV into it.
 // If there is an existing fullKV at the destination (next segment), it will be loaded instead (whichever file is seen first)
 func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUnit Unit) error {
-	metrics := mergeMetrics{}
-	metrics.start = time.Now()
-	metrics.stage = stage.idx
-	metrics.moduleName = modState.name
-	metrics.moduleHash = modState.storeConfig.ModuleHash()
+	meter := mergeMetrics{}
+	meter.start = time.Now()
+	meter.stage = stage.idx
+	meter.moduleName = modState.name
+	meter.moduleHash = modState.storeConfig.ModuleHash()
 
 	rng := modState.segmenter.Range(mergeUnit.Segment)
-	metrics.blockRange = rng
+	meter.blockRange = rng
 	segmentEndsOnInterval := modState.segmenter.EndsOnInterval(mergeUnit.Segment)
 
 	// Retrieve store to merge, from cache or load from storage. Allows skipping of segments
@@ -115,12 +116,12 @@ func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUni
 	}
 
 	// Load
-	metrics.loadStart = time.Now()
+	meter.loadStart = time.Now()
 	partialKV, partialFile, newFullKV, err := getPartialOrFullKV(s.ctx, modState, rng)
 	if err != nil {
 		return err
 	}
-	metrics.loadEnd = time.Now()
+	meter.loadEnd = time.Now()
 	if s.ctx.Err() != nil {
 		return s.ctx.Err()
 	}
@@ -128,18 +129,21 @@ func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUni
 	if newFullKV != nil {
 		modState.cachedStore = newFullKV
 		modState.lastBlockInStore = rng.ExclusiveEndBlock
-		s.logger.Debug("squashing time metrics (skipped, loaded from full kv)", metrics.logFields()...)
+		s.logger.Debug("squashing time metrics (skipped, loaded from full kv)", meter.logFields()...)
 		return nil
 	}
 
+	metrics.SquashersStarted.Inc()
+	defer metrics.SquashersEnded.Inc()
+
 	// Merge
-	metrics.mergeStart = time.Now()
+	meter.mergeStart = time.Now()
 	if err := fullKV.Merge(partialKV); err != nil {
 		return fmt.Errorf("merging: %w", err)
 	}
 
 	modState.lastBlockInStore = rng.ExclusiveEndBlock
-	metrics.mergeEnd = time.Now()
+	meter.mergeEnd = time.Now()
 
 	s.logger.Info("deleting partial store", zap.Stringer("store", partialKV))
 	stage.asyncWork.Go(func() error {
@@ -148,19 +152,19 @@ func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUni
 
 	// Flush full store
 	if segmentEndsOnInterval {
-		metrics.saveStart = time.Now()
+		meter.saveStart = time.Now()
 		_, writer, err := fullKV.Save(rng.ExclusiveEndBlock)
 		if err != nil {
 			return fmt.Errorf("save full store: %w", err)
 		}
-		metrics.saveEnd = time.Now()
+		meter.saveEnd = time.Now()
 
 		stage.asyncWork.Go(func() error {
 			return writer.Write(context.Background()) // always write files here even if the request was cancelled.
 		})
 	}
 
-	s.logger.Info("squashing time metrics", metrics.logFields()...)
+	s.logger.Info("squashing time metrics", meter.logFields()...)
 
 	return nil
 }

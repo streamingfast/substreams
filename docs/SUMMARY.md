@@ -25,7 +25,7 @@
 * [Install Substreams CLI](how-to-guides/cli/installing-the-cli.md)
   * [Substreams CLI Authentication](how-to-guides/cli/authentication.md)
 * [Developing Substreams](how-to-guides/develop-your-own-substreams/develop-your-own-substreams.md)
-  * [on EVM](how-to-guides/develop-your-own-substreams/evm/exploring-ethereum/exploring-ethereum.md)
+  * [on EVM](how-to-guides/develop-your-own-substreams/evm)
     * [Exploring Ethereum](how-to-guides/develop-your-own-substreams/evm/exploring-ethereum/exploring-ethereum.md)
       * [Filter Transactions](how-to-guides/develop-your-own-substreams/evm/exploring-ethereum/map_filter_transactions_module.md)
       * [Retrieve Events of a Smart Contract](how-to-guides/develop-your-own-substreams/evm/exploring-ethereum/map_contract_events_module.md)
@@ -71,13 +71,13 @@
 ## Reference Material
 
 * [CLI Reference](references/cli/command-line-interface.md)
-* [Core Concepts](references/architecture.md)
+* Core Concepts
   * [Architecture & Parallel Execution](references/architecture.md)
   * [Foundational Stores](references/foundational-store-reference.md)
   * [Module Concepts](references/substreams-components/modules/modules.md)
   * [Reliability Guarantees](references/reliability-guarantees.md)
   * [FAQ](references/faq.md)
-* [Manifest & Components](references/substreams-components/manifests.md)
+* Manifest & Components
   * [Manifests](references/substreams-components/manifests.md)
   * [Packages](references/substreams-components/packages.md)
   * [Module Types](references/substreams-components/modules/types.md)
@@ -89,7 +89,7 @@
   * [Parameterized Modules](references/substreams-components/modules/parameterized-modules.md)
   * [Dynamic Data Sources](references/substreams-components/modules/dynamic-data-sources.md)
   * [Aggregation Windows](references/substreams-components/modules/aggregation-windows.md)
-* [Chain Support](references/chains-and-endpoints.md)
+* Chain Support
   * [Chains & Endpoints](references/chains-and-endpoints.md)
   * [Ethereum Data Model](references/ethereum-data-model.md)
   * [Flashblocks support](references/flashblocks.md)
@@ -100,7 +100,7 @@
     * [Reorg Handling](references/sql/reorg-handling.md)
 * Operators
   * [Hosting Foundational Stores](./references/foundational-stores/hosting-foundational-stores.md)
-* [Development Tools](references/log-and-debug.md)
+* Development Tools
   * [Logging & Debugging](references/log-and-debug.md)
   * [Dev Container Reference](references/devcontainer-ref.md)
 * [Change log](release-notes/change-log.md)

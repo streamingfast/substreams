@@ -14,10 +14,10 @@ jobs:
   test:
     name: Test
     runs-on: ${{ matrix.os }}
-    if: "${{ !startsWith(github.event.head_commit.message, 'GitBook: [#') }}"
+    if: "!startsWith(github.event.head_commit.message, 'GitBook: [#')"
     strategy:
       matrix:
-        go-version: [ 1.24.x ]
+        go-version: [1.24.x]
         os: [ubuntu-latest, macos-latest]
     steps:
       - name: Set up Go
@@ -42,6 +42,9 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
+
+      - name: Validate GitBook
+        run: go run ./docs/.gitbook/validate.go
 
       - name: Run Tests
         run: ./bin/test.sh

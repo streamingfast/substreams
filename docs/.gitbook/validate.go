@@ -40,7 +40,11 @@ func main() {
 	validSummary := validateAllFilesAreInSummary(docsRoot)
 
 	fmt.Println("")
-	if validReferences && validSummary {
+	fmt.Println("Checking for duplicate file references in SUMMARY.md...")
+	validUniqueSummary := validateSummaryNoDuplicates(docsRoot)
+
+	fmt.Println("")
+	if validReferences && validSummary && validUniqueSummary {
 		fmt.Println("🎉 All documentation checks passed!")
 		os.Exit(0)
 	} else {
@@ -94,6 +98,57 @@ func validateLocalReferences(docsRoot string) bool {
 	}
 
 	return true
+}
+
+func validateSummaryNoDuplicates(docsRoot string) bool {
+	cwd, err := os.Getwd()
+	cli.NoError(err, "Unable to get current working directory")
+
+	summaryPath := filepath.Join(docsRoot, "SUMMARY.md")
+	summaryContent, err := os.ReadFile(summaryPath)
+	cli.NoError(err, "Unable to read SUMMARY.md", zap.String("path", summaryPath))
+
+	summaryLinks := extractMarkdownLinks(summaryPath, string(summaryContent))
+
+	// Track which files appear and where
+	fileOccurrences := make(map[string][]MarkdownLink)
+	for _, link := range summaryLinks {
+		if link.TargetFilePath != nil {
+			fileOccurrences[*link.TargetFilePath] = append(fileOccurrences[*link.TargetFilePath], link)
+		}
+	}
+
+	// Find duplicates
+	duplicates := []string{}
+	for filePath, occurrences := range fileOccurrences {
+		if len(occurrences) > 1 {
+			duplicates = append(duplicates, filePath)
+		}
+	}
+
+	if len(duplicates) == 0 {
+		fmt.Println("✓ No duplicate file references in SUMMARY.md!")
+		return true
+	}
+
+	fmt.Printf("\n❌ Found %d files referenced multiple times in SUMMARY.md:\n\n", len(duplicates))
+	for _, filePath := range duplicates {
+		relPath, err := filepath.Rel(cwd, filePath)
+		if err != nil {
+			relPath = filePath
+		}
+		fmt.Printf("  • %s (referenced %d times):\n", relPath, len(fileOccurrences[filePath]))
+		for _, link := range fileOccurrences[filePath] {
+			relSummaryPath, err := filepath.Rel(cwd, summaryPath)
+			if err != nil {
+				relSummaryPath = summaryPath
+			}
+			fmt.Printf("    - %s:%d - [%s](%s)\n", relSummaryPath, link.LineNumber, link.LinkText, link.LinkPath)
+		}
+		fmt.Println()
+	}
+
+	return false
 }
 
 func validateAllFilesAreInSummary(docsRoot string) bool {

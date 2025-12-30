@@ -273,7 +273,6 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 	if err != nil {
 		// This is the case where you received partials for block 36, but then you receive a different real block 36: we will undo the previous 36 up to its parent (35), then send handle this new 36 partial.
 		if errors.Is(err, errHashMismatch) {
-			panic("hehe")
 			if err := p.handleStepUndo(&pbsubstreams.Clock{
 				Id:     p.partialProcessingState.lastBlockID,
 				Number: p.partialProcessingState.num,

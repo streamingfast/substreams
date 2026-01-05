@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  solana-validator:
+    image: solana/solana:v1.18.26
+    container_name: solana-dev-validator
+    command: |
+      solana-test-validator
+      --rpc-port 8899
+      --rpc-bind-address 0.0.0.0
+      --faucet-port 8900
+      --faucet-sol 1000000
+      --enable-rpc-transaction-history
+      --enable-extended-tx-metadata-storage
+      --log
+    ports:
+      - "8899:8899"   # RPC
+      - "8900:8900"   # Faucet
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8899", "-X", "POST", "-H", "Content-Type: application/json", "-d", '{"jsonrpc":"2.0","id":1,"method":"getHealth"}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - solana_data:/data
+    networks:
+      - solana_network
+
+  firehose-solana:
+    image: ghcr.io/streamingfast/firehose-solana:v1.1.0
+    container_name: firehose-solana
+    command: |
+      firehose-solana start
+      --config-file=
+      --common-first-streamable-block=0
+      --firehose-grpc-listen-addr=:9000
+      --reader-node-path=firesolana
+      --reader-node-arguments="fetch rpc http://solana-validator:8899"
+    ports:
+      - "9000:9000"   # Firehose gRPC
+    depends_on:
+      solana-validator:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-addr=localhost:9000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks:
+      - solana_network
+
+volumes:
+  solana_data:
+
+networks:
+  solana_network:
+    driver: bridge

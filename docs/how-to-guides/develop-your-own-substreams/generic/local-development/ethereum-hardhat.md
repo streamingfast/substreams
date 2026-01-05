@@ -18,7 +18,7 @@ Ensure you have the following installed:
 
 - **Docker 20.10+** with Docker Compose v2.0+
 - **Node.js 18+** with npm or yarn
-- **Substreams CLI** v1.7.0+ ([installation guide](../../cli/installing-the-cli.md))
+- **Substreams CLI** v1.7.0+ ([installation guide](../../../cli/installing-the-cli.md))
 - **Rust** with `wasm32-unknown-unknown` target
 - **curl** for testing endpoints
 

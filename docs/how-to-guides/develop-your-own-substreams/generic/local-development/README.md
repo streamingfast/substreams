@@ -33,7 +33,7 @@ Before starting with any platform, ensure you have:
 
 - **Docker 20.10+** with Docker Compose v2.0+
 - **4GB RAM** and **20GB disk space** available
-- **Substreams CLI** v1.7.0+ ([installation guide](../../cli/installing-the-cli.md))
+- **Substreams CLI** v1.7.0+ ([installation guide](../../../cli/installing-the-cli.md))
 - **Rust** with `wasm32-unknown-unknown` target
 - Platform-specific tools (detailed in each guide)
 
@@ -68,6 +68,6 @@ These Docker configurations are for local development only - never use in produc
 
 ## Additional Resources
 
-- [Substreams CLI Reference](../../../cli/command-line-interface.md)
+- [Substreams CLI Reference](../../../../references/cli/command-line-interface.md)
 - [Creating Protobuf Schemas](../creating-protobuf-schemas.md)
 - [Dev Container Reference](../../../../references/devcontainer-ref.md)

@@ -20,7 +20,7 @@ Ensure you have the following installed:
 - **Node.js 18+** with npm or yarn
 - **Anchor CLI** 0.30.1 - [Installation guide](https://www.anchor-lang.com/docs/installation)
 - **Solana CLI** 1.18.26 - [Installation guide](https://docs.solana.com/cli/install-solana-cli-tools)
-- **Substreams CLI** v1.7.0+ ([installation guide](../../cli/installing-the-cli.md))
+- **Substreams CLI** v1.7.0+ ([installation guide](../../../cli/installing-the-cli.md))
 - **Rust** with `wasm32-unknown-unknown` target
 - **curl** for testing endpoints
 

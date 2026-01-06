@@ -35,7 +35,7 @@ The local environment consists of:
 │   Your App      │    │    Substreams    │    │   HardHat       │
 │                 │    │                  │    │                 │
 │ ┌─────────────┐ │    │ ┌──────────────┐ │    │ ┌─────────────┐ │
-│ │ Substreams  │◄┼────┼─┤  Substreams  │ │    │ │   Deploy    │ │
+│ │ Substreams  │─┼────┼►│  Substreams  │ │    │ │   Deploy    │ │
 │ │    CLI      │ │    │ │   (port      │ │    │ │ Contracts   │ │
 │ └─────────────┘ │    │ │    9000)     │ │    │ └─────────────┘ │
 └─────────────────┘    │ └──────────────┘ │    └─────────────────┘
@@ -259,7 +259,9 @@ Deployed Addresses
 CounterModule#Counter - <CONTRACT_ADDRESS>
 ```
 
-**SAVE THE CONTRACT ADDRESS** - you'll need it for Substreams configuration!
+{% hint style="info" %}
+Save your deployed contract address - you'll need it in multiple places for the Substreams module.
+{% endhint %}
 
 ### 5. Verify Deployment
 
@@ -269,13 +271,11 @@ npx hardhat console --network local
 
 In the console:
 ```javascript
-const counter = await viem.getContractAt("Counter", "<CONTRACT_ADDRESS>");
+const { viem } = await network.connect();
+let counter = await viem.getContractAt("Counter", "<CONTRACT_ADDRESS>");
+await counter.write.incBy([2n]);
 await counter.read.x(); // Should return current counter value
 ```
-
-{% hint style="info" %}
-Save your deployed contract address - you'll need it in multiple places for the Substreams module.
-{% endhint %}
 
 ## Create Substreams Module
 
@@ -321,13 +321,11 @@ substreams run -e localhost:9000 --plaintext counter-v0.1.0.spkg
 
 {% hint style="note" %}
 Look for the deployment block as it's the one that will contain some actual data. You can scan a specific range using `-s <DEPLOYMENT_BLOCK> -t +10` to scan 10 blocks starting from the deployment block.
+
+You can also leave the GUI running and open another terminal to run `npx hardhat console --network local`, then execute `counter.write.incBy([5n])` to see the events appear live in your Substreams output.
 {% endhint %}
 
 You should see the Increment events from your contract deployment!
-
-{% hint style="note" %}
-Dev mode produces blocks every 1 second when transactions are pending. If you don't see events, ensure your contract deployment transactions were successful.
-{% endhint %}
 
 ## Troubleshooting
 
@@ -338,7 +336,7 @@ For common issues with Docker Compose, RPC connectivity, Substreams, and platfor
 Now that you have a working local environment:
 
 1. **Try Other Platforms** - Explore [Foundry](foundry.md) or [Solana](../../solana/local-development/anchor.md) local development
-2. **Advanced Substreams** - Learn about [stores, modules, and data transformations](../../generic/using-rust-proto.md)
+2. **Advanced Substreams** - Learn about [modules](../../../../references/substreams-components/modules/modules.md), [manifests](../../../../references/substreams-components/manifests.md), and [data transformations](../../generic/using-rust-proto.md)
 3. **Consuming Substreams** - Connect to [databases](../../../sinks/sql/sql.md) or [streaming platforms](../../../sinks/stream/stream.md)
 4. **Production Deployment** - Move to [production endpoints](../../../../references/chains-and-endpoints.md)
 

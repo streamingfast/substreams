@@ -14,6 +14,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## Server
 
 * Fix issue where "live backfiller" would not create segments after reconnecting with a cursor starting from a previous quicksave, causing delays in future reconnection
+* Prevent "panic" when log messages are too large: instead, they will be truncated with a 'some logs were truncated' message.
+* Raise max individual log message size from 128k to 512k
+* Raise max log message size for a full block from 128k to 5MiB
+* Reduce log level from Warn to Debug when we fail to get or set the store size (for backends that don't support it)
 
 ## v1.17.8
 

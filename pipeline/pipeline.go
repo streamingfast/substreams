@@ -409,7 +409,7 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 	for _, loadable := range loadableStores {
 		compressed, uncompressed, metadata, err := loadable.fullKVStore.GetSize(ctx, loadable.fileInfo.Filename) // ignore error here
 		if err != nil {
-			logger.Warn("failed to get size of store", zap.String("store_name", loadable.fullKVStore.Name()), zap.Error(err))
+			logger.Debug("failed to get size of store", zap.String("store_name", loadable.fullKVStore.Name()), zap.Error(err))
 		}
 		if uncompressed == nil {
 			neededSize += compressed * 4
@@ -446,7 +446,7 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 		go func() {
 			err := loadable.fullKVStore.Store().SetMetadata(ctx, loadable.fullKVStore.Filename(), met)
 			if err != nil {
-				logger.Warn("failed to set metadata on store",
+				logger.Debug("failed to set metadata on store",
 					zap.String("store_name", loadable.fullKVStore.Name()),
 					zap.String("filename", loadable.fullKVStore.Filename()),
 					zap.Error(err))

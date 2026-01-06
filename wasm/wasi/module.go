@@ -10,7 +10,6 @@ import (
 	"os"
 	"sync"
 
-	"github.com/dustin/go-humanize"
 	"github.com/protocolbuffers/protoscope"
 	"github.com/streamingfast/substreams/wasm"
 	"github.com/streamingfast/substreams/wasm/wasi/fs"
@@ -149,17 +148,12 @@ func (w *LogWriter) Write(p []byte) (n int, err error) {
 	defer w.mu.Unlock()
 
 	logMessage := string(p)
-	length := len(p)
 
 	call := wasm.FromContext(w.ctx)
 
 	if call.ReachedLogsMaxByteCount() {
 		// Early exit, we don't even need to collect the message as we would not store it anyway
 		return 0, nil
-	}
-
-	if length > wasm.MaxLogByteCount {
-		return 0, fmt.Errorf("message to log is too big, max size is %s", humanize.IBytes(uint64(length)))
 	}
 
 	call.AppendLog(logMessage)

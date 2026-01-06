@@ -51,6 +51,7 @@ type Call struct {
 
 	Logs           []string
 	LogsByteCount  uint64
+	logsTruncated  bool
 	ExecutionStack []string
 	stats          *metrics.Stats
 }
@@ -114,24 +115,37 @@ func (c *Call) SetPanicError(message string, filename string, lineNo int, colNo 
 }
 
 func (c *Call) AppendLog(message string) {
+
+	// sanity: skipping logs after MaxTotalLogsByteCount
+	if c.ReachedLogsMaxByteCount() {
+		if !c.logsTruncated {
+			c.Logs = append(c.Logs, fmt.Sprintf("some logs were truncated (above %s bytes) ...", maxTotalLogsByteCountHumanized))
+			c.logsTruncated = true
+		}
+		return
+	}
+
 	// len(<string>) in Go count number of bytes and not characters, so we are good here
-	if len(message) > MaxLogByteCount {
-		panic(fmt.Errorf("message to log is too big, size is %s, max is %s", humanize.IBytes(uint64(len(message))), humanize.IBytes(uint64(MaxLogByteCount))))
+	if len(message) > maxLogByteCount {
+		message = message[:maxLogByteCount] + fmt.Sprintf(" (... %d bytes)", len(message)-maxLogByteCount)
 	}
+
+	c.Logs = append(c.Logs, message)
+
 	c.LogsByteCount += uint64(len(message))
-	if !c.ReachedLogsMaxByteCount() {
-		c.Logs = append(c.Logs, message)
-	}
+
 }
 
 func (c *Call) SetOutputStore(store store.Store) {
 	c.outputStore = store
 }
 
-const MaxLogByteCount = 128 * 1024 // 128 KiB
+const maxLogByteCount = 512 * 1024            // 512 KiB
+const maxTotalLogsByteCount = 5 * 1024 * 1024 // 5 MiB
+var maxTotalLogsByteCountHumanized = humanize.IBytes(maxTotalLogsByteCount)
 
 func (c *Call) ReachedLogsMaxByteCount() bool {
-	return c.LogsByteCount >= MaxLogByteCount
+	return c.LogsByteCount >= maxLogByteCount
 }
 
 func (c *Call) DoSet(ord uint64, key string, value []byte) {

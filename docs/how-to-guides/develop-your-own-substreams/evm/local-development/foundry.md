@@ -35,7 +35,7 @@ The local environment consists of:
 │   Your App      │    │    Substreams    │    │    Foundry      │
 │                 │    │                  │    │                 │
 │ ┌─────────────┐ │    │ ┌──────────────┐ │    │ ┌─────────────┐ │
-│ │ Substreams  │◄┼────┼─┤  Substreams  │ │    │ │   Deploy    │ │
+│ │ Substreams  │─┼────┼►│  Substreams  │ │    │ │   Deploy    │ │
 │ │    CLI      │ │    │ │   (port      │ │    │ │ Contracts   │ │
 │ └─────────────┘ │    │ │    9000)     │ │    │ └─────────────┘ │
 └─────────────────┘    │ └──────────────┘ │    └─────────────────┘
@@ -199,7 +199,7 @@ forge init --no-git --force
 
 ### 3. Configure Foundry
 
-Create `foundry.toml`:
+Add the following network configuration to `foundry.toml` (the file already exists from `forge init`):
 
 ```toml
 [profile.default]
@@ -215,33 +215,43 @@ local = "http://localhost:8545"
 # No API key needed for local development
 ```
 
-### 4. Create Counter Contract
+### 4. Set Environment Variables
 
-Replace the default contract in `src/Counter.sol`:
+Set up the private key environment variable for easier command usage:
+
+```bash
+# Using HardHat's default test account 0 private key (pre-funded in dev environment)
+export PKEY="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+```
+
+{% hint style="info" %}
+This makes subsequent `forge` and `cast` commands cleaner and easier to read. You'll need to run this in each new terminal session.
+{% endhint %}
+
+### 5. Use Default Counter Contract
+
+Foundry already created a suitable Counter contract in `src/Counter.sol`. The default contract contains:
 
 ```solidity
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
+pragma solidity ^0.8.13;
 
 contract Counter {
-  uint public x;
+    uint256 public number;
 
-  event Increment(uint by);
+    function setNumber(uint256 newNumber) public {
+        number = newNumber;
+    }
 
-  function inc() public {
-    x++;
-    emit Increment(1);
-  }
-
-  function incBy(uint by) public {
-    require(by > 0, "incBy: increment should be positive");
-    x += by;
-    emit Increment(by);
-  }
+    function increment() public {
+        number++;
+    }
 }
 ```
 
-### 5. Create Deployment Script
+No need to modify this file - we'll use the default contract as-is.
+
+### 6. Create Deployment Script
 
 Create `script/Deploy.s.sol`:
 
@@ -268,13 +278,13 @@ contract DeployScript is Script {
         // Generate some test transactions
         console.log("Generating test transactions...");
         
-        counter.inc();
-        console.log("Incremented counter (tx1)");
+        counter.setNumber(42);
+        console.log("Set counter to 42 (tx1)");
         
-        counter.inc();
+        counter.increment();
         console.log("Incremented counter (tx2)");
         
-        uint256 currentCount = counter.x();
+        uint256 currentCount = counter.number();
         console.log("Current count:", currentCount);
         
         vm.stopBroadcast();
@@ -285,37 +295,44 @@ contract DeployScript is Script {
 }
 ```
 
-### 6. Compile and Deploy
+### 7. Compile and Deploy
 
 ```bash
 # Compile contracts
 forge build
 
 # Deploy to local network
-forge script script/Deploy.s.sol --rpc-url local --broadcast --legacy
+forge create --rpc-url local --private-key $PKEY --broadcast src/Counter.sol:Counter
 ```
 
 Example output:
 ```
 ...
-Counter deployed to: <CONTRACT_ADDRESS>
-...
+Deployer: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+Deployed to: 0x5FbDB2315678afecb367f032d93F642f64180aa3
+Transaction hash: 0x83dba3bc167c38e36b79b075552f67cd6c3f924bf8efb09ab6686ee50ed4816a
 ```
-
-**SAVE THE CONTRACT ADDRESS** from the deployment output!
-
-### 7. Verify Deployment
-
-```bash
-# Replace <CONTRACT_ADDRESS> with your deployed contract address
-cast call <CONTRACT_ADDRESS> "x()(uint256)" --rpc-url local
-```
-
-Expected output: `2` (since we incremented twice)
 
 {% hint style="info" %}
 Save your deployed contract address - you'll need it in multiple places for the Substreams module.
 {% endhint %}
+
+### 8. Verify Deployment
+
+Test the deployed contract with the following sequence:
+
+```bash
+# 1. Set a number using setNumber
+cast send <CONTRACT_ADDRESS> "setNumber(uint256)" 42 --rpc-url local --private-key $PKEY
+
+# 2. Increment the counter
+cast send <CONTRACT_ADDRESS> "increment()" --rpc-url local --private-key $PKEY
+
+# 3. Read the current number
+cast call <CONTRACT_ADDRESS> "number()" --rpc-url local
+```
+
+Expected output from the final call: `43` (42 + 1 from increment)
 
 ## Create Substreams Module
 
@@ -361,13 +378,11 @@ substreams run -e localhost:9000 --plaintext counter-v0.1.0.spkg
 
 {% hint style="note" %}
 Look for the deployment block as it's the one that will contain some actual data. You can scan a specific range using `-s <DEPLOYMENT_BLOCK> -t +10` to scan 10 blocks starting from the deployment block.
+
+You can also leave the substreams run command running and open another terminal to run `cast send <CONTRACT_ADDRESS> "increment()" --rpc-url local --private-key $PKEY` to increment the counter and see the events appear live in your Substreams output.
 {% endhint %}
 
 You should see the Increment events from your contract deployment!
-
-{% hint style="note" %}
-Dev mode produces blocks every 1 second when transactions are pending. If you don't see events, ensure your contract deployment transactions were successful.
-{% endhint %}
 
 ## Troubleshooting
 
@@ -378,7 +393,7 @@ For common issues with Docker Compose, RPC connectivity, and Substreams, see the
 Now that you have a working local environment:
 
 1. **Try Other Platforms** - Explore [HardHat](hardhat.md) or [Solana](../../solana/local-development/anchor.md) local development
-2. **Advanced Substreams** - Learn about [stores, modules, and data transformations](../../generic/using-rust-proto.md)
+2. **Advanced Substreams** - Learn about [modules](../../../../references/substreams-components/modules/modules.md), [manifests](../../../../references/substreams-components/manifests.md), and [data transformations](../../generic/using-rust-proto.md)
 3. **Consuming Substreams** - Connect to [databases](../../../sinks/sql/sql.md) or [streaming platforms](../../../sinks/stream/stream.md)
 4. **Production Deployment** - Move to [production endpoints](../../../../references/chains-and-endpoints.md)
 

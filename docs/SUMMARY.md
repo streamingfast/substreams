@@ -44,9 +44,9 @@
       * [Foundational Modules](how-to-guides/develop-your-own-substreams/cosmos/injective/foundational.md)
   * General
     * [Local Development](how-to-guides/develop-your-own-substreams/generic/local-development/README.md)
-      * [Ethereum (HardHat)](how-to-guides/develop-your-own-substreams/generic/local-development/ethereum-hardhat.md)
-      * [Ethereum (Foundry)](how-to-guides/develop-your-own-substreams/generic/local-development/ethereum-foundry.md)
-      * [Solana (Anchor)](how-to-guides/develop-your-own-substreams/generic/local-development/solana.md)
+      * [Ethereum (HardHat)](how-to-guides/develop-your-own-substreams/evm/local-development/hardhat.md)
+      * [Ethereum (Foundry)](how-to-guides/develop-your-own-substreams/evm/local-development/foundry.md)
+      * [Solana (Anchor)](how-to-guides/develop-your-own-substreams/solana/local-development/anchor.md)
     * [Using Rust & Protobuf](how-to-guides/develop-your-own-substreams/generic/using-rust-proto.md)
     * [Rust](how-to-guides/develop-your-own-substreams/generic/rust/rust.md)
       * [Option struct](how-to-guides/develop-your-own-substreams/generic/rust/option.md)

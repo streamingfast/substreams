@@ -20,12 +20,12 @@ This section provides complete local development environments for different bloc
 
 ### Ethereum Development
 
-- **[Ethereum with HardHat](ethereum-hardhat.md)** - Complete Ethereum development environment using HardHat for contract deployment and testing
-- **[Ethereum with Foundry](ethereum-foundry.md)** - Alternative Ethereum setup using Foundry toolkit for faster compilation and deployment
+- **[Ethereum with HardHat](../../evm/local-development/hardhat.md)** - Complete Ethereum development environment using HardHat for contract deployment and testing
+- **[Ethereum with Foundry](../../evm/local-development/foundry.md)** - Alternative Ethereum setup using Foundry toolkit for faster compilation and deployment
 
 ### Solana Development
 
-- **[Solana with Anchor](solana.md)** - Complete Solana development environment using Anchor framework for program development
+- **[Solana with Anchor](../../solana/local-development/anchor.md)** - Complete Solana development environment using Anchor framework for program development
 
 ## Prerequisites
 

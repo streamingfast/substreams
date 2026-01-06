@@ -31,21 +31,19 @@ The local environment consists of:
 - **Docker network** - Connecting all services
 
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Your App      │    │    Substreams    │    │    Foundry      │
-│                 │    │                  │    │                 │
-│ ┌─────────────┐ │    │ ┌──────────────┐ │    │ ┌─────────────┐ │
-│ │ Substreams  │─┼────┼►│  Substreams  │ │    │ │   Deploy    │ │
-│ │    CLI      │ │    │ │   (port      │ │    │ │ Contracts   │ │
-│ └─────────────┘ │    │ │    9000)     │ │    │ └─────────────┘ │
-└─────────────────┘    │ └──────────────┘ │    └─────────────────┘
-                       │         │        │
-                       │ ┌──────────────┐ │
-                       │ │     Geth     │ │
-                       │ │  (ports      │ │
-                       │ │ 8545/8546)   │ │
-                       │ └──────────────┘ │
-                       └──────────────────┘
+┌─────────────────┐    ┌─────────────────────┐    ┌─────────────────┐
+│   Your App      │    │     Substreams      │    │     Foundry     │
+│                 │    │                     │    │                 │
+│ ┌─────────────┐ │    │ ┌─────────────────┐ │    │ ┌─────────────┐ │
+│ │ Substreams  │─┼────┼►│   Substreams    │ │    │ │   Deploy    │ │
+│ │    CLI      │ │    │ │   (port 9000)   │ │    │ │  Contracts  │ │
+│ └─────────────┘ │    │ └─────────────────┘ │    │ └─────────────┘ │
+└─────────────────┘    │          │          │    └─────────────────┘
+                       │ ┌─────────────────┐ │
+                       │ │      Geth       │ │
+                       │ │   (port 8545)   │ │
+                       │ └─────────────────┘ │
+                       └─────────────────────┘
 ```
 
 ## Setup Instructions
@@ -251,51 +249,7 @@ contract Counter {
 
 No need to modify this file - we'll use the default contract as-is.
 
-### 6. Create Deployment Script
-
-Create `script/Deploy.s.sol`:
-
-```solidity
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.28;
-
-import "forge-std/Script.sol";
-import "../src/Counter.sol";
-
-contract DeployScript is Script {
-    function run() external {
-        // Default private key for dev mode (account 0)
-        uint256 deployerPrivateKey = 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;
-        
-        vm.startBroadcast(deployerPrivateKey);
-        
-        console.log("Deploying Counter contract...");
-        
-        Counter counter = new Counter();
-        
-        console.log("Counter deployed to:", address(counter));
-        
-        // Generate some test transactions
-        console.log("Generating test transactions...");
-        
-        counter.setNumber(42);
-        console.log("Set counter to 42 (tx1)");
-        
-        counter.increment();
-        console.log("Incremented counter (tx2)");
-        
-        uint256 currentCount = counter.number();
-        console.log("Current count:", currentCount);
-        
-        vm.stopBroadcast();
-        
-        console.log("\n🎉 SAVE THIS ADDRESS:", address(counter));
-        console.log("You'll need it for the Substreams configuration!");
-    }
-}
-```
-
-### 7. Compile and Deploy
+### 6. Compile and Deploy
 
 ```bash
 # Compile contracts
@@ -319,13 +273,9 @@ Export the deployed contract address for easy reference:
 export CONTRACT=<DEPLOYED_ADDRESS>
 ```
 
-Replace `<DEPLOYED_ADDRESS>` with the actual address from the deployment output.
+Replace `<DEPLOYED_ADDRESS>` with the actual address from the deployment output (look for the `Deployed to:` field).
 
-{% hint style="info" %}
-Save your deployed contract address - you'll need it in multiple places for the Substreams module.
-{% endhint %}
-
-### 8. Verify Deployment
+### 7. Verify Deployment
 
 Test the deployed contract with the following sequence:
 
@@ -394,6 +344,18 @@ You can also leave the substreams run command running and open another terminal 
 {% endhint %}
 
 You should see the Increment events from your contract deployment!
+
+## Cleanup
+
+Congratulations! You've completed the tutorial and have a working local Foundry development environment for Substreams.
+
+When you're done, you can clean up the Docker environment with:
+
+```bash
+docker compose down --volumes
+```
+
+This will stop all containers and remove all data, allowing you to start fresh if needed.
 
 ## Troubleshooting
 

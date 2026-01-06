@@ -31,21 +31,19 @@ The local environment consists of:
 - **Docker network** - Connecting all services
 
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Your App      │    │    Substreams    │    │   HardHat       │
-│                 │    │                  │    │                 │
-│ ┌─────────────┐ │    │ ┌──────────────┐ │    │ ┌─────────────┐ │
-│ │ Substreams  │─┼────┼►│  Substreams  │ │    │ │   Deploy    │ │
-│ │    CLI      │ │    │ │   (port      │ │    │ │ Contracts   │ │
-│ └─────────────┘ │    │ │    9000)     │ │    │ └─────────────┘ │
-└─────────────────┘    │ └──────────────┘ │    └─────────────────┘
-                       │         │        │
-                       │ ┌──────────────┐ │
-                       │ │     Geth     │ │
-                       │ │  (ports      │ │
-                       │ │ 8545/8546)   │ │
-                       │ └──────────────┘ │
-                       └──────────────────┘
+┌─────────────────┐    ┌─────────────────────┐    ┌─────────────────┐
+│   Your App      │    │     Substreams      │    │     HardHat     │
+│                 │    │                     │    │                 │
+│ ┌─────────────┐ │    │ ┌─────────────────┐ │    │ ┌─────────────┐ │
+│ │ Substreams  │─┼────┼►│   Substreams    │ │    │ │   Deploy    │ │
+│ │    CLI      │ │    │ │   (port 9000)   │ │    │ │  Contracts  │ │
+│ └─────────────┘ │    │ └─────────────────┘ │    │ └─────────────┘ │
+└─────────────────┘    │          │          │    └─────────────────┘
+                       │ ┌─────────────────┐ │
+                       │ │      Geth       │ │
+                       │ │   (port 8545)   │ │
+                       │ └─────────────────┘ │
+                       └─────────────────────┘
 ```
 
 ## Setup Instructions
@@ -326,6 +324,18 @@ You can also leave the `substreams run` running and open another terminal to run
 {% endhint %}
 
 You should see the Increment events from your contract deployment!
+
+## Cleanup
+
+Congratulations! You've completed the tutorial and have a working local HardHat development environment for Substreams.
+
+When you're done, you can clean up the Docker environment with:
+
+```bash
+docker compose down --volumes
+```
+
+This will stop all containers and remove all data, allowing you to start fresh if needed.
 
 ## Troubleshooting
 

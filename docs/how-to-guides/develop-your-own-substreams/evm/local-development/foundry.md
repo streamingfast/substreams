@@ -313,6 +313,14 @@ Deployed to: 0x5FbDB2315678afecb367f032d93F642f64180aa3
 Transaction hash: 0x83dba3bc167c38e36b79b075552f67cd6c3f924bf8efb09ab6686ee50ed4816a
 ```
 
+Export the deployed contract address for easy reference:
+
+```bash
+export CONTRACT=<DEPLOYED_ADDRESS>
+```
+
+Replace `<DEPLOYED_ADDRESS>` with the actual address from the deployment output.
+
 {% hint style="info" %}
 Save your deployed contract address - you'll need it in multiple places for the Substreams module.
 {% endhint %}
@@ -322,14 +330,17 @@ Save your deployed contract address - you'll need it in multiple places for the 
 Test the deployed contract with the following sequence:
 
 ```bash
-# 1. Set a number using setNumber
-cast send <CONTRACT_ADDRESS> "setNumber(uint256)" 42 --rpc-url local --private-key $PKEY
+# 1. Read the current counter value
+cast call $CONTRACT "number()(uint256)" --rpc-url local
 
-# 2. Increment the counter
-cast send <CONTRACT_ADDRESS> "increment()" --rpc-url local --private-key $PKEY
+# 2. Set a number using setNumber
+cast send $CONTRACT "setNumber(uint256)" 42 --rpc-url local --private-key $PKEY
 
-# 3. Read the current number
-cast call <CONTRACT_ADDRESS> "number()" --rpc-url local
+# 3. Increment the counter
+cast send $CONTRACT "increment()" --rpc-url local --private-key $PKEY
+
+# 4. Verify the value changed
+cast call $CONTRACT "number()(uint256)" --rpc-url local
 ```
 
 Expected output from the final call: `43` (42 + 1 from increment)
@@ -357,7 +368,7 @@ Follow the interactive prompts:
 - **Chosen generator**: `evm-events-calls`
 - **Please enter the project name**: `counter`
 - **Please select the chain**: `Ethereum Mainnet` (or the chain you are targeting)
-- **Please enter the contract address**: `<CONTRACT_ADDRESS>` (use your deployed address)
+- **Please enter the contract address**: Use your deployed address (from `$CONTRACT` variable)
 - **How do you want to provide the JSON ABI?**: `JSON in a local file`
 - **Input the full path of the JSON ABI**: `out/Counter.sol/Counter.abi.json`
 - **Please enter the contract initial block number**: `0`
@@ -379,7 +390,7 @@ substreams run -e localhost:9000 --plaintext counter-v0.1.0.spkg
 {% hint style="note" %}
 Look for the deployment block as it's the one that will contain some actual data. You can scan a specific range using `-s <DEPLOYMENT_BLOCK> -t +10` to scan 10 blocks starting from the deployment block.
 
-You can also leave the substreams run command running and open another terminal to run `cast send <CONTRACT_ADDRESS> "increment()" --rpc-url local --private-key $PKEY` to increment the counter and see the events appear live in your Substreams output.
+You can also leave the substreams run command running and open another terminal to run `cast send $CONTRACT "increment()" --rpc-url local --private-key $PKEY` to increment the counter and see the events appear live in your Substreams output.
 {% endhint %}
 
 You should see the Increment events from your contract deployment!

@@ -322,7 +322,7 @@ substreams run -e localhost:9000 --plaintext counter-v0.1.0.spkg
 {% hint style="note" %}
 Look for the deployment block as it's the one that will contain some actual data. You can scan a specific range using `-s <DEPLOYMENT_BLOCK> -t +10` to scan 10 blocks starting from the deployment block.
 
-You can also leave the GUI running and open another terminal to run `npx hardhat console --network local`, then execute `counter.write.incBy([5n])` to see the events appear live in your Substreams output.
+You can also leave the `substreams run` running and open another terminal to run execute the [Verify Deployment](#5-verify-deployment) commands to see data being process live.
 {% endhint %}
 
 You should see the Increment events from your contract deployment!

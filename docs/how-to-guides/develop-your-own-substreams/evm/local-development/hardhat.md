@@ -338,13 +338,13 @@ For common issues with Docker Compose, RPC connectivity, Substreams, and platfor
 Now that you have a working local environment:
 
 1. **Try Other Platforms** - Explore [Foundry](foundry.md) or [Solana](../../solana/local-development/anchor.md) local development
-2. **Advanced Substreams** - Learn about [stores, modules, and data transformations](../../../generic/using-rust-proto.md)
-3. **Consuming Substreams** - Connect to [databases](../../../../sinks/sql/sql.md) or [streaming platforms](../../../../sinks/stream/stream.md)
-4. **Production Deployment** - Move to [production endpoints](../../../../../references/chains-and-endpoints.md)
+2. **Advanced Substreams** - Learn about [stores, modules, and data transformations](../../generic/using-rust-proto.md)
+3. **Consuming Substreams** - Connect to [databases](../../../sinks/sql/sql.md) or [streaming platforms](../../../sinks/stream/stream.md)
+4. **Production Deployment** - Move to [production endpoints](../../../../references/chains-and-endpoints.md)
 
 ## Additional Resources
 
 - [HardHat Documentation](https://hardhat.org/docs)
 - [Substreams Ethereum Reference](https://github.com/streamingfast/substreams-ethereum)
 - [Substreams CLI Reference](../../../../references/cli/command-line-interface.md)
-- [Creating Protobuf Schemas](../../../generic/creating-protobuf-schemas.md)
+- [Creating Protobuf Schemas](../../generic/creating-protobuf-schemas.md)

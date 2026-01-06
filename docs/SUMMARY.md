@@ -46,6 +46,8 @@
       * [Simple Substreams Example](how-to-guides/develop-your-own-substreams/cosmos/injective/block-stats.md)
       * [Foundational Modules](how-to-guides/develop-your-own-substreams/cosmos/injective/foundational.md)
   * General
+    * [Local Development](how-to-guides/develop-your-own-substreams/generic/local-development/README.md)
+      * [Troubleshooting](how-to-guides/develop-your-own-substreams/generic/local-development/troubleshooting.md)
     * [Using Rust & Protobuf](how-to-guides/develop-your-own-substreams/generic/using-rust-proto.md)
     * [Rust](how-to-guides/develop-your-own-substreams/generic/rust/rust.md)
       * [Option struct](how-to-guides/develop-your-own-substreams/generic/rust/option.md)

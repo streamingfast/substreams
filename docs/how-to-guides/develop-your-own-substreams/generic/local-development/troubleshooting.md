@@ -67,6 +67,46 @@ docker compose up -d
 - Close other resource-intensive applications
 - Check available disk space (20GB minimum recommended)
 
+### Container Name Conflicts
+
+**Problem:** Container name conflict when starting Docker services
+
+**Error Example:**
+```
+Error response from daemon: Conflict. The container name "/ethereum-dev-node" is already in use by container "10d7ad16b7895f4a0d714778b2daa222686517444e81e289ac142dc32f5e42d6". You have to remove (or rename) that container to be able to reuse that name.
+```
+
+**Solutions:**
+1. **Check for existing containers:**
+   ```bash
+   docker ps -a
+   ```
+
+2. **Remove conflicting container:**
+   ```bash
+   # Remove by container name
+   docker rm ethereum-dev-node
+   
+   # Or remove by container ID
+   docker rm 10d7ad16b7895f4a0d714778b2daa222686517444e81e289ac142dc32f5e42d6
+   ```
+
+3. **Clean up entire compose project:**
+   ```bash
+   # Standard cleanup
+   docker compose down
+   
+   # Complete cleanup (removes volumes too)
+   docker compose down --volumes
+   ```
+
+4. **Retry starting services:**
+   ```bash
+   docker compose up -d
+   ```
+
+**Prevention:** Always use `docker compose down` to properly stop services instead of manually stopping containers with `docker stop`.
+
 ## RPC Connectivity Problems
 
 ### Connection Refused

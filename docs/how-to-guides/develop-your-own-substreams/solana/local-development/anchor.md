@@ -29,7 +29,7 @@ Ensure you have the following installed:
 The local environment consists of:
 
 - **Solana Validator** (port 8899/8900) - Test validator with unlimited SOL
-- **Firehose Solana** (port 9000) - Firehose integration providing gRPC streaming
+- **Substreams** (port 9000) - Substreams Tier1 service providing gRPC streaming
 - **Docker network** - Connecting all services
 
 ```
@@ -37,7 +37,7 @@ The local environment consists of:
 │   Your App      │    │    Substreams    │    │     Anchor      │
 │                 │    │                  │    │                 │
 │ ┌─────────────┐ │    │ ┌──────────────┐ │    │ ┌─────────────┐ │
-│ │ Substreams  │◄┼────┼─┤   Firehose   │ │    │ │   Deploy    │ │
+│ │ Substreams  │◄┼────┼─┤  Substreams  │ │    │ │   Deploy    │ │
 │ │    CLI      │ │    │ │   (port      │ │    │ │  Programs   │ │
 │ └─────────────┘ │    │ │    9000)     │ │    │ └─────────────┘ │
 └─────────────────┘    │ └──────────────┘ │    └─────────────────┘
@@ -65,24 +65,22 @@ cd substreams-solana-local
 Create a `docker-compose.yml` file:
 
 ```yaml
-version: '3.8'
-
 services:
-  solana-validator:
-    image: solana/solana:v1.18.26
+  solana-node:
+    image: ghcr.io/beeman/solana-test-validator:2.2.15
     container_name: solana-dev-validator
-    command: |
-      solana-test-validator
-      --rpc-port 8899
-      --rpc-bind-address 0.0.0.0
-      --faucet-port 8900
-      --faucet-sol 1000000
-      --enable-rpc-transaction-history
-      --enable-extended-tx-metadata-storage
-      --log
+    entrypoint: ["solana-test-validator"]
+    command:
+      - --rpc-port=8899
+      - --rpc-bind-address=0.0.0.0
+      - --faucet-port=8900
+      - --faucet-sol=1000000
+      - --enable-rpc-transaction-history
+      - --enable-extended-tx-metadata-storage
+      - --log
     ports:
-      - "8899:8899"   # RPC
-      - "8900:8900"   # Faucet
+      - "8899:8899"
+      - "8900:8900"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8899", "-X", "POST", "-H", "Content-Type: application/json", "-d", '{"jsonrpc":"2.0","id":1,"method":"getHealth"}']
       interval: 10s
@@ -94,20 +92,28 @@ services:
     networks:
       - solana_network
 
-  firehose-solana:
+  bigeagle-firehose:
     image: ghcr.io/streamingfast/firehose-solana:v1.1.0
     container_name: firehose-solana
-    command: |
-      firehose-solana start
-      --config-file=
-      --common-first-streamable-block=0
-      --firehose-grpc-listen-addr=:9000
-      --reader-node-path=firesolana
-      --reader-node-arguments="fetch rpc http://solana-validator:8899"
+    entrypoint: ["/app/firecore"]
+    command:
+      - start
+      - reader-node,merger,relayer,firehose,substreams-tier1,substreams-tier2
+      - --config-file=
+      - --log-format=text
+      - --log-to-file=false
+      - --common-first-streamable-block=0
+      - --firehose-grpc-listen-addr=:8089
+      - --substreams-tier1-grpc-listen-addr=:9000
+      - --substreams-tier1-block-type=sf.solana.type.v1.Block
+      - --advertise-block-id-encoding=base58
+      - --reader-node-path=/app/firesol
+      - --reader-node-arguments=fetch rpc http://solana-node:8899 --state-dir=/data/reader-state
     ports:
-      - "9000:9000"   # Firehose gRPC
+      - "8089:8089"
+      - "9000:9000"
     depends_on:
-      solana-validator:
+      solana-node:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "grpc_health_probe", "-addr=localhost:9000"]
@@ -115,6 +121,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 60s
+    volumes:
+      - solana_data:/data
     networks:
       - solana_network
 
@@ -129,10 +137,12 @@ networks:
 ### 3. Start the Environment
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
-Wait for the services to start (about 60-90 seconds).
+{% hint style="warning" %}
+To restart everything from scratch, use `docker compose down --volumes` to remove all data and start fresh.
+{% endhint %}
 
 ## Validation Commands
 
@@ -141,45 +151,30 @@ Wait for the services to start (about 60-90 seconds).
 Verify all containers are running and healthy:
 
 ```bash
-docker-compose ps
+docker compose ps
 ```
 
 Expected output:
 ```
 NAME                   COMMAND                  SERVICE           STATUS              PORTS
-solana-dev-validator   "solana-test-validat…"   solana-validator  Up (healthy)        0.0.0.0:8899->8899/tcp, 0.0.0.0:8900->8900/tcp
+solana-dev-validator   "solana-test-validat…"   solana-node       Up (healthy)        0.0.0.0:8899->8899/tcp, 0.0.0.0:8900->8900/tcp
+firehose-solana        "/app/firecore start…"   bigeagle-firehose Up (healthy)        0.0.0.0:8089->8089/tcp, 0.0.0.0:9000->9000/tcp
 firehose-solana        "firehose-solana sta…"   firehose-solana   Up (healthy)        0.0.0.0:9000->9000/tcp
 ```
 
-### 2. Test RPC Connectivity
+### 2. Test Substreams Connectivity
 
-Test the Solana JSON-RPC endpoint:
-
-```bash
-curl -X POST -H "Content-Type: application/json" \
-  --data '{"jsonrpc":"2.0","id":1,"method":"getHealth"}' \
-  http://localhost:8899
-```
-
-Expected response:
-```json
-{"jsonrpc":"2.0","result":"ok","id":1}
-```
-
-### 3. Test Firehose Connectivity
-
-Test Firehose gRPC connectivity:
+Test Substreams Tier1 gRPC connectivity:
 
 ```bash
-docker run --rm --network=host ghcr.io/streamingfast/firehose-solana:latest \
-  firecore tools firehose-client localhost:9000 --plaintext -o text -- -1
+substreams run -e localhost:9000 --plaintext common@v0.1.0 -o clock -s -1
 ```
 
-Or using substreams CLI:
-
-```bash
-docker run --rm --network=host ghcr.io/streamingfast/substreams:latest \
-  substreams run -e localhost:9000 --plaintext common@v0.1.0 -s -1
+Expected output:
+```text
+Writing clock information only (no data)
+----------- BLOCK #24 (6c3dbc20ae11cb856bed9789f7845359e98de71b830f0d9599d0061ed4e962d2) age=1.959195s ---------------
+...
 ```
 
 {% hint style="success" %}
@@ -220,10 +215,7 @@ solana airdrop 10
 ### 3. Initialize Anchor Project
 
 ```bash
-mkdir anchor-counter
-cd anchor-counter
 anchor init counter --no-git
-cd counter
 ```
 
 ### 4. Configure Anchor
@@ -473,17 +465,50 @@ Solana uses slots (400ms) - multiple slots can be in one block. The test validat
 
 ## Create Substreams Module
 
-### 1. Initialize Substreams Project
+### 1. Extract IDL File
+
+First, extract the Anchor IDL from your deployed program:
 
 ```bash
-cd .. # Back to substreams-solana-local
-mkdir substreams
-cd substreams
+anchor idl fetch <PROGRAM_ID> --filepath counter.json
 ```
 
-### 2. Create Protobuf Schema
+### 2. Initialize Substreams Project
 
-Create `proto/counter.proto`:
+Use the interactive `substreams init` command to bootstrap your project:
+
+```bash
+substreams init
+```
+
+Follow the interactive prompts:
+- **Chosen protocol**: `Solana`
+- **Chosen generator**: `solana-program-instructions`
+- **Please enter the project name**: `counter`
+- **Please select the chain**: `Solana Mainnet` (or your target chain)
+- **Please enter the program address**: `<PROGRAM_ID>` (from your deployment)
+- **How do you want to provide the JSON IDL?**: `JSON in a local file`
+- **Input the full path of the JSON IDL**: `counter.json`
+- **Please enter the program initial block number**: `0`
+- **Choose a short name for the program**: `counter`
+- **What do you want to track for this program?**: `Instructions`
+- **Add another program?**: `No`
+- **In which directory do you want to download the project?**: `./substreams`
+- **How would you like to consume the Substreams?**: `To Postgres` (or choose any other option)
+
+### 3. Build and Test Substreams
+
+```bash
+cd substreams
+substreams build
+substreams run -e localhost:9000 --plaintext counter-v0.1.0.spkg -s <DEPLOYMENT_BLOCK> -t +10
+```
+
+{% hint style="note" %}
+Look for the deployment block in your transaction output - it's the block that will contain actual program data. Use `-s <DEPLOYMENT_BLOCK> -t +10` to scan a specific range of blocks.
+{% endhint %}
+
+## Troubleshooting
 
 ```protobuf
 syntax = "proto3";
@@ -756,100 +781,32 @@ You should see the Counter events from your program deployment and test transact
 
 ## Troubleshooting
 
-### Docker Issues
-
-**Problem:** Container fails to start
-```bash
-# Check logs
-docker-compose logs solana-validator
-docker-compose logs firehose-solana
-
-# Restart services
-docker-compose down
-docker-compose up -d
-```
-
-**Problem:** Port conflicts
-```bash
-# Check what's using the ports
-lsof -i :8899
-lsof -i :9000
-
-# Kill conflicting processes or change ports in docker-compose.yml
-```
-
-### Solana Validator Issues
-
-**Problem:** Connection refused to localhost:8899
-- Ensure Docker container is running and healthy
-- Check firewall settings
-- Verify port mapping in docker-compose.yml
-
-**Problem:** "Health check failed"
-- Wait for validator to fully initialize (can take 60+ seconds)
-- Check validator logs: `docker-compose logs solana-validator`
-
-### Anchor/CLI Issues
-
-**Problem:** "insufficient funds for transaction"
-- Run `solana airdrop 10` to get more SOL
-- Verify balance: `solana balance`
-
-**Problem:** "Program not found" during deployment
-- Ensure Solana CLI is configured correctly: `solana config get`
-- Verify validator is running and accessible
-
-**Problem:** Anchor build fails
-- Ensure Rust and Anchor versions are correct
-- Check `Anchor.toml` configuration
-
-### Firehose Connectivity Issues
-
-**Problem:** gRPC connection failed
-- Verify Firehose is listening on port 9000
-- Check Docker network connectivity
-- Ensure `--plaintext` flag is used for local development
-- Wait for both services to be healthy
-
-### Substreams Build Issues
-
-**Problem:** `wasm32-unknown-unknown` target not found
-```bash
-rustup target add wasm32-unknown-unknown
-```
-
-**Problem:** Protobuf generation fails
-- Ensure `substreams protogen` excludes system paths
-- Check proto file syntax
-
-**Problem:** No events in Substreams output
-- Verify program ID in substreams.yaml matches deployed program
-- Check that transactions actually generated events
-- Ensure slot range includes deployment slot
-- Verify Anchor event discriminators are correct
-
-### Mac-Specific Networking
-
-**Problem:** Docker networking issues on macOS
-- Use `host.docker.internal` instead of `localhost` in some contexts
-- Ensure Docker Desktop networking is properly configured
-
-{% hint style="warning" %}
-Local validator provides unlimited SOL - production networks require real SOL for transactions.
-{% endhint %}
+For common issues with Docker Compose, RPC connectivity, and Substreams, see the [Local Development Troubleshooting](../../generic/local-development/troubleshooting.md) guide.
 
 ## Next Steps
 
-Now that you have a working local environment:
+Now that you have a working local Solana development environment:
 
-1. **Extend the Program** - Add more instructions and events to explore different patterns
-2. **Advanced Substreams** - Implement stores, multiple modules, and complex data transformations  
-3. **Testing Scenarios** - Create reproducible test cases with specific program states
-4. **Integration** - Connect your Substreams to sinks like databases or message queues
+1. **Explore Other Local Development Guides:**
+   - [Ethereum with HardHat](../../evm/local-development/hardhat.md) - EVM development with HardHat 3 Beta
+   - [Ethereum with Foundry](../../evm/local-development/foundry.md) - EVM development with Foundry toolkit
+
+2. **Advanced Substreams Development:**
+   - [Composing Substreams](../../../composing-substreams/composing-substreams.md) - Build complex data pipelines
+   - [Foundational Modules](../../../composing-substreams/foundational-modules.md) - Reusable Substreams components
+
+3. **Production Deployment:**
+   - [Consuming Substreams](../../../sinks/sinks.md) - Connect to databases and services
+   - [Substreams:SQL](../../../sinks/sql/sql.md) - Stream data to PostgreSQL/ClickHouse
+   - [Publishing Packages](../../../publish-package.md) - Share your Substreams modules
+
+4. **Solana-Specific Resources:**
+   - [SPL Token Tracker](../token-tracker/token-tracker.md) - Track Solana token transfers
+   - [DEX Trades](../top-ledger/dex-trades.md) - Monitor decentralized exchange activity
 
 ## Additional Resources
 
-- [Anchor Documentation](https://www.anchor-lang.com/)
-- [Solana Cookbook](https://solanacookbook.com/)
-- [Substreams Solana Reference](https://github.com/streamingfast/substreams-solana)
-- [Solana Test Validator](https://docs.solana.com/developing/test-validator)
+- [Anchor Documentation](https://www.anchor-lang.com/) - Solana development framework
+- [Solana Cookbook](https://solanacookbook.com/) - Solana development recipes
+- [Substreams Solana Reference](https://github.com/streamingfast/substreams-solana) - Solana-specific Substreams tools
+- [Substreams CLI Reference](../../../../references/cli/command-line-interface.md) - Complete CLI documentation

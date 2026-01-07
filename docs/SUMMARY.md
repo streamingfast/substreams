@@ -30,6 +30,9 @@
       * [Filter Transactions](how-to-guides/develop-your-own-substreams/evm/exploring-ethereum/map_filter_transactions_module.md)
       * [Retrieve Events of a Smart Contract](how-to-guides/develop-your-own-substreams/evm/exploring-ethereum/map_contract_events_module.md)
     * [Making eth\_calls](how-to-guides/develop-your-own-substreams/evm/eth-calls.md)
+    * Local Development
+      * [HardHat](how-to-guides/develop-your-own-substreams/evm/local-development/hardhat.md)
+      * [Foundry](how-to-guides/develop-your-own-substreams/evm/local-development/foundry.md)
   * [on Solana](how-to-guides/develop-your-own-substreams/solana/solana.md)
     * [Explore Solana](how-to-guides/develop-your-own-substreams/solana/explore-solana/explore-solana.md)
       * [Filter Instructions](how-to-guides/develop-your-own-substreams/solana/explore-solana/filter-instructions.md)
@@ -37,12 +40,17 @@
     * [SPL Token Tracker](how-to-guides/develop-your-own-substreams/solana/token-tracker/token-tracker.md)
     * [NFT Trades](how-to-guides/develop-your-own-substreams/solana/top-ledger/nft-trades.md)
     * [DEX Trades](how-to-guides/develop-your-own-substreams/solana/top-ledger/dex-trades.md)
+    * Local Development
+      * [Anchor](how-to-guides/develop-your-own-substreams/solana/local-development/anchor.md)
     * [From Yellowstone to Substreams](how-to-guides/develop-your-own-substreams/solana/migrate-from-yellowstone.md)
   * [on Cosmos](how-to-guides/develop-your-own-substreams/cosmos)
     * [Injective](how-to-guides/develop-your-own-substreams/cosmos/injective)
       * [Simple Substreams Example](how-to-guides/develop-your-own-substreams/cosmos/injective/block-stats.md)
       * [Foundational Modules](how-to-guides/develop-your-own-substreams/cosmos/injective/foundational.md)
-  * [General](how-to-guides/develop-your-own-substreams/generic/using-rust-proto.md)
+  * General
+    * [Local Development](how-to-guides/develop-your-own-substreams/generic/local-development/README.md)
+      * [Troubleshooting](how-to-guides/develop-your-own-substreams/generic/local-development/troubleshooting.md)
+    * [Using Rust & Protobuf](how-to-guides/develop-your-own-substreams/generic/using-rust-proto.md)
     * [Rust](how-to-guides/develop-your-own-substreams/generic/rust/rust.md)
       * [Option struct](how-to-guides/develop-your-own-substreams/generic/rust/option.md)
       * [Result struct](how-to-guides/develop-your-own-substreams/generic/rust/result.md)

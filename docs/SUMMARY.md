@@ -37,9 +37,9 @@
     * [Explore Solana](how-to-guides/develop-your-own-substreams/solana/explore-solana/explore-solana.md)
       * [Filter Instructions](how-to-guides/develop-your-own-substreams/solana/explore-solana/filter-instructions.md)
       * [Filter Transactions](how-to-guides/develop-your-own-substreams/solana/explore-solana/filter-transactions.md)
-    * [SPL Token Tracker](how-to-guides/develop-your-own-substreams/solana/token-tracker/token-tracker.md)
-    * [NFT Trades](how-to-guides/develop-your-own-substreams/solana/top-ledger/nft-trades.md)
-    * [DEX Trades](how-to-guides/develop-your-own-substreams/solana/top-ledger/dex-trades.md)
+      * [SPL Token Tracker](how-to-guides/develop-your-own-substreams/solana/explore-solana/token-tracker.md)
+      * [NFT Trades](how-to-guides/develop-your-own-substreams/solana/explore-solana/nft-trades.md)
+      * [DEX Trades](how-to-guides/develop-your-own-substreams/solana/explore-solana/dex-trades.md)
     * Local Development
       * [Anchor](how-to-guides/develop-your-own-substreams/solana/local-development/anchor.md)
     * [From Yellowstone to Substreams](how-to-guides/develop-your-own-substreams/solana/migrate-from-yellowstone.md)

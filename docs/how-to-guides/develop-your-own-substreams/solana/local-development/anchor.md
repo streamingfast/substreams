@@ -80,7 +80,7 @@ services:
       - solana_network
 
   firehose:
-    image: ghcr.io/streamingfast/firehose-solana:v1.1.4
+    image: ghcr.io/streamingfast/firehose-solana:v1.2.0
     container_name: firehose-solana
     entrypoint: ["/app/firecore"]
     command:
@@ -318,6 +318,8 @@ This will create transactions on the local Solana validator that you can later o
 
 ## Create Substreams Module
 
+### 1. Initialize Substreams Project
+
 Navigate back to the parent directory:
 
 ```bash
@@ -348,12 +350,12 @@ The IDL file at `./counter/target/idl/counter.json` was automatically generated 
 
 This will generate the basic Substreams module structure with the necessary configuration for tracking your Counter program.
 
-### 1. Build and Test Substreams
+### 2. Build and Test Substreams
 
 ```bash
 cd substreams
 substreams build
-substreams run -e localhost:9000 --plaintext my-project-v0.1.0.spkg map_program_data -s -1
+substreams run -e localhost:9000 --plaintext counter-v0.1.0.spkg
 ```
 
 {% hint style="note" %}
@@ -385,7 +387,7 @@ For common issues with Docker Compose, RPC connectivity, and Substreams, see the
 Now that you have a working local Solana development environment:
 
 1. **Try Other Platforms** - Explore [HardHat](../../evm/local-development/hardhat.md) or [Foundry](../../evm/local-development/foundry.md) local development
-2. **Advanced Substreams** - Learn about [stores, modules, and data transformations](../../generic/using-rust-proto.md)
+2. **Advanced Substreams** - Learn about [modules](../../../../references/substreams-components/modules/modules.md), [manifests](../../../../references/substreams-components/manifests.md), and [data transformations](../../generic/using-rust-proto.md)
 3. **Consuming Substreams** - Connect to [databases](../../../sinks/sql/sql.md) or [streaming platforms](../../../sinks/stream/stream.md)
 4. **Production Deployment** - Move to [production endpoints](../../../../references/chains-and-endpoints.md)
 

@@ -33,22 +33,19 @@ The local environment consists of:
 - **Docker network** - Connecting all services
 
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Your App      │    │    Substreams    │    │     Anchor      │
-│                 │    │                  │    │                 │
-│ ┌─────────────┐ │    │ ┌──────────────┐ │    │ ┌─────────────┐ │
-│ │ Substreams  │─┼────┼►│  Substreams  │ │    │ │   Deploy    │ │
-│ │    CLI      │ │    │ │   (port      │ │    │ │  Programs   │ │
-│ └─────────────┘ │    │ │    9000)     │ │    │ └─────────────┘ │
-└─────────────────┘    │ └──────────────┘ │    └─────────────────┘
-                       │         │        │
-                       │ ┌──────────────┐ │
-                       │ │   Solana     │ │
-                       │ │ Validator    │ │
-                       │ │  (ports      │ │
-                       │ │ 8899/8900)   │ │
-                       │ └──────────────┘ │
-                       └──────────────────┘
+┌─────────────────┐    ┌─────────────────────┐    ┌─────────────────┐
+│   Your App      │    │     Substreams      │    │      Anchor     │
+│                 │    │                     │    │                 │
+│ ┌─────────────┐ │    │ ┌─────────────────┐ │    │ ┌─────────────┐ │
+│ │ Substreams  │─┼────┼►│   Substreams    │ │    │ │   Deploy    │ │
+│ │    CLI      │ │    │ │   (port 9000)   │ │    │ │  Programs   │ │
+│ └─────────────┘ │    │ └─────────────────┘ │    │ └─────────────┘ │
+└─────────────────┘    │          │          │    └─────────────────┘
+                       │ ┌─────────────────┐ │
+                       │ │     Solana      │ │
+                       │ │   (port 8899)   │ │
+                       │ └─────────────────┘ │
+                       └─────────────────────┘
 ```
 
 ## Setup Instructions
@@ -73,19 +70,10 @@ services:
     command:
       - --bind-address=0.0.0.0
       - --rpc-port=8899
-      - --faucet-port=8900
       - --faucet-sol=1000000
-      - --enable-rpc-transaction-history
-      - --enable-extended-tx-metadata-storage
     ports:
       - "8899:8899"
       - "8900:8900"
-    healthcheck:
-      test: ["CMD-SHELL", "timeout 1 bash -c '</dev/tcp/localhost/8899' || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 60s
     volumes:
       - solana_data:/root/.config/solana/test-ledger
     networks:
@@ -113,9 +101,6 @@ services:
     ports:
       - "8089:8089"
       - "9000:9000"
-    depends_on:
-      solana-node:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "grpc_health_probe", "-addr=localhost:9000"]
       interval: 10s
@@ -157,10 +142,9 @@ docker compose ps
 
 Expected output:
 ```
-NAME                   COMMAND                  SERVICE           STATUS              PORTS
-solana-dev-validator   "solana-test-validat…"   solana-node       Up (healthy)        0.0.0.0:8899->8899/tcp, 0.0.0.0:8900->8900/tcp
-firehose-solana        "/app/firecore start…"   bigeagle-firehose Up (healthy)        0.0.0.0:8089->8089/tcp, 0.0.0.0:9000->9000/tcp
-firehose-solana        "firehose-solana sta…"   firehose-solana   Up (healthy)        0.0.0.0:9000->9000/tcp
+NAME                   IMAGE                                          COMMAND                  SERVICE       CREATED          STATUS                           PORTS
+firehose-solana        ghcr.io/streamingfast/firehose-solana:v1.1.4   "/app/firecore start…"   firehose      2 minutes ago    Up 2 minutes (healthy)           0.0.0.0:8089->8089/tcp, 0.0.0.0:9000->9000/tcp
+solana-dev-validator   ghcr.io/beeman/solana-test-validator:2.2.15    "solana-test-validat…"   solana-node   2 minutes ago    Up 2 minutes                     0.0.0.0:8899-8900->8899-8900/tcp
 ```
 
 ### 2. Test Substreams Connectivity
@@ -174,7 +158,7 @@ substreams run -e localhost:9000 --plaintext common@v0.1.0 -o clock -s -1
 Expected output:
 ```text
 Writing clock information only (no data)
------------ BLOCK #24 (6c3dbc20ae11cb856bed9789f7845359e98de71b830f0d9599d0061ed4e962d2) age=1.959195s ---------------
+----------- BLOCK #25 (7TjZKsW6nhKtS7UrJvv5eS7u6NzVTpFcM97wc7TBPgPW) age=3.301572s ---------------
 ...
 ```
 
@@ -227,6 +211,7 @@ solana airdrop 10
 
 ```bash
 anchor init counter --no-git
+cd counter
 ```
 
 ### 4. Configure Anchor
@@ -235,11 +220,11 @@ The `anchor init` command creates a default `Anchor.toml` file. Verify the confi
 
 ```toml
 [provider]
-cluster = "Localnet"
+cluster = "localnet"
 wallet = "~/.config/solana/id.json"
 ```
 
-The cluster should be set to "Localnet" and the wallet path should match the keypair you created in the previous step.
+The cluster should be set to "localnet" (lowercase) and the wallet path should match the keypair you created in the previous step.
 
 ### 5. Review Generated Program
 
@@ -279,56 +264,130 @@ Deploy to your local cluster (as configured in `Anchor.toml`):
 anchor deploy
 ```
 
-The compiled program is located in `target/deploy/`, and Anchor will deploy it to the cluster specified in your `Anchor.toml` configuration (Localnet).
+After deployment, you'll see output similar to this:
 
-After deployment, note the program ID from the output - you'll need it for creating your Substreams module.
+```
+Deploying cluster: http://127.0.0.1:8899
+Upgrade authority: /Users/maoueh/.config/solana/id.json
+Deploying program "counter"...
+Program path: /private/tmp/substreams-solana-local/counter/target/deploy/counter.so...
+Program Id: E2sTdp1aDaKbyh26BQkpYUH338u52fzwaiFbnym8MTk4
+
+Signature: 29aeeGh2c4ogsKwnLjR8KoANY7rBDwonXdJzzDRF8MbQEASQerEMCSZbz591GfmZU8Uff5JHtnehT5w1zSbjq5wP
+
+Waiting for program E2sTdp1aDaKbyh26BQkpYUH338u52fzwaiFbnym8MTk4 to be confirmed...
+Program confirmed on-chain
+Idl data length: 211 bytes
+Step 0/211
+Idl account created: G5GLdJwfDagZ7jfWjDZPBDwFNmZWtsY6WA3Lgbw6txmF
+Deploy success
+```
+
+Export the Program ID and IDL account from the deployment output:
+
+```bash
+export PROGRAM=<PROGRAM_ID>
+export IDL=<IDL_ACCOUNT>
+```
+
+Replace `<PROGRAM_ID>` with the address from the `Program Id:` line (e.g., `E2sTdp1aDaKbyh26BQkpYUH338u52fzwaiFbnym8MTk4`) and `<IDL_ACCOUNT>` with the address from the `Idl account created:` line (e.g., `G5GLdJwfDagZ7jfWjDZPBDwFNmZWtsY6WA3Lgbw6txmF`).
 
 ### 7. Verify Deployment
 
 ```bash
 # Check program account
-solana program show <PROGRAM_ID>
+solana program show $PROGRAM
 
 # Check if program is deployed
-solana account <PROGRAM_ID>
+solana account $PROGRAM
 ```
 
-{% hint style="info" %}
-Save your deployed program ID - you'll need it for the Substreams configuration.
-{% endhint %}
+## Interact with the Counter Program
+
+Now that the program is deployed, let's interact with it to generate some on-chain activity by calling the initialize instruction.
+
+Start the Anchor shell:
+
+```bash
+anchor shell
+```
+
+In the Anchor shell, run the following commands to call the initialize instruction:
+
+```javascript
+const program = anchor.workspace.Counter
+await program.methods.initialize().accounts({}).signers([]).rpc()
+```
+
+You should see a transaction signature returned, indicating the initialize instruction was successfully called.
+
+Exit the shell:
+
+```javascript
+.exit
+```
+
+This will create transactions on the local Solana validator that you can later observe when running your Substreams module.
 
 ## Create Substreams Module
 
-### 1. Initialize Substreams Project
+Navigate back to the parent directory:
 
-Initialize a new Substreams project with the Solana Anchor template:
+```bash
+cd ..
+```
+
+Initialize the Substreams module:
 
 ```bash
 substreams init
 ```
 
-When prompted during initialization, provide:
-- **Protocol**: Solana
-- **Template**: `sol-anchor-beta` (Solana Anchor program template)
-- **Program ID**: Your deployed Counter program ID
+Follow the interactive prompts:
+* **Chosen protocol**: `Solana`
+* **Chosen generator**: `sol-anchor-beta`
+* **Please enter the project name**: `counter`
+* **Please select the chain**: `Solana Devnet`
+* **How do you want to provide the JSON IDL?**: `JSON in a local file`
+* **Input the full path of your JSON IDL in your filesystem**: `./counter/target/idl/counter.json`
+* **Do you want to proceed with this IDL?**: `Yes`
+* **At what block do you want to start indexing data?**: `0`
+* **How would you like to consume the Substreams?**: `To Postgres`
+* **In which directory do you want to download the project?**: `./substreams`
 
-The `substreams init` command generates all necessary files including:
-- `substreams.yaml` manifest with Solana block configuration
-- Proto schemas for your program
-- Rust handler code structure
-- Build configuration
+{% hint style="info" %}
+The IDL file at `counter/target/idl/counter.json` was automatically generated by Anchor during the build process. We reference this file when initializing the Substreams module.
+{% endhint %}
+
+This will generate the basic Substreams module structure with the necessary configuration for tracking your Counter program.
 
 ### 2. Build and Test Substreams
 
 ```bash
 cd substreams
 substreams build
-substreams run -e localhost:9000 --plaintext counter-v0.1.0.spkg -s <DEPLOYMENT_BLOCK> -t +10
+substreams run -e localhost:9000 --plaintext my-project-v0.1.0.spkg map_program_data -s -1
 ```
 
 {% hint style="note" %}
-Look for the deployment block in your transaction output - it's the block that will contain actual program data. Use `-s <DEPLOYMENT_BLOCK> -t +10` to scan a specific range of blocks.
+Look for the block where you called the initialize instruction as it's the one that will contain some actual data. You can scan a specific range using `-s <BLOCK_NUMBER> -t +10` to scan 10 blocks starting from a specific block.
+
+You can also leave the substreams run command running and open another terminal to run `anchor shell` and execute `await anchor.workspace.Counter.methods.initialize().accounts({}).signers([]).rpc()` to call the initialize instruction and see the events appear live in your Substreams output.
 {% endhint %}
+
+You should see the Counter program events from your deployment and interactions!
+
+## Cleanup
+
+Congratulations! You've completed the tutorial and have a working local Anchor development environment for Substreams.
+
+When you're done, you can clean up the Docker environment with:
+
+```bash
+docker compose down --volumes
+```
+
+This will stop all containers and remove all data, allowing you to start fresh if needed.
 
 ## Troubleshooting
 

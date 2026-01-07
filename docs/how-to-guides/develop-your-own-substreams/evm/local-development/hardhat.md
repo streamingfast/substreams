@@ -257,10 +257,6 @@ Deployed Addresses
 CounterModule#Counter - <CONTRACT_ADDRESS>
 ```
 
-{% hint style="info" %}
-Save your deployed contract address - you'll need it in multiple places for the Substreams module.
-{% endhint %}
-
 ### 5. Verify Deployment
 
 ```bash

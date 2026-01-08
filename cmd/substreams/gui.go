@@ -32,6 +32,7 @@ func init() {
 	// GUI-specific flags
 	guiCmd.Flags().StringP(sink.FlagStopBlock, sink.ShortFlagStopBlock, "+1000", "Stop block to end stream at, exclusively. If the start-block is positive, a '+' prefix can indicate 'relative to start-block'. If stop-block is positive, default value will be set to '0'")
 	guiCmd.Flags().Bool("production-mode", false, "Enable Production Mode, with high-speed parallel processing")
+	guiCmd.Flags().String("bytes-encoding", "", "Encoding to use as default for all bytes representation, one of: ['', 'hex', 'base58', 'base64', 'string']. If empty, will guess based on the network, falling back to hex")
 	guiCmd.Flags().Uint64("limit-processed-blocks", 10000, "Limit the number of blocks to be processed by the server, including preparing the stores, as a safeguard to prevent unexpected expensive reprocessing (0 disables the limit)")
 	guiCmd.Flags().StringSlice("debug-modules-initial-snapshot", nil, "List of 'store' modules from which to print the initial data snapshot (Unavailable in Production Mode)")
 	guiCmd.Flags().StringSlice("debug-modules-output", nil, "List of modules from which to fetch the outputs, useful when debugging (unavailable in Production Mode). Defaults to the non-imported modules. Set to '.*' to to request all module outputs.")
@@ -151,16 +152,17 @@ func runGui(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	tuiConfig := &common.TUIConfig{
-		StartBlock:    sinkerConfig.StartBlock,
-		StopBlock:     stopBlockString, // we ignore stopBlock from sinkerConfig for now, the manifest will be (re)loaded later
-		ManifestPath:  manifestPath,
-		HomeDir:       homeDir,
-		Vcr:           sflags.MustGetBool(cmd, "replay"),
-		Headers:       parseHeaders(sinkerConfig.ExtraHeaders),
-		Cursor:        sflags.MustGetString(cmd, sink.FlagCursor),
-		Params:        strings.Join(sinkerConfig.Params, "\n"),
-		DefaultParams: strings.Join(defaultParams, "\n"),
-		OutputModule:  outputModuleName,
+		StartBlock:         sinkerConfig.StartBlock,
+		StopBlock:          stopBlockString, // we ignore stopBlock from sinkerConfig for now, the manifest will be (re)loaded later
+		ManifestPath:       manifestPath,
+		HomeDir:            homeDir,
+		Vcr:                sflags.MustGetBool(cmd, "replay"),
+		Headers:            parseHeaders(sinkerConfig.ExtraHeaders),
+		Cursor:             sflags.MustGetString(cmd, sink.FlagCursor),
+		Params:             strings.Join(sinkerConfig.Params, "\n"),
+		DefaultParams:      strings.Join(defaultParams, "\n"),
+		OutputModule:       outputModuleName,
+		RequestedBytesRepr: sflags.MustGetString(cmd, "bytes-encoding"),
 	}
 
 	fmt.Println("Launching Substreams GUI...")

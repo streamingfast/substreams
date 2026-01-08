@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jhump/protoreflect/dynamic"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/derr"
@@ -33,6 +34,7 @@ func init() {
 	runCmd.Flags().StringSlice("debug-modules-initial-snapshot", nil, "List of 'store' modules from which to print the initial data snapshot (Unavailable in Production Mode)")
 
 	runCmd.Flags().StringP("output", "o", "", "Output mode, one of: [tui (and ui), json, jsonl, clock] Defaults to 'tui' when in a TTY is present, and 'json' otherwise")
+	runCmd.Flags().String("bytes-encoding", "", "Encoding to use for all bytes representation, one of: ['', 'hex', 'base58', 'base64', 'string']. If empty, will guess based on the network, falling back to hex")
 
 	runCmd.Flags().String("test-file", "", "Runs a test file")
 	runCmd.Flags().Bool("test-verbose", false, "Print out all the results")
@@ -119,7 +121,25 @@ func runRun(cmd *cobra.Command, args []string) error {
 		ui.SetTestRunner(testRunner)
 	}
 
-	if err := ui.Init(outputMode, common.ToDynamicBytesRepresentation(sinker.BytesRepresentation())); err != nil {
+	var bytesRepresentation dynamic.BytesRepresentation
+
+	enc := sflags.MustGetString(cmd, "bytes-encoding")
+	switch enc {
+	case "hex":
+		bytesRepresentation = dynamic.BytesAsHex
+	case "base64":
+		bytesRepresentation = dynamic.BytesAsBase64
+	case "base58":
+		bytesRepresentation = dynamic.BytesAsBase58
+	case "string":
+		bytesRepresentation = dynamic.BytesAsString
+	case "":
+		bytesRepresentation = common.ToDynamicBytesRepresentation(sinker.BytesRepresentation())
+	default:
+		return fmt.Errorf("invalid bytes encoding: %s", enc)
+	}
+
+	if err := ui.Init(outputMode, bytesRepresentation); err != nil {
 		return fmt.Errorf("TUI initialization: %w", err)
 	}
 	defer ui.CleanUpTerminal()

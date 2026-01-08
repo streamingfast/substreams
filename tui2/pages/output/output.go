@@ -74,7 +74,23 @@ type Output struct {
 }
 
 func New(c common.Common, sinkerConfig *sink.SinkerConfig, tuiConfig *common.TUIConfig) (*Output, error) {
-	bytesRepresentation := common.ToDynamicBytesRepresentation(sink.InferBytesRepresentation(sinkerConfig.Pkg.Network, sinkerConfig.ClientConfig.Endpoint()))
+
+	var initialBytesRepresentation dynamic.BytesRepresentation
+	switch tuiConfig.RequestedBytesRepr {
+	case "hex":
+		initialBytesRepresentation = dynamic.BytesAsHex
+	case "base64":
+		initialBytesRepresentation = dynamic.BytesAsBase64
+	case "base58":
+		initialBytesRepresentation = dynamic.BytesAsBase58
+	case "string":
+		initialBytesRepresentation = dynamic.BytesAsString
+	case "":
+		initialBytesRepresentation = common.ToDynamicBytesRepresentation(sink.InferBytesRepresentation(sinkerConfig.Pkg.Network, sinkerConfig.ClientConfig.Endpoint()))
+	default:
+		return nil, fmt.Errorf("invalid bytes encoding: %s", tuiConfig.RequestedBytesRepr)
+	}
+
 	output := &Output{
 		Common:              c,
 		sinkerConfig:        sinkerConfig,
@@ -86,10 +102,10 @@ func New(c common.Common, sinkerConfig *sink.SinkerConfig, tuiConfig *common.TUI
 		outputView:          viewport.New(24, 80),
 		messageFactory:      dynamic.NewMessageFactoryWithDefaults(),
 		outputViewYoffset:   map[common.BlockContext]int{},
-		statusBar:           newStatusBarWithBytesRepresentation(c, bytesRepresentation),
+		statusBar:           newStatusBarWithBytesRepresentation(c, initialBytesRepresentation),
 		searchCtx:           search.New(c),
 		blockSearchCtx:      blocksearch.New(c),
-		bytesRepresentation: bytesRepresentation,
+		bytesRepresentation: initialBytesRepresentation,
 		moduleSearchView:    modsearch.New(c, "output"),
 		outputModule:        tuiConfig.OutputModule,
 		logsEnabled:         true,

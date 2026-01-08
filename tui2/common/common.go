@@ -25,17 +25,18 @@ type BlockContext struct {
 
 // TUIConfig contains TUI-specific configuration that doesn't belong in SinkerConfig
 type TUIConfig struct {
-	ManifestPath  string
-	HomeDir       string
-	Vcr           bool
-	Headers       map[string]string
-	StartBlock    int64
-	StopBlock     string
-	Cursor        string
-	Params        string
-	DefaultParams string
-	OutputModule  string
-	RequiresBuild bool
+	ManifestPath       string
+	HomeDir            string
+	Vcr                bool
+	Headers            map[string]string
+	StartBlock         int64
+	StopBlock          string
+	Cursor             string
+	Params             string
+	DefaultParams      string
+	OutputModule       string
+	RequiresBuild      bool
+	RequestedBytesRepr string
 }
 
 type SetupNewInstanceMsg struct {

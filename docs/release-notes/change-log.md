@@ -19,6 +19,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Raise max log message size for a full block from 128k to 5MiB
 * Reduce log level from Warn to Debug when we fail to get or set the store size (for backends that don't support it)
 
+## CLI
+
+* Added `--bytes-encoding` flag to `run` and `gui`, accepted values: ['', 'hex', 'base58', 'base64', 'string'] (default: '' still auto-detects from network)
+
 ## v1.17.8
 
 * Added experimental support for partial blocks (ex: Base's Flash Blocks) -- only supported on https://base-mainnet-flash.streamingfast.io endpoint

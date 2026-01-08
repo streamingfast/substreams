@@ -34,7 +34,7 @@ func init() {
 // ParseTxCounterSummary unmarshals the MapOutput protobuf Any field into a TxCounterSummary
 // and returns the key values: blockNumber, currentTxCount, storedTxCount, totalTxCount
 // Returns ok=false if the unmarshaling fails
-func ParseTxCounterSummary(output *pbsubstreamsrpcv2.MapModuleOutput) (blockNumber, currentTxCount, storedTxCount, totalTxCount uint64, ok bool) {
+func ParseTxCounterSummary(output *pbsubstreamsrpcv2.MapModuleOutput) (blockNumber, currentTxCount, prevBlockTxCount, totalTxCount uint64, ok bool) {
 	if output == nil || output.MapOutput == nil {
 		return 0, 0, 0, 0, false
 	}
@@ -48,13 +48,13 @@ func ParseTxCounterSummary(output *pbsubstreamsrpcv2.MapModuleOutput) (blockNumb
 	currentTxCount = uint64(summary.CurrentBlockTxCount)
 	totalTxCount = uint64(summary.TotalTxCount)
 
-	// Calculate stored tx count from the block_counts slice
-	storedTxCount = 0
-	for _, blockCount := range summary.BlockCounts {
-		storedTxCount += uint64(blockCount.TxCount)
+	// Calculate stored tx count from the previous block in block_counts slice
+	prevBlockTxCount = 0
+	if len(summary.BlockCounts) > 1 {
+		prevBlockTxCount = uint64(summary.BlockCounts[1].TxCount)
 	}
 
-	return summary.BlockNumber, currentTxCount, storedTxCount, totalTxCount, true
+	return summary.BlockNumber, currentTxCount, prevBlockTxCount, totalTxCount, true
 }
 
 func RunRequest(t *testing.T, req *pbsubstreamsrpcv2.Request, endpoint string) ([]*pbsubstreamsrpcv2.BlockScopedData, *pbsubstreamsrpcv2.SessionInit, error) {

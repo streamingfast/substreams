@@ -399,15 +399,18 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 		p.pendingUndoMessage = nil
 	}
 
+	withPartialBlocks := reqctx.PartialBlocks(ctx)
+	sendFullBlockInPartialMode := withPartialBlocks && (p.partialProcessingState == nil || p.partialProcessingState.num != clock.Number)
+
 	// if we get a 'new' block while handling partial blocks, we complete the missing partials based on its content.
 	// Ex: we got partials 3, 4, 7
 	//    -> partial 3 contains all transactions from partials 1+2+3
 	//    -> partial 4 only processes transactions from partial 4
-	//    -> when we get the full block (stepNEW), if it differs from the partial7's ID, we process it so that we send a 'partial 10' that contains transactions from partials 8,9,10
-	if reqctx.PartialBlocks(ctx) {
-		if p.partialProcessingState == nil || p.partialProcessingState.lastBlockID != clock.Id {
+	//    -> when we get the full block 4 (stepNEW), if it differs from the partial7's ID, we process it so that we send a 'partial 10' that contains transactions from partials 8,9,10
+	if withPartialBlocks && p.partialProcessingState != nil {
+		if p.partialProcessingState.num == clock.Number && p.partialProcessingState.lastBlockID != clock.Id {
 			partialBlockIndex := biggestPartialBlockIndex
-			if p.partialProcessingState != nil && p.partialProcessingState.highestIndex > partialBlockIndex {
+			if p.partialProcessingState.highestIndex >= partialBlockIndex {
 				partialBlockIndex = p.partialProcessingState.highestIndex + 1 // push back the 'biggest partial block index' so we don't send them out of order to the client
 			}
 
@@ -426,22 +429,24 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 	}
 
 	if p.gate.shouldSendOutputs() {
-		p.sentBlocks++
-		if !reqctx.PartialBlocks(ctx) {
-			if reqDetails.IsTier2Request { // the gate.shouldSendOutputs() assures us that we are a streaming tier2 in this case
-				if out := p.mapModuleOutput.GetMapOutput(); out != nil {
-					skippable := p.mapModuleOutputSkippable && len(out.Value) == 0
-					if !skippable {
-						if err = returnTier2DataOutputs(clock, out, p.respFunc); err != nil {
-							return fmt.Errorf("failed to return module data output: %w", err)
-						}
+		if reqDetails.IsTier2Request { // the gate.shouldSendOutputs() assures us that we are a streaming tier2 in this case
+			if out := p.mapModuleOutput.GetMapOutput(); out != nil {
+				skippable := p.mapModuleOutputSkippable && len(out.Value) == 0
+				if !skippable {
+					p.sentBlocks++
+					if err = returnTier2DataOutputs(clock, out, p.respFunc); err != nil {
+						return fmt.Errorf("failed to return module data output: %w", err)
 					}
 				}
-			} else {
-				// LIVE and DEV mode always receive module data outputs, even when they are empty
-				// so they can follow progress (and dev also gets debug output...)
-				//
+			}
+		} else {
+			// LIVE and DEV mode always receive module data outputs, even when they are empty
+			// so they can follow progress (and dev also gets debug output...)
+			//
+
+			if !reqctx.PartialBlocks(ctx) || sendFullBlockInPartialMode {
 				mapModuleOutput := normalizeModuleOutput(p.mapModuleOutput, reqDetails.OutputModule)
+				p.sentBlocks++
 				if err = returnModuleDataOutputs(clock, cursor, mapModuleOutput, p.extraMapModuleOutputs, p.extraStoreModuleOutputs, p.respFunc, logger); err != nil {
 					return fmt.Errorf("failed to return module data output: %w", err)
 				}

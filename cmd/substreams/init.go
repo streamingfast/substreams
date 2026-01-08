@@ -503,6 +503,7 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 				}); err != nil {
 					return fmt.Errorf("error sending local file message: %w", err)
 				}
+				continue
 			}
 
 			if err := sendFunc(&pbconvo.UserInput{

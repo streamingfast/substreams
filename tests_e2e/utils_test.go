@@ -294,7 +294,7 @@ func (r *responses) Strings() (out []string) {
 				if *rr.IsLastPartial {
 					lastPartial = "*"
 				}
-				out = append(out, fmt.Sprintf("P:%d:%d%s", rr.Clock.Number, rr.PartialIndex, lastPartial))
+				out = append(out, fmt.Sprintf("P:%d:%d%s", rr.Clock.Number, *rr.PartialIndex, lastPartial))
 			} else {
 				out = append(out, fmt.Sprintf("F:%d", rr.Clock.Number))
 			}

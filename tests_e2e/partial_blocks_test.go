@@ -3,7 +3,6 @@ package tests_e2e
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"testing"
@@ -240,71 +239,69 @@ func TestPartialBlocksWithStores(t *testing.T) {
 			//seenBlocks := make(map[uint64]fullBlockResponse)
 
 			//var partialResponses []*pbsubstreamsrpcv2.BlockScopedData
+
+			prevBlock := uint64(0)
+			prevBlockTxCount := uint64(0)
+			var prevBlockWasFull bool
+			var prevBlockWasLastPartial bool
+			totalTxCount := uint64(0)
+
 			for _, fullResponse := range blockScopedData {
 
-				if fullResponse.IsPartial {
-					fmt.Println("Processing partial response", fullResponse.Clock.Number, fullResponse.PartialIndex)
-				} else {
-					fmt.Println("Processing full response", fullResponse.Clock.Number)
+				blockNumber, currentTxCount, storedPrevBlockTxCount, storedTotalTxCount, ok := ParseTxCounterSummary(fullResponse.Output)
+				if !ok {
+					t.Fatal("Failed to parse TxCounterSummary from MapOutput")
 				}
-				//if fullResponse.PartialIndex != 0 {
-				//	partialResponses = append(partialResponses, fullResponse)
-				//	continue
-				//}
-				//blockNumber, currentTxCount, storedTxCount, totalTxCount, ok := ParseTxCounterSummary(fullResponse.Output)
-				//require.True(t, ok, "Failed to parse TxCounterSummary from MapOutput")
-				//require.Equal(t, blockNumber, fullResponse.Clock.Number)
 
-				//seenBlocks[fullResponse.Clock.Number] = fullBlockResponse{
-				//	currentTxCount: currentTxCount,
-				//	storedTxCount:  storedTxCount,
-				//	totalTxCount:   totalTxCount,
-				//}
+				// heavy print-debugging
+				// partialIndex := 9999
+				// if fullResponse.PartialIndex != nil {
+				// 	partialIndex = int(*fullResponse.PartialIndex)
+				// }
+				// fmt.Printf("Processing response block %d (currentTxCount %d prevBlockStoredTxCount %d totalTxCount %d partialIndex %d)\n", blockNumber, currentTxCount, storedPrevBlockTxCount, totalTxCount, partialIndex)
+
+				// first block ever
+				if prevBlock == 0 {
+					prevBlock = blockNumber
+					prevBlockTxCount = currentTxCount
+					totalTxCount = storedTotalTxCount
+					continue
+				}
+
+				totalTxCount += currentTxCount // happens on every block
+
+				if fullResponse.IsPartial {
+					assert.Equal(t, int(totalTxCount), int(storedTotalTxCount))
+
+					if blockNumber == prevBlock {
+						assert.False(t, prevBlockWasFull, "prev block was full, receiving a partial %d", blockNumber)
+						assert.False(t, prevBlockWasLastPartial, "prev block was last partial, receiving another partial %d", blockNumber)
+
+						prevBlockTxCount += currentTxCount // append to block
+					} else {
+						assert.Equal(t, int(prevBlockTxCount), int(storedPrevBlockTxCount), "at block %d", blockNumber)
+						assert.True(t, prevBlockWasFull || prevBlockWasLastPartial, "prev block was not full NOR last partial")
+
+						prevBlock = blockNumber
+						prevBlockTxCount = currentTxCount // replace
+					}
+
+					prevBlockWasFull = false
+					prevBlockWasLastPartial = *fullResponse.IsLastPartial
+
+				} else {
+					require.True(t, blockNumber == prevBlock+1, "non-consecutive block numbers, prev %d, current %d", prevBlock, blockNumber)
+
+					// full block always replaces
+					prevBlock = blockNumber
+					prevBlockTxCount = currentTxCount
+					prevBlockWasFull = true
+					prevBlockWasLastPartial = false
+				}
 			}
-
-			//			lastSeenPartialNumber := uint64(0)
-			//			lastSeenPartialIndex := uint32(0)
-			//			sumCurrentTxCount := uint64(0)
-			//
-			//			assert.Len(t, partialResponses, tc.expectPartialResponses, "Should have received %d partial block data", tc.expectPartialResponses)
-			//			for _, partialResponse := range partialResponses {
-			//				blockNumber, currentTxCount, storedTxCount, totalTxCount, ok := ParseTxCounterSummary(partialResponse.Output)
-			//				require.True(t, ok, "Failed to parse TxCounterSummary from MapOutput")
-			//				require.Equal(t, blockNumber, partialResponse.Clock.Number)
-			//				t.Logf("Partial Block - Block: %d, idx: %d, Current TX count: %d, Stored TX count: %d, Total: %d",
-			//					blockNumber, partialResponse.PartialIndex, currentTxCount, storedTxCount, totalTxCount)
-			//
-			//				if blockNumber == lastSeenPartialNumber {
-			//					assert.Greater(t, partialResponse.PartialIndex, lastSeenPartialIndex)
-			//					sumCurrentTxCount += currentTxCount
-			//				} else {
-			//					assert.Greater(t, blockNumber, lastSeenPartialNumber)
-			//					lastSeenPartialNumber = blockNumber
-			//					sumCurrentTxCount = currentTxCount // reset counter
-			//				}
-			//
-			//				lastSeenPartialIndex = partialResponse.PartialIndex
-			//
-			//if fullResp, ok := seenBlocks[blockNumber]; ok {
-			//	if partialResponse.PartialIndex == 4 {
-			//		assert.True(t, currentTxCount <= fullResp.currentTxCount, "Partial block %d has more transactions than full block", blockNumber)
-			//		assert.Equal(t, storedTxCount, fullResp.storedTxCount)
-			//		assert.Equal(t, totalTxCount, fullResp.totalTxCount)
-			//		assert.Equal(t, sumCurrentTxCount, fullResp.currentTxCount)
-			//	}
-			//} else {
-			//	t.Logf("Partial block %d received that was not seen in full responses", blockNumber)
-			//	if notSeen != 0 && notSeen != blockNumber {
-			//		t.Errorf("More than one partial block received that was not seen in in full responses: %d and %d", blockNumber, notSeen)
-			//	}
-			//	notSeen = blockNumber
-			//}
-
-			//		}
 
 		})
 	}
-
 	// ensure we close this well, for next tests
 	app.Shutdown(nil)
 	app2.Shutdown(nil)

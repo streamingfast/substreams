@@ -32,10 +32,9 @@ var cancelFunc = contextKeyType(9)
 var sessionKey = contextKeyType(10)
 var spkgKey = contextKeyType(11)
 var activeRequestsHandlerKey = contextKeyType(12)
-var includePartialBlocksKey = contextKeyType(13)
-var partialBlocksOnlyKey = contextKeyType(14)
-var ethCallFallbackToLatestDuration = contextKeyType(15)
-var ethCallUseBlockNumberDuration = contextKeyType(16)
+var partialBlocksKey = contextKeyType(13)
+var ethCallFallbackToLatestDuration = contextKeyType(14)
+var ethCallUseBlockNumberDuration = contextKeyType(15)
 
 func WithSpkg(ctx context.Context, pkg *pbsubstreams.Package) context.Context {
 	return context.WithValue(ctx, spkgKey, pkg)
@@ -61,30 +60,17 @@ func ActiveRequestsHandler(ctx context.Context) *active_requests.ActiveRequestsH
 	return nil
 }
 
-func WithPartialBlocksOnly(ctx context.Context, partialBlocksOnly bool) context.Context {
-	return context.WithValue(ctx, partialBlocksOnlyKey, partialBlocksOnly)
+func WithPartialBlocks(ctx context.Context, partialBlocks bool) context.Context {
+	return context.WithValue(ctx, partialBlocksKey, partialBlocks)
 }
 
-func PartialBlocksOnly(ctx context.Context) bool {
-	val := ctx.Value(partialBlocksOnlyKey)
+func PartialBlocks(ctx context.Context) bool {
+	val := ctx.Value(partialBlocksKey)
 	if b, ok := val.(bool); ok {
 		return b
 	}
 	return false
 }
-
-func WithIncludePartialBlocks(ctx context.Context, includePartialblocks bool) context.Context {
-	return context.WithValue(ctx, includePartialBlocksKey, includePartialblocks)
-}
-
-func IncludePartialBlocks(ctx context.Context) bool {
-	val := ctx.Value(includePartialBlocksKey)
-	if b, ok := val.(bool); ok {
-		return b
-	}
-	return false
-}
-
 func WithCancelFunc(ctx context.Context, f context.CancelCauseFunc) context.Context {
 	return context.WithValue(ctx, cancelFunc, f)
 }

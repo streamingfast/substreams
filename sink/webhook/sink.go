@@ -73,7 +73,6 @@ func (s *Sink) Run(ctx context.Context) error {
 
 	handlers := sink.NewSinkerFullHandlersWithPartial(
 		s.handleBlockScopedData,
-		s.handlePartialBlockData,
 		s.handleBlockUndoSignal,
 		nil,
 		nil,
@@ -126,42 +125,6 @@ func (s *Sink) handleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.
 				zap.Error(err),
 				zap.String("file", s.stateFile))
 		}
-	}
-
-	return nil
-}
-
-// handlePartialBlockData processes a block of partial data and sends it to the webhook
-func (s *Sink) handlePartialBlockData(ctx context.Context, partial *pbsubstreamsrpc.PartialBlockData) error {
-	if partial.Output.MapOutput.Value == nil {
-		return nil
-	}
-
-	msgDesc := s.decoder.GetMessageDescriptor(partial.Output.Name)
-	dataContent := s.decoder.DecodeDynamicMessage(msgDesc, partial.Output.MapOutput)
-
-	payload, err := NewWebhookPayload(partial.Output.Name, partial.Clock, partial.Output.MapOutput.TypeUrl, dataContent)
-	if err != nil {
-		return fmt.Errorf("failed to create webhook payload: %w", err)
-	}
-
-	wrappedOut, err := payload.ToJSON()
-	if err != nil {
-		return fmt.Errorf("failed to serialize webhook payload: %w", err)
-	}
-
-	WebhookCallsCounter.Inc()
-	WebhookSizeBytes.AddInt(len(wrappedOut))
-
-	s.logger.Info("calling webhook",
-		zap.Uint64("block", partial.Clock.Number),
-	)
-
-	// Make the webhook call with automatic retries for transient failures
-	err = s.client.Call(ctx, s.webhookURL, wrappedOut, partial.Clock.Number)
-	if err != nil {
-		// Continue processing even if webhook fails to avoid blocking the stream
-		return nil
 	}
 
 	return nil

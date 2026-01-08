@@ -20,8 +20,7 @@ func init() {
 	sink.AddFlagsToSet(runCmd.Flags(),
 		sink.FlagIncludeOptional(
 			sink.FlagCursor,
-			sink.FlagIncludePartialBlocks,
-			sink.FlagPartialBlocksOnly,
+			sink.FlagPartialBlocks,
 		),
 		sink.FlagExcludeDefault(
 			sink.FlagDevelopmentMode,
@@ -146,7 +145,6 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	h := sink.NewSinkerFullHandlersWithPartial(
 		ui.HandleBlockScopedData,
-		ui.HandlePartialBlockData, // this is always set, but we may not receive any partial block depending on the sinker's viper flags
 		ui.HandleBlockUndoSignal,
 		ui.HandleSession,
 		ui.HandleProgress,

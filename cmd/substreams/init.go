@@ -208,12 +208,15 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 			Generators []*pbconvo.DiscoveryResponse_Generator
 		}
 
+		// Use a slice to maintain insertion order and a map for lookup
+		var protocolOrder []string
 		filteredProtocols := make(map[string]*BlockchainProtocolSelector)
 		for _, gen := range resp.Msg.Generators {
 			selector, groupExists := filteredProtocols[gen.Group]
 			if groupExists {
 				selector.Generators = append(selector.Generators, gen)
 			} else {
+				protocolOrder = append(protocolOrder, gen.Group)
 				filteredProtocols[gen.Group] = &BlockchainProtocolSelector{
 					Id:         gen.Group,
 					Title:      gen.Group,
@@ -223,7 +226,8 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		}
 
 		protocolOptions := make([]huh.Option[*BlockchainProtocolSelector], 0, len(filteredProtocols))
-		for _, value := range filteredProtocols {
+		for _, group := range protocolOrder {
+			value := filteredProtocols[group]
 			protocolOptions = append(protocolOptions, huh.Option[*BlockchainProtocolSelector]{
 				Key:   value.Title,
 				Value: value,

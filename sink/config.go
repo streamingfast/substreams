@@ -38,11 +38,10 @@ type SinkerConfig struct {
 	//
 	// The stop block is considered exclusive, meaning if you set StopBlock to 100, the last block processed
 	// will be 99.
-	StopBlock            uint64
-	UndoBufferSize       int
-	FinalBlocksOnly      bool
-	PartialBlocksOnly    bool
-	IncludePartialBlocks bool
+	StopBlock       uint64
+	UndoBufferSize  int
+	FinalBlocksOnly bool
+	PartialBlocks   bool
 
 	// Dev-mode extras
 	DevOutputSnapshots []string

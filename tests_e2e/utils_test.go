@@ -289,9 +289,15 @@ func (r *responses) Strings() (out []string) {
 	for _, rr := range *r {
 		switch rr := rr.(type) {
 		case *pbsubstreamsrpcv2.BlockScopedData:
-			out = append(out, fmt.Sprintf("F:%d", rr.Clock.Number))
-		case *pbsubstreamsrpcv2.PartialBlockData:
-			out = append(out, fmt.Sprintf("P:%d:%d", rr.Clock.Number, rr.PartialIndex))
+			if rr.IsPartial {
+				lastPartial := ""
+				if *rr.IsLastPartial {
+					lastPartial = "*"
+				}
+				out = append(out, fmt.Sprintf("P:%d:%d%s", rr.Clock.Number, rr.PartialIndex, lastPartial))
+			} else {
+				out = append(out, fmt.Sprintf("F:%d", rr.Clock.Number))
+			}
 		case *pbsubstreamsrpcv2.BlockUndoSignal:
 			out = append(out, fmt.Sprintf("U:%d", rr.LastValidBlock.Number))
 		}
@@ -310,19 +316,6 @@ func (r *responses) BlockScopedData() []*pbsubstreamsrpcv2.BlockScopedData {
 		}
 	}
 	return blockScopedData
-}
-
-func (r *responses) PartialBlockData() []*pbsubstreamsrpcv2.PartialBlockData {
-	if r == nil {
-		return nil
-	}
-	var partialBlockData []*pbsubstreamsrpcv2.PartialBlockData
-	for _, resp := range *r {
-		if partialBlockDataResp, ok := resp.(*pbsubstreamsrpcv2.PartialBlockData); ok {
-			partialBlockData = append(partialBlockData, partialBlockDataResp)
-		}
-	}
-	return partialBlockData
 }
 
 func (r *responses) SessionInit() *pbsubstreamsrpcv2.SessionInit {
@@ -400,22 +393,19 @@ func RunRequestWithPartialBlocks(t *testing.T, req *pbsubstreamsrpcv2.Request, e
 			t.Logf("Received session: %+v", sess)
 		}
 
-		// Check for partial block data and accumulate
-		if partialData := response.GetPartialBlockData(); partialData != nil {
-			resps = append(resps, partialData)
-			partialBlockDataCount++
-			//t.Logf("Received partial block data %d/%d", len(partialBlockDataSlice), partialResponseCount)
-
-			// Break if we've received the desired number of partial responses
-			if partialBlockDataCount >= maxPartialResponses {
-				t.Logf("Received %d partial responses - halting request", partialBlockDataCount)
-				break
-			}
-		}
-
 		// Accumulate BlockScopedData
 		if blockData := response.GetBlockScopedData(); blockData != nil {
 			resps = append(resps, blockData)
+
+			if blockData.IsPartial {
+				partialBlockDataCount++
+				//t.Logf("Received partial block data %d/%d", len(partialBlockDataSlice), partialResponseCount)
+				// Break if we've received the desired number of partial responses
+				if partialBlockDataCount >= maxPartialResponses {
+					t.Logf("Received %d partial responses - halting request", partialBlockDataCount)
+					break
+				}
+			}
 			//t.Logf("Accumulated BlockScopedData clock %d, total count: %d", blockData.Clock.Number, len(blockScopedDataSlice))
 		}
 

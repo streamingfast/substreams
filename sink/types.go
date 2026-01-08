@@ -18,7 +18,6 @@ type sinkerHandlers struct {
 
 type fullSinkerHandlers struct {
 	sinkerHandlers
-	handlePartialBlockData        func(ctx context.Context, data *pbsubstreamsrpc.PartialBlockData) error
 	handleSessionInit             func(ctx context.Context, req *pbsubstreamsrpc.Request, session *pbsubstreamsrpc.SessionInit) error
 	handleProgress                func(ctx context.Context, progress *pbsubstreamsrpc.ModulesProgress)
 	handleInitialSnapshotData     func(ctx context.Context, debug *pbsubstreamsrpc.InitialSnapshotData) error
@@ -34,13 +33,6 @@ func (h sinkerHandlers) HandleBlockScopedData(ctx context.Context, data *pbsubst
 
 func (h sinkerHandlers) HandleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *Cursor) error {
 	return h.handleBlockUndoSignal(ctx, undoSignal, cursor)
-}
-
-func (h fullSinkerHandlers) HandlePartialBlockData(ctx context.Context, data *pbsubstreamsrpc.PartialBlockData) error {
-	if h.handlePartialBlockData != nil {
-		return h.handlePartialBlockData(ctx, data)
-	}
-	return nil
 }
 
 func (h fullSinkerHandlers) HandleProgress(ctx context.Context, progress *pbsubstreamsrpc.ModulesProgress) {
@@ -113,7 +105,6 @@ func NewSinkerFullHandlers(
 // NewSinkerFullHandlersWithPartial creates a SinkerHandler with extra interfaces for handling session initialization, progress and debug data
 func NewSinkerFullHandlersWithPartial(
 	handleBlockScopedData func(ctx context.Context, data *pbsubstreamsrpc.BlockScopedData, isLive *bool, cursor *Cursor) error,
-	handlePartialBlockData func(ctx context.Context, partial *pbsubstreamsrpc.PartialBlockData) error,
 	handleBlockUndoSignal func(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *Cursor) error,
 	handleSessionInit func(ctx context.Context, req *pbsubstreamsrpc.Request, session *pbsubstreamsrpc.SessionInit) error,
 	handleProgress func(ctx context.Context, progress *pbsubstreamsrpc.ModulesProgress),
@@ -126,7 +117,6 @@ func NewSinkerFullHandlersWithPartial(
 			handleBlockScopedData: handleBlockScopedData,
 			handleBlockUndoSignal: handleBlockUndoSignal,
 		},
-		handlePartialBlockData:        handlePartialBlockData,
 		handleSessionInit:             handleSessionInit,
 		handleProgress:                handleProgress,
 		handleInitialSnapshotData:     handleInitialSnapshotData,
@@ -179,14 +169,6 @@ type SinkerProgressHandler interface {
 	//
 	// The [HandleProgress] is optional and can be nil.
 	HandleProgress(ctx context.Context, progress *pbsubstreamsrpc.ModulesProgress)
-}
-
-// SinkerPartialBlockHandler defines an extra interface that handles the PartialBlockData message.
-type SinkerPartialBlockHandler interface {
-	// HandlePartialBlockHandler defines the callback that will handle data from partial blocks
-	//
-	// It is optional and can be nil.
-	HandlePartialBlockData(ctx context.Context, data *pbsubstreamsrpc.PartialBlockData) error
 }
 
 type SinkerSessionInitHandler interface {

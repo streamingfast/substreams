@@ -78,13 +78,12 @@ type Request struct {
 	// Progress_messages_interval_ms is the interval between progress messages, in milliseconds (min 500ms)
 	// default: start at 500ms and ramp up to 5000ms within 1min
 	ProgressMessagesIntervalMs uint64 `protobuf:"varint,14,opt,name=progress_messages_interval_ms,json=progressMessagesIntervalMs,proto3" json:"progress_messages_interval_ms,omitempty"`
-	// If true, partial blocks are also sent on the stream
-	IncludePartialBlocks bool `protobuf:"varint,15,opt,name=include_partial_blocks,json=includePartialBlocks,proto3" json:"include_partial_blocks,omitempty"`
-	// If true, only partial blocks are sent, no 'block-scoped-data' or cursor.
-	// This value supersedes include_partial_blocks
-	PartialBlocksOnly bool `protobuf:"varint,16,opt,name=partial_blocks_only,json=partialBlocksOnly,proto3" json:"partial_blocks_only,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// If true, blocks close to head will be sent in "partials" as soon as we get them.
+	// This means that you will get different versions of the same block number, each an incomplete increment
+	// Other blocks will be sent completely (older blocks, or blocks for which the provider did not get a partial in time)
+	PartialBlocks bool `protobuf:"varint,16,opt,name=partial_blocks,json=partialBlocks,proto3" json:"partial_blocks,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Request) Reset() {
@@ -215,16 +214,9 @@ func (x *Request) GetProgressMessagesIntervalMs() uint64 {
 	return 0
 }
 
-func (x *Request) GetIncludePartialBlocks() bool {
+func (x *Request) GetPartialBlocks() bool {
 	if x != nil {
-		return x.IncludePartialBlocks
-	}
-	return false
-}
-
-func (x *Request) GetPartialBlocksOnly() bool {
-	if x != nil {
-		return x.PartialBlocksOnly
+		return x.PartialBlocks
 	}
 	return false
 }
@@ -233,7 +225,7 @@ var File_sf_substreams_rpc_v3_service_proto protoreflect.FileDescriptor
 
 const file_sf_substreams_rpc_v3_service_proto_rawDesc = "" +
 	"\n" +
-	"\"sf/substreams/rpc/v3/service.proto\x12\x14sf.substreams.rpc.v3\x1a\x19google/protobuf/any.proto\x1a\x1dsf/firehose/v2/firehose.proto\x1a\"sf/substreams/rpc/v2/service.proto\x1a\x1csf/substreams/v1/clock.proto\x1a\x1esf/substreams/v1/modules.proto\x1a\x1esf/substreams/v1/package.proto\"\xc2\x06\n" +
+	"\"sf/substreams/rpc/v3/service.proto\x12\x14sf.substreams.rpc.v3\x1a\x19google/protobuf/any.proto\x1a\x1dsf/firehose/v2/firehose.proto\x1a\"sf/substreams/rpc/v2/service.proto\x1a\x1csf/substreams/v1/clock.proto\x1a\x1esf/substreams/v1/modules.proto\x1a\x1esf/substreams/v1/package.proto\"\x89\x06\n" +
 	"\aRequest\x12&\n" +
 	"\x0fstart_block_num\x18\x01 \x01(\x03R\rstartBlockNum\x12!\n" +
 	"\fstart_cursor\x18\x02 \x01(\tR\vstartCursor\x12$\n" +
@@ -249,12 +241,11 @@ const file_sf_substreams_rpc_v3_service_proto_rawDesc = "" +
 	"\tnoop_mode\x18\v \x01(\bR\bnoopMode\x124\n" +
 	"\x16limit_processed_blocks\x18\f \x01(\x04R\x14limitProcessedBlocks\x12,\n" +
 	"\x12dev_output_modules\x18\r \x03(\tR\x10devOutputModules\x12A\n" +
-	"\x1dprogress_messages_interval_ms\x18\x0e \x01(\x04R\x1aprogressMessagesIntervalMs\x124\n" +
-	"\x16include_partial_blocks\x18\x0f \x01(\bR\x14includePartialBlocks\x12.\n" +
-	"\x13partial_blocks_only\x18\x10 \x01(\bR\x11partialBlocksOnly\x1a9\n" +
+	"\x1dprogress_messages_interval_ms\x18\x0e \x01(\x04R\x1aprogressMessagesIntervalMs\x12%\n" +
+	"\x0epartial_blocks\x18\x10 \x01(\bR\rpartialBlocks\x1a9\n" +
 	"\vParamsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x012S\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01J\x04\b\x0f\x10\x102S\n" +
 	"\x06Stream\x12I\n" +
 	"\x06Blocks\x12\x1d.sf.substreams.rpc.v3.Request\x1a\x1e.sf.substreams.rpc.v2.Response0\x01BOZMgithub.com/streamingfast/substreams/pb/sf/substreams/rpc/v3;pbsubstreamsrpcv3b\x06proto3"
 

@@ -122,8 +122,8 @@ func (p *Pipeline) processBlock(
 
 	switch step {
 	case bstream.StepPartial:
-		if reqctx.IncludePartialBlocks(ctx) { // this also covers 'partialBlocksOnly'
-			p.handleStepPartial(ctx, clock, cursor, execOutput, partialIndex)
+		if reqctx.PartialBlocks(ctx) { // this also covers 'partialBlocksOnly'
+			p.handleStepPartial(ctx, clock, cursor, execOutput, partialIndex, false)
 		}
 
 	case bstream.StepUndo:
@@ -254,10 +254,10 @@ func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
 	return nil
 }
 
-func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput, idx int32) (err error) {
+func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput, idx int32, isLast bool) (err error) {
 	if p.partialProcessingState != nil {
-		if clock.Id == p.partialProcessingState.lastBlockID {
-			return nil // same hash: nothing new to process
+		if clock.Id == p.partialProcessingState.lastBlockID && !isLast {
+			return nil // same hash: nothing new to process. We only send this 'empty' partial block if it is the last
 		}
 		if clock.Number == p.partialProcessingState.num {
 			p.partialProcessingState.highestIndex = idx
@@ -288,7 +288,7 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 			}
 
 			p.partialProcessingState = nil
-			return p.handleStepPartial(ctx, clock, cursor, execOutput, idx) // call handleStepPartial again, now that undo was performed and we have the new version of the block
+			return p.handleStepPartial(ctx, clock, cursor, execOutput, idx, isLast) // call handleStepPartial again, now that undo was performed and we have the new version of the block
 		} else {
 			return err
 		}
@@ -320,7 +320,7 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 
 	mapModuleOutput := normalizeModuleOutput(p.mapModuleOutput, reqDetails.OutputModule)
 
-	if err = returnPartialDataOutput(clock, cursor, mapModuleOutput, p.respFunc, idx); err != nil {
+	if err = returnPartialDataOutput(clock, cursor, mapModuleOutput, p.respFunc, uint32(idx), isLast); err != nil {
 		return fmt.Errorf("failed to return module data output: %w", err)
 	}
 
@@ -404,7 +404,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 	//    -> partial 3 contains all transactions from partials 1+2+3
 	//    -> partial 4 only processes transactions from partial 4
 	//    -> when we get the full block (stepNEW), if it differs from the partial7's ID, we process it so that we send a 'partial 10' that contains transactions from partials 8,9,10
-	if reqctx.IncludePartialBlocks(ctx) { // this also covers 'partialBlocksOnly'
+	if reqctx.PartialBlocks(ctx) {
 		if p.partialProcessingState == nil || p.partialProcessingState.lastBlockID != clock.Id {
 			partialBlockIndex := biggestPartialBlockIndex
 			if p.partialProcessingState != nil && p.partialProcessingState.highestIndex > partialBlockIndex {
@@ -412,7 +412,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 			}
 
 			// this handleStepPartial will gate the 'shouldSendOutputs' itself
-			if err := p.handleStepPartial(ctx, clock, cursor, execOutput.Clone(), partialBlockIndex); err != nil { // we will reuse this execOutput so we clone it here
+			if err := p.handleStepPartial(ctx, clock, cursor, execOutput.Clone(), partialBlockIndex, true); err != nil { // we will reuse this execOutput so we clone it here
 				return err
 			}
 		}
@@ -427,7 +427,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 
 	if p.gate.shouldSendOutputs() {
 		p.sentBlocks++
-		if !reqctx.PartialBlocksOnly(ctx) {
+		if !reqctx.PartialBlocks(ctx) {
 			if reqDetails.IsTier2Request { // the gate.shouldSendOutputs() assures us that we are a streaming tier2 in this case
 				if out := p.mapModuleOutput.GetMapOutput(); out != nil {
 					skippable := p.mapModuleOutputSkippable && len(out.Value) == 0

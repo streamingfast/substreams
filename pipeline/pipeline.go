@@ -905,18 +905,21 @@ func returnPartialDataOutput(
 	cursor *bstream.Cursor,
 	mapModuleOutput *pbsubstreamsrpc.MapModuleOutput,
 	respFunc substreams.ResponseFunc,
-	partialIdx int32,
+	partialIdx uint32,
+	lastPartial bool,
 ) error {
 
-	out := &pbsubstreamsrpc.PartialBlockData{
+	out := &pbsubstreamsrpc.BlockScopedData{
 		Clock:            clock,
 		Cursor:           cursor.ToOpaque(),
 		FinalBlockHeight: cursor.LIB.Num(),
 		Output:           mapModuleOutput,
-		PartialIndex:     uint32(partialIdx),
+		IsPartial:        true,
+		PartialIndex:     &partialIdx,
+		IsLastPartial:    &lastPartial,
 	}
 
-	if err := respFunc(substreams.NewPartialBlockResponse(out)); err != nil {
+	if err := respFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {
 		return fmt.Errorf("calling response func: %w", err)
 	}
 

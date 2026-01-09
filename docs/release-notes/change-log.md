@@ -19,7 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * commands `run` and `sink webhook` now support these flags:
   - `--include-partial-blocks`: sends every block as partial(s) but also as real block
   - `--partial-blocks-only`: only sends partials (for every block, every bit of data should be there)
-  
+
 ### Sink library
 
 * To use the new partial blocks in a sink that uses github.com/streamingfast/substreams/sink, simply:
@@ -35,8 +35,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## v1.17.7
 
 ### [CLI]
-
-* Added `substreams estimate` command to estimate, by sampling
 
 * The `--endpoint` flag on various elements (`substreams run/gui/sink`) now accepts a short identifier to resolve, identifier which must match of the The Graph Network Registry, so for example, `--endpoint=solana` can be used directly now.
 

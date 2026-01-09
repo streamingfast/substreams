@@ -117,8 +117,9 @@ func estimateE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Force production mode for estimation
+	// Force production mode for estimation and infinite retries
 	sinkerConfig.Mode = sink.SubstreamsModeProduction
+	sinkerConfig.MaxRetries = -1
 
 	// Get estimate-specific flags
 	numSegments := sflags.MustGetInt(cmd, "samples")
@@ -246,6 +247,10 @@ func estimateE(cmd *cobra.Command, args []string) error {
 	report.Line("")
 
 	generateReport(report, results, startBlock, stopBlock)
+
+	// Print usage report (actual consumption during estimation across all segments)
+	printUsageReport()
+
 	return nil
 }
 
@@ -547,8 +552,8 @@ func calculateChainSegments(startBlock, endBlock uint64, numSegments int) []Chai
 			testEnd = chainEnd
 		}
 
-		// Skip if the range is invalid
-		if testStart >= chainEnd {
+		// Skip if the range is invalid (testStart must be strictly less than testEnd)
+		if testStart >= testEnd {
 			continue
 		}
 
@@ -961,4 +966,23 @@ func formatDuration(d time.Duration) string {
 
 	// Use Go's default formatting for everything else (handles h/m/s nicely)
 	return d.String()
+}
+
+// printUsageReport prints the actual usage consumed during estimation by reading
+// from the global metrics that were accumulated across all segment executions
+func printUsageReport() {
+	egressBytes := sink.ServerEgressBytes.Get()
+	processedBlocks := sink.ProcessedBlocks.Get()
+	receivedBlockData := sink.DataMessageCount.Get()
+
+	var noDataReceived string
+	if egressBytes == 0 && processedBlocks == 0 {
+		noDataReceived = " (no data received)"
+	}
+
+	fmt.Fprintf(os.Stderr, "\n")
+	fmt.Fprintf(os.Stderr, "📊 Usage Report%s\n", noDataReceived)
+	fmt.Fprintf(os.Stderr, " • Egress Bytes (uncompressed): %s\n", humanize.IBytes(uint64(egressBytes)))
+	fmt.Fprintf(os.Stderr, " • Processed Blocks: %s blocks\n", humanize.Comma(int64(processedBlocks)))
+	fmt.Fprintf(os.Stderr, " • Received Blocks: %s blocks\n", humanize.Comma(int64(receivedBlockData)))
 }

@@ -9,6 +9,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### CLI
+
+* The `substreams init` command will now list generators in the server's specified order (instead of randomly display them).
+
+* The `substreams init` has now proper error handling when a file cannot be uploaded to the server.
+
 ## v1.17.9
 
 ### Server

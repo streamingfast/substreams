@@ -85,6 +85,13 @@ func init() {
 var INIT_TRACE = false
 var WITH_ACCESSIBLE = false
 
+var globalInputHistory *InputHistory
+
+func init() {
+	// Initialize input history tracker
+	globalInputHistory = NewInputHistory()
+}
+
 type initStateFormat struct {
 	GeneratorID string          `json:"generator"`
 	State       json.RawMessage `json:"state"`
@@ -96,6 +103,83 @@ type UserState struct {
 
 func newUserState() *UserState {
 	return &UserState{}
+}
+
+// isFilePathInput uses heuristics to determine if an input is requesting a file path
+func isFilePathInput(prompt, description, placeholder string) bool {
+	combined := strings.ToLower(prompt + " " + description + " " + placeholder)
+
+	// File extensions (strong indicators)
+	fileExtensions := []string{".json", ".sol", ".yaml", ".yml", ".abi", ".txt", ".csv", ".md"}
+	for _, ext := range fileExtensions {
+		if strings.Contains(combined, ext) {
+			return true
+		}
+	}
+
+	// Word-boundary file keywords (avoid matching within words like "profile")
+	words := strings.Fields(combined)
+	fileKeywords := []string{"file", "path", "directory", "folder", "filepath", "dirpath"}
+	for _, word := range words {
+		for _, keyword := range fileKeywords {
+			if word == keyword {
+				return true
+			}
+		}
+	}
+
+	// Multi-word file indicators
+	contractFileKeywords := []string{"contract file", "abi file", "config file", "source file"}
+	for _, keyword := range contractFileKeywords {
+		if strings.Contains(combined, keyword) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// runFilePicker runs the huh FilePicker component
+func runFilePicker(prompt, description, defaultPath string) (string, error) {
+	// Determine starting directory
+	startDir := "."
+	if defaultPath != "" {
+		if stat, err := os.Stat(defaultPath); err == nil && stat.IsDir() {
+			startDir = defaultPath
+		} else {
+			startDir = filepath.Dir(defaultPath)
+		}
+	}
+
+	var selectedPath string
+
+	// Create FilePicker using huh API
+	picker := huh.NewFilePicker().
+		Title(prompt).
+		Description(description).
+		CurrentDirectory(startDir).
+		Value(&selectedPath)
+
+	err := huh.NewForm(huh.NewGroup(picker)).WithTheme(huhTheme).WithAccessible(WITH_ACCESSIBLE).Run()
+	if err != nil {
+		return "", err
+	}
+
+	return selectedPath, nil
+}
+
+// runEnhancedTextInput runs enhanced text input with history
+func runEnhancedTextInput(prompt, description, placeholder, defaultValue, validationRegex, validationError string) (string, error) {
+	enhancedInput := NewEnhancedInput(
+		prompt,
+		description,
+		placeholder,
+		defaultValue,
+		validationRegex,
+		validationError,
+	)
+
+	return enhancedInput.Run()
 }
 
 func readGeneratorState(stateFile string) (*initStateFormat, error) {
@@ -434,37 +518,40 @@ func runSubstreamsInitE(cmd *cobra.Command, args []string) error {
 		case *pbconvo.SystemOutput_TextInput_:
 			input := msg.TextInput
 
-			returnValue := input.DefaultValue
+			// Check if this input is requesting a file path
+			isFilePath := isFilePathInput(input.Prompt, input.Description, input.Placeholder)
 
-			inputField := huh.NewInput().
-				Title(input.Prompt).
-				Description(input.Description).
-				Placeholder(input.Placeholder).
-				Value(&returnValue)
+			var returnValue string
+			var err error
 
-			if input.ValidationRegexp != "" {
-				validationRE, err := regexp.Compile(input.ValidationRegexp)
+			if isFilePath {
+				// Use FilePicker for file path inputs
+				returnValue, err = runFilePicker(input.Prompt, input.Description, input.DefaultValue)
 				if err != nil {
-					return fmt.Errorf("invalid regexp received from server (%q) to validate text input: %w", msg.TextInput.ValidationRegexp, err)
+					return fmt.Errorf("failed taking file input: %w", err)
 				}
-
-				inputField.Validate(func(userInput string) error {
-					matched := validationRE.MatchString(strings.TrimRight(returnValue, " "))
-					if !matched {
-						return errors.New(input.ValidationErrorMessage)
-					}
-					return nil
-				})
-			}
-
-			err := huh.NewForm(huh.NewGroup(inputField)).WithTheme(huhTheme).WithAccessible(WITH_ACCESSIBLE).Run()
-			if err != nil {
-				return fmt.Errorf("failed taking input: %w", err)
+			} else {
+				// Use enhanced text input with history for other inputs
+				returnValue, err = runEnhancedTextInput(
+					input.Prompt,
+					input.Description,
+					input.Placeholder,
+					input.DefaultValue,
+					input.ValidationRegexp,
+					input.ValidationErrorMessage,
+				)
+				if err != nil {
+					return fmt.Errorf("failed taking text input: %w", err)
+				}
 			}
 
 			fmt.Println(gray("┃"), input.Prompt+":", bold(returnValue))
 			fmt.Println("")
 
+			// Record in history
+			globalInputHistory.Add(returnValue)
+
+			// Send to server
 			if err := sendFunc(&pbconvo.UserInput{
 				FromActionId: resp.ActionId,
 				Entry: &pbconvo.UserInput_TextInput_{

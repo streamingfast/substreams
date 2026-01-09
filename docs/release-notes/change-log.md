@@ -11,7 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v1.17.9
 
-## Server
+### Server
 
 * Fix issue where "live backfiller" would not create segments after reconnecting with a cursor starting from a previous quicksave, causing delays in future reconnection
 * Prevent "panic" when log messages are too large: instead, they will be truncated with a 'some logs were truncated' message.
@@ -19,19 +19,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Raise max log message size for a full block from 128k to 5MiB
 * Reduce log level from Warn to Debug when we fail to get or set the store size (for backends that don't support it)
 
-## CLI
+### CLI
 
 * Added `--bytes-encoding` flag to `run` and `gui`, accepted values: ['', 'hex', 'base58', 'base64', 'string'] (default: '' still auto-detects from network)
 
-## Partial blocks (experimental)
+### Partial blocks (experimental)
 
 * Removed PartialsData message and brought back this data inside the good old BlockScopedData
 * added the following fields to BlockScopedData:
   - bool `is_partial` to indicate if this block is a partial block. The following two fields are only present when `is_partial==true`
   - optional bool `is_last_partial` to indicate if this is the last partial of a given block (with correct block hash)
   - optional uint32 `partial_index` to indicate the index of this partial block within the full block
-* renamed `partial_blocks_only` to `partial_blocks` on substreams Blocks request
-* removed `include_partial_blocks` from substreams Blocks request
+* renamed `--partial_blocks_only` flag to `partial_blocks` on substreams Blocks request
+* removed `--include_partial_blocks` flag from substreams Blocks request
 
 ## v1.17.8
 

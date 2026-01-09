@@ -204,7 +204,7 @@ func TestDecoder_WrapMessage(t *testing.T) {
 	modName := "test_module"
 	data := json.RawMessage(`{"field1":"value1","field2":42}`)
 
-	wrapped, err := decoder.WrapMessage(msgType, blockNum, modName, data, 0)
+	wrapped, err := decoder.WrapMessage(msgType, blockNum, modName, data, nil, nil)
 	if err != nil {
 		t.Fatalf("WrapMessage failed: %v", err)
 	}

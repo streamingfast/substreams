@@ -184,9 +184,9 @@ func (ui *TUI) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.
 	ui.seenFirstData = true
 	if ui.outputMode == OutputModeTUI {
 		ui.ensureTerminalUnlocked()
-		return ui.decoratedBlockScopedData(data.Output, data.DebugMapOutputs, data.DebugStoreOutputs, data.Clock, 0)
+		return ui.decoratedBlockScopedData(data.Output, data.DebugMapOutputs, data.DebugStoreOutputs, data.Clock, data.PartialIndex, data.IsLastPartial)
 	} else {
-		return ui.jsonBlockScopedData(data.Output, data.DebugMapOutputs, data.DebugStoreOutputs, data.Clock, 0)
+		return ui.jsonBlockScopedData(data.Output, data.DebugMapOutputs, data.DebugStoreOutputs, data.Clock, data.PartialIndex, data.IsLastPartial)
 	}
 }
 

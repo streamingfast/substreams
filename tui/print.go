@@ -23,7 +23,9 @@ func (ui *TUI) decoratedBlockScopedData(
 	debugMapOutputs []*pbsubstreamsrpc.MapModuleOutput,
 	debugStoreOutputs []*pbsubstreamsrpc.StoreModuleOutput,
 	clock *pbsubstreams.Clock,
-	partialIndex uint32,
+	partialIndex *uint32,
+	isLastPartial *bool,
+
 ) error {
 	var s []string
 	for _, out := range append([]*pbsubstreamsrpc.MapModuleOutput{output}, debugMapOutputs...) {
@@ -41,7 +43,7 @@ func (ui *TUI) decoratedBlockScopedData(
 			msgType := ui.decoder.GetMessageType(out.Name)
 			dataContent := ui.decoder.DecodeDynamicMessage(msgDesc, out.MapOutput)
 
-			wrappedCnt, err := ui.decoder.WrapMessage(msgType, clock.Number, out.Name, dataContent, partialIndex)
+			wrappedCnt, err := ui.decoder.WrapMessage(msgType, clock.Number, out.Name, dataContent, partialIndex, isLastPartial)
 			if err != nil {
 				s = append(s, fmt.Sprintf("Error wrapping message: %v", err))
 			} else {
@@ -138,7 +140,8 @@ func (ui *TUI) jsonBlockScopedData(
 	debugMapOutputs []*pbsubstreamsrpc.MapModuleOutput,
 	debugStoreOutputs []*pbsubstreamsrpc.StoreModuleOutput,
 	clock *pbsubstreams.Clock,
-	partialIndex uint32,
+	partialIndex *uint32,
+	lastPartial *bool,
 ) error {
 
 	for _, out := range append([]*pbsubstreamsrpc.MapModuleOutput{output}, debugMapOutputs...) {
@@ -151,7 +154,7 @@ func (ui *TUI) jsonBlockScopedData(
 			msgType := ui.decoder.GetMessageType(out.Name)
 			dataContent := ui.decoder.DecodeDynamicMessage(msgDesc, out.MapOutput)
 
-			wrappedCnt, err := ui.decoder.WrapMessage(msgType, clock.Number, out.Name, dataContent, partialIndex)
+			wrappedCnt, err := ui.decoder.WrapMessage(msgType, clock.Number, out.Name, dataContent, partialIndex, lastPartial)
 			if err != nil {
 				fmt.Printf("Error wrapping message: %v\n", err)
 			} else {
@@ -290,9 +293,9 @@ func decodeAsString(in []byte) []byte { return []byte(fmt.Sprintf("%q", string(i
 func printClock(block *pbsubstreamsrpc.BlockScopedData) {
 	blockWord := "BLOCK"
 	if block.IsPartial {
-		blockWord = "PARTIAL BLOCK"
+		blockWord = fmt.Sprintf("PARTIAL BLOCK (idx=%d)", *block.PartialIndex)
 		if *block.IsLastPartial {
-			blockWord = "LAST PARTIAL BLOCK"
+			blockWord = "PARTIAL BLOCK (last)"
 		}
 	}
 	fmt.Printf("----------- %s #%s (%s) age=%s ---------------\n", blockWord, humanize.Comma(int64(block.Clock.Number)), block.Clock.Id, time.Since(block.Clock.Timestamp.AsTime()))

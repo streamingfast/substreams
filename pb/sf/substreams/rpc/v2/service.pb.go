@@ -7,14 +7,15 @@
 package pbsubstreamsrpcv2
 
 import (
+	reflect "reflect"
+	sync "sync"
+	unsafe "unsafe"
+
 	v2 "github.com/streamingfast/pbgo/sf/firehose/v2"
 	v1 "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	anypb "google.golang.org/protobuf/types/known/anypb"
-	reflect "reflect"
-	sync "sync"
-	unsafe "unsafe"
 )
 
 const (
@@ -484,7 +485,7 @@ type BlockScopedData struct {
 	// Only present if is_partial==true
 	PartialIndex *uint32 `protobuf:"varint,14,opt,name=partial_index,json=partialIndex,proto3,oneof" json:"partial_index,omitempty"`
 	// Only present if is_partial==true
-	// true if this is the last partial of a given block, this will be the hash of the block (unless there are reorgs)
+	// true if this is the last partial of a given block, this will be the correct hash of the block (unless there are reorgs)
 	IsLastPartial *bool `protobuf:"varint,15,opt,name=is_last_partial,json=isLastPartial,proto3,oneof" json:"is_last_partial,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

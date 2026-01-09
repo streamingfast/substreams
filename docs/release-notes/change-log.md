@@ -9,7 +9,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v1.17.9
 
 ## Server
 
@@ -22,6 +22,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## CLI
 
 * Added `--bytes-encoding` flag to `run` and `gui`, accepted values: ['', 'hex', 'base58', 'base64', 'string'] (default: '' still auto-detects from network)
+
+## Partial blocks (experimental)
+
+* Removed PartialsData message and brought back this data inside the good old BlockScopedData
+* added the following fields to BlockScopedData:
+  - bool `is_partial` to indicate if this block is a partial block. The following two fields are only present when `is_partial==true`
+  - optional bool `is_last_partial` to indicate if this is the last partial of a given block (with correct block hash)
+  - optional uint32 `partial_index` to indicate the index of this partial block within the full block
+* renamed `partial_blocks_only` to `partial_blocks` on substreams Blocks request
+* removed `include_partial_blocks` from substreams Blocks request
 
 ## v1.17.8
 

@@ -125,7 +125,7 @@ message BlockScopedData {
   optional uint32 partial_index = 14;
 
   // Only present if is_partial==true
-  // true if this is the last partial of a given block, this will be the hash of the block (unless there are reorgs)
+  // true if this is the last partial of a given block, this will be the correct hash of the block (unless there are reorgs)
   optional bool is_last_partial = 15;
 }
 

@@ -11,10 +11,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Server
+
+* Added bucketed prometheus metrics `head_block_relative_time_sum{app=substreams_output}` that shows latency between outputing live blocks and their blocktime.
+* Fixed underflow in 'FailedPrecondition desc = request needs to process a total of x blocks' error when running from 'substreams run' with a start-block in the future.
+
 ### CLI
 
 * The `substreams init` command will now list generators in the server's specified order (instead of randomly display them).
-
 * The `substreams init` has now proper error handling when a file cannot be uploaded to the server.
 
 ## v1.17.9

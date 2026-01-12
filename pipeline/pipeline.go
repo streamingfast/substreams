@@ -293,18 +293,18 @@ func (p *Pipeline) InitTier1StoresAndBackprocess(ctx context.Context, reqPlan *p
 
 		reqDetails := reqctx.Details(ctx)
 		var toProcessAfter uint64
-		stopBlockNum := reqDetails.StopBlockNum
-		if stopBlockNum == 0 && p.getHeadBlockNum != nil {
+		estimateProcessUpto := reqDetails.StopBlockNum
+		if estimateProcessUpto == 0 && p.getHeadBlockNum != nil {
 			headBlock, err := p.getHeadBlockNum()
 			if err != nil {
 				reqctx.Logger(ctx).Warn("cannot get head block for sessionInit", zap.Error(err))
 			} else {
-				stopBlockNum = headBlock
+				estimateProcessUpto = headBlock
 			}
 		}
 
-		if stopBlockNum != 0 {
-			toProcessAfter = stopBlockNum - reqDetails.ResolvedStartBlockNum
+		if estimateProcessUpto != 0 && estimateProcessUpto > reqDetails.ResolvedStartBlockNum {
+			toProcessAfter = estimateProcessUpto - reqDetails.ResolvedStartBlockNum
 		}
 
 		p.respFunc(&pbsubstreamsrpc.Response{

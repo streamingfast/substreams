@@ -10,6 +10,7 @@ import (
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/reqctx"
 	"go.uber.org/zap"
 )
@@ -87,13 +88,25 @@ func GetTotalBytesWritten(meter dmetering.Meter) uint64 {
 func LiveSourceMiddlewareHandlerFactory(ctx context.Context) func(handler bstream.Handler) bstream.Handler {
 	return func(next bstream.Handler) bstream.Handler {
 		return bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
+			var isStepNew bool
 			if stepable, ok := obj.(bstream.Stepable); ok {
 				step := stepable.Step()
+				isStepNew = true
 				if step.Matches(bstream.StepNew) {
 					dmetering.GetBytesMeter(ctx).CountInc(MeterLiveUncompressedReadBytes, len(blk.GetPayload().GetValue()))
 				}
 			}
-			return next.ProcessBlock(blk, obj)
+			err := next.ProcessBlock(blk, obj)
+			if err != nil {
+				return err
+			}
+			if liveable, ok := obj.(bstream.Liveable); ok && isStepNew {
+				if liveable.IsLiveBlock() {
+					metrics.Tier1OutputHeadBlockRelativeTime.SetLastBlock(blk.Time())
+				}
+			}
+
+			return nil
 		})
 	}
 }

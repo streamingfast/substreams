@@ -83,6 +83,7 @@
   * [Architecture & Parallel Execution](references/architecture.md)
   * [Foundational Stores](references/foundational-store-reference.md)
   * [Module Concepts](references/substreams-components/modules/modules.md)
+  * [Module Caching](references/module-caching.md)
   * [Reliability Guarantees](references/reliability-guarantees.md)
   * [FAQ](references/faq.md)
 * Manifest & Components

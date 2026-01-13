@@ -6,7 +6,7 @@ require (
 	github.com/docker/docker v28.2.2+incompatible
 	github.com/streamingfast/dauth v0.0.0-20251218134044-fb716c7172b4
 	github.com/streamingfast/dmetering v0.0.0-20251027175535-4fd530934b97
-	github.com/streamingfast/dmetrics v0.0.0-20250711072030-f023e918a175
+	github.com/streamingfast/dmetrics v0.0.0-20260109212625-35256f512c62
 	github.com/streamingfast/dsession v0.0.0-20251029144057-b94d1030e142
 	github.com/streamingfast/substreams v1.16.7-0.20251015182509-1c9938899a91
 	github.com/stretchr/testify v1.11.1
@@ -150,7 +150,7 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.15.0 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
-	github.com/streamingfast/bstream v0.0.2-0.20251222143922-f74bcc447878 // indirect
+	github.com/streamingfast/bstream v0.0.2-0.20260112175926-a19e6cd0ce1f // indirect
 	github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b // indirect
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c // indirect
 	github.com/streamingfast/derr v0.0.0-20250321151415-6b4fbbcb1bb5 // indirect
@@ -159,7 +159,7 @@ require (
 	github.com/streamingfast/dummy-blockchain v1.7.3 // indirect
 	github.com/streamingfast/firehose-ethereum/types v0.0.0-20251113151010-c9c94d64348a // indirect
 	github.com/streamingfast/firehose-networks v0.2.2 // indirect
-	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091 // indirect
+	github.com/streamingfast/logging v0.0.0-20251127143054-23a35e5bd633 // indirect
 	github.com/streamingfast/opaque v0.0.0-20210811180740-0c01d37ea308 // indirect
 	github.com/streamingfast/pbgo v0.0.6-0.20251125204657-0a9c67563b19 // indirect
 	github.com/streamingfast/sf-tracing v0.0.0-20251218140752-bafd5572499f // indirect

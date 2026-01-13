@@ -92,7 +92,7 @@ func LiveSourceMiddlewareHandlerFactory(ctx context.Context) func(handler bstrea
 			if stepable, ok := obj.(bstream.Stepable); ok {
 				step := stepable.Step()
 				isStepNew = true
-				if step.Matches(bstream.StepNew) {
+				if step.Matches(bstream.StepNew) || step.Matches(bstream.StepPartial) {
 					dmetering.GetBytesMeter(ctx).CountInc(MeterLiveUncompressedReadBytes, len(blk.GetPayload().GetValue()))
 				}
 			}

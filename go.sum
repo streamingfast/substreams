@@ -555,8 +555,8 @@ github.com/streamingfast/dmetrics v0.0.0-20260109212625-35256f512c62 h1:Tb4T34Im
 github.com/streamingfast/dmetrics v0.0.0-20260109212625-35256f512c62/go.mod h1:JbxEDbzWRG1dHdNIPrYfuPllEkktZMgm40AwVIBENcw=
 github.com/streamingfast/dsession v0.0.0-20251029144057-b94d1030e142 h1:mgPawX0VOgrG2LHSc6EfY15r0x3AO/GK6LY58io3/+4=
 github.com/streamingfast/dsession v0.0.0-20251029144057-b94d1030e142/go.mod h1:ldDwFqr20xXyaLhwDm7XlMaf2vvoZNOrjgsMcFJGtrw=
-github.com/streamingfast/dstore v0.1.3-0.20260113181007-4f744789047a h1:QOFRNi3RT9ktTuKVYJ3UGmRjt2+XvDTLOPW/uGLG6TU=
-github.com/streamingfast/dstore v0.1.3-0.20260113181007-4f744789047a/go.mod h1:mmxVV6CNRlO8XwqsBTDm4PJxBUEwtZ6/bp1+8CFPBTU=
+github.com/streamingfast/dstore v0.1.3-0.20260113210117-94d66eda2027 h1:6rf8oH6cKwCyu0F+q6bMneWf+5ROYjw2nGWYz5aCWqs=
+github.com/streamingfast/dstore v0.1.3-0.20260113210117-94d66eda2027/go.mod h1:mmxVV6CNRlO8XwqsBTDm4PJxBUEwtZ6/bp1+8CFPBTU=
 github.com/streamingfast/dummy-blockchain v1.7.3 h1:rPheajbwc+hwh4XVRMaroET/p/lvlI7WGfqETBkIL18=
 github.com/streamingfast/dummy-blockchain v1.7.3/go.mod h1:EP8X3OwOoGYjJfzhw+zD1A0GTNSDg+v1OKDwSTDhHyc=
 github.com/streamingfast/firehose-ethereum/types v0.0.0-20251113151010-c9c94d64348a h1:qatil0YhFzTVAFQnH7iMcq+gpVUNEs9Se3lLq4eaof8=

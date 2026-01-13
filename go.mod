@@ -16,7 +16,7 @@ require (
 	github.com/streamingfast/derr v0.0.0-20250814163534-bd7407bd89d7
 	github.com/streamingfast/dgrpc v0.0.0-20251218142640-027692a12722
 	github.com/streamingfast/dhttp v0.1.3-0.20251218140957-6d46b8f12eb1
-	github.com/streamingfast/dstore v0.1.3-0.20260113181007-4f744789047a
+	github.com/streamingfast/dstore v0.1.3-0.20260113210117-94d66eda2027
 	github.com/streamingfast/logging v0.0.0-20260108192805-38f96de0a641
 	github.com/streamingfast/pbgo v0.0.6-0.20250120164644-a58d8066ab4b
 	github.com/stretchr/testify v1.11.1

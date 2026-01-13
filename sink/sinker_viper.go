@@ -221,7 +221,7 @@ func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagInclusionExclusion) {
 	}
 
 	if defaultFlagIncluded(FlagExtraHeaders) {
-		flags.StringSliceP(FlagExtraHeaders, "H", nil, "Additional headers to be sent in the substreams request")
+		flags.StringSliceP(FlagExtraHeaders, "H", nil, "Additional headers to be sent in the substreams request. Valid headers: X-Substreams-Parallel-Workers, X-substreams-acknowledge-non-deterministic. For more details, see https://docs.substreams.dev/reference-material/command-line-interface#headers")
 	}
 
 	if defaultFlagIncluded(FlagAPIKeyEnvvar) {

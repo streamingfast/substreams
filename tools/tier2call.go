@@ -30,7 +30,7 @@ func init() {
 	tier2CallCmd.Flags().StringP("substreams-endpoint", "e", "mainnet.eth.streamingfast.io:443", "Substreams gRPC endpoint")
 	tier2CallCmd.Flags().Bool("insecure", false, "Skip certificate validation on GRPC connection")
 	tier2CallCmd.Flags().Bool("plaintext", false, "Establish GRPC connection in plaintext")
-	tier2CallCmd.Flags().StringSliceP("header", "H", nil, "Additional headers to be sent in the substreams request")
+	tier2CallCmd.Flags().StringSliceP("header", "H", nil, "Additional headers to be sent in the substreams request. Valid headers: X-Substreams-Parallel-Workers, X-substreams-acknowledge-non-deterministic. For more details, see https://docs.substreams.dev/reference-material/command-line-interface#headers")
 	tier2CallCmd.Flags().StringArrayP("params", "p", nil, "Set a params for parameterizable modules. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
 	tier2CallCmd.Flags().String("metering-plugin", "null://", "Metering configuration")
 	tier2CallCmd.Flags().String("block-type", "sf.ethereum.type.v2.Block", "Block type")

@@ -522,6 +522,7 @@ func (s *Sinker) doRequest(
 
 		beforeReceive := time.Now()
 		resp, err := stream.Recv()
+
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				return activeCursor, receivedDataMessage, err

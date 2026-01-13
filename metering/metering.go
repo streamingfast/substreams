@@ -102,6 +102,9 @@ func LiveSourceMiddlewareHandlerFactory(ctx context.Context) func(handler bstrea
 			}
 			if liveable, ok := obj.(bstream.Liveable); ok && isStepNew {
 				if liveable.IsLiveBlock() {
+					if time.Since(blk.Time()) > time.Second*5 {
+						reqctx.Logger(ctx).Debug("live block slow", zap.Duration("time_since", time.Since(blk.Time())), zap.Uint64("block_num", blk.Number))
+					}
 					metrics.Tier1OutputHeadBlockRelativeTime.SetLastBlock(blk.Time())
 				}
 			}

@@ -363,6 +363,10 @@ func removeUnusedImportedModules(pkg *pbsubstreams.Package, manif *Manifest) {
 		}
 	}
 
+	if manif.Sink != nil && manif.Sink.Module != "" {
+		neededModules(manif.Sink.Module)
+	}
+
 	for _, manifModule := range manif.Modules {
 		neededModules(manifModule.Name)
 

@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### CLI
 
+* Fix parsing of params with modules derived with `use`: now allows reusing the same modules with different params
 * The `substreams init` command will now list generators in the server's specified order (instead of randomly display them).
 * The `substreams init` has now proper error handling when a file cannot be uploaded to the server.
 

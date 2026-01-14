@@ -215,7 +215,16 @@ func isEmptyMessage(msg *pbsubstreams.Module_BlockFilter) bool {
 
 func checkUseInputs(moduleWithUse, usedModule *pbsubstreams.Module, manifestModuleWithUse *Module, packageModulesMapping map[string]*pbsubstreams.Module) error {
 	if moduleWithUse.Inputs == nil {
-		moduleWithUse.Inputs = usedModule.Inputs
+		for _, input := range usedModule.Inputs {
+			var newInput *pbsubstreams.Module_Input
+			switch {
+			case input.GetParams() != nil: // params may be overloaded from elsewhere, so it needs a deep copy even if it is not set
+				newInput = &pbsubstreams.Module_Input{Input: &pbsubstreams.Module_Input_Params_{Params: &pbsubstreams.Module_Input_Params{Value: input.GetParams().Value}}} // even without explicitly setting params in the input, it might get overriden after
+			default:
+				newInput = input
+			}
+			moduleWithUse.Inputs = append(moduleWithUse.Inputs, newInput)
+		}
 	}
 
 	if len(moduleWithUse.Inputs) != len(usedModule.Inputs) {

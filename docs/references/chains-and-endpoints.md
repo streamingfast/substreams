@@ -33,7 +33,6 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 | NEAR     | [`sf.near.type.v1.Block`](https://github.com/streamingfast/firehose-near/blob/develop/proto/sf/near/type/v1/type.proto)                   |                                                                                                                       |
 | Solana   | [`sf.solana.type.v1.Block`](https://github.com/streamingfast/firehose-solana/blob/develop/proto/sf/solana/type/v1/type.proto)             | [solana-v0.1.0.spkg](https://github.com/streamingfast/sf-solana/releases/download/v0.1.0/solana-v0.1.0.spkg)          |
 | Cosmos   | [`sf.cosmos.type.v2.Block`](https://github.com/streamingfast/firehose-cosmos/blob/develop/cosmos/proto/sf/cosmos/type/v2/block.proto#L10) |                                                                                                                       |
-| Bitcoin  | [`sf.bitcoin.type.v1.Block`](https://github.com/streamingfast/firehose-bitcoin/blob/develop/proto/sf/bitcoin/type/v1/type.proto)          |                                                                                                                       |
 | Antelope | [`sf.antelope.type.v1.Block`](https://buf.build/pinax/firehose-antelope/docs/main:sf.antelope.type.v1#sf.antelope.type.v1.Block)          |                                                                                                                       |
 | Starknet | [`sf.starknet.type.v1.Block`](https://github.com/streamingfast/firehose-starknet/blob/main/proto/sf/starknet/type/v1/block.proto#L8)      |                                                                                                                       |
 | Stellar | [`sf.stellar.type.v1.Block`](https://github.com/streamingfast/firehose-stellar/blob/main/proto/sf/stellar/type/v1/block.proto#L7)      |                                                                                                                       |
@@ -48,17 +47,20 @@ For EVM chains, there are two different types of `Block` models: _Extended_ and 
 
 The following table summarizes the different data contained in each type of `Block`.
 
-<figure><img src="../../.gitbook/assets/intro/base-extended-block.png" alt="" width="100%"><figcaption><p>Base vs. Extended Block Data Available</p></figcaption></figure>
+<figure><img src="../.gitbook/assets/intro/base-extended-block.png" alt="" width="100%"><figcaption><p>Base vs. Extended Block Data Available</p></figcaption></figure>
 
 The data missing in the Base Block makes the corresponding Protobuf field empty. For example, if you try to read _internal call_ on a Base Block, the list will be empty.
 
-## Official Endpoints
+## Up-to-date Reference for all substreams endpoints
+
+* See https://graph-networks-app.vercel.app/ for a complete list of networks and endpoints.
+* See https://networks-registry.thegraph.com/TheGraphNetworksRegistry.json for the raw data behind this list (including information like "extended blocks" vs "base blocks").
+
+## Streamingfast Endpoints
 
 - **Ethereum Mainnet**: `mainnet.eth.streamingfast.io:443`
 - **Ethereum Sepolia**: `sepolia.eth.streamingfast.io:443`
-- **Ethereum Holesky**: `holesky.eth.streamingfast.io:443`
 - **Polygon** **Mainnet**: `polygon.streamingfast.io:443`
-- **Mumbai Testnet**: `mumbai.streamingfast.io:443`
 - **Arbitrum One**: `arb-one.streamingfast.io:443`
 - **BNB**: `bnb.streamingfast.io:443`
 - **Optimism**: `mainnet.optimism.streamingfast.io:443`
@@ -70,7 +72,6 @@ The data missing in the Base Block makes the corresponding Protobuf field empty.
 - **Solana Accounts**: `accounts.mainnet.sol.streamingfast.io:443`
 - **TRON Native**: `mainnet.tron.streamingfast.io:443`
 - **TRON EVM**: `mainnet-evm.tron.streamingfast.io:443`
-- **Bitcoin Mainnet**: `mainnet.btc.streamingfast.io:443`
 - **Injective EVM Testnet**: `testnet.injective-evm.streamingfast.io:443`
 - **Injective Mainnet**: `mainnet.injective.streamingfast.io:443`
 - **Injective Testnet**: `testnet.injective.streamingfast.io:443`

@@ -354,6 +354,7 @@ func (s *Tier1Service) BlocksAny(
 	s.activeRequestsWG.Add(1)
 	defer func() {
 		if reason, countAsRejected := metrics.IsRejectedRequestError(serverErr); countAsRejected {
+			s.logger.Debug("rejected request", zap.String("reason", reason), zap.Error(serverErr))
 			metrics.Tier1RejectedRequestCounter.Inc(reason)
 		}
 		s.activeRequestsWG.Done()

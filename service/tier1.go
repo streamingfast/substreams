@@ -20,6 +20,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/hub"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+	"github.com/streamingfast/bstream/stream"
 	bsstream "github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/dgrpc"
@@ -862,7 +863,7 @@ func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelC
 		scheduleStores,
 	)
 	if err != nil {
-		return fmt.Errorf("error building request plan: %w", err)
+		return stream.NewErrInvalidArg("%s", err.Error())
 	}
 
 	if s.sessionPool != nil {

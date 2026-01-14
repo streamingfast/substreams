@@ -53,8 +53,8 @@ The data missing in the Base Block makes the corresponding Protobuf field empty.
 
 ## Up-to-date Reference for all substreams endpoints
 
-* See https://graph-networks-app.vercel.app/ for a complete list of networks and endpoints.
-* See https://networks-registry.thegraph.com/TheGraphNetworksRegistry.json for the raw data behind this list (including information like "extended blocks" vs "base blocks").
+* See [TheGraphNetworkRegistryApp](https://graph-networks-app.vercel.app/) for a complete list of networks and endpoints.
+* See [TheGraphNetworkRegistry.json](https://networks-registry.thegraph.com/TheGraphNetworksRegistry.json) for the raw data behind this list (including information like "extended blocks" vs "base blocks").
 
 ## Streamingfast Endpoints
 

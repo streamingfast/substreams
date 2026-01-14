@@ -79,9 +79,11 @@ modules:
     inputs:
       - source: sf.ethereum.type.v2.Block
       - map: ethereum_common:filtered_logs
-        params: "address=0xa0b86a33e6776e1b1c4b0b8b8b8b8b8b8b8b8b8b"
     output:
       type: proto:my.custom.Output
+      
+params:
+  ethereum_common:filtered_logs: "address=0xa0b86a33e6776e1b1c4b0b8b8b8b8b8b8b8b8b8b" # lowercase is important! this is an exact string match
 ```
 
 ### Example: Using Ethereum Log Filtering
@@ -128,9 +130,11 @@ modules:
     kind: map
     inputs:
       - map: ethereum_common:filtered_logs
-        params: "address=0xa0b86a33e6776e1b1c4b0b8b8b8b8b8b8b8b8b8b&topic0=0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
     output:
       type: proto:my.transfers.Transfers
+      
+params:
+  ethereum_common:filtered_logs: "address=0xa0b86a33e6776e1b1c4b0b8b8b8b8b8b8b8b8b8b&topic0=0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 ```
 
 ### Performance Benefits

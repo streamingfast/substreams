@@ -72,6 +72,28 @@ modules:
       Params contains Uniswap factory smart contract address without `0x` prefix, i.e. 1f98431c8ad98523631ae4a59f267346ea31f984 for Ethereum Mainnet
 ```
 
+## Reusing module with different parameters
+
+You can reuse the same module with different parameters by duplicating them (with the `use:` keyword) and assigning values in the `params` section of the manifest.
+
+```
+imports:
+  ethereum_common: ethereum_common@v0.3.3
+
+modules:
+  - name: filtered_logs_one
+    use: ethereum_common:filtered_logs
+    
+  - name: filtered_logs_two
+    use: ethereum_common:filtered_logs
+    
+params:
+  filtered_logs_one: "address=0xa0b86a33e6776e1b1c4b0b8b8b8b8b8b8b8b8b8b" # lowercase is important! this is an exact string match
+  filtered_logs_two: "address=0x1234567890aaaabcccddeeefffffffffffffffff"
+```
+
+While this example could be achieved simply with the parameter `address=0xa0b86a33e6776e1b1c4b0b8b8b8b8b8b8b8b8b8b||address=0x1234567890aaaabcccddeeefffffffffffffffff`, there are some scenarios where you will need this level of flexibility.
+
 ## Advanced parameters
 
 Sometimes you may need to use multiple parameters for a module. To pass multiple parameters, you can encode them as a URL-encoded query string, i.e. `param1=value1&param2=value2`.

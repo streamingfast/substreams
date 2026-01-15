@@ -245,12 +245,20 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 			return nil
 		}
 		if s.ExecOutWalker.IsWorking() {
+			s.logger.Debug("scheduler: execout walker already working, skipping download request")
 			return nil
 		}
 		s.ExecOutWalker.MarkWorking()
 		if s.ExecOutWalker.IsCompleted() {
+			s.logger.Debug("scheduler: execout walker completed")
 			return execout.CmdWalkerCompleted()
 		}
+		first, current, end := s.ExecOutWalker.Progress()
+		s.logger.Debug("scheduler: downloading execout segment",
+			zap.Int("segment", current),
+			zap.Int("first_segment", first),
+			zap.Int("last_segment", end),
+		)
 		cmds = append(cmds, s.ExecOutWalker.CmdDownloadCurrentSegment(msg.Wait))
 
 	case execout.MsgWalkerCompleted:
@@ -290,7 +298,12 @@ func (s *Scheduler) cmdShutdownWhenComplete() loop.Cmd {
 		var fields []zap.Field
 		if s.ExecOutWalker != nil {
 			start, current, end := s.ExecOutWalker.Progress()
-			fields = append(fields, zap.Int("cached_output_start", start), zap.Int("cached_output_current", current), zap.Int("cached_output_end", end))
+			fields = append(fields,
+				zap.Int("cached_output_start", start),
+				zap.Int("cached_output_current", current),
+				zap.Int("cached_output_end", end),
+				zap.Bool("walker_is_working", s.ExecOutWalker.IsWorking()),
+			)
 		}
 		s.logger.Info("scheduler: waiting for output stream to complete, stores ready", fields...)
 	}

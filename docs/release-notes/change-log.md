@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Fix `substreams pack` for a substreams.yaml where no modules are defined, but a SinkConfig points to an imported module (force modules inclusion)
 * The `substreams init` command will now list generators in the server's specified order (instead of randomly display them).
 * The `substreams init` has now proper error handling when a file cannot be uploaded to the server.
+* added `substreams sink protojson` (migrated from https://github.com/streamingfast/substreams-sink-files)
 
 ## v1.17.9
 

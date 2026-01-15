@@ -72,6 +72,7 @@ require (
 	github.com/streamingfast/sf-tracing v0.0.0-20251218140752-bafd5572499f
 	github.com/streamingfast/shutter v1.5.0
 	github.com/streamingfast/substreams-sdk-go v0.0.0-20240110154316-5fb21a7a330b
+	github.com/streamingfast/substreams-sink-files/v2 v2.3.1
 	github.com/test-go/testify v1.1.4
 	github.com/tetratelabs/wazero v1.8.0
 	github.com/tidwall/pretty v1.2.1
@@ -100,6 +101,7 @@ require (
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.6.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.54.0 // indirect
 	github.com/alecthomas/chroma/v2 v2.8.0 // indirect
+	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.32.6 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.7 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.28.6 // indirect
@@ -136,19 +138,24 @@ require (
 	github.com/gorilla/schema v1.0.2 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.3 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
+	github.com/holiman/uint256 v1.3.1 // indirect
 	github.com/iancoleman/strcase v0.3.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/manifoldco/promptui v0.9.0 // indirect
 	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
 	github.com/mostynb/go-grpc-compression v1.2.3 // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
+	github.com/parquet-go/parquet-go v0.23.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.6 // indirect
+	github.com/pierrec/lz4/v4 v4.1.21 // indirect
 	github.com/pinax-network/graph-networks-libs/packages/golang v0.7.0 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/rs/cors v1.10.0 // indirect
 	github.com/sahilm/fuzzy v0.1.1 // indirect
+	github.com/segmentio/encoding v0.4.0 // indirect
 	github.com/sercand/kuberesolver/v5 v5.1.1 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
+	github.com/streamingfast/dhammer v0.0.0-20220506192416-3797a7906da2 // indirect
 	github.com/streamingfast/validator v0.0.0-20231124184318-71ec8080e4ae // indirect
 	github.com/thedevsaddam/govalidator v1.9.6 // indirect
 	github.com/tidwall/match v1.1.1 // indirect

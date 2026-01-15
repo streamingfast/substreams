@@ -69,8 +69,9 @@
     * [JavaScript](how-to-guides/sinks/stream/javascript.md)
     * [Go](how-to-guides/sinks/stream/go.md)
   * [Substreams:PubSub](how-to-guides/sinks/pubsub.md)
+  * [ProtoJSON](how-to-guides/sinks/protojson.md)
   * [Files](how-to-guides/sinks/files.md)
-  * [Community Sinks](how-to-guides/sinks/community/other-sinks)
+  * [Community Sinks]
     * [MongoDB](how-to-guides/sinks/community/other-sinks/mongodb.md)
     * [Key-Value Store](how-to-guides/sinks/community/other-sinks/kv.md)
     * [Prometheus](how-to-guides/sinks/community/other-sinks/prometheus.md)

@@ -876,8 +876,6 @@ github.com/opentracing/opentracing-go v1.1.0 h1:pWlfV3Bxv7k65HYwkikxat0+s3pV4bsq
 github.com/openzipkin/zipkin-go v0.4.2/go.mod h1:ZeVkFjuuBiSy13y8vpSDCjMi9GoI3hPpCJSBx/EYFhY=
 github.com/paulmach/orb v0.9.0 h1:MwA1DqOKtvCgm7u9RZ/pnYejTeDJPnr0+0oFajBbJqk=
 github.com/paulmach/orb v0.9.0/go.mod h1:SudmOk85SXtmXAB3sLGyJ6tZy/8pdfrV0o6ef98Xc30=
-github.com/pierrec/lz4/v4 v4.1.21 h1:yOVMLb6qSIDP67pl/5F7RepeKYu/VmTyEXvuMI5d9mQ=
-github.com/pierrec/lz4/v4 v4.1.21/go.mod h1:gZWDp/Ze/IJXGXf23ltt2EXimqmTUXEy0GFuRQyBid4=
 github.com/pkg/diff v0.0.0-20210226163009-20ebb0f2a09e h1:aoZm08cpOy4WuID//EZDgcC4zIxODThtZNPirFr42+A=
 github.com/pkg/diff v0.0.0-20210226163009-20ebb0f2a09e/go.mod h1:pJLUxLENpZxwdsKMEsNbx1VGcRFpLqf3715MtcvvzbA=
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
@@ -933,6 +931,7 @@ github.com/sagikazarmark/crypt v0.9.0 h1:fipzMFW34hFUEc4D7fsLQFtE7yElkpgyS2zrued
 github.com/sagikazarmark/crypt v0.9.0/go.mod h1:RnH7sEhxfdnPm1z+XMgSLjWTEIjyK4z2dw6+4vHTMuo=
 github.com/santhosh-tekuri/jsonschema/v5 v5.3.1 h1:lZUw3E0/J3roVtGQ+SCrUrg3ON6NgVqpn3+iol9aGu4=
 github.com/santhosh-tekuri/jsonschema/v5 v5.3.1/go.mod h1:uToXkOrWAZ6/Oc07xWQrPOhJotwFIyu2bBVN41fcDUY=
+github.com/segmentio/asm v1.1.3/go.mod h1:Ld3L4ZXGNcSLRg4JBsZ3//1+f/TjYl0Mzen/DQy1EJg=
 github.com/segmentio/asm v1.2.0 h1:9BQrFxC+YOHJlTlHGkTrFWf59nbL3XnCoFLTwDCI7ys=
 github.com/segmentio/asm v1.2.0/go.mod h1:BqMnlJP91P8d+4ibuonYZw9mfnzI9HfxselHZr5aAcs=
 github.com/sethvargo/go-retry v0.1.0/go.mod h1:JzIOdZqQDNpPkQDmcqgtteAcxFLtYpNF/zJCM1ysDg8=
@@ -952,8 +951,6 @@ github.com/streamingfast/bstream v0.0.2-0.20260112175926-a19e6cd0ce1f/go.mod h1:
 github.com/streamingfast/derr v0.0.0-20210811180100-9138d738bcec/go.mod h1:ulVfui/yGXmPBbt9aAqCWdAjM7YxnZkYHzvQktLfw3M=
 github.com/streamingfast/dgrpc v0.0.0-20250227145723-9bc2e4941b4e/go.mod h1:qdcskj9WmO+nDjgxyafc5oMCftTZolOk693p2ZFUdO8=
 github.com/streamingfast/dgrpc v0.0.0-20251218133127-15b36e02a74f/go.mod h1:B+RAf6/idk6Kz41wEAEeQH1PW3Bk6WQkmvuRhdTEgKg=
-github.com/streamingfast/dhammer v0.0.0-20220506192416-3797a7906da2 h1:/mcLVdwy6NeHWfJwuh2GD4+FMfPa59fkfM15sl8Jejk=
-github.com/streamingfast/dhammer v0.0.0-20220506192416-3797a7906da2/go.mod h1:MyG3U4ABuf7ANS8tix+e8UUevN7B9juhEnAbslS/X3M=
 github.com/streamingfast/dhammer v0.0.0-20230125192823-c34bbd561bd4/go.mod h1:ehPytv7E4rI65iLcrwTes4rNGGqPPiugnH+20nDQyp4=
 github.com/streamingfast/dmetrics v0.0.0-20210811180524-8494aeb34447/go.mod h1:VLdQY/FwczmC/flqWkcsBbqXO4BhU4zQDSK7GMrpcjY=
 github.com/streamingfast/dstore v0.1.1-0.20220607202639-35118aeaf648/go.mod h1:SHSEIPowGeE1TfNNmGeAUUnlO3dwevmX5kFOSazU60M=
@@ -973,6 +970,9 @@ github.com/streamingfast/substreams-sink v0.3.3-0.20230901183759-218c1d9ec645 h1
 github.com/streamingfast/substreams-sink v0.3.3-0.20230901183759-218c1d9ec645/go.mod h1:nBPwmsjz+CV0HT5Vmp0XTiu+RjP8CbdhD5u+uC3lo84=
 github.com/streamingfast/substreams-sink-database-changes v1.1.3 h1:rXeGb/V2mjC8FftumRkMQxG2jtdLfHdLx9UQVUtAqS8=
 github.com/streamingfast/substreams-sink-database-changes v1.1.3/go.mod h1:bul4OLl22/M8LlYO9+sxA/5ghUrV7eYrG5NSlfm5m5k=
+github.com/streamingfast/substreams-sink-files v0.2.1-0.20251218211850-db3125577b26 h1:fD6xngYPMMgxyw1yLvX12FzdWJLX/x5lVrLEqDVaOWQ=
+github.com/streamingfast/substreams-sink-files v0.2.1-0.20251218211850-db3125577b26/go.mod h1:c2QiCE74k+asOtDQAhSOWykL1loLUqEYZmf3whRqMIE=
+github.com/streamingfast/substreams-sink-sql v1.0.1-0.20231127153906-acf5f3e34330/go.mod h1:4Zd5Re1SrhXDnO3VJh/FJcn64SyZPqAv6gFPjbyqMYI=
 github.com/streamingfast/worker-pool-protocol v0.0.0-20251029142144-b539534f3eb1/go.mod h1:fq44dFx8K9S3/9QOoIVk0s+ptEscfpQmftLog/9WYU4=
 github.com/stretchr/testify v1.6.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=

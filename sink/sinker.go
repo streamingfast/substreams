@@ -594,6 +594,11 @@ func (s *Sinker) doRequest(
 			for k, val := range latestEndBlockPerStage {
 				ProgressMessageLastBlock.SetUint64(val, stageString(k))
 			}
+			// Reset running jobs count for all stages first, then set actual values.
+			// This ensures stages with no running jobs show 0 instead of stale values.
+			for i := range msg.Stages {
+				ProgressMessageRunningJobs.SetUint64(0, stageString(uint32(i)))
+			}
 			for k, val := range jobsPerStage {
 				ProgressMessageRunningJobs.SetUint64(val, stageString(k))
 			}

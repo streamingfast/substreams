@@ -10,6 +10,6 @@ The `substreams-sink-files` tool provides the ability to pipe data extracted fro
 
 For example, you could extract all of the ERC20, ERC721, and ERC1155 transfers from the Ethereum blockchain and persist the data to a files-based store.
 
-It supports CSV, and Parquet format. (for ProtoJSON, use `substreams sink protojson` command: [ProtoJSON](how-to-guides/sinks/protojson.md))
+It supports CSV, and Parquet format. (for ProtoJSON, use `substreams sink protojson` command: [ProtoJSON](protojson.md))
 
 See [substreams-sink-files README](https://github.com/streamingfast/substreams-sink-files) for details

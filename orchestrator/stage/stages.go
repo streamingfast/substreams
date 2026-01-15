@@ -322,7 +322,7 @@ func (s *Stages) MergeCompleted(mergeUnit Unit) {
 
 func (s *Stages) MoveSegmentCompletedForward(stageIdx int) {
 	stage := s.stages[stageIdx]
-	for i := stage.segmentCompleted + 1; i < stage.segmenter.LastIndex(); i++ {
+	for i := stage.segmentCompleted + 1; i <= stage.segmenter.LastIndex(); i++ {
 		unit := Unit{Stage: stageIdx, Segment: i}
 		if s.getState(unit) == UnitCompleted {
 			stage.segmentCompleted = i

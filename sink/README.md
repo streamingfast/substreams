@@ -312,13 +312,17 @@ fmt.Printf("Total Processed Blocks: %d\n", sink.ProgressMessageTotalProcessedBlo
 fmt.Printf("Total Received Bytes: %d\n", sink.DataMessageSizeBytes.Get())
 ```
 
-### Example Uses
+### Example Implementations
+
+
+The following sinks are included with the substreams binary:
+
+* [example](https://github.com/streamingfast/substreams/tree/develop/sink/examples/simple-sink) - A simple example
+* [webhook](https://github.com/streamingfast/substreams/tree/develop/sink/webhook) - Webhook sink for HTTP endpoints
+* [noop](https://github.com/streamingfast/substreams/tree/develop/sink/noop) - Not exactly a sink -> used to force the substreams server to prepare its cache, with minimal data egress.
+* [protojson](https://github.com/streamingfast/substreams/tree/develop/sink/protojson) - Sink to JSONL files (using ProtoJSON encoding)
 
 The following repositories are production examples of how the sink library can be used:
 
 * [substreams-sink-mongodb](https://github.com/streamingfast/substreams-sink-mongodb) - MongoDB sink implementation
 * [substreams-sink-postgres](https://github.com/streamingfast/substreams-sink-postgres) - PostgreSQL sink implementation
-* [substreams-sink-files](https://github.com/streamingfast/substreams-sink-files) - File-based sink implementation
-* [substreams-sink-webhook](https://github.com/streamingfast/substreams-sink-webhook) - Webhook sink for HTTP endpoints
-
-These examples demonstrate various patterns including database integration, file output, and HTTP webhook delivery.

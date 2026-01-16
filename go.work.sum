@@ -946,13 +946,12 @@ github.com/streamingfast/atm v0.0.0-20220131151839-18c87005e680 h1:fGJnUx0shX9Y3
 github.com/streamingfast/atm v0.0.0-20220131151839-18c87005e680/go.mod h1:iISPGAstbUsPgyC3auLLi7PYUTi9lHv5z0COam0OPOY=
 github.com/streamingfast/bstream v0.0.2-0.20231207142002-6844e8db9e20/go.mod h1:08GVb+DXyz6jVNIsbf+2zlaC81UeEGu5o1h49KrSR3Y=
 github.com/streamingfast/bstream v0.0.2-0.20251218133631-a5f5c59a7c05/go.mod h1:desuTzXOKd0zUbOLKnvhLc1ucQhl454KIdl1KmRw7WY=
-github.com/streamingfast/bstream v0.0.2-0.20260112175926-a19e6cd0ce1f h1:gleUq6AaatOHiIn3Fs1gJ1GA52htUgNeKC/+tsS3pXA=
-github.com/streamingfast/bstream v0.0.2-0.20260112175926-a19e6cd0ce1f/go.mod h1:0sed+gw+d62tBsGl5omaB1m14Gmfvb3YAs4epHuL1YU=
 github.com/streamingfast/derr v0.0.0-20210811180100-9138d738bcec/go.mod h1:ulVfui/yGXmPBbt9aAqCWdAjM7YxnZkYHzvQktLfw3M=
 github.com/streamingfast/dgrpc v0.0.0-20250227145723-9bc2e4941b4e/go.mod h1:qdcskj9WmO+nDjgxyafc5oMCftTZolOk693p2ZFUdO8=
 github.com/streamingfast/dgrpc v0.0.0-20251218133127-15b36e02a74f/go.mod h1:B+RAf6/idk6Kz41wEAEeQH1PW3Bk6WQkmvuRhdTEgKg=
 github.com/streamingfast/dhammer v0.0.0-20230125192823-c34bbd561bd4/go.mod h1:ehPytv7E4rI65iLcrwTes4rNGGqPPiugnH+20nDQyp4=
 github.com/streamingfast/dmetrics v0.0.0-20210811180524-8494aeb34447/go.mod h1:VLdQY/FwczmC/flqWkcsBbqXO4BhU4zQDSK7GMrpcjY=
+github.com/streamingfast/dmetrics v0.0.0-20250711072030-f023e918a175/go.mod h1:JbxEDbzWRG1dHdNIPrYfuPllEkktZMgm40AwVIBENcw=
 github.com/streamingfast/dstore v0.1.1-0.20220607202639-35118aeaf648/go.mod h1:SHSEIPowGeE1TfNNmGeAUUnlO3dwevmX5kFOSazU60M=
 github.com/streamingfast/dstore v0.1.1-0.20250609173504-95368d3441ee/go.mod h1:FKF6+noY/Qgf+1EgeyQdQllQpmCvKQ6bghSbqRYJhlw=
 github.com/streamingfast/dtracing v0.0.0-20210811175635-d55665d3622a h1:/7Rw3pYpueJYOQReTJpfAhAPk0uZD4I58LfiUAr4IMc=
@@ -962,6 +961,7 @@ github.com/streamingfast/eth-go v0.0.0-20250914133932-bcf944f540f1/go.mod h1:1sz
 github.com/streamingfast/firehose v0.1.1-0.20240118135215-dcf04d40bfcd/go.mod h1:du6tys2Q6X2pRQ3JbCziWiy7Y7KrOcl4CSb9uiGsVxA=
 github.com/streamingfast/firehose-core v1.12.3-0.20251120201321-3654cf122f26/go.mod h1:85CncPe8vr7cTqfegjE70U81cbn9I/eVaKc6zsSfK3A=
 github.com/streamingfast/jsonpb v0.0.0-20210811021341-3670f0aa02d0/go.mod h1:cTNObq2Uofb330y05JbbZZ6RwE6QUXw5iVcHk1Fx3fk=
+github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091/go.mod h1:VlduQ80JcGJSargkRU4Sg9Xo63wZD/l8A5NC/Uo1/uU=
 github.com/streamingfast/payment-gateway v0.0.0-20251029145129-e04bdcdb54c5/go.mod h1:0AvrAiJaL5NUjGvjxQpjCHY/FuwkoZgP/HYiSmXlrvE=
 github.com/streamingfast/pbgo v0.0.6-0.20231120172814-537d034aad5e/go.mod h1:fZuijmeFrqxW2YnnXmGrkQpUTHx3eHCaJUKwdvXAYKM=
 github.com/streamingfast/sf-tracing v0.0.0-20240209202324-9daa52c71a52/go.mod h1:VRhdIrTjQSsc9cryNR18HTS32rgrHxQYwmoUOSEhpFA=

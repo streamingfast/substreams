@@ -31,6 +31,7 @@ type Walker struct {
 	module     *pbsubstreams.Module
 	logger     *zap.Logger
 	working    bool
+	workingAt  time.Time // Timestamp when working was set to true
 	noopMode   bool
 }
 
@@ -42,7 +43,7 @@ func NewWalker(
 	stream *response.Stream,
 	noopMode bool,
 ) *Walker {
-	logger := reqctx.Logger(ctx)
+	logger := reqctx.Logger(ctx).Named("execout_walker")
 	return &Walker{
 		ctx:        ctx,
 		module:     module,
@@ -60,33 +61,114 @@ func (r *Walker) IsNoopMode() bool {
 
 func (r *Walker) MarkNotWorking() {
 	r.working = false
+	r.workingAt = time.Time{}
 }
 
 func (r *Walker) MarkWorking() {
 	r.working = true
+	r.workingAt = time.Now()
 }
 
 func (r *Walker) IsWorking() bool {
 	return r.working
 }
 
+// WorkingDuration returns how long the walker has been in working state.
+// Returns 0 if not currently working.
+func (r *Walker) WorkingDuration() time.Duration {
+	if !r.working || r.workingAt.IsZero() {
+		return 0
+	}
+	return time.Since(r.workingAt)
+}
+
 func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
-	return func() loop.Msg {
+	first, current, last := r.fileWalker.Progress()
+	r.logger.Info("starting download command",
+		zap.Int("segment", current),
+		zap.Int("first_segment", first),
+		zap.Int("last_segment", last),
+		zap.Duration("wait_before", waitBefore),
+		zap.Bool("noop_mode", r.noopMode),
+		zap.Bool("keep", false),
+	)
+
+	return func() (msg loop.Msg) {
+		downloadStartTime := time.Now()
+		r.logger.Info("download goroutine started",
+			zap.Int("segment", current),
+			zap.Bool("noop_mode", r.noopMode),
+			zap.Bool("keep", false),
+		)
+
+		// Recover from any panic to prevent the event loop from getting stuck
+		defer func() {
+			if rec := recover(); rec != nil {
+				r.logger.Error("panic during download, returning quit message",
+					zap.Int("segment", current),
+					zap.Any("panic", rec),
+					zap.Duration("elapsed", time.Since(downloadStartTime)),
+				)
+				msg = loop.NewQuitMsg(fmt.Errorf("panic during execout download for segment %d: %v", current, rec))
+			}
+		}()
+
 		time.Sleep(waitBefore)
+
+		// Check if context is cancelled before attempting download
+		if r.ctx.Err() != nil {
+			r.logger.Info("context cancelled before download",
+				zap.Int("segment", current),
+				zap.Error(r.ctx.Err()),
+			)
+			return loop.NewQuitMsg(r.ctx.Err())
+		}
+
 		file, err := r.fileWalker.FileReader(r.ctx)
 
 		if errors.Is(err, dstore.ErrNotFound) {
+			r.logger.Info("file not found, will retry",
+				zap.Int("segment", current),
+			)
 			return MsgFileNotPresent{NextWait: computeNewWait(waitBefore, r.fileWalker.IsLocal)}
 		}
 		if err != nil {
-			return loop.NewQuitMsg(fmt.Errorf("loading %s cache %q: %w", file.ModuleName(), file.Filename(), err))
+			r.logger.Error("error loading file",
+				zap.Int("segment", current),
+				zap.Error(err),
+			)
+			// file might be nil if error occurred, so we can't use file.ModuleName()/Filename()
+			return loop.NewQuitMsg(fmt.Errorf("loading cache for segment %d: %w", current, err))
 		}
+		if file == nil {
+			r.logger.Error("file reader is nil without error",
+				zap.Int("segment", current),
+			)
+			return loop.NewQuitMsg(fmt.Errorf("file reader is nil for segment %d", current))
+		}
+
+		r.logger.Info("file found, sending items",
+			zap.Int("segment", current),
+			zap.String("filename", file.Filename()),
+			zap.Bool("keep", false),
+		)
 
 		if err := r.sendItems(file); err != nil {
 			if err != io.EOF {
+				r.logger.Error("error sending items",
+					zap.Int("segment", current),
+					zap.Error(err),
+				)
 				return loop.NewQuitMsg(err)
 			}
 		}
+
+		r.logger.Info("file download completed, returning MsgFileDownloaded",
+			zap.Int("segment", current),
+			zap.Bool("noop_mode", r.noopMode),
+			zap.Duration("download_elapsed", time.Since(downloadStartTime)),
+			zap.Bool("keep", false),
+		)
 		return MsgFileDownloaded{}
 	}
 }
@@ -107,6 +189,7 @@ func computeNewWait(previousWait time.Duration, storeIsLocal bool) time.Duration
 
 func (r *Walker) sendItems(reader execout.FileReader) error {
 	defer reader.Close()
+	itemCount := 0
 	for item, err := range reader.Iter() {
 		if err != nil {
 			return err
@@ -115,6 +198,12 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 			continue
 		}
 		if item.BlockNum >= r.ExclusiveEndBlock {
+			r.logger.Info("reached exclusive end block in sendItems",
+				zap.Uint64("item_block_num", item.BlockNum),
+				zap.Uint64("exclusive_end_block", r.ExclusiveEndBlock),
+				zap.Int("items_sent", itemCount),
+				zap.Bool("keep", false),
+			)
 			return nil
 		}
 
@@ -126,8 +215,15 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 		if err = r.streamOut.BlockScopedData(blockScopedData); err != nil {
 			return fmt.Errorf("calling response func: %w", err)
 		}
+		itemCount++
+
 		if r.noopMode {
 			// only a single message per bundle is sent in noop mode. The sender function will take care of removing the content
+			r.logger.Info("noop mode, returning after single item",
+				zap.Uint64("block_num", blockScopedData.Clock.Number),
+				zap.Int("items_sent", itemCount),
+				zap.Bool("keep", false),
+			)
 			return nil
 		}
 
@@ -135,10 +231,15 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 			r.logger.Info("stop pulling block scoped data, end block reach",
 				zap.Uint64("exclusive_end_block_num", r.ExclusiveEndBlock),
 				zap.Uint64("cache_item_block_num", blockScopedData.Clock.Number),
+				zap.Int("items_sent", itemCount),
 			)
 			return nil
 		}
 	}
+	r.logger.Info("finished iterating all items",
+		zap.Int("items_sent", itemCount),
+		zap.Bool("keep", false),
+	)
 	return nil
 }
 

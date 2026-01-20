@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/streamingfast/derr"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/reqctx"
@@ -45,7 +46,7 @@ func (s *Stages) multiSquash(stage *Stage, mergeUnit Unit) error {
 		})
 	}
 
-	return stage.syncWork.Wait()
+	return stage.syncWork.Wait() // ensure we don't merge the same fullKV multiple times concurrently before it is completely written
 }
 
 type Result struct {
@@ -146,22 +147,25 @@ func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUni
 	meter.mergeEnd = time.Now()
 
 	s.logger.Info("deleting partial store", zap.Stringer("store", partialKV))
-	stage.asyncWork.Go(func() error {
-		return partialKV.DeleteStore(s.ctx, partialFile)
-	})
 
 	// Flush full store
 	if segmentEndsOnInterval {
-		meter.saveStart = time.Now()
-		_, writer, err := fullKV.Save(rng.ExclusiveEndBlock)
-		if err != nil {
-			return fmt.Errorf("save full store: %w", err)
-		}
-		meter.saveEnd = time.Now()
-
-		stage.asyncWork.Go(func() error {
-			return writer.Write(context.Background()) // always write files here even if the request was cancelled.
+		err := derr.RetryContext(s.ctx, 5, func(ctx context.Context) error {
+			meter.saveStart = time.Now()
+			_, writer, err := fullKV.Save(rng.ExclusiveEndBlock)
+			if err != nil {
+				return fmt.Errorf("save full store: %w", err)
+			}
+			meter.saveEnd = time.Now()
+			err = writer.Write(ctx)
+			if err == nil {
+				go partialKV.DeleteStore(context.Background(), partialFile)
+			}
+			return err
 		})
+		if err != nil {
+			return fmt.Errorf("flushing full store: %w", err)
+		}
 	}
 
 	s.logger.Info("squashing time metrics", meter.logFields()...)

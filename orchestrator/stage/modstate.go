@@ -2,6 +2,7 @@ package stage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"go.uber.org/zap"
@@ -69,7 +70,13 @@ func (s *StoreModuleState) getStore(ctx context.Context, exclusiveEndBlock uint6
 		fullKVFile := store.NewCompleteFileInfo(s.name, moduleInitBlock, exclusiveEndBlock)
 		err := loadStore.Load(ctx, fullKVFile)
 		if err != nil {
-			return nil, fmt.Errorf("load store %q: %w", s.name, err)
+			if errors.Is(err, store.ErrInvalidFullKVFile) {
+				s.logger.Warn("found a corrupted fullKV store, deleting it", zap.Error(err), zap.String("store_name", loadStore.Name()), zap.String("store_hash", loadStore.ModuleHash()), zap.String("filename", fullKVFile.Filename))
+				if err := loadStore.Delete(ctx, fullKVFile); err != nil {
+					s.logger.Error("cannot delete corrupted fullKV store", zap.Error(err), zap.String("store_name", loadStore.Name()), zap.String("store_hash", loadStore.ModuleHash()), zap.String("filename", fullKVFile.Filename))
+				}
+			}
+			return nil, fmt.Errorf("load full store %s (%s): %w", loadStore.Name(), loadStore.ModuleHash(), err)
 		}
 	}
 	s.cachedStore = loadStore

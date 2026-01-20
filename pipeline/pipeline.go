@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -431,6 +432,12 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 	var actualRequestStoresSize uint64
 	for _, loadable := range loadableStores {
 		if err := loadable.fullKVStore.Load(ctx, loadable.fileInfo); err != nil {
+			if errors.Is(err, store.ErrInvalidFullKVFile) {
+				logger.Warn("found a corrupted fullKV store, deleting it", zap.Error(err), zap.String("store_name", loadable.fullKVStore.Name()), zap.String("store_hash", loadable.fullKVStore.ModuleHash()), zap.String("filename", loadable.fileInfo.Filename))
+				if err := loadable.fullKVStore.Delete(ctx, loadable.fileInfo); err != nil {
+					logger.Error("cannot delete corrupted fullKV store", zap.Error(err), zap.String("store_name", loadable.fullKVStore.Name()), zap.String("store_hash", loadable.fullKVStore.ModuleHash()), zap.String("filename", loadable.fileInfo.Filename))
+				}
+			}
 			return nil, fmt.Errorf("load full store %s (%s): %w", loadable.fullKVStore.Name(), loadable.fullKVStore.ModuleHash(), err)
 		}
 		//  add loaded file size to metadata

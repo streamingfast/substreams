@@ -2,7 +2,6 @@ package stage
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -621,7 +620,6 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 		}()
 	}
 
-	var errs error
 	var actualRequestStoresSize uint64
 	for len(out) < len(storeModuleStates) {
 		select {
@@ -632,8 +630,7 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 				break
 			}
 			if loaded.err != nil {
-				errs = errors.Join(errs, fmt.Errorf("while loading %s: %w", loaded.name, loaded.err))
-				break
+				return nil, fmt.Errorf("while loading %s: %w", loaded.name, loaded.err)
 			}
 			out[loaded.name] = loaded.kv
 			actualRequestStoresSize += loaded.kv.SizeBytes()

@@ -1,6 +1,8 @@
 package stage
 
 import (
+	"sync"
+
 	"github.com/abourget/llerrgroup"
 
 	"github.com/streamingfast/substreams/block"
@@ -18,6 +20,8 @@ type Stage struct {
 
 	// allExecutedModules is all the store+mapper executed specifically for this stage
 	allExecutedModules []string
+
+	SquashLock sync.Mutex
 
 	// syncWork keeps tab of the parallel goroutines that do the merge work,
 	// and need to be waited on before marking the Unit as properly merged.

@@ -43,9 +43,8 @@ func saveStoreStream(ctx context.Context, store dstore.Store, filename string, r
 		store.SetMeter(dmetering.GetBytesMeter(ctx))
 	}
 
-	return derr.RetryContext(ctx, 10, func(ctx context.Context) error { // more than the usual 5 retries because if we fail, we have to reprocess the whole segment
-		return store.WriteObject(ctx, filename, reader)
-	})
+	// We cannot do a retry here, because the reader cannot be reset.
+	return store.WriteObject(ctx, filename, reader)
 }
 
 func loadStore(ctx context.Context, store dstore.Store, filename string) (out []byte, err error) {

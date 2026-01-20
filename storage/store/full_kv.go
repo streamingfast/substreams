@@ -3,6 +3,7 @@ package store
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -132,6 +133,13 @@ func (s *FullKV) QuickSave(ctx context.Context, atBlockHash string) error {
 	return fw.Write(ctx)
 }
 
+var ErrInvalidFullKVFile = errors.New("unmarshal store error") // this error will bubble up to the user
+
+func (s *FullKV) Delete(ctx context.Context, file *FileInfo) error {
+	s.Store().DeleteObject(ctx, file.Filename)
+	return nil
+}
+
 func (s *FullKV) Load(ctx context.Context, file *FileInfo) error {
 	s.loadedFrom = file.Filename
 	s.logger.Debug("loading full store state from file", zap.String("fileName", file.Filename))
@@ -147,7 +155,7 @@ func (s *FullKV) Load(ctx context.Context, file *FileInfo) error {
 		defer reader.Close()
 		storeData, size, err = unmarshaller.UnmarshalStream(reader, 10*1024*1024) // TODO: bubble up approximation of store size here
 		if err != nil {
-			return fmt.Errorf("unmarshal store (streaming): %w", err)
+			return fmt.Errorf("%w (streaming): %s", ErrInvalidFullKVFile, err.Error())
 		}
 	} else {
 		data, err := loadStore(ctx, s.objStore, file.Filename)
@@ -156,7 +164,7 @@ func (s *FullKV) Load(ctx context.Context, file *FileInfo) error {
 		}
 		storeData, size, err = s.marshaller.Unmarshal(data)
 		if err != nil {
-			return fmt.Errorf("unmarshal store: %w", err)
+			return fmt.Errorf("%w: %s", ErrInvalidFullKVFile, err.Error())
 		}
 	}
 	if err := ctx.Err(); err != nil {

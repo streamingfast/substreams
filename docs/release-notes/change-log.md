@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Server
+
+* Fix issue where a retry on dstore while writing a fullKV would corrupt the file, making it unreadable. Fix prevents this and also now deletes affected files when they are detected.
+
 ### Sink
 
 * Fix `progress_running_jobs` not resetting its counter when reaching 0 jobs running on the server.

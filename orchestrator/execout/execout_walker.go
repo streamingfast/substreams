@@ -134,12 +134,12 @@ func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
 		file, err := r.fileWalker.FileReader(r.ctx)
 
 		if errors.Is(err, dstore.ErrNotFound) {
-			r.logger.Debug("file not found, will retry",
-				zap.Int("segment", current),
-			)
 			return MsgFileNotPresent{NextWait: computeNewWait(waitBefore, r.fileWalker.IsLocal)}
 		}
 		if err != nil {
+			if isTransientStorageError(err) {
+				return MsgFileReadTransientError{NextWait: computeNewWait(waitBefore, r.fileWalker.IsLocal), Error: err}
+			}
 
 			// Fatal error - fail the request
 			r.logger.Error("fatal error loading file",
@@ -178,6 +178,33 @@ func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
 		)
 		return MsgFileDownloaded{}
 	}
+}
+
+// isTransientStorageError checks if an error is a transient network/HTTP2 error
+// that should be retried rather than treated as fatal
+func isTransientStorageError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errStr := err.Error()
+
+	// HTTP/2 stream errors from GCS (e.g., "stream error: stream ID 971; INTERNAL_ERROR")
+	if strings.Contains(errStr, "stream error") && strings.Contains(errStr, "INTERNAL_ERROR") {
+		return true
+	}
+
+	// Other common transient errors
+	if strings.Contains(errStr, "connection reset by peer") ||
+		strings.Contains(errStr, "broken pipe") ||
+		strings.Contains(errStr, "connection refused") ||
+		strings.Contains(errStr, "temporary failure") ||
+		strings.Contains(errStr, "timeout") ||
+		strings.Contains(errStr, "deadline exceeded") {
+		return true
+	}
+
+	return false
 }
 
 func computeNewWait(previousWait time.Duration, storeIsLocal bool) time.Duration {

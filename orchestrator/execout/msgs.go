@@ -21,6 +21,12 @@ type MsgFileNotPresent struct {
 	NextWait time.Duration
 } // In which case, simply re-issue the CmdDownloadFile
 
+type MsgFileReadTransientError struct {
+	loop.IsMsg
+	Error    error
+	NextWait time.Duration
+} // In which case, simply re-issue the CmdDownloadFile
+
 type MsgWalkerCompleted struct{ loop.IsMsg }
 
 func CmdWalkerCompleted() loop.Cmd {

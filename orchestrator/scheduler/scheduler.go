@@ -256,6 +256,18 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		s.ExecOutWalker.MarkNotWorking()
 		cmds = append(cmds, execout.CmdDownloadSegment(msg.NextWait))
 
+	case execout.MsgFileReadTransientError:
+		first, current, end := s.ExecOutWalker.Progress()
+		s.logger.Debug("execout file read failed, will retry",
+			zap.Int("segment", current),
+			zap.Int("first_segment", first),
+			zap.Int("last_segment", end),
+			zap.Duration("next_wait", msg.NextWait),
+			zap.Error(msg.Error),
+		)
+		s.ExecOutWalker.MarkNotWorking()
+		cmds = append(cmds, execout.CmdDownloadSegment(msg.NextWait))
+
 	case execout.MsgFileDownloaded:
 		first, current, end := s.ExecOutWalker.Progress()
 		s.logger.Debug("execout file downloaded, advancing to next segment",

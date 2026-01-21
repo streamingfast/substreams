@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * Fix issue where a retry on dstore while writing a fullKV would corrupt the file, making it unreadable. Fix prevents this and also now deletes affected files when they are detected.
 * Fix bug in event loop where `loop.NewQuitMsg()` (which returns `*QuitMsg` pointer) was not being handled, causing quit messages from error paths to be silently ignored and requests to hang indefinitely.
+* Fix issue where transient HTTP/2 stream errors (e.g., `INTERNAL_ERROR`) from `dstore` were being treated as fatal errors instead of being retried. These transient network errors are now detected and retried with exponential backoff. Added comprehensive diagnostic logging including working duration tracking and ERROR-level alerts when walker is stuck for more than 5 minutes.
 
 ### Sink
 

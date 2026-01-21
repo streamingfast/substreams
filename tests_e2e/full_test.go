@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/stretchr/testify/assert"
@@ -13,10 +14,14 @@ import (
 	"go.uber.org/zap"
 )
 
+var zlog, _ = logging.PackageLogger("tests_e2e", "github.com/streamingfast/substreams/tests_e2e")
+
+func init() {
+	logging.InstantiateLoggers(logging.WithDefaultLevel(zap.DPanicLevel))
+}
+
 func TestDummyBlockchainContainer(t *testing.T) {
 	ctx := context.Background()
-	//zlog := logging.MustCreateLoggerWithServiceName("dummy-blockchain-test")
-	zlog := zap.NewNop()
 
 	// Create temporary directory for volume mount
 	tmpDir, err := os.MkdirTemp("", "firehose-data-")
@@ -27,6 +32,8 @@ func TestDummyBlockchainContainer(t *testing.T) {
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, "ghcr.io/streamingfast/dummy-blockchain:v1.7.2", "", 1000)
 	require.NoError(t, err)
 	defer container.Terminate(ctx)
+
+	zlog.Info("dummy blockchain container started", zap.String("tmp_dir", tmpDir))
 
 	app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog)
 	app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)

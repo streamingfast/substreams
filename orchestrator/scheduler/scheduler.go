@@ -298,29 +298,21 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 
 			// This is a potential deadlock indicator - if we see this message repeatedly
 			// while progress is not advancing, the walker is stuck
-			s.logger.Debug("execout walker already working, skipping download request (potential stuck indicator)",
+			level := zap.DebugLevel
+			if workingDuration > 5*time.Minute {
+				level = zap.ErrorLevel
+			}
+
+			s.logger.Check(level, "execout walker already working, skipping download request (potential stuck indicator)").Write(
 				zap.Int("segment", current),
 				zap.Int("first_segment", first),
 				zap.Int("last_segment", end),
-				zap.Duration("working_duration", workingDuration),
 				zap.Bool("output_stream_completed", s.outputStreamCompleted),
 				zap.Bool("stores_sync_completed", s.storesSyncCompleted),
+				zap.Bool("likely_stuck", workingDuration > 5*time.Minute),
+				zap.Duration("working_duration", workingDuration),
 				zap.Bool("noop_mode", s.ExecOutWalker.IsNoopMode()),
 			)
-
-			// If the walker has been stuck for more than 5 minutes, something is seriously wrong
-			// Log an error to make it easier to detect this condition
-			if workingDuration > 5*time.Minute {
-				s.logger.Error("execout walker appears stuck (working for more than 5 minutes without progress)",
-					zap.Int("segment", current),
-					zap.Int("first_segment", first),
-					zap.Int("last_segment", end),
-					zap.Duration("working_duration", workingDuration),
-					zap.Bool("output_stream_completed", s.outputStreamCompleted),
-					zap.Bool("stores_sync_completed", s.storesSyncCompleted),
-					zap.Bool("noop_mode", s.ExecOutWalker.IsNoopMode()),
-				)
-			}
 
 			return nil
 		}
@@ -333,6 +325,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 			)
 			return execout.CmdWalkerCompleted()
 		}
+
 		s.logger.Debug("downloading execout segment",
 			zap.Int("segment", current),
 			zap.Int("first_segment", first),
@@ -376,30 +369,22 @@ func (s *Scheduler) cmdShutdownWhenComplete() loop.Cmd {
 		s.logger.Info("waiting for output stream and stores to complete")
 	}
 	if !s.outputStreamCompleted && s.storesSyncCompleted {
-
 		var fields []zap.Field
 		if s.ExecOutWalker != nil {
 			start, current, end := s.ExecOutWalker.Progress()
 			workingDuration := s.ExecOutWalker.WorkingDuration()
+
 			fields = append(fields,
 				zap.Int("cached_output_start", start),
 				zap.Int("cached_output_current", current),
 				zap.Int("cached_output_end", end),
 				zap.Bool("walker_is_working", s.ExecOutWalker.IsWorking()),
+				zap.Bool("walker_likely_stuck", workingDuration > 5*time.Minute),
 				zap.Duration("walker_working_duration", workingDuration),
+				zap.Bool("noop_mode", s.ExecOutWalker.IsNoopMode()),
 			)
-
-			// Detect stuck walker and log an error
-			if s.ExecOutWalker.IsWorking() && workingDuration > 5*time.Minute {
-				s.logger.Error("execout walker stuck while waiting for output stream completion",
-					zap.Int("cached_output_start", start),
-					zap.Int("cached_output_current", current),
-					zap.Int("cached_output_end", end),
-					zap.Duration("walker_working_duration", workingDuration),
-					zap.Bool("noop_mode", s.ExecOutWalker.IsNoopMode()),
-				)
-			}
 		}
+
 		s.logger.Info("waiting for output stream to complete, stores ready", fields...)
 	}
 	if s.outputStreamCompleted && !s.storesSyncCompleted {

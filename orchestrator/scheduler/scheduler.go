@@ -43,8 +43,7 @@ type Scheduler struct {
 }
 
 func New(ctx context.Context, stream *response.Stream) *Scheduler {
-	logger := reqctx.Logger(ctx)
-	logger = logger.Named("scheduler").With(zap.Bool("keep", false))
+	logger := reqctx.Logger(ctx).Named("scheduler")
 	s := &Scheduler{
 		ctx:    ctx,
 		stream: stream,
@@ -86,7 +85,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		fmt.Printf("Scheduler message: %T %v\n", msg, msg)
 	}
 
-	s.logger.Info("received message",
+	s.logger.Debug("received message",
 		zapx.Type("msg_type", msg),
 		zap.Bool("output_stream_completed", s.outputStreamCompleted),
 		zap.Bool("stores_sync_completed", s.storesSyncCompleted),
@@ -100,7 +99,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		cmds = append(cmds, loop.Quit(errShuttingDown))
 
 	case work.MsgJobSucceeded:
-		s.logger.Info("job succeeded",
+		s.logger.Debug("job succeeded",
 			zap.Object("unit", msg.Unit),
 			zap.Bool("streamed", msg.Streamed),
 		)
@@ -128,7 +127,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 			work.CmdScheduleNextJob("job succeeded"),
 		)
 		if s.ExecOutWalker != nil && (s.firstTier2MapSegmentStreamed || !s.StreamFirstTier2MapSegment) {
-			s.logger.Info("triggering download segment after job success",
+			s.logger.Debug("triggering download segment after job success",
 				zap.Bool("first_tier2_map_segment_streamed", s.firstTier2MapSegmentStreamed),
 				zap.Bool("stream_first_tier2_map_segment", s.StreamFirstTier2MapSegment),
 			)
@@ -157,7 +156,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		workUnit, workRange, skippedAboveSegment := s.Stages.NextJob(notAboveSegment)
 		if workRange == nil { // no job ready
 			if !skippedAboveSegment {
-				s.logger.Info("no next job available and not skipped above segment, returning nil (potential deadlock point)",
+				s.logger.Debug("no next job available and not skipped above segment, returning nil (potential deadlock point)",
 					zap.Bool("output_stream_completed", s.outputStreamCompleted),
 					zap.Bool("stores_sync_completed", s.storesSyncCompleted),
 					zap.String("trigger_by", msg.TriggerBy),
@@ -248,7 +247,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 
 	case execout.MsgFileNotPresent:
 		first, current, end := s.ExecOutWalker.Progress()
-		s.logger.Info("execout file not present, will retry",
+		s.logger.Debug("execout file not present, will retry",
 			zap.Int("segment", current),
 			zap.Int("first_segment", first),
 			zap.Int("last_segment", end),
@@ -259,7 +258,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 
 	case execout.MsgFileDownloaded:
 		first, current, end := s.ExecOutWalker.Progress()
-		s.logger.Info("execout file downloaded, advancing to next segment",
+		s.logger.Debug("execout file downloaded, advancing to next segment",
 			zap.Int("segment", current),
 			zap.Int("first_segment", first),
 			zap.Int("last_segment", end),
@@ -278,7 +277,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 
 	case execout.MsgDownloadSegment:
 		if s.ExecOutWalker == nil {
-			s.logger.Info("execout walker is nil, skipping download request")
+			s.logger.Debug("execout walker is nil, skipping download request")
 			return nil
 		}
 		first, current, end := s.ExecOutWalker.Progress()
@@ -287,7 +286,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 
 			// This is a potential deadlock indicator - if we see this message repeatedly
 			// while progress is not advancing, the walker is stuck
-			s.logger.Info("execout walker already working, skipping download request (potential stuck indicator)",
+			s.logger.Debug("execout walker already working, skipping download request (potential stuck indicator)",
 				zap.Int("segment", current),
 				zap.Int("first_segment", first),
 				zap.Int("last_segment", end),
@@ -322,7 +321,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 			)
 			return execout.CmdWalkerCompleted()
 		}
-		s.logger.Info("downloading execout segment",
+		s.logger.Debug("downloading execout segment",
 			zap.Int("segment", current),
 			zap.Int("first_segment", first),
 			zap.Int("last_segment", end),

@@ -1,6 +1,8 @@
 package loop
 
-import "context"
+import (
+	"context"
+)
 
 // loop is the micro framework for the Scheduler's event loop,
 // heavily inspired by BubbleTea, which we use for the substreams GUI.
@@ -34,8 +36,8 @@ loop:
 			err = l.ctx.Err()
 			break loop
 		case msg := <-l.msgs:
-			if quit, ok := msg.(QuitMsg); ok {
-				err = quit.err
+			if quit, ok := msg.(Quitter); ok {
+				err = quit.QuitError()
 				break loop
 			}
 

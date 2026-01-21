@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Server
 
 * Fix issue where a retry on dstore while writing a fullKV would corrupt the file, making it unreadable. Fix prevents this and also now deletes affected files when they are detected.
+* Fix bug in event loop where `loop.NewQuitMsg()` (which returns `*QuitMsg` pointer) was not being handled, causing quit messages from error paths to be silently ignored and requests to hang indefinitely.
 
 ### Sink
 

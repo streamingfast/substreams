@@ -48,9 +48,17 @@ func Sequence(cmds ...Cmd) Cmd {
 	}
 }
 
+type Quitter interface {
+	QuitError() error
+}
+
 type QuitMsg struct {
 	IsMsg
 	err error
+}
+
+func (q QuitMsg) QuitError() error {
+	return q.err
 }
 
 func NewQuitMsg(err error) Msg {

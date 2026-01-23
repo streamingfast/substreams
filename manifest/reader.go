@@ -787,7 +787,7 @@ func (r *Reader) ParseStandardPackageAndVersion(input string) (packageName, vers
 }
 
 // IsLocalManifest determines if reader's input to read the manifest is a local manifest file, which is determined
-// by ensure it's not a remote package and if the file end with `.yaml` or `.yml`.
+// by ensuring it's not a remote package and if the file ends with `.yaml` or `.yml`.
 func (r *Reader) IsLocalManifest() bool {
 	if r.IsRemotePackage(r.currentInput) {
 		return false

@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/bytecodealliance/wasmtime-go/v36"
+	"github.com/bytecodealliance/wasmtime-go/v41"
 )
 
 type allocation struct {

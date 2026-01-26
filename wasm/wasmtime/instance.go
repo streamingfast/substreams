@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	wasmtime "github.com/bytecodealliance/wasmtime-go/v36"
+	wasmtime "github.com/bytecodealliance/wasmtime-go/v41"
 
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/wasm"

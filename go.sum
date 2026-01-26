@@ -187,8 +187,8 @@ github.com/bobg/go-generics/v3 v3.5.0 h1:OdBXzCRCO4e3Z7FQz1maEN2Q5LFYHc7vIK8EXcS
 github.com/bobg/go-generics/v3 v3.5.0/go.mod h1:wGlMLQER92clsh3cJoQjbUtUEJ03FoxnGhZjaWhf4fM=
 github.com/bufbuild/protocompile v0.4.0 h1:LbFKd2XowZvQ/kajzguUp2DC9UEIQhIq77fZZlaQsNA=
 github.com/bufbuild/protocompile v0.4.0/go.mod h1:3v93+mbWn/v3xzN+31nwkJfrEpAUwp+BagBSZWx+TP8=
-github.com/bytecodealliance/wasmtime-go/v36 v36.0.0 h1:AEapAro5dYIryZtIfS29QonBXAblVMCKEPH6fs7fOEE=
-github.com/bytecodealliance/wasmtime-go/v36 v36.0.0/go.mod h1:wysMJXQcKNOgby61jR/8+7VDuQfId27t9FrUQRwDdVo=
+github.com/bytecodealliance/wasmtime-go/v41 v41.0.0 h1:o1l7UVHra79sf1Z9kyRsVRwhqrNHZ/sh/k7zFfamVdY=
+github.com/bytecodealliance/wasmtime-go/v41 v41.0.0/go.mod h1:weJp1zFaCqjWGG8eblmCncBT3qA2HicEvu5aj1nGVGY=
 github.com/catppuccin/go v0.2.0 h1:ktBeIrIP42b/8FGiScP9sgrWOss3lw0Z5SktRoithGA=
 github.com/catppuccin/go v0.2.0/go.mod h1:8IHJuMGaUUjQM82qBrGNBv7LFq6JI3NnQCF6MOlZjpc=
 github.com/cenkalti/backoff/v4 v4.2.1 h1:y4OZtCnogmCPw98Zjyt5a6+QwPLGkiQsYW5oUqylYbM=

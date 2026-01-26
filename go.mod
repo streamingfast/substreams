@@ -37,7 +37,7 @@ require (
 	github.com/alecthomas/participle v0.7.1
 	github.com/bmatcuk/doublestar/v4 v4.6.1
 	github.com/bobg/go-generics/v2 v2.2.2
-	github.com/bytecodealliance/wasmtime-go/v36 v36.0.0
+	github.com/bytecodealliance/wasmtime-go/v41 v41.0.0
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/charmbracelet/bubbles v0.20.0
 	github.com/charmbracelet/bubbletea v1.1.0

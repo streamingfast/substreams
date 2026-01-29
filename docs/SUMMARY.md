@@ -107,6 +107,7 @@
   * SQL
     * [Sink Config](references/sql/sink-config.md)
     * [DSN Reference](references/sql/dsn-reference.md)
+    * [Delta Updates](references/sql/delta-updates.md)
     * [Reorg Handling](references/sql/reorg-handling.md)
 * Operators
   * [Hosting Foundational Stores](./references/foundational-stores/hosting-foundational-stores.md)

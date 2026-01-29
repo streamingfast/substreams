@@ -17,8 +17,9 @@ import (
 
 func TestPartialBlocksSimple(t *testing.T) {
 	ctx := context.Background()
+	// takes zlog from init()
 	//zlog := logging.MustCreateLoggerWithServiceName("partial-blocks-test")
-	zlog := zap.NewNop()
+	//zlog := zap.NewNop()
 
 	// Create temporary directory for volume mount
 	tmpDir, err := os.MkdirTemp("", "firehose-data-")
@@ -26,7 +27,7 @@ func TestPartialBlocksSimple(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// launch dummy blockchain container with flash blocks enabled
-	image := "ghcr.io/streamingfast/dummy-blockchain:17b576d"
+	image := "ghcr.io/streamingfast/dummy-blockchain:d6b690b"
 	burst := 120
 
 	t.Logf("Starting container with image: %s and burst %d", image, burst)
@@ -397,7 +398,7 @@ func TestPartialBlocksReorgs(t *testing.T) {
 			}
 
 			// Run the request with custom handling for partial blocks
-			resps, err := RunRequestWithPartialBlocks(t, request, substreamsEndpoint, 300)
+			resps, err := RunRequestWithPartialBlocks(t, request, substreamsEndpoint, 100)
 			if err != nil && err != io.EOF && !errors.Is(err, context.Canceled) {
 				// Let's try to get container logs to debug
 				logs, logErr := container.Logs(ctx)

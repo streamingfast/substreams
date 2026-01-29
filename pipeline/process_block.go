@@ -58,7 +58,7 @@ func (p *Pipeline) ProcessFromExecOutput(
 		return fmt.Errorf("setting up exec output: %w", err)
 	}
 
-	if err = p.processBlock(ctx, execOutput, clock, cursor, bstream.StepNewIrreversible, nil, 0); err != nil {
+	if err = p.processBlock(ctx, execOutput, clock, cursor, bstream.StepNewIrreversible, nil, 0, false); err != nil {
 		return err
 	}
 
@@ -86,7 +86,7 @@ func (p *Pipeline) ProcessBlock(block *pbbstream.Block, obj interface{}) (err er
 		return fmt.Errorf("setting up exec output: %w", err)
 	}
 
-	if err = p.processBlock(ctx, execOutput, clock, cursor, step, reorgJunctionBlock, block.PartialIndex); err != nil {
+	if err = p.processBlock(ctx, execOutput, clock, cursor, step, reorgJunctionBlock, block.PartialIndex, block.LastPartial); err != nil {
 		return err // watch out, io.EOF needs to go through undecorated
 	}
 
@@ -117,13 +117,14 @@ func (p *Pipeline) processBlock(
 	step bstream.StepType,
 	reorgJunctionBlock bstream.BlockRef,
 	partialIndex int32,
+	isLastPartial bool,
 ) (err error) {
 	var eof bool
 
 	switch step {
 	case bstream.StepPartial:
 		if reqctx.PartialBlocks(ctx) { // this also covers 'partialBlocksOnly'
-			p.handleStepPartial(ctx, clock, cursor, execOutput, partialIndex, false)
+			p.handleStepPartial(ctx, clock, cursor, execOutput, partialIndex, isLastPartial)
 		}
 
 	case bstream.StepUndo:
@@ -295,6 +296,7 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 	}
 	p.partialProcessingState.processedTransactionsHash = txsHash
 	p.partialProcessingState.processedTransactionsCount = txCount
+	p.partialProcessingState.lastBlockID = clock.Id
 
 	p.partialProcessingState.processedPartials = append(p.partialProcessingState.processedPartials, clock)
 	reqDetails := reqctx.Details(ctx)
@@ -579,6 +581,7 @@ func recoverExecutionPanic(ctx context.Context, executionError error, recovered 
 		return connect.NewError(connect.CodeDeadlineExceeded, fmt.Errorf("execution timed out at block %s: %w", blockRef, recoveredErr))
 	}
 
+	PrintStack = true
 	// Otherwise, log the panic and return a generic error
 	if PrintStack {
 		debug.PrintStack()

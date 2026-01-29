@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -255,10 +256,14 @@ func newDummyBlockchainContainer(ctx context.Context, tmpDir string, image strin
 			"relayer",
 			"-c",
 			"",
+			"--common-system-shutdown-signal-delay=10s",
 			"--advertise-chain-name=acme-dummy-blockchain",
 			"--reader-node-path=dummy-blockchain",
 			"--reader-node-arguments=" + readerArgs,
 			"--advertise-block-id-encoding=hex",
+		},
+		Env: map[string]string{
+			"DLOG": ".*=debug",
 		},
 		ExposedPorts: []string{"10014/tcp"},
 		HostConfigModifier: func(hostConfig *container.HostConfig) {
@@ -269,6 +274,8 @@ func newDummyBlockchainContainer(ctx context.Context, tmpDir string, image strin
 			wait.ForLog("serving gRPC").WithStartupTimeout(30*time.Second),
 		),
 	}
+
+	fmt.Println(strings.Join(req.Cmd, " "))
 
 	// Start container
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{

@@ -51,7 +51,7 @@ type ExecOutputTesting struct {
 	clock          *pbsubstreams.Clock
 }
 
-func NewExecOutputTesting(t *testing.T, block *pbbstream.Block, clock *pbsubstreams.Clock) *ExecOutputTesting {
+func NewExecOutputTesting(t *testing.T, block *pbbstream.Block, clock *pbsubstreams.Clock, blockType string) *ExecOutputTesting {
 	blkBytes := block.Payload.Value
 
 	clockBytes, err := proto.Marshal(clock)
@@ -60,8 +60,8 @@ func NewExecOutputTesting(t *testing.T, block *pbbstream.Block, clock *pbsubstre
 	return &ExecOutputTesting{
 		clock: clock,
 		Values: map[string][]byte{
-			"sf.substreams.v1.test.Block": blkBytes,
-			"sf.substreams.v1.Clock":      clockBytes,
+			blockType:                blkBytes,
+			"sf.substreams.v1.Clock": clockBytes,
 		},
 		ValuesForFiles: map[string][]byte{},
 	}

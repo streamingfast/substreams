@@ -48,7 +48,7 @@ Then enable the skills:
 
 1. Run `/plugin` to open the plugin manager
 2. Go to the **Discover** tab
-3. Find and install the desired skills (e.g., `substreams-dev`, `substreams-sql`)
+3. Find and install the `substreams-dev` plugin (which pulls all defined skills automatically)
 4. Restart Claude instance(s) for skills to be discovered
 
 After installation, Claude automatically uses Substreams expertise when working on relevant projects.

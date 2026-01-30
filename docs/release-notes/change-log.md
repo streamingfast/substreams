@@ -9,6 +9,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### CLI
+
+* Added support for buf.build commit references in descriptor set module versions. In addition to semantic versions (e.g., `v1.2.3`), you can now use buf.build commit hashes (32 lowercase hex characters, e.g., `@f3ab5976b9ba4f9bac28b26271fca7d7`). Commit references are also cached since they are immutable.
+
 ## v1.17.11
 
 ### Server

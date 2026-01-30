@@ -55,8 +55,8 @@ func newDescriptorCache() *DescriptorCache {
 }
 
 func (c *DescriptorCache) isDeterministicVersion(version string) bool {
-	// Only cache valid semver versions
-	return semver.IsValid(version)
+	// Cache valid semver versions and buf commit references (both are immutable)
+	return semver.IsValid(version) || isValidBufCommitRef(version)
 }
 
 func (c *DescriptorCache) generateCacheKey(module, version string, symbols []string) string {

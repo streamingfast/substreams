@@ -594,6 +594,55 @@ version: 1.2`,
 			expectError: true,
 			errorMsg:    "is not valid semantic version (or 'latest')",
 		},
+		{
+			name: "buf commit reference inline (32 hex chars)",
+			yaml: `module: buf.build/streamingfast/substreams-foundational-store@f3ab5976b9ba4f9bac28b26271fca7d7`,
+			expected: DescriptorSetEntry{
+				Module:  "buf.build/streamingfast/substreams-foundational-store",
+				Version: "f3ab5976b9ba4f9bac28b26271fca7d7",
+			},
+			expectError: false,
+		},
+		{
+			name: "buf commit reference in separate version field",
+			yaml: `module: buf.build/streamingfast/substreams-foundational-store
+version: f3ab5976b9ba4f9bac28b26271fca7d7`,
+			expected: DescriptorSetEntry{
+				Module:  "buf.build/streamingfast/substreams-foundational-store",
+				Version: "f3ab5976b9ba4f9bac28b26271fca7d7",
+			},
+			expectError: false,
+		},
+		{
+			name: "buf commit reference with symbols",
+			yaml: `module: buf.build/streamingfast/substreams-foundational-store@f3ab5976b9ba4f9bac28b26271fca7d7
+symbols:
+  - sf.substreams.foundational.store.v1.Store`,
+			expected: DescriptorSetEntry{
+				Module:  "buf.build/streamingfast/substreams-foundational-store",
+				Version: "f3ab5976b9ba4f9bac28b26271fca7d7",
+				Symbols: []string{"sf.substreams.foundational.store.v1.Store"},
+			},
+			expectError: false,
+		},
+		{
+			name:        "error: buf commit reference too short (31 chars)",
+			yaml:        `module: buf.build/streamingfast/substreams-sink-sql@f3ab5976b9ba4f9bac28b26271fca7d`,
+			expectError: true,
+			errorMsg:    "is not valid semantic version",
+		},
+		{
+			name:        "error: buf commit reference too long (33 chars)",
+			yaml:        `module: buf.build/streamingfast/substreams-sink-sql@f3ab5976b9ba4f9bac28b26271fca7d7a`,
+			expectError: true,
+			errorMsg:    "is not valid semantic version",
+		},
+		{
+			name:        "error: buf commit reference with uppercase (invalid)",
+			yaml:        `module: buf.build/streamingfast/substreams-sink-sql@F3AB5976B9BA4F9BAC28B26271FCA7D7`,
+			expectError: true,
+			errorMsg:    "is not valid semantic version",
+		},
 	}
 
 	for _, tt := range tests {
@@ -613,6 +662,33 @@ version: 1.2`,
 			assert.Equal(t, tt.expected.Module, descriptorSetEntry.Module)
 			assert.Equal(t, tt.expected.Version, descriptorSetEntry.Version)
 			assert.Equal(t, tt.expected.Symbols, descriptorSetEntry.Symbols)
+		})
+	}
+}
+
+func TestIsValidBufCommitRef(t *testing.T) {
+	tests := []struct {
+		version     string
+		expected    bool
+		description string
+	}{
+		{"f3ab5976b9ba4f9bac28b26271fca7d7", true, "valid 32 char lowercase hex"},
+		{"0000000000000000000000000000000a", true, "valid hex with zeros"},
+		{"abcdef0123456789abcdef0123456789", true, "valid hex with all valid chars"},
+		{"", false, "empty string"},
+		{"f3ab5976b9ba4f9bac28b26271fca7d", false, "31 chars (too short)"},
+		{"f3ab5976b9ba4f9bac28b26271fca7d7a", false, "33 chars (too long)"},
+		{"F3AB5976B9BA4F9BAC28B26271FCA7D7", false, "uppercase hex (invalid)"},
+		{"g3ab5976b9ba4f9bac28b26271fca7d7", false, "invalid hex char 'g'"},
+		{"v1.0.0", false, "semver (not a commit ref)"},
+		{"main", false, "branch name"},
+		{"latest", false, "latest keyword"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.description, func(t *testing.T) {
+			result := isValidBufCommitRef(tt.version)
+			assert.Equal(t, tt.expected, result, tt.description)
 		})
 	}
 }

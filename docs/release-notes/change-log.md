@@ -13,6 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### CLI
 
+* Improved `substreams auth` command to better guide new users by showing the registration link alongside the authentication link. The command now also accepts API keys directly and automatically exchanges them for JWT tokens.
+
 * Added support for buf.build commit references in descriptor set module versions. In addition to semantic versions (e.g., `v1.2.3`), you can now use buf.build commit hashes (32 lowercase hex characters, e.g., `@f3ab5976b9ba4f9bac28b26271fca7d7`). Commit references are also cached since they are immutable.
 
 * Fixed `protogen` hash caching behavior when descriptor sets don't have a pinned version. Previously, when using descriptor sets without a version (resolving to "latest"), the `.last_generated_hash` file would cache incorrectly and skip regeneration even when the remote content had changed. Now:

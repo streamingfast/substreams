@@ -196,6 +196,9 @@ func (p *Pipeline) handleStepStalled(clock *pbsubstreams.Clock) error {
 }
 
 func (p *Pipeline) undoPartialStates() error {
+	if true {
+		return nil
+	}
 	if p.partialProcessingState == nil {
 		return nil
 	}

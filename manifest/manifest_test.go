@@ -692,3 +692,186 @@ func TestIsValidBufCommitRef(t *testing.T) {
 		})
 	}
 }
+
+func TestIsDeterministicVersion(t *testing.T) {
+	tests := []struct {
+		version     string
+		expected    bool
+		description string
+	}{
+		{"v1.0.0", true, "semver is deterministic"},
+		{"v0.1.2-beta", true, "semver with prerelease is deterministic"},
+		{"f3ab5976b9ba4f9bac28b26271fca7d7", true, "buf commit ref is deterministic"},
+		{"", false, "empty string is not deterministic"},
+		{"main", false, "branch name is not deterministic"},
+		{"develop", false, "branch name is not deterministic"},
+		{"master", false, "branch name is not deterministic"},
+		{"latest", false, "latest is not deterministic"},
+		{"1.0.0", false, "semver without v prefix is not deterministic"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.description, func(t *testing.T) {
+			result := isDeterministicVersion(tt.version)
+			assert.Equal(t, tt.expected, result, tt.description)
+		})
+	}
+}
+
+func TestManifest_HasNonDeterministicDescriptorSets(t *testing.T) {
+	tests := []struct {
+		name     string
+		manifest *Manifest
+		expected bool
+	}{
+		{
+			name:     "nil protobuf descriptor sets",
+			manifest: &Manifest{},
+			expected: false,
+		},
+		{
+			name: "all deterministic with semver",
+			manifest: &Manifest{
+				Protobuf: Protobuf{
+					DescriptorSets: []*DescriptorSetEntry{
+						{Module: "buf.build/org/pkg", Version: "v1.0.0"},
+						{Module: "buf.build/org/pkg2", Version: "v2.0.0"},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "all deterministic with commit ref",
+			manifest: &Manifest{
+				Protobuf: Protobuf{
+					DescriptorSets: []*DescriptorSetEntry{
+						{Module: "buf.build/org/pkg", Version: "f3ab5976b9ba4f9bac28b26271fca7d7"},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "local path is always deterministic",
+			manifest: &Manifest{
+				Protobuf: Protobuf{
+					DescriptorSets: []*DescriptorSetEntry{
+						{LocalPath: "/path/to/local.binpb"},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "empty version is non-deterministic",
+			manifest: &Manifest{
+				Protobuf: Protobuf{
+					DescriptorSets: []*DescriptorSetEntry{
+						{Module: "buf.build/org/pkg", Version: ""},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "branch name is non-deterministic",
+			manifest: &Manifest{
+				Protobuf: Protobuf{
+					DescriptorSets: []*DescriptorSetEntry{
+						{Module: "buf.build/org/pkg", Version: "main"},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "mixed deterministic and non-deterministic",
+			manifest: &Manifest{
+				Protobuf: Protobuf{
+					DescriptorSets: []*DescriptorSetEntry{
+						{Module: "buf.build/org/pkg", Version: "v1.0.0"},
+						{Module: "buf.build/org/pkg2", Version: ""}, // non-deterministic
+					},
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.manifest.HasNonDeterministicDescriptorSets()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestManifest_GetNonDeterministicDescriptorSets(t *testing.T) {
+	tests := []struct {
+		name          string
+		manifest      *Manifest
+		expectedCount int
+	}{
+		{
+			name:          "nil protobuf descriptor sets",
+			manifest:      &Manifest{},
+			expectedCount: 0,
+		},
+		{
+			name: "all deterministic",
+			manifest: &Manifest{
+				Protobuf: Protobuf{
+					DescriptorSets: []*DescriptorSetEntry{
+						{Module: "buf.build/org/pkg", Version: "v1.0.0"},
+						{Module: "buf.build/org/pkg2", Version: "f3ab5976b9ba4f9bac28b26271fca7d7"},
+					},
+				},
+			},
+			expectedCount: 0,
+		},
+		{
+			name: "one non-deterministic",
+			manifest: &Manifest{
+				Protobuf: Protobuf{
+					DescriptorSets: []*DescriptorSetEntry{
+						{Module: "buf.build/org/pkg", Version: ""},
+					},
+				},
+			},
+			expectedCount: 1,
+		},
+		{
+			name: "multiple non-deterministic",
+			manifest: &Manifest{
+				Protobuf: Protobuf{
+					DescriptorSets: []*DescriptorSetEntry{
+						{Module: "buf.build/org/pkg", Version: ""},
+						{Module: "buf.build/org/pkg2", Version: "main"},
+						{Module: "buf.build/org/pkg3", Version: "v1.0.0"}, // deterministic
+					},
+				},
+			},
+			expectedCount: 2,
+		},
+		{
+			name: "local path not counted as non-deterministic",
+			manifest: &Manifest{
+				Protobuf: Protobuf{
+					DescriptorSets: []*DescriptorSetEntry{
+						{LocalPath: "/path/to/local.binpb", Module: "", Version: ""}, // local path takes precedence
+						{Module: "buf.build/org/pkg", Version: ""},                   // non-deterministic
+					},
+				},
+			},
+			expectedCount: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.manifest.GetNonDeterministicDescriptorSets()
+			assert.Len(t, result, tt.expectedCount)
+		})
+	}
+}

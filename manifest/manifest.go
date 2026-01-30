@@ -608,3 +608,40 @@ func (d *DescriptorSetEntry) UnmarshalYAML(n *yaml.Node) error {
 func isValidBufCommitRef(version string) bool {
 	return bufCommitRefRegexp.MatchString(version)
 }
+
+// isDeterministicVersion returns true if the version is deterministic (semver or buf commit reference).
+// An empty version or branch name like "main" is not deterministic.
+// This is used by both the manifest parsing and the descriptor cache to determine
+// whether a version can be reliably cached.
+func isDeterministicVersion(version string) bool {
+	return semver.IsValid(version) || isValidBufCommitRef(version)
+}
+
+// HasNonDeterministicDescriptorSets returns true if any descriptor set in the manifest
+// has a non-deterministic version (empty, "latest", or branch name).
+func (m *Manifest) HasNonDeterministicDescriptorSets() bool {
+	for _, entry := range m.Protobuf.DescriptorSets {
+		if entry.LocalPath != "" {
+			continue // Local paths are always deterministic
+		}
+		if !isDeterministicVersion(entry.Version) {
+			return true
+		}
+	}
+	return false
+}
+
+// GetNonDeterministicDescriptorSets returns a list of descriptor set entries that have
+// non-deterministic versions (empty, "latest", or branch name).
+func (m *Manifest) GetNonDeterministicDescriptorSets() []*DescriptorSetEntry {
+	var result []*DescriptorSetEntry
+	for _, entry := range m.Protobuf.DescriptorSets {
+		if entry.LocalPath != "" {
+			continue // Local paths are always deterministic
+		}
+		if !isDeterministicVersion(entry.Version) {
+			result = append(result, entry)
+		}
+	}
+	return result
+}

@@ -21,7 +21,6 @@ import (
 	"github.com/streamingfast/substreams/pb/system"
 	sfproto "github.com/streamingfast/substreams/proto"
 	"go.uber.org/zap"
-	"golang.org/x/mod/semver"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/descriptorpb"
 )
@@ -55,8 +54,7 @@ func newDescriptorCache() *DescriptorCache {
 }
 
 func (c *DescriptorCache) isDeterministicVersion(version string) bool {
-	// Cache valid semver versions and buf commit references (both are immutable)
-	return semver.IsValid(version) || isValidBufCommitRef(version)
+	return isDeterministicVersion(version)
 }
 
 func (c *DescriptorCache) generateCacheKey(module, version string, symbols []string) string {

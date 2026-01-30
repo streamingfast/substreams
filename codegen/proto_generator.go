@@ -17,9 +17,10 @@ import (
 )
 
 type ProtoGenerator struct {
-	excludedPaths []string
-	outputPath    string
-	generateMod   bool
+	excludedPaths                   []string
+	outputPath                      string
+	generateMod                     bool
+	hasNonDeterministicDescriptors  bool
 }
 
 func NewProtoGenerator(outputPath string, excludedPaths []string, generateMod bool) *ProtoGenerator {
@@ -36,6 +37,13 @@ func NewProtoGenerator(outputPath string, excludedPaths []string, generateMod bo
 		excludedPaths: excludedPaths,
 		generateMod:   generateMod,
 	}
+}
+
+// SetHasNonDeterministicDescriptors sets whether the manifest has non-deterministic
+// descriptor sets. When true, protobuf generation will always run regardless of
+// hash comparison, since the content may have changed without the hash changing.
+func (g *ProtoGenerator) SetHasNonDeterministicDescriptors(has bool) {
+	g.hasNonDeterministicDescriptors = has
 }
 
 // calculateHash computes a deterministic hash of the proto generation inputs
@@ -155,16 +163,20 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
 		return fmt.Errorf("calculating hash: %w", err)
 	}
 
-	// Read last generated hash
-	lastHash, err := g.readLastGeneratedHash()
-	if err != nil {
-		return fmt.Errorf("reading last generated hash: %w", err)
-	}
+	// Skip hash comparison if there are non-deterministic descriptor sets
+	// since the content may have changed without the manifest changing
+	if !g.hasNonDeterministicDescriptors {
+		// Read last generated hash
+		lastHash, err := g.readLastGeneratedHash()
+		if err != nil {
+			return fmt.Errorf("reading last generated hash: %w", err)
+		}
 
-	// Check if we can skip generation
-	if lastHash != "" && lastHash == currentHash && g.hasGeneratedFiles() {
-		fmt.Printf("⚡ Protobuf generation skipped (no changes detected)\n")
-		return nil
+		// Check if we can skip generation
+		if lastHash != "" && lastHash == currentHash && g.hasGeneratedFiles() {
+			fmt.Printf("⚡ Protobuf generation skipped (no changes detected)\n")
+			return nil
+		}
 	}
 
 	tmpDir, err := os.MkdirTemp("", "substreams_protogen")
@@ -246,9 +258,16 @@ func (g *ProtoGenerator) GenerateProto(pkg *pbsubstreams.Package) error {
 		return fmt.Errorf("error executing 'buf':: %w", err)
 	}
 
-	// Update hash file after successful generation
-	if err := g.writeLastGeneratedHash(currentHash); err != nil {
-		return fmt.Errorf("writing hash file: %w", err)
+	// Update hash file after successful generation (only if all descriptor sets are deterministic)
+	if g.hasNonDeterministicDescriptors {
+		// Remove the hash file if it exists, since we can't reliably cache
+		// when descriptor sets may change without version changes
+		hashFilePath := filepath.Join(g.outputPath, ".last_generated_hash")
+		os.Remove(hashFilePath) // Ignore errors, file may not exist
+	} else {
+		if err := g.writeLastGeneratedHash(currentHash); err != nil {
+			return fmt.Errorf("writing hash file: %w", err)
+		}
 	}
 
 	fmt.Printf("🎯 Protobuf generation complete\n")

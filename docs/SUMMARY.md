@@ -25,6 +25,15 @@
 * [Install Substreams CLI](how-to-guides/cli/installing-the-cli.md)
   * [Substreams CLI Authentication](how-to-guides/cli/authentication.md)
 * [Developing Substreams](how-to-guides/develop-your-own-substreams/develop-your-own-substreams.md)
+  * General
+    * [Agent Skills](how-to-guides/develop-your-own-substreams/generic/agent-skills.md)
+    * [Local Development](how-to-guides/develop-your-own-substreams/generic/local-development/README.md)
+      * [Troubleshooting](how-to-guides/develop-your-own-substreams/generic/local-development/troubleshooting.md)
+    * [Using Rust & Protobuf](how-to-guides/develop-your-own-substreams/generic/using-rust-proto.md)
+    * [Rust](how-to-guides/develop-your-own-substreams/generic/rust/rust.md)
+      * [Option struct](how-to-guides/develop-your-own-substreams/generic/rust/option.md)
+      * [Result struct](how-to-guides/develop-your-own-substreams/generic/rust/result.md)
+    * [Protobuf](how-to-guides/develop-your-own-substreams/generic/creating-protobuf-schemas.md)
   * [on EVM](how-to-guides/develop-your-own-substreams/evm)
     * [Exploring Ethereum](how-to-guides/develop-your-own-substreams/evm/exploring-ethereum/exploring-ethereum.md)
       * [Filter Transactions](how-to-guides/develop-your-own-substreams/evm/exploring-ethereum/map_filter_transactions_module.md)
@@ -47,14 +56,6 @@
     * [Injective](how-to-guides/develop-your-own-substreams/cosmos/injective)
       * [Simple Substreams Example](how-to-guides/develop-your-own-substreams/cosmos/injective/block-stats.md)
       * [Foundational Modules](how-to-guides/develop-your-own-substreams/cosmos/injective/foundational.md)
-  * General
-    * [Local Development](how-to-guides/develop-your-own-substreams/generic/local-development/README.md)
-      * [Troubleshooting](how-to-guides/develop-your-own-substreams/generic/local-development/troubleshooting.md)
-    * [Using Rust & Protobuf](how-to-guides/develop-your-own-substreams/generic/using-rust-proto.md)
-    * [Rust](how-to-guides/develop-your-own-substreams/generic/rust/rust.md)
-      * [Option struct](how-to-guides/develop-your-own-substreams/generic/rust/option.md)
-      * [Result struct](how-to-guides/develop-your-own-substreams/generic/rust/result.md)
-    * [Protobuf](how-to-guides/develop-your-own-substreams/generic/creating-protobuf-schemas.md)
 * [Composing Substreams](how-to-guides/composing-substreams/composing-substreams.md)
   * [Foundational Modules](how-to-guides/composing-substreams/foundational-modules.md)
   * [Foundational Stores](how-to-guides/composing-substreams/foundational-stores/foundational-stores.md)
@@ -107,6 +108,7 @@
   * SQL
     * [Sink Config](references/sql/sink-config.md)
     * [DSN Reference](references/sql/dsn-reference.md)
+    * [Delta Updates](references/sql/delta-updates.md)
     * [Reorg Handling](references/sql/reorg-handling.md)
 * Operators
   * [Hosting Foundational Stores](./references/foundational-stores/hosting-foundational-stores.md)

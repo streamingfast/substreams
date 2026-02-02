@@ -594,6 +594,55 @@ version: 1.2`,
 			expectError: true,
 			errorMsg:    "is not valid semantic version (or 'latest')",
 		},
+		{
+			name: "buf commit reference inline (32 hex chars)",
+			yaml: `module: buf.build/streamingfast/substreams-foundational-store@f3ab5976b9ba4f9bac28b26271fca7d7`,
+			expected: DescriptorSetEntry{
+				Module:  "buf.build/streamingfast/substreams-foundational-store",
+				Version: "f3ab5976b9ba4f9bac28b26271fca7d7",
+			},
+			expectError: false,
+		},
+		{
+			name: "buf commit reference in separate version field",
+			yaml: `module: buf.build/streamingfast/substreams-foundational-store
+version: f3ab5976b9ba4f9bac28b26271fca7d7`,
+			expected: DescriptorSetEntry{
+				Module:  "buf.build/streamingfast/substreams-foundational-store",
+				Version: "f3ab5976b9ba4f9bac28b26271fca7d7",
+			},
+			expectError: false,
+		},
+		{
+			name: "buf commit reference with symbols",
+			yaml: `module: buf.build/streamingfast/substreams-foundational-store@f3ab5976b9ba4f9bac28b26271fca7d7
+symbols:
+  - sf.substreams.foundational.store.v1.Store`,
+			expected: DescriptorSetEntry{
+				Module:  "buf.build/streamingfast/substreams-foundational-store",
+				Version: "f3ab5976b9ba4f9bac28b26271fca7d7",
+				Symbols: []string{"sf.substreams.foundational.store.v1.Store"},
+			},
+			expectError: false,
+		},
+		{
+			name:        "error: buf commit reference too short (31 chars)",
+			yaml:        `module: buf.build/streamingfast/substreams-sink-sql@f3ab5976b9ba4f9bac28b26271fca7d`,
+			expectError: true,
+			errorMsg:    "is not valid semantic version",
+		},
+		{
+			name:        "error: buf commit reference too long (33 chars)",
+			yaml:        `module: buf.build/streamingfast/substreams-sink-sql@f3ab5976b9ba4f9bac28b26271fca7d7a`,
+			expectError: true,
+			errorMsg:    "is not valid semantic version",
+		},
+		{
+			name:        "error: buf commit reference with uppercase (invalid)",
+			yaml:        `module: buf.build/streamingfast/substreams-sink-sql@F3AB5976B9BA4F9BAC28B26271FCA7D7`,
+			expectError: true,
+			errorMsg:    "is not valid semantic version",
+		},
 	}
 
 	for _, tt := range tests {
@@ -613,6 +662,216 @@ version: 1.2`,
 			assert.Equal(t, tt.expected.Module, descriptorSetEntry.Module)
 			assert.Equal(t, tt.expected.Version, descriptorSetEntry.Version)
 			assert.Equal(t, tt.expected.Symbols, descriptorSetEntry.Symbols)
+		})
+	}
+}
+
+func TestIsValidBufCommitRef(t *testing.T) {
+	tests := []struct {
+		version     string
+		expected    bool
+		description string
+	}{
+		{"f3ab5976b9ba4f9bac28b26271fca7d7", true, "valid 32 char lowercase hex"},
+		{"0000000000000000000000000000000a", true, "valid hex with zeros"},
+		{"abcdef0123456789abcdef0123456789", true, "valid hex with all valid chars"},
+		{"", false, "empty string"},
+		{"f3ab5976b9ba4f9bac28b26271fca7d", false, "31 chars (too short)"},
+		{"f3ab5976b9ba4f9bac28b26271fca7d7a", false, "33 chars (too long)"},
+		{"F3AB5976B9BA4F9BAC28B26271FCA7D7", false, "uppercase hex (invalid)"},
+		{"g3ab5976b9ba4f9bac28b26271fca7d7", false, "invalid hex char 'g'"},
+		{"v1.0.0", false, "semver (not a commit ref)"},
+		{"main", false, "branch name"},
+		{"latest", false, "latest keyword"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.description, func(t *testing.T) {
+			result := isValidBufCommitRef(tt.version)
+			assert.Equal(t, tt.expected, result, tt.description)
+		})
+	}
+}
+
+func TestIsDeterministicVersion(t *testing.T) {
+	tests := []struct {
+		version     string
+		expected    bool
+		description string
+	}{
+		{"v1.0.0", true, "semver is deterministic"},
+		{"v0.1.2-beta", true, "semver with prerelease is deterministic"},
+		{"f3ab5976b9ba4f9bac28b26271fca7d7", true, "buf commit ref is deterministic"},
+		{"", false, "empty string is not deterministic"},
+		{"main", false, "branch name is not deterministic"},
+		{"develop", false, "branch name is not deterministic"},
+		{"master", false, "branch name is not deterministic"},
+		{"latest", false, "latest is not deterministic"},
+		{"1.0.0", false, "semver without v prefix is not deterministic"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.description, func(t *testing.T) {
+			result := isDeterministicVersion(tt.version)
+			assert.Equal(t, tt.expected, result, tt.description)
+		})
+	}
+}
+
+func TestManifest_HasNonDeterministicDescriptorSets(t *testing.T) {
+	tests := []struct {
+		name     string
+		manifest *Manifest
+		expected bool
+	}{
+		{
+			name:     "nil protobuf descriptor sets",
+			manifest: &Manifest{},
+			expected: false,
+		},
+		{
+			name: "all deterministic with semver",
+			manifest: &Manifest{
+				Protobuf: Protobuf{
+					DescriptorSets: []*DescriptorSetEntry{
+						{Module: "buf.build/org/pkg", Version: "v1.0.0"},
+						{Module: "buf.build/org/pkg2", Version: "v2.0.0"},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "all deterministic with commit ref",
+			manifest: &Manifest{
+				Protobuf: Protobuf{
+					DescriptorSets: []*DescriptorSetEntry{
+						{Module: "buf.build/org/pkg", Version: "f3ab5976b9ba4f9bac28b26271fca7d7"},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "local path is always deterministic",
+			manifest: &Manifest{
+				Protobuf: Protobuf{
+					DescriptorSets: []*DescriptorSetEntry{
+						{LocalPath: "/path/to/local.binpb"},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "empty version is non-deterministic",
+			manifest: &Manifest{
+				Protobuf: Protobuf{
+					DescriptorSets: []*DescriptorSetEntry{
+						{Module: "buf.build/org/pkg", Version: ""},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "branch name is non-deterministic",
+			manifest: &Manifest{
+				Protobuf: Protobuf{
+					DescriptorSets: []*DescriptorSetEntry{
+						{Module: "buf.build/org/pkg", Version: "main"},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "mixed deterministic and non-deterministic",
+			manifest: &Manifest{
+				Protobuf: Protobuf{
+					DescriptorSets: []*DescriptorSetEntry{
+						{Module: "buf.build/org/pkg", Version: "v1.0.0"},
+						{Module: "buf.build/org/pkg2", Version: ""}, // non-deterministic
+					},
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.manifest.HasNonDeterministicDescriptorSets()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestManifest_GetNonDeterministicDescriptorSets(t *testing.T) {
+	tests := []struct {
+		name          string
+		manifest      *Manifest
+		expectedCount int
+	}{
+		{
+			name:          "nil protobuf descriptor sets",
+			manifest:      &Manifest{},
+			expectedCount: 0,
+		},
+		{
+			name: "all deterministic",
+			manifest: &Manifest{
+				Protobuf: Protobuf{
+					DescriptorSets: []*DescriptorSetEntry{
+						{Module: "buf.build/org/pkg", Version: "v1.0.0"},
+						{Module: "buf.build/org/pkg2", Version: "f3ab5976b9ba4f9bac28b26271fca7d7"},
+					},
+				},
+			},
+			expectedCount: 0,
+		},
+		{
+			name: "one non-deterministic",
+			manifest: &Manifest{
+				Protobuf: Protobuf{
+					DescriptorSets: []*DescriptorSetEntry{
+						{Module: "buf.build/org/pkg", Version: ""},
+					},
+				},
+			},
+			expectedCount: 1,
+		},
+		{
+			name: "multiple non-deterministic",
+			manifest: &Manifest{
+				Protobuf: Protobuf{
+					DescriptorSets: []*DescriptorSetEntry{
+						{Module: "buf.build/org/pkg", Version: ""},
+						{Module: "buf.build/org/pkg2", Version: "main"},
+						{Module: "buf.build/org/pkg3", Version: "v1.0.0"}, // deterministic
+					},
+				},
+			},
+			expectedCount: 2,
+		},
+		{
+			name: "local path not counted as non-deterministic",
+			manifest: &Manifest{
+				Protobuf: Protobuf{
+					DescriptorSets: []*DescriptorSetEntry{
+						{LocalPath: "/path/to/local.binpb", Module: "", Version: ""}, // local path takes precedence
+						{Module: "buf.build/org/pkg", Version: ""},                   // non-deterministic
+					},
+				},
+			},
+			expectedCount: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.manifest.GetNonDeterministicDescriptorSets()
+			assert.Len(t, result, tt.expectedCount)
 		})
 	}
 }

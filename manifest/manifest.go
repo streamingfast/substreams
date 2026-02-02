@@ -18,11 +18,13 @@ import (
 
 const UNSET = math.MaxUint64
 
-var moduleNameRegexp *regexp.Regexp
-
-func init() {
+var (
+	// moduleNameRegexp matches a valid module name (alphanumeric, underscores, hyphens, max length 64)
 	moduleNameRegexp = regexp.MustCompile(`^([a-zA-Z][a-zA-Z0-9_-]{0,63})$`)
-}
+
+	// bufCommitRefRegexp matches a buf.build commit reference (32 lowercase hex characters)
+	bufCommitRefRegexp = regexp.MustCompile(`^[a-f0-9]{32}$`)
+)
 
 const (
 	ModuleKindStore      = "store"
@@ -572,12 +574,12 @@ func (d *DescriptorSetEntry) UnmarshalYAML(n *yaml.Node) error {
 		if versionPart == "latest" {
 			return fmt.Errorf("descriptor set module %q: '@latest' is not allowed in inline notation; use 'version: latest' or omit the version", module)
 		}
-		// Validate explicit version is valid semver
+		// Validate explicit version is valid semver or buf commit reference
 		if strings.Contains(versionPart, "@") {
 			return fmt.Errorf("descriptor set module %q: version %q should not contain '@'", module, versionPart)
 		}
-		if !semver.IsValid(versionPart) {
-			return fmt.Errorf("descriptor set module %q: version %q is not valid semantic version (expected like v1.2.3)", module, versionPart)
+		if !semver.IsValid(versionPart) && !isValidBufCommitRef(versionPart) {
+			return fmt.Errorf("descriptor set module %q: version %q is not valid semantic version (expected like v1.2.3) or buf commit reference (expected 32 hex characters)", module, versionPart)
 		}
 		d.Module = modulePart
 		d.Version = versionPart
@@ -594,9 +596,52 @@ func (d *DescriptorSetEntry) UnmarshalYAML(n *yaml.Node) error {
 		return nil
 	}
 
-	if !semver.IsValid(version) {
-		return fmt.Errorf("descriptor set module %q: version %q is not valid semantic version (or 'latest')", module, version)
+	if !semver.IsValid(version) && !isValidBufCommitRef(version) {
+		return fmt.Errorf("descriptor set module %q: version %q is not valid semantic version (or 'latest') or buf commit reference", module, version)
 	}
 	d.Version = version
 	return nil
+}
+
+// isValidBufCommitRef returns true if the version is a valid buf.build commit reference
+// (32 lowercase hex characters, e.g., "f3ab5976b9ba4f9bac28b26271fca7d7")
+func isValidBufCommitRef(version string) bool {
+	return bufCommitRefRegexp.MatchString(version)
+}
+
+// isDeterministicVersion returns true if the version is deterministic (semver or buf commit reference).
+// An empty version or branch name like "main" is not deterministic.
+// This is used by both the manifest parsing and the descriptor cache to determine
+// whether a version can be reliably cached.
+func isDeterministicVersion(version string) bool {
+	return semver.IsValid(version) || isValidBufCommitRef(version)
+}
+
+// HasNonDeterministicDescriptorSets returns true if any descriptor set in the manifest
+// has a non-deterministic version (empty, "latest", or branch name).
+func (m *Manifest) HasNonDeterministicDescriptorSets() bool {
+	for _, entry := range m.Protobuf.DescriptorSets {
+		if entry.LocalPath != "" {
+			continue // Local paths are always deterministic
+		}
+		if !isDeterministicVersion(entry.Version) {
+			return true
+		}
+	}
+	return false
+}
+
+// GetNonDeterministicDescriptorSets returns a list of descriptor set entries that have
+// non-deterministic versions (empty, "latest", or branch name).
+func (m *Manifest) GetNonDeterministicDescriptorSets() []*DescriptorSetEntry {
+	var result []*DescriptorSetEntry
+	for _, entry := range m.Protobuf.DescriptorSets {
+		if entry.LocalPath != "" {
+			continue // Local paths are always deterministic
+		}
+		if !isDeterministicVersion(entry.Version) {
+			result = append(result, entry)
+		}
+	}
+	return result
 }

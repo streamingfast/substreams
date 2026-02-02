@@ -205,6 +205,22 @@ func (p *ProtoBuilder) Build(ctx context.Context) error {
 	}
 
 	generator := codegen.NewProtoGenerator(outputPath, pkgBundle.Manifest.Protobuf.ExcludePaths, true)
+
+	// Check for non-deterministic descriptor sets and warn the user
+	nonDeterministicEntries := pkgBundle.Manifest.GetNonDeterministicDescriptorSets()
+	if len(nonDeterministicEntries) > 0 {
+		generator.SetHasNonDeterministicDescriptors(true)
+		fmt.Printf("⚠️  Warning: Some descriptor sets do not have a pinned version and will always trigger regeneration:\n")
+		for _, entry := range nonDeterministicEntries {
+			if entry.Version == "" {
+				fmt.Printf("   • %s (no version specified, resolves to latest)\n", entry.Module)
+			} else {
+				fmt.Printf("   • %s@%s (non-deterministic version)\n", entry.Module, entry.Version)
+			}
+		}
+		fmt.Printf("   To enable caching and faster builds, specify a semver (e.g., @v1.0.0) or commit ref (e.g., @f3ab5976b9ba4f9bac28b26271fca7d7)\n")
+	}
+
 	err = generator.GenerateProto(pkgBundle.Package)
 	if err != nil {
 		return fmt.Errorf("error generating proto: %w", err)

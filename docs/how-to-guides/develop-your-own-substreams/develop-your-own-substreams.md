@@ -6,6 +6,7 @@ These how-to guides walk through creating a Substreams that uses raw blockchain 
 
 Choose your ecosystem to get started:
 
+- [General](./generic/local-development/README.md) - Cross-chain topics including local development, Rust, Protobuf, and agent skills
 - [EVM](./evm/exploring-ethereum/exploring-ethereum.md)
 - [Solana](./solana/solana.md)
 - [Cosmos](./cosmos/injective/block-stats.md)

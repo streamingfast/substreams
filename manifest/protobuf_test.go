@@ -435,6 +435,11 @@ func TestDescriptorCache_IsDeterministicVersion(t *testing.T) {
 		{"main", false, "main branch should not be cached"},
 		{"develop", false, "develop branch should not be cached"},
 		{"master", false, "master branch should not be cached"},
+		{"f3ab5976b9ba4f9bac28b26271fca7d7", true, "buf commit reference (32 hex chars) should be cached"},
+		{"0000000000000000000000000000000a", true, "buf commit reference with zeros should be cached"},
+		{"f3ab5976b9ba4f9bac28b26271fca7d", false, "31 char hex string should not be cached"},
+		{"f3ab5976b9ba4f9bac28b26271fca7d7a", false, "33 char hex string should not be cached"},
+		{"F3AB5976B9BA4F9BAC28B26271FCA7D7", false, "uppercase hex should not be cached"},
 	}
 
 	for _, tt := range tests {

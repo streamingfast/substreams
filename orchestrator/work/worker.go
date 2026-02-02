@@ -302,7 +302,6 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 
 	span.SetAttributes(attribute.String("substreams.remote_hostname", remoteHostname))
 
-	var tier2SupportsStreamingMode bool
 	stats := reqctx.ReqStats(ctx)
 	for {
 		resp, err := stream.Recv()
@@ -332,7 +331,6 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 
 			case *pbssinternal.ProcessRangeResponse_Completed:
 				logger.Debug("worker done")
-				tier2SupportsStreamingMode = r.Completed.StreamingMode
 				stats.RecordBlocksProcessed(r.Completed.ProcessedBlocks) // add workers' processed blocks count to our own stats
 
 			case *pbssinternal.ProcessRangeResponse_BlockScopedData:
@@ -363,10 +361,6 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 
 		if err != nil {
 			if err == io.EOF {
-				if request.StreamOutput && !tier2SupportsStreamingMode {
-					return &Result{Error: fmt.Errorf("tier2 incompatible: it does not support streaming mode, operator should upgrade tier2 server")}
-				}
-
 				return &Result{}
 			}
 			if ctx.Err() != nil {

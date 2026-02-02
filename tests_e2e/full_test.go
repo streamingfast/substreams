@@ -11,6 +11,7 @@ import (
 	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/testcontainers/testcontainers-go"
 	"go.uber.org/zap"
 )
 
@@ -31,7 +32,7 @@ func TestDummyBlockchainContainer(t *testing.T) {
 	// launch dummy blockchain container
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, "ghcr.io/streamingfast/dummy-blockchain:v1.7.2", "", 1000)
 	require.NoError(t, err)
-	defer container.Terminate(ctx)
+	defer container.Terminate(ctx, testcontainers.StopTimeout(0))
 
 	zlog.Info("dummy blockchain container started", zap.String("tmp_dir", tmpDir))
 

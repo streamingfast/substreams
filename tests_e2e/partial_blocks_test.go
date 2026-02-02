@@ -12,6 +12,7 @@ import (
 	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/testcontainers/testcontainers-go"
 	"go.uber.org/zap"
 )
 
@@ -33,7 +34,7 @@ func TestPartialBlocksSimple(t *testing.T) {
 	t.Logf("Starting container with image: %s and burst %d", image, burst)
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, image, "--with-flash-blocks", burst)
 	require.NoError(t, err)
-	defer container.Terminate(ctx)
+	defer container.Terminate(ctx, testcontainers.StopTimeout(0))
 
 	// Log container details for debugging
 	if container != nil {
@@ -151,7 +152,7 @@ func TestPartialBlocksWithStores(t *testing.T) {
 	t.Logf("Starting container with image: %s and burst %d", image, burst)
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, image, "--with-flash-blocks", burst)
 	require.NoError(t, err)
-	defer container.Terminate(ctx)
+	defer container.Terminate(ctx, testcontainers.StopTimeout(0))
 
 	// Log container details for debugging
 	if container != nil {
@@ -351,7 +352,7 @@ func TestPartialBlocksReorgs(t *testing.T) {
 
 			ctx := context.Background()
 			// zlog := logging.MustCreateLoggerWithServiceName("partial-blocks-test")
-			zlog := zap.NewNop()
+			// zlog := zap.NewNop()
 
 			// Create temporary directory for volume mount
 			tmpDir, err := os.MkdirTemp("", "firehose-data-")
@@ -365,7 +366,7 @@ func TestPartialBlocksReorgs(t *testing.T) {
 			t.Logf("Starting container with image: %s and burst %d", image, burst)
 			container, err := newDummyBlockchainContainer(ctx, tmpDir, image, "--with-flash-blocks --with-skipped-blocks=false --with-reorgs --block-rate=220", burst)
 			require.NoError(t, err)
-			defer container.Terminate(ctx)
+			defer container.Terminate(ctx, testcontainers.StopTimeout(0))
 
 			// Log container details for debugging
 			if container != nil {
@@ -397,6 +398,14 @@ func TestPartialBlocksReorgs(t *testing.T) {
 				PartialBlocks:   tc.partialBlocks,
 			}
 
+			defer func() {
+				// ensure we close this well, for next tests
+				app.Shutdown(nil)
+				app2.Shutdown(nil)
+				<-app.Terminated()
+				<-app2.Terminated()
+			}()
+
 			// Run the request with custom handling for partial blocks
 			resps, err := RunRequestWithPartialBlocks(t, request, substreamsEndpoint, 300)
 			if err != nil && err != io.EOF && !errors.Is(err, context.Canceled) {
@@ -415,11 +424,6 @@ func TestPartialBlocksReorgs(t *testing.T) {
 			tc.assertFunc(t, allResponses)
 			require.NotNil(t, resps.SessionInit(), "Should have received at least one session")
 
-			// ensure we close this well, for next tests
-			app.Shutdown(nil)
-			app2.Shutdown(nil)
-			<-app.Terminated()
-			<-app2.Terminated()
 		})
 
 	}

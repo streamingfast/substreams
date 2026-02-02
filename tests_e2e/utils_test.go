@@ -2,7 +2,9 @@ package tests_e2e
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -99,8 +101,8 @@ func RunRequest(t *testing.T, req *pbsubstreamsrpcv2.Request, endpoint string) (
 		response, err = stream.Recv()
 		if err != nil {
 			t.Logf("Stream ended or error: %v", err)
-			if strings.Contains(err.Error(), "RST_STREAM") {
-				t.Logf("Error RST_STREAM in these tests usually means that the test panicked. Make sure that you run with `DLOG=info` (or similar) to see the server-side panic")
+			if strings.Contains(err.Error(), "RST_STREAM") || errors.Is(err, io.EOF) {
+				t.Logf("Error RST_STREAM or EOF in these tests usually means that the test panicked. Make sure that you run with `DLOG=info` (or similar) to see the server-side panic")
 			}
 			break
 		}

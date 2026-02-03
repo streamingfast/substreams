@@ -661,6 +661,7 @@ func (s *Tier1Service) BlocksAny(
 }
 
 func compressorsFromHeader(header http.Header) (out map[string]bool) {
+	out = make(map[string]bool)
 	for k, v := range header {
 		petitK := strings.ToLower(k)
 		if petitK == "grpc-accept-encoding" || petitK == "connect-accept-encoding" || petitK == "accept-encoding" {

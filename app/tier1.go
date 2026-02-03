@@ -8,7 +8,6 @@ import (
 	"os"
 	"time"
 
-	"connectrpc.com/connect"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/blockstream"
 	"github.com/streamingfast/bstream/hub"
@@ -21,7 +20,7 @@ import (
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metrics"
-	pbsubstreamsrpcv2connect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcv2connect"
+	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service"
 	"github.com/streamingfast/substreams/wasm"
@@ -281,7 +280,7 @@ func (a *Tier1App) Run() error {
 	})
 
 	go func() {
-		var infoServer pbsubstreamsrpcv2connect.EndpointInfoHandler
+		var infoServer pbsubstreamsrpcv2.EndpointInfoServer
 		if a.modules.InfoServer != nil {
 			a.logger.Info("waiting until info server is ready")
 			infoServer = &InfoServerWrapper{a.modules.InfoServer}
@@ -348,17 +347,17 @@ func (config *Tier1Config) Validate() error {
 	return nil
 }
 
-var _ pbsubstreamsrpcv2connect.EndpointInfoHandler = (*InfoServerWrapper)(nil)
+var _ pbsubstreamsrpcv2.EndpointInfoServer = (*InfoServerWrapper)(nil)
 
 type InfoServerWrapper struct {
-	rpcInfoServer InfoServer
+	rpcInfoServer pbsubstreamsrpcv2.EndpointInfoServer
 }
 
 // Info implements pbsubstreamsrpcconnect.EndpointInfoHandler.
-func (i *InfoServerWrapper) Info(ctx context.Context, req *connect.Request[pbfirehose.InfoRequest]) (*connect.Response[pbfirehose.InfoResponse], error) {
-	resp, err := i.rpcInfoServer.Info(ctx, req.Msg)
+func (i *InfoServerWrapper) Info(ctx context.Context, req *pbfirehose.InfoRequest) (*pbfirehose.InfoResponse, error) {
+	resp, err := i.rpcInfoServer.Info(ctx, req)
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(resp), nil
+	return resp, nil
 }

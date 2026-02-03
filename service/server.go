@@ -1,24 +1,20 @@
 package service
 
 import (
-	"context"
-	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
-	"connectrpc.com/connect"
-	compress "github.com/klauspost/connect-compress/v2"
+	_ "github.com/mostynb/go-grpc-compression/experimental/s2"
+	_ "github.com/mostynb/go-grpc-compression/lz4"
+	_ "github.com/mostynb/go-grpc-compression/zstd"
 	"github.com/streamingfast/dauth"
-	dauthconnect "github.com/streamingfast/dauth/middleware/connect"
 	dauthgrpc "github.com/streamingfast/dauth/middleware/grpc"
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
-	connectweb "github.com/streamingfast/dgrpc/server/connectrpc"
 	"github.com/streamingfast/dgrpc/server/factory"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
-	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcv2connect"
 	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
-	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3/pbsubstreamsrpcv3connect"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
@@ -43,95 +39,65 @@ func GetCommonServerOptions(listenAddr string, logger *zap.Logger, healthcheck d
 	return options
 }
 
-type streamHandlerV3 func(ctx context.Context, req *connect.Request[pbsubstreamsrpcv3.Request], stream *connect.ServerStream[pbsubstreamsrpc.Response]) error
+type v3Adapter struct {
+	*Tier1Service
+}
 
-func (h streamHandlerV3) Blocks(ctx context.Context, req *connect.Request[pbsubstreamsrpcv3.Request], stream *connect.ServerStream[pbsubstreamsrpc.Response]) error {
-	return h(ctx, req, stream)
+func (a *v3Adapter) Blocks(req *pbsubstreamsrpcv3.Request, srv pbsubstreamsrpcv3.Stream_BlocksServer) error {
+	return a.BlocksV3(req, srv)
 }
 
 func ListenTier1(
 	listenAddr string,
 	svc *Tier1Service,
-	infoService pbsubstreamsrpcv2connect.EndpointInfoHandler,
+	infoService pbsubstreamsrpc.EndpointInfoServer,
 	auth dauth.Authenticator,
 	logger *zap.Logger,
 	healthcheck dgrpcserver.HealthCheck,
 ) (err error) {
 
-	done := make(chan struct{})
-	var servers []*connectweb.ConnectWebServer
+	done := make(chan any)
+
+	var servers []dgrpcserver.Server
 	for _, addr := range strings.Split(listenAddr, ",") {
 		// note: some of these common options don't work with connectWeb
 		options := GetCommonServerOptions(addr, logger, healthcheck)
-
-		options = append(options, dgrpcserver.WithConnectInterceptor(dauthconnect.NewAuthInterceptor(auth, logger)))
-		options = append(options, dgrpcserver.WithConnectStrictContentType(false))
-		options = append(options, dgrpcserver.WithConnectReflection(pbsubstreamsrpcv2connect.StreamName))
-		options = append(options, dgrpcserver.WithConnectReflection(pbsubstreamsrpcv3connect.StreamName))
-		options = append(options, dgrpcserver.WithConnectReflection(pbsubstreamsrpcv3connect.StreamName))
-
-		//todo: move compression to dgrpc :-(
-
-		streamHandlerGetter := func(opts ...connect.HandlerOption) (string, http.Handler) {
-			var o []connect.HandlerOption
-			for _, opt := range opts {
-				o = append(o, opt)
-			}
-			o = append(o, compress.WithAll(compress.LevelBalanced))
-			return pbsubstreamsrpcv2connect.NewStreamHandler(svc, o...)
-		}
-
-		streamHandlerGetterV3 := func(opts ...connect.HandlerOption) (string, http.Handler) {
-			handler := streamHandlerV3(svc.BlocksV3)
-			var o []connect.HandlerOption
-			for _, opt := range opts {
-				o = append(o, opt)
-			}
-			o = append(o, compress.WithAll(compress.LevelBalanced))
-			return pbsubstreamsrpcv3connect.NewStreamHandler(handler, o...)
-		}
-
-		handlerGetters := []connectweb.HandlerGetter{streamHandlerGetter, streamHandlerGetterV3}
-
+		options = append(options, dgrpcserver.WithPostUnaryInterceptor(dauthgrpc.UnaryAuthChecker(auth, logger)))
+		options = append(options, dgrpcserver.WithPostStreamInterceptor(dauthgrpc.StreamAuthChecker(auth, logger)))
+		grpcServer := factory.ServerFromOptions(options...)
+		pbsubstreamsrpc.RegisterStreamServer(grpcServer.ServiceRegistrar(), svc)
+		pbsubstreamsrpcv3.RegisterStreamServer(grpcServer.ServiceRegistrar(), &v3Adapter{svc})
 		if infoService != nil {
-			infoHandlerGetter := func(opts ...connect.HandlerOption) (string, http.Handler) {
-
-				var o []connect.HandlerOption
-				for _, opt := range opts {
-					o = append(o, opt)
-				}
-				o = append(o, compress.WithAll(compress.LevelBalanced))
-				out, outh := pbsubstreamsrpcv2connect.NewEndpointInfoHandler(infoService, o...)
-				return out, outh
-			}
-			handlerGetters = append(handlerGetters, infoHandlerGetter)
+			pbsubstreamsrpc.RegisterEndpointInfoServer(grpcServer.ServiceRegistrar(), infoService)
 		}
-
-		options = append(options, dgrpcserver.WithConnectPermissiveCORS())
-		srv := connectweb.New(handlerGetters, options...)
 		svc.OnTerminating(func(err error) {
 			logger.Info("Tier1Service is terminating")
-			srv.Shutdown(err)
+			grpcServer.Shutdown(30 * time.Second)
 		})
-		servers = append(servers, srv)
 		cleanAddr := strings.ReplaceAll(addr, "*", "")
+		servers = append(servers, grpcServer)
 		go func() {
-			srv.Launch(cleanAddr)
-			done <- struct{}{}
+			grpcServer.Launch(cleanAddr)
+			close(done)
 		}()
 	}
 
 	<-done
 	for _, srv := range servers {
-		srv.Shutdown(nil)
+		srv.Shutdown(0)
 	}
 
-	for _, srv := range servers {
-		<-srv.Terminated()
-		if e := srv.Err(); e != nil {
-			err = e
-		}
-	}
+	//GRRRRRRRRRRRRRR
+	//GRRRRRRRRRRRRRR
+
+	//for _, srv := range servers {
+	//	<-srv.Terminated()
+	//	if e := srv.Err(); e != nil {
+	//		err = e
+	//	}
+	//}
+	//GRRRRRRRRRRRRRR
+	//GRRRRRRRRRRRRRR
 
 	return
 }
@@ -158,7 +124,7 @@ func ListenTier2(
 
 	svc.OnTerminating(func(err error) {
 		logger.Info("Tier2Service is terminating")
-		grpcServer.Shutdown(0)
+		grpcServer.Shutdown(30 * time.Second)
 	})
 
 	done := make(chan struct{})

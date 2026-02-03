@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -40,7 +41,6 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/plan"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
-	pbsubstreamsrpcv2connect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcv2connect"
 	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline"
@@ -56,7 +56,10 @@ import (
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -64,7 +67,6 @@ var errShuttingDown = errors.New("endpoint is shutting down, please reconnect")
 
 type Tier1Service struct {
 	*shutter.Shutter
-	pbsubstreamsrpcv2connect.UnimplementedStreamHandler
 	activeRequestsWG sync.WaitGroup
 
 	blockType             string
@@ -287,25 +289,39 @@ func NewTier1(
 	return s, nil
 }
 
-func (s *Tier1Service) BlocksV3(
-	ctx context.Context,
-	req *connect.Request[pbsubstreamsrpcv3.Request],
-	stream *connect.ServerStream[pbsubstreamsrpc.Response],
-) error {
-	r := req.Msg
-
-	_, err := manifest.ApplyPackageTransformations(r.Package, false, r.Network, r.OutputModule, r.Params)
-	if err != nil {
-		return err
+func metadataToHeader(ctx context.Context) http.Header {
+	md, _ := metadata.FromIncomingContext(ctx)
+	h := http.Header{}
+	for k, vvs := range md {
+		hk := http.CanonicalHeaderKey(k)
+		for _, vv := range vvs {
+			h.Add(hk, vv)
+		}
 	}
+	return h
+}
 
-	ctx = reqctx.WithSpkg(ctx, r.Package) // passing by context is simpler for now, this could be cleaned up
-	reqV2, err := r.ToV2()
+func (s *Tier1Service) Blocks(req *pbsubstreamsrpc.Request, srv pbsubstreamsrpc.Stream_BlocksServer) error {
+	ctx := srv.Context()
+	header := metadataToHeader(ctx)
+	protocol := "/sf.substreams.rpc.v2.Stream/Blocks"
+	return s.BlocksAny(ctx, req, header, protocol, nil, srv)
+}
+
+func (s *Tier1Service) BlocksV3(req *pbsubstreamsrpcv3.Request, srv pbsubstreamsrpcv3.Stream_BlocksServer) error {
+	_, err := manifest.ApplyPackageTransformations(req.Package, false, req.Network, req.OutputModule, req.Params)
 	if err != nil {
-		return fmt.Errorf("failed to convert request to v2: %w", err)
+		return status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-
-	return s.BlocksAny(ctx, reqV2, req.Header(), "/sf.substreams.rpc.v3.Stream/Blocks", r.Package, stream)
+	ctx := srv.Context()
+	ctx = reqctx.WithSpkg(ctx, req.Package)
+	v2req, err := req.ToV2()
+	if err != nil {
+		return status.Errorf(codes.InvalidArgument, "failed to convert request to v2: %s", err)
+	}
+	header := metadataToHeader(ctx)
+	protocol := "/sf.substreams.rpc.v3.Stream/Blocks"
+	return s.BlocksAny(ctx, v2req, header, protocol, req.Package, srv)
 }
 
 type usedStore struct {
@@ -331,27 +347,46 @@ func (s *UsedFoundationalStore) MarshalLogObject(e zapcore.ObjectEncoder) error 
 	return nil
 }
 
-func (s *Tier1Service) Blocks(
-	ctx context.Context,
-	req *connect.Request[pbsubstreamsrpc.Request],
-	stream *connect.ServerStream[pbsubstreamsrpc.Response],
-) (serverErr error) {
-	return s.BlocksAny(ctx, req.Msg, req.Header(), "/sf.substreams.rpc.v2.Stream/Blocks", nil, stream)
-}
-
 func (s *Tier1Service) BlocksAny(
 	ctx context.Context,
 	request *pbsubstreamsrpc.Request,
 	header http.Header,
 	protocol string,
 	pkg *pbsubstreams.Package,
-	stream *connect.ServerStream[pbsubstreamsrpc.Response],
+	stream grpc.ServerStream,
 ) (serverErr error) {
-
 	if s.IsTerminating() {
 		serverErr = connect.NewError(connect.CodeUnavailable, errShuttingDown)
 		return
 	}
+
+	supportedCompressors, e := grpc.ClientSupportedCompressors(stream.Context())
+	if e != nil {
+		return fmt.Errorf("getting supported compressors: %w", e)
+	}
+
+	fmt.Println("-----------------------------------------------")
+	fmt.Println("-----------------------------------------------")
+	fmt.Println("supported compressors:", supportedCompressors)
+	fmt.Println("-----------------------------------------------")
+	fmt.Println("-----------------------------------------------")
+
+	compressionHeaderValue := "none"
+	switch {
+	case slices.Contains(supportedCompressors, "s2"):
+		compressionHeaderValue = "s2"
+	case slices.Contains(supportedCompressors, "gzip"):
+		compressionHeaderValue = "gzip"
+	case slices.Contains(supportedCompressors, "zstd"):
+		compressionHeaderValue = "zstd"
+	case slices.Contains(supportedCompressors, "lz4"):
+		compressionHeaderValue = "lz4"
+	}
+	e = stream.SetHeader(metadata.Pairs("grpc-encoding", compressionHeaderValue))
+	if e != nil {
+		return fmt.Errorf("setting header: %w", e)
+	}
+
 	s.activeRequestsWG.Add(1)
 	defer func() {
 		if reason, countAsRejected := metrics.IsRejectedRequestError(serverErr); countAsRejected {
@@ -1088,7 +1123,7 @@ func configureLiveBackFillerFromQuickload(ctx context.Context, segmentSize uint6
 	return nil
 }
 
-func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logger, streamSrv *connect.ServerStream[pbsubstreamsrpc.Response], noop bool, stats *metrics.Stats, debugOutputForModules []string) substreams.ResponseFunc {
+func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logger, streamSrv grpc.ServerStream, noop bool, stats *metrics.Stats, debugOutputForModules []string) substreams.ResponseFunc {
 	auth := dauth.FromContext(ctx)
 	organizationID := auth.OrganizationID()
 	apiKeyID := auth.APIKeyID()
@@ -1112,6 +1147,7 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 		}
 	}
 
+	//var buffer []*pbsubstreamsrpc.BlockScopedData
 	return func(respAny substreams.ResponseFromAnyTier) error {
 		resp := respAny.(*pbsubstreamsrpc.Response)
 		mut.Lock()
@@ -1153,7 +1189,7 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 		egressBytes := proto.Size(resp)
 
 		begin := time.Now()
-		if err := streamSrv.Send(resp); err != nil {
+		if err := streamSrv.SendMsg(resp); err != nil {
 			logger.Info("unable to send block probably due to client disconnecting", zap.String("user_id", organizationID), zap.String("api_key_id", apiKeyID), zap.Error(err))
 			return connect.NewError(connect.CodeUnavailable, err)
 		}

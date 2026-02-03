@@ -437,7 +437,6 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 			}
 			logger.Warn("receiving new block with an active partial state, but previousLastPartialBlock is not the same as the current block. Undoing partial state",
 				zap.String("previous last partial", prevLastPartial), zap.Stringer("current new block", clock))
-			fmt.Println("sending from 444", cursor.Block.String(), p.previousLastPartialBlock.String(), p.partialProcessingState.num)
 			if err := p.undoPartialStates(cursor, true); err != nil {
 				return fmt.Errorf("failed to undo partial states: %w", err)
 			}

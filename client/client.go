@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/dustin/go-humanize"
+	"github.com/mostynb/go-grpc-compression/experimental/s2"
 	_ "github.com/mostynb/go-grpc-compression/experimental/s2"
-	_ "github.com/mostynb/go-grpc-compression/lz4"
 	"github.com/streamingfast/dgrpc"
 	networks "github.com/streamingfast/firehose-networks"
 	"github.com/streamingfast/logging/zapx"
@@ -25,7 +25,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/credentials/oauth"
 	xdscreds "google.golang.org/grpc/credentials/xds"
-	"google.golang.org/grpc/encoding/gzip"
 	_ "google.golang.org/grpc/encoding/gzip"
 	stats "google.golang.org/grpc/stats"
 	_ "google.golang.org/grpc/xds"
@@ -426,22 +425,7 @@ func newConnection(config *SubstreamsClientConfig) (conn *grpc.ClientConn, close
 
 	sizeHandler := &sizeLoggingHandler{}
 	dialOptions = append(dialOptions, grpc.WithStatsHandler(sizeHandler))
-	dialOptions = append(dialOptions, grpc.WithDefaultCallOptions(grpc.UseCompressor(gzip.Name)))
-
-	//compressor := strings.ToLower(os.Getenv("GRPC_COMPRESSOR"))
-	//switch compressor {
-	//case "lz4":
-	//	dialOptions = append(dialOptions, grpc.WithDefaultCallOptions(grpc.UseCompressor(lz4.Name)))
-	//case "s2":
-	//	dialOptions = append(dialOptions, grpc.WithDefaultCallOptions(grpc.UseCompressor(s2.Name)))
-	//case "zstd":
-	//	dialOptions = append(dialOptions, grpc.WithDefaultCallOptions(grpc.UseCompressor(zstd.Name)))
-	//case "gzip":
-	//case "none":
-	//	dialOptions = append(dialOptions, grpc.WithCompressor(nil))
-	//default:
-	//	dialOptions = append(dialOptions, grpc.WithDefaultCallOptions(grpc.UseCompressor(s2.Name)))
-	//}
+	dialOptions = append(dialOptions, grpc.WithDefaultCallOptions(grpc.UseCompressor(s2.Name)))
 
 	dialOptions = append(dialOptions, grpc.WithUserAgent(config.agent))
 

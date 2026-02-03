@@ -1,0 +1,6 @@
+version: v2
+modules:
+  - path: proto
+deps:
+  - buf.build/streamingfast/firehose-ethereum
+  - buf.build/streamingfast/firehose-solana

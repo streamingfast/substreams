@@ -1,0 +1,74 @@
+specVersion: v0.1.0
+package:
+  name: allocator_bench
+  version: v1.0.0
+
+protobuf:
+  files:
+    - bench.proto
+  importPaths:
+    - ./proto
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: ./target/wasm32-unknown-unknown/release/substreams.wasm
+
+modules:
+  # Ethereum benchmarks
+  - name: bench_decode_only_ethereum
+    kind: map
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+    output:
+      type: proto:bench.BenchOutput
+
+  - name: bench_small_allocs_ethereum
+    kind: map
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+    output:
+      type: proto:bench.BenchOutput
+
+  - name: bench_large_allocs_ethereum
+    kind: map
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+    output:
+      type: proto:bench.BenchOutput
+
+  - name: bench_mixed_ethereum
+    kind: map
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+    output:
+      type: proto:bench.LargeOutput
+
+  # Solana benchmarks
+  - name: bench_decode_only_solana
+    kind: map
+    inputs:
+      - source: sf.solana.type.v1.Block
+    output:
+      type: proto:bench.BenchOutput
+
+  - name: bench_small_allocs_solana
+    kind: map
+    inputs:
+      - source: sf.solana.type.v1.Block
+    output:
+      type: proto:bench.BenchOutput
+
+  - name: bench_large_allocs_solana
+    kind: map
+    inputs:
+      - source: sf.solana.type.v1.Block
+    output:
+      type: proto:bench.BenchOutput
+
+  - name: bench_mixed_solana
+    kind: map
+    inputs:
+      - source: sf.solana.type.v1.Block
+    output:
+      type: proto:bench.LargeOutput

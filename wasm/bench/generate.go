@@ -15,11 +15,14 @@ import (
 )
 
 //go:generate go run . mainnet.eth.streamingfast.io:443 16021772 testdata/ethereum_mainnet_block_16021772.binpb
+//go:generate go run . mainnet.sol.streamingfast.io:443 396976773 testdata/solana_mainnet_block_396976773.binpb
+//go:generate go run . bnb.streamingfast.io:443 78347457 testdata/bnb_mainnet_block_78347457.binpb
+//go:generate go run . polygon.streamingfast.io:443 82340855 testdata/polygon_mainnet_block_82340855.binpb
 
-// usage: SF_API_TOKEN=<token> go run main.go <endpoint> <block_number> <output>
+// usage: SUBSTREAMS_API_TOKEN=<token> go run main.go <endpoint> <block_number> <output>
 func main() {
-	jwt := os.Getenv("SF_API_TOKEN")
-	cli.Ensure(jwt != "", "SF_API_TOKEN env variable must be set")
+	jwt := os.Getenv("SUBSTREAMS_API_TOKEN")
+	cli.Ensure(jwt != "", "SUBSTREAMS_API_TOKEN env variable must be set")
 
 	endpoint := os.Args[1]
 	blockNum, err := strconv.ParseUint(os.Args[2], 0, 64)

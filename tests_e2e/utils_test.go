@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types/container"
+	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dauth"
 	dauthnull "github.com/streamingfast/dauth/null"
 	dauthtrust "github.com/streamingfast/dauth/trust"
@@ -86,7 +87,7 @@ func RunRequest(t *testing.T, req *pbsubstreamsrpcv2.Request, endpoint string) (
 	streamClient := pbsubstreamsrpcv2.NewStreamClient(conn)
 
 	// Make the streaming call
-	stream, err := streamClient.Blocks(ctx, req, callOpts...)
+	blockStream, err := streamClient.Blocks(ctx, req, callOpts...)
 	if err != nil {
 		t.Logf("Error making streaming call: %v", err)
 		require.NoError(t, err)
@@ -98,11 +99,15 @@ func RunRequest(t *testing.T, req *pbsubstreamsrpcv2.Request, endpoint string) (
 
 	for {
 		var response *pbsubstreamsrpcv2.Response
-		response, err = stream.Recv()
+		response, err = blockStream.Recv()
 		if err != nil {
-			t.Logf("Stream ended or error: %v", err)
-			if strings.Contains(err.Error(), "RST_STREAM") || errors.Is(err, io.EOF) {
-				t.Logf("Error RST_STREAM or EOF in these tests usually means that the test panicked. Make sure that you run with `DLOG=info` (or similar) to see the server-side panic")
+			if errors.Is(err, stream.ErrStopBlockReached) || errors.Is(err, io.EOF) {
+				t.Logf("Reached stop block or EOF: %v", err)
+				err = nil
+			} else if strings.Contains(err.Error(), "RST_STREAM") {
+				t.Logf("Error RST_STREAM in these tests usually means that the test panicked. Make sure that you run with `DLOG=info` (or similar) to see the server-side panic")
+			} else {
+				t.Logf("Unknown error: %v", err)
 			}
 			break
 		}
@@ -383,7 +388,7 @@ func RunRequestWithPartialBlocks(t *testing.T, req *pbsubstreamsrpcv2.Request, e
 	streamClient := pbsubstreamsrpcv2.NewStreamClient(conn)
 
 	// Make the streaming call
-	stream, err := streamClient.Blocks(ctx, req, callOpts...)
+	blockStream, err := streamClient.Blocks(ctx, req, callOpts...)
 	if err != nil {
 		t.Logf("Error making streaming call: %v", err)
 		require.NoError(t, err)
@@ -392,9 +397,16 @@ func RunRequestWithPartialBlocks(t *testing.T, req *pbsubstreamsrpcv2.Request, e
 
 	for {
 		var response *pbsubstreamsrpcv2.Response
-		response, err = stream.Recv()
+		response, err = blockStream.Recv()
 		if err != nil {
-			t.Logf("Stream ended or error: %v", err)
+			t.Logf("Stream ended with error: %v", err)
+			if strings.Contains(err.Error(), "RST_STREAM") {
+				t.Logf("Error RST_STREAM in these tests usually means that the test panicked. Make sure that you run with `DLOG=info` (or similar) to see the server-side panic")
+			}
+			if errors.Is(err, stream.ErrStopBlockReached) || errors.Is(err, io.EOF) {
+				t.Logf("Reached stop block or EOF")
+				err = nil
+			}
 			break
 		}
 		require.NotNil(t, response)

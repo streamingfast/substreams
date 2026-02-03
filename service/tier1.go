@@ -1052,7 +1052,6 @@ func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelC
 
 	span.EndWithErr(&streamErr)
 
-	fmt.Println("RETURNING STREAM TERMINATED", streamErr)
 	return pipe.OnStreamTerminated(ctx, streamErr)
 }
 

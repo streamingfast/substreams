@@ -127,7 +127,7 @@ func TestDummyBlockchainContainer(t *testing.T) {
 
 			// Run the request
 			blockScopedDataSlice, session, err := RunRequest(t, request, substreamsEndpoint)
-			if err != io.EOF {
+			if err != nil && err != io.EOF {
 				// Let's try to get container logs to debug
 				logs, logErr := container.Logs(ctx)
 				if logErr == nil {
@@ -136,7 +136,7 @@ func TestDummyBlockchainContainer(t *testing.T) {
 					n, _ := logs.Read(buf)
 					t.Logf("Container logs: %s", string(buf[:n]))
 				}
-				t.Fatalf("Unexpected error: %s", err)
+				t.Fatalf("Unexpected error: %s", err.Error())
 			}
 
 			require.NotNil(t, session, "Should have received at least one session")

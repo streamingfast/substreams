@@ -45,6 +45,7 @@ func (f *ForkHandler) handleUndo(
 		for _, h := range f.undoHandlers {
 			h(clock, moduleOutputs)
 		}
+		delete(f.reversibleOutputs, clock.Id)
 	}
 	return nil
 }

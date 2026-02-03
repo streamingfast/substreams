@@ -133,8 +133,8 @@ func (p *Pipeline) processBlock(
 	case bstream.StepUndoPartial:
 		if reqctx.PartialBlocks(ctx) {
 			p.blockStepMap[bstream.StepUndoPartial]++
-			if err := p.handleStepUndo(clock, cursor, reorgJunctionBlock); err != nil {
-				return fmt.Errorf("step undo partial: %w", err)
+			if err := p.undoPartialStates(cursor, true); err != nil {
+				return err
 			}
 		}
 

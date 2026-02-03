@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"os"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -376,23 +375,25 @@ func (s *Tier1Service) BlocksAny(
 	fmt.Println("-----------------------------------------------")
 	fmt.Println("-----------------------------------------------")
 
+	compressors := compressorsFromHeader(header)
+
 	switch {
-	case slices.Contains(supportedCompressors, "s2"):
+	case compressors["s2"]:
 		fmt.Println("Grrrrrr: Setting s2 compressor")
 		if e := grpc.SetSendCompressor(ctx, s2.Name); e != nil {
 			return fmt.Errorf("setting s2 compressor: %w", e)
 		}
-	case slices.Contains(supportedCompressors, "gzip"):
+	case compressors["gzip"]:
 		fmt.Println("Grrrrrr: Setting gzip compressor")
 		if e := grpc.SetSendCompressor(ctx, gzip.Name); e != nil {
 			return fmt.Errorf("setting gzip compressor: %w", e)
 		}
-	case slices.Contains(supportedCompressors, "zstd"):
+	case compressors["zstd"]:
 		fmt.Println("Grrrrrr: Setting zstd compressor")
 		if e := grpc.SetSendCompressor(ctx, zstd.Name); e != nil {
 			return fmt.Errorf("setting zstd compressor: %w", e)
 		}
-	case slices.Contains(supportedCompressors, "lz4"):
+	case compressors["lz4"]:
 		fmt.Println("Grrrrrr: Setting lz4 compressor")
 		if e := grpc.SetSendCompressor(ctx, lz4.Name); e != nil {
 			return fmt.Errorf("setting lz4 compressor: %w", e)
@@ -657,6 +658,20 @@ func (s *Tier1Service) BlocksAny(
 	}
 	logger.Debug("Blocks request completed without error")
 	return nil
+}
+
+func compressorsFromHeader(header http.Header) (out map[string]bool) {
+	for k, v := range header {
+		petitK := strings.ToLower(k)
+		if petitK == "grpc-accept-encoding" || petitK == "connect-accept-encoding" || petitK == "accept-encoding" {
+			for _, vv := range v {
+				for _, vvv := range strings.Split(vv, ",") {
+					out[strings.ToLower(vvv)] = true
+				}
+			}
+		}
+	}
+	return
 }
 
 // writePackage writes the spkg to the module cache if it doesn't exist:

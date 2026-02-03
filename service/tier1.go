@@ -18,6 +18,9 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/mostynb/go-grpc-compression/experimental/s2"
+	"github.com/mostynb/go-grpc-compression/lz4"
+	"github.com/mostynb/go-grpc-compression/zstd"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/hub"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
@@ -58,6 +61,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/encoding/gzip"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -368,23 +372,31 @@ func (s *Tier1Service) BlocksAny(
 	fmt.Println("-----------------------------------------------")
 	fmt.Println("-----------------------------------------------")
 	fmt.Println("supported compressors:", supportedCompressors)
+	fmt.Println("headers:", header)
 	fmt.Println("-----------------------------------------------")
 	fmt.Println("-----------------------------------------------")
 
-	compressionHeaderValue := "none"
 	switch {
 	case slices.Contains(supportedCompressors, "s2"):
-		compressionHeaderValue = "s2"
+		fmt.Println("Grrrrrr: Setting s2 compressor")
+		if e := grpc.SetSendCompressor(ctx, s2.Name); e != nil {
+			return fmt.Errorf("setting s2 compressor: %w", e)
+		}
 	case slices.Contains(supportedCompressors, "gzip"):
-		compressionHeaderValue = "gzip"
+		fmt.Println("Grrrrrr: Setting gzip compressor")
+		if e := grpc.SetSendCompressor(ctx, gzip.Name); e != nil {
+			return fmt.Errorf("setting gzip compressor: %w", e)
+		}
 	case slices.Contains(supportedCompressors, "zstd"):
-		compressionHeaderValue = "zstd"
+		fmt.Println("Grrrrrr: Setting zstd compressor")
+		if e := grpc.SetSendCompressor(ctx, zstd.Name); e != nil {
+			return fmt.Errorf("setting zstd compressor: %w", e)
+		}
 	case slices.Contains(supportedCompressors, "lz4"):
-		compressionHeaderValue = "lz4"
-	}
-	e = stream.SetHeader(metadata.Pairs("grpc-encoding", compressionHeaderValue))
-	if e != nil {
-		return fmt.Errorf("setting header: %w", e)
+		fmt.Println("Grrrrrr: Setting lz4 compressor")
+		if e := grpc.SetSendCompressor(ctx, lz4.Name); e != nil {
+			return fmt.Errorf("setting lz4 compressor: %w", e)
+		}
 	}
 
 	s.activeRequestsWG.Add(1)

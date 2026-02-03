@@ -482,6 +482,9 @@ func (s *Sinker) doRequest(
 	s.Logger.Debug("launching substreams request", zap.Int64("start_block", req.StartBlockNum), zap.Stringer("cursor", activeCursor))
 	receivedDataMessage := false
 
+	//md := metadata.Pairs("grpc-accept-encoding", "s2,identity")
+	//ctx = metadata.NewOutgoingContext(ctx, md)
+
 	var stream grpc.ServerStreamingClient[pbsubstreamsrpc.Response]
 	var err error
 

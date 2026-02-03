@@ -6,7 +6,8 @@ import (
 	"net/url"
 	"strings"
 
-	connect_go "connectrpc.com/connect"
+	"connectrpc.com/connect"
+	compress "github.com/klauspost/connect-compress/v2"
 	"github.com/streamingfast/dauth"
 	dauthconnect "github.com/streamingfast/dauth/middleware/connect"
 	dauthgrpc "github.com/streamingfast/dauth/middleware/grpc"
@@ -15,9 +16,9 @@ import (
 	"github.com/streamingfast/dgrpc/server/factory"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
-	pbsubstreamsrpcv2connect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcv2connect"
+	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcv2connect"
 	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
-	pbsubstreamsrpcv3connect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3/pbsubstreamsrpcv3connect"
+	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3/pbsubstreamsrpcv3connect"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
@@ -42,9 +43,9 @@ func GetCommonServerOptions(listenAddr string, logger *zap.Logger, healthcheck d
 	return options
 }
 
-type streamHandlerV3 func(ctx context.Context, req *connect_go.Request[pbsubstreamsrpcv3.Request], stream *connect_go.ServerStream[pbsubstreamsrpc.Response]) error
+type streamHandlerV3 func(ctx context.Context, req *connect.Request[pbsubstreamsrpcv3.Request], stream *connect.ServerStream[pbsubstreamsrpc.Response]) error
 
-func (h streamHandlerV3) Blocks(ctx context.Context, req *connect_go.Request[pbsubstreamsrpcv3.Request], stream *connect_go.ServerStream[pbsubstreamsrpc.Response]) error {
+func (h streamHandlerV3) Blocks(ctx context.Context, req *connect.Request[pbsubstreamsrpcv3.Request], stream *connect.ServerStream[pbsubstreamsrpc.Response]) error {
 	return h(ctx, req, stream)
 }
 
@@ -67,21 +68,40 @@ func ListenTier1(
 		options = append(options, dgrpcserver.WithConnectStrictContentType(false))
 		options = append(options, dgrpcserver.WithConnectReflection(pbsubstreamsrpcv2connect.StreamName))
 		options = append(options, dgrpcserver.WithConnectReflection(pbsubstreamsrpcv3connect.StreamName))
+		options = append(options, dgrpcserver.WithConnectReflection(pbsubstreamsrpcv3connect.StreamName))
 
-		streamHandlerGetter := func(opts ...connect_go.HandlerOption) (string, http.Handler) {
-			return pbsubstreamsrpcv2connect.NewStreamHandler(svc, opts...)
+		//todo: move compression to dgrpc :-(
+
+		streamHandlerGetter := func(opts ...connect.HandlerOption) (string, http.Handler) {
+			var o []connect.HandlerOption
+			for _, opt := range opts {
+				o = append(o, opt)
+			}
+			o = append(o, compress.WithAll(compress.LevelBalanced))
+			return pbsubstreamsrpcv2connect.NewStreamHandler(svc, o...)
 		}
 
-		streamHandlerGetterV3 := func(opts ...connect_go.HandlerOption) (string, http.Handler) {
+		streamHandlerGetterV3 := func(opts ...connect.HandlerOption) (string, http.Handler) {
 			handler := streamHandlerV3(svc.BlocksV3)
-			return pbsubstreamsrpcv3connect.NewStreamHandler(handler, opts...)
+			var o []connect.HandlerOption
+			for _, opt := range opts {
+				o = append(o, opt)
+			}
+			o = append(o, compress.WithAll(compress.LevelBalanced))
+			return pbsubstreamsrpcv3connect.NewStreamHandler(handler, o...)
 		}
 
 		handlerGetters := []connectweb.HandlerGetter{streamHandlerGetter, streamHandlerGetterV3}
 
 		if infoService != nil {
-			infoHandlerGetter := func(opts ...connect_go.HandlerOption) (string, http.Handler) {
-				out, outh := pbsubstreamsrpcv2connect.NewEndpointInfoHandler(infoService, opts...)
+			infoHandlerGetter := func(opts ...connect.HandlerOption) (string, http.Handler) {
+
+				var o []connect.HandlerOption
+				for _, opt := range opts {
+					o = append(o, opt)
+				}
+				o = append(o, compress.WithAll(compress.LevelBalanced))
+				out, outh := pbsubstreamsrpcv2connect.NewEndpointInfoHandler(infoService, o...)
 				return out, outh
 			}
 			handlerGetters = append(handlerGetters, infoHandlerGetter)

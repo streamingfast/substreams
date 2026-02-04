@@ -58,7 +58,7 @@ func (p *Pipeline) ProcessFromExecOutput(
 		return fmt.Errorf("setting up exec output: %w", err)
 	}
 
-	if err = p.processBlock(ctx, execOutput, clock, cursor, bstream.StepNewIrreversible, nil, 0); err != nil {
+	if err = p.processBlock(ctx, execOutput, clock, cursor, bstream.StepNewIrreversible, nil, 0, false); err != nil {
 		return err
 	}
 
@@ -86,7 +86,7 @@ func (p *Pipeline) ProcessBlock(block *pbbstream.Block, obj interface{}) (err er
 		return fmt.Errorf("setting up exec output: %w", err)
 	}
 
-	if err = p.processBlock(ctx, execOutput, clock, cursor, step, reorgJunctionBlock, block.PartialIndex); err != nil {
+	if err = p.processBlock(ctx, execOutput, clock, cursor, step, reorgJunctionBlock, block.PartialIndex, block.LastPartial); err != nil {
 		return err // watch out, io.EOF needs to go through undecorated
 	}
 
@@ -117,18 +117,30 @@ func (p *Pipeline) processBlock(
 	step bstream.StepType,
 	reorgJunctionBlock bstream.BlockRef,
 	partialIndex int32,
+	isLastPartial bool,
 ) (err error) {
 	var eof bool
 
 	switch step {
 	case bstream.StepPartial:
-		if reqctx.PartialBlocks(ctx) { // this also covers 'partialBlocksOnly'
-			p.handleStepPartial(ctx, clock, cursor, execOutput, partialIndex, false)
+		p.blockStepMap[bstream.StepPartial]++
+		if reqctx.PartialBlocks(ctx) {
+			if err := p.handleStepPartial(ctx, clock, cursor, execOutput, partialIndex, isLastPartial); err != nil {
+				return fmt.Errorf("step partial: %w", err)
+			}
+		}
+
+	case bstream.StepUndoPartial:
+		if reqctx.PartialBlocks(ctx) {
+			p.blockStepMap[bstream.StepUndoPartial]++
+			if err := p.handleStepUndoPartial(cursor); err != nil {
+				return err
+			}
 		}
 
 	case bstream.StepUndo:
 		p.blockStepMap[bstream.StepUndo]++
-		if err = p.handleStepUndo(clock, cursor, reorgJunctionBlock); err != nil {
+		if err := p.handleStepUndo(clock, cursor, reorgJunctionBlock); err != nil {
 			return fmt.Errorf("step undo: %w", err)
 		}
 	case bstream.StepStalled:
@@ -144,11 +156,12 @@ func (p *Pipeline) processBlock(
 		dmetering.GetBytesMeter(ctx).AddBytesRead(execOutput.Len())
 
 		err = p.handleStepNew(ctx, clock, cursor, execOutput, false)
-		if err != nil && err != io.EOF {
-			return err
-		}
-		if err == io.EOF {
-			eof = true
+		if err != nil {
+			if err == io.EOF {
+				eof = true
+			} else {
+				return err
+			}
 		}
 	case bstream.StepNewIrreversible:
 		p.blockStepMap[bstream.StepNewIrreversible]++
@@ -194,25 +207,26 @@ func (p *Pipeline) handleStepStalled(clock *pbsubstreams.Clock) error {
 	return nil
 }
 
+// undoPartialStates reverts all partial states from stores in reverse order.
+// It clears the partial processing state but does NOT send any undo signal to the user.
 func (p *Pipeline) undoPartialStates() error {
 	if p.partialProcessingState == nil {
 		return nil
 	}
+
 	for i := len(p.partialProcessingState.processedPartials) - 1; i >= 0; i-- {
 		clk := p.partialProcessingState.processedPartials[i]
 		if err := p.forkHandler.handleUndo(clk); err != nil {
 			return fmt.Errorf("reverting outputs: %w", err)
 		}
 	}
+
 	p.partialProcessingState = nil
 	return nil
 }
 
-func (p *Pipeline) handleStepUndo(clock *pbsubstreams.Clock, cursor *bstream.Cursor, reorgJunctionBlock bstream.BlockRef) error {
-	if err := p.undoPartialStates(); err != nil {
-		return err
-	}
-
+// handleUndo reverts a block's outputs and sends an undo signal to the user.
+func (p *Pipeline) handleUndo(clock *pbsubstreams.Clock, cursor *bstream.Cursor, reorgJunctionBlock bstream.BlockRef) error {
 	if err := p.forkHandler.handleUndo(clock); err != nil {
 		return fmt.Errorf("reverting outputs: %w", err)
 	}
@@ -244,6 +258,43 @@ func (p *Pipeline) handleStepUndo(clock *pbsubstreams.Clock, cursor *bstream.Cur
 		})
 }
 
+// handleStepUndo handles a regular undo step: undoes any pending partial states,
+// then reverts the block and sends an undo signal to the user.
+func (p *Pipeline) handleStepUndo(clock *pbsubstreams.Clock, cursor *bstream.Cursor, reorgJunctionBlock bstream.BlockRef) error {
+	if err := p.undoPartialStates(); err != nil {
+		return err
+	}
+	return p.handleUndo(clock, cursor, reorgJunctionBlock)
+}
+
+// handleStepUndoPartial handles an undo specifically for partial blocks.
+// It undoes partial states and sends an undo signal to the user.
+func (p *Pipeline) handleStepUndoPartial(cursor *bstream.Cursor) error {
+	if p.partialProcessingState == nil {
+		return nil
+	}
+
+	clock := &pbsubstreams.Clock{
+		Id:     p.partialProcessingState.lastBlockID,
+		Number: p.partialProcessingState.num,
+	}
+
+	targetCursor := &bstream.Cursor{
+		Step:      bstream.StepUndo,
+		Block:     cursor.Block,
+		HeadBlock: cursor.HeadBlock,
+		LIB:       cursor.LIB,
+	}
+
+	reorgJunctionBlock := p.partialProcessingState.previousBlockRef
+
+	if err := p.undoPartialStates(); err != nil {
+		return err
+	}
+
+	return p.handleUndo(clock, targetCursor, reorgJunctionBlock)
+}
+
 func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
 	p.lastFinalClock = clock
 	p.insideReorgUpTo = nil
@@ -260,43 +311,26 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 			return nil // same hash: nothing new to process. We only send this 'empty' partial block if it is the last
 		}
 		if clock.Number == p.partialProcessingState.num {
+			// new partial for same block number: normal behavior
 			p.partialProcessingState.highestIndex = idx
 		} else {
-			reqctx.Logger(ctx).Warn("received partials from different block numbers consecutively (without step_New or step_Undo) -- this should not happen unless you are running a chain with partial blocks AND skipped blocks", zap.Uint64("received", clock.Number), zap.Uint64("expected", p.partialProcessingState.num))
-			p.partialProcessingState = newPartialProcessingState(clock.Number, clock.Id, idx)
+			reqctx.Logger(ctx).Warn("received partial after another non-last partial with different block numbers (without step_Undo) -- this should not happen unless you are running a chain with partial blocks AND skipped blocks", zap.Uint64("received", clock.Number), zap.Uint64("expected", p.partialProcessingState.num))
+			if err := p.handleStepUndoPartial(cursor); err != nil {
+				return err
+			}
+			// now that we have undone previous partials, we start a new one
+			p.partialProcessingState = newPartialProcessingState(clock.Number, clock.Id, idx, cursor.HeadBlock) //on StepPartial, the cursor.headBlock is the parent of the partial
 		}
 	} else {
-		p.partialProcessingState = newPartialProcessingState(clock.Number, clock.Id, idx)
+		p.partialProcessingState = newPartialProcessingState(clock.Number, clock.Id, idx, cursor.HeadBlock)
 	}
 
 	txCount, txsHash, err := splitPartialblock(execOutput, p.blockType, p.partialProcessingState.processedTransactionsCount, p.partialProcessingState.processedTransactionsHash)
 	if err != nil {
-		// This is the case where you received partials for block 36, but then you receive a different real block 36: we will undo the previous 36 up to its parent (35), then send handle this new 36 partial.
-		if errors.Is(err, errHashMismatch) {
-			if err := p.handleStepUndo(&pbsubstreams.Clock{
-				Id:     p.partialProcessingState.lastBlockID,
-				Number: p.partialProcessingState.num,
-			}, &bstream.Cursor{
-				Step:      bstream.StepUndo,
-				Block:     bstream.NewBlockRef(p.partialProcessingState.lastBlockID, p.partialProcessingState.num),
-				HeadBlock: bstream.NewBlockRef(p.partialProcessingState.lastBlockID, p.partialProcessingState.num),
-				LIB:       cursor.LIB,
-			},
-				cursor.HeadBlock, // this is the parent block of the partial
-			); err != nil {
-				return err
-			}
-
-			p.partialProcessingState = nil
-			return p.handleStepPartial(ctx, clock, cursor, execOutput, idx, isLast) // call handleStepPartial again, now that undo was performed and we have the new version of the block
-		} else {
-			return err
-		}
+		// an error occurred, partial blocks do not contain what they should...
+		return err
 	}
-	p.partialProcessingState.processedTransactionsHash = txsHash
-	p.partialProcessingState.processedTransactionsCount = txCount
 
-	p.partialProcessingState.processedPartials = append(p.partialProcessingState.processedPartials, clock)
 	reqDetails := reqctx.Details(ctx)
 	if isBlockOverStopBlock(clock.Number, reqDetails.StopBlockNum) {
 		return nil
@@ -307,15 +341,29 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 	if p.pendingUndoMessage != nil {
 		return nil
 	}
-	if !p.gate.shouldSendOutputs() {
-		return nil
-	}
 	if reqDetails.IsTier2Request {
 		panic("tier2 requests should never receive partial block")
 	}
 
 	if err := p.executeModules(ctx, execOutput, false, false); err != nil {
 		return fmt.Errorf("execute modules: %w", err)
+	}
+
+	if isLast {
+		// allow an 'undo' on this 'last' partial block to undo the whole thing -- must be run AFTER the executeModules()
+		// important because we will lose all information on the partialProcessingState
+		p.forkHandler.joinReversibleOutputs(clock, p.partialProcessingState.processedPartials)
+		p.partialProcessingState = nil
+		p.previousLastPartialBlock = bstream.NewBlockRef(clock.Id, clock.Number)
+	} else {
+		p.partialProcessingState.processedTransactionsHash = txsHash
+		p.partialProcessingState.processedTransactionsCount = txCount
+		p.partialProcessingState.lastBlockID = clock.Id
+		p.partialProcessingState.processedPartials = append(p.partialProcessingState.processedPartials, clock)
+	}
+
+	if !p.gate.shouldSendOutputs() {
+		return nil
 	}
 
 	mapModuleOutput := normalizeModuleOutput(p.mapModuleOutput, reqDetails.OutputModule)
@@ -400,27 +448,26 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 	}
 
 	withPartialBlocks := reqctx.PartialBlocks(ctx)
-	sendFullBlockInPartialMode := withPartialBlocks && (p.partialProcessingState == nil || p.partialProcessingState.num != clock.Number)
 
-	// if we get a 'new' block while handling partial blocks, we complete the missing partials based on its content.
-	// Ex: we got partials 3, 4, 7
-	//    -> partial 3 contains all transactions from partials 1+2+3
-	//    -> partial 4 only processes transactions from partial 4
-	//    -> when we get the full block 4 (stepNEW), if it differs from the partial7's ID, we process it so that we send a 'partial 10' that contains transactions from partials 8,9,10
-	if withPartialBlocks && p.partialProcessingState != nil {
-		if p.partialProcessingState.num == clock.Number && p.partialProcessingState.lastBlockID != clock.Id {
-			partialBlockIndex := biggestPartialBlockIndex
-			if p.partialProcessingState.highestIndex >= partialBlockIndex {
-				partialBlockIndex = p.partialProcessingState.highestIndex + 1 // push back the 'biggest partial block index' so we don't send them out of order to the client
-			}
+	if withPartialBlocks {
 
-			// this handleStepPartial will gate the 'shouldSendOutputs' itself
-			if err := p.handleStepPartial(ctx, clock, cursor, execOutput.Clone(), partialBlockIndex, true); err != nil { // we will reuse this execOutput so we clone it here
-				return err
-			}
+		if p.previousLastPartialBlock != nil && p.previousLastPartialBlock.Num() == clock.Number && p.previousLastPartialBlock.ID() == clock.Id {
+			// all good, this 'new' block can be ignored, it has been processed as a 'lastPartial'.
+			p.lastProcessedBlockRef = bstream.NewBlockRef(clock.Id, clock.Number)
+			p.lastCursor = cursor
+			return nil
 		}
-		if err := p.undoPartialStates(); err != nil {
-			return err
+
+		if p.partialProcessingState != nil {
+			prevLastPartial := "nil"
+			if p.previousLastPartialBlock != nil {
+				prevLastPartial = p.previousLastPartialBlock.String()
+			}
+			logger.Warn("receiving new block with an active partial state, but previousLastPartialBlock is not the same as the current block. Undoing partial state",
+				zap.String("previous last partial", prevLastPartial), zap.Stringer("current new block", clock))
+			if err := p.handleStepUndoPartial(cursor); err != nil {
+				return fmt.Errorf("failed to undo partial states: %w", err)
+			}
 		}
 	}
 
@@ -444,7 +491,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 			// so they can follow progress (and dev also gets debug output...)
 			//
 
-			if !reqctx.PartialBlocks(ctx) || sendFullBlockInPartialMode {
+			if p.partialProcessingState == nil {
 				mapModuleOutput := normalizeModuleOutput(p.mapModuleOutput, reqDetails.OutputModule)
 				p.sentBlocks++
 				if err = returnModuleDataOutputs(clock, cursor, mapModuleOutput, p.extraMapModuleOutputs, p.extraStoreModuleOutputs, p.respFunc, logger); err != nil {

@@ -3,6 +3,7 @@ package tests_e2e
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -12,13 +13,17 @@ import (
 	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/testcontainers/testcontainers-go"
 	"go.uber.org/zap"
 )
 
+const latestDummyBlockchainImage = "ghcr.io/streamingfast/dummy-blockchain:v1.7.6"
+
 func TestPartialBlocksSimple(t *testing.T) {
 	ctx := context.Background()
+	// takes zlog from init()
 	//zlog := logging.MustCreateLoggerWithServiceName("partial-blocks-test")
-	zlog := zap.NewNop()
+	//zlog := zap.NewNop()
 
 	// Create temporary directory for volume mount
 	tmpDir, err := os.MkdirTemp("", "firehose-data-")
@@ -26,13 +31,14 @@ func TestPartialBlocksSimple(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// launch dummy blockchain container with flash blocks enabled
-	image := "ghcr.io/streamingfast/dummy-blockchain:17b576d"
+	image := latestDummyBlockchainImage
+
 	burst := 120
 
 	t.Logf("Starting container with image: %s and burst %d", image, burst)
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, image, "--with-flash-blocks", burst)
 	require.NoError(t, err)
-	defer container.Terminate(ctx)
+	defer container.Terminate(ctx, testcontainers.StopTimeout(0))
 
 	// Log container details for debugging
 	if container != nil {
@@ -50,6 +56,15 @@ func TestPartialBlocksSimple(t *testing.T) {
 
 	app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog)
 	app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)
+
+	defer func() {
+		container.Terminate(ctx, testcontainers.StopTimeout(0))
+		// ensure we close this well, for next tests
+		app.Shutdown(nil)
+		app2.Shutdown(nil)
+		<-app.Terminated()
+		<-app2.Terminated()
+	}()
 
 	testCases := []struct {
 		name           string
@@ -134,76 +149,84 @@ func TestPartialBlocksSimple(t *testing.T) {
 }
 
 func TestPartialBlocksWithStores(t *testing.T) {
-	ctx := context.Background()
-	zlog := zap.NewNop()
-	// zlog := MustCreateLoggerWithServiceName("partial-blocks-test") // use this to include verbose substreams service logs
-
-	// Create temporary directory for volume mount
-	tmpDir, err := os.MkdirTemp("", "firehose-data-")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	// launch dummy blockchain container with flash blocks enabled
-	image := "ghcr.io/streamingfast/dummy-blockchain:17b576d"
-	burst := 300
-
-	t.Logf("Starting container with image: %s and burst %d", image, burst)
-	container, err := newDummyBlockchainContainer(ctx, tmpDir, image, "--with-flash-blocks", burst)
-	require.NoError(t, err)
-	defer container.Terminate(ctx)
-
-	// Log container details for debugging
-	if container != nil {
-		if ports, portErr := container.Ports(ctx); portErr == nil {
-			t.Logf("Container exposed ports: %v", ports)
-		}
-		if logs, logErr := container.Logs(ctx); logErr == nil {
-			defer logs.Close()
-			buf := make([]byte, 2048)
-			if n, _ := logs.Read(buf); n > 0 {
-				t.Logf("Container logs: %s", string(buf[:n]))
-			}
-		}
-	}
-
-	app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog)
-	app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)
-
 	testCases := []struct {
-		name                   string
-		startBlock             int64
-		stopBlock              uint64
-		productionMode         bool
-		spkgFile               string
-		outputModule           string
-		expectPartialResponses int
+		name           string
+		startBlock     int64
+		stopBlock      uint64
+		productionMode bool
+		spkgFile       string
+		outputModule   string
 	}{
 		{
-			name:                   "dev with stores",
-			startBlock:             100,
-			stopBlock:              0, // Will halt after the requested number of partial responses
-			productionMode:         false,
-			spkgFile:               "./partial_blocks_store/partial-blocks-store-v0.1.0.spkg",
-			outputModule:           "map_tx_counter_summary",
-			expectPartialResponses: 100,
+			name:           "dev with stores",
+			startBlock:     300,
+			stopBlock:      330,
+			productionMode: false,
+			spkgFile:       "./partial_blocks_store/partial-blocks-store-v0.1.0.spkg",
+			outputModule:   "map_tx_counter_summary",
 		},
 		{
-			name:                   "prod with stores",
-			startBlock:             200,
-			stopBlock:              0, // Will halt after the requested number of partial responses
-			productionMode:         false,
-			spkgFile:               "./partial_blocks_store/partial-blocks-store-v0.1.0.spkg",
-			outputModule:           "map_tx_counter_summary",
-			expectPartialResponses: 50,
+			name:           "prod with stores",
+			startBlock:     300,
+			stopBlock:      330,
+			productionMode: true,
+			spkgFile:       "./partial_blocks_store/partial-blocks-store-v0.1.0.spkg",
+			outputModule:   "map_tx_counter_summary",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+
+			ctx := context.Background()
+			zlog := zap.NewNop()
+			// zlog := MustCreateLoggerWithServiceName("partial-blocks-test") // use this to include verbose substreams service logs
+
+			// Create temporary directory for volume mount
+			tmpDir, err := os.MkdirTemp("", "firehose-data-")
+			require.NoError(t, err)
+			defer os.RemoveAll(tmpDir)
+
+			// launch dummy blockchain container with flash blocks enabled
+			image := latestDummyBlockchainImage
+			burst := int(tc.startBlock)
+
+			t.Logf("Starting container with image: %s and burst %d", image, burst)
+			container, err := newDummyBlockchainContainer(ctx, tmpDir, image, "--with-flash-blocks --with-reorgs", burst)
+			require.NoError(t, err)
+			defer container.Terminate(ctx, testcontainers.StopTimeout(0))
+
+			// Log container details for debugging
+			if container != nil {
+				if ports, portErr := container.Ports(ctx); portErr == nil {
+					t.Logf("Container exposed ports: %v", ports)
+				}
+				if logs, logErr := container.Logs(ctx); logErr == nil {
+					defer logs.Close()
+					buf := make([]byte, 2048)
+					if n, _ := logs.Read(buf); n > 0 {
+						t.Logf("Container logs: %s", string(buf[:n]))
+					}
+				}
+			}
+
+			app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog)
+			app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)
+
+			defer func() {
+				fmt.Println("Terminating container...")
+				container.Terminate(ctx, testcontainers.StopTimeout(0))
+				// ensure we close this well, for next tests
+				app.Shutdown(nil)
+				app2.Shutdown(nil)
+				<-app.Terminated()
+				<-app2.Terminated()
+			}()
+
 			pkg, err := manifest.MustNewReader(tc.spkgFile).Read()
 			require.NoError(t, err)
 
-			request := &pbsubstreamsrpcv2.Request{
+			requestPartials := &pbsubstreamsrpcv2.Request{
 				StartBlockNum:   tc.startBlock,
 				StopBlockNum:    tc.stopBlock,
 				FinalBlocksOnly: false,
@@ -213,8 +236,39 @@ func TestPartialBlocksWithStores(t *testing.T) {
 				PartialBlocks:   true,
 			}
 
+			requestNoPartials := &pbsubstreamsrpcv2.Request{
+				StartBlockNum:   tc.startBlock,
+				StopBlockNum:    tc.stopBlock,
+				FinalBlocksOnly: false,
+				ProductionMode:  tc.productionMode,
+				OutputModule:    tc.outputModule,
+				Modules:         pkg.Package.Modules,
+			}
+
+			respsNoPartialsCh := make(chan responses)
+			go func() {
+				data, init, err := RunRequest(t, requestNoPartials, substreamsEndpoint)
+				if err != nil && err != io.EOF && !errors.Is(err, context.Canceled) {
+					// Let's try to get container logs to debug
+					logs, logErr := container.Logs(ctx)
+					if logErr == nil {
+						defer logs.Close()
+						buf := make([]byte, 4096)
+						n, _ := logs.Read(buf)
+						t.Logf("Container logs: %s", string(buf[:n]))
+					}
+					panic(err)
+				}
+				result := responses{init}
+				for _, d := range data {
+					result = append(result, d)
+				}
+				respsNoPartialsCh <- result
+
+			}()
+
 			// Run the request with custom handling for partial blocks
-			resps, err := RunRequestWithPartialBlocks(t, request, substreamsEndpoint, tc.expectPartialResponses)
+			respsPartials, err := RunRequestWithPartialBlocks(t, requestPartials, substreamsEndpoint, 0)
 			if err != nil && err != io.EOF && !errors.Is(err, context.Canceled) {
 				// Let's try to get container logs to debug
 				logs, logErr := container.Logs(ctx)
@@ -226,89 +280,36 @@ func TestPartialBlocksWithStores(t *testing.T) {
 				}
 				t.Fatalf("Unexpected error: %s", err)
 			}
-			blockScopedData := resps.BlockScopedData()
-			session := resps.SessionInit()
+			respsNoPartials := <-respsNoPartialsCh
 
-			require.NotNil(t, session, "Should have received at least one session")
-
-			type fullBlockResponse struct {
-				currentTxCount uint64
-				storedTxCount  uint64
-				totalTxCount   uint64
+			ref := make(map[uint64]*pbsubstreamsrpcv2.BlockScopedData)
+			for _, data := range respsNoPartials.BlockScopedData() {
+				ref[data.Clock.Number] = data
 			}
 
-			//seenBlocks := make(map[uint64]fullBlockResponse)
+			finalPartialCount := 0
+			for _, data := range respsPartials.BlockScopedData() {
+				if data.IsLastPartial != nil && *data.IsLastPartial {
+					require.NotNil(t, ref[data.Clock.Number], "Partial block should have a corresponding full block")
 
-			//var partialResponses []*pbsubstreamsrpcv2.BlockScopedData
+					blockNumber, currentTxCount, storedPrevBlockTxCount, storedTotalTxCount, ok := ParseTxCounterSummary(data.Output)
+					require.True(t, ok, "Failed to parse tx counter summary")
 
-			prevBlock := uint64(0)
-			prevBlockTxCount := uint64(0)
-			var prevBlockWasFull bool
-			var prevBlockWasLastPartial bool
-			totalTxCount := uint64(0)
+					refBlockNumber, refCurrentTxCount, refStoredPrevBlockTxCount, refStoredTotalTxCount, ok := ParseTxCounterSummary(ref[data.Clock.Number].Output)
+					require.True(t, ok, "Failed to parse tx counter summary")
 
-			for _, fullResponse := range blockScopedData {
-
-				blockNumber, currentTxCount, storedPrevBlockTxCount, storedTotalTxCount, ok := ParseTxCounterSummary(fullResponse.Output)
-				if !ok {
-					t.Fatal("Failed to parse TxCounterSummary from MapOutput")
-				}
-
-				// heavy print-debugging
-				// partialIndex := 9999
-				// if fullResponse.PartialIndex != nil {
-				// 	partialIndex = int(*fullResponse.PartialIndex)
-				// }
-				// fmt.Printf("Processing response block %d (currentTxCount %d prevBlockStoredTxCount %d totalTxCount %d partialIndex %d)\n", blockNumber, currentTxCount, storedPrevBlockTxCount, totalTxCount, partialIndex)
-
-				// first block ever
-				if prevBlock == 0 {
-					prevBlock = blockNumber
-					prevBlockTxCount = currentTxCount
-					totalTxCount = storedTotalTxCount
-					continue
-				}
-
-				totalTxCount += currentTxCount // happens on every block
-
-				if fullResponse.IsPartial {
-					assert.Equal(t, int(totalTxCount), int(storedTotalTxCount))
-
-					if blockNumber == prevBlock {
-						assert.False(t, prevBlockWasFull, "prev block was full, receiving a partial %d", blockNumber)
-						assert.False(t, prevBlockWasLastPartial, "prev block was last partial, receiving another partial %d", blockNumber)
-
-						prevBlockTxCount += currentTxCount // append to block
-					} else {
-						assert.Equal(t, int(prevBlockTxCount), int(storedPrevBlockTxCount), "at block %d", blockNumber)
-						assert.True(t, prevBlockWasFull || prevBlockWasLastPartial, "prev block was not full NOR last partial")
-
-						prevBlock = blockNumber
-						prevBlockTxCount = currentTxCount // replace
-					}
-
-					prevBlockWasFull = false
-					prevBlockWasLastPartial = *fullResponse.IsLastPartial
-
-				} else {
-					require.True(t, blockNumber == prevBlock+1, "non-consecutive block numbers, prev %d, current %d", prevBlock, blockNumber)
-
-					// full block always replaces
-					prevBlock = blockNumber
-					prevBlockTxCount = currentTxCount
-					prevBlockWasFull = true
-					prevBlockWasLastPartial = false
+					assert.Equal(t, refBlockNumber, blockNumber, "Partial block number should match full block number")
+					assert.GreaterOrEqual(t, refCurrentTxCount, currentTxCount, "Partial block current tx count should be less or equal to full block current tx count -- this one is not identical")
+					assert.Equal(t, storedPrevBlockTxCount, refStoredPrevBlockTxCount, "Partial block stored prev block tx count should match full block stored prev block tx count")
+					assert.Equalf(t, int(refStoredTotalTxCount), int(storedTotalTxCount), "Partial block stored total tx count should match full block stored total tx count in block %d", blockNumber)
+					finalPartialCount++
 				}
 			}
+			assert.GreaterOrEqual(t, finalPartialCount, 20)        // should validate against at least 20 partial blocks
+			assert.GreaterOrEqual(t, len(respsPartials.Undo()), 2) // should validate against at least 2 undo
 
 		})
 	}
-	// ensure we close this well, for next tests
-	app.Shutdown(nil)
-	app2.Shutdown(nil)
-	<-app.Terminated()
-	<-app2.Terminated()
-
 }
 
 func TestPartialBlocksReorgs(t *testing.T) {
@@ -332,25 +333,24 @@ func TestPartialBlocksReorgs(t *testing.T) {
 			outputModule:   "map_events_0",
 			assertFunc: func(t *testing.T, allResponses string) {
 				assert.Contains(t, allResponses,
-					"P:33:1,P:33:2,P:33:3,P:33:4,P:33:10*,"+ // partials for block 33
-						"P:34:1,P:34:2,P:34:3,P:34:4,"+ // partials for block 34, no final partial for that 34
+					"P:32:1,P:32:2,P:32:3,P:32:4*,"+ // partials for block 32 (normal)
+						"P:33:1,P:33:2,P:33:3,U:32,F:33,"+ // partials for block 33 (got no p4 from dummy-blockchain: multiples of 11 are missing the lastFinal)
+						"P:34:1,P:34:2,P:34:3,P:34:4*,"+ // partials for block 34
 						"F:35,"+ // sudden "full" block 35
-						"U:33,"+ // undo block 33
+						"U:33,"+ // undo up to block 33
 						"F:34,"+"F:35,"+ // get the right block 34 and 35 (from "full")
-						"P:36:1,P:36:2,P:36:3,P:36:4,P:36:10*,", // partials for block 36 (back on track)
+						"P:36:1,P:36:2,P:36:3,P:36:4*,", // partials for block 36 (back on track)
 					"did not contain expected partial blocks + undo sequence")
 			},
 		},
 	}
-
-	//	"P:33:1,P:33:2,P:33:3,P:33:4,P:33:10*,P:34:1,P:34:2,P:34:3,P:34:4,F:35,U:33,F:34,F:35,P:36:1,P:36:2,P:36:3,P:36:4,P:36:10*,P:37:1,P:37:2,P:37:3,P:37:4,P:37:10*,P:38:1,P:38:2,P:38:3,P:38:4,P:38:10*,P:39:1,P:39:2,P:39:3,P:39:4,P:39:10*" does not contain "P:33:1,P:33:2,P:33:3,P:33:4,P:33:10*,P:34:1,P:34:2,P:34:3,P:34:4*,F:35,U:33,F:34,F:35,P:36:1,P:36:2,P:36:3,P:36:4*,"
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 
 			ctx := context.Background()
 			// zlog := logging.MustCreateLoggerWithServiceName("partial-blocks-test")
-			zlog := zap.NewNop()
+			// zlog := zap.NewNop()
 
 			// Create temporary directory for volume mount
 			tmpDir, err := os.MkdirTemp("", "firehose-data-")
@@ -358,13 +358,13 @@ func TestPartialBlocksReorgs(t *testing.T) {
 			defer os.RemoveAll(tmpDir)
 
 			// launch dummy blockchain container with flash blocks enabled
-			image := "ghcr.io/streamingfast/dummy-blockchain:17b576d"
+			image := latestDummyBlockchainImage
+
 			burst := 0
 
 			t.Logf("Starting container with image: %s and burst %d", image, burst)
 			container, err := newDummyBlockchainContainer(ctx, tmpDir, image, "--with-flash-blocks --with-skipped-blocks=false --with-reorgs --block-rate=220", burst)
 			require.NoError(t, err)
-			defer container.Terminate(ctx)
 
 			// Log container details for debugging
 			if container != nil {
@@ -382,6 +382,15 @@ func TestPartialBlocksReorgs(t *testing.T) {
 
 			app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog)
 			app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)
+
+			defer func() {
+				container.Terminate(ctx, testcontainers.StopTimeout(0))
+				// ensure we close this well, for next tests
+				app.Shutdown(nil)
+				app2.Shutdown(nil)
+				<-app.Terminated()
+				<-app2.Terminated()
+			}()
 
 			pkg, err := manifest.MustNewReader(tc.spkgFile).Read()
 			require.NoError(t, err)
@@ -414,11 +423,6 @@ func TestPartialBlocksReorgs(t *testing.T) {
 			tc.assertFunc(t, allResponses)
 			require.NotNil(t, resps.SessionInit(), "Should have received at least one session")
 
-			// ensure we close this well, for next tests
-			app.Shutdown(nil)
-			app2.Shutdown(nil)
-			<-app.Terminated()
-			<-app2.Terminated()
 		})
 
 	}

@@ -626,7 +626,6 @@ func recoverExecutionPanic(ctx context.Context, executionError error, recovered 
 		return connect.NewError(connect.CodeDeadlineExceeded, fmt.Errorf("execution timed out at block %s: %w", blockRef, recoveredErr))
 	}
 
-	PrintStack = true
 	// Otherwise, log the panic and return a generic error
 	if PrintStack {
 		debug.PrintStack()

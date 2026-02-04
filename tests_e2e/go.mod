@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/docker/docker v28.2.2+incompatible
-	github.com/streamingfast/bstream v0.0.2-0.20260129145732-573f7c50a243
+	github.com/streamingfast/bstream v0.0.2-0.20260204202442-c5bd9b2dffea
 	github.com/streamingfast/dauth v0.0.0-20251218134044-fb716c7172b4
 	github.com/streamingfast/dmetering v0.0.0-20251027175535-4fd530934b97
 	github.com/streamingfast/dmetrics v0.0.0-20260109212625-35256f512c62

@@ -17,7 +17,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const latestDummyBlockchainImage = "ghcr.io/streamingfast/dummy-blockchain:f619197"
+const latestDummyBlockchainImage = "ghcr.io/streamingfast/dummy-blockchain:a4ded51"
 
 func TestPartialBlocksSimple(t *testing.T) {
 	ctx := context.Background()
@@ -150,31 +150,28 @@ func TestPartialBlocksSimple(t *testing.T) {
 
 func TestPartialBlocksWithStores(t *testing.T) {
 	testCases := []struct {
-		name                   string
-		startBlock             int64
-		stopBlock              uint64
-		productionMode         bool
-		spkgFile               string
-		outputModule           string
-		expectPartialResponses int
+		name           string
+		startBlock     int64
+		stopBlock      uint64
+		productionMode bool
+		spkgFile       string
+		outputModule   string
 	}{
 		{
-			name:                   "dev with stores",
-			startBlock:             100,
-			stopBlock:              0, // Will halt after the requested number of partial responses
-			productionMode:         false,
-			spkgFile:               "./partial_blocks_store/partial-blocks-store-v0.1.0.spkg",
-			outputModule:           "map_tx_counter_summary",
-			expectPartialResponses: 100,
+			name:           "dev with stores",
+			startBlock:     300,
+			stopBlock:      330,
+			productionMode: false,
+			spkgFile:       "./partial_blocks_store/partial-blocks-store-v0.1.0.spkg",
+			outputModule:   "map_tx_counter_summary",
 		},
 		{
-			name:                   "prod with stores",
-			startBlock:             200,
-			stopBlock:              0, // Will halt after the requested number of partial responses
-			productionMode:         false,
-			spkgFile:               "./partial_blocks_store/partial-blocks-store-v0.1.0.spkg",
-			outputModule:           "map_tx_counter_summary",
-			expectPartialResponses: 50,
+			name:           "prod with stores",
+			startBlock:     300,
+			stopBlock:      330,
+			productionMode: true,
+			spkgFile:       "./partial_blocks_store/partial-blocks-store-v0.1.0.spkg",
+			outputModule:   "map_tx_counter_summary",
 		},
 	}
 
@@ -192,10 +189,10 @@ func TestPartialBlocksWithStores(t *testing.T) {
 
 			// launch dummy blockchain container with flash blocks enabled
 			image := latestDummyBlockchainImage
-			burst := 300
+			burst := int(tc.startBlock)
 
 			t.Logf("Starting container with image: %s and burst %d", image, burst)
-			container, err := newDummyBlockchainContainer(ctx, tmpDir, image, "--with-flash-blocks", burst)
+			container, err := newDummyBlockchainContainer(ctx, tmpDir, image, "--with-flash-blocks --with-reorgs", burst)
 			require.NoError(t, err)
 			defer container.Terminate(ctx, testcontainers.StopTimeout(0))
 
@@ -229,7 +226,7 @@ func TestPartialBlocksWithStores(t *testing.T) {
 			pkg, err := manifest.MustNewReader(tc.spkgFile).Read()
 			require.NoError(t, err)
 
-			request := &pbsubstreamsrpcv2.Request{
+			requestPartials := &pbsubstreamsrpcv2.Request{
 				StartBlockNum:   tc.startBlock,
 				StopBlockNum:    tc.stopBlock,
 				FinalBlocksOnly: false,
@@ -239,8 +236,39 @@ func TestPartialBlocksWithStores(t *testing.T) {
 				PartialBlocks:   true,
 			}
 
+			requestNoPartials := &pbsubstreamsrpcv2.Request{
+				StartBlockNum:   tc.startBlock,
+				StopBlockNum:    tc.stopBlock,
+				FinalBlocksOnly: false,
+				ProductionMode:  tc.productionMode,
+				OutputModule:    tc.outputModule,
+				Modules:         pkg.Package.Modules,
+			}
+
+			respsNoPartialsCh := make(chan responses)
+			go func() {
+				data, init, err := RunRequest(t, requestNoPartials, substreamsEndpoint)
+				if err != nil && err != io.EOF && !errors.Is(err, context.Canceled) {
+					// Let's try to get container logs to debug
+					logs, logErr := container.Logs(ctx)
+					if logErr == nil {
+						defer logs.Close()
+						buf := make([]byte, 4096)
+						n, _ := logs.Read(buf)
+						t.Logf("Container logs: %s", string(buf[:n]))
+					}
+					panic(err)
+				}
+				result := responses{init}
+				for _, d := range data {
+					result = append(result, d)
+				}
+				respsNoPartialsCh <- result
+
+			}()
+
 			// Run the request with custom handling for partial blocks
-			resps, err := RunRequestWithPartialBlocks(t, request, substreamsEndpoint, tc.expectPartialResponses)
+			respsPartials, err := RunRequestWithPartialBlocks(t, requestPartials, substreamsEndpoint, 0)
 			if err != nil && err != io.EOF && !errors.Is(err, context.Canceled) {
 				// Let's try to get container logs to debug
 				logs, logErr := container.Logs(ctx)
@@ -252,97 +280,33 @@ func TestPartialBlocksWithStores(t *testing.T) {
 				}
 				t.Fatalf("Unexpected error: %s", err)
 			}
+			respsNoPartials := <-respsNoPartialsCh
 
-			for _, undo := range resps.Undo() {
-				t.Logf("Undo: %s", undo)
-			}
-			require.Zero(t, len(resps.Undo()))
-
-			blockScopedData := resps.BlockScopedData()
-			session := resps.SessionInit()
-
-			require.NotNil(t, session, "Should have received at least one session")
-
-			type fullBlockResponse struct {
-				currentTxCount uint64
-				storedTxCount  uint64
-				totalTxCount   uint64
+			ref := make(map[uint64]*pbsubstreamsrpcv2.BlockScopedData)
+			for _, data := range respsNoPartials.BlockScopedData() {
+				ref[data.Clock.Number] = data
 			}
 
-			//seenBlocks := make(map[uint64]fullBlockResponse)
+			finalPartialCount := 0
+			for _, data := range respsPartials.BlockScopedData() {
+				if data.IsLastPartial != nil && *data.IsLastPartial {
+					require.NotNil(t, ref[data.Clock.Number], "Partial block should have a corresponding full block")
 
-			//var partialResponses []*pbsubstreamsrpcv2.BlockScopedData
+					blockNumber, currentTxCount, storedPrevBlockTxCount, storedTotalTxCount, ok := ParseTxCounterSummary(data.Output)
+					require.True(t, ok, "Failed to parse tx counter summary")
 
-			prevBlock := uint64(0)
-			var prevPartialIndex *uint32
-			//prevBlockTxCount := uint64(0)
-			//var prevBlockWasLastPartial bool
-			totalTxCount := uint64(0)
+					refBlockNumber, refCurrentTxCount, refStoredPrevBlockTxCount, refStoredTotalTxCount, ok := ParseTxCounterSummary(ref[data.Clock.Number].Output)
+					require.True(t, ok, "Failed to parse tx counter summary")
 
-			for _, fullResponse := range blockScopedData {
-
-				blockNumber, currentTxCount, storedPrevBlockTxCount, storedTotalTxCount, ok := ParseTxCounterSummary(fullResponse.Output)
-				if !ok {
-					t.Fatal("Failed to parse TxCounterSummary from MapOutput")
+					assert.Equal(t, refBlockNumber, blockNumber, "Partial block number should match full block number")
+					assert.GreaterOrEqual(t, refCurrentTxCount, currentTxCount, "Partial block current tx count should be less or equal to full block current tx count -- this one is not identical")
+					assert.Equal(t, storedPrevBlockTxCount, refStoredPrevBlockTxCount, "Partial block stored prev block tx count should match full block stored prev block tx count")
+					assert.Equalf(t, int(refStoredTotalTxCount), int(storedTotalTxCount), "Partial block stored total tx count should match full block stored total tx count in block %d", blockNumber)
+					finalPartialCount++
 				}
-
-				// heavy print-debugging
-				// partialIndex := 9999
-				// if fullResponse.PartialIndex != nil {
-				// 	partialIndex = int(*fullResponse.PartialIndex)
-				// }
-				// fmt.Printf("Processing response block %d (currentTxCount %d prevBlockStoredTxCount %d totalTxCount %d partialIndex %d)\n", blockNumber, currentTxCount, storedPrevBlockTxCount, totalTxCount, partialIndex)
-
-				// first block ever
-				if prevBlock == 0 {
-					prevBlock = blockNumber
-					//	prevBlockTxCount = currentTxCount
-					totalTxCount = storedTotalTxCount
-					continue
-				}
-
-				totalTxCount += currentTxCount // happens on every block
-
-				// check continuity of partial blocks (this 'mostly' validates the dummy-blockchain behavior without reorgs and skipped blocks)
-				if blockNumber == prevBlock {
-					require.NotNil(t, fullResponse.PartialIndex) // no full block here because we have no reorgs
-					require.NotNil(t, prevPartialIndex)
-					require.True(t, *fullResponse.PartialIndex == (*prevPartialIndex)+1, "non-consecutive partial indices, prev %d, current %d", prevPartialIndex, prevPartialIndex)
-				} else {
-					require.True(t, blockNumber == prevBlock+1, "non-consecutive block numbers, prev %d, current %d", prevBlock, blockNumber)
-				}
-
-				_ = storedPrevBlockTxCount
-				prevBlock = blockNumber
-				prevPartialIndex = fullResponse.PartialIndex
-
-				//	if fullResponse.IsPartial {
-				//		assert.Equal(t, int(totalTxCount), int(storedTotalTxCount))
-
-				//		if blockNumber == prevBlock {
-				//			assert.False(t, prevBlockWasLastPartial, "prev block was last partial, receiving another partial %d", blockNumber)
-
-				//			prevBlockTxCount += currentTxCount // append to block
-				//		} else {
-				//			assert.Equal(t, int(prevBlockTxCount), int(storedPrevBlockTxCount), "at block %d", blockNumber)
-				//			assert.True(t, prevBlockWasFull || prevBlockWasLastPartial, "prev block was not full NOR last partial")
-
-				//			prevBlock = blockNumber
-				//			prevBlockTxCount = currentTxCount // replace
-				//		}
-
-				//		prevBlockWasLastPartial = *fullResponse.IsLastPartial
-
-				//	} else {
-				//		require.True(t, blockNumber == prevBlock+1, "non-consecutive block numbers, prev %d, current %d", prevBlock, blockNumber)
-
-				//		// full block always replaces
-				//		prevBlock = blockNumber
-				//		prevBlockTxCount = currentTxCount
-				//		prevBlockWasFull = true
-				//		prevBlockWasLastPartial = false
-				//	}
 			}
+			assert.GreaterOrEqual(t, finalPartialCount, 20)        // should validate against at least 20 partial blocks
+			assert.GreaterOrEqual(t, len(respsPartials.Undo()), 2) // should validate against at least 2 undo
 
 		})
 	}

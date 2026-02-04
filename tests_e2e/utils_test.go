@@ -425,7 +425,7 @@ func RunRequestWithPartialBlocks(t *testing.T, req *pbsubstreamsrpcv2.Request, e
 				partialBlockDataCount++
 				//t.Logf("Received partial block data %d/%d", len(partialBlockDataSlice), partialResponseCount)
 				// Break if we've received the desired number of partial responses
-				if partialBlockDataCount >= maxPartialResponses {
+				if maxPartialResponses != 0 && partialBlockDataCount >= maxPartialResponses {
 					t.Logf("Received %d partial responses - halting request", partialBlockDataCount)
 					break
 				}

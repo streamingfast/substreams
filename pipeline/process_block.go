@@ -315,16 +315,6 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 		return err
 	}
 
-	if isLast {
-		p.partialProcessingState = nil
-		p.previousLastPartialBlock = bstream.NewBlockRef(clock.Id, clock.Number)
-	} else {
-		p.partialProcessingState.processedTransactionsHash = txsHash
-		p.partialProcessingState.processedTransactionsCount = txCount
-		p.partialProcessingState.lastBlockID = clock.Id
-		p.partialProcessingState.processedPartials = append(p.partialProcessingState.processedPartials, clock)
-	}
-
 	reqDetails := reqctx.Details(ctx)
 	if isBlockOverStopBlock(clock.Number, reqDetails.StopBlockNum) {
 		return nil
@@ -341,6 +331,19 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 
 	if err := p.executeModules(ctx, execOutput, false, false); err != nil {
 		return fmt.Errorf("execute modules: %w", err)
+	}
+
+	if isLast {
+		// allow an 'undo' on this 'last' partial block to undo the whole thing -- must be run AFTER the executeModules()
+		// important because we will lose all information on the partialProcessingState
+		p.forkHandler.joinReversibleOutputs(clock, p.partialProcessingState.processedPartials)
+		p.partialProcessingState = nil
+		p.previousLastPartialBlock = bstream.NewBlockRef(clock.Id, clock.Number)
+	} else {
+		p.partialProcessingState.processedTransactionsHash = txsHash
+		p.partialProcessingState.processedTransactionsCount = txCount
+		p.partialProcessingState.lastBlockID = clock.Id
+		p.partialProcessingState.processedPartials = append(p.partialProcessingState.processedPartials, clock)
 	}
 
 	if !p.gate.shouldSendOutputs() {

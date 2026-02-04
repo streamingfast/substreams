@@ -313,6 +313,9 @@ func NewInternalClientFactory(config *SubstreamsClientConfig) InternalClientFact
 
 	noop := func() error { return nil }
 	cli, _, callOpts, headers, err := NewSubstreamsInternalClient(config)
+	if err != nil {
+		zlog.Error("failed to create substreams client", zap.Error(err))
+	}
 	return func() (pbssinternal.SubstreamsClient, func() error, []grpc.CallOption, Headers, error) {
 		return cli, noop, callOpts, headers, err
 	}
@@ -431,10 +434,10 @@ func newConnection(config *SubstreamsClientConfig) (conn *grpc.ClientConn, close
 	//compressor := os.Getenv("GRPC_COMPRESSOR")
 	//switch compressor {
 	//case "gzip":
-	//	dialOptions = append(dialOptions, grpc.WithDefaultCallOptions(grpc.UseCompressor(gzip.Name)))
+	//dialOptions = append(dialOptions, grpc.WithDefaultCallOptions(grpc.UseCompressor(gzip.Name)))
 	//case "s2":
 	dialOptions = append(dialOptions, grpc.WithDefaultCallOptions(grpc.UseCompressor(s2.Name)))
-	//}`
+	//}
 
 	dialOptions = append(dialOptions, grpc.WithUserAgent(config.agent))
 

@@ -405,15 +405,12 @@ func (s *Tier1Service) BlocksAny(
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier1/request")
 	defer span.EndWithErr(&err)
 
-	compressor := header.Values("grpc-encoding")
-
 	fields := []zap.Field{
 		zap.String("protocol", protocol),
 		zap.Int64("start_block", request.StartBlockNum),
 		zap.Uint64("stop_block", request.StopBlockNum),
 		zap.String("cursor", request.StartCursor),
 		zap.String("output_module", request.OutputModule),
-		zap.Strings("compressor", compressor),
 		zap.Bool("final_blocks_only", request.FinalBlocksOnly),
 		zap.Bool("production_mode", request.ProductionMode),
 		zap.Bool("noop_mode", request.NoopMode),

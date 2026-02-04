@@ -22,9 +22,10 @@ import (
 	_ "google.golang.org/grpc/experimental"
 )
 
-func GetCommonServerOptions(listenAddr string, logger *zap.Logger, healthcheck dgrpcserver.HealthCheck) []dgrpcserver.Option {
+func GetCommonServerOptions(listenAddr string, logger *zap.Logger, healthcheck dgrpcserver.HealthCheck, enforceCompression bool) []dgrpcserver.Option {
 	tracerProvider := otel.GetTracerProvider()
 	options := []dgrpcserver.Option{
+
 		dgrpcserver.WithLogger(logger),
 		dgrpcserver.WithHealthCheck(dgrpcserver.HealthCheckOverGRPC|dgrpcserver.HealthCheckOverHTTP, healthcheck),
 		dgrpcserver.WithGRPCServerOptions(
@@ -32,6 +33,10 @@ func GetCommonServerOptions(listenAddr string, logger *zap.Logger, healthcheck d
 			grpc.MaxRecvMsgSize(1024*1024*1024),
 		),
 	}
+	if enforceCompression {
+		options = append(options, dgrpcserver.WithEnforceCompression())
+	}
+
 	if strings.Contains(listenAddr, "*") {
 		options = append(options, dgrpcserver.WithInsecureServer())
 	} else {
@@ -55,6 +60,7 @@ func ListenTier1(
 	auth dauth.Authenticator,
 	logger *zap.Logger,
 	healthcheck dgrpcserver.HealthCheck,
+	enforceCompression bool,
 ) (err error) {
 
 	done := make(chan any)
@@ -62,7 +68,7 @@ func ListenTier1(
 	var servers []dgrpcserver.Server
 	for _, addr := range strings.Split(listenAddr, ",") {
 		// note: some of these common options don't work with connectWeb
-		options := GetCommonServerOptions(addr, logger, healthcheck)
+		options := GetCommonServerOptions(addr, logger, healthcheck, enforceCompression)
 		options = append(options, dgrpcserver.WithPostUnaryInterceptor(dauthgrpc.UnaryAuthChecker(auth, logger)))
 		options = append(options, dgrpcserver.WithPostStreamInterceptor(dauthgrpc.StreamAuthChecker(auth, logger)))
 		grpcServer := factory.ServerFromOptions(options...)
@@ -110,8 +116,9 @@ func ListenTier2(
 	auth dauth.Authenticator,
 	logger *zap.Logger,
 	healthcheck dgrpcserver.HealthCheck,
+	enforceCompression bool,
 ) (err error) {
-	options := GetCommonServerOptions(addr, logger, healthcheck)
+	options := GetCommonServerOptions(addr, logger, healthcheck, enforceCompression)
 	if serviceDiscoveryURL != nil {
 		options = append(options, dgrpcserver.WithServiceDiscoveryURL(serviceDiscoveryURL))
 	}

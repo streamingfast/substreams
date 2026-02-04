@@ -12,7 +12,6 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/mostynb/go-grpc-compression/experimental/s2"
-	"google.golang.org/grpc/encoding/gzip"
 
 	//"github.com/mostynb/go-grpc-compression/experimental/s2"
 	//_ "github.com/mostynb/go-grpc-compression/experimental/s2"
@@ -429,13 +428,13 @@ func newConnection(config *SubstreamsClientConfig) (conn *grpc.ClientConn, close
 	sizeHandler := &sizeLoggingHandler{}
 	dialOptions = append(dialOptions, grpc.WithStatsHandler(sizeHandler))
 
-	compressor := os.Getenv("GRPC_COMPRESSOR")
-	switch compressor {
-	case "gzip":
-		dialOptions = append(dialOptions, grpc.WithDefaultCallOptions(grpc.UseCompressor(gzip.Name)))
-	case "s2":
-		dialOptions = append(dialOptions, grpc.WithDefaultCallOptions(grpc.UseCompressor(s2.Name)))
-	}
+	//compressor := os.Getenv("GRPC_COMPRESSOR")
+	//switch compressor {
+	//case "gzip":
+	//	dialOptions = append(dialOptions, grpc.WithDefaultCallOptions(grpc.UseCompressor(gzip.Name)))
+	//case "s2":
+	dialOptions = append(dialOptions, grpc.WithDefaultCallOptions(grpc.UseCompressor(s2.Name)))
+	//}`
 
 	dialOptions = append(dialOptions, grpc.WithUserAgent(config.agent))
 

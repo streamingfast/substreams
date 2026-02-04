@@ -17,9 +17,6 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	"github.com/mostynb/go-grpc-compression/experimental/s2"
-	"github.com/mostynb/go-grpc-compression/lz4"
-	"github.com/mostynb/go-grpc-compression/zstd"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/hub"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
@@ -60,7 +57,6 @@ import (
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/encoding/gzip"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -363,43 +359,6 @@ func (s *Tier1Service) BlocksAny(
 		return
 	}
 
-	supportedCompressors, e := grpc.ClientSupportedCompressors(stream.Context())
-	if e != nil {
-		return fmt.Errorf("getting supported compressors: %w", e)
-	}
-
-	fmt.Println("-----------------------------------------------")
-	fmt.Println("-----------------------------------------------")
-	fmt.Println("supported compressors:", supportedCompressors)
-	fmt.Println("headers:", header)
-	fmt.Println("-----------------------------------------------")
-	fmt.Println("-----------------------------------------------")
-
-	compressors := compressorsFromHeader(header)
-
-	switch {
-	case compressors["s2"]:
-		fmt.Println("Grrrrrr: Setting s2 compressor")
-		if e := grpc.SetSendCompressor(ctx, s2.Name); e != nil {
-			return fmt.Errorf("setting s2 compressor: %w", e)
-		}
-	case compressors["gzip"]:
-		fmt.Println("Grrrrrr: Setting gzip compressor")
-		if e := grpc.SetSendCompressor(ctx, gzip.Name); e != nil {
-			return fmt.Errorf("setting gzip compressor: %w", e)
-		}
-	case compressors["zstd"]:
-		fmt.Println("Grrrrrr: Setting zstd compressor")
-		if e := grpc.SetSendCompressor(ctx, zstd.Name); e != nil {
-			return fmt.Errorf("setting zstd compressor: %w", e)
-		}
-	case compressors["lz4"]:
-		fmt.Println("Grrrrrr: Setting lz4 compressor")
-		if e := grpc.SetSendCompressor(ctx, lz4.Name); e != nil {
-			return fmt.Errorf("setting lz4 compressor: %w", e)
-		}
-	}
-
 	s.activeRequestsWG.Add(1)
 	defer func() {
 		if reason, countAsRejected := metrics.IsRejectedRequestError(serverErr); countAsRejected {
@@ -446,10 +405,7 @@ func (s *Tier1Service) BlocksAny(
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier1/request")
 	defer span.EndWithErr(&err)
 
-	var compressed bool
-	if matchHeader(header) {
-		compressed = true
-	}
+	compressor := header.Values("grpc-encoding")
 
 	fields := []zap.Field{
 		zap.String("protocol", protocol),
@@ -457,19 +413,12 @@ func (s *Tier1Service) BlocksAny(
 		zap.Uint64("stop_block", request.StopBlockNum),
 		zap.String("cursor", request.StartCursor),
 		zap.String("output_module", request.OutputModule),
-		zap.Bool("compressed", compressed),
+		zap.Strings("compressor", compressor),
 		zap.Bool("final_blocks_only", request.FinalBlocksOnly),
 		zap.Bool("production_mode", request.ProductionMode),
 		zap.Bool("noop_mode", request.NoopMode),
 		zap.Strings("dev_output_modules", request.DevOutputModules),
 		zap.Bool("partial_blocks", request.PartialBlocks),
-	}
-
-	if s.enforceCompression && !compressed {
-		err := connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("your client does not accept gzip- or zstd-compressed streams. Check how to enable it on your gRPC or ConnectRPC client"))
-		fields = append(fields, zap.Error(err))
-		logger.Info("refusing Substreams Blocks request", fields...)
-		return err
 	}
 
 	if request.Modules == nil {
@@ -1422,28 +1371,6 @@ func toConnectError(ctx context.Context, err error) error {
 	// Do we want to print the full cause as coming from Golang? Would we like to maybe trim off "operational"
 	// data?
 	return connect.NewError(connect.CodeInternal, err)
-}
-
-// must be lowercase
-var compressionHeader = map[string]map[string]bool{
-	"grpc-accept-encoding":    {"gzip": true, "zstd": true},
-	"connect-accept-encoding": {"gzip": true, "zstd": true},
-	"accept-encoding":         {"gzip": true}, // HTTP encoding for connect+proto in browser
-}
-
-func matchHeader(header http.Header) bool {
-	for k, v := range header {
-		if validEncodings, ok := compressionHeader[strings.ToLower(k)]; ok {
-			for _, vv := range v {
-				for _, vvv := range strings.Split(vv, ",") {
-					if validEncodings[strings.TrimSpace(strings.ToLower(vvv))] {
-						return true
-					}
-				}
-			}
-		}
-	}
-	return false
 }
 
 type overloadingStatus struct {

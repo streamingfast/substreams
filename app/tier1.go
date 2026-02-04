@@ -303,7 +303,7 @@ func (a *Tier1App) Run() error {
 		a.logger.Info("launching gRPC server", zap.Bool("live_support", withLive))
 		a.setIsReady(true)
 
-		err := service.ListenTier1(a.config.GRPCListenAddr, svc, infoServer, a.modules.Authenticator, a.logger, a.HealthCheck)
+		err := service.ListenTier1(a.config.GRPCListenAddr, svc, infoServer, a.modules.Authenticator, a.logger, a.HealthCheck, a.config.EnforceCompression)
 		a.Shutdown(err)
 	}()
 

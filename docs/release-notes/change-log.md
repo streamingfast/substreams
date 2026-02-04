@@ -21,6 +21,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Descriptor sets without a deterministic version (semver or commit ref) will always trigger regeneration
   - A warning is emitted listing which descriptor sets need pinned versions
   - The hash file is removed when non-deterministic descriptor sets are present to prevent stale caches
+  
+### Server  
+
+* Improved 'partial blocks': support new pbbstream's "LastPartial" field, fix 'undo' scenarios for stores
 
 ## v1.17.11
 

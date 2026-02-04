@@ -124,7 +124,7 @@ func (a *Tier2App) Run() error {
 		a.logger.Info("launching gRPC server")
 		a.setIsReady(true)
 
-		err := service.ListenTier2(a.config.GRPCListenAddr, a.config.ServiceDiscoveryURL, svc, trustAuth, a.logger, a.HealthCheck)
+		err := service.ListenTier2(a.config.GRPCListenAddr, a.config.ServiceDiscoveryURL, svc, trustAuth, a.logger, a.HealthCheck, false)
 		a.Shutdown(err)
 	}()
 

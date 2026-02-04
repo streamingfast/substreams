@@ -133,7 +133,7 @@ func (p *Pipeline) processBlock(
 	case bstream.StepUndoPartial:
 		if reqctx.PartialBlocks(ctx) {
 			p.blockStepMap[bstream.StepUndoPartial]++
-			if err := p.undoPartialStates(cursor, true); err != nil {
+			if err := p.handleStepUndoPartial(cursor); err != nil {
 				return err
 			}
 		}
@@ -207,12 +207,13 @@ func (p *Pipeline) handleStepStalled(clock *pbsubstreams.Clock) error {
 	return nil
 }
 
-// undoPartialStates will revert all partial states from stores in reverse order, etc.
-// Given a cursor and sendMessage==true, it will also send the undo message to the user
-func (p *Pipeline) undoPartialStates(cursor *bstream.Cursor, sendMessage bool) error {
+// undoPartialStates reverts all partial states from stores in reverse order.
+// It clears the partial processing state but does NOT send any undo signal to the user.
+func (p *Pipeline) undoPartialStates() error {
 	if p.partialProcessingState == nil {
 		return nil
 	}
+
 	for i := len(p.partialProcessingState.processedPartials) - 1; i >= 0; i-- {
 		clk := p.partialProcessingState.processedPartials[i]
 		if err := p.forkHandler.handleUndo(clk); err != nil {
@@ -220,26 +221,11 @@ func (p *Pipeline) undoPartialStates(cursor *bstream.Cursor, sendMessage bool) e
 		}
 	}
 
-	if sendMessage {
-		if err := p.handleUndo(&pbsubstreams.Clock{
-			Id:     p.partialProcessingState.lastBlockID,
-			Number: p.partialProcessingState.num,
-		}, &bstream.Cursor{
-			Step:      bstream.StepUndo,
-			Block:     cursor.Block,
-			HeadBlock: cursor.HeadBlock,
-			LIB:       cursor.LIB,
-		},
-			p.partialProcessingState.previousBlockRef,
-		); err != nil {
-			return err
-		}
-	}
-
 	p.partialProcessingState = nil
 	return nil
 }
 
+// handleUndo reverts a block's outputs and sends an undo signal to the user.
 func (p *Pipeline) handleUndo(clock *pbsubstreams.Clock, cursor *bstream.Cursor, reorgJunctionBlock bstream.BlockRef) error {
 	if err := p.forkHandler.handleUndo(clock); err != nil {
 		return fmt.Errorf("reverting outputs: %w", err)
@@ -272,11 +258,41 @@ func (p *Pipeline) handleUndo(clock *pbsubstreams.Clock, cursor *bstream.Cursor,
 		})
 }
 
+// handleStepUndo handles a regular undo step: undoes any pending partial states,
+// then reverts the block and sends an undo signal to the user.
 func (p *Pipeline) handleStepUndo(clock *pbsubstreams.Clock, cursor *bstream.Cursor, reorgJunctionBlock bstream.BlockRef) error {
-	if err := p.undoPartialStates(cursor, false); err != nil {
+	if err := p.undoPartialStates(); err != nil {
 		return err
 	}
 	return p.handleUndo(clock, cursor, reorgJunctionBlock)
+}
+
+// handleStepUndoPartial handles an undo specifically for partial blocks.
+// It undoes partial states and sends an undo signal to the user.
+func (p *Pipeline) handleStepUndoPartial(cursor *bstream.Cursor) error {
+	if p.partialProcessingState == nil {
+		return nil
+	}
+
+	clock := &pbsubstreams.Clock{
+		Id:     p.partialProcessingState.lastBlockID,
+		Number: p.partialProcessingState.num,
+	}
+
+	targetCursor := &bstream.Cursor{
+		Step:      bstream.StepUndo,
+		Block:     cursor.Block,
+		HeadBlock: cursor.HeadBlock,
+		LIB:       cursor.LIB,
+	}
+
+	reorgJunctionBlock := p.partialProcessingState.previousBlockRef
+
+	if err := p.undoPartialStates(); err != nil {
+		return err
+	}
+
+	return p.handleUndo(clock, targetCursor, reorgJunctionBlock)
 }
 
 func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
@@ -299,7 +315,7 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 			p.partialProcessingState.highestIndex = idx
 		} else {
 			reqctx.Logger(ctx).Warn("received partial after another non-last partial with different block numbers (without step_Undo) -- this should not happen unless you are running a chain with partial blocks AND skipped blocks", zap.Uint64("received", clock.Number), zap.Uint64("expected", p.partialProcessingState.num))
-			if err := p.undoPartialStates(cursor, true); err != nil {
+			if err := p.handleStepUndoPartial(cursor); err != nil {
 				return err
 			}
 			// now that we have undone previous partials, we start a new one
@@ -377,7 +393,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 	if p.isTier1 && p.checkPendingShutdown() {
 		if p.stores.StoreMap != nil && p.sentBlocks > minBlocksProcessedToSave {
 			p.stores.logger.Info("shutting down, quick saving stores")
-			if err := p.undoPartialStates(cursor, false); err != nil {
+			if err := p.undoPartialStates(); err != nil {
 				return err
 			}
 			p.stores.StoreMap.QuickSave(ctx, p.lastProcessedBlockRef.ID())
@@ -449,7 +465,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 			}
 			logger.Warn("receiving new block with an active partial state, but previousLastPartialBlock is not the same as the current block. Undoing partial state",
 				zap.String("previous last partial", prevLastPartial), zap.Stringer("current new block", clock))
-			if err := p.undoPartialStates(cursor, true); err != nil {
+			if err := p.handleStepUndoPartial(cursor); err != nil {
 				return fmt.Errorf("failed to undo partial states: %w", err)
 			}
 		}

@@ -17,7 +17,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const latestDummyBlockchainImage = "ghcr.io/streamingfast/dummy-blockchain:a4ded51"
+const latestDummyBlockchainImage = "ghcr.io/streamingfast/dummy-blockchain:v1.7.6"
 
 func TestPartialBlocksSimple(t *testing.T) {
 	ctx := context.Background()

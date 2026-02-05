@@ -79,8 +79,6 @@ The data missing in the Base Block makes the corresponding Protobuf field empty.
 - **Starknet Mainnet**: `mainnet.starknet.streamingfast.io:443`
 - **Starknet Testnet**: `testnet.starknet.streamingfast.io:443`
 - **Base Mainnet**: `base-mainnet.streamingfast.io:443`
-- **Mantra Mainnet**: `mainnet.mantra.streamingfast.io:443`
-- **Mantra Testnet**: `testnet.mantra.streamingfast.io:443`
 - **Monad Mainnet**: `mainnet-base.monad.streamingfast.io:443`
 - **Stellar Mainnet**: `mainnet.stellar.streamingfast.io:443`
 - **Stellar Testnet**: `testnet.stellar.streamingfast.io:443`

@@ -192,6 +192,7 @@ func (a *Tier1App) Run() error {
 					return h.ProcessBlock(blk, obj)
 				}),
 				blockstream.WithRequester("substreams-tier1"),
+				blockstream.WithPartialBlocks(),
 			)
 		})
 

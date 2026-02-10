@@ -18,7 +18,7 @@ require (
 	github.com/streamingfast/dauth v0.0.0-20251218134044-fb716c7172b4
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
 	github.com/streamingfast/derr v0.0.0-20250814163534-bd7407bd89d7
-	github.com/streamingfast/dgrpc v0.0.0-20260206130010-7b182ca29e1d
+	github.com/streamingfast/dgrpc v0.0.0-20260210154506-666c5437f4e6
 	github.com/streamingfast/dhttp v0.1.3-0.20251218140957-6d46b8f12eb1
 	github.com/streamingfast/dstore v0.1.3-0.20260113210117-94d66eda2027
 	github.com/streamingfast/logging v0.0.0-20260108192805-38f96de0a641
@@ -97,6 +97,9 @@ require (
 	cel.dev/expr v0.24.0 // indirect
 	cloud.google.com/go/auth v0.17.0 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
+	connectrpc.com/grpchealth v1.3.0 // indirect
+	connectrpc.com/grpcreflect v1.3.0 // indirect
+	connectrpc.com/otelconnect v0.8.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.20.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.13.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.11.2 // indirect

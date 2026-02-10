@@ -4,10 +4,6 @@ go 1.25.0
 
 toolchain go1.25.4
 
-//replace (
-//	github.com/streamingfast/dgrpc => ../dgrpc
-//)
-
 require (
 	github.com/golang/protobuf v1.5.4
 	github.com/jhump/protoreflect v1.14.0
@@ -18,7 +14,7 @@ require (
 	github.com/streamingfast/dauth v0.0.0-20251218134044-fb716c7172b4
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
 	github.com/streamingfast/derr v0.0.0-20250814163534-bd7407bd89d7
-	github.com/streamingfast/dgrpc v0.0.0-20260210154506-666c5437f4e6
+	github.com/streamingfast/dgrpc v0.0.0-20260210174949-b033ef4d8421
 	github.com/streamingfast/dhttp v0.1.3-0.20251218140957-6d46b8f12eb1
 	github.com/streamingfast/dstore v0.1.3-0.20260113210117-94d66eda2027
 	github.com/streamingfast/logging v0.0.0-20260108192805-38f96de0a641

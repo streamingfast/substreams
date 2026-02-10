@@ -20,6 +20,7 @@ import (
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
 	connectweb "github.com/streamingfast/dgrpc/server/connectrpc"
 	"github.com/streamingfast/dgrpc/server/factory"
+	"github.com/streamingfast/dgrpc/server/standard"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcv2connect"
@@ -58,10 +59,6 @@ func (a *v3Adapter) Blocks(req *pbsubstreamsrpcv3.Request, srv pbsubstreamsrpcv3
 func ListenTier1(
 	secureProxyListenAddress string,
 	plaintextProxyListenAddress string,
-	secureGrpcListenAddress string,
-	plaintextGrpcListenAddress string,
-	secureConnectListenAddress string,
-	plaintextConnectListenAddress string,
 	svc *Tier1Service,
 	connectSvc *tier1Connect.Service,
 	infoService pbsubstreamsrpc.EndpointInfoServer,
@@ -71,89 +68,32 @@ func ListenTier1(
 	enforceCompression bool,
 ) (err error) {
 
-	var secureGrpcServer dgrpcserver.Server
-	var plaintextGrpcServer dgrpcserver.Server
-	var secureConnectServer dgrpcserver.Server
-	var plaintextConnectServer dgrpcserver.Server
-	if plaintextGrpcListenAddress != "" {
-		plaintextGrpcServer = grpcSever(plaintextGrpcListenAddress, svc, infoService, auth, healthcheck, enforceCompression, logger)
-		go func() {
-			logger.Info("starting grpc server", zap.String("address", plaintextGrpcListenAddress))
-			plaintextGrpcServer.Launch(strings.ReplaceAll(plaintextGrpcListenAddress, "*", ""))
-		}()
-	}
+	grpcServer := grpcSever(secureProxyListenAddress, svc, infoService, auth, healthcheck, enforceCompression, logger)
+	connectServer := connectServer(secureProxyListenAddress, connectSvc, infoService, auth, healthcheck, enforceCompression, logger)
 
-	if secureGrpcListenAddress != "" {
-		secureGrpcServer = grpcSever(secureGrpcListenAddress, svc, infoService, auth, healthcheck, enforceCompression, logger)
-		go func() {
-			logger.Info("starting grpc server", zap.String("address", secureGrpcListenAddress))
-			secureGrpcServer.Launch(strings.ReplaceAll(secureGrpcListenAddress, "*", ""))
-		}()
-	}
-
-	if plaintextConnectListenAddress != "" {
-		plaintextConnectServer = connectServer(plaintextConnectListenAddress, connectSvc, infoService, auth, healthcheck, enforceCompression, logger)
-		go func() {
-			logger.Info("starting connect server", zap.String("address", plaintextConnectListenAddress))
-			plaintextConnectServer.Launch(strings.ReplaceAll(plaintextConnectListenAddress, "*", ""))
-		}()
-	}
-
-	if secureConnectListenAddress != "" {
-		secureConnectServer = connectServer(secureConnectListenAddress, connectSvc, infoService, auth, healthcheck, enforceCompression, logger)
-		go func() {
-			logger.Info("starting connect server", zap.String("address", secureConnectListenAddress))
-			secureConnectServer.Launch(strings.ReplaceAll(secureConnectListenAddress, "*", ""))
-		}()
-	}
-
-	// The main multiplexer / router
 	mux := http.NewServeMux()
-
-	// Catch-all handler that decides based on Content-Type
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		contentType := r.Header.Get("Content-Type")
-		isSecure := r.TLS != nil
 
-		// gRPC protocol starts with application/grpc
-		// gRPC-Web often uses application/grpc-web or application/grpc-web+proto
-		if strings.HasPrefix(contentType, "application/grpc") ||
-			strings.HasPrefix(contentType, "application/grpc-web") {
-
-			if isSecure {
-				logger.Debug("forwarding gRPC request over HTTPS")
-				secureGrpcServer.ServeHTTP(w, r)
-				return
-			}
-			logger.Debug("forwarding gRPC request over HTTP")
-			plaintextGrpcServer.ServeHTTP(w, r)
-			return
-		}
-
-		// Connect protocol: application/connect+proto or application/connect+json
-		// Also catch JSON for REST-like testing
-		if strings.HasPrefix(contentType, "application/connect") ||
-			contentType == "application/json" ||
-			strings.Contains(contentType, "json") { // loose match for safety
-
-			if isSecure {
-				logger.Debug("forwarding gRPC-Web request over HTTPS")
-				secureConnectServer.ServeHTTP(w, r)
-				return
-			}
-
-			logger.Debug("forwarding gRPC-Web request over HTTP")
-			plaintextConnectServer.ServeHTTP(w, r)
+		if strings.HasPrefix(contentType, "application/grpc") || strings.HasPrefix(contentType, "application/grpc-web") {
+			logger.Debug("forwarding gRPC request")
+			grpcServer.ServeHTTP(w, r)
 
 			return
 		}
 
-		// Fallback: could return 415 or route to one by default
+		if strings.HasPrefix(contentType, "application/connect") || contentType == "application/json" || strings.Contains(contentType, "json") { // loose match for safety
+			logger.Debug("forwarding gRPC-Web request")
+			connectServer.ServeHTTP(w, r)
+			return
+
+		}
+
 		http.Error(w, "Unsupported Content-Type for RPC", http.StatusUnsupportedMediaType)
 	})
 
-	// Support HTTP/1.1 → h2c upgrade + direct h2
-	handler := h2c.NewHandler(mux, &http2.Server{})
+	compressionHandler := standard.CompressionHandler(enforceCompression, mux)
+	handler := h2c.NewHandler(compressionHandler, &http2.Server{})
 
 	logger.Info("starting secure proxy server", zap.String("address", secureProxyListenAddress))
 	go func() {
@@ -170,21 +110,13 @@ func ListenTier1(
 
 	logger.Info("started")
 
-	if secureGrpcServer != nil {
-		<-secureGrpcServer.Terminating()
-		logger.Info("secure gRPC server terminated", zap.Error(secureGrpcServer.Error()))
+	if grpcServer != nil {
+		<-grpcServer.Terminating()
+		logger.Info("gRPC server terminated", zap.Error(grpcServer.Error()))
 	}
-	if plaintextGrpcServer != nil {
-		<-plaintextGrpcServer.Terminating()
-		logger.Info("secure gRPC server terminated", zap.Error(plaintextGrpcServer.Error()))
-	}
-	if secureConnectServer != nil {
-		<-secureConnectServer.Terminating()
-		logger.Info("secure gRPC server terminated", zap.Error(secureConnectServer.Error()))
-	}
-	if plaintextConnectServer != nil {
-		<-plaintextConnectServer.Terminating()
-		logger.Info("secure gRPC server terminated", zap.Error(plaintextConnectServer.Error()))
+	if connectServer != nil {
+		<-connectServer.Terminating()
+		logger.Info("gRPC server terminated", zap.Error(connectServer.Error()))
 	}
 
 	return

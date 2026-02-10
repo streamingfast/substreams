@@ -310,12 +310,6 @@ func (a *Tier1App) Run() error {
 		secureGrpcProxyAddr := ":9000"
 		plaintextGrpcProxyAddr := ":8080"
 
-		secureGrpcAddr := ":9100"
-		plaintextGrpcAddr := ":8180"
-
-		secureConnectProxyAddr := ":9200"
-		plaintextConnectProxyAddr := ":8180"
-
 		addresses := strings.Split(a.config.GRPCListenAddr, ",")
 		addressCount := len(addresses)
 		if addressCount == 0 {
@@ -328,20 +322,8 @@ func (a *Tier1App) Run() error {
 		if addressCount > 1 {
 			plaintextGrpcProxyAddr = addresses[1]
 		}
-		if addressCount > 2 {
-			secureGrpcAddr = addresses[2]
-		}
-		if addressCount > 3 {
-			plaintextGrpcAddr = addresses[3]
-		}
-		if addressCount > 4 {
-			secureConnectProxyAddr = addresses[4]
-		}
-		if addressCount > 5 {
-			plaintextConnectProxyAddr = addresses[5]
-		}
 
-		err := service.ListenTier1(secureGrpcProxyAddr, plaintextGrpcProxyAddr, secureGrpcAddr, plaintextGrpcAddr, secureConnectProxyAddr, plaintextConnectProxyAddr, tier1Service, tier1ServiceConnect, infoServer, a.modules.Authenticator, a.logger, a.HealthCheck, a.config.EnforceCompression)
+		err := service.ListenTier1(secureGrpcProxyAddr, plaintextGrpcProxyAddr, tier1Service, tier1ServiceConnect, infoServer, a.modules.Authenticator, a.logger, a.HealthCheck, a.config.EnforceCompression)
 		a.Shutdown(err)
 	}()
 

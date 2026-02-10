@@ -12,9 +12,7 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/mostynb/go-grpc-compression/experimental/s2"
-
-	//"github.com/mostynb/go-grpc-compression/experimental/s2"
-	//_ "github.com/mostynb/go-grpc-compression/experimental/s2"
+	vt "github.com/planetscale/vtprotobuf/codec/grpc"
 	"github.com/streamingfast/dgrpc"
 	networks "github.com/streamingfast/firehose-networks"
 	"github.com/streamingfast/logging/zapx"
@@ -27,10 +25,16 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/credentials/oauth"
 	xdscreds "google.golang.org/grpc/credentials/xds"
+	"google.golang.org/grpc/encoding"
 	_ "google.golang.org/grpc/encoding/gzip"
 	stats "google.golang.org/grpc/stats"
 	_ "google.golang.org/grpc/xds"
 )
+
+func init() {
+	fmt.Println("------------------ VT Proto registered ------------------------")
+	encoding.RegisterCodec(vt.Codec{})
+}
 
 type AuthType int
 
@@ -187,6 +191,7 @@ func (h *sizeLoggingHandler) TagRPC(ctx context.Context, info *stats.RPCTagInfo)
 }
 
 func (h *sizeLoggingHandler) HandleRPC(ctx context.Context, rs stats.RPCStats) {
+	//fmt.Println("handle rpc:", h.messageCount)
 	if inPayload, ok := rs.(*stats.InPayload); ok && inPayload != nil {
 		if h.messageCount == 0 {
 			h.timeStart = time.Now()
@@ -213,6 +218,7 @@ func (h *sizeLoggingHandler) HandleRPC(ctx context.Context, rs stats.RPCStats) {
 				zap.String("compressed", humanize.Bytes(uint64(h.compressedBytes))),
 				zap.Int("uncompressed_bytes", h.uncompressedBytes),
 				zap.Int("compressed_bytes", h.compressedBytes),
+				zap.Bool("keep", false),
 			)
 
 			h.timeStart = time.Now()

@@ -1097,7 +1097,15 @@ func configureLiveBackFillerFromQuickload(ctx context.Context, segmentSize uint6
 	return nil
 }
 
-func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logger, streamSrv grpc.ServerStream, noop bool, stats *metrics.Stats, debugOutputForModules []string) substreams.ResponseFunc {
+func tier1ResponseHandler(
+	ctx context.Context,
+	mut *sync.Mutex,
+	logger *zap.Logger,
+	streamSrv grpc.ServerStream,
+	noop bool,
+	stats *metrics.Stats,
+	debugOutputForModules []string,
+) substreams.ResponseFunc {
 	auth := dauth.FromContext(ctx)
 	organizationID := auth.OrganizationID()
 	apiKeyID := auth.APIKeyID()

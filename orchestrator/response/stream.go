@@ -19,6 +19,10 @@ func (s *Stream) BlockScopedData(in *pbsubstreamsrpc.BlockScopedData) error {
 	return s.respFunc(substreams.NewBlockScopedDataResponse(in))
 }
 
+func (s *Stream) BlockScopedDatas(in *pbsubstreamsrpc.BlockScopedDatas) error {
+	return s.respFunc(substreams.NewBlockScopedDatasResponse(in))
+}
+
 func (s *Stream) SendModulesStats(stats []*pbsubstreamsrpc.ModuleStats, stages []*pbsubstreamsrpc.Stage, jobs []*pbsubstreamsrpc.Job, bytesRead, bytesWritten, blocksProcessed uint64) error {
 	return s.respFunc(&pbsubstreamsrpc.Response{
 		Message: &pbsubstreamsrpc.Response_Progress{

@@ -18,6 +18,11 @@ func NewBlockScopedDataResponse(in *pbsubstreamsrpc.BlockScopedData) *pbsubstrea
 		Message: &pbsubstreamsrpc.Response_BlockScopedData{BlockScopedData: in},
 	}
 }
+func NewBlockScopedDatasResponse(in *pbsubstreamsrpc.BlockScopedDatas) *pbsubstreamsrpc.Response {
+	return &pbsubstreamsrpc.Response{
+		Message: &pbsubstreamsrpc.Response_BlockScopedDatas{BlockScopedDatas: in},
+	}
+}
 func NewBlockScopedDataInternResponse(in *pbssinternal.BlockScopedData) *pbssinternal.ProcessRangeResponse {
 	return &pbssinternal.ProcessRangeResponse{
 		Type: &pbssinternal.ProcessRangeResponse_BlockScopedData{BlockScopedData: in},

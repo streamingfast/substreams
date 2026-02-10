@@ -633,76 +633,20 @@ func (s *Sinker) doRequest(
 				s.Logger.Debug("received response Progress", zap.Reflect("progress", r))
 			}
 
-		case *pbsubstreamsrpc.Response_BlockScopedData:
-			receivedDataMessage = true
-			if cursorLivenessChecker, ok := s.LivenessChecker.(*CursorBasedLivenessChecker); ok {
-				cursorLivenessChecker.CheckCursor(r.BlockScopedData.Cursor)
+		case *pbsubstreamsrpc.Response_BlockScopedDatas:
+			for idx, item := range r.BlockScopedDatas.Items {
+				if activeCursor, receivedDataMessage, err = s.processBlockScopedData(ctx, handler, item, idx == 0, beforeReceive, &prevBlockTime, activeCursor); err != nil {
+					return activeCursor, receivedDataMessage, err
+				}
+				afterReceive = time.Now()
+				lastMessageWasData = true
 			}
-
+		case *pbsubstreamsrpc.Response_BlockScopedData:
+			if activeCursor, receivedDataMessage, err = s.processBlockScopedData(ctx, handler, r.BlockScopedData, true, beforeReceive, &prevBlockTime, activeCursor); err != nil {
+				return activeCursor, receivedDataMessage, err
+			}
 			afterReceive = time.Now()
 			lastMessageWasData = true
-			AvgBlockWaitTime.AddElapsedTime(beforeReceive)
-			BlockWaitTime.SetFloat64(AvgBlockWaitTime.Average().Seconds())
-
-			blockTime := r.BlockScopedData.Clock.Timestamp.AsTime()
-			if !prevBlockTime.IsZero() {
-				AvgBlockTimeDelta.AddDuration(blockTime.Sub(prevBlockTime))
-				BlockTimeDelta.SetFloat64(AvgBlockTimeDelta.Average().Seconds())
-			}
-			prevBlockTime = blockTime
-
-			block := bstream.NewBlockRef(r.BlockScopedData.Clock.Id, r.BlockScopedData.Clock.Number)
-			moduleOutput := r.BlockScopedData.Output
-
-			if s.Tracer.Enabled() {
-				s.Logger.Debug("received response BlockScopedData", zap.Stringer("at", block), zap.String("module_name", moduleOutput.Name), zap.Int("payload_bytes", len(moduleOutput.MapOutput.Value)))
-			}
-
-			// We record our stats before the buffer action, so user sees state of "stream" and not state of buffer
-			s.stats.RecordBlock(block)
-			HeadBlockNumber.SetUint64(block.Num())
-			HeadBlockTimeDrift.SetBlockTime(r.BlockScopedData.Clock.Timestamp.AsTime())
-			DataMessageCount.Inc()
-			ServerEgressBytes.AddInt(proto.Size(r.BlockScopedData))
-			BackprocessingCompletion.SetUint64(1)
-
-			cursor, err := NewCursor(r.BlockScopedData.Cursor)
-			if err != nil {
-				return activeCursor, receivedDataMessage, fmt.Errorf("invalid received cursor, 'bstream' library in here is probably not up to date: %w", err)
-			}
-
-			activeCursor = cursor
-
-			var dataToProcess []*pbsubstreamsrpc.BlockScopedData
-			if s.buffer == nil {
-				// No buffering, process directly
-				dataToProcess = []*pbsubstreamsrpc.BlockScopedData{r.BlockScopedData}
-			} else {
-				dataToProcess, err = s.buffer.HandleBlockScopedData(r.BlockScopedData)
-				if err != nil {
-					return activeCursor, receivedDataMessage, fmt.Errorf("buffer add block data: %w", err)
-				}
-			}
-
-			for _, blockScopedData := range dataToProcess {
-				currentCursor, err := NewCursor(blockScopedData.Cursor)
-				if err != nil {
-					return activeCursor, receivedDataMessage, fmt.Errorf("invalid received cursor, 'bstream' library in here is probably not up to date: %w", err)
-				}
-
-				var isLive *bool
-				if s.LivenessChecker != nil {
-					isLive = &blockNotLive
-					if s.LivenessChecker.IsLive(blockScopedData.Clock) {
-						isLive = &liveBlock
-					}
-					s.stats.SetLiveness(isLive)
-				}
-
-				if err := handler.HandleBlockScopedData(ctx, blockScopedData, isLive, currentCursor); err != nil {
-					return activeCursor, receivedDataMessage, fmt.Errorf("handle BlockScopedData message at block %s: %w", block, err)
-				}
-			}
 
 		case *pbsubstreamsrpc.Response_BlockUndoSignal:
 			undoSignal := r.BlockUndoSignal
@@ -778,6 +722,89 @@ func (s *Sinker) doRequest(
 			UnknownMessageCount.Inc()
 		}
 	}
+}
+
+func (s *Sinker) processBlockScopedData(
+	ctx context.Context,
+	handler SinkerHandler,
+	data *pbsubstreamsrpc.BlockScopedData,
+	isFirstItem bool,
+	beforeReceive time.Time,
+	prevBlockTime *time.Time,
+	activeCursor *Cursor,
+) (newCursor *Cursor, receivedDataMessage bool, err error) {
+	receivedDataMessage = true
+	if cursorLivenessChecker, ok := s.LivenessChecker.(*CursorBasedLivenessChecker); ok {
+		cursorLivenessChecker.CheckCursor(data.Cursor)
+	}
+
+	if isFirstItem {
+		AvgBlockWaitTime.AddElapsedTime(beforeReceive)
+		BlockWaitTime.SetFloat64(AvgBlockWaitTime.Average().Seconds())
+	}
+
+	blockTime := data.Clock.Timestamp.AsTime()
+	if !prevBlockTime.IsZero() {
+		AvgBlockTimeDelta.AddDuration(blockTime.Sub(*prevBlockTime))
+		BlockTimeDelta.SetFloat64(AvgBlockTimeDelta.Average().Seconds())
+	}
+	*prevBlockTime = blockTime
+
+	block := bstream.NewBlockRef(data.Clock.Id, data.Clock.Number)
+	moduleOutput := data.Output
+
+	if s.Tracer.Enabled() {
+		s.Logger.Debug("received response BlockScopedData", zap.Stringer("at", block), zap.String("module_name", moduleOutput.Name), zap.Int("payload_bytes", len(moduleOutput.MapOutput.Value)))
+	}
+
+	// We record our stats before the buffer action, so user sees state of "stream" and not state of buffer
+	s.stats.RecordBlock(block)
+	HeadBlockNumber.SetUint64(block.Num())
+	HeadBlockTimeDrift.SetBlockTime(data.Clock.Timestamp.AsTime())
+	DataMessageCount.Inc()
+	ServerEgressBytes.AddInt(proto.Size(data))
+	BackprocessingCompletion.SetUint64(1)
+
+	cursor, err := NewCursor(data.Cursor)
+	if err != nil {
+		return activeCursor, receivedDataMessage, fmt.Errorf("invalid received cursor, 'bstream' library in here is probably not up to date: %w", err)
+	}
+
+	activeCursor = cursor
+
+	var dataToProcess []*pbsubstreamsrpc.BlockScopedData
+	if s.buffer == nil {
+		// No buffering, process directly
+		dataToProcess = []*pbsubstreamsrpc.BlockScopedData{data}
+	} else {
+		var err error
+		dataToProcess, err = s.buffer.HandleBlockScopedData(data)
+		if err != nil {
+			return activeCursor, receivedDataMessage, fmt.Errorf("buffer add block data: %w", err)
+		}
+	}
+
+	for _, blockScopedData := range dataToProcess {
+		currentCursor, err := NewCursor(blockScopedData.Cursor)
+		if err != nil {
+			return activeCursor, receivedDataMessage, fmt.Errorf("invalid received cursor, 'bstream' library in here is probably not up to date: %w", err)
+		}
+
+		var isLive *bool
+		if s.LivenessChecker != nil {
+			isLive = &blockNotLive
+			if s.LivenessChecker.IsLive(blockScopedData.Clock) {
+				isLive = &liveBlock
+			}
+			s.stats.SetLiveness(isLive)
+		}
+
+		if err := handler.HandleBlockScopedData(ctx, blockScopedData, isLive, currentCursor); err != nil {
+			return activeCursor, receivedDataMessage, fmt.Errorf("handle BlockScopedData message at block %s: %w", block, err)
+		}
+	}
+
+	return activeCursor, true, nil
 }
 
 func stageString(i uint32) string {

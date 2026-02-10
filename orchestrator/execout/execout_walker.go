@@ -10,9 +10,6 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
-	"go.uber.org/zap"
-	"google.golang.org/protobuf/types/known/anypb"
-
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/orchestrator/response"
@@ -21,6 +18,8 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
 	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
+	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type Walker struct {
@@ -33,6 +32,7 @@ type Walker struct {
 	working    bool
 	workingAt  time.Time // Timestamp when working was set to true
 	noopMode   bool
+	buffer     *MessageBuffer
 }
 
 func NewWalker(
@@ -52,6 +52,7 @@ func NewWalker(
 		streamOut:  stream,
 		noopMode:   noopMode,
 		logger:     logger,
+		buffer:     NewMessageBuffer(100),
 	}
 }
 
@@ -167,6 +168,7 @@ func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
 					zap.Int("segment", current),
 					zap.Error(err),
 				)
+
 				return loop.NewQuitMsg(err)
 			}
 		}
@@ -226,6 +228,12 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 	itemCount := 0
 	for item, err := range reader.Iter() {
 		if err != nil {
+			if err == io.EOF {
+				err := r.buffer.Flush(r.streamOut)
+				if err != nil {
+					return fmt.Errorf("flushing buffer on eof: %w", err)
+				}
+			}
 			return err
 		}
 		if item.BlockNum < r.StartBlock {
@@ -245,6 +253,13 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 			return fmt.Errorf("converting to block scoped data: %w", err)
 		}
 
+		r.buffer.Append(blockScopedData)
+		if r.buffer.ShouldFlush() {
+			err := r.buffer.Flush(r.streamOut)
+			if err != nil {
+				return fmt.Errorf("flushing buffer: %w", err)
+			}
+		}
 		if err = r.streamOut.BlockScopedData(blockScopedData); err != nil {
 			return fmt.Errorf("calling response func: %w", err)
 		}

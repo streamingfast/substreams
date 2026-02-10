@@ -7,15 +7,14 @@
 package pbsubstreamsrpcv2
 
 import (
-	reflect "reflect"
-	sync "sync"
-	unsafe "unsafe"
-
 	v2 "github.com/streamingfast/pbgo/sf/firehose/v2"
 	v1 "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	anypb "google.golang.org/protobuf/types/known/anypb"
+	reflect "reflect"
+	sync "sync"
+	unsafe "unsafe"
 )
 
 const (
@@ -74,7 +73,7 @@ func (x StoreDelta_Operation) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use StoreDelta_Operation.Descriptor instead.
 func (StoreDelta_Operation) EnumDescriptor() ([]byte, []int) {
-	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{17, 0}
+	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{18, 0}
 }
 
 type Request struct {
@@ -258,6 +257,7 @@ type Response struct {
 	//	*Response_BlockScopedData
 	//	*Response_BlockUndoSignal
 	//	*Response_FatalError
+	//	*Response_BlockScopedDatas
 	//	*Response_DebugSnapshotData
 	//	*Response_DebugSnapshotComplete
 	Message       isResponse_Message `protobuf_oneof:"message"`
@@ -347,6 +347,15 @@ func (x *Response) GetFatalError() *Error {
 	return nil
 }
 
+func (x *Response) GetBlockScopedDatas() *BlockScopedDatas {
+	if x != nil {
+		if x, ok := x.Message.(*Response_BlockScopedDatas); ok {
+			return x.BlockScopedDatas
+		}
+	}
+	return nil
+}
+
 func (x *Response) GetDebugSnapshotData() *InitialSnapshotData {
 	if x != nil {
 		if x, ok := x.Message.(*Response_DebugSnapshotData); ok {
@@ -389,6 +398,10 @@ type Response_FatalError struct {
 	FatalError *Error `protobuf:"bytes,5,opt,name=fatal_error,json=fatalError,proto3,oneof"`
 }
 
+type Response_BlockScopedDatas struct {
+	BlockScopedDatas *BlockScopedDatas `protobuf:"bytes,6,opt,name=block_scoped_datas,json=blockScopedDatas,proto3,oneof"`
+}
+
 type Response_DebugSnapshotData struct {
 	// Available only in developer mode, and only if `debug_initial_store_snapshot_for_modules` is set.
 	DebugSnapshotData *InitialSnapshotData `protobuf:"bytes,10,opt,name=debug_snapshot_data,json=debugSnapshotData,proto3,oneof"`
@@ -408,6 +421,8 @@ func (*Response_BlockScopedData) isResponse_Message() {}
 func (*Response_BlockUndoSignal) isResponse_Message() {}
 
 func (*Response_FatalError) isResponse_Message() {}
+
+func (*Response_BlockScopedDatas) isResponse_Message() {}
 
 func (*Response_DebugSnapshotData) isResponse_Message() {}
 
@@ -468,6 +483,50 @@ func (x *BlockUndoSignal) GetLastValidCursor() string {
 	return ""
 }
 
+type BlockScopedDatas struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Items         []*BlockScopedData     `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BlockScopedDatas) Reset() {
+	*x = BlockScopedDatas{}
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BlockScopedDatas) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BlockScopedDatas) ProtoMessage() {}
+
+func (x *BlockScopedDatas) ProtoReflect() protoreflect.Message {
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BlockScopedDatas.ProtoReflect.Descriptor instead.
+func (*BlockScopedDatas) Descriptor() ([]byte, []int) {
+	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *BlockScopedDatas) GetItems() []*BlockScopedData {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
 type BlockScopedData struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Output *MapModuleOutput       `protobuf:"bytes,1,opt,name=output,proto3" json:"output,omitempty"`
@@ -493,7 +552,7 @@ type BlockScopedData struct {
 
 func (x *BlockScopedData) Reset() {
 	*x = BlockScopedData{}
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[3]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -505,7 +564,7 @@ func (x *BlockScopedData) String() string {
 func (*BlockScopedData) ProtoMessage() {}
 
 func (x *BlockScopedData) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[3]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -518,7 +577,7 @@ func (x *BlockScopedData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockScopedData.ProtoReflect.Descriptor instead.
 func (*BlockScopedData) Descriptor() ([]byte, []int) {
-	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{3}
+	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *BlockScopedData) GetOutput() *MapModuleOutput {
@@ -617,7 +676,7 @@ type SessionInit struct {
 
 func (x *SessionInit) Reset() {
 	*x = SessionInit{}
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[4]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -629,7 +688,7 @@ func (x *SessionInit) String() string {
 func (*SessionInit) ProtoMessage() {}
 
 func (x *SessionInit) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[4]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -642,7 +701,7 @@ func (x *SessionInit) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionInit.ProtoReflect.Descriptor instead.
 func (*SessionInit) Descriptor() ([]byte, []int) {
-	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{4}
+	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *SessionInit) GetTraceId() string {
@@ -724,7 +783,7 @@ type InitialSnapshotComplete struct {
 
 func (x *InitialSnapshotComplete) Reset() {
 	*x = InitialSnapshotComplete{}
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[5]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -736,7 +795,7 @@ func (x *InitialSnapshotComplete) String() string {
 func (*InitialSnapshotComplete) ProtoMessage() {}
 
 func (x *InitialSnapshotComplete) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[5]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -749,7 +808,7 @@ func (x *InitialSnapshotComplete) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InitialSnapshotComplete.ProtoReflect.Descriptor instead.
 func (*InitialSnapshotComplete) Descriptor() ([]byte, []int) {
-	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{5}
+	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *InitialSnapshotComplete) GetCursor() string {
@@ -771,7 +830,7 @@ type InitialSnapshotData struct {
 
 func (x *InitialSnapshotData) Reset() {
 	*x = InitialSnapshotData{}
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[6]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -783,7 +842,7 @@ func (x *InitialSnapshotData) String() string {
 func (*InitialSnapshotData) ProtoMessage() {}
 
 func (x *InitialSnapshotData) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[6]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -796,7 +855,7 @@ func (x *InitialSnapshotData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InitialSnapshotData.ProtoReflect.Descriptor instead.
 func (*InitialSnapshotData) Descriptor() ([]byte, []int) {
-	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{6}
+	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *InitialSnapshotData) GetModuleName() string {
@@ -839,7 +898,7 @@ type MapModuleOutput struct {
 
 func (x *MapModuleOutput) Reset() {
 	*x = MapModuleOutput{}
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[7]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -851,7 +910,7 @@ func (x *MapModuleOutput) String() string {
 func (*MapModuleOutput) ProtoMessage() {}
 
 func (x *MapModuleOutput) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[7]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -864,7 +923,7 @@ func (x *MapModuleOutput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MapModuleOutput.ProtoReflect.Descriptor instead.
 func (*MapModuleOutput) Descriptor() ([]byte, []int) {
-	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{7}
+	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *MapModuleOutput) GetName() string {
@@ -903,7 +962,7 @@ type StoreModuleOutput struct {
 
 func (x *StoreModuleOutput) Reset() {
 	*x = StoreModuleOutput{}
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[8]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -915,7 +974,7 @@ func (x *StoreModuleOutput) String() string {
 func (*StoreModuleOutput) ProtoMessage() {}
 
 func (x *StoreModuleOutput) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[8]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -928,7 +987,7 @@ func (x *StoreModuleOutput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StoreModuleOutput.ProtoReflect.Descriptor instead.
 func (*StoreModuleOutput) Descriptor() ([]byte, []int) {
-	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{8}
+	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *StoreModuleOutput) GetName() string {
@@ -965,7 +1024,7 @@ type OutputDebugInfo struct {
 
 func (x *OutputDebugInfo) Reset() {
 	*x = OutputDebugInfo{}
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[9]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -977,7 +1036,7 @@ func (x *OutputDebugInfo) String() string {
 func (*OutputDebugInfo) ProtoMessage() {}
 
 func (x *OutputDebugInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[9]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -990,7 +1049,7 @@ func (x *OutputDebugInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OutputDebugInfo.ProtoReflect.Descriptor instead.
 func (*OutputDebugInfo) Descriptor() ([]byte, []int) {
-	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{9}
+	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *OutputDebugInfo) GetLogs() []string {
@@ -1031,7 +1090,7 @@ type ModulesProgress struct {
 
 func (x *ModulesProgress) Reset() {
 	*x = ModulesProgress{}
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[10]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1043,7 +1102,7 @@ func (x *ModulesProgress) String() string {
 func (*ModulesProgress) ProtoMessage() {}
 
 func (x *ModulesProgress) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[10]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1056,7 +1115,7 @@ func (x *ModulesProgress) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ModulesProgress.ProtoReflect.Descriptor instead.
 func (*ModulesProgress) Descriptor() ([]byte, []int) {
-	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{10}
+	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ModulesProgress) GetRunningJobs() []*Job {
@@ -1104,7 +1163,7 @@ type ProcessedBytes struct {
 
 func (x *ProcessedBytes) Reset() {
 	*x = ProcessedBytes{}
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[11]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1116,7 +1175,7 @@ func (x *ProcessedBytes) String() string {
 func (*ProcessedBytes) ProtoMessage() {}
 
 func (x *ProcessedBytes) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[11]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1129,7 +1188,7 @@ func (x *ProcessedBytes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProcessedBytes.ProtoReflect.Descriptor instead.
 func (*ProcessedBytes) Descriptor() ([]byte, []int) {
-	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{11}
+	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ProcessedBytes) GetTotalBytesRead() uint64 {
@@ -1160,7 +1219,7 @@ type Error struct {
 
 func (x *Error) Reset() {
 	*x = Error{}
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[12]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1172,7 +1231,7 @@ func (x *Error) String() string {
 func (*Error) ProtoMessage() {}
 
 func (x *Error) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[12]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1185,7 +1244,7 @@ func (x *Error) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Error.ProtoReflect.Descriptor instead.
 func (*Error) Descriptor() ([]byte, []int) {
-	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{12}
+	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *Error) GetModule() string {
@@ -1229,7 +1288,7 @@ type Job struct {
 
 func (x *Job) Reset() {
 	*x = Job{}
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[13]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1241,7 +1300,7 @@ func (x *Job) String() string {
 func (*Job) ProtoMessage() {}
 
 func (x *Job) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[13]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1254,7 +1313,7 @@ func (x *Job) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Job.ProtoReflect.Descriptor instead.
 func (*Job) Descriptor() ([]byte, []int) {
-	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{13}
+	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *Job) GetStage() uint32 {
@@ -1302,7 +1361,7 @@ type Stage struct {
 
 func (x *Stage) Reset() {
 	*x = Stage{}
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[14]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1314,7 +1373,7 @@ func (x *Stage) String() string {
 func (*Stage) ProtoMessage() {}
 
 func (x *Stage) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[14]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1327,7 +1386,7 @@ func (x *Stage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Stage.ProtoReflect.Descriptor instead.
 func (*Stage) Descriptor() ([]byte, []int) {
-	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{14}
+	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *Stage) GetModules() []string {
@@ -1379,7 +1438,7 @@ type ModuleStats struct {
 
 func (x *ModuleStats) Reset() {
 	*x = ModuleStats{}
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[15]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1391,7 +1450,7 @@ func (x *ModuleStats) String() string {
 func (*ModuleStats) ProtoMessage() {}
 
 func (x *ModuleStats) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[15]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1404,7 +1463,7 @@ func (x *ModuleStats) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ModuleStats.ProtoReflect.Descriptor instead.
 func (*ModuleStats) Descriptor() ([]byte, []int) {
-	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{15}
+	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ModuleStats) GetName() string {
@@ -1502,7 +1561,7 @@ type ExternalCallMetric struct {
 
 func (x *ExternalCallMetric) Reset() {
 	*x = ExternalCallMetric{}
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[16]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1514,7 +1573,7 @@ func (x *ExternalCallMetric) String() string {
 func (*ExternalCallMetric) ProtoMessage() {}
 
 func (x *ExternalCallMetric) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[16]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1527,7 +1586,7 @@ func (x *ExternalCallMetric) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExternalCallMetric.ProtoReflect.Descriptor instead.
 func (*ExternalCallMetric) Descriptor() ([]byte, []int) {
-	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{16}
+	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ExternalCallMetric) GetName() string {
@@ -1564,7 +1623,7 @@ type StoreDelta struct {
 
 func (x *StoreDelta) Reset() {
 	*x = StoreDelta{}
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[17]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1576,7 +1635,7 @@ func (x *StoreDelta) String() string {
 func (*StoreDelta) ProtoMessage() {}
 
 func (x *StoreDelta) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[17]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1589,7 +1648,7 @@ func (x *StoreDelta) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StoreDelta.ProtoReflect.Descriptor instead.
 func (*StoreDelta) Descriptor() ([]byte, []int) {
-	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{17}
+	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *StoreDelta) GetOperation() StoreDelta_Operation {
@@ -1637,7 +1696,7 @@ type BlockRange struct {
 
 func (x *BlockRange) Reset() {
 	*x = BlockRange{}
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[18]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1649,7 +1708,7 @@ func (x *BlockRange) String() string {
 func (*BlockRange) ProtoMessage() {}
 
 func (x *BlockRange) ProtoReflect() protoreflect.Message {
-	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[18]
+	mi := &file_sf_substreams_rpc_v2_service_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1662,7 +1721,7 @@ func (x *BlockRange) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockRange.ProtoReflect.Descriptor instead.
 func (*BlockRange) Descriptor() ([]byte, []int) {
-	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{18}
+	return file_sf_substreams_rpc_v2_service_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *BlockRange) GetStartBlock() uint64 {
@@ -1698,21 +1757,24 @@ const file_sf_substreams_rpc_v2_service_proto_rawDesc = "" +
 	"\x16limit_processed_blocks\x18\f \x01(\x04R\x14limitProcessedBlocks\x12,\n" +
 	"\x12dev_output_modules\x18\r \x03(\tR\x10devOutputModules\x12A\n" +
 	"\x1dprogress_messages_interval_ms\x18\x0e \x01(\x04R\x1aprogressMessagesIntervalMs\x12%\n" +
-	"\x0epartial_blocks\x18\x10 \x01(\bR\rpartialBlocksJ\x04\b\x0f\x10\x10\"\xc9\x04\n" +
+	"\x0epartial_blocks\x18\x10 \x01(\bR\rpartialBlocksJ\x04\b\x0f\x10\x10\"\xa1\x05\n" +
 	"\bResponse\x12=\n" +
 	"\asession\x18\x01 \x01(\v2!.sf.substreams.rpc.v2.SessionInitH\x00R\asession\x12C\n" +
 	"\bprogress\x18\x02 \x01(\v2%.sf.substreams.rpc.v2.ModulesProgressH\x00R\bprogress\x12S\n" +
 	"\x11block_scoped_data\x18\x03 \x01(\v2%.sf.substreams.rpc.v2.BlockScopedDataH\x00R\x0fblockScopedData\x12S\n" +
 	"\x11block_undo_signal\x18\x04 \x01(\v2%.sf.substreams.rpc.v2.BlockUndoSignalH\x00R\x0fblockUndoSignal\x12>\n" +
 	"\vfatal_error\x18\x05 \x01(\v2\x1b.sf.substreams.rpc.v2.ErrorH\x00R\n" +
-	"fatalError\x12[\n" +
+	"fatalError\x12V\n" +
+	"\x12block_scoped_datas\x18\x06 \x01(\v2&.sf.substreams.rpc.v2.BlockScopedDatasH\x00R\x10blockScopedDatas\x12[\n" +
 	"\x13debug_snapshot_data\x18\n" +
 	" \x01(\v2).sf.substreams.rpc.v2.InitialSnapshotDataH\x00R\x11debugSnapshotData\x12g\n" +
 	"\x17debug_snapshot_complete\x18\v \x01(\v2-.sf.substreams.rpc.v2.InitialSnapshotCompleteH\x00R\x15debugSnapshotCompleteB\t\n" +
 	"\amessage\"\x83\x01\n" +
 	"\x0fBlockUndoSignal\x12D\n" +
 	"\x10last_valid_block\x18\x01 \x01(\v2\x1a.sf.substreams.v1.BlockRefR\x0elastValidBlock\x12*\n" +
-	"\x11last_valid_cursor\x18\x02 \x01(\tR\x0flastValidCursor\"\xaf\x04\n" +
+	"\x11last_valid_cursor\x18\x02 \x01(\tR\x0flastValidCursor\"O\n" +
+	"\x10BlockScopedDatas\x12;\n" +
+	"\x05items\x18\x01 \x03(\v2%.sf.substreams.rpc.v2.BlockScopedDataR\x05items\"\xaf\x04\n" +
 	"\x0fBlockScopedData\x12=\n" +
 	"\x06output\x18\x01 \x01(\v2%.sf.substreams.rpc.v2.MapModuleOutputR\x06output\x12-\n" +
 	"\x05clock\x18\x02 \x01(\v2\x17.sf.substreams.v1.ClockR\x05clock\x12\x16\n" +
@@ -1849,70 +1911,73 @@ func file_sf_substreams_rpc_v2_service_proto_rawDescGZIP() []byte {
 }
 
 var file_sf_substreams_rpc_v2_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_sf_substreams_rpc_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_sf_substreams_rpc_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_sf_substreams_rpc_v2_service_proto_goTypes = []any{
 	(StoreDelta_Operation)(0),       // 0: sf.substreams.rpc.v2.StoreDelta.Operation
 	(*Request)(nil),                 // 1: sf.substreams.rpc.v2.Request
 	(*Response)(nil),                // 2: sf.substreams.rpc.v2.Response
 	(*BlockUndoSignal)(nil),         // 3: sf.substreams.rpc.v2.BlockUndoSignal
-	(*BlockScopedData)(nil),         // 4: sf.substreams.rpc.v2.BlockScopedData
-	(*SessionInit)(nil),             // 5: sf.substreams.rpc.v2.SessionInit
-	(*InitialSnapshotComplete)(nil), // 6: sf.substreams.rpc.v2.InitialSnapshotComplete
-	(*InitialSnapshotData)(nil),     // 7: sf.substreams.rpc.v2.InitialSnapshotData
-	(*MapModuleOutput)(nil),         // 8: sf.substreams.rpc.v2.MapModuleOutput
-	(*StoreModuleOutput)(nil),       // 9: sf.substreams.rpc.v2.StoreModuleOutput
-	(*OutputDebugInfo)(nil),         // 10: sf.substreams.rpc.v2.OutputDebugInfo
-	(*ModulesProgress)(nil),         // 11: sf.substreams.rpc.v2.ModulesProgress
-	(*ProcessedBytes)(nil),          // 12: sf.substreams.rpc.v2.ProcessedBytes
-	(*Error)(nil),                   // 13: sf.substreams.rpc.v2.Error
-	(*Job)(nil),                     // 14: sf.substreams.rpc.v2.Job
-	(*Stage)(nil),                   // 15: sf.substreams.rpc.v2.Stage
-	(*ModuleStats)(nil),             // 16: sf.substreams.rpc.v2.ModuleStats
-	(*ExternalCallMetric)(nil),      // 17: sf.substreams.rpc.v2.ExternalCallMetric
-	(*StoreDelta)(nil),              // 18: sf.substreams.rpc.v2.StoreDelta
-	(*BlockRange)(nil),              // 19: sf.substreams.rpc.v2.BlockRange
-	(*v1.Modules)(nil),              // 20: sf.substreams.v1.Modules
-	(*v1.BlockRef)(nil),             // 21: sf.substreams.v1.BlockRef
-	(*v1.Clock)(nil),                // 22: sf.substreams.v1.Clock
-	(*anypb.Any)(nil),               // 23: google.protobuf.Any
-	(*v2.InfoRequest)(nil),          // 24: sf.firehose.v2.InfoRequest
-	(*v2.InfoResponse)(nil),         // 25: sf.firehose.v2.InfoResponse
+	(*BlockScopedDatas)(nil),        // 4: sf.substreams.rpc.v2.BlockScopedDatas
+	(*BlockScopedData)(nil),         // 5: sf.substreams.rpc.v2.BlockScopedData
+	(*SessionInit)(nil),             // 6: sf.substreams.rpc.v2.SessionInit
+	(*InitialSnapshotComplete)(nil), // 7: sf.substreams.rpc.v2.InitialSnapshotComplete
+	(*InitialSnapshotData)(nil),     // 8: sf.substreams.rpc.v2.InitialSnapshotData
+	(*MapModuleOutput)(nil),         // 9: sf.substreams.rpc.v2.MapModuleOutput
+	(*StoreModuleOutput)(nil),       // 10: sf.substreams.rpc.v2.StoreModuleOutput
+	(*OutputDebugInfo)(nil),         // 11: sf.substreams.rpc.v2.OutputDebugInfo
+	(*ModulesProgress)(nil),         // 12: sf.substreams.rpc.v2.ModulesProgress
+	(*ProcessedBytes)(nil),          // 13: sf.substreams.rpc.v2.ProcessedBytes
+	(*Error)(nil),                   // 14: sf.substreams.rpc.v2.Error
+	(*Job)(nil),                     // 15: sf.substreams.rpc.v2.Job
+	(*Stage)(nil),                   // 16: sf.substreams.rpc.v2.Stage
+	(*ModuleStats)(nil),             // 17: sf.substreams.rpc.v2.ModuleStats
+	(*ExternalCallMetric)(nil),      // 18: sf.substreams.rpc.v2.ExternalCallMetric
+	(*StoreDelta)(nil),              // 19: sf.substreams.rpc.v2.StoreDelta
+	(*BlockRange)(nil),              // 20: sf.substreams.rpc.v2.BlockRange
+	(*v1.Modules)(nil),              // 21: sf.substreams.v1.Modules
+	(*v1.BlockRef)(nil),             // 22: sf.substreams.v1.BlockRef
+	(*v1.Clock)(nil),                // 23: sf.substreams.v1.Clock
+	(*anypb.Any)(nil),               // 24: google.protobuf.Any
+	(*v2.InfoRequest)(nil),          // 25: sf.firehose.v2.InfoRequest
+	(*v2.InfoResponse)(nil),         // 26: sf.firehose.v2.InfoResponse
 }
 var file_sf_substreams_rpc_v2_service_proto_depIdxs = []int32{
-	20, // 0: sf.substreams.rpc.v2.Request.modules:type_name -> sf.substreams.v1.Modules
-	5,  // 1: sf.substreams.rpc.v2.Response.session:type_name -> sf.substreams.rpc.v2.SessionInit
-	11, // 2: sf.substreams.rpc.v2.Response.progress:type_name -> sf.substreams.rpc.v2.ModulesProgress
-	4,  // 3: sf.substreams.rpc.v2.Response.block_scoped_data:type_name -> sf.substreams.rpc.v2.BlockScopedData
+	21, // 0: sf.substreams.rpc.v2.Request.modules:type_name -> sf.substreams.v1.Modules
+	6,  // 1: sf.substreams.rpc.v2.Response.session:type_name -> sf.substreams.rpc.v2.SessionInit
+	12, // 2: sf.substreams.rpc.v2.Response.progress:type_name -> sf.substreams.rpc.v2.ModulesProgress
+	5,  // 3: sf.substreams.rpc.v2.Response.block_scoped_data:type_name -> sf.substreams.rpc.v2.BlockScopedData
 	3,  // 4: sf.substreams.rpc.v2.Response.block_undo_signal:type_name -> sf.substreams.rpc.v2.BlockUndoSignal
-	13, // 5: sf.substreams.rpc.v2.Response.fatal_error:type_name -> sf.substreams.rpc.v2.Error
-	7,  // 6: sf.substreams.rpc.v2.Response.debug_snapshot_data:type_name -> sf.substreams.rpc.v2.InitialSnapshotData
-	6,  // 7: sf.substreams.rpc.v2.Response.debug_snapshot_complete:type_name -> sf.substreams.rpc.v2.InitialSnapshotComplete
-	21, // 8: sf.substreams.rpc.v2.BlockUndoSignal.last_valid_block:type_name -> sf.substreams.v1.BlockRef
-	8,  // 9: sf.substreams.rpc.v2.BlockScopedData.output:type_name -> sf.substreams.rpc.v2.MapModuleOutput
-	22, // 10: sf.substreams.rpc.v2.BlockScopedData.clock:type_name -> sf.substreams.v1.Clock
-	8,  // 11: sf.substreams.rpc.v2.BlockScopedData.debug_map_outputs:type_name -> sf.substreams.rpc.v2.MapModuleOutput
-	9,  // 12: sf.substreams.rpc.v2.BlockScopedData.debug_store_outputs:type_name -> sf.substreams.rpc.v2.StoreModuleOutput
-	18, // 13: sf.substreams.rpc.v2.InitialSnapshotData.deltas:type_name -> sf.substreams.rpc.v2.StoreDelta
-	23, // 14: sf.substreams.rpc.v2.MapModuleOutput.map_output:type_name -> google.protobuf.Any
-	10, // 15: sf.substreams.rpc.v2.MapModuleOutput.debug_info:type_name -> sf.substreams.rpc.v2.OutputDebugInfo
-	18, // 16: sf.substreams.rpc.v2.StoreModuleOutput.debug_store_deltas:type_name -> sf.substreams.rpc.v2.StoreDelta
-	10, // 17: sf.substreams.rpc.v2.StoreModuleOutput.debug_info:type_name -> sf.substreams.rpc.v2.OutputDebugInfo
-	14, // 18: sf.substreams.rpc.v2.ModulesProgress.running_jobs:type_name -> sf.substreams.rpc.v2.Job
-	16, // 19: sf.substreams.rpc.v2.ModulesProgress.modules_stats:type_name -> sf.substreams.rpc.v2.ModuleStats
-	15, // 20: sf.substreams.rpc.v2.ModulesProgress.stages:type_name -> sf.substreams.rpc.v2.Stage
-	12, // 21: sf.substreams.rpc.v2.ModulesProgress.processed_bytes:type_name -> sf.substreams.rpc.v2.ProcessedBytes
-	19, // 22: sf.substreams.rpc.v2.Stage.completed_ranges:type_name -> sf.substreams.rpc.v2.BlockRange
-	17, // 23: sf.substreams.rpc.v2.ModuleStats.external_call_metrics:type_name -> sf.substreams.rpc.v2.ExternalCallMetric
-	0,  // 24: sf.substreams.rpc.v2.StoreDelta.operation:type_name -> sf.substreams.rpc.v2.StoreDelta.Operation
-	1,  // 25: sf.substreams.rpc.v2.Stream.Blocks:input_type -> sf.substreams.rpc.v2.Request
-	24, // 26: sf.substreams.rpc.v2.EndpointInfo.Info:input_type -> sf.firehose.v2.InfoRequest
-	2,  // 27: sf.substreams.rpc.v2.Stream.Blocks:output_type -> sf.substreams.rpc.v2.Response
-	25, // 28: sf.substreams.rpc.v2.EndpointInfo.Info:output_type -> sf.firehose.v2.InfoResponse
-	27, // [27:29] is the sub-list for method output_type
-	25, // [25:27] is the sub-list for method input_type
-	25, // [25:25] is the sub-list for extension type_name
-	25, // [25:25] is the sub-list for extension extendee
-	0,  // [0:25] is the sub-list for field type_name
+	14, // 5: sf.substreams.rpc.v2.Response.fatal_error:type_name -> sf.substreams.rpc.v2.Error
+	4,  // 6: sf.substreams.rpc.v2.Response.block_scoped_datas:type_name -> sf.substreams.rpc.v2.BlockScopedDatas
+	8,  // 7: sf.substreams.rpc.v2.Response.debug_snapshot_data:type_name -> sf.substreams.rpc.v2.InitialSnapshotData
+	7,  // 8: sf.substreams.rpc.v2.Response.debug_snapshot_complete:type_name -> sf.substreams.rpc.v2.InitialSnapshotComplete
+	22, // 9: sf.substreams.rpc.v2.BlockUndoSignal.last_valid_block:type_name -> sf.substreams.v1.BlockRef
+	5,  // 10: sf.substreams.rpc.v2.BlockScopedDatas.items:type_name -> sf.substreams.rpc.v2.BlockScopedData
+	9,  // 11: sf.substreams.rpc.v2.BlockScopedData.output:type_name -> sf.substreams.rpc.v2.MapModuleOutput
+	23, // 12: sf.substreams.rpc.v2.BlockScopedData.clock:type_name -> sf.substreams.v1.Clock
+	9,  // 13: sf.substreams.rpc.v2.BlockScopedData.debug_map_outputs:type_name -> sf.substreams.rpc.v2.MapModuleOutput
+	10, // 14: sf.substreams.rpc.v2.BlockScopedData.debug_store_outputs:type_name -> sf.substreams.rpc.v2.StoreModuleOutput
+	19, // 15: sf.substreams.rpc.v2.InitialSnapshotData.deltas:type_name -> sf.substreams.rpc.v2.StoreDelta
+	24, // 16: sf.substreams.rpc.v2.MapModuleOutput.map_output:type_name -> google.protobuf.Any
+	11, // 17: sf.substreams.rpc.v2.MapModuleOutput.debug_info:type_name -> sf.substreams.rpc.v2.OutputDebugInfo
+	19, // 18: sf.substreams.rpc.v2.StoreModuleOutput.debug_store_deltas:type_name -> sf.substreams.rpc.v2.StoreDelta
+	11, // 19: sf.substreams.rpc.v2.StoreModuleOutput.debug_info:type_name -> sf.substreams.rpc.v2.OutputDebugInfo
+	15, // 20: sf.substreams.rpc.v2.ModulesProgress.running_jobs:type_name -> sf.substreams.rpc.v2.Job
+	17, // 21: sf.substreams.rpc.v2.ModulesProgress.modules_stats:type_name -> sf.substreams.rpc.v2.ModuleStats
+	16, // 22: sf.substreams.rpc.v2.ModulesProgress.stages:type_name -> sf.substreams.rpc.v2.Stage
+	13, // 23: sf.substreams.rpc.v2.ModulesProgress.processed_bytes:type_name -> sf.substreams.rpc.v2.ProcessedBytes
+	20, // 24: sf.substreams.rpc.v2.Stage.completed_ranges:type_name -> sf.substreams.rpc.v2.BlockRange
+	18, // 25: sf.substreams.rpc.v2.ModuleStats.external_call_metrics:type_name -> sf.substreams.rpc.v2.ExternalCallMetric
+	0,  // 26: sf.substreams.rpc.v2.StoreDelta.operation:type_name -> sf.substreams.rpc.v2.StoreDelta.Operation
+	1,  // 27: sf.substreams.rpc.v2.Stream.Blocks:input_type -> sf.substreams.rpc.v2.Request
+	25, // 28: sf.substreams.rpc.v2.EndpointInfo.Info:input_type -> sf.firehose.v2.InfoRequest
+	2,  // 29: sf.substreams.rpc.v2.Stream.Blocks:output_type -> sf.substreams.rpc.v2.Response
+	26, // 30: sf.substreams.rpc.v2.EndpointInfo.Info:output_type -> sf.firehose.v2.InfoResponse
+	29, // [29:31] is the sub-list for method output_type
+	27, // [27:29] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_sf_substreams_rpc_v2_service_proto_init() }
@@ -1926,17 +1991,18 @@ func file_sf_substreams_rpc_v2_service_proto_init() {
 		(*Response_BlockScopedData)(nil),
 		(*Response_BlockUndoSignal)(nil),
 		(*Response_FatalError)(nil),
+		(*Response_BlockScopedDatas)(nil),
 		(*Response_DebugSnapshotData)(nil),
 		(*Response_DebugSnapshotComplete)(nil),
 	}
-	file_sf_substreams_rpc_v2_service_proto_msgTypes[3].OneofWrappers = []any{}
+	file_sf_substreams_rpc_v2_service_proto_msgTypes[4].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_sf_substreams_rpc_v2_service_proto_rawDesc), len(file_sf_substreams_rpc_v2_service_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   19,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

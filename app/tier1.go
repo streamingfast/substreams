@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/streamingfast/bstream"
@@ -23,6 +24,7 @@ import (
 	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service"
+	"github.com/streamingfast/substreams/service/connect"
 	"github.com/streamingfast/substreams/wasm"
 
 	_ "github.com/streamingfast/substreams/wasm/wasmtime"
@@ -247,7 +249,7 @@ func (a *Tier1App) Run() error {
 		FoundationalStoreEndpoints: foundationalStoreEndpoints,
 	}
 
-	svc, err := service.NewTier1(
+	tier1Service, err := service.NewTier1(
 		a.logger,
 		mergedBlocksStore,
 		forkedBlocksStore,
@@ -273,10 +275,12 @@ func (a *Tier1App) Run() error {
 		return err
 	}
 
+	tier1ServiceConnect := connect.NewService(tier1Service)
+
 	a.OnTerminating(func(err error) {
 		metrics.AppReadinessTier1.SetNotReady()
 
-		svc.Shutdown(err)
+		tier1Service.Shutdown(err)
 	})
 
 	go func() {
@@ -303,7 +307,41 @@ func (a *Tier1App) Run() error {
 		a.logger.Info("launching gRPC server", zap.Bool("live_support", withLive))
 		a.setIsReady(true)
 
-		err := service.ListenTier1(a.config.GRPCListenAddr, svc, infoServer, a.modules.Authenticator, a.logger, a.HealthCheck, a.config.EnforceCompression)
+		secureGrpcProxyAddr := ":9000"
+		plaintextGrpcProxyAddr := ":8080"
+
+		secureGrpcAddr := ":9100"
+		plaintextGrpcAddr := ":8180"
+
+		secureConnectProxyAddr := ":9200"
+		plaintextConnectProxyAddr := ":8180"
+
+		addresses := strings.Split(a.config.GRPCListenAddr, ",")
+		addressCount := len(addresses)
+		if addressCount == 0 {
+			a.logger.Error("no gRPC listen addresses provided")
+			return
+		}
+		if addressCount > 0 {
+			secureGrpcProxyAddr = addresses[0]
+		}
+		if addressCount > 1 {
+			plaintextGrpcProxyAddr = addresses[1]
+		}
+		if addressCount > 2 {
+			secureGrpcAddr = addresses[2]
+		}
+		if addressCount > 3 {
+			plaintextGrpcAddr = addresses[3]
+		}
+		if addressCount > 4 {
+			secureConnectProxyAddr = addresses[4]
+		}
+		if addressCount > 5 {
+			plaintextConnectProxyAddr = addresses[5]
+		}
+
+		err := service.ListenTier1(secureGrpcProxyAddr, plaintextGrpcProxyAddr, secureGrpcAddr, plaintextGrpcAddr, secureConnectProxyAddr, plaintextConnectProxyAddr, tier1Service, tier1ServiceConnect, infoServer, a.modules.Authenticator, a.logger, a.HealthCheck, a.config.EnforceCompression)
 		a.Shutdown(err)
 	}()
 

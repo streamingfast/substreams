@@ -74,6 +74,7 @@ func ListenTier1(
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		contentType := r.Header.Get("Content-Type")
+		logger.Info("handling request", zap.String("content-type", contentType))
 
 		if strings.HasPrefix(contentType, "application/grpc") || strings.HasPrefix(contentType, "application/grpc-web") {
 			logger.Debug("forwarding gRPC request")

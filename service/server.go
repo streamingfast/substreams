@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -13,7 +12,6 @@ import (
 	_ "github.com/mostynb/go-grpc-compression/experimental/s2"
 	_ "github.com/mostynb/go-grpc-compression/lz4"
 	_ "github.com/mostynb/go-grpc-compression/zstd"
-	vt "github.com/planetscale/vtprotobuf/codec/grpc"
 	"github.com/streamingfast/dauth"
 	dauthconnect "github.com/streamingfast/dauth/middleware/connect"
 	dauthgrpc "github.com/streamingfast/dauth/middleware/grpc"
@@ -33,14 +31,13 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/encoding"
 	_ "google.golang.org/grpc/experimental"
 )
 
-func init() {
-	fmt.Println("------------------ VT Proto registered ------------------------")
-	encoding.RegisterCodec(vt.Codec{})
-}
+//func init() {
+//	fmt.Println("------------------ VT Proto registered ------------------------")
+//	encoding.RegisterCodec(vt.Codec{})
+//}
 
 type streamHandlerV3 func(ctx context.Context, req *connect.Request[pbsubstreamsrpcv3.Request], stream *connect.ServerStream[pbsubstreamsrpc.Response]) error
 
@@ -82,7 +79,6 @@ func ListenTier1(
 
 			return
 		}
-
 		if strings.HasPrefix(contentType, "application/connect") || contentType == "application/json" || strings.Contains(contentType, "json") { // loose match for safety
 			logger.Debug("forwarding gRPC-Web request")
 			connectServer.ServeHTTP(w, r)

@@ -31,7 +31,7 @@ func main() {
 
 	fmt.Printf("Fetching block %d (at %s)\n", blockNum, endpoint)
 
-	conn, err := dgrpc.NewExternalClient(endpoint, grpc.WithPerRPCCredentials(oauth.TokenSource{TokenSource: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: jwt})}))
+	conn, err := dgrpc.NewExternalClientConn(endpoint, grpc.WithPerRPCCredentials(oauth.TokenSource{TokenSource: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: jwt})}))
 	cli.NoError(err, "unable to create external gRPC client")
 	defer conn.Close()
 

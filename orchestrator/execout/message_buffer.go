@@ -41,7 +41,7 @@ func (b *MessageBuffer) ShouldFlush() bool {
 	b.mut.Lock()
 	defer b.mut.Unlock()
 
-	if b.Len() > b.maxBufferedMessage {
+	if len(b.buf.Items) > b.maxBufferedMessage {
 		return true
 	}
 

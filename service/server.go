@@ -12,6 +12,7 @@ import (
 	_ "github.com/mostynb/go-grpc-compression/experimental/s2"
 	_ "github.com/mostynb/go-grpc-compression/lz4"
 	_ "github.com/mostynb/go-grpc-compression/zstd"
+	_ "github.com/planetscale/vtprotobuf/codec/grpc"
 	"github.com/streamingfast/dauth"
 	dauthconnect "github.com/streamingfast/dauth/middleware/connect"
 	dauthgrpc "github.com/streamingfast/dauth/middleware/grpc"

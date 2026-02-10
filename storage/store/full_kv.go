@@ -8,6 +8,7 @@ import (
 	"io"
 	"strconv"
 
+	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
@@ -48,13 +49,13 @@ func (s *FullKV) DerivePartialStore(initialBlock uint64) *PartialKV {
 
 var ErrNoQuickSaveStore = fmt.Errorf("no quick save store")
 
-func (s *FullKV) QuickLoad(ctx context.Context, atBlockHash string) error {
+func (s *FullKV) QuickLoad(ctx context.Context, atBlock bstream.BlockRef) error {
 	if s.quickSaveStore == nil {
 		return ErrNoQuickSaveStore
 	}
 
-	filename := atBlockHash + ".quicksave"
-	s.logger.Debug("loading full store state from temporary file", zap.String("fileName", filename), zap.String("module_hash", s.moduleHash))
+	filename := atBlock.ID() + ".quicksave"
+	s.logger.Debug("loading full store state from temporary file", zap.String("fileName", filename), zap.String("module_hash", s.moduleHash), zap.Uint64("block_num", atBlock.Num()), zap.String("block_id", atBlock.ID()))
 
 	r, err := s.quickSaveStore.OpenObject(ctx, filename)
 	if err != nil {
@@ -89,7 +90,7 @@ func (s *FullKV) QuickLoad(ctx context.Context, atBlockHash string) error {
 		s.kv = make(map[string][]byte)
 	}
 
-	s.logger.Debug("full store loaded", zap.String("fileName", filename), zap.Int("key_count", len(s.kv)), zap.Uint64("data_size", size))
+	s.logger.Info("quickload: full store loaded", zap.String("fileName", filename), zap.Int("key_count", len(s.kv)), zap.Uint64("data_size", size), zap.Uint64("block_num", atBlock.Num()), zap.String("block_id", atBlock.ID()))
 	return nil
 }
 
@@ -97,7 +98,7 @@ func (s *FullKV) QuickSave(ctx context.Context, atBlockHash string) error {
 	if s.quickSaveStore == nil {
 		return ErrNoQuickSaveStore
 	}
-	s.logger.Debug("writing temporary store state", zap.Object("store", s))
+	s.logger.Info("quicksave: writing temporary store state", zap.Object("store", s))
 
 	stateData := &marshaller.StoreData{
 		Kv: s.kv,

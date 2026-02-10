@@ -6,6 +6,7 @@ import (
 	"math/big"
 
 	"github.com/shopspring/decimal"
+	"github.com/streamingfast/bstream"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
@@ -55,7 +56,7 @@ type Store interface {
 }
 
 type QuickLoad interface {
-	QuickLoad(ctx context.Context, atBlockHash string) error
+	QuickLoad(ctx context.Context, atBlock bstream.BlockRef) error
 }
 
 type QuickSave interface {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/reqctx"
 	"go.uber.org/zap/zapcore"
 )
@@ -42,11 +43,11 @@ func (m *Map) QuickSave(ctx context.Context, atBlockHash string) error {
 	return nil
 }
 
-func (m *Map) QuickLoad(ctx context.Context, atBlockHash string) error {
+func (m *Map) QuickLoad(ctx context.Context, atBlock bstream.BlockRef) error {
 
 	for _, s := range m.All() {
 		if writable, ok := s.(QuickLoad); ok {
-			if err := writable.QuickLoad(ctx, atBlockHash); err != nil {
+			if err := writable.QuickLoad(ctx, atBlock); err != nil {
 				return err
 			}
 		}

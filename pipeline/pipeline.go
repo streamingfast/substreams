@@ -270,11 +270,11 @@ func (p *Pipeline) initStoresFromQuickload(ctx context.Context, reqPlan *plan.Re
 		storeMap[storeConfig.Name()] = storeConfig.NewFullKV(p.stores.logger)
 	}
 
-	if err := storeMap.QuickLoad(ctx, cursor.Block.ID()); err != nil {
+	if err := storeMap.QuickLoad(ctx, cursor.Block); err != nil {
 		p.stores.logger.Info("no temporary store files found", zap.Error(err))
 		return false
 	}
-	reqctx.Logger(ctx).Info("skipping backprocessing, reading from temporary files", zap.Strings("stores", storeMap.Names()), zap.String("block", cursor.Block.String()))
+	reqctx.Logger(ctx).Info("skipping backprocessing, reading from temporary files", zap.Strings("stores", storeMap.Names()), zap.Uint64("block_num", cursor.Block.Num()), zap.String("block_id", cursor.Block.ID()))
 	p.stores.StoreMap = storeMap
 	return true
 }

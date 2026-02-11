@@ -9,11 +9,12 @@ import (
 	"strings"
 	"time"
 
+	connectrpc "connectrpc.com/connect"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/blockstream"
 	"github.com/streamingfast/bstream/hub"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
-	dauth "github.com/streamingfast/dauth"
+	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/dsession"
 	"github.com/streamingfast/dstore"
@@ -22,11 +23,11 @@ import (
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metrics"
 	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcv2connect"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service"
 	"github.com/streamingfast/substreams/service/connect"
 	"github.com/streamingfast/substreams/wasm"
-
 	_ "github.com/streamingfast/substreams/wasm/wasmtime"
 	"github.com/streamingfast/substreams/wasm/wazero"
 	"go.uber.org/atomic"
@@ -294,6 +295,12 @@ func (a *Tier1App) Run() error {
 			}
 		}
 
+		var infoServerConnect pbsubstreamsrpcv2connect.EndpointInfoHandler
+		if a.modules.InfoServer != nil {
+			infoServerConnect = &InfoServerConnectWrapper{a.modules.InfoServer}
+			a.logger.Info("info server ready")
+		}
+
 		if withLive {
 			a.logger.Info("waiting until hub is real-time synced")
 			select {
@@ -323,7 +330,7 @@ func (a *Tier1App) Run() error {
 			plaintextGrpcProxyAddr = addresses[1]
 		}
 
-		err := service.ListenTier1(secureGrpcProxyAddr, plaintextGrpcProxyAddr, tier1Service, tier1ServiceConnect, infoServer, a.modules.Authenticator, a.logger, a.HealthCheck, a.config.EnforceCompression)
+		err := service.ListenTier1(secureGrpcProxyAddr, plaintextGrpcProxyAddr, tier1Service, tier1ServiceConnect, infoServer, infoServerConnect, a.modules.Authenticator, a.logger, a.HealthCheck, a.config.EnforceCompression)
 		a.Shutdown(err)
 	}()
 
@@ -380,4 +387,16 @@ func (i *InfoServerWrapper) Info(ctx context.Context, req *pbfirehose.InfoReques
 		return nil, err
 	}
 	return resp, nil
+}
+
+type InfoServerConnectWrapper struct {
+	rpcInfoServer pbsubstreamsrpcv2.EndpointInfoServer
+}
+
+func (i *InfoServerConnectWrapper) Info(ctx context.Context, req *connectrpc.Request[pbfirehose.InfoRequest]) (*connectrpc.Response[pbfirehose.InfoResponse], error) {
+	resp, err := i.rpcInfoServer.Info(ctx, req.Msg)
+	if err != nil {
+		return nil, err
+	}
+	return connectrpc.NewResponse(resp), nil
 }

@@ -60,6 +60,7 @@ func ListenTier1(
 	svc *Tier1Service,
 	connectSvc *tier1Connect.Service,
 	infoService pbsubstreamsrpc.EndpointInfoServer,
+	infoServiceConnect pbsubstreamsrpcv2connect.EndpointInfoHandler,
 	auth dauth.Authenticator,
 	logger *zap.Logger,
 	healthcheck dgrpcserver.HealthCheck,
@@ -67,7 +68,7 @@ func ListenTier1(
 ) (err error) {
 
 	grpcServer := grpcSever(secureProxyListenAddress, svc, infoService, auth, healthcheck, enforceCompression, logger)
-	connectServer := connectServer(secureProxyListenAddress, connectSvc, infoService, auth, healthcheck, enforceCompression, logger)
+	connectServer := connectServer(secureProxyListenAddress, connectSvc, infoServiceConnect, auth, healthcheck, enforceCompression, logger)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -153,7 +154,7 @@ func grpcSever(
 func connectServer(
 	address string,
 	service *tier1Connect.Service,
-	infoService pbsubstreamsrpc.EndpointInfoServer,
+	infoService pbsubstreamsrpcv2connect.EndpointInfoHandler,
 	auth dauth.Authenticator,
 	healthcheck dgrpcserver.HealthCheck,
 	enforceCompression bool,
@@ -190,24 +191,19 @@ func connectServer(
 
 	handlerGetters := []connectweb.HandlerGetter{streamHandlerGetter, streamHandlerGetterV3}
 
-	//GRRRRRRRRRRRRRRRRRRRR
-	//GRRRRRRRRRRRRRRRRRRRR
-	// FIX ME!
-	//GRRRRRRRRRRRRRRRRRRRR
-	//GRRRRRRRRRRRRRRRRRRRR
-	//if infoService != nil {
-	//	infoHandlerGetter := func(opts ...connect.HandlerOption) (string, http.Handler) {
-	//
-	//		var o []connect.HandlerOption
-	//		for _, opt := range opts {
-	//			o = append(o, opt)
-	//		}
-	//		o = append(o, compress.WithAll(compress.LevelBalanced))
-	//		out, outh := pbsubstreamsrpcv2connect.NewEndpointInfoHandler(infoService, o...)
-	//		return out, outh
-	//	}
-	//	handlerGetters = append(handlerGetters, infoHandlerGetter)
-	//}
+	if infoService != nil {
+		infoHandlerGetter := func(opts ...connect.HandlerOption) (string, http.Handler) {
+
+			var o []connect.HandlerOption
+			for _, opt := range opts {
+				o = append(o, opt)
+			}
+			o = append(o, compress.WithAll(compress.LevelBalanced))
+			out, outh := pbsubstreamsrpcv2connect.NewEndpointInfoHandler(infoService, o...)
+			return out, outh
+		}
+		handlerGetters = append(handlerGetters, infoHandlerGetter)
+	}
 
 	options = append(options, dgrpcserver.WithConnectPermissiveCORS())
 	server := connectweb.New(handlerGetters, options...)

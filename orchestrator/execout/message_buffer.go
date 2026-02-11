@@ -52,6 +52,15 @@ func (b *MessageBuffer) Flush(streamSrv *response.Stream) error {
 	b.mut.Lock()
 	defer b.mut.Unlock()
 
+	if b.maxBufferedMessage > 2 {
+		for _, msg := range b.buf.Items {
+			err := streamSrv.BlockScopedData(msg)
+			if err != nil {
+				return fmt.Errorf("flushing single block scope data: %w", err)
+			}
+		}
+	}
+
 	err := streamSrv.BlockScopedDatas(b.buf)
 	if err != nil {
 		return fmt.Errorf("flushing buffer: %w", err)

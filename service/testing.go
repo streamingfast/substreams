@@ -44,7 +44,7 @@ func (s *Tier1Service) TestBlocks(ctx context.Context, isSubRequest bool, reques
 		return stream.NewErrInvalidArg("%s", err.Error())
 	}
 
-	return s.blocks(ctx, nil, request, nil, execGraph, respFunc, metrics.NewReqStats(&metrics.Config{}, nil, nil, zap.NewNop()), nil)
+	return s.blocks(ctx, nil, request, nil, execGraph, respFunc, metrics.NewReqStats(&metrics.Config{}, nil, nil, zap.NewNop()), nil, 0)
 }
 
 func TestNewServiceTier2(moduleExecutionTracing bool, streamFactoryFunc StreamFactoryFunc) *Tier2Service {

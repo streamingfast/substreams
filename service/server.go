@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -74,6 +75,7 @@ func ListenTier1(
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		contentType := r.Header.Get("Content-Type")
 		logger.Info("handling request", zap.String("content-type", contentType))
+		fmt.Println("Grrrrrr: Handling request with content-type:", contentType)
 
 		if strings.HasPrefix(contentType, "application/grpc") || strings.HasPrefix(contentType, "application/grpc-web") {
 			logger.Debug("forwarding gRPC request")
@@ -92,18 +94,25 @@ func ListenTier1(
 	})
 
 	compressionHandler := standard.CompressionHandler(enforceCompression, mux)
-	handler := h2c.NewHandler(compressionHandler, &http2.Server{})
+
+	rootMux := http.NewServeMux()
+	rootMux.Handle("/healthz", grpcServer.HealthHandler())
+	rootMux.Handle("/", compressionHandler)
+
+	handler := h2c.NewHandler(rootMux, &http2.Server{})
 
 	logger.Info("starting secure proxy server", zap.String("address", secureProxyListenAddress))
 	go func() {
 		if err := http.ListenAndServe(strings.ReplaceAll(secureProxyListenAddress, "*", ""), handler); err != nil {
 			logger.Error("failed to start secure proxy server", zap.Error(err))
+			grpcServer.Shutdown(0)
 		}
 	}()
 	logger.Info("starting plaintext proxy server", zap.String("address", plaintextProxyListenAddress))
 	go func() {
 		if err := http.ListenAndServe(strings.ReplaceAll(plaintextProxyListenAddress, "*", ""), handler); err != nil {
 			logger.Error("failed to start secure proxy server", zap.Error(err))
+			connectServer.Shutdown(0)
 		}
 	}()
 

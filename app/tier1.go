@@ -88,7 +88,8 @@ type Tier1Config struct {
 	SubrequestsInsecure     bool
 	SubrequestsPlaintext    bool
 
-	SharedCacheSize uint64
+	SharedCacheSize          uint64
+	ExecOutMessageBufferSize uint64
 
 	WASMExtensions wasm.WASMExtensioner
 	Tracing        bool
@@ -268,6 +269,7 @@ func (a *Tier1App) Run() error {
 		a.config.ActiveRequestsSoftLimit,
 		a.config.ActiveRequestsHardLimit,
 		a.config.SharedCacheSize,
+		a.config.ExecOutMessageBufferSize,
 		a.modules.SessionPool,
 		foundationalStoreEndpoints,
 		opts...,

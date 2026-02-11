@@ -42,6 +42,7 @@ func NewWalker(
 	walkRange *block.Range,
 	stream *response.Stream,
 	noopMode bool,
+	bufferSize int,
 ) *Walker {
 	logger := reqctx.Logger(ctx).Named("execout_walker")
 	return &Walker{
@@ -52,7 +53,12 @@ func NewWalker(
 		streamOut:  stream,
 		noopMode:   noopMode,
 		logger:     logger,
-		buffer:     NewMessageBuffer(100),
+		buffer: NewMessageBuffer(func() int {
+			if bufferSize <= 0 {
+				return 100
+			}
+			return bufferSize
+		}()),
 	}
 }
 

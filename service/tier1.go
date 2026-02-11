@@ -85,13 +85,14 @@ type Tier1Service struct {
 	resolveCursor       pipeline.CursorResolver
 	getHeadBlock        func() (uint64, error)
 
-	enforceCompression      bool
-	activeRequestsSoftLimit int
-	activeRequestsHardLimit int
-	tier2RequestParameters  reqctx.Tier2RequestParameters
-	foundationalEndpoints   map[string]string
-	sessionPool             dsession.SessionPool
-	activeRequestsManager   *active_requests.ActiveRequestsManager // we keep a list of current requests for the debugAPI and to manage memory
+	enforceCompression       bool
+	activeRequestsSoftLimit  int
+	activeRequestsHardLimit  int
+	tier2RequestParameters   reqctx.Tier2RequestParameters
+	foundationalEndpoints    map[string]string
+	sessionPool              dsession.SessionPool
+	activeRequestsManager    *active_requests.ActiveRequestsManager // we keep a list of current requests for the debugAPI and to manage memory
+	execOutMessageBufferSize int
 }
 
 func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
@@ -158,6 +159,7 @@ func NewTier1(
 	activeRequestsSoftLimit int,
 	activeRequestsHardLimit int,
 	sharedCacheSize uint64,
+	execOutMessageBufferSize uint64,
 	sessionPool dsession.SessionPool,
 	foundationalEndpoints map[string]string,
 	opts ...Option,
@@ -200,21 +202,22 @@ func NewTier1(
 
 	logger.Info("launching tier1 service", zap.Reflect("client_config", substreamsClientConfig), zap.String("block_type", blockType), zap.Bool("with_live", hub != nil))
 	s := &Tier1Service{
-		Shutter:                 shutter.New(),
-		runtimeConfig:           runtimeConfig,
-		blockType:               blockType,
-		tracer:                  tracing.GetTracer(),
-		resolveCursor:           pipeline.NewCursorResolver(hub, mergedBlocksStore, forkedBlocksStore),
-		logger:                  logger,
-		appSetIsReadyState:      appSetIsReadyState,
-		tier2RequestParameters:  tier2RequestParameters,
-		blockExecutionTimeout:   3 * time.Minute,
-		enforceCompression:      enforceCompression,
-		activeRequestsSoftLimit: activeRequestsSoftLimit,
-		activeRequestsHardLimit: activeRequestsHardLimit,
-		foundationalEndpoints:   foundationalEndpoints,
-		sessionPool:             sessionPool,
-		activeRequestsManager:   active_requests.NewActiveRequestsManager(logger),
+		Shutter:                  shutter.New(),
+		runtimeConfig:            runtimeConfig,
+		blockType:                blockType,
+		tracer:                   tracing.GetTracer(),
+		resolveCursor:            pipeline.NewCursorResolver(hub, mergedBlocksStore, forkedBlocksStore),
+		logger:                   logger,
+		appSetIsReadyState:       appSetIsReadyState,
+		tier2RequestParameters:   tier2RequestParameters,
+		blockExecutionTimeout:    3 * time.Minute,
+		enforceCompression:       enforceCompression,
+		activeRequestsSoftLimit:  activeRequestsSoftLimit,
+		activeRequestsHardLimit:  activeRequestsHardLimit,
+		foundationalEndpoints:    foundationalEndpoints,
+		sessionPool:              sessionPool,
+		activeRequestsManager:    active_requests.NewActiveRequestsManager(logger),
+		execOutMessageBufferSize: int(execOutMessageBufferSize),
 	}
 	s.OnTerminating(func(_ error) {
 		s.activeRequestsWG.Wait()
@@ -585,7 +588,7 @@ func (s *Tier1Service) BlocksAny(
 	runningContext = reqctx.WithCancelFunc(runningContext, cancelRunning) // we pass this down so that the 'workerPool/requestPool' can cancel the running context
 
 	respFunc := tier1ResponseHandler(respContext, &mut, logger, stream, request.NoopMode, reqStats, request.DevOutputModules)
-	err = s.blocks(runningContext, cancelRunning, request, header, execGraph, respFunc, reqStats, fields)
+	err = s.blocks(runningContext, cancelRunning, request, header, execGraph, respFunc, reqStats, fields, s.execOutMessageBufferSize)
 
 	if connectError := toConnectError(runningContext, err); connectError != nil {
 		switch connect.CodeOf(connectError) {
@@ -675,7 +678,7 @@ func (s *Tier1Service) writeLastUsed(ctx context.Context, execGraph *exec.Graph,
 
 var IsValidCacheTag = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`).MatchString
 
-func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelCauseFunc, request *pbsubstreamsrpc.Request, header http.Header, execGraph *exec.Graph, respFunc substreams.ResponseFunc, reqStats *metrics.Stats, logFields []zap.Field) (err error) {
+func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelCauseFunc, request *pbsubstreamsrpc.Request, header http.Header, execGraph *exec.Graph, respFunc substreams.ResponseFunc, reqStats *metrics.Stats, logFields []zap.Field, execOutMessageBufferSize int) (err error) {
 	chainFirstStreamableBlock := bstream.GetProtocolFirstStreamableBlock
 	if request.StartBlockNum > 0 && request.StartBlockNum < int64(chainFirstStreamableBlock) {
 		return bsstream.NewErrInvalidArg("invalid start block %d, must be >= %d (the first streamable block of the chain)", request.StartBlockNum, chainFirstStreamableBlock)
@@ -844,6 +847,7 @@ func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelC
 			return s.IsTerminating() // pipeline starts draining when the service is actually terminating, (after the global shutdown-signal-delay)
 		},
 		s.foundationalEndpoints,
+		execOutMessageBufferSize,
 		opts...,
 	)
 

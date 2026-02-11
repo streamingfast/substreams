@@ -33,6 +33,7 @@ func BuildParallelProcessor(
 	respFunc func(resp substreams.ResponseFromAnyTier) error,
 	storeConfigs store.ConfigMap,
 	noopMode bool,
+	bufferSize int,
 ) (*ParallelProcessor, error) {
 
 	// FIXME: Are all the progress messages properly sent? When we skip some stores and mark them complete,
@@ -68,6 +69,7 @@ func BuildParallelProcessor(
 					reqPlan.ReadExecOut,
 					stream,
 					noopMode,
+					bufferSize,
 				)
 			}
 		}

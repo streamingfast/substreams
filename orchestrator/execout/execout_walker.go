@@ -161,14 +161,15 @@ func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
 			zap.String("filename", file.Filename()),
 		)
 
-		if err := r.sendItems(file); err != nil {
-			if err != io.EOF {
-				r.logger.Error("error sending items",
-					zap.Int("segment", current),
-					zap.Error(err),
-				)
+		if err := r.sendItems(file); err != nil && err != io.EOF {
+			if errors.Is(err, context.Canceled) {
 				return loop.NewQuitMsg(err)
 			}
+			r.logger.Error("error sending items",
+				zap.Int("segment", current),
+				zap.Error(err),
+			)
+			return loop.NewQuitMsg(err)
 		}
 
 		r.logger.Debug("file download completed, returning MsgFileDownloaded",

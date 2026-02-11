@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -103,10 +104,45 @@ func ListenTier1(
 
 	logger.Info("starting secure proxy server", zap.String("address", secureProxyListenAddress))
 	go func() {
-		if err := http.ListenAndServe(strings.ReplaceAll(secureProxyListenAddress, "*", ""), handler); err != nil {
-			logger.Error("failed to start secure proxy server", zap.Error(err))
-			grpcServer.Shutdown(0)
+		cleanAddr := strings.ReplaceAll(secureProxyListenAddress, "*", "")
+		if strings.Contains(secureProxyListenAddress, "*") {
+			tcpListener, err := net.Listen("tcp", cleanAddr)
+			if err != nil {
+				logger.Error("failed to start secure grpc server", zap.Error(err))
+				grpcServer.Shutdown(0)
+				return
+			}
+
+			errorLogger, err := zap.NewStdLogAt(logger, zap.ErrorLevel)
+			if err != nil {
+				logger.Error("failed to start secure grpc server", zap.Error(err))
+				grpcServer.Shutdown(0)
+				return
+			}
+
+			h2s := &http2.Server{
+				MaxConcurrentStreams: 1000,
+			}
+
+			httpServer := &http.Server{
+				Handler:  h2c.NewHandler(rootMux, h2s),
+				ErrorLog: errorLogger,
+			}
+			httpServer.TLSConfig = dgrpcserver.SecuredByBuiltInSelfSignedCertificate().AsTLSConfig()
+			if err := httpServer.ServeTLS(tcpListener, "", ""); err != nil {
+
+				logger.Error("failed to start secure grpc server", zap.Error(err))
+				grpcServer.Shutdown(0)
+				return
+			}
+
+		} else {
+			if err := http.ListenAndServe(cleanAddr, mux); err != nil {
+				logger.Error("failed to start secure proxy server", zap.Error(err))
+				grpcServer.Shutdown(0)
+			}
 		}
+
 	}()
 	logger.Info("starting plaintext proxy server", zap.String("address", plaintextProxyListenAddress))
 	go func() {
@@ -115,6 +151,25 @@ func ListenTier1(
 			connectServer.Shutdown(0)
 		}
 	}()
+
+	//if s.options.SecureTLSConfig != nil {
+	//	s.logger().Info("serving gRPC (over HTTP router) (encrypted)", zap.String("listen_addr", serverListenerAddress))
+	//	s.httpServer.TLSConfig = s.options.SecureTLSConfig
+	//	if err := s.httpServer.ServeTLS(tcpListener, "", ""); err != nil {
+	//		s.shutter.Shutdown(fmt.Errorf("gRPC (over HTTP router) serve (TLS) failed: %w", err))
+	//		return
+	//	}
+	//} else if s.options.IsPlainText {
+	//	s.logger().Info("serving gRPC (over HTTP router) (plain-text)", zap.String("listen_addr", serverListenerAddress))
+	//
+	//	if err := s.httpServer.Serve(tcpListener); err != nil {
+	//		s.shutter.Shutdown(fmt.Errorf("gRPC (over HTTP router) serve failed: %w", err))
+	//		return
+	//	}
+	//} else {
+	//	s.shutter.Shutdown(errors.New("invalid server config, server is not plain-text and no TLS config available, something is wrong, this should never happen"))
+	//	return
+	//}
 
 	logger.Info("started")
 

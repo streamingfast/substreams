@@ -1,15 +1,13 @@
-# Flashblocks Support (alpha)
+# Flashblocks Support (beta)
 
-New support for "Flashblocks" is now available for alpha testing on Base Mainnet. For more details about Base Flashblocks, see the [Base documentation](https://docs.base.org/base-chain/flashblocks/apps).
+New support for "Flashblocks" is now available as a *beta feature* on Base Mainnet. For more details about Base Flashblocks, see the [Base documentation](https://docs.base.org/base-chain/flashblocks/apps).
 
 {% hint style="warning" %}
 **Disclaimers**
 
-* The only endpoint currently supporting Flashblocks is `https://base-mainnet-flash.streamingfast.io:443`.
-* That endpoint is not guaranteed to be stable or available at all times (alpha testing).
-* The protocol might still change in the next few weeks, as we gather feedback on usage.
-* It is normal to receive only "some" partial blocks indexes. In Substreams, the data from missing ones will always be bundled in the next PartialBlockData.
-* Substreams only sends an "undo signal" in case of a reorg, or if the sent partial blocks are being discarded and the new block does not correspond to the partial blocks sent. It will not send "undo signals" between each partial block with the same block height and different block hash.
+* Only the `Base Mainnet` endpoint (https://base-mainnet.streamingfast.io) supports Flashblocks at this time.
+* It is normal to sometimes skip some flash blocks indexes. In Substreams, the data from missing flash blocks will always be bundled in the next block so you won't miss any data.
+* Substreams only sends an "undo signal" in case of a reorg, or if the sent partial blocks are being discarded (replaced by a different block). It will not send "undo signals" between each partial block with the same block height.
 {% endhint %}
 
 ## Description
@@ -25,8 +23,8 @@ Transactions can be processed incrementally, making your applications more respo
 
 * In Substreams, Flashblocks are called **partial blocks**, as a generalization of the concept, even though Flashblocks are the only supported implementation yet.
 * To benefit from partial blocks:
-  - You need the latest version of Substreams CLI or library (v1.17.9).
-  - Your Substreams modules should avoid doing "block-level aggregations" and should only work on what is inside the "transactionTraces"
+  - You need a recent version of Substreams CLI or library (> v1.17.9).
+  - Your Substreams modules should avoid doing "block-level aggregations" and should only work on what is inside the "transactionTraces" -- to avoid non-deterministic output.
   - Your Substreams sink implementation should only take decisions on the block hash if it receives a full block or the "last_partial_block"
 
 Here's how it works:
@@ -102,57 +100,69 @@ The user will receive 5 `BlockScopedData` messages:
 
 1. To test with a common module, using `jq` to quickly see what is going on (you need [jq](https://jqlang.org/)):
 
-`substreams run -e https://base-mainnet-flash.streamingfast.io ethereum_common all_events -s -5 --partial-blocks -o jsonl | jq -r '"Block: #\(.["@block"]) Partial: \(.["@partial_index"]) (last:\(.["@is_last_partial"])) Event count:\(.["@data"].events|length)"'`
+`substreams run -e https://base-mainnet.streamingfast.io ethereum_common all_events -s -1 --partial-blocks -o json`
 
-{% hint style="note" %}
-The `jq` part is optional, only used here to show a quick summary of the content. Without it, you would receive the full JSON objects with the ethereum events..
-{% endhint %}
-
-This will print lines like this:
-
+You will get responses like this for partial blocks:
 ```
-Block: #40591619 Partial: null (last:null) Event count:1403
-Block: #40591620 Partial: null (last:null) Event count:975
-Block: #40591621 Partial: null (last:null) Event count:1366
-Block: #40591622 Partial: null (last:null) Event count:1545
-Block: #40591623 Partial: null (last:null) Event count:789
-Block: #40591624 Partial: 5 (last:false) Event count:533
-Block: #40591624 Partial: 7 (last:false) Event count:78
-Block: #40591624 Partial: 9 (last:false) Event count:711
-Block: #40591624 Partial: 10 (last:true) Event count:246
-Block: #40591625 Partial: 5 (last:false) Event count:935
-Block: #40591625 Partial: 7 (last:false) Event count:108
-Block: #40591625 Partial: 9 (last:false) Event count:148
-Block: #40591625 Partial: 10 (last:true) Event count:0
+{
+  "@module": "all_events",
+  "@block": 41764712,
+  "@partial_index": 9,
+  "@is_last_partial": false,
+  "@type": "sf.substreams.ethereum.v1.Events",
+  "@data": {
+    (...)
+  }
+}
 ```
 
-When you see "partial: null" and "last:null", it means that it is the actual full block.
+and sometimes a full block like this one:
+
+```
+{
+  "@module": "all_events",
+  "@block": 41764713,
+  "@type": "sf.substreams.ethereum.v1.Events",
+  "@data": {
+    (...)
+  }
+}
+```
 
 1. To see how it performs with a clock, you can use, as always, the -o clock with something like this:
 
-`substreams run -e https://base-mainnet-flash.streamingfast.io https://github.com/graphprotocol/graph-node/raw/refs/heads/master/substreams/substreams-head-tracker/substreams-head-tracker-v1.0.0.spkg -s -1 -o clock --partial-blocks`
+`substreams run -e https://base-mainnet.streamingfast.io https://github.com/graphprotocol/graph-node/raw/refs/heads/master/substreams/substreams-head-tracker/substreams-head-tracker-v1.0.0.spkg -s -1 -o clock --partial-blocks`
 
 This will print lines like this:
 ```
------------ BLOCK #40,591,725 (cdfc46f244004b890fabcb7e92234e12a3a146473f1001797c7e8bbd86009282) age=1.775644s ---------------
------------ PARTIAL BLOCK (idx=7) #40,591,726 (366bef1c98d1e2f1f548e67a984ccc607450b599356036164b318de1d096a53d) age=-205.354ms ---------------
------------ PARTIAL BLOCK (idx=9) #40,591,726 (f060709ceac09c44b1af22a8889b9f7988fb59f6efbd70dda6cd5cc56e4bcec5) age=58.385ms ---------------
------------ PARTIAL BLOCK (last) #40,591,726 (514c078213650a19c5e262d836217c2c85e79a5422037ee3a30de0456965ec84) age=871.572ms ---------------
------------ PARTIAL BLOCK (idx=5) #40,591,727 (0f10c34677af8101e9485e19f709ea749b0c7f386c98eb9f20047ad2febee121) age=-581.566ms ---------------
------------ PARTIAL BLOCK (idx=7) #40,591,727 (6fae223728d9ea46ca12e6e30fcd025158a9da631795df27d4bfbd352ba7174b) age=-545.254ms ---------------
------------ PARTIAL BLOCK (idx=9) #40,591,727 (117195eeae67615c01cc4def371e8783b182b73172337b6c31b617bd6b1f93bd) age=121.267ms ---------------
------------ PARTIAL BLOCK (last) #40,591,727 (5c284f1bf94363dc71c60d9fb7a4c12a828c2bd258fdf7fe6ea5d9628b9bb20a) age=1.301598s ---------------
+----------- BLOCK #41,764,571 (45e2e160e8121e7a9cb2db8c3b10d155cdad73ee5385fc6113c04c8af920411b) age=2.09382s ---------------
+----------- PARTIAL BLOCK (idx=10) #41,764,572 (910e532120abc7fbed609f74d23bde300a9b3b4faf46bbf405469c6a63e5aac3) age=119.132ms ---------------
+----------- PARTIAL BLOCK (last) #41,764,572 (e53e57ed50fc7a0136d4e092fc1cb11fd02698e16749847f180a126f0397be4e) age=439.173ms ---------------
+----------- PARTIAL BLOCK (idx=1) #41,764,573 (198f9754cfc5eff733429ca79421a2039fb6ef76360fa769475630b361290d19) age=-1.499929s ---------------
+----------- PARTIAL BLOCK (idx=2) #41,764,573 (52c4605a5bb394ac3436a0d371861c8efaa6ffe912a7ed8e4c80b69b90c241ae) age=-1.4895s ---------------
+----------- PARTIAL BLOCK (idx=3) #41,764,573 (a2e2a2a0a67072f05ae6c3c8a41f442daaac6d3685e8aa0070f685eb131cffbc) age=-1.359628s ---------------
+----------- PARTIAL BLOCK (idx=4) #41,764,573 (cfd5b34d92ba14bf4901c26541180e74a6057d8174e8b85bcb0ca5628dc441c2) age=-1.201712s ---------------
+----------- PARTIAL BLOCK (idx=5) #41,764,573 (752d4b6578bd3bd661713c1b45dd9b545379a5185ff92366ebf7879f5bf43b5d) age=-1.009816s ---------------
+----------- PARTIAL BLOCK (idx=6) #41,764,573 (b6e9dfab82bfeb7eb50388d706f6bf01f94fb4dc171b09e56875ff2713592261) age=-756.23ms ---------------
+----------- PARTIAL BLOCK (idx=7) #41,764,573 (53eaa9eb18ac5b7d8d49d4c3fa9cebc5fd1c9788e74831d41c5cb8edebf4da14) age=-621.185ms ---------------
+----------- PARTIAL BLOCK (idx=8) #41,764,573 (cd2d4b9c0051966db0c8887002f07c3b22c1e3ce04b638fd4049f1699092c98a) age=-457.616ms ---------------
+----------- PARTIAL BLOCK (idx=9) #41,764,573 (5b3288a1712e8d6126bbf131ab4608c5d33a57705388ca7785b9c639fbbdff69) age=-252.544ms ---------------
+----------- PARTIAL BLOCK (idx=10) #41,764,573 (c14d1553dbc40d99505a51bf1fe9618b0bf884261f54512867dbd24a2346fb7e) age=-129.763ms ---------------
+----------- PARTIAL BLOCK (last) #41,764,573 (ae919437884c5f08a1730c2ffe0e390f3d3fd4c2a16258540db12dd12cd58bbc) age=457.636ms ---------------
+----------- PARTIAL BLOCK (idx=1) #41,764,574 (da8c1003dc819ff776ddbfa0f44759f828c30ed853530505d7b1c3178df6ba4c) age=-1.541983s ---------------
+----------- PARTIAL BLOCK (idx=2) #41,764,574 (6011e585fbbffedce1bb3ee448a7613e40fea20c78d12011af87dae6fb78e382) age=-1.541895s ---------------
 ```
+
 {% hint style="note" %}
 See the "negative age", that's because at partial block with idx=5, the proposed block timestamp is still 2 seconds in the future.
 {% endhint %}
 
 ### A more useful example, with the Substreams Webhook Sink:
 
-1. Get the latest release of Substreams: https://github.com/streamingfast/substreams/releases/tag/v1.17.9
+1. Get the latest release of Substreams: https://github.com/streamingfast/substreams/releases
 1. Run this command:
 
-`substreams sink webhook --partial-blocks -e https://base-mainnet-flash.streamingfast.io http://webhook.example.com path-to-your.spkg  -s -1`
+`substreams sink webhook --partial-blocks -e https://base-mainnet.streamingfast.io http://webhook.example.com path-to-your.spkg  -s -1`
 
 Enjoy!
 

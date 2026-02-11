@@ -2,7 +2,9 @@ package tests_e2e
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -11,6 +13,7 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types/container"
+	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dauth"
 	dauthnull "github.com/streamingfast/dauth/null"
 	dauthtrust "github.com/streamingfast/dauth/trust"
@@ -84,7 +87,7 @@ func RunRequest(t *testing.T, req *pbsubstreamsrpcv2.Request, endpoint string) (
 	streamClient := pbsubstreamsrpcv2.NewStreamClient(conn)
 
 	// Make the streaming call
-	stream, err := streamClient.Blocks(ctx, req, callOpts...)
+	blockStream, err := streamClient.Blocks(ctx, req, callOpts...)
 	if err != nil {
 		t.Logf("Error making streaming call: %v", err)
 		require.NoError(t, err)
@@ -96,11 +99,15 @@ func RunRequest(t *testing.T, req *pbsubstreamsrpcv2.Request, endpoint string) (
 
 	for {
 		var response *pbsubstreamsrpcv2.Response
-		response, err = stream.Recv()
+		response, err = blockStream.Recv()
 		if err != nil {
-			t.Logf("Stream ended or error: %v", err)
-			if strings.Contains(err.Error(), "RST_STREAM") {
+			if errors.Is(err, stream.ErrStopBlockReached) || errors.Is(err, io.EOF) {
+				t.Logf("Reached stop block or EOF: %v", err)
+				err = nil
+			} else if strings.Contains(err.Error(), "RST_STREAM") {
 				t.Logf("Error RST_STREAM in these tests usually means that the test panicked. Make sure that you run with `DLOG=info` (or similar) to see the server-side panic")
+			} else {
+				t.Logf("Unknown error: %v", err)
 			}
 			break
 		}
@@ -259,10 +266,14 @@ func newDummyBlockchainContainer(ctx context.Context, tmpDir string, image strin
 			"relayer",
 			"-c",
 			"",
+			"--common-system-shutdown-signal-delay=10s",
 			"--advertise-chain-name=acme-dummy-blockchain",
 			"--reader-node-path=dummy-blockchain",
 			"--reader-node-arguments=" + readerArgs,
 			"--advertise-block-id-encoding=hex",
+		},
+		Env: map[string]string{
+			"DLOG": ".*=debug",
 		},
 		ExposedPorts: []string{"10014/tcp"},
 		HostConfigModifier: func(hostConfig *container.HostConfig) {
@@ -273,6 +284,8 @@ func newDummyBlockchainContainer(ctx context.Context, tmpDir string, image strin
 			wait.ForLog("serving gRPC").WithStartupTimeout(30*time.Second),
 		),
 	}
+
+	fmt.Println(strings.Join(req.Cmd, " "))
 
 	// Start container
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
@@ -375,7 +388,7 @@ func RunRequestWithPartialBlocks(t *testing.T, req *pbsubstreamsrpcv2.Request, e
 	streamClient := pbsubstreamsrpcv2.NewStreamClient(conn)
 
 	// Make the streaming call
-	stream, err := streamClient.Blocks(ctx, req, callOpts...)
+	blockStream, err := streamClient.Blocks(ctx, req, callOpts...)
 	if err != nil {
 		t.Logf("Error making streaming call: %v", err)
 		require.NoError(t, err)
@@ -384,9 +397,16 @@ func RunRequestWithPartialBlocks(t *testing.T, req *pbsubstreamsrpcv2.Request, e
 
 	for {
 		var response *pbsubstreamsrpcv2.Response
-		response, err = stream.Recv()
+		response, err = blockStream.Recv()
 		if err != nil {
-			t.Logf("Stream ended or error: %v", err)
+			t.Logf("Stream ended with error: %v", err)
+			if strings.Contains(err.Error(), "RST_STREAM") {
+				t.Logf("Error RST_STREAM in these tests usually means that the test panicked. Make sure that you run with `DLOG=info` (or similar) to see the server-side panic")
+			}
+			if errors.Is(err, stream.ErrStopBlockReached) || errors.Is(err, io.EOF) {
+				t.Logf("Reached stop block or EOF")
+				err = nil
+			}
 			break
 		}
 		require.NotNil(t, response)
@@ -405,7 +425,7 @@ func RunRequestWithPartialBlocks(t *testing.T, req *pbsubstreamsrpcv2.Request, e
 				partialBlockDataCount++
 				//t.Logf("Received partial block data %d/%d", len(partialBlockDataSlice), partialResponseCount)
 				// Break if we've received the desired number of partial responses
-				if partialBlockDataCount >= maxPartialResponses {
+				if maxPartialResponses != 0 && partialBlockDataCount >= maxPartialResponses {
 					t.Logf("Received %d partial responses - halting request", partialBlockDataCount)
 					break
 				}

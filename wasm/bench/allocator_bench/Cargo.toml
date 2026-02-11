@@ -1,0 +1,36 @@
+[package]
+name = "allocator-bench"
+version = "1.0.0"
+edition = "2021"
+
+[lib]
+name = "substreams"
+crate-type = ["cdylib"]
+
+[features]
+default = []
+alloc-talc = ["talc", "spin"]
+alloc-rlsf = ["rlsf"]
+alloc-lol = ["lol_alloc"]
+alloc-mini = ["mini-alloc"]
+
+[dependencies]
+substreams = "0.6"
+substreams-ethereum = "0.10"
+substreams-solana = "0.14"
+prost = "0.13"
+prost-types = "0.13"
+hex = "0.4"
+bs58 = "0.5"  # For Solana base58 encoding
+
+# Allocator dependencies (optional)
+talc = { version = "4", optional = true }
+spin = { version = "0.9", optional = true }
+rlsf = { version = "0.2", optional = true }
+lol_alloc = { version = "0.4", optional = true }
+mini-alloc = { version = "0.10.0-beta.0", optional = true }
+
+[profile.release]
+lto = true
+opt-level = 's'
+strip = "debuginfo"

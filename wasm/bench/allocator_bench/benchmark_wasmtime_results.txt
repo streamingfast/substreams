@@ -1,0 +1,915 @@
+goos: linux
+goarch: arm64
+pkg: github.com/streamingfast/substreams/wasm/bench
+BenchmarkAllocators/alloc=default/chain=ethereum/bench=decode_only-10         	    1135	   2132906 ns/op	     562 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=ethereum/bench=decode_only-10         	    1130	   2092787 ns/op	     562 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=ethereum/bench=decode_only-10         	    1128	   2096842 ns/op	     562 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=ethereum/bench=small_allocs-10        	    1046	   2272738 ns/op	     564 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=ethereum/bench=small_allocs-10        	    1042	   2275302 ns/op	     564 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=ethereum/bench=small_allocs-10        	    1072	   2275185 ns/op	     563 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=ethereum/bench=large_allocs-10        	    1124	   2128883 ns/op	     562 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=ethereum/bench=large_allocs-10        	    1137	   2140576 ns/op	     562 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=ethereum/bench=large_allocs-10        	    1107	   2130974 ns/op	     562 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=ethereum/bench=mixed-10               	    1080	   2229308 ns/op	   18995 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=default/chain=ethereum/bench=mixed-10               	    1076	   2222997 ns/op	   18995 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=default/chain=ethereum/bench=mixed-10               	    1070	   2229302 ns/op	   18996 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=default/chain=bnb/bench=decode_only-10              	    1020	   2280469 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=bnb/bench=decode_only-10              	    1058	   2292360 ns/op	     564 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=bnb/bench=decode_only-10              	    1026	   2283524 ns/op	     565 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=bnb/bench=small_allocs-10             	     969	   2448908 ns/op	     554 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=bnb/bench=small_allocs-10             	     987	   2442206 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=bnb/bench=small_allocs-10             	     976	   2413289 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=bnb/bench=large_allocs-10             	    1020	   2335531 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=bnb/bench=large_allocs-10             	     987	   2342970 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=bnb/bench=large_allocs-10             	     972	   2343669 ns/op	     554 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=bnb/bench=mixed-10                    	     996	   2442087 ns/op	   18986 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=default/chain=bnb/bench=mixed-10                    	     960	   2448643 ns/op	   18986 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=default/chain=bnb/bench=mixed-10                    	     986	   2434087 ns/op	   18986 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=default/chain=polygon/bench=decode_only-10          	     316	   7583837 ns/op	     565 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=polygon/bench=decode_only-10          	     314	   7527030 ns/op	     565 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=polygon/bench=decode_only-10          	     313	   7528357 ns/op	     565 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=polygon/bench=small_allocs-10         	     297	   8053794 ns/op	     567 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=polygon/bench=small_allocs-10         	     295	   7986324 ns/op	     567 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=polygon/bench=small_allocs-10         	     285	   8142396 ns/op	     551 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=polygon/bench=large_allocs-10         	     304	   7616725 ns/op	     566 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=polygon/bench=large_allocs-10         	     304	   7665942 ns/op	     566 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=polygon/bench=large_allocs-10         	     306	   7763205 ns/op	     566 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=polygon/bench=mixed-10                	     303	   7805856 ns/op	   41526 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=default/chain=polygon/bench=mixed-10                	     300	   7808942 ns/op	   41527 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=default/chain=polygon/bench=mixed-10                	     302	   7760412 ns/op	   41526 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=default/chain=solana/bench=decode_only-10           	     273	   8743742 ns/op	     552 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=solana/bench=decode_only-10           	     271	   8646287 ns/op	     552 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=solana/bench=decode_only-10           	     272	   8736710 ns/op	     552 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=solana/bench=small_allocs-10          	     135	  17453914 ns/op	     552 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=solana/bench=small_allocs-10          	     138	  17231726 ns/op	     551 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=solana/bench=small_allocs-10          	     139	  17297275 ns/op	     551 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=solana/bench=large_allocs-10          	     272	   8759321 ns/op	     552 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=solana/bench=large_allocs-10          	     271	   8789199 ns/op	     552 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=solana/bench=large_allocs-10          	     266	   8804126 ns/op	     552 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=default/chain=solana/bench=mixed-10                 	     271	   8677137 ns/op	     544 B/op	      27 allocs/op
+BenchmarkAllocators/alloc=default/chain=solana/bench=mixed-10                 	     274	   8643709 ns/op	     544 B/op	      27 allocs/op
+BenchmarkAllocators/alloc=default/chain=solana/bench=mixed-10                 	     279	   8619969 ns/op	     544 B/op	      27 allocs/op
+BenchmarkAllocators/alloc=talc/chain=ethereum/bench=decode_only-10            	    1094	   2213324 ns/op	     563 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=ethereum/bench=decode_only-10            	    1089	   2173889 ns/op	     563 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=ethereum/bench=decode_only-10            	    1105	   2178226 ns/op	     562 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=ethereum/bench=small_allocs-10           	    1022	   2365563 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=ethereum/bench=small_allocs-10           	    1014	   2359437 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=ethereum/bench=small_allocs-10           	    1015	   2330434 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=ethereum/bench=large_allocs-10           	    1095	   2225419 ns/op	     563 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=ethereum/bench=large_allocs-10           	    1087	   2188714 ns/op	     563 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=ethereum/bench=large_allocs-10           	    1072	   2238540 ns/op	     563 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=ethereum/bench=mixed-10                  	    1041	   2348724 ns/op	   18996 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=talc/chain=ethereum/bench=mixed-10                  	    1020	   2332851 ns/op	   18985 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=talc/chain=ethereum/bench=mixed-10                  	    1053	   2316336 ns/op	   18996 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=talc/chain=bnb/bench=decode_only-10                 	    1029	   2348993 ns/op	     564 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=bnb/bench=decode_only-10                 	    1052	   2346447 ns/op	     564 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=bnb/bench=decode_only-10                 	    1028	   2332662 ns/op	     565 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=bnb/bench=small_allocs-10                	     952	   2509958 ns/op	     554 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=bnb/bench=small_allocs-10                	     972	   2515498 ns/op	     554 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=bnb/bench=small_allocs-10                	     964	   2506427 ns/op	     554 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=bnb/bench=large_allocs-10                	    1008	   2348043 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=bnb/bench=large_allocs-10                	    1010	   2343931 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=bnb/bench=large_allocs-10                	    1017	   2336703 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=bnb/bench=mixed-10                       	     979	   2455827 ns/op	   18985 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=talc/chain=bnb/bench=mixed-10                       	     987	   2441579 ns/op	   18985 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=talc/chain=bnb/bench=mixed-10                       	     999	   2437859 ns/op	   18985 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=talc/chain=polygon/bench=decode_only-10             	     310	   7581399 ns/op	     566 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=polygon/bench=decode_only-10             	     310	   7542051 ns/op	     566 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=polygon/bench=decode_only-10             	     310	   7519087 ns/op	     566 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=polygon/bench=small_allocs-10            	     295	   8041470 ns/op	     567 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=polygon/bench=small_allocs-10            	     292	   8036059 ns/op	     568 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=polygon/bench=small_allocs-10            	     294	   8057440 ns/op	     567 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=polygon/bench=large_allocs-10            	     310	   7677481 ns/op	     566 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=polygon/bench=large_allocs-10            	     310	   7664126 ns/op	     566 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=polygon/bench=large_allocs-10            	     313	   7684744 ns/op	     565 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=polygon/bench=mixed-10                   	     302	   7836315 ns/op	   41526 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=talc/chain=polygon/bench=mixed-10                   	     301	   7846500 ns/op	   41527 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=talc/chain=polygon/bench=mixed-10                   	     303	   7843711 ns/op	   41527 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=talc/chain=solana/bench=decode_only-10              	     264	   9080888 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=solana/bench=decode_only-10              	     262	   8986865 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=solana/bench=decode_only-10              	     264	   8993708 ns/op	     552 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=solana/bench=small_allocs-10             	     133	  17813520 ns/op	     552 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=solana/bench=small_allocs-10             	     134	  17986536 ns/op	     552 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=solana/bench=small_allocs-10             	     130	  18041909 ns/op	     552 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=solana/bench=large_allocs-10             	     261	   9146402 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=solana/bench=large_allocs-10             	     259	   9217321 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=solana/bench=large_allocs-10             	     259	   9131423 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=talc/chain=solana/bench=mixed-10                    	     260	   9056866 ns/op	     545 B/op	      27 allocs/op
+BenchmarkAllocators/alloc=talc/chain=solana/bench=mixed-10                    	     262	   9079050 ns/op	     545 B/op	      27 allocs/op
+BenchmarkAllocators/alloc=talc/chain=solana/bench=mixed-10                    	     261	   9222547 ns/op	     545 B/op	      27 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=ethereum/bench=decode_only-10            	    1056	   2232338 ns/op	     564 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=ethereum/bench=decode_only-10            	    1074	   2230476 ns/op	     563 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=ethereum/bench=decode_only-10            	    1065	   2260593 ns/op	     564 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=ethereum/bench=small_allocs-10           	     979	   2392012 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=ethereum/bench=small_allocs-10           	     992	   2417744 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=ethereum/bench=small_allocs-10           	     974	   2426279 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=ethereum/bench=large_allocs-10           	    1062	   2286037 ns/op	     564 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=ethereum/bench=large_allocs-10           	    1087	   2246979 ns/op	     563 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=ethereum/bench=large_allocs-10           	    1058	   2259297 ns/op	     564 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=ethereum/bench=mixed-10                  	    1016	   2393380 ns/op	   18985 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=ethereum/bench=mixed-10                  	    1010	   2391300 ns/op	   18985 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=ethereum/bench=mixed-10                  	    1011	   2395634 ns/op	   18985 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=bnb/bench=decode_only-10                 	     973	   2402566 ns/op	     554 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=bnb/bench=decode_only-10                 	     981	   2389687 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=bnb/bench=decode_only-10                 	    1018	   2374383 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=bnb/bench=small_allocs-10                	     937	   2554360 ns/op	     554 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=bnb/bench=small_allocs-10                	     927	   2498622 ns/op	     554 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=bnb/bench=small_allocs-10                	     945	   2538261 ns/op	     554 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=bnb/bench=large_allocs-10                	    1005	   2403172 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=bnb/bench=large_allocs-10                	     980	   2398139 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=bnb/bench=large_allocs-10                	     986	   2391463 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=bnb/bench=mixed-10                       	     960	   2520585 ns/op	   18986 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=bnb/bench=mixed-10                       	     957	   2555582 ns/op	   18986 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=bnb/bench=mixed-10                       	     930	   2617288 ns/op	   18986 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=polygon/bench=decode_only-10             	     302	   7720334 ns/op	     566 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=polygon/bench=decode_only-10             	     310	   7659140 ns/op	     566 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=polygon/bench=decode_only-10             	     310	   7682925 ns/op	     566 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=polygon/bench=small_allocs-10            	     290	   8215220 ns/op	     568 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=polygon/bench=small_allocs-10            	     291	   8136614 ns/op	     568 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=polygon/bench=small_allocs-10            	     289	   8156899 ns/op	     568 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=polygon/bench=large_allocs-10            	     307	   7830101 ns/op	     566 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=polygon/bench=large_allocs-10            	     302	   7792369 ns/op	     566 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=polygon/bench=large_allocs-10            	     302	   7919422 ns/op	     566 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=polygon/bench=mixed-10                   	     295	   7965409 ns/op	   41527 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=polygon/bench=mixed-10                   	     298	   8017507 ns/op	   41527 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=polygon/bench=mixed-10                   	     295	   8007920 ns/op	   41527 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=solana/bench=decode_only-10              	     262	   9204561 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=solana/bench=decode_only-10              	     259	   9092523 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=solana/bench=decode_only-10              	     260	   9182156 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=solana/bench=small_allocs-10             	     135	  17746881 ns/op	     552 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=solana/bench=small_allocs-10             	     135	  17809602 ns/op	     552 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=solana/bench=small_allocs-10             	     133	  17731974 ns/op	     552 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=solana/bench=large_allocs-10             	     255	   9173149 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=solana/bench=large_allocs-10             	     258	   9204697 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=solana/bench=large_allocs-10             	     255	   9346100 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=solana/bench=mixed-10                    	     256	   9147436 ns/op	     545 B/op	      27 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=solana/bench=mixed-10                    	     258	   9157466 ns/op	     545 B/op	      27 allocs/op
+BenchmarkAllocators/alloc=rlsf/chain=solana/bench=mixed-10                    	     258	   9162955 ns/op	     545 B/op	      27 allocs/op
+BenchmarkAllocators/alloc=lol/chain=ethereum/bench=decode_only-10             	--- FAIL: BenchmarkAllocators/alloc=lol/chain=ethereum/bench=decode_only-10
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:354
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:   0xa010 - substreams.wasm!<alloc[7d0ac6b1ae9b09cb]::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc[7d0ac6b1ae9b09cb]::alloc::Global>
+        	            	    6:   0x2cc3 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:   0x5015 - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Call, &mut &[u8]>
+        	            	    8:  0x1a55b - substreams.wasm!<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Block as prost[b8d901f56645fde8]::message::Message>::decode::<&[u8]>
+        	            	    9:  0x22469 - substreams.wasm!bench_decode_only_ethereum
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=ethereum/bench=decode_only
+BenchmarkAllocators/alloc=lol/chain=ethereum/bench=decode_only-10             	--- FAIL: BenchmarkAllocators/alloc=lol/chain=ethereum/bench=decode_only-10
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:354
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:   0xa010 - substreams.wasm!<alloc[7d0ac6b1ae9b09cb]::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc[7d0ac6b1ae9b09cb]::alloc::Global>
+        	            	    6:   0x2cc3 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:   0x5015 - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Call, &mut &[u8]>
+        	            	    8:  0x1a55b - substreams.wasm!<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Block as prost[b8d901f56645fde8]::message::Message>::decode::<&[u8]>
+        	            	    9:  0x22469 - substreams.wasm!bench_decode_only_ethereum
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=ethereum/bench=decode_only
+BenchmarkAllocators/alloc=lol/chain=ethereum/bench=decode_only-10             	--- FAIL: BenchmarkAllocators/alloc=lol/chain=ethereum/bench=decode_only-10
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:354
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:   0xa010 - substreams.wasm!<alloc[7d0ac6b1ae9b09cb]::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc[7d0ac6b1ae9b09cb]::alloc::Global>
+        	            	    6:   0x2cc3 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:   0x5015 - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Call, &mut &[u8]>
+        	            	    8:  0x1a55b - substreams.wasm!<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Block as prost[b8d901f56645fde8]::message::Message>::decode::<&[u8]>
+        	            	    9:  0x22469 - substreams.wasm!bench_decode_only_ethereum
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=ethereum/bench=decode_only
+BenchmarkAllocators/alloc=lol/chain=ethereum/bench=small_allocs-10            	--- FAIL: BenchmarkAllocators/alloc=lol/chain=ethereum/bench=small_allocs-10
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:354
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:  0x253a5 - substreams.wasm!<&[u8] as bytes[1f2f091d38b715fb]::buf::buf_impl::Buf>::copy_to_bytes
+        	            	    6:   0x2c99 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:   0x3954 - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Log, &mut &[u8]>
+        	            	    8:  0x1a904 - substreams.wasm!<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Block as prost[b8d901f56645fde8]::message::Message>::decode::<&[u8]>
+        	            	    9:  0x23ba3 - substreams.wasm!bench_small_allocs_ethereum
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=ethereum/bench=small_allocs
+BenchmarkAllocators/alloc=lol/chain=ethereum/bench=small_allocs-10            	--- FAIL: BenchmarkAllocators/alloc=lol/chain=ethereum/bench=small_allocs-10
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:354
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:  0x253a5 - substreams.wasm!<&[u8] as bytes[1f2f091d38b715fb]::buf::buf_impl::Buf>::copy_to_bytes
+        	            	    6:   0x2c99 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:   0x3954 - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Log, &mut &[u8]>
+        	            	    8:  0x1a904 - substreams.wasm!<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Block as prost[b8d901f56645fde8]::message::Message>::decode::<&[u8]>
+        	            	    9:  0x23ba3 - substreams.wasm!bench_small_allocs_ethereum
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=ethereum/bench=small_allocs
+BenchmarkAllocators/alloc=lol/chain=ethereum/bench=small_allocs-10            	--- FAIL: BenchmarkAllocators/alloc=lol/chain=ethereum/bench=small_allocs-10
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:354
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:  0x253a5 - substreams.wasm!<&[u8] as bytes[1f2f091d38b715fb]::buf::buf_impl::Buf>::copy_to_bytes
+        	            	    6:   0x2c99 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:   0x3954 - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Log, &mut &[u8]>
+        	            	    8:  0x1a904 - substreams.wasm!<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Block as prost[b8d901f56645fde8]::message::Message>::decode::<&[u8]>
+        	            	    9:  0x23ba3 - substreams.wasm!bench_small_allocs_ethereum
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=ethereum/bench=small_allocs
+BenchmarkAllocators/alloc=lol/chain=ethereum/bench=large_allocs-10            	--- FAIL: BenchmarkAllocators/alloc=lol/chain=ethereum/bench=large_allocs-10
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:354
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:   0x769f - substreams.wasm!<alloc[7d0ac6b1ae9b09cb]::raw_vec::RawVec<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::GasChange>>::grow_one
+        	            	    6:   0x5d19 - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Call, &mut &[u8]>
+        	            	    7:  0x1a55b - substreams.wasm!<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Block as prost[b8d901f56645fde8]::message::Message>::decode::<&[u8]>
+        	            	    8:  0x22d81 - substreams.wasm!bench_large_allocs_ethereum
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=ethereum/bench=large_allocs
+BenchmarkAllocators/alloc=lol/chain=ethereum/bench=large_allocs-10            	--- FAIL: BenchmarkAllocators/alloc=lol/chain=ethereum/bench=large_allocs-10
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:354
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:   0x769f - substreams.wasm!<alloc[7d0ac6b1ae9b09cb]::raw_vec::RawVec<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::GasChange>>::grow_one
+        	            	    6:   0x5d19 - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Call, &mut &[u8]>
+        	            	    7:  0x1a55b - substreams.wasm!<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Block as prost[b8d901f56645fde8]::message::Message>::decode::<&[u8]>
+        	            	    8:  0x22d81 - substreams.wasm!bench_large_allocs_ethereum
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=ethereum/bench=large_allocs
+BenchmarkAllocators/alloc=lol/chain=ethereum/bench=large_allocs-10            	--- FAIL: BenchmarkAllocators/alloc=lol/chain=ethereum/bench=large_allocs-10
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:354
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:   0x769f - substreams.wasm!<alloc[7d0ac6b1ae9b09cb]::raw_vec::RawVec<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::GasChange>>::grow_one
+        	            	    6:   0x5d19 - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Call, &mut &[u8]>
+        	            	    7:  0x1a55b - substreams.wasm!<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Block as prost[b8d901f56645fde8]::message::Message>::decode::<&[u8]>
+        	            	    8:  0x22d81 - substreams.wasm!bench_large_allocs_ethereum
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=ethereum/bench=large_allocs
+BenchmarkAllocators/alloc=lol/chain=ethereum/bench=mixed-10                   	--- FAIL: BenchmarkAllocators/alloc=lol/chain=ethereum/bench=mixed-10
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:354
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:  0x253a5 - substreams.wasm!<&[u8] as bytes[1f2f091d38b715fb]::buf::buf_impl::Buf>::copy_to_bytes
+        	            	    6:   0x2c99 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:   0x50e3 - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Call, &mut &[u8]>
+        	            	    8:  0x1a55b - substreams.wasm!<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Block as prost[b8d901f56645fde8]::message::Message>::decode::<&[u8]>
+        	            	    9:  0x22f9e - substreams.wasm!bench_mixed_ethereum
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=ethereum/bench=mixed
+BenchmarkAllocators/alloc=lol/chain=ethereum/bench=mixed-10                   	--- FAIL: BenchmarkAllocators/alloc=lol/chain=ethereum/bench=mixed-10
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:354
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:  0x253a5 - substreams.wasm!<&[u8] as bytes[1f2f091d38b715fb]::buf::buf_impl::Buf>::copy_to_bytes
+        	            	    6:   0x2c99 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:   0x50e3 - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Call, &mut &[u8]>
+        	            	    8:  0x1a55b - substreams.wasm!<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Block as prost[b8d901f56645fde8]::message::Message>::decode::<&[u8]>
+        	            	    9:  0x22f9e - substreams.wasm!bench_mixed_ethereum
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=ethereum/bench=mixed
+BenchmarkAllocators/alloc=lol/chain=ethereum/bench=mixed-10                   	--- FAIL: BenchmarkAllocators/alloc=lol/chain=ethereum/bench=mixed-10
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:354
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:  0x253a5 - substreams.wasm!<&[u8] as bytes[1f2f091d38b715fb]::buf::buf_impl::Buf>::copy_to_bytes
+        	            	    6:   0x2c99 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:   0x50e3 - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Call, &mut &[u8]>
+        	            	    8:  0x1a55b - substreams.wasm!<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Block as prost[b8d901f56645fde8]::message::Message>::decode::<&[u8]>
+        	            	    9:  0x22f9e - substreams.wasm!bench_mixed_ethereum
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=ethereum/bench=mixed
+BenchmarkAllocators/alloc=lol/chain=bnb/bench=decode_only-10                  	--- FAIL: BenchmarkAllocators/alloc=lol/chain=bnb/bench=decode_only-10
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:354
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:   0xa010 - substreams.wasm!<alloc[7d0ac6b1ae9b09cb]::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc[7d0ac6b1ae9b09cb]::alloc::Global>
+        	            	    6:   0x2cc3 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:   0x507c - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Call, &mut &[u8]>
+        	            	    8:  0x1a55b - substreams.wasm!<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Block as prost[b8d901f56645fde8]::message::Message>::decode::<&[u8]>
+        	            	    9:  0x22469 - substreams.wasm!bench_decode_only_ethereum
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=bnb/bench=decode_only
+BenchmarkAllocators/alloc=lol/chain=bnb/bench=decode_only-10                  	--- FAIL: BenchmarkAllocators/alloc=lol/chain=bnb/bench=decode_only-10
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:354
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:   0xa010 - substreams.wasm!<alloc[7d0ac6b1ae9b09cb]::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc[7d0ac6b1ae9b09cb]::alloc::Global>
+        	            	    6:   0x2cc3 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:   0x507c - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Call, &mut &[u8]>
+        	            	    8:  0x1a55b - substreams.wasm!<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Block as prost[b8d901f56645fde8]::message::Message>::decode::<&[u8]>
+        	            	    9:  0x22469 - substreams.wasm!bench_decode_only_ethereum
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=bnb/bench=decode_only
+BenchmarkAllocators/alloc=lol/chain=bnb/bench=decode_only-10                  	--- FAIL: BenchmarkAllocators/alloc=lol/chain=bnb/bench=decode_only-10
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:354
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:   0xa010 - substreams.wasm!<alloc[7d0ac6b1ae9b09cb]::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc[7d0ac6b1ae9b09cb]::alloc::Global>
+        	            	    6:   0x2cc3 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:   0x507c - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Call, &mut &[u8]>
+        	            	    8:  0x1a55b - substreams.wasm!<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Block as prost[b8d901f56645fde8]::message::Message>::decode::<&[u8]>
+        	            	    9:  0x22469 - substreams.wasm!bench_decode_only_ethereum
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=bnb/bench=decode_only
+BenchmarkAllocators/alloc=lol/chain=bnb/bench=small_allocs-10                 	--- FAIL: BenchmarkAllocators/alloc=lol/chain=bnb/bench=small_allocs-10
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:354
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:  0x253a5 - substreams.wasm!<&[u8] as bytes[1f2f091d38b715fb]::buf::buf_impl::Buf>::copy_to_bytes
+        	            	    6:   0x2c99 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:   0x3886 - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Log, &mut &[u8]>
+        	            	    8:   0x5eb3 - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Call, &mut &[u8]>
+        	            	    9:  0x1a55b - substreams.wasm!<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Block as prost[b8d901f56645fde8]::message::Message>::decode::<&[u8]>
+        	            	   10:  0x23ba3 - substreams.wasm!bench_small_allocs_ethereum
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=bnb/bench=small_allocs
+BenchmarkAllocators/alloc=lol/chain=bnb/bench=small_allocs-10                 	--- FAIL: BenchmarkAllocators/alloc=lol/chain=bnb/bench=small_allocs-10
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:354
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:  0x253a5 - substreams.wasm!<&[u8] as bytes[1f2f091d38b715fb]::buf::buf_impl::Buf>::copy_to_bytes
+        	            	    6:   0x2c99 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:   0x3886 - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Log, &mut &[u8]>
+        	            	    8:   0x5eb3 - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Call, &mut &[u8]>
+        	            	    9:  0x1a55b - substreams.wasm!<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Block as prost[b8d901f56645fde8]::message::Message>::decode::<&[u8]>
+        	            	   10:  0x23ba3 - substreams.wasm!bench_small_allocs_ethereum
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=bnb/bench=small_allocs
+BenchmarkAllocators/alloc=lol/chain=bnb/bench=small_allocs-10                 	--- FAIL: BenchmarkAllocators/alloc=lol/chain=bnb/bench=small_allocs-10
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:354
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:  0x253a5 - substreams.wasm!<&[u8] as bytes[1f2f091d38b715fb]::buf::buf_impl::Buf>::copy_to_bytes
+        	            	    6:   0x2c99 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:   0x3886 - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Log, &mut &[u8]>
+        	            	    8:   0x5eb3 - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Call, &mut &[u8]>
+        	            	    9:  0x1a55b - substreams.wasm!<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Block as prost[b8d901f56645fde8]::message::Message>::decode::<&[u8]>
+        	            	   10:  0x23ba3 - substreams.wasm!bench_small_allocs_ethereum
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=bnb/bench=small_allocs
+BenchmarkAllocators/alloc=lol/chain=bnb/bench=large_allocs-10                 	--- FAIL: BenchmarkAllocators/alloc=lol/chain=bnb/bench=large_allocs-10
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:354
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:  0x253a5 - substreams.wasm!<&[u8] as bytes[1f2f091d38b715fb]::buf::buf_impl::Buf>::copy_to_bytes
+        	            	    6:   0x2c99 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:   0x44e2 - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Call, &mut &[u8]>
+        	            	    8:  0x1a55b - substreams.wasm!<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Block as prost[b8d901f56645fde8]::message::Message>::decode::<&[u8]>
+        	            	    9:  0x22d81 - substreams.wasm!bench_large_allocs_ethereum
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=bnb/bench=large_allocs
+BenchmarkAllocators/alloc=lol/chain=bnb/bench=large_allocs-10                 	--- FAIL: BenchmarkAllocators/alloc=lol/chain=bnb/bench=large_allocs-10
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:354
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:  0x253a5 - substreams.wasm!<&[u8] as bytes[1f2f091d38b715fb]::buf::buf_impl::Buf>::copy_to_bytes
+        	            	    6:   0x2c99 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:   0x44e2 - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Call, &mut &[u8]>
+        	            	    8:  0x1a55b - substreams.wasm!<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Block as prost[b8d901f56645fde8]::message::Message>::decode::<&[u8]>
+        	            	    9:  0x22d81 - substreams.wasm!bench_large_allocs_ethereum
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=bnb/bench=large_allocs
+BenchmarkAllocators/alloc=lol/chain=bnb/bench=large_allocs-10                 	--- FAIL: BenchmarkAllocators/alloc=lol/chain=bnb/bench=large_allocs-10
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:354
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:  0x253a5 - substreams.wasm!<&[u8] as bytes[1f2f091d38b715fb]::buf::buf_impl::Buf>::copy_to_bytes
+        	            	    6:   0x2c99 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:   0x44e2 - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Call, &mut &[u8]>
+        	            	    8:  0x1a55b - substreams.wasm!<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Block as prost[b8d901f56645fde8]::message::Message>::decode::<&[u8]>
+        	            	    9:  0x22d81 - substreams.wasm!bench_large_allocs_ethereum
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=bnb/bench=large_allocs
+BenchmarkAllocators/alloc=lol/chain=bnb/bench=mixed-10                        	--- FAIL: BenchmarkAllocators/alloc=lol/chain=bnb/bench=mixed-10
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:354
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:  0x253a5 - substreams.wasm!<&[u8] as bytes[1f2f091d38b715fb]::buf::buf_impl::Buf>::copy_to_bytes
+        	            	    6:   0x2c99 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:   0x3d05 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge_repeated::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    8:   0x38ed - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Log, &mut &[u8]>
+        	            	    9:  0x1a904 - substreams.wasm!<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Block as prost[b8d901f56645fde8]::message::Message>::decode::<&[u8]>
+        	            	   10:  0x22f9e - substreams.wasm!bench_mixed_ethereum
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=bnb/bench=mixed
+BenchmarkAllocators/alloc=lol/chain=bnb/bench=mixed-10                        	--- FAIL: BenchmarkAllocators/alloc=lol/chain=bnb/bench=mixed-10
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:354
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:  0x253a5 - substreams.wasm!<&[u8] as bytes[1f2f091d38b715fb]::buf::buf_impl::Buf>::copy_to_bytes
+        	            	    6:   0x2c99 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:   0x3d05 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge_repeated::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    8:   0x38ed - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Log, &mut &[u8]>
+        	            	    9:  0x1a904 - substreams.wasm!<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Block as prost[b8d901f56645fde8]::message::Message>::decode::<&[u8]>
+        	            	   10:  0x22f9e - substreams.wasm!bench_mixed_ethereum
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=bnb/bench=mixed
+BenchmarkAllocators/alloc=lol/chain=bnb/bench=mixed-10                        	--- FAIL: BenchmarkAllocators/alloc=lol/chain=bnb/bench=mixed-10
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:354
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:  0x253a5 - substreams.wasm!<&[u8] as bytes[1f2f091d38b715fb]::buf::buf_impl::Buf>::copy_to_bytes
+        	            	    6:   0x2c99 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:   0x3d05 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge_repeated::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    8:   0x38ed - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Log, &mut &[u8]>
+        	            	    9:  0x1a904 - substreams.wasm!<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Block as prost[b8d901f56645fde8]::message::Message>::decode::<&[u8]>
+        	            	   10:  0x22f9e - substreams.wasm!bench_mixed_ethereum
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=bnb/bench=mixed
+--- FAIL: BenchmarkAllocators/alloc=lol/chain=polygon/bench=decode_only
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:245
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:  0x253a5 - substreams.wasm!<&[u8] as bytes[1f2f091d38b715fb]::buf::buf_impl::Buf>::copy_to_bytes
+        	            	    6:   0x2c99 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:   0x3d05 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge_repeated::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    8:   0x38ed - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Log, &mut &[u8]>
+        	            	    9:  0x1a904 - substreams.wasm!<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Block as prost[b8d901f56645fde8]::message::Message>::decode::<&[u8]>
+        	            	   10:  0x22469 - substreams.wasm!bench_decode_only_ethereum
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=polygon/bench=decode_only
+--- FAIL: BenchmarkAllocators/alloc=lol/chain=polygon/bench=small_allocs
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:245
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:  0x253a5 - substreams.wasm!<&[u8] as bytes[1f2f091d38b715fb]::buf::buf_impl::Buf>::copy_to_bytes
+        	            	    6:   0x2c99 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:   0x3d05 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge_repeated::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    8:   0x38ed - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Log, &mut &[u8]>
+        	            	    9:  0x1a904 - substreams.wasm!<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Block as prost[b8d901f56645fde8]::message::Message>::decode::<&[u8]>
+        	            	   10:  0x23ba3 - substreams.wasm!bench_small_allocs_ethereum
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=polygon/bench=small_allocs
+--- FAIL: BenchmarkAllocators/alloc=lol/chain=polygon/bench=large_allocs
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:245
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:  0x253a5 - substreams.wasm!<&[u8] as bytes[1f2f091d38b715fb]::buf::buf_impl::Buf>::copy_to_bytes
+        	            	    6:   0x2c99 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:   0x3d05 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge_repeated::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    8:   0x38ed - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Log, &mut &[u8]>
+        	            	    9:  0x1a904 - substreams.wasm!<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Block as prost[b8d901f56645fde8]::message::Message>::decode::<&[u8]>
+        	            	   10:  0x22d81 - substreams.wasm!bench_large_allocs_ethereum
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=polygon/bench=large_allocs
+--- FAIL: BenchmarkAllocators/alloc=lol/chain=polygon/bench=mixed
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:245
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:  0x253a5 - substreams.wasm!<&[u8] as bytes[1f2f091d38b715fb]::buf::buf_impl::Buf>::copy_to_bytes
+        	            	    6:   0x2c99 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:   0x3d05 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge_repeated::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    8:   0x38ed - substreams.wasm!prost[b8d901f56645fde8]::encoding::message::merge_repeated::<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Log, &mut &[u8]>
+        	            	    9:  0x1a904 - substreams.wasm!<substreams_ethereum_core[fcb2f00b6705bfc]::pb::generated::sf::ethereum::type::v2::Block as prost[b8d901f56645fde8]::message::Message>::decode::<&[u8]>
+        	            	   10:  0x22f9e - substreams.wasm!bench_mixed_ethereum
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=polygon/bench=mixed
+--- FAIL: BenchmarkAllocators/alloc=lol/chain=solana/bench=decode_only
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:245
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:   0xa010 - substreams.wasm!<alloc[7d0ac6b1ae9b09cb]::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc[7d0ac6b1ae9b09cb]::alloc::Global>
+        	            	    6:   0x2cc3 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:  0x1edbc - substreams.wasm!<substreams_solana_core[239f8b51e0af9a52]::pb::sf::solana::type::v1::ConfirmedTransaction as prost[b8d901f56645fde8]::message::Message>::merge_field::<&mut &[u8]>
+        	            	    8:  0x20468 - substreams.wasm!substreams[6a08bfe49dc21467]::proto::decode_ptr::<substreams_solana_core[239f8b51e0af9a52]::pb::sf::solana::type::v1::Block>
+        	            	    9:  0x24141 - substreams.wasm!bench_decode_only_solana
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=solana/bench=decode_only
+--- FAIL: BenchmarkAllocators/alloc=lol/chain=solana/bench=small_allocs
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:245
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:   0xa010 - substreams.wasm!<alloc[7d0ac6b1ae9b09cb]::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc[7d0ac6b1ae9b09cb]::alloc::Global>
+        	            	    6:   0x2cc3 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:  0x1edbc - substreams.wasm!<substreams_solana_core[239f8b51e0af9a52]::pb::sf::solana::type::v1::ConfirmedTransaction as prost[b8d901f56645fde8]::message::Message>::merge_field::<&mut &[u8]>
+        	            	    8:  0x20468 - substreams.wasm!substreams[6a08bfe49dc21467]::proto::decode_ptr::<substreams_solana_core[239f8b51e0af9a52]::pb::sf::solana::type::v1::Block>
+        	            	    9:  0x245b2 - substreams.wasm!bench_small_allocs_solana
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=solana/bench=small_allocs
+--- FAIL: BenchmarkAllocators/alloc=lol/chain=solana/bench=large_allocs
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:245
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:   0xa010 - substreams.wasm!<alloc[7d0ac6b1ae9b09cb]::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc[7d0ac6b1ae9b09cb]::alloc::Global>
+        	            	    6:   0x2cc3 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:  0x1edbc - substreams.wasm!<substreams_solana_core[239f8b51e0af9a52]::pb::sf::solana::type::v1::ConfirmedTransaction as prost[b8d901f56645fde8]::message::Message>::merge_field::<&mut &[u8]>
+        	            	    8:  0x20468 - substreams.wasm!substreams[6a08bfe49dc21467]::proto::decode_ptr::<substreams_solana_core[239f8b51e0af9a52]::pb::sf::solana::type::v1::Block>
+        	            	    9:  0x2431f - substreams.wasm!bench_large_allocs_solana
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=solana/bench=large_allocs
+--- FAIL: BenchmarkAllocators/alloc=lol/chain=solana/bench=mixed
+    allocator_bench_test.go:136: 
+        	Error Trace:	/Users/maoueh/work/sf/substreams/wasm/bench/allocator_bench_test.go:136
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:219
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/testing/benchmark.go:245
+        	            				/home/agent/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.25.0.linux-arm64/src/runtime/asm_arm64.s:1268
+        	Error:      	Received unexpected error:
+        	            	calling entrypoint: error while executing at wasm backtrace:
+        	            	    0:  0x17496 - substreams.wasm!std[5d612a8a124524d4]::sys::backtrace::__rust_end_short_backtrace::<std[5d612a8a124524d4]::alloc::rust_oom::{closure#0}, !>
+        	            	    1:  0x17663 - substreams.wasm!std[5d612a8a124524d4]::alloc::rust_oom
+        	            	    2:   0x9a5d - substreams.wasm!__rustc[e1bf4ce096729b3a]::__rust_alloc_error_handler
+        	            	    3:   0x98ea - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::alloc::handle_alloc_error
+        	            	    4:   0x9711 - substreams.wasm!alloc[7d0ac6b1ae9b09cb]::raw_vec::handle_error
+        	            	    5:   0xa010 - substreams.wasm!<alloc[7d0ac6b1ae9b09cb]::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc[7d0ac6b1ae9b09cb]::alloc::Global>
+        	            	    6:   0x2cc3 - substreams.wasm!prost[b8d901f56645fde8]::encoding::bytes::merge::<alloc[7d0ac6b1ae9b09cb]::vec::Vec<u8>, &mut &[u8]>
+        	            	    7:  0x1edbc - substreams.wasm!<substreams_solana_core[239f8b51e0af9a52]::pb::sf::solana::type::v1::ConfirmedTransaction as prost[b8d901f56645fde8]::message::Message>::merge_field::<&mut &[u8]>
+        	            	    8:  0x20468 - substreams.wasm!substreams[6a08bfe49dc21467]::proto::decode_ptr::<substreams_solana_core[239f8b51e0af9a52]::pb::sf::solana::type::v1::Block>
+        	            	    9:  0x244de - substreams.wasm!bench_mixed_solana
+        	            	
+        	            	Caused by:
+        	            	    wasm trap: wasm `unreachable` instruction executed
+        	Test:       	BenchmarkAllocators/alloc=lol/chain=solana/bench=mixed
+BenchmarkAllocators/alloc=mini/chain=ethereum/bench=decode_only-10            	    1120	   2102408 ns/op	     562 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=ethereum/bench=decode_only-10            	    1107	   2080385 ns/op	     562 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=ethereum/bench=decode_only-10            	    1066	   2086309 ns/op	     563 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=ethereum/bench=small_allocs-10           	    1016	   2257632 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=ethereum/bench=small_allocs-10           	     994	   2243915 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=ethereum/bench=small_allocs-10           	     981	   2268432 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=ethereum/bench=large_allocs-10           	    1018	   2143528 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=ethereum/bench=large_allocs-10           	     973	   2189997 ns/op	     554 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=ethereum/bench=large_allocs-10           	    1084	   2178045 ns/op	     563 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=ethereum/bench=mixed-10                  	    1027	   2254107 ns/op	   18997 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=mini/chain=ethereum/bench=mixed-10                  	    1000	   2228288 ns/op	   18985 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=mini/chain=ethereum/bench=mixed-10                  	    1070	   2216795 ns/op	   18996 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=mini/chain=bnb/bench=decode_only-10                 	     956	   2352475 ns/op	     554 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=bnb/bench=decode_only-10                 	     961	   2362507 ns/op	     554 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=bnb/bench=decode_only-10                 	     954	   2377598 ns/op	     554 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=bnb/bench=small_allocs-10                	     880	   2498442 ns/op	     555 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=bnb/bench=small_allocs-10                	     898	   2502621 ns/op	     555 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=bnb/bench=small_allocs-10                	     896	   2490047 ns/op	     555 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=bnb/bench=large_allocs-10                	     888	   2481388 ns/op	     555 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=bnb/bench=large_allocs-10                	     891	   2474062 ns/op	     555 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=bnb/bench=large_allocs-10                	     862	   2489024 ns/op	     556 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=bnb/bench=mixed-10                       	     948	   2476321 ns/op	   18986 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=mini/chain=bnb/bench=mixed-10                       	     932	   2448918 ns/op	   18987 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=mini/chain=bnb/bench=mixed-10                       	     934	   2466767 ns/op	   18986 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=mini/chain=polygon/bench=decode_only-10             	     307	   7565063 ns/op	     566 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=polygon/bench=decode_only-10             	     307	   7670924 ns/op	     566 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=polygon/bench=decode_only-10             	     302	   8193982 ns/op	     566 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=polygon/bench=small_allocs-10            	     254	   8253454 ns/op	     553 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=polygon/bench=small_allocs-10            	     279	   8125717 ns/op	     552 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=polygon/bench=small_allocs-10            	     288	   7988408 ns/op	     568 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=polygon/bench=large_allocs-10            	     283	   8425667 ns/op	     551 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=polygon/bench=large_allocs-10            	     283	   8046030 ns/op	     551 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=polygon/bench=large_allocs-10            	     286	   8080303 ns/op	     551 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=polygon/bench=mixed-10                   	     284	   7988974 ns/op	   41511 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=mini/chain=polygon/bench=mixed-10                   	     290	   8000070 ns/op	   41528 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=mini/chain=polygon/bench=mixed-10                   	     284	   7981993 ns/op	   41512 B/op	      30 allocs/op
+BenchmarkAllocators/alloc=mini/chain=solana/bench=decode_only-10              	     272	   8442761 ns/op	     552 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=solana/bench=decode_only-10              	     273	   8501117 ns/op	     552 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=solana/bench=decode_only-10              	     270	   8449531 ns/op	     552 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=solana/bench=small_allocs-10             	     130	  17055854 ns/op	     552 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=solana/bench=small_allocs-10             	     138	  16936239 ns/op	     551 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=solana/bench=small_allocs-10             	     138	  17052059 ns/op	     551 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=solana/bench=large_allocs-10             	     272	   8474438 ns/op	     552 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=solana/bench=large_allocs-10             	     268	   8511679 ns/op	     552 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=solana/bench=large_allocs-10             	     268	   8567391 ns/op	     552 B/op	      29 allocs/op
+BenchmarkAllocators/alloc=mini/chain=solana/bench=mixed-10                    	     272	   8386777 ns/op	     544 B/op	      27 allocs/op
+BenchmarkAllocators/alloc=mini/chain=solana/bench=mixed-10                    	     273	   8371236 ns/op	     544 B/op	      27 allocs/op
+BenchmarkAllocators/alloc=mini/chain=solana/bench=mixed-10                    	     268	   8507166 ns/op	     544 B/op	      27 allocs/op
+--- FAIL: BenchmarkAllocators
+    allocator_bench_test.go:89: Allocator default: WASM size = 200687 bytes
+    allocator_bench_test.go:89: Allocator talc: WASM size = 199280 bytes
+    allocator_bench_test.go:89: Allocator rlsf: WASM size = 192997 bytes
+    allocator_bench_test.go:89: Allocator lol: WASM size = 199133 bytes
+    allocator_bench_test.go:89: Allocator mini: WASM size = 199799 bytes
+FAIL
+exit status 1
+FAIL	github.com/streamingfast/substreams/wasm/bench	581.205s

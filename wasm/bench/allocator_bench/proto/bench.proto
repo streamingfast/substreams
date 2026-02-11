@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package bench;
+
+// Simple output for benchmarks that just count things
+message BenchOutput {
+  uint64 count = 1;
+}
+
+// Large output with structured data for mixed allocation patterns
+message LargeOutput {
+  repeated TxData transactions = 1;
+}
+
+message TxData {
+  string hash = 1;
+  string from = 2;
+  string to = 3;
+  repeated CallData calls = 4;
+}
+
+message CallData {
+  uint64 index = 1;
+  uint64 input_size = 2;
+  uint64 return_size = 3;
+}

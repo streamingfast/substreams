@@ -7,6 +7,7 @@ import (
 	"io"
 	"testing"
 
+	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/storage/store/marshaller"
@@ -109,7 +110,8 @@ func TestFullKV_QuickSave_QuickLoad_Empty(t *testing.T) {
 	}
 
 	// Test QuickLoad
-	err = kvl.QuickLoad(context.Background(), blockHash)
+	blockRef := bstream.NewBlockRef(blockHash, 123)
+	err = kvl.QuickLoad(context.Background(), blockRef)
 	require.NoError(t, err)
 	require.NotNil(t, kvl.kv, "kvl.kv should not be nil after QuickLoad")
 	require.Equal(t, 0, len(kvl.kv), "kvl.kv should be empty")
@@ -166,7 +168,8 @@ func TestFullKV_QuickSave_QuickLoad_WithData(t *testing.T) {
 	}
 
 	// Test QuickLoad
-	err = kvl.QuickLoad(context.Background(), blockHash)
+	blockRef := bstream.NewBlockRef(blockHash, 456)
+	err = kvl.QuickLoad(context.Background(), blockRef)
 	require.NoError(t, err)
 	require.NotNil(t, kvl.kv, "kvl.kv should not be nil after QuickLoad")
 	require.Equal(t, len(testData), len(kvl.kv), "kvl.kv should have same number of entries")
@@ -196,7 +199,8 @@ func TestFullKV_QuickLoad_NoQuickSaveStore(t *testing.T) {
 		},
 	}
 
-	err := kvs.QuickLoad(context.Background(), "test_block_hash")
+	blockRef := bstream.NewBlockRef("test_block_hash", 100)
+	err := kvs.QuickLoad(context.Background(), blockRef)
 	require.Error(t, err)
 	require.Equal(t, ErrNoQuickSaveStore, err)
 }
@@ -242,7 +246,8 @@ func TestFullKV_QuickLoad_FileNotFound(t *testing.T) {
 		},
 	}
 
-	err := kvs.QuickLoad(context.Background(), "nonexistent_block_hash")
+	blockRef := bstream.NewBlockRef("nonexistent_block_hash", 200)
+	err := kvs.QuickLoad(context.Background(), blockRef)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "opening file")
 	require.Contains(t, err.Error(), "test_module")
@@ -303,7 +308,8 @@ func TestFullKV_QuickSave_QuickLoad_LargeData(t *testing.T) {
 	}
 
 	// Test QuickLoad
-	err = kvl.QuickLoad(context.Background(), blockHash)
+	blockRef := bstream.NewBlockRef(blockHash, 1000)
+	err = kvl.QuickLoad(context.Background(), blockRef)
 	require.NoError(t, err)
 	require.NotNil(t, kvl.kv, "kvl.kv should not be nil after QuickLoad")
 	require.Equal(t, len(testData), len(kvl.kv), "kvl.kv should have same number of entries")
@@ -385,7 +391,8 @@ func TestFullKV_QuickSave_QuickLoad_RoundTrip(t *testing.T) {
 			},
 		}
 
-		err = loadStore.QuickLoad(context.Background(), blockHash)
+		blockRef := bstream.NewBlockRef(blockHash, uint64(i+1))
+		err = loadStore.QuickLoad(context.Background(), blockRef)
 		require.NoError(t, err)
 
 		// Verify data matches

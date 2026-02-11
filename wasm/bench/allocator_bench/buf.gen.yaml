@@ -1,0 +1,6 @@
+version: v2
+plugins:
+  - remote: buf.build/prost/plugins/prost:v0.3.1-1
+    out: src/pb
+    opt:
+      - bytes=.

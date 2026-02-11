@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/docker/docker v28.2.2+incompatible
+	github.com/streamingfast/bstream v0.0.2-0.20260211203220-e95f72b706fa
 	github.com/streamingfast/dauth v0.0.0-20251218134044-fb716c7172b4
 	github.com/streamingfast/dmetering v0.0.0-20251027175535-4fd530934b97
 	github.com/streamingfast/dmetrics v0.0.0-20260109212625-35256f512c62
@@ -176,7 +177,6 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spf13/viper v1.15.0 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
-	github.com/streamingfast/bstream v0.0.2-0.20260211203220-e95f72b706fa // indirect
 	github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b // indirect
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c // indirect
 	github.com/streamingfast/derr v0.0.0-20250814163534-bd7407bd89d7 // indirect

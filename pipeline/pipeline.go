@@ -55,14 +55,16 @@ type partialProcessingState struct {
 	processedPartials          []*pbsubstreams.Clock
 	processedTransactionsCount int
 	processedTransactionsHash  []byte
+	previousBlockRef           bstream.BlockRef // used for some emergency UNDOs if we detect that blocks are not based on same beginning in partials
 	highestIndex               int32
 }
 
-func newPartialProcessingState(num uint64, id string, idx int32) *partialProcessingState {
+func newPartialProcessingState(num uint64, id string, idx int32, prevBlockRef bstream.BlockRef) *partialProcessingState {
 	return &partialProcessingState{
-		num:          num,
-		lastBlockID:  id,
-		highestIndex: idx,
+		num:              num,
+		lastBlockID:      id,
+		highestIndex:     idx,
+		previousBlockRef: prevBlockRef,
 	}
 }
 
@@ -94,7 +96,8 @@ type Pipeline struct {
 	extraStoreModuleOutputs []*pbsubstreamsrpc.StoreModuleOutput
 	preexistingBlockIndices map[string]map[string]*roaring64.Bitmap
 
-	partialProcessingState *partialProcessingState
+	partialProcessingState   *partialProcessingState
+	previousLastPartialBlock bstream.BlockRef // when we get a partial with 'isLast', we nil out partialProcessingState and write the block ref here.
 
 	respFunc         substreams.ResponseFunc
 	lastProgressSent time.Time
@@ -270,11 +273,11 @@ func (p *Pipeline) initStoresFromQuickload(ctx context.Context, reqPlan *plan.Re
 		storeMap[storeConfig.Name()] = storeConfig.NewFullKV(p.stores.logger)
 	}
 
-	if err := storeMap.QuickLoad(ctx, cursor.Block.ID()); err != nil {
+	if err := storeMap.QuickLoad(ctx, cursor.Block); err != nil {
 		p.stores.logger.Info("no temporary store files found", zap.Error(err))
 		return false
 	}
-	reqctx.Logger(ctx).Info("skipping backprocessing, reading from temporary files", zap.Strings("stores", storeMap.Names()), zap.String("block", cursor.Block.String()))
+	reqctx.Logger(ctx).Info("skipping backprocessing, reading from temporary files", zap.Strings("stores", storeMap.Names()), zap.Uint64("block_num", cursor.Block.Num()), zap.String("block_id", cursor.Block.ID()))
 	p.stores.StoreMap = storeMap
 	return true
 }

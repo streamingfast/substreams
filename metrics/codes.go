@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"context"
 	"errors"
 
 	"connectrpc.com/connect"
@@ -46,6 +47,9 @@ func codeToRejectedReason(code uint32) string {
 func IsRejectedRequestError(err error) (metricsReason string, countAsRejected bool) {
 	if err == nil {
 		return "", false
+	}
+	if errors.Is(err, context.Canceled) {
+		return "cancelled", false
 	}
 
 	errorCode := errorToRejectedReason(err)

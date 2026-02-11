@@ -13,7 +13,7 @@ import (
 	"github.com/streamingfast/substreams/wasm"
 
 	// _ "github.com/streamingfast/substreams/wasm/wasi"
-	_ "github.com/streamingfast/substreams/wasm/wasmtime"
+	// _ "github.com/streamingfast/substreams/wasm/wasmtime"
 	_ "github.com/streamingfast/substreams/wasm/wazero"
 
 	"github.com/stretchr/testify/require"

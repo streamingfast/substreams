@@ -114,6 +114,7 @@
   * [Hosting Foundational Stores](./references/foundational-stores/hosting-foundational-stores.md)
 * Development Tools
   * [Logging & Debugging](references/log-and-debug.md)
+  * [Testing](references/testing.md)
   * [Dev Container Reference](references/devcontainer-ref.md)
 * [Change log](release-notes/change-log.md)
 

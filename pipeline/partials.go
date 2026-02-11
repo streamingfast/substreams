@@ -41,7 +41,7 @@ func splitPartialblock(execOutput execout.ExecutionOutput, blockType string, pre
 				}
 			}
 			newHash = hasher.Sum(nil)
-			if hashMismatch {
+			if hashMismatch || len(block.Transactions) < prevTrxCount {
 				return len(block.Transactions), newHash, errHashMismatch
 			}
 
@@ -73,7 +73,7 @@ func splitPartialblock(execOutput execout.ExecutionOutput, blockType string, pre
 				}
 			}
 			newHash = hasher.Sum(nil)
-			if hashMismatch {
+			if hashMismatch || len(block.TransactionTraces) < prevTrxCount {
 				return len(block.TransactionTraces), newHash, errHashMismatch
 			}
 

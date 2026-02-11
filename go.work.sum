@@ -1,5 +1,6 @@
 al.essio.dev/pkg/shellescape v1.6.0 h1:NxFcEqzFSEVCGN2yq7Huv/9hyCEGVa/TncnOOBBeXHA=
 al.essio.dev/pkg/shellescape v1.6.0/go.mod h1:6sIqp7X2P6mThCQ7twERpZTuigpr6KbZWtls1U8I890=
+buf.build/go/hyperpb v0.1.3/go.mod h1:IHXAM5qnS0/Fsnd7/HGDghFNvUET646WoHmq1FDZXIE=
 cel.dev/expr v0.15.0/go.mod h1:TRSuuV7DlVCE/uwv5QbAiW/v8l5O8C4eEPHeu7gf7Sg=
 cel.dev/expr v0.16.0/go.mod h1:TRSuuV7DlVCE/uwv5QbAiW/v8l5O8C4eEPHeu7gf7Sg=
 cel.dev/expr v0.16.1/go.mod h1:AsGA5zb3WruAEQeQng1RZdGEXmBj0jvMWh6l5SnNuC8=
@@ -987,6 +988,8 @@ github.com/streamingfast/atm v0.0.0-20220131151839-18c87005e680/go.mod h1:iISPGA
 github.com/streamingfast/bstream v0.0.2-0.20231207142002-6844e8db9e20/go.mod h1:08GVb+DXyz6jVNIsbf+2zlaC81UeEGu5o1h49KrSR3Y=
 github.com/streamingfast/bstream v0.0.2-0.20251218133631-a5f5c59a7c05/go.mod h1:desuTzXOKd0zUbOLKnvhLc1ucQhl454KIdl1KmRw7WY=
 github.com/streamingfast/bstream v0.0.2-0.20260112182417-be2bce62fabe/go.mod h1:0sed+gw+d62tBsGl5omaB1m14Gmfvb3YAs4epHuL1YU=
+github.com/streamingfast/bstream v0.0.2-0.20260127202638-27d286c7156a/go.mod h1:0sed+gw+d62tBsGl5omaB1m14Gmfvb3YAs4epHuL1YU=
+github.com/streamingfast/bstream v0.0.2-0.20260129145732-573f7c50a243/go.mod h1:0sed+gw+d62tBsGl5omaB1m14Gmfvb3YAs4epHuL1YU=
 github.com/streamingfast/derr v0.0.0-20210811180100-9138d738bcec/go.mod h1:ulVfui/yGXmPBbt9aAqCWdAjM7YxnZkYHzvQktLfw3M=
 github.com/streamingfast/dgrpc v0.0.0-20250227145723-9bc2e4941b4e/go.mod h1:qdcskj9WmO+nDjgxyafc5oMCftTZolOk693p2ZFUdO8=
 github.com/streamingfast/dgrpc v0.0.0-20251218133127-15b36e02a74f/go.mod h1:B+RAf6/idk6Kz41wEAEeQH1PW3Bk6WQkmvuRhdTEgKg=
@@ -1023,6 +1026,7 @@ github.com/stretchr/testify v1.9.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8
 github.com/stretchr/testify v1.10.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
 github.com/tiendc/go-deepcopy v1.6.1 h1:uVRTItFeNHkMcLueHS7OCsxgxT9P8MzGB/taUa2Y4Tk=
 github.com/tiendc/go-deepcopy v1.6.1/go.mod h1:toXoeQoUqXOOS/X4sKuiAoSk6elIdqc0pN7MTgOOo2I=
+github.com/timandy/routine v1.1.5/go.mod h1:kXslgIosdY8LW0byTyPnenDgn4/azt2euufAq9rK51w=
 github.com/tsenart/deadcode v0.0.0-20160724212837-210d2dc333e9 h1:vY5WqiEon0ZSTGM3ayVVi+twaHKHDFUVloaQ/wug9/c=
 github.com/ugorji/go/codec v1.1.7 h1:2SvQaVZ1ouYrrKKwoSk2pzd4A9evlKJb9oTL+OaLUSs=
 github.com/ugorji/go/codec v1.1.7/go.mod h1:Ax+UKWsSmolVDwsd+7N3ZtXu+yMGCf907BLYF3GoBXY=

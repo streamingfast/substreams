@@ -14,7 +14,6 @@ import (
 	_ "github.com/mostynb/go-grpc-compression/lz4"
 	_ "github.com/mostynb/go-grpc-compression/zstd"
 	_ "github.com/planetscale/vtprotobuf/codec/grpc"
-	vt "github.com/planetscale/vtprotobuf/codec/grpc"
 	"github.com/streamingfast/dauth"
 	dauthconnect "github.com/streamingfast/dauth/middleware/connect"
 	dauthgrpc "github.com/streamingfast/dauth/middleware/grpc"
@@ -27,6 +26,7 @@ import (
 	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcv2connect"
 	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
 	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3/pbsubstreamsrpcv3connect"
+	"github.com/streamingfast/substreams/protodecode"
 	tier1Connect "github.com/streamingfast/substreams/service/connect"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
@@ -39,7 +39,7 @@ import (
 )
 
 func init() {
-	encoding.RegisterCodec(vt.Codec{})
+	encoding.RegisterCodec(protodecode.PreferredVTCodec{})
 }
 
 type streamHandlerV3 func(ctx context.Context, req *connect.Request[pbsubstreamsrpcv3.Request], stream *connect.ServerStream[pbsubstreamsrpc.Response]) error

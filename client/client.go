@@ -12,11 +12,11 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/mostynb/go-grpc-compression/experimental/s2"
-	vt "github.com/planetscale/vtprotobuf/codec/grpc"
 	"github.com/streamingfast/dgrpc"
 	networks "github.com/streamingfast/firehose-networks"
 	"github.com/streamingfast/logging/zapx"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
+	"github.com/streamingfast/substreams/protodecode"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/oauth2"
@@ -32,7 +32,7 @@ import (
 )
 
 func init() {
-	encoding.RegisterCodec(vt.Codec{})
+	encoding.RegisterCodec(protodecode.PreferredVTCodec{})
 }
 
 type AuthType int

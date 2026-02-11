@@ -159,7 +159,7 @@ func NewTier1(
 	activeRequestsSoftLimit int,
 	activeRequestsHardLimit int,
 	sharedCacheSize uint64,
-	execOutMessageBufferSize uint64,
+	outputBundleSize uint64,
 	sessionPool dsession.SessionPool,
 	foundationalEndpoints map[string]string,
 	opts ...Option,
@@ -217,7 +217,7 @@ func NewTier1(
 		foundationalEndpoints:    foundationalEndpoints,
 		sessionPool:              sessionPool,
 		activeRequestsManager:    active_requests.NewActiveRequestsManager(logger),
-		execOutMessageBufferSize: int(execOutMessageBufferSize),
+		execOutMessageBufferSize: int(outputBundleSize),
 	}
 	s.OnTerminating(func(_ error) {
 		s.activeRequestsWG.Wait()

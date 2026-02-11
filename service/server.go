@@ -14,6 +14,7 @@ import (
 	_ "github.com/mostynb/go-grpc-compression/lz4"
 	_ "github.com/mostynb/go-grpc-compression/zstd"
 	_ "github.com/planetscale/vtprotobuf/codec/grpc"
+	vt "github.com/planetscale/vtprotobuf/codec/grpc"
 	"github.com/streamingfast/dauth"
 	dauthconnect "github.com/streamingfast/dauth/middleware/connect"
 	dauthgrpc "github.com/streamingfast/dauth/middleware/grpc"
@@ -33,13 +34,13 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/encoding"
 	_ "google.golang.org/grpc/experimental"
 )
 
-//func init() {
-//	fmt.Println("------------------ VT Proto registered ------------------------")
-//	encoding.RegisterCodec(vt.Codec{})
-//}
+func init() {
+	encoding.RegisterCodec(vt.Codec{})
+}
 
 type streamHandlerV3 func(ctx context.Context, req *connect.Request[pbsubstreamsrpcv3.Request], stream *connect.ServerStream[pbsubstreamsrpc.Response]) error
 
@@ -56,8 +57,7 @@ func (a *v3Adapter) Blocks(req *pbsubstreamsrpcv3.Request, srv pbsubstreamsrpcv3
 }
 
 func ListenTier1(
-	secureProxyListenAddress string,
-	plaintextProxyListenAddress string,
+	listenAddresses []string,
 	svc *Tier1Service,
 	connectSvc *tier1Connect.Service,
 	infoService pbsubstreamsrpc.EndpointInfoServer,
@@ -68,8 +68,8 @@ func ListenTier1(
 	enforceCompression bool,
 ) (err error) {
 
-	grpcServer := grpcSever(secureProxyListenAddress, svc, infoService, auth, healthcheck, enforceCompression, logger)
-	connectServer := connectServer(secureProxyListenAddress, connectSvc, infoServiceConnect, auth, healthcheck, enforceCompression, logger)
+	grpcServer := grpcServer(svc, infoService, auth, healthcheck, enforceCompression, logger)
+	connectServer := connectServer(connectSvc, infoServiceConnect, auth, healthcheck, enforceCompression, logger)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -98,76 +98,53 @@ func ListenTier1(
 	rootMux.Handle("/healthz", grpcServer.HealthHandler())
 	rootMux.Handle("/", compressionHandler)
 
-	handler := h2c.NewHandler(rootMux, &http2.Server{})
-
-	logger.Info("starting secure proxy server", zap.String("address", secureProxyListenAddress))
-	go func() {
-		cleanAddr := strings.ReplaceAll(secureProxyListenAddress, "*", "")
-		if strings.Contains(secureProxyListenAddress, "*") {
-			tcpListener, err := net.Listen("tcp", cleanAddr)
-			if err != nil {
-				logger.Error("failed to start secure grpc server", zap.Error(err))
-				grpcServer.Shutdown(0)
-				return
-			}
-
-			errorLogger, err := zap.NewStdLogAt(logger, zap.ErrorLevel)
-			if err != nil {
-				logger.Error("failed to start secure grpc server", zap.Error(err))
-				grpcServer.Shutdown(0)
-				return
-			}
+	for _, addr := range listenAddresses {
+		go func() {
 
 			h2s := &http2.Server{
 				MaxConcurrentStreams: 1000,
 			}
+			handler := h2c.NewHandler(rootMux, h2s)
 
-			httpServer := &http.Server{
-				Handler:  h2c.NewHandler(rootMux, h2s),
-				ErrorLog: errorLogger,
+			if strings.Contains(addr, "*") {
+				cleanAddr := strings.ReplaceAll(addr, "*", "")
+				tcpListener, err := net.Listen("tcp", cleanAddr)
+				if err != nil {
+					logger.Error("failed to start secure grpc server", zap.Error(err))
+					grpcServer.Shutdown(0)
+					return
+				}
+
+				errorLogger, err := zap.NewStdLogAt(logger, zap.ErrorLevel)
+				if err != nil {
+					logger.Error("failed to start secure grpc server", zap.Error(err))
+					grpcServer.Shutdown(0)
+					return
+				}
+
+				httpServer := &http.Server{
+					Handler:   handler,
+					ErrorLog:  errorLogger,
+					TLSConfig: dgrpcserver.SecuredByBuiltInSelfSignedCertificate().AsTLSConfig(),
+				}
+
+				logger.Info("serving gRPC (over HTTP router) (secure)", zap.String("listen_addr", addr))
+				if err := httpServer.ServeTLS(tcpListener, "", ""); err != nil {
+					logger.Error("failed to start secure grpc server", zap.Error(err))
+					grpcServer.Shutdown(0)
+					return
+				}
+
+			} else {
+				logger.Info("serving gRPC (over HTTP router) (plain-text)", zap.String("listen_addr", addr))
+				if err := http.ListenAndServe(addr, handler); err != nil {
+					logger.Error("failed to start secure proxy server", zap.Error(err))
+					grpcServer.Shutdown(0)
+				}
 			}
-			httpServer.TLSConfig = dgrpcserver.SecuredByBuiltInSelfSignedCertificate().AsTLSConfig()
-			if err := httpServer.ServeTLS(tcpListener, "", ""); err != nil {
 
-				logger.Error("failed to start secure grpc server", zap.Error(err))
-				grpcServer.Shutdown(0)
-				return
-			}
-
-		} else {
-			if err := http.ListenAndServe(cleanAddr, mux); err != nil {
-				logger.Error("failed to start secure proxy server", zap.Error(err))
-				grpcServer.Shutdown(0)
-			}
-		}
-
-	}()
-	logger.Info("starting plaintext proxy server", zap.String("address", plaintextProxyListenAddress))
-	go func() {
-		if err := http.ListenAndServe(strings.ReplaceAll(plaintextProxyListenAddress, "*", ""), handler); err != nil {
-			logger.Error("failed to start secure proxy server", zap.Error(err))
-			connectServer.Shutdown(0)
-		}
-	}()
-
-	//if s.options.SecureTLSConfig != nil {
-	//	s.logger().Info("serving gRPC (over HTTP router) (encrypted)", zap.String("listen_addr", serverListenerAddress))
-	//	s.httpServer.TLSConfig = s.options.SecureTLSConfig
-	//	if err := s.httpServer.ServeTLS(tcpListener, "", ""); err != nil {
-	//		s.shutter.Shutdown(fmt.Errorf("gRPC (over HTTP router) serve (TLS) failed: %w", err))
-	//		return
-	//	}
-	//} else if s.options.IsPlainText {
-	//	s.logger().Info("serving gRPC (over HTTP router) (plain-text)", zap.String("listen_addr", serverListenerAddress))
-	//
-	//	if err := s.httpServer.Serve(tcpListener); err != nil {
-	//		s.shutter.Shutdown(fmt.Errorf("gRPC (over HTTP router) serve failed: %w", err))
-	//		return
-	//	}
-	//} else {
-	//	s.shutter.Shutdown(errors.New("invalid server config, server is not plain-text and no TLS config available, something is wrong, this should never happen"))
-	//	return
-	//}
+		}()
+	}
 
 	logger.Info("started")
 
@@ -183,8 +160,7 @@ func ListenTier1(
 	return
 }
 
-func grpcSever(
-	address string,
+func grpcServer(
 	service *Tier1Service,
 	infoService pbsubstreamsrpc.EndpointInfoServer,
 	auth dauth.Authenticator,
@@ -192,7 +168,7 @@ func grpcSever(
 	enforceCompression bool,
 	logger *zap.Logger,
 ) dgrpcserver.Server {
-	options := GetCommonServerOptions(address, logger, healthcheck, enforceCompression)
+	options := GetCommonServerOptions(logger, healthcheck, enforceCompression)
 	options = append(options, dgrpcserver.WithPostUnaryInterceptor(dauthgrpc.UnaryAuthChecker(auth, logger)))
 	options = append(options, dgrpcserver.WithPostStreamInterceptor(dauthgrpc.StreamAuthChecker(auth, logger)))
 
@@ -203,18 +179,11 @@ func grpcSever(
 		pbsubstreamsrpc.RegisterEndpointInfoServer(server.ServiceRegistrar(), infoService)
 	}
 
-	cleanAddr := strings.ReplaceAll(address, "*", "")
-
-	service.OnTerminating(func(err error) {
-		logger.Info("Tier1Service is terminating", zap.String("address", cleanAddr), zap.Error(err))
-		server.Shutdown(0)
-	})
 	return server
 
 }
 
 func connectServer(
-	address string,
 	service *tier1Connect.Service,
 	infoService pbsubstreamsrpcv2connect.EndpointInfoHandler,
 	auth dauth.Authenticator,
@@ -222,7 +191,7 @@ func connectServer(
 	enforceCompression bool,
 	logger *zap.Logger,
 ) dgrpcserver.Server {
-	options := GetConnectCommonServerOptions(address, logger, healthcheck, enforceCompression)
+	options := GetConnectCommonServerOptions(logger, healthcheck, enforceCompression)
 
 	options = append(options, dgrpcserver.WithConnectInterceptor(dauthconnect.NewAuthInterceptor(auth, logger)))
 	options = append(options, dgrpcserver.WithConnectStrictContentType(false))
@@ -285,7 +254,7 @@ func ListenTier2(
 	healthcheck dgrpcserver.HealthCheck,
 	enforceCompression bool,
 ) (err error) {
-	options := GetCommonServerOptions(addr, logger, healthcheck, enforceCompression)
+	options := GetCommonServerOptions(logger, healthcheck, enforceCompression)
 	if serviceDiscoveryURL != nil {
 		options = append(options, dgrpcserver.WithServiceDiscoveryURL(serviceDiscoveryURL))
 	}
@@ -293,6 +262,11 @@ func ListenTier2(
 		dgrpcserver.WithPostUnaryInterceptor(dauthgrpc.UnaryAuthChecker(auth, logger)),
 		dgrpcserver.WithPostStreamInterceptor(dauthgrpc.StreamAuthChecker(auth, logger)),
 	)
+	if strings.Contains(addr, "*") {
+		options = append(options, dgrpcserver.WithInsecureServer())
+	} else {
+		options = append(options, dgrpcserver.WithPlainTextServer())
+	}
 
 	grpcServer := factory.ServerFromOptions(options...)
 	pbssinternal.RegisterSubstreamsServer(grpcServer.ServiceRegistrar(), svc)
@@ -315,7 +289,7 @@ func ListenTier2(
 
 }
 
-func GetCommonServerOptions(listenAddr string, logger *zap.Logger, healthcheck dgrpcserver.HealthCheck, enforceCompression bool) []dgrpcserver.Option {
+func GetCommonServerOptions(logger *zap.Logger, healthcheck dgrpcserver.HealthCheck, enforceCompression bool) []dgrpcserver.Option {
 	tracerProvider := otel.GetTracerProvider()
 	options := []dgrpcserver.Option{
 
@@ -330,15 +304,10 @@ func GetCommonServerOptions(listenAddr string, logger *zap.Logger, healthcheck d
 		options = append(options, dgrpcserver.WithEnforceCompression())
 	}
 
-	if strings.Contains(listenAddr, "*") {
-		options = append(options, dgrpcserver.WithInsecureServer())
-	} else {
-		options = append(options, dgrpcserver.WithPlainTextServer())
-	}
 	return options
 }
 
-func GetConnectCommonServerOptions(listenAddr string, logger *zap.Logger, healthcheck dgrpcserver.HealthCheck, enforceCompression bool) []dgrpcserver.Option {
+func GetConnectCommonServerOptions(logger *zap.Logger, healthcheck dgrpcserver.HealthCheck, enforceCompression bool) []dgrpcserver.Option {
 	tracerProvider := otel.GetTracerProvider()
 	options := []dgrpcserver.Option{
 		dgrpcserver.WithLogger(logger),
@@ -347,11 +316,6 @@ func GetConnectCommonServerOptions(listenAddr string, logger *zap.Logger, health
 			grpc.StatsHandler(otelgrpc.NewServerHandler(otelgrpc.WithTracerProvider(tracerProvider))),
 			grpc.MaxRecvMsgSize(1024*1024*1024),
 		),
-	}
-	if strings.Contains(listenAddr, "*") {
-		options = append(options, dgrpcserver.WithInsecureServer())
-	} else {
-		options = append(options, dgrpcserver.WithPlainTextServer())
 	}
 	return options
 }

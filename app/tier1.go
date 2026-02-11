@@ -88,8 +88,8 @@ type Tier1Config struct {
 	SubrequestsInsecure     bool
 	SubrequestsPlaintext    bool
 
-	SharedCacheSize          uint64
-	ExecOutMessageBufferSize uint64
+	SharedCacheSize  uint64
+	OutputBundleSize uint64
 
 	WASMExtensions wasm.WASMExtensioner
 	Tracing        bool
@@ -269,7 +269,7 @@ func (a *Tier1App) Run() error {
 		a.config.ActiveRequestsSoftLimit,
 		a.config.ActiveRequestsHardLimit,
 		a.config.SharedCacheSize,
-		a.config.ExecOutMessageBufferSize,
+		a.config.OutputBundleSize,
 		a.modules.SessionPool,
 		foundationalStoreEndpoints,
 		opts...,
@@ -316,23 +316,12 @@ func (a *Tier1App) Run() error {
 		a.logger.Info("launching gRPC server", zap.Bool("live_support", withLive))
 		a.setIsReady(true)
 
-		secureGrpcProxyAddr := ":9000"
-		plaintextGrpcProxyAddr := ":8080"
-
 		addresses := strings.Split(a.config.GRPCListenAddr, ",")
-		addressCount := len(addresses)
-		if addressCount == 0 {
+		if len(addresses) == 0 {
 			a.logger.Error("no gRPC listen addresses provided")
 			return
 		}
-		if addressCount > 0 {
-			secureGrpcProxyAddr = addresses[0]
-		}
-		if addressCount > 1 {
-			plaintextGrpcProxyAddr = addresses[1]
-		}
-
-		err := service.ListenTier1(secureGrpcProxyAddr, plaintextGrpcProxyAddr, tier1Service, tier1ServiceConnect, infoServer, infoServerConnect, a.modules.Authenticator, a.logger, a.HealthCheck, a.config.EnforceCompression)
+		err := service.ListenTier1(addresses, tier1Service, tier1ServiceConnect, infoServer, infoServerConnect, a.modules.Authenticator, a.logger, a.HealthCheck, a.config.EnforceCompression)
 		a.Shutdown(err)
 	}()
 

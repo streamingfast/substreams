@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -76,7 +75,6 @@ func ListenTier1(
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		contentType := r.Header.Get("Content-Type")
 		logger.Info("handling request", zap.String("content-type", contentType))
-		fmt.Println("Grrrrrr: Handling request with content-type:", contentType)
 
 		if strings.HasPrefix(contentType, "application/grpc") || strings.HasPrefix(contentType, "application/grpc-web") {
 			logger.Debug("forwarding gRPC request")

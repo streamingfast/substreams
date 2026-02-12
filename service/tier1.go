@@ -23,7 +23,6 @@ import (
 	"github.com/streamingfast/bstream/stream"
 	bsstream "github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dauth"
-	"github.com/streamingfast/dgrpc"
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/dsession"
@@ -40,7 +39,6 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/plan"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
-	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/pipeline/cache"
@@ -54,11 +52,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -303,52 +298,6 @@ func metadataToHeader(ctx context.Context) http.Header {
 	return h
 }
 
-func (s *Tier1Service) Blocks(req *pbsubstreamsrpc.Request, srv pbsubstreamsrpc.Stream_BlocksServer) error {
-	ctx := srv.Context()
-	header := metadataToHeader(ctx)
-	protocol := "/sf.substreams.rpc.v2.Stream/Blocks"
-	return s.BlocksAny(ctx, req, header, protocol, nil, srv)
-}
-
-func (s *Tier1Service) BlocksV3(req *pbsubstreamsrpcv3.Request, srv pbsubstreamsrpcv3.Stream_BlocksServer) error {
-	_, err := manifest.ApplyPackageTransformations(req.Package, false, req.Network, req.OutputModule, req.Params)
-	if err != nil {
-		return status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	ctx := srv.Context()
-	ctx = reqctx.WithSpkg(ctx, req.Package)
-	v2req, err := req.ToV2()
-	if err != nil {
-		return status.Errorf(codes.InvalidArgument, "failed to convert request to v2: %s", err)
-	}
-	header := metadataToHeader(ctx)
-	protocol := "/sf.substreams.rpc.v3.Stream/Blocks"
-	return s.BlocksAny(ctx, v2req, header, protocol, req.Package, srv)
-}
-
-type usedStore struct {
-	Name string
-	Hash string
-}
-
-func (s *usedStore) MarshalLogObject(e zapcore.ObjectEncoder) error {
-	e.AddString("name", s.Name)
-	e.AddString("hash", s.Hash)
-	return nil
-}
-
-type UsedFoundationalStore struct {
-	Identifier string
-	ModuleHash string
-}
-
-func (s *UsedFoundationalStore) MarshalLogObject(e zapcore.ObjectEncoder) error {
-	e.AddString("identifier", s.Identifier)
-	e.AddString("module_hash", s.ModuleHash)
-
-	return nil
-}
-
 func (s *Tier1Service) BlocksAny(
 	ctx context.Context,
 	request *pbsubstreamsrpc.Request,
@@ -356,7 +305,8 @@ func (s *Tier1Service) BlocksAny(
 	protocol string,
 	pkg *pbsubstreams.Package,
 	stream grpc.ServerStream,
-) (serverErr error) {
+	logger *zap.Logger,
+) (runningCtx context.Context, serverErr error, blockErr error) {
 	if s.IsTerminating() {
 		serverErr = connect.NewError(connect.CodeUnavailable, errShuttingDown)
 		return
@@ -377,14 +327,12 @@ func (s *Tier1Service) BlocksAny(
 	// and not only the `grpcError` one which is a subset view of the full `err`.
 	var err error
 
-	logger := reqctx.Logger(ctx).Named("tier1")
-
 	envEthCallFallbackToLatestDuration := os.Getenv(EnvEthCallFallbackToLatestDuration)
 	fallbackDuration := time.Duration(0)
 	if envEthCallFallbackToLatestDuration != "" {
 		fallbackDuration, err = time.ParseDuration(envEthCallFallbackToLatestDuration)
 		if err != nil {
-			return fmt.Errorf("invalid value for env var %s: %w", EnvEthCallFallbackToLatestDuration, err)
+			return nil, fmt.Errorf("invalid value for env var %s: %w", EnvEthCallFallbackToLatestDuration, err), nil
 		}
 	}
 
@@ -393,7 +341,7 @@ func (s *Tier1Service) BlocksAny(
 	if envEthCallUseBlockNumberDuration != "" {
 		useBlockNumberDuration, err = time.ParseDuration(envEthCallUseBlockNumberDuration)
 		if err != nil {
-			return fmt.Errorf("invalid value for env var %s: %w", EnvEthCallUseBlockNumberDuration, err)
+			return nil, fmt.Errorf("invalid value for env var %s: %w", EnvEthCallUseBlockNumberDuration, err), nil
 		}
 	}
 
@@ -425,7 +373,7 @@ func (s *Tier1Service) BlocksAny(
 		err := connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("missing modules in request"))
 		fields = append(fields, zap.Error(err))
 		logger.Info("refusing Substreams Blocks request", fields...)
-		return err
+		return nil, err, nil
 	}
 
 	if auth := dauth.FromContext(ctx); auth != nil {
@@ -460,7 +408,7 @@ func (s *Tier1Service) BlocksAny(
 		err := connect.NewError(connect.CodeUnavailable, fmt.Errorf("service under heavy load, please try connecting again"))
 		fields = append(fields, zap.Error(err), zap.Int("active_request_count", stat.activeRequestCount), zap.Int("hard_limit", stat.hardLimit))
 		logger.Info("refusing Substreams Blocks request", fields...)
-		return err
+		return nil, err, nil
 	}
 
 	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules, bstream.GetProtocolFirstStreamableBlock)
@@ -468,7 +416,7 @@ func (s *Tier1Service) BlocksAny(
 		err := connect.NewError(connect.CodeInvalidArgument, err)
 		fields = append(fields, zap.Error(err))
 		logger.Info("refusing Substreams Blocks request", fields...)
-		return err
+		return nil, err, nil
 	}
 
 	outputModuleHash := execGraph.ModuleHashes()[request.OutputModule]
@@ -548,14 +496,14 @@ func (s *Tier1Service) BlocksAny(
 	if err := ValidateTier1Request(request, s.blockType); err != nil {
 		err := connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("validate request: %w", err))
 		logger.Info("refusing Substreams Blocks request", append(fields, zap.Error(err))...)
-		return err
+		return nil, err, nil
 	}
 
 	if envEthCallFallbackToLatestDuration != "" && hasEthCall(request.Modules.Binaries) {
 		if header.Get("X-substreams-acknowledge-non-deterministic") != "true" {
 			err := connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("header X-substreams-acknowledge-non-deterministic must be set to true when using eth_call or eth_get_balance on a non deterministic rpc provider"))
 			logger.Info("refusing Substreams Blocks request", append(fields, zap.Error(err))...)
-			return err
+			return nil, err, nil
 		}
 	}
 
@@ -589,24 +537,12 @@ func (s *Tier1Service) BlocksAny(
 
 	respFunc := tier1ResponseHandler(respContext, &mut, logger, stream, request.NoopMode, reqStats, request.DevOutputModules)
 	err = s.blocks(runningContext, cancelRunning, request, header, execGraph, respFunc, reqStats, fields, s.execOutMessageBufferSize)
-
-	if connectError := toConnectError(runningContext, err); connectError != nil {
-		switch connect.CodeOf(connectError) {
-		case connect.CodeInternal:
-			logger.Warn("unexpected termination of stream of blocks", zap.String("stream_processor", "tier1"), zap.Error(err))
-		case connect.CodeInvalidArgument:
-			logger.Debug("invalid argument on request", zap.Error(connectError))
-		case connect.CodeCanceled:
-			logger.Debug("Blocks request canceled by user", zap.Error(connectError))
-		case connect.CodeResourceExhausted:
-			logger.Debug("Blocks request failed with ResourceExhausted", zap.Error(connectError))
-		default:
-			logger.Warn("Blocks request completed with error", zap.Error(connectError))
-		}
-		return connectError
+	if err != nil {
+		return runningContext, nil, err
 	}
+
 	logger.Debug("Blocks request completed without error")
-	return nil
+	return runningContext, nil, nil
 }
 
 func compressorsFromHeader(header http.Header) (out map[string]bool) {
@@ -1294,92 +1230,6 @@ func setupRequestStats(ctx context.Context, outputModuleName, outputModuleHash s
 		ProductionMode:   productionMode,
 	}, execGraph.Stores(), execGraph.ModuleHashes(), logger)
 	return reqctx.WithReqStats(ctx, stats), stats
-}
-
-// toConnectError turns an `err` into a connect error if it's non-nil, in the `nil` case,
-// `nil` is returned right away.
-//
-// If the `err` has in its chain of error either `context.Canceled`, `context.DeadlineExceeded`
-// or `stream.ErrInvalidArg`, error is turned into a proper connect error respectively of code
-// `Canceled`, `DeadlineExceeded` or `InvalidArgument`.
-//
-// If the `err` has in its chain any error constructed through `connect.NewError` (and its variants), then
-// we return the first found error of such type directly, because it's already a connect error.
-//
-// If the `err` has in its chain any error constructed through `grpc` or `status`, it will be converted to connect equivalent.
-//
-// Otherwise, the error is assumed to be an internal error and turned backed into a proper
-// `connect.NewError(connect.CodeInternal, err)`.
-func toConnectError(ctx context.Context, err error) error {
-	if err == nil {
-		return nil
-	}
-
-	if errors.Is(err, context.Canceled) {
-		if contextCause := context.Cause(ctx); contextCause != nil {
-			err = contextCause // unwrap errors in canceled contexts
-			if errors.Is(err, context.Canceled) {
-				return connect.NewError(connect.CodeCanceled, err)
-			}
-		} else {
-			return connect.NewError(connect.CodeCanceled, err)
-		}
-	}
-
-	if err, ok := dsession.ToConnectError(err); ok {
-		return err
-	}
-	// special case for context canceled when shutting down
-	if err == errShuttingDown {
-		return connect.NewError(connect.CodeUnavailable, err)
-	}
-
-	// GRPC to connect error
-	if grpcError := dgrpc.AsGRPCError(err); grpcError != nil {
-		switch grpcError.Code() {
-		case codes.Canceled:
-			return connect.NewError(connect.CodeCanceled, errors.New(grpcError.Message()))
-		case codes.Unavailable:
-			return connect.NewError(connect.CodeUnavailable, errors.New(grpcError.Message()))
-		case codes.InvalidArgument:
-			return connect.NewError(connect.CodeInvalidArgument, errors.New(grpcError.Message()))
-		case codes.DeadlineExceeded:
-			return connect.NewError(connect.CodeDeadlineExceeded, err)
-		case codes.ResourceExhausted:
-			return connect.NewError(connect.CodeResourceExhausted, errors.New(grpcError.Message()))
-		case codes.Unknown:
-			return connect.NewError(connect.CodeUnknown, errors.New(grpcError.Message()))
-		}
-		return grpcError.Err()
-	}
-
-	// special case for "QuickSave" on shutdown
-	if err == pipeline.ErrShuttingDown {
-		return connect.NewError(connect.CodeUnavailable, err)
-	}
-
-	// context deadline exceeded
-	if errors.Is(err, context.DeadlineExceeded) {
-		return connect.NewError(connect.CodeDeadlineExceeded, err)
-	}
-
-	if errors.Is(err, wasm.ErrWasmDeterministicExec) || errors.Is(err, store.ErrStoreAboveMaxSize) {
-		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("%w (deterministic error)", err))
-	}
-
-	var errInvalidArg *bsstream.ErrInvalidArg
-	if errors.As(err, &errInvalidArg) {
-		return connect.NewError(connect.CodeInvalidArgument, errInvalidArg)
-	}
-
-	connectError := new(connect.Error)
-	if errors.As(err, &connectError) {
-		return connectError
-	}
-
-	// Do we want to print the full cause as coming from Golang? Would we like to maybe trim off "operational"
-	// data?
-	return connect.NewError(connect.CodeInternal, err)
 }
 
 type overloadingStatus struct {

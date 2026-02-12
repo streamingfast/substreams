@@ -26,7 +26,6 @@ import (
 	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcv2connect"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service"
-	"github.com/streamingfast/substreams/service/connect"
 	"github.com/streamingfast/substreams/wasm"
 	_ "github.com/streamingfast/substreams/wasm/wasmtime"
 	"github.com/streamingfast/substreams/wasm/wazero"
@@ -279,7 +278,7 @@ func (a *Tier1App) Run() error {
 		return err
 	}
 
-	tier1ServiceConnect := connect.NewService(tier1Service)
+	tier1ServiceConnect := service.NewService(tier1Service)
 
 	a.OnTerminating(func(err error) {
 		metrics.AppReadinessTier1.SetNotReady()

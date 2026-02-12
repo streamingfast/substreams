@@ -27,7 +27,6 @@ import (
 	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
 	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3/pbsubstreamsrpcv3connect"
 	"github.com/streamingfast/substreams/protodecode"
-	tier1Connect "github.com/streamingfast/substreams/service/connect"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
@@ -59,7 +58,7 @@ func (a *v3Adapter) Blocks(req *pbsubstreamsrpcv3.Request, srv pbsubstreamsrpcv3
 func ListenTier1(
 	listenAddresses []string,
 	svc *Tier1Service,
-	connectSvc *tier1Connect.Service,
+	connectSvc *ConnectService,
 	infoService pbsubstreamsrpc.EndpointInfoServer,
 	infoServiceConnect pbsubstreamsrpcv2connect.EndpointInfoHandler,
 	auth dauth.Authenticator,
@@ -184,7 +183,7 @@ func grpcServer(
 }
 
 func connectServer(
-	service *tier1Connect.Service,
+	service *ConnectService,
 	infoService pbsubstreamsrpcv2connect.EndpointInfoHandler,
 	auth dauth.Authenticator,
 	healthcheck dgrpcserver.HealthCheck,

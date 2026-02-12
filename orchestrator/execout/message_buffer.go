@@ -2,6 +2,8 @@ package execout
 
 import (
 	"fmt"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -17,12 +19,26 @@ type MessageBuffer struct {
 	maxBufferedMessage int
 	DataSize           int
 	logger             *zap.Logger
+	maxDataSize        int
 }
 
 func NewMessageBuffer(maxBufferedMessage int, logger *zap.Logger) *MessageBuffer {
+	maxDaraSize := 1024 * 1024 * 10
+	maxDataSizeString := os.Getenv("MESSAGE_BUFFER_MAX_DATA_SIZE")
+
+	if maxDataSizeString != "" {
+		parsed, err := strconv.Atoi(maxDataSizeString)
+		if err != nil {
+			logger.Warn("failed to parse MESSAGE_BUFFER_MAX_DATA_SIZE, using default value", zap.Error(err))
+		} else {
+			maxDaraSize = parsed
+		}
+	}
+
 	return &MessageBuffer{
 		buf:                &pbsubstreamsrpcv2.BlockScopedDatas{Items: []*pbsubstreamsrpcv2.BlockScopedData{}},
 		maxBufferedMessage: maxBufferedMessage,
+		maxDataSize:        maxDaraSize,
 		logger:             logger.Named("message-buffer"),
 	}
 }
@@ -46,7 +62,7 @@ func (b *MessageBuffer) ShouldFlush() bool {
 	b.mut.Lock()
 	defer b.mut.Unlock()
 
-	if b.DataSize > 1024*1024*10 {
+	if b.DataSize > b.maxDataSize {
 		b.logger.Debug("flushing due to large data size", zap.Int("data_size", b.DataSize), zap.Bool("keep", false))
 		return true
 	}

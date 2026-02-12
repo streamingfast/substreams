@@ -46,7 +46,7 @@ func (b *MessageBuffer) ShouldFlush() bool {
 	b.mut.Lock()
 	defer b.mut.Unlock()
 
-	if b.DataSize > 1024*1024*10 {
+	if b.DataSize > 1024*1024 {
 		b.logger.Info("flushing due to large data size", zap.Int("data_size", b.DataSize), zap.Bool("keep", false))
 		return true
 	}

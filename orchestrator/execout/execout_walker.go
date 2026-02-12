@@ -261,9 +261,6 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 				return fmt.Errorf("flushing buffer: %w", err)
 			}
 		}
-		if err = r.streamOut.BlockScopedData(blockScopedData); err != nil {
-			return fmt.Errorf("calling response func: %w", err)
-		}
 		itemCount++
 
 		if r.noopMode {

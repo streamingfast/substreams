@@ -69,11 +69,11 @@ func (b *MessageBuffer) Flush(streamSrv *response.Stream) error {
 				return fmt.Errorf("flushing single block scope data: %w", err)
 			}
 		}
-	}
-
-	err := streamSrv.BlockScopedDatas(b.buf)
-	if err != nil {
-		return fmt.Errorf("flushing buffer: %w", err)
+	} else {
+		err := streamSrv.BlockScopedDatas(b.buf)
+		if err != nil {
+			return fmt.Errorf("flushing buffer: %w", err)
+		}
 	}
 
 	b.lastFlush = time.Now()

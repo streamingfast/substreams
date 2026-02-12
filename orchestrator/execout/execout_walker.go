@@ -259,7 +259,7 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 			return fmt.Errorf("converting to block scoped data: %w", err)
 		}
 
-		r.buffer.Append(blockScopedData)
+		r.buffer.Append(blockScopedData, len(item.Payload))
 		if r.buffer.ShouldFlush() {
 			err := r.buffer.Flush(r.streamOut)
 			if err != nil {

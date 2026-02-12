@@ -14,6 +14,7 @@ type MessageBuffer struct {
 	buf                *pbsubstreamsrpcv2.BlockScopedDatas
 	lastFlush          time.Time
 	maxBufferedMessage int
+	DataSize           int
 }
 
 func NewMessageBuffer(maxBufferedMessage int) *MessageBuffer {
@@ -30,16 +31,21 @@ func (b *MessageBuffer) Len() int {
 	return len(b.buf.Items)
 }
 
-func (b *MessageBuffer) Append(msg *pbsubstreamsrpcv2.BlockScopedData) {
+func (b *MessageBuffer) Append(msg *pbsubstreamsrpcv2.BlockScopedData, dataSize int) {
 	b.mut.Lock()
 	defer b.mut.Unlock()
 
+	b.DataSize += dataSize
 	b.buf.Items = append(b.buf.Items, msg)
 }
 
 func (b *MessageBuffer) ShouldFlush() bool {
 	b.mut.Lock()
 	defer b.mut.Unlock()
+
+	if b.DataSize > 1024*1024*1024 {
+		return true
+	}
 
 	if len(b.buf.Items) > b.maxBufferedMessage {
 		return true
@@ -67,6 +73,7 @@ func (b *MessageBuffer) Flush(streamSrv *response.Stream) error {
 	}
 
 	b.lastFlush = time.Now()
+	b.DataSize = 0
 	b.buf = &pbsubstreamsrpcv2.BlockScopedDatas{Items: []*pbsubstreamsrpcv2.BlockScopedData{}}
 
 	return nil

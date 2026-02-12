@@ -118,34 +118,47 @@ func toGrpcTier1Error(ctx context.Context, err error) error {
 		}
 	}
 
-	grpcError := func(err error) (error, bool) {
-		// Handle session pool errors
-		if errors.Is(err, dsession.ErrUnavailable) {
-			return status.Error(codes.Unavailable, err.Error()), true
-		}
-		if errors.Is(err, dsession.ErrPermissionDenied) {
-			return status.Error(codes.PermissionDenied, err.Error()), true
-		}
-		if errors.Is(err, dsession.ErrQuotaExceeded) {
-			return status.Error(codes.ResourceExhausted, err.Error()), true
-		}
-		if errors.Is(err, dsession.ErrConcurrentStreamLimitExceeded) {
-			return status.Error(codes.ResourceExhausted, err.Error()), true
-		}
-		return err, false
-	}
-
-	if err, ok := grpcError(err); ok {
+	// GRPC error directly
+	if grpcError := dgrpc.AsGRPCError(err); grpcError != nil {
 		return err
 	}
+
+	// convert connectWeb error
+	connectError := new(connect.Error)
+	if errors.As(err, &connectError) {
+		switch connectError.Code() {
+		case connect.CodeCanceled:
+			return status.Error(codes.Canceled, connectError.Message())
+		case connect.CodeUnavailable:
+			return status.Error(codes.Unavailable, connectError.Message())
+		case connect.CodeInvalidArgument:
+			return status.Error(codes.InvalidArgument, connectError.Message())
+		case connect.CodeDeadlineExceeded:
+			return status.Error(codes.DeadlineExceeded, connectError.Message())
+		case connect.CodeResourceExhausted:
+			return status.Error(codes.ResourceExhausted, connectError.Message())
+		default:
+			return status.Error(codes.Unknown, connectError.Message())
+		}
+	}
+
+	// convert dsession error
+	if errors.Is(err, dsession.ErrUnavailable) {
+		return status.Error(codes.Unavailable, err.Error())
+	}
+	if errors.Is(err, dsession.ErrPermissionDenied) {
+		return status.Error(codes.PermissionDenied, err.Error())
+	}
+	if errors.Is(err, dsession.ErrQuotaExceeded) {
+		return status.Error(codes.ResourceExhausted, err.Error())
+	}
+	if errors.Is(err, dsession.ErrConcurrentStreamLimitExceeded) {
+		return status.Error(codes.ResourceExhausted, err.Error())
+	}
+
 	// special case for context canceled when shutting down
 	if errors.Is(err, errShuttingDown) {
 		return status.Error(codes.Unavailable, err.Error())
-	}
-
-	// GRPC to connect error
-	if grpcError := dgrpc.AsGRPCError(err); grpcError != nil {
-		return grpcError.Err()
 	}
 
 	// special case for "QuickSave" on shutdown

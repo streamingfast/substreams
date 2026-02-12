@@ -53,12 +53,7 @@ func NewWalker(
 		streamOut:  stream,
 		noopMode:   noopMode,
 		logger:     logger,
-		buffer: NewMessageBuffer(func() int {
-			if bufferSize <= 0 {
-				return 100
-			}
-			return bufferSize
-		}()),
+		buffer:     NewMessageBuffer(bufferSize, logger),
 	}
 }
 

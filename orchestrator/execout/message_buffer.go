@@ -7,6 +7,7 @@ import (
 
 	"github.com/streamingfast/substreams/orchestrator/response"
 	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	"go.uber.org/zap"
 )
 
 type MessageBuffer struct {
@@ -15,12 +16,14 @@ type MessageBuffer struct {
 	lastFlush          time.Time
 	maxBufferedMessage int
 	DataSize           int
+	logger             *zap.Logger
 }
 
-func NewMessageBuffer(maxBufferedMessage int) *MessageBuffer {
+func NewMessageBuffer(maxBufferedMessage int, logger *zap.Logger) *MessageBuffer {
 	return &MessageBuffer{
 		buf:                &pbsubstreamsrpcv2.BlockScopedDatas{Items: []*pbsubstreamsrpcv2.BlockScopedData{}},
 		maxBufferedMessage: maxBufferedMessage,
+		logger:             logger.Named("message-buffer"),
 	}
 }
 
@@ -43,7 +46,8 @@ func (b *MessageBuffer) ShouldFlush() bool {
 	b.mut.Lock()
 	defer b.mut.Unlock()
 
-	if b.DataSize > 1024*1024*1024 {
+	if b.DataSize > 1024*1024*10 {
+		b.logger.Info("flushing due to large data size", zap.Int("data_size", b.DataSize), zap.Bool("keep", false))
 		return true
 	}
 

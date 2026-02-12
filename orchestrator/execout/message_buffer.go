@@ -58,7 +58,7 @@ func (b *MessageBuffer) Flush(streamSrv *response.Stream) error {
 	b.mut.Lock()
 	defer b.mut.Unlock()
 
-	if b.maxBufferedMessage > 2 {
+	if b.maxBufferedMessage < 2 {
 		for _, msg := range b.buf.Items {
 			err := streamSrv.BlockScopedData(msg)
 			if err != nil {

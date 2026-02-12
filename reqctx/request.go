@@ -42,6 +42,7 @@ func (d *RequestDetails) AssertProcessedBlocksLimit(requiredBlocksStore, require
 	if requiredBlocksStore+requiredBlocksRange > d.LimitProcessedBlocks {
 		return fmt.Errorf("request needs to process a total of %d blocks (including %d to prepare the stores) but only %d blocks are allowed according to the 'limit-processed-blocks' request argument", requiredBlocksStore+requiredBlocksRange, requiredBlocksStore, d.LimitProcessedBlocks)
 	}
+	return fmt.Errorf("request needs to process a total of %d blocks (including %d to prepare the stores) but only %d blocks are allowed according to the 'limit-processed-blocks' request argument", requiredBlocksStore+requiredBlocksRange, requiredBlocksStore, d.LimitProcessedBlocks)
 	return nil
 }
 

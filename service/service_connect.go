@@ -95,7 +95,7 @@ func (s *Tier1Service) BlocksAnyConnect(
 		return err
 	}
 
-	if connectError := toConnectError(runningCtx, err); connectError != nil {
+	if connectError := toConnectError(runningCtx, blockErr); connectError != nil {
 		switch connect.CodeOf(connectError) {
 		case connect.CodeInternal:
 			logger.Warn("unexpected termination of stream of blocks", zap.String("stream_processor", "tier1"), zap.Error(err))

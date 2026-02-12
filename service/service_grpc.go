@@ -53,7 +53,7 @@ func (s *Tier1Service) BlocksAnyGrpc(
 		return err
 	}
 
-	if grpcErr := toGrpcTier1Error(runningCtx, err); grpcErr != nil {
+	if grpcErr := toGrpcTier1Error(runningCtx, blockErr); grpcErr != nil {
 		switch status.Code(grpcErr) {
 		case codes.Internal:
 			logger.Warn("unexpected termination of stream of blocks", zap.String("stream_processor", "tier1"), zap.Error(err))

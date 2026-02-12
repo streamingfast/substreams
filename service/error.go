@@ -126,7 +126,8 @@ func toGrpcTier1Error(ctx context.Context, err error) error {
 	// convert connectWeb error
 	connectError := new(connect.Error)
 	if errors.As(err, &connectError) {
-		switch connectError.Code() {
+		code := connectError.Code()
+		switch code {
 		case connect.CodeCanceled:
 			return status.Error(codes.Canceled, connectError.Message())
 		case connect.CodeUnavailable:
@@ -137,6 +138,28 @@ func toGrpcTier1Error(ctx context.Context, err error) error {
 			return status.Error(codes.DeadlineExceeded, connectError.Message())
 		case connect.CodeResourceExhausted:
 			return status.Error(codes.ResourceExhausted, connectError.Message())
+		case connect.CodeFailedPrecondition:
+			return status.Error(codes.FailedPrecondition, connectError.Message())
+		case connect.CodeAborted:
+			return status.Error(codes.Aborted, connectError.Message())
+		case connect.CodeOutOfRange:
+			return status.Error(codes.OutOfRange, connectError.Message())
+		case connect.CodeUnimplemented:
+			return status.Error(codes.Unimplemented, connectError.Message())
+		case connect.CodeInternal:
+			return status.Error(codes.Internal, connectError.Message())
+		case connect.CodeUnknown:
+			return status.Error(codes.Unknown, connectError.Message())
+		case connect.CodeNotFound:
+			return status.Error(codes.NotFound, connectError.Message())
+		case connect.CodeAlreadyExists:
+			return status.Error(codes.AlreadyExists, connectError.Message())
+		case connect.CodePermissionDenied:
+			return status.Error(codes.PermissionDenied, connectError.Message())
+		case connect.CodeUnauthenticated:
+			return status.Error(codes.Unauthenticated, connectError.Message())
+		case connect.CodeDataLoss:
+			return status.Error(codes.DataLoss, connectError.Message())
 		default:
 			return status.Error(codes.Unknown, connectError.Message())
 		}

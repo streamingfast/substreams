@@ -840,6 +840,8 @@ func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelC
 			return err
 		}
 
+		logFields = append(logFields, zap.String("session_id", sessionID))
+
 		s.logger.Debug("acquired session", zap.String("session_id", sessionID))
 
 		// Pass sessionKey through context for WorkerPool
@@ -850,7 +852,6 @@ func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelC
 			s.sessionPool.Release(sessionID)
 		}()
 	}
-
 	traceID := tracing.GetTraceID(ctx).String()
 
 	if s.activeRequestsManager != nil {

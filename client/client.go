@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/dustin/go-humanize"
@@ -174,6 +175,7 @@ func (c *SubstreamsClientConfig) MarshalLogObject(encoder zapcore.ObjectEncoder)
 }
 
 type sizeLoggingHandler struct {
+	messageLimit int
 	messageCount int
 	timeStart    time.Time
 
@@ -202,7 +204,7 @@ func (h *sizeLoggingHandler) HandleRPC(ctx context.Context, rs stats.RPCStats) {
 		h.compressedBytes += inPayload.CompressedLength
 		h.wireBytes += inPayload.WireLength
 
-		if h.messageCount == 10000 {
+		if h.messageCount == h.messageLimit {
 			secs := time.Since(h.timeStart).Seconds()
 			messagesPerSecond := float64(h.messageCount) / secs
 			compressedPercentage := 100.0 - (float64(h.compressedBytes) / float64(h.uncompressedBytes) * 100.0)
@@ -432,8 +434,17 @@ func newConnection(config *SubstreamsClientConfig) (conn *grpc.ClientConn, close
 			dialOptions = []grpc.DialOption{grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true}))}
 		}
 	}
-
-	sizeHandler := &sizeLoggingHandler{}
+	messageLimitString := os.Getenv("GRPC_SIZE_LOGGER_MESSAGE_LIMIT")
+	messageLimit := 10000
+	if messageLimitString != "" {
+		messageLimit, err = strconv.Atoi(messageLimitString)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("failed to parse GRPC_SIZE_LOGGER_MESSAGE_LIMIT: %w", err)
+		}
+	}
+	sizeHandler := &sizeLoggingHandler{
+		messageLimit: messageLimit,
+	}
 	dialOptions = append(dialOptions, grpc.WithStatsHandler(sizeHandler))
 
 	//compressor := os.Getenv("GRPC_COMPRESSOR")

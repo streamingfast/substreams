@@ -18,6 +18,7 @@ import (
 	dauthconnect "github.com/streamingfast/dauth/middleware/connect"
 	dauthgrpc "github.com/streamingfast/dauth/middleware/grpc"
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
+	"github.com/streamingfast/dgrpc/server/connectrpc"
 	connectweb "github.com/streamingfast/dgrpc/server/connectrpc"
 	"github.com/streamingfast/dgrpc/server/factory"
 	"github.com/streamingfast/dgrpc/server/standard"
@@ -166,12 +167,22 @@ func grpcServer(
 	healthcheck dgrpcserver.HealthCheck,
 	enforceCompression bool,
 	logger *zap.Logger,
-) dgrpcserver.Server {
-	options := GetCommonServerOptions(logger, healthcheck, enforceCompression)
-	options = append(options, dgrpcserver.WithPostUnaryInterceptor(dauthgrpc.UnaryAuthChecker(auth, logger)))
-	options = append(options, dgrpcserver.WithPostStreamInterceptor(dauthgrpc.StreamAuthChecker(auth, logger)))
+) *standard.StandardServer {
+	options := &dgrpcserver.Options{
+		Logger:          logger,
+		HealthCheck:     healthcheck,
+		HealthCheckOver: dgrpcserver.HealthCheckOverGRPC | dgrpcserver.HealthCheckOverHTTP,
+		ServerOptions: []grpc.ServerOption{
+			grpc.StatsHandler(otelgrpc.NewServerHandler(otelgrpc.WithTracerProvider(otel.GetTracerProvider()))),
+			grpc.MaxRecvMsgSize(1024 * 1024 * 1024),
+		},
+		EnforceCompression:     enforceCompression,
+		PostUnaryInterceptors:  []grpc.UnaryServerInterceptor{dauthgrpc.UnaryAuthChecker(auth, logger)},
+		PostStreamInterceptors: []grpc.StreamServerInterceptor{dauthgrpc.StreamAuthChecker(auth, logger)},
+	}
 
-	server := factory.ServerFromOptions(options...)
+	server := standard.NewServer(options)
+
 	pbsubstreamsrpc.RegisterStreamServer(server.ServiceRegistrar(), service)
 	pbsubstreamsrpcv3.RegisterStreamServer(server.ServiceRegistrar(), &v3Adapter{service})
 	if infoService != nil {
@@ -179,7 +190,6 @@ func grpcServer(
 	}
 
 	return server
-
 }
 
 func connectServer(
@@ -189,16 +199,22 @@ func connectServer(
 	healthcheck dgrpcserver.HealthCheck,
 	enforceCompression bool,
 	logger *zap.Logger,
-) dgrpcserver.Server {
-	options := GetConnectCommonServerOptions(logger, healthcheck, enforceCompression)
+) *connectrpc.ConnectWebServer {
 
+	tracerProvider := otel.GetTracerProvider()
+	options := []dgrpcserver.Option{
+		dgrpcserver.WithLogger(logger),
+		dgrpcserver.WithHealthCheck(dgrpcserver.HealthCheckOverGRPC|dgrpcserver.HealthCheckOverHTTP, healthcheck),
+		dgrpcserver.WithGRPCServerOptions(
+			grpc.StatsHandler(otelgrpc.NewServerHandler(otelgrpc.WithTracerProvider(tracerProvider))),
+			grpc.MaxRecvMsgSize(1024*1024*1024),
+		),
+	}
 	options = append(options, dgrpcserver.WithConnectInterceptor(dauthconnect.NewAuthInterceptor(auth, logger)))
 	options = append(options, dgrpcserver.WithConnectStrictContentType(false))
 	options = append(options, dgrpcserver.WithConnectReflection(pbsubstreamsrpcv2connect.StreamName))
 	options = append(options, dgrpcserver.WithConnectReflection(pbsubstreamsrpcv3connect.StreamName))
 	options = append(options, dgrpcserver.WithConnectReflection(pbsubstreamsrpcv3connect.StreamName))
-
-	//todo: move compression to dgrpc :-(
 
 	streamHandlerGetter := func(opts ...connect.HandlerOption) (string, http.Handler) {
 		var o []connect.HandlerOption
@@ -253,7 +269,20 @@ func ListenTier2(
 	healthcheck dgrpcserver.HealthCheck,
 	enforceCompression bool,
 ) (err error) {
-	options := GetCommonServerOptions(logger, healthcheck, enforceCompression)
+	tracerProvider := otel.GetTracerProvider()
+	options := []dgrpcserver.Option{
+
+		dgrpcserver.WithLogger(logger),
+		dgrpcserver.WithHealthCheck(dgrpcserver.HealthCheckOverGRPC|dgrpcserver.HealthCheckOverHTTP, healthcheck),
+		dgrpcserver.WithGRPCServerOptions(
+			grpc.StatsHandler(otelgrpc.NewServerHandler(otelgrpc.WithTracerProvider(tracerProvider))),
+			grpc.MaxRecvMsgSize(1024*1024*1024),
+		),
+	}
+	if enforceCompression {
+		options = append(options, dgrpcserver.WithEnforceCompression())
+	}
+
 	if serviceDiscoveryURL != nil {
 		options = append(options, dgrpcserver.WithServiceDiscoveryURL(serviceDiscoveryURL))
 	}
@@ -286,35 +315,4 @@ func ListenTier2(
 
 	return
 
-}
-
-func GetCommonServerOptions(logger *zap.Logger, healthcheck dgrpcserver.HealthCheck, enforceCompression bool) []dgrpcserver.Option {
-	tracerProvider := otel.GetTracerProvider()
-	options := []dgrpcserver.Option{
-
-		dgrpcserver.WithLogger(logger),
-		dgrpcserver.WithHealthCheck(dgrpcserver.HealthCheckOverGRPC|dgrpcserver.HealthCheckOverHTTP, healthcheck),
-		dgrpcserver.WithGRPCServerOptions(
-			grpc.StatsHandler(otelgrpc.NewServerHandler(otelgrpc.WithTracerProvider(tracerProvider))),
-			grpc.MaxRecvMsgSize(1024*1024*1024),
-		),
-	}
-	if enforceCompression {
-		options = append(options, dgrpcserver.WithEnforceCompression())
-	}
-
-	return options
-}
-
-func GetConnectCommonServerOptions(logger *zap.Logger, healthcheck dgrpcserver.HealthCheck, enforceCompression bool) []dgrpcserver.Option {
-	tracerProvider := otel.GetTracerProvider()
-	options := []dgrpcserver.Option{
-		dgrpcserver.WithLogger(logger),
-		dgrpcserver.WithHealthCheck(dgrpcserver.HealthCheckOverGRPC|dgrpcserver.HealthCheckOverHTTP, healthcheck),
-		dgrpcserver.WithGRPCServerOptions(
-			grpc.StatsHandler(otelgrpc.NewServerHandler(otelgrpc.WithTracerProvider(tracerProvider))),
-			grpc.MaxRecvMsgSize(1024*1024*1024),
-		),
-	}
-	return options
 }

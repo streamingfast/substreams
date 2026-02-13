@@ -1,7 +1,6 @@
 package client
 
 import (
-	"context"
 	"crypto/tls"
 	"fmt"
 	"log"
@@ -9,13 +8,10 @@ import (
 	"os"
 	"regexp"
 	"strconv"
-	"time"
 
-	"github.com/dustin/go-humanize"
 	"github.com/mostynb/go-grpc-compression/experimental/s2"
 	"github.com/streamingfast/dgrpc"
 	networks "github.com/streamingfast/firehose-networks"
-	"github.com/streamingfast/logging/zapx"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/protodecode"
 	"go.uber.org/zap"
@@ -28,7 +24,6 @@ import (
 	xdscreds "google.golang.org/grpc/credentials/xds"
 	"google.golang.org/grpc/encoding"
 	_ "google.golang.org/grpc/encoding/gzip"
-	stats "google.golang.org/grpc/stats"
 	_ "google.golang.org/grpc/xds"
 )
 
@@ -174,71 +169,6 @@ func (c *SubstreamsClientConfig) MarshalLogObject(encoder zapcore.ObjectEncoder)
 	return nil
 }
 
-type sizeLoggingHandler struct {
-	messageLimit int
-	messageCount int
-	timeStart    time.Time
-
-	uncompressedBytes int
-	compressedBytes   int
-	wireBytes         int
-	lastReceivedTime  time.Time
-	waitToReceive     time.Duration
-}
-
-func (h *sizeLoggingHandler) TagRPC(ctx context.Context, info *stats.RPCTagInfo) context.Context {
-	zlog.Info("gRPC client RPC started", zap.String("method", info.FullMethodName))
-	return ctx
-}
-
-func (h *sizeLoggingHandler) HandleRPC(ctx context.Context, rs stats.RPCStats) {
-	//fmt.Println("handle rpc:", h.messageCount)
-	if inPayload, ok := rs.(*stats.InPayload); ok && inPayload != nil {
-		if h.messageCount == 0 {
-			h.timeStart = time.Now()
-		}
-		h.waitToReceive += time.Since(h.lastReceivedTime)
-		h.lastReceivedTime = time.Now()
-		h.messageCount++
-		h.uncompressedBytes += inPayload.Length
-		h.compressedBytes += inPayload.CompressedLength
-		h.wireBytes += inPayload.WireLength
-
-		if h.messageCount == h.messageLimit {
-			secs := time.Since(h.timeStart).Seconds()
-			messagesPerSecond := float64(h.messageCount) / secs
-			compressedPercentage := 100.0 - (float64(h.compressedBytes) / float64(h.uncompressedBytes) * 100.0)
-
-			zlog.Info(
-				"grpc io stats",
-				zap.Float64("msg_sec", messagesPerSecond),
-				zapx.HumanDuration("duration", time.Since(h.timeStart)),
-				zapx.HumanDuration("wait_to_receive", h.waitToReceive),
-				zap.String("compression_ratio", fmt.Sprintf("%.2f%%", compressedPercentage)),
-				zap.String("uncompressed", humanize.Bytes(uint64(h.uncompressedBytes))),
-				zap.String("compressed", humanize.Bytes(uint64(h.compressedBytes))),
-				zap.Int("uncompressed_bytes", h.uncompressedBytes),
-				zap.Int("compressed_bytes", h.compressedBytes),
-				zap.Bool("keep", false),
-			)
-
-			h.timeStart = time.Now()
-			h.messageCount = 0
-			h.uncompressedBytes = 0
-			h.compressedBytes = 0
-			h.wireBytes = 0
-			h.waitToReceive = 0
-		}
-	}
-}
-
-func (h *sizeLoggingHandler) TagConn(ctx context.Context, cti *stats.ConnTagInfo) context.Context {
-	return ctx
-}
-
-func (h *sizeLoggingHandler) HandleConn(ctx context.Context, cs stats.ConnStats) {
-}
-
 type InternalClientFactory = func() (cli pbssinternal.SubstreamsClient, closeFunc func() error, callOpts []grpc.CallOption, headers Headers, err error)
 
 // NewSubstreamsClientConfig creates a new SubstreamsClientConfig using the provided options.
@@ -365,8 +295,10 @@ func NewSubstreamsInternalClient(config *SubstreamsClientConfig) (cli pbssintern
 		}
 	}
 
-	sizeHandler := &sizeLoggingHandler{}
-	dialOptions = append(dialOptions, grpc.WithStatsHandler(sizeHandler))
+	if messageLimit, ok := getGRPCSizeLoggerFromEnv(); ok {
+		sizeHandler := dgrpc.NewSizeLoggingHandler(messageLimit, zlog)
+		dialOptions = append(dialOptions, grpc.WithStatsHandler(sizeHandler))
+	}
 
 	zlog.Debug("getting connection", zap.String("endpoint", endpoint))
 	conn, err := dgrpc.NewExternalClientConn(endpoint, dialOptions...)
@@ -434,27 +366,13 @@ func newConnection(config *SubstreamsClientConfig) (conn *grpc.ClientConn, close
 			dialOptions = []grpc.DialOption{grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true}))}
 		}
 	}
-	messageLimitString := os.Getenv("GRPC_SIZE_LOGGER_MESSAGE_LIMIT")
-	messageLimit := 10000
-	if messageLimitString != "" {
-		messageLimit, err = strconv.Atoi(messageLimitString)
-		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("failed to parse GRPC_SIZE_LOGGER_MESSAGE_LIMIT: %w", err)
-		}
-	}
-	sizeHandler := &sizeLoggingHandler{
-		messageLimit: messageLimit,
-	}
-	dialOptions = append(dialOptions, grpc.WithStatsHandler(sizeHandler))
 
-	//compressor := os.Getenv("GRPC_COMPRESSOR")
-	//switch compressor {
-	//case "gzip":
-	//dialOptions = append(dialOptions, grpc.WithDefaultCallOptions(grpc.UseCompressor(gzip.Name)))
-	//case "s2":
+	if messageLimit, ok := getGRPCSizeLoggerFromEnv(); ok {
+		sizeHandler := dgrpc.NewSizeLoggingHandler(messageLimit, zlog)
+		dialOptions = append(dialOptions, grpc.WithStatsHandler(sizeHandler))
+	}
+
 	dialOptions = append(dialOptions, grpc.WithDefaultCallOptions(grpc.UseCompressor(s2.Name)))
-	//}
-
 	dialOptions = append(dialOptions, grpc.WithUserAgent(config.agent))
 
 	zlog.Debug("getting connection", zap.String("endpoint", endpoint))
@@ -481,4 +399,21 @@ func newConnection(config *SubstreamsClientConfig) (conn *grpc.ClientConn, close
 
 func NewSubstreamsClientConn(config *SubstreamsClientConfig) (conn *grpc.ClientConn, closeFunc func() error, callOpts []grpc.CallOption, headers Headers, err error) {
 	return newConnection(config)
+}
+
+func getGRPCSizeLoggerFromEnv() (limit int, ok bool) {
+	messageLimitString := os.Getenv("GRPC_SIZE_LOGGER_MESSAGE_LIMIT")
+	if messageLimitString == "" {
+		return 0, false
+	}
+	messageLimit := 10000
+	var err error
+	if messageLimitString != "" {
+		messageLimit, err = strconv.Atoi(messageLimitString)
+		if err != nil {
+			zlog.Warn("failed to parse GRPC_SIZE_LOGGER_MESSAGE_LIMIT", zap.Error(err))
+			return 0, false
+		}
+	}
+	return messageLimit, true
 }

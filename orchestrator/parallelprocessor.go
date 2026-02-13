@@ -34,6 +34,7 @@ func BuildParallelProcessor(
 	storeConfigs store.ConfigMap,
 	noopMode bool,
 	bufferSize int,
+	supportBuffering bool,
 ) (*ParallelProcessor, error) {
 
 	// FIXME: Are all the progress messages properly sent? When we skip some stores and mark them complete,
@@ -70,6 +71,7 @@ func BuildParallelProcessor(
 					stream,
 					noopMode,
 					bufferSize,
+					supportBuffering,
 				)
 			}
 		}

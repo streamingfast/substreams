@@ -45,6 +45,7 @@ const (
 	ProtocolVersionUnset ProtocolVersion = 0
 	ProtocolVersionV2    ProtocolVersion = 2
 	ProtocolVersionV3    ProtocolVersion = 3
+	ProtocolVersionV4    ProtocolVersion = 4
 )
 
 // String returns the string representation of the protocol version
@@ -56,6 +57,8 @@ func (pv ProtocolVersion) String() string {
 		return "v2"
 	case ProtocolVersionV3:
 		return "v3"
+	case ProtocolVersionV4:
+		return "v4"
 	default:
 		return "unknown"
 	}
@@ -63,7 +66,7 @@ func (pv ProtocolVersion) String() string {
 
 // IsValid returns true if the protocol version is valid
 func (pv ProtocolVersion) IsValid() bool {
-	return pv == ProtocolVersionUnset || pv == ProtocolVersionV2 || pv == ProtocolVersionV3
+	return pv == ProtocolVersionUnset || pv == ProtocolVersionV2 || pv == ProtocolVersionV3 || pv == ProtocolVersionV4
 }
 
 // ParseProtocolVersion parses an integer to a ProtocolVersion
@@ -75,8 +78,10 @@ func ParseProtocolVersion(version int) (ProtocolVersion, error) {
 		return ProtocolVersionV2, nil
 	case 3:
 		return ProtocolVersionV3, nil
+	case 4:
+		return ProtocolVersionV4, nil
 	default:
-		return ProtocolVersionUnset, fmt.Errorf("invalid protocol version %d, only 0, 2 and 3 are supported", version)
+		return ProtocolVersionUnset, fmt.Errorf("invalid protocol version %d, only 0, 2, 3 and 4 are supported", version)
 	}
 }
 
@@ -86,6 +91,10 @@ func (pv ProtocolVersion) IsV2() bool {
 
 func (pv ProtocolVersion) IsV3() bool {
 	return pv == ProtocolVersionV3
+}
+
+func (pv ProtocolVersion) IsV4() bool {
+	return pv == ProtocolVersionV4
 }
 
 func (pv ProtocolVersion) IsUnset() bool {
@@ -106,7 +115,7 @@ type SubstreamsClientConfigOptions struct {
 	PlainText bool
 	// Agent is the User-Agent string for gRPC requests
 	Agent string
-	// ForceProtocolVersion forces the use of a specific protocol version (2 or 3)
+	// ForceProtocolVersion forces the use of a specific protocol version (2, 3 or 4)
 	ForceProtocolVersion ProtocolVersion
 }
 

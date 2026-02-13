@@ -1,32 +1,23 @@
 package service
 
 import (
-	"context"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
-	"connectrpc.com/connect"
-	compress "github.com/klauspost/connect-compress/v2"
 	_ "github.com/mostynb/go-grpc-compression/experimental/s2"
 	_ "github.com/mostynb/go-grpc-compression/lz4"
 	_ "github.com/mostynb/go-grpc-compression/zstd"
 	_ "github.com/planetscale/vtprotobuf/codec/grpc"
 	"github.com/streamingfast/dauth"
-	dauthconnect "github.com/streamingfast/dauth/middleware/connect"
 	dauthgrpc "github.com/streamingfast/dauth/middleware/grpc"
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
-	"github.com/streamingfast/dgrpc/server/connectrpc"
-	connectweb "github.com/streamingfast/dgrpc/server/connectrpc"
 	"github.com/streamingfast/dgrpc/server/factory"
 	"github.com/streamingfast/dgrpc/server/standard"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcv2connect"
-	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
-	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3/pbsubstreamsrpcv3connect"
 	"github.com/streamingfast/substreams/protodecode"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
@@ -40,20 +31,6 @@ import (
 
 func init() {
 	encoding.RegisterCodec(protodecode.PreferredVTCodec{})
-}
-
-type streamHandlerV3 func(ctx context.Context, req *connect.Request[pbsubstreamsrpcv3.Request], stream *connect.ServerStream[pbsubstreamsrpc.Response]) error
-
-func (h streamHandlerV3) Blocks(ctx context.Context, req *connect.Request[pbsubstreamsrpcv3.Request], stream *connect.ServerStream[pbsubstreamsrpc.Response]) error {
-	return h(ctx, req, stream)
-}
-
-type v3Adapter struct {
-	*Tier1Service
-}
-
-func (a *v3Adapter) Blocks(req *pbsubstreamsrpcv3.Request, srv pbsubstreamsrpcv3.Stream_BlocksServer) error {
-	return a.BlocksV3(req, srv)
 }
 
 func ListenTier1(
@@ -158,106 +135,6 @@ func ListenTier1(
 	}
 
 	return
-}
-
-func grpcServer(
-	service *Tier1Service,
-	infoService pbsubstreamsrpc.EndpointInfoServer,
-	auth dauth.Authenticator,
-	healthcheck dgrpcserver.HealthCheck,
-	enforceCompression bool,
-	logger *zap.Logger,
-) *standard.StandardServer {
-	options := &dgrpcserver.Options{
-		Logger:          logger,
-		HealthCheck:     healthcheck,
-		HealthCheckOver: dgrpcserver.HealthCheckOverGRPC | dgrpcserver.HealthCheckOverHTTP,
-		ServerOptions: []grpc.ServerOption{
-			grpc.StatsHandler(otelgrpc.NewServerHandler(otelgrpc.WithTracerProvider(otel.GetTracerProvider()))),
-			grpc.MaxRecvMsgSize(1024 * 1024 * 1024),
-		},
-		EnforceCompression:     enforceCompression,
-		PostUnaryInterceptors:  []grpc.UnaryServerInterceptor{dauthgrpc.UnaryAuthChecker(auth, logger)},
-		PostStreamInterceptors: []grpc.StreamServerInterceptor{dauthgrpc.StreamAuthChecker(auth, logger)},
-	}
-
-	server := standard.NewServer(options)
-
-	pbsubstreamsrpc.RegisterStreamServer(server.ServiceRegistrar(), service)
-	pbsubstreamsrpcv3.RegisterStreamServer(server.ServiceRegistrar(), &v3Adapter{service})
-	if infoService != nil {
-		pbsubstreamsrpc.RegisterEndpointInfoServer(server.ServiceRegistrar(), infoService)
-	}
-
-	return server
-}
-
-func connectServer(
-	service *ConnectService,
-	infoService pbsubstreamsrpcv2connect.EndpointInfoHandler,
-	auth dauth.Authenticator,
-	healthcheck dgrpcserver.HealthCheck,
-	enforceCompression bool,
-	logger *zap.Logger,
-) *connectrpc.ConnectWebServer {
-
-	tracerProvider := otel.GetTracerProvider()
-	options := []dgrpcserver.Option{
-		dgrpcserver.WithLogger(logger),
-		dgrpcserver.WithHealthCheck(dgrpcserver.HealthCheckOverGRPC|dgrpcserver.HealthCheckOverHTTP, healthcheck),
-		dgrpcserver.WithGRPCServerOptions(
-			grpc.StatsHandler(otelgrpc.NewServerHandler(otelgrpc.WithTracerProvider(tracerProvider))),
-			grpc.MaxRecvMsgSize(1024*1024*1024),
-		),
-	}
-	options = append(options, dgrpcserver.WithConnectInterceptor(dauthconnect.NewAuthInterceptor(auth, logger)))
-	options = append(options, dgrpcserver.WithConnectStrictContentType(false))
-	options = append(options, dgrpcserver.WithConnectReflection(pbsubstreamsrpcv2connect.StreamName))
-	options = append(options, dgrpcserver.WithConnectReflection(pbsubstreamsrpcv3connect.StreamName))
-	options = append(options, dgrpcserver.WithConnectReflection(pbsubstreamsrpcv3connect.StreamName))
-
-	streamHandlerGetter := func(opts ...connect.HandlerOption) (string, http.Handler) {
-		var o []connect.HandlerOption
-		for _, opt := range opts {
-			o = append(o, opt)
-		}
-		o = append(o, compress.WithAll(compress.LevelBalanced))
-		return pbsubstreamsrpcv2connect.NewStreamHandler(service, o...)
-	}
-
-	streamHandlerGetterV3 := func(opts ...connect.HandlerOption) (string, http.Handler) {
-		handler := streamHandlerV3(service.BlocksV3)
-		var o []connect.HandlerOption
-		for _, opt := range opts {
-			o = append(o, opt)
-		}
-		o = append(o, compress.WithAll(compress.LevelBalanced))
-		return pbsubstreamsrpcv3connect.NewStreamHandler(handler, o...)
-	}
-
-	handlerGetters := []connectweb.HandlerGetter{streamHandlerGetter, streamHandlerGetterV3}
-
-	if infoService != nil {
-		infoHandlerGetter := func(opts ...connect.HandlerOption) (string, http.Handler) {
-
-			var o []connect.HandlerOption
-			for _, opt := range opts {
-				o = append(o, opt)
-			}
-			o = append(o, compress.WithAll(compress.LevelBalanced))
-			out, outh := pbsubstreamsrpcv2connect.NewEndpointInfoHandler(infoService, o...)
-			return out, outh
-		}
-		handlerGetters = append(handlerGetters, infoHandlerGetter)
-	}
-
-	options = append(options, dgrpcserver.WithConnectPermissiveCORS())
-	server := connectweb.New(handlerGetters, options...)
-	server.OnTerminating(func(err error) {
-		logger.Info("Tier1Service is terminating")
-		server.Shutdown(time.Duration(0))
-	})
-	return server
 }
 
 func ListenTier2(

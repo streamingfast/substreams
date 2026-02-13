@@ -85,7 +85,6 @@ message Response {
     BlockScopedData block_scoped_data = 3;
     BlockUndoSignal block_undo_signal = 4;
     Error fatal_error = 5;
-    BlockScopedDatas block_scoped_datas = 6;
 
     // Available only in developer mode, and only if `debug_initial_store_snapshot_for_modules` is set.
     InitialSnapshotData debug_snapshot_data = 10;
@@ -102,10 +101,6 @@ message Response {
 message BlockUndoSignal {
   sf.substreams.v1.BlockRef last_valid_block = 1;
   string last_valid_cursor = 2;
-}
-
-message BlockScopedDatas {
-  repeated BlockScopedData items = 1;
 }
 
 message BlockScopedData {

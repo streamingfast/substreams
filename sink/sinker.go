@@ -24,6 +24,7 @@ import (
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
+	pbsubstreamsrpcv4 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v4"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -482,33 +483,40 @@ func (s *Sinker) doRequest(
 	s.Logger.Debug("launching substreams request", zap.Int64("start_block", req.StartBlockNum), zap.Stringer("cursor", activeCursor))
 	receivedDataMessage := false
 
-	//md := metadata.Pairs("grpc-accept-encoding", "s2,identity")
-	//ctx = metadata.NewOutgoingContext(ctx, md)
-
-	var stream grpc.ServerStreamingClient[pbsubstreamsrpc.Response]
+	var streamV23 grpc.ServerStreamingClient[pbsubstreamsrpc.Response]
+	var streamV4 grpc.ServerStreamingClient[pbsubstreamsrpcv4.Response]
 	var err error
 
 	ssClientV2 := pbsubstreamsrpcv2.NewStreamClient(conn)
 	ssClientV3 := pbsubstreamsrpcv3.NewStreamClient(conn)
+	ssClientV4 := pbsubstreamsrpcv4.NewStreamClient(conn)
 	var isRunningV2 bool
 
-	if forceProtocolVersion.IsV2() {
+	switch forceProtocolVersion {
+	case client.ProtocolVersionV2:
 		reqV2, err := req.ToV2()
 		if err != nil {
 			return activeCursor, receivedDataMessage, fmt.Errorf("failed to convert request to v2: %w", err)
 		}
 
-		stream, err = ssClientV2.Blocks(ctx, reqV2, callOpts...)
+		streamV23, err = ssClientV2.Blocks(ctx, reqV2, callOpts...)
 		if err != nil {
 			return activeCursor, receivedDataMessage, retryable(fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err))
 		}
 		isRunningV2 = true
-	} else {
-		stream, err = ssClientV3.Blocks(ctx, req, callOpts...)
+
+	case client.ProtocolVersionV3:
+		streamV23, err = ssClientV3.Blocks(ctx, req, callOpts...)
 		if err != nil {
 			return activeCursor, receivedDataMessage, retryable(fmt.Errorf("call sf.substreams.rpc.v3.Stream/Blocks: %w", err))
 		}
+	default:
+		streamV4, err = ssClientV4.Blocks(ctx, req, callOpts...)
+		if err != nil {
+			return activeCursor, receivedDataMessage, retryable(fmt.Errorf("call sf.substreams.rpc.v4.Stream/Blocks: %w", err))
+		}
 	}
+
 	var prevBlockTime time.Time
 	var afterReceive time.Time
 	var lastMessageWasData bool
@@ -525,7 +533,15 @@ func (s *Sinker) doRequest(
 		lastMessageWasData = false // reset
 
 		beforeReceive := time.Now()
-		resp, err := stream.Recv()
+
+		var respV23 *pbsubstreamsrpc.Response
+		var respV4 *pbsubstreamsrpcv4.Response
+
+		if streamV4 != nil {
+			respV4, err = streamV4.Recv()
+		} else {
+			respV23, err = streamV23.Recv()
+		}
 
 		if err != nil {
 			if errors.Is(err, io.EOF) {
@@ -536,17 +552,48 @@ func (s *Sinker) doRequest(
 				switch dgrpcError.Code() {
 				case codes.Unimplemented, codes.NotFound:
 					if forceProtocolVersion.IsUnset() && !isRunningV2 {
-						// fallback to use v2 if the server does not support v3
+						// fallback logic: if v4 failed, we try v3, then v2
+						// currently if v4 fails, it will try v2 directly because streamV23 is used for both v2 and v3
+						// and we need to decide which one to try.
+
+						// If we were running V4 (streamV4 != nil) and it failed with Unimplemented, let's try V3
+						if streamV4 != nil {
+							s.Logger.Info("server does not implement sf.substreams.rpc.v4.Stream/Blocks, trying v3")
+							streamV23, err = ssClientV3.Blocks(ctx, req, callOpts...)
+							if err != nil {
+								// if v3 also fails immediately with unimplemented, we will hit this again and go to v2
+								if dgrpcError := dgrpc.AsGRPCError(err); dgrpcError != nil && (dgrpcError.Code() == codes.Unimplemented || dgrpcError.Code() == codes.NotFound) {
+									s.Logger.Info("server does not implement sf.substreams.rpc.v3.Stream/Blocks, trying v2")
+									isRunningV2 = true
+									reqV2, err := req.ToV2()
+									if err != nil {
+										return activeCursor, receivedDataMessage, fmt.Errorf("failed to convert request to v2: %w", err)
+									}
+									streamV23, err = ssClientV2.Blocks(ctx, reqV2, callOpts...)
+									if err != nil {
+										return activeCursor, receivedDataMessage, retryable(fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err))
+									}
+									streamV4 = nil
+									continue
+								}
+								return activeCursor, receivedDataMessage, retryable(fmt.Errorf("call sf.substreams.rpc.v3.Stream/Blocks: %w", err))
+							}
+							streamV4 = nil
+							continue
+						}
+
+						// Fallback to use v2 if the server does not support v3
 						s.Logger.Info("server does not implement sf.substreams.rpc.v3.Stream/Blocks, trying v2")
 						isRunningV2 = true
 						reqV2, err := req.ToV2()
 						if err != nil {
 							return activeCursor, receivedDataMessage, fmt.Errorf("failed to convert request to v2: %w", err)
 						}
-						stream, err = ssClientV2.Blocks(ctx, reqV2, callOpts...)
+						streamV23, err = ssClientV2.Blocks(ctx, reqV2, callOpts...)
 						if err != nil {
 							return activeCursor, receivedDataMessage, retryable(fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err))
 						}
+						streamV4 = nil
 						continue
 					}
 					return activeCursor, receivedDataMessage, fmt.Errorf("stream auth failure: %w", err)
@@ -575,9 +622,47 @@ func (s *Sinker) doRequest(
 			return activeCursor, receivedDataMessage, retryable(err)
 		}
 
-		MessageSizeBytes.AddInt(proto.Size(resp))
+		var message any
+		if respV23 != nil {
+			MessageSizeBytes.AddInt(proto.Size(respV23))
+			message = respV23.Message
+		} else {
+			MessageSizeBytes.AddInt(proto.Size(respV4))
+			// Mapping v4 messages back to pbsubstreamsrpc.isResponse_Message (which is rpc.v2.isResponse_Message)
+			// This works for fields that have the same type in both.
+			switch r := respV4.Message.(type) {
+			case *pbsubstreamsrpcv4.Response_Session:
+				message = &pbsubstreamsrpc.Response_Session{Session: r.Session}
+			case *pbsubstreamsrpcv4.Response_Progress:
+				message = &pbsubstreamsrpc.Response_Progress{Progress: r.Progress}
+			case *pbsubstreamsrpcv4.Response_BlockUndoSignal:
+				message = &pbsubstreamsrpc.Response_BlockUndoSignal{BlockUndoSignal: r.BlockUndoSignal}
+			case *pbsubstreamsrpcv4.Response_FatalError:
+				message = &pbsubstreamsrpc.Response_FatalError{FatalError: r.FatalError}
+			case *pbsubstreamsrpcv4.Response_DebugSnapshotData:
+				message = &pbsubstreamsrpc.Response_DebugSnapshotData{DebugSnapshotData: r.DebugSnapshotData}
+			case *pbsubstreamsrpcv4.Response_DebugSnapshotComplete:
+				message = &pbsubstreamsrpc.Response_DebugSnapshotComplete{DebugSnapshotComplete: r.DebugSnapshotComplete}
+			case *pbsubstreamsrpcv4.Response_BlockScopedDatas:
+				// We don't map this to pbsubstreamsrpc.isResponse_Message because there is no equivalent
+				// We'll handle it specially below.
+			}
+		}
 
-		switch r := resp.Message.(type) {
+		if respV4 != nil {
+			if r, ok := respV4.Message.(*pbsubstreamsrpcv4.Response_BlockScopedDatas); ok {
+				for idx, item := range r.BlockScopedDatas.Items {
+					if activeCursor, receivedDataMessage, err = s.processBlockScopedData(ctx, handler, item, idx == 0, beforeReceive, &prevBlockTime, activeCursor); err != nil {
+						return activeCursor, receivedDataMessage, err
+					}
+					afterReceive = time.Now()
+					lastMessageWasData = true
+				}
+				continue
+			}
+		}
+
+		switch r := message.(type) {
 		case *pbsubstreamsrpc.Response_Progress:
 			if ph, ok := handler.(SinkerProgressHandler); ok {
 				ph.HandleProgress(ctx, r.Progress)
@@ -633,14 +718,6 @@ func (s *Sinker) doRequest(
 				s.Logger.Debug("received response Progress", zap.Reflect("progress", r))
 			}
 
-		case *pbsubstreamsrpc.Response_BlockScopedDatas:
-			for idx, item := range r.BlockScopedDatas.Items {
-				if activeCursor, receivedDataMessage, err = s.processBlockScopedData(ctx, handler, item, idx == 0, beforeReceive, &prevBlockTime, activeCursor); err != nil {
-					return activeCursor, receivedDataMessage, err
-				}
-				afterReceive = time.Now()
-				lastMessageWasData = true
-			}
 		case *pbsubstreamsrpc.Response_BlockScopedData:
 			if activeCursor, receivedDataMessage, err = s.processBlockScopedData(ctx, handler, r.BlockScopedData, true, beforeReceive, &prevBlockTime, activeCursor); err != nil {
 				return activeCursor, receivedDataMessage, err

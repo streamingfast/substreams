@@ -9,20 +9,22 @@ import (
 
 	"github.com/streamingfast/substreams/orchestrator/response"
 	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreamsrpcv4 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v4"
 	"go.uber.org/zap"
 )
 
 type MessageBuffer struct {
 	mut                sync.RWMutex
-	buf                *pbsubstreamsrpcv2.BlockScopedDatas
+	buf                *pbsubstreamsrpcv4.BlockScopedDatas
 	lastFlush          time.Time
 	maxBufferedMessage int
 	DataSize           int
 	logger             *zap.Logger
 	maxDataSize        int
+	supportBuffer      bool
 }
 
-func NewMessageBuffer(maxBufferedMessage int, logger *zap.Logger) *MessageBuffer {
+func NewMessageBuffer(maxBufferedMessage int, supportBuffer bool, logger *zap.Logger) *MessageBuffer {
 	maxDaraSize := 1024 * 1024 * 10
 	maxDataSizeString := os.Getenv("MESSAGE_BUFFER_MAX_DATA_SIZE")
 
@@ -36,9 +38,10 @@ func NewMessageBuffer(maxBufferedMessage int, logger *zap.Logger) *MessageBuffer
 	}
 
 	return &MessageBuffer{
-		buf:                &pbsubstreamsrpcv2.BlockScopedDatas{Items: []*pbsubstreamsrpcv2.BlockScopedData{}},
+		buf:                &pbsubstreamsrpcv4.BlockScopedDatas{Items: []*pbsubstreamsrpcv2.BlockScopedData{}},
 		maxBufferedMessage: maxBufferedMessage,
 		maxDataSize:        maxDaraSize,
+		supportBuffer:      supportBuffer,
 		logger:             logger.Named("message-buffer"),
 	}
 }
@@ -80,9 +83,19 @@ func (b *MessageBuffer) Flush(streamSrv *response.Stream) error {
 
 	if b.maxBufferedMessage < 2 {
 		for _, msg := range b.buf.Items {
-			err := streamSrv.BlockScopedData(msg)
-			if err != nil {
-				return fmt.Errorf("flushing single block scope data: %w", err)
+			if b.supportBuffer { //this is looking weird but if a v4 request is running the support of BlockScopedData has been removed
+				d := &pbsubstreamsrpcv4.BlockScopedDatas{Items: []*pbsubstreamsrpcv2.BlockScopedData{
+					msg,
+				}}
+				err := streamSrv.BlockScopedDatas(d)
+				if err != nil {
+					return fmt.Errorf("flushing buffer: %w", err)
+				}
+			} else {
+				err := streamSrv.BlockScopedData(msg)
+				if err != nil {
+					return fmt.Errorf("flushing single block scope data: %w", err)
+				}
 			}
 		}
 	} else {
@@ -94,7 +107,7 @@ func (b *MessageBuffer) Flush(streamSrv *response.Stream) error {
 
 	b.lastFlush = time.Now()
 	b.DataSize = 0
-	b.buf = &pbsubstreamsrpcv2.BlockScopedDatas{Items: []*pbsubstreamsrpcv2.BlockScopedData{}}
+	b.buf = &pbsubstreamsrpcv4.BlockScopedDatas{Items: []*pbsubstreamsrpcv2.BlockScopedData{}}
 
 	return nil
 }

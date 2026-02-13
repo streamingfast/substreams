@@ -39,6 +39,7 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/plan"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreamsrpcv4 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v4"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/pipeline/cache"
@@ -305,6 +306,7 @@ func (s *Tier1Service) BlocksAny(
 	protocol string,
 	pkg *pbsubstreams.Package,
 	stream grpc.ServerStream,
+	supportBuffering bool,
 	logger *zap.Logger,
 ) (runningCtx context.Context, serverErr error, blockErr error) {
 	if s.IsTerminating() {
@@ -535,8 +537,9 @@ func (s *Tier1Service) BlocksAny(
 
 	runningContext = reqctx.WithCancelFunc(runningContext, cancelRunning) // we pass this down so that the 'workerPool/requestPool' can cancel the running context
 
-	respFunc := tier1ResponseHandler(respContext, &mut, logger, stream, request.NoopMode, reqStats, request.DevOutputModules)
-	err = s.blocks(runningContext, cancelRunning, request, header, execGraph, respFunc, reqStats, fields, s.execOutMessageBufferSize)
+	respFunc := tier1ResponseHandler(respContext, &mut, logger, stream, request.NoopMode, reqStats, request.DevOutputModules, supportBuffering)
+
+	err = s.blocks(runningContext, cancelRunning, request, header, execGraph, respFunc, reqStats, fields, supportBuffering, s.execOutMessageBufferSize)
 	if err != nil {
 		return runningContext, nil, err
 	}
@@ -614,7 +617,18 @@ func (s *Tier1Service) writeLastUsed(ctx context.Context, execGraph *exec.Graph,
 
 var IsValidCacheTag = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`).MatchString
 
-func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelCauseFunc, request *pbsubstreamsrpc.Request, header http.Header, execGraph *exec.Graph, respFunc substreams.ResponseFunc, reqStats *metrics.Stats, logFields []zap.Field, execOutMessageBufferSize int) (err error) {
+func (s *Tier1Service) blocks(
+	ctx context.Context,
+	cancelRunning context.CancelCauseFunc,
+	request *pbsubstreamsrpc.Request,
+	header http.Header,
+	execGraph *exec.Graph,
+	respFunc substreams.ResponseFunc,
+	reqStats *metrics.Stats,
+	logFields []zap.Field,
+	supportBuffering bool,
+	execOutMessageBufferSize int,
+) (err error) {
 	chainFirstStreamableBlock := bstream.GetProtocolFirstStreamableBlock
 	if request.StartBlockNum > 0 && request.StartBlockNum < int64(chainFirstStreamableBlock) {
 		return bsstream.NewErrInvalidArg("invalid start block %d, must be >= %d (the first streamable block of the chain)", request.StartBlockNum, chainFirstStreamableBlock)
@@ -784,6 +798,7 @@ func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelC
 		},
 		s.foundationalEndpoints,
 		execOutMessageBufferSize,
+		supportBuffering,
 		opts...,
 	)
 
@@ -1046,6 +1061,7 @@ func tier1ResponseHandler(
 	noop bool,
 	stats *metrics.Stats,
 	debugOutputForModules []string,
+	supportBuffering bool,
 ) substreams.ResponseFunc {
 	auth := dauth.FromContext(ctx)
 	organizationID := auth.OrganizationID()
@@ -1072,7 +1088,6 @@ func tier1ResponseHandler(
 
 	//var buffer []*pbsubstreamsrpc.BlockScopedData
 	return func(respAny substreams.ResponseFromAnyTier) error {
-		resp := respAny.(*pbsubstreamsrpc.Response)
 		mut.Lock()
 		defer mut.Unlock()
 
@@ -1081,38 +1096,23 @@ func tier1ResponseHandler(
 			return ctx.Err()
 		}
 
-		var isData bool
-		if data := resp.GetBlockScopedData(); data != nil {
-			isData = true
-			if noop {
-				data.DebugMapOutputs = nil
-				data.DebugStoreOutputs = nil
-				data.Output = &pbsubstreamsrpc.MapModuleOutput{}
-			}
-			if debugOutputs != nil {
-				// Filter DebugMapOutputs
-				var filteredMapOutputs []*pbsubstreamsrpc.MapModuleOutput
-				for _, output := range data.DebugMapOutputs {
-					if _, exists := debugOutputs[output.Name]; exists {
-						filteredMapOutputs = append(filteredMapOutputs, output)
-					}
-				}
-				data.DebugMapOutputs = filteredMapOutputs
+		isData := true
 
-				// Filter DebugStoreOutputs
-				var filteredStoreOutputs []*pbsubstreamsrpc.StoreModuleOutput
-				for _, output := range data.DebugStoreOutputs {
-					if _, exists := debugOutputs[output.Name]; exists {
-						filteredStoreOutputs = append(filteredStoreOutputs, output)
-					}
-				}
-				data.DebugStoreOutputs = filteredStoreOutputs
+		switch r := respAny.(type) {
+		case *pbsubstreamsrpc.Response:
+			d := r.GetBlockScopedData()
+			filterData(d, noop, debugOutputs)
+		case *pbsubstreamsrpcv4.Response:
+			for _, d := range r.GetBlockScopedDatas().Items {
+				filterData(d, noop, debugOutputs)
 			}
+		default:
+			isData = false
 		}
-		egressBytes := proto.Size(resp)
 
+		egressBytes := proto.Size(respAny.(proto.Message))
 		begin := time.Now()
-		if err := streamSrv.SendMsg(resp); err != nil {
+		if err := streamSrv.SendMsg(respAny); err != nil {
 			logger.Info("unable to send block probably due to client disconnecting", zap.String("user_id", organizationID), zap.String("api_key_id", apiKeyID), zap.Error(err))
 			return connect.NewError(connect.CodeUnavailable, err)
 		}
@@ -1126,6 +1126,33 @@ func tier1ResponseHandler(
 
 		metericsSender.Send(ctx, organizationID, apiKeyID, ip, userMeta, outputModuleHash, endpoint)
 		return nil
+	}
+}
+
+func filterData(data *pbsubstreamsrpc.BlockScopedData, noop bool, debugOutputs map[string]struct{}) {
+	if noop {
+		data.DebugMapOutputs = nil
+		data.DebugStoreOutputs = nil
+		data.Output = &pbsubstreamsrpc.MapModuleOutput{}
+	}
+	if debugOutputs != nil {
+		// Filter DebugMapOutputs
+		var filteredMapOutputs []*pbsubstreamsrpc.MapModuleOutput
+		for _, output := range data.DebugMapOutputs {
+			if _, exists := debugOutputs[output.Name]; exists {
+				filteredMapOutputs = append(filteredMapOutputs, output)
+			}
+		}
+		data.DebugMapOutputs = filteredMapOutputs
+
+		// Filter DebugStoreOutputs
+		var filteredStoreOutputs []*pbsubstreamsrpc.StoreModuleOutput
+		for _, output := range data.DebugStoreOutputs {
+			if _, exists := debugOutputs[output.Name]; exists {
+				filteredStoreOutputs = append(filteredStoreOutputs, output)
+			}
+		}
+		data.DebugStoreOutputs = filteredStoreOutputs
 	}
 }
 

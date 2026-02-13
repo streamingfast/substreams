@@ -5,6 +5,7 @@ import (
 
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreamsrpcv4 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v4"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
@@ -18,9 +19,9 @@ func NewBlockScopedDataResponse(in *pbsubstreamsrpc.BlockScopedData) *pbsubstrea
 		Message: &pbsubstreamsrpc.Response_BlockScopedData{BlockScopedData: in},
 	}
 }
-func NewBlockScopedDatasResponse(in *pbsubstreamsrpc.BlockScopedDatas) *pbsubstreamsrpc.Response {
-	return &pbsubstreamsrpc.Response{
-		Message: &pbsubstreamsrpc.Response_BlockScopedDatas{BlockScopedDatas: in},
+func NewBlockScopedDatasResponse(in *pbsubstreamsrpcv4.BlockScopedDatas) *pbsubstreamsrpcv4.Response {
+	return &pbsubstreamsrpcv4.Response{
+		Message: &pbsubstreamsrpcv4.Response_BlockScopedDatas{BlockScopedDatas: in},
 	}
 }
 func NewBlockScopedDataInternResponse(in *pbssinternal.BlockScopedData) *pbssinternal.ProcessRangeResponse {

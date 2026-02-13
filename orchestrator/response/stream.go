@@ -3,6 +3,7 @@ package response
 import (
 	"github.com/streamingfast/substreams"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreamsrpcv4 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v4"
 )
 
 type Stream struct {
@@ -19,7 +20,7 @@ func (s *Stream) BlockScopedData(in *pbsubstreamsrpc.BlockScopedData) error {
 	return s.respFunc(substreams.NewBlockScopedDataResponse(in))
 }
 
-func (s *Stream) BlockScopedDatas(in *pbsubstreamsrpc.BlockScopedDatas) error {
+func (s *Stream) BlockScopedDatas(in *pbsubstreamsrpcv4.BlockScopedDatas) error {
 	return s.respFunc(substreams.NewBlockScopedDatasResponse(in))
 }
 

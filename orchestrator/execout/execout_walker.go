@@ -25,14 +25,15 @@ import (
 type Walker struct {
 	ctx context.Context
 	*block.Range
-	fileWalker *execout.FileWalker
-	streamOut  *response.Stream
-	module     *pbsubstreams.Module
-	logger     *zap.Logger
-	working    bool
-	workingAt  time.Time // Timestamp when working was set to true
-	noopMode   bool
-	buffer     *MessageBuffer
+	fileWalker       *execout.FileWalker
+	streamOut        *response.Stream
+	module           *pbsubstreams.Module
+	logger           *zap.Logger
+	working          bool
+	workingAt        time.Time // Timestamp when working was set to true
+	noopMode         bool
+	buffer           *MessageBuffer
+	supportBuffering bool
 }
 
 func NewWalker(
@@ -43,17 +44,19 @@ func NewWalker(
 	stream *response.Stream,
 	noopMode bool,
 	bufferSize int,
+	supportBuffering bool,
 ) *Walker {
 	logger := reqctx.Logger(ctx).Named("execout_walker")
 	return &Walker{
-		ctx:        ctx,
-		module:     module,
-		fileWalker: fileWalker,
-		Range:      walkRange,
-		streamOut:  stream,
-		noopMode:   noopMode,
-		logger:     logger,
-		buffer:     NewMessageBuffer(bufferSize, logger),
+		ctx:              ctx,
+		module:           module,
+		fileWalker:       fileWalker,
+		Range:            walkRange,
+		streamOut:        stream,
+		noopMode:         noopMode,
+		logger:           logger,
+		buffer:           NewMessageBuffer(bufferSize, supportBuffering, logger),
+		supportBuffering: supportBuffering,
 	}
 }
 
@@ -229,7 +232,7 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 	itemCount := 0
 	for item, err := range reader.Iter() {
 		if err != nil {
-			if err == io.EOF {
+			if err == io.EOF && r.supportBuffering {
 				err := r.buffer.Flush(r.streamOut)
 				if err != nil {
 					return fmt.Errorf("flushing buffer on eof: %w", err)
@@ -254,11 +257,18 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 			return fmt.Errorf("converting to block scoped data: %w", err)
 		}
 
-		r.buffer.Append(blockScopedData, len(item.Payload))
-		if r.buffer.ShouldFlush() {
-			err := r.buffer.Flush(r.streamOut)
+		if r.supportBuffering {
+			r.buffer.Append(blockScopedData, len(item.Payload))
+			if r.buffer.ShouldFlush() {
+				err := r.buffer.Flush(r.streamOut)
+				if err != nil {
+					return fmt.Errorf("flushing buffer: %w", err)
+				}
+			}
+		} else {
+			err := r.streamOut.BlockScopedData(blockScopedData)
 			if err != nil {
-				return fmt.Errorf("flushing buffer: %w", err)
+				return fmt.Errorf("sending block scoped data: %w", err)
 			}
 		}
 		itemCount++

@@ -54,6 +54,13 @@ This document lists all environment variables used by the Substreams project, or
 - **Default**: 1073741824 (1GiB)
 - **Location**: `service/utils.go`
 
+#### SUBSTREAMS_LOG_TOTAL_STORE_SIZE
+**Log total store size**
+- **Purpose**: Log total store size in bytes
+- **Usage**: Set as "true" to add a "info" log when logging a store
+- **Default**: false
+- **Location**: `service/active_requests/active_requests.go`
+
 ### Ethereum RPC Call Configuration
 
 #### `ETH_CALL_FALLBACK_TO_LATEST_DURATION`

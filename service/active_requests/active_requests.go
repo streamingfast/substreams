@@ -20,6 +20,7 @@ var GB uint64 = 1024 * 1024 * 1024
 var enforceStoreSizeLimitPerRequest = os.Getenv("SUBSTREAMS_ENFORCE_STORE_SIZE_LIMIT_PER_REQUEST") == "true"
 var storeSizeLimitPerRequest = parseUint64EnvVar("SUBSTREAMS_STORE_SIZE_LIMIT_PER_REQUEST", 5*GB) // limit size of all loaded stores for a single request, in bytes
 
+var logTotalStoreSize = os.Getenv("SUBSTREAMS_LOG_TOTAL_STORE_SIZE") == "true"
 var enforceTotalStoreSizeLimit = os.Getenv("SUBSTREAMS_ENFORCE_TOTAL_STORE_SIZE_LIMIT") == "true"
 var totalStoreSizeLimitPercent = parseUint64EnvVar("SUBSTREAMS_TOTAL_STORE_SIZE_LIMIT_PERCENT", 75) // limit size in-memory of all loaded stores concurrently, in percentage of usable memory (cgroup or system total -- regardless of free or available)
 
@@ -122,16 +123,36 @@ func (arh *ActiveRequestsHandler) AllocateFullKVSizeOrForceCancelRequest(size ui
 	if req := arh.manager.reqs[arh.uniqueID]; req != nil {
 
 		if size > arh.manager.storeSizeLimitPerRequest {
-			arh.manager.logger.Warn("sum of all stores used in this request is above maximum", zap.String("uniqueID", arh.uniqueID), zap.Uint64("size", size), zap.Uint64("totalBytes", arh.manager.storeSizeLimitPerRequest), zap.Bool("enforced", arh.manager.enforceStoreSizeLimitPerRequest))
+			arh.manager.logger.Warn("sum of all stores used in this request is above maximum",
+				zap.String("trace_id", req.TraceID),
+				zap.String("uniqueID", arh.uniqueID),
+				zap.Uint64("size", size),
+				zap.Uint64("totalBytes", arh.manager.storeSizeLimitPerRequest),
+				zap.Bool("enforced", arh.manager.enforceStoreSizeLimitPerRequest),
+			)
 			if arh.manager.enforceStoreSizeLimitPerRequest {
 				req.cancelFunc(connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("sum of all stores used in this request have a size of %q, above maximum of: %q, (deterministic error)", humanize.IBytes(size), humanize.IBytes(arh.manager.storeSizeLimitPerRequest))))
 				return
 			}
 		}
 
-		availableMemory := arh.manager.totalStoreSizeLimitBytes - arh.totalLoadedSize()
+		totalLoaded := arh.totalLoadedSize()
+		availableMemory := arh.manager.totalStoreSizeLimitBytes - totalLoaded
+
+		if logTotalStoreSize {
+			arh.manager.logger.Info("allocating memory for request",
+				zap.String("trace_id", req.TraceID),
+				zap.String("uniqueID", arh.uniqueID),
+				zap.Uint64("requested_size", size),
+				zap.Uint64("total_loaded", totalLoaded),
+				zap.Uint64("available_memory", availableMemory),
+				zap.Bool("enforced", arh.manager.enforceTotalStoreSizeLimit),
+			)
+		}
+
 		if size > availableMemory {
 			arh.manager.logger.Warn("Cannot load KV stores: will go out of memory",
+				zap.String("trace_id", req.TraceID),
 				zap.String("uniqueID", arh.uniqueID),
 				zap.Uint64("requested_size", size),
 				zap.Uint64("available_memory", availableMemory),

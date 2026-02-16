@@ -1096,18 +1096,21 @@ func tier1ResponseHandler(
 			return ctx.Err()
 		}
 
-		isData := true
+		isData := false
 
 		switch r := respAny.(type) {
 		case *pbsubstreamsrpc.Response:
 			d := r.GetBlockScopedData()
-			filterData(d, noop, debugOutputs)
-		case *pbsubstreamsrpcv4.Response:
-			for _, d := range r.GetBlockScopedDatas().Items {
+			if d != nil {
+				isData = true
 				filterData(d, noop, debugOutputs)
 			}
-		default:
-			isData = false
+		case *pbsubstreamsrpcv4.Response:
+			for _, d := range r.GetBlockScopedDatas().Items {
+				if d != nil {
+					filterData(d, noop, debugOutputs)
+				}
+			}
 		}
 
 		egressBytes := proto.Size(respAny.(proto.Message))

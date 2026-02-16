@@ -24,6 +24,7 @@ import (
 	pbservice "github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/service/v2"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreamsrpcv4 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v4"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/cache"
 	"github.com/streamingfast/substreams/pipeline/exec"
@@ -951,6 +952,7 @@ func returnModuleDataOutputs(
 	extraMapModuleOutputs []*pbsubstreamsrpc.MapModuleOutput,
 	extraStoreModuleOutputs []*pbsubstreamsrpc.StoreModuleOutput,
 	respFunc substreams.ResponseFunc,
+	supportBuffering bool,
 	logger *zap.Logger,
 ) error {
 
@@ -966,6 +968,19 @@ func returnModuleDataOutputs(
 		DebugStoreOutputs: extraStoreModuleOutputs,
 		Cursor:            cursor.ToOpaque(),
 		FinalBlockHeight:  cursor.LIB.Num(),
+	}
+
+	if supportBuffering { //v4 support
+		bsd := &pbsubstreamsrpcv4.BlockScopedDatas{
+			Items: []*pbsubstreamsrpc.BlockScopedData{
+				out,
+			},
+		}
+
+		if err := respFunc(substreams.NewBlockScopedDatasResponse(bsd)); err != nil {
+			return fmt.Errorf("calling return func: %w", err)
+		}
+		return nil
 	}
 
 	if err := respFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {

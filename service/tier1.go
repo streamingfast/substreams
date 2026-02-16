@@ -1102,6 +1102,9 @@ func tier1ResponseHandler(
 		case *pbsubstreamsrpc.Response:
 			d := r.GetBlockScopedData()
 			if d != nil {
+				if supportBuffering {
+					return fmt.Errorf("receive a single block scoped data response, but supportBuffering is enabled")
+				}
 				isData = true
 				filterData(d, noop, debugOutputs)
 			}

@@ -504,17 +504,19 @@ func (s *Sinker) doRequest(
 			return activeCursor, receivedDataMessage, retryable(fmt.Errorf("call sf.substreams.rpc.v2.Stream/Blocks: %w", err))
 		}
 		isRunningV2 = true
-
+		s.Logger.Info("substreams using protocol version v2")
 	case client.ProtocolVersionV3:
 		streamV23, err = ssClientV3.Blocks(ctx, req, callOpts...)
 		if err != nil {
 			return activeCursor, receivedDataMessage, retryable(fmt.Errorf("call sf.substreams.rpc.v3.Stream/Blocks: %w", err))
 		}
+		s.Logger.Info("substreams using protocol version v3")
 	default:
 		streamV4, err = ssClientV4.Blocks(ctx, req, callOpts...)
 		if err != nil {
 			return activeCursor, receivedDataMessage, retryable(fmt.Errorf("call sf.substreams.rpc.v4.Stream/Blocks: %w", err))
 		}
+		s.Logger.Info("substreams using protocol version v4")
 	}
 
 	var prevBlockTime time.Time
@@ -650,10 +652,11 @@ func (s *Sinker) doRequest(
 		}
 
 		if respV4 != nil {
+			s.Logger.Debug("received V4 response", zap.Any("message", message))
 			if r, ok := respV4.Message.(*pbsubstreamsrpcv4.Response_BlockScopedDatas); ok {
 				for idx, item := range r.BlockScopedDatas.Items {
 					if activeCursor, receivedDataMessage, err = s.processBlockScopedData(ctx, handler, item, idx == 0, beforeReceive, &prevBlockTime, activeCursor); err != nil {
-						return activeCursor, receivedDataMessage, err
+						return activeCursor, receivedDataMessage, fmt.Errorf("processing block scoped data: %w", err)
 					}
 					afterReceive = time.Now()
 					lastMessageWasData = true

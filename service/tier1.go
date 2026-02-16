@@ -1111,6 +1111,7 @@ func tier1ResponseHandler(
 		case *pbsubstreamsrpcv4.Response:
 			for _, d := range r.GetBlockScopedDatas().Items {
 				if d != nil {
+					isData = true
 					filterData(d, noop, debugOutputs)
 				}
 			}

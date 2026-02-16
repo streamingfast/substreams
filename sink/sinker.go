@@ -654,6 +654,7 @@ func (s *Sinker) doRequest(
 		if respV4 != nil {
 			s.Logger.Debug("received V4 response", zap.Any("message", message))
 			if r, ok := respV4.Message.(*pbsubstreamsrpcv4.Response_BlockScopedDatas); ok {
+				s.Logger.Debug("received block scoped data response", zap.Int("count", len(r.BlockScopedDatas.Items)))
 				for idx, item := range r.BlockScopedDatas.Items {
 					if activeCursor, receivedDataMessage, err = s.processBlockScopedData(ctx, handler, item, idx == 0, beforeReceive, &prevBlockTime, activeCursor); err != nil {
 						return activeCursor, receivedDataMessage, fmt.Errorf("processing block scoped data: %w", err)

@@ -451,11 +451,19 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 
 	if withPartialBlocks {
 
-		if p.previousLastPartialBlock != nil && p.previousLastPartialBlock.Num() == clock.Number && p.previousLastPartialBlock.ID() == clock.Id {
-			// all good, this 'new' block can be ignored, it has been processed as a 'lastPartial'.
-			p.lastProcessedBlockRef = bstream.NewBlockRef(clock.Id, clock.Number)
-			p.lastCursor = cursor
-			return nil
+		if p.previousLastPartialBlock != nil {
+			if clock.Number <= p.previousLastPartialBlock.Num() {
+
+				// extra check, but forkDB should prevent this
+				if clock.Number == p.previousLastPartialBlock.Num() && p.previousLastPartialBlock.ID() != clock.Id {
+					return fmt.Errorf("received new block with the same number as the previous last partial block, but different ID. expected an UNDO")
+				}
+
+				// all good, this 'new' block can be ignored, it is older than our previous last partial block
+				p.lastProcessedBlockRef = bstream.NewBlockRef(clock.Id, clock.Number)
+				p.lastCursor = cursor
+				return nil
+			}
 		}
 
 		if p.partialProcessingState != nil {

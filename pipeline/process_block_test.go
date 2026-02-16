@@ -61,6 +61,26 @@ func TestHandleStepPartial(t *testing.T) {
 				dataResp(2, "2a"),
 			},
 		},
+		{
+			name: "partials with lastPartial, then older StepNew blocks should be ignored",
+			blocks: []blockWithStep{
+				withStepNew(testBlock(8, "8a")),
+				withStepNew(testPartialBlock(9, "9a", 4, true)),
+				withStepNew(testPartialBlock(10, "10x", 3, false)),
+				withStepNew(testPartialBlock(10, "10a", 4, true)),
+				withStepNew(testBlock(9, "9a")),   // should not be sent: older than last partial
+				withStepNew(testBlock(10, "10a")), // should not be sent: same number as last partial
+				withStepNew(testBlock(11, "11a")), // should be sent: newer than last partial
+			},
+			expectedResponses: []substreamsResp{
+				dataResp(8, "8a"),
+				partialDataResp(9, "9a", 4, true),
+				partialDataResp(10, "10x", 3, false),
+				partialDataResp(10, "10a", 4, true),
+				// blocks 9, 10 should not be sent
+				dataResp(11, "11a"),
+			},
+		},
 	}
 
 	for _, tt := range tests {

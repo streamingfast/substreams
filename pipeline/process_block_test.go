@@ -81,6 +81,24 @@ func TestHandleStepPartial(t *testing.T) {
 				dataResp(11, "11a"),
 			},
 		},
+		{
+			name: "partial undo does not reset 'lastPartial'",
+			blocks: []blockWithStep{
+				withStepNew(testBlock(8, "8a")),
+				withStepNew(testPartialBlock(9, "9a", 4, true)),
+				withStepNew(testPartialBlock(10, "10x", 1, false)),
+				withStepUndo(testPartialBlock(10, "10x", 1, false), 9, "9a"), // resulst in an UNDO to 9
+				withStepNew(testBlock(9, "9a")),                              // should not be sent: older than last partial
+				withStepNew(testBlock(10, "10a")),
+			},
+			expectedResponses: []substreamsResp{
+				dataResp(8, "8a"),
+				partialDataResp(9, "9a", 4, true),
+				partialDataResp(10, "10x", 1, false),
+				undoResp(9, "9a"),
+				dataResp(10, "10a"),
+			},
+		},
 	}
 
 	for _, tt := range tests {

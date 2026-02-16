@@ -261,6 +261,10 @@ func (p *Pipeline) handleUndo(clock *pbsubstreams.Clock, cursor *bstream.Cursor,
 // handleStepUndo handles a regular undo step: undoes any pending partial states,
 // then reverts the block and sends an undo signal to the user.
 func (p *Pipeline) handleStepUndo(clock *pbsubstreams.Clock, cursor *bstream.Cursor, reorgJunctionBlock bstream.BlockRef) error {
+
+	if p.previousLastPartialBlock != nil && p.previousLastPartialBlock.Num() > reorgJunctionBlock.Num() {
+		p.previousLastPartialBlock = nil // remove assumptions about an 'undone' previous partial block
+	}
 	if err := p.undoPartialStates(); err != nil {
 		return err
 	}
@@ -456,7 +460,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 
 				// extra check, but forkDB should prevent this
 				if clock.Number == p.previousLastPartialBlock.Num() && p.previousLastPartialBlock.ID() != clock.Id {
-					return fmt.Errorf("received new block with the same number as the previous last partial block, but different ID. expected an UNDO")
+					return fmt.Errorf("received new block with the same number as the previous last partial block (%d), but different ID (%q, expected %q). expected an UNDO", clock.Number, clock.Id, p.previousLastPartialBlock.ID())
 				}
 
 				// all good, this 'new' block can be ignored, it is older than our previous last partial block

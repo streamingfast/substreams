@@ -21,10 +21,9 @@ type MessageBuffer struct {
 	DataSize           int
 	logger             *zap.Logger
 	maxDataSize        int
-	supportBuffer      bool
 }
 
-func NewMessageBuffer(maxBufferedMessage int, supportBuffer bool, logger *zap.Logger) *MessageBuffer {
+func NewMessageBuffer(maxBufferedMessage int, logger *zap.Logger) *MessageBuffer {
 	maxDataSize := 1024 * 1024 * 10
 	maxDataSizeString := os.Getenv("MESSAGE_BUFFER_MAX_DATA_SIZE")
 
@@ -41,7 +40,6 @@ func NewMessageBuffer(maxBufferedMessage int, supportBuffer bool, logger *zap.Lo
 		buf:                &pbsubstreamsrpcv4.BlockScopedDatas{Items: []*pbsubstreamsrpcv2.BlockScopedData{}},
 		maxBufferedMessage: maxBufferedMessage,
 		maxDataSize:        maxDataSize,
-		supportBuffer:      supportBuffer,
 		logger:             logger.Named("message-buffer"),
 	}
 }
@@ -81,28 +79,9 @@ func (b *MessageBuffer) Flush(streamSrv *response.Stream) error {
 	b.mut.Lock()
 	defer b.mut.Unlock()
 
-	if b.maxBufferedMessage < 2 {
-		for _, msg := range b.buf.Items {
-			if b.supportBuffer { //this is looking weird but if a v4 request is running the support of BlockScopedData has been removed
-				d := &pbsubstreamsrpcv4.BlockScopedDatas{Items: []*pbsubstreamsrpcv2.BlockScopedData{
-					msg,
-				}}
-				err := streamSrv.BlockScopedDatas(d)
-				if err != nil {
-					return fmt.Errorf("flushing buffer: %w", err)
-				}
-			} else {
-				err := streamSrv.BlockScopedData(msg)
-				if err != nil {
-					return fmt.Errorf("flushing single block scope data: %w", err)
-				}
-			}
-		}
-	} else {
-		err := streamSrv.BlockScopedDatas(b.buf)
-		if err != nil {
-			return fmt.Errorf("flushing buffer: %w", err)
-		}
+	err := streamSrv.BlockScopedDatas(b.buf)
+	if err != nil {
+		return fmt.Errorf("flushing buffer: %w", err)
 	}
 
 	b.lastFlush = time.Now()

@@ -47,6 +47,12 @@ func NewWalker(
 	supportBuffering bool,
 ) *Walker {
 	logger := reqctx.Logger(ctx).Named("execout_walker")
+
+	var buffer *MessageBuffer
+	if supportBuffering {
+		buffer = NewMessageBuffer(bufferSize, logger)
+	}
+
 	return &Walker{
 		ctx:              ctx,
 		module:           module,
@@ -55,7 +61,7 @@ func NewWalker(
 		streamOut:        stream,
 		noopMode:         noopMode,
 		logger:           logger,
-		buffer:           NewMessageBuffer(bufferSize, supportBuffering, logger),
+		buffer:           buffer,
 		supportBuffering: supportBuffering,
 	}
 }

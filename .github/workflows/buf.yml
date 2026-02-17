@@ -38,9 +38,23 @@ jobs:
           input: proto
           against: "https://github.com/${{ github.repository }}.git#branch=${{ github.base_ref }}"
 
-      - uses: bufbuild/buf-push-action@v1
+      - name: Push to Buf registry
         if: github.event_name != 'pull_request'
-        with:
-          input: proto
-          buf_token: ${{ secrets.BUF_TOKEN }}
-          draft: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        env:
+          BUF_TOKEN: ${{ secrets.BUF_TOKEN }}
+        run: |
+          ARGS=""
+
+          # Use --draft for non-tag pushes
+          if [[ ! "$GITHUB_REF" =~ ^refs/tags/v ]]; then
+            ARGS="--draft"
+          fi
+
+          # Add --label with the tag name for tag pushes
+          if [[ "$GITHUB_REF" =~ ^refs/tags/ ]]; then
+            TAG_NAME="${GITHUB_REF#refs/tags/}"
+            ARGS="$ARGS --label $TAG_NAME"
+          fi
+
+          echo "Running: buf push proto $ARGS"
+          buf push proto $ARGS

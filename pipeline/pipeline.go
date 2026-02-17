@@ -136,7 +136,7 @@ type Pipeline struct {
 	blockStepMap         map[bstream.StepType]uint64
 	workerPoolFactory    work.WorkerPoolFactory
 	checkPendingShutdown func() bool
-	bufferSize           int
+	outputBufferSize     int
 	supportBuffering     bool
 }
 
@@ -156,7 +156,7 @@ func New(
 	executionTimeout time.Duration,
 	checkPendingShutdown func() bool,
 	foundationalEndpoints map[string]string,
-	bufferSize int,
+	outputBufferSize int,
 	supportBuffering bool,
 	opts ...Option,
 ) *Pipeline {
@@ -183,7 +183,7 @@ func New(
 		workerPoolFactory:       workerPoolFactory,
 		checkPendingShutdown:    checkPendingShutdown,
 		moduleNameToStage:       make(map[string]int),
-		bufferSize:              bufferSize,
+		outputBufferSize:        outputBufferSize,
 		supportBuffering:        supportBuffering,
 	}
 	for _, opt := range opts {
@@ -512,7 +512,7 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 		p.respFunc,
 		p.stores.configs,
 		noopMode,
-		p.bufferSize,
+		p.outputBufferSize,
 		p.supportBuffering,
 	)
 	if err != nil {

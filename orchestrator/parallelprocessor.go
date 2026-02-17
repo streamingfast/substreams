@@ -33,7 +33,7 @@ func BuildParallelProcessor(
 	respFunc func(resp substreams.ResponseFromAnyTier) error,
 	storeConfigs store.ConfigMap,
 	noopMode bool,
-	bufferSize int,
+	outputBufferSize int,
 	supportBuffering bool,
 ) (*ParallelProcessor, error) {
 
@@ -70,7 +70,7 @@ func BuildParallelProcessor(
 					reqPlan.ReadExecOut,
 					stream,
 					noopMode,
-					bufferSize,
+					outputBufferSize,
 					supportBuffering,
 				)
 			}

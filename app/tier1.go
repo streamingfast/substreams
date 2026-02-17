@@ -55,6 +55,7 @@ func NewDefaultTier1Config() *Tier1Config {
 		MaxSubrequests:        10,
 		StateBundleSize:       1000,
 		BlockExecutionTimeout: 1 * time.Minute,
+		OutputBufferSize:      100,
 	}
 }
 
@@ -88,7 +89,7 @@ type Tier1Config struct {
 	SubrequestsPlaintext    bool
 
 	SharedCacheSize  uint64
-	OutputBundleSize uint64
+	OutputBufferSize uint64 // Used to bundle execout messages within 'BlockScopedDatas' when using protocol V4
 
 	WASMExtensions wasm.WASMExtensioner
 	Tracing        bool
@@ -269,7 +270,7 @@ func (a *Tier1App) Run() error {
 		a.config.ActiveRequestsSoftLimit,
 		a.config.ActiveRequestsHardLimit,
 		a.config.SharedCacheSize,
-		a.config.OutputBundleSize,
+		a.config.OutputBufferSize,
 		a.modules.SessionPool,
 		foundationalStoreEndpoints,
 		opts...,

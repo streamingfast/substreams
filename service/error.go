@@ -64,13 +64,34 @@ func toConnectError(ctx context.Context, err error) error {
 		case codes.InvalidArgument:
 			return connect.NewError(connect.CodeInvalidArgument, errors.New(grpcError.Message()))
 		case codes.DeadlineExceeded:
-			return connect.NewError(connect.CodeDeadlineExceeded, err)
+			return connect.NewError(connect.CodeDeadlineExceeded, errors.New(grpcError.Message()))
 		case codes.ResourceExhausted:
 			return connect.NewError(connect.CodeResourceExhausted, errors.New(grpcError.Message()))
+		case codes.FailedPrecondition:
+			return connect.NewError(connect.CodeFailedPrecondition, errors.New(grpcError.Message()))
+		case codes.Aborted:
+			return connect.NewError(connect.CodeAborted, errors.New(grpcError.Message()))
+		case codes.OutOfRange:
+			return connect.NewError(connect.CodeOutOfRange, errors.New(grpcError.Message()))
+		case codes.Unimplemented:
+			return connect.NewError(connect.CodeUnimplemented, errors.New(grpcError.Message()))
+		case codes.Internal:
+			return connect.NewError(connect.CodeInternal, errors.New(grpcError.Message()))
 		case codes.Unknown:
 			return connect.NewError(connect.CodeUnknown, errors.New(grpcError.Message()))
+		case codes.NotFound:
+			return connect.NewError(connect.CodeNotFound, errors.New(grpcError.Message()))
+		case codes.AlreadyExists:
+			return connect.NewError(connect.CodeAlreadyExists, errors.New(grpcError.Message()))
+		case codes.PermissionDenied:
+			return connect.NewError(connect.CodePermissionDenied, errors.New(grpcError.Message()))
+		case codes.Unauthenticated:
+			return connect.NewError(connect.CodeUnauthenticated, errors.New(grpcError.Message()))
+		case codes.DataLoss:
+			return connect.NewError(connect.CodeDataLoss, errors.New(grpcError.Message()))
+		default:
+			return connect.NewError(connect.CodeUnknown, errors.New(grpcError.Message()))
 		}
-		return grpcError.Err()
 	}
 
 	// special case for "QuickSave" on shutdown

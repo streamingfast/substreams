@@ -548,21 +548,6 @@ func (s *Tier1Service) BlocksAny(
 	return runningContext, nil, nil
 }
 
-func compressorsFromHeader(header http.Header) (out map[string]bool) {
-	out = make(map[string]bool)
-	for k, v := range header {
-		petitK := strings.ToLower(k)
-		if petitK == "grpc-accept-encoding" || petitK == "connect-accept-encoding" || petitK == "accept-encoding" {
-			for _, vv := range v {
-				for _, vvv := range strings.Split(vv, ",") {
-					out[strings.ToLower(vvv)] = true
-				}
-			}
-		}
-	}
-	return
-}
-
 // writePackage writes the spkg to the module cache if it doesn't exist:
 //   - `substreams.spkg.zst` if it comes from a substreams.rpc.v3 request (package is complete with metadata)
 //   - `substreams.partial.spkg.zst` if it comes from a substreams.rpc.v2 request (package is partial, missing protobuf definitions and other metadata)

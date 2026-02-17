@@ -25,7 +25,7 @@ type MessageBuffer struct {
 }
 
 func NewMessageBuffer(maxBufferedMessage int, supportBuffer bool, logger *zap.Logger) *MessageBuffer {
-	maxDaraSize := 1024 * 1024 * 10
+	maxDataSize := 1024 * 1024 * 10
 	maxDataSizeString := os.Getenv("MESSAGE_BUFFER_MAX_DATA_SIZE")
 
 	if maxDataSizeString != "" {
@@ -33,14 +33,14 @@ func NewMessageBuffer(maxBufferedMessage int, supportBuffer bool, logger *zap.Lo
 		if err != nil {
 			logger.Warn("failed to parse MESSAGE_BUFFER_MAX_DATA_SIZE, using default value", zap.Error(err))
 		} else {
-			maxDaraSize = parsed
+			maxDataSize = parsed
 		}
 	}
 
 	return &MessageBuffer{
 		buf:                &pbsubstreamsrpcv4.BlockScopedDatas{Items: []*pbsubstreamsrpcv2.BlockScopedData{}},
 		maxBufferedMessage: maxBufferedMessage,
-		maxDataSize:        maxDaraSize,
+		maxDataSize:        maxDataSize,
 		supportBuffer:      supportBuffer,
 		logger:             logger.Named("message-buffer"),
 	}

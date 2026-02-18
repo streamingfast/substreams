@@ -53,12 +53,10 @@ func ListenTier1(
 		contentType := r.Header.Get("Content-Type")
 		logger.Info("handling request", zap.String("content-type", contentType))
 
-		if strings.HasPrefix(contentType, "application/grpc") || strings.HasPrefix(contentType, "application/grpc-web") {
-			logger.Debug("forwarding gRPC request")
-			grpcServer.ServeHTTP(w, r)
-
-			return
-		}
+		//if strings.HasPrefix(contentType, "application/grpc") || strings.HasPrefix(contentType, "application/grpc-web") {
+		//
+		//	return
+		//}
 		if strings.HasPrefix(contentType, "application/connect") || contentType == "application/json" || strings.Contains(contentType, "json") { // loose match for safety
 			logger.Debug("forwarding gRPC-Web request")
 			connectServer.ServeHTTP(w, r)
@@ -66,7 +64,10 @@ func ListenTier1(
 
 		}
 
-		http.Error(w, "Unsupported Content-Type for RPC", http.StatusUnsupportedMediaType)
+		logger.Debug("forwarding gRPC request")
+		grpcServer.ServeHTTP(w, r)
+
+		//http.Error(w, "Unsupported Content-Type for RPC", http.StatusUnsupportedMediaType)
 	})
 
 	compressionHandler := standard.CompressionHandler(enforceCompression, mux)

@@ -111,7 +111,7 @@ func ListenTier1(
 		srv := connectweb.New(handlerGetters, options...)
 		svc.OnTerminating(func(err error) {
 			logger.Info("Tier1Service is terminating")
-			srv.Shutdown(err)
+			srv.Shutdown(0)
 		})
 		servers = append(servers, srv)
 		cleanAddr := strings.ReplaceAll(addr, "*", "")
@@ -123,7 +123,7 @@ func ListenTier1(
 
 	<-done
 	for _, srv := range servers {
-		srv.Shutdown(nil)
+		srv.Shutdown(0)
 	}
 
 	for _, srv := range servers {

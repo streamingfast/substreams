@@ -17,7 +17,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const latestDummyBlockchainImage = "ghcr.io/streamingfast/dummy-blockchain:v1.7.6"
+const latestDummyBlockchainImage = "ghcr.io/streamingfast/dummy-blockchain:762f40d"
 
 func TestPartialBlocksSimple(t *testing.T) {
 	ctx := context.Background()
@@ -338,7 +338,7 @@ func TestPartialBlocksReorgs(t *testing.T) {
 						"P:34:1,P:34:2,P:34:3,P:34:4*,"+ // partials for block 34
 						"F:35,"+ // sudden "full" block 35
 						"U:33,"+ // undo up to block 33
-						"F:34,"+"F:35,"+ // get the right block 34 and 35 (from "full")
+						"F:34,"+"P:35:4*,"+ // get the right block 34 and 35 (from "full")
 						"P:36:1,P:36:2,P:36:3,P:36:4*,", // partials for block 36 (back on track)
 					"did not contain expected partial blocks + undo sequence")
 			},

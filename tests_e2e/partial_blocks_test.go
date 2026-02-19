@@ -128,9 +128,9 @@ func TestPartialBlocksSimple(t *testing.T) {
 			var partialBlocks int
 			for _, blkdata := range blockScopedDataSlice {
 				if blkdata.IsPartial {
-					fullBlocks++
-				} else {
 					partialBlocks++
+				} else {
+					fullBlocks++
 				}
 			}
 

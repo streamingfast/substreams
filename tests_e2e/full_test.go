@@ -30,7 +30,7 @@ func TestDummyBlockchainContainer(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// launch dummy blockchain container
-	container, err := newDummyBlockchainContainer(ctx, tmpDir, "ghcr.io/streamingfast/dummy-blockchain:v1.7.2", "", 1000)
+	container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", 1000)
 	require.NoError(t, err)
 	defer container.Terminate(ctx, testcontainers.StopTimeout(0))
 

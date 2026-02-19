@@ -385,7 +385,7 @@ func (s *Scheduler) cmdShutdownWhenComplete() loop.Cmd {
 			)
 		}
 
-		s.logger.Info("waiting for output stream to complete, stores ready", fields...)
+		s.logger.Info("`waiting for output stream to complete, stores ready", fields...)
 	}
 	if s.outputStreamCompleted && !s.storesSyncCompleted {
 		s.logger.Info("waiting for stores to complete, output stream completed")

@@ -22,9 +22,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - A warning is emitted listing which descriptor sets need pinned versions
   - The hash file is removed when non-deterministic descriptor sets are present to prevent stale caches
   
-### Server  
+### Server
 
 * Improved 'partial blocks': support new pbbstream's "LastPartial" field, fix 'undo' scenarios for stores
+
+### Performance (RPC V4)
+
+This release introduces significant performance optimizations to the Substreams gRPC communication layer. See [RPC Protocol Reference](../references/rpc-protocol.md) for details.
+
+* **RPC V4 protocol with `BlockScopedDatas` batching**: The new V4 protocol batches multiple `BlockScopedData` messages into a single `BlockScopedDatas` response, reducing gRPC round-trips and message framing overhead during backfill.
+
+* **S2 compression (new default)**: S2 compression replaces gzip as the default compression algorithm. S2 provides ~3-5x faster compression/decompression than gzip with comparable compression ratios. The client automatically negotiates compression with the server.
+
+* **VTProtobuf fast serialization**: Both client and server now use [vtprotobuf](https://github.com/planetscale/vtprotobuf) for protobuf marshaling/unmarshaling, providing ~2-3x faster serialization with reduced memory allocations.
+
+* **Server-side message buffering**: Configurable via `OutputBufferSize` flag (default: 100 blocks) or `MESSAGE_BUFFER_MAX_DATA_SIZE` environment variable (default: 10MB).
+
+* **Automatic protocol fallback**: Clients gracefully fall back V4 → V3 → V2 when connecting to older servers.
+
+* **Improved Connect/gRPC protocol selection**: Server now efficiently routes requests to the appropriate handler based on content-type, improving performance by ~15% for pure gRPC clients (previously all requests went through Connect RPC layer).
+
+### Sink
+
+* Updated sink library to leverage RPC V4 protocol with `BlockScopedDatas` batching, improving throughput by reducing per-message processing overhead.
 
 ## v1.17.11
 

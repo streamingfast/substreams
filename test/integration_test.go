@@ -385,7 +385,10 @@ func TestOneStoreOneMap(t *testing.T) {
 					assert.Equal(t, value, meteringEvents[key], key)
 				}
 			}
-
+			parts := strings.Split(mapOutput, "\n")
+			for _, part := range parts {
+				fmt.Println(part)
+			}
 			assert.Equal(t, test.expectedResponseCount, strings.Count(mapOutput, "\n"))
 
 			withZST := func(s []string) []string {

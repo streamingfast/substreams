@@ -24,6 +24,7 @@ import (
 	pbservice "github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/service/v2"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreamsrpcv4 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v4"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline/cache"
 	"github.com/streamingfast/substreams/pipeline/exec"
@@ -135,6 +136,8 @@ type Pipeline struct {
 	blockStepMap         map[bstream.StepType]uint64
 	workerPoolFactory    work.WorkerPoolFactory
 	checkPendingShutdown func() bool
+	outputBufferSize     int
+	supportBuffering     bool
 }
 
 func New(
@@ -153,6 +156,8 @@ func New(
 	executionTimeout time.Duration,
 	checkPendingShutdown func() bool,
 	foundationalEndpoints map[string]string,
+	outputBufferSize int,
+	supportBuffering bool,
 	opts ...Option,
 ) *Pipeline {
 	pipe := &Pipeline{
@@ -178,6 +183,8 @@ func New(
 		workerPoolFactory:       workerPoolFactory,
 		checkPendingShutdown:    checkPendingShutdown,
 		moduleNameToStage:       make(map[string]int),
+		outputBufferSize:        outputBufferSize,
+		supportBuffering:        supportBuffering,
 	}
 	for _, opt := range opts {
 		opt(pipe)
@@ -505,6 +512,8 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 		p.respFunc,
 		p.stores.configs,
 		noopMode,
+		p.outputBufferSize,
+		p.supportBuffering,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("building parallel processor: %w", err)
@@ -943,6 +952,7 @@ func returnModuleDataOutputs(
 	extraMapModuleOutputs []*pbsubstreamsrpc.MapModuleOutput,
 	extraStoreModuleOutputs []*pbsubstreamsrpc.StoreModuleOutput,
 	respFunc substreams.ResponseFunc,
+	supportBuffering bool,
 	logger *zap.Logger,
 ) error {
 
@@ -958,6 +968,19 @@ func returnModuleDataOutputs(
 		DebugStoreOutputs: extraStoreModuleOutputs,
 		Cursor:            cursor.ToOpaque(),
 		FinalBlockHeight:  cursor.LIB.Num(),
+	}
+
+	if supportBuffering { //v4 support
+		bsd := &pbsubstreamsrpcv4.BlockScopedDatas{
+			Items: []*pbsubstreamsrpc.BlockScopedData{
+				out,
+			},
+		}
+
+		if err := respFunc(substreams.NewBlockScopedDatasResponse(bsd)); err != nil {
+			return fmt.Errorf("calling return func: %w", err)
+		}
+		return nil
 	}
 
 	if err := respFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {

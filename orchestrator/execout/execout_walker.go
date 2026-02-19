@@ -10,9 +10,6 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
-	"go.uber.org/zap"
-	"google.golang.org/protobuf/types/known/anypb"
-
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/orchestrator/response"
@@ -21,18 +18,22 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
 	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
+	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type Walker struct {
 	ctx context.Context
 	*block.Range
-	fileWalker *execout.FileWalker
-	streamOut  *response.Stream
-	module     *pbsubstreams.Module
-	logger     *zap.Logger
-	working    bool
-	workingAt  time.Time // Timestamp when working was set to true
-	noopMode   bool
+	fileWalker       *execout.FileWalker
+	streamOut        *response.Stream
+	module           *pbsubstreams.Module
+	logger           *zap.Logger
+	working          bool
+	workingAt        time.Time // Timestamp when working was set to true
+	noopMode         bool
+	buffer           *MessageBuffer
+	supportBuffering bool
 }
 
 func NewWalker(
@@ -42,16 +43,26 @@ func NewWalker(
 	walkRange *block.Range,
 	stream *response.Stream,
 	noopMode bool,
+	bufferSize int,
+	supportBuffering bool,
 ) *Walker {
 	logger := reqctx.Logger(ctx).Named("execout_walker")
+
+	var buffer *MessageBuffer
+	if supportBuffering {
+		buffer = NewMessageBuffer(bufferSize, logger)
+	}
+
 	return &Walker{
-		ctx:        ctx,
-		module:     module,
-		fileWalker: fileWalker,
-		Range:      walkRange,
-		streamOut:  stream,
-		noopMode:   noopMode,
-		logger:     logger,
+		ctx:              ctx,
+		module:           module,
+		fileWalker:       fileWalker,
+		Range:            walkRange,
+		streamOut:        stream,
+		noopMode:         noopMode,
+		logger:           logger,
+		buffer:           buffer,
+		supportBuffering: supportBuffering,
 	}
 }
 
@@ -227,6 +238,12 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 	itemCount := 0
 	for item, err := range reader.Iter() {
 		if err != nil {
+			if err == io.EOF && r.supportBuffering {
+				err := r.buffer.Flush(r.streamOut)
+				if err != nil {
+					return fmt.Errorf("flushing buffer on eof: %w", err)
+				}
+			}
 			return err
 		}
 		if item.BlockNum < r.StartBlock {
@@ -246,8 +263,19 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 			return fmt.Errorf("converting to block scoped data: %w", err)
 		}
 
-		if err = r.streamOut.BlockScopedData(blockScopedData); err != nil {
-			return fmt.Errorf("calling response func: %w", err)
+		if r.supportBuffering {
+			r.buffer.Append(blockScopedData, len(item.Payload))
+			if r.buffer.ShouldFlush() {
+				err := r.buffer.Flush(r.streamOut)
+				if err != nil {
+					return fmt.Errorf("flushing buffer: %w", err)
+				}
+			}
+		} else {
+			err := r.streamOut.BlockScopedData(blockScopedData)
+			if err != nil {
+				return fmt.Errorf("sending block scoped data: %w", err)
+			}
 		}
 		itemCount++
 

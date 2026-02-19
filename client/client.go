@@ -7,11 +7,13 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 
+	"github.com/mostynb/go-grpc-compression/experimental/s2"
 	"github.com/streamingfast/dgrpc"
 	networks "github.com/streamingfast/firehose-networks"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"github.com/streamingfast/substreams/protodecode"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/oauth2"
@@ -20,9 +22,14 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/credentials/oauth"
 	xdscreds "google.golang.org/grpc/credentials/xds"
-	"google.golang.org/grpc/encoding/gzip"
+	"google.golang.org/grpc/encoding"
+	_ "google.golang.org/grpc/encoding/gzip"
 	_ "google.golang.org/grpc/xds"
 )
+
+func init() {
+	encoding.RegisterCodec(protodecode.PreferredVTCodec{})
+}
 
 type AuthType int
 
@@ -38,6 +45,7 @@ const (
 	ProtocolVersionUnset ProtocolVersion = 0
 	ProtocolVersionV2    ProtocolVersion = 2
 	ProtocolVersionV3    ProtocolVersion = 3
+	ProtocolVersionV4    ProtocolVersion = 4
 )
 
 // String returns the string representation of the protocol version
@@ -49,6 +57,8 @@ func (pv ProtocolVersion) String() string {
 		return "v2"
 	case ProtocolVersionV3:
 		return "v3"
+	case ProtocolVersionV4:
+		return "v4"
 	default:
 		return "unknown"
 	}
@@ -56,7 +66,7 @@ func (pv ProtocolVersion) String() string {
 
 // IsValid returns true if the protocol version is valid
 func (pv ProtocolVersion) IsValid() bool {
-	return pv == ProtocolVersionUnset || pv == ProtocolVersionV2 || pv == ProtocolVersionV3
+	return pv == ProtocolVersionUnset || pv == ProtocolVersionV2 || pv == ProtocolVersionV3 || pv == ProtocolVersionV4
 }
 
 // ParseProtocolVersion parses an integer to a ProtocolVersion
@@ -68,8 +78,10 @@ func ParseProtocolVersion(version int) (ProtocolVersion, error) {
 		return ProtocolVersionV2, nil
 	case 3:
 		return ProtocolVersionV3, nil
+	case 4:
+		return ProtocolVersionV4, nil
 	default:
-		return ProtocolVersionUnset, fmt.Errorf("invalid protocol version %d, only 0, 2 and 3 are supported", version)
+		return ProtocolVersionUnset, fmt.Errorf("invalid protocol version %d, only 0, 2, 3 and 4 are supported", version)
 	}
 }
 
@@ -79,6 +91,10 @@ func (pv ProtocolVersion) IsV2() bool {
 
 func (pv ProtocolVersion) IsV3() bool {
 	return pv == ProtocolVersionV3
+}
+
+func (pv ProtocolVersion) IsV4() bool {
+	return pv == ProtocolVersionV4
 }
 
 func (pv ProtocolVersion) IsUnset() bool {
@@ -99,7 +115,7 @@ type SubstreamsClientConfigOptions struct {
 	PlainText bool
 	// Agent is the User-Agent string for gRPC requests
 	Agent string
-	// ForceProtocolVersion forces the use of a specific protocol version (2 or 3)
+	// ForceProtocolVersion forces the use of a specific protocol version (2, 3 or 4)
 	ForceProtocolVersion ProtocolVersion
 }
 
@@ -243,6 +259,9 @@ func NewInternalClientFactory(config *SubstreamsClientConfig) InternalClientFact
 
 	noop := func() error { return nil }
 	cli, _, callOpts, headers, err := NewSubstreamsInternalClient(config)
+	if err != nil {
+		zlog.Error("failed to create substreams client", zap.Error(err))
+	}
 	return func() (pbssinternal.SubstreamsClient, func() error, []grpc.CallOption, Headers, error) {
 		return cli, noop, callOpts, headers, err
 	}
@@ -285,7 +304,10 @@ func NewSubstreamsInternalClient(config *SubstreamsClientConfig) (cli pbssintern
 		}
 	}
 
-	dialOptions = append(dialOptions, grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
+	if messageLimit, ok := getGRPCSizeLoggerFromEnv(); ok {
+		sizeHandler := dgrpc.NewSizeLoggingHandler(messageLimit, zlog)
+		dialOptions = append(dialOptions, grpc.WithStatsHandler(sizeHandler))
+	}
 
 	zlog.Debug("getting connection", zap.String("endpoint", endpoint))
 	conn, err := dgrpc.NewExternalClientConn(endpoint, dialOptions...)
@@ -354,12 +376,17 @@ func newConnection(config *SubstreamsClientConfig) (conn *grpc.ClientConn, close
 		}
 	}
 
-	dialOptions = append(dialOptions, grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
-	dialOptions = append(dialOptions, grpc.WithDefaultCallOptions(grpc.UseCompressor(gzip.Name)))
+	if messageLimit, ok := getGRPCSizeLoggerFromEnv(); ok {
+		sizeHandler := dgrpc.NewSizeLoggingHandler(messageLimit, zlog)
+		dialOptions = append(dialOptions, grpc.WithStatsHandler(sizeHandler))
+	}
+
+	dialOptions = append(dialOptions, grpc.WithDefaultCallOptions(grpc.UseCompressor(s2.Name)))
 	dialOptions = append(dialOptions, grpc.WithUserAgent(config.agent))
 
 	zlog.Debug("getting connection", zap.String("endpoint", endpoint))
 	conn, err = dgrpc.NewExternalClient(endpoint, dialOptions...)
+
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("unable to create external gRPC client: %w", err)
 	}
@@ -381,4 +408,21 @@ func newConnection(config *SubstreamsClientConfig) (conn *grpc.ClientConn, close
 
 func NewSubstreamsClientConn(config *SubstreamsClientConfig) (conn *grpc.ClientConn, closeFunc func() error, callOpts []grpc.CallOption, headers Headers, err error) {
 	return newConnection(config)
+}
+
+func getGRPCSizeLoggerFromEnv() (limit int, ok bool) {
+	messageLimitString := os.Getenv("GRPC_SIZE_LOGGER_MESSAGE_LIMIT")
+	if messageLimitString == "" {
+		return 0, false
+	}
+	messageLimit := 10000
+	var err error
+	if messageLimitString != "" {
+		messageLimit, err = strconv.Atoi(messageLimitString)
+		if err != nil {
+			zlog.Warn("failed to parse GRPC_SIZE_LOGGER_MESSAGE_LIMIT", zap.Error(err))
+			return 0, false
+		}
+	}
+	return messageLimit, true
 }

@@ -7,15 +7,14 @@
 package pbsubstreamsrpcv2
 
 import (
-	reflect "reflect"
-	sync "sync"
-	unsafe "unsafe"
-
 	v2 "github.com/streamingfast/pbgo/sf/firehose/v2"
 	v1 "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	anypb "google.golang.org/protobuf/types/known/anypb"
+	reflect "reflect"
+	sync "sync"
+	unsafe "unsafe"
 )
 
 const (

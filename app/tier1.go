@@ -6,14 +6,15 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 
-	"connectrpc.com/connect"
+	connectrpc "connectrpc.com/connect"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/blockstream"
 	"github.com/streamingfast/bstream/hub"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
-	dauth "github.com/streamingfast/dauth"
+	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/dsession"
 	"github.com/streamingfast/dstore"
@@ -21,11 +22,11 @@ import (
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/metrics"
-	pbsubstreamsrpcv2connect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcv2connect"
+	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	"github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcv2connect"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service"
 	"github.com/streamingfast/substreams/wasm"
-
 	_ "github.com/streamingfast/substreams/wasm/wasmtime"
 	"github.com/streamingfast/substreams/wasm/wazero"
 	"go.uber.org/atomic"
@@ -54,6 +55,7 @@ func NewDefaultTier1Config() *Tier1Config {
 		MaxSubrequests:        10,
 		StateBundleSize:       1000,
 		BlockExecutionTimeout: 1 * time.Minute,
+		OutputBufferSize:      100,
 	}
 }
 
@@ -86,7 +88,8 @@ type Tier1Config struct {
 	SubrequestsInsecure     bool
 	SubrequestsPlaintext    bool
 
-	SharedCacheSize uint64
+	SharedCacheSize  uint64
+	OutputBufferSize uint64 // Used to bundle execout messages within 'BlockScopedDatas' when using protocol V4
 
 	WASMExtensions wasm.WASMExtensioner
 	Tracing        bool
@@ -249,7 +252,7 @@ func (a *Tier1App) Run() error {
 		FoundationalStoreEndpoints: foundationalStoreEndpoints,
 	}
 
-	svc, err := service.NewTier1(
+	tier1Service, err := service.NewTier1(
 		a.logger,
 		mergedBlocksStore,
 		forkedBlocksStore,
@@ -267,6 +270,7 @@ func (a *Tier1App) Run() error {
 		a.config.ActiveRequestsSoftLimit,
 		a.config.ActiveRequestsHardLimit,
 		a.config.SharedCacheSize,
+		a.config.OutputBufferSize,
 		a.modules.SessionPool,
 		foundationalStoreEndpoints,
 		opts...,
@@ -275,14 +279,16 @@ func (a *Tier1App) Run() error {
 		return err
 	}
 
+	tier1ServiceConnect := service.NewService(tier1Service)
+
 	a.OnTerminating(func(err error) {
 		metrics.AppReadinessTier1.SetNotReady()
 
-		svc.Shutdown(err)
+		tier1Service.Shutdown(err)
 	})
 
 	go func() {
-		var infoServer pbsubstreamsrpcv2connect.EndpointInfoHandler
+		var infoServer pbsubstreamsrpcv2.EndpointInfoServer
 		if a.modules.InfoServer != nil {
 			a.logger.Info("waiting until info server is ready")
 			infoServer = &InfoServerWrapper{a.modules.InfoServer}
@@ -290,6 +296,12 @@ func (a *Tier1App) Run() error {
 				a.Shutdown(fmt.Errorf("cannot initialize info server: %w", err))
 				return
 			}
+		}
+
+		var infoServerConnect pbsubstreamsrpcv2connect.EndpointInfoHandler
+		if a.modules.InfoServer != nil {
+			infoServerConnect = &InfoServerConnectWrapper{a.modules.InfoServer}
+			a.logger.Info("info server ready")
 		}
 
 		if withLive {
@@ -305,7 +317,12 @@ func (a *Tier1App) Run() error {
 		a.logger.Info("launching gRPC server", zap.Bool("live_support", withLive))
 		a.setIsReady(true)
 
-		err := service.ListenTier1(a.config.GRPCListenAddr, svc, infoServer, a.modules.Authenticator, a.logger, a.HealthCheck)
+		addresses := strings.Split(a.config.GRPCListenAddr, ",")
+		if len(addresses) == 0 {
+			a.logger.Error("no gRPC listen addresses provided")
+			return
+		}
+		err := service.ListenTier1(addresses, tier1Service, tier1ServiceConnect, infoServer, infoServerConnect, a.modules.Authenticator, a.logger, a.HealthCheck, a.config.EnforceCompression)
 		a.Shutdown(err)
 	}()
 
@@ -349,17 +366,29 @@ func (config *Tier1Config) Validate() error {
 	return nil
 }
 
-var _ pbsubstreamsrpcv2connect.EndpointInfoHandler = (*InfoServerWrapper)(nil)
+var _ pbsubstreamsrpcv2.EndpointInfoServer = (*InfoServerWrapper)(nil)
 
 type InfoServerWrapper struct {
-	rpcInfoServer InfoServer
+	rpcInfoServer pbsubstreamsrpcv2.EndpointInfoServer
 }
 
 // Info implements pbsubstreamsrpcconnect.EndpointInfoHandler.
-func (i *InfoServerWrapper) Info(ctx context.Context, req *connect.Request[pbfirehose.InfoRequest]) (*connect.Response[pbfirehose.InfoResponse], error) {
+func (i *InfoServerWrapper) Info(ctx context.Context, req *pbfirehose.InfoRequest) (*pbfirehose.InfoResponse, error) {
+	resp, err := i.rpcInfoServer.Info(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+type InfoServerConnectWrapper struct {
+	rpcInfoServer pbsubstreamsrpcv2.EndpointInfoServer
+}
+
+func (i *InfoServerConnectWrapper) Info(ctx context.Context, req *connectrpc.Request[pbfirehose.InfoRequest]) (*connectrpc.Response[pbfirehose.InfoResponse], error) {
 	resp, err := i.rpcInfoServer.Info(ctx, req.Msg)
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(resp), nil
+	return connectrpc.NewResponse(resp), nil
 }

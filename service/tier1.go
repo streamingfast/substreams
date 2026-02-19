@@ -23,7 +23,6 @@ import (
 	"github.com/streamingfast/bstream/stream"
 	bsstream "github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dauth"
-	"github.com/streamingfast/dgrpc"
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/dsession"
@@ -40,8 +39,7 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/plan"
 	"github.com/streamingfast/substreams/orchestrator/work"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
-	pbsubstreamsrpcv2connect "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2/pbsubstreamsrpcv2connect"
-	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
+	pbsubstreamsrpcv4 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v4"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/pipeline/cache"
@@ -55,8 +53,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
-	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -64,7 +62,6 @@ var errShuttingDown = errors.New("endpoint is shutting down, please reconnect")
 
 type Tier1Service struct {
 	*shutter.Shutter
-	pbsubstreamsrpcv2connect.UnimplementedStreamHandler
 	activeRequestsWG sync.WaitGroup
 
 	blockType             string
@@ -84,13 +81,14 @@ type Tier1Service struct {
 	resolveCursor       pipeline.CursorResolver
 	getHeadBlock        func() (uint64, error)
 
-	enforceCompression      bool
-	activeRequestsSoftLimit int
-	activeRequestsHardLimit int
-	tier2RequestParameters  reqctx.Tier2RequestParameters
-	foundationalEndpoints   map[string]string
-	sessionPool             dsession.SessionPool
-	activeRequestsManager   *active_requests.ActiveRequestsManager // we keep a list of current requests for the debugAPI and to manage memory
+	enforceCompression       bool
+	activeRequestsSoftLimit  int
+	activeRequestsHardLimit  int
+	tier2RequestParameters   reqctx.Tier2RequestParameters
+	foundationalEndpoints    map[string]string
+	sessionPool              dsession.SessionPool
+	activeRequestsManager    *active_requests.ActiveRequestsManager // we keep a list of current requests for the debugAPI and to manage memory
+	execOutMessageBufferSize int
 }
 
 func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
@@ -157,6 +155,7 @@ func NewTier1(
 	activeRequestsSoftLimit int,
 	activeRequestsHardLimit int,
 	sharedCacheSize uint64,
+	outputBufferSize uint64,
 	sessionPool dsession.SessionPool,
 	foundationalEndpoints map[string]string,
 	opts ...Option,
@@ -199,21 +198,22 @@ func NewTier1(
 
 	logger.Info("launching tier1 service", zap.Reflect("client_config", substreamsClientConfig), zap.String("block_type", blockType), zap.Bool("with_live", hub != nil))
 	s := &Tier1Service{
-		Shutter:                 shutter.New(),
-		runtimeConfig:           runtimeConfig,
-		blockType:               blockType,
-		tracer:                  tracing.GetTracer(),
-		resolveCursor:           pipeline.NewCursorResolver(hub, mergedBlocksStore, forkedBlocksStore),
-		logger:                  logger,
-		appSetIsReadyState:      appSetIsReadyState,
-		tier2RequestParameters:  tier2RequestParameters,
-		blockExecutionTimeout:   3 * time.Minute,
-		enforceCompression:      enforceCompression,
-		activeRequestsSoftLimit: activeRequestsSoftLimit,
-		activeRequestsHardLimit: activeRequestsHardLimit,
-		foundationalEndpoints:   foundationalEndpoints,
-		sessionPool:             sessionPool,
-		activeRequestsManager:   active_requests.NewActiveRequestsManager(logger),
+		Shutter:                  shutter.New(),
+		runtimeConfig:            runtimeConfig,
+		blockType:                blockType,
+		tracer:                   tracing.GetTracer(),
+		resolveCursor:            pipeline.NewCursorResolver(hub, mergedBlocksStore, forkedBlocksStore),
+		logger:                   logger,
+		appSetIsReadyState:       appSetIsReadyState,
+		tier2RequestParameters:   tier2RequestParameters,
+		blockExecutionTimeout:    3 * time.Minute,
+		enforceCompression:       enforceCompression,
+		activeRequestsSoftLimit:  activeRequestsSoftLimit,
+		activeRequestsHardLimit:  activeRequestsHardLimit,
+		foundationalEndpoints:    foundationalEndpoints,
+		sessionPool:              sessionPool,
+		activeRequestsManager:    active_requests.NewActiveRequestsManager(logger),
+		execOutMessageBufferSize: int(outputBufferSize),
 	}
 	s.OnTerminating(func(_ error) {
 		s.activeRequestsWG.Wait()
@@ -287,56 +287,16 @@ func NewTier1(
 	return s, nil
 }
 
-func (s *Tier1Service) BlocksV3(
-	ctx context.Context,
-	req *connect.Request[pbsubstreamsrpcv3.Request],
-	stream *connect.ServerStream[pbsubstreamsrpc.Response],
-) error {
-	r := req.Msg
-
-	_, err := manifest.ApplyPackageTransformations(r.Package, false, r.Network, r.OutputModule, r.Params)
-	if err != nil {
-		return err
+func metadataToHeader(ctx context.Context) http.Header {
+	md, _ := metadata.FromIncomingContext(ctx)
+	h := http.Header{}
+	for k, vvs := range md {
+		hk := http.CanonicalHeaderKey(k)
+		for _, vv := range vvs {
+			h.Add(hk, vv)
+		}
 	}
-
-	ctx = reqctx.WithSpkg(ctx, r.Package) // passing by context is simpler for now, this could be cleaned up
-	reqV2, err := r.ToV2()
-	if err != nil {
-		return fmt.Errorf("failed to convert request to v2: %w", err)
-	}
-
-	return s.BlocksAny(ctx, reqV2, req.Header(), "/sf.substreams.rpc.v3.Stream/Blocks", r.Package, stream)
-}
-
-type usedStore struct {
-	Name string
-	Hash string
-}
-
-func (s *usedStore) MarshalLogObject(e zapcore.ObjectEncoder) error {
-	e.AddString("name", s.Name)
-	e.AddString("hash", s.Hash)
-	return nil
-}
-
-type UsedFoundationalStore struct {
-	Identifier string
-	ModuleHash string
-}
-
-func (s *UsedFoundationalStore) MarshalLogObject(e zapcore.ObjectEncoder) error {
-	e.AddString("identifier", s.Identifier)
-	e.AddString("module_hash", s.ModuleHash)
-
-	return nil
-}
-
-func (s *Tier1Service) Blocks(
-	ctx context.Context,
-	req *connect.Request[pbsubstreamsrpc.Request],
-	stream *connect.ServerStream[pbsubstreamsrpc.Response],
-) (serverErr error) {
-	return s.BlocksAny(ctx, req.Msg, req.Header(), "/sf.substreams.rpc.v2.Stream/Blocks", nil, stream)
+	return h
 }
 
 func (s *Tier1Service) BlocksAny(
@@ -345,13 +305,15 @@ func (s *Tier1Service) BlocksAny(
 	header http.Header,
 	protocol string,
 	pkg *pbsubstreams.Package,
-	stream *connect.ServerStream[pbsubstreamsrpc.Response],
-) (serverErr error) {
-
+	stream grpc.ServerStream,
+	supportBuffering bool,
+	logger *zap.Logger,
+) (runningCtx context.Context, serverErr error, blockErr error) {
 	if s.IsTerminating() {
 		serverErr = connect.NewError(connect.CodeUnavailable, errShuttingDown)
 		return
 	}
+
 	s.activeRequestsWG.Add(1)
 	defer func() {
 		if reason, countAsRejected := metrics.IsRejectedRequestError(serverErr); countAsRejected {
@@ -367,14 +329,12 @@ func (s *Tier1Service) BlocksAny(
 	// and not only the `grpcError` one which is a subset view of the full `err`.
 	var err error
 
-	logger := reqctx.Logger(ctx).Named("tier1")
-
 	envEthCallFallbackToLatestDuration := os.Getenv(EnvEthCallFallbackToLatestDuration)
 	fallbackDuration := time.Duration(0)
 	if envEthCallFallbackToLatestDuration != "" {
 		fallbackDuration, err = time.ParseDuration(envEthCallFallbackToLatestDuration)
 		if err != nil {
-			return fmt.Errorf("invalid value for env var %s: %w", EnvEthCallFallbackToLatestDuration, err)
+			return nil, fmt.Errorf("invalid value for env var %s: %w", EnvEthCallFallbackToLatestDuration, err), nil
 		}
 	}
 
@@ -383,7 +343,7 @@ func (s *Tier1Service) BlocksAny(
 	if envEthCallUseBlockNumberDuration != "" {
 		useBlockNumberDuration, err = time.ParseDuration(envEthCallUseBlockNumberDuration)
 		if err != nil {
-			return fmt.Errorf("invalid value for env var %s: %w", EnvEthCallUseBlockNumberDuration, err)
+			return nil, fmt.Errorf("invalid value for env var %s: %w", EnvEthCallUseBlockNumberDuration, err), nil
 		}
 	}
 
@@ -398,18 +358,12 @@ func (s *Tier1Service) BlocksAny(
 	ctx, span := reqctx.WithSpan(ctx, "substreams/tier1/request")
 	defer span.EndWithErr(&err)
 
-	var compressed bool
-	if matchHeader(header) {
-		compressed = true
-	}
-
 	fields := []zap.Field{
 		zap.String("protocol", protocol),
 		zap.Int64("start_block", request.StartBlockNum),
 		zap.Uint64("stop_block", request.StopBlockNum),
 		zap.String("cursor", request.StartCursor),
 		zap.String("output_module", request.OutputModule),
-		zap.Bool("compressed", compressed),
 		zap.Bool("final_blocks_only", request.FinalBlocksOnly),
 		zap.Bool("production_mode", request.ProductionMode),
 		zap.Bool("noop_mode", request.NoopMode),
@@ -417,18 +371,11 @@ func (s *Tier1Service) BlocksAny(
 		zap.Bool("partial_blocks", request.PartialBlocks),
 	}
 
-	if s.enforceCompression && !compressed {
-		err := connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("your client does not accept gzip- or zstd-compressed streams. Check how to enable it on your gRPC or ConnectRPC client"))
-		fields = append(fields, zap.Error(err))
-		logger.Info("refusing Substreams Blocks request", fields...)
-		return err
-	}
-
 	if request.Modules == nil {
 		err := connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("missing modules in request"))
 		fields = append(fields, zap.Error(err))
 		logger.Info("refusing Substreams Blocks request", fields...)
-		return err
+		return nil, err, nil
 	}
 
 	if auth := dauth.FromContext(ctx); auth != nil {
@@ -463,7 +410,7 @@ func (s *Tier1Service) BlocksAny(
 		err := connect.NewError(connect.CodeUnavailable, fmt.Errorf("service under heavy load, please try connecting again"))
 		fields = append(fields, zap.Error(err), zap.Int("active_request_count", stat.activeRequestCount), zap.Int("hard_limit", stat.hardLimit))
 		logger.Info("refusing Substreams Blocks request", fields...)
-		return err
+		return nil, err, nil
 	}
 
 	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules, bstream.GetProtocolFirstStreamableBlock)
@@ -471,7 +418,7 @@ func (s *Tier1Service) BlocksAny(
 		err := connect.NewError(connect.CodeInvalidArgument, err)
 		fields = append(fields, zap.Error(err))
 		logger.Info("refusing Substreams Blocks request", fields...)
-		return err
+		return nil, err, nil
 	}
 
 	outputModuleHash := execGraph.ModuleHashes()[request.OutputModule]
@@ -551,14 +498,14 @@ func (s *Tier1Service) BlocksAny(
 	if err := ValidateTier1Request(request, s.blockType); err != nil {
 		err := connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("validate request: %w", err))
 		logger.Info("refusing Substreams Blocks request", append(fields, zap.Error(err))...)
-		return err
+		return nil, err, nil
 	}
 
 	if envEthCallFallbackToLatestDuration != "" && hasEthCall(request.Modules.Binaries) {
 		if header.Get("X-substreams-acknowledge-non-deterministic") != "true" {
 			err := connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("header X-substreams-acknowledge-non-deterministic must be set to true when using eth_call or eth_get_balance on a non deterministic rpc provider"))
 			logger.Info("refusing Substreams Blocks request", append(fields, zap.Error(err))...)
-			return err
+			return nil, err, nil
 		}
 	}
 
@@ -590,26 +537,15 @@ func (s *Tier1Service) BlocksAny(
 
 	runningContext = reqctx.WithCancelFunc(runningContext, cancelRunning) // we pass this down so that the 'workerPool/requestPool' can cancel the running context
 
-	respFunc := tier1ResponseHandler(respContext, &mut, logger, stream, request.NoopMode, reqStats, request.DevOutputModules)
-	err = s.blocks(runningContext, cancelRunning, request, header, execGraph, respFunc, reqStats, fields)
+	respFunc := tier1ResponseHandler(respContext, &mut, logger, stream, request.NoopMode, reqStats, request.DevOutputModules, supportBuffering)
 
-	if connectError := toConnectError(runningContext, err); connectError != nil {
-		switch connect.CodeOf(connectError) {
-		case connect.CodeInternal:
-			logger.Warn("unexpected termination of stream of blocks", zap.String("stream_processor", "tier1"), zap.Error(err))
-		case connect.CodeInvalidArgument:
-			logger.Debug("invalid argument on request", zap.Error(connectError))
-		case connect.CodeCanceled:
-			logger.Debug("Blocks request canceled by user", zap.Error(connectError))
-		case connect.CodeResourceExhausted:
-			logger.Debug("Blocks request failed with ResourceExhausted", zap.Error(connectError))
-		default:
-			logger.Warn("Blocks request completed with error", zap.Error(connectError))
-		}
-		return connectError
+	err = s.blocks(runningContext, cancelRunning, request, header, execGraph, respFunc, reqStats, fields, supportBuffering, s.execOutMessageBufferSize)
+	if err != nil {
+		return runningContext, nil, err
 	}
+
 	logger.Debug("Blocks request completed without error")
-	return nil
+	return runningContext, nil, nil
 }
 
 // writePackage writes the spkg to the module cache if it doesn't exist:
@@ -666,7 +602,18 @@ func (s *Tier1Service) writeLastUsed(ctx context.Context, execGraph *exec.Graph,
 
 var IsValidCacheTag = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`).MatchString
 
-func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelCauseFunc, request *pbsubstreamsrpc.Request, header http.Header, execGraph *exec.Graph, respFunc substreams.ResponseFunc, reqStats *metrics.Stats, logFields []zap.Field) (err error) {
+func (s *Tier1Service) blocks(
+	ctx context.Context,
+	cancelRunning context.CancelCauseFunc,
+	request *pbsubstreamsrpc.Request,
+	header http.Header,
+	execGraph *exec.Graph,
+	respFunc substreams.ResponseFunc,
+	reqStats *metrics.Stats,
+	logFields []zap.Field,
+	supportBuffering bool,
+	execOutMessageBufferSize int,
+) (err error) {
 	chainFirstStreamableBlock := bstream.GetProtocolFirstStreamableBlock
 	if request.StartBlockNum > 0 && request.StartBlockNum < int64(chainFirstStreamableBlock) {
 		return bsstream.NewErrInvalidArg("invalid start block %d, must be >= %d (the first streamable block of the chain)", request.StartBlockNum, chainFirstStreamableBlock)
@@ -835,6 +782,8 @@ func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelC
 			return s.IsTerminating() // pipeline starts draining when the service is actually terminating, (after the global shutdown-signal-delay)
 		},
 		s.foundationalEndpoints,
+		execOutMessageBufferSize,
+		supportBuffering,
 		opts...,
 	)
 
@@ -891,6 +840,8 @@ func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelC
 			return err
 		}
 
+		logFields = append(logFields, zap.String("session_id", sessionID))
+
 		s.logger.Debug("acquired session", zap.String("session_id", sessionID))
 
 		// Pass sessionKey through context for WorkerPool
@@ -901,7 +852,6 @@ func (s *Tier1Service) blocks(ctx context.Context, cancelRunning context.CancelC
 			s.sessionPool.Release(sessionID)
 		}()
 	}
-
 	traceID := tracing.GetTraceID(ctx).String()
 
 	if s.activeRequestsManager != nil {
@@ -1088,7 +1038,16 @@ func configureLiveBackFillerFromQuickload(ctx context.Context, segmentSize uint6
 	return nil
 }
 
-func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logger, streamSrv *connect.ServerStream[pbsubstreamsrpc.Response], noop bool, stats *metrics.Stats, debugOutputForModules []string) substreams.ResponseFunc {
+func tier1ResponseHandler(
+	ctx context.Context,
+	mut *sync.Mutex,
+	logger *zap.Logger,
+	streamSrv grpc.ServerStream,
+	noop bool,
+	stats *metrics.Stats,
+	debugOutputForModules []string,
+	supportBuffering bool,
+) substreams.ResponseFunc {
 	auth := dauth.FromContext(ctx)
 	organizationID := auth.OrganizationID()
 	apiKeyID := auth.APIKeyID()
@@ -1112,8 +1071,8 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 		}
 	}
 
+	//var buffer []*pbsubstreamsrpc.BlockScopedData
 	return func(respAny substreams.ResponseFromAnyTier) error {
-		resp := respAny.(*pbsubstreamsrpc.Response)
 		mut.Lock()
 		defer mut.Unlock()
 
@@ -1122,38 +1081,30 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 			return ctx.Err()
 		}
 
-		var isData bool
-		if data := resp.GetBlockScopedData(); data != nil {
-			isData = true
-			if noop {
-				data.DebugMapOutputs = nil
-				data.DebugStoreOutputs = nil
-				data.Output = &pbsubstreamsrpc.MapModuleOutput{}
-			}
-			if debugOutputs != nil {
-				// Filter DebugMapOutputs
-				var filteredMapOutputs []*pbsubstreamsrpc.MapModuleOutput
-				for _, output := range data.DebugMapOutputs {
-					if _, exists := debugOutputs[output.Name]; exists {
-						filteredMapOutputs = append(filteredMapOutputs, output)
-					}
-				}
-				data.DebugMapOutputs = filteredMapOutputs
+		isData := false
 
-				// Filter DebugStoreOutputs
-				var filteredStoreOutputs []*pbsubstreamsrpc.StoreModuleOutput
-				for _, output := range data.DebugStoreOutputs {
-					if _, exists := debugOutputs[output.Name]; exists {
-						filteredStoreOutputs = append(filteredStoreOutputs, output)
-					}
+		switch r := respAny.(type) {
+		case *pbsubstreamsrpc.Response:
+			d := r.GetBlockScopedData()
+			if d != nil {
+				if supportBuffering {
+					return fmt.Errorf("receive a single block scoped data response, but supportBuffering is enabled")
 				}
-				data.DebugStoreOutputs = filteredStoreOutputs
+				isData = true
+				filterData(d, noop, debugOutputs)
+			}
+		case *pbsubstreamsrpcv4.Response:
+			for _, d := range r.GetBlockScopedDatas().Items {
+				if d != nil {
+					isData = true
+					filterData(d, noop, debugOutputs)
+				}
 			}
 		}
-		egressBytes := proto.Size(resp)
 
+		egressBytes := proto.Size(respAny.(proto.Message))
 		begin := time.Now()
-		if err := streamSrv.Send(resp); err != nil {
+		if err := streamSrv.SendMsg(respAny); err != nil {
 			logger.Info("unable to send block probably due to client disconnecting", zap.String("user_id", organizationID), zap.String("api_key_id", apiKeyID), zap.Error(err))
 			return connect.NewError(connect.CodeUnavailable, err)
 		}
@@ -1167,6 +1118,33 @@ func tier1ResponseHandler(ctx context.Context, mut *sync.Mutex, logger *zap.Logg
 
 		metericsSender.Send(ctx, organizationID, apiKeyID, ip, userMeta, outputModuleHash, endpoint)
 		return nil
+	}
+}
+
+func filterData(data *pbsubstreamsrpc.BlockScopedData, noop bool, debugOutputs map[string]struct{}) {
+	if noop {
+		data.DebugMapOutputs = nil
+		data.DebugStoreOutputs = nil
+		data.Output = &pbsubstreamsrpc.MapModuleOutput{}
+	}
+	if debugOutputs != nil {
+		// Filter DebugMapOutputs
+		var filteredMapOutputs []*pbsubstreamsrpc.MapModuleOutput
+		for _, output := range data.DebugMapOutputs {
+			if _, exists := debugOutputs[output.Name]; exists {
+				filteredMapOutputs = append(filteredMapOutputs, output)
+			}
+		}
+		data.DebugMapOutputs = filteredMapOutputs
+
+		// Filter DebugStoreOutputs
+		var filteredStoreOutputs []*pbsubstreamsrpc.StoreModuleOutput
+		for _, output := range data.DebugStoreOutputs {
+			if _, exists := debugOutputs[output.Name]; exists {
+				filteredStoreOutputs = append(filteredStoreOutputs, output)
+			}
+		}
+		data.DebugStoreOutputs = filteredStoreOutputs
 	}
 }
 
@@ -1272,114 +1250,6 @@ func setupRequestStats(ctx context.Context, outputModuleName, outputModuleHash s
 		ProductionMode:   productionMode,
 	}, execGraph.Stores(), execGraph.ModuleHashes(), logger)
 	return reqctx.WithReqStats(ctx, stats), stats
-}
-
-// toConnectError turns an `err` into a connect error if it's non-nil, in the `nil` case,
-// `nil` is returned right away.
-//
-// If the `err` has in its chain of error either `context.Canceled`, `context.DeadlineExceeded`
-// or `stream.ErrInvalidArg`, error is turned into a proper connect error respectively of code
-// `Canceled`, `DeadlineExceeded` or `InvalidArgument`.
-//
-// If the `err` has in its chain any error constructed through `connect.NewError` (and its variants), then
-// we return the first found error of such type directly, because it's already a connect error.
-//
-// If the `err` has in its chain any error constructed through `grpc` or `status`, it will be converted to connect equivalent.
-//
-// Otherwise, the error is assumed to be an internal error and turned backed into a proper
-// `connect.NewError(connect.CodeInternal, err)`.
-func toConnectError(ctx context.Context, err error) error {
-	if err == nil {
-		return nil
-	}
-
-	if errors.Is(err, context.Canceled) {
-		if contextCause := context.Cause(ctx); contextCause != nil {
-			err = contextCause // unwrap errors in canceled contexts
-			if errors.Is(err, context.Canceled) {
-				return connect.NewError(connect.CodeCanceled, err)
-			}
-		} else {
-			return connect.NewError(connect.CodeCanceled, err)
-		}
-	}
-
-	if err, ok := dsession.ToConnectError(err); ok {
-		return err
-	}
-	// special case for context canceled when shutting down
-	if err == errShuttingDown {
-		return connect.NewError(connect.CodeUnavailable, err)
-	}
-
-	// GRPC to connect error
-	if grpcError := dgrpc.AsGRPCError(err); grpcError != nil {
-		switch grpcError.Code() {
-		case codes.Canceled:
-			return connect.NewError(connect.CodeCanceled, errors.New(grpcError.Message()))
-		case codes.Unavailable:
-			return connect.NewError(connect.CodeUnavailable, errors.New(grpcError.Message()))
-		case codes.InvalidArgument:
-			return connect.NewError(connect.CodeInvalidArgument, errors.New(grpcError.Message()))
-		case codes.DeadlineExceeded:
-			return connect.NewError(connect.CodeDeadlineExceeded, err)
-		case codes.ResourceExhausted:
-			return connect.NewError(connect.CodeResourceExhausted, errors.New(grpcError.Message()))
-		case codes.Unknown:
-			return connect.NewError(connect.CodeUnknown, errors.New(grpcError.Message()))
-		}
-		return grpcError.Err()
-	}
-
-	// special case for "QuickSave" on shutdown
-	if err == pipeline.ErrShuttingDown {
-		return connect.NewError(connect.CodeUnavailable, err)
-	}
-
-	// context deadline exceeded
-	if errors.Is(err, context.DeadlineExceeded) {
-		return connect.NewError(connect.CodeDeadlineExceeded, err)
-	}
-
-	if errors.Is(err, wasm.ErrWasmDeterministicExec) || errors.Is(err, store.ErrStoreAboveMaxSize) {
-		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("%w (deterministic error)", err))
-	}
-
-	var errInvalidArg *bsstream.ErrInvalidArg
-	if errors.As(err, &errInvalidArg) {
-		return connect.NewError(connect.CodeInvalidArgument, errInvalidArg)
-	}
-
-	connectError := new(connect.Error)
-	if errors.As(err, &connectError) {
-		return connectError
-	}
-
-	// Do we want to print the full cause as coming from Golang? Would we like to maybe trim off "operational"
-	// data?
-	return connect.NewError(connect.CodeInternal, err)
-}
-
-// must be lowercase
-var compressionHeader = map[string]map[string]bool{
-	"grpc-accept-encoding":    {"gzip": true, "zstd": true},
-	"connect-accept-encoding": {"gzip": true, "zstd": true},
-	"accept-encoding":         {"gzip": true}, // HTTP encoding for connect+proto in browser
-}
-
-func matchHeader(header http.Header) bool {
-	for k, v := range header {
-		if validEncodings, ok := compressionHeader[strings.ToLower(k)]; ok {
-			for _, vv := range v {
-				for _, vvv := range strings.Split(vv, ",") {
-					if validEncodings[strings.TrimSpace(strings.ToLower(vvv))] {
-						return true
-					}
-				}
-			}
-		}
-	}
-	return false
 }
 
 type overloadingStatus struct {

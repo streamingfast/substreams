@@ -83,6 +83,7 @@
 * [CLI Reference](references/cli/command-line-interface.md)
 * Core Concepts
   * [Architecture & Parallel Execution](references/architecture.md)
+  * [RPC Protocol](references/rpc-protocol.md)
   * [Foundational Stores](references/foundational-store-reference.md)
   * [Module Concepts](references/substreams-components/modules/modules.md)
   * [Module Caching](references/module-caching.md)

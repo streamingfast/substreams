@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package sf.substreams.rpc.v4;
+
+import "google/protobuf/any.proto";
+import "sf/firehose/v2/firehose.proto";
+import "sf/substreams/rpc/v2/service.proto";
+import "sf/substreams/rpc/v3/service.proto";
+import "sf/substreams/v1/clock.proto";
+import "sf/substreams/v1/modules.proto";
+import "sf/substreams/v1/package.proto";
+
+option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v4;pbsubstreamsrpcv4";
+
+service Stream {
+  // Request processing of blocks via substreams engine.
+  // Similar to `sf.substreams.rpc.v2.Stream/Blocks` request, but:
+  //   - the full spkg package is sent instead of just the modules
+  //   - 'params' and 'network' fields are sent to apply the user-defined params to the package server-side
+  // Responses are identical to those of the v2 request.
+  rpc Blocks(sf.substreams.rpc.v3.Request) returns (stream Response);
+}
+
+
+message Response {
+  oneof message {
+    sf.substreams.rpc.v2.SessionInit session = 1; // Always sent first
+    sf.substreams.rpc.v2.ModulesProgress progress = 2; // Progress of data preparation, before sending in the stream of `data` events.
+
+    BlockScopedDatas block_scoped_datas = 3;
+    sf.substreams.rpc.v2.BlockUndoSignal block_undo_signal = 4;
+    sf.substreams.rpc.v2.Error fatal_error = 5;
+
+    // Available only in developer mode, and only if `debug_initial_store_snapshot_for_modules` is set.
+    sf.substreams.rpc.v2.InitialSnapshotData debug_snapshot_data = 10;
+    // Available only in developer mode, and only if `debug_initial_store_snapshot_for_modules` is set.
+    sf.substreams.rpc.v2.InitialSnapshotComplete debug_snapshot_complete = 11;
+
+    // previously used in partial alpha tests = 12;
+  }
+}
+
+message BlockScopedDatas {
+  repeated sf.substreams.rpc.v2.BlockScopedData items = 1;
+}
+

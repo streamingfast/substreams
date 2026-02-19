@@ -2,13 +2,13 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             (unknown)
-// source: sf/substreams/rpc/v3/service.proto
+// source: sf/substreams/rpc/v4/service.proto
 
-package pbsubstreamsrpcv3
+package pbsubstreamsrpcv4
 
 import (
 	context "context"
-	v2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	v3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -20,7 +20,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Stream_Blocks_FullMethodName = "/sf.substreams.rpc.v3.Stream/Blocks"
+	Stream_Blocks_FullMethodName = "/sf.substreams.rpc.v4.Stream/Blocks"
 )
 
 // StreamClient is the client API for Stream service.
@@ -33,7 +33,7 @@ type StreamClient interface {
 	//   - 'params' and 'network' fields are sent to apply the user-defined params to the package server-side
 	//
 	// Responses are identical to those of the v2 request.
-	Blocks(ctx context.Context, in *Request, opts ...grpc.CallOption) (grpc.ServerStreamingClient[v2.Response], error)
+	Blocks(ctx context.Context, in *v3.Request, opts ...grpc.CallOption) (grpc.ServerStreamingClient[Response], error)
 }
 
 type streamClient struct {
@@ -44,13 +44,13 @@ func NewStreamClient(cc grpc.ClientConnInterface) StreamClient {
 	return &streamClient{cc}
 }
 
-func (c *streamClient) Blocks(ctx context.Context, in *Request, opts ...grpc.CallOption) (grpc.ServerStreamingClient[v2.Response], error) {
+func (c *streamClient) Blocks(ctx context.Context, in *v3.Request, opts ...grpc.CallOption) (grpc.ServerStreamingClient[Response], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &Stream_ServiceDesc.Streams[0], Stream_Blocks_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[Request, v2.Response]{ClientStream: stream}
+	x := &grpc.GenericClientStream[v3.Request, Response]{ClientStream: stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func (c *streamClient) Blocks(ctx context.Context, in *Request, opts ...grpc.Cal
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type Stream_BlocksClient = grpc.ServerStreamingClient[v2.Response]
+type Stream_BlocksClient = grpc.ServerStreamingClient[Response]
 
 // StreamServer is the server API for Stream service.
 // All implementations should embed UnimplementedStreamServer
@@ -73,7 +73,7 @@ type StreamServer interface {
 	//   - 'params' and 'network' fields are sent to apply the user-defined params to the package server-side
 	//
 	// Responses are identical to those of the v2 request.
-	Blocks(*Request, grpc.ServerStreamingServer[v2.Response]) error
+	Blocks(*v3.Request, grpc.ServerStreamingServer[Response]) error
 }
 
 // UnimplementedStreamServer should be embedded to have
@@ -83,7 +83,7 @@ type StreamServer interface {
 // pointer dereference when methods are called.
 type UnimplementedStreamServer struct{}
 
-func (UnimplementedStreamServer) Blocks(*Request, grpc.ServerStreamingServer[v2.Response]) error {
+func (UnimplementedStreamServer) Blocks(*v3.Request, grpc.ServerStreamingServer[Response]) error {
 	return status.Errorf(codes.Unimplemented, "method Blocks not implemented")
 }
 func (UnimplementedStreamServer) testEmbeddedByValue() {}
@@ -107,21 +107,21 @@ func RegisterStreamServer(s grpc.ServiceRegistrar, srv StreamServer) {
 }
 
 func _Stream_Blocks_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(Request)
+	m := new(v3.Request)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(StreamServer).Blocks(m, &grpc.GenericServerStream[Request, v2.Response]{ServerStream: stream})
+	return srv.(StreamServer).Blocks(m, &grpc.GenericServerStream[v3.Request, Response]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type Stream_BlocksServer = grpc.ServerStreamingServer[v2.Response]
+type Stream_BlocksServer = grpc.ServerStreamingServer[Response]
 
 // Stream_ServiceDesc is the grpc.ServiceDesc for Stream service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var Stream_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "sf.substreams.rpc.v3.Stream",
+	ServiceName: "sf.substreams.rpc.v4.Stream",
 	HandlerType: (*StreamServer)(nil),
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
@@ -131,5 +131,5 @@ var Stream_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "sf/substreams/rpc/v3/service.proto",
+	Metadata: "sf/substreams/rpc/v4/service.proto",
 }

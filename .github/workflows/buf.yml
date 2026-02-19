@@ -13,7 +13,7 @@ on:
 jobs:
   buf:
     runs-on: ubuntu-24.04
-    if: "${{ !startsWith(github.event.head_commit.message, 'GitBook: [#') }}"
+    if: "${{ github.event.head_commit == null || !startsWith(github.event.head_commit.message, 'GitBook: [#') }}"
     permissions:
       contents: read
 
@@ -43,18 +43,7 @@ jobs:
         env:
           BUF_TOKEN: ${{ secrets.BUF_TOKEN }}
         run: |
-          ARGS=""
-
-          # Use --draft for non-tag pushes
-          if [[ ! "$GITHUB_REF" =~ ^refs/tags/v ]]; then
-            ARGS="--draft"
-          fi
-
-          # Add --label with the tag name for tag pushes
-          if [[ "$GITHUB_REF" =~ ^refs/tags/ ]]; then
-            TAG_NAME="${GITHUB_REF#refs/tags/}"
-            ARGS="$ARGS --label $TAG_NAME"
-          fi
-
-          echo "Running: buf push proto $ARGS"
-          buf push proto $ARGS
+          # --git-metadata automatically sets labels based on git branches/tags
+          # and source-control-url from the git remote
+          echo "Running: buf push proto --git-metadata"
+          buf push proto --git-metadata

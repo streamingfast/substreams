@@ -105,41 +105,46 @@ func (i flagsInclusion) IsExplicitlyExcluded(flag string) bool {
 // # Default Inclusion
 //
 // Added by default: [FlagEndpoint], [FlagStartBlock], [FlagStopBlock], [FlagNetwork], [FlagParams],
-// [FlagInsecure], [FlagPlaintext], [FlagUndoBufferSize], [FlagLiveBlockTimeDelta], [FlagDevelopmentMode],
-// [FlagFinalBlocksOnly], [FlagMaxRetries], [FlagSkipPackageValidation], [FlagExtraHeaders],
-// [FlagAPIKeyEnvvar], [FlagAPITokenEnvvar], [FlagProtoPath], [FlagProtoDescriptorSet], [FlagPrometheusAddr]
+// [FlagInsecure], [FlagPlaintext], [FlagForceProtocolVersion], [FlagUndoBufferSize], [FlagLiveBlockTimeDelta],
+// [FlagDevelopmentMode], [FlagNoopMode], [FlagFinalBlocksOnly], [FlagMaxRetries], [FlagSkipPackageValidation],
+// [FlagExtraHeaders], [FlagAPIKeyEnvvar], [FlagAPITokenEnvvar], [FlagProtoPath], [FlagProtoDescriptorSet],
+// [FlagPrometheusAddr]
 //
 // To avoid adding a default included flag, use [FlagExcludeDefault(<flag>, ...)].
 //
 // # Possible Inclusion
 //
-// Not added by default but can be explicitly included: [FlagCursor].
+// Not added by default but can be explicitly included: [FlagCursor], [FlagSkipCheckModuleBinariesExist],
+// [FlagPartialBlocks].
 //
 // You add those flags by using [FlagIncludeOptional(<flag>, ...)].
 //
 // # Reference Table
 //
-//	[FlagEndpoint]: `--endpoint` (-e) (defaults `""`)
-//	[FlagStartBlock]: `--start-block` (-s) (defaults `""`)
-//	[FlagStopBlock]: `--stop-block` (-t) (defaults `""`)
-//	[FlagCursor]: `--cursor` (-c) (defaults `""`)
-//	[FlagNetwork]: `--network` (defaults `""`)
-//	[FlagParams]: `--params` (-p) (defaults `[]`)
-//	[FlagInsecure]: `--insecure` (defaults `false`)
-//	[FlagPlaintext]: `--plaintext` (defaults `false`)
-//	[FlagUndoBufferSize]: `--undo-buffer-size` (defaults `12`)
-//	[FlagLiveBlockTimeDelta]: `--live-block-time-delta` (defaults `300*time.Second`)
-//	[FlagDevelopmentMode]: `--development-mode` (defaults `false`)
-//	[FlagNoopMode]: `--noop-mode` (defaults `false`)
-//	[FlagFinalBlocksOnly]: `--final-blocks-only` (defaults `false`)
-//	[FlagMaxRetries]: `--max-retries` (defaults `3`)
-//	[FlagSkipPackageValidation]: `--skip-package-validation` (defaults `false`)
-//	[FlagExtraHeaders]: `--header` (-H) (defaults `[]`)
-//	[FlagAPIKeyEnvvar]: `--api-key-envvar` (default `SUBSTREAMS_API_KEY`)
-//	[FlagAPITokenEnvvar]: `--api-token-envvar` (default `SUBSTREAMS_API_TOKEN`)
-//	[FlagProtoPath]: `--proto-path` (defaults `""`)
-//	[FlagProtoDescriptorSet]: `--proto-descriptor-set` (defaults `""`)
-//	[FlagPrometheusAddr]: `--prometheus-addr` (defaults `""`)
+//	FlagEndpoint: `--endpoint` (-e) (defaults `""`)
+//	FlagStartBlock: `--start-block` (-s) (defaults `""`)
+//	FlagStopBlock: `--stop-block` (-t) (defaults `"0"`)
+//	FlagCursor: `--cursor` (-c) (defaults `""`)
+//	FlagNetwork: `--network` (defaults `""`)
+//	FlagParams: `--params` (-p) (defaults `[]`)
+//	FlagInsecure: `--insecure` (defaults `false`)
+//	FlagPlaintext: `--plaintext` (defaults `false`)
+//	FlagForceProtocolVersion: `--force-protocol-version` (defaults `0`)
+//	FlagUndoBufferSize: `--undo-buffer-size` (defaults `0`)
+//	FlagLiveBlockTimeDelta: `--live-block-time-delta` (defaults `0`)
+//	FlagDevelopmentMode: `--development-mode` (defaults `false`)
+//	FlagNoopMode: `--noop-mode` (defaults `false`)
+//	FlagFinalBlocksOnly: `--final-blocks-only` (defaults `false`)
+//	FlagMaxRetries: `--max-retries` (defaults `3`)
+//	FlagSkipPackageValidation: `--skip-package-validation` (defaults `false`)
+//	FlagPartialBlocks: `--partial-blocks` (defaults `false`)
+//	FlagSkipCheckModuleBinariesExist: `--skip-check-module-binaries-exist` (defaults `true`)
+//	FlagExtraHeaders: `--header` (-H) (defaults `[]`)
+//	FlagAPIKeyEnvvar: `--api-key-envvar` (default `SUBSTREAMS_API_KEY`)
+//	FlagAPITokenEnvvar: `--api-token-envvar` (default `SUBSTREAMS_API_TOKEN`)
+//	FlagProtoPath: `--proto-path` (defaults `""`)
+//	FlagProtoDescriptorSet: `--proto-descriptor-set` (defaults `""`)
+//	FlagPrometheusAddr: `--prometheus-addr` (defaults `"localhost:9102"`)
 func AddFlagsToSet(flags *pflag.FlagSet, ignore ...FlagInclusionExclusion) {
 	defaultFlagIncluded := func(x string) bool {
 		return every(ignore, func(e FlagInclusionExclusion) bool { return !e.IsExplicitlyExcluded(x) })

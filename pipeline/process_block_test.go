@@ -98,6 +98,25 @@ func TestHandleStepPartial(t *testing.T) {
 			},
 		},
 		{
+			name: "bstream test output: undo partial scenario 3",
+			blocks: []blockWithStep{
+				withStepNew(testBlock(3, "3a")),
+				withStepNew(testPartialBlock(4, "4b", 2, false)),
+				withStepNew(testBlock(4, "4b")),
+				withStepUndo(testBlock(4, "4b"), 3, "3a"),
+				withStepNew(testBlock(4, "4a")),
+				withStepNew(testPartialBlock(5, "5b", 1, false)),
+			},
+			expectedResponses: []substreamsResp{
+				dataResp(3, "3a"),
+				partialDataResp(4, "4b", 2, false),
+				partialDataResp(4, "4b", 3, true),
+				undoResp(3, "3a"),
+				dataResp(4, "4a"),
+				partialDataResp(5, "5b", 1, false),
+			},
+		},
+		{
 			name: "bstream test output: undo incomplete partialblock sequence",
 			blocks: []blockWithStep{
 				withStepNew(testBlock(3, "3a")),

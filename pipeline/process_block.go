@@ -130,6 +130,26 @@ func (p *Pipeline) processBlock(
 			}
 		}
 
+	case bstream.StepNewPartial:
+		p.blockStepMap[bstream.StepNewPartial]++
+		if reqctx.PartialBlocks(ctx) {
+			if err := p.handleStepPartial(ctx, clock, cursor, execOutput, partialIndex, isLastPartial); err != nil {
+				if err == io.EOF {
+					eof = true
+				} else {
+					return fmt.Errorf("step partial: %w", err)
+				}
+			}
+		} else {
+			if err := p.handleStepNew(ctx, clock, cursor, execOutput, false); err != nil {
+				if err == io.EOF {
+					eof = true
+				} else {
+					return fmt.Errorf("step new: %w", err)
+				}
+			}
+		}
+
 	case bstream.StepUndoPartial:
 		if reqctx.PartialBlocks(ctx) {
 			p.blockStepMap[bstream.StepUndoPartial]++
@@ -310,6 +330,11 @@ func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
 }
 
 func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput, idx int32, isLast bool) (err error) {
+	if p.lastProcessedBlockRef != nil && clock.Number <= p.lastProcessedBlockRef.Num() {
+		// this can happen if we got the full block and used it as the 'last partial block'
+		return nil
+	}
+
 	if p.partialProcessingState != nil {
 		if clock.Id == p.partialProcessingState.lastBlockID && !isLast {
 			return nil // same hash: nothing new to process. We only send this 'empty' partial block if it is the last
@@ -359,6 +384,8 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 		p.forkHandler.joinReversibleOutputs(clock, p.partialProcessingState.processedPartials)
 		p.partialProcessingState = nil
 		p.previousLastPartialBlock = bstream.NewBlockRef(clock.Id, clock.Number)
+		p.lastProcessedBlockRef = p.previousLastPartialBlock // acts as new
+		p.lastCursor = cursor
 	} else {
 		p.partialProcessingState.processedTransactionsHash = txsHash
 		p.partialProcessingState.processedTransactionsCount = txCount
@@ -455,22 +482,30 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 
 	if withPartialBlocks {
 
-		if p.previousLastPartialBlock != nil {
-			if clock.Number <= p.previousLastPartialBlock.Num() {
+		if p.previousLastPartialBlock != nil && clock.Number <= p.previousLastPartialBlock.Num() {
 
-				// extra check, but forkDB should prevent this
-				if clock.Number == p.previousLastPartialBlock.Num() && p.previousLastPartialBlock.ID() != clock.Id {
-					return fmt.Errorf("received new block with the same number as the previous last partial block (%d), but different ID (%q, expected %q). expected an UNDO", clock.Number, clock.Id, p.previousLastPartialBlock.ID())
-				}
-
-				// all good, this 'new' block can be ignored, it is older than our previous last partial block
-				p.lastProcessedBlockRef = bstream.NewBlockRef(clock.Id, clock.Number)
-				p.lastCursor = cursor
-				return nil
+			// extra check, but forkDB should prevent this
+			if clock.Number == p.previousLastPartialBlock.Num() && p.previousLastPartialBlock.ID() != clock.Id {
+				return fmt.Errorf("received new block with the same number as the previous last partial block (%d), but different ID (%q, expected %q). expected an UNDO", clock.Number, clock.Id, p.previousLastPartialBlock.ID())
 			}
+
+			// all good, this 'new' block can be ignored, it is older than our previous last partial block
+			p.lastProcessedBlockRef = bstream.NewBlockRef(clock.Id, clock.Number)
+			p.lastCursor = cursor
+			return nil
 		}
 
 		if p.partialProcessingState != nil {
+			if p.partialProcessingState.num == clock.Number && p.partialProcessingState.lastBlockID == clock.Id {
+				// all good, this 'new' block will be used as a 'last partial block'
+
+				if err := p.handleStepPartial(ctx, clock, cursor, execOutput, p.partialProcessingState.highestIndex+1, true); err != nil {
+					return err
+				}
+
+				return nil
+			}
+
 			prevLastPartial := "nil"
 			if p.previousLastPartialBlock != nil {
 				prevLastPartial = p.previousLastPartialBlock.String()

@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/streamingfast/bstream"
@@ -26,6 +27,94 @@ func TestHandleStepPartial(t *testing.T) {
 		expectedResponses []substreamsResp
 	}{
 		{
+			name: "bstream test output: happy path with partial block",
+			blocks: []blockWithStep{
+				withStepNew(testBlock(3, "3a")),
+				withStepNew(testPartialBlock(4, "4b", 1, false)),
+				withStepNew(testPartialBlock(4, "4a", 3, true)),
+				withStepNew(testBlock(5, "5a")),
+			},
+			expectedResponses: []substreamsResp{
+				dataResp(3, "3a"),
+				partialDataResp(4, "4b", 1, false),
+				partialDataResp(4, "4a", 3, true),
+				dataResp(5, "5a"),
+			},
+		},
+		{
+			name: "bstream test output: undo wrong lastPartialBlock",
+			blocks: []blockWithStep{
+				withStepNew(testBlock(3, "3a")),
+				withStepNew(testPartialBlock(4, "4b", 1, false)),
+				withStepNew(testPartialBlock(4, "4c", 3, true)),
+				withStepUndo(testPartialBlock(4, "4c", 3, true), 3, "3a"),
+				withStepNew(testBlock(4, "4a")),
+				withStepNew(testBlock(5, "5a")),
+			},
+			expectedResponses: []substreamsResp{
+				dataResp(3, "3a"),
+				partialDataResp(4, "4b", 1, false),
+				partialDataResp(4, "4c", 3, true),
+				undoResp(3, "3a"),
+				dataResp(4, "4a"),
+				dataResp(5, "5a"),
+			},
+		},
+
+		{
+			name: "bstream test output: undo partial scenario",
+			blocks: []blockWithStep{
+				withStepNew(testBlock(3, "3a")),
+				withStepNew(testPartialBlock(4, "4a", 3, true)),
+				withStepNew(testPartialBlock(5, "5b", 1, false)),
+				withStepUndo(testPartialBlock(5, "5b", 3, true), 4, "4a"),
+				withStepNew(testBlock(5, "5a")),
+			},
+			expectedResponses: []substreamsResp{
+				dataResp(3, "3a"),
+				partialDataResp(4, "4a", 3, true),
+				partialDataResp(5, "5b", 1, false),
+				undoResp(4, "4a"),
+				dataResp(5, "5a"),
+			},
+		},
+		{
+			name: "bstream test output: undo partial scenario 2",
+			blocks: []blockWithStep{
+				withStepNew(testBlock(3, "3a")),
+				withStepNew(testPartialBlock(4, "4b", 2, false)),
+				withStepNew(testPartialBlock(4, "4a", 3, false)),
+				withStepNew(testBlock(4, "4a")),
+				withStepNew(testPartialBlock(5, "5b", 1, false)),
+				withStepNew(testPartialBlock(5, "5a", 3, true)),
+			},
+			expectedResponses: []substreamsResp{
+				dataResp(3, "3a"),
+				partialDataResp(4, "4b", 2, false),
+				partialDataResp(4, "4a", 3, false),
+				partialDataResp(4, "4a", 4, true), // triggered by the real testBlock(4a), bumped the index
+				partialDataResp(5, "5b", 1, false),
+				partialDataResp(5, "5a", 3, true),
+			},
+		},
+		{
+			name: "bstream test output: undo incomplete partialblock sequence",
+			blocks: []blockWithStep{
+				withStepNew(testBlock(3, "3a")),
+				withStepNew(testPartialBlock(4, "4b", 2, false)),
+				withStepUndo(testPartialBlock(4, "4b", 3, false), 3, "3a"),
+				withStepNew(testBlock(4, "4a")),
+				withStepNew(testBlock(5, "5a")),
+			},
+			expectedResponses: []substreamsResp{
+				dataResp(3, "3a"),
+				partialDataResp(4, "4b", 2, false),
+				undoResp(3, "3a"),
+				dataResp(4, "4a"),
+				dataResp(5, "5a"),
+			},
+		},
+		{
 			name: "partials with lastPartial, a few full blocks",
 			blocks: []blockWithStep{
 				withStepNew(testPartialBlock(1, "1x", 3, false)),
@@ -42,6 +131,22 @@ func TestHandleStepPartial(t *testing.T) {
 				dataResp(2, "2b"),
 				undoResp(1, "1a"),
 				dataResp(2, "2a"),
+			},
+		},
+		{
+			name: "partials with real block equal to previous partial that is was not yet LastPartial",
+			blocks: []blockWithStep{
+				withStepNew(testBlock(1, "1a")),                  // 1a
+				withStepNew(testPartialBlock(2, "2x", 3, false)), // p:2x
+				withStepNew(testPartialBlock(2, "2a", 4, false)), // p:2a
+				withStepNew(testBlock(2, "2a")),                  // p:2a(last)
+				withStepNew(testPartialBlock(2, "2a", 4, true)),  // noop (redundant)
+			},
+			expectedResponses: []substreamsResp{
+				dataResp(1, "1a"),
+				partialDataResp(2, "2x", 3, false),
+				partialDataResp(2, "2a", 4, false),
+				partialDataResp(2, "2a", 5, true),
 			},
 		},
 		{
@@ -137,7 +242,7 @@ func TestHandleStepPartial(t *testing.T) {
 				switch blk.step {
 				case bstream.StepNew:
 					err = pipe.handleStepNew(ctx, clock, testCursor(blk.blk, blk.step), execOutput, false)
-				case bstream.StepPartial:
+				case bstream.StepPartial, bstream.StepNewPartial: // we always have partial blocks active here
 					err = pipe.handleStepPartial(ctx, clock, testCursor(blk.blk, blk.step), execOutput, blk.blk.PartialIndex, blk.blk.LastPartial)
 				case bstream.StepUndo, bstream.StepUndoPartial:
 					err = pipe.handleStepUndo(clock, testCursor(blk.blk, blk.step), blk.junction)
@@ -162,13 +267,13 @@ func TestHandleStepPartial(t *testing.T) {
 				if expected.isUndo {
 					// Validate undo signal
 					undo := resp.GetBlockUndoSignal()
-					require.NotNil(t, undo, "expected undo signal at index %d", i)
+					require.NotNil(t, undo, "expected undo signal at index %d, got %v", i, resp)
 					assert.Equal(t, expected.lastValidBlockNum, undo.LastValidBlock.Number, "undo lastValidBlock number mismatch at index %d", i)
 					assert.Equal(t, expected.lastValidBlockID, undo.LastValidBlock.Id, "undo lastValidBlock ID mismatch at index %d", i)
 				} else {
 					// Validate data response
 					data := resp.GetBlockScopedData()
-					require.NotNil(t, data, "expected block scoped data at index %d", i)
+					require.NotNil(t, data, "expected block scoped data at index %d, got %v", i, resp)
 					require.NotNil(t, data.Clock, "clock should not be nil at index %d", i)
 
 					assert.Equal(t, expected.clockNumber, data.Clock.Number, "clock number mismatch at index %d", i)
@@ -263,6 +368,9 @@ func withStepNew(blk *pbbstream.Block) blockWithStep {
 	step := bstream.StepNew
 	if blk.PartialIndex != 0 {
 		step = bstream.StepPartial
+		if blk.LastPartial {
+			step = bstream.StepNewPartial
+		}
 	}
 	return blockWithStep{
 		blk:  blk,
@@ -378,11 +486,16 @@ func testCursor(blk *pbbstream.Block, step bstream.StepType) *bstream.Cursor {
 	if blockNum < 10 {
 		lib = 0
 	}
+	block := bstream.NewBlockRef(blockID, blockNum)
+	headBlock := block
+	if step == bstream.StepPartial { // not StepNewPartial, where the cursor would not contain previousID
+		headBlock = bstream.NewBlockRef(fmt.Sprintf("%da", blockNum-1), blockNum-1)
+	}
 
 	return &bstream.Cursor{
 		Step:      step,
-		Block:     bstream.NewBlockRef(blockID, blockNum),
-		HeadBlock: bstream.NewBlockRef(blockID, blockNum),
+		Block:     block,
+		HeadBlock: headBlock,
 		LIB:       bstream.NewBlockRef("lib-"+blockID, lib),
 	}
 }

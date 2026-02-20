@@ -303,19 +303,35 @@ func newDummyBlockchainContainer(ctx context.Context, tmpDir string, image strin
 
 type responses []interface{}
 
+func blockScopedDataToString(bsd *pbsubstreamsrpcv2.BlockScopedData) string {
+	if bsd.IsPartial {
+		lastPartial := ""
+		if bsd.IsLastPartial != nil && *bsd.IsLastPartial {
+			lastPartial = "*"
+		}
+		idx := uint32(0)
+		if bsd.PartialIndex != nil {
+			idx = *bsd.PartialIndex
+		}
+		return fmt.Sprintf("P:%d:%d%s", bsd.Clock.Number, idx, lastPartial)
+	}
+	return fmt.Sprintf("F:%d", bsd.Clock.Number)
+}
+
 func (r *responses) Strings() (out []string) {
 	for _, rr := range *r {
 		switch rr := rr.(type) {
-		case *pbsubstreamsrpcv2.BlockScopedData:
-			if rr.IsPartial {
-				lastPartial := ""
-				if *rr.IsLastPartial {
-					lastPartial = "*"
+		case *pbsubstreamsrpcv4.Response:
+			if bsds := rr.GetBlockScopedDatas(); bsds != nil {
+				for _, bsd := range bsds.Items {
+					out = append(out, blockScopedDataToString(bsd))
 				}
-				out = append(out, fmt.Sprintf("P:%d:%d%s", rr.Clock.Number, *rr.PartialIndex, lastPartial))
-			} else {
-				out = append(out, fmt.Sprintf("F:%d", rr.Clock.Number))
 			}
+			if undo := rr.GetBlockUndoSignal(); undo != nil {
+				out = append(out, fmt.Sprintf("U:%d", undo.LastValidBlock.Number))
+			}
+		case *pbsubstreamsrpcv2.BlockScopedData:
+			out = append(out, blockScopedDataToString(rr))
 		case *pbsubstreamsrpcv2.BlockUndoSignal:
 			out = append(out, fmt.Sprintf("U:%d", rr.LastValidBlock.Number))
 		}
@@ -329,10 +345,13 @@ func (r *responses) BlockScopedData() []*pbsubstreamsrpcv2.BlockScopedData {
 	}
 	var blockScopedData []*pbsubstreamsrpcv2.BlockScopedData
 	for _, resp := range *r {
-		if response, ok := resp.(*pbsubstreamsrpcv4.Response); ok {
-			if data := response.GetBlockScopedDatas(); data != nil {
+		switch item := resp.(type) {
+		case *pbsubstreamsrpcv4.Response:
+			if data := item.GetBlockScopedDatas(); data != nil {
 				blockScopedData = append(blockScopedData, data.Items...)
 			}
+		case *pbsubstreamsrpcv2.BlockScopedData:
+			blockScopedData = append(blockScopedData, item)
 		}
 	}
 	return blockScopedData

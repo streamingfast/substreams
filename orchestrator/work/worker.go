@@ -346,7 +346,7 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 						HeadBlock: blockRef,
 					}
 
-					upstream.BlockScopedData(&pbsubstreamsrpc.BlockScopedData{
+					err := upstream.BlockScopedData(&pbsubstreamsrpc.BlockScopedData{
 						Output: &pbsubstreamsrpc.MapModuleOutput{
 							Name:      details.OutputModule,
 							MapOutput: r.BlockScopedData.Output,
@@ -355,6 +355,10 @@ func (w *RemoteWorker) work(ctx context.Context, request *pbssinternal.ProcessRa
 						FinalBlockHeight: r.BlockScopedData.Clock.Number,
 						Cursor:           cursor.ToOpaque(),
 					})
+
+					if err != nil {
+						return &Result{Error: err}
+					}
 				}
 			}
 		}

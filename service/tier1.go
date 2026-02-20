@@ -1079,11 +1079,14 @@ func tier1ResponseHandler(
 		case *pbsubstreamsrpc.Response:
 			d := r.GetBlockScopedData()
 			if d != nil {
-				if supportBuffering {
-					return fmt.Errorf("receive a single block scoped data response, but supportBuffering is enabled")
-				}
 				isData = true
 				filterData(d, noop, debugOutputs)
+				if supportBuffering {
+					// Worker used the v2 response path; promote to v4 BlockScopedDatas for v4 clients
+					respAny = substreams.NewBlockScopedDatasResponse(&pbsubstreamsrpcv4.BlockScopedDatas{
+						Items: []*pbsubstreamsrpc.BlockScopedData{d},
+					})
+				}
 			}
 		case *pbsubstreamsrpcv4.Response:
 			for _, d := range r.GetBlockScopedDatas().Items {

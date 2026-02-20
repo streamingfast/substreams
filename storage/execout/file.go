@@ -319,13 +319,10 @@ func (fr *fileReader) Iter() iter.Seq2[*pboutput.Item, error] {
 	return func(yield func(*pboutput.Item, error) bool) {
 		for {
 			item, err := fr.ReadNext()
-			if err == io.EOF {
+			if err == io.EOF { // DONE
 				return
 			}
 			if !yield(item, err) {
-				return
-			}
-			if err != nil {
 				return
 			}
 		}

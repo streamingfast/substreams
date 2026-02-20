@@ -238,13 +238,7 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 	itemCount := 0
 	for item, err := range reader.Iter() {
 		if err != nil {
-			if err == io.EOF && r.supportBuffering {
-				err := r.buffer.Flush(r.streamOut)
-				if err != nil {
-					return fmt.Errorf("flushing buffer on eof: %w", err)
-				}
-			}
-			return err
+			return fmt.Errorf("iterating on execout reader: %w", err)
 		}
 		if item.BlockNum < r.StartBlock {
 			continue
@@ -255,6 +249,11 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 				zap.Uint64("exclusive_end_block", r.ExclusiveEndBlock),
 				zap.Int("items_sent", itemCount),
 			)
+			if r.supportBuffering {
+				if err := r.buffer.Flush(r.streamOut); err != nil {
+					return fmt.Errorf("flushing buffer on end block: %w", err)
+				}
+			}
 			return nil
 		}
 
@@ -266,9 +265,8 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 		if r.supportBuffering {
 			r.buffer.Append(blockScopedData, len(item.Payload))
 			if r.buffer.ShouldFlush() {
-				err := r.buffer.Flush(r.streamOut)
-				if err != nil {
-					return fmt.Errorf("flushing buffer: %w", err)
+				if err := r.buffer.Flush(r.streamOut); err != nil {
+					return fmt.Errorf("flushing buffer on 'should flush': %w", err)
 				}
 			}
 		} else {
@@ -288,18 +286,14 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 			return nil
 		}
 
-		if blockScopedData.Clock.Number >= r.ExclusiveEndBlock {
-			r.logger.Info("stop pulling block scoped data, end block reach",
-				zap.Uint64("exclusive_end_block_num", r.ExclusiveEndBlock),
-				zap.Uint64("cache_item_block_num", blockScopedData.Clock.Number),
-				zap.Int("items_sent", itemCount),
-			)
-			return nil
-		}
 	}
 	r.logger.Debug("finished iterating all items",
 		zap.Int("items_sent", itemCount),
 	)
+
+	if r.supportBuffering {
+		return r.buffer.Flush(r.streamOut)
+	}
 	return nil
 }
 

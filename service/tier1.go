@@ -59,6 +59,29 @@ import (
 )
 
 var errShuttingDown = errors.New("endpoint is shutting down, please reconnect")
+var fallbackDuration time.Duration
+var useBlockNumberDuration time.Duration
+
+func init() {
+	envEthCallFallbackToLatestDuration := os.Getenv(EnvEthCallFallbackToLatestDuration)
+	if envEthCallFallbackToLatestDuration != "" {
+		d, err := time.ParseDuration(envEthCallFallbackToLatestDuration)
+		if err != nil {
+			panic(fmt.Errorf("invalid value for env var %s: %w", EnvEthCallFallbackToLatestDuration, err))
+		}
+		fallbackDuration = d
+	}
+
+	envEthCallUseBlockNumberDuration := os.Getenv(EnvEthCallUseBlockNumberDuration)
+	if envEthCallUseBlockNumberDuration != "" {
+		d, err := time.ParseDuration(envEthCallUseBlockNumberDuration)
+		if err != nil {
+			panic(fmt.Errorf("invalid value for env var %s: %w", EnvEthCallUseBlockNumberDuration, err))
+		}
+		useBlockNumberDuration = d
+	}
+
+}
 
 type Tier1Service struct {
 	*shutter.Shutter
@@ -308,44 +331,21 @@ func (s *Tier1Service) BlocksAny(
 	stream grpc.ServerStream,
 	supportBuffering bool,
 	logger *zap.Logger,
-) (runningCtx context.Context, serverErr error, blockErr error) {
+) (runningCtx context.Context, err error) {
 	if s.IsTerminating() {
-		serverErr = connect.NewError(connect.CodeUnavailable, errShuttingDown)
-		return
+		return nil, connect.NewError(connect.CodeUnavailable, errShuttingDown)
 	}
 
 	s.activeRequestsWG.Add(1)
 	defer func() {
-		if reason, countAsRejected := metrics.IsRejectedRequestError(serverErr); countAsRejected {
-			s.logger.Debug("rejected request", zap.String("reason", reason), zap.Error(serverErr))
+		if reason, countAsRejected := metrics.IsRejectedRequestError(err); countAsRejected {
+			s.logger.Debug("rejected request", zap.String("reason", reason), zap.Error(err))
 			metrics.Tier1RejectedRequestCounter.Inc(reason)
 		}
 		s.activeRequestsWG.Done()
 	}()
 
 	ctx = reqctx.WithPartialBlocks(ctx, request.PartialBlocks)
-
-	// We keep `err` here as the unaltered error from `blocks` call, this is used in the EndSpan to record the full error
-	// and not only the `grpcError` one which is a subset view of the full `err`.
-	var err error
-
-	envEthCallFallbackToLatestDuration := os.Getenv(EnvEthCallFallbackToLatestDuration)
-	fallbackDuration := time.Duration(0)
-	if envEthCallFallbackToLatestDuration != "" {
-		fallbackDuration, err = time.ParseDuration(envEthCallFallbackToLatestDuration)
-		if err != nil {
-			return nil, fmt.Errorf("invalid value for env var %s: %w", EnvEthCallFallbackToLatestDuration, err), nil
-		}
-	}
-
-	envEthCallUseBlockNumberDuration := os.Getenv(EnvEthCallUseBlockNumberDuration)
-	useBlockNumberDuration := time.Duration(0)
-	if envEthCallUseBlockNumberDuration != "" {
-		useBlockNumberDuration, err = time.ParseDuration(envEthCallUseBlockNumberDuration)
-		if err != nil {
-			return nil, fmt.Errorf("invalid value for env var %s: %w", EnvEthCallUseBlockNumberDuration, err), nil
-		}
-	}
 
 	ctx = logging.WithLogger(ctx, logger)
 	ctx = reqctx.WithTracer(ctx, s.tracer)
@@ -375,7 +375,7 @@ func (s *Tier1Service) BlocksAny(
 		err := connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("missing modules in request"))
 		fields = append(fields, zap.Error(err))
 		logger.Info("refusing Substreams Blocks request", fields...)
-		return nil, err, nil
+		return nil, err
 	}
 
 	if auth := dauth.FromContext(ctx); auth != nil {
@@ -410,7 +410,7 @@ func (s *Tier1Service) BlocksAny(
 		err := connect.NewError(connect.CodeUnavailable, fmt.Errorf("service under heavy load, please try connecting again"))
 		fields = append(fields, zap.Error(err), zap.Int("active_request_count", stat.activeRequestCount), zap.Int("hard_limit", stat.hardLimit))
 		logger.Info("refusing Substreams Blocks request", fields...)
-		return nil, err, nil
+		return nil, err
 	}
 
 	execGraph, err := exec.NewOutputModuleGraph(request.OutputModule, request.ProductionMode, request.Modules, bstream.GetProtocolFirstStreamableBlock)
@@ -418,7 +418,7 @@ func (s *Tier1Service) BlocksAny(
 		err := connect.NewError(connect.CodeInvalidArgument, err)
 		fields = append(fields, zap.Error(err))
 		logger.Info("refusing Substreams Blocks request", fields...)
-		return nil, err, nil
+		return nil, err
 	}
 
 	outputModuleHash := execGraph.ModuleHashes()[request.OutputModule]
@@ -498,15 +498,7 @@ func (s *Tier1Service) BlocksAny(
 	if err := ValidateTier1Request(request, s.blockType); err != nil {
 		err := connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("validate request: %w", err))
 		logger.Info("refusing Substreams Blocks request", append(fields, zap.Error(err))...)
-		return nil, err, nil
-	}
-
-	if envEthCallFallbackToLatestDuration != "" && hasEthCall(request.Modules.Binaries) {
-		if header.Get("X-substreams-acknowledge-non-deterministic") != "true" {
-			err := connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("header X-substreams-acknowledge-non-deterministic must be set to true when using eth_call or eth_get_balance on a non deterministic rpc provider"))
-			logger.Info("refusing Substreams Blocks request", append(fields, zap.Error(err))...)
-			return nil, err, nil
-		}
+		return nil, err
 	}
 
 	var reqStats *metrics.Stats
@@ -541,11 +533,11 @@ func (s *Tier1Service) BlocksAny(
 
 	err = s.blocks(runningContext, cancelRunning, request, header, execGraph, respFunc, reqStats, fields, supportBuffering, s.execOutMessageBufferSize)
 	if err != nil {
-		return runningContext, nil, err
+		return runningContext, err
 	}
 
 	logger.Debug("Blocks request completed without error")
-	return runningContext, nil, nil
+	return runningContext, nil
 }
 
 // writePackage writes the spkg to the module cache if it doesn't exist:

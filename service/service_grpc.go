@@ -105,12 +105,9 @@ func (s *Tier1Service) BlocksAnyGrpc(
 ) (serverErr error) {
 
 	logger := reqctx.Logger(ctx).Named("tier1-grpc")
-	runningCtx, err, blockErr := s.BlocksAny(ctx, request, header, protocol, pkg, stream, supportBuffering, logger)
-	if err != nil {
-		return err
-	}
+	runningCtx, err := s.BlocksAny(ctx, request, header, protocol, pkg, stream, supportBuffering, logger)
 
-	if grpcErr := toGrpcTier1Error(runningCtx, blockErr); grpcErr != nil {
+	if grpcErr := toGrpcTier1Error(runningCtx, err); grpcErr != nil {
 		switch status.Code(grpcErr) {
 		case codes.Internal:
 			logger.Warn("unexpected termination of stream of blocks", zap.String("stream_processor", "tier1"), zap.Error(err))
@@ -126,5 +123,5 @@ func (s *Tier1Service) BlocksAnyGrpc(
 		return grpcErr
 	}
 
-	return blockErr
+	return err
 }

@@ -254,12 +254,9 @@ func (s *Tier1Service) BlocksAnyConnect(
 ) (serverErr error) {
 
 	logger := reqctx.Logger(ctx).Named("tier1-connect")
-	runningCtx, err, blockErr := s.BlocksAny(ctx, request, header, protocol, pkg, stream, supportBuffering, logger)
-	if err != nil {
-		return err
-	}
+	runningCtx, err := s.BlocksAny(ctx, request, header, protocol, pkg, stream, supportBuffering, logger)
 
-	if connectError := toConnectError(runningCtx, blockErr); connectError != nil {
+	if connectError := toConnectError(runningCtx, err); connectError != nil {
 		switch connect.CodeOf(connectError) {
 		case connect.CodeInternal:
 			logger.Warn("unexpected termination of stream of blocks", zap.String("stream_processor", "tier1"), zap.Error(err))
@@ -275,5 +272,5 @@ func (s *Tier1Service) BlocksAnyConnect(
 		return connectError
 	}
 
-	return blockErr
+	return err
 }

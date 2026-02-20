@@ -11,6 +11,7 @@ import (
 
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -97,13 +98,13 @@ func TestPartialBlocksSimple(t *testing.T) {
 			pkg, err := manifest.MustNewReader(tc.spkgFile).Read()
 			require.NoError(t, err)
 
-			request := &pbsubstreamsrpcv2.Request{
+			request := &pbsubstreamsrpcv3.Request{
 				StartBlockNum:   tc.startBlock,
 				StopBlockNum:    tc.stopBlock,
 				FinalBlocksOnly: false,
 				ProductionMode:  tc.productionMode,
 				OutputModule:    tc.outputModule,
-				Modules:         pkg.Package.Modules,
+				Package:         pkg.Package,
 				PartialBlocks:   true,
 			}
 
@@ -226,23 +227,23 @@ func TestPartialBlocksWithStores(t *testing.T) {
 			pkg, err := manifest.MustNewReader(tc.spkgFile).Read()
 			require.NoError(t, err)
 
-			requestPartials := &pbsubstreamsrpcv2.Request{
+			requestPartials := &pbsubstreamsrpcv3.Request{
 				StartBlockNum:   tc.startBlock,
 				StopBlockNum:    tc.stopBlock,
 				FinalBlocksOnly: false,
 				ProductionMode:  tc.productionMode,
 				OutputModule:    tc.outputModule,
-				Modules:         pkg.Package.Modules,
+				Package:         pkg.Package,
 				PartialBlocks:   true,
 			}
 
-			requestNoPartials := &pbsubstreamsrpcv2.Request{
+			requestNoPartials := &pbsubstreamsrpcv3.Request{
 				StartBlockNum:   tc.startBlock,
 				StopBlockNum:    tc.stopBlock,
 				FinalBlocksOnly: false,
 				ProductionMode:  tc.productionMode,
 				OutputModule:    tc.outputModule,
-				Modules:         pkg.Package.Modules,
+				Package:         pkg.Package,
 			}
 
 			respsNoPartialsCh := make(chan responses)
@@ -395,13 +396,13 @@ func TestPartialBlocksReorgs(t *testing.T) {
 			pkg, err := manifest.MustNewReader(tc.spkgFile).Read()
 			require.NoError(t, err)
 
-			request := &pbsubstreamsrpcv2.Request{
+			request := &pbsubstreamsrpcv3.Request{
 
 				StopBlockNum:    tc.stopBlock,
 				FinalBlocksOnly: false,
 				ProductionMode:  tc.productionMode,
 				OutputModule:    tc.outputModule,
-				Modules:         pkg.Package.Modules,
+				Package:         pkg.Package,
 				PartialBlocks:   tc.partialBlocks,
 			}
 

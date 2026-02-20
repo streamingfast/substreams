@@ -24,6 +24,8 @@ import (
 	"github.com/streamingfast/substreams/app"
 	"github.com/streamingfast/substreams/client"
 	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
+	pbsubstreamsrpcv4 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v4"
 	pbtest "github.com/streamingfast/substreams/tests_e2e/partial_blocks_store/pb"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -61,7 +63,7 @@ func ParseTxCounterSummary(output *pbsubstreamsrpcv2.MapModuleOutput) (blockNumb
 	return summary.BlockNumber, currentTxCount, prevBlockTxCount, totalTxCount, true
 }
 
-func RunRequest(t *testing.T, req *pbsubstreamsrpcv2.Request, endpoint string) ([]*pbsubstreamsrpcv2.BlockScopedData, *pbsubstreamsrpcv2.SessionInit, error) {
+func RunRequest(t *testing.T, req *pbsubstreamsrpcv3.Request, endpoint string) ([]*pbsubstreamsrpcv2.BlockScopedData, *pbsubstreamsrpcv2.SessionInit, error) {
 
 	ctx := t.Context()
 	// substreams client
@@ -84,7 +86,7 @@ func RunRequest(t *testing.T, req *pbsubstreamsrpcv2.Request, endpoint string) (
 	t.Logf("Connecting to endpoint: %s", endpoint)
 
 	// Create client
-	streamClient := pbsubstreamsrpcv2.NewStreamClient(conn)
+	streamClient := pbsubstreamsrpcv4.NewStreamClient(conn)
 
 	// Make the streaming call
 	blockStream, err := streamClient.Blocks(ctx, req, callOpts...)
@@ -98,7 +100,7 @@ func RunRequest(t *testing.T, req *pbsubstreamsrpcv2.Request, endpoint string) (
 	var session *pbsubstreamsrpcv2.SessionInit
 
 	for {
-		var response *pbsubstreamsrpcv2.Response
+		var response *pbsubstreamsrpcv4.Response
 		response, err = blockStream.Recv()
 		if err != nil {
 			if errors.Is(err, stream.ErrStopBlockReached) || errors.Is(err, io.EOF) {
@@ -120,9 +122,8 @@ func RunRequest(t *testing.T, req *pbsubstreamsrpcv2.Request, endpoint string) (
 		}
 
 		// Accumulate BlockScopedData
-		if blockData := response.GetBlockScopedData(); blockData != nil {
-			blockScopedDataSlice = append(blockScopedDataSlice, blockData)
-			//t.Logf("Accumulated BlockScopedData clock %d, total count: %d", blockData.Clock.Number, len(blockScopedDataSlice))
+		if blockDatas := response.GetBlockScopedDatas(); blockDatas != nil {
+			blockScopedDataSlice = append(blockScopedDataSlice, blockDatas.Items...)
 		}
 	}
 
@@ -328,8 +329,10 @@ func (r *responses) BlockScopedData() []*pbsubstreamsrpcv2.BlockScopedData {
 	}
 	var blockScopedData []*pbsubstreamsrpcv2.BlockScopedData
 	for _, resp := range *r {
-		if blockScopedDataResp, ok := resp.(*pbsubstreamsrpcv2.BlockScopedData); ok {
-			blockScopedData = append(blockScopedData, blockScopedDataResp)
+		if response, ok := resp.(*pbsubstreamsrpcv4.Response); ok {
+			if data := response.GetBlockScopedDatas(); data != nil {
+				blockScopedData = append(blockScopedData, data.Items...)
+			}
 		}
 	}
 	return blockScopedData
@@ -340,8 +343,10 @@ func (r *responses) SessionInit() *pbsubstreamsrpcv2.SessionInit {
 		return nil
 	}
 	for _, resp := range *r {
-		if sessionInitResp, ok := resp.(*pbsubstreamsrpcv2.SessionInit); ok {
-			return sessionInitResp
+		if response, ok := resp.(*pbsubstreamsrpcv4.Response); ok {
+			if sess := response.GetSession(); sess != nil {
+				return sess
+			}
 		}
 	}
 	return nil
@@ -353,15 +358,17 @@ func (r *responses) Undo() []*pbsubstreamsrpcv2.BlockUndoSignal {
 	}
 	var blockUndoSignals []*pbsubstreamsrpcv2.BlockUndoSignal
 	for _, resp := range *r {
-		if blockUndoSignalResp, ok := resp.(*pbsubstreamsrpcv2.BlockUndoSignal); ok {
-			blockUndoSignals = append(blockUndoSignals, blockUndoSignalResp)
+		if response, ok := resp.(*pbsubstreamsrpcv4.Response); ok {
+			if undo := response.GetBlockUndoSignal(); undo != nil {
+				blockUndoSignals = append(blockUndoSignals, undo)
+			}
 		}
 	}
 	return blockUndoSignals
 }
 
 // RunRequestWithPartialBlocks is similar to RunRequest but specifically looks for partial block data
-func RunRequestWithPartialBlocks(t *testing.T, req *pbsubstreamsrpcv2.Request, endpoint string, maxPartialResponses int) (responses, error) {
+func RunRequestWithPartialBlocks(t *testing.T, req *pbsubstreamsrpcv3.Request, endpoint string, maxPartialResponses int) (responses, error) {
 	var resps responses
 
 	ctx := t.Context()
@@ -385,7 +392,7 @@ func RunRequestWithPartialBlocks(t *testing.T, req *pbsubstreamsrpcv2.Request, e
 	t.Logf("Connecting to endpoint: %s", endpoint)
 
 	// Create client
-	streamClient := pbsubstreamsrpcv2.NewStreamClient(conn)
+	streamClient := pbsubstreamsrpcv4.NewStreamClient(conn)
 
 	// Make the streaming call
 	blockStream, err := streamClient.Blocks(ctx, req, callOpts...)
@@ -396,7 +403,7 @@ func RunRequestWithPartialBlocks(t *testing.T, req *pbsubstreamsrpcv2.Request, e
 	var partialBlockDataCount int
 
 	for {
-		var response *pbsubstreamsrpcv2.Response
+		var response *pbsubstreamsrpcv4.Response
 		response, err = blockStream.Recv()
 		if err != nil {
 			t.Logf("Stream ended with error: %v", err)
@@ -418,23 +425,23 @@ func RunRequestWithPartialBlocks(t *testing.T, req *pbsubstreamsrpcv2.Request, e
 		}
 
 		// Accumulate BlockScopedData
-		if blockData := response.GetBlockScopedData(); blockData != nil {
-			resps = append(resps, blockData)
+		resps = append(resps, response)
 
-			if blockData.IsPartial {
-				partialBlockDataCount++
-				//t.Logf("Received partial block data %d/%d", len(partialBlockDataSlice), partialResponseCount)
-				// Break if we've received the desired number of partial responses
-				if maxPartialResponses != 0 && partialBlockDataCount >= maxPartialResponses {
-					t.Logf("Received %d partial responses - halting request", partialBlockDataCount)
-					break
+		if blockDatas := response.GetBlockScopedDatas(); blockDatas != nil {
+			for _, blockData := range blockDatas.Items {
+				if blockData.IsPartial {
+					partialBlockDataCount++
+					//t.Logf("Received partial block data %d/%d", len(partialBlockDataSlice), partialResponseCount)
+					// Break if we've received the desired number of partial responses
+					if maxPartialResponses != 0 && partialBlockDataCount >= maxPartialResponses {
+						t.Logf("Received %d partial responses - halting request", partialBlockDataCount)
+						return resps, nil
+					}
 				}
 			}
-			//t.Logf("Accumulated BlockScopedData clock %d, total count: %d", blockData.Clock.Number, len(blockScopedDataSlice))
 		}
 
 		if undo := response.GetBlockUndoSignal(); undo != nil {
-			resps = append(resps, undo)
 			//t.Logf("Accumulated BlockUndoSignal clock %d, total count: %d", undo.Clock.Number, len(blockUndoSignalSlice))
 		}
 	}

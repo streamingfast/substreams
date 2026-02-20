@@ -9,6 +9,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.18.1
+
+### Server-side fixes
+
+* Fix V4 buffer flushing on end-of-file: the buffer is now properly flushed when the last block in a segment is reached
+* Fix error handling for `InvalidArgument` and other validation errors: they were shown as `Unknown`
+* Fix partial blocks output in V4: prevent `NewPartial` and `UndoPartial` cursor steps from being exposed to clients (normalized to `New`/`Undo` respectively)
+* Fix partial block data to be correctly wrapped in `BlockScopedDatas` on v4.
+* Last partial blocks are now accepted interchangeably with `new` blocks and vice-versa, allowing faster full blocks for requests that do not ask for partial blocks.
+
 ## 1.18.0
 
 ### CLI

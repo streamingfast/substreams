@@ -919,6 +919,18 @@ func (p *Pipeline) cleanUpModuleExecutors(ctx context.Context, logger *zap.Logge
 	return nil
 }
 
+// normalizedOpaqueCursor returns a opaque cursor string without some
+// esoteric steps like 'NewPartial' and 'UndoPartial' which may not be supported by some clients
+func normalizedOpaqueCursor(cursor bstream.Cursor) string {
+	switch cursor.Step {
+	case bstream.StepNewPartial:
+		cursor.Step = bstream.StepNew
+	case bstream.StepUndoPartial:
+		cursor.Step = bstream.StepUndo
+	}
+	return cursor.ToOpaque()
+}
+
 func returnPartialDataOutput(
 	clock *pbsubstreams.Clock,
 	cursor *bstream.Cursor,
@@ -926,16 +938,30 @@ func returnPartialDataOutput(
 	respFunc substreams.ResponseFunc,
 	partialIdx uint32,
 	lastPartial bool,
+	supportBuffering bool,
 ) error {
 
 	out := &pbsubstreamsrpc.BlockScopedData{
 		Clock:            clock,
-		Cursor:           cursor.ToOpaque(),
+		Cursor:           normalizedOpaqueCursor(*cursor),
 		FinalBlockHeight: cursor.LIB.Num(),
 		Output:           mapModuleOutput,
 		IsPartial:        true,
 		PartialIndex:     &partialIdx,
 		IsLastPartial:    &lastPartial,
+	}
+
+	if supportBuffering { //v4 support
+		bsd := &pbsubstreamsrpcv4.BlockScopedDatas{
+			Items: []*pbsubstreamsrpc.BlockScopedData{
+				out,
+			},
+		}
+
+		if err := respFunc(substreams.NewBlockScopedDatasResponse(bsd)); err != nil {
+			return fmt.Errorf("calling return func: %w", err)
+		}
+		return nil
 	}
 
 	if err := respFunc(substreams.NewBlockScopedDataResponse(out)); err != nil {
@@ -966,7 +992,7 @@ func returnModuleDataOutputs(
 		Output:            mapModuleOutput,
 		DebugMapOutputs:   extraMapModuleOutputs,
 		DebugStoreOutputs: extraStoreModuleOutputs,
-		Cursor:            cursor.ToOpaque(),
+		Cursor:            normalizedOpaqueCursor(*cursor),
 		FinalBlockHeight:  cursor.LIB.Num(),
 	}
 

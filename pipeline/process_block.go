@@ -272,7 +272,7 @@ func (p *Pipeline) handleUndo(clock *pbsubstreams.Clock, cursor *bstream.Cursor,
 			Message: &pbsubstreamsrpc.Response_BlockUndoSignal{
 				BlockUndoSignal: &pbsubstreamsrpc.BlockUndoSignal{
 					LastValidBlock:  targetClock,
-					LastValidCursor: targetCursor.ToOpaque(),
+					LastValidCursor: normalizedOpaqueCursor(*targetCursor),
 				},
 			},
 		})
@@ -399,7 +399,7 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 
 	mapModuleOutput := normalizeModuleOutput(p.mapModuleOutput, reqDetails.OutputModule)
 
-	if err = returnPartialDataOutput(clock, cursor, mapModuleOutput, p.respFunc, uint32(idx), isLast); err != nil {
+	if err = returnPartialDataOutput(clock, cursor, mapModuleOutput, p.respFunc, uint32(idx), isLast, p.supportBuffering); err != nil {
 		return fmt.Errorf("failed to return module data output: %w", err)
 	}
 

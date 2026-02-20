@@ -222,7 +222,7 @@ func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, res
 				Number: cursor.Block.Num(),
 				Id:     cursor.Block.ID(),
 			},
-			LastValidCursor: cursor.ToOpaque(),
+			LastValidCursor: normalizedOpaqueCursor(*cursor),
 		}
 	}
 
@@ -255,7 +255,7 @@ func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, res
 
 		undoSignal = &pbsubstreamsrpc.BlockUndoSignal{
 			LastValidBlock:  blockRefToPB(reorgJunctionBlock),
-			LastValidCursor: resolvedCursor.ToOpaque(),
+			LastValidCursor: normalizedOpaqueCursor(*resolvedCursor),
 		}
 	}
 
@@ -267,7 +267,7 @@ func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, res
 		resolvedStartBlockNum = resolvedCursor.Block.Num()
 	}
 
-	return resolvedStartBlockNum, resolvedCursor.ToOpaque(), undoSignal, nil
+	return resolvedStartBlockNum, normalizedOpaqueCursor(*resolvedCursor), undoSignal, nil
 }
 
 type CursorResolver func(context.Context, *bstream.Cursor) (reorgJunctionBlock, currentHead bstream.BlockRef, err error)

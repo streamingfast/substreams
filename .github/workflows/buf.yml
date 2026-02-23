@@ -45,5 +45,11 @@ jobs:
         run: |
           # --git-metadata automatically sets labels based on git branches/tags
           # and source-control-url from the git remote
-          echo "Running: buf push proto --git-metadata"
-          buf push proto --git-metadata
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            # For tags, also push to 'main' label so docs stay up to date
+            echo "Running: buf push proto --git-metadata --label main"
+            buf push proto --git-metadata --label main
+          else
+            echo "Running: buf push proto --git-metadata"
+            buf push proto --git-metadata
+          fi

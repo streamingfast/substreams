@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dustin/go-humanize"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging/zapx"
@@ -245,10 +246,13 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 	flushingDuration := time.Duration(0)
 	iterationStartTime := time.Now()
 	firstItemTime := time.Duration(0)
+	cumulativePayloadSize := 0
 	for item, err := range reader.Iter() {
 		if itemCount == 0 {
 			firstItemTime = time.Since(iterationStartTime)
 		}
+
+		cumulativePayloadSize += len(item.Payload)
 
 		if err != nil {
 			return fmt.Errorf("iterating on execout reader: %w", err)
@@ -320,7 +324,9 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 		zap.Int("items_sent", itemCount),
 		zapx.HumanDuration("flushing_duration", flushingDuration),
 		zapx.HumanDuration("first_item_duration", firstItemTime),
+		zap.Duration("first_item_duration_raw", firstItemTime),
 		zapx.HumanDuration("total_duration", totalDuration),
+		zap.String("payload size", humanize.Bytes(uint64(cumulativePayloadSize))),
 		zap.Bool("keep", false),
 	)
 

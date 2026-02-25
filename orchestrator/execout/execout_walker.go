@@ -10,6 +10,7 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/logging/zapx"
 	"github.com/streamingfast/substreams/block"
 	"github.com/streamingfast/substreams/orchestrator/loop"
 	"github.com/streamingfast/substreams/orchestrator/response"
@@ -189,8 +190,8 @@ func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
 		r.logger.Debug("file download completed, returning MsgFileDownloaded",
 			zap.Int("segment", current),
 			zap.Bool("noop_mode", r.noopMode),
-			zap.Duration("download_elapsed", time.Since(downloadStartTime)),
-			zap.Duration("file_reader_creation_duration", fileReaderCreationDuration),
+			zapx.HumanDuration("download_elapsed", time.Since(downloadStartTime)),
+			zapx.HumanDuration("file_reader_creation_duration", fileReaderCreationDuration),
 			zap.Bool("keep", false),
 		)
 		return MsgFileDownloaded{}
@@ -315,9 +316,9 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 	totalDuration := time.Since(iterationStartTime)
 	r.logger.Debug("finished iterating all items",
 		zap.Int("items_sent", itemCount),
-		zap.Duration("flushing_duration", flushingDuration),
-		zap.Duration("first_item_duration", firstItemTime),
-		zap.Duration("total_duration", totalDuration),
+		zapx.HumanDuration("flushing_duration", flushingDuration),
+		zapx.HumanDuration("first_item_duration", firstItemTime),
+		zapx.HumanDuration("total_duration", totalDuration),
 		zap.Bool("keep", false),
 	)
 

@@ -95,6 +95,7 @@ func (r *Walker) WorkingDuration() time.Duration {
 
 func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
 	first, current, last := r.fileWalker.Progress()
+
 	r.logger.Debug("starting download command",
 		zap.Int("segment", current),
 		zap.Int("first_segment", first),
@@ -142,7 +143,9 @@ func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
 			return loop.NewQuitMsg(r.ctx.Err())
 		}
 
+		s := time.Now()
 		file, err := r.fileWalker.FileReader(r.ctx)
+		fileReaderCreationDuration := time.Since(s)
 
 		if errors.Is(err, dstore.ErrNotFound) {
 			return MsgFileNotPresent{NextWait: computeNewWait(waitBefore, r.fileWalker.IsLocal)}
@@ -187,6 +190,7 @@ func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
 			zap.Int("segment", current),
 			zap.Bool("noop_mode", r.noopMode),
 			zap.Duration("download_elapsed", time.Since(downloadStartTime)),
+			zap.Duration("file_reader_creation_duration", fileReaderCreationDuration),
 		)
 		return MsgFileDownloaded{}
 	}
@@ -236,7 +240,12 @@ func computeNewWait(previousWait time.Duration, storeIsLocal bool) time.Duration
 func (r *Walker) sendItems(reader execout.FileReader) error {
 	defer reader.Close()
 	itemCount := 0
+	flushingDuration := time.Duration(0)
+	iterationStartTime := time.Now()
+	firstItemTime := time.Duration(0)
 	for item, err := range reader.Iter() {
+		firstItemTime += time.Since(iterationStartTime)
+
 		if err != nil {
 			return fmt.Errorf("iterating on execout reader: %w", err)
 		}
@@ -265,15 +274,19 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 		if r.supportBuffering {
 			r.buffer.Append(blockScopedData, len(item.Payload))
 			if r.buffer.ShouldFlush() {
+				s := time.Now()
 				if err := r.buffer.Flush(r.streamOut); err != nil {
 					return fmt.Errorf("flushing buffer on 'should flush': %w", err)
 				}
+				flushingDuration += time.Since(s)
 			}
 		} else {
+			s := time.Now()
 			err := r.streamOut.BlockScopedData(blockScopedData)
 			if err != nil {
 				return fmt.Errorf("sending block scoped data: %w", err)
 			}
+			flushingDuration += time.Since(s)
 		}
 		itemCount++
 
@@ -287,13 +300,21 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 		}
 
 	}
-	r.logger.Debug("finished iterating all items",
-		zap.Int("items_sent", itemCount),
-	)
 
+	s := time.Now()
 	if r.supportBuffering {
 		return r.buffer.Flush(r.streamOut)
 	}
+	flushingDuration += time.Since(s)
+
+	totalDuration := time.Since(iterationStartTime)
+	r.logger.Debug("finished iterating all items",
+		zap.Int("items_sent", itemCount),
+		zap.Duration("flushing_duration", flushingDuration),
+		zap.Duration("first_item_duration", firstItemTime),
+		zap.Duration("total_duration", totalDuration),
+	)
+
 	return nil
 }
 

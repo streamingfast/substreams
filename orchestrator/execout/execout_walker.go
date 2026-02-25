@@ -246,7 +246,9 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 	iterationStartTime := time.Now()
 	firstItemTime := time.Duration(0)
 	for item, err := range reader.Iter() {
-		firstItemTime += time.Since(iterationStartTime)
+		if itemCount == 0 {
+			firstItemTime = time.Since(iterationStartTime)
+		}
 
 		if err != nil {
 			return fmt.Errorf("iterating on execout reader: %w", err)

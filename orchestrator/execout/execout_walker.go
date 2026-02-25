@@ -191,6 +191,7 @@ func (r *Walker) CmdDownloadCurrentSegment(waitBefore time.Duration) loop.Cmd {
 			zap.Bool("noop_mode", r.noopMode),
 			zap.Duration("download_elapsed", time.Since(downloadStartTime)),
 			zap.Duration("file_reader_creation_duration", fileReaderCreationDuration),
+			zap.Bool("keep", false),
 		)
 		return MsgFileDownloaded{}
 	}
@@ -257,6 +258,7 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 				zap.Uint64("item_block_num", item.BlockNum),
 				zap.Uint64("exclusive_end_block", r.ExclusiveEndBlock),
 				zap.Int("items_sent", itemCount),
+				zap.Bool("keep", false),
 			)
 			if r.supportBuffering {
 				if err := r.buffer.Flush(r.streamOut); err != nil {
@@ -295,6 +297,7 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 			r.logger.Debug("noop mode, returning after single item",
 				zap.Uint64("block_num", blockScopedData.Clock.Number),
 				zap.Int("items_sent", itemCount),
+				zap.Bool("keep", false),
 			)
 			return nil
 		}
@@ -313,6 +316,7 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 		zap.Duration("flushing_duration", flushingDuration),
 		zap.Duration("first_item_duration", firstItemTime),
 		zap.Duration("total_duration", totalDuration),
+		zap.Bool("keep", false),
 	)
 
 	return nil

@@ -306,7 +306,9 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 
 	s := time.Now()
 	if r.supportBuffering {
-		return r.buffer.Flush(r.streamOut)
+		if err := r.buffer.Flush(r.streamOut); err != nil {
+			return fmt.Errorf("flushing buffer on end of iteration: %w", err)
+		}
 	}
 	flushingDuration += time.Since(s)
 

@@ -1,0 +1,25 @@
+specVersion: v0.1.0
+package:
+  name: test_with_networks
+  version: v0.0.0
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: binaries/dummy.wasm
+
+network: mainnet
+
+networks:
+  mainnet:
+    initialBlock:
+      kv_out: 1000
+
+modules:
+  - name: kv_out
+    kind: map
+    initialBlock: 0
+    inputs:
+      - source: sf.test.Block
+    output:
+      type: proto:kv-out

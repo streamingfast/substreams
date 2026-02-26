@@ -4,7 +4,9 @@ import (
 	"encoding/hex"
 	"testing"
 
+	"github.com/streamingfast/substreams/manifest"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestReadManifestAndModule(t *testing.T) {
@@ -79,4 +81,56 @@ func TestReadManifestAndModule(t *testing.T) {
 			assert.Equal(t, tt.wantOutputModuleHash, hex.EncodeToString(gotOutputModuleHash))
 		})
 	}
+}
+
+func TestReadManifestAndModule_WithNetworks_ExplicitModule(t *testing.T) {
+	// Test that reading a manifest with networks works when an explicit
+	// module name is provided.
+	gotPkg, gotModule, _, err := ReadManifestAndModule(
+		"testdata/substreams_with_networks.yaml",
+		"",      // network (use default from manifest)
+		nil,     // params
+		"kv_out", // explicit module name
+		IgnoreOutputModuleType,
+		false, // skipPackageValidation
+		nil,   // additionalOptions
+		zlog,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, gotPkg)
+	assert.Equal(t, "kv_out", gotModule.Name)
+}
+
+func TestReadManifestAndModule_WithNetworks_WithOverrideOutputModule_SentinelValue(t *testing.T) {
+	// This is a regression test that documents the bug where passing
+	// WithOverrideOutputModule with the InferOutputModuleFromPackage sentinel
+	// value would cause an error when the manifest has a networks: section.
+	//
+	// The bug occurred because the sentinel value was passed to the manifest reader
+	// which tried to look up ancestors of the sentinel module name in the graph
+	// during network validation (in dependentImportedModules).
+	//
+	// The fix in sinker_viper.go (ConfigFromViper) prevents the sentinel value
+	// from being passed to WithOverrideOutputModule. This test documents what
+	// happens if the sentinel value IS incorrectly passed.
+	_, _, _, err := ReadManifestAndModule(
+		"testdata/substreams_with_networks.yaml",
+		"",
+		nil,
+		"kv_out", // Use explicit module name for the function parameter
+		IgnoreOutputModuleType,
+		false,
+		[]manifest.Option{
+			// This simulates what the bug was: the sentinel value being passed
+			// to WithOverrideOutputModule in the additionalOptions
+			manifest.WithOverrideOutputModule(InferOutputModuleFromPackage),
+		},
+		zlog,
+	)
+
+	// With the sentinel value passed to WithOverrideOutputModule, we expect an error
+	// because the manifest reader tries to find the module "@!##_InferOutputModuleFromSpkg_##!@"
+	// in the graph when processing the networks section.
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), InferOutputModuleFromPackage)
 }

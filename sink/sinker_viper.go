@@ -323,7 +323,7 @@ func ConfigFromViper(
 		}
 	}
 
-	if outputModuleName != "" {
+	if outputModuleName != "" && outputModuleName != InferOutputModuleFromPackage {
 		readerOptions = append(readerOptions, manifest.WithOverrideOutputModule(outputModuleName))
 	}
 

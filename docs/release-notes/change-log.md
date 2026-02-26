@@ -9,6 +9,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Sink
+
+* Fix `InferOutputModuleFromPackage` sentinel value causing error when used with manifests containing a `networks:` section. The sentinel value was being passed to the manifest reader before resolution, causing a "could not find module @!##_InferOutputModuleFromSpkg_##!@ in graph" error.
+
 ## v1.18.1
 
 ### Server-side fixes

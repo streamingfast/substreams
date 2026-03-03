@@ -120,7 +120,6 @@ func TestMultiSquashWithDifferentSegments(t *testing.T) {
 	mergeUnit := Unit{Stage: 0, Segment: 1}
 
 	for _, modState := range stage.storeModuleStates {
-		modState := modState
 		if mergeUnit.Segment < modState.segmenter.FirstIndex() {
 			continue
 		}
@@ -175,7 +174,6 @@ func TestMultiSquashErrorHandling(t *testing.T) {
 
 	// Simulate error in one of the goroutines
 	for idx := range stage.storeModuleStates {
-		idx := idx
 		stage.syncWork.Go(func() error {
 			if idx == 1 {
 				return assert.AnError // Simulate error in second module
@@ -327,7 +325,6 @@ func TestSyncWorkGroupBehavior(t *testing.T) {
 
 	// Spawn multiple goroutines with different execution times
 	for i := range 5 {
-		i := i
 		group.Go(func() error {
 			sleepTime := time.Duration(5-i) * 10 * time.Millisecond
 			time.Sleep(sleepTime)

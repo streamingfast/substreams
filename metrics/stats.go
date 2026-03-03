@@ -44,7 +44,7 @@ type Stats struct {
 	completedJobsBytesWritten uint64
 	// successfully completed tier2 job (could be a noop if the tier2 finds out that all its required files are there upon startup)
 	completedJobs uint64
-	// jobs that failed (either with a fatal error or repeatdly on retryable errors, above a threshold)
+	// jobs that failed (either with a fatal error or repeatedly on retryable errors, above a threshold)
 	failedJobs uint64
 
 	// retries that happened (does not affect the total number of jobs, a single startedJob can be retried multiple times)

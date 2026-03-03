@@ -756,7 +756,7 @@ func (s *Sinker) doRequest(
 				}
 			} else {
 				// In the case of dealing with an undo buffer, it's expected that a fork will never
-				// go beyong the first block in the buffer because if it does, `s.buffer.HandleBlockUndoSignal` here
+				// go beyond the first block in the buffer because if it does, `s.buffer.HandleBlockUndoSignal` here
 				// returns an error.
 				//
 				// This means ultimately that we expect to never call the downstream `BlockUndoSignalHandler` function.

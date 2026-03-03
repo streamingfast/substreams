@@ -398,7 +398,7 @@ func (s *Stages) NextJob(notAboveSegment int) (Unit, *block.Range, bool) {
 	//  but we want to keep the diagonal balanced).
 	//
 	// OPTIMIZATION: Another option is to have an algorithm that doesn't return a job
-	//  right away when there are too much jobs scheduled before others
+	//  right away when there are too many jobs scheduled before others
 	//  in a given stage.
 	//
 	// OPTIMIZATION: eventually, we can push `segmentsOffset`

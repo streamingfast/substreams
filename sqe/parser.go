@@ -144,7 +144,7 @@ func (p *Parser) parseExpression(depth int) (Expression, error) {
 				return nil, fmt.Errorf("missing expression after 'or' clause: %w", err)
 			}
 
-			// It's impossible to coascle `||` expressions since they are recursive
+			// It's impossible to coalesce `||` expressions since they are recursive
 			left = &OrExpression{Children: []Expression{left, right}}
 
 		default:

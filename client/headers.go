@@ -3,6 +3,7 @@ package client
 type Headers map[string]string
 
 const ApiKeyHeader = "x-api-key"
+const SecretKeyHeader = "authorization"
 
 func (h Headers) Append(headers map[string]string) map[string]string {
 	for key, value := range headers {

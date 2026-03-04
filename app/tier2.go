@@ -43,6 +43,7 @@ type Tier2App struct {
 
 type Tier2Modules struct {
 	CheckPendingShutDown func() bool
+	Authenticator        dauth.Authenticator
 }
 
 func NewTier2(logger *zap.Logger, config *Tier2Config, modules *Tier2Modules) *Tier2App {
@@ -108,12 +109,13 @@ func (a *Tier2App) Run() error {
 		return err
 	}
 
-	// tier2 always trusts the headers sent from tier1
-	trustAuth, err := dauth.New("trust://", a.logger)
-	if err != nil {
-		return fmt.Errorf("failed to setup trust authenticator: %w", err)
+	if a.modules.Authenticator == nil {
+		trustAuth, err := dauth.New("trust://", a.logger)
+		if err != nil {
+			return fmt.Errorf("failed to setup trust authenticator: %w", err)
+		}
+		a.modules.Authenticator = trustAuth
 	}
-
 	// app shuts down the service with its listener
 	a.OnTerminating(func(err error) {
 		a.setIsReady(false)
@@ -124,7 +126,7 @@ func (a *Tier2App) Run() error {
 		a.logger.Info("launching gRPC server")
 		a.setIsReady(true)
 
-		err := service.ListenTier2(a.config.GRPCListenAddr, a.config.ServiceDiscoveryURL, svc, trustAuth, a.logger, a.HealthCheck, false)
+		err := service.ListenTier2(a.config.GRPCListenAddr, a.config.ServiceDiscoveryURL, svc, a.modules.Authenticator, a.logger, a.HealthCheck, false)
 		a.Shutdown(err)
 	}()
 

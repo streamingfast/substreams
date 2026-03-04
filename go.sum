@@ -553,8 +553,8 @@ github.com/streamingfast/bstream v0.0.2-0.20260219205021-a73f004bfdea h1:dshasnf
 github.com/streamingfast/bstream v0.0.2-0.20260219205021-a73f004bfdea/go.mod h1:6IkpMw6g2z+E4gH2DJkm6vsQfZ8Y/WdYdYWjsLJIYr4=
 github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b h1:ztYeX3/5rg2tV2EU7edcrcHzMz6wUbdJB+LqCrP5W8s=
 github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b/go.mod h1:o9R/tjNON01X2mgWL5qirl2MV6xQ4EZI5D504ST3K/M=
-github.com/streamingfast/dauth v0.0.0-20251218134044-fb716c7172b4 h1:qJmiXzqs3T7124+FXEnhPgK/3fbSjqjQuBTdIrUk4Oc=
-github.com/streamingfast/dauth v0.0.0-20251218134044-fb716c7172b4/go.mod h1:4g4HFFqtlmdK1FIxnVToetc7unBRAGRSjc4VArvUmbM=
+github.com/streamingfast/dauth v0.0.0-20260304175046-02898e30442d h1:NYrpGcWWLNpIYbHwvNo/W8E+oXhsrn/0kUwun0Rwx8w=
+github.com/streamingfast/dauth v0.0.0-20260304175046-02898e30442d/go.mod h1:4g4HFFqtlmdK1FIxnVToetc7unBRAGRSjc4VArvUmbM=
 github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c h1:6WjE2yInE+5jnI7cmCcxOiGZiEs2FQm9Zsg2a9Ivp0Q=
 github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c/go.mod h1:dbfiy9ORrL8c6ldSq+L0H9pg8TOqqu/FsghsgUEWK54=
 github.com/streamingfast/derr v0.0.0-20250814163534-bd7407bd89d7 h1:KeyhmbdPhEzot+On1XrHSAOmRoeyIRiM0EkGQAqnVxI=

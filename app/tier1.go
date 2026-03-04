@@ -87,6 +87,7 @@ type Tier1Config struct {
 	SubrequestsEndpoint     string
 	SubrequestsInsecure     bool
 	SubrequestsPlaintext    bool
+	SubrequestsSecret       string
 
 	SharedCacheSize  uint64
 	OutputBufferSize uint64 // Used to bundle execout messages within 'BlockScopedDatas' when using protocol V4
@@ -205,10 +206,14 @@ func (a *Tier1App) Run() error {
 		go forkableHub.Run()
 	}
 
+	authType := client.None
+	if a.config.SubrequestsSecret != "" {
+		authType = client.SecretKey
+	}
 	subRequestsClientConfig := client.NewSubstreamsClientConfig(client.SubstreamsClientConfigOptions{
 		Endpoint:             a.config.SubrequestsEndpoint,
-		AuthToken:            "",
-		AuthType:             client.None,
+		AuthToken:            a.config.SubrequestsSecret,
+		AuthType:             authType,
 		Insecure:             a.config.SubrequestsInsecure,
 		PlainText:            a.config.SubrequestsPlaintext,
 		Agent:                "substreams_tier1",

@@ -8,6 +8,7 @@ import (
 
 type Stream struct {
 	respFunc substreams.ResponseFunc
+	dataSent bool
 }
 
 func New(respFunc substreams.ResponseFunc) *Stream {
@@ -17,11 +18,17 @@ func New(respFunc substreams.ResponseFunc) *Stream {
 }
 
 func (s *Stream) BlockScopedData(in *pbsubstreamsrpc.BlockScopedData) error {
+	s.dataSent = true
 	return s.respFunc(substreams.NewBlockScopedDataResponse(in))
 }
 
 func (s *Stream) BlockScopedDatas(in *pbsubstreamsrpcv4.BlockScopedDatas) error {
+	s.dataSent = true
 	return s.respFunc(substreams.NewBlockScopedDatasResponse(in))
+}
+
+func (s *Stream) DataSent() bool {
+	return s.dataSent
 }
 
 func (s *Stream) SendModulesStats(stats []*pbsubstreamsrpc.ModuleStats, stages []*pbsubstreamsrpc.Stage, jobs []*pbsubstreamsrpc.Job, bytesRead, bytesWritten, blocksProcessed uint64) error {

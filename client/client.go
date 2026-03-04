@@ -37,6 +37,7 @@ const (
 	None AuthType = iota
 	JWT
 	ApiKey
+	SecretKey
 )
 
 type ProtocolVersion int
@@ -107,7 +108,7 @@ type SubstreamsClientConfigOptions struct {
 	Endpoint string
 	// AuthToken is the authentication token (JWT or API key)
 	AuthToken string
-	// AuthType specifies the type of authentication (None, JWT, or ApiKey)
+	// AuthType specifies the type of authentication (None, JWT, ApiKey or Secret)
 	AuthType AuthType
 	// Insecure allows insecure TLS connections (skips certificate verification)
 	Insecure bool
@@ -174,6 +175,7 @@ func (c *SubstreamsClientConfig) MarshalLogObject(encoder zapcore.ObjectEncoder)
 	encoder.AddBool("client_insecure", c.insecure)
 	encoder.AddBool("jwt_set", c.authToken != "" && c.authType == JWT)
 	encoder.AddBool("api_key_set", c.authToken != "" && c.authType == ApiKey)
+	encoder.AddBool("secret_set", c.authToken != "" && c.authType == SecretKey)
 
 	return nil
 }
@@ -284,7 +286,6 @@ func NewSubstreamsInternalClient(config *SubstreamsClientConfig) (cli pbssintern
 	bootStrapFilename := os.Getenv("GRPC_XDS_BOOTSTRAP")
 
 	var dialOptions []grpc.DialOption
-	skipAuth := authType == None || usePlainTextConnection
 	if bootStrapFilename != "" {
 		log.Println("Using xDS credentials...")
 		creds, err := xdscreds.NewClientCredentials(xdscreds.ClientOptions{FallbackCreds: insecure.NewCredentials()})
@@ -316,15 +317,17 @@ func NewSubstreamsInternalClient(config *SubstreamsClientConfig) (cli pbssintern
 	}
 	closeFunc = conn.Close
 
-	if !skipAuth {
-		if authType == JWT {
-			zlog.Debug("creating oauth access", zap.String("endpoint", endpoint))
-			tokenSource := oauth.TokenSource{TokenSource: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: authToken, TokenType: "Bearer"})}
-			callOpts = append(callOpts, grpc.PerRPCCredentials(tokenSource))
-		} else if authType == ApiKey {
-			zlog.Debug("creating api key access", zap.String("endpoint", endpoint))
-			headers = map[string]string{ApiKeyHeader: authToken}
-		}
+	switch authType {
+	case JWT:
+		zlog.Debug("creating oauth access", zap.String("endpoint", endpoint))
+		tokenSource := oauth.TokenSource{TokenSource: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: authToken, TokenType: "Bearer"})}
+		callOpts = append(callOpts, grpc.PerRPCCredentials(tokenSource))
+	case ApiKey:
+		zlog.Debug("creating api key access", zap.String("endpoint", endpoint))
+		headers = map[string]string{ApiKeyHeader: authToken}
+	case SecretKey:
+		zlog.Debug("using secret key", zap.String("endpoint", endpoint))
+		headers = map[string]string{SecretKeyHeader: authToken}
 	}
 
 	zlog.Debug("creating new client", zap.String("endpoint", endpoint))

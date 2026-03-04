@@ -34,6 +34,7 @@ func init() {
 	tier2CallCmd.Flags().StringArrayP("params", "p", nil, "Set a params for parameterizable modules. Can be specified multiple times. Ex: -p module1=valA -p module2=valX&valY")
 	tier2CallCmd.Flags().String("metering-plugin", "null://", "Metering configuration")
 	tier2CallCmd.Flags().String("block-type", "sf.ethereum.type.v2.Block", "Block type")
+	tier2CallCmd.Flags().String("foundational-stores-config-path", "", "path to file containing foundational stores configuration")
 	tier2CallCmd.Flags().String("merged-blocks-store-url", "./firehose-data/storage/merged-blocks", "Merged blocks store")
 	tier2CallCmd.Flags().Uint64("state-bundle-size", uint64(1_000), "State segment size")
 	tier2CallCmd.Flags().Uint64("first-streamable-block", 0, "First Streamable block on the chain (usually 0 or 1, some networks start at arbitrary block numbers)")
@@ -109,7 +110,6 @@ func tier2CallE(cmd *cobra.Command, args []string) error {
 		for k, v := range res {
 			headerArray = append(headerArray, k, v)
 		}
-		fmt.Println("the header array is this", headerArray)
 		ctx = metadata.AppendToOutgoingContext(ctx, headerArray...)
 	}
 

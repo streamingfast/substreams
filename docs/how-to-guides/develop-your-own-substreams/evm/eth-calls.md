@@ -10,6 +10,14 @@ In this tutorial, you will learn how to perform contract calls (`eth_calls`) thr
 Specifically, you will query the USDT smart contract (`0xdac17f958d2ee523a2206206994597c13d831ec7`) to get the number of decimals used by the token.
 The USDT smart contract exposes a read function called `decimals`.
 
+## Block State Execution
+
+{% hint style="success" %}
+**Important:** All `eth_call` operations are executed at the **specific block hash** being processed by your Substreams module, not at the latest block state. This guarantees **deterministic execution** across all runs and ensures that your Substreams module will produce the same results when processing the same block, regardless of when it runs.
+
+The RPC endpoint automatically uses the block hash of the block being processed, so you never need to specify a block number or worry about using "latest" state.
+{% endhint %}
+
 ## Pre-requisites
 
 - You have some knowledge about Substreams ([modules](../../../references/substreams-components/modules/modules.md) and [fundamentals](../../../references/architecture.md)).

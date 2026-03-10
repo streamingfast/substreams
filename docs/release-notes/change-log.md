@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Add optional 'secret key' authentication between tier1 and tier2 services
 * substreams client library will no longer forcefully strip authentication from plaintext connections
 * substreams tier1 will now retry failed tier2 jobs that stream data directly if they have not produced any data yet.
+* substreams worker jobs will always retry tier2 jobs that return with codes.Unavailable: `no healthy upstream`, considering this error as load-balancer version of codes.ResourceExhausted
 
 ## v1.18.2
 

@@ -150,7 +150,7 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 					return err
 
 				}
-				if grpcError := dgrpc.AsGRPCError(err); grpcError != nil && grpcError.Code() == codes.ResourceExhausted { // tier2 overloaded
+				if grpcError := dgrpc.AsGRPCError(err); grpcError != nil && (grpcError.Code() == codes.ResourceExhausted || (grpcError.Code() == codes.Unavailable && strings.Contains(err.Error(), "no healthy upstream"))) {
 					stats.RecordJobDelayed(jobIdx)
 					metrics.Tier1WorkerRejectedOverloadedCounter.Inc()
 					// don't count towards maxRetries, retry immediately

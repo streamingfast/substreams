@@ -186,6 +186,20 @@ func (a *Tier1App) Run() error {
 
 	if withLive {
 		liveSourceFactory := bstream.SourceFactory(func(h bstream.Handler) bstream.Source {
+			if strings.Contains(a.config.BlockStreamAddr, ",") {
+				return NewMultiplexedSource(
+					bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
+						a.modules.HeadBlockNumberMetric.SetUint64(blk.Number)
+						a.modules.HeadTimeDriftMetric.SetBlockTime(blk.Time())
+						return h.ProcessBlock(blk, obj)
+					}),
+					strings.Split(a.config.BlockStreamAddr, ","),
+					time.Hour*999999,
+					2,
+					a.logger,
+				)
+			}
+
 			return blockstream.NewSource(
 				context.Background(),
 				a.config.BlockStreamAddr,

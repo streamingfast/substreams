@@ -53,7 +53,10 @@ func ListenTier1(
 		logger.Info("handling request", zap.String("content-type", contentType))
 
 		// Loose match for safety
-		if strings.HasPrefix(contentType, "application/connect") || contentType == "application/json" || strings.Contains(contentType, "json") {
+		if strings.HasPrefix(contentType, "application/connect") ||
+			strings.HasPrefix(contentType, "application/grpc-web") ||
+			contentType == "application/json" ||
+			strings.Contains(contentType, "json") {
 			logger.Debug("forwarding gRPC-Web request")
 			connectServer.ServeHTTP(w, r)
 			return

@@ -34,18 +34,16 @@ func parseUint64EnvVar(envVar string, defaultValue uint64) uint64 {
 }
 
 var usableMemoryBytesMemoized uint64
+var usableMemoryOnce sync.Once
 
 func usableMemoryBytes() uint64 {
-	if usableMemoryBytesMemoized != 0 {
-		return usableMemoryBytesMemoized
-	}
-
-	if mem, err := memlimit.FromCgroup(); err == nil {
-		usableMemoryBytesMemoized = mem
-	} else {
-		usableMemoryBytesMemoized = memory.TotalMemory()
-	}
-
+	usableMemoryOnce.Do(func() {
+		if mem, err := memlimit.FromCgroup(); err == nil {
+			usableMemoryBytesMemoized = mem
+		} else {
+			usableMemoryBytesMemoized = memory.TotalMemory()
+		}
+	})
 	return usableMemoryBytesMemoized
 }
 
@@ -137,7 +135,10 @@ func (arh *ActiveRequestsHandler) AllocateFullKVSizeOrForceCancelRequest(size ui
 		}
 
 		totalLoaded := arh.totalLoadedSize()
-		availableMemory := arh.manager.totalStoreSizeLimitBytes - totalLoaded
+		var availableMemory uint64
+		if arh.manager.totalStoreSizeLimitBytes > totalLoaded {
+			availableMemory = arh.manager.totalStoreSizeLimitBytes - totalLoaded
+		}
 
 		if logTotalStoreSize {
 			arh.manager.logger.Info("allocating memory for request",

@@ -298,9 +298,11 @@ func (j *junctionBlockGetter) ProcessBlock(block *pbbstream.Block, obj interface
 func NewCursorResolver(hub *hub.ForkableHub, mergedBlocksStore, forkedBlocksStore dstore.Store) CursorResolver {
 	return func(ctx context.Context, cursor *bstream.Cursor) (reorgJunctionBlock, currentHead bstream.BlockRef, err error) {
 		jctBlkGetter := &junctionBlockGetter{}
+		var isFromFile bool
 		src := hub.SourceFromCursor(cursor, jctBlkGetter)
 		if src == nil { // block is out of reversible segment
 			src = bstream.NewFileSourceFromCursor(mergedBlocksStore, forkedBlocksStore, cursor, jctBlkGetter, zap.NewNop())
+			isFromFile = true
 		}
 
 		go func() {
@@ -321,9 +323,11 @@ func NewCursorResolver(hub *hub.ForkableHub, mergedBlocksStore, forkedBlocksStor
 			if headNum, headID, _, _, err := hub.HeadInfo(); err == nil {
 				headBlock = bstream.NewBlockRef(headID, headNum)
 			}
+			reqctx.Logger(ctx).Warn("cursor resolver failed", zap.Stringer("cursor", cursor), zap.Error(src.Err()))
 			return cursor.LIB, headBlock, nil
 		}
 
+		reqctx.Logger(ctx).Info("cursor resolver succeeded", zap.Stringer("cursor", cursor), zap.Bool("from_file", isFromFile), zap.Stringer("junctionBlock", jctBlkGetter.reorgJunctionBlock))
 		return jctBlkGetter.reorgJunctionBlock, jctBlkGetter.currentHead, nil
 	}
 }

@@ -248,15 +248,15 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 	firstItemTime := time.Duration(0)
 	cumulativePayloadSize := 0
 	for item, err := range reader.Iter() {
+		if err != nil {
+			return fmt.Errorf("iterating on execout reader: %w", err)
+		}
+
 		if itemCount == 0 {
 			firstItemTime = time.Since(iterationStartTime)
 		}
 
 		cumulativePayloadSize += len(item.Payload)
-
-		if err != nil {
-			return fmt.Errorf("iterating on execout reader: %w", err)
-		}
 		if item.BlockNum < r.StartBlock {
 			continue
 		}

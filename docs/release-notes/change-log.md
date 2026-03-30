@@ -13,12 +13,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Server
 
-* Add optional 'secret key' authentication between tier1 and tier2 services
+* Add optional 'secret key' authentication between tier1 and tier2 services.
 * Fixed a case where a nil pointer exception could happen on storage error(s).
-* substreams client library will no longer forcefully strip authentication from plaintext connections
-* substreams tier1 will now retry failed tier2 jobs that stream data directly if they have not produced any data yet.
-* substreams worker jobs will always retry tier2 jobs that return with codes.Unavailable: `no healthy upstream`, considering this error as load-balancer version of codes.ResourceExhausted
-* substreams will reject requests with stores when expected total memory usage from stores alone are above 45% (down from prev. 75%)
+* Substreams client library will no longer forcefully strip authentication from plaintext connections.
+* Substreams tier1 will now retry failed tier2 jobs that stream data directly if they have not produced any data yet.
+* Substreams worker jobs will always retry tier2 jobs that return with codes.Unavailable: `no healthy upstream`, considering this error as load-balancer version of `codes.ResourceExhausted`.
+* Substreams will reject requests with stores when expected total memory usage from stores alone are above 45% (down from prev. 75%)
   You can set `SUBSTREAMS_TOTAL_STORE_SIZE_LIMIT_PERCENT=75` to go back to previous behavior or `SUBSTREAMS_ENFORCE_TOTAL_STORE_SIZE_LIMIT=false` to disable the feature.
 
 ## v1.18.2

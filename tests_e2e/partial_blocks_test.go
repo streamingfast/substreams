@@ -27,9 +27,7 @@ func TestPartialBlocksSimple(t *testing.T) {
 	//zlog := zap.NewNop()
 
 	// Create temporary directory for volume mount
-	tmpDir, err := os.MkdirTemp("", "firehose-data-")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	// launch dummy blockchain container with flash blocks enabled
 	image := latestDummyBlockchainImage
@@ -184,9 +182,7 @@ func TestPartialBlocksWithStores(t *testing.T) {
 			// zlog := MustCreateLoggerWithServiceName("partial-blocks-test") // use this to include verbose substreams service logs
 
 			// Create temporary directory for volume mount
-			tmpDir, err := os.MkdirTemp("", "firehose-data-")
-			require.NoError(t, err)
-			defer os.RemoveAll(tmpDir)
+			tmpDir := t.TempDir()
 
 			// launch dummy blockchain container with flash blocks enabled
 			image := latestDummyBlockchainImage
@@ -354,9 +350,7 @@ func TestPartialBlocksReorgs(t *testing.T) {
 			// zlog := zap.NewNop()
 
 			// Create temporary directory for volume mount
-			tmpDir, err := os.MkdirTemp("", "firehose-data-")
-			require.NoError(t, err)
-			defer os.RemoveAll(tmpDir)
+			tmpDir := t.TempDir()
 
 			// launch dummy blockchain container with flash blocks enabled
 			image := latestDummyBlockchainImage

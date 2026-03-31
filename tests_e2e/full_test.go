@@ -3,7 +3,6 @@ package tests_e2e
 import (
 	"context"
 	"io"
-	"os"
 	"testing"
 
 	"github.com/streamingfast/logging"
@@ -25,9 +24,7 @@ func TestDummyBlockchainContainer(t *testing.T) {
 	ctx := context.Background()
 
 	// Create temporary directory for volume mount
-	tmpDir, err := os.MkdirTemp("", "firehose-data-")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	// launch dummy blockchain container
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", 1000)

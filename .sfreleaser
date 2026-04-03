@@ -7,3 +7,4 @@ release:
   goreleaser-docker-image: "goreleaser/goreleaser-cross:v1.25"
   pre-build-hooks:
     - "go test ./..."
+    - "go test ./tests_e2e"

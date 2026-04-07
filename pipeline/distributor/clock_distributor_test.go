@@ -1,4 +1,4 @@
-package execout
+package distributor
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"iter"
 	"testing"
 
+	"github.com/streamingfast/substreams/storage/execout"
 	pboutput "github.com/streamingfast/substreams/storage/execout/pb"
 	"github.com/stretchr/testify/assert"
 
@@ -82,19 +83,19 @@ func (m *MockFileReader) SetReadError(err error) {
 func TestNewClockDistributor(t *testing.T) {
 	tests := []struct {
 		name       string
-		execOuts   map[string]FileReader
+		execOuts   map[string]execout.FileReader
 		startBlock uint64
 		stopBlock  uint64
 	}{
 		{
 			name:       "empty exec outs",
-			execOuts:   make(map[string]FileReader),
+			execOuts:   make(map[string]execout.FileReader),
 			startBlock: 100,
 			stopBlock:  200,
 		},
 		{
 			name: "single exec out",
-			execOuts: map[string]FileReader{
+			execOuts: map[string]execout.FileReader{
 				"module1": &MockFileReader{moduleName: "module1", filename: "file1.output"},
 			},
 			startBlock: 100,
@@ -102,7 +103,7 @@ func TestNewClockDistributor(t *testing.T) {
 		},
 		{
 			name: "multiple exec outs",
-			execOuts: map[string]FileReader{
+			execOuts: map[string]execout.FileReader{
 				"module1": &MockFileReader{moduleName: "module1", filename: "file1.output"},
 				"module2": &MockFileReader{moduleName: "module2", filename: "file2.output"},
 			},
@@ -113,7 +114,7 @@ func TestNewClockDistributor(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cd := NewClockDistributor(tt.execOuts, tt.startBlock, tt.stopBlock)
+			cd := NewClockDistributor(tt.execOuts, tt.startBlock, tt.stopBlock, nil, nil, nil)
 
 			assert.NotNil(t, cd)
 			assert.Equal(t, tt.execOuts, cd.execOuts)
@@ -177,12 +178,12 @@ func TestClockDistributor_Next_MultipleModules(t *testing.T) {
 	}
 	mockReader2.SetItems(items2)
 
-	execOuts := map[string]FileReader{
+	execOuts := map[string]execout.FileReader{
 		"module1": mockReader1,
 		"module2": mockReader2,
 	}
 
-	cd := NewClockDistributor(execOuts, 100, 106)
+	cd := NewClockDistributor(execOuts, 100, 106, nil, nil, nil)
 	ctx := context.Background()
 
 	clock, err := cd.Next(ctx)
@@ -209,6 +210,6 @@ func TestClockDistributor_Next_MultipleModules(t *testing.T) {
 	assert.Equal(t, "block_105", clock.Id)
 
 	clock, err = cd.Next(ctx)
+	require.Error(t, err)
 	assert.Equal(t, io.EOF, err)
-	assert.Nil(t, clock)
 }

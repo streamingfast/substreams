@@ -32,6 +32,7 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/pipeline/cache"
+	"github.com/streamingfast/substreams/pipeline/distributor"
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/active_requests"
@@ -580,9 +581,18 @@ excludable:
 
 		ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/pipeline/mapper_stream")
 
-		distributor := execout.NewClockDistributor(executionPlan.ExistingExecOuts, startBlock, stopBlock)
+		//distributor := execout.NewClockDistributor(executionPlan.ExistingExecOuts, startBlock, stopBlock)
+		inputs := execGraph.OutputModule().Inputs
+		dist := distributor.NewClockDistributor(
+			executionPlan.ExistingExecOuts,
+			startBlock,
+			stopBlock,
+			inputs,
+			pipe.StagedModuleExecutorsMap,
+			pipe.StagedModuleExecutors,
+		)
 
-		for clock, err := range distributor.Iter(ctx) {
+		for clock, err := range dist.Iter(ctx) {
 			if err != nil {
 				span.EndWithErr(&err)
 				return pipe.OnStreamTerminated(ctx, err)

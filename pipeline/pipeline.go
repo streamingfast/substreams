@@ -13,6 +13,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/logging"
+	"github.com/streamingfast/logging/zapx"
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/foudational_store"
@@ -126,6 +127,7 @@ type Pipeline struct {
 	insideReorgUpTo bstream.BlockRef
 
 	execOutputCache *cache.Engine
+	moduleCache     *cache.ModuleCache
 	blockType       string
 
 	// lastFinalClock should always be either THE `stopBlock` or a block beyond that point
@@ -152,6 +154,7 @@ func New(
 	execoutStorage *execout.Configs,
 	wasmRuntime *wasm.Registry,
 	execOutputCache *cache.Engine,
+	moduleCache *cache.ModuleCache,
 	stateBundleSize uint64,
 	workerPoolFactory work.WorkerPoolFactory,
 	respFunc substreams.ResponseFunc,
@@ -167,6 +170,7 @@ func New(
 		isTier1:                  isTier1,
 		gate:                     newGate(ctx),
 		execOutputCache:          execOutputCache,
+		moduleCache:              moduleCache,
 		stateBundleSize:          stateBundleSize,
 		preexistingBlockIndices:  indices,
 		blockType:                blockType,
@@ -769,30 +773,57 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 		return nil
 	}
 
-	reqModules := reqctx.Details(ctx).Modules
+	logger := reqctx.Logger(ctx)
+	logger = logger.Named("BuildModuleExecutors")
+
+	reqDetails := reqctx.Details(ctx)
+	reqModules := reqDetails.Modules
 	tracer := otel.GetTracerProvider().Tracer("executor")
 
 	loadedModules := make(map[moduleKey]wasm.Module)
+	loadingModuleStart := time.Now()
+	moduleHashDuration := time.Duration(0)
 	for _, stage := range p.executionStages {
 		for _, layer := range stage {
 			for _, module := range layer {
 				code := reqModules.Binaries[module.BinaryIndex]
 				key := moduleKey{binaryIndex: module.BinaryIndex, binaryType: code.Type}
+
+				moduleHashStart := time.Now()
+				moduleHash := p.execGraph.ModuleHashes()[module.Name]
+				_ = moduleHash
+				moduleHashDuration += time.Since(moduleHashStart)
+
 				if _, exists := loadedModules[key]; exists {
 					continue
 				}
-				m, err := p.wasmRuntime.NewModule(ctx, code.Content, code.Type)
-				if err != nil {
-					return fmt.Errorf("new wasm module: %w", err)
+
+				var m wasm.Module
+				var err error
+				if p.moduleCache != nil {
+					if cachedModule, found := p.moduleCache.Get(moduleHash); found {
+						m = cachedModule
+					}
+				}
+
+				if m == nil {
+					m, err = p.wasmRuntime.NewModule(ctx, code.Content, code.Type)
+					if err != nil {
+						return fmt.Errorf("new wasm module: %w", err)
+					}
+					if p.moduleCache != nil {
+						p.moduleCache.Set(moduleHash, m)
+					}
 				}
 				loadedModules[key] = m
 			}
 		}
 	}
-
+	loadingModuleDuration := time.Since(loadingModuleStart)
 	p.loadedModules = loadedModules
 	modulesInitBlocks := p.execGraph.ModulesInitBlocks()
 
+	executerCreationStart := time.Now()
 	var stagedModuleExecutors [][]exec.ModuleExecutor
 	for stageIndex, stage := range p.executionStages {
 		for layerIndex, layer := range stage {
@@ -916,6 +947,15 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 		}
 	}
 
+	executerCreationDuratiom := time.Since(executerCreationStart)
+
+	logger.Info("build module executers",
+		zapx.HumanDuration("module hash", moduleHashDuration),
+		zapx.HumanDuration("build module executers", executerCreationDuratiom),
+		zapx.HumanDuration("module loading", loadingModuleDuration),
+		zap.Bool("keep", false),
+	)
+
 	p.StagedModuleExecutors = stagedModuleExecutors
 	return nil
 }
@@ -928,11 +968,11 @@ func (p *Pipeline) cleanUpModuleExecutors(ctx context.Context, logger *zap.Logge
 			}
 		}
 	}
-	for key, mod := range p.loadedModules {
-		if err := mod.Close(ctx); err != nil {
-			return fmt.Errorf("closing wasm module %+v: %w", key, err)
-		}
-	}
+	//for key, mod := range p.loadedModules {
+	//	if err := mod.Close(ctx); err != nil {
+	//		return fmt.Errorf("closing wasm module %+v: %w", key, err)
+	//	}
+	//}
 
 	return nil
 }

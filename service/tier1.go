@@ -94,6 +94,7 @@ type Tier1Service struct {
 	streamFactoryFunc     StreamFactoryFunc
 	blockExecutionTimeout time.Duration
 	runtimeConfig         config.RuntimeConfig
+	moduleCache           *cache.ModuleCache
 	tracer                ttrace.Tracer
 	logger                *zap.Logger
 
@@ -223,6 +224,7 @@ func NewTier1(
 	s := &Tier1Service{
 		Shutter:                  shutter.New(),
 		runtimeConfig:            runtimeConfig,
+		moduleCache:              cache.NewModuleCache(),
 		blockType:                blockType,
 		tracer:                   tracing.GetTracer(),
 		resolveCursor:            pipeline.NewCursorResolver(hub, mergedBlocksStore, forkedBlocksStore),
@@ -766,6 +768,7 @@ func (s *Tier1Service) blocks(
 		execOutputConfigs,
 		wasmRuntime,
 		execOutputCacheEngine,
+		s.moduleCache,
 		segmentSize,
 		s.runtimeConfig.WorkerPoolFactory,
 		respFunc,

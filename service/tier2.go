@@ -95,6 +95,7 @@ type Tier2Service struct {
 	checkPendingShutdown func() bool
 
 	tier2RequestParameters *reqctx.Tier2RequestParameters
+	moduleCache            *cache.ModuleCache
 
 	simulateOverloaded *atomic.Bool                           // when true, the service will pretent that it is overloaded and refuse incoming requests
 	activeRequests     *active_requests.ActiveRequestsManager // we keep a list of current requests for the debugAPI and to manage memory
@@ -117,6 +118,7 @@ func NewTier2(
 		segmentExecutionTimeout: 60 * time.Minute,
 
 		simulateOverloaded: atomic.NewBool(false),
+		moduleCache:        cache.NewModuleCache(),
 
 		activeRequests: active_requests.NewActiveRequestsManager(logger),
 	}
@@ -362,6 +364,10 @@ func (s *Tier2Service) getWASMRegistry(wasmExtensionConfigs map[string]string) (
 
 func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) error {
 	logger := reqctx.Logger(ctx)
+	start := time.Now()
+	defer func() {
+		logger.Info("processRange completed", zap.Duration("duration", time.Since(start)))
+	}()
 
 	mergedBlocksStore, cacheStore, unmeteredCacheStore, err := s.getStores(ctx, request)
 	if err != nil {
@@ -516,6 +522,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		execOutputConfigs,
 		wasmRegistry,
 		execOutputCacheEngine,
+		s.moduleCache,
 		request.SegmentSize,
 		nil,
 		respFunc,
@@ -581,7 +588,6 @@ excludable:
 
 		ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/pipeline/mapper_stream")
 
-		//distributor := execout.NewClockDistributor(executionPlan.ExistingExecOuts, startBlock, stopBlock)
 		inputs := execGraph.OutputModule().Inputs
 		dist := distributor.NewClockDistributor(
 			executionPlan.ExistingExecOuts,
@@ -633,9 +639,9 @@ excludable:
 		return pipe.OnStreamTerminated(ctx, fmt.Errorf("error getting stream: %w", err))
 	}
 
-	ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/pipeline/blocks_stream")
+	//ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/pipeline/blocks_stream")
 	streamErr = blockStream.Run(ctx)
-	span.EndWithErr(&streamErr)
+	//span.EndWithErr(&streamErr)
 
 	if errors.Is(context.Canceled, streamErr) {
 		streamErr = context.Cause(ctx)

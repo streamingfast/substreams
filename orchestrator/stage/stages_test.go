@@ -514,3 +514,183 @@ func TestStages_allocSegments(t *testing.T) {
 		})
 	}
 }
+
+func TestStages_dependenciesCompleted(t *testing.T) {
+	// makeDepsStages constructs a minimal Stages for testing dependenciesCompleted.
+	// segmentOffset: the base index subtracted when indexing into segmentStates.
+	// stageCount: number of stages (all sharing one segmenter for simplicity).
+	// firstIndex: segment index where the segmenter starts
+	//   (initialBlock = firstIndex * 10), so getState returns UnitNoOp for segments below it.
+	// segStates: the state matrix indexed as [segmentIdx - segmentOffset][stageIdx].
+	makeDepsStages := func(segmentOffset, stageCount, firstIndex int, segStates []stageStates) *Stages {
+		seg := block.NewSegmenter(10, uint64(firstIndex)*10, uint64(firstIndex*10+10000))
+		stages := make([]*Stage, stageCount)
+		for i := 0; i < stageCount; i++ {
+			stages[i] = &Stage{segmenter: seg}
+		}
+		return &Stages{
+			segmentOffset: segmentOffset,
+			segmentStates: segStates,
+			stages:        stages,
+		}
+	}
+
+	tests := []struct {
+		name string
+		s    *Stages
+		unit Unit
+		want bool
+	}{
+		// Stage 0 has no prior stages — always true.
+		{
+			name: "stage 0 always true regardless of other states",
+			s:    makeDepsStages(0, 2, 0, []stageStates{{UnitPending, UnitPending}}),
+			unit: Unit{Segment: 0, Stage: 0},
+			want: true,
+		},
+
+		// --- Stage 1: each possible state for the single prior stage ---
+		{
+			name: "stage 1 parent completed",
+			s:    makeDepsStages(0, 2, 0, []stageStates{{UnitCompleted, UnitPending}}),
+			unit: Unit{Segment: 0, Stage: 1},
+			want: true,
+		},
+		{
+			name: "stage 1 parent noop",
+			s:    makeDepsStages(0, 2, 0, []stageStates{{UnitNoOp, UnitPending}}),
+			unit: Unit{Segment: 0, Stage: 1},
+			want: true,
+		},
+		{
+			name: "stage 1 parent pending",
+			s:    makeDepsStages(0, 2, 0, []stageStates{{UnitPending, UnitPending}}),
+			unit: Unit{Segment: 0, Stage: 1},
+			want: false,
+		},
+		{
+			name: "stage 1 parent scheduled",
+			s:    makeDepsStages(0, 2, 0, []stageStates{{UnitScheduled, UnitPending}}),
+			unit: Unit{Segment: 0, Stage: 1},
+			want: false,
+		},
+		{
+			name: "stage 1 parent merging",
+			s:    makeDepsStages(0, 2, 0, []stageStates{{UnitMerging, UnitPending}}),
+			unit: Unit{Segment: 0, Stage: 1},
+			want: false,
+		},
+		{
+			name: "stage 1 parent partial present",
+			s:    makeDepsStages(0, 2, 0, []stageStates{{UnitMerging, UnitPartialPresent}}),
+			unit: Unit{Segment: 0, Stage: 1},
+			want: false,
+		},
+
+		// --- Shadowed parent: allowed only when the previous segment's parent is done ---
+		{
+			name: "stage 1 parent shadowed prev-segment-parent completed",
+			s: makeDepsStages(0, 2, 0, []stageStates{
+				{UnitCompleted, UnitPending},
+				{UnitShadowed, UnitPending},
+			}),
+			unit: Unit{Segment: 1, Stage: 1},
+			want: true,
+		},
+		{
+			// segmentOffset=1 means segment 0 is before the offset; getState returns UnitNoOp for it.
+			name: "stage 1 parent shadowed prev-segment-parent noop (segment before offset)",
+			s:    makeDepsStages(1, 2, 0, []stageStates{{UnitShadowed, UnitPending}}),
+			unit: Unit{Segment: 1, Stage: 1},
+			want: true,
+		},
+		{
+			name: "stage 1 parent shadowed prev-segment-parent pending",
+			s: makeDepsStages(0, 2, 0, []stageStates{
+				{UnitPending, UnitPending},
+				{UnitShadowed, UnitPending},
+			}),
+			unit: Unit{Segment: 1, Stage: 1},
+			want: false,
+		},
+
+		// --- PartialPresent parent: same rule as Shadowed ---
+		{
+			name: "stage 1 parent partial-present prev-segment-parent completed",
+			s: makeDepsStages(0, 2, 0, []stageStates{
+				{UnitCompleted, UnitPending},
+				{UnitPartialPresent, UnitPending},
+			}),
+			unit: Unit{Segment: 1, Stage: 1},
+			want: true,
+		},
+		{
+			name: "stage 1 parent partial-present prev-segment-parent noop (segment before offset)",
+			s:    makeDepsStages(1, 2, 0, []stageStates{{UnitPartialPresent, UnitPending}}),
+			unit: Unit{Segment: 1, Stage: 1},
+			want: true,
+		},
+		{
+			name: "stage 1 parent partial-present prev-segment-parent pending",
+			s: makeDepsStages(0, 2, 0, []stageStates{
+				{UnitPending, UnitPending},
+				{UnitPartialPresent, UnitPending},
+			}),
+			unit: Unit{Segment: 1, Stage: 1},
+			want: false,
+		},
+
+		// --- Multi-stage (stage 2 has two prior stages that must both be satisfied) ---
+		{
+			name: "stage 2 all prior stages completed",
+			s:    makeDepsStages(0, 3, 0, []stageStates{{UnitCompleted, UnitCompleted, UnitPending}}),
+			unit: Unit{Segment: 0, Stage: 2},
+			want: true,
+		},
+		{
+			name: "stage 2 first prior stage pending",
+			s:    makeDepsStages(0, 3, 0, []stageStates{{UnitPending, UnitCompleted, UnitPending}}),
+			unit: Unit{Segment: 0, Stage: 2},
+			want: false,
+		},
+		{
+			name: "stage 2 second prior stage pending",
+			s:    makeDepsStages(0, 3, 0, []stageStates{{UnitCompleted, UnitPending, UnitPending}}),
+			unit: Unit{Segment: 0, Stage: 2},
+			want: false,
+		},
+		{
+			// previousSegmentParent = getState({seg 0, stage 1}) = UnitCompleted → shadowed stage 1 is OK
+			name: "stage 2 intermediate stage shadowed prev-segment-parent completed",
+			s: makeDepsStages(0, 3, 0, []stageStates{
+				{UnitCompleted, UnitCompleted, UnitPending},
+				{UnitCompleted, UnitShadowed, UnitPending},
+			}),
+			unit: Unit{Segment: 1, Stage: 2},
+			want: true,
+		},
+		{
+			// previousSegmentParent = getState({seg 0, stage 1}) = UnitPending → shadowed stage 1 blocks
+			name: "stage 2 intermediate stage shadowed prev-segment-parent pending",
+			s: makeDepsStages(0, 3, 0, []stageStates{
+				{UnitCompleted, UnitPending, UnitPending},
+				{UnitCompleted, UnitShadowed, UnitPending},
+			}),
+			unit: Unit{Segment: 1, Stage: 2},
+			want: false,
+		},
+
+		{
+			name: "pending parent at the first segment of the segmenter must return false",
+			s:    makeDepsStages(5, 2, 5, []stageStates{{UnitPending, UnitPending}}),
+			unit: Unit{Segment: 5, Stage: 1},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.s.dependenciesCompleted(tt.unit))
+		})
+	}
+}

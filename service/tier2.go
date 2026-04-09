@@ -96,6 +96,8 @@ type Tier2Service struct {
 
 	tier2RequestParameters *reqctx.Tier2RequestParameters
 	moduleCache            *cache.ModuleCache
+	evictionInterval       time.Duration
+	ttl                    time.Duration
 
 	simulateOverloaded *atomic.Bool                           // when true, the service will pretent that it is overloaded and refuse incoming requests
 	activeRequests     *active_requests.ActiveRequestsManager // we keep a list of current requests for the debugAPI and to manage memory
@@ -116,9 +118,10 @@ func NewTier2(
 		logger:                  logger,
 		blockExecutionTimeout:   3 * time.Minute,
 		segmentExecutionTimeout: 60 * time.Minute,
+		evictionInterval:        60 * time.Second,
+		ttl:                     10 * time.Minute,
 
 		simulateOverloaded: atomic.NewBool(false),
-		moduleCache:        cache.NewModuleCache(),
 
 		activeRequests: active_requests.NewActiveRequestsManager(logger),
 	}
@@ -146,7 +149,28 @@ func NewTier2(
 		opt(s)
 	}
 
+	if s.evictionInterval <= 0 {
+		s.evictionInterval = 60 * time.Second
+		s.logger.Warn("module cache evictionInterval was <= 0, reset to default", zap.Duration("value", s.evictionInterval))
+	}
+	if s.ttl <= 0 {
+		s.ttl = 10 * time.Minute
+		s.logger.Warn("module cache ttl was <= 0, reset to default", zap.Duration("value", s.ttl))
+	}
+
+	s.moduleCache = cache.NewModuleCache(s.evictionInterval, s.ttl)
+
 	return s, nil
+}
+
+func WithModuleCacheConfig(evictionInterval time.Duration, ttl time.Duration) Option {
+	return func(a anyTierService) {
+		switch s := a.(type) {
+		case *Tier2Service:
+			s.evictionInterval = evictionInterval
+			s.ttl = ttl
+		}
+	}
 }
 
 func (s *Tier2Service) isOverloaded() bool {

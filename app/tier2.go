@@ -18,6 +18,16 @@ import (
 	"go.uber.org/zap"
 )
 
+// returns config with default sane values
+func NewDefaultTier2Config() *Tier2Config {
+	return &Tier2Config{
+		BlockExecutionTimeout:   3 * time.Minute,
+		SegmentExecutionTimeout: 60 * time.Minute,
+		EvictionInterval:        30 * time.Second,
+		TTL:                     5 * time.Minute,
+	}
+}
+
 type Tier2Config struct {
 	GRPCListenAddr      string // gRPC address where this app will listen to
 	ServiceDiscoveryURL *url.URL
@@ -30,7 +40,9 @@ type Tier2Config struct {
 	SegmentExecutionTimeout   time.Duration
 	TmpDir                    string
 
-	Tracing bool
+	Tracing          bool
+	EvictionInterval time.Duration
+	TTL              time.Duration
 }
 
 type Tier2App struct {
@@ -99,6 +111,7 @@ func (a *Tier2App) Run() error {
 	if a.config.WASMExtensions != nil {
 		opts = append(opts, service.WithWASMExtensioner(a.config.WASMExtensions))
 	}
+	opts = append(opts, service.WithModuleCacheConfig(a.config.EvictionInterval, a.config.TTL))
 
 	svc, err := service.NewTier2(
 		a.logger,

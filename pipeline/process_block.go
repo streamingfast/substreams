@@ -267,6 +267,9 @@ func (p *Pipeline) handleUndo(clock *pbsubstreams.Clock, cursor *bstream.Cursor,
 
 	targetClock := blockRefToPB(reorgJunctionBlock)
 	lastValidBlockTimestamp := p.reversibleBlockTimestamps[reorgJunctionBlock.ID()]
+	if lastValidBlockTimestamp == nil {
+		reqctx.Logger(p.ctx).Debug("no timestamp found for reorg junction block, last_valid_block_timestamp will be unset in undo signal", zap.Stringer("reorg_junction_block", reorgJunctionBlock))
+	}
 
 	p.lastProcessedBlockRef = reorgJunctionBlock
 	p.lastCursor = targetCursor

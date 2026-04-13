@@ -3,6 +3,7 @@ syntax = "proto3";
 package sf.substreams.rpc.v2;
 
 import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
 import "sf/firehose/v2/firehose.proto";
 import "sf/substreams/v1/clock.proto";
 import "sf/substreams/v1/modules.proto";
@@ -101,6 +102,7 @@ message Response {
 message BlockUndoSignal {
   sf.substreams.v1.BlockRef last_valid_block = 1;
   string last_valid_cursor = 2;
+  google.protobuf.Timestamp last_valid_block_timestamp = 3;
 }
 
 message BlockScopedData {

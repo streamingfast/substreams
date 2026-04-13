@@ -37,6 +37,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // moduleKey combines binary index and type to handle cases where the same binary is used with different runtime extensions (wasm-bindgen-shims)
@@ -123,6 +124,8 @@ type Pipeline struct {
 	forkHandler     *ForkHandler
 	insideReorgUpTo bstream.BlockRef
 
+	reversibleBlockTimestamps map[string]*timestamppb.Timestamp
+
 	execOutputCache *cache.Engine
 	blockType       string
 
@@ -178,6 +181,7 @@ func New(
 		execoutStorage:          execoutStorage,
 		forkHandler:             NewForkHandler(),
 		blockStepMap:            make(map[bstream.StepType]uint64),
+		reversibleBlockTimestamps: make(map[string]*timestamppb.Timestamp),
 		startTime:               time.Now(),
 		executionTimeout:        executionTimeout,
 		workerPoolFactory:       workerPoolFactory,

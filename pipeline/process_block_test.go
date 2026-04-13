@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func TestHandleStepPartial(t *testing.T) {
@@ -479,13 +480,14 @@ func setupTestPipeline(t *testing.T, executors [][]exec.ModuleExecutor) *Pipelin
 	ctx := setupTestContext(t, "test_module", 200)
 
 	pipe := &Pipeline{
-		ctx:                   ctx,
-		StagedModuleExecutors: executors,
-		forkHandler:           NewForkHandler(),
-		stores:                &Stores{logger: zap.NewNop()},
-		moduleNameToStage:     make(map[string]int),
-		blockStepMap:          make(map[bstream.StepType]uint64),
-		executionTimeout:      10000000000, // 10 seconds timeout for tests
+		ctx:                       ctx,
+		StagedModuleExecutors:     executors,
+		forkHandler:               NewForkHandler(),
+		stores:                    &Stores{logger: zap.NewNop()},
+		moduleNameToStage:         make(map[string]int),
+		blockStepMap:              make(map[bstream.StepType]uint64),
+		reversibleBlockTimestamps: make(map[string]*timestamppb.Timestamp),
+		executionTimeout:          10000000000, // 10 seconds timeout for tests
 	}
 
 	// Build module name to stage mapping

@@ -151,15 +151,13 @@ func NewTier2(
 	}
 
 	if s.evictionInterval <= 0 {
-		s.evictionInterval = 60 * time.Second
-		s.logger.Warn("module cache evictionInterval was <= 0, reset to default", zap.Duration("value", s.evictionInterval))
+		s.logger.Info("module cache disabled (evictionInterval <= 0)")
+	} else {
+		if s.ttl <= 0 {
+			return nil, fmt.Errorf("module cache ttl must be > 0 when module cache is enabled (evictionInterval > 0)")
+		}
+		s.moduleCache = cache.NewModuleCache(ctx, s.evictionInterval, s.ttl, logger)
 	}
-	if s.ttl <= 0 {
-		s.ttl = 10 * time.Minute
-		s.logger.Warn("module cache ttl was <= 0, reset to default", zap.Duration("value", s.ttl))
-	}
-
-	s.moduleCache = cache.NewModuleCache(ctx, s.evictionInterval, s.ttl, logger)
 
 	return s, nil
 }

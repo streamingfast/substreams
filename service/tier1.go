@@ -224,21 +224,20 @@ func NewTier1(
 	tier2RequestParameters.StateBundleSize = runtimeConfig.SegmentSize
 
 	logger.Info("launching tier1 service", zap.Reflect("client_config", substreamsClientConfig), zap.String("block_type", blockType), zap.Bool("with_live", hub != nil))
-	effectiveEvictionInterval := evictionInterval
+	var moduleCache *cache.ModuleCache
 	if evictionInterval <= 0 {
-		effectiveEvictionInterval = 60 * time.Second
-		logger.Warn("module cache evictionInterval was <= 0, reset to default", zap.Duration("value", effectiveEvictionInterval))
-	}
-	effectiveTTL := ttl
-	if ttl <= 0 {
-		effectiveTTL = 10 * time.Minute
-		logger.Warn("module cache ttl was <= 0, reset to default", zap.Duration("value", effectiveTTL))
+		logger.Info("module cache disabled (evictionInterval <= 0)")
+	} else {
+		if ttl <= 0 {
+			return nil, fmt.Errorf("module cache ttl must be > 0 when module cache is enabled (evictionInterval > 0)")
+		}
+		moduleCache = cache.NewModuleCache(ctx, evictionInterval, ttl, logger)
 	}
 
 	s := &Tier1Service{
 		Shutter:                  shutter.New(),
 		runtimeConfig:            runtimeConfig,
-		moduleCache:              cache.NewModuleCache(ctx, effectiveEvictionInterval, effectiveTTL, logger),
+		moduleCache:              moduleCache,
 		blockType:                blockType,
 		tracer:                   tracing.GetTracer(),
 		resolveCursor:            pipeline.NewCursorResolver(hub, mergedBlocksStore, forkedBlocksStore),

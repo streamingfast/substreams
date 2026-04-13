@@ -121,10 +121,8 @@ func (cd *ClockDistributor) Iter(ctx context.Context) iter.Seq2[*pbsubstreams.Cl
 			if err == io.EOF {
 				return
 			}
+
 			if !yield(clock, err) {
-				return
-			}
-			if err != nil {
 				return
 			}
 		}

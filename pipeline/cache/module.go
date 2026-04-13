@@ -10,7 +10,7 @@ import (
 )
 
 type ModuleCache struct {
-	sync.Mutex
+	sync.RWMutex
 	modules map[string]cacheEntry
 }
 
@@ -54,8 +54,8 @@ func NewModuleCache(ctx context.Context, evictionInterval time.Duration, ttl tim
 }
 
 func (c *ModuleCache) Get(hash string) (wasm.Module, bool) {
-	c.Lock()
-	defer c.Unlock()
+	c.RLock()
+	defer c.RUnlock()
 	entry, ok := c.modules[hash]
 	if !ok {
 		return nil, false

@@ -73,6 +73,7 @@ func NewTier2(logger *zap.Logger, config *Tier2Config, modules *Tier2Modules) *T
 }
 
 func (a *Tier2App) Run() error {
+	ctx := context.Background()
 
 	// declared in NewTier2, registered here
 	dmetrics.Register(metrics.MetricSet)
@@ -111,6 +112,7 @@ func (a *Tier2App) Run() error {
 	opts = append(opts, service.WithModuleCacheConfig(a.config.EvictionInterval, a.config.TTL))
 
 	svc, err := service.NewTier2(
+		ctx,
 		a.logger,
 		a.modules.CheckPendingShutDown,
 		opts...,

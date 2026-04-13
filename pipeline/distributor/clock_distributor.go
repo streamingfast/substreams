@@ -18,12 +18,12 @@ type ClockDistributor struct {
 	startBlock               uint64
 	stopBlock                uint64
 	nextClockNumber          uint64
-	inputs                   []*pbsubstreams.Module_Input
+	outputModuleInputs       []*pbsubstreams.Module_Input
 	stagedModuleExecutorsMap map[string]*execp.ExecutorPath
 	stagedModuleExecutors    [][]exec.ModuleExecutor
 }
 
-func NewClockDistributor(execOuts map[string]execout.FileReader, startBlock uint64, stopBlock uint64, inputs []*pbsubstreams.Module_Input, stagedModuleExecutorsMap map[string]*execp.ExecutorPath, stagedModuleExecutors [][]exec.ModuleExecutor) *ClockDistributor {
+func NewClockDistributor(execOuts map[string]execout.FileReader, startBlock uint64, stopBlock uint64, outputModuleInputs []*pbsubstreams.Module_Input, stagedModuleExecutorsMap map[string]*execp.ExecutorPath, stagedModuleExecutors [][]exec.ModuleExecutor) *ClockDistributor {
 	return &ClockDistributor{
 		execOuts:                 execOuts,
 		execOutsLastclock:        make(map[string]uint64),
@@ -31,7 +31,7 @@ func NewClockDistributor(execOuts map[string]execout.FileReader, startBlock uint
 		startBlock:               startBlock,
 		stopBlock:                stopBlock,
 		nextClockNumber:          startBlock,
-		inputs:                   inputs,
+		outputModuleInputs:       outputModuleInputs,
 		stagedModuleExecutorsMap: stagedModuleExecutorsMap,
 		stagedModuleExecutors:    stagedModuleExecutors,
 	}
@@ -41,11 +41,11 @@ func (cd *ClockDistributor) Next(ctx context.Context) (*pbsubstreams.Clock, erro
 	for i := cd.nextClockNumber; i < cd.stopBlock; i++ {
 		indicesSkip := true
 		if len(cd.stagedModuleExecutorsMap) > 0 {
-			for _, input := range cd.inputs {
+			for _, input := range cd.outputModuleInputs {
 				executerPath := cd.stagedModuleExecutorsMap[input.GetMap().ModuleName]
 				executer := cd.stagedModuleExecutors[executerPath.LayerIndex][executerPath.ModuleIndex]
 				if store := input.GetStore(); store != nil {
-					//Can not skip if store is deltas
+					//Cannot skip if store is deltas
 					if store.GetMode() == pbsubstreams.Module_Input_Store_DELTAS {
 						indicesSkip = false
 						break

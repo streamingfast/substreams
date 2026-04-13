@@ -612,12 +612,12 @@ excludable:
 
 		ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/pipeline/mapper_stream")
 
-		inputs := execGraph.OutputModule().Inputs
+		outputModuleInputs := execGraph.OutputModule().Inputs
 		dist := distributor.NewClockDistributor(
 			executionPlan.ExistingExecOuts,
 			startBlock,
 			stopBlock,
-			inputs,
+			outputModuleInputs,
 			pipe.StagedModuleExecutorsMap,
 			pipe.StagedModuleExecutors,
 		)

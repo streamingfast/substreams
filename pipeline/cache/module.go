@@ -1,10 +1,12 @@
 package cache
 
 import (
+	"context"
 	"sync"
 	"time"
 
 	"github.com/streamingfast/substreams/wasm"
+	"go.uber.org/zap"
 )
 
 type ModuleCache struct {
@@ -17,7 +19,8 @@ type cacheEntry struct {
 	fetchedAt time.Time
 }
 
-func NewModuleCache(evictionInterval time.Duration, ttl time.Duration) *ModuleCache {
+func NewModuleCache(ctx context.Context, evictionInterval time.Duration, ttl time.Duration, logger *zap.Logger) *ModuleCache {
+	logger = logger.Named("module-cache")
 	c := &ModuleCache{
 		modules: make(map[string]cacheEntry),
 	}
@@ -26,15 +29,24 @@ func NewModuleCache(evictionInterval time.Duration, ttl time.Duration) *ModuleCa
 		ticker := time.NewTicker(evictionInterval)
 		defer ticker.Stop()
 
-		for range ticker.C {
-			c.Lock()
-			cutoff := time.Now().Add(-ttl)
-			for hash, entry := range c.modules {
-				if entry.fetchedAt.Before(cutoff) {
-					delete(c.modules, hash)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				c.Lock()
+				cutoff := time.Now().Add(-ttl)
+				for hash, entry := range c.modules {
+					if entry.fetchedAt.Before(cutoff) {
+						if err := entry.mod.Close(ctx); err != nil {
+							logger.Warn("closing wasm module", zap.String("hash", hash), zap.Error(err))
+						}
+
+						delete(c.modules, hash)
+					}
 				}
+				c.Unlock()
 			}
-			c.Unlock()
 		}
 	}()
 

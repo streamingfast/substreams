@@ -106,6 +106,7 @@ type Tier2Service struct {
 const protoPkfPrefix = "type.googleapis.com/"
 
 func NewTier2(
+	ctx context.Context,
 	logger *zap.Logger,
 	checkPendingShutdown func() bool,
 	opts ...Option,
@@ -158,7 +159,7 @@ func NewTier2(
 		s.logger.Warn("module cache ttl was <= 0, reset to default", zap.Duration("value", s.ttl))
 	}
 
-	s.moduleCache = cache.NewModuleCache(s.evictionInterval, s.ttl)
+	s.moduleCache = cache.NewModuleCache(ctx, s.evictionInterval, s.ttl, logger)
 
 	return s, nil
 }
@@ -663,9 +664,9 @@ excludable:
 		return pipe.OnStreamTerminated(ctx, fmt.Errorf("error getting stream: %w", err))
 	}
 
-	//ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/pipeline/blocks_stream")
+	ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/pipeline/blocks_stream")
 	streamErr = blockStream.Run(ctx)
-	//span.EndWithErr(&streamErr)
+	span.EndWithErr(&streamErr)
 
 	if errors.Is(context.Canceled, streamErr) {
 		streamErr = context.Cause(ctx)

@@ -159,6 +159,7 @@ func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
 	return strings.TrimPrefix(out, protoPkfPrefix), nil
 }
 func NewTier1(
+	ctx context.Context,
 	logger *zap.Logger,
 	mergedBlocksStore dstore.Store,
 	forkedBlocksStore dstore.Store,
@@ -237,7 +238,7 @@ func NewTier1(
 	s := &Tier1Service{
 		Shutter:                  shutter.New(),
 		runtimeConfig:            runtimeConfig,
-		moduleCache:              cache.NewModuleCache(effectiveEvictionInterval, effectiveTTL),
+		moduleCache:              cache.NewModuleCache(ctx, effectiveEvictionInterval, effectiveTTL, logger),
 		blockType:                blockType,
 		tracer:                   tracing.GetTracer(),
 		resolveCursor:            pipeline.NewCursorResolver(hub, mergedBlocksStore, forkedBlocksStore),

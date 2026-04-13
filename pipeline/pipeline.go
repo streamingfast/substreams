@@ -968,11 +968,6 @@ func (p *Pipeline) cleanUpModuleExecutors(ctx context.Context, logger *zap.Logge
 			}
 		}
 	}
-	//for key, mod := range p.loadedModules {
-	//	if err := mod.Close(ctx); err != nil {
-	//		return fmt.Errorf("closing wasm module %+v: %w", key, err)
-	//	}
-	//}
 
 	return nil
 }

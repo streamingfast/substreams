@@ -83,9 +83,6 @@ func (a *Tier2App) Run() error {
 	}
 
 	var opts []service.Option
-	//for _, opt := range a.config.PipelineOptions {
-	//	opts = append(opts, service.WithPipelineOptions(opt))
-	//}
 
 	if a.config.Tracing {
 		opts = append(opts, service.WithModuleExecutionTracing())

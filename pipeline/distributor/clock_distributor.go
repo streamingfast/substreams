@@ -42,8 +42,12 @@ func (cd *ClockDistributor) Next(ctx context.Context) (*pbsubstreams.Clock, erro
 		indicesSkip := true
 		if len(cd.stagedModuleExecutorsMap) > 0 {
 			for _, input := range cd.outputModuleInputs {
-				executerPath := cd.stagedModuleExecutorsMap[input.GetMap().ModuleName]
-				executer := cd.stagedModuleExecutors[executerPath.LayerIndex][executerPath.ModuleIndex]
+
+				if source := input.GetSource(); source != nil {
+					indicesSkip = false
+					break
+				}
+
 				if store := input.GetStore(); store != nil {
 					//Cannot skip if store is deltas
 					if store.GetMode() == pbsubstreams.Module_Input_Store_DELTAS {
@@ -52,15 +56,21 @@ func (cd *ClockDistributor) Next(ctx context.Context) (*pbsubstreams.Clock, erro
 					}
 				}
 
-				if blockIndex := executer.BlockIndex(); blockIndex != nil {
-					if !blockIndex.Skip(i) {
+				if m := input.GetMap(); m != nil {
+					executerPath := cd.stagedModuleExecutorsMap[m.ModuleName]
+					executer := cd.stagedModuleExecutors[executerPath.LayerIndex][executerPath.ModuleIndex]
+
+					if blockIndex := executer.BlockIndex(); blockIndex != nil {
+						if !blockIndex.Skip(i) {
+							indicesSkip = false
+						}
+					} else {
+						//If on module as no index, we cannot skip the block
 						indicesSkip = false
+						break
 					}
-				} else {
-					//If on module as no index, we cannot skip the block
-					indicesSkip = false
-					break
 				}
+
 			}
 		} else {
 			indicesSkip = false

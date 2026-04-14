@@ -31,16 +31,20 @@ service Stream {
 // v2 request by accepting a full `.spkg` package instead of raw module definitions, and
 // adds support for parameter overrides and network selection applied server-side.
 message Request {
-  // if positive, determines the absolute requested start block
-  // if 0, the start block is determined by the chain's first streamable block
-  // if negative, the start block is relative to the chain HEAD (determined server-side at the time of the request)
+  // If positive, the absolute block number at which to start streaming (inclusive).
+  // If 0, streaming starts at the first streamable block of the chain.
+  // If negative, the start block is resolved relative to the chain HEAD at the time of
+  // the request (e.g., -10 starts 10 blocks before the current HEAD).
   int64 start_block_num = 1;
 
-  // start_cursor has precedence over start_block_num
+  // Cursor returned by a previous `BlockScopedData.cursor` or
+  // `BlockUndoSignal.last_valid_cursor`. When provided, streaming resumes from the exact
+  // position the cursor points to, taking precedence over `start_block_num`. Use this to
+  // implement reliable exactly-once resumption after disconnections or forks.
   string start_cursor = 2;
 
-  // if non-zero, processing will stop *before* this block (exclusive)
-  // if zero, processing will continue and keep up with the chain HEAD
+  // If non-zero, streaming stops *before* reaching this block number (exclusive upper bound).
+  // If zero, the stream continues indefinitely, following the chain HEAD in real-time.
   uint64 stop_block_num = 3;
 
   // With final_block_only, you only receive blocks that are irreversible:
@@ -69,20 +73,25 @@ message Request {
   bool production_mode = 5;
 
   // Name of the map module whose output should be streamed back to the client. Must be a
-  // `map` module defined in the provided `package`.
+  // `map` module defined in the provided `package`. Only one output module is supported per request.
   string output_module = 6;
 
   // The full .spkg package containing the module definitions and their code.
   sf.substreams.v1.Package package = 7;
+
   // Module parameter overrides to apply to the package server-side. Keys are module names, values are parameter strings.
   map<string, string> params = 8;
+
   // Network name to select when the package supports multiple networks (e.g., "mainnet", "sepolia").
   string network = 9;
 
   // Available only in developer mode
   repeated string debug_initial_store_snapshot_for_modules = 10;
 
-  // Prepares the stores and caches on the server, sending only progress messages and "minimal" clock data (and cursor)
+  // When true, prepares the stores and caches on the server without sending any module
+  // output. Only progress messages and minimal clock/cursor data are returned. Useful for
+  // pre-warming caches (e.g., to reduce latency for a subsequent real request) without
+  // incurring the cost of transmitting full block data.
   bool noop_mode = 11;
 
   // If set, the engine will reject a request if the number of blocks to process (including preparing the stores) is above this limit.
@@ -95,8 +104,7 @@ message Request {
   // This allows the user to reduce the payload in dev mode, while still getting some extra debugging information
   repeated string dev_output_modules = 13;
 
-  // Progress_messages_interval_ms is the interval between progress messages, in milliseconds (min 500ms)
-  // default: start at 500ms and ramp up to 5000ms within 1min
+  // Progress_messages_interval_ms is the interval between progress messages, in milliseconds (minimum: 500, default: start at 500ms and ramp up to 5000ms within 1min)
   uint64 progress_messages_interval_ms = 14;
 
   // previously used in partial alpha tests

@@ -12,21 +12,39 @@ import "sf/substreams/v1/package.proto";
 
 option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v4;pbsubstreamsrpcv4";
 
+// Stream is the primary service for consuming Substreams data using the v4 API.
+// It is similar to the v3 API but returns a v4-specific `Response` message that batches
+// multiple `BlockScopedData` items in a single `BlockScopedDatas` message, which reduces
+// round-trips near chain HEAD.
 service Stream {
-  // Request processing of blocks via substreams engine.
-  // Similar to `sf.substreams.rpc.v2.Stream/Blocks` request, but:
-  //   - the full spkg package is sent instead of just the modules
-  //   - 'params' and 'network' fields are sent to apply the user-defined params to the package server-side
-  // Responses are identical to those of the v2 request.
+  // Blocks streams processed blockchain data for the requested range, applying the specified
+  // Substreams modules from the provided `.spkg` package. The request format is identical
+  // to `sf.substreams.rpc.v3.Stream/Blocks`. Responses use the v4 `Response` message which
+  // may batch multiple blocks in a single `BlockScopedDatas` message.
+  // All other response types (session, progress, undo signal, errors) are identical to v2.
+  //
+  // For reliable, exactly-once consumption, see `sf.substreams.rpc.v2.BlockScopedData.cursor`
+  // and `sf.substreams.rpc.v2.BlockUndoSignal.last_valid_cursor`: persisting and resuming
+  // from these cursors is the foundation of the "never miss a beat" guarantee.
   rpc Blocks(sf.substreams.rpc.v3.Request) returns (stream Response);
 }
 
 
+// Response is the output message streamed back by the v4 `Stream.Blocks` RPC.
+// It is similar to `sf.substreams.rpc.v2.Response` but replaces the single
+// `block_scoped_data` field with `block_scoped_datas`, which can carry multiple
+// consecutive blocks in a single message. Each response contains exactly one of the
+// possible message types.
 message Response {
   oneof message {
-    sf.substreams.rpc.v2.SessionInit session = 1; // Always sent first
-    sf.substreams.rpc.v2.ModulesProgress progress = 2; // Progress of data preparation, before sending in the stream of `data` events.
+    // Always sent first when the stream opens.
+    sf.substreams.rpc.v2.SessionInit session = 1;
+    // Progress of data preparation, before sending in the stream of `data` events.
+    sf.substreams.rpc.v2.ModulesProgress progress = 2;
 
+    // One or more consecutive processed blocks. Near chain HEAD, this will typically
+    // contain a single block; during catch-up it may contain multiple blocks batched
+    // together for efficiency.
     BlockScopedDatas block_scoped_datas = 3;
     sf.substreams.rpc.v2.BlockUndoSignal block_undo_signal = 4;
     sf.substreams.rpc.v2.Error fatal_error = 5;
@@ -40,7 +58,11 @@ message Response {
   }
 }
 
+// BlockScopedDatas is a batch of one or more `BlockScopedData` messages for consecutive
+// blocks. This batching reduces gRPC message overhead when streaming multiple blocks in
+// quick succession (e.g., during historical catch-up or when near a fast-producing HEAD).
 message BlockScopedDatas {
+  // The processed block data items in this batch, ordered by block number ascending.
   repeated sf.substreams.rpc.v2.BlockScopedData items = 1;
 }
 

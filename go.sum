@@ -58,8 +58,8 @@ cloud.google.com/go/storage v1.6.0/go.mod h1:N7U0C8pVQ/+NIKOBQyamJIeKQKkZ+mxpohl
 cloud.google.com/go/storage v1.8.0/go.mod h1:Wv1Oy7z6Yz3DshWRJFhqM/UCfaWIRTdp0RXyy7KQOVs=
 cloud.google.com/go/storage v1.10.0/go.mod h1:FLPqc6j+Ki4BU591ie1oL6qBQGu2Bl/tZ9ullr3+Kg0=
 cloud.google.com/go/storage v1.14.0/go.mod h1:GrKmX003DSIwi9o29oFT7YDnHYwZoctc3fOKtUw0Xmo=
-cloud.google.com/go/storage v1.59.0 h1:9p3yDzEN9Vet4JnbN90FECIw6n4FCXcKBK1scxtQnw8=
-cloud.google.com/go/storage v1.59.0/go.mod h1:cMWbtM+anpC74gn6qjLh+exqYcfmB9Hqe5z6adx+CLI=
+cloud.google.com/go/storage v1.59.1 h1:DXAZLcTimtiXdGqDSnebROVPd9QvRsFVVlptz02Wk58=
+cloud.google.com/go/storage v1.59.1/go.mod h1:cMWbtM+anpC74gn6qjLh+exqYcfmB9Hqe5z6adx+CLI=
 cloud.google.com/go/trace v1.11.6 h1:2O2zjPzqPYAHrn3OKl029qlqG6W8ZdYaOWRyr8NgMT4=
 cloud.google.com/go/trace v1.11.6/go.mod h1:GA855OeDEBiBMzcckLPE2kDunIpC72N+Pq8WFieFjnI=
 connectrpc.com/connect v1.19.1 h1:R5M57z05+90EfEvCY1b7hBxDVOUl45PrtXtAV2fOC14=
@@ -571,8 +571,8 @@ github.com/streamingfast/dmetrics v0.0.0-20260109212625-35256f512c62 h1:Tb4T34Im
 github.com/streamingfast/dmetrics v0.0.0-20260109212625-35256f512c62/go.mod h1:JbxEDbzWRG1dHdNIPrYfuPllEkktZMgm40AwVIBENcw=
 github.com/streamingfast/dsession v0.0.0-20251029144057-b94d1030e142 h1:mgPawX0VOgrG2LHSc6EfY15r0x3AO/GK6LY58io3/+4=
 github.com/streamingfast/dsession v0.0.0-20251029144057-b94d1030e142/go.mod h1:ldDwFqr20xXyaLhwDm7XlMaf2vvoZNOrjgsMcFJGtrw=
-github.com/streamingfast/dstore v0.1.3-0.20260113210117-94d66eda2027 h1:6rf8oH6cKwCyu0F+q6bMneWf+5ROYjw2nGWYz5aCWqs=
-github.com/streamingfast/dstore v0.1.3-0.20260113210117-94d66eda2027/go.mod h1:mmxVV6CNRlO8XwqsBTDm4PJxBUEwtZ6/bp1+8CFPBTU=
+github.com/streamingfast/dstore v0.2.2 h1:2lFpogqubClaaAxJkre1bPyDankHm29sOo4tsNT20dk=
+github.com/streamingfast/dstore v0.2.2/go.mod h1:O7Lsvvz0AnIJmW/CidKSBHbyW5xAK6AyD7L9kQ58Bbw=
 github.com/streamingfast/dummy-blockchain v1.7.3 h1:rPheajbwc+hwh4XVRMaroET/p/lvlI7WGfqETBkIL18=
 github.com/streamingfast/dummy-blockchain v1.7.3/go.mod h1:EP8X3OwOoGYjJfzhw+zD1A0GTNSDg+v1OKDwSTDhHyc=
 github.com/streamingfast/firehose-ethereum/types v0.0.0-20251113151010-c9c94d64348a h1:qatil0YhFzTVAFQnH7iMcq+gpVUNEs9Se3lLq4eaof8=

@@ -372,6 +372,8 @@ cloud.google.com/go/storage v1.43.0/go.mod h1:ajvxEa7WmZS1PxvKRq4bq0tFT3vMd502Jw
 cloud.google.com/go/storage v1.50.0/go.mod h1:l7XeiD//vx5lfqE3RavfmU9yvk5Pp0Zhcv482poyafY=
 cloud.google.com/go/storage v1.56.0 h1:iixmq2Fse2tqxMbWhLWC9HfBj1qdxqAmiK8/eqtsLxI=
 cloud.google.com/go/storage v1.56.0/go.mod h1:Tpuj6t4NweCLzlNbw9Z9iwxEkrSem20AetIeH/shgVU=
+cloud.google.com/go/storage v1.59.1 h1:DXAZLcTimtiXdGqDSnebROVPd9QvRsFVVlptz02Wk58=
+cloud.google.com/go/storage v1.59.1/go.mod h1:cMWbtM+anpC74gn6qjLh+exqYcfmB9Hqe5z6adx+CLI=
 cloud.google.com/go/storagetransfer v1.12.1/go.mod h1:hQqbfs8/LTmObJyCC0KrlBw8yBJ2bSFlaGila0qBMk4=
 cloud.google.com/go/storagetransfer v1.13.0 h1:uqKX3OgcYzR1W1YI943ZZ45id0RqA2eXXoCBSPstlbw=
 cloud.google.com/go/storagetransfer v1.13.0/go.mod h1:+aov7guRxXBYgR3WCqedkyibbTICdQOiXOdpPcJCKl8=
@@ -1013,6 +1015,8 @@ github.com/streamingfast/dmetrics v0.0.0-20210811180524-8494aeb34447/go.mod h1:V
 github.com/streamingfast/dmetrics v0.0.0-20250711072030-f023e918a175/go.mod h1:JbxEDbzWRG1dHdNIPrYfuPllEkktZMgm40AwVIBENcw=
 github.com/streamingfast/dstore v0.1.1-0.20220607202639-35118aeaf648/go.mod h1:SHSEIPowGeE1TfNNmGeAUUnlO3dwevmX5kFOSazU60M=
 github.com/streamingfast/dstore v0.1.1-0.20250609173504-95368d3441ee/go.mod h1:FKF6+noY/Qgf+1EgeyQdQllQpmCvKQ6bghSbqRYJhlw=
+github.com/streamingfast/dstore v0.2.2 h1:2lFpogqubClaaAxJkre1bPyDankHm29sOo4tsNT20dk=
+github.com/streamingfast/dstore v0.2.2/go.mod h1:O7Lsvvz0AnIJmW/CidKSBHbyW5xAK6AyD7L9kQ58Bbw=
 github.com/streamingfast/dtracing v0.0.0-20210811175635-d55665d3622a h1:/7Rw3pYpueJYOQReTJpfAhAPk0uZD4I58LfiUAr4IMc=
 github.com/streamingfast/dtracing v0.0.0-20210811175635-d55665d3622a/go.mod h1:bqiYZaX6L/MoXNfFQeAdau6g9HLA3yKHkX8KzStt58Q=
 github.com/streamingfast/dtracing v0.0.0-20220305214756-b5c0e8699839/go.mod h1:huOJyjMYS6K8upTuxDxaNd+emD65RrXoVBvh8f1/7Ns=

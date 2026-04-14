@@ -21,6 +21,7 @@ import (
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
+	"github.com/streamingfast/logging/zapx"
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams"
@@ -389,7 +390,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	logger := reqctx.Logger(ctx)
 	start := time.Now()
 	defer func() {
-		logger.Info("processRange completed", zap.Duration("duration", time.Since(start)))
+		logger.Info("processRange completed", zapx.HumanDuration("duration", time.Since(start)))
 	}()
 
 	mergedBlocksStore, cacheStore, unmeteredCacheStore, err := s.getStores(ctx, request)

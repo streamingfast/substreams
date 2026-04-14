@@ -11,15 +11,21 @@ import "sf/substreams/v1/package.proto";
 
 option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3;pbsubstreamsrpcv3";
 
+// Stream is the primary service for consuming Substreams data using the v3 API.
+// It extends the v2 API by accepting a full `.spkg` package instead of raw module
+// definitions, and adds support for parameter overrides and network selection applied
+// server-side. Responses are identical to those of the v2 API.
 service Stream {
-  // Request processing of blocks via substreams engine.
-  // Similar to `sf.substreams.rpc.v2.Stream/Blocks` request, but:
-  //   - the full spkg package is sent instead of just the modules
-  //   - 'params' and 'network' fields are sent to apply the user-defined params to the package server-side
-  // Responses are identical to those of the v2 request.
+  // Blocks streams processed blockchain data for the requested range, applying the
+  // Substreams modules defined in the provided `.spkg` package. Parameter overrides
+  // (`params`) and network selection (`network`) are resolved server-side.
+  // Responses are identical to `sf.substreams.rpc.v2.Stream/Blocks`.
   rpc Blocks(Request) returns (stream sf.substreams.rpc.v2.Response);
 }
 
+// Request is the input message for the `Stream.Blocks` RPC in the v3 API. It extends the
+// v2 request by accepting a full `.spkg` package instead of raw module definitions, and
+// adds support for parameter overrides and network selection applied server-side.
 message Request {
   // if positive, determines the absolute requested start block
   // if 0, the start block is determined by the chain's first streamable block
@@ -58,11 +64,13 @@ message Request {
   // parallel execution of module ahead of time.
   bool production_mode = 5;
 
+  // Name of the map module whose output should be streamed back to the client. Must be a
+  // `map` module defined in the provided `package`.
   string output_module = 6;
 
-  sf.substreams.v1.Package package = 7; // whole spkg package
-  map<string, string> params = 8; // params applied over the package
-  string network = 9; // network choice applied over the package
+  sf.substreams.v1.Package package = 7; // The full .spkg package containing the module definitions and their code.
+  map<string, string> params = 8; // Module parameter overrides to apply to the package server-side. Keys are module names, values are parameter strings.
+  string network = 9; // Network name to select when the package supports multiple networks (e.g., "mainnet", "sepolia").
 
   // Available only in developer mode
   repeated string debug_initial_store_snapshot_for_modules = 10;

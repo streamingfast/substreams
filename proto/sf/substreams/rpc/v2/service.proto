@@ -119,8 +119,10 @@ message Request {
 // Each response contains exactly one of the possible message types.
 message Response {
   oneof message {
-    SessionInit session = 1; // Always sent first
-    ModulesProgress progress = 2; // Progress of data preparation, before sending in the stream of `data` events.
+    // Always sent first when the stream opens.
+    SessionInit session = 1;
+    // Progress of data preparation, before sending in the stream of `data` events.
+    ModulesProgress progress = 2;
     BlockScopedData block_scoped_data = 3;
     BlockUndoSignal block_undo_signal = 4;
     Error fatal_error = 5;

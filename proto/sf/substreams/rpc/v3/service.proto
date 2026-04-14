@@ -72,9 +72,12 @@ message Request {
   // `map` module defined in the provided `package`.
   string output_module = 6;
 
-  sf.substreams.v1.Package package = 7; // The full .spkg package containing the module definitions and their code.
-  map<string, string> params = 8; // Module parameter overrides to apply to the package server-side. Keys are module names, values are parameter strings.
-  string network = 9; // Network name to select when the package supports multiple networks (e.g., "mainnet", "sepolia").
+  // The full .spkg package containing the module definitions and their code.
+  sf.substreams.v1.Package package = 7;
+  // Module parameter overrides to apply to the package server-side. Keys are module names, values are parameter strings.
+  map<string, string> params = 8;
+  // Network name to select when the package supports multiple networks (e.g., "mainnet", "sepolia").
+  string network = 9;
 
   // Available only in developer mode
   repeated string debug_initial_store_snapshot_for_modules = 10;

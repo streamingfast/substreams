@@ -37,8 +37,10 @@ service Stream {
 // possible message types.
 message Response {
   oneof message {
-    sf.substreams.rpc.v2.SessionInit session = 1; // Always sent first
-    sf.substreams.rpc.v2.ModulesProgress progress = 2; // Progress of data preparation, before sending in the stream of `data` events.
+    // Always sent first when the stream opens.
+    sf.substreams.rpc.v2.SessionInit session = 1;
+    // Progress of data preparation, before sending in the stream of `data` events.
+    sf.substreams.rpc.v2.ModulesProgress progress = 2;
 
     // One or more consecutive processed blocks. Near chain HEAD, this will typically
     // contain a single block; during catch-up it may contain multiple blocks batched

@@ -22,6 +22,10 @@ service Stream {
   // to `sf.substreams.rpc.v3.Stream/Blocks`. Responses use the v4 `Response` message which
   // may batch multiple blocks in a single `BlockScopedDatas` message.
   // All other response types (session, progress, undo signal, errors) are identical to v2.
+  //
+  // For reliable, exactly-once consumption, see `sf.substreams.rpc.v2.BlockScopedData.cursor`
+  // and `sf.substreams.rpc.v2.BlockUndoSignal.last_valid_cursor`: persisting and resuming
+  // from these cursors is the foundation of the "never miss a beat" guarantee.
   rpc Blocks(sf.substreams.rpc.v3.Request) returns (stream Response);
 }
 

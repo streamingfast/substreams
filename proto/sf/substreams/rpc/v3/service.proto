@@ -20,6 +20,10 @@ service Stream {
   // Substreams modules defined in the provided `.spkg` package. Parameter overrides
   // (`params`) and network selection (`network`) are resolved server-side.
   // Responses are identical to `sf.substreams.rpc.v2.Stream/Blocks`.
+  //
+  // For reliable, exactly-once consumption, see `sf.substreams.rpc.v2.BlockScopedData.cursor`
+  // and `sf.substreams.rpc.v2.BlockUndoSignal.last_valid_cursor`: persisting and resuming
+  // from these cursors is the foundation of the "never miss a beat" guarantee.
   rpc Blocks(Request) returns (stream sf.substreams.rpc.v2.Response);
 }
 

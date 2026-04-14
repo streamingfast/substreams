@@ -13,9 +13,13 @@ option go_package = "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2
 // and historical stream of blockchain blocks processed through Substreams modules.
 service Stream {
   // Blocks streams processed blockchain data for the requested range, applying the specified
-  // Substreams modules. Responses include a one-time session init message, progress updates
-  // during parallel processing, processed block-scoped data, undo signals for chain
-  // reorganizations, and fatal error notifications.
+  // Substreams modules. Responses include a one-time `SessionInit` message, optional progress
+  // updates during parallel processing, `BlockScopedData` messages for each processed block,
+  // `BlockUndoSignal` messages on chain reorganizations, and an `Error` fatal error notification.
+  //
+  // For reliable, exactly-once consumption, see `BlockScopedData.cursor` and
+  // `BlockUndoSignal.last_valid_cursor`: persisting and resuming from these cursors is the
+  // foundation of the "never miss a beat" guarantee.
   rpc Blocks(Request) returns (stream Response);
 }
 
@@ -161,8 +165,18 @@ message BlockUndoSignal {
 }
 
 // BlockScopedData contains the processed output for a single block and is the primary
-// data-bearing message in the stream. Persist `cursor` after processing each block to
-// enable reliable resumption on reconnection.
+// data-bearing message in the stream.
+//
+// Cursor handling and resumption:
+// Persist `cursor` atomically together with your processed data (ideally in the same
+// transaction) after every block. On reconnection, pass the persisted cursor as
+// `Request.start_cursor` to resume the stream from exactly where you left off, with no
+// duplicates and no gaps — even if a disconnection happened mid-fork.
+//
+// If your storage backend does not support transactions, a practical alternative is:
+// on startup, delete all stored data for blocks whose number is >= the last persisted
+// block number before resuming. This removes any half-written data from a previous
+// interrupted run and ensures a clean state before the stream continues.
 message BlockScopedData {
   // The output produced by the `output_module` for this block. The `map_output` field
   // within contains the module's Protobuf-encoded result.
@@ -195,7 +209,13 @@ message BlockScopedData {
   optional uint32 partial_index = 14;
 
   // Only present if is_partial==true
-  // true if this is the last partial of a given block, this will be the correct hash of the block (unless there are reorgs)
+  // True if this is the last partial payload for this block number. The `clock.id` (block
+  // hash) carried in this message is the final, definitive hash for the block. Prior
+  // partials for the same block number will have had a tentative or empty hash.
+  //
+  // Partial block support is currently implemented for Flashblocks, the pre-confirmation
+  // block stream used on Base and Optimism. A single canonical block is typically split
+  // into multiple incremental partials; the last one carries the block's true hash.
   optional bool is_last_partial = 15;
 }
 

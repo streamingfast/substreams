@@ -23,6 +23,7 @@ import (
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/substreams/storage/store"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	otelCodes "go.opentelemetry.io/otel/codes"
@@ -90,6 +91,7 @@ func NewRequest(ctx context.Context, req *reqctx.RequestDetails, stageIndex int,
 		FoundationalStoreEndpoints:      tier2ReqParams.FoundationalStoreEndpoints,
 		EthCallFallbackToLatestDuration: int64(reqctx.EthCallFallbackToLatestDuration(ctx)),
 		EthCallFallbackToNumberDuration: int64(reqctx.EthCallUseBlockNumberDuration(ctx)),
+		StoreSizeLimit:                  store.StoreSizeLimit,
 	}
 }
 

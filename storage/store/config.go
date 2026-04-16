@@ -40,6 +40,7 @@ func NewConfig(
 	valueType string,
 	store dstore.Store,
 	quickSaveStore dstore.Store,
+	storeSizeLimit uint64,
 ) (*Config, error) {
 	subStore, err := store.SubStore(fmt.Sprintf("%s/states", moduleHash))
 	if err != nil {
@@ -67,8 +68,13 @@ func NewConfig(
 		moduleInitialBlock: moduleInitialBlock,
 		moduleHash:         moduleHash,
 		appendLimit:        8_388_608, // 8MiB = 8 * 1024 * 1024,
-		totalSizeLimit:     StoreSizeLimit,
-		itemSizeLimit:      10_485_760, // 10MiB
+		totalSizeLimit: func() uint64 {
+			if storeSizeLimit != 0 {
+				return storeSizeLimit
+			}
+			return StoreSizeLimit
+		}(),
+		itemSizeLimit: 10_485_760, // 10MiB
 	}, nil
 }
 

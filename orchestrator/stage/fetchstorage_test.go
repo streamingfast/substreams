@@ -569,7 +569,7 @@ func testStoreConfig(
 	valueType string,
 	objStore dstore.Store,
 ) *store.Config {
-	conf, err := store.NewConfig(name, moduleInitialBlock, moduleHash, updatePolicy, valueType, objStore, nil)
+	conf, err := store.NewConfig(name, moduleInitialBlock, moduleHash, updatePolicy, valueType, objStore, nil, 0)
 	require.NoError(t, err)
 	return conf
 }

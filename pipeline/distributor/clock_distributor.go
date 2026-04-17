@@ -37,6 +37,21 @@ func NewClockDistributor(execOuts map[string]execout.FileReader, startBlock uint
 	}
 }
 
+// canSkipBlockForModule returns true when the module's block index exists and
+// reports that block i can be skipped. If the module has no block index, the
+// block cannot be skipped.
+func (cd *ClockDistributor) canSkipBlockForModule(moduleName string, i uint64) bool {
+	executerPath := cd.stagedModuleExecutorsMap[moduleName]
+	executer := cd.stagedModuleExecutors[executerPath.LayerIndex][executerPath.ModuleIndex]
+
+	blockIndex := executer.BlockIndex()
+	if blockIndex == nil {
+		// If the module has no index, we cannot skip the block.
+		return false
+	}
+	return blockIndex.Skip(i)
+}
+
 func (cd *ClockDistributor) Next(ctx context.Context) (*pbsubstreams.Clock, error) {
 	for i := cd.nextClockNumber; i < cd.stopBlock; i++ {
 		indicesSkip := true
@@ -49,23 +64,16 @@ func (cd *ClockDistributor) Next(ctx context.Context) (*pbsubstreams.Clock, erro
 				}
 
 				if store := input.GetStore(); store != nil {
-					//Cannot skip if store is deltas
 					if store.GetMode() == pbsubstreams.Module_Input_Store_DELTAS {
-						indicesSkip = false
-						break
+						if !cd.canSkipBlockForModule(store.ModuleName, i) {
+							indicesSkip = false
+							break
+						}
 					}
 				}
 
 				if m := input.GetMap(); m != nil {
-					executerPath := cd.stagedModuleExecutorsMap[m.ModuleName]
-					executer := cd.stagedModuleExecutors[executerPath.LayerIndex][executerPath.ModuleIndex]
-
-					if blockIndex := executer.BlockIndex(); blockIndex != nil {
-						if !blockIndex.Skip(i) {
-							indicesSkip = false
-						}
-					} else {
-						//If on module as no index, we cannot skip the block
+					if !cd.canSkipBlockForModule(m.ModuleName, i) {
 						indicesSkip = false
 						break
 					}

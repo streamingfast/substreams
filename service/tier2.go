@@ -96,9 +96,6 @@ type Tier2Service struct {
 	checkPendingShutdown func() bool
 
 	tier2RequestParameters *reqctx.Tier2RequestParameters
-	moduleCache            *cache.ModuleCache
-	evictionInterval       time.Duration
-	ttl                    time.Duration
 
 	simulateOverloaded *atomic.Bool                           // when true, the service will pretent that it is overloaded and refuse incoming requests
 	activeRequests     *active_requests.ActiveRequestsManager // we keep a list of current requests for the debugAPI and to manage memory
@@ -120,8 +117,6 @@ func NewTier2(
 		logger:                  logger,
 		blockExecutionTimeout:   3 * time.Minute,
 		segmentExecutionTimeout: 60 * time.Minute,
-		evictionInterval:        60 * time.Second,
-		ttl:                     10 * time.Minute,
 
 		simulateOverloaded: atomic.NewBool(false),
 
@@ -151,26 +146,7 @@ func NewTier2(
 		opt(s)
 	}
 
-	if s.evictionInterval <= 0 {
-		s.logger.Info("module cache disabled (evictionInterval <= 0)")
-	} else {
-		if s.ttl <= 0 {
-			return nil, fmt.Errorf("module cache ttl must be > 0 when module cache is enabled (evictionInterval > 0)")
-		}
-		s.moduleCache = cache.NewModuleCache(ctx, s.evictionInterval, s.ttl, logger)
-	}
-
 	return s, nil
-}
-
-func WithModuleCacheConfig(evictionInterval time.Duration, ttl time.Duration) Option {
-	return func(a anyTierService) {
-		switch s := a.(type) {
-		case *Tier2Service:
-			s.evictionInterval = evictionInterval
-			s.ttl = ttl
-		}
-	}
 }
 
 func (s *Tier2Service) isOverloaded() bool {
@@ -546,7 +522,6 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		execOutputConfigs,
 		wasmRegistry,
 		execOutputCacheEngine,
-		s.moduleCache,
 		request.SegmentSize,
 		nil,
 		respFunc,

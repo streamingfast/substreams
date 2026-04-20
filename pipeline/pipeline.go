@@ -153,7 +153,6 @@ func New(
 	execoutStorage *execout.Configs,
 	wasmRuntime *wasm.Registry,
 	execOutputCache *cache.Engine,
-	moduleCache *cache.ModuleCache,
 	stateBundleSize uint64,
 	workerPoolFactory work.WorkerPoolFactory,
 	respFunc substreams.ResponseFunc,
@@ -169,7 +168,6 @@ func New(
 		isTier1:                 isTier1,
 		gate:                    newGate(ctx),
 		execOutputCache:         execOutputCache,
-		moduleCache:             moduleCache,
 		stateBundleSize:         stateBundleSize,
 		preexistingBlockIndices: indices,
 		blockType:               blockType,
@@ -797,22 +795,12 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 					continue
 				}
 
-				var m wasm.Module
-				var err error
-				if p.moduleCache != nil {
-					if cachedModule, found := p.moduleCache.Get(moduleHash); found {
-						m = cachedModule
-					}
+				m, err := p.wasmRuntime.NewModule(ctx, code.Content, code.Type)
+				if err != nil {
+					return fmt.Errorf("new wasm module: %w", err)
 				}
-
-				if m == nil {
-					m, err = p.wasmRuntime.NewModule(ctx, code.Content, code.Type)
-					if err != nil {
-						return fmt.Errorf("new wasm module: %w", err)
-					}
-					if p.moduleCache != nil {
-						p.moduleCache.Set(moduleHash, m)
-					}
+				if p.moduleCache != nil {
+					p.moduleCache.Set(moduleHash, m)
 				}
 				loadedModules[key] = m
 			}
@@ -953,6 +941,11 @@ func (p *Pipeline) cleanUpModuleExecutors(ctx context.Context, logger *zap.Logge
 			if err := executor.Close(ctx); err != nil {
 				return fmt.Errorf("closing module executor %q: %w", executor.Name(), err)
 			}
+		}
+	}
+	for key, mod := range p.loadedModules {
+		if err := mod.Close(ctx); err != nil {
+			return fmt.Errorf("closing wasm module %+v: %w", key, err)
 		}
 	}
 

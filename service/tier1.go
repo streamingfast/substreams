@@ -94,7 +94,6 @@ type Tier1Service struct {
 	streamFactoryFunc     StreamFactoryFunc
 	blockExecutionTimeout time.Duration
 	runtimeConfig         config.RuntimeConfig
-	moduleCache           *cache.ModuleCache
 	tracer                ttrace.Tracer
 	logger                *zap.Logger
 
@@ -183,8 +182,6 @@ func NewTier1(
 	outputBufferSize uint64,
 	sessionPool dsession.SessionPool,
 	foundationalEndpoints map[string]string,
-	evictionInterval time.Duration,
-	ttl time.Duration,
 	opts ...Option,
 ) (*Tier1Service, error) {
 
@@ -224,20 +221,10 @@ func NewTier1(
 	tier2RequestParameters.StateBundleSize = runtimeConfig.SegmentSize
 
 	logger.Info("launching tier1 service", zap.Reflect("client_config", substreamsClientConfig), zap.String("block_type", blockType), zap.Bool("with_live", hub != nil))
-	var moduleCache *cache.ModuleCache
-	if evictionInterval <= 0 {
-		logger.Info("module cache disabled (evictionInterval <= 0)")
-	} else {
-		if ttl <= 0 {
-			return nil, fmt.Errorf("module cache ttl must be > 0 when module cache is enabled (evictionInterval > 0)")
-		}
-		moduleCache = cache.NewModuleCache(ctx, evictionInterval, ttl, logger)
-	}
 
 	s := &Tier1Service{
 		Shutter:                  shutter.New(),
 		runtimeConfig:            runtimeConfig,
-		moduleCache:              moduleCache,
 		blockType:                blockType,
 		tracer:                   tracing.GetTracer(),
 		resolveCursor:            pipeline.NewCursorResolver(hub, mergedBlocksStore, forkedBlocksStore),
@@ -781,7 +768,6 @@ func (s *Tier1Service) blocks(
 		execOutputConfigs,
 		wasmRuntime,
 		execOutputCacheEngine,
-		s.moduleCache,
 		segmentSize,
 		s.runtimeConfig.WorkerPoolFactory,
 		respFunc,

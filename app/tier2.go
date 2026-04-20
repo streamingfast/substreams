@@ -23,8 +23,6 @@ func NewDefaultTier2Config() *Tier2Config {
 	return &Tier2Config{
 		BlockExecutionTimeout:   3 * time.Minute,
 		SegmentExecutionTimeout: 60 * time.Minute,
-		EvictionInterval:        30 * time.Second,
-		TTL:                     5 * time.Minute,
 	}
 }
 
@@ -40,9 +38,7 @@ type Tier2Config struct {
 	SegmentExecutionTimeout   time.Duration
 	TmpDir                    string
 
-	Tracing          bool
-	EvictionInterval time.Duration
-	TTL              time.Duration
+	Tracing bool
 }
 
 type Tier2App struct {
@@ -109,7 +105,6 @@ func (a *Tier2App) Run() error {
 	if a.config.WASMExtensions != nil {
 		opts = append(opts, service.WithWASMExtensioner(a.config.WASMExtensions))
 	}
-	opts = append(opts, service.WithModuleCacheConfig(a.config.EvictionInterval, a.config.TTL))
 
 	svc, err := service.NewTier2(
 		ctx,

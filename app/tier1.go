@@ -56,8 +56,6 @@ func NewDefaultTier1Config() *Tier1Config {
 		StateBundleSize:       1000,
 		BlockExecutionTimeout: 1 * time.Minute,
 		OutputBufferSize:      100,
-		EvictionInterval:      30 * time.Second,
-		TTL:                   2 * time.Minute,
 	}
 }
 
@@ -94,10 +92,8 @@ type Tier1Config struct {
 	SharedCacheSize  uint64
 	OutputBufferSize uint64 // Used to bundle execout messages within 'BlockScopedDatas' when using protocol V4
 
-	WASMExtensions   wasm.WASMExtensioner
-	Tracing          bool
-	EvictionInterval time.Duration
-	TTL              time.Duration
+	WASMExtensions wasm.WASMExtensioner
+	Tracing        bool
 }
 
 type Tier1App struct {
@@ -284,8 +280,6 @@ func (a *Tier1App) Run() error {
 		a.config.OutputBufferSize,
 		a.modules.SessionPool,
 		foundationalStoreEndpoints,
-		a.config.EvictionInterval,
-		a.config.TTL,
 		opts...,
 	)
 	if err != nil {

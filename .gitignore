@@ -10,6 +10,7 @@ target
 .goreleaser.SOURCE_ME.sh
 /dist
 /substreams
+/store-to-badger
 .fleet
 /codegen/test_substreams/src/
 /build

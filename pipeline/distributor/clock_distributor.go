@@ -6,45 +6,54 @@ import (
 	"iter"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/pipeline/exec"
+	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
-	execp "github.com/streamingfast/substreams/storage/path"
+	"github.com/streamingfast/substreams/storage/index"
+	"go.uber.org/zap"
 )
 
 type ClockDistributor struct {
-	execOuts                 map[string]execout.FileReader
-	execOutsLastclock        map[string]uint64
-	seenClocks               map[uint64]*pbsubstreams.Clock
-	startBlock               uint64
-	stopBlock                uint64
-	nextClockNumber          uint64
-	outputModuleInputs       []*pbsubstreams.Module_Input
-	stagedModuleExecutorsMap map[string]*execp.ExecutorPath
-	stagedModuleExecutors    [][]exec.ModuleExecutor
+	execOuts           map[string]execout.FileReader
+	execOutsLastclock  map[string]uint64
+	seenClocks         map[uint64]*pbsubstreams.Clock
+	startBlock         uint64
+	stopBlock          uint64
+	nextClockNumber    uint64
+	outputModuleInputs []*pbsubstreams.Module_Input
+	// moduleBlockIndexes maps a module name to its *index.BlockIndex (if any).
+	// A module that is present in the execution plan but has no block index will
+	// have a nil value stored here, while modules that are not part of the plan
+	// at all will be absent from the map.
+	moduleBlockIndexes map[string]*index.BlockIndex
 }
 
-func NewClockDistributor(execOuts map[string]execout.FileReader, startBlock uint64, stopBlock uint64, outputModuleInputs []*pbsubstreams.Module_Input, stagedModuleExecutorsMap map[string]*execp.ExecutorPath, stagedModuleExecutors [][]exec.ModuleExecutor) *ClockDistributor {
+func NewClockDistributor(
+	execOuts map[string]execout.FileReader,
+	startBlock uint64,
+	stopBlock uint64,
+	outputModuleInputs []*pbsubstreams.Module_Input,
+	moduleBlockIndexes map[string]*index.BlockIndex,
+) *ClockDistributor {
 	return &ClockDistributor{
-		execOuts:                 execOuts,
-		execOutsLastclock:        make(map[string]uint64),
-		seenClocks:               make(map[uint64]*pbsubstreams.Clock),
-		startBlock:               startBlock,
-		stopBlock:                stopBlock,
-		nextClockNumber:          startBlock,
-		outputModuleInputs:       outputModuleInputs,
-		stagedModuleExecutorsMap: stagedModuleExecutorsMap,
-		stagedModuleExecutors:    stagedModuleExecutors,
+		execOuts:           execOuts,
+		execOutsLastclock:  make(map[string]uint64),
+		seenClocks:         make(map[uint64]*pbsubstreams.Clock),
+		startBlock:         startBlock,
+		stopBlock:          stopBlock,
+		nextClockNumber:    startBlock,
+		outputModuleInputs: outputModuleInputs,
+		moduleBlockIndexes: moduleBlockIndexes,
 	}
 }
 
-// canSkipBlockForModule returns true when the module's block index exists and
-// reports that block i can be skipped. If the module has no block index, the
-// block cannot be skipped.
-func (cd *ClockDistributor) canSkipBlockForModule(moduleName string, i uint64) bool {
-	executerPath := cd.stagedModuleExecutorsMap[moduleName]
-	executer := cd.stagedModuleExecutors[executerPath.LayerIndex][executerPath.ModuleIndex]
-
-	blockIndex := executer.BlockIndex()
+// canSkipBlockForModule returns true when the module's block index exists
+// and reports that block i can be skipped. If the module has no block index,
+// the block cannot be skipped.
+func (cd *ClockDistributor) canSkipBlockForModule(moduleName string, i uint64, logger *zap.Logger) bool {
+	blockIndex, ok := cd.moduleBlockIndexes[moduleName]
+	if !ok {
+		logger.Warn("module block index not found in canSkipBlockForModule, this should not happen", zap.String("module", moduleName))
+	}
 	if blockIndex == nil {
 		// If the module has no index, we cannot skip the block.
 		return false
@@ -53,9 +62,10 @@ func (cd *ClockDistributor) canSkipBlockForModule(moduleName string, i uint64) b
 }
 
 func (cd *ClockDistributor) Next(ctx context.Context) (*pbsubstreams.Clock, error) {
+	logger := reqctx.Logger(ctx)
 	for i := cd.nextClockNumber; i < cd.stopBlock; i++ {
 		indicesSkip := true
-		if len(cd.stagedModuleExecutorsMap) > 0 {
+		if len(cd.moduleBlockIndexes) > 0 {
 			for _, input := range cd.outputModuleInputs {
 
 				if source := input.GetSource(); source != nil {
@@ -65,7 +75,7 @@ func (cd *ClockDistributor) Next(ctx context.Context) (*pbsubstreams.Clock, erro
 
 				if store := input.GetStore(); store != nil {
 					if store.GetMode() == pbsubstreams.Module_Input_Store_DELTAS {
-						if !cd.canSkipBlockForModule(store.ModuleName, i) {
+						if !cd.canSkipBlockForModule(store.ModuleName, i, logger) {
 							indicesSkip = false
 							break
 						}
@@ -73,7 +83,7 @@ func (cd *ClockDistributor) Next(ctx context.Context) (*pbsubstreams.Clock, erro
 				}
 
 				if m := input.GetMap(); m != nil {
-					if !cd.canSkipBlockForModule(m.ModuleName, i) {
+					if !cd.canSkipBlockForModule(m.ModuleName, i, logger) {
 						indicesSkip = false
 						break
 					}

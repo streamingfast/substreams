@@ -114,7 +114,7 @@ func TestNewClockDistributor(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cd := NewClockDistributor(tt.execOuts, tt.startBlock, tt.stopBlock, nil, nil, nil)
+			cd := NewClockDistributor(tt.execOuts, tt.startBlock, tt.stopBlock, nil, nil)
 
 			assert.NotNil(t, cd)
 			assert.Equal(t, tt.execOuts, cd.execOuts)
@@ -183,7 +183,7 @@ func TestClockDistributor_Next_MultipleModules(t *testing.T) {
 		"module2": mockReader2,
 	}
 
-	cd := NewClockDistributor(execOuts, 100, 106, nil, nil, nil)
+	cd := NewClockDistributor(execOuts, 100, 106, nil, nil)
 	ctx := context.Background()
 
 	clock, err := cd.Next(ctx)

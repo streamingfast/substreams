@@ -618,8 +618,7 @@ excludable:
 			startBlock,
 			stopBlock,
 			outputModuleInputs,
-			pipe.StagedModuleExecutorsMap,
-			pipe.StagedModuleExecutors,
+			pipe.ModuleBlockIndexes,
 		)
 
 		for clock, err := range dist.Iter(ctx) {

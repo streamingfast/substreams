@@ -33,7 +33,6 @@ import (
 	"github.com/streamingfast/substreams/sqe"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/index"
-	"github.com/streamingfast/substreams/storage/path"
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
 	"go.opentelemetry.io/otel"
@@ -89,9 +88,9 @@ type Pipeline struct {
 	// StagedModuleExecutors represents all the modules within a stage that should be executed. The
 	// first level of the 2D list represents layer within a stage to execute sequentially.
 	// The second level contains modules to execute within a layer, those can be executed concurrently.
-	StagedModuleExecutors    [][]exec.ModuleExecutor
-	StagedModuleExecutorsMap map[string]*path.ExecutorPath
-	executionStages          exec.ExecutionStages
+	StagedModuleExecutors [][]exec.ModuleExecutor
+	ModuleBlockIndexes    map[string]*index.BlockIndex
+	executionStages       exec.ExecutionStages
 
 	mapModuleOutput          *pbsubstreamsrpc.MapModuleOutput
 	mapModuleOutputSkippable bool
@@ -166,32 +165,32 @@ func New(
 	opts ...Option,
 ) *Pipeline {
 	pipe := &Pipeline{
-		ctx:                      ctx,
-		isTier1:                  isTier1,
-		gate:                     newGate(ctx),
-		execOutputCache:          execOutputCache,
-		moduleCache:              moduleCache,
-		stateBundleSize:          stateBundleSize,
-		preexistingBlockIndices:  indices,
-		blockType:                blockType,
-		execGraph:                execGraph,
-		wasmRuntime:              wasmRuntime,
-		respFunc:                 respFunc,
-		stores:                   stores,
-		foundationalClients:      make(map[string][]pbservice.StoreClient),
-		foundationalClosers:      make(map[string][]func() error),
-		foundationalEndpoints:    foundationalEndpoints,
-		execoutStorage:           execoutStorage,
-		forkHandler:              NewForkHandler(),
-		blockStepMap:             make(map[bstream.StepType]uint64),
-		startTime:                time.Now(),
-		executionTimeout:         executionTimeout,
-		workerPoolFactory:        workerPoolFactory,
-		checkPendingShutdown:     checkPendingShutdown,
-		moduleNameToStage:        make(map[string]int),
-		outputBufferSize:         outputBufferSize,
-		supportBuffering:         supportBuffering,
-		StagedModuleExecutorsMap: make(map[string]*path.ExecutorPath),
+		ctx:                     ctx,
+		isTier1:                 isTier1,
+		gate:                    newGate(ctx),
+		execOutputCache:         execOutputCache,
+		moduleCache:             moduleCache,
+		stateBundleSize:         stateBundleSize,
+		preexistingBlockIndices: indices,
+		blockType:               blockType,
+		execGraph:               execGraph,
+		wasmRuntime:             wasmRuntime,
+		respFunc:                respFunc,
+		stores:                  stores,
+		foundationalClients:     make(map[string][]pbservice.StoreClient),
+		foundationalClosers:     make(map[string][]func() error),
+		foundationalEndpoints:   foundationalEndpoints,
+		execoutStorage:          execoutStorage,
+		forkHandler:             NewForkHandler(),
+		blockStepMap:            make(map[bstream.StepType]uint64),
+		startTime:               time.Now(),
+		executionTimeout:        executionTimeout,
+		workerPoolFactory:       workerPoolFactory,
+		checkPendingShutdown:    checkPendingShutdown,
+		moduleNameToStage:       make(map[string]int),
+		outputBufferSize:        outputBufferSize,
+		supportBuffering:        supportBuffering,
+		ModuleBlockIndexes:      make(map[string]*index.BlockIndex),
 	}
 	for _, opt := range opts {
 		opt(pipe)
@@ -825,10 +824,10 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 
 	executerCreationStart := time.Now()
 	var stagedModuleExecutors [][]exec.ModuleExecutor
-	for stageIndex, stage := range p.executionStages {
-		for layerIndex, layer := range stage {
+	for _, stage := range p.executionStages {
+		for _, layer := range stage {
 			var moduleExecutors []exec.ModuleExecutor
-			for moduleIndex, module := range layer {
+			for _, module := range layer {
 				inputs, err := p.renderWasmInputs(module)
 				if err != nil {
 					return fmt.Errorf("module %q: get wasm inputs: %w", module.Name, err)
@@ -859,6 +858,7 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 				foundationalStores := getFoundationalStores(inputs)
 				switch kind := module.Kind.(type) {
 				case *pbsubstreams.Module_KindMap_:
+					p.ModuleBlockIndexes[module.Name] = moduleBlockIndex
 					outType := strings.TrimPrefix(module.Output.Type, "proto:")
 
 					baseExecutor := exec.NewBaseExecutor(
@@ -876,13 +876,9 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 					)
 					executor := exec.NewMapperModuleExecutor(baseExecutor, outType)
 					moduleExecutors = append(moduleExecutors, executor)
-					p.StagedModuleExecutorsMap[executor.Name()] = &path.ExecutorPath{
-						StageIndex:  stageIndex,
-						LayerIndex:  layerIndex,
-						ModuleIndex: moduleIndex,
-					}
 
 				case *pbsubstreams.Module_KindStore_:
+					p.ModuleBlockIndexes[module.Name] = moduleBlockIndex
 					updatePolicy := kind.KindStore.UpdatePolicy
 					valueType := kind.KindStore.ValueType
 
@@ -907,13 +903,9 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 					)
 					executor := exec.NewStoreModuleExecutor(baseExecutor, outputStore)
 					moduleExecutors = append(moduleExecutors, executor)
-					p.StagedModuleExecutorsMap[executor.Name()] = &path.ExecutorPath{
-						StageIndex:  stageIndex,
-						LayerIndex:  layerIndex,
-						ModuleIndex: moduleIndex,
-					}
 
 				case *pbsubstreams.Module_KindBlockIndex_:
+					p.ModuleBlockIndexes[module.Name] = moduleBlockIndex // this must be before the 'break': we check the index later even if we don't execute this module
 					if indices := p.preexistingBlockIndices[module.Name]; indices != nil {
 						break // don't execute index modules that are useless
 					}
@@ -933,11 +925,6 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 
 					executor := exec.NewIndexModuleExecutor(baseExecutor)
 					moduleExecutors = append(moduleExecutors, executor)
-					p.StagedModuleExecutorsMap[executor.Name()] = &path.ExecutorPath{
-						StageIndex:  stageIndex,
-						LayerIndex:  layerIndex,
-						ModuleIndex: moduleIndex,
-					}
 
 				default:
 					panic(fmt.Errorf("invalid kind %q input module %q", module.Kind, module.Name))

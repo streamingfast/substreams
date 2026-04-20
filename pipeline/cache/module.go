@@ -15,8 +15,8 @@ type ModuleCache struct {
 }
 
 type cacheEntry struct {
-	mod       wasm.Module
-	fetchedAt time.Time
+	mod            wasm.Module
+	lastAccessedAt time.Time
 }
 
 func NewModuleCache(ctx context.Context, evictionInterval time.Duration, ttl time.Duration, logger *zap.Logger) *ModuleCache {
@@ -37,7 +37,7 @@ func NewModuleCache(ctx context.Context, evictionInterval time.Duration, ttl tim
 				c.Lock()
 				cutoff := time.Now().Add(-ttl)
 				for hash, entry := range c.modules {
-					if entry.fetchedAt.Before(cutoff) {
+					if entry.lastAccessedAt.Before(cutoff) {
 						if err := entry.mod.Close(ctx); err != nil {
 							logger.Warn("closing wasm module", zap.String("hash", hash), zap.Error(err))
 						}
@@ -54,17 +54,19 @@ func NewModuleCache(ctx context.Context, evictionInterval time.Duration, ttl tim
 }
 
 func (c *ModuleCache) Get(hash string) (wasm.Module, bool) {
-	c.RLock()
-	defer c.RUnlock()
+	c.Lock()
+	defer c.Unlock()
 	entry, ok := c.modules[hash]
 	if !ok {
 		return nil, false
 	}
+	entry.lastAccessedAt = time.Now()
+	c.modules[hash] = entry
 	return entry.mod, true
 }
 
 func (c *ModuleCache) Set(hash string, module wasm.Module) {
 	c.Lock()
 	defer c.Unlock()
-	c.modules[hash] = cacheEntry{mod: module, fetchedAt: time.Now()}
+	c.modules[hash] = cacheEntry{mod: module, lastAccessedAt: time.Now()}
 }

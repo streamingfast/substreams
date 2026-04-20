@@ -3,6 +3,7 @@ package store
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -92,8 +93,7 @@ func storeTooBigError(storeName string, size, limit uint64) error {
 func (b *baseStore) ApplyDeltasReverse(deltas []*pbsubstreams.StoreDelta) {
 	b.recentlyDeletedPrefixes.Clear() // whenever we have an undo block, we clear this cache to avoid any bug
 
-	for i := len(deltas) - 1; i >= 0; i-- {
-		delta := deltas[i]
+	for _, delta := range slices.Backward(deltas) {
 
 		newSize := uint64(len(delta.NewValue))
 		oldSize := uint64(len(delta.OldValue))

@@ -4,6 +4,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 
 	_ "github.com/mostynb/go-grpc-compression/experimental/s2"
@@ -149,6 +150,11 @@ func ListenTier2(
 		dgrpcserver.WithGRPCServerOptions(
 			grpc.StatsHandler(otelgrpc.NewServerHandler(otelgrpc.WithTracerProvider(tracerProvider))),
 			grpc.MaxRecvMsgSize(1024*1024*1024),
+		),
+		// we get these errors when the tier1's dns loadbalancer selector checks availability, we want to ignore them.
+		dgrpcserver.WithSuppressHTTPError(
+			regexp.MustCompile(`TLS handshake error.*EOF`),
+			regexp.MustCompile(`TLS handshake error.*connection reset by peer`),
 		),
 	}
 	if enforceCompression {

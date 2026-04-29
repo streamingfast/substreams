@@ -64,7 +64,7 @@ require (
 	github.com/prometheus/client_golang v1.16.0
 	github.com/protocolbuffers/protoscope v0.0.0-20221109213918-8e7a6aafa2c9
 	github.com/schollz/closestmatch v2.1.0+incompatible
-	github.com/shopspring/decimal v1.3.1
+	github.com/shopspring/decimal v1.4.0
 	github.com/streamingfast/dmetering v0.0.0-20251027175535-4fd530934b97
 	github.com/streamingfast/dmetrics v0.0.0-20260109212625-35256f512c62
 	github.com/streamingfast/dsession v0.0.0-20251029144057-b94d1030e142
@@ -158,6 +158,7 @@ require (
 	github.com/sercand/kuberesolver/v5 v5.1.1 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
 	github.com/streamingfast/dhammer v0.0.0-20220506192416-3797a7906da2 // indirect
+	github.com/streamingfast/substreams-foundational-store v0.2.2 // indirect
 	github.com/streamingfast/validator v0.0.0-20231124184318-71ec8080e4ae // indirect
 	github.com/thedevsaddam/govalidator v1.9.6 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
@@ -264,3 +265,5 @@ replace (
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869 => github.com/streamingfast/graph v0.0.0-20220329181048-a5710712d873
 	rogchap.com/v8go => github.com/streamingfast/v8go v0.0.0-20250609192103-f9b5beca42f2
 )
+
+replace github.com/streamingfast/substreams-foundational-store => ../substreams-foundational-store

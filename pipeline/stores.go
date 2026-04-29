@@ -91,8 +91,20 @@ func (s *Stores) saveStoresSnapshots(ctx context.Context, stage int, boundaryBlo
 }
 
 func (s *Stores) storesHandleUndo(moduleOutput *pbssinternal.ModuleOutput) {
-	if s, found := s.StoreMap.Get(moduleOutput.ModuleName); found {
-		if deltaStore, ok := s.(store.DeltaAccessor); ok {
+	if st, found := s.StoreMap.Get(moduleOutput.ModuleName); found {
+		// For BadgerBackedStore, we need to call EvictFromBadger to handle reorgs
+		if _, ok := st.(*store.BadgerBackedStore); ok {
+			// The reorg block number would be extracted from the undo context
+			// For now, we apply deltas reverse on the local cache
+			if deltaStore, ok := st.(store.DeltaAccessor); ok {
+				deltaStore.ApplyDeltasReverse(moduleOutput.GetStoreDeltas().StoreDeltas)
+			}
+			// TODO: Wire this to get the actual reorg block number and call EvictFromBadger
+			// badgerStore.EvictFromBadger(reorgBlockNum)
+			return
+		}
+		
+		if deltaStore, ok := st.(store.DeltaAccessor); ok {
 			deltaStore.ApplyDeltasReverse(moduleOutput.GetStoreDeltas().StoreDeltas)
 		}
 	}
@@ -102,6 +114,14 @@ func (s *Stores) saveStoreSnapshot(ctx context.Context, saveStore store.Store, b
 	ctx, span := reqctx.WithSpan(ctx, fmt.Sprintf("substreams/%s/stores/save_store_snapshot", s.tier))
 	span.SetAttributes(attribute.String("subtreams.store", saveStore.Name()))
 	defer span.EndWithErr(&err)
+
+	// For BadgerBackedStore, flush to foundational store instead of saving to object storage
+	if badgerStore, ok := saveStore.(*store.BadgerBackedStore); ok {
+		if err := badgerStore.FlushToBadger(boundaryBlock); err != nil {
+			return fmt.Errorf("flushing BadgerBackedStore %q to foundational store at boundary %d: %w", saveStore.Name(), boundaryBlock, err)
+		}
+		return nil
+	}
 
 	file, writer, err := saveStore.Save(boundaryBlock)
 	if err != nil {

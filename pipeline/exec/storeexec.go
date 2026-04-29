@@ -46,6 +46,10 @@ func (e *StoreModuleExecutor) run(ctx context.Context, reader execout.ExecutionO
 
 func (e *StoreModuleExecutor) HasValidOutput() bool {
 	_, ok := e.outputStore.(*store.FullKV)
+	if ok {
+		return true
+	}
+	_, ok = e.outputStore.(*store.BadgerBackedStore)
 	return ok
 }
 func (e *StoreModuleExecutor) HasOutputForFiles() bool {
@@ -88,5 +92,18 @@ func (e *StoreModuleExecutor) toModuleOutput(data []byte) (*pbssinternal.ModuleO
 			},
 		}, nil
 	}
+	
+	if badgerStore, ok := e.outputStore.(*store.BadgerBackedStore); ok {
+		deltas := badgerStore.GetDeltas()
+
+		return &pbssinternal.ModuleOutput{
+			Data: &pbssinternal.ModuleOutput_StoreDeltas{
+				StoreDeltas: &pbsubstreams.StoreDeltas{
+					StoreDeltas: deltas,
+				},
+			},
+		}, nil
+	}
+	
 	return nil, nil
 }

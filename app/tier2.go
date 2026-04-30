@@ -18,6 +18,14 @@ import (
 	"go.uber.org/zap"
 )
 
+// returns config with default sane values
+func NewDefaultTier2Config() *Tier2Config {
+	return &Tier2Config{
+		BlockExecutionTimeout:   3 * time.Minute,
+		SegmentExecutionTimeout: 60 * time.Minute,
+	}
+}
+
 type Tier2Config struct {
 	GRPCListenAddr      string // gRPC address where this app will listen to
 	ServiceDiscoveryURL *url.URL
@@ -61,6 +69,7 @@ func NewTier2(logger *zap.Logger, config *Tier2Config, modules *Tier2Modules) *T
 }
 
 func (a *Tier2App) Run() error {
+	ctx := context.Background()
 
 	// declared in NewTier2, registered here
 	dmetrics.Register(metrics.MetricSet)
@@ -71,9 +80,6 @@ func (a *Tier2App) Run() error {
 	}
 
 	var opts []service.Option
-	//for _, opt := range a.config.PipelineOptions {
-	//	opts = append(opts, service.WithPipelineOptions(opt))
-	//}
 
 	if a.config.Tracing {
 		opts = append(opts, service.WithModuleExecutionTracing())
@@ -101,6 +107,7 @@ func (a *Tier2App) Run() error {
 	}
 
 	svc, err := service.NewTier2(
+		ctx,
 		a.logger,
 		a.modules.CheckPendingShutDown,
 		opts...,

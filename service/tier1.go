@@ -158,6 +158,7 @@ func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
 	return strings.TrimPrefix(out, protoPkfPrefix), nil
 }
 func NewTier1(
+	ctx context.Context,
 	logger *zap.Logger,
 	mergedBlocksStore dstore.Store,
 	forkedBlocksStore dstore.Store,
@@ -220,6 +221,7 @@ func NewTier1(
 	tier2RequestParameters.StateBundleSize = runtimeConfig.SegmentSize
 
 	logger.Info("launching tier1 service", zap.Reflect("client_config", substreamsClientConfig), zap.String("block_type", blockType), zap.Bool("with_live", hub != nil))
+
 	s := &Tier1Service{
 		Shutter:                  shutter.New(),
 		runtimeConfig:            runtimeConfig,

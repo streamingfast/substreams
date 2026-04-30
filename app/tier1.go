@@ -140,6 +140,7 @@ func loadTier1FoundationalStoreEndpoints(configPath string) (map[string]string, 
 }
 
 func (a *Tier1App) Run() error {
+	ctx := context.Background()
 	// declared in NewTier1, registered here
 	dmetrics.Register(metrics.MetricSet)
 
@@ -258,6 +259,7 @@ func (a *Tier1App) Run() error {
 	}
 
 	tier1Service, err := service.NewTier1(
+		ctx,
 		a.logger,
 		mergedBlocksStore,
 		forkedBlocksStore,

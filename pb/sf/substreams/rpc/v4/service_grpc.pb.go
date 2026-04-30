@@ -26,13 +26,21 @@ const (
 // StreamClient is the client API for Stream service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// Stream is the primary service for consuming Substreams data using the v4 API.
+// It is similar to the v3 API but returns a v4-specific `Response` message that batches
+// multiple `BlockScopedData` items in a single `BlockScopedDatas` message, which reduces
+// round-trips near chain HEAD.
 type StreamClient interface {
-	// Request processing of blocks via substreams engine.
-	// Similar to `sf.substreams.rpc.v2.Stream/Blocks` request, but:
-	//   - the full spkg package is sent instead of just the modules
-	//   - 'params' and 'network' fields are sent to apply the user-defined params to the package server-side
+	// Blocks streams processed blockchain data for the requested range, applying the specified
+	// Substreams modules from the provided `.spkg` package. The request format is identical
+	// to `sf.substreams.rpc.v3.Stream/Blocks`. Responses use the v4 `Response` message which
+	// may batch multiple blocks in a single `BlockScopedDatas` message.
+	// All other response types (session, progress, undo signal, errors) are identical to v2.
 	//
-	// Responses are identical to those of the v2 request.
+	// For reliable, exactly-once consumption, see `sf.substreams.rpc.v2.BlockScopedData.cursor`
+	// and `sf.substreams.rpc.v2.BlockUndoSignal.last_valid_cursor`: persisting and resuming
+	// from these cursors is the foundation of the "never miss a beat" guarantee.
 	Blocks(ctx context.Context, in *v3.Request, opts ...grpc.CallOption) (grpc.ServerStreamingClient[Response], error)
 }
 
@@ -66,13 +74,21 @@ type Stream_BlocksClient = grpc.ServerStreamingClient[Response]
 // StreamServer is the server API for Stream service.
 // All implementations should embed UnimplementedStreamServer
 // for forward compatibility.
+//
+// Stream is the primary service for consuming Substreams data using the v4 API.
+// It is similar to the v3 API but returns a v4-specific `Response` message that batches
+// multiple `BlockScopedData` items in a single `BlockScopedDatas` message, which reduces
+// round-trips near chain HEAD.
 type StreamServer interface {
-	// Request processing of blocks via substreams engine.
-	// Similar to `sf.substreams.rpc.v2.Stream/Blocks` request, but:
-	//   - the full spkg package is sent instead of just the modules
-	//   - 'params' and 'network' fields are sent to apply the user-defined params to the package server-side
+	// Blocks streams processed blockchain data for the requested range, applying the specified
+	// Substreams modules from the provided `.spkg` package. The request format is identical
+	// to `sf.substreams.rpc.v3.Stream/Blocks`. Responses use the v4 `Response` message which
+	// may batch multiple blocks in a single `BlockScopedDatas` message.
+	// All other response types (session, progress, undo signal, errors) are identical to v2.
 	//
-	// Responses are identical to those of the v2 request.
+	// For reliable, exactly-once consumption, see `sf.substreams.rpc.v2.BlockScopedData.cursor`
+	// and `sf.substreams.rpc.v2.BlockUndoSignal.last_valid_cursor`: persisting and resuming
+	// from these cursors is the foundation of the "never miss a beat" guarantee.
 	Blocks(*v3.Request, grpc.ServerStreamingServer[Response]) error
 }
 

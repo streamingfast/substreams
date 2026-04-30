@@ -109,6 +109,7 @@ type Tier1Service struct {
 	activeRequestsHardLimit  int
 	tier2RequestParameters   reqctx.Tier2RequestParameters
 	foundationalEndpoints    map[string]string
+	badgerBackedEndpoints    map[string]string
 	sessionPool              dsession.SessionPool
 	activeRequestsManager    *active_requests.ActiveRequestsManager // we keep a list of current requests for the debugAPI and to manage memory
 	execOutMessageBufferSize int
@@ -234,6 +235,7 @@ func NewTier1(
 		activeRequestsSoftLimit:  activeRequestsSoftLimit,
 		activeRequestsHardLimit:  activeRequestsHardLimit,
 		foundationalEndpoints:    foundationalEndpoints,
+		badgerBackedEndpoints:    tier2RequestParameters.BadgerBackedStoreEndpoints,
 		sessionPool:              sessionPool,
 		activeRequestsManager:    active_requests.NewActiveRequestsManager(logger),
 		execOutMessageBufferSize: int(outputBufferSize),
@@ -774,6 +776,7 @@ func (s *Tier1Service) blocks(
 			return s.IsTerminating() // pipeline starts draining when the service is actually terminating, (after the global shutdown-signal-delay)
 		},
 		s.foundationalEndpoints,
+		s.badgerBackedEndpoints,
 		execOutMessageBufferSize,
 		supportBuffering,
 		opts...,

@@ -2,15 +2,18 @@ package pipeline
 
 import (
 	"context"
+	"net"
 	"testing"
 
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dstore"
+	pbfoundationalservice "github.com/streamingfast/substreams-foundational-store/pb/sf/substreams/foundational-store/service/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -266,4 +269,75 @@ func (cr *testCursorResolver) resolveCursor(_ context.Context, cursor *bstream.C
 		return cursor.Block, cursor.HeadBlock, nil
 	}
 	return resp.lastValid, resp.currentHead, resp.err
+}
+
+// TestNewStoreOrBadger verifies that newStoreOrBadger returns the correct store type
+// depending on whether the module is listed in badgerBackedEndpoints and whether a
+// partial store is requested.
+func TestNewStoreOrBadger(t *testing.T) {
+	objStore := dstore.NewMockStore(nil)
+	cfg, err := store2.NewConfig("mystore", 0, "mystore", pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD, "int64", objStore, nil)
+	require.NoError(t, err)
+
+	logger := zap.NewNop()
+
+	t.Run("non-badger full store", func(t *testing.T) {
+		p := &Pipeline{
+			badgerBackedEndpoints: map[string]string{},
+			foundationalClosers:   make(map[string][]func() error),
+		}
+		s, err := p.newStoreOrBadger(cfg, logger, 0, false)
+		require.NoError(t, err)
+		_, ok := s.(*store2.FullKV)
+		assert.True(t, ok, "expected *store.FullKV, got %T", s)
+	})
+
+	t.Run("non-badger partial store", func(t *testing.T) {
+		p := &Pipeline{
+			badgerBackedEndpoints: map[string]string{},
+			foundationalClosers:   make(map[string][]func() error),
+		}
+		s, err := p.newStoreOrBadger(cfg, logger, 5, true)
+		require.NoError(t, err)
+		partial, ok := s.(*store2.PartialKV)
+		assert.True(t, ok, "expected *store.PartialKV, got %T", s)
+		assert.Equal(t, uint64(5), partial.InitialBlock())
+	})
+
+	t.Run("non-badger partial store at block 0", func(t *testing.T) {
+		// Partial store with initialBlock==0 must still be PartialKV, not FullKV.
+		p := &Pipeline{
+			badgerBackedEndpoints: map[string]string{},
+			foundationalClosers:   make(map[string][]func() error),
+		}
+		s, err := p.newStoreOrBadger(cfg, logger, 0, true)
+		require.NoError(t, err)
+		_, ok := s.(*store2.PartialKV)
+		assert.True(t, ok, "expected *store.PartialKV at block 0, got %T", s)
+	})
+
+	t.Run("badger-backed store returns BadgerBackedStore type via in-process server", func(t *testing.T) {
+		// Start an in-process gRPC server implementing the foundational store service.
+		lis, err := net.Listen("tcp", "localhost:0")
+		require.NoError(t, err)
+		srv := grpc.NewServer()
+		pbfoundationalservice.RegisterStoreServer(srv, &mockFoundationalStoreServer{})
+		go srv.Serve(lis) //nolint:errcheck
+		defer srv.Stop()
+
+		p := &Pipeline{
+			badgerBackedEndpoints: map[string]string{"mystore": lis.Addr().String()},
+			foundationalClosers:   make(map[string][]func() error),
+		}
+		s, err := p.newStoreOrBadger(cfg, logger, 0, false)
+		require.NoError(t, err)
+		_, ok := s.(*store2.BadgerBackedStore)
+		assert.True(t, ok, "expected *store.BadgerBackedStore, got %T", s)
+	})
+}
+
+// mockFoundationalStoreServer is a minimal no-op implementation of the foundational store
+// gRPC server, used only to allow NewStoreClient to connect successfully in unit tests.
+type mockFoundationalStoreServer struct {
+	pbfoundationalservice.UnimplementedStoreServer
 }

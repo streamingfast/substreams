@@ -88,6 +88,7 @@ func NewRequest(ctx context.Context, req *reqctx.RequestDetails, stageIndex int,
 		ProductionMode:                  req.ProductionMode,
 		StreamOutput:                    streamOutput,
 		FoundationalStoreEndpoints:      tier2ReqParams.FoundationalStoreEndpoints,
+		BadgerBackedStoreEndpoints:      tier2ReqParams.BadgerBackedStoreEndpoints,
 		EthCallFallbackToLatestDuration: int64(reqctx.EthCallFallbackToLatestDuration(ctx)),
 		EthCallFallbackToNumberDuration: int64(reqctx.EthCallUseBlockNumberDuration(ctx)),
 	}

@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/streamingfast/substreams/metrics"
-	pbservice "github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/service/v2"
+	pbservice "github.com/streamingfast/substreams-foundational-store/pb/sf/substreams/foundational-store/service/v2"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/execout"
 	"github.com/streamingfast/substreams/storage/index"

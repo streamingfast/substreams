@@ -1,8 +1,8 @@
 package wasmtime
 
 import (
-	pbmodel "github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/model/v2"
-	depricated "github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/service/v1"
+	pbmodel "github.com/streamingfast/substreams-foundational-store/pb/sf/substreams/foundational-store/model/v2"
+	depricated "github.com/streamingfast/substreams-foundational-store/pb/sf/substreams/foundational-store/service/v1"
 	"google.golang.org/protobuf/proto"
 )
 

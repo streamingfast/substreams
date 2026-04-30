@@ -73,7 +73,7 @@ require (
 	github.com/streamingfast/firehose-networks v0.2.2
 	github.com/streamingfast/sf-tracing v0.0.0-20251218140752-bafd5572499f
 	github.com/streamingfast/shutter v1.5.0
-	github.com/streamingfast/substreams-foundational-store v0.2.1-0.20260430134623-56d9ea6be294
+	github.com/streamingfast/substreams-foundational-store v0.2.1-0.20260430142406-466c94d50de8
 	github.com/streamingfast/substreams-sdk-go v0.0.0-20240110154316-5fb21a7a330b
 	github.com/streamingfast/substreams-sink-files/v2 v2.3.1
 	github.com/test-go/testify v1.1.4

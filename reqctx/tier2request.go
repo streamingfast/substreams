@@ -18,6 +18,9 @@ type Tier2RequestParameters struct {
 
 	WASMModules                map[string]string
 	FoundationalStoreEndpoints map[string]string
+	// BadgerBackedStoreEndpoints maps store module name -> foundational store gRPC address.
+	// Modules listed here get a BadgerBackedStore instead of FullKV/PartialKV.
+	BadgerBackedStoreEndpoints map[string]string
 }
 
 func WithTier2RequestParameters(ctx context.Context, parameters Tier2RequestParameters) context.Context {

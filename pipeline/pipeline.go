@@ -21,7 +21,7 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/plan"
 	"github.com/streamingfast/substreams/orchestrator/response"
 	"github.com/streamingfast/substreams/orchestrator/work"
-	pbservice "github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/service/v2"
+	pbservice "github.com/streamingfast/substreams-foundational-store/pb/sf/substreams/foundational-store/service/v2"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreamsrpcv4 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v4"
@@ -110,8 +110,11 @@ type Pipeline struct {
 
 	foundationalClients   map[string][]pbservice.StoreClient
 	foundationalEndpoints map[string]string
+	foundationalClosers   map[string][]func() error
 
-	foundationalClosers map[string][]func() error
+	// badgerBackedEndpoints maps store module name -> foundational store gRPC address.
+	// Modules listed here get a BadgerBackedStore instead of FullKV/PartialKV.
+	badgerBackedEndpoints map[string]string
 
 	processingModule *processingModule
 
@@ -140,6 +143,33 @@ type Pipeline struct {
 	supportBuffering     bool
 }
 
+// newStoreOrBadger returns a BadgerBackedStore if the module is listed in badgerBackedEndpoints,
+// otherwise falls back to NewPartialKV (when wantPartial is true) or NewFullKV.
+// On Tier1/Tier2, BadgerBackedStore replaces both FullKV and PartialKV — there are no partial
+// snapshots; Badger is the authoritative state.
+func (p *Pipeline) newStoreOrBadger(storeConfig *store.Config, logger *zap.Logger, partialInitialBlock uint64, wantPartial bool) (store.Store, error) {
+	addr, isBadger := p.badgerBackedEndpoints[storeConfig.Name()]
+	if !isBadger {
+		if wantPartial {
+			return storeConfig.NewPartialKV(partialInitialBlock, logger), nil
+		}
+		return storeConfig.NewFullKV(logger), nil
+	}
+
+	grpcClient, closer, err := foudational_store.NewStoreClient(addr, logger)
+	if err != nil {
+		return nil, fmt.Errorf("dialing badger store for module %q at %q: %w", storeConfig.Name(), addr, err)
+	}
+	// Track the closer so we can shut it down when the pipeline terminates
+	p.foundationalClosers[storeConfig.Name()] = append(p.foundationalClosers[storeConfig.Name()], closer)
+
+	s, err := store.NewBadgerBackedKV(logger, nil, storeConfig, grpcClient)
+	if err != nil {
+		return nil, fmt.Errorf("creating BadgerBackedStore for module %q: %w", storeConfig.Name(), err)
+	}
+	return s, nil
+}
+
 func New(
 	ctx context.Context,
 	isTier1 bool,
@@ -156,6 +186,7 @@ func New(
 	executionTimeout time.Duration,
 	checkPendingShutdown func() bool,
 	foundationalEndpoints map[string]string,
+	badgerBackedEndpoints map[string]string,
 	outputBufferSize int,
 	supportBuffering bool,
 	opts ...Option,
@@ -175,6 +206,7 @@ func New(
 		foundationalClients:     make(map[string][]pbservice.StoreClient),
 		foundationalClosers:     make(map[string][]func() error),
 		foundationalEndpoints:   foundationalEndpoints,
+		badgerBackedEndpoints:   badgerBackedEndpoints,
 		execoutStorage:          execoutStorage,
 		forkHandler:             NewForkHandler(),
 		blockStepMap:            make(map[bstream.StepType]uint64),
@@ -274,7 +306,12 @@ func (p *Pipeline) initStoresFromQuickload(ctx context.Context, reqPlan *plan.Re
 
 	storeMap := store.NewMap()
 	for _, storeConfig := range p.stores.configs {
-		storeMap[storeConfig.Name()] = storeConfig.NewFullKV(p.stores.logger)
+		s, err := p.newStoreOrBadger(storeConfig, p.stores.logger, 0, false)
+		if err != nil {
+			p.stores.logger.Warn("failed to create store for quickload, skipping", zap.String("module", storeConfig.Name()), zap.Error(err))
+			return false
+		}
+		storeMap[storeConfig.Name()] = s
 	}
 
 	if err := storeMap.QuickLoad(ctx, cursor.Block); err != nil {
@@ -396,21 +433,26 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 				if storeConfig.ModuleInitialBlock() > reqDetails.ResolvedStartBlockNum {
 					initialBlock = storeConfig.ModuleInitialBlock()
 				}
-				partialStore := storeConfig.NewPartialKV(initialBlock, logger)
-				storeMap.Set(partialStore)
+				s, err := p.newStoreOrBadger(storeConfig, logger, initialBlock, true)
+				if err != nil {
+					return nil, fmt.Errorf("creating store for module %q: %w", mod.Name, err)
+				}
+				storeMap.Set(s)
 
 			} else {
-				fullStore := storeConfig.NewFullKV(logger)
+				s, err := p.newStoreOrBadger(storeConfig, logger, 0, false)
+				if err != nil {
+					return nil, fmt.Errorf("creating store for module %q: %w", mod.Name, err)
+				}
 
-				if fullStore.InitialBlock() < reqDetails.ResolvedStartBlockNum {
+				if fullStore, ok := s.(*store.FullKV); ok && fullStore.InitialBlock() < reqDetails.ResolvedStartBlockNum {
 					file := store.NewCompleteFileInfo(fullStore.Name(), fullStore.InitialBlock(), reqDetails.ResolvedStartBlockNum)
 					loadableStores = append(loadableStores, &loadable{
 						fullKVStore: fullStore,
 						fileInfo:    file,
 					})
-
 				}
-				storeMap.Set(fullStore)
+				storeMap.Set(s)
 			}
 		}
 	}
@@ -483,8 +525,12 @@ func (p *Pipeline) setupEmptyStores(ctx context.Context) store.Map {
 	logger := reqctx.Logger(ctx)
 	storeMap := store.NewMap()
 	for _, storeConfig := range p.stores.configs {
-		fullStore := storeConfig.NewFullKV(logger)
-		storeMap.Set(fullStore)
+		s, err := p.newStoreOrBadger(storeConfig, logger, 0, false)
+		if err != nil {
+			logger.Warn("failed to create store in setupEmptyStores, falling back to FullKV", zap.String("module", storeConfig.Name()), zap.Error(err))
+			s = storeConfig.NewFullKV(logger)
+		}
+		storeMap.Set(s)
 	}
 	return storeMap
 }

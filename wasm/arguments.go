@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/protocolbuffers/protoscope"
-	pbservice "github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/service/v2"
+	pbservice "github.com/streamingfast/substreams-foundational-store/pb/sf/substreams/foundational-store/service/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/storage/store"
 )

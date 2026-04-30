@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/streamingfast/dgrpc"
-	pbservice "github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/service/v2"
+	pbservice "github.com/streamingfast/substreams-foundational-store/pb/sf/substreams/foundational-store/service/v2"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"

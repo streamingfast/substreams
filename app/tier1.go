@@ -63,6 +63,12 @@ type Tier1Config struct {
 	MeteringConfig string
 
 	FoundationalStoresConfigPath string
+	// BadgerBackedStoresConfigPath is a path to a JSON file mapping store module name -> foundational store gRPC address.
+	// When set, it is loaded at startup and populates BadgerBackedStoreEndpoints.
+	BadgerBackedStoresConfigPath string
+	// BadgerBackedStoreEndpoints maps store module name -> foundational store gRPC address.
+	// Modules listed here get a BadgerBackedStore instead of FullKV/PartialKV on both Tier1 and Tier2.
+	BadgerBackedStoreEndpoints map[string]string
 
 	MergedBlocksStoreURL    string
 	OneBlocksStoreURL       string
@@ -241,6 +247,15 @@ func (a *Tier1App) Run() error {
 		return fmt.Errorf("failed to load foundational store endpoints %q: %w", a.config.FoundationalStoresConfigPath, err)
 	}
 
+	badgerBackedStoreEndpoints := a.config.BadgerBackedStoreEndpoints
+	if a.config.BadgerBackedStoresConfigPath != "" {
+		loaded, err := loadTier1FoundationalStoreEndpoints(a.config.BadgerBackedStoresConfigPath)
+		if err != nil {
+			return fmt.Errorf("failed to load badger backed store endpoints %q: %w", a.config.BadgerBackedStoresConfigPath, err)
+		}
+		badgerBackedStoreEndpoints = loaded
+	}
+
 	var wasmModules map[string]string
 	if a.config.WASMExtensions != nil {
 		wasmModules = a.config.WASMExtensions.Params()
@@ -255,6 +270,7 @@ func (a *Tier1App) Run() error {
 		StateStoreDefaultTag:       a.config.StateStoreDefaultTag,
 		WASMModules:                wasmModules,
 		FoundationalStoreEndpoints: foundationalStoreEndpoints,
+		BadgerBackedStoreEndpoints: badgerBackedStoreEndpoints,
 	}
 
 	tier1Service, err := service.NewTier1(

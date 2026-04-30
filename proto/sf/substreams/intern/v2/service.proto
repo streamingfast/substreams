@@ -51,6 +51,10 @@ message ProcessRangeRequest {
 
   int64 eth_call_fallback_to_latest_duration = 19; // if non-zero, above this duration in nanoseconds, the eth_calls will use "latest" instead of block ref. It will also automatically retry 'block not found' with 'latest'. It has precedence over eth_call_fallback_to_number_duration.
   int64 eth_call_fallback_to_number_duration = 20; // if non-zero, above this duration in nanoseconds, the eth_calls will use block number instead of block hash
+
+  // Maps store module name -> foundational store gRPC address, for stores that are backed by Badger
+  // instead of object storage. Tier2 uses this to instantiate BadgerBackedStore instead of FullKV/PartialKV.
+  map<string, string> badger_backed_store_endpoints = 21;
 }
 
 message ProcessRangeResponse {

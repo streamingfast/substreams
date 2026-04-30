@@ -113,7 +113,11 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 	case errors.Is(err, ErrSkippableOutput):
 		skippableOutput = true
 	case errors.Is(err, ErrNoInput):
-		return nil, nil, nil, true, true, nil
+		emptyOutput, _ := executor.toModuleOutput(nil)
+		if emptyOutput != nil {
+			emptyOutput.ModuleName = executor.Name()
+		}
+		return emptyOutput, nil, nil, true, true, nil
 	case err != nil:
 		return nil, nil, nil, false, skippableOutput, fmt.Errorf("execute: %w", err)
 	}

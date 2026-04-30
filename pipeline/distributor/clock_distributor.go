@@ -52,7 +52,7 @@ func NewClockDistributor(
 func (cd *ClockDistributor) canSkipBlockForModule(moduleName string, i uint64, logger *zap.Logger) bool {
 	blockIndex, ok := cd.moduleBlockIndexes[moduleName]
 	if !ok {
-		logger.Warn("module block index not found in canSkipBlockForModule, this should not happen", zap.String("module", moduleName))
+		logger.Debug("module block index not found in canSkipBlockForModule", zap.String("module", moduleName))
 	}
 	if blockIndex == nil {
 		// If the module has no index, we cannot skip the block.

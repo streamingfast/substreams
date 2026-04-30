@@ -73,6 +73,7 @@ require (
 	github.com/streamingfast/firehose-networks v0.2.2
 	github.com/streamingfast/sf-tracing v0.0.0-20251218140752-bafd5572499f
 	github.com/streamingfast/shutter v1.5.0
+	github.com/streamingfast/substreams-foundational-store v0.2.1-0.20260430134623-56d9ea6be294
 	github.com/streamingfast/substreams-sdk-go v0.0.0-20240110154316-5fb21a7a330b
 	github.com/streamingfast/substreams-sink-files/v2 v2.3.1
 	github.com/test-go/testify v1.1.4
@@ -158,7 +159,6 @@ require (
 	github.com/sercand/kuberesolver/v5 v5.1.1 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
 	github.com/streamingfast/dhammer v0.0.0-20220506192416-3797a7906da2 // indirect
-	github.com/streamingfast/substreams-foundational-store v0.2.2 // indirect
 	github.com/streamingfast/validator v0.0.0-20231124184318-71ec8080e4ae // indirect
 	github.com/thedevsaddam/govalidator v1.9.6 // indirect
 	github.com/tidwall/match v1.1.1 // indirect

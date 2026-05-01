@@ -92,4 +92,5 @@ jobs:
           only-severities: critical,high
           image: ${{ steps.meta.outputs.tags }}
           github-token: ${{ secrets.PR_COMMENTER }}
+          exit-code: true # This will fail the GitHub Action step if CVEs are found
           write-comment: true

@@ -2,8 +2,8 @@ package db_proto
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -130,7 +130,7 @@ func (s *Sinker) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrp
 				return fmt.Errorf("begin tx: %w", err)
 			}
 		}
-		errs := multiError{}
+		var errs []error
 		if s.parallel {
 			wg := sync.WaitGroup{}
 			wg.Add(len(holding))
@@ -158,7 +158,7 @@ func (s *Sinker) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrp
 			}
 			wg.Wait()
 			if len(errs) > 0 {
-				return fmt.Errorf("errors: %w", errs)
+				return fmt.Errorf("errors: %w", errors.Join(errs...))
 			}
 
 		} else {
@@ -259,16 +259,4 @@ func (s *Sinker) HandleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstr
 	}
 
 	return nil
-}
-
-type multiError []error
-
-func (e multiError) Error() string {
-	var msgs []string
-	for _, err := range e {
-		if err != nil {
-			msgs = append(msgs, err.Error())
-		}
-	}
-	return strings.Join(msgs, "\n")
 }

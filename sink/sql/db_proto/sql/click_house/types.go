@@ -53,8 +53,6 @@ func MapFieldType(fd protoreflect.FieldDescriptor, bytesEncoding bytes.Encoding,
 		case fd.Message().FullName() == "google.protobuf.Timestamp":
 			baseType = TypeDateTime
 		case column.Nested != nil:
-			// Nested columns are handled separately by dialect.go using ClickHouse Nested() syntax
-			// This case should not be reached in normal flow as nested columns are processed differently
 			return DataType("")
 		default:
 			panic(fmt.Sprintf("Message type not supported: %s", string(fd.Message().FullName())))
@@ -105,7 +103,6 @@ func MapFieldType(fd protoreflect.FieldDescriptor, bytesEncoding bytes.Encoding,
 		panic(fmt.Sprintf("unsupported type: %s", kind))
 	}
 
-	// If field is repeated, wrap the base type as an array
 	if fd.IsList() {
 		return DataType(fmt.Sprintf("Array(%s)", baseType))
 	}
@@ -122,8 +119,6 @@ func ColInputForColumn(fd protoreflect.FieldDescriptor, bytesEncoding bytes.Enco
 		case fd.Message().FullName() == "google.protobuf.Timestamp":
 			baseInput = &proto.ColDateTime{}
 		case column.Nested != nil:
-			// Nested columns are handled separately by dialect.go using ClickHouse Nested() syntax
-			// Return nil as these columns don't need ColInput
 			return nil
 		default:
 			panic(fmt.Sprintf("Message type not supported: %s", string(fd.Message().FullName())))
@@ -185,7 +180,6 @@ func ColInputForColumn(fd protoreflect.FieldDescriptor, bytesEncoding bytes.Enco
 		panic(fmt.Sprintf("unsupported type: %s", fd.Kind()))
 	}
 
-	// If field is repeated, wrap the base input as an array
 	if fd.IsList() {
 		switch base := baseInput.(type) {
 		case *proto.ColInt32:

@@ -121,7 +121,6 @@ func (d *DialectClickHouse) createTable(table *schema.Table) error {
 		var fields []string
 		for _, nestedCol := range columns {
 			if nestedCol.Nested != nil {
-				// Handle nested within nested
 				innerFields := buildNestedFields(nestedCol.Nested.Columns)
 				fields = append(fields, fmt.Sprintf("%s Nested(%s)", nestedCol.Name, innerFields))
 			} else {
@@ -134,14 +133,11 @@ func (d *DialectClickHouse) createTable(table *schema.Table) error {
 
 	var processColumn func(f *schema.Column, sb *strings.Builder)
 	processColumn = func(f *schema.Column, sb *strings.Builder) {
-		// Check if this column has nested structure
 		if f.Nested != nil {
-			// Use ClickHouse Nested() syntax instead of prefixing
 			nestedFieldsStr := buildNestedFields(f.Nested.Columns)
 			sb.WriteString(fmt.Sprintf("%s Nested(%s)", f.Name, nestedFieldsStr))
 			sb.WriteString(",")
 		} else {
-			// Process regular column
 			fieldType := MapFieldType(f.FieldDescriptor, d.bytesEncoding, f).String()
 			sb.WriteString(fmt.Sprintf("%s %s", f.Name, fieldType))
 			sb.WriteString(",")
@@ -155,7 +151,6 @@ func (d *DialectClickHouse) createTable(table *schema.Table) error {
 		processColumn(f, &sb)
 	}
 
-	//removing the last comma since it is complicated to removing it before
 	temp := sb.String()
 	temp = temp[:len(temp)-1]
 	sb = strings.Builder{}
@@ -178,7 +173,6 @@ func (d *DialectClickHouse) createTable(table *schema.Table) error {
 		return fmt.Errorf("getting 'partition by' string: %w", err)
 	}
 
-	// Add indexes if they exist
 	indexes, err := indexString(table)
 	if err != nil {
 		return fmt.Errorf("getting 'index' string: %w", err)
@@ -201,18 +195,15 @@ func (d *DialectClickHouse) FullTableName(table *schema.Table) string {
 
 func (d *DialectClickHouse) AppendInlineFieldValues(fieldValues []any, fd protoreflect.FieldDescriptor, fv protoreflect.Value, dm *dynamicpb.Message) ([]any, error) {
 	if fd.IsList() {
-		// Handle as array of nested columns - flatten into multiple arrays
 		list := fv.List()
 		if list.Len() > 0 {
 			firstMessage := list.Get(0).Message().Interface().(*dynamicpb.Message)
 			nestedFields := firstMessage.Descriptor().Fields()
 
-			// For each nested field, create an array of values from all list elements
 			for j := 0; j < nestedFields.Len(); j++ {
 				nestedFd := nestedFields.Get(j)
 				var nestedValues []interface{}
 
-				// Collect values for this nested field from all list elements
 				for k := 0; k < list.Len(); k++ {
 					fm := list.Get(k).Message().Interface().(*dynamicpb.Message)
 					nestedValue := fm.Get(nestedFd)
@@ -222,24 +213,19 @@ func (d *DialectClickHouse) AppendInlineFieldValues(fieldValues []any, fd protor
 				fieldValues = append(fieldValues, nestedValues)
 			}
 		} else {
-			// Empty list - need to get field count from descriptor
-			// Get the message descriptor for this field type
 			msgDesc := fd.Message()
 			nestedFields := msgDesc.Fields()
 
-			// Append empty arrays for each nested field
 			for j := 0; j < nestedFields.Len(); j++ {
 				fieldValues = append(fieldValues, []interface{}{})
 			}
 		}
 	} else {
-		// Handle as nested column - extract each field as an array
 		fm := fv.Message().Interface().(*dynamicpb.Message)
 		nestedFields := fm.Descriptor().Fields()
 		for j := 0; j < nestedFields.Len(); j++ {
 			nestedFd := nestedFields.Get(j)
 			nestedValue := fm.Get(nestedFd)
-			// Wrap the single value in an array (array of size 1)
 			fieldValues = append(fieldValues, []interface{}{nestedValue.Interface()})
 		}
 	}
@@ -251,7 +237,6 @@ func (d *DialectClickHouse) SchemaHash() string {
 
 	var buf []byte
 
-	// SchemaHash tableCreateStatements
 	var sqls []string
 	for _, sql := range d.CreateTableSql {
 		sqls = append(sqls, sql)
@@ -335,7 +320,6 @@ func partitionByString(table *schema.Table) (string, error) {
 
 	var parts []string
 
-	// Check if any partition field is a function applied to _block_timestamp_
 	hasBlockTimestampFunction := false
 	for _, field := range info.PartitionFields {
 		if field.Name == sql2.DialectFieldBlockTimestamp {
@@ -344,12 +328,10 @@ func partitionByString(table *schema.Table) (string, error) {
 		}
 	}
 
-	// Only include raw _block_timestamp_ if no function is applied to it
 	if !hasBlockTimestampFunction {
 		parts = append(parts, wrapWithClickhouseFunction(sql2.DialectFieldBlockTimestamp, pbSchmema.Function_toYYYYMM))
 	}
 
-	// Add all partition fields
 	for _, field := range info.PartitionFields {
 		w := wrapWithClickhouseFunction(field.Name, field.Function)
 		parts = append(parts, w)

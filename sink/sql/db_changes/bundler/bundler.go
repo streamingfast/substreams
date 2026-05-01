@@ -110,7 +110,6 @@ func (b *Bundler) Roll(ctx context.Context, blockNum uint64) (rolled bool, err e
 		return false, fmt.Errorf("stop active boundary: %w", err)
 	}
 
-	// Empty boundaries are before `blockNum`, we must flush them also before checking if we should quit
 	for _, boundary := range boundaries {
 		if err := b.Start(boundary.StartBlock()); err != nil {
 			return false, fmt.Errorf("start skipping boundary: %w", err)
@@ -172,7 +171,6 @@ func (b *Bundler) stop(ctx context.Context) error {
 		b.zlogger.Debug("boundary not written, skipping upload of files", zap.Stringer("boundary", b.activeBoundary))
 	}
 
-	// Reset state
 	b.HeaderWritten = false
 	b.activeBoundary = nil
 	b.stats.endBoundary()

@@ -19,7 +19,6 @@ type boundaryStats struct {
 	totalBoundaryCount uint64
 	boundary           *bstream.Range
 
-	// averages
 	avgUploadDuration          *dmetrics.AvgDurationCounter
 	avgBoundaryProcessDuration *dmetrics.AvgDurationCounter
 	avgDataProcessDuration     *dmetrics.AvgDurationCounter

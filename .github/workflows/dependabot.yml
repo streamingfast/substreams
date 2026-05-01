@@ -1,11 +1,6 @@
 name: "Dependency Review"
 on:
   pull_request:
-  push:
-    tags:
-      - v*
-    branches:
-      - develop
 
 permissions:
   contents: read

@@ -91,4 +91,5 @@ jobs:
           command: cves
           only-severities: critical,high
           image: ${{ steps.meta.outputs.tags }}
+          github-token: ${{ secrets.PR_COMMENTER }}
           write-comment: true

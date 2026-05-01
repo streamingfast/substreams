@@ -11,7 +11,7 @@ import (
 	sink "github.com/streamingfast/substreams/sink"
 	"github.com/streamingfast/substreams/sink/sql/bytes"
 	"github.com/streamingfast/substreams/sink/sql/db_changes/db"
-	"github.com/streamingfast/substreams/sink/sql/db_proto/sql"
+	sql2 "github.com/streamingfast/substreams/sink/sql/db_proto/sql"
 	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/schema"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -19,7 +19,7 @@ import (
 )
 
 type Database struct {
-	*sql.BaseDatabase
+	*sql2.BaseDatabase
 	db             *pgsql.DB
 	tx             *pgsql.Tx
 	schema         *schema.Schema
@@ -48,7 +48,7 @@ func NewDatabase(schema *schema.Schema, dsn *db.DSN, moduleOutputType string, ro
 		return nil, fmt.Errorf("creating postgres dialect: %w", err)
 	}
 
-	baseDB, err := sql.NewBaseDatabase(moduleOutputType, rootMessageDescriptor, useProtoOptions, logger)
+	baseDB, err := sql2.NewBaseDatabase(moduleOutputType, rootMessageDescriptor, useProtoOptions, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create base database: %w", err)
 	}
@@ -89,7 +89,7 @@ func (d *Database) Open() error {
 	return nil
 }
 
-func (d *Database) GetDialect() sql.Dialect {
+func (d *Database) GetDialect() sql2.Dialect {
 	return d.dialect
 }
 
@@ -188,7 +188,7 @@ func (d *Database) Insert(table string, values []any) error {
 	return d.inserter.insert(table, values, d)
 }
 
-func (d *Database) WalkMessageDescriptorAndInsert(dm *dynamicpb.Message, blockNum uint64, blockTimestamp time.Time, parent *sql.Parent) (time.Duration, error) {
+func (d *Database) WalkMessageDescriptorAndInsert(dm *dynamicpb.Message, blockNum uint64, blockTimestamp time.Time, parent *sql2.Parent) (time.Duration, error) {
 	return d.WalkMessageDescriptorAndInsertWithDialect(dm, blockNum, blockTimestamp, parent, d.dialect, d)
 }
 
@@ -211,7 +211,7 @@ func (d *Database) Flush() (time.Duration, error) {
 	return time.Since(startFlush), nil
 }
 
-func (d *Database) FetchSinkInfo(schemaName string) (*sql.SinkInfo, error) {
+func (d *Database) FetchSinkInfo(schemaName string) (*sql2.SinkInfo, error) {
 	query := fmt.Sprintf("SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = '%s' AND table_name = '_sink_info_')", schemaName)
 
 	var exist bool
@@ -223,7 +223,7 @@ func (d *Database) FetchSinkInfo(schemaName string) (*sql.SinkInfo, error) {
 		return nil, nil
 	}
 
-	out := &sql.SinkInfo{}
+	out := &sql2.SinkInfo{}
 
 	err = d.db.QueryRow(fmt.Sprintf("SELECT schema_hash FROM %s._sink_info_", d.schema.Name)).Scan(&out.SchemaHash)
 	if err != nil {
@@ -309,7 +309,7 @@ func (d *Database) HandleBlocksUndo(lastValidBlockNum uint64) (err error) {
 	return nil
 }
 
-func (d *Database) Clone() sql.Database {
+func (d *Database) Clone() sql2.Database {
 	base := d.BaseClone()
 	d.BaseDatabase = base
 	return d

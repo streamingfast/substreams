@@ -136,7 +136,6 @@ func (d *DialectPostgres) createTable(table *schema.Table) error {
 
 		switch {
 		case f.IsRepeated:
-			// Arrays are now supported, continue processing
 		case f.Nested != nil:
 			fmt.Println("found nested type")
 		case f.IsMessage && !IsWellKnownType(f.FieldDescriptor):

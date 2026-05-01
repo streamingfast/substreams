@@ -169,6 +169,7 @@ func (o *Operation) mergeData(newData map[string]FieldData) error {
 	return nil
 }
 
+// validateOpTransition checks if the transition from existing to incoming op is valid.
 func validateOpTransition(fieldName string, existing, incoming UpdateOp) error {
 	if existing == UpdateOpSet {
 		return nil
@@ -258,7 +259,6 @@ func (o *Operation) mergeOperation(otherData map[string]FieldData) error {
 	if o.opType == OperationTypeDelete {
 		return fmt.Errorf("unable to merge operation for a delete operation")
 	}
-
 	return o.mergeData(otherData)
 }
 
@@ -270,7 +270,6 @@ func EscapeIdentifier(valueToEscape string) string {
 	if strings.Contains(valueToEscape, `"`) {
 		valueToEscape = strings.ReplaceAll(valueToEscape, `"`, `""`)
 	}
-
 	return `"` + valueToEscape + `"`
 }
 
@@ -278,7 +277,6 @@ func escapeStringValue(valueToEscape string) string {
 	if strings.Contains(valueToEscape, `'`) {
 		valueToEscape = strings.ReplaceAll(valueToEscape, `'`, `''`)
 	}
-
 	return `'` + valueToEscape + `'`
 }
 

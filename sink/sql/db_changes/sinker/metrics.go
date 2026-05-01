@@ -2,7 +2,7 @@ package sinker
 
 import (
 	"github.com/streamingfast/dmetrics"
-	"github.com/streamingfast/substreams/sink/sql/db_changes/db"
+	db "github.com/streamingfast/substreams/sink/sql/db_changes/db"
 )
 
 func RegisterMetrics() {

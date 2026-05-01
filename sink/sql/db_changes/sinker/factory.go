@@ -8,7 +8,7 @@ import (
 
 	"github.com/streamingfast/logging"
 	sink "github.com/streamingfast/substreams/sink"
-	"github.com/streamingfast/substreams/sink/sql/db_changes/db"
+	db "github.com/streamingfast/substreams/sink/sql/db_changes/db"
 	"go.uber.org/zap"
 )
 

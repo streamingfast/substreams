@@ -86,8 +86,6 @@ func (s *Stats) Start(each time.Duration, cursor *sink.Cursor) {
 }
 
 func (s *Stats) LogNow() {
-	// Logging fields order is important as it affects the final rendering, we carefully ordered
-	// them so the development logs looks nicer.
 	fields := []zap.Field{
 		zap.Stringer("db_flush_rate", s.dbFlushRate),
 		zap.Stringer("db_flush_duration_rate", s.dbFlushAvgDuration),
@@ -95,7 +93,6 @@ func (s *Stats) LogNow() {
 		zap.Stringer("handle_block_duration", s.handleBlockDuration),
 	}
 
-	// Only log undo metrics if we've had any undo operations (typically in live mode)
 	if s.hasUndoSegments {
 		fields = append(fields, zap.Stringer("handle_undo_duration", s.handleUndoDuration))
 	}

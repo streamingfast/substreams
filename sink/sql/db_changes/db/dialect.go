@@ -24,7 +24,7 @@ type Dialect interface {
 	DriverSupportRowsAffected() bool
 	GetUpdateCursorQuery(table, moduleHash string, cursor *sink.Cursor, block_num uint64, block_id string) string
 	GetAllCursorsQuery(table string) string
-	ParseDatetimeNormalization(value string) string
+	ParseDateTime Normalization(value string) string
 	Flush(tx Tx, ctx context.Context, l *Loader, outputModuleHash string, lastFinalBlock uint64) (int, error)
 	Revert(tx Tx, ctx context.Context, l *Loader, lastValidFinalBlock uint64) error
 	OnlyInserts() bool

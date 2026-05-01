@@ -1,147 +1,194 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/jhump/protoreflect/desc"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
-	sfcli "github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
-	"github.com/streamingfast/substreams/manifest"
-	sink "github.com/streamingfast/substreams/sink"
-	sinker2 "github.com/streamingfast/substreams/sink/sql/db_changes/sinker"
+	"github.com/streamingfast/derr"
+	sinksqlbytes "github.com/streamingfast/substreams/sink/sql/bytes"
+	dbchangesdb "github.com/streamingfast/substreams/sink/sql/db_changes/db"
+	dbchangessinker "github.com/streamingfast/substreams/sink/sql/db_changes/sinker"
+	dbproto "github.com/streamingfast/substreams/sink/sql/db_proto"
+	dbprotoproto "github.com/streamingfast/substreams/sink/sql/db_proto/proto"
+	"github.com/streamingfast/substreams/sink"
+	"google.golang.org/protobuf/types/descriptorpb"
 )
 
 func init() {
-	clickhouseCmd.AddCommand(clickhouseRunCmd)
-	clickhouseCmd.AddCommand(clickhouseSetupCmd)
-	SinkCmd.AddCommand(clickhouseCmd)
+	sink.AddFlagsToSet(sinkClickhouseCmd.Flags(),
+		sink.FlagExcludeDefault(sink.FlagUndoBufferSize))
+
+	sinkClickhouseCmd.Flags().String("on-module-hash-mismatch", "error", "What to do when the module hash in the manifest does not match the one in the database, can be 'error', 'warn' or 'ignore'")
+	sinkClickhouseCmd.Flags().String("cursors-table", "cursors", "Name of the table to use for storing cursors")
+	sinkClickhouseCmd.Flags().String("history-table", "substreams_history", "Name of the table to use for storing block history")
+	sinkClickhouseCmd.Flags().String("bytes-encoding", "raw", "Encoding for protobuf bytes fields: raw, hex, 0xhex, base64, base58")
+	sinkClickhouseCmd.Flags().Int("batch-block-flush-interval", 1000, "When in catch up mode, flush every N blocks")
+	sinkClickhouseCmd.Flags().Int("batch-row-flush-interval", 100000, "When in catch up mode, flush every N rows")
+	sinkClickhouseCmd.Flags().Int("live-block-flush-interval", 1, "When processing in live mode, flush every N blocks")
+	sinkClickhouseCmd.Flags().Int("flush-retry-count", 3, "Number of retry attempts for flush operations")
+	sinkClickhouseCmd.Flags().Duration("flush-retry-delay", 1*time.Second, "Base delay for retry backoff on flush failures")
+	sinkClickhouseCmd.Flags().Bool("no-constraints", false, "Do not add constraints to the database (proto-based mode only)")
+	sinkClickhouseCmd.Flags().Int("block-batch-size", 25, "Number of blocks to process at a time (proto-based mode only)")
+	sinkClickhouseCmd.Flags().String("clickhouse-cluster", "", "If non-empty, a 'ON CLUSTER <cluster>' clause will be applied when setting up tables in ClickHouse")
+	sinkClickhouseCmd.Flags().String("clickhouse-sink-info-folder", "", "Folder where to store the ClickHouse sink info (proto-based mode only)")
+	sinkClickhouseCmd.Flags().String("clickhouse-cursor-file-path", "cursor.txt", "File path where to store the ClickHouse cursor (proto-based mode only)")
+	sinkClickhouseCmd.Flags().Int("clickhouse-query-retry-count", 3, "Number of retries for ClickHouse queries when an error occurs")
+	sinkClickhouseCmd.Flags().Duration("clickhouse-query-retry-sleep", time.Second, "Sleep duration between ClickHouse query retries")
+
+	SinkCmd.AddCommand(sinkClickhouseCmd)
 }
 
-var clickhouseCmd = &cobra.Command{
-	Use:   "clickhouse",
-	Short: "ClickHouse sink commands",
+var sinkClickhouseCmd = &cobra.Command{
+	Use:   "clickhouse <dsn> [<manifest> [<module_name>]]",
+	Short: "Run a ClickHouse sink for Substreams",
+	RunE:  sinkClickhouseE,
+	Args:  cobra.RangeArgs(1, 3),
 }
 
-var clickhouseRunCmd = sfcli.Command(clickhouseRunE,
-	"run <dsn> <manifest> [<start>:<stop>]",
-	"Runs ClickHouse sink process",
-	sfcli.RangeArgs(2, 3),
-	sfcli.Flags(func(flags *pflag.FlagSet) {
-		sink.AddFlagsToSet(flags, sink.FlagExcludeDefault("undo-buffer-size"))
-		sqlAddCommonSinkerFlags(flags)
-		sqlAddCommonDatabaseChangesFlags(flags)
-		flags.Int("undo-buffer-size", 0, "If non-zero, handling of reorgs in the database is disabled. Instead, a buffer is introduced to only process blocks once they have been confirmed by that many blocks, introducing a latency but slightly reducing the load on the database when close to head. Set to 0 to enable reorg handling in the database.")
-		flags.Int("batch-block-flush-interval", 1_000, "When in catch up mode, flush every N blocks or after batch-row-flush-interval, whichever comes first. Set to 0 to disable and only use batch-row-flush-interval.")
-		flags.Int("batch-row-flush-interval", 100_000, "When in catch up mode, flush every N rows or after batch-block-flush-interval, whichever comes first. Set to 0 to disable and only use batch-block-flush-interval.")
-		flags.Int("live-block-flush-interval", 1, "When processing in live mode, flush every N blocks.")
-		flags.Int("flush-retry-count", 3, "Number of retry attempts for flush operations.")
-		flags.Duration("flush-retry-delay", 1*time.Second, "Base delay for incremental retry backoff on flush failures.")
-	}),
-	sfcli.OnCommandErrorLogAndExit(zlog),
-)
-
-func clickhouseRunE(cmd *cobra.Command, args []string) error {
-	app := sfcli.NewApplication(cmd.Context())
-
-	sinker2.RegisterMetrics()
+func sinkClickhouseE(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
+	cmd.SilenceUsage = true
 
 	dsnString := args[0]
-	manifestPath := args[1]
-
+	var manifestPath, outputModule string
+	if len(args) > 1 {
+		manifestPath = args[1]
+	}
 	if len(args) > 2 {
-		thirdArg := args[2]
-		if strings.Contains(thirdArg, ":") {
-			if err := sqlSetBlockRangeFlags(cmd, thirdArg); err != nil {
-				return fmt.Errorf("invalid block range %q: %w", thirdArg, err)
-			}
-		}
+		outputModule = args[2]
 	}
 
-	baseSink, err := sink.NewFromViper(
-		cmd,
-		sqlSupportedOutputTypes,
-		manifestPath,
-		sink.InferOutputModuleFromPackage,
-		fmt.Sprintf("substreams-sink-sql/%s", version),
-		zlog,
-		tracer,
-	)
+	sink.LoadSubstreamsAuthEnvFile(manifestPath)
+
+	sinkerConfig, err := sink.ConfigFromViper(cmd, sink.IgnoreOutputModuleType, manifestPath, outputModule, "sink_clickhouse", zlog, tracer)
 	if err != nil {
-		return fmt.Errorf("new base sinker: %w", err)
+		return err
 	}
 
-	batchBlockFlushInterval := sflags.MustGetInt(cmd, "batch-block-flush-interval")
-	batchRowFlushInterval := sflags.MustGetInt(cmd, "batch-row-flush-interval")
-	liveBlockFlushInterval := sflags.MustGetInt(cmd, "live-block-flush-interval")
-	flushRetryCount := sflags.MustGetInt(cmd, "flush-retry-count")
-	flushRetryDelay := sflags.MustGetDuration(cmd, "flush-retry-delay")
+	outputType := strings.TrimPrefix(sinkerConfig.OutputModule.Output.Type, "proto:")
 
-	cursorTableName := sflags.MustGetString(cmd, "cursors-table")
-	historyTableName := sflags.MustGetString(cmd, "history-table")
-	handleReorgs := sflags.MustGetInt(cmd, "undo-buffer-size") == 0
+	ctx, cancel := context.WithCancel(ctx)
+	go func() {
+		<-derr.SetupSignalHandler(0)
+		cancel()
+	}()
 
-	sinkerFactory := sinker2.SinkerFactory(baseSink, sinker2.SinkerFactoryOptions{
-		CursorTableName:         cursorTableName,
-		HistoryTableName:        historyTableName,
+	if strings.Contains(outputType, "DatabaseChanges") {
+		return sinkClickhouseDatabaseChanges(ctx, cmd, dsnString, sinkerConfig)
+	}
+	return sinkClickhouseProto(ctx, cmd, dsnString, sinkerConfig, outputType)
+}
+
+func sinkClickhouseDatabaseChanges(ctx context.Context, cmd *cobra.Command, dsnString string, sinkerConfig *sink.SinkerConfig) error {
+	dbchangessinker.RegisterMetrics()
+
+	baseSink, err := sink.NewFromConfig(sinkerConfig)
+	if err != nil {
+		return fmt.Errorf("creating base sinker: %w", err)
+	}
+
+	sinkerFactory := dbchangessinker.SinkerFactory(baseSink, dbchangessinker.SinkerFactoryOptions{
+		CursorTableName:         sflags.MustGetString(cmd, "cursors-table"),
+		HistoryTableName:        sflags.MustGetString(cmd, "history-table"),
 		ClickhouseCluster:       sflags.MustGetString(cmd, "clickhouse-cluster"),
-		BatchBlockFlushInterval: batchBlockFlushInterval,
-		BatchRowFlushInterval:   batchRowFlushInterval,
-		LiveBlockFlushInterval:  liveBlockFlushInterval,
-		OnModuleHashMismatch:    sqlResolveModuleHashMismatchFlag(cmd),
-		HandleReorgs:            handleReorgs,
-		FlushRetryCount:         flushRetryCount,
-		FlushRetryDelay:         flushRetryDelay,
+		BatchBlockFlushInterval: sflags.MustGetInt(cmd, "batch-block-flush-interval"),
+		BatchRowFlushInterval:   sflags.MustGetInt(cmd, "batch-row-flush-interval"),
+		LiveBlockFlushInterval:  sflags.MustGetInt(cmd, "live-block-flush-interval"),
+		OnModuleHashMismatch:    sflags.MustGetString(cmd, "on-module-hash-mismatch"),
+		HandleReorgs:            false,
+		FlushRetryCount:         sflags.MustGetInt(cmd, "flush-retry-count"),
+		FlushRetryDelay:         sflags.MustGetDuration(cmd, "flush-retry-delay"),
 	})
 
-	sqlSinker, err := sinkerFactory(app.Context(), dsnString, zlog, tracer)
+	sqlSinker, err := sinkerFactory(ctx, dsnString, zlog, tracer)
 	if err != nil {
 		return fmt.Errorf("unable to setup sql sinker: %w", err)
 	}
 
-	app.SuperviseAndStart(sqlSinker)
-
-	return app.WaitForTermination(zlog, 0*time.Second, 30*time.Second)
+	sqlSinker.Run(ctx)
+	return sqlSinker.Err()
 }
 
-var clickhouseSetupCmd = sfcli.Command(clickhouseSetupE,
-	"setup <dsn> <manifest>",
-	"Setup the required infrastructure for a Substreams SQL deployable unit (ClickHouse)",
-	sfcli.ExactArgs(2),
-	sfcli.Flags(func(flags *pflag.FlagSet) {
-		sqlAddCommonDatabaseChangesFlags(flags)
-		sqlAddCommonSinkerFlags(flags)
-		flags.Bool("system-tables-only", false, "Will only create/update the system tables (cursors, substreams_history) and ignore the schema from the manifest")
-		flags.Bool("ignore-duplicate-table-errors", false, "[Dev] Use this if you want to ignore duplicate table errors, take caution that this means the 'schema.sql' file will not have run fully!")
-	}),
-	sfcli.OnCommandErrorLogAndExit(zlog),
-)
-
-func clickhouseSetupE(cmd *cobra.Command, args []string) error {
-	ctx := cmd.Context()
-
-	dsnString := args[0]
-	manifestPath := args[1]
-
-	reader, err := manifest.NewReader(manifestPath)
+func sinkClickhouseProto(ctx context.Context, cmd *cobra.Command, dsnString string, sinkerConfig *sink.SinkerConfig, outputType string) error {
+	dsn, err := dbchangesdb.ParseDSN(dsnString)
 	if err != nil {
-		return fmt.Errorf("setup manifest reader: %w", err)
+		return fmt.Errorf("parsing dsn: %w", err)
 	}
-	pkgBundle, err := reader.Read()
+
+	spkg := sinkerConfig.Pkg
+	protoFiles := make(map[string]*descriptorpb.FileDescriptorProto, len(spkg.ProtoFiles))
+	for _, file := range spkg.ProtoFiles {
+		protoFiles[file.GetName()] = file
+	}
+
+	deps, err := dbprotoproto.ResolveDependencies(protoFiles)
 	if err != nil {
-		return fmt.Errorf("read manifest: %w", err)
+		return fmt.Errorf("resolving dependencies: %w", err)
 	}
 
-	options := sinker2.SinkerSetupOptions{
-		CursorTableName:            sflags.MustGetString(cmd, "cursors-table"),
-		HistoryTableName:           sflags.MustGetString(cmd, "history-table"),
-		ClickhouseCluster:          sflags.MustGetString(cmd, "clickhouse-cluster"),
-		OnModuleHashMismatch:       sqlResolveModuleHashMismatchFlag(cmd),
-		SystemTablesOnly:           sflags.MustGetBool(cmd, "system-tables-only"),
-		IgnoreDuplicateTableErrors: sflags.MustGetBool(cmd, "ignore-duplicate-table-errors"),
+	fileDescriptor, err := dbprotoproto.FileDescriptorForOutputType(spkg, nil, deps, outputType)
+	if err != nil {
+		return fmt.Errorf("finding file descriptor for output type %q: %w", outputType, err)
 	}
 
-	return sinker2.SinkerSetup(ctx, dsnString, pkgBundle.Package, options, zlog, tracer)
+	var rootMessageDescriptor *desc.MessageDescriptor
+	for _, md := range fileDescriptor.GetMessageTypes() {
+		if md.GetFullyQualifiedName() == outputType {
+			rootMessageDescriptor = md
+			break
+		}
+	}
+	if rootMessageDescriptor == nil {
+		return fmt.Errorf("message descriptor not found for output type %q, ensure your substreams bundles its protobuf definitions", outputType)
+	}
+
+	useConstraints := !sflags.MustGetBool(cmd, "no-constraints")
+	useProtoOption := false
+	for _, dep := range fileDescriptor.GetDependencies() {
+		if dep.GetName() == "sf/substreams/sink/sql/schema/v1/schema.proto" {
+			useProtoOption = true
+		}
+	}
+	if !useProtoOption {
+		useConstraints = false
+	}
+
+	encodingStr := sflags.MustGetString(cmd, "bytes-encoding")
+	encoding, err := sinksqlbytes.ParseEncoding(encodingStr)
+	if err != nil {
+		return fmt.Errorf("invalid bytes encoding %q: %w", encodingStr, err)
+	}
+
+	baseSink, err := sink.NewFromConfig(sinkerConfig)
+	if err != nil {
+		return fmt.Errorf("creating base sinker: %w", err)
+	}
+
+	outputModuleName := sinkerConfig.OutputModule.Name
+	factory := dbproto.SinkerFactory(baseSink, outputModuleName, rootMessageDescriptor.UnwrapMessage(), dbproto.SinkerFactoryOptions{
+		UseProtoOption:  useProtoOption,
+		UseConstraints:  useConstraints,
+		UseTransactions: true,
+		BlockBatchSize:  sflags.MustGetInt(cmd, "block-batch-size"),
+		Parallel:        false,
+		Encoding:        encoding,
+		Clickhouse: dbproto.SinkerFactoryClickhouse{
+			SinkInfoFolder:  sflags.MustGetString(cmd, "clickhouse-sink-info-folder"),
+			CursorFilePath:  sflags.MustGetString(cmd, "clickhouse-cursor-file-path"),
+			QueryRetryCount: sflags.MustGetInt(cmd, "clickhouse-query-retry-count"),
+			QueryRetrySleep: sflags.MustGetDuration(cmd, "clickhouse-query-retry-sleep"),
+		},
+	})
+
+	dbProtoSinker, err := factory(ctx, dsnString, dsn.Schema(), zlog, tracer)
+	if err != nil {
+		return fmt.Errorf("creating sinker: %w", err)
+	}
+
+	return dbProtoSinker.Run(ctx)
 }

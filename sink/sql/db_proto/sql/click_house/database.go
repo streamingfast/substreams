@@ -16,7 +16,7 @@ import (
 	sink "github.com/streamingfast/substreams/sink"
 	"github.com/streamingfast/substreams/sink/sql/bytes"
 	"github.com/streamingfast/substreams/sink/sql/db_changes/db"
-	sql "github.com/streamingfast/substreams/sink/sql/db_proto/sql"
+	"github.com/streamingfast/substreams/sink/sql/db_proto/sql"
 	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/schema"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -356,7 +356,6 @@ func (d *Database) StoreCursor(cursor *sink.Cursor) error {
 func (d *Database) HandleBlocksUndo(lastValidBlockNum uint64) error {
 	tables := d.dialect.GetTables()
 
-	// Sort tables in descending order based on their Ordinal field
 	sort.Slice(tables, func(i, j int) bool {
 		return tables[i].Ordinal > tables[j].Ordinal
 	})
@@ -366,7 +365,6 @@ func (d *Database) HandleBlocksUndo(lastValidBlockNum uint64) error {
 		return fmt.Errorf("creating clickhouse client: %w", err)
 	}
 
-	// local helper with retry and fresh client per attempt
 	doWithRetry := func(q string) error {
 		retryCount := d.queryRetryCount
 		retrySleep := d.queryRetrySleep

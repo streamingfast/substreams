@@ -11,7 +11,7 @@ import (
 	"github.com/streamingfast/logging/zapx"
 	"github.com/streamingfast/shutter"
 	sink "github.com/streamingfast/substreams/sink"
-	pbdatabase "github.com/streamingfast/substreams-sink-database-changes/pb/sf/substreams/sink/database/v1"
+	pbdatabase "github.com/streamingfast/substreams/sink/sql/pb/sf/substreams/sink/database/v1"
 	db2 "github.com/streamingfast/substreams/sink/sql/db_changes/db"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"go.uber.org/zap"

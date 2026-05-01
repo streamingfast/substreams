@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/derr"
-	dbchangessinker "github.com/streamingfast/substreams-sink-sql/db_changes/sinker"
+	dbchangessinker "github.com/streamingfast/substreams/sink/sql/db_changes/sinker"
 	"github.com/streamingfast/substreams/sink"
 )
 
@@ -43,7 +43,7 @@ The DSN must be a ClickHouse connection string, e.g.:
 The manifest is optional; if omitted, the command looks for 'substreams.yaml' in the current directory.
 
 Before running for the first time, set up the database schema with:
-  substreams-sink-sql setup <dsn> <manifest>`,
+  substreams sink setup <dsn> <manifest>`,
 	RunE:         sinkClickhouseE,
 	Args:         cobra.RangeArgs(1, 3),
 	SilenceUsage: true,

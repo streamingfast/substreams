@@ -239,7 +239,7 @@ func (p *Pipeline) Init(ctx context.Context) (err error) {
 
 	p.forkHandler.registerUndoHandler(func(clock *pbsubstreams.Clock, moduleOutputs []*pbssinternal.ModuleOutput) {
 		for _, modOut := range moduleOutputs {
-			p.stores.storesHandleUndo(modOut)
+			p.stores.storesHandleUndo(modOut, clock.Number)
 		}
 	})
 

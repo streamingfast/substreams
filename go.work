@@ -3,4 +3,5 @@ go 1.25.0
 use (
 	.
 	./tests_e2e
+    ../substreams-foundational-store
 )

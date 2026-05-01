@@ -75,35 +75,41 @@ func (s *Stores) flushStores(ctx context.Context, executionStages exec.Execution
 
 func (s *Stores) saveStoresSnapshots(ctx context.Context, stage int, boundaryBlock uint64) (err error) {
 	for mod := range s.storesToWrite {
-		store := s.StoreMap[mod]
+		st := s.StoreMap[mod]
 		s.logger.Info("flushing store at boundary", zap.Uint64("boundary", boundaryBlock), zap.String("store", mod), zap.Int("stage", stage))
-		// TODO when partials are generic again, we can also check if PartialKV exists and skip if it does.
-		existsFullKv, _ := s.configs[mod].ExistsFullKV(ctx, boundaryBlock)
-		if existsFullKv {
-			continue
+
+		// BadgerBackedStore uses foundational-store, not object storage — skip the ExistsFullKV check.
+		if _, isBadger := st.(*store.BadgerBackedStore); !isBadger {
+			// TODO when partials are generic again, we can also check if PartialKV exists and skip if it does.
+			existsFullKv, _ := s.configs[mod].ExistsFullKV(ctx, boundaryBlock)
+			if existsFullKv {
+				continue
+			}
 		}
 
-		if err := s.saveStoreSnapshot(ctx, store, boundaryBlock); err != nil {
+		if err := s.saveStoreSnapshot(ctx, st, boundaryBlock); err != nil {
 			return fmt.Errorf("save store snapshot %q: %w", mod, err)
 		}
 	}
 	return nil
 }
 
-func (s *Stores) storesHandleUndo(moduleOutput *pbssinternal.ModuleOutput) {
+func (s *Stores) storesHandleUndo(moduleOutput *pbssinternal.ModuleOutput, undoBlockNum uint64) {
 	if st, found := s.StoreMap.Get(moduleOutput.ModuleName); found {
-		// For BadgerBackedStore, we need to call EvictFromBadger to handle reorgs
-		if _, ok := st.(*store.BadgerBackedStore); ok {
-			// The reorg block number would be extracted from the undo context
-			// For now, we apply deltas reverse on the local cache
-			if deltaStore, ok := st.(store.DeltaAccessor); ok {
-				deltaStore.ApplyDeltasReverse(moduleOutput.GetStoreDeltas().StoreDeltas)
+		if badgerStore, ok := st.(*store.BadgerBackedStore); ok {
+			// Apply deltas in reverse to restore local read cache
+			badgerStore.ApplyDeltasReverse(moduleOutput.GetStoreDeltas().StoreDeltas)
+			// Evict speculative entries from the foundational store ForkAware cache
+			if err := badgerStore.EvictFromBadger(undoBlockNum); err != nil {
+				s.logger.Warn("failed to evict badger store on undo",
+					zap.String("module", moduleOutput.ModuleName),
+					zap.Uint64("block_num", undoBlockNum),
+					zap.Error(err),
+				)
 			}
-			// TODO: Wire this to get the actual reorg block number and call EvictFromBadger
-			// badgerStore.EvictFromBadger(reorgBlockNum)
 			return
 		}
-		
+
 		if deltaStore, ok := st.(store.DeltaAccessor); ok {
 			deltaStore.ApplyDeltasReverse(moduleOutput.GetStoreDeltas().StoreDeltas)
 		}

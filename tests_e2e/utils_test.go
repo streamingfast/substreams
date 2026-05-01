@@ -132,6 +132,10 @@ func RunRequest(t *testing.T, req *pbsubstreamsrpcv3.Request, endpoint string) (
 }
 
 func startTier1App(t *testing.T, ctx context.Context, tmpDir string, container testcontainers.Container, t2Endpoint string, zlog *zap.Logger) (*app.Tier1App, string) {
+	return startTier1AppWithBadgerBackedStores(t, ctx, tmpDir, container, t2Endpoint, zlog, nil)
+}
+
+func startTier1AppWithBadgerBackedStores(t *testing.T, ctx context.Context, tmpDir string, container testcontainers.Container, t2Endpoint string, zlog *zap.Logger, badgerBackedStoreEndpoints map[string]string) (*app.Tier1App, string) {
 
 	os.Setenv("SUBSTREAMS_WORKERS_RAMPUP_TIME", "0")
 
@@ -163,6 +167,7 @@ func startTier1App(t *testing.T, ctx context.Context, tmpDir string, container t
 		SubrequestsEndpoint:          t2Endpoint,
 		SubrequestsPlaintext:         true,
 		MaxSubrequests:               10,
+		BadgerBackedStoreEndpoints:   badgerBackedStoreEndpoints,
 	}
 
 	// unused components, but required for the tier1 to start

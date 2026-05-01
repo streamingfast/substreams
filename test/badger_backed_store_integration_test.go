@@ -7,11 +7,11 @@ import (
 	"sync"
 	"testing"
 
+	fsgrpc "github.com/streamingfast/substreams-foundational-store/grpc"
 	pbfoundationalmodel "github.com/streamingfast/substreams-foundational-store/pb/sf/substreams/foundational-store/model/v2"
 	pbfoundationalservice "github.com/streamingfast/substreams-foundational-store/pb/sf/substreams/foundational-store/service/v2"
 	fsstore "github.com/streamingfast/substreams-foundational-store/store"
 	fsForkAware "github.com/streamingfast/substreams-foundational-store/store/ForkAware"
-	fsgrpc "github.com/streamingfast/substreams-foundational-store/grpc"
 	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/metrics"
@@ -24,7 +24,7 @@ import (
 )
 
 // inMemoryBackendStore is a minimal in-memory implementation of the foundational store.Store interface.
-// It is used exclusively for integration tests — it does NOT implement arithmetic accumulation (that's done
+// It is used exclusively for integration tests it does NOT implement arithmetic accumulation (that's done
 // in the ForkAware layer above it).
 type inMemoryBackendStore struct {
 	mu   sync.RWMutex
@@ -37,7 +37,7 @@ func newInMemoryBackendStore() *inMemoryBackendStore {
 	}
 }
 
-func (s *inMemoryBackendStore) SetAll(entries []*pbfoundationalmodel.Entry, _ bool, _ uint64) error {
+func (s *inMemoryBackendStore) SetAll(entries []*pbfoundationalmodel.Entry, _ []string, _ bool, _ uint64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, e := range entries {

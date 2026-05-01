@@ -326,6 +326,22 @@ func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
 		return fmt.Errorf("exec output cache: handle final: %w", err)
 	}
 	p.forkHandler.removeReversibleOutput(clock.Id)
+
+	// Flush any BadgerBackedStores up to this finalized (LIB) block number.
+	// This drains the ForkAware in-memory cache to Badger for all blocks <= clock.Number,
+	// which is safe because the block is now irreversible.
+	// Skip if the pipeline context is already canceled — StepIrreversible signals for old
+	// blocks can arrive after the Substreams request has completed and p.ctx is torn down.
+	if p.stores.StoreMap != nil && p.ctx.Err() == nil {
+		for _, st := range p.stores.StoreMap.All() {
+			if badgerStore, ok := st.(*store.BadgerBackedStore); ok {
+				if err := badgerStore.FlushToBadger(clock.Number); err != nil {
+					return fmt.Errorf("flushing BadgerBackedStore %q to foundational store at LIB %d: %w", badgerStore.Name(), clock.Number, err)
+				}
+			}
+		}
+	}
+
 	return nil
 }
 

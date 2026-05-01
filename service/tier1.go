@@ -788,6 +788,20 @@ func (s *Tier1Service) blocks(
 	// But it seems a bit more involved in here.
 
 	scheduleStores := execGraph.StagedUsedModules()[0].LastLayer().IsStoreLayer()
+	if scheduleStores {
+		// Don't schedule parallel store building for badger-backed stores: they are
+		// served by an external foundational-store gRPC server and have no PartialKV/FullKV state.
+		allBadger := true
+		for _, mod := range execGraph.StagedUsedModules()[0].LastLayer() {
+			if _, ok := s.badgerBackedEndpoints[mod.Name]; !ok {
+				allBadger = false
+				break
+			}
+		}
+		if allBadger {
+			scheduleStores = false
+		}
+	}
 	var lowestStoresInitBlock uint64
 	if scheduleStores {
 		lowestStoresInitBlock = *execGraph.LowestStoresInitBlock()

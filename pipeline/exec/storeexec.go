@@ -37,6 +37,16 @@ func (e *StoreModuleExecutor) run(ctx context.Context, reader execout.ExecutionO
 	defer span.EndWithErr(&err)
 	e.ctx = ctx
 
+	// Propagate block number and pipeline context to BadgerBackedStore so Flush() tags
+	// entries correctly, gRPC calls respect cancellation, and fork rollback works.
+	if badgerStore, ok := e.outputStore.(*store.BadgerBackedStore); ok {
+		badgerStore.SetBlockNum(reader.Clock().Number)
+		// Use WithoutCancel so the stored context is not invalidated when the per-block
+		// execution timeout fires. FlushToBadger/EvictFromBadger are called after the
+		// block executor returns and need a live context.
+		badgerStore.SetBlockContext(context.WithoutCancel(ctx))
+	}
+
 	if _, err := e.wasmCall(reader, true, nil, GlobalUndoManager); err != nil {
 		return nil, nil, nil, fmt.Errorf("store wasm call: %w", err)
 	}

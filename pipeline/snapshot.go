@@ -15,9 +15,22 @@ func (p *Pipeline) sendSnapshots(storeMap store.Map, snapshotModules []string) e
 	}
 
 	for _, modName := range snapshotModules {
-		store, found := storeMap.Get(modName)
+		s, found := storeMap.Get(modName)
 		if !found {
 			return fmt.Errorf("store %q not found", modName)
+		}
+
+		// BadgerBackedStore state lives in the foundational store service, not in the
+		// local kv cache. Enumerating all keys would require a full scan over gRPC which
+		// is not yet implemented. Skip snapshot generation and send an empty snapshot so
+		// the client receives a well-formed response rather than a silently partial one.
+		if _, isBadger := s.(*store.BadgerBackedStore); isBadger {
+			p.respFunc(substreams.NewSnapshotData(&pbsubstreamsrpc.InitialSnapshotData{
+				ModuleName: modName,
+				SentKeys:   0,
+				TotalKeys:  0,
+			}))
+			continue
 		}
 
 		send := func(count uint64, total uint64, deltas []*pbsubstreamsrpc.StoreDelta) {
@@ -31,10 +44,10 @@ func (p *Pipeline) sendSnapshots(storeMap store.Map, snapshotModules []string) e
 		}
 
 		var count uint64
-		total := store.Length()
+		total := s.Length()
 		var accum []*pbsubstreamsrpc.StoreDelta
 
-		store.Iter(func(k string, v []byte) error {
+		s.Iter(func(k string, v []byte) error {
 			count++
 			accum = append(accum, &pbsubstreamsrpc.StoreDelta{
 				Operation: pbsubstreamsrpc.StoreDelta_CREATE,

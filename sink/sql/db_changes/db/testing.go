@@ -4,9 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"maps"
 	"strings"
 	"testing"
+
+	"maps"
 
 	"github.com/streamingfast/logging"
 	"github.com/stretchr/testify/require"
@@ -45,6 +46,7 @@ func NewTestLoader(
 	loader.tables = tables
 	loader.cursorTable = tables[testCursorTableName]
 	return loader
+
 }
 
 func TestSinglePrimaryKeyTables(schema string) map[string]*TableInfo {

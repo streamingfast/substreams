@@ -12,7 +12,6 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// Make the typing a bit easier
 type OrderedMap[K comparable, V any] struct {
 	*orderedmap.OrderedMap[K, V]
 }
@@ -44,10 +43,10 @@ type Loader struct {
 	logger *zap.Logger
 	tracer logging.Tracer
 
-	testTx *TestTx // used for testing: if non-nil, 'loader.BeginTx()' will return this object instead of a real *sql.Tx
+	testTx *TestTx
 	dsn    *DSN
 
-	batchOrdinal uint64 // Counter for ordinals within the current batch, resets on flush
+	batchOrdinal uint64
 }
 
 func NewLoader(
@@ -62,7 +61,6 @@ func NewLoader(
 	tracer logging.Tracer,
 ) (*Loader, error) {
 
-	// Validate ClickHouse is not using HTTP protocol ports
 	if dsn.Driver() == "clickhouse" {
 		if dsn.Port == 8123 || dsn.Port == 8443 {
 			return nil, fmt.Errorf("ClickHouse HTTP protocol (port %d) is not supported. Please use the native TCP protocol on port 9000 or 9440", dsn.Port)
@@ -99,7 +97,6 @@ func NewLoader(
 	}
 
 	if handleReorgs == nil {
-		// automatic detection
 		l.handleReorgs = !l.dialect.OnlyInserts()
 	} else {
 		l.handleReorgs = *handleReorgs
@@ -174,7 +171,6 @@ func (l *Loader) getTablesFromSchema(schemaName string) (map[[2]string][]*sql.Co
 	}
 
 	result := make(map[[2]string][]*sql.ColumnType)
-
 	for _, table := range tables {
 		schemaName, tableName := table[0], table[1]
 
@@ -218,7 +214,6 @@ func (l *Loader) LoadTables(schemaName string, cursorTableName string, historyTa
 			if err := l.validateCursorTables(columns, schemaName, cursorTableName); err != nil {
 				return fmt.Errorf("invalid cursors table: %w", err)
 			}
-
 			seenCursorTable = true
 		}
 		if tableName == historyTableName {
@@ -254,7 +249,6 @@ func (l *Loader) LoadTables(schemaName string, cursorTableName string, historyTa
 	}
 
 	l.cursorTable = l.tables[cursorTableName]
-
 	return nil
 }
 
@@ -319,10 +313,8 @@ func (l *Loader) GetAvailableTablesInSchema() []string {
 }
 
 func (l *Loader) HasTable(tableName string) bool {
-	if _, found := l.tables[tableName]; found {
-		return true
-	}
-	return false
+	_, found := l.tables[tableName]
+	return found
 }
 
 func (l *Loader) MarshalLogObject(encoder zapcore.ObjectEncoder) error {
@@ -330,8 +322,7 @@ func (l *Loader) MarshalLogObject(encoder zapcore.ObjectEncoder) error {
 	return nil
 }
 
-// Setup creates the schemaName, cursors and history table where the <schemaBytes> is a byte array
-// taken from somewhere.
+// Setup creates the schemaName, cursors and history table.
 func (l *Loader) Setup(ctx context.Context, schemaName string, userSql string, withPostgraphile bool) error {
 	if userSql != "" {
 		if err := l.dialect.ExecuteSetupScript(ctx, l, userSql); err != nil {
@@ -388,6 +379,5 @@ func (s obfuscatedString) String() string {
 	if len(s) == 0 {
 		return "<unset>"
 	}
-
 	return "********"
 }

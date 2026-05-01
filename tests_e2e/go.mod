@@ -27,7 +27,7 @@ require (
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	cloud.google.com/go/iam v1.5.3 // indirect
 	cloud.google.com/go/monitoring v1.24.2 // indirect
-	cloud.google.com/go/storage v1.59.0 // indirect
+	cloud.google.com/go/storage v1.59.1 // indirect
 	cloud.google.com/go/trace v1.11.6 // indirect
 	connectrpc.com/connect v1.19.1 // indirect
 	connectrpc.com/grpchealth v1.3.0 // indirect
@@ -172,16 +172,16 @@ require (
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/spf13/afero v1.10.0 // indirect
 	github.com/spf13/cast v1.5.0 // indirect
-	github.com/spf13/cobra v1.7.0 // indirect
+	github.com/spf13/cobra v1.9.1 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
-	github.com/spf13/pflag v1.0.5 // indirect
+	github.com/spf13/pflag v1.0.6 // indirect
 	github.com/spf13/viper v1.15.0 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
 	github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b // indirect
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c // indirect
 	github.com/streamingfast/derr v0.0.0-20250814163534-bd7407bd89d7 // indirect
-	github.com/streamingfast/dgrpc v0.0.0-20260224192836-e5cd6cffceff // indirect
-	github.com/streamingfast/dstore v0.1.3-0.20260113210117-94d66eda2027 // indirect
+	github.com/streamingfast/dgrpc v0.0.0-20260420180129-8b81f2664993 // indirect
+	github.com/streamingfast/dstore v0.2.2 // indirect
 	github.com/streamingfast/dummy-blockchain v1.7.3 // indirect
 	github.com/streamingfast/firehose-ethereum/types v0.0.0-20251113151010-c9c94d64348a // indirect
 	github.com/streamingfast/firehose-networks v0.2.2 // indirect

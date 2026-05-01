@@ -1,7 +1,7 @@
 specVersion: v0.1.0
 package:
   name: e2e
-  version: v0.1.0
+  version: v0.2.0
 
 protobuf:
   descriptorSets:
@@ -68,6 +68,22 @@ modules:
     inputs:
       - source: sf.acme.type.v1.Block
       - store: store_stats2
+    output:
+      type: proto:test.output.Events
+
+  - name: map_filtered
+    kind: map
+    initialBlock: 100
+    inputs:
+      - map: map_events
+    output:
+      type: proto:test.output.Events
+
+  - name: map_downstream
+    kind: map
+    initialBlock: 100
+    inputs:
+      - map: map_filtered
     output:
       type: proto:test.output.Events
 

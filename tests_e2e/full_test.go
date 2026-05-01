@@ -149,3 +149,90 @@ func TestDummyBlockchainContainer(t *testing.T) {
 	<-app.Terminated()
 	<-app2.Terminated()
 }
+
+// TestErrNoInputTypeUrlNotEmpty replicates the issue where a module that has no input
+// for a block (ErrNoInput) produced a BlockScopedData with an empty anypb.Any payload
+// (no TypeUrl, no Value). The fix ensures TypeUrl is always set.
+//
+// The scenario uses two modules:
+//   - map_filtered: takes map_events as input, calls skip_empty_output() for even blocks
+//   - map_downstream: takes ONLY map_filtered as input (no block source)
+//
+// When map_filtered skips its output for an even block, map_downstream's only input
+// is absent from the cache and it hits the ErrNoInput code path. Before the fix,
+// this produced an empty anypb.Any{}. After the fix, TypeUrl is always set.
+func TestErrNoInputTypeUrlNotEmpty(t *testing.T) {
+	ctx := context.Background()
+
+	tmpDir := t.TempDir()
+
+	container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", 1000)
+	require.NoError(t, err)
+	defer container.Terminate(ctx, testcontainers.StopTimeout(0))
+
+	app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog)
+	app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)
+	defer func() {
+		app.Shutdown(nil)
+		app2.Shutdown(nil)
+		<-app.Terminated()
+		<-app2.Terminated()
+	}()
+
+	pkg, err := manifest.MustNewReader("./dummy/e2e-v0.2.0.spkg").Read()
+	require.NoError(t, err)
+
+	// Stream map_downstream over 40 blocks in dev mode.
+	// Roughly half of these blocks will have map_filtered skip its output (even block numbers),
+	// causing map_downstream to hit the ErrNoInput path.
+	request := &pbsubstreamsrpcv3.Request{
+		StartBlockNum:   100,
+		StopBlockNum:    140,
+		FinalBlocksOnly: false,
+		ProductionMode:  false,
+		OutputModule:    "map_downstream",
+		Package:         pkg.Package,
+	}
+
+	blockScopedDataSlice, session, err := RunRequest(t, request, substreamsEndpoint)
+	if err != nil && err != io.EOF {
+		logs, logErr := container.Logs(ctx)
+		if logErr == nil {
+			defer logs.Close()
+			buf := make([]byte, 4096)
+			n, _ := logs.Read(buf)
+			t.Logf("Container logs: %s", string(buf[:n]))
+		}
+		t.Fatalf("Unexpected error: %s", err.Error())
+	}
+
+	require.NotNil(t, session, "Should have received at least one session")
+	require.Equal(t, 40, len(blockScopedDataSlice), "Should have received all 40 blocks")
+
+	var blocksWithData, blocksWithEmptyOutput int
+	for _, bsd := range blockScopedDataSlice {
+		output := bsd.GetOutput()
+		require.NotNil(t, output, "output field must not be nil for block %d", bsd.Clock.Number)
+
+		mapOutput := output.GetMapOutput()
+		require.NotNil(t, mapOutput, "MapOutput must not be nil for block %d", bsd.Clock.Number)
+
+		// This is the key assertion: TypeUrl must always be set, never empty.
+		// Before the fix, blocks where map_downstream hit ErrNoInput would produce
+		// an empty anypb.Any{} with no TypeUrl.
+		assert.NotEmpty(t, mapOutput.TypeUrl,
+			"MapOutput.TypeUrl must be non-empty for block %d (ErrNoInput fix validation)", bsd.Clock.Number)
+
+		if len(mapOutput.Value) > 0 {
+			blocksWithData++
+		} else {
+			blocksWithEmptyOutput++
+		}
+	}
+
+	// Sanity check: roughly half of blocks should have empty output (even blocks filtered out),
+	// and the other half should have data (odd blocks passed through).
+	t.Logf("Blocks with data: %d, blocks with empty output (ErrNoInput path): %d", blocksWithData, blocksWithEmptyOutput)
+	assert.Greater(t, blocksWithEmptyOutput, 0, "At least some blocks should have triggered the ErrNoInput path")
+	assert.Greater(t, blocksWithData, 0, "At least some blocks should have data")
+}

@@ -10,6 +10,7 @@ use substreams::scalar::BigDecimal;
 #[allow(unused_imports)]
 use substreams::scalar::BigInt;
 use substreams::store::{StoreAdd, StoreAddBigInt, StoreGet, StoreGetBigInt, StoreNew};
+use substreams::skip_empty_output;
 
 #[substreams::handlers::map]
 fn map_events(blk: acme::Block) -> Result<pbtest::Events, substreams::errors::Error> {
@@ -155,5 +156,34 @@ fn map_stats2(
         events.event.push(event);
     }
 
+    Ok(events)
+}
+
+// map_filtered takes map_events as its only input (no block source).
+// It only keeps events from odd block numbers, calling skip_empty_output()
+// when the result is empty. This causes the engine to skip caching the output,
+// so that map_downstream sees nil inputs and hits the ErrNoInput path.
+#[substreams::handlers::map]
+fn map_filtered(events: pbtest::Events) -> Result<pbtest::Events, substreams::errors::Error> {
+    let filtered: Vec<pbtest::Event> = events
+        .event
+        .into_iter()
+        .filter(|e| e.evt_block_number % 2 == 1)
+        .collect();
+
+    if filtered.is_empty() {
+        skip_empty_output();
+        return Ok(pbtest::Events::default());
+    }
+
+    Ok(pbtest::Events { event: filtered })
+}
+
+// map_downstream takes only map_filtered as input (no direct block source).
+// When map_filtered skips its output (even blocks), map_downstream has no input
+// and will hit the ErrNoInput code path in the Go executor. The fix ensures
+// that ErrNoInput still produces a properly-formed anypb.Any with TypeUrl set.
+#[substreams::handlers::map]
+fn map_downstream(events: pbtest::Events) -> Result<pbtest::Events, substreams::errors::Error> {
     Ok(events)
 }

@@ -15,7 +15,9 @@ import (
 )
 
 const (
+	// Verify that this generated code is sufficiently up-to-date.
 	_ = protoimpl.EnforceVersion(20 - protoimpl.MinVersion)
+	// Verify that runtime/protoimpl is sufficiently up-to-date.
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
@@ -27,6 +29,7 @@ const (
 	Service_clickhouse Service_Engine = 2
 )
 
+// Enum value maps for Service_Engine.
 var (
 	Service_Engine_name = map[int32]string{
 		0: "unset",

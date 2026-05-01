@@ -86,6 +86,8 @@ jobs:
         if: ${{ github.event_name == 'pull_request' }}
         uses: docker/scout-action@v1
         with:
+          dockerhub-user: ${{ secrets.DOCKER_SCOUT_USER }}
+          dockerhub-password: ${{ secrets.DOCKER_SCOUT_PASSWORD }}
           command: cves
           only-severities: critical,high
           image: ${{ steps.meta.outputs.tags }}

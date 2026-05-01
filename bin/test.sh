@@ -18,6 +18,9 @@ main() {
   set -e
 
   go test ./... "$@"
+  pushd tests_e2e &> /dev/null
+  go test ./... "$@"
+  popd
 }
 
 usage_error() {

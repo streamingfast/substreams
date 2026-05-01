@@ -1,14 +1,12 @@
 name: Build docker image
 
 on:
+  pull_request:
   push:
     tags:
       - "v*"
     branches:
-      - "dockerbuild"
       - "develop"
-      - "release/v*"
-      - "feature/*"
 
 env:
   REGISTRY: ghcr.io

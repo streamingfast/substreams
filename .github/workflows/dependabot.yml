@@ -1,5 +1,11 @@
-name: 'Dependency Review'
-on: [pull_request]
+name: "Dependency Review"
+on:
+  pull_request:
+  push:
+    tags:
+      - v*
+    branches:
+      - develop
 
 permissions:
   contents: read
@@ -8,9 +14,9 @@ jobs:
   dependency-review:
     runs-on: ubuntu-latest
     steps:
-      - name: 'Checkout Repository'
+      - name: "Checkout Repository"
         uses: actions/checkout@v4
-      - name: 'Dependency Review'
+      - name: "Dependency Review"
         uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: high # Fail on high, critical

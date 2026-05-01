@@ -3,40 +3,61 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/derr"
-	sink "github.com/streamingfast/substreams/sink"
-	"github.com/streamingfast/substreams/sink/sql/db_changes/sinker"
+	dbchangessinker "github.com/streamingfast/substreams-sink-sql/db_changes/sinker"
+	"github.com/streamingfast/substreams/sink"
 )
 
 func init() {
-	sink.AddFlagsToSet(sinkPostgresCmd.Flags())
-	sinkPostgresCmd.Flags().String("cursor-table-name", "cursors", "Table to use for storing cursors")
-	sinkPostgresCmd.Flags().String("history-table-name", "substreams_history", "Table to use for storing block history for reorg support")
-	sinkPostgresCmd.Flags().Int("batch-block-flush-interval", 1000, "Number of blocks between flushes in batch mode (0 to disable)")
-	sinkPostgresCmd.Flags().Int("batch-row-flush-interval", 100000, "Number of rows between flushes in batch mode (0 to disable)")
-	sinkPostgresCmd.Flags().Int("live-block-flush-interval", 1, "Number of blocks between flushes in live mode")
-	sinkPostgresCmd.Flags().String("on-module-hash-mismatch", "error", "What to do when module hash mismatch: error, warn, ignore")
-	sinkPostgresCmd.Flags().Bool("handle-reorgs", true, "Whether to handle reorgs in the database via a history table")
-	sinkPostgresCmd.Flags().Int("flush-retry-count", 3, "Number of flush retry attempts on error")
-	sinkPostgresCmd.Flags().Duration("flush-retry-delay", 1*time.Second, "Base delay between flush retries")
+	sink.AddFlagsToSet(sinkPostgresCmd.Flags(),
+		sink.FlagExcludeDefault(sink.FlagUndoBufferSize),
+	)
+
+	sinkPostgresCmd.Flags().Int(sink.FlagUndoBufferSize, 0, "Number of blocks to keep buffered to handle fork reorganizations; set to 0 (default) to handle reorgs in the PostgreSQL database via the history table")
+	sinkPostgresCmd.Flags().Int("batch-block-flush-interval", 1_000, "Flush every N blocks in catch-up mode (0 to disable); ineffective in live mode")
+	sinkPostgresCmd.Flags().Int("batch-row-flush-interval", 100_000, "Flush every N rows in catch-up mode (0 to disable); ineffective in live mode")
+	sinkPostgresCmd.Flags().Int("live-block-flush-interval", 1, "Flush every N blocks in live mode")
+	sinkPostgresCmd.Flags().Int("flush-retry-count", 3, "Number of flush retry attempts before failing")
+	sinkPostgresCmd.Flags().Duration("flush-retry-delay", 1*time.Second, "Base delay for incremental retry backoff on flush failures")
+	sinkPostgresCmd.Flags().String("on-module-hash-mismatch", "error", "Action when module hash mismatches the stored value: 'error', 'warn', or 'ignore'")
+	sinkPostgresCmd.Flags().String("cursors-table", "cursors", "Table name for storing cursors")
+	sinkPostgresCmd.Flags().String("history-table", "substreams_history", "Table name for storing block history used by reorg handling")
+
 	SinkCmd.AddCommand(sinkPostgresCmd)
 }
 
 var sinkPostgresCmd = &cobra.Command{
 	Use:   "postgres <dsn> [<manifest> [<module_name>]]",
-	Short: "Sink Substreams data to a PostgreSQL database",
-	RunE:  sinkPostgresE,
-	Args:  cobra.RangeArgs(1, 3),
+	Short: "Sink a DatabaseChanges substreams to a PostgreSQL database",
+	Long: `Sink a substreams module emitting sf.substreams.sink.database.v1.DatabaseChanges messages to a PostgreSQL database.
+
+The DSN must be a PostgreSQL connection string, e.g.:
+  postgres://user:password@localhost:5432/mydb?sslmode=disable
+
+The manifest is optional; if omitted, the command looks for 'substreams.yaml' in the current directory.
+
+Before running for the first time, set up the database schema with:
+  substreams-sink-sql setup <dsn> <manifest>`,
+	RunE:         sinkPostgresE,
+	Args:         cobra.RangeArgs(1, 3),
+	SilenceUsage: true,
 }
+
+const postgresOutputTypes = "sf.substreams.sink.database.v1.DatabaseChanges,sf.substreams.database.v1.DatabaseChanges"
 
 func sinkPostgresE(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	cmd.SilenceUsage = true
 
-	dsn := args[0]
+	dsnString := args[0]
+	if !strings.HasPrefix(dsnString, "postgres://") && !strings.HasPrefix(dsnString, "postgresql://") {
+		return fmt.Errorf("DSN %q is not a valid PostgreSQL connection string (must start with 'postgres://' or 'postgresql://')", dsnString)
+	}
 
 	manifestPath, outputModule, err := ruiOrGuiManifestModulePositionalParams(args[1:])
 	if err != nil {
@@ -45,40 +66,29 @@ func sinkPostgresE(cmd *cobra.Command, args []string) error {
 
 	sink.LoadSubstreamsAuthEnvFile(manifestPath)
 
-	baseSink, err := sink.ConfigFromViper(cmd, sink.IgnoreOutputModuleType, manifestPath, outputModule, "sink_postgres", zlog, tracer)
+	baseSink, err := sink.NewFromViper(cmd, postgresOutputTypes, manifestPath, outputModule, "sink_postgres", zlog, tracer)
 	if err != nil {
-		return err
+		return fmt.Errorf("creating base sinker: %w", err)
 	}
 
-	cursorTableName, _ := cmd.Flags().GetString("cursor-table-name")
-	historyTableName, _ := cmd.Flags().GetString("history-table-name")
-	batchBlockFlushInterval, _ := cmd.Flags().GetInt("batch-block-flush-interval")
-	batchRowFlushInterval, _ := cmd.Flags().GetInt("batch-row-flush-interval")
-	liveBlockFlushInterval, _ := cmd.Flags().GetInt("live-block-flush-interval")
-	onModuleHashMismatch, _ := cmd.Flags().GetString("on-module-hash-mismatch")
-	handleReorgs, _ := cmd.Flags().GetBool("handle-reorgs")
-	flushRetryCount, _ := cmd.Flags().GetInt("flush-retry-count")
-	flushRetryDelay, _ := cmd.Flags().GetDuration("flush-retry-delay")
+	dbchangessinker.RegisterMetrics()
 
-	sinker.RegisterMetrics()
-
-	factoryFunc := sinker.SinkerFactory(baseSink, sinker.SinkerFactoryOptions{
-		CursorTableName:         cursorTableName,
-		HistoryTableName:        historyTableName,
-		BatchBlockFlushInterval: batchBlockFlushInterval,
-		BatchRowFlushInterval:   batchRowFlushInterval,
-		LiveBlockFlushInterval:  liveBlockFlushInterval,
-		OnModuleHashMismatch:    onModuleHashMismatch,
-		HandleReorgs:            handleReorgs,
-		FlushRetryCount:         flushRetryCount,
-		FlushRetryDelay:         flushRetryDelay,
+	sinkerFactory := dbchangessinker.SinkerFactory(baseSink, dbchangessinker.SinkerFactoryOptions{
+		CursorTableName:         sflags.MustGetString(cmd, "cursors-table"),
+		HistoryTableName:        sflags.MustGetString(cmd, "history-table"),
+		BatchBlockFlushInterval: sflags.MustGetInt(cmd, "batch-block-flush-interval"),
+		BatchRowFlushInterval:   sflags.MustGetInt(cmd, "batch-row-flush-interval"),
+		LiveBlockFlushInterval:  sflags.MustGetInt(cmd, "live-block-flush-interval"),
+		OnModuleHashMismatch:    sflags.MustGetString(cmd, "on-module-hash-mismatch"),
+		HandleReorgs:            baseSink.UndoBufferSize == 0,
+		FlushRetryCount:         sflags.MustGetInt(cmd, "flush-retry-count"),
+		FlushRetryDelay:         sflags.MustGetDuration(cmd, "flush-retry-delay"),
 	})
 
-	sqlSinker, err := factoryFunc(ctx, dsn, zlog, tracer)
+	sqlSinker, err := sinkerFactory(ctx, dsnString, zlog, tracer)
 	if err != nil {
-		return fmt.Errorf("creating sql sinker: %w", err)
+		return fmt.Errorf("creating postgres sinker: %w", err)
 	}
-	defer sqlSinker.Close()
 
 	ctx, cancel := context.WithCancel(ctx)
 	go func() {

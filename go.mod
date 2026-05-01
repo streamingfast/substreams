@@ -19,6 +19,7 @@ require (
 	github.com/streamingfast/dstore v0.2.2
 	github.com/streamingfast/logging v0.0.0-20260108192805-38f96de0a641
 	github.com/streamingfast/pbgo v0.0.6-0.20250120164644-a58d8066ab4b
+	github.com/streamingfast/substreams-sink-sql v4.13.1+incompatible
 	github.com/stretchr/testify v1.11.1
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869
 	go.uber.org/zap v1.27.1

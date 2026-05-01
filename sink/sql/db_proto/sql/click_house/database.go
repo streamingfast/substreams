@@ -141,7 +141,6 @@ func (d *Database) client() (*ch.Client, error) {
 			return nil, fmt.Errorf("creating clickhouse client: %w", err)
 		}
 		d.cachedClient = client
-
 	}
 
 	return d.cachedClient, nil
@@ -331,7 +330,6 @@ func (d *Database) FetchCursor() (*sink.Cursor, error) {
 	}
 
 	return cursor, nil
-
 }
 
 func (d *Database) StoreCursor(cursor *sink.Cursor) error {
@@ -422,7 +420,6 @@ func (d *Database) HandleBlocksUndo(lastValidBlockNum uint64) error {
 			}
 			fieldFound := false
 			for _, parentField := range parentTable.Columns {
-
 				if parentField.Name == table.ChildOf.ParentTableField {
 					fields += fmt.Sprintf(", %s", parentField.Name)
 					fieldFound = true

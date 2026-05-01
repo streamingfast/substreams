@@ -24,6 +24,8 @@ type TableInfo struct {
 	columnsByName  map[string]*ColumnInfo
 	primaryColumns []*ColumnInfo
 
+	// Identifier is equivalent to 'escape(<schemaName>).escape(<name>)' but pre-computed
+	// for usage when computing queries.
 	identifier string
 }
 

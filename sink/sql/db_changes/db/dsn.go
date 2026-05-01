@@ -23,6 +23,7 @@ type DSN struct {
 	Database string
 	Options  DSNOptions
 
+	// schema is the extracted schema from the DSN schemaName option (if present)
 	schema string
 }
 
@@ -85,6 +86,8 @@ func ParseDSN(dsn string) (*DSN, error) {
 	schemaName := d.Options.RemoveOr("schemaName", "")
 
 	if driver == "clickhouse" {
+		// For ClickHouse, store the target database name in schema, but keep
+		// connecting to the original database to allow CREATE DATABASE commands
 		if schemaName != "" {
 			d.schema = schemaName
 		} else {
@@ -95,6 +98,7 @@ func ParseDSN(dsn string) (*DSN, error) {
 			schemaName = "public"
 		}
 
+		// For other databases (PostgreSQL), schemaName is separate from database
 		d.schema = schemaName
 	}
 
@@ -117,6 +121,7 @@ func (c *DSN) ConnString() string {
 
 		return baseURL
 	}
+	// PostgreSQL connection string uses space-separated options
 	options := c.Options.EncodeWithSeparator(" ")
 	out := fmt.Sprintf("host=%s port=%d dbname=%s %s", c.Host, c.Port, c.Database, options)
 	if c.Username != "" {
@@ -147,8 +152,11 @@ func (c *DSN) Clone() *DSN {
 	}
 }
 
+// DSNOptions is a thin wrapper around url.Values to provide helper methods and
+// better names.
 type DSNOptions url.Values
 
+// Iterate over the first value of each key, to be used in for range loops.
 func (v DSNOptions) Iter() iter.Seq2[string, string] {
 	return func(yield func(k string, v string) bool) {
 		for k, vs := range v {
@@ -161,18 +169,23 @@ func (v DSNOptions) Iter() iter.Seq2[string, string] {
 	}
 }
 
+// Encode encodes the values into "URL encoded" form ("bar=baz&foo=quux") sorted by key.
 func (v DSNOptions) Encode() string {
 	return (url.Values(v)).Encode()
 }
 
+// EncodeWithSeparator encodes the values into "URL encoded" like form ("bar=baz foo=quux") sorted by key
+// where essentially the separator is used instead of '&'.
 func (v DSNOptions) EncodeWithSeparator(sep string) string {
 	return strings.ReplaceAll((url.Values(v)).Encode(), "&", sep)
 }
 
+// Get returns the value associated with the key.
 func (v DSNOptions) Get(key string) string {
 	return (url.Values(v)).Get(key)
 }
 
+// GetOr returns the value associated with the key or defaultValue if not found.
 func (v DSNOptions) GetOr(key, defaultValue string) string {
 	if val := (url.Values(v)).Get(key); val != "" {
 		return val
@@ -181,6 +194,7 @@ func (v DSNOptions) GetOr(key, defaultValue string) string {
 	return defaultValue
 }
 
+// RemoveOr removes the key from the options and returns its value or defaultValue if not found.
 func (v DSNOptions) RemoveOr(key, defaultValue string) string {
 	val := (url.Values(v)).Get(key)
 	(url.Values(v)).Del(key)

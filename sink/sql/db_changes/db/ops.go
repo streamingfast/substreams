@@ -9,6 +9,8 @@ import (
 	"go.uber.org/zap"
 )
 
+// Insert a row in the DB, it is assumed the table exists, you can do a
+// check before with HasTable()
 func (l *Loader) Insert(tableName string, primaryKey map[string]string, data map[string]FieldData, reversibleBlockNum *uint64) error {
 	uniqueID := createRowUniqueID(primaryKey)
 
@@ -96,6 +98,8 @@ func (l *Loader) GetPrimaryKey(tableName string, pk string) (map[string]string, 
 	return nil, fmt.Errorf("substreams sent a single primary key, but our sql table has a composite primary key (columns: %s), this is unsupported", strings.Join(cols, ","))
 }
 
+// Upsert a row in the DB, it is assumed the table exists, you can do a
+// check before with HasTable().
 func (l *Loader) Upsert(tableName string, primaryKey map[string]string, data map[string]FieldData, reversibleBlockNum *uint64) error {
 	if l.dialect.OnlyInserts() {
 		return fmt.Errorf("update operation is not supported by the current database")
@@ -162,6 +166,8 @@ func (l *Loader) Upsert(tableName string, primaryKey map[string]string, data map
 	return nil
 }
 
+// Update a row in the DB, it is assumed the table exists, you can do a
+// check before with HasTable()
 func (l *Loader) Update(tableName string, primaryKey map[string]string, data map[string]FieldData, reversibleBlockNum *uint64) error {
 	if l.dialect.OnlyInserts() {
 		return fmt.Errorf("update operation is not supported by the current database")
@@ -222,6 +228,8 @@ func (l *Loader) Update(tableName string, primaryKey map[string]string, data map
 	return nil
 }
 
+// Delete a row in the DB, it is assumed the table exists, you can do a
+// check before with HasTable()
 func (l *Loader) Delete(tableName string, primaryKey map[string]string, reversibleBlockNum *uint64) error {
 	if l.dialect.OnlyInserts() {
 		return fmt.Errorf("delete operation is not supported by the current database")

@@ -30,6 +30,7 @@ var _OnModuleHashMismatchNames = []string{
 	_OnModuleHashMismatchName[10:15],
 }
 
+// OnModuleHashMismatchNames returns a list of possible string values of OnModuleHashMismatch.
 func OnModuleHashMismatchNames() []string {
 	tmp := make([]string, len(_OnModuleHashMismatchNames))
 	copy(tmp, _OnModuleHashMismatchNames)
@@ -42,6 +43,7 @@ var _OnModuleHashMismatchMap = map[OnModuleHashMismatch]string{
 	OnModuleHashMismatchError:  _OnModuleHashMismatchName[10:15],
 }
 
+// String implements the Stringer interface.
 func (x OnModuleHashMismatch) String() string {
 	if str, ok := _OnModuleHashMismatchMap[x]; ok {
 		return str
@@ -49,6 +51,8 @@ func (x OnModuleHashMismatch) String() string {
 	return fmt.Sprintf("OnModuleHashMismatch(%d)", x)
 }
 
+// IsValid provides a quick way to determine if the typed value is
+// part of the allowed enumerated values
 func (x OnModuleHashMismatch) IsValid() bool {
 	_, ok := _OnModuleHashMismatchMap[x]
 	return ok
@@ -63,6 +67,7 @@ var _OnModuleHashMismatchValue = map[string]OnModuleHashMismatch{
 	strings.ToLower(_OnModuleHashMismatchName[10:15]): OnModuleHashMismatchError,
 }
 
+// ParseOnModuleHashMismatch attempts to convert a string to a OnModuleHashMismatch.
 func ParseOnModuleHashMismatch(name string) (OnModuleHashMismatch, error) {
 	if x, ok := _OnModuleHashMismatchValue[name]; ok {
 		return x, nil
@@ -73,10 +78,12 @@ func ParseOnModuleHashMismatch(name string) (OnModuleHashMismatch, error) {
 	return OnModuleHashMismatch(0), fmt.Errorf("%s is %w", name, ErrInvalidOnModuleHashMismatch)
 }
 
+// MarshalText implements the text marshaller method.
 func (x OnModuleHashMismatch) MarshalText() ([]byte, error) {
 	return []byte(x.String()), nil
 }
 
+// UnmarshalText implements the text unmarshaller method.
 func (x *OnModuleHashMismatch) UnmarshalText(text []byte) error {
 	name := string(text)
 	tmp, err := ParseOnModuleHashMismatch(name)

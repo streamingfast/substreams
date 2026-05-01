@@ -25,16 +25,18 @@ const (
 	OperationTypeDelete OperationType = "DELETE"
 )
 
+// UpdateOp defines the operation to apply when updating a field on conflict
 type UpdateOp int32
 
 const (
-	UpdateOpSet       UpdateOp = 0
-	UpdateOpAdd       UpdateOp = 1
-	UpdateOpMax       UpdateOp = 2
-	UpdateOpMin       UpdateOp = 3
-	UpdateOpSetIfNull UpdateOp = 4
+	UpdateOpSet       UpdateOp = 0 // Direct assignment: col = value
+	UpdateOpAdd       UpdateOp = 1 // Accumulate: col = COALESCE(col, 0) + value
+	UpdateOpMax       UpdateOp = 2 // Maximum: col = GREATEST(COALESCE(col, 0), value)
+	UpdateOpMin       UpdateOp = 3 // Minimum: col = LEAST(COALESCE(col, 0), value)
+	UpdateOpSetIfNull UpdateOp = 4 // Set only if NULL: col = COALESCE(col, value)
 )
 
+// FieldData holds a field's value and its update operation
 type FieldData struct {
 	Value    string
 	UpdateOp UpdateOp
@@ -46,7 +48,7 @@ type Operation struct {
 	primaryKey         map[string]string
 	data               map[string]FieldData
 	ordinal            uint64
-	reversibleBlockNum *uint64
+	reversibleBlockNum *uint64 // nil if that block is known to be irreversible
 }
 
 func (o *Operation) String() string {
@@ -171,17 +173,14 @@ func validateOpTransition(fieldName string, existing, incoming UpdateOp) error {
 	if existing == UpdateOpSet {
 		return nil
 	}
-
 	if incoming == UpdateOpSet {
 		return nil
 	}
-
 	if existing == incoming {
 		return nil
 	}
-
 	return fmt.Errorf(
-		"invalid UpdateOp transition for field %q: cannot apply %s after %s (only %s \u2192 %s or SET \u2192 %s is allowed)",
+		"invalid UpdateOp transition for field %q: cannot apply %s after %s (only %s → %s or SET → %s is allowed)",
 		fieldName,
 		updateOpName(incoming),
 		updateOpName(existing),

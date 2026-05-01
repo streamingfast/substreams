@@ -129,14 +129,11 @@ func createAccumulators(dialect *DialectClickHouse) (map[string]*accumulator, er
 				skipCount++
 				continue
 			}
-			// Handle nested columns with flatten_nested = 1 using dot notation
 			if column.Nested != nil {
-				// For each field in the nested table, create a proto.NewArray column with dot notation
 				for _, nestedCol := range column.Nested.Columns {
 					nestedColName := fmt.Sprintf("%s.%s", column.Name, nestedCol.Name)
 					nestedInput := ColInputForColumn(nestedCol.FieldDescriptor, dialect.bytesEncoding, nestedCol)
 					if nestedInput != nil {
-						// Wrap in proto.NewArray for nested columns
 						switch base := nestedInput.(type) {
 						case *proto.ColStr:
 							input[nestedColName] = proto.NewArray(base)
@@ -161,7 +158,6 @@ func createAccumulators(dialect *DialectClickHouse) (map[string]*accumulator, er
 						default:
 							return nil, fmt.Errorf("unsupported nested column type %T for column %s.%s", base, column.Name, nestedCol.Name)
 						}
-						// Create a pseudo-column entry for tracking
 						nestedColEntry := &schema.Column{
 							Name:            nestedColName,
 							FieldDescriptor: nestedCol.FieldDescriptor,
@@ -552,13 +548,13 @@ func (i *AccumulatorInserter) flush(database *Database) error {
 		qStart := time.Now()
 
 		inputs := proto.Input{}
-		for n, i := range acc.input {
+		for n, inp := range acc.input {
 			if n == "block_number" {
-				rowCount += i.Rows()
+				rowCount += inp.Rows()
 			}
 			inputs = append(inputs, proto.InputColumn{
 				Name: n,
-				Data: i,
+				Data: inp,
 			})
 		}
 
@@ -587,7 +583,6 @@ func (i *AccumulatorInserter) flush(database *Database) error {
 		queryDuration += time.Since(qStart)
 	}
 
-	//reset
 	accs, err := createAccumulators(database.dialect)
 	if err != nil {
 		return fmt.Errorf("clickhouse accumulator inserter: creating accumulators: %w", err)

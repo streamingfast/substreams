@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	pbSchmema "github.com/streamingfast/substreams/sink/sql/pb/sf/substreams/sink/sql/schema/v1"
-	"github.com/streamingfast/substreams/sink/sql/db_proto/proto"
+	pbSchmema "github.com/streamingfast/substreams/pb/sf/substreams/sink/sql/schema/v1"
+	"github.com/streamingfast/substreams/sink/sql/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 

@@ -9,7 +9,7 @@ import (
 
 	"github.com/streamingfast/substreams/sink/sql/bytes"
 	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/schema"
-	v1 "github.com/streamingfast/substreams/sink/sql/pb/sf/substreams/sink/sql/schema/v1"
+	v1 "github.com/streamingfast/substreams/pb/sf/substreams/sink/sql/schema/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/known/timestamppb"

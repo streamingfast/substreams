@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	pbSchema "github.com/streamingfast/substreams/sink/sql/pb/sf/substreams/sink/sql/schema/v1"
-	"github.com/streamingfast/substreams/sink/sql/db_proto/proto"
+	pbSchema "github.com/streamingfast/substreams/pb/sf/substreams/sink/sql/schema/v1"
+	"github.com/streamingfast/substreams/sink/sql/proto"
 	sink "github.com/streamingfast/substreams/sink"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/reflect/protoreflect"

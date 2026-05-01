@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	v1 "github.com/streamingfast/substreams/sink/sql/pb/sf/substreams/sink/sql/schema/v1"
+	v1 "github.com/streamingfast/substreams/pb/sf/substreams/sink/sql/schema/v1"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 

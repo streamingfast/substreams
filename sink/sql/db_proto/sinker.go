@@ -2,8 +2,8 @@ package db_proto
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,6 +17,16 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/dynamicpb"
 )
+
+type multiError []error
+
+func (m multiError) Error() string {
+	msgs := make([]string, len(m))
+	for i, e := range m {
+		msgs[i] = e.Error()
+	}
+	return strings.Join(msgs, "; ")
+}
 
 type Sinker struct {
 	*sink.Sinker
@@ -47,6 +57,7 @@ func NewSinker(rootMessageDescriptor protoreflect.MessageDescriptor, sink *sink.
 }
 
 func (s *Sinker) Run(ctx context.Context) error {
+	// Show stats one last time before exiting run
 	defer s.LogStats()
 
 	cursor, err := s.db.FetchCursor()
@@ -54,6 +65,7 @@ func (s *Sinker) Run(ctx context.Context) error {
 		return fmt.Errorf("fetch cursor: %w", err)
 	}
 
+	//clean up the mess from running without a transaction
 	if cursor != nil {
 		err = s.db.HandleBlocksUndo(cursor.Block().Num())
 		if err != nil {
@@ -127,7 +139,7 @@ func (s *Sinker) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrp
 				return fmt.Errorf("begin tx: %w", err)
 			}
 		}
-		var errs []error
+		errs := multiError{}
 		if s.parallel {
 			wg := sync.WaitGroup{}
 			wg.Add(len(holding))
@@ -154,7 +166,7 @@ func (s *Sinker) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrp
 			}
 			wg.Wait()
 			if len(errs) > 0 {
-				return errors.Join(errs...)
+				return fmt.Errorf("errors: %w", errs)
 			}
 
 		} else {

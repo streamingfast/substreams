@@ -96,6 +96,7 @@ func SinkerFactory(
 
 		default:
 			panic(fmt.Sprintf("unsupported driver: %s", dsn.Driver()))
+
 		}
 
 		sinkInfo, err := database.FetchSinkInfo(schema.Name)
@@ -159,6 +160,7 @@ func SinkerFactory(
 					if err != nil {
 						return nil, fmt.Errorf("commit transaction: %w", err)
 					}
+
 				}
 			}
 		}

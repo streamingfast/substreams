@@ -21,6 +21,7 @@ func NewAverage(title string, windowSize int, lastX int) *Average {
 		lastX:      lastX,
 	}
 }
+
 func (a *Average) Add(d time.Duration) {
 	a.Duration = append(a.Duration, d)
 	if len(a.Duration) > a.windowSize {

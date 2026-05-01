@@ -38,6 +38,7 @@ func ModuleOutputType(spkg *v1.Package, moduleName string) string {
 	}
 	return outputType
 }
+
 func ResolveDependencies(protoFiles map[string]*descriptorpb.FileDescriptorProto) (map[string]*desc.FileDescriptor, error) {
 	out := map[string]*desc.FileDescriptor{}
 	for _, protoFile := range protoFiles {

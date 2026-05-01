@@ -46,7 +46,7 @@ func (d PostgresDialect) Revert(tx Tx, ctx context.Context, l *Loader, lastValid
 
 	var reversions []func() error
 	l.logger.Info("reverting forked block block(s)", zap.Uint64("last_valid_final_block", lastValidFinalBlock))
-	if rows != nil { // rows will be nil with no error only in testing scenarios
+	if rows != nil {
 		defer rows.Close()
 		for rows.Next() {
 			var op string
@@ -60,8 +60,6 @@ func (d PostgresDialect) Revert(tx Tx, ctx context.Context, l *Loader, lastValid
 			l.logger.Debug("reverting", zap.String("operation", op), zap.String("table_name", table_name), zap.String("pk", pk), zap.Uint64("block_num", block_num))
 			prev_value := prev_value_nullable.String
 
-			// we can't call revertOp inside this loop, because it calls tx.ExecContext,
-			// which can't run while this query is "active" or it will silently discard the remaining rows!
 			reversions = append(reversions, func() error {
 				if err := d.revertOp(tx, ctx, op, table_name, pk, prev_value, block_num); err != nil {
 					return fmt.Errorf("revertOp: %w", err)
@@ -120,7 +118,6 @@ func (d PostgresDialect) Flush(tx Tx, ctx context.Context, l *Loader, outputModu
 			return 0, fmt.Errorf("failed to prepare statement: %w", err)
 		}
 
-		// Execute undo query first (if present) to save state before modifying
 		if undoQuery != "" {
 			if l.tracer.Enabled() {
 				l.logger.Debug("adding undo query from operation to transaction", zap.Stringer("op", entry), zap.String("query", undoQuery), zap.Uint64("ordinal", entry.ordinal))
@@ -134,7 +131,6 @@ func (d PostgresDialect) Flush(tx Tx, ctx context.Context, l *Loader, outputModu
 			QueryExecutionDuration.AddInt64(undoDuration.Nanoseconds(), "undo")
 		}
 
-		// Execute normal query
 		if l.tracer.Enabled() {
 			l.logger.Debug("adding normal query from operation to transaction", zap.Stringer("op", entry), zap.String("query", normalQuery), zap.Uint64("ordinal", entry.ordinal))
 		}
@@ -270,7 +266,6 @@ func (d PostgresDialect) GetCreateHistoryQuery(schema string, withPostgraphile b
 }
 
 func (d PostgresDialect) ExecuteSetupScript(ctx context.Context, l *Loader, schemaSql string) error {
-	// Prepend search_path directive to ensure user SQL runs in the correct schema context
 	fullSql := fmt.Sprintf(`SET search_path TO %s;`+"\n\n%s", EscapeIdentifier(d.schemaName), schemaSql)
 
 	if _, err := l.ExecContext(ctx, fullSql); err != nil {
@@ -381,21 +376,19 @@ func (d PostgresDialect) saveRow(op, schema, escapedTableName string, primaryKey
 
 }
 
-// getResultCast returns the appropriate cast suffix for the result of arithmetic operations
-// based on the column's scan type. TEXT columns need ::text cast, numeric types don't need cast.
 func getResultCast(scanType reflect.Type) string {
 	if scanType == nil {
-		return "" // unknown type, let PostgreSQL handle it
+		return ""
 	}
 	switch scanType.Kind() {
 	case reflect.String:
-		return "::text" // TEXT columns need explicit cast from numeric
+		return "::text"
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
 		reflect.Float32, reflect.Float64:
-		return "" // numeric types don't need cast, PostgreSQL will handle it
+		return ""
 	default:
-		return "" // unknown type, let PostgreSQL handle it
+		return ""
 	}
 }
 
@@ -411,7 +404,6 @@ func (d *PostgresDialect) prepareStatement(schema string, o *Operation) (normalQ
 	}
 
 	if o.opType == OperationTypeUpsert || o.opType == OperationTypeUpdate || o.opType == OperationTypeDelete {
-		// A table without a primary key set yield a `primaryKey` map with a single entry where the key is an empty string
 		if _, found := o.primaryKey[""]; found {
 			return "", "", fmt.Errorf("trying to perform %s operation but table %q don't have a primary key set, this is not accepted", o.opType, o.table.name)
 		}
@@ -431,38 +423,31 @@ func (d *PostgresDialect) prepareStatement(schema string, o *Operation) (normalQ
 		return insertQuery, "", nil
 
 	case OperationTypeUpsert:
-		// Build per-field update expressions based on UpdateOp
 		updates := make([]string, len(columns))
 		for i := range columns {
 			col := columns[i]
 			resultCast := getResultCast(scanTypes[i])
 			switch updateOps[i] {
 			case UpdateOpSet:
-				// Direct assignment: col = EXCLUDED.col
 				updates[i] = fmt.Sprintf("%s=EXCLUDED.%s", col, col)
 			case UpdateOpAdd:
-				// Accumulate: col = COALESCE(col, 0) + EXCLUDED.col
 				updates[i] = fmt.Sprintf("%s=(COALESCE(%s.%s::numeric, 0) + EXCLUDED.%s::numeric)%s", col, o.table.nameEscaped, col, col, resultCast)
 			case UpdateOpMax:
-				// Maximum: col = GREATEST(COALESCE(col, 0), EXCLUDED.col)
 				updates[i] = fmt.Sprintf("%s=GREATEST(COALESCE(%s.%s::numeric, 0), EXCLUDED.%s::numeric)%s", col, o.table.nameEscaped, col, col, resultCast)
 			case UpdateOpMin:
-				// Minimum: col = LEAST(COALESCE(col, 0), EXCLUDED.col)
 				updates[i] = fmt.Sprintf("%s=LEAST(COALESCE(%s.%s::numeric, 0), EXCLUDED.%s::numeric)%s", col, o.table.nameEscaped, col, col, resultCast)
 			case UpdateOpSetIfNull:
-				// Set only if NULL (first value wins): col = COALESCE(col, EXCLUDED.col)
 				updates[i] = fmt.Sprintf("%s=COALESCE(%s.%s, EXCLUDED.%s)", col, o.table.nameEscaped, col, col)
 			default:
 				updates[i] = fmt.Sprintf("%s=EXCLUDED.%s", col, col)
 			}
 		}
 
-		// Escape primary key column names to preserve case sensitivity (e.g., camelCase)
 		escapedPKColumns := make([]string, 0, len(o.primaryKey))
 		for pkColumn := range o.primaryKey {
 			escapedPKColumns = append(escapedPKColumns, EscapeIdentifier(pkColumn))
 		}
-		sort.Strings(escapedPKColumns) // Sort for deterministic output
+		sort.Strings(escapedPKColumns)
 
 		insertQuery := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) DO UPDATE SET %s;",
 			o.table.identifier,
@@ -478,7 +463,6 @@ func (d *PostgresDialect) prepareStatement(schema string, o *Operation) (normalQ
 		return insertQuery, "", nil
 
 	case OperationTypeUpdate:
-		// Build per-field update expressions based on UpdateOp
 		updates := make([]string, len(columns))
 		for i := range columns {
 			col := columns[i]
@@ -486,19 +470,14 @@ func (d *PostgresDialect) prepareStatement(schema string, o *Operation) (normalQ
 			resultCast := getResultCast(scanTypes[i])
 			switch updateOps[i] {
 			case UpdateOpSet:
-				// Direct assignment: col = value
 				updates[i] = fmt.Sprintf("%s=%s", col, val)
 			case UpdateOpAdd:
-				// Accumulate: col = COALESCE(col, 0) + value
 				updates[i] = fmt.Sprintf("%s=(COALESCE(%s::numeric, 0) + %s::numeric)%s", col, col, val, resultCast)
 			case UpdateOpMax:
-				// Maximum: col = GREATEST(COALESCE(col, 0), value)
 				updates[i] = fmt.Sprintf("%s=GREATEST(COALESCE(%s::numeric, 0), %s::numeric)%s", col, col, val, resultCast)
 			case UpdateOpMin:
-				// Minimum: col = LEAST(COALESCE(col, 0), value)
 				updates[i] = fmt.Sprintf("%s=LEAST(COALESCE(%s::numeric, 0), %s::numeric)%s", col, col, val, resultCast)
 			case UpdateOpSetIfNull:
-				// Set only if NULL (first value wins): col = COALESCE(col, value)
 				updates[i] = fmt.Sprintf("%s=COALESCE(%s, %s)", col, col, val)
 			default:
 				updates[i] = fmt.Sprintf("%s=%s", col, val)
@@ -549,7 +528,7 @@ func (d *PostgresDialect) prepareColValues(table *TableInfo, colValues map[strin
 		columns[i] = colName
 		i++
 	}
-	sort.Strings(columns) // sorted for determinism in tests
+	sort.Strings(columns)
 
 	for i, columnName := range columns {
 		fieldData := colValues[columnName]
@@ -564,7 +543,7 @@ func (d *PostgresDialect) prepareColValues(table *TableInfo, colValues map[strin
 		}
 
 		values[i] = normalizedValue
-		columns[i] = columnInfo.escapedName // escape the column name
+		columns[i] = columnInfo.escapedName
 		updateOps[i] = fieldData.UpdateOp
 		scanTypes[i] = columnInfo.scanType
 	}
@@ -604,7 +583,6 @@ func getPrimaryKeyFakeEmptyValuesAssertion(primaryKey map[string]string, escaped
 }
 
 func getPrimaryKeyWhereClause(primaryKey map[string]string, escapedTableName string) string {
-	// Avoid any allocation if there is a single primary key
 	if len(primaryKey) == 1 {
 		for key, value := range primaryKey {
 			if escapedTableName == "" {
@@ -629,15 +607,12 @@ func getPrimaryKeyWhereClause(primaryKey map[string]string, escapedTableName str
 	return strings.Join(reg[:], " AND ")
 }
 
-// Format based on type, value returned unescaped
 func (d *PostgresDialect) normalizeValueType(value string, valueType reflect.Type) (string, error) {
 	switch valueType.Kind() {
 	case reflect.String:
-		// replace unicode null character with empty string
 		value = strings.ReplaceAll(value, "\u0000", "")
 		return escapeStringValue(value), nil
 
-	// BYTES in Postgres must be escaped, we receive a Vec<u8> from substreams
 	case reflect.Slice:
 		return escapeStringValue(value), nil
 
@@ -664,18 +639,11 @@ func (d *PostgresDialect) normalizeValueType(value string, valueType reflect.Typ
 				return escapeStringValue(time.Unix(int64(i), 0).Format(time.RFC3339)), nil
 			}
 
-			// It's a plain string, parse by dialect it and pass it to the database
 			return d.ParseDatetimeNormalization(value), nil
 		}
 
 		return "", fmt.Errorf("unsupported struct type %s", valueType)
 	default:
-		// It's a column's type the schemaName parsing don't know how to represents as
-		// a Go type. In that case, we pass it unmodified to the database engine. It
-		// will be the responsibility of the one sending the data to correctly represent
-		// it in the way accepted by the database.
-		//
-		// In most cases, it going to just work.
 		return value, nil
 	}
 }

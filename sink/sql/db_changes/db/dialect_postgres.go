@@ -438,14 +438,19 @@ func (d *PostgresDialect) prepareStatement(schema string, o *Operation) (normalQ
 			resultCast := getResultCast(scanTypes[i])
 			switch updateOps[i] {
 			case UpdateOpSet:
+				// Direct assignment: col = EXCLUDED.col
 				updates[i] = fmt.Sprintf("%s=EXCLUDED.%s", col, col)
 			case UpdateOpAdd:
+				// Accumulate: col = COALESCE(col, 0) + EXCLUDED.col
 				updates[i] = fmt.Sprintf("%s=(COALESCE(%s.%s::numeric, 0) + EXCLUDED.%s::numeric)%s", col, o.table.nameEscaped, col, col, resultCast)
 			case UpdateOpMax:
+				// Maximum: col = GREATEST(COALESCE(col, 0), EXCLUDED.col)
 				updates[i] = fmt.Sprintf("%s=GREATEST(COALESCE(%s.%s::numeric, 0), EXCLUDED.%s::numeric)%s", col, o.table.nameEscaped, col, col, resultCast)
 			case UpdateOpMin:
+				// Minimum: col = LEAST(COALESCE(col, 0), EXCLUDED.col)
 				updates[i] = fmt.Sprintf("%s=LEAST(COALESCE(%s.%s::numeric, 0), EXCLUDED.%s::numeric)%s", col, o.table.nameEscaped, col, col, resultCast)
 			case UpdateOpSetIfNull:
+				// Set only if NULL (first value wins): col = COALESCE(col, EXCLUDED.col)
 				updates[i] = fmt.Sprintf("%s=COALESCE(%s.%s, EXCLUDED.%s)", col, o.table.nameEscaped, col, col)
 			default:
 				updates[i] = fmt.Sprintf("%s=EXCLUDED.%s", col, col)
@@ -481,14 +486,19 @@ func (d *PostgresDialect) prepareStatement(schema string, o *Operation) (normalQ
 			resultCast := getResultCast(scanTypes[i])
 			switch updateOps[i] {
 			case UpdateOpSet:
+				// Direct assignment: col = value
 				updates[i] = fmt.Sprintf("%s=%s", col, val)
 			case UpdateOpAdd:
+				// Accumulate: col = COALESCE(col, 0) + value
 				updates[i] = fmt.Sprintf("%s=(COALESCE(%s::numeric, 0) + %s::numeric)%s", col, col, val, resultCast)
 			case UpdateOpMax:
+				// Maximum: col = GREATEST(COALESCE(col, 0), value)
 				updates[i] = fmt.Sprintf("%s=GREATEST(COALESCE(%s::numeric, 0), %s::numeric)%s", col, col, val, resultCast)
 			case UpdateOpMin:
+				// Minimum: col = LEAST(COALESCE(col, 0), value)
 				updates[i] = fmt.Sprintf("%s=LEAST(COALESCE(%s::numeric, 0), %s::numeric)%s", col, col, val, resultCast)
 			case UpdateOpSetIfNull:
+				// Set only if NULL (first value wins): col = COALESCE(col, value)
 				updates[i] = fmt.Sprintf("%s=COALESCE(%s, %s)", col, col, val)
 			default:
 				updates[i] = fmt.Sprintf("%s=%s", col, val)
@@ -545,8 +555,7 @@ func (d *PostgresDialect) prepareColValues(table *TableInfo, colValues map[strin
 		fieldData := colValues[columnName]
 		columnInfo, found := table.columnsByName[columnName]
 		if !found {
-			return nil, nil, nil, nil,
-				fmt.Errorf("cannot find column %q for table %q (valid columns are %q)", columnName, table.identifier, strings.Join(maps.Keys(table.columnsByName), ", "))
+			return nil, nil, nil, nil, fmt.Errorf("cannot find column %q for table %q (valid columns are %q)", columnName, table.identifier, strings.Join(maps.Keys(table.columnsByName), ", "))
 		}
 
 		normalizedValue, err := d.normalizeValueType(fieldData.Value, columnInfo.scanType)

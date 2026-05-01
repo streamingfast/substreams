@@ -94,7 +94,7 @@ func createInsertFromDescriptor(table *schema.Table, dialect sql2.Dialect) (stri
 		fieldCount++
 		returningField = pk.Name
 		fieldNames = append(fieldNames, pk.Name)
-		placeholders = append(placeholders, fmt.Sprintf("$%d", fieldCount)) //$1
+		placeholders = append(placeholders, fmt.Sprintf("$%d", fieldCount))
 	}
 
 	if table.ChildOf != nil {
@@ -107,15 +107,13 @@ func createInsertFromDescriptor(table *schema.Table, dialect sql2.Dialect) (stri
 		if field.Name == returningField {
 			continue
 		}
-		if field.IsExtension { //not a direct child
+		if field.IsExtension {
 			continue
 		}
 		if field.IsRepeated && field.Nested == nil {
-			// Check if it's a repeated message (which should be skipped) or repeated scalar (which should be processed)
 			if field.IsMessage {
 				continue
 			}
-			// Allow repeated scalar fields to be processed as arrays
 		}
 		fieldCount++
 		fieldNames = append(fieldNames, field.QuotedName())
@@ -139,13 +137,13 @@ func (i *RowInserter) insert(table string, values []any, database *Database) err
 
 	fieldIndexOffset := 2
 	if t != nil && t.ChildOf != nil {
-		fieldIndexOffset = 3 //remove foreign key
+		fieldIndexOffset = 3
 	}
 
 	for i, value := range values {
 
 		var column *schema.Column
-		fieldIndex := i - fieldIndexOffset //remove _block_number and _block_timestamp + foreign key
+		fieldIndex := i - fieldIndexOffset
 
 		if t != nil && fieldIndex >= 0 {
 			column = t.Columns[fieldIndex]
@@ -173,7 +171,6 @@ func (i *RowInserter) insert(table string, values []any, database *Database) err
 		case *timestamppb.Timestamp:
 			values[i] = "'" + v.AsTime().Format(time.RFC3339) + "'"
 		case []interface{}:
-			// Handle arrays by converting to PostgreSQL array format
 			var elements []string
 			for _, elem := range v {
 				elements = append(elements, ValueToString(elem, database.dialect.bytesEncoding))

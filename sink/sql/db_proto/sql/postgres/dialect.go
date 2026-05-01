@@ -138,7 +138,6 @@ func (d *DialectPostgres) createTable(table *schema.Table) error {
 		case f.IsRepeated:
 			// Arrays are now supported, continue processing
 		case f.Nested != nil:
-			// Nested types are not supported, continue processing
 			fmt.Println("found nested type")
 		case f.IsMessage && !IsWellKnownType(f.FieldDescriptor):
 			childTable, found := d.TableRegistry[f.Message]
@@ -192,7 +191,6 @@ func (d *DialectPostgres) createTable(table *schema.Table) error {
 		sb.WriteString(",")
 	}
 
-	//removing the last comma since it is complicated to removing it before
 	temp := sb.String()
 	temp = temp[:len(temp)-1]
 	sb = strings.Builder{}
@@ -213,7 +211,6 @@ func (d *DialectPostgres) FullTableName(table *schema.Table) string {
 
 func (d *DialectPostgres) AppendInlineFieldValues(fieldValues []any, fd protoreflect.FieldDescriptor, fv protoreflect.Value, dm *dynamicpb.Message) ([]any, error) {
 	if fd.IsList() {
-		// For repeated inline messages, append the list of JSON strings
 		list := fv.List()
 		var jsonStrings []string
 		for j := 0; j < list.Len(); j++ {
@@ -226,7 +223,6 @@ func (d *DialectPostgres) AppendInlineFieldValues(fieldValues []any, fd protoref
 		}
 		fieldValues = append(fieldValues, pq.Array(jsonStrings))
 	} else {
-		// For single inline message, append the JSON string
 		fm := fv.Message().Interface().(*dynamicpb.Message)
 		jsonBytes, err := protojson.Marshal(fm)
 		if err != nil {
@@ -242,7 +238,6 @@ func (d *DialectPostgres) SchemaHash() string {
 
 	var buf []byte
 
-	// SchemaHash tableCreateStatements
 	var sqls []string
 	for _, sql := range d.CreateTableSql {
 		sqls = append(sqls, sql)

@@ -40,7 +40,6 @@ type DialectPostgres struct {
 	*sql2.BaseDialect
 	schemaName    string
 	bytesEncoding bytes.Encoding
-	//database   *Database
 }
 
 func NewDialectPostgres(schema *schema.Schema, bytesEncoding bytes.Encoding, logger *zap.Logger) (*DialectPostgres, error) {

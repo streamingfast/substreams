@@ -80,3 +80,13 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             VERSION=${{ steps.extract-version.outputs.VERSION }}
+
+      - name: Docker Scout
+        id: docker-scout
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          only-severities: critical,high
+          image: ${{ steps.meta.outputs.tags }}
+          write-comment: true

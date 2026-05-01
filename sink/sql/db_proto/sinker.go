@@ -60,7 +60,6 @@ func (s *Sinker) Run(ctx context.Context) error {
 			return fmt.Errorf("handle blocks undo from %s: %w", cursor.Block(), err)
 		}
 	}
-
 	s.logger.Info("fetched cursor", zap.Stringer("block", cursor.Block()))
 
 	s.stats.LastBlockProcessAt = time.Now()

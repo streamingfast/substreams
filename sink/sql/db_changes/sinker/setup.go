@@ -81,13 +81,16 @@ func SinkerSetup(
 	return nil
 }
 
+// isDuplicateTableError checks if the error is a PostgreSQL duplicate table error
 func isDuplicateTableError(err error) bool {
 	var sqlError *pq.Error
 	if !errors.As(err, &sqlError) {
 		return false
 	}
 
+	// List at https://www.postgresql.org/docs/14/errcodes-appendix.html#ERRCODES-TABLE
 	switch sqlError.Code {
+	// Error code named `duplicate_table`
 	case "42P07":
 		return true
 	}

@@ -179,44 +179,29 @@ func StringToInt256(s string) (proto.Int256, error) {
 		}
 	} else {
 		// Negative number - use two's complement
-		// First get the absolute value
 		absBigInt := new(big.Int).Abs(bigInt)
-
-		// Convert to two's complement
-		// For 256-bit two's complement: flip all bits and add 1
 		maxUint256 := new(big.Int)
 		maxUint256.SetBit(maxUint256, 256, 1) // 2^256
-
 		twosComplement := new(big.Int).Sub(maxUint256, absBigInt)
-
-		// Extract 64-bit chunks
 		tempBig := new(big.Int).Set(twosComplement)
-
-		// Extract low.low (bits 0-63)
 		lowLow = tempBig.Uint64()
 		tempBig.Rsh(tempBig, 64)
-
-		// Extract low.high (bits 64-127)
 		if tempBig.BitLen() > 0 {
 			lowHigh = tempBig.Uint64()
 			tempBig.Rsh(tempBig, 64)
 		} else {
-			lowHigh = ^uint64(0) // All bits set for negative number
+			lowHigh = ^uint64(0)
 		}
-
-		// Extract high.low (bits 128-191)
 		if tempBig.BitLen() > 0 {
 			highLow = tempBig.Uint64()
 			tempBig.Rsh(tempBig, 64)
 		} else {
-			highLow = ^uint64(0) // All bits set for negative number
+			highLow = ^uint64(0)
 		}
-
-		// Extract high.high (bits 192-255)
 		if tempBig.BitLen() > 0 {
 			highHigh = tempBig.Uint64()
 		} else {
-			highHigh = ^uint64(0) // All bits set for negative number
+			highHigh = ^uint64(0)
 		}
 	}
 
@@ -258,7 +243,6 @@ func StringToUInt256(s string) (proto.UInt256, error) {
 	}
 
 	// Check if the number fits in unsigned 256 bits
-	// Range: 0 to 2^256-1
 	maxUint256 := new(big.Int)
 	maxUint256.Exp(big.NewInt(2), big.NewInt(256), nil)
 	maxUint256.Sub(maxUint256, big.NewInt(1)) // 2^256 - 1
@@ -267,28 +251,18 @@ func StringToUInt256(s string) (proto.UInt256, error) {
 		return proto.UInt256{}, fmt.Errorf("integer value out of range for UInt256: %s", s)
 	}
 
-	// Convert to UInt256 - extract 64-bit chunks
 	var lowLow, lowHigh, highLow, highHigh uint64
-
 	tempBig := new(big.Int).Set(bigInt)
-
-	// Extract low.low (bits 0-63)
 	lowLow = tempBig.Uint64()
 	tempBig.Rsh(tempBig, 64)
-
-	// Extract low.high (bits 64-127)
 	if tempBig.BitLen() > 0 {
 		lowHigh = tempBig.Uint64()
 		tempBig.Rsh(tempBig, 64)
 	}
-
-	// Extract high.low (bits 128-191)
 	if tempBig.BitLen() > 0 {
 		highLow = tempBig.Uint64()
 		tempBig.Rsh(tempBig, 64)
 	}
-
-	// Extract high.high (bits 192-255)
 	if tempBig.BitLen() > 0 {
 		highHigh = tempBig.Uint64()
 	}

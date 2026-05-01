@@ -8,35 +8,8 @@ import (
 
 	"github.com/jhump/protoreflect/desc"
 	v1 "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	schema "github.com/streamingfast/substreams/sink/sql/pb/sf/substreams/sink/sql/schema/v1"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 )
-
-func TableInfo(d protoreflect.MessageDescriptor) *schema.Table {
-	msgOptions := d.Options()
-	if proto.HasExtension(msgOptions, schema.E_Table) {
-		ext := proto.GetExtension(msgOptions, schema.E_Table)
-		table, ok := ext.(*schema.Table)
-		if ok {
-			return table
-		}
-	}
-	return nil
-}
-
-func FieldInfo(d protoreflect.FieldDescriptor) *schema.Column {
-	options := d.Options()
-	if proto.HasExtension(options, schema.E_Field) {
-		ext := proto.GetExtension(options, schema.E_Field)
-		f, ok := ext.(*schema.Column)
-		if ok {
-			return f
-		}
-	}
-	return nil
-}
 
 func FileDescriptorForOutputType(spkg *v1.Package, err error, deps map[string]*desc.FileDescriptor, outputType string) (*desc.FileDescriptor, error) {
 	for _, p := range spkg.ProtoFiles {

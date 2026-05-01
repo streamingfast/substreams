@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	pbsql "github.com/streamingfast/substreams/sink/sql/pb/sf/substreams/sink/sql/services/v1"
+	pbsql "github.com/streamingfast/substreams/pb/sf/substreams/sink/sql/services/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"google.golang.org/protobuf/proto"
 )

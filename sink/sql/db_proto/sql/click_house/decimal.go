@@ -9,7 +9,6 @@ import (
 )
 
 // StringToDecimal128 converts a decimal string to proto.Decimal128.
-// The scale parameter specifies the number of decimal places.
 func StringToDecimal128(s string, scale int32) (proto.Decimal128, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -50,6 +49,7 @@ func StringToDecimal128(s string, scale int32) (proto.Decimal128, error) {
 		}
 	}
 
+	// Validate that all characters are digits
 	for _, r := range integerPart + fractionalPart {
 		if r < '0' || r > '9' {
 			return proto.Decimal128{}, fmt.Errorf("invalid character in decimal: %c", r)
@@ -104,7 +104,6 @@ func StringToDecimal128(s string, scale int32) (proto.Decimal128, error) {
 }
 
 // StringToDecimal256 converts a decimal string to proto.Decimal256.
-// The scale parameter specifies the number of decimal places.
 func StringToDecimal256(s string, scale int32) (proto.Decimal256, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {

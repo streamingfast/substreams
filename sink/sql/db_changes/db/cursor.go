@@ -61,6 +61,8 @@ func (l *Loader) GetCursor(ctx context.Context, outputModuleHash string) (cursor
 		return activeCursor, false, err
 	}
 
+	// It's not found at this point, look for one with highest block, we will report
+	// (maybe) a warning if the module hash is different, which is the case here.
 	actualOutputModuleHash, activeCursor := cursorAtHighestBlock(cursors)
 
 	switch l.moduleMismatchMode {
@@ -73,6 +75,7 @@ func (l *Loader) GetCursor(ctx context.Context, outputModuleHash string) (cursor
 			zap.String("expected_module_hash", outputModuleHash),
 			zap.String("actual_module_hash", actualOutputModuleHash),
 		)
+
 		return activeCursor, true, err
 
 	case OnModuleHashMismatchError:
@@ -94,6 +97,7 @@ func cursorAtHighestBlock(in map[string]*sink.Cursor) (hash string, highest *sin
 			hash = moduleHash
 		}
 	}
+
 	return
 }
 
@@ -108,9 +112,13 @@ func (l *Loader) InsertCursor(ctx context.Context, moduleHash string, c *sink.Cu
 	if _, err := l.DB.ExecContext(ctx, query); err != nil {
 		return fmt.Errorf("insert cursor: %w", err)
 	}
+
 	return nil
 }
 
+// UpdateCursor updates the active cursor. If no cursor is active and no update occurred, returns
+// ErrCursorNotFound. If the update was not successful on the database, returns an error.
+// You can use tx=nil to run the query outside of a transaction.
 func (l *Loader) UpdateCursor(ctx context.Context, tx Tx, moduleHash string, c *sink.Cursor) error {
 	l.logger.Debug("updating cursor", zap.String("module_hash", moduleHash), zap.Stringer("cursor", c))
 	_, err := l.runModifiyQuery(ctx, tx, "update", l.dialect.GetUpdateCursorQuery(
@@ -119,16 +127,19 @@ func (l *Loader) UpdateCursor(ctx context.Context, tx Tx, moduleHash string, c *
 	return err
 }
 
+// DeleteCursor deletes the active cursor for the given 'moduleHash'.
 func (l *Loader) DeleteCursor(ctx context.Context, moduleHash string) error {
 	_, err := l.runModifiyQuery(ctx, nil, "delete", fmt.Sprintf("DELETE FROM %s WHERE id = '%s'", l.cursorTable.identifier, moduleHash))
 	return err
 }
 
+// DeleteAllCursors deletes all cursors.
 func (l *Loader) DeleteAllCursors(ctx context.Context) (deletedCount int64, err error) {
 	deletedCount, err = l.runModifiyQuery(ctx, nil, "delete", fmt.Sprintf("DELETE FROM %s", l.cursorTable.identifier))
 	if err != nil && errors.Is(err, ErrCursorNotFound) {
 		return 0, nil
 	}
+
 	return deletedCount, nil
 }
 
@@ -136,6 +147,8 @@ type sqlExecutor interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 }
 
+// runModifiyQuery runs the logic to execute a query that is supposed to modify the database in some form affecting
+// at least 1 row.
 func (l *Loader) runModifiyQuery(ctx context.Context, tx Tx, action string, query string) (rowsAffected int64, err error) {
 	var executor sqlExecutor = l.DB
 	if tx != nil {

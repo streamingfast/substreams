@@ -23,6 +23,7 @@ type DSN struct {
 	Database string
 	Options  DSNOptions
 
+	// schema is the extracted schema from the DSN schemaName option (if present)
 	schema string
 }
 
@@ -147,7 +148,8 @@ func (c *DSN) Clone() *DSN {
 	}
 }
 
-// DSNOptions is a thin wrapper around url.Values to provide helper methods.
+// DSNOptions is a thin wrapper around url.Values to provide helper methods and
+// better names.
 type DSNOptions url.Values
 
 // Iter iterates over the first value of each key.
@@ -163,12 +165,13 @@ func (v DSNOptions) Iter() iter.Seq2[string, string] {
 	}
 }
 
-// Encode encodes the values into "URL encoded" form sorted by key.
+// Encode encodes the values into "URL encoded" form ("bar=baz&foo=quux") sorted by key.
 func (v DSNOptions) Encode() string {
 	return (url.Values(v)).Encode()
 }
 
-// EncodeWithSeparator encodes the values with a custom separator instead of '&'.
+// EncodeWithSeparator encodes the values into "URL encoded" like form ("bar=baz foo=quux") sorted by key
+// where essentially the separator is used instead of '&'.
 func (v DSNOptions) EncodeWithSeparator(sep string) string {
 	return strings.ReplaceAll((url.Values(v)).Encode(), "&", sep)
 }

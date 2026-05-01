@@ -11,7 +11,7 @@ import (
 	"github.com/streamingfast/logging/zapx"
 	"github.com/streamingfast/shutter"
 	sink "github.com/streamingfast/substreams/sink"
-	pbdatabase "github.com/streamingfast/substreams/sink/sql/db_changes/pb/sf/substreams/sink/database/v1"
+	pbdatabase "github.com/streamingfast/substreams/pb/sf/substreams/sink/database/v1"
 	db2 "github.com/streamingfast/substreams/sink/sql/db_changes/db"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"go.uber.org/zap"
@@ -73,6 +73,9 @@ func (s *SQLSinker) Run(ctx context.Context) {
 		return
 	}
 
+	// We write an empty cursor right away in the database because the flush logic
+	// only performs an `update` operation so an initial cursor is required in the database
+	// for the flush to work correctly.
 	if errors.Is(err, db2.ErrCursorNotFound) {
 		if err := s.loader.InsertCursor(ctx, s.OutputModuleHash(), sink.NewBlankCursor()); err != nil {
 			s.Shutdown(fmt.Errorf("unable to write initial empty cursor: %w", err))
@@ -86,6 +89,7 @@ func (s *SQLSinker) Run(ctx context.Context) {
 		}
 	}
 
+	// Works in all cases, even if the cursor is blank or nil (gives 0)
 	s.lastAppliedBlockNum = cursor.Block().Num()
 
 	s.Sinker.OnTerminating(s.Shutdown)
@@ -117,6 +121,7 @@ func (s *SQLSinker) flushWithRetry(ctx context.Context, moduleHash string, curso
 	var lastErr error
 	for attempt := 0; attempt <= retries; attempt++ {
 		if attempt > 0 {
+			// Do not retry if flush delay is 0, useful in tests
 			if s.flushRetryDelay == 0 {
 				return 0, lastErr
 			}
@@ -169,6 +174,9 @@ func (s *SQLSinker) HandleBlockScopedData(ctx context.Context, data *pbsubstream
 			return fmt.Errorf("mismatched message type: trying to unmarshal unknown type %q", mapOutput.MessageName())
 		}
 
+		// We do not use UnmarshalTo here because we need to parse an older proto type and
+		// UnmarshalTo enforces the type check. So we check manually the `TypeUrl` above and we use
+		// `Unmarshal` instead which only deals with the bytes value.
 		if err := proto.Unmarshal(mapOutput.Value, dbChanges); err != nil {
 			return fmt.Errorf("unmarshal database changes: %w", err)
 		}
@@ -307,6 +315,7 @@ func (s *SQLSinker) applyDatabaseChanges(dbChanges *pbdatabase.DatabaseChanges, 
 	return nil
 }
 
+// protoUpdateOpToDbUpdateOp converts proto Field_UpdateOp to db UpdateOp
 func protoUpdateOpToDbUpdateOp(op pbdatabase.Field_UpdateOp) db2.UpdateOp {
 	switch op {
 	case pbdatabase.Field_UPDATE_OP_ADD:
@@ -323,6 +332,8 @@ func protoUpdateOpToDbUpdateOp(op pbdatabase.Field_UpdateOp) db2.UpdateOp {
 }
 
 func (s *SQLSinker) HandleBlockRangeCompletion(ctx context.Context, cursor *sink.Cursor) error {
+	// To be moved in the base sinker library, happens usually only on integration tests where the connection
+	// can close with "nil" error but we haven't completed the range for real yet.
 	stopBlock := s.Sinker.StopBlock()
 	if stopBlock > 0 && cursor.Block().Num() < stopBlock {
 		s.logger.Debug("range not completed yet, skipping", zap.Stringer("block", cursor.Block()), zap.Uint64("stop_block", stopBlock))

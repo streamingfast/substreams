@@ -93,6 +93,7 @@ func (s *Stats) LogNow() {
 		zap.Stringer("handle_block_duration", s.handleBlockDuration),
 	}
 
+	// Only log undo metrics if we've had any undo operations (typically in live mode)
 	if s.hasUndoSegments {
 		fields = append(fields, zap.Stringer("handle_undo_duration", s.handleUndoDuration))
 	}

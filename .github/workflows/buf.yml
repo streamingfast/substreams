@@ -7,8 +7,6 @@ on:
       - v*
     branches:
       - develop
-      - release/v*
-      - feature/*
 
 jobs:
   buf:

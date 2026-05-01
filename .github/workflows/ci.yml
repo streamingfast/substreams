@@ -1,14 +1,10 @@
 name: Build and Test
 
 on:
+  pull_request:
   push:
     branches:
-      - master
       - develop
-      - "release/v*"
-  pull_request:
-    branches:
-      - "**"
 
 jobs:
   test:

@@ -235,7 +235,6 @@ func (i *AccumulatorInserter) insert(table string, values []any) error {
 		case *ColScaledDecimal128:
 			stringValue := value.(string)
 			scale := column.ConvertTo.Convertion.(*v1.StringConvertion_Decimal128).Decimal128.Scale
-			// Handle optional fields with empty strings by using zero value
 			if column.IsOptional && stringValue == "" {
 				input.Append(proto.Decimal128{})
 			} else {
@@ -248,7 +247,6 @@ func (i *AccumulatorInserter) insert(table string, values []any) error {
 		case *ColScaledDecimal256:
 			stringValue := value.(string)
 			scale := column.ConvertTo.Convertion.(*v1.StringConvertion_Decimal256).Decimal256.Scale
-			// Handle optional fields with empty strings by using zero value
 			if column.IsOptional && stringValue == "" {
 				input.Append(proto.Decimal256{})
 			} else {
@@ -260,7 +258,6 @@ func (i *AccumulatorInserter) insert(table string, values []any) error {
 			}
 		case *proto.ColInt128:
 			stringValue := value.(string)
-			// Handle optional fields with empty strings by using zero value
 			if column.IsOptional && stringValue == "" {
 				input.Append(proto.Int128{})
 			} else {
@@ -272,7 +269,6 @@ func (i *AccumulatorInserter) insert(table string, values []any) error {
 			}
 		case *proto.ColUInt128:
 			stringValue := value.(string)
-			// Handle optional fields with empty strings by using zero value
 			if column.IsOptional && stringValue == "" {
 				input.Append(proto.UInt128{})
 			} else {
@@ -284,7 +280,6 @@ func (i *AccumulatorInserter) insert(table string, values []any) error {
 			}
 		case *proto.ColInt256:
 			stringValue := value.(string)
-			// Handle optional fields with empty strings by using zero value
 			if column.IsOptional && stringValue == "" {
 				input.Append(proto.Int256{})
 			} else {
@@ -296,7 +291,6 @@ func (i *AccumulatorInserter) insert(table string, values []any) error {
 			}
 		case *proto.ColUInt256:
 			stringValue := value.(string)
-			// Handle optional fields with empty strings by using zero value
 			if column.IsOptional && stringValue == "" {
 				input.Append(proto.UInt256{})
 			} else {
@@ -308,7 +302,6 @@ func (i *AccumulatorInserter) insert(table string, values []any) error {
 			}
 		case *proto.ColStr:
 			if bytesValue, ok := value.([]byte); ok {
-				// Convert []byte to string using the bytes encoder
 				encoded, err := i.bytesEncoding.EncodeBytes(bytesValue)
 				if err != nil {
 					panic(fmt.Sprintf("failed to encode bytes for column %s of table %s: %v", column.Name, table, err))
@@ -321,7 +314,6 @@ func (i *AccumulatorInserter) insert(table string, values []any) error {
 			input.Append(value.([]byte))
 		case *proto.ColBool:
 			input.Append(value.(bool))
-		// Handle array column types
 		case *proto.ColArr[int32]:
 			if arr, ok := value.([]interface{}); ok {
 				int32Arr := make([]int32, len(arr))
@@ -367,7 +359,6 @@ func (i *AccumulatorInserter) insert(table string, values []any) error {
 				int128Arr := make([]*proto.Int128, len(arr))
 				for i, v := range arr {
 					stringValue := v.(string)
-					// Handle empty strings in array elements by using zero value
 					if stringValue == "" {
 						zeroValue := proto.Int128{}
 						int128Arr[i] = &zeroValue
@@ -388,7 +379,6 @@ func (i *AccumulatorInserter) insert(table string, values []any) error {
 				uint128Arr := make([]*proto.UInt128, len(arr))
 				for i, v := range arr {
 					stringValue := v.(string)
-					// Handle empty strings in array elements by using zero value
 					if stringValue == "" {
 						zeroValue := proto.UInt128{}
 						uint128Arr[i] = &zeroValue
@@ -407,7 +397,6 @@ func (i *AccumulatorInserter) insert(table string, values []any) error {
 				int256Arr := make([]*proto.Int256, len(arr))
 				for i, v := range arr {
 					stringValue := v.(string)
-					// Handle empty strings in array elements by using zero value
 					if stringValue == "" {
 						zeroValue := proto.Int256{}
 						int256Arr[i] = &zeroValue
@@ -426,7 +415,6 @@ func (i *AccumulatorInserter) insert(table string, values []any) error {
 				uint256Arr := make([]*proto.UInt256, len(arr))
 				for i, v := range arr {
 					stringValue := v.(string)
-					// Handle empty strings in array elements by using zero value
 					if stringValue == "" {
 						zeroValue := proto.UInt256{}
 						uint256Arr[i] = &zeroValue
@@ -574,18 +562,16 @@ func (i *AccumulatorInserter) flush(database *Database) error {
 			})
 		}
 
-		// Retry logic on client.Do failure: sleep between attempts and get a fresh client for each retry
 		retryCount := database.queryRetryCount
 		retrySleep := database.queryRetrySleep
 		for attempt := 0; ; attempt++ {
 			if err := client.Do(database.ctx, ch.Query{
-				Body:  inputs.Into(acc.tableName), // helper that generates INSERT INTO query with all columns
+				Body:  inputs.Into(acc.tableName),
 				Input: inputs,
 			}); err != nil {
 				if attempt >= retryCount {
 					return fmt.Errorf("clickhouse accumulator inserter: executing query on %q after %d retries: %w", acc.debugTableAndColumns(), attempt, err)
 				}
-				// Log, sleep, and get a fresh client before retrying
 				i.logger.Warn("clickhouse insert failed, will retry", zap.Int("attempt", attempt+1), zap.Int("max_attempts", retryCount), zap.String("table", acc.tableName), zap.Error(err))
 				time.Sleep(retrySleep)
 				fresh, cErr := database.freshClient()
@@ -629,7 +615,7 @@ func (acc *accumulator) debugTableAndColumns() string {
 
 type ColScaledDecimal256 struct {
 	*proto.ColDecimal256
-	scale uint8 // Your desired scale (0-9 for Decimal32)
+	scale uint8
 }
 
 func (c *ColScaledDecimal256) Type() proto.ColumnType {
@@ -638,7 +624,7 @@ func (c *ColScaledDecimal256) Type() proto.ColumnType {
 
 type ColScaledDecimal128 struct {
 	*proto.ColDecimal128
-	scale uint8 // Your desired scale (0-9 for Decimal32)
+	scale uint8
 }
 
 func (c *ColScaledDecimal128) Type() proto.ColumnType {

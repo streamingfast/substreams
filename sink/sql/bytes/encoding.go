@@ -113,7 +113,9 @@ func (e Encoding) DecodeBytes(encoded interface{}) ([]byte, error) {
 	case EncodingBase58:
 		if str, ok := encoded.(string); ok {
 			decoded, err := base58.Decode(str)
-			if err != nil { return nil, fmt.Errorf("decoding base58: %w", err) }
+			if err != nil {
+				return nil, fmt.Errorf("base58 decoding: %w", err)
+			}
 			return decoded, nil
 		}
 		return nil, fmt.Errorf("expected string for base58 encoding, got %T", encoded)

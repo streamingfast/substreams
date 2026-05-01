@@ -5,8 +5,15 @@ go 1.25.0
 toolchain go1.25.4
 
 require (
+	github.com/AfterShip/clickhouse-sql-parser v0.4.9
+	github.com/ClickHouse/ch-go v0.68.0
+	github.com/ClickHouse/clickhouse-go/v2 v2.40.3
+	github.com/drone/envsubst v1.0.3
 	github.com/golang/protobuf v1.5.4
+	github.com/jackc/pgx/v4 v4.18.1
 	github.com/jhump/protoreflect v1.14.0
+	github.com/jmoiron/sqlx v1.4.0
+	github.com/lib/pq v1.10.9
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
 	github.com/streamingfast/bstream v0.0.2-0.20260402095814-607e840ece3d
@@ -20,6 +27,7 @@ require (
 	github.com/streamingfast/logging v0.0.0-20260108192805-38f96de0a641
 	github.com/streamingfast/pbgo v0.0.6-0.20250120164644-a58d8066ab4b
 	github.com/stretchr/testify v1.11.1
+	github.com/wk8/go-ordered-map/v2 v2.1.7
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869
 	go.uber.org/zap v1.27.1
 	google.golang.org/protobuf v1.36.11

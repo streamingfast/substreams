@@ -118,6 +118,9 @@ func (s *BufferedIO) IsWritten() bool {
 var _ io.WriteCloser = (*LazyFile)(nil)
 
 // LazyFile only creates and writes to file if `Write` is called at least one.
+//
+// **Important** Not safe for concurrent access, you need to gate yourself if
+// you need that.
 type LazyFile struct {
 	*os.File
 

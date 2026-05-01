@@ -86,8 +86,6 @@ func ParseDSN(dsn string) (*DSN, error) {
 	schemaName := d.Options.RemoveOr("schemaName", "")
 
 	if driver == "clickhouse" {
-		// For ClickHouse, store the target database name in schema, but keep
-		// connecting to the original database to allow CREATE DATABASE commands
 		if schemaName != "" {
 			d.schema = schemaName
 		} else {
@@ -98,7 +96,6 @@ func ParseDSN(dsn string) (*DSN, error) {
 			schemaName = "public"
 		}
 
-		// For other databases (PostgreSQL), schemaName is separate from database
 		d.schema = schemaName
 	}
 
@@ -121,7 +118,6 @@ func (c *DSN) ConnString() string {
 
 		return baseURL
 	}
-	// PostgreSQL connection string uses space-separated options
 	options := c.Options.EncodeWithSeparator(" ")
 	out := fmt.Sprintf("host=%s port=%d dbname=%s %s", c.Host, c.Port, c.Database, options)
 	if c.Username != "" {

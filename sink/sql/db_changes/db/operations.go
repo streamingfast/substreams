@@ -110,34 +110,27 @@ func (o *Operation) mergeData(newData map[string]FieldData) error {
 			continue
 		}
 
-		// Validate transition based on strict rules (consistent with Rust library)
-		// SET can be followed by any op, but non-SET ops can only be followed by same type
 		if err := validateOpTransition(k, existing.UpdateOp, fd.UpdateOp); err != nil {
 			return err
 		}
 
-		// Handle each incoming operation type
 		switch fd.UpdateOp {
 		case UpdateOpSet:
-			// SET: latest value wins, overwrites any previous operation
 			o.data[k] = fd
 
 		case UpdateOpAdd:
-			// ADD: accumulate values (valid after SET or ADD)
 			existingDec, err1 := parseDecimal(existing.Value)
 			newDec, err2 := parseDecimal(fd.Value)
 			if err1 == nil && err2 == nil {
 				o.data[k] = FieldData{
 					Value:    existingDec.Add(newDec).String(),
-					UpdateOp: existing.UpdateOp, // Keep existing op: SET stays SET, ADD stays ADD
+					UpdateOp: existing.UpdateOp,
 				}
 			} else {
-				// Non-numeric: latest value wins
 				o.data[k] = fd
 			}
 
 		case UpdateOpMax:
-			// MAX: compute maximum (valid after SET or MAX)
 			existingDec, err1 := parseDecimal(existing.Value)
 			newDec, err2 := parseDecimal(fd.Value)
 			if err1 == nil && err2 == nil {
@@ -147,15 +140,13 @@ func (o *Operation) mergeData(newData map[string]FieldData) error {
 				}
 				o.data[k] = FieldData{
 					Value:    maxVal.String(),
-					UpdateOp: existing.UpdateOp, // Keep existing op: SET stays SET, MAX stays MAX
+					UpdateOp: existing.UpdateOp,
 				}
 			} else {
-				// Non-numeric: latest value wins
 				o.data[k] = fd
 			}
 
 		case UpdateOpMin:
-			// MIN: compute minimum (valid after SET or MIN)
 			existingDec, err1 := parseDecimal(existing.Value)
 			newDec, err2 := parseDecimal(fd.Value)
 			if err1 == nil && err2 == nil {
@@ -165,53 +156,31 @@ func (o *Operation) mergeData(newData map[string]FieldData) error {
 				}
 				o.data[k] = FieldData{
 					Value:    minVal.String(),
-					UpdateOp: existing.UpdateOp, // Keep existing op: SET stays SET, MIN stays MIN
+					UpdateOp: existing.UpdateOp,
 				}
 			} else {
-				// Non-numeric: latest value wins
 				o.data[k] = fd
 			}
 
 		case UpdateOpSetIfNull:
-			// SET_IF_NULL: keep existing value (first value wins)
-			// Field already exists, so keep it and don't overwrite
 			continue
 		}
 	}
 	return nil
 }
 
-// validateOpTransition checks if the transition from existing to incoming op is valid.
-// Returns an error for invalid transitions.
-//
-// Valid transitions:
-//   - SET → any op: OK
-//   - any op → SET: OK (SET always overwrites)
-//   - ADD → ADD: OK (accumulates)
-//   - MAX → MAX: OK (computes max)
-//   - MIN → MIN: OK (computes min)
-//   - SET_IF_NULL → SET_IF_NULL: OK (first value wins)
-//
-// All other transitions are invalid.
 func validateOpTransition(fieldName string, existing, incoming UpdateOp) error {
-	// SET can be followed by any operation
 	if existing == UpdateOpSet {
 		return nil
 	}
-
-	// Any operation can be followed by SET (SET overwrites)
 	if incoming == UpdateOpSet {
 		return nil
 	}
-
-	// Non-SET ops can only be followed by the same op type
 	if existing == incoming {
 		return nil
 	}
-
-	// Invalid transition
 	return fmt.Errorf(
-		"invalid UpdateOp transition for field %q: cannot apply %s after %s (only %s → %s or SET → %s is allowed)",
+		"invalid UpdateOp transition for field %q: cannot apply %s after %s (only %s \u2192 %s or SET \u2192 %s is allowed)",
 		fieldName,
 		updateOpName(incoming),
 		updateOpName(existing),
@@ -239,7 +208,6 @@ func updateOpName(op UpdateOp) string {
 }
 
 func parseDecimal(s string) (decimal, error) {
-	// Simple decimal parsing - just use big.Rat for precision
 	var d decimal
 	_, ok := d.SetString(s)
 	if !ok {
@@ -248,7 +216,6 @@ func parseDecimal(s string) (decimal, error) {
 	return d, nil
 }
 
-// decimal is a simple wrapper around big.Rat for delta accumulation
 type decimal struct {
 	*big.Rat
 }
@@ -287,7 +254,6 @@ func (d decimal) String() string {
 	return d.Rat.FloatString(18)
 }
 
-// mergeOperation merges another operation into this one, keeping the lowest ordinal
 func (o *Operation) mergeOperation(otherData map[string]FieldData) error {
 	if o.opType == OperationTypeDelete {
 		return fmt.Errorf("unable to merge operation for a delete operation")
@@ -316,16 +282,14 @@ func escapeStringValue(valueToEscape string) string {
 	return `'` + valueToEscape + `'`
 }
 
-// to store in an history table
 func primaryKeyToJSON(primaryKey map[string]string) string {
 	m, err := json.Marshal(primaryKey)
 	if err != nil {
-		panic(err) // should never happen with map[string]string
+		panic(err)
 	}
 	return string(m)
 }
 
-// to store in an history table
 func jsonToPrimaryKey(in string) (map[string]string, error) {
 	out := make(map[string]string)
 	err := json.Unmarshal([]byte(in), &out)

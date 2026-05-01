@@ -161,17 +161,13 @@ func (l *Loader) LiveBlockFlushInterval() int {
 
 func (l *Loader) FlushNeeded() bool {
 	totalRows := 0
-	// todo keep a running count when inserting/deleting rows directly
 	for pair := l.entries.Oldest(); pair != nil; pair = pair.Next() {
 		totalRows += pair.Value.Len()
 	}
 	return totalRows > l.batchRowFlushInterval
 }
 
-// getTablesFromSchema returns table information similar to schema.Tables()
-// but only inspects tables in the specified schema to avoid issues with database extensions
 func (l *Loader) getTablesFromSchema(schemaName string) (map[[2]string][]*sql.ColumnType, error) {
-	// Use dialect-specific method to get tables
 	tables, err := l.dialect.GetTablesInSchema(l.DB, schemaName)
 	if err != nil {
 		return nil, fmt.Errorf("getting tables from schema: %w", err)
@@ -182,7 +178,6 @@ func (l *Loader) getTablesFromSchema(schemaName string) (map[[2]string][]*sql.Co
 	for _, table := range tables {
 		schemaName, tableName := table[0], table[1]
 
-		// Get column information for this table
 		columns, err := l.dialect.GetTableColumns(l.DB, schemaName, tableName)
 		if err != nil {
 			l.logger.Warn("failed to get columns for table, skipping",
@@ -306,7 +301,6 @@ func (l *Loader) validateCursorTables(columns []*sql.ColumnType, schemaName stri
 func (l *Loader) GetColumnsForTable(name string) []string {
 	columns := make([]string, 0, len(l.tables[name].columnsByName))
 	for column := range l.tables[name].columnsByName {
-		// check if column is empty
 		if len(column) > 0 {
 			columns = append(columns, column)
 		}
@@ -376,7 +370,7 @@ func (l *Loader) GetIdentifier() string {
 	return fmt.Sprintf("%s/%s", l.dsn.schema, l.dsn.schema)
 }
 
-// GetIdentifier returns <database>/<schema> suitable for user presentation
+// GetDSN returns the DSN
 func (l *Loader) GetDSN() *DSN {
 	return l.dsn
 }

@@ -47,7 +47,6 @@ func NewSinker(rootMessageDescriptor protoreflect.MessageDescriptor, sink *sink.
 }
 
 func (s *Sinker) Run(ctx context.Context) error {
-	// Show stats one last time before exiting run
 	defer s.LogStats()
 
 	cursor, err := s.db.FetchCursor()
@@ -55,14 +54,13 @@ func (s *Sinker) Run(ctx context.Context) error {
 		return fmt.Errorf("fetch cursor: %w", err)
 	}
 
-	//clean up the mess from running without a transaction
 	if cursor != nil {
 		err = s.db.HandleBlocksUndo(cursor.Block().Num())
 		if err != nil {
 			return fmt.Errorf("handle blocks undo from %s: %w", cursor.Block(), err)
 		}
 	}
-	//panic("Testing 12 12")
+
 	s.logger.Info("fetched cursor", zap.Stringer("block", cursor.Block()))
 
 	s.stats.LastBlockProcessAt = time.Now()
@@ -147,7 +145,6 @@ func (s *Sinker) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrp
 					if err != nil {
 						db.RollbackTransaction()
 						errs = append(errs, err)
-						//return fmt.Errorf("process holder: %w", err)
 					}
 					err = db.CommitTransaction()
 					if err != nil {
@@ -158,7 +155,7 @@ func (s *Sinker) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrp
 			}
 			wg.Wait()
 			if len(errs) > 0 {
-				return fmt.Errorf("errors: %w", errors.Join(errs...))
+				return errors.Join(errs...)
 			}
 
 		} else {
@@ -225,6 +222,7 @@ func (s *Sinker) processHolder(h *Holder, stats *stats.Stats) (err error) {
 
 	return nil
 }
+
 func processMessage(dm *dynamicpb.Message, database sql.Database, blockNum uint64, blockHash string, blockTimestamp time.Time, stats *stats.Stats) error {
 	startInsertBlock := time.Now()
 	err := database.InsertBlock(blockNum, blockHash, blockTimestamp)

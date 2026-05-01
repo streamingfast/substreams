@@ -1,8 +1,8 @@
 package postgres
 
 import (
-	pgsql "database/sql"
 	"context"
+	pgsql "database/sql"
 	"fmt"
 	"hash/fnv"
 	"time"
@@ -11,7 +11,7 @@ import (
 	sink "github.com/streamingfast/substreams/sink"
 	"github.com/streamingfast/substreams/sink/sql/bytes"
 	"github.com/streamingfast/substreams/sink/sql/db_changes/db"
-	sql "github.com/streamingfast/substreams/sink/sql/db_proto/sql"
+	"github.com/streamingfast/substreams/sink/sql/db_proto/sql"
 	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/schema"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/reflect/protoreflect"

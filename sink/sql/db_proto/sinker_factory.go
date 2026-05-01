@@ -160,9 +160,6 @@ func SinkerFactory(
 					if err != nil {
 						return nil, fmt.Errorf("commit transaction: %w", err)
 					}
-
-				} else {
-					//todo: create the temp schema ... and exit
 				}
 			}
 		}

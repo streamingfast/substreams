@@ -138,27 +138,22 @@ func (d *BaseDatabase) WalkMessageDescriptorAndInsertWithDialect(dm *dynamicpb.M
 		fv := dm.Get(fd)
 
 		if fd.IsList() {
-			// Check if this is an array of messages or native values
 			list := fv.List()
 			if fd.Kind() == protoreflect.MessageKind {
-				// Check if this is an inline nested array
 				fieldInfo := proto.FieldInfo(fd)
 				if fieldInfo != nil && fieldInfo.Inline {
-					// Delegate to dialect for inline handling
 					var err error
 					fieldValues, err = dialect.AppendInlineFieldValues(fieldValues, fd, fv, dm)
 					if err != nil {
 						return 0, fmt.Errorf("appending inline field values for %q: %w", string(fd.Name()), err)
 					}
 				} else if list.Len() > 0 {
-					// Array of messages - process as child tables
 					for j := 0; j < list.Len(); j++ {
 						fm := list.Get(j).Message().Interface().(*dynamicpb.Message)
 						childs = append(childs, fm)
 					}
 				}
 			} else if list.Len() > 0 {
-				// Array of native values - add as a single field value (the array itself)
 				var values []interface{}
 				for j := 0; j < list.Len(); j++ {
 					values = append(values, list.Get(j).Interface())
@@ -171,7 +166,6 @@ func (d *BaseDatabase) WalkMessageDescriptorAndInsertWithDialect(dm *dynamicpb.M
 			if fv.Message().IsValid() {
 				fm := fv.Message().Interface().(*dynamicpb.Message)
 				if fm.Descriptor().FullName() == "google.protobuf.Timestamp" {
-					// Convert fv to *timestamppb.Timestamp
 					timestamp := &timestamppb.Timestamp{}
 					timestamp.Seconds = fm.Get(fm.Descriptor().Fields().ByName("seconds")).Int()
 					timestamp.Nanos = int32(fm.Get(fm.Descriptor().Fields().ByName("nanos")).Int())
@@ -179,10 +173,8 @@ func (d *BaseDatabase) WalkMessageDescriptorAndInsertWithDialect(dm *dynamicpb.M
 					continue
 				}
 
-				// Check if this field should be treated as a nested (inline) column
 				fieldInfo := proto.FieldInfo(fd)
 				if fieldInfo != nil && fieldInfo.Inline {
-					// Delegate to dialect for inline handling
 					var err error
 					fieldValues, err = dialect.AppendInlineFieldValues(fieldValues, fd, fv, dm)
 					if err != nil {
@@ -191,7 +183,7 @@ func (d *BaseDatabase) WalkMessageDescriptorAndInsertWithDialect(dm *dynamicpb.M
 					continue
 				}
 
-				childs = append(childs, fm) //need to be handled after current message inserted
+				childs = append(childs, fm)
 			}
 		} else {
 			fieldValues = append(fieldValues, fv.Interface())

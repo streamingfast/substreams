@@ -113,7 +113,6 @@ func MapFieldType(fd protoreflect.FieldDescriptor, bytesEncoding bytes.Encoding,
 		panic(fmt.Sprintf("unsupported type: %s", kind))
 	}
 
-	// If field is repeated, wrap the base type as an array
 	if fd.IsList() {
 		return DataType(fmt.Sprintf("%s[]", baseType))
 	}

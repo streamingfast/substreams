@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	base58 "github.com/mr-tron/base58/base58"
+	"github.com/mr-tron/base58/base58"
 )
 
 // Encoding represents the different encoding types for protobuf bytes fields
@@ -114,7 +114,7 @@ func (e Encoding) DecodeBytes(encoded interface{}) ([]byte, error) {
 		if str, ok := encoded.(string); ok {
 			decoded, err := base58.Decode(str)
 			if err != nil {
-				return nil, fmt.Errorf("decoding base58: %w", err)
+				return nil, fmt.Errorf("base58 decode: %w", err)
 			}
 			return decoded, nil
 		}

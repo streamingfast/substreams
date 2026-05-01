@@ -21,5 +21,5 @@ func fieldQuotedName(f protoreflect.FieldDescriptor) string {
 }
 
 func Quoted(value string) string {
-	return fmt.Sprintf("%q", value)
+	return fmt.Sprintf("\"%s\"", value)
 }

@@ -15,7 +15,9 @@ import (
 )
 
 const (
+	// Verify that this generated code is sufficiently up-to-date.
 	_ = protoimpl.EnforceVersion(20 - protoimpl.MinVersion)
+	// Verify that runtime/protoimpl is sufficiently up-to-date.
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
@@ -27,6 +29,7 @@ const (
 	Service_clickhouse Service_Engine = 2
 )
 
+// Enum value maps for Service_Engine.
 var (
 	Service_Engine_name = map[int32]string{
 		0: "unset",
@@ -72,6 +75,7 @@ type Service struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// Containing both create table statements and index creation statements.
 	Schema               string                `protobuf:"bytes,1,opt,name=schema,proto3" json:"schema,omitempty"`
 	DbtConfig            *DBTConfig            `protobuf:"bytes,2,opt,name=dbt_config,json=dbtConfig,proto3,oneof" json:"dbt_config,omitempty"`
 	HasuraFrontend       *HasuraFrontend       `protobuf:"bytes,4,opt,name=hasura_frontend,json=hasuraFrontend,proto3" json:"hasura_frontend,omitempty"`

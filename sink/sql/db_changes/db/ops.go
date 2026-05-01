@@ -52,6 +52,7 @@ func (l *Loader) Insert(tableName string, primaryKey map[string]string, data map
 		l.logger.Debug("primary key entry never existed for table, adding insert operation", zap.String("primary_key", uniqueID), zap.String("table_name", tableName))
 	}
 
+	// We need to make sure to add the primary key(s) in the data so that those column get created correctly, but only if there is data
 	for _, primary := range l.tables[tableName].primaryColumns {
 		if dataFromPrimaryKey, ok := primaryKey[primary.name]; ok {
 			data[primary.name] = FieldData{Value: dataFromPrimaryKey, UpdateOp: UpdateOpSet}
@@ -136,6 +137,7 @@ func (l *Loader) Upsert(tableName string, primaryKey map[string]string, data map
 		case OperationTypeDelete:
 			return fmt.Errorf("attempting to upsert an object with primary key %q, that is scheduled to be deleted", primaryKey)
 		case OperationTypeUpdate:
+			// Accept existing update operation but change it to upsert, merge columns together
 			op.opType = OperationTypeUpsert
 		case OperationTypeUpsert:
 			// Fine, merge columns together
@@ -156,6 +158,7 @@ func (l *Loader) Upsert(tableName string, primaryKey map[string]string, data map
 		l.logger.Debug("primary key entry never existed for table, adding upsert operation", zap.String("primary_key", uniqueID), zap.String("table_name", tableName))
 	}
 
+	// We need to make sure to add the primary key(s) in the data so that those column get created correctly, but only if there is data
 	for _, primary := range l.tables[tableName].primaryColumns {
 		if dataFromPrimaryKey, ok := primaryKey[primary.name]; ok {
 			data[primary.name] = FieldData{Value: dataFromPrimaryKey, UpdateOp: UpdateOpSet}

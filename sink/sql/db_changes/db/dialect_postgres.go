@@ -34,19 +34,19 @@ func NewPostgresDialect(schemaName string, cursorTableName string, historyTableN
 }
 
 func (d PostgresDialect) Revert(tx Tx, ctx context.Context, l *Loader, lastValidFinalBlock uint64) error {
-	query := fmt.Sprintf(`SELECT op,table_name,pk,prev_value,block_num FROM %s WHERE "block_num" > %d ORDER BY "block_num" DESC`,
+	q := fmt.Sprintf(`SELECT op,table_name,pk,prev_value,block_num FROM %s WHERE "block_num" > %d ORDER BY "block_num" DESC`,
 		d.historyTable(d.schemaName),
 		lastValidFinalBlock,
 	)
 
-	rows, err := tx.QueryContext(ctx, query)
+	rows, err := tx.QueryContext(ctx, q)
 	if err != nil {
 		return err
 	}
 
 	var reversions []func() error
 	l.logger.Info("reverting forked block block(s)", zap.Uint64("last_valid_final_block", lastValidFinalBlock))
-	if rows != nil {
+	if rows != nil { // rows will be nil with no error only in testing scenarios
 		defer rows.Close()
 		for rows.Next() {
 			var op string
@@ -60,6 +60,8 @@ func (d PostgresDialect) Revert(tx Tx, ctx context.Context, l *Loader, lastValid
 			l.logger.Debug("reverting", zap.String("operation", op), zap.String("table_name", table_name), zap.String("pk", pk), zap.Uint64("block_num", block_num))
 			prev_value := prev_value_nullable.String
 
+			// we can't call revertOp inside this loop, because it calls tx.ExecContext,
+			// which can't run while this query is "active" or it will silently discard the remaining rows!
 			reversions = append(reversions, func() error {
 				if err := d.revertOp(tx, ctx, op, table_name, pk, prev_value, block_num); err != nil {
 					return fmt.Errorf("revertOp: %w", err)
@@ -68,7 +70,7 @@ func (d PostgresDialect) Revert(tx Tx, ctx context.Context, l *Loader, lastValid
 			})
 		}
 		if err := rows.Err(); err != nil {
-			return fmt.Errorf("iterating on rows from query %q: %w", query, err)
+			return fmt.Errorf("iterating on rows from query %q: %w", q, err)
 		}
 		for _, reversion := range reversions {
 			if err := reversion(); err != nil {
@@ -118,6 +120,7 @@ func (d PostgresDialect) Flush(tx Tx, ctx context.Context, l *Loader, outputModu
 			return 0, fmt.Errorf("failed to prepare statement: %w", err)
 		}
 
+		// Execute undo query first (if present) to save state before modifying
 		if undoQuery != "" {
 			if l.tracer.Enabled() {
 				l.logger.Debug("adding undo query from operation to transaction", zap.Stringer("op", entry), zap.String("query", undoQuery), zap.Uint64("ordinal", entry.ordinal))
@@ -131,6 +134,7 @@ func (d PostgresDialect) Flush(tx Tx, ctx context.Context, l *Loader, outputModu
 			QueryExecutionDuration.AddInt64(undoDuration.Nanoseconds(), "undo")
 		}
 
+		// Execute normal query
 		if l.tracer.Enabled() {
 			l.logger.Debug("adding normal query from operation to transaction", zap.Stringer("op", entry), zap.String("query", normalQuery), zap.Uint64("ordinal", entry.ordinal))
 		}
@@ -156,28 +160,27 @@ func (d PostgresDialect) Flush(tx Tx, ctx context.Context, l *Loader, outputModu
 }
 
 func (d PostgresDialect) revertOp(tx Tx, ctx context.Context, op, escaped_table_name, pk, prev_value string, block_num uint64) error {
-
 	pkmap := make(map[string]string)
 	if err := json.Unmarshal([]byte(pk), &pkmap); err != nil {
 		return fmt.Errorf("revertOp: unmarshalling %q: %w", pk, err)
 	}
 	switch op {
 	case "I":
-		query := fmt.Sprintf(`DELETE FROM %s WHERE %s;`,
+		q := fmt.Sprintf(`DELETE FROM %s WHERE %s;`,
 			escaped_table_name,
 			getPrimaryKeyWhereClause(pkmap, ""),
 		)
-		if _, err := tx.ExecContext(ctx, query); err != nil {
-			return fmt.Errorf("executing revert query %q: %w", query, err)
+		if _, err := tx.ExecContext(ctx, q); err != nil {
+			return fmt.Errorf("executing revert query %q: %w", q, err)
 		}
 	case "D":
-		query := fmt.Sprintf(`INSERT INTO %s SELECT * FROM json_populate_record(null::%s,%s);`,
+		q := fmt.Sprintf(`INSERT INTO %s SELECT * FROM json_populate_record(null::%s,%s);`,
 			escaped_table_name,
 			escaped_table_name,
 			escapeStringValue(prev_value),
 		)
-		if _, err := tx.ExecContext(ctx, query); err != nil {
-			return fmt.Errorf("executing revert query %q: %w", query, err)
+		if _, err := tx.ExecContext(ctx, q); err != nil {
+			return fmt.Errorf("executing revert query %q: %w", q, err)
 		}
 
 	case "U":
@@ -186,7 +189,7 @@ func (d PostgresDialect) revertOp(tx Tx, ctx context.Context, op, escaped_table_
 			return err
 		}
 
-		query := fmt.Sprintf(`UPDATE %s SET(%s)=((SELECT %s FROM json_populate_record(null::%s,%s))) WHERE %s;`,
+		q := fmt.Sprintf(`UPDATE %s SET(%s)=((SELECT %s FROM json_populate_record(null::%s,%s))) WHERE %s;`,
 			escaped_table_name,
 			columns,
 			columns,
@@ -194,8 +197,8 @@ func (d PostgresDialect) revertOp(tx Tx, ctx context.Context, op, escaped_table_
 			escapeStringValue(prev_value),
 			getPrimaryKeyWhereClause(pkmap, ""),
 		)
-		if _, err := tx.ExecContext(ctx, query); err != nil {
-			return fmt.Errorf("executing revert query %q: %w", query, err)
+		if _, err := tx.ExecContext(ctx, q); err != nil {
+			return fmt.Errorf("executing revert query %q: %w", q, err)
 		}
 	default:
 		panic("invalid op in revert command")
@@ -220,9 +223,9 @@ func sqlColumnNamesFromJSON(in string) (string, error) {
 }
 
 func (d PostgresDialect) pruneReversibleSegment(tx Tx, ctx context.Context, schema string, highestFinalBlock uint64) error {
-	query := fmt.Sprintf(`DELETE FROM %s WHERE block_num <= %d;`, d.historyTable(schema), highestFinalBlock)
-	if _, err := tx.ExecContext(ctx, query); err != nil {
-		return fmt.Errorf("executing prune query %q: %w", query, err)
+	q := fmt.Sprintf(`DELETE FROM %s WHERE block_num <= %d;`, d.historyTable(schema), highestFinalBlock)
+	if _, err := tx.ExecContext(ctx, q); err != nil {
+		return fmt.Errorf("executing prune query %q: %w", q, err)
 	}
 	return nil
 }
@@ -266,6 +269,7 @@ func (d PostgresDialect) GetCreateHistoryQuery(schema string, withPostgraphile b
 }
 
 func (d PostgresDialect) ExecuteSetupScript(ctx context.Context, l *Loader, schemaSql string) error {
+	// Prepend search_path directive to ensure user SQL runs in the correct schema context
 	fullSql := fmt.Sprintf(`SET search_path TO %s;`+"\n\n%s", EscapeIdentifier(d.schemaName), schemaSql)
 
 	if _, err := l.ExecContext(ctx, fullSql); err != nil {
@@ -354,7 +358,6 @@ func (d PostgresDialect) saveUpsert(schema string, escapedTableName string, prim
 		EscapeIdentifier(schema), escapedTableName,
 		getPrimaryKeyWhereClause(primaryKey, escapedTableName),
 	)
-
 }
 
 func (d PostgresDialect) saveUpdate(schema string, escapedTableName string, primaryKey map[string]string, blockNum uint64) string {
@@ -373,9 +376,10 @@ func (d PostgresDialect) saveRow(op, schema, escapedTableName string, primaryKey
 		EscapeIdentifier(schema), escapedTableName,
 		getPrimaryKeyWhereClause(primaryKey, ""),
 	)
-
 }
 
+// getResultCast returns the appropriate cast suffix for the result of arithmetic operations
+// based on the column's scan type.
 func getResultCast(scanType reflect.Type) string {
 	if scanType == nil {
 		return ""
@@ -404,6 +408,7 @@ func (d *PostgresDialect) prepareStatement(schema string, o *Operation) (normalQ
 	}
 
 	if o.opType == OperationTypeUpsert || o.opType == OperationTypeUpdate || o.opType == OperationTypeDelete {
+		// A table without a primary key set yield a `primaryKey` map with a single entry where the key is an empty string
 		if _, found := o.primaryKey[""]; found {
 			return "", "", fmt.Errorf("trying to perform %s operation but table %q don't have a primary key set, this is not accepted", o.opType, o.table.name)
 		}
@@ -423,6 +428,7 @@ func (d *PostgresDialect) prepareStatement(schema string, o *Operation) (normalQ
 		return insertQuery, "", nil
 
 	case OperationTypeUpsert:
+		// Build per-field update expressions based on UpdateOp
 		updates := make([]string, len(columns))
 		for i := range columns {
 			col := columns[i]
@@ -443,6 +449,7 @@ func (d *PostgresDialect) prepareStatement(schema string, o *Operation) (normalQ
 			}
 		}
 
+		// Escape primary key column names to preserve case sensitivity (e.g., camelCase)
 		escapedPKColumns := make([]string, 0, len(o.primaryKey))
 		for pkColumn := range o.primaryKey {
 			escapedPKColumns = append(escapedPKColumns, EscapeIdentifier(pkColumn))
@@ -463,6 +470,7 @@ func (d *PostgresDialect) prepareStatement(schema string, o *Operation) (normalQ
 		return insertQuery, "", nil
 
 	case OperationTypeUpdate:
+		// Build per-field update expressions based on UpdateOp
 		updates := make([]string, len(columns))
 		for i := range columns {
 			col := columns[i]
@@ -528,7 +536,7 @@ func (d *PostgresDialect) prepareColValues(table *TableInfo, colValues map[strin
 		columns[i] = colName
 		i++
 	}
-	sort.Strings(columns)
+	sort.Strings(columns) // sorted for determinism in tests
 
 	for i, columnName := range columns {
 		fieldData := colValues[columnName]
@@ -543,7 +551,7 @@ func (d *PostgresDialect) prepareColValues(table *TableInfo, colValues map[strin
 		}
 
 		values[i] = normalizedValue
-		columns[i] = columnInfo.escapedName
+		columns[i] = columnInfo.escapedName // escape the column name
 		updateOps[i] = fieldData.UpdateOp
 		scanTypes[i] = columnInfo.scanType
 	}
@@ -583,6 +591,7 @@ func getPrimaryKeyFakeEmptyValuesAssertion(primaryKey map[string]string, escaped
 }
 
 func getPrimaryKeyWhereClause(primaryKey map[string]string, escapedTableName string) string {
+	// Avoid any allocation if there is a single primary key
 	if len(primaryKey) == 1 {
 		for key, value := range primaryKey {
 			if escapedTableName == "" {
@@ -607,12 +616,15 @@ func getPrimaryKeyWhereClause(primaryKey map[string]string, escapedTableName str
 	return strings.Join(reg[:], " AND ")
 }
 
+// normalizeValueType formats a value based on its type
 func (d *PostgresDialect) normalizeValueType(value string, valueType reflect.Type) (string, error) {
 	switch valueType.Kind() {
 	case reflect.String:
+		// replace unicode null character with empty string
 		value = strings.ReplaceAll(value, "\u0000", "")
 		return escapeStringValue(value), nil
 
+	// BYTES in Postgres must be escaped, we receive a Vec<u8> from substreams
 	case reflect.Slice:
 		return escapeStringValue(value), nil
 
@@ -639,21 +651,26 @@ func (d *PostgresDialect) normalizeValueType(value string, valueType reflect.Typ
 				return escapeStringValue(time.Unix(int64(i), 0).Format(time.RFC3339)), nil
 			}
 
+			// It's a plain string, parse by dialect it and pass it to the database
 			return d.ParseDatetimeNormalization(value), nil
 		}
 
 		return "", fmt.Errorf("unsupported struct type %s", valueType)
 	default:
+		// It's a column's type the schemaName parsing don't know how to represents as
+		// a Go type. In that case, we pass it unmodified to the database engine. It
+		// will be the responsibility of the one sending the data to correctly represent
+		// it in the way accepted by the database.
 		return value, nil
 	}
 }
 
 func (d PostgresDialect) GetTableColumns(db *sql.DB, schemaName, tableName string) ([]*sql.ColumnType, error) {
-	query := fmt.Sprintf("SELECT * FROM %s.%s WHERE 1=0",
+	q := fmt.Sprintf("SELECT * FROM %s.%s WHERE 1=0",
 		EscapeIdentifier(schemaName),
 		EscapeIdentifier(tableName))
 
-	rows, err := db.Query(query)
+	rows, err := db.Query(q)
 	if err != nil {
 		return nil, fmt.Errorf("querying table structure: %w", err)
 	}
@@ -663,7 +680,7 @@ func (d PostgresDialect) GetTableColumns(db *sql.DB, schemaName, tableName strin
 }
 
 func (d PostgresDialect) GetTablesInSchema(db *sql.DB, schemaName string) ([][2]string, error) {
-	query := `
+	q := `
 		SELECT table_schema, table_name
 		FROM information_schema.tables
 		WHERE table_type = 'BASE TABLE'
@@ -671,7 +688,7 @@ func (d PostgresDialect) GetTablesInSchema(db *sql.DB, schemaName string) ([][2]
 		ORDER BY table_schema, table_name
 	`
 
-	rows, err := db.Query(query, schemaName)
+	rows, err := db.Query(q, schemaName)
 	if err != nil {
 		return nil, fmt.Errorf("querying tables: %w", err)
 	}
@@ -706,18 +723,18 @@ const postgresPrimaryKeyQuery = `
 	ORDER BY kcu.ordinal_position`
 
 func (d PostgresDialect) GetPrimaryKey(db *sql.DB, schemaName, tableName string) ([]string, error) {
-	var query string
+	var q string
 	var args []any
 
 	if schemaName == "" {
-		query = fmt.Sprintf(postgresPrimaryKeyQuery, "current_schema()", "$1")
+		q = fmt.Sprintf(postgresPrimaryKeyQuery, "current_schema()", "$1")
 		args = []any{tableName}
 	} else {
-		query = fmt.Sprintf(postgresPrimaryKeyQuery, "$1", "$2")
+		q = fmt.Sprintf(postgresPrimaryKeyQuery, "$1", "$2")
 		args = []any{schemaName, tableName}
 	}
 
-	rows, err := db.Query(query, args...)
+	rows, err := db.Query(q, args...)
 	if err != nil {
 		return nil, fmt.Errorf("querying primary key: %w", err)
 	}

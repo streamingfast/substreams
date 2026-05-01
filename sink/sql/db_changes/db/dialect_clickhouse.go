@@ -34,12 +34,15 @@ func NewClickhouseDialect(schemaName string, cursorTableName string, cluster str
 	}
 }
 
+// Clickhouse should be used to insert a lot of data in batches. The current official clickhouse
+// driver doesn't support Transactions for multiple tables. The only way to add in batches is
+// creating a transaction for a table, adding all rows and commiting it.
 func (d ClickhouseDialect) Flush(tx Tx, ctx context.Context, l *Loader, outputModuleHash string, lastFinalBlock uint64) (int, error) {
 	var entryCount int
 	for entriesPair := l.entries.Oldest(); entriesPair != nil; entriesPair = entriesPair.Next() {
 		tableName := entriesPair.Key
 		entries := entriesPair.Value
-		tx, err := l.DB.BeginTx(ctx, nil)
+		sqlTx, err := l.DB.BeginTx(ctx, nil)
 		if err != nil {
 			return entryCount, fmt.Errorf("failed to begin db transaction")
 		}
@@ -53,12 +56,12 @@ func (d ClickhouseDialect) Flush(tx Tx, ctx context.Context, l *Loader, outputMo
 			columns = append(columns, column)
 		}
 		sort.Strings(columns)
-		query := fmt.Sprintf(
+		insertQuery := fmt.Sprintf(
 			"INSERT INTO %s.%s (%s)",
 			EscapeIdentifier(d.schemaName),
 			EscapeIdentifier(tableName),
 			strings.Join(columns, ","))
-		batch, err := tx.Prepare(query)
+		batch, err := sqlTx.Prepare(insertQuery)
 		if err != nil {
 			return entryCount, fmt.Errorf("failed to prepare insert into %q: %w", tableName, err)
 		}
@@ -66,7 +69,7 @@ func (d ClickhouseDialect) Flush(tx Tx, ctx context.Context, l *Loader, outputMo
 			entry := entryPair.Value
 
 			if l.tracer.Enabled() {
-				l.logger.Debug("adding query from operation to transaction", zap.Stringer("op", entry), zap.String("query", query))
+				l.logger.Debug("adding query from operation to transaction", zap.Stringer("op", entry), zap.String("query", insertQuery))
 			}
 
 			values, err := convertOpToClickhouseValues(entry)
@@ -79,7 +82,7 @@ func (d ClickhouseDialect) Flush(tx Tx, ctx context.Context, l *Loader, outputMo
 			}
 		}
 
-		if err := tx.Commit(); err != nil {
+		if err := sqlTx.Commit(); err != nil {
 			return entryCount, fmt.Errorf("failed to commit db transaction: %w", err)
 		}
 		entryCount += entries.Len()
@@ -93,7 +96,7 @@ func (d ClickhouseDialect) Revert(tx Tx, ctx context.Context, l *Loader, lastVal
 }
 
 func (d ClickhouseDialect) GetCreateCursorQuery(schema string, withPostgraphile bool) string {
-	_ = withPostgraphile
+	_ = withPostgraphile // TODO: see if this can work
 
 	clusterClause := ""
 	engine := "ReplacingMergeTree()"
@@ -174,6 +177,8 @@ func (d ClickhouseDialect) ExecuteSetupScript(ctx context.Context, l *Loader, sc
 			}
 		}
 	} else {
+		// Splitting statements by ';' is not perfect but should be enough for now,
+		// it will fail for example if user enter a string that contains a ;!
 		for query := range strings.SplitSeq(schemaSql, ";") {
 			if len(strings.TrimSpace(query)) == 0 {
 				continue
@@ -333,6 +338,8 @@ func convertToType(value string, valueType reflect.Type) (any, error) {
 			if strings.Contains(value, "T") && strings.HasSuffix(value, "Z") {
 				v, err = time.Parse("2006-01-02T15:04:05Z", value)
 			} else if dateRegex.MatchString(value) {
+				// This is a Clickhouse Date field. The Clickhouse Go client doesn't convert unix timestamp into Date,
+				// so we just validate the format here and return a string.
 				_, err = time.Parse("2006-01-02", value)
 				if err != nil {
 					return "", fmt.Errorf("could not convert %s to date: %w", value, err)
@@ -361,6 +368,9 @@ func convertToType(value string, valueType reflect.Type) (any, error) {
 			return nil, fmt.Errorf("invalid pointer type: %w", err)
 		}
 
+		// We cannot just return &val here as this will return an *interface{} that the Clickhouse Go client won't be
+		// able to convert on inserting. Instead, we create a new variable using the type that valueType has been
+		// pointing to, assign the converted value from convertToType to that and then return a pointer to the new variable.
 		result := reflect.New(elemType).Elem()
 		result.Set(reflect.ValueOf(val))
 		return result.Addr().Interface(), nil
@@ -371,6 +381,7 @@ func convertToType(value string, valueType reflect.Type) (any, error) {
 }
 
 func (d ClickhouseDialect) GetTableColumns(db *sql.DB, schemaName, tableName string) ([]*sql.ColumnType, error) {
+	// For TCP, use DESCRIBE TABLE to filter out AggregateFunction columns
 	describeQuery := fmt.Sprintf("DESCRIBE TABLE %s.%s",
 		EscapeIdentifier(schemaName),
 		EscapeIdentifier(tableName))
@@ -383,12 +394,15 @@ func (d ClickhouseDialect) GetTableColumns(db *sql.DB, schemaName, tableName str
 
 	var nonAggregateColumns []string
 
+	// Get the column types to know how many columns DESCRIBE returns
 	describeColumnTypes, err := describeRows.ColumnTypes()
 	if err != nil {
 		return nil, fmt.Errorf("getting describe column types: %w", err)
 	}
 
+	// Parse DESCRIBE results to filter out AggregateFunction columns
 	for describeRows.Next() {
+		// Create slice to hold all column values dynamically
 		values := make([]interface{}, len(describeColumnTypes))
 		valuePtrs := make([]interface{}, len(describeColumnTypes))
 		for i := range values {
@@ -400,6 +414,8 @@ func (d ClickhouseDialect) GetTableColumns(db *sql.DB, schemaName, tableName str
 			return nil, fmt.Errorf("scanning describe results: %w", err)
 		}
 
+		// First column is always the column name, second is the data type,
+		// third is the default_type (MATERIALIZED, ALIAS, DEFAULT, or empty)
 		name := fmt.Sprintf("%v", values[0])
 		dataType := fmt.Sprintf("%v", values[1])
 		defaultType := ""
@@ -407,6 +423,8 @@ func (d ClickhouseDialect) GetTableColumns(db *sql.DB, schemaName, tableName str
 			defaultType = fmt.Sprintf("%v", values[2])
 		}
 
+		// Skip AggregateFunction columns and MATERIALIZED columns
+		// MATERIALIZED columns are auto-computed and cannot be inserted into
 		if !strings.Contains(dataType, "AggregateFunction") && defaultType != "MATERIALIZED" {
 			nonAggregateColumns = append(nonAggregateColumns, EscapeIdentifier(name))
 		}
@@ -420,6 +438,7 @@ func (d ClickhouseDialect) GetTableColumns(db *sql.DB, schemaName, tableName str
 		return nil, fmt.Errorf("no non-aggregate columns found in table %s.%s", schemaName, tableName)
 	}
 
+	// TCP protocol works well with WHERE 1=0
 	columnList := strings.Join(nonAggregateColumns, ", ")
 	selectQuery := fmt.Sprintf("SELECT %s FROM %s.%s WHERE 1=0",
 		columnList,
@@ -436,7 +455,9 @@ func (d ClickhouseDialect) GetTableColumns(db *sql.DB, schemaName, tableName str
 }
 
 func (d ClickhouseDialect) GetTablesInSchema(db *sql.DB, schemaName string) ([][2]string, error) {
-	query := fmt.Sprintf(`
+	// Use system.tables to query for tables in the schema
+	// Filter out MaterializedView as they are not regular tables and should not receive direct inserts
+	q := fmt.Sprintf(`
 		SELECT database AS table_schema, name AS table_name
 		FROM system.tables
 		WHERE database = '%s'
@@ -447,7 +468,7 @@ func (d ClickhouseDialect) GetTablesInSchema(db *sql.DB, schemaName string) ([][
 		ORDER BY database, name
 	`, schemaName)
 
-	rows, err := db.Query(query)
+	rows, err := db.Query(q)
 	if err != nil {
 		return nil, fmt.Errorf("querying tables from system.tables: %w", err)
 	}
@@ -478,18 +499,18 @@ const clickhousePrimaryKeyQuery = `
 	ORDER BY position DESC`
 
 func (d ClickhouseDialect) GetPrimaryKey(db *sql.DB, schemaName, tableName string) ([]string, error) {
-	var query string
+	var q string
 	var args []interface{}
 
 	if schemaName == "" {
-		query = fmt.Sprintf(clickhousePrimaryKeyQuery, "currentDatabase()", "?")
+		q = fmt.Sprintf(clickhousePrimaryKeyQuery, "currentDatabase()", "?")
 		args = []interface{}{tableName}
 	} else {
-		query = fmt.Sprintf(clickhousePrimaryKeyQuery, "?", "?")
+		q = fmt.Sprintf(clickhousePrimaryKeyQuery, "?", "?")
 		args = []interface{}{schemaName, tableName}
 	}
 
-	rows, err := db.Query(query, args...)
+	rows, err := db.Query(q, args...)
 	if err != nil {
 		return nil, fmt.Errorf("querying primary key: %w", err)
 	}

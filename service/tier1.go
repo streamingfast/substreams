@@ -636,7 +636,7 @@ func (s *Tier1Service) blocks(
 		}
 
 		if requestDetails.ResolvedStartBlockNum > request.StopBlockNum {
-			err := bsstream.NewErrInvalidArg("stop block %d is below resolved start block %d", requestDetails.ResolvedStartBlockNum, request.StopBlockNum)
+			err := bsstream.NewErrInvalidArg("stop block %d is below resolved start block %d", request.StopBlockNum, requestDetails.ResolvedStartBlockNum)
 			logger.Info("refusing Substreams Blocks request", append(logFields, zap.Error(err))...)
 			return err
 		}

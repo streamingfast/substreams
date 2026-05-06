@@ -7,7 +7,7 @@ ARG TARGETOS TARGETARCH VERSION=dev
 RUN --mount=target=. \
       --mount=type=cache,target=/root/.cache/go-build \
       --mount=type=cache,target=/go/pkg \
-      GOOS=$TARGETOS GOARCH=$TARGETARCH go build -ldflags "-X \"main.version=$VERSION\"" -o /app/substreams ./cmd/substreams
+      GOWORK=off GOOS=$TARGETOS GOARCH=$TARGETARCH go build -ldflags "-X \"main.version=$VERSION\"" -o /app/substreams ./cmd/substreams
 
 FROM ubuntu:24.04
 

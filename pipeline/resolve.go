@@ -327,7 +327,12 @@ func NewCursorResolver(hub *hub.ForkableHub, mergedBlocksStore, forkedBlocksStor
 			return cursor.LIB, headBlock, nil
 		}
 
-		reqctx.Logger(ctx).Info("cursor resolver succeeded", zap.Stringer("cursor", cursor), zap.Bool("from_file", isFromFile), zap.Stringer("junctionBlock", jctBlkGetter.reorgJunctionBlock))
+		var junctionBlockStr string
+		if jctBlkGetter.reorgJunctionBlock != nil {
+			junctionBlockStr = jctBlkGetter.reorgJunctionBlock.String()
+		}
+
+		reqctx.Logger(ctx).Info("cursor resolver succeeded", zap.Stringer("cursor", cursor), zap.Bool("from_file", isFromFile), zap.String("junctionBlock", junctionBlockStr))
 		return jctBlkGetter.reorgJunctionBlock, jctBlkGetter.currentHead, nil
 	}
 }

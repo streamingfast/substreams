@@ -2,7 +2,7 @@
 name = "substreams-test"
 version = "0.1.0"
 description = "Substream test project"
-edition = "2021"
+edition = "2024"
 repository = "n/a"
 
 [lib]

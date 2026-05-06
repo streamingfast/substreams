@@ -113,7 +113,16 @@ func RunModule(ctx context.Context, executor ModuleExecutor, execOutput execout.
 	case errors.Is(err, ErrSkippableOutput):
 		skippableOutput = true
 	case errors.Is(err, ErrNoInput):
-		return nil, nil, nil, true, true, nil
+		// Follow the same pattern as skipFromIndex: call toModuleOutput(nil) to get an output
+		// with the TypeUrl set, even though there is no value. This prevents an empty anypb.Any{}
+		// (no TypeUrl, no Value) from being sent to clients in the BlockScopedData response.
+		// The error is intentionally discarded here since toModuleOutput(nil) does not error
+		// for map/index modules, matching the skipFromIndex path above.
+		emptyOutput, _ := executor.toModuleOutput(nil)
+		if emptyOutput != nil {
+			emptyOutput.ModuleName = executor.Name()
+		}
+		return emptyOutput, nil, nil, true, true, nil
 	case err != nil:
 		return nil, nil, nil, false, skippableOutput, fmt.Errorf("execute: %w", err)
 	}

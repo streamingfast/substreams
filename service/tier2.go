@@ -21,6 +21,7 @@ import (
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
+	"github.com/streamingfast/logging/zapx"
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams"
@@ -32,6 +33,7 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/pipeline/cache"
+	"github.com/streamingfast/substreams/pipeline/distributor"
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/service/active_requests"
@@ -102,6 +104,7 @@ type Tier2Service struct {
 const protoPkfPrefix = "type.googleapis.com/"
 
 func NewTier2(
+	ctx context.Context,
 	logger *zap.Logger,
 	checkPendingShutdown func() bool,
 	opts ...Option,
@@ -364,6 +367,10 @@ func (s *Tier2Service) getWASMRegistry(wasmExtensionConfigs map[string]string) (
 
 func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.ProcessRangeRequest, respFunc substreams.ResponseFunc) error {
 	logger := reqctx.Logger(ctx)
+	start := time.Now()
+	defer func() {
+		logger.Info("processRange completed", zapx.HumanDuration("duration", time.Since(start)))
+	}()
 
 	mergedBlocksStore, cacheStore, unmeteredCacheStore, err := s.getStores(ctx, request)
 	if err != nil {
@@ -584,9 +591,16 @@ excludable:
 
 		ctx, span := reqctx.WithSpan(ctx, "substreams/tier2/pipeline/mapper_stream")
 
-		distributor := execout.NewClockDistributor(executionPlan.ExistingExecOuts, startBlock, stopBlock)
+		outputModuleInputs := execGraph.OutputModule().Inputs
+		dist := distributor.NewClockDistributor(
+			executionPlan.ExistingExecOuts,
+			startBlock,
+			stopBlock,
+			outputModuleInputs,
+			pipe.ModuleBlockIndexes,
+		)
 
-		for clock, err := range distributor.Iter(ctx) {
+		for clock, err := range dist.Iter(ctx) {
 			if err != nil {
 				span.EndWithErr(&err)
 				return pipe.OnStreamTerminated(ctx, err)

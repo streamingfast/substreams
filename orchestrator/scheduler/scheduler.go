@@ -16,6 +16,7 @@ import (
 	"github.com/streamingfast/substreams/orchestrator/work"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
+	ttrace "go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 )
 
@@ -40,14 +41,17 @@ type Scheduler struct {
 	storesSyncCompleted   bool
 
 	delayedScheduleNextJob bool
+	tracer                 ttrace.Tracer
 }
 
 func New(ctx context.Context, stream *response.Stream) *Scheduler {
 	logger := reqctx.Logger(ctx).Named("scheduler")
+	tracer := reqctx.Tracer(ctx)
 	s := &Scheduler{
 		ctx:    ctx,
 		stream: stream,
 		logger: logger,
+		tracer: tracer,
 	}
 	s.EventLoop = loop.NewEventLoop(s.Update)
 	return s
@@ -105,6 +109,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		)
 		shadowedUnits := s.Stages.MarkJobSuccess(msg.Unit)
 		s.WorkerPool.Return(s.ctx, msg.Worker)
+		s.delayedScheduleNextJob = false
 		if msg.Streamed {
 			s.firstTier2MapSegmentStreamed = true
 		}
@@ -221,6 +226,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 
 	case work.MsgJobFailed:
 		s.WorkerPool.Return(s.ctx, msg.Worker)
+		s.delayedScheduleNextJob = false
 		cmds = append(cmds, loop.Quit(msg.Error))
 
 	case stage.MsgMergeFinished:

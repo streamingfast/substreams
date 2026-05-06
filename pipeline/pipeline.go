@@ -13,6 +13,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/logging"
+	"github.com/streamingfast/logging/zapx"
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/foudational_store"
@@ -88,6 +89,7 @@ type Pipeline struct {
 	// first level of the 2D list represents layer within a stage to execute sequentially.
 	// The second level contains modules to execute within a layer, those can be executed concurrently.
 	StagedModuleExecutors [][]exec.ModuleExecutor
+	ModuleBlockIndexes    map[string]*index.BlockIndex
 	executionStages       exec.ExecutionStages
 
 	mapModuleOutput          *pbsubstreamsrpc.MapModuleOutput
@@ -124,6 +126,7 @@ type Pipeline struct {
 	insideReorgUpTo bstream.BlockRef
 
 	execOutputCache *cache.Engine
+	moduleCache     *cache.ModuleCache
 	blockType       string
 
 	// lastFinalClock should always be either THE `stopBlock` or a block beyond that point
@@ -185,6 +188,7 @@ func New(
 		moduleNameToStage:       make(map[string]int),
 		outputBufferSize:        outputBufferSize,
 		supportBuffering:        supportBuffering,
+		ModuleBlockIndexes:      make(map[string]*index.BlockIndex),
 	}
 	for _, opt := range opts {
 		opt(pipe)
@@ -766,30 +770,47 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 		return nil
 	}
 
-	reqModules := reqctx.Details(ctx).Modules
+	logger := reqctx.Logger(ctx)
+	logger = logger.Named("BuildModuleExecutors")
+
+	reqDetails := reqctx.Details(ctx)
+	reqModules := reqDetails.Modules
 	tracer := otel.GetTracerProvider().Tracer("executor")
 
 	loadedModules := make(map[moduleKey]wasm.Module)
+	loadingModuleStart := time.Now()
+	moduleHashDuration := time.Duration(0)
 	for _, stage := range p.executionStages {
 		for _, layer := range stage {
 			for _, module := range layer {
 				code := reqModules.Binaries[module.BinaryIndex]
 				key := moduleKey{binaryIndex: module.BinaryIndex, binaryType: code.Type}
+
+				moduleHashStart := time.Now()
+				moduleHash := p.execGraph.ModuleHashes()[module.Name]
+				_ = moduleHash
+				moduleHashDuration += time.Since(moduleHashStart)
+
 				if _, exists := loadedModules[key]; exists {
 					continue
 				}
+
 				m, err := p.wasmRuntime.NewModule(ctx, code.Content, code.Type)
 				if err != nil {
 					return fmt.Errorf("new wasm module: %w", err)
+				}
+				if p.moduleCache != nil {
+					p.moduleCache.Set(moduleHash, m)
 				}
 				loadedModules[key] = m
 			}
 		}
 	}
-
+	loadingModuleDuration := time.Since(loadingModuleStart)
 	p.loadedModules = loadedModules
 	modulesInitBlocks := p.execGraph.ModulesInitBlocks()
 
+	executerCreationStart := time.Now()
 	var stagedModuleExecutors [][]exec.ModuleExecutor
 	for _, stage := range p.executionStages {
 		for _, layer := range stage {
@@ -825,6 +846,7 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 				foundationalStores := getFoundationalStores(inputs)
 				switch kind := module.Kind.(type) {
 				case *pbsubstreams.Module_KindMap_:
+					p.ModuleBlockIndexes[module.Name] = moduleBlockIndex
 					outType := strings.TrimPrefix(module.Output.Type, "proto:")
 
 					baseExecutor := exec.NewBaseExecutor(
@@ -844,6 +866,7 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 					moduleExecutors = append(moduleExecutors, executor)
 
 				case *pbsubstreams.Module_KindStore_:
+					p.ModuleBlockIndexes[module.Name] = moduleBlockIndex
 					updatePolicy := kind.KindStore.UpdatePolicy
 					valueType := kind.KindStore.ValueType
 
@@ -870,6 +893,7 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 					moduleExecutors = append(moduleExecutors, executor)
 
 				case *pbsubstreams.Module_KindBlockIndex_:
+					p.ModuleBlockIndexes[module.Name] = moduleBlockIndex // this must be before the 'break': we check the index later even if we don't execute this module
 					if indices := p.preexistingBlockIndices[module.Name]; indices != nil {
 						break // don't execute index modules that are useless
 					}
@@ -897,6 +921,15 @@ func (p *Pipeline) BuildModuleExecutors(ctx context.Context) error {
 			stagedModuleExecutors = append(stagedModuleExecutors, moduleExecutors)
 		}
 	}
+
+	executerCreationDuratiom := time.Since(executerCreationStart)
+
+	logger.Info("build module executers",
+		zapx.HumanDuration("module hash", moduleHashDuration),
+		zapx.HumanDuration("build module executers", executerCreationDuratiom),
+		zapx.HumanDuration("module loading", loadingModuleDuration),
+		zap.Bool("keep", false),
+	)
 
 	p.StagedModuleExecutors = stagedModuleExecutors
 	return nil

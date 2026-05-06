@@ -3,7 +3,7 @@ use substreams::errors::Error;
 use crate::pb;
 use crate::generated::substreams::{Substreams, SubstreamsTrait};
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn test_index(
     block_ptr: *mut u8,
     block_len: usize,
@@ -25,7 +25,7 @@ pub extern "C" fn test_index(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn test_map(
     params_ptr: *mut u8,
     params_len: usize,
@@ -50,7 +50,7 @@ pub extern "C" fn test_map(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn test_store_proto(
     test_map_ptr: *mut u8,
     test_map_len: usize,
@@ -69,7 +69,7 @@ pub extern "C" fn test_store_proto(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn test_store_delete_prefix(
     block_ptr: *mut u8,
     block_len: usize,
@@ -88,7 +88,7 @@ pub extern "C" fn test_store_delete_prefix(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_delete_prefix(
     block_ptr: *mut u8,
     block_len: usize,
@@ -112,7 +112,7 @@ pub extern "C" fn assert_test_store_delete_prefix(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_index(
     block_ptr: *mut u8,
     block_len: usize,
@@ -132,7 +132,7 @@ pub extern "C" fn assert_test_index(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn setup_test_store_add_i64(
     block_ptr: *mut u8,
     block_len: usize,
@@ -151,7 +151,7 @@ pub extern "C" fn setup_test_store_add_i64(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_add_i64(
     block_ptr: *mut u8,
     block_len: usize,
@@ -175,7 +175,7 @@ pub extern "C" fn assert_test_store_add_i64(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_add_i64_deltas(
     block_ptr: *mut u8,
     block_len: usize,
@@ -204,7 +204,7 @@ pub extern "C" fn assert_test_store_add_i64_deltas(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn setup_test_store_set_i64(
     block_ptr: *mut u8,
     block_len: usize,
@@ -223,7 +223,7 @@ pub extern "C" fn setup_test_store_set_i64(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_set_i64(
     block_ptr: *mut u8,
     block_len: usize,
@@ -247,7 +247,7 @@ pub extern "C" fn assert_test_store_set_i64(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_set_i64_deltas(
     block_ptr: *mut u8,
     block_len: usize,
@@ -276,7 +276,7 @@ pub extern "C" fn assert_test_store_set_i64_deltas(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn setup_test_store_set_if_not_exists_i64(
     block_ptr: *mut u8,
     block_len: usize,
@@ -295,7 +295,7 @@ pub extern "C" fn setup_test_store_set_if_not_exists_i64(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_set_if_not_exists_i64(
     block_ptr: *mut u8,
     block_len: usize,
@@ -319,7 +319,7 @@ pub extern "C" fn assert_test_store_set_if_not_exists_i64(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_set_if_not_exists_i64_deltas(
     block_ptr: *mut u8,
     block_len: usize,
@@ -348,7 +348,7 @@ pub extern "C" fn assert_test_store_set_if_not_exists_i64_deltas(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn setup_test_store_min_i64(
     block_ptr: *mut u8,
     block_len: usize,
@@ -367,7 +367,7 @@ pub extern "C" fn setup_test_store_min_i64(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_min_i64(
     block_ptr: *mut u8,
     block_len: usize,
@@ -391,7 +391,7 @@ pub extern "C" fn assert_test_store_min_i64(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_min_i64_deltas(
     block_ptr: *mut u8,
     block_len: usize,
@@ -420,7 +420,7 @@ pub extern "C" fn assert_test_store_min_i64_deltas(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn setup_test_store_max_i64(
     block_ptr: *mut u8,
     block_len: usize,
@@ -439,7 +439,7 @@ pub extern "C" fn setup_test_store_max_i64(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_max_i64(
     block_ptr: *mut u8,
     block_len: usize,
@@ -463,7 +463,7 @@ pub extern "C" fn assert_test_store_max_i64(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_max_i64_deltas(
     block_ptr: *mut u8,
     block_len: usize,
@@ -492,7 +492,7 @@ pub extern "C" fn assert_test_store_max_i64_deltas(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn setup_test_store_add_float64(
     block_ptr: *mut u8,
     block_len: usize,
@@ -511,7 +511,7 @@ pub extern "C" fn setup_test_store_add_float64(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_add_float64(
     block_ptr: *mut u8,
     block_len: usize,
@@ -535,7 +535,7 @@ pub extern "C" fn assert_test_store_add_float64(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_add_float64_deltas(
     block_ptr: *mut u8,
     block_len: usize,
@@ -564,7 +564,7 @@ pub extern "C" fn assert_test_store_add_float64_deltas(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn setup_test_store_set_float64(
     block_ptr: *mut u8,
     block_len: usize,
@@ -583,7 +583,7 @@ pub extern "C" fn setup_test_store_set_float64(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_set_float64(
     block_ptr: *mut u8,
     block_len: usize,
@@ -607,7 +607,7 @@ pub extern "C" fn assert_test_store_set_float64(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_set_float64_deltas(
     block_ptr: *mut u8,
     block_len: usize,
@@ -636,7 +636,7 @@ pub extern "C" fn assert_test_store_set_float64_deltas(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn setup_test_store_set_if_not_exists_float64(
     block_ptr: *mut u8,
     block_len: usize,
@@ -655,7 +655,7 @@ pub extern "C" fn setup_test_store_set_if_not_exists_float64(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_set_if_not_exists_float64(
     block_ptr: *mut u8,
     block_len: usize,
@@ -679,7 +679,7 @@ pub extern "C" fn assert_test_store_set_if_not_exists_float64(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_set_if_not_exists_float64_deltas(
     block_ptr: *mut u8,
     block_len: usize,
@@ -708,7 +708,7 @@ pub extern "C" fn assert_test_store_set_if_not_exists_float64_deltas(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn setup_test_store_min_float64(
     block_ptr: *mut u8,
     block_len: usize,
@@ -727,7 +727,7 @@ pub extern "C" fn setup_test_store_min_float64(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_min_float64(
     block_ptr: *mut u8,
     block_len: usize,
@@ -751,7 +751,7 @@ pub extern "C" fn assert_test_store_min_float64(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_min_float64_deltas(
     block_ptr: *mut u8,
     block_len: usize,
@@ -780,7 +780,7 @@ pub extern "C" fn assert_test_store_min_float64_deltas(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn setup_test_store_max_float64(
     block_ptr: *mut u8,
     block_len: usize,
@@ -799,7 +799,7 @@ pub extern "C" fn setup_test_store_max_float64(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_max_float64(
     block_ptr: *mut u8,
     block_len: usize,
@@ -823,7 +823,7 @@ pub extern "C" fn assert_test_store_max_float64(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_max_float64_deltas(
     block_ptr: *mut u8,
     block_len: usize,
@@ -852,7 +852,7 @@ pub extern "C" fn assert_test_store_max_float64_deltas(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn setup_test_store_add_bigint(
     block_ptr: *mut u8,
     block_len: usize,
@@ -871,7 +871,7 @@ pub extern "C" fn setup_test_store_add_bigint(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_add_bigint(
     block_ptr: *mut u8,
     block_len: usize,
@@ -895,7 +895,7 @@ pub extern "C" fn assert_test_store_add_bigint(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_add_bigint_deltas(
     block_ptr: *mut u8,
     block_len: usize,
@@ -924,7 +924,7 @@ pub extern "C" fn assert_test_store_add_bigint_deltas(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn setup_test_store_set_bigint(
     block_ptr: *mut u8,
     block_len: usize,
@@ -943,7 +943,7 @@ pub extern "C" fn setup_test_store_set_bigint(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_set_bigint(
     block_ptr: *mut u8,
     block_len: usize,
@@ -967,7 +967,7 @@ pub extern "C" fn assert_test_store_set_bigint(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_set_bigint_deltas(
     block_ptr: *mut u8,
     block_len: usize,
@@ -996,7 +996,7 @@ pub extern "C" fn assert_test_store_set_bigint_deltas(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn setup_test_store_set_if_not_exists_bigint(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1015,7 +1015,7 @@ pub extern "C" fn setup_test_store_set_if_not_exists_bigint(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_set_if_not_exists_bigint(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1039,7 +1039,7 @@ pub extern "C" fn assert_test_store_set_if_not_exists_bigint(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_set_if_not_exists_bigint_deltas(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1068,7 +1068,7 @@ pub extern "C" fn assert_test_store_set_if_not_exists_bigint_deltas(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn setup_test_store_min_bigint(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1087,7 +1087,7 @@ pub extern "C" fn setup_test_store_min_bigint(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_min_bigint(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1111,7 +1111,7 @@ pub extern "C" fn assert_test_store_min_bigint(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_min_bigint_deltas(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1140,7 +1140,7 @@ pub extern "C" fn assert_test_store_min_bigint_deltas(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn setup_test_store_max_bigint(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1159,7 +1159,7 @@ pub extern "C" fn setup_test_store_max_bigint(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_max_bigint(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1183,7 +1183,7 @@ pub extern "C" fn assert_test_store_max_bigint(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_max_bigint_deltas(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1212,7 +1212,7 @@ pub extern "C" fn assert_test_store_max_bigint_deltas(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn setup_test_store_add_bigdecimal(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1231,7 +1231,7 @@ pub extern "C" fn setup_test_store_add_bigdecimal(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_add_bigdecimal(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1255,7 +1255,7 @@ pub extern "C" fn assert_test_store_add_bigdecimal(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_add_bigdecimal_deltas(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1284,7 +1284,7 @@ pub extern "C" fn assert_test_store_add_bigdecimal_deltas(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn setup_test_store_set_bigdecimal(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1303,7 +1303,7 @@ pub extern "C" fn setup_test_store_set_bigdecimal(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_set_bigdecimal(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1327,7 +1327,7 @@ pub extern "C" fn assert_test_store_set_bigdecimal(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_set_bigdecimal_deltas(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1356,7 +1356,7 @@ pub extern "C" fn assert_test_store_set_bigdecimal_deltas(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn setup_test_store_set_if_not_exists_bigdecimal(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1375,7 +1375,7 @@ pub extern "C" fn setup_test_store_set_if_not_exists_bigdecimal(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_set_if_not_exists_bigdecimal(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1399,7 +1399,7 @@ pub extern "C" fn assert_test_store_set_if_not_exists_bigdecimal(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_set_if_not_exists_bigdecimal_deltas(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1428,7 +1428,7 @@ pub extern "C" fn assert_test_store_set_if_not_exists_bigdecimal_deltas(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn setup_test_store_min_bigdecimal(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1447,7 +1447,7 @@ pub extern "C" fn setup_test_store_min_bigdecimal(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_min_bigdecimal(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1471,7 +1471,7 @@ pub extern "C" fn assert_test_store_min_bigdecimal(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_min_bigdecimal_deltas(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1500,7 +1500,7 @@ pub extern "C" fn assert_test_store_min_bigdecimal_deltas(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn setup_test_store_max_bigdecimal(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1519,7 +1519,7 @@ pub extern "C" fn setup_test_store_max_bigdecimal(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_max_bigdecimal(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1543,7 +1543,7 @@ pub extern "C" fn assert_test_store_max_bigdecimal(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_max_bigdecimal_deltas(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1572,7 +1572,7 @@ pub extern "C" fn assert_test_store_max_bigdecimal_deltas(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn setup_test_store_set_string(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1591,7 +1591,7 @@ pub extern "C" fn setup_test_store_set_string(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_set_string(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1615,7 +1615,7 @@ pub extern "C" fn assert_test_store_set_string(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_set_string_deltas(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1644,7 +1644,7 @@ pub extern "C" fn assert_test_store_set_string_deltas(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn setup_test_store_set_if_not_exists_string(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1663,7 +1663,7 @@ pub extern "C" fn setup_test_store_set_if_not_exists_string(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_set_if_not_exists_string(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1687,7 +1687,7 @@ pub extern "C" fn assert_test_store_set_if_not_exists_string(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_set_if_not_exists_string_deltas(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1716,7 +1716,7 @@ pub extern "C" fn assert_test_store_set_if_not_exists_string_deltas(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn setup_test_store_append_string(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1735,7 +1735,7 @@ pub extern "C" fn setup_test_store_append_string(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_append_string(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1759,7 +1759,7 @@ pub extern "C" fn assert_test_store_append_string(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_test_store_append_string_deltas(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1788,7 +1788,7 @@ pub extern "C" fn assert_test_store_append_string_deltas(
     substreams::output(result.unwrap());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn store_root(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1807,7 +1807,7 @@ pub extern "C" fn store_root(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn store_depend(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1829,7 +1829,7 @@ pub extern "C" fn store_depend(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn store_depends_on_depend(
     block_ptr: *mut u8,
     block_len: usize,
@@ -1854,7 +1854,7 @@ pub extern "C" fn store_depends_on_depend(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_all_test_i64(
     assert_test_store_add_i64_ptr: *mut u8,
     assert_test_store_add_i64_len: usize,
@@ -1909,7 +1909,7 @@ pub extern "C" fn assert_all_test_i64(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_all_test_float64(
     assert_test_store_add_float64_ptr: *mut u8,
     assert_test_store_add_float64_len: usize,
@@ -1964,7 +1964,7 @@ pub extern "C" fn assert_all_test_float64(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_all_test_bigint(
     assert_test_store_add_bigint_ptr: *mut u8,
     assert_test_store_add_bigint_len: usize,
@@ -2019,7 +2019,7 @@ pub extern "C" fn assert_all_test_bigint(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_all_test_bigdecimal(
     assert_test_store_add_bigdecimal_ptr: *mut u8,
     assert_test_store_add_bigdecimal_len: usize,
@@ -2074,7 +2074,7 @@ pub extern "C" fn assert_all_test_bigdecimal(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_all_test_string(
     assert_test_store_append_string_ptr: *mut u8,
     assert_test_store_append_string_len: usize,
@@ -2113,7 +2113,7 @@ pub extern "C" fn assert_all_test_string(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_all_test_delete_prefix(
     assert_test_store_delete_prefix_ptr: *mut u8,
     assert_test_store_delete_prefix_len: usize,
@@ -2132,7 +2132,7 @@ pub extern "C" fn assert_all_test_delete_prefix(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_all_test_index(
     assert_test_index_ptr: *mut u8,
     assert_test_index_len: usize,
@@ -2151,7 +2151,7 @@ pub extern "C" fn assert_all_test_index(
     func()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn assert_all_test(
     assert_all_test_delete_prefix_ptr: u32,
     assert_all_test_string_ptr: u32,

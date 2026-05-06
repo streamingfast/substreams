@@ -19,6 +19,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      pull-requests: write
 
     steps:
       - name: Checkout repository
@@ -75,36 +76,20 @@ jobs:
         with:
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
-          push: true
+          push: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             VERSION=${{ steps.extract-version.outputs.VERSION }}
 
-  docker-scout:
-    name: docker-scout
-    runs-on: ubuntu-24.04
-    needs: build-and-push-image
-    if: ${{ github.event_name == 'pull_request' }}
-    permissions:
-      contents: read
-      packages: read
-      pull-requests: write
-
-    steps:
-      - name: Log in to the Container registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Compute short SHA
         id: sha
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
         run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - name: Docker Scout
         id: docker-scout
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
         uses: docker/scout-action@v1
         with:
           dockerhub-user: ${{ secrets.DOCKER_SCOUT_USER }}

@@ -146,6 +146,8 @@ func NewTier2(
 		opt(s)
 	}
 
+	metrics.Tier2MaxConcurrentRequests.SetFloat64(float64(s.maxConcurrentRequests))
+
 	return s, nil
 }
 

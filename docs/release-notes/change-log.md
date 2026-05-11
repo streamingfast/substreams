@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * **Index optimisation**: Optimized `ClockDistributor` to skip blocks earlier and faster when using block filter.
 * Fix server-side bug that would cause Blocks request to fail after a few retries with 'load full store (...) load store stream: opening file for streaming: not found' when depending on a store that is being merged slowly
+* add 'substreams_tier1_active_requests_hard_limit' and 'substreams_tier2_max_concurrent_requests' attributes to prometheus metrics (constant, reflects the configuration)
 
 ## v1.18.4
 

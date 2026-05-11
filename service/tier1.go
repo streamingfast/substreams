@@ -244,6 +244,8 @@ func NewTier1(
 		s.activeRequestsWG.Wait()
 	})
 
+	metrics.Tier1ActiveRequestsHardLimit.SetFloat64(float64(activeRequestsHardLimit))
+
 	if debugAPIAddress := os.Getenv("SUBSTREAMS_TIER1_DEBUG_API_ADDR"); debugAPIAddress != "" {
 		debugAPI := debugapi.New(
 			debugAPIAddress,

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
+	"github.com/moby/moby/api/types/container"
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dauth"
 	dauthnull "github.com/streamingfast/dauth/null"
@@ -138,7 +138,7 @@ func startTier1App(t *testing.T, ctx context.Context, tmpDir string, container t
 	relayerPort, err := container.MappedPort(ctx, "10014/tcp")
 	require.NoError(t, err)
 
-	relayerEndpoint := fmt.Sprintf("localhost:%d", relayerPort.Int())
+	relayerEndpoint := fmt.Sprintf("localhost:%d", relayerPort.Num())
 	t.Logf("Tier1App relayer endpoint: %s", relayerEndpoint)
 
 	listenPort := findFreePort(t)

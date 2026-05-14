@@ -16,9 +16,10 @@ import (
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
 	"github.com/streamingfast/substreams/reqctx"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/metadata"
 )
 
-const finalBlockDelay = 120
+const defaultFinalBlockDelay = 120
 const backfillRetries = 999 // no point in failing "early". It may be failing because merged blocks are lagging behind a little bit.
 
 type RequestBackProcessingFunc = func(ctx context.Context, logger *zap.Logger, startBlock uint64, stageToProcess int, clientFactory client.InternalClientFactory, jobCompleted chan error)
@@ -32,6 +33,7 @@ type LiveBackFiller struct {
 	logger                *zap.Logger
 	stageToProcess        int
 	clientFactory         client.InternalClientFactory
+	finalBlockDelay       uint64
 
 	ctx context.Context
 }
@@ -46,6 +48,7 @@ func NewLiveBackFiller(ctx context.Context, nextHandler bstream.Handler, logger 
 		segmentSize:           segmentSize,
 		logger:                logger,
 		clientFactory:         clientFactory,
+		finalBlockDelay:       defaultFinalBlockDelay,
 
 		ctx: ctx,
 	}
@@ -87,9 +90,13 @@ func RequestBackProcessing(ctx context.Context, logger *zap.Logger, startBlock u
 func requestBackProcessing(ctx context.Context, logger *zap.Logger, liveCachingRequest *pbssinternal.ProcessRangeRequest, clientFactory client.InternalClientFactory) error {
 	zlog.Debug("request live back filling", zap.Uint64("start_block", liveCachingRequest.StartBlock()), zap.Uint64("end_block", liveCachingRequest.StopBlock()))
 
-	grpcClient, closeFunc, grpcCallOpts, _, err := clientFactory()
+	grpcClient, closeFunc, grpcCallOpts, headers, err := clientFactory()
 	if err != nil {
 		return fmt.Errorf("failed to create live cache grpc client: %w", err)
+	}
+
+	if headers.IsSet() {
+		ctx = metadata.AppendToOutgoingContext(ctx, headers.ToArray()...)
 	}
 
 	stream, err := grpcClient.ProcessRange(ctx, liveCachingRequest, grpcCallOpts...)
@@ -170,7 +177,7 @@ func (l *LiveBackFiller) Start(ctx context.Context) {
 
 		segmentStart := l.currentSegment * l.segmentSize
 		segmentEnd := (l.currentSegment + 1) * l.segmentSize
-		mergedBlockIsWritten := (blockNumber - segmentEnd) > finalBlockDelay
+		mergedBlockIsWritten := (blockNumber - segmentEnd) > l.finalBlockDelay
 
 		if (targetSegment > l.currentSegment) && mergedBlockIsWritten {
 			jobProcessing = true

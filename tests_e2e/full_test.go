@@ -150,6 +150,65 @@ func TestDummyBlockchainContainer(t *testing.T) {
 	<-app2.Terminated()
 }
 
+// TestLiveBackfillerWithTier2SecretAuth validates that the live backfiller
+// forwards the subrequest secret key when calling tier2.
+// Tier2 uses a secret:// authenticator and will reject unauthenticated requests.
+func TestLiveBackfillerWithTier2SecretAuth(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+
+	// Burst 500 blocks so merged-block files are ready for historical segments.
+	// StopBlockNum=550 puts the stop past the burst LIB so the live source
+	// engages and the backfiller fires at least one authenticated job to tier2.
+	// LiveBackFillerFinalBlockDelay=2 (set on Tier1Config) makes the backfiller
+	// fire quickly instead of waiting for the default 120-block delay.
+	container, err := newDummyBlockchainContainerWithBlockRate(ctx, tmpDir, latestDummyBlockchainImage, "", 500, 480)
+	require.NoError(t, err)
+	defer container.Terminate(ctx, testcontainers.StopTimeout(0))
+
+	const secret = "super-secret-key-e2e"
+
+	app2, t2Endpoint := startTier2AppWithSecret(t, ctx, tmpDir, secret, zlog)
+	app1, substreamsEndpoint := startTier1AppWithSecret(t, ctx, tmpDir, container, t2Endpoint, secret, zlog)
+	defer func() {
+		app1.Shutdown(nil)
+		app2.Shutdown(nil)
+		<-app1.Terminated()
+		<-app2.Terminated()
+	}()
+
+	pkg, err := manifest.MustNewReader("./dummy/e2e-v0.1.0.spkg").Read()
+	require.NoError(t, err)
+
+	// Production mode with a store module ensures tier2 back-processes
+	// historical segments, then the live backfiller handles the remainder.
+	request := &pbsubstreamsrpcv3.Request{
+		StartBlockNum:   0,
+		StopBlockNum:    550,
+		FinalBlocksOnly: false,
+		ProductionMode:  true,
+		OutputModule:    "map_stats",
+		Package:         pkg.Package,
+	}
+
+	blockScopedDataSlice, session, err := RunRequest(t, request, substreamsEndpoint)
+	if err != nil && err != io.EOF {
+		logs, logErr := container.Logs(ctx)
+		if logErr == nil {
+			defer logs.Close()
+			buf := make([]byte, 4096)
+			n, _ := logs.Read(buf)
+			t.Logf("Container logs: %s", string(buf[:n]))
+		}
+		t.Fatalf("Unexpected error: %s", err.Error())
+	}
+
+	require.NotNil(t, session, "should have received at least one session init message")
+	assert.Equal(t, 549, len(blockScopedDataSlice), "should have received all expected blocks")
+	require.Greater(t, len(blockScopedDataSlice), 0)
+	assert.Equal(t, uint64(549), uint64(blockScopedDataSlice[len(blockScopedDataSlice)-1].Clock.Number), "should end on block 549")
+}
+
 // TestErrNoInputTypeUrlNotEmpty replicates the issue where a module that has no input
 // for a block (ErrNoInput) produced a BlockScopedData with an empty anypb.Any payload
 // (no TypeUrl, no Value). The fix ensures TypeUrl is always set.

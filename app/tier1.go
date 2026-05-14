@@ -94,6 +94,11 @@ type Tier1Config struct {
 
 	WASMExtensions wasm.WASMExtensioner
 	Tracing        bool
+
+	// LiveBackFillerFinalBlockDelay overrides the default 120-block delay the
+	// live backfiller waits before concluding merged blocks are safely written.
+	// Leave at 0 to use the default.
+	LiveBackFillerFinalBlockDelay uint64
 }
 
 type Tier1App struct {
@@ -231,6 +236,10 @@ func (a *Tier1App) Run() error {
 
 	if a.config.BlockExecutionTimeout != 0 {
 		opts = append(opts, service.WithBlockExecutionTimeout(a.config.BlockExecutionTimeout))
+	}
+
+	if a.config.LiveBackFillerFinalBlockDelay != 0 {
+		opts = append(opts, service.WithLiveBackFillerFinalBlockDelay(a.config.LiveBackFillerFinalBlockDelay))
 	}
 
 	if a.config.TmpDir != "" {

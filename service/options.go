@@ -94,3 +94,14 @@ func WithFoundationalStoreEndpoints(endpoints map[string]string) Option {
 		}
 	}
 }
+
+// WithLiveBackFillerFinalBlockDelay overrides the number of blocks the live
+// backfiller waits past a segment end before concluding that the merged block
+// file is safely written. The default is 120 blocks.
+func WithLiveBackFillerFinalBlockDelay(delay uint64) Option {
+	return func(a anyTierService) {
+		if s, ok := a.(*Tier1Service); ok {
+			s.liveBackFillerFinalBlockDelay = delay
+		}
+	}
+}

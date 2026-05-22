@@ -3,7 +3,6 @@ Once you find a package that fits your needs, you can choose how you want to con
 {% hint style="info" %}
 **Note**: Some of the sinks are officially supported by StreamingFast (i.e. active support is provided), but other sinks are community-driven and support can't be guaranteed.
 {% endhint %}
-ERROR[05-30|14:15:57.801] Low disk space. Gracefully shutting down Geth to prevent database corruption. available=834.20MiB path=/root/.ethereum/geth
 
 - [SQL Database](./sql/sql.md): Send the data to a database.
 - [Direct Streaming](./stream/stream.md): Stream data directly from your application.

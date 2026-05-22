@@ -112,6 +112,11 @@ type Tier1Service struct {
 	sessionPool              dsession.SessionPool
 	activeRequestsManager    *active_requests.ActiveRequestsManager // we keep a list of current requests for the debugAPI and to manage memory
 	execOutMessageBufferSize int
+
+	// liveBackFillerFinalBlockDelay overrides the default 120-block delay the
+	// live backfiller waits past a segment end before concluding merged blocks
+	// are safely written. 0 means use the default.
+	liveBackFillerFinalBlockDelay uint64
 }
 
 func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
@@ -158,6 +163,7 @@ func getBlockTypeFromStreamFactory(sf *StreamFactory) (string, error) {
 	return strings.TrimPrefix(out, protoPkfPrefix), nil
 }
 func NewTier1(
+	ctx context.Context,
 	logger *zap.Logger,
 	mergedBlocksStore dstore.Store,
 	forkedBlocksStore dstore.Store,
@@ -220,6 +226,7 @@ func NewTier1(
 	tier2RequestParameters.StateBundleSize = runtimeConfig.SegmentSize
 
 	logger.Info("launching tier1 service", zap.Reflect("client_config", substreamsClientConfig), zap.String("block_type", blockType), zap.Bool("with_live", hub != nil))
+
 	s := &Tier1Service{
 		Shutter:                  shutter.New(),
 		runtimeConfig:            runtimeConfig,
@@ -241,6 +248,8 @@ func NewTier1(
 	s.OnTerminating(func(_ error) {
 		s.activeRequestsWG.Wait()
 	})
+
+	metrics.Tier1ActiveRequestsHardLimit.SetFloat64(float64(activeRequestsHardLimit))
 
 	if debugAPIAddress := os.Getenv("SUBSTREAMS_TIER1_DEBUG_API_ADDR"); debugAPIAddress != "" {
 		debugAPI := debugapi.New(
@@ -634,7 +643,7 @@ func (s *Tier1Service) blocks(
 		}
 
 		if requestDetails.ResolvedStartBlockNum > request.StopBlockNum {
-			err := bsstream.NewErrInvalidArg("stop block %d is below resolved start block %d", requestDetails.ResolvedStartBlockNum, request.StopBlockNum)
+			err := bsstream.NewErrInvalidArg("stop block %d is below resolved start block %d", request.StopBlockNum, requestDetails.ResolvedStartBlockNum)
 			logger.Info("refusing Substreams Blocks request", append(logFields, zap.Error(err))...)
 			return err
 		}
@@ -923,11 +932,17 @@ func (s *Tier1Service) blocks(
 	var wrappedPipe bstream.Handler
 	if requestDetails.ProductionMode {
 		liveBackFiller := NewLiveBackFiller(ctx, pipe, logger, execGraph.OutputModuleStageIndex(), segmentSize, requestDetails.LinearHandoffBlockNum, s.runtimeConfig.ClientFactory, RequestBackProcessing)
+		if s.liveBackFillerFinalBlockDelay != 0 {
+			liveBackFiller.finalBlockDelay = s.liveBackFillerFinalBlockDelay
+		}
 
 		// In noop mode, the pipe handler is overwritten by a NoopHandler which produces no outputs.
 		if request.NoopMode {
 			noopHandler := NewNoopHandler(respFunc)
 			liveBackFiller = NewLiveBackFiller(ctx, noopHandler, logger, execGraph.OutputModuleStageIndex(), segmentSize, requestDetails.LinearHandoffBlockNum, s.runtimeConfig.ClientFactory, RequestBackProcessing)
+			if s.liveBackFillerFinalBlockDelay != 0 {
+				liveBackFiller.finalBlockDelay = s.liveBackFillerFinalBlockDelay
+			}
 		}
 
 		if requestDetails.FromQuickload {

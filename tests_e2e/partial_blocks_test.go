@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"testing"
 
@@ -18,7 +17,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const latestDummyBlockchainImage = "ghcr.io/streamingfast/dummy-blockchain:762f40d"
+const latestDummyBlockchainImage = "ghcr.io/streamingfast/dummy-blockchain:1cea671"
 
 func TestPartialBlocksSimple(t *testing.T) {
 	ctx := context.Background()
@@ -189,7 +188,7 @@ func TestPartialBlocksWithStores(t *testing.T) {
 			burst := int(tc.startBlock)
 
 			t.Logf("Starting container with image: %s and burst %d", image, burst)
-			container, err := newDummyBlockchainContainer(ctx, tmpDir, image, "--with-flash-blocks --with-reorgs", burst)
+			container, err := newDummyBlockchainContainerWithBlockRate(ctx, tmpDir, image, "--with-flash-blocks --with-reorgs", burst, 330)
 			require.NoError(t, err)
 			defer container.Terminate(ctx, testcontainers.StopTimeout(0))
 

@@ -1,14 +1,10 @@
 name: Build and Test
 
 on:
+  pull_request:
   push:
     branches:
-      - master
       - develop
-      - "release/v*"
-  pull_request:
-    branches:
-      - "**"
 
 jobs:
   test:
@@ -17,7 +13,7 @@ jobs:
     if: "!startsWith(github.event.head_commit.message, 'GitBook: [#')"
     strategy:
       matrix:
-        go-version: [1.25.x]
+        go-version: [1.25.x] # if you change these values, you need to change the github PR compliance requirements
         os: [ubuntu-latest, macos-latest]
     steps:
       - name: Set up Go

@@ -94,6 +94,11 @@ type Tier1Config struct {
 
 	WASMExtensions wasm.WASMExtensioner
 	Tracing        bool
+
+	// LiveBackFillerFinalBlockDelay overrides the default 120-block delay the
+	// live backfiller waits before concluding merged blocks are safely written.
+	// Leave at 0 to use the default.
+	LiveBackFillerFinalBlockDelay uint64
 }
 
 type Tier1App struct {
@@ -140,6 +145,7 @@ func loadTier1FoundationalStoreEndpoints(configPath string) (map[string]string, 
 }
 
 func (a *Tier1App) Run() error {
+	ctx := context.Background()
 	// declared in NewTier1, registered here
 	dmetrics.Register(metrics.MetricSet)
 
@@ -232,6 +238,10 @@ func (a *Tier1App) Run() error {
 		opts = append(opts, service.WithBlockExecutionTimeout(a.config.BlockExecutionTimeout))
 	}
 
+	if a.config.LiveBackFillerFinalBlockDelay != 0 {
+		opts = append(opts, service.WithLiveBackFillerFinalBlockDelay(a.config.LiveBackFillerFinalBlockDelay))
+	}
+
 	if a.config.TmpDir != "" {
 		wazero.SetTempDir(a.config.TmpDir)
 	}
@@ -258,6 +268,7 @@ func (a *Tier1App) Run() error {
 	}
 
 	tier1Service, err := service.NewTier1(
+		ctx,
 		a.logger,
 		mergedBlocksStore,
 		forkedBlocksStore,

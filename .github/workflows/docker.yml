@@ -1,26 +1,25 @@
 name: Build docker image
 
 on:
+  pull_request:
   push:
     tags:
       - "v*"
     branches:
-      - "dockerbuild"
       - "develop"
-      - "release/v*"
-      - "feature/*"
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build-and-push-image:
+  docker-build:
     runs-on: ubuntu-24.04
     if: "${{ github.event.head_commit == null || !startsWith(github.event.head_commit.message, 'GitBook: [#') }}"
     permissions:
       contents: read
       packages: write
+      pull-requests: write
 
     steps:
       - name: Checkout repository
@@ -42,6 +41,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to the Container registry
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -77,8 +77,26 @@ jobs:
         with:
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
-          push: true
+          push: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             VERSION=${{ steps.extract-version.outputs.VERSION }}
+
+      - name: Compute short SHA
+        id: sha
+        run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Docker Scout
+        id: docker-scout
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+        uses: docker/scout-action@v1
+        with:
+          dockerhub-user: ${{ secrets.DOCKER_SCOUT_USER }}
+          dockerhub-password: ${{ secrets.DOCKER_SCOUT_PASSWORD }}
+          command: cves
+          only-severities: critical,high
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.sha.outputs.short }}
+          github-token: ${{ secrets.PR_COMMENTER }}
+          exit-code: true # This will fail the GitHub Action step if CVEs are found
+          write-comment: ${{ github.event.pull_request.head.repo.full_name == github.repository }}

@@ -144,7 +144,7 @@ require (
 	github.com/gorilla/schema v1.4.1 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
-	github.com/holiman/uint256 v1.3.1 // indirect
+	github.com/holiman/uint256 v1.3.2 // indirect
 	github.com/iancoleman/strcase v0.3.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/manifoldco/promptui v0.9.0 // indirect

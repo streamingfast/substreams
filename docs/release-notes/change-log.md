@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Sink
+
+* Fix `Sinker.requestActiveStartBlock` not being set when the handler implements `SinkerSessionInitHandler`, which previously caused `ProgressMessageLastContiguousBlock` to be incorrect for production-mode mapper stages.
+
 ### Fixed
 
 - CI: Docker image login, build and push are now skipped for fork PRs; image is still built (without push) to validate the Dockerfile.

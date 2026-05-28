@@ -663,14 +663,16 @@ func recoverExecutionPanic(ctx context.Context, executionError error, recovered 
 		recoveredErr = fmt.Errorf("%v", recovered)
 	}
 
+	// If the context deadline was exceeded, return a deadline exceeded error RPC error.
+	// This must be checked before context.Canceled, because the catch-all `ctx.Err() != nil`
+	// below would otherwise swallow deadline-exceeded panics and silently drop the block.
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return connect.NewError(connect.CodeDeadlineExceeded, fmt.Errorf("execution timed out at block %s: %w", blockRef, recoveredErr))
+	}
+
 	// If recovering from context cancel, simply return the execution error as-is
 	if ctx.Err() != nil || errors.Is(recoveredErr, context.Canceled) {
 		return executionError
-	}
-
-	// If the context deadline was exceeded, return a deadline exceeded error RPC error
-	if ctx.Err() == context.DeadlineExceeded {
-		return connect.NewError(connect.CodeDeadlineExceeded, fmt.Errorf("execution timed out at block %s: %w", blockRef, recoveredErr))
 	}
 
 	// Otherwise, log the panic and return a generic error
@@ -721,8 +723,10 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 				return
 			}
 
-			// Move the panic up so it's handled at a higher level by those who call execute()
-			panic(fmt.Errorf("unknown error: %s", r))
+			// Move the panic up so it's handled at a higher level by those who call execute().
+			// Wrap with %w (not %s) to preserve the error chain so that callers can
+			// errors.Is(err, context.DeadlineExceeded) on the result.
+			panic(fmt.Errorf("unknown error: %w", recoveredErr))
 		}
 	}()
 

@@ -111,10 +111,12 @@ func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUni
 
 	// Retrieve store to merge, from cache or load from storage. Allows skipping of segments
 	// for handling partials interspearsed with full KVs.
+	meter.getStoreStart = time.Now()
 	fullKV, err := modState.getStore(s.ctx, rng.StartBlock) // loads+caches or uses cached store
 	if err != nil {
 		return fmt.Errorf("getting store: %w", err)
 	}
+	meter.getStoreEnd = time.Now()
 
 	// Load
 	meter.loadStart = time.Now()
@@ -157,7 +159,9 @@ func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUni
 				return fmt.Errorf("save full store: %w", err)
 			}
 			meter.saveEnd = time.Now()
+			meter.writeStart = time.Now()
 			err = writer.Write(ctx)
+			meter.writeEnd = time.Now()
 			if err == nil {
 				go partialKV.DeleteStore(context.Background(), partialFile)
 			}

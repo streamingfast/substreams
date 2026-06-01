@@ -16,6 +16,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Server: per-block execution timeouts (`--substreams-block-execution-timeout`) are no longer silently swallowed when a WASM host-function panic (e.g. wasmtime) coincides with the deadline. Previously, `recoverExecutionPanic` would return `nil` instead of `CodeDeadlineExceeded`, causing the offending block to be skipped and the stream to complete successfully.
 - CI: Docker image login, build and push are now skipped for fork PRs; image is still built (without push) to validate the Dockerfile.
 
+### Added
+
+- added more metrics to identify time spent squashing
+
 ## v1.18.5
 
 ### Server

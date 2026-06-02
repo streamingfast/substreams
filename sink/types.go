@@ -181,8 +181,16 @@ type SinkerSessionInitHandler interface {
 	//
 	// The [HandleSessionInit] is optional and can be nil.
 	//
+	// This callback behaves as an *interceptor*, not as a replacement: implementing it does **not**
+	// short-circuit the [Sinker]'s normal session-init handling. After your callback returns (with a nil
+	// error), the [Sinker] still performs its default bookkeeping for every session — it emits the
+	// default "session initialized with remote endpoint" log line and updates its internal
+	// resolved-start-block state. Your implementation runs *in addition to* that default behavior, so it
+	// should layer on whatever extra work you need (extra logging, persistence, etc.) rather than assume
+	// it has taken over session handling.
+	//
 	// Your handler must return an error value that can be nil or non-nil. If non-nil, the error is assumed to be a fatal
-	// error and the [Sinker] will shutdown
+	// error and the [Sinker] will shutdown.
 	HandleSessionInit(ctx context.Context, req *pbsubstreamsrpcv3.Request, sessionInit *pbsubstreamsrpc.SessionInit) error
 }
 

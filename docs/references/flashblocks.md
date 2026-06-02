@@ -1,5 +1,11 @@
 # Flashblocks Support (beta)
 
+{% hint style="info" %}
+**Flashblocks support temporarily disabled**
+
+As of May 13th, Flashblocks support has been disabled while we switch to op-reth instrumented nodes. It will be restored in the coming weeks.
+{% endhint %}
+
 New support for "Flashblocks" is now available as a *beta feature* on Base Mainnet. For more details about Base Flashblocks, see the [Base documentation](https://docs.base.org/base-chain/flashblocks/apps).
 
 {% hint style="warning" %}

@@ -133,6 +133,7 @@ func (s *Stats) Close() {
 	s.Shutdown(nil)
 	s.dataMsgRate.Stop()
 	s.undoMsgRate.Stop()
+	s.progressBlockRate.Stop()
 }
 
 type unsetBlockRef struct{}

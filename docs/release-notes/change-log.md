@@ -11,7 +11,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Sink
+
+* Fix `Sinker.requestActiveStartBlock` not being set when the handler implements `SinkerSessionInitHandler`, which previously caused `ProgressMessageLastContiguousBlock` to be incorrect for production-mode mapper stages.
+
+### Fixed
+
+- Server: per-block execution timeouts (`--substreams-block-execution-timeout`) are no longer silently swallowed when a WASM host-function panic (e.g. wasmtime) coincides with the deadline. Previously, `recoverExecutionPanic` would return `nil` instead of `CodeDeadlineExceeded`, causing the offending block to be skipped and the stream to complete successfully.
+- CI: Docker image login, build and push are now skipped for fork PRs; image is still built (without push) to validate the Dockerfile.
+
+### Added
+
+- added more metrics to identify time spent squashing
+
+## v1.18.5
+
+### Server
+
+* **Index optimisation**: Optimized `ClockDistributor` to skip blocks earlier and faster when using block filter.
 * Fix server-side bug that would cause Blocks request to fail after a few retries with 'load full store (...) load store stream: opening file for streaming: not found' when depending on a store that is being merged slowly
+* add 'substreams_tier1_active_requests_hard_limit' and 'substreams_tier2_max_concurrent_requests' attributes to prometheus metrics (constant, reflects the configuration)
 
 ## v1.18.4
 

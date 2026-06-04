@@ -94,12 +94,16 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		fmt.Printf("Scheduler message: %T %v\n", msg, msg)
 	}
 
-	s.logger.Debug("received message",
-		zapx.Type("msg_type", msg),
-		zap.Bool("output_stream_completed", s.outputStreamCompleted),
-		zap.Bool("stores_sync_completed", s.storesSyncCompleted),
-		zap.Bool("delayed_schedule_next_job", s.delayedScheduleNextJob),
-	)
+	// Guard the per-message log: when debug is disabled this skips building the
+	// field slice and the reflection-based zapx.Type on every single message.
+	if ce := s.logger.Check(zap.DebugLevel, "received message"); ce != nil {
+		ce.Write(
+			zapx.Type("msg_type", msg),
+			zap.Bool("output_stream_completed", s.outputStreamCompleted),
+			zap.Bool("stores_sync_completed", s.storesSyncCompleted),
+			zap.Bool("delayed_schedule_next_job", s.delayedScheduleNextJob),
+		)
+	}
 
 	var cmds []loop.Cmd
 

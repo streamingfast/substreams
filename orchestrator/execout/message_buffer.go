@@ -63,6 +63,10 @@ func (b *MessageBuffer) ShouldFlush() bool {
 	b.mut.Lock()
 	defer b.mut.Unlock()
 
+	return b.shouldFlushLocked()
+}
+
+func (b *MessageBuffer) shouldFlushLocked() bool {
 	if b.DataSize > b.maxDataSize {
 		b.logger.Debug("flushing due to large data size", zap.Int("data_size", b.DataSize), zap.Bool("keep", false))
 		return true
@@ -73,6 +77,19 @@ func (b *MessageBuffer) ShouldFlush() bool {
 	}
 
 	return false
+}
+
+// AppendAndShouldFlush appends a message and reports whether the buffer should be
+// flushed, doing both under a single lock. This is called once per block on the
+// output hot path, so it avoids the second lock acquisition of Append+ShouldFlush.
+func (b *MessageBuffer) AppendAndShouldFlush(msg *pbsubstreamsrpcv2.BlockScopedData, dataSize int) bool {
+	b.mut.Lock()
+	defer b.mut.Unlock()
+
+	b.DataSize += dataSize
+	b.buf.Items = append(b.buf.Items, msg)
+
+	return b.shouldFlushLocked()
 }
 
 func (b *MessageBuffer) Flush(streamSrv *response.Stream) error {

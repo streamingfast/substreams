@@ -24,6 +24,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - added more metrics to identify time spent squashing
 
+### Performance
+
+- Server: the tier1 job scheduler no longer slows down on very large reprocessings (millions of segments). Both `NextJob` and `AllStoresCompleted` used to rescan the whole completed-segment prefix on every scheduling event, making job selection O(segments²) over a run; they now advance a forward-only cursor and are O(1) amortized.
+- Server: `UpdateStats` (progress reporting) now builds each stage's ranges in a single sort-free pass instead of one map+sort per stage every second.
+- Server: removed per-message overhead in the scheduler event loop — the debug-state env var is read once at startup instead of on every message, and the per-message debug log no longer builds its fields when debug logging is disabled.
+- Server: the cached-output streaming buffer now appends and checks for flushing under a single lock per block.
+
 ## v1.18.5
 
 ### Server

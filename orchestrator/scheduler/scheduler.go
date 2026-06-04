@@ -42,16 +42,21 @@ type Scheduler struct {
 
 	delayedScheduleNextJob bool
 	tracer                 ttrace.Tracer
+
+	// debugState mirrors SUBSTREAMS_DEBUG_SCHEDULER_STATE, read once here instead
+	// of calling os.Getenv (which takes a runtime lock) on every Update message.
+	debugState bool
 }
 
 func New(ctx context.Context, stream *response.Stream) *Scheduler {
 	logger := reqctx.Logger(ctx).Named("scheduler")
 	tracer := reqctx.Tracer(ctx)
 	s := &Scheduler{
-		ctx:    ctx,
-		stream: stream,
-		logger: logger,
-		tracer: tracer,
+		ctx:        ctx,
+		stream:     stream,
+		logger:     logger,
+		tracer:     tracer,
+		debugState: os.Getenv("SUBSTREAMS_DEBUG_SCHEDULER_STATE") == "true",
 	}
 	s.EventLoop = loop.NewEventLoop(s.Update)
 	return s
@@ -84,7 +89,7 @@ func (s *Scheduler) Init() loop.Cmd {
 func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 	defer s.Stages.UpdateStats()
 
-	if os.Getenv("SUBSTREAMS_DEBUG_SCHEDULER_STATE") == "true" {
+	if s.debugState {
 		fmt.Print(s.Stages.StatesString())
 		fmt.Printf("Scheduler message: %T %v\n", msg, msg)
 	}

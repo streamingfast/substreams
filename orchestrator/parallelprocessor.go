@@ -18,6 +18,10 @@ import (
 	"github.com/streamingfast/substreams/storage/store"
 )
 
+// debugSchedulerState mirrors SUBSTREAMS_DEBUG_SCHEDULER_STATE, read once at
+// startup instead of on every BuildParallelProcessor (i.e. every request).
+var debugSchedulerState = os.Getenv("SUBSTREAMS_DEBUG_SCHEDULER_STATE") == "true"
+
 type ParallelProcessor struct {
 	scheduler *scheduler.Scheduler
 	reqPlan   *plan.RequestPlan
@@ -79,7 +83,7 @@ func BuildParallelProcessor(
 
 	sched.Stages = stages
 
-	if os.Getenv("SUBSTREAMS_DEBUG_SCHEDULER_STATE") == "true" {
+	if debugSchedulerState {
 		fmt.Println("Initial state:")
 		fmt.Print(stages.StatesString())
 	}

@@ -55,6 +55,10 @@ var slowQueryNotificationFrequency = 30 * time.Second
 var slowQueryNotificationThreshold = 300 * time.Second
 var ErrRequestActiveForTooLong = errors.New("request active for too long")
 
+// sendHostnameHeader mirrors SUBSTREAMS_SEND_HOSTNAME, read once at startup
+// instead of on every request (updateStreamHeadersHostname runs per ProcessRange).
+var sendHostnameHeader = os.Getenv("SUBSTREAMS_SEND_HOSTNAME") == "true"
+
 type ModuleExecutionConfig struct {
 	name       string
 	moduleHash string
@@ -736,7 +740,7 @@ func updateStreamHeadersHostname(setHeader func(metadata.MD) error, logger *zap.
 		logger.Warn("cannot find hostname, using 'unknown'", zap.Error(err))
 		hostname = "unknown host"
 	}
-	if os.Getenv("SUBSTREAMS_SEND_HOSTNAME") == "true" {
+	if sendHostnameHeader {
 		md := metadata.New(map[string]string{"host": hostname})
 		err = setHeader(md)
 		if err != nil {

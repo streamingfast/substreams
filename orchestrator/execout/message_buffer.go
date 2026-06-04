@@ -13,6 +13,27 @@ import (
 	"go.uber.org/zap"
 )
 
+const defaultMessageBufferMaxDataSize = 1024 * 1024 * 10
+
+// messageBufferMaxDataSize is resolved from MESSAGE_BUFFER_MAX_DATA_SIZE once at
+// startup instead of on every NewMessageBuffer (i.e. every request). If the env
+// var is set but unparseable, messageBufferMaxDataSizeInvalid holds the bad value
+// so NewMessageBuffer can still warn about it.
+var (
+	messageBufferMaxDataSize        = defaultMessageBufferMaxDataSize
+	messageBufferMaxDataSizeInvalid string
+)
+
+func init() {
+	if v := os.Getenv("MESSAGE_BUFFER_MAX_DATA_SIZE"); v != "" {
+		if parsed, err := strconv.Atoi(v); err != nil {
+			messageBufferMaxDataSizeInvalid = v
+		} else {
+			messageBufferMaxDataSize = parsed
+		}
+	}
+}
+
 type MessageBuffer struct {
 	mut                sync.RWMutex
 	buf                *pbsubstreamsrpcv4.BlockScopedDatas
@@ -24,22 +45,14 @@ type MessageBuffer struct {
 }
 
 func NewMessageBuffer(maxBufferedMessage int, logger *zap.Logger) *MessageBuffer {
-	maxDataSize := 1024 * 1024 * 10
-	maxDataSizeString := os.Getenv("MESSAGE_BUFFER_MAX_DATA_SIZE")
-
-	if maxDataSizeString != "" {
-		parsed, err := strconv.Atoi(maxDataSizeString)
-		if err != nil {
-			logger.Warn("failed to parse MESSAGE_BUFFER_MAX_DATA_SIZE, using default value", zap.Error(err))
-		} else {
-			maxDataSize = parsed
-		}
+	if messageBufferMaxDataSizeInvalid != "" {
+		logger.Warn("failed to parse MESSAGE_BUFFER_MAX_DATA_SIZE, using default value", zap.String("value", messageBufferMaxDataSizeInvalid))
 	}
 
 	return &MessageBuffer{
 		buf:                &pbsubstreamsrpcv4.BlockScopedDatas{Items: []*pbsubstreamsrpcv2.BlockScopedData{}},
 		maxBufferedMessage: maxBufferedMessage,
-		maxDataSize:        maxDataSize,
+		maxDataSize:        messageBufferMaxDataSize,
 		logger:             logger.Named("message-buffer"),
 	}
 }

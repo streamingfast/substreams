@@ -3,7 +3,6 @@ package stage
 import (
 	"context"
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -238,38 +237,39 @@ func (s *Stages) UpdateStats() {
 	s.lastStatUpdate = time.Now()
 	out := make([]*pbsubstreamsrpc.Stage, len(s.stages))
 
+	rangesByStage := s.statsRangesByStage()
 	for stgIdx := range s.stages {
-
 		mods := make([]string, len(s.stages[stgIdx].allExecutedModules))
 		_ = copy(mods, s.stages[stgIdx].allExecutedModules)
 
-		br := make(map[uint64]*block.Range)
-		for segmentIdx, segment := range s.segmentStates {
-			state := segment[stgIdx]
-			segmenter := s.stages[stgIdx].storeModuleStates[0].segmenter
-			if state == UnitCompleted || state == UnitPartialPresent || state == UnitMerging {
-				if rng := segmenter.Range(segmentIdx + s.segmentOffset); rng != nil {
-					br[rng.StartBlock] = rng
-				}
-			}
-		}
-
-		blockRanges := block.Ranges(make([]*block.Range, len(br)))
-		i := 0
-		for _, v := range br {
-			blockRanges[i] = v
-			i++
-		}
-		sort.Sort(blockRanges)
-		blockRanges = blockRanges.Merged()
-
 		out[stgIdx] = &pbsubstreamsrpc.Stage{
 			Modules:         mods,
-			CompletedRanges: toProtoRanges(blockRanges),
+			CompletedRanges: toProtoRanges(rangesByStage[stgIdx].Merged()),
 		}
 	}
 
 	reqctx.ReqStats(s.ctx).RecordStages(out)
+}
+
+// statsRangesByStage collects, per stage, the ranges of segments that are in
+// progress or done (Completed/PartialPresent/Merging), in a single pass over the
+// segment matrix. Because segments are visited in ascending order the ranges come
+// out already sorted and de-duplicated (one range per segment), so callers can
+// Merged() them directly — no per-stage map allocation and no sort.
+func (s *Stages) statsRangesByStage() []block.Ranges {
+	rangesByStage := make([]block.Ranges, len(s.stages))
+	for segmentIdx, segment := range s.segmentStates {
+		for stgIdx := range s.stages {
+			switch segment[stgIdx] {
+			case UnitCompleted, UnitPartialPresent, UnitMerging:
+				segmenter := s.stages[stgIdx].storeModuleStates[0].segmenter
+				if rng := segmenter.Range(segmentIdx + s.segmentOffset); rng != nil {
+					rangesByStage[stgIdx] = append(rangesByStage[stgIdx], rng)
+				}
+			}
+		}
+	}
+	return rangesByStage
 }
 
 func toProtoRanges(in block.Ranges) []*pbsubstreamsrpc.BlockRange {

@@ -67,6 +67,12 @@ type Stages struct {
 	// the whole completed prefix on every call. See AllStoresCompleted.
 	allStoresDone   bool
 	allStoresCursor []int
+
+	// nextJobCursor is the lowest segment that may still yield a job. NextJob
+	// starts its scan here instead of at globalSegmenter.FirstIndex(), so it no
+	// longer re-walks the (ever-growing) prefix of finished segments on every
+	// call. See NextJob / segmentMayYieldJob.
+	nextJobCursor int
 }
 type stageStates []UnitState
 
@@ -138,6 +144,7 @@ func NewStages(
 	}
 
 	out.initSegmentsOffset(reqPlan)
+	out.nextJobCursor = out.globalSegmenter.FirstIndex()
 
 	return out
 }
@@ -417,6 +424,40 @@ func (s *Stages) WaitAsyncWork() error {
 	return nil
 }
 
+// segmentMayYieldJob reports whether NextJob could ever still return a job for
+// this segment. It is used to advance nextJobCursor over the finished prefix.
+//
+// A segment can no longer yield a job once every in-range stage's unit is in a
+// state that never transitions back to UnitPending:
+//   - Completed / NoOp are terminal for any stage;
+//   - PartialPresent is terminal only for map stages (maps are never squashed);
+//     a store partial can revert to Pending if a squash fails, so it still counts.
+//
+// Out-of-range stages (segment before the stage's first index or after its last)
+// never schedule there, matching the skip/break in NextJob's main loop. Being
+// conservative here (returning true when unsure) is always safe: it just keeps the
+// cursor a bit further back, never skips a schedulable segment.
+func (s *Stages) segmentMayYieldJob(segmentIdx int) bool {
+	for stageIdx := range s.stages {
+		stage := s.stages[stageIdx]
+		if segmentIdx < stage.segmenter.FirstIndex() || segmentIdx > stage.segmenter.LastIndex() {
+			continue
+		}
+		switch s.getState(Unit{Segment: segmentIdx, Stage: stageIdx}) {
+		case UnitCompleted, UnitNoOp:
+			// permanently done for this stage
+		case UnitPartialPresent:
+			if stage.kind != KindMap {
+				return true
+			}
+		default:
+			// Pending, Scheduled, Merging, Shadowed: may still (re)schedule
+			return true
+		}
+	}
+	return false
+}
+
 // Returns the unit, its block range and a boolean indicating if we are backing off because of 'notAbove'
 func (s *Stages) NextJob(notAboveSegment int) (Unit, *block.Range, bool) {
 	// OPTIMIZATION: before calling NextJob, keep a small reserve (10% ?) of workers
@@ -427,12 +468,22 @@ func (s *Stages) NextJob(notAboveSegment int) (Unit, *block.Range, bool) {
 	// OPTIMIZATION: Another option is to have an algorithm that doesn't return a job
 	//  right away when there are too many jobs scheduled before others
 	//  in a given stage.
-	//
-	// OPTIMIZATION: eventually, we can push `segmentsOffset`
-	//  each time contiguous segments are completed for all stages.
 
 	lastStage := len(s.stages) - 1
-	for segmentIdx := s.globalSegmenter.FirstIndex(); segmentIdx <= s.globalSegmenter.LastIndex(); segmentIdx++ {
+	lastSegment := s.globalSegmenter.LastIndex()
+
+	// Advance the scan cursor past the contiguous prefix of segments that can no
+	// longer yield a job, so we don't re-walk the finished prefix on every call
+	// (which made NextJob O(n^2) over a reprocessing run). The states we skip on
+	// are permanent — see segmentMayYieldJob — so the cursor only ever moves forward.
+	if s.nextJobCursor < s.globalSegmenter.FirstIndex() {
+		s.nextJobCursor = s.globalSegmenter.FirstIndex()
+	}
+	for s.nextJobCursor <= lastSegment && !s.segmentMayYieldJob(s.nextJobCursor) {
+		s.nextJobCursor++
+	}
+
+	for segmentIdx := s.nextJobCursor; segmentIdx <= lastSegment; segmentIdx++ {
 		someShadowed := s.markShadowedUnits(segmentIdx)
 		for stageIdx := lastStage; stageIdx >= 0; stageIdx-- {
 			stage := s.stages[stageIdx]

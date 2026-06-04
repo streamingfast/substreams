@@ -60,6 +60,13 @@ type Stages struct {
 
 	// first segment where we can run directly the higher stages (shadowing the lower stages)
 	shadowableSegment int
+
+	// allStoresDone latches true once every store stage is fully completed, and
+	// allStoresCursor[stageIdx] is the lowest store segment not yet known terminal.
+	// Together they make AllStoresCompleted O(1) amortized instead of rescanning
+	// the whole completed prefix on every call. See AllStoresCompleted.
+	allStoresDone   bool
+	allStoresCursor []int
 }
 type stageStates []UnitState
 
@@ -180,19 +187,39 @@ func (s *Stages) AllStoresCompleted() bool {
 	if s.storeSegmenter.ExclusiveEndBlock() == s.storeSegmenter.InitialBlock() { // first segment on a mapper, no store to process
 		return true
 	}
+	if s.allStoresDone {
+		return true
+	}
 	lastSegment := s.storeSegmenter.LastIndex()
+
+	if s.allStoresCursor == nil {
+		s.allStoresCursor = make([]int, len(s.stages))
+		for i := range s.allStoresCursor {
+			s.allStoresCursor[i] = s.storeSegmenter.FirstIndex()
+		}
+	}
 
 	for idx, stage := range s.stages {
 		if stage.kind != KindStore {
 			continue
 		}
-		for seg := s.storeSegmenter.FirstIndex(); seg <= lastSegment; seg++ {
+		// Advance the per-stage cursor over the contiguous prefix of terminal
+		// (Completed/NoOp) segments. Both states are permanent, so segments below
+		// the cursor never need re-checking again — repeated calls become O(1)
+		// amortized instead of O(completed-prefix) (which made this O(n^2) over a run).
+		seg := s.allStoresCursor[idx]
+		for ; seg <= lastSegment; seg++ {
 			state := s.getState(Unit{Segment: seg, Stage: idx})
 			if state != UnitCompleted && state != UnitNoOp {
-				return false
+				break
 			}
 		}
+		s.allStoresCursor[idx] = seg
+		if seg <= lastSegment {
+			return false
+		}
 	}
+	s.allStoresDone = true
 	return true
 }
 

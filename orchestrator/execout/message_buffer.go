@@ -79,23 +79,36 @@ func (b *MessageBuffer) shouldFlushLocked() bool {
 	return false
 }
 
-// AppendAndShouldFlush appends a message and reports whether the buffer should be
-// flushed, doing both under a single lock. This is called once per block on the
-// output hot path, so it avoids the second lock acquisition of Append+ShouldFlush.
-func (b *MessageBuffer) AppendAndShouldFlush(msg *pbsubstreamsrpcv2.BlockScopedData, dataSize int) bool {
+// AppendAndFlushWhenNeeded appends a message and, when the buffer is full, flushes
+// it — append, flush-check and flush all happen under a single lock, so the output
+// hot path takes the buffer mutex exactly once per block. It returns the time spent
+// flushing (0 if no flush happened).
+func (b *MessageBuffer) AppendAndFlushWhenNeeded(msg *pbsubstreamsrpcv2.BlockScopedData, dataSize int, streamSrv *response.Stream) (time.Duration, error) {
 	b.mut.Lock()
 	defer b.mut.Unlock()
 
 	b.DataSize += dataSize
 	b.buf.Items = append(b.buf.Items, msg)
 
-	return b.shouldFlushLocked()
+	if !b.shouldFlushLocked() {
+		return 0, nil
+	}
+
+	start := time.Now()
+	if err := b.flushLocked(streamSrv); err != nil {
+		return 0, err
+	}
+	return time.Since(start), nil
 }
 
 func (b *MessageBuffer) Flush(streamSrv *response.Stream) error {
 	b.mut.Lock()
 	defer b.mut.Unlock()
 
+	return b.flushLocked(streamSrv)
+}
+
+func (b *MessageBuffer) flushLocked(streamSrv *response.Stream) error {
 	err := streamSrv.BlockScopedDatas(b.buf)
 	if err != nil {
 		return fmt.Errorf("flushing buffer: %w", err)

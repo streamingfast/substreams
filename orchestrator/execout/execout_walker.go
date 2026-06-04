@@ -281,13 +281,11 @@ func (r *Walker) sendItems(reader execout.FileReader) error {
 		}
 
 		if r.supportBuffering {
-			if r.buffer.AppendAndShouldFlush(blockScopedData, len(item.Payload)) {
-				s := time.Now()
-				if err := r.buffer.Flush(r.streamOut); err != nil {
-					return fmt.Errorf("flushing buffer on 'should flush': %w", err)
-				}
-				flushingDuration += time.Since(s)
+			d, err := r.buffer.AppendAndFlushWhenNeeded(blockScopedData, len(item.Payload), r.streamOut)
+			if err != nil {
+				return fmt.Errorf("flushing buffer on 'should flush': %w", err)
 			}
+			flushingDuration += d
 		} else {
 			s := time.Now()
 			err := r.streamOut.BlockScopedData(blockScopedData)

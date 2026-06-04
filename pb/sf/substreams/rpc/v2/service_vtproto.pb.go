@@ -8,10 +8,12 @@ import (
 	fmt "fmt"
 	protohelpers "github.com/planetscale/vtprotobuf/protohelpers"
 	anypb1 "github.com/planetscale/vtprotobuf/types/known/anypb"
+	timestamppb1 "github.com/planetscale/vtprotobuf/types/known/timestamppb"
 	v1 "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	proto "google.golang.org/protobuf/proto"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	anypb "google.golang.org/protobuf/types/known/anypb"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	io "io"
 )
 
@@ -33,11 +35,17 @@ func (m *Request) CloneVT() *Request {
 	r.FinalBlocksOnly = m.FinalBlocksOnly
 	r.ProductionMode = m.ProductionMode
 	r.OutputModule = m.OutputModule
-	r.Modules = m.Modules.CloneVT()
 	r.NoopMode = m.NoopMode
 	r.LimitProcessedBlocks = m.LimitProcessedBlocks
 	r.ProgressMessagesIntervalMs = m.ProgressMessagesIntervalMs
 	r.PartialBlocks = m.PartialBlocks
+	if rhs := m.Modules; rhs != nil {
+		if vtpb, ok := interface{}(rhs).(interface{ CloneVT() *v1.Modules }); ok {
+			r.Modules = vtpb.CloneVT()
+		} else {
+			r.Modules = proto.Clone(rhs).(*v1.Modules)
+		}
+	}
 	if rhs := m.DebugInitialStoreSnapshotForModules; rhs != nil {
 		tmpContainer := make([]string, len(rhs))
 		copy(tmpContainer, rhs)
@@ -146,8 +154,15 @@ func (m *BlockUndoSignal) CloneVT() *BlockUndoSignal {
 		return (*BlockUndoSignal)(nil)
 	}
 	r := new(BlockUndoSignal)
-	r.LastValidBlock = m.LastValidBlock.CloneVT()
 	r.LastValidCursor = m.LastValidCursor
+	r.LastValidBlockTimestamp = (*timestamppb.Timestamp)((*timestamppb1.Timestamp)(m.LastValidBlockTimestamp).CloneVT())
+	if rhs := m.LastValidBlock; rhs != nil {
+		if vtpb, ok := interface{}(rhs).(interface{ CloneVT() *v1.BlockRef }); ok {
+			r.LastValidBlock = vtpb.CloneVT()
+		} else {
+			r.LastValidBlock = proto.Clone(rhs).(*v1.BlockRef)
+		}
+	}
 	if len(m.unknownFields) > 0 {
 		r.unknownFields = make([]byte, len(m.unknownFields))
 		copy(r.unknownFields, m.unknownFields)
@@ -165,11 +180,17 @@ func (m *BlockScopedData) CloneVT() *BlockScopedData {
 	}
 	r := new(BlockScopedData)
 	r.Output = m.Output.CloneVT()
-	r.Clock = m.Clock.CloneVT()
 	r.Cursor = m.Cursor
 	r.FinalBlockHeight = m.FinalBlockHeight
 	r.Attestation = m.Attestation
 	r.IsPartial = m.IsPartial
+	if rhs := m.Clock; rhs != nil {
+		if vtpb, ok := interface{}(rhs).(interface{ CloneVT() *v1.Clock }); ok {
+			r.Clock = vtpb.CloneVT()
+		} else {
+			r.Clock = proto.Clone(rhs).(*v1.Clock)
+		}
+	}
 	if rhs := m.DebugMapOutputs; rhs != nil {
 		tmpContainer := make([]*MapModuleOutput, len(rhs))
 		for k, v := range rhs {
@@ -593,7 +614,11 @@ func (this *Request) EqualVT(that *Request) bool {
 	if this.OutputModule != that.OutputModule {
 		return false
 	}
-	if !this.Modules.EqualVT(that.Modules) {
+	if equal, ok := interface{}(this.Modules).(interface{ EqualVT(*v1.Modules) bool }); ok {
+		if !equal.EqualVT(that.Modules) {
+			return false
+		}
+	} else if !proto.Equal(this.Modules, that.Modules) {
 		return false
 	}
 	if len(this.DebugInitialStoreSnapshotForModules) != len(that.DebugInitialStoreSnapshotForModules) {
@@ -843,10 +868,17 @@ func (this *BlockUndoSignal) EqualVT(that *BlockUndoSignal) bool {
 	} else if this == nil || that == nil {
 		return false
 	}
-	if !this.LastValidBlock.EqualVT(that.LastValidBlock) {
+	if equal, ok := interface{}(this.LastValidBlock).(interface{ EqualVT(*v1.BlockRef) bool }); ok {
+		if !equal.EqualVT(that.LastValidBlock) {
+			return false
+		}
+	} else if !proto.Equal(this.LastValidBlock, that.LastValidBlock) {
 		return false
 	}
 	if this.LastValidCursor != that.LastValidCursor {
+		return false
+	}
+	if !(*timestamppb1.Timestamp)(this.LastValidBlockTimestamp).EqualVT((*timestamppb1.Timestamp)(that.LastValidBlockTimestamp)) {
 		return false
 	}
 	return string(this.unknownFields) == string(that.unknownFields)
@@ -868,7 +900,11 @@ func (this *BlockScopedData) EqualVT(that *BlockScopedData) bool {
 	if !this.Output.EqualVT(that.Output) {
 		return false
 	}
-	if !this.Clock.EqualVT(that.Clock) {
+	if equal, ok := interface{}(this.Clock).(interface{ EqualVT(*v1.Clock) bool }); ok {
+		if !equal.EqualVT(that.Clock) {
+			return false
+		}
+	} else if !proto.Equal(this.Clock, that.Clock) {
 		return false
 	}
 	if this.Cursor != that.Cursor {
@@ -1562,12 +1598,24 @@ func (m *Request) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 		}
 	}
 	if m.Modules != nil {
-		size, err := m.Modules.MarshalToSizedBufferVT(dAtA[:i])
-		if err != nil {
-			return 0, err
+		if vtmsg, ok := interface{}(m.Modules).(interface {
+			MarshalToSizedBufferVT([]byte) (int, error)
+		}); ok {
+			size, err := vtmsg.MarshalToSizedBufferVT(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = protohelpers.EncodeVarint(dAtA, i, uint64(size))
+		} else {
+			encoded, err := proto.Marshal(m.Modules)
+			if err != nil {
+				return 0, err
+			}
+			i -= len(encoded)
+			copy(dAtA[i:], encoded)
+			i = protohelpers.EncodeVarint(dAtA, i, uint64(len(encoded)))
 		}
-		i -= size
-		i = protohelpers.EncodeVarint(dAtA, i, uint64(size))
 		i--
 		dAtA[i] = 0x3a
 	}
@@ -1823,6 +1871,16 @@ func (m *BlockUndoSignal) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
 	}
+	if m.LastValidBlockTimestamp != nil {
+		size, err := (*timestamppb1.Timestamp)(m.LastValidBlockTimestamp).MarshalToSizedBufferVT(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = protohelpers.EncodeVarint(dAtA, i, uint64(size))
+		i--
+		dAtA[i] = 0x1a
+	}
 	if len(m.LastValidCursor) > 0 {
 		i -= len(m.LastValidCursor)
 		copy(dAtA[i:], m.LastValidCursor)
@@ -1831,12 +1889,24 @@ func (m *BlockUndoSignal) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 		dAtA[i] = 0x12
 	}
 	if m.LastValidBlock != nil {
-		size, err := m.LastValidBlock.MarshalToSizedBufferVT(dAtA[:i])
-		if err != nil {
-			return 0, err
+		if vtmsg, ok := interface{}(m.LastValidBlock).(interface {
+			MarshalToSizedBufferVT([]byte) (int, error)
+		}); ok {
+			size, err := vtmsg.MarshalToSizedBufferVT(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = protohelpers.EncodeVarint(dAtA, i, uint64(size))
+		} else {
+			encoded, err := proto.Marshal(m.LastValidBlock)
+			if err != nil {
+				return 0, err
+			}
+			i -= len(encoded)
+			copy(dAtA[i:], encoded)
+			i = protohelpers.EncodeVarint(dAtA, i, uint64(len(encoded)))
 		}
-		i -= size
-		i = protohelpers.EncodeVarint(dAtA, i, uint64(size))
 		i--
 		dAtA[i] = 0xa
 	}
@@ -1942,12 +2012,24 @@ func (m *BlockScopedData) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 		dAtA[i] = 0x1a
 	}
 	if m.Clock != nil {
-		size, err := m.Clock.MarshalToSizedBufferVT(dAtA[:i])
-		if err != nil {
-			return 0, err
+		if vtmsg, ok := interface{}(m.Clock).(interface {
+			MarshalToSizedBufferVT([]byte) (int, error)
+		}); ok {
+			size, err := vtmsg.MarshalToSizedBufferVT(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = protohelpers.EncodeVarint(dAtA, i, uint64(size))
+		} else {
+			encoded, err := proto.Marshal(m.Clock)
+			if err != nil {
+				return 0, err
+			}
+			i -= len(encoded)
+			copy(dAtA[i:], encoded)
+			i = protohelpers.EncodeVarint(dAtA, i, uint64(len(encoded)))
 		}
-		i -= size
-		i = protohelpers.EncodeVarint(dAtA, i, uint64(size))
 		i--
 		dAtA[i] = 0x12
 	}
@@ -2933,7 +3015,13 @@ func (m *Request) SizeVT() (n int) {
 		n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
 	}
 	if m.Modules != nil {
-		l = m.Modules.SizeVT()
+		if size, ok := interface{}(m.Modules).(interface {
+			SizeVT() int
+		}); ok {
+			l = size.SizeVT()
+		} else {
+			l = proto.Size(m.Modules)
+		}
 		n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
 	}
 	if len(m.DebugInitialStoreSnapshotForModules) > 0 {
@@ -3068,11 +3156,21 @@ func (m *BlockUndoSignal) SizeVT() (n int) {
 	var l int
 	_ = l
 	if m.LastValidBlock != nil {
-		l = m.LastValidBlock.SizeVT()
+		if size, ok := interface{}(m.LastValidBlock).(interface {
+			SizeVT() int
+		}); ok {
+			l = size.SizeVT()
+		} else {
+			l = proto.Size(m.LastValidBlock)
+		}
 		n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
 	}
 	l = len(m.LastValidCursor)
 	if l > 0 {
+		n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
+	}
+	if m.LastValidBlockTimestamp != nil {
+		l = (*timestamppb1.Timestamp)(m.LastValidBlockTimestamp).SizeVT()
 		n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
 	}
 	n += len(m.unknownFields)
@@ -3090,7 +3188,13 @@ func (m *BlockScopedData) SizeVT() (n int) {
 		n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
 	}
 	if m.Clock != nil {
-		l = m.Clock.SizeVT()
+		if size, ok := interface{}(m.Clock).(interface {
+			SizeVT() int
+		}); ok {
+			l = size.SizeVT()
+		} else {
+			l = proto.Size(m.Clock)
+		}
 		n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
 	}
 	l = len(m.Cursor)
@@ -3721,8 +3825,16 @@ func (m *Request) UnmarshalVT(dAtA []byte) error {
 			if m.Modules == nil {
 				m.Modules = &v1.Modules{}
 			}
-			if err := m.Modules.UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
-				return err
+			if unmarshal, ok := interface{}(m.Modules).(interface {
+				UnmarshalVT([]byte) error
+			}); ok {
+				if err := unmarshal.UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
+					return err
+				}
+			} else {
+				if err := proto.Unmarshal(dAtA[iNdEx:postIndex], m.Modules); err != nil {
+					return err
+				}
 			}
 			iNdEx = postIndex
 		case 10:
@@ -4288,8 +4400,16 @@ func (m *BlockUndoSignal) UnmarshalVT(dAtA []byte) error {
 			if m.LastValidBlock == nil {
 				m.LastValidBlock = &v1.BlockRef{}
 			}
-			if err := m.LastValidBlock.UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
-				return err
+			if unmarshal, ok := interface{}(m.LastValidBlock).(interface {
+				UnmarshalVT([]byte) error
+			}); ok {
+				if err := unmarshal.UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
+					return err
+				}
+			} else {
+				if err := proto.Unmarshal(dAtA[iNdEx:postIndex], m.LastValidBlock); err != nil {
+					return err
+				}
 			}
 			iNdEx = postIndex
 		case 2:
@@ -4323,6 +4443,42 @@ func (m *BlockUndoSignal) UnmarshalVT(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.LastValidCursor = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LastValidBlockTimestamp", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return protohelpers.ErrInvalidLength
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return protohelpers.ErrInvalidLength
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.LastValidBlockTimestamp == nil {
+				m.LastValidBlockTimestamp = &timestamppb.Timestamp{}
+			}
+			if err := (*timestamppb1.Timestamp)(m.LastValidBlockTimestamp).UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -4443,8 +4599,16 @@ func (m *BlockScopedData) UnmarshalVT(dAtA []byte) error {
 			if m.Clock == nil {
 				m.Clock = &v1.Clock{}
 			}
-			if err := m.Clock.UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
-				return err
+			if unmarshal, ok := interface{}(m.Clock).(interface {
+				UnmarshalVT([]byte) error
+			}); ok {
+				if err := unmarshal.UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
+					return err
+				}
+			} else {
+				if err := proto.Unmarshal(dAtA[iNdEx:postIndex], m.Clock); err != nil {
+					return err
+				}
 			}
 			iNdEx = postIndex
 		case 3:

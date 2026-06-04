@@ -3,6 +3,7 @@ syntax = "proto3";
 package sf.substreams.rpc.v2;
 
 import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
 import "sf/firehose/v2/firehose.proto";
 import "sf/substreams/v1/clock.proto";
 import "sf/substreams/v1/modules.proto";
@@ -164,6 +165,7 @@ message BlockUndoSignal {
   // The cursor corresponding to `last_valid_block`. Persist this cursor atomically with
   // your data deletions so that on reconnection the stream resumes from exactly this point.
   string last_valid_cursor = 2;
+  google.protobuf.Timestamp last_valid_block_timestamp = 3;
 }
 
 // BlockScopedData contains the processed output for a single block and is the primary

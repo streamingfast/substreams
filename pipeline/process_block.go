@@ -224,6 +224,7 @@ func (p *Pipeline) processBlock(
 func (p *Pipeline) handleStepStalled(clock *pbsubstreams.Clock) error {
 	p.execOutputCache.HandleStalled(clock)
 	p.forkHandler.removeReversibleOutput(clock.Id)
+	delete(p.reversibleBlockTimestamps, clock.Id)
 	return nil
 }
 
@@ -250,6 +251,7 @@ func (p *Pipeline) handleUndo(clock *pbsubstreams.Clock, cursor *bstream.Cursor,
 	if err := p.forkHandler.handleUndo(clock); err != nil {
 		return fmt.Errorf("reverting outputs: %w", err)
 	}
+	delete(p.reversibleBlockTimestamps, clock.Id)
 
 	if bstream.EqualsBlockRefs(p.insideReorgUpTo, reorgJunctionBlock) {
 		return nil
@@ -264,6 +266,10 @@ func (p *Pipeline) handleUndo(clock *pbsubstreams.Clock, cursor *bstream.Cursor,
 	}
 
 	targetClock := blockRefToPB(reorgJunctionBlock)
+	lastValidBlockTimestamp, found := p.reversibleBlockTimestamps[reorgJunctionBlock.ID()]
+	if !found {
+		reqctx.Logger(p.ctx).Warn("no timestamp found for reorg junction block, last_valid_block_timestamp will be unset in undo signal", zap.Stringer("reorg_junction_block", reorgJunctionBlock))
+	}
 
 	p.lastProcessedBlockRef = reorgJunctionBlock
 	p.lastCursor = targetCursor
@@ -271,8 +277,9 @@ func (p *Pipeline) handleUndo(clock *pbsubstreams.Clock, cursor *bstream.Cursor,
 		&pbsubstreamsrpc.Response{
 			Message: &pbsubstreamsrpc.Response_BlockUndoSignal{
 				BlockUndoSignal: &pbsubstreamsrpc.BlockUndoSignal{
-					LastValidBlock:  targetClock,
-					LastValidCursor: normalizedOpaqueCursor(*targetCursor),
+					LastValidBlock:          targetClock,
+					LastValidCursor:         normalizedOpaqueCursor(*targetCursor),
+					LastValidBlockTimestamp: lastValidBlockTimestamp,
 				},
 			},
 		})
@@ -326,6 +333,7 @@ func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
 		return fmt.Errorf("exec output cache: handle final: %w", err)
 	}
 	p.forkHandler.removeReversibleOutput(clock.Id)
+	delete(p.reversibleBlockTimestamps, clock.Id)
 	return nil
 }
 
@@ -382,6 +390,7 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 		// allow an 'undo' on this 'last' partial block to undo the whole thing -- must be run AFTER the executeModules()
 		// important because we will lose all information on the partialProcessingState
 		p.forkHandler.joinReversibleOutputs(clock, p.partialProcessingState.processedPartials)
+		p.reversibleBlockTimestamps[clock.Id] = clock.Timestamp
 		p.partialProcessingState = nil
 		p.previousLastPartialBlock = bstream.NewBlockRef(clock.Id, clock.Number)
 		p.lastProcessedBlockRef = p.previousLastPartialBlock // acts as new
@@ -435,6 +444,9 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 	}
 
 	p.insideReorgUpTo = nil
+	if !isFinalBlock {
+		p.reversibleBlockTimestamps[clock.Id] = clock.Timestamp
+	}
 	reqDetails := reqctx.Details(ctx)
 
 	if p.respFunc != nil {

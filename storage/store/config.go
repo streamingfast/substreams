@@ -31,7 +31,7 @@ type Config struct {
 	itemSizeLimit  uint64
 }
 
-var StoreSizeLimit uint64 = 1_073_741_824 // 1GiB
+var DefaultStoreSizeLimit uint64 = 1_073_741_824 // 1GiB
 func NewConfig(
 	name string,
 	moduleInitialBlock uint64,
@@ -72,7 +72,7 @@ func NewConfig(
 			if storeSizeLimit != 0 {
 				return storeSizeLimit
 			}
-			return StoreSizeLimit
+			return DefaultStoreSizeLimit
 		}(),
 		itemSizeLimit: 10_485_760, // 10MiB
 	}, nil

@@ -226,6 +226,9 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	if request.EthCallFallbackToNumberDuration > 0 {
 		ctx = reqctx.WithEthCallUseBlockNumberDuration(ctx, time.Duration(request.EthCallFallbackToNumberDuration))
 	}
+	if request.StoreSizeLimit != 0 {
+		ctx = reqctx.WithStoreSizeLimit(ctx, request.StoreSizeLimit)
+	}
 
 	stage := request.OutputModule
 	logger := reqctx.Logger(ctx).Named("tier2").With(zap.String("output_module", stage), zap.Uint64("segment_number", request.SegmentNumber))
@@ -410,7 +413,8 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("new config map: %w", err)
 	}
 
-	storeConfigs, err := store.NewConfigMap(cacheStore, nil, execGraph.Stores(), execGraph.ModuleHashes(), request.FirstStreamableBlock)
+	storeSizeLimit := reqctx.StoreSizeLimit(ctx)
+	storeConfigs, err := store.NewConfigMap(cacheStore, nil, execGraph.Stores(), execGraph.ModuleHashes(), request.FirstStreamableBlock, storeSizeLimit)
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}

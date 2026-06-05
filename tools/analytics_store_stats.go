@@ -116,6 +116,7 @@ func StoreStatsE(cmd *cobra.Command, args []string) error {
 				module.GetKind().(*pbsubstreams.Module_KindStore_).KindStore.ValueType,
 				baseDStore,
 				nil,
+				0,
 			)
 			if err != nil {
 				zlog.Error("creating store config", zap.Error(err))

@@ -45,7 +45,7 @@ func setSubstreamsStoreSizeLimitFromEnv(logger *zap.Logger) {
 	if limit := os.Getenv("SUBSTREAMS_STORE_SIZE_LIMIT"); limit != "" {
 		if parsed, err := strconv.ParseUint(limit, 10, 64); err == nil {
 			logger.Info("using SUBSTREAMS_STORE_SIZE_LIMIT from env var", zap.Uint64("limit", parsed))
-			store.StoreSizeLimit = parsed
+			store.DefaultStoreSizeLimit = parsed
 		} else {
 			logger.Warn("invalid SUBSTREAMS_STORE_SIZE_LIMIT env var", zap.String("string", limit))
 		}

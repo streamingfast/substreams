@@ -9,7 +9,9 @@ import (
 
 type ConfigMap map[string]*Config
 
-func NewConfigMap(baseObjectStore, quickSaveStore dstore.Store, storeModules []*pbsubstreams.Module, moduleHashes map[string]string, firstStreamableBlock uint64) (out ConfigMap, err error) {
+// NewConfigMap creates a ConfigMap for the given store modules.
+// storeSizeLimit, if non-zero, overrides the default StoreSizeLimit for all stores in this map.
+func NewConfigMap(baseObjectStore, quickSaveStore dstore.Store, storeModules []*pbsubstreams.Module, moduleHashes map[string]string, firstStreamableBlock uint64, storeSizeLimit uint64) (out ConfigMap, err error) {
 	out = make(ConfigMap)
 	for _, storeModule := range storeModules {
 		initialBlock := max(firstStreamableBlock, storeModule.InitialBlock)
@@ -21,6 +23,7 @@ func NewConfigMap(baseObjectStore, quickSaveStore dstore.Store, storeModules []*
 			storeModule.GetKindStore().ValueType,
 			baseObjectStore,
 			quickSaveStore,
+			storeSizeLimit,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("new store config for %q: %w", storeModule.Name, err)

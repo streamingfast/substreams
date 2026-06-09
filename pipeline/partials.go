@@ -3,8 +3,10 @@ package pipeline
 import (
 	"bytes"
 	"crypto/md5"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"hash/fnv"
 
 	pbacme "github.com/streamingfast/dummy-blockchain/pb/sf/acme/type/v1"
 	pbeth "github.com/streamingfast/firehose-ethereum/types/pb/sf/ethereum/type/v2"
@@ -60,10 +62,37 @@ func splitPartialblock(execOutput execout.ExecutionOutput, blockType string, pre
 			}
 
 			var hashMismatch bool
-			hasher := md5.New()
+			// fnv64a is non-cryptographic but fast and allocation-free; we only
+			// need to detect that the partial block matches the previous one, not
+			// to defend against collisions. For each trace, in order, we write the
+			// transaction hash and the receipt fields (and its logs) directly into
+			// the hasher. Fields are written by hand rather than via proto
+			// marshalling to avoid the reflection cost on this hot path; the
+			// fixed-width integers double as natural separators between records.
+			hasher := fnv.New64a()
+			var scratch [8]byte
+			writeUint64 := func(v uint64) {
+				binary.LittleEndian.PutUint64(scratch[:], v)
+				hasher.Write(scratch[:])
+			}
 			for i, trx := range block.TransactionTraces {
-				if _, err := hasher.Write([]byte(trx.Hash)); err != nil {
-					return 0, nil, fmt.Errorf("hash transaction: %w", err)
+				hasher.Write(trx.Hash)
+				if r := trx.Receipt; r != nil {
+					hasher.Write(r.StateRoot)
+					writeUint64(r.CumulativeGasUsed)
+					for _, log := range r.Logs {
+						hasher.Write(log.Address)
+						for _, topic := range log.Topics {
+							hasher.Write(topic)
+						}
+						hasher.Write(log.Data)
+					}
+					if r.BlobGasUsed != nil {
+						writeUint64(*r.BlobGasUsed)
+					}
+					if r.BlobGasPrice != nil {
+						hasher.Write(r.BlobGasPrice.Bytes)
+					}
 				}
 				if i+1 == prevTrxCount {
 					if !bytes.Equal(hasher.Sum(nil), expectedHash) {

@@ -80,16 +80,12 @@ func splitPartialblock(execOutput execout.ExecutionOutput, blockType string, pre
 				if r := trx.Receipt; r != nil {
 					hasher.Write(r.StateRoot)
 					writeUint64(r.CumulativeGasUsed)
-					hasher.Write(r.LogsBloom)
 					for _, log := range r.Logs {
 						hasher.Write(log.Address)
 						for _, topic := range log.Topics {
 							hasher.Write(topic)
 						}
 						hasher.Write(log.Data)
-						writeUint64(uint64(log.Index))
-						writeUint64(uint64(log.BlockIndex))
-						writeUint64(log.Ordinal)
 					}
 					if r.BlobGasUsed != nil {
 						writeUint64(*r.BlobGasUsed)

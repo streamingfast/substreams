@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"errors"
 	"fmt"
+	"hash/fnv"
 
 	pbacme "github.com/streamingfast/dummy-blockchain/pb/sf/acme/type/v1"
 	pbeth "github.com/streamingfast/firehose-ethereum/types/pb/sf/ethereum/type/v2"
@@ -60,10 +61,22 @@ func splitPartialblock(execOutput execout.ExecutionOutput, blockType string, pre
 			}
 
 			var hashMismatch bool
-			hasher := md5.New()
+			// fnv64a is non-cryptographic but fast and allocation-free; we only
+			// need to detect that the partial block matches the previous one, not
+			// to defend against collisions. We hash the transaction hash plus a
+			// deterministic marshalling of the receipt (and all its fields) for
+			// each trace, in order.
+			hasher := fnv.New64a()
+			marshalOpts := proto.MarshalOptions{Deterministic: true}
+			var receiptBuf []byte
 			for i, trx := range block.TransactionTraces {
-				if _, err := hasher.Write([]byte(trx.Hash)); err != nil {
-					return 0, nil, fmt.Errorf("hash transaction: %w", err)
+				hasher.Write(trx.Hash)
+				if trx.Receipt != nil {
+					receiptBuf, err = marshalOpts.MarshalAppend(receiptBuf[:0], trx.Receipt)
+					if err != nil {
+						return 0, nil, fmt.Errorf("hash transaction receipt: %w", err)
+					}
+					hasher.Write(receiptBuf)
 				}
 				if i+1 == prevTrxCount {
 					if !bytes.Equal(hasher.Sum(nil), expectedHash) {

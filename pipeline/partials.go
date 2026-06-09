@@ -3,6 +3,7 @@ package pipeline
 import (
 	"bytes"
 	"crypto/md5"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"hash/fnv"
@@ -63,20 +64,39 @@ func splitPartialblock(execOutput execout.ExecutionOutput, blockType string, pre
 			var hashMismatch bool
 			// fnv64a is non-cryptographic but fast and allocation-free; we only
 			// need to detect that the partial block matches the previous one, not
-			// to defend against collisions. We hash the transaction hash plus a
-			// deterministic marshalling of the receipt (and all its fields) for
-			// each trace, in order.
+			// to defend against collisions. For each trace, in order, we write the
+			// transaction hash and the receipt fields (and its logs) directly into
+			// the hasher. Fields are written by hand rather than via proto
+			// marshalling to avoid the reflection cost on this hot path; the
+			// fixed-width integers double as natural separators between records.
 			hasher := fnv.New64a()
-			marshalOpts := proto.MarshalOptions{Deterministic: true}
-			var receiptBuf []byte
+			var scratch [8]byte
+			writeUint64 := func(v uint64) {
+				binary.LittleEndian.PutUint64(scratch[:], v)
+				hasher.Write(scratch[:])
+			}
 			for i, trx := range block.TransactionTraces {
 				hasher.Write(trx.Hash)
-				if trx.Receipt != nil {
-					receiptBuf, err = marshalOpts.MarshalAppend(receiptBuf[:0], trx.Receipt)
-					if err != nil {
-						return 0, nil, fmt.Errorf("hash transaction receipt: %w", err)
+				if r := trx.Receipt; r != nil {
+					hasher.Write(r.StateRoot)
+					writeUint64(r.CumulativeGasUsed)
+					hasher.Write(r.LogsBloom)
+					for _, log := range r.Logs {
+						hasher.Write(log.Address)
+						for _, topic := range log.Topics {
+							hasher.Write(topic)
+						}
+						hasher.Write(log.Data)
+						writeUint64(uint64(log.Index))
+						writeUint64(uint64(log.BlockIndex))
+						writeUint64(log.Ordinal)
 					}
-					hasher.Write(receiptBuf)
+					if r.BlobGasUsed != nil {
+						writeUint64(*r.BlobGasUsed)
+					}
+					if r.BlobGasPrice != nil {
+						hasher.Write(r.BlobGasPrice.Bytes)
+					}
 				}
 				if i+1 == prevTrxCount {
 					if !bytes.Equal(hasher.Sum(nil), expectedHash) {

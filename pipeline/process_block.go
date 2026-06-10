@@ -58,7 +58,7 @@ func (p *Pipeline) ProcessFromExecOutput(
 		return fmt.Errorf("setting up exec output: %w", err)
 	}
 
-	if err = p.processBlock(ctx, execOutput, clock, cursor, bstream.StepNewIrreversible, nil, 0, false); err != nil {
+	if err = p.processBlock(ctx, execOutput, clock, cursor, bstream.StepNewIrreversible, nil, nil, 0, false); err != nil {
 		return err
 	}
 
@@ -86,7 +86,7 @@ func (p *Pipeline) ProcessBlock(block *pbbstream.Block, obj interface{}) (err er
 		return fmt.Errorf("setting up exec output: %w", err)
 	}
 
-	if err = p.processBlock(ctx, execOutput, clock, cursor, step, reorgJunctionBlock, block.PartialIndex, block.LastPartial); err != nil {
+	if err = p.processBlock(ctx, execOutput, clock, cursor, step, reorgJunctionBlock, block.PreviousRef(), block.PartialIndex, block.LastPartial); err != nil {
 		return err // watch out, io.EOF needs to go through undecorated
 	}
 
@@ -116,6 +116,7 @@ func (p *Pipeline) processBlock(
 	cursor *bstream.Cursor,
 	step bstream.StepType,
 	reorgJunctionBlock bstream.BlockRef,
+	parentBlock bstream.BlockRef,
 	partialIndex int32,
 	isLastPartial bool,
 ) (err error) {
@@ -125,7 +126,7 @@ func (p *Pipeline) processBlock(
 	case bstream.StepPartial:
 		p.blockStepMap[bstream.StepPartial]++
 		if reqctx.PartialBlocks(ctx) {
-			if err := p.handleStepPartial(ctx, clock, cursor, execOutput, partialIndex, isLastPartial); err != nil {
+			if err := p.handleStepPartial(ctx, clock, cursor, execOutput, parentBlock, partialIndex, isLastPartial); err != nil {
 				return fmt.Errorf("step partial: %w", err)
 			}
 		}
@@ -133,7 +134,7 @@ func (p *Pipeline) processBlock(
 	case bstream.StepNewPartial:
 		p.blockStepMap[bstream.StepNewPartial]++
 		if reqctx.PartialBlocks(ctx) {
-			if err := p.handleStepPartial(ctx, clock, cursor, execOutput, partialIndex, isLastPartial); err != nil {
+			if err := p.handleStepPartial(ctx, clock, cursor, execOutput, parentBlock, partialIndex, isLastPartial); err != nil {
 				if err == io.EOF {
 					eof = true
 				} else {
@@ -329,7 +330,7 @@ func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
 	return nil
 }
 
-func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput, idx int32, isLast bool) (err error) {
+func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput, parentBlock bstream.BlockRef, idx int32, isLast bool) (err error) {
 	if p.lastProcessedBlockRef != nil && clock.Number <= p.lastProcessedBlockRef.Num() {
 		// this can happen if we got the full block and used it as the 'last partial block'
 		return nil
@@ -358,7 +359,11 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 			// (and undoing) every churning version of the block
 			return nil
 		}
-		p.partialProcessingState = newPartialProcessingState(clock.Number, clock.Id, idx, cursor.HeadBlock) // on StepPartial, the cursor.headBlock is the parent of the partial
+		parent := cursor.HeadBlock // on StepPartial, the cursor.headBlock is the parent of the partial
+		if isLast && parentBlock != nil && parentBlock.ID() != "" {
+			parent = parentBlock // on StepNewPartial, the cursor.headBlock is the actual head block, not the parent
+		}
+		p.partialProcessingState = newPartialProcessingState(clock.Number, clock.Id, idx, parent)
 	}
 
 	txCount, txsHash, err := splitPartialblock(execOutput, p.blockType, p.partialProcessingState.processedTransactionsCount, p.partialProcessingState.processedTransactionsHash)
@@ -390,8 +395,11 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 	if p.isTier1 && p.checkPendingShutdown() {
 		return nil
 	}
-	if p.pendingUndoMessage != nil {
-		return nil
+	if p.pendingUndoMessage != nil && p.gate.shouldSendOutputs() {
+		if err := p.respFunc(p.pendingUndoMessage); err != nil {
+			return fmt.Errorf("failed to send pending undo message: %w", err)
+		}
+		p.pendingUndoMessage = nil
 	}
 	if reqDetails.IsTier2Request {
 		panic("tier2 requests should never receive partial block")
@@ -524,7 +532,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 			if p.partialProcessingState.num == clock.Number && p.partialProcessingState.lastBlockID == clock.Id {
 				// all good, this 'new' block will be used as a 'last partial block'
 
-				if err := p.handleStepPartial(ctx, clock, cursor, execOutput, p.partialProcessingState.highestIndex+1, true); err != nil {
+				if err := p.handleStepPartial(ctx, clock, cursor, execOutput, nil, p.partialProcessingState.highestIndex+1, true); err != nil {
 					return err
 				}
 

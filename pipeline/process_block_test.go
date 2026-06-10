@@ -22,10 +22,41 @@ import (
 
 func TestHandleStepPartial(t *testing.T) {
 	tests := []struct {
-		name              string
-		blocks            []blockWithStep
-		expectedResponses []substreamsResp
+		name               string
+		blocks             []blockWithStep
+		pendingUndoMessage *pbsubstreamsrpc.Response
+		expectedResponses  []substreamsResp
 	}{
+		{
+			name:               "pending undo message is flushed by the first partial block, not muting the stream",
+			pendingUndoMessage: pendingUndoMsg(3, "3a"),
+			blocks: []blockWithStep{
+				withStepNew(testPartialBlock(4, "4b", 1, false)),
+				withStepNew(testPartialBlock(4, "4a", 2, true)),
+				withStepNew(testBlock(5, "5a")),
+			},
+			expectedResponses: []substreamsResp{
+				undoResp(3, "3a"),
+				partialDataResp(4, "4b", 1, false),
+				partialDataResp(4, "4a", 2, true),
+				dataResp(5, "5a"),
+			},
+		},
+		{
+			name:               "pending undo message flushed when resuming on settled partial blocks near head",
+			pendingUndoMessage: pendingUndoMsg(3, "3a"),
+			blocks: []blockWithStep{
+				withStepNew(testPartialBlock(4, "4a", 2, true)),
+				withStepNew(testPartialBlock(5, "5a", 2, true)),
+				withStepNew(testPartialBlock(6, "6b", 1, false)),
+			},
+			expectedResponses: []substreamsResp{
+				undoResp(3, "3a"),
+				partialDataResp(4, "4a", 2, true),
+				partialDataResp(5, "5a", 2, true),
+				partialDataResp(6, "6b", 1, false),
+			},
+		},
 		{
 			name: "bstream test output: happy path with partial block",
 			blocks: []blockWithStep{
@@ -354,6 +385,7 @@ func TestHandleStepPartial(t *testing.T) {
 			pipe.gate.passed = true
 			pipe.blockType = blockType
 			pipe.stateBundleSize = 100
+			pipe.pendingUndoMessage = tt.pendingUndoMessage
 
 			for _, blk := range tt.blocks {
 
@@ -366,7 +398,7 @@ func TestHandleStepPartial(t *testing.T) {
 				case bstream.StepNew:
 					err = pipe.handleStepNew(ctx, clock, testCursor(blk.blk, blk.step), execOutput, false)
 				case bstream.StepPartial, bstream.StepNewPartial: // we always have partial blocks active here
-					err = pipe.handleStepPartial(ctx, clock, testCursor(blk.blk, blk.step), execOutput, blk.blk.PartialIndex, blk.blk.LastPartial)
+					err = pipe.handleStepPartial(ctx, clock, testCursor(blk.blk, blk.step), execOutput, blk.blk.PreviousRef(), blk.blk.PartialIndex, blk.blk.LastPartial)
 				case bstream.StepUndo, bstream.StepUndoPartial:
 					err = pipe.handleStepUndo(clock, testCursor(blk.blk, blk.step), blk.junction)
 				}
@@ -563,6 +595,17 @@ func dataResp(clockNumber uint64, clockID string) substreamsResp {
 		isPartial:     false,
 		partialIndex:  0,
 		isLastPartial: false,
+	}
+}
+
+// pendingUndoMsg builds the undo message installed at stream setup when resuming from a partial cursor
+func pendingUndoMsg(lastValidBlockNum uint64, lastValidBlockID string) *pbsubstreamsrpc.Response {
+	return &pbsubstreamsrpc.Response{
+		Message: &pbsubstreamsrpc.Response_BlockUndoSignal{
+			BlockUndoSignal: &pbsubstreamsrpc.BlockUndoSignal{
+				LastValidBlock: &pbsubstreams.BlockRef{Number: lastValidBlockNum, Id: lastValidBlockID},
+			},
+		},
 	}
 }
 

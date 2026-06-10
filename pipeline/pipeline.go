@@ -101,6 +101,7 @@ type Pipeline struct {
 
 	partialProcessingState   *partialProcessingState
 	previousLastPartialBlock bstream.BlockRef // when we get a partial with 'isLast', we nil out partialProcessingState and write the block ref here.
+	undonePartialsBlockNum   uint64           // when partials for a block number were undone after a transactions mismatch, further non-last partials for that number are dropped until its last partial or full block arrives
 
 	respFunc         substreams.ResponseFunc
 	lastProgressSent time.Time

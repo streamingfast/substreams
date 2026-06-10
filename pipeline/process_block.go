@@ -347,14 +347,37 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 			if err := p.handleStepUndoPartial(cursor); err != nil {
 				return err
 			}
-			// now that we have undone previous partials, we start a new one
-			p.partialProcessingState = newPartialProcessingState(clock.Number, clock.Id, idx, cursor.HeadBlock) //on StepPartial, the cursor.headBlock is the parent of the partial
+			// partialProcessingState is now nil, a new sequence starts below
 		}
-	} else {
-		p.partialProcessingState = newPartialProcessingState(clock.Number, clock.Id, idx, cursor.HeadBlock)
+	}
+
+	if p.partialProcessingState == nil {
+		if clock.Number == p.undonePartialsBlockNum && !isLast {
+			// partials for this block number were already undone after a transactions mismatch:
+			// stay silent until its last partial or full block arrives instead of streaming
+			// (and undoing) every churning version of the block
+			return nil
+		}
+		p.partialProcessingState = newPartialProcessingState(clock.Number, clock.Id, idx, cursor.HeadBlock) // on StepPartial, the cursor.headBlock is the parent of the partial
 	}
 
 	txCount, txsHash, err := splitPartialblock(execOutput, p.blockType, p.partialProcessingState.processedTransactionsCount, p.partialProcessingState.processedTransactionsHash)
+	if errors.Is(err, errHashMismatch) {
+		// this partial block does not extend the transactions already sent for that block number:
+		// it is a different version of the block (a reorg happening inside partial blocks).
+		// Undo the partials sent so far.
+		parentRef := p.partialProcessingState.previousBlockRef // same block number: same parent
+		if err := p.handleStepUndoPartial(cursor); err != nil {
+			return err
+		}
+		if !isLast {
+			p.undonePartialsBlockNum = clock.Number
+			return nil
+		}
+		// the last partial (or full block) settles the block: process it from its first transaction
+		p.partialProcessingState = newPartialProcessingState(clock.Number, clock.Id, idx, parentRef)
+		txCount, txsHash, err = splitPartialblock(execOutput, p.blockType, 0, nil)
+	}
 	if err != nil {
 		// an error occurred, partial blocks do not contain what they should...
 		return err
@@ -373,6 +396,8 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 	if reqDetails.IsTier2Request {
 		panic("tier2 requests should never receive partial block")
 	}
+
+	p.insideReorgUpTo = nil // new data will flow: a future undo back to the same junction must be sent again
 
 	if err := p.executeModules(ctx, execOutput, false, false); err != nil {
 		return fmt.Errorf("execute modules: %w", err)

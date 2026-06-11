@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- Server: `tier1` forkable hub now logs under the `tier1` logger instead of the generic `bstream` package logger, so `processing block` (and related hub) log lines are correctly attributed to the component (requires bstream `hub.WithLogger`).
 - Server: per-block execution timeouts (`--substreams-block-execution-timeout`) are no longer silently swallowed when a WASM host-function panic (e.g. wasmtime) coincides with the deadline. Previously, `recoverExecutionPanic` would return `nil` instead of `CodeDeadlineExceeded`, causing the offending block to be skipped and the stream to complete successfully.
 - CI: Docker image login, build and push are now skipped for fork PRs; image is still built (without push) to validate the Dockerfile.
 

@@ -206,7 +206,7 @@ func (a *Tier1App) Run() error {
 			)
 		})
 
-		forkableHub = hub.NewForkableHub(liveSourceFactory, 200, oneBlocksStore)
+		forkableHub = hub.NewForkableHubWithOptions(liveSourceFactory, 200, oneBlocksStore, []hub.Option{hub.WithLogger(a.logger)})
 		forkableHub.OnTerminated(a.Shutdown)
 
 		go forkableHub.Run()

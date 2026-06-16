@@ -19,7 +19,9 @@ Before creating a sink, you need:
 
 ## Creating a Sink
 
-Navigate to **Sinks** in the sidebar and click **New Sink**.
+Navigate to [**Sinks**](https://thegraph.market/sinks) in the sidebar and click **New Sink**.
+
+![](<../../../assets/add-sinks-graph-market.png>)
 
 ### 1. Basics
 
@@ -32,7 +34,7 @@ Choose how you want to supply the `.spkg`:
 | Source | When to use |
 |---|---|
 | **URL** | The package is hosted at a public URL (e.g., GitHub releases, IPFS). |
-| **Substreams.dev** | The package is published on The Graph Market. Enter its ID (e.g., `mainnet.eth.v0.1.0`). |
+| **Substreams.dev** | The package is published on [the Substreams Registry](https://substreams.dev). Enter its ID (e.g., `ethereum_common@v0.3.3`). |
 | **Binary upload** | Upload a `.spkg` file directly from your machine. |
 
 ### 3. Output

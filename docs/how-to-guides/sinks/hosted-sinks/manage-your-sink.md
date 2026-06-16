@@ -6,6 +6,8 @@ Once a sink is deployed, the sink detail page gives you visibility into its runt
 
 Navigate to **Sinks** and click a sink to open its detail page. The page has three main sections: the runtime summary, the pod list, and the deployment event log.
 
+![](<../../../assets/sink-details-graph-market.png>)
+
 ### Runtime Summary
 
 The summary strip shows four metrics at a glance:

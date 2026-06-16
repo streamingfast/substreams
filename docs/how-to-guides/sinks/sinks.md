@@ -1,17 +1,14 @@
 Once you find a package that fits your needs, you can choose how you want to consume the data. Sinks are integrations that allow you to send the extracted data to different destinations, such as a SQL database, or a file.
 
 {% hint style="info" %}
-**Note**: Some of the sinks are officially supported by StreamingFast (i.e. active support is provided), but other sinks are community-driven and support can't be guaranteed.
+**Note**: Some of the sinks are officially supported by StreamingFast (i.e. active support is provided), but other sinks are community-driven and support can’t be guaranteed.
 {% endhint %}
 
+- [Hosted Sinks](./hosted-sinks/hosted-sinks.md): Let StreamingFast run your sink for you — no infrastructure to manage.
 - [SQL Database](./sql/sql.md): Send the data to a database.
 - [Direct Streaming](./stream/stream.md): Stream data directly from your application.
 - [PubSub](./pubsub.md): Send data to a PubSub topic.
 - [Community Sinks](../sinks/community): Explore quality community maintained sinks.
-
-{% hint style="success" %}
-**Deployable Service**: If you’d like your sink (e.g., SQL or PubSub) to be hosted for you, reach out to the StreamingFast team [here](mailto:sales@streamingfast.io).
-{% endhint %}
 
 ## Navigating Sink Repos
 

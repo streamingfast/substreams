@@ -35,7 +35,6 @@ Choose how you want to supply the `.spkg`:
 |---|---|
 | **URL** | The package is hosted at a public URL (e.g., GitHub releases, IPFS). |
 | **Substreams.dev** | The package is published on [the Substreams Registry](https://substreams.dev). Enter its ID (e.g., `ethereum_common@v0.3.3`). |
-| **Binary upload** | Upload a `.spkg` file directly from your machine. |
 
 ### 3. Output
 

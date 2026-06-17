@@ -6,7 +6,7 @@ Once a sink is deployed, the sink detail page gives you visibility into its runt
 
 Navigate to **Sinks** and click a sink to open its detail page. The page has three main sections: the runtime summary, the pod list, and the deployment event log.
 
-![](<../../../assets/sink-details-graph-market.png>)
+![](<../../../assets/managing-sink.png>)
 
 ### Runtime Summary
 
@@ -68,7 +68,7 @@ Click **Edit** in the top-right toolbar to open the edit modal. Changes take eff
 
 ### Deployment tab
 
-Update the Substreams package source (URL, Substreams.dev ID, or upload a new binary) and the execution config (start block, stop block, output module, filters, parameters).
+Update the Substreams package source (URL or Substreams.dev ID) and the execution config (start block, stop block, output module, filters, parameters).
 
 ### Output tab
 

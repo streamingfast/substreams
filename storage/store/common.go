@@ -14,6 +14,7 @@ import (
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/reqctx"
+	"github.com/streamingfast/substreams/storage/store/marshaller"
 
 	"github.com/shopspring/decimal"
 )
@@ -95,6 +96,26 @@ func loadStoreStream(ctx context.Context, store dstore.Store, filename string) (
 	})
 
 	return
+}
+
+// unmarshalIterInto streams entries from an UnmarshalIter call directly into the kvImpl.
+func unmarshalIterInto(impl KVImpl, um marshaller.StreamMarshaller, reader io.Reader, onTrailer func(deletePrefixes []string)) (uint64, error) {
+	var totalSizeBytes uint64
+
+	trailer, err := impl.Load(um.UnmarshalIter(reader, 10*1024*1024))
+
+	if err != nil {
+		return 0, fmt.Errorf("kv load: %w", err)
+	}
+
+	if trailer != nil {
+		totalSizeBytes = trailer.TotalSizeBytes
+		if onTrailer != nil {
+			onTrailer(trailer.DeletePrefixes)
+		}
+	}
+
+	return totalSizeBytes, nil
 }
 
 // apparently this is faster than append() method

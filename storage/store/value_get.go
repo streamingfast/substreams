@@ -24,7 +24,7 @@ func (b *baseStore) getFirst(key string) ([]byte, bool) {
 		}
 	}
 
-	val, found := b.kv[key]
+	val, found := b.kvImpl.Get(key)
 	return val, found
 }
 
@@ -58,7 +58,7 @@ func (b *baseStore) HasFirst(key string) bool {
 
 	}
 
-	_, found := b.kv[key]
+	_, found := b.kvImpl.Get(key)
 	return found
 }
 
@@ -79,7 +79,7 @@ func (b *baseStore) getLast(key string) ([]byte, bool) {
 		}
 	}
 
-	val, found := b.kv[key]
+	val, found := b.kvImpl.Get(key)
 	return val, found
 }
 
@@ -112,7 +112,7 @@ func (b *baseStore) HasLast(key string) bool {
 		}
 	}
 
-	_, found := b.kv[key]
+	_, found := b.kvImpl.Get(key)
 	return found
 }
 

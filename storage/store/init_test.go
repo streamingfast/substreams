@@ -25,7 +25,7 @@ func newTestBaseStore(
 		appendLimit = 10
 	}
 
-	config, err := NewConfig("test", 0, "test.module.hash", updatePolicy, valueType, store, nil)
+	config, err := NewConfig("test", 0, "test.module.hash", updatePolicy, valueType, store, nil, "")
 	config.appendLimit = appendLimit
 	config.totalSizeLimit = 9999
 	config.itemSizeLimit = 10_485_760
@@ -33,9 +33,9 @@ func newTestBaseStore(
 	return &baseStore{
 		Config:                  config,
 		kvOps:                   &pbssinternal.Operations{},
-		kv:                      make(map[string][]byte),
+		kvImpl:                  newMemoryKVImpl(),
 		logger:                  zap.NewNop(),
-		marshaller:              &marshaller.Binary{},
+		marshaller:              marshaller.Default(),
 		recentlyDeletedPrefixes: make(DeletedPrefixes),
 	}
 }

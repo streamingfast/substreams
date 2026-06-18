@@ -37,6 +37,7 @@ type Tier2Config struct {
 	BlockExecutionTimeout     time.Duration
 	SegmentExecutionTimeout   time.Duration
 	TmpDir                    string
+	StoresScratchSpace        string
 
 	Tracing bool
 }
@@ -104,6 +105,10 @@ func (a *Tier2App) Run() error {
 	}
 	if a.config.WASMExtensions != nil {
 		opts = append(opts, service.WithWASMExtensioner(a.config.WASMExtensions))
+	}
+
+	if a.config.StoresScratchSpace != "" {
+		opts = append(opts, service.WithStoresScratchSpace(a.config.StoresScratchSpace))
 	}
 
 	svc, err := service.NewTier2(

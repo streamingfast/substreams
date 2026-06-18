@@ -1,17 +1,14 @@
 package store
 
 import (
-	"bytes"
 	"context"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"math"
 	"math/big"
 
 	"github.com/shopspring/decimal"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"github.com/streamingfast/substreams/storage/store/marshaller"
 	"go.uber.org/zap"
 )
 
@@ -29,7 +26,10 @@ type PartialKV struct {
 
 func (p *PartialKV) Roll(lastBlock uint64) {
 	p.initialBlock = lastBlock
-	p.baseStore.kv = map[string][]byte{}
+	// Reset the KV impl
+	if err := p.baseStore.kvImpl.Clear(); err != nil {
+		panic(fmt.Sprintf("failed to clear kv impl: %v", err))
+	}
 }
 
 func (p *PartialKV) InitialBlock() uint64 { return p.initialBlock }
@@ -38,74 +38,35 @@ func (p *PartialKV) Load(ctx context.Context, file *FileInfo) error {
 	p.loadedFrom = file.Filename
 	p.logger.Debug("loading partial store state from file", zap.String("filename", file.Filename))
 
-	var storeData *marshaller.StoreData
-	var size uint64
+	reader, err := loadStoreStream(ctx, p.objStore, file.Filename)
+	if err != nil {
+		return fmt.Errorf("load store stream: %w", err)
+	}
+	defer reader.Close()
 
-	if unmarshaller, ok := p.marshaller.(marshaller.StreamMarshaller); ok {
-		reader, err := loadStoreStream(ctx, p.objStore, file.Filename)
-		if err != nil {
-			return fmt.Errorf("load store stream: %w", err)
-		}
-		defer reader.Close()
-		storeData, size, err = unmarshaller.UnmarshalStream(reader, 10*1024*1024) // TODO: bubble up approximation of store size here
-		if err != nil {
-			return fmt.Errorf("unmarshal store (streaming): %w", err)
-		}
-	} else {
-		data, err := loadStore(ctx, p.objStore, file.Filename)
-		if err != nil {
-			return fmt.Errorf("load full store %s at %s: %w", p.name, file.Filename, err)
-		}
-		storeData, size, err = p.marshaller.Unmarshal(data)
-		if err != nil {
-			return fmt.Errorf("unmarshal store: %w", err)
-		}
+	size, err := unmarshalIterInto(p.kvImpl, p.marshaller, reader, func(deletePrefixes []string) {
+		p.DeletedPrefixes = deletePrefixes
+	})
+	if err != nil {
+		return fmt.Errorf("unmarshal store (streaming): %w", err)
 	}
 
-	p.kv = storeData.Kv
-	if p.kv == nil {
-		p.kv = map[string][]byte{}
-	}
-	p.totalSizeBytes = size
-	p.DeletedPrefixes = storeData.DeletePrefixes
-
-	p.logger.Debug("partial store loaded", zap.String("filename", file.Filename), zap.Int("key_count", len(p.kv)), zap.Uint64("data_size", size))
+	p.logger.Debug("partial store loaded", zap.String("filename", file.Filename), zap.Int("key_count", p.kvImpl.KeyCount()), zap.Uint64("data_size", size))
 	return nil
 }
 
 func (p *PartialKV) Save(endBoundaryBlock uint64) (*FileInfo, *fileWriter, error) {
 	p.logger.Debug("writing partial store state", zap.Object("store", p))
 
-	stateData := &marshaller.StoreData{
-		Kv:             p.kv,
-		DeletePrefixes: p.DeletedPrefixes,
-	}
-
 	file := NewPartialFileInfo(p.name, p.initialBlock, endBoundaryBlock)
 	p.logger.Debug("partial store save written", zap.String("file_name", file.Filename), zap.Stringer("block_range", file.Range))
 
-	var fw *fileWriter
+	reader := p.marshaller.MarshalStreamIter(p.kvImpl.Iter, p.DeletedPrefixes, int64(p.totalSizeBytes))
 
-	// New streaming marshaller support
-	if marshaller, ok := p.marshaller.(marshaller.StreamMarshaller); ok && p.totalSizeBytes > 524288 { // we don't use the streaming approach for payloads below 512kiB, it is slower
-		reader := marshaller.MarshalStream(stateData, int64(p.totalSizeBytes))
-
-		fw = &fileWriter{
-			store:    p.objStore,
-			filename: file.Filename,
-			reader:   reader,
-		}
-	} else {
-		content, err := p.marshaller.Marshal(stateData)
-		if err != nil {
-			return nil, nil, fmt.Errorf("marshal kv state: %w", err)
-		}
-
-		fw = &fileWriter{
-			store:    p.objStore,
-			filename: file.Filename,
-			reader:   io.NopCloser(bytes.NewReader(content)),
-		}
+	fw := &fileWriter{
+		store:    p.objStore,
+		filename: file.Filename,
+		reader:   reader,
 	}
 
 	return file, fw, nil
@@ -130,7 +91,7 @@ func (p *PartialKV) DeleteStore(ctx context.Context, file *FileInfo) (err error)
 }
 
 func (p *PartialKV) String() string {
-	return fmt.Sprintf("partialKV name %s moduleInitialBlock %d  keyCount %d deltasCount %d loadFrom %s", p.Name(), p.moduleInitialBlock, len(p.kv), len(p.deltas), p.loadedFrom)
+	return fmt.Sprintf("partialKV name %s moduleInitialBlock %d  keyCount %d deltasCount %d loadFrom %s", p.Name(), p.moduleInitialBlock, p.kvImpl.KeyCount(), len(p.deltas), p.loadedFrom)
 }
 
 func valueToFloat64(value []byte) float64 {

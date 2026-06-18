@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dauth"
 	dauthnull "github.com/streamingfast/dauth/null"
@@ -138,7 +137,7 @@ func startTier1App(t *testing.T, ctx context.Context, tmpDir string, container t
 	relayerPort, err := container.MappedPort(ctx, "10014/tcp")
 	require.NoError(t, err)
 
-	relayerEndpoint := fmt.Sprintf("localhost:%d", relayerPort.Int())
+	relayerEndpoint := fmt.Sprintf("localhost:%s", relayerPort.Port())
 	t.Logf("Tier1App relayer endpoint: %s", relayerEndpoint)
 
 	listenPort := findFreePort(t)
@@ -277,9 +276,9 @@ func newDummyBlockchainContainer(ctx context.Context, tmpDir string, image strin
 			"DLOG": ".*=debug",
 		},
 		ExposedPorts: []string{"10014/tcp"},
-		HostConfigModifier: func(hostConfig *container.HostConfig) {
-			hostConfig.Binds = []string{tmpDir + ":/app/firehose-data/storage/"}
-		},
+		Mounts: testcontainers.Mounts(
+			testcontainers.BindMount(tmpDir, "/app/firehose-data/storage/"),
+		),
 		WaitingFor: wait.ForAll(
 			wait.ForListeningPort("10014/tcp"),
 			wait.ForLog("serving gRPC").WithStartupTimeout(30*time.Second),

@@ -94,6 +94,7 @@ type Tier2Service struct {
 	foundationalEndpoints     map[string]string
 
 	checkPendingShutdown func() bool
+	storesScratchSpace   string
 
 	tier2RequestParameters *reqctx.Tier2RequestParameters
 
@@ -404,7 +405,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("new config map: %w", err)
 	}
 
-	storeConfigs, err := store.NewConfigMap(cacheStore, nil, execGraph.Stores(), execGraph.ModuleHashes(), request.FirstStreamableBlock)
+	storeConfigs, err := store.NewConfigMap(cacheStore, nil, execGraph.Stores(), execGraph.ModuleHashes(), request.FirstStreamableBlock, s.storesScratchSpace)
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}

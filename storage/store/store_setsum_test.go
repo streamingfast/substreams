@@ -71,7 +71,7 @@ func TestStoreSetSumInt64(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			b := newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, "", nil)
 			if test.existingValue != nil {
-				b.kv[test.key] = test.existingValue
+				b.kvImpl.Set(test.key, test.existingValue)
 				b.totalSizeBytes += uint64(len(test.key) + len(test.existingValue))
 			}
 
@@ -158,7 +158,7 @@ func TestStoreSetSumFloat64(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			b := newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, "", nil)
 			if test.existingValue != nil {
-				b.kv[test.key] = test.existingValue
+				b.kvImpl.Set(test.key, test.existingValue)
 				b.totalSizeBytes += uint64(len(test.key) + len(test.existingValue))
 			}
 
@@ -244,7 +244,7 @@ func TestStoreSetSumBigInt(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			b := newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, "", nil)
 			if test.existingValue != nil {
-				b.kv[test.key] = test.existingValue
+				b.kvImpl.Set(test.key, test.existingValue)
 				b.totalSizeBytes += uint64(len(test.key) + len(test.existingValue))
 			}
 
@@ -330,7 +330,7 @@ func TestStoreSetSumBigDecimal(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			b := newTestBaseStore(t, pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM, "", nil)
 			if test.existingValue != nil {
-				b.kv[test.key] = test.existingValue
+				b.kvImpl.Set(test.key, test.existingValue)
 				b.totalSizeBytes += uint64(len(test.key) + len(test.existingValue))
 			}
 

@@ -18,6 +18,7 @@ type RuntimeConfig struct {
 	BaseObjectStore        dstore.Store
 	QuickSaveStore         dstore.Store
 	DefaultCacheTag        string // appended to BaseObjectStore unless overridden by auth layer
+	StoresScratchSpace     string // local directory for ephemeral store files (e.g. bbolt); uses OS temp dir if empty
 	ClientFactory          client.InternalClientFactory
 	WorkerPoolFactory      work.WorkerPoolFactory
 	ModuleExecutionTracing bool
@@ -32,6 +33,7 @@ func NewTier1RuntimeConfig(
 	defaultCacheTag string,
 	clientFactory client.InternalClientFactory,
 	WorkerPoolFactory work.WorkerPoolFactory,
+	storesScratchSpace string,
 ) RuntimeConfig {
 	return RuntimeConfig{
 		SegmentSize:                segmentSize,
@@ -42,6 +44,7 @@ func NewTier1RuntimeConfig(
 		DefaultCacheTag:            defaultCacheTag,
 		ClientFactory:              clientFactory,
 		WorkerPoolFactory:          WorkerPoolFactory,
+		StoresScratchSpace:         storesScratchSpace,
 		// overridden by Tier Options
 		ModuleExecutionTracing: false,
 	}

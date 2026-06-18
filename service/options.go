@@ -94,3 +94,14 @@ func WithFoundationalStoreEndpoints(endpoints map[string]string) Option {
 		}
 	}
 }
+
+func WithStoresScratchSpace(path string) Option {
+	return func(a anyTierService) {
+		switch s := a.(type) {
+		case *Tier1Service:
+			s.runtimeConfig.StoresScratchSpace = path
+		case *Tier2Service:
+			s.storesScratchSpace = path
+		}
+	}
+}

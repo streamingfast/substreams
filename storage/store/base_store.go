@@ -14,13 +14,13 @@ import (
 type baseStore struct {
 	*Config
 
-	kv    map[string][]byte        // kv is the state, and assumes all deltas were already applied to it.
-	kvOps *pbssinternal.Operations // operations to the curent block called from the WASM module
+	kvImpl KVImpl                   // the storage implementation (bbolt mmap by default, in-memory map for backward compat)
+	kvOps  *pbssinternal.Operations // operations to the curent block called from the WASM module
 	// deltas are always deltas for the given block. they are produced when store is flushed
 	// 	and used to read back in the store at different ordinals
 	deltas                  []*pbsubstreams.StoreDelta
 	lastOrdinal             uint64
-	marshaller              marshaller.Marshaller
+	marshaller              marshaller.StreamMarshaller
 	totalSizeBytes          uint64
 	recentlyDeletedPrefixes DeletedPrefixes // we cache them here to speed up future deletePrefix()
 
@@ -39,7 +39,7 @@ func (b *baseStore) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	enc.AddString("name", b.name)
 	enc.AddString("hash", b.moduleHash)
 	enc.AddUint64("module_initial_block", b.moduleInitialBlock)
-	enc.AddInt("key_count", len(b.kv))
+	enc.AddInt("key_count", b.kvImpl.KeyCount())
 	enc.AddUint64("total_size_bytes", b.totalSizeBytes)
 
 	return nil
@@ -47,11 +47,18 @@ func (b *baseStore) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 
 func (b *baseStore) Reset() {
 	if tracer.Enabled() {
-		b.logger.Debug("flushing store", zap.Int("delta_count", len(b.deltas)), zap.Int("entry_count", len(b.kv)), zap.Uint64("total_size_bytes", b.totalSizeBytes))
+		b.logger.Debug("flushing store", zap.Int("delta_count", len(b.deltas)), zap.Int("entry_count", b.kvImpl.KeyCount()), zap.Uint64("total_size_bytes", b.totalSizeBytes))
 	}
 	b.kvOps = &pbssinternal.Operations{}
 	b.deltas = nil
 	b.lastOrdinal = 0
+}
+
+func (b *baseStore) Close() error {
+	if b.kvImpl != nil {
+		return b.kvImpl.Close()
+	}
+	return nil
 }
 
 func (b *baseStore) ReadOps() []byte {

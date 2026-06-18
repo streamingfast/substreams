@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"iter"
 	"sync"
 
 	pbstore "github.com/streamingfast/substreams/storage/store/marshaller/pb"
@@ -74,10 +75,230 @@ func (p *VTproto) Marshal(data *StoreData) ([]byte, error) {
 // MarshalStream returns an io.ReadCloser that streams the marshaled data.
 // The data is assumed to not change until the returned ReadCloser is closed.
 // estimatedSize is used for buffer optimization; use 0 for auto-sizing.
-// MarshalStream returns an io.ReadCloser that streams the marshaled data.
 // IMPORTANT: The caller MUST call Close() on the returned ReadCloser to prevent resource leaks.
 func (p *VTproto) MarshalStream(data *StoreData, estimatedSize int64) io.ReadCloser {
 	return newFastStreamingMarshaler(data, estimatedSize)
+}
+
+// UnmarshalIter streams entries from reader one at a time, yielding each KV pair
+// without materializing the full map. This is the production load path for mmap:
+// bytes → UnmarshalIter → LoadFromStream → bbolt, with no intermediate map allocation.
+func (p *VTproto) UnmarshalIter(reader io.Reader, estimatedSize int64) iter.Seq2[StoreDataEntry, error] {
+	return func(yield func(StoreDataEntry, error) bool) {
+		bufferSize := int64(32768)
+		if estimatedSize > 0 {
+			proposed := estimatedSize / 16
+			if proposed > 1048576 {
+				proposed = 1048576
+			}
+			if proposed < 32768 {
+				proposed = 32768
+			}
+			bufferSize = proposed
+		}
+
+		br := bufio.NewReaderSize(reader, int(bufferSize))
+
+		workBuf := make([]byte, max(65536, int(estimatedSize/8)))
+
+		readVarint := func() (uint64, error) {
+			var value uint64
+			var shift uint
+			for {
+				if shift >= 64 {
+					return 0, pbstore.ErrIntOverflow
+				}
+				b, err := br.ReadByte()
+				if err != nil {
+					return 0, err
+				}
+				value |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+				shift += 7
+			}
+			return value, nil
+		}
+
+		readExact := func(n int) ([]byte, error) {
+			if n > len(workBuf) {
+				workBuf = make([]byte, n*2)
+			}
+			_, err := io.ReadFull(br, workBuf[:n])
+			return workBuf[:n], err
+		}
+
+		var totalSizeBytes uint64
+
+		for {
+			wire, err := readVarint()
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				yield(StoreDataEntry{}, err)
+				return
+			}
+
+			fieldNum := int32(wire >> 3)
+			wireType := int(wire & 0x7)
+
+			if wireType == 4 {
+				yield(StoreDataEntry{}, fmt.Errorf("proto: StoreData: wiretype end group for non-group"))
+				return
+			}
+			if fieldNum <= 0 {
+				yield(StoreDataEntry{}, fmt.Errorf("proto: StoreData: illegal tag %d (wire type %d)", fieldNum, wire))
+				return
+			}
+
+			switch fieldNum {
+			case 1: // kv entry
+				if wireType != 2 {
+					yield(StoreDataEntry{}, fmt.Errorf("proto: wrong wireType = %d for field Kv", wireType))
+					return
+				}
+				msglen, err := readVarint()
+				if err != nil {
+					yield(StoreDataEntry{}, err)
+					return
+				}
+				entryData, err := readExact(int(msglen))
+				if err != nil {
+					yield(StoreDataEntry{}, err)
+					return
+				}
+
+				var mapkey string
+				var mapvalue []byte
+				iNdEx := 0
+				l := int(msglen)
+				for iNdEx < l {
+					var w uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							yield(StoreDataEntry{}, pbstore.ErrIntOverflow)
+							return
+						}
+						if iNdEx >= l {
+							yield(StoreDataEntry{}, io.ErrUnexpectedEOF)
+							return
+						}
+						b := entryData[iNdEx]
+						iNdEx++
+						w |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					fn := int32(w >> 3)
+					if fn == 1 {
+						var slen uint64
+						for shift := uint(0); ; shift += 7 {
+							if shift >= 64 {
+								yield(StoreDataEntry{}, pbstore.ErrIntOverflow)
+								return
+							}
+							if iNdEx >= l {
+								yield(StoreDataEntry{}, io.ErrUnexpectedEOF)
+								return
+							}
+							b := entryData[iNdEx]
+							iNdEx++
+							slen |= uint64(b&0x7F) << shift
+							if b < 0x80 {
+								break
+							}
+						}
+						end := iNdEx + int(slen)
+						if end > l {
+							yield(StoreDataEntry{}, io.ErrUnexpectedEOF)
+							return
+						}
+						mapkey = unsafeGetString(entryData[iNdEx:end])
+						iNdEx = end
+					} else if fn == 2 {
+						var vlen uint64
+						for shift := uint(0); ; shift += 7 {
+							if shift >= 64 {
+								yield(StoreDataEntry{}, pbstore.ErrIntOverflow)
+								return
+							}
+							if iNdEx >= l {
+								yield(StoreDataEntry{}, io.ErrUnexpectedEOF)
+								return
+							}
+							b := entryData[iNdEx]
+							iNdEx++
+							vlen |= uint64(b&0x7F) << shift
+							if b < 0x80 {
+								break
+							}
+						}
+						end := iNdEx + int(vlen)
+						if end > l {
+							yield(StoreDataEntry{}, io.ErrUnexpectedEOF)
+							return
+						}
+						// copy value — entryData is a shared workBuf slice
+						mapvalue = make([]byte, int(vlen))
+						copy(mapvalue, entryData[iNdEx:end])
+						iNdEx = end
+					} else {
+						skippy, err := skipInBuffer(entryData[iNdEx:])
+						if err != nil {
+							yield(StoreDataEntry{}, err)
+							return
+						}
+						iNdEx += skippy
+					}
+				}
+
+				totalSizeBytes += uint64(len(mapkey) + len(mapvalue))
+				if !yield(StoreDataEntry{kv: KeyValue{Key: mapkey, Value: mapvalue}}, nil) {
+					return
+				}
+
+			case 2: // delete_prefixes — emit as trailer at end, collect for now
+				if wireType != 2 {
+					yield(StoreDataEntry{}, fmt.Errorf("proto: wrong wireType = %d for field DeletePrefixes", wireType))
+					return
+				}
+				slen, err := readVarint()
+				if err != nil {
+					yield(StoreDataEntry{}, err)
+					return
+				}
+				data, err := readExact(int(slen))
+				if err != nil {
+					yield(StoreDataEntry{}, err)
+					return
+				}
+				prefix := string(data)
+				if !yield(StoreDataEntry{sdt: &StoreDataTrailer{DeletePrefixes: []string{prefix}}}, nil) {
+					return
+				}
+
+			default:
+				if err := skipFieldFromBufferedReader(br, wireType); err != nil {
+					yield(StoreDataEntry{}, err)
+					return
+				}
+			}
+		}
+
+		// Emit final trailer with total size
+		yield(StoreDataEntry{sdt: &StoreDataTrailer{TotalSizeBytes: totalSizeBytes}}, nil)
+	}
+}
+
+// MarshalStreamIter streams marshal directly from a key-value iterator, bypassing
+// the intermediate map[string][]byte allocation. The iterator must yield keys in
+// lexicographic order (bbolt Iter guarantees this).
+// IMPORTANT: The caller MUST call Close() on the returned ReadCloser to prevent resource leaks.
+func (p *VTproto) MarshalStreamIter(iter func(fn func(key string, value []byte) error) error, deletePrefixes []string, estimatedSize int64) io.ReadCloser {
+	return newFastStreamingMarshalerFromIter(iter, deletePrefixes, estimatedSize)
 }
 
 // fastStreamingMarshaler is a high-performance streaming marshaler that pre-computes
@@ -149,6 +370,47 @@ func (f *fastStreamingMarshaler) precomputeChunks(data *StoreData, estimatedSize
 			currentChunk = make([]byte, 0, chunkSize)
 		}
 
+		currentChunk = f.appendDeletePrefixField(currentChunk, prefix, varintBuf[:])
+	}
+
+	if len(currentChunk) > 0 {
+		f.chunks = append(f.chunks, currentChunk)
+	}
+}
+
+func newFastStreamingMarshalerFromIter(iter func(fn func(key string, value []byte) error) error, deletePrefixes []string, estimatedSize int64) *fastStreamingMarshaler {
+	m := &fastStreamingMarshaler{}
+	m.precomputeChunksFromIter(iter, deletePrefixes, estimatedSize)
+	return m
+}
+
+// precomputeChunksFromIter is like precomputeChunks but reads from a KVImpl.Iter callback
+// instead of a map. Keys arrive in lexicographic order so no sorting is needed.
+func (f *fastStreamingMarshaler) precomputeChunksFromIter(iter func(fn func(key string, value []byte) error) error, deletePrefixes []string, estimatedSize int64) {
+	chunkSize := 128 * 1024
+	if estimatedSize > 50*1024*1024 {
+		chunkSize = 512 * 1024
+	}
+
+	varintBuf := [10]byte{}
+	currentChunk := make([]byte, 0, chunkSize)
+
+	_ = iter(func(key string, value []byte) error {
+		fieldSize := f.calculateKVFieldSize(key, value)
+		if len(currentChunk)+fieldSize > chunkSize && len(currentChunk) > 0 {
+			f.chunks = append(f.chunks, currentChunk)
+			currentChunk = make([]byte, 0, chunkSize)
+		}
+		currentChunk = f.appendKVField(currentChunk, key, value, varintBuf[:])
+		return nil
+	})
+
+	for _, prefix := range deletePrefixes {
+		fieldSize := varintSize(2<<3|2) + varintSize(uint64(len(prefix))) + len(prefix)
+		if len(currentChunk)+fieldSize > chunkSize && len(currentChunk) > 0 {
+			f.chunks = append(f.chunks, currentChunk)
+			currentChunk = make([]byte, 0, chunkSize)
+		}
 		currentChunk = f.appendDeletePrefixField(currentChunk, prefix, varintBuf[:])
 	}
 

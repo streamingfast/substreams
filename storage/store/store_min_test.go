@@ -48,9 +48,9 @@ func TestStoreSetMinBigInt(t *testing.T) {
 	}
 
 	initTestStore := func(b *baseStore, key string, value *big.Int) {
-		b.kv = map[string][]byte{}
+		b.kvImpl.Load(mapToIter(map[string][]byte{}))
 		if value != nil {
-			b.kv[key] = []byte(value.String())
+			b.kvImpl.Set(key, []byte(value.String()))
 		}
 	}
 
@@ -114,9 +114,9 @@ func TestStoreSetMinInt64(t *testing.T) {
 	}
 
 	initTestStore := func(b *baseStore, key string, value *int64) {
-		b.kv = map[string][]byte{}
+		b.kvImpl.Load(mapToIter(map[string][]byte{}))
 		if value != nil {
-			b.kv[key] = []byte(fmt.Sprintf("%d", *value))
+			b.kvImpl.Set(key, []byte(fmt.Sprintf("%d", *value)))
 		}
 	}
 
@@ -181,9 +181,9 @@ func TestStoreSetMinFloat64(t *testing.T) {
 	}
 
 	initTestStore := func(b *baseStore, key string, value *float64) {
-		b.kv = map[string][]byte{}
+		b.kvImpl.Load(mapToIter(map[string][]byte{}))
 		if value != nil {
-			b.kv[key] = []byte(strconv.FormatFloat(*value, 'g', 100, 64))
+			b.kvImpl.Set(key, []byte(strconv.FormatFloat(*value, 'g', 100, 64)))
 		}
 	}
 
@@ -243,9 +243,9 @@ func TestStoreSetMinBigFloat(t *testing.T) {
 	}
 
 	initTestStore := func(b *baseStore, key string, value decimal.Decimal) {
-		b.kv = map[string][]byte{}
+		b.kvImpl.Load(mapToIter(map[string][]byte{}))
 		if value != nilDecimal {
-			b.kv[key] = []byte(value.String())
+			b.kvImpl.Set(key, []byte(value.String()))
 		}
 	}
 

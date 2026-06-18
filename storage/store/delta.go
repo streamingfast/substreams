@@ -56,7 +56,9 @@ func (b *baseStore) ApplyDelta(delta *pbsubstreams.StoreDelta) {
 	case pbsubstreams.StoreDelta_UPDATE:
 		b.recentlyDeletedPrefixes.RemoveMatching(delta.Key)
 
-		b.kv[delta.Key] = delta.NewValue
+		if err := b.kvImpl.Set(delta.Key, delta.NewValue); err != nil {
+			panic(fmt.Sprintf("failed to set key %q: %v", delta.Key, err))
+		}
 		switch {
 		case newSize > oldSize:
 			b.totalSizeBytes += (newSize - oldSize)
@@ -67,12 +69,16 @@ func (b *baseStore) ApplyDelta(delta *pbsubstreams.StoreDelta) {
 	case pbsubstreams.StoreDelta_CREATE:
 		b.recentlyDeletedPrefixes.RemoveMatching(delta.Key)
 
-		b.kv[delta.Key] = delta.NewValue
+		if err := b.kvImpl.Set(delta.Key, delta.NewValue); err != nil {
+			panic(fmt.Sprintf("failed to set key %q: %v", delta.Key, err))
+		}
 		b.totalSizeBytes += newSize
 		b.totalSizeBytes += keySize
 
 	case pbsubstreams.StoreDelta_DELETE:
-		delete(b.kv, delta.Key)
+		if err := b.kvImpl.Delete(delta.Key); err != nil {
+			panic(fmt.Sprintf("failed to delete key %q: %v", delta.Key, err))
+		}
 		b.totalSizeBytes -= oldSize
 		b.totalSizeBytes -= keySize
 		return
@@ -100,7 +106,9 @@ func (b *baseStore) ApplyDeltasReverse(deltas []*pbsubstreams.StoreDelta) {
 		keySize := uint64(len(delta.Key))
 		switch delta.Operation {
 		case pbsubstreams.StoreDelta_UPDATE:
-			b.kv[delta.Key] = delta.OldValue
+			if err := b.kvImpl.Set(delta.Key, delta.OldValue); err != nil {
+				panic(fmt.Sprintf("failed to set key %q: %v", delta.Key, err))
+			}
 			switch {
 			case newSize > oldSize:
 				b.totalSizeBytes -= (newSize - oldSize)
@@ -109,12 +117,16 @@ func (b *baseStore) ApplyDeltasReverse(deltas []*pbsubstreams.StoreDelta) {
 			}
 
 		case pbsubstreams.StoreDelta_CREATE:
-			delete(b.kv, delta.Key)
+			if err := b.kvImpl.Delete(delta.Key); err != nil {
+				panic(fmt.Sprintf("failed to delete key %q: %v", delta.Key, err))
+			}
 			b.totalSizeBytes -= newSize
 			b.totalSizeBytes -= keySize
 
 		case pbsubstreams.StoreDelta_DELETE:
-			b.kv[delta.Key] = delta.OldValue
+			if err := b.kvImpl.Set(delta.Key, delta.OldValue); err != nil {
+				panic(fmt.Sprintf("failed to set key %q: %v", delta.Key, err))
+			}
 			b.totalSizeBytes += oldSize
 			b.totalSizeBytes += keySize
 			return

@@ -1106,6 +1106,7 @@ go.etcd.io/etcd/client/v2 v2.305.6 h1:fIDR0p4KMjw01MJMfUIDWdQbjo06PD6CeYM5z4EHLi
 go.etcd.io/etcd/client/v2 v2.305.6/go.mod h1:BHha8XJGe8vCIBfWBpbBLVZ4QjOIlfoouvOwydu63E0=
 go.etcd.io/etcd/client/v3 v3.5.6 h1:coLs69PWCXE9G4FKquzNaSHrRyMCAXwF+IX1tAPVO8E=
 go.etcd.io/etcd/client/v3 v3.5.6/go.mod h1:f6GRinRMCsFVv9Ht42EyY7nfsVGwrNO0WEoS2pRKzQk=
+go.etcd.io/gofail v0.2.0/go.mod h1:nL3ILMGfkXTekKI3clMBNazKnjUZjYLKmBHzsVAnC1o=
 go.opencensus.io v0.23.0/go.mod h1:XItmlyltB5F7CS4xOC1DcqMoFqwtC6OG2xF7mCv7P7E=
 go.opentelemetry.io/auto/sdk v1.1.0/go.mod h1:3wSPjt5PWp2RhlCcmmOial7AvC4DQqZb7a7wCow3W8A=
 go.opentelemetry.io/contrib/detectors/gcp v1.9.0/go.mod h1:OqG0FEnmWeJWYVrEovaHXHXY4bVTnp/WfTzhwrsGWlw=

@@ -182,6 +182,7 @@ func NewTier1(
 	outputBufferSize uint64,
 	sessionPool dsession.SessionPool,
 	foundationalEndpoints map[string]string,
+	storesScratchSpace string,
 	opts ...Option,
 ) (*Tier1Service, error) {
 
@@ -199,6 +200,7 @@ func NewTier1(
 		defaultCacheTag,
 		clientFactory,
 		workerPoolFactory.WorkerPool,
+		storesScratchSpace,
 	)
 
 	sf := &StreamFactory{
@@ -728,7 +730,7 @@ func (s *Tier1Service) blocks(
 		return fmt.Errorf("new config map: %w", err)
 	}
 
-	storeConfigs, err := store.NewConfigMap(cacheStore, quickSaveStore, execGraph.Stores(), execGraph.ModuleHashes(), chainFirstStreamableBlock)
+	storeConfigs, err := store.NewConfigMap(cacheStore, quickSaveStore, execGraph.Stores(), execGraph.ModuleHashes(), chainFirstStreamableBlock, s.runtimeConfig.StoresScratchSpace)
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}

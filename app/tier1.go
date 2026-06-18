@@ -75,6 +75,7 @@ type Tier1Config struct {
 
 	TmpDir                  string
 	StateStoreURL           string
+	StoresScratchSpace      string
 	QuickSaveStoreURL       string
 	StateStoreDefaultTag    string
 	BlockType               string
@@ -280,6 +281,7 @@ func (a *Tier1App) Run() error {
 		a.config.OutputBufferSize,
 		a.modules.SessionPool,
 		foundationalStoreEndpoints,
+		a.config.StoresScratchSpace,
 		opts...,
 	)
 	if err != nil {

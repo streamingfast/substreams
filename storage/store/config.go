@@ -29,6 +29,8 @@ type Config struct {
 	appendLimit    uint64
 	totalSizeLimit uint64
 	itemSizeLimit  uint64
+
+	scratchSpace string // local directory for ephemeral store files
 }
 
 var StoreSizeLimit uint64 = 1_073_741_824 // 1GiB
@@ -40,6 +42,7 @@ func NewConfig(
 	valueType string,
 	store dstore.Store,
 	quickSaveStore dstore.Store,
+	scratchSpace string,
 ) (*Config, error) {
 	subStore, err := store.SubStore(fmt.Sprintf("%s/states", moduleHash))
 	if err != nil {
@@ -69,14 +72,27 @@ func NewConfig(
 		appendLimit:        8_388_608, // 8MiB = 8 * 1024 * 1024,
 		totalSizeLimit:     StoreSizeLimit,
 		itemSizeLimit:      10_485_760, // 10MiB
+		scratchSpace:       scratchSpace,
 	}, nil
 }
 
 func (c *Config) newBaseStore(logger *zap.Logger) *baseStore {
+	return c.newBaseStoreWithBackend(logger, &MmapBackendConfig{ScratchSpace: c.scratchSpace})
+}
+
+func (c *Config) newBaseStoreWithBackend(logger *zap.Logger, backend KVImplBackendConfig) *baseStore {
+	kvImplCfg := DefaultKVImplConfig(c.name, c.moduleHash, backend)
+
+	kvImpl, err := kvImplCfg.NewKVImpl(logger)
+	if err != nil {
+		logger.Warn("failed to create KV impl, falling back to in-memory", zap.Error(err))
+		kvImpl = newMemoryKVImplWithStoreName(c.name)
+	}
+
 	return &baseStore{
 		Config:                  c,
 		kvOps:                   &pbssinternal.Operations{},
-		kv:                      make(map[string][]byte),
+		kvImpl:                  kvImpl,
 		logger:                  logger.Named("store").With(zap.String("store_name", c.name), zap.String("module_hash", c.moduleHash)),
 		marshaller:              marshaller.Default(),
 		recentlyDeletedPrefixes: make(DeletedPrefixes),
@@ -119,7 +135,7 @@ func (c *Config) ExistsPartialKV(ctx context.Context, from, to uint64) (bool, er
 
 func (c *Config) NewPartialKV(initialBlock uint64, logger *zap.Logger) *PartialKV {
 	return &PartialKV{
-		baseStore:    c.newBaseStore(logger),
+		baseStore:    c.newBaseStoreWithBackend(logger, &MemoryBackendConfig{}),
 		initialBlock: initialBlock,
 		seen:         make(map[string]bool),
 	}

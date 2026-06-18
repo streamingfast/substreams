@@ -238,40 +238,6 @@ func (b *mmapKVImpl) Iter(fn func(key string, value []byte) error) error {
 	})
 }
 
-// writeSortedBatches writes pre-sorted keys in chunks of mmapBatchSize.
-// Keys must be sorted before calling — bbolt requires sorted inserts for
-// efficient B+tree page utilization. FillPercent=1.0 is set because
-// sequential inserts never need to split partially-filled pages.
-func (b *mmapKVImpl) writeSortedBatches(keys []string, kv map[string][]byte) error {
-	for i := 0; i < len(keys); i += mmapBatchSize {
-		end := i + mmapBatchSize
-		if end > len(keys) {
-			end = len(keys)
-		}
-		chunk := keys[i:end]
-
-		err := b.db.Update(func(tx *bbolt.Tx) error {
-			bucket := tx.Bucket(defaultBucket)
-			if bucket == nil {
-				return fmt.Errorf("internal error: default bucket not found")
-			}
-			// FillPercent=1.0: since keys are sorted, pages fill completely
-			// before splitting — maximizes page utilization, minimizes splits.
-			bucket.FillPercent = 1.0
-			for _, k := range chunk {
-				if err := bucket.Put([]byte(k), kv[k]); err != nil {
-					return fmt.Errorf("writing key %q: %w", k, err)
-				}
-			}
-			return nil
-		})
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // GetMany retrieves multiple keys in a single db.View() transaction.
 // This avoids the per-call transaction overhead of calling Get() in a loop,
 // which is critical for Merge where we need to read all existing FullKV values.

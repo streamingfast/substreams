@@ -86,8 +86,8 @@ func newBenchKVImpl(b *testing.B) KVImpl {
 	b.Helper()
 	backend := os.Getenv("SUBSTREAMS_STORE_BACKEND")
 	switch backend {
-	case "mmap", "mmap_nosync", "mmap_batch", "mmap_batch_nosync":
-		noSync := backend == "mmap_nosync" || backend == "mmap_batch_nosync"
+	case "mmap", "mmap_nosync":
+		noSync := backend == "mmap_nosync"
 		var impl *mmapKVImpl
 		var err error
 		if noSync {

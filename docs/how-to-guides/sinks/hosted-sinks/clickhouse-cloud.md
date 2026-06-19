@@ -5,7 +5,7 @@ This walkthrough connects a Hosted Sink to a [ClickHouse Cloud](https://clickhou
 ## 1. Create a ClickHouse Cloud Service
 
 1. Sign in to [clickhouse.cloud](https://clickhouse.cloud) and open your organization.
-2. Click **New service**, choose a cloud provider and region close to StreamingFast's infrastructure, and select a service tier.
+2. Click **New service**, choose a cloud provider and region close to StreamingFast's infrastructure, and select a service tier. Hosted Sinks are provided from us-central1 in Iowa.
 3. Set the **default user** password during creation — save it immediately, it is only shown once.
 4. Wait for the service to reach **Running** status (typically 1–3 minutes).
 
@@ -30,7 +30,7 @@ ClickHouse Cloud exposes the native protocol on port **9440** (TLS) rather than 
 By default, ClickHouse Cloud restricts inbound connections. You must allow StreamingFast's infrastructure to reach your service. Hosted Sinks runs in **us-central1 (Iowa)**.
 
 1. In your service, go to **Settings → Security → IP Access List**.
-2. Click **Add entry** and add `0.0.0.0/0` to allow connections from any IP.
+2. Click **Add entry** and add `0.0.0.0/0` to allow connections from any IP. Note, if you require a restricted IP range, please contact us at support@streamingfast.io.
 3. Save the access list.
 
 ## 4. Create a Dedicated User and Database (Recommended)
@@ -52,7 +52,7 @@ Replace `substreams` with your intended database name.
 
 ## 5. Configure the Hosted Sink
 
-In [The Graph Market](https://thegraph.market/sinks), create a new sink and fill in the **Output** section:
+In [The Graph Market](https://thegraph.market/sinks/new), create a new sink and fill in the **Output** section:
 
 | Field | Value |
 |---|---|

@@ -63,6 +63,8 @@
     * [Solana - SPL Initialized Account](how-to-guides/composing-substreams/foundational-stores/solana/spl-initialized-account.md)
   * [Published Packages](how-to-guides/composing-substreams/published-packages.md)
 * [Consuming Substreams](how-to-guides/sinks/sinks.md)
+  * [Hosted Sinks](how-to-guides/sinks/hosted-sinks/hosted-sinks.md)
+    * [Managing Your Sink](how-to-guides/sinks/hosted-sinks/manage-your-sink.md)
   * [Substreams:SQL](how-to-guides/sinks/sql/sql.md)
     * [Using Relational Mappings](how-to-guides/sinks/sql/relational-mappings.md)
     * [Using Database Changes](how-to-guides/sinks/sql/db_out.md)

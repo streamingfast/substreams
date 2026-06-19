@@ -7,6 +7,10 @@ In this tutorial, you'll learn how to initialize a Injective-based Substreams pr
  The CLI installation is supported only on Linux and macOS. If you're using Windows, consider using the [DevContainer environment](../../references/devcontainer-ref.md), which launches a Linux-based virtual environment.
 {% endhint %}
 
+{% hint style="info" %}
+**Tip**: Using an AI coding assistant? Install the [Substreams agent skills](../../how-to-guides/develop-your-own-substreams/generic/agent-skills.md) to get expert Substreams guidance while building.
+{% endhint %}
+
 ## Step 1: Initialize Your Injective Substreams Project
 
 1. [Install the Substreams CLI](../../how-to-guides/cli/installing-the-cli.md).

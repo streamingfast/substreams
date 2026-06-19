@@ -14,8 +14,6 @@
   * [on Monad](tutorials/monad.md)
   * [on TRON](tutorials/tron.md)
   * [on Injective](tutorials/cosmos-compatible/injective.md)
-  * [on MANTRA](tutorials/cosmos-compatible/mantra.md)
-  * [on Starknet](tutorials/starknet.md)
   * [on Stellar](tutorials/stellar.md)
   * [on World Chain](tutorials/world-chain.md)
 * [Consuming a Foundational Store](tutorials/consuming-foundational-store.md)

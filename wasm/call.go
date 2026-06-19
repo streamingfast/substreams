@@ -12,6 +12,7 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/mr-tron/base58"
 	"github.com/shopspring/decimal"
+	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/substreams/metrics"
 	pbmodel "github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/model/v2"
 	pbservice "github.com/streamingfast/substreams/pb/sf/substreams/foundational-store/service/v2"
@@ -19,6 +20,7 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/metadata"
 )
 
 var ErrWasmDeterministicExec = errors.New("wasm execution failed deterministically")
@@ -343,7 +345,14 @@ func (c *Call) DoFoundationalStoreGet(index uint32, keys *pbmodel.Keys) *pbmodel
 	logger := reqctx.Logger(c.ctx).With(zap.Uint32("foundational_store_index", index))
 
 	for {
-		ctx, cancel := context.WithTimeoutCause(c.ctx, foundationalStoreMaxWaitTime, fmt.Errorf("foundational store get_all timeout after %s", foundationalStoreMaxWaitTime))
+		callCtx := dauth.FromContext(c.ctx).ToOutgoingGRPCContext(c.ctx)
+		// Forward raw authorization header if present (for hosted store auth plugins that expect the original Bearer token)
+		if md, ok := metadata.FromIncomingContext(c.ctx); ok {
+			if auths := md.Get("authorization"); len(auths) > 0 {
+				callCtx = metadata.AppendToOutgoingContext(callCtx, "authorization", auths[0])
+			}
+		}
+		ctx, cancel := context.WithTimeoutCause(callCtx, foundationalStoreMaxWaitTime, fmt.Errorf("foundational store get_all timeout after %s", foundationalStoreMaxWaitTime))
 		defer cancel()
 
 		request := &pbservice.GetRequest{
@@ -383,7 +392,14 @@ func (c *Call) DoFoundationalStoreGetFirst(index uint32, keys *pbmodel.Keys) *pb
 	logger := reqctx.Logger(c.ctx).With(zap.Uint32("foundational_store_index", index))
 
 	for {
-		ctx, cancel := context.WithTimeoutCause(c.ctx, foundationalStoreMaxWaitTime, fmt.Errorf("foundational store get_all timeout after %s", foundationalStoreMaxWaitTime))
+		callCtx := dauth.FromContext(c.ctx).ToOutgoingGRPCContext(c.ctx)
+		// Forward raw authorization header if present (for hosted store auth plugins that expect the original Bearer token)
+		if md, ok := metadata.FromIncomingContext(c.ctx); ok {
+			if auths := md.Get("authorization"); len(auths) > 0 {
+				callCtx = metadata.AppendToOutgoingContext(callCtx, "authorization", auths[0])
+			}
+		}
+		ctx, cancel := context.WithTimeoutCause(callCtx, foundationalStoreMaxWaitTime, fmt.Errorf("foundational store get_all timeout after %s", foundationalStoreMaxWaitTime))
 		defer cancel()
 
 		request := &pbservice.GetRequest{

@@ -14,6 +14,7 @@ import (
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/logging/zapx"
+	pbprivateservice "github.com/streamingfast/services-control-plane/pb/sf/hosted/private/service/v1"
 	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/substreams"
 	"github.com/streamingfast/substreams/foudational_store"
@@ -37,6 +38,8 @@ import (
 	"github.com/streamingfast/substreams/wasm"
 	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -116,6 +119,10 @@ type Pipeline struct {
 
 	foundationalClosers map[string][]func() error
 
+	// hostedStoreRegistryAddress for hosted foundational stores resolved via control-plane registry (JSON for legacy)
+	hostedStoreRegistryAddress string
+	cpFSRegistryClient         pbprivateservice.FoundationStoreRegistryServiceClient
+
 	processingModule *processingModule
 
 	gate            *gate
@@ -162,34 +169,36 @@ func New(
 	foundationalEndpoints map[string]string,
 	outputBufferSize int,
 	supportBuffering bool,
+	hostedStoreRegistryAddress string,
 	opts ...Option,
 ) *Pipeline {
 	pipe := &Pipeline{
-		ctx:                     ctx,
-		isTier1:                 isTier1,
-		gate:                    newGate(ctx),
-		execOutputCache:         execOutputCache,
-		stateBundleSize:         stateBundleSize,
-		preexistingBlockIndices: indices,
-		blockType:               blockType,
-		execGraph:               execGraph,
-		wasmRuntime:             wasmRuntime,
-		respFunc:                respFunc,
-		stores:                  stores,
-		foundationalClients:     make(map[string][]pbservice.StoreClient),
-		foundationalClosers:     make(map[string][]func() error),
-		foundationalEndpoints:   foundationalEndpoints,
-		execoutStorage:          execoutStorage,
-		forkHandler:             NewForkHandler(),
-		blockStepMap:            make(map[bstream.StepType]uint64),
-		startTime:               time.Now(),
-		executionTimeout:        executionTimeout,
-		workerPoolFactory:       workerPoolFactory,
-		checkPendingShutdown:    checkPendingShutdown,
-		moduleNameToStage:       make(map[string]int),
-		outputBufferSize:        outputBufferSize,
-		supportBuffering:        supportBuffering,
-		ModuleBlockIndexes:      make(map[string]*index.BlockIndex),
+		ctx:                        ctx,
+		isTier1:                    isTier1,
+		gate:                       newGate(ctx),
+		execOutputCache:            execOutputCache,
+		stateBundleSize:            stateBundleSize,
+		preexistingBlockIndices:    indices,
+		blockType:                  blockType,
+		execGraph:                  execGraph,
+		wasmRuntime:                wasmRuntime,
+		respFunc:                   respFunc,
+		stores:                     stores,
+		foundationalClients:        make(map[string][]pbservice.StoreClient),
+		foundationalClosers:        make(map[string][]func() error),
+		foundationalEndpoints:      foundationalEndpoints,
+		execoutStorage:             execoutStorage,
+		forkHandler:                NewForkHandler(),
+		blockStepMap:               make(map[bstream.StepType]uint64),
+		startTime:                  time.Now(),
+		executionTimeout:           executionTimeout,
+		workerPoolFactory:          workerPoolFactory,
+		checkPendingShutdown:       checkPendingShutdown,
+		moduleNameToStage:          make(map[string]int),
+		outputBufferSize:           outputBufferSize,
+		supportBuffering:           supportBuffering,
+		ModuleBlockIndexes:         make(map[string]*index.BlockIndex),
+		hostedStoreRegistryAddress: hostedStoreRegistryAddress,
 	}
 	for _, opt := range opts {
 		opt(pipe)
@@ -1100,10 +1109,34 @@ func (p *Pipeline) renderWasmInputs(module *pbsubstreams.Module) (out []wasm.Arg
 			identifier := in.FoundationalStore.GetIdentifier()
 			clients, ok := p.foundationalClients[identifier]
 			if !ok {
-				// Look up the endpoint for this foundational store identifier
+				// Look up the endpoint for this foundational store identifier.
+				// 1. JSON registry for current/legacy foundational stores (backward compat)
 				endpoint, hasEndpoint := p.foundationalEndpoints[identifier]
 				if !hasEndpoint {
-					// Fall back to using identifier as endpoint
+					// 2. Hosted stores: resolve via control-plane registry service (legacy/current continue to use JSON)
+					if p.hostedStoreRegistryAddress != "" {
+						if p.cpFSRegistryClient == nil {
+							conn, err := grpc.Dial(p.hostedStoreRegistryAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+							if err == nil {
+								p.cpFSRegistryClient = pbprivateservice.NewFoundationStoreRegistryServiceClient(conn)
+							}
+						}
+						if p.cpFSRegistryClient != nil {
+							resp, err := p.cpFSRegistryClient.GetFoundationStore(context.Background(), &pbprivateservice.GetFoundationStoreRequest{
+								DeploymentId: identifier,
+							})
+							if err == nil && resp.Success && resp.Entry != nil {
+								if resp.Entry.InternalEndpoint != "" {
+									endpoint = resp.Entry.InternalEndpoint
+								} else {
+									endpoint = resp.Entry.Endpoint
+								}
+							}
+						}
+					}
+				}
+				if endpoint == "" {
+					// 3. Fallback to identifier as endpoint (old behaviour)
 					endpoint = identifier
 				}
 

@@ -1,6 +1,7 @@
-go 1.25.0
+go 1.26.0
 
 use (
 	.
 	./tests_e2e
+	/Users/cbillett/devel/sf/services-control-plane
 )

@@ -104,14 +104,15 @@ type Tier1Service struct {
 	resolveCursor       pipeline.CursorResolver
 	getHeadBlock        func() (uint64, error)
 
-	enforceCompression       bool
-	activeRequestsSoftLimit  int
-	activeRequestsHardLimit  int
-	tier2RequestParameters   reqctx.Tier2RequestParameters
-	foundationalEndpoints    map[string]string
-	sessionPool              dsession.SessionPool
-	activeRequestsManager    *active_requests.ActiveRequestsManager // we keep a list of current requests for the debugAPI and to manage memory
-	execOutMessageBufferSize int
+	enforceCompression         bool
+	activeRequestsSoftLimit    int
+	activeRequestsHardLimit    int
+	tier2RequestParameters     reqctx.Tier2RequestParameters
+	foundationalEndpoints      map[string]string
+	hostedStoreRegistryAddress string
+	sessionPool                dsession.SessionPool
+	activeRequestsManager      *active_requests.ActiveRequestsManager // we keep a list of current requests for the debugAPI and to manage memory
+	execOutMessageBufferSize   int
 
 	// liveBackFillerFinalBlockDelay overrides the default 120-block delay the
 	// live backfiller waits past a segment end before concluding merged blocks
@@ -187,6 +188,7 @@ func NewTier1(
 	outputBufferSize uint64,
 	sessionPool dsession.SessionPool,
 	foundationalEndpoints map[string]string,
+	hostedStoreRegistryAddress string,
 	opts ...Option,
 ) (*Tier1Service, error) {
 
@@ -228,22 +230,23 @@ func NewTier1(
 	logger.Info("launching tier1 service", zap.Reflect("client_config", substreamsClientConfig), zap.String("block_type", blockType), zap.Bool("with_live", hub != nil))
 
 	s := &Tier1Service{
-		Shutter:                  shutter.New(),
-		runtimeConfig:            runtimeConfig,
-		blockType:                blockType,
-		tracer:                   tracing.GetTracer(),
-		resolveCursor:            pipeline.NewCursorResolver(hub, mergedBlocksStore, forkedBlocksStore),
-		logger:                   logger,
-		appSetIsReadyState:       appSetIsReadyState,
-		tier2RequestParameters:   tier2RequestParameters,
-		blockExecutionTimeout:    3 * time.Minute,
-		enforceCompression:       enforceCompression,
-		activeRequestsSoftLimit:  activeRequestsSoftLimit,
-		activeRequestsHardLimit:  activeRequestsHardLimit,
-		foundationalEndpoints:    foundationalEndpoints,
-		sessionPool:              sessionPool,
-		activeRequestsManager:    active_requests.NewActiveRequestsManager(logger),
-		execOutMessageBufferSize: int(outputBufferSize),
+		Shutter:                    shutter.New(),
+		runtimeConfig:              runtimeConfig,
+		blockType:                  blockType,
+		tracer:                     tracing.GetTracer(),
+		resolveCursor:              pipeline.NewCursorResolver(hub, mergedBlocksStore, forkedBlocksStore),
+		logger:                     logger,
+		appSetIsReadyState:         appSetIsReadyState,
+		tier2RequestParameters:     tier2RequestParameters,
+		blockExecutionTimeout:      3 * time.Minute,
+		enforceCompression:         enforceCompression,
+		activeRequestsSoftLimit:    activeRequestsSoftLimit,
+		activeRequestsHardLimit:    activeRequestsHardLimit,
+		foundationalEndpoints:      foundationalEndpoints,
+		hostedStoreRegistryAddress: hostedStoreRegistryAddress,
+		sessionPool:                sessionPool,
+		activeRequestsManager:      active_requests.NewActiveRequestsManager(logger),
+		execOutMessageBufferSize:   int(outputBufferSize),
 	}
 	s.OnTerminating(func(_ error) {
 		s.activeRequestsWG.Wait()
@@ -785,6 +788,7 @@ func (s *Tier1Service) blocks(
 		s.foundationalEndpoints,
 		execOutMessageBufferSize,
 		supportBuffering,
+		s.hostedStoreRegistryAddress,
 		opts...,
 	)
 

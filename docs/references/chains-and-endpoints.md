@@ -34,7 +34,6 @@ Protobuf definitions and public endpoints are provided for the supported protoco
 | Solana   | [`sf.solana.type.v1.Block`](https://github.com/streamingfast/firehose-solana/blob/develop/proto/sf/solana/type/v1/type.proto)             | [solana-v0.1.0.spkg](https://github.com/streamingfast/sf-solana/releases/download/v0.1.0/solana-v0.1.0.spkg)          |
 | Cosmos   | [`sf.cosmos.type.v2.Block`](https://github.com/streamingfast/firehose-cosmos/blob/develop/cosmos/proto/sf/cosmos/type/v2/block.proto#L10) |                                                                                                                       |
 | Antelope | [`sf.antelope.type.v1.Block`](https://buf.build/pinax/firehose-antelope/docs/main:sf.antelope.type.v1#sf.antelope.type.v1.Block)          |                                                                                                                       |
-| Starknet | [`sf.starknet.type.v1.Block`](https://github.com/streamingfast/firehose-starknet/blob/main/proto/sf/starknet/type/v1/block.proto#L8)      |                                                                                                                       |
 | Stellar | [`sf.stellar.type.v1.Block`](https://github.com/streamingfast/firehose-stellar/blob/main/proto/sf/stellar/type/v1/block.proto#L7)      |                                                                                                                       |
 
 
@@ -75,16 +74,12 @@ The data missing in the Base Block makes the corresponding Protobuf field empty.
 - **Injective EVM Testnet**: `testnet.injective-evm.streamingfast.io:443`
 - **Injective Mainnet**: `mainnet.injective.streamingfast.io:443`
 - **Injective Testnet**: `testnet.injective.streamingfast.io:443`
-- **Sei EVM Mainnet**: `evm-mainnet.sei.streamingfast.io:443`
-- **Starknet Mainnet**: `mainnet.starknet.streamingfast.io:443`
-- **Starknet Testnet**: `testnet.starknet.streamingfast.io:443`
 - **Base Mainnet**: `base-mainnet.streamingfast.io:443`
 - **Monad Mainnet**: `mainnet-base.monad.streamingfast.io:443`
 - **Stellar Mainnet**: `mainnet.stellar.streamingfast.io:443`
 - **Stellar Testnet**: `testnet.stellar.streamingfast.io:443`
 - **Unichain Mainnet**: `mainnet.unichain.streamingfast.io:443`
 - **World Chain Mainnet**: `mainnet.worldchain.streamingfast.io:443`
-- **Katana Mainnet**: `katana.streamingfast.io:443`
 
 ## Community Endpoints
 

@@ -47,7 +47,7 @@ Replace `substreams` with your intended schema name.
 
 ## 4. Configure the Hosted Sink
 
-In [The Graph Market](https://thegraph.market/sinks), create a new sink and fill in the **Output** section:
+In [The Graph Market](https://thegraph.market/sinks/new), create a new sink and fill in the **Output** section:
 
 | Field | Value |
 |---|---|

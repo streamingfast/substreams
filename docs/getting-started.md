@@ -19,11 +19,13 @@ If you can't find a Substreams package that meets your specific needs, you can d
 
 - [EVM](./tutorials/evm.md)
 - [Solana](./tutorials/solana/solana.md)
-- [Starknet](./tutorials/starknet.md)
 - [Injective](./tutorials/cosmos-compatible/injective.md)
-- [MANTRA](./tutorials/cosmos-compatible/mantra.md)
 
 To build and optimize your Substreams from zero, use the minimal path within the [Dev Container](./references/devcontainer-ref.md) to setup your environment and follow the [How-To Guides](./how-to-guides/develop-your-own-substreams/develop-your-own-substreams.md).
+
+{% hint style="info" %}
+**Tip**: Using an AI coding assistant? Install the [Substreams agent skills](./how-to-guides/develop-your-own-substreams/generic/agent-skills.md) to give it deep expertise in Substreams development patterns, Rust modules, protobuf schemas, and debugging techniques.
+{% endhint %}
 
 ## Learn
 

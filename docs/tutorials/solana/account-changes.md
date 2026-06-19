@@ -10,6 +10,10 @@ By the end of this tutorial, you will have a working Substreams feed that allows
 Data for Solana account changes is available on a rolling three-month window.
 {% endhint %}
 
+{% hint style="info" %}
+**Tip**: Using an AI coding assistant? Install the [Substreams agent skills](../../how-to-guides/develop-your-own-substreams/generic/agent-skills.md) to get expert Substreams guidance while building.
+{% endhint %}
+
 For each Solana Account block, only the latest update per account is recorded, see the [Protobuf Referece](https://buf.build/streamingfast/firehose-solana/file/main:sf/solana/type/v1/account.proto). If an account is deleted, a payload with `deleted == True` is provided. Additionally, events of low importance we're omitted, such as those with the special owner “Vote11111111…” account or changes that do not affect the account data (ex: lamport changes).
 
 {% hint style="success" %} The Account Changes Substreams natively handles a change of ownership upon delete. {% endhint %}

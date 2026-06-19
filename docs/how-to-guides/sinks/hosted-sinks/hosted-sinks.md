@@ -38,7 +38,8 @@ Choose how you want to supply the `.spkg`:
 
 ### 3. Output
 
-Choose **Postgres** or **ClickHouse** and fill in the connection details.
+Choose **Postgres** or **ClickHouse** and fill in the connection details. 
+See walkthroughs provided below for different SQL services you can rely on, with guided setups to run your Hosted Sink.
 
 **Postgres fields:**
 

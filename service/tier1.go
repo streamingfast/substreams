@@ -652,7 +652,7 @@ func (s *Tier1Service) blocks(
 		}
 	}
 	if request.ProgressMessagesIntervalMs != 0 && request.ProgressMessagesIntervalMs < 500 {
-		err := bsstream.NewErrInvalidArg("Invalid progress_messages_interval_ms %q (minimum 500)", request.ProgressMessagesIntervalMs)
+		err := bsstream.NewErrInvalidArg("Invalid progress_messages_interval_ms %T (minimum 500)", request.ProgressMessagesIntervalMs)
 		logger.Info("refusing Substreams Blocks request", append(logFields, zap.Error(err))...)
 		return err
 	}

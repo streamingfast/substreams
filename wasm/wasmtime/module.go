@@ -97,7 +97,7 @@ func (m *Module) ExecuteNewCall(ctx context.Context, call *wasm.Call, cachedInst
 	}
 	entrypoint := export.Func()
 	if entrypoint == nil {
-		return nil, fmt.Errorf("failed to get exported function %q", entrypoint)
+		return nil, fmt.Errorf("failed to get exported function %T", entrypoint)
 	}
 
 	var args []interface{}

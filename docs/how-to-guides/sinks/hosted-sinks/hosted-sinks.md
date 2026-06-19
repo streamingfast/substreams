@@ -86,6 +86,17 @@ Credentials are stored securely and used only to connect the sink process to you
 
 Click **Deploy sink**. The sink enters the `Deploying` state while the infrastructure provisions. Once pods are ready it transitions to `Deployed` and begins indexing.
 
+## Provider Walkthroughs
+
+Step-by-step guides for connecting a Hosted Sink to common managed database providers:
+
+**Postgres**
+- [Supabase](./supabase.md) — managed Postgres with a generous free tier.
+- [Neon](./neon.md) — serverless Postgres that scales to zero.
+
+**ClickHouse**
+- [ClickHouse Cloud](./clickhouse-cloud.md) — fully managed ClickHouse from the creators of ClickHouse.
+
 ## Next Steps
 
 - [Monitor and manage your sink](./manage-your-sink.md) — check status, view logs, edit config, stop, or delete.

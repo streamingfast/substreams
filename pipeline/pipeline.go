@@ -1127,8 +1127,14 @@ func (p *Pipeline) renderWasmInputs(module *pbsubstreams.Module) (out []wasm.Arg
 						}
 						if p.cpFSRegistryClient != nil {
 							logger.Info("got cpFSRegistryClient")
+
+							deploymentId := identifier
+							if idx := strings.Index(identifier, "@v"); idx != -1 {
+								deploymentId = identifier[:idx]
+							}
+
 							resp, err := p.cpFSRegistryClient.GetFoundationStore(context.Background(), &pbprivateservice.GetFoundationStoreRequest{
-								DeploymentId: identifier,
+								DeploymentId: deploymentId,
 							})
 							if err == nil && resp.Success && resp.Entry != nil {
 								if resp.Entry.InternalEndpoint != "" {

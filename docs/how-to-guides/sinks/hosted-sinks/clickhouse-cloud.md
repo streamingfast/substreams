@@ -30,7 +30,7 @@ ClickHouse Cloud exposes the native protocol on port **9440** (TLS) rather than 
 By default, ClickHouse Cloud restricts inbound connections. You must allow StreamingFast's infrastructure to reach your service. Hosted Sinks runs in **us-central1 (Iowa)**.
 
 1. In your service, go to **Settings → Security → IP Access List**.
-2. Click **Add entry** and add `0.0.0.0/0` to allow connections from any IP. Note, if you require a restricted IP range, please contact us at support@streamingfast.io.
+2. Click **Add entry** and add `0.0.0.0/0` to allow connections from any IP. Note, if you require a restricted IP range, please [contact us](mailto:support@streamingfast.io).
 3. Save the access list.
 
 ## 4. Create a Dedicated User and Database (Recommended)

@@ -343,12 +343,15 @@ func (c *Call) DoFoundationalStoreGet(index uint32, keys *pbmodel.Keys) *pbmodel
 	c.validateFoundationalStoreIndex(int(index), "foundational_store_get_all")
 
 	logger := reqctx.Logger(c.ctx).With(zap.Uint32("foundational_store_index", index))
+	logger = logger.Named("DoFoundationalStoreGet")
 
 	for {
 		callCtx := dauth.FromContext(c.ctx).ToOutgoingGRPCContext(c.ctx)
 		// Forward raw authorization header if present (for hosted store auth plugins that expect the original Bearer token)
 		if md, ok := metadata.FromIncomingContext(c.ctx); ok {
 			if auths := md.Get("authorization"); len(auths) > 0 {
+				a := auths[0]
+				logger.Debug("foundational store get_all authorization", zap.String("authorization", a))
 				callCtx = metadata.AppendToOutgoingContext(callCtx, "authorization", auths[0])
 			}
 		}

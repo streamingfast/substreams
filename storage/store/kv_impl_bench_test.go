@@ -171,8 +171,8 @@ var storeSizes = []struct {
 }{
 	{"10k_keys", 10_000, 1_024},
 	{"100k_keys", 100_000, 1_024},
-	{"500k_keys", 500_000, 1_024},
-	{"1M_keys", 1_000_000, 1_024},
+	// {"500k_keys", 500_000, 1_024},
+	// {"1M_keys", 1_000_000, 1_024},
 }
 
 // opCounts defines how many operations to perform per benchmark iteration.

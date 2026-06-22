@@ -105,3 +105,14 @@ func WithStoresScratchSpace(path string) Option {
 		}
 	}
 }
+
+func WithStoresBackend(backend string) Option {
+	return func(a anyTierService) {
+		switch s := a.(type) {
+		case *Tier1Service:
+			// not used on tier1
+		case *Tier2Service:
+			s.storesBackend = backend
+		}
+	}
+}

@@ -30,6 +30,9 @@ type KVImpl interface {
 	// The value slice is only valid during the callback and must not be retained.
 	Iter(fn func(key string, value []byte) error) error
 
+	// Clear removes all key-value pairs, resetting the store to an empty state.
+	// For mmap backends this drops and recreates the bbolt bucket in a single transaction.
+	// For memory backends this replaces the map with a fresh allocation.
 	Clear() error
 
 	// Load replaces the impl's contents from an iterator of StoreDataEntry.

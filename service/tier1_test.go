@@ -24,6 +24,7 @@ func createTestStoreConfig(name string, initialBlock uint64, mockStore dstore.St
 		mockStore,
 		nil, // quickSaveStore
 		"",
+		"",
 	)
 }
 

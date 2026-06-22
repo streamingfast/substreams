@@ -64,15 +64,25 @@ func (cfg *KVImplConfig) NewKVImpl(logger *zap.Logger) (KVImpl, error) {
 	}
 }
 
-// DefaultKVImplConfig returns a config based on SUBSTREAMS_STORE_BACKEND env var.
+// DefaultKVImplConfig returns a KVImplConfig whose Type is derived from the backend
+// argument when provided, falling back to the SUBSTREAMS_STORE_BACKEND env var.
 func DefaultKVImplConfig(storeName, moduleHash string, backend KVImplBackendConfig) *KVImplConfig {
-	t := getKVImplTypeFromEnv()
-	if backend == nil {
-		switch t {
-		case KVImplTypeMemory:
-			backend = &MemoryBackendConfig{}
-		default:
-			backend = &MmapBackendConfig{}
+	var t KVImplType
+	switch backend.(type) {
+	case *MemoryBackendConfig:
+		t = KVImplTypeMemory
+	case *MmapBackendConfig:
+		t = KVImplTypeMmap
+	default:
+		// backend is nil or unknown — fall back to env var
+		t = getKVImplTypeFromEnv()
+		if backend == nil {
+			switch t {
+			case KVImplTypeMemory:
+				backend = &MemoryBackendConfig{}
+			default:
+				backend = &MmapBackendConfig{}
+			}
 		}
 	}
 	return &KVImplConfig{

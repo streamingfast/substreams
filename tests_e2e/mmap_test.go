@@ -23,20 +23,18 @@ func TestMmapBackendE2E(t *testing.T) {
 	ctx := context.Background()
 	tmpDir := t.TempDir()
 
-	// Set custom mmap directory for this test (mmap is already the default)
 	mmapDir := filepath.Join(tmpDir, "mmap-stores")
-	t.Setenv("SUBSTREAMS_STORE_MMAP_BASE_DIR", mmapDir)
 	err := os.MkdirAll(mmapDir, 0755)
 	require.NoError(t, err)
 
-	t.Logf("Mmap base dir: %s (mmap is default, no backend env var needed)", mmapDir)
+	t.Logf("Mmap base dir: %s", mmapDir)
 
 	// Launch containers
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", 1000)
 	require.NoError(t, err)
 	defer container.Terminate(ctx, testcontainers.StopTimeout(0))
 
-	app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog)
+	app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog, mmapDir)
 	app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)
 	defer func() {
 		app.Shutdown(nil)
@@ -228,17 +226,18 @@ func TestMmapVsMemoryComparison(t *testing.T) {
 			}
 
 			mmapDir := filepath.Join(tmpDir, "mmap-stores")
+			var t2ScratchSpace string
 			if tc.backend == "mmap" {
-				t.Setenv("SUBSTREAMS_STORE_MMAP_BASE_DIR", mmapDir)
 				err := os.MkdirAll(mmapDir, 0755)
 				require.NoError(t, err)
+				t2ScratchSpace = mmapDir
 			}
 
 			container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", 1000)
 			require.NoError(t, err)
 			defer container.Terminate(ctx, testcontainers.StopTimeout(0))
 
-			app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog)
+			app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog, t2ScratchSpace)
 			app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)
 			defer func() {
 				app.Shutdown(nil)

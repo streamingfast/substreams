@@ -31,6 +31,7 @@ type Config struct {
 	itemSizeLimit  uint64
 
 	scratchSpace string // local directory for ephemeral store files
+	backend      string // "mmap" (default) or "memory"
 }
 
 var StoreSizeLimit uint64 = 1_073_741_824 // 1GiB
@@ -43,6 +44,7 @@ func NewConfig(
 	store dstore.Store,
 	quickSaveStore dstore.Store,
 	scratchSpace string,
+	backend string,
 ) (*Config, error) {
 	subStore, err := store.SubStore(fmt.Sprintf("%s/states", moduleHash))
 	if err != nil {
@@ -73,11 +75,24 @@ func NewConfig(
 		totalSizeLimit:     StoreSizeLimit,
 		itemSizeLimit:      10_485_760, // 10MiB
 		scratchSpace:       scratchSpace,
+		backend:            backend,
 	}, nil
 }
 
 func (c *Config) newBaseStore(logger *zap.Logger) *baseStore {
-	return c.newBaseStoreWithBackend(logger, &MmapBackendConfig{ScratchSpace: c.scratchSpace})
+	switch c.backend {
+	case "memory":
+		return c.newBaseStoreWithBackend(logger, &MemoryBackendConfig{})
+	case "mmap":
+		return c.newBaseStoreWithBackend(logger, &MmapBackendConfig{ScratchSpace: c.scratchSpace})
+	default:
+		// fall back to env var when backend is unset, but preserve scratchSpace
+		t := getKVImplTypeFromEnv()
+		if t == KVImplTypeMemory {
+			return c.newBaseStoreWithBackend(logger, &MemoryBackendConfig{})
+		}
+		return c.newBaseStoreWithBackend(logger, &MmapBackendConfig{ScratchSpace: c.scratchSpace})
+	}
 }
 
 func (c *Config) newBaseStoreWithBackend(logger *zap.Logger, backend KVImplBackendConfig) *baseStore {

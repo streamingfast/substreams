@@ -9,7 +9,7 @@ import (
 
 type ConfigMap map[string]*Config
 
-func NewConfigMap(baseObjectStore, quickSaveStore dstore.Store, storeModules []*pbsubstreams.Module, moduleHashes map[string]string, firstStreamableBlock uint64, scratchSpace string) (out ConfigMap, err error) {
+func NewConfigMap(baseObjectStore, quickSaveStore dstore.Store, storeModules []*pbsubstreams.Module, moduleHashes map[string]string, firstStreamableBlock uint64, scratchSpace string, backend string) (out ConfigMap, err error) {
 	out = make(ConfigMap)
 	for _, storeModule := range storeModules {
 		initialBlock := max(firstStreamableBlock, storeModule.InitialBlock)
@@ -22,6 +22,7 @@ func NewConfigMap(baseObjectStore, quickSaveStore dstore.Store, storeModules []*
 			baseObjectStore,
 			quickSaveStore,
 			scratchSpace,
+			backend,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("new store config for %q: %w", storeModule.Name, err)

@@ -38,6 +38,7 @@ type Tier2Config struct {
 	SegmentExecutionTimeout   time.Duration
 	TmpDir                    string
 	StoresScratchSpace        string
+	StoresBackend             string
 
 	Tracing bool
 }
@@ -109,6 +110,9 @@ func (a *Tier2App) Run() error {
 
 	if a.config.StoresScratchSpace != "" {
 		opts = append(opts, service.WithStoresScratchSpace(a.config.StoresScratchSpace))
+	}
+	if a.config.StoresBackend != "" {
+		opts = append(opts, service.WithStoresBackend(a.config.StoresBackend))
 	}
 
 	svc, err := service.NewTier2(

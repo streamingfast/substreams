@@ -206,7 +206,7 @@ waitReady:
 	return t1app, substreamsEndpoint
 }
 
-func startTier2App(t *testing.T, ctx context.Context, tmpDir string, zlog *zap.Logger) (out *app.Tier2App, endpoint string) {
+func startTier2App(t *testing.T, ctx context.Context, tmpDir string, zlog *zap.Logger, scratchSpace ...string) (out *app.Tier2App, endpoint string) {
 
 	port := findFreePort(t)
 	endpoint = fmt.Sprintf("localhost:%d", port)
@@ -217,6 +217,9 @@ func startTier2App(t *testing.T, ctx context.Context, tmpDir string, zlog *zap.L
 		ServiceDiscoveryURL:   nil,
 		BlockExecutionTimeout: 5 * time.Second,
 		TmpDir:                filepath.Join(tmpDir, "tmp"),
+	}
+	if len(scratchSpace) > 0 && scratchSpace[0] != "" {
+		t2conf.StoresScratchSpace = scratchSpace[0]
 	}
 
 	t2app := app.NewTier2(zlog, t2conf, &app.Tier2Modules{

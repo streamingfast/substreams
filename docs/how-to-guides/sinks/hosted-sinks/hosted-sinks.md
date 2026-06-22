@@ -38,7 +38,8 @@ Choose how you want to supply the `.spkg`:
 
 ### 3. Output
 
-Choose **Postgres** or **ClickHouse** and fill in the connection details.
+Choose **Postgres** or **ClickHouse** and fill in the connection details. 
+See walkthroughs provided below for different SQL services you can rely on, with guided setups to run your Hosted Sink.
 
 **Postgres fields:**
 
@@ -85,6 +86,17 @@ Credentials are stored securely and used only to connect the sink process to you
 ### 5. Deploy
 
 Click **Deploy sink**. The sink enters the `Deploying` state while the infrastructure provisions. Once pods are ready it transitions to `Deployed` and begins indexing.
+
+## Provider Walkthroughs
+
+Step-by-step guides for connecting a Hosted Sink to common managed database providers:
+
+**Postgres**
+- [Supabase](./supabase.md) — managed Postgres with a generous free tier.
+- [Neon](./neon.md) — serverless Postgres that scales to zero.
+
+**ClickHouse**
+- [ClickHouse Cloud](./clickhouse-cloud.md) — fully managed ClickHouse from the creators of ClickHouse.
 
 ## Next Steps
 

@@ -1115,13 +1115,18 @@ func (p *Pipeline) renderWasmInputs(module *pbsubstreams.Module) (out []wasm.Arg
 				if !hasEndpoint {
 					// 2. Hosted stores: resolve via control-plane registry service (legacy/current continue to use JSON)
 					if p.hostedStoreRegistryAddress != "" {
+						logger := reqctx.Logger(p.ctx).Named("hosted_store")
+						logger.Info("looking up hosted store endpoint", zap.String("identifier", identifier), zap.String("hosted_store_registry_address", p.hostedStoreRegistryAddress))
 						if p.cpFSRegistryClient == nil {
 							conn, err := grpc.Dial(p.hostedStoreRegistryAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
 							if err == nil {
 								p.cpFSRegistryClient = pbprivateservice.NewFoundationStoreRegistryServiceClient(conn)
+							} else {
+								logger.Error("failed to dial hosted store registry", zap.Error(err))
 							}
 						}
 						if p.cpFSRegistryClient != nil {
+							logger.Info("got cpFSRegistryClient")
 							resp, err := p.cpFSRegistryClient.GetFoundationStore(context.Background(), &pbprivateservice.GetFoundationStoreRequest{
 								DeploymentId: identifier,
 							})
@@ -1131,6 +1136,10 @@ func (p *Pipeline) renderWasmInputs(module *pbsubstreams.Module) (out []wasm.Arg
 								} else {
 									endpoint = resp.Entry.Endpoint
 								}
+								logger.Info("got foundational store endpoint", zap.String("endpoint", endpoint))
+							}
+							if err != nil {
+								logger.Error("failed to get foundational store", zap.Error(err))
 							}
 						}
 					}

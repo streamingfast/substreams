@@ -2,6 +2,10 @@
 
 This guide explains how to consume data from a Foundational Store in your Substreams modules. Foundational Stores provide efficient access to pre-processed blockchain data for building complex data processing pipelines.
 
+{% hint style="info" %}
+**Tip**: Using an AI coding assistant? Install the [Substreams agent skills](../how-to-guides/develop-your-own-substreams/generic/agent-skills.md) to get expert Substreams guidance while building.
+{% endhint %}
+
 ## What is a Foundational Store?
 
 A Foundational Store is a high-performance, multi-backend key-value storage system designed for Substreams ingestion and serving. It provides:

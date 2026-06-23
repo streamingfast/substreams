@@ -35,12 +35,6 @@ Cosmos-compatible chains include modules for:
 - **IBC Transfers**: Inter-blockchain communication tracking
 - **Chain-Specific Features**: Modules tailored for Injective, Osmosis, and other Cosmos chains
 
-### Starknet
-Starknet foundational modules provide:
-
-- **Cairo program interactions**: Parsed Cairo program calls and state changes
-- **Account operations**: Account deployment and upgrade tracking
-
 ### TRON
 TRON foundational modules offer:
 

@@ -21,7 +21,7 @@ RUN --mount=target=. \
       --mount=type=cache,target=/go/pkg/mod \
       --mount=type=cache,target=/root/.cache/go-build \
       CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
-      GOWORK=off go build -ldflags="-X main.version=${VERSION}" -o /app/substreams ./cmd/substreams
+      GOWORK=off go build -ldflags="-X 'main.version=${VERSION}'" -o /app/substreams ./cmd/substreams
 
 FROM ubuntu:24.04
 

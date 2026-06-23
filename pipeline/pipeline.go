@@ -965,6 +965,16 @@ func (p *Pipeline) cleanUpModuleExecutors(ctx context.Context, logger *zap.Logge
 	return nil
 }
 
+// deploymentIDFromIdentifier strips the "@v<version>" suffix from a hosted-store
+// identifier, returning the bare deployment id. Identifiers without the suffix
+// are returned unchanged.
+func deploymentIDFromIdentifier(identifier string) string {
+	if idx := strings.LastIndex(identifier, "@v"); idx > 0 {
+		return identifier[:idx]
+	}
+	return identifier
+}
+
 // closeFoundationalResources closes the per-identifier foundational store gRPC
 // clients and the shared hosted-store registry connection. gRPC connections are
 // not tied to a context lifetime, so they must be closed explicitly to avoid
@@ -1156,13 +1166,8 @@ func (p *Pipeline) renderWasmInputs(module *pbsubstreams.Module) (out []wasm.Arg
 						if p.cpFSRegistryClient != nil {
 							logger.Info("got cpFSRegistryClient")
 
-							deploymentId := identifier
-							if idx := strings.Index(identifier, "@v"); idx != -1 {
-								deploymentId = identifier[:idx]
-							}
-
 							resp, err := p.cpFSRegistryClient.GetFoundationStore(p.ctx, &pbprivateservice.GetFoundationStoreRequest{
-								DeploymentId: deploymentId,
+								DeploymentId: deploymentIDFromIdentifier(identifier),
 							})
 							if err == nil && resp.Success && resp.Entry != nil {
 								if resp.Entry.InternalEndpoint != "" {

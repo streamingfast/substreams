@@ -88,14 +88,15 @@ type Tier2Service struct {
 
 	// You can call this function to switch the parent app to be ready or not ready influencing the health check,
 	// it's provided by [app.Tier1App] and tied to the health check endpoint.
-	appSetIsReadyState        func(isReady bool)
-	currentConcurrentRequests int64
-	maxConcurrentRequests     uint64
-	moduleExecutionTracing    bool
-	connectionCountMutex      sync.RWMutex
-	blockExecutionTimeout     time.Duration
-	segmentExecutionTimeout   time.Duration
-	foundationalEndpoints     map[string]string
+	appSetIsReadyState         func(isReady bool)
+	currentConcurrentRequests  int64
+	maxConcurrentRequests      uint64
+	moduleExecutionTracing     bool
+	connectionCountMutex       sync.RWMutex
+	blockExecutionTimeout      time.Duration
+	segmentExecutionTimeout    time.Duration
+	foundationalEndpoints      map[string]string
+	HostedStoreRegistryAddress string
 
 	checkPendingShutdown func() bool
 
@@ -540,6 +541,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		request.FoundationalStoreEndpoints,
 		0,
 		false,
+		s.HostedStoreRegistryAddress,
 		opts...,
 	)
 

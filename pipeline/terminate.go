@@ -23,6 +23,10 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, err error) error {
 	logger := reqctx.Logger(ctx)
 	reqDetails := reqctx.Details(ctx)
 
+	// Close foundational store clients and the hosted-store registry connection.
+	// Deferred so it runs on every return path, not just the graceful one.
+	defer p.closeFoundationalResources(logger)
+
 	if err := p.cleanUpModuleExecutors(ctx, logger); err != nil {
 		return err
 	}

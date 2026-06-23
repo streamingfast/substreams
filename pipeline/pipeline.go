@@ -122,6 +122,7 @@ type Pipeline struct {
 	// hostedStoreRegistryAddress for hosted foundational stores resolved via control-plane registry (JSON for legacy)
 	hostedStoreRegistryAddress string
 	cpFSRegistryClient         pbprivateservice.FoundationStoreRegistryServiceClient
+	cpFSRegistryConn           *grpc.ClientConn
 
 	processingModule *processingModule
 
@@ -962,6 +963,30 @@ func (p *Pipeline) cleanUpModuleExecutors(ctx context.Context, logger *zap.Logge
 	return nil
 }
 
+// closeFoundationalResources closes the per-identifier foundational store gRPC
+// clients and the shared hosted-store registry connection. gRPC connections are
+// not tied to a context lifetime, so they must be closed explicitly to avoid
+// leaking sockets and background goroutines across requests.
+func (p *Pipeline) closeFoundationalResources(logger *zap.Logger) {
+	for identifier, closers := range p.foundationalClosers {
+		for _, closer := range closers {
+			if err := closer(); err != nil {
+				logger.Warn("closing foundational store client", zap.String("identifier", identifier), zap.Error(err))
+			}
+		}
+	}
+	p.foundationalClosers = nil
+	p.foundationalClients = nil
+
+	if p.cpFSRegistryConn != nil {
+		if err := p.cpFSRegistryConn.Close(); err != nil {
+			logger.Warn("closing hosted store registry connection", zap.Error(err))
+		}
+		p.cpFSRegistryConn = nil
+		p.cpFSRegistryClient = nil
+	}
+}
+
 // normalizedOpaqueCursor returns a opaque cursor string without some
 // esoteric steps like 'NewPartial' and 'UndoPartial' which may not be supported by some clients
 func normalizedOpaqueCursor(cursor bstream.Cursor) string {
@@ -1120,6 +1145,7 @@ func (p *Pipeline) renderWasmInputs(module *pbsubstreams.Module) (out []wasm.Arg
 						if p.cpFSRegistryClient == nil {
 							conn, err := grpc.Dial(p.hostedStoreRegistryAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
 							if err == nil {
+								p.cpFSRegistryConn = conn
 								p.cpFSRegistryClient = pbprivateservice.NewFoundationStoreRegistryServiceClient(conn)
 							} else {
 								logger.Error("failed to dial hosted store registry", zap.Error(err))
@@ -1133,7 +1159,7 @@ func (p *Pipeline) renderWasmInputs(module *pbsubstreams.Module) (out []wasm.Arg
 								deploymentId = identifier[:idx]
 							}
 
-							resp, err := p.cpFSRegistryClient.GetFoundationStore(context.Background(), &pbprivateservice.GetFoundationStoreRequest{
+							resp, err := p.cpFSRegistryClient.GetFoundationStore(p.ctx, &pbprivateservice.GetFoundationStoreRequest{
 								DeploymentId: deploymentId,
 							})
 							if err == nil && resp.Success && resp.Entry != nil {

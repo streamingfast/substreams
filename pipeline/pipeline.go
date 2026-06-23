@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"connectrpc.com/connect"
@@ -121,6 +122,7 @@ type Pipeline struct {
 
 	// hostedStoreRegistryAddress for hosted foundational stores resolved via control-plane registry (JSON for legacy)
 	hostedStoreRegistryAddress string
+	cpFSRegistryOnce           sync.Once
 	cpFSRegistryClient         pbprivateservice.FoundationStoreRegistryServiceClient
 	cpFSRegistryConn           *grpc.ClientConn
 
@@ -1142,15 +1144,15 @@ func (p *Pipeline) renderWasmInputs(module *pbsubstreams.Module) (out []wasm.Arg
 					if p.hostedStoreRegistryAddress != "" {
 						logger := reqctx.Logger(p.ctx).Named("hosted_store")
 						logger.Info("looking up hosted store endpoint", zap.String("identifier", identifier), zap.String("hosted_store_registry_address", p.hostedStoreRegistryAddress))
-						if p.cpFSRegistryClient == nil {
+						p.cpFSRegistryOnce.Do(func() {
 							conn, err := grpc.Dial(p.hostedStoreRegistryAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
-							if err == nil {
-								p.cpFSRegistryConn = conn
-								p.cpFSRegistryClient = pbprivateservice.NewFoundationStoreRegistryServiceClient(conn)
-							} else {
+							if err != nil {
 								logger.Error("failed to dial hosted store registry", zap.Error(err))
+								return
 							}
-						}
+							p.cpFSRegistryConn = conn
+							p.cpFSRegistryClient = pbprivateservice.NewFoundationStoreRegistryServiceClient(conn)
+						})
 						if p.cpFSRegistryClient != nil {
 							logger.Info("got cpFSRegistryClient")
 

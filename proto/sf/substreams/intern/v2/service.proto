@@ -51,6 +51,8 @@ message ProcessRangeRequest {
 
   int64 eth_call_fallback_to_latest_duration = 19; // if non-zero, above this duration in nanoseconds, the eth_calls will use "latest" instead of block ref. It will also automatically retry 'block not found' with 'latest'. It has precedence over eth_call_fallback_to_number_duration.
   int64 eth_call_fallback_to_number_duration = 20; // if non-zero, above this duration in nanoseconds, the eth_calls will use block number instead of block hash
+
+  uint64 store_size_limit = 21; // if non-zero, overrides the default store size limit (in bytes) for stores loaded during this request
 }
 
 message ProcessRangeResponse {

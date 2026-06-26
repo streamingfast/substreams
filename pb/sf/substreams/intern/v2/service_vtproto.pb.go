@@ -43,6 +43,7 @@ func (m *ProcessRangeRequest) CloneVT() *ProcessRangeRequest {
 	r.StreamOutput = m.StreamOutput
 	r.EthCallFallbackToLatestDuration = m.EthCallFallbackToLatestDuration
 	r.EthCallFallbackToNumberDuration = m.EthCallFallbackToNumberDuration
+	r.StoreSizeLimit = m.StoreSizeLimit
 	if rhs := m.WasmExtensionConfigs; rhs != nil {
 		tmpContainer := make(map[string]string, len(rhs))
 		for k, v := range rhs {
@@ -361,6 +362,9 @@ func (this *ProcessRangeRequest) EqualVT(that *ProcessRangeRequest) bool {
 		return false
 	}
 	if this.EthCallFallbackToNumberDuration != that.EthCallFallbackToNumberDuration {
+		return false
+	}
+	if this.StoreSizeLimit != that.StoreSizeLimit {
 		return false
 	}
 	return string(this.unknownFields) == string(that.unknownFields)
@@ -768,6 +772,13 @@ func (m *ProcessRangeRequest) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 	if m.unknownFields != nil {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
+	}
+	if m.StoreSizeLimit != 0 {
+		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.StoreSizeLimit))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xa8
 	}
 	if m.EthCallFallbackToNumberDuration != 0 {
 		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.EthCallFallbackToNumberDuration))
@@ -1533,6 +1544,9 @@ func (m *ProcessRangeRequest) SizeVT() (n int) {
 	}
 	if m.EthCallFallbackToNumberDuration != 0 {
 		n += 2 + protohelpers.SizeOfVarint(uint64(m.EthCallFallbackToNumberDuration))
+	}
+	if m.StoreSizeLimit != 0 {
+		n += 2 + protohelpers.SizeOfVarint(uint64(m.StoreSizeLimit))
 	}
 	n += len(m.unknownFields)
 	return n
@@ -2444,6 +2458,25 @@ func (m *ProcessRangeRequest) UnmarshalVT(dAtA []byte) error {
 				b := dAtA[iNdEx]
 				iNdEx++
 				m.EthCallFallbackToNumberDuration |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 21:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field StoreSizeLimit", wireType)
+			}
+			m.StoreSizeLimit = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.StoreSizeLimit |= uint64(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}

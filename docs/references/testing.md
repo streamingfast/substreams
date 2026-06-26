@@ -2,6 +2,10 @@
 
 This reference covers testing strategies for Substreams applications, from unit testing individual handlers to integration testing complete modules with real blockchain data.
 
+{% hint style="info" %}
+**Tip**: The [substreams-testing agent skill](../how-to-guides/develop-your-own-substreams/generic/agent-skills.md) gives your AI coding assistant expert knowledge on unit testing, integration testing, performance testing, and CI/CD patterns for Substreams.
+{% endhint %}
+
 ## Why Testing Matters
 
 Blockchain data is immutable and mistakes are permanent. Testing is critical because:

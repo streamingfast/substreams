@@ -26,7 +26,6 @@ This version refers to the `Block` emitted by the Firehose trace.
 - This version is currently in place for the following chains:
     - Optimism
     - Ethereum Hoodi
-    - Sei EVM
 - This version fixes the known issue of version 3.
 
 ## Prague-enabled blockchains

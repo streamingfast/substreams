@@ -88,14 +88,15 @@ type Tier2Service struct {
 
 	// You can call this function to switch the parent app to be ready or not ready influencing the health check,
 	// it's provided by [app.Tier1App] and tied to the health check endpoint.
-	appSetIsReadyState        func(isReady bool)
-	currentConcurrentRequests int64
-	maxConcurrentRequests     uint64
-	moduleExecutionTracing    bool
-	connectionCountMutex      sync.RWMutex
-	blockExecutionTimeout     time.Duration
-	segmentExecutionTimeout   time.Duration
-	foundationalEndpoints     map[string]string
+	appSetIsReadyState         func(isReady bool)
+	currentConcurrentRequests  int64
+	maxConcurrentRequests      uint64
+	moduleExecutionTracing     bool
+	connectionCountMutex       sync.RWMutex
+	blockExecutionTimeout      time.Duration
+	segmentExecutionTimeout    time.Duration
+	foundationalEndpoints      map[string]string
+	HostedStoreRegistryAddress string
 
 	checkPendingShutdown func() bool
 
@@ -225,6 +226,9 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	}
 	if request.EthCallFallbackToNumberDuration > 0 {
 		ctx = reqctx.WithEthCallUseBlockNumberDuration(ctx, time.Duration(request.EthCallFallbackToNumberDuration))
+	}
+	if request.StoreSizeLimit != 0 {
+		ctx = reqctx.WithStoreSizeLimit(ctx, request.StoreSizeLimit)
 	}
 
 	stage := request.OutputModule
@@ -410,7 +414,8 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("new config map: %w", err)
 	}
 
-	storeConfigs, err := store.NewConfigMap(cacheStore, nil, execGraph.Stores(), execGraph.ModuleHashes(), request.FirstStreamableBlock)
+	storeSizeLimit := reqctx.StoreSizeLimit(ctx)
+	storeConfigs, err := store.NewConfigMap(cacheStore, nil, execGraph.Stores(), execGraph.ModuleHashes(), request.FirstStreamableBlock, storeSizeLimit)
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
@@ -536,6 +541,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		request.FoundationalStoreEndpoints,
 		0,
 		false,
+		s.HostedStoreRegistryAddress,
 		opts...,
 	)
 

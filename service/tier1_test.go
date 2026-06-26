@@ -23,6 +23,7 @@ func createTestStoreConfig(name string, initialBlock uint64, mockStore dstore.St
 		"string",
 		mockStore,
 		nil, // quickSaveStore
+		0,   // storeSizeLimit: use global default
 	)
 }
 

@@ -64,6 +64,11 @@ type Tier1Config struct {
 
 	FoundationalStoresConfigPath string
 
+	// HostedStoreRegistryAddress is the gRPC address of the control-plane
+	// registry service used to resolve hosted foundational stores.
+	// Legacy/current stores continue to be resolved exclusively via the JSON registry.
+	HostedStoreRegistryAddress string
+
 	MergedBlocksStoreURL    string
 	OneBlocksStoreURL       string
 	ForkedBlocksStoreURL    string
@@ -206,7 +211,7 @@ func (a *Tier1App) Run() error {
 			)
 		})
 
-		forkableHub = hub.NewForkableHub(liveSourceFactory, 200, oneBlocksStore)
+		forkableHub = hub.NewForkableHubWithOptions(liveSourceFactory, 200, oneBlocksStore, []hub.Option{hub.WithLogger(a.logger)})
 		forkableHub.OnTerminated(a.Shutdown)
 
 		go forkableHub.Run()
@@ -265,6 +270,7 @@ func (a *Tier1App) Run() error {
 		StateStoreDefaultTag:       a.config.StateStoreDefaultTag,
 		WASMModules:                wasmModules,
 		FoundationalStoreEndpoints: foundationalStoreEndpoints,
+		HostedStoreRegistryAddress: a.config.HostedStoreRegistryAddress,
 	}
 
 	tier1Service, err := service.NewTier1(
@@ -289,6 +295,7 @@ func (a *Tier1App) Run() error {
 		a.config.OutputBufferSize,
 		a.modules.SessionPool,
 		foundationalStoreEndpoints,
+		a.config.HostedStoreRegistryAddress,
 		opts...,
 	)
 	if err != nil {

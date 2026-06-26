@@ -32,11 +32,12 @@ type Tier2Config struct {
 
 	PipelineOptions []pipeline.Option
 
-	MaximumConcurrentRequests uint64
-	WASMExtensions            wasm.WASMExtensioner
-	BlockExecutionTimeout     time.Duration
-	SegmentExecutionTimeout   time.Duration
-	TmpDir                    string
+	MaximumConcurrentRequests  uint64
+	WASMExtensions             wasm.WASMExtensioner
+	BlockExecutionTimeout      time.Duration
+	SegmentExecutionTimeout    time.Duration
+	TmpDir                     string
+	HostedStoreRegistryAddress string // for hosted stores; legacy use JSON
 
 	Tracing bool
 }
@@ -115,6 +116,8 @@ func (a *Tier2App) Run() error {
 	if err != nil {
 		return err
 	}
+
+	svc.HostedStoreRegistryAddress = a.config.HostedStoreRegistryAddress
 
 	if a.modules.Authenticator == nil {
 		trustAuth, err := dauth.New("trust://", a.logger)

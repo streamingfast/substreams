@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - develop
+      - feature/*
 
 jobs:
   test:
@@ -13,7 +14,7 @@ jobs:
     if: "!startsWith(github.event.head_commit.message, 'GitBook: [#')"
     strategy:
       matrix:
-        go-version: [1.25.x] # if you change these values, you need to change the github PR compliance requirements
+        go-version: [1.26.x] # if you change these values, you need to change the github PR compliance requirements
         os: [ubuntu-latest, macos-latest]
     steps:
       - name: Set up Go

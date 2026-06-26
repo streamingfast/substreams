@@ -24,6 +24,12 @@ var (
 
 	// bufCommitRefRegexp matches a buf.build commit reference (32 lowercase hex characters)
 	bufCommitRefRegexp = regexp.MustCompile(`^[a-f0-9]{32}$`)
+
+	// foundationalStoreIDRegexp matches a hosted-store deployment id, which is a
+	// UUID (e.g. 97caa575-4434-4877-b672-92f73c914656). Unlike a package name, a
+	// deployment id can start with a digit, so it cannot be validated with
+	// moduleNameRegexp.
+	foundationalStoreIDRegexp = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 )
 
 const (
@@ -231,19 +237,31 @@ func (i *Input) parseFoundationalStore() error {
 		return fmt.Errorf("foundational-store: identifier cannot be empty")
 	}
 
-	pkg, version, hasAt, validationErr := ParseShortPackageIdentifier(id)
-	if validationErr != nil {
-		return fmt.Errorf("invalid foundational-store identifier %q: %w", id, validationErr)
+	ref, version, hasAt := strings.Cut(id, "@")
+
+	// The reference is either a hosted-store deployment id (a UUID) or a short
+	// package identifier (a package name). Deployment ids can start with a digit,
+	// so they are not valid package names and must be matched separately.
+	if !foundationalStoreIDRegexp.MatchString(ref) && !moduleNameRegexp.MatchString(ref) {
+		return fmt.Errorf("invalid foundational-store identifier %q: expected a deployment id (UUID) or a package name", id)
 	}
+
 	if !hasAt {
 		return fmt.Errorf("foundational-store input %q: expected package@version", id)
+	}
+
+	if version == "" {
+		version = "latest"
 	}
 	if version == "latest" {
 		return fmt.Errorf("version %q is not supported for foundational-store inputs, use a specific semver (e.g., v1.2.3)", version)
 	}
-
-	// parsed & validated
-	_ = pkg
+	if strings.Contains(version, "@") {
+		return fmt.Errorf("foundational-store input %q: version %q should not contain '@'", id, version)
+	}
+	if !semver.IsValid(version) {
+		return fmt.Errorf("foundational-store input %q: version %q is not valid Semver format", id, version)
+	}
 
 	return nil
 }

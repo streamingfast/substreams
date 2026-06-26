@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- Manifest: a `foundational-store:` input now accepts a hosted-store deployment id (a UUID), in addition to package `name@version` notation. Previously the deployment id was validated with the package-name regexp (`^[a-zA-Z]...`), which rejected any UUID starting with a digit, making real hosted stores impossible to reference.
 - Server: per-block execution timeouts (`--substreams-block-execution-timeout`) are no longer silently swallowed when a WASM host-function panic (e.g. wasmtime) coincides with the deadline. Previously, `recoverExecutionPanic` would return `nil` instead of `CodeDeadlineExceeded`, causing the offending block to be skipped and the stream to complete successfully.
 - CI: Docker image login, build and push are now skipped for fork PRs; image is still built (without push) to validate the Dockerfile.
 

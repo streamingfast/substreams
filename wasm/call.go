@@ -339,6 +339,38 @@ func (c *Call) DoHasLast(storeIndex int, key string) (found bool) {
 	return readStore.HasLast(key)
 }
 
+// foundationalStoreOutgoingContext builds the outgoing gRPC context used to call
+// a (possibly hosted) foundational store.
+//
+// It forwards the trusted identity headers resolved for this request (via dauth)
+// and, explicitly, the x-organization-id header so a hosted store's internal
+// (trust-based) listener can authorize the request without requiring the
+// end-user JWT, which is consumed upstream and never reaches tier1. For hosted
+// stores whose public endpoint still expects the original Bearer token, the raw
+// authorization header is forwarded when present in the incoming context.
+func foundationalStoreOutgoingContext(ctx context.Context, logger *zap.Logger) context.Context {
+	auth := dauth.FromContext(ctx)
+	callCtx := auth.ToOutgoingGRPCContext(ctx)
+
+	if orgID := auth.OrganizationID(); orgID != "" {
+		callCtx = metadata.AppendToOutgoingContext(callCtx, dauth.HeaderNewOrganizationID, orgID)
+	}
+
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		if auths := md.Get("authorization"); len(auths) > 0 {
+			if ce := logger.Check(zap.DebugLevel, "forwarding foundational store authorization header"); ce != nil {
+				ce.Write(
+					zap.Int("token_length", len(auths[0])),
+					zap.String("organization_id", auth.OrganizationID()),
+				)
+			}
+			callCtx = metadata.AppendToOutgoingContext(callCtx, "authorization", auths[0])
+		}
+	}
+
+	return callCtx
+}
+
 func (c *Call) DoFoundationalStoreGet(index uint32, keys *pbmodel.Keys) *pbmodel.QueriedEntries {
 	c.validateFoundationalStoreIndex(int(index), "foundational_store_get_all")
 
@@ -346,20 +378,7 @@ func (c *Call) DoFoundationalStoreGet(index uint32, keys *pbmodel.Keys) *pbmodel
 	logger = logger.Named("DoFoundationalStoreGet")
 
 	for {
-		auth := dauth.FromContext(c.ctx)
-		callCtx := auth.ToOutgoingGRPCContext(c.ctx)
-		// Forward raw authorization header if present (for hosted store auth plugins that expect the original Bearer token)
-		if md, ok := metadata.FromIncomingContext(c.ctx); ok {
-			if auths := md.Get("authorization"); len(auths) > 0 {
-				if ce := logger.Check(zap.DebugLevel, "forwarding foundational store authorization header"); ce != nil {
-					ce.Write(
-						zap.Int("token_length", len(auths[0])),
-						zap.String("organization_id", auth.OrganizationID()),
-					)
-				}
-				callCtx = metadata.AppendToOutgoingContext(callCtx, "authorization", auths[0])
-			}
-		}
+		callCtx := foundationalStoreOutgoingContext(c.ctx, logger)
 		ctx, cancel := context.WithTimeoutCause(callCtx, foundationalStoreMaxWaitTime, fmt.Errorf("foundational store get_all timeout after %s", foundationalStoreMaxWaitTime))
 		defer cancel()
 
@@ -400,20 +419,7 @@ func (c *Call) DoFoundationalStoreGetFirst(index uint32, keys *pbmodel.Keys) *pb
 	logger := reqctx.Logger(c.ctx).With(zap.Uint32("foundational_store_index", index))
 
 	for {
-		auth := dauth.FromContext(c.ctx)
-		callCtx := auth.ToOutgoingGRPCContext(c.ctx)
-		// Forward raw authorization header if present (for hosted store auth plugins that expect the original Bearer token)
-		if md, ok := metadata.FromIncomingContext(c.ctx); ok {
-			if auths := md.Get("authorization"); len(auths) > 0 {
-				if ce := logger.Check(zap.DebugLevel, "forwarding foundational store authorization header"); ce != nil {
-					ce.Write(
-						zap.Int("token_length", len(auths[0])),
-						zap.String("organization_id", auth.OrganizationID()),
-					)
-				}
-				callCtx = metadata.AppendToOutgoingContext(callCtx, "authorization", auths[0])
-			}
-		}
+		callCtx := foundationalStoreOutgoingContext(c.ctx, logger)
 		ctx, cancel := context.WithTimeoutCause(callCtx, foundationalStoreMaxWaitTime, fmt.Errorf("foundational store get_all timeout after %s", foundationalStoreMaxWaitTime))
 		defer cancel()
 

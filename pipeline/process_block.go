@@ -751,7 +751,7 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 			}
 
 			// Those are not deterministic errors, just propagate them up for now, but the context is probably cancelled at this point
-			if errors.Is(recoveredErr, wasm.ErrFoundationalStoreCanceled) {
+			if errors.Is(recoveredErr, wasm.ErrFoundationalStoreCanceled) || errors.Is(recoveredErr, wasm.ErrFoundationalStoreFatal) {
 				out.err = recoveredErr
 				return
 			}

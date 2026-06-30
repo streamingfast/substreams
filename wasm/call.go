@@ -38,14 +38,15 @@ var ErrFoundationalStoreFatal = errors.New("foundational store request failed")
 const (
 	foundationalStoreRetryDelay  = 100 * time.Millisecond
 	foundationalStoreMaxWaitTime = 30 * time.Second
-
-	// foundationalStoreMaxUnreachableRetries bounds how many consecutive
-	// "unreachable" (codes.Unavailable) responses we tolerate before giving up,
-	// so a transient blip or rolling restart is absorbed but a truly down or
-	// misconfigured endpoint fails fast instead of retrying until the global
-	// deadline. At foundationalStoreRetryDelay each, this is ~30s of budget.
-	foundationalStoreMaxUnreachableRetries = 300
 )
+
+// foundationalStoreMaxUnreachableRetries bounds how many consecutive
+// "unreachable" (codes.Unavailable) responses we tolerate before giving up, so a
+// transient blip or rolling restart is absorbed but a truly down or
+// misconfigured endpoint fails fast instead of retrying until the global
+// deadline. At foundationalStoreRetryDelay each, this is ~30s of budget. It is a
+// var (not a const) so tests can lower it.
+var foundationalStoreMaxUnreachableRetries = 300
 
 type Call struct {
 	ctx        context.Context

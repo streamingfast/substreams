@@ -50,6 +50,19 @@ func (s *Stores) SetStoreMap(storeMap store.Map) {
 	s.StoreMap = storeMap
 }
 
+func (s *Stores) Close() {
+	if s.StoreMap == nil {
+		return
+	}
+	for _, st := range s.StoreMap.All() {
+		if closer, ok := st.(interface{ Close() error }); ok {
+			if err := closer.Close(); err != nil {
+				s.logger.Warn("failed to close store", zap.String("store", st.Name()), zap.Error(err))
+			}
+		}
+	}
+}
+
 func (s *Stores) resetStores() {
 	for _, s := range s.StoreMap.All() {
 		if resetableStore, ok := s.(store.Resettable); ok {

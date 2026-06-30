@@ -1,5 +1,9 @@
 # Hosted Sinks
 
+{% hint style="warning" %}
+**Hosted Sinks is currently in beta.** The service is under active development and changes may occur. To stay up to date with the latest information, join our [Discord Server](https://discord.gg/jZwqxJAvRs) and follow the **#announcements** channel.
+{% endhint %}
+
 **Hosted Sinks** is a managed service on [The Graph Market](https://thegraph.market) that runs your Substreams sink for you. Instead of provisioning servers, managing deployments, or operating sink processes yourself, you configure a sink in the portal and StreamingFast handles the infrastructure.
 
 A hosted sink continuously reads data from your Substreams package and writes it to your own Postgres or ClickHouse database.

@@ -167,7 +167,9 @@ func (i *instance) foundationalStoreGetEntries(storeIndex int32, reqPtr int32, r
 		return 0
 	}
 
+	zlog.Debug("calling DoFoundationalStoreGet")
 	entries := i.CurrentCall.DoFoundationalStoreGet(uint32(storeIndex), &keys)
+	zlog.Debug("DoFoundationalStoreGet called")
 
 	// Serialize response
 	respData, err := proto.Marshal(entries)

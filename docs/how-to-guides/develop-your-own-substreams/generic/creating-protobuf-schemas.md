@@ -12,6 +12,10 @@ Substreams uses Google Protocol Buffers extensively. Protocol Buffers, also refe
 **Tip**: Protobufs define the input and output for modules.
 {% endhint %}
 
+{% hint style="info" %}
+**Tip**: The [substreams-dev agent skill](./agent-skills.md) includes expert knowledge on protobuf schema design for blockchain data modeling — install it in your AI coding assistant to get guidance while designing your schemas.
+{% endhint %}
+
 Learn more about the details of Google Protocol Buffers in the official documentation provided by Google.
 
 **Google Protocol Buffer Documentation**

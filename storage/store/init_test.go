@@ -25,7 +25,7 @@ func newTestBaseStore(
 		appendLimit = 10
 	}
 
-	config, err := NewConfig("test", 0, "test.module.hash", updatePolicy, valueType, store, nil, "", "")
+	config, err := NewConfig("test", 0, "test.module.hash", updatePolicy, valueType, store, nil, 0, "", "")
 	config.appendLimit = appendLimit
 	config.totalSizeLimit = 9999
 	config.itemSizeLimit = 10_485_760

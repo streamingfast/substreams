@@ -325,6 +325,13 @@ func TestInputParseFoundationalStore(t *testing.T) {
 			expectError: "",
 		},
 		{
+			name: "valid deployment id (UUID) with leading digit",
+			input: Input{
+				FoundationalStore: "97caa575-4434-4877-b672-92f73c914656@v0.1.0",
+			},
+			expectError: "",
+		},
+		{
 			name: "invalid package notation - empty package",
 			input: Input{
 				FoundationalStore: "@v1.0.0",

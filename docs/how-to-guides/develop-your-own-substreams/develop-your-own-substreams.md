@@ -4,6 +4,10 @@ These how-to guides walk through creating a Substreams that uses raw blockchain 
 **Important**_:_ These how-to guides are in-depth walkthroughs of building highly performance indexers for your dapp. Less experienced users may want to reference the [Tutorials](../../tutorials/intro-to-tutorials.md) for a quick start.  
 {% endhint %}
 
+{% hint style="info" %}
+**Tip**: Speed up development by installing the [Substreams agent skills](./generic/agent-skills.md) in your AI coding assistant (Claude Code, Cursor, VS Code). The `substreams-dev` skill provides expert guidance on Rust modules, manifest configuration, protobuf design, and debugging.
+{% endhint %}
+
 Choose your ecosystem to get started:
 
 - [General](./generic/local-development/README.md) - Cross-chain topics including local development, Rust, Protobuf, and agent skills

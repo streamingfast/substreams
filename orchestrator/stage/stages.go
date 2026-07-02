@@ -3,7 +3,6 @@ package stage
 import (
 	"context"
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -60,6 +59,19 @@ type Stages struct {
 
 	// first segment where we can run directly the higher stages (shadowing the lower stages)
 	shadowableSegment int
+
+	// allStoresDone latches true once every store stage is fully completed, and
+	// allStoresCursor[stageIdx] is the lowest store segment not yet known terminal.
+	// Together they make AllStoresCompleted O(1) amortized instead of rescanning
+	// the whole completed prefix on every call. See AllStoresCompleted.
+	allStoresDone   bool
+	allStoresCursor []int
+
+	// nextJobCursor is the lowest segment that may still yield a job. NextJob
+	// starts its scan here instead of at globalSegmenter.FirstIndex(), so it no
+	// longer re-walks the (ever-growing) prefix of finished segments on every
+	// call. See NextJob / segmentMayYieldJob.
+	nextJobCursor int
 }
 type stageStates []UnitState
 
@@ -131,6 +143,7 @@ func NewStages(
 	}
 
 	out.initSegmentsOffset(reqPlan)
+	out.nextJobCursor = out.globalSegmenter.FirstIndex()
 
 	return out
 }
@@ -180,19 +193,39 @@ func (s *Stages) AllStoresCompleted() bool {
 	if s.storeSegmenter.ExclusiveEndBlock() == s.storeSegmenter.InitialBlock() { // first segment on a mapper, no store to process
 		return true
 	}
+	if s.allStoresDone {
+		return true
+	}
 	lastSegment := s.storeSegmenter.LastIndex()
+
+	if s.allStoresCursor == nil {
+		s.allStoresCursor = make([]int, len(s.stages))
+		for i := range s.allStoresCursor {
+			s.allStoresCursor[i] = s.storeSegmenter.FirstIndex()
+		}
+	}
 
 	for idx, stage := range s.stages {
 		if stage.kind != KindStore {
 			continue
 		}
-		for seg := s.storeSegmenter.FirstIndex(); seg <= lastSegment; seg++ {
+		// Advance the per-stage cursor over the contiguous prefix of terminal
+		// (Completed/NoOp) segments. Both states are permanent, so segments below
+		// the cursor never need re-checking again — repeated calls become O(1)
+		// amortized instead of O(completed-prefix) (which made this O(n^2) over a run).
+		seg := s.allStoresCursor[idx]
+		for ; seg <= lastSegment; seg++ {
 			state := s.getState(Unit{Segment: seg, Stage: idx})
 			if state != UnitCompleted && state != UnitNoOp {
-				return false
+				break
 			}
 		}
+		s.allStoresCursor[idx] = seg
+		if seg <= lastSegment {
+			return false
+		}
 	}
+	s.allStoresDone = true
 	return true
 }
 
@@ -204,38 +237,39 @@ func (s *Stages) UpdateStats() {
 	s.lastStatUpdate = time.Now()
 	out := make([]*pbsubstreamsrpc.Stage, len(s.stages))
 
+	rangesByStage := s.statsRangesByStage()
 	for stgIdx := range s.stages {
-
 		mods := make([]string, len(s.stages[stgIdx].allExecutedModules))
 		_ = copy(mods, s.stages[stgIdx].allExecutedModules)
 
-		br := make(map[uint64]*block.Range)
-		for segmentIdx, segment := range s.segmentStates {
-			state := segment[stgIdx]
-			segmenter := s.stages[stgIdx].storeModuleStates[0].segmenter
-			if state == UnitCompleted || state == UnitPartialPresent || state == UnitMerging {
-				if rng := segmenter.Range(segmentIdx + s.segmentOffset); rng != nil {
-					br[rng.StartBlock] = rng
-				}
-			}
-		}
-
-		blockRanges := block.Ranges(make([]*block.Range, len(br)))
-		i := 0
-		for _, v := range br {
-			blockRanges[i] = v
-			i++
-		}
-		sort.Sort(blockRanges)
-		blockRanges = blockRanges.Merged()
-
 		out[stgIdx] = &pbsubstreamsrpc.Stage{
 			Modules:         mods,
-			CompletedRanges: toProtoRanges(blockRanges),
+			CompletedRanges: toProtoRanges(rangesByStage[stgIdx].Merged()),
 		}
 	}
 
 	reqctx.ReqStats(s.ctx).RecordStages(out)
+}
+
+// statsRangesByStage collects, per stage, the ranges of segments that are in
+// progress or done (Completed/PartialPresent/Merging), in a single pass over the
+// segment matrix. Because segments are visited in ascending order the ranges come
+// out already sorted and de-duplicated (one range per segment), so callers can
+// Merged() them directly — no per-stage map allocation and no sort.
+func (s *Stages) statsRangesByStage() []block.Ranges {
+	rangesByStage := make([]block.Ranges, len(s.stages))
+	for segmentIdx, segment := range s.segmentStates {
+		for stgIdx := range s.stages {
+			switch segment[stgIdx] {
+			case UnitCompleted, UnitPartialPresent, UnitMerging:
+				segmenter := s.stages[stgIdx].storeModuleStates[0].segmenter
+				if rng := segmenter.Range(segmentIdx + s.segmentOffset); rng != nil {
+					rangesByStage[stgIdx] = append(rangesByStage[stgIdx], rng)
+				}
+			}
+		}
+	}
+	return rangesByStage
 }
 
 func toProtoRanges(in block.Ranges) []*pbsubstreamsrpc.BlockRange {
@@ -390,6 +424,40 @@ func (s *Stages) WaitAsyncWork() error {
 	return nil
 }
 
+// segmentMayYieldJob reports whether NextJob could ever still return a job for
+// this segment. It is used to advance nextJobCursor over the finished prefix.
+//
+// A segment can no longer yield a job once every in-range stage's unit is in a
+// state that never transitions back to UnitPending:
+//   - Completed / NoOp are terminal for any stage;
+//   - PartialPresent is terminal only for map stages (maps are never squashed);
+//     a store partial can revert to Pending if a squash fails, so it still counts.
+//
+// Out-of-range stages (segment before the stage's first index or after its last)
+// never schedule there, matching the skip/break in NextJob's main loop. Being
+// conservative here (returning true when unsure) is always safe: it just keeps the
+// cursor a bit further back, never skips a schedulable segment.
+func (s *Stages) segmentMayYieldJob(segmentIdx int) bool {
+	for stageIdx := range s.stages {
+		stage := s.stages[stageIdx]
+		if segmentIdx < stage.segmenter.FirstIndex() || segmentIdx > stage.segmenter.LastIndex() {
+			continue
+		}
+		switch s.getState(Unit{Segment: segmentIdx, Stage: stageIdx}) {
+		case UnitCompleted, UnitNoOp:
+			// permanently done for this stage
+		case UnitPartialPresent:
+			if stage.kind != KindMap {
+				return true
+			}
+		default:
+			// Pending, Scheduled, Merging, Shadowed: may still (re)schedule
+			return true
+		}
+	}
+	return false
+}
+
 // Returns the unit, its block range and a boolean indicating if we are backing off because of 'notAbove'
 func (s *Stages) NextJob(notAboveSegment int) (Unit, *block.Range, bool) {
 	// OPTIMIZATION: before calling NextJob, keep a small reserve (10% ?) of workers
@@ -400,12 +468,22 @@ func (s *Stages) NextJob(notAboveSegment int) (Unit, *block.Range, bool) {
 	// OPTIMIZATION: Another option is to have an algorithm that doesn't return a job
 	//  right away when there are too many jobs scheduled before others
 	//  in a given stage.
-	//
-	// OPTIMIZATION: eventually, we can push `segmentsOffset`
-	//  each time contiguous segments are completed for all stages.
 
 	lastStage := len(s.stages) - 1
-	for segmentIdx := s.globalSegmenter.FirstIndex(); segmentIdx <= s.globalSegmenter.LastIndex(); segmentIdx++ {
+	lastSegment := s.globalSegmenter.LastIndex()
+
+	// Advance the scan cursor past the contiguous prefix of segments that can no
+	// longer yield a job, so we don't re-walk the finished prefix on every call
+	// (which made NextJob O(n^2) over a reprocessing run). The states we skip on
+	// are permanent — see segmentMayYieldJob — so the cursor only ever moves forward.
+	if s.nextJobCursor < s.globalSegmenter.FirstIndex() {
+		s.nextJobCursor = s.globalSegmenter.FirstIndex()
+	}
+	for s.nextJobCursor <= lastSegment && !s.segmentMayYieldJob(s.nextJobCursor) {
+		s.nextJobCursor++
+	}
+
+	for segmentIdx := s.nextJobCursor; segmentIdx <= lastSegment; segmentIdx++ {
 		someShadowed := s.markShadowedUnits(segmentIdx)
 		for stageIdx := lastStage; stageIdx >= 0; stageIdx-- {
 			stage := s.stages[stageIdx]

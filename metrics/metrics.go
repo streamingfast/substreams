@@ -36,6 +36,8 @@ var Tier1OutputHeadBlockRelativeTime *dmetrics.HeadBlockRelativeTime
 var StoreBackendType *dmetrics.GaugeVec
 var StoreMmapFileSizeBytes *dmetrics.GaugeVec
 var StoreMmapOperationsTotal *dmetrics.CounterVec
+var Tier1ActiveRequestsHardLimit *dmetrics.Gauge
+var Tier2MaxConcurrentRequests *dmetrics.Gauge
 
 func DeclareTier1Metrics(zlog *zap.Logger) {
 	AppReadinessTier1 = MetricSet.NewAppReadiness("substreams_tier1")
@@ -55,6 +57,7 @@ func DeclareTier1Metrics(zlog *zap.Logger) {
 	Tier1WorkerRetryCounter = MetricSet.NewCounter("substreams_tier1_worker_retry_counter", "Counter for total retryable errors returned from tier2")
 	Tier1WorkerRejectedOverloadedCounter = MetricSet.NewCounter("substreams_tier1_worker_rejected_overloaded_counter", "Counter for number of times a worker rejected a request because it was overloaded (included in RetryCounter)")
 	Tier1OutputHeadBlockRelativeTime = MetricSet.NewHeadBlockRelativeTime("substreams_output")
+	Tier1ActiveRequestsHardLimit = MetricSet.NewGauge("substreams_tier1_active_requests_hard_limit", "Hard limit of concurrent active requests on tier1 (0 means unlimited)")
 
 	StoreBackendType = MetricSet.NewGaugeVec(
 		"substreams_store_backend_type",
@@ -84,5 +87,6 @@ func DeclareTier2Metrics(zlog *zap.Logger) {
 		[]string{"reason"},
 		"Counter for total Substreams requests the tier2 rejected, by reason (gRPC code reason)",
 	)
+	Tier2MaxConcurrentRequests = MetricSet.NewGauge("substreams_tier2_max_concurrent_requests", "Hard limit of concurrent requests on tier2 (0 means unlimited)")
 	zlog.Info("registering tier2 substreams metrics")
 }

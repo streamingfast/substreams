@@ -11,7 +11,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Fixed
+
+- Server: `tier1` calls to hosted foundational stores now forward the `x-organization-id` identity header (alongside the existing trusted headers), so a store's internal trust-based listener can authorize the request without an end-user JWT. This fixes `Unauthenticated: required authorization token not found` errors when reading from hosted foundational stores resolved via the control-plane registry.
+- Server: foundational store calls that fail with authentication errors, organization id mismatch, or prolonged unreachability now bubble up to the user as a non-deterministic (uncached) error instead of retrying until the global deadline. Transient unavailability is still retried (~30s) to absorb blips and rolling restarts.
+
+## v1.19.0
+
+### Sink
+
+* Fix `Sinker.requestActiveStartBlock` not being set when the handler implements `SinkerSessionInitHandler`, which previously caused `ProgressMessageLastContiguousBlock` to be incorrect for production-mode mapper stages.
+
+### Fixed
+
+- Manifest: a `foundational-store:` input now accepts a hosted-store deployment id (a UUID), in addition to package `name@version` notation. Previously the deployment id was validated with the package-name regexp (`^[a-zA-Z]...`), which rejected any UUID starting with a digit, making real hosted stores impossible to reference.
+- Server: `tier1` forkable hub now logs under the `tier1` logger instead of the generic `bstream` package logger, so `processing block` (and related hub) log lines are correctly attributed to the component (requires bstream `hub.WithLogger`).
+- Server: per-block execution timeouts (`--substreams-block-execution-timeout`) are no longer silently swallowed when a WASM host-function panic (e.g. wasmtime) coincides with the deadline. Previously, `recoverExecutionPanic` would return `nil` instead of `CodeDeadlineExceeded`, causing the offending block to be skipped and the stream to complete successfully.
+- CI: Docker image login, build and push are now skipped for fork PRs; image is still built (without push) to validate the Dockerfile.
+
+### Added
+
+- added more metrics to identify time spent squashing
+
+### Performance
+
+- Server: the tier1 job scheduler no longer slows down on very large reprocessings (100_000s of segments). Both `NextJob` and `AllStoresCompleted` used to rescan the whole completed-segment prefix on every scheduling event, making job selection O(segments²) over a run; they now advance a forward-only cursor and are O(1) amortized.
+- Server: `UpdateStats` (progress reporting) now builds each stage's ranges in a single sort-free pass instead of one map+sort per stage every second.
+- Server: removed per-message overhead in the scheduler event loop — the debug-state env var is read once at startup instead of on every message, and the per-message debug log no longer builds its fields when debug logging is disabled.
+- Server: the cached-output streaming buffer now appends and checks for flushing under a single lock per block.
+
+## v1.18.5
+
+### Server
+
+* **Index optimisation**: Optimized `ClockDistributor` to skip blocks earlier and faster when using block filter.
 * Fix server-side bug that would cause Blocks request to fail after a few retries with 'load full store (...) load store stream: opening file for streaming: not found' when depending on a store that is being merged slowly
+* add 'substreams_tier1_active_requests_hard_limit' and 'substreams_tier2_max_concurrent_requests' attributes to prometheus metrics (constant, reflects the configuration)
 
 ## v1.18.4
 

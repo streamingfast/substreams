@@ -22,10 +22,41 @@ import (
 
 func TestHandleStepPartial(t *testing.T) {
 	tests := []struct {
-		name              string
-		blocks            []blockWithStep
-		expectedResponses []substreamsResp
+		name               string
+		blocks             []blockWithStep
+		pendingUndoMessage *pbsubstreamsrpc.Response
+		expectedResponses  []substreamsResp
 	}{
+		{
+			name:               "pending undo message is flushed by the first partial block, not muting the stream",
+			pendingUndoMessage: pendingUndoMsg(3, "3a"),
+			blocks: []blockWithStep{
+				withStepNew(testPartialBlock(4, "4b", 1, false)),
+				withStepNew(testPartialBlock(4, "4a", 2, true)),
+				withStepNew(testBlock(5, "5a")),
+			},
+			expectedResponses: []substreamsResp{
+				undoResp(3, "3a"),
+				partialDataResp(4, "4b", 1, false),
+				partialDataResp(4, "4a", 2, true),
+				dataResp(5, "5a"),
+			},
+		},
+		{
+			name:               "pending undo message flushed when resuming on settled partial blocks near head",
+			pendingUndoMessage: pendingUndoMsg(3, "3a"),
+			blocks: []blockWithStep{
+				withStepNew(testPartialBlock(4, "4a", 2, true)),
+				withStepNew(testPartialBlock(5, "5a", 2, true)),
+				withStepNew(testPartialBlock(6, "6b", 1, false)),
+			},
+			expectedResponses: []substreamsResp{
+				undoResp(3, "3a"),
+				partialDataResp(4, "4a", 2, true),
+				partialDataResp(5, "5a", 2, true),
+				partialDataResp(6, "6b", 1, false),
+			},
+		},
 		{
 			name: "bstream test output: happy path with partial block",
 			blocks: []blockWithStep{
@@ -206,6 +237,110 @@ func TestHandleStepPartial(t *testing.T) {
 			},
 		},
 		{
+			name: "partial with mismatching transactions triggers undo then waits for the last partial, not an error",
+			blocks: []blockWithStep{
+				withStepNew(testBlock(3, "3a")),
+				withTxs(withStepNew(testPartialBlock(4, "4x", 1, false)), "t1", "t2"),
+				withTxs(withStepNew(testPartialBlock(4, "4y", 2, false)), "t1", "t2", "t3"), // extends 4x: no undo
+				withTxs(withStepNew(testPartialBlock(4, "4z", 3, false)), "o1", "o2"),       // different transactions: new version of block 4
+				withTxs(withStepNew(testPartialBlock(4, "4a", 4, true)), "o1", "o2", "o3"),  // last partial settles the block
+				withStepNew(testBlock(5, "5a")),
+			},
+			expectedResponses: []substreamsResp{
+				dataResp(3, "3a"),
+				partialDataResp(4, "4x", 1, false),
+				partialDataResp(4, "4y", 2, false),
+				undoResp(3, "3a"),
+				// 4z is not sent: after the undo, we wait for the last partial of block 4
+				partialDataResp(4, "4a", 4, true),
+				dataResp(5, "5a"),
+			},
+		},
+		{
+			name: "partial with fewer transactions than already sent triggers undo",
+			blocks: []blockWithStep{
+				withStepNew(testBlock(3, "3a")),
+				withTxs(withStepNew(testPartialBlock(4, "4x", 1, false)), "t1", "t2", "t3"),
+				withTxs(withStepNew(testPartialBlock(4, "4y", 2, false)), "t1"), // shrunk: new version of block 4
+				withTxs(withStepNew(testPartialBlock(4, "4a", 3, true)), "t1", "t2"),
+			},
+			expectedResponses: []substreamsResp{
+				dataResp(3, "3a"),
+				partialDataResp(4, "4x", 1, false),
+				undoResp(3, "3a"),
+				partialDataResp(4, "4a", 3, true),
+			},
+		},
+		{
+			name: "churning partial versions trigger a single undo then silence until the last partial",
+			blocks: []blockWithStep{
+				withStepNew(testBlock(3, "3a")),
+				withTxs(withStepNew(testPartialBlock(4, "4w", 1, false)), "t1"),
+				withTxs(withStepNew(testPartialBlock(4, "4x", 2, false)), "t1", "t2"),
+				withTxs(withStepNew(testPartialBlock(4, "4y", 3, false)), "u1", "u2"),       // mismatch: undo, then mute
+				withTxs(withStepNew(testPartialBlock(4, "4z", 4, false)), "u1", "u2", "u3"), // muted, even though it extends 4y
+				withTxs(withStepNew(testPartialBlock(4, "4q", 5, false)), "v1"),             // muted
+				withTxs(withStepNew(testPartialBlock(4, "4a", 6, true)), "v1", "v2"),        // last partial settles the block
+				withStepNew(testBlock(5, "5a")),
+			},
+			expectedResponses: []substreamsResp{
+				dataResp(3, "3a"),
+				partialDataResp(4, "4w", 1, false),
+				partialDataResp(4, "4x", 2, false),
+				undoResp(3, "3a"),
+				partialDataResp(4, "4a", 6, true),
+				dataResp(5, "5a"),
+			},
+		},
+		{
+			name: "undo to the same junction after a mismatch-undo is not suppressed",
+			blocks: []blockWithStep{
+				withStepNew(testBlock(3, "3a")),
+				withTxs(withStepNew(testPartialBlock(4, "4x", 1, false)), "t1", "t2"),
+				withTxs(withStepNew(testPartialBlock(4, "4y", 2, false)), "u1", "u2"), // mismatch: undo to 3a, then mute
+				withTxs(withStepNew(testPartialBlock(4, "4b", 3, true)), "u1", "u2", "u3"),
+				withStepUndo(testBlock(4, "4b"), 3, "3a"), // chain reorgs block 4 away: undo to 3a again
+				withStepNew(testBlock(4, "4a")),
+			},
+			expectedResponses: []substreamsResp{
+				dataResp(3, "3a"),
+				partialDataResp(4, "4x", 1, false),
+				undoResp(3, "3a"),
+				partialDataResp(4, "4b", 3, true),
+				undoResp(3, "3a"), // must not be suppressed by the undo dedup
+				dataResp(4, "4a"),
+			},
+		},
+		{
+			name: "full block with mismatching transactions triggers undo and is sent as last partial",
+			blocks: []blockWithStep{
+				withStepNew(testBlock(3, "3a")),
+				withTxs(withStepNew(testPartialBlock(4, "4y", 1, false)), "t1", "t2"),
+				withTxs(withStepNew(testBlock(4, "4y")), "o1", "o2"), // same ID as the partial but different content
+				withStepNew(testBlock(5, "5a")),
+			},
+			expectedResponses: []substreamsResp{
+				dataResp(3, "3a"),
+				partialDataResp(4, "4y", 1, false),
+				undoResp(3, "3a"),
+				partialDataResp(4, "4y", 2, true),
+				dataResp(5, "5a"),
+			},
+		},
+		{
+			name: "partials on a chain with skipped block numbers are accepted",
+			blocks: []blockWithStep{
+				withStepNew(testBlock(3, "3a")),
+				withTxs(withStepNew(testPartialBlock(5, "5x", 1, false)), "t1"), // block 4 skipped
+				withTxs(withStepNew(testPartialBlock(5, "5a", 2, true)), "t1", "t2"),
+			},
+			expectedResponses: []substreamsResp{
+				dataResp(3, "3a"),
+				partialDataResp(5, "5x", 1, false),
+				partialDataResp(5, "5a", 2, true),
+			},
+		},
+		{
 			name: "partial undo does not reset 'lastPartial'",
 			blocks: []blockWithStep{
 				withStepNew(testBlock(8, "8a")),
@@ -250,10 +385,11 @@ func TestHandleStepPartial(t *testing.T) {
 			pipe.gate.passed = true
 			pipe.blockType = blockType
 			pipe.stateBundleSize = 100
+			pipe.pendingUndoMessage = tt.pendingUndoMessage
 
 			for _, blk := range tt.blocks {
 
-				err := fillTestAcmeBlock(blk.blk)
+				err := fillTestAcmeBlock(blk.blk, blk.txs)
 				require.NoError(t, err)
 
 				clock := BlockToClock(blk.blk)
@@ -262,7 +398,7 @@ func TestHandleStepPartial(t *testing.T) {
 				case bstream.StepNew:
 					err = pipe.handleStepNew(ctx, clock, testCursor(blk.blk, blk.step), execOutput, false)
 				case bstream.StepPartial, bstream.StepNewPartial: // we always have partial blocks active here
-					err = pipe.handleStepPartial(ctx, clock, testCursor(blk.blk, blk.step), execOutput, blk.blk.PartialIndex, blk.blk.LastPartial)
+					err = pipe.handleStepPartial(ctx, clock, testCursor(blk.blk, blk.step), execOutput, blk.blk.PreviousRef(), blk.blk.PartialIndex, blk.blk.LastPartial)
 				case bstream.StepUndo, bstream.StepUndoPartial:
 					err = pipe.handleStepUndo(clock, testCursor(blk.blk, blk.step), blk.junction)
 				}
@@ -367,6 +503,13 @@ type blockWithStep struct {
 	blk      *pbbstream.Block
 	step     bstream.StepType
 	junction bstream.BlockRef
+	txs      []string
+}
+
+// withTxs sets the transaction hashes carried by the underlying acme block
+func withTxs(b blockWithStep, txs ...string) blockWithStep {
+	b.txs = txs
+	return b
 }
 
 func withStepUndo(blk *pbbstream.Block, junctionNum uint64, junctionID string) blockWithStep {
@@ -397,13 +540,17 @@ func withStepNew(blk *pbbstream.Block) blockWithStep {
 	}
 }
 
-func fillTestAcmeBlock(blk *pbbstream.Block) error {
+func fillTestAcmeBlock(blk *pbbstream.Block, txs []string) error {
+	var transactions []*pbacme.Transaction
+	for _, hash := range txs {
+		transactions = append(transactions, &pbacme.Transaction{Hash: hash})
+	}
 	acmeBlock := &pbacme.Block{
 		Header: &pbacme.BlockHeader{
 			Height: blk.Number,
 			Hash:   blk.Id,
 		},
-		Transactions: nil,
+		Transactions: transactions,
 	}
 
 	payload, err := anypb.New(acmeBlock)
@@ -448,6 +595,17 @@ func dataResp(clockNumber uint64, clockID string) substreamsResp {
 		isPartial:     false,
 		partialIndex:  0,
 		isLastPartial: false,
+	}
+}
+
+// pendingUndoMsg builds the undo message installed at stream setup when resuming from a partial cursor
+func pendingUndoMsg(lastValidBlockNum uint64, lastValidBlockID string) *pbsubstreamsrpc.Response {
+	return &pbsubstreamsrpc.Response{
+		Message: &pbsubstreamsrpc.Response_BlockUndoSignal{
+			BlockUndoSignal: &pbsubstreamsrpc.BlockUndoSignal{
+				LastValidBlock: &pbsubstreams.BlockRef{Number: lastValidBlockNum, Id: lastValidBlockID},
+			},
+		},
 	}
 }
 

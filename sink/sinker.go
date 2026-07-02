@@ -784,25 +784,41 @@ func (s *Sinker) doRequest(
 			}
 
 		case *pbsubstreamsrpc.Response_Session:
-			if sh, ok := handler.(SinkerSessionInitHandler); ok {
-				if err := sh.HandleSessionInit(ctx, s.request, r.Session); err != nil {
-					return activeCursor, receivedDataMessage, fmt.Errorf("handle session init: %w", err)
-				}
-				break
+			if err := s.handleSessionInit(ctx, handler, r.Session); err != nil {
+				return activeCursor, receivedDataMessage, err
 			}
-			s.Logger.Info("session initialized with remote endpoint",
-				zap.Uint64("max_parallel_workers", r.Session.MaxParallelWorkers),
-				zap.Uint64("linear_handoff_block", r.Session.LinearHandoffBlock),
-				zap.Uint64("resolved_start_block", r.Session.ResolvedStartBlock),
-				zap.String("trace_id", r.Session.TraceId),
-			)
-			s.requestActiveStartBlock = r.Session.ResolvedStartBlock
 
 		default:
 			s.Logger.Info("received unknown type of message", zap.Reflect("message", r))
 			UnknownMessageCount.Inc()
 		}
 	}
+}
+
+// handleSessionInit processes a `Response_Session` message received from the Substreams endpoint.
+//
+// If the registered handler implements [SinkerSessionInitHandler], its [SinkerSessionInitHandler.HandleSessionInit]
+// callback is invoked. We do *not* short-circuit afterwards: the default logging and the
+// `s.requestActiveStartBlock` assignment are sinker-internal bookkeeping that must run on every
+// `Response_Session` message regardless of whether a custom handler is installed. The
+// `requestActiveStartBlock` field is later consumed in the `Response_ModulesProgress` case to identify the
+// contiguous completed range covering the user's resolved start block, so it must always be kept up to date.
+func (s *Sinker) handleSessionInit(ctx context.Context, handler SinkerHandler, session *pbsubstreamsrpc.SessionInit) error {
+	if sh, ok := handler.(SinkerSessionInitHandler); ok {
+		if err := sh.HandleSessionInit(ctx, s.request, session); err != nil {
+			return fmt.Errorf("handle session init: %w", err)
+		}
+	}
+
+	s.Logger.Info("session initialized with remote endpoint",
+		zap.Uint64("max_parallel_workers", session.MaxParallelWorkers),
+		zap.Uint64("linear_handoff_block", session.LinearHandoffBlock),
+		zap.Uint64("resolved_start_block", session.ResolvedStartBlock),
+		zap.String("trace_id", session.TraceId),
+	)
+	s.requestActiveStartBlock = session.ResolvedStartBlock
+
+	return nil
 }
 
 func (s *Sinker) processBlockScopedData(

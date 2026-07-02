@@ -55,6 +55,10 @@ var slowQueryNotificationFrequency = 30 * time.Second
 var slowQueryNotificationThreshold = 300 * time.Second
 var ErrRequestActiveForTooLong = errors.New("request active for too long")
 
+// sendHostnameHeader mirrors SUBSTREAMS_SEND_HOSTNAME, read once at startup
+// instead of on every request (updateStreamHeadersHostname runs per ProcessRange).
+var sendHostnameHeader = os.Getenv("SUBSTREAMS_SEND_HOSTNAME") == "true"
+
 type ModuleExecutionConfig struct {
 	name       string
 	moduleHash string
@@ -84,14 +88,15 @@ type Tier2Service struct {
 
 	// You can call this function to switch the parent app to be ready or not ready influencing the health check,
 	// it's provided by [app.Tier1App] and tied to the health check endpoint.
-	appSetIsReadyState        func(isReady bool)
-	currentConcurrentRequests int64
-	maxConcurrentRequests     uint64
-	moduleExecutionTracing    bool
-	connectionCountMutex      sync.RWMutex
-	blockExecutionTimeout     time.Duration
-	segmentExecutionTimeout   time.Duration
-	foundationalEndpoints     map[string]string
+	appSetIsReadyState         func(isReady bool)
+	currentConcurrentRequests  int64
+	maxConcurrentRequests      uint64
+	moduleExecutionTracing     bool
+	connectionCountMutex       sync.RWMutex
+	blockExecutionTimeout      time.Duration
+	segmentExecutionTimeout    time.Duration
+	foundationalEndpoints      map[string]string
+	HostedStoreRegistryAddress string
 
 	checkPendingShutdown func() bool
 	storesScratchSpace   string
@@ -147,6 +152,8 @@ func NewTier2(
 	for _, opt := range opts {
 		opt(s)
 	}
+
+	metrics.Tier2MaxConcurrentRequests.SetFloat64(float64(s.maxConcurrentRequests))
 
 	return s, nil
 }
@@ -221,6 +228,9 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 	}
 	if request.EthCallFallbackToNumberDuration > 0 {
 		ctx = reqctx.WithEthCallUseBlockNumberDuration(ctx, time.Duration(request.EthCallFallbackToNumberDuration))
+	}
+	if request.StoreSizeLimit != 0 {
+		ctx = reqctx.WithStoreSizeLimit(ctx, request.StoreSizeLimit)
 	}
 
 	stage := request.OutputModule
@@ -406,7 +416,8 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return fmt.Errorf("new config map: %w", err)
 	}
 
-	storeConfigs, err := store.NewConfigMap(cacheStore, nil, execGraph.Stores(), execGraph.ModuleHashes(), request.FirstStreamableBlock, s.storesScratchSpace, s.storesBackend)
+	storeSizeLimit := reqctx.StoreSizeLimit(ctx)
+	storeConfigs, err := store.NewConfigMap(cacheStore, nil, execGraph.Stores(), execGraph.ModuleHashes(), request.FirstStreamableBlock, storeSizeLimit, s.storesScratchSpace, s.storesBackend)
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
@@ -533,6 +544,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		request.FoundationalStoreEndpoints,
 		0,
 		false,
+		s.HostedStoreRegistryAddress,
 		opts...,
 	)
 
@@ -737,7 +749,7 @@ func updateStreamHeadersHostname(setHeader func(metadata.MD) error, logger *zap.
 		logger.Warn("cannot find hostname, using 'unknown'", zap.Error(err))
 		hostname = "unknown host"
 	}
-	if os.Getenv("SUBSTREAMS_SEND_HOSTNAME") == "true" {
+	if sendHostnameHeader {
 		md := metadata.New(map[string]string{"host": hostname})
 		err = setHeader(md)
 		if err != nil {

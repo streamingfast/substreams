@@ -12,9 +12,14 @@ import (
 	"testing"
 	"time"
 
+<<<<<<< HEAD
+=======
+	"github.com/moby/moby/api/types/container"
+>>>>>>> develop
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dauth"
 	dauthnull "github.com/streamingfast/dauth/null"
+	dauthsecret "github.com/streamingfast/dauth/secret"
 	dauthtrust "github.com/streamingfast/dauth/trust"
 	"github.com/streamingfast/dmetering/logger"
 	"github.com/streamingfast/dmetrics"
@@ -137,7 +142,7 @@ func startTier1App(t *testing.T, ctx context.Context, tmpDir string, container t
 	relayerPort, err := container.MappedPort(ctx, "10014/tcp")
 	require.NoError(t, err)
 
-	relayerEndpoint := fmt.Sprintf("localhost:%s", relayerPort.Port())
+	relayerEndpoint := fmt.Sprintf("localhost:%d", relayerPort.Num())
 	t.Logf("Tier1App relayer endpoint: %s", relayerEndpoint)
 
 	listenPort := findFreePort(t)
@@ -227,6 +232,37 @@ func startTier2App(t *testing.T, ctx context.Context, tmpDir string, zlog *zap.L
 			return false
 		},
 	})
+
+	return startTier2AppInternal(t, ctx, t2app, endpoint)
+}
+
+// startTier2AppWithSecret starts a tier2 that requires requests to carry
+// "Authorization: Bearer <secret>" — mimicking a real deployment where tier1
+// must authenticate its subrequests to tier2.
+func startTier2AppWithSecret(t *testing.T, ctx context.Context, tmpDir string, secret string, zlog *zap.Logger) (out *app.Tier2App, endpoint string) {
+	port := findFreePort(t)
+	endpoint = fmt.Sprintf("localhost:%d", port)
+
+	dauthsecret.Register()
+	auth, err := dauth.New(fmt.Sprintf("secret://%s", secret), zlog)
+	require.NoError(t, err)
+
+	t2conf := &app.Tier2Config{
+		GRPCListenAddr:        endpoint,
+		ServiceDiscoveryURL:   nil,
+		BlockExecutionTimeout: 5 * time.Second,
+		TmpDir:                filepath.Join(tmpDir, "tmp"),
+	}
+
+	t2app := app.NewTier2(zlog, t2conf, &app.Tier2Modules{
+		CheckPendingShutDown: func() bool { return false },
+		Authenticator:        auth,
+	})
+
+	return startTier2AppInternal(t, ctx, t2app, endpoint)
+}
+
+func startTier2AppInternal(t *testing.T, ctx context.Context, t2app *app.Tier2App, endpoint string) (*app.Tier2App, string) {
 	go func() {
 		err := t2app.Run()
 		require.NoError(t, err)
@@ -244,7 +280,7 @@ waitReady:
 			t.Fatal("timeout waiting for t2app to be ready")
 		case <-ticker.C:
 			if t2app.IsReady(ctx) {
-				t.Logf("t1app is ready")
+				t.Logf("t2app is ready")
 				break waitReady
 			}
 		}
@@ -253,12 +289,103 @@ waitReady:
 	return t2app, endpoint
 }
 
+// startTier1AppWithSecret starts a tier1 that sends subrequests to tier2 using the
+// provided secret key in the Authorization header.
+func startTier1AppWithSecret(t *testing.T, ctx context.Context, tmpDir string, container testcontainers.Container, t2Endpoint string, secret string, zlog *zap.Logger) (*app.Tier1App, string) {
+	os.Setenv("SUBSTREAMS_WORKERS_RAMPUP_TIME", "0")
+
+	relayerPort, err := container.MappedPort(ctx, "10014/tcp")
+	require.NoError(t, err)
+
+	relayerEndpoint := fmt.Sprintf("localhost:%d", relayerPort.Num())
+	t.Logf("Tier1App (with secret) relayer endpoint: %s", relayerEndpoint)
+
+	listenPort := findFreePort(t)
+	substreamsEndpoint := fmt.Sprintf("localhost:%d", listenPort)
+	t1conf := &app.Tier1Config{
+		GRPCListenAddr:                substreamsEndpoint,
+		OneBlocksStoreURL:             filepath.Join(tmpDir, "one-blocks"),
+		MergedBlocksStoreURL:          filepath.Join(tmpDir, "merged-blocks"),
+		BlockStreamAddr:               relayerEndpoint,
+		MeteringConfig:                "logger://",
+		FoundationalStoresConfigPath:  "",
+		ForkedBlocksStoreURL:          "",
+		GRPCShutdownGracePeriod:       0,
+		ServiceDiscoveryURL:           nil,
+		BlockExecutionTimeout:         5 * time.Second,
+		TmpDir:                        filepath.Join(tmpDir, "tmp"),
+		StateStoreURL:                 filepath.Join(tmpDir, "states"),
+		QuickSaveStoreURL:             "",
+		StateStoreDefaultTag:          "",
+		BlockType:                     "sf.acme.type.v1.Block",
+		StateBundleSize:               100,
+		SubrequestsEndpoint:           t2Endpoint,
+		SubrequestsPlaintext:          true,
+		SubrequestsSecret:             secret,
+		MaxSubrequests:                10,
+		LiveBackFillerFinalBlockDelay: 2,
+	}
+
+	dauthnull.Register()
+	auth, err := dauth.New("null://", zlog)
+	require.NoError(t, err)
+	metricset := dmetrics.NewSet()
+	headBlockNumMetric := metricset.NewHeadBlockNumber("test-firehose-secret")
+	headTimeDriftmetric := metricset.NewHeadTimeDrift("test-firehose-secret")
+
+	sessionPool, err := dsession.New("local://localhost?max_workers=10&max_workers_per_session=5", zlog)
+	require.NoError(t, err)
+	t1app := app.NewTier1(zlog, t1conf, &app.Tier1Modules{
+		HeadTimeDriftMetric:   headTimeDriftmetric,
+		HeadBlockNumberMetric: headBlockNumMetric,
+		Authenticator:         auth,
+		SessionPool:           sessionPool,
+	})
+	go func() {
+		err := t1app.Run()
+		require.NoError(t, err)
+	}()
+
+	timeout := time.After(20 * time.Second)
+	ticker := time.NewTicker(20 * time.Millisecond)
+	defer ticker.Stop()
+
+waitReady:
+	for {
+		select {
+		case <-timeout:
+			t.Fatal("timeout waiting for t1app (with secret) to be ready")
+		case <-ticker.C:
+			if t1app.IsReady(ctx) {
+				t.Logf("t1app (with secret) is ready")
+				break waitReady
+			}
+		}
+	}
+
+	return t1app, substreamsEndpoint
+}
+
 func newDummyBlockchainContainer(ctx context.Context, tmpDir string, image string, additionalReaderArgs string, burst int) (testcontainers.Container, error) {
 	baseReaderArgs := fmt.Sprintf("start --log-level=error --tracer=firehose --store-dir=/data --genesis-block-burst=%d --block-rate=120 --block-size=1500 --genesis-height=0 --server-addr=:9777 --with-reorgs=false --with-skipped-blocks=false", burst)
 	readerArgs := baseReaderArgs
 	if additionalReaderArgs != "" {
 		readerArgs = baseReaderArgs + " " + additionalReaderArgs
 	}
+
+	return newDummyBlockchainContainerWithArgs(ctx, tmpDir, image, readerArgs)
+}
+
+func newDummyBlockchainContainerWithBlockRate(ctx context.Context, tmpDir string, image string, additionalReaderArgs string, burst int, blockRate int) (testcontainers.Container, error) {
+	readerArgs := fmt.Sprintf("start --log-level=error --tracer=firehose --store-dir=/data --genesis-block-burst=%d --block-rate=%d --block-size=1500 --genesis-height=0 --server-addr=:9777 --with-reorgs=false --with-skipped-blocks=false", burst, blockRate)
+	if additionalReaderArgs != "" {
+		readerArgs = readerArgs + " " + additionalReaderArgs
+	}
+
+	return newDummyBlockchainContainerWithArgs(ctx, tmpDir, image, readerArgs)
+}
+
+func newDummyBlockchainContainerWithArgs(ctx context.Context, tmpDir string, image string, readerArgs string) (testcontainers.Container, error) {
 
 	req := testcontainers.ContainerRequest{
 		Image: image,

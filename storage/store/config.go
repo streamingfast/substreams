@@ -34,7 +34,7 @@ type Config struct {
 	backend      string // "mmap" (default) or "memory"
 }
 
-var StoreSizeLimit uint64 = 1_073_741_824 // 1GiB
+var DefaultStoreSizeLimit uint64 = 1_073_741_824 // 1GiB
 func NewConfig(
 	name string,
 	moduleInitialBlock uint64,
@@ -43,6 +43,7 @@ func NewConfig(
 	valueType string,
 	store dstore.Store,
 	quickSaveStore dstore.Store,
+	storeSizeLimit uint64,
 	scratchSpace string,
 	backend string,
 ) (*Config, error) {
@@ -72,10 +73,15 @@ func NewConfig(
 		moduleInitialBlock: moduleInitialBlock,
 		moduleHash:         moduleHash,
 		appendLimit:        8_388_608, // 8MiB = 8 * 1024 * 1024,
-		totalSizeLimit:     StoreSizeLimit,
-		itemSizeLimit:      10_485_760, // 10MiB
-		scratchSpace:       scratchSpace,
-		backend:            backend,
+		totalSizeLimit: func() uint64 {
+			if storeSizeLimit != 0 {
+				return storeSizeLimit
+			}
+			return DefaultStoreSizeLimit
+		}(),
+		itemSizeLimit: 10_485_760, // 10MiB,
+		scratchSpace:  scratchSpace,
+		backend:       backend,
 	}, nil
 }
 

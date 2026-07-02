@@ -1,8 +1,10 @@
 package foudational_store
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/streamingfast/dgrpc"
@@ -10,6 +12,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
@@ -21,12 +24,21 @@ func NewStoreClient(rawEndpoint string, logger *zap.Logger) (
 	logger = logger.Named("foundational-store")
 	logger.Info("creating new foundational store", zap.String("raw_endpoint", rawEndpoint))
 
-	if u, err := url.Parse(rawEndpoint); err == nil && (u.Scheme == "grpc" || u.Scheme == "grpcs") {
-		rawEndpoint = u.Host
+	transportCreds := insecure.NewCredentials()
+	if u, err := url.Parse(rawEndpoint); err == nil {
+		if u.Scheme == "grpcs" {
+			transportCreds = credentials.NewTLS(&tls.Config{})
+			rawEndpoint = u.Host
+		} else if u.Scheme == "grpc" {
+			rawEndpoint = u.Host
+		} else if strings.HasSuffix(rawEndpoint, ":443") {
+			// heuristic for bare host:443 -> use TLS (for hosted stores without scheme)
+			transportCreds = credentials.NewTLS(&tls.Config{})
+		}
 	}
 
 	opts := []grpc.DialOption{
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithTransportCredentials(transportCreds),
 		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 		grpc.WithBlock(),
 		grpc.WithTimeout(5 * time.Second),

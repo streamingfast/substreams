@@ -23,7 +23,7 @@ func createTestStore(t *testing.T, name string, updatePolicy pbsubstreams.Module
 		moduleInitialBlock: 0,
 		moduleHash:         "test_hash_12345",
 		appendLimit:        8_388_608,
-		totalSizeLimit:     StoreSizeLimit,
+		totalSizeLimit:     DefaultStoreSizeLimit,
 		itemSizeLimit:      10_485_760,
 		scratchSpace:       scratchSpace,
 	}

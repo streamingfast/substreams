@@ -126,6 +126,8 @@ func (a *Tier2App) Run() error {
 		return err
 	}
 
+	svc.HostedStoreRegistryAddress = a.config.HostedStoreRegistryAddress
+
 	if a.modules.Authenticator == nil {
 		trustAuth, err := dauth.New("trust://", a.logger)
 		if err != nil {

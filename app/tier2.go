@@ -37,8 +37,9 @@ type Tier2Config struct {
 	BlockExecutionTimeout     time.Duration
 	SegmentExecutionTimeout   time.Duration
 	TmpDir                    string
-	StoresScratchSpace        string
-	StoresBackend             string
+	StoresScratchSpace             string
+	StoresBackend                  string
+	HostedStoreRegistryAddress     string
 
 	Tracing bool
 }

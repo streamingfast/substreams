@@ -75,8 +75,9 @@ type Tier1Config struct {
 
 	TmpDir                  string
 	StateStoreURL           string
-	StoresScratchSpace      string
-	QuickSaveStoreURL       string
+	StoresScratchSpace             string
+	HostedStoreRegistryAddress     string
+	QuickSaveStoreURL              string
 	StateStoreDefaultTag    string
 	BlockType               string
 	StateBundleSize         uint64

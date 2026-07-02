@@ -283,6 +283,13 @@ func (p *Pipeline) initStoresFromQuickload(ctx context.Context, reqPlan *plan.Re
 
 	if err := storeMap.QuickLoad(ctx, cursor.Block); err != nil {
 		p.stores.logger.Info("no temporary store files found", zap.Error(err))
+		for _, st := range storeMap.All() {
+			if closer, ok := st.(interface{ Close() error }); ok {
+				if cerr := closer.Close(); cerr != nil {
+					p.stores.logger.Warn("failed to close store after quickload failure", zap.String("store", st.Name()), zap.Error(cerr))
+				}
+			}
+		}
 		return false
 	}
 	reqctx.Logger(ctx).Info("skipping backprocessing, reading from temporary files", zap.Strings("stores", storeMap.Names()), zap.Uint64("block_num", cursor.Block.Num()), zap.String("block_id", cursor.Block.ID()))
@@ -375,6 +382,17 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 	logger := reqctx.Logger(ctx)
 
 	storeMap = store.NewMap()
+	defer func() {
+		if err != nil {
+			for _, st := range storeMap.All() {
+				if closer, ok := st.(interface{ Close() error }); ok {
+					if cerr := closer.Close(); cerr != nil {
+						logger.Warn("failed to close store after setup error", zap.String("store", st.Name()), zap.Error(cerr))
+					}
+				}
+			}
+		}
+	}()
 
 	type loadable struct {
 		fullKVStore *store.FullKV

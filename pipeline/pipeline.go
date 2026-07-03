@@ -146,6 +146,7 @@ type Pipeline struct {
 	lastProcessedBlockRef bstream.BlockRef
 	lastCursor            *bstream.Cursor
 	sentBlocks            uint64
+	quickSaved            bool
 
 	blockStepMap         map[bstream.StepType]uint64
 	workerPoolFactory    work.WorkerPoolFactory

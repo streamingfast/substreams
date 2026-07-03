@@ -1093,12 +1093,14 @@ func tier1ResponseHandler(
 		}
 
 		isData := false
+		var lastSentClock *pbsubstreams.Clock
 
 		switch r := respAny.(type) {
 		case *pbsubstreamsrpc.Response:
 			d := r.GetBlockScopedData()
 			if d != nil {
 				isData = true
+				lastSentClock = d.Clock
 				filterData(d, noop, debugOutputs)
 				if supportBuffering {
 					// Worker used the v2 response path; promote to v4 BlockScopedDatas for v4 clients
@@ -1111,6 +1113,7 @@ func tier1ResponseHandler(
 			for _, d := range r.GetBlockScopedDatas().Items {
 				if d != nil {
 					isData = true
+					lastSentClock = d.Clock
 					filterData(d, noop, debugOutputs)
 				}
 			}
@@ -1126,6 +1129,7 @@ func tier1ResponseHandler(
 
 		if isData {
 			stats.RecordDataSent()
+			stats.RecordLastBlockSent(lastSentClock)
 		}
 		stats.RecordEgress(egressBytes)
 		metering.AddEgressBytes(ctx, egressBytes)

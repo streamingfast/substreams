@@ -76,16 +76,51 @@ func (s *StoreModuleState) getStore(ctx context.Context, exclusiveEndBlock uint6
 					s.logger.Error("cannot delete corrupted fullKV store", zap.Error(err), zap.String("store_name", loadStore.Name()), zap.String("store_hash", loadStore.ModuleHash()), zap.String("filename", fullKVFile.Filename))
 				}
 			}
+			loadStore.Close()
 			return nil, fmt.Errorf("load full store %s (%s): %w", loadStore.Name(), loadStore.ModuleHash(), err)
 		}
+	}
+	if s.cachedStore != nil {
+		s.cachedStore.Close()
 	}
 	s.cachedStore = loadStore
 	s.lastBlockInStore = exclusiveEndBlock
 	return loadStore, nil
 }
 
+func (s *StoreModuleState) Close() {
+	if s.cachedStore != nil {
+		s.cachedStore.Close()
+		s.cachedStore = nil
+	}
+}
+
 func (s *StoreModuleState) derivePartialKV(initialBlock uint64) *store.PartialKV {
 	return s.storeConfig.NewPartialKV(initialBlock, s.logger)
+}
+
+// tryLoadFullKV attempts to load a FullKV from storage for the given block range.
+// It does NOT touch cachedStore — use getStore for cache-aware loading.
+// Returns (nil, nil) if moduleInitBlock >= exclusiveEndBlock.
+// Returns (nil, err) if the file doesn't exist or is corrupt; callers treat this as "no fullKV available".
+func (s *StoreModuleState) tryLoadFullKV(ctx context.Context, exclusiveEndBlock uint64) (*store.FullKV, error) {
+	moduleInitBlock := s.storeConfig.ModuleInitialBlock()
+	if moduleInitBlock >= exclusiveEndBlock {
+		return nil, nil
+	}
+	kv := s.storeConfig.NewFullKV(s.logger)
+	fullKVFile := store.NewCompleteFileInfo(s.name, moduleInitBlock, exclusiveEndBlock)
+	if err := kv.Load(ctx, fullKVFile); err != nil {
+		if errors.Is(err, store.ErrInvalidFullKVFile) {
+			s.logger.Warn("found a corrupted fullKV store, deleting it", zap.Error(err), zap.String("store_name", kv.Name()), zap.String("store_hash", kv.ModuleHash()), zap.String("filename", fullKVFile.Filename))
+			if delErr := kv.Delete(ctx, fullKVFile); delErr != nil {
+				s.logger.Error("cannot delete corrupted fullKV store", zap.Error(delErr), zap.String("store_name", kv.Name()), zap.String("store_hash", kv.ModuleHash()), zap.String("filename", fullKVFile.Filename))
+			}
+		}
+		kv.Close()
+		return nil, err
+	}
+	return kv, nil
 }
 
 //type MergeState int

@@ -1,6 +1,8 @@
 package service
 
 import (
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/streamingfast/substreams/wasm"
@@ -102,7 +104,18 @@ func WithStoresScratchSpace(path string) Option {
 			s.runtimeConfig.StoresScratchSpace = path
 		case *Tier2Service:
 			s.storesScratchSpace = path
+			sweepOrphanMmapFiles(path)
 		}
+	}
+}
+
+// sweepOrphanMmapFiles removes bbolt files left behind by a previous process kill,
+// before the service starts accepting requests. Safe to call at startup because
+// no requests are in flight yet.
+func sweepOrphanMmapFiles(dir string) {
+	matches, _ := filepath.Glob(filepath.Join(dir, "substreams-store-*.db"))
+	for _, f := range matches {
+		os.Remove(f)
 	}
 }
 

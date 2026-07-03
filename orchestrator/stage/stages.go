@@ -148,6 +148,14 @@ func NewStages(
 	return out
 }
 
+func (s *Stages) Close() {
+	for _, stage := range s.stages {
+		for _, modState := range stage.storeModuleStates {
+			modState.Close()
+		}
+	}
+}
+
 func layerKind(layer exec.LayerModules) Kind {
 	if layer.IsStoreLayer() {
 		return KindStore

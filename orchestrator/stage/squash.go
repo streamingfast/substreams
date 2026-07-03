@@ -69,7 +69,7 @@ func getPartialOrFullKV(ctx context.Context, modState *StoreModuleState, rng *bl
 	}()
 
 	go func() {
-		nextFull, err := modState.getStore(ctx, rng.ExclusiveEndBlock)
+		nextFull, err := modState.tryLoadFullKV(ctx, rng.ExclusiveEndBlock)
 		results <- Result{fullKVStore: nextFull, error: err}
 	}()
 
@@ -130,6 +130,9 @@ func (s *Stages) singleSquash(stage *Stage, modState *StoreModuleState, mergeUni
 	}
 
 	if newFullKV != nil {
+		if fullKV != nil {
+			fullKV.Close()
+		}
 		modState.cachedStore = newFullKV
 		modState.lastBlockInStore = rng.ExclusiveEndBlock
 		s.logger.Debug("squashing time metrics (skipped, loaded from full kv)", meter.logFields()...)

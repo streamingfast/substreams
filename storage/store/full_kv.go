@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"time"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/derr"
@@ -54,6 +55,7 @@ func (s *FullKV) QuickLoad(ctx context.Context, atBlock bstream.BlockRef) error 
 		return ErrNoQuickSaveStore
 	}
 
+	start := time.Now()
 	filename := atBlock.ID() + ".quicksave"
 	s.logger.Debug("loading full store state from temporary file", zap.String("fileName", filename), zap.String("module_hash", s.moduleHash), zap.Uint64("block_num", atBlock.Num()), zap.String("block_id", atBlock.ID()))
 
@@ -90,7 +92,7 @@ func (s *FullKV) QuickLoad(ctx context.Context, atBlock bstream.BlockRef) error 
 		s.kv = make(map[string][]byte)
 	}
 
-	s.logger.Info("quickload: full store loaded", zap.String("fileName", filename), zap.Int("key_count", len(s.kv)), zap.Uint64("data_size", size), zap.Uint64("block_num", atBlock.Num()), zap.String("block_id", atBlock.ID()))
+	s.logger.Info("quickload: full store loaded", zap.String("fileName", filename), zap.Int("key_count", len(s.kv)), zap.Uint64("data_size", size), zap.Uint64("block_num", atBlock.Num()), zap.String("block_id", atBlock.ID()), zap.Duration("load_duration", time.Since(start)))
 	return nil
 }
 
@@ -98,6 +100,7 @@ func (s *FullKV) QuickSave(ctx context.Context, atBlockHash string) error {
 	if s.quickSaveStore == nil {
 		return ErrNoQuickSaveStore
 	}
+	start := time.Now()
 	s.logger.Info("quicksave: writing temporary store state", zap.Object("store", s))
 
 	stateData := &marshaller.StoreData{
@@ -131,7 +134,12 @@ func (s *FullKV) QuickSave(ctx context.Context, atBlockHash string) error {
 		}
 	}
 
-	return fw.Write(ctx)
+	if err := fw.Write(ctx); err != nil {
+		return err
+	}
+
+	s.logger.Info("quicksave: temporary store state written", zap.String("fileName", filename), zap.Int("key_count", len(s.kv)), zap.Uint64("data_size", s.totalSizeBytes), zap.Duration("save_duration", time.Since(start)))
+	return nil
 }
 
 var ErrInvalidFullKVFile = errors.New("unmarshal store error") // this error will bubble up to the user

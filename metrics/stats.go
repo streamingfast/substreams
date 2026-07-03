@@ -64,6 +64,10 @@ type Stats struct {
 	logger         *zap.Logger
 	stores         []*pbsubstreams.Module
 	moduleHashes   map[string]string
+
+	lastSentBlockNum  uint64
+	lastSentBlockID   string
+	lastSentBlockTime time.Time
 }
 
 type runningJobs map[uint64]*extendedJob
@@ -256,6 +260,17 @@ func (s *Stats) RecordDataSent() {
 	if s.timeToFirstData == 0 {
 		s.timeToFirstData = time.Since(s.startTime)
 	}
+}
+
+// RecordLastBlockSent keeps track of the last block that was sent to the client, reported in the
+// final "substreams request stats" log. Sent linearly, no need to lock.
+func (s *Stats) RecordLastBlockSent(clock *pbsubstreams.Clock) {
+	if clock == nil {
+		return
+	}
+	s.lastSentBlockNum = clock.Number
+	s.lastSentBlockID = clock.Id
+	s.lastSentBlockTime = clock.Timestamp.AsTime()
 }
 
 func (s *Stats) RecordBlocksProcessed(count uint64) {
@@ -754,6 +769,9 @@ func (s *Stats) getZapFields(meter dmetering.Meter) []zap.Field {
 		zap.Uint64("total_blocks_processed", s.processedBlocks),            // includes remote and local blocks processed in this request, multiplied by execution stages, excludes blocks that were skipped from indexes
 		zap.Uint64("uncompressed_egress_bytes", s.uncompressedEgressBytes),
 		zap.Duration("client_read_average_time_last_5_minutes", s.clientReadTime.Average()),
+		zap.Uint64("last_sent_block_num", s.lastSentBlockNum),
+		zap.String("last_sent_block_id", s.lastSentBlockID),
+		zap.Time("last_sent_block_time", s.lastSentBlockTime),
 		zap.String("error", errorText),
 	}
 

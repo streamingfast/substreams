@@ -296,8 +296,8 @@ func (a *Tier1App) Run() error {
 		a.config.OutputBufferSize,
 		a.modules.SessionPool,
 		foundationalStoreEndpoints,
-		a.config.StoresScratchSpace,
 		a.config.HostedStoreRegistryAddress,
+		a.config.StoresScratchSpace,
 		opts...,
 	)
 	if err != nil {

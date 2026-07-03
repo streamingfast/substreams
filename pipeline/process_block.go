@@ -8,6 +8,7 @@ import (
 	"os"
 	"runtime/debug"
 	"strconv"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/streamingfast/bstream"
@@ -485,8 +486,11 @@ func (p *Pipeline) quickSaveStores(ctx context.Context, reason string) error {
 	}
 
 	// The incoming context may already be canceled (client disconnect), so detach it to make
-	// sure the store write is not aborted before it completes.
-	if err := p.stores.StoreMap.QuickSave(context.WithoutCancel(ctx), p.lastProcessedBlockRef.ID()); err != nil {
+	// sure the store write is not aborted before it completes. Cap it at 2 minutes so a slow or
+	// stuck store write can never hang the shutdown/disconnect path indefinitely.
+	saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Minute)
+	defer cancel()
+	if err := p.stores.StoreMap.QuickSave(saveCtx, p.lastProcessedBlockRef.ID()); err != nil {
 		p.stores.logger.Warn("quick save failed", zap.Error(err))
 	}
 	return nil

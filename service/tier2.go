@@ -867,8 +867,13 @@ func GetExecutionPlan(
 		}
 	}
 
+	// existingExecOuts is written by the loop below while the cleanup goroutine
+	// iterates over it on context cancellation: guard all accesses with a mutex.
+	var existingExecOutsLock sync.Mutex
 	go func() {
 		<-ctx.Done()
+		existingExecOutsLock.Lock()
+		defer existingExecOutsLock.Unlock()
 		for _, eo := range existingExecOuts {
 			if err := eo.Close(); err != nil {
 				logger.Info("error closing reader", zap.String("filename", eo.Filename()), zap.Error(err))
@@ -876,6 +881,12 @@ func GetExecutionPlan(
 		}
 		// Writers don't need to be closed, canceling the context is enough
 	}()
+
+	setExistingExecOut := func(name string, file execout.FileReader) {
+		existingExecOutsLock.Lock()
+		defer existingExecOutsLock.Unlock()
+		existingExecOuts[name] = file
+	}
 
 	for _, mod := range usedModules {
 		if mod.InitialBlock >= stopBlock {
@@ -915,7 +926,7 @@ func GetExecutionPlan(
 				requiredModules[name] = usedModules[name]
 				break
 			}
-			existingExecOuts[name] = file
+			setExistingExecOut(name, file)
 
 		case pbsubstreams.ModuleKindStore:
 			file, readErr := c.OpenFileReader(ctx, &block.Range{StartBlock: moduleStartBlock, ExclusiveEndBlock: stopBlock})
@@ -925,7 +936,7 @@ func GetExecutionPlan(
 				}
 				requiredModules[name] = usedModules[name]
 			} else {
-				existingExecOuts[name] = file
+				setExistingExecOut(name, file)
 			}
 
 			// if either full or partial kv exists, we can skip the module

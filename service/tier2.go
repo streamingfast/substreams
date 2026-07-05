@@ -236,6 +236,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 
 	fields := []zap.Field{
 		zap.Uint64("segment_size", request.SegmentSize),
+		zap.Uint64("merged_blocks_bundle_size", request.MergedBlocksBundleSizeOrDefault()),
 		zap.Uint32("stage", request.Stage),
 		zap.String("output_module", request.OutputModule),
 		zap.Uint64("first_streamable_block", request.FirstStreamableBlock),
@@ -625,7 +626,8 @@ excludable:
 		return pipe.OnStreamTerminated(ctx, streamErr)
 	}
 	sf := &StreamFactory{
-		mergedBlocksStore: mergedBlocksStore,
+		mergedBlocksStore:      mergedBlocksStore,
+		mergedBlocksBundleSize: request.MergedBlocksBundleSizeOrDefault(),
 	}
 	streamFactoryFunc := sf.New
 

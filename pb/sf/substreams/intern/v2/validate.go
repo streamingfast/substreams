@@ -6,6 +6,16 @@ import (
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
+// MergedBlocksBundleSizeOrDefault returns the number of blocks per merged-blocks
+// file in MergedBlocksStore. Requests from older tier1s leave the field at 0,
+// which means the historical default of 100.
+func (r *ProcessRangeRequest) MergedBlocksBundleSizeOrDefault() uint64 {
+	if r.MergedBlocksBundleSize == 0 {
+		return 100
+	}
+	return r.MergedBlocksBundleSize
+}
+
 func (r *ProcessRangeRequest) Validate() error {
 	switch {
 	case r.StopBlockNum != 0:

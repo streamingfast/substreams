@@ -163,7 +163,7 @@ const maxTotalLogsByteCount = 5 * 1024 * 1024 // 5 MiB
 var maxTotalLogsByteCountHumanized = humanize.IBytes(maxTotalLogsByteCount)
 
 func (c *Call) ReachedLogsMaxByteCount() bool {
-	return c.LogsByteCount >= maxLogByteCount
+	return c.LogsByteCount >= maxTotalLogsByteCount
 }
 
 func (c *Call) DoSet(ord uint64, key string, value []byte) {

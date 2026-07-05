@@ -292,6 +292,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 		err := status.Error(codes.InvalidArgument, "missing modules in request")
 		fields = append(fields, zap.Error(err))
 		logger.Info("refusing Substreams ProcessRange request", fields...)
+		return err
 	}
 	moduleNames := make([]string, len(request.Modules.Modules))
 	for i := 0; i < len(moduleNames); i++ {

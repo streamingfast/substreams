@@ -657,7 +657,7 @@ excludable:
 	streamErr = blockStream.Run(ctx)
 	span.EndWithErr(&streamErr)
 
-	if errors.Is(context.Canceled, streamErr) {
+	if errors.Is(streamErr, context.Canceled) {
 		streamErr = context.Cause(ctx)
 	}
 

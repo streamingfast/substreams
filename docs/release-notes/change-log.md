@@ -11,6 +11,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Changed
+
+- Server: store quicksave/quickload now run up to 8 stores concurrently instead of one at a time, cutting shutdown/resume latency for pipelines with many stores.
+- Server: quicksave now streams the store lazily and unsorted (one KV entry at a time as the upload consumes it, without sorting keys), instead of buffering the whole serialized store and paying an O(n log n) key sort plus key-slice allocation up front. This lowers both peak memory and save time for large stores (millions of keys). Quickload is order-independent, and the on-disk format is unchanged (byte-compatible protobuf), so no migration is required.
+- Server: tier1 store loading at request start now loads up to 8 stores concurrently (both the size probe and the download/decode), instead of one at a time.
+
 ### Added
 
 - Server: store quicksave now also triggers on client disconnect (context canceled), not only on graceful server shutdown, so a reconnecting client can resume without reprocessing. Only applies to production-mode requests.

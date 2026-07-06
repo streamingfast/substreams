@@ -112,9 +112,11 @@ func (s *FullKV) QuickSave(ctx context.Context, atBlockHash string) error {
 
 	var fw *fileWriter
 
-	// New streaming marshaller support
-	if marshaller, ok := s.marshaller.(marshaller.StreamMarshaller); ok && s.totalSizeBytes > 524288 { // we don't use the streaming approach for payloads below 512kiB, it is slower
-		reader := marshaller.MarshalStream(stateData, int64(s.totalSizeBytes))
+	// Quicksave streams the store unsorted (quickload is order-independent),
+	// skipping the key sort and key-slice allocation. We don't use the streaming
+	// approach for payloads below 512kiB, it is slower.
+	if unsortedMarshaller, ok := s.marshaller.(marshaller.UnsortedStreamMarshaller); ok && s.totalSizeBytes > 524288 {
+		reader := unsortedMarshaller.MarshalStreamUnsorted(stateData)
 
 		fw = &fileWriter{
 			store:    store,

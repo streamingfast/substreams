@@ -72,7 +72,9 @@ func BuildTier1RequestPlan(productionMode bool, segmentInterval, lowestInitialBl
 
 	if productionMode {
 		storesEnd := linearHandoffBlock
-		if scheduleStores { // even if the stores have their initialBlock after our storesEnd, we still add buildStore.
+		// storesEnd == 0 (linear pipeline starts at block 0) means there is nothing to backprocess:
+		// a range ending at 0 would be interpreted as infinite by the segmenter.
+		if scheduleStores && storesEnd != 0 { // even if the stores have their initialBlock after our storesEnd, we still add buildStore.
 			plan.BuildStores = block.NewRange(lowestStoreInitialBlock, storesEnd)
 		}
 

@@ -176,7 +176,15 @@ func (a *Tier1App) Run() error {
 
 	var quickSaveStore dstore.Store
 	if a.config.QuickSaveStoreURL != "" {
-		quickSaveStore, err = dstore.NewStore(a.config.QuickSaveStoreURL, "zst", "zstd", true)
+		// Quicksave state is ephemeral (read once on resume, then discarded), so
+		// SUBSTREAMS_QUICKSAVE_COMPRESSION=none trades storage/egress for wall-clock
+		// by skipping zstd compression, which can dominate the save time for large
+		// stores on a fast same-region link.
+		quickSaveExt, quickSaveCompression := "zst", "zstd"
+		if os.Getenv("SUBSTREAMS_QUICKSAVE_COMPRESSION") == "none" {
+			quickSaveExt, quickSaveCompression = "", ""
+		}
+		quickSaveStore, err = dstore.NewStore(a.config.QuickSaveStoreURL, quickSaveExt, quickSaveCompression, true)
 		if err != nil {
 			return fmt.Errorf("failed setting up quickSave store from url %q: %w", a.config.QuickSaveStoreURL, err)
 		}

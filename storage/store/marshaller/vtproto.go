@@ -80,6 +80,41 @@ func (p *VTproto) MarshalStream(data *StoreData, estimatedSize int64) io.ReadClo
 	return newFastStreamingMarshaler(data, estimatedSize)
 }
 
+// MarshalStreamUnsorted streams the StoreData in protobuf wire format without
+// sorting keys, ranging the map directly from a producer goroutine. It avoids
+// both the O(n log n) key sort and the O(n) key-slice allocation that
+// MarshalStream needs, at the cost of nondeterministic entry order. Only one
+// entry plus a small write buffer is held in memory at a time.
+//
+// The caller MUST Close() the returned reader; doing so unblocks the producer
+// goroutine if it is still writing.
+func (p *VTproto) MarshalStreamUnsorted(data *StoreData) io.ReadCloser {
+	pr, pw := io.Pipe()
+	go func() {
+		var enc fastStreamingMarshaler
+		var varintBuf [10]byte
+		var entry []byte
+		bw := bufio.NewWriterSize(pw, 128*1024)
+
+		for key, value := range data.Kv {
+			entry = enc.appendKVField(entry[:0], key, value, varintBuf[:])
+			if _, err := bw.Write(entry); err != nil {
+				pw.CloseWithError(err)
+				return
+			}
+		}
+		for _, prefix := range data.DeletePrefixes {
+			entry = enc.appendDeletePrefixField(entry[:0], prefix, varintBuf[:])
+			if _, err := bw.Write(entry); err != nil {
+				pw.CloseWithError(err)
+				return
+			}
+		}
+		pw.CloseWithError(bw.Flush())
+	}()
+	return pr
+}
+
 // fastStreamingMarshaler lazily serializes a StoreData into the standard
 // protobuf wire format, encoding a single entry at a time as Read() consumes
 // it. Peak memory stays proportional to the largest single entry plus the

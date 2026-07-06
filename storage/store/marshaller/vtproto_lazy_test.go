@@ -57,6 +57,58 @@ func TestMarshalStream_LazyEquivalence(t *testing.T) {
 	}
 }
 
+// TestMarshalStreamUnsorted_RoundTrip ensures the unsorted streaming path
+// produces valid protobuf that round-trips back to the same store, regardless
+// of read buffer size. Entry order is not asserted (it is nondeterministic).
+func TestMarshalStreamUnsorted_RoundTrip(t *testing.T) {
+	p := &VTproto{}
+
+	data := &StoreData{
+		Kv: map[string][]byte{
+			"a":       []byte("1"),
+			"b":       bytes.Repeat([]byte("x"), 1024),
+			"cc":      []byte(""),
+			"key-zzz": bytes.Repeat([]byte("y"), 4096),
+		},
+	}
+
+	for _, bufSize := range []int{1, 7, 64, 4096, 1 << 20} {
+		r := p.MarshalStreamUnsorted(data)
+		got, err := io.ReadAll(&fixedReader{r: r, size: bufSize})
+		r.Close()
+		if err != nil {
+			t.Fatalf("bufSize=%d ReadAll: %v", bufSize, err)
+		}
+
+		out, _, err := p.Unmarshal(got)
+		if err != nil {
+			t.Fatalf("bufSize=%d Unmarshal: %v", bufSize, err)
+		}
+		if len(out.Kv) != len(data.Kv) {
+			t.Fatalf("bufSize=%d: kv count %d != %d", bufSize, len(out.Kv), len(data.Kv))
+		}
+		for k, v := range data.Kv {
+			if !bytes.Equal(out.Kv[k], v) {
+				t.Fatalf("bufSize=%d: kv[%q] mismatch", bufSize, k)
+			}
+		}
+	}
+}
+
+// TestMarshalStreamUnsorted_Empty ensures an empty store streams to empty bytes.
+func TestMarshalStreamUnsorted_Empty(t *testing.T) {
+	p := &VTproto{}
+	r := p.MarshalStreamUnsorted(&StoreData{Kv: map[string][]byte{}})
+	defer r.Close()
+	got, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("expected empty stream, got %d bytes", len(got))
+	}
+}
+
 // TestMarshalStream_Empty ensures an empty store streams to empty bytes.
 func TestMarshalStream_Empty(t *testing.T) {
 	p := &VTproto{}

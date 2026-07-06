@@ -80,98 +80,56 @@ func (p *VTproto) MarshalStream(data *StoreData, estimatedSize int64) io.ReadClo
 	return newFastStreamingMarshaler(data, estimatedSize)
 }
 
-// fastStreamingMarshaler is a high-performance streaming marshaler that pre-computes
-// and batches operations to minimize per-Read() overhead
+// fastStreamingMarshaler lazily serializes a StoreData into the standard
+// protobuf wire format, encoding a single entry at a time as Read() consumes
+// it. Peak memory stays proportional to the largest single entry plus the
+// (values-free) sorted key slice, instead of buffering the whole serialized
+// store like an eager marshal would.
 type fastStreamingMarshaler struct {
-	chunks   [][]byte // Pre-computed chunks of data
-	chunkIdx int      // Current chunk index
-	chunkPos int      // Position within current chunk
-	closed   bool
+	kv             map[string][]byte
+	sortedKeys     []string // stable iteration order for KV entries
+	deletePrefixes []string
+
+	keyIdx    int // index of the next KV entry to encode
+	prefixIdx int // index of the next delete-prefix to encode
+
+	entry     []byte // current encoded entry awaiting readout (reused across entries)
+	entryPos  int    // read position within entry
+	varintBuf [10]byte
+	closed    bool
 }
 
-func newFastStreamingMarshaler(data *StoreData, estimatedSize int64) *fastStreamingMarshaler {
-	marshaler := &fastStreamingMarshaler{}
-	marshaler.precomputeChunks(data, estimatedSize)
-	return marshaler
+func newFastStreamingMarshaler(data *StoreData, _ int64) *fastStreamingMarshaler {
+	f := &fastStreamingMarshaler{
+		kv:             data.Kv,
+		deletePrefixes: data.DeletePrefixes,
+	}
+	f.sortedKeys = f.getSortedKeys(data.Kv)
+	return f
 }
 
-func (f *fastStreamingMarshaler) precomputeChunks(data *StoreData, estimatedSize int64) {
-	// Calculate total size to minimize allocations
-	totalEstimate := estimatedSize
-	if totalEstimate <= 0 {
-		// Quick estimate: 50 bytes per KV + 20 bytes per prefix
-		totalEstimate = int64(len(data.Kv)*50 + len(data.DeletePrefixes)*20)
+// encodeNextEntry serializes the next KV entry (then delete prefixes) into
+// f.entry, reusing its backing array. Returns false once everything has been
+// encoded.
+func (f *fastStreamingMarshaler) encodeNextEntry() bool {
+	f.entry = f.entry[:0]
+	f.entryPos = 0
+
+	if f.keyIdx < len(f.sortedKeys) {
+		key := f.sortedKeys[f.keyIdx]
+		f.keyIdx++
+		f.entry = f.appendKVField(f.entry, key, f.kv[key], f.varintBuf[:])
+		return true
 	}
 
-	// Use single large buffer if data is small enough
-	if totalEstimate < 1024*1024 { // < 1MB, use single buffer
-		buffer := make([]byte, 0, totalEstimate+1024) // Add some padding
-		buffer = f.marshalAllToBuffer(data, buffer)
-		f.chunks = [][]byte{buffer}
-		return
+	if f.prefixIdx < len(f.deletePrefixes) {
+		prefix := f.deletePrefixes[f.prefixIdx]
+		f.prefixIdx++
+		f.entry = f.appendDeletePrefixField(f.entry, prefix, f.varintBuf[:])
+		return true
 	}
 
-	// For larger data, use chunking
-	chunkSize := 128 * 1024           // 128KB chunks for better performance
-	if totalEstimate > 50*1024*1024 { // > 50MB
-		chunkSize = 512 * 1024 // 512KB chunks
-	}
-
-	// Pre-allocate chunks slice
-	estimatedChunks := int(totalEstimate)/chunkSize + 1
-	f.chunks = make([][]byte, 0, estimatedChunks)
-
-	currentChunk := make([]byte, 0, chunkSize)
-	varintBuf := [10]byte{} // Stack-allocated buffer
-
-	// Pre-sort keys once
-	sortedKeys := f.getSortedKeys(data.Kv)
-
-	// Process KV entries
-	for _, key := range sortedKeys {
-		value := data.Kv[key]
-		fieldSize := f.calculateKVFieldSize(key, value)
-
-		if len(currentChunk)+fieldSize > chunkSize && len(currentChunk) > 0 {
-			f.chunks = append(f.chunks, currentChunk)
-			currentChunk = make([]byte, 0, chunkSize)
-		}
-
-		currentChunk = f.appendKVField(currentChunk, key, value, varintBuf[:])
-	}
-
-	// Process delete prefixes
-	for _, prefix := range data.DeletePrefixes {
-		fieldSize := varintSize(2<<3|2) + varintSize(uint64(len(prefix))) + len(prefix)
-
-		if len(currentChunk)+fieldSize > chunkSize && len(currentChunk) > 0 {
-			f.chunks = append(f.chunks, currentChunk)
-			currentChunk = make([]byte, 0, chunkSize)
-		}
-
-		currentChunk = f.appendDeletePrefixField(currentChunk, prefix, varintBuf[:])
-	}
-
-	if len(currentChunk) > 0 {
-		f.chunks = append(f.chunks, currentChunk)
-	}
-}
-
-// marshalAllToBuffer marshals everything into a single buffer for small datasets
-func (f *fastStreamingMarshaler) marshalAllToBuffer(data *StoreData, buffer []byte) []byte {
-	varintBuf := [10]byte{}
-	sortedKeys := f.getSortedKeys(data.Kv)
-
-	for _, key := range sortedKeys {
-		value := data.Kv[key]
-		buffer = f.appendKVField(buffer, key, value, varintBuf[:])
-	}
-
-	for _, prefix := range data.DeletePrefixes {
-		buffer = f.appendDeletePrefixField(buffer, prefix, varintBuf[:])
-	}
-
-	return buffer
+	return false
 }
 
 // getSortedKeys returns sorted keys with minimal allocations
@@ -229,16 +187,6 @@ func (f *fastStreamingMarshaler) partition(keys []string, low, high int) int {
 	return i + 1
 }
 
-// calculateKVFieldSize calculates the size of a KV field
-func (f *fastStreamingMarshaler) calculateKVFieldSize(key string, value []byte) int {
-	keyLen := len(key)
-	valueLen := len(value)
-	keyFieldSize := varintSize(1<<3|2) + varintSize(uint64(keyLen)) + keyLen
-	valueFieldSize := varintSize(2<<3|2) + varintSize(uint64(valueLen)) + valueLen
-	mapEntrySize := keyFieldSize + valueFieldSize
-	return varintSize(1<<3|2) + varintSize(uint64(mapEntrySize)) + mapEntrySize
-}
-
 // appendKVField appends a complete KV field to the buffer
 func (f *fastStreamingMarshaler) appendKVField(buf []byte, key string, value []byte, varintBuf []byte) []byte {
 	keyLen := len(key)
@@ -276,40 +224,30 @@ func (f *fastStreamingMarshaler) Read(p []byte) (n int, err error) {
 		return 0, io.EOF
 	}
 
-	totalRead := 0
-
-	for totalRead < len(p) && f.chunkIdx < len(f.chunks) {
-		currentChunk := f.chunks[f.chunkIdx]
-
-		// Copy data from current chunk
-		available := len(currentChunk) - f.chunkPos
-		needed := len(p) - totalRead
-		toCopy := available
-		if needed < available {
-			toCopy = needed
+	for n < len(p) {
+		if f.entryPos >= len(f.entry) {
+			if !f.encodeNextEntry() {
+				break // everything has been encoded and read
+			}
 		}
 
-		copy(p[totalRead:], currentChunk[f.chunkPos:f.chunkPos+toCopy])
-		totalRead += toCopy
-		f.chunkPos += toCopy
-
-		// Move to next chunk if current is exhausted
-		if f.chunkPos >= len(currentChunk) {
-			f.chunkIdx++
-			f.chunkPos = 0
-		}
+		copied := copy(p[n:], f.entry[f.entryPos:])
+		n += copied
+		f.entryPos += copied
 	}
 
-	if totalRead == 0 {
+	if n == 0 {
 		return 0, io.EOF
 	}
 
-	return totalRead, nil
+	return n, nil
 }
 
 func (f *fastStreamingMarshaler) Close() error {
 	f.closed = true
-	f.chunks = nil // Help GC
+	f.entry = nil
+	f.sortedKeys = nil
+	f.kv = nil
 	return nil
 }
 

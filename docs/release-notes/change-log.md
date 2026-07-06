@@ -11,6 +11,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Changed
+
+- Server: store quicksave/quickload now run up to 8 stores concurrently instead of one at a time, cutting shutdown/resume latency for pipelines with many stores.
+- Server: the streaming store marshaller now serializes lazily (one KV entry at a time as the upload consumes it) instead of buffering the whole serialized store up front, lowering peak memory when quicksaving large stores. The on-disk format is unchanged (byte-compatible protobuf), so no migration is required.
+
 ### Added
 
 - Server: store quicksave now also triggers on client disconnect (context canceled), not only on graceful server shutdown, so a reconnecting client can resume without reprocessing. Only applies to production-mode requests.

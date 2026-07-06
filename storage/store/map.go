@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/abourget/llerrgroup"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams/reqctx"
 	"go.uber.org/zap/zapcore"
@@ -32,27 +33,50 @@ func (m Map) Names() []string {
 	return out
 }
 
+// quickSaveParallelism bounds how many stores are quicksaved/quickloaded
+// concurrently. Each in-flight store streams its state one entry at a time, so
+// peak extra memory is roughly this many single-entry buffers.
+const quickSaveParallelism = 8
+
 func (m *Map) QuickSave(ctx context.Context, atBlockHash string) error {
+	eg := llerrgroup.New(quickSaveParallelism)
 	for _, s := range m.All() {
-		if writable, ok := s.(QuickSave); ok {
-			if err := writable.QuickSave(ctx, atBlockHash); err != nil {
-				return err
-			}
+		writable, ok := s.(QuickSave)
+		if !ok {
+			continue
 		}
+		if eg.Stop() {
+			break
+		}
+		eg.Go(func() error {
+			return writable.QuickSave(ctx, atBlockHash)
+		})
 	}
-	return nil
+	return eg.Wait()
 }
 
 func (m *Map) QuickLoad(ctx context.Context, atBlock bstream.BlockRef) error {
-
+	eg := llerrgroup.New(quickSaveParallelism)
 	for _, s := range m.All() {
-		if writable, ok := s.(QuickLoad); ok {
-			if err := writable.QuickLoad(ctx, atBlock); err != nil {
-				return err
-			}
+		loadable, ok := s.(QuickLoad)
+		if !ok {
+			continue
 		}
+		if eg.Stop() {
+			break
+		}
+		eg.Go(func() error {
+			return loadable.QuickLoad(ctx, atBlock)
+		})
+	}
+	if err := eg.Wait(); err != nil {
+		return err
+	}
 
-		if reqHandler := reqctx.ActiveRequestsHandler(ctx); reqHandler != nil {
+	// Memory accounting is done after all stores are loaded: the handler is not
+	// concurrency-safe and may force-cancel the request, so it runs serially.
+	if reqHandler := reqctx.ActiveRequestsHandler(ctx); reqHandler != nil {
+		for _, s := range m.All() {
 			reqHandler.AllocateFullKVSizeOrForceCancelRequest(s.SizeBytes())
 			if ctx.Err() != nil {
 				return ctx.Err()

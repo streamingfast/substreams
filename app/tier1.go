@@ -81,6 +81,7 @@ type Tier1Config struct {
 	TmpDir                  string
 	StateStoreURL           string
 	StoresScratchSpace      string
+	StoresBackend           string
 	QuickSaveStoreURL       string
 	StateStoreDefaultTag    string
 	BlockType               string
@@ -298,6 +299,7 @@ func (a *Tier1App) Run() error {
 		foundationalStoreEndpoints,
 		a.config.HostedStoreRegistryAddress,
 		a.config.StoresScratchSpace,
+		a.config.StoresBackend,
 		opts...,
 	)
 	if err != nil {

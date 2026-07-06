@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 	"time"
 
@@ -19,11 +18,6 @@ import (
 )
 
 var _ Store = (*FullKV)(nil)
-
-// quicksaveUnsorted, when enabled via SUBSTREAMS_QUICKSAVE_UNSORTED=true, makes
-// quicksave stream store state without sorting keys, skipping the key sort and
-// key-slice allocation. Safe because quickload does not depend on entry order.
-var quicksaveUnsorted = os.Getenv("SUBSTREAMS_QUICKSAVE_UNSORTED") == "true" || os.Getenv("SUBSTREAMS_QUICKSAVE_UNSORTED") == "1"
 
 type FullKV struct {
 	*baseStore
@@ -118,20 +112,11 @@ func (s *FullKV) QuickSave(ctx context.Context, atBlockHash string) error {
 
 	var fw *fileWriter
 
-	// Streaming marshaller support: we don't use the streaming approach for
-	// payloads below 512kiB, it is slower.
-	streamable := s.totalSizeBytes > 524288
-
-	if unsortedMarshaller, ok := s.marshaller.(marshaller.UnsortedStreamMarshaller); ok && quicksaveUnsorted && streamable {
+	// Quicksave streams the store unsorted (quickload is order-independent),
+	// skipping the key sort and key-slice allocation. We don't use the streaming
+	// approach for payloads below 512kiB, it is slower.
+	if unsortedMarshaller, ok := s.marshaller.(marshaller.UnsortedStreamMarshaller); ok && s.totalSizeBytes > 524288 {
 		reader := unsortedMarshaller.MarshalStreamUnsorted(stateData)
-
-		fw = &fileWriter{
-			store:    store,
-			filename: filename,
-			reader:   reader,
-		}
-	} else if streamMarshaller, ok := s.marshaller.(marshaller.StreamMarshaller); ok && streamable {
-		reader := streamMarshaller.MarshalStream(stateData, int64(s.totalSizeBytes))
 
 		fw = &fileWriter{
 			store:    store,

@@ -143,7 +143,10 @@ func computeLinearHandoffBlockNum(productionMode bool, startBlock, stopBlock uin
 		}
 		libHandoffBoundary := libHandoff - (libHandoff % segmentSize)
 
-		if stopBlock == 0 || libHandoff < stopBlock {
+		// tier2 jobs process whole segments and need finalized (merged) blocks up to
+		// the segment end: only hand off at nextBoundary if that whole segment is final,
+		// otherwise stream the tail linearly on tier1.
+		if stopBlock == 0 || nextBoundary > libHandoff {
 			if !stateRequired && startBlock > libHandoffBoundary {
 				return startBlock, nil
 			}

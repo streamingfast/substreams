@@ -9,10 +9,11 @@ type Tier2RequestParameters struct {
 	MeteringConfig       string
 	FirstStreamableBlock uint64
 
-	MergedBlockStoreURL  string
-	StateStoreURL        string
-	StateBundleSize      uint64
-	StateStoreDefaultTag string
+	MergedBlockStoreURL    string
+	MergedBlocksBundleSize uint64 // number of blocks per merged-blocks file in MergedBlockStoreURL
+	StateStoreURL          string
+	StateBundleSize        uint64
+	StateStoreDefaultTag   string
 
 	BlockType string
 

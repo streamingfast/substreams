@@ -29,7 +29,6 @@ func (m *ProcessRangeRequest) CloneVT() *ProcessRangeRequest {
 	r := new(ProcessRangeRequest)
 	r.StopBlockNum = m.StopBlockNum
 	r.OutputModule = m.OutputModule
-	r.Modules = m.Modules.CloneVT()
 	r.Stage = m.Stage
 	r.MeteringConfig = m.MeteringConfig
 	r.FirstStreamableBlock = m.FirstStreamableBlock
@@ -44,6 +43,14 @@ func (m *ProcessRangeRequest) CloneVT() *ProcessRangeRequest {
 	r.EthCallFallbackToLatestDuration = m.EthCallFallbackToLatestDuration
 	r.EthCallFallbackToNumberDuration = m.EthCallFallbackToNumberDuration
 	r.StoreSizeLimit = m.StoreSizeLimit
+	r.MergedBlocksBundleSize = m.MergedBlocksBundleSize
+	if rhs := m.Modules; rhs != nil {
+		if vtpb, ok := interface{}(rhs).(interface{ CloneVT() *v1.Modules }); ok {
+			r.Modules = vtpb.CloneVT()
+		} else {
+			r.Modules = proto.Clone(rhs).(*v1.Modules)
+		}
+	}
 	if rhs := m.WasmExtensionConfigs; rhs != nil {
 		tmpContainer := make(map[string]string, len(rhs))
 		for k, v := range rhs {
@@ -132,7 +139,13 @@ func (m *BlockScopedData) CloneVT() *BlockScopedData {
 	}
 	r := new(BlockScopedData)
 	r.Output = (*anypb.Any)((*anypb1.Any)(m.Output).CloneVT())
-	r.Clock = m.Clock.CloneVT()
+	if rhs := m.Clock; rhs != nil {
+		if vtpb, ok := interface{}(rhs).(interface{ CloneVT() *v1.Clock }); ok {
+			r.Clock = vtpb.CloneVT()
+		} else {
+			r.Clock = proto.Clone(rhs).(*v1.Clock)
+		}
+	}
 	if len(m.unknownFields) > 0 {
 		r.unknownFields = make([]byte, len(m.unknownFields))
 		copy(r.unknownFields, m.unknownFields)
@@ -298,7 +311,11 @@ func (this *ProcessRangeRequest) EqualVT(that *ProcessRangeRequest) bool {
 	if this.OutputModule != that.OutputModule {
 		return false
 	}
-	if !this.Modules.EqualVT(that.Modules) {
+	if equal, ok := interface{}(this.Modules).(interface{ EqualVT(*v1.Modules) bool }); ok {
+		if !equal.EqualVT(that.Modules) {
+			return false
+		}
+	} else if !proto.Equal(this.Modules, that.Modules) {
 		return false
 	}
 	if this.Stage != that.Stage {
@@ -365,6 +382,9 @@ func (this *ProcessRangeRequest) EqualVT(that *ProcessRangeRequest) bool {
 		return false
 	}
 	if this.StoreSizeLimit != that.StoreSizeLimit {
+		return false
+	}
+	if this.MergedBlocksBundleSize != that.MergedBlocksBundleSize {
 		return false
 	}
 	return string(this.unknownFields) == string(that.unknownFields)
@@ -514,7 +534,11 @@ func (this *BlockScopedData) EqualVT(that *BlockScopedData) bool {
 	if !(*anypb1.Any)(this.Output).EqualVT((*anypb1.Any)(that.Output)) {
 		return false
 	}
-	if !this.Clock.EqualVT(that.Clock) {
+	if equal, ok := interface{}(this.Clock).(interface{ EqualVT(*v1.Clock) bool }); ok {
+		if !equal.EqualVT(that.Clock) {
+			return false
+		}
+	} else if !proto.Equal(this.Clock, that.Clock) {
 		return false
 	}
 	return string(this.unknownFields) == string(that.unknownFields)
@@ -773,6 +797,13 @@ func (m *ProcessRangeRequest) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
 	}
+	if m.MergedBlocksBundleSize != 0 {
+		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.MergedBlocksBundleSize))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0xb0
+	}
 	if m.StoreSizeLimit != 0 {
 		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.StoreSizeLimit))
 		i--
@@ -914,12 +945,24 @@ func (m *ProcessRangeRequest) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 		dAtA[i] = 0x28
 	}
 	if m.Modules != nil {
-		size, err := m.Modules.MarshalToSizedBufferVT(dAtA[:i])
-		if err != nil {
-			return 0, err
+		if vtmsg, ok := interface{}(m.Modules).(interface {
+			MarshalToSizedBufferVT([]byte) (int, error)
+		}); ok {
+			size, err := vtmsg.MarshalToSizedBufferVT(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = protohelpers.EncodeVarint(dAtA, i, uint64(size))
+		} else {
+			encoded, err := proto.Marshal(m.Modules)
+			if err != nil {
+				return 0, err
+			}
+			i -= len(encoded)
+			copy(dAtA[i:], encoded)
+			i = protohelpers.EncodeVarint(dAtA, i, uint64(len(encoded)))
 		}
-		i -= size
-		i = protohelpers.EncodeVarint(dAtA, i, uint64(size))
 		i--
 		dAtA[i] = 0x22
 	}
@@ -1087,12 +1130,24 @@ func (m *BlockScopedData) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 		copy(dAtA[i:], m.unknownFields)
 	}
 	if m.Clock != nil {
-		size, err := m.Clock.MarshalToSizedBufferVT(dAtA[:i])
-		if err != nil {
-			return 0, err
+		if vtmsg, ok := interface{}(m.Clock).(interface {
+			MarshalToSizedBufferVT([]byte) (int, error)
+		}); ok {
+			size, err := vtmsg.MarshalToSizedBufferVT(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = protohelpers.EncodeVarint(dAtA, i, uint64(size))
+		} else {
+			encoded, err := proto.Marshal(m.Clock)
+			if err != nil {
+				return 0, err
+			}
+			i -= len(encoded)
+			copy(dAtA[i:], encoded)
+			i = protohelpers.EncodeVarint(dAtA, i, uint64(len(encoded)))
 		}
-		i -= size
-		i = protohelpers.EncodeVarint(dAtA, i, uint64(size))
 		i--
 		dAtA[i] = 0x12
 	}
@@ -1482,7 +1537,13 @@ func (m *ProcessRangeRequest) SizeVT() (n int) {
 		n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
 	}
 	if m.Modules != nil {
-		l = m.Modules.SizeVT()
+		if size, ok := interface{}(m.Modules).(interface {
+			SizeVT() int
+		}); ok {
+			l = size.SizeVT()
+		} else {
+			l = proto.Size(m.Modules)
+		}
 		n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
 	}
 	if m.Stage != 0 {
@@ -1547,6 +1608,9 @@ func (m *ProcessRangeRequest) SizeVT() (n int) {
 	}
 	if m.StoreSizeLimit != 0 {
 		n += 2 + protohelpers.SizeOfVarint(uint64(m.StoreSizeLimit))
+	}
+	if m.MergedBlocksBundleSize != 0 {
+		n += 2 + protohelpers.SizeOfVarint(uint64(m.MergedBlocksBundleSize))
 	}
 	n += len(m.unknownFields)
 	return n
@@ -1624,7 +1688,13 @@ func (m *BlockScopedData) SizeVT() (n int) {
 		n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
 	}
 	if m.Clock != nil {
-		l = m.Clock.SizeVT()
+		if size, ok := interface{}(m.Clock).(interface {
+			SizeVT() int
+		}); ok {
+			l = size.SizeVT()
+		} else {
+			l = proto.Size(m.Clock)
+		}
 		n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
 	}
 	n += len(m.unknownFields)
@@ -1890,8 +1960,16 @@ func (m *ProcessRangeRequest) UnmarshalVT(dAtA []byte) error {
 			if m.Modules == nil {
 				m.Modules = &v1.Modules{}
 			}
-			if err := m.Modules.UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
-				return err
+			if unmarshal, ok := interface{}(m.Modules).(interface {
+				UnmarshalVT([]byte) error
+			}); ok {
+				if err := unmarshal.UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
+					return err
+				}
+			} else {
+				if err := proto.Unmarshal(dAtA[iNdEx:postIndex], m.Modules); err != nil {
+					return err
+				}
 			}
 			iNdEx = postIndex
 		case 5:
@@ -2481,6 +2559,25 @@ func (m *ProcessRangeRequest) UnmarshalVT(dAtA []byte) error {
 					break
 				}
 			}
+		case 22:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field MergedBlocksBundleSize", wireType)
+			}
+			m.MergedBlocksBundleSize = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.MergedBlocksBundleSize |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := protohelpers.Skip(dAtA[iNdEx:])
@@ -2815,8 +2912,16 @@ func (m *BlockScopedData) UnmarshalVT(dAtA []byte) error {
 			if m.Clock == nil {
 				m.Clock = &v1.Clock{}
 			}
-			if err := m.Clock.UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
-				return err
+			if unmarshal, ok := interface{}(m.Clock).(interface {
+				UnmarshalVT([]byte) error
+			}); ok {
+				if err := unmarshal.UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
+					return err
+				}
+			} else {
+				if err := proto.Unmarshal(dAtA[iNdEx:postIndex], m.Clock); err != nil {
+					return err
+				}
 			}
 			iNdEx = postIndex
 		default:

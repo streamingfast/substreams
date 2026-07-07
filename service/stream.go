@@ -119,11 +119,16 @@ func (s *StreamFactory) bundleSize() uint64 {
 // merged-blocks bundle, the most recent block that is guaranteed to be readable
 // from a fully-written merged-blocks file.
 func roundToBundleFinalBlock(finalBlockNum, bundleSize, firstStreamableBlock uint64) uint64 {
-	if finalBlockNum > firstStreamableBlock+2*bundleSize {
-		finalBlockNum -= finalBlockNum % bundleSize
-		finalBlockNum -= bundleSize
+	// Need at least one complete bundle above the chain start; below that no
+	// merged-blocks file exists yet, so there is nothing to snap to.
+	if finalBlockNum < firstStreamableBlock+bundleSize {
+		return finalBlockNum
 	}
-	return finalBlockNum
+	rounded := finalBlockNum - finalBlockNum%bundleSize - bundleSize
+	if rounded < firstStreamableBlock {
+		return firstStreamableBlock
+	}
+	return rounded
 }
 
 func (s *StreamFactory) GetHeadBlock() (uint64, error) {

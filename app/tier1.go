@@ -54,7 +54,7 @@ func NewDefaultTier1Config() *Tier1Config {
 		SharedCacheSize:        15,
 		MaxSubrequests:         10,
 		StateBundleSize:        1000,
-		MergedBlocksBundleSize: 100,
+		MergedBlocksBundleSize: bstream.DefaultMergedBlocksBundleSize,
 		BlockExecutionTimeout:  1 * time.Minute,
 		OutputBufferSize:       100,
 	}
@@ -163,7 +163,7 @@ func (a *Tier1App) Run() error {
 
 	mergedBlocksBundleSize := a.config.MergedBlocksBundleSize
 	if mergedBlocksBundleSize == 0 {
-		mergedBlocksBundleSize = 100
+		mergedBlocksBundleSize = bstream.DefaultMergedBlocksBundleSize
 	}
 	if a.config.StateBundleSize%mergedBlocksBundleSize != 0 && mergedBlocksBundleSize%a.config.StateBundleSize != 0 {
 		a.logger.Warn("merged-blocks bundle size and state bundle size do not divide evenly, segment boundaries will not align with merged-blocks files",

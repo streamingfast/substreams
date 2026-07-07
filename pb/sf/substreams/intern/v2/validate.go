@@ -3,15 +3,16 @@ package pbssinternal
 import (
 	"fmt"
 
+	"github.com/streamingfast/bstream"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
 // MergedBlocksBundleSizeOrDefault returns the number of blocks per merged-blocks
 // file in MergedBlocksStore. Requests from older tier1s leave the field at 0,
-// which means the historical default of 100.
+// which means the default of bstream.DefaultMergedBlocksBundleSize.
 func (r *ProcessRangeRequest) MergedBlocksBundleSizeOrDefault() uint64 {
 	if r.MergedBlocksBundleSize == 0 {
-		return 100
+		return bstream.DefaultMergedBlocksBundleSize
 	}
 	return r.MergedBlocksBundleSize
 }

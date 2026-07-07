@@ -3,7 +3,7 @@ package service
 import (
 	"testing"
 
-	"github.com/test-go/testify/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestRoundToBundleFinalBlock(t *testing.T) {

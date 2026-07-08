@@ -182,20 +182,16 @@ func testLargeDataset(t *testing.T, s *baseStore, baseDir string) {
 		mmapImpl, ok := s.kvImpl.(*mmapKVImpl)
 		require.True(t, ok, "should be mmap implementation")
 
-		// Verify file exists and is in the correct directory
-		assert.FileExists(t, mmapImpl.path)
+		// The path is derived from the configured base dir and store name...
 		assert.Contains(t, mmapImpl.path, baseDir, "mmap file should be in configured base dir")
-
-		// Verify filename contains store name
 		filename := filepath.Base(mmapImpl.path)
 		assert.Contains(t, filename, "test_store", "filename should contain store name")
 
-		// Check file size (should be > 1MB for 1K * 1KB entries)
-		stat, err := os.Stat(mmapImpl.path)
-		require.NoError(t, err)
-		t.Logf("Mmap file size: %d bytes (%.2f MB)", stat.Size(), float64(stat.Size())/(1024*1024))
-		// bbolt allocates in pages, so actual size may vary, but should be substantial
-		assert.Greater(t, stat.Size(), int64(512*1024), "file should be at least 512KB")
+		// ...but the backing file is unlinked at open time, so it is not visible
+		// on disk while the store is live — this is what makes an orphaned bbolt
+		// file impossible no matter how the process dies.
+		_, err := os.Stat(mmapImpl.path)
+		assert.True(t, os.IsNotExist(err), "mmap file should be unlinked after open, stat err=%v", err)
 	}
 
 	// Test iteration over large dataset

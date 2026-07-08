@@ -498,7 +498,11 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 		}
 		egLoad.Go(func() error {
 			if err := loadable.fullKVStore.Load(ctx, loadable.fileInfo); err != nil {
-				if errors.Is(err, store.ErrInvalidFullKVFile) {
+				// A canceled context surfaces as ErrInvalidFullKVFile because the
+				// streaming unmarshal wraps the read error as a string, so only
+				// treat the file as corrupt when the context is still live —
+				// otherwise a canceled request would delete a valid store file.
+				if errors.Is(err, store.ErrInvalidFullKVFile) && ctx.Err() == nil {
 					logger.Warn("found a corrupted fullKV store, deleting it", zap.Error(err), zap.String("store_name", loadable.fullKVStore.Name()), zap.String("store_hash", loadable.fullKVStore.ModuleHash()), zap.String("filename", loadable.fileInfo.Filename))
 					if err := loadable.fullKVStore.Delete(ctx, loadable.fileInfo); err != nil {
 						logger.Error("cannot delete corrupted fullKV store", zap.Error(err), zap.String("store_name", loadable.fullKVStore.Name()), zap.String("store_hash", loadable.fullKVStore.ModuleHash()), zap.String("filename", loadable.fileInfo.Filename))

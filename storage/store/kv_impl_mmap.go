@@ -141,8 +141,18 @@ func newMmapKVImplWithConfig(storeName, moduleHash string, cfg *MmapBackendConfi
 
 	db, err := openMmapDB(path, true, 0) // NoSync: substreams stores are ephemeral and rebuilt from object storage on crash
 	if err != nil {
+		os.Remove(path) // openMmapDB may have left the file behind
 		return nil, fmt.Errorf("failed to open mmap KVImpl for store %q at %q: %w", storeName, path, err)
 	}
+
+	// Unlink the backing file now that it is open. On unix the inode (and its
+	// mmap) stays valid for the lifetime of the open db handle, but the
+	// directory entry is gone — so no matter how this process dies (SIGKILL,
+	// OOM, panic, a Load/Save that outlives a shutdown deadline), it can never
+	// leave an orphan bbolt file behind. Space is reclaimed when Close() drops
+	// the handle. Best-effort: on platforms that refuse to unlink an open file
+	// (e.g. Windows) this is a no-op and Close() falls back to removing by path.
+	os.Remove(path)
 
 	impl, err := newMmapKVImplFromDB(db, path, storeName, true)
 	if err != nil {
@@ -554,20 +564,29 @@ func (b *mmapKVImpl) Close() error {
 	b.snapMu.RLock()
 	defer b.snapMu.RUnlock()
 
+	var closeErr error
 	if b.db != nil {
 		if metrics.StoreMmapFileSizeBytes != nil {
 			if stat, err := os.Stat(b.path); err == nil {
 				metrics.StoreMmapFileSizeBytes.SetFloat64(float64(stat.Size()), b.storeName)
 			}
 		}
-		if err := b.db.Close(); err != nil {
-			return fmt.Errorf("closing mmap db: %w", err)
-		}
+		closeErr = b.db.Close()
 	}
+	// Always attempt removal, even if db.Close failed: the file is usually
+	// already gone (unlinked at open time), but on platforms where the
+	// open-file unlink was a no-op this is what reclaims it. Skipping it on a
+	// db.Close error would leak the file.
 	if b.path != "" {
 		if err := os.Remove(b.path); err != nil && !os.IsNotExist(err) {
+			if closeErr != nil {
+				return fmt.Errorf("closing mmap db: %w (and removing file %s: %v)", closeErr, b.path, err)
+			}
 			return fmt.Errorf("removing mmap db file %s: %w", b.path, err)
 		}
+	}
+	if closeErr != nil {
+		return fmt.Errorf("closing mmap db: %w", closeErr)
 	}
 	return nil
 }

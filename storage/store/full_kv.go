@@ -129,6 +129,13 @@ func (s *FullKV) Load(ctx context.Context, file *FileInfo) error {
 
 	s.totalSizeBytes, err = unmarshalIterInto(s.kvImpl, s.marshaller, reader, nil)
 	if err != nil {
+		// A canceled/expired context aborts the streaming read and would
+		// otherwise be reported as file corruption, tricking callers into
+		// deleting a perfectly valid store file. Surface the cancellation
+		// instead so it never gets misclassified.
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
 		return fmt.Errorf("%w (streaming): %s", ErrInvalidFullKVFile, err.Error())
 	}
 

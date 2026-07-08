@@ -66,6 +66,39 @@ func TestFullKV_Save_Load_Empty_MapNotNil(t *testing.T) {
 	require.NotNilf(t, kvl.kvImpl, "kvl.kvImpl is nil")
 }
 
+// TestFullKV_Load_CanceledContext_NotCorrupt ensures a load aborted by context
+// cancellation reports the cancellation, not ErrInvalidFullKVFile — otherwise
+// callers would delete a perfectly valid remote store file.
+func TestFullKV_Load_CanceledContext_NotCorrupt(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	store := dstore.NewMockStore(nil)
+	store.OpenObjectFunc = func(context.Context, string) (io.ReadCloser, error) {
+		cancel() // the stream is torn down mid-read
+		return io.NopCloser(&errReaderReadCloser{err: context.Canceled}), nil
+	}
+
+	kv := &FullKV{
+		baseStore: &baseStore{
+			kvImpl:     newMemoryKVImpl(),
+			kvOps:      &pbssinternal.Operations{},
+			logger:     zap.NewNop(),
+			marshaller: marshaller.Default(),
+			Config:     &Config{moduleInitialBlock: 0, objStore: store},
+		},
+	}
+
+	err := kv.Load(ctx, NewCompleteFileInfo("test", 0, 100))
+	require.Error(t, err)
+	require.ErrorIs(t, err, context.Canceled, "canceled load must surface cancellation")
+	require.NotErrorIs(t, err, ErrInvalidFullKVFile, "canceled load must not look like corruption")
+}
+
+type errReaderReadCloser struct{ err error }
+
+func (r *errReaderReadCloser) Read([]byte) (int, error) { return 0, r.err }
+func (r *errReaderReadCloser) Close() error             { return nil }
+
 func TestFullKV_QuickSave_QuickLoad_Empty(t *testing.T) {
 	var writtenBytes []byte
 	mockStore := dstore.NewMockStore(func(base string, f io.Reader) (err error) {

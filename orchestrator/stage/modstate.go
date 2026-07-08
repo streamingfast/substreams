@@ -71,7 +71,9 @@ func (s *StoreModuleState) getStore(ctx context.Context, exclusiveEndBlock uint6
 		fullKVFile := store.NewCompleteFileInfo(s.name, moduleInitBlock, exclusiveEndBlock)
 		err := loadStore.Load(ctx, fullKVFile)
 		if err != nil {
-			if errors.Is(err, store.ErrInvalidFullKVFile) {
+			// Only a live context means real corruption: a canceled load also
+			// surfaces as ErrInvalidFullKVFile and must not delete a valid file.
+			if errors.Is(err, store.ErrInvalidFullKVFile) && ctx.Err() == nil {
 				s.logger.Warn("found a corrupted fullKV store, deleting it", zap.Error(err), zap.String("store_name", loadStore.Name()), zap.String("store_hash", loadStore.ModuleHash()), zap.String("filename", fullKVFile.Filename))
 				if err := loadStore.Delete(ctx, fullKVFile); err != nil {
 					s.logger.Error("cannot delete corrupted fullKV store", zap.Error(err), zap.String("store_name", loadStore.Name()), zap.String("store_hash", loadStore.ModuleHash()), zap.String("filename", fullKVFile.Filename))
@@ -112,7 +114,9 @@ func (s *StoreModuleState) tryLoadFullKV(ctx context.Context, exclusiveEndBlock 
 	kv := s.storeConfig.NewFullKV(s.logger)
 	fullKVFile := store.NewCompleteFileInfo(s.name, moduleInitBlock, exclusiveEndBlock)
 	if err := kv.Load(ctx, fullKVFile); err != nil {
-		if errors.Is(err, store.ErrInvalidFullKVFile) {
+		// A canceled load also surfaces as ErrInvalidFullKVFile; only delete
+		// when the context is still live so we never drop a valid store file.
+		if errors.Is(err, store.ErrInvalidFullKVFile) && ctx.Err() == nil {
 			s.logger.Warn("found a corrupted fullKV store, deleting it", zap.Error(err), zap.String("store_name", kv.Name()), zap.String("store_hash", kv.ModuleHash()), zap.String("filename", fullKVFile.Filename))
 			if delErr := kv.Delete(ctx, fullKVFile); delErr != nil {
 				s.logger.Error("cannot delete corrupted fullKV store", zap.Error(delErr), zap.String("store_name", kv.Name()), zap.String("store_hash", kv.ModuleHash()), zap.String("filename", fullKVFile.Filename))

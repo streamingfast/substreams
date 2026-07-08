@@ -1,12 +1,14 @@
 package store
 
 import (
+	"bytes"
 	"fmt"
 	"iter"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/storage/store/marshaller"
@@ -22,6 +24,13 @@ var (
 // during bulk operations (Load, BatchSet).
 const mmapBatchSize = 10_000
 
+// snapshotBatchMaxKeys and snapshotBatchMaxBytes bound how many entries a
+// snapshot iterator copies into heap per refill transaction.
+const (
+	snapshotBatchMaxKeys  = 10_000
+	snapshotBatchMaxBytes = 8 << 20 // 8MiB
+)
+
 // mmapKVImpl is a memory-mapped KVImpl backed by bbolt.
 // Data lives on disk and is paged into memory by the OS as needed.
 type mmapKVImpl struct {
@@ -30,6 +39,16 @@ type mmapKVImpl struct {
 	storeName string
 	noSync    bool // if true, bbolt skips fsync on each write
 	keyCount  int  // tracked in-memory to avoid O(N) bucket.Stats() traversal
+
+	// snapMu gates writes against open snapshots. Roles are inverted from the
+	// usual RWMutex reading: write operations hold the R side (they may run
+	// concurrently with each other — bbolt serializes them internally), while
+	// an open Snapshot holds the W side exclusively, blocking all writes (and
+	// Close) for its lifetime so its paged reads across separate View
+	// transactions observe a stable store.
+	// CAUTION: writing to the store from the goroutine that holds an open
+	// snapshot deadlocks.
+	snapMu sync.RWMutex
 }
 
 func openMmapDB(path string, noSync bool, initialMmapSize int) (*bbolt.DB, error) {
@@ -166,6 +185,8 @@ func (b *mmapKVImpl) Get(key string) ([]byte, bool) {
 
 // Set writes a single key-value pair.
 func (b *mmapKVImpl) Set(key string, value []byte) error {
+	b.snapMu.RLock()
+	defer b.snapMu.RUnlock()
 	if metrics.StoreMmapOperationsTotal != nil {
 		metrics.StoreMmapOperationsTotal.Inc("set", b.storeName)
 	}
@@ -182,6 +203,8 @@ func (b *mmapKVImpl) Set(key string, value []byte) error {
 }
 
 func (b *mmapKVImpl) Delete(key string) error {
+	b.snapMu.RLock()
+	defer b.snapMu.RUnlock()
 	if metrics.StoreMmapOperationsTotal != nil {
 		metrics.StoreMmapOperationsTotal.Inc("delete", b.storeName)
 	}
@@ -265,6 +288,8 @@ func (b *mmapKVImpl) GetMany(keys []string) (map[string][]byte, error) {
 }
 
 func (b *mmapKVImpl) BatchSet(kv map[string][]byte) error {
+	b.snapMu.RLock()
+	defer b.snapMu.RUnlock()
 	if metrics.StoreMmapOperationsTotal != nil {
 		metrics.StoreMmapOperationsTotal.Inc("batch_set", b.storeName)
 	}
@@ -308,6 +333,15 @@ func (b *mmapKVImpl) BatchSet(kv map[string][]byte) error {
 // Clear wipes all data from the store without closing the database.
 // Used by PartialKV.Roll() to reset between segments.
 func (b *mmapKVImpl) Clear() error {
+	b.snapMu.RLock()
+	defer b.snapMu.RUnlock()
+	return b.clearLocked()
+}
+
+// clearLocked is Clear without the snapMu gate, for callers already holding it.
+// Nested RLock on the same goroutine can deadlock if a Snapshot's Lock is
+// queued in between, so write paths must acquire snapMu exactly once.
+func (b *mmapKVImpl) clearLocked() error {
 	b.keyCount = 0
 	return b.db.Update(func(tx *bbolt.Tx) error {
 		if err := tx.DeleteBucket(defaultBucket); err != nil && err != bbolt.ErrBucketNotFound {
@@ -323,8 +357,11 @@ func (b *mmapKVImpl) Clear() error {
 // store snapshots from object storage.
 // Entries are written in batches of mmapBatchSize for efficient B+tree page utilization.
 func (b *mmapKVImpl) Load(it iter.Seq2[marshaller.StoreDataEntry, error]) (*marshaller.StoreDataTrailer, error) {
+	b.snapMu.RLock()
+	defer b.snapMu.RUnlock()
+
 	// Clear existing data
-	if err := b.Clear(); err != nil {
+	if err := b.clearLocked(); err != nil {
 		return nil, fmt.Errorf("mmap Load: clearing bucket for store %q: %w", b.storeName, err)
 	}
 
@@ -404,11 +441,119 @@ func (b *mmapKVImpl) Save() iter.Seq2[marshaller.StoreDataEntry, error] {
 	}
 }
 
+// Snapshot returns a pull-based iterator over the store in lexicographic key
+// order, reading in bounded batches (short View transaction per batch, resumed
+// via cursor Seek on the last key). It never holds a bbolt read transaction
+// across batches, so it does not pin the mmap or block file growth.
+// Consistency across batches is guaranteed by holding snapMu exclusively:
+// all writes (Set, Delete, BatchSet, Clear, Load) and Close block until the
+// iterator is closed. The caller MUST Close() the returned iterator.
+func (b *mmapKVImpl) Snapshot() (marshaller.KVSnapshotIter, error) {
+	if metrics.StoreMmapOperationsTotal != nil {
+		metrics.StoreMmapOperationsTotal.Inc("snapshot", b.storeName)
+	}
+	b.snapMu.Lock()
+	return &mmapSnapshotIter{db: b.db, unlock: b.snapMu.Unlock}, nil
+}
+
+type mmapSnapshotIter struct {
+	db     *bbolt.DB
+	unlock func()
+
+	buf       []marshaller.KeyValue // current batch, copied out of the mmap
+	pos       int                   // read position within buf
+	lastKey   []byte                // last key returned by the previous batch
+	exhausted bool
+	closed    bool
+}
+
+func (it *mmapSnapshotIter) Next() (string, []byte, bool, error) {
+	if it.closed {
+		return "", nil, false, fmt.Errorf("mmap snapshot iterator used after close")
+	}
+	if it.pos >= len(it.buf) {
+		if it.exhausted {
+			return "", nil, false, nil
+		}
+		if err := it.refill(); err != nil {
+			return "", nil, false, fmt.Errorf("refilling snapshot batch: %w", err)
+		}
+		if len(it.buf) == 0 {
+			return "", nil, false, nil
+		}
+	}
+	kv := it.buf[it.pos]
+	it.pos++
+	return kv.Key, kv.Value, true, nil
+}
+
+// refill copies the next batch of entries out of a short-lived View
+// transaction, bounded by snapshotBatchMaxKeys / snapshotBatchMaxBytes.
+func (it *mmapSnapshotIter) refill() error {
+	it.buf = it.buf[:0]
+	it.pos = 0
+	batchBytes := 0
+
+	err := it.db.View(func(tx *bbolt.Tx) error {
+		bucket := tx.Bucket(defaultBucket)
+		if bucket == nil {
+			it.exhausted = true
+			return nil
+		}
+		c := bucket.Cursor()
+
+		var k, v []byte
+		if it.lastKey == nil {
+			k, v = c.First()
+		} else {
+			k, v = c.Seek(it.lastKey)
+			if k != nil && bytes.Equal(k, it.lastKey) {
+				k, v = c.Next()
+			}
+		}
+
+		for ; k != nil; k, v = c.Next() {
+			val := make([]byte, len(v))
+			copy(val, v)
+			it.buf = append(it.buf, marshaller.KeyValue{Key: string(k), Value: val})
+			batchBytes += len(k) + len(v)
+			if len(it.buf) >= snapshotBatchMaxKeys || batchBytes >= snapshotBatchMaxBytes {
+				return nil
+			}
+		}
+		it.exhausted = true
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if n := len(it.buf); n > 0 {
+		it.lastKey = []byte(it.buf[n-1].Key)
+	}
+	return nil
+}
+
+func (it *mmapSnapshotIter) Close() error {
+	if it.closed {
+		return nil
+	}
+	it.closed = true
+	it.buf = nil
+	it.unlock()
+	return nil
+}
+
 func (b *mmapKVImpl) KeyCount() int {
 	return b.keyCount
 }
 
 func (b *mmapKVImpl) Close() error {
+	// Wait for any open snapshot before closing and removing the db file;
+	// a leaked snapshot iterator makes this hang, loudly surfacing the bug
+	// instead of yanking the file from under an in-flight save.
+	b.snapMu.RLock()
+	defer b.snapMu.RUnlock()
+
 	if b.db != nil {
 		if metrics.StoreMmapFileSizeBytes != nil {
 			if stat, err := os.Stat(b.path); err == nil {

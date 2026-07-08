@@ -243,6 +243,21 @@ func TestBuildConfig(t *testing.T) {
 			expectLinearPipelineRange: "nil",
 		},
 		{
+			name:                      "prod, handoff at 0 (first segment not final): no store scheduling, all linear",
+			storeInterval:             10,
+			productionMode:            true,
+			needsStores:               true,
+			graphInitBlock:            0,
+			lowestStoreInitBlock:      0,
+			resolvedStartBlock:        2,
+			linearHandoffBlock:        0,
+			exclusiveEndBlock:         4,
+			expectStoresRange:         "nil", // a 0-10 range here would be interpreted as infinite by the segmenter
+			expectWriteExecOutRange:   "nil",
+			expectReadExecOutRange:    "nil",
+			expectLinearPipelineRange: "0-4",
+		},
+		{
 			name:                      "req in live segment development",
 			storeInterval:             10,
 			productionMode:            true,

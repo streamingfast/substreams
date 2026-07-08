@@ -43,6 +43,13 @@ type KVImpl interface {
 	// This is the inverse of Load, streams data out without materializing a map.
 	Save() iter.Seq2[marshaller.StoreDataEntry, error]
 
+	// Snapshot returns a pull-based iterator over a stable view of the store in
+	// lexicographic key order, used to stream store serialization without
+	// materializing it. For the mmap backend, writes to the store are blocked
+	// while a snapshot is open so pages read across internal batches stay
+	// consistent. The returned iterator MUST be closed.
+	Snapshot() (marshaller.KVSnapshotIter, error)
+
 	// BatchSet writes multiple key-value pairs in a single atomic operation.
 	// This is significantly faster than calling Set() in a loop for mmap backends
 	// because it commits a single transaction instead of one per key.

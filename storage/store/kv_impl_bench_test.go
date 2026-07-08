@@ -272,7 +272,11 @@ func BenchmarkKV_LoadFromStream(b *testing.B) {
 		// Pre-serialize once outside any timing.
 		srcImpl := newMemoryKVImpl()
 		srcImpl.Load(mapToIter(kv))
-		rc := sm.MarshalStreamIter(srcImpl.Iter, nil, totalBytes)
+		snap, err := srcImpl.Snapshot()
+		if err != nil {
+			b.Fatal(err)
+		}
+		rc := sm.MarshalStreamSnapshot(snap, nil)
 		serialized, err := io.ReadAll(rc)
 		rc.Close()
 		if err != nil {
@@ -329,7 +333,7 @@ func BenchmarkKV_Iter(b *testing.B) {
 }
 
 // BenchmarkFullKV_Save measures the production save path:
-// kvImpl.Iter → MarshalStreamIter → bytes.
+// kvImpl.Snapshot → MarshalStreamSnapshot → bytes.
 // Impl is loaded once; only serialization is timed.
 func BenchmarkFullKV_Save(b *testing.B) {
 	sm := &marshaller.VTproto{}
@@ -349,7 +353,11 @@ func BenchmarkFullKV_Save(b *testing.B) {
 			b.SetBytes(totalBytes)
 
 			for b.Loop() {
-				rc := sm.MarshalStreamIter(impl.Iter, nil, totalBytes)
+				snap, err := impl.Snapshot()
+				if err != nil {
+					b.Fatal(err)
+				}
+				rc := sm.MarshalStreamSnapshot(snap, nil)
 				if _, err := io.ReadAll(rc); err != nil {
 					b.Fatal(err)
 				}

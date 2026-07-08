@@ -51,11 +51,12 @@ type InfoServer interface {
 // returns config with default sane values
 func NewDefaultTier1Config() *Tier1Config {
 	return &Tier1Config{
-		SharedCacheSize:       15,
-		MaxSubrequests:        10,
-		StateBundleSize:       1000,
-		BlockExecutionTimeout: 1 * time.Minute,
-		OutputBufferSize:      100,
+		SharedCacheSize:        15,
+		MaxSubrequests:         10,
+		StateBundleSize:        1000,
+		MergedBlocksBundleSize: bstream.DefaultMergedBlocksBundleSize,
+		BlockExecutionTimeout:  1 * time.Minute,
+		OutputBufferSize:       100,
 	}
 }
 
@@ -86,6 +87,7 @@ type Tier1Config struct {
 	StateStoreDefaultTag    string
 	BlockType               string
 	StateBundleSize         uint64
+	MergedBlocksBundleSize  uint64 // number of blocks per merged-blocks file in MergedBlocksStoreURL (0 means the default of 100)
 	EnforceCompression      bool // refuse incoming requests that do not accept gzip compression (ConnectRPC or GRPC)
 	ActiveRequestsSoftLimit int  // maximum number of active requests a tier1 app can have with external clients before starting to advertise itself as unready in the health check
 
@@ -161,6 +163,17 @@ func (a *Tier1App) Run() error {
 		return fmt.Errorf("invalid app config: %w", err)
 	}
 
+	mergedBlocksBundleSize := a.config.MergedBlocksBundleSize
+	if mergedBlocksBundleSize == 0 {
+		mergedBlocksBundleSize = bstream.DefaultMergedBlocksBundleSize
+	}
+	if a.config.StateBundleSize%mergedBlocksBundleSize != 0 && mergedBlocksBundleSize%a.config.StateBundleSize != 0 {
+		a.logger.Warn("merged-blocks bundle size and state bundle size do not divide evenly, segment boundaries will not align with merged-blocks files",
+			zap.Uint64("merged_blocks_bundle_size", mergedBlocksBundleSize),
+			zap.Uint64("state_bundle_size", a.config.StateBundleSize),
+		)
+	}
+
 	mergedBlocksStore, err := dstore.NewDBinStore(a.config.MergedBlocksStoreURL)
 	if err != nil {
 		return fmt.Errorf("failed setting up block store from url %q: %w", a.config.MergedBlocksStoreURL, err)
@@ -213,7 +226,10 @@ func (a *Tier1App) Run() error {
 			)
 		})
 
-		forkableHub = hub.NewForkableHubWithOptions(liveSourceFactory, 200, oneBlocksStore, []hub.Option{hub.WithLogger(a.logger)})
+		// the hub must hold at least two merged-blocks files worth of final
+		// blocks so the joining source can hand off from a file boundary
+		keepFinalBlocks := int(max(200, 2*mergedBlocksBundleSize))
+		forkableHub = hub.NewForkableHubWithOptions(liveSourceFactory, keepFinalBlocks, oneBlocksStore, []hub.Option{hub.WithLogger(a.logger)})
 		forkableHub.OnTerminated(a.Shutdown)
 
 		go forkableHub.Run()
@@ -267,6 +283,7 @@ func (a *Tier1App) Run() error {
 		MeteringConfig:             a.config.MeteringConfig,
 		FirstStreamableBlock:       bstream.GetProtocolFirstStreamableBlock,
 		MergedBlockStoreURL:        a.config.MergedBlocksStoreURL,
+		MergedBlocksBundleSize:     mergedBlocksBundleSize,
 		StateStoreURL:              a.config.StateStoreURL,
 		StateBundleSize:            a.config.StateBundleSize,
 		StateStoreDefaultTag:       a.config.StateStoreDefaultTag,

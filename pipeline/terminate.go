@@ -37,6 +37,14 @@ func (p *Pipeline) OnStreamTerminated(ctx context.Context, err error) error {
 		if err == nil {
 			err = fmt.Errorf("stream terminated without reaching the stop block")
 		}
+		// On client disconnect (context canceled) the stream stops without a final block, so the
+		// in-loop quicksave in handleStepNew never fires. Quick-save here too so a reconnecting
+		// client can resume. Idempotent: a no-op if the shutdown path already saved.
+		if errors.Is(err, context.Canceled) {
+			if saveErr := p.quickSaveStores(ctx, "client disconnected"); saveErr != nil {
+				logger.Warn("quick save on client disconnect failed", zap.Error(saveErr))
+			}
+		}
 		return err
 	}
 

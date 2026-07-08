@@ -42,12 +42,29 @@ type Marshaller interface {
 	Marshal(data *StoreData) ([]byte, error)
 }
 
+// KVSnapshotIter is a pull-based iterator over a consistent snapshot of a KV
+// store, yielding entries in lexicographic key order. Next returns ok=false
+// once exhausted. Close MUST be called to release the snapshot's underlying
+// resources (locks, transactions); it is safe to call after exhaustion or
+// mid-iteration.
+type KVSnapshotIter interface {
+	Next() (key string, value []byte, ok bool, err error)
+	Close() error
+}
+
 type StreamMarshaller interface {
 	Marshaller
 	UnmarshalStream(reader io.Reader, estimatedSize int64) (*StoreData, uint64, error)
 	UnmarshalIter(reader io.Reader, estimatedSize int64) iter.Seq2[StoreDataEntry, error]
 	MarshalStream(data *StoreData, estimatedSize int64) io.ReadCloser
-	MarshalStreamIter(iter func(fn func(key string, value []byte) error) error, deletePrefixes []string, estimatedSize int64) io.ReadCloser
+	MarshalStreamSnapshot(snap KVSnapshotIter, deletePrefixes []string) io.ReadCloser
+}
+
+// UnsortedStreamMarshaller streams the store without sorting keys, trading
+// deterministic entry order for skipping the O(n log n) key sort and the O(n)
+// key-slice allocation. Suitable for order-independent consumers like quicksave.
+type UnsortedStreamMarshaller interface {
+	MarshalStreamUnsorted(data *StoreData) io.ReadCloser
 }
 
 func Default() StreamMarshaller {

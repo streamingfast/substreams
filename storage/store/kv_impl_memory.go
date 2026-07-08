@@ -150,6 +150,39 @@ func (m *memoryKVImpl) Save() iter.Seq2[marshaller.StoreDataEntry, error] {
 	}
 }
 
+// Snapshot returns a pull-based iterator over the store in sorted key order.
+// Only the key slice is copied; values are read from the live map, matching
+// the memory-backend assumption that the store is not mutated during a save.
+func (m *memoryKVImpl) Snapshot() (marshaller.KVSnapshotIter, error) {
+	keys := make([]string, 0, len(m.kv))
+	for k := range m.kv {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return &memorySnapshotIter{kv: m.kv, keys: keys}, nil
+}
+
+type memorySnapshotIter struct {
+	kv   map[string][]byte
+	keys []string
+	idx  int
+}
+
+func (it *memorySnapshotIter) Next() (string, []byte, bool, error) {
+	if it.idx >= len(it.keys) {
+		return "", nil, false, nil
+	}
+	k := it.keys[it.idx]
+	it.idx++
+	return k, it.kv[k], true, nil
+}
+
+func (it *memorySnapshotIter) Close() error {
+	it.kv = nil
+	it.keys = nil
+	return nil
+}
+
 func (m *memoryKVImpl) KeyCount() int {
 	return len(m.kv)
 }

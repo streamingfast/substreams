@@ -213,9 +213,10 @@ func NewTier1(
 	)
 
 	sf := &StreamFactory{
-		mergedBlocksStore: mergedBlocksStore,
-		forkedBlocksStore: forkedBlocksStore,
-		hub:               hub,
+		mergedBlocksStore:      mergedBlocksStore,
+		forkedBlocksStore:      forkedBlocksStore,
+		hub:                    hub,
+		mergedBlocksBundleSize: tier2RequestParameters.MergedBlocksBundleSize,
 	}
 
 	setSubstreamsStoreSizeLimitFromEnv(logger)
@@ -231,14 +232,19 @@ func NewTier1(
 	tier2RequestParameters.BlockType = blockType
 	tier2RequestParameters.StateBundleSize = runtimeConfig.SegmentSize
 
-	logger.Info("launching tier1 service", zap.Reflect("client_config", substreamsClientConfig), zap.String("block_type", blockType), zap.Bool("with_live", hub != nil))
+	logger.Info("launching tier1 service", zap.Reflect("client_config", substreamsClientConfig), zap.String("block_type", blockType), zap.Bool("with_live", hub != nil), zap.Uint64("merged_blocks_bundle_size", tier2RequestParameters.MergedBlocksBundleSize))
+
+	var cursorResolverOptions []bstream.FileSourceOption
+	if tier2RequestParameters.MergedBlocksBundleSize != 0 {
+		cursorResolverOptions = append(cursorResolverOptions, bstream.FileSourceWithBundleSize(tier2RequestParameters.MergedBlocksBundleSize))
+	}
 
 	s := &Tier1Service{
 		Shutter:                    shutter.New(),
 		runtimeConfig:              runtimeConfig,
 		blockType:                  blockType,
 		tracer:                     tracing.GetTracer(),
-		resolveCursor:              pipeline.NewCursorResolver(hub, mergedBlocksStore, forkedBlocksStore),
+		resolveCursor:              pipeline.NewCursorResolver(hub, mergedBlocksStore, forkedBlocksStore, cursorResolverOptions...),
 		logger:                     logger,
 		appSetIsReadyState:         appSetIsReadyState,
 		tier2RequestParameters:     tier2RequestParameters,
@@ -939,18 +945,22 @@ func (s *Tier1Service) blocks(
 
 	var wrappedPipe bstream.Handler
 	if requestDetails.ProductionMode {
-		liveBackFiller := NewLiveBackFiller(ctx, pipe, logger, execGraph.OutputModuleStageIndex(), segmentSize, requestDetails.LinearHandoffBlockNum, s.runtimeConfig.ClientFactory, RequestBackProcessing)
-		if s.liveBackFillerFinalBlockDelay != 0 {
-			liveBackFiller.finalBlockDelay = s.liveBackFillerFinalBlockDelay
+		finalBlockDelay := s.liveBackFillerFinalBlockDelay
+		if finalBlockDelay == 0 {
+			// the merged file containing a segment end is only written once the
+			// chain has moved a full bundle past its base, so the default delay
+			// must scale with the merged-blocks bundle size
+			finalBlockDelay = max(defaultFinalBlockDelay, s.tier2RequestParameters.MergedBlocksBundleSize+20)
 		}
+
+		liveBackFiller := NewLiveBackFiller(ctx, pipe, logger, execGraph.OutputModuleStageIndex(), segmentSize, requestDetails.LinearHandoffBlockNum, s.runtimeConfig.ClientFactory, RequestBackProcessing)
+		liveBackFiller.finalBlockDelay = finalBlockDelay
 
 		// In noop mode, the pipe handler is overwritten by a NoopHandler which produces no outputs.
 		if request.NoopMode {
 			noopHandler := NewNoopHandler(respFunc)
 			liveBackFiller = NewLiveBackFiller(ctx, noopHandler, logger, execGraph.OutputModuleStageIndex(), segmentSize, requestDetails.LinearHandoffBlockNum, s.runtimeConfig.ClientFactory, RequestBackProcessing)
-			if s.liveBackFillerFinalBlockDelay != 0 {
-				liveBackFiller.finalBlockDelay = s.liveBackFillerFinalBlockDelay
-			}
+			liveBackFiller.finalBlockDelay = finalBlockDelay
 		}
 
 		if requestDetails.FromQuickload {
@@ -1097,12 +1107,14 @@ func tier1ResponseHandler(
 		}
 
 		isData := false
+		var lastSentClock *pbsubstreams.Clock
 
 		switch r := respAny.(type) {
 		case *pbsubstreamsrpc.Response:
 			d := r.GetBlockScopedData()
 			if d != nil {
 				isData = true
+				lastSentClock = d.Clock
 				filterData(d, noop, debugOutputs)
 				if supportBuffering {
 					// Worker used the v2 response path; promote to v4 BlockScopedDatas for v4 clients
@@ -1115,6 +1127,7 @@ func tier1ResponseHandler(
 			for _, d := range r.GetBlockScopedDatas().Items {
 				if d != nil {
 					isData = true
+					lastSentClock = d.Clock
 					filterData(d, noop, debugOutputs)
 				}
 			}
@@ -1130,6 +1143,7 @@ func tier1ResponseHandler(
 
 		if isData {
 			stats.RecordDataSent()
+			stats.RecordLastBlockSent(lastSentClock)
 		}
 		stats.RecordEgress(egressBytes)
 		metering.AddEgressBytes(ctx, egressBytes)

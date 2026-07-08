@@ -44,7 +44,7 @@ func (p *PartialKV) Load(ctx context.Context, file *FileInfo) error {
 	}
 	defer reader.Close()
 
-	size, err := unmarshalIterInto(p.kvImpl, p.marshaller, reader, func(deletePrefixes []string) {
+	size, err := unmarshalIterInto(ctx, p.kvImpl, p.marshaller, reader, func(deletePrefixes []string) {
 		p.DeletedPrefixes = deletePrefixes
 	})
 	if err != nil {

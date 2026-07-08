@@ -27,6 +27,7 @@ package store
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"iter"
@@ -294,7 +295,7 @@ func BenchmarkKV_LoadFromStream(b *testing.B) {
 
 				reader := bytes.NewReader(serialized)
 
-				if _, err := unmarshalIterInto(impl, sm, reader, nil); err != nil {
+				if _, err := unmarshalIterInto(context.Background(), impl, sm, reader, nil); err != nil {
 					b.Fatal(err)
 				}
 			}

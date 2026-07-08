@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -54,7 +55,7 @@ func TestMmapLoadCancelCleanup(t *testing.T) {
 
 	// Fail the load partway through.
 	r := &cancelAfterReader{data: []byte("garbage-that-fails-to-parse-immediately"), failAt: 5, failErr: fmt.Errorf("context canceled")}
-	_, loadErr := unmarshalIterInto(dst.kvImpl, dst.marshaller, r, nil)
+	_, loadErr := unmarshalIterInto(context.Background(), dst.kvImpl, dst.marshaller, r, nil)
 	require.Error(t, loadErr, "load should fail")
 	t.Logf("load error: %v", loadErr)
 

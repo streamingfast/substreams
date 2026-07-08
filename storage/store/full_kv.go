@@ -64,7 +64,7 @@ func (s *FullKV) QuickLoad(ctx context.Context, atBlock bstream.BlockRef) error 
 
 	defer r.Close()
 
-	s.totalSizeBytes, err = unmarshalIterInto(s.kvImpl, s.marshaller, r, nil)
+	s.totalSizeBytes, err = unmarshalIterInto(ctx, s.kvImpl, s.marshaller, r, nil)
 	if err != nil {
 		return fmt.Errorf("unmarshal store (streaming): %w", err)
 	}
@@ -127,7 +127,7 @@ func (s *FullKV) Load(ctx context.Context, file *FileInfo) error {
 	}
 	defer reader.Close()
 
-	s.totalSizeBytes, err = unmarshalIterInto(s.kvImpl, s.marshaller, reader, nil)
+	s.totalSizeBytes, err = unmarshalIterInto(ctx, s.kvImpl, s.marshaller, reader, nil)
 	if err != nil {
 		// A canceled/expired context aborts the streaming read and would
 		// otherwise be reported as file corruption, tricking callers into

@@ -188,6 +188,9 @@ func (m *memoryKVImpl) KeyCount() int {
 }
 
 func (m *memoryKVImpl) Close() error {
-	// No resources to release for in-memory impl
+	// Drop the backing map so a lingering reference to this store (e.g. a
+	// deferred close before GC, or an in-flight metadata goroutine) retains an
+	// empty shell instead of the full multi-GB dataset.
+	m.kv = nil
 	return nil
 }

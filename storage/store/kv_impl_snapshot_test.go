@@ -2,6 +2,7 @@ package store
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"testing"
@@ -48,7 +49,7 @@ func TestSnapshotStreamRoundTrip(t *testing.T) {
 			defer dst.Close()
 
 			var gotPrefixes []string
-			size, err := unmarshalIterInto(dst, sm, bytes.NewReader(serialized), func(dp []string) {
+			size, err := unmarshalIterInto(context.Background(), dst, sm, bytes.NewReader(serialized), func(dp []string) {
 				gotPrefixes = dp
 			})
 			require.NoError(t, err)

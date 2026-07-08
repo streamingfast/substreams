@@ -725,6 +725,14 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 		reqHandler.AdjustFullKVSize(actualRequestStoresSize)
 	}
 
+	// Ownership of the loaded stores transfers to the returned map: the linear
+	// pipeline keeps writing to them and closes them at request end. Detach
+	// them from the module states so Stages.Close() does not close stores
+	// still in use.
+	for _, modState := range storeModuleStates {
+		modState.cachedStore = nil
+	}
+
 	return out, nil
 }
 

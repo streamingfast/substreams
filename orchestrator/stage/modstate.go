@@ -43,6 +43,7 @@ func (s *StoreModuleState) estimateStoreSizeBytes(ctx context.Context, exclusive
 	}
 
 	fullKV := s.storeConfig.NewFullKV(s.logger)
+	defer fullKV.Close() // only used for GetSize; releases the backing mmap file
 
 	moduleInitBlock := s.storeConfig.ModuleInitialBlock()
 	if moduleInitBlock < exclusiveEndBlock {

@@ -754,6 +754,7 @@ func (s *Tier1Service) blocks(
 	}
 
 	stores := pipeline.NewStores(ctx, storeConfigs, segmentSize, requestDetails.LinearHandoffBlockNum, request.StopBlockNum, false, nil)
+	defer stores.Close() // releases mmap-backed store files once the request ends
 
 	execOutputCacheEngine, err := cache.NewEngine(ctx, nil, s.blockType, nil, nil) // we don't read or write ExecOuts on tier1
 	if err != nil {

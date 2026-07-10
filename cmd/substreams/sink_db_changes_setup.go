@@ -9,15 +9,15 @@ import (
 	"github.com/streamingfast/substreams/sink/sql/db_changes/sinker"
 )
 
-var sinkSQLSetupCmd = &cobra.Command{
+var sinkDBChangesSetupCmd = &cobra.Command{
 	Use:   "setup <manifest>",
 	Short: "Setup the required infrastructure to deploy a Substreams SQL deployable unit",
 	Args:  cobra.ExactArgs(1),
-	RunE:  sinkSQLSetupE,
+	RunE:  sinkDBChangesSetupE,
 }
 
 func init() {
-	flags := sinkSQLSetupCmd.Flags()
+	flags := sinkDBChangesSetupCmd.Flags()
 	addCommonDatabaseChangesFlags(flags)
 	addCommonSinkerFlags(flags)
 
@@ -25,19 +25,21 @@ func init() {
 	flags.Bool("system-tables-only", false, "will only create/update the systems tables (cursors, substreams_history) and ignore the schema from the manifest")
 	flags.Bool("ignore-duplicate-table-errors", false, "[Dev] Use this if you want to ignore duplicate table errors, take caution that this means the 'schema.sql' file will not have run fully!")
 
-	sinkSQLCmd.AddCommand(sinkSQLSetupCmd)
+	sinkDBChangesCmd.AddCommand(sinkDBChangesSetupCmd)
 }
 
-func sinkSQLSetupE(cmd *cobra.Command, args []string) error {
+func sinkDBChangesSetupE(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 	ctx := cmd.Context()
 
-	dsnString, err := resolveSinkSQLDSN(cmd)
+	dsnString, err := resolveSinkDSN(cmd)
 	if err != nil {
 		return err
 	}
 
 	manifestPath := args[0]
+
+	sinkDBPreStart(cmd)
 
 	reader, err := manifest.NewReader(manifestPath)
 	if err != nil {
@@ -52,7 +54,7 @@ func sinkSQLSetupE(cmd *cobra.Command, args []string) error {
 		CursorTableName:            sflags.MustGetString(cmd, "cursors-table"),
 		HistoryTableName:           sflags.MustGetString(cmd, "history-table"),
 		ClickhouseCluster:          sflags.MustGetString(cmd, "clickhouse-cluster"),
-		OnModuleHashMismatch:       resolveOnModuleHashMismatchFlag(cmd),
+		OnModuleHashMismatch:       sflags.MustGetString(cmd, onModuleHashMismatchFlag),
 		SystemTablesOnly:           sflags.MustGetBool(cmd, "system-tables-only"),
 		IgnoreDuplicateTableErrors: sflags.MustGetBool(cmd, "ignore-duplicate-table-errors"),
 		Postgraphile:               sflags.MustGetBool(cmd, "postgraphile"),

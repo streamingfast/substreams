@@ -9,9 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
-	"github.com/streamingfast/substreams/manifest"
 	"github.com/streamingfast/substreams/sink"
-	pbsql "github.com/streamingfast/substreams/pb/sf/substreams/sink/sql/services/v1"
 	sinksql "github.com/streamingfast/substreams/sink/sql"
 	sqlbytes "github.com/streamingfast/substreams/sink/sql/bytes"
 	"github.com/streamingfast/substreams/sink/sql/db_changes/db"
@@ -32,8 +30,8 @@ func init() {
 	flags := sinkFromProtoCmd.Flags()
 	sink.AddFlagsToSet(flags, sink.FlagExcludeDefault(sink.FlagUndoBufferSize))
 	addOperatorFlags(flags)
+	addDSNFlag(flags)
 
-	flags.String("dsn", "", "Database connection string (falls back to the SUBSTREAMS_SINK_SQL_DSN environment variable), e.g. \"psql://user:pass@localhost:5432/db?sslmode=disable\" or \"clickhouse://user:pass@localhost:9000/db\"")
 	flags.Bool("no-constraints", false, "Do not add any constraints to the database. This is useful to speed up the initial import of a large dataset.")
 	flags.Int("block-batch-size", 25, "number of blocks to process at a time")
 	flags.String("clickhouse-sink-info-folder", "", "folder where to store the clickhouse sink info")
@@ -49,11 +47,7 @@ func init() {
 func sinkFromProtoE(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 
-	sinkSQLPreStart(cmd)
-
-	app := cli.NewApplication(cmd.Context())
-
-	dsnString, err := resolveSinkSQLDSN(cmd)
+	dsnString, err := resolveSinkDSN(cmd)
 	if err != nil {
 		return err
 	}
@@ -74,37 +68,19 @@ func sinkFromProtoE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid bytes encoding %q: %w", encodingStr, err)
 	}
 
-	useTransactions := true
-	parallel := false
-
 	retryCount := sflags.MustGetInt(cmd, "clickhouse-query-retry-count")
 	retrySleep := sflags.MustGetDuration(cmd, "clickhouse-query-retry-sleep")
-
-	endpoint := sflags.MustGetString(cmd, "endpoint")
-
-	if endpoint == "" {
-		network := sflags.MustGetString(cmd, "network")
-		if network == "" {
-			reader, err := manifest.NewReader(manifestPath)
-			if err != nil {
-				return fmt.Errorf("setup manifest reader: %w", err)
-			}
-			pkgBundle, err := reader.Read()
-			if err != nil {
-				return fmt.Errorf("read manifest: %w", err)
-			}
-			network = pkgBundle.Package.Network
-		}
-		endpoint, err = manifest.ExtractNetworkEndpoint(network, "", zlog)
-		if err != nil {
-			return err
-		}
-	}
 
 	dsn, err := db.ParseDSN(dsnString)
 	if err != nil {
 		return fmt.Errorf("parsing dsn: %w", err)
 	}
+
+	sinkDBPreStart(cmd)
+
+	app := cli.NewApplication(cmd.Context())
+
+	sink.LoadSubstreamsAuthEnvFile(manifestPath)
 
 	spkg, module, _, err := sink.ReadManifestAndModule(manifestPath, "", nil, outputModuleName, "", false, nil, zlog)
 	if err != nil {
@@ -117,13 +93,10 @@ func sinkFromProtoE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("could not find output type for module %s", outputModuleName)
 	}
 
-	service, err := sinksql.ExtractSinkService(spkg)
-	if err != nil {
-		service = &pbsql.Service{}
-	}
-
-	if err := services.Run(service, zlog); err != nil {
-		return fmt.Errorf("running service: %w", err)
+	if service, err := sinksql.ExtractSinkService(spkg); err == nil {
+		if err := services.Run(service, zlog); err != nil {
+			return fmt.Errorf("running service: %w", err)
+		}
 	}
 
 	var fileDescriptor *desc.FileDescriptor
@@ -160,7 +133,7 @@ func sinkFromProtoE(cmd *cobra.Command, args []string) error {
 		}
 		fileDescriptor = fds[0]
 	} else {
-		fileDescriptor, err = proto.FileDescriptorForOutputType(spkg, err, deps, outputType)
+		fileDescriptor, err = proto.FileDescriptorForOutputType(spkg, deps, outputType)
 		if err != nil {
 			return fmt.Errorf("finding file descriptor for output type %q: %w", outputType, err)
 		}
@@ -203,9 +176,9 @@ func sinkFromProtoE(cmd *cobra.Command, args []string) error {
 	factory := db_proto.SinkerFactory(baseSink, outputModuleName, rootMessageDescriptor.UnwrapMessage(), db_proto.SinkerFactoryOptions{
 		UseProtoOption:  useProtoOption,
 		UseConstraints:  useConstraints,
-		UseTransactions: useTransactions,
+		UseTransactions: true,
 		BlockBatchSize:  blockBatchSize,
-		Parallel:        parallel,
+		Parallel:        false,
 		Encoding:        encoding,
 		Clickhouse: db_proto.SinkerFactoryClickhouse{
 			SinkInfoFolder:  sflags.MustGetString(cmd, "clickhouse-sink-info-folder"),

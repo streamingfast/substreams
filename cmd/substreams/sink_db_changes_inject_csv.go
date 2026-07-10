@@ -14,15 +14,17 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/spf13/cobra"
+	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
+	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging/zapx"
 	"github.com/streamingfast/substreams/sink/sql/db_changes/db"
 	"go.uber.org/zap"
 )
 
-var sinkSQLInjectCSVCmd = &cobra.Command{
+var sinkDBChangesInjectCSVCmd = &cobra.Command{
 	Use:   "inject-csv <input_path> <table> <start>:<stop>",
 	Short: "Injects generated CSV rows for <table> into the database (postgresql-only)",
 	Long: cli.Dedent(`
@@ -33,21 +35,23 @@ var sinkSQLInjectCSVCmd = &cobra.Command{
 		Watch out, the <start> must be aligned with the range size of the CSV files or the module initial block.
 	`),
 	Args: cobra.ExactArgs(3),
-	RunE: sinkSQLInjectCSVE,
+	RunE: sinkDBChangesInjectCSVE,
 }
 
 func init() {
-	flags := sinkSQLInjectCSVCmd.Flags()
+	flags := sinkDBChangesInjectCSVCmd.Flags()
 	addCommonDatabaseChangesFlags(flags)
 
-	sinkSQLCmd.AddCommand(sinkSQLInjectCSVCmd)
+	flags.String("prometheus-addr", "", "[Operator] If non-empty, the process will listen on this address for Prometheus metrics request(s)")
+
+	sinkDBChangesCmd.AddCommand(sinkDBChangesInjectCSVCmd)
 }
 
-func sinkSQLInjectCSVE(cmd *cobra.Command, args []string) error {
+func sinkDBChangesInjectCSVE(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 	ctx := cmd.Context()
 
-	psqlDSN, err := resolveSinkSQLDSN(cmd)
+	psqlDSN, err := resolveSinkDSN(cmd)
 	if err != nil {
 		return err
 	}
@@ -56,7 +60,7 @@ func sinkSQLInjectCSVE(cmd *cobra.Command, args []string) error {
 	tableName := args[1]
 	cursorTableName := sflags.MustGetString(cmd, "cursors-table")
 
-	blockRange, err := readBlockRangeArgument(args[2])
+	blockRange, err := bstream.ParseRange(args[2])
 	if err != nil {
 		return fmt.Errorf("invalid block range %q: %w", args[2], err)
 	}
@@ -68,6 +72,12 @@ func sinkSQLInjectCSVE(cmd *cobra.Command, args []string) error {
 
 	if sqlDSN.Driver() != "postgres" {
 		return fmt.Errorf("inject-csv only supports postgresql DSNs, got %q", sqlDSN.Driver())
+	}
+
+	sinkDBPreStart(cmd)
+
+	if addr := sflags.MustGetString(cmd, "prometheus-addr"); addr != "" {
+		go dmetrics.Serve(addr)
 	}
 
 	zlog.Info("connecting to input store")

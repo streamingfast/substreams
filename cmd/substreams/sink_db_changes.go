@@ -5,61 +5,60 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"strings"
 	"time"
 
 	_ "github.com/lib/pq"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
-	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/logging/zapx"
 	"go.uber.org/zap"
 )
 
 var supportedOutputTypes = "sf.substreams.sink.database.v1.DatabaseChanges,sf.substreams.database.v1.DatabaseChanges"
 
-var (
-	onModuleHashMismatchFlag            = "on-module-hash-mismatch"
-	onModuleHashMistmatchFlagDeprecated = "on-module-hash-mistmatch"
-)
+var onModuleHashMismatchFlag = "on-module-hash-mismatch"
 
-var sinkSQLCmd = &cobra.Command{
-	Use:   "sql",
-	Short: "Sink Substreams data into an SQL database (PostgreSQL, ClickHouse)",
+var sinkDBChangesCmd = &cobra.Command{
+	Use:     "database-changes",
+	Aliases: []string{"db-changes"},
+	Short:   "Sink Substreams DatabaseChanges (db_out) data into an SQL database (PostgreSQL, ClickHouse)",
 }
 
 func init() {
-	flags := sinkSQLCmd.PersistentFlags()
-	flags.String("dsn", "", "Database connection string (falls back to the SUBSTREAMS_SINK_SQL_DSN environment variable), e.g. \"psql://user:pass@localhost:5432/db?sslmode=disable\" or \"clickhouse://user:pass@localhost:9000/db\"")
-	flags.Duration("delay-before-start", 0, "[Operator] Amount of time to wait before starting any internal processes, can be used to perform maintenance on the pod before actually letting it start")
-	flags.String("metrics-listen-addr", "", "[Operator] If non-empty, the process will listen on this address for Prometheus metrics request(s)")
-	flags.String("pprof-listen-addr", "", "[Operator] If non-empty, the process will listen on this address for pprof analysis (see https://golang.org/pkg/net/http/pprof/)")
+	flags := sinkDBChangesCmd.PersistentFlags()
+	addDSNFlag(flags)
+	addOperatorFlags(flags)
 
-	SinkCmd.AddCommand(sinkSQLCmd)
+	SinkCmd.AddCommand(sinkDBChangesCmd)
 }
 
-func resolveSinkSQLDSN(cmd *cobra.Command) (string, error) {
+func addDSNFlag(flags *pflag.FlagSet) {
+	flags.String("dsn", "", "Database connection string (falls back to the SUBSTREAMS_SINK_DSN environment variable), e.g. \"psql://user:pass@localhost:5432/db?sslmode=disable\" or \"clickhouse://user:pass@localhost:9000/db\"")
+}
+
+func addOperatorFlags(flags *pflag.FlagSet) {
+	flags.Duration("delay-before-start", 0, "[Operator] Amount of time to wait before starting any internal processes, can be used to perform maintenance on the pod before actually letting it start")
+	flags.String("pprof-listen-addr", "", "[Operator] If non-empty, the process will listen on this address for pprof analysis (see https://golang.org/pkg/net/http/pprof/)")
+}
+
+func resolveSinkDSN(cmd *cobra.Command) (string, error) {
 	dsn := sflags.MustGetString(cmd, "dsn")
 	if dsn == "" {
-		dsn = os.Getenv("SUBSTREAMS_SINK_SQL_DSN")
+		dsn = os.Getenv("SUBSTREAMS_SINK_DSN")
 	}
 	if dsn == "" {
-		return "", fmt.Errorf("no DSN provided, use --dsn or set SUBSTREAMS_SINK_SQL_DSN (e.g. \"psql://user:pass@localhost:5432/db?sslmode=disable\" or \"clickhouse://user:pass@localhost:9000/db\")")
+		return "", fmt.Errorf("no DSN provided, use --dsn or set SUBSTREAMS_SINK_DSN (e.g. \"psql://user:pass@localhost:5432/db?sslmode=disable\" or \"clickhouse://user:pass@localhost:9000/db\")")
 	}
 	return dsn, nil
 }
 
-func sinkSQLPreStart(cmd *cobra.Command) {
+func sinkDBPreStart(cmd *cobra.Command) {
 	if delay := sflags.MustGetDuration(cmd, "delay-before-start"); delay > 0 {
 		zlog.Info("sleeping to respect delay before start setting", zapx.HumanDuration("delay", delay))
 		time.Sleep(delay)
-	}
-
-	if addr := sflags.MustGetString(cmd, "metrics-listen-addr"); addr != "" {
-		zlog.Debug("starting prometheus metrics server", zap.String("listen_addr", addr))
-		go dmetrics.Serve(addr)
 	}
 
 	if addr := sflags.MustGetString(cmd, "pprof-listen-addr"); addr != "" {
@@ -72,12 +71,6 @@ func sinkSQLPreStart(cmd *cobra.Command) {
 	}
 }
 
-func addOperatorFlags(flags *pflag.FlagSet) {
-	flags.Duration("delay-before-start", 0, "[Operator] Amount of time to wait before starting any internal processes, can be used to perform maintenance on the pod before actually letting it start")
-	flags.String("metrics-listen-addr", "", "[Operator] If non-empty, the process will listen on this address for Prometheus metrics request(s)")
-	flags.String("pprof-listen-addr", "", "[Operator] If non-empty, the process will listen on this address for pprof analysis (see https://golang.org/pkg/net/http/pprof/)")
-}
-
 func addCommonSinkerFlags(flags *pflag.FlagSet) {
 	flags.String(onModuleHashMismatchFlag, "error", cli.FlagDescription(`
 		What to do when the module hash in the manifest does not match the one in the database, can be 'error', 'warn' or 'ignore'
@@ -87,8 +80,6 @@ func addCommonSinkerFlags(flags *pflag.FlagSet) {
 		- If 'ignore' is set, we pick the cursor at the highest block number and use it as the starting point. Subsequent
 		updates to the cursor will overwrite the module hash in the database.
 	`))
-	flags.String(onModuleHashMistmatchFlagDeprecated, "error", "(deprecated) use --on-module-hash-mismatch instead")
-	flags.Lookup(onModuleHashMistmatchFlagDeprecated).Deprecated = "use --on-module-hash-mismatch instead"
 }
 
 func addCommonDatabaseChangesFlags(flags *pflag.FlagSet) {
@@ -98,13 +89,32 @@ func addCommonDatabaseChangesFlags(flags *pflag.FlagSet) {
 	flags.String("bytes-encoding", "raw", "[Schema] Encoding for protobuf bytes fields: raw, hex, 0xhex, base64, base58. Non-raw encodings store data as string type in database.")
 }
 
-func readBlockRangeArgument(in string) (*bstream.Range, error) {
-	return bstream.ParseRange(in)
-}
-
-func resolveOnModuleHashMismatchFlag(cmd *cobra.Command) string {
-	if value, provided := sflags.MustGetStringProvided(cmd, onModuleHashMistmatchFlagDeprecated); provided {
-		return value
+// applyBlockRangeArg bridges a positional <start>:<stop> argument into the
+// shared sink start-block/stop-block flags
+func applyBlockRangeArg(cmd *cobra.Command, arg string) error {
+	if arg == "" {
+		return nil
 	}
-	return sflags.MustGetString(cmd, onModuleHashMismatchFlag)
+
+	if !strings.Contains(arg, ":") {
+		return fmt.Errorf("invalid block range %q: expected format [<start>]:<stop>", arg)
+	}
+
+	startPart, stopPart, _ := strings.Cut(arg, ":")
+	if startPart == "" && stopPart == "" {
+		return fmt.Errorf("invalid block range %q: at least one of start or stop must be provided", arg)
+	}
+
+	if startPart != "" {
+		if err := cmd.Flags().Set("start-block", startPart); err != nil {
+			return fmt.Errorf("setting start-block flag: %w", err)
+		}
+	}
+	if stopPart != "" {
+		if err := cmd.Flags().Set("stop-block", stopPart); err != nil {
+			return fmt.Errorf("setting stop-block flag: %w", err)
+		}
+	}
+
+	return nil
 }

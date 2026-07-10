@@ -13,17 +13,17 @@ import (
 	"github.com/streamingfast/substreams/sink/sql/db_changes/db"
 )
 
-var sinkSQLToolsCmd = &cobra.Command{
+var sinkDBChangesToolsCmd = &cobra.Command{
 	Use:   "tools",
 	Short: "Tools for developers and operators",
 }
 
-var sinkSQLToolsCursorCmd = &cobra.Command{
+var sinkDBChangesToolsCursorCmd = &cobra.Command{
 	Use:   "cursor",
 	Short: "Tools related to cursor handling (read/write)",
 }
 
-var sinkSQLToolsReadCursorCmd = &cobra.Command{
+var sinkDBChangesToolsReadCursorCmd = &cobra.Command{
 	Use:   "read",
 	Short: "[Operator] Read active cursor(s) from database, if present",
 	Long: cli.Dedent(`
@@ -36,7 +36,7 @@ var sinkSQLToolsReadCursorCmd = &cobra.Command{
 	RunE: toolsReadCursorE,
 }
 
-var sinkSQLToolsWriteCursorCmd = &cobra.Command{
+var sinkDBChangesToolsWriteCursorCmd = &cobra.Command{
 	Use:   "write <module_hash> <cursor>",
 	Short: "[Operator] Write a new active cursor for a given module's hash in the database",
 	Long: cli.Dedent(`
@@ -50,7 +50,7 @@ var sinkSQLToolsWriteCursorCmd = &cobra.Command{
 	RunE: toolsWriteCursorE,
 }
 
-var sinkSQLToolsDeleteCursorCmd = &cobra.Command{
+var sinkDBChangesToolsDeleteCursorCmd = &cobra.Command{
 	Use:   "delete [<module_hash>]",
 	Short: "[Operator] Delete the active cursor for a given module's hash in the database",
 	Long: cli.Dedent(`
@@ -70,22 +70,29 @@ func init() {
 		flags.String("clickhouse-cluster", "", "[Operator] If non-empty, a 'ON CLUSTER <cluster>' clause will be applied when setting up tables in Clickhouse. It will also replace the table engine with it's replicated counterpart (MergeTree will be replaced with ReplicatedMergeTree for example).")
 	}
 
-	addToolsCursorFlags(sinkSQLToolsReadCursorCmd.Flags())
-	addToolsCursorFlags(sinkSQLToolsWriteCursorCmd.Flags())
-	addToolsCursorFlags(sinkSQLToolsDeleteCursorCmd.Flags())
-	sinkSQLToolsDeleteCursorCmd.Flags().BoolP("all", "a", false, "Delete all active cursors")
+	addToolsCursorFlags(sinkDBChangesToolsReadCursorCmd.Flags())
+	addToolsCursorFlags(sinkDBChangesToolsWriteCursorCmd.Flags())
+	addToolsCursorFlags(sinkDBChangesToolsDeleteCursorCmd.Flags())
+	sinkDBChangesToolsDeleteCursorCmd.Flags().BoolP("all", "a", false, "Delete all active cursors")
 
-	sinkSQLToolsCursorCmd.AddCommand(sinkSQLToolsReadCursorCmd)
-	sinkSQLToolsCursorCmd.AddCommand(sinkSQLToolsWriteCursorCmd)
-	sinkSQLToolsCursorCmd.AddCommand(sinkSQLToolsDeleteCursorCmd)
-	sinkSQLToolsCmd.AddCommand(sinkSQLToolsCursorCmd)
-	sinkSQLCmd.AddCommand(sinkSQLToolsCmd)
+	sinkDBChangesToolsCursorCmd.AddCommand(sinkDBChangesToolsReadCursorCmd)
+	sinkDBChangesToolsCursorCmd.AddCommand(sinkDBChangesToolsWriteCursorCmd)
+	sinkDBChangesToolsCursorCmd.AddCommand(sinkDBChangesToolsDeleteCursorCmd)
+	sinkDBChangesToolsCmd.AddCommand(sinkDBChangesToolsCursorCmd)
+	sinkDBChangesCmd.AddCommand(sinkDBChangesToolsCmd)
 }
 
 func toolsReadCursorE(cmd *cobra.Command, _ []string) error {
 	cmd.SilenceUsage = true
 
-	loader, err := toolsCreateLoader(cmd)
+	dsnString, err := resolveSinkDSN(cmd)
+	if err != nil {
+		return err
+	}
+
+	sinkDBPreStart(cmd)
+
+	loader, err := toolsCreateLoader(cmd, dsnString)
 	if err != nil {
 		return err
 	}
@@ -108,7 +115,7 @@ func toolsReadCursorE(cmd *cobra.Command, _ []string) error {
 func toolsWriteCursorE(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 
-	loader, err := toolsCreateLoader(cmd)
+	dsnString, err := resolveSinkDSN(cmd)
 	if err != nil {
 		return err
 	}
@@ -121,6 +128,13 @@ func toolsWriteCursorE(cmd *cobra.Command, args []string) error {
 
 	cursor, err := sink.NewCursor(opaqueCursor)
 	cli.NoError(err, "The <cursor> is invalid")
+
+	sinkDBPreStart(cmd)
+
+	loader, err := toolsCreateLoader(cmd, dsnString)
+	if err != nil {
+		return err
+	}
 
 	err = loader.UpdateCursor(cmd.Context(), nil, moduleHash, cursor)
 	if err != nil {
@@ -144,7 +158,7 @@ func toolsWriteCursorE(cmd *cobra.Command, args []string) error {
 func toolsDeleteCursorE(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 
-	loader, err := toolsCreateLoader(cmd)
+	dsnString, err := resolveSinkDSN(cmd)
 	if err != nil {
 		return err
 	}
@@ -157,6 +171,13 @@ func toolsDeleteCursorE(cmd *cobra.Command, args []string) error {
 
 		cli.Ensure(moduleHash != "", "The <module_hash> cannot be empty")
 		cli.Ensure(len(moduleHash) == 40, "The <module_hash> must be exactly 40 characters long")
+	}
+
+	sinkDBPreStart(cmd)
+
+	loader, err := toolsCreateLoader(cmd, dsnString)
+	if err != nil {
+		return err
 	}
 
 	if moduleHash == "" {
@@ -176,12 +197,7 @@ func toolsDeleteCursorE(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func toolsCreateLoader(cmd *cobra.Command) (*db.Loader, error) {
-	dsnString, err := resolveSinkSQLDSN(cmd)
-	if err != nil {
-		return nil, err
-	}
-
+func toolsCreateLoader(cmd *cobra.Command, dsnString string) (*db.Loader, error) {
 	cursorTableName := sflags.MustGetString(cmd, "cursors-table")
 	historyTableName := sflags.MustGetString(cmd, "history-table")
 

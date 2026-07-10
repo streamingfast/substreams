@@ -15,7 +15,7 @@ import (
 
 const lastCursorFilename = "last_cursor"
 
-var sinkSQLGenerateCSVCmd = &cobra.Command{
+var sinkDBChangesGenerateCSVCmd = &cobra.Command{
 	Use:   "generate-csv <manifest> [start]:<stop>",
 	Short: "Generates CSVs for each table so it can be bulk inserted with `inject-csv` (for postgresql only)",
 	Long: cli.Dedent(`
@@ -32,12 +32,12 @@ var sinkSQLGenerateCSVCmd = &cobra.Command{
 		- Start streaming with the 'run' command
 	`),
 	Args: cobra.ExactArgs(2),
-	RunE: sinkSQLGenerateCSVE,
+	RunE: sinkDBChangesGenerateCSVE,
 }
 
 func init() {
-	flags := sinkSQLGenerateCSVCmd.Flags()
-	sink.AddFlagsToSet(flags)
+	flags := sinkDBChangesGenerateCSVCmd.Flags()
+	sink.AddFlagsToSet(flags, sink.FlagExcludeDefault(sink.FlagFinalBlocksOnly))
 	addCommonSinkerFlags(flags)
 	addCommonDatabaseChangesFlags(flags)
 
@@ -56,41 +56,28 @@ func init() {
 		Default value for the buffer is 4 MiB.
 	`))
 
-	sinkSQLCmd.AddCommand(sinkSQLGenerateCSVCmd)
+	sinkDBChangesCmd.AddCommand(sinkDBChangesGenerateCSVCmd)
 }
 
-func sinkSQLGenerateCSVE(cmd *cobra.Command, args []string) error {
+func sinkDBChangesGenerateCSVE(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 
-	sinkSQLPreStart(cmd)
-
-	app := cli.NewApplication(cmd.Context())
-
-	sinker.RegisterMetrics()
-
-	dsnString, err := resolveSinkSQLDSN(cmd)
+	dsnString, err := resolveSinkDSN(cmd)
 	if err != nil {
 		return err
 	}
 
 	manifestPath := args[0]
-	blockRange := args[1]
 
-	br, err := readBlockRangeArgument(blockRange)
-	if err != nil {
-		return fmt.Errorf("invalid block range %q: %w", blockRange, err)
+	if err := applyBlockRangeArg(cmd, args[1]); err != nil {
+		return err
 	}
 
-	if br.StartBlock() > 0 {
-		if err := cmd.Flags().Set("start-block", fmt.Sprintf("%d", br.StartBlock())); err != nil {
-			return fmt.Errorf("setting start-block flag: %w", err)
-		}
-	}
-	if br.EndBlock() != nil {
-		if err := cmd.Flags().Set("stop-block", fmt.Sprintf("%d", *br.EndBlock())); err != nil {
-			return fmt.Errorf("setting stop-block flag: %w", err)
-		}
-	}
+	sinkDBPreStart(cmd)
+
+	app := cli.NewApplication(cmd.Context())
+
+	sinker.RegisterMetrics()
 
 	outputDir := sflags.MustGetString(cmd, "output-dir")
 	bundleSize := sflags.MustGetUint64(cmd, "bundle-size")
@@ -99,19 +86,23 @@ func sinkSQLGenerateCSVE(cmd *cobra.Command, args []string) error {
 	cursorTableName := sflags.MustGetString(cmd, "cursors-table")
 	historyTableName := sflags.MustGetString(cmd, "history-table")
 
-	if err := cmd.Flags().Set("final-blocks-only", "true"); err != nil {
-		return fmt.Errorf("setting final-blocks-only flag: %w", err)
-	}
+	sink.LoadSubstreamsAuthEnvFile(manifestPath)
 
-	baseSink, err := sink.NewFromViper(
+	sinkConfig, err := sink.ConfigFromViper(
 		cmd,
 		supportedOutputTypes,
 		manifestPath,
 		sink.InferOutputModuleFromPackage,
-		"sink_sql",
+		"sink_database_changes",
 		zlog,
 		tracer,
 	)
+	if err != nil {
+		return fmt.Errorf("new base sinker config: %w", err)
+	}
+	sinkConfig.FinalBlocksOnly = true
+
+	baseSink, err := sink.NewFromConfig(sinkConfig)
 	if err != nil {
 		return fmt.Errorf("new base sinker: %w", err)
 	}
@@ -128,7 +119,7 @@ func sinkSQLGenerateCSVE(cmd *cobra.Command, args []string) error {
 		historyTableName,
 		sflags.MustGetString(cmd, "clickhouse-cluster"),
 		0, 0, 0,
-		resolveOnModuleHashMismatchFlag(cmd),
+		sflags.MustGetString(cmd, onModuleHashMismatchFlag),
 		&handleReorgs,
 		zlog, tracer,
 	)

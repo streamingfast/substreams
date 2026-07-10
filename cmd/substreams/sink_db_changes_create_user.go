@@ -4,36 +4,36 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli/sflags"
+	"github.com/streamingfast/derr"
 	"github.com/streamingfast/substreams/sink/sql/db_changes/db"
 )
 
-var sinkSQLCreateUserCmd = &cobra.Command{
+var sinkDBChangesCreateUserCmd = &cobra.Command{
 	Use:   "create-user <username> <database>",
 	Short: "Create a user in the database",
 	Args:  cobra.ExactArgs(2),
-	RunE:  sinkSQLCreateUserE,
+	RunE:  sinkDBChangesCreateUserE,
 }
 
 func init() {
-	flags := sinkSQLCreateUserCmd.Flags()
+	flags := sinkDBChangesCreateUserCmd.Flags()
 	addCommonDatabaseChangesFlags(flags)
 
 	flags.Int("retries", 3, "Number of retries to attempt when a connection error occurs")
 	flags.Bool("read-only", false, "Create a read-only user")
 	flags.String("password-env", "", "Name of the environment variable containing the password")
 
-	sinkSQLCmd.AddCommand(sinkSQLCreateUserCmd)
+	sinkDBChangesCmd.AddCommand(sinkDBChangesCreateUserCmd)
 }
 
-func sinkSQLCreateUserE(cmd *cobra.Command, args []string) error {
+func sinkDBChangesCreateUserE(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 	ctx := cmd.Context()
 
-	dsnString, err := resolveSinkSQLDSN(cmd)
+	dsnString, err := resolveSinkDSN(cmd)
 	if err != nil {
 		return err
 	}
@@ -61,7 +61,10 @@ func sinkSQLCreateUserE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("parsing dsn: %w", err)
 	}
 
-	if err := sinkSQLRetry(ctx, func(ctx context.Context) error {
+	sinkDBPreStart(cmd)
+
+	retries := sflags.MustGetInt(cmd, "retries")
+	if err := derr.RetryContext(ctx, uint64(retries), func(ctx context.Context) error {
 		handleReorgs := false
 		dbLoader, err := db.NewLoader(
 			dsn,
@@ -82,21 +85,9 @@ func sinkSQLCreateUserE(cmd *cobra.Command, args []string) error {
 		}
 
 		return nil
-	}, sflags.MustGetInt(cmd, "retries")); err != nil {
+	}); err != nil {
 		return fmt.Errorf("create user: %w", err)
 	}
 
 	return nil
-}
-
-func sinkSQLRetry(ctx context.Context, f func(ctx context.Context) error, retries int) error {
-	var err error
-	for i := 0; i < retries; i++ {
-		err = f(ctx)
-		if err == nil {
-			return nil
-		}
-		time.Sleep(5*time.Duration(i)*time.Second + 1*time.Second)
-	}
-	return err
 }

@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	pbsql "github.com/streamingfast/substreams/pb/sf/substreams/sink/sql/services/v1"
@@ -34,6 +35,10 @@ func runDBT(config *pbsql.DBTConfig, logger *zap.Logger) error {
 	// Extract each file in the archive
 	for _, file := range reader.File {
 		filePath := filepath.Join(dbtDir, file.Name)
+		// the zip comes from an untrusted .spkg, reject entries escaping dbtDir
+		if !strings.HasPrefix(filePath, filepath.Clean(dbtDir)+string(os.PathSeparator)) {
+			return fmt.Errorf("invalid file path in dbt config zip: %q", file.Name)
+		}
 
 		// Ensure the file's directory structure exists
 		if file.FileInfo().IsDir() {
@@ -80,6 +85,6 @@ func runDBT(config *pbsql.DBTConfig, logger *zap.Logger) error {
 		logger.Info("dbt output")
 		fmt.Println(string(output))
 
-		time.Sleep(time.Duration(config.RunIntervalSeconds))
+		time.Sleep(time.Duration(config.RunIntervalSeconds) * time.Second)
 	}
 }

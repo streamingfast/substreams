@@ -11,7 +11,7 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 )
 
-func FileDescriptorForOutputType(spkg *v1.Package, err error, deps map[string]*desc.FileDescriptor, outputType string) (*desc.FileDescriptor, error) {
+func FileDescriptorForOutputType(spkg *v1.Package, deps map[string]*desc.FileDescriptor, outputType string) (*desc.FileDescriptor, error) {
 	for _, p := range spkg.ProtoFiles {
 		fd, err := desc.CreateFileDescriptor(p, slices.Collect(maps.Values(deps))...)
 		if err != nil {

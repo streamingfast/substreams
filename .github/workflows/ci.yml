@@ -44,6 +44,9 @@ jobs:
         run: go run ./docs/.gitbook/validate.go
 
       - name: Run Tests
+        env:
+          # Docker-backed sink/sql integration tests, only ubuntu runners have Docker
+          SF_SINK_SQL_INTEGRATION_TESTS: ${{ matrix.os == 'ubuntu-latest' && 'true' || '' }}
         run: ./bin/test.sh
 
       - name: Build

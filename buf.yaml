@@ -11,12 +11,26 @@ modules:
       except:
         - FIELD_NOT_REQUIRED
         - PACKAGE_NO_IMPORT_CYCLE
-      # sink/sql protos keep their historical packages (bare `schema`,
+      # sink/sql protos keep their historical names (bare `schema` package,
       # `...sql.service.v1` in a services/ dir, lowercase enum values):
       # existing user .spkg files and manifests reference those names
-      ignore:
-        - proto/sf/substreams/sink/sql/schema/v1/schema.proto
-        - proto/sf/substreams/sink/sql/services/v1/services.proto
+      ignore_only:
+        ENUM_VALUE_PREFIX:
+          - proto/sf/substreams/sink/sql/schema/v1/schema.proto
+          - proto/sf/substreams/sink/sql/services/v1/services.proto
+        ENUM_VALUE_UPPER_SNAKE_CASE:
+          - proto/sf/substreams/sink/sql/schema/v1/schema.proto
+          - proto/sf/substreams/sink/sql/services/v1/services.proto
+        ENUM_ZERO_VALUE_SUFFIX:
+          - proto/sf/substreams/sink/sql/schema/v1/schema.proto
+          - proto/sf/substreams/sink/sql/services/v1/services.proto
+        FIELD_LOWER_SNAKE_CASE:
+          - proto/sf/substreams/sink/sql/schema/v1/schema.proto
+        PACKAGE_DIRECTORY_MATCH:
+          - proto/sf/substreams/sink/sql/schema/v1/schema.proto
+          - proto/sf/substreams/sink/sql/services/v1/services.proto
+        PACKAGE_VERSION_SUFFIX:
+          - proto/sf/substreams/sink/sql/schema/v1/schema.proto
       disallow_comment_ignores: true
     breaking:
       use:

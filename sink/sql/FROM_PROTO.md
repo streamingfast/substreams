@@ -15,18 +15,18 @@ The `from-proto` command streamlines the process of running a SQL sink by:
 ## Command Syntax
 
 ```bash
-substreams sink from-proto <dsn> <manifest> [output-module]
+substreams sink from-proto <manifest> [output-module] --dsn <dsn>
 ```
 
 ### Arguments
 
-- `<dsn>`: Database connection string (Data Source Name) - see [DSN Format](#dsn-format) section below
 - `<manifest>`: Path to your Substreams manifest file (substreams.yaml)
 - `[output-module]`: Optional. Name of the output module to stream from (defaults to auto-detection)
 
 ### Common Flags
 
-- `-e, --substreams-endpoint`: Substreams gRPC endpoint
+- `--dsn`: Database connection string (falls back to the `SUBSTREAMS_SINK_DSN` environment variable) - see [DSN Format](#dsn-format) section below
+- `-e, --endpoint`: Substreams gRPC endpoint
 - `-s, --start-block`: Start block number to stream from
 - `-t, --stop-block`: Stop block to end stream at (default: 0, meaning no limit)
 - `--no-constraints`: Skip adding database constraints (useful for fast initial imports)
@@ -97,10 +97,10 @@ For security, avoid hardcoding credentials in commands. Use environment variable
 
 ```bash
 # Set DSN as environment variable (replace with actual credentials)
-export DSN="postgres://[username]:[password]@localhost:5432/mydb?sslmode=disable"
+export SUBSTREAMS_SINK_DSN="postgres://[username]:[password]@localhost:5432/mydb?sslmode=disable"
 
 # Use in command
-substreams sink from-proto $DSN substreams.yaml
+substreams sink from-proto substreams.yaml
 ```
 
 ### Database Setup Examples
@@ -112,7 +112,7 @@ docker run --name postgres \
   -e POSTGRES_DB=analytics \
   -p 5432:5432 -d postgres:13
 
-export DSN="postgres://postgres:password@localhost:5432/analytics?sslmode=disable"
+export SUBSTREAMS_SINK_DSN="postgres://postgres:password@localhost:5432/analytics?sslmode=disable"
 ```
 
 **ClickHouse with Docker:**
@@ -121,7 +121,7 @@ docker run --name clickhouse \
   -p 9000:9000 -p 8123:8123 \
   -d clickhouse/clickhouse-server
 
-export DSN="clickhouse://127.0.0.1:9000/default?secure=false"
+export SUBSTREAMS_SINK_DSN="clickhouse://127.0.0.1:9000/default?secure=false"
 ```
 
 ## Substreams to Database Step-by-Step Workflow
@@ -292,14 +292,14 @@ Execute the `from-proto` command to automatically generate schema and start stre
 
 **PostgreSQL:**
 ```bash
-export DSN="postgres://postgres:password@localhost:5432/postgres?sslmode=disable"
-substreams sink from-proto $DSN substreams.yaml
+export SUBSTREAMS_SINK_DSN="postgres://postgres:password@localhost:5432/postgres?sslmode=disable"
+substreams sink from-proto substreams.yaml
 ```
 
 **ClickHouse:**
 ```bash
-export DSN="clickhouse://127.0.0.1:9000/default?secure=false"
-substreams sink from-proto $DSN substreams.yaml
+export SUBSTREAMS_SINK_DSN="clickhouse://127.0.0.1:9000/default?secure=false"
+substreams sink from-proto substreams.yaml
 ```
 
 ## Proto Schema Annotations
@@ -423,7 +423,7 @@ This is particularly useful for:
 Stream specific block ranges:
 
 ```bash
-substreams sink from-proto $DSN substreams.yaml \
+substreams sink from-proto substreams.yaml \
   --start-block 1000000 \
   --stop-block 1001000
 ```
@@ -433,7 +433,7 @@ substreams sink from-proto $DSN substreams.yaml \
 For high-throughput scenarios:
 
 ```bash
-substreams sink from-proto $DSN substreams.yaml \
+substreams sink from-proto substreams.yaml \
   --no-constraints \
   --block-batch-size 100
 ```
@@ -443,7 +443,7 @@ substreams sink from-proto $DSN substreams.yaml \
 For ClickHouse with additional configuration:
 
 ```bash
-substreams sink from-proto $DSN substreams.yaml \
+substreams sink from-proto substreams.yaml \
   --clickhouse-sink-info-folder ./clickhouse-info \
   --clickhouse-cursor-file-path ./cursor.txt
 ```

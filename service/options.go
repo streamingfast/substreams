@@ -123,7 +123,7 @@ func WithStoresBackend(backend string) Option {
 	return func(a anyTierService) {
 		switch s := a.(type) {
 		case *Tier1Service:
-			// not used on tier1
+			s.runtimeConfig.StoresBackend = backend
 		case *Tier2Service:
 			s.storesBackend = backend
 		}

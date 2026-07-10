@@ -14,8 +14,9 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 )
 
-// TestMmapBackendE2E validates that mmap backend works in full e2e scenario
-// This test explicitly sets SUBSTREAMS_STORE_BACKEND=mmap and verifies:
+// TestMmapBackendE2E validates that mmap backend works in full e2e scenario.
+// mmap is the default backend, so no SUBSTREAMS_STORE_BACKEND env var is set here.
+// It verifies:
 // 1. Stores work correctly in production mode with squashing
 // 2. Large store operations complete without OOM
 // 3. Multiple stores can coexist

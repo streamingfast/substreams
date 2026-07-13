@@ -24,6 +24,12 @@ var (
 // during bulk operations (Load, BatchSet).
 const mmapBatchSize = 10_000
 
+// defaultInitialMmapSize is the mmap address space pre-reserved when a store is
+// opened without an explicit InitialMmapSize hint. It is a virtual reservation
+// (not resident RAM) that lets small/medium stores hydrate and grow without the
+// remap stalls bbolt incurs when it doubles its mmap.
+const defaultInitialMmapSize = 128 << 20 // 128 MiB
+
 // snapshotBatchMaxKeys and snapshotBatchMaxBytes bound how many entries a
 // snapshot iterator copies into heap per refill transaction.
 const (
@@ -139,7 +145,12 @@ func newMmapKVImplWithConfig(storeName, moduleHash string, cfg *MmapBackendConfi
 	path := f.Name()
 	f.Close()
 
-	db, err := openMmapDB(path, true, 0) // NoSync: substreams stores are ephemeral and rebuilt from object storage on crash
+	initialMmapSize := cfg.InitialMmapSize
+	if initialMmapSize <= 0 {
+		initialMmapSize = defaultInitialMmapSize
+	}
+
+	db, err := openMmapDB(path, true, initialMmapSize) // NoSync: substreams stores are ephemeral and rebuilt from object storage on crash
 	if err != nil {
 		os.Remove(path) // openMmapDB may have left the file behind
 		return nil, fmt.Errorf("failed to open mmap KVImpl for store %q at %q: %w", storeName, path, err)
@@ -293,6 +304,30 @@ func (b *mmapKVImpl) GetMany(keys []string) (map[string][]byte, error) {
 	})
 	if err != nil {
 		return nil, fmt.Errorf("mmap GetMany: %w", err)
+	}
+	return result, nil
+}
+
+// GetManySizes reads the value length of each key in a single read transaction
+// without copying the values out of the mmap. Keys not present are omitted.
+func (b *mmapKVImpl) GetManySizes(keys []string) (map[string]int, error) {
+	result := make(map[string]int, len(keys))
+	err := b.db.View(func(tx *bbolt.Tx) error {
+		bucket := tx.Bucket(defaultBucket)
+		if bucket == nil {
+			return nil
+		}
+		for _, k := range keys {
+			// bucket.Get returns an mmap-backed slice; we only read its length
+			// and never retain it, so no copy is needed.
+			if v := bucket.Get([]byte(k)); v != nil {
+				result[k] = len(v)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("mmap GetManySizes: %w", err)
 	}
 	return result, nil
 }

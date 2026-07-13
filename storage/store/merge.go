@@ -95,16 +95,44 @@ func (b *baseStore) mergeBatched(kvPartialStore *PartialKV) error {
 		return fmt.Errorf("iterating partial store: %w", err)
 	}
 
-	// Step 2: Read existing FullKV values for all partial keys in a single transaction.
-	// All policies need this for totalSizeBytes accounting (knowing if a key existed and
-	// its old size). Policies other than SET also need the values to compute the merge result.
+	// Step 2: Read what we need about the existing FullKV values for all partial
+	// keys, in a single transaction.
+	//
+	// SET and SET_IF_NOT_EXISTS never fold the previous value into the result —
+	// they only need to know whether a key already existed (SET_IF_NOT_EXISTS)
+	// and its former size (for the totalSizeBytes accounting below). For those we
+	// fetch value *lengths* only via GetManySizes, which on the mmap backend
+	// reads the sizes straight out of the bbolt pages without copying every
+	// previous value onto the heap — a full random-read sweep whose bytes would
+	// otherwise be allocated, copied, and immediately discarded. All other
+	// policies fold the previous value into the merge and need the bytes, so they
+	// fetch via GetMany. Either way existingSizes ends up populated for every
+	// present key so the accounting path stays backend- and policy-agnostic.
 	keys := make([]string, len(partialEntries))
 	for i, e := range partialEntries {
 		keys[i] = e.key
 	}
-	existingKV, err := b.kvImpl.GetMany(keys)
-	if err != nil {
-		return fmt.Errorf("reading existing keys from full store: %w", err)
+	var (
+		existingKV    map[string][]byte // populated only for value-consuming policies
+		existingSizes map[string]int    // always populated: present key -> old value length
+		err           error
+	)
+	switch b.updatePolicy {
+	case pbsubstreams.Module_KindStore_UPDATE_POLICY_SET,
+		pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS:
+		existingSizes, err = b.kvImpl.GetManySizes(keys)
+		if err != nil {
+			return fmt.Errorf("reading existing key sizes from full store: %w", err)
+		}
+	default:
+		existingKV, err = b.kvImpl.GetMany(keys)
+		if err != nil {
+			return fmt.Errorf("reading existing keys from full store: %w", err)
+		}
+		existingSizes = make(map[string]int, len(existingKV))
+		for k, v := range existingKV {
+			existingSizes[k] = len(v)
+		}
 	}
 
 	// Step 3: Compute merged results in memory.
@@ -117,9 +145,9 @@ func (b *baseStore) mergeBatched(kvPartialStore *PartialKV) error {
 		}
 
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS:
-		// existingKV populated above — only write keys not already present
+		// existingSizes populated above — only write keys not already present
 		for _, e := range partialEntries {
-			if _, found := existingKV[e.key]; !found {
+			if _, found := existingSizes[e.key]; !found {
 				results[e.key] = e.val
 			}
 		}
@@ -394,8 +422,8 @@ func (b *baseStore) mergeBatched(kvPartialStore *PartialKV) error {
 	// For each key we're writing: subtract old value size (if existed), add new value size.
 	// For new keys: also add the key size.
 	for k, newVal := range results {
-		if oldVal, existed := existingKV[k]; existed {
-			b.totalSizeBytes -= uint64(len(oldVal))
+		if oldLen, existed := existingSizes[k]; existed {
+			b.totalSizeBytes -= uint64(oldLen)
 		} else {
 			b.totalSizeBytes += uint64(len(k))
 		}

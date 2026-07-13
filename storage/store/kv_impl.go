@@ -62,6 +62,15 @@ type KVImpl interface {
 	// Keys not found are omitted from the result map.
 	GetMany(keys []string) (map[string][]byte, error)
 
+	// GetManySizes retrieves, in a single operation, the byte length of the
+	// value stored at each of the given keys. Keys not found are omitted from
+	// the result map (so the map doubles as a presence test). It is the
+	// value-free counterpart of GetMany: for the mmap backend it reads value
+	// lengths straight out of the bbolt pages without copying the values onto
+	// the heap, which the merge path uses for SET/SET_IF_NOT_EXISTS where only
+	// prior existence and size (for accounting) matter, not the old bytes.
+	GetManySizes(keys []string) (map[string]int, error)
+
 	// KeyCount returns the number of keys currently stored.
 	KeyCount() int
 

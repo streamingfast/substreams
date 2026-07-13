@@ -36,10 +36,17 @@ func (p *Pipeline) sendSnapshots(storeMap store.Map, snapshotModules []string) e
 
 		store.Iter(func(k string, v []byte) error {
 			count++
+			// Copy v: on the mmap backend Iter yields a slice aliasing bbolt's
+			// page buffer, valid only during the read transaction. This delta is
+			// accumulated and sent asynchronously (every 100 entries / at the
+			// end), outliving the scan, so the alias would be overwritten before
+			// it is serialized.
+			newValue := make([]byte, len(v))
+			copy(newValue, v)
 			accum = append(accum, &pbsubstreamsrpc.StoreDelta{
 				Operation: pbsubstreamsrpc.StoreDelta_CREATE,
 				Key:       k,
-				NewValue:  v,
+				NewValue:  newValue,
 			})
 
 			if count%100 == 0 {

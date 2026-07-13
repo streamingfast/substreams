@@ -298,6 +298,13 @@ func (p *Pipeline) initStoresFromQuickload(ctx context.Context, reqPlan *plan.Re
 
 	if err := storeMap.QuickLoad(ctx, cursor.Block); err != nil {
 		p.stores.logger.Info("no temporary store files found", zap.Error(err))
+		for _, st := range storeMap.All() {
+			if closer, ok := st.(interface{ Close() error }); ok {
+				if cerr := closer.Close(); cerr != nil {
+					p.stores.logger.Warn("failed to close store after quickload failure", zap.String("store", st.Name()), zap.Error(cerr))
+				}
+			}
+		}
 		return false
 	}
 	reqctx.Logger(ctx).Info("skipping backprocessing, reading from temporary files", zap.Strings("stores", storeMap.Names()), zap.Uint64("block_num", cursor.Block.Num()), zap.String("block_id", cursor.Block.ID()))
@@ -390,6 +397,17 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 	logger := reqctx.Logger(ctx)
 
 	storeMap = store.NewMap()
+	defer func() {
+		if err != nil {
+			for _, st := range storeMap.All() {
+				if closer, ok := st.(interface{ Close() error }); ok {
+					if cerr := closer.Close(); cerr != nil {
+						logger.Warn("failed to close store after setup error", zap.String("store", st.Name()), zap.Error(cerr))
+					}
+				}
+			}
+		}
+	}()
 
 	type loadable struct {
 		fullKVStore *store.FullKV
@@ -480,7 +498,11 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 		}
 		egLoad.Go(func() error {
 			if err := loadable.fullKVStore.Load(ctx, loadable.fileInfo); err != nil {
-				if errors.Is(err, store.ErrInvalidFullKVFile) {
+				// A canceled context surfaces as ErrInvalidFullKVFile because the
+				// streaming unmarshal wraps the read error as a string, so only
+				// treat the file as corrupt when the context is still live —
+				// otherwise a canceled request would delete a valid store file.
+				if errors.Is(err, store.ErrInvalidFullKVFile) && ctx.Err() == nil {
 					logger.Warn("found a corrupted fullKV store, deleting it", zap.Error(err), zap.String("store_name", loadable.fullKVStore.Name()), zap.String("store_hash", loadable.fullKVStore.ModuleHash()), zap.String("filename", loadable.fileInfo.Filename))
 					if err := loadable.fullKVStore.Delete(ctx, loadable.fileInfo); err != nil {
 						logger.Error("cannot delete corrupted fullKV store", zap.Error(err), zap.String("store_name", loadable.fullKVStore.Name()), zap.String("store_hash", loadable.fullKVStore.ModuleHash()), zap.String("filename", loadable.fileInfo.Filename))
@@ -500,15 +522,9 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 			}
 			actualRequestStoresSize += actualSize
 			loadMu.Unlock()
-			go func() {
-				err := loadable.fullKVStore.Store().SetMetadata(ctx, loadable.fullKVStore.Filename(), met)
-				if err != nil {
-					logger.Debug("failed to set metadata on store",
-						zap.String("store_name", loadable.fullKVStore.Name()),
-						zap.String("filename", loadable.fullKVStore.Filename()),
-						zap.Error(err))
-				}
-			}()
+			// Detached metadata write: does not retain fullKVStore or ride the
+			// request ctx (see store.SetMetadataDetached).
+			store.SetMetadataDetached(loadable.fullKVStore.Store(), loadable.fullKVStore.Filename(), loadable.fullKVStore.Name(), met, logger)
 			return nil
 		})
 	}

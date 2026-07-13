@@ -208,7 +208,7 @@ waitReady:
 	return t1app, substreamsEndpoint
 }
 
-func startTier2App(t *testing.T, ctx context.Context, tmpDir string, zlog *zap.Logger) (out *app.Tier2App, endpoint string) {
+func startTier2App(t *testing.T, ctx context.Context, tmpDir string, zlog *zap.Logger, scratchSpace ...string) (out *app.Tier2App, endpoint string) {
 
 	port := findFreePort(t)
 	endpoint = fmt.Sprintf("localhost:%d", port)
@@ -219,6 +219,9 @@ func startTier2App(t *testing.T, ctx context.Context, tmpDir string, zlog *zap.L
 		ServiceDiscoveryURL:   nil,
 		BlockExecutionTimeout: 5 * time.Second,
 		TmpDir:                filepath.Join(tmpDir, "tmp"),
+	}
+	if len(scratchSpace) > 0 && scratchSpace[0] != "" {
+		t2conf.StoresScratchSpace = scratchSpace[0]
 	}
 
 	t2app := app.NewTier2(zlog, t2conf, &app.Tier2Modules{
@@ -400,9 +403,9 @@ func newDummyBlockchainContainerWithArgs(ctx context.Context, tmpDir string, ima
 			"DLOG": ".*=debug",
 		},
 		ExposedPorts: []string{"10014/tcp"},
-		HostConfigModifier: func(hostConfig *container.HostConfig) {
-			hostConfig.Binds = []string{tmpDir + ":/app/firehose-data/storage/"}
-		},
+		Mounts: testcontainers.Mounts(
+			testcontainers.BindMount(tmpDir, "/app/firehose-data/storage/"),
+		),
 		WaitingFor: wait.ForAll(
 			wait.ForListeningPort("10014/tcp"),
 			wait.ForLog("serving gRPC").WithStartupTimeout(30*time.Second),

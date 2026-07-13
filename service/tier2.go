@@ -99,6 +99,8 @@ type Tier2Service struct {
 	HostedStoreRegistryAddress string
 
 	checkPendingShutdown func() bool
+	storesScratchSpace   string
+	storesBackend        string
 
 	tier2RequestParameters *reqctx.Tier2RequestParameters
 
@@ -414,7 +416,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	}
 
 	storeSizeLimit := reqctx.StoreSizeLimit(ctx)
-	storeConfigs, err := store.NewConfigMap(cacheStore, nil, execGraph.Stores(), execGraph.ModuleHashes(), request.FirstStreamableBlock, storeSizeLimit)
+	storeConfigs, err := store.NewConfigMap(cacheStore, nil, execGraph.Stores(), execGraph.ModuleHashes(), request.FirstStreamableBlock, storeSizeLimit, s.storesScratchSpace, s.storesBackend)
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
@@ -462,6 +464,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return nil
 	}
 	stores := pipeline.NewStores(ctx, storeConfigs, request.SegmentSize, requestDetails.ResolvedStartBlockNum, stopBlock, true, executionPlan.StoresToWrite)
+	defer stores.Close()
 
 	// this engine will keep the ExistingExecOuts to optimize the execution (for inputs from modules that skip execution)
 	execOutputCacheEngine, err := cache.NewEngine(ctx, executionPlan.ExecoutWriters, request.BlockType, executionPlan.ExistingExecOuts, executionPlan.IndexWriters)

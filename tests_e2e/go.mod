@@ -3,7 +3,6 @@ module github.com/streamingfast/substreams/tests_e2e
 go 1.25.0
 
 require (
-	github.com/docker/docker v28.2.2+incompatible
 	github.com/streamingfast/bstream v0.0.2-0.20260402095814-607e840ece3d
 	github.com/streamingfast/dauth v0.0.0-20260304175046-02898e30442d
 	github.com/streamingfast/dmetering v0.0.0-20251027175535-4fd530934b97
@@ -195,6 +194,7 @@ require (
 	github.com/tklauser/numcpus v0.11.0 // indirect
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
+	go.etcd.io/bbolt v1.4.3 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.41.0 // indirect

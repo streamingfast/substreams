@@ -763,12 +763,13 @@ func (s *Tier1Service) blocks(
 		return fmt.Errorf("new config map: %w", err)
 	}
 
-	storeConfigs, err := store.NewConfigMap(cacheStore, quickSaveStore, execGraph.Stores(), execGraph.ModuleHashes(), chainFirstStreamableBlock, 0)
+	storeConfigs, err := store.NewConfigMap(cacheStore, quickSaveStore, execGraph.Stores(), execGraph.ModuleHashes(), chainFirstStreamableBlock, 0, s.runtimeConfig.StoresScratchSpace, s.runtimeConfig.StoresBackend)
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
 
 	stores := pipeline.NewStores(ctx, storeConfigs, segmentSize, requestDetails.LinearHandoffBlockNum, request.StopBlockNum, false, nil)
+	defer stores.Close() // releases mmap-backed store files once the request ends
 
 	execOutputCacheEngine, err := cache.NewEngine(ctx, nil, s.blockType, nil, nil) // we don't read or write ExecOuts on tier1
 	if err != nil {

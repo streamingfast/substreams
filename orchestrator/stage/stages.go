@@ -148,6 +148,14 @@ func NewStages(
 	return out
 }
 
+func (s *Stages) Close() {
+	for _, stage := range s.stages {
+		for _, modState := range stage.storeModuleStates {
+			modState.Close()
+		}
+	}
+}
+
 func layerKind(layer exec.LayerModules) Kind {
 	if layer.IsStoreLayer() {
 		return KindStore
@@ -685,12 +693,10 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 				if met["datasize"] == "" {
 					met["datasize"] = fmt.Sprintf("%d", fullKV.SizeBytes())
 				}
-				go func() {
-					err := fullKV.Store().SetMetadata(s.ctx, fullKV.Filename(), met)
-					if err != nil {
-						s.logger.Warn("failed to set metadata on store", zap.String("store_name", modState.name), zap.String("filename", fullKV.Filename()), zap.Error(err))
-					}
-				}()
+				// Detached metadata write: does not retain fullKV or ride the
+				// request ctx (see store.SetMetadataDetached). Tier1 twin of the
+				// tier2 fix in pipeline.setupSubrequestStores.
+				store.SetMetadataDetached(fullKV.Store(), fullKV.Filename(), modState.name, met, s.logger)
 			}
 		}()
 	}
@@ -715,6 +721,14 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 	if reqHandler := reqctx.ActiveRequestsHandler(s.ctx); reqHandler != nil {
 		s.logger.Info("adjusting to stores size", zap.Uint64("actual_store_size", actualRequestStoresSize/1024/1024))
 		reqHandler.AdjustFullKVSize(actualRequestStoresSize)
+	}
+
+	// Ownership of the loaded stores transfers to the returned map: the linear
+	// pipeline keeps writing to them and closes them at request end. Detach
+	// them from the module states so Stages.Close() does not close stores
+	// still in use.
+	for _, modState := range storeModuleStates {
+		modState.cachedStore = nil
 	}
 
 	return out, nil

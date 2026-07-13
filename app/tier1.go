@@ -269,6 +269,15 @@ func (a *Tier1App) Run() error {
 		opts = append(opts, service.WithLiveBackFillerFinalBlockDelay(a.config.LiveBackFillerFinalBlockDelay))
 	}
 
+	// Scratch space and store backend are passed as options (same as tier2) so
+	// both tiers are wired identically.
+	if a.config.StoresScratchSpace != "" {
+		opts = append(opts, service.WithStoresScratchSpace(a.config.StoresScratchSpace))
+	}
+	if a.config.StoresBackend != "" {
+		opts = append(opts, service.WithStoresBackend(a.config.StoresBackend))
+	}
+
 	if a.config.TmpDir != "" {
 		wazero.SetTempDir(a.config.TmpDir)
 	}
@@ -320,8 +329,6 @@ func (a *Tier1App) Run() error {
 		a.modules.SessionPool,
 		foundationalStoreEndpoints,
 		a.config.HostedStoreRegistryAddress,
-		a.config.StoresScratchSpace,
-		a.config.StoresBackend,
 		opts...,
 	)
 	if err != nil {

@@ -198,8 +198,6 @@ func NewTier1(
 	sessionPool dsession.SessionPool,
 	foundationalEndpoints map[string]string,
 	hostedStoreRegistryAddress string,
-	storesScratchSpace string,
-	storesBackend string,
 	opts ...Option,
 ) (*Tier1Service, error) {
 
@@ -217,8 +215,6 @@ func NewTier1(
 		defaultCacheTag,
 		clientFactory,
 		workerPoolFactory.WorkerPool,
-		storesScratchSpace,
-		storesBackend,
 	)
 
 	sf := &StreamFactory{

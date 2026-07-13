@@ -61,8 +61,17 @@ import (
 var errShuttingDown = errors.New("endpoint is shutting down, please reconnect")
 var fallbackDuration time.Duration
 var useBlockNumberDuration time.Duration
+var deterministicErrorMaxAge = time.Hour
 
 func init() {
+	if v := os.Getenv(EnvDeterministicErrorMaxAge); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			panic(fmt.Errorf("invalid value for env var %s: %w", EnvDeterministicErrorMaxAge, err))
+		}
+		deterministicErrorMaxAge = d
+	}
+
 	envEthCallFallbackToLatestDuration := os.Getenv(EnvEthCallFallbackToLatestDuration)
 	if envEthCallFallbackToLatestDuration != "" {
 		d, err := time.ParseDuration(envEthCallFallbackToLatestDuration)
@@ -1204,23 +1213,36 @@ func (s *Tier1Service) containsDeterministicError(ctx context.Context, startBloc
 	return nil
 }
 
-func parseFilename(in string) (blockNum uint64, moduleExtendedHash string, err error) {
+// parseFilename parses an error filename of the form:
+//
+//	errors.<blockNum:10>.<moduleExtendedHash>.<unixTimestamp>
+//
+// Older formats without a timestamp (or without an extended hash) are still parsed; a
+// zero timestamp signals a legacy error that the caller should discard.
+func parseFilename(in string) (blockNum uint64, moduleExtendedHash string, timestamp time.Time, err error) {
 	in = strings.TrimPrefix(in, "errors.")
 
 	if len(in) < 10 {
-		return 0, "", err
+		return 0, "", time.Time{}, err
 	}
 
 	blockNumStr := in[:10]
 	blockNum, err = strconv.ParseUint(blockNumStr, 10, 64)
 	if err != nil {
-		return 0, "", err
+		return 0, "", time.Time{}, err
 	}
 
 	if len(in) > 10 {
-		moduleExtendedHash = in[11:] // ignore the '.' between blocknum and moduleExtendedHash
+		rest := in[11:] // ignore the '.' between blocknum and the rest
+		parts := strings.Split(rest, ".")
+		moduleExtendedHash = parts[0]
+		if len(parts) > 1 {
+			if sec, parseErr := strconv.ParseInt(parts[1], 10, 64); parseErr == nil {
+				timestamp = time.Unix(sec, 0)
+			}
+		}
 	}
-	return blockNum, moduleExtendedHash, nil
+	return blockNum, moduleExtendedHash, timestamp, nil
 }
 
 func containsDeterministicError(ctx context.Context, moduleStore dstore.Store, moduleName, extendedHash string, startBlock, endBlock uint64, isStore bool, logger *zap.Logger) error {
@@ -1233,7 +1255,7 @@ func containsDeterministicError(ctx context.Context, moduleStore dstore.Store, m
 
 	moduleStore.WalkFrom(ctx, "errors.", startFile, func(filename string) (err error) {
 
-		blockNum, parsedExtendedHash, err := parseFilename(filename)
+		blockNum, parsedExtendedHash, timestamp, err := parseFilename(filename)
 		if err != nil {
 			logger.Warn("checking for errors: invalid filename", zap.String("filename", filename), zap.Error(err))
 			return nil
@@ -1247,6 +1269,19 @@ func containsDeterministicError(ctx context.Context, moduleStore dstore.Store, m
 
 		if parsedExtendedHash != extendedHash {
 			logger.Info("ignoring error on another version of the same module", zap.String("filename", filename), zap.String("parsedExtendedHash", parsedExtendedHash), zap.String("extendedHash", extendedHash))
+			return nil
+		}
+
+		// Errors without a timestamp (legacy format) or older than the configured max age
+		// are discarded so execution is retried.
+		if timestamp.IsZero() {
+			logger.Info("deleting old deterministic error without timestamp", zap.String("filename", filename))
+			moduleStore.DeleteObject(ctx, filename)
+			return nil
+		}
+		if age := time.Since(timestamp); age > deterministicErrorMaxAge {
+			logger.Info("deleting expired deterministic error", zap.String("filename", filename), zap.Duration("age", age), zap.Duration("max_age", deterministicErrorMaxAge))
+			moduleStore.DeleteObject(ctx, filename)
 			return nil
 		}
 
@@ -1266,7 +1301,7 @@ func containsDeterministicError(ctx context.Context, moduleStore dstore.Store, m
 			return nil
 		}
 
-		lastError = fmt.Errorf("error from block %d in module %s: %s", blockNum, moduleName, string(cnt))
+		lastError = fmt.Errorf("error from block %d in module %s (deterministic error, cached for %d seconds): %s", blockNum, moduleName, int(time.Since(timestamp).Seconds()), string(cnt))
 		return nil
 	})
 

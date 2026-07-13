@@ -20,6 +20,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- Server: cached deterministic errors now expire. Each error file carries a write timestamp in its name (`errors.<block>.<hash>.<unix>`), and on read tier1 discards any error older than `SUBSTREAMS_DETERMINISTIC_ERROR_MAX_AGE` (Go duration, default `1h`), retrying execution. Legacy error files without a timestamp are deleted on read.
+
 - Server: new `ProcessRangeRequest.merged_blocks_bundle_size` field (internal tier1→tier2 protocol) carrying the number of blocks per merged-blocks file. `0` (older tier1s) means the historical default of `100`. Tier2 applies the value per-request, so a single tier2 can serve chains with different merged-blocks sizes. **Upgrade all tier2s before setting a non-100 value on any tier1**: older tier2s ignore the field and would read the store with a bundle size of 100 (jobs stall on missing file names).
 - Server: new `Tier1Config.MergedBlocksBundleSize` (default `100`), used by tier1's own merged-blocks reads, cursor resolution, final-block rounding and forwarded to tier2 on every subrequest. The hub's kept final blocks and the live backfiller delay now scale with the bundle size.
 - `substreams tools tier2call`: new `--merged-blocks-bundle-size` flag (default `0` = server default).

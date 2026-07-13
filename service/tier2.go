@@ -810,7 +810,7 @@ func toGRPCError(ctx context.Context, err error) error {
 		return status.Error(codes.DeadlineExceeded, err.Error())
 	}
 	if errors.Is(err, wasm.ErrWasmDeterministicExec) || errors.Is(err, store.ErrStoreAboveMaxSize) {
-		return status.Error(codes.InvalidArgument, fmt.Sprintf("%s (deterministic error)", err.Error()))
+		return status.Error(codes.InvalidArgument, fmt.Sprintf("%s (new deterministic error)", err.Error()))
 	}
 
 	var errInvalidArg *stream.ErrInvalidArg

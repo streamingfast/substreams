@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	"go.uber.org/zap"
 )
 
 // DeletedPrefixes is a specialized map to track deleted prefixes
@@ -49,6 +50,22 @@ func (b *baseStore) ApplyDelta(delta *pbsubstreams.StoreDelta) {
 		panic(fmt.Sprintf("key %q invalid, must be at least 1 character and not start with 0xFF", delta.Key))
 	}
 
+	// Enforced on every backend so a module behaves identically on the memory
+	// and mmap stores: the mmap (bbolt) backend rejects keys above MaxKeySize,
+	// the memory backend has no limit. Without this an oversized key would
+	// succeed on memory and panic only on mmap. This is a function of the
+	// module's own output, hence a deterministic error.
+	//
+	// Values need no equivalent guard here: every write is already capped well
+	// below bbolt's MaxValueSize (2GiB) by itemSizeLimit (10MiB, value_set.go)
+	// and appendLimit (8MiB, value_append.go).
+	if len(delta.Key) > maxStoreKeySize {
+		b.logger.Warn("store key exceeds backend size limit, failing block deterministically",
+			zap.Int("key_bytes", len(delta.Key)),
+			zap.Int("limit_bytes", maxStoreKeySize))
+		panic(entryTooLargeError(b.name, "key", delta.Key, len(delta.Key), maxStoreKeySize))
+	}
+
 	newSize := uint64(len(delta.NewValue))
 	oldSize := uint64(len(delta.OldValue))
 	keySize := uint64(len(delta.Key))
@@ -57,7 +74,7 @@ func (b *baseStore) ApplyDelta(delta *pbsubstreams.StoreDelta) {
 		b.recentlyDeletedPrefixes.RemoveMatching(delta.Key)
 
 		if err := b.kvImpl.Set(delta.Key, delta.NewValue); err != nil {
-			panic(fmt.Sprintf("failed to set key %q: %v", delta.Key, err))
+			panic(backendFailure("set", delta.Key, err))
 		}
 		switch {
 		case newSize > oldSize:
@@ -70,14 +87,14 @@ func (b *baseStore) ApplyDelta(delta *pbsubstreams.StoreDelta) {
 		b.recentlyDeletedPrefixes.RemoveMatching(delta.Key)
 
 		if err := b.kvImpl.Set(delta.Key, delta.NewValue); err != nil {
-			panic(fmt.Sprintf("failed to set key %q: %v", delta.Key, err))
+			panic(backendFailure("set", delta.Key, err))
 		}
 		b.totalSizeBytes += newSize
 		b.totalSizeBytes += keySize
 
 	case pbsubstreams.StoreDelta_DELETE:
 		if err := b.kvImpl.Delete(delta.Key); err != nil {
-			panic(fmt.Sprintf("failed to delete key %q: %v", delta.Key, err))
+			panic(backendFailure("delete", delta.Key, err))
 		}
 		b.totalSizeBytes -= oldSize
 		b.totalSizeBytes -= keySize
@@ -90,6 +107,32 @@ func (b *baseStore) ApplyDelta(delta *pbsubstreams.StoreDelta) {
 }
 
 var ErrStoreAboveMaxSize = errors.New("store above max size")
+
+// maxStoreKeySize mirrors bbolt's MaxKeySize, the hard key-length cap of the
+// mmap backend (not runtime-configurable). Enforced on all backends (see
+// ApplyDelta) so behaviour does not diverge between memory and mmap.
+const maxStoreKeySize = 32768 // bbolt MaxKeySize
+
+// ErrStoreEntryTooLarge marks a key that exceeds the backend size limit. It is a
+// function of the module's output, hence a deterministic error (it is not in the
+// non-deterministic ErrStoreBackendFailure family below).
+var ErrStoreEntryTooLarge = errors.New("store entry too large")
+
+func entryTooLargeError(storeName, kind, key string, size, limit int) error {
+	return fmt.Errorf("store %q %s for key %q is %d bytes, exceeds backend limit of %d: %w", storeName, kind, key, size, limit, ErrStoreEntryTooLarge)
+}
+
+// ErrStoreBackendFailure marks a store operation that failed for reasons that
+// are NOT a function of the module's input: disk full, mmap grow / ENOMEM, I/O
+// error, or writing to a closed store. It only arises on the mmap backend (the
+// memory backend's Set/Delete cannot fail). It is non-deterministic — a retry
+// on a healthy node can succeed — so callers must NOT cache it as a
+// deterministic error (see pipeline/exec.baseexec).
+var ErrStoreBackendFailure = errors.New("store backend failure")
+
+func backendFailure(op, key string, err error) error {
+	return fmt.Errorf("store backend failed to %s key %q: %w: %w", op, key, err, ErrStoreBackendFailure)
+}
 
 func storeTooBigError(storeName string, size, limit uint64) error {
 	return fmt.Errorf("store %q became too big at %d, maximum size: %d, %w", storeName, size, limit, ErrStoreAboveMaxSize)
@@ -107,7 +150,7 @@ func (b *baseStore) ApplyDeltasReverse(deltas []*pbsubstreams.StoreDelta) {
 		switch delta.Operation {
 		case pbsubstreams.StoreDelta_UPDATE:
 			if err := b.kvImpl.Set(delta.Key, delta.OldValue); err != nil {
-				panic(fmt.Sprintf("failed to set key %q: %v", delta.Key, err))
+				panic(backendFailure("set", delta.Key, err))
 			}
 			switch {
 			case newSize > oldSize:
@@ -118,14 +161,14 @@ func (b *baseStore) ApplyDeltasReverse(deltas []*pbsubstreams.StoreDelta) {
 
 		case pbsubstreams.StoreDelta_CREATE:
 			if err := b.kvImpl.Delete(delta.Key); err != nil {
-				panic(fmt.Sprintf("failed to delete key %q: %v", delta.Key, err))
+				panic(backendFailure("delete", delta.Key, err))
 			}
 			b.totalSizeBytes -= newSize
 			b.totalSizeBytes -= keySize
 
 		case pbsubstreams.StoreDelta_DELETE:
 			if err := b.kvImpl.Set(delta.Key, delta.OldValue); err != nil {
-				panic(fmt.Sprintf("failed to set key %q: %v", delta.Key, err))
+				panic(backendFailure("set", delta.Key, err))
 			}
 			b.totalSizeBytes += oldSize
 			b.totalSizeBytes += keySize

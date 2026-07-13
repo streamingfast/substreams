@@ -1291,7 +1291,7 @@ func containsDeterministicError(ctx context.Context, moduleStore dstore.Store, m
 			return nil
 		}
 
-		lastError = fmt.Errorf("error from block %d in module %s: %s", blockNum, moduleName, string(cnt))
+		lastError = fmt.Errorf("error from block %d in module %s (deterministic error, cached for %d seconds): %s", blockNum, moduleName, int(time.Since(timestamp).Seconds()), string(cnt))
 		return nil
 	})
 

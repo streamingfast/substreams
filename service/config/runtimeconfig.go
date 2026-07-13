@@ -44,8 +44,6 @@ func NewTier1RuntimeConfig(
 		DefaultCacheTag:            defaultCacheTag,
 		ClientFactory:              clientFactory,
 		WorkerPoolFactory:          WorkerPoolFactory,
-		// StoresScratchSpace and StoresBackend are set by WithStoresScratchSpace
-		// / WithStoresBackend options (same as tier2), not positional args.
 		// overridden by Tier Options
 		ModuleExecutionTracing: false,
 	}

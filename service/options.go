@@ -102,6 +102,7 @@ func WithStoresScratchSpace(path string) Option {
 		switch s := a.(type) {
 		case *Tier1Service:
 			s.runtimeConfig.StoresScratchSpace = path
+			sweepOrphanMmapFiles(path)
 		case *Tier2Service:
 			s.storesScratchSpace = path
 			sweepOrphanMmapFiles(path)

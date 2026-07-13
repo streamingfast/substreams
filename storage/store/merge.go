@@ -74,26 +74,56 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 //
 // This reduces mmap Merge from O(N) transactions to O(N/batchSize) transactions,
 // cutting 500k-key Merge from ~15s / 30GB heap to ~700ms / 550MB heap.
+// mergeChunkSize bounds how many partial keys are processed per Merge window.
+// It is a var (not a const) so tests can shrink it to exercise chunk boundaries.
+var mergeChunkSize = 25_000
+
 func (b *baseStore) mergeBatched(kvPartialStore *PartialKV) error {
 	intoValueTypeLower := strings.ToLower(b.valueType)
 
 	// Step 1: Stream all partial keys into memory.
 	// For mmap partial stores this is a single db.View() scan; for memory it's a sorted walk.
 	// We collect into a slice to preserve key list for GetMany.
-	type entry struct {
-		key string
-		val []byte
-	}
-	partialEntries := make([]entry, 0, kvPartialStore.kvImpl.KeyCount())
+	partialEntries := make([]mergeEntry, 0, kvPartialStore.kvImpl.KeyCount())
 	if err := kvPartialStore.kvImpl.Iter(func(key string, value []byte) error {
 		// Copy value — Iter contract says value is only valid during callback
 		v := make([]byte, len(value))
 		copy(v, value)
-		partialEntries = append(partialEntries, entry{key, v})
+		partialEntries = append(partialEntries, mergeEntry{key, v})
 		return nil
 	}); err != nil {
 		return fmt.Errorf("iterating partial store: %w", err)
 	}
+
+	// Steps 2-5 run over fixed-size windows of the partial so existingKV,
+	// existingSizes, results and the keys slice never span the whole partial at
+	// once. This caps the per-key map/slice bookkeeping — which dominates heap
+	// for small-value/high-key-count partials — at ~mergeChunkSize keys instead
+	// of the full partial key count. partialEntries itself is still held whole (it
+	// owns the value bytes copied in Step 1).
+	for start := 0; start < len(partialEntries); start += mergeChunkSize {
+		end := start + mergeChunkSize
+		if end > len(partialEntries) {
+			end = len(partialEntries)
+		}
+		if err := b.mergeChunk(intoValueTypeLower, partialEntries[start:end]); err != nil {
+			return err
+		}
+	}
+
+	b.Reset() // Merge should never keep deltas or ordinals
+	return nil
+}
+
+type mergeEntry struct {
+	key string
+	val []byte
+}
+
+// mergeChunk applies Merge steps 2-5 (read existing values, compute merged
+// results, update size accounting, BatchSet) for a single window of partial
+// entries.
+func (b *baseStore) mergeChunk(intoValueTypeLower string, partialEntries []mergeEntry) error {
 
 	// Step 2: Read what we need about the existing FullKV values for all partial
 	// keys, in a single transaction.
@@ -335,7 +365,7 @@ func (b *baseStore) mergeBatched(kvPartialStore *PartialKV) error {
 				results[e.key] = []byte(max(v0, v1).String())
 			}
 		default:
-			return fmt.Errorf("update policy %q not supported for value type %q", kvPartialStore.updatePolicy, kvPartialStore.valueType)
+			return fmt.Errorf("update policy %q not supported for value type %q", b.updatePolicy, b.valueType)
 		}
 
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN:
@@ -436,7 +466,6 @@ func (b *baseStore) mergeBatched(kvPartialStore *PartialKV) error {
 		return fmt.Errorf("batch writing merged results: %w", err)
 	}
 
-	b.Reset() // Merge should never keep deltas or ordinals
 	return nil
 }
 

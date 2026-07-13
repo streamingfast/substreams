@@ -105,7 +105,7 @@ func toConnectError(ctx context.Context, err error) error {
 	}
 
 	if errors.Is(err, wasm.ErrWasmDeterministicExec) || errors.Is(err, store.ErrStoreAboveMaxSize) {
-		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("%w (deterministic error)", err))
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("%w (new deterministic error)", err))
 	}
 
 	var errInvalidArg *bsstream.ErrInvalidArg
@@ -220,7 +220,7 @@ func toGrpcTier1Error(ctx context.Context, err error) error {
 	}
 
 	if errors.Is(err, wasm.ErrWasmDeterministicExec) || errors.Is(err, store.ErrStoreAboveMaxSize) {
-		return status.Errorf(codes.InvalidArgument, "%s (deterministic error)", err)
+		return status.Errorf(codes.InvalidArgument, "%s (new deterministic error)", err)
 	}
 
 	var errInvalidArg *bsstream.ErrInvalidArg

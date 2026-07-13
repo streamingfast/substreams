@@ -47,13 +47,6 @@ This document lists all environment variables used by the Substreams project, or
 
 ### Performance tuning
 
-#### `SUBSTREAMS_STORE_SIZE_LIMIT`
-**Store size limit**
-- **Purpose**: Set maximum size limit for Substreams stores in bytes
-- **Usage**: Set as unsigned integer (bytes) to limit store memory usage
-- **Default**: 1073741824 (1GiB)
-- **Location**: `service/utils.go`
-
 #### SUBSTREAMS_LOG_TOTAL_STORE_SIZE
 **Log total store size**
 - **Purpose**: Log total store size in bytes

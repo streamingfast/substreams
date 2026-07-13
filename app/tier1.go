@@ -99,6 +99,10 @@ type Tier1Config struct {
 	SharedCacheSize  uint64
 	OutputBufferSize uint64 // Used to bundle execout messages within 'BlockScopedDatas' when using protocol V4
 
+	// StoreSizeLimit, if non-zero, overrides the default store size limit (in bytes)
+	// used by tier2 stores. The value is forwarded to tier2 on each request.
+	StoreSizeLimit uint64
+
 	WASMExtensions wasm.WASMExtensioner
 	Tracing        bool
 
@@ -288,6 +292,7 @@ func (a *Tier1App) Run() error {
 		WASMModules:                wasmModules,
 		FoundationalStoreEndpoints: foundationalStoreEndpoints,
 		HostedStoreRegistryAddress: a.config.HostedStoreRegistryAddress,
+		StoreSizeLimit:             a.config.StoreSizeLimit,
 	}
 
 	tier1Service, err := service.NewTier1(

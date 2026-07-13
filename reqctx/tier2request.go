@@ -17,6 +17,10 @@ type Tier2RequestParameters struct {
 
 	BlockType string
 
+	// StoreSizeLimit, if non-zero, overrides the default store size limit (in bytes)
+	// for stores loaded on tier2. Set from the tier1 store-size-limit flag.
+	StoreSizeLimit uint64
+
 	WASMModules                map[string]string
 	FoundationalStoreEndpoints map[string]string
 	HostedStoreRegistryAddress string

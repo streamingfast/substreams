@@ -128,8 +128,6 @@ func NewTier2(
 		activeRequests: active_requests.NewActiveRequestsManager(logger),
 	}
 
-	setSubstreamsStoreSizeLimitFromEnv(logger)
-
 	if debugAPIAddress := os.Getenv("SUBSTREAMS_TIER2_DEBUG_API_ADDR"); debugAPIAddress != "" {
 		debugAPI := debugapi.New(
 			debugAPIAddress,

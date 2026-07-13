@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
+- Server: the store size limit override is now configured by a tier1 flag (`Tier1Config.StoreSizeLimit`, exposed as `--substreams-tier1-store-size-limit`) instead of the `SUBSTREAMS_STORE_SIZE_LIMIT` environment variable, which has been removed. The value is forwarded from tier1 to tier2 on every subrequest via the existing `ProcessRangeRequest.store_size_limit` field, so it no longer needs to be set on tier2. `0` keeps the default of 1GiB.
 - Server: store quicksave/quickload now run up to 8 stores concurrently instead of one at a time, cutting shutdown/resume latency for pipelines with many stores.
 - Server: quicksave now streams the store lazily and unsorted (one KV entry at a time as the upload consumes it, without sorting keys), instead of buffering the whole serialized store and paying an O(n log n) key sort plus key-slice allocation up front. This lowers both peak memory and save time for large stores (millions of keys). Quickload is order-independent, and the on-disk format is unchanged (byte-compatible protobuf), so no migration is required.
 - Server: tier1 store loading at request start now loads up to 8 stores concurrently (both the size probe and the download/decode), instead of one at a time.

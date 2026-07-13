@@ -215,8 +215,6 @@ func NewTier1(
 		mergedBlocksBundleSize: tier2RequestParameters.MergedBlocksBundleSize,
 	}
 
-	setSubstreamsStoreSizeLimitFromEnv(logger)
-
 	var err error
 	if blockType == "" {
 		blockType, err = getBlockTypeFromStreamFactory(sf)

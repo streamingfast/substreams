@@ -163,33 +163,53 @@ func (m *memoryKVImpl) Save() iter.Seq2[marshaller.StoreDataEntry, error] {
 // Snapshot returns a pull-based iterator over the store in sorted key order.
 // Only the key slice is copied; values are read from the live map, matching
 // the memory-backend assumption that the store is not mutated during a save.
+// Snapshot captures a stable view of the store at call time. It copies the
+// key/value *pointers* into a slice up front rather than holding the live map
+// and reading it per Next(): with the lazy streaming marshal a snapshot's read
+// window spans the whole upload, and reading the live map while another
+// goroutine writes it is a fatal (unrecoverable) "concurrent map read and map
+// write" panic. Copying the entries here gives memory the same "frozen during
+// save" safety the mmap backend gets from its snapMu write-gate — the two
+// backends must not have different concurrency envelopes.
+//
+// This copies pointers only, not value bytes: Set replaces map entries and
+// never mutates a stored []byte in place, so the captured slices stay valid and
+// unchanged for the snapshot's lifetime without duplicating the payload.
 func (m *memoryKVImpl) Snapshot() (marshaller.KVSnapshotIter, error) {
 	keys := make([]string, 0, len(m.kv))
 	for k := range m.kv {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	return &memorySnapshotIter{kv: m.kv, keys: keys}, nil
+
+	entries := make([]memorySnapshotEntry, len(keys))
+	for i, k := range keys {
+		entries[i] = memorySnapshotEntry{key: k, value: m.kv[k]}
+	}
+	return &memorySnapshotIter{entries: entries}, nil
+}
+
+type memorySnapshotEntry struct {
+	key   string
+	value []byte
 }
 
 type memorySnapshotIter struct {
-	kv   map[string][]byte
-	keys []string
-	idx  int
+	entries []memorySnapshotEntry
+	idx     int
 }
 
 func (it *memorySnapshotIter) Next() (string, []byte, bool, error) {
-	if it.idx >= len(it.keys) {
+	if it.idx >= len(it.entries) {
 		return "", nil, false, nil
 	}
-	k := it.keys[it.idx]
+	e := it.entries[it.idx]
 	it.idx++
-	return k, it.kv[k], true, nil
+	return e.key, e.value, true, nil
 }
 
 func (it *memorySnapshotIter) Close() error {
-	it.kv = nil
-	it.keys = nil
+	it.entries = nil
 	return nil
 }
 

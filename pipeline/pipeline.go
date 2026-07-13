@@ -522,24 +522,9 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 			}
 			actualRequestStoresSize += actualSize
 			loadMu.Unlock()
-			// Capture only the values the metadata write needs, NOT the whole
-			// fullKVStore — otherwise this un-awaited goroutine pins the entire
-			// loaded (multi-GB) KV map until SetMetadata returns. Use a bounded
-			// timeout detached from the request ctx so a canceled request neither
-			// pins the store nor leaves the goroutine hanging indefinitely.
-			metaStore := loadable.fullKVStore.Store()
-			metaFilename := loadable.fullKVStore.Filename()
-			metaStoreName := loadable.fullKVStore.Name()
-			go func() {
-				metaCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-				defer cancel()
-				if err := metaStore.SetMetadata(metaCtx, metaFilename, met); err != nil {
-					logger.Debug("failed to set metadata on store",
-						zap.String("store_name", metaStoreName),
-						zap.String("filename", metaFilename),
-						zap.Error(err))
-				}
-			}()
+			// Detached metadata write: does not retain fullKVStore or ride the
+			// request ctx (see store.SetMetadataDetached).
+			store.SetMetadataDetached(loadable.fullKVStore.Store(), loadable.fullKVStore.Filename(), loadable.fullKVStore.Name(), met, logger)
 			return nil
 		})
 	}

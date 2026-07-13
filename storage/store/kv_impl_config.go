@@ -53,10 +53,7 @@ type KVImplConfig struct {
 // NewKVImpl creates the KVImpl described by this config.
 func (cfg *KVImplConfig) NewKVImpl(logger *zap.Logger) (KVImpl, error) {
 	switch cfg.Type {
-	case KVImplTypeMemory:
-		logger.Info("using in-memory KV store")
-		return newMemoryKVImplWithStoreName(cfg.StoreName), nil
-	default: // KVImplTypeMmap
+	case KVImplTypeMmap:
 		mmapCfg, _ := cfg.Backend.(*MmapBackendConfig)
 		if mmapCfg == nil {
 			mmapCfg = &MmapBackendConfig{}
@@ -66,10 +63,16 @@ func (cfg *KVImplConfig) NewKVImpl(logger *zap.Logger) (KVImpl, error) {
 			zap.String("store_name", cfg.StoreName))
 		impl, err := newMmapKVImplWithConfig(cfg.StoreName, cfg.ModuleHash, mmapCfg)
 		if err != nil {
-			logger.Warn("failed to create mmap KV impl, falling back to in-memory", zap.Error(err))
+			logger.Warn("failed to create mmap KV impl, falling back to in-memory",
+				zap.String("store_name", cfg.StoreName),
+				zap.String("scratch_space", mmapCfg.ScratchSpace),
+				zap.Error(err))
 			return newMemoryKVImplWithStoreName(cfg.StoreName), nil
 		}
 		return impl, nil
+	default: // KVImplTypeMemory, mmap is opt-in, memory is the default
+		logger.Info("using in-memory KV store")
+		return newMemoryKVImplWithStoreName(cfg.StoreName), nil
 	}
 }
 
@@ -102,12 +105,13 @@ func DefaultKVImplConfig(storeName, moduleHash string, backend KVImplBackendConf
 	}
 }
 
-// getKVImplTypeFromEnv reads SUBSTREAMS_STORE_BACKEND env var
+// getKVImplTypeFromEnv reads SUBSTREAMS_STORE_BACKEND env var. mmap is opt-in:
+// anything other than an explicit "mmap" resolves to the in-memory backend.
 func getKVImplTypeFromEnv() KVImplType {
 	switch strings.ToLower(os.Getenv("SUBSTREAMS_STORE_BACKEND")) {
-	case "memory", "mem":
-		return KVImplTypeMemory
-	default:
+	case "mmap":
 		return KVImplTypeMmap
+	default:
+		return KVImplTypeMemory
 	}
 }

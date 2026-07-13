@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/storage/store/marshaller"
@@ -44,7 +45,8 @@ type mmapKVImpl struct {
 	path      string
 	storeName string
 	noSync    bool // if true, bbolt skips fsync on each write
-	keyCount  int  // tracked in-memory to avoid O(N) bucket.Stats() traversal
+	keyCount  atomic.Int64 // tracked in-memory to avoid O(N) bucket.Stats() traversal; atomic because
+	// write paths mutate it while holding only the shared snapMu.RLock() side.
 
 	// snapMu gates writes against open snapshots. Roles are inverted from the
 	// usual RWMutex reading: write operations hold the R side (they may run
@@ -178,8 +180,13 @@ func newMmapKVImplWithConfig(storeName, moduleHash string, cfg *MmapBackendConfi
 }
 
 func (b *mmapKVImpl) Get(key string) ([]byte, bool) {
-	if b == nil || b.db == nil {
-		panic(fmt.Sprintf("mmapKVImpl.Get called on nil instance (storeName=%s)", b.storeName))
+	if b == nil {
+		// Don't reference b.storeName here: the receiver is nil, so reading it
+		// would itself nil-panic and mask this message.
+		panic("mmapKVImpl.Get called on nil receiver")
+	}
+	if b.db == nil {
+		panic(fmt.Sprintf("mmapKVImpl.Get called on closed/uninitialized instance (storeName=%s)", b.storeName))
 	}
 	if metrics.StoreMmapOperationsTotal != nil {
 		metrics.StoreMmapOperationsTotal.Inc("get", b.storeName)
@@ -217,7 +224,7 @@ func (b *mmapKVImpl) Set(key string, value []byte) error {
 			return fmt.Errorf("internal error: default bucket not found")
 		}
 		if bucket.Get([]byte(key)) == nil {
-			b.keyCount++
+			b.keyCount.Add(1)
 		}
 		return bucket.Put([]byte(key), value)
 	})
@@ -235,7 +242,7 @@ func (b *mmapKVImpl) Delete(key string) error {
 			return nil
 		}
 		if bucket.Get([]byte(key)) != nil {
-			b.keyCount--
+			b.keyCount.Add(-1)
 		}
 		return bucket.Delete([]byte(key))
 	})
@@ -360,7 +367,7 @@ func (b *mmapKVImpl) BatchSet(kv map[string][]byte) error {
 			bucket.FillPercent = 1.0
 			for _, k := range chunk {
 				if bucket.Get([]byte(k)) == nil {
-					b.keyCount++
+					b.keyCount.Add(1)
 				}
 				if err := bucket.Put([]byte(k), kv[k]); err != nil {
 					return fmt.Errorf("writing key %q: %w", k, err)
@@ -387,7 +394,7 @@ func (b *mmapKVImpl) Clear() error {
 // Nested RLock on the same goroutine can deadlock if a Snapshot's Lock is
 // queued in between, so write paths must acquire snapMu exactly once.
 func (b *mmapKVImpl) clearLocked() error {
-	b.keyCount = 0
+	b.keyCount.Store(0)
 	return b.db.Update(func(tx *bbolt.Tx) error {
 		if err := tx.DeleteBucket(defaultBucket); err != nil && err != bbolt.ErrBucketNotFound {
 			return fmt.Errorf("deleting existing bucket: %w", err)
@@ -449,7 +456,7 @@ func (b *mmapKVImpl) Load(it iter.Seq2[marshaller.StoreDataEntry, error]) (*mars
 		}
 		kve := entry.KV()
 		batch = append(batch, kv{[]byte(kve.Key), kve.Value})
-		b.keyCount++
+		b.keyCount.Add(1)
 		if len(batch) >= mmapBatchSize {
 			if err := flush(); err != nil {
 				return nil, fmt.Errorf("mmap Load: flushing batch: %w", err)
@@ -589,7 +596,7 @@ func (it *mmapSnapshotIter) Close() error {
 }
 
 func (b *mmapKVImpl) KeyCount() int {
-	return b.keyCount
+	return int(b.keyCount.Load())
 }
 
 func (b *mmapKVImpl) Close() error {

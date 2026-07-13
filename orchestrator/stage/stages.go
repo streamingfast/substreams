@@ -693,12 +693,10 @@ func (s *Stages) FinalStoreMap(exclusiveEndBlock uint64) (store.Map, error) {
 				if met["datasize"] == "" {
 					met["datasize"] = fmt.Sprintf("%d", fullKV.SizeBytes())
 				}
-				go func() {
-					err := fullKV.Store().SetMetadata(s.ctx, fullKV.Filename(), met)
-					if err != nil {
-						s.logger.Warn("failed to set metadata on store", zap.String("store_name", modState.name), zap.String("filename", fullKV.Filename()), zap.Error(err))
-					}
-				}()
+				// Detached metadata write: does not retain fullKV or ride the
+				// request ctx (see store.SetMetadataDetached). Tier1 twin of the
+				// tier2 fix in pipeline.setupSubrequestStores.
+				store.SetMetadataDetached(fullKV.Store(), fullKV.Filename(), modState.name, met, s.logger)
 			}
 		}()
 	}

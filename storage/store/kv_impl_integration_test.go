@@ -39,10 +39,12 @@ func TestKVImplBackends(t *testing.T) {
 		expectMmap   bool
 	}{
 		{
-			name:         "default (mmap)",
+			// mmap is opt-in: with no explicit backend the store must default
+			// to the in-memory backend, never mmap.
+			name:         "default (memory)",
 			envBackend:   "",
 			scratchSpace: "",
-			expectMmap:   true,
+			expectMmap:   false,
 		},
 		{
 			name:         "explicit mmap",

@@ -31,7 +31,7 @@ type Config struct {
 	itemSizeLimit  uint64
 
 	scratchSpace string // local directory for ephemeral store files
-	backend      string // "mmap" (default) or "memory"
+	backend      string // "memory" (default) or "mmap"; empty falls back to SUBSTREAMS_STORE_BACKEND (also memory-default)
 }
 
 var DefaultStoreSizeLimit uint64 = 1_073_741_824 // 1GiB

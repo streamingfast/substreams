@@ -154,6 +154,17 @@ func (s *FullKV) Load(ctx context.Context, file *FileInfo) error {
 // Save is to be called ONLY when we just passed the
 // `nextExpectedBoundary` and processed nothing more after that
 // boundary.
+//
+// Locking / ops note: Save opens a Snapshot and returns a fileWriter that the
+// caller uploads to object storage LATER; the snapshot stays open (and is only
+// released by fileWriter.Write -> reader.Close -> snap.Close) for the whole
+// upload. On the mmap backend the snapshot holds the exclusive snapMu the whole
+// time, so every write to this store AND Close() block until the upload
+// finishes. This is intentional (the store must be frozen while it is
+// serialized), and is bounded by ctx cancellation of the Write. But be aware: a
+// multi-GB save over slow/stuck object storage wedges this store until the
+// write's deadline. The memory backend copies its snapshot up front (no
+// write-gate) but is otherwise equivalent in externally observable behaviour.
 func (s *FullKV) Save(endBoundaryBlock uint64) (*FileInfo, *fileWriter, error) {
 	s.logger.Debug("writing full store state", zap.Object("store", s))
 
@@ -185,6 +196,32 @@ func (s *FullKV) Filename() string {
 
 func (s *FullKV) String() string {
 	return fmt.Sprintf("fullKV name %s moduleInitialBlock %d keyCount %d loadedFrom %s deltasCount %d", s.Name(), s.moduleInitialBlock, s.kvImpl.KeyCount(), s.loadedFrom, len(s.deltas))
+}
+
+// setMetadataTimeout bounds the fire-and-forget metadata write so it can never
+// hang indefinitely.
+const setMetadataTimeout = 30 * time.Second
+
+// SetMetadataDetached writes store metadata in the background WITHOUT retaining
+// the FullKV or riding the caller's request context.
+//
+// Callers previously spawned `go func(){ fullKV.Store().SetMetadata(reqCtx, ...) }()`,
+// which (1) captured the whole multi-GB fullKV until the write returned, pinning
+// it long after the request could otherwise release it, and (2) ran on the
+// request ctx, so a canceled/finished request killed the write. This helper
+// takes only the store, filename and name, and runs on a bounded background
+// context, so the write survives request cancellation and pins nothing.
+func SetMetadataDetached(metaStore dstore.Store, filename, storeName string, metadata map[string]string, logger *zap.Logger) {
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), setMetadataTimeout)
+		defer cancel()
+		if err := metaStore.SetMetadata(ctx, filename, metadata); err != nil {
+			logger.Warn("failed to set metadata on store",
+				zap.String("store_name", storeName),
+				zap.String("filename", filename),
+				zap.Error(err))
+		}
+	}()
 }
 
 func (s *FullKV) GetSize(ctx context.Context, filename string) (compressedSize uint64, uncompressedSize *uint64, metadata map[string]string, err error) {

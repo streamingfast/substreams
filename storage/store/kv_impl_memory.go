@@ -134,6 +134,16 @@ func (m *memoryKVImpl) GetMany(keys []string) (map[string][]byte, error) {
 	return result, nil
 }
 
+func (m *memoryKVImpl) GetManySizes(keys []string) (map[string]int, error) {
+	result := make(map[string]int, len(keys))
+	for _, k := range keys {
+		if v, ok := m.kv[k]; ok {
+			result[k] = len(v)
+		}
+	}
+	return result, nil
+}
+
 func (m *memoryKVImpl) Save() iter.Seq2[marshaller.StoreDataEntry, error] {
 	return func(yield func(marshaller.StoreDataEntry, error) bool) {
 		keys := make([]string, 0, len(m.kv))

@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
+- Server: mmap store squashing is faster. The bbolt mmap is now pre-sized from the store's configured size limit (`InitialMmapSize`), eliminating the repeated remap stalls bbolt otherwise incurs while a large store is hydrated or grown; and the SET / SET_IF_NOT_EXISTS merge paths now read only prior value *lengths* (`GetManySizes`) instead of copying every previous value off the mmap and onto the heap just to discard it. Both changes are backend-transparent (memory backend behaviour and the on-disk format are unchanged).
 - Server: store quicksave/quickload now run up to 8 stores concurrently instead of one at a time, cutting shutdown/resume latency for pipelines with many stores.
 - Server: quicksave now streams the store lazily and unsorted (one KV entry at a time as the upload consumes it, without sorting keys), instead of buffering the whole serialized store and paying an O(n log n) key sort plus key-slice allocation up front. This lowers both peak memory and save time for large stores (millions of keys). Quickload is order-independent, and the on-disk format is unchanged (byte-compatible protobuf), so no migration is required.
 - Server: tier1 store loading at request start now loads up to 8 stores concurrently (both the size probe and the download/decode), instead of one at a time.

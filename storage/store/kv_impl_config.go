@@ -24,6 +24,15 @@ type KVImplBackendConfig interface {
 // MmapBackendConfig holds mmap (bbolt) specific options.
 type MmapBackendConfig struct {
 	ScratchSpace string // base directory for bbolt files; uses OS temp dir if empty
+
+	// InitialMmapSize pre-reserves this many bytes of mmap address space when
+	// the bbolt file is opened. bbolt otherwise grows its mmap by doubling and
+	// remapping, and each remap must wait for all in-flight transactions to
+	// finish and blocks new ones — a stall that recurs O(log size) times while a
+	// large store is hydrated (Load) or grown (Merge/BatchSet). This is a
+	// virtual reservation only (pages are not resident until touched), so a
+	// generous value is cheap on 64-bit. Zero falls back to defaultInitialMmapSize.
+	InitialMmapSize int
 }
 
 // MemoryBackendConfig holds in-memory backend options (none currently).

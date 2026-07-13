@@ -90,15 +90,46 @@ func (c *Config) newBaseStore(logger *zap.Logger) *baseStore {
 	case "memory":
 		return c.newBaseStoreWithBackend(logger, &MemoryBackendConfig{})
 	case "mmap":
-		return c.newBaseStoreWithBackend(logger, &MmapBackendConfig{ScratchSpace: c.scratchSpace})
+		return c.newBaseStoreWithBackend(logger, c.mmapBackendConfig())
 	default:
 		// fall back to env var when backend is unset, but preserve scratchSpace
 		t := getKVImplTypeFromEnv()
 		if t == KVImplTypeMemory {
 			return c.newBaseStoreWithBackend(logger, &MemoryBackendConfig{})
 		}
-		return c.newBaseStoreWithBackend(logger, &MmapBackendConfig{ScratchSpace: c.scratchSpace})
+		return c.newBaseStoreWithBackend(logger, c.mmapBackendConfig())
 	}
+}
+
+// mmapBackendConfig builds the mmap backend options for this store, pre-sizing
+// the bbolt mmap from the store's own size ceiling so the file can grow to its
+// full extent without a single remap stall.
+func (c *Config) mmapBackendConfig() *MmapBackendConfig {
+	return &MmapBackendConfig{
+		ScratchSpace:    c.scratchSpace,
+		InitialMmapSize: mmapInitialSizeForLimit(c.totalSizeLimit),
+	}
+}
+
+// mmapInitialSizeForLimit turns a store's uncompressed data-size limit into an
+// mmap reservation. It reserves ~1.5x the limit to absorb bbolt's B+tree page
+// overhead so a store never remaps as it approaches its cap, clamped to a
+// [floor, cap] range: the floor keeps tiny stores from remapping during load,
+// the cap keeps a pathologically large limit from reserving absurd address
+// space (a late remap in that rare case is acceptable). The reservation is
+// virtual only — unused pages never become resident.
+func mmapInitialSizeForLimit(totalSizeLimit uint64) int {
+	const floor = defaultInitialMmapSize
+	const maxReservation = 8 << 30 // 8 GiB
+
+	want := totalSizeLimit + totalSizeLimit/2 // ~1.5x
+	if want < floor {
+		want = floor
+	}
+	if want > maxReservation {
+		want = maxReservation
+	}
+	return int(want)
 }
 
 func (c *Config) newBaseStoreWithBackend(logger *zap.Logger, backend KVImplBackendConfig) *baseStore {

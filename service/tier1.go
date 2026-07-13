@@ -655,6 +655,18 @@ func (s *Tier1Service) blocks(
 
 	if request.StopBlockNum != 0 {
 		if requestDetails.ResolvedStartBlockNum == request.StopBlockNum {
+			// The stop block is exclusive, so a resolved start block equal to it means the
+			// requested range is empty. When the start was resolved from a cursor, the stream
+			// has already reached its stop block: complete cleanly (client receives EOF) instead
+			// of surfacing a fatal InvalidArgument for what is really a finished stream. This
+			// typically happens when a transient disconnect makes the client reconnect with a
+			// cursor sitting on the last block of the range.
+			if request.StartCursor != "" {
+				logger.Info("stream already complete: cursor resolved at the stop block, nothing left to stream",
+					append(logFields, zap.Uint64("stop_block", request.StopBlockNum), zap.Uint64("resolved_start_block", requestDetails.ResolvedStartBlockNum))...)
+				return nil
+			}
+
 			err := bsstream.NewErrInvalidArg("start block and stop block are the same: %d and %d", requestDetails.ResolvedStartBlockNum, request.StopBlockNum)
 			logger.Info("refusing Substreams Blocks request", append(logFields, zap.Error(err))...)
 			return err

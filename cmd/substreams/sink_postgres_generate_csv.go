@@ -15,8 +15,8 @@ import (
 
 const lastCursorFilename = "last_cursor"
 
-var sinkDBChangesGenerateCSVCmd = &cobra.Command{
-	Use:   "generate-csv <manifest> [start]:<stop>",
+var sinkPostgresGenerateCSVCmd = &cobra.Command{
+	Use:   "generate-csv [<manifest> [<module>]]",
 	Short: "Generates CSVs for each table so it can be bulk inserted with `inject-csv` (for postgresql only)",
 	Long: cli.Dedent(`
 		This command is the first of a multi-step process to bulk insert data into a PostgreSQL database.
@@ -25,21 +25,23 @@ var sinkDBChangesGenerateCSVCmd = &cobra.Command{
 
 		It needs that the database already exists and that the schema is already created.
 
+		The stop block is required and provided through the -t/--stop-block flag.
+
 		The process is as follows:
 
 		- Generate CSVs for each table with this command
 		- Inject the CSVs into the database with the 'inject-csv' command (contains 'cursors' table, double check you injected it correctly!)
 		- Start streaming with the 'run' command
 	`),
-	Args: cobra.ExactArgs(2),
-	RunE: sinkDBChangesGenerateCSVE,
+	Args: cobra.RangeArgs(0, 2),
+	RunE: sinkPostgresGenerateCSVE,
 }
 
 func init() {
-	flags := sinkDBChangesGenerateCSVCmd.Flags()
+	flags := sinkPostgresGenerateCSVCmd.Flags()
 	sink.AddFlagsToSet(flags, sink.FlagExcludeDefault(sink.FlagFinalBlocksOnly))
-	addCommonSinkerFlags(flags)
-	addCommonDatabaseChangesFlags(flags)
+	addOnModuleHashMismatchFlag(flags)
+	addCursorTableFlags(flags)
 
 	flags.Uint64("bundle-size", 10000, "Size of output bundle, in blocks")
 	flags.String("working-dir", "./workdir", "Path to local folder used as working directory")
@@ -56,21 +58,30 @@ func init() {
 		Default value for the buffer is 4 MiB.
 	`))
 
-	sinkDBChangesCmd.AddCommand(sinkDBChangesGenerateCSVCmd)
+	sinkPostgresCmd.AddCommand(sinkPostgresGenerateCSVCmd)
 }
 
-func sinkDBChangesGenerateCSVE(cmd *cobra.Command, args []string) error {
+func sinkPostgresGenerateCSVE(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 
 	dsnString, err := resolveSinkDSN(cmd)
 	if err != nil {
 		return err
 	}
-
-	manifestPath := args[0]
-
-	if err := applyBlockRangeArg(cmd, args[1]); err != nil {
+	if _, err := validateDSNEngine(dsnString, sinkPostgresDriver); err != nil {
 		return err
+	}
+
+	manifestPath, outputModule, err := ruiOrGuiManifestModulePositionalParams(args)
+	if err != nil {
+		return err
+	}
+	if outputModule == "" {
+		outputModule = sink.InferOutputModuleFromPackage
+	}
+
+	if stop := sflags.MustGetString(cmd, sink.FlagStopBlock); stop == "" || stop == "0" {
+		return fmt.Errorf("generate-csv requires a stop block, provide it with -t/--stop-block")
 	}
 
 	sinkDBPreStart(cmd)
@@ -92,7 +103,7 @@ func sinkDBChangesGenerateCSVE(cmd *cobra.Command, args []string) error {
 		cmd,
 		supportedOutputTypes,
 		manifestPath,
-		sink.InferOutputModuleFromPackage,
+		outputModule,
 		"sink_database_changes",
 		zlog,
 		tracer,
@@ -117,7 +128,7 @@ func sinkDBChangesGenerateCSVE(cmd *cobra.Command, args []string) error {
 		dsn,
 		cursorTableName,
 		historyTableName,
-		sflags.MustGetString(cmd, "clickhouse-cluster"),
+		"",
 		0, 0, 0,
 		sflags.MustGetString(cmd, onModuleHashMismatchFlag),
 		&handleReorgs,

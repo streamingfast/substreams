@@ -36,7 +36,7 @@ func Run(service *pbsql.Service, logger *zap.Logger) error {
 func logUnsupportedServiceMessage(serviceName string, logger *zap.Logger) {
 	logger.Warn(
 		"This package has " + serviceName + " service defined, however " + serviceName + " is not " +
-			"supported yet when using relational mappings mode (e.g. 'substreams sink from-proto ...', " +
+			"supported yet when using relational mappings mode (e.g. 'substreams sink postgres|clickhouse run ...' on a protobuf output module), " +
 			"skipping it",
 	)
 }

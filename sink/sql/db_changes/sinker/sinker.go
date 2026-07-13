@@ -365,7 +365,7 @@ func (s *SQLSinker) HandleBlockUndoSignal(ctx context.Context, data *pbsubstream
 
 func (s *SQLSinker) batchBlockModulo(isLive *bool) uint64 {
 	if isLive == nil {
-		panic(fmt.Errorf("liveness checker has been disabled on the Sinker instance, this is invalid in the context of 'substreams sink database-changes'"))
+		panic(fmt.Errorf("liveness checker has been disabled on the Sinker instance, this is invalid in the context of 'substreams sink postgres|clickhouse run'"))
 	}
 
 	if *isLive {

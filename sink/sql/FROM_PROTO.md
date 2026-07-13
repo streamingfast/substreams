@@ -1,12 +1,12 @@
-# FROM_PROTO Command Guide
+# Relational Mappings (from-proto) Guide
 
-The `from-proto` command allows you to run a Substreams SQL sink directly from a protocol buffer definition without needing to set up separate schema files. This command automatically generates the SQL schema from your protobuf definitions and runs the sink in a single step.
+The `substreams sink postgres run` and `substreams sink clickhouse run` commands can run a Substreams SQL sink directly from a protocol buffer definition without needing to set up separate schema files. When the selected module's output type is not `DatabaseChanges`, `run` automatically uses this relational-mappings path: it generates the SQL schema from your protobuf definitions and runs the sink in a single step. Pick the command that matches your database engine (`postgres` for a `postgres://`/`psql://` DSN, `clickhouse` for a `clickhouse://` DSN); the DSN is validated against the command.
 
 > **💡 See it in action**: Check out the [ClickHouse Showcase](https://github.com/streamingfast/substreams-sink-clickhouse-showcase) for a complete working example with USDC transfers, including advanced features like materialized views and partitioning strategies.
 
 ## Overview
 
-The `from-proto` command streamlines the process of running a SQL sink by:
+The relational-mappings path streamlines the process of running a SQL sink by:
 1. Reading your Substreams manifest and protobuf definitions
 2. Automatically generating the SQL schema from proto annotations
 3. Creating database tables based on the proto message structure
@@ -15,12 +15,13 @@ The `from-proto` command streamlines the process of running a SQL sink by:
 ## Command Syntax
 
 ```bash
-substreams sink from-proto <manifest> [output-module] --dsn <dsn>
+substreams sink postgres run [<manifest> [output-module]] --dsn <dsn>
+substreams sink clickhouse run [<manifest> [output-module]] --dsn <dsn>
 ```
 
 ### Arguments
 
-- `<manifest>`: Path to your Substreams manifest file (substreams.yaml)
+- `[<manifest>]`: Optional. Path to your Substreams manifest file (defaults to `./substreams.yaml`)
 - `[output-module]`: Optional. Name of the output module to stream from (defaults to auto-detection)
 
 ### Common Flags
@@ -99,8 +100,8 @@ For security, avoid hardcoding credentials in commands. Use environment variable
 # Set DSN as environment variable (replace with actual credentials)
 export SUBSTREAMS_SINK_DSN="postgres://[username]:[password]@localhost:5432/mydb?sslmode=disable"
 
-# Use in command
-substreams sink from-proto substreams.yaml
+# Use in command (PostgreSQL DSN -> postgres command)
+substreams sink postgres run substreams.yaml
 ```
 
 ### Database Setup Examples
@@ -286,25 +287,25 @@ docker run --name postgres -e POSTGRES_PASSWORD=password -p 5432:5432 -d postgre
 docker run --name clickhouse -p 9000:9000 -d clickhouse/clickhouse-server
 ```
 
-### Step 6: Run the from-proto Command
+### Step 6: Run the sink
 
-Execute the `from-proto` command to automatically generate schema and start streaming:
+Run the sink to automatically generate the schema and start streaming:
 
 **PostgreSQL:**
 ```bash
 export SUBSTREAMS_SINK_DSN="postgres://postgres:password@localhost:5432/postgres?sslmode=disable"
-substreams sink from-proto substreams.yaml
+substreams sink postgres run substreams.yaml
 ```
 
 **ClickHouse:**
 ```bash
 export SUBSTREAMS_SINK_DSN="clickhouse://127.0.0.1:9000/default?secure=false"
-substreams sink from-proto substreams.yaml
+substreams sink clickhouse run substreams.yaml
 ```
 
 ## Proto Schema Annotations
 
-The `from-proto` command relies on special protobuf annotations to generate the SQL schema. Here are the key annotations:
+The relational-mappings path relies on special protobuf annotations to generate the SQL schema. Here are the key annotations:
 
 ### Table Options
 
@@ -366,7 +367,7 @@ message OrderItem {
 
 ## Supported Data Types
 
-The `from-proto` command automatically maps protobuf types to SQL types:
+The relational-mappings path automatically maps protobuf types to SQL types:
 
 ### Basic Types
 
@@ -423,7 +424,7 @@ This is particularly useful for:
 Stream specific block ranges:
 
 ```bash
-substreams sink from-proto substreams.yaml \
+substreams sink postgres run substreams.yaml \
   --start-block 1000000 \
   --stop-block 1001000
 ```
@@ -433,7 +434,7 @@ substreams sink from-proto substreams.yaml \
 For high-throughput scenarios:
 
 ```bash
-substreams sink from-proto substreams.yaml \
+substreams sink postgres run substreams.yaml \
   --no-constraints \
   --block-batch-size 100
 ```
@@ -443,9 +444,9 @@ substreams sink from-proto substreams.yaml \
 For ClickHouse with additional configuration:
 
 ```bash
-substreams sink from-proto substreams.yaml \
-  --clickhouse-sink-info-folder ./clickhouse-info \
-  --clickhouse-cursor-file-path ./cursor.txt
+substreams sink clickhouse run substreams.yaml \
+  --sink-info-folder ./clickhouse-info \
+  --cursor-file-path ./cursor.txt
 ```
 
 ## ClickHouse Advanced Features

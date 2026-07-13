@@ -24,7 +24,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var sinkDBChangesInjectCSVCmd = &cobra.Command{
+var sinkPostgresInjectCSVCmd = &cobra.Command{
 	Use:   "inject-csv <input_path> <table> <start>:<stop>",
 	Short: "Injects generated CSV rows for <table> into the database (postgresql-only)",
 	Long: cli.Dedent(`
@@ -35,19 +35,19 @@ var sinkDBChangesInjectCSVCmd = &cobra.Command{
 		Watch out, the <start> must be aligned with the range size of the CSV files or the module initial block.
 	`),
 	Args: cobra.ExactArgs(3),
-	RunE: sinkDBChangesInjectCSVE,
+	RunE: sinkPostgresInjectCSVE,
 }
 
 func init() {
-	flags := sinkDBChangesInjectCSVCmd.Flags()
-	addCommonDatabaseChangesFlags(flags)
+	flags := sinkPostgresInjectCSVCmd.Flags()
+	flags.String("cursors-table", "cursors", "[Operator] Name of the table to use for storing cursors")
 
 	flags.String("prometheus-addr", "", "[Operator] If non-empty, the process will listen on this address for Prometheus metrics request(s)")
 
-	sinkDBChangesCmd.AddCommand(sinkDBChangesInjectCSVCmd)
+	sinkPostgresCmd.AddCommand(sinkPostgresInjectCSVCmd)
 }
 
-func sinkDBChangesInjectCSVE(cmd *cobra.Command, args []string) error {
+func sinkPostgresInjectCSVE(cmd *cobra.Command, args []string) error {
 	cmd.SilenceUsage = true
 	ctx := cmd.Context()
 

@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/moby/moby/api/types/container"
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dauth"
 	dauthnull "github.com/streamingfast/dauth/null"

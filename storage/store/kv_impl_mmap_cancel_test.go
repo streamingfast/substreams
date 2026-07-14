@@ -48,10 +48,9 @@ func TestMmapLoadCancelCleanup(t *testing.T) {
 	dst := createTestStore(t, "cancel_dst", 0, scratch)
 	mm := dst.kvImpl.(*mmapKVImpl)
 	path := mm.path
-	// The backing file is unlinked at open time, so no process death can ever
-	// orphan it: it is already absent from the directory while fully usable.
+
 	_, err := os.Stat(path)
-	require.True(t, os.IsNotExist(err), "dst file should already be unlinked after open, stat err=%v", err)
+	require.NoError(t, err, "dst file should exist on disk while the store is live")
 
 	// Fail the load partway through.
 	r := &cancelAfterReader{data: []byte("garbage-that-fails-to-parse-immediately"), failAt: 5, failErr: fmt.Errorf("context canceled")}

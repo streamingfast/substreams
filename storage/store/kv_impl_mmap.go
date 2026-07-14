@@ -158,15 +158,6 @@ func newMmapKVImplWithConfig(storeName, moduleHash string, cfg *MmapBackendConfi
 		return nil, fmt.Errorf("failed to open mmap KVImpl for store %q at %q: %w", storeName, path, err)
 	}
 
-	// Unlink the backing file now that it is open. On unix the inode (and its
-	// mmap) stays valid for the lifetime of the open db handle, but the
-	// directory entry is gone — so no matter how this process dies (SIGKILL,
-	// OOM, panic, a Load/Save that outlives a shutdown deadline), it can never
-	// leave an orphan bbolt file behind. Space is reclaimed when Close() drops
-	// the handle. Best-effort: on platforms that refuse to unlink an open file
-	// (e.g. Windows) this is a no-op and Close() falls back to removing by path.
-	os.Remove(path)
-
 	impl, err := newMmapKVImplFromDB(db, path, storeName, true)
 	if err != nil {
 		return nil, err
@@ -615,10 +606,7 @@ func (b *mmapKVImpl) Close() error {
 		}
 		closeErr = b.db.Close()
 	}
-	// Always attempt removal, even if db.Close failed: the file is usually
-	// already gone (unlinked at open time), but on platforms where the
-	// open-file unlink was a no-op this is what reclaims it. Skipping it on a
-	// db.Close error would leak the file.
+	// Remove the named file even if db.Close failed, else it leaks.
 	if b.path != "" {
 		if err := os.Remove(b.path); err != nil && !os.IsNotExist(err) {
 			if closeErr != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strconv"
 	"time"
 
@@ -21,6 +22,12 @@ type FullKV struct {
 	*baseStore
 
 	loadedFrom string
+
+	// quickLoadReader holds the quicksave object opened by QuickLoadOpen until
+	// QuickLoadFinish streams it (or QuickLoadClose discards it). Set/read only
+	// from the request goroutine, so no synchronization is needed.
+	quickLoadReader   io.ReadCloser
+	quickLoadFilename string
 }
 
 func (s *FullKV) Store() dstore.Store {
@@ -48,12 +55,25 @@ func (s *FullKV) DerivePartialStore(initialBlock uint64) *PartialKV {
 
 var ErrNoQuickSaveStore = fmt.Errorf("no quick save store")
 
+// QuickLoad opens and streams the quicksave file in one call. It is equivalent
+// to QuickLoadOpen followed by QuickLoadFinish and exists for callers that don't
+// need to interleave work between the (cheap) open and the (slow) streaming decode.
 func (s *FullKV) QuickLoad(ctx context.Context, atBlock bstream.BlockRef) error {
+	if err := s.QuickLoadOpen(ctx, atBlock); err != nil {
+		return err
+	}
+	return s.QuickLoadFinish(ctx, atBlock)
+}
+
+// QuickLoadOpen opens the quicksave object for atBlock, confirming it exists and
+// is readable, but does not stream it yet. Pairing this with a later QuickLoadFinish
+// lets the caller do work (e.g. send the client its session/trace-id and keepalives)
+// during the potentially slow streaming decode instead of before it.
+func (s *FullKV) QuickLoadOpen(ctx context.Context, atBlock bstream.BlockRef) error {
 	if s.quickSaveStore == nil {
 		return ErrNoQuickSaveStore
 	}
 
-	start := time.Now()
 	filename := atBlock.ID() + ".quicksave"
 	s.logger.Debug("loading full store state from temporary file", zap.String("fileName", filename), zap.String("module_hash", s.moduleHash), zap.Uint64("block_num", atBlock.Num()), zap.String("block_id", atBlock.ID()))
 
@@ -62,8 +82,26 @@ func (s *FullKV) QuickLoad(ctx context.Context, atBlock bstream.BlockRef) error 
 		return fmt.Errorf("opening file %q (in module %q): %w", filename, s.moduleHash, err)
 	}
 
+	s.quickLoadReader = r
+	s.quickLoadFilename = filename
+	return nil
+}
+
+// QuickLoadFinish streams the object opened by QuickLoadOpen into the store and
+// closes it. It must be called after a successful QuickLoadOpen.
+func (s *FullKV) QuickLoadFinish(ctx context.Context, atBlock bstream.BlockRef) error {
+	if s.quickLoadReader == nil {
+		return fmt.Errorf("quickload finish called without a prior successful open for store %q", s.name)
+	}
+
+	r := s.quickLoadReader
+	filename := s.quickLoadFilename
+	s.quickLoadReader = nil
+	s.quickLoadFilename = ""
 	defer r.Close()
 
+	start := time.Now()
+	var err error
 	s.totalSizeBytes, err = unmarshalIterInto(ctx, s.kvImpl, s.marshaller, r, nil)
 	if err != nil {
 		return fmt.Errorf("unmarshal store (streaming): %w", err)
@@ -78,6 +116,17 @@ func (s *FullKV) QuickLoad(ctx context.Context, atBlock bstream.BlockRef) error 
 		zap.Duration("load_duration", time.Since(start)),
 	)
 	return nil
+}
+
+// QuickLoadClose discards a reader opened by QuickLoadOpen without streaming it,
+// used to release resources when a sibling store's open failed and the whole
+// quickload is being abandoned.
+func (s *FullKV) QuickLoadClose() {
+	if s.quickLoadReader != nil {
+		_ = s.quickLoadReader.Close()
+		s.quickLoadReader = nil
+		s.quickLoadFilename = ""
+	}
 }
 
 func (s *FullKV) QuickSave(ctx context.Context, atBlockHash string) error {

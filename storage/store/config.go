@@ -172,7 +172,7 @@ func (c *Config) ModuleInitialBlock() uint64 {
 }
 
 func (c *Config) NewFullKV(logger *zap.Logger) *FullKV {
-	return &FullKV{c.newBaseStore(logger), "N/A"}
+	return &FullKV{baseStore: c.newBaseStore(logger), loadedFrom: "N/A"}
 }
 
 func (c *Config) ExistsFullKV(ctx context.Context, upTo uint64) (bool, error) {

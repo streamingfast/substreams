@@ -9,6 +9,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- Manifest: environment variable expansion (`$VAR` / `${VAR}`) is now supported in the `foundational-store` module input, allowing a manifest to be authored with a placeholder (e.g. `foundational-store: $DEPLOYMENT_ID`) that is resolved at pack/load time. The generated `.spkg` always embeds the resolved value.
+
+### Changed
+
+- Manifest: environment variable expansion in `imports` and `protobuf.importPaths` now errors out when a referenced variable is undefined, instead of silently substituting an empty string.
+
 ## v1.19.0
 
 ### Sink

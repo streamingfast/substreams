@@ -86,7 +86,7 @@ func (p *mmapDBFilePoller) Stop() (maxDBFiles int, maxTotalSize int64) {
 }
 
 // TestMmapBackendE2E validates that mmap backend works in full e2e scenario.
-// mmap is the default backend, so no SUBSTREAMS_STORE_BACKEND env var is set here.
+// mmap is opt-in (memory is the default), so we force it via SUBSTREAMS_STORE_BACKEND.
 // It verifies:
 // 1. Stores work correctly in production mode with squashing
 // 2. Large store operations complete without OOM
@@ -94,6 +94,8 @@ func (p *mmapDBFilePoller) Stop() (maxDBFiles int, maxTotalSize int64) {
 func TestMmapBackendE2E(t *testing.T) {
 	ctx := context.Background()
 	tmpDir := t.TempDir()
+
+	t.Setenv("SUBSTREAMS_STORE_BACKEND", "mmap")
 
 	mmapDir := filepath.Join(tmpDir, "mmap-stores")
 	err := os.MkdirAll(mmapDir, 0755)
@@ -283,13 +285,9 @@ func TestMmapVsMemoryComparison(t *testing.T) {
 			tmpDir := t.TempDir()
 
 			// Only set env var if we want to override the default (mmap)
-			if tc.backend == "memory" {
-				t.Setenv("SUBSTREAMS_STORE_BACKEND", "memory")
-				t.Log("Overriding default mmap with memory backend")
-			} else {
-				// mmap is default, no env var needed
-				t.Log("Using default mmap backend (no env var set)")
-			}
+			// mmap is opt-in; memory is the default. Force the backend explicitly.
+			t.Setenv("SUBSTREAMS_STORE_BACKEND", tc.backend)
+			t.Logf("Forcing %s backend", tc.backend)
 
 			mmapDir := filepath.Join(tmpDir, "mmap-stores")
 			var t2ScratchSpace string

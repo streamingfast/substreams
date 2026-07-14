@@ -277,6 +277,9 @@ func (a *Tier1App) Run() error {
 	if a.config.StoresBackend != "" {
 		opts = append(opts, service.WithStoresBackend(a.config.StoresBackend))
 	}
+	if a.config.StoreSizeLimit != 0 {
+		opts = append(opts, service.WithStoreSizeLimit(a.config.StoreSizeLimit))
+	}
 
 	if a.config.TmpDir != "" {
 		wazero.SetTempDir(a.config.TmpDir)

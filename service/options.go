@@ -119,6 +119,16 @@ func deleteLeftoverStoreFilesAtStartup(dir string) {
 	}
 }
 
+// WithStoreSizeLimit sets the per-store size limit on tier1's own (linear)
+// pipeline. Tier2 receives this limit per-request via ProcessRangeRequest.
+func WithStoreSizeLimit(limit uint64) Option {
+	return func(a anyTierService) {
+		if s, ok := a.(*Tier1Service); ok {
+			s.runtimeConfig.StoreSizeLimit = limit
+		}
+	}
+}
+
 func WithStoresBackend(backend string) Option {
 	return func(a anyTierService) {
 		switch s := a.(type) {

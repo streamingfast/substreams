@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/streamingfast/substreams/manifest"
@@ -121,20 +122,21 @@ func TestMmapBackendE2E(t *testing.T) {
 			require.Greater(t, len(blockScopedDataSlice), 0)
 			assert.Equal(t, tc.expectedClock, uint64(blockScopedDataSlice[len(blockScopedDataSlice)-1].Clock.Number), "Should end on expected block")
 
-			// Check mmap directory after test - should have mmap files
 			filesAfter, err := os.ReadDir(mmapDir)
 			require.NoError(t, err)
 			t.Logf("Mmap files after test: %d", len(filesAfter))
 
-			// Log mmap file details
+			dbFiles := 0
 			for _, file := range filesAfter {
-				if !file.IsDir() {
+				if !file.IsDir() && strings.HasSuffix(file.Name(), ".db") {
+					dbFiles++
 					info, err := file.Info()
 					if err == nil {
 						t.Logf("  - %s: %d bytes (%.2f MB)", file.Name(), info.Size(), float64(info.Size())/(1024*1024))
 					}
 				}
 			}
+			assert.Greater(t, dbFiles, 0, "mmap backend must leave visible .db files in the scratch dir")
 
 			t.Logf("Test completed successfully with mmap backend")
 		})

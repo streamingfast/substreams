@@ -189,11 +189,9 @@ func testLargeDataset(t *testing.T, s *baseStore, baseDir string) {
 		filename := filepath.Base(mmapImpl.path)
 		assert.Contains(t, filename, "test_store", "filename should contain store name")
 
-		// ...but the backing file is unlinked at open time, so it is not visible
-		// on disk while the store is live — this is what makes an orphaned bbolt
-		// file impossible no matter how the process dies.
-		_, err := os.Stat(mmapImpl.path)
-		assert.True(t, os.IsNotExist(err), "mmap file should be unlinked after open, stat err=%v", err)
+		fi, err := os.Stat(mmapImpl.path)
+		require.NoError(t, err, "mmap file should exist on disk while the store is live")
+		assert.False(t, fi.IsDir(), "mmap path should be a regular file")
 	}
 
 	// Test iteration over large dataset

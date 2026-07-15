@@ -102,21 +102,30 @@ func WithStoresScratchSpace(path string) Option {
 		switch s := a.(type) {
 		case *Tier1Service:
 			s.runtimeConfig.StoresScratchSpace = path
-			sweepOrphanMmapFiles(path)
+			deleteLeftoverStoreFilesAtStartup(path)
 		case *Tier2Service:
 			s.storesScratchSpace = path
-			sweepOrphanMmapFiles(path)
+			deleteLeftoverStoreFilesAtStartup(path)
 		}
 	}
 }
 
-// sweepOrphanMmapFiles removes bbolt files left behind by a previous process kill,
-// before the service starts accepting requests. Safe to call at startup because
-// no requests are in flight yet.
-func sweepOrphanMmapFiles(dir string) {
+// deleteLeftoverStoreFilesAtStartup deletes mmap store (.db) files left in the
+// scratch dir by a previous run. Only safe at startup, before any request runs.
+func deleteLeftoverStoreFilesAtStartup(dir string) {
 	matches, _ := filepath.Glob(filepath.Join(dir, "substreams-store-*.db"))
 	for _, f := range matches {
 		os.Remove(f)
+	}
+}
+
+// WithStoreSizeLimit sets the per-store size limit on tier1's own (linear)
+// pipeline. Tier2 receives this limit per-request via ProcessRangeRequest.
+func WithStoreSizeLimit(limit uint64) Option {
+	return func(a anyTierService) {
+		if s, ok := a.(*Tier1Service); ok {
+			s.runtimeConfig.StoreSizeLimit = limit
+		}
 	}
 }
 

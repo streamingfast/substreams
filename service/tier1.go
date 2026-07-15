@@ -763,7 +763,7 @@ func (s *Tier1Service) blocks(
 		return fmt.Errorf("new config map: %w", err)
 	}
 
-	storeConfigs, err := store.NewConfigMap(cacheStore, quickSaveStore, execGraph.Stores(), execGraph.ModuleHashes(), chainFirstStreamableBlock, 0, s.runtimeConfig.StoresScratchSpace, s.runtimeConfig.StoresBackend)
+	storeConfigs, err := store.NewConfigMap(cacheStore, quickSaveStore, execGraph.Stores(), execGraph.ModuleHashes(), chainFirstStreamableBlock, s.runtimeConfig.StoreSizeLimit, s.runtimeConfig.StoresScratchSpace, s.runtimeConfig.StoresBackend)
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}

@@ -5,7 +5,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
@@ -14,8 +18,75 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 )
 
+// mmapDBFilePoller watches dir for *.db files while a request runs. The mmap
+// backend creates a temp .db file per store and removes it on Close (see
+// storage/store/kv_impl_mmap.go), so the files only exist transiently during
+// processing and are gone by the time a request returns. Poll fast to observe
+// the peak count instead of checking the dir after the fact.
+type mmapDBFilePoller struct {
+	dir     string
+	maxDB   int64
+	maxSize int64
+	stop    chan struct{}
+	done    chan struct{}
+}
+
+func startMmapDBFilePoller(dir string) *mmapDBFilePoller {
+	p := &mmapDBFilePoller{
+		dir:  dir,
+		stop: make(chan struct{}),
+		done: make(chan struct{}),
+	}
+	go func() {
+		defer close(p.done)
+		ticker := time.NewTicker(5 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			p.sample()
+			select {
+			case <-p.stop:
+				p.sample() // final sample to catch anything created just before stop
+				return
+			case <-ticker.C:
+			}
+		}
+	}()
+	return p
+}
+
+func (p *mmapDBFilePoller) sample() {
+	entries, err := os.ReadDir(p.dir)
+	if err != nil {
+		return
+	}
+	var count, size int64
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".db") {
+			continue
+		}
+		count++
+		if info, err := e.Info(); err == nil {
+			size += info.Size()
+		}
+	}
+	if count > atomic.LoadInt64(&p.maxDB) {
+		atomic.StoreInt64(&p.maxDB, count)
+	}
+	if size > atomic.LoadInt64(&p.maxSize) {
+		atomic.StoreInt64(&p.maxSize, size)
+	}
+}
+
+// Stop halts polling and returns the peak .db file count and total size seen.
+func (p *mmapDBFilePoller) Stop() (maxDBFiles int, maxTotalSize int64) {
+	var once sync.Once
+	once.Do(func() { close(p.stop) })
+	<-p.done
+	return int(atomic.LoadInt64(&p.maxDB)), atomic.LoadInt64(&p.maxSize)
+}
+
 // TestMmapBackendE2E validates that mmap backend works in full e2e scenario.
-// mmap is the default backend, so no SUBSTREAMS_STORE_BACKEND env var is set here.
+// mmap is opt-in (memory is the default), so we force it via SUBSTREAMS_STORE_BACKEND.
 // It verifies:
 // 1. Stores work correctly in production mode with squashing
 // 2. Large store operations complete without OOM
@@ -23,6 +94,8 @@ import (
 func TestMmapBackendE2E(t *testing.T) {
 	ctx := context.Background()
 	tmpDir := t.TempDir()
+
+	t.Setenv("SUBSTREAMS_STORE_BACKEND", "mmap")
 
 	mmapDir := filepath.Join(tmpDir, "mmap-stores")
 	err := os.MkdirAll(mmapDir, 0755)
@@ -103,6 +176,10 @@ func TestMmapBackendE2E(t *testing.T) {
 				Package:         pkg.Package,
 			}
 
+			// Watch for the transient mmap .db files while the request runs;
+			// the backend removes them on Close, so they won't exist afterward.
+			poller := startMmapDBFilePoller(mmapDir)
+
 			// Run the request
 			blockScopedDataSlice, session, err := RunRequest(t, request, substreamsEndpoint)
 			if err != nil && err != io.EOF {
@@ -116,25 +193,15 @@ func TestMmapBackendE2E(t *testing.T) {
 				t.Fatalf("Unexpected error: %s", err.Error())
 			}
 
+			maxDBFiles, maxTotalSize := poller.Stop()
+
 			require.NotNil(t, session, "Should have received at least one session")
 			assert.Equal(t, tc.expectedLen, len(blockScopedDataSlice), "Should have received all expected blocks")
 			require.Greater(t, len(blockScopedDataSlice), 0)
 			assert.Equal(t, tc.expectedClock, uint64(blockScopedDataSlice[len(blockScopedDataSlice)-1].Clock.Number), "Should end on expected block")
 
-			// Check mmap directory after test - should have mmap files
-			filesAfter, err := os.ReadDir(mmapDir)
-			require.NoError(t, err)
-			t.Logf("Mmap files after test: %d", len(filesAfter))
-
-			// Log mmap file details
-			for _, file := range filesAfter {
-				if !file.IsDir() {
-					info, err := file.Info()
-					if err == nil {
-						t.Logf("  - %s: %d bytes (%.2f MB)", file.Name(), info.Size(), float64(info.Size())/(1024*1024))
-					}
-				}
-			}
+			t.Logf("Peak mmap .db files during test: %d (%.2f MB)", maxDBFiles, float64(maxTotalSize)/(1024*1024))
+			assert.Greater(t, maxDBFiles, 0, "mmap backend must create .db files in the scratch dir while running")
 
 			t.Logf("Test completed successfully with mmap backend")
 		})
@@ -218,13 +285,9 @@ func TestMmapVsMemoryComparison(t *testing.T) {
 			tmpDir := t.TempDir()
 
 			// Only set env var if we want to override the default (mmap)
-			if tc.backend == "memory" {
-				t.Setenv("SUBSTREAMS_STORE_BACKEND", "memory")
-				t.Log("Overriding default mmap with memory backend")
-			} else {
-				// mmap is default, no env var needed
-				t.Log("Using default mmap backend (no env var set)")
-			}
+			// mmap is opt-in; memory is the default. Force the backend explicitly.
+			t.Setenv("SUBSTREAMS_STORE_BACKEND", tc.backend)
+			t.Logf("Forcing %s backend", tc.backend)
 
 			mmapDir := filepath.Join(tmpDir, "mmap-stores")
 			var t2ScratchSpace string
@@ -259,6 +322,11 @@ func TestMmapVsMemoryComparison(t *testing.T) {
 				Package:         pkg.Package,
 			}
 
+			var poller *mmapDBFilePoller
+			if tc.backend == "mmap" {
+				poller = startMmapDBFilePoller(mmapDir)
+			}
+
 			blockScopedDataSlice, session, err := RunRequest(t, request, substreamsEndpoint)
 			if err != nil && err != io.EOF {
 				t.Fatalf("Unexpected error: %s", err.Error())
@@ -276,22 +344,12 @@ func TestMmapVsMemoryComparison(t *testing.T) {
 				finalClock: finalClock,
 			}
 
-			// Check for mmap files
+			// The mmap backend removes each store's .db file on Close, so
+			// sample the peak seen during the run instead of after it.
 			if tc.backend == "mmap" {
-				files, err := os.ReadDir(mmapDir)
-				require.NoError(t, err)
-				result.mmapFilesCount = len(files)
-
-				totalSize := int64(0)
-				for _, file := range files {
-					if !file.IsDir() {
-						info, err := file.Info()
-						if err == nil {
-							totalSize += info.Size()
-						}
-					}
-				}
-				result.totalMmapSizeMB = float64(totalSize) / (1024 * 1024)
+				maxDBFiles, maxTotalSize := poller.Stop()
+				result.mmapFilesCount = maxDBFiles
+				result.totalMmapSizeMB = float64(maxTotalSize) / (1024 * 1024)
 			}
 
 			results = append(results, result)

@@ -9,7 +9,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v1.20.1
+
+### Fixed
+
+- Server: linear quickload resume now emits `SessionInit` (trace id) and starts keepalives before the store decode streams, instead of after. A large or remote quicksave could previously stream for a long time with zero client output; the quickload-success path also never emitted a `SessionInit` at all.
+
+## v1.20.0
 
 ### Changed
 
@@ -20,7 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
-- Server: new opt-in mmap (bbolt-backed) store backend, selectable via `--substreams-stores-backend=mmap` (default `memory`). It keeps FullKV store data in a memory-mapped file so cold pages are reclaimable by the kernel under memory pressure, instead of pinning everything on the non-reclaimable Go heap — this addresses production OOMs with large or highly concurrent stores. The in-memory backend remains the default and is byte-for-byte unchanged; mmap is validated to produce identical output. **The scratch-space directory holding the bbolt files (`StoresScratchSpace`, OS temp dir if unset) must live on a local NVMe SSD**: the store is continuously read from and written to through the mmap, and the kernel pages it straight to that file, so a slow or network-backed disk turns store operations into an I/O bottleneck and negates the benefit. Do not point it at network/EBS-class storage.
+- Server: new opt-in mmap (bbolt-backed) store backend, selectable via `--substreams-stores-backend=mmap` (default `memory`). It keeps FullKV store data in a memory-mapped file so cold pages are reclaimable by the kernel under memory pressure, instead of pinning everything on the non-reclaimable Go heap — this addresses production OOMs with large or highly concurrent stores. The in-memory backend remains the default and is byte-for-byte unchanged; mmap is validated to produce identical output. **The scratch-space directory holding the bbolt files (`StoresScratchSpace`, default "{sf-data-dir}/substreams/stores-scratch") must live on a local NVMe SSD**: the store is continuously read from and written to through the mmap, and the kernel pages it straight to that file, so a slow or network-backed disk turns store operations into an I/O bottleneck and negates the benefit. Do not point it at network/EBS-class storage.
 
 - Server: cached deterministic errors now expire. Each error file carries a write timestamp in its name (`errors.<block>.<hash>.<unix>`), and on read tier1 discards any error older than `SUBSTREAMS_DETERMINISTIC_ERROR_MAX_AGE` (Go duration, default `1h`), retrying execution. Legacy error files without a timestamp are deleted on read.
 
@@ -42,6 +48,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Server: the quicksave block count now counts settled blocks (normal or last-partial) instead of skipping partials entirely, so quicksave arms correctly on flash-block chains. The minimum sent-block threshold before a quicksave triggers was raised from 25 to 50.
 - Server: `tier1` calls to hosted foundational stores now forward the `x-organization-id` identity header (alongside the existing trusted headers), so a store's internal trust-based listener can authorize the request without an end-user JWT. This fixes `Unauthenticated: required authorization token not found` errors when reading from hosted foundational stores resolved via the control-plane registry.
 - Server: foundational store calls that fail with authentication errors, organization id mismatch, or prolonged unreachability now bubble up to the user as a non-deterministic (uncached) error instead of retrying until the global deadline. Transient unavailability is still retried (~30s) to absorb blips and rolling restarts.
+- Server: a client cancellation (`context canceled`) while loading an execout file is now logged at INFO instead of ERROR in the execout walker.
+- CLI: `substreams info <shortname>` now fetches the package from the download endpoint (spkg.io) instead of the registry API host, fixing `package does not exist on the Substreams registry` for short-name lookups such as `substreams info common`.
 
 ## v1.19.0
 

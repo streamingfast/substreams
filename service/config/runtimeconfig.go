@@ -20,6 +20,7 @@ type RuntimeConfig struct {
 	DefaultCacheTag        string // appended to BaseObjectStore unless overridden by auth layer
 	StoresScratchSpace     string // local directory for ephemeral store files (e.g. bbolt); uses OS temp dir if empty
 	StoresBackend          string // store KV backend: "memory" (default) or "mmap"; empty falls back to SUBSTREAMS_STORE_BACKEND env var (also memory-default)
+	StoreSizeLimit         uint64 // if non-zero, overrides the default per-store size limit (in bytes)
 	ClientFactory          client.InternalClientFactory
 	WorkerPoolFactory      work.WorkerPoolFactory
 	ModuleExecutionTracing bool

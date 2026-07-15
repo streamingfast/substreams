@@ -20,6 +20,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/glamour/ansi"
+	"github.com/charmbracelet/glamour/styles"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/huh/spinner"
 	"github.com/charmbracelet/lipgloss"
@@ -78,8 +79,8 @@ func init() {
 		return &style
 	}
 
-	customLightStyle = adjustStyle(glamour.LightStyleConfig)
-	customDarkStyle = adjustStyle(glamour.DarkStyleConfig)
+	customLightStyle = adjustStyle(styles.LightStyleConfig)
+	customDarkStyle = adjustStyle(styles.DarkStyleConfig)
 }
 
 var INIT_TRACE = false

@@ -3,7 +3,6 @@ module github.com/streamingfast/substreams/tests_e2e
 go 1.26.0
 
 require (
-	github.com/moby/moby/api v1.54.2
 	github.com/streamingfast/bstream v0.0.2-0.20260707150341-487b28967227
 	github.com/streamingfast/dauth v0.0.0-20260304175046-02898e30442d
 	github.com/streamingfast/dmetering v0.0.0-20251027175535-4fd530934b97
@@ -137,6 +136,7 @@ require (
 	github.com/mitchellh/go-testing-interface v1.14.1 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/go-archive v0.2.0 // indirect
+	github.com/moby/moby/api v1.55.0 // indirect
 	github.com/moby/moby/client v0.4.0 // indirect
 	github.com/moby/patternmatcher v0.6.1 // indirect
 	github.com/moby/sys/sequential v0.6.0 // indirect

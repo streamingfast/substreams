@@ -159,7 +159,7 @@ func (c *Call) SetOutputStore(store store.Store) {
 }
 
 const maxLogByteCount = 512 * 1024            // 512 KiB
-const maxTotalLogsByteCount = 5 * 1024 * 1024 // 5 MiB
+const maxTotalLogsByteCount = 2 * 1024 * 1024 // 2 MiB
 var maxTotalLogsByteCountHumanized = humanize.IBytes(maxTotalLogsByteCount)
 
 func (c *Call) ReachedLogsMaxByteCount() bool {

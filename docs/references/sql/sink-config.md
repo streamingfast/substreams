@@ -7,7 +7,7 @@ The Substreams SQL sink can be configured in multiple ways. While the sink confi
 The sink configuration in your `substreams.yaml` file is **optional**. You can run the sink without any configuration by specifying the module name directly in the CLI command:
 
 ```bash
-substreams-sink-sql from-proto $DSN ./substreams.yaml map_my_data
+substreams sink postgres run ./substreams.yaml map_my_data --dsn $DSN
 ```
 
 ## Sink Configuration Options
@@ -38,17 +38,17 @@ sink:
 
 ## CLI Override
 
-When using the CLI, you can override or bypass the sink configuration entirely:
+When using the CLI, you can override or bypass the sink configuration entirely (use `sink clickhouse run` instead of `sink postgres run` when `config.engine` is `clickhouse`):
 
 ```bash
 # Use sink config from substreams.yaml
-substreams-sink-sql from-proto $DSN ./substreams.yaml
+substreams sink postgres run ./substreams.yaml --dsn $DSN
 
 # Override module name (ignores sink config)
-substreams-sink-sql from-proto $DSN ./substreams.yaml my_custom_module
+substreams sink postgres run ./substreams.yaml my_custom_module --dsn $DSN
 
 # Use published package (no local config needed)
-substreams-sink-sql from-proto $DSN https://github.com/example/package.spkg
+substreams sink postgres run https://github.com/example/package.spkg --dsn $DSN
 ```
 
 The CLI approach provides more flexibility and is often preferred for development and testing scenarios.

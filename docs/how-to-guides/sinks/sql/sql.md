@@ -6,13 +6,13 @@ Before you begin, make sure you have:
 
 - A Substreams package (for example, a package that indexes ERC20 tokens).
 - A SQL database: Postgres or ClickHouse.
-- The [substreams-sink-sql](https://github.com/streamingfast/substreams-sink-sql) CLI installed in your computer.
+- The [Substreams CLI](../../cli/installing-the-cli.md) installed on your computer. The SQL sink is built into the `substreams` CLI (`substreams sink postgres` / `substreams sink clickhouse`).
 
 ## Mapping Substreams to SQL
 
 The core function of the SQL sink is to translate your Substreams output (Protobuf data) into SQL tables. Choose one of the following methods depending on your needs:
 
-- [Using Relational Mappings "from-proto"](https://github.com/streamingfast/substreams-sink-sql/blob/develop/FROM_PROTO.md)
+- [Using Relational Mappings "from-proto"](https://github.com/streamingfast/substreams/blob/develop/sink/sql/FROM_PROTO.md)
     * Enables foreign key relationships in your SQL schema.
     * Requires adding annotations to your Protobuf messages (e.g., primary and foreign keys).
     * Currently insert-only.
@@ -33,19 +33,5 @@ The core function of the SQL sink is to translate your Substreams output (Protob
 
 ## Installation
 
-Enabling `substreams-sink-sql` in your [Substreams CLI](../../cli/installing-the-cli.md).
-
-1. Download the current binary, optionally depending on your operating system, from the [substreams-sink-sql GitHub releases](https://github.com/streamingfast/substreams-sink-sql/releases) page.
-1. Move the binary to your `$PATH`.
-
-### Installing from Source
-
-1. Clone the [substreams-sink-sql GitHub repository](https://github.com/streamingfast/substreams-sink-sql).
-1. Install the binary using Go.
-
-```bash
-go install ./cmd/substreams-sink-sql
-```
-
-1. Make sure GO is installed and the GO bin directory is in your $PATH.
+The SQL sink is included in the [Substreams CLI](../../cli/installing-the-cli.md) — there is no separate binary to install. Once `substreams` is installed, the `substreams sink postgres` and `substreams sink clickhouse` commands are available.
 

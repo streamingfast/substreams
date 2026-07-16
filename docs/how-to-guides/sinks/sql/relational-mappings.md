@@ -49,7 +49,7 @@ You can run the sink with the following syntax:
 # Ensure you are authenticated properly https://docs.substreams.dev/how-to-guides/installing-the-cli/authentication
 
 export DSN="postgres://postgres:password@localhost:5432/substreams?sslmode=disable"
-substreams-sink-sql from-proto "$DSN" solana-spl-token@latest
+substreams sink postgres run solana-spl-token@latest --dsn "$DSN"
 
 # Run 'docker rm postgres-db --force' to delete running database or start from scratch
 ```
@@ -214,7 +214,7 @@ export DSN="postgres://postgres:password@localhost:5432/substreams?sslmode=disab
 - Run the sink using the published package:
 
 ```bash
-substreams-sink-sql from-proto $DSN https://github.com/streamingfast/substreams-spl-token/releases/download/v0.1.0/solana-spl-token-v0.1.0.spkg
+substreams sink postgres run https://github.com/streamingfast/substreams-spl-token/releases/download/v0.1.0/solana-spl-token-v0.1.0.spkg --dsn $DSN
 ```
 
 ## Run the Sink Without Annotations

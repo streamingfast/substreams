@@ -71,13 +71,37 @@ func (r *manifestConverter) expandManifestVariables(manif *Manifest) error {
 
 	// Allow environment variables in `imports` element
 	for i, moduleImport := range manif.Imports {
-		manif.Imports[i][1] = os.ExpandEnv(moduleImport[1])
+		expanded, err := expandEnvVars(moduleImport[1])
+		if err != nil {
+			return fmt.Errorf("import %q: %w", moduleImport[0], err)
+		}
+		manif.Imports[i][1] = expanded
 	}
 
 	// Allow environment variables in `protobuf.importPaths` element
 	for i := range manif.Protobuf.ImportPaths {
-		manif.Protobuf.ImportPaths[i] = os.ExpandEnv(manif.Protobuf.ImportPaths[i])
+		expanded, err := expandEnvVars(manif.Protobuf.ImportPaths[i])
+		if err != nil {
+			return fmt.Errorf("protobuf import path %q: %w", manif.Protobuf.ImportPaths[i], err)
+		}
+		manif.Protobuf.ImportPaths[i] = expanded
 	}
+
+	// Allow environment variables in `foundational-store` module inputs
+	for _, module := range manif.Modules {
+		for _, input := range module.Inputs {
+			if input.FoundationalStore == "" {
+				continue
+			}
+
+			expanded, err := expandEnvVars(input.FoundationalStore)
+			if err != nil {
+				return fmt.Errorf("module %q foundational-store input: %w", module.Name, err)
+			}
+			input.FoundationalStore = expanded
+		}
+	}
+
 	return nil
 }
 

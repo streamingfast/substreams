@@ -84,20 +84,25 @@ func TestApplyDelta(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			s := &baseStore{
 				Config: baseStoreConfig,
-				kv:     make(map[string][]byte),
+				kvImpl: newMemoryKVImpl(),
 			}
 			for _, delta := range test.deltas {
 				s.ApplyDelta(delta)
 			}
-			assert.Equal(t, test.expectedKV, s.kv)
+			snapshot, err := saveToMap(s.kvImpl.Save())
+			assert.NoError(t, err)
+			assert.Equal(t, test.expectedKV, snapshot)
 		})
 	}
 }
 
 func Test_baseStore_SetDeltas(t *testing.T) {
+	kvImpl := newMemoryKVImpl()
+	kvImpl.Load(mapToIter(map[string][]byte{"A": []byte("a")}))
+	
 	s := baseStore{
 		Config:         baseStoreConfig,
-		kv:             map[string][]byte{"A": []byte("a")},
+		kvImpl:         kvImpl,
 		totalSizeBytes: 2,
 	}
 	s.SetDeltas([]*pbsubstreams.StoreDelta{
@@ -123,9 +128,12 @@ func Test_baseStore_SetDeltas(t *testing.T) {
 			NewValue:  []byte("d"),
 		},
 	})
-	assert.Len(t, s.kv, 2)
-	assert.Equal(t, "b", string(s.kv["B"]))
-	assert.Equal(t, "d", string(s.kv["C"]))
+	
+	snapshot, err := saveToMap(s.kvImpl.Save())
+	assert.NoError(t, err)
+	assert.Len(t, snapshot, 2)
+	assert.Equal(t, "b", string(snapshot["B"]))
+	assert.Equal(t, "d", string(snapshot["C"]))
 	assert.Equal(t, uint64(4), s.totalSizeBytes)
 	assert.Len(t, s.deltas, 4)
 }

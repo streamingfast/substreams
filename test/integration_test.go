@@ -182,6 +182,29 @@ func TestForkHandling(t *testing.T) {
 	}
 }
 
+// TestStoreSizeLimit guards the tier1 linear-pipeline wiring of the configured
+// per-store size limit (RuntimeConfig.StoreSizeLimit). Regression: tier1 used to
+// hardcode 0 when building its store ConfigMap, so it always applied the default
+// store size limit and ignored the operator-configured value. With a tiny limit
+// set here, tier1's own linear processing must trip ErrStoreAboveMaxSize; if the
+// limit is silently dropped again, the store grows unbounded and this test fails.
+func TestStoreSizeLimit(t *testing.T) {
+	manifest.TestUseSimpleHash = true
+	bstream.GetProtocolFirstStreamableBlock = 0
+
+	defaultSPKG := "./testdata/simple_substreams/substreams-test-v0.1.0.spkg"
+
+	run := newTestRun(t, 25, 25, 29, 0, "assert_test_store_add_i64", defaultSPKG)
+	run.ProductionMode = false
+	run.ParallelSubrequests = 1
+	run.StoreSizeLimit = 1 // 1 byte: any store content trips the limit on tier1
+
+	err := run.Run(t, "store_size_limit")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "became too big")
+	assert.Contains(t, err.Error(), "maximum size: 1")
+}
+
 func TestOneStoreOneMap(t *testing.T) {
 	testStoreAddI64Hash := hex.EncodeToString([]byte("setup_test_store_add_i64"))
 	assertTestStoreAddI64Hash := hex.EncodeToString([]byte("assert_test_store_add_i64"))

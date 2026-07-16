@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
@@ -62,7 +63,9 @@ func (c *Config) WriteDeterministicError(ctx context.Context, atBlock uint64, er
 	}
 
 	r := strings.NewReader(err.Error())
-	return c.errStore.WriteObject(ctx, fmt.Sprintf("errors.%010d.%s", atBlock, c.extendedModuleHash), r)
+	// The trailing unix timestamp lets the reader expire errors older than a configured
+	// duration; errors without a timestamp are treated as expired and deleted on read.
+	return c.errStore.WriteObject(ctx, fmt.Sprintf("errors.%010d.%s.%d", atBlock, c.extendedModuleHash, time.Now().Unix()), r)
 }
 
 func (c *Config) NewFile(targetRange *block.Range) *File {

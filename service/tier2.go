@@ -99,6 +99,8 @@ type Tier2Service struct {
 	HostedStoreRegistryAddress string
 
 	checkPendingShutdown func() bool
+	storesScratchSpace   string
+	storesBackend        string
 
 	tier2RequestParameters *reqctx.Tier2RequestParameters
 
@@ -127,8 +129,6 @@ func NewTier2(
 
 		activeRequests: active_requests.NewActiveRequestsManager(logger),
 	}
-
-	setSubstreamsStoreSizeLimitFromEnv(logger)
 
 	if debugAPIAddress := os.Getenv("SUBSTREAMS_TIER2_DEBUG_API_ADDR"); debugAPIAddress != "" {
 		debugAPI := debugapi.New(
@@ -236,6 +236,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 
 	fields := []zap.Field{
 		zap.Uint64("segment_size", request.SegmentSize),
+		zap.Uint64("merged_blocks_bundle_size", request.MergedBlocksBundleSizeOrDefault()),
 		zap.Uint32("stage", request.Stage),
 		zap.String("output_module", request.OutputModule),
 		zap.Uint64("first_streamable_block", request.FirstStreamableBlock),
@@ -415,7 +416,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	}
 
 	storeSizeLimit := reqctx.StoreSizeLimit(ctx)
-	storeConfigs, err := store.NewConfigMap(cacheStore, nil, execGraph.Stores(), execGraph.ModuleHashes(), request.FirstStreamableBlock, storeSizeLimit)
+	storeConfigs, err := store.NewConfigMap(cacheStore, nil, execGraph.Stores(), execGraph.ModuleHashes(), request.FirstStreamableBlock, storeSizeLimit, s.storesScratchSpace, s.storesBackend)
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
@@ -463,6 +464,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return nil
 	}
 	stores := pipeline.NewStores(ctx, storeConfigs, request.SegmentSize, requestDetails.ResolvedStartBlockNum, stopBlock, true, executionPlan.StoresToWrite)
+	defer stores.Close()
 
 	// this engine will keep the ExistingExecOuts to optimize the execution (for inputs from modules that skip execution)
 	execOutputCacheEngine, err := cache.NewEngine(ctx, executionPlan.ExecoutWriters, request.BlockType, executionPlan.ExistingExecOuts, executionPlan.IndexWriters)
@@ -625,7 +627,8 @@ excludable:
 		return pipe.OnStreamTerminated(ctx, streamErr)
 	}
 	sf := &StreamFactory{
-		mergedBlocksStore: mergedBlocksStore,
+		mergedBlocksStore:      mergedBlocksStore,
+		mergedBlocksBundleSize: request.MergedBlocksBundleSizeOrDefault(),
 	}
 	streamFactoryFunc := sf.New
 
@@ -810,7 +813,7 @@ func toGRPCError(ctx context.Context, err error) error {
 		return status.Error(codes.DeadlineExceeded, err.Error())
 	}
 	if errors.Is(err, wasm.ErrWasmDeterministicExec) || errors.Is(err, store.ErrStoreAboveMaxSize) {
-		return status.Error(codes.InvalidArgument, fmt.Sprintf("%s (deterministic error)", err.Error()))
+		return status.Error(codes.InvalidArgument, fmt.Sprintf("%s (new deterministic error)", err.Error()))
 	}
 
 	var errInvalidArg *stream.ErrInvalidArg

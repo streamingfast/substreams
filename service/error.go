@@ -105,7 +105,7 @@ func toConnectError(ctx context.Context, err error) error {
 	}
 
 	if errors.Is(err, wasm.ErrWasmDeterministicExec) || errors.Is(err, store.ErrStoreAboveMaxSize) {
-		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("%w (deterministic error)", err))
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("%w (new deterministic error)", err))
 	}
 
 	var errInvalidArg *bsstream.ErrInvalidArg
@@ -132,10 +132,14 @@ func toGrpcTier1Error(ctx context.Context, err error) error {
 		if contextCause := context.Cause(ctx); contextCause != nil {
 			err = contextCause // unwrap errors in canceled contexts
 			if errors.Is(err, context.Canceled) {
-				return connect.NewError(connect.CodeCanceled, err)
+				// Return a gRPC status error (like every other branch below) so the caller's
+				// status.Code() resolves to codes.Canceled and logs at Debug. A connect error
+				// here resolves to codes.Unknown, wrongly logging a client disconnect as WARN
+				// (and the gRPC middleware then reports "code Unknown" at ERROR).
+				return status.Error(codes.Canceled, err.Error())
 			}
 		} else {
-			return connect.NewError(connect.CodeCanceled, err)
+			return status.Error(codes.Canceled, err.Error())
 		}
 	}
 
@@ -216,7 +220,7 @@ func toGrpcTier1Error(ctx context.Context, err error) error {
 	}
 
 	if errors.Is(err, wasm.ErrWasmDeterministicExec) || errors.Is(err, store.ErrStoreAboveMaxSize) {
-		return status.Errorf(codes.InvalidArgument, "%s (deterministic error)", err)
+		return status.Errorf(codes.InvalidArgument, "%s (new deterministic error)", err)
 	}
 
 	var errInvalidArg *bsstream.ErrInvalidArg

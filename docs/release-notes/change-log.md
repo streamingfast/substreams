@@ -18,6 +18,47 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Changed
 
 - Manifest: environment variable expansion in `imports` and `protobuf.importPaths` now errors out when a referenced variable is undefined, instead of silently substituting an empty string.
+## v1.20.1
+
+### Fixed
+
+- Server: linear quickload resume now emits `SessionInit` (trace id) and starts keepalives before the store decode streams, instead of after. A large or remote quicksave could previously stream for a long time with zero client output; the quickload-success path also never emitted a `SessionInit` at all.
+
+## v1.20.0
+
+### Changed
+
+- Server: the store size limit override is now configured by a tier1 flag (`Tier1Config.StoreSizeLimit`, exposed as `--substreams-tier1-store-size-limit`) instead of the `SUBSTREAMS_STORE_SIZE_LIMIT` environment variable, which has been removed. The value is forwarded from tier1 to tier2 on every subrequest via the existing `ProcessRangeRequest.store_size_limit` field, so it no longer needs to be set on tier2. `0` keeps the default of 1GiB.
+- Server: store quicksave/quickload now run up to 8 stores concurrently instead of one at a time, cutting shutdown/resume latency for pipelines with many stores.
+- Server: quicksave now streams the store lazily and unsorted (one KV entry at a time as the upload consumes it, without sorting keys), instead of buffering the whole serialized store and paying an O(n log n) key sort plus key-slice allocation up front. This lowers both peak memory and save time for large stores (millions of keys). Quickload is order-independent, and the on-disk format is unchanged (byte-compatible protobuf), so no migration is required.
+- Server: tier1 store loading at request start now loads up to 8 stores concurrently (both the size probe and the download/decode), instead of one at a time.
+
+### Added
+
+- Server: new opt-in mmap (bbolt-backed) store backend, selectable via `--substreams-stores-backend=mmap` (default `memory`). It keeps FullKV store data in a memory-mapped file so cold pages are reclaimable by the kernel under memory pressure, instead of pinning everything on the non-reclaimable Go heap — this addresses production OOMs with large or highly concurrent stores. The in-memory backend remains the default and is byte-for-byte unchanged; mmap is validated to produce identical output. **The scratch-space directory holding the bbolt files (`StoresScratchSpace`, default "{sf-data-dir}/substreams/stores-scratch") must live on a local NVMe SSD**: the store is continuously read from and written to through the mmap, and the kernel pages it straight to that file, so a slow or network-backed disk turns store operations into an I/O bottleneck and negates the benefit. Do not point it at network/EBS-class storage.
+
+- Server: cached deterministic errors now expire. Each error file carries a write timestamp in its name (`errors.<block>.<hash>.<unix>`), and on read tier1 discards any error older than `SUBSTREAMS_DETERMINISTIC_ERROR_MAX_AGE` (Go duration, default `1h`), retrying execution. Legacy error files without a timestamp are deleted on read.
+
+- Server: new `ProcessRangeRequest.merged_blocks_bundle_size` field (internal tier1→tier2 protocol) carrying the number of blocks per merged-blocks file. `0` (older tier1s) means the historical default of `100`. Tier2 applies the value per-request, so a single tier2 can serve chains with different merged-blocks sizes. **Upgrade all tier2s before setting a non-100 value on any tier1**: older tier2s ignore the field and would read the store with a bundle size of 100 (jobs stall on missing file names).
+- Server: new `Tier1Config.MergedBlocksBundleSize` (default `100`), used by tier1's own merged-blocks reads, cursor resolution, final-block rounding and forwarded to tier2 on every subrequest. The hub's kept final blocks and the live backfiller delay now scale with the bundle size.
+- `substreams tools tier2call`: new `--merged-blocks-bundle-size` flag (default `0` = server default).
+
+- Server: store quicksave now also triggers on client disconnect (context canceled), not only on graceful server shutdown, so a reconnecting client can resume without reprocessing. Only applies to production-mode requests.
+- Server: the `substreams request stats` log now includes the last block sent to the client (`last_sent_block_num`, `last_sent_block_id`, `last_sent_block_time`).
+- Server: quicksave/quickload logs now report their duration (`save_duration` / `load_duration`).
+
+### Fixed
+
+- Server: canceled store loads now abort promptly instead of reading the entire (multi-GB) store file into the heap before returning. A tier2 store `Load` now checks the request context while streaming entries, so a canceled/disconnected request stops hydrating immediately. Also `memoryKVImpl.Close()` now drops its backing map (was a no-op), and the post-load `SetMetadata` goroutine no longer captures the whole loaded store (only the object store, filename and metadata) and runs under a bounded 30s timeout — together these stop a finished/canceled request from transiently pinning gigabytes of store data.
+- Server: a Blocks request whose start block resolves (from a cursor) to exactly the exclusive stop block now completes cleanly instead of returning `InvalidArgument: start block and stop block are the same`. The range is empty (stop is exclusive), so the stream is already done; this previously surfaced as a fatal, non-retryable error to clients that reconnected with a cursor sitting on the last block of the range after a transient disconnect. Raw (cursor-less) requests with `start == stop` still return the InvalidArgument as before.
+- Sink: when resuming from a cursor already at or past the stop block, the sinker now shuts down immediately instead of opening a stream to the server. The pre-flight check previously compared the cursor against `adjustedEndBlock()` (stop block inflated by the partial-blocks buffer capacity), so a cursor sitting in the `[stopBlock-1, stopBlock+bufferCap-1)` window was let through and issued a useless request; it now compares against the raw exclusive `StopBlock`.
+- Server: client disconnects (`context canceled`) on a tier1 Blocks stream are no longer logged as `WARNING`/`ERROR`. `toGrpcTier1Error` returned a `connect` error for the canceled case (unlike every other branch, which returns a gRPC `status` error), so the caller's `status.Code()` resolved to `Unknown` — logging the request completion as a WARN and the gRPC middleware call as an ERROR with `code Unknown`. It now returns `codes.Canceled`, so the disconnect is logged at Debug/Info as intended.
+- Server: bumped `dstore`, which now sends S3 request checksums only when the target requires them, fixing uploads/downloads against S3-compatible stores that reject the newer default checksum headers.
+- Server: the quicksave block count now counts settled blocks (normal or last-partial) instead of skipping partials entirely, so quicksave arms correctly on flash-block chains. The minimum sent-block threshold before a quicksave triggers was raised from 25 to 50.
+- Server: `tier1` calls to hosted foundational stores now forward the `x-organization-id` identity header (alongside the existing trusted headers), so a store's internal trust-based listener can authorize the request without an end-user JWT. This fixes `Unauthenticated: required authorization token not found` errors when reading from hosted foundational stores resolved via the control-plane registry.
+- Server: foundational store calls that fail with authentication errors, organization id mismatch, or prolonged unreachability now bubble up to the user as a non-deterministic (uncached) error instead of retrying until the global deadline. Transient unavailability is still retried (~30s) to absorb blips and rolling restarts.
+- Server: a client cancellation (`context canceled`) while loading an execout file is now logged at INFO instead of ERROR in the execout walker.
+- CLI: `substreams info <shortname>` now fetches the package from the download endpoint (spkg.io) instead of the registry API host, fixing `package does not exist on the Substreams registry` for short-name lookups such as `substreams info common`.
 
 ## v1.19.0
 

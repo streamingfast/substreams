@@ -1318,6 +1318,7 @@ github.com/streamingfast/bstream v0.0.2-0.20260219185151-b5ba3f4bc777 h1:odiGZ0Z
 github.com/streamingfast/bstream v0.0.2-0.20260219185151-b5ba3f4bc777/go.mod h1:6IkpMw6g2z+E4gH2DJkm6vsQfZ8Y/WdYdYWjsLJIYr4=
 github.com/streamingfast/bstream v0.0.2-0.20260219205021-a73f004bfdea h1:dshasnf6SEnOvhmbsMxw6SA+qm+eiuNp45IQX47Ivac=
 github.com/streamingfast/bstream v0.0.2-0.20260219205021-a73f004bfdea/go.mod h1:6IkpMw6g2z+E4gH2DJkm6vsQfZ8Y/WdYdYWjsLJIYr4=
+github.com/streamingfast/bstream v0.0.2-0.20260611155534-4edda1cff251/go.mod h1:Asuul2Rnxln0Vk6eY869AZ2UybIQcB7eYOQAIhfQHzE=
 github.com/streamingfast/derr v0.0.0-20210811180100-9138d738bcec/go.mod h1:ulVfui/yGXmPBbt9aAqCWdAjM7YxnZkYHzvQktLfw3M=
 github.com/streamingfast/dgrpc v0.0.0-20250227145723-9bc2e4941b4e/go.mod h1:qdcskj9WmO+nDjgxyafc5oMCftTZolOk693p2ZFUdO8=
 github.com/streamingfast/dgrpc v0.0.0-20251218133127-15b36e02a74f/go.mod h1:B+RAf6/idk6Kz41wEAEeQH1PW3Bk6WQkmvuRhdTEgKg=
@@ -1413,6 +1414,7 @@ go.etcd.io/etcd/pkg/v3 v3.6.8 h1:Xe+LIL974spy8b4nEx3H0KMr1ofq3r0kh6FbU3aw4es=
 go.etcd.io/etcd/pkg/v3 v3.6.8/go.mod h1:TRibVNe+FqJIe1abOAA1PsuQ4wqO87ZaOoprg09Tn8c=
 go.etcd.io/etcd/server/v3 v3.6.8 h1:U2strdSEy1U8qcSzRIdkYpvOPtBy/9i/IfaaCI9flZ4=
 go.etcd.io/etcd/server/v3 v3.6.8/go.mod h1:88dCtwUnSirkUoJbflQxxWXqtBSZa6lSG0Kuej+dois=
+go.etcd.io/gofail v0.2.0/go.mod h1:nL3ILMGfkXTekKI3clMBNazKnjUZjYLKmBHzsVAnC1o=
 go.etcd.io/raft/v3 v3.6.0 h1:5NtvbDVYpnfZWcIHgGRk9DyzkBIXOi8j+DDp1IcnUWQ=
 go.etcd.io/raft/v3 v3.6.0/go.mod h1:nLvLevg6+xrVtHUmVaTcTz603gQPHfh7kUAwV6YpfGo=
 go.opencensus.io v0.23.0/go.mod h1:XItmlyltB5F7CS4xOC1DcqMoFqwtC6OG2xF7mCv7P7E=

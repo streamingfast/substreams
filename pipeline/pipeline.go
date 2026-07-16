@@ -10,6 +10,7 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/RoaringBitmap/roaring/roaring64"
+	"github.com/abourget/llerrgroup"
 	"github.com/dustin/go-humanize"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dmetering"
@@ -146,6 +147,8 @@ type Pipeline struct {
 	lastProcessedBlockRef bstream.BlockRef
 	lastCursor            *bstream.Cursor
 	sentBlocks            uint64
+	quickSaved            bool
+	sessionInitSent       bool // ensures a single Response_Session per request; see sendSession
 
 	blockStepMap         map[bstream.StepType]uint64
 	workerPoolFactory    work.WorkerPoolFactory
@@ -259,34 +262,40 @@ func (p *Pipeline) InitTier2Stores(ctx context.Context) (err error) {
 	return nil
 }
 
-func (p *Pipeline) initStoresFromQuickload(ctx context.Context, reqPlan *plan.RequestPlan) (success bool) {
+// openStoresFromQuickload checks whether the request can resume linearly from its
+// cursor by loading store state from the temporary quicksave files, and if so opens
+// (but does NOT yet stream) those files. Returning a primed store map + the cursor
+// block lets the caller emit the client's session/trace-id before the slow streaming
+// decode in finishStoresFromQuickload. On any miss it cleans up and returns false so
+// the caller falls back to a full parallel rebuild.
+func (p *Pipeline) openStoresFromQuickload(ctx context.Context, reqPlan *plan.RequestPlan) (store.Map, bstream.BlockRef, bool) {
 
 	// no stores to init
 	if len(p.stores.configs) == 0 {
-		return false
+		return nil, nil, false
 	}
 
 	if reqPlan.LinearPipeline == nil {
-		return false
+		return nil, nil, false
 	}
 
 	if reqPlan.WriteExecOut != nil || reqPlan.ReadExecOut != nil {
-		return false
+		return nil, nil, false
 	}
 
 	details := reqctx.Details(ctx)
 	if details.ResolvedCursor == "" {
-		return false
+		return nil, nil, false
 	}
 
 	cursor, err := bstream.CursorFromOpaque(details.ResolvedCursor)
 	if err != nil {
 		reqctx.Logger(ctx).Warn("invalid cursor", zap.Error(err))
-		return false
+		return nil, nil, false
 	}
 
 	if !reqPlan.LinearPipeline.Contains(cursor.Block.Num() + 1) {
-		return false
+		return nil, nil, false
 	}
 
 	storeMap := store.NewMap()
@@ -294,20 +303,67 @@ func (p *Pipeline) initStoresFromQuickload(ctx context.Context, reqPlan *plan.Re
 		storeMap[storeConfig.Name()] = storeConfig.NewFullKV(p.stores.logger)
 	}
 
-	if err := storeMap.QuickLoad(ctx, cursor.Block); err != nil {
+	if err := storeMap.QuickLoadOpen(ctx, cursor.Block); err != nil {
 		p.stores.logger.Info("no temporary store files found", zap.Error(err))
-		return false
+		p.closeQuickloadStores(storeMap)
+		return nil, nil, false
 	}
-	reqctx.Logger(ctx).Info("skipping backprocessing, reading from temporary files", zap.Strings("stores", storeMap.Names()), zap.Uint64("block_num", cursor.Block.Num()), zap.String("block_id", cursor.Block.ID()))
+
+	return storeMap, cursor.Block, true
+}
+
+// finishStoresFromQuickload streams the quicksave files opened by
+// openStoresFromQuickload into the store map and installs it as the active store map.
+func (p *Pipeline) finishStoresFromQuickload(ctx context.Context, storeMap store.Map, atBlock bstream.BlockRef) error {
+	if err := storeMap.QuickLoadFinish(ctx, atBlock); err != nil {
+		return err
+	}
+	reqctx.Logger(ctx).Info("skipping backprocessing, reading from temporary files", zap.Strings("stores", storeMap.Names()), zap.Uint64("block_num", atBlock.Num()), zap.String("block_id", atBlock.ID()))
 	p.stores.StoreMap = storeMap
-	return true
+	return nil
+}
+
+// closeQuickloadStores releases the KV backends (e.g. the bbolt mmap file) of a
+// quickload store map that will not be used, so a failed/abandoned quickload does
+// not leak open stores.
+func (p *Pipeline) closeQuickloadStores(storeMap store.Map) {
+	for _, st := range storeMap.All() {
+		if closer, ok := st.(interface{ Close() error }); ok {
+			if cerr := closer.Close(); cerr != nil {
+				p.stores.logger.Warn("failed to close store after quickload failure", zap.String("store", st.Name()), zap.Error(cerr))
+			}
+		}
+	}
 }
 
 func (p *Pipeline) InitTier1StoresAndBackprocess(ctx context.Context, reqPlan *plan.RequestPlan, noopMode bool) (bool, error) {
-	success := p.initStoresFromQuickload(ctx, reqPlan)
-	if success {
-		reqctx.Details(ctx).FromQuickload = true
-		return true, nil
+	if storeMap, atBlock, ok := p.openStoresFromQuickload(ctx, reqPlan); ok {
+		// Emit the session (trace id) and start keepalives BEFORE streaming the
+		// quicksave files: that decode can take a long time for a large store on a
+		// cold/remote quicksave store, and it used to run with zero output to the
+		// client, risking a gateway/client idle-timeout before the trace id ever
+		// arrived. The files are already open here, so we're committed to the linear
+		// resume path.
+		if err := p.emitLinearSessionInit(ctx); err != nil {
+			storeMap.QuickLoadClose()
+			p.closeQuickloadStores(storeMap)
+			return false, err
+		}
+
+		// A decode failure here (corrupt/truncated file, or canceled context) falls
+		// through to a full rebuild below, exactly as a missing file would. The already
+		// -emitted linear session is deduped by sendSession, so the rebuild path won't
+		// emit a second, conflicting one. Release the abandoned store map first (open
+		// readers + mmap db/temp file), and leave FromQuickload false so the rebuild is
+		// not mistaken for a genuine quickload resume downstream (live backfiller).
+		if err := p.finishStoresFromQuickload(ctx, storeMap, atBlock); err != nil {
+			p.stores.logger.Warn("quicksave present but failed to decode, falling back to full processing", zap.Error(err))
+			storeMap.QuickLoadClose()
+			p.closeQuickloadStores(storeMap)
+		} else {
+			reqctx.Details(ctx).FromQuickload = true
+			return true, nil
+		}
 	}
 
 	if reqPlan.RequiresParallelProcessing() {
@@ -318,46 +374,67 @@ func (p *Pipeline) InitTier1StoresAndBackprocess(ctx context.Context, reqPlan *p
 		p.stores.SetStoreMap(storeMap) // this is valid even if we don't have stores in the parallelProcessing but only a mapper
 		return false, nil
 	} else {
-
-		reqDetails := reqctx.Details(ctx)
-		var toProcessAfter uint64
-		estimateProcessUpto := reqDetails.StopBlockNum
-		if estimateProcessUpto == 0 && p.getHeadBlockNum != nil {
-			headBlock, err := p.getHeadBlockNum()
-			if err != nil {
-				reqctx.Logger(ctx).Warn("cannot get head block for sessionInit", zap.Error(err))
-			} else {
-				estimateProcessUpto = headBlock
-			}
+		if err := p.emitLinearSessionInit(ctx); err != nil {
+			return false, err
 		}
-
-		if estimateProcessUpto != 0 && estimateProcessUpto > reqDetails.ResolvedStartBlockNum {
-			toProcessAfter = estimateProcessUpto - reqDetails.ResolvedStartBlockNum
-		}
-
-		p.respFunc(&pbsubstreamsrpc.Response{
-			Message: &pbsubstreamsrpc.Response_Session{
-				Session: &pbsubstreamsrpc.SessionInit{
-					TraceId:                                  tracing.GetTraceID(ctx).String(),
-					ResolvedStartBlock:                       reqDetails.ResolvedStartBlockNum,
-					LinearHandoffBlock:                       reqDetails.LinearHandoffBlockNum,
-					MaxParallelWorkers:                       reqDetails.MaxParallelJobs,
-					BlocksToProcessBeforeStartBlock:          0,
-					EffectiveBlocksToProcessBeforeStartBlock: 0,
-					BlocksToProcessAfterStartBlock:           toProcessAfter, // only linear processing
-					EffectiveBlocksToProcessAfterStartBlock:  toProcessAfter, // only linear processing
-				},
-			},
-		})
-
-		if err := reqDetails.AssertProcessedBlocksLimit(0, toProcessAfter); err != nil {
-			return false, connect.NewError(connect.CodeFailedPrecondition, err)
-		}
-
 	}
 
 	p.stores.SetStoreMap(p.setupEmptyStores(ctx))
 	return false, nil
+}
+
+// sendSession emits the request's Response_Session, at most once. Both the linear
+// (emitLinearSessionInit) and parallel (runParallelProcess) paths funnel through
+// here, so a quickload that emits its linear session and then falls back to a full
+// rebuild cannot produce a second, conflicting session. Called only from the request
+// goroutine, so the flag needs no synchronization.
+func (p *Pipeline) sendSession(session *pbsubstreamsrpc.SessionInit) {
+	if p.sessionInitSent {
+		return
+	}
+	p.sessionInitSent = true
+	p.respFunc(&pbsubstreamsrpc.Response{
+		Message: &pbsubstreamsrpc.Response_Session{Session: session},
+	})
+}
+
+// emitLinearSessionInit sends the Response_Session message for a purely linear run
+// (no parallel backprocessing): quickload resume from a cursor, or a start block
+// already inside the linear pipeline. The parallel path emits its own Session message
+// from runParallelProcess.
+func (p *Pipeline) emitLinearSessionInit(ctx context.Context) error {
+	reqDetails := reqctx.Details(ctx)
+	var toProcessAfter uint64
+	estimateProcessUpto := reqDetails.StopBlockNum
+	if estimateProcessUpto == 0 && p.getHeadBlockNum != nil {
+		headBlock, err := p.getHeadBlockNum()
+		if err != nil {
+			reqctx.Logger(ctx).Warn("cannot get head block for sessionInit", zap.Error(err))
+		} else {
+			estimateProcessUpto = headBlock
+		}
+	}
+
+	if estimateProcessUpto != 0 && estimateProcessUpto > reqDetails.ResolvedStartBlockNum {
+		toProcessAfter = estimateProcessUpto - reqDetails.ResolvedStartBlockNum
+	}
+
+	p.sendSession(&pbsubstreamsrpc.SessionInit{
+		TraceId:                                  tracing.GetTraceID(ctx).String(),
+		ResolvedStartBlock:                       reqDetails.ResolvedStartBlockNum,
+		LinearHandoffBlock:                       reqDetails.LinearHandoffBlockNum,
+		MaxParallelWorkers:                       reqDetails.MaxParallelJobs,
+		BlocksToProcessBeforeStartBlock:          0,
+		EffectiveBlocksToProcessBeforeStartBlock: 0,
+		BlocksToProcessAfterStartBlock:           toProcessAfter, // only linear processing
+		EffectiveBlocksToProcessAfterStartBlock:  toProcessAfter, // only linear processing
+	})
+
+	if err := reqDetails.AssertProcessedBlocksLimit(0, toProcessAfter); err != nil {
+		return connect.NewError(connect.CodeFailedPrecondition, err)
+	}
+
+	return nil
 }
 
 func (p *Pipeline) GetStoreMap() store.Map {
@@ -388,6 +465,17 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 	logger := reqctx.Logger(ctx)
 
 	storeMap = store.NewMap()
+	defer func() {
+		if err != nil {
+			for _, st := range storeMap.All() {
+				if closer, ok := st.(interface{ Close() error }); ok {
+					if cerr := closer.Close(); cerr != nil {
+						logger.Warn("failed to close store after setup error", zap.String("store", st.Name()), zap.Error(cerr))
+					}
+				}
+			}
+		}
+	}()
 
 	type loadable struct {
 		fullKVStore *store.FullKV
@@ -434,17 +522,30 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 
 	storesMetadata := make(map[string]map[string]string)
 	var neededSize uint64
+	var sizeMu sync.Mutex
+	egSize := llerrgroup.New(8)
 	for _, loadable := range loadableStores {
-		compressed, uncompressed, metadata, err := loadable.fullKVStore.GetSize(ctx, loadable.fileInfo.Filename) // ignore error here
-		if err != nil {
-			logger.Debug("failed to get size of store", zap.String("store_name", loadable.fullKVStore.Name()), zap.Error(err))
+		if egSize.Stop() {
+			break
 		}
-		if uncompressed == nil {
-			neededSize += compressed * 4
-		} else {
-			neededSize += *uncompressed
-		}
-		storesMetadata[loadable.fullKVStore.Name()] = metadata
+		egSize.Go(func() error {
+			compressed, uncompressed, metadata, err := loadable.fullKVStore.GetSize(ctx, loadable.fileInfo.Filename) // ignore error here
+			if err != nil {
+				logger.Debug("failed to get size of store", zap.String("store_name", loadable.fullKVStore.Name()), zap.Error(err))
+			}
+			sizeMu.Lock()
+			if uncompressed == nil {
+				neededSize += compressed * 4
+			} else {
+				neededSize += *uncompressed
+			}
+			storesMetadata[loadable.fullKVStore.Name()] = metadata
+			sizeMu.Unlock()
+			return nil
+		})
+	}
+	if err := egSize.Wait(); err != nil {
+		return nil, err
 	}
 
 	logger.Info("about to load stores", zap.String("approx_store_size", humanize.IBytes(neededSize)))
@@ -457,35 +558,46 @@ func (p *Pipeline) setupSubrequestStores(ctx context.Context) (storeMap store.Ma
 	}
 
 	var actualRequestStoresSize uint64
+	var loadMu sync.Mutex
+	egLoad := llerrgroup.New(8)
 	for _, loadable := range loadableStores {
-		if err := loadable.fullKVStore.Load(ctx, loadable.fileInfo); err != nil {
-			if errors.Is(err, store.ErrInvalidFullKVFile) {
-				logger.Warn("found a corrupted fullKV store, deleting it", zap.Error(err), zap.String("store_name", loadable.fullKVStore.Name()), zap.String("store_hash", loadable.fullKVStore.ModuleHash()), zap.String("filename", loadable.fileInfo.Filename))
-				if err := loadable.fullKVStore.Delete(ctx, loadable.fileInfo); err != nil {
-					logger.Error("cannot delete corrupted fullKV store", zap.Error(err), zap.String("store_name", loadable.fullKVStore.Name()), zap.String("store_hash", loadable.fullKVStore.ModuleHash()), zap.String("filename", loadable.fileInfo.Filename))
+		if egLoad.Stop() {
+			break
+		}
+		egLoad.Go(func() error {
+			if err := loadable.fullKVStore.Load(ctx, loadable.fileInfo); err != nil {
+				// A canceled context surfaces as ErrInvalidFullKVFile because the
+				// streaming unmarshal wraps the read error as a string, so only
+				// treat the file as corrupt when the context is still live —
+				// otherwise a canceled request would delete a valid store file.
+				if errors.Is(err, store.ErrInvalidFullKVFile) && ctx.Err() == nil {
+					logger.Warn("found a corrupted fullKV store, deleting it", zap.Error(err), zap.String("store_name", loadable.fullKVStore.Name()), zap.String("store_hash", loadable.fullKVStore.ModuleHash()), zap.String("filename", loadable.fileInfo.Filename))
+					if err := loadable.fullKVStore.Delete(ctx, loadable.fileInfo); err != nil {
+						logger.Error("cannot delete corrupted fullKV store", zap.Error(err), zap.String("store_name", loadable.fullKVStore.Name()), zap.String("store_hash", loadable.fullKVStore.ModuleHash()), zap.String("filename", loadable.fileInfo.Filename))
+					}
 				}
+				return fmt.Errorf("load full store %s (%s): %w", loadable.fullKVStore.Name(), loadable.fullKVStore.ModuleHash(), err)
 			}
-			return nil, fmt.Errorf("load full store %s (%s): %w", loadable.fullKVStore.Name(), loadable.fullKVStore.ModuleHash(), err)
-		}
-		//  add loaded file size to metadata
-		met := storesMetadata[loadable.fullKVStore.Name()]
-		if met == nil {
-			met = make(map[string]string)
-		}
-		actualSize := loadable.fullKVStore.SizeBytes()
-		if met["datasize"] == "" {
-			met["datasize"] = fmt.Sprintf("%d", actualSize)
-		}
-		actualRequestStoresSize += actualSize
-		go func() {
-			err := loadable.fullKVStore.Store().SetMetadata(ctx, loadable.fullKVStore.Filename(), met)
-			if err != nil {
-				logger.Debug("failed to set metadata on store",
-					zap.String("store_name", loadable.fullKVStore.Name()),
-					zap.String("filename", loadable.fullKVStore.Filename()),
-					zap.Error(err))
+			//  add loaded file size to metadata
+			actualSize := loadable.fullKVStore.SizeBytes()
+			loadMu.Lock()
+			met := storesMetadata[loadable.fullKVStore.Name()]
+			if met == nil {
+				met = make(map[string]string)
 			}
-		}()
+			if met["datasize"] == "" {
+				met["datasize"] = fmt.Sprintf("%d", actualSize)
+			}
+			actualRequestStoresSize += actualSize
+			loadMu.Unlock()
+			// Detached metadata write: does not retain fullKVStore or ride the
+			// request ctx (see store.SetMetadataDetached).
+			store.SetMetadataDetached(loadable.fullKVStore.Store(), loadable.fullKVStore.Filename(), loadable.fullKVStore.Name(), met, logger)
+			return nil
+		})
+	}
+	if err := egLoad.Wait(); err != nil {
+		return nil, err
 	}
 
 	if reqHandler := reqctx.ActiveRequestsHandler(ctx); reqHandler != nil {
@@ -545,20 +657,15 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 	}
 
 	blocksBefore, effectiveBlocksBefore, blocksAfter, effectiveBlocksAfter := parallelProcessor.Stages().BlocksToProcess(headBlockNum)
-	traceId := tracing.GetTraceID(ctx).String()
-	p.respFunc(&pbsubstreamsrpc.Response{
-		Message: &pbsubstreamsrpc.Response_Session{
-			Session: &pbsubstreamsrpc.SessionInit{
-				TraceId:                                  traceId,
-				ResolvedStartBlock:                       reqDetails.ResolvedStartBlockNum,
-				LinearHandoffBlock:                       reqDetails.LinearHandoffBlockNum,
-				MaxParallelWorkers:                       reqDetails.MaxParallelJobs,
-				BlocksToProcessBeforeStartBlock:          blocksBefore,
-				BlocksToProcessAfterStartBlock:           blocksAfter,
-				EffectiveBlocksToProcessBeforeStartBlock: effectiveBlocksBefore,
-				EffectiveBlocksToProcessAfterStartBlock:  effectiveBlocksAfter,
-			},
-		},
+	p.sendSession(&pbsubstreamsrpc.SessionInit{
+		TraceId:                                  tracing.GetTraceID(ctx).String(),
+		ResolvedStartBlock:                       reqDetails.ResolvedStartBlockNum,
+		LinearHandoffBlock:                       reqDetails.LinearHandoffBlockNum,
+		MaxParallelWorkers:                       reqDetails.MaxParallelJobs,
+		BlocksToProcessBeforeStartBlock:          blocksBefore,
+		BlocksToProcessAfterStartBlock:           blocksAfter,
+		EffectiveBlocksToProcessBeforeStartBlock: effectiveBlocksBefore,
+		EffectiveBlocksToProcessAfterStartBlock:  effectiveBlocksAfter,
 	})
 
 	if err := reqDetails.AssertProcessedBlocksLimit(effectiveBlocksBefore, effectiveBlocksAfter); err != nil {

@@ -8,6 +8,7 @@ import (
 	"os"
 	"runtime/debug"
 	"strconv"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/streamingfast/bstream"
@@ -44,7 +45,7 @@ func getBiggestPartialBlockIndex() int32 {
 }
 
 var ErrShuttingDown = errors.New("endpoint is shutting down, please reconnect")
-var minBlocksProcessedToSave = uint64(25)
+var minBlocksProcessedToSave = uint64(50)
 
 func (p *Pipeline) ProcessFromExecOutput(
 	ctx context.Context,
@@ -432,6 +433,13 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 
 	mapModuleOutput := normalizeModuleOutput(p.mapModuleOutput, reqDetails.OutputModule)
 
+	// Only the last partial settles a canonical block; intermediate (flash) partials are churn
+	// and must not count towards the quicksave threshold. This mirrors the non-partial full-block
+	// count in handleStepNew (which is skipped when a block settles through this path).
+	if isLast {
+		p.sentBlocks++
+	}
+
 	if err = returnPartialDataOutput(clock, cursor, mapModuleOutput, p.respFunc, uint32(idx), isLast, p.supportBuffering); err != nil {
 		return fmt.Errorf("failed to return module data output: %w", err)
 	}
@@ -452,17 +460,47 @@ func normalizeModuleOutput(in *pbsubstreamsrpc.MapModuleOutput, outputModule str
 	return in
 }
 
+// quickSaveStores writes the current store state to the temporary quicksave store so a
+// reconnecting client can resume without reprocessing. It is called both on graceful server
+// shutdown and on client disconnect. `reason` is only used for logging. It is idempotent: a
+// second call is a no-op once the stores have already been quick-saved.
+func (p *Pipeline) quickSaveStores(ctx context.Context, reason string) error {
+	if !p.isTier1 || p.quickSaved {
+		return nil
+	}
+
+	// Quickload is only wired up for production-mode requests, so there is no point saving otherwise.
+	if !reqctx.Details(ctx).ProductionMode {
+		return nil
+	}
+
+	if p.stores.StoreMap == nil || p.sentBlocks <= minBlocksProcessedToSave {
+		p.stores.logger.Info(reason+" (no quick save)", zap.Bool("has_stores", p.stores.StoreMap != nil), zap.Uint64("sent_blocks", p.sentBlocks))
+		return nil
+	}
+
+	p.quickSaved = true
+	p.stores.logger.Info(reason+", quick saving stores", zap.Uint64("block_num", p.lastProcessedBlockRef.Num()), zap.String("block_id", p.lastProcessedBlockRef.ID()))
+	if err := p.undoPartialStates(); err != nil {
+		return err
+	}
+
+	// The incoming context may already be canceled (client disconnect), so detach it to make
+	// sure the store write is not aborted before it completes. Cap it at 2 minutes so a slow or
+	// stuck store write can never hang the shutdown/disconnect path indefinitely.
+	saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Minute)
+	defer cancel()
+	if err := p.stores.StoreMap.QuickSave(saveCtx, p.lastProcessedBlockRef.ID()); err != nil {
+		p.stores.logger.Warn("quick save failed", zap.Error(err))
+	}
+	return nil
+}
+
 func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, execOutput execout.ExecutionOutput, isFinalBlock bool) (err error) {
 
 	if p.isTier1 && p.checkPendingShutdown() {
-		if p.stores.StoreMap != nil && p.sentBlocks > minBlocksProcessedToSave {
-			p.stores.logger.Info("shutting down, quick saving stores")
-			if err := p.undoPartialStates(); err != nil {
-				return err
-			}
-			p.stores.StoreMap.QuickSave(ctx, p.lastProcessedBlockRef.ID())
-		} else {
-			p.stores.logger.Info("shutting down (no quick save)", zap.Bool("has_stores", p.stores.StoreMap != nil), zap.Uint64("sent_blocks", p.sentBlocks))
+		if err := p.quickSaveStores(ctx, "shutting down"); err != nil {
+			return err
 		}
 		return ErrShuttingDown
 	}
@@ -745,13 +783,13 @@ func (p *Pipeline) execute(ctx context.Context, executor exec.ModuleExecutor, ex
 			}
 
 			if errors.Is(recoveredErr, wasm.ErrWasmDeterministicExec) || errors.Is(recoveredErr, store.ErrStoreAboveMaxSize) {
-				p.execoutStorage.ConfigMap[executorName].WriteDeterministicError(ctx, execOutput.Clock().Number, fmt.Errorf("%w (deterministic error)", recoveredErr))
+				p.execoutStorage.ConfigMap[executorName].WriteDeterministicError(ctx, execOutput.Clock().Number, recoveredErr)
 				out.err = recoveredErr
 				return
 			}
 
 			// Those are not deterministic errors, just propagate them up for now, but the context is probably cancelled at this point
-			if errors.Is(recoveredErr, wasm.ErrFoundationalStoreCanceled) {
+			if errors.Is(recoveredErr, wasm.ErrFoundationalStoreCanceled) || errors.Is(recoveredErr, wasm.ErrFoundationalStoreFatal) {
 				out.err = recoveredErr
 				return
 			}

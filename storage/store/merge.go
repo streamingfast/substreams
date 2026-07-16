@@ -18,25 +18,29 @@ import (
 func (b *baseStore) setKV(k string, v []byte) {
 	b.recentlyDeletedPrefixes.RemoveMatching(k)
 
-	if prev, ok := b.kv[k]; ok {
+	if prev, ok := b.kvImpl.Get(k); ok {
 		b.totalSizeBytes -= uint64(len(prev))
 	} else {
 		b.totalSizeBytes += uint64(len(k))
 	}
 	b.totalSizeBytes += uint64(len(v))
-	b.kv[k] = v
+	if err := b.kvImpl.Set(k, v); err != nil {
+		panic(fmt.Sprintf("failed to set key %q: %v", k, err))
+	}
 }
 
 func (b *baseStore) setNewKV(k string, v []byte) {
 	b.recentlyDeletedPrefixes.RemoveMatching(k)
 
 	b.totalSizeBytes += uint64(len(k) + len(v))
-	b.kv[k] = v
+	if err := b.kvImpl.Set(k, v); err != nil {
+		panic(fmt.Sprintf("failed to set key %q: %v", k, err))
+	}
 }
 
 // Merge nextStore _into_ `s`, where nextStore is for the next contiguous segment's store output.
 func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
-	b.logger.Debug("merging store", zap.Int("current_key_count", len(b.kv)), zap.Uint64("mod_init_block", b.moduleInitialBlock), zap.Int("partial_key_count", len(kvPartialStore.kv)), zap.Uint64("partial_start_block", kvPartialStore.initialBlock))
+	b.logger.Debug("merging store", zap.Int("current_key_count", b.kvImpl.KeyCount()), zap.Uint64("mod_init_block", b.moduleInitialBlock), zap.Int("partial_key_count", kvPartialStore.kvImpl.KeyCount()), zap.Uint64("partial_start_block", kvPartialStore.initialBlock))
 
 	if kvPartialStore.updatePolicy != b.updatePolicy {
 		return fmt.Errorf("incompatible update policies: policy %q cannot merge policy %q", b.updatePolicy, kvPartialStore.updatePolicy)
@@ -57,153 +61,237 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 		b.logger.Debug("merging: applied delete prefixes", zap.Duration("duration", time.Since(partialKvTime)))
 	}
 
+	return b.mergeBatched(kvPartialStore)
+}
+
+// mergeBatched is the optimized Merge path.
+//
+// Instead of Snapshot(partial) + N×Get() + N×Set(), it:
+//  1. Streams partial keys via Iter() — no heap copy of the partial store
+//  2. Reads existing FullKV values via GetMany() — single read transaction
+//  3. Computes merged results in memory
+//  4. Writes all results via BatchSet() — ~N/10k transactions instead of N
+//
+// This reduces mmap Merge from O(N) transactions to O(N/batchSize) transactions,
+// cutting 500k-key Merge from ~15s / 30GB heap to ~700ms / 550MB heap.
+// mergeChunkSize bounds how many partial keys are processed per Merge window.
+// It is a var (not a const) so tests can shrink it to exercise chunk boundaries.
+var mergeChunkSize = 25_000
+
+func (b *baseStore) mergeBatched(kvPartialStore *PartialKV) error {
 	intoValueTypeLower := strings.ToLower(b.valueType)
+
+	// Step 1: Stream all partial keys into memory.
+	// For mmap partial stores this is a single db.View() scan; for memory it's a sorted walk.
+	// We collect into a slice to preserve key list for GetMany.
+	partialEntries := make([]mergeEntry, 0, kvPartialStore.kvImpl.KeyCount())
+	if err := kvPartialStore.kvImpl.Iter(func(key string, value []byte) error {
+		// Copy value — Iter contract says value is only valid during callback
+		v := make([]byte, len(value))
+		copy(v, value)
+		partialEntries = append(partialEntries, mergeEntry{key, v})
+		return nil
+	}); err != nil {
+		return fmt.Errorf("iterating partial store: %w", err)
+	}
+
+	// Steps 2-5 run over fixed-size windows of the partial so existingKV,
+	// existingSizes, results and the keys slice never span the whole partial at
+	// once. This caps the per-key map/slice bookkeeping — which dominates heap
+	// for small-value/high-key-count partials — at ~mergeChunkSize keys instead
+	// of the full partial key count. partialEntries itself is still held whole (it
+	// owns the value bytes copied in Step 1).
+	for start := 0; start < len(partialEntries); start += mergeChunkSize {
+		end := start + mergeChunkSize
+		if end > len(partialEntries) {
+			end = len(partialEntries)
+		}
+		if err := b.mergeChunk(intoValueTypeLower, partialEntries[start:end]); err != nil {
+			return err
+		}
+	}
+
+	b.Reset() // Merge should never keep deltas or ordinals
+	return nil
+}
+
+type mergeEntry struct {
+	key string
+	val []byte
+}
+
+// mergeChunk applies Merge steps 2-5 (read existing values, compute merged
+// results, update size accounting, BatchSet) for a single window of partial
+// entries.
+func (b *baseStore) mergeChunk(intoValueTypeLower string, partialEntries []mergeEntry) error {
+
+	// Step 2: Read what we need about the existing FullKV values for all partial
+	// keys, in a single transaction.
+	//
+	// SET and SET_IF_NOT_EXISTS never fold the previous value into the result —
+	// they only need to know whether a key already existed (SET_IF_NOT_EXISTS)
+	// and its former size (for the totalSizeBytes accounting below). For those we
+	// fetch value *lengths* only via GetManySizes, which on the mmap backend
+	// reads the sizes straight out of the bbolt pages without copying every
+	// previous value onto the heap — a full random-read sweep whose bytes would
+	// otherwise be allocated, copied, and immediately discarded. All other
+	// policies fold the previous value into the merge and need the bytes, so they
+	// fetch via GetMany. Either way existingSizes ends up populated for every
+	// present key so the accounting path stays backend- and policy-agnostic.
+	keys := make([]string, len(partialEntries))
+	for i, e := range partialEntries {
+		keys[i] = e.key
+	}
+	var (
+		existingKV    map[string][]byte // populated only for value-consuming policies
+		existingSizes map[string]int    // always populated: present key -> old value length
+		err           error
+	)
+	switch b.updatePolicy {
+	case pbsubstreams.Module_KindStore_UPDATE_POLICY_SET,
+		pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS:
+		existingSizes, err = b.kvImpl.GetManySizes(keys)
+		if err != nil {
+			return fmt.Errorf("reading existing key sizes from full store: %w", err)
+		}
+	default:
+		existingKV, err = b.kvImpl.GetMany(keys)
+		if err != nil {
+			return fmt.Errorf("reading existing keys from full store: %w", err)
+		}
+		existingSizes = make(map[string]int, len(existingKV))
+		for k, v := range existingKV {
+			existingSizes[k] = len(v)
+		}
+	}
+
+	// Step 3: Compute merged results in memory.
+	results := make(map[string][]byte, len(partialEntries))
 
 	switch b.updatePolicy {
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_SET:
-		for k, v := range kvPartialStore.kv {
-			b.setKV(k, v)
+		for _, e := range partialEntries {
+			results[e.key] = e.val
 		}
+
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_IF_NOT_EXISTS:
-		for k, v := range kvPartialStore.kv {
-			if _, found := b.kv[k]; !found {
-				b.setNewKV(k, v)
+		// existingSizes populated above — only write keys not already present
+		for _, e := range partialEntries {
+			if _, found := existingSizes[e.key]; !found {
+				results[e.key] = e.val
 			}
 		}
+
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_APPEND:
-		for k, v := range kvPartialStore.kv {
-			if prevVal, found := b.kv[k]; found {
-				newLen := len(prevVal) + len(v)
+		for _, e := range partialEntries {
+			if prevVal, found := existingKV[e.key]; found {
+				newLen := len(prevVal) + len(e.val)
 				if b.appendLimit > 0 && uint64(newLen) >= b.appendLimit {
 					return fmt.Errorf("append would exceed limit of %d bytes", b.appendLimit)
 				}
-
-				nextVal := make([]byte, len(prevVal)+len(v))
-				copy(nextVal[0:], prevVal)
-				copy(nextVal[len(prevVal):], v)
-				b.setKV(k, nextVal)
+				nextVal := make([]byte, newLen)
+				copy(nextVal, prevVal)
+				copy(nextVal[len(prevVal):], e.val)
+				results[e.key] = nextVal
 			} else {
-				b.setNewKV(k, v)
+				results[e.key] = e.val
 			}
 		}
+
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_ADD:
-		// check valueType to do the right thing
 		switch intoValueTypeLower {
 		case manifest.OutputValueTypeInt64:
-			sum := func(a, b int64) int64 {
-				return a + b
-			}
-			for k, v := range kvPartialStore.kv {
-				v0b, fv0 := b.kv[k]
+			sum := func(a, b int64) int64 { return a + b }
+			for _, e := range partialEntries {
+				v0b, fv0 := existingKV[e.key]
 				v0 := foundOrZeroInt64(v0b, fv0)
-				v1 := foundOrZeroInt64(v, true)
-				b.setKV(k, []byte(fmt.Sprintf("%d", sum(v0, v1))))
+				v1 := foundOrZeroInt64(e.val, true)
+				results[e.key] = []byte(fmt.Sprintf("%d", sum(v0, v1)))
 			}
 		case manifest.OutputValueTypeFloat64:
-			sum := func(a, b float64) float64 {
-				return a + b
-			}
-			for k, v := range kvPartialStore.kv {
-				v0b, fv0 := b.kv[k]
+			sum := func(a, b float64) float64 { return a + b }
+			for _, e := range partialEntries {
+				v0b, fv0 := existingKV[e.key]
 				v0 := foundOrZeroFloat(v0b, fv0)
-				v1 := foundOrZeroFloat(v, true)
-				b.setKV(k, floatToBytes(sum(v0, v1)))
+				v1 := foundOrZeroFloat(e.val, true)
+				results[e.key] = floatToBytes(sum(v0, v1))
 			}
 		case manifest.OutputValueTypeBigInt:
-			sum := func(a, b *big.Int) *big.Int {
-				return new(big.Int).Add(a, b)
-			}
-			for k, v := range kvPartialStore.kv {
-				v0b, fv0 := b.kv[k]
+			sum := func(a, b *big.Int) *big.Int { return new(big.Int).Add(a, b) }
+			for _, e := range partialEntries {
+				v0b, fv0 := existingKV[e.key]
 				v0 := foundOrZeroBigInt(v0b, fv0)
-				v1 := foundOrZeroBigInt(v, true)
-				b.setKV(k, []byte(fmt.Sprintf("%d", sum(v0, v1))))
+				v1 := foundOrZeroBigInt(e.val, true)
+				results[e.key] = []byte(fmt.Sprintf("%d", sum(v0, v1)))
 			}
 		case manifest.OutputValueTypeBigFloat:
 			fallthrough
 		case manifest.OutputValueTypeBigDecimal:
-			sum := func(a, b decimal.Decimal) decimal.Decimal {
-				return a.Add(b)
-			}
-			for k, v := range kvPartialStore.kv {
-				v0b, fv0 := b.kv[k]
+			sum := func(a, b decimal.Decimal) decimal.Decimal { return a.Add(b) }
+			for _, e := range partialEntries {
+				v0b, fv0 := existingKV[e.key]
 				v0 := foundOrZeroBigDecimal(v0b, fv0)
-				v1 := foundOrZeroBigDecimal(v, true)
-				b.setKV(k, []byte(sum(v0, v1).String()))
+				v1 := foundOrZeroBigDecimal(e.val, true)
+				results[e.key] = []byte(sum(v0, v1).String())
 			}
 		default:
 			return fmt.Errorf("update policy %q not supported for value type %q", b.updatePolicy, b.valueType)
 		}
+
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_SET_SUM:
 		switch intoValueTypeLower {
 		case manifest.OutputValueTypeInt64:
-			sum := func(a, b int64) int64 {
-				return a + b
-			}
-			for k, v := range kvPartialStore.kv {
-				if bytes.HasPrefix(v, []byte("set:")) {
-					newV := bytes.Join([][]byte{[]byte("sum:"), v[4:]}, nil)
-					b.setKV(k, newV)
+			sum := func(a, b int64) int64 { return a + b }
+			for _, e := range partialEntries {
+				if bytes.HasPrefix(e.val, []byte("set:")) {
+					results[e.key] = append([]byte("sum:"), e.val[4:]...)
 				} else {
-					//  add both numbers by parsing out the int64 after the ":" in the value
-					v0b, fv0 := b.kv[k]
+					v0b, fv0 := existingKV[e.key]
 					v0 := foundOrZeroPrefixedInt64(v0b, fv0)
-					v1 := foundOrZeroPrefixedInt64(v, true)
-					b.setKV(k, []byte(fmt.Sprintf("sum:%d", sum(v0, v1))))
+					v1 := foundOrZeroPrefixedInt64(e.val, true)
+					results[e.key] = []byte(fmt.Sprintf("sum:%d", sum(v0, v1)))
 				}
 			}
 		case manifest.OutputValueTypeFloat64:
-			sum := func(a, b float64) float64 {
-				return a + b
-			}
-			for k, v := range kvPartialStore.kv {
-				if bytes.HasPrefix(v, []byte("set:")) {
-					b.setKV(k, floatToPrefixedBytes("sum:", bytesToFloat(v[4:])))
+			sum := func(a, b float64) float64 { return a + b }
+			for _, e := range partialEntries {
+				if bytes.HasPrefix(e.val, []byte("set:")) {
+					results[e.key] = floatToPrefixedBytes("sum:", bytesToFloat(e.val[4:]))
 				} else {
-					//  add both numbers by parsing out the float64 after the ":" in the value
-					v0b, fv0 := b.kv[k]
+					v0b, fv0 := existingKV[e.key]
 					v0 := foundOrZeroPrefixedFloat(v0b, fv0)
-					v1 := foundOrZeroPrefixedFloat(v, true)
-					b.setKV(k, floatToPrefixedBytes("sum:", sum(v0, v1)))
+					v1 := foundOrZeroPrefixedFloat(e.val, true)
+					results[e.key] = floatToPrefixedBytes("sum:", sum(v0, v1))
 				}
 			}
 		case manifest.OutputValueTypeBigInt:
-			sum := func(a, b *big.Int) *big.Int {
-				return new(big.Int).Add(a, b)
-			}
-			for k, v := range kvPartialStore.kv {
-				if bytes.HasPrefix(v, []byte("set:")) {
-					newV := bytes.Join([][]byte{[]byte("sum:"), v[4:]}, nil)
-					b.setKV(k, newV)
+			sum := func(a, b *big.Int) *big.Int { return new(big.Int).Add(a, b) }
+			for _, e := range partialEntries {
+				if bytes.HasPrefix(e.val, []byte("set:")) {
+					results[e.key] = append([]byte("sum:"), e.val[4:]...)
 				} else {
-					//  add both numbers by parsing out the int64 after the ":" in the value
-					v0b, fv0 := b.kv[k]
+					v0b, fv0 := existingKV[e.key]
 					v0 := foundOrZeroPrefixedBigInt(v0b, fv0)
-					v1 := foundOrZeroPrefixedBigInt(v, true)
-					b.setKV(k, []byte(fmt.Sprintf("sum:%d", sum(v0, v1))))
+					v1 := foundOrZeroPrefixedBigInt(e.val, true)
+					results[e.key] = []byte(fmt.Sprintf("sum:%d", sum(v0, v1)))
 				}
 			}
 		case manifest.OutputValueTypeBigFloat:
 			fallthrough
 		case manifest.OutputValueTypeBigDecimal:
-			sum := func(a, b decimal.Decimal) decimal.Decimal {
-				return a.Add(b)
-			}
-			for k, v := range kvPartialStore.kv {
-				if bytes.HasPrefix(v, []byte("set:")) {
-					b.setKV(k, []byte(fmt.Sprintf("sum:%s", string(v[4:]))))
+			sum := func(a, b decimal.Decimal) decimal.Decimal { return a.Add(b) }
+			for _, e := range partialEntries {
+				if bytes.HasPrefix(e.val, []byte("set:")) {
+					results[e.key] = []byte(fmt.Sprintf("sum:%s", string(e.val[4:])))
 				} else {
-					//  add both numbers by parsing out the float64 after the ":" in the value
-					v0b, fv0 := b.kv[k]
+					v0b, fv0 := existingKV[e.key]
 					v0 := foundOrZeroPrefixedBigDecimal(v0b, fv0)
-					v1 := foundOrZeroPrefixedBigDecimal(v, true)
-					b.setKV(k, bytes.Join([][]byte{
-						[]byte("sum:"),
-						[]byte(sum(v0, v1).String()),
-					}, nil))
+					v1 := foundOrZeroPrefixedBigDecimal(e.val, true)
+					results[e.key] = bytes.Join([][]byte{[]byte("sum:"), []byte(sum(v0, v1).String())}, nil)
 				}
 			}
 		}
+
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_MAX:
 		switch intoValueTypeLower {
 		case manifest.OutputValueTypeInt64:
@@ -213,16 +301,15 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 				}
 				return b
 			}
-			for k, v := range kvPartialStore.kv {
-				v1 := foundOrZeroInt64(v, true)
-				v, found := b.kv[k]
+			for _, e := range partialEntries {
+				v1 := foundOrZeroInt64(e.val, true)
+				v0b, found := existingKV[e.key]
 				if !found {
-					b.setNewKV(k, []byte(fmt.Sprintf("%d", v1)))
+					results[e.key] = []byte(fmt.Sprintf("%d", v1))
 					continue
 				}
-				v0 := foundOrZeroInt64(v, true)
-
-				b.setKV(k, []byte(fmt.Sprintf("%d", max(v0, v1))))
+				v0 := foundOrZeroInt64(v0b, true)
+				results[e.key] = []byte(fmt.Sprintf("%d", max(v0, v1)))
 			}
 		case manifest.OutputValueTypeFloat64:
 			max := func(a, b float64) float64 {
@@ -231,16 +318,15 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 				}
 				return a
 			}
-			for k, v := range kvPartialStore.kv {
-				v1 := foundOrZeroFloat(v, true)
-				v, found := b.kv[k]
+			for _, e := range partialEntries {
+				v1 := foundOrZeroFloat(e.val, true)
+				v0b, found := existingKV[e.key]
 				if !found {
-					b.setNewKV(k, floatToBytes(v1))
+					results[e.key] = floatToBytes(v1)
 					continue
 				}
-				v0 := foundOrZeroFloat(v, true)
-
-				b.setKV(k, floatToBytes(max(v0, v1)))
+				v0 := foundOrZeroFloat(v0b, true)
+				results[e.key] = floatToBytes(max(v0, v1))
 			}
 		case manifest.OutputValueTypeBigInt:
 			max := func(a, b *big.Int) *big.Int {
@@ -249,16 +335,15 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 				}
 				return a
 			}
-			for k, v := range kvPartialStore.kv {
-				v1 := foundOrZeroBigInt(v, true)
-				v, found := b.kv[k]
+			for _, e := range partialEntries {
+				v1 := foundOrZeroBigInt(e.val, true)
+				v0b, found := existingKV[e.key]
 				if !found {
-					b.setNewKV(k, []byte(v1.String()))
+					results[e.key] = []byte(v1.String())
 					continue
 				}
-				v0 := foundOrZeroBigInt(v, true)
-
-				b.setKV(k, []byte(fmt.Sprintf("%d", max(v0, v1))))
+				v0 := foundOrZeroBigInt(v0b, true)
+				results[e.key] = []byte(fmt.Sprintf("%d", max(v0, v1)))
 			}
 		case manifest.OutputValueTypeBigFloat:
 			fallthrough
@@ -269,20 +354,20 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 				}
 				return a
 			}
-			for k, v := range kvPartialStore.kv {
-				v1 := foundOrZeroBigDecimal(v, true)
-				v, found := b.kv[k]
+			for _, e := range partialEntries {
+				v1 := foundOrZeroBigDecimal(e.val, true)
+				v0b, found := existingKV[e.key]
 				if !found {
-					b.setNewKV(k, []byte(v1.String()))
+					results[e.key] = []byte(v1.String())
 					continue
 				}
-				v0 := foundOrZeroBigDecimal(v, true)
-
-				b.setNewKV(k, []byte(max(v0, v1).String()))
+				v0 := foundOrZeroBigDecimal(v0b, true)
+				results[e.key] = []byte(max(v0, v1).String())
 			}
 		default:
-			return fmt.Errorf("update policy %q not supported for value type %q", kvPartialStore.updatePolicy, kvPartialStore.valueType)
+			return fmt.Errorf("update policy %q not supported for value type %q", b.updatePolicy, b.valueType)
 		}
+
 	case pbsubstreams.Module_KindStore_UPDATE_POLICY_MIN:
 		switch intoValueTypeLower {
 		case manifest.OutputValueTypeInt64:
@@ -292,16 +377,15 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 				}
 				return b
 			}
-			for k, v := range kvPartialStore.kv {
-				v1 := foundOrZeroInt64(v, true)
-				v, found := b.kv[k]
+			for _, e := range partialEntries {
+				v1 := foundOrZeroInt64(e.val, true)
+				v0b, found := existingKV[e.key]
 				if !found {
-					b.setNewKV(k, []byte(fmt.Sprintf("%d", v1)))
+					results[e.key] = []byte(fmt.Sprintf("%d", v1))
 					continue
 				}
-				v0 := foundOrZeroInt64(v, true)
-
-				b.setKV(k, []byte(fmt.Sprintf("%d", min(v0, v1))))
+				v0 := foundOrZeroInt64(v0b, true)
+				results[e.key] = []byte(fmt.Sprintf("%d", min(v0, v1)))
 			}
 		case manifest.OutputValueTypeFloat64:
 			min := func(a, b float64) float64 {
@@ -310,16 +394,15 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 				}
 				return b
 			}
-			for k, v := range kvPartialStore.kv {
-				v1 := foundOrZeroFloat(v, true)
-				v, found := b.kv[k]
+			for _, e := range partialEntries {
+				v1 := foundOrZeroFloat(e.val, true)
+				v0b, found := existingKV[e.key]
 				if !found {
-					b.setNewKV(k, floatToBytes(v1))
+					results[e.key] = floatToBytes(v1)
 					continue
 				}
-				v0 := foundOrZeroFloat(v, true)
-
-				b.setKV(k, floatToBytes(min(v0, v1)))
+				v0 := foundOrZeroFloat(v0b, true)
+				results[e.key] = floatToBytes(min(v0, v1))
 			}
 		case manifest.OutputValueTypeBigInt:
 			min := func(a, b *big.Int) *big.Int {
@@ -328,16 +411,15 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 				}
 				return b
 			}
-			for k, v := range kvPartialStore.kv {
-				v1 := foundOrZeroBigInt(v, true)
-				v, found := b.kv[k]
+			for _, e := range partialEntries {
+				v1 := foundOrZeroBigInt(e.val, true)
+				v0b, found := existingKV[e.key]
 				if !found {
-					b.setNewKV(k, []byte(v1.String()))
+					results[e.key] = []byte(v1.String())
 					continue
 				}
-				v0 := foundOrZeroBigInt(v, true)
-
-				b.setKV(k, []byte(fmt.Sprintf("%d", min(v0, v1))))
+				v0 := foundOrZeroBigInt(v0b, true)
+				results[e.key] = []byte(fmt.Sprintf("%d", min(v0, v1)))
 			}
 		case manifest.OutputValueTypeBigFloat:
 			fallthrough
@@ -348,24 +430,42 @@ func (b *baseStore) Merge(kvPartialStore *PartialKV) error {
 				}
 				return b
 			}
-			for k, v := range kvPartialStore.kv {
-				v1 := foundOrZeroBigDecimal(v, true)
-				v, found := b.kv[k]
+			for _, e := range partialEntries {
+				v1 := foundOrZeroBigDecimal(e.val, true)
+				v0b, found := existingKV[e.key]
 				if !found {
-					b.setNewKV(k, []byte(v1.String()))
+					results[e.key] = []byte(v1.String())
 					continue
 				}
-				v0 := foundOrZeroBigDecimal(v, true)
-				b.setNewKV(k, []byte(min(v0, v1).String()))
+				v0 := foundOrZeroBigDecimal(v0b, true)
+				results[e.key] = []byte(min(v0, v1).String())
 			}
 		default:
 			return fmt.Errorf("update policy %q not supported for value type %q", b.updatePolicy, b.valueType)
 		}
+
 	default:
 		return fmt.Errorf("update policy %q not supported", b.updatePolicy) // should have been validated already
 	}
 
-	b.Reset() // Merge should never keep deltas or ordinals
+	// Step 4: Update totalSizeBytes accounting before BatchSet.
+	// For each key we're writing: subtract old value size (if existed), add new value size.
+	// For new keys: also add the key size.
+	for k, newVal := range results {
+		if oldLen, existed := existingSizes[k]; existed {
+			b.totalSizeBytes -= uint64(oldLen)
+		} else {
+			b.totalSizeBytes += uint64(len(k))
+		}
+		b.totalSizeBytes += uint64(len(newVal))
+		b.recentlyDeletedPrefixes.RemoveMatching(k)
+	}
+
+	// Step 5: Write all results in batched transactions.
+	if err := b.kvImpl.BatchSet(results); err != nil {
+		return fmt.Errorf("batch writing merged results: %w", err)
+	}
+
 	return nil
 }
 

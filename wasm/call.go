@@ -20,17 +20,33 @@ import (
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/storage/store"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 var ErrWasmDeterministicExec = errors.New("wasm execution failed deterministically")
 var ErrFoundationalStoreCanceled = errors.New("foundational store request canceled")
+
+// ErrFoundationalStoreFatal indicates a foundational store call failed in a way
+// that retrying will not fix (authentication failure, organization id mismatch,
+// or the store being unreachable). It is non-deterministic so it bubbles up to
+// the user without being cached.
+var ErrFoundationalStoreFatal = errors.New("foundational store request failed")
 
 // Foundational store retry configuration constants
 const (
 	foundationalStoreRetryDelay  = 100 * time.Millisecond
 	foundationalStoreMaxWaitTime = 30 * time.Second
 )
+
+// foundationalStoreMaxUnreachableRetries bounds how many consecutive
+// "unreachable" (codes.Unavailable) responses we tolerate before giving up, so a
+// transient blip or rolling restart is absorbed but a truly down or
+// misconfigured endpoint fails fast instead of retrying until the global
+// deadline. At foundationalStoreRetryDelay each, this is ~30s of budget. It is a
+// var (not a const) so tests can lower it.
+var foundationalStoreMaxUnreachableRetries = 300
 
 type Call struct {
 	ctx        context.Context
@@ -339,27 +355,47 @@ func (c *Call) DoHasLast(storeIndex int, key string) (found bool) {
 	return readStore.HasLast(key)
 }
 
+// foundationalStoreOutgoingContext builds the outgoing gRPC context used to call
+// a (possibly hosted) foundational store.
+//
+// It forwards the trusted identity headers resolved for this request (via dauth)
+// and, explicitly, the x-organization-id header so a hosted store's internal
+// (trust-based) listener can authorize the request without requiring the
+// end-user JWT, which is consumed upstream and never reaches tier1. For hosted
+// stores whose public endpoint still expects the original Bearer token, the raw
+// authorization header is forwarded when present in the incoming context.
+func foundationalStoreOutgoingContext(ctx context.Context, logger *zap.Logger) context.Context {
+	auth := dauth.FromContext(ctx)
+	callCtx := auth.ToOutgoingGRPCContext(ctx)
+
+	if orgID := auth.OrganizationID(); orgID != "" {
+		callCtx = metadata.AppendToOutgoingContext(callCtx, dauth.HeaderNewOrganizationID, orgID)
+	}
+
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		if auths := md.Get("authorization"); len(auths) > 0 {
+			if ce := logger.Check(zap.DebugLevel, "forwarding foundational store authorization header"); ce != nil {
+				ce.Write(
+					zap.Int("token_length", len(auths[0])),
+					zap.String("organization_id", auth.OrganizationID()),
+				)
+			}
+			callCtx = metadata.AppendToOutgoingContext(callCtx, "authorization", auths[0])
+		}
+	}
+
+	return callCtx
+}
+
 func (c *Call) DoFoundationalStoreGet(index uint32, keys *pbmodel.Keys) *pbmodel.QueriedEntries {
 	c.validateFoundationalStoreIndex(int(index), "foundational_store_get_all")
 
 	logger := reqctx.Logger(c.ctx).With(zap.Uint32("foundational_store_index", index))
 	logger = logger.Named("DoFoundationalStoreGet")
 
+	unreachableRetries := 0
 	for {
-		auth := dauth.FromContext(c.ctx)
-		callCtx := auth.ToOutgoingGRPCContext(c.ctx)
-		// Forward raw authorization header if present (for hosted store auth plugins that expect the original Bearer token)
-		if md, ok := metadata.FromIncomingContext(c.ctx); ok {
-			if auths := md.Get("authorization"); len(auths) > 0 {
-				if ce := logger.Check(zap.DebugLevel, "forwarding foundational store authorization header"); ce != nil {
-					ce.Write(
-						zap.Int("token_length", len(auths[0])),
-						zap.String("organization_id", auth.OrganizationID()),
-					)
-				}
-				callCtx = metadata.AppendToOutgoingContext(callCtx, "authorization", auths[0])
-			}
-		}
+		callCtx := foundationalStoreOutgoingContext(c.ctx, logger)
 		ctx, cancel := context.WithTimeoutCause(callCtx, foundationalStoreMaxWaitTime, fmt.Errorf("foundational store get_all timeout after %s", foundationalStoreMaxWaitTime))
 		defer cancel()
 
@@ -382,6 +418,10 @@ func (c *Call) DoFoundationalStoreGet(index uint32, keys *pbmodel.Keys) *pbmodel
 				c.PanicNonDeterministicError(ErrFoundationalStoreCanceled)
 			}
 
+			// Fatal errors (auth, org id mismatch, prolonged unreachability) bubble
+			// up as non-deterministic instead of retrying until the global deadline.
+			c.handleFoundationalStoreError(err, &unreachableRetries)
+
 			logger.Warn("failed to call foundational store", zap.Error(err))
 			time.Sleep(foundationalStoreRetryDelay)
 			continue
@@ -399,21 +439,9 @@ func (c *Call) DoFoundationalStoreGetFirst(index uint32, keys *pbmodel.Keys) *pb
 
 	logger := reqctx.Logger(c.ctx).With(zap.Uint32("foundational_store_index", index))
 
+	unreachableRetries := 0
 	for {
-		auth := dauth.FromContext(c.ctx)
-		callCtx := auth.ToOutgoingGRPCContext(c.ctx)
-		// Forward raw authorization header if present (for hosted store auth plugins that expect the original Bearer token)
-		if md, ok := metadata.FromIncomingContext(c.ctx); ok {
-			if auths := md.Get("authorization"); len(auths) > 0 {
-				if ce := logger.Check(zap.DebugLevel, "forwarding foundational store authorization header"); ce != nil {
-					ce.Write(
-						zap.Int("token_length", len(auths[0])),
-						zap.String("organization_id", auth.OrganizationID()),
-					)
-				}
-				callCtx = metadata.AppendToOutgoingContext(callCtx, "authorization", auths[0])
-			}
-		}
+		callCtx := foundationalStoreOutgoingContext(c.ctx, logger)
 		ctx, cancel := context.WithTimeoutCause(callCtx, foundationalStoreMaxWaitTime, fmt.Errorf("foundational store get_all timeout after %s", foundationalStoreMaxWaitTime))
 		defer cancel()
 
@@ -436,6 +464,10 @@ func (c *Call) DoFoundationalStoreGetFirst(index uint32, keys *pbmodel.Keys) *pb
 				c.PanicNonDeterministicError(ErrFoundationalStoreCanceled)
 			}
 
+			// Fatal errors (auth, org id mismatch, prolonged unreachability) bubble
+			// up as non-deterministic instead of retrying until the global deadline.
+			c.handleFoundationalStoreError(err, &unreachableRetries)
+
 			logger.Warn("failed to call foundational store", zap.Error(err))
 			time.Sleep(foundationalStoreRetryDelay)
 			continue
@@ -446,6 +478,25 @@ func (c *Call) DoFoundationalStoreGetFirst(index uint32, keys *pbmodel.Keys) *pb
 		}
 
 		time.Sleep(foundationalStoreRetryDelay)
+	}
+}
+
+// handleFoundationalStoreError classifies a gRPC error returned by a foundational
+// store call. Fatal errors that retrying cannot fix (authentication failure,
+// organization id mismatch, or the store being unreachable for too long) panic
+// with a non-deterministic error so they bubble up to the user uncached. Other
+// errors return so the caller keeps retrying (e.g. a local request timeout, or
+// the store not having reached the requested block yet). unreachableRetries
+// accumulates consecutive codes.Unavailable responses across the retry loop.
+func (c *Call) handleFoundationalStoreError(err error, unreachableRetries *int) {
+	switch status.Code(err) {
+	case codes.Unauthenticated, codes.PermissionDenied:
+		c.PanicNonDeterministicError(fmt.Errorf("%w: %s", ErrFoundationalStoreFatal, err))
+	case codes.Unavailable:
+		*unreachableRetries++
+		if *unreachableRetries > foundationalStoreMaxUnreachableRetries {
+			c.PanicNonDeterministicError(fmt.Errorf("%w: store unreachable after %d attempts: %s", ErrFoundationalStoreFatal, *unreachableRetries, err))
+		}
 	}
 }
 

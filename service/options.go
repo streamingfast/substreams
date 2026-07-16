@@ -1,6 +1,8 @@
 package service
 
 import (
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/streamingfast/substreams/wasm"
@@ -91,6 +93,49 @@ func WithFoundationalStoreEndpoints(endpoints map[string]string) Option {
 			// not used
 		case *Tier2Service:
 			s.foundationalEndpoints = endpoints
+		}
+	}
+}
+
+func WithStoresScratchSpace(path string) Option {
+	return func(a anyTierService) {
+		switch s := a.(type) {
+		case *Tier1Service:
+			s.runtimeConfig.StoresScratchSpace = path
+			deleteLeftoverStoreFilesAtStartup(path)
+		case *Tier2Service:
+			s.storesScratchSpace = path
+			deleteLeftoverStoreFilesAtStartup(path)
+		}
+	}
+}
+
+// deleteLeftoverStoreFilesAtStartup deletes mmap store (.db) files left in the
+// scratch dir by a previous run. Only safe at startup, before any request runs.
+func deleteLeftoverStoreFilesAtStartup(dir string) {
+	matches, _ := filepath.Glob(filepath.Join(dir, "substreams-store-*.db"))
+	for _, f := range matches {
+		os.Remove(f)
+	}
+}
+
+// WithStoreSizeLimit sets the per-store size limit on tier1's own (linear)
+// pipeline. Tier2 receives this limit per-request via ProcessRangeRequest.
+func WithStoreSizeLimit(limit uint64) Option {
+	return func(a anyTierService) {
+		if s, ok := a.(*Tier1Service); ok {
+			s.runtimeConfig.StoreSizeLimit = limit
+		}
+	}
+}
+
+func WithStoresBackend(backend string) Option {
+	return func(a anyTierService) {
+		switch s := a.(type) {
+		case *Tier1Service:
+			s.runtimeConfig.StoresBackend = backend
+		case *Tier2Service:
+			s.storesBackend = backend
 		}
 	}
 }

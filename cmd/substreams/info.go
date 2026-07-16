@@ -66,7 +66,7 @@ func runInfo(cmd *cobra.Command, args []string) error {
 	}
 
 	opts := []manifest.Option{
-		manifest.WithRegistryURL(getSubstreamsRegistryEndpoint()),
+		manifest.WithRegistryURL(getSubstreamsDownloadEndpoint()),
 	}
 	if skipPackageValidation {
 		opts = append(opts, manifest.SkipPackageValidationReader())

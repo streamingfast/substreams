@@ -143,7 +143,10 @@ func computeLinearHandoffBlockNum(productionMode bool, startBlock, stopBlock uin
 		}
 		libHandoffBoundary := libHandoff - (libHandoff % segmentSize)
 
-		if stopBlock == 0 || libHandoff < stopBlock {
+		// tier2 jobs process whole segments and need finalized (merged) blocks up to
+		// the segment end: only hand off at nextBoundary if that whole segment is final,
+		// otherwise stream the tail linearly on tier1.
+		if stopBlock == 0 || nextBoundary > libHandoff {
 			if !stateRequired && startBlock > libHandoffBoundary {
 				return startBlock, nil
 			}
@@ -295,13 +298,13 @@ func (j *junctionBlockGetter) ProcessBlock(block *pbbstream.Block, obj interface
 
 }
 
-func NewCursorResolver(hub *hub.ForkableHub, mergedBlocksStore, forkedBlocksStore dstore.Store) CursorResolver {
+func NewCursorResolver(hub *hub.ForkableHub, mergedBlocksStore, forkedBlocksStore dstore.Store, fileSourceOptions ...bstream.FileSourceOption) CursorResolver {
 	return func(ctx context.Context, cursor *bstream.Cursor) (reorgJunctionBlock, currentHead bstream.BlockRef, err error) {
 		jctBlkGetter := &junctionBlockGetter{}
 		var isFromFile bool
 		src := hub.SourceFromCursor(cursor, jctBlkGetter)
 		if src == nil { // block is out of reversible segment
-			src = bstream.NewFileSourceFromCursor(mergedBlocksStore, forkedBlocksStore, cursor, jctBlkGetter, zap.NewNop())
+			src = bstream.NewFileSourceFromCursor(mergedBlocksStore, forkedBlocksStore, cursor, jctBlkGetter, zap.NewNop(), fileSourceOptions...)
 			isFromFile = true
 		}
 

@@ -32,6 +32,10 @@ var SkippedCachedWasmModules = MetricSet.NewCounter("substreams_skipped_cached_w
 
 var Tier1OutputHeadBlockRelativeTime *dmetrics.HeadBlockRelativeTime
 
+// Store backend metrics
+var StoreBackendType *dmetrics.GaugeVec
+var StoreMmapFileSizeBytes *dmetrics.GaugeVec
+var StoreMmapOperationsTotal *dmetrics.CounterVec
 var Tier1ActiveRequestsHardLimit *dmetrics.Gauge
 var Tier2MaxConcurrentRequests *dmetrics.Gauge
 
@@ -54,6 +58,22 @@ func DeclareTier1Metrics(zlog *zap.Logger) {
 	Tier1WorkerRejectedOverloadedCounter = MetricSet.NewCounter("substreams_tier1_worker_rejected_overloaded_counter", "Counter for number of times a worker rejected a request because it was overloaded (included in RetryCounter)")
 	Tier1OutputHeadBlockRelativeTime = MetricSet.NewHeadBlockRelativeTime("substreams_output")
 	Tier1ActiveRequestsHardLimit = MetricSet.NewGauge("substreams_tier1_active_requests_hard_limit", "Hard limit of concurrent active requests on tier1 (0 means unlimited)")
+
+	StoreBackendType = MetricSet.NewGaugeVec(
+		"substreams_store_backend_type",
+		[]string{"backend", "store_name"},
+		"Store backend type in use (1=mmap, 2=memory)",
+	)
+	StoreMmapFileSizeBytes = MetricSet.NewGaugeVec(
+		"substreams_store_mmap_file_size_bytes",
+		[]string{"store_name"},
+		"Size of mmap database files in bytes",
+	)
+	StoreMmapOperationsTotal = MetricSet.NewCounterVec(
+		"substreams_store_mmap_operations_total",
+		[]string{"operation", "store_name"},
+		"Total number of mmap operations (get, set, delete, scan)",
+	)
 
 	zlog.Info("registering substreams tier1 metrics")
 }

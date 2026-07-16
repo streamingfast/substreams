@@ -255,6 +255,11 @@ func Test_computeLinaerHandoffBlockNum(t *testing.T) {
 		{"g6_lib_between_start_and_stop_livehub_fails", false, 342, true, 121, 498, 500, false, ref(0)},
 		{"g7_stop_block_infinity", true, 342, true, 121, 0, 300, false, ref(0)},
 		{"g7_stop_block_infinity_livehub_fails", false, 342, true, 121, 0, 300, true, ref(0)},
+		// stop block is below LIB but its segment is not fully final: hand off at LIB boundary,
+		// stream the tail on tier1 instead of scheduling a tier2 job that waits for the full segment
+		{"g8_stop_final_but_segment_not_final", true, 342, true, 300, 301, 300, false, ref(0)},
+		{"g8_stop_final_but_segment_not_final_start_below_boundary", true, 342, true, 138, 320, 300, false, ref(0)},
+		{"g8_stop_final_but_segment_not_final_no_state_required", true, 342, true, 320, 330, 320, false, nil},
 	}
 
 	for _, test := range tests {

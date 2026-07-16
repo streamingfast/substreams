@@ -14,9 +14,12 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/dustin/go-humanize"
+	"github.com/fatih/color"
 	"github.com/mattn/go-isatty"
 	"github.com/muesli/termenv"
 	"github.com/olekukonko/tablewriter"
+	"github.com/olekukonko/tablewriter/renderer"
+	"github.com/olekukonko/tablewriter/tw"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
@@ -864,38 +867,39 @@ func generateSegmentsTable(report *ReportBuilder, tableData [][]string) {
 		))
 	}
 
-	table := tablewriter.NewWriter(report)
-	table.SetHeader(headers)
-
-	// Set header colors if TTY
+	// Borderless, separator-less layout matching the previous rendering.
+	settings := tw.Settings{Separators: tw.SeparatorsNone, Lines: tw.LinesNone}
+	var rnd tw.Renderer
 	if isTTY {
-		table.SetHeaderColor(
-			tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
-			tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
-			tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
-			tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
-			tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
-			tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
-		)
+		// Cyan bold headers via the colorized renderer.
+		rnd = renderer.NewColorized(renderer.ColorizedConfig{
+			Borders:  tw.BorderNone,
+			Settings: settings,
+			Header:   renderer.Tint{FG: renderer.Colors{color.FgCyan, color.Bold}},
+		})
+	} else {
+		rnd = renderer.NewBlueprint(tw.Rendition{Borders: tw.BorderNone, Settings: settings})
 	}
 
-	table.SetAutoWrapText(false)
-	table.SetAutoFormatHeaders(true)
-	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetCenterSeparator("")
-	table.SetColumnSeparator("")
-	table.SetRowSeparator("")
-	table.SetHeaderLine(false)
-	table.SetBorder(false)
-	table.SetTablePadding("  ")
-
-	// Only use SetNoWhiteSpace if not using colors, as ANSI codes break the width calculation
-	if !isTTY {
-		table.SetNoWhiteSpace(true)
+	// Uppercase headers ourselves and disable auto-formatting: v1's auto-format
+	// splits on punctuation (e.g. "Est. Blocks" -> "EST . BLOCKS").
+	upperHeaders := make([]string, len(headers))
+	for i, h := range headers {
+		upperHeaders[i] = strings.ToUpper(h)
 	}
-	table.AppendBulk(tableData)
-	table.Render()
+
+	table := tablewriter.NewTable(report,
+		tablewriter.WithRenderer(rnd),
+		tablewriter.WithHeaderAutoFormat(tw.Off),
+		tablewriter.WithHeaderAlignment(tw.AlignLeft),
+		tablewriter.WithRowAlignment(tw.AlignLeft),
+		tablewriter.WithHeaderAutoWrap(tw.WrapNone),
+		tablewriter.WithRowAutoWrap(tw.WrapNone),
+		tablewriter.WithPadding(tw.Padding{Right: "  "}),
+	)
+	table.Header(upperHeaders)
+	_ = table.Bulk(tableData)
+	_ = table.Render()
 }
 
 var _ io.Writer = (*ReportBuilder)(nil)

@@ -172,7 +172,6 @@ func (b *baseStore) ApplyDeltasReverse(deltas []*pbsubstreams.StoreDelta) {
 			}
 			b.totalSizeBytes += oldSize
 			b.totalSizeBytes += keySize
-			return
 		}
 	}
 }

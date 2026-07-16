@@ -319,6 +319,13 @@ func NewCursorResolver(hub *hub.ForkableHub, mergedBlocksStore, forkedBlocksStor
 			src.Shutdown(ctx.Err())
 			return nil, nil, ctx.Err()
 		case <-src.Terminated():
+			// On cancellation, the shutdown goroutine above may terminate the
+			// source before this select observes ctx.Done(): in that case we
+			// must propagate the cancellation instead of falling through to
+			// the fallback below, which would emit an undo-to-LIB signal.
+			if ctx.Err() != nil {
+				return nil, nil, ctx.Err()
+			}
 		}
 
 		if !errors.Is(src.Err(), ErrDone) {

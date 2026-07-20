@@ -208,6 +208,9 @@ type inprocessCall struct {
 type extendedCallMetric struct {
 	count uint64
 	time  time.Duration
+	// maxTime is the duration of the slowest single call, which a total or an average hides: one
+	// 30s eth_call among thousands of fast ones barely moves the average.
+	maxTime time.Duration
 }
 
 // updateDurations should be called while locked
@@ -451,7 +454,11 @@ func (s *Stats) RecordModuleWasmExternalCallEnd(moduleName string, extension str
 		mod.externalCallMetrics[extension] = met
 	}
 	inproc := mod.inprocessCallMetrics[uniqueID]
-	met.time += time.Since(inproc.startTime)
+	elapsed := time.Since(inproc.startTime)
+	met.time += elapsed
+	if elapsed > met.maxTime {
+		met.maxTime = elapsed
+	}
 
 	delete(mod.inprocessCallMetrics, uniqueID)
 }
@@ -802,6 +809,91 @@ func (s *Stats) getZapFields(meter dmetering.Meter) []zap.Field {
 		out = append(out, zap.Uint64("total_uncompressed_read_bytes", remoteBytesRead+uint64(meter.GetCount("total_read_bytes"))))
 	}
 	// ##########################################################################################
+
+	// Additive only: `module_wasm_ext_duration` above merges every extension into a single
+	// duration, which tells you that external calls are slow but not which one.
+	out = append(out, zap.Objects("rpc_call_metrics", s.rpcCallMetrics()))
+
+	return out
+}
+
+// rpcCallMetric is the per-extension breakdown of external (RPC) calls reported in the final
+// request stats log. It aggregates every module, since what matters when hunting a slow RPC is the
+// extension being called, not which module happened to call it.
+type rpcCallMetric struct {
+	extension string
+	count     uint64
+	totalTime time.Duration
+	// maxTime is only known for calls made locally by this process. Calls made by tier2 jobs are
+	// reported back as a count and a total only, and each tier2 logs its own max.
+	maxTime time.Duration
+}
+
+func (m *rpcCallMetric) MarshalLogObject(encoder zapcore.ObjectEncoder) error {
+	encoder.AddString("extension", m.extension)
+	encoder.AddUint64("count", m.count)
+	encoder.AddInt64("total_ms", m.totalTime.Milliseconds())
+
+	var averageMs float64
+	if m.count > 0 {
+		averageMs = float64((m.totalTime / time.Duration(m.count)).Microseconds()) / 1000
+	}
+	encoder.AddFloat64("avg_ms", averageMs)
+	encoder.AddInt64("max_ms", m.maxTime.Milliseconds())
+
+	return nil
+}
+
+// rpcCallMetrics aggregates the external call metrics per extension across the same three sources
+// moduleWasmExtDuration sums: locally executed modules, running jobs and completed jobs.
+//
+// rpcCallMetrics should be called while Stats is locked
+func (s *Stats) rpcCallMetrics() []*rpcCallMetric {
+	byExtension := make(map[string]*rpcCallMetric)
+
+	metricFor := func(extension string) *rpcCallMetric {
+		metric, ok := byExtension[extension]
+		if !ok {
+			metric = &rpcCallMetric{extension: extension}
+			byExtension[extension] = metric
+		}
+		return metric
+	}
+
+	// Only the local metrics carry a per-call max, the remote ones are counts and totals.
+	for _, mod := range s.modulesStats {
+		for extension, callMetric := range mod.externalCallMetrics {
+			metric := metricFor(extension)
+			metric.count += callMetric.count
+			metric.totalTime += callMetric.time
+			if callMetric.maxTime > metric.maxTime {
+				metric.maxTime = callMetric.maxTime
+			}
+		}
+	}
+
+	addRemote := func(modulesStats map[string]*pbssinternal.ModuleStats) {
+		for _, mod := range modulesStats {
+			for _, callMetric := range mod.ExternalCallMetrics {
+				metric := metricFor(callMetric.Name)
+				metric.count += callMetric.Count
+				metric.totalTime += time.Duration(callMetric.TimeMs) * time.Millisecond
+			}
+		}
+	}
+
+	for _, job := range s.runningJobs {
+		addRemote(job.modulesStats)
+	}
+	addRemote(s.completedJobsStats)
+
+	out := make([]*rpcCallMetric, 0, len(byExtension))
+	for _, metric := range byExtension {
+		out = append(out, metric)
+	}
+	slices.SortFunc(out, func(a, b *rpcCallMetric) int {
+		return strings.Compare(a.extension, b.extension)
+	})
 
 	return out
 }

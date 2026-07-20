@@ -23,6 +23,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Server: fixed a per-request stats leak causing long-lived live streams to progressively burn more CPU per block and eventually fall behind the chain until reconnect.
 
+- Server: WASM extension calls (e.g. `eth_call`) that returned an error were never closed in the request stats, leaking an in-process entry that kept inflating the reported external call duration for the remaining lifetime of the request. Both the `wazero` and `wasmtime` runtimes are fixed.
+
 ## v1.20.1
 
 ### Fixed

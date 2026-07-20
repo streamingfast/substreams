@@ -269,14 +269,18 @@ func addExtensionFunctions(ctx context.Context, runtime wazero.Runtime, registry
 					data := readBytes(inst, ptr, length)
 					call := wasm.FromContext(ctx)
 
-					metricID := reqctx.WasmExtensionReqStats(ctx).RecordModuleWasmExternalCallBegin(call.ModuleName, fmt.Sprintf("%s:%s", namespace, importName))
+					extension := fmt.Sprintf("%s:%s", namespace, importName)
+					extStats := reqctx.WasmExtensionReqStats(ctx)
+
+					metricID := extStats.RecordModuleWasmExternalCallBegin(call.ModuleName, extension)
 
 					out, err := f(ctx, reqctx.Details(ctx).UniqueIDString(), call.Clock, data)
+					// The call must be closed on every path, including errors, otherwise the in-process
+					// entry leaks and keeps inflating the reported external call duration forever.
+					extStats.RecordModuleWasmExternalCallEnd(call.ModuleName, extension, metricID)
 					if err != nil {
 						panic(fmt.Errorf(`running wasm extension "%s::%s": %w`, namespace, importName, err))
 					}
-
-					reqctx.WasmExtensionReqStats(ctx).RecordModuleWasmExternalCallEnd(call.ModuleName, fmt.Sprintf("%s:%s", namespace, importName), metricID)
 
 					if ctx.Err() == context.Canceled {
 						// Sometimes long-running extensions will come back to a canceled context.

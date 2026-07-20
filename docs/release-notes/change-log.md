@@ -15,6 +15,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Manifest: environment variable expansion (`$VAR` / `${VAR}`) is now supported in the `foundational-store` module input, allowing a manifest to be authored with a placeholder (e.g. `foundational-store: $DEPLOYMENT_ID`) that is resolved at pack/load time. The generated `.spkg` always embeds the resolved value.
 
+- Server: new Prometheus metrics for external (RPC) calls made by WASM extensions, such as `eth_call`, making it possible to spot slow RPC clogging a tier:
+
+  - `substreams_tier1_rpc_call_counter{extension,outcome}` and `substreams_tier1_rpc_call_duration_seconds{extension,outcome}`
+  - `substreams_tier2_rpc_call_counter{extension,outcome}` and `substreams_tier2_rpc_call_duration_seconds{extension,outcome}`
+
+  `extension` is the extension being called (e.g. `eth:call`) and `outcome` is `success` or `error`. The duration histogram extends the default buckets with a 30s and 60s tail so that slow calls and timeouts remain distinguishable.
+
 ### Changed
 
 - Manifest: environment variable expansion in `imports` and `protobuf.importPaths` now errors out when a referenced variable is undefined, instead of silently substituting an empty string.

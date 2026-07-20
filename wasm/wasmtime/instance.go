@@ -3,9 +3,11 @@ package wasmtime
 import (
 	"context"
 	"fmt"
+	"time"
 
 	wasmtime "github.com/bytecodealliance/wasmtime-go/v41"
 
+	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/wasm"
 )
@@ -47,10 +49,19 @@ func (i *instance) newExtensionFunction(ctx context.Context, namespace, name str
 		extStats := reqctx.WasmExtensionReqStats(ctx)
 
 		metricID := extStats.RecordModuleWasmExternalCallBegin(i.CurrentCall.ModuleName, extension)
+		startTime := time.Now()
 		out, err := f(ctx, reqctx.Details(ctx).UniqueIDString(), i.CurrentCall.Clock, data)
+		elapsed := time.Since(startTime)
 		// The call must be closed on every path, including errors, otherwise the in-process
 		// entry leaks and keeps inflating the reported external call duration forever.
 		extStats.RecordModuleWasmExternalCallEnd(i.CurrentCall.ModuleName, extension, metricID)
+
+		outcome := metrics.RPCCallOutcomeSuccess
+		if err != nil {
+			outcome = metrics.RPCCallOutcomeError
+		}
+		metrics.RecordRPCCall(reqctx.Details(ctx).IsTier2Request, extension, outcome, elapsed)
+
 		if err != nil {
 			panic(fmt.Errorf(`running wasm extension "%s::%s": %w`, namespace, name, err))
 		}

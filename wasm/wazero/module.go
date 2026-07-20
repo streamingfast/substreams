@@ -6,7 +6,9 @@ import (
 	"os"
 	"path"
 	"sync"
+	"time"
 
+	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/reqctx"
 	"github.com/streamingfast/substreams/wasm"
 	"github.com/tetratelabs/wazero"
@@ -274,10 +276,19 @@ func addExtensionFunctions(ctx context.Context, runtime wazero.Runtime, registry
 
 					metricID := extStats.RecordModuleWasmExternalCallBegin(call.ModuleName, extension)
 
+					startTime := time.Now()
 					out, err := f(ctx, reqctx.Details(ctx).UniqueIDString(), call.Clock, data)
+					elapsed := time.Since(startTime)
 					// The call must be closed on every path, including errors, otherwise the in-process
 					// entry leaks and keeps inflating the reported external call duration forever.
 					extStats.RecordModuleWasmExternalCallEnd(call.ModuleName, extension, metricID)
+
+					outcome := metrics.RPCCallOutcomeSuccess
+					if err != nil {
+						outcome = metrics.RPCCallOutcomeError
+					}
+					metrics.RecordRPCCall(reqctx.Details(ctx).IsTier2Request, extension, outcome, elapsed)
+
 					if err != nil {
 						panic(fmt.Errorf(`running wasm extension "%s::%s": %w`, namespace, importName, err))
 					}

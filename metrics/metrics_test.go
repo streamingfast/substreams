@@ -9,54 +9,54 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// installTestRPCCallMetrics points the tier1/tier2 RPC call metrics at a throwaway set for the
-// duration of the test, restoring whatever was there before.
-func installTestRPCCallMetrics(t *testing.T) {
+// installTestWasmExtensionCallMetrics points the tier1/tier2 WASM extension call metrics at a
+// throwaway set for the duration of the test, restoring whatever was there before.
+func installTestWasmExtensionCallMetrics(t *testing.T) {
 	t.Helper()
 
-	previousTier1Counter, previousTier1Duration := Tier1RPCCallCounter, Tier1RPCCallDuration
-	previousTier2Counter, previousTier2Duration := Tier2RPCCallCounter, Tier2RPCCallDuration
+	previousTier1Counter, previousTier1Duration := Tier1WasmExtensionCallCounter, Tier1WasmExtensionCallDuration
+	previousTier2Counter, previousTier2Duration := Tier2WasmExtensionCallCounter, Tier2WasmExtensionCallDuration
 	t.Cleanup(func() {
-		Tier1RPCCallCounter, Tier1RPCCallDuration = previousTier1Counter, previousTier1Duration
-		Tier2RPCCallCounter, Tier2RPCCallDuration = previousTier2Counter, previousTier2Duration
+		Tier1WasmExtensionCallCounter, Tier1WasmExtensionCallDuration = previousTier1Counter, previousTier1Duration
+		Tier2WasmExtensionCallCounter, Tier2WasmExtensionCallDuration = previousTier2Counter, previousTier2Duration
 	})
 
 	set := dmetrics.NewSet()
-	Tier1RPCCallCounter = set.NewCounterVec("test_tier1_rpc_call_counter", rpcCallLabels, "test")
-	Tier1RPCCallDuration = set.NewHistogramVecCustomBuckets("test_tier1_rpc_call_duration_seconds", rpcCallLabels, rpcCallDurationBuckets, "test")
-	Tier2RPCCallCounter = set.NewCounterVec("test_tier2_rpc_call_counter", rpcCallLabels, "test")
-	Tier2RPCCallDuration = set.NewHistogramVecCustomBuckets("test_tier2_rpc_call_duration_seconds", rpcCallLabels, rpcCallDurationBuckets, "test")
+	Tier1WasmExtensionCallCounter = set.NewCounterVec("test_tier1_wasm_extension_call_counter", wasmExtensionCallLabels, "test")
+	Tier1WasmExtensionCallDuration = set.NewHistogramVecCustomBuckets("test_tier1_wasm_extension_call_duration_seconds", wasmExtensionCallLabels, wasmExtensionCallDurationBuckets, "test")
+	Tier2WasmExtensionCallCounter = set.NewCounterVec("test_tier2_wasm_extension_call_counter", wasmExtensionCallLabels, "test")
+	Tier2WasmExtensionCallDuration = set.NewHistogramVecCustomBuckets("test_tier2_wasm_extension_call_duration_seconds", wasmExtensionCallLabels, wasmExtensionCallDurationBuckets, "test")
 }
 
-func TestRecordRPCCall_RoutesToTierMetric(t *testing.T) {
-	installTestRPCCallMetrics(t)
+func TestRecordWasmExtensionCall_RoutesToTierMetric(t *testing.T) {
+	installTestWasmExtensionCallMetrics(t)
 
-	RecordRPCCall(false, "eth:call", RPCCallOutcomeSuccess, 10*time.Millisecond)
-	RecordRPCCall(false, "eth:call", RPCCallOutcomeSuccess, 10*time.Millisecond)
-	RecordRPCCall(true, "eth:call", RPCCallOutcomeSuccess, 10*time.Millisecond)
+	RecordWasmExtensionCall(false, "eth:call", WasmExtensionCallOutcomeSuccess, 10*time.Millisecond)
+	RecordWasmExtensionCall(false, "eth:call", WasmExtensionCallOutcomeSuccess, 10*time.Millisecond)
+	RecordWasmExtensionCall(true, "eth:call", WasmExtensionCallOutcomeSuccess, 10*time.Millisecond)
 
-	assert.Equal(t, float64(2), testutil.ToFloat64(Tier1RPCCallCounter.Native().WithLabelValues("eth:call", RPCCallOutcomeSuccess)))
-	assert.Equal(t, float64(1), testutil.ToFloat64(Tier2RPCCallCounter.Native().WithLabelValues("eth:call", RPCCallOutcomeSuccess)))
+	assert.Equal(t, float64(2), testutil.ToFloat64(Tier1WasmExtensionCallCounter.Native().WithLabelValues("eth:call", WasmExtensionCallOutcomeSuccess)))
+	assert.Equal(t, float64(1), testutil.ToFloat64(Tier2WasmExtensionCallCounter.Native().WithLabelValues("eth:call", WasmExtensionCallOutcomeSuccess)))
 }
 
-func TestRecordRPCCall_SeparatesOutcomes(t *testing.T) {
-	installTestRPCCallMetrics(t)
+func TestRecordWasmExtensionCall_SeparatesOutcomes(t *testing.T) {
+	installTestWasmExtensionCallMetrics(t)
 
-	RecordRPCCall(false, "eth:call", RPCCallOutcomeSuccess, 10*time.Millisecond)
-	RecordRPCCall(false, "eth:call", RPCCallOutcomeError, 30*time.Second)
+	RecordWasmExtensionCall(false, "eth:call", WasmExtensionCallOutcomeSuccess, 10*time.Millisecond)
+	RecordWasmExtensionCall(false, "eth:call", WasmExtensionCallOutcomeError, 30*time.Second)
 
-	assert.Equal(t, float64(1), testutil.ToFloat64(Tier1RPCCallCounter.Native().WithLabelValues("eth:call", RPCCallOutcomeSuccess)))
-	assert.Equal(t, float64(1), testutil.ToFloat64(Tier1RPCCallCounter.Native().WithLabelValues("eth:call", RPCCallOutcomeError)))
+	assert.Equal(t, float64(1), testutil.ToFloat64(Tier1WasmExtensionCallCounter.Native().WithLabelValues("eth:call", WasmExtensionCallOutcomeSuccess)))
+	assert.Equal(t, float64(1), testutil.ToFloat64(Tier1WasmExtensionCallCounter.Native().WithLabelValues("eth:call", WasmExtensionCallOutcomeError)))
 }
 
 // A process only declares the metrics of the tier it serves, and tests declare none at all, so
 // recording against an undeclared tier must be a no-op rather than a nil dereference.
-func TestRecordRPCCall_UndeclaredTierIsNoop(t *testing.T) {
-	installTestRPCCallMetrics(t)
+func TestRecordWasmExtensionCall_UndeclaredTierIsNoop(t *testing.T) {
+	installTestWasmExtensionCallMetrics(t)
 
-	Tier2RPCCallCounter, Tier2RPCCallDuration = nil, nil
+	Tier2WasmExtensionCallCounter, Tier2WasmExtensionCallDuration = nil, nil
 
 	assert.NotPanics(t, func() {
-		RecordRPCCall(true, "eth:call", RPCCallOutcomeSuccess, 10*time.Millisecond)
+		RecordWasmExtensionCall(true, "eth:call", WasmExtensionCallOutcomeSuccess, 10*time.Millisecond)
 	})
 }

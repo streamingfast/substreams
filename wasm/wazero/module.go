@@ -283,11 +283,11 @@ func addExtensionFunctions(ctx context.Context, runtime wazero.Runtime, registry
 					// entry leaks and keeps inflating the reported external call duration forever.
 					extStats.RecordModuleWasmExternalCallEnd(call.ModuleName, extension, metricID)
 
-					outcome := metrics.RPCCallOutcomeSuccess
+					outcome := metrics.WasmExtensionCallOutcomeSuccess
 					if err != nil {
-						outcome = metrics.RPCCallOutcomeError
+						outcome = metrics.WasmExtensionCallOutcomeError
 					}
-					metrics.RecordRPCCall(reqctx.Details(ctx).IsTier2Request, extension, outcome, elapsed)
+					metrics.RecordWasmExtensionCall(reqctx.Details(ctx).IsTier2Request, extension, outcome, elapsed)
 
 					if err != nil {
 						panic(fmt.Errorf(`running wasm extension "%s::%s": %w`, namespace, importName, err))

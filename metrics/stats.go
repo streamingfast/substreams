@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"cmp"
 	"context"
 	"slices"
 	"strings"
@@ -811,16 +812,21 @@ func (s *Stats) getZapFields(meter dmetering.Meter) []zap.Field {
 	// ##########################################################################################
 
 	// Additive only: `module_wasm_ext_duration` above merges every extension into a single
-	// duration, which tells you that external calls are slow but not which one.
-	out = append(out, zap.Objects("rpc_call_metrics", s.rpcCallMetrics()))
+	// duration, which tells you that external calls are slow but not which one. The global list
+	// answers "which extension", the per-module list answers "which module to go fix". Both are
+	// empty when no extension call happened.
+	byModule := s.wasmExtensionCallMetricsByModule()
+	out = append(out, zap.Objects("wasm_ext_call_metrics", aggregateWasmExtensionCallMetricsByExtension(byModule)))
+	out = append(out, zap.Objects("wasm_ext_call_metrics_by_module", byModule))
 
 	return out
 }
 
-// rpcCallMetric is the per-extension breakdown of external (RPC) calls reported in the final
-// request stats log. It aggregates every module, since what matters when hunting a slow RPC is the
-// extension being called, not which module happened to call it.
-type rpcCallMetric struct {
+// wasmExtensionCallMetric is one row of the external call (e.g. eth_call) breakdown reported in the
+// final request stats log. When `module` is empty the row is the aggregate across every module for
+// a given extension; otherwise it is scoped to that module.
+type wasmExtensionCallMetric struct {
+	module    string
 	extension string
 	count     uint64
 	totalTime time.Duration
@@ -829,7 +835,10 @@ type rpcCallMetric struct {
 	maxTime time.Duration
 }
 
-func (m *rpcCallMetric) MarshalLogObject(encoder zapcore.ObjectEncoder) error {
+func (m *wasmExtensionCallMetric) MarshalLogObject(encoder zapcore.ObjectEncoder) error {
+	if m.module != "" {
+		encoder.AddString("module", m.module)
+	}
 	encoder.AddString("extension", m.extension)
 	encoder.AddUint64("count", m.count)
 	encoder.AddInt64("total_ms", m.totalTime.Milliseconds())
@@ -844,26 +853,34 @@ func (m *rpcCallMetric) MarshalLogObject(encoder zapcore.ObjectEncoder) error {
 	return nil
 }
 
-// rpcCallMetrics aggregates the external call metrics per extension across the same three sources
-// moduleWasmExtDuration sums: locally executed modules, running jobs and completed jobs.
+// wasmExtensionCallMetricsByModule returns one entry per (module, extension) pair that actually
+// made at least one external call, aggregated across the same three sources moduleWasmExtDuration
+// sums: locally executed modules, running jobs and completed jobs. Modules with no external call
+// are absent, so the list is empty when nothing called out.
 //
-// rpcCallMetrics should be called while Stats is locked
-func (s *Stats) rpcCallMetrics() []*rpcCallMetric {
-	byExtension := make(map[string]*rpcCallMetric)
+// wasmExtensionCallMetricsByModule should be called while Stats is locked
+func (s *Stats) wasmExtensionCallMetricsByModule() []*wasmExtensionCallMetric {
+	// module -> extension -> metric
+	byModule := make(map[string]map[string]*wasmExtensionCallMetric)
 
-	metricFor := func(extension string) *rpcCallMetric {
-		metric, ok := byExtension[extension]
+	metricFor := func(module, extension string) *wasmExtensionCallMetric {
+		extensions, ok := byModule[module]
 		if !ok {
-			metric = &rpcCallMetric{extension: extension}
-			byExtension[extension] = metric
+			extensions = make(map[string]*wasmExtensionCallMetric)
+			byModule[module] = extensions
+		}
+		metric, ok := extensions[extension]
+		if !ok {
+			metric = &wasmExtensionCallMetric{module: module, extension: extension}
+			extensions[extension] = metric
 		}
 		return metric
 	}
 
 	// Only the local metrics carry a per-call max, the remote ones are counts and totals.
-	for _, mod := range s.modulesStats {
+	for module, mod := range s.modulesStats {
 		for extension, callMetric := range mod.externalCallMetrics {
-			metric := metricFor(extension)
+			metric := metricFor(module, extension)
 			metric.count += callMetric.count
 			metric.totalTime += callMetric.time
 			if callMetric.maxTime > metric.maxTime {
@@ -873,9 +890,9 @@ func (s *Stats) rpcCallMetrics() []*rpcCallMetric {
 	}
 
 	addRemote := func(modulesStats map[string]*pbssinternal.ModuleStats) {
-		for _, mod := range modulesStats {
+		for module, mod := range modulesStats {
 			for _, callMetric := range mod.ExternalCallMetrics {
-				metric := metricFor(callMetric.Name)
+				metric := metricFor(module, callMetric.Name)
 				metric.count += callMetric.Count
 				metric.totalTime += time.Duration(callMetric.TimeMs) * time.Millisecond
 			}
@@ -887,11 +904,45 @@ func (s *Stats) rpcCallMetrics() []*rpcCallMetric {
 	}
 	addRemote(s.completedJobsStats)
 
-	out := make([]*rpcCallMetric, 0, len(byExtension))
+	var out []*wasmExtensionCallMetric
+	for _, extensions := range byModule {
+		for _, metric := range extensions {
+			out = append(out, metric)
+		}
+	}
+	slices.SortFunc(out, func(a, b *wasmExtensionCallMetric) int {
+		return cmp.Or(
+			strings.Compare(a.module, b.module),
+			strings.Compare(a.extension, b.extension),
+		)
+	})
+
+	return out
+}
+
+// aggregateWasmExtensionCallMetricsByExtension collapses the per-module breakdown into one entry
+// per extension (module left empty), for the quick-glance global view.
+func aggregateWasmExtensionCallMetricsByExtension(byModule []*wasmExtensionCallMetric) []*wasmExtensionCallMetric {
+	byExtension := make(map[string]*wasmExtensionCallMetric)
+
+	for _, m := range byModule {
+		metric, ok := byExtension[m.extension]
+		if !ok {
+			metric = &wasmExtensionCallMetric{extension: m.extension}
+			byExtension[m.extension] = metric
+		}
+		metric.count += m.count
+		metric.totalTime += m.totalTime
+		if m.maxTime > metric.maxTime {
+			metric.maxTime = m.maxTime
+		}
+	}
+
+	out := make([]*wasmExtensionCallMetric, 0, len(byExtension))
 	for _, metric := range byExtension {
 		out = append(out, metric)
 	}
-	slices.SortFunc(out, func(a, b *rpcCallMetric) int {
+	slices.SortFunc(out, func(a, b *wasmExtensionCallMetric) int {
 		return strings.Compare(a.extension, b.extension)
 	})
 

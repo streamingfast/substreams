@@ -22,15 +22,15 @@ var Tier1WorkerRequestCounter *dmetrics.Counter
 var Tier1WorkerRetryCounter *dmetrics.Counter
 var Tier1WorkerRejectedOverloadedCounter *dmetrics.Counter
 
-var Tier1RPCCallCounter *dmetrics.CounterVec
-var Tier1RPCCallDuration *dmetrics.HistogramVec
+var Tier1WasmExtensionCallCounter *dmetrics.CounterVec
+var Tier1WasmExtensionCallDuration *dmetrics.HistogramVec
 
 var AppReadinessTier2 *dmetrics.AppReadiness
 var Tier2ActiveRequests *dmetrics.Gauge
 var Tier2RequestCounter *dmetrics.Counter
 var Tier2RejectedRequestCounter *dmetrics.CounterVec
-var Tier2RPCCallCounter *dmetrics.CounterVec
-var Tier2RPCCallDuration *dmetrics.HistogramVec
+var Tier2WasmExtensionCallCounter *dmetrics.CounterVec
+var Tier2WasmExtensionCallDuration *dmetrics.HistogramVec
 
 var BlockBeginProcess = MetricSet.NewCounter("substreams_block_process_start_counter", "Counter for total block processes started, used for rate")
 var BlockEndProcess = MetricSet.NewCounter("substreams_block_process_end_counter", "Counter for total block processes ended, used for rate")
@@ -82,44 +82,44 @@ func DeclareTier1Metrics(zlog *zap.Logger) {
 		"Total number of mmap operations (get, set, delete, scan)",
 	)
 
-	Tier1RPCCallCounter = MetricSet.NewCounterVec(
-		"substreams_tier1_rpc_call_counter",
-		rpcCallLabels,
-		"Counter for external (RPC) calls made by WASM extensions on tier1, by extension and outcome",
+	Tier1WasmExtensionCallCounter = MetricSet.NewCounterVec(
+		"substreams_tier1_wasm_extension_call_counter",
+		wasmExtensionCallLabels,
+		"Counter for external calls made by WASM extensions (e.g. eth_call) on tier1, by extension and outcome",
 	)
-	Tier1RPCCallDuration = MetricSet.NewHistogramVecCustomBuckets(
-		"substreams_tier1_rpc_call_duration_seconds",
-		rpcCallLabels,
-		rpcCallDurationBuckets,
-		"Duration of external (RPC) calls made by WASM extensions on tier1, by extension and outcome",
+	Tier1WasmExtensionCallDuration = MetricSet.NewHistogramVecCustomBuckets(
+		"substreams_tier1_wasm_extension_call_duration_seconds",
+		wasmExtensionCallLabels,
+		wasmExtensionCallDurationBuckets,
+		"Duration of external calls made by WASM extensions (e.g. eth_call) on tier1, by extension and outcome",
 	)
 
 	zlog.Info("registering substreams tier1 metrics")
 }
 
-var rpcCallLabels = []string{"extension", "outcome"}
+var wasmExtensionCallLabels = []string{"extension", "outcome"}
 
-// rpcCallDurationBuckets are the Prometheus default buckets extended with a 30s and 60s tail, so
-// that slow calls and timeouts (the ones actually clogging a tier) land in a visible bucket
-// instead of all collapsing into +Inf.
-var rpcCallDurationBuckets = []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 30, 60}
+// wasmExtensionCallDurationBuckets are the Prometheus default buckets extended with a 30s and 60s
+// tail, so that slow calls and timeouts (the ones actually clogging a tier) land in a visible
+// bucket instead of all collapsing into +Inf.
+var wasmExtensionCallDurationBuckets = []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 30, 60}
 
 const (
-	RPCCallOutcomeSuccess = "success"
-	RPCCallOutcomeError   = "error"
+	WasmExtensionCallOutcomeSuccess = "success"
+	WasmExtensionCallOutcomeError   = "error"
 )
 
-// RecordRPCCall records a single external (RPC) call made by a WASM extension, for example
-// `eth:call`. Following the convention used throughout this package, the tier is encoded in the
+// RecordWasmExtensionCall records a single external call made by a WASM extension, eth_call being
+// the main one. Following the convention used throughout this package, the tier is encoded in the
 // metric name rather than in a label, so the caller resolves it and passes it in. It cannot be
 // resolved here from a context because `reqctx` imports this package.
 //
 // The metrics are nil when the corresponding tier's metrics were never declared, which is the case
 // in tests and, in production, for the tier a process does not serve.
-func RecordRPCCall(isTier2 bool, extension, outcome string, elapsed time.Duration) {
-	counter, duration := Tier1RPCCallCounter, Tier1RPCCallDuration
+func RecordWasmExtensionCall(isTier2 bool, extension, outcome string, elapsed time.Duration) {
+	counter, duration := Tier1WasmExtensionCallCounter, Tier1WasmExtensionCallDuration
 	if isTier2 {
-		counter, duration = Tier2RPCCallCounter, Tier2RPCCallDuration
+		counter, duration = Tier2WasmExtensionCallCounter, Tier2WasmExtensionCallDuration
 	}
 
 	if counter == nil || duration == nil {
@@ -141,16 +141,16 @@ func DeclareTier2Metrics(zlog *zap.Logger) {
 	)
 	Tier2MaxConcurrentRequests = MetricSet.NewGauge("substreams_tier2_max_concurrent_requests", "Hard limit of concurrent requests on tier2 (0 means unlimited)")
 
-	Tier2RPCCallCounter = MetricSet.NewCounterVec(
-		"substreams_tier2_rpc_call_counter",
-		rpcCallLabels,
-		"Counter for external (RPC) calls made by WASM extensions on tier2, by extension and outcome",
+	Tier2WasmExtensionCallCounter = MetricSet.NewCounterVec(
+		"substreams_tier2_wasm_extension_call_counter",
+		wasmExtensionCallLabels,
+		"Counter for external calls made by WASM extensions (e.g. eth_call) on tier2, by extension and outcome",
 	)
-	Tier2RPCCallDuration = MetricSet.NewHistogramVecCustomBuckets(
-		"substreams_tier2_rpc_call_duration_seconds",
-		rpcCallLabels,
-		rpcCallDurationBuckets,
-		"Duration of external (RPC) calls made by WASM extensions on tier2, by extension and outcome",
+	Tier2WasmExtensionCallDuration = MetricSet.NewHistogramVecCustomBuckets(
+		"substreams_tier2_wasm_extension_call_duration_seconds",
+		wasmExtensionCallLabels,
+		wasmExtensionCallDurationBuckets,
+		"Duration of external calls made by WASM extensions (e.g. eth_call) on tier2, by extension and outcome",
 	)
 
 	zlog.Info("registering tier2 substreams metrics")

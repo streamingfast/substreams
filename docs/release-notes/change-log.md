@@ -25,6 +25,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Server: WASM extension calls (e.g. `eth_call`) that returned an error were never closed in the request stats, leaking an in-process entry that kept inflating the reported external call duration for the remaining lifetime of the request. Both the `wazero` and `wasmtime` runtimes are fixed.
 
+- Server: external call metrics (e.g. `eth_call` count and duration) gathered on the shared-cache execution path were silently discarded, so modules executed through that path reported no external call activity at all.
+
 ## v1.20.1
 
 ### Fixed

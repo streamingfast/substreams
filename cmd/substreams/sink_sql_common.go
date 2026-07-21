@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -17,9 +16,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
-	"github.com/streamingfast/derr"
 	"github.com/streamingfast/logging/zapx"
-	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/streamingfast/substreams/sink"
 	sinksql "github.com/streamingfast/substreams/sink/sql"
@@ -169,6 +166,42 @@ func addFromProtoModeRunFlags(flags *pflag.FlagSet, driver string) {
 	}
 }
 
+// addSinkRunFlags registers the full set of flags used by the run action of an engine
+// command. It is used both for the explicit `run` subcommand and for the parent engine
+// command, which defaults to the run action.
+func addSinkRunFlags(flags *pflag.FlagSet, driver string) {
+	sink.AddFlagsToSet(flags, sink.FlagExcludeDefault(sink.FlagUndoBufferSize))
+	addBytesEncodingFlag(flags)
+	if driver == "clickhouse" {
+		addClusterFlag(flags)
+	}
+	addDatabaseChangesModeRunFlags(flags)
+	addFromProtoModeRunFlags(flags, driver)
+}
+
+// sinkBytesEncoding resolves the --bytes-encoding flag into a concrete encoding.
+func sinkBytesEncoding(cmd *cobra.Command) (sqlbytes.Encoding, error) {
+	encodingStr := sflags.MustGetString(cmd, "bytes-encoding")
+	encoding, err := sqlbytes.ParseEncoding(encodingStr)
+	if err != nil {
+		return 0, fmt.Errorf("invalid bytes encoding %q: %w", encodingStr, err)
+	}
+	return encoding, nil
+}
+
+// sinkEngineParentArgs validates the engine parent command's positional args. The
+// parent defaults to `run`, so a removed subcommand name would otherwise be taken
+// as a manifest path and fail with a confusing registry error.
+func sinkEngineParentArgs(cmd *cobra.Command, args []string) error {
+	if err := cobra.RangeArgs(0, 2)(cmd, args); err != nil {
+		return err
+	}
+	if len(args) > 0 && args[0] == "create-user" {
+		return fmt.Errorf("the create-user command was removed, create the user directly in your database")
+	}
+	return nil
+}
+
 // newSinkRunE builds the RunE for the `run` command of the given engine. It resolves
 // the manifest/module positional params, reads the package once to detect the output
 // module type and routes to the DatabaseChanges or the from-proto sink accordingly.
@@ -258,10 +291,9 @@ func runFromProtoSink(cmd *cobra.Command, driver, manifestPath, dsnString string
 	useConstraints := !sflags.MustGetBool(cmd, "no-constraints")
 	blockBatchSize := sflags.MustGetInt(cmd, "block-batch-size")
 
-	encodingStr := sflags.MustGetString(cmd, "bytes-encoding")
-	encoding, err := sqlbytes.ParseEncoding(encodingStr)
+	encoding, err := sinkBytesEncoding(cmd)
 	if err != nil {
-		return fmt.Errorf("invalid bytes encoding %q: %w", encodingStr, err)
+		return err
 	}
 
 	dsn, err := db.ParseDSN(dsnString)
@@ -273,76 +305,19 @@ func runFromProtoSink(cmd *cobra.Command, driver, manifestPath, dsnString string
 
 	app := cli.NewApplication(cmd.Context())
 
-	outputType := proto.ModuleOutputType(spkg, outputModuleName)
-	if outputType == "" {
-		return fmt.Errorf("could not find output type for module %s", outputModuleName)
-	}
-
 	if service, err := sinksql.ExtractSinkService(spkg); err == nil {
 		if err := services.Run(service, zlog); err != nil {
 			return fmt.Errorf("running service: %w", err)
 		}
 	}
 
-	var fileDescriptor *desc.FileDescriptor
-
-	protoFiles := map[string]*descriptorpb.FileDescriptorProto{}
-	for _, file := range spkg.ProtoFiles {
-		protoFiles[file.GetName()] = file
-	}
-
-	deps, err := proto.ResolveDependencies(protoFiles)
-	if err != nil {
-		return fmt.Errorf("resolving dependencies: %w", err)
-	}
-
 	protoFileOverride := sflags.MustGetString(cmd, "proto-file-override")
-	if protoFileOverride != "" {
-		parser := protoparse.Parser{
-			ImportPaths:           []string{},
-			IncludeSourceCodeInfo: true,
-			LookupImport: func(filename string) (*desc.FileDescriptor, error) {
-				if fd, exists := deps[filename]; exists {
-					return fd, nil
-				}
-				return nil, fmt.Errorf("import %q not found", filename)
-			},
-		}
-
-		fds, err := parser.ParseFiles(protoFileOverride)
-		if err != nil {
-			return fmt.Errorf("parsing proto file override %q: %w", protoFileOverride, err)
-		}
-		if len(fds) == 0 {
-			return fmt.Errorf("no file descriptors found in proto file override %q", protoFileOverride)
-		}
-		fileDescriptor = fds[0]
-	} else {
-		fileDescriptor, err = proto.FileDescriptorForOutputType(spkg, deps, outputType)
-		if err != nil {
-			return fmt.Errorf("finding file descriptor for output type %q: %w", outputType, err)
-		}
-	}
-
-	useProtoOption := false
-	for _, descriptor := range fileDescriptor.GetDependencies() {
-		if descriptor.GetName() == "sf/substreams/sink/sql/schema/v1/schema.proto" {
-			useProtoOption = true
-		}
+	rootMessageDescriptor, outputType, useProtoOption, err := resolveFromProtoRootMessage(spkg, outputModuleName, protoFileOverride)
+	if err != nil {
+		return err
 	}
 	if !useProtoOption {
 		useConstraints = false
-	}
-
-	var rootMessageDescriptor *desc.MessageDescriptor
-	for _, messageDescriptor := range fileDescriptor.GetMessageTypes() {
-		if messageDescriptor.GetFullyQualifiedName() == outputType {
-			rootMessageDescriptor = messageDescriptor
-			break
-		}
-	}
-	if rootMessageDescriptor == nil {
-		return fmt.Errorf("message descriptor not found for output type %q. Your substreams need to bundle its protobuf definitions", outputType)
 	}
 
 	baseSink, err := sink.NewFromViper(
@@ -358,16 +333,6 @@ func runFromProtoSink(cmd *cobra.Command, driver, manifestPath, dsnString string
 		return fmt.Errorf("new base sinker: %w", err)
 	}
 
-	var clickhouseOptions db_proto.SinkerFactoryClickhouse
-	if driver == "clickhouse" {
-		clickhouseOptions = db_proto.SinkerFactoryClickhouse{
-			SinkInfoFolder:  sflags.MustGetString(cmd, "sink-info-folder"),
-			CursorFilePath:  sflags.MustGetString(cmd, "cursor-file-path"),
-			QueryRetryCount: sflags.MustGetInt(cmd, "query-retry-count"),
-			QueryRetrySleep: sflags.MustGetDuration(cmd, "query-retry-sleep"),
-		}
-	}
-
 	factory := db_proto.SinkerFactory(baseSink, outputModuleName, rootMessageDescriptor.UnwrapMessage(), db_proto.SinkerFactoryOptions{
 		UseProtoOption:  useProtoOption,
 		UseConstraints:  useConstraints,
@@ -375,7 +340,7 @@ func runFromProtoSink(cmd *cobra.Command, driver, manifestPath, dsnString string
 		BlockBatchSize:  blockBatchSize,
 		Parallel:        false,
 		Encoding:        encoding,
-		Clickhouse:      clickhouseOptions,
+		Clickhouse:      fromProtoClickhouseOptions(cmd, driver),
 	})
 
 	sqlSinker, err := factory(cmd.Context(), dsnString, dsn.Schema(), zlog, tracer)
@@ -392,10 +357,91 @@ func runFromProtoSink(cmd *cobra.Command, driver, manifestPath, dsnString string
 	return nil
 }
 
+// resolveFromProtoRootMessage extracts, from the substreams package, the root protobuf
+// message descriptor for the module's output type together with the output type name and
+// whether the schema.proto annotation is bundled (which enables database constraints). It
+// mirrors the descriptor resolution performed by the from-proto run path so the run and
+// setup commands share a single resolution.
+func resolveFromProtoRootMessage(spkg *pbsubstreams.Package, outputModuleName, protoFileOverride string) (rootMessageDescriptor *desc.MessageDescriptor, outputType string, useProtoOption bool, err error) {
+	outputType = proto.ModuleOutputType(spkg, outputModuleName)
+	if outputType == "" {
+		return nil, "", false, fmt.Errorf("could not find output type for module %s", outputModuleName)
+	}
+
+	protoFiles := map[string]*descriptorpb.FileDescriptorProto{}
+	for _, file := range spkg.ProtoFiles {
+		protoFiles[file.GetName()] = file
+	}
+
+	deps, err := proto.ResolveDependencies(protoFiles)
+	if err != nil {
+		return nil, "", false, fmt.Errorf("resolving dependencies: %w", err)
+	}
+
+	var fileDescriptor *desc.FileDescriptor
+	if protoFileOverride != "" {
+		parser := protoparse.Parser{
+			ImportPaths:           []string{},
+			IncludeSourceCodeInfo: true,
+			LookupImport: func(filename string) (*desc.FileDescriptor, error) {
+				if fd, exists := deps[filename]; exists {
+					return fd, nil
+				}
+				return nil, fmt.Errorf("import %q not found", filename)
+			},
+		}
+
+		fds, err := parser.ParseFiles(protoFileOverride)
+		if err != nil {
+			return nil, "", false, fmt.Errorf("parsing proto file override %q: %w", protoFileOverride, err)
+		}
+		if len(fds) == 0 {
+			return nil, "", false, fmt.Errorf("no file descriptors found in proto file override %q", protoFileOverride)
+		}
+		fileDescriptor = fds[0]
+	} else {
+		fileDescriptor, err = proto.FileDescriptorForOutputType(spkg, deps, outputType)
+		if err != nil {
+			return nil, "", false, fmt.Errorf("finding file descriptor for output type %q: %w", outputType, err)
+		}
+	}
+
+	for _, descriptor := range fileDescriptor.GetDependencies() {
+		if descriptor.GetName() == "sf/substreams/sink/sql/schema/v1/schema.proto" {
+			useProtoOption = true
+		}
+	}
+
+	for _, messageDescriptor := range fileDescriptor.GetMessageTypes() {
+		if messageDescriptor.GetFullyQualifiedName() == outputType {
+			rootMessageDescriptor = messageDescriptor
+			break
+		}
+	}
+	if rootMessageDescriptor == nil {
+		return nil, "", false, fmt.Errorf("message descriptor not found for output type %q. Your substreams need to bundle its protobuf definitions", outputType)
+	}
+
+	return rootMessageDescriptor, outputType, useProtoOption, nil
+}
+
+// fromProtoClickhouseOptions collects the ClickHouse-specific options needed to construct
+// the from-proto database. It returns the zero value for non-clickhouse engines.
+func fromProtoClickhouseOptions(cmd *cobra.Command, driver string) db_proto.SinkerFactoryClickhouse {
+	if driver != "clickhouse" {
+		return db_proto.SinkerFactoryClickhouse{}
+	}
+	return db_proto.SinkerFactoryClickhouse{
+		SinkInfoFolder:  sflags.MustGetString(cmd, "sink-info-folder"),
+		CursorFilePath:  sflags.MustGetString(cmd, "cursor-file-path"),
+		QueryRetryCount: sflags.MustGetInt(cmd, "query-retry-count"),
+		QueryRetrySleep: sflags.MustGetDuration(cmd, "query-retry-sleep"),
+	}
+}
+
 func newSinkSetupE(driver string) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		cmd.SilenceUsage = true
-		ctx := cmd.Context()
 
 		dsnString, err := resolveSinkDSN(cmd)
 		if err != nil {
@@ -409,94 +455,85 @@ func newSinkSetupE(driver string) func(*cobra.Command, []string) error {
 
 		sinkDBPreStart(cmd)
 
-		reader, err := manifest.NewReader(manifestPath)
+		sink.LoadSubstreamsAuthEnvFile(manifestPath)
+
+		spkg, module, _, err := sink.ReadManifestAndModule(manifestPath, "", nil, sink.InferOutputModuleFromPackage, sink.IgnoreOutputModuleType, false, nil, zlog)
 		if err != nil {
-			return fmt.Errorf("setup manifest reader: %w", err)
-		}
-		pkgBundle, err := reader.Read()
-		if err != nil {
-			return fmt.Errorf("read manifest: %w", err)
+			return fmt.Errorf("reading manifest: %w", err)
 		}
 
-		options := sinker.SinkerSetupOptions{
-			CursorTableName:            sflags.MustGetString(cmd, "cursors-table"),
-			HistoryTableName:           sflags.MustGetString(cmd, "history-table"),
-			ClickhouseCluster:          clusterFlag(cmd),
-			OnModuleHashMismatch:       sflags.MustGetString(cmd, onModuleHashMismatchFlag),
-			SystemTablesOnly:           sflags.MustGetBool(cmd, "system-tables-only"),
-			IgnoreDuplicateTableErrors: sflags.MustGetBool(cmd, "ignore-duplicate-table-errors"),
-			Postgraphile:               boolFlag(cmd, "postgraphile"),
+		if isDatabaseChangesType(module.Output.Type) {
+			return runDatabaseChangesSetup(cmd, dsnString, spkg)
 		}
 
-		return sinker.SinkerSetup(ctx, dsnString, pkgBundle.Package, options, zlog, tracer)
+		return runFromProtoSetup(cmd, driver, dsnString, spkg, module.Name)
 	}
 }
 
-func newSinkCreateUserE(driver string) func(*cobra.Command, []string) error {
-	return func(cmd *cobra.Command, args []string) error {
-		cmd.SilenceUsage = true
-		ctx := cmd.Context()
+func runDatabaseChangesSetup(cmd *cobra.Command, dsnString string, spkg *pbsubstreams.Package) error {
+	options := sinker.SinkerSetupOptions{
+		CursorTableName:            sflags.MustGetString(cmd, "cursors-table"),
+		HistoryTableName:           sflags.MustGetString(cmd, "history-table"),
+		ClickhouseCluster:          clusterFlag(cmd),
+		OnModuleHashMismatch:       sflags.MustGetString(cmd, onModuleHashMismatchFlag),
+		SystemTablesOnly:           sflags.MustGetBool(cmd, "system-tables-only"),
+		IgnoreDuplicateTableErrors: sflags.MustGetBool(cmd, "ignore-duplicate-table-errors"),
+		Postgraphile:               boolFlag(cmd, "postgraphile"),
+	}
 
-		dsnString, err := resolveSinkDSN(cmd)
-		if err != nil {
-			return err
+	return sinker.SinkerSetup(cmd.Context(), dsnString, spkg, options, zlog, tracer)
+}
+
+// runFromProtoSetup performs the from-proto "update database schema" step: it resolves the
+// schema from the module's output proto, connects using the DSN and ensures the database
+// schema exists via db_proto.SetupDatabaseSchema, then exits without starting a sinker. It
+// is idempotent thanks to the sink-info guard inside SetupDatabaseSchema.
+func runFromProtoSetup(cmd *cobra.Command, driver, dsnString string, spkg *pbsubstreams.Package, outputModuleName string) error {
+	warnIgnoredDatabaseChangesSetupFlags(cmd)
+
+	useConstraints := !boolFlag(cmd, "no-constraints")
+
+	encoding, err := sinkBytesEncoding(cmd)
+	if err != nil {
+		return err
+	}
+
+	dsn, err := db.ParseDSN(dsnString)
+	if err != nil {
+		return fmt.Errorf("parsing dsn: %w", err)
+	}
+
+	protoFileOverride := sflags.MustGetString(cmd, "proto-file-override")
+	rootMessageDescriptor, _, useProtoOption, err := resolveFromProtoRootMessage(spkg, outputModuleName, protoFileOverride)
+	if err != nil {
+		return err
+	}
+	if !useProtoOption {
+		useConstraints = false
+	}
+
+	options := db_proto.SinkerFactoryOptions{
+		UseProtoOption: useProtoOption,
+		UseConstraints: useConstraints,
+		Encoding:       encoding,
+		Clickhouse:     fromProtoClickhouseOptions(cmd, driver),
+	}
+
+	if _, err := db_proto.SetupDatabaseSchema(cmd.Context(), dsnString, dsn.Schema(), outputModuleName, rootMessageDescriptor.UnwrapMessage(), options, zlog, tracer); err != nil {
+		return fmt.Errorf("setting up database schema: %w", err)
+	}
+
+	zlog.Info("database schema setup completed", zap.String("schema", dsn.Schema()), zap.Bool("constraints", useConstraints))
+	return nil
+}
+
+// warnIgnoredDatabaseChangesSetupFlags logs a warning for each DatabaseChanges-only setup
+// flag that the user explicitly set, since those flags have no effect in from-proto mode.
+func warnIgnoredDatabaseChangesSetupFlags(cmd *cobra.Command) {
+	for _, name := range []string{"postgraphile", "system-tables-only", "ignore-duplicate-table-errors"} {
+		if flag := cmd.Flags().Lookup(name); flag != nil && flag.Changed {
+			zlog.Warn("flag has no effect in from-proto setup mode and is ignored", zap.String("flag", name))
 		}
-		if _, err := validateDSNEngine(dsnString, driver); err != nil {
-			return err
-		}
-
-		username := args[0]
-		database := args[1]
-
-		cursorTableName := sflags.MustGetString(cmd, "cursors-table")
-		historyTableName := sflags.MustGetString(cmd, "history-table")
-
-		readOnly := sflags.MustGetBool(cmd, "read-only")
-		passwordEnv := sflags.MustGetString(cmd, "password-env")
-
-		if passwordEnv == "" {
-			return fmt.Errorf("password-env is required")
-		}
-
-		password := os.Getenv(passwordEnv)
-		if password == "" {
-			return fmt.Errorf("non-empty password is required")
-		}
-
-		dsn, err := db.ParseDSN(dsnString)
-		if err != nil {
-			return fmt.Errorf("parsing dsn: %w", err)
-		}
-
-		sinkDBPreStart(cmd)
-
-		retries := sflags.MustGetInt(cmd, "retries")
-		if err := derr.RetryContext(ctx, uint64(retries), func(ctx context.Context) error {
-			handleReorgs := false
-			dbLoader, err := db.NewLoader(
-				dsn,
-				cursorTableName,
-				historyTableName,
-				clusterFlag(cmd),
-				0, 0, 0,
-				db.OnModuleHashMismatchError.String(),
-				&handleReorgs,
-				zlog, tracer,
-			)
-			if err != nil {
-				return fmt.Errorf("creating loader: %w", err)
-			}
-
-			if err := dbLoader.CreateUser(ctx, username, password, database, readOnly); err != nil {
-				return fmt.Errorf("create user: %w", err)
-			}
-
-			return nil
-		}); err != nil {
-			return fmt.Errorf("create user: %w", err)
-		}
-
-		return nil
 	}
 }
 

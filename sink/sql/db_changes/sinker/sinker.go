@@ -334,8 +334,10 @@ func protoUpdateOpToDbUpdateOp(op pbdatabase.Field_UpdateOp) db2.UpdateOp {
 func (s *SQLSinker) HandleBlockRangeCompletion(ctx context.Context, cursor *sink.Cursor) error {
 	// To be moved in the base sinker library, happens usually only on integration tests where the connection
 	// can close with "nil" error but we haven't completed the range for real yet.
+	// The stop block is exclusive: the last streamed block is stopBlock-1, which
+	// completes the range and must trigger the final flush.
 	stopBlock := s.Sinker.StopBlock()
-	if stopBlock > 0 && cursor.Block().Num() < stopBlock {
+	if stopBlock > 0 && cursor.Block().Num() < stopBlock-1 {
 		s.logger.Debug("range not completed yet, skipping", zap.Stringer("block", cursor.Block()), zap.Uint64("stop_block", stopBlock))
 		return nil
 	}

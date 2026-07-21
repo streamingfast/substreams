@@ -31,6 +31,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- SQL sink: a bounded run (`--stop-block` set) never flushed the final batch to the database — the range-completion check treated the exclusive stop block as unreached (`last block == stop-1`). Bounded backfills now flush and store their cursor. The bug also exists in the standalone `substreams-sink-sql` binary when built against recent sink library versions.
+- CLI: manifests with a `sink:` config of type `sf.substreams.sink.sql.v1.Service` or `sf.substreams.sink.sql.service.v1.Service` now parse — the SQL sink protos are bundled in the CLI's system descriptors.
+
 - Server: the quicksave block count now counts settled blocks (normal or last-partial) instead of skipping partials entirely, so quicksave arms correctly on flash-block chains. The minimum sent-block threshold before a quicksave triggers was raised from 25 to 50.
 - Server: `tier1` calls to hosted foundational stores now forward the `x-organization-id` identity header (alongside the existing trusted headers), so a store's internal trust-based listener can authorize the request without an end-user JWT. This fixes `Unauthenticated: required authorization token not found` errors when reading from hosted foundational stores resolved via the control-plane registry.
 - Server: foundational store calls that fail with authentication errors, organization id mismatch, or prolonged unreachability now bubble up to the user as a non-deterministic (uncached) error instead of retrying until the global deadline. Transient unavailability is still retried (~30s) to absorb blips and rolling restarts.

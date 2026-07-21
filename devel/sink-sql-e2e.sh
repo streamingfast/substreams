@@ -17,7 +17,7 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 ENDPOINT="${E2E_ENDPOINT:-mainnet.eth.streamingfast.io:443}"
-DBCHANGES_SPKG="${E2E_DBCHANGES_SPKG:-https://github.com/streamingfast/substreams-eth-block-meta/releases/download/v0.5.1/substreams-eth-block-meta-v0.5.1.spkg}"
+DBCHANGES_SPKG="${E2E_DBCHANGES_SPKG:-./devel/sink-sql-e2e/substreams.yaml}"
 FROMPROTO_SPKG="${E2E_FROMPROTO_SPKG:-https://github.com/streamingfast/substreams-spl-token/releases/download/v0.1.0/solana-spl-token-v0.1.0.spkg}"
 FROMPROTO_ENDPOINT="${E2E_FROMPROTO_ENDPOINT:-mainnet.sol.streamingfast.io:443}"
 BLOCKS="${E2E_BLOCKS:-+30}"
@@ -31,6 +31,12 @@ cleanup
 
 echo "--- building substreams CLI"
 go build -o /tmp/substreams-e2e ./cmd/substreams
+
+if [ ! -s devel/sink-sql-e2e/block-meta.spkg ]; then
+  echo "--- downloading block-meta spkg"
+  curl -sSL --retry 3 -o devel/sink-sql-e2e/block-meta.spkg \
+    https://github.com/streamingfast/substreams-eth-block-meta/releases/download/v0.5.1/substreams-eth-block-meta-v0.5.1.spkg
+fi
 
 echo "--- starting postgres"
 docker run -d --name "$PG_CONTAINER" -e POSTGRES_PASSWORD=insecure -p 5433:5432 postgres:17-alpine >/dev/null
@@ -49,7 +55,7 @@ echo "block_meta rows: $rows"
 [ "$rows" -gt 0 ] || { echo "FAIL: no rows sunk in DatabaseChanges mode"; exit 1; }
 
 echo "--- mode A: cursor"
-/tmp/substreams-e2e sink postgres tools cursor read --dsn "$PG_DSN" | grep -i cursor || { echo "FAIL: no cursor stored"; exit 1; }
+/tmp/substreams-e2e sink postgres tools cursor read --dsn "$PG_DSN" | grep -E "Module .*: Block #" || { echo "FAIL: no cursor stored"; exit 1; }
 
 echo "--- mode B (relational mappings): run $BLOCKS blocks (auto-detected, no setup)"
 /tmp/substreams-e2e sink postgres "$FROMPROTO_SPKG" -e "$FROMPROTO_ENDPOINT" -t "$BLOCKS" --dsn "$PG_DSN"

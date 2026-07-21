@@ -812,6 +812,52 @@ func TestSinker_Integration_UndoBufferWorks(t *testing.T) {
 	)
 }
 
+// TestSinker_Integration_BoundedRunFlushesOnCompletion locks in the fix for the
+// bounded-run completion flush. With --stop-block set, the stop block is exclusive,
+// so the last streamed block is stopBlock-1. Here every interval flush is disabled
+// (all flush intervals set high) so nothing is written while blocks are handled: the
+// completion flush is the only writer. The stream ends cleanly at the last block and
+// HandleBlockRangeCompletion must flush the accumulated rows plus the cursor.
+//
+// The previous off-by-one compared cursor.Block().Num() < stopBlock (instead of
+// stopBlock-1), so the final flush was skipped on bounded runs: zero rows and a blank
+// cursor. This test fails against that code and passes with the fix.
+func TestSinker_Integration_BoundedRunFlushesOnCompletion(t *testing.T) {
+	runSinkerTest(
+		t,
+		sharedDbChangesPostgresContainer,
+		func(defaults []sink.Option) []sink.Option {
+			// Bounded run: exclusive stop block equal to lastBlock+1 (12 -> 13).
+			return append(defaults, sink.WithBlockRange(bstream.MustParseRange("1-13", bstream.WithExclusiveEnd())))
+		},
+		func(defaults sinker.SinkerFactoryOptions) sinker.SinkerFactoryOptions {
+			// Disable every interval flush so only the completion flush can write.
+			defaults.BatchBlockFlushInterval = 1000
+			defaults.LiveBlockFlushInterval = 1000
+			defaults.BatchRowFlushInterval = 1000
+			return defaults
+		},
+		tablesInput(func(schema string) map[string]*db2.TableInfo { return db2.TestSinglePrimaryKeyTables(schema) }),
+		streamMock(
+			dbChangesBlockData(t, "10a", finalBlock("10a"),
+				insertRowSinglePK("xfer", "1234", "from", "sender1", "to", "receiver1"),
+			),
+			dbChangesBlockData(t, "11a", finalBlock("11a"),
+				insertRowSinglePK("xfer", "5678", "from", "sender2", "to", "receiver2"),
+			),
+			dbChangesBlockData(t, "12a", finalBlock("12a"),
+				insertRowSinglePK("xfer", "9101", "from", "sender3", "to", "receiver3"),
+			),
+		),
+		equalsXferRows([]*XferSinglePKRow{
+			{ID: "1234", From: "sender1", To: "receiver1"},
+			{ID: "5678", From: "sender2", To: "receiver2"},
+			{ID: "9101", From: "sender3", To: "receiver3"},
+		}),
+		"Block #12 (12a) - LIB #12 (12a)",
+	)
+}
+
 func TestSinker_Integration_DeltaUpdate_Add(t *testing.T) {
 	type CounterRow struct {
 		ID    string `db:"id"`

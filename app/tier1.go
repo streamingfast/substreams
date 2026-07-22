@@ -81,6 +81,8 @@ type Tier1Config struct {
 
 	TmpDir                  string
 	StateStoreURL           string
+	StoresScratchSpace      string
+	StoresBackend           string
 	QuickSaveStoreURL       string
 	StateStoreDefaultTag    string
 	BlockType               string
@@ -98,6 +100,10 @@ type Tier1Config struct {
 
 	SharedCacheSize  uint64
 	OutputBufferSize uint64 // Used to bundle execout messages within 'BlockScopedDatas' when using protocol V4
+
+	// StoreSizeLimit, if non-zero, overrides the default store size limit (in bytes)
+	// used by tier2 stores. The value is forwarded to tier2 on each request.
+	StoreSizeLimit uint64
 
 	WASMExtensions wasm.WASMExtensioner
 	Tracing        bool
@@ -263,6 +269,18 @@ func (a *Tier1App) Run() error {
 		opts = append(opts, service.WithLiveBackFillerFinalBlockDelay(a.config.LiveBackFillerFinalBlockDelay))
 	}
 
+	// Scratch space and store backend are passed as options (same as tier2) so
+	// both tiers are wired identically.
+	if a.config.StoresScratchSpace != "" {
+		opts = append(opts, service.WithStoresScratchSpace(a.config.StoresScratchSpace))
+	}
+	if a.config.StoresBackend != "" {
+		opts = append(opts, service.WithStoresBackend(a.config.StoresBackend))
+	}
+	if a.config.StoreSizeLimit != 0 {
+		opts = append(opts, service.WithStoreSizeLimit(a.config.StoreSizeLimit))
+	}
+
 	if a.config.TmpDir != "" {
 		wazero.SetTempDir(a.config.TmpDir)
 	}
@@ -288,6 +306,7 @@ func (a *Tier1App) Run() error {
 		WASMModules:                wasmModules,
 		FoundationalStoreEndpoints: foundationalStoreEndpoints,
 		HostedStoreRegistryAddress: a.config.HostedStoreRegistryAddress,
+		StoreSizeLimit:             a.config.StoreSizeLimit,
 	}
 
 	tier1Service, err := service.NewTier1(

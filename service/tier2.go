@@ -99,6 +99,8 @@ type Tier2Service struct {
 	HostedStoreRegistryAddress string
 
 	checkPendingShutdown func() bool
+	storesScratchSpace   string
+	storesBackend        string
 
 	tier2RequestParameters *reqctx.Tier2RequestParameters
 
@@ -127,8 +129,6 @@ func NewTier2(
 
 		activeRequests: active_requests.NewActiveRequestsManager(logger),
 	}
-
-	setSubstreamsStoreSizeLimitFromEnv(logger)
 
 	if debugAPIAddress := os.Getenv("SUBSTREAMS_TIER2_DEBUG_API_ADDR"); debugAPIAddress != "" {
 		debugAPI := debugapi.New(
@@ -292,6 +292,7 @@ func (s *Tier2Service) ProcessRange(request *pbssinternal.ProcessRangeRequest, s
 		err := status.Error(codes.InvalidArgument, "missing modules in request")
 		fields = append(fields, zap.Error(err))
 		logger.Info("refusing Substreams ProcessRange request", fields...)
+		return err
 	}
 	moduleNames := make([]string, len(request.Modules.Modules))
 	for i := 0; i < len(moduleNames); i++ {
@@ -416,7 +417,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 	}
 
 	storeSizeLimit := reqctx.StoreSizeLimit(ctx)
-	storeConfigs, err := store.NewConfigMap(cacheStore, nil, execGraph.Stores(), execGraph.ModuleHashes(), request.FirstStreamableBlock, storeSizeLimit)
+	storeConfigs, err := store.NewConfigMap(cacheStore, nil, execGraph.Stores(), execGraph.ModuleHashes(), request.FirstStreamableBlock, storeSizeLimit, s.storesScratchSpace, s.storesBackend)
 	if err != nil {
 		return fmt.Errorf("configuring stores: %w", err)
 	}
@@ -464,6 +465,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		return nil
 	}
 	stores := pipeline.NewStores(ctx, storeConfigs, request.SegmentSize, requestDetails.ResolvedStartBlockNum, stopBlock, true, executionPlan.StoresToWrite)
+	defer stores.Close()
 
 	// this engine will keep the ExistingExecOuts to optimize the execution (for inputs from modules that skip execution)
 	execOutputCacheEngine, err := cache.NewEngine(ctx, executionPlan.ExecoutWriters, request.BlockType, executionPlan.ExistingExecOuts, executionPlan.IndexWriters)
@@ -655,7 +657,7 @@ excludable:
 	streamErr = blockStream.Run(ctx)
 	span.EndWithErr(&streamErr)
 
-	if errors.Is(context.Canceled, streamErr) {
+	if errors.Is(streamErr, context.Canceled) {
 		streamErr = context.Cause(ctx)
 	}
 
@@ -812,7 +814,7 @@ func toGRPCError(ctx context.Context, err error) error {
 		return status.Error(codes.DeadlineExceeded, err.Error())
 	}
 	if errors.Is(err, wasm.ErrWasmDeterministicExec) || errors.Is(err, store.ErrStoreAboveMaxSize) {
-		return status.Error(codes.InvalidArgument, fmt.Sprintf("%s (deterministic error)", err.Error()))
+		return status.Error(codes.InvalidArgument, fmt.Sprintf("%s (new deterministic error)", err.Error()))
 	}
 
 	var errInvalidArg *stream.ErrInvalidArg
@@ -865,8 +867,13 @@ func GetExecutionPlan(
 		}
 	}
 
+	// existingExecOuts is written by the loop below while the cleanup goroutine
+	// iterates over it on context cancellation: guard all accesses with a mutex.
+	var existingExecOutsLock sync.Mutex
 	go func() {
 		<-ctx.Done()
+		existingExecOutsLock.Lock()
+		defer existingExecOutsLock.Unlock()
 		for _, eo := range existingExecOuts {
 			if err := eo.Close(); err != nil {
 				logger.Info("error closing reader", zap.String("filename", eo.Filename()), zap.Error(err))
@@ -874,6 +881,12 @@ func GetExecutionPlan(
 		}
 		// Writers don't need to be closed, canceling the context is enough
 	}()
+
+	setExistingExecOut := func(name string, file execout.FileReader) {
+		existingExecOutsLock.Lock()
+		defer existingExecOutsLock.Unlock()
+		existingExecOuts[name] = file
+	}
 
 	for _, mod := range usedModules {
 		if mod.InitialBlock >= stopBlock {
@@ -913,7 +926,7 @@ func GetExecutionPlan(
 				requiredModules[name] = usedModules[name]
 				break
 			}
-			existingExecOuts[name] = file
+			setExistingExecOut(name, file)
 
 		case pbsubstreams.ModuleKindStore:
 			file, readErr := c.OpenFileReader(ctx, &block.Range{StartBlock: moduleStartBlock, ExclusiveEndBlock: stopBlock})
@@ -923,7 +936,7 @@ func GetExecutionPlan(
 				}
 				requiredModules[name] = usedModules[name]
 			} else {
-				existingExecOuts[name] = file
+				setExistingExecOut(name, file)
 			}
 
 			// if either full or partial kv exists, we can skip the module

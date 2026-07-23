@@ -113,6 +113,7 @@
   * SQL
     * [Sink Config](references/sql/sink-config.md)
     * [DSN Reference](references/sql/dsn-reference.md)
+    * [Proto Annotations](references/sql/proto-annotations.md)
     * [Delta Updates](references/sql/delta-updates.md)
     * [Reorg Handling](references/sql/reorg-handling.md)
 * Operators

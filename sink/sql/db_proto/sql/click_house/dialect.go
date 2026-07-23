@@ -36,7 +36,7 @@ const staticSqlCreateBlock = `
 	    allow_experimental_replacing_merge_with_cleanup = 1;
 `
 
-const clickhouseTableOptionsErrorMsg = "schema annotation 'clickhouse_table_options' is required in table annotation 'option (schema.table) = { name: %q, ... }' , see: https://github.com/streamingfast/substreams/blob/develop/sink/sql/FROM_PROTO.md#clickhouse-specific-options for configuration details"
+const clickhouseTableOptionsErrorMsg = "schema annotation 'clickhouse_table_options' is required in table annotation 'option (schema.table) = { name: %q, ... }' , see: https://github.com/streamingfast/substreams/blob/develop/docs/references/sql/proto-annotations.md#clickhouse-specific-options for configuration details"
 
 type DialectClickHouse struct {
 	*sql2.BaseDialect

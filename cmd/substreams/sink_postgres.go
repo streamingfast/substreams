@@ -10,17 +10,9 @@ const sinkPostgresDriver = "postgres"
 var sinkPostgresCmd = &cobra.Command{
 	Use:     "postgres [<manifest> [<module>]]",
 	Short:   "Sink Substreams data into a PostgreSQL database",
-	Long:    "Sink Substreams data into a PostgreSQL database. Invoked without a subcommand, it runs the sink process, behaving exactly like the 'run' subcommand.",
+	Long:    "Sink Substreams data into a PostgreSQL database, auto-detecting the mode from the output module type.",
 	Example: "substreams sink postgres uniswap-v3@v0.2.10 --dsn 'postgres://localhost:5432/postgres?sslmode=disable'",
 	Args:    sinkEngineParentArgs,
-	RunE:    newSinkRunE(sinkPostgresDriver),
-}
-
-var sinkPostgresRunCmd = &cobra.Command{
-	Use:     "run [<manifest> [<module>]]",
-	Short:   "Runs the PostgreSQL sink process, auto-detecting the mode from the output module type",
-	Example: "substreams sink postgres run uniswap-v3@v0.2.10 --dsn 'postgres://localhost:5432/postgres?sslmode=disable'",
-	Args:    cobra.RangeArgs(0, 2),
 	RunE:    newSinkRunE(sinkPostgresDriver),
 }
 
@@ -46,7 +38,6 @@ func init() {
 	addDSNFlag(persistent)
 	addOperatorFlags(persistent)
 
-	addSinkRunFlags(sinkPostgresRunCmd.Flags(), sinkPostgresDriver)
 	addSinkRunFlags(sinkPostgresCmd.Flags(), sinkPostgresDriver)
 
 	setupFlags := sinkPostgresSetupCmd.Flags()
@@ -58,7 +49,6 @@ func init() {
 	addBytesEncodingFlag(setupFlags)
 	addFromProtoModeRunFlags(setupFlags, sinkPostgresDriver)
 
-	sinkPostgresCmd.AddCommand(sinkPostgresRunCmd)
 	sinkPostgresCmd.AddCommand(sinkPostgresSetupCmd)
 	sinkPostgresCmd.AddCommand(newSinkToolsCmd(sinkPostgresDriver))
 

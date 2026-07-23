@@ -165,9 +165,8 @@ func addFromProtoModeRunFlags(flags *pflag.FlagSet, driver string) {
 	}
 }
 
-// addSinkRunFlags registers the full set of flags used by the run action of an engine
-// command. It is used both for the explicit `run` subcommand and for the parent engine
-// command, which defaults to the run action.
+// addSinkRunFlags registers the full set of flags used by the sink process of an
+// engine command.
 func addSinkRunFlags(flags *pflag.FlagSet, driver string) {
 	sink.AddFlagsToSet(flags, sink.FlagExcludeDefault(sink.FlagUndoBufferSize))
 	addBytesEncodingFlag(flags)
@@ -188,20 +187,25 @@ func sinkBytesEncoding(cmd *cobra.Command) (sqlbytes.Encoding, error) {
 	return encoding, nil
 }
 
-// sinkEngineParentArgs validates the engine parent command's positional args. The
-// parent defaults to `run`, so a removed subcommand name would otherwise be taken
-// as a manifest path and fail with a confusing registry error.
+// sinkEngineParentArgs validates the engine command's positional args. The command
+// runs the sink directly, so a removed subcommand name would otherwise be taken as
+// a manifest path and fail with a confusing registry error.
 func sinkEngineParentArgs(cmd *cobra.Command, args []string) error {
 	if err := cobra.RangeArgs(0, 2)(cmd, args); err != nil {
 		return err
 	}
-	if len(args) > 0 && args[0] == "create-user" {
-		return fmt.Errorf("the create-user command was removed, create the user directly in your database")
+	if len(args) > 0 {
+		switch args[0] {
+		case "create-user":
+			return fmt.Errorf("the create-user command was removed, create the user directly in your database")
+		case "run":
+			return fmt.Errorf("there is no run subcommand, the command runs the sink directly: substreams sink %s <manifest>", cmd.Name())
+		}
 	}
 	return nil
 }
 
-// newSinkRunE builds the RunE for the `run` command of the given engine. It resolves
+// newSinkRunE builds the RunE for the given engine command. It resolves
 // the manifest/module positional params, reads the package once to detect the output
 // module type and routes to the DatabaseChanges or the from-proto sink accordingly.
 func newSinkRunE(driver string) func(*cobra.Command, []string) error {

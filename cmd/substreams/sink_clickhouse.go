@@ -10,17 +10,9 @@ const sinkClickhouseDriver = "clickhouse"
 var sinkClickhouseCmd = &cobra.Command{
 	Use:     "clickhouse [<manifest> [<module>]]",
 	Short:   "Sink Substreams data into a ClickHouse database",
-	Long:    "Sink Substreams data into a ClickHouse database. Invoked without a subcommand, it runs the sink process, behaving exactly like the 'run' subcommand.",
+	Long:    "Sink Substreams data into a ClickHouse database, auto-detecting the mode from the output module type.",
 	Example: "substreams sink clickhouse uniswap-v3@v0.2.10 --dsn 'clickhouse://localhost:9000/default'",
 	Args:    sinkEngineParentArgs,
-	RunE:    newSinkRunE(sinkClickhouseDriver),
-}
-
-var sinkClickhouseRunCmd = &cobra.Command{
-	Use:     "run [<manifest> [<module>]]",
-	Short:   "Runs the ClickHouse sink process, auto-detecting the mode from the output module type",
-	Example: "substreams sink clickhouse run uniswap-v3@v0.2.10 --dsn 'clickhouse://localhost:9000/default'",
-	Args:    cobra.RangeArgs(0, 2),
 	RunE:    newSinkRunE(sinkClickhouseDriver),
 }
 
@@ -46,7 +38,6 @@ func init() {
 	addDSNFlag(persistent)
 	addOperatorFlags(persistent)
 
-	addSinkRunFlags(sinkClickhouseRunCmd.Flags(), sinkClickhouseDriver)
 	addSinkRunFlags(sinkClickhouseCmd.Flags(), sinkClickhouseDriver)
 
 	setupFlags := sinkClickhouseSetupCmd.Flags()
@@ -58,7 +49,6 @@ func init() {
 	addBytesEncodingFlag(setupFlags)
 	addFromProtoModeRunFlags(setupFlags, sinkClickhouseDriver)
 
-	sinkClickhouseCmd.AddCommand(sinkClickhouseRunCmd)
 	sinkClickhouseCmd.AddCommand(sinkClickhouseSetupCmd)
 	sinkClickhouseCmd.AddCommand(newSinkToolsCmd(sinkClickhouseDriver))
 

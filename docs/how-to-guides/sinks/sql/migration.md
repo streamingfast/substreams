@@ -23,6 +23,18 @@ There is no separate `from-proto` command anymore: the engine command (and `setu
 ## Flag changes
 
 - The DSN is no longer a positional argument. Pass `--dsn`, or set the `SUBSTREAMS_SINK_DSN` environment variable. `${VAR}` expansion inside the DSN still works.
+
+  ```bash
+  # before
+  substreams-sink-sql run "psql://user:pass@localhost:5432/db?sslmode=disable" manifest.yaml 100:200
+
+  # after
+  substreams sink postgres manifest.yaml -s 100 -t 200 --dsn "psql://user:pass@localhost:5432/db?sslmode=disable"
+
+  # or keep the DSN out of the command line entirely
+  export SUBSTREAMS_SINK_DSN="psql://user:pass@localhost:5432/db?sslmode=disable"
+  substreams sink postgres manifest.yaml -s 100 -t 200
+  ```
 - The block range is no longer a positional argument. Use `-s/--start-block` and `-t/--stop-block`, like `substreams run`. `inject-csv` keeps its positional `<start>:<stop>` file range.
 - ClickHouse flags lost their prefix and only exist on `substreams sink clickhouse`: `--cluster`, `--cursor-file-path`, `--sink-info-folder`, `--query-retry-count`, `--query-retry-sleep`.
 - `--metrics-listen-addr` is replaced by the standard sink flag `--prometheus-addr` (same `localhost:9102` default).

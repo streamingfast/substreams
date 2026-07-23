@@ -4,7 +4,7 @@ The standalone `substreams-sink-sql` binary is now part of the `substreams` CLI 
 
 ## Command mapping
 
-The engine is now part of the command name and must match your DSN scheme. `run` is the default action and can be omitted.
+The engine is now part of the command name and must match your DSN scheme. There is no `run` subcommand: the engine command itself runs the sink.
 
 | substreams-sink-sql | substreams CLI |
 | --- | --- |
@@ -18,7 +18,7 @@ The engine is now part of the command name and must match your DSN scheme. `run`
 
 For ClickHouse targets, replace `postgres` with `clickhouse` in every command. `generate-csv` and `inject-csv` are PostgreSQL-only.
 
-There is no separate `from-proto` command anymore: `run` (and `setup`) detect the mode from the output module's type. A module producing `sf.substreams.sink.database.v1.DatabaseChanges` uses your `schema.sql`; any other output type uses relational mappings derived from the protobuf definition.
+There is no separate `from-proto` command anymore: the engine command (and `setup`) detects the mode from the output module's type. A module producing `sf.substreams.sink.database.v1.DatabaseChanges` uses your `schema.sql`; any other output type uses relational mappings derived from the protobuf definition.
 
 ## Flag changes
 
@@ -28,6 +28,15 @@ There is no separate `from-proto` command anymore: `run` (and `setup`) detect th
 - `--metrics-listen-addr` is replaced by the standard sink flag `--prometheus-addr` (same `localhost:9102` default).
 - `--flush-interval` (deprecated alias) is gone; use `--batch-block-flush-interval`.
 - The misspelled `--on-module-hash-mistmatch` alias is gone; use `--on-module-hash-mismatch`.
+
+## Operators: Docker image and service arguments
+
+- The Docker image changes from `ghcr.io/streamingfast/substreams-sink-sql` to `ghcr.io/streamingfast/substreams`. Both images use their binary as entrypoint, so only the container arguments change:
+  - before: `run $DSN /data/manifest.yaml 100:200 --on-module-hash-mismatch=warn`
+  - after: `sink postgres /data/manifest.yaml -s 100 -t 200 --dsn $DSN --on-module-hash-mismatch=warn`
+- Instead of putting the DSN (and its password) in the arguments, you can set the `SUBSTREAMS_SINK_DSN` environment variable on the container.
+- Prometheus scraping: `--metrics-listen-addr` is now `--prometheus-addr`, same `localhost:9102` default. Bind it to `0.0.0.0:9102` if you scrape from outside the container.
+- pprof no longer listens by default; opt in with `--pprof-listen-addr`.
 
 ## Cursor compatibility
 

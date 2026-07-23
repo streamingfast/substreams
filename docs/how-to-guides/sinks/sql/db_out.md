@@ -6,7 +6,7 @@ You will create a new module, `db_out`, which maps the output of your Substreams
 
 ## Running the Sink
 
-To index a `db_out` module, you will have to run two different commands: `substreams sink postgres setup` (or `substreams sink clickhouse setup`) to create the necessary tables from a given `schema.sql` file, and `substreams sink postgres run` (or `substreams sink clickhouse run`) to perform the actual execution.
+To index a `db_out` module, you will have to run two different commands: `substreams sink postgres setup` (or `substreams sink clickhouse setup`) to create the necessary tables from a given `schema.sql` file, and `substreams sink postgres` (or `substreams sink clickhouse`) to perform the actual execution.
 
 ```bash
 substreams sink postgres setup <SUBSTREAMS_PACKAGE> --dsn <DSN>
@@ -90,5 +90,5 @@ substreams sink postgres setup ./substreams.yaml --dsn $DSN
 - Run the sink
 
 ```bash
-substreams sink postgres run ./substreams.yaml --dsn $DSN
+substreams sink postgres ./substreams.yaml --dsn $DSN
 ```

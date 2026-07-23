@@ -112,7 +112,7 @@ export DB_USER="myuser"
 export DB_PASS="mypassword"
 export DSN="postgres://${DB_USER}:${DB_PASS}@localhost:5432/mydatabase"
 
-substreams sink postgres run ./substreams.yaml --dsn $DSN
+substreams sink postgres ./substreams.yaml --dsn $DSN
 ```
 
 ## Troubleshooting

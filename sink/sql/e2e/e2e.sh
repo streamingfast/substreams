@@ -14,10 +14,10 @@
 #   E2E_BLOCKS             number of blocks to stream (default +30)
 
 set -euo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")/.."
+cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
 
 ENDPOINT="${E2E_ENDPOINT:-mainnet.eth.streamingfast.io:443}"
-DBCHANGES_SPKG="${E2E_DBCHANGES_SPKG:-./devel/sink-sql-e2e/substreams.yaml}"
+DBCHANGES_SPKG="${E2E_DBCHANGES_SPKG:-./sink/sql/e2e/substreams.yaml}"
 FROMPROTO_SPKG="${E2E_FROMPROTO_SPKG:-https://github.com/streamingfast/substreams-spl-token/releases/download/v0.1.0/solana-spl-token-v0.1.0.spkg}"
 FROMPROTO_ENDPOINT="${E2E_FROMPROTO_ENDPOINT:-mainnet.sol.streamingfast.io:443}"
 BLOCKS="${E2E_BLOCKS:-+30}"
@@ -32,9 +32,9 @@ cleanup
 echo "--- building substreams CLI"
 go build -o /tmp/substreams-e2e ./cmd/substreams
 
-if [ ! -s devel/sink-sql-e2e/block-meta.spkg ]; then
+if [ ! -s sink/sql/e2e/block-meta.spkg ]; then
   echo "--- downloading block-meta spkg"
-  curl -sSL --retry 3 -o devel/sink-sql-e2e/block-meta.spkg \
+  curl -sSL --retry 3 -o sink/sql/e2e/block-meta.spkg \
     https://github.com/streamingfast/substreams-eth-block-meta/releases/download/v0.5.1/substreams-eth-block-meta-v0.5.1.spkg
 fi
 

@@ -1,6 +1,6 @@
 # Re-org Handling Reference
 
-This document describes how `substreams-sink-sql` implements re-organization (re-org) handling to maintain data consistency when blockchain reorganizations occur.
+This document describes how the SQL sink (`substreams sink postgres` / `substreams sink clickhouse`) implements re-organization (re-org) handling to maintain data consistency when blockchain reorganizations occur.
 
 ## Overview
 

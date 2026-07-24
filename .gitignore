@@ -26,3 +26,4 @@ package-lock.json
 state.cursor
 /wasigo
 /.claude
+.substreams.env

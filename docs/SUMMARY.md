@@ -69,6 +69,7 @@
   * [Substreams:SQL](how-to-guides/sinks/sql/sql.md)
     * [Using Relational Mappings](how-to-guides/sinks/sql/relational-mappings.md)
     * [Using Database Changes](how-to-guides/sinks/sql/db_out.md)
+    * [Migrating from substreams-sink-sql](how-to-guides/sinks/sql/migration.md)
   * [Substreams:Stream](how-to-guides/sinks/stream/stream.md)
     * [JavaScript](how-to-guides/sinks/stream/javascript.md)
     * [Go](how-to-guides/sinks/stream/go.md)
@@ -112,6 +113,7 @@
   * SQL
     * [Sink Config](references/sql/sink-config.md)
     * [DSN Reference](references/sql/dsn-reference.md)
+    * [Proto Annotations](references/sql/proto-annotations.md)
     * [Delta Updates](references/sql/delta-updates.md)
     * [Reorg Handling](references/sql/reorg-handling.md)
 * Operators

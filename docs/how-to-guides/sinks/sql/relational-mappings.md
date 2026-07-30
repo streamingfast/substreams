@@ -35,6 +35,8 @@ message Pool {
 
 In the example above, two entities are defined: `Swap` and `Pool`, where each Swap belongs to a Pool. As a result, the Pool object includes a list of Swaps, linked by the Pool’s _id using the child_of annotation. The SQL sink **will automatically generate the corresponding tables** and relationships based on the annotations in the Protobuf.
 
+For the full list of annotations, type mappings, and ClickHouse-specific options, see the [Proto Annotations Reference](../../../references/sql/proto-annotations.md).
+
 ## Run the Sink
 
 First, let's spin up a PostgreSQL database using Docker:
@@ -49,7 +51,7 @@ You can run the sink with the following syntax:
 # Ensure you are authenticated properly https://docs.substreams.dev/how-to-guides/installing-the-cli/authentication
 
 export DSN="postgres://postgres:password@localhost:5432/substreams?sslmode=disable"
-substreams-sink-sql from-proto "$DSN" solana-spl-token@latest
+substreams sink postgres solana-spl-token@latest --dsn "$DSN"
 
 # Run 'docker rm postgres-db --force' to delete running database or start from scratch
 ```
@@ -214,7 +216,7 @@ export DSN="postgres://postgres:password@localhost:5432/substreams?sslmode=disab
 - Run the sink using the published package:
 
 ```bash
-substreams-sink-sql from-proto $DSN https://github.com/streamingfast/substreams-spl-token/releases/download/v0.1.0/solana-spl-token-v0.1.0.spkg
+substreams sink postgres https://github.com/streamingfast/substreams-spl-token/releases/download/v0.1.0/solana-spl-token-v0.1.0.spkg --dsn $DSN
 ```
 
 ## Run the Sink Without Annotations

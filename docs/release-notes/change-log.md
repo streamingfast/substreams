@@ -9,6 +9,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- Server: new Prometheus metrics for external calls made by WASM extensions (e.g. `eth_call`), making it possible to spot slow calls clogging a tier:
+
+  - `substreams_tier1_wasm_extension_call_counter{extension,outcome}` and `substreams_tier1_wasm_extension_call_duration_seconds{extension,outcome}`
+  - `substreams_tier2_wasm_extension_call_counter{extension,outcome}` and `substreams_tier2_wasm_extension_call_duration_seconds{extension,outcome}`
+
+  `extension` is the extension being called (e.g. `eth:call`) and `outcome` is `success` or `error`. The duration histogram extends the default buckets with a 30s and 60s tail so that slow calls and timeouts remain distinguishable.
+
+- Server: the `substreams request stats` log gained a `wasm_ext_call_metrics` field (per extension) and a `wasm_ext_call_metrics_by_module` field (per module and extension), each breaking down external calls (e.g. `eth_call`) with `count`, `total_ms`, `avg_ms` and `max_ms`. Only modules that actually made a call appear, so both are empty when nothing called out. The pre-existing `module_wasm_ext_duration` merges every extension into a single duration and is unchanged. `max_ms` covers the calls made locally by the process emitting the log; calls made by tier2 jobs are reported back as a count and a total, and each tier2 logs its own `max_ms`.
+
+### Fixed
+
+- Server: WASM extension calls (e.g. `eth_call`) that returned an error were never closed in the request stats, leaking an in-process entry that kept inflating the reported external call duration for the remaining lifetime of the request. Both the `wazero` and `wasmtime` runtimes are fixed.
+
+- Server: external call metrics (e.g. `eth_call` count and duration) gathered on the shared-cache execution path were silently discarded, so modules executed through that path reported no external call activity at all.
+
 ## v1.20.2
 
 ### Added

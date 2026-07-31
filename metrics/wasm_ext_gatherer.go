@@ -43,12 +43,21 @@ func (m *WasmMetricsGatherer) RecordModuleWasmExternalCallEnd(moduleName string,
 	defer m.Unlock()
 
 	if m.inProcessCalls[moduleName] == nil || m.inProcessCalls[moduleName][uniqueID] == nil {
-		m.logger.Warn("inprocess call not found", zap.String("module", moduleName), zap.String("extension", extension), zap.Uint64("unique_id", uniqueID))
+		if m.logger != nil {
+			m.logger.Warn("inprocess call not found", zap.String("module", moduleName), zap.String("extension", extension), zap.Uint64("unique_id", uniqueID))
+		}
 		return
 	}
 
 	duration := time.Since(m.inProcessCalls[moduleName][uniqueID].startTime)
 	delete(m.inProcessCalls[moduleName], uniqueID)
+
+	if m.doneCalls == nil {
+		m.doneCalls = make(map[string]map[string]*pbssinternal.ExternalCallMetric)
+	}
+	if m.doneCalls[moduleName] == nil {
+		m.doneCalls[moduleName] = make(map[string]*pbssinternal.ExternalCallMetric)
+	}
 
 	metric, ok := m.doneCalls[moduleName][extension]
 	if !ok {
@@ -57,6 +66,7 @@ func (m *WasmMetricsGatherer) RecordModuleWasmExternalCallEnd(moduleName string,
 			Count:  0,
 			TimeMs: 0,
 		}
+		m.doneCalls[moduleName][extension] = metric
 	}
 
 	metric.Count++

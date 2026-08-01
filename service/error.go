@@ -49,8 +49,10 @@ func toConnectError(ctx context.Context, err error) error {
 	if err, ok := dsession.ToConnectError(err); ok {
 		return err
 	}
-	// special case for context canceled when shutting down
-	if err == errShuttingDown {
+	// special case for context canceled when shutting down. The error is wrapped by the
+	// time it reaches here (ex: `error during init_stores_and_backprocess: ... scheduler
+	// run: %w`), so it must be matched with `errors.Is` and not a pointer comparison.
+	if errors.Is(err, errShuttingDown) {
 		return connect.NewError(connect.CodeUnavailable, err)
 	}
 
@@ -95,7 +97,7 @@ func toConnectError(ctx context.Context, err error) error {
 	}
 
 	// special case for "QuickSave" on shutdown
-	if err == pipeline.ErrShuttingDown {
+	if errors.Is(err, pipeline.ErrShuttingDown) {
 		return connect.NewError(connect.CodeUnavailable, err)
 	}
 

@@ -11,9 +11,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Changed
+
+- Server: tier2 now aborts a segment when it **stops making progress** rather than when it exceeds a fixed time budget. A new stall timeout (10 minutes by default, `WithSegmentStallTimeout`) resets on every block processed, and the pre-existing segment execution timeout (`WithSegmentExecutionTimeout`) is kept only as an absolute backstop, its default raised from 60 minutes to 4 hours.
+
+  The old fixed budget was fatal to expensive-but-healthy workloads: a segment making thousands of `eth_call` per block could take slightly longer than 60 minutes while still advancing block by block, get killed, and — since a killed segment is never cached — have its retry redo the same work and hit the same wall. Such a request could never complete, no matter how many times it reconnected. A stalled segment is still killed promptly, and since a single block is already bounded by the block execution timeout (3 minutes by default), the stall timeout cannot be tripped by one legitimately slow block.
+
+  The `request active for a long time` log gained a `since_last_progress` field, and a segment killed for stalling now reports `request stalled, no block progress` instead of `request active for too long`.
+
 ### Fixed
 
 - Server: tier2 no longer logs `tls: first record does not look like a TLS handshake` errors from plain-HTTP health probes / load balancers hitting a TLS port (same suppress list as the existing EOF and connection-reset handshake noise).
+- Server: a tier1 shutdown happening while a request was still in its parallel backprocessing phase was reported to the client as `Internal` instead of `Unavailable`. The `endpoint is shutting down, please reconnect` error is wrapped several times on its way up from the scheduler (`error during init_stores_and_backprocess: run_parallel_process failed: parallel processing run: scheduler run: ...`) and was matched with a pointer comparison, so it never took the `Unavailable` path. Clients now see the correct reconnect signal during a tier1 rollout.
 
 ## 1.20.3
 

@@ -19,6 +19,7 @@ import (
 	"github.com/mattn/go-isatty"
 	"github.com/streamingfast/shutter"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
@@ -216,7 +217,7 @@ func (ui *TUI) HandleDebugSnapshotComplete(ctx context.Context, complete *pbsubs
 	return nil
 }
 
-func (ui *TUI) HandleSession(ctx context.Context, req *pbsubstreamsrpc.Request, session *pbsubstreamsrpc.SessionInit) error {
+func (ui *TUI) HandleSession(ctx context.Context, req *pbsubstreamsrpcv3.Request, session *pbsubstreamsrpc.SessionInit) error {
 	if session.BlocksToProcessAfterStartBlock != 0 {
 		ui.RequiredProcessedBlocks = session.EffectiveBlocksToProcessBeforeStartBlock + session.EffectiveBlocksToProcessAfterStartBlock
 	}
@@ -226,7 +227,7 @@ func (ui *TUI) HandleSession(ctx context.Context, req *pbsubstreamsrpc.Request, 
 		ui.ensureTerminalLocked()
 		ui.prog.Send(session)
 	} else {
-		execGraph, err := exec.NewOutputModuleGraph(req.OutputModule, req.ProductionMode, req.Modules, bstream.GetProtocolFirstStreamableBlock)
+		execGraph, err := exec.NewOutputModuleGraph(req.OutputModule, req.ProductionMode, req.Package.GetModules(), bstream.GetProtocolFirstStreamableBlock)
 		if err != nil {
 			return fmt.Errorf("cannot handle module graph: %w", err)
 		}
@@ -255,6 +256,18 @@ func (ui *TUI) HandleSession(ctx context.Context, req *pbsubstreamsrpc.Request, 
 		}
 	}
 	return nil
+}
+
+// HandleError is called by the sinker when the stream is severed and about to be retried. The
+// session that follows carries a brand new trace ID, so the UI must stop advertising the previous
+// one until we are effectively re-connected.
+func (ui *TUI) HandleError(ctx context.Context, err error) {
+	_ = ctx
+	_ = err
+
+	if ui.outputMode == OutputModeTUI {
+		ui.Connecting()
+	}
 }
 
 func (ui *TUI) ensureTerminalUnlocked() {

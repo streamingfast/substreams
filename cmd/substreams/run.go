@@ -150,7 +150,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		ui.HandleProgress,
 		ui.HandleDebugSnapshotData,
 		ui.HandleDebugSnapshotComplete,
-		nil,
+		ui.HandleError,
 	)
 	ctx, cancelCause := context.WithCancelCause(ctx)
 	go func() {

@@ -42,9 +42,17 @@ var tpl = template.Must(template.New("main_view.txt.gotmpl").Funcs(template.Func
 func barmode(in ranges, backprocessingCompleteAtBlock, width uint64) string {
 	lo := in.Lo()
 	hi := backprocessingCompleteAtBlock
+
+	// The width is 0 until the first `tea.WindowSizeMsg` is received and the completed
+	// ranges can sit past the backprocessing target, both would make the bin computation
+	// below divide by zero or underflow.
+	if width == 0 || hi <= lo {
+		return ""
+	}
+
 	binsize := (hi - lo) / width
 	var out []string
-	for i := uint64(0); i < width; i++ {
+	for i := range width {
 		loCheck := binsize*i + lo
 		hiCheck := binsize*(i+1) + lo
 

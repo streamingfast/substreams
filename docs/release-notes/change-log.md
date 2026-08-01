@@ -9,6 +9,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Changed
+
+- Sink: **Breaking** the `handleSessionInit` callback passed to `sink.NewSinkerFullHandlers` and `sink.NewSinkerFullHandlersWithPartial` now receives a `*pbsubstreamsrpcv3.Request` instead of a `*pbsubstreamsrpc.Request` (`rpc/v2`), matching both the `SinkerSessionInitHandler` interface and the request the sinker actually sends. The two disagreed, so the sinker's type assertion never matched and the callback was never invoked — no behavior can depend on it today.
+
+  Callers passing `nil` are unaffected. Callers passing a callback get a compile error and should switch the parameter type; the only field that moved is `req.Modules`, now reachable as `req.Package.Modules`. Callers implementing `SinkerSessionInitHandler` directly on their own handler type were already writing the `rpc/v3` signature and are unaffected.
+
+- Sink: **Breaking** the `handleError` callback passed to `sink.NewSinkerFullHandlers` and `sink.NewSinkerFullHandlersWithPartial` now receives an `error` instead of a `*pbsubstreamsrpc.Error`, matching the `SinkerErrorHandler` interface. Same as above, the callback was never invoked before this fix. It is called for stream errors the sinker is about to retry, not on `io.EOF` nor on fatal errors.
+
+### Fixed
+
+- CLI: `substreams run` in TUI output mode was stuck on `Connecting...` and never displayed the trace ID. The session-init callback signature had drifted from the `SinkerSessionInitHandler` interface, so the sinker's type assertion failed and the session never reached the UI at all. The per-stage progress section (stage modules, completed ranges and the `m` bar mode) was hidden by the same bug and is displayed again.
+
+- CLI: `substreams run` with a non-TUI output mode (`--output json`, `jsonl`, ...) was not printing the `TraceID:`, `Server HEAD block:` and stage/blocks-to-process summary lines anymore, for the same reason as above.
+
+- CLI: `substreams run` in TUI output mode kept advertising `Connected` with a stale trace ID while the sinker was retrying a severed stream. It now falls back to `Connecting...` and picks up the new trace ID of the re-established session.
+
 ## 1.20.3
 
 ### Added

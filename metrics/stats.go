@@ -37,7 +37,9 @@ type Stats struct {
 	runningJobs             runningJobs
 	completedJobsStats      map[string]*pbssinternal.ModuleStats
 	uncompressedEgressBytes uint64
-	processedBlocks         uint64
+	// processedBlocks is written from the block-processing goroutine and read from tier2's
+	// segment watchdog goroutine (which uses it as a liveness signal), so it must be atomic.
+	processedBlocks atomic.Uint64
 
 	localProcessedBlockCount  uint64
 	remoteProcessedBlockCount uint64
@@ -278,11 +280,11 @@ func (s *Stats) RecordLastBlockSent(clock *pbsubstreams.Clock) {
 }
 
 func (s *Stats) RecordBlocksProcessed(count uint64) {
-	s.processedBlocks += count
+	s.processedBlocks.Add(count)
 }
 
 func (s *Stats) GetBlocksProcessed() uint64 {
-	return s.processedBlocks
+	return s.processedBlocks.Load()
 }
 
 func (s *Stats) RecordStages(stages []*pbsubstreamsrpc.Stage) {
@@ -774,7 +776,7 @@ func (s *Stats) getZapFields(meter dmetering.Meter) []zap.Field {
 		zap.Uint64("remote_jobs_retried", s.retriedJobs),
 		zap.Uint64("remote_jobs_delayed", s.delayedJobs),
 		zap.Uint64("remote_blocks_processed", s.remoteProcessedBlockCount), // "estimated" from remote ranges
-		zap.Uint64("total_blocks_processed", s.processedBlocks),            // includes remote and local blocks processed in this request, multiplied by execution stages, excludes blocks that were skipped from indexes
+		zap.Uint64("total_blocks_processed", s.processedBlocks.Load()),     // includes remote and local blocks processed in this request, multiplied by execution stages, excludes blocks that were skipped from indexes
 		zap.Uint64("uncompressed_egress_bytes", s.uncompressedEgressBytes),
 		zap.Duration("client_read_average_time_last_5_minutes", s.clientReadTime.Average()),
 		zap.Uint64("last_sent_block_num", s.lastSentBlockNum),

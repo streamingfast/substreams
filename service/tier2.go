@@ -54,6 +54,7 @@ import (
 var slowQueryNotificationFrequency = 30 * time.Second
 var slowQueryNotificationThreshold = 300 * time.Second
 var ErrRequestActiveForTooLong = errors.New("request active for too long")
+var ErrRequestStalled = errors.New("request stalled, no block progress")
 
 // sendHostnameHeader mirrors SUBSTREAMS_SEND_HOSTNAME, read once at startup
 // instead of on every request (updateStreamHeadersHostname runs per ProcessRange).
@@ -95,6 +96,7 @@ type Tier2Service struct {
 	connectionCountMutex       sync.RWMutex
 	blockExecutionTimeout      time.Duration
 	segmentExecutionTimeout    time.Duration
+	segmentStallTimeout        time.Duration
 	foundationalEndpoints      map[string]string
 	HostedStoreRegistryAddress string
 
@@ -123,7 +125,8 @@ func NewTier2(
 		tracer:                  tracing.GetTracer(),
 		logger:                  logger,
 		blockExecutionTimeout:   3 * time.Minute,
-		segmentExecutionTimeout: 60 * time.Minute,
+		segmentExecutionTimeout: 4 * time.Hour,
+		segmentStallTimeout:     10 * time.Minute,
 
 		simulateOverloaded: atomic.NewBool(false),
 
@@ -478,15 +481,21 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 
 	now := time.Now()
 	go func() {
+		reqStats := reqctx.ReqStats(ctx)
+		watchdog := newSegmentWatchdog(now, reqStats.GetBlocksProcessed(), s.segmentStallTimeout, s.segmentExecutionTimeout)
+
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-time.After(slowQueryNotificationFrequency):
-				if s.segmentExecutionTimeout != 0 && time.Since(now) > s.segmentExecutionTimeout {
-					cancelCause(connect.NewError(connect.CodeDeadlineExceeded, ErrRequestActiveForTooLong))
+				tick := time.Now()
+				if err := watchdog.check(tick, reqStats.GetBlocksProcessed()); err != nil {
+					cancelCause(err)
+					continue
 				}
-				if time.Since(now) > slowQueryNotificationThreshold {
+
+				if tick.Sub(now) > slowQueryNotificationThreshold {
 
 					modStats := reqctx.ReqStats(ctx).AggregatedModulesStats()
 					modStrings := make([]string, len(modStats))
@@ -515,7 +524,7 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 						userID = fmt.Sprintf("user_id:%s,", auth.UserID())
 					}
 					sort.Strings(modStrings)
-					logger.Info("request active for a long time", zap.Duration("duration", time.Since(now)), zap.Strings("modules", modStrings), zap.Uint64("processed_blocks", reqctx.ReqStats(ctx).GetBlocksProcessed()), zap.String("user_id", userID))
+					logger.Info("request active for a long time", zap.Duration("duration", tick.Sub(now)), zap.Strings("modules", modStrings), zap.Uint64("processed_blocks", watchdog.processedBlocks), zap.Duration("since_last_progress", watchdog.sinceLastProgress(tick)), zap.String("user_id", userID))
 				}
 			}
 		}
@@ -803,7 +812,7 @@ func toGRPCError(ctx context.Context, err error) error {
 	if errors.Is(err, context.Canceled) {
 		if context.Cause(ctx) != nil {
 			err = context.Cause(ctx)
-			if err == errShuttingDown {
+			if errors.Is(err, errShuttingDown) {
 				return status.Error(codes.Unavailable, err.Error())
 			}
 			return toGRPCError(context.TODO(), err) // get error parsing from above for the error encapsulated in the cause

@@ -25,6 +25,7 @@ import (
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/logging"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/sink"
 	"go.uber.org/zap"
@@ -657,7 +658,7 @@ func runSegment(ctx context.Context, segment ChainSegment, baseConfig *sink.Sink
 		func(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *sink.Cursor) error {
 			return nil
 		},
-		func(ctx context.Context, req *pbsubstreamsrpc.Request, session *pbsubstreamsrpc.SessionInit) error {
+		func(ctx context.Context, req *pbsubstreamsrpcv3.Request, session *pbsubstreamsrpc.SessionInit) error {
 			zlog.Info("started segment",
 				zap.Reflect("session", session),
 				zap.Uint64("sampled_start_block", segment.SampledStartBlock),

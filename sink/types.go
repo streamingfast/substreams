@@ -18,12 +18,23 @@ type sinkerHandlers struct {
 
 type fullSinkerHandlers struct {
 	sinkerHandlers
-	handleSessionInit             func(ctx context.Context, req *pbsubstreamsrpc.Request, session *pbsubstreamsrpc.SessionInit) error
+	handleSessionInit             func(ctx context.Context, req *pbsubstreamsrpcv3.Request, session *pbsubstreamsrpc.SessionInit) error
 	handleProgress                func(ctx context.Context, progress *pbsubstreamsrpc.ModulesProgress)
 	handleInitialSnapshotData     func(ctx context.Context, debug *pbsubstreamsrpc.InitialSnapshotData) error
 	handleInitialSnapshotComplete func(ctx context.Context, debug *pbsubstreamsrpc.InitialSnapshotComplete) error
-	handleError                   func(ctx context.Context, error *pbsubstreamsrpc.Error)
+	handleError                   func(ctx context.Context, err error)
 }
+
+// The optional handler interfaces are reached through a type assertion on the [SinkerHandler]
+// value, so a signature that drifts away from the interface silently turns the corresponding
+// callback into dead code instead of failing to compile.
+var (
+	_ SinkerHandler            = (*fullSinkerHandlers)(nil)
+	_ SinkerProgressHandler    = (*fullSinkerHandlers)(nil)
+	_ SinkerSessionInitHandler = (*fullSinkerHandlers)(nil)
+	_ SinkerErrorHandler       = (*fullSinkerHandlers)(nil)
+	_ SinkerSnapshotHandler    = (*fullSinkerHandlers)(nil)
+)
 
 var ErrHandlerNotImplemented = errors.New("handler not implemented")
 
@@ -41,13 +52,13 @@ func (h fullSinkerHandlers) HandleProgress(ctx context.Context, progress *pbsubs
 	}
 }
 
-func (h fullSinkerHandlers) HandleError(ctx context.Context, error *pbsubstreamsrpc.Error) {
+func (h fullSinkerHandlers) HandleError(ctx context.Context, err error) {
 	if h.handleError != nil {
-		h.handleError(ctx, error)
+		h.handleError(ctx, err)
 	}
 }
 
-func (h fullSinkerHandlers) HandleSessionInit(ctx context.Context, req *pbsubstreamsrpc.Request, sessionInit *pbsubstreamsrpc.SessionInit) error {
+func (h fullSinkerHandlers) HandleSessionInit(ctx context.Context, req *pbsubstreamsrpcv3.Request, sessionInit *pbsubstreamsrpc.SessionInit) error {
 	if h.handleSessionInit != nil {
 		return h.handleSessionInit(ctx, req, sessionInit)
 	}
@@ -83,11 +94,11 @@ func NewSinkerHandlers(
 func NewSinkerFullHandlers(
 	handleBlockScopedData func(ctx context.Context, data *pbsubstreamsrpc.BlockScopedData, isLive *bool, cursor *Cursor) error,
 	handleBlockUndoSignal func(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *Cursor) error,
-	handleSessionInit func(ctx context.Context, req *pbsubstreamsrpc.Request, session *pbsubstreamsrpc.SessionInit) error,
+	handleSessionInit func(ctx context.Context, req *pbsubstreamsrpcv3.Request, session *pbsubstreamsrpc.SessionInit) error,
 	handleProgress func(ctx context.Context, progress *pbsubstreamsrpc.ModulesProgress),
 	handleInitialSnapshotData func(ctx context.Context, debug *pbsubstreamsrpc.InitialSnapshotData) error,
 	handleInitialSnapshotComplete func(ctx context.Context, complete *pbsubstreamsrpc.InitialSnapshotComplete) error,
-	handleError func(ctx context.Context, error *pbsubstreamsrpc.Error),
+	handleError func(ctx context.Context, err error),
 ) SinkerHandler {
 	return &fullSinkerHandlers{
 		sinkerHandlers: sinkerHandlers{
@@ -106,11 +117,11 @@ func NewSinkerFullHandlers(
 func NewSinkerFullHandlersWithPartial(
 	handleBlockScopedData func(ctx context.Context, data *pbsubstreamsrpc.BlockScopedData, isLive *bool, cursor *Cursor) error,
 	handleBlockUndoSignal func(ctx context.Context, undoSignal *pbsubstreamsrpc.BlockUndoSignal, cursor *Cursor) error,
-	handleSessionInit func(ctx context.Context, req *pbsubstreamsrpc.Request, session *pbsubstreamsrpc.SessionInit) error,
+	handleSessionInit func(ctx context.Context, req *pbsubstreamsrpcv3.Request, session *pbsubstreamsrpc.SessionInit) error,
 	handleProgress func(ctx context.Context, progress *pbsubstreamsrpc.ModulesProgress),
 	handleInitialSnapshotData func(ctx context.Context, debug *pbsubstreamsrpc.InitialSnapshotData) error,
 	handleInitialSnapshotComplete func(ctx context.Context, complete *pbsubstreamsrpc.InitialSnapshotComplete) error,
-	handleError func(ctx context.Context, error *pbsubstreamsrpc.Error),
+	handleError func(ctx context.Context, err error),
 ) SinkerHandler {
 	return &fullSinkerHandlers{
 		sinkerHandlers: sinkerHandlers{
@@ -200,7 +211,12 @@ type SinkerErrorHandler interface {
 	//
 	// The handler receives the following arguments:
 	// - `ctx` is the context runtime, your handler should be minimal, so normally you shouldn't use this.
-	// - `error` is simply the error received from the Substreams API.
+	// - `err` is simply the error received from the Substreams API.
+	//
+	// It is called only for errors that the [Sinker] is about to retry, the stream is severed at that
+	// point and a new one, with a new session and a new trace ID, is established. Reaching the stop block
+	// (`io.EOF`) and fatal errors (invalid request, authentication failure, quota exceeded) do not go
+	// through this callback.
 	//
 	// The [HandleError] is optional and can be nil.
 	HandleError(ctx context.Context, err error)

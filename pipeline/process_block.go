@@ -15,6 +15,7 @@ import (
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/logging"
+	tracing "github.com/streamingfast/sf-tracing"
 	"github.com/streamingfast/substreams/metering"
 	"github.com/streamingfast/substreams/metrics"
 	pbssinternal "github.com/streamingfast/substreams/pb/sf/substreams/intern/v2"
@@ -155,14 +156,14 @@ func (p *Pipeline) processBlock(
 	case bstream.StepUndoPartial:
 		if reqctx.PartialBlocks(ctx) {
 			p.blockStepMap[bstream.StepUndoPartial]++
-			if err := p.handleStepUndoPartial(cursor); err != nil {
+			if err := p.handleStepUndoPartial(ctx, cursor); err != nil {
 				return err
 			}
 		}
 
 	case bstream.StepUndo:
 		p.blockStepMap[bstream.StepUndo]++
-		if err := p.handleStepUndo(clock, cursor, reorgJunctionBlock); err != nil {
+		if err := p.handleStepUndo(ctx, clock, cursor, reorgJunctionBlock); err != nil {
 			return fmt.Errorf("step undo: %w", err)
 		}
 	case bstream.StepStalled:
@@ -247,8 +248,35 @@ func (p *Pipeline) undoPartialStates() error {
 	return nil
 }
 
+// undoWarnThreshold is the number of reverted blocks above which an undo signal is logged as a warning.
+const undoWarnThreshold = 5
+
+// reportUndoSignal counts an undo signal sent to the user and warns when it reverts more than
+// 'undoWarnThreshold' blocks. The 'requestCursor' is only set when the undo signal is caused by
+// the cursor of an incoming request pointing to a block that was reorged out.
+func reportUndoSignal(ctx context.Context, source string, headBlockNum, lastValidBlockNum uint64, requestCursor string) {
+	metrics.UndoSignalCounter.Inc(source)
+
+	if headBlockNum <= lastValidBlockNum+undoWarnThreshold {
+		return
+	}
+
+	fields := []zap.Field{
+		zap.String("trace_id", tracing.GetTraceID(ctx).String()),
+		zap.String("source", source),
+		zap.Uint64("head", headBlockNum),
+		zap.Uint64("revert_up_to", lastValidBlockNum),
+		zap.Uint64("distance", headBlockNum-lastValidBlockNum),
+	}
+	if requestCursor != "" {
+		fields = append(fields, zap.String("cursor", requestCursor))
+	}
+
+	reqctx.Logger(ctx).Warn("sending undo signal reverting more than 5 blocks", fields...)
+}
+
 // handleUndo reverts a block's outputs and sends an undo signal to the user.
-func (p *Pipeline) handleUndo(clock *pbsubstreams.Clock, cursor *bstream.Cursor, reorgJunctionBlock bstream.BlockRef) error {
+func (p *Pipeline) handleUndo(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, reorgJunctionBlock bstream.BlockRef) error {
 	if err := p.forkHandler.handleUndo(clock); err != nil {
 		return fmt.Errorf("reverting outputs: %w", err)
 	}
@@ -269,6 +297,9 @@ func (p *Pipeline) handleUndo(clock *pbsubstreams.Clock, cursor *bstream.Cursor,
 
 	p.lastProcessedBlockRef = reorgJunctionBlock
 	p.lastCursor = targetCursor
+
+	reportUndoSignal(ctx, "reorg", clock.Number, reorgJunctionBlock.Num(), "")
+
 	return p.respFunc(
 		&pbsubstreamsrpc.Response{
 			Message: &pbsubstreamsrpc.Response_BlockUndoSignal{
@@ -282,7 +313,7 @@ func (p *Pipeline) handleUndo(clock *pbsubstreams.Clock, cursor *bstream.Cursor,
 
 // handleStepUndo handles a regular undo step: undoes any pending partial states,
 // then reverts the block and sends an undo signal to the user.
-func (p *Pipeline) handleStepUndo(clock *pbsubstreams.Clock, cursor *bstream.Cursor, reorgJunctionBlock bstream.BlockRef) error {
+func (p *Pipeline) handleStepUndo(ctx context.Context, clock *pbsubstreams.Clock, cursor *bstream.Cursor, reorgJunctionBlock bstream.BlockRef) error {
 
 	if p.previousLastPartialBlock != nil && p.previousLastPartialBlock.Num() > reorgJunctionBlock.Num() {
 		p.previousLastPartialBlock = nil // remove assumptions about an 'undone' previous partial block
@@ -290,12 +321,12 @@ func (p *Pipeline) handleStepUndo(clock *pbsubstreams.Clock, cursor *bstream.Cur
 	if err := p.undoPartialStates(); err != nil {
 		return err
 	}
-	return p.handleUndo(clock, cursor, reorgJunctionBlock)
+	return p.handleUndo(ctx, clock, cursor, reorgJunctionBlock)
 }
 
 // handleStepUndoPartial handles an undo specifically for partial blocks.
 // It undoes partial states and sends an undo signal to the user.
-func (p *Pipeline) handleStepUndoPartial(cursor *bstream.Cursor) error {
+func (p *Pipeline) handleStepUndoPartial(ctx context.Context, cursor *bstream.Cursor) error {
 	if p.partialProcessingState == nil {
 		return nil
 	}
@@ -318,7 +349,7 @@ func (p *Pipeline) handleStepUndoPartial(cursor *bstream.Cursor) error {
 		return err
 	}
 
-	return p.handleUndo(clock, targetCursor, reorgJunctionBlock)
+	return p.handleUndo(ctx, clock, targetCursor, reorgJunctionBlock)
 }
 
 func (p *Pipeline) handleStepFinal(clock *pbsubstreams.Clock) error {
@@ -346,7 +377,7 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 			p.partialProcessingState.highestIndex = idx
 		} else {
 			reqctx.Logger(ctx).Warn("received partial after another non-last partial with different block numbers (without step_Undo) -- this should not happen unless you are running a chain with partial blocks AND skipped blocks", zap.Uint64("received", clock.Number), zap.Uint64("expected", p.partialProcessingState.num))
-			if err := p.handleStepUndoPartial(cursor); err != nil {
+			if err := p.handleStepUndoPartial(ctx, cursor); err != nil {
 				return err
 			}
 			// partialProcessingState is now nil, a new sequence starts below
@@ -373,7 +404,7 @@ func (p *Pipeline) handleStepPartial(ctx context.Context, clock *pbsubstreams.Cl
 		// it is a different version of the block (a reorg happening inside partial blocks).
 		// Undo the partials sent so far.
 		parentRef := p.partialProcessingState.previousBlockRef // same block number: same parent
-		if err := p.handleStepUndoPartial(cursor); err != nil {
+		if err := p.handleStepUndoPartial(ctx, cursor); err != nil {
 			return err
 		}
 		if !isLast {
@@ -583,7 +614,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 			}
 			logger.Info("receiving new block with an active partial state, but previousLastPartialBlock is not the same as the current block. Undoing partial state",
 				zap.String("previous last partial", prevLastPartial), zap.Stringer("current new block", clock))
-			if err := p.handleStepUndoPartial(cursor); err != nil {
+			if err := p.handleStepUndoPartial(ctx, cursor); err != nil {
 				return fmt.Errorf("failed to undo partial states: %w", err)
 			}
 		}

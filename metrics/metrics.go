@@ -37,6 +37,11 @@ var BlockEndProcess = MetricSet.NewCounter("substreams_block_process_end_counter
 var ExecutedWasmModules = MetricSet.NewCounter("substreams_executed_wasm_modules", "Counter for total WASM executions for each module on each block")
 var SkippedCachedWasmModules = MetricSet.NewCounter("substreams_skipped_cached_wasm_modules", "Counter for total WASM skipped executions for each module on each block due to the shared cache")
 
+// UndoSignalCounter counts the BlockUndoSignal messages sent to clients, by source:
+// "reorg" when a fork is detected while streaming, "cursor_resolution" when the cursor
+// of an incoming request points to a block that is no longer part of the canonical chain.
+var UndoSignalCounter = MetricSet.NewCounterVec("substreams_undo_signal_counter", []string{"source"}, "Counter for undo signals sent to clients, by source")
+
 var Tier1OutputHeadBlockRelativeTime *dmetrics.HeadBlockRelativeTime
 
 // Store backend metrics

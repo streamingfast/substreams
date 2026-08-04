@@ -1,6 +1,8 @@
 package metrics
 
 import (
+	"time"
+
 	"github.com/streamingfast/dmetrics"
 	"go.uber.org/zap"
 )
@@ -20,10 +22,15 @@ var Tier1WorkerRequestCounter *dmetrics.Counter
 var Tier1WorkerRetryCounter *dmetrics.Counter
 var Tier1WorkerRejectedOverloadedCounter *dmetrics.Counter
 
+var Tier1WasmExtensionCallCounter *dmetrics.CounterVec
+var Tier1WasmExtensionCallDuration *dmetrics.HistogramVec
+
 var AppReadinessTier2 *dmetrics.AppReadiness
 var Tier2ActiveRequests *dmetrics.Gauge
 var Tier2RequestCounter *dmetrics.Counter
 var Tier2RejectedRequestCounter *dmetrics.CounterVec
+var Tier2WasmExtensionCallCounter *dmetrics.CounterVec
+var Tier2WasmExtensionCallDuration *dmetrics.HistogramVec
 
 var BlockBeginProcess = MetricSet.NewCounter("substreams_block_process_start_counter", "Counter for total block processes started, used for rate")
 var BlockEndProcess = MetricSet.NewCounter("substreams_block_process_end_counter", "Counter for total block processes ended, used for rate")
@@ -75,7 +82,52 @@ func DeclareTier1Metrics(zlog *zap.Logger) {
 		"Total number of mmap operations (get, set, delete, scan)",
 	)
 
+	Tier1WasmExtensionCallCounter = MetricSet.NewCounterVec(
+		"substreams_tier1_wasm_extension_call_counter",
+		wasmExtensionCallLabels,
+		"Counter for external calls made by WASM extensions (e.g. eth_call) on tier1, by extension and outcome",
+	)
+	Tier1WasmExtensionCallDuration = MetricSet.NewHistogramVecCustomBuckets(
+		"substreams_tier1_wasm_extension_call_duration_seconds",
+		wasmExtensionCallLabels,
+		wasmExtensionCallDurationBuckets,
+		"Duration of external calls made by WASM extensions (e.g. eth_call) on tier1, by extension and outcome",
+	)
+
 	zlog.Info("registering substreams tier1 metrics")
+}
+
+var wasmExtensionCallLabels = []string{"extension", "outcome"}
+
+// wasmExtensionCallDurationBuckets are the Prometheus default buckets extended with a 30s and 60s
+// tail, so that slow calls and timeouts (the ones actually clogging a tier) land in a visible
+// bucket instead of all collapsing into +Inf.
+var wasmExtensionCallDurationBuckets = []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 30, 60}
+
+const (
+	WasmExtensionCallOutcomeSuccess = "success"
+	WasmExtensionCallOutcomeError   = "error"
+)
+
+// RecordWasmExtensionCall records a single external call made by a WASM extension, eth_call being
+// the main one. Following the convention used throughout this package, the tier is encoded in the
+// metric name rather than in a label, so the caller resolves it and passes it in. It cannot be
+// resolved here from a context because `reqctx` imports this package.
+//
+// The metrics are nil when the corresponding tier's metrics were never declared, which is the case
+// in tests and, in production, for the tier a process does not serve.
+func RecordWasmExtensionCall(isTier2 bool, extension, outcome string, elapsed time.Duration) {
+	counter, duration := Tier1WasmExtensionCallCounter, Tier1WasmExtensionCallDuration
+	if isTier2 {
+		counter, duration = Tier2WasmExtensionCallCounter, Tier2WasmExtensionCallDuration
+	}
+
+	if counter == nil || duration == nil {
+		return
+	}
+
+	counter.Inc(extension, outcome)
+	duration.ObserveDuration(elapsed, extension, outcome)
 }
 
 func DeclareTier2Metrics(zlog *zap.Logger) {
@@ -88,5 +140,18 @@ func DeclareTier2Metrics(zlog *zap.Logger) {
 		"Counter for total Substreams requests the tier2 rejected, by reason (gRPC code reason)",
 	)
 	Tier2MaxConcurrentRequests = MetricSet.NewGauge("substreams_tier2_max_concurrent_requests", "Hard limit of concurrent requests on tier2 (0 means unlimited)")
+
+	Tier2WasmExtensionCallCounter = MetricSet.NewCounterVec(
+		"substreams_tier2_wasm_extension_call_counter",
+		wasmExtensionCallLabels,
+		"Counter for external calls made by WASM extensions (e.g. eth_call) on tier2, by extension and outcome",
+	)
+	Tier2WasmExtensionCallDuration = MetricSet.NewHistogramVecCustomBuckets(
+		"substreams_tier2_wasm_extension_call_duration_seconds",
+		wasmExtensionCallLabels,
+		wasmExtensionCallDurationBuckets,
+		"Duration of external calls made by WASM extensions (e.g. eth_call) on tier2, by extension and outcome",
+	)
+
 	zlog.Info("registering tier2 substreams metrics")
 }

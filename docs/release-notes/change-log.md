@@ -9,6 +9,52 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Changed
+
+- Sink: **Breaking** the `handleSessionInit` callback passed to `sink.NewSinkerFullHandlers` and `sink.NewSinkerFullHandlersWithPartial` now receives a `*pbsubstreamsrpcv3.Request` instead of a `*pbsubstreamsrpc.Request` (`rpc/v2`), matching both the `SinkerSessionInitHandler` interface and the request the sinker actually sends. The two disagreed, so the sinker's type assertion never matched and the callback was never invoked — no behavior can depend on it today.
+
+  Callers passing `nil` are unaffected. Callers passing a callback get a compile error and should switch the parameter type; the only field that moved is `req.Modules`, now reachable as `req.Package.Modules`. Callers implementing `SinkerSessionInitHandler` directly on their own handler type were already writing the `rpc/v3` signature and are unaffected.
+
+- Sink: **Breaking** the `handleError` callback passed to `sink.NewSinkerFullHandlers` and `sink.NewSinkerFullHandlersWithPartial` now receives an `error` instead of a `*pbsubstreamsrpc.Error`, matching the `SinkerErrorHandler` interface. Same as above, the callback was never invoked before this fix. It is called for stream errors the sinker is about to retry, not on `io.EOF` nor on fatal errors.
+
+- Server: tier2 now aborts a segment when it **stops making progress** rather than when it exceeds a fixed time budget. A new stall timeout (10 minutes by default, `WithSegmentStallTimeout`) resets on every block processed, and the pre-existing segment execution timeout (`WithSegmentExecutionTimeout`) is kept only as an absolute backstop, its default raised from 60 minutes to 4 hours.
+
+  The old fixed budget was fatal to expensive-but-healthy workloads: a segment making thousands of `eth_call` per block could take slightly longer than 60 minutes while still advancing block by block, get killed, and — since a killed segment is never cached — have its retry redo the same work and hit the same wall. Such a request could never complete, no matter how many times it reconnected. A stalled segment is still killed promptly, and since a single block is already bounded by the block execution timeout (3 minutes by default), the stall timeout cannot be tripped by one legitimately slow block.
+
+  The `request active for a long time` log gained a `since_last_progress` field, and a segment killed for stalling now reports `request stalled, no block progress` instead of `request active for too long`.
+
+### Fixed
+
+- CLI: `substreams run` in TUI output mode was stuck on `Connecting...` and never displayed the trace ID. The session-init callback signature had drifted from the `SinkerSessionInitHandler` interface, so the sinker's type assertion failed and the session never reached the UI at all. The per-stage progress section (stage modules, completed ranges and the `m` bar mode) was hidden by the same bug and is displayed again.
+
+- CLI: `substreams run` with a non-TUI output mode (`--output json`, `jsonl`, ...) was not printing the `TraceID:`, `Server HEAD block:` and stage/blocks-to-process summary lines anymore, for the same reason as above.
+
+- CLI: `substreams run` in TUI output mode kept advertising `Connected` with a stale trace ID while the sinker was retrying a severed stream. It now falls back to `Connecting...` and picks up the new trace ID of the re-established session.
+
+- Server: tier2 no longer logs `tls: first record does not look like a TLS handshake` errors from plain-HTTP health probes / load balancers hitting a TLS port (same suppress list as the existing EOF and connection-reset handshake noise).
+- Server: a tier1 shutdown happening while a request was still in its parallel backprocessing phase was reported to the client as `Internal` instead of `Unavailable`. The `endpoint is shutting down, please reconnect` error is wrapped several times on its way up from the scheduler (`error during init_stores_and_backprocess: run_parallel_process failed: parallel processing run: scheduler run: ...`) and was matched with a pointer comparison, so it never took the `Unavailable` path. Clients now see the correct reconnect signal during a tier1 rollout.
+
+## 1.20.3
+
+### Added
+
+- Server: new Prometheus metrics for external calls made by WASM extensions (e.g. `eth_call`), making it possible to spot slow calls clogging a tier:
+
+  - `substreams_tier1_wasm_extension_call_counter{extension,outcome}` and `substreams_tier1_wasm_extension_call_duration_seconds{extension,outcome}`
+  - `substreams_tier2_wasm_extension_call_counter{extension,outcome}` and `substreams_tier2_wasm_extension_call_duration_seconds{extension,outcome}`
+
+  `extension` is the extension being called (e.g. `eth:call`) and `outcome` is `success` or `error`. The duration histogram extends the default buckets with a 30s and 60s tail so that slow calls and timeouts remain distinguishable.
+
+- Server: the `substreams request stats` log gained a `wasm_ext_call_metrics` field (per extension) and a `wasm_ext_call_metrics_by_module` field (per module and extension), each breaking down external calls (e.g. `eth_call`) with `count`, `total_ms`, `avg_ms` and `max_ms`. Only modules that actually made a call appear, so both are empty when nothing called out. The pre-existing `module_wasm_ext_duration` merges every extension into a single duration and is unchanged. `max_ms` covers the calls made locally by the process emitting the log; calls made by tier2 jobs are reported back as a count and a total, and each tier2 logs its own `max_ms`.
+
+### Fixed
+
+- Server: WASM extension calls (e.g. `eth_call`) that returned an error were never closed in the request stats, leaking an in-process entry that kept inflating the reported external call duration for the remaining lifetime of the request. Both the `wazero` and `wasmtime` runtimes are fixed.
+
+- Server: external call metrics (e.g. `eth_call` count and duration) gathered on the shared-cache execution path were silently discarded, so modules executed through that path reported no external call activity at all.
+
 ## v1.20.2
 
 > **Note** The standalone `substreams-sink-sql` binary is now part of the `substreams` CLI, as `substreams sink postgres` and `substreams sink clickhouse`. Existing databases keep working: cursor tables and schemas are unchanged, so the CLI resumes exactly where the standalone binary left off. The DSN and block range move from positional arguments to `--dsn` (or `SUBSTREAMS_SINK_DSN`) and `-s`/`-t`, and operators switch the Docker image from `ghcr.io/streamingfast/substreams-sink-sql` to `ghcr.io/streamingfast/substreams`. See the [migration guide](../how-to-guides/sinks/sql/migration.md) for the full command, flag, cursor and operator mapping.

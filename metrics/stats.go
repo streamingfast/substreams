@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"cmp"
 	"context"
 	"slices"
 	"strings"
@@ -36,7 +37,9 @@ type Stats struct {
 	runningJobs             runningJobs
 	completedJobsStats      map[string]*pbssinternal.ModuleStats
 	uncompressedEgressBytes uint64
-	processedBlocks         uint64
+	// processedBlocks is written from the block-processing goroutine and read from tier2's
+	// segment watchdog goroutine (which uses it as a liveness signal), so it must be atomic.
+	processedBlocks atomic.Uint64
 
 	localProcessedBlockCount  uint64
 	remoteProcessedBlockCount uint64
@@ -208,6 +211,9 @@ type inprocessCall struct {
 type extendedCallMetric struct {
 	count uint64
 	time  time.Duration
+	// maxTime is the duration of the slowest single call, which a total or an average hides: one
+	// 30s eth_call among thousands of fast ones barely moves the average.
+	maxTime time.Duration
 }
 
 // updateDurations should be called while locked
@@ -274,11 +280,11 @@ func (s *Stats) RecordLastBlockSent(clock *pbsubstreams.Clock) {
 }
 
 func (s *Stats) RecordBlocksProcessed(count uint64) {
-	s.processedBlocks += count
+	s.processedBlocks.Add(count)
 }
 
 func (s *Stats) GetBlocksProcessed() uint64 {
-	return s.processedBlocks
+	return s.processedBlocks.Load()
 }
 
 func (s *Stats) RecordStages(stages []*pbsubstreamsrpc.Stage) {
@@ -451,7 +457,11 @@ func (s *Stats) RecordModuleWasmExternalCallEnd(moduleName string, extension str
 		mod.externalCallMetrics[extension] = met
 	}
 	inproc := mod.inprocessCallMetrics[uniqueID]
-	met.time += time.Since(inproc.startTime)
+	elapsed := time.Since(inproc.startTime)
+	met.time += elapsed
+	if elapsed > met.maxTime {
+		met.maxTime = elapsed
+	}
 
 	delete(mod.inprocessCallMetrics, uniqueID)
 }
@@ -766,7 +776,7 @@ func (s *Stats) getZapFields(meter dmetering.Meter) []zap.Field {
 		zap.Uint64("remote_jobs_retried", s.retriedJobs),
 		zap.Uint64("remote_jobs_delayed", s.delayedJobs),
 		zap.Uint64("remote_blocks_processed", s.remoteProcessedBlockCount), // "estimated" from remote ranges
-		zap.Uint64("total_blocks_processed", s.processedBlocks),            // includes remote and local blocks processed in this request, multiplied by execution stages, excludes blocks that were skipped from indexes
+		zap.Uint64("total_blocks_processed", s.processedBlocks.Load()),     // includes remote and local blocks processed in this request, multiplied by execution stages, excludes blocks that were skipped from indexes
 		zap.Uint64("uncompressed_egress_bytes", s.uncompressedEgressBytes),
 		zap.Duration("client_read_average_time_last_5_minutes", s.clientReadTime.Average()),
 		zap.Uint64("last_sent_block_num", s.lastSentBlockNum),
@@ -802,6 +812,141 @@ func (s *Stats) getZapFields(meter dmetering.Meter) []zap.Field {
 		out = append(out, zap.Uint64("total_uncompressed_read_bytes", remoteBytesRead+uint64(meter.GetCount("total_read_bytes"))))
 	}
 	// ##########################################################################################
+
+	// Additive only: `module_wasm_ext_duration` above merges every extension into a single
+	// duration, which tells you that external calls are slow but not which one. The global list
+	// answers "which extension", the per-module list answers "which module to go fix". Both are
+	// empty when no extension call happened.
+	byModule := s.wasmExtensionCallMetricsByModule()
+	out = append(out, zap.Objects("wasm_ext_call_metrics", aggregateWasmExtensionCallMetricsByExtension(byModule)))
+	out = append(out, zap.Objects("wasm_ext_call_metrics_by_module", byModule))
+
+	return out
+}
+
+// wasmExtensionCallMetric is one row of the external call (e.g. eth_call) breakdown reported in the
+// final request stats log. When `module` is empty the row is the aggregate across every module for
+// a given extension; otherwise it is scoped to that module.
+type wasmExtensionCallMetric struct {
+	module    string
+	extension string
+	count     uint64
+	totalTime time.Duration
+	// maxTime is only known for calls made locally by this process. Calls made by tier2 jobs are
+	// reported back as a count and a total only, and each tier2 logs its own max.
+	maxTime time.Duration
+}
+
+func (m *wasmExtensionCallMetric) MarshalLogObject(encoder zapcore.ObjectEncoder) error {
+	if m.module != "" {
+		encoder.AddString("module", m.module)
+	}
+	encoder.AddString("extension", m.extension)
+	encoder.AddUint64("count", m.count)
+	encoder.AddInt64("total_ms", m.totalTime.Milliseconds())
+
+	var averageMs float64
+	if m.count > 0 {
+		averageMs = float64((m.totalTime / time.Duration(m.count)).Microseconds()) / 1000
+	}
+	encoder.AddFloat64("avg_ms", averageMs)
+	encoder.AddInt64("max_ms", m.maxTime.Milliseconds())
+
+	return nil
+}
+
+// wasmExtensionCallMetricsByModule returns one entry per (module, extension) pair that actually
+// made at least one external call, aggregated across the same three sources moduleWasmExtDuration
+// sums: locally executed modules, running jobs and completed jobs. Modules with no external call
+// are absent, so the list is empty when nothing called out.
+//
+// wasmExtensionCallMetricsByModule should be called while Stats is locked
+func (s *Stats) wasmExtensionCallMetricsByModule() []*wasmExtensionCallMetric {
+	// module -> extension -> metric
+	byModule := make(map[string]map[string]*wasmExtensionCallMetric)
+
+	metricFor := func(module, extension string) *wasmExtensionCallMetric {
+		extensions, ok := byModule[module]
+		if !ok {
+			extensions = make(map[string]*wasmExtensionCallMetric)
+			byModule[module] = extensions
+		}
+		metric, ok := extensions[extension]
+		if !ok {
+			metric = &wasmExtensionCallMetric{module: module, extension: extension}
+			extensions[extension] = metric
+		}
+		return metric
+	}
+
+	// Only the local metrics carry a per-call max, the remote ones are counts and totals.
+	for module, mod := range s.modulesStats {
+		for extension, callMetric := range mod.externalCallMetrics {
+			metric := metricFor(module, extension)
+			metric.count += callMetric.count
+			metric.totalTime += callMetric.time
+			if callMetric.maxTime > metric.maxTime {
+				metric.maxTime = callMetric.maxTime
+			}
+		}
+	}
+
+	addRemote := func(modulesStats map[string]*pbssinternal.ModuleStats) {
+		for module, mod := range modulesStats {
+			for _, callMetric := range mod.ExternalCallMetrics {
+				metric := metricFor(module, callMetric.Name)
+				metric.count += callMetric.Count
+				metric.totalTime += time.Duration(callMetric.TimeMs) * time.Millisecond
+			}
+		}
+	}
+
+	for _, job := range s.runningJobs {
+		addRemote(job.modulesStats)
+	}
+	addRemote(s.completedJobsStats)
+
+	var out []*wasmExtensionCallMetric
+	for _, extensions := range byModule {
+		for _, metric := range extensions {
+			out = append(out, metric)
+		}
+	}
+	slices.SortFunc(out, func(a, b *wasmExtensionCallMetric) int {
+		return cmp.Or(
+			strings.Compare(a.module, b.module),
+			strings.Compare(a.extension, b.extension),
+		)
+	})
+
+	return out
+}
+
+// aggregateWasmExtensionCallMetricsByExtension collapses the per-module breakdown into one entry
+// per extension (module left empty), for the quick-glance global view.
+func aggregateWasmExtensionCallMetricsByExtension(byModule []*wasmExtensionCallMetric) []*wasmExtensionCallMetric {
+	byExtension := make(map[string]*wasmExtensionCallMetric)
+
+	for _, m := range byModule {
+		metric, ok := byExtension[m.extension]
+		if !ok {
+			metric = &wasmExtensionCallMetric{extension: m.extension}
+			byExtension[m.extension] = metric
+		}
+		metric.count += m.count
+		metric.totalTime += m.totalTime
+		if m.maxTime > metric.maxTime {
+			metric.maxTime = m.maxTime
+		}
+	}
+
+	out := make([]*wasmExtensionCallMetric, 0, len(byExtension))
+	for _, metric := range byExtension {
+		out = append(out, metric)
+	}
+	slices.SortFunc(out, func(a, b *wasmExtensionCallMetric) int {
+		return strings.Compare(a.extension, b.extension)
+	})
 
 	return out
 }

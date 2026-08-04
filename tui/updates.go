@@ -17,7 +17,10 @@ func (m model) Init() tea.Cmd { return nil }
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg {
 	case Connecting:
+		// Can be received again after the initial connection when the sinker retries a severed
+		// stream, the trace ID of the previous session does not apply anymore.
 		m.Connected = false
+		m.TraceID = ""
 	case Connected:
 		m.Connected = true
 	}
@@ -53,9 +56,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.BackprocessingCompleteAtBlock = uint64(m.Request.StartBlockNum)
 		}
 		return m, nil
-	case *pbsubstreamsrpc.Response_Session:
-		m.TraceID = msg.Session.TraceId
-		m.BackprocessingCompleteAtBlock = msg.Session.ResolvedStartBlock
+	case *pbsubstreamsrpc.SessionInit:
+		// Receiving the session init message means the connection to the server is
+		// established, the trace ID is only known at that point.
+		m.Connected = true
+		m.TraceID = msg.TraceId
+		m.BackprocessingCompleteAtBlock = msg.ResolvedStartBlock
 
 	case *pbsubstreamsrpc.ModulesProgress:
 		m.Updates += 1

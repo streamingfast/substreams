@@ -34,7 +34,9 @@ func WithBlockExecutionTimeout(timeout time.Duration) Option {
 	}
 }
 
-// Tier2 will completely bail out if a segment execution takes longer than the this.
+// Tier2 will completely bail out if a segment execution takes longer than the this. This is an
+// absolute backstop: a segment that keeps making progress is normally bounded by
+// [WithSegmentStallTimeout] instead, so this should stay generous.
 func WithSegmentExecutionTimeout(timeout time.Duration) Option {
 	return func(a anyTierService) {
 		switch s := a.(type) {
@@ -42,6 +44,21 @@ func WithSegmentExecutionTimeout(timeout time.Duration) Option {
 			// not used
 		case *Tier2Service:
 			s.segmentExecutionTimeout = timeout
+		}
+	}
+}
+
+// Tier2 will bail out if a segment stops processing blocks for longer than this. Unlike
+// [WithSegmentExecutionTimeout] the deadline resets on every block processed, so a slow but
+// advancing segment is left alone and only a wedged one is killed. Keep it well above
+// [WithBlockExecutionTimeout], which already bounds a single block.
+func WithSegmentStallTimeout(timeout time.Duration) Option {
+	return func(a anyTierService) {
+		switch s := a.(type) {
+		case *Tier1Service:
+			// not used
+		case *Tier2Service:
+			s.segmentStallTimeout = timeout
 		}
 	}
 }

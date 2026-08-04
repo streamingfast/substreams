@@ -22,7 +22,8 @@ import (
 func NewDefaultTier2Config() *Tier2Config {
 	return &Tier2Config{
 		BlockExecutionTimeout:   3 * time.Minute,
-		SegmentExecutionTimeout: 60 * time.Minute,
+		SegmentExecutionTimeout: 4 * time.Hour,
+		SegmentStallTimeout:     10 * time.Minute,
 	}
 }
 
@@ -36,6 +37,7 @@ type Tier2Config struct {
 	WASMExtensions            wasm.WASMExtensioner
 	BlockExecutionTimeout     time.Duration
 	SegmentExecutionTimeout   time.Duration
+	SegmentStallTimeout       time.Duration
 	TmpDir                    string
 	StoresScratchSpace             string
 	StoresBackend                  string
@@ -98,6 +100,10 @@ func (a *Tier2App) Run() error {
 
 	if a.config.SegmentExecutionTimeout != 0 {
 		opts = append(opts, service.WithSegmentExecutionTimeout(a.config.SegmentExecutionTimeout))
+	}
+
+	if a.config.SegmentStallTimeout != 0 {
+		opts = append(opts, service.WithSegmentStallTimeout(a.config.SegmentStallTimeout))
 	}
 
 	opts = append(opts, service.WithReadinessFunc(a.setIsReady))

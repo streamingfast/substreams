@@ -205,6 +205,7 @@ func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, res
 	}
 
 	var undoSignal *pbsubstreamsrpc.BlockUndoSignal
+	requestBlockNum := cursor.Block.Num() // block the client was on, kept for reporting since 'cursor' may be replaced below
 
 	if cursor.Step == bstream.StepPartial && cursor.HeadBlock.Num() < cursor.Block.Num() {
 		// cursors with StepPartial hide the 'parent block' in the 'head block' field
@@ -231,6 +232,9 @@ func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, res
 
 	if cursor.IsOnFinalBlock() {
 		nextBlock := cursor.Block.Num() + 1
+		if undoSignal != nil {
+			reportUndoSignal(ctx, "cursor_resolution", requestBlockNum, undoSignal.LastValidBlock.Number, req.StartCursor)
+		}
 		return nextBlock, cursor.ToOpaque(), undoSignal, nil
 	}
 
@@ -268,6 +272,10 @@ func resolveStartBlockNum(ctx context.Context, req *pbsubstreamsrpc.Request, res
 		resolvedStartBlockNum = resolvedCursor.Block.Num() + 1
 	case resolvedCursor.Step.Matches(bstream.StepUndo):
 		resolvedStartBlockNum = resolvedCursor.Block.Num()
+	}
+
+	if undoSignal != nil {
+		reportUndoSignal(ctx, "cursor_resolution", requestBlockNum, undoSignal.LastValidBlock.Number, req.StartCursor)
 	}
 
 	return resolvedStartBlockNum, normalizedOpaqueCursor(*resolvedCursor), undoSignal, nil

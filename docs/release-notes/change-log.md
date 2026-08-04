@@ -9,9 +9,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v1.21.0
+
+> **Note** The standalone `substreams-sink-sql` binary is now part of the `substreams` CLI, as `substreams sink postgres` and `substreams sink clickhouse`. Existing databases keep working: cursor tables and schemas are unchanged, so the CLI resumes exactly where the standalone binary left off. The DSN and block range move from positional arguments to `--dsn` (or `SUBSTREAMS_SINK_DSN`) and `-s`/`-t`, and operators switch the Docker image from `ghcr.io/streamingfast/substreams-sink-sql` to `ghcr.io/streamingfast/substreams`. See the [migration guide](https://docs.substreams.dev/how-to-guides/sinks/sql/migration) for the full command, flag, cursor and operator mapping.
 
 ### Added
+
+- CLI: `substreams-sink-sql` is now part of the `substreams` CLI: `substreams sink postgres {setup,generate-csv,inject-csv,tools}` and `substreams sink clickhouse {setup,tools}`, where the engine command itself runs the sink. Both the sink and `setup` auto-detect the mode from the output module's type (`DatabaseChanges` → `schema.sql`, any other proto → relational mappings). See the [migration guide](https://docs.substreams.dev/how-to-guides/sinks/sql/migration) for the full command, flag, and operator (Docker image) mapping.
 
 - Server: new `substreams_undo_signal_distance_blocks` prometheus histogram, observing how many blocks each `BlockUndoSignal` sent to clients reverts, labeled by `source` (`reorg` when a fork is seen while streaming, `cursor_resolution` when the cursor of an incoming request points to a block that was reorged out). Its `_count` gives the total number of undo signals sent; subtracting the `le="5"` bucket from it gives the number of large ones. Undo signals reverting more than 5 blocks are also logged as a warning with `trace_id`, `head`, `revert_up_to`, `distance` and, on the `cursor_resolution` path, the client `cursor`.
 
@@ -37,6 +41,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - CLI: `substreams run` in TUI output mode kept advertising `Connected` with a stale trace ID while the sinker was retrying a severed stream. It now falls back to `Connecting...` and picks up the new trace ID of the re-established session.
 
+- CLI: manifests with a `sink:` config of type `sf.substreams.sink.sql.v1.Service` or `sf.substreams.sink.sql.service.v1.Service` now parse — the SQL sink protos are bundled in the CLI's system descriptors.
+
+- SQL sink: `tools cursor delete <module_hash>` now deletes only the given module's cursor (the standalone binary deleted all of them due to a bug).
+
+- SQL sink: a bounded run (`--stop-block` set) never flushed the final batch to the database — the range-completion check treated the exclusive stop block as unreached (`last block == stop-1`). Bounded backfills now flush and store their cursor. The bug also exists in the standalone `substreams-sink-sql` binary when built against recent sink library versions.
+
 - Server: tier2 no longer logs `tls: first record does not look like a TLS handshake` errors from plain-HTTP health probes / load balancers hitting a TLS port (same suppress list as the existing EOF and connection-reset handshake noise).
 - Server: a tier1 shutdown happening while a request was still in its parallel backprocessing phase was reported to the client as `Internal` instead of `Unavailable`. The `endpoint is shutting down, please reconnect` error is wrapped several times on its way up from the scheduler (`error during init_stores_and_backprocess: run_parallel_process failed: parallel processing run: scheduler run: ...`) and was matched with a pointer comparison, so it never took the `Unavailable` path. Clients now see the correct reconnect signal during a tier1 rollout.
 
@@ -61,11 +71,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v1.20.2
 
-> **Note** The standalone `substreams-sink-sql` binary is now part of the `substreams` CLI, as `substreams sink postgres` and `substreams sink clickhouse`. Existing databases keep working: cursor tables and schemas are unchanged, so the CLI resumes exactly where the standalone binary left off. The DSN and block range move from positional arguments to `--dsn` (or `SUBSTREAMS_SINK_DSN`) and `-s`/`-t`, and operators switch the Docker image from `ghcr.io/streamingfast/substreams-sink-sql` to `ghcr.io/streamingfast/substreams`. See the [migration guide](../how-to-guides/sinks/sql/migration.md) for the full command, flag, cursor and operator mapping.
-
 ### Added
 
-- CLI: `substreams-sink-sql` is now part of the `substreams` CLI: `substreams sink postgres {setup,generate-csv,inject-csv,tools}` and `substreams sink clickhouse {setup,tools}`, where the engine command itself runs the sink. Both the sink and `setup` auto-detect the mode from the output module's type (`DatabaseChanges` → `schema.sql`, any other proto → relational mappings). See the [migration guide](../how-to-guides/sinks/sql/migration.md) for the full command, flag, and operator (Docker image) mapping.
 - Manifest: environment variable expansion (`$VAR` / `${VAR}`) is now supported in the `foundational-store` module input, allowing a manifest to be authored with a placeholder (e.g. `foundational-store: $DEPLOYMENT_ID`) that is resolved at pack/load time. The generated `.spkg` always embeds the resolved value.
 
 ### Changed
@@ -74,9 +81,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
-- SQL sink: `tools cursor delete <module_hash>` now deletes only the given module's cursor (the standalone binary deleted all of them due to a bug).
-- SQL sink: a bounded run (`--stop-block` set) never flushed the final batch to the database — the range-completion check treated the exclusive stop block as unreached (`last block == stop-1`). Bounded backfills now flush and store their cursor. The bug also exists in the standalone `substreams-sink-sql` binary when built against recent sink library versions.
-- CLI: manifests with a `sink:` config of type `sf.substreams.sink.sql.v1.Service` or `sf.substreams.sink.sql.service.v1.Service` now parse — the SQL sink protos are bundled in the CLI's system descriptors.
 - Server: fixed a per-request stats leak causing long-lived live streams to progressively burn more CPU per block and eventually fall behind the chain until reconnect.
 
 ## v1.20.1

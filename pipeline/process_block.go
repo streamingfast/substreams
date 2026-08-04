@@ -251,13 +251,17 @@ func (p *Pipeline) undoPartialStates() error {
 // undoWarnThreshold is the number of reverted blocks above which an undo signal is logged as a warning.
 const undoWarnThreshold = 5
 
-// reportUndoSignal counts an undo signal sent to the user and warns when it reverts more than
-// 'undoWarnThreshold' blocks. The 'requestCursor' is only set when the undo signal is caused by
-// the cursor of an incoming request pointing to a block that was reorged out.
+// reportUndoSignal observes the distance of an undo signal sent to the user and warns when it
+// reverts more than 'undoWarnThreshold' blocks. The 'requestCursor' is only set when the undo
+// signal is caused by the cursor of an incoming request pointing to a block that was reorged out.
 func reportUndoSignal(ctx context.Context, source string, headBlockNum, lastValidBlockNum uint64, requestCursor string) {
-	metrics.UndoSignalCounter.Inc(source)
+	var distance uint64
+	if headBlockNum > lastValidBlockNum {
+		distance = headBlockNum - lastValidBlockNum
+	}
+	metrics.UndoSignalDistance.ObserveFloat64(float64(distance), source)
 
-	if headBlockNum <= lastValidBlockNum+undoWarnThreshold {
+	if distance <= undoWarnThreshold {
 		return
 	}
 
@@ -266,7 +270,7 @@ func reportUndoSignal(ctx context.Context, source string, headBlockNum, lastVali
 		zap.String("source", source),
 		zap.Uint64("head", headBlockNum),
 		zap.Uint64("revert_up_to", lastValidBlockNum),
-		zap.Uint64("distance", headBlockNum-lastValidBlockNum),
+		zap.Uint64("distance", distance),
 	}
 	if requestCursor != "" {
 		fields = append(fields, zap.String("cursor", requestCursor))

@@ -37,10 +37,17 @@ var BlockEndProcess = MetricSet.NewCounter("substreams_block_process_end_counter
 var ExecutedWasmModules = MetricSet.NewCounter("substreams_executed_wasm_modules", "Counter for total WASM executions for each module on each block")
 var SkippedCachedWasmModules = MetricSet.NewCounter("substreams_skipped_cached_wasm_modules", "Counter for total WASM skipped executions for each module on each block due to the shared cache")
 
-// UndoSignalCounter counts the BlockUndoSignal messages sent to clients, by source:
+// UndoSignalDistance observes how many blocks each BlockUndoSignal sent to clients reverts, by source:
 // "reorg" when a fork is detected while streaming, "cursor_resolution" when the cursor
 // of an incoming request points to a block that is no longer part of the canonical chain.
-var UndoSignalCounter = MetricSet.NewCounterVec("substreams_undo_signal_counter", []string{"source"}, "Counter for undo signals sent to clients, by source")
+// The '_count' gives the total number of undo signals sent, subtracting the 'le="5"' bucket
+// from it gives the number of undo signals reverting more than 5 blocks.
+var UndoSignalDistance = MetricSet.NewHistogramVecCustomBuckets(
+	"substreams_undo_signal_distance_blocks",
+	[]string{"source"},
+	[]float64{1, 2, 5, 10, 25, 100},
+	"Distribution of the number of blocks reverted by the undo signals sent to clients, by source",
+)
 
 var Tier1OutputHeadBlockRelativeTime *dmetrics.HeadBlockRelativeTime
 

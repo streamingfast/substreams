@@ -251,6 +251,8 @@ func (p *Pipeline) undoPartialStates() error {
 // undoWarnThreshold is the number of reverted blocks above which an undo signal is logged as a warning.
 const undoWarnThreshold = 5
 
+var undoWarnMessage = fmt.Sprintf("sending undo signal reverting more than %d blocks", undoWarnThreshold)
+
 // reportUndoSignal observes the distance of an undo signal sent to the user and warns when it
 // reverts more than 'undoWarnThreshold' blocks. The 'requestCursor' is only set when the undo
 // signal is caused by the cursor of an incoming request pointing to a block that was reorged out.
@@ -276,7 +278,7 @@ func reportUndoSignal(ctx context.Context, source string, headBlockNum, lastVali
 		fields = append(fields, zap.String("cursor", requestCursor))
 	}
 
-	reqctx.Logger(ctx).Warn("sending undo signal reverting more than 5 blocks", fields...)
+	reqctx.Logger(ctx).Warn(undoWarnMessage, fields...)
 }
 
 // handleUndo reverts a block's outputs and sends an undo signal to the user.

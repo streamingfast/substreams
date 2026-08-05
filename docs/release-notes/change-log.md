@@ -9,6 +9,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- Server: `substreams-tier1` now restarts when its block hub can no longer link incoming live blocks, instead of hanging every request at a frozen head indefinitely. A live-source gap whose one-block files were already merged away can never be linked, and the head-block metrics keep tracking the live source, so the process looked healthy throughout.
+
 ## v1.21.0
 
 > **Note** The standalone `substreams-sink-sql` binary is now part of the `substreams` CLI, as `substreams sink postgres` and `substreams sink clickhouse`. Existing databases keep working: cursor tables and schemas are unchanged, so the CLI resumes exactly where the standalone binary left off. The DSN and block range move from positional arguments to `--dsn` (or `SUBSTREAMS_SINK_DSN`) and `-s`/`-t`, and operators switch the Docker image from `ghcr.io/streamingfast/substreams-sink-sql` to `ghcr.io/streamingfast/substreams`. See the [migration guide](https://docs.substreams.dev/how-to-guides/sinks/sql/migration) for the full command, flag, cursor and operator mapping.

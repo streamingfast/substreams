@@ -96,15 +96,10 @@ func (m *WasmMetricsGatherer) ApplyToStats(stats *Stats) {
 		}
 	}
 
-	// Calls that have not returned are the ones worth reporting the soonest, and they are the
-	// ones this loop would otherwise drop: they sit in inProcessCalls until they complete, which
-	// for a call retrying against a dead endpoint can be minutes.
-	for moduleName, inProcess := range m.inProcessCalls {
-		modStats := stats.moduleStats(moduleName)
-		for uniqueID, call := range inProcess {
-			modStats.inprocessCallMetrics[uniqueID] = *call
-		}
-	}
+	// Deliberately not copying m.inProcessCalls: Stats has no way to ever remove those entries
+	// (the gatherer deletes from its own map when a call ends), so they would inflate the
+	// reported in-flight count and duration forever. This gatherer is applied once its wasm
+	// call has returned anyway, so there is normally nothing in flight left to report.
 }
 
 type WasmExtensionStats interface {

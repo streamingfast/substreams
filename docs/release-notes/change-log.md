@@ -24,6 +24,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- Sink: `substreams sink postgres` in from-proto mode now stores `bytes` fields as binary in their `BYTEA` columns. Under the default `--bytes-encoding=raw` both inserters corrupted them, each differently: without `--no-constraints` a 7-byte value was stored as the 14 characters of its base64 form including the surrounding quotes, and with it as the 14 characters of its hex form. The same confusion also broke repeated scalar fields without `--no-constraints`, where each array element was stored with SQL quotes as part of its value (`'alpha'` rather than `alpha`).
+
+  Nothing failed loudly for any of these: the rows were all there, and every query against those columns simply matched nothing. Databases already populated by an affected version hold corrupted values in those columns and need the affected block range re-synced.
+
 - Server: `substreams-tier1` now restarts when its block hub can no longer link incoming live blocks, instead of hanging every request at a frozen head indefinitely. A live-source gap whose one-block files were already merged away can never be linked, and the head-block metrics keep tracking the live source, so the process looked healthy throughout.
 
 ## v1.21.0

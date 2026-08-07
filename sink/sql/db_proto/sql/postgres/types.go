@@ -143,9 +143,9 @@ func ValueToString(value any, bytesEncoding bytes.Encoding) (s string) {
 		s = strconv.FormatFloat(float64(v), 'f', -1, 32)
 	case []uint8:
 		if bytesEncoding == bytes.EncodingRaw {
-			// For raw encoding, use PostgreSQL bytea format
-			//s = "'" + base64.StdEncoding.EncodeToString(v) + "'"
-			s = "E'" + hex.EncodeToString(v) + "'::BYTEA"
+			// bytea hex input format. Casting an E'<hex>' string instead would store the
+			// characters of the hex representation, twice the intended byte count.
+			s = `'\x` + hex.EncodeToString(v) + `'::bytea`
 		} else {
 			encoded, err := bytesEncoding.EncodeBytes(v)
 			if err != nil {

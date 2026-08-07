@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
@@ -97,16 +99,16 @@ func TestStats_WasmExtensionCallMetrics_Empty(t *testing.T) {
 func TestStats_RecordModuleWasmExternalCallEnd_TracksMax(t *testing.T) {
 	stats := NewReqStats(&Config{}, nil, nil, zlogTest)
 
-	slowID := stats.RecordModuleWasmExternalCallBegin("mod_a", "eth:call")
+	slowID := stats.RecordModuleWasmExternalCallBegin("mod_a", "eth:call", 12_450_739)
 	time.Sleep(30 * time.Millisecond)
-	stats.RecordModuleWasmExternalCallEnd("mod_a", "eth:call", slowID)
+	stats.RecordModuleWasmExternalCallEnd("mod_a", "eth:call", slowID, nil)
 
 	slowest := stats.modulesStats["mod_a"].externalCallMetrics["eth:call"].maxTime
 	require.GreaterOrEqual(t, slowest, 30*time.Millisecond)
 
 	// A faster call afterwards must not lower the recorded max.
-	fastID := stats.RecordModuleWasmExternalCallBegin("mod_a", "eth:call")
-	stats.RecordModuleWasmExternalCallEnd("mod_a", "eth:call", fastID)
+	fastID := stats.RecordModuleWasmExternalCallBegin("mod_a", "eth:call", 12_450_739)
+	stats.RecordModuleWasmExternalCallEnd("mod_a", "eth:call", fastID, nil)
 
 	callMetric := stats.modulesStats["mod_a"].externalCallMetrics["eth:call"]
 	assert.Equal(t, slowest, callMetric.maxTime)
@@ -148,4 +150,57 @@ func TestWasmExtensionCallMetric_MarshalLogObject_GlobalOmitsModule(t *testing.T
 func setExternalCallMetric(stats *Stats, moduleName, extension string, count uint64, total, max time.Duration) {
 	mod := stats.moduleStats(moduleName)
 	mod.externalCallMetrics[extension] = &extendedCallMetric{count: count, time: total, maxTime: max}
+}
+
+// A tier2 reports its external calls to tier1 as running totals. These two tests pin what those
+// totals must carry for a failing or hung endpoint to be visible before the segment gives up.
+func TestStats_ExternalCallMetrics_ReportFailures(t *testing.T) {
+	stats := NewReqStats(&Config{}, nil, nil, zap.NewNop())
+
+	ok := stats.RecordModuleWasmExternalCallBegin("mod_a", "rpc:eth_call", 500)
+	stats.RecordModuleWasmExternalCallEnd("mod_a", "rpc:eth_call", ok, nil)
+
+	failed := stats.RecordModuleWasmExternalCallBegin("mod_a", "rpc:eth_call", 501)
+	stats.RecordModuleWasmExternalCallEnd("mod_a", "rpc:eth_call", failed, errors.New("connection refused"))
+
+	metric := externalCallMetric(t, stats, "mod_a", "rpc:eth_call")
+	assert.Equal(t, uint64(2), metric.Count)
+	assert.Equal(t, uint64(1), metric.FailedCount)
+	assert.Equal(t, uint64(0), metric.InFlightCount)
+}
+
+func TestStats_ExternalCallMetrics_ReportInFlight(t *testing.T) {
+	stats := NewReqStats(&Config{}, nil, nil, zap.NewNop())
+
+	// Begin without End is what a call retrying against an unreachable endpoint looks like from
+	// here: the extension retries internally, so it stays a single call for minutes.
+	id := stats.RecordModuleWasmExternalCallBegin("mod_a", "rpc:eth_call", 12_450_739)
+	stats.modulesStats["mod_a"].inprocessCallMetrics[id] = inprocessCall{
+		startTime: time.Now().Add(-3 * time.Minute),
+		extension: "rpc:eth_call",
+		blockNum:  12_450_739,
+	}
+
+	metric := externalCallMetric(t, stats, "mod_a", "rpc:eth_call")
+	assert.Equal(t, uint64(1), metric.InFlightCount)
+	assert.Equal(t, uint64(12_450_739), metric.OldestInFlightBlock)
+	assert.InDelta(t, (3 * time.Minute).Milliseconds(), metric.OldestInFlightMs, 1000)
+	// The time already spent waiting counts, otherwise a hung call reports as instantaneous.
+	assert.InDelta(t, (3 * time.Minute).Milliseconds(), metric.TimeMs, 1000)
+}
+
+func externalCallMetric(t *testing.T, stats *Stats, module, extension string) *pbssinternal.ExternalCallMetric {
+	t.Helper()
+	for _, mod := range stats.LocalModulesStats() {
+		if mod.Name != module {
+			continue
+		}
+		for _, metric := range mod.ExternalCallMetrics {
+			if metric.Name == extension {
+				return metric
+			}
+		}
+	}
+	t.Fatalf("no %q metric reported for module %q", extension, module)
+	return nil
 }

@@ -39,6 +39,7 @@ import (
 	"github.com/streamingfast/substreams/storage/store"
 	"github.com/streamingfast/substreams/wasm"
 	"go.opentelemetry.io/otel"
+	"go.uber.org/atomic"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -140,6 +141,11 @@ type Pipeline struct {
 	execOutputCache *cache.Engine
 	moduleCache     *cache.ModuleCache
 	blockType       string
+
+	// currentBlockNum is the block being processed right now. Written by the block loop and
+	// read by the progress snapshot goroutine, hence the atomic: it is what tells tier1 where
+	// a job is stuck when a block takes minutes to go through.
+	currentBlockNum atomic.Uint64
 
 	// lastFinalClock should always be either THE `stopBlock` or a block beyond that point
 	// (for chains with potential block skips)
@@ -851,6 +857,34 @@ func (p *Pipeline) returnInternalModuleComplete() error {
 		return fmt.Errorf("calling return func: %w", err)
 	}
 	return nil
+}
+
+// SendProgressSnapshot emits an internal progress update from outside the block loop.
+//
+// returnInternalModuleProgressOutputs only runs once a block finished processing, so a module
+// stuck inside a single block — typically blocked on an external call that is retrying against
+// an unreachable endpoint — reports nothing at all for as long as it is stuck, and tier1 sees
+// an idle job with no external call metrics. The stats already account for calls still in
+// flight; they just need to be sent. Safe to call concurrently with the block loop: the tier2
+// response function serializes sends.
+func (p *Pipeline) SendProgressSnapshot() error {
+	if p.respFunc == nil {
+		return nil
+	}
+
+	update := p.toInternalUpdate(nil)
+	// toInternalUpdate only knows how to derive the progress from a completed block, and a
+	// snapshot is taken precisely when none completed. Reporting 0 here would overwrite the
+	// job's progress on tier1 with every snapshot.
+	if current := p.currentBlockNum.Load(); current != 0 && p.processingModule != nil && current > p.processingModule.initialBlockNum {
+		update.ProgressBlocks = current - p.processingModule.initialBlockNum
+	}
+
+	return p.respFunc(&pbssinternal.ProcessRangeResponse{
+		Type: &pbssinternal.ProcessRangeResponse_Update{
+			Update: update,
+		},
+	})
 }
 
 func (p *Pipeline) returnInternalModuleProgressOutputs(clock *pbsubstreams.Clock, forceOutput bool) error {

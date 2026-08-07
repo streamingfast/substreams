@@ -48,13 +48,13 @@ func (i *instance) newExtensionFunction(ctx context.Context, namespace, name str
 		extension := fmt.Sprintf("%s:%s", namespace, name)
 		extStats := reqctx.WasmExtensionReqStats(ctx)
 
-		metricID := extStats.RecordModuleWasmExternalCallBegin(i.CurrentCall.ModuleName, extension)
+		metricID := extStats.RecordModuleWasmExternalCallBegin(i.CurrentCall.ModuleName, extension, i.CurrentCall.Clock.GetNumber())
 		startTime := time.Now()
 		out, err := f(ctx, reqctx.Details(ctx).UniqueIDString(), i.CurrentCall.Clock, data)
 		elapsed := time.Since(startTime)
 		// The call must be closed on every path, including errors, otherwise the in-process
 		// entry leaks and keeps inflating the reported external call duration forever.
-		extStats.RecordModuleWasmExternalCallEnd(i.CurrentCall.ModuleName, extension, metricID)
+		extStats.RecordModuleWasmExternalCallEnd(i.CurrentCall.ModuleName, extension, metricID, err)
 
 		outcome := metrics.WasmExtensionCallOutcomeSuccess
 		if err != nil {

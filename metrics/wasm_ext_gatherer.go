@@ -18,7 +18,7 @@ type WasmMetricsGatherer struct {
 	logger    *zap.Logger
 }
 
-func (m *WasmMetricsGatherer) RecordModuleWasmExternalCallBegin(moduleName string, extension string) uint64 {
+func (m *WasmMetricsGatherer) RecordModuleWasmExternalCallBegin(moduleName string, extension string, blockNum uint64) uint64 {
 	m.Lock()
 	defer m.Unlock()
 	if m.inProcessCalls == nil {
@@ -33,12 +33,13 @@ func (m *WasmMetricsGatherer) RecordModuleWasmExternalCallBegin(moduleName strin
 	m.inProcessCalls[moduleName][uniqueID] = &inprocessCall{
 		startTime: time.Now(),
 		extension: extension,
+		blockNum:  blockNum,
 	}
 
 	return uniqueID
 }
 
-func (m *WasmMetricsGatherer) RecordModuleWasmExternalCallEnd(moduleName string, extension string, uniqueID uint64) {
+func (m *WasmMetricsGatherer) RecordModuleWasmExternalCallEnd(moduleName string, extension string, uniqueID uint64, callErr error) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -71,6 +72,9 @@ func (m *WasmMetricsGatherer) RecordModuleWasmExternalCallEnd(moduleName string,
 
 	metric.Count++
 	metric.TimeMs += uint64(duration.Milliseconds())
+	if callErr != nil {
+		metric.FailedCount++
+	}
 }
 
 func (m *WasmMetricsGatherer) ApplyToStats(stats *Stats) {
@@ -88,12 +92,22 @@ func (m *WasmMetricsGatherer) ApplyToStats(stats *Stats) {
 			}
 			metrics[extension].count += metric.Count
 			metrics[extension].time += time.Duration(metric.TimeMs) * time.Millisecond
+			metrics[extension].failed += metric.FailedCount
 		}
 	}
 
+	// Calls that have not returned are the ones worth reporting the soonest, and they are the
+	// ones this loop would otherwise drop: they sit in inProcessCalls until they complete, which
+	// for a call retrying against a dead endpoint can be minutes.
+	for moduleName, inProcess := range m.inProcessCalls {
+		modStats := stats.moduleStats(moduleName)
+		for uniqueID, call := range inProcess {
+			modStats.inprocessCallMetrics[uniqueID] = *call
+		}
+	}
 }
 
 type WasmExtensionStats interface {
-	RecordModuleWasmExternalCallBegin(moduleName string, extension string) uint64
-	RecordModuleWasmExternalCallEnd(moduleName string, extension string, uniqueID uint64)
+	RecordModuleWasmExternalCallBegin(moduleName string, extension string, blockNum uint64) uint64
+	RecordModuleWasmExternalCallEnd(moduleName string, extension string, uniqueID uint64, callErr error)
 }

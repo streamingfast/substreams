@@ -206,11 +206,17 @@ type extendedStats struct {
 type inprocessCall struct {
 	startTime time.Time
 	extension string
+	// blockNum is the block the module was executing when it made the call, which is where
+	// processing is stuck for as long as the call does not return.
+	blockNum uint64
 }
 
 type extendedCallMetric struct {
 	count uint64
-	time  time.Duration
+	// failed counts the calls that came back with an error. A chain endpoint that is refusing
+	// connections shows up here long before the segment gives up on it.
+	failed uint64
+	time   time.Duration
 	// maxTime is the duration of the slowest single call, which a total or an average hides: one
 	// 30s eth_call among thousands of fast ones barely moves the average.
 	maxTime time.Duration
@@ -227,13 +233,24 @@ func (s *extendedStats) updateDurations() {
 	i := 0
 	for k, v := range s.externalCallMetrics {
 		callMetric := &pbssinternal.ExternalCallMetric{
-			Name:   k,
-			Count:  v.count,
-			TimeMs: uint64(v.time.Milliseconds()),
+			Name:        k,
+			Count:       v.count,
+			TimeMs:      uint64(v.time.Milliseconds()),
+			FailedCount: v.failed,
 		}
+		// A call that has not returned has already been counted (the count is incremented when
+		// it starts) but contributed no time yet. Reported as-is, a call hung for minutes looks
+		// instantaneous and a whole class of problems stays invisible until the segment dies.
 		for _, inproc := range s.inprocessCallMetrics {
-			if inproc.extension == k {
-				callMetric.TimeMs += uint64(time.Since(inproc.startTime).Milliseconds())
+			if inproc.extension != k {
+				continue
+			}
+			waiting := time.Since(inproc.startTime)
+			callMetric.TimeMs += uint64(waiting.Milliseconds())
+			callMetric.InFlightCount++
+			if waiting.Milliseconds() > int64(callMetric.OldestInFlightMs) {
+				callMetric.OldestInFlightMs = uint64(waiting.Milliseconds())
+				callMetric.OldestInFlightBlock = inproc.blockNum
 			}
 		}
 
@@ -422,7 +439,7 @@ func (s *Stats) RecordModuleWasmBlockEnd(moduleName string, uniqueID uint64) {
 var uniqueIDCounter = atomic.NewUint64(0)
 
 // RecordModuleWasmExternalCallBegin can be called multiple times per module per block, for each external module call (ex: eth_call).
-func (s *Stats) RecordModuleWasmExternalCallBegin(moduleName string, extension string) uint64 {
+func (s *Stats) RecordModuleWasmExternalCallBegin(moduleName string, extension string, blockNum uint64) uint64 {
 	s.Lock()
 	defer s.Unlock()
 
@@ -433,6 +450,7 @@ func (s *Stats) RecordModuleWasmExternalCallBegin(moduleName string, extension s
 	mod.inprocessCallMetrics[uniqueID] = inprocessCall{
 		startTime: time.Now(),
 		extension: extension,
+		blockNum:  blockNum,
 	}
 
 	met, ok := mod.externalCallMetrics[extension]
@@ -446,7 +464,7 @@ func (s *Stats) RecordModuleWasmExternalCallBegin(moduleName string, extension s
 }
 
 // RecordModuleWasmExternalCallEnd can be called multiple times per module per block, for each external module call (ex: eth_call). `elapsed` is the time spent in executing that call.
-func (s *Stats) RecordModuleWasmExternalCallEnd(moduleName string, extension string, uniqueID uint64) {
+func (s *Stats) RecordModuleWasmExternalCallEnd(moduleName string, extension string, uniqueID uint64, callErr error) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -461,6 +479,9 @@ func (s *Stats) RecordModuleWasmExternalCallEnd(moduleName string, extension str
 	met.time += elapsed
 	if elapsed > met.maxTime {
 		met.maxTime = elapsed
+	}
+	if callErr != nil {
+		met.failed++
 	}
 
 	delete(mod.inprocessCallMetrics, uniqueID)

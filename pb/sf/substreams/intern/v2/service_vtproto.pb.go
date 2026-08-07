@@ -29,6 +29,7 @@ func (m *ProcessRangeRequest) CloneVT() *ProcessRangeRequest {
 	r := new(ProcessRangeRequest)
 	r.StopBlockNum = m.StopBlockNum
 	r.OutputModule = m.OutputModule
+	r.Modules = m.Modules.CloneVT()
 	r.Stage = m.Stage
 	r.MeteringConfig = m.MeteringConfig
 	r.FirstStreamableBlock = m.FirstStreamableBlock
@@ -44,13 +45,6 @@ func (m *ProcessRangeRequest) CloneVT() *ProcessRangeRequest {
 	r.EthCallFallbackToNumberDuration = m.EthCallFallbackToNumberDuration
 	r.StoreSizeLimit = m.StoreSizeLimit
 	r.MergedBlocksBundleSize = m.MergedBlocksBundleSize
-	if rhs := m.Modules; rhs != nil {
-		if vtpb, ok := interface{}(rhs).(interface{ CloneVT() *v1.Modules }); ok {
-			r.Modules = vtpb.CloneVT()
-		} else {
-			r.Modules = proto.Clone(rhs).(*v1.Modules)
-		}
-	}
 	if rhs := m.WasmExtensionConfigs; rhs != nil {
 		tmpContainer := make(map[string]string, len(rhs))
 		for k, v := range rhs {
@@ -139,13 +133,7 @@ func (m *BlockScopedData) CloneVT() *BlockScopedData {
 	}
 	r := new(BlockScopedData)
 	r.Output = (*anypb.Any)((*anypb1.Any)(m.Output).CloneVT())
-	if rhs := m.Clock; rhs != nil {
-		if vtpb, ok := interface{}(rhs).(interface{ CloneVT() *v1.Clock }); ok {
-			r.Clock = vtpb.CloneVT()
-		} else {
-			r.Clock = proto.Clone(rhs).(*v1.Clock)
-		}
-	}
+	r.Clock = m.Clock.CloneVT()
 	if len(m.unknownFields) > 0 {
 		r.unknownFields = make([]byte, len(m.unknownFields))
 		copy(r.unknownFields, m.unknownFields)
@@ -222,6 +210,10 @@ func (m *ExternalCallMetric) CloneVT() *ExternalCallMetric {
 	r.Name = m.Name
 	r.Count = m.Count
 	r.TimeMs = m.TimeMs
+	r.FailedCount = m.FailedCount
+	r.InFlightCount = m.InFlightCount
+	r.OldestInFlightMs = m.OldestInFlightMs
+	r.OldestInFlightBlock = m.OldestInFlightBlock
 	if len(m.unknownFields) > 0 {
 		r.unknownFields = make([]byte, len(m.unknownFields))
 		copy(r.unknownFields, m.unknownFields)
@@ -311,11 +303,7 @@ func (this *ProcessRangeRequest) EqualVT(that *ProcessRangeRequest) bool {
 	if this.OutputModule != that.OutputModule {
 		return false
 	}
-	if equal, ok := interface{}(this.Modules).(interface{ EqualVT(*v1.Modules) bool }); ok {
-		if !equal.EqualVT(that.Modules) {
-			return false
-		}
-	} else if !proto.Equal(this.Modules, that.Modules) {
+	if !this.Modules.EqualVT(that.Modules) {
 		return false
 	}
 	if this.Stage != that.Stage {
@@ -534,11 +522,7 @@ func (this *BlockScopedData) EqualVT(that *BlockScopedData) bool {
 	if !(*anypb1.Any)(this.Output).EqualVT((*anypb1.Any)(that.Output)) {
 		return false
 	}
-	if equal, ok := interface{}(this.Clock).(interface{ EqualVT(*v1.Clock) bool }); ok {
-		if !equal.EqualVT(that.Clock) {
-			return false
-		}
-	} else if !proto.Equal(this.Clock, that.Clock) {
+	if !this.Clock.EqualVT(that.Clock) {
 		return false
 	}
 	return string(this.unknownFields) == string(that.unknownFields)
@@ -663,6 +647,18 @@ func (this *ExternalCallMetric) EqualVT(that *ExternalCallMetric) bool {
 		return false
 	}
 	if this.TimeMs != that.TimeMs {
+		return false
+	}
+	if this.FailedCount != that.FailedCount {
+		return false
+	}
+	if this.InFlightCount != that.InFlightCount {
+		return false
+	}
+	if this.OldestInFlightMs != that.OldestInFlightMs {
+		return false
+	}
+	if this.OldestInFlightBlock != that.OldestInFlightBlock {
 		return false
 	}
 	return string(this.unknownFields) == string(that.unknownFields)
@@ -945,24 +941,12 @@ func (m *ProcessRangeRequest) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 		dAtA[i] = 0x28
 	}
 	if m.Modules != nil {
-		if vtmsg, ok := interface{}(m.Modules).(interface {
-			MarshalToSizedBufferVT([]byte) (int, error)
-		}); ok {
-			size, err := vtmsg.MarshalToSizedBufferVT(dAtA[:i])
-			if err != nil {
-				return 0, err
-			}
-			i -= size
-			i = protohelpers.EncodeVarint(dAtA, i, uint64(size))
-		} else {
-			encoded, err := proto.Marshal(m.Modules)
-			if err != nil {
-				return 0, err
-			}
-			i -= len(encoded)
-			copy(dAtA[i:], encoded)
-			i = protohelpers.EncodeVarint(dAtA, i, uint64(len(encoded)))
+		size, err := m.Modules.MarshalToSizedBufferVT(dAtA[:i])
+		if err != nil {
+			return 0, err
 		}
+		i -= size
+		i = protohelpers.EncodeVarint(dAtA, i, uint64(size))
 		i--
 		dAtA[i] = 0x22
 	}
@@ -1130,24 +1114,12 @@ func (m *BlockScopedData) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 		copy(dAtA[i:], m.unknownFields)
 	}
 	if m.Clock != nil {
-		if vtmsg, ok := interface{}(m.Clock).(interface {
-			MarshalToSizedBufferVT([]byte) (int, error)
-		}); ok {
-			size, err := vtmsg.MarshalToSizedBufferVT(dAtA[:i])
-			if err != nil {
-				return 0, err
-			}
-			i -= size
-			i = protohelpers.EncodeVarint(dAtA, i, uint64(size))
-		} else {
-			encoded, err := proto.Marshal(m.Clock)
-			if err != nil {
-				return 0, err
-			}
-			i -= len(encoded)
-			copy(dAtA[i:], encoded)
-			i = protohelpers.EncodeVarint(dAtA, i, uint64(len(encoded)))
+		size, err := m.Clock.MarshalToSizedBufferVT(dAtA[:i])
+		if err != nil {
+			return 0, err
 		}
+		i -= size
+		i = protohelpers.EncodeVarint(dAtA, i, uint64(size))
 		i--
 		dAtA[i] = 0x12
 	}
@@ -1340,6 +1312,26 @@ func (m *ExternalCallMetric) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 	if m.unknownFields != nil {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
+	}
+	if m.OldestInFlightBlock != 0 {
+		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.OldestInFlightBlock))
+		i--
+		dAtA[i] = 0x38
+	}
+	if m.OldestInFlightMs != 0 {
+		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.OldestInFlightMs))
+		i--
+		dAtA[i] = 0x30
+	}
+	if m.InFlightCount != 0 {
+		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.InFlightCount))
+		i--
+		dAtA[i] = 0x28
+	}
+	if m.FailedCount != 0 {
+		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.FailedCount))
+		i--
+		dAtA[i] = 0x20
 	}
 	if m.TimeMs != 0 {
 		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.TimeMs))
@@ -1537,13 +1529,7 @@ func (m *ProcessRangeRequest) SizeVT() (n int) {
 		n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
 	}
 	if m.Modules != nil {
-		if size, ok := interface{}(m.Modules).(interface {
-			SizeVT() int
-		}); ok {
-			l = size.SizeVT()
-		} else {
-			l = proto.Size(m.Modules)
-		}
+		l = m.Modules.SizeVT()
 		n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
 	}
 	if m.Stage != 0 {
@@ -1688,13 +1674,7 @@ func (m *BlockScopedData) SizeVT() (n int) {
 		n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
 	}
 	if m.Clock != nil {
-		if size, ok := interface{}(m.Clock).(interface {
-			SizeVT() int
-		}); ok {
-			l = size.SizeVT()
-		} else {
-			l = proto.Size(m.Clock)
-		}
+		l = m.Clock.SizeVT()
 		n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
 	}
 	n += len(m.unknownFields)
@@ -1782,6 +1762,18 @@ func (m *ExternalCallMetric) SizeVT() (n int) {
 	}
 	if m.TimeMs != 0 {
 		n += 1 + protohelpers.SizeOfVarint(uint64(m.TimeMs))
+	}
+	if m.FailedCount != 0 {
+		n += 1 + protohelpers.SizeOfVarint(uint64(m.FailedCount))
+	}
+	if m.InFlightCount != 0 {
+		n += 1 + protohelpers.SizeOfVarint(uint64(m.InFlightCount))
+	}
+	if m.OldestInFlightMs != 0 {
+		n += 1 + protohelpers.SizeOfVarint(uint64(m.OldestInFlightMs))
+	}
+	if m.OldestInFlightBlock != 0 {
+		n += 1 + protohelpers.SizeOfVarint(uint64(m.OldestInFlightBlock))
 	}
 	n += len(m.unknownFields)
 	return n
@@ -1960,16 +1952,8 @@ func (m *ProcessRangeRequest) UnmarshalVT(dAtA []byte) error {
 			if m.Modules == nil {
 				m.Modules = &v1.Modules{}
 			}
-			if unmarshal, ok := interface{}(m.Modules).(interface {
-				UnmarshalVT([]byte) error
-			}); ok {
-				if err := unmarshal.UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
-					return err
-				}
-			} else {
-				if err := proto.Unmarshal(dAtA[iNdEx:postIndex], m.Modules); err != nil {
-					return err
-				}
+			if err := m.Modules.UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
+				return err
 			}
 			iNdEx = postIndex
 		case 5:
@@ -2912,16 +2896,8 @@ func (m *BlockScopedData) UnmarshalVT(dAtA []byte) error {
 			if m.Clock == nil {
 				m.Clock = &v1.Clock{}
 			}
-			if unmarshal, ok := interface{}(m.Clock).(interface {
-				UnmarshalVT([]byte) error
-			}); ok {
-				if err := unmarshal.UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
-					return err
-				}
-			} else {
-				if err := proto.Unmarshal(dAtA[iNdEx:postIndex], m.Clock); err != nil {
-					return err
-				}
+			if err := m.Clock.UnmarshalVT(dAtA[iNdEx:postIndex]); err != nil {
+				return err
 			}
 			iNdEx = postIndex
 		default:
@@ -3433,6 +3409,82 @@ func (m *ExternalCallMetric) UnmarshalVT(dAtA []byte) error {
 				b := dAtA[iNdEx]
 				iNdEx++
 				m.TimeMs |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field FailedCount", wireType)
+			}
+			m.FailedCount = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.FailedCount |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field InFlightCount", wireType)
+			}
+			m.InFlightCount = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.InFlightCount |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 6:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field OldestInFlightMs", wireType)
+			}
+			m.OldestInFlightMs = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.OldestInFlightMs |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 7:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field OldestInFlightBlock", wireType)
+			}
+			m.OldestInFlightBlock = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.OldestInFlightBlock |= uint64(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}

@@ -51,6 +51,11 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
+// inFlightProgressInterval is how often tier2 reports what it is doing while a block is still
+// being processed. Frequent enough that a stuck external call shows up in tier1's progress log
+// well before the segment times out, cheap enough to be irrelevant next to the block loop.
+var inFlightProgressInterval = 10 * time.Second
+
 var slowQueryNotificationFrequency = 30 * time.Second
 var slowQueryNotificationThreshold = 300 * time.Second
 var ErrRequestActiveForTooLong = errors.New("request active for too long")
@@ -557,6 +562,25 @@ func (s *Tier2Service) processRange(ctx context.Context, request *pbssinternal.P
 		opts...,
 	)
 
+	// Keep reporting while a block is being processed, not only once it completes: a module
+	// blocked on a retrying external call would otherwise stay silent for the whole stall,
+	// and tier1 would show a job running for minutes with no external call metrics at all.
+	go func() {
+		ticker := time.NewTicker(inFlightProgressInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := pipe.SendProgressSnapshot(); err != nil {
+					logger.Debug("cannot send in-flight progress snapshot", zap.Error(err))
+					return
+				}
+			}
+		}
+	}()
+
 	logger.Debug("initializing tier2 pipeline",
 		zap.Uint64("request_start_block", requestDetails.ResolvedStartBlockNum),
 		zap.String("output_module", request.OutputModule),
@@ -741,7 +765,18 @@ func tier2ResponseHandler(ctx context.Context, logger *zap.Logger, streamSrv pbs
 		logger.Warn("no auth information available in tier2 response handler")
 	}
 
+	// Progress snapshots are emitted from a ticker goroutine while the block loop keeps
+	// sending, and a gRPC stream does not tolerate concurrent Send calls.
+	var mut sync.Mutex
+
 	return func(respAny substreams.ResponseFromAnyTier) error {
+		mut.Lock()
+		defer mut.Unlock()
+
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
 		resp := respAny.(*pbssinternal.ProcessRangeResponse)
 		if err := streamSrv.Send(resp); err != nil {
 			logger.Info("unable to send block probably due to client disconnecting", zap.Error(err), zap.String("user_id", userID), zap.String("key_id", apiKeyID), zap.Error(err))

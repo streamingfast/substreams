@@ -7,10 +7,10 @@ import (
 	"sort"
 	"strings"
 
+	pbSchmema "github.com/streamingfast/substreams/pb/sf/substreams/sink/sql/schema/v1"
 	"github.com/streamingfast/substreams/sink/sql/bytes"
 	sql2 "github.com/streamingfast/substreams/sink/sql/db_proto/sql"
 	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/schema"
-	pbSchmema "github.com/streamingfast/substreams/pb/sf/substreams/sink/sql/schema/v1"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/dynamicpb"

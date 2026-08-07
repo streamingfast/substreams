@@ -172,6 +172,9 @@ func (i *RowInserter) insert(table string, values []any, database *Database) err
 			}
 			// Raw bytes target a BYTEA column and the driver binds []byte to it directly.
 			// Rendering a literal here would store that literal's characters instead.
+		case sql2.EnumValue:
+			// The column is TEXT; bind the name rather than the wrapper.
+			values[i] = v.String()
 		case *timestamppb.Timestamp:
 			values[i] = "'" + v.AsTime().Format(time.RFC3339) + "'"
 		case []interface{}:
@@ -237,6 +240,8 @@ func arrayElementText(value interface{}, bytesEncoding bytes.Encoding) string {
 			}
 		}
 		return `\x` + hex.EncodeToString(v)
+	case sql2.EnumValue:
+		return v.String()
 	case time.Time:
 		return v.UTC().Format(time.RFC3339)
 	case *timestamppb.Timestamp:

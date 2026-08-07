@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/streamingfast/logging/zapx"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	sink "github.com/streamingfast/substreams/sink"
 	sql "github.com/streamingfast/substreams/sink/sql/db_proto/sql"
 	"github.com/streamingfast/substreams/sink/sql/db_proto/stats"
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"go.uber.org/zap"
 	"google.golang.org/appengine"
 	"google.golang.org/protobuf/proto"

@@ -690,9 +690,11 @@ func (s *Tier1Service) blocks(
 		}
 	}
 
-	parallelJobs, parallelExecutors := reqctx.GetEffectiveHeaderValues(ctx, header, s.runtimeConfig.DefaultParallelSubrequests, reqctx.DefaultMaxStageLayerParallelExecutorCount)
-	requestDetails.MaxParallelJobs = parallelJobs
-	requestDetails.MaxStageLayerParallelExecutor = parallelExecutors
+	parallelism := reqctx.GetEffectiveHeaderValues(ctx, header, s.runtimeConfig.DefaultParallelSubrequests, reqctx.DefaultMaxStageLayerParallelExecutorCount)
+	requestDetails.MaxParallelJobs = parallelism.Workers
+	requestDetails.MaxStageLayerParallelExecutor = parallelism.StageLayerExecutors
+	reqStats.SetWorkerCounts(parallelism.RequestedWorkers, parallelism.GrantedWorkers, parallelism.Workers)
+	logFields = append(logFields, zap.Object("parallelism", parallelism))
 
 	ctx = reqctx.WithRequest(ctx, requestDetails)
 	if s.runtimeConfig.ModuleExecutionTracing {
@@ -845,6 +847,18 @@ func (s *Tier1Service) blocks(
 	if err != nil {
 		return stream.NewErrInvalidArg("%s", err.Error())
 	}
+
+	// The number of segments to backprocess bounds how many workers can ever be busy at
+	// once: asking for 300 workers on a request that only has 12 segments of work left
+	// will never use more than 12 of them.
+	var parallelSegmentCount int
+	if segmenter := reqPlan.BackprocessSegmenter(); segmenter != nil {
+		parallelSegmentCount = segmenter.Count()
+	}
+	logFields = append(logFields,
+		zap.Int("parallel_segment_count", parallelSegmentCount),
+		zap.Int("stage_count", len(execGraph.StagedUsedModules())),
+	)
 
 	if s.sessionPool != nil {
 		auth := dauth.FromContext(ctx)

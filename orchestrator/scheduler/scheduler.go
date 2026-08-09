@@ -204,6 +204,9 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 			s.Stages.ReleaseJob(workUnit)
 			if errors.Is(err, work.ErrorResourceExhausted) {
 				s.logger.Debug("resource exhausted", zap.Error(err))
+				if stats := reqctx.ReqStatsOrNil(s.ctx); stats != nil {
+					stats.RecordWorkerPoolExhausted()
+				}
 				if s.delayedScheduleNextJob {
 					s.logger.Debug("skipping delayed schedule next job")
 					return nil
@@ -215,6 +218,9 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 				})
 			} else if errors.Is(err, work.ErrorResourceExhaustedRampUp) {
 				s.logger.Debug("resource exhausted ramp up", zap.Error(err))
+				if stats := reqctx.ReqStatsOrNil(s.ctx); stats != nil {
+					stats.RecordWorkerPoolRampUpDeferred()
+				}
 
 				if s.delayedScheduleNextJob {
 					s.logger.Debug("skipping ramp up delayed schedule next job")

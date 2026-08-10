@@ -482,6 +482,12 @@ func (d *Database) HandleBlocksUndo(lastValidBlockNum uint64) error {
 	return nil
 }
 
+// Close is a no-op: ClickHouse buffers in memory and flushes inline.
+func (d *Database) Close(ctx context.Context) error { return nil }
+
+// BufferStats reports nothing buffered locally.
+func (d *Database) BufferStats() (int64, int64, uint64, bool) { return 0, 0, 0, false }
+
 func (d *Database) DatabaseHash(schemaName string) (uint64, error) {
 	panic("not implemented")
 }

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dustin/go-humanize"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/protoparse"
 	"github.com/spf13/cobra"
@@ -24,6 +25,7 @@ import (
 	"github.com/streamingfast/substreams/sink/sql/db_changes/sinker"
 	"github.com/streamingfast/substreams/sink/sql/db_proto"
 	"github.com/streamingfast/substreams/sink/sql/db_proto/proto"
+	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/postgres/cache"
 	"github.com/streamingfast/substreams/sink/sql/services"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/descriptorpb"
@@ -156,6 +158,11 @@ func addFromProtoModeRunFlags(flags *pflag.FlagSet, driver string) {
 	flags.Bool("no-constraints", false, "[from-proto mode] Do not add any constraints to the database. This is useful to speed up the initial import of a large dataset.")
 	flags.Int("block-batch-size", 25, "[from-proto mode] number of blocks to process at a time")
 	flags.String("proto-file-override", "", "[from-proto mode] Override protobuf file to use instead of extracting from substreams package")
+
+	if driver == "postgres" {
+		flags.String("local-cache", "", "[from-proto mode] Buffer rows in this directory and load them with binary COPY from a background goroutine, so the stream never waits on the database. Requires --no-constraints")
+		flags.String("local-cache-max-size", "16GiB", "[from-proto mode] Disk budget for --local-cache; the stream is held once the buffer reaches it")
+	}
 
 	if driver == "clickhouse" {
 		flags.String("sink-info-folder", "", "[from-proto mode] folder where to store the clickhouse sink info")
@@ -336,7 +343,13 @@ func runFromProtoSink(cmd *cobra.Command, driver, manifestPath, dsnString string
 		return fmt.Errorf("new base sinker: %w", err)
 	}
 
+	localCache, err := fromProtoLocalCacheOptions(cmd, driver, useConstraints)
+	if err != nil {
+		return err
+	}
+
 	factory := db_proto.SinkerFactory(baseSink, outputModuleName, rootMessageDescriptor.UnwrapMessage(), db_proto.SinkerFactoryOptions{
+		LocalCache:      localCache,
 		UseProtoOption:  useProtoOption,
 		UseConstraints:  useConstraints,
 		UseTransactions: true,
@@ -766,4 +779,31 @@ func cursorToShortString(in *sink.Cursor) string {
 	}
 
 	return cursor
+}
+
+// fromProtoLocalCacheOptions resolves the --local-cache flags into cache options, or nil
+// when the cache is off.
+func fromProtoLocalCacheOptions(cmd *cobra.Command, driver string, useConstraints bool) (*cache.Options, error) {
+	if driver != "postgres" {
+		return nil, nil
+	}
+
+	dir := sflags.MustGetString(cmd, "local-cache")
+	if dir == "" {
+		return nil, nil
+	}
+
+	if useConstraints {
+		// Binary COPY feeds one table at a time, so a child row can reach the server
+		// before its parent within a segment, which an immediate foreign key rejects.
+		return nil, fmt.Errorf("--local-cache requires --no-constraints")
+	}
+
+	rawSize := sflags.MustGetString(cmd, "local-cache-max-size")
+	maxBytes, err := humanize.ParseBytes(rawSize)
+	if err != nil {
+		return nil, fmt.Errorf("invalid --local-cache-max-size %q: %w", rawSize, err)
+	}
+
+	return &cache.Options{Dir: dir, MaxBytes: int64(maxBytes)}, nil
 }

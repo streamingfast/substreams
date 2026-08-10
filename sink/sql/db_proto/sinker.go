@@ -67,6 +67,11 @@ func (s *Sinker) Run(ctx context.Context) error {
 	}
 	//panic("Testing 12 12")
 	s.logger.Info("fetched cursor", zap.Stringer("block", cursor.Block()))
+	if cursor != nil {
+		// Seed the applied mark, otherwise the first downloaded block would be measured
+		// against zero and reported as a chain-height-sized backlog.
+		s.stats.Progress.SetResumeBlock(cursor.Block().Num())
+	}
 
 	s.stats.LastBlockProcessAt = time.Now()
 	s.Sinker.Run(ctx, cursor, s)
@@ -120,6 +125,9 @@ func (s *Sinker) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrp
 		cursor: cursor,
 	}
 	s.holding = append(s.holding, holder)
+	s.stats.Progress.RecordDownloaded(data.Clock.Number)
+	s.recordBuffered()
+
 	if data.Clock.Number > (s.lastAppliedBlockNum+s.blockBatchSize) || s.blockBatchSize == 1 || (isLive != nil && *isLive) {
 		if isLive != nil && *isLive && s.stats.FlushDuration.Average() > data.Clock.Timestamp.AsTime().Sub(s.lastAppliedBlockTime) {
 			s.logger.Debug("skipping a flush because we are LIVE and flush average duration is above time between blocks", zapx.HumanDuration("flush_duration_average", s.stats.FlushDuration.Average()), zap.Time("last_block_time", s.lastAppliedBlockTime), zap.Time("block_time", data.Clock.Timestamp.AsTime()))
@@ -140,13 +148,18 @@ func (s *Sinker) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrp
 // --block-batch-size larger than the range, that meant an empty database and a run that
 // looked successful.
 func (s *Sinker) HandleBlockRangeCompletion(ctx context.Context, cursor *sink.Cursor) error {
-	if len(s.holding) == 0 {
-		return nil
+
+	if len(s.holding) > 0 {
+		s.logger.Info("flushing blocks held at the end of the requested range", zap.Int("block_count", len(s.holding)))
+
+		if err := s.flushHolding(cursor); err != nil {
+			return err
+		}
 	}
 
-	s.logger.Info("flushing blocks held at the end of the requested range", zap.Int("block_count", len(s.holding)))
-
-	return s.flushHolding(cursor)
+	// A local cache still holds whatever has not reached its segment size. Draining it
+	// here is what keeps those blocks from being streamed, and paid for, twice.
+	return s.db.Close(ctx)
 }
 
 // flushHolding applies every held block, stores the cursor and commits.
@@ -205,7 +218,28 @@ func (s *Sinker) flushHolding(cursor *sink.Cursor) (err error) {
 	}
 	s.holding = s.holding[:0]
 
+	// With a local cache the rows are only queued at this point, not durable, so the
+	// applied mark has to come from what the cache actually committed.
+	if _, _, applied, buffering := s.db.BufferStats(); !buffering {
+		s.stats.Progress.RecordApplied(lastClock.Number)
+	} else if applied > 0 {
+		s.stats.Progress.RecordApplied(applied)
+	}
+	s.recordBuffered()
+
 	return nil
+}
+
+// recordBuffered reports what sits between the stream and the database: blocks held in
+// memory for the next flush, plus whatever a local cache has queued on disk.
+func (s *Sinker) recordBuffered() {
+	cachedBlocks, cachedBytes, _, buffering := s.db.BufferStats()
+	if !buffering {
+		s.stats.Progress.RecordBuffered(len(s.holding), 0)
+		return
+	}
+
+	s.stats.Progress.RecordBuffered(len(s.holding)+int(cachedBlocks), cachedBytes)
 }
 
 // recordDecodeStats folds the per-block timings the workers measured back into the

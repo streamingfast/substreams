@@ -7,11 +7,13 @@ import (
 	"hash/fnv"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/streamingfast/logging/zapx"
 	sink "github.com/streamingfast/substreams/sink"
 	"github.com/streamingfast/substreams/sink/sql/bytes"
 	"github.com/streamingfast/substreams/sink/sql/db_changes/db"
 	"github.com/streamingfast/substreams/sink/sql/db_proto/sql"
+	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/postgres/cache"
 	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/schema"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -20,14 +22,34 @@ import (
 
 type Database struct {
 	*sql.BaseDatabase
-	db             *pgsql.DB
+	db *pgsql.DB
+	// pool is only created when the local cache is enabled: binary COPY needs pgx, the
+	// rest of the sink talks to PostgreSQL through database/sql and lib/pq.
+	pool           *pgxpool.Pool
+	cacheOptions   *cache.Options
 	tx             *pgsql.Tx
+	dsn            *db.DSN
 	schema         *schema.Schema
 	logger         *zap.Logger
 	dialect        *DialectPostgres
 	inserter       pgInserter
 	flusher        pgFlusher
 	useConstraints bool
+}
+
+// cacheActive reports whether rows are currently being routed to the local cache.
+//
+// This is deliberately not "was a cache configured": schema creation runs before Open
+// and does need real transactions, so the distinction is what keeps DDL working.
+func (d *Database) cacheActive() bool {
+	_, ok := d.inserter.(*cacheInserter)
+
+	return ok
+}
+
+// WithLocalCache turns on the on-disk buffer. It must be called before Open.
+func (d *Database) WithLocalCache(options cache.Options) {
+	d.cacheOptions = &options
 }
 
 func NewDatabase(schema *schema.Schema, dsn *db.DSN, moduleOutputType string, rootMessageDescriptor protoreflect.MessageDescriptor, useProtoOptions bool, useConstraints bool, bytesEncoding bytes.Encoding, logger *zap.Logger) (*Database, error) {
@@ -54,6 +76,7 @@ func NewDatabase(schema *schema.Schema, dsn *db.DSN, moduleOutputType string, ro
 	}
 	database := &Database{
 		db:             sqlDB,
+		dsn:            dsn,
 		schema:         schema,
 		useConstraints: useConstraints,
 		BaseDatabase:   baseDB,
@@ -65,6 +88,25 @@ func NewDatabase(schema *schema.Schema, dsn *db.DSN, moduleOutputType string, ro
 }
 
 func (d *Database) Open() error {
+	if d.cacheOptions != nil {
+		ctx := context.Background()
+
+		pool, err := pgxpool.New(ctx, d.dsn.ConnString())
+		if err != nil {
+			return fmt.Errorf("connecting to the database for binary COPY: %w", err)
+		}
+		d.pool = pool
+
+		inserter, err := newCacheInserter(ctx, d, *d.cacheOptions, d.logger)
+		if err != nil {
+			return fmt.Errorf("starting the local cache: %w", err)
+		}
+		d.inserter = inserter
+		d.flusher = inserter
+
+		return nil
+	}
+
 	if d.useConstraints {
 		inserter, err := NewRowInserter(d.logger)
 		if err != nil {
@@ -154,6 +196,13 @@ func (d *Database) applyConstraints() error {
 }
 
 func (d *Database) BeginTransaction() (err error) {
+	if d.cacheActive() {
+		// The cache owns its transactions: one per segment, in the applier goroutine.
+		// Holding one here would pin a connection for the whole buffering window and
+		// would not cover the writes anyway.
+		return nil
+	}
+
 	d.tx, err = d.db.Begin()
 	if err != nil {
 		return fmt.Errorf("beginning transaction: %w", err)
@@ -162,6 +211,10 @@ func (d *Database) BeginTransaction() (err error) {
 }
 
 func (d *Database) CommitTransaction() (err error) {
+	if d.cacheActive() {
+		return nil
+	}
+
 	err = d.tx.Commit()
 	if err != nil {
 		return fmt.Errorf("committing transaction: %w", err)
@@ -171,6 +224,10 @@ func (d *Database) CommitTransaction() (err error) {
 }
 
 func (d *Database) RollbackTransaction() {
+	if d.cacheActive() {
+		return
+	}
+
 	err := d.tx.Rollback()
 	if err != nil {
 		panic("RollbackTransaction failed: " + err.Error())
@@ -204,6 +261,27 @@ func (d *Database) InsertBlock(blockNum uint64, hash string, timestamp time.Time
 	}
 
 	return nil
+}
+
+// Close drains the local cache, if one is in use, so the blocks buffered at shutdown
+// reach the database rather than being streamed again on the next run.
+func (d *Database) Close(ctx context.Context) error {
+	inserter, ok := d.inserter.(*cacheInserter)
+	if !ok {
+		return nil
+	}
+
+	return inserter.close(ctx)
+}
+
+// BufferStats reports what the local cache is holding, for the progress line.
+func (d *Database) BufferStats() (blocks int64, bytes int64, appliedBlock uint64, enabled bool) {
+	inserter, ok := d.inserter.(*cacheInserter)
+	if !ok {
+		return 0, 0, 0, false
+	}
+
+	return inserter.cache.BlocksBuffered(), inserter.cache.BytesOnDisk(), inserter.cache.AppliedBlock(), true
 }
 
 func (d *Database) Flush() (time.Duration, error) {

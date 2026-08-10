@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -47,6 +48,16 @@ type Database interface {
 	GetDialect() Dialect
 
 	Open() error
+
+	// Close releases anything the database buffered locally, so blocks held at shutdown
+	// reach the server rather than being streamed again.
+	Close(ctx context.Context) error
+
+	// BufferStats reports what is buffered between the stream and the server: how many
+	// blocks, how many bytes on disk, and the last block actually committed. enabled is
+	// false when nothing buffers locally, in which case the caller knows a flush means
+	// the rows are stored.
+	BufferStats() (blocks int64, bytes int64, appliedBlock uint64, enabled bool)
 }
 
 type BaseDatabase struct {

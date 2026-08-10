@@ -12,6 +12,7 @@ import (
 	protosql "github.com/streamingfast/substreams/sink/sql/db_proto/sql"
 	clickhouse "github.com/streamingfast/substreams/sink/sql/db_proto/sql/click_house"
 	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/postgres"
+	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/postgres/cache"
 	schema2 "github.com/streamingfast/substreams/sink/sql/db_proto/sql/schema"
 	stats2 "github.com/streamingfast/substreams/sink/sql/db_proto/stats"
 	"go.uber.org/zap"
@@ -29,7 +30,10 @@ type SinkerFactoryOptions struct {
 	// flush time. Zero picks one per core, less one.
 	DecodeWorkers int
 	Encoding      bytes.Encoding
-	Clickhouse    SinkerFactoryClickhouse
+	// LocalCache, when set, buffers rows on disk and loads them with binary COPY from a
+	// background goroutine. PostgreSQL only.
+	LocalCache *cache.Options
+	Clickhouse SinkerFactoryClickhouse
 }
 
 type SinkerFactoryClickhouse struct {
@@ -75,7 +79,7 @@ func SinkerFactory(
 			options.UseConstraints,
 			options.BlockBatchSize,
 			options.DecodeWorkers,
-			stats2.NewStats(logger),
+			stats2.NewStats(logger, options.BlockBatchSize),
 			logger,
 		), nil
 	}
@@ -112,10 +116,14 @@ func SetupDatabaseSchema(
 
 	switch dsn.Driver() {
 	case "postgres":
-		database, err = postgres.NewDatabase(schema, dsn, outputModuleName, rootMessageDescriptor, options.UseProtoOption, options.UseConstraints, options.Encoding, logger)
-		if err != nil {
-			return nil, fmt.Errorf("creating postgres database: %w", err)
+		pgDatabase, pgErr := postgres.NewDatabase(schema, dsn, outputModuleName, rootMessageDescriptor, options.UseProtoOption, options.UseConstraints, options.Encoding, logger)
+		if pgErr != nil {
+			return nil, fmt.Errorf("creating postgres database: %w", pgErr)
 		}
+		if options.LocalCache != nil {
+			pgDatabase.WithLocalCache(*options.LocalCache)
+		}
+		database = pgDatabase
 
 	case "clickhouse":
 		database, err = clickhouse.NewDatabase(

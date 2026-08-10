@@ -424,7 +424,7 @@ func TestProgressHints(t *testing.T) {
 		// limit and stays there: being throttled for the whole window is the healthy state of
 		// a production request, whatever the consumer is doing.
 		stats.startTime = time.Now().Add(-30 * time.Minute)
-		stats.RecordMaxParallelJobs(10)
+		stats.SetWorkerCounts(0, 10, 10)
 		stats.windowThrottled.add(time.Now(), ProgressWindow)
 		logger.logProgress()
 

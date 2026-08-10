@@ -93,6 +93,10 @@ const (
 	// the second threshold.
 	squashingBehindSegments = 5
 	squashingBehindFor      = 2 * time.Minute
+	// Failed worker borrows over the window before the shared pool is called out. A couple of
+	// misses is normal — the pool is shared and workers come back quickly — so what matters is
+	// missing repeatedly while this request still has room to run more.
+	workerPoolExhaustedToReport = 5
 )
 
 // StageProgress is a point-in-time view of one stage of the parallel phase: what it executes,
@@ -256,11 +260,49 @@ func (s *Stats) RecordJobSchedulingBlocked(blocked bool) {
 	s.schedulingBlockedSince = time.Time{}
 }
 
-// RecordMaxParallelJobs records how many jobs this request may run at once.
-func (s *Stats) RecordMaxParallelJobs(count uint64) {
-	s.Lock()
-	defer s.Unlock()
-	s.maxParallelJobs = count
+// workerReport is the live view of this request's workers, as opposed to the end-of-request
+// summary carried by workerStats: how many workers the request may use, how many it is using
+// right now, and whether the shared pool is what stands between the two.
+type workerReport struct {
+	requested uint64
+	granted   uint64
+	effective uint64
+	running   uint64
+	// idle is how many of the allowed workers have no job. It is not a symptom on its own: a
+	// request whose stages all depend on one another has nothing to hand out, and a throttled
+	// one is idle by design.
+	idle uint64
+	// poolExhausted counts, over the window, the jobs that were ready to run but found the
+	// shared pool empty. This is the one that separates "this request has nothing to schedule"
+	// from "the fleet has nothing to give it".
+	poolExhausted uint64
+}
+
+func (w *workerReport) MarshalLogObject(encoder zapcore.ObjectEncoder) error {
+	encoder.AddUint64("requested", w.requested)
+	encoder.AddUint64("granted", w.granted)
+	encoder.AddUint64("effective", w.effective)
+	encoder.AddUint64("running", w.running)
+	encoder.AddUint64("idle", w.idle)
+	if w.poolExhausted != 0 {
+		encoder.AddUint64("pool_exhausted_5m", w.poolExhausted)
+	}
+	return nil
+}
+
+// workerReport should be called while locked
+func (s *Stats) workerReport(now time.Time) *workerReport {
+	report := &workerReport{
+		requested:     s.workers.requested.Load(),
+		granted:       s.workers.granted.Load(),
+		effective:     s.workers.effective.Load(),
+		running:       uint64(len(s.runningJobs)),
+		poolExhausted: s.windowPoolExhausted.sum(now),
+	}
+	if report.effective > report.running {
+		report.idle = report.effective - report.running
+	}
+	return report
 }
 
 // throttledOverWindow is how long scheduling was held back over the window, including the
@@ -363,6 +405,7 @@ func (s *Stats) progressFields() []zap.Field {
 	linearBlocksInWindow := s.windowLocalBlocks.sum(now)
 	stages := s.stageJobReport(now)
 	calls := s.externalCallReport(now, measured)
+	workers := s.workerReport(now)
 
 	// How much output is sitting in the cache that the consumer has not taken yet. Measured
 	// from where the consumer actually is, which before the first block is the start of the
@@ -391,6 +434,7 @@ func (s *Stats) progressFields() []zap.Field {
 		zap.Float64("linear_blocks_processed_per_sec_5m", perSecond(linearBlocksInWindow, measured)),
 		zap.Uint64("blocks_sent", s.blocksSent),
 		zap.Object("blocks_sent_5m", sendStats),
+		zap.Object("workers", workers),
 		zap.Objects("stages", stages),
 		zap.Objects("external_calls", calls),
 	}
@@ -412,7 +456,7 @@ func (s *Stats) progressFields() []zap.Field {
 		}))
 	}
 
-	fields = append(fields, zap.Strings("hints", s.progressHints(stages, calls, sendStats, cachedAhead, linearPhase, measured, jobErrorsInWindow, now)))
+	fields = append(fields, zap.Strings("hints", s.progressHints(stages, calls, sendStats, workers, cachedAhead, linearPhase, measured, jobErrorsInWindow, now)))
 
 	return fields
 }
@@ -871,6 +915,7 @@ func (s *Stats) progressHints(
 	stages []*stageJobReport,
 	calls []*externalCallReport,
 	sendStats durationStats,
+	workers *workerReport,
 	cachedAhead uint64,
 	linearPhase bool,
 	measured time.Duration,
@@ -1008,6 +1053,20 @@ func (s *Stats) progressHints(
 				"%d job error(s) over the last %s, last one on stage %d: %s",
 				jobErrorsInWindow, humanDuration(measured), s.lastJobErrorStage, s.lastJobError))
 		}
+	}
+
+	// 3c. Jobs were ready to run and there was no worker to run them on, while this request was
+	// still allowed more. Worth stating on its own: every hint above reads as "the work is
+	// slow", this one says the work never started.
+	//
+	// The pool reports a single "limit exceeded" for three different ceilings — the fleet-wide
+	// worker count, the per-organization one, and a server-side per-session cap that can sit
+	// below what this request negotiated — so the hint reports what was observed and names the
+	// candidates instead of picking one.
+	if workers.poolExhausted >= workerPoolExhaustedToReport && workers.idle != 0 {
+		hints = append(hints, fmt.Sprintf(
+			"%d job(s) over the last %s were ready to run but no worker was free, while this request is running %d of the %d workers it was granted: something below its own limit is capping it — the tier2 fleet being full, this organization's worker quota, or the server's per-session worker cap",
+			workers.poolExhausted, humanDuration(measured), workers.running, workers.effective))
 	}
 
 	// 4. Jobs produced the partials but squashing them into the full stores lags behind.

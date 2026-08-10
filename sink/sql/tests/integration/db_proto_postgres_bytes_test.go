@@ -113,7 +113,6 @@ func runBytesSinker(t *testing.T, schema string, useConstraints bool, payload []
 		UseConstraints:  useConstraints,
 		UseTransactions: true,
 		BlockBatchSize:  1,
-		Parallel:        false,
 		Encoding:        sqlbytes.EncodingRaw,
 	}.Defaults()
 	options.Encoding = sqlbytes.EncodingRaw

@@ -13,11 +13,11 @@ import (
 	"github.com/cenkalti/backoff/v4"
 	"github.com/jmoiron/sqlx"
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/substreams/manifest"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	sink "github.com/streamingfast/substreams/sink"
 	"github.com/streamingfast/substreams/sink/sql/db_proto"
 	pbrelations "github.com/streamingfast/substreams/sink/sql/tests/relations"
-	"github.com/streamingfast/substreams/manifest"
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go/modules/clickhouse"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -142,7 +142,6 @@ func TestDbProtoClickhouseIntegration(t *testing.T) {
 				UseConstraints:  false,
 				UseTransactions: true,
 				BlockBatchSize:  1,
-				Parallel:        false,
 				Clickhouse: db_proto.SinkerFactoryClickhouse{
 					SinkInfoFolder: clickhouseStateFolder,
 					CursorFilePath: filepath.Join(clickhouseStateFolder, "cursor.txt"),

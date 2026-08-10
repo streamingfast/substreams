@@ -100,6 +100,10 @@ type Stats struct {
 	// above is a momentary state that flips on every scheduling attempt, so it says nothing on
 	// its own about whether the throttle cost anything.
 	windowThrottled windowedDuration
+	// windowPoolExhausted counts the borrow failures of workers.poolExhaustedCount over the
+	// window. The cumulative count says the pool ran dry at some point in the request; only the
+	// windowed one says it is dry now.
+	windowPoolExhausted windowedCounter
 	// stageJobs holds job accounting per stage, indexed by stage number.
 	stageJobs []*stageJobStats
 	// lastJobError keeps the most recent tier2 job error of the request. Failure counts tell
@@ -287,6 +291,13 @@ func (s *Stats) SetWorkerCounts(requested, granted, effective uint64) {
 // had no worker left to give, which happens when the pool is shared with other requests.
 func (s *Stats) RecordWorkerPoolExhausted() {
 	s.workers.poolExhaustedCount.Inc()
+
+	// The windowed count is what the periodic progress log reports, so it has to go through the
+	// mutex the rest of that machinery uses. The scheduler backs off for seconds after a failed
+	// borrow, so this cannot turn into a hot lock.
+	s.Lock()
+	defer s.Unlock()
+	s.windowPoolExhausted.add(time.Now(), 1)
 }
 
 // RecordWorkerPoolRampUpDeferred should be called when a job was held back because the worker

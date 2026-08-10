@@ -19,6 +19,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
   The `substreams request stats` entry gained a `workers` object (`requested`, `granted`, `effective`, `peak`, `pool_exhausted_count`, `pool_rampup_deferred_count`), reported on tier1 only. A high `pool_exhausted_count` with a `peak` well below `effective` means the shared worker pool ran dry, a case that was previously only visible at debug level.
 
+  The periodic `substreams request progress` entry gained its own `workers` object (`requested`, `granted`, `effective`, `running`, `idle`, and `pool_exhausted_5m` when jobs failed to get a worker over the window), so the same question can be answered while the request is still running rather than only once it ends. When jobs repeatedly find no free worker while the request still has idle capacity, a hint now says so and names the three ceilings that can cause it — the tier2 fleet being full, the organization's worker quota, or the server's per-session worker cap — since the pool reports a single error for all three.
+
 ### Fixed
 
 - Server: `substreams-tier1` now restarts when its block hub can no longer link incoming live blocks, instead of hanging every request at a frozen head indefinitely. A live-source gap whose one-block files were already merged away can never be linked, and the head-block metrics keep tracking the live source, so the process looked healthy throughout.

@@ -927,7 +927,6 @@ func (s *Tier1Service) blocks(
 	// Periodic snapshot of what this request is doing, so a slow substreams can be
 	// diagnosed from the logs alone, without waiting for the final stats line.
 	reqStats.RecordResolvedStartBlock(requestDetails.ResolvedStartBlockNum)
-	reqStats.RecordMaxParallelJobs(requestDetails.MaxParallelJobs)
 	progressCtx, cancelProgressLog := context.WithCancel(ctx)
 	defer cancelProgressLog()
 	go metrics.NewProgressLogger(reqStats, logger).Run(progressCtx)

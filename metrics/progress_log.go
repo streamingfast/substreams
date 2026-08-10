@@ -256,13 +256,6 @@ func (s *Stats) RecordJobSchedulingBlocked(blocked bool) {
 	s.schedulingBlockedSince = time.Time{}
 }
 
-// RecordMaxParallelJobs records how many jobs this request may run at once.
-func (s *Stats) RecordMaxParallelJobs(count uint64) {
-	s.Lock()
-	defer s.Unlock()
-	s.maxParallelJobs = count
-}
-
 // throttledOverWindow is how long scheduling was held back over the window, including the
 // interval still open.
 //

@@ -100,9 +100,6 @@ type Stats struct {
 	// above is a momentary state that flips on every scheduling attempt, so it says nothing on
 	// its own about whether the throttle cost anything.
 	windowThrottled windowedDuration
-	// maxParallelJobs is what the request is allowed to run at once, so an idle worker count
-	// can be derived: a throttle only costs something when it leaves workers with nothing to do.
-	maxParallelJobs uint64
 	// stageJobs holds job accounting per stage, indexed by stage number.
 	stageJobs []*stageJobStats
 	// lastJobError keeps the most recent tier2 job error of the request. Failure counts tell
@@ -249,6 +246,8 @@ type workerStats struct {
 	granted atomic.Uint64
 
 	// effective is the worker count this request may actually use, the min of the two above.
+	// It is also what an idle worker count is derived from, since a throttle only costs
+	// something when it leaves workers with nothing to do.
 	effective atomic.Uint64
 
 	// peak is the highest number of jobs that ran concurrently during this request. Well below
@@ -274,9 +273,10 @@ func (w *workerStats) MarshalLogObject(encoder zapcore.ObjectEncoder) error {
 	return nil
 }
 
-// SetWorkerCounts records the outcome of the worker count negotiation for this request. It is
-// called once the trusted and client headers have been resolved, which happens after the stats
-// object is created.
+// SetWorkerCounts records the outcome of the worker count negotiation for this request, and is
+// the only place these counts are set. It is called once the trusted and client headers have
+// been resolved, which happens after the stats object is created but before either the periodic
+// progress log or the final stats log can read them.
 func (s *Stats) SetWorkerCounts(requested, granted, effective uint64) {
 	s.workers.requested.Store(requested)
 	s.workers.granted.Store(granted)

@@ -23,7 +23,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - CLI: `substreams-sink-sql` is now part of the `substreams` CLI: `substreams sink postgres {setup,generate-csv,inject-csv,tools}` and `substreams sink clickhouse {setup,tools}`, where the engine command itself runs the sink. Both the sink and `setup` auto-detect the mode from the output module's type (`DatabaseChanges` → `schema.sql`, any other proto → relational mappings). See the [migration guide](https://docs.substreams.dev/how-to-guides/sinks/sql/migration) for the full command, flag, and operator (Docker image) mapping.
 
+- Server: tier1 emits a periodic `substreams request progress` log per request (after 1 minute, then every 5 minutes) meant to answer "why is my substreams slow?" while the request is still running: phase, per-stage module and job progress, external call cost, last job error, and time spent blocked writing to the consumer. It ends with a short `hints` list naming the likely bottleneck when one is detected. Rates and deltas are suffixed `_5m` and cover a fixed trailing 5 minutes whatever the emission interval is; cadence is tunable with `SUBSTREAMS_PROGRESS_LOG_FIRST_DELAY` and `SUBSTREAMS_PROGRESS_LOG_INTERVAL`.
+
+- Server: tier2 reports its progress every 10 seconds while a block is being processed, instead of only once the block completes, and `ExternalCallMetric` gained `failed_count`, `in_flight_count`, `oldest_in_flight_ms` and `oldest_in_flight_block`. An `eth_call` retrying against an unreachable endpoint is a single wasm extension call that can last minutes: it used to be completely invisible to tier1 until the segment timed out.
+
 - Server: new `substreams_undo_signal_distance_blocks` prometheus histogram, observing how many blocks each `BlockUndoSignal` sent to clients reverts, labeled by `source` (`reorg` when a fork is seen while streaming, `cursor_resolution` when the cursor of an incoming request points to a block that was reorged out). Its `_count` gives the total number of undo signals sent; subtracting the `le="5"` bucket from it gives the number of large ones. Undo signals reverting more than 5 blocks are also logged as a warning with `trace_id`, `head`, `revert_up_to`, `distance` and, on the `cursor_resolution` path, the client `cursor`.
+
+- CLI: new `substreams tools simulate-slow-reader <manifest> [<module>] --delay <duration>` command, consuming a substreams slowly enough to exert real back-pressure on the server, to exercise the "consumer is the bottleneck" reporting.
 
 ### Changed
 

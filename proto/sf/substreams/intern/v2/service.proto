@@ -101,8 +101,23 @@ message ModuleStats {
 
 message ExternalCallMetric {
   string name = 1;
+  // count is every call that was started, including those still waiting for an answer.
   uint64 count = 2;
+  // time_ms includes the time already spent by calls that have not returned yet, so a call
+  // hung against an unreachable endpoint shows up as time spent rather than as nothing at all.
   uint64 time_ms = 3;
+
+  // failed_count is how many of those calls came back with an error. A tier2 keeps retrying
+  // them internally, so without this tier1 only learns of a failing endpoint once the whole
+  // segment gives up, minutes later.
+  uint64 failed_count = 4;
+  // in_flight_count is how many calls are still waiting for an answer right now.
+  uint64 in_flight_count = 5;
+  // oldest_in_flight_ms is how long the oldest of them has been waiting.
+  uint64 oldest_in_flight_ms = 6;
+  // oldest_in_flight_block is the block that call was made on, which is where processing is
+  // stuck for as long as it does not return.
+  uint64 oldest_in_flight_block = 7;
 }
 
 message Completed {

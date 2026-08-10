@@ -543,6 +543,7 @@ func (p *Pipeline) handleStepNew(ctx context.Context, clock *pbsubstreams.Clock,
 	}
 
 	p.insideReorgUpTo = nil
+	p.currentBlockNum.Store(clock.Number)
 	reqDetails := reqctx.Details(ctx)
 
 	if p.respFunc != nil {

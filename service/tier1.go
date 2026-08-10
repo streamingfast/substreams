@@ -910,6 +910,14 @@ func (s *Tier1Service) blocks(
 
 	logger.Info("incoming Substreams Blocks request", logFields...)
 
+	// Periodic snapshot of what this request is doing, so a slow substreams can be
+	// diagnosed from the logs alone, without waiting for the final stats line.
+	reqStats.RecordResolvedStartBlock(requestDetails.ResolvedStartBlockNum)
+	reqStats.RecordMaxParallelJobs(requestDetails.MaxParallelJobs)
+	progressCtx, cancelProgressLog := context.WithCancel(ctx)
+	defer cancelProgressLog()
+	go metrics.NewProgressLogger(reqStats, logger).Run(progressCtx)
+
 	defer func() {
 		switch {
 		case errors.Is(err, context.Canceled):
@@ -1123,6 +1131,7 @@ func tier1ResponseHandler(
 		}
 
 		isData := false
+		blockCount := 0
 		var lastSentClock *pbsubstreams.Clock
 
 		switch r := respAny.(type) {
@@ -1130,6 +1139,7 @@ func tier1ResponseHandler(
 			d := r.GetBlockScopedData()
 			if d != nil {
 				isData = true
+				blockCount = 1
 				lastSentClock = d.Clock
 				filterData(d, noop, debugOutputs)
 				if supportBuffering {
@@ -1143,6 +1153,7 @@ func tier1ResponseHandler(
 			for _, d := range r.GetBlockScopedDatas().Items {
 				if d != nil {
 					isData = true
+					blockCount++
 					lastSentClock = d.Clock
 					filterData(d, noop, debugOutputs)
 				}
@@ -1158,6 +1169,10 @@ func tier1ResponseHandler(
 		stats.RecordReadTime(begin)
 
 		if isData {
+			// Only data messages are timed for the progress log: this isolates how long the
+			// consumer takes to accept one payload, which is what tells a slow client apart
+			// from a slow pipeline.
+			stats.RecordBlockSent(time.Since(begin), blockCount)
 			stats.RecordDataSent()
 			stats.RecordLastBlockSent(lastSentClock)
 		}

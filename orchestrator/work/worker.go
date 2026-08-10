@@ -141,6 +141,10 @@ func (w *RemoteWorker) Work(ctx context.Context, unit stage.Unit, startBlock uin
 
 			res = w.work(ctx, request, moduleNames, upstream, jobIdx)
 			err := res.Error
+			// Keep the reason around: the request progress log reports failure counts, but
+			// only the error text says whether jobs die on an unreachable RPC endpoint, a
+			// module panic or an overloaded tier2.
+			stats.RecordJobError(jobIdx, err)
 			switch err.(type) {
 			case *RetryableErr:
 				previousError = err

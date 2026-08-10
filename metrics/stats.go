@@ -3,6 +3,7 @@ package metrics
 import (
 	"cmp"
 	"context"
+	"errors"
 	"slices"
 	"strings"
 	"sync"
@@ -71,6 +72,53 @@ type Stats struct {
 	lastSentBlockNum  uint64
 	lastSentBlockID   string
 	lastSentBlockTime time.Time
+	// resolvedStartBlockNum is where the stream starts, so a request that has not sent
+	// anything yet still has a baseline to measure the consumer against. Without it, "0"
+	// stands in for "nothing sent" and every distance computed from it is nonsense.
+	resolvedStartBlockNum uint64
+
+	// ---- fields feeding the periodic "substreams request progress" log (tier1) ----
+
+	// stagesProgress is refreshed by the orchestrator's Stages while parallel processing runs.
+	stagesProgress []StageProgress
+	// squashBacklogSince records, per stage, when its squash backlog first crossed the
+	// reporting threshold, so only a backlog that holds is reported.
+	squashBacklogSince map[int]time.Time
+	// lastProcessedBlockNum is the last block that went through the linear pipeline, which
+	// supersedes modulesProgress once we left the parallel phase.
+	lastProcessedBlockNum uint64
+	// streamingFirstSegment is set while a tier2 job streams the first mapper segment straight
+	// to the client, instead of tier1 reading it from the exec-out cache.
+	streamingFirstSegment bool
+	// schedulingBlockedOnConsumption is set when the scheduler refuses to schedule further
+	// jobs because they would run too far ahead of what the client consumed.
+	schedulingBlockedOnConsumption bool
+	schedulingBlockedSince         time.Time
+	// windowThrottled is how long scheduling was actually held back over the window. The flag
+	// above is a momentary state that flips on every scheduling attempt, so it says nothing on
+	// its own about whether the throttle cost anything.
+	windowThrottled windowedDuration
+	// maxParallelJobs is what the request is allowed to run at once, so an idle worker count
+	// can be derived: a throttle only costs something when it leaves workers with nothing to do.
+	maxParallelJobs uint64
+	// stageJobs holds job accounting per stage, indexed by stage number.
+	stageJobs []*stageJobStats
+	// lastJobError keeps the most recent tier2 job error of the request. Failure counts tell
+	// you that jobs are being redone; only the error text tells you why (an unreachable RPC
+	// endpoint behind an eth_call, a deterministic module panic, an overloaded tier2...).
+	lastJobError      string
+	lastJobErrorStage int
+	lastJobErrorTime  time.Time
+	jobErrors         uint64
+	windowJobErrors   windowedCounter
+	// blockSendWindow times the individual `SendMsg` calls carrying block data, so we can tell
+	// a slow consumer apart from slow processing.
+	blockSendWindow windowedDurations
+	blocksSent      uint64
+	// windowLocalBlocks counts blocks that went through the linear pipeline, over the window.
+	windowLocalBlocks windowedCounter
+	// windowExternalCalls turns the cumulative external-call totals into a windowed delta.
+	windowExternalCalls windowedCallCounters
 }
 
 type runningJobs map[uint64]*extendedJob
@@ -206,11 +254,17 @@ type extendedStats struct {
 type inprocessCall struct {
 	startTime time.Time
 	extension string
+	// blockNum is the block the module was executing when it made the call, which is where
+	// processing is stuck for as long as the call does not return.
+	blockNum uint64
 }
 
 type extendedCallMetric struct {
 	count uint64
-	time  time.Duration
+	// failed counts the calls that came back with an error. A chain endpoint that is refusing
+	// connections shows up here long before the segment gives up on it.
+	failed uint64
+	time   time.Duration
 	// maxTime is the duration of the slowest single call, which a total or an average hides: one
 	// 30s eth_call among thousands of fast ones barely moves the average.
 	maxTime time.Duration
@@ -227,13 +281,24 @@ func (s *extendedStats) updateDurations() {
 	i := 0
 	for k, v := range s.externalCallMetrics {
 		callMetric := &pbssinternal.ExternalCallMetric{
-			Name:   k,
-			Count:  v.count,
-			TimeMs: uint64(v.time.Milliseconds()),
+			Name:        k,
+			Count:       v.count,
+			TimeMs:      uint64(v.time.Milliseconds()),
+			FailedCount: v.failed,
 		}
+		// A call that has not returned has already been counted (the count is incremented when
+		// it starts) but contributed no time yet. Reported as-is, a call hung for minutes looks
+		// instantaneous and a whole class of problems stays invisible until the segment dies.
 		for _, inproc := range s.inprocessCallMetrics {
-			if inproc.extension == k {
-				callMetric.TimeMs += uint64(time.Since(inproc.startTime).Milliseconds())
+			if inproc.extension != k {
+				continue
+			}
+			waiting := time.Since(inproc.startTime)
+			callMetric.TimeMs += uint64(waiting.Milliseconds())
+			callMetric.InFlightCount++
+			if waiting.Milliseconds() > int64(callMetric.OldestInFlightMs) {
+				callMetric.OldestInFlightMs = uint64(waiting.Milliseconds())
+				callMetric.OldestInFlightBlock = inproc.blockNum
 			}
 		}
 
@@ -254,6 +319,9 @@ func (s *Stats) RecordInitializationComplete() {
 	s.Lock()
 	defer s.Unlock()
 	s.initDuration = time.Since(s.startTime)
+	// No more jobs to hold back once parallel processing is over.
+	s.schedulingBlockedOnConsumption = false
+	s.schedulingBlockedSince = time.Time{}
 }
 
 func (s *Stats) RecordEgress(egressBytes int) {
@@ -277,6 +345,24 @@ func (s *Stats) RecordLastBlockSent(clock *pbsubstreams.Clock) {
 	s.lastSentBlockNum = clock.Number
 	s.lastSentBlockID = clock.Id
 	s.lastSentBlockTime = clock.Timestamp.AsTime()
+}
+
+// RecordResolvedStartBlock sets the block the stream starts at, once it is known.
+func (s *Stats) RecordResolvedStartBlock(blockNum uint64) {
+	s.Lock()
+	defer s.Unlock()
+	s.resolvedStartBlockNum = blockNum
+}
+
+// consumedUpTo is the highest block the consumer can be said to have gone through. Before
+// the first block is sent that is the start of the stream, not block 0.
+//
+// consumedUpTo should be called while locked
+func (s *Stats) consumedUpTo() uint64 {
+	if s.lastSentBlockNum != 0 {
+		return s.lastSentBlockNum
+	}
+	return s.resolvedStartBlockNum
 }
 
 func (s *Stats) RecordBlocksProcessed(count uint64) {
@@ -316,8 +402,19 @@ func (s *Stats) RecordNewSubrequest(stage uint32, startBlock, stopBlock uint64) 
 		},
 		modulesStats: make(map[string]*pbssinternal.ModuleStats),
 	}
+
+	s.stageJobStats(int(stage)).scheduled++
+
 	s.Unlock()
 	return id
+}
+
+// stageJobStats should be called while locked
+func (s *Stats) stageJobStats(stage int) *stageJobStats {
+	for len(s.stageJobs) <= stage {
+		s.stageJobs = append(s.stageJobs, &stageJobStats{})
+	}
+	return s.stageJobs[stage]
 }
 
 func (s *Stats) RecordModuleMerging(module string) {
@@ -347,11 +444,49 @@ const (
 	JobFailed
 )
 
+// maxLoggedJobError bounds how much of a job error reaches the progress log. Worker errors
+// are deeply wrapped and can carry a payload dump; the interesting part (the innermost
+// cause, e.g. "connection refused" under an eth_call) sits well past the first few hundred
+// characters, so the cap has to be generous, but only one error is ever kept.
+const maxLoggedJobError = 900
+
+// RecordJobError should be called whenever a tier2 job comes back with an error, whether it
+// will be retried or not.
+func (s *Stats) RecordJobError(jobIdx uint64, err error) {
+	// A cancellation is the request going away, not a job going wrong: reporting it would
+	// bury the real error under noise every time a client disconnects.
+	if err == nil || errors.Is(err, context.Canceled) {
+		return
+	}
+	s.Lock()
+	defer s.Unlock()
+
+	s.jobErrors++
+	s.windowJobErrors.add(time.Now(), 1)
+	s.lastJobError = truncateError(err.Error())
+	s.lastJobErrorTime = time.Now()
+	if job, ok := s.runningJobs[jobIdx]; ok {
+		s.lastJobErrorStage = int(job.Stage)
+	}
+}
+
+func truncateError(in string) string {
+	if len(in) <= maxLoggedJobError {
+		return in
+	}
+	return in[:maxLoggedJobError] + "…(truncated)"
+}
+
 // RecordJobDelayed should be called when a job is retried without any work done (ex: rejected upon connection to tier2)
 func (s *Stats) RecordJobDelayed(jobIdx uint64) {
 	s.Lock()
 	defer s.Unlock()
 	s.delayedJobs++
+	if job, ok := s.runningJobs[jobIdx]; ok {
+		stg := s.stageJobStats(int(job.Stage))
+		stg.delayed++
+		stg.window.bucket(time.Now()).delayed++
+	}
 }
 
 // RecordJobRetried should be called when a job is retried after having possibly done some work
@@ -359,6 +494,11 @@ func (s *Stats) RecordJobRetried(jobIdx uint64) {
 	s.Lock()
 	defer s.Unlock()
 	s.retriedJobs++
+	if job, ok := s.runningJobs[jobIdx]; ok {
+		stg := s.stageJobStats(int(job.Stage))
+		stg.retried++
+		stg.window.bucket(time.Now()).retried++
+	}
 }
 
 func (s *Stats) RecordEndSubrequest(jobIdx uint64, status JobStatus) {
@@ -386,13 +526,28 @@ func (s *Stats) RecordEndSubrequest(jobIdx uint64, status JobStatus) {
 	s.completedJobsBytesRead += job.bytesRead
 	s.completedJobsBytesWritten += job.bytesWritten
 
+	stg := s.stageJobStats(int(job.Stage))
+	bucket := stg.window.bucket(time.Now())
+	elapsed := time.Since(job.start)
 	switch status {
 	case JobComplete:
 		s.completedJobs++
+		stg.completed++
+		bucket.completed++
+		bucket.duration += elapsed
+		if elapsed > bucket.maxDuration {
+			bucket.maxDuration = elapsed
+		}
+		if job.StopBlock > stg.lastCompletedStopBlock {
+			stg.lastCompletedStopBlock = job.StopBlock
+		}
 	case JobCancelled:
-	// no-op
+		stg.cancelled++
+		bucket.cancelled++
 	case JobFailed:
 		s.failedJobs++
+		stg.failed++
+		bucket.failed++
 	}
 	s.remoteProcessedBlockCount += job.ProgressBlocks
 
@@ -422,7 +577,7 @@ func (s *Stats) RecordModuleWasmBlockEnd(moduleName string, uniqueID uint64) {
 var uniqueIDCounter = atomic.NewUint64(0)
 
 // RecordModuleWasmExternalCallBegin can be called multiple times per module per block, for each external module call (ex: eth_call).
-func (s *Stats) RecordModuleWasmExternalCallBegin(moduleName string, extension string) uint64 {
+func (s *Stats) RecordModuleWasmExternalCallBegin(moduleName string, extension string, blockNum uint64) uint64 {
 	s.Lock()
 	defer s.Unlock()
 
@@ -433,6 +588,7 @@ func (s *Stats) RecordModuleWasmExternalCallBegin(moduleName string, extension s
 	mod.inprocessCallMetrics[uniqueID] = inprocessCall{
 		startTime: time.Now(),
 		extension: extension,
+		blockNum:  blockNum,
 	}
 
 	met, ok := mod.externalCallMetrics[extension]
@@ -446,7 +602,7 @@ func (s *Stats) RecordModuleWasmExternalCallBegin(moduleName string, extension s
 }
 
 // RecordModuleWasmExternalCallEnd can be called multiple times per module per block, for each external module call (ex: eth_call). `elapsed` is the time spent in executing that call.
-func (s *Stats) RecordModuleWasmExternalCallEnd(moduleName string, extension string, uniqueID uint64) {
+func (s *Stats) RecordModuleWasmExternalCallEnd(moduleName string, extension string, uniqueID uint64, callErr error) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -461,6 +617,9 @@ func (s *Stats) RecordModuleWasmExternalCallEnd(moduleName string, extension str
 	met.time += elapsed
 	if elapsed > met.maxTime {
 		met.maxTime = elapsed
+	}
+	if callErr != nil {
+		met.failed++
 	}
 
 	delete(mod.inprocessCallMetrics, uniqueID)
@@ -506,6 +665,10 @@ func (s *Stats) RecordBlock(ref bstream.BlockRef) {
 	defer s.Unlock()
 	s.blockRate.Add(1)
 	s.localProcessedBlockCount += 1
+	s.windowLocalBlocks.add(time.Now(), 1)
+	if ref != nil {
+		s.lastProcessedBlockNum = ref.Num()
+	}
 }
 
 func newExtendedStats(moduleName string) *extendedStats {
@@ -835,6 +998,14 @@ type wasmExtensionCallMetric struct {
 	// maxTime is only known for calls made locally by this process. Calls made by tier2 jobs are
 	// reported back as a count and a total only, and each tier2 logs its own max.
 	maxTime time.Duration
+	// inFlight, oldestInFlight and oldestInFlightBlock cover calls that started and have not
+	// returned. Same caveat as maxTime: only locally executed modules are visible here, a
+	// tier2 job folds the elapsed time of its own in-flight calls into the total it reports.
+	inFlight            uint64
+	oldestInFlight      time.Duration
+	oldestInFlightBlock uint64
+	// failed counts the calls that came back with an error, wherever they ran.
+	failed uint64
 }
 
 func (m *wasmExtensionCallMetric) MarshalLogObject(encoder zapcore.ObjectEncoder) error {
@@ -885,8 +1056,22 @@ func (s *Stats) wasmExtensionCallMetricsByModule() []*wasmExtensionCallMetric {
 			metric := metricFor(module, extension)
 			metric.count += callMetric.count
 			metric.totalTime += callMetric.time
+			metric.failed += callMetric.failed
 			if callMetric.maxTime > metric.maxTime {
 				metric.maxTime = callMetric.maxTime
+			}
+		}
+		// A call that is still running has already been counted (the count is incremented when
+		// it starts) but has contributed no time yet. Left out, a call hung for minutes against
+		// a dead endpoint looks instantaneous, which is the opposite of what is happening.
+		for _, inProcess := range mod.inprocessCallMetrics {
+			metric := metricFor(module, inProcess.extension)
+			elapsed := time.Since(inProcess.startTime)
+			metric.totalTime += elapsed
+			metric.inFlight++
+			if elapsed > metric.oldestInFlight {
+				metric.oldestInFlight = elapsed
+				metric.oldestInFlightBlock = inProcess.blockNum
 			}
 		}
 	}
@@ -897,6 +1082,12 @@ func (s *Stats) wasmExtensionCallMetricsByModule() []*wasmExtensionCallMetric {
 				metric := metricFor(module, callMetric.Name)
 				metric.count += callMetric.Count
 				metric.totalTime += time.Duration(callMetric.TimeMs) * time.Millisecond
+				metric.failed += callMetric.FailedCount
+				metric.inFlight += callMetric.InFlightCount
+				if oldest := time.Duration(callMetric.OldestInFlightMs) * time.Millisecond; oldest > metric.oldestInFlight {
+					metric.oldestInFlight = oldest
+					metric.oldestInFlightBlock = callMetric.OldestInFlightBlock
+				}
 			}
 		}
 	}

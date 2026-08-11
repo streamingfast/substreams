@@ -56,6 +56,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- Sink: `substreams sink postgres` in from-proto mode now undoes a reorg correctly without database constraints. The undo was a single `DELETE FROM _blocks_`, relying on `fk_block ... ON DELETE CASCADE` to take the entity rows with it — and that foreign key only exists when constraints are on. Without them the block rows went and every entity row of the undone blocks stayed behind, orphaned, to be duplicated when the replayed blocks arrived. Rows are now deleted from every table explicitly, children first, which works with or without constraints.
+
+  Two related holes went with it: blocks still held in memory for the current batch are flushed before the delete rather than after it, and a local buffer is drained first, so rows in flight can no longer land after the delete that was meant to remove them.
+
+  A guard claiming "live mode is not supported without constraints" was dead code — `NewSinker` took the flag and never stored it, so the check never ran — and is gone, along with the field.
+
 - Sink: `substreams sink postgres` and `substreams sink clickhouse` in from-proto mode now write the blocks still held when a bounded run reaches its stop block. Blocks accumulate until `--block-batch-size` of them have gone by, and nothing drained that buffer at the end of the range, so a run ending mid-batch silently dropped its last blocks along with the cursor covering them — and still reported success. With a batch size larger than the requested range, nothing was written at all.
 
 - Sink: `substreams sink postgres` and `substreams sink clickhouse` in from-proto mode no longer crash on a module whose output carries an `enum` field. protoreflect hands an enum out as a `protoreflect.EnumNumber`, a named `int32` that neither dialect's type switch matched: PostgreSQL panicked with `unsupported type: protoreflect.EnumNumber` and ClickHouse on a failed `value.(int32)` assertion. Since the two disagree on the column type — PostgreSQL declares it `TEXT`, ClickHouse `Int32` — the walk now carries both renderings and each dialect takes the one matching the column it created, so PostgreSQL stores the enum's name and ClickHouse its number. A value absent from the descriptor falls back to its number. This covers an enum wherever it appears: as a plain field, as a `repeated` one, inside an `inline` nested message, and as a table's primary key.

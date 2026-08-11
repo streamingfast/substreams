@@ -85,6 +85,10 @@ type sealedSegment struct {
 	dir      string
 	manifest *Manifest
 	bytes    int64
+
+	// barrier marks a segment that carries no data: the applier closes it and moves on,
+	// which tells Drain that everything queued ahead of it has reached the database.
+	barrier chan struct{}
 }
 
 // New prepares the buffer directory and starts the applier.
@@ -300,6 +304,30 @@ func (b *Buffer) setError(err error) {
 }
 
 // Close seals whatever is left, drains the applier and reports the first failure.
+// Drain seals what is being written and returns once every segment queued before it has
+// been applied, so the caller can act on a database that holds everything the buffer has
+// accepted so far. An undo needs that: rows still in flight would otherwise land after
+// the delete that was supposed to remove them.
+func (b *Buffer) Drain(ctx context.Context) error {
+	if err := b.Seal(ctx); err != nil {
+		return err
+	}
+
+	barrier := make(chan struct{})
+	select {
+	case b.segments <- &sealedSegment{barrier: barrier}:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	select {
+	case <-barrier:
+		return b.pendingError()
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
 func (b *Buffer) Close(ctx context.Context) error {
 	var err error
 	b.closeOnce.Do(func() {
@@ -319,6 +347,11 @@ func (b *Buffer) applyLoop(ctx context.Context) {
 	defer b.waitGroup.Done()
 
 	for pending := range b.segments {
+		if pending.barrier != nil {
+			close(pending.barrier)
+			continue
+		}
+
 		if b.pendingError() != nil {
 			// Keep draining so Close does not deadlock, but do not touch the database
 			// again after a failure.

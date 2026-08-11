@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"regexp"
+	"sort"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -424,7 +425,24 @@ func (d *Database) StoreCursor(cursor *sink.Cursor) error {
 	return err
 }
 
+// HandleBlocksUndo removes everything a reorg invalidated: every entity row above the
+// last valid block, then the block rows themselves.
+//
+// The deletes are explicit rather than left to `fk_block ... ON DELETE CASCADE`, because
+// that foreign key only exists with --with-constraints. Deleting just the block rows, as
+// this used to, silently orphaned every entity row of the undone blocks on a schema
+// without constraints — and that is now the default. Every table carries
+// `_block_number_`, so the same delete works either way, and the descending Ordinal
+// visits children before parents so a foreign key never blocks its own cleanup.
 func (d *Database) HandleBlocksUndo(lastValidBlockNum uint64) (err error) {
+	// Rows for the undone blocks may still be sitting in the buffer, on their way to a
+	// COPY; applying them after the delete would resurrect exactly what it removed.
+	if inserter, ok := d.inserter.(*localBufferInserter); ok {
+		if err := inserter.buffer.Drain(context.Background()); err != nil {
+			return fmt.Errorf("draining the local buffer before an undo: %w", err)
+		}
+	}
+
 	tx, err := d.db.Begin()
 	if err != nil {
 		return fmt.Errorf("HandleBlocksUndo beginning transaction: %w", err)
@@ -443,16 +461,42 @@ func (d *Database) HandleBlocksUndo(lastValidBlockNum uint64) (err error) {
 	}()
 
 	d.logger.Info("undoing blocks", zap.Uint64("last_valid_block_num", lastValidBlockNum))
+	startAt := time.Now()
+
+	tables := d.dialect.GetTables()
+	sort.Slice(tables, func(i, j int) bool {
+		return tables[i].Ordinal > tables[j].Ordinal
+	})
+
+	var rowsAffected int64
+	for _, table := range tables {
+		query := fmt.Sprintf(`DELETE FROM %s WHERE %s > $1`, tableName(d.schema.Name, table.Name), sql.DialectFieldBlockNumber)
+		result, err := tx.Exec(query, lastValidBlockNum)
+		if err != nil {
+			return fmt.Errorf("deleting rows of %q from %d: %w", table.Name, lastValidBlockNum, err)
+		}
+
+		affected, err := result.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("fetching rows affected: %w", err)
+		}
+		rowsAffected += affected
+	}
+
 	query := fmt.Sprintf(`DELETE FROM %s._blocks_ WHERE "number" > $1`, d.schema.Name)
 	result, err := tx.Exec(query, lastValidBlockNum)
 	if err != nil {
 		return fmt.Errorf("deleting block from %d: %w", lastValidBlockNum, err)
 	}
-	rowsAffected, err := result.RowsAffected()
+	blocksAffected, err := result.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("fetching rows affected: %w", err)
 	}
-	d.logger.Info("undo completed", zap.Int64("row_affected", rowsAffected))
+
+	d.logger.Info("undo completed",
+		zap.Int64("row_affected", rowsAffected),
+		zap.Int64("block_affected", blocksAffected),
+		zapx.HumanDuration("duration", time.Since(startAt)))
 
 	return nil
 }

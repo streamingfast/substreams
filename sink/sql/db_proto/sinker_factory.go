@@ -76,7 +76,6 @@ func SinkerFactory(
 			baseSink,
 			database,
 			options.UseTransactions,
-			options.UseConstraints,
 			options.BlockBatchSize,
 			options.DecodeWorkers,
 			stats2.NewStats(logger, options.BlockBatchSize),

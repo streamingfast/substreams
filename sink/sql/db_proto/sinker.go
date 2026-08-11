@@ -22,7 +22,6 @@ type Sinker struct {
 	stats                 *stats.Stats
 	logger                *zap.Logger
 	rootMessageDescriptor protoreflect.MessageDescriptor
-	useConstraints        bool
 	lastAppliedBlockNum   uint64
 	lastAppliedBlockTime  time.Time
 
@@ -36,7 +35,7 @@ type Sinker struct {
 // NewSinker builds the from-proto sinker. decodeWorkers bounds how many blocks are
 // unmarshalled and walked concurrently at flush time; zero picks one per core, less one,
 // capped at eight.
-func NewSinker(rootMessageDescriptor protoreflect.MessageDescriptor, sink *sink.Sinker, db sql.Database, useTransaction bool, useConstraints bool, blockBatchSize int, decodeWorkers int, stats *stats.Stats, logger *zap.Logger) *Sinker {
+func NewSinker(rootMessageDescriptor protoreflect.MessageDescriptor, sink *sink.Sinker, db sql.Database, useTransaction bool, blockBatchSize int, decodeWorkers int, stats *stats.Stats, logger *zap.Logger) *Sinker {
 	return &Sinker{
 		db:                    db,
 		rootMessageDescriptor: rootMessageDescriptor,
@@ -99,10 +98,6 @@ func (s *Sinker) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrp
 
 	if output.Name != s.OutputModuleName() {
 		return fmt.Errorf("received data from wrong output module, expected to received from %q but got module's output for %q", s.OutputModuleName(), output.Name)
-	}
-
-	if (isLive != nil && *isLive) && s.useConstraints {
-		return fmt.Errorf("live mode is not supported without constraints")
 	}
 
 	startAt := time.Now()
@@ -259,6 +254,13 @@ func (s *Sinker) HandleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstr
 	lastValidBlockNum := undoSignal.LastValidBlock.Number
 
 	s.logger.Info("Handling undo block signal", zap.Stringer("block", cursor.Block()), zap.Stringer("cursor", cursor))
+
+	// Blocks are held in memory until the batch fills, so the undone ones may not have
+	// reached the database yet. Writing them first and deleting after is what keeps a
+	// later flush from putting back exactly what the undo removed.
+	if err := s.flushHolding(cursor); err != nil {
+		return fmt.Errorf("flushing held blocks before an undo: %w", err)
+	}
 
 	err = s.db.HandleBlocksUndo(lastValidBlockNum)
 	if err != nil {

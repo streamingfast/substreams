@@ -93,15 +93,23 @@ func setupRawPostgresContainer(config PostgresContainerConfig) (*PostgresContain
 	dbUser := "user"
 	dbPassword := "password"
 
+	// Wait by connecting, not by reading the log, and mirror the ClickHouse strategy
+	// below. The log line this used to watch for is printed twice — once by the
+	// temporary server initdb runs over a Unix socket, once by the real one — so
+	// matching the second occurrence is a proxy for "listening on TCP" rather than
+	// proof of it. Running a query is the proof. The old 5s startup budget was also
+	// well inside what a cold CI runner takes to start Postgres, and a timeout here
+	// panics the whole package rather than failing one test.
 	postgresContainer, err := postgres.Run(ctx,
 		config.Image,
 		postgres.WithDatabase(dbName),
 		postgres.WithUsername(dbUser),
 		postgres.WithPassword(dbPassword),
 		testcontainers.WithWaitStrategy(
-			wait.ForLog("database system is ready to accept connections").
-				WithOccurrence(2).
-				WithStartupTimeout(5*time.Second)),
+			wait.ForSQL("5432/tcp", "postgres", func(host string, port network.Port) string {
+				return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", dbUser, dbPassword, host, port.Port(), dbName)
+			}).WithStartupTimeout(60*time.Second).WithQuery("SELECT 1"),
+		),
 	)
 	if err != nil {
 		panic(fmt.Errorf("setting up postgres container: %w", err))

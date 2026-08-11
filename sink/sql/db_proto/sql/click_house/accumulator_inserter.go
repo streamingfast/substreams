@@ -194,7 +194,9 @@ func (i *AccumulatorInserter) insert(table string, values []any) error {
 	if accumulator == nil {
 		return fmt.Errorf("accumulator not found for table %q", table)
 	}
-	i.logger.Debug("inserting", zap.String("table", table), zap.Int("values", len(values)))
+	if ce := i.logger.Check(zap.DebugLevel, "inserting"); ce != nil {
+		ce.Write(zap.String("table", table), zap.Int("values", len(values)))
+	}
 
 	for idx, value := range values {
 		column, found := accumulator.columns[idx]

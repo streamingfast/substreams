@@ -132,7 +132,11 @@ func createInsertFromDescriptor(table *schema.Table, dialect sql2.Dialect) (stri
 }
 
 func (i *RowInserter) insert(table string, values []any, database *Database) error {
-	i.logger.Debug("inserting row", zap.String("table", table), zap.Any("values", values))
+	// Guarded: this runs once per row, and zap.Any on the value slice allocates
+	// whether or not debug logging is enabled.
+	if ce := i.logger.Check(zap.DebugLevel, "inserting row"); ce != nil {
+		ce.Write(zap.String("table", table), zap.Any("values", values))
+	}
 	stmt := i.insertStatements[table]
 	stmt = database.wrapInsertStatement(stmt)
 

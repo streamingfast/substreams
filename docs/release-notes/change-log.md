@@ -21,6 +21,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   The `substreams request stats` entry gained a `workers` object (`requested`, `granted`, `effective`, `peak`, `pool_exhausted_count`, `pool_rampup_deferred_count`), reported on tier1 only. A high `pool_exhausted_count` with a `peak` well below `effective` means the shared worker pool ran dry, a case that was previously only visible at debug level.
 
   The periodic `substreams request progress` entry gained its own `workers` object (`requested`, `granted`, `effective`, `running`, `idle`, and `pool_exhausted_5m` when jobs failed to get a worker over the window), so the same question can be answered while the request is still running rather than only once it ends. When jobs repeatedly find no free worker while the request still has idle capacity, a hint now says so and names the three ceilings that can cause it — the tier2 fleet being full, the organization's worker quota, or the server's per-session worker cap — since the pool reports a single error for all three.
+### Changed
+
+- Sink: `substreams sink postgres` and `substreams sink clickhouse` in from-proto mode now unmarshal and walk blocks on a worker pool instead of one at a time at flush. Decoding a block was where the sink spent its time — around 7.8µs of the 9.3µs a wide entity cost — while PostgreSQL sat on roughly eight times that in headroom, so the sink itself was the throughput limit. Measured at 4.1x on a wide entity. Workers only fill a per-block buffer; the inserts are still replayed in block order, in the same transaction as before, so the resulting database is unchanged.
+
+  The pool defaults to one worker per core less one, capped at eight, since the work is allocator-bound before it runs out of cores. `SinkerFactoryOptions.DecodeWorkers` overrides it.
+
+- Sink: **Breaking** `db_proto.NewSinker` takes a `decodeWorkers int` parameter, and `SinkerFactoryOptions.Parallel` is gone along with `sql.Database.Clone()`. The parallel flush path they served was unreachable — `Parallel` was hardcoded to false at every call site — and unsound had it run: `Clone()` returned the receiver, so every goroutine shared one `*sql.Tx`.
 
 ### Fixed
 

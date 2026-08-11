@@ -179,6 +179,17 @@ func SetupDatabaseSchema(
 		}
 
 	} else {
+		if options.UseConstraints {
+			// The schema exists, but nothing says it carries constraints: a run without
+			// them creates the very same tables, and the sink info hash is computed over
+			// the DDL the dialect would emit either way. Adding the missing ones is the
+			// only way to get there, and doing it here means --with-constraints on a
+			// database synced without them behaves the same as one created with them.
+			if err := applyConstraints(database, logger); err != nil {
+				return nil, err
+			}
+		}
+
 		migrationNeeded := sinkInfo.SchemaHash != database.GetDialect().SchemaHash()
 		if migrationNeeded {
 
@@ -228,4 +239,31 @@ func SetupDatabaseSchema(
 	}
 
 	return database, nil
+}
+
+// applyConstraints adds the constraints an earlier run left out, in one transaction.
+//
+// On a populated database this can run for a long time: every index has to be built and
+// every foreign key validated, with the table locked while it happens. Hence the warning
+// rather than a silent wait.
+func applyConstraints(database protosql.Database, logger *zap.Logger) error {
+	logger.Warn("adding the SQL constraints to the existing schema, this can take a long time and locks the tables while it runs")
+
+	startAt := time.Now()
+	if err := database.BeginTransaction(); err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+
+	if err := database.ApplyConstraints(); err != nil {
+		database.RollbackTransaction()
+		return fmt.Errorf("applying constraints: %w", err)
+	}
+
+	if err := database.CommitTransaction(); err != nil {
+		return fmt.Errorf("commit transaction: %w", err)
+	}
+
+	logger.Info("constraints applied", zap.Duration("duration", time.Since(startAt)))
+
+	return nil
 }

@@ -163,14 +163,20 @@ measure() { # measure <size> <variant>
   rm -rf "$bufferdir"
 
   local extra=()
-  [ "$variant" = buffer ] && extra=(--local-buffer "$bufferdir" --local-buffer-max-size "$BUFFER_MAX")
+  # The buffer is on by default now, so the accumulator variant is the one that has to
+  # say so: an empty --local-buffer turns it off.
+  if [ "$variant" = buffer ]; then
+    extra=(--local-buffer "$bufferdir" --local-buffer-max-size "$BUFFER_MAX")
+  else
+    extra=(--local-buffer "")
+  fi
   [ -n "$BLOCK_BATCH" ] && extra+=(--block-batch-size "$BLOCK_BATCH")
 
   local t0 t1 rc
   t0=$(python3 -c 'import time;print(time.monotonic())')
 
   "$BIN" sink postgres "$PACKAGE" "$MODULE" \
-    --dsn "${DSN_BASE}&schemaName=${schema}" -e "$ENDPOINT" --no-constraints \
+    --dsn "${DSN_BASE}&schemaName=${schema}" -e "$ENDPOINT" \
     -s "$START_BLOCK" -t "+${size}" "${extra[@]}" > "$log" 2>&1
   rc=$?
 

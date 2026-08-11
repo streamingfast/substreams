@@ -32,7 +32,7 @@ type Options struct {
 
 func (o Options) withDefaults() Options {
 	if o.MaxBytes <= 0 {
-		o.MaxBytes = 16 << 30
+		o.MaxBytes = 8 << 30
 	}
 	if o.TargetFlushDuration <= 0 {
 		o.TargetFlushDuration = 3 * time.Second

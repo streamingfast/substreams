@@ -164,6 +164,12 @@ func (d *Database) clientNoCache(dsn *db.DSN) (*ch.Client, error) {
 	return client, nil
 }
 
+// ApplyConstraints does nothing: ClickHouse has no primary/foreign key constraints to
+// apply, which is also why CreateDatabase ignores its useConstraints argument.
+func (d *Database) ApplyConstraints() error {
+	return nil
+}
+
 func (d *Database) CreateDatabase(useConstraints bool) error {
 	dsn := d.dsn.Clone()
 	dsn.Database = "default"

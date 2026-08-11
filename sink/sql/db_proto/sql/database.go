@@ -26,6 +26,10 @@ type Database interface {
 	StoreSinkInfo(schemaName string, schemaHash string) error
 
 	CreateDatabase(useConstraints bool) error
+	// ApplyConstraints adds the schema's constraints to a database that already exists,
+	// skipping the ones already in place. A schema first synced without constraints has
+	// none of them, and only this puts them there.
+	ApplyConstraints() error
 	WalkMessageDescriptorAndInsert(dm *dynamicpb.Message, blockNum uint64, blockTimestamp time.Time, parent *Parent) (time.Duration, error)
 	// WalkMessageDescriptorAndInsertInto is the same walk, against a caller-supplied
 	// inserter. It touches no database state, so it is safe to call concurrently with

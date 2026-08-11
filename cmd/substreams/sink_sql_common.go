@@ -151,17 +151,22 @@ func addDatabaseChangesModeRunFlags(flags *pflag.FlagSet) {
 	flags.String(onModuleHashMismatchFlag, "error", "[DatabaseChanges mode] What to do when the module hash in the manifest does not match the one in the database, can be 'error', 'warn' or 'ignore'")
 }
 
+// defaultLocalBufferDir is where the from-proto sink buffers rows when nothing else is
+// asked for: a data folder under the working directory, as the other sink commands use
+// for their own local state.
+const defaultLocalBufferDir = "./localdata/local-buffer"
+
 // addFromProtoModeRunFlags registers the run flags that only apply when the selected
 // module outputs an arbitrary protobuf message (relational mappings). The ClickHouse
 // specific flags are only registered for the clickhouse engine.
 func addFromProtoModeRunFlags(flags *pflag.FlagSet, driver string) {
-	flags.Bool("no-constraints", false, "[from-proto mode] Do not add any constraints to the database. This is useful to speed up the initial import of a large dataset.")
+	flags.Bool("with-constraints", false, "[from-proto mode] Add the schema's primary keys, unique and foreign key constraints, creating the ones an earlier run left out. This prevents the performance enhancements the sink relies on: multi-row inserts and the local buffer are both disabled while constraints are on, which slows a large initial sync down considerably, so we recommend leaving it off until the sink is close to chain HEAD. Enabling the SQL constraints can also take a long time on a populated database, locking the tables while it runs.")
 	flags.Int("block-batch-size", 25, "[from-proto mode] number of blocks to process at a time")
 	flags.String("proto-file-override", "", "[from-proto mode] Override protobuf file to use instead of extracting from substreams package")
 
 	if driver == "postgres" {
-		flags.String("local-buffer", "", "[from-proto mode] Buffer rows in this directory and load them with binary COPY from a background goroutine, so the stream never waits on the database. Requires --no-constraints")
-		flags.String("local-buffer-max-size", "16GiB", "[from-proto mode] Disk budget for --local-buffer; the stream is held once the buffer reaches it")
+		flags.String("local-buffer", defaultLocalBufferDir, "[from-proto mode] Buffer rows in this directory and load them with binary COPY from a background goroutine, so the stream never waits on the database. An empty value disables it, and so does --with-constraints")
+		flags.String("local-buffer-max-size", "8GiB", "[from-proto mode] Disk budget for --local-buffer; the stream is held once the buffer reaches it")
 	}
 
 	if driver == "clickhouse" {
@@ -298,7 +303,7 @@ func runDatabaseChangesSink(cmd *cobra.Command, manifestPath, outputModule, dsnS
 }
 
 func runFromProtoSink(cmd *cobra.Command, driver, manifestPath, dsnString string, spkg *pbsubstreams.Package, outputModuleName string) error {
-	useConstraints := !sflags.MustGetBool(cmd, "no-constraints")
+	useConstraints := sflags.MustGetBool(cmd, "with-constraints")
 	blockBatchSize := sflags.MustGetInt(cmd, "block-batch-size")
 
 	encoding, err := sinkBytesEncoding(cmd)
@@ -329,6 +334,7 @@ func runFromProtoSink(cmd *cobra.Command, driver, manifestPath, dsnString string
 	if !useProtoOption {
 		useConstraints = false
 	}
+	warnAboutConstraints(useConstraints)
 
 	baseSink, err := sink.NewFromViper(
 		cmd,
@@ -506,7 +512,7 @@ func runDatabaseChangesSetup(cmd *cobra.Command, dsnString string, spkg *pbsubst
 func runFromProtoSetup(cmd *cobra.Command, driver, dsnString string, spkg *pbsubstreams.Package, outputModuleName string) error {
 	warnIgnoredDatabaseChangesSetupFlags(cmd)
 
-	useConstraints := !boolFlag(cmd, "no-constraints")
+	useConstraints := boolFlag(cmd, "with-constraints")
 
 	encoding, err := sinkBytesEncoding(cmd)
 	if err != nil {
@@ -526,6 +532,7 @@ func runFromProtoSetup(cmd *cobra.Command, driver, dsnString string, spkg *pbsub
 	if !useProtoOption {
 		useConstraints = false
 	}
+	warnAboutConstraints(useConstraints)
 
 	options := db_proto.SinkerFactoryOptions{
 		UseProtoOption: useProtoOption,
@@ -781,6 +788,19 @@ func cursorToShortString(in *sink.Cursor) string {
 	return cursor
 }
 
+// warnAboutConstraints says out loud what --with-constraints costs, since the flag turns
+// off the two things that make a large sync bearable and its effect on an already
+// populated database is not instantaneous.
+func warnAboutConstraints(useConstraints bool) {
+	if !useConstraints {
+		return
+	}
+
+	zlog.Warn("constraints are enabled, which disables the sink's performance enhancements: rows are inserted one at a time and the local buffer is off. " +
+		"A large initial sync is considerably slower this way, so keep --with-constraints off until the sink is close to chain HEAD. " +
+		"Enabling the constraints themselves can also take a long time on a populated database, and locks the tables while it runs")
+}
+
 // fromProtoLocalBufferOptions resolves the --local-buffer flags into buffer options, or nil
 // when the buffer is off.
 func fromProtoLocalBufferOptions(cmd *cobra.Command, driver string, useConstraints bool) (*buffer.Options, error) {
@@ -788,15 +808,23 @@ func fromProtoLocalBufferOptions(cmd *cobra.Command, driver string, useConstrain
 		return nil, nil
 	}
 
-	dir := sflags.MustGetString(cmd, "local-buffer")
-	if dir == "" {
-		return nil, nil
-	}
-
 	if useConstraints {
 		// Binary COPY feeds one table at a time, so a child row can reach the server
 		// before its parent within a segment, which an immediate foreign key rejects.
-		return nil, fmt.Errorf("--local-buffer requires --no-constraints")
+		// The buffer is therefore off with constraints — silently when it is only on by
+		// default, but never behind the back of someone who asked for it.
+		for _, name := range []string{"local-buffer", "local-buffer-max-size"} {
+			if cmd.Flags().Changed(name) {
+				return nil, fmt.Errorf("--%s cannot be combined with --with-constraints: the buffer loads a table at a time with binary COPY, which a foreign key rejects when a child row reaches the server before its parent", name)
+			}
+		}
+
+		return nil, nil
+	}
+
+	dir := sflags.MustGetString(cmd, "local-buffer")
+	if dir == "" {
+		return nil, nil
 	}
 
 	rawSize := sflags.MustGetString(cmd, "local-buffer-max-size")

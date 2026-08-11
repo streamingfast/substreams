@@ -72,7 +72,7 @@ data fails, however fast it was.
 `postgres:17-alpine` under OrbStack on an M-series laptop, best of 2 passes. Ratios,
 not absolutes, are the point.
 
-### No indexes (`--no-constraints`, the backfill case)
+### No indexes (the default, the backfill case)
 
 | variant | duration | rows/s | MiB/s | vs current |
 |---|--:|--:|--:|--:|
@@ -312,9 +312,10 @@ the current cost. The other ~87% is the server parsing a multi-megabyte statemen
 **The driver is irrelevant.** `lib/pq` and pgx in simple-protocol mode are within noise
 (2.296s vs 2.281s). No reason to switch drivers for the INSERT path.
 
-**Per-row prepared INSERT is 10x worse than the current default.** `--no-constraints` is
-not just about constraint overhead — it also selects the accumulator. Turning constraints
-on for a large backfill costs an order of magnitude.
+**Per-row prepared INSERT is 10x worse than the default.** `--with-constraints` is not
+just about constraint overhead — it also moves the sink off the accumulator and the local
+buffer onto per-row prepared INSERTs. Turning constraints on for a large backfill costs an
+order of magnitude.
 
 **Indexes eat over half the COPY advantage** — 7.29x drops to 3.84x with two btrees.
 COPY removes client and parse cost, not index maintenance or WAL amplification.

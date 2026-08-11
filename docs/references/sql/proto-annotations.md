@@ -165,16 +165,35 @@ FROM transfers.transfers
 
 ## Performance Flags
 
-For fast initial imports:
+A fast initial import is the default: the sink creates no constraints, inserts rows in
+batches and buffers them on local disk before loading them with binary COPY.
 
 ```bash
 substreams sink postgres substreams.yaml --dsn $DSN \
-  --no-constraints \
   --block-batch-size 100
 ```
 
-- `--no-constraints`: skip creating database constraints
 - `--block-batch-size`: number of blocks to process at a time (default: 25)
+- `--local-buffer`: directory the rows are buffered in (default: `./localdata/local-buffer`);
+  an empty value turns the buffer off
+- `--local-buffer-max-size`: disk budget for that buffer (default: `8GiB`). The stream is
+  held once the buffer fills, so the database is never outrun by more than this.
+
+Once the sink is close to chain HEAD, constraints can be turned on:
+
+```bash
+substreams sink postgres substreams.yaml --dsn $DSN --with-constraints
+```
+
+- `--with-constraints`: add the primary keys, unique and foreign key constraints, creating
+  the ones an earlier run left out.
+
+  This prevents the performance enhancements above — multi-row inserts and the local
+  buffer are both disabled while constraints are on — and will slow a big initial sync of
+  the database down considerably, so we recommend that it stay off until you are close to
+  chain HEAD. Enabling the SQL constraints on a populated database can also take a long
+  time, locking the tables while it runs. Passing `--local-buffer` together with it is an
+  error rather than a silent downgrade.
 
 ## Troubleshooting
 

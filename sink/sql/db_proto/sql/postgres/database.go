@@ -5,6 +5,7 @@ import (
 	pgsql "database/sql"
 	"fmt"
 	"hash/fnv"
+	"regexp"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -168,31 +169,96 @@ func (d *Database) createDatabase() error {
 	return nil
 }
 
+// ApplyConstraints puts the dialect's constraints on a schema that already exists,
+// leaving the ones already there alone.
+//
+// It is what --with-constraints does to a database first synced without them: the sink
+// info hash cannot tell those two apart, since it is computed over the DDL the dialect
+// would emit, constraints included, either way.
+//
+// The caller owns the transaction. On a populated database this is not quick — every
+// index has to be built and every foreign key validated, with the table locked meanwhile.
+func (d *Database) ApplyConstraints() error {
+	return d.applyConstraints()
+}
+
 func (d *Database) applyConstraints() error {
 	startAt := time.Now()
-	for _, constraint := range d.dialect.PrimaryKeySql {
-		d.logger.Info("executing pk statement", zap.String("sql", constraint.Sql))
-		_, err := d.tx.Exec(constraint.Sql)
-		if err != nil {
-			return fmt.Errorf("executing pk statement: %w %s", err, constraint.Sql)
-		}
+
+	existing, err := d.existingConstraintNames()
+	if err != nil {
+		return err
 	}
-	for _, constraint := range d.dialect.UniqueConstraintSql {
-		d.logger.Info("executing unique statement", zap.String("sql", constraint.Sql))
-		_, err := d.tx.Exec(constraint.Sql)
-		if err != nil {
-			return fmt.Errorf("executing unique statement: %w %s", err, constraint.Sql)
+
+	apply := func(kind string, constraints []*sql.Constraint) error {
+		for _, constraint := range constraints {
+			if name := constraintName(constraint.Sql); name != "" && existing[name] {
+				d.logger.Debug("constraint already in place, skipping", zap.String("constraint", name))
+				continue
+			}
+
+			d.logger.Info("executing "+kind+" statement", zap.String("sql", constraint.Sql))
+			if _, err := d.tx.Exec(constraint.Sql); err != nil {
+				return fmt.Errorf("executing %s statement: %w %s", kind, err, constraint.Sql)
+			}
 		}
+
+		return nil
 	}
-	for _, constraint := range d.dialect.ForeignKeySql {
-		d.logger.Info("executing fk constraint statement", zap.String("sql", constraint.Sql))
-		_, err := d.tx.Exec(constraint.Sql)
-		if err != nil {
-			return fmt.Errorf("executing fk constraint statement: %w %s", err, constraint.Sql)
-		}
+
+	if err := apply("pk", d.dialect.PrimaryKeySql); err != nil {
+		return err
 	}
+	if err := apply("unique", d.dialect.UniqueConstraintSql); err != nil {
+		return err
+	}
+	if err := apply("fk constraint", d.dialect.ForeignKeySql); err != nil {
+		return err
+	}
+
 	d.logger.Info("applying constraints", zapx.HumanDuration("duration", time.Since(startAt)))
 	return nil
+}
+
+// existingConstraintNames is what makes applying constraints re-runnable: PostgreSQL has
+// no ADD CONSTRAINT IF NOT EXISTS, and the errors it raises instead differ by kind — a
+// second primary key is `multiple primary keys` rather than a duplicate name — so the
+// check has to happen before the statement rather than around it.
+func (d *Database) existingConstraintNames() (map[string]bool, error) {
+	rows, err := d.tx.Query(`
+		SELECT c.conname
+		FROM pg_constraint c
+		JOIN pg_namespace n ON n.oid = c.connamespace
+		WHERE n.nspname = $1`, d.schema.Name)
+	if err != nil {
+		return nil, fmt.Errorf("listing the existing constraints of schema %q: %w", d.schema.Name, err)
+	}
+	defer rows.Close()
+
+	names := map[string]bool{}
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, fmt.Errorf("scanning constraint name: %w", err)
+		}
+		names[name] = true
+	}
+
+	return names, rows.Err()
+}
+
+// constraintNamePattern pulls the name out of the dialect's own DDL. Every constraint it
+// emits is named, so an empty result means the statement is not one of ours and is left
+// to the server to accept or reject.
+var constraintNamePattern = regexp.MustCompile(`(?i)add\s+constraint\s+"?([a-z0-9_]+)"?`)
+
+func constraintName(statement string) string {
+	match := constraintNamePattern.FindStringSubmatch(statement)
+	if len(match) != 2 {
+		return ""
+	}
+
+	return match[1]
 }
 
 func (d *Database) BeginTransaction() (err error) {

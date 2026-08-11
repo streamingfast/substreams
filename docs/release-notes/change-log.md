@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+### Added
+
+- CLI: the Ethereum Hoodi testnet (`hoodi`) now resolves to StreamingFast endpoints (`hoodi.eth.streamingfast.io:443`), so `network: hoodi` in a manifest streams without an explicit `--endpoint`. Comes from bumping `firehose-networks` to `v0.2.3`, which overrides the upstream Graph networks registry entry — listing only Pinax endpoints — with the StreamingFast ones.
+
 ### Fixed
 
 - Server: `substreams-tier1` now restarts when its block hub can no longer link incoming live blocks, instead of hanging every request at a frozen head indefinitely. A live-source gap whose one-block files were already merged away can never be linked, and the head-block metrics keep tracking the live source, so the process looked healthy throughout.

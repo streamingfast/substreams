@@ -7,13 +7,13 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/testcontainers/testcontainers-go"
 	"go.uber.org/zap"
 )
 
@@ -36,7 +36,7 @@ func TestPartialBlocksSimple(t *testing.T) {
 	t.Logf("Starting container with image: %s and burst %d", image, burst)
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, image, "--with-flash-blocks", burst)
 	require.NoError(t, err)
-	defer container.Terminate(ctx, testcontainers.StopTimeout(0))
+	defer terminateContainer(ctx, container)
 
 	// Log container details for debugging
 	if container != nil {
@@ -56,7 +56,7 @@ func TestPartialBlocksSimple(t *testing.T) {
 	app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)
 
 	defer func() {
-		container.Terminate(ctx, testcontainers.StopTimeout(0))
+		terminateContainer(ctx, container)
 		// ensure we close this well, for next tests
 		app.Shutdown(nil)
 		app2.Shutdown(nil)
@@ -190,7 +190,7 @@ func TestPartialBlocksWithStores(t *testing.T) {
 			t.Logf("Starting container with image: %s and burst %d", image, burst)
 			container, err := newDummyBlockchainContainerWithBlockRate(ctx, tmpDir, image, "--with-flash-blocks --with-reorgs", burst, 330)
 			require.NoError(t, err)
-			defer container.Terminate(ctx, testcontainers.StopTimeout(0))
+			defer terminateContainer(ctx, container)
 
 			// Log container details for debugging
 			if container != nil {
@@ -211,7 +211,7 @@ func TestPartialBlocksWithStores(t *testing.T) {
 
 			defer func() {
 				fmt.Println("Terminating container...")
-				container.Terminate(ctx, testcontainers.StopTimeout(0))
+				terminateContainer(ctx, container)
 				// ensure we close this well, for next tests
 				app.Shutdown(nil)
 				app2.Shutdown(nil)
@@ -241,8 +241,21 @@ func TestPartialBlocksWithStores(t *testing.T) {
 				Package:         pkg.Package,
 			}
 
-			respsNoPartialsCh := make(chan responses)
+			type noPartialsResult struct {
+				resps responses
+				err   error
+			}
+
+			// Buffered, and paired with a done channel, so this request can never outlive
+			// the subtest: a t.Fatalf below used to return while it was still streaming,
+			// and the deferred shutdown then failed it with "endpoint is shutting down",
+			// which the goroutine turned into a panic that took the whole test binary
+			// down — losing the original failure with it.
+			respsNoPartialsCh := make(chan noPartialsResult, 1)
+			noPartialsDone := make(chan struct{})
 			go func() {
+				defer close(noPartialsDone)
+
 				data, init, err := RunRequest(t, requestNoPartials, substreamsEndpoint)
 				if err != nil && err != io.EOF && !errors.Is(err, context.Canceled) {
 					// Let's try to get container logs to debug
@@ -253,14 +266,24 @@ func TestPartialBlocksWithStores(t *testing.T) {
 						n, _ := logs.Read(buf)
 						t.Logf("Container logs: %s", string(buf[:n]))
 					}
-					panic(err)
+					respsNoPartialsCh <- noPartialsResult{err: err}
+					return
 				}
 				result := responses{init}
 				for _, d := range data {
 					result = append(result, d)
 				}
-				respsNoPartialsCh <- result
+				respsNoPartialsCh <- noPartialsResult{resps: result}
+			}()
 
+			// Defers run last-in-first-out, so this waits for the request above before
+			// the teardown registered earlier shuts the apps down.
+			defer func() {
+				select {
+				case <-noPartialsDone:
+				case <-time.After(60 * time.Second):
+					t.Error("the no-partials request never returned")
+				}
 			}()
 
 			// Run the request with custom handling for partial blocks
@@ -276,7 +299,9 @@ func TestPartialBlocksWithStores(t *testing.T) {
 				}
 				t.Fatalf("Unexpected error: %s", err)
 			}
-			respsNoPartials := <-respsNoPartialsCh
+			noPartials := <-respsNoPartialsCh
+			require.NoError(t, noPartials.err, "the no-partials request failed")
+			respsNoPartials := noPartials.resps
 
 			ref := make(map[uint64]*pbsubstreamsrpcv2.BlockScopedData)
 			for _, data := range respsNoPartials.BlockScopedData() {
@@ -378,7 +403,7 @@ func TestPartialBlocksReorgs(t *testing.T) {
 			app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)
 
 			defer func() {
-				container.Terminate(ctx, testcontainers.StopTimeout(0))
+				terminateContainer(ctx, container)
 				// ensure we close this well, for next tests
 				app.Shutdown(nil)
 				app2.Shutdown(nil)

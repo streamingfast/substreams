@@ -10,7 +10,6 @@ import (
 	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/testcontainers/testcontainers-go"
 	"go.uber.org/zap"
 )
 
@@ -29,7 +28,7 @@ func TestDummyBlockchainContainer(t *testing.T) {
 	// launch dummy blockchain container
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", 1000)
 	require.NoError(t, err)
-	defer container.Terminate(ctx, testcontainers.StopTimeout(0))
+	defer terminateContainer(ctx, container)
 
 	zlog.Info("dummy blockchain container started", zap.String("tmp_dir", tmpDir))
 
@@ -164,7 +163,7 @@ func TestLiveBackfillerWithTier2SecretAuth(t *testing.T) {
 	// fire quickly instead of waiting for the default 120-block delay.
 	container, err := newDummyBlockchainContainerWithBlockRate(ctx, tmpDir, latestDummyBlockchainImage, "", 500, 480)
 	require.NoError(t, err)
-	defer container.Terminate(ctx, testcontainers.StopTimeout(0))
+	defer terminateContainer(ctx, container)
 
 	const secret = "super-secret-key-e2e"
 
@@ -227,7 +226,7 @@ func TestErrNoInputTypeUrlNotEmpty(t *testing.T) {
 
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", 1000)
 	require.NoError(t, err)
-	defer container.Terminate(ctx, testcontainers.StopTimeout(0))
+	defer terminateContainer(ctx, container)
 
 	app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog)
 	app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)

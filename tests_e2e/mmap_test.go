@@ -15,7 +15,6 @@ import (
 	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/testcontainers/testcontainers-go"
 )
 
 // mmapDBFilePoller watches dir for *.db files while a request runs. The mmap
@@ -106,7 +105,7 @@ func TestMmapBackendE2E(t *testing.T) {
 	// Launch containers
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", 1000)
 	require.NoError(t, err)
-	defer container.Terminate(ctx, testcontainers.StopTimeout(0))
+	defer terminateContainer(ctx, container)
 
 	app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog, mmapDir)
 	app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)
@@ -220,7 +219,7 @@ func TestMemoryBackendE2E(t *testing.T) {
 
 	container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", 1000)
 	require.NoError(t, err)
-	defer container.Terminate(ctx, testcontainers.StopTimeout(0))
+	defer terminateContainer(ctx, container)
 
 	app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog)
 	app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)
@@ -299,7 +298,7 @@ func TestMmapVsMemoryComparison(t *testing.T) {
 
 			container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", 1000)
 			require.NoError(t, err)
-			defer container.Terminate(ctx, testcontainers.StopTimeout(0))
+			defer terminateContainer(ctx, container)
 
 			app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog, t2ScratchSpace)
 			app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)

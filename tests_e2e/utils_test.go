@@ -381,6 +381,10 @@ func newDummyBlockchainContainerWithBlockRate(ctx context.Context, tmpDir string
 	return newDummyBlockchainContainerWithArgs(ctx, tmpDir, image, readerArgs)
 }
 
+// containerStorageDir is where the node's data lands inside the container; the tests
+// bind-mount a host directory here.
+const containerStorageDir = "/app/firehose-data/storage"
+
 func newDummyBlockchainContainerWithArgs(ctx context.Context, tmpDir string, image string, readerArgs string) (testcontainers.Container, error) {
 
 	req := testcontainers.ContainerRequest{
@@ -403,7 +407,7 @@ func newDummyBlockchainContainerWithArgs(ctx context.Context, tmpDir string, ima
 		},
 		ExposedPorts: []string{"10014/tcp"},
 		Mounts: testcontainers.Mounts(
-			testcontainers.BindMount(tmpDir, "/app/firehose-data/storage/"),
+			testcontainers.BindMount(tmpDir, containerStorageDir+"/"),
 		),
 		WaitingFor: wait.ForAll(
 			wait.ForListeningPort("10014/tcp"),
@@ -424,6 +428,25 @@ func newDummyBlockchainContainerWithArgs(ctx context.Context, tmpDir string, ima
 	}
 
 	return container, nil
+}
+
+// terminateContainer stops a dummy-blockchain container, first making everything it
+// wrote into the bind-mounted directory removable by whoever runs the test.
+//
+// The node runs as root, so on a Linux host every block file it produces is root-owned
+// and t.TempDir's cleanup cannot unlink it — `TempDir RemoveAll cleanup: permission
+// denied`, which fails a test that asserted nothing wrong. Docker Desktop and OrbStack
+// map ownership on the way out, which is why this only ever bit CI.
+func terminateContainer(ctx context.Context, container testcontainers.Container) {
+	if container == nil {
+		return
+	}
+
+	// Runs as root inside the container, and a+rwX covers the directories as well —
+	// unlinking a file needs write permission on its parent, not on the file.
+	_, _, _ = container.Exec(ctx, []string{"chmod", "-R", "a+rwX", containerStorageDir})
+
+	_ = container.Terminate(ctx, testcontainers.StopTimeout(0))
 }
 
 type responses []interface{}

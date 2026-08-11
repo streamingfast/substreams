@@ -18,7 +18,7 @@ type WasmMetricsGatherer struct {
 	logger    *zap.Logger
 }
 
-func (m *WasmMetricsGatherer) RecordModuleWasmExternalCallBegin(moduleName string, extension string) uint64 {
+func (m *WasmMetricsGatherer) RecordModuleWasmExternalCallBegin(moduleName string, extension string, blockNum uint64) uint64 {
 	m.Lock()
 	defer m.Unlock()
 	if m.inProcessCalls == nil {
@@ -33,12 +33,13 @@ func (m *WasmMetricsGatherer) RecordModuleWasmExternalCallBegin(moduleName strin
 	m.inProcessCalls[moduleName][uniqueID] = &inprocessCall{
 		startTime: time.Now(),
 		extension: extension,
+		blockNum:  blockNum,
 	}
 
 	return uniqueID
 }
 
-func (m *WasmMetricsGatherer) RecordModuleWasmExternalCallEnd(moduleName string, extension string, uniqueID uint64) {
+func (m *WasmMetricsGatherer) RecordModuleWasmExternalCallEnd(moduleName string, extension string, uniqueID uint64, callErr error) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -71,6 +72,9 @@ func (m *WasmMetricsGatherer) RecordModuleWasmExternalCallEnd(moduleName string,
 
 	metric.Count++
 	metric.TimeMs += uint64(duration.Milliseconds())
+	if callErr != nil {
+		metric.FailedCount++
+	}
 }
 
 func (m *WasmMetricsGatherer) ApplyToStats(stats *Stats) {
@@ -88,12 +92,17 @@ func (m *WasmMetricsGatherer) ApplyToStats(stats *Stats) {
 			}
 			metrics[extension].count += metric.Count
 			metrics[extension].time += time.Duration(metric.TimeMs) * time.Millisecond
+			metrics[extension].failed += metric.FailedCount
 		}
 	}
 
+	// Deliberately not copying m.inProcessCalls: Stats has no way to ever remove those entries
+	// (the gatherer deletes from its own map when a call ends), so they would inflate the
+	// reported in-flight count and duration forever. This gatherer is applied once its wasm
+	// call has returned anyway, so there is normally nothing in flight left to report.
 }
 
 type WasmExtensionStats interface {
-	RecordModuleWasmExternalCallBegin(moduleName string, extension string) uint64
-	RecordModuleWasmExternalCallEnd(moduleName string, extension string, uniqueID uint64)
+	RecordModuleWasmExternalCallBegin(moduleName string, extension string, blockNum uint64) uint64
+	RecordModuleWasmExternalCallEnd(moduleName string, extension string, uniqueID uint64, callErr error)
 }

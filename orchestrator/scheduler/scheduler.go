@@ -65,6 +65,10 @@ func New(ctx context.Context, stream *response.Stream) *Scheduler {
 func (s *Scheduler) Init() loop.Cmd {
 	var cmds []loop.Cmd
 
+	// Surfaced as the request's phase: until that segment lands, the blocks the client gets
+	// come from a worker rather than from the cache.
+	reqctx.ReqStats(s.ctx).RecordStreamingFirstSegment(s.StreamFirstTier2MapSegment)
+
 	if s.StreamFirstTier2MapSegment {
 		cmds = append(cmds, execout.CmdWaitFirstTier2MapSegmentStreamed(250*time.Millisecond))
 	} else if s.ExecOutWalker != nil {
@@ -121,6 +125,7 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		s.delayedScheduleNextJob = false
 		if msg.Streamed {
 			s.firstTier2MapSegmentStreamed = true
+			reqctx.ReqStats(s.ctx).RecordStreamingFirstSegment(false)
 		}
 
 		tryMerge := s.Stages.CmdTryMerge(msg.Unit.Stage)
@@ -168,6 +173,9 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 		}
 
 		workUnit, workRange, skippedAboveSegment := s.Stages.NextJob(notAboveSegment)
+		// Surfaced in the periodic request progress log: jobs held back here mean the
+		// consumer, not the processing, is setting the pace.
+		reqctx.ReqStats(s.ctx).RecordJobSchedulingBlocked(skippedAboveSegment)
 		if workRange == nil { // no job ready
 			if !skippedAboveSegment {
 				s.logger.Debug("no next job available and not skipped above segment, returning nil (potential deadlock point)",
@@ -196,6 +204,9 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 			s.Stages.ReleaseJob(workUnit)
 			if errors.Is(err, work.ErrorResourceExhausted) {
 				s.logger.Debug("resource exhausted", zap.Error(err))
+				if stats := reqctx.ReqStatsOrNil(s.ctx); stats != nil {
+					stats.RecordWorkerPoolExhausted()
+				}
 				if s.delayedScheduleNextJob {
 					s.logger.Debug("skipping delayed schedule next job")
 					return nil
@@ -207,6 +218,9 @@ func (s *Scheduler) Update(msg loop.Msg) loop.Cmd {
 				})
 			} else if errors.Is(err, work.ErrorResourceExhaustedRampUp) {
 				s.logger.Debug("resource exhausted ramp up", zap.Error(err))
+				if stats := reqctx.ReqStatsOrNil(s.ctx); stats != nil {
+					stats.RecordWorkerPoolRampUpDeferred()
+				}
 
 				if s.delayedScheduleNextJob {
 					s.logger.Debug("skipping ramp up delayed schedule next job")

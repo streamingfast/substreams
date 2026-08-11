@@ -274,14 +274,14 @@ func addExtensionFunctions(ctx context.Context, runtime wazero.Runtime, registry
 					extension := fmt.Sprintf("%s:%s", namespace, importName)
 					extStats := reqctx.WasmExtensionReqStats(ctx)
 
-					metricID := extStats.RecordModuleWasmExternalCallBegin(call.ModuleName, extension)
+					metricID := extStats.RecordModuleWasmExternalCallBegin(call.ModuleName, extension, call.Clock.GetNumber())
 
 					startTime := time.Now()
 					out, err := f(ctx, reqctx.Details(ctx).UniqueIDString(), call.Clock, data)
 					elapsed := time.Since(startTime)
 					// The call must be closed on every path, including errors, otherwise the in-process
 					// entry leaks and keeps inflating the reported external call duration forever.
-					extStats.RecordModuleWasmExternalCallEnd(call.ModuleName, extension, metricID)
+					extStats.RecordModuleWasmExternalCallEnd(call.ModuleName, extension, metricID, err)
 
 					outcome := metrics.WasmExtensionCallOutcomeSuccess
 					if err != nil {

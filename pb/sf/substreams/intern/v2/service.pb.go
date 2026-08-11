@@ -615,12 +615,26 @@ func (x *ModuleStats) GetStoreSizeBytes() uint64 {
 }
 
 type ExternalCallMetric struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Count         uint64                 `protobuf:"varint,2,opt,name=count,proto3" json:"count,omitempty"`
-	TimeMs        uint64                 `protobuf:"varint,3,opt,name=time_ms,json=timeMs,proto3" json:"time_ms,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// count is every call that was started, including those still waiting for an answer.
+	Count uint64 `protobuf:"varint,2,opt,name=count,proto3" json:"count,omitempty"`
+	// time_ms includes the time already spent by calls that have not returned yet, so a call
+	// hung against an unreachable endpoint shows up as time spent rather than as nothing at all.
+	TimeMs uint64 `protobuf:"varint,3,opt,name=time_ms,json=timeMs,proto3" json:"time_ms,omitempty"`
+	// failed_count is how many of those calls came back with an error. A tier2 keeps retrying
+	// them internally, so without this tier1 only learns of a failing endpoint once the whole
+	// segment gives up, minutes later.
+	FailedCount uint64 `protobuf:"varint,4,opt,name=failed_count,json=failedCount,proto3" json:"failed_count,omitempty"`
+	// in_flight_count is how many calls are still waiting for an answer right now.
+	InFlightCount uint64 `protobuf:"varint,5,opt,name=in_flight_count,json=inFlightCount,proto3" json:"in_flight_count,omitempty"`
+	// oldest_in_flight_ms is how long the oldest of them has been waiting.
+	OldestInFlightMs uint64 `protobuf:"varint,6,opt,name=oldest_in_flight_ms,json=oldestInFlightMs,proto3" json:"oldest_in_flight_ms,omitempty"`
+	// oldest_in_flight_block is the block that call was made on, which is where processing is
+	// stuck for as long as it does not return.
+	OldestInFlightBlock uint64 `protobuf:"varint,7,opt,name=oldest_in_flight_block,json=oldestInFlightBlock,proto3" json:"oldest_in_flight_block,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *ExternalCallMetric) Reset() {
@@ -670,6 +684,34 @@ func (x *ExternalCallMetric) GetCount() uint64 {
 func (x *ExternalCallMetric) GetTimeMs() uint64 {
 	if x != nil {
 		return x.TimeMs
+	}
+	return 0
+}
+
+func (x *ExternalCallMetric) GetFailedCount() uint64 {
+	if x != nil {
+		return x.FailedCount
+	}
+	return 0
+}
+
+func (x *ExternalCallMetric) GetInFlightCount() uint64 {
+	if x != nil {
+		return x.InFlightCount
+	}
+	return 0
+}
+
+func (x *ExternalCallMetric) GetOldestInFlightMs() uint64 {
+	if x != nil {
+		return x.OldestInFlightMs
+	}
+	return 0
+}
+
+func (x *ExternalCallMetric) GetOldestInFlightBlock() uint64 {
+	if x != nil {
+		return x.OldestInFlightBlock
 	}
 	return 0
 }
@@ -910,11 +952,15 @@ const file_sf_substreams_intern_v2_service_proto_rawDesc = "" +
 	"\x11store_write_count\x18\n" +
 	" \x01(\x04R\x0fstoreWriteCount\x128\n" +
 	"\x18store_deleteprefix_count\x18\v \x01(\x04R\x16storeDeleteprefixCount\x12(\n" +
-	"\x10store_size_bytes\x18\f \x01(\x04R\x0estoreSizeBytes\"W\n" +
+	"\x10store_size_bytes\x18\f \x01(\x04R\x0estoreSizeBytes\"\x86\x02\n" +
 	"\x12ExternalCallMetric\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05count\x18\x02 \x01(\x04R\x05count\x12\x17\n" +
-	"\atime_ms\x18\x03 \x01(\x04R\x06timeMs\"\xbc\x01\n" +
+	"\atime_ms\x18\x03 \x01(\x04R\x06timeMs\x12!\n" +
+	"\ffailed_count\x18\x04 \x01(\x04R\vfailedCount\x12&\n" +
+	"\x0fin_flight_count\x18\x05 \x01(\x04R\rinFlightCount\x12-\n" +
+	"\x13oldest_in_flight_ms\x18\x06 \x01(\x04R\x10oldestInFlightMs\x123\n" +
+	"\x16oldest_in_flight_block\x18\a \x01(\x04R\x13oldestInFlightBlock\"\xbc\x01\n" +
 	"\tCompleted\x12W\n" +
 	"\x14all_processed_ranges\x18\x01 \x03(\v2%.sf.substreams.internal.v2.BlockRangeR\x12allProcessedRanges\x12)\n" +
 	"\x10processed_blocks\x18\x03 \x01(\x04R\x0fprocessedBlocks\x12%\n" +

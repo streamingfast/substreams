@@ -1,0 +1,9 @@
+Backprocessing  █░░░░░░░░░░░░░░░░░░░   5%  0/10 jobs  (1M cached)
+  s0            ████░░░░░░░░░░░░░░░░  20%
+  s1            ██░░░░░░░░░░░░░░░░░░  10%
+  out           ██░░░░░░░░░░░░░░░░░░  10%  1,050,000 → 1,500,000
+
+Slowest modules
+  s0  alpha:map_events  50ms/blk
+  s1  beta:map_events   30ms/blk
+  s1  map_transfers     20ms/blk

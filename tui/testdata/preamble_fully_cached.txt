@@ -1,0 +1,4 @@
+Session  a9ba0e51af0f494eb8036d60c731a6c8
+  Module  map_tx_counter_summary · production · 2 stages
+  Chain   localhost:54168 · start 6,000 · 10 workers max
+  Work    stores fully cached (5.9k) · range fully cached (200)

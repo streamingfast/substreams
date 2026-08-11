@@ -33,6 +33,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   The `substreams request stats` entry gained a `workers` object (`requested`, `granted`, `effective`, `peak`, `pool_exhausted_count`, `pool_rampup_deferred_count`), reported on tier1 only. A high `pool_exhausted_count` with a `peak` well below `effective` means the shared worker pool ran dry, a case that was previously only visible at debug level.
 
   The periodic `substreams request progress` entry gained its own `workers` object (`requested`, `granted`, `effective`, `running`, `idle`, and `pool_exhausted_5m` when jobs failed to get a worker over the window), so the same question can be answered while the request is still running rather than only once it ends. When jobs repeatedly find no free worker while the request still has idle capacity, a hint now says so and names the three ceilings that can cause it — the tier2 fleet being full, the organization's worker quota, or the server's per-session worker cap — since the pool reports a single error for all three.
+
+- CLI: `substreams tools devenv` boots a complete local stack — a dummy blockchain in a container plus a tier1 and a tier2 built from the current source tree — prints the endpoint and stays up until interrupted. Requires Docker. `--burst` sets how many blocks exist at genesis and `--bundle-size` the segment size, which together decide how much parallel work a request has to do; the state store lives under `--data-dir`, so deleting it is what gives a cold backprocess again. The command waits for the merger to catch up with the burst before starting tier1, since tier1 bootstraps its block hub from merged blocks and cannot become ready until they exist. The end-to-end tests now share this same setup code, so what a developer watches locally is the path CI exercises.
+
 ### Changed
 
 - Sink: `substreams sink postgres` and `substreams sink clickhouse` in from-proto mode now unmarshal and walk blocks on a worker pool instead of one at a time at flush. Decoding a block was where the sink spent its time — around 7.8µs of the 9.3µs a wide entity cost — while PostgreSQL sat on roughly eight times that in headroom, so the sink itself was the throughput limit. Measured at 4.1x on a wide entity. Workers only fill a per-block buffer; the inserts are still replayed in block order, in the same transaction as before, so the resulting database is unchanged.
@@ -40,6 +43,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   The pool defaults to one worker per core less one, capped at eight, since the work is allocator-bound before it runs out of cores. `SinkerFactoryOptions.DecodeWorkers` overrides it.
 
 - Sink: **Breaking** `db_proto.NewSinker` takes a `decodeWorkers int` parameter, and `SinkerFactoryOptions.Parallel` is gone along with `sql.Database.Clone()`. The parallel flush path they served was unreachable — `Parallel` was hardcoded to false at every call site — and unsound had it run: `Clone()` returned the receiver, so every goroutine shared one `*sql.Tx`.
+
+- CLI: `substreams run` now reports backprocessing as progress and rates instead of a list of block ranges. A four-line session header (trace ID, module, chain, work to do, including how much was already cached) is printed once and stays in the scrollback, followed by a compact live block: overall percentage, blocks per second, ETA, running jobs against the worker limit, then one bar per stage with its job count and oldest job age, and an `out` row tracking the output frontier towards the requested start block.
+
+  Percentages come from the work counts the server already reported in `SessionInit` and were never displayed, and the in-flight job progress is added to the completed-job count so the bar advances continuously rather than in steps. A run whose stores are fully cached now says so in one line instead of rendering an empty progress skeleton.
+
+  `Slowest modules` is kept as its own section, ranked across all stages, now showing both a recent (30s window) and a lifetime per-block cost, tagged with the stage each module belongs to. Modules under 10ms per block no longer earn a line.
+
+  Stage progress is measured from `Stage.ready_up_to_exclusive` rather than from `completed_ranges`. The latter counts a store segment as soon as its partial has been produced, so a stage rendered as 100% while tier1 was still squashing — and since squashing schedules no job and advances no `processed_blocks`, the request looked frozen at 100% with a rate of zero. That state is now named on the stage row as `squashing N segments`. Reading the squashed frontier also fixes the bar's low end: it is the lowest *contiguous* block across the stage's modules, so a stage with a gap in its produced ranges no longer counts the ranges beyond that gap, and a stage that has not started reports where it begins instead of being invisible.
+
+  The `Longest-running jobs` section is gone: it fired on a fixed 5 second threshold, which flickered in and out on healthy runs where jobs normally take 5 to 8 seconds. Job age is now always visible on the stage rows instead. Also removed: the `Progress messages received` counter, which only tracked the server's deliberately decreasing progress interval, and the `m` key toggling between bar and block-range rendering, which no longer has two modes to switch between.
+
+- CLI: `substreams run` output on failure is no longer one undivided wall of text. The session header, the progress block, the usage report and the error are separated, the progress block is closed with `Backprocessing  aborted` rather than trailing off at `starting…`, and a request refused for exceeding `--limit-processed-blocks` now reports the figures it was given at session init and names the fix:
+
+  ```
+  Error: --limit-processed-blocks is set to 10,000, but this request needs to process 3,394,913 blocks (3,394,000 of them to prepare the stores): raise it with --limit-processed-blocks 3400000, or remove the guard entirely with --limit-processed-blocks 0
+  ```
+
+- Sink: `Sinker.PrintStats` collapses to a single `📊 Usage Report: no data received` line when a request produced nothing, instead of a header followed by three zeroed counters. Affects `substreams run`, `substreams sink webhook` and `substreams sink noop`.
 
 ### Fixed
 
@@ -51,6 +72,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
   Nothing failed loudly for any of these: the rows were all there, and every query against those columns simply matched nothing. Databases already populated by an affected version hold corrupted values in those columns and need the affected block range re-synced.
   This changes what lands in those columns, so it breaks anything downstream built against the corrupted form. A consumer reading a `bytes` column as base64 or hex text now gets the binary value instead. A query written to work around the array corruption — matching the element `'alpha'`, quote characters and all, because that is what was stored — now has to match `alpha`. Re-syncing an existing database leaves both forms in the same table until the affected range is rewritten.
+
+- CLI: `substreams run` needed two Ctrl-C to stop while the progress view was on screen. The view puts the terminal in raw mode, so the first Ctrl-C arrived as a key press rather than as SIGINT: the UI quit but the request kept streaming, and only the second one — delivered because the first had released the terminal — actually stopped it. The key press now cancels the request directly.
+
+- CLI: `substreams run` was never printing the `Backprocessing history up to requested target block` line, nor the head block, stage count and cached-blocks summary the non-TTY output has always shown. The line was guarded on a field that nothing in the codebase ever set, and rendered as blank lines instead.
 
 - Server: `substreams-tier1` now restarts when its block hub can no longer link incoming live blocks, instead of hanging every request at a frozen head indefinitely. A live-source gap whose one-block files were already merged away can never be linked, and the head-block metrics keep tracking the live source, so the process looked healthy throughout.
 

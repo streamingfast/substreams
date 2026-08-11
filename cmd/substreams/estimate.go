@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"math/big"
 	"os"
 	"strings"
 	"sync"
@@ -24,6 +23,7 @@ import (
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/logging"
+	"github.com/streamingfast/substreams/internal/formatx"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreamsrpcv3 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v3"
 	"github.com/streamingfast/substreams/pipeline/exec"
@@ -929,48 +929,22 @@ func (r *ReportBuilder) LineStyled(style lipgloss.Style, format string, a ...any
 }
 
 func formatBlockNumber[T ~uint64](blockNumber T) string {
-	if blockNumber > math.MaxInt64 {
-		return humanize.BigComma(new(big.Int).SetUint64(uint64(blockNumber)))
-	}
-
-	return humanize.Comma(int64(blockNumber))
+	return formatx.BlockNumber(blockNumber)
 }
 
 // formatBytes formats bytes in human-readable format
 func formatBytes(bytes uint64) string {
-	const unit = 1024
-	if bytes < unit {
-		return fmt.Sprintf("%d B", bytes)
-	}
-	div, exp := uint64(unit), 0
-	for n := bytes / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %ciB", float64(bytes)/float64(div), "KMGTPE"[exp])
+	return formatx.BytesIEC(bytes)
 }
 
-// formatDuration formats a duration in a human-readable format
+// formatDuration formats a duration in a human-readable format, where a zero duration means
+// the value is not known rather than being instantaneous.
 func formatDuration(d time.Duration) string {
 	if d == 0 {
 		return "N/A"
 	}
 
-	// Round to seconds
-	d = d.Round(time.Second)
-
-	// For durations >= 24 hours, show in days
-	if d >= 24*time.Hour {
-		days := d / (24 * time.Hour)
-		remainder := d % (24 * time.Hour)
-		if remainder > 0 {
-			return fmt.Sprintf("%dd%s", days, remainder)
-		}
-		return fmt.Sprintf("%dd", days)
-	}
-
-	// Use Go's default formatting for everything else (handles h/m/s nicely)
-	return d.String()
+	return formatx.Duration(d)
 }
 
 // printUsageReport prints the actual usage consumed during estimation by reading

@@ -242,12 +242,14 @@ func (s *Sinker) PrintStats() {
 	processedBlocks := ProcessedBlocks.Get()
 	receivedBlockData := DataMessageCount.Get()
 
-	var noDataReceived string
-	if egressBytes == 0 && processedBlocks == 0 {
-		noDataReceived = " (no data received)"
+	// A request that failed before producing anything has nothing to report, and three lines of
+	// zeroes below the header only push the actual error further down the screen.
+	if egressBytes == 0 && processedBlocks == 0 && receivedBlockData == 0 {
+		fmt.Fprintln(os.Stderr, "📊 Usage Report: no data received")
+		return
 	}
 
-	fmt.Fprintf(os.Stderr, "📊 Usage Report%s\n", noDataReceived)
+	fmt.Fprintln(os.Stderr, "📊 Usage Report")
 	fmt.Fprintf(os.Stderr, " • Egress Bytes (uncompressed): %s\n", humanize.IBytes(uint64(egressBytes)))
 	fmt.Fprintf(os.Stderr, " • Processed Blocks: %s blocks\n", humanize.Comma(int64(processedBlocks)))
 	fmt.Fprintf(os.Stderr, " • Received Blocks: %s blocks\n", humanize.Comma(int64(receivedBlockData)))

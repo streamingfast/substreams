@@ -668,8 +668,8 @@ github.com/streamingfast/dummy-blockchain v1.7.7 h1:9IZk0zmkeqHirSIRSNtbxrl5kRzy
 github.com/streamingfast/dummy-blockchain v1.7.7/go.mod h1:EP8X3OwOoGYjJfzhw+zD1A0GTNSDg+v1OKDwSTDhHyc=
 github.com/streamingfast/firehose-ethereum/types v0.0.0-20251113151010-c9c94d64348a h1:qatil0YhFzTVAFQnH7iMcq+gpVUNEs9Se3lLq4eaof8=
 github.com/streamingfast/firehose-ethereum/types v0.0.0-20251113151010-c9c94d64348a/go.mod h1:CG22ObinxSbKIP19bAj0uro0a290kzZTiBbjL8VR0SE=
-github.com/streamingfast/firehose-networks v0.2.2 h1:araNCSHVa9C8+7hGrxNJYt8TlbK65kNDxQMBJuzBjxA=
-github.com/streamingfast/firehose-networks v0.2.2/go.mod h1:/XyroRcAUOO9DdxdgHktuVI1U6uKgjj6+1r+zgLEb90=
+github.com/streamingfast/firehose-networks v0.2.3 h1:kFqhWlp5QtkKW9kezee0cqVjZlChEMGqlkrHK+mtj38=
+github.com/streamingfast/firehose-networks v0.2.3/go.mod h1:/XyroRcAUOO9DdxdgHktuVI1U6uKgjj6+1r+zgLEb90=
 github.com/streamingfast/graph v0.0.0-20220329181048-a5710712d873 h1:8+TXT26c2p6f8JMg0w4JQ8t4fAbfMmR11zLN4KFVRC8=
 github.com/streamingfast/graph v0.0.0-20220329181048-a5710712d873/go.mod h1:M7l9klD6EPgXwPOrhzQrLLKZHZSNTt4nm+GDRFNbQdc=
 github.com/streamingfast/logging v0.0.0-20210811175431-f3b44b61606a/go.mod h1:4GdqELhZOXj4xwc4IaBmzofzdErGynnaSzuzxy0ZIBo=

@@ -79,7 +79,7 @@ require (
 	github.com/streamingfast/dsession v0.0.0-20251029144057-b94d1030e142
 	github.com/streamingfast/dummy-blockchain v1.7.7
 	github.com/streamingfast/firehose-ethereum/types v0.0.0-20251113151010-c9c94d64348a
-	github.com/streamingfast/firehose-networks v0.2.2
+	github.com/streamingfast/firehose-networks v0.2.3
 	github.com/streamingfast/services-control-plane v0.0.0-20260619122356-7b2e68aea813
 	github.com/streamingfast/sf-tracing v0.0.0-20251218140752-bafd5572499f
 	github.com/streamingfast/shutter v1.5.0

@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- CLI: Ethereum Hoodi testnet (`hoodi`) StreamingFast endpoints (`hoodi.eth.streamingfast.io:443`).
 - Server: tier1 request logs now explain how many parallel workers a request actually got, and why. A client asking for 300 workers and getting 15 previously left no trace of the negotiation anywhere in the logs.
 
   The `incoming Substreams Blocks request` entry gained a `parallelism` object (`requested_workers` as asked by the client, `granted_workers` as allowed by the authentication layer, the effective `workers`, `workers_source` telling which of the two applied, plus `plan_tier` and `stage_layer_executors`), along with `parallel_segment_count` and `stage_count` — a request with fewer segments than workers can never use them all.

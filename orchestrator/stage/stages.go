@@ -252,20 +252,28 @@ func (s *Stages) UpdateStats() {
 	s.lastStatUpdate = time.Now()
 	out := make([]*pbsubstreamsrpc.Stage, len(s.stages))
 
+	// The progress view is computed once and feeds both the RPC message and the progress log,
+	// so the segment matrix is still walked a single time per update.
 	stats := s.computeStageStats()
+	progress := s.stagesProgress(stats)
 	for stgIdx := range s.stages {
 		mods := make([]string, len(s.stages[stgIdx].allExecutedModules))
 		_ = copy(mods, s.stages[stgIdx].allExecutedModules)
 
 		out[stgIdx] = &pbsubstreamsrpc.Stage{
-			Modules:         mods,
-			CompletedRanges: toProtoRanges(stats.ranges[stgIdx].Merged()),
+			Modules: mods,
+			// CompletedRanges counts a store segment as soon as its partial exists, while
+			// ReadyUpToExclusive stops at the last squashed one. The gap between the two is
+			// what SquashWaitSegmentCount measures.
+			CompletedRanges:        toProtoRanges(stats.ranges[stgIdx].Merged()),
+			ReadyUpToExclusive:     progress[stgIdx].HighestContiguousBlock,
+			SquashWaitSegmentCount: progress[stgIdx].SegmentsReadyForSquashing,
 		}
 	}
 
 	reqStats := reqctx.ReqStats(s.ctx)
 	reqStats.RecordStages(out)
-	reqStats.RecordStagesProgress(s.stagesProgress(stats))
+	reqStats.RecordStagesProgress(progress)
 }
 
 // stageStats is what a single pass over the segment matrix yields, per stage.

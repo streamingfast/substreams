@@ -218,6 +218,7 @@ func (m *SessionInit) CloneVT() *SessionInit {
 	r.EffectiveBlocksToProcessBeforeStartBlock = m.EffectiveBlocksToProcessBeforeStartBlock
 	r.BlocksToProcessAfterStartBlock = m.BlocksToProcessAfterStartBlock
 	r.EffectiveBlocksToProcessAfterStartBlock = m.EffectiveBlocksToProcessAfterStartBlock
+	r.SegmentBlockCount = m.SegmentBlockCount
 	if len(m.unknownFields) > 0 {
 		r.unknownFields = make([]byte, len(m.unknownFields))
 		copy(r.unknownFields, m.unknownFields)
@@ -446,6 +447,8 @@ func (m *Stage) CloneVT() *Stage {
 		return (*Stage)(nil)
 	}
 	r := new(Stage)
+	r.ReadyUpToExclusive = m.ReadyUpToExclusive
+	r.SquashWaitSegmentCount = m.SquashWaitSegmentCount
 	if rhs := m.Modules; rhs != nil {
 		tmpContainer := make([]string, len(rhs))
 		copy(tmpContainer, rhs)
@@ -969,6 +972,9 @@ func (this *SessionInit) EqualVT(that *SessionInit) bool {
 	if this.EffectiveBlocksToProcessAfterStartBlock != that.EffectiveBlocksToProcessAfterStartBlock {
 		return false
 	}
+	if this.SegmentBlockCount != that.SegmentBlockCount {
+		return false
+	}
 	return string(this.unknownFields) == string(that.unknownFields)
 }
 
@@ -1326,6 +1332,12 @@ func (this *Stage) EqualVT(that *Stage) bool {
 				return false
 			}
 		}
+	}
+	if this.ReadyUpToExclusive != that.ReadyUpToExclusive {
+		return false
+	}
+	if this.SquashWaitSegmentCount != that.SquashWaitSegmentCount {
+		return false
 	}
 	return string(this.unknownFields) == string(that.unknownFields)
 }
@@ -1994,6 +2006,11 @@ func (m *SessionInit) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
 	}
+	if m.SegmentBlockCount != 0 {
+		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.SegmentBlockCount))
+		i--
+		dAtA[i] = 0x58
+	}
 	if m.EffectiveBlocksToProcessAfterStartBlock != 0 {
 		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.EffectiveBlocksToProcessAfterStartBlock))
 		i--
@@ -2618,6 +2635,16 @@ func (m *Stage) MarshalToSizedBufferVT(dAtA []byte) (int, error) {
 		i -= len(m.unknownFields)
 		copy(dAtA[i:], m.unknownFields)
 	}
+	if m.SquashWaitSegmentCount != 0 {
+		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.SquashWaitSegmentCount))
+		i--
+		dAtA[i] = 0x20
+	}
+	if m.ReadyUpToExclusive != 0 {
+		i = protohelpers.EncodeVarint(dAtA, i, uint64(m.ReadyUpToExclusive))
+		i--
+		dAtA[i] = 0x18
+	}
 	if len(m.CompletedRanges) > 0 {
 		for iNdEx := len(m.CompletedRanges) - 1; iNdEx >= 0; iNdEx-- {
 			size, err := m.CompletedRanges[iNdEx].MarshalToSizedBufferVT(dAtA[:i])
@@ -3167,6 +3194,9 @@ func (m *SessionInit) SizeVT() (n int) {
 	if m.EffectiveBlocksToProcessAfterStartBlock != 0 {
 		n += 1 + protohelpers.SizeOfVarint(uint64(m.EffectiveBlocksToProcessAfterStartBlock))
 	}
+	if m.SegmentBlockCount != 0 {
+		n += 1 + protohelpers.SizeOfVarint(uint64(m.SegmentBlockCount))
+	}
 	n += len(m.unknownFields)
 	return n
 }
@@ -3399,6 +3429,12 @@ func (m *Stage) SizeVT() (n int) {
 			l = e.SizeVT()
 			n += 1 + l + protohelpers.SizeOfVarint(uint64(l))
 		}
+	}
+	if m.ReadyUpToExclusive != 0 {
+		n += 1 + protohelpers.SizeOfVarint(uint64(m.ReadyUpToExclusive))
+	}
+	if m.SquashWaitSegmentCount != 0 {
+		n += 1 + protohelpers.SizeOfVarint(uint64(m.SquashWaitSegmentCount))
 	}
 	n += len(m.unknownFields)
 	return n
@@ -4926,6 +4962,25 @@ func (m *SessionInit) UnmarshalVT(dAtA []byte) error {
 					break
 				}
 			}
+		case 11:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SegmentBlockCount", wireType)
+			}
+			m.SegmentBlockCount = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.SegmentBlockCount |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := protohelpers.Skip(dAtA[iNdEx:])
@@ -6322,6 +6377,44 @@ func (m *Stage) UnmarshalVT(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ReadyUpToExclusive", wireType)
+			}
+			m.ReadyUpToExclusive = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ReadyUpToExclusive |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SquashWaitSegmentCount", wireType)
+			}
+			m.SquashWaitSegmentCount = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return protohelpers.ErrIntOverflow
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.SquashWaitSegmentCount |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := protohelpers.Skip(dAtA[iNdEx:])

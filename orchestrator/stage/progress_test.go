@@ -8,6 +8,7 @@ import (
 	"github.com/streamingfast/substreams/metrics"
 	"github.com/streamingfast/substreams/orchestrator/plan"
 	"github.com/streamingfast/substreams/pipeline/exec"
+	"github.com/streamingfast/substreams/reqctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -135,4 +136,62 @@ func TestComputeStageStatsKeepsCompletedRanges(t *testing.T) {
 	require.Len(t, merged, 1)
 	assert.Equal(t, uint64(0), merged[0].StartBlock)
 	assert.Equal(t, uint64(30), merged[0].ExclusiveEndBlock)
+}
+
+// TestUpdateStatsReadyUpToExcludesUnsquashed is the end-to-end counterpart of the tests
+// above: it goes all the way to the pbsubstreamsrpc.Stage message a client receives, since
+// the whole point of ready_up_to_exclusive is that completed_ranges alone lets a stage look
+// finished while tier1 is still squashing it.
+func TestUpdateStatsReadyUpToExcludesUnsquashed(t *testing.T) {
+	stages := stagesForProgress(t, 0)
+
+	reqStats := metrics.NewReqStats(&metrics.Config{OutputModule: "map_out"}, nil, nil, zlogTest)
+	stages.ctx = reqctx.WithReqStats(stages.ctx, reqStats)
+
+	// Stage 0 is a store covering [0, 50) in 5 segments. Only the first one made it through
+	// the squasher; the four above it have their partial on disk and nothing more. To a
+	// client watching completed_ranges only, this stage is done.
+	setStates(t, stages, map[Unit]UnitState{
+		unit(0, 0): UnitCompleted,
+		unit(1, 0): UnitPartialPresent,
+		unit(2, 0): UnitMerging,
+		unit(3, 0): UnitPartialPresent,
+		unit(4, 0): UnitPartialPresent,
+	})
+
+	stages.UpdateStats()
+
+	out := reqStats.Stages()
+	require.Len(t, out, 3)
+
+	// completed_ranges says the whole stage is covered...
+	completed := out[0].GetCompletedRanges()
+	require.Len(t, completed, 1)
+	assert.Equal(t, uint64(0), completed[0].GetStartBlock())
+	assert.Equal(t, uint64(50), completed[0].GetEndBlock())
+
+	// ...while ready_up_to_exclusive has not moved past the first squashed segment, and the
+	// four segments in between are accounted for as waiting on the squasher.
+	assert.Equal(t, uint64(10), out[0].GetReadyUpToExclusive())
+	assert.Equal(t, uint64(4), out[0].GetSquashWaitSegmentCount())
+
+	// A stage that has not started reports where its modules begin rather than a sentinel;
+	// the test graph leaves init blocks at 0, so 0 here means "nothing usable yet".
+	assert.Equal(t, uint64(0), out[1].GetReadyUpToExclusive())
+	assert.Equal(t, uint64(0), out[1].GetSquashWaitSegmentCount())
+
+	// Stage 2 is a map: it never squashes, so it can never report a squash backlog.
+	assert.Equal(t, uint64(0), out[2].GetSquashWaitSegmentCount())
+}
+
+// TestStagesProgressIsIndexedByStage guards the assumption UpdateStats makes when it reads
+// stagesProgress() positionally to fill the RPC message.
+func TestStagesProgressIsIndexedByStage(t *testing.T) {
+	stages := stagesForProgress(t, 0)
+
+	progress := stages.stagesProgress(stages.computeStageStats())
+	require.Len(t, progress, len(stages.stages))
+	for idx, p := range progress {
+		assert.Equal(t, idx, p.Stage, "stagesProgress must stay ordered by stage index")
+	}
 }

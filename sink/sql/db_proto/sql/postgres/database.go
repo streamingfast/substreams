@@ -22,6 +22,16 @@ import (
 	"google.golang.org/protobuf/types/dynamicpb"
 )
 
+const (
+	// maxOpenConnections bounds the sink's own pool: inserts are serialised on one
+	// goroutine, and the queries around them are occasional.
+	maxOpenConnections = 8
+	maxIdleConnections = 2
+
+	// maxCopyConnections bounds the binary COPY pool, driven by a single applier.
+	maxCopyConnections = 2
+)
+
 type Database struct {
 	*sql.BaseDatabase
 	db *pgsql.DB
@@ -63,6 +73,11 @@ func NewDatabase(schema *schema.Schema, dsn *db.DSN, moduleOutputType string, ro
 		return nil, fmt.Errorf("open db connection: %w", err)
 	}
 
+	// The sink writes from one goroutine and queries occasionally around it, so an
+	// unbounded pool only ever buys a way to exhaust the server's connection slots.
+	sqlDB.SetMaxOpenConns(maxOpenConnections)
+	sqlDB.SetMaxIdleConns(maxIdleConnections)
+
 	if reachable, err := isDatabaseReachable(sqlDB); !reachable {
 		return nil, fmt.Errorf("database not reachable: %w", err)
 	}
@@ -93,7 +108,15 @@ func (d *Database) Open() error {
 	if d.bufferOptions != nil {
 		ctx := context.Background()
 
-		pool, err := pgxpool.New(ctx, d.dsn.ConnString())
+		poolConfig, err := pgxpool.ParseConfig(d.dsn.ConnString())
+		if err != nil {
+			return fmt.Errorf("parsing the connection string for binary COPY: %w", err)
+		}
+		// One applier goroutine COPYs one segment at a time, so the pgx default of four
+		// connections per core is a fleet of idle connections against the server.
+		poolConfig.MaxConns = maxCopyConnections
+
+		pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 		if err != nil {
 			return fmt.Errorf("connecting to the database for binary COPY: %w", err)
 		}
@@ -109,6 +132,13 @@ func (d *Database) Open() error {
 		return nil
 	}
 
+	return d.openDirectInserter()
+}
+
+// openDirectInserter installs the inserter that writes to the database itself: one
+// prepared INSERT per row when constraints have to be respected row by row, a multi-row
+// INSERT built at flush otherwise.
+func (d *Database) openDirectInserter() error {
 	if d.useConstraints {
 		inserter, err := NewRowInserter(d.logger)
 		if err != nil {
@@ -119,17 +149,59 @@ func (d *Database) Open() error {
 		}
 		d.inserter = inserter
 		d.flusher = inserter
-	} else {
-		inserter, err := NewAccumulatorInserter(d.logger)
-		if err != nil {
-			return fmt.Errorf("creating accumulator inserter: %w", err)
-		}
-		if err := inserter.init(d); err != nil {
-			return fmt.Errorf("initializing row inserter: %w", err)
-		}
-		d.inserter = inserter
-		d.flusher = inserter
+
+		return nil
 	}
+
+	inserter, err := NewAccumulatorInserter(d.logger)
+	if err != nil {
+		return fmt.Errorf("creating accumulator inserter: %w", err)
+	}
+	if err := inserter.init(d); err != nil {
+		return fmt.Errorf("initializing accumulator inserter: %w", err)
+	}
+	d.inserter = inserter
+	d.flusher = inserter
+
+	return nil
+}
+
+// SwitchToDirectInserts drains the local buffer and inserts straight into the database
+// from here on.
+//
+// The buffer trades freshness for throughput: rows sit on disk until a segment fills,
+// which is what a backfill wants and the opposite of what a sink at the chain head wants,
+// where a block should be queryable when it arrives rather than when the segment it
+// happens to land in is full. Reorgs are also cheaper to undo out of a table than out of
+// a segment that has not been applied yet.
+//
+// Everything buffered is applied before the switch, so no row is left behind, and the
+// buffer is closed for good — a stream that has reached the head does not go back.
+func (d *Database) SwitchToDirectInserts(ctx context.Context) error {
+	inserter, ok := d.inserter.(*localBufferInserter)
+	if !ok {
+		return nil
+	}
+
+	d.logger.Info("stream reached the chain head, draining the local buffer and switching to direct inserts")
+
+	if err := inserter.close(ctx); err != nil {
+		return fmt.Errorf("draining the local buffer: %w", err)
+	}
+
+	if err := d.openDirectInserter(); err != nil {
+		return fmt.Errorf("switching to direct inserts: %w", err)
+	}
+
+	// bufferActive() reads the inserter, so transactions resume from here; the options
+	// go with it to keep the two from disagreeing.
+	d.bufferOptions = nil
+
+	if d.pool != nil {
+		d.pool.Close()
+		d.pool = nil
+	}
+
 	return nil
 }
 
@@ -332,13 +404,25 @@ func (d *Database) InsertBlock(blockNum uint64, hash string, timestamp time.Time
 
 // Close drains the local buffer, if one is in use, so the blocks buffered at shutdown
 // reach the database rather than being streamed again on the next run.
+// Close drains a local buffer, if one is in use, and then releases the connections. It
+// is called once the stream is done with the database, so holding the pools open past it
+// only occupies connection slots on the server.
 func (d *Database) Close(ctx context.Context) error {
-	inserter, ok := d.inserter.(*localBufferInserter)
-	if !ok {
-		return nil
+	var err error
+	if inserter, ok := d.inserter.(*localBufferInserter); ok {
+		err = inserter.close(ctx)
 	}
 
-	return inserter.close(ctx)
+	if d.pool != nil {
+		d.pool.Close()
+		d.pool = nil
+	}
+
+	if closeErr := d.db.Close(); closeErr != nil && err == nil {
+		err = fmt.Errorf("closing the database connections: %w", closeErr)
+	}
+
+	return err
 }
 
 // BufferStats reports what the local buffer is holding, for the progress line.

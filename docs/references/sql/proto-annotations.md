@@ -179,6 +179,11 @@ substreams sink postgres substreams.yaml --dsn $DSN \
 - `--local-buffer-max-size`: disk budget for that buffer (default: `8GiB`). The stream is
   held once the buffer fills, so the database is never outrun by more than this.
 
+The buffer is a backfill tool, so the sink stops using it on its own once the stream
+reaches the chain head: on the first live block everything buffered is applied and the
+inserts go straight to the database from then on, where a block is queryable as soon as it
+arrives.
+
 Once the sink is close to chain HEAD, constraints can be turned on:
 
 ```bash

@@ -39,8 +39,9 @@ func TestDbProtoPostgresConstraintsBackfill(t *testing.T) {
 			BlockBatchSize:  1,
 		}.Defaults()
 
-		_, err := db_proto.SetupDatabaseSchema(ctx, postgresContainer.ConnectionString, schemaName, defaultOutputModuleName, outputMessageDescriptor, options, logger, tracer)
+		database, err := db_proto.SetupDatabaseSchema(ctx, postgresContainer.ConnectionString, schemaName, defaultOutputModuleName, outputMessageDescriptor, options, logger, tracer)
 		require.NoError(t, err)
+		require.NoError(t, database.Close(ctx))
 	}
 
 	db, err := sql.Open("postgres", postgresContainer.ConnectionString)

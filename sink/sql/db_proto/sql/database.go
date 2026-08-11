@@ -30,6 +30,10 @@ type Database interface {
 	// skipping the ones already in place. A schema first synced without constraints has
 	// none of them, and only this puts them there.
 	ApplyConstraints() error
+	// SwitchToDirectInserts leaves any buffered write path behind and inserts straight
+	// into the database from now on. It is a one-way switch, called when the stream
+	// reaches the chain head, and a no-op for a backend that never buffered.
+	SwitchToDirectInserts(ctx context.Context) error
 	WalkMessageDescriptorAndInsert(dm *dynamicpb.Message, blockNum uint64, blockTimestamp time.Time, parent *Parent) (time.Duration, error)
 	// WalkMessageDescriptorAndInsertInto is the same walk, against a caller-supplied
 	// inserter. It touches no database state, so it is safe to call concurrently with

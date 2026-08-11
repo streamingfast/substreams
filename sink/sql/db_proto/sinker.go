@@ -25,6 +25,10 @@ type Sinker struct {
 	lastAppliedBlockNum   uint64
 	lastAppliedBlockTime  time.Time
 
+	// directInserts records that the stream reached the chain head and the database was
+	// switched off any buffered write path. It only ever goes from false to true.
+	directInserts bool
+
 	// holding buffers the blocks received since the last flush. It is only ever touched
 	// from the sinker's callbacks, which are called sequentially.
 	holding []*Holder
@@ -112,6 +116,22 @@ func (s *Sinker) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrp
 		s.stats.TotalDurationBetween += time.Since(s.stats.LastBlockProcessAt)
 	}
 	s.stats.BlockCount++
+
+	if isLive != nil && *isLive && !s.directInserts {
+		// Write what is held before the switch, with the cursor of the last held block:
+		// those blocks belong to the buffered path, and this block's cursor covers a
+		// block that has not been applied yet.
+		if len(s.holding) > 0 {
+			if err := s.flushHolding(s.holding[len(s.holding)-1].cursor); err != nil {
+				return fmt.Errorf("flushing held blocks before switching to direct inserts: %w", err)
+			}
+		}
+
+		if err := s.db.SwitchToDirectInserts(ctx); err != nil {
+			return fmt.Errorf("switching to direct inserts: %w", err)
+		}
+		s.directInserts = true
+	}
 
 	holder := &Holder{
 		output: output,

@@ -42,6 +42,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
+- Sink: `substreams sink postgres` in from-proto mode leaves the local buffer behind once the stream reaches the chain head. The buffer holds rows on disk until a segment fills, which is what a backfill wants and the opposite of what a live sink wants: at the head a block should be queryable when it arrives, not when the segment it happens to land in is full. On the first live block — a cursor at `STEP_NEW` rather than `STEP_NEW_IRREVERSIBLE` — whatever is buffered is applied, the buffer is closed and inserts go straight to the database from there on. It is one-way: a stream that reached the head does not go back to buffering.
+
+  This also required wiring a liveness checker for the from-proto sink, which nothing did before, so `isLive` was always nil there. Blocks are now also flushed per block once live, rather than per batch, which is the existing behaviour that the missing checker had made unreachable.
+
+  The connection pools are bounded while at it — 8 connections for the sink's own pool and 2 for binary COPY, where the pgx default was four per core for an applier that COPYs one segment at a time — and `Close` now releases them instead of holding the slots until the process exits.
+
 - Sink: from-proto mode now runs without database constraints by default. `--no-constraints` is gone, replaced by `--with-constraints` (default false), so a fresh sink starts out on the fast path — no constraints, multi-row inserts, local buffer on — instead of needing a flag to get there.
 
   `--with-constraints` adds the primary keys, unique and foreign key constraints to the schema, creating the ones an earlier run left out rather than only applying them to a schema it creates itself. It prevents the performance enhancements the sink otherwise uses: multi-row inserts and the local buffer are both disabled while it is on, and it will slow a big initial sync of the database down considerably, so we recommend leaving it off until the sink is close to chain HEAD. Enabling the SQL constraints can itself take a long time on a populated database, and locks the tables while it runs.

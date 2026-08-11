@@ -349,6 +349,12 @@ func runFromProtoSink(cmd *cobra.Command, driver, manifestPath, dsnString string
 		return fmt.Errorf("new base sinker: %w", err)
 	}
 
+	// Nothing told the sinker when the stream reached the chain head, so nothing could
+	// act on it — the local buffer kept holding blocks that a live sink wants in the
+	// database as they arrive. The cursor-based checker turns live as soon as an
+	// undo-able block shows up, which is exactly that moment.
+	sink.WithLivenessChecker(sink.NewCursorBasedLivenessChecker())(baseSink)
+
 	localBuffer, err := fromProtoLocalBufferOptions(cmd, driver, useConstraints)
 	if err != nil {
 		return err

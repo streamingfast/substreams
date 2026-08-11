@@ -164,6 +164,12 @@ func (d *Database) clientNoCache(dsn *db.DSN) (*ch.Client, error) {
 	return client, nil
 }
 
+// SwitchToDirectInserts does nothing: the ClickHouse backend has no local buffer, its
+// inserts already go straight to the server.
+func (d *Database) SwitchToDirectInserts(ctx context.Context) error {
+	return nil
+}
+
 // ApplyConstraints does nothing: ClickHouse has no primary/foreign key constraints to
 // apply, which is also why CreateDatabase ignores its useConstraints argument.
 func (d *Database) ApplyConstraints() error {

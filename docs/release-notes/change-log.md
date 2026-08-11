@@ -24,6 +24,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- Sink: `substreams sink postgres` and `substreams sink clickhouse` in from-proto mode now write the blocks still held when a bounded run reaches its stop block. Blocks accumulate until `--block-batch-size` of them have gone by, and nothing drained that buffer at the end of the range, so a run ending mid-batch silently dropped its last blocks along with the cursor covering them — and still reported success. With a batch size larger than the requested range, nothing was written at all.
+
+- Sink: `substreams sink postgres` and `substreams sink clickhouse` in from-proto mode no longer crash on a module whose output carries an `enum` field. protoreflect hands an enum out as a `protoreflect.EnumNumber`, a named `int32` that neither dialect's type switch matched: PostgreSQL panicked with `unsupported type: protoreflect.EnumNumber` and ClickHouse on a failed `value.(int32)` assertion. Since the two disagree on the column type — PostgreSQL declares it `TEXT`, ClickHouse `Int32` — the walk now carries both renderings and each dialect takes the one matching the column it created, so PostgreSQL stores the enum's name and ClickHouse its number. A value absent from the descriptor falls back to its number. This covers an enum wherever it appears: as a plain field, as a `repeated` one, inside an `inline` nested message, and as a table's primary key.
+
+- Sink: **BREAKING** — `substreams sink postgres` in from-proto mode now stores `bytes` fields as binary in their `BYTEA` columns. Under the default `--bytes-encoding=raw` both inserters corrupted them, each differently: without `--no-constraints` a 7-byte value was stored as the 14 characters of its base64 form including the surrounding quotes, and with it as the 14 characters of its hex form. The same confusion also broke repeated scalar fields without `--no-constraints`, where each array element was stored with SQL quotes as part of its value (`'alpha'` rather than `alpha`).
+
+  Nothing failed loudly for any of these: the rows were all there, and every query against those columns simply matched nothing. Databases already populated by an affected version hold corrupted values in those columns and need the affected block range re-synced.
+  This changes what lands in those columns, so it breaks anything downstream built against the corrupted form. A consumer reading a `bytes` column as base64 or hex text now gets the binary value instead. A query written to work around the array corruption — matching the element `'alpha'`, quote characters and all, because that is what was stored — now has to match `alpha`. Re-syncing an existing database leaves both forms in the same table until the affected range is rewritten.
+
 - Server: `substreams-tier1` now restarts when its block hub can no longer link incoming live blocks, instead of hanging every request at a frozen head indefinitely. A live-source gap whose one-block files were already merged away can never be linked, and the head-block metrics keep tracking the live source, so the process looked healthy throughout.
 
 ## v1.21.0

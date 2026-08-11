@@ -2,12 +2,13 @@ package postgres
 
 import (
 	"database/sql"
-	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/streamingfast/substreams/sink/sql/bytes"
 	sql2 "github.com/streamingfast/substreams/sink/sql/db_proto/sql"
 	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/schema"
 	"go.uber.org/zap"
@@ -169,16 +170,18 @@ func (i *RowInserter) insert(table string, values []any, database *Database) err
 				values[i] = encoded.(string)
 				continue
 			}
-			values[i] = "'" + base64.StdEncoding.EncodeToString(v) + "'"
+			// Raw bytes target a BYTEA column and the driver binds []byte to it directly.
+			// Rendering a literal here would store that literal's characters instead.
+		case sql2.EnumValue:
+			// The column is TEXT; bind the name rather than the wrapper.
+			values[i] = v.String()
 		case *timestamppb.Timestamp:
 			values[i] = "'" + v.AsTime().Format(time.RFC3339) + "'"
 		case []interface{}:
-			// Handle arrays by converting to PostgreSQL array format
-			var elements []string
-			for _, elem := range v {
-				elements = append(elements, ValueToString(elem, database.dialect.bytesEncoding))
-			}
-			values[i] = "{" + strings.Join(elements, ",") + "}"
+			// These are bound as parameters, not interpolated, so the value must be the
+			// array's text *input* form: {"a","b"} with double quotes. ValueToString
+			// renders SQL literals ('a') and would store the quotes as data.
+			values[i] = pgArrayLiteral(v, database.dialect.bytesEncoding)
 		}
 	}
 
@@ -193,4 +196,57 @@ func (i *RowInserter) insert(table string, values []any, database *Database) err
 
 func (i *RowInserter) flush(database *Database) error {
 	return nil
+}
+
+// pgArrayLiteral renders values in PostgreSQL's array input format, {"a","b"}, for use
+// as a bound parameter. Every element is double-quoted, which the parser accepts for
+// numeric and boolean element types too, and backslashes and quotes are escaped.
+func pgArrayLiteral(values []interface{}, bytesEncoding bytes.Encoding) string {
+	var b strings.Builder
+	b.WriteByte('{')
+
+	for i, value := range values {
+		if i > 0 {
+			b.WriteByte(',')
+		}
+
+		if value == nil {
+			b.WriteString("NULL")
+			continue
+		}
+
+		b.WriteByte('"')
+		b.WriteString(arrayElementEscaper.Replace(arrayElementText(value, bytesEncoding)))
+		b.WriteByte('"')
+	}
+
+	b.WriteByte('}')
+
+	return b.String()
+}
+
+var arrayElementEscaper = strings.NewReplacer(`\`, `\\`, `"`, `\"`)
+
+// arrayElementText is the text output form of one array element, before array quoting.
+func arrayElementText(value interface{}, bytesEncoding bytes.Encoding) string {
+	switch v := value.(type) {
+	case string:
+		return v
+	case []uint8:
+		if bytesEncoding.IsStringType() {
+			encoded, err := bytesEncoding.EncodeBytes(v)
+			if err == nil {
+				return encoded.(string)
+			}
+		}
+		return `\x` + hex.EncodeToString(v)
+	case sql2.EnumValue:
+		return v.String()
+	case time.Time:
+		return v.UTC().Format(time.RFC3339)
+	case *timestamppb.Timestamp:
+		return v.AsTime().UTC().Format(time.RFC3339)
+	default:
+		return fmt.Sprint(v)
+	}
 }

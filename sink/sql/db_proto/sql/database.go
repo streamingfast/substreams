@@ -7,8 +7,8 @@ import (
 	"time"
 
 	pbSchema "github.com/streamingfast/substreams/pb/sf/substreams/sink/sql/schema/v1"
-	"github.com/streamingfast/substreams/sink/sql/proto"
 	sink "github.com/streamingfast/substreams/sink"
+	"github.com/streamingfast/substreams/sink/sql/proto"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/dynamicpb"
@@ -116,7 +116,7 @@ func (d *BaseDatabase) WalkMessageDescriptorAndInsertWithDialect(dm *dynamicpb.M
 					return 0, fmt.Errorf("missing primary key field %q for table %q", primaryKey, tableInfo.Name)
 				}
 				pkValue := dm.Get(pkField)
-				fieldValues = append(fieldValues, pkValue.Interface())
+				fieldValues = append(fieldValues, ScalarFieldValue(pkField, pkValue))
 			}
 		}
 	}
@@ -161,7 +161,7 @@ func (d *BaseDatabase) WalkMessageDescriptorAndInsertWithDialect(dm *dynamicpb.M
 				// Array of native values - add as a single field value (the array itself)
 				var values []interface{}
 				for j := 0; j < list.Len(); j++ {
-					values = append(values, list.Get(j).Interface())
+					values = append(values, ScalarFieldValue(fd,list.Get(j)))
 				}
 				fieldValues = append(fieldValues, values)
 			} else {
@@ -194,7 +194,7 @@ func (d *BaseDatabase) WalkMessageDescriptorAndInsertWithDialect(dm *dynamicpb.M
 				childs = append(childs, fm) //need to be handled after current message inserted
 			}
 		} else {
-			fieldValues = append(fieldValues, fv.Interface())
+			fieldValues = append(fieldValues, ScalarFieldValue(fd,fv))
 		}
 	}
 
@@ -236,6 +236,29 @@ func (d *BaseDatabase) WalkMessageDescriptorAndInsertWithDialect(dm *dynamicpb.M
 	}
 
 	return totalSqlDuration, nil
+}
+
+// ScalarFieldValue unwraps a non-message, non-list value for the inserters.
+//
+// Enums are the only kind that cannot be handed over as-is: protoreflect yields a
+// protoreflect.EnumNumber, a named int32 type that every dialect's type switch misses,
+// so both of them panicked on any message carrying an enum field.
+//
+// Every path that feeds a value to an inserter has to go through here, including the
+// list elements and the dialects' inline/nested extraction, or the same panic comes
+// back for a repeated or nested enum.
+func ScalarFieldValue(fd protoreflect.FieldDescriptor, value protoreflect.Value) any {
+	if fd.Kind() != protoreflect.EnumKind {
+		return value.Interface()
+	}
+
+	number := value.Enum()
+	out := EnumValue{Number: int32(number)}
+	if descriptor := fd.Enum().Values().ByNumber(number); descriptor != nil {
+		out.Name = string(descriptor.Name())
+	}
+
+	return out
 }
 
 type SinkInfo struct {

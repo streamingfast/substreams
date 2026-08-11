@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/streamingfast/logging/zapx"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	sink "github.com/streamingfast/substreams/sink"
 	sql "github.com/streamingfast/substreams/sink/sql/db_proto/sql"
 	"github.com/streamingfast/substreams/sink/sql/db_proto/stats"
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"go.uber.org/zap"
 	"google.golang.org/appengine"
 	"google.golang.org/protobuf/proto"
@@ -125,80 +125,109 @@ func (s *Sinker) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrp
 			return nil
 		}
 
-		if s.useTransaction && !s.parallel {
-			if err := s.db.BeginTransaction(); err != nil {
-				return fmt.Errorf("begin tx: %w", err)
-			}
+		return s.flushHolding(cursor)
+	}
+
+	return nil
+}
+
+// HandleBlockRangeCompletion flushes whatever is still held when a bounded run reaches
+// its stop block.
+//
+// Blocks accumulate until the batch is full, so a run that ends mid-batch left its last
+// blocks in memory and never wrote them, nor the cursor covering them. With
+// --block-batch-size larger than the range, that meant an empty database and a run that
+// looked successful.
+func (s *Sinker) HandleBlockRangeCompletion(ctx context.Context, cursor *sink.Cursor) error {
+	if len(holding) == 0 {
+		return nil
+	}
+
+	s.logger.Info("flushing blocks held at the end of the requested range", zap.Int("block_count", len(holding)))
+
+	return s.flushHolding(cursor)
+}
+
+// flushHolding applies every held block, stores the cursor and commits.
+func (s *Sinker) flushHolding(cursor *sink.Cursor) (err error) {
+	if len(holding) == 0 {
+		return nil
+	}
+
+	lastClock := holding[len(holding)-1].data.Clock
+
+	if s.useTransaction && !s.parallel {
+		if err := s.db.BeginTransaction(); err != nil {
+			return fmt.Errorf("begin tx: %w", err)
 		}
-		errs := appengine.MultiError{}
-		if s.parallel {
-			wg := sync.WaitGroup{}
-			wg.Add(len(holding))
+	}
+	errs := appengine.MultiError{}
+	if s.parallel {
+		wg := sync.WaitGroup{}
+		wg.Add(len(holding))
 
-			for _, h := range holding {
-				go func() {
-					db := s.db.Clone()
-					err := db.BeginTransaction()
-					if err != nil {
-						errs = append(errs, err)
-					}
+		for _, h := range holding {
+			go func() {
+				db := s.db.Clone()
+				err := db.BeginTransaction()
+				if err != nil {
+					errs = append(errs, err)
+				}
 
-					err = s.processHolder(h, s.stats)
-					if err != nil {
-						db.RollbackTransaction()
-						errs = append(errs, err)
-						//return fmt.Errorf("process holder: %w", err)
-					}
-					err = db.CommitTransaction()
-					if err != nil {
-						errs = append(errs, err)
-					}
-					wg.Done()
-				}()
-			}
-			wg.Wait()
-			if len(errs) > 0 {
-				return fmt.Errorf("errors: %w", errs)
-			}
-
-		} else {
-			for _, h := range holding {
 				err = s.processHolder(h, s.stats)
 				if err != nil {
-					if s.useTransaction {
-						s.logger.Error("rolling back transaction", zap.Error(err))
-						s.db.RollbackTransaction()
-					}
-					return fmt.Errorf("process holder: %w", err)
+					db.RollbackTransaction()
+					errs = append(errs, err)
 				}
+				err = db.CommitTransaction()
+				if err != nil {
+					errs = append(errs, err)
+				}
+				wg.Done()
+			}()
+		}
+		wg.Wait()
+		if len(errs) > 0 {
+			return fmt.Errorf("errors: %w", errs)
+		}
+
+	} else {
+		for _, h := range holding {
+			err = s.processHolder(h, s.stats)
+			if err != nil {
+				if s.useTransaction {
+					s.logger.Error("rolling back transaction", zap.Error(err))
+					s.db.RollbackTransaction()
+				}
+				return fmt.Errorf("process holder: %w", err)
 			}
 		}
-
-		flushDuration, err := s.db.Flush()
-		if err != nil {
-			return fmt.Errorf("flushing: %w", err)
-		}
-
-		var flushDurationPerBlock time.Duration
-		if len(holding) > 0 {
-			flushDurationPerBlock = flushDuration / time.Duration(len(holding))
-		}
-		s.stats.FlushDuration.Add(flushDurationPerBlock)
-
-		s.lastAppliedBlockNum = data.Clock.Number
-		s.lastAppliedBlockTime = data.Clock.Timestamp.AsTime()
-		err = s.db.StoreCursor(cursor)
-		if err != nil {
-			return fmt.Errorf("inserting cursor: %w", err)
-		}
-
-		if s.useTransaction && !s.parallel {
-			if err := s.db.CommitTransaction(); err != nil {
-				return fmt.Errorf("commit tx: %w", err)
-			}
-		}
-		holding = []*Holder{}
 	}
+
+	flushDuration, err := s.db.Flush()
+	if err != nil {
+		return fmt.Errorf("flushing: %w", err)
+	}
+
+	var flushDurationPerBlock time.Duration
+	if len(holding) > 0 {
+		flushDurationPerBlock = flushDuration / time.Duration(len(holding))
+	}
+	s.stats.FlushDuration.Add(flushDurationPerBlock)
+
+	s.lastAppliedBlockNum = lastClock.Number
+	s.lastAppliedBlockTime = lastClock.Timestamp.AsTime()
+	err = s.db.StoreCursor(cursor)
+	if err != nil {
+		return fmt.Errorf("inserting cursor: %w", err)
+	}
+
+	if s.useTransaction && !s.parallel {
+		if err := s.db.CommitTransaction(); err != nil {
+			return fmt.Errorf("commit tx: %w", err)
+		}
+	}
+	holding = []*Holder{}
 
 	return nil
 }

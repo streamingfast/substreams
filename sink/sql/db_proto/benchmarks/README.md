@@ -17,12 +17,12 @@ The second one turned out to matter more than the first. See *What the numbers s
 
 ## Running
 
-The correctness tests run by default; only the measurements are gated, so plain
-`go test ./...` stays fast and still works without Docker:
+The correctness tests always run; only the measurements are gated, so plain
+`go test ./...` stays fast. It does need a container runtime:
 
 | gate | covers | |
 |---|---|---|
-| *(none, needs a container runtime)* | `TestPgCopyBinaryRoundTrip` | correctness; runs whenever Docker is reachable, skips when it is not. `SF_SINK_SQL_INTEGRATION_TESTS=true` turns "no runtime" into a failure instead of a skip, for a runner that is supposed to have one |
+| *(none)* | `TestPgCopyBinaryRoundTrip` | correctness; always runs, and needs a container runtime |
 | `SF_SINK_SQL_BENCHMARKS=true` | everything else | measurements; they assert nothing and cost minutes |
 
 `TestCopyVsInsert` still needs `SF_SINK_SQL_BENCHMARKS=true`; its container now comes on

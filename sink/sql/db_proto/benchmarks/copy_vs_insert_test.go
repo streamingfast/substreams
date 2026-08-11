@@ -49,7 +49,6 @@ import (
 const multiRowBatchSize = 500
 
 func TestCopyVsInsert(t *testing.T) {
-	requireDocker(t)
 	requireBenchmark(t)
 
 	ctx := context.Background()

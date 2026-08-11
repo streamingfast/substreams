@@ -20,7 +20,6 @@ import (
 // parameterised INSERT of the same value produces. Binary COPY does no coercion, so an
 // encoder bug shows up as either a hard COPY failure or, worse, silently wrong data.
 func TestPgCopyBinaryRoundTrip(t *testing.T) {
-	requireDocker(t)
 
 	ctx := context.Background()
 	pool := startPostgres(t, ctx)

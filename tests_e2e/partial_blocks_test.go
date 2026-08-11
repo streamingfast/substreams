@@ -19,6 +19,10 @@ import (
 
 const latestDummyBlockchainImage = "ghcr.io/streamingfast/dummy-blockchain:1cea671"
 
+// burstBlocks is how many blocks the dummy chain produces before it starts streaming
+// live. Requests in TestPartialBlocksWithStores start above it, see below.
+const burstBlocks = 300
+
 func TestPartialBlocksSimple(t *testing.T) {
 	ctx := context.Background()
 	// takes zlog from init()
@@ -157,16 +161,16 @@ func TestPartialBlocksWithStores(t *testing.T) {
 	}{
 		{
 			name:           "dev with stores",
-			startBlock:     300,
-			stopBlock:      330,
+			startBlock:     310,
+			stopBlock:      340,
 			productionMode: false,
 			spkgFile:       "./partial_blocks_store/partial-blocks-store-v0.1.0.spkg",
 			outputModule:   "map_tx_counter_summary",
 		},
 		{
 			name:           "prod with stores",
-			startBlock:     300,
-			stopBlock:      330,
+			startBlock:     310,
+			stopBlock:      340,
 			productionMode: true,
 			spkgFile:       "./partial_blocks_store/partial-blocks-store-v0.1.0.spkg",
 			outputModule:   "map_tx_counter_summary",
@@ -185,7 +189,12 @@ func TestPartialBlocksWithStores(t *testing.T) {
 
 			// launch dummy blockchain container with flash blocks enabled
 			image := latestDummyBlockchainImage
-			burst := int(tc.startBlock)
+
+			// The chain bursts to burstBlocks and only then starts streaming live, so
+			// requests start past that mark: a reorg landing on the boundary itself
+			// forks off a parent the hub never saw live, and five of those in a row are
+			// what maxConsecutiveUnlinkableBlocks calls a wedged hub.
+			burst := burstBlocks
 
 			t.Logf("Starting container with image: %s and burst %d", image, burst)
 			container, err := newDummyBlockchainContainerWithBlockRate(ctx, tmpDir, image, "--with-flash-blocks --with-reorgs", burst, 330)

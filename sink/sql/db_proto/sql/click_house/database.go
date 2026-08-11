@@ -226,6 +226,10 @@ func (d *Database) WalkMessageDescriptorAndInsert(dm *dynamicpb.Message, blockNu
 	return d.BaseDatabase.WalkMessageDescriptorAndInsertWithDialect(dm, blockNum, blockTimestamp, parent, d.dialect, d)
 }
 
+func (d *Database) WalkMessageDescriptorAndInsertInto(dm *dynamicpb.Message, blockNum uint64, blockTimestamp time.Time, parent *sql.Parent, inserter sql.Inserter) (time.Duration, error) {
+	return d.BaseDatabase.WalkMessageDescriptorAndInsertWithDialect(dm, blockNum, blockTimestamp, parent, d.dialect, inserter)
+}
+
 func (d *Database) BeginTransaction() error {
 	return nil
 }
@@ -476,12 +480,6 @@ func (d *Database) HandleBlocksUndo(lastValidBlockNum uint64) error {
 	}
 
 	return nil
-}
-
-func (d *Database) Clone() sql.Database {
-	base := d.BaseClone()
-	d.BaseDatabase = base
-	return d
 }
 
 func (d *Database) DatabaseHash(schemaName string) (uint64, error) {

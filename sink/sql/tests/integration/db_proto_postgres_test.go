@@ -11,11 +11,11 @@ import (
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/substreams/manifest"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	sink "github.com/streamingfast/substreams/sink"
 	"github.com/streamingfast/substreams/sink/sql/db_proto"
 	pbrelations "github.com/streamingfast/substreams/sink/sql/tests/relations"
-	"github.com/streamingfast/substreams/manifest"
-	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -95,7 +95,6 @@ func TestDbProtoPostgresIntegration(t *testing.T) {
 				UseConstraints:  false,
 				UseTransactions: true,
 				BlockBatchSize:  1,
-				Parallel:        false,
 			}.Defaults()
 
 			sinkerFactory := db_proto.SinkerFactory(

@@ -434,6 +434,7 @@ func (p *Pipeline) emitLinearSessionInit(ctx context.Context) error {
 		EffectiveBlocksToProcessBeforeStartBlock: 0,
 		BlocksToProcessAfterStartBlock:           toProcessAfter, // only linear processing
 		EffectiveBlocksToProcessAfterStartBlock:  toProcessAfter, // only linear processing
+		SegmentBlockCount:                        p.stateBundleSize,
 	})
 
 	if err := reqDetails.AssertProcessedBlocksLimit(0, toProcessAfter); err != nil {
@@ -672,6 +673,7 @@ func (p *Pipeline) runParallelProcess(ctx context.Context, reqPlan *plan.Request
 		BlocksToProcessAfterStartBlock:           blocksAfter,
 		EffectiveBlocksToProcessBeforeStartBlock: effectiveBlocksBefore,
 		EffectiveBlocksToProcessAfterStartBlock:  effectiveBlocksAfter,
+		SegmentBlockCount:                        p.stateBundleSize,
 	})
 
 	if err := reqDetails.AssertProcessedBlocksLimit(effectiveBlocksBefore, effectiveBlocksAfter); err != nil {

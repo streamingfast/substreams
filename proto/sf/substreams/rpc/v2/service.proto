@@ -258,6 +258,15 @@ message SessionInit {
 
   // same as `blocks_to_process_after_start_block`, but excluding the current cached outputs
   uint64 effective_blocks_to_process_after_start_block = 10;
+
+  // The width in blocks of one parallel processing segment, constant for the whole session.
+  // Segments are the unit the parallel phase schedules, caches and squashes in, so this is
+  // what turns a segment count such as `Stage.squash_wait_segment_count` into a number of blocks.
+  //
+  // Careful, it is an upper bound rather than an exact multiplier: the first and last segment
+  // of a run are genuinely narrower when a module's initial block or the request's stop block
+  // falls inside a segment. Good enough to size a progress bar, not to reconcile a total.
+  uint64 segment_block_count = 11;
 }
 
 // InitialSnapshotComplete is sent in developer mode after all InitialSnapshotData
@@ -373,7 +382,31 @@ message Stage {
   // The names of the modules that belong to this execution stage.
   repeated string modules = 1;
   // The block ranges that have been fully processed and cached for this stage.
+  //
+  // Careful: a store segment appears here as soon as its *partial* has been produced, which
+  // happens before tier1 has squashed that partial into the store. Full coverage here does
+  // therefore not mean the stage is usable end to end. Use ready_up_to_exclusive for that.
   repeated BlockRange completed_ranges = 2;
+  // The chain block number, exclusive, up to which this stage is immediately usable. It is
+  // the lowest such block across the stage's modules, since a stage is only as advanced as
+  // its least advanced module.
+  //
+  // For stores this stops at the last *squashed* segment: unlike completed_ranges, segments
+  // that were produced but not merged yet are deliberately excluded. Mappers and indexes
+  // count their partial files as ready, since that is exactly what the output stream reads
+  // from, so for them the two notions coincide.
+  //
+  // A stage that has not started yet reports where its modules begin (their initial block,
+  // floored at the chain's first streamable block), not a sentinel. 0 is a valid value
+  // meaning "nothing usable yet, starting from block 0" and must not be read as "unknown".
+  uint64 ready_up_to_exclusive = 3;
+  // The number of *segments* — not blocks — whose store partial exists but is still waiting
+  // to be squashed into the store. Always 0 for a stage that executes no store module.
+  //
+  // A stage showing complete completed_ranges together with a non-zero value here is not
+  // stuck: tier1 is squashing. Squashing runs no job and advances no processed_blocks
+  // counter, so such a request otherwise looks frozen at 100% with a rate of zero.
+  uint64 squash_wait_segment_count = 4;
 }
 
 // ModuleStats gathers metrics and statistics from each module, running on tier1 or tier2

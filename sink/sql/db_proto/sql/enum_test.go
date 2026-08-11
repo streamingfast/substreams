@@ -31,7 +31,7 @@ func TestScalarFieldValueUnwrapsEnums(t *testing.T) {
 	field := descriptor.Fields().ByName("update_policy")
 	require.NotNil(t, field)
 
-	value := scalarFieldValue(field, dynamic.Get(field))
+	value := ScalarFieldValue(field, dynamic.Get(field))
 
 	enum, ok := value.(EnumValue)
 	require.True(t, ok, "expected an EnumValue, got %T", value)
@@ -52,10 +52,10 @@ func TestScalarFieldValueLeavesOtherKindsAlone(t *testing.T) {
 	require.NoError(t, proto.Unmarshal(encoded, dynamic))
 
 	name := descriptor.Fields().ByName("name")
-	assert.Equal(t, "map_something", scalarFieldValue(name, dynamic.Get(name)))
+	assert.Equal(t, "map_something", ScalarFieldValue(name, dynamic.Get(name)))
 
 	initialBlock := descriptor.Fields().ByName("initial_block")
-	assert.Equal(t, uint64(42), scalarFieldValue(initialBlock, dynamic.Get(initialBlock)))
+	assert.Equal(t, uint64(42), ScalarFieldValue(initialBlock, dynamic.Get(initialBlock)))
 }
 
 // TestEnumValueFallsBackToTheNumber covers a value the descriptor does not know, which a

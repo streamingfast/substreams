@@ -216,7 +216,7 @@ func (d *DialectClickHouse) AppendInlineFieldValues(fieldValues []any, fd protor
 				for k := 0; k < list.Len(); k++ {
 					fm := list.Get(k).Message().Interface().(*dynamicpb.Message)
 					nestedValue := fm.Get(nestedFd)
-					nestedValues = append(nestedValues, nestedValue.Interface())
+					nestedValues = append(nestedValues, sql2.ScalarFieldValue(nestedFd, nestedValue))
 				}
 
 				fieldValues = append(fieldValues, nestedValues)
@@ -240,7 +240,7 @@ func (d *DialectClickHouse) AppendInlineFieldValues(fieldValues []any, fd protor
 			nestedFd := nestedFields.Get(j)
 			nestedValue := fm.Get(nestedFd)
 			// Wrap the single value in an array (array of size 1)
-			fieldValues = append(fieldValues, []interface{}{nestedValue.Interface()})
+			fieldValues = append(fieldValues, []interface{}{sql2.ScalarFieldValue(nestedFd, nestedValue)})
 		}
 	}
 	return fieldValues, nil

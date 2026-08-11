@@ -116,7 +116,7 @@ func (d *BaseDatabase) WalkMessageDescriptorAndInsertWithDialect(dm *dynamicpb.M
 					return 0, fmt.Errorf("missing primary key field %q for table %q", primaryKey, tableInfo.Name)
 				}
 				pkValue := dm.Get(pkField)
-				fieldValues = append(fieldValues, pkValue.Interface())
+				fieldValues = append(fieldValues, ScalarFieldValue(pkField, pkValue))
 			}
 		}
 	}
@@ -161,7 +161,7 @@ func (d *BaseDatabase) WalkMessageDescriptorAndInsertWithDialect(dm *dynamicpb.M
 				// Array of native values - add as a single field value (the array itself)
 				var values []interface{}
 				for j := 0; j < list.Len(); j++ {
-					values = append(values, scalarFieldValue(fd, list.Get(j)))
+					values = append(values, ScalarFieldValue(fd,list.Get(j)))
 				}
 				fieldValues = append(fieldValues, values)
 			} else {
@@ -194,7 +194,7 @@ func (d *BaseDatabase) WalkMessageDescriptorAndInsertWithDialect(dm *dynamicpb.M
 				childs = append(childs, fm) //need to be handled after current message inserted
 			}
 		} else {
-			fieldValues = append(fieldValues, scalarFieldValue(fd, fv))
+			fieldValues = append(fieldValues, ScalarFieldValue(fd,fv))
 		}
 	}
 
@@ -238,12 +238,16 @@ func (d *BaseDatabase) WalkMessageDescriptorAndInsertWithDialect(dm *dynamicpb.M
 	return totalSqlDuration, nil
 }
 
-// scalarFieldValue unwraps a non-message, non-list value for the inserters.
+// ScalarFieldValue unwraps a non-message, non-list value for the inserters.
 //
 // Enums are the only kind that cannot be handed over as-is: protoreflect yields a
 // protoreflect.EnumNumber, a named int32 type that every dialect's type switch misses,
 // so both of them panicked on any message carrying an enum field.
-func scalarFieldValue(fd protoreflect.FieldDescriptor, value protoreflect.Value) any {
+//
+// Every path that feeds a value to an inserter has to go through here, including the
+// list elements and the dialects' inline/nested extraction, or the same panic comes
+// back for a repeated or nested enum.
+func ScalarFieldValue(fd protoreflect.FieldDescriptor, value protoreflect.Value) any {
 	if fd.Kind() != protoreflect.EnumKind {
 		return value.Interface()
 	}

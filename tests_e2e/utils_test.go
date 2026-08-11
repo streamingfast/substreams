@@ -362,30 +362,33 @@ waitReady:
 	return t1app, substreamsEndpoint
 }
 
-func newDummyBlockchainContainer(ctx context.Context, tmpDir string, image string, additionalReaderArgs string, burst int) (testcontainers.Container, error) {
+func newDummyBlockchainContainer(t *testing.T, ctx context.Context, tmpDir string, image string, additionalReaderArgs string, burst int) (testcontainers.Container, error) {
 	baseReaderArgs := fmt.Sprintf("start --log-level=error --tracer=firehose --store-dir=/data --genesis-block-burst=%d --block-rate=120 --block-size=1500 --genesis-height=0 --server-addr=:9777 --with-reorgs=false --with-skipped-blocks=false", burst)
 	readerArgs := baseReaderArgs
 	if additionalReaderArgs != "" {
 		readerArgs = baseReaderArgs + " " + additionalReaderArgs
 	}
 
-	return newDummyBlockchainContainerWithArgs(ctx, tmpDir, image, readerArgs)
+	return newDummyBlockchainContainerWithArgs(t, ctx, tmpDir, image, readerArgs)
 }
 
-func newDummyBlockchainContainerWithBlockRate(ctx context.Context, tmpDir string, image string, additionalReaderArgs string, burst int, blockRate int) (testcontainers.Container, error) {
+func newDummyBlockchainContainerWithBlockRate(t *testing.T, ctx context.Context, tmpDir string, image string, additionalReaderArgs string, burst int, blockRate int) (testcontainers.Container, error) {
 	readerArgs := fmt.Sprintf("start --log-level=error --tracer=firehose --store-dir=/data --genesis-block-burst=%d --block-rate=%d --block-size=1500 --genesis-height=0 --server-addr=:9777 --with-reorgs=false --with-skipped-blocks=false", burst, blockRate)
 	if additionalReaderArgs != "" {
 		readerArgs = readerArgs + " " + additionalReaderArgs
 	}
 
-	return newDummyBlockchainContainerWithArgs(ctx, tmpDir, image, readerArgs)
+	return newDummyBlockchainContainerWithArgs(t, ctx, tmpDir, image, readerArgs)
 }
 
 // containerStorageDir is where the node's data lands inside the container; the tests
 // bind-mount a host directory here.
 const containerStorageDir = "/app/firehose-data/storage"
 
-func newDummyBlockchainContainerWithArgs(ctx context.Context, tmpDir string, image string, readerArgs string) (testcontainers.Container, error) {
+// containerStartupTimeout is how long a dummy-blockchain container gets to serve gRPC.
+const containerStartupTimeout = 3 * time.Minute
+
+func newDummyBlockchainContainerWithArgs(t *testing.T, ctx context.Context, tmpDir string, image string, readerArgs string) (testcontainers.Container, error) {
 
 	req := testcontainers.ContainerRequest{
 		Image: image,
@@ -409,10 +412,12 @@ func newDummyBlockchainContainerWithArgs(ctx context.Context, tmpDir string, ima
 		Mounts: testcontainers.Mounts(
 			testcontainers.BindMount(tmpDir, containerStorageDir+"/"),
 		),
+		// A CI runner bursting a thousand blocks is a good deal slower than a laptop, and
+		// the default 60s left it timing out on the port before the node was serving.
 		WaitingFor: wait.ForAll(
-			wait.ForListeningPort("10014/tcp"),
-			wait.ForLog("serving gRPC").WithStartupTimeout(30*time.Second),
-		),
+			wait.ForListeningPort("10014/tcp").WithStartupTimeout(containerStartupTimeout),
+			wait.ForLog("serving gRPC").WithStartupTimeout(containerStartupTimeout),
+		).WithStartupTimeoutDefault(containerStartupTimeout),
 	}
 
 	fmt.Println(strings.Join(req.Cmd, " "))
@@ -423,6 +428,11 @@ func newDummyBlockchainContainerWithArgs(ctx context.Context, tmpDir string, ima
 		Started:          true,
 	})
 
+	// A container that failed its readiness wait is still running and still writing into
+	// the bind mount, so it is returned for the caller to clean up rather than dropped.
+	if container != nil {
+		t.Cleanup(func() { terminateContainer(context.WithoutCancel(ctx), container) })
+	}
 	if err != nil {
 		return nil, err
 	}

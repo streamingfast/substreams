@@ -38,9 +38,8 @@ func TestPartialBlocksSimple(t *testing.T) {
 	burst := 120
 
 	t.Logf("Starting container with image: %s and burst %d", image, burst)
-	container, err := newDummyBlockchainContainer(ctx, tmpDir, image, "--with-flash-blocks", burst)
+	container, err := newDummyBlockchainContainer(t, ctx, tmpDir, image, "--with-flash-blocks", burst)
 	require.NoError(t, err)
-	defer terminateContainer(ctx, container)
 
 	// Log container details for debugging
 	if container != nil {
@@ -197,9 +196,8 @@ func TestPartialBlocksWithStores(t *testing.T) {
 			burst := burstBlocks
 
 			t.Logf("Starting container with image: %s and burst %d", image, burst)
-			container, err := newDummyBlockchainContainerWithBlockRate(ctx, tmpDir, image, "--with-flash-blocks --with-reorgs", burst, 330)
+			container, err := newDummyBlockchainContainerWithBlockRate(t, ctx, tmpDir, image, "--with-flash-blocks --with-reorgs", burst, 330)
 			require.NoError(t, err)
-			defer terminateContainer(ctx, container)
 
 			// Log container details for debugging
 			if container != nil {
@@ -391,7 +389,7 @@ func TestPartialBlocksReorgs(t *testing.T) {
 			burst := 0
 
 			t.Logf("Starting container with image: %s and burst %d", image, burst)
-			container, err := newDummyBlockchainContainer(ctx, tmpDir, image, "--with-flash-blocks --with-skipped-blocks=false --with-reorgs --block-rate=220", burst)
+			container, err := newDummyBlockchainContainer(t, ctx, tmpDir, image, "--with-flash-blocks --with-skipped-blocks=false --with-reorgs --block-rate=220", burst)
 			require.NoError(t, err)
 
 			// Log container details for debugging

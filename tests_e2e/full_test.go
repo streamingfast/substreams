@@ -26,9 +26,8 @@ func TestDummyBlockchainContainer(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// launch dummy blockchain container
-	container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", 1000)
+	container, err := newDummyBlockchainContainer(t, ctx, tmpDir, latestDummyBlockchainImage, "", 1000)
 	require.NoError(t, err)
-	defer terminateContainer(ctx, container)
 
 	zlog.Info("dummy blockchain container started", zap.String("tmp_dir", tmpDir))
 
@@ -161,9 +160,8 @@ func TestLiveBackfillerWithTier2SecretAuth(t *testing.T) {
 	// engages and the backfiller fires at least one authenticated job to tier2.
 	// LiveBackFillerFinalBlockDelay=2 (set on Tier1Config) makes the backfiller
 	// fire quickly instead of waiting for the default 120-block delay.
-	container, err := newDummyBlockchainContainerWithBlockRate(ctx, tmpDir, latestDummyBlockchainImage, "", 500, 480)
+	container, err := newDummyBlockchainContainerWithBlockRate(t, ctx, tmpDir, latestDummyBlockchainImage, "", 500, 480)
 	require.NoError(t, err)
-	defer terminateContainer(ctx, container)
 
 	const secret = "super-secret-key-e2e"
 
@@ -224,9 +222,8 @@ func TestErrNoInputTypeUrlNotEmpty(t *testing.T) {
 
 	tmpDir := t.TempDir()
 
-	container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", 1000)
+	container, err := newDummyBlockchainContainer(t, ctx, tmpDir, latestDummyBlockchainImage, "", 1000)
 	require.NoError(t, err)
-	defer terminateContainer(ctx, container)
 
 	app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog)
 	app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)

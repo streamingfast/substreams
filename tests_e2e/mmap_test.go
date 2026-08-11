@@ -103,9 +103,8 @@ func TestMmapBackendE2E(t *testing.T) {
 	t.Logf("Mmap base dir: %s", mmapDir)
 
 	// Launch containers
-	container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", 1000)
+	container, err := newDummyBlockchainContainer(t, ctx, tmpDir, latestDummyBlockchainImage, "", 1000)
 	require.NoError(t, err)
-	defer terminateContainer(ctx, container)
 
 	app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog, mmapDir)
 	app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)
@@ -217,9 +216,8 @@ func TestMemoryBackendE2E(t *testing.T) {
 	t.Setenv("SUBSTREAMS_STORE_BACKEND", "memory")
 	t.Log("Memory backend explicitly enabled (overriding default mmap)")
 
-	container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", 1000)
+	container, err := newDummyBlockchainContainer(t, ctx, tmpDir, latestDummyBlockchainImage, "", 1000)
 	require.NoError(t, err)
-	defer terminateContainer(ctx, container)
 
 	app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog)
 	app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)
@@ -296,9 +294,8 @@ func TestMmapVsMemoryComparison(t *testing.T) {
 				t2ScratchSpace = mmapDir
 			}
 
-			container, err := newDummyBlockchainContainer(ctx, tmpDir, latestDummyBlockchainImage, "", 1000)
+			container, err := newDummyBlockchainContainer(t, ctx, tmpDir, latestDummyBlockchainImage, "", 1000)
 			require.NoError(t, err)
-			defer terminateContainer(ctx, container)
 
 			app2, t2Endpoint := startTier2App(t, ctx, tmpDir, zlog, t2ScratchSpace)
 			app, substreamsEndpoint := startTier1App(t, ctx, tmpDir, container, t2Endpoint, zlog)

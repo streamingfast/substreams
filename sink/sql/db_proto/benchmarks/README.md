@@ -17,19 +17,20 @@ The second one turned out to matter more than the first. See *What the numbers s
 
 ## Running
 
-Everything here is gated, so plain `go test ./...` stays fast and works without Docker:
+The correctness tests run by default; only the measurements are gated, so plain
+`go test ./...` stays fast and still works without Docker:
 
 | gate | covers | |
 |---|---|---|
-| `SF_SINK_SQL_INTEGRATION_TESTS=true` | `TestPgCopyBinaryRoundTrip` | correctness; needs a container, runs wherever the other sink/sql integration tests run |
+| *(none, needs a container runtime)* | `TestPgCopyBinaryRoundTrip` | correctness; runs whenever Docker is reachable, skips when it is not. `SF_SINK_SQL_INTEGRATION_TESTS=true` turns "no runtime" into a failure instead of a skip, for a runner that is supposed to have one |
 | `SF_SINK_SQL_BENCHMARKS=true` | everything else | measurements; they assert nothing and cost minutes |
 
-`TestCopyVsInsert` needs both.
+`TestCopyVsInsert` still needs `SF_SINK_SQL_BENCHMARKS=true`; its container now comes on
+its own.
 
 ```bash
 # correctness first: the binary encoder must be byte-identical to a parameterised INSERT
-SF_SINK_SQL_INTEGRATION_TESTS=true \
-  go test ./sink/sql/db_proto/benchmarks/ -run TestPgCopyBinaryRoundTrip -v
+go test ./sink/sql/db_proto/benchmarks/ -run TestPgCopyBinaryRoundTrip -v
 
 # server side
 PGBENCH_ROWS=250000 PGBENCH_REPEAT=2 \

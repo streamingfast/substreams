@@ -9,18 +9,20 @@ import (
 	"go.uber.org/zap"
 )
 
-// bufferInserter routes rows into the on-disk buffer instead of the database.
+// localBufferInserter routes rows into the local buffer on disk — the one
+// `--local-buffer-max-size` bounds — instead of into the database. It is unrelated to
+// sql.BufferedInserter, which only records a walk's inserts in memory for replay.
 //
 // It sits behind the same pgInserter/pgFlusher interfaces as the accumulator, so the
 // sinker is unchanged: what differs is that a "flush" only seals a segment, and the
 // database is written to later, by the buffer's own goroutine. That is the whole point —
 // the stream stops waiting on PostgreSQL.
-type bufferInserter struct {
+type localBufferInserter struct {
 	buffer *buffer.Buffer
 	logger *zap.Logger
 }
 
-func newBufferInserter(ctx context.Context, database *Database, options buffer.Options, logger *zap.Logger) (*bufferInserter, error) {
+func newLocalBufferInserter(ctx context.Context, database *Database, options buffer.Options, logger *zap.Logger) (*localBufferInserter, error) {
 	applier := buffer.NewApplier(database.pool, database.schema.Name, logger)
 	if err := applier.EnsureSchema(ctx); err != nil {
 		return nil, err
@@ -36,7 +38,7 @@ func newBufferInserter(ctx context.Context, database *Database, options buffer.O
 		return nil, err
 	}
 
-	return &bufferInserter{buffer: buf, logger: logger.Named("buffer_inserter")}, nil
+	return &localBufferInserter{buffer: buf, logger: logger.Named("local_buffer_inserter")}, nil
 }
 
 // loadColumnLayouts resolves every table's column order and type OIDs from the live
@@ -63,7 +65,7 @@ func loadColumnLayouts(ctx context.Context, database *Database) (map[string]*pgc
 	return layouts, nil
 }
 
-func (i *bufferInserter) insert(table string, values []any, database *Database) error {
+func (i *localBufferInserter) insert(table string, values []any, database *Database) error {
 	switch table {
 	case "_cursor_":
 		// The cursor is not a row to buffer: it is what makes a segment resumable, and
@@ -86,10 +88,10 @@ func (i *bufferInserter) insert(table string, values []any, database *Database) 
 	return i.buffer.Insert(table, values)
 }
 
-func (i *bufferInserter) flush(database *Database) error {
+func (i *localBufferInserter) flush(database *Database) error {
 	return i.buffer.MaybeSeal(context.Background())
 }
 
-func (i *bufferInserter) close(ctx context.Context) error {
+func (i *localBufferInserter) close(ctx context.Context) error {
 	return i.buffer.Close(ctx)
 }

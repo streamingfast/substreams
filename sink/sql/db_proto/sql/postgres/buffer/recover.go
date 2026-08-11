@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/postgres/pgcopy"
@@ -35,7 +35,7 @@ func (b *Buffer) recover(ctx context.Context) error {
 	if len(dirs) == 0 {
 		return nil
 	}
-	sort.Strings(dirs)
+	slices.Sort(dirs)
 
 	applied, err := b.applier.AppliedSegments(ctx)
 	if err != nil {

@@ -42,7 +42,7 @@ type Database struct {
 // This is deliberately not "was a buffer configured": schema creation runs before Open
 // and does need real transactions, so the distinction is what keeps DDL working.
 func (d *Database) bufferActive() bool {
-	_, ok := d.inserter.(*bufferInserter)
+	_, ok := d.inserter.(*localBufferInserter)
 
 	return ok
 }
@@ -97,7 +97,7 @@ func (d *Database) Open() error {
 		}
 		d.pool = pool
 
-		inserter, err := newBufferInserter(ctx, d, *d.bufferOptions, d.logger)
+		inserter, err := newLocalBufferInserter(ctx, d, *d.bufferOptions, d.logger)
 		if err != nil {
 			return fmt.Errorf("starting the local buffer: %w", err)
 		}
@@ -266,7 +266,7 @@ func (d *Database) InsertBlock(blockNum uint64, hash string, timestamp time.Time
 // Close drains the local buffer, if one is in use, so the blocks buffered at shutdown
 // reach the database rather than being streamed again on the next run.
 func (d *Database) Close(ctx context.Context) error {
-	inserter, ok := d.inserter.(*bufferInserter)
+	inserter, ok := d.inserter.(*localBufferInserter)
 	if !ok {
 		return nil
 	}
@@ -276,7 +276,7 @@ func (d *Database) Close(ctx context.Context) error {
 
 // BufferStats reports what the local buffer is holding, for the progress line.
 func (d *Database) BufferStats() (blocks int64, bytes int64, appliedBlock uint64, enabled bool) {
-	inserter, ok := d.inserter.(*bufferInserter)
+	inserter, ok := d.inserter.(*localBufferInserter)
 	if !ok {
 		return 0, 0, 0, false
 	}

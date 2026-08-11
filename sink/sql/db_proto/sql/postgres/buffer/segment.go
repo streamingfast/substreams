@@ -12,9 +12,10 @@ package buffer
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/postgres/pgcopy"
@@ -117,7 +118,7 @@ func (s *segment) seal() (*Manifest, error) {
 		Sealed:     true,
 	}
 
-	for _, name := range sortedKeys(s.tables) {
+	for _, name := range slices.Sorted(maps.Keys(s.tables)) {
 		target := s.tables[name]
 
 		if err := target.writer.Close(); err != nil {
@@ -228,14 +229,4 @@ func sanitizeFileName(name string) string {
 			return '_'
 		}
 	}, name)
-}
-
-func sortedKeys[V any](in map[string]V) []string {
-	out := make([]string, 0, len(in))
-	for key := range in {
-		out = append(out, key)
-	}
-	sort.Strings(out)
-
-	return out
 }

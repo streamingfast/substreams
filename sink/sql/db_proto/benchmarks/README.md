@@ -1,7 +1,7 @@
 # from-proto Postgres sink: ingestion benchmarks
 
 Two suites, answering the two questions that decide the design in
-`plans/2026-08-07-fast-local-cache-copy.md`:
+`plans/2026-08-07-fast-local-buffer-copy.md`:
 
 - **`TestCopyVsInsert`** — how fast can PostgreSQL absorb rows, per strategy? Runs against
   a real server in a testcontainer. Every artifact is materialised on disk *before* any
@@ -156,7 +156,7 @@ package and to Docker Hub for the PostgreSQL image, and disk for the database.
 
 **Disk is the one that bites.** At roughly 110 KB per block that is about 5.5 GB for the
 default sizes and about 20 GB at 200,000 blocks, plus the `postgres:17-alpine` image
-(291 MB) and the local cache directory, which `CACHE_MAX` bounds. Note the space has to
+(291 MB) and the local buffer directory, which `BUFFER_MAX` bounds. Note the space has to
 be free where *docker* stores its data, which is often a different filesystem from the
 working directory. The script prints both before it starts and warns when the estimate
 does not fit.
@@ -175,7 +175,7 @@ log, which says `No space left on device` plainly.
 | `WARM` | `0` | stream the range once first, see below |
 | `SUBSTREAMS_BIN` | *(built from source)* | skip the build |
 | `PG_PORT` / `PG_IMAGE` / `PG_CONTAINER` | `55432` / `postgres:17-alpine` / `sinkbench-pg` | |
-| `CACHE_MAX` | `8GiB` | `--local-cache-max-size` |
+| `BUFFER_MAX` | `8GiB` | `--local-buffer-max-size` |
 | `BLOCK_BATCH` | *(sink default, 25)* | `--block-batch-size`; lower it if a backend is killed for memory |
 
 **Warming, `WARM=1`, is off by default.** The server-side cache holds for about 30 days,
@@ -191,7 +191,7 @@ rather than merely running slowly. The script recognises that error and points a
 `WARM=1`.
 
 **These are totals, to durable.** The clock is launch to exit, and the sink only exits
-after `HandleBlockRangeCompletion` has flushed what is held and drained the cache. Every
+after `HandleBlockRangeCompletion` has flushed what is held and drained the buffer. Every
 check on the resulting data runs strictly after the process is gone, so a variant that
 deferred work past exit reports fewer rows rather than a better time. The `drain` column
 is the part of the run that happened after the stream finished — a path that merely
@@ -205,7 +205,7 @@ same rows, same blocks, same fingerprint.
 
 **On a server** — AWS `c5.2xlarge` in `us-east-2`, EBS `gp3` at 1000 MB/s and 10,000 IOPS:
 
-| endpoint | blocks | rows | accumulator | cache | speedup | acc rows/s | cache rows/s |
+| endpoint | blocks | rows | accumulator | buffer | speedup | acc rows/s | buffer rows/s |
 |---|--:|--:|--:|--:|--:|--:|--:|
 | mainnet.eth | 10,000 | 3,375,211 | 94.9s | 18.3s | 5.19x | 35,566 | 184,438 |
 | mainnet.eth | 50,000 | 17,018,743 | 473.8s | 66.6s | 7.11x | 35,919 | 255,537 |
@@ -224,7 +224,7 @@ sides explain it separately:
 - The **accumulator is almost perfectly linear**: 35.6k, 35.9k, 36.5k, 38.2k, 38.1k rows/s
   across every size and endpoint. It is bound by one core building a multi-megabyte
   statement and one backend parsing it, and neither cares how large the table has grown.
-- The **cache is not**: 184k to 259k rows/s. Fixed startup — schema setup, connection,
+- The **buffer is not**: 184k to 259k rows/s. Fixed startup — schema setup, connection,
   the segment sizer ramping from its 8 MiB floor — is amortised over less data at 10,000,
   and by 200,000 the table is around 20 GB and PostgreSQL's own ingest has slowed a
   little. The best case sits in between.
@@ -233,7 +233,7 @@ So the honest headline for server hardware is a range, 5.6x to 7.1x, rather than
 
 **On a laptop** — M-series, `postgres:17-alpine` in Docker Desktop:
 
-| endpoint | blocks | rows | accumulator | cache | speedup |
+| endpoint | blocks | rows | accumulator | buffer | speedup |
 |---|--:|--:|--:|--:|--:|
 | mainnet.eth | 10,000 | 3,375,211 | 40.0s | 12.2s | 3.28x |
 | mainnet.eth | 50,000 | 17,018,743 | 220.7s | 70.2s | 3.14x |
@@ -247,16 +247,16 @@ Repeat measurement, laptop mainnet.eth.ca 200,000 accumulator: 1297.8s and 1364.
 
 ### What the two machines say
 
-**The server is where the accumulator hurts most.** The cache lands near the laptop's
+**The server is where the accumulator hurts most.** The buffer lands near the laptop's
 figures (18.3s against 12.2s at 10,000) while the accumulator is more than twice as slow
 (94.9s against 40.0s). That is the shape to expect: the accumulator is bound by one core
 building and one backend parsing a multi-megabyte statement, and the c5's single-core
-throughput is well below an M-series laptop's, whereas the cache spends its time in COPY
+throughput is well below an M-series laptop's, whereas the buffer spends its time in COPY
 and in the stream. Laptop figures are the conservative case, not the flattering one.
 
 The laptop's mainnet.eth column shows the ratio falling with size (3.28x, 3.14x, 2.77x)
 where the server shows a hump. Neither is a law; both are the same two curves — a flat
-accumulator and a cache whose throughput depends on startup amortisation and on how large
+accumulator and a buffer whose throughput depends on startup amortisation and on how large
 the table has grown — sampled on different hardware.
 
 **The laptop's `.ca` rows are a network artifact, not an endpoint property.** They were
@@ -267,7 +267,7 @@ little sink cost left to remove, and the ratio collapses toward 1x — 1.1x to 1
 at every size including 10,000. Measuring the sink over a slow or distant link measures
 the link.
 
-**Throughput is flat in data volume.** On the laptop against mainnet.eth the cache holds
+**Throughput is flat in data volume.** On the laptop against mainnet.eth the buffer holds
 276k, 242k and 245k rows/s across 10k, 50k and 200k, and the accumulator 84k, 77k and
 88k. Neither degrades from 3.4M to 66M rows.
 

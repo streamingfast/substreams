@@ -48,22 +48,22 @@ def main(argv):
         pairs[(r.endpoint, r.size)][r.variant] = r
 
     print(f"{'endpoint':22s} {'blocks':>8s} {'rows':>12s} "
-          f"{'accumulator':>12s} {'cache':>10s} {'speedup':>8s} {'identical':>10s} {'drain a/c':>14s}")
+          f"{'accumulator':>12s} {'buffer':>10s} {'speedup':>8s} {'identical':>10s} {'drain a/c':>14s}")
     for (endpoint, size), variants in sorted(pairs.items(), key=lambda kv: (kv[0][0], kv[0][1])):
-        acc, cache = variants.get("accumulator"), variants.get("cache")
-        if not (acc and cache):
+        acc, buffer = variants.get("accumulator"), variants.get("buffer")
+        if not (acc and buffer):
             only = next(iter(variants.values()))
             print(f"{short(endpoint):22s} {size:>8,} {only.rows:>12,} "
                   f"{'(only ' + only.variant + ')':>32s}")
             continue
 
-        identical = acc.rows == cache.rows and acc.blocks == cache.blocks and acc.fp == cache.fp
+        identical = acc.rows == buffer.rows and acc.blocks == buffer.blocks and acc.fp == buffer.fp
         drain = "-"
-        if acc.drain is not None and cache.drain is not None:
-            drain = f"{acc.drain:.1f}s/{cache.drain:.1f}s"
+        if acc.drain is not None and buffer.drain is not None:
+            drain = f"{acc.drain:.1f}s/{buffer.drain:.1f}s"
         print(f"{short(endpoint):22s} {size:>8,} {acc.rows:>12,} "
-              f"{acc.seconds:>11.1f}s {cache.seconds:>9.1f}s "
-              f"{acc.seconds / cache.seconds:>7.2f}x "
+              f"{acc.seconds:>11.1f}s {buffer.seconds:>9.1f}s "
+              f"{acc.seconds / buffer.seconds:>7.2f}x "
               f"{'yes' if identical else 'NO -- MISMATCH':>10s} {drain:>14s}")
 
     repeats = collections.defaultdict(list)

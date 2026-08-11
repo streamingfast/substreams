@@ -1,4 +1,4 @@
-package cache
+package buffer
 
 import (
 	"context"
@@ -20,10 +20,10 @@ import (
 // not yet deleted, or anything sitting past a hole left by a lost segment. Whatever is
 // discarded is re-streamed from the cursor, which costs Substreams throughput but can
 // never corrupt.
-func (c *Cache) recover(ctx context.Context) error {
-	entries, err := os.ReadDir(c.options.Dir)
+func (b *Buffer) recover(ctx context.Context) error {
+	entries, err := os.ReadDir(b.options.Dir)
 	if err != nil {
-		return fmt.Errorf("listing %s: %w", c.options.Dir, err)
+		return fmt.Errorf("listing %s: %w", b.options.Dir, err)
 	}
 
 	dirs := make([]string, 0, len(entries))
@@ -37,7 +37,7 @@ func (c *Cache) recover(ctx context.Context) error {
 	}
 	sort.Strings(dirs)
 
-	applied, err := c.applier.AppliedSegments(ctx)
+	applied, err := b.applier.AppliedSegments(ctx)
 	if err != nil {
 		return err
 	}
@@ -49,12 +49,12 @@ func (c *Cache) recover(ctx context.Context) error {
 	)
 
 	for _, name := range dirs {
-		dir := filepath.Join(c.options.Dir, name)
+		dir := filepath.Join(b.options.Dir, name)
 
 		// Segment names carry a sequence number, so the highest one seen tells the next
 		// run where to continue numbering.
-		if sequence := parseSequence(name); sequence > c.nextSequence {
-			c.nextSequence = sequence
+		if sequence := parseSequence(name); sequence > b.nextSequence {
+			b.nextSequence = sequence
 		}
 
 		if holeFound {
@@ -66,7 +66,7 @@ func (c *Cache) recover(ctx context.Context) error {
 		manifest, err := readManifest(dir)
 		if err != nil || !manifest.Sealed {
 			// Never sealed: the process died mid-segment. Its blocks are re-streamed.
-			c.logger.Info("discarding an unsealed cache segment", zap.String("dir", dir))
+			b.logger.Info("discarding an unsealed buffer segment", zap.String("dir", dir))
 			os.RemoveAll(dir)
 			discarded++
 			holeFound = true
@@ -80,7 +80,7 @@ func (c *Cache) recover(ctx context.Context) error {
 		}
 
 		if err := verify(dir, manifest); err != nil {
-			c.logger.Warn("discarding a truncated cache segment, its blocks will be streamed again",
+			b.logger.Warn("discarding a truncated buffer segment, its blocks will be streamed again",
 				zap.String("dir", dir), zap.Error(err))
 			os.RemoveAll(dir)
 			discarded++
@@ -88,7 +88,7 @@ func (c *Cache) recover(ctx context.Context) error {
 			continue
 		}
 
-		if err := c.applier.Apply(ctx, dir, manifest); err != nil {
+		if err := b.applier.Apply(ctx, dir, manifest); err != nil {
 			return fmt.Errorf("replaying segment %s: %w", dir, err)
 		}
 		os.RemoveAll(dir)
@@ -96,7 +96,7 @@ func (c *Cache) recover(ctx context.Context) error {
 	}
 
 	if replayed > 0 || discarded > 0 {
-		c.logger.Info("recovered the local cache",
+		b.logger.Info("recovered the local buffer",
 			zap.Int("segments_replayed", replayed),
 			zap.Int("segments_discarded", discarded))
 	}

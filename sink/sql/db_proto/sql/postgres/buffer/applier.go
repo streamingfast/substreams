@@ -1,4 +1,4 @@
-package cache
+package buffer
 
 import (
 	"context"
@@ -24,7 +24,7 @@ type Applier struct {
 }
 
 func NewApplier(pool *pgxpool.Pool, schema string, logger *zap.Logger) *Applier {
-	return &Applier{pool: pool, schema: schema, logger: logger.Named("cache_applier")}
+	return &Applier{pool: pool, schema: schema, logger: logger.Named("buffer_applier")}
 }
 
 // EnsureSchema creates the bookkeeping table recovery relies on.

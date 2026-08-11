@@ -5,7 +5,7 @@
 #
 #   accumulator  the current path: rows are buffered in memory as SQL literals and
 #                flushed as one large multi-row INSERT per table, synchronously
-#   cache        --local-cache: rows are written to disk in the binary COPY wire format
+#   buffer        --local-buffer: rows are written to disk in the binary COPY wire format
 #                and loaded by a background goroutine, one transaction per segment
 #
 # Both variants run the same binary over the same block range; only the flag differs.
@@ -32,7 +32,7 @@ START_BLOCK=${START_BLOCK:-20000000}
 SIZES=${SIZES:-"10000 50000"}
 WARM=${WARM:-0}
 WARM_CHUNK=${WARM_CHUNK:-10000}
-CACHE_MAX=${CACHE_MAX:-8GiB}
+BUFFER_MAX=${BUFFER_MAX:-8GiB}
 BLOCK_BATCH=${BLOCK_BATCH:-}
 # Rough on-disk cost of one block for the default package, measured at ~324 bytes per row
 # and ~338 rows per block. Only used to size the preflight check.
@@ -156,14 +156,14 @@ warm() {
 measure() { # measure <size> <variant>
   local size=$1 variant=$2
   local schema="sb_${variant}_${size}"
-  local cachedir="$WORKDIR/cache_${variant}_${size}"
+  local bufferdir="$WORKDIR/buffer_${variant}_${size}"
   local log="$WORKDIR/log_${variant}_${size}.txt"
 
   psql_q "DROP SCHEMA IF EXISTS ${schema} CASCADE;" >/dev/null 2>&1
-  rm -rf "$cachedir"
+  rm -rf "$bufferdir"
 
   local extra=()
-  [ "$variant" = cache ] && extra=(--local-cache "$cachedir" --local-cache-max-size "$CACHE_MAX")
+  [ "$variant" = buffer ] && extra=(--local-buffer "$bufferdir" --local-buffer-max-size "$BUFFER_MAX")
   [ -n "$BLOCK_BATCH" ] && extra+=(--block-batch-size "$BLOCK_BATCH")
 
   local t0 t1 rc
@@ -196,7 +196,7 @@ measure() { # measure <size> <variant>
 
       if grep -qiE "no space left on device|could not write to file|could not extend file" <<< "$pglog"; then
         printf '\n  the database ran out of disk. this benchmark writes about %s per\n' "$(human_bytes "$BYTES_PER_BLOCK")"
-        printf '  block, so %s blocks needs roughly %s, plus the local cache directory.\n' \
+        printf '  block, so %s blocks needs roughly %s, plus the local buffer directory.\n' \
                "$size" "$(human_bytes $(( size * BYTES_PER_BLOCK )))"
         printf '  free space now: docker %s, workdir %s\n' \
                "$(free_space "$(docker_root)")" "$(free_space "$WORKDIR")"
@@ -273,7 +273,7 @@ print('  %-11s %8.1fs  rows=%s  rc=%s%s' % (variant, seconds, rows or '?', rc, t
 PYEOF
 
   psql_q "DROP SCHEMA IF EXISTS ${schema} CASCADE;" >/dev/null 2>&1
-  rm -rf "$cachedir"
+  rm -rf "$bufferdir"
 }
 
 # --- run ---------------------------------------------------------------------------
@@ -306,7 +306,7 @@ fi
 for size in $SIZES; do
   log "${size} blocks"
   measure "$size" accumulator
-  measure "$size" cache
+  measure "$size" buffer
 done
 
 log "results"

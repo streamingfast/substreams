@@ -4,24 +4,24 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/postgres/cache"
+	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/postgres/buffer"
 	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/postgres/pgcopy"
 	"go.uber.org/zap"
 )
 
-// cacheInserter routes rows into the on-disk cache instead of the database.
+// bufferInserter routes rows into the on-disk buffer instead of the database.
 //
 // It sits behind the same pgInserter/pgFlusher interfaces as the accumulator, so the
 // sinker is unchanged: what differs is that a "flush" only seals a segment, and the
-// database is written to later, by the cache's own goroutine. That is the whole point —
+// database is written to later, by the buffer's own goroutine. That is the whole point —
 // the stream stops waiting on PostgreSQL.
-type cacheInserter struct {
-	cache  *cache.Cache
+type bufferInserter struct {
+	buffer *buffer.Buffer
 	logger *zap.Logger
 }
 
-func newCacheInserter(ctx context.Context, database *Database, options cache.Options, logger *zap.Logger) (*cacheInserter, error) {
-	applier := cache.NewApplier(database.pool, database.schema.Name, logger)
+func newBufferInserter(ctx context.Context, database *Database, options buffer.Options, logger *zap.Logger) (*bufferInserter, error) {
+	applier := buffer.NewApplier(database.pool, database.schema.Name, logger)
 	if err := applier.EnsureSchema(ctx); err != nil {
 		return nil, err
 	}
@@ -31,12 +31,12 @@ func newCacheInserter(ctx context.Context, database *Database, options cache.Opt
 		return nil, err
 	}
 
-	buffer, err := cache.New(ctx, options, applier, database.schema.Name, tables, logger)
+	buf, err := buffer.New(ctx, options, applier, database.schema.Name, tables, logger)
 	if err != nil {
 		return nil, err
 	}
 
-	return &cacheInserter{cache: buffer, logger: logger.Named("cache_inserter")}, nil
+	return &bufferInserter{buffer: buf, logger: logger.Named("buffer_inserter")}, nil
 }
 
 // loadColumnLayouts resolves every table's column order and type OIDs from the live
@@ -63,7 +63,7 @@ func loadColumnLayouts(ctx context.Context, database *Database) (map[string]*pgc
 	return layouts, nil
 }
 
-func (i *cacheInserter) insert(table string, values []any, database *Database) error {
+func (i *bufferInserter) insert(table string, values []any, database *Database) error {
 	switch table {
 	case "_cursor_":
 		// The cursor is not a row to buffer: it is what makes a segment resumable, and
@@ -72,7 +72,7 @@ func (i *cacheInserter) insert(table string, values []any, database *Database) e
 		if !ok {
 			return fmt.Errorf("expected a string cursor, got %T", values[1])
 		}
-		i.cache.RecordCursor(cursor)
+		i.buffer.RecordCursor(cursor)
 		return nil
 
 	case "_blocks_":
@@ -80,16 +80,16 @@ func (i *cacheInserter) insert(table string, values []any, database *Database) e
 		if !ok {
 			return fmt.Errorf("expected a uint64 block number, got %T", values[0])
 		}
-		i.cache.RecordBlock(blockNum)
+		i.buffer.RecordBlock(blockNum)
 	}
 
-	return i.cache.Insert(table, values)
+	return i.buffer.Insert(table, values)
 }
 
-func (i *cacheInserter) flush(database *Database) error {
-	return i.cache.MaybeSeal(context.Background())
+func (i *bufferInserter) flush(database *Database) error {
+	return i.buffer.MaybeSeal(context.Background())
 }
 
-func (i *cacheInserter) close(ctx context.Context) error {
-	return i.cache.Close(ctx)
+func (i *bufferInserter) close(ctx context.Context) error {
+	return i.buffer.Close(ctx)
 }

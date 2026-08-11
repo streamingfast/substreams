@@ -1,4 +1,4 @@
-package cache
+package buffer
 
 import (
 	"context"
@@ -13,11 +13,11 @@ import (
 	"go.uber.org/zap"
 )
 
-// Options configures the on-disk cache. Everything not set here is derived at runtime.
+// Options configures the on-disk buffer. Everything not set here is derived at runtime.
 type Options struct {
 	// Dir is where segments live. Required.
 	Dir string
-	// MaxBytes is the disk quota. Writes block once the cache holds this much waiting to
+	// MaxBytes is the disk quota. Writes block once the buffer holds this much waiting to
 	// be applied, which is what turns a slow database into backpressure rather than a
 	// full disk. Zero picks 16GiB.
 	MaxBytes int64
@@ -50,12 +50,12 @@ func (o Options) withDefaults() Options {
 	return o
 }
 
-// Cache buffers rows on disk and applies whole segments to PostgreSQL in the background.
+// Buffer holds rows on disk and applies whole segments to PostgreSQL in the background.
 //
 // Rows go in through Insert on the sinker's goroutine; sealed segments leave through a
 // bounded queue that one applier goroutine drains. The queue and the disk quota are what
 // bound memory and disk when the database cannot keep up.
-type Cache struct {
+type Buffer struct {
 	options  Options
 	applier  *Applier
 	logger   *zap.Logger
@@ -72,7 +72,7 @@ type Cache struct {
 	bytesOnDisk atomic.Int64
 	blocksAhead atomic.Int64
 	// appliedBlock is the last block the applier actually committed. It is the only
-	// honest answer to "what is in the database": with a cache, a block reaching the
+	// honest answer to "what is in the database": with a buffer, a block reaching the
 	// sinker's flush means it was queued, not stored.
 	appliedBlock atomic.Uint64
 
@@ -87,113 +87,113 @@ type sealedSegment struct {
 	bytes    int64
 }
 
-// New prepares the cache directory and starts the applier.
+// New prepares the buffer directory and starts the applier.
 //
 // Recovery runs first: anything already on disk is either replayed or discarded before a
 // single new row is written, so the applied state and the resume cursor cannot disagree.
-func New(ctx context.Context, options Options, applier *Applier, schema string, tables map[string]*pgcopy.Table, logger *zap.Logger) (*Cache, error) {
+func New(ctx context.Context, options Options, applier *Applier, schema string, tables map[string]*pgcopy.Table, logger *zap.Logger) (*Buffer, error) {
 	options = options.withDefaults()
 
 	root := filepath.Join(options.Dir, schema)
 	if err := os.MkdirAll(root, 0o755); err != nil {
-		return nil, fmt.Errorf("creating cache directory %s: %w", root, err)
+		return nil, fmt.Errorf("creating buffer directory %s: %w", root, err)
 	}
 
-	c := &Cache{
+	b := &Buffer{
 		options:       options,
 		applier:       applier,
-		logger:        logger.Named("cache"),
+		logger:        logger.Named("buffer"),
 		schema:        schema,
 		tables:        tables,
 		segments:      make(chan *sealedSegment, options.QueueDepth),
 		segmentTarget: options.SegmentMinBytes,
 	}
-	c.options.Dir = root
+	b.options.Dir = root
 
-	if err := c.recover(ctx); err != nil {
-		return nil, fmt.Errorf("recovering cache at %s: %w", root, err)
+	if err := b.recover(ctx); err != nil {
+		return nil, fmt.Errorf("recovering buffer at %s: %w", root, err)
 	}
 
-	c.waitGroup.Add(1)
-	go c.applyLoop(ctx)
+	b.waitGroup.Add(1)
+	go b.applyLoop(ctx)
 
-	return c, nil
+	return b, nil
 }
 
-// Insert buffers one row. It blocks when the cache is full, which is the backpressure
+// Insert buffers one row. It blocks when the buffer is full, which is the backpressure
 // that keeps a slow database from filling the disk.
-func (c *Cache) Insert(table string, values []any) error {
-	if err := c.pendingError(); err != nil {
+func (b *Buffer) Insert(table string, values []any) error {
+	if err := b.pendingError(); err != nil {
 		return err
 	}
 
-	target, ok := c.tables[table]
+	target, ok := b.tables[table]
 	if !ok {
 		return fmt.Errorf("no column layout known for table %q", table)
 	}
 
-	if c.current == nil {
-		if err := c.startSegment(); err != nil {
+	if b.current == nil {
+		if err := b.startSegment(); err != nil {
 			return err
 		}
 	}
 
-	return c.current.writeRow(table, target, values)
+	return b.current.writeRow(table, target, values)
 }
 
 // RecordBlock notes which block the rows now being written belong to.
-func (c *Cache) RecordBlock(blockNum uint64) {
-	if c.current == nil {
-		if err := c.startSegment(); err != nil {
-			c.setError(err)
+func (b *Buffer) RecordBlock(blockNum uint64) {
+	if b.current == nil {
+		if err := b.startSegment(); err != nil {
+			b.setError(err)
 			return
 		}
 	}
-	if c.current.firstBlock == 0 {
-		c.current.firstBlock = blockNum
+	if b.current.firstBlock == 0 {
+		b.current.firstBlock = blockNum
 	}
-	c.current.lastBlock = blockNum
+	b.current.lastBlock = blockNum
 }
 
 // RecordCursor notes the cursor covering everything written so far. The segment carries
 // it so that applying the segment and advancing the cursor commit together.
-func (c *Cache) RecordCursor(cursor string) {
-	if c.current != nil {
-		c.current.cursor = cursor
+func (b *Buffer) RecordCursor(cursor string) {
+	if b.current != nil {
+		b.current.cursor = cursor
 	}
 }
 
 // MaybeSeal hands the current segment to the applier once it is big enough. It is called
 // at every sink flush, so it is also where backpressure is applied.
-func (c *Cache) MaybeSeal(ctx context.Context) error {
-	if err := c.pendingError(); err != nil {
+func (b *Buffer) MaybeSeal(ctx context.Context) error {
+	if err := b.pendingError(); err != nil {
 		return err
 	}
-	if c.current == nil {
+	if b.current == nil {
 		return nil
 	}
 
-	if c.current.pendingBytes() < c.segmentTarget {
+	if b.current.pendingBytes() < b.segmentTarget {
 		return nil
 	}
 
-	return c.Seal(ctx)
+	return b.Seal(ctx)
 }
 
 // Seal closes the current segment and queues it, blocking if the queue is full or the
 // disk quota is reached.
-func (c *Cache) Seal(ctx context.Context) error {
-	if c.current == nil {
+func (b *Buffer) Seal(ctx context.Context) error {
+	if b.current == nil {
 		return nil
 	}
-	if c.current.cursor == "" {
+	if b.current.cursor == "" {
 		// Without a cursor the segment could not be resumed from, so it must not be
 		// applied on its own.
 		return nil
 	}
 
-	pending := c.current
-	c.current = nil
+	pending := b.current
+	b.current = nil
 
 	manifest, err := pending.seal()
 	if err != nil {
@@ -206,32 +206,32 @@ func (c *Cache) Seal(ctx context.Context) error {
 		bytes += table.Bytes
 	}
 
-	if err := c.awaitQuota(ctx, bytes); err != nil {
+	if err := b.awaitQuota(ctx, bytes); err != nil {
 		return err
 	}
 
-	c.bytesOnDisk.Add(bytes)
-	c.blocksAhead.Add(int64(manifest.LastBlock-manifest.FirstBlock) + 1)
+	b.bytesOnDisk.Add(bytes)
+	b.blocksAhead.Add(int64(manifest.LastBlock-manifest.FirstBlock) + 1)
 
 	select {
-	case c.segments <- &sealedSegment{dir: pending.dir, manifest: manifest, bytes: bytes}:
+	case b.segments <- &sealedSegment{dir: pending.dir, manifest: manifest, bytes: bytes}:
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
 	}
 }
 
-// awaitQuota blocks until the cache is under its disk quota again.
-func (c *Cache) awaitQuota(ctx context.Context, incoming int64) error {
+// awaitQuota blocks until the buffer is under its disk quota again.
+func (b *Buffer) awaitQuota(ctx context.Context, incoming int64) error {
 	warned := false
-	for c.bytesOnDisk.Load()+incoming > c.options.MaxBytes {
-		if err := c.pendingError(); err != nil {
+	for b.bytesOnDisk.Load()+incoming > b.options.MaxBytes {
+		if err := b.pendingError(); err != nil {
 			return err
 		}
 		if !warned {
-			c.logger.Warn("local cache is full, holding the stream until the database catches up",
-				zap.String("on_disk", humanBytes(c.bytesOnDisk.Load())),
-				zap.String("quota", humanBytes(c.options.MaxBytes)))
+			b.logger.Warn("local buffer is full, holding the stream until the database catches up",
+				zap.String("on_disk", humanBytes(b.bytesOnDisk.Load())),
+				zap.String("quota", humanBytes(b.options.MaxBytes)))
 			warned = true
 		}
 
@@ -245,9 +245,9 @@ func (c *Cache) awaitQuota(ctx context.Context, incoming int64) error {
 	return nil
 }
 
-func (c *Cache) startSegment() error {
-	c.nextSequence++
-	dir := filepath.Join(c.options.Dir, fmt.Sprintf("seg-%012d", c.nextSequence))
+func (b *Buffer) startSegment() error {
+	b.nextSequence++
+	dir := filepath.Join(b.options.Dir, fmt.Sprintf("seg-%012d", b.nextSequence))
 
 	// A directory left over from a previous run under the same name was already handled
 	// by recovery; removing it keeps a restart from appending to a stale stream.
@@ -257,7 +257,7 @@ func (c *Cache) startSegment() error {
 	if err != nil {
 		return err
 	}
-	c.current = created
+	b.current = created
 
 	return nil
 }
@@ -265,81 +265,81 @@ func (c *Cache) startSegment() error {
 // BytesOnDisk is how much is buffered waiting for the database, including the segment
 // still being written. Counting only sealed segments would badly under-report: a segment
 // grows to hundreds of megabytes before it is handed over.
-func (c *Cache) BytesOnDisk() int64 {
-	total := c.bytesOnDisk.Load()
-	if c.current != nil {
-		total += c.current.pendingBytes()
+func (b *Buffer) BytesOnDisk() int64 {
+	total := b.bytesOnDisk.Load()
+	if b.current != nil {
+		total += b.current.pendingBytes()
 	}
 
 	return total
 }
 
 // BlocksBuffered is how many blocks are waiting, sealed or still being written.
-func (c *Cache) BlocksBuffered() int64 {
-	total := c.blocksAhead.Load()
-	if c.current != nil {
-		total += c.current.blockCount()
+func (b *Buffer) BlocksBuffered() int64 {
+	total := b.blocksAhead.Load()
+	if b.current != nil {
+		total += b.current.blockCount()
 	}
 
 	return total
 }
 
 // AppliedBlock is the last block committed to the database, zero before the first one.
-func (c *Cache) AppliedBlock() uint64 { return c.appliedBlock.Load() }
+func (b *Buffer) AppliedBlock() uint64 { return b.appliedBlock.Load() }
 
-func (c *Cache) pendingError() error {
-	if err := c.applyErr.Load(); err != nil {
+func (b *Buffer) pendingError() error {
+	if err := b.applyErr.Load(); err != nil {
 		return *err
 	}
 
 	return nil
 }
 
-func (c *Cache) setError(err error) {
-	c.applyErr.CompareAndSwap(nil, &err)
+func (b *Buffer) setError(err error) {
+	b.applyErr.CompareAndSwap(nil, &err)
 }
 
 // Close seals whatever is left, drains the applier and reports the first failure.
-func (c *Cache) Close(ctx context.Context) error {
+func (b *Buffer) Close(ctx context.Context) error {
 	var err error
-	c.closeOnce.Do(func() {
-		err = c.Seal(ctx)
-		close(c.segments)
-		c.waitGroup.Wait()
+	b.closeOnce.Do(func() {
+		err = b.Seal(ctx)
+		close(b.segments)
+		b.waitGroup.Wait()
 	})
 
 	if err != nil {
 		return err
 	}
 
-	return c.pendingError()
+	return b.pendingError()
 }
 
-func (c *Cache) applyLoop(ctx context.Context) {
-	defer c.waitGroup.Done()
+func (b *Buffer) applyLoop(ctx context.Context) {
+	defer b.waitGroup.Done()
 
-	for pending := range c.segments {
-		if c.pendingError() != nil {
+	for pending := range b.segments {
+		if b.pendingError() != nil {
 			// Keep draining so Close does not deadlock, but do not touch the database
 			// again after a failure.
 			continue
 		}
 
 		startAt := time.Now()
-		if err := c.applier.Apply(ctx, pending.dir, pending.manifest); err != nil {
-			c.setError(fmt.Errorf("applying segment %s: %w", pending.dir, err))
+		if err := b.applier.Apply(ctx, pending.dir, pending.manifest); err != nil {
+			b.setError(fmt.Errorf("applying segment %s: %w", pending.dir, err))
 			continue
 		}
 		elapsed := time.Since(startAt)
 
-		c.appliedBlock.Store(pending.manifest.LastBlock)
-		c.bytesOnDisk.Add(-pending.bytes)
-		c.blocksAhead.Add(-(int64(pending.manifest.LastBlock-pending.manifest.FirstBlock) + 1))
+		b.appliedBlock.Store(pending.manifest.LastBlock)
+		b.bytesOnDisk.Add(-pending.bytes)
+		b.blocksAhead.Add(-(int64(pending.manifest.LastBlock-pending.manifest.FirstBlock) + 1))
 		os.RemoveAll(pending.dir)
 
-		c.resize(pending.bytes, elapsed)
+		b.resize(pending.bytes, elapsed)
 
-		c.logger.Debug("applied segment",
+		b.logger.Debug("applied segment",
 			zap.Uint64("first_block", pending.manifest.FirstBlock),
 			zap.Uint64("last_block", pending.manifest.LastBlock),
 			zap.String("bytes", humanBytes(pending.bytes)),
@@ -350,17 +350,17 @@ func (c *Cache) applyLoop(ctx context.Context) {
 // resize steers the segment size toward the target COPY duration. Sizing by bytes rather
 // than by blocks matters because block payload size varies by orders of magnitude across
 // chains and modules, so a block count gives wildly unstable durations.
-func (c *Cache) resize(bytes int64, elapsed time.Duration) {
+func (b *Buffer) resize(bytes int64, elapsed time.Duration) {
 	if elapsed <= 0 {
 		return
 	}
 
-	ratio := c.options.TargetFlushDuration.Seconds() / elapsed.Seconds()
+	ratio := b.options.TargetFlushDuration.Seconds() / elapsed.Seconds()
 	// Clamp per step so the sizer converges instead of oscillating.
 	ratio = min(max(ratio, 0.5), 2.0)
 
-	next := int64(float64(c.segmentTarget) * ratio)
-	c.segmentTarget = min(max(next, c.options.SegmentMinBytes), c.options.SegmentMaxBytes)
+	next := int64(float64(b.segmentTarget) * ratio)
+	b.segmentTarget = min(max(next, b.options.SegmentMinBytes), b.options.SegmentMaxBytes)
 }
 
 func humanBytes(n int64) string {

@@ -157,7 +157,7 @@ func (s *Sinker) HandleBlockRangeCompletion(ctx context.Context, cursor *sink.Cu
 		}
 	}
 
-	// A local cache still holds whatever has not reached its segment size. Draining it
+	// A local buffer still holds whatever has not reached its segment size. Draining it
 	// here is what keeps those blocks from being streamed, and paid for, twice.
 	return s.db.Close(ctx)
 }
@@ -218,8 +218,8 @@ func (s *Sinker) flushHolding(cursor *sink.Cursor) (err error) {
 	}
 	s.holding = s.holding[:0]
 
-	// With a local cache the rows are only queued at this point, not durable, so the
-	// applied mark has to come from what the cache actually committed.
+	// With a local buffer the rows are only queued at this point, not durable, so the
+	// applied mark has to come from what the buffer actually committed.
 	if _, _, applied, buffering := s.db.BufferStats(); !buffering {
 		s.stats.Progress.RecordApplied(lastClock.Number)
 	} else if applied > 0 {
@@ -231,15 +231,15 @@ func (s *Sinker) flushHolding(cursor *sink.Cursor) (err error) {
 }
 
 // recordBuffered reports what sits between the stream and the database: blocks held in
-// memory for the next flush, plus whatever a local cache has queued on disk.
+// memory for the next flush, plus whatever a local buffer has queued on disk.
 func (s *Sinker) recordBuffered() {
-	cachedBlocks, cachedBytes, _, buffering := s.db.BufferStats()
+	bufferedBlocks, bufferedBytes, _, buffering := s.db.BufferStats()
 	if !buffering {
 		s.stats.Progress.RecordBuffered(len(s.holding), 0)
 		return
 	}
 
-	s.stats.Progress.RecordBuffered(len(s.holding)+int(cachedBlocks), cachedBytes)
+	s.stats.Progress.RecordBuffered(len(s.holding)+int(bufferedBlocks), bufferedBytes)
 }
 
 // recordDecodeStats folds the per-block timings the workers measured back into the

@@ -1,4 +1,4 @@
-// Package cache buffers a from-proto sink's rows on local disk, in the exact byte
+// Package buffer holds a from-proto sink's rows on local disk, in the exact byte
 // format `COPY ... FROM STDIN (FORMAT BINARY)` expects, and applies them to PostgreSQL
 // from a separate goroutine.
 //
@@ -7,7 +7,7 @@
 // database. Substreams throughput is paid for, so a slow or stalled PostgreSQL should
 // cost disk, not download progress, and blocks already paid for should survive a restart
 // rather than be streamed again.
-package cache
+package buffer
 
 import (
 	"encoding/json"

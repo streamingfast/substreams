@@ -1,4 +1,4 @@
-# Local cache + binary COPY for the from-proto Postgres sink
+# Local buffer + binary COPY for the from-proto Postgres sink
 
 Status: proposal, revised after measurement
 Scope: `sink/sql/db_proto/**` (from-proto mode, PostgreSQL, insert-only). DatabaseChanges
@@ -94,7 +94,7 @@ wide entities, +3% on narrow, no downside.
    [segment slots, filled in stream order]
         │
         ▼
-  local cache: sealed segments on disk        ◀── download cursor lives here
+  local buffer: sealed segments on disk        ◀── download cursor lives here
         │  (PGCOPY binary + manifest.json)
         │
         ├──▶ COPY worker 1 ─┐
@@ -111,14 +111,14 @@ possible.
 
 This is the change that serves goal 1 directly.
 
-- **Download cursor** — persisted in the local cache next to the segments. On restart the
+- **Download cursor** — persisted in the local buffer next to the segments. On restart the
   stream resumes from here.
 - **Apply cursor** — in PostgreSQL, in `_cursor_`, as today. Only ever advances to the
   last block of a committed segment.
 
 Today there is only the apply cursor, so a PostgreSQL outage or a sink crash means
 re-streaming — and re-paying for — every block since the last successful commit. With a
-local cache, downloaded blocks are on disk and are never fetched twice. If the cache is
+local buffer, downloaded blocks are on disk and are never fetched twice. If the buffer is
 lost or torn, the sink falls back to the apply cursor and re-streams, which is correct,
 just slower and billable.
 
@@ -134,7 +134,7 @@ manifest records the cursor of its highest block. No reorder buffer, no per-row 
 ### 2.3 Segment layout
 
 ```
-<local-cache>/<schema>/
+<local-buffer>/<schema>/
     download-cursor.json                       # cursor + block of the last sealed segment
     seg-%016d-%s/                              # first block num + random suffix
         manifest.json                          # written last; its presence = sealed
@@ -150,7 +150,7 @@ manifest is torn and is deleted on recovery.
 `COPY ... FROM STDIN (FORMAT BINARY)` is a length-prefixed tuple stream. Writing that
 exact format to disk makes the flush an `io.Copy` from file to socket: no re-encoding, no
 escaping, no parsing at flush time. That is what lets the COPY workers run independently
-of the decode workers, and it makes the cache directory a first-class artifact that can
+of the decode workers, and it makes the buffer directory a first-class artifact that can
 be loaded into any PostgreSQL later (§7).
 
 Format: 19-byte header (`"PGCOPY\n\377\r\n\0"`, int32 flags, int32 header extension
@@ -187,9 +187,9 @@ That test is the safety net; extend it whenever a new column type becomes reacha
 Three flags, and nothing else user-facing:
 
 ```
---local-cache <path>             enable the decoupled path and say where the cache lives
---local-cache-max-size <size>    disk quota (default: min(10% of free space, 16GiB))
---local-cache-only               download only, never connect to PostgreSQL (see §7)
+--local-buffer <path>             enable the decoupled path and say where the buffer lives
+--local-buffer-max-size <size>    disk quota (default: min(10% of free space, 16GiB))
+--local-buffer-only               download only, never connect to PostgreSQL (see §7)
 ```
 
 Everything else is derived at runtime:
@@ -199,7 +199,7 @@ Everything else is derived at runtime:
 | decode workers | `max(1, NumCPU-1)`; blocks are independent so this is free parallelism |
 | COPY workers | start at 1; add one whenever the segment queue is non-empty **and** the previous addition improved segment throughput; drop back when it does not. Cap at 8 |
 | segment size | target a 3s COPY; after each segment `next = clamp(current * clamp(3s/observed, 0.5, 2), 8MiB, 512MiB)`. Seal on size or a 30s age bound, never mid-block |
-| direct vs cached | `isLive` — live blocks go through the existing accumulator, backfill goes through the cache (§8) |
+| direct vs buffered | `isLive` — live blocks go through the existing accumulator, backfill goes through the buffer (§8) |
 | backpressure | block the receive loop when the queue is full or the disk quota is reached; count the wait |
 
 Sizing segments by **bytes, not blocks or rows**: block payload size varies by orders of
@@ -261,34 +261,34 @@ Metrics to add to `db_proto/stats.Stats`: `DecodeDuration`, `EncodeDuration`,
 `BackpressureWaitDuration`, `DownloadedBlock`, `AppliedBlock`. `BackpressureWaitDuration`
 near zero versus dominant is the single number that separates state 2 from state 3.
 
-## 7. The cache as an artifact
+## 7. The buffer as an artifact
 
-Once the cache directory holds PGCOPY binary plus manifests, three things become
+Once the buffer directory holds PGCOPY binary plus manifests, three things become
 possible for free, and they serve goal 1 better than any tuning:
 
-- **`--local-cache-only`** — stream and encode at full speed, never open a database
+- **`--local-buffer-only`** — stream and encode at full speed, never open a database
   connection. The user pays Substreams once, at the maximum rate their CPU allows.
-- **`substreams sink postgres cache-load <dir>`** — load a cache directory into any
+- **`substreams sink postgres buffer-load <dir>`** — load a buffer directory into any
   PostgreSQL, with as many parallel COPY workers as that server can take. Offline,
   resumable, and repeatable into several databases.
-- **`substreams sink postgres cache-status <dir>`** — report what has been downloaded
+- **`substreams sink postgres buffer-status <dir>`** — report what has been downloaded
   without touching PostgreSQL at all.
 
-`cache-load` overlaps heavily with the existing `inject-csv` command
+`buffer-load` overlaps heavily with the existing `inject-csv` command
 (`cmd/substreams/sink_postgres_inject_csv.go`), which already streams CSV into
 `PgConn().CopyFrom`. Same shape, binary format, manifest-driven.
 
 ## 8. Live blocks, undo, and constraints
 
-- **Live blocks bypass the cache.** When `isLive`, use the existing accumulator path:
+- **Live blocks bypass the buffer.** When `isLive`, use the existing accumulator path:
   latency matters, volume is trivial, undo signals arrive, and round-tripping through
-  disk is pure overhead. Backfill uses the cache. The transition backfill→live must
+  disk is pure overhead. Backfill uses the buffer. The transition backfill→live must
   **drain the segment queue and wait for the last COPY to commit** before the first
-  direct insert, or a direct row could land ahead of an older cached one.
+  direct insert, or a direct row could land ahead of an older buffered one.
 - **Undo signals** only occur near head, where the queue is empty. Guard explicitly:
   assert an empty queue and no in-flight segment, then run the existing
   `HandleBlocksUndo`. Error loudly rather than silently mis-ordering.
-- **The cached path requires `--no-constraints`.** `useConstraints` already selects
+- **The buffered path requires `--no-constraints`.** `useConstraints` already selects
   `RowInserter`, a different path entirely, and FK checks are immediate per row unless
   declared `DEFERRABLE INITIALLY DEFERRED`, which per-table COPY files would violate.
   Fail fast at startup if both are set.
@@ -298,7 +298,7 @@ possible for free, and they serve goal 1 better than any tuning:
 On startup, before running the stream:
 
 1. Read the apply cursor from PostgreSQL and the applied ranges from `_segments_`.
-2. Scan the cache for segment directories, sorted by `first_block`.
+2. Scan the buffer for segment directories, sorted by `first_block`.
 3. Drop segments without a valid sealed manifest (torn write).
 4. Drop segments already recorded in `_segments_` (crash between COMMIT and `rm`).
 5. Drop segments beyond a hole — if an earlier segment was lost, nothing after it is
@@ -323,14 +323,14 @@ re-downloading a few segments — correct but billable, never corrupt.
    `sink/sql/db_proto/decoder.go`. Measures 4.13x at eight workers on a wide entity
    (129k → 534k rows/s); scaling flattens past eight, the work being allocator-bound
    before it runs out of cores, so the default is capped there.
-4. Cache writer: segments, manifests, download cursor, sealing. Synchronous COPY on seal
+4. Buffer writer: segments, manifests, download cursor, sealing. Synchronous COPY on seal
    at first, so the file format and recovery are exercised before concurrency is added.
 5. COPY workers, `_segments_` table, bounded queues, disk-quota backpressure.
 6. Auto-tuning of segment size and COPY worker count (§4).
 7. Recovery and replay (§9), with a test that SIGKILLs mid-backfill and asserts no gaps
    and no duplicates.
 8. Bottleneck verdict logging and metrics (§6).
-9. `--local-cache-only`, `cache-load`, `cache-status` (§7).
+9. `--local-buffer-only`, `buffer-load`, `buffer-status` (§7).
 
 Step 3 is worth doing first and on its own: it needs no new file format, no recovery
 story, and on the measured numbers it is where the throughput is.
@@ -370,7 +370,7 @@ FROM pg_stat_activity WHERE state='active' GROUP BY 1,2;
 Cheap wins that may reduce how much of this is needed:
 
 - `synchronous_commit = off` on the sink's session — safe here, because a lost commit is
-  recovered by the cache replay logic.
+  recovered by the buffer replay logic.
 - Raise `max_wal_size` and `checkpoint_timeout` for the duration of a backfill.
 - Drop secondary indexes for the backfill and build them at the end. Usually the single
   largest factor at tens of GB.

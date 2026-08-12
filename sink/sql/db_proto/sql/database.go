@@ -11,7 +11,6 @@ import (
 	"github.com/streamingfast/substreams/sink/sql/proto"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/types/dynamicpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -25,11 +24,14 @@ type Database interface {
 	StoreSinkInfo(schemaName string, schemaHash string) error
 
 	CreateDatabase(useConstraints bool) error
-	WalkMessageDescriptorAndInsert(dm *dynamicpb.Message, blockNum uint64, blockTimestamp time.Time, parent *Parent) (time.Duration, error)
+	// WalkMessageDescriptorAndInsert reads the message through protoreflect only, so it
+	// does not care which dynamic implementation produced it — dynamicpb and hyperpb are
+	// both accepted, and the decoder picks.
+	WalkMessageDescriptorAndInsert(dm protoreflect.Message, blockNum uint64, blockTimestamp time.Time, parent *Parent) (time.Duration, error)
 	// WalkMessageDescriptorAndInsertInto is the same walk, against a caller-supplied
 	// inserter. It touches no database state, so it is safe to call concurrently with
 	// a BufferedInserter per goroutine.
-	WalkMessageDescriptorAndInsertInto(dm *dynamicpb.Message, blockNum uint64, blockTimestamp time.Time, parent *Parent, inserter Inserter) (time.Duration, error)
+	WalkMessageDescriptorAndInsertInto(dm protoreflect.Message, blockNum uint64, blockTimestamp time.Time, parent *Parent, inserter Inserter) (time.Duration, error)
 	InsertBlock(blockNum uint64, hash string, timestamp time.Time) error
 
 	HandleBlocksUndo(lastValidBlockNumber uint64) error
@@ -74,7 +76,17 @@ type Parent struct {
 	id    interface{}
 }
 
-func (d *BaseDatabase) WalkMessageDescriptorAndInsertWithDialect(dm *dynamicpb.Message, blockNum uint64, blockTimestamp time.Time, parent *Parent, dialect Dialect, inserter Inserter) (time.Duration, error) {
+// WalkMessageDescriptorAndInsertWithDialect turns one message into rows.
+//
+// It takes a protoreflect.Message rather than a concrete *dynamicpb.Message because the
+// walk is read-only: it calls Descriptor, Get and IsValid and nothing else. That is
+// exactly the subset hyperpb implements, which is what lets the decoder swap in the
+// faster parser without this file changing behaviour.
+//
+// Values reached through Get may alias the parser's own memory — hyperpb strings and
+// bytes point into its arena — so an inserter that keeps a []any past the walk keeps the
+// message alive too. See decoder.arenas for where that lifetime is managed.
+func (d *BaseDatabase) WalkMessageDescriptorAndInsertWithDialect(dm protoreflect.Message, blockNum uint64, blockTimestamp time.Time, parent *Parent, dialect Dialect, inserter Inserter) (time.Duration, error) {
 	if dm == nil {
 		return 0, fmt.Errorf("received a nil message")
 	}
@@ -129,7 +141,7 @@ func (d *BaseDatabase) WalkMessageDescriptorAndInsertWithDialect(dm *dynamicpb.M
 		fieldValues = append(fieldValues, parent.id)
 	}
 
-	var childs []*dynamicpb.Message
+	var childs []protoreflect.Message
 
 	fields := md.Fields()
 	for i := 0; i < fields.Len(); i++ {
@@ -155,7 +167,7 @@ func (d *BaseDatabase) WalkMessageDescriptorAndInsertWithDialect(dm *dynamicpb.M
 				} else if list.Len() > 0 {
 					// Array of messages - process as child tables
 					for j := 0; j < list.Len(); j++ {
-						fm := list.Get(j).Message().Interface().(*dynamicpb.Message)
+						fm := list.Get(j).Message()
 						childs = append(childs, fm)
 					}
 				}
@@ -171,7 +183,7 @@ func (d *BaseDatabase) WalkMessageDescriptorAndInsertWithDialect(dm *dynamicpb.M
 			}
 		} else if fd.Kind() == protoreflect.MessageKind {
 			if fv.Message().IsValid() {
-				fm := fv.Message().Interface().(*dynamicpb.Message)
+				fm := fv.Message()
 				if fm.Descriptor().FullName() == "google.protobuf.Timestamp" {
 					// Convert fv to *timestamppb.Timestamp
 					timestamp := &timestamppb.Timestamp{}

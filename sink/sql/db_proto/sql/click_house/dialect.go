@@ -13,7 +13,6 @@ import (
 	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/schema"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/types/dynamicpb"
 )
 
 const staticSqlCreatDatabase = `
@@ -199,12 +198,12 @@ func (d *DialectClickHouse) FullTableName(table *schema.Table) string {
 	return tableName(d.schemaName, table.Name)
 }
 
-func (d *DialectClickHouse) AppendInlineFieldValues(fieldValues []any, fd protoreflect.FieldDescriptor, fv protoreflect.Value, dm *dynamicpb.Message) ([]any, error) {
+func (d *DialectClickHouse) AppendInlineFieldValues(fieldValues []any, fd protoreflect.FieldDescriptor, fv protoreflect.Value, dm protoreflect.Message) ([]any, error) {
 	if fd.IsList() {
 		// Handle as array of nested columns - flatten into multiple arrays
 		list := fv.List()
 		if list.Len() > 0 {
-			firstMessage := list.Get(0).Message().Interface().(*dynamicpb.Message)
+			firstMessage := list.Get(0).Message()
 			nestedFields := firstMessage.Descriptor().Fields()
 
 			// For each nested field, create an array of values from all list elements
@@ -214,7 +213,7 @@ func (d *DialectClickHouse) AppendInlineFieldValues(fieldValues []any, fd protor
 
 				// Collect values for this nested field from all list elements
 				for k := 0; k < list.Len(); k++ {
-					fm := list.Get(k).Message().Interface().(*dynamicpb.Message)
+					fm := list.Get(k).Message()
 					nestedValue := fm.Get(nestedFd)
 					nestedValues = append(nestedValues, sql2.ScalarFieldValue(nestedFd, nestedValue))
 				}
@@ -234,7 +233,7 @@ func (d *DialectClickHouse) AppendInlineFieldValues(fieldValues []any, fd protor
 		}
 	} else {
 		// Handle as nested column - extract each field as an array
-		fm := fv.Message().Interface().(*dynamicpb.Message)
+		fm := fv.Message()
 		nestedFields := fm.Descriptor().Fields()
 		for j := 0; j < nestedFields.Len(); j++ {
 			nestedFd := nestedFields.Get(j)

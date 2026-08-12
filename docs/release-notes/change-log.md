@@ -64,6 +64,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Sink: `Sinker.PrintStats` collapses to a single `📊 Usage Report: no data received` line when a request produced nothing, instead of a header followed by three zeroed counters. Affects `substreams run`, `substreams sink webhook` and `substreams sink noop`.
 
+- Sink: `substreams sink postgres` and `substreams sink clickhouse` in from-proto mode now parse block payloads with [hyperpb](https://buf.build/go/hyperpb) instead of protobuf-go's `dynamicpb`. Both are driven only by the module's descriptor, which is all the sink has at runtime, and both are read through `protoreflect` by the descriptor walk, so the rows are identical — but hyperpb compiles the descriptor into a parser once and parses into an arena, at 18x the speed and one allocation per block instead of thousands.
+
+  End to end that is 1.9x on the full decode path for a wide entity (88k to 168k rows/s on one core) and 2.7x across the decoder's worker pool (517k to 1.40M rows/s on eight). The parse is no longer the expensive half of decoding: the descriptor walk is now around 90% of it. For wide entities the sink is no longer the throughput limit either — eight workers now produce more rows per second than binary COPY absorbs.
+
+  hyperpb builds on amd64 and arm64 only. Every release target already qualifies, and 32-bit was unbuildable for unrelated reasons well before this.
+
+- Sink: **Breaking** `sql.Database.WalkMessageDescriptorAndInsert`, `WalkMessageDescriptorAndInsertInto`, `BaseDatabase.WalkMessageDescriptorAndInsertWithDialect` and `sql.Dialect.AppendInlineFieldValues` take a `protoreflect.Message` where they took a `*dynamicpb.Message`. The walk only ever read the message, so this is what lets the parser be chosen by the caller.
+
 ### Fixed
 
 - Sink: `substreams sink postgres` and `substreams sink clickhouse` in from-proto mode now write the blocks still held when a bounded run reaches its stop block. Blocks accumulate until `--block-batch-size` of them have gone by, and nothing drained that buffer at the end of the range, so a run ending mid-batch silently dropped its last blocks along with the cursor covering them — and still reported success. With a batch size larger than the requested range, nothing was written at all.

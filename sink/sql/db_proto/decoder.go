@@ -6,27 +6,91 @@ import (
 	"sync"
 	"time"
 
+	"buf.build/go/hyperpb"
 	sql "github.com/streamingfast/substreams/sink/sql/db_proto/sql"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/types/dynamicpb"
 )
 
 // decoder turns buffered blocks into buffered inserts, on several goroutines.
 //
-// Unmarshalling into dynamicpb and walking the message descriptor is where the sink
-// spends its time — measured at ~7.8µs of the ~9.3µs a wide entity costs, see
-// sink/sql/db_proto/benchmarks. Blocks are independent, so that part parallelises
-// cleanly. Everything that touches the database stays on the caller's goroutine: the
-// workers only fill a BufferedInserter each, and the caller replays them in block
-// order.
+// Unmarshalling the payload and walking the message descriptor is where the sink spends
+// its time — see sink/sql/db_proto/benchmarks. Blocks are independent, so that part
+// parallelises cleanly. Everything that touches the database stays on the caller's
+// goroutine: the workers only fill a BufferedInserter each, and the caller replays them
+// in block order.
+//
+// The parser is hyperpb rather than protobuf-go's dynamicpb. Both are driven purely by
+// the module's descriptor, which is all the sink has at runtime, and both are read
+// through protoreflect by the walk — but hyperpb compiles the descriptor into a parser
+// once and then parses into an arena, which BenchmarkUnmarshal measures at 15-17x
+// dynamicpb with one allocation per block instead of thousands. That last part is the
+// one that matters here: TestClientDecodeScaling flattens at eight workers because the
+// decode path is allocator-bound, so removing the allocations lifts the ceiling the
+// worker pool runs into, not just the single-threaded time.
 type decoder struct {
-	rootMessageDescriptor protoreflect.MessageDescriptor
-	workers               int
+	// messageType is the parser compiled from the module's output descriptor. Compiling
+	// is expensive and the result is immutable and safe to share, so it happens once per
+	// sinker.
+	messageType *hyperpb.MessageType
+	workers     int
 
 	// buffers are reused across flushes to keep the per-row []any allocations from
 	// being handed to the GC every batch.
 	buffers []*sql.BufferedInserter
+	// arenas hold the parsed messages, one per buffer slot.
+	//
+	// hyperpb parses into an arena and hands out strings and byte slices that point into
+	// it, so the arena has to outlive every value the walk extracted. Those values sit in
+	// buffers[i] until apply replays them, which is why an arena is only freed at the top
+	// of the *next* decodeAll — by then the previous round has been applied and flushed,
+	// and neither the buffer nor any inserter still refers to it.
+	//
+	// Freeing does not return the memory to the OS, it returns it to hyperpb for reuse,
+	// so a slot's arena settles at roughly the high-water mark of the blocks that landed
+	// in it. That is the same shape as buffers above.
+	arenas []*arena
+}
+
+// arena owns one hyperpb.Shared and the bookkeeping the decoder needs around it.
+//
+// Two rules come from hyperpb rather than from us, and both are panics rather than
+// errors, so they are enforced here instead of being left to callers:
+//
+//   - Free panics if nothing was ever allocated. A block whose module produced no output
+//     never parses, so a slot can reach its first free untouched. used covers that.
+//   - A Shared holds exactly one parse: parsing again before Free panics with "attempted
+//     to parse message using in-use Context". The decoder satisfies this structurally by
+//     giving every block in a batch its own slot, and freeing a whole round at once.
+type arena struct {
+	shared *hyperpb.Shared
+	used   bool
+}
+
+func newArena() *arena {
+	return &arena{shared: new(hyperpb.Shared)}
+}
+
+// parse decodes one payload. The message, and every string and byte slice reachable from
+// it, is backed by the arena and stays valid until free.
+func (a *arena) parse(messageType *hyperpb.MessageType, payload []byte) (*hyperpb.Message, error) {
+	a.used = true
+
+	message := a.shared.NewMessage(messageType)
+	if err := message.Unmarshal(payload); err != nil {
+		return nil, err
+	}
+
+	return message, nil
+}
+
+// free reclaims the arena, invalidating everything the last parse produced.
+func (a *arena) free() {
+	if !a.used {
+		return
+	}
+
+	a.shared.Free()
+	a.used = false
 }
 
 // decoded is one block's worth of buffered inserts, plus what it cost to produce.
@@ -46,15 +110,15 @@ type decoded struct {
 func newDecoder(rootMessageDescriptor protoreflect.MessageDescriptor, workers int) *decoder {
 	if workers <= 0 {
 		// One per core, less one for the goroutine draining the gRPC stream, capped at
-		// 8: TestClientDecodeScaling measures 4.13x at eight workers and only 4.24x at
-		// fifteen, the work being allocator-bound well before it runs out of cores.
-		// Taking more would cost the rest of the machine for nothing.
+		// 8: TestClientDecodeScaling measures 4.52x at eight workers and 5.06x at
+		// fifteen, so the seven extra cores together buy 11%. Taking them would cost the
+		// rest of the machine for almost nothing.
 		workers = min(8, max(1, runtime.NumCPU()-1))
 	}
 
 	return &decoder{
-		rootMessageDescriptor: rootMessageDescriptor,
-		workers:               workers,
+		messageType: hyperpb.CompileMessageDescriptor(rootMessageDescriptor),
+		workers:     workers,
 	}
 }
 
@@ -66,11 +130,11 @@ func (d *decoder) decodeAll(holding []*Holder, db sql.Database) ([]*decoded, err
 	results := make([]*decoded, len(holding))
 	errs := make([]error, len(holding))
 
-	d.ensureBuffers(len(holding))
+	d.ensureSlots(len(holding))
 
 	if d.workers == 1 || len(holding) == 1 {
 		for i, holder := range holding {
-			results[i], errs[i] = d.decodeOne(holder, db, d.buffers[i])
+			results[i], errs[i] = d.decodeOne(holder, db, d.buffers[i], d.arenas[i])
 		}
 		return collect(results, errs)
 	}
@@ -85,7 +149,7 @@ func (d *decoder) decodeAll(holding []*Holder, db sql.Database) ([]*decoded, err
 		go func() {
 			defer wg.Done()
 			for i := range next {
-				results[i], errs[i] = d.decodeOne(holding[i], db, d.buffers[i])
+				results[i], errs[i] = d.decodeOne(holding[i], db, d.buffers[i], d.arenas[i])
 			}
 		}()
 	}
@@ -109,17 +173,32 @@ func collect(results []*decoded, errs []error) ([]*decoded, error) {
 	return results, nil
 }
 
-// ensureBuffers grows the reusable buffer pool to one per held block and resets them.
-func (d *decoder) ensureBuffers(count int) {
+// ensureSlots grows the reusable per-block pools to one entry per held block, and clears
+// the entries this round is about to use.
+//
+// This is the only place an arena is freed, and the reason is ordering: the rows the last
+// round produced alias arena memory and are consumed by apply, which the sinker calls
+// before it can come back here. Freeing on the way in therefore reclaims memory that is
+// provably dead, where freeing on the way out of decodeAll would pull it out from under
+// the rows still waiting to be replayed.
+func (d *decoder) ensureSlots(count int) {
+	// Every arena is freed, not only the ones this round will use: a shorter batch after
+	// a longer one would otherwise leave the tail slots pinning the previous round's
+	// memory until a batch that large came along again.
+	for _, arena := range d.arenas {
+		arena.free()
+	}
+
 	for len(d.buffers) < count {
 		d.buffers = append(d.buffers, sql.NewBufferedInserter(64))
+		d.arenas = append(d.arenas, newArena())
 	}
 	for i := range count {
 		d.buffers[i].Reset()
 	}
 }
 
-func (d *decoder) decodeOne(holder *Holder, db sql.Database, into *sql.BufferedInserter) (*decoded, error) {
+func (d *decoder) decodeOne(holder *Holder, db sql.Database, into *sql.BufferedInserter, arena *arena) (*decoded, error) {
 	clock := holder.data.Clock
 	out := &decoded{
 		blockNum:       clock.Number,
@@ -135,8 +214,8 @@ func (d *decoder) decodeOne(holder *Holder, db sql.Database, into *sql.BufferedI
 	}
 
 	unmarshalStartAt := time.Now()
-	message := dynamicpb.NewMessage(d.rootMessageDescriptor)
-	if err := proto.Unmarshal(payload, message); err != nil {
+	message, err := arena.parse(d.messageType, payload)
+	if err != nil {
 		return nil, fmt.Errorf("unmarshaling message: %w", err)
 	}
 	out.unmarshalDuration = time.Since(unmarshalStartAt)

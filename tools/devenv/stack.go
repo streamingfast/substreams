@@ -13,6 +13,7 @@ package devenv
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -211,13 +212,9 @@ func StartTier2(ctx context.Context, config Tier2Config, logger *zap.Logger) (*a
 	}
 
 	t2app := app.NewTier2(logger, conf, modules)
-	go func() {
-		if err := t2app.Run(); err != nil {
-			logger.Error("tier2 terminated", zap.Error(err))
-		}
-	}()
+	terminated := runApp(t2app, "tier2", logger)
 
-	if err := waitReady(ctx, orDefault(config.ReadyTimeout, 30*time.Second), t2app.IsReady); err != nil {
+	if err := waitReady(ctx, orDefault(config.ReadyTimeout, 30*time.Second), t2app.IsReady, terminated); err != nil {
 		return nil, "", fmt.Errorf("tier2 never became ready: %w", err)
 	}
 
@@ -336,13 +333,9 @@ func StartTier1(ctx context.Context, config Tier1Config, logger *zap.Logger) (*a
 		Authenticator:         auth,
 		SessionPool:           sessionPool,
 	})
-	go func() {
-		if err := t1app.Run(); err != nil {
-			logger.Error("tier1 terminated", zap.Error(err))
-		}
-	}()
+	terminated := runApp(t1app, "tier1", logger)
 
-	if err := waitReady(ctx, orDefault(config.ReadyTimeout, 2*time.Minute), t1app.IsReady); err != nil {
+	if err := waitReady(ctx, orDefault(config.ReadyTimeout, 2*time.Minute), t1app.IsReady, terminated); err != nil {
 		return nil, "", fmt.Errorf("tier1 never became ready: %w", err)
 	}
 
@@ -431,7 +424,51 @@ func FindFreePort() (int, error) {
 	return listener.Addr().(*net.TCPAddr).Port, nil
 }
 
-func waitReady(ctx context.Context, timeout time.Duration, isReady func(context.Context) bool) error {
+// runnableApp is the shutter-based app shape both tiers share.
+type runnableApp interface {
+	Run() error
+	OnTerminated(f func(error))
+}
+
+// runApp starts an app and reports any failure on the returned channel.
+//
+// Both tiers launch their listener in a goroutine and return nil from Run straight away, so a
+// nil return means "started", not "finished" — only a non-nil one is a startup failure.
+// Anything that goes wrong afterwards arrives on the shutter instead, which is why both are
+// watched.
+func runApp(app runnableApp, name string, logger *zap.Logger) <-chan error {
+	// Buffered and never closed: two senders, and the reader stops as soon as the app is ready.
+	terminated := make(chan error, 1)
+	report := func(err error) {
+		select {
+		case terminated <- err:
+		default:
+		}
+	}
+
+	app.OnTerminated(func(err error) {
+		if err != nil {
+			logger.Error(name+" terminated", zap.Error(err))
+		}
+		report(err)
+	})
+
+	go func() {
+		if err := app.Run(); err != nil {
+			logger.Error(name+" failed to start", zap.Error(err))
+			report(err)
+		}
+	}()
+
+	return terminated
+}
+
+// waitReady polls until the app reports ready, and gives up early when it terminates instead.
+//
+// Watching for termination is the whole point of the channel: an app that fails on startup —
+// a port already taken, an unreadable store — would otherwise only surface as "timeout after
+// 2m0s", with the real cause sitting in a log line that scrolled past minutes earlier.
+func waitReady(ctx context.Context, timeout time.Duration, isReady func(context.Context) bool, terminated <-chan error) error {
 	deadline := time.After(timeout)
 	ticker := time.NewTicker(20 * time.Millisecond)
 	defer ticker.Stop()
@@ -440,6 +477,11 @@ func waitReady(ctx context.Context, timeout time.Duration, isReady func(context.
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
+		case err := <-terminated:
+			if err != nil {
+				return fmt.Errorf("terminated before becoming ready: %w", err)
+			}
+			return errors.New("terminated before becoming ready")
 		case <-deadline:
 			return fmt.Errorf("timeout after %s", timeout)
 		case <-ticker.C:

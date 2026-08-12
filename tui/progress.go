@@ -302,7 +302,7 @@ func (m model) progressLines() []string {
 	total := globalTotal(m.session)
 	if total == 0 {
 		if cached := cachedBlocks(m.session); cached != 0 {
-			return []string{fmt.Sprintf("Backprocessing  nothing to do  —  %s blocks already cached", formatx.BlockNumber(cached))}
+			return []string{fmt.Sprintf("Backprocessing  nothing to do  —  %s blocks already cached", formatx.Integer(cached))}
 		}
 		return []string{"Backprocessing  nothing to do"}
 	}
@@ -475,11 +475,11 @@ func (m model) outLine(width int) string {
 	ratio := float64(frontier-lo) / float64(target-lo)
 
 	if len(stages) == 1 {
-		return fmt.Sprintf("%s → %s", formatx.BlockNumber(frontier), formatx.BlockNumber(target))
+		return fmt.Sprintf("%s → %s", formatx.Integer(frontier), formatx.Integer(target))
 	}
 
 	return progressRow(stageLabel("out"), ratio, width,
-		fmt.Sprintf("%s → %s", formatx.BlockNumber(frontier), formatx.BlockNumber(target)))
+		fmt.Sprintf("%s → %s", formatx.Integer(frontier), formatx.Integer(target)))
 }
 
 func (m model) moduleLines() []string {

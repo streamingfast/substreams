@@ -224,7 +224,7 @@ func (ui *TUI) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.
 		printClock(data)
 		return nil
 	case OutputModeCURSOR:
-		fmt.Printf("BLOCK #%s (%s) age: %s cursor: %s\n", formatx.BlockNumber(data.Clock.Number), data.Clock.Id, time.Since(data.Clock.Timestamp.AsTime()), cursor.String())
+		fmt.Printf("BLOCK #%s (%s) age: %s cursor: %s\n", formatx.Integer(data.Clock.Number), data.Clock.Id, time.Since(data.Clock.Timestamp.AsTime()), cursor.String())
 		return nil
 	}
 

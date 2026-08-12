@@ -298,11 +298,11 @@ func printClock(block *pbsubstreamsrpc.BlockScopedData) {
 			blockWord = "PARTIAL BLOCK (last)"
 		}
 	}
-	fmt.Printf("----------- %s #%s (%s) age=%s ---------------\n", blockWord, formatx.BlockNumber(block.Clock.Number), block.Clock.Id, time.Since(block.Clock.Timestamp.AsTime()))
+	fmt.Printf("----------- %s #%s (%s) age=%s ---------------\n", blockWord, formatx.Integer(block.Clock.Number), block.Clock.Id, time.Since(block.Clock.Timestamp.AsTime()))
 }
 
 func printUndo(lastGoodClock *pbsubstreams.BlockRef, cursor string) {
-	fmt.Printf("----------- BLOCK UNDO UP TO #%s (0x%s) ---------------\n", formatx.BlockNumber(lastGoodClock.Number), lastGoodClock.Id)
+	fmt.Printf("----------- BLOCK UNDO UP TO #%s (0x%s) ---------------\n", formatx.Integer(lastGoodClock.Number), lastGoodClock.Id)
 	fmt.Printf("\nNext cursor: %s\n", cursor)
 }
 func printUndoJSON(lastGoodClock *pbsubstreams.BlockRef, cursor string) {

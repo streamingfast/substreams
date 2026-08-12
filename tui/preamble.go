@@ -43,11 +43,11 @@ func formatSessionPreamble(session *pbsubstreamsrpc.SessionInit, sctx sessionCon
 
 	head := ""
 	if session.ChainHead != 0 {
-		head = "head " + formatx.BlockNumber(session.ChainHead)
+		head = "head " + formatx.Integer(session.ChainHead)
 	}
 	start := ""
 	if session.ResolvedStartBlock != 0 {
-		start = "start " + formatx.BlockNumber(session.ResolvedStartBlock)
+		start = "start " + formatx.Integer(session.ResolvedStartBlock)
 	}
 	workers := ""
 	if session.MaxParallelWorkers != 0 {

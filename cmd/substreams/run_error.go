@@ -32,16 +32,16 @@ func explainRunError(err error, work sessionWorkReporter, limit uint64) error {
 	total, prepareStores, ok := work.SessionWork()
 	if !ok {
 		return fmt.Errorf("this request processes more blocks than --%s allows (%s): raise it, or remove the guard entirely with --%s 0",
-			limitProcessedBlocksFlag, formatx.BlockNumber(limit), limitProcessedBlocksFlag)
+			limitProcessedBlocksFlag, formatx.Integer(limit), limitProcessedBlocksFlag)
 	}
 
-	needed := formatx.BlockNumber(total) + " blocks"
+	needed := formatx.Integer(total) + " blocks"
 	if prepareStores != 0 {
-		needed += fmt.Sprintf(" (%s of them to prepare the stores)", formatx.BlockNumber(prepareStores))
+		needed += fmt.Sprintf(" (%s of them to prepare the stores)", formatx.Integer(prepareStores))
 	}
 
 	return fmt.Errorf("--%s is set to %s, but this request needs to process %s: raise it with --%s %d, or remove the guard entirely with --%s 0",
-		limitProcessedBlocksFlag, formatx.BlockNumber(limit), needed,
+		limitProcessedBlocksFlag, formatx.Integer(limit), needed,
 		limitProcessedBlocksFlag, suggestedLimit(total), limitProcessedBlocksFlag)
 }
 

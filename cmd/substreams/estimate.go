@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/dustin/go-humanize"
 	"github.com/fatih/color"
 	"github.com/mattn/go-isatty"
 	"github.com/muesli/termenv"
@@ -190,12 +189,12 @@ func estimateE(cmd *cobra.Command, args []string) error {
 	report.Line("%s %s", labelStyle.Render("Package:"), valueStyle.Render(sinkerConfig.Pkg.PackageMeta[0].Name))
 	report.Line("%s  %s", labelStyle.Render("Module:"), valueStyle.Render(sinkerConfig.OutputModule.Name))
 	report.Line("%s  %s", labelStyle.Render("Range:"), valueStyle.Render(fmt.Sprintf("%s - %s (%s blocks)",
-		formatBlockNumber(startBlock),
-		formatBlockNumber(stopBlock),
-		formatBlockNumber(totalRange))))
+		formatx.Integer(startBlock),
+		formatx.Integer(stopBlock),
+		formatx.Integer(totalRange))))
 	report.Line("%s %s", labelStyle.Render("Samples:"), valueStyle.Render(fmt.Sprintf("%d segments (%s blocks, %.2f%% of range)",
 		len(segments),
-		formatBlockNumber(totalSampledBlocks),
+		formatx.Integer(totalSampledBlocks),
 		samplingPercentage)))
 	report.Line("%s %s", labelStyle.Render("Workers:"), valueStyle.Render(fmt.Sprintf("%d parallel", parallelRequests)))
 	report.Line(dimStyle.Render(sectionSeparator))
@@ -206,10 +205,10 @@ func estimateE(cmd *cobra.Command, args []string) error {
 	if !skipConfirmation {
 		report.Line(labelStyle.Render("This estimation will:"))
 		report.Line("  • Sample %s blocks (%.2f%% of the requested range)",
-			formatBlockNumber(totalSampledBlocks),
+			formatx.Integer(totalSampledBlocks),
 			samplingPercentage)
 		report.Line("  • Consume %s processed blocks from your plan's quota",
-			formatBlockNumber(totalSampledBlocks))
+			formatx.Integer(totalSampledBlocks))
 		report.Line("  • Generate egress bytes that count toward your plan's limits")
 		report.Line("")
 		report.Line(labelStyle.Render("Estimation accuracy depends on:"))
@@ -282,15 +281,15 @@ type SegmentResult struct {
 // SampledRangeString returns a formatted string for the sampled block range
 func (r *SegmentResult) SampledRangeString() string {
 	return fmt.Sprintf("%s - %s",
-		formatBlockNumber(r.Segment.SampledStartBlock),
-		formatBlockNumber(r.Segment.SampledEndBlock))
+		formatx.Integer(r.Segment.SampledStartBlock),
+		formatx.Integer(r.Segment.SampledEndBlock))
 }
 
 // ChainRangeString returns a formatted string for the chain block range
 func (r *SegmentResult) ChainRangeString() string {
 	return fmt.Sprintf("%s - %s",
-		formatBlockNumber(r.Segment.ChainStartBlock),
-		formatBlockNumber(r.Segment.ChainEndBlock))
+		formatx.Integer(r.Segment.ChainStartBlock),
+		formatx.Integer(r.Segment.ChainEndBlock))
 }
 
 // ChainRange returns the number of blocks in the chain segment
@@ -734,11 +733,11 @@ func displayProgress(progressChan <-chan *SegmentResult, doneChan chan struct{},
 			status,
 			completed,
 			totalSegments,
-			formatBlockNumber(result.Segment.SampledStartBlock),
-			formatBlockNumber(result.Segment.SampledEndBlock),
-			formatDuration(result.Duration),
-			formatBlockNumber(result.ProcessedBlockCount),
-			formatBytes(result.EgressBytes),
+			formatx.Integer(result.Segment.SampledStartBlock),
+			formatx.Integer(result.Segment.SampledEndBlock),
+			formatx.Duration(result.Duration, formatx.WithZero("N/A")),
+			formatx.Integer(result.ProcessedBlockCount),
+			formatx.Bytes(result.EgressBytes),
 		)
 	}
 }
@@ -785,8 +784,8 @@ func generateReport(report *ReportBuilder, results SegmentResults, startBlock, e
 			result.SampledRangeString(),
 			result.ChainRangeString(),
 			fmt.Sprintf("%.2fs", result.Duration.Seconds()),
-			formatBlockNumber(result.ForecastProcessedBlocks()),
-			formatBytes(result.ForecastEgressBytes()),
+			formatx.Integer(result.ForecastProcessedBlocks()),
+			formatx.Bytes(result.ForecastEgressBytes()),
 		})
 	}
 
@@ -809,13 +808,13 @@ func generateReport(report *ReportBuilder, results SegmentResults, startBlock, e
 	report.Line("%s %s",
 		labelStyle.Render("Requested Range:"),
 		valueStyle.Render(fmt.Sprintf("%s - %s (%s blocks)",
-			formatBlockNumber(startBlock),
-			formatBlockNumber(endBlock),
-			formatBlockNumber(totalRange))))
+			formatx.Integer(startBlock),
+			formatx.Integer(endBlock),
+			formatx.Integer(totalRange))))
 	report.Line("%s %s",
 		labelStyle.Render("Blocks Sampled:"),
 		valueStyle.Render(fmt.Sprintf("%s (%.2f%% of range)",
-			formatBlockNumber(totalSampledBlocks),
+			formatx.Integer(totalSampledBlocks),
 			samplingPercentage)))
 	report.Line("%s %s",
 		labelStyle.Render("Segments Tested:"),
@@ -827,10 +826,10 @@ func generateReport(report *ReportBuilder, results SegmentResults, startBlock, e
 
 	report.Line("%s %s",
 		labelStyle.Render("Estimated Processed Blocks:"),
-		successStyle.Render(formatBlockNumber(results.ForecastProcessedBlocks())))
+		successStyle.Render(formatx.Integer(results.ForecastProcessedBlocks())))
 	report.Line("%s %s",
 		labelStyle.Render("Estimated Egress Bytes:"),
-		successStyle.Render(formatBytes(results.ForecastEgressBytes())))
+		successStyle.Render(formatx.Bytes(results.ForecastEgressBytes())))
 	report.Line("")
 
 	// Calculate estimated reprocessing time
@@ -838,16 +837,16 @@ func generateReport(report *ReportBuilder, results SegmentResults, startBlock, e
 	report.LineStyled(labelStyle, "Estimated Reprocessing Time:")
 	report.Line("  %s %s",
 		dimStyle.Render("Free plan (5 workers):"),
-		valueStyle.Render(formatDuration(reprocessingTimes[5])))
+		valueStyle.Render(formatx.Duration(reprocessingTimes[5], formatx.WithZero("N/A"))))
 	report.Line("  %s %s",
 		dimStyle.Render("Scaling plan (15 workers):"),
-		valueStyle.Render(formatDuration(reprocessingTimes[15])))
+		valueStyle.Render(formatx.Duration(reprocessingTimes[15], formatx.WithZero("N/A"))))
 	report.Line("  %s %s",
 		dimStyle.Render("Pro plan (75 workers):"),
-		valueStyle.Render(formatDuration(reprocessingTimes[75])))
+		valueStyle.Render(formatx.Duration(reprocessingTimes[75], formatx.WithZero("N/A"))))
 	report.Line("  %s %s",
 		dimStyle.Render("Enterprise plan (200 workers):"),
-		valueStyle.Render(formatDuration(reprocessingTimes[200])))
+		valueStyle.Render(formatx.Duration(reprocessingTimes[200], formatx.WithZero("N/A"))))
 	report.Line("")
 	report.LineStyled(dimStyle, "%s", sectionSeparator)
 }
@@ -928,25 +927,6 @@ func (r *ReportBuilder) LineStyled(style lipgloss.Style, format string, a ...any
 	fmt.Fprintf(r.writer, "%s", style.Render(fmt.Sprintf(format, a...))+"\n")
 }
 
-func formatBlockNumber[T ~uint64](blockNumber T) string {
-	return formatx.BlockNumber(blockNumber)
-}
-
-// formatBytes formats bytes in human-readable format
-func formatBytes(bytes uint64) string {
-	return formatx.BytesIEC(bytes)
-}
-
-// formatDuration formats a duration in a human-readable format, where a zero duration means
-// the value is not known rather than being instantaneous.
-func formatDuration(d time.Duration) string {
-	if d == 0 {
-		return "N/A"
-	}
-
-	return formatx.Duration(d)
-}
-
 // printUsageReport prints the actual usage consumed during estimation by reading
 // from the global metrics that were accumulated across all segment executions
 func printUsageReport() {
@@ -961,7 +941,7 @@ func printUsageReport() {
 
 	fmt.Fprintf(os.Stderr, "\n")
 	fmt.Fprintf(os.Stderr, "📊 Usage Report%s\n", noDataReceived)
-	fmt.Fprintf(os.Stderr, " • Egress Bytes (uncompressed): %s\n", humanize.IBytes(uint64(egressBytes)))
-	fmt.Fprintf(os.Stderr, " • Processed Blocks: %s blocks\n", humanize.Comma(int64(processedBlocks)))
-	fmt.Fprintf(os.Stderr, " • Received Blocks: %s blocks\n", humanize.Comma(int64(receivedBlockData)))
+	fmt.Fprintf(os.Stderr, " • Egress Bytes (uncompressed): %s\n", formatx.Bytes(uint64(egressBytes)))
+	fmt.Fprintf(os.Stderr, " • Processed Blocks: %s blocks\n", formatx.Integer(uint64(processedBlocks)))
+	fmt.Fprintf(os.Stderr, " • Received Blocks: %s blocks\n", formatx.Integer(uint64(receivedBlockData)))
 }

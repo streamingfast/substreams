@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
-	"github.com/dustin/go-humanize"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dgrpc"
@@ -20,6 +19,7 @@ import (
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/client"
+	"github.com/streamingfast/substreams/internal/formatx"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -250,9 +250,9 @@ func (s *Sinker) PrintStats() {
 	}
 
 	fmt.Fprintln(os.Stderr, "📊 Usage Report")
-	fmt.Fprintf(os.Stderr, " • Egress Bytes (uncompressed): %s\n", humanize.IBytes(uint64(egressBytes)))
-	fmt.Fprintf(os.Stderr, " • Processed Blocks: %s blocks\n", humanize.Comma(int64(processedBlocks)))
-	fmt.Fprintf(os.Stderr, " • Received Blocks: %s blocks\n", humanize.Comma(int64(receivedBlockData)))
+	fmt.Fprintf(os.Stderr, " • Egress Bytes (uncompressed): %s\n", formatx.Bytes(uint64(egressBytes)))
+	fmt.Fprintf(os.Stderr, " • Processed Blocks: %s blocks\n", formatx.Integer(uint64(processedBlocks)))
+	fmt.Fprintf(os.Stderr, " • Received Blocks: %s blocks\n", formatx.Integer(uint64(receivedBlockData)))
 }
 
 func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler) {

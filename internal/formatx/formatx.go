@@ -4,6 +4,10 @@
 // It exists so that the same quantity does not get formatted three different ways in three
 // different commands. Anything that turns a number into something a user reads belongs here,
 // and nothing here knows about substreams types.
+//
+// Every function takes the same Option list rather than coming in named variants, so a caller
+// that wants "N/A" instead of "0s", or decimal units instead of binary ones, asks for that at
+// the call site instead of growing a wrapper next to it.
 package formatx
 
 import (
@@ -16,20 +20,65 @@ import (
 	"github.com/dustin/go-humanize"
 )
 
-// BlockNumber renders a block number with thousands separators. Block numbers are uint64 and
-// can in principle exceed what humanize.Comma accepts, hence the big.Int path.
-func BlockNumber[T ~uint64](blockNumber T) string {
-	if blockNumber > math.MaxInt64 {
-		return humanize.BigComma(new(big.Int).SetUint64(uint64(blockNumber)))
+// Option adjusts how a value is rendered. Options are shared across every function here; one
+// that does not apply to a given value is simply ignored.
+type Option func(*config)
+
+type config struct {
+	zeroText string
+	hasZero  bool
+	decimal  bool
+}
+
+func newConfig(opts []Option) config {
+	var c config
+	for _, opt := range opts {
+		opt(&c)
+	}
+	return c
+}
+
+// WithZero renders a zero value as the given text instead of formatting it. Use it where zero
+// means "not known" or "not applicable" rather than an actual measurement — an unset duration
+// reading "N/A" says more than one reading "0s".
+func WithZero(text string) Option {
+	return func(c *config) {
+		c.zeroText, c.hasZero = text, true
+	}
+}
+
+// WithDecimalUnits switches Bytes from binary units to powers of a thousand: 1.5 MB rather
+// than 1.5 MiB.
+func WithDecimalUnits() Option {
+	return func(c *config) { c.decimal = true }
+}
+
+// Integer renders a whole number with thousands separators, for block numbers and for exact
+// counts alike — anything a reader has to be able to take in digit by digit, as opposed to
+// Count, which trades those digits for an order of magnitude. The values are uint64 and can in
+// principle exceed what humanize.Comma accepts, hence the big.Int path.
+func Integer[T ~uint64](value T, opts ...Option) string {
+	c := newConfig(opts)
+	if value == 0 && c.hasZero {
+		return c.zeroText
 	}
 
-	return humanize.Comma(int64(blockNumber))
+	if value > math.MaxInt64 {
+		return humanize.BigComma(new(big.Int).SetUint64(uint64(value)))
+	}
+
+	return humanize.Comma(int64(value))
 }
 
 // Count renders a quantity compactly: 912, 3.4k, 6.8M, 1.2B. Use it where the order of
 // magnitude is the point and the exact figure is not; use BlockNumber when the number
 // identifies something and has to be readable digit by digit.
-func Count(n uint64) string {
+func Count(n uint64, opts ...Option) string {
+	c := newConfig(opts)
+	if n == 0 && c.hasZero {
+		return c.zeroText
+	}
+
 	if n < 1_000 {
 		return fmt.Sprintf("%d", n)
 	}
@@ -51,16 +100,27 @@ func Count(n uint64) string {
 }
 
 // Rate renders a per-second rate of the given unit, e.g. Rate(1700, "blk") is "1.7k blk/s".
-func Rate(perSecond float64, unit string) string {
+func Rate(perSecond float64, unit string, opts ...Option) string {
 	if perSecond < 0 || math.IsNaN(perSecond) {
 		perSecond = 0
 	}
+
+	c := newConfig(opts)
+	if perSecond == 0 && c.hasZero {
+		return c.zeroText
+	}
+
 	return Count(uint64(perSecond)) + " " + unit + "/s"
 }
 
 // Duration is shorter than time.Duration.String() at the scales that matter to a reader: an
 // age or an estimate never needs sub-second precision, and hours never need seconds.
-func Duration(d time.Duration) string {
+func Duration(d time.Duration, opts ...Option) string {
+	c := newConfig(opts)
+	if d == 0 && c.hasZero {
+		return c.zeroText
+	}
+
 	if d < 0 {
 		d = 0
 	}
@@ -89,27 +149,43 @@ func Duration(d time.Duration) string {
 }
 
 // Millis renders a millisecond figure, keeping a decimal only while it carries signal.
-func Millis(ms float64) string {
+func Millis(ms float64, opts ...Option) string {
+	c := newConfig(opts)
+	if ms == 0 && c.hasZero {
+		return c.zeroText
+	}
+
 	if ms < 10 {
 		return trimZero(ms) + "ms"
 	}
+
 	return fmt.Sprintf("%dms", int(ms+0.5))
 }
 
-// BytesIEC renders a byte count in binary units: 1.5 MiB.
-func BytesIEC(bytes uint64) string {
-	const unit = 1024
-	if bytes < unit {
+// Bytes renders a byte count in binary units by default — 1.5 MiB — since that is what a file
+// size or a transfer volume is measured in. WithDecimalUnits switches to 1.5 MB.
+func Bytes(bytes uint64, opts ...Option) string {
+	c := newConfig(opts)
+	if bytes == 0 && c.hasZero {
+		return c.zeroText
+	}
+
+	base, suffix := uint64(1024), "iB"
+	if c.decimal {
+		base, suffix = 1000, "B"
+	}
+
+	if bytes < base {
 		return fmt.Sprintf("%d B", bytes)
 	}
 
-	div, exp := uint64(unit), 0
-	for n := bytes / unit; n >= unit; n /= unit {
-		div *= unit
+	div, exp := base, 0
+	for n := bytes / base; n >= base; n /= base {
+		div *= base
 		exp++
 	}
 
-	return fmt.Sprintf("%.1f %ciB", float64(bytes)/float64(div), "KMGTPE"[exp])
+	return fmt.Sprintf("%.1f %c%s", float64(bytes)/float64(div), "KMGTPE"[exp], suffix)
 }
 
 // JoinNonEmpty assembles "a · b · c" segments, dropping the parts that had no data rather

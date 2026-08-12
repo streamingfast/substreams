@@ -8,11 +8,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestBlockNumber(t *testing.T) {
-	assert.Equal(t, "0", BlockNumber(uint64(0)))
-	assert.Equal(t, "1,500,000", BlockNumber(uint64(1_500_000)))
+func TestInteger(t *testing.T) {
+	assert.Equal(t, "0", Integer(uint64(0)))
+	assert.Equal(t, "1,500,000", Integer(uint64(1_500_000)))
 	// Past MaxInt64 the int64 conversion would wrap, hence the big.Int path.
-	assert.Equal(t, "18,446,744,073,709,551,615", BlockNumber(uint64(math.MaxUint64)))
+	assert.Equal(t, "18,446,744,073,709,551,615", Integer(uint64(math.MaxUint64)))
 }
 
 func TestCount(t *testing.T) {
@@ -66,10 +66,41 @@ func TestMillis(t *testing.T) {
 	assert.Equal(t, "13ms", Millis(12.5))
 }
 
-func TestBytesIEC(t *testing.T) {
-	assert.Equal(t, "512 B", BytesIEC(512))
-	assert.Equal(t, "1.0 KiB", BytesIEC(1024))
-	assert.Equal(t, "1.5 MiB", BytesIEC(1024*1024*3/2))
+func TestBytes(t *testing.T) {
+	assert.Equal(t, "512 B", Bytes(512))
+	assert.Equal(t, "1.0 KiB", Bytes(1024))
+	assert.Equal(t, "1.5 MiB", Bytes(1024*1024*3/2))
+
+	// Binary units are the default because that is what a size is measured in; the decimal ones
+	// are an option rather than a second function.
+	assert.Equal(t, "1.0 KB", Bytes(1000, WithDecimalUnits()))
+	assert.Equal(t, "1.5 MB", Bytes(1_500_000, WithDecimalUnits()))
+}
+
+// Zero is an amount for some values and the absence of a measurement for others, so which of
+// the two it is belongs to the caller rather than to a dedicated wrapper per call site.
+func TestWithZero(t *testing.T) {
+	assert.Equal(t, "0s", Duration(0))
+	assert.Equal(t, "N/A", Duration(0, WithZero("N/A")))
+	assert.Equal(t, "41s", Duration(41*time.Second, WithZero("N/A")))
+
+	assert.Equal(t, "0", Integer(uint64(0)))
+	assert.Equal(t, "none", Integer(uint64(0), WithZero("none")))
+	assert.Equal(t, "1,500,000", Integer(uint64(1_500_000), WithZero("none")))
+
+	assert.Equal(t, "0", Count(0))
+	assert.Equal(t, "none", Count(0, WithZero("none")))
+
+	assert.Equal(t, "0 B", Bytes(0))
+	assert.Equal(t, "nothing", Bytes(0, WithZero("nothing")))
+
+	assert.Equal(t, "0ms", Millis(0))
+	assert.Equal(t, "N/A", Millis(0, WithZero("N/A")))
+
+	assert.Equal(t, "0 blk/s", Rate(0, "blk"))
+	assert.Equal(t, "idle", Rate(0, "blk", WithZero("idle")))
+	// A negative or NaN rate is clamped to zero first, so it takes the same branch.
+	assert.Equal(t, "idle", Rate(-5, "blk", WithZero("idle")))
 }
 
 func TestJoinNonEmpty(t *testing.T) {

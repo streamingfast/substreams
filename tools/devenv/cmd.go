@@ -1,9 +1,12 @@
 package devenv
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -40,7 +43,11 @@ func init() {
 }
 
 func runDevenv(cmd *cobra.Command, _ []string) error {
-	ctx := cmd.Context()
+	// The root command runs with context.Background(), so nothing here would ever observe a
+	// Ctrl-C: the wait below would block forever and the process would be killed outright,
+	// taking the deferred teardown with it and leaving the container running.
+	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	burst := sflags.MustGetInt(cmd, "burst")
 
@@ -63,8 +70,15 @@ func runDevenv(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("start dummy blockchain: %w", err)
 	}
 	defer func() {
-		// A fresh context: cmd's is already cancelled by the time this runs.
-		if err := container.Terminate(cmd.Root().Context()); err != nil {
+		// Ctrl-C is the normal way out of this command, so by the time this runs ctx is
+		// cancelled — and a cancelled context makes the Docker call fail on the spot, leaving
+		// the container running. cmd.Root().Context() is no help: cobra hands the child the very
+		// same context object. Detach from the cancellation to get the teardown through, and
+		// bound it so a wedged daemon cannot hang the exit instead.
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+		defer cancel()
+
+		if err := container.Terminate(ctx); err != nil {
 			fmt.Fprintf(os.Stderr, "failed terminating container: %s\n", err)
 		}
 	}()

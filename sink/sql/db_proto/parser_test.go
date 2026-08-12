@@ -2,6 +2,7 @@ package db_proto
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -254,6 +255,52 @@ func TestHyperpbRejectsMutation(t *testing.T) {
 	require.Panics(t, func() {
 		message.ProtoReflect().Clear(entities)
 	})
+}
+
+// TestHyperpbConcurrentParsesShareTheType covers the one thing the decoder really does
+// share between goroutines: the compiled message type.
+//
+// The arena is not shared — there is one per block slot, and a slot is handed to exactly
+// one worker per round — and it must not be, since it is an allocator with an explicit
+// Free. What every worker touches at once is the *MessageType, which is safe because
+// compiling is a one-time operation: hyperpb's own PGO path returns a new type from
+// Recompile rather than mutating the one in use. Run with -race, this fails the day that
+// stops being true.
+func TestHyperpbConcurrentParsesShareTheType(t *testing.T) {
+	descriptor := outputDescriptor(t)
+	messageType := hyperpb.CompileMessageDescriptor(descriptor)
+
+	payload, err := proto.Marshal(buildCustomerOutput(50))
+	require.NoError(t, err)
+
+	const workers = 8
+
+	var wg sync.WaitGroup
+	wg.Add(workers)
+	for range workers {
+		go func() {
+			defer wg.Done()
+
+			// One arena per goroutine, as the decoder gives one per block slot.
+			shared := new(hyperpb.Shared)
+			for range 50 {
+				message := shared.NewMessage(messageType)
+				if err := message.Unmarshal(payload); err != nil {
+					t.Error(err)
+					return
+				}
+
+				entities := message.ProtoReflect().Descriptor().Fields().ByName("entities")
+				if got := message.ProtoReflect().Get(entities).List().Len(); got != 50 {
+					t.Errorf("expected 50 entities, got %d", got)
+					return
+				}
+
+				shared.Free()
+			}
+		}()
+	}
+	wg.Wait()
 }
 
 func buildCustomerOutput(count int) *pbrelations.Output {

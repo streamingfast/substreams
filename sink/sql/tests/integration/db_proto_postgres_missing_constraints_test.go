@@ -2,6 +2,7 @@ package tests
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	_ "github.com/lib/pq"
@@ -46,7 +47,12 @@ func TestDbProtoPostgresMissingConstraints(t *testing.T) {
 
 		missing, err := database.MissingConstraints()
 		require.NoError(t, err)
-		require.Subset(t, missing, []string{"block_pk", "fk_block", "customers_pk"})
+		require.Subset(t, missing, []string{
+			"missing_constraints_bare._blocks_.block_pk",
+			"missing_constraints_bare.customers.customers_pk",
+			"missing_constraints_bare.customers.fk_block",
+			"missing_constraints_bare.orders.fk_block",
+		}, "each one is named by its relation as well: fk_block is a different constraint on every table")
 	})
 
 	t.Run("nothing is missing once they have been created", func(t *testing.T) {
@@ -69,4 +75,59 @@ func TestDbProtoPostgresMissingConstraints(t *testing.T) {
 		require.NoError(t, err)
 		require.Empty(t, missing, "nothing the policy leaves out can be missing")
 	})
+}
+
+// TestDbProtoConstraintsPerTransaction covers the pass committing as it goes.
+//
+// A single transaction around every index build and every foreign key validation is what
+// turns a large schema into an OOM that loses the whole pass. Committing in batches bounds
+// that, and what a killed run finished has to still be there — which is the same property
+// that lets the pass be re-run against a schema that is partly constrained already.
+func TestDbProtoConstraintsPerTransaction(t *testing.T) {
+	outputMessageDescriptor := (*pbrelations.Output)(nil).ProtoReflect().Descriptor()
+	postgresContainer := sharedDbChangesPostgresContainer
+	ctx := context.Background()
+
+	open := func(t *testing.T, schemaName string, perTransaction int) protosql.Database {
+		t.Helper()
+
+		options := db_proto.SinkerFactoryOptions{
+			UseProtoOption: true,
+			Constraints: protosql.ConstraintPolicy{
+				Timing:         protosql.ConstraintsManual,
+				PerTransaction: perTransaction,
+			},
+			UseTransactions: true,
+			DecodeBatchSize: 1,
+		}.Defaults()
+
+		database, err := db_proto.SetupDatabaseSchema(ctx, postgresContainer.ConnectionString, schemaName, defaultOutputModuleName, outputMessageDescriptor, options, logger, tracer)
+		require.NoError(t, err)
+		t.Cleanup(func() { database.Close(ctx) })
+
+		return database
+	}
+
+	for _, perTransaction := range []int{1, 3} {
+		t.Run(fmt.Sprintf("%d per transaction", perTransaction), func(t *testing.T) {
+			schemaName := fmt.Sprintf("constraints_per_transaction_%d", perTransaction)
+			createPostgresTestSchema(t, postgresContainer.ConnectionString, schemaName)
+
+			database := open(t, schemaName, perTransaction)
+
+			require.NoError(t, database.ApplyConstraints())
+			missing, err := database.MissingConstraints()
+			require.NoError(t, err)
+			require.Empty(t, missing)
+
+			// Re-running has to be a no-op rather than an "already exists" failure, which
+			// is what a resumed pass depends on.
+			require.NoError(t, database.ApplyConstraints())
+
+			require.NoError(t, database.DropConstraints())
+			missing, err = database.MissingConstraints()
+			require.NoError(t, err)
+			require.NotEmpty(t, missing, "dropping has to actually remove them")
+		})
+	}
 }

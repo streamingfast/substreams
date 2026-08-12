@@ -138,6 +138,16 @@ func stringFlag(cmd *cobra.Command, name string) string {
 	return ""
 }
 
+// intFlag returns the value of an int flag, or zero when the flag is not registered on
+// the command.
+func intFlag(cmd *cobra.Command, name string) int {
+	if sflags.FlagDefined(cmd, name) {
+		return sflags.MustGetInt(cmd, name)
+	}
+
+	return 0
+}
+
 func stringSliceFlag(cmd *cobra.Command, name string) []string {
 	if sflags.FlagDefined(cmd, name) {
 		return sflags.MustGetStringSlice(cmd, name)
@@ -222,6 +232,14 @@ var databaseChangesFlagNames = []string{
 // addFromProtoSchemaFlags registers the from-proto flags that describe the schema. They
 // go on the run command, on `setup` and on `constraints`, which all have to agree on
 // which constraints the schema is meant to have.
+// addConstraintPassFlags registers what governs how the constraint pass runs, as opposed
+// to which constraints it creates. Only the `constraints` commands carry it: the run
+// creates them one at a time, which is the safe shape, and anything more deliberate is
+// what the command is for.
+func addConstraintPassFlags(flags *pflag.FlagSet) {
+	flags.Int("constraints-per-transaction", 1, "How many constraints are created or dropped per transaction. Building an index and validating a foreign key are the two most memory-hungry things the sink asks of the server, so they go one at a time by default: a run killed part-way keeps what it finished, and the next one carries on. Raise it to trade that back for fewer round trips on a schema whose constraints are small.")
+}
+
 func addFromProtoSchemaFlags(flags *pflag.FlagSet) {
 	flags.Bool("disable-foreign-keys", false, "Never create foreign keys, including the one every table has to the block table. They are what a load pays most for, and without them a reorg is undone by deleting from each table rather than by a cascade.")
 	flags.StringSlice("disable-primary-keys", nil, "Tables that go without a primary key, or 'all'. No primary key also means no index on the entity id.")
@@ -766,30 +784,23 @@ func errDatabaseChangesOwnsSchema(what string) error {
 		"it is created from the 'schema.sql' bundled in the manifest, and the sink neither derives it nor manages its constraints", what)
 }
 
+// applyDatabaseConstraints and dropDatabaseConstraints do not wrap the pass in a
+// transaction: it owns its own, committing every --constraints-per-transaction statements
+// so a killed run keeps what it finished.
 func applyDatabaseConstraints(database protosql.Database) error {
-	if err := database.BeginTransaction(); err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
-	}
-
 	if err := database.ApplyConstraints(); err != nil {
-		database.RollbackTransaction()
 		return fmt.Errorf("applying constraints: %w", err)
 	}
 
-	return database.CommitTransaction()
+	return nil
 }
 
 func dropDatabaseConstraints(database protosql.Database) error {
-	if err := database.BeginTransaction(); err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
-	}
-
 	if err := database.DropConstraints(); err != nil {
-		database.RollbackTransaction()
 		return fmt.Errorf("dropping constraints: %w", err)
 	}
 
-	return database.CommitTransaction()
+	return nil
 }
 
 func runDatabaseChangesSetup(cmd *cobra.Command, dsnString string, spkg *pbsubstreams.Package) error {
@@ -1108,6 +1119,7 @@ func fromProtoConstraintPolicy(cmd *cobra.Command) (protosql.ConstraintPolicy, e
 		DisableForeignKeys: boolFlag(cmd, "disable-foreign-keys"),
 		DisablePrimaryKeys: stringSliceFlag(cmd, "disable-primary-keys"),
 		DisableUniques:     stringSliceFlag(cmd, "disable-unique-constraints"),
+		PerTransaction:     intFlag(cmd, "constraints-per-transaction"),
 	}
 
 	// --no-constraints shipped in v1.21.0 and said "none of them at all", which is exactly

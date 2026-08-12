@@ -95,6 +95,7 @@ func init() {
 	for _, constraintsCmd := range []*cobra.Command{sinkPostgresConstraintsApplyCmd, sinkPostgresConstraintsDropCmd} {
 		addBytesEncodingFlag(constraintsCmd.Flags())
 		addFromProtoSchemaFlags(constraintsCmd.Flags())
+		addConstraintPassFlags(constraintsCmd.Flags())
 	}
 	sinkPostgresConstraintsCmd.AddCommand(sinkPostgresConstraintsApplyCmd)
 	sinkPostgresConstraintsCmd.AddCommand(sinkPostgresConstraintsDropCmd)

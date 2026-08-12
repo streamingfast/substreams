@@ -49,6 +49,22 @@ type ConstraintPolicy struct {
 	// DisablePrimaryKeys and DisableUniques name the tables that go without, or AllTables.
 	DisablePrimaryKeys []string
 	DisableUniques     []string
+
+	// PerTransaction is how many constraints are created or dropped per transaction.
+	// Zero means one, which is what keeps the pass restartable and its memory bounded:
+	// each index build and each foreign key validation is committed before the next
+	// starts, so a run that is killed keeps what it finished and the next one carries on.
+	// It is an execution knob rather than a property of the schema.
+	PerTransaction int
+}
+
+// ConstraintsPerTransaction is how many statements the pass commits at a time.
+func (p ConstraintPolicy) ConstraintsPerTransaction() int {
+	if p.PerTransaction <= 0 {
+		return 1
+	}
+
+	return p.PerTransaction
 }
 
 // SkipPrimaryKey reports whether the given table is meant to go without its primary key.

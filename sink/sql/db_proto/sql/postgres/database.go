@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -365,128 +366,103 @@ func (d *Database) ApplyConstraints() error {
 	return d.applyConstraints()
 }
 
+// applyConstraints creates what the policy asks for and the catalog does not have.
+//
+// It owns its transactions rather than running inside the caller's, and commits every
+// --constraints-per-transaction statements. Building an index and validating a foreign key
+// are the two most memory-hungry things the sink ever asks of the server, and holding them
+// all open at once is what turns a large schema into an OOM that loses the entire pass.
+// Committing as it goes bounds that, and leaves a killed run's finished work in place for
+// the next one to carry on from.
 func (d *Database) applyConstraints() error {
 	startAt := time.Now()
 
-	existing, err := d.existingConstraintNames()
+	existing, err := d.existingConstraints(d.querier())
 	if err != nil {
 		return err
 	}
 
-	apply := func(kind string, constraints []*sql.Constraint, skip func(string) bool) error {
+	var pending []statement
+	collect := func(kind string, constraints []*sql.Constraint, skip func(string) bool) {
 		for _, constraint := range constraints {
 			if skip(constraint.Table) {
 				d.logger.Debug("constraint disabled by the policy, skipping", zap.String("kind", kind), zap.String("table", constraint.Table))
 				continue
 			}
 
-			if name := constraintName(constraint.Sql); name != "" && existing[name] {
-				d.logger.Debug("constraint already in place, skipping", zap.String("constraint", name))
+			if key, ok := constraintTarget(constraint.Sql); ok && existing[key] {
+				d.logger.Debug("constraint already in place, skipping", zap.String("constraint", key.name), zap.String("relation", key.relation))
 				continue
 			}
 
-			d.logger.Info("executing "+kind+" statement", zap.String("sql", constraint.Sql))
-			if _, err := d.tx.Exec(constraint.Sql); err != nil {
-				return fmt.Errorf("executing %s statement: %w %s", kind, err, constraint.Sql)
-			}
+			pending = append(pending, statement{kind: kind, sql: constraint.Sql})
 		}
-
-		return nil
 	}
 
-	if err := apply("pk", d.dialect.PrimaryKeySql, d.constraints.SkipPrimaryKey); err != nil {
-		return err
-	}
-	if err := apply("unique", d.dialect.UniqueConstraintSql, d.constraints.SkipUnique); err != nil {
-		return err
-	}
-	if err := apply("fk constraint", d.dialect.ForeignKeySql, d.constraints.SkipForeignKey); err != nil {
+	collect("pk", d.dialect.PrimaryKeySql, d.constraints.SkipPrimaryKey)
+	collect("unique", d.dialect.UniqueConstraintSql, d.constraints.SkipUnique)
+	collect("fk constraint", d.dialect.ForeignKeySql, d.constraints.SkipForeignKey)
+
+	if err := d.runStatements(pending); err != nil {
 		return err
 	}
 
-	d.logger.Info("applying constraints", zapx.HumanDuration("duration", time.Since(startAt)))
+	d.logger.Info("applying constraints", zap.Int("created", len(pending)), zapx.HumanDuration("duration", time.Since(startAt)))
+
 	return nil
 }
 
-// existingConstraintNames is what makes applying constraints re-runnable: PostgreSQL has
-// no ADD CONSTRAINT IF NOT EXISTS, and the errors it raises instead differ by kind — a
-// second primary key is `multiple primary keys` rather than a duplicate name — so the
-// check has to happen before the statement rather than around it.
-// DropConstraints removes the constraints this schema's DDL would create, leaving
-// anything the sink did not put there alone.
+// statement is one piece of DDL the constraint pass has to run.
+type statement struct {
+	kind string
+	sql  string
+}
+
+// runStatements executes the DDL, committing every ConstraintsPerTransaction of them.
 //
-// Foreign keys go first, then unique constraints, then primary keys: a primary key still
-// referenced by a foreign key cannot be dropped. Constraints already absent are skipped,
-// so this is idempotent and safe to run against a schema that never had them.
-func (d *Database) DropConstraints() error {
-	relations, err := d.existingConstraintRelations()
-	if err != nil {
-		return err
-	}
-
-	drop := func(kind string, constraints []*sql.Constraint) error {
-		for _, constraint := range constraints {
-			name := constraintName(constraint.Sql)
-			if name == "" {
-				continue
-			}
-			relation, found := relations[name]
-			if !found {
-				d.logger.Debug("constraint already absent, skipping", zap.String("constraint", name))
-				continue
-			}
-
-			statement := fmt.Sprintf("ALTER TABLE %s DROP CONSTRAINT IF EXISTS %s", relation, pq.QuoteIdentifier(name))
-			d.logger.Info("dropping "+kind, zap.String("sql", statement))
-			if _, err := d.tx.Exec(statement); err != nil {
-				return fmt.Errorf("dropping %s %q: %w", kind, name, err)
+// When the caller already has a transaction open — creating the schema does — the
+// statements join it instead: the tables they constrain are not committed yet, so
+// nothing else could see them.
+func (d *Database) runStatements(statements []statement) error {
+	if d.tx != nil {
+		for _, s := range statements {
+			d.logger.Info("executing "+s.kind+" statement", zap.String("sql", s.sql))
+			if _, err := d.tx.Exec(s.sql); err != nil {
+				return fmt.Errorf("executing %s statement: %w %s", s.kind, err, s.sql)
 			}
 		}
 
 		return nil
 	}
 
-	if err := drop("fk constraint", d.dialect.ForeignKeySql); err != nil {
-		return err
-	}
-	if err := drop("unique constraint", d.dialect.UniqueConstraintSql); err != nil {
-		return err
-	}
+	perTransaction := d.constraints.ConstraintsPerTransaction()
 
-	return drop("pk", d.dialect.PrimaryKeySql)
-}
+	for start := 0; start < len(statements); start += perTransaction {
+		end := min(start+perTransaction, len(statements))
 
-// existingConstraintRelations maps every constraint name in the schema to the relation it
-// belongs to, already quoted. Reading the relation from the catalog rather than deriving
-// it from the logical table name is what keeps this working under the server's own
-// identifier folding.
-func (d *Database) existingConstraintRelations() (map[string]string, error) {
-	rows, err := d.tx.Query(`
-		SELECT c.conname, c.conrelid::regclass::text
-		FROM pg_constraint c
-		JOIN pg_namespace n ON n.oid = c.connamespace
-		WHERE n.nspname = $1`, d.schema.Name)
-	if err != nil {
-		return nil, fmt.Errorf("listing the existing constraints of schema %q: %w", d.schema.Name, err)
-	}
-	defer rows.Close()
-
-	relations := map[string]string{}
-	for rows.Next() {
-		var name, relation string
-		if err := rows.Scan(&name, &relation); err != nil {
-			return nil, fmt.Errorf("scanning constraint name: %w", err)
+		tx, err := d.db.Begin()
+		if err != nil {
+			return fmt.Errorf("beginning a constraint transaction: %w", err)
 		}
-		relations[name] = relation
+
+		for _, s := range statements[start:end] {
+			startAt := time.Now()
+			d.logger.Info("executing "+s.kind+" statement", zap.String("sql", s.sql))
+
+			if _, err := tx.Exec(s.sql); err != nil {
+				tx.Rollback()
+				return fmt.Errorf("executing %s statement: %w %s", s.kind, err, s.sql)
+			}
+
+			d.logger.Debug("statement done", zap.String("sql", s.sql), zapx.HumanDuration("duration", time.Since(startAt)))
+		}
+
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("committing a constraint transaction: %w", err)
+		}
 	}
 
-	return relations, rows.Err()
-}
-
-// rowQuerier is what both a transaction and the pool itself satisfy, so the catalog can
-// be read inside the constraint pass or on its own at startup.
-type rowQuerier interface {
-	Query(query string, args ...any) (*pgsql.Rows, error)
+	return nil
 }
 
 // MissingConstraints names the constraints the policy says this schema should carry and
@@ -496,7 +472,7 @@ type rowQuerier interface {
 // the cost of building the constraints it reports on — so it is cheap enough to run on
 // every start.
 func (d *Database) MissingConstraints() ([]string, error) {
-	existing, err := d.existingConstraintNamesFrom(d.db)
+	existing, err := d.existingConstraints(d.querier())
 	if err != nil {
 		return nil, err
 	}
@@ -507,8 +483,8 @@ func (d *Database) MissingConstraints() ([]string, error) {
 			if skip(constraint.Table) {
 				continue
 			}
-			if name := constraintName(constraint.Sql); name != "" && !existing[name] {
-				missing = append(missing, name)
+			if key, ok := constraintTarget(constraint.Sql); ok && !existing[key] {
+				missing = append(missing, key.relation+"."+key.name)
 			}
 		}
 	}
@@ -520,45 +496,119 @@ func (d *Database) MissingConstraints() ([]string, error) {
 	return missing, nil
 }
 
-func (d *Database) existingConstraintNames() (map[string]bool, error) {
-	return d.existingConstraintNamesFrom(d.tx)
+// DropConstraints removes the constraints this schema's DDL would create, leaving
+// anything the sink did not put there alone.
+//
+// Foreign keys go first, then unique constraints, then primary keys: a primary key still
+// referenced by a foreign key cannot be dropped. Constraints already absent are skipped,
+// so this is idempotent and safe to run against a schema that never had them.
+func (d *Database) DropConstraints() error {
+	existing, err := d.existingConstraints(d.querier())
+	if err != nil {
+		return err
+	}
+
+	var pending []statement
+	collect := func(kind string, constraints []*sql.Constraint) {
+		for _, constraint := range constraints {
+			key, ok := constraintTarget(constraint.Sql)
+			if !ok || !existing[key] {
+				d.logger.Debug("constraint already absent, skipping", zap.String("constraint", key.name))
+				continue
+			}
+
+			pending = append(pending, statement{
+				kind: kind,
+				sql:  fmt.Sprintf("ALTER TABLE %s DROP CONSTRAINT IF EXISTS %s", key.relation, pq.QuoteIdentifier(key.name)),
+			})
+		}
+	}
+
+	// Foreign keys first, then uniques, then primary keys: a primary key still referenced
+	// by a foreign key cannot be dropped.
+	collect("fk constraint", d.dialect.ForeignKeySql)
+	collect("unique constraint", d.dialect.UniqueConstraintSql)
+	collect("pk", d.dialect.PrimaryKeySql)
+
+	return d.runStatements(pending)
 }
 
-func (d *Database) existingConstraintNamesFrom(from rowQuerier) (map[string]bool, error) {
+// existingConstraintRelations maps every constraint name in the schema to the relation it
+// belongs to, already quoted. Reading the relation from the catalog rather than deriving
+// it from the logical table name is what keeps this working under the server's own
+// identifier folding.
+// rowQuerier is what both a transaction and the pool itself satisfy.
+type rowQuerier interface {
+	Query(query string, args ...any) (*pgsql.Rows, error)
+}
+
+// querier is the transaction if one is open, the pool otherwise.
+//
+// Creating the schema runs the constraint pass inside its own transaction, against tables
+// that are not committed yet — so the pass has to read and write through that transaction
+// or it cannot see them. On a database that is already loaded there is no open
+// transaction, and the pass owns its own.
+func (d *Database) querier() rowQuerier {
+	if d.tx != nil {
+		return d.tx
+	}
+
+	return d.db
+}
+
+// constraintKey identifies a constraint the way PostgreSQL does: by relation and name.
+//
+// Names are only unique per table, not per schema — every table carries a foreign key
+// called fk_block — so keying by name alone both drops the wrong number of them and
+// reports a constraint present on one table as present on all of them.
+type constraintKey struct {
+	relation string
+	name     string
+}
+
+// existingConstraints reads which of them the schema actually carries.
+func (d *Database) existingConstraints(from rowQuerier) (map[constraintKey]bool, error) {
 	rows, err := from.Query(`
-		SELECT c.conname
+		SELECT c.conname, n.nspname || '.' || cl.relname
 		FROM pg_constraint c
 		JOIN pg_namespace n ON n.oid = c.connamespace
+		JOIN pg_class cl ON cl.oid = c.conrelid
 		WHERE n.nspname = $1`, d.schema.Name)
 	if err != nil {
 		return nil, fmt.Errorf("listing the existing constraints of schema %q: %w", d.schema.Name, err)
 	}
 	defer rows.Close()
 
-	names := map[string]bool{}
+	existing := map[constraintKey]bool{}
 	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
+		var name, relation string
+		if err := rows.Scan(&name, &relation); err != nil {
 			return nil, fmt.Errorf("scanning constraint name: %w", err)
 		}
-		names[name] = true
+		existing[constraintKey{relation: normalizeRelation(relation), name: name}] = true
 	}
 
-	return names, rows.Err()
+	return existing, rows.Err()
 }
 
-// constraintNamePattern pulls the name out of the dialect's own DDL. Every constraint it
-// emits is named, so an empty result means the statement is not one of ours and is left
-// to the server to accept or reject.
-var constraintNamePattern = regexp.MustCompile(`(?i)add\s+constraint\s+"?([a-z0-9_]+)"?`)
+// constraintTargetPattern pulls the relation and the name out of the dialect's own DDL.
+var constraintTargetPattern = regexp.MustCompile(`(?i)alter\s+table\s+(\S+)\s+add\s+constraint\s+"?([a-z0-9_]+)"?`)
 
-func constraintName(statement string) string {
-	match := constraintNamePattern.FindStringSubmatch(statement)
-	if len(match) != 2 {
-		return ""
+// constraintTarget says which constraint a statement of ours creates. It reports false for
+// anything it does not recognise, which is then left to the server to accept or reject.
+func constraintTarget(statement string) (constraintKey, bool) {
+	match := constraintTargetPattern.FindStringSubmatch(statement)
+	if len(match) != 3 {
+		return constraintKey{}, false
 	}
 
-	return match[1]
+	return constraintKey{relation: normalizeRelation(match[1]), name: match[2]}, true
+}
+
+// normalizeRelation puts a schema-qualified name in the shape the catalog reports, the
+// dialect writing its DDL unquoted and the server folding it.
+func normalizeRelation(relation string) string {
+	return strings.ToLower(strings.ReplaceAll(strings.TrimSpace(relation), `"`, ""))
 }
 
 func (d *Database) BeginTransaction() (err error) {

@@ -276,17 +276,11 @@ func applyConstraints(database protosql.Database, logger *zap.Logger) error {
 	logger.Warn("adding the SQL constraints to the existing schema, this can take a long time and locks the tables while it runs")
 
 	startAt := time.Now()
-	if err := database.BeginTransaction(); err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
-	}
 
+	// The pass owns its own transactions, committing as it goes so that a run killed
+	// part-way keeps what it finished.
 	if err := database.ApplyConstraints(); err != nil {
-		database.RollbackTransaction()
 		return fmt.Errorf("applying constraints: %w", err)
-	}
-
-	if err := database.CommitTransaction(); err != nil {
-		return fmt.Errorf("commit transaction: %w", err)
 	}
 
 	logger.Info("constraints applied", zap.Duration("duration", time.Since(startAt)))

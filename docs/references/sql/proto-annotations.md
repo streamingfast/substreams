@@ -203,6 +203,13 @@ foreign key validated, tables locked while it runs. A backfill that ends with no
 constraints is a silent wrong result that looks like success; a stall is at least a
 visible one. Use `manual` to put that pass in a maintenance window instead.
 
+Constraints are created one per transaction, committing as it goes: building an index and
+validating a foreign key are the two most memory-hungry things the sink asks of the server,
+and holding them all open at once is what turns a large schema into an OOM that loses the
+whole pass. A run that is killed keeps what it finished, and the next one carries on.
+`--constraints-per-transaction` on the `constraints` commands trades that back for fewer
+round trips when the constraints are small.
+
 Running `constraints apply` again is safe — the constraints already in place are left
 alone — so it also back-fills a schema an earlier run created without them.
 `constraints drop` is the inverse, and the escape hatch after `--apply-constraints=always`

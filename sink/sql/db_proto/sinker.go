@@ -183,12 +183,18 @@ func (s *Sinker) HandleBlockRangeCompletion(ctx context.Context, cursor *sink.Cu
 		}
 	}
 
+	// The spool still holds whatever has not reached its segment size, and it owns the
+	// transactions while it is open. Draining it first is what keeps those blocks from
+	// being streamed, and paid for, twice, and what leaves the constraints to be created
+	// against a database that already holds every row of the range.
+	if err := s.db.SwitchToDirectInserts(ctx); err != nil {
+		return fmt.Errorf("draining before the end of the range: %w", err)
+	}
+
 	if err := s.applyConstraintsOnce(); err != nil {
 		return err
 	}
 
-	// A local buffer still holds whatever has not reached its segment size. Draining it
-	// here is what keeps those blocks from being streamed, and paid for, twice.
 	return s.db.Close(ctx)
 }
 

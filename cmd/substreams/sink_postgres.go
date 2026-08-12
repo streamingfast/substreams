@@ -17,7 +17,7 @@ var sinkPostgresCmd = &cobra.Command{
 }
 
 var sinkPostgresSetupCmd = &cobra.Command{
-	Use:   "setup <manifest>",
+	Use:   "setup <manifest> [<module>]",
 	Short: "Setup the required infrastructure to deploy a Substreams SQL deployable unit",
 	Long: cli.Dedent(`
 		Setup the database for the Substreams SQL sink, auto-detecting the mode from the
@@ -29,7 +29,7 @@ var sinkPostgresSetupCmd = &cobra.Command{
 		  proto and creates the database schema and tables, then exits. This step is
 		  idempotent and can be run again safely.
 	`),
-	Args: cobra.ExactArgs(1),
+	Args: cobra.RangeArgs(1, 2),
 	RunE: newSinkSetupE(sinkPostgresDriver),
 }
 
@@ -39,7 +39,7 @@ var sinkPostgresConstraintsCmd = &cobra.Command{
 }
 
 var sinkPostgresConstraintsApplyCmd = &cobra.Command{
-	Use:   "apply <manifest>",
+	Use:   "apply <manifest> [<module>]",
 	Short: "Create the schema's constraints on an already loaded database",
 	Long: cli.Dedent(`
 		Create the primary keys, unique and foreign key constraints of a from-proto schema
@@ -53,13 +53,17 @@ var sinkPostgresConstraintsApplyCmd = &cobra.Command{
 		window, which is what --apply-constraints=manual leaves it to this command for.
 
 		Running it again is safe: constraints already in place are left alone.
+
+		The module is inferred from the package when it is left out. A package with more
+		than one candidate has to be told which, or the schema this derives will not be the
+		one the run created.
 	`),
-	Args: cobra.ExactArgs(1),
+	Args: cobra.RangeArgs(1, 2),
 	RunE: newSinkConstraintsE(sinkPostgresDriver, constraintsApply),
 }
 
 var sinkPostgresConstraintsDropCmd = &cobra.Command{
-	Use:   "drop <manifest>",
+	Use:   "drop <manifest> [<module>]",
 	Short: "Drop the schema's constraints",
 	Long: cli.Dedent(`
 		Drop the primary keys, unique and foreign key constraints of a from-proto schema,
@@ -71,7 +75,7 @@ var sinkPostgresConstraintsDropCmd = &cobra.Command{
 
 		Running it again is safe: constraints already absent are skipped.
 	`),
-	Args: cobra.ExactArgs(1),
+	Args: cobra.RangeArgs(1, 2),
 	RunE: newSinkConstraintsE(sinkPostgresDriver, constraintsDrop),
 }
 

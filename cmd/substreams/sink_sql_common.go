@@ -156,6 +156,20 @@ func stringSliceFlag(cmd *cobra.Command, name string) []string {
 	return nil
 }
 
+// sinkManifestAndModule reads the positional arguments the schema-side commands take.
+//
+// The module is optional and inferred from the package when it is left out, exactly as the
+// run command does — but a package with more than one candidate has to be told which, or
+// `setup` and `constraints` would derive a schema from a different module than the run
+// they are meant to accompany.
+func sinkManifestAndModule(args []string) (manifestPath string, outputModule string) {
+	if len(args) > 1 && args[1] != "" {
+		return args[0], args[1]
+	}
+
+	return args[0], sink.InferOutputModuleFromPackage
+}
+
 func isDatabaseChangesType(outputType string) bool {
 	unprefixed := strings.TrimPrefix(outputType, "proto:")
 	for _, t := range strings.Split(supportedOutputTypes, ",") {
@@ -607,13 +621,13 @@ func newSinkSetupE(driver string) func(*cobra.Command, []string) error {
 			return err
 		}
 
-		manifestPath := args[0]
+		manifestPath, outputModule := sinkManifestAndModule(args)
 
 		sinkDBPreStart(cmd)
 
 		sink.LoadSubstreamsAuthEnvFile(manifestPath)
 
-		spkg, module, _, err := sink.ReadManifestAndModule(manifestPath, "", nil, sink.InferOutputModuleFromPackage, sink.IgnoreOutputModuleType, false, nil, zlog)
+		spkg, module, _, err := sink.ReadManifestAndModule(manifestPath, "", nil, outputModule, sink.IgnoreOutputModuleType, false, nil, zlog)
 		if err != nil {
 			return fmt.Errorf("reading manifest: %w", err)
 		}
@@ -662,12 +676,12 @@ func newSinkConstraintsE(driver string, action constraintsAction) func(*cobra.Co
 			return err
 		}
 
-		manifestPath := args[0]
+		manifestPath, outputModule := sinkManifestAndModule(args)
 
 		sinkDBPreStart(cmd)
 		sink.LoadSubstreamsAuthEnvFile(manifestPath)
 
-		spkg, module, _, err := sink.ReadManifestAndModule(manifestPath, "", nil, sink.InferOutputModuleFromPackage, sink.IgnoreOutputModuleType, false, nil, zlog)
+		spkg, module, _, err := sink.ReadManifestAndModule(manifestPath, "", nil, outputModule, sink.IgnoreOutputModuleType, false, nil, zlog)
 		if err != nil {
 			return fmt.Errorf("reading manifest: %w", err)
 		}

@@ -17,7 +17,7 @@ var sinkClickhouseCmd = &cobra.Command{
 }
 
 var sinkClickhouseSetupCmd = &cobra.Command{
-	Use:   "setup <manifest>",
+	Use:   "setup <manifest> [<module>]",
 	Short: "Setup the required infrastructure to deploy a Substreams SQL deployable unit",
 	Long: cli.Dedent(`
 		Setup the database for the Substreams SQL sink, auto-detecting the mode from the
@@ -29,7 +29,7 @@ var sinkClickhouseSetupCmd = &cobra.Command{
 		  proto and creates the database schema and tables, then exits. This step is
 		  idempotent and can be run again safely.
 	`),
-	Args: cobra.ExactArgs(1),
+	Args: cobra.RangeArgs(1, 2),
 	RunE: newSinkSetupE(sinkClickhouseDriver),
 }
 

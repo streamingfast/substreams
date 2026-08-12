@@ -709,12 +709,6 @@ func newSinkConstraintsE(driver string, action constraintsAction) func(*cobra.Co
 		}
 		defer database.Close(cmd.Context())
 
-		constraints, err = reconcileRecordedPolicy(cmd, database, dsn.Schema(), constraints)
-		if err != nil {
-			return err
-		}
-		options.Constraints = constraints
-
 		if action == constraintsApply {
 			if err := applyDatabaseConstraints(database); err != nil {
 				return err
@@ -763,44 +757,6 @@ func rejectFlags(cmd *cobra.Command, names []string, appliesTo string, because s
 	}
 
 	return nil
-}
-
-// reconcileRecordedPolicy prefers what `setup` recorded over what the flags default to.
-//
-// Which constraints a schema is meant to have is a property of the schema, not of the
-// command that happens to be running. Passing them again days later, from memory, is how
-// `constraints apply` ends up creating one the setup deliberately left out — a
-// stop-the-world pass nobody asked for. So the recorded policy wins unless the operator
-// actually typed a switch, and a typed switch that disagrees says so out loud.
-func reconcileRecordedPolicy(cmd *cobra.Command, database protosql.Database, schemaName string, typed protosql.ConstraintPolicy) (protosql.ConstraintPolicy, error) {
-	info, err := database.FetchSinkInfo(schemaName)
-	if err != nil || info == nil || info.Constraints == "" {
-		return typed, err
-	}
-
-	recorded, err := protosql.DecodeConstraintPolicy(info.Constraints, typed.Timing)
-	if err != nil {
-		return typed, err
-	}
-
-	anyTyped := false
-	for _, name := range []string{"disable-foreign-keys", "disable-primary-keys", "disable-unique-constraints", "no-constraints"} {
-		anyTyped = anyTyped || flagChanged(cmd, name)
-	}
-
-	if !anyTyped {
-		zlog.Info("using the constraint policy recorded at setup", zap.String("constraints", recorded.Describe()))
-
-		return recorded, nil
-	}
-
-	if !recorded.SameShape(typed) {
-		zlog.Warn("the constraint flags disagree with what setup recorded for this schema, going with the flags",
-			zap.String("recorded", recorded.Describe()),
-			zap.String("flags", typed.Describe()))
-	}
-
-	return typed, nil
 }
 
 // errDatabaseChangesOwnsSchema is what every from-proto-only entry point says when the
@@ -893,17 +849,6 @@ func runFromProtoSetup(cmd *cobra.Command, driver, dsnString string, spkg *pbsub
 		return fmt.Errorf("setting up database schema: %w", err)
 	}
 	defer database.Close(cmd.Context())
-
-	// Recorded so `constraints apply` does not have to be told the same thing again, days
-	// later, from memory. Creating a constraint the schema was deliberately set up without
-	// is a stop-the-world pass nobody asked for.
-	encoded, err := constraints.Encode()
-	if err != nil {
-		return err
-	}
-	if err := database.StoreConstraintPolicy(dsn.Schema(), encoded); err != nil {
-		return err
-	}
 
 	zlog.Info("database schema setup completed", zap.String("schema", dsn.Schema()), zap.String("constraints", constraints.Describe()))
 	return nil

@@ -24,16 +24,16 @@ type Database interface {
 	UpdateSinkInfoHash(schemaName string, newHash string) error
 	StoreSinkInfo(schemaName string, schemaHash string) error
 
-	// StoreConstraintPolicy records which constraints the schema is meant to have, so
-	// that `constraints apply` does not have to be told again — and cannot be told
-	// something different by accident three days later.
-	StoreConstraintPolicy(schemaName string, encoded string) error
-
 	CreateDatabase(useConstraints bool) error
 	// ApplyConstraints adds the schema's constraints to a database that already exists,
 	// skipping the ones already in place. A schema first synced without constraints has
 	// none of them, and only this puts them there.
 	ApplyConstraints() error
+
+	// MissingConstraints names the constraints the policy says the schema should carry and
+	// the database does not have. It is what turns "this schema has no indexes" from
+	// something you find out by querying it into something the sink says on every start.
+	MissingConstraints() ([]string, error)
 
 	// DropConstraints removes the constraints this schema's DDL would create, leaving
 	// anything the sink did not put there alone. It is the escape hatch after
@@ -307,8 +307,4 @@ func ScalarFieldValue(fd protoreflect.FieldDescriptor, value protoreflect.Value)
 
 type SinkInfo struct {
 	SchemaHash string `json:"schema_hash"`
-	// Constraints is the policy `setup` recorded, encoded by ConstraintPolicy.Encode.
-	// Empty on a schema created before it was recorded, and on a driver that has no
-	// constraints to have a policy about.
-	Constraints string `json:"constraints"`
 }

@@ -215,14 +215,13 @@ func (d *Database) ApplyConstraints() error {
 	return nil
 }
 
-// DropConstraints does nothing, for the same reason as ApplyConstraints.
-func (d *Database) DropConstraints() error {
-	return nil
+// MissingConstraints reports none: ClickHouse has no constraints to be missing.
+func (d *Database) MissingConstraints() ([]string, error) {
+	return nil, nil
 }
 
-// StoreConstraintPolicy does nothing: with no constraints to create, there is no policy
-// for a later command to have to agree with.
-func (d *Database) StoreConstraintPolicy(string, string) error {
+// DropConstraints does nothing, for the same reason as ApplyConstraints.
+func (d *Database) DropConstraints() error {
 	return nil
 }
 

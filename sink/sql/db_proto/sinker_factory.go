@@ -83,6 +83,8 @@ func SinkerFactory(
 			return nil, fmt.Errorf("opening database: %w", err)
 		}
 
+		warnAboutMissingConstraints(database, options.Constraints, logger)
+
 		return NewSinker(
 			rootMessageDescriptor,
 			baseSink,
@@ -290,4 +292,39 @@ func applyConstraints(database protosql.Database, logger *zap.Logger) error {
 	logger.Info("constraints applied", zap.Duration("duration", time.Since(startAt)))
 
 	return nil
+}
+
+// warnAboutMissingConstraints says on every start whether the schema carries the
+// constraints the flags describe.
+//
+// A run that was interrupted before the backfill ended, or whose constraint pass was
+// killed part-way, leaves a database with no primary keys and no foreign keys — which
+// answers queries, slowly and without rejecting anything, and looks exactly like a
+// database that is fine. The check is one indexed catalog query, so it costs nothing next
+// to what it reports on.
+//
+// It only reports. Creating them is still the constraint timing's business: auto does it
+// when the backfill ends, manual leaves it to `sink postgres constraints apply`.
+func warnAboutMissingConstraints(database protosql.Database, constraints protosql.ConstraintPolicy, logger *zap.Logger) {
+	if constraints.SkipsEverything() {
+		return
+	}
+
+	missing, err := database.MissingConstraints()
+	if err != nil {
+		logger.Debug("could not check which constraints the schema carries", zap.Error(err))
+		return
+	}
+	if len(missing) == 0 {
+		return
+	}
+
+	next := "run `sink postgres constraints apply <manifest>` when a maintenance window suits"
+	if constraints.ApplyAtHead() {
+		next = "they will be created once the backfill reaches chain HEAD"
+	}
+
+	logger.Warn("the schema is missing constraints it is meant to have, so its tables have no indexes to match and reject nothing. "+next,
+		zap.Int("missing_count", len(missing)),
+		zap.Strings("missing", missing))
 }

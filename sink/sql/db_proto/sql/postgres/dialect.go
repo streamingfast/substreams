@@ -20,8 +20,7 @@ const postgresStaticSql = `
 	CREATE SCHEMA IF NOT EXISTS "%s";
 
 	CREATE TABLE IF NOT EXISTS "%s"._sink_info_ (
-		schema_hash TEXT PRIMARY KEY,
-		constraints TEXT
+		schema_hash TEXT PRIMARY KEY
 	);
 
 	CREATE TABLE IF NOT EXISTS "%s"._cursor_ (

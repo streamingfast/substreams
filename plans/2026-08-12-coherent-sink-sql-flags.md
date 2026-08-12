@@ -299,14 +299,15 @@ Drops `--apply-constraints` (timing is a run-time decision), `--block-batch-size
 `--local-buffer`, `--local-buffer-max-size`. Does not register any `--write-mode`,
 `--decode-*`, `--db-write-*` or `--spool-*`.
 
-New behaviour: `setup` records the effective constraint policy in the sink-info table so
-the run and the constraints commands can read it back.
-
 ### `constraints apply|drop <manifest>` — added: none
 
-Keeps `--disable-foreign-keys`, `--disable-primary-keys`, `--disable-unique-constraints`
-— now *overrides* on top of what `setup` recorded, with a warning naming both values when
-they disagree — plus `--bytes-encoding` and `--proto-file-override`.
+Keeps `--disable-foreign-keys`, `--disable-primary-keys`, `--disable-unique-constraints`,
+`--bytes-encoding` and `--proto-file-override`.
+
+They have to be passed again here, and deliberately so: `setup` is optional — the run
+path creates the schema itself when it finds none — so anything it recorded would be
+present or absent depending on a step nobody is required to take, and `constraints apply`
+would quietly mean different things on two otherwise identical deployments.
 
 Drops everything else. The common invocation becomes
 `sink postgres constraints apply <manifest> --dsn ...`.
@@ -465,8 +466,8 @@ than being silently mangled at apply time.
 ## Outcome
 
 Every flag above is registered, the three PostgreSQL write modes and ClickHouse all spool,
-and `constraints apply|drop` reads the policy `setup` recorded. Principle 3 holds on both
-drivers.
+and `constraints apply|drop` takes the same schema switches as the run. Principle 3 holds
+on both drivers.
 
 Two things the first draft of this plan got wrong, kept here because the reasoning is
 worth having:

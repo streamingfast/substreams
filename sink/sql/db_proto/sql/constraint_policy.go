@@ -1,9 +1,7 @@
 package sql
 
 import (
-	"encoding/json"
 	"fmt"
-	"slices"
 	"strings"
 )
 
@@ -134,63 +132,6 @@ func (p ConstraintPolicy) ApplyUpfront() bool {
 // ApplyAtHead reports whether the sink creates them itself once the backfill is over.
 func (p ConstraintPolicy) ApplyAtHead() bool {
 	return (p.Timing == ConstraintsAuto || p.Timing == "") && !p.SkipsEverything()
-}
-
-// storedPolicy is what gets recorded, which is the shape of the schema and not the
-// timing: when constraints are created is a decision each run makes, which tables are
-// meant to have them is a property of the schema every command has to agree on.
-type storedPolicy struct {
-	DisableForeignKeys bool     `json:"disable_foreign_keys"`
-	DisablePrimaryKeys []string `json:"disable_primary_keys,omitempty"`
-	DisableUniques     []string `json:"disable_uniques,omitempty"`
-}
-
-// Encode renders the schema-shaping half of the policy for storage.
-func (p ConstraintPolicy) Encode() (string, error) {
-	encoded, err := json.Marshal(storedPolicy{
-		DisableForeignKeys: p.DisableForeignKeys,
-		DisablePrimaryKeys: p.DisablePrimaryKeys,
-		DisableUniques:     p.DisableUniques,
-	})
-	if err != nil {
-		return "", fmt.Errorf("encoding the constraint policy: %w", err)
-	}
-
-	return string(encoded), nil
-}
-
-// DecodeConstraintPolicy reads back what Encode wrote, keeping the caller's timing.
-func DecodeConstraintPolicy(encoded string, timing ConstraintTiming) (ConstraintPolicy, error) {
-	var stored storedPolicy
-	if err := json.Unmarshal([]byte(encoded), &stored); err != nil {
-		return ConstraintPolicy{}, fmt.Errorf("decoding the recorded constraint policy %q: %w", encoded, err)
-	}
-
-	return ConstraintPolicy{
-		Timing:             timing,
-		DisableForeignKeys: stored.DisableForeignKeys,
-		DisablePrimaryKeys: stored.DisablePrimaryKeys,
-		DisableUniques:     stored.DisableUniques,
-	}, nil
-}
-
-// SameShape reports whether two policies describe the same schema, ignoring timing.
-func (p ConstraintPolicy) SameShape(other ConstraintPolicy) bool {
-	return p.DisableForeignKeys == other.DisableForeignKeys &&
-		slices.Equal(normalizeTables(p.DisablePrimaryKeys), normalizeTables(other.DisablePrimaryKeys)) &&
-		slices.Equal(normalizeTables(p.DisableUniques), normalizeTables(other.DisableUniques))
-}
-
-func normalizeTables(list []string) []string {
-	out := make([]string, 0, len(list))
-	for _, entry := range list {
-		if trimmed := strings.ToLower(strings.TrimSpace(entry)); trimmed != "" {
-			out = append(out, trimmed)
-		}
-	}
-	slices.Sort(out)
-
-	return out
 }
 
 // ParseConstraintTiming validates the flag value.

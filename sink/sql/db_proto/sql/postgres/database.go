@@ -483,8 +483,49 @@ func (d *Database) existingConstraintRelations() (map[string]string, error) {
 	return relations, rows.Err()
 }
 
+// rowQuerier is what both a transaction and the pool itself satisfy, so the catalog can
+// be read inside the constraint pass or on its own at startup.
+type rowQuerier interface {
+	Query(query string, args ...any) (*pgsql.Rows, error)
+}
+
+// MissingConstraints names the constraints the policy says this schema should carry and
+// the catalog does not have.
+//
+// It is one query against pg_constraint filtered by namespace — indexed, and nothing like
+// the cost of building the constraints it reports on — so it is cheap enough to run on
+// every start.
+func (d *Database) MissingConstraints() ([]string, error) {
+	existing, err := d.existingConstraintNamesFrom(d.db)
+	if err != nil {
+		return nil, err
+	}
+
+	var missing []string
+	collect := func(constraints []*sql.Constraint, skip func(string) bool) {
+		for _, constraint := range constraints {
+			if skip(constraint.Table) {
+				continue
+			}
+			if name := constraintName(constraint.Sql); name != "" && !existing[name] {
+				missing = append(missing, name)
+			}
+		}
+	}
+
+	collect(d.dialect.PrimaryKeySql, d.constraints.SkipPrimaryKey)
+	collect(d.dialect.UniqueConstraintSql, d.constraints.SkipUnique)
+	collect(d.dialect.ForeignKeySql, d.constraints.SkipForeignKey)
+
+	return missing, nil
+}
+
 func (d *Database) existingConstraintNames() (map[string]bool, error) {
-	rows, err := d.tx.Query(`
+	return d.existingConstraintNamesFrom(d.tx)
+}
+
+func (d *Database) existingConstraintNamesFrom(from rowQuerier) (map[string]bool, error) {
+	rows, err := from.Query(`
 		SELECT c.conname
 		FROM pg_constraint c
 		JOIN pg_namespace n ON n.oid = c.connamespace
@@ -642,21 +683,12 @@ func (d *Database) FetchSinkInfo(schemaName string) (*sql.SinkInfo, error) {
 		return nil, nil
 	}
 
-	// A schema created before the policy was recorded has no column for it. Adding it is
-	// idempotent and does not move the sink info hash, which is computed over the entity
-	// tables and their constraints rather than the bookkeeping ones.
-	if _, err := d.db.Exec(fmt.Sprintf(`ALTER TABLE "%s"._sink_info_ ADD COLUMN IF NOT EXISTS constraints TEXT`, d.schema.Name)); err != nil {
-		return nil, fmt.Errorf("adding the constraints column to the sink info: %w", err)
-	}
-
 	out := &sql.SinkInfo{}
 
-	var constraints pgsql.NullString
-	err = d.db.QueryRow(fmt.Sprintf("SELECT schema_hash, constraints FROM %s._sink_info_", d.schema.Name)).Scan(&out.SchemaHash, &constraints)
+	err = d.db.QueryRow(fmt.Sprintf("SELECT schema_hash FROM %s._sink_info_", d.schema.Name)).Scan(&out.SchemaHash)
 	if err != nil {
 		return nil, fmt.Errorf("fetching sync info: %w", err)
 	}
-	out.Constraints = constraints.String
 
 	return out, nil
 
@@ -667,18 +699,6 @@ func (d *Database) StoreSinkInfo(schemaName string, schemaHash string) error {
 	if err != nil {
 		return fmt.Errorf("storing schema hash: %w", err)
 	}
-	return nil
-}
-
-// StoreConstraintPolicy records which constraints the schema is meant to have, so that
-// `constraints apply` does not have to be told again — and cannot be told something
-// different by accident three days later.
-func (d *Database) StoreConstraintPolicy(schemaName string, encoded string) error {
-	_, err := d.db.Exec(fmt.Sprintf("UPDATE %s._sink_info_ SET constraints = $1", schemaName), encoded)
-	if err != nil {
-		return fmt.Errorf("storing the constraint policy: %w", err)
-	}
-
 	return nil
 }
 

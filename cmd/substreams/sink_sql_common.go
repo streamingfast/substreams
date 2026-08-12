@@ -470,6 +470,10 @@ func runFromProtoSink(cmd *cobra.Command, driver, manifestPath, dsnString string
 	if !useProtoOption {
 		// Without the schema annotations there are no relations to constrain.
 		constraints = protosql.DisableAllConstraints()
+
+		zlog.Warn("the module's output carries no schema.proto annotations, so its tables get no primary keys, no unique constraints and no foreign keys — " +
+			"and therefore no indexes. Queries against them are sequential scans and duplicate ids are not rejected. " +
+			"Annotate the output to have the sink derive them")
 	}
 	warnAboutConstraints(constraints)
 
@@ -709,7 +713,9 @@ func newSinkConstraintsE(driver string, action constraintsAction) func(*cobra.Co
 			return err
 		}
 		if !useProtoOption {
-			return fmt.Errorf("the module's output has no schema annotations, so it has no constraints to %s", action)
+			return fmt.Errorf("the module's output carries no schema.proto annotations, so the sink has no primary keys, unique constraints or foreign keys to %s. "+
+				"Its tables are derived from the message structure alone and have no indexes at all — annotate the output with `schema.field { primary_key: true }` "+
+				"and the relations you want, then re-run the sink, for this command to have anything to do", action)
 		}
 
 		encoding, err := sinkBytesEncoding(cmd)
@@ -859,6 +865,10 @@ func runFromProtoSetup(cmd *cobra.Command, driver, dsnString string, spkg *pbsub
 	if !useProtoOption {
 		// Without the schema annotations there are no relations to constrain.
 		constraints = protosql.DisableAllConstraints()
+
+		zlog.Warn("the module's output carries no schema.proto annotations, so its tables get no primary keys, no unique constraints and no foreign keys — " +
+			"and therefore no indexes. Queries against them are sequential scans and duplicate ids are not rejected. " +
+			"Annotate the output to have the sink derive them")
 	}
 	warnAboutConstraints(constraints)
 

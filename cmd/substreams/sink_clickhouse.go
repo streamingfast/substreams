@@ -39,15 +39,16 @@ func init() {
 	addOperatorFlags(persistent)
 
 	addSinkRunFlags(sinkClickhouseCmd.Flags(), sinkClickhouseDriver)
+	setModeGroupedUsage(sinkClickhouseCmd)
 
 	setupFlags := sinkClickhouseSetupCmd.Flags()
 	addCursorTableFlags(setupFlags)
 	addClusterFlag(setupFlags)
 	addOnModuleHashMismatchFlag(setupFlags)
-	setupFlags.Bool("system-tables-only", false, "[DatabaseChanges mode] will only create/update the systems tables (cursors, substreams_history) and ignore the schema from the manifest")
-	setupFlags.Bool("ignore-duplicate-table-errors", false, "[DatabaseChanges mode][Dev] Use this if you want to ignore duplicate table errors, take caution that this means the 'schema.sql' file will not have run fully!")
+	setupFlags.Bool("system-tables-only", false, "will only create/update the systems tables (cursors, substreams_history) and ignore the schema from the manifest")
+	setupFlags.Bool("ignore-duplicate-table-errors", false, "[Dev] Use this if you want to ignore duplicate table errors, take caution that this means the 'schema.sql' file will not have run fully!")
 	addBytesEncodingFlag(setupFlags)
-	addFromProtoModeRunFlags(setupFlags, sinkClickhouseDriver)
+	addFromProtoSchemaFlags(setupFlags)
 
 	sinkClickhouseCmd.AddCommand(sinkClickhouseSetupCmd)
 	sinkClickhouseCmd.AddCommand(newSinkToolsCmd(sinkClickhouseDriver))

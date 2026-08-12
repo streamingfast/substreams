@@ -18,6 +18,7 @@ import (
 	"github.com/streamingfast/substreams/sink/sql/db_changes/db"
 	"github.com/streamingfast/substreams/sink/sql/db_proto/sql"
 	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/schema"
+	"github.com/streamingfast/substreams/sink/sql/db_proto/sql/spool"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
@@ -33,6 +34,8 @@ type Database struct {
 	dsn             *db.DSN
 	ctx             context.Context
 	inserter        *AccumulatorInserter
+	spoolOptions    *spool.Options
+	spool           *spool.Spool
 	bytesEncoding   bytes.Encoding
 	queryRetryCount int
 	queryRetrySleep time.Duration
@@ -90,7 +93,28 @@ func NewDatabase(
 	return database, nil
 }
 
+// WithSpool turns on the on-disk spool. It must be called before Open.
+func (d *Database) WithSpool(options spool.Options) {
+	d.spoolOptions = &options
+}
+
+// Open starts the spool, if one is configured.
+//
+// Rows then land on disk and a background goroutine applies whole segments, so the stream
+// stops waiting on ClickHouse. What reaches the server is unchanged: a segment is replayed
+// into the same column builders and sent by the same flush, followed by the same cursor
+// write.
 func (d *Database) Open() error {
+	if d.spoolOptions == nil {
+		return nil
+	}
+
+	created, err := spool.New(d.ctx, *d.spoolOptions, newCHCodec(), newCHApplier(d, d.inserter, d.logger), d.schema.Name, d.logger)
+	if err != nil {
+		return fmt.Errorf("starting the local spool: %w", err)
+	}
+	d.spool = created
+
 	return nil
 }
 
@@ -163,6 +187,45 @@ func (d *Database) clientNoCache(dsn *db.DSN) (*ch.Client, error) {
 	return client, nil
 }
 
+// SwitchToDirectInserts drains the spool and inserts inline from here on.
+//
+// The spool trades freshness for throughput, which is what a backfill wants and the
+// opposite of what a sink at the chain head wants, where a block should be queryable when
+// it arrives rather than when the segment it lands in is full.
+func (d *Database) SwitchToDirectInserts(ctx context.Context) error {
+	if d.spool == nil {
+		return nil
+	}
+
+	d.logger.Info("stream reached the chain head, draining the spool and switching to direct inserts. " +
+		"--db-write-* and --spool-* no longer apply from here on")
+
+	if err := d.spool.Close(ctx); err != nil {
+		return fmt.Errorf("draining the spool: %w", err)
+	}
+	d.spool = nil
+	d.spoolOptions = nil
+
+	return nil
+}
+
+// ApplyConstraints does nothing: ClickHouse has no primary/foreign key constraints to
+// apply, which is also why CreateDatabase ignores its useConstraints argument.
+func (d *Database) ApplyConstraints() error {
+	return nil
+}
+
+// DropConstraints does nothing, for the same reason as ApplyConstraints.
+func (d *Database) DropConstraints() error {
+	return nil
+}
+
+// StoreConstraintPolicy does nothing: with no constraints to create, there is no policy
+// for a later command to have to agree with.
+func (d *Database) StoreConstraintPolicy(string, string) error {
+	return nil
+}
+
 func (d *Database) CreateDatabase(useConstraints bool) error {
 	dsn := d.dsn.Clone()
 	dsn.Database = "default"
@@ -218,7 +281,17 @@ func (d *Database) CreateDatabase(useConstraints bool) error {
 }
 
 func (d *Database) Insert(table string, values []any) error {
-	return d.inserter.insert(table, values)
+	if d.spool == nil {
+		return d.inserter.insert(table, values)
+	}
+
+	if table == sql.DialectTableBlock {
+		if blockNum, ok := values[0].(uint64); ok {
+			d.spool.RecordBlock(blockNum)
+		}
+	}
+
+	return d.spool.Insert(table, values)
 }
 
 func (d *Database) WalkMessageDescriptorAndInsert(dm protoreflect.Message, blockNum uint64, blockTimestamp time.Time, parent *sql.Parent) (time.Duration, error) {
@@ -244,6 +317,17 @@ func (d *Database) Flush() (time.Duration, error) {
 	d.logger.Debug("flushing")
 
 	startFlush := time.Now()
+
+	// With a spool a flush only seals a segment once it is big enough; the write to
+	// ClickHouse happens later, on the applier's goroutine.
+	if d.spool != nil {
+		if err := d.spool.MaybeSeal(d.ctx); err != nil {
+			return 0, fmt.Errorf("sealing: %w", err)
+		}
+
+		return time.Since(startFlush), nil
+	}
+
 	err := d.inserter.flush(d)
 	if err != nil {
 		return 0, fmt.Errorf("flushing: %w", err)
@@ -338,6 +422,14 @@ func (d *Database) FetchCursor() (*sink.Cursor, error) {
 }
 
 func (d *Database) StoreCursor(cursor *sink.Cursor) error {
+	// With a spool the cursor belongs to the segment being written: it is what makes that
+	// segment resumable, and it must not run ahead of the rows it covers.
+	if d.spool != nil {
+		d.spool.RecordCursor(cursor.String())
+
+		return nil
+	}
+
 	if d.cursorFilePath == "" {
 		return fmt.Errorf("cursor file path is not set")
 	}
@@ -357,6 +449,14 @@ func (d *Database) StoreCursor(cursor *sink.Cursor) error {
 }
 
 func (d *Database) HandleBlocksUndo(lastValidBlockNum uint64) error {
+	// Rows still in the spool would otherwise land after the delete that was supposed to
+	// remove them.
+	if d.spool != nil {
+		if err := d.spool.Drain(d.ctx); err != nil {
+			return fmt.Errorf("draining the spool before an undo: %w", err)
+		}
+	}
+
 	tables := d.dialect.GetTables()
 
 	// Sort tables in descending order based on their Ordinal field
@@ -479,6 +579,25 @@ func (d *Database) HandleBlocksUndo(lastValidBlockNum uint64) error {
 	}
 
 	return nil
+}
+
+// Close drains the spool, so blocks held at shutdown reach the server rather than being
+// streamed again. Without one there is nothing held: inserts flush inline.
+func (d *Database) Close(ctx context.Context) error {
+	if d.spool == nil {
+		return nil
+	}
+
+	return d.spool.Close(ctx)
+}
+
+// BufferStats reports what sits between the stream and the server.
+func (d *Database) BufferStats() (int64, int64, uint64, bool) {
+	if d.spool == nil {
+		return 0, 0, 0, false
+	}
+
+	return d.spool.BlocksBuffered(), d.spool.BytesOnDisk(), d.spool.AppliedBlock(), true
 }
 
 func (d *Database) DatabaseHash(schemaName string) (uint64, error) {

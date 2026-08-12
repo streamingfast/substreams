@@ -110,9 +110,9 @@ func runBytesSinker(t *testing.T, schema string, useConstraints bool, payload []
 
 	options := db_proto.SinkerFactoryOptions{
 		UseProtoOption:  true,
-		UseConstraints:  useConstraints,
+		Constraints:     constraintPolicy(useConstraints),
 		UseTransactions: true,
-		BlockBatchSize:  1,
+		DecodeBatchSize: 1,
 		Encoding:        sqlbytes.EncodingRaw,
 	}.Defaults()
 	options.Encoding = sqlbytes.EncodingRaw

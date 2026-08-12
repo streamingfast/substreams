@@ -13,6 +13,7 @@ import (
 	"github.com/streamingfast/substreams/manifest"
 	sink "github.com/streamingfast/substreams/sink"
 	"github.com/streamingfast/substreams/sink/sql/db_proto"
+	protosql "github.com/streamingfast/substreams/sink/sql/db_proto/sql"
 	pbrelations "github.com/streamingfast/substreams/sink/sql/tests/relations"
 	"github.com/stretchr/testify/require"
 )
@@ -65,11 +66,11 @@ func TestDbProtoPostgresBoundedRunFlushesOnCompletion(t *testing.T) {
 
 	options := db_proto.SinkerFactoryOptions{
 		UseProtoOption:  true,
-		UseConstraints:  false,
+		Constraints:     protosql.DisableAllConstraints(),
 		UseTransactions: true,
-		BlockBatchSize:  blockBatchSize,
+		DecodeBatchSize: blockBatchSize,
 	}.Defaults()
-	options.BlockBatchSize = blockBatchSize
+	options.DecodeBatchSize = blockBatchSize
 
 	createPostgresTestSchema(t, postgresContainer.ConnectionString, schema)
 

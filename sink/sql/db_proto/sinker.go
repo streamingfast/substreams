@@ -22,9 +22,17 @@ type Sinker struct {
 	stats                 *stats.Stats
 	logger                *zap.Logger
 	rootMessageDescriptor protoreflect.MessageDescriptor
-	useConstraints        bool
 	lastAppliedBlockNum   uint64
 	lastAppliedBlockTime  time.Time
+
+	// directInserts records that the stream reached the chain head and the database was
+	// switched off any buffered write path. It only ever goes from false to true.
+	directInserts bool
+
+	// constraints decides what is created and when. Anything not applied upfront is
+	// applied once the backfill is over, which is the point of the default.
+	constraints        sql.ConstraintPolicy
+	constraintsApplied bool
 
 	// holding buffers the blocks received since the last flush. It is only ever touched
 	// from the sinker's callbacks, which are called sequentially.
@@ -36,11 +44,12 @@ type Sinker struct {
 // NewSinker builds the from-proto sinker. decodeWorkers bounds how many blocks are
 // unmarshalled and walked concurrently at flush time; zero picks one per core, less one,
 // capped at eight.
-func NewSinker(rootMessageDescriptor protoreflect.MessageDescriptor, sink *sink.Sinker, db sql.Database, useTransaction bool, useConstraints bool, blockBatchSize int, decodeWorkers int, stats *stats.Stats, logger *zap.Logger) *Sinker {
+func NewSinker(rootMessageDescriptor protoreflect.MessageDescriptor, sink *sink.Sinker, db sql.Database, useTransaction bool, constraints sql.ConstraintPolicy, blockBatchSize int, decodeWorkers int, stats *stats.Stats, logger *zap.Logger) *Sinker {
 	return &Sinker{
 		db:                    db,
 		rootMessageDescriptor: rootMessageDescriptor,
 		useTransaction:        useTransaction,
+		constraints:           constraints,
 		blockBatchSize:        uint64(blockBatchSize),
 		stats:                 stats,
 		Sinker:                sink,
@@ -67,6 +76,11 @@ func (s *Sinker) Run(ctx context.Context) error {
 	}
 	//panic("Testing 12 12")
 	s.logger.Info("fetched cursor", zap.Stringer("block", cursor.Block()))
+	if cursor != nil {
+		// Seed the applied mark, otherwise the first downloaded block would be measured
+		// against zero and reported as a chain-height-sized backlog.
+		s.stats.Progress.SetResumeBlock(cursor.Block().Num())
+	}
 
 	s.stats.LastBlockProcessAt = time.Now()
 	s.Sinker.Run(ctx, cursor, s)
@@ -96,10 +110,6 @@ func (s *Sinker) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrp
 		return fmt.Errorf("received data from wrong output module, expected to received from %q but got module's output for %q", s.OutputModuleName(), output.Name)
 	}
 
-	if (isLive != nil && *isLive) && s.useConstraints {
-		return fmt.Errorf("live mode is not supported without constraints")
-	}
-
 	startAt := time.Now()
 	defer func() {
 		s.stats.LastBlockProcessAt = time.Now()
@@ -113,6 +123,27 @@ func (s *Sinker) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrp
 	}
 	s.stats.BlockCount++
 
+	if isLive != nil && *isLive && !s.directInserts {
+		// Write what is held before the switch, with the cursor of the last held block:
+		// those blocks belong to the buffered path, and this block's cursor covers a
+		// block that has not been applied yet.
+		if len(s.holding) > 0 {
+			if err := s.flushHolding(s.holding[len(s.holding)-1].cursor); err != nil {
+				return fmt.Errorf("flushing held blocks before switching to direct inserts: %w", err)
+			}
+		}
+
+		if err := s.db.SwitchToDirectInserts(ctx); err != nil {
+			return fmt.Errorf("switching to direct inserts: %w", err)
+		}
+
+		if err := s.applyConstraintsOnce(); err != nil {
+			return err
+		}
+
+		s.directInserts = true
+	}
+
 	holder := &Holder{
 		output: output,
 		data:   data,
@@ -120,6 +151,9 @@ func (s *Sinker) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrp
 		cursor: cursor,
 	}
 	s.holding = append(s.holding, holder)
+	s.stats.Progress.RecordDownloaded(data.Clock.Number)
+	s.recordBuffered()
+
 	if data.Clock.Number > (s.lastAppliedBlockNum+s.blockBatchSize) || s.blockBatchSize == 1 || (isLive != nil && *isLive) {
 		if isLive != nil && *isLive && s.stats.FlushDuration.Average() > data.Clock.Timestamp.AsTime().Sub(s.lastAppliedBlockTime) {
 			s.logger.Debug("skipping a flush because we are LIVE and flush average duration is above time between blocks", zapx.HumanDuration("flush_duration_average", s.stats.FlushDuration.Average()), zap.Time("last_block_time", s.lastAppliedBlockTime), zap.Time("block_time", data.Clock.Timestamp.AsTime()))
@@ -140,13 +174,22 @@ func (s *Sinker) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrp
 // --block-batch-size larger than the range, that meant an empty database and a run that
 // looked successful.
 func (s *Sinker) HandleBlockRangeCompletion(ctx context.Context, cursor *sink.Cursor) error {
-	if len(s.holding) == 0 {
-		return nil
+
+	if len(s.holding) > 0 {
+		s.logger.Info("flushing blocks held at the end of the requested range", zap.Int("block_count", len(s.holding)))
+
+		if err := s.flushHolding(cursor); err != nil {
+			return err
+		}
 	}
 
-	s.logger.Info("flushing blocks held at the end of the requested range", zap.Int("block_count", len(s.holding)))
+	if err := s.applyConstraintsOnce(); err != nil {
+		return err
+	}
 
-	return s.flushHolding(cursor)
+	// A local buffer still holds whatever has not reached its segment size. Draining it
+	// here is what keeps those blocks from being streamed, and paid for, twice.
+	return s.db.Close(ctx)
 }
 
 // flushHolding applies every held block, stores the cursor and commits.
@@ -205,7 +248,28 @@ func (s *Sinker) flushHolding(cursor *sink.Cursor) (err error) {
 	}
 	s.holding = s.holding[:0]
 
+	// With a local buffer the rows are only queued at this point, not durable, so the
+	// applied mark has to come from what the buffer actually committed.
+	if _, _, applied, buffering := s.db.BufferStats(); !buffering {
+		s.stats.Progress.RecordApplied(lastClock.Number)
+	} else if applied > 0 {
+		s.stats.Progress.RecordApplied(applied)
+	}
+	s.recordBuffered()
+
 	return nil
+}
+
+// recordBuffered reports what sits between the stream and the database: blocks held in
+// memory for the next flush, plus whatever a local buffer has queued on disk.
+func (s *Sinker) recordBuffered() {
+	bufferedBlocks, bufferedBytes, _, buffering := s.db.BufferStats()
+	if !buffering {
+		s.stats.Progress.RecordBuffered(len(s.holding), 0)
+		return
+	}
+
+	s.stats.Progress.RecordBuffered(len(s.holding)+int(bufferedBlocks), bufferedBytes)
 }
 
 // recordDecodeStats folds the per-block timings the workers measured back into the
@@ -226,6 +290,13 @@ func (s *Sinker) HandleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstr
 
 	s.logger.Info("Handling undo block signal", zap.Stringer("block", cursor.Block()), zap.Stringer("cursor", cursor))
 
+	// Blocks are held in memory until the batch fills, so the undone ones may not have
+	// reached the database yet. Writing them first and deleting after is what keeps a
+	// later flush from putting back exactly what the undo removed.
+	if err := s.flushHolding(cursor); err != nil {
+		return fmt.Errorf("flushing held blocks before an undo: %w", err)
+	}
+
 	err = s.db.HandleBlocksUndo(lastValidBlockNum)
 	if err != nil {
 		return fmt.Errorf("handle blocks undo from %d : %w", lastValidBlockNum, err)
@@ -235,6 +306,37 @@ func (s *Sinker) HandleBlockUndoSignal(ctx context.Context, undoSignal *pbsubstr
 	if err != nil {
 		return fmt.Errorf("inserting cursor: %w", err)
 	}
+
+	return nil
+}
+
+// applyConstraintsOnce creates the schema's constraints now that the bulk of the loading
+// is behind us, which is where they belong: measured through binary COPY, loading with
+// foreign keys in place costs 27.7x against 3.3x for building them afterwards.
+//
+// It runs when the stream reaches the chain head, and again at the end of a bounded run
+// that never got there. Both are idempotent — the constraints already in place are left
+// alone — so whichever comes first does the work.
+func (s *Sinker) applyConstraintsOnce() error {
+	if s.constraintsApplied || !s.constraints.ApplyAtHead() {
+		if !s.constraintsApplied && s.constraints.Timing == sql.ConstraintsManual && !s.constraints.SkipsEverything() {
+			s.constraintsApplied = true
+			s.logger.Info("the backfill is done and the schema has no constraints yet. Creating them locks every table while indexes are built and foreign keys validated, " +
+				"so it is left to you: run `substreams sink postgres apply-constraints <manifest> --dsn ...` when a maintenance window suits")
+		}
+
+		return nil
+	}
+	s.constraintsApplied = true
+
+	s.logger.Info("backfill is done, creating the schema's constraints as --apply-constraints=head asked. This locks every table while it runs")
+
+	startAt := time.Now()
+	if err := applyConstraints(s.db, s.logger); err != nil {
+		return err
+	}
+
+	s.logger.Debug("constraints created", zap.Duration("duration", time.Since(startAt)))
 
 	return nil
 }

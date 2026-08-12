@@ -33,23 +33,74 @@ var sinkPostgresSetupCmd = &cobra.Command{
 	RunE: newSinkSetupE(sinkPostgresDriver),
 }
 
+var sinkPostgresConstraintsCmd = &cobra.Command{
+	Use:   "constraints",
+	Short: "Create or drop the schema's constraints on an already loaded database",
+}
+
+var sinkPostgresConstraintsApplyCmd = &cobra.Command{
+	Use:   "apply <manifest>",
+	Short: "Create the schema's constraints on an already loaded database",
+	Long: cli.Dedent(`
+		Create the primary keys, unique and foreign key constraints of a from-proto schema
+		on a database the sink has already loaded, skipping the ones already in place.
+
+		The sink loads without them on purpose: measured through binary COPY, loading with
+		foreign keys in place runs 27x slower than loading without, where building the very
+		same constraints afterwards costs 3.3x. Creating them is a stop-the-world
+		operation, though — every index is built and every foreign key validated, with the
+		tables locked while it runs — so on a large database this belongs in a maintenance
+		window, which is what --apply-constraints=manual leaves it to this command for.
+
+		Running it again is safe: constraints already in place are left alone.
+	`),
+	Args: cobra.ExactArgs(1),
+	RunE: newSinkConstraintsE(sinkPostgresDriver, constraintsApply),
+}
+
+var sinkPostgresConstraintsDropCmd = &cobra.Command{
+	Use:   "drop <manifest>",
+	Short: "Drop the schema's constraints",
+	Long: cli.Dedent(`
+		Drop the primary keys, unique and foreign key constraints of a from-proto schema,
+		leaving anything the sink did not create alone.
+
+		This is the escape hatch after --apply-constraints=always, and what makes a
+		backfill that has to be resumed fast again without setting the schema up afresh:
+		loading with foreign keys in place measured 27x slower than loading without them.
+
+		Running it again is safe: constraints already absent are skipped.
+	`),
+	Args: cobra.ExactArgs(1),
+	RunE: newSinkConstraintsE(sinkPostgresDriver, constraintsDrop),
+}
+
 func init() {
 	persistent := sinkPostgresCmd.PersistentFlags()
 	addDSNFlag(persistent)
 	addOperatorFlags(persistent)
 
 	addSinkRunFlags(sinkPostgresCmd.Flags(), sinkPostgresDriver)
+	setModeGroupedUsage(sinkPostgresCmd)
 
 	setupFlags := sinkPostgresSetupCmd.Flags()
 	addCursorTableFlags(setupFlags)
 	addOnModuleHashMismatchFlag(setupFlags)
-	setupFlags.Bool("postgraphile", false, "[DatabaseChanges mode] Will append the necessary 'comments' on cursors table to fully support postgraphile")
-	setupFlags.Bool("system-tables-only", false, "[DatabaseChanges mode] will only create/update the systems tables (cursors, substreams_history) and ignore the schema from the manifest")
-	setupFlags.Bool("ignore-duplicate-table-errors", false, "[DatabaseChanges mode][Dev] Use this if you want to ignore duplicate table errors, take caution that this means the 'schema.sql' file will not have run fully!")
+	setupFlags.Bool("postgraphile", false, "Will append the necessary 'comments' on cursors table to fully support postgraphile")
+	setupFlags.Bool("system-tables-only", false, "will only create/update the systems tables (cursors, substreams_history) and ignore the schema from the manifest")
+	setupFlags.Bool("ignore-duplicate-table-errors", false, "[Dev] Use this if you want to ignore duplicate table errors, take caution that this means the 'schema.sql' file will not have run fully!")
 	addBytesEncodingFlag(setupFlags)
-	addFromProtoModeRunFlags(setupFlags, sinkPostgresDriver)
+	addFromProtoSchemaFlags(setupFlags)
+
+	for _, constraintsCmd := range []*cobra.Command{sinkPostgresConstraintsApplyCmd, sinkPostgresConstraintsDropCmd} {
+		addBytesEncodingFlag(constraintsCmd.Flags())
+		addFromProtoSchemaFlags(constraintsCmd.Flags())
+	}
+	sinkPostgresConstraintsCmd.AddCommand(sinkPostgresConstraintsApplyCmd)
+	sinkPostgresConstraintsCmd.AddCommand(sinkPostgresConstraintsDropCmd)
 
 	sinkPostgresCmd.AddCommand(sinkPostgresSetupCmd)
+	sinkPostgresCmd.AddCommand(sinkPostgresConstraintsCmd)
 	sinkPostgresCmd.AddCommand(newSinkToolsCmd(sinkPostgresDriver))
 
 	SinkCmd.AddCommand(sinkPostgresCmd)

@@ -20,7 +20,8 @@ const postgresStaticSql = `
 	CREATE SCHEMA IF NOT EXISTS "%s";
 
 	CREATE TABLE IF NOT EXISTS "%s"._sink_info_ (
-		schema_hash TEXT PRIMARY KEY
+		schema_hash TEXT PRIMARY KEY,
+		constraints TEXT
 	);
 
 	CREATE TABLE IF NOT EXISTS "%s"._cursor_ (
@@ -116,7 +117,7 @@ func (d *DialectPostgres) createTable(table *schema.Table) error {
 					ForeignField: parentField.Name,
 				}
 
-				d.AddForeignKeySql(table.Name, foreignKey.String())
+				d.AddForeignKeyReferencing(table.Name, parentTable.Name, foreignKey.String())
 
 				fieldFound = true
 				break
@@ -155,7 +156,7 @@ func (d *DialectPostgres) createTable(table *schema.Table) error {
 				ForeignTable: d.FullTableName(childTable),
 				ForeignField: childTable.PrimaryKey.Name,
 			}
-			d.AddForeignKeySql(table.Name, foreignKey.String())
+			d.AddForeignKeyReferencing(table.Name, childTable.Name, foreignKey.String())
 
 		case f.ForeignKey != nil:
 			foreignTable, found := d.TableRegistry[f.ForeignKey.Table]
@@ -181,7 +182,7 @@ func (d *DialectPostgres) createTable(table *schema.Table) error {
 				ForeignTable: d.FullTableName(foreignTable),
 				ForeignField: foreignField.Name,
 			}
-			d.AddForeignKeySql(table.Name, foreignKey.String())
+			d.AddForeignKeyReferencing(table.Name, foreignTable.Name, foreignKey.String())
 		}
 		fieldType := MapFieldType(f.FieldDescriptor, d.bytesEncoding, f)
 		if f.IsUnique {
@@ -200,7 +201,7 @@ func (d *DialectPostgres) createTable(table *schema.Table) error {
 
 	sb.WriteString(");\n")
 
-	d.AddForeignKeySql(tableName, fmt.Sprintf("ALTER TABLE %s ADD CONSTRAINT fk_block FOREIGN KEY (%s) REFERENCES %s.%s(number) ON DELETE CASCADE", tableName, sql2.DialectFieldBlockNumber, d.schemaName, sql2.DialectTableBlock))
+	d.AddForeignKeyReferencing(table.Name, sql2.DialectTableBlock, fmt.Sprintf("ALTER TABLE %s ADD CONSTRAINT fk_block FOREIGN KEY (%s) REFERENCES %s.%s(number) ON DELETE CASCADE", tableName, sql2.DialectFieldBlockNumber, d.schemaName, sql2.DialectTableBlock))
 	d.AddCreateTableSql(table.Name, sb.String())
 
 	return nil

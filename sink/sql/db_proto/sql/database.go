@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -23,7 +24,26 @@ type Database interface {
 	UpdateSinkInfoHash(schemaName string, newHash string) error
 	StoreSinkInfo(schemaName string, schemaHash string) error
 
+	// StoreConstraintPolicy records which constraints the schema is meant to have, so
+	// that `constraints apply` does not have to be told again — and cannot be told
+	// something different by accident three days later.
+	StoreConstraintPolicy(schemaName string, encoded string) error
+
 	CreateDatabase(useConstraints bool) error
+	// ApplyConstraints adds the schema's constraints to a database that already exists,
+	// skipping the ones already in place. A schema first synced without constraints has
+	// none of them, and only this puts them there.
+	ApplyConstraints() error
+
+	// DropConstraints removes the constraints this schema's DDL would create, leaving
+	// anything the sink did not put there alone. It is the escape hatch after
+	// --apply-constraints=always, and what makes a stalled backfill fast again without a
+	// second setup.
+	DropConstraints() error
+	// SwitchToDirectInserts leaves any buffered write path behind and inserts straight
+	// into the database from now on. It is a one-way switch, called when the stream
+	// reaches the chain head, and a no-op for a backend that never buffered.
+	SwitchToDirectInserts(ctx context.Context) error
 	// WalkMessageDescriptorAndInsert reads the message through protoreflect only, so it
 	// does not care which dynamic implementation produced it — dynamicpb and hyperpb are
 	// both accepted, and the decoder picks.
@@ -49,6 +69,16 @@ type Database interface {
 	GetDialect() Dialect
 
 	Open() error
+
+	// Close releases anything the database buffered locally, so blocks held at shutdown
+	// reach the server rather than being streamed again.
+	Close(ctx context.Context) error
+
+	// BufferStats reports what is buffered between the stream and the server: how many
+	// blocks, how many bytes on disk, and the last block actually committed. enabled is
+	// false when nothing buffers locally, in which case the caller knows a flush means
+	// the rows are stored.
+	BufferStats() (blocks int64, bytes int64, appliedBlock uint64, enabled bool)
 }
 
 type BaseDatabase struct {
@@ -175,7 +205,7 @@ func (d *BaseDatabase) WalkMessageDescriptorAndInsertWithDialect(dm protoreflect
 				// Array of native values - add as a single field value (the array itself)
 				var values []interface{}
 				for j := 0; j < list.Len(); j++ {
-					values = append(values, ScalarFieldValue(fd,list.Get(j)))
+					values = append(values, ScalarFieldValue(fd, list.Get(j)))
 				}
 				fieldValues = append(fieldValues, values)
 			} else {
@@ -208,7 +238,7 @@ func (d *BaseDatabase) WalkMessageDescriptorAndInsertWithDialect(dm protoreflect
 				childs = append(childs, fm) //need to be handled after current message inserted
 			}
 		} else {
-			fieldValues = append(fieldValues, ScalarFieldValue(fd,fv))
+			fieldValues = append(fieldValues, ScalarFieldValue(fd, fv))
 		}
 	}
 
@@ -277,4 +307,8 @@ func ScalarFieldValue(fd protoreflect.FieldDescriptor, value protoreflect.Value)
 
 type SinkInfo struct {
 	SchemaHash string `json:"schema_hash"`
+	// Constraints is the policy `setup` recorded, encoded by ConstraintPolicy.Encode.
+	// Empty on a schema created before it was recorded, and on a driver that has no
+	// constraints to have a policy about.
+	Constraints string `json:"constraints"`
 }

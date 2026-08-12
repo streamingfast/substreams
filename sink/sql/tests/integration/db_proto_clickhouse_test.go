@@ -17,6 +17,7 @@ import (
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	sink "github.com/streamingfast/substreams/sink"
 	"github.com/streamingfast/substreams/sink/sql/db_proto"
+	protosql "github.com/streamingfast/substreams/sink/sql/db_proto/sql"
 	pbrelations "github.com/streamingfast/substreams/sink/sql/tests/relations"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go/modules/clickhouse"
@@ -139,9 +140,9 @@ func TestDbProtoClickhouseIntegration(t *testing.T) {
 
 			options := db_proto.SinkerFactoryOptions{
 				UseProtoOption:  true,
-				UseConstraints:  false,
+				Constraints:     protosql.DisableAllConstraints(),
 				UseTransactions: true,
-				BlockBatchSize:  1,
+				DecodeBatchSize: 1,
 				Clickhouse: db_proto.SinkerFactoryClickhouse{
 					SinkInfoFolder: clickhouseStateFolder,
 					CursorFilePath: filepath.Join(clickhouseStateFolder, "cursor.txt"),

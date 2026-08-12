@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
-	"github.com/dustin/go-humanize"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dgrpc"
@@ -20,6 +19,7 @@ import (
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams/client"
+	"github.com/streamingfast/substreams/internal/formatx"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreamsrpcv2 "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
@@ -242,15 +242,17 @@ func (s *Sinker) PrintStats() {
 	processedBlocks := ProcessedBlocks.Get()
 	receivedBlockData := DataMessageCount.Get()
 
-	var noDataReceived string
-	if egressBytes == 0 && processedBlocks == 0 {
-		noDataReceived = " (no data received)"
+	// A request that failed before producing anything has nothing to report, and three lines of
+	// zeroes below the header only push the actual error further down the screen.
+	if egressBytes == 0 && processedBlocks == 0 && receivedBlockData == 0 {
+		fmt.Fprintln(os.Stderr, "📊 Usage Report: no data received")
+		return
 	}
 
-	fmt.Fprintf(os.Stderr, "📊 Usage Report%s\n", noDataReceived)
-	fmt.Fprintf(os.Stderr, " • Egress Bytes (uncompressed): %s\n", humanize.IBytes(uint64(egressBytes)))
-	fmt.Fprintf(os.Stderr, " • Processed Blocks: %s blocks\n", humanize.Comma(int64(processedBlocks)))
-	fmt.Fprintf(os.Stderr, " • Received Blocks: %s blocks\n", humanize.Comma(int64(receivedBlockData)))
+	fmt.Fprintln(os.Stderr, "📊 Usage Report")
+	fmt.Fprintf(os.Stderr, " • Egress Bytes (uncompressed): %s\n", formatx.Bytes(uint64(egressBytes)))
+	fmt.Fprintf(os.Stderr, " • Processed Blocks: %s blocks\n", formatx.Integer(uint64(processedBlocks)))
+	fmt.Fprintf(os.Stderr, " • Received Blocks: %s blocks\n", formatx.Integer(uint64(receivedBlockData)))
 }
 
 func (s *Sinker) Run(ctx context.Context, cursor *Cursor, handler SinkerHandler) {

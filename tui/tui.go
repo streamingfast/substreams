@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dustin/go-humanize"
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/substreams/internal/formatx"
 	"github.com/streamingfast/substreams/pipeline/exec"
 	"github.com/streamingfast/substreams/protodecode"
 	"github.com/streamingfast/substreams/sink"
@@ -44,8 +44,54 @@ type TUI struct {
 	RequiredProcessedBlocks uint64
 	ResolvedStartBlock      uint64
 
+	// endpoint is only known to the caller, the server does not report it, and it belongs in
+	// the session preamble.
+	endpoint string
+
+	session *pbsubstreamsrpc.SessionInit
+
+	interrupt   func()
+	interrupted bool
+
 	testRunner *test.Runner
 }
+
+// SetInterruptHandler registers what to do when the user hits Ctrl-C while the live view owns
+// the terminal.
+//
+// Bubbletea puts the terminal in raw mode, so Ctrl-C arrives as a key event and the process
+// never sees SIGINT — the command's signal handler does not run. Without this the UI would
+// quit while the request kept streaming, and stopping for real took a second Ctrl-C, which
+// only worked because the first one had released the terminal.
+func (ui *TUI) SetInterruptHandler(f func()) { ui.interrupt = f }
+
+// Interrupt is called by the live view when the user asks to stop. It cancels the work; the
+// terminal is restored by the tea program shutting down, and the command's normal teardown
+// prints the stats.
+func (ui *TUI) Interrupt() {
+	ui.interrupted = true
+	fmt.Fprintln(os.Stderr, "Interrupted, shutting down…")
+
+	if ui.interrupt != nil {
+		ui.interrupt()
+	}
+}
+
+// SessionWork reports the work the server said it had to do, in module-blocks: the total, and
+// the part of it spent preparing the stores before the first block can be sent. ok is false
+// until a session has been established.
+func (ui *TUI) SessionWork() (total, prepareStores uint64, ok bool) {
+	if ui.session == nil {
+		return 0, 0, false
+	}
+
+	return ui.session.EffectiveBlocksToProcessBeforeStartBlock + ui.session.EffectiveBlocksToProcessAfterStartBlock,
+		ui.session.EffectiveBlocksToProcessBeforeStartBlock,
+		true
+}
+
+// SetEndpoint records the endpoint the request is sent to, for display purposes only.
+func (ui *TUI) SetEndpoint(endpoint string) { ui.endpoint = endpoint }
 
 func New(pkg *pbsubstreams.Package, outputStreamNames []string) (*TUI, error) {
 	decoder, err := protodecode.NewDecoder(pkg, outputStreamNames)
@@ -178,7 +224,7 @@ func (ui *TUI) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.
 		printClock(data)
 		return nil
 	case OutputModeCURSOR:
-		fmt.Printf("BLOCK #%s (%s) age: %s cursor: %s\n", humanize.Comma(int64(data.Clock.Number)), data.Clock.Id, time.Since(data.Clock.Timestamp.AsTime()), cursor.String())
+		fmt.Printf("BLOCK #%s (%s) age: %s cursor: %s\n", formatx.Integer(data.Clock.Number), data.Clock.Id, time.Since(data.Clock.Timestamp.AsTime()), cursor.String())
 		return nil
 	}
 
@@ -222,16 +268,35 @@ func (ui *TUI) HandleSession(ctx context.Context, req *pbsubstreamsrpcv3.Request
 		ui.RequiredProcessedBlocks = session.EffectiveBlocksToProcessBeforeStartBlock + session.EffectiveBlocksToProcessAfterStartBlock
 	}
 	ui.ResolvedStartBlock = session.ResolvedStartBlock
+	ui.session = session
+
+	execGraph, err := exec.NewOutputModuleGraph(req.OutputModule, req.ProductionMode, req.Package.GetModules(), bstream.GetProtocolFirstStreamableBlock)
+	if err != nil {
+		return fmt.Errorf("cannot handle module graph: %w", err)
+	}
 
 	if ui.outputMode == OutputModeTUI {
+		// Printed rather than rendered by the model: the live view is torn down as soon as the
+		// first block arrives, and the trace ID has to outlive it.
+		//
+		// The live region is stopped for the duration of the write instead of going through
+		// prog.Println, which only repaints on the next render tick — a request whose blocks are
+		// entirely cached tears the program down before that tick ever comes, and the preamble
+		// then lands after the first block of data.
+		ui.ensureTerminalUnlocked()
+
+		// Trailing blank line: the progress block, or an error, is drawn immediately below and
+		// otherwise runs straight into the session header.
+		fmt.Fprintf(os.Stderr, "%s\n\n", formatSessionPreamble(session, sessionContext{
+			Endpoint:       ui.endpoint,
+			OutputModule:   req.OutputModule,
+			ProductionMode: req.ProductionMode,
+			Stages:         effectiveStageCount(len(execGraph.StagedUsedModules()), req.ProductionMode),
+		}))
+
 		ui.ensureTerminalLocked()
 		ui.prog.Send(session)
 	} else {
-		execGraph, err := exec.NewOutputModuleGraph(req.OutputModule, req.ProductionMode, req.Package.GetModules(), bstream.GetProtocolFirstStreamableBlock)
-		if err != nil {
-			return fmt.Errorf("cannot handle module graph: %w", err)
-		}
-
 		fmt.Fprintf(os.Stderr, "TraceID: %s\n", session.TraceId)
 		if session.ChainHead != 0 {
 			fmt.Fprintf(os.Stderr, "Server HEAD block: %d\n", session.ChainHead)
@@ -265,7 +330,10 @@ func (ui *TUI) HandleError(ctx context.Context, err error) {
 	_ = ctx
 	_ = err
 
-	if ui.outputMode == OutputModeTUI {
+	// Cancelling the request makes the stream fail, and the sinker reports that failure the same
+	// way it reports a severed connection. Repainting "Connecting..." while tearing down would
+	// claim the opposite of what is happening.
+	if ui.outputMode == OutputModeTUI && !ui.interrupted {
 		ui.Connecting()
 	}
 }
@@ -301,6 +369,21 @@ func (ui *TUI) ensureTerminalLocked() {
 			}
 		}
 	}()
+}
+
+// AbortProgress closes the backprocessing block when the request ended before a single block
+// came out of it.
+//
+// The live region renders inline, so every frame it drew stays in the scrollback. Without
+// this the last thing the user reads above the error is "Backprocessing  starting…", which
+// reads as output that got cut off rather than as a request that never got going.
+func (ui *TUI) AbortProgress() {
+	if ui.outputMode != OutputModeTUI || ui.seenFirstData {
+		return
+	}
+
+	ui.ensureTerminalUnlocked()
+	fmt.Fprintln(os.Stderr, "Backprocessing  aborted")
 }
 
 func (ui *TUI) CleanUpTerminal() {

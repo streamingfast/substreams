@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dustin/go-humanize"
 	"github.com/golang/protobuf/jsonpb"
 	protoV1 "github.com/golang/protobuf/proto"
+	"github.com/streamingfast/substreams/internal/formatx"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/tidwall/pretty"
@@ -298,11 +298,11 @@ func printClock(block *pbsubstreamsrpc.BlockScopedData) {
 			blockWord = "PARTIAL BLOCK (last)"
 		}
 	}
-	fmt.Printf("----------- %s #%s (%s) age=%s ---------------\n", blockWord, humanize.Comma(int64(block.Clock.Number)), block.Clock.Id, time.Since(block.Clock.Timestamp.AsTime()))
+	fmt.Printf("----------- %s #%s (%s) age=%s ---------------\n", blockWord, formatx.Integer(block.Clock.Number), block.Clock.Id, time.Since(block.Clock.Timestamp.AsTime()))
 }
 
 func printUndo(lastGoodClock *pbsubstreams.BlockRef, cursor string) {
-	fmt.Printf("----------- BLOCK UNDO UP TO #%s (0x%s) ---------------\n", humanize.Comma(int64(lastGoodClock.Number)), lastGoodClock.Id)
+	fmt.Printf("----------- BLOCK UNDO UP TO #%s (0x%s) ---------------\n", formatx.Integer(lastGoodClock.Number), lastGoodClock.Id)
 	fmt.Printf("\nNext cursor: %s\n", cursor)
 }
 func printUndoJSON(lastGoodClock *pbsubstreams.BlockRef, cursor string) {
